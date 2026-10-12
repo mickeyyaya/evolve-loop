@@ -10,7 +10,7 @@ import (
 func TestReviewTrailer(t *testing.T) {
 	t.Parallel()
 	repo := t.TempDir()
-	writeAttestation(t, repo, "deadbeef") // reviewers_run: simplifier, reviewer, go-reviewer
+	writeAttestation(t, repo, "deadbeef")
 
 	t.Run("manual + valid attestation → one trailer line per reviewer", func(t *testing.T) {
 		got := reviewTrailer(&Options{Class: ClassManual, ProjectRoot: repo})

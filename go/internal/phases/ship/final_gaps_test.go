@@ -46,11 +46,8 @@ func TestVerifySelfSHA_RepinWriteStateFails_Errors(t *testing.T) {
 	bin := filepath.Join(repo, "ship-binary-fixture")
 	preSeedTOFU(t, repo, bin)
 
-	// Overwrites state.json with an empty object so no expected_ship_sha is
-	// present, forcing the first-run repin path.
 	mustWrite(t, filepath.Join(repo, ".evolve", "state.json"), "{}\n")
 
-	// .evolve is made read-only so writeStateMap (CreateTemp) fails.
 	evolveDir := filepath.Join(repo, ".evolve")
 	if err := os.Chmod(evolveDir, 0o555); err != nil {
 		t.Skip("cannot chmod .evolve dir")
@@ -67,9 +64,6 @@ func TestVerifySelfSHA_RepinWriteStateFails_Errors(t *testing.T) {
 		Stderr:         io.Discard,
 	}
 	err := verifySelfSHA(context.Background(), opts, &RunResult{})
-	// A read-only .evolve dir fails at lock-acquire before the write; assert
-	// the STATE_IO refusal, not the site.
-	// See ADR-0049.
 	var se *core.ShipError
 	if err == nil || !errors.As(err, &se) || se.Code != core.CodeStateIO {
 		t.Fatalf("want a STATE_IO refusal on read-only .evolve, got %v", err)
@@ -88,10 +82,8 @@ func TestVerifyManualConfirm_DiffCachedQuietRunnerError_Errors(t *testing.T) {
 			}
 			call++
 			if call == 1 {
-				// First call: git add -A — succeed.
 				return 0, nil
 			}
-			// Second call: git diff --cached --quiet — runner error.
 			return -1, errors.New("diff quiet runner error")
 		},
 		Stderr: io.Discard,
@@ -113,7 +105,6 @@ func TestVerifyTrivial_StagedNameOnlyRunnerError_Errors(t *testing.T) {
 		ProjectRoot: repo,
 		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-			// verifyTrivial's first git call: git diff --cached --name-only.
 			if name == "git" && argsContain(args, "--cached") && argsContain(args, "--name-only") {
 				return -1, errors.New("staged name-only exploded")
 			}
@@ -133,7 +124,6 @@ func TestVerifyAuditBinding_UnreadableArtifact_SHA256Error(t *testing.T) {
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 
-	// Make the audit-report.md unreadable (but present so Stat passes).
 	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
 	if err := os.Chmod(auditPath, 0o000); err != nil {
 		t.Skip("cannot chmod 0000 on this system")
@@ -179,8 +169,6 @@ func TestVerifyAuditBinding_ComputeTreeSHARunnerError_Errors(t *testing.T) {
 	seedAudit(t, repo, "PASS")
 
 	opts := auditOpts(t, repo)
-	// computeTreeStateSHA calls "git diff HEAD" — fail it while letting
-	// rev-parse HEAD succeed (needed to pass the HEAD binding check first).
 	opts.Runner = func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if name == "git" && argsContain(args, "diff") && argsContain(args, "HEAD") {
@@ -222,7 +210,6 @@ func TestShipFromWorktree_CommitPrefixGateRejects_Errors(t *testing.T) {
 	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
-	// The gate uses RepoDir=worktree, so the manifest lives in wt/.evolve/.
 	manifest := `{"prefixes":{"docs":{"required_paths":["docs/"]}}}`
 	mustWrite(t, filepath.Join(wt, ".evolve", "commit-prefix-scope.json"), manifest)
 
@@ -275,8 +262,6 @@ func TestShipFromWorktree_WriteTreeFails_Errors(t *testing.T) {
 			}
 			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},
-		// Set a non-empty internalAuditBoundTreeSHA so the pre-commit binding
-		// check runs (and reaches the write-tree call we fault-inject).
 		internalAuditBoundTreeSHA: "someboundsha",
 		Stdin:                     strings.NewReader(""),
 		Stdout:                    io.Discard,
@@ -299,7 +284,7 @@ func TestShipFromWorktree_WriteTreeEmptyOutput_FailsClosed(t *testing.T) {
 		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 			if name == "git" && argsContain(args, "write-tree") {
-				return 0, nil // exit 0, no stdout written
+				return 0, nil
 			}
 			return execRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
 		},

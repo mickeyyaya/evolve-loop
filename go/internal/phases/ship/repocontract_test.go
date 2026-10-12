@@ -18,8 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
-// addedTestPackages is the tests' projection of the added-test seed: the
-// candidates of root's changes vs HEAD, flattened and sorted.
 func addedTestPackages(root string) (packages, excluded []string) {
 	files, _ := changedpkgs.ChangedFilesChecked(root, "HEAD")
 	groups, excluded, _ := addedtests.Groups(root, files)
@@ -30,13 +28,8 @@ func addedTestPackages(root string) (packages, excluded []string) {
 	return packages, excluded
 }
 
-// scanChatter is written by every fake pack run so the scan-log assertions
-// prove real scanner output reached the artifact, not just that a file was
-// touched open.
 const scanChatter = "=== RUN   TestGuardSuite\n"
 
-// writeGreenGuardSuites gives a lane module one passing test in every package
-// the fixed pack names, so a fixture tracks the real pack instead of a copy.
 func writeGreenGuardSuites(t *testing.T, goDir string) {
 	t.Helper()
 	for _, pattern := range repoContractPackages {
@@ -47,10 +40,6 @@ func writeGreenGuardSuites(t *testing.T, goDir string) {
 	}
 }
 
-// swapRepoContractTest installs a fake pack that returns the given outcomes in
-// order (the last one repeats, so an over-eager retry loop is caught by the
-// invocation count rather than a panic). The returned slice records one entry
-// per invocation: its LENGTH is the "exactly N runs" assertion.
 func swapRepoContractTest(t *testing.T, outcomes ...packOutcome) *[]string {
 	t.Helper()
 	var dirs []string
@@ -70,8 +59,6 @@ func swapRepoContractTest(t *testing.T, outcomes ...packOutcome) *[]string {
 
 func greenPack() packOutcome { return packOutcome{} }
 
-// redPack is a GENUINE contract violation: nonzero exit WITH named test
-// failures — the pack itself said "your code is broken".
 func redPack(names ...string) packOutcome {
 	failures := make([]packFailure, 0, len(names))
 	for _, name := range names {
@@ -80,7 +67,6 @@ func redPack(names ...string) packOutcome {
 	return packOutcome{failures: failures, err: errors.New("exit status 1")}
 }
 
-// packFailureOf reads a "pkg.Test" name back into its parts; a build failure has no test part.
 func packFailureOf(name string) packFailure {
 	if strings.Contains(name, "[build failed]") {
 		return packFailure{Package: name}
@@ -89,8 +75,6 @@ func packFailureOf(name string) packFailure {
 	return packFailure{Package: name[:dot], Test: name[dot+1:]}
 }
 
-// ambiguousPack is a nonzero exit where not one guard suite reported a
-// failure. The toolchain died, the contract did not.
 func ambiguousPack() packOutcome {
 	return packOutcome{err: errors.New("signal: killed")}
 }
@@ -108,7 +92,7 @@ func TestRepoContractGate_OffSkips(t *testing.T) {
 }
 
 func TestRepoContractGate_EnforceGreenPasses(t *testing.T) {
-	repo := repoDeclaring(t, evolveLoopGoMod) // the seed reads the tree; a fake path is an INFRA discovery failure
+	repo := repoDeclaring(t, evolveLoopGoMod)
 	dirs := swapRepoContractTest(t, greenPack())
 	if err := runRepoContractGate(context.Background(), "enforce", repo, "", io.Discard); err != nil {
 		t.Fatalf("green pack must pass: %v", err)
@@ -134,7 +118,7 @@ func TestRepoContractGate_EnforceRedFailsWithDedicatedCode(t *testing.T) {
 }
 
 func TestRepoContractGate_UnknownStageFailsTowardEnforce(t *testing.T) {
-	repo := repoDeclaring(t, evolveLoopGoMod) // the seed reads the tree; a fake path is an INFRA discovery failure
+	repo := repoDeclaring(t, evolveLoopGoMod)
 	dirs := swapRepoContractTest(t, greenPack())
 	var warn strings.Builder
 	if err := runRepoContractGate(context.Background(), "shadwo", repo, "", &warn); err != nil {
@@ -148,27 +132,16 @@ func TestRepoContractGate_UnknownStageFailsTowardEnforce(t *testing.T) {
 	}
 }
 
-// TestNew_ThreadsRepoContractGate guards the production construction site:
-// it must thread the dial or the gate is permanently off no matter what
-// policy says.
 func TestNew_ThreadsRepoContractGate(t *testing.T) {
 	t.Parallel()
 	p := New(Config{RepoContractGate: "enforce"})
 	if p.repoContractGate != "enforce" {
 		t.Fatalf("Config.RepoContractGate must thread into the Phase, got %q", p.repoContractGate)
 	}
-	_ = os.Stderr // keep os import parallel with production file expectations
+	_ = os.Stderr
 }
 
-// TestRepoContractGate_RealTestFailureIsContractRedWithoutRetry is the crux
-// anti-regression: a pack that NAMES a failing test is a genuine violation —
-// it must still fail the ship closed with CodeRepoContractGate and must run
-// EXACTLY ONCE. Retrying a real RED both doubles every red ship's wall-time
-// and gives a flaky-but-real suite a second chance to pass by luck,
-// laundering the violation onto main.
 func TestRepoContractGate_RealTestFailureIsContractRedWithoutRetry(t *testing.T) {
-	// Second outcome is GREEN on purpose: if the gate wrongly retried a real
-	// RED, it would return nil and this test would catch the laundering.
 	dirs := swapRepoContractTest(t, redPack("internal/profiles.TestTrackedProfilesBound"), greenPack())
 	err := runRepoContractGate(context.Background(), "enforce", evolveLoopLane(t), "", io.Discard)
 	if err == nil {
@@ -186,11 +159,8 @@ func TestRepoContractGate_RealTestFailureIsContractRedWithoutRetry(t *testing.T)
 	}
 }
 
-// TestRepoContractGate_TransientFailureRetriesOnceThenShips: attempt 1 exits
-// nonzero with no test-level failure (build-cache contention / OOM kill),
-// attempt 2 is clean — the ship MUST proceed.
 func TestRepoContractGate_TransientFailureRetriesOnceThenShips(t *testing.T) {
-	repo := repoDeclaring(t, evolveLoopGoMod) // the seed reads the tree; a fake path is an INFRA discovery failure
+	repo := repoDeclaring(t, evolveLoopGoMod)
 	dirs := swapRepoContractTest(t, ambiguousPack(), greenPack())
 	if err := runRepoContractGate(context.Background(), "enforce", repo, "", io.Discard); err != nil {
 		t.Fatalf("an unclassifiable failure that clears on retry must NOT block the ship, got %v", err)
@@ -200,10 +170,6 @@ func TestRepoContractGate_TransientFailureRetriesOnceThenShips(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_PersistentAmbiguityIsInfraClassedExactlyTwoRuns is the
-// negative case: ambiguity on BOTH attempts must fail the ship with the
-// DISTINCT infra code (not silently proceed — the pack never proved the repo
-// green) and must not spawn a third run.
 func TestRepoContractGate_PersistentAmbiguityIsInfraClassedExactlyTwoRuns(t *testing.T) {
 	dirs := swapRepoContractTest(t, ambiguousPack(), ambiguousPack())
 	err := runRepoContractGate(context.Background(), "enforce", evolveLoopLane(t), "", io.Discard)
@@ -225,11 +191,8 @@ func TestRepoContractGate_PersistentAmbiguityIsInfraClassedExactlyTwoRuns(t *tes
 	}
 }
 
-// TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns: proving a RED false
-// needs the green baseline from the same artifact path, so the scan log must
-// persist on both green and red runs.
 func TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns(t *testing.T) {
-	repo := repoDeclaring(t, evolveLoopGoMod) // the seed reads the tree; a fake path is an INFRA discovery failure
+	repo := repoDeclaring(t, evolveLoopGoMod)
 	for _, tc := range []struct {
 		name    string
 		outcome packOutcome
@@ -259,9 +222,6 @@ func TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_RedErrorMessageNamesFailingTests: the parsed failing
-// test names must ride in the ship error so ship-error.json carries them
-// directly, instead of the generic "(exit status 1)".
 func TestRepoContractGate_RedErrorMessageNamesFailingTests(t *testing.T) {
 	swapRepoContractTest(t, redPack("internal/profiles.TestTrackedProfilesBound", "internal/routingtest.TestRenderParity"))
 	err := runRepoContractGate(context.Background(), "enforce", evolveLoopLane(t), "", io.Discard)
@@ -275,9 +235,6 @@ func TestRepoContractGate_RedErrorMessageNamesFailingTests(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_NewlyAddedFailingTestBlocksShip reproduces the red-main
-// escape: the shipping diff adds a failing Go test outside the four fixed
-// suites. The real scanner must detect it before a ship can proceed.
 func TestRepoContractGate_NewlyAddedFailingTestBlocksShip(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -369,10 +326,6 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 	})
 }
 
-// TestClassifyPackEvents_SeparatesRealFailuresFromNoise pins the parser
-// directly: the seam-swapping tests above cannot reach it, so without this
-// the `go test -json` decoding would be untested production logic sitting
-// under every ship.
 func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 	t.Parallel()
 	feed := strings.Join([]string{
@@ -380,7 +333,7 @@ func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 		`{"Action":"output","Package":"p/profiles","Test":"TestBound","Output":"    profiles_test.go:12: mismatch\n"}`,
 		`{"Action":"fail","Package":"p/profiles","Test":"TestBound"}`,
 		`{"Action":"pass","Package":"p/phasespec","Test":"TestOK"}`,
-		`{"Action":"fail","Package":"p/profiles"}`, // package roll-up: already counted
+		`{"Action":"fail","Package":"p/profiles"}`,
 		`go: downloading something (not a JSON event)`,
 		`{"Action":"output","Package":"p/broken","Output":"FAIL\tp/broken [build failed]\n"}`,
 	}, "\n")
@@ -405,10 +358,6 @@ func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 	}
 }
 
-// TestClassifyPackEvents_AmbiguousFeedNamesNothing is the other half of the
-// parser contract and the root of the false-RED fix: a feed with no failure
-// event must yield ZERO names, so the gate routes to the retry/infra path
-// instead of blocking the ship.
 func TestClassifyPackEvents_AmbiguousFeedNamesNothing(t *testing.T) {
 	t.Parallel()
 	feed := `{"Action":"output","Package":"p/profiles","Output":"signal: killed\n"}`
@@ -417,11 +366,6 @@ func TestClassifyPackEvents_AmbiguousFeedNamesNothing(t *testing.T) {
 	}
 }
 
-// TestRunNative_RepoContractGateReceivesRunWorkspace drives the PRODUCTION
-// caller (Phase.runNative, ship.go) rather than runRepoContractGate directly,
-// and asserts the scan log landed in req.Workspace: a log seam reachable only
-// from a test is dead code. The pack is faked RED so runNative returns at the
-// gate without touching git.
 func TestRunNative_RepoContractGateReceivesRunWorkspace(t *testing.T) {
 	swapRepoContractTest(t, redPack("internal/phasecoherence.TestPairing"))
 	ws := t.TempDir()
@@ -447,10 +391,6 @@ func TestRunNative_RepoContractGateReceivesRunWorkspace(t *testing.T) {
 	}
 }
 
-// TestPhaseRunNative_NewlyAddedFailingTestPreventsRun proves the production
-// path with the real scanner and a real newly-added failing test file, driven
-// through Phase.runNative rather than runRepoContractGate directly — closing
-// the gap a helper-only detector, correct only in isolation, would leave.
 func TestPhaseRunNative_NewlyAddedFailingTestPreventsRun(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -489,10 +429,6 @@ func TestPhaseRunNative_NewlyAddedFailingTestPreventsRun(t *testing.T) {
 	}
 }
 
-// TestRunNative_AddedSkippedTestDoesNotBlockShip: a newly added test that is
-// honestly `t.Skip`-ped (a tracked known gap, not a hidden failure) must NOT
-// trip the repo-contract gate — skip must stay an honest, non-blocking
-// signal here as elsewhere in this pipeline.
 func TestRunNative_AddedSkippedTestDoesNotBlockShip(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -526,13 +462,6 @@ func TestRunNative_AddedSkippedTestDoesNotBlockShip(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_AddedEnvExclusiveTestBackstopRecorded: a newly added
-// test file that is genuinely un-runnable on a quiet host (a `requires_tmux`
-// build constraint) must never be silently claimed green nor silently
-// skipped with no record — both launder a real coverage gap. The gate must
-// (1) not fail the ship over a candidate it correctly cannot run, and (2)
-// leave a durable, explicit backstop record in the scan log naming the file
-// and its exclusion reason.
 func TestRepoContractGate_AddedEnvExclusiveTestBackstopRecorded(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)

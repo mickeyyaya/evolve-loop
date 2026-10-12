@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// ghCapture is a CmdRunner that records gh invocations and returns ghExit
-// for them; every other binary returns (0, nil).
 type ghCapture struct {
 	calls  [][]string
 	ghExit int
@@ -87,7 +85,7 @@ func TestMaybeCreateRelease_UnparseableVersion_SkipsWithWarn(t *testing.T) {
 	t.Parallel()
 	g := &ghCapture{}
 	root := t.TempDir()
-	writePluginJSON(t, root, `{"name":"no-version-field"}`) // valid JSON, empty version
+	writePluginJSON(t, root, `{"name":"no-version-field"}`)
 	opts := &Options{
 		Class:       ClassRelease,
 		ProjectRoot: root,
@@ -109,7 +107,7 @@ func TestMaybeCreateRelease_UnparseableVersion_SkipsWithWarn(t *testing.T) {
 
 func TestMaybeCreateRelease_GhNonZero_WarnsAndContinues(t *testing.T) {
 	t.Parallel()
-	g := &ghCapture{ghExit: 1} // gh fails (e.g., release already exists)
+	g := &ghCapture{ghExit: 1}
 	root := t.TempDir()
 	writePluginJSON(t, root, `{"version":"4.5.6"}`)
 	opts := &Options{
@@ -120,7 +118,6 @@ func TestMaybeCreateRelease_GhNonZero_WarnsAndContinues(t *testing.T) {
 		Runner:      g.runner(),
 	}
 	res := &RunResult{}
-	// Non-zero gh is best-effort: it must NOT fail the ship.
 	if err := maybeCreateRelease(context.Background(), opts, res); err != nil {
 		t.Fatalf("gh failure must be non-fatal; got %v", err)
 	}

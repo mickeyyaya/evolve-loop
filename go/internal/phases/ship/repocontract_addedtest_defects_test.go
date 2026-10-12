@@ -12,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
-// newLaneRepo builds a temporary lane worktree that is GREEN for the four
-// fixed guard suites, so anything a test observes afterwards is attributable
-// to the added-test backstop alone.
 func newLaneRepo(t *testing.T) string {
 	t.Helper()
 	repo := makeRepo(t)
@@ -26,8 +23,6 @@ func newLaneRepo(t *testing.T) string {
 	return repo
 }
 
-// readScanLog returns the run-dir scanner artifact, failing the test when it
-// is absent — every gate run, green or red, owes one.
 func readScanLog(t *testing.T, workspace string) string {
 	t.Helper()
 	body, err := os.ReadFile(filepath.Join(workspace, scanLogName))
@@ -46,10 +41,6 @@ func containsAny(haystack string, needles ...string) bool {
 	return false
 }
 
-// TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip: a deliberately
-// red-first reproducer that lands `t.Skip`-ped is the SAFE intermediate state
-// and must ship — a gate that graded skip as failure would push lanes back
-// to landing bare reds.
 func TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip(t *testing.T) {
 	t.Parallel()
 	repo := newLaneRepo(t)
@@ -67,11 +58,6 @@ func TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen: an added
-// file carrying `//go:build integration` and failing must not be silently
-// graded green because its package also holds an untagged passing test — the
-// backstop must run each added candidate under the build tags that file
-// actually declares, and fail closed naming the failing test.
 func TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen(t *testing.T) {
 	t.Parallel()
 	repo := newLaneRepo(t)
@@ -96,13 +82,6 @@ func TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen(t *testi
 	}
 }
 
-// TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed: a lone
-// tag-guarded predicate package (the shape every cycle's own go/acs/cycleNNNN
-// mints, this one included) has zero files under the default tag set, which
-// `go test` reports as a build/setup failure that the classifier would
-// otherwise grade a genuine RED. It must run under its own tag instead, and
-// the scan log must say what was done with it rather than dropping it
-// silently.
 func TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed(t *testing.T) {
 	t.Parallel()
 	repo := newLaneRepo(t)
@@ -121,21 +100,15 @@ func TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed(t *testi
 	}
 }
 
-// TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded: a backstop that
-// can disable itself invisibly is worse than no backstop — the ship report
-// would claim coverage it never had.
 func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir() // a real Go module but not a git repo — how the underlying git query fails
+	root := t.TempDir()
 	goDir := filepath.Join(root, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
 	writeGreenGuardSuites(t, goDir)
 
 	ws := t.TempDir()
 	err := runRepoContractGate(context.Background(), "enforce", root, ws, io.Discard)
-	// An undiscoverable diff is an infrastructure gap, not a contract
-	// violation — the distinct, re-dispatchable INFRA class, never a silent
-	// green.
 	se, ok := shiperr.AsShipError(err)
 	if !ok || se.Code != shiperr.CodeRepoContractInfra {
 		t.Fatalf("an undiscoverable diff is the INFRA class, got %v", err)
@@ -149,10 +122,6 @@ func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests: the
-// operator must be able to tell which scan went red — the fixed-pack message
-// must keep naming every guard suite, and an added-test message must
-// identify itself as an added-test failure.
 func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testing.T) {
 	t.Run("fixed pack RED still names every guard suite", func(t *testing.T) {
 		swapRepoContractTest(t, redPack("internal/phasespec.TestCatalogParity"))
@@ -188,9 +157,6 @@ func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testi
 	})
 }
 
-// TestRepoContractTestArgs_CarriesAnExplicitTimeout asserts the argv rather
-// than an observed timeout, since the defect this guards is the missing flag
-// itself — a test that actually waited out a deadline would have to burn one.
 func TestRepoContractTestArgs_CarriesAnExplicitTimeout(t *testing.T) {
 	t.Parallel()
 	args := repoContractTestArgs([]string{"./internal/core"}, nil)
@@ -209,15 +175,11 @@ func TestRepoContractTestArgs_CarriesAnExplicitTimeout(t *testing.T) {
 		t.Fatalf("repoContractTestTimeout %v is no headroom over Go's 10m default — ./internal/core "+
 			"already measured 355.8s at ship, and the whole point is to clear it under load", d)
 	}
-	// The flag must precede the package list, or `go test` reads it as a package.
 	if p := indexOfArg(args, "./internal/core"); p >= 0 && p < i {
 		t.Fatalf("-timeout must come before the package operands, got args=%v", args)
 	}
 }
 
-// TestRepoContractTestArgs_KeepsTagsAndPackagesAfterTheTimeout pins that
-// extracting the argv builder did not disturb the flags the backstop's
-// tag-grouped run depends on (the `//go:build acs` predicate packages).
 func TestRepoContractTestArgs_KeepsTagsAndPackagesAfterTheTimeout(t *testing.T) {
 	t.Parallel()
 	args := repoContractTestArgs([]string{"./acs/cycle1679"}, []string{"acs"})

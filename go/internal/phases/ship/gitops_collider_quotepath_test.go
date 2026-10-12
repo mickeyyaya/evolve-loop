@@ -10,15 +10,10 @@ import (
 	"testing"
 )
 
-// colliderStub is a CmdRunner standing in for the three git reads
-// detectColliders issues: `diff --name-only`, `status --porcelain`, and the
-// per-candidate `ls-files` tracking probe. Canned output is emitted verbatim —
-// quoted exactly as git writes it — so the parser is exercised against real
-// git output shape rather than a pre-normalised convenience value.
 type colliderStub struct {
-	diff    string   // `git diff --name-only` stdout
-	status  string   // `git status --porcelain` stdout
-	tracked []string // literal paths `git ls-files <p>` reports as tracked in main
+	diff    string
+	status  string
+	tracked []string
 	calls   [][]string
 }
 
@@ -41,7 +36,6 @@ func (c *colliderStub) runner() CmdRunner {
 		case slices.Contains(args, "status"):
 			return write(c.status)
 		case slices.Contains(args, "ls-files"):
-			// git ls-files echoes the pathspec only when it is tracked.
 			p := args[len(args)-1]
 			if slices.Contains(c.tracked, p) {
 				return write(p + "\n")
@@ -61,10 +55,6 @@ func (c *colliderStub) gitCallWith(sub string) []string {
 	return nil
 }
 
-// colliderTrees materialises the two sides detectColliders os.Stat()s: the
-// cycle worktree and the main project root. Every name is written to BOTH
-// unless listed in mainOnlyAbsent, because a collider is by definition a file
-// that exists on both sides and is untracked on the main side.
 func colliderTrees(t *testing.T, names []string, mainOnlyAbsent ...string) (root, worktree string) {
 	t.Helper()
 	root, worktree = filepath.Join(t.TempDir(), "main"), filepath.Join(t.TempDir(), "wt")
@@ -91,8 +81,8 @@ func TestDetectColliders_QuotePathDecodesPorcelainEntries(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name   string
-		status string // exactly as git writes it
-		want   string // the literal on-disk path
+		status string
+		want   string
 	}{
 		{
 			name:   "octal-escaped non-ascii",
@@ -151,8 +141,8 @@ func TestDetectColliders_QuotePathDecodesDiffNameOnly(t *testing.T) {
 func TestDetectColliders_QuotePathNonCollidersStaySilent(t *testing.T) {
 	t.Parallel()
 	const (
-		real     = "café.txt"     // untracked on main → the one true collider
-		absent   = "absent é.txt" // worktree-only → not a collider
+		real     = "café.txt"
+		absent   = "absent é.txt"
 		trackedP = "tracked é.txt"
 		deleted  = "gone é.txt"
 	)

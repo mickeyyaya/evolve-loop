@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// stalePinStateJSON writes state.json with a deliberately wrong pin under the
-// current plugin version.
 func stalePinStateJSON(t *testing.T, repo string) {
 	t.Helper()
 	mustWrite(t, filepath.Join(repo, ".evolve", "state.json"),
@@ -38,7 +36,6 @@ func TestRepair_SelfSHA_VerifiedRebuild_RepinsAndShips(t *testing.T) {
 		t.Errorf("RepairOutcome = %q, want a successful repin outcome", res.RepairOutcome)
 	}
 
-	// want is the sha of makeRepo's fixture binary content, as committed at HEAD.
 	stMap, rerr := readStateMap(filepath.Join(repo, ".evolve", "state.json"))
 	if rerr != nil {
 		t.Fatalf("read state.json: %v", rerr)
@@ -60,7 +57,6 @@ func TestRepair_SelfSHA_GenuineTamper_StillBlocks(t *testing.T) {
 	addRemote(t, repo)
 	stalePinStateJSON(t, repo)
 
-	// Written on disk without committing, so it diverges from the HEAD blob.
 	mustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v1\n# injected payload\n")
 
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nedit\n")
@@ -86,7 +82,6 @@ func TestRepair_SelfSHA_BinaryNotAtHEAD_StillBlocks(t *testing.T) {
 	addRemote(t, repo)
 	stalePinStateJSON(t, repo)
 
-	// Written after the initial commit; never committed, so no blob at HEAD.
 	loose := filepath.Join(repo, "loose-bin")
 	mustWrite(t, loose, "loose binary content\n")
 

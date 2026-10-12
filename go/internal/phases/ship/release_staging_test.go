@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// stagingCapture records every git invocation; `git diff --cached --quiet`
-// reports staged changes present (exit 1) so shipDirect proceeds, everything
-// else succeeds with empty output.
 type stagingCapture struct {
 	calls [][]string
 }
@@ -22,14 +19,12 @@ func (c *stagingCapture) runner() CmdRunner {
 		_ io.Reader, _, _ io.Writer) (int, error) {
 		c.calls = append(c.calls, append([]string{name}, args...))
 		if name == "git" && len(args) >= 3 && args[0] == "diff" && args[1] == "--cached" && args[2] == "--quiet" {
-			return 1, nil // staged changes exist
+			return 1, nil
 		}
 		return 0, nil
 	}
 }
 
-// gitCallWith returns the first recorded git call whose args contain every
-// needle, or nil.
 func (c *stagingCapture) gitCallWith(needles ...string) []string {
 	for _, call := range c.calls {
 		if call[0] != "git" {
@@ -49,8 +44,6 @@ func (c *stagingCapture) gitCallWith(needles ...string) []string {
 	return nil
 }
 
-// initReleaseStagingTree lays out the release file set plus an untracked
-// stray log and the freshly rebuilt binary.
 func initReleaseStagingTree(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -62,7 +55,7 @@ func initReleaseStagingTree(t *testing.T) string {
 		"README.md",
 		"CHANGELOG.md",
 		"go/evolve",
-		"evolve.log", // untracked stray — must never be staged in a release
+		"evolve.log",
 	} {
 		mustWrite(t, filepath.Join(root, filepath.FromSlash(rel)), "content of "+rel)
 	}
@@ -109,7 +102,7 @@ func TestShipDirect_ReleaseClass_StagesExplicitSetKeepsBinary(t *testing.T) {
 	for _, want := range []string{
 		".claude-plugin/plugin.json",
 		".claude-plugin/marketplace.json",
-		".codex-plugin/plugin.json", // the generated Codex mirror must ride into the release commit
+		".codex-plugin/plugin.json",
 		"skills/loop/SKILL.md",
 		"README.md",
 		"CHANGELOG.md",
@@ -123,8 +116,3 @@ func TestShipDirect_ReleaseClass_StagesExplicitSetKeepsBinary(t *testing.T) {
 		t.Errorf("release staging swept the untracked stray evolve.log: %v", addCall)
 	}
 }
-
-// The cycle-class half of this discriminator (churn discard, then staging
-// the declared manifest rather than `add -A`) lives in
-// stage_explicit_paths_test.go: TestShipDirect_CycleClass_KeepsChurnDiscard
-// and TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll.

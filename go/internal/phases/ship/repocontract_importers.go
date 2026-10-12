@@ -12,24 +12,11 @@ import (
 )
 
 const (
-	// importerBackstopTimeout bounds one importer-backstop run. A core change
-	// closes over most of the module — what main's CI runs, moved before the
-	// push — and that run must still end inside the ship phase; past the bound
-	// the pack exits with no test-level failure and is classed infra.
-	importerBackstopTimeout = 20 * time.Minute
-	// importerBackstopRetryMaxTargets caps the pack size the ambiguous-exit
-	// retry is still worth: above it the second full run is more expensive
-	// than a re-dispatch, so an ambiguous exit is classed infra straight away.
+	importerBackstopTimeout         = 20 * time.Minute
 	importerBackstopRetryMaxTargets = 25
-	// discoveryRetryPause gives the one named transient — a concurrent lane's
-	// index.lock — time to clear before the single discovery retry.
-	discoveryRetryPause = time.Second
+	discoveryRetryPause             = time.Second
 )
 
-// changedFilesTwice is the gate's seed: changedpkgs.ChangedFilesChecked with
-// one retry (a concurrent fleet lane's index.lock is the known transient),
-// classed CodeRepoContractInfra when git still cannot answer — a discovery
-// failure is re-dispatchable, never a silent green.
 func changedFilesTwice(out io.Writer, root, baseRef string) ([]changedpkgs.ChangedFile, error) {
 	for attempt := 0; attempt < 2; attempt++ {
 		if files, ok := changedpkgs.ChangedFilesChecked(root, baseRef); ok {
@@ -42,9 +29,6 @@ func changedFilesTwice(out io.Writer, root, baseRef string) ([]changedpkgs.Chang
 		fmt.Sprintf("repo-contract backstop discovery: git could not derive the changes of %s vs %s (twice) — INFRA fault, not a contract violation; safe to re-dispatch", root, baseRef))
 }
 
-// runImporterBackstop is the third gate layer. files is the gate's seed;
-// alreadyRun are the patterns an earlier layer paid for in the default build
-// context (the fixed pack, the untagged added-test groups).
 func runImporterBackstop(ctx context.Context, out packLog, root, moduleDir, workspace string, files []changedpkgs.ChangedFile, alreadyRun []string, cleared func([]string)) error {
 	changed := changedpkgs.PackagesOf(files)
 	if len(changed) == 0 {
@@ -87,7 +71,6 @@ func runImporterBackstop(ctx context.Context, out packLog, root, moduleDir, work
 	})
 }
 
-// without returns xs minus every element of drop, order preserved.
 func without(xs, drop []string) []string {
 	skip := map[string]bool{}
 	for _, d := range drop {

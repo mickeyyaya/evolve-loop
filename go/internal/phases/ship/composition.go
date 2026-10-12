@@ -22,10 +22,6 @@ type compositionEntry struct {
 	GateResults  map[string]string `json:"gate_results"`
 }
 
-// Review verdicts follow the patch-id (the change); native gates must still
-// follow the tree. Every rejected condition falls back to a full re-audit,
-// so this path can only narrow what ships, never widen it.
-// See ADR-0069.
 func tryTrivialRebaseCarryForward(ctx context.Context, opts *Options, res *RunResult, ledgerPath string, audit *auditEntry, currentHEAD string) (bool, error) {
 	ce := findCompositionVerdict(ledgerPath, audit.ArtifactSHA256, currentHEAD)
 	if ce == nil {
@@ -62,8 +58,6 @@ func tryTrivialRebaseCarryForward(ctx context.Context, opts *Options, res *RunRe
 	return true, nil
 }
 
-// findCompositionVerdict mirrors findLatestAudit's tolerance: an unreadable
-// ledger or an alien line simply yields no match.
 func findCompositionVerdict(ledgerPath, auditRef, currentHEAD string) *compositionEntry {
 	raw, err := os.ReadFile(ledgerPath)
 	if err != nil {

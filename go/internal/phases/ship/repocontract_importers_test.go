@@ -14,11 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
-// importerFixture is a module with base ← user (user's non-test code imports
-// base; its test asserts base's contract), base ← xonly (ONLY xonly's external
-// test imports base), and an unrelated other; the four guard suites are green
-// stubs. Everything is committed: the tests below change the tree the way a
-// lane does — unstaged edits and untracked files.
 func importerFixture(t *testing.T) (repo, goDir string) {
 	t.Helper()
 	repo = makeRepo(t)
@@ -37,9 +32,6 @@ func importerFixture(t *testing.T) (repo, goDir string) {
 	return repo, goDir
 }
 
-// The incident shape on the cycle path: the lane changes base — UNSTAGED —
-// its own tests are green, user's untouched test asserts the old contract.
-// The gate goes RED naming it, and the test-only importer is in the closure.
 func TestRepoContractGate_ImporterOfAChangedPackageBlocksShip(t *testing.T) {
 	t.Parallel()
 	repo, goDir := importerFixture(t)
@@ -62,7 +54,6 @@ func TestRepoContractGate_ImporterOfAChangedPackageBlocksShip(t *testing.T) {
 	}
 }
 
-// A change nothing imports runs only its own package — the closure is bounded.
 func TestRepoContractGate_UnimportedChangeRunsOnlyItself(t *testing.T) {
 	t.Parallel()
 	repo, goDir := importerFixture(t)
@@ -80,7 +71,6 @@ func TestRepoContractGate_UnimportedChangeRunsOnlyItself(t *testing.T) {
 	}
 }
 
-// No Go change (a docs-only ship): no backstop run, said once.
 func TestRepoContractGate_NoGoChangeSkipsTheImporterBackstop(t *testing.T) {
 	t.Parallel()
 	repo, _ := importerFixture(t)
@@ -94,9 +84,6 @@ func TestRepoContractGate_NoGoChangeSkipsTheImporterBackstop(t *testing.T) {
 	}
 }
 
-// The cycle path for the added-test backstop: a lane's new red test is
-// UNTRACKED at gate time (the ship stages it later). An index-based seed saw
-// nothing here and let the reproducer red main.
 func TestRepoContractGate_UntrackedAddedRedTestBlocksShip(t *testing.T) {
 	t.Parallel()
 	repo, goDir := importerFixture(t)
@@ -107,7 +94,6 @@ func TestRepoContractGate_UntrackedAddedRedTestBlocksShip(t *testing.T) {
 	}
 }
 
-// A tag-only package seeds the walk but is said, not run.
 func TestRepoContractGate_TagOnlyChangeIsSaidNotRun(t *testing.T) {
 	t.Parallel()
 	repo, goDir := importerFixture(t)
@@ -121,8 +107,6 @@ func TestRepoContractGate_TagOnlyChangeIsSaidNotRun(t *testing.T) {
 	}
 }
 
-// Discovery failure is a re-dispatchable INFRA class, never a silent green:
-// the fixed pack is green (seam), but the root is not a repository.
 func TestRepoContractGate_DiscoveryFailureIsInfra(t *testing.T) {
 	swapRepoContractTest(t, greenPack())
 	err := runRepoContractGate(context.Background(), "enforce", t.TempDir(), t.TempDir(), io.Discard)
@@ -135,10 +119,6 @@ func TestRepoContractGate_DiscoveryFailureIsInfra(t *testing.T) {
 	}
 }
 
-// The wiring proof: a cycle ship's changes live in the LANE WORKTREE, and
-// the gate must test that tree against the worktree's base. The project root
-// (main's pre-landing tree) is untouched here — a gate that ran there passes
-// green and lets the red importer land.
 func TestRunNative_GateTestsTheLaneWorktreeNotTheProjectRoot(t *testing.T) {
 	t.Parallel()
 	repo, _ := importerFixture(t)
@@ -164,10 +144,6 @@ func TestRunNative_GateTestsTheLaneWorktreeNotTheProjectRoot(t *testing.T) {
 	}
 }
 
-// An unresolvable typed worktree fails the gate closed with the ship's own
-// worktree-resolve class — one landing-tree decision (landingTree) serves
-// atomicShip and the gate, so the gate never tests the project root in the
-// lane's stead and reports a misleading green before Run aborts.
 func TestRepoContractGateRoot_UnresolvableTypedWorktreeFailsClosed(t *testing.T) {
 	t.Parallel()
 	repo, _ := importerFixture(t)

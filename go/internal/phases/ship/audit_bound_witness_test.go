@@ -9,16 +9,11 @@ import (
 	"testing"
 )
 
-// assignmentRe matches an assignment to internalAuditBoundTreeSHA: either a
-// bare `internalAuditBoundTreeSHA = ...` (package-level helper) or a
-// struct-field write `<x>.internalAuditBoundTreeSHA = ...` / `:=` short
-// form is impossible for a struct field, so `=` is sufficient. Comparisons
-// (`==`, `!=`) and reads are intentionally NOT matched.
 var assignmentRe = regexp.MustCompile(`\binternalAuditBoundTreeSHA\s*=[^=]`)
 
 func TestInternalAuditBoundTreeSHA_OnlyAssignedInAuditGo(t *testing.T) {
 	t.Parallel()
-	dir := "." // go/internal/phases/ship
+	dir := "."
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("read package dir: %v", err)

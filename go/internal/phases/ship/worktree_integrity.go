@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// verifyStagedTree checks the audit binding before commit, so a mismatch never
-// creates an orphan commit. Dry runs skip it because their index is unstaged.
 func (s *worktreeShip) verifyStagedTree() error {
 	if s.opts.DryRun || s.opts.internalAuditBoundTreeSHA == "" {
 		return nil

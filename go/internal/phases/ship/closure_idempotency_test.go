@@ -11,9 +11,6 @@ import (
 	"testing"
 )
 
-// shipWorktreeFixture provisions the standard worktree-cycle ship scenario:
-// repo + bare remote + active worktree on cycleBranch with feature.txt
-// edited, cycle-state.json pointing at the worktree, PASS audit seeded.
 func shipWorktreeFixture(t *testing.T, cycleBranch string) (repo, wt string) {
 	t.Helper()
 	repo = makeRepo(t)
@@ -47,7 +44,6 @@ func TestShip_PostPush_Idempotent_CorrectReportOnly(t *testing.T) {
 	t.Parallel()
 	repo, _ := shipWorktreeFixture(t, "cycle-1-branch")
 
-	// First ship: the real push. Precondition, not the behavior under test.
 	res1, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "evolve-cycle 1: goal=test"})
 	if err != nil || res1.ExitCode != ExitOK {
 		t.Fatalf("fixture ship failed: exit=%d err=%v logs=%v", res1.ExitCode, err, res1.Logs)
@@ -55,7 +51,6 @@ func TestShip_PostPush_Idempotent_CorrectReportOnly(t *testing.T) {
 	shippedHEAD := headSHA(t, repo)
 	shippedRemote := remoteHeadSHA(t, repo)
 
-	// Correction re-dispatch: identical invocation, post-push state.
 	res2, err2 := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "evolve-cycle 1: goal=test"})
 
 	if res2.ExitCode != ExitOK {
@@ -83,7 +78,6 @@ func TestShip_PrePush_CorrectionStillFullShip(t *testing.T) {
 	t.Parallel()
 	repo, _ := shipWorktreeFixture(t, "cycle-1b-branch")
 
-	// Stale sidecar: a binding whose commit_sha is NOT the current HEAD.
 	mustWrite(t, filepath.Join(repo, ".evolve", "runs", "cycle-1", "ship-binding.json"),
 		`{"audit_bound_tree_sha":"","tree_sha_committed":"","commit_sha":"`+strings.Repeat("d", 40)+`","cycle":1}`)
 
@@ -105,8 +99,6 @@ func TestShip_PrePush_CorrectionStillFullShip(t *testing.T) {
 	}
 }
 
-// trackEvolveBinary commits go/evolve (content v1) into the fixture repo so
-// it is a TRACKED file, mirroring the real repo's release-managed binary.
 func trackEvolveBinary(t *testing.T, repo string) {
 	t.Helper()
 	mustWrite(t, filepath.Join(repo, "go", "evolve"), "binary-v1\n")
@@ -194,7 +186,6 @@ func TestShip_PinPostCommitSha(t *testing.T) {
 	mustWrite(t, binAbs, "binary-v2-committed\n")
 	runGit(t, repo, "add", binRel)
 	runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "binary v2")
-	// Disk drifts AFTER the commit (a rebuild) — committed state stays v2.
 	mustWrite(t, binAbs, "binary-v3-stale-disk\n")
 
 	opts := &Options{

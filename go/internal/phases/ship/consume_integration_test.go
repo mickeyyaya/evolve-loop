@@ -19,15 +19,12 @@ func consumeScenario(t *testing.T, acsVerdict string) (repo, wt, ws, itemRel str
 	repo, wt = makeWorktreeScenario(t)
 	runGit(t, wt, "reset", "HEAD", "wt-change.txt")
 
-	// Mirrors the real repo's .gitignore negation ladder for .evolve/inbox.
 	mustWrite(t, filepath.Join(wt, ".gitignore"),
 		".evolve/\n!.evolve/\n.evolve/*\n!.evolve/inbox/\n.evolve/inbox/processed/\n.evolve/inbox/processing/\n.evolve/inbox/rejected/\n")
 	runGit(t, wt, "add", ".gitignore")
 	itemRel = ".evolve/inbox/2026-08-15T03-00-00Z-fix-the-widget.json"
 	mustWrite(t, filepath.Join(wt, filepath.FromSlash(itemRel)),
 		`{"id":"fix-the-widget","title":"Fix the widget","weight":0.5}`)
-	// Staged, not committed: the ship commit itself carries the seed; only
-	// the tree/consumed-record state after ship is under test.
 	runGit(t, wt, "add", itemRel)
 
 	ws = t.TempDir()
@@ -223,7 +220,6 @@ func TestConsume_ResolvesIDsLikePostShip(t *testing.T) {
 
 	t.Run("triage named a different id: the Closes-Inbox marker still closes it", func(t *testing.T) {
 		repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
-			// Triage renamed the work, so top_n never matches the inbox file's own id.
 			mustWrite(t, filepath.Join(ws, "triage-decision.json"),
 				`{"schema_version":1,"top_n":[{"id":"some-decomposed-subtask"}],"deferred":[],"dropped":[]}`)
 			mustWrite(t, filepath.Join(ws, "build-report.md"),
@@ -253,9 +249,6 @@ func shipConsumeAndAssert(t *testing.T, repo, wt, ws, itemRel, consumedRel, why 
 	if err := shipFromWorktree(context.Background(), opts, res, "main", wt); err != nil {
 		t.Fatalf("shipFromWorktree: %v", err)
 	}
-	// Full path, not the basename: the commit also carries the tracked ROOT
-	// DELETION under the identical basename, so a basename match is satisfied by
-	// an implementation that deletes the item and never writes the record.
 	if files := commitFileList(t, wt, "cycle-1"); !strings.Contains(files, "consumed/"+filepath.Base(consumedRel)) {
 		t.Fatalf("%s\nthe ship commit must carry the tracked consumed/ record; files=%q", why, files)
 	}
@@ -268,7 +261,7 @@ func shipConsumeAndAssert(t *testing.T, repo, wt, ws, itemRel, consumedRel, why 
 }
 
 func TestManualShip_NonShippableVerdictKeepsItemPickable(t *testing.T) {
-	t.Parallel() // self-contained temp repo; see TestConsumeGate_OnlyVerdictPASSConsumes
+	t.Parallel()
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)
@@ -282,7 +275,6 @@ func TestManualShip_NonShippableVerdictKeepsItemPickable(t *testing.T) {
 	runGit(t, repo, "commit", "-m", "seed tracked inbox item")
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "landed by a reviewed console ship\n")
 
-	// A killed/timed-out predicate run: the test started and never reported.
 	stream := strings.NewReader(`{"Action":"run","Test":"TestC1691_001_Widget"}` + "\n")
 	v, err := acsrunner.ParseTestJSON(stream, 1691)
 	if err != nil {
@@ -325,9 +317,6 @@ func TestManualShip_NonShippableVerdictKeepsItemPickable(t *testing.T) {
 	}
 }
 
-// Guards the fixture: if the producer ever stops writing verdict FAIL,
-// ship_eligible false and red_count 0 together, this must fail loudly
-// instead of passing vacuously.
 func requireNonShippableZeroRed(t *testing.T, path string) {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -361,7 +350,7 @@ func TestConsumeGate_OnlyVerdictPASSConsumes(t *testing.T) {
 	}
 	cases := []struct {
 		name        string
-		body        string // "" = no acs-verdict.json at all
+		body        string
 		wantConsume bool
 	}{
 		{"acssuite PASS", string(acssuitePass), true},

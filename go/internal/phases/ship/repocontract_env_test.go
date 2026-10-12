@@ -12,12 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestRunRepoContractPackages_ScrubsTheLaneIPCEnvFromGoTest: a fleet lane
-// exports its own IPC env (fleet flag, cycle-state-file path) process-wide,
-// and the gate's `go test` must not inherit it — env-sensitive tests would
-// fail in the lane worktree while passing in CI and in a clean shell. The
-// gate must hand `go test` the environment CI has: the lane's IPC namespace
-// scrubbed.
 func TestRunRepoContractPackages_ScrubsTheLaneIPCEnvFromGoTest(t *testing.T) {
 	t.Setenv(ipcenv.FleetKey, "1")
 	t.Setenv(ipcenv.CycleStateFileKey, "/runs/cycle-1677/cycle-state.json")
@@ -37,16 +31,8 @@ func TestRunRepoContractPackages_ScrubsTheLaneIPCEnvFromGoTest(t *testing.T) {
 	}
 }
 
-// probeRanMarker is written by the probe test itself, so the proof it ran does
-// not depend on the scan tee; the tee assertion above then pins the runner's
-// lockedWriter (without it, under -race this test reports a data race between
-// exec's stderr copy and the tee on the one bytes.Buffer, and the tee text is
-// lost at EOF).
 const probeRanMarker = "probe-ran.marker"
 
-// envProbeModule writes a throwaway Go module whose single test fails when any
-// of keys is present in its environment — the shape of every env-sensitive test
-// the gate runs, reduced to the leak itself.
 func envProbeModule(t *testing.T, keys ...string) string {
 	t.Helper()
 	dir := t.TempDir()

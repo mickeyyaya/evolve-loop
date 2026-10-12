@@ -11,13 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// See ADR-0050.
-// Ship reads commit_message from the typed envelope at enforce
-// (req.Input.Active()) and the legacy Context["commit_message"] below it. The
-// empty→defaultCommitMessage(req) fallback is preserved on both paths. We
-// assert the resolved message reached the commit via HEAD's subject, matching
-// the existing TestPhaseRun_DefaultCommitMessage_WhenContextMissing seam.
-
 func shipOnce(t *testing.T, req core.PhaseRequest) string {
 	t.Helper()
 	repo := makeRepo(t)
@@ -51,7 +44,6 @@ func TestShip_CommitMessage_TypedVsMap(t *testing.T) {
 		})
 	}
 
-	// Legacy map path (below enforce): Context["commit_message"] wins.
 	t.Run("map_path", func(t *testing.T) {
 		subject := shipOnce(t, core.PhaseRequest{
 			Cycle:   7,
@@ -62,7 +54,6 @@ func TestShip_CommitMessage_TypedVsMap(t *testing.T) {
 		}
 	})
 
-	// Enforce path: the typed envelope is consulted even with NO Context.
 	t.Run("typed_path_enforce", func(t *testing.T) {
 		subject := shipOnce(t, core.PhaseRequest{
 			Cycle: 7,
@@ -73,8 +64,6 @@ func TestShip_CommitMessage_TypedVsMap(t *testing.T) {
 		}
 	})
 
-	// An active envelope with an EMPTY CommitMessage still falls back to the
-	// synthesized cycle message — byte-identical to the legacy empty-map default.
 	t.Run("typed_empty_falls_to_default", func(t *testing.T) {
 		subject := shipOnce(t, core.PhaseRequest{
 			Cycle: 42,

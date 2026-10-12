@@ -11,21 +11,12 @@ import (
 	"testing"
 )
 
-// TestShipFromWorktree_DropsGitignoredDeclaredEvalPath — a worktree whose
-// phase reports declare BOTH a real changed file and the cycle's gitignored
-// eval file (the eval-quality contract does this on every cycle) must ship
-// cleanly: the eval path is dropped from staging (real `git add` refuses
-// ignored paths with rc=1), the declared source file lands in the commit, and
-// the eval file stays on disk untouched.
 func TestShipFromWorktree_DropsGitignoredDeclaredEvalPath(t *testing.T) {
 	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
-	// Un-stage so the ship's own staging step is what decides the commit.
 	runGit(t, wt, "reset", "HEAD", "wt-change.txt")
 
-	// Gitignore the eval dir IN THE COMMITTED TREE (mirrors .evolve/* in the
-	// real repo) and create the eval file the reports will declare.
 	mustWrite(t, filepath.Join(wt, ".gitignore"), ".evolve/*\n")
 	runGit(t, wt, "add", ".gitignore")
 	evalRel := ".evolve/evals/persona-budget-inlane-gate.md"
@@ -58,11 +49,9 @@ func TestShipFromWorktree_DropsGitignoredDeclaredEvalPath(t *testing.T) {
 	if strings.Contains(files, evalRel) {
 		t.Errorf("gitignored eval path rode into the ship commit; files=%q", files)
 	}
-	// Dropped from staging ≠ deleted: the runtime eval file must survive.
 	if _, err := os.Stat(filepath.Join(wt, filepath.FromSlash(evalRel))); err != nil {
 		t.Errorf("eval file must remain on disk after being excluded from staging: %v", err)
 	}
-	// And the drop is LOUD in the ship log.
 	var logged bool
 	for _, l := range res.Logs {
 		if strings.Contains(l, "gitignored") && strings.Contains(l, evalRel) {

@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestVerifyClass_Release_LogsAndReturnsNil: ClassRelease logs two skip
-// lines and returns nil (pipeline-internal path — no audit check).
 func TestVerifyClass_Release_LogsAndReturnsNil(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -39,8 +37,6 @@ func TestVerifyClass_Release_LogsAndReturnsNil(t *testing.T) {
 	}
 }
 
-// TestVerifyClass_Invalid_ReturnsError: an unrecognized class string returns
-// a plain error (not an IntegrityError) referencing "invalid class".
 func TestVerifyClass_Invalid_ReturnsError(t *testing.T) {
 	t.Parallel()
 	opts := &Options{Class: Class("bogus"), ProjectRoot: t.TempDir()}
@@ -50,12 +46,8 @@ func TestVerifyClass_Invalid_ReturnsError(t *testing.T) {
 	}
 }
 
-// TestVerifyClass_Trivial_ReadsCycleState: ClassTrivial reads cycle-state.json.
-// A missing .evolve dir causes a read error, which should surface.
 func TestVerifyClass_Trivial_MissingCycleState_Errors(t *testing.T) {
 	t.Parallel()
-	// No .evolve dir → readStateMap returns empty map → stateString returns "".
-	// That means cycle_size_estimate = "" ≠ "trivial" → IntegrityError.
 	root := t.TempDir()
 	opts := &Options{
 		Class:       ClassTrivial,
@@ -68,8 +60,6 @@ func TestVerifyClass_Trivial_MissingCycleState_Errors(t *testing.T) {
 	}
 }
 
-// TestPostShip_NonCycleClass_OnlyLogsDone: for ClassRelease, postShip
-// skips advance/promote/repin entirely and just logs the DONE line.
 func TestPostShip_NonCycleClass_OnlyLogsDone(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -80,7 +70,6 @@ func TestPostShip_NonCycleClass_OnlyLogsDone(t *testing.T) {
 		ProjectRoot:    root,
 		ShipBinaryPath: bin,
 	}
-	// Seed state.json so repinPostCycle doesn't fail on missing path.
 	mustWrite(t, filepath.Join(root, ".evolve", "state.json"), `{}`)
 
 	res := &RunResult{ClassUsed: ClassRelease, CommitSHA: "abc123"}
@@ -92,8 +81,6 @@ func TestPostShip_NonCycleClass_OnlyLogsDone(t *testing.T) {
 	}
 }
 
-// TestPostShip_DryRun_NoopAndNoLog: postShip with DryRun=true returns nil
-// immediately without writing any log (the commit is not on remote).
 func TestPostShip_DryRun_NoopAndNoLog(t *testing.T) {
 	t.Parallel()
 	opts := &Options{DryRun: true, Class: ClassCycle, ProjectRoot: t.TempDir()}
@@ -106,8 +93,6 @@ func TestPostShip_DryRun_NoopAndNoLog(t *testing.T) {
 	}
 }
 
-// TestPostShip_ClassCycle_AdvancesAndLogs: ClassCycle + cycle_id present →
-// advances lastCycleNumber and appends the DONE log.
 func TestPostShip_ClassCycle_AdvancesAndLogs(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -133,15 +118,11 @@ func TestPostShip_ClassCycle_AdvancesAndLogs(t *testing.T) {
 	}
 }
 
-// TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge: EVOLVE_BYPASS_SHIP_VERIFY
-// is silently ignored — the retired bridge no longer re-classifies ClassCycle
-// to ClassManual. ClassCycle proceeds as ClassCycle.
 func TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "bypass.txt"), "bypass test\n")
-	// No seedAudit — ClassCycle will fail at audit check (not at a bridge).
 
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassCycle,
@@ -162,9 +143,6 @@ func TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge(t *testing.T) {
 	}
 }
 
-// TestWriteShipBinding_NoCycleID_Errors: when cycle-state.json has no
-// cycle_id field, writeShipBinding must return a plain "no cycle_id" error
-// (not panic, not silently skip the file write).
 func TestWriteShipBinding_NoCycleID_Errors(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -179,8 +157,6 @@ func TestWriteShipBinding_NoCycleID_Errors(t *testing.T) {
 	}
 }
 
-// TestWriteShipBinding_MissingCycleState_Errors: cycle-state.json doesn't
-// exist → readStateMap returns empty map → no cycle_id → error.
 func TestWriteShipBinding_MissingCycleState_Errors(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -191,13 +167,10 @@ func TestWriteShipBinding_MissingCycleState_Errors(t *testing.T) {
 	}
 }
 
-// TestCurrentBranch_RunnerError_Propagates: when the Runner itself returns
-// an error (not just a non-zero exit code), currentBranch must propagate it.
 func TestCurrentBranch_RunnerError_Propagates(t *testing.T) {
 	t.Parallel()
 	errRunner := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-		// simulate a hard runner failure (not an exit-code failure)
 		if name == "git" {
 			return -1, &IntegrityError{Msg: "runner died"}
 		}
@@ -210,14 +183,10 @@ func TestCurrentBranch_RunnerError_Propagates(t *testing.T) {
 	}
 }
 
-// TestBuildDiffFooterAtDir_EmptyDiff_ReturnsEmptyString: when the staged
-// area has no files changed, buildDiffFooterAtDir returns an empty footer
-// string (no footer appended to the commit message).
 func TestBuildDiffFooterAtDir_EmptyDiff_ReturnsEmptyString(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{}
 	r.runner()
-	// Both git diff queries return empty stdout (nothing staged).
 	r.scripts["git diff"] = struct {
 		stdout string
 		stderr string
@@ -234,8 +203,6 @@ func TestBuildDiffFooterAtDir_EmptyDiff_ReturnsEmptyString(t *testing.T) {
 	}
 }
 
-// TestPluginVersion_InvalidJSON_ReturnsEmpty: a plugin.json that contains
-// invalid JSON must return "" (not panic, not error-out).
 func TestPluginVersion_InvalidJSON_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -245,28 +212,17 @@ func TestPluginVersion_InvalidJSON_ReturnsEmpty(t *testing.T) {
 	}
 }
 
-// TestVerifyManualConfirm_NonTTY_IntegrityError: when git diff --cached has
-// staged changes and EVOLVE_SHIP_AUTO_CONFIRM is not set, but stdin is not a
-// TTY (bytes.Buffer), the function must return IntegrityError requiring
-// interactive stdin.
 func TestVerifyManualConfirm_NonTTY_IntegrityError(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{}
 	r.runner()
-	// git diff --cached --quiet → exit 1 = there are staged changes.
 	r.scripts["git diff"] = struct {
 		stdout string
 		stderr string
 		exit   int
 		err    error
 	}{stdout: "", exit: 1}
-	// All "git diff …" calls match this single key: the scriptedRunner
-	// dispatches on the first non-flag arg, so --cached/--stat/--quiet all
-	// resolve to "git diff". exit 1 = staged changes present; the --stat and
-	// full-diff calls ignore the exit code (impl checks only err), so this one
-	// entry drives the whole verifyManualConfirm flow up to the isTerminal check.
 
-	// Use a strings.Reader (not os.Stdin) so isTerminal returns false.
 	var stdinBuf strings.Builder
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
@@ -278,13 +234,10 @@ func TestVerifyManualConfirm_NonTTY_IntegrityError(t *testing.T) {
 	wantShipErr(t, err, core.CodeManualNotTTY, core.ShipClassConfig, "not a tty")
 }
 
-// TestVerifyAuditBinding_TreeMismatch_IntegrityError: HEAD matches but the
-// working tree has uncommitted changes since audit (tree-state SHA mismatch).
 func TestVerifyAuditBinding_TreeMismatch_IntegrityError(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
-	// Modify a tracked file WITHOUT staging — the tree-state SHA changes.
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture modified post-audit\n")
 
 	opts := auditOpts(t, repo)

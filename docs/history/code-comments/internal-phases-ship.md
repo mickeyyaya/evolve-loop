@@ -3267,3 +3267,265 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // acquired exactly once on <root>/.evolve/ship.lock and released. RED before
 // the acquire is wired into shipFromWorktree (acquired=0), GREEN after.
 ```
+
+## comment-zero s1
+
+### `go/internal/phases/ship/consume.go:3` — above `import (`
+
+```text
+// Cross-plane note (review): the ship commit's tracked root deletion can meet
+// a runtime plane whose LOCAL copy carries an unstaged failure-count
+// write-back — `git merge origin/main` then aborts (modified-vs-delete).
+// Recovery: `git checkout -- .evolve/inbox/<file>` and re-merge; the window is
+// narrow (claimed items leave the root at dispatch) but real for
+// root-resident failure-bumped items consumed via skip_shipped.
+//
+// consume.go — transactional inbox consumption (consumption-rides-landing-ship
+// 0.92; live burns: cycles 1448, 1464, 1471). The PASS closeout promotes items
+// to the GITIGNORED processed/ on the runtime plane AFTER the commit, so main
+// keeps the tracked item and every fresh lane worktree re-picks it. The class
+// fix: the PASS ship commit ITSELF carries the consumption — the tracked root
+// file moves to the tracked inbox/consumed/ with a consumption annotation, and
+// both paths are staged into the very commit that lands the work. The post-ship
+// promotion then resolves the id nowhere and takes its documented idempotent
+// no-op path.
+```
+
+### `go/internal/phases/ship/consume.go:37` — above `func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, dir string) {`
+
+```text
+// consumeCommittedItems moves this cycle's committed inbox items into the
+// tracked consumed/ dir INSIDE the ship tree and stages the moves, so they
+// ride the ship commit. Gated on the verdict string PASS — the sole
+// authority, shared with postship's landedPASS gate. Both writers derive it
+// from their own counts (acssuite: red_count==0; acsrunner: red_count==0 AND
+// incomplete_count==0), so red_count alone is weaker: acsrunner writes
+// red_count:0 beside verdict FAIL for a suite that never finished. On the
+// cycle path acssuite.ReadVerdict already refuses a non-PASS verdict with
+// red_count:0 before this runs; the manual path has no such reader, so this
+// gate is its only guard (warn-ship-consumption-gap, cycle-1691). Every step
+// is per-item fail-open and LOUD: a consumption problem must never block a
+// ship that already earned its verdict. The one atomic unit is a validated
+// unified commitment, whose members close all-or-nothing (consumeUnified).
+```
+
+### `go/internal/phases/ship/consume.go:56` — above `if opts.WorkspacePath == "" {`
+
+```text
+// consumption_must_ride_the_landing, the manual half (the lane half
+// shipped as #466; cycle-1547's red-first reproduction pins this one):
+// a reviewed console ship that closes an inbox item must retire that
+// item IN THE LANDING COMMIT, or every later cycle rediscovers it —
+// three recorded live burns. A manual ship WITHOUT cycle evidence
+// (ordinary console commit, no WorkspacePath) has nothing to consume
+// and returns silently: the loud missing-verdict warn below is for
+// ships that CLAIM a workspace and can't prove a PASS.
+```
+
+### `go/internal/phases/ship/consume.go:290` — above `m := consumedMove{id: id, src: src, raw: raw}`
+
+```text
+// Transactional retire, registry half (park-consume-releases-continuation-
+// binding): consumption takes the item out of the batch loader's reach, so
+// its scope-keyed continuation binding must go too — otherwise the next
+// wave mints a lane straight off the immortal binding (cycles 1487, 1497).
+// The pointer is PRESERVED into the consumed item here; the registry delete
+// happens only in record, after the move is final, so a rollback leaves both
+// stores exactly as they were.
+```
+
+### `go/internal/phases/ship/consume.go:323` — above `if opts.internalAuditBoundTreeSHA != "" {`
+
+```text
+// Review HIGH (cycle-1506 fix hardening): when an audit binding is set,
+// the drift tolerance downstream will SANCTION these paths — so the
+// consumed bytes must be exactly what the AUDITED tree carried. A file
+// planted or tampered in the post-binding window (the one window the
+// binding floor exists to close) rolls back loudly and stays pickable;
+// it does not ship unaudited. shipDirect (no binding, no drift checks)
+// is untouched — plane-side failure-count write-backs keep consuming.
+```
+
+### `go/internal/phases/ship/consume.go:372` — above `func appendReleasedForConsume(doc map[string]any, c continuation.Continuation, cycleID string) []any {`
+
+```text
+// appendReleasedForConsume returns doc's released_continuations[] with the
+// released binding appended, preserving any entries an earlier retirement left
+// (a non-array value is replaced — the entry being written now is the one that
+// carries the live salvage pointer).
+// The consumed item is TRACKED and rides the ship commit to the public remote,
+// so the absolute host paths are collapsed to "~" first (audit cycle-1507 M1):
+// worktree/findings_path carry the operator account name, while the snapshot,
+// base and branch refs salvage resumes from are unaffected.
+```
+
+### `go/internal/phases/ship/consume.go:420` — above `args = append(args, shipmanifest.RawPathRead("diff-tree", "-r", "--name-only", boundTree, actualTree)...)`
+
+```text
+// shipmanifest.RawPathRead/UnquoteGitPath (cycle-1108): without them a non-ASCII byte in
+// an item filename comes back C-quoted, never matches the sanctioned set,
+// and false-refuses a legitimate consumption ship (review M4).
+```
+
+### `go/internal/phases/ship/coverage_raise_test.go:272` — above `Env: map[string]string{"EVOLVE_PLUGIN_ROOT": repo},`
+
+```text
+// No Context commit_message → defaultCommitMessage("evolve-cycle 42").
+```
+
+### `go/internal/phases/ship/landing_pins_test.go:174` — above `func pinOptions(t *testing.T, class Class) (*Options, *strings.Builder, *strings.Builder) {`
+
+```text
+// pinOptions is the host fixture every pin drives: a temp project root, the
+// operator streams as buffers, a fake integrator lock, cycle 7, no release.
+```
+
+### `go/internal/phases/ship/manifest.go:13` — above `const ManifestGateEnforce = "enforce"`
+
+```text
+// manifest.go — ship-bind tree-manifest reconciliation (shadow + enforce).
+//
+// Cycle-653 second seam: ship binds the whole `git diff HEAD` tree, so any
+// path present in the worktree ships (or blocks) regardless of whether the
+// cycle's build/TDD phases declared it. reconcileManifest reconciles the paths
+// ship is about to bind against the cycle's DECLARED file manifest (paths named
+// in build-report.md + test-report.md).
+//
+// Two modes (opts.ManifestGate, config-sourced; default shadow — the
+// ReportSizeGate "new gates default shadow" precedent):
+//   - shadow (default): log out-of-manifest paths, never block — behavior-preserving.
+//   - enforce: FAIL CLOSED on any out-of-manifest path — the cross-lane
+//     untracked-leak guard (inbox `ship-stage-explicit-paths`, cycle-645).
+//
+// BEFORE enabling enforce in production (the deferred policy.json→Options
+// wiring), prerequisites (2026-07-14 review):
+//   1. DONE (2026-07-14): shipmanifest's pathToken now also extracts bare root-level
+//      filenames (CHANGELOG.md, go.mod) via an extension allow-list, so a legit
+//      root-file change is no longer a FALSE-BLOCK under enforce.
+//   2. DONE (cycle-1064): the enforce branch carries the dedicated
+//      core.CodeManifestGate (mirroring CodeCommitPrefixGate) instead of reusing
+//      CodeGitStageFailed, so the ledger/debugger can tell a manifest block from
+//      a real `git add` failure; router.shipLocalCodes routes it to the debugger.
+//   3. DONE (cycle-1064): policy.json `gates.manifest_gate` resolves through
+//      policy.GatesConfig() into ship.Config.ManifestGate → Options.ManifestGate,
+//      so enforce is operator-activatable without a code edit. Default stays
+//      "shadow" — behavior-preserving.
+```
+
+### `go/internal/phases/ship/manifest.go:52` — above `func reconcileManifest(ctx context.Context, opts *Options, res *RunResult, worktree, branch, cycleBranch string) error {`
+
+```text
+// reconcileManifest reconciles the paths ship is about to bind against the
+// cycle's DECLARED file manifest (build-report.md + test-report.md). Changed
+// set = worktree porcelain dirt plus commits already on the cycle branch (same
+// inputs detectColliders binds). In SHADOW mode (the default) it only REPORTS
+// out-of-manifest paths and returns nil — behavior-preserving. In ENFORCE mode
+// it FAILS CLOSED on any out-of-manifest path: refusing to commit files no
+// phase declared, which under a fleet are typically a sibling lane's untracked
+// leak (cycle-645) whose commit reddens main. A loud, recoverable block beats a
+// silent contaminated commit. Returns nil (skips) when no reports are readable.
+```
+
+### `go/internal/phases/ship/native.go:152` — above `Signals *signalcenter.Center`
+
+```text
+// Signals is the root's Signal Center the landing's ship.warning events
+// reach (ADR-0103 unit 07): the orchestrator root threads it through
+// Config.Signals, the standalone `evolve ship` root builds its own; nil
+// (the `evolve phase ship` registry factory, direct-helper tests) is the
+// Null Object — the warnings are dropped, never a panic.
+```
+
+### `go/internal/phases/ship/postship.go:63` — above `if err := withStateLock(stPath, func() error {`
+
+```text
+// Same shared lock every other state.json RMW takes (ADR-0049), so a
+// concurrent allocator write can neither lose nor be lost to this one.
+```
+
+### `go/internal/phases/ship/postship.go:108` — above `csPath := opts.cycleStateFile()`
+
+```text
+// run-scoped (cycle_id); see ADR-0049.
+```
+
+### `go/internal/phases/ship/postship.go:148` — above `csPath := opts.cycleStateFile()`
+
+```text
+// run-scoped (cycle_id); see ADR-0049.
+```
+
+### `go/internal/phases/ship/postship_audit_extra_test.go:28` — above `func TestPromoteInbox_ProjectsDecisionFromReport(t *testing.T) {`
+
+```text
+// TestPromoteInbox_ProjectsDecisionFromReport pins the deterministic fallback
+// (ADR-0047): the triage agent emits only triage-report.md, so promoteInbox
+// PROJECTS the companion from it — guaranteed present, so promotion runs and the
+// projected companion lands on disk for downstream readers.
+```
+
+### `go/internal/phases/ship/postship_drain_claim_test.go:84` — above `blockDrainPath(t, filepath.Join(inbox, "processed"))`
+
+```text
+// processed/ is a FILE ⇒ processed/cycle-42/ cannot be created ⇒ the
+// committed promote is a non-delivery and ApplyCycleOutcome returns an error.
+```
+
+### `go/internal/phases/ship/realgit_testhelpers_test.go:347` — above `func makeWorktreeScenario(t *testing.T) (string, string) {`
+
+```text
+// makeWorktreeScenario returns (mainRepo, worktreePath) where:
+//   - mainRepo has a remote, a committed file, and a seeded audit
+//   - worktreePath is a linked worktree on branch "cycle-1"
+//     with one staged change so there are uncommitted changes to ship
+```
+
+### `go/internal/phases/ship/register_test.go:10` — above `func TestShipSelfRegisters(t *testing.T) {`
+
+```text
+// TestShipSelfRegisters asserts the ship phase publishes its own factory to the
+// phase registry in package init() — exactly like every other built-in phase
+// (intent/scout/...). The flow/dispatcher must never know HOW to construct
+// ship; it looks the factory up by name. This is the phase-agnostic invariant
+// (ADR-0035/0038): adding/owning a phase lives in the phase's package + JSON,
+// never in a dispatcher switch. This is the permanent regression guard for
+// that invariant — the test does not import the dispatcher.
+```
+
+### `go/internal/phases/ship/repair.go:194` — above `csMap, err := readStateMap(opts.cycleStateFile())`
+
+```text
+// See ADR-0049: run-scoped (cycle_id)
+```
+
+### `go/internal/phases/ship/repocontract_importers_test.go:40` — above `func TestRepoContractGate_ImporterOfAChangedPackageBlocksShip(t *testing.T) {`
+
+```text
+// The incident shape on the cycle path: the lane changes base — UNSTAGED —
+// its own tests are green, user's untouched test asserts the old contract.
+// The gate goes RED naming it, and the test-only importer is in the closure.
+```
+
+### `go/internal/phases/ship/ship.go:158` — above `WorkspacePath:                   req.Workspace,`
+
+```text
+// See ADR-0049: run-scope ship's reads
+```
+
+### `go/internal/phases/ship/ship.go:159` — above `RunID:                           req.RunID,`
+
+```text
+// See ADR-0049: run-scope the audit binding
+```
+
+### `go/internal/phases/ship/ship.go:169` — above `PhaseIO:                         p.phaseIO,`
+
+```text
+// See ADR-0050: sentinel-first verdict parse at enforce
+```
+
+### `go/internal/phases/ship/ship.go:173` — above `Signals:                         p.signals,`
+
+```text
+// See ADR-0103: the landing's ship.warning events reach the root's Center
+```

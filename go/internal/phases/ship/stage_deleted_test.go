@@ -30,7 +30,6 @@ func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
 	}
 	gitIn(t, root, "add", "-A")
 	gitIn(t, root, "commit", "-q", "-m", "seed")
-	// The boundary shape: delete + PRE-STAGE the deletion, plus a normal edit.
 	if err := os.Remove(filepath.Join(root, "doomed.txt")); err != nil {
 		t.Fatal(err)
 	}
@@ -46,15 +45,9 @@ func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
 	}
 }
 
-// TestStageExplicitPaths_AlreadyStagedRename is the sibling of the deletion
-// case above, and it is a DIFFERENT porcelain shape: git reports a staged
-// rename as `R  old -> new`, never as `D  old`, so the "D " filter does not
-// see the source path — yet the source is gone from the worktree AND from the
-// index under its old name, which is exactly the rc=128 condition.
 func TestStageExplicitPaths_AlreadyStagedRename(t *testing.T) {
 	t.Parallel()
 	root := gittest.Fixture(t).Dir
-	// Content long enough that git scores old→new as a rename, not add+delete.
 	body := []byte("{\n  \"id\": \"some-item\",\n  \"weight\": 0.85,\n  \"title\": \"a queued item with enough body to score as a rename\"\n}\n")
 	if err := os.MkdirAll(filepath.Join(root, "inbox"), 0o755); err != nil {
 		t.Fatal(err)
@@ -65,7 +58,6 @@ func TestStageExplicitPaths_AlreadyStagedRename(t *testing.T) {
 	gitIn(t, root, "add", "-A")
 	gitIn(t, root, "commit", "-q", "-m", "seed")
 
-	// The boundary shape: move the file and PRE-STAGE the move.
 	if err := os.MkdirAll(filepath.Join(root, "inbox", "consumed"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -78,9 +70,6 @@ func TestStageExplicitPaths_AlreadyStagedRename(t *testing.T) {
 	}
 	gitIn(t, root, "add", "-A")
 
-	// Guard the premise: if git stops calling this a rename the test is no
-	// longer exercising the shape it claims to, and must fail loudly rather
-	// than pass for the wrong reason.
 	out, err := exec.Command("git", "-C", root, "status", "--porcelain").CombinedOutput()
 	if err != nil {
 		t.Fatalf("git status: %v", err)

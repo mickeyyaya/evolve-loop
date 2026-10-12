@@ -13,12 +13,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// --- statefile.go: writeStateMap error branches --------------------------
-
 func TestWriteStateMap_MarshalError(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "state.json")
-	bad := map[string]any{"fn": func() {}} // funcs are not JSON-encodable
+	bad := map[string]any{"fn": func() {}}
 
 	err := writeStateMap(path, bad)
 
@@ -32,7 +30,6 @@ func TestWriteStateMap_MarshalError(t *testing.T) {
 
 func TestWriteStateMap_RenameError(t *testing.T) {
 	t.Parallel()
-	// dest is a directory: create/write/sync/close succeed, only os.Rename fails.
 	root := t.TempDir()
 	dest := filepath.Join(root, "state-as-dir")
 	mustMkdir(t, dest)
@@ -50,8 +47,6 @@ func TestWriteStateMap_RenameError(t *testing.T) {
 	}
 }
 
-// --- verify.go: IntegrityError.Unwrap nil branch ------------------------
-
 func TestIntegrityError_Unwrap_NilWrapped(t *testing.T) {
 	t.Parallel()
 	ie := &IntegrityError{Msg: "legacy direct-construction"}
@@ -63,15 +58,13 @@ func TestIntegrityError_Unwrap_NilWrapped(t *testing.T) {
 	}
 }
 
-// --- verify.go: isTerminal Stat-error branch ----------------------------
-
 func TestIsTerminal_ClosedFile_ReturnsFalse(t *testing.T) {
 	t.Parallel()
 	f, err := os.Open(os.DevNull)
 	if err != nil {
 		t.Fatalf("open /dev/null: %v", err)
 	}
-	_ = f.Close() // now Stat() on f fails
+	_ = f.Close()
 
 	if isTerminal(f) {
 		t.Error("a closed *os.File must not be reported as a terminal")
@@ -91,8 +84,6 @@ func TestIsTerminal_RegularFile_ReturnsFalse(t *testing.T) {
 		t.Error("a regular file must not be reported as a terminal")
 	}
 }
-
-// --- commitgate.go: malformed / empty-SHA / read-error branches ---------
 
 func commitGateOpts(t *testing.T, repo string) *Options {
 	t.Helper()
@@ -127,14 +118,11 @@ func TestVerifyCommitGate_EmptyTreeSHA_Refuses(t *testing.T) {
 func TestVerifyCommitGate_ReadError_NonNotExist_Transient(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
-	// Make attestation.json a directory so os.ReadFile returns a non-NotExist error.
 	mustMkdir(t, filepath.Join(repo, ".commit-gate", "attestation.json"))
 
 	err := verifyCommitGateAttestation(context.Background(), commitGateOpts(t, repo), &RunResult{})
 	wantShipErr(t, err, core.CodeStateIO, core.ShipClassTransient, "read commit-gate attestation")
 }
-
-// --- audit.go: WorktreeTreeSHA priority + alien-line skip ----------------
 
 func TestVerifyAuditBinding_WorktreeTreeSHA_TakesPriority(t *testing.T) {
 	t.Parallel()
@@ -161,8 +149,6 @@ func TestFindLatestAudit_SkipsUnparseableLine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read ledger: %v", err)
 	}
-	// Appended after the real entry: findLatestAudit walks backward, so this
-	// alien line is hit first.
 	mustWrite(t, ledger, strings.TrimRight(string(raw), "\n")+"\nthis-is-not-json\n")
 
 	entry, err := findLatestAudit(ledger, "")
@@ -173,8 +159,6 @@ func TestFindLatestAudit_SkipsUnparseableLine(t *testing.T) {
 		t.Errorf("found entry role=%q, want auditor", entry.Role)
 	}
 }
-
-// --- postship.go: repinPostCycle error branches --------------------------
 
 func TestRepinPostCycle_MissingBinary_BestEffortNoop(t *testing.T) {
 	t.Parallel()
@@ -195,12 +179,9 @@ func TestRepinPostCycle_MissingBinary_BestEffortNoop(t *testing.T) {
 	}
 }
 
-// --- dryrun.go: writeDryRunJournal mkdir-failure best-effort -------------
-
 func TestWriteDryRunJournal_MkdirFails_BestEffortNoPath(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// Make .evolve a FILE so MkdirAll(.evolve/release-journal) fails.
 	mustWrite(t, filepath.Join(root, ".evolve"), "i am a file, not a dir\n")
 	opts := &Options{ProjectRoot: root, DryRun: true, Class: ClassCycle, Runner: execRunner}
 	res := &RunResult{}
@@ -212,8 +193,6 @@ func TestWriteDryRunJournal_MkdirFails_BestEffortNoPath(t *testing.T) {
 	}
 }
 
-// --- verify.go: verifyTrivial cycle-state read error --------------------
-
 func TestVerifyTrivial_UnreadableCycleState_Transient(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -224,11 +203,9 @@ func TestVerifyTrivial_UnreadableCycleState_Transient(t *testing.T) {
 	wantShipErr(t, err, core.CodeStateIO, core.ShipClassTransient, "read cycle-state.json")
 }
 
-// --- gitops.go: maybeCreateRelease missing-plugin WITH notes set --------
-
 func TestMaybeCreateRelease_NotesSetButNoPluginJSON_WarnsAndContinues(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir() // no .claude-plugin/plugin.json
+	root := t.TempDir()
 	opts := &Options{
 		Class:       ClassRelease,
 		ProjectRoot: root,
@@ -244,8 +221,6 @@ func TestMaybeCreateRelease_NotesSetButNoPluginJSON_WarnsAndContinues(t *testing
 		t.Errorf("missing skip-release WARN log; got %v", res.Logs)
 	}
 }
-
-// --- ship.go: Phase.Run guards ------------------------------------------
 
 func TestPhaseRun_NilRunner_Errors(t *testing.T) {
 	t.Parallel()
@@ -269,8 +244,7 @@ func TestPhaseRun_DefaultCommitMessage_WhenContextMissing(t *testing.T) {
 		RunID: "test-run", AuditRound: 1,
 		ProjectRoot: repo,
 		Workspace:   filepath.Join(repo, ".evolve", "runs", "cycle-42"),
-		// No Context commit_message → defaultCommitMessage("evolve-cycle 42").
-		Env: map[string]string{"EVOLVE_PLUGIN_ROOT": repo},
+		Env:         map[string]string{"EVOLVE_PLUGIN_ROOT": repo},
 	})
 	if err != nil {
 		t.Fatalf("Run with default message errored: %v (diags=%v)", err, resp.Diagnostics)

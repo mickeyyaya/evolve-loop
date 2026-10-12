@@ -45,8 +45,6 @@ func TestShipFromWorktree_TreeSHABindingVerifiedLog(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":20,"active_worktree":"`+wt+`"}`)
 
-	// seedAudit (no bound tree) is used here so the binding check is skipped
-	// and only the post-push path is exercised.
 	seedAudit(t, repo, "PASS")
 
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: binding log test"})
@@ -75,8 +73,6 @@ func TestShipFromWorktree_WithAuditBoundTreeSHA_BindingLogged(t *testing.T) {
 
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":21,"active_worktree":"`+wt+`"}`)
-	// Binds audit HEAD to repo's HEAD (the check target) while setting
-	// internalAuditBoundTreeSHA to wtTreeSHA.
 	seedAuditWithBoundTree(t, repo, "PASS", wtTreeSHA)
 
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: bound tree ship"})
@@ -97,7 +93,6 @@ func TestAdvanceLastCycleNumber_WriteStateFails_WarnsAndReturnsNil(t *testing.T)
 	evolveDir := filepath.Join(root, ".evolve")
 	mustWrite(t, filepath.Join(evolveDir, "cycle-state.json"), `{"cycle_id":15}`)
 	mustWrite(t, filepath.Join(evolveDir, "state.json"), `{"lastCycleNumber":14}`)
-	// .evolve is made read-only so CreateTemp inside writeStateMap fails.
 	if err := os.Chmod(evolveDir, 0o555); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
@@ -221,16 +216,12 @@ func TestVerifyTrivial_CriticalPathTruncated_Shows3Max(t *testing.T) {
 	}{stdout: "", exit: 0}
 	opts := &Options{ProjectRoot: root, Runner: r.runner()}
 	err := verifyTrivial(context.Background(), opts, &RunResult{})
-	// 4 critical files → config-class refusal; message shows "4 touched" but
-	// only samples 3 paths.
 	wantShipErr(t, err, core.CodeTrivialCriticalPaths, core.ShipClassConfig, "4 touched")
 }
 
 func TestFindLatestAudit_ReadError_Propagates(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	// Pass a directory path (not a file) — os.ReadFile returns "is a directory"
-	// which is NOT os.ErrNotExist.
 	_, err := findLatestAudit(dir, "")
 	if err == nil {
 		t.Fatal("read error must propagate")
@@ -277,7 +268,6 @@ func TestAtomicShip_EmptyBranch_DetachedHEAD_Refuses(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{}
 	r.runner()
-	// symbolic-ref exits 0 but returns empty string → "" branch name.
 	r.scripts["git symbolic-ref"] = struct {
 		stdout string
 		stderr string

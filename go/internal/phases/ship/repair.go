@@ -15,48 +15,31 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 )
 
-// repairOutcome is the dispatcher's verdict on a single repair attempt.
 type repairOutcome int
 
 const (
-	// repairNone: no repair applies, or the repair declined/failed — the
-	// caller surfaces the ORIGINAL error unchanged.
 	repairNone repairOutcome = iota
-	// repairRetryStage: the invariant was re-established — the caller re-runs
-	// the failed stage exactly once.
 	repairRetryStage
-	// repairCompleted: the repair completed the ship itself (push-only resume
-	// closure) — the caller skips the remaining mutate stages and proceeds to
-	// the success path.
 	repairCompleted
 )
 
-// repairFn is one typed repair. It must be conservative: any doubt → repairNone.
 type repairFn func(ctx context.Context, opts *Options, res *RunResult, se *core.ShipError) repairOutcome
 
-// repairFns maps each repairable ShipError code to its single typed repair.
-// GIT_PUSH_REJECTED is deliberately absent: its retry runs inline at the push
-// site (pushWithRepair in gitops_landing.go) so the post-push tree
-// verification and ship-binding sidecar still execute on the healed path.
 var repairFns = map[core.ShipErrorCode]repairFn{
 	core.CodeSelfSHATampered:       repairSelfSHAPin,
 	core.CodeGitFFMergeDiverged:    repairColliders,
 	core.CodeAuditBindingHeadMoved: repairResumeUnpushed,
 }
 
-// ensureRepairMap lazily initializes opts.repairAttempted.
 func ensureRepairMap(opts *Options) {
 	if opts.repairAttempted == nil {
 		opts.repairAttempted = map[core.ShipErrorCode]bool{}
 	}
 }
 
-// attemptRepair is the single dispatch point of the ladder. It enforces the
-// once-per-code guard, records observability fields, and marks declined
-// attempts on the original error's Debug map.
 func attemptRepair(ctx context.Context, opts *Options, res *RunResult, err error) repairOutcome {
 	if opts.DryRun {
-		return repairNone // repairs mutate; dry-run reports the raw failure
+		return repairNone
 	}
 	se, ok := core.AsShipError(err)
 	if !ok {
@@ -68,7 +51,7 @@ func attemptRepair(ctx context.Context, opts *Options, res *RunResult, err error
 	}
 	ensureRepairMap(opts)
 	if opts.repairAttempted[se.Code] {
-		return repairNone // once per code per Run — no in-process loop
+		return repairNone
 	}
 	opts.repairAttempted[se.Code] = true
 	res.RepairAttempted = string(se.Code)
@@ -84,9 +67,6 @@ func attemptRepair(ctx context.Context, opts *Options, res *RunResult, err error
 	return out
 }
 
-// runStageWithRepair runs a ship stage; on failure it consults the ladder and
-// either re-runs the stage once (invariant re-established), reports the ship
-// as completed (push-only closure), or returns the original error.
 func runStageWithRepair(ctx context.Context, opts *Options, res *RunResult, stage func() error) (completed bool, err error) {
 	err = stage()
 	if err == nil {
@@ -102,11 +82,6 @@ func runStageWithRepair(ctx context.Context, opts *Options, res *RunResult, stag
 	}
 }
 
-// --- mode #1: SELF_SHA_TAMPERED from a stale TOFU pin ----------------------
-
-// repairSelfSHAPin heals a stale TOFU pin when the running binary's SHA
-// still matches the blob committed at HEAD; any divergence keeps the
-// integrity block (the same trust boundary repinPostCycle uses).
 func repairSelfSHAPin(ctx context.Context, opts *Options, res *RunResult, _ *core.ShipError) repairOutcome {
 	binPath := opts.ShipBinaryPath
 	if binPath == "" {
@@ -125,14 +100,11 @@ func repairSelfSHAPin(ctx context.Context, opts *Options, res *RunResult, _ *cor
 	}
 	committedSHA := committedBinSHA(ctx, opts, filepath.ToSlash(relBin))
 	if committedSHA == "" || committedSHA != actualSHA {
-		return repairNone // binary diverges from committed source — real tampering posture
+		return repairNone
 	}
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
 	pluginVer := pluginVersion(opts.PluginRoot)
-	// See ADR-0049.
-	// Serializes the read-modify-write under the shared state.json lock;
-	// any lock/read/write error declines the repair.
 	if err := withStateLock(statePath, func() error {
 		stateMap, err := readStateMap(statePath)
 		if err != nil {
@@ -150,8 +122,6 @@ func repairSelfSHAPin(ctx context.Context, opts *Options, res *RunResult, _ *cor
 	return repairRetryStage
 }
 
-// committedBinSHA returns sha256 of the blob at HEAD:<relBin>, or "" when the
-// path is not a blob at HEAD (or git fails). Shared with repinPostCycle.
 func committedBinSHA(ctx context.Context, opts *Options, relBin string) string {
 	var buf strings.Builder
 	exitCode, err := opts.run(ctx, "git", []string{"show", "HEAD:" + relBin}, &buf, io.Discard)
@@ -163,16 +133,9 @@ func committedBinSHA(ctx context.Context, opts *Options, relBin string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// --- mode #3: GIT_FF_MERGE_DIVERGED untracked colliders ---------------------
-
-// repairColliders heals untracked main-side files blocking the worktree
-// ff-merge: byte-identical copies are removed, differing copies are
-// quarantine-moved (content is never deleted), and the atomic-ship stage is
-// re-run so it re-detects colliders from scratch rather than trusting this
-// repair's own plan.
 func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *core.ShipError) repairOutcome {
 	if se.Debug["colliders"] == "" {
-		return repairNone // the real-divergence variant of GIT_FF_MERGE_DIVERGED — not repairable here
+		return repairNone
 	}
 	worktree := readActiveWorktree(opts)
 	if worktree == "" {
@@ -191,7 +154,7 @@ func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *cor
 		return repairNone
 	}
 
-	csMap, err := readStateMap(opts.cycleStateFile()) // See ADR-0049: run-scoped (cycle_id)
+	csMap, err := readStateMap(opts.cycleStateFile())
 	if err != nil {
 		return repairNone
 	}
@@ -201,9 +164,6 @@ func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *cor
 	}
 	qDir := filepath.Join(opts.ProjectRoot, ".evolve", "quarantine", fmt.Sprintf("cycle-%d", cid))
 
-	// Plan-then-execute: every collider is verified readable/comparable before
-	// any mutation, and a partial heal never re-runs the stage — the original
-	// error stands so no merge can land over a half-healed tree.
 	type colliderAction struct {
 		path      string
 		identical bool
@@ -212,7 +172,7 @@ func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *cor
 	for _, p := range colliders {
 		identical, cmpErr := filesIdentical(filepath.Join(opts.ProjectRoot, p), filepath.Join(worktree, p))
 		if cmpErr != nil {
-			return repairNone // can't prove safety for this collider — decline with zero mutations
+			return repairNone
 		}
 		plan = append(plan, colliderAction{path: p, identical: identical})
 	}
@@ -254,7 +214,6 @@ func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *cor
 	return repairRetryStage
 }
 
-// filesIdentical reports byte equality of two files.
 func filesIdentical(a, b string) (bool, error) {
 	ba, err := os.ReadFile(a)
 	if err != nil {
@@ -267,8 +226,6 @@ func filesIdentical(a, b string) (bool, error) {
 	return string(ba) == string(bb), nil
 }
 
-// appendQuarantineManifest records quarantined paths in
-// <qDir>/manifest.json (append-merge, atomic write).
 func appendQuarantineManifest(opts *Options, qDir string, cycle int, paths []string) error {
 	type entry struct {
 		Path   string `json:"path"`
@@ -279,11 +236,11 @@ func appendQuarantineManifest(opts *Options, qDir string, cycle int, paths []str
 	manifestPath := filepath.Join(qDir, "manifest.json")
 	var entries []entry
 	if raw, err := os.ReadFile(manifestPath); err == nil {
-		_ = json.Unmarshal(raw, &entries) // malformed existing manifest → start fresh
+		_ = json.Unmarshal(raw, &entries)
 	}
 	nowFn := opts.NowFn
 	if nowFn == nil {
-		nowFn = defaultNow // Run() defaults this, but direct callers may not
+		nowFn = defaultNow
 	}
 	ts := nowFn().RFC3339
 	for _, p := range paths {
@@ -299,8 +256,6 @@ func appendQuarantineManifest(opts *Options, qDir string, cycle int, paths []str
 	}
 	return os.Rename(tmp, manifestPath)
 }
-
-// --- mode #2: AUDIT_BINDING_HEAD_MOVED resume-unpushed closure --------------
 
 func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se *core.ShipError) repairOutcome {
 	in, ok := strandedLanding(ctx, opts, se)

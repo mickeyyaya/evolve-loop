@@ -12,13 +12,10 @@ import (
 	"testing"
 )
 
-// --- gitops.go:153-154: worktree git add -A runner error -------------------
-
 func TestShipFromWorktree_GitAddFails_Errors(t *testing.T) {
 	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
-	// Un-stage the file so "git add -A" is needed, then fail it.
 	runGit(t, wt, "reset", "HEAD", "wt-change.txt")
 
 	opts := &Options{
@@ -35,8 +32,6 @@ func TestShipFromWorktree_GitAddFails_Errors(t *testing.T) {
 	}
 }
 
-// --- gitops.go:160-162: worktree diff --cached --quiet runner error ---------
-
 func TestShipFromWorktree_DiffCachedQuietFails_Errors(t *testing.T) {
 	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
@@ -47,7 +42,6 @@ func TestShipFromWorktree_DiffCachedQuietFails_Errors(t *testing.T) {
 		ProjectRoot:   repo,
 		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-			// Fail specifically: git diff --cached --quiet (has both flags).
 			if name == "git" && argsContain(args, "--cached") && argsContain(args, "--quiet") {
 				return -1, errors.New("diff quiet injected error")
 			}
@@ -62,12 +56,8 @@ func TestShipFromWorktree_DiffCachedQuietFails_Errors(t *testing.T) {
 	}
 }
 
-// --- gitops.go:167-169: rev-list runner error (ahead check) ----------------
-
 func TestShipFromWorktree_RevListFails_WhenBranchAheadCheck(t *testing.T) {
 	t.Parallel()
-	// Create a worktree with nothing to commit but ahead of main by one commit,
-	// so prepareChanges resolves to worktreeBranchAhead.
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	seedAudit(t, repo, "PASS")
@@ -92,8 +82,6 @@ func TestShipFromWorktree_RevListFails_WhenBranchAheadCheck(t *testing.T) {
 	}
 }
 
-// --- gitops.go:181-183: buildDiffFooterAtDir error in worktree commit path -
-
 func TestShipFromWorktree_BuildDiffFooterFails_Errors(t *testing.T) {
 	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
@@ -104,8 +92,6 @@ func TestShipFromWorktree_BuildDiffFooterFails_Errors(t *testing.T) {
 		ProjectRoot:   repo,
 		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-			// buildDiffFooterAtDir calls "git -C <wt> diff --cached --name-status".
-			// Match by --name-status (unique to this call).
 			if name == "git" && argsContain(args, "--name-status") {
 				return -1, errors.New("name-status injected error")
 			}
@@ -170,8 +156,6 @@ func TestShipFromWorktree_AFastForwardThatFailsAfterThePushStillLands(t *testing
 	}
 }
 
-// --- gitops.go:234-237: push failure ---------------------------------------
-
 func TestShipFromWorktree_PushFails_Errors(t *testing.T) {
 	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
@@ -190,13 +174,10 @@ func TestShipFromWorktree_PushFails_Errors(t *testing.T) {
 	}
 }
 
-// --- gitops.go:268-270: writeShipBinding readStateMap error ----------------
-
 func TestWriteShipBinding_ReadStateMapError_ReturnsError(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 
-	// Make cycle-state.json a directory so readStateMap errors.
 	csDir := filepath.Join(repo, ".evolve")
 	if err := os.MkdirAll(csDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -212,7 +193,3 @@ func TestWriteShipBinding_ReadStateMapError_ReturnsError(t *testing.T) {
 		t.Fatal("want error from readStateMap on directory, got nil")
 	}
 }
-
-// Note: writeShipBinding MkdirAll failure (gitops.go:291-293) is already
-// covered by TestWriteShipBinding_MkdirFails_ReturnsError in coverage_final_test.go.
-// TestWriteShipBinding_NoCycleID_Errors (no cycle_id) is in misc_gaps_test.go.

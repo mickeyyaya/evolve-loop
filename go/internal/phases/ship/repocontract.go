@@ -32,23 +32,14 @@ var repoContractSelections = repocontract.TreeReadingTests()
 
 const packWaitDelay = 2 * time.Second
 
-// scanLogName is the run-dir artifact every scanner-pack run is teed to —
-// green runs included, since a green baseline is what disproves a false RED.
-// Kept unexported: nothing outside this package consumes the name today.
 const scanLogName = "ship-repocontract-scan.log"
 
-// packOutcome is one classified scanner-pack run. failures is non-empty
-// ONLY when the pack itself said "your code is broken" — a `go test -json`
-// fail event carrying a test name, or a build/setup failure. An err with an
-// EMPTY failures is the ambiguous case: the toolchain exited nonzero
-// without any guard suite reporting a violation.
 type packOutcome struct {
 	failures   []packFailure
 	failureLog string
 	err        error
 }
 
-// packFailure is one classified failure: a named test of a package, or a build failure (Test empty).
 type packFailure struct{ Package, Test string }
 
 func (f packFailure) String() string {
@@ -69,7 +60,6 @@ func (o packOutcome) failedNames() []string {
 	return names
 }
 
-// allNamedTests reports whether every failure is a named test, so each can be re-run by name.
 func (o packOutcome) allNamedTests() bool {
 	if len(o.failures) == 0 {
 		return false
@@ -82,9 +72,6 @@ func (o packOutcome) allNamedTests() bool {
 	return true
 }
 
-// repoContractTestFn is the seam for the pack execution (package var, mirrors
-// the runner seams elsewhere in this package's tests). Production runs
-// `go test -json` in the lane worktree's module dir.
 var repoContractTestFn = defaultRepoContractTest
 
 func defaultRepoContractTest(ctx context.Context, moduleDir string, out packLog) packOutcome {
@@ -135,16 +122,8 @@ func runRepoContractPackages(ctx context.Context, moduleDir string, out packLog,
 	return runRepoContractPackagesWithTags(ctx, moduleDir, out, packages, nil)
 }
 
-// repoContractTestTimeout is the per-binary deadline the gate hands `go test`,
-// well above Go's 10m default: a tight deadline under fleet load can make
-// `go test -json` emit a fail event for the running test and every paused
-// t.Parallel() test, which the gate would then class as a real contract RED
-// on green code. Raising the deadline can only turn a timeout into a real
-// verdict; it can never turn a failing test green.
 const repoContractTestTimeout = addedtests.PackageTimeout
 
-// repoContractTestArgs builds the gate's `go test` argv. Split out from the
-// runner so the flags the gate depends on are assertable without exec'ing go.
 func repoContractTestArgs(packages, tags []string) []string {
 	args := []string{"test", "-json", "-count=1", "-timeout", repoContractTestTimeout}
 	if len(tags) > 0 {
@@ -153,8 +132,6 @@ func repoContractTestArgs(packages, tags []string) []string {
 	return append(args, packages...)
 }
 
-// packagesOf returns each failure's package once, sorted, so a package with
-// multiple named failures is run (or re-run) only once.
 func packagesOf(failures []packFailure) []string {
 	seen := map[string]bool{}
 	var pkgs []string
@@ -172,15 +149,10 @@ func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out 
 	return runGoTestJSON(ctx, moduleDir, out, repoContractTestArgs(packages, tags))
 }
 
-// goTestJSONFn is the seam for one `go test -json` run (package var, mirrors repoContractTestFn).
 var goTestJSONFn = runGoTestJSON
 
 var stdoutPipe = (*exec.Cmd).StdoutPipe
 
-// runRepoContractPackagesAlone re-runs each package with a named red by itself — the whole package, so same-package
-// state stays in play and only the pack's concurrent load is removed. A package green by itself contributes
-// nothing; one still red contributes the tests still red; one whose re-run named nothing keeps its first-run reds,
-// since nothing was proven about them. The result is green only when every package is.
 func runRepoContractPackagesAlone(ctx context.Context, moduleDir string, out packLog, failures []packFailure) packOutcome {
 	var merged packOutcome
 	var errs []string
@@ -222,47 +194,28 @@ func runGoTestJSON(ctx context.Context, moduleDir string, log packLog, args []st
 	out := &lockedWriter{w: log.raw}
 	cmd := sysexec.Command(ctx, "go", args...)
 	cmd.Dir = moduleDir
-	cmd.Env = ipcenv.Scrub(os.Environ()) // the lane's IPC state must not reach env-sensitive tests
+	cmd.Env = ipcenv.Scrub(os.Environ())
 	cancelKillsTheProcessGroup(cmd)
 	cmd.WaitDelay = packWaitDelay
 	stdout, err := stdoutPipe(cmd)
 	if err != nil {
 		return packOutcome{err: fmt.Errorf("go test stdout pipe: %w", err)}
 	}
-	cmd.Stderr = out // toolchain-level chatter is not a JSON event stream
+	cmd.Stderr = out
 	if err := cmd.Start(); err != nil {
 		return packOutcome{err: fmt.Errorf("go test start: %w", err)}
 	}
-	// Drain to completion BEFORE Wait: an undrained pipe deadlocks the child.
 	failed, failureLog := classifyPackEvents(stdout, out)
 	return packOutcome{failures: failed, failureLog: failureLog, err: cmd.Wait()}
 }
 
-// classifyPackEvents streams a `go test -json` event feed, teeing the
-// human-readable Output text to tee (that is what lands in the scan log) and
-// collecting the names of genuinely failing tests and their own output.
-//
-// The classification is deliberately conservative in ONE direction: a
-// package-level fail with no test name is recorded only when the output marks
-// a build/setup failure. A compile break is a real contract RED; an
-// unexplained nonzero exit is NOT, and must fall through to the retry path
-// rather than block an audit-green ship.
-//
-// Lines that are not JSON objects are teed verbatim and skipped rather than
-// aborting the scan — a stray non-event line must not blind the classifier to
-// the real failures after it.
 func classifyPackEvents(r io.Reader, tee io.Writer) ([]packFailure, string) {
 	var failed []packFailure
 	failureLog := newPackFailureLog()
-	// A single compile break surfaces TWICE — once as a `build-fail` action
-	// (which carries no package on go1.26) and once as the `FAIL pkg [build
-	// failed]` output line — so build failures are collected per package and
-	// appended after the loop rather than inline. Reporting one broken package
-	// as two failures would make the ship error read as a wider RED than it is.
 	buildFailPkgs := map[string]bool{}
 	unattributedBuildFail := false
 	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024) // guard suites emit long lines
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	for sc.Scan() {
 		line := sc.Bytes()
 		var ev packEvent
@@ -292,13 +245,10 @@ func classifyPackEvents(r io.Reader, tee io.Writer) ([]packFailure, string) {
 	for pkg := range buildFailPkgs {
 		pkgs = append(pkgs, pkg)
 	}
-	sort.Strings(pkgs) // deterministic ship-error message across runs
+	sort.Strings(pkgs)
 	for _, pkg := range pkgs {
 		failed = append(failed, packFailure{Package: pkg + " [build failed]"})
 	}
-	// A build failure the toolchain never attributed to a package is still a
-	// real RED — it must never fall through to the infra/retry path — so it is
-	// recorded when no attributed one covers it.
 	if unattributedBuildFail && len(pkgs) == 0 {
 		failed = append(failed, packFailure{Package: "[build failed] (package unattributed)"})
 	}
@@ -361,14 +311,6 @@ func (l *packFailureLog) flush(key string) {
 	}
 }
 
-// lockedWriter serializes the two writers the pack runner points at ONE
-// io.Writer: the child's stderr (copied by exec's own goroutine) and the tee of
-// the JSON event stream (classifyPackEvents, on the caller's goroutine).
-// Without it a bytes.Buffer out is a data race — and its ReadFrom, which
-// io.Copy picks for the stderr goroutine, re-slices to the length it captured
-// before its blocking read, dropping every tee write made meanwhile — while an
-// *os.File out merely interleaves by luck. It deliberately implements Write
-// only (no io.ReaderFrom), so exec's io.Copy takes the lock per chunk.
 type lockedWriter struct {
 	mu sync.Mutex
 	w  io.Writer
@@ -387,26 +329,10 @@ func writeTee(tee io.Writer, s string) {
 	_, _ = io.WriteString(tee, s)
 }
 
-// runRepoContractGate is the test-facing projection of runRepoContractGateAt:
-// the given root is the tree under test and its changes are measured against
-// HEAD. No production caller today — runNative resolves both through
-// repoContractGateRoot.
 func runRepoContractGate(ctx context.Context, gate, root, workspace string, stderr io.Writer) error {
 	return runRepoContractGateAt(ctx, gate, root, "HEAD", workspace, stderr, nil)
 }
 
-// runRepoContractGateAt executes the three gate layers per the resolved dial,
-// in root — the tree the ship will land: the lane worktree for a cycle ship
-// (repoContractGateRoot), the project root otherwise — against baseRef, the
-// base the tree's changes are measured from. Returns nil when the dial is
-// off/empty-off, every layer is green, or an unclassifiable first failure
-// cleared on the single retry. A genuine RED returns CodeRepoContractGate
-// naming the failing tests; a twice-ambiguous failure (a pack run, or the
-// change discovery itself) returns the distinct CodeRepoContractInfra.
-//
-// workspace is the run dir (`req.Workspace`); the scanner output is teed to
-// <workspace>/ship-repocontract-scan.log. Empty workspace degrades to
-// stderr-only diagnostics — a missing run dir must never block a ship.
 func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace string, stderr io.Writer, cleared func([]string)) error {
 	if !repocontract.GateOn(gate) {
 		return nil
@@ -414,8 +340,6 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 	moduleDir := repocontract.ModuleDir(root)
 	out := packLog{notes: stderr, raw: stderr}
 	if scan := openScanLog(workspace, stderr); scan != nil {
-		// Close error deliberately dropped: the scan log is best-effort
-		// forensics; a close failure must never turn a green pack red.
 		defer func() { _ = scan.Close() }()
 		defer fmt.Fprintf(stderr, "[ship] repo-contract gate: full output: %s\n", scan.Name())
 		out = packLog{notes: io.MultiWriter(stderr, scan), raw: scan}
@@ -441,8 +365,6 @@ func runFixedPack(ctx context.Context, out packLog, gate, root, baseRef, workspa
 	if note != "" {
 		fmt.Fprintf(out, "[ship] repo-contract gate: %s\n", note)
 	}
-	// Header first, so the artifact is non-empty and self-identifying even on
-	// a green run — the green baseline is what disproves a false RED.
 	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 -timeout %s %s (module %s, changes vs %s)\n",
 		repoContractTestTimeout,
 		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
@@ -452,11 +374,6 @@ func runFixedPack(ctx context.Context, out packLog, gate, root, baseRef, workspa
 	})
 }
 
-// runAddedTestBackstop is the second gate layer: it derives the gate's seed
-// (the tree's changes vs baseRef) and runs every ADDED test package under the
-// build tags its files declare. Returns the seed and the untagged groups'
-// patterns so the importer backstop (the third layer) neither re-derives the
-// seed nor re-runs those packages in the same build context.
 func runAddedTestBackstop(ctx context.Context, out packLog, root, baseRef, moduleDir, workspace string) (files []changedpkgs.ChangedFile, untagged []string, err error) {
 	files, err = changedFilesTwice(out, root, baseRef)
 	if err != nil {
@@ -494,18 +411,11 @@ func runClassifiedPack(ctx context.Context, out io.Writer, workspace, name strin
 	return runClassifiedPackRetrying(ctx, out, workspace, name, true, run, nil)
 }
 
-// aloneRerun is the importer backstop's second look at a named red: run
-// re-runs the red packages by themselves, cleared hears the names a green
-// re-run cleared (nil when nobody listens).
 type aloneRerun struct {
 	run     func([]packFailure) packOutcome
 	cleared func(names []string)
 }
 
-// runClassifiedPackRetrying is runClassifiedPack with the ambiguous-exit
-// retry as a decision: a pack too large to run twice inside one ship classes
-// an ambiguous exit infra straight away (re-dispatchable) instead of paying
-// for the second run.
 func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, name string, retry bool, run func() packOutcome, alone *aloneRerun) error {
 	first := run()
 	switch {
@@ -537,20 +447,14 @@ func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, na
 			name, first.err, second.err, scanLogHint(workspace)))
 }
 
-// aloneRerunMaxFailures caps the named reds the alone re-run is still worth: more named reds under the importer
-// backstop are a broken contract, not a timing window.
 const aloneRerunMaxFailures = 3
 
-// CodeBackstopFlake is the ship.warning of a named red the importer backstop cleared by re-running its package
-// by itself; its recurrence across cycles is what makes a flake a hygiene item.
 const CodeBackstopFlake signalcenter.Code = "SHIP_BACKSTOP_FLAKE"
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeBackstopFlake, "the importer backstop named red tests that were green when their packages re-ran by themselves, without the pack's concurrent load; the ship proceeded on that evidence — recurrence is a hygiene item, not proof of a timing window")
 }
 
-// backstopFlakeSignal is what the gate tells the Signal Center when a re-run clears named reds; a nil Center hears
-// nothing.
 func backstopFlakeSignal(signals *signalcenter.Center, cycle int) func(names []string) {
 	return func(names []string) {
 		if signals == nil {
@@ -565,10 +469,6 @@ func backstopFlakeSignal(signals *signalcenter.Center, cycle int) func(names []s
 	}
 }
 
-// clearedAlone re-runs the named reds by themselves when the pack is not the ship's own change (alone is set),
-// every red is a named test and there are few enough to be a flake. A green re-run is flake evidence, logged
-// loudly, and the pack is not the lane's RED; a red one is returned as the verdict; a re-run that names nothing
-// leaves the first verdict standing.
 func clearedAlone(out io.Writer, name string, first packOutcome, alone *aloneRerun) (packOutcome, bool) {
 	if alone == nil || !first.allNamedTests() || len(first.failures) > aloneRerunMaxFailures {
 		return first, false
@@ -589,9 +489,6 @@ func clearedAlone(out io.Writer, name string, first packOutcome, alone *aloneRer
 	return first, false
 }
 
-// contractRed builds the genuine-violation ship error, naming the parsed
-// failing tests so ship-error.json carries them directly instead of a bare
-// "exit status 1".
 func contractRed(packName string, o packOutcome) error {
 	detail := packName
 	switch packName {
@@ -605,10 +502,6 @@ func contractRed(packName string, o packOutcome) error {
 			detail, o.err, strings.Join(o.failedNames(), ", ")))
 }
 
-// openScanLog opens the run-dir scan log, truncating any prior attempt's file.
-// Returns nil (never an error) when there is no workspace or the file cannot
-// be opened: the log is diagnostics, and losing diagnostics must never fail a
-// ship that would otherwise succeed.
 func openScanLog(workspace string, stderr io.Writer) *os.File {
 	if workspace == "" {
 		return nil

@@ -15,7 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// readSeededAuditEntry returns the single ledger row seedAudit wrote.
 func readSeededAuditEntry(t *testing.T, repo string) map[string]any {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(repo, ".evolve", "ledger.jsonl"))
@@ -32,10 +31,6 @@ func readSeededAuditEntry(t *testing.T, repo string) map[string]any {
 	return entry
 }
 
-// rewriteAuditWithReportComment rewrites the seeded report to carry an
-// `audit_bound_tree_sha:` line naming commentTree and rebinds the ledger row to
-// ledgerTree. Evidence is re-sealed against the seeded tree and the artifact
-// re-hashed, so only the ledger binding differs from a clean seeded audit.
 func rewriteAuditWithReportComment(t *testing.T, repo, commentTree, ledgerTree string) {
 	t.Helper()
 	seeded := readSeededAuditEntry(t, repo)
@@ -61,8 +56,6 @@ func rewriteAuditWithReportComment(t *testing.T, repo, commentTree, ledgerTree s
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), string(line)+"\n")
 }
 
-// The report comment carries the correct tree here — the only shape in which
-// a report-sourced binding could look trustworthy.
 func TestVerifyAuditBinding_ReportCommentNeverBindsTree(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -109,8 +102,6 @@ func TestVerifyAuditBinding_LedgerTreeWinsOverReportComment(t *testing.T) {
 	}
 }
 
-// The scan targets the report-comment form (`audit_bound_tree_sha:`), not the
-// ship-binding.json key "audit_bound_tree_sha", which production legitimately reads.
 func TestShipSource_NoAuditReportTreeCommentParser(t *testing.T) {
 	t.Parallel()
 	entries, err := os.ReadDir(".")

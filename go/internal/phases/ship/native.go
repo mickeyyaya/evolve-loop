@@ -19,7 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Class enumerates the four commit lifecycles. Matches ship.sh --class.
 type Class string
 
 const (
@@ -29,7 +28,6 @@ const (
 	ClassTrivial Class = "trivial"
 )
 
-// IsValid reports whether c is one of the four supported classes.
 func (c Class) IsValid() bool {
 	switch c {
 	case ClassCycle, ClassManual, ClassRelease, ClassTrivial:
@@ -38,8 +36,6 @@ func (c Class) IsValid() bool {
 	return false
 }
 
-// ExitCode bins ship.sh exit semantics (0 shipped, 1 runtime failure,
-// 2 integrity failure, 127 required binary missing).
 type ExitCode int
 
 const (
@@ -49,37 +45,21 @@ const (
 	ExitMissingBin ExitCode = 127
 )
 
-// Options captures every external knob ship.sh exposes. Tests construct
-// these directly; CLI builds them from flags/env.
 type Options struct {
 	Class Class
 
-	// CommitMessage is the user-supplied commit body (footer appended later).
 	CommitMessage string
 
-	// DryRun skips all mutations but runs every read-only check.
 	DryRun bool
 
-	// Explicit emergency bypasses. The CLI exposes these as flags; environment
-	// variables are intentionally not consulted.
 	BypassCommitGate bool
 	BypassPrefixGate bool
-	// PushOnly pushes an already-committed, provenance-verified ahead set and
-	// nothing else (pushonly.go); staged changes refuse.
-	PushOnly bool
+	PushOnly         bool
 
-	// ProjectRoot is the writable side — where git lives, where .evolve/ writes go.
 	ProjectRoot string
 
-	// WorkspacePath is this run's per-cycle workspace
-	// (<ProjectRoot>/.evolve/runs/cycle-<N>/); empty means a standalone
-	// `evolve ship` uses the global cycle-state.json.
-	// See ADR-0049.
 	WorkspacePath string
 
-	// Cycle explanation identity comes from the host-owned PhaseRequest, never
-	// the Builder-writable workspace/run.json mirror; direct CLI calls leave it
-	// zero and the native gate resolves it from cycle-state.json.
 	CycleID                         int
 	AuditRound                      int
 	ActiveWorktree                  string
@@ -88,52 +68,26 @@ type Options struct {
 	BuildExplanation                *phaseio.ExplanationView
 	RequireBuildExplanationHandoff  bool
 
-	// ManifestGate is the ship-hygiene gate mode for the worktree ship path:
-	// "" (default) is SHADOW (log out-of-manifest paths, never block);
-	// "enforce" is FAIL-CLOSED (refuse to commit any path no phase report
-	// declared). Config-sourced (policy.json); today only tests set enforce.
 	ManifestGate string
 
-	// RunID is this run's event-sourced identity. When set, the audit→ship
-	// binding lookup (findLatestAudit) prefers the ledger entry stamped with
-	// THIS RunID over a concurrent run's later entry.
-	// See ADR-0049.
 	RunID string
 
-	// PluginRoot is the read-only side — where .claude-plugin/plugin.json lives.
-	// May equal ProjectRoot when running from the evolve-loop repo itself.
 	PluginRoot string
 
-	// ShipBinaryPath is the path to the binary whose SHA is TOFU-pinned.
-	// In the bash impl this is ship.sh itself; in native this is the
-	// evolve binary (resolved via os.Executable when empty).
 	ShipBinaryPath string
 
-	// Env overrides for the operator-facing env vars. Empty values fall
-	// through to os.Getenv. Key: EVOLVE_SHIP_AUTO_CONFIRM. Strict-audit is
-	// sourced from .evolve/policy.json (workflow.strict_audit), not here.
-	// EVOLVE_SHIP_RELEASE_NOTES is IPC-only (releasepipeline → evolve-ship
-	// subprocess; split-const form).
 	Env map[string]string
 
-	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict
-	// parse. At >= StageEnforce parseVerdicts is sentinel-first; StageOff (the
-	// zero value) keeps the prose parse.
-	// See ADR-0050.
 	PhaseIO config.Stage
 
-	// Stdin/Stdout/Stderr default to the real streams when nil.
 	Stdin  io.Reader
 	Stdout io.Writer
 	Stderr io.Writer
 
-	// NowFn is a clock seam for tests.
 	NowFn func() Now
 
 	Sleep func(time.Duration)
 
-	// CmdRunner is the git/gh/external-binary execution seam. Tests
-	// inject a fake; production wiring uses execRunner.
 	Runner CmdRunner
 
 	internalAuditBoundTreeSHA string
@@ -141,57 +95,34 @@ type Options struct {
 
 	internalConsumedPaths []string
 
-	// repairAttempted is the repair ladder's once-per-code-per-Run guard.
 	repairAttempted map[core.ShipErrorCode]bool
 
-	// shipLock is the test seam for the integrator lock; nil defaults to
-	// flock.Lock on <ProjectRoot>/.evolve/ship.lock. Signature mirrors
-	// flock.Lock.
 	shipLock func(path string) (release func(), err error)
 
-	// Signals is the root's Signal Center the landing's ship.warning events
-	// reach (ADR-0103 unit 07): the orchestrator root threads it through
-	// Config.Signals, the standalone `evolve ship` root builds its own; nil
-	// (the `evolve phase ship` registry factory, direct-helper tests) is the
-	// Null Object — the warnings are dropped, never a panic.
 	Signals *signalcenter.Center
 
-	// land is the landing, lazily built and cached by landing() (gitops_landing.go).
 	land *landing.Landing
 
 	relPath func(base, target string) (string, error)
 }
 
-// Now is a minimal time interface (Unix seconds + RFC3339 formatter) so
-// the ship package doesn't pull in time-zone behavior at the entry point.
 type Now struct {
 	Unix    int64
 	RFC3339 string
 }
 
-// RunResult is the structured outcome. CLI wrappers translate this to
-// process exit code; the PhaseRunner adapter translates to core.Verdict.
 type RunResult struct {
 	ExitCode   ExitCode
 	CommitSHA  string
 	ClassUsed  Class
 	Provenance string
 	Logs       []string
-	DryRunPath string // non-empty when DryRun=1 and journal was written
+	DryRunPath string
 
-	// RepairAttempted/RepairOutcome surface the repair ladder: the ShipError
-	// code a typed repair was attempted for, and its outcome (e.g.
-	// "repinned-verified-rebuild", "resume-pushed", "push-retried",
-	// "colliders-healed:…", "needs-reaudit", "declined"); empty when no
-	// repair fired. Multiple repairs in one Run record only the LAST
-	// attempt — the full trail lives in Logs and the ShipError Debug map.
-	// See ADR-0039.
 	RepairAttempted string
 	RepairOutcome   string
 }
 
-// Run executes the ship lifecycle end-to-end; missing Options fields are
-// resolved from env/defaults.
 func Run(ctx context.Context, opts Options) (RunResult, error) {
 	res, resumed, err := resumeFirst(ctx, &opts)
 	if resumed || err != nil {
@@ -320,12 +251,7 @@ func shipVerified(ctx context.Context, opts *Options, res *RunResult) (RunResult
 	return finalize(ctx, opts, res, nil, "normal")
 }
 
-// finalize classifies an error into the right ExitCode and writes the
-// dry-run journal if applicable. Returns the result + a (possibly nil)
-// error suitable for the caller.
 func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exitReason string) (RunResult, error) {
-	// Every MINTED commit is journaled, on success or after a rejected push
-	// (pushonly.go); push-only itself mints nothing so it is exempt.
 	journalMinted(opts, res)
 	if err == nil {
 		res.ExitCode = ExitOK

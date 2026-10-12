@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// readCarryoverIDs returns the ids in .evolve/state.json:carryoverTodos[].
 func readCarryoverIDs(t *testing.T, root string) []string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(root, ".evolve", "state.json"))
@@ -31,8 +30,6 @@ func readCarryoverIDs(t *testing.T, root string) []string {
 	return ids
 }
 
-// seedCarryoverState writes .evolve/state.json with two carryover todos: the id
-// this cycle commits, and an unrelated one that must survive.
 func seedCarryoverState(t *testing.T, root, committedID string) {
 	t.Helper()
 	mustWriteState(t, filepath.Join(root, ".evolve", "state.json"), map[string]any{
@@ -52,8 +49,6 @@ func hasID(ids []string, want string) bool {
 	return false
 }
 
-// A LANDED PASS closeout whose triage decision committed <id> must leave
-// state.json without that carryover entry — and with every other entry intact.
 func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -62,7 +57,7 @@ func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
 	writeInboxFixture(t, root, cid, id)
 	seedCarryoverState(t, root, id)
 
-	r := landingScriptedRunner(0) // commit IS an ancestor of HEAD — landed
+	r := landingScriptedRunner(0)
 	opts := &Options{ProjectRoot: root, Runner: r.runner(), Stderr: io.Discard}
 	res := &RunResult{CommitSHA: "cafebabecafebabecafebabecafebabecafebabe"}
 
@@ -79,9 +74,6 @@ func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
 	}
 }
 
-// Promotion is already gated on the ship commit reaching durable history,
-// and retirement must obey the same gate: an unlanded commit that retired
-// the todo would erase the only record of work that never shipped.
 func TestPromoteInbox_UnlandedPassKeepsCarryover(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -90,7 +82,7 @@ func TestPromoteInbox_UnlandedPassKeepsCarryover(t *testing.T) {
 	writeInboxFixture(t, root, cid, id)
 	seedCarryoverState(t, root, id)
 
-	r := landingScriptedRunner(1) // NOT an ancestor of HEAD or origin — unlanded
+	r := landingScriptedRunner(1)
 	opts := &Options{ProjectRoot: root, Runner: r.runner(), Stderr: io.Discard}
 	res := &RunResult{CommitSHA: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}
 
@@ -103,9 +95,6 @@ func TestPromoteInbox_UnlandedPassKeepsCarryover(t *testing.T) {
 	}
 }
 
-// A project with no .evolve/state.json (fresh checkout, or a lane whose
-// state lives elsewhere) must not error the whole PASS closeout over
-// bookkeeping.
 func TestPromoteInbox_NoStateFileIsNoOp(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

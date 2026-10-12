@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// landingScriptedRunner scripts "git merge-base" (the isAncestor call
-// signature: merge-base --is-ancestor <sha> HEAD) to report landed/unlanded.
 func landingScriptedRunner(mergeBaseExit int) *scriptedRunner {
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
@@ -28,9 +26,6 @@ func landingScriptedRunner(mergeBaseExit int) *scriptedRunner {
 	return r
 }
 
-// writeInboxFixture lays down .evolve/inbox/processing/cycle-<cid>/<id>.json,
-// .evolve/runs/cycle-<cid>/triage-decision.json (top_n: [id]), and
-// .evolve/cycle-state.json:cycle_id=<cid>. Returns the processing-dir path.
 func writeInboxFixture(t *testing.T, root string, cid int, id string) string {
 	t.Helper()
 	procDir := filepath.Join(root, ".evolve", "inbox", "processing", "cycle-"+itoa(cid))
@@ -65,10 +60,6 @@ func itoa(n int) string {
 	return strconv.Itoa(n)
 }
 
-// res.CommitSHA is neither an ancestor of HEAD nor found on origin (fake
-// runner reports merge-base --is-ancestor exit!=0 for every ref probed).
-// promoteInbox must NOT call Promote(..., "processed", ...) — the item
-// stays out of processed/cycle-<cid>/ — and must log the unlanded WARN.
 func TestPromoteInbox_UnlandedCommitSkipsPromotion(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -76,7 +67,7 @@ func TestPromoteInbox_UnlandedCommitSkipsPromotion(t *testing.T) {
 	const id = "fix-inbox-promotion-landing-gate"
 	writeInboxFixture(t, root, cid, id)
 
-	r := landingScriptedRunner(1) // not an ancestor of HEAD or origin
+	r := landingScriptedRunner(1)
 	opts := &Options{ProjectRoot: root, Runner: r.runner(), Stderr: io.Discard}
 	res := &RunResult{CommitSHA: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}
 
@@ -94,9 +85,6 @@ func TestPromoteInbox_UnlandedCommitSkipsPromotion(t *testing.T) {
 	}
 }
 
-// The exact same fixture, but res.CommitSHA IS an ancestor of HEAD
-// (merge-base --is-ancestor exits 0); promoteInbox must promote normally
-// and log "promoted: landed".
 func TestPromoteInbox_LandedCommitPromotes(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -104,7 +92,7 @@ func TestPromoteInbox_LandedCommitPromotes(t *testing.T) {
 	const id = "fix-inbox-promotion-landing-gate"
 	writeInboxFixture(t, root, cid, id)
 
-	r := landingScriptedRunner(0) // is an ancestor of HEAD
+	r := landingScriptedRunner(0)
 	opts := &Options{ProjectRoot: root, Runner: r.runner(), Stderr: io.Discard}
 	res := &RunResult{CommitSHA: "cafebabecafebabecafebabecafebabecafebabe"}
 
@@ -122,8 +110,6 @@ func TestPromoteInbox_LandedCommitPromotes(t *testing.T) {
 	}
 }
 
-// The superseded-reconcile path (ReconcileSuperseded) gets the identical
-// landing check — an unlanded commit must not retire a superseded id either.
 func TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -154,11 +140,8 @@ func TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement(t *testing.T) 
 	mustWriteState(t, filepath.Join(root, ".evolve", "cycle-state.json"), map[string]any{
 		"cycle_id": float64(cid),
 	})
-	// The primary top_n item's own fixture file is absent on purpose — this
-	// test isolates the superseded-reconcile branch; Promote's ship.sh-compat
-	// NoOp on a missing file is a pre-existing, unrelated pass.
 
-	r := landingScriptedRunner(1) // unlanded
+	r := landingScriptedRunner(1)
 	opts := &Options{ProjectRoot: root, Runner: r.runner(), Stderr: io.Discard}
 	res := &RunResult{CommitSHA: "0000000000000000000000000000000000000000"}
 
@@ -175,10 +158,6 @@ func TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement(t *testing.T) 
 	}
 }
 
-// RepairOutcome=="needs-reaudit" (origin diverged, the landing's push repair
-// declined to push) paired with a commit that is only local (not an ancestor
-// of HEAD-on-origin) must never promote, regardless of whether a caller
-// upstream still considers the cycle a "PASS".
 func TestPromoteInbox_NeedsReauditOutcomeNeverPromotes(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -17,8 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// This joins the real native Audit, the orchestrator's private host recorder,
-// and Ship's binding verifier. Only the model and non-audit phases are replaced.
 func TestHostAuditRoundTrip_CoreLedgerAuthorizesOnlyHostPass(t *testing.T) {
 	t.Parallel()
 	for _, pass := range []bool{true, false} {
@@ -34,13 +32,9 @@ func TestHostAuditRoundTrip_CoreLedgerAuthorizesOnlyHostPass(t *testing.T) {
 				t.Fatal(err)
 			}
 			mustWrite(t, filepath.Join(repo, "go", "acs", "cycle7", "predicate_test.go"), string(source))
-			// The committed fixture also reaches the native durable-ACS check.
 			mustWrite(t, filepath.Join(repo, "go", "acs", "regression", "doc.go"), "package regression\n")
 			runGit(t, repo, "add", "--", "go")
 			runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-qm", "fixture: predicate + durable acs")
-			// The cycle's worktree is what production provisions — a detached
-			// worktree of the repository — never the repository itself, which
-			// core refuses to stage or normalize.
 			wt := filepath.Join(t.TempDir(), "cycle-7")
 			runGit(t, repo, "worktree", "add", "--detach", "-q", wt, "HEAD")
 			ws := core.RunWorkspacePath(repo, 7)

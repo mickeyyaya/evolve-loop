@@ -22,7 +22,6 @@ func TestRun_NilPluginRoot_DefaultsToProjectRoot(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, "p.txt"), "change\n")
 	seedAudit(t, repo, "PASS")
 
-	// Call Run() directly (not runShip) so PluginRoot="" reaches the default.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	res, err := Run(ctx, Options{
@@ -113,7 +112,6 @@ func TestShipFromWorktree_EmptyCycleBranch_Errors(t *testing.T) {
 		`{"cycle_id":100,"active_worktree":"`+wt+`"}`)
 	seedAudit(t, repo, "PASS")
 
-	// Inject a runner that returns empty for symbolic-ref on the worktree.
 	base := execRunner
 	hijack := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
@@ -227,12 +225,6 @@ func argsContain(args []string, flags ...string) bool {
 	return true
 }
 
-// manualConfirmRunner builds a CmdRunner that handles the three git calls made
-// by verifyManualConfirm, distinguished by their complete flag sets:
-//
-//	git diff --cached --quiet  → exit 1 (staged changes present)
-//	git diff --cached --stat   → statFn
-//	git diff --cached          → diffFn
 func manualConfirmRunner(
 	statFn func(stdout, stderr io.Writer) (int, error),
 	diffFn func(stdout, stderr io.Writer) (int, error),
@@ -280,7 +272,7 @@ func TestVerifyManualConfirm_DiffRunnerError_Propagates(t *testing.T) {
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
 		Runner: manualConfirmRunner(
-			func(_, _ io.Writer) (int, error) { return 0, nil }, // stat succeeds
+			func(_, _ io.Writer) (int, error) { return 0, nil },
 			func(_, _ io.Writer) (int, error) { return -1, errors.New("full diff exploded") },
 		),
 		Stderr: io.Discard,
@@ -323,8 +315,6 @@ func TestVerifyManualConfirm_LongDiff_Truncated(t *testing.T) {
 	}
 }
 
-// A directory at acs-verdict.json triggers a plain read error (not
-// ErrNotExist), which checkEGPSGate must propagate as-is.
 func TestVerifyAuditBinding_EGPSGateReadError_PropagatesFromBinding(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
