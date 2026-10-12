@@ -8,6 +8,7 @@ import (
 )
 
 func TestNewDefaultWithStageCompactSpec_AcceptsOptions(t *testing.T) {
+	t.Parallel()
 	var applied Config
 	capture := Option(func(c *Config) { applied = *c })
 	acc := func() *signalcenter.Center { return signalcenter.New() }

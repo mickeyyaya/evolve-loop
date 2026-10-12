@@ -55,6 +55,7 @@ func stdoutParityPanes() []string {
 // ctx, so this test's final capture can only succeed if the fix hands the
 // detector a genuinely usable context.
 func TestTmuxREPL_StdoutContract_CancelAfterIdle_CompletesNotTimeout(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &ctxHonoringTmux{&fakeTmux{paneSeq: stdoutParityPanes()}}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -91,6 +92,7 @@ func TestTmuxREPL_StdoutContract_CancelAfterIdle_CompletesNotTimeout(t *testing.
 // TestTmuxREPL_CancelWithoutDeliverable_StillTimesOut for the artifact
 // contract.
 func TestTmuxREPL_StdoutContract_CancelWhileStreaming_StillTimesOut(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	streaming := []string{
 		tmuxPromptMarkerDefault, tmuxPromptMarkerDefault, tmuxPromptMarkerDefault,
@@ -172,6 +174,7 @@ func gitFixture(t *testing.T, fx launchFixture) string {
 // poll gap, so the final post-cancel poll is the first look that could ever
 // observe the advance.
 func TestTmuxREPL_GitContract_CancelAfterEvidenceCommit_CompletesNotTimeout(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tok := gitFixture(t, fx)
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
@@ -225,6 +228,7 @@ func TestTmuxREPL_GitContract_CancelAfterEvidenceCommit_CompletesNotTimeout(t *t
 // The negative on two axes at once: HEAD never advances, and the commit
 // message carries no verifying trailer.
 func TestTmuxREPL_GitContract_CancelWithoutEvidenceCommit_StillTimesOut(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	_ = gitFixture(t, fx)
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}

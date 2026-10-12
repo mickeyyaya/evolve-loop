@@ -9,6 +9,7 @@ import (
 )
 
 func TestLaunchProfileDenialsReachSandbox(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	root, wt := t.TempDir(), t.TempDir()
 	body := `{"name":"fixture","model":"auto","sandbox":{"enabled":true,"allow_network":true,"deny_subpaths":[".evolve/evals"],"deny_read_subpaths":["docs/private"]}}`
@@ -48,6 +49,7 @@ func TestLaunchProfileDenialsReachSandbox(t *testing.T) {
 }
 
 func TestSandboxDenialsCoverSymlinksAndMissingDescendants(t *testing.T) {
+	t.Parallel()
 	root, wt, target := t.TempDir(), t.TempDir(), t.TempDir()
 	if err := os.Symlink(target, filepath.Join(wt, "protected")); err != nil {
 		t.Fatal(err)
@@ -79,6 +81,7 @@ func TestSandboxDenialsCoverSymlinksAndMissingDescendants(t *testing.T) {
 }
 
 func TestLinuxSandboxDenialsAndUnsupportedTargets(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	protected := filepath.Join(root, "evals")
 	private := filepath.Join(root, "private-fixture")
@@ -116,6 +119,7 @@ func TestLinuxSandboxDenialsAndUnsupportedTargets(t *testing.T) {
 }
 
 func TestMandatorySandboxDoesNotTrustNestedEnvironment(t *testing.T) {
+	t.Parallel()
 	deps := Deps{Env: map[string]string{"CLAUDECODE": "1"}}
 	if !sandboxRequiredButUnavailable(deps, &Config{RequireSandbox: true}, false) {
 		t.Fatal("nested marker is not proof of required filesystem restrictions")

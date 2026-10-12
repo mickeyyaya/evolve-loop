@@ -33,6 +33,7 @@ func newTestRecipeDriver(t *testing.T, tx *fakeTmux, cli, session string) *recip
 }
 
 func TestRecipeDriver_EnsureSession_Attach(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{existing: map[string]bool{"sess": true}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	if err := d.EnsureSession(context.Background()); err != nil {
@@ -44,6 +45,7 @@ func TestRecipeDriver_EnsureSession_Attach(t *testing.T) {
 }
 
 func TestRecipeDriver_EnsureSession_BootSuccess(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"booting", "ready\n❯"}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	if err := d.EnsureSession(context.Background()); err != nil {
@@ -55,6 +57,7 @@ func TestRecipeDriver_EnsureSession_BootSuccess(t *testing.T) {
 }
 
 func TestRecipeDriver_EnsureSession_BootTimeout(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"never shows the marker"}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	if err := d.EnsureSession(context.Background()); err == nil {
@@ -63,6 +66,7 @@ func TestRecipeDriver_EnsureSession_BootTimeout(t *testing.T) {
 }
 
 func TestRecipeDriver_EnsureSession_AnEndedContextStopsTheBootWaitInsteadOfPollingTheFullDeadline(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"never shows the marker"}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	ctx, cancel := context.WithCancel(context.Background())
@@ -76,6 +80,7 @@ func TestRecipeDriver_EnsureSession_AnEndedContextStopsTheBootWaitInsteadOfPolli
 }
 
 func TestRecipeDriver_EnsureSession_AContextEndingMidBootStopsTheWaitAtTheNextTick(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"never shows the marker"}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	ctx, cancel := context.WithCancel(context.Background())
@@ -96,6 +101,7 @@ func TestRecipeDriver_EnsureSession_AContextEndingMidBootStopsTheWaitAtTheNextTi
 }
 
 func TestRecipeDriver_EnsureSession_NewSessionError(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{newSessErr: os.ErrPermission}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	if err := d.EnsureSession(context.Background()); err == nil {
@@ -104,6 +110,7 @@ func TestRecipeDriver_EnsureSession_NewSessionError(t *testing.T) {
 }
 
 func TestRecipeDriver_SendCommand_Pastes(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	if err := d.SendCommand(context.Background(), "/plugin install ecc@ecc"); err != nil {
@@ -124,6 +131,7 @@ func TestRecipeDriver_SendCommand_Pastes(t *testing.T) {
 }
 
 func TestRecipeDriver_SendCommand_PropagatesError(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	// Make .bridge-inbox a regular file so injectText's MkdirAll fails — the
@@ -137,6 +145,7 @@ func TestRecipeDriver_SendCommand_PropagatesError(t *testing.T) {
 }
 
 func TestRecipeDriver_SendKeys_Raw(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	if err := d.SendKeys(context.Background(), "Down Down Enter"); err != nil {
@@ -149,6 +158,7 @@ func TestRecipeDriver_SendKeys_Raw(t *testing.T) {
 
 func TestRecipeDriver_AutoRespond_Escalation(t *testing.T) {
 	// claude-tmux manifest's auth_recheck rule escalates on "Please log in".
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"Please log in to continue"}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	escalated, err := d.AutoRespond(context.Background())
@@ -161,6 +171,7 @@ func TestRecipeDriver_AutoRespond_Escalation(t *testing.T) {
 }
 
 func TestRecipeDriver_AutoRespond_NoEscalationAndNilAR(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"benign output ❯"}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	if esc, _ := d.AutoRespond(context.Background()); esc {
@@ -173,6 +184,7 @@ func TestRecipeDriver_AutoRespond_NoEscalationAndNilAR(t *testing.T) {
 }
 
 func TestNewRecipeEngine_ResolvesMarker(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{Workspace: t.TempDir(), Agent: "recipe"}
 	eng, err := newRecipeEngine(cfg, recipeDeps(&fakeTmux{}), "claude-tmux")
 	if err != nil {
@@ -184,6 +196,7 @@ func TestNewRecipeEngine_ResolvesMarker(t *testing.T) {
 }
 
 func TestNewRecipeEngine_UnknownCLI(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{Workspace: t.TempDir()}
 	if _, err := newRecipeEngine(cfg, recipeDeps(&fakeTmux{}), "no-such-cli"); err == nil {
 		t.Fatal("want manifest-not-found error")
@@ -193,6 +206,7 @@ func TestNewRecipeEngine_UnknownCLI(t *testing.T) {
 func TestRunRecipe_PluginInstallHappyPath(t *testing.T) {
 	// One benign pane satisfies boot-marker + all three step awaits and trips
 	// no fail_regex / interactive_prompt rule.
+	t.Parallel()
 	pane := "❯ marketplace added; plugin installed; plugins reloaded; ready ❯"
 	tx := &fakeTmux{existing: map[string]bool{}, paneSeq: []string{pane}}
 	cfg := &Config{
@@ -218,6 +232,7 @@ func TestRunRecipe_PluginInstallHappyPath(t *testing.T) {
 }
 
 func TestRunRecipe_UnknownRecipe(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{CLI: "claude-tmux", Workspace: t.TempDir(), Agent: "recipe"}
 	if _, err := RunRecipe(context.Background(), cfg, recipeDeps(&fakeTmux{}), "claude-tmux", "no-such-recipe", nil); err == nil {
 		t.Fatal("want recipe-not-found error")
@@ -225,6 +240,7 @@ func TestRunRecipe_UnknownRecipe(t *testing.T) {
 }
 
 func TestCaptureHelp(t *testing.T) {
+	t.Parallel()
 	help := "Available commands:\n/help    Show help\n/model   Switch model\n/plugin  Manage plugins\nready ❯"
 	tx := &fakeTmux{existing: map[string]bool{"evolve-bridge-named-covhelp": true}, paneSeq: []string{help}}
 	cfg := &Config{
@@ -241,6 +257,7 @@ func TestCaptureHelp(t *testing.T) {
 }
 
 func TestCaptureHelp_UnknownCLI(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{Workspace: t.TempDir()}
 	if _, err := CaptureHelp(context.Background(), cfg, recipeDeps(&fakeTmux{}), "no-such-cli"); err == nil {
 		t.Fatal("want manifest error")
@@ -249,6 +266,7 @@ func TestCaptureHelp_UnknownCLI(t *testing.T) {
 
 func TestCaptureHelp_BootFailure(t *testing.T) {
 	// Session does not exist and the marker never appears → EnsureSession errors.
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"no marker here"}}
 	cfg := &Config{CLI: "claude-tmux", Workspace: t.TempDir(), Agent: "introspect", Realization: RealizeFor("claude-tmux", LaunchIntent{})}
 	if _, err := CaptureHelp(context.Background(), cfg, recipeDeps(tx), "claude-tmux"); err == nil {
@@ -258,6 +276,7 @@ func TestCaptureHelp_BootFailure(t *testing.T) {
 
 func TestRunRecipe_UnknownCLIEngineError(t *testing.T) {
 	// Recipe loads, but newRecipeEngine fails resolving an unknown CLI's manifest.
+	t.Parallel()
 	cfg := &Config{CLI: "no-such-cli", Workspace: t.TempDir(), Agent: "recipe"}
 	if _, err := RunRecipe(context.Background(), cfg, recipeDeps(&fakeTmux{}), "no-such-cli", "list-capabilities", nil); err == nil {
 		t.Fatal("want newRecipeEngine manifest error")
@@ -265,6 +284,7 @@ func TestRunRecipe_UnknownCLIEngineError(t *testing.T) {
 }
 
 func TestRunRecipe_UnsupportedCLI(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{CLI: "ollama-tmux", Workspace: t.TempDir(), Agent: "recipe"}
 	_, err := RunRecipe(context.Background(), cfg, recipeDeps(&fakeTmux{}), "ollama-tmux", "plugin-install", map[string]string{"marketplace": "x", "plugin": "y"})
 	if err == nil || !strings.Contains(err.Error(), "no steps for cli") {

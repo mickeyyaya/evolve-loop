@@ -10,6 +10,7 @@ import (
 )
 
 func TestSecondaryArtifacts_ArmsOnlyOnContinuationWorkspaces(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	req := core.PhaseRequest{Workspace: ws}
 

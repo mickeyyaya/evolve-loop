@@ -10,6 +10,7 @@ import (
 // launch with no designated worktree runs in a disposable scratch dir under
 // its own Workspace, never the process cwd.
 func TestApplyScratchCwd_PointsProbeAtScratchUnderWorkspace(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := &Config{Workspace: ws} // probe: no Worktree designated
 	applyScratchCwd(cfg)
@@ -31,6 +32,7 @@ func TestApplyScratchCwd_PointsProbeAtScratchUnderWorkspace(t *testing.T) {
 // must return "" (never a fabricated path) when there is no workspace to own it
 // or no name — the caller then keeps its own prior fallback.
 func TestScratchCwd_MintsUnderWorkspaceAndFailsOpen(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	got := ScratchCwd(ws, "retro-scratch-cwd")
 
@@ -52,6 +54,7 @@ func TestScratchCwd_MintsUnderWorkspaceAndFailsOpen(t *testing.T) {
 // A real phase already carries its worktree — applyScratchCwd must never touch it
 // (the degraded-mode os.Getwd() fallback in runTmuxREPL stays the phase path).
 func TestApplyScratchCwd_NoOpWhenWorktreeSet(t *testing.T) {
+	t.Parallel()
 	realWorktree := t.TempDir()
 	cfg := &Config{Workspace: t.TempDir(), Worktree: realWorktree}
 	applyScratchCwd(cfg)
@@ -63,6 +66,7 @@ func TestApplyScratchCwd_NoOpWhenWorktreeSet(t *testing.T) {
 // With no owned Workspace there is nowhere safe to put a scratch dir, so the
 // caller keeps its existing fallback (Worktree stays empty) — no temp leak.
 func TestApplyScratchCwd_NoOpWhenNoWorkspace(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{}
 	applyScratchCwd(cfg)
 	if cfg.Worktree != "" {
@@ -75,6 +79,7 @@ func TestApplyScratchCwd_NoOpWhenNoWorkspace(t *testing.T) {
 // share: a false negative strands a live lane in a repo-less scratch dir, a
 // false positive hands the bridge a path it will refuse.
 func TestIsDir_MatchesTheLaunchGuardPredicate(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	file := filepath.Join(dir, "not-a-dir")
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {

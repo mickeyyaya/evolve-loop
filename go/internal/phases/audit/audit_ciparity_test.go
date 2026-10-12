@@ -11,6 +11,7 @@ import (
 )
 
 func TestRun_CIParityGate_Offenders_FAILsAudit(t *testing.T) {
+	t.Parallel()
 	offenders := func(core.PhaseRequest) ([]string, error) { return []string{"boom"}, nil }
 	cases := []struct {
 		name string
@@ -44,6 +45,7 @@ func TestRun_CIParityGate_Offenders_FAILsAudit(t *testing.T) {
 }
 
 func TestRun_CIParityGate_Error_FailsOpenWithWarning(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	phase := New(Config{
@@ -61,6 +63,7 @@ func TestRun_CIParityGate_Error_FailsOpenWithWarning(t *testing.T) {
 }
 
 func TestNewDefault_WiresCIParityGates(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skips real go vet subprocess under -short; full `go test` + CI still run it")
 	}

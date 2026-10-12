@@ -43,6 +43,7 @@ func containsInt(xs []int, v int) bool {
 }
 
 func TestScrollbackLines(t *testing.T) {
+	t.Parallel()
 	t.Run("override 2000 → final capture uses 2000, not the 10000 default", func(t *testing.T) {
 		got := runScrollbackPhase(t, 2000)
 		if !containsInt(got, 2000) {

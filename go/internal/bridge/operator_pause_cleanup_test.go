@@ -29,6 +29,7 @@ func (c *pauseCleanupController) KillSession(ctx context.Context, _ string) erro
 	return nil
 }
 func TestOperatorPauseCleanupCancelsProvider(t *testing.T) {
+	t.Parallel()
 	for _, canceled := range []bool{false, true} {
 		name := "live_context_control"
 		if canceled {
@@ -50,6 +51,7 @@ func TestOperatorPauseCleanupCancelsProvider(t *testing.T) {
 }
 
 func TestTmuxCleanup_CapturesThePaneOfTheDispatchBeforeTheKill(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	capture := paneCapture{shared: filepath.Join(dir, "tmux-final-scrollback.txt"), dispatch: filepath.Join(dir, "build-s1-final-pane.txt"), lines: 5}
 	tm := &pauseCleanupController{}
@@ -65,6 +67,7 @@ func TestTmuxCleanup_CapturesThePaneOfTheDispatchBeforeTheKill(t *testing.T) {
 }
 
 func TestTmuxCleanup_AFailedDispatchCaptureIsAWarnAndIsNotObserved(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	capture := paneCapture{shared: filepath.Join(dir, "tmux-final-scrollback.txt"), dispatch: filepath.Join(dir, "absent", "build-s1-final-pane.txt"), lines: 5}
 	var stderr bytes.Buffer
@@ -88,6 +91,7 @@ func (c *paneTextController) CapturePane(context.Context, string, int) (string, 
 }
 
 func TestTmuxCleanup_TheDispatchCaptureIsPrivateAndKeepsOnlyTheLastBytes(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		max  int

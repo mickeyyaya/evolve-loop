@@ -19,6 +19,7 @@ import (
 // These tests exercise the real Make recipes and Go coverage tools. A percentage
 // alone is not a verdict: Go writes coverage even when a test assertion fails.
 func TestMakeCoverageGates_PropagateTestFailure(t *testing.T) {
+	t.Parallel()
 	for _, failing := range []bool{false, true} {
 		name := "passing"
 		if failing {
@@ -68,6 +69,7 @@ func requireMake(t *testing.T, root, target string) {
 }
 
 func TestMakeCoverageGates_RejectToolFailure(t *testing.T) {
+	t.Parallel()
 	for _, stage := range []string{"test", "tool", "list"} {
 		t.Run(stage, func(t *testing.T) {
 			root := makeFixture(t)
@@ -89,6 +91,7 @@ func TestMakeCoverageGates_RejectToolFailure(t *testing.T) {
 }
 
 func TestMakeCoverStrict_PreservesFloor(t *testing.T) {
+	t.Parallel()
 	root := makeFixture(t)
 	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value(b bool) int { if b { return 1 }; return 2 }\n")
 	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value(true) != 1 { t.Fatal(\"wrong value\") } }\n")
@@ -100,6 +103,7 @@ func TestMakeCoverStrict_PreservesFloor(t *testing.T) {
 }
 
 func TestMakeAPIEnforce_ExcludesCyclePredicatesFromMeasurement(t *testing.T) {
+	t.Parallel()
 	root := makeFixture(t)
 	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value() int { return 1 }\n")
 	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 1 { t.Fatal(\"wrong value\") } }\n")
@@ -111,6 +115,7 @@ func TestMakeAPIEnforce_ExcludesCyclePredicatesFromMeasurement(t *testing.T) {
 }
 
 func TestMakeAPIEnforce_AcceptsTestOnlyOrEmptyEnrollment(t *testing.T) {
+	t.Parallel()
 	for _, manifest := range []string{"./acs/probe\n", "# no enrolled packages\n"} {
 		t.Run(strings.TrimSpace(manifest), func(t *testing.T) {
 			root := makeFixture(t)
@@ -124,6 +129,7 @@ func TestMakeAPIEnforce_AcceptsTestOnlyOrEmptyEnrollment(t *testing.T) {
 }
 
 func TestMakeAPICheck_RejectsMissingOrMalformedProfile(t *testing.T) {
+	t.Parallel()
 	for _, missing := range []bool{true, false} {
 		name := "malformed"
 		if missing {
@@ -144,6 +150,7 @@ func TestMakeAPICheck_RejectsMissingOrMalformedProfile(t *testing.T) {
 }
 
 func TestMakeCoverStrict_ChecksFinalLineWithoutNewline(t *testing.T) {
+	t.Parallel()
 	root := makeFixture(t)
 	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value(b bool) int { if b { return 1 }; return 2 }\n")
 	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value(true) != 1 { t.Fatal(\"wrong value\") } }\n")
@@ -155,6 +162,7 @@ func TestMakeCoverStrict_ChecksFinalLineWithoutNewline(t *testing.T) {
 }
 
 func TestMakeCoverageGates_RejectMissingManifest(t *testing.T) {
+	t.Parallel()
 	for _, target := range []string{"cover-strict", "apicover-enforce"} {
 		t.Run(target, func(t *testing.T) {
 			root := makeFixture(t)
@@ -173,6 +181,7 @@ func TestMakeCoverageGates_RejectMissingManifest(t *testing.T) {
 }
 
 func TestMakeCoverStrict_RejectsManifestDirectory(t *testing.T) {
+	t.Parallel()
 	root := makeFixture(t)
 	manifest := filepath.Join(root, ".cover-strict")
 	if err := os.Remove(manifest); err != nil {
@@ -188,6 +197,7 @@ func TestMakeCoverStrict_RejectsManifestDirectory(t *testing.T) {
 }
 
 func TestMakeFixture_CancellationFailsHarness(t *testing.T) {
+	t.Parallel()
 	const control = "EVOLVE_MAKE_CANCELLATION_CONTROL"
 	if os.Getenv(control) == "1" {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -206,6 +216,7 @@ func TestMakeFixture_CancellationFailsHarness(t *testing.T) {
 }
 
 func TestMakeCoverStrict_RejectsInvalidFloorOrEvaluator(t *testing.T) {
+	t.Parallel()
 	for _, fault := range []string{"invalid_floor", "floor_over_100", "failed_evaluator"} {
 		t.Run(fault, func(t *testing.T) {
 			root := probeFixture(t, false)
@@ -229,6 +240,7 @@ func TestMakeCoverStrict_RejectsInvalidFloorOrEvaluator(t *testing.T) {
 }
 
 func TestMakeCoverStrict_RefusesAMissingOrStaleProfile(t *testing.T) {
+	t.Parallel()
 	root := probeFixture(t, false)
 	out, err := runMakeFixture(t, root, "cover-strict")
 	if err == nil || !strings.Contains(out, "no coverage profile") {
@@ -246,6 +258,7 @@ func TestMakeCoverStrict_RefusesAMissingOrStaleProfile(t *testing.T) {
 }
 
 func TestMakeIntegration_LeavesAProfileOnlyAfterAGreenRun(t *testing.T) {
+	t.Parallel()
 	root := probeFixture(t, true)
 	writeMakeFixture(t, root, "coverage.txt", "mode: atomic\nstale profile of an earlier run\n")
 	if out, err := runMakeFixture(t, root, "test-integration"); err == nil {
@@ -268,6 +281,7 @@ func TestMakeIntegration_LeavesAProfileOnlyAfterAGreenRun(t *testing.T) {
 }
 
 func TestMakeIntegration_SelectsEntireRuntime(t *testing.T) {
+	t.Parallel()
 	root := makeFixture(t)
 	packages := []string{"internal/probe", "cmd/probe", "pkg/probe", "test/component", "test/fixtures", "test/trustkernel", "test/integration", "examples/probe"}
 	for _, pkg := range packages {
@@ -289,6 +303,7 @@ func TestMakeIntegration_SelectsEntireRuntime(t *testing.T) {
 }
 
 func TestMakeAll_ExecutesCompoundE2ETag(t *testing.T) {
+	t.Parallel()
 	root := makeFixture(t)
 	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\n")
 	writeMakeFixture(t, root, "cmd/probe/probe.go", "package probe\n")
@@ -395,6 +410,7 @@ func runMakeFixtureContext(t *testing.T, ctx context.Context, root, target strin
 }
 
 func TestMakeAPIEnforce_LeavesTheIntegrationProfileForCoverChanged(t *testing.T) {
+	t.Parallel()
 	root := makeFixture(t)
 	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value() int { return 1 }\n")
 	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 1 { t.Fatal(\"wrong value\") } }\n")
@@ -415,6 +431,7 @@ func TestMakeAPIEnforce_LeavesTheIntegrationProfileForCoverChanged(t *testing.T)
 }
 
 func TestMakeApicover_NeverFeedsTheCoverageGates(t *testing.T) {
+	t.Parallel()
 	root := probeFixture(t, false)
 	scoped := "APICOVER_PKGS=./internal/probe"
 	if out, err := runMakeFixture(t, root, "apicover", scoped); err != nil {

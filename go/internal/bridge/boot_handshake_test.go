@@ -26,6 +26,7 @@ bquote>
 zsh: command not found: and`
 
 func TestBootRejectsMarkerOverDeadShell(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	frames := make([]string, 0, tmuxREPLBootTimeoutS+1)
 	for i := 0; i < tmuxREPLBootTimeoutS+1; i++ {
@@ -47,6 +48,7 @@ func TestBootRejectsMarkerOverDeadShell(t *testing.T) {
 }
 
 func TestBootAcceptsMarkerWithCLIProcess(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	// Two frames: boot marker + the deferred cleanup's final-scrollback capture.
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ done"}, PaneCmd: "node"}
@@ -60,6 +62,7 @@ func TestBootAcceptsMarkerWithCLIProcess(t *testing.T) {
 }
 
 func TestPostPasteShellSpillFailsFast(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	// Frames: boot marker (process node), then the post-paste interval baseline showing the spill (process zsh),
 	// then the deferred-cleanup final scrollback. No artifact is ever written.
@@ -83,6 +86,7 @@ func TestPostPasteShellSpillFailsFast(t *testing.T) {
 }
 
 func TestPostPasteSpillLookalikeWithCLIProcessIgnored(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	// The pane quotes spill text while the foreground process is still the CLI, so the run must complete.
 	// The lookalike frame is queued twice: the cross-poll stability window captures the settled pane once more.
@@ -102,6 +106,7 @@ func TestPostPasteSpillLookalikeWithCLIProcessIgnored(t *testing.T) {
 
 // A harness whose REPL is a shell script (the RealTmux integration fixtures) must boot when guardDeadShell is unset.
 func TestGuardOffShellREPLBoots(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ done"}, PaneCmd: "bash"}
 	code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
@@ -114,6 +119,7 @@ func TestGuardOffShellREPLBoots(t *testing.T) {
 }
 
 func TestIsShellProcess(t *testing.T) {
+	t.Parallel()
 	cases := map[string]bool{
 		"zsh": true, "-zsh": true, "bash": true, "-bash": true, "sh": true,
 		"fish": true, "dash": true, "tcsh": true, "ksh": true,

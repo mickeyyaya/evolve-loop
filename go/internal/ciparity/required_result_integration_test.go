@@ -12,6 +12,7 @@ import (
 )
 
 func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
+	t.Parallel()
 	step := workflowStep(t, RequiredWorkflow, "required", "result")
 	bindings := map[string]string{
 		"ROUTE_RESULT": "${{ needs.changes.result }}", "VALIDATE_RESULT": "${{ needs.validate.result }}",

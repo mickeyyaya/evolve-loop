@@ -106,6 +106,7 @@ const itMarker = "ITREADY"
 // --- 1. claude single-select AskUserQuestion → bare Enter unblocks ----------
 
 func TestRealTmux_Interactive_ClaudeSingleSelect_AutoEnter(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
 	// Footer matches askuserquestion_select; no "[ ]" so the multiselect rule
@@ -128,6 +129,7 @@ func TestRealTmux_Interactive_ClaudeSingleSelect_AutoEnter(t *testing.T) {
 // --- 1b. claude multi-select → "Enter,Right,Enter" sequence unblocks --------
 
 func TestRealTmux_Interactive_ClaudeMultiSelect_AutoSubmit(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
 	// Prompt carries the highlighted checkbox row → matches askuserquestion_
@@ -153,6 +155,7 @@ func TestRealTmux_Interactive_ClaudeMultiSelect_AutoSubmit(t *testing.T) {
 // --- 2. codex trust dialog at boot → "1,Enter" unblocks ---------------------
 
 func TestRealTmux_Interactive_CodexTrust_AutoRespondAtBoot(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
 	launch := writeInteractiveFake(t, cfg.Worktree, itMarker,
@@ -174,6 +177,7 @@ func TestRealTmux_Interactive_CodexTrust_AutoRespondAtBoot(t *testing.T) {
 // --- 3. agy permission prompt → "y,Enter" unblocks --------------------------
 
 func TestRealTmux_Interactive_AgyPermission_AutoYes(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
 	launch := writeInteractiveFake(t, cfg.Worktree, itMarker,
@@ -194,6 +198,7 @@ func TestRealTmux_Interactive_AgyPermission_AutoYes(t *testing.T) {
 // --- 4. escalate prompt → EC85 fast, no hang, escalation report written -----
 
 func TestRealTmux_Interactive_Escalate_FailsFastWithReport(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
 	// auth_recheck is policy=escalate → the bridge cannot self-resolve OAuth,
@@ -216,6 +221,7 @@ func TestRealTmux_Interactive_Escalate_FailsFastWithReport(t *testing.T) {
 // --- 5b. Config.ArtifactTimeoutS overrides the 300s default deadline --------
 
 func TestRealTmux_Interactive_ArtifactTimeoutOverride(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	// The fake boots but never writes the artifact; ArtifactTimeoutS=2 (not the
 	// 300s default) must bound the wait → fast EC81. Guards the per-launch
@@ -236,6 +242,7 @@ func TestRealTmux_Interactive_ArtifactTimeoutOverride(t *testing.T) {
 // --- 6. stuck auto_respond prompt → loop guard EC86, no infinite hang -------
 
 func TestRealTmux_Interactive_StuckAutoRespond_TripsLoopGuard(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
 	// model_deprecation is auto_respond (y,Enter), but the fake never clears

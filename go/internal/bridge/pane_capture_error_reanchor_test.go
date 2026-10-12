@@ -42,6 +42,7 @@ var errCapture = errors.New("capture-pane: no server running")
 // ERROR → good frame sequence and asserts the answer line reaches pane.live
 // exactly once.
 func TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	deps := covDeps()
@@ -88,6 +89,7 @@ func TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta(t *testing.T) {
 // captures successfully after priming still completes on its artifact and
 // emits nothing spurious.
 func TestRunTmuxREPL_CaptureErrorStillCompletes(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	deps := covDeps()

@@ -28,6 +28,7 @@ func newC672TickResponder(t *testing.T, pane string) *autoResponder {
 }
 
 func TestC672_003_TickEchoedExhaustionDoesNotEscalate(t *testing.T) {
+	t.Parallel()
 	pane := "thinking...\n" + c672PromptEchoLine + "\nwriting report...\n"
 	ar := newC672TickResponder(t, pane)
 	ar.injectedPrompt = "Instructions.\n" + c672PromptEchoLine + "\nProceed."
@@ -42,6 +43,7 @@ func TestC672_003_TickEchoedExhaustionDoesNotEscalate(t *testing.T) {
 // genuine CLI quota banner ABSENT from the injected prompt must still
 // escalate — the echo-veto wiring must not blanket-disable the wall.
 func TestC672_004_TickGenuineExhaustionStillEscalates(t *testing.T) {
+	t.Parallel()
 	pane := "You have reached your usage limit. Resets in 4h.\n"
 	ar := newC672TickResponder(t, pane)
 	ar.injectedPrompt = "Instructions: do the task and report." // banner is NOT a substring
@@ -63,6 +65,7 @@ func TestC672_004_TickGenuineExhaustionStillEscalates(t *testing.T) {
 // autoResponder must reference injectedPrompt, or the behavioral tests above
 // could pass on a field production never populates.
 func TestC672_005_ResponderConstructionSitesCarryInjectedPrompt(t *testing.T) {
+	t.Parallel()
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("could not resolve this test file's path via runtime.Caller")

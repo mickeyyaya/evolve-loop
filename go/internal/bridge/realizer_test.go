@@ -48,6 +48,7 @@ func agyTmuxManifest() Manifest {
 }
 
 func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
+	t.Parallel()
 	intent := LaunchIntent{
 		ModelTier:     "sonnet",
 		Permission:    "bypass",
@@ -107,6 +108,7 @@ func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
 // in-session. No production manifest uses it today, so it's pinned here with
 // a synthetic manifest to keep the channel covered and reserved.
 func TestRealize_REPLChannel(t *testing.T) {
+	t.Parallel()
 	m := Manifest{
 		CLI:          "hypo-tmux",
 		ModelTierMap: map[string]string{"sonnet": "model-x"},
@@ -122,6 +124,7 @@ func TestRealize_REPLChannel(t *testing.T) {
 }
 
 func TestRealize_NamedSessionMode(t *testing.T) {
+	t.Parallel()
 	got := Realize(claudeTmuxManifest(), LaunchIntent{SessionMode: "named:work-1"})
 	if got.Ephemeral {
 		t.Fatal("named session must not be ephemeral")
@@ -132,6 +135,7 @@ func TestRealize_NamedSessionMode(t *testing.T) {
 }
 
 func TestRealize_UnknownIntentIsNoop(t *testing.T) {
+	t.Parallel()
 	got := Realize(Manifest{CLI: "bare"}, LaunchIntent{ModelTier: "sonnet", Permission: "bypass", SettingsScope: "project"})
 	if len(got.LaunchFlags) != 0 || len(got.REPLInput) != 0 {
 		t.Fatalf("bare manifest must realize to nothing; got flags=%v repl=%v", got.LaunchFlags, got.REPLInput)
@@ -139,6 +143,7 @@ func TestRealize_UnknownIntentIsNoop(t *testing.T) {
 }
 
 func TestRealize_RawEscapeHatchAppliesOnlyToMatchingCLI(t *testing.T) {
+	t.Parallel()
 	intent := LaunchIntent{RawByCLI: map[string][]string{"claude-tmux": {"--foo", "bar"}, "agy-tmux": {"--baz"}}}
 	cl := Realize(claudeTmuxManifest(), intent)
 	if !containsToken(cl.LaunchFlags, "--foo") || !containsToken(cl.LaunchFlags, "bar") {
@@ -154,6 +159,7 @@ func TestRealize_RawEscapeHatchAppliesOnlyToMatchingCLI(t *testing.T) {
 }
 
 func TestRealize_AllowedToolsExpandsFlag(t *testing.T) {
+	t.Parallel()
 	got := Realize(claudeTmuxManifest(), LaunchIntent{AllowedTools: []string{"Read", "Write"}})
 	want := []string{"--allowedTools", "Read", "Write"}
 	if !reflect.DeepEqual(got.LaunchFlags, want) {
@@ -164,6 +170,7 @@ func TestRealize_AllowedToolsExpandsFlag(t *testing.T) {
 func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 	// Synthetic manifest: default_args + one per-param scalar. Tokens MUST
 	// appear in this exact order.
+	t.Parallel()
 	m := Manifest{
 		CLI:         "hypo",
 		DefaultArgs: []string{"--always", "--on"},
@@ -201,6 +208,7 @@ func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 	// Collision case: default_args declares the same flag the bypass channel
 	// emits. Result must contain it exactly ONCE, at the leading position.
+	t.Parallel()
 	m := Manifest{
 		CLI:         "hypo",
 		DefaultArgs: []string{"--bypass"},
@@ -234,6 +242,7 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 // input shape so future refactors surface here first. Order-preservation
 // (first occurrence wins) is the load-bearing contract.
 func TestDedupeLaunchFlags_Edges(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		in   []string
@@ -294,6 +303,7 @@ func TestDedupeLaunchFlags_Edges(t *testing.T) {
 // TestDedupeLaunchFlags_AliasSafety pins that dedupeLaunchFlags returns a
 // slice that shares no backing storage with its input, in either direction.
 func TestDedupeLaunchFlags_AliasSafety(t *testing.T) {
+	t.Parallel()
 	in := []string{"--a", "--b", "--a", "--c"}
 	original := append([]string(nil), in...)
 	got := dedupeLaunchFlags(in)
@@ -323,6 +333,7 @@ func TestDedupeLaunchFlags_AliasSafety(t *testing.T) {
 // internal order), raw escape-hatch flags last. This is the documented
 // contract for a single CLI; cross-CLI tests live in realizer_realmanifest_test.go.
 func TestRealize_DefaultArgs_StackInteraction(t *testing.T) {
+	t.Parallel()
 	m := Manifest{
 		CLI:          "stack",
 		DefaultArgs:  []string{"--default-1", "--default-2"},
@@ -358,6 +369,7 @@ func TestRealize_DefaultArgs_StackInteraction(t *testing.T) {
 // manifest" path: a brand-new driver with only DefaultArgs and a Binary can
 // still emit boot flags before its param table is fleshed out.
 func TestRealize_DefaultArgs_DegenerateManifest(t *testing.T) {
+	t.Parallel()
 	m := Manifest{CLI: "bare", DefaultArgs: []string{"--only-this"}}
 	got := Realize(m, LaunchIntent{ModelTier: "sonnet", Permission: "bypass"})
 	if !reflect.DeepEqual(got.LaunchFlags, []string{"--only-this"}) {
@@ -372,6 +384,7 @@ func TestRealize_DefaultArgs_DegenerateManifest(t *testing.T) {
 // repeats WITHIN default_args itself, not just collisions WITH the params
 // channel. A typo'd manifest `["--yolo", "--yolo"]` shouldn't double-emit.
 func TestRealize_DefaultArgs_InternalDuplicates(t *testing.T) {
+	t.Parallel()
 	m := Manifest{
 		CLI:         "dup-default",
 		DefaultArgs: []string{"--yolo", "--yolo", "--yolo"},
@@ -387,6 +400,7 @@ func TestRealize_DefaultArgs_InternalDuplicates(t *testing.T) {
 // channel params write to REPLInput; default_args writes to LaunchFlags.
 // They must remain orthogonal so a manifest can use both safely.
 func TestRealize_DefaultArgs_OrthogonalToREPLChannel(t *testing.T) {
+	t.Parallel()
 	m := Manifest{
 		CLI:          "mixed",
 		DefaultArgs:  []string{"--launch-only"},
@@ -411,6 +425,7 @@ func TestRealize_DefaultArgs_OrthogonalToREPLChannel(t *testing.T) {
 // driver_ollamatmux.go ollamaComposeLaunchCmd) treat empty tokens as
 // no-ops. This pins that contract at the realizer level.
 func TestRealize_DefaultArgs_EmptyTokenDefensive(t *testing.T) {
+	t.Parallel()
 	m := Manifest{CLI: "typo", DefaultArgs: []string{"", "--real", ""}}
 	got := Realize(m, LaunchIntent{})
 	// Dedupe collapses the two empties to one. The downstream join paths

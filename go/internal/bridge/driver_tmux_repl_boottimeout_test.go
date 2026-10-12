@@ -10,6 +10,7 @@ import (
 )
 
 func TestEngineLaunch_BootTimeout_ConfigurableViaEnv(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	const bootPasses, finalScrollbackCaptures = 4, 1
 	const wantPolls = bootPasses + finalScrollbackCaptures
@@ -34,6 +35,7 @@ func TestEngineLaunch_BootTimeout_ConfigurableViaEnv(t *testing.T) {
 }
 
 func TestEngineLaunch_BootTimeout_RecordsStrike(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{}
 	store := clihealth.NewStore(t.TempDir(), nil)

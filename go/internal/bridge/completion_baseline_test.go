@@ -14,6 +14,7 @@ func newArtifactDetectorWithBaselineAt(ws, artifact string) *artifactDetector {
 }
 
 func TestArtifactDetector_PreExistingArtifactRequiresPostDispatchWrite(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	writeArtifact(t, canonical, "verdict: FAIL\n", fixedMTime)
@@ -40,6 +41,7 @@ func TestArtifactDetector_PreExistingArtifactRequiresPostDispatchWrite(t *testin
 }
 
 func TestArtifactDetector_FinalPollRefusesUnchangedBaseline(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	writeArtifact(t, canonical, "verdict: FAIL\n", fixedMTime)
@@ -54,6 +56,7 @@ func TestArtifactDetector_FinalPollRefusesUnchangedBaseline(t *testing.T) {
 }
 
 func TestArtifactDetector_FinalPollStillCompletesPostDispatchWrite(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	writeArtifact(t, canonical, "verdict: FAIL\n", fixedMTime)
@@ -69,6 +72,7 @@ func TestArtifactDetector_FinalPollStillCompletesPostDispatchWrite(t *testing.T)
 }
 
 func TestCaptureArtifactBaseline(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	if b := captureArtifactBaseline(&Config{Workspace: ws, Artifact: canonical}); len(b.entries) != 0 {
@@ -83,6 +87,7 @@ func TestCaptureArtifactBaseline(t *testing.T) {
 }
 
 func TestRunTmuxREPL_StalePreDispatchArtifactTimesOutInsteadOfCompleting(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	writeArtifact(t, fx.artifact, "verdict: FAIL\nprior attempt's report\n", fixedMTime)
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; agent never writes
@@ -102,6 +107,7 @@ func TestRunTmuxREPL_StalePreDispatchArtifactTimesOutInsteadOfCompleting(t *test
 // attempt's report — the size delta is then the only post-dispatch evidence,
 // and the write must still certify normally.
 func TestArtifactDetector_SameMTimeDifferentSizeWriteIsPostDispatch(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	writeArtifact(t, canonical, "verdict: FAIL\n", fixedMTime)
@@ -121,6 +127,7 @@ func TestArtifactDetector_SameMTimeDifferentSizeWriteIsPostDispatch(t *testing.T
 func zeroBaselineCapture(*Config) dispatchBaseline { return dispatchBaseline{} }
 
 func TestDepsWithDefaults_CaptureBaselineIsReal(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	writeArtifact(t, canonical, "prior\n", fixedMTime)
@@ -136,6 +143,7 @@ func TestDepsWithDefaults_CaptureBaselineIsReal(t *testing.T) {
 // vanishes mid-session (a rm-then-rewrite gap), the stray would otherwise
 // start a fresh window and launder the same class through the fallback path.
 func TestArtifactDetector_ShadowedFallbackStrayIsAlsoBaselined(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallbackDir := filepath.Join(ws, "workspace")

@@ -17,6 +17,7 @@ import (
 )
 
 func TestRecordTokenUsage_AgyThoughtLineMeasuresTheAttempt(t *testing.T) {
+	t.Parallel()
 	start := time.Date(2026, 10, 6, 10, 0, 0, 0, time.UTC)
 	end := start.Add(90 * time.Second)
 	ws := filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1806")
@@ -46,6 +47,7 @@ func TestRecordTokenUsage_AgyThoughtLineMeasuresTheAttempt(t *testing.T) {
 }
 
 func TestAgyTmuxManifest_TokenLineRegexNamesCountAndScale(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatal(err)

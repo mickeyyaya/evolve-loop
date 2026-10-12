@@ -40,6 +40,7 @@ func (f *fakeWrap) wrap() SandboxWrapper {
 func TestSandboxPrefix_NoWorktree_SkipsWrap(t *testing.T) {
 	// Non-source-writing phases (cfg.Worktree=="") MUST NOT consult the
 	// wrapper — they don't write source, so confinement adds nothing.
+	t.Parallel()
 	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "x"}, available: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{Worktree: "", Agent: "scout"}
@@ -53,6 +54,7 @@ func TestSandboxPrefix_NoWorktree_SkipsWrap(t *testing.T) {
 }
 
 func TestSandboxPrefix_RequiredContractConsultsWrapperWithoutWorktree(t *testing.T) {
+	t.Parallel()
 	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "x"}, available: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{RequireSandbox: true, Workspace: "/ws", ProjectRoot: "/repo", Agent: "build"}
@@ -68,6 +70,7 @@ func TestSandboxPrefix_RequiredContractConsultsWrapperWithoutWorktree(t *testing
 func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 	// Source-writing phases pass their absolute Worktree+Workspace+RepoRoot
 	// to the wrapper — the SBPL profile depends on every path being absolute.
+	t.Parallel()
 	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "/tmp/sb.sb"}, available: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{
@@ -95,6 +98,7 @@ func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 // is forced true regardless of the profile value; the profile value controls
 // only whether a misconfiguration WARN fires.
 func TestSandboxPrefix_ForcesNetwork(t *testing.T) {
+	t.Parallel()
 	base := func() *Config {
 		return &Config{Worktree: "/wt", Workspace: "/ws", ProjectRoot: "/repo", Agent: "tdd"}
 	}
@@ -138,6 +142,7 @@ func TestSandboxPrefix_ForcesNetwork(t *testing.T) {
 func TestSandboxPrefix_NoWrapper_Degrades(t *testing.T) {
 	// A deps with no SandboxWrap (older test harness, or explicit off) must
 	// return (nil, false) — drivers then run unwrapped. Never panic on nil.
+	t.Parallel()
 	deps := Deps{SandboxWrap: nil}
 	cfg := &Config{Worktree: "/abs/wt/x", Agent: "build"}
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
@@ -148,6 +153,7 @@ func TestSandboxPrefix_NoWrapper_Degrades(t *testing.T) {
 
 func TestWrapHeadless_NoWrap_PassesThrough(t *testing.T) {
 	// When wrap is unavailable the (name, args) pair must come out unchanged.
+	t.Parallel()
 	fw := &fakeWrap{returnEmpty: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{Worktree: "/abs/wt/x", Agent: "build"}
@@ -161,6 +167,7 @@ func TestWrapHeadless_WithWrap_PrependsPrefix(t *testing.T) {
 	// With wrap, name becomes the sandbox binary and args = prefix-flags +
 	// [original-binary] + original-args. Order matters — the inner binary
 	// MUST come BEFORE its original args for argv parsing to work.
+	t.Parallel()
 	fw := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "/tmp/sb.sb"}, available: true}
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{Worktree: "/abs/wt/x", Agent: "build"}
@@ -178,6 +185,7 @@ func TestJoinPrefixForTmux_QuotesSpecialChars(t *testing.T) {
 	// The tmux driver sends the launch command as a single SHELL LINE via
 	// SendKeys, so any path containing spaces / quotes must be POSIX-quoted
 	// or the shell will tokenize it incorrectly.
+	t.Parallel()
 	got := joinPrefixForTmux([]string{"sandbox-exec", "-p", "/tmp/has space.sb"})
 	if !strings.Contains(got, `'/tmp/has space.sb'`) {
 		t.Errorf("path with space not single-quoted; got %q", got)
@@ -190,6 +198,7 @@ func TestJoinPrefixForTmux_QuotesSpecialChars(t *testing.T) {
 }
 
 func TestDefaultSandboxWrap_OffMode_NeverWraps(t *testing.T) {
+	t.Parallel()
 	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOff}}
 	wrap := defaultSandboxWrap(deps)
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
@@ -202,6 +211,7 @@ func TestDefaultSandboxWrap_NestedClaudeAuto_DoesNotWrap(t *testing.T) {
 	// Auto mode + nested-claude (the outer Claude Code session already has OS
 	// sandbox + Tier-1 hooks) must skip wrapping to avoid EPERM noise. Same
 	// signal preflight uses.
+	t.Parallel()
 	deps := Deps{Env: map[string]string{
 		"EVOLVE_SANDBOX":         config.SandboxModeAuto,
 		"CLAUDE_CODE_ENTRYPOINT": "cli",
@@ -218,6 +228,7 @@ func TestDefaultSandboxWrap_NestedViaLookupEnv_DoesNotWrap(t *testing.T) {
 	// deps.LookupEnv; this pins the LookupEnv fallback branch (a nested signal
 	// present only via LookupEnv must still be detected, so the wrap is
 	// skipped).
+	t.Parallel()
 	deps := Deps{
 		Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeAuto},
 		LookupEnv: func(k string) (string, bool) {
@@ -249,6 +260,7 @@ func TestDefaultSandboxWrap_Darwin_WritesSBPLAndUsesDashF(t *testing.T) {
 	// (per-phase file) AND the prefix uses `-f` (file path), NOT `-p` (which
 	// would make sandbox-exec parse the path AS the inline profile, silently
 	// leaving the phase unconfined).
+	t.Parallel()
 	ws := t.TempDir()
 	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOn}}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
@@ -274,6 +286,7 @@ func TestDefaultSandboxWrap_Darwin_WritesSBPLAndUsesDashF(t *testing.T) {
 }
 
 func TestDefaultSandboxWrap_Darwin_AllowsHomeReadAndProfileNetwork(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOn}}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
@@ -307,6 +320,7 @@ func TestDefaultSandboxWrap_OnMode_UnavailableProbe_LogsWarn(t *testing.T) {
 	// confined when there's no kernel to confine with), but it MUST emit a
 	// loud WARN so the bypass is observable — otherwise the operator's
 	// intent is silently violated.
+	t.Parallel()
 	var stderr strings.Builder
 	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeOn}, Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", false))
@@ -323,6 +337,7 @@ func TestDefaultSandboxWrap_AutoMode_UnavailableProbe_Silent(t *testing.T) {
 	// Auto mode degrades silently when probe is unavailable — that's the
 	// designed soft-fallback so a missing sandbox binary doesn't kill cycles.
 	// Only `on` should escalate via WARN.
+	t.Parallel()
 	var stderr strings.Builder
 	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": config.SandboxModeAuto}, Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", false))
@@ -340,6 +355,7 @@ func TestDefaultSandboxWrap_UnknownMode_NestedClaude_DoesNotWrap(t *testing.T) {
 	// SBPL file there and returns the wrap prefix — t.TempDir() ensures that
 	// write SUCCEEDS, so a missing fix is a true RED (wrap returned), not a
 	// false pass via os.WriteFile failure.
+	t.Parallel()
 	deps := Deps{Env: map[string]string{
 		"EVOLVE_SANDBOX":         "1", // unrecognized — not auto|on|off
 		"CLAUDE_CODE_ENTRYPOINT": "cli",
@@ -358,6 +374,7 @@ func TestDefaultSandboxWrap_UnknownMode_NormalizesToAuto_WarnsAndWrapsWhenNotNes
 	// normalizes to auto (so an available probe still confines — fail-safe is
 	// preserved) AND emits a one-line WARN so the misconfiguration is
 	// observable (mirrors config.applyEnv, which also warns on unknown values).
+	t.Parallel()
 	var stderr strings.Builder
 	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": "bogus"}, Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
@@ -376,6 +393,7 @@ func TestDefaultSandboxWrap_OnMode_NestedClaude_DoesNotWrap(t *testing.T) {
 	// Nested-Claude detection skips the wrap for ALL modes, not just auto —
 	// `on` still emits a loud WARN since its mandatory-confinement request is
 	// delegated to the outer session rather than silently honoured.
+	t.Parallel()
 	var stderr strings.Builder
 	deps := Deps{Env: map[string]string{
 		"EVOLVE_SANDBOX":         config.SandboxModeOn,
@@ -421,6 +439,7 @@ func sbplPathOf(t *testing.T, prefix []string) string {
 // sandbox-exec read could confine A to B's allow-list.
 // See ADR-0049.
 func TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()                      // one shared workspace for both dispatches
 	deps := Deps{Env: map[string]string{}} // not nested, mode auto → wraps
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
@@ -451,6 +470,7 @@ func TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir(t *testing.T) {
 // falls back to the shared workspace profile (confinement preserved, isolation
 // lost) rather than running UNCONFINED (returning false).
 func TestDefaultSandboxWrap_Darwin_ProfileDirMkdirFails_FallsBackToWorkspace(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	var stderr strings.Builder
 	deps := Deps{

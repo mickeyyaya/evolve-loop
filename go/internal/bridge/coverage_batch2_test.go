@@ -20,6 +20,7 @@ func writeJSON(t *testing.T, path, body string) string {
 }
 
 func TestLoadProfile_AllBranches(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if _, err := LoadProfile(""); err == nil {
 		t.Fatal("empty path should error")
@@ -60,6 +61,7 @@ func TestLoadProfile_AllBranches(t *testing.T) {
 
 // An absent sandbox block leaves Sandbox nil: v1 profiles never carried one.
 func TestLoadProfile_NoSandbox(t *testing.T) {
+	t.Parallel()
 	p, err := LoadProfile(writeJSON(t, filepath.Join(t.TempDir(), "nosb.json"),
 		`{"name":"n","permission_mode":"default"}`))
 	if err != nil {
@@ -71,6 +73,7 @@ func TestLoadProfile_NoSandbox(t *testing.T) {
 }
 
 func TestLoadManifest_AndParse_Errors(t *testing.T) {
+	t.Parallel()
 	if _, err := LoadManifest(""); err == nil {
 		t.Fatal("empty cli should error")
 	}
@@ -89,6 +92,7 @@ func TestLoadManifest_AndParse_Errors(t *testing.T) {
 }
 
 func TestParseLaunchArgs_Branches(t *testing.T) {
+	t.Parallel()
 	r, err := parseLaunchArgs([]string{"--cli", "claude-p", "--model", "haiku", "--agent", "scout"}, nil)
 	if err != nil || r.cli != "claude-p" || r.model != "haiku" || r.agent != "scout" {
 		t.Fatalf("space form: %+v err=%v", r, err)
@@ -119,6 +123,7 @@ func TestParseLaunchArgs_Branches(t *testing.T) {
 }
 
 func TestLaunchArgs_ErrorBranches(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	if code, se := runLookup(t, &fakeRunner{}, fx.args("claude-p", "--bogus"), nil); code != ExitBadFlags || !strings.Contains(se, "unknown flag") {
 		t.Fatalf("unknown flag: code=%d se=%q", code, se)
@@ -150,6 +155,7 @@ func TestLaunchArgs_ErrorBranches(t *testing.T) {
 }
 
 func TestLaunchArgs_InvalidStreamOutputEnv(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	eng := NewEngine(Deps{Runner: (&fakeRunner{}).runner(), LookupEnv: mapLookup(nil)})
 	var so, se strings.Builder
@@ -166,6 +172,7 @@ func mustExit(t *testing.T, args []string, lookup map[string]string) int {
 }
 
 func TestPreparePrompt_Branches(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "token=$CHALLENGE_TOKEN art=$ARTIFACT_PATH")
 	cfg := &Config{PromptFile: pf, Workspace: ws, Artifact: filepath.Join(ws, "a.md")}
@@ -186,6 +193,7 @@ func TestPreparePrompt_Branches(t *testing.T) {
 }
 
 func TestEnsureDirsAndOpenLogs_Error(t *testing.T) {
+	t.Parallel()
 	f := filepath.Join(t.TempDir(), "afile")
 	writeJSON(t, f, "x")
 	cfg := &Config{Workspace: f} // Workspace is a regular file → MkdirAll fails
@@ -198,6 +206,7 @@ func TestEnsureDirsAndOpenLogs_Error(t *testing.T) {
 }
 
 func TestEngineLaunch_ValidationAndMkdir(t *testing.T) {
+	t.Parallel()
 	eng := NewEngine(Deps{})
 	reqs := []core.BridgeRequest{
 		{Profile: "p", Workspace: "w", ArtifactPath: "a"},
@@ -219,6 +228,7 @@ func TestEngineLaunch_ValidationAndMkdir(t *testing.T) {
 }
 
 func TestRunTmuxREPL_WorkingDirMissing(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	code, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--worktree=/no/such/dir-xyz")
 	if code != ExitBadFlags || !strings.Contains(se, "working dir does not exist") {
@@ -227,6 +237,7 @@ func TestRunTmuxREPL_WorkingDirMissing(t *testing.T) {
 }
 
 func TestRunTmuxREPL_NamedSessionResume(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	writeJSON(t, fx.artifact, "done") // artifact already present
 	tmux := &fakeTmux{existing: map[string]bool{"evolve-bridge-named-mysess": true}}
@@ -243,6 +254,7 @@ func TestRunTmuxREPL_NamedSessionResume(t *testing.T) {
 }
 
 func TestCodexDriver_UnrecognizedModelOmitsM(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := runLookup(t, fr, codexArgs(fx, "weird"), nil)
@@ -255,6 +267,7 @@ func TestCodexDriver_UnrecognizedModelOmitsM(t *testing.T) {
 }
 
 func TestClaudeP_StreamOutputAndSessionNote(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, se := runLookup(t, fr, fx.args("claude-p", "--stream-output", "--session-name=foo"), nil)
@@ -271,6 +284,7 @@ func TestClaudeP_StreamOutputAndSessionNote(t *testing.T) {
 }
 
 func TestDryRun_ChallengeToken(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	writeJSON(t, fx.promptFile, "use $CHALLENGE_TOKEN here")
 	code, _ := runLookup(t, &fakeRunner{}, fx.args("claude-p", "--dry-run"), nil)
@@ -283,6 +297,7 @@ func TestDryRun_ChallengeToken(t *testing.T) {
 }
 
 func TestRequireFull_ManifestMissing(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	args := []string{
 		"--cli=no-such-cli", "--profile=" + fx.profile, "--model=auto",

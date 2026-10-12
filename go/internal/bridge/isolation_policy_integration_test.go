@@ -19,6 +19,7 @@ import (
 
 // t.TempDir uses macOS's /var/folders and would miss the broad /tmp write-grant regression, so this uses /tmp directly.
 func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
+	t.Parallel()
 	probe := requireNativeSandbox(t)
 	if probe.OS != "darwin" {
 		t.Skip("unsupported: linked-worktree metadata requires precise file grants; mandatory Linux launch fails closed")
@@ -102,6 +103,7 @@ func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
 }
 
 func TestLaunchProfilePolicyWithFixtureChild(t *testing.T) {
+	t.Parallel()
 	probe := requireNativeSandbox(t)
 	fx := newFixture(t, "codex", "")
 	root := t.TempDir()

@@ -3,6 +3,7 @@ package bridge
 import "testing"
 
 func TestExhaustionGate_PersistenceSemantics(t *testing.T) {
+	t.Parallel()
 	if exhaustionPersistObservations < 2 {
 		t.Fatalf("threshold must be >= 2 to distinguish a transient frame from a persistent wall; got %d", exhaustionPersistObservations)
 	}

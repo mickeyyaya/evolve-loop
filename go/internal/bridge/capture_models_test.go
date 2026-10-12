@@ -16,6 +16,7 @@ func namedCaptureCfg(t *testing.T, name string) *Config {
 }
 
 func TestCaptureModelPicker_OpensImmediately(t *testing.T) {
+	t.Parallel()
 	picker := "Select model\n1. Default  Opus 4.8\n2. Sonnet  Sonnet 4.6\n3. Haiku  Haiku 4.5"
 	sess := NamedSessionName("mp1")
 	tx := &fakeTmux{existing: map[string]bool{sess: true}, paneSeq: []string{picker}}
@@ -34,6 +35,7 @@ func TestCaptureModelPicker_OpensImmediately(t *testing.T) {
 }
 
 func TestCaptureModelPicker_NeverOpensErrors(t *testing.T) {
+	t.Parallel()
 	sess := NamedSessionName("mp2")
 	tx := &fakeTmux{existing: map[string]bool{sess: true}, paneSeq: []string{"just a prompt ❯"}}
 	cfg := namedCaptureCfg(t, "mp2")
@@ -47,6 +49,7 @@ func TestCaptureModelPicker_NeverOpensErrors(t *testing.T) {
 }
 
 func TestCaptureModelPicker_UnknownCLI(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{Workspace: t.TempDir()}
 	if _, err := CaptureModelPicker(context.Background(), cfg, recipeDeps(&fakeTmux{}), "no-such-cli"); err == nil {
 		t.Fatal("expected manifest error for unknown CLI")
@@ -54,6 +57,7 @@ func TestCaptureModelPicker_UnknownCLI(t *testing.T) {
 }
 
 func TestContainsAnySubstring(t *testing.T) {
+	t.Parallel()
 	if !containsAnySubstring("foo Switch Model bar", modelPickerMarkers) {
 		t.Fatal("should match agy marker")
 	}

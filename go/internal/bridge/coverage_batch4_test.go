@@ -13,6 +13,7 @@ import (
 
 func TestDrivers_OpenLogsError(t *testing.T) {
 	// --stdout-log points at the workspace dir itself → os.Create fails.
+	t.Parallel()
 	for _, cli := range []string{"claude-p", "codex", "agy"} {
 		t.Run(cli, func(t *testing.T) {
 			fx := newFixture(t, cli, "")
@@ -30,6 +31,7 @@ func TestDrivers_OpenLogsError(t *testing.T) {
 }
 
 func TestEngineLaunch_ArgBranchesAndMissingArtifact(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeJSON(t, filepath.Join(ws, "p.json"), `{"name":"n","model":"haiku"}`)
 	art := filepath.Join(ws, "art.md")
@@ -57,6 +59,7 @@ func TestEngineLaunch_ArgBranchesAndMissingArtifact(t *testing.T) {
 // The session name does not already exist, so this exercises the
 // CREATE-NAMED path; the session must be preserved on exit (no /exit).
 func TestRunTmuxREPL_NamedSessionCreate(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	writeJSON(t, fx.artifact, "done")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots (new session)
@@ -74,12 +77,14 @@ func TestRunTmuxREPL_NamedSessionCreate(t *testing.T) {
 
 func TestLoadProfile_ReadDirError(t *testing.T) {
 	// Passing a directory path → os.ReadFile returns a non-ENOENT error.
+	t.Parallel()
 	if _, err := LoadProfile(t.TempDir()); err == nil {
 		t.Fatal("reading a directory as a profile should error")
 	}
 }
 
 func TestBuildReport_ArtifactIsDirectory(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if err := os.Mkdir(filepath.Join(ws, "artifact.md"), 0o755); err != nil {
 		t.Fatal(err)

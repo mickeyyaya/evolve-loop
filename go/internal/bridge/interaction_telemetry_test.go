@@ -90,6 +90,7 @@ func runTelemetryLaunch(t *testing.T, fx launchFixture, tm TmuxController, looku
 }
 
 func TestOutcome_ArtifactAppearedWithinWindow(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &nudgeReactiveTmux{
 		fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
@@ -125,6 +126,7 @@ func TestOutcome_ArtifactAppearedWithinWindow(t *testing.T) {
 }
 
 func TestOutcome_NudgeCaptureFailureContinuesAndRecordsDeferredResult(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &nudgeCaptureFailureTmux{
 		fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
@@ -170,6 +172,7 @@ func TestOutcome_NudgeCaptureFailureContinuesAndRecordsDeferredResult(t *testing
 }
 
 func TestOutcome_NoEffectRecordedHonestly(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	if code := runTelemetryLaunch(t, fx, tm, nil); code != ExitArtifactTimeout {
@@ -191,6 +194,7 @@ func TestOutcome_NoEffectRecordedHonestly(t *testing.T) {
 }
 
 func TestRecorder_RecordsAtStageOff(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	code := runTelemetryLaunch(t, fx, tm, map[string]string{"EVOLVE_PHASE_RECOVERY": "off"})

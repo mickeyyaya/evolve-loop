@@ -17,6 +17,7 @@ import (
 const deadShellPaneLine = "zsh: command not found: Please"
 
 func TestFreshSessionAllowed_TheGate(t *testing.T) {
+	t.Parallel()
 	e := NewEngine(Deps{})
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -50,6 +51,7 @@ func TestFreshSessionAllowed_TheGate(t *testing.T) {
 }
 
 func TestRunTmuxREPL_FatalCheckpointReportsItsTypedCause(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	deadPane := tmuxPromptMarkerDefault + "\n" + deadShellPaneLine + "\n" + tmuxPromptMarkerDefault
 	tmux := &fakeTmux{paneSeq: checkpointPaneSeq(deadPane, deadPane)}
@@ -142,6 +144,7 @@ func launchScriptedWith(t *testing.T, dead int, stage string, mutate func(*core.
 }
 
 func TestEngineLaunch_ADeadShellAsksTheCallerForAFreshSessionAndRunsNoSecondSession(t *testing.T) {
+	t.Parallel()
 	tmux, resp, err, rows, retries := launchScripted(t, 1, "enforce", nil)
 	if err == nil || resp.ExitCode != ExitArtifactTimeout || !resp.SessionRecoverable {
 		t.Fatalf("the dead session returns exit 81 marked session-recoverable: code=%d recoverable=%v err=%v", resp.ExitCode, resp.SessionRecoverable, err)
@@ -155,6 +158,7 @@ func TestEngineLaunch_ADeadShellAsksTheCallerForAFreshSessionAndRunsNoSecondSess
 }
 
 func TestEngineLaunch_TheFreshSessionIsMarkedAndSignalledWhenItLaunches(t *testing.T) {
+	t.Parallel()
 	_, resp, err, rows, retries := launchScripted(t, 0, "enforce", func(r *core.BridgeRequest) { r.FreshSession = true })
 	if err != nil || resp.ExitCode != ExitOK {
 		t.Fatalf("the fresh session completes: code=%d err=%v", resp.ExitCode, err)
@@ -165,6 +169,7 @@ func TestEngineLaunch_TheFreshSessionIsMarkedAndSignalledWhenItLaunches(t *testi
 }
 
 func TestEngineLaunch_TheResponseNamesTheDispatchAndItsOwnPaneCapture(t *testing.T) {
+	t.Parallel()
 	_, resp, _, _, _ := launchScripted(t, 1, "enforce", nil)
 	if !strings.HasPrefix(resp.DispatchID, "run-1687/1687/triage/") {
 		t.Fatalf("DispatchID = %q, want the dispatch tag of this launch", resp.DispatchID)
@@ -180,6 +185,7 @@ func TestEngineLaunch_TheResponseNamesTheDispatchAndItsOwnPaneCapture(t *testing
 }
 
 func TestEngineLaunch_NoFreshSessionWithoutEnforceOrForANamedSession(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, stage string
 		mutate      func(*core.BridgeRequest)
@@ -196,6 +202,7 @@ func TestEngineLaunch_NoFreshSessionWithoutEnforceOrForANamedSession(t *testing.
 }
 
 func TestEngineLaunch_TheCallLocalHooksChainThePreWiredObservers(t *testing.T) {
+	t.Parallel()
 	var dispatched []modelDispatch
 	var fatal []fatalPaneObservation
 	wire := func(d *Deps) {

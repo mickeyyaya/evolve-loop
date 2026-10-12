@@ -10,6 +10,7 @@ const agyIgnoredModelPane = "⚠ failed to construct executor: plan model not sp
 	"⚠ Warning\n  ⎿  model Claude Opus 5.5 (High) is not recognized as a known model or custom model in settings. Ignoring the flag."
 
 func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, cli, pane, wantAction string
 		wantRC                      int
@@ -94,6 +95,7 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 }
 
 func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
+	t.Parallel()
 	for _, cli := range []string{"codex-tmux", "agy-tmux"} {
 		t.Run(cli, func(t *testing.T) {
 			m, err := LoadManifest(cli)
@@ -124,6 +126,7 @@ func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
 }
 
 func TestAutoRespond_FeedbackRatingFiresOnce(t *testing.T) {
+	t.Parallel()
 	for _, cli := range []string{"claude-tmux", "agy-tmux"} {
 		t.Run(cli, func(t *testing.T) {
 			m, err := LoadManifest(cli)
@@ -149,6 +152,7 @@ func TestAutoRespond_FeedbackRatingFiresOnce(t *testing.T) {
 }
 
 func TestAutoRespond_MultiSelectRuleWinsOverSingleSelect(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -163,6 +167,7 @@ func TestAutoRespond_MultiSelectRuleWinsOverSingleSelect(t *testing.T) {
 }
 
 func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -204,6 +209,7 @@ func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
 }
 
 func TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -241,6 +247,7 @@ func TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch(t *testing.T) {
 // Both rules send "1,Enter", so the order only decides which pattern the log names; pinning it keeps
 // that attribution stable.
 func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -273,6 +280,7 @@ func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
 
 // Pins a known footgun: an agent printing "Yes, proceed" still fires once; the loop guard is the safety net.
 func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -291,6 +299,7 @@ func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.
 }
 
 func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)

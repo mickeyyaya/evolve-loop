@@ -55,6 +55,7 @@ func enforceFixtureCleanGit(t *testing.T) (root string) {
 }
 
 func TestApicoverEnforceChangedDefault_UnderivableChangedSet_FailsLoud(t *testing.T) {
+	t.Parallel()
 	root := enforceFixtureNonGit(t)
 	off, err := apicoverEnforceChangedDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
 	if err != nil {
@@ -74,6 +75,7 @@ func TestApicoverEnforceChangedDefault_CleanGitTree_StaysNoOp(t *testing.T) {
 }
 
 func TestApicoverNewPackageGraduationDefault_UnderivableChangedSet_FailsLoud(t *testing.T) {
+	t.Parallel()
 	root := enforceFixtureNonGit(t)
 	off, err := apicoverNewPackageGraduationDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
 	if err != nil {

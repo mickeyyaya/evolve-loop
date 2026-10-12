@@ -39,6 +39,7 @@ func enterCount(seq []string) int {
 }
 
 func TestPastePrompt_WaitsForTheStablePaneBeforeEnter(t *testing.T) {
+	t.Parallel()
 	tm := &fakeTmux{paneSeq: []string{
 		"› [Pasted Content 1 +40 lines]",
 		"› [Pasted Content 1 +900 lines]",
@@ -69,6 +70,7 @@ func TestPastePrompt_WaitsForTheStablePaneBeforeEnter(t *testing.T) {
 }
 
 func TestPastePrompt_StabilityWaitIsBounded(t *testing.T) {
+	t.Parallel()
 	tm := &countingTmux{}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
@@ -88,6 +90,7 @@ func TestPastePrompt_StabilityWaitIsBounded(t *testing.T) {
 }
 
 func TestVerifySubmitted_BacksOffBetweenResends(t *testing.T) {
+	t.Parallel()
 	prompt := guardNudge
 	parked := parkedPane(prompt)
 	tm := &fakeTmux{paneSeq: []string{parked, parked, "● done\n\n" + tmuxPromptMarkerDefault + " "}} // the initial pane is the argument; three captures follow the three re-sends
@@ -119,6 +122,7 @@ func (c *countingTmux) CapturePane(_ context.Context, _ string, _ int) (string, 
 }
 
 func TestPastePrompt_UnreadablePromptAssumesALargePaste(t *testing.T) {
+	t.Parallel()
 	tm := &fakeTmux{paneSeq: []string{"› [Pasted Content 1 +40 lines]", "› [Pasted Content 1 +40 lines]"}}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
@@ -141,6 +145,7 @@ func TestPastePrompt_UnreadablePromptAssumesALargePaste(t *testing.T) {
 }
 
 func TestPasteTiming_NeverEqualsTheArtifactWaitInterval(t *testing.T) {
+	t.Parallel()
 	for size := 0; size <= 120_000; size += 100 {
 		if d := pasteSettleFor(size); d == artifactWaitInterval {
 			t.Fatalf("pasteSettleFor(%d) = %v == artifactWaitInterval", size, d)
@@ -157,6 +162,7 @@ func TestPasteTiming_NeverEqualsTheArtifactWaitInterval(t *testing.T) {
 }
 
 func TestPastePrompt_SmallPromptTakesTheCaptureFreePath(t *testing.T) {
+	t.Parallel()
 	tm := &fakeTmux{paneSeq: []string{"› [Pasted Content 1 +2 lines]"}}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
@@ -175,6 +181,7 @@ func TestPastePrompt_SmallPromptTakesTheCaptureFreePath(t *testing.T) {
 }
 
 func TestPastePrompt_CaptureFaultFailsOpen(t *testing.T) {
+	t.Parallel()
 	tm := &captureErrTmux{fakeTmux: &fakeTmux{paneSeq: []string{"› x"}}, errAfter: 1}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
@@ -193,6 +200,7 @@ func TestPastePrompt_CaptureFaultFailsOpen(t *testing.T) {
 }
 
 func TestPastePrompt_EnterFollowsTwoAgreeingCaptures(t *testing.T) {
+	t.Parallel()
 	tm := &fakeTmux{paneSeq: []string{"› [Pasted Content 1 +40 lines]", "› [Pasted Content 1 +900 lines]", "› [Pasted Content 1 +900 lines]"}}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
@@ -211,6 +219,7 @@ func TestPastePrompt_EnterFollowsTwoAgreeingCaptures(t *testing.T) {
 }
 
 func TestInjectText_SharesTheDeliveryTail(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	tm := &fakeTmux{paneSeq: []string{"› a", "› a"}}
 	var stderr bytes.Buffer
@@ -235,6 +244,7 @@ func TestInjectText_SharesTheDeliveryTail(t *testing.T) {
 }
 
 func TestRecordSubmitVerify_CarriesThePasteEvidence(t *testing.T) {
+	t.Parallel()
 	rec := interaction.NewRecorder(t.TempDir())
 	recordSubmitVerify(rec, "build", 7, "prompt", submitVerifyOutcome{Result: interaction.ResultSubmitVerified}, pasteOutcome{Settle: 4 * time.Second, Stability: pasteStable})
 	recordSubmitVerify(rec, "build", 7, "nudge", submitVerifyOutcome{Resends: 1, Result: interaction.ResultSubmittedAfterResend}, pasteOutcome{})

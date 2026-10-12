@@ -9,6 +9,7 @@ import (
 
 // A frozen clock gives every lane the same timestamp, so only the atomic nonce can separate the names.
 func TestResolveSession_AgyConcurrent_UniqueUnderRace(t *testing.T) {
+	t.Parallel()
 	frozen := time.Unix(1_700_000_000, 0)
 	deps := Deps{Now: func() time.Time { return frozen }}.withDefaults()
 
@@ -48,6 +49,7 @@ func TestResolveSession_AgyConcurrent_UniqueUnderRace(t *testing.T) {
 }
 
 func TestResolveSession_AgyConcurrent_MixedRunsAndCycles(t *testing.T) {
+	t.Parallel()
 	frozen := time.Unix(1_700_000_000, 0)
 	deps := Deps{Now: func() time.Time { return frozen }}.withDefaults()
 

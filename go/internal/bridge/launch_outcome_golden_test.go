@@ -142,6 +142,7 @@ func TestLaunchOutcome_Golden_Capture(t *testing.T) {
 }
 
 func TestLaunchArgs_Golden_FullArgvVector(t *testing.T) {
+	t.Parallel()
 	req := core.BridgeRequest{
 		CLI: "claude-tmux", Profile: "/p/profile.json", Model: "opus", Workspace: "/ws",
 		ArtifactPath: "/ws/report.md", SecondaryArtifacts: []string{"/ws/second.md", "/ws/third.json"},
@@ -256,6 +257,7 @@ func TestEngineLaunch_SignalStream_Golden(t *testing.T) {
 // TestLaunchOutcome_GoldenRowsCoverEveryCodeCtxAndFixture keeps the oracle
 // honest about its own shape: 13 codes × 2 contexts × 7 fixtures.
 func TestLaunchOutcome_GoldenRowsCoverEveryCodeCtxAndFixture(t *testing.T) {
+	t.Parallel()
 	data, err := os.ReadFile(filepath.Join("testdata", "launch-outcome.golden.json"))
 	if err != nil {
 		t.Fatal(err)

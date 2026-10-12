@@ -15,6 +15,7 @@ import (
 )
 
 func TestEngineLaunch_RequiredFields_FourSentinelStrings(t *testing.T) {
+	t.Parallel()
 	full := core.BridgeRequest{CLI: "claude-p", Profile: "p", Workspace: "w", ArtifactPath: "a"}
 	for _, tc := range []struct {
 		name string
@@ -119,6 +120,7 @@ func TestEngineLaunch_ExitClassificationTable(t *testing.T) {
 }
 
 func TestEngineSourceKeepsTheACSTokens(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile(filepath.Join(".", "engine.go"))
 	if err != nil {
 		t.Fatal(err)

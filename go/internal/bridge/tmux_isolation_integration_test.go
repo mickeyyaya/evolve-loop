@@ -16,6 +16,7 @@ import (
 const isolationProbeOutEnv = "EVOLVE_TMUX_ISOLATION_PROBE_OUT"
 
 func TestRealTmux_IsolationProbeFixture(t *testing.T) {
+	t.Parallel()
 	out := os.Getenv(isolationProbeOutEnv)
 	if out == "" {
 		return
@@ -35,6 +36,7 @@ func TestRealTmux_IsolationProbeFixture(t *testing.T) {
 }
 
 func TestRealTmux_ConcurrentTestProcessesNeverShareATmuxServer(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	self, err := os.Executable()
 	if err != nil {

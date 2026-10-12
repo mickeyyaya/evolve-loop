@@ -159,6 +159,7 @@ func bootClaudeThroughTrustDialog(t *testing.T, pane TmuxController) (int, strin
 }
 
 func TestClaudeTrustDialog_ASwallowedDownNeverLetsEnterConfirmNo(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{downsToSwallow: 1}
 
 	rc, stderr := bootClaudeThroughTrustDialog(t, pane)
@@ -175,6 +176,7 @@ func TestClaudeTrustDialog_ASwallowedDownNeverLetsEnterConfirmNo(t *testing.T) {
 }
 
 func TestClaudeTrustDialog_ADownThatLandsBootsWithOneDownAndOneEnter(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{}
 
 	rc, stderr := bootClaudeThroughTrustDialog(t, pane)
@@ -188,6 +190,7 @@ func TestClaudeTrustDialog_ADownThatLandsBootsWithOneDownAndOneEnter(t *testing.
 }
 
 func TestClaudeTrustDialog_ACursorThatNeverMovesEndsTheBootOnTheLoopGuardWithoutConfirming(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{downIsInert: true}
 
 	rc, stderr := bootClaudeThroughTrustDialog(t, pane)
@@ -208,6 +211,7 @@ func TestClaudeTrustDialog_ACursorThatNeverMovesEndsTheBootOnTheLoopGuardWithout
 }
 
 func TestClaudeBoot_AnEscalatePromptThatNeverClearsEndsAsABootTimeoutWithoutSendingKeys(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{frameAfterLaunch: "Welcome to Claude Code\nLogin expired. Please log in again.\n"}
 
 	rc, stderr := bootClaudeThroughTrustDialog(t, pane)
@@ -225,6 +229,7 @@ func TestClaudeBoot_AnEscalatePromptThatNeverClearsEndsAsABootTimeoutWithoutSend
 }
 
 func TestClaudeTrustDialog_ADialogMountingAfterLaunchStillBootsOnYes(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{capturesBeforeMount: 1}
 
 	rc, stderr := bootClaudeThroughTrustDialog(t, pane)
@@ -275,6 +280,7 @@ func (f *enterLostOnceOnYes) SendKeys(ctx context.Context, session, keys string,
 }
 
 func TestClaudeTrustDialog_AFailedCaptureOfTheDialogIsNeverReadiness(t *testing.T) {
+	t.Parallel()
 	for _, fc := range failedCaptureTexts {
 		t.Run(fc.name, func(t *testing.T) {
 			pane := &trustDialogPane{}
@@ -289,6 +295,7 @@ func TestClaudeTrustDialog_AFailedCaptureOfTheDialogIsNeverReadiness(t *testing.
 }
 
 func TestClaudeTrustDialog_ALostEnterOnYesIsRetriedAndBootsOnTheREPL(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{}
 
 	rc, stderr := bootClaudeThroughTrustDialog(t, &enterLostOnceOnYes{trustDialogPane: pane})
@@ -299,6 +306,7 @@ func TestClaudeTrustDialog_ALostEnterOnYesIsRetriedAndBootsOnTheREPL(t *testing.
 }
 
 func TestClaudeBoot_AnEscalateMatchOnTheREPLLeavesReadinessToTheMarker(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{frameAfterLaunch: claudeREPLFrame + "\n  Login expired · run /login"}
 
 	rc, stderr := bootClaudeThroughTrustDialog(t, pane)
@@ -329,6 +337,7 @@ func newTrustDialogRecipeDriver(t *testing.T, pane *trustDialogPane) *recipeSess
 }
 
 func TestRecipeBoot_TrustDialogIsConfirmedOnYesBeforeReady(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{downsToSwallow: 1}
 
 	err := newTrustDialogRecipeDriver(t, pane).EnsureSession(context.Background())
@@ -342,6 +351,7 @@ func TestRecipeBoot_TrustDialogIsConfirmedOnYesBeforeReady(t *testing.T) {
 }
 
 func TestRecipeBoot_ADialogMountingAfterLaunchIsAnsweredBeforeTheFirstCommand(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{capturesBeforeMount: 1}
 	d := newTrustDialogRecipeDriver(t, pane)
 
@@ -357,6 +367,7 @@ func TestRecipeBoot_ADialogMountingAfterLaunchIsAnsweredBeforeTheFirstCommand(t 
 }
 
 func TestRecipeBoot_AFailedCaptureOfTheDialogIsNeverReadiness(t *testing.T) {
+	t.Parallel()
 	for _, fc := range failedCaptureTexts {
 		t.Run(fc.name, func(t *testing.T) {
 			pane := &trustDialogPane{}
@@ -377,6 +388,7 @@ func TestRecipeBoot_AFailedCaptureOfTheDialogIsNeverReadiness(t *testing.T) {
 }
 
 func TestRecipeBoot_ACursorThatNeverMovesFailsOnTheLoopGuard(t *testing.T) {
+	t.Parallel()
 	pane := &trustDialogPane{downIsInert: true}
 
 	err := newTrustDialogRecipeDriver(t, pane).EnsureSession(context.Background())
@@ -390,6 +402,7 @@ func TestRecipeBoot_ACursorThatNeverMovesFailsOnTheLoopGuard(t *testing.T) {
 }
 
 func TestAutoRespond_ClaudeTrustRulesAreDisjointOnEveryDialogFrame(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)
@@ -438,6 +451,7 @@ func TestAutoRespond_ClaudeTrustRulesAreDisjointOnEveryDialogFrame(t *testing.T)
 }
 
 func TestAutoRespond_ClaudeTrustNavigationWinsAFrameBothRulesMatch(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)

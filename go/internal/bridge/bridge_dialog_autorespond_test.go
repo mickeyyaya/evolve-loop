@@ -11,6 +11,7 @@ import (
 
 // Deprecated: TestAgyTmuxManifest_SessionRating_AutoResponds
 func TestAgyTmuxManifest_SessionRating_AutoResponds(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest(agy-tmux): %v", err)
@@ -36,6 +37,7 @@ func TestAgyTmuxManifest_SessionRating_AutoResponds(t *testing.T) {
 }
 
 func TestAgyTmuxManifest_SessionRating_NoFalsePositives(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest(agy-tmux): %v", err)
@@ -100,6 +102,7 @@ func runTmuxNudge(t *testing.T, fx launchFixture, tmux *nudgeRecordingTmux) (int
 }
 
 func TestTmuxREPL_IdleArtifactNudge_SentOnceThenTimeout(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}
 	code, stderr := runTmuxNudge(t, fx, tmux)
@@ -112,6 +115,7 @@ func TestTmuxREPL_IdleArtifactNudge_SentOnceThenTimeout(t *testing.T) {
 }
 
 func TestTmuxREPL_NoNudgeWhenArtifactPresent(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)

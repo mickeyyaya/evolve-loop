@@ -14,6 +14,7 @@ import (
 )
 
 func TestEngineLaunch_ClearsALeftoverPaneWatchSnapshotBeforeEachAttempt(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-panewatch", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -39,6 +40,7 @@ func TestEngineLaunch_ClearsALeftoverPaneWatchSnapshotBeforeEachAttempt(t *testi
 }
 
 func TestPaneWatcher_StampsTheWriterPID(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	lp := agyLaunchForTest()
 	w := newPaneWatcher(&Config{Workspace: ws, Agent: "build"}, lp, paneProfileFor(lp), &bytes.Buffer{}, "[agy-tmux]")

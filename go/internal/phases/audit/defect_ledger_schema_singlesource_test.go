@@ -9,6 +9,7 @@ import (
 )
 
 func TestDispositionSchemaExampleMatchesDocumentedExample(t *testing.T) {
+	t.Parallel()
 	root := docExampleRepoRoot(t)
 	docRaw := extractDispositionExample(t, root, "docs/architecture/continuation-defect-ledger.md")
 
@@ -25,6 +26,7 @@ func TestDispositionSchemaExampleMatchesDocumentedExample(t *testing.T) {
 }
 
 func TestDispositionSchemaExampleIsAcceptedByProductionReader(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, dispositionFile), []byte(dispositionSchemaExample), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)

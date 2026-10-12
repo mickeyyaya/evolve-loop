@@ -22,6 +22,7 @@ func warnReportWithPrescription(prescriptions ...string) string {
 }
 
 func TestDefectLedger_WarnPrescription(t *testing.T) {
+	t.Parallel()
 	t.Run("nonempty_prescription_mints_open_entry", func(t *testing.T) {
 		ws := t.TempDir()
 		yes := true
@@ -102,6 +103,7 @@ func prescriptionAncestorFixture(t *testing.T, ancestorCycle, thisCycle int, pre
 }
 
 func TestReconcile_WarnPrescriptionBlocks(t *testing.T) {
+	t.Parallel()
 	const prescriptionText = "run `git add -f X` or dropIgnoredPaths will silently drop it"
 
 	t.Run("unaccounted_prescription_blocks_pass", func(t *testing.T) {
@@ -151,6 +153,7 @@ func TestReconcile_WarnPrescriptionBlocks(t *testing.T) {
 }
 
 func TestAudit_WarnWithoutPrescription_NoRegression(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)

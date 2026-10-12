@@ -10,6 +10,7 @@ import (
 )
 
 func TestHumanActive(t *testing.T) {
+	t.Parallel()
 	simOn := mapLookup(map[string]string{"BRIDGE_HUMAN_SIMULATION": "1"})
 	if humanActive(Deps{LookupEnv: simOn}, false) {
 		t.Fatal("humanInput=false → inactive")
@@ -23,6 +24,7 @@ func TestHumanActive(t *testing.T) {
 }
 
 func TestHumanSampleMS(t *testing.T) {
+	t.Parallel()
 	if d := humanSampleMS(65, 20); d < 10*time.Millisecond {
 		t.Fatalf("sample = %v, want >= 10ms", d)
 	}
@@ -32,6 +34,7 @@ func TestHumanSampleMS(t *testing.T) {
 }
 
 func TestHumanPrimitives(t *testing.T) {
+	t.Parallel()
 	tmux := &fakeTmux{}
 	deps := Deps{Sleep: func(time.Duration) {}, Stderr: io.Discard, Tmux: tmux}
 
@@ -58,6 +61,7 @@ func TestHumanPrimitives(t *testing.T) {
 }
 
 func TestClaudeTmux_HumanInput_GateAndPath(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 
 	code, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--human-input")

@@ -14,6 +14,7 @@ import (
 )
 
 func TestCI_TheRunnerCanApplyTheAgentSandbox(t *testing.T) {
+	t.Parallel()
 	probe := requireNativeSandbox(t)
 	var stderr bytes.Buffer
 	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), Stderr: &stderr}

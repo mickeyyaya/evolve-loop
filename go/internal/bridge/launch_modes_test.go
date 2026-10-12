@@ -8,6 +8,7 @@ import (
 )
 
 func TestLaunchArgs_ValidateOnly(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
 	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
@@ -28,6 +29,7 @@ func TestLaunchArgs_ValidateOnly(t *testing.T) {
 }
 
 func TestLaunchArgs_DryRun(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
 	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
@@ -49,6 +51,7 @@ func TestLaunchArgs_DryRun(t *testing.T) {
 }
 
 func TestLaunchArgs_RequireFull_Unmet(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	eng := NewEngine(Deps{
 		Runner:    (&fakeRunner{}).runner(),
@@ -66,6 +69,7 @@ func TestLaunchArgs_RequireFull_Unmet(t *testing.T) {
 }
 
 func TestLaunchArgs_RequireFull_Met(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	eng := NewEngine(Deps{

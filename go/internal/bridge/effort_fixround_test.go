@@ -45,6 +45,7 @@ func TestControllerFamilyConfig_CarriesAnEffort(t *testing.T) {
 }
 
 func TestLaunchIntentFor_AnUntieredModelTakesTheManifestDefaultTier(t *testing.T) {
+	t.Parallel()
 	cases := []struct{ cli, model, want string }{
 		{"claude-tmux", "auto", "medium"},
 		{"claude-tmux", "", "medium"},
@@ -60,6 +61,7 @@ func TestLaunchIntentFor_AnUntieredModelTakesTheManifestDefaultTier(t *testing.T
 }
 
 func TestClaudePHeadlessLaunchCarriesTheEffort(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{CLI: "claude-p", Model: "deep"}
 	cfg.Realization = RealizeFor("claude-p", launchIntentFor(cfg, Profile{}, policy.EffortTable{}))
 	args, _ := claudePArgs(cfg, "prompt")
@@ -78,6 +80,7 @@ func TestAgyClaudeExplicitAgentEffortWinsOverAPinnedVariant(t *testing.T) {
 }
 
 func TestModelVariant_ANameWithoutAVariantRecordsTheUnappliedEffort(t *testing.T) {
+	t.Parallel()
 	m := Manifest{
 		CLI:          "variant-fixture",
 		ModelTierMap: map[string]string{"deep": "claude-opus-5-5"},
@@ -95,6 +98,7 @@ func TestModelVariant_ANameWithoutAVariantRecordsTheUnappliedEffort(t *testing.T
 }
 
 func TestReportLaunchModel_WarnsOnceForAnUnappliedEffort(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	cfg := &Config{Model: "deep", Realization: Realization{EffortUnapplied: "high"}}
 	reportLaunchModel(Deps{Stderr: &stderr}, cfg, "[agy-claude-tmux]", "s", "/w")

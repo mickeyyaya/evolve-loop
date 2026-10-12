@@ -12,6 +12,7 @@ import (
 )
 
 func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatalf("manifest: %v", err)
@@ -47,6 +48,7 @@ func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
 }
 
 func TestDecideAutoRespond(t *testing.T) {
+	t.Parallel()
 	prompts := []ManifestPrompt{
 		{Name: "escA", Regex: "Please log in", Policy: "escalate"},
 		{Name: "autoB", Regex: `Continue\?`, ResponseKeys: "y,Enter", Policy: "auto_respond"},
@@ -74,6 +76,7 @@ func TestDecideAutoRespond(t *testing.T) {
 }
 
 func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
+	t.Parallel()
 	prompts := []ManifestPrompt{
 		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
 	}
@@ -99,6 +102,7 @@ func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
 }
 
 func TestDecideAutoRespond_BareDiffLineNotChrome(t *testing.T) {
+	t.Parallel()
 	prompts := []ManifestPrompt{
 		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
 	}
@@ -119,6 +123,7 @@ func TestDecideAutoRespond_BareDiffLineNotChrome(t *testing.T) {
 }
 
 func TestDecideAutoRespond_IndentedBareDiffLineNotChrome(t *testing.T) {
+	t.Parallel()
 	prompts := []ManifestPrompt{
 		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
 	}
@@ -134,6 +139,7 @@ func TestDecideAutoRespond_IndentedBareDiffLineNotChrome(t *testing.T) {
 }
 
 func TestDecideAutoRespond_LoopGuard(t *testing.T) {
+	t.Parallel()
 	prompts := []ManifestPrompt{{Name: "stuck", Regex: "Please log in", Policy: "escalate"}}
 	counts := map[string]int{}
 	var a string
@@ -148,6 +154,7 @@ func TestDecideAutoRespond_LoopGuard(t *testing.T) {
 
 func TestSendKeySequence(t *testing.T) {
 	// The multi-keystroke case is the load-bearing one: claude's multi-select needs three distinct presses.
+	t.Parallel()
 	cases := []struct {
 		name, csv string
 		want      []string
@@ -174,6 +181,7 @@ func TestSendKeySequence(t *testing.T) {
 
 func TestClaudeTmux_AutoRespond_EscalateWritesReport(t *testing.T) {
 	// The REPL boots, then shows an auth-recheck prompt the manifest escalates.
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "Please log in to continue"}}
 	code, _ := runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -187,6 +195,7 @@ func TestClaudeTmux_AutoRespond_EscalateWritesReport(t *testing.T) {
 
 func TestClaudeTmux_AutoRespond_StuckPromptTripsLoopGuard(t *testing.T) {
 	// A model-deprecation prompt that never clears: the 6th match trips the loop guard.
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "this model is deprecated, Continue?"}}
 	code, _ := runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -199,6 +208,7 @@ func TestClaudeTmux_AutoRespond_StuckPromptTripsLoopGuard(t *testing.T) {
 }
 
 func TestDecideAutoRespond_CodexModelUnsupportedIsIdleGated(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatalf("manifest: %v", err)

@@ -32,6 +32,7 @@ func (a *liveArtifactTmux) PasteBuffer(ctx context.Context, session string) erro
 }
 
 func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	// The extra "working ❯" is the settling tick: the cross-poll stability window (completion.go) completes
 	// the artifact one tick after it first appears, so the pane is captured once more before cleanup.
@@ -50,6 +51,7 @@ func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
 }
 
 func TestLiveSmokeTest_QuotaWallClassified(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	wall := "■ You've hit your usage limit. Upgrade to Pro or try again at 6:11 AM."
 	tm := &FakeTmuxController{CaptureFrames: []string{"›", "thinking", wall, wall, wall, wall, wall, wall}}
@@ -66,6 +68,7 @@ func TestLiveSmokeTest_QuotaWallClassified(t *testing.T) {
 }
 
 func TestLiveSmokeTest_NonTmuxDriverRejected(t *testing.T) {
+	t.Parallel()
 	rc, _, _ := LiveSmokeTest(context.Background(), "claude-p", nil, liveSmokeDeps(&FakeTmuxController{}))
 	if rc != ExitBadFlags {
 		t.Fatalf("rc=%d, want ExitBadFlags for non-tmux driver", rc)

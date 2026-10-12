@@ -144,6 +144,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 // the caller threading --allow-bypass, since the autonomous orchestrator is
 // the trusted bypass authority.
 func TestEngineLaunch_EnablesBypassForInProcessPath(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	profile := writeIntentProfile(t, ws, "agent", "agy-tmux", nil)
 	artifact := filepath.Join(ws, "artifact.md")

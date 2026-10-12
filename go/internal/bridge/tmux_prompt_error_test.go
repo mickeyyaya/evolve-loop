@@ -44,6 +44,7 @@ func (f *promptErrorTmux) SendKeys(ctx context.Context, session, keys string, en
 }
 
 func TestTmuxPromptTransportErrorStopsDelivery(t *testing.T) {
+	t.Parallel()
 	for _, human := range []bool{false, true} {
 		for i, stage := range []string{"load-buffer", "paste-buffer", "submit"} {
 			t.Run(fmt.Sprintf("human=%t/%s", human, stage), func(t *testing.T) {

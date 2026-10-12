@@ -11,6 +11,7 @@ import (
 )
 
 func TestRun_SolutionContractViolation_FAILsAudit(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -34,6 +35,7 @@ func TestRun_SolutionContractViolation_FAILsAudit(t *testing.T) {
 }
 
 func TestRun_SolutionContractClean_PASSPreserved(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -48,6 +50,7 @@ func TestRun_SolutionContractClean_PASSPreserved(t *testing.T) {
 }
 
 func TestNew_SolutionSpecWiresTheGate(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	for name, body := range map[string]string{
@@ -74,6 +77,7 @@ func TestNew_SolutionSpecWiresTheGate(t *testing.T) {
 }
 
 func TestNewDefaultWithStageCompactSpec_WiresTheGate(t *testing.T) {
+	t.Parallel()
 	spec := config.DeliverableKindSpec{Root: "solutions", MinOptions: 2}
 	if phase := NewDefaultWithStageCompactSpec(&fakeBridge{writeArtifact: "x"}, fakePromptsFS("body"), config.StageOff, false, &spec); phase == nil || phase.BaseRunner == nil {
 		t.Fatal("constructor must return a wired phase")

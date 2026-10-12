@@ -18,6 +18,7 @@ func growingFallback(t *testing.T, path string, i int) {
 }
 
 func TestArtifactDetector_RelocationDeferredWhileFallbackStillGrowing(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallback := filepath.Join(ws, "workspace", "report.md")
@@ -43,6 +44,7 @@ func TestArtifactDetector_RelocationDeferredWhileFallbackStillGrowing(t *testing
 }
 
 func TestArtifactDetector_RelocationHappensOnceFallbackSettles(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallback := filepath.Join(ws, "workspace", "report.md")
@@ -74,6 +76,7 @@ func TestArtifactDetector_RelocationHappensOnceFallbackSettles(t *testing.T) {
 }
 
 func TestArtifactDetector_RelocatedCompleteFallbackStillCompletes(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallback := filepath.Join(ws, "workspace", "report.md")

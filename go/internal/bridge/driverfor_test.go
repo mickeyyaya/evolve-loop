@@ -3,6 +3,7 @@ package bridge
 import "testing"
 
 func TestDriverFor_BareAndDriverNames(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want string

@@ -83,6 +83,7 @@ func assertMenuAutoAnswered(t *testing.T, prompt string) {
 }
 
 func TestLiveCLI_Interactive_ClaudeSingleSelect_AutoAnswered(t *testing.T) {
+	t.Parallel()
 	liveCLIGate(t, "EVOLVE_BRIDGE_LIVE_CLI_INTERACTIVE")
 	assertMenuAutoAnswered(t,
 		"IMMEDIATELY use the AskUserQuestion tool to ask me to choose my favorite among "+
@@ -91,6 +92,7 @@ func TestLiveCLI_Interactive_ClaudeSingleSelect_AutoAnswered(t *testing.T) {
 }
 
 func TestLiveCLI_Interactive_ClaudeMultiSelect_AutoAnswered(t *testing.T) {
+	t.Parallel()
 	liveCLIGate(t, "EVOLVE_BRIDGE_LIVE_CLI_INTERACTIVE")
 	assertMenuAutoAnswered(t,
 		"IMMEDIATELY use the AskUserQuestion tool with multiSelect enabled to ask me to pick "+

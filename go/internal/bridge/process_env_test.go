@@ -23,6 +23,7 @@ func envCapturingEngine(seen map[string][]string) *Engine {
 }
 
 func TestProcessEnv_IsTheProcessEnvironmentPlusTheFamilyManifestsDefaultEnv(t *testing.T) {
+	t.Parallel()
 	agy := ProcessEnv("agy")
 	if !slices.Contains(agy, agyAutoUpdateOffEnv+"=1") {
 		t.Errorf("a bare agy exec must carry %s=1 from the agy-tmux manifest; env has %d entries without it", agyAutoUpdateOffEnv, len(agy))
@@ -38,6 +39,7 @@ func TestProcessEnv_IsTheProcessEnvironmentPlusTheFamilyManifestsDefaultEnv(t *t
 }
 
 func TestDoctorVersion_ProbesTheBinaryWithItsFamilyManifestEnv(t *testing.T) {
+	t.Parallel()
 	seen := map[string][]string{}
 	e := envCapturingEngine(seen)
 
@@ -50,6 +52,7 @@ func TestDoctorVersion_ProbesTheBinaryWithItsFamilyManifestEnv(t *testing.T) {
 }
 
 func TestDoctorDeep_TheHeadlessAgyProbeRunsWithItsFamilyManifestEnv(t *testing.T) {
+	t.Parallel()
 	seen := map[string][]string{}
 	e := envCapturingEngine(seen)
 

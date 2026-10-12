@@ -7,6 +7,7 @@ import (
 )
 
 func TestEmitChannelBreadcrumb_Format(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	emitChannelBreadcrumb(&buf, "inject_applied", "c1")
 	if got := strings.TrimSpace(buf.String()); got != `{"evolve_channel":"inject_applied","corr_id":"c1"}` {
@@ -15,6 +16,7 @@ func TestEmitChannelBreadcrumb_Format(t *testing.T) {
 }
 
 func TestEmitChannelBreadcrumb_EmptyCorrIDNoOp(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	emitChannelBreadcrumb(&buf, "inject_applied", "")
 	if buf.Len() != 0 {
@@ -23,6 +25,7 @@ func TestEmitChannelBreadcrumb_EmptyCorrIDNoOp(t *testing.T) {
 }
 
 func TestEmitChannelBreadcrumb_IdleReachedFormat(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	emitChannelBreadcrumb(&buf, "idle_reached", "c9")
 	if got := strings.TrimSpace(buf.String()); got != `{"evolve_channel":"idle_reached","corr_id":"c9"}` {

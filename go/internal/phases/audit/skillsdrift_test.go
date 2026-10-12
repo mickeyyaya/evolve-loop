@@ -16,6 +16,7 @@ import (
 )
 
 func TestSkillsCheckOffenders(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		report string
@@ -137,6 +138,7 @@ func TestWorktreeSkillsDrift_ATimeoutCannotGradeAndSaysSo(t *testing.T) {
 }
 
 func TestGeneratorDisagreement(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		host    []string
@@ -165,6 +167,7 @@ func TestGeneratorDisagreement(t *testing.T) {
 }
 
 func TestRun_SkillsDriftWarningKeepsThePASSAndNamesTheGate(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	phase := New(Config{
@@ -188,6 +191,7 @@ func TestRun_SkillsDriftWarningKeepsThePASSAndNamesTheGate(t *testing.T) {
 }
 
 func TestCarriesSkillsGenerator(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		file string

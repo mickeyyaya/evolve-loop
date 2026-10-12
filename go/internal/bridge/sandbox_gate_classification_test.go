@@ -15,6 +15,7 @@ func gateCfg() *Config {
 }
 
 func TestSandboxGate_NestedSessionDoesNotSatisfyRequirement(t *testing.T) {
+	t.Parallel()
 	deps := Deps{Env: map[string]string{"CLAUDECODE": "1"}}
 	if !sandboxRequiredButUnavailable(deps, gateCfg(), false) {
 		t.Fatal("unverified outer confinement must fail a mandatory requirement")
@@ -22,6 +23,7 @@ func TestSandboxGate_NestedSessionDoesNotSatisfyRequirement(t *testing.T) {
 }
 
 func TestSandboxGate_ExplicitOffIsAHostOptOutAndWarnsLoudly(t *testing.T) {
+	t.Parallel()
 	var errBuf strings.Builder
 	deps := Deps{Env: map[string]string{"EVOLVE_SANDBOX": "off"}, Stderr: &errBuf}
 	if sandboxRequiredButUnavailable(deps, gateCfg(), false) {
@@ -33,6 +35,7 @@ func TestSandboxGate_ExplicitOffIsAHostOptOutAndWarnsLoudly(t *testing.T) {
 }
 
 func TestSandboxGate_UnavailableUnderAutoStillFailsClosed(t *testing.T) {
+	t.Parallel()
 	deps := Deps{Env: map[string]string{}}
 	if !sandboxRequiredButUnavailable(deps, gateCfg(), false) {
 		t.Fatal("not nested, not opted out, wrap unavailable: THIS is the violation the gate exists for — it must fail closed")
@@ -40,6 +43,7 @@ func TestSandboxGate_UnavailableUnderAutoStillFailsClosed(t *testing.T) {
 }
 
 func TestSandboxGate_WrappedNeverGates(t *testing.T) {
+	t.Parallel()
 	deps := Deps{Env: map[string]string{}}
 	if sandboxRequiredButUnavailable(deps, gateCfg(), true) {
 		t.Fatal("a wrapped launch satisfied the requirement outright")
@@ -47,6 +51,7 @@ func TestSandboxGate_WrappedNeverGates(t *testing.T) {
 }
 
 func TestSandboxGate_NoRequirementNeverGates(t *testing.T) {
+	t.Parallel()
 	deps := Deps{Env: map[string]string{}}
 	if sandboxRequiredButUnavailable(deps, &Config{Agent: "build"}, false) {
 		t.Fatal("RequireSandbox=false must never gate")
@@ -57,6 +62,7 @@ func TestSandboxGate_NoRequirementNeverGates(t *testing.T) {
 }
 
 func TestSandboxGate_NamedSessionCannotProveRequestedPolicy(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	writeJSON(t, fx.artifact, "done")
 	tmux := &fakeTmux{existing: map[string]bool{"evolve-bridge-named-previous-policy": true}}
@@ -71,6 +77,7 @@ func TestSandboxGate_NamedSessionCannotProveRequestedPolicy(t *testing.T) {
 
 // The default tmux driver must enforce the same mandatory boundary as headless.
 func TestSandboxGate_TmuxDriverRejectsUnverifiedNestedConfinement(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	cfg.RequireSandbox = true

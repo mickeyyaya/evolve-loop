@@ -10,6 +10,7 @@ import (
 var wallRuleName = regexp.MustCompile(`(?i)quota|rate|limit|exhaust`)
 
 func TestManifests_EveryQuotaOrRateWallRuleBenchesItsFamily(t *testing.T) {
+	t.Parallel()
 	names := ManifestNames()
 	if len(names) < 4 {
 		t.Fatalf("found %d manifests %v; the walk has lost its subjects", len(names), names)

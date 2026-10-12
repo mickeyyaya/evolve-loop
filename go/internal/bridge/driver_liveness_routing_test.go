@@ -24,6 +24,7 @@ func repoRootForBridge(t *testing.T) string {
 }
 
 func TestDriverLivenessRouting_ClaudeTmux(t *testing.T) {
+	t.Parallel()
 	lp := tmuxLaunch{name: "claude-tmux"}
 	probe := detectorFor(lp)
 	if _, ok := probe.(*panestream.ClaudeDetector); !ok {
@@ -32,6 +33,7 @@ func TestDriverLivenessRouting_ClaudeTmux(t *testing.T) {
 }
 
 func TestDriverLivenessRouting_CodexTmux(t *testing.T) {
+	t.Parallel()
 	lp := tmuxLaunch{name: "codex-tmux"}
 	probe := detectorFor(lp)
 	if _, ok := probe.(*panestream.DefaultDetector); !ok {
@@ -40,6 +42,7 @@ func TestDriverLivenessRouting_CodexTmux(t *testing.T) {
 }
 
 func TestDriverLivenessRouting_AgyTmux(t *testing.T) {
+	t.Parallel()
 	lp := tmuxLaunch{name: "agy-tmux"}
 	probe := detectorFor(lp)
 	if _, ok := probe.(*panestream.AgyDetector); !ok {
@@ -48,6 +51,7 @@ func TestDriverLivenessRouting_AgyTmux(t *testing.T) {
 }
 
 func TestDriverLivenessRouting_OllamaTmux(t *testing.T) {
+	t.Parallel()
 	lp := tmuxLaunch{name: "ollama-tmux"}
 	probe := detectorFor(lp)
 	if _, ok := probe.(*panestream.OllamaDetector); !ok {
@@ -56,6 +60,7 @@ func TestDriverLivenessRouting_OllamaTmux(t *testing.T) {
 }
 
 func TestDriverLivenessRouting_UnknownTmux(t *testing.T) {
+	t.Parallel()
 	lp := tmuxLaunch{name: "unknown-tmux"}
 	probe := detectorFor(lp)
 	if probe == nil {
@@ -67,6 +72,7 @@ func TestDriverLivenessRouting_UnknownTmux(t *testing.T) {
 }
 
 func TestDriverLivenessRouting_StopReviewHasNoCLILiterals(t *testing.T) {
+	t.Parallel()
 	root := repoRootForBridge(t)
 	path := filepath.Join(root, "go", "internal", "bridge", "stopreview.go")
 	src, err := os.ReadFile(path)

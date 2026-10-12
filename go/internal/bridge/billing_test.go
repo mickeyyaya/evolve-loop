@@ -10,6 +10,7 @@ import (
 )
 
 func TestBillingTokenHash(t *testing.T) {
+	t.Parallel()
 	h := billingTokenHash([]byte(`{"accessToken":"abc123def456ghijklmnopqrstuvwxyz0123456789"}`))
 	if len(h) != 64 {
 		t.Fatalf("token hash len = %d, want 64 (sha256 hex)", len(h))
@@ -67,6 +68,7 @@ func TestBillingSnapshot(t *testing.T) {
 }
 
 func TestBillingCompare(t *testing.T) {
+	t.Parallel()
 	mk := func(body string) string {
 		p := filepath.Join(t.TempDir(), "s.json")
 		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {

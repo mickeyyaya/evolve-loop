@@ -237,6 +237,7 @@ func carriesConfigOverride(argv []string, override string) bool {
 }
 
 func TestCodexLaunch_ArgvCarriesTheUpdateCheckOffOverride(t *testing.T) {
+	t.Parallel()
 	pane := &codexUpdateMenuPane{startOnComposer: true}
 	phaseRealization := RealizeFor("codex-tmux", LaunchIntent{ModelTier: "balanced", Permission: "bypass"})
 
@@ -251,6 +252,7 @@ func TestCodexLaunch_ArgvCarriesTheUpdateCheckOffOverride(t *testing.T) {
 }
 
 func TestCodexUpdateMenu_ASwallowedDownNeverLetsEnterConfirmUpdateNow(t *testing.T) {
+	t.Parallel()
 	pane := &codexUpdateMenuPane{navKeysToSwallow: 1}
 
 	rc, stderr := bootCodexThroughUpdateMenu(t, pane, Realization{})
@@ -267,6 +269,7 @@ func TestCodexUpdateMenu_ASwallowedDownNeverLetsEnterConfirmUpdateNow(t *testing
 }
 
 func TestCodexUpdateMenu_ADownThatLandsBootsWithOneDownAndOneEnterOnSkip(t *testing.T) {
+	t.Parallel()
 	pane := &codexUpdateMenuPane{}
 
 	rc, stderr := bootCodexThroughUpdateMenu(t, pane, Realization{})
@@ -283,6 +286,7 @@ func TestCodexUpdateMenu_ADownThatLandsBootsWithOneDownAndOneEnterOnSkip(t *test
 }
 
 func TestCodexUpdateMenu_ACursorThatNeverMovesEndsTheBootAsABootTimeoutWithoutConfirming(t *testing.T) {
+	t.Parallel()
 	pane := &codexUpdateMenuPane{navigationIsInert: true}
 
 	rc, stderr := bootCodexThroughUpdateMenu(t, pane, Realization{})
@@ -303,6 +307,7 @@ func TestCodexUpdateMenu_ACursorThatNeverMovesEndsTheBootAsABootTimeoutWithoutCo
 }
 
 func TestCodexUpdateMenu_AnAnsweredMenuLeftInScrollbackAboveTheComposerIsNeverAnsweredAgain(t *testing.T) {
+	t.Parallel()
 	pane := &codexUpdateMenuPane{startOnComposer: true, answeredMenuAbove: true}
 
 	rc, stderr := bootCodexThroughUpdateMenu(t, pane, Realization{})
@@ -316,6 +321,7 @@ func TestCodexUpdateMenu_AnAnsweredMenuLeftInScrollbackAboveTheComposerIsNeverAn
 }
 
 func TestCodexUpdateMenu_AMenuTheRulesCannotParseEndsTheBootAsABootTimeoutWithoutAnyKey(t *testing.T) {
+	t.Parallel()
 	pane := &codexUpdateMenuPane{menuFooter: codexVariantMenuFooter}
 
 	rc, stderr := bootCodexThroughUpdateMenu(t, pane, Realization{})
@@ -365,6 +371,7 @@ func matchingRules(pane string, rules []ManifestPrompt) []string {
 }
 
 func TestAutoRespond_CodexUpdateMenuRulesAreDisjointOnEveryMenuFrame(t *testing.T) {
+	t.Parallel()
 	m, shaped, catchAll := codexUpdateMenuRules(t)
 	frames := []struct {
 		name     string
@@ -414,6 +421,7 @@ func TestAutoRespond_CodexUpdateMenuRulesAreDisjointOnEveryMenuFrame(t *testing.
 }
 
 func TestAutoRespond_CodexUpdateMenuTailLinesRejectsAFooterFarBelowTheOptions(t *testing.T) {
+	t.Parallel()
 	m, shaped, _ := codexUpdateMenuRules(t)
 	farFooter := strings.Repeat("\n", 5) + codexUpdateMenuFooter
 	frames := map[string]string{
@@ -437,6 +445,7 @@ func TestAutoRespond_CodexUpdateMenuTailLinesRejectsAFooterFarBelowTheOptions(t 
 }
 
 func TestAutoRespond_CodexUpdateMenuHoldSkipsABusyPane(t *testing.T) {
+	t.Parallel()
 	_, _, catchAll := codexUpdateMenuRules(t)
 	unparsed := codexUpdateMenuFrameWith(codexVariantMenuFooter, codexMenuUpdateNow)
 
@@ -452,6 +461,7 @@ func TestAutoRespond_CodexUpdateMenuHoldSkipsABusyPane(t *testing.T) {
 }
 
 func TestAutoRespond_CodexUpdateMenuNavigationWinsAFrameBothRulesMatch(t *testing.T) {
+	t.Parallel()
 	m, shaped, _ := codexUpdateMenuRules(t)
 	overlap := codexUpdateMenuHeader + "› 1. Update now (runs `brew upgrade --cask codex`)\n" +
 		strings.TrimPrefix(codexUpdateMenuFrame(codexMenuSkip), codexUpdateMenuHeader)

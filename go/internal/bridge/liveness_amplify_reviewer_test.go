@@ -7,6 +7,7 @@ import (
 )
 
 func TestAmp_Reviewer_IdleStateNotExtend(t *testing.T) {
+	t.Parallel()
 	r := NewDeterministicReviewer(6) // maxExtends=6
 	for _, attempt := range []int{0, 1, 3, 6, 9} {
 		ev := StopEvent{State: panestream.LivenessIdle, Attempt: attempt}
@@ -18,6 +19,7 @@ func TestAmp_Reviewer_IdleStateNotExtend(t *testing.T) {
 }
 
 func TestAmp_Reviewer_BusyButStagnantUnderMaxExtendsExtends(t *testing.T) {
+	t.Parallel()
 	const maxExtends = 4
 	r := NewDeterministicReviewer(maxExtends)
 	// attempts strictly under the cap: 0, 1, maxExtends-1
@@ -31,6 +33,7 @@ func TestAmp_Reviewer_BusyButStagnantUnderMaxExtendsExtends(t *testing.T) {
 }
 
 func TestAmp_Reviewer_BusyButStagnantAtMaxExtendsBackstops(t *testing.T) {
+	t.Parallel()
 	const maxExtends = 3
 	r := NewDeterministicReviewer(maxExtends)
 	// attempts at or past the cap
@@ -44,6 +47,7 @@ func TestAmp_Reviewer_BusyButStagnantAtMaxExtendsBackstops(t *testing.T) {
 }
 
 func TestAmp_Reviewer_HungAtAttemptZeroFastFails(t *testing.T) {
+	t.Parallel()
 	r := NewDeterministicReviewer(6) // maxExtends=6
 	ev := StopEvent{State: panestream.LivenessHung, Attempt: 0}
 	verdict := r.Review(ev)
@@ -53,6 +57,7 @@ func TestAmp_Reviewer_HungAtAttemptZeroFastFails(t *testing.T) {
 }
 
 func TestAmp_Reviewer_StateZeroIgnoresRetiredLegacyFields(t *testing.T) {
+	t.Parallel()
 	r := NewDeterministicReviewer(2)
 
 	// The retired fallback would have extended on Progressed=true; must now pause.
@@ -75,6 +80,7 @@ func TestAmp_Reviewer_StateZeroIgnoresRetiredLegacyFields(t *testing.T) {
 }
 
 func TestAmp_Reviewer_ConvergingWithNonPositiveMaxExtendsStillExtends(t *testing.T) {
+	t.Parallel()
 	for _, max := range []int{0, -1} {
 		r := NewDeterministicReviewer(max)
 		ev := StopEvent{State: panestream.LivenessConverging, Attempt: 0}

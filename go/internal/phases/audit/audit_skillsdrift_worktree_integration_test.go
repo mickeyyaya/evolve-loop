@@ -131,6 +131,7 @@ func requireDisagreement(t *testing.T, err error, n int) {
 }
 
 func TestSkillsDriftGate_GeneratorChangeWithRegeneratedStubsPasses(t *testing.T) {
+	t.Parallel()
 	root := generatorLaneWorktree(t)
 	editGenerator(t, root, rendererFile, laneMarkerOld, laneMarkerNew)
 	regenerateWithWorktreeGenerator(t, root)
@@ -148,6 +149,7 @@ func TestSkillsDriftGate_GeneratorChangeWithRegeneratedStubsPasses(t *testing.T)
 }
 
 func TestSkillsDriftGate_CommittedGeneratorChangeIsGradedByTheWorktreeWithOrWithoutABase(t *testing.T) {
+	t.Parallel()
 	repo := generatorLaneRepo(t)
 	base := repo.Git("rev-parse", "HEAD")
 	editGenerator(t, repo.Dir, rendererFile, laneMarkerOld, laneMarkerNew)
@@ -166,6 +168,7 @@ func TestSkillsDriftGate_CommittedGeneratorChangeIsGradedByTheWorktreeWithOrWith
 }
 
 func TestSkillsDriftGate_GeneratorChangeThatAgreesWithTheHostIsSilent(t *testing.T) {
+	t.Parallel()
 	root := generatorLaneWorktree(t)
 	fixtures.MustWrite(t, filepath.Join(root, "go", "internal", "skillcheck", "zz_lane.go"), "package skillcheck\n\nconst laneTouch = 1\n")
 
@@ -177,6 +180,7 @@ func TestSkillsDriftGate_GeneratorChangeThatAgreesWithTheHostIsSilent(t *testing
 }
 
 func TestSkillsDriftGate_GeneratorChangeWithoutRegenerationFails(t *testing.T) {
+	t.Parallel()
 	root := generatorLaneWorktree(t)
 	editGenerator(t, root, rendererFile, laneMarkerOld, laneMarkerNew)
 	if host, _ := skillcheck.Check(root); len(host) != 0 {
@@ -194,6 +198,7 @@ func TestSkillsDriftGate_GeneratorChangeWithoutRegenerationFails(t *testing.T) {
 }
 
 func TestSkillsDriftGate_ReworkedReportProtocolStillFails(t *testing.T) {
+	t.Parallel()
 	root := generatorLaneWorktree(t)
 	editGenerator(t, root, rendererFile, laneMarkerOld, laneMarkerNew)
 	editGenerator(t, root, checkerFile, driftWordOld, driftWordNew)
@@ -264,6 +269,7 @@ func skillsGateDiagnostics(t *testing.T, check func(core.PhaseRequest) ([]string
 }
 
 func TestSkillsDriftGate_Cycle1840ReplayPasses(t *testing.T) {
+	t.Parallel()
 	root := generatorLaneWorktree(t)
 	editGenerator(t, root, rendererFile, laneMarkerOld, laneMarkerNew)
 	regenerateWithWorktreeGenerator(t, root)

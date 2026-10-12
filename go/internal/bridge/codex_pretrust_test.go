@@ -9,6 +9,7 @@ import (
 )
 
 func TestPretrustCodexProjects(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name           string
 		existing       string
@@ -209,6 +210,7 @@ trust_level = "trusted"
 
 // A start barrier makes every reader see the same empty file, so a lost update trips reliably across iterations.
 func TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 	cfgs := []*Config{
@@ -259,6 +261,7 @@ func TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive(t *testing.T) {
 }
 
 func TestPretrustCodexProjects_CreatesParentDir(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	nested := filepath.Join(dir, "codex-home", ".codex", "config.toml")
 
@@ -279,6 +282,7 @@ func TestPretrustCodexProjects_CreatesParentDir(t *testing.T) {
 }
 
 func TestPretrustCodexProjects_NilCfg(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 	if err := pretrustCodexProjects(nil); err != nil {
@@ -290,6 +294,7 @@ func TestPretrustCodexProjects_NilCfg(t *testing.T) {
 }
 
 func TestPretrustCodexProjects_WritesHideRateLimitNudge(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 	cfg := &Config{Worktree: filepath.Join(dir, "wt"), Workspace: filepath.Join(dir, "ws"), codexConfigPath: path}
@@ -313,6 +318,7 @@ func TestPretrustCodexProjects_WritesHideRateLimitNudge(t *testing.T) {
 }
 
 func TestAppendCodexNotice(t *testing.T) {
+	t.Parallel()
 	out := appendCodexNotice("")
 	if !strings.Contains(out, "[notice]") || !strings.Contains(out, "hide_rate_limit_model_nudge = true") {
 		t.Errorf("empty → must add notice; got %q", out)
@@ -332,6 +338,7 @@ func TestAppendCodexNotice(t *testing.T) {
 }
 
 func TestAppendCodexTrustEntries(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		existing string

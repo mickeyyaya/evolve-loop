@@ -6,6 +6,7 @@ import (
 )
 
 func TestTmuxBoot_ExportsProjectRootIntoThePaneShell(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	root := t.TempDir()
 	tmux := &fakeTmux{}
@@ -34,6 +35,7 @@ func TestTmuxBoot_ExportsProjectRootIntoThePaneShell(t *testing.T) {
 }
 
 func TestTmuxBoot_NoProjectRootMeansNoExport(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil, "--worktree="+t.TempDir())

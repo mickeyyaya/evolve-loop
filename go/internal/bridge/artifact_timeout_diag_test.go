@@ -13,6 +13,7 @@ import (
 )
 
 func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never lands
 	// Two extends then a pause, so extends_used is 2 and the pause reason must survive.
@@ -65,6 +66,7 @@ func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T
 }
 
 func TestRunTmuxREPL_NegativeMaxExtendsReportsDefault(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "stop"}}}
@@ -81,6 +83,7 @@ func TestRunTmuxREPL_NegativeMaxExtendsReportsDefault(t *testing.T) {
 }
 
 func TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
@@ -119,6 +122,7 @@ func TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends(t *testing.T) {
 // panestream.LivenessState has no String method, so the summary publishes its own closed word list;
 // the zero value is named, never blank.
 func TestTimeoutSummaryVocabulary(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		in   panestream.LivenessState
 		want string
@@ -167,9 +171,11 @@ func (chattyTimeoutDriver) Launch(_ context.Context, cfg *Config, deps Deps) (in
 	return ExitArtifactTimeout, nil
 }
 
-func init() { Register(chattyTimeoutDriver{}) }
-
 func TestEngineLaunch_ArtifactTimeout_SummaryBeatsEarlierBridgeChatter(t *testing.T) {
+	ResetDriversForTesting()
+	registerBuiltins()
+	Register(chattyTimeoutDriver{})
+	t.Cleanup(func() { ResetDriversForTesting(); registerBuiltins() })
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "chatty", "")
 	eng := NewEngine(Deps{LookupEnv: mapLookup(nil)})
@@ -193,6 +199,7 @@ func TestEngineLaunch_ArtifactTimeout_SummaryBeatsEarlierBridgeChatter(t *testin
 }
 
 func TestEngineLaunch_NonTimeoutExit_CauseUnchanged(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitSafetyGate}

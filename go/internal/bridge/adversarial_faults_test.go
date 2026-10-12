@@ -99,6 +99,7 @@ func rateLimitWallFor(family string) string {
 }
 
 func TestAdversarialFaultMatrix(t *testing.T) {
+	t.Parallel()
 	for _, tc := range adversarialFaultCases() {
 		tc := tc
 		t.Run(tc.family+"_"+tc.fault, func(t *testing.T) {
@@ -130,6 +131,7 @@ func TestAdversarialFaultMatrix(t *testing.T) {
 }
 
 func TestAdversarialFaultMatrix_RequiredFamiliesCovered(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	for _, tc := range adversarialFaultCases() {
 		seen[tc.family] = true
@@ -142,6 +144,7 @@ func TestAdversarialFaultMatrix_RequiredFamiliesCovered(t *testing.T) {
 }
 
 func TestAdversarialFaultMatrix_RequiredFaultTypesPresent(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	for _, tc := range adversarialFaultCases() {
 		seen[strings.ReplaceAll(tc.fault, "-", "")] = true

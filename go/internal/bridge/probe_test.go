@@ -14,6 +14,7 @@ func hasBinaryIn(set ...string) func(string) bool {
 }
 
 func TestResolveTier(t *testing.T) {
+	t.Parallel()
 	full := Manifest{Binary: "claude", DefaultTier: "full", TierDependencies: map[string][]string{"full": {"claude", "tmux"}}}
 	cases := []struct {
 		name  string
@@ -37,6 +38,7 @@ func TestResolveTier(t *testing.T) {
 }
 
 func TestEngineProbe_NoBinaries_AllNone(t *testing.T) {
+	t.Parallel()
 	eng := NewEngine(Deps{LookPath: func(string) (string, error) { return "", errNoBin }})
 	p, err := eng.Probe(context.Background())
 	if err != nil {
@@ -54,6 +56,7 @@ func TestEngineProbe_NoBinaries_AllNone(t *testing.T) {
 
 func TestEngineProbe_ClaudeTmuxAvailable(t *testing.T) {
 	// claude + tmux present → claude-tmux resolves to its declared tier (hybrid).
+	t.Parallel()
 	eng := NewEngine(Deps{LookPath: func(b string) (string, error) {
 		if b == "claude" || b == "tmux" {
 			return "/usr/bin/" + b, nil

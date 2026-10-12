@@ -11,6 +11,7 @@ import (
 )
 
 func TestApicoverNewPkgGraduation_OffendersFailAudit(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	cfg := Config{
@@ -34,6 +35,7 @@ func TestApicoverNewPkgGraduation_OffendersFailAudit(t *testing.T) {
 }
 
 func TestApicoverNewPkgGraduationDefault_NoUngraduatedPackages_NoOp(t *testing.T) {
+	t.Parallel()
 	root, goDir := writeApicoverFixture(t, apicoverCleanPkg)
 	_ = goDir
 	off, err := apicoverNewPackageGraduationDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
@@ -43,6 +45,7 @@ func TestApicoverNewPkgGraduationDefault_NoUngraduatedPackages_NoOp(t *testing.T
 }
 
 func TestApicoverNewPkgGraduationDefault_UngraduatedPackageFlagged(t *testing.T) {
+	t.Parallel()
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -71,6 +74,7 @@ func TestApicoverNewPkgGraduationDefault_UngraduatedPackageFlagged(t *testing.T)
 }
 
 func TestApicoverNewPkgGraduationDefault_OffenderIncludesPrescriptiveFix(t *testing.T) {
+	t.Parallel()
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -106,6 +110,7 @@ func TestApicoverNewPkgGraduationDefault_OffenderIncludesPrescriptiveFix(t *test
 }
 
 func TestApicoverNewPkgGraduationDefault_CmdChangeNotFlagged(t *testing.T) {
+	t.Parallel()
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte(""), 0o644); err != nil {
 		t.Fatal(err)

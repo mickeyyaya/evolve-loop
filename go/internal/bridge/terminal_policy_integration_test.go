@@ -19,6 +19,7 @@ import (
 )
 
 func TestRealTmuxSandboxTerminalConfinement(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	probe := requireNativeSandbox(t)
 	node := testhost.Tool(t, "node")
@@ -128,6 +129,7 @@ process.stdin.resume();
 // Invoked only inside the native terminal fixture's sandbox. TIOCGETD is a
 // harmless query, supported by the unwrapped control, outside the allowlist.
 func TestSandboxTerminalIoctlFixture(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("EVOLVE_TERMINAL_IOCTL_FIXTURE") != "1" {
 		return
 	}

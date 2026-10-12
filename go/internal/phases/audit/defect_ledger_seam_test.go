@@ -33,6 +33,7 @@ func streamOf(events []signalcenter.Event) string {
 }
 
 func TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback(t *testing.T) {
+	t.Parallel()
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.Remove(filepath.Join(ws, "continuation-manifest.json")); err != nil {
 		t.Fatal(err)
@@ -51,6 +52,7 @@ func TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback(t *testing.T) {
 }
 
 func TestAuditConfig_SignalsReachTheLedger(t *testing.T) {
+	t.Parallel()
 	acc, got := recordingAccessor()
 	if !newHooks(Config{Signals: acc}).ledger.SignalsWired() {
 		t.Fatal("Config.Signals wires the ledger")
@@ -78,6 +80,7 @@ func TestAuditConfig_SignalsReachTheLedger(t *testing.T) {
 }
 
 func TestDefectLedgerSeam_OneConstructionSite(t *testing.T) {
+	t.Parallel()
 	const onlySite = "internal/phases/audit/defect_ledger.go"
 	if offenders := auditNonTestSourcesMentioning(t, "defectledger.New(", onlySite); len(offenders) > 0 {
 		t.Errorf("defectledger.New( belongs to ONE non-test file (%s); these use it too: %v", onlySite, offenders)
@@ -85,6 +88,7 @@ func TestDefectLedgerSeam_OneConstructionSite(t *testing.T) {
 }
 
 func TestDefectLedgerSeam_ProductionSitesUseTheWiredLedger(t *testing.T) {
+	t.Parallel()
 	disposition, err := os.ReadFile("disposition.go")
 	if err != nil {
 		t.Fatal(err)
@@ -102,6 +106,7 @@ func TestDefectLedgerSeam_ProductionSitesUseTheWiredLedger(t *testing.T) {
 }
 
 func TestNullLedgerFacades_HaveNoProductionCaller(t *testing.T) {
+	t.Parallel()
 	const onlySite = "internal/phases/audit/defect_ledger.go"
 	for _, needle := range []string{"emitDefectLedger(", "reconcileContinuationDefects(", "readDispositions(", "dispositionPreflight("} {
 		if offenders := auditNonTestSourcesMentioning(t, needle, onlySite); len(offenders) > 0 {
@@ -148,6 +153,7 @@ func auditNonTestSourcesMentioning(t *testing.T, needle, allowed string) []strin
 }
 
 func TestClassify_LedgerStreamSequenceOnABlockedContinuation(t *testing.T) {
+	t.Parallel()
 	acc, got := recordingAccessor()
 	wired := hooks{ledger: wiredDefectLedger(acc)}
 
@@ -205,6 +211,7 @@ func diagnosticContaining(diags []core.Diagnostic, needle string) core.Diagnosti
 }
 
 func TestArtifactNames_HaveOneProductionSpellingEach(t *testing.T) {
+	t.Parallel()
 	owners := map[string]string{
 		defectledger.LedgerFile:       "internal/core/defectledger/schema.go",
 		defectledger.DispositionsFile: "internal/core/defectledger/schema.go",

@@ -13,6 +13,7 @@ import (
 )
 
 func TestRun_IntegrationTierGate_Offenders_FAILsAudit(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	phase := New(Config{
@@ -35,6 +36,7 @@ func TestRun_IntegrationTierGate_Offenders_FAILsAudit(t *testing.T) {
 }
 
 func TestIntegrationTierCheckDefault_NoOpWithoutGoModule(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	offenders, err := integrationTierCheckDefault(core.PhaseRequest{Cycle: 1, ProjectRoot: root, Worktree: root})
 	if err != nil {
@@ -46,6 +48,7 @@ func TestIntegrationTierCheckDefault_NoOpWithoutGoModule(t *testing.T) {
 }
 
 func TestNewDefault_WiresIntegrationTierGate(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skips real `go test -tags integration` subprocess under -short; full `go test` + CI still run it")
 	}
@@ -126,6 +129,7 @@ func writeRaceFixtureWorktree(t *testing.T) string {
 }
 
 func TestIntegrationTierGate_Race(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skips real `go test -race -tags integration` subprocess under -short; full `go test` + CI still run it")
 	}
@@ -143,6 +147,7 @@ func TestIntegrationTierGate_Race(t *testing.T) {
 }
 
 func TestIntegrationTierGate_RaceFixtureIsRaceOnly(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skips real `go test -tags integration` subprocess under -short; full `go test` + CI still run it")
 	}

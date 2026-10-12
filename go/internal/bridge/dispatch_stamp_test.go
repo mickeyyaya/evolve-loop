@@ -29,6 +29,7 @@ func TestRandomStamp_HexEncodesSixEntropyBytes(t *testing.T) {
 }
 
 func TestRandomStamp_RealEntropyNeverRepeatsAcrossCalls(t *testing.T) {
+	t.Parallel()
 	seen := map[string]bool{}
 	hex12 := regexp.MustCompile(`^[0-9a-f]{12}$`)
 	for range 64 {

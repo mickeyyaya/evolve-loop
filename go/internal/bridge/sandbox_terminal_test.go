@@ -22,6 +22,7 @@ func (f *failedTerminalTmux) paneTTY(context.Context, string) (string, error) {
 }
 
 func TestSandboxTerminalFailurePreventsLaunch(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS != "darwin" {
 		t.Skip("macOS terminal grant")
 	}
@@ -53,6 +54,7 @@ func TestSandboxTerminalFailurePreventsLaunch(t *testing.T) {
 }
 
 func TestSandboxTerminalOptOutDoesNotQueryPane(t *testing.T) {
+	t.Parallel()
 	for _, mode := range []string{"off", " off "} {
 		mux := &failedTerminalTmux{fakeTmux: &fakeTmux{}, err: errors.New("must not query")}
 		path, err := sandboxTerminalPath(context.Background(), Deps{Tmux: mux, Env: map[string]string{envSandboxMode: mode}}, &Config{RequireSandbox: true}, "fixture")

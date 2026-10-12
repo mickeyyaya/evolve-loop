@@ -73,6 +73,7 @@ func stagedTreeOf(t *testing.T, root string, paths ...string) string {
 }
 
 func TestPredicateTreeFor_Cycle1735_TheDeclaredExplanationDocumentIsInTheShipTree(t *testing.T) {
+	t.Parallel()
 	root, ws, req := shipTreeFixture(t, 1735)
 	doc := "docs/explain/builds/cycle-1735-01m3k2r1z13znw2sze4j96xx4k.md"
 	writeAt(t, root, "go/source.go", "package source\n\nfunc Shrunk() {}\n")
@@ -88,6 +89,7 @@ func TestPredicateTreeFor_Cycle1735_TheDeclaredExplanationDocumentIsInTheShipTre
 }
 
 func TestPredicateTreeFor_Cycle1694_TheDeclaredPredicateAndEvalAreInTheShipTree(t *testing.T) {
+	t.Parallel()
 	root, ws, req := shipTreeFixture(t, 1694)
 	pred := "go/acs/cycle1694/predicates_test.go"
 	eval := ".evolve/evals/atomicwrite-linked-state-sweep.md"
@@ -104,6 +106,7 @@ func TestPredicateTreeFor_Cycle1694_TheDeclaredPredicateAndEvalAreInTheShipTree(
 }
 
 func TestPredicateTreeFor_AnUndeclaredUntrackedInputIsRefusedByName(t *testing.T) {
+	t.Parallel()
 	root, ws, req := shipTreeFixture(t, 1)
 	writeAt(t, root, "go/helper.go", "package source\n")
 	writeAt(t, root, "go/source.go", "package source\n\nfunc Declared() {}\n")
@@ -125,6 +128,7 @@ func TestPredicateTreeFor_AnUndeclaredUntrackedInputIsRefusedByName(t *testing.T
 }
 
 func TestPredicateTreeFor_AnUndeclaredTrackedEditShipsAndIsAudited(t *testing.T) {
+	t.Parallel()
 	root, ws, req := shipTreeFixture(t, 1)
 	writeAt(t, root, "go/source.go", "package source\n\nvar Edited = true\n")
 	writeAt(t, ws, "build-report.md", "No paths named.\n")

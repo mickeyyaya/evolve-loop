@@ -7,6 +7,7 @@ import (
 )
 
 func TestRetrospectiveGrantRejectsRetargetedLessonScope(t *testing.T) {
+	t.Parallel()
 	for _, scope := range []string{".evolve", ".evolve/instincts", ".evolve/instincts/lessons"} {
 		for _, outside := range []bool{false, true} {
 			t.Run(scope+map[bool]string{false: "/sibling", true: "/outside"}[outside], func(t *testing.T) {

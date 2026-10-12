@@ -13,6 +13,7 @@ import (
 )
 
 func TestNewDefaultWithStage_NamedPhase(t *testing.T) {
+	t.Parallel()
 	br := &fakeBridge{}
 	prm := fakePromptsFS("# Auditor body")
 
@@ -40,6 +41,7 @@ func TestNewDefaultWithStage_NamedPhase(t *testing.T) {
 }
 
 func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
+	t.Parallel()
 	var compactPhase *Phase = NewDefaultWithStageCompact(&fakeBridge{}, fakePromptsFS("# Auditor body"), config.StageEnforce, true)
 	if compactPhase == nil {
 		t.Fatal("NewDefaultWithStageCompact must return a non-nil *Phase")
@@ -79,6 +81,7 @@ func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
 }
 
 func TestWithSignals_NamedOptionReachesTheGates(t *testing.T) {
+	t.Parallel()
 	var opt Option = WithSignals(func() *signalcenter.Center { return signalcenter.New() })
 	var cfg Config
 	opt(&cfg)
@@ -98,6 +101,7 @@ type noHostEffects struct{}
 func (noHostEffects) Perform(context.Context, core.ReviewInput) error { return nil }
 
 func TestWithHostEffects_NamedOptionReachesTheEngine(t *testing.T) {
+	t.Parallel()
 	var opt Option = WithHostEffects(func() core.HostEffects { return noHostEffects{} })
 	var cfg Config
 	opt(&cfg)
@@ -113,6 +117,7 @@ func TestWithHostEffects_NamedOptionReachesTheEngine(t *testing.T) {
 }
 
 func TestWithContractVerifier_NamedOptionReachesTheEngine(t *testing.T) {
+	t.Parallel()
 	verifier := deliverable.PlainVerifier{PhaseIO: config.StageOff}
 	var opt Option = WithContractVerifier(func() runner.ContractVerifier { return verifier })
 	var cfg Config

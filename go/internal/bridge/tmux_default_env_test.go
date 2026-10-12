@@ -10,6 +10,7 @@ import (
 const promptSuggestionExport = "export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
 
 func TestClaudeTmuxManifest_TurnsPromptSuggestionsOff(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -20,6 +21,7 @@ func TestClaudeTmuxManifest_TurnsPromptSuggestionsOff(t *testing.T) {
 }
 
 func TestTmuxBoot_ExportsTheManifestEnvBeforeTheLaunch(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil, "--project-root="+t.TempDir(), "--worktree="+t.TempDir())
@@ -47,6 +49,7 @@ func TestTmuxBoot_ExportsTheManifestEnvBeforeTheLaunch(t *testing.T) {
 }
 
 func TestTmuxBoot_ACLIWithoutDefaultEnvExportsNothingExtra(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
 	tmux := &fakeTmux{}
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass", "--worktree="+t.TempDir())

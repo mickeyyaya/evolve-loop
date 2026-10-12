@@ -64,6 +64,7 @@ func liveCLIGate(t *testing.T, envKey string) {
 // EC80. It mirrors runTmuxREPL's boot loop exactly, including ticking the
 // auto-responder for tickDuringBoot CLIs to dismiss a boot-time trust prompt.
 func TestLiveCLI_BootMarkerDetected(t *testing.T) {
+	t.Parallel()
 	liveCLIGate(t, "EVOLVE_BRIDGE_LIVE_CLI")
 	wd, _ := os.Getwd() // a real, trusted dir for the CLI to start in
 	tx := execTmux{}
@@ -128,6 +129,7 @@ func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 // → artifact-wait → scrollback → exit. Proves the whole bridge contract end
 // to end against the live CLI. Gated separately because it spends tokens.
 func TestLiveCLI_FullRoundtrip(t *testing.T) {
+	t.Parallel()
 	liveCLIGate(t, "EVOLVE_BRIDGE_LIVE_CLI_ROUNDTRIP")
 	wd, _ := os.Getwd()
 	tx := execTmux{}

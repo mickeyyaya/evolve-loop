@@ -45,6 +45,7 @@ func idleReachedBracketRegionSource(t *testing.T) string {
 // center, so the idle_reached bracket cannot silently regress to a duplicate
 // direct busy read.
 func TestRunTmuxREPL_NoDirectChromeParseAtIdleReachedBracket(t *testing.T) {
+	t.Parallel()
 	region := idleReachedBracketRegionSource(t)
 	if strings.Contains(region, "panestream.PaneBusy(") {
 		t.Error("idle_reached bracket still calls panestream.PaneBusy( directly — must read it via panestream.LivenessCenter.BusyOf instead")

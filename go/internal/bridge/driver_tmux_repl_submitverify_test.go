@@ -148,6 +148,7 @@ func nudgeSeqIdx(seq []string, artifact string) int {
 }
 
 func TestTmuxREPL_NudgeUnsubmitted_ResendsEnter(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &stickyInputTmux{
 		fakeTmux:      &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
@@ -174,6 +175,7 @@ func TestTmuxREPL_NudgeUnsubmitted_ResendsEnter(t *testing.T) {
 }
 
 func TestTmuxREPL_NudgeSubmitted_NoResend(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// Plain fake: every capture is a clean prompt marker, so the nudge is
 	// submitted the moment it is sent.
@@ -193,6 +195,7 @@ func TestTmuxREPL_NudgeSubmitted_NoResend(t *testing.T) {
 }
 
 func TestTmuxREPL_NudgeUnsubmitted_ResendBounded(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &stickyInputTmux{
 		fakeTmux:      &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
@@ -221,6 +224,7 @@ func TestTmuxREPL_NudgeUnsubmitted_ResendBounded(t *testing.T) {
 // to the prompt-paste delivery site; no observed run shows an unsubmitted
 // prompt, so this pane state is stipulated, not replayed.
 func TestTmuxREPL_PromptPasteUnsubmitted_ResendsEnter(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &pasteStickyTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}
 	code, stderr := runSubmitVerify(t, fx, tm)

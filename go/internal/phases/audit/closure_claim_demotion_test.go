@@ -13,6 +13,7 @@ const demotionClosureReport = "# Audit Report\n\n## Findings\n\n" +
 	"the cycle-1490 defect is verified closed\n\n## Verdict\n**WARN**\n"
 
 func TestClassify_ClosureMissDemotedWhenLineageFullyAccounted(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -34,6 +35,7 @@ func TestClassify_ClosureMissDemotedWhenLineageFullyAccounted(t *testing.T) {
 }
 
 func TestClassify_ClosureMissOutsideLineageStillForces(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -52,6 +54,7 @@ func TestClassify_ClosureMissOutsideLineageStillForces(t *testing.T) {
 }
 
 func TestClassify_RefLessStrongClaimStillForcesOnAccountedLineage(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -70,6 +73,7 @@ func TestClassify_RefLessStrongClaimStillForcesOnAccountedLineage(t *testing.T) 
 }
 
 func TestClassify_MissingAncestorLedgerDoesNotVouchLineage(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -89,6 +93,7 @@ func TestClassify_MissingAncestorLedgerDoesNotVouchLineage(t *testing.T) {
 }
 
 func TestClassify_ClosureMissStillForcesWhenReconcileBlocked(t *testing.T) {
+	t.Parallel()
 	_, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -99,6 +104,7 @@ func TestClassify_ClosureMissStillForcesWhenReconcileBlocked(t *testing.T) {
 }
 
 func TestClassify_ClosureMissStillForcesOnNonContinuation(t *testing.T) {
+	t.Parallel()
 	verdict, _ := classifyWith(t, demotionClosureReport, func(ws string) {
 		yes := true
 		writeACSVerdictShip(t, ws, 0, &yes)

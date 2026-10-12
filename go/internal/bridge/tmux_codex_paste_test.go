@@ -26,6 +26,7 @@ func (p *codexPasteChipTmux) CapturePane(ctx context.Context, session string, sc
 // The fixture prompt is under the stability floor, so it settles 1s and
 // skips the capture.
 func TestTmuxPromptCodexPasteChipRecovery(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ name, driver, marker, pane, want string }{
 		{"parked", "codex-tmux", "›", "› [Pasted Content 52509 chars]\n  gpt-5.6-sol high", `"payload":"site=prompt resends=1 paste_settle=1s stability=skipped","result":"submitted_after_resend"`},
 		{"quoted history", "codex-tmux", "›", "Earlier: [Pasted Content 52509 chars]\n› ", `"payload":"site=prompt resends=0 paste_settle=1s stability=skipped","result":"submit_verified"`},

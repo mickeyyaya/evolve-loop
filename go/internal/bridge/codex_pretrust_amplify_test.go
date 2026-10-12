@@ -10,6 +10,7 @@ import (
 )
 
 func TestPretrustCodexProjects_Concurrent_ThreeGoroutines_AllSurvive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 
@@ -64,6 +65,7 @@ func TestPretrustCodexProjects_Concurrent_ThreeGoroutines_AllSurvive(t *testing.
 }
 
 func TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 
@@ -116,6 +118,7 @@ func TestPretrustCodexProjects_Concurrent_PreSeededFileSurvives(t *testing.T) {
 }
 
 func TestPretrustCodexProjects_Concurrent_SamePath_NoDuplicateSection(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 
@@ -156,6 +159,7 @@ func TestPretrustCodexProjects_Concurrent_SamePath_NoDuplicateSection(t *testing
 }
 
 func TestPretrustCodexProjects_Concurrent_HighStress_TenGoroutines(t *testing.T) {
+	t.Parallel()
 	const n = 10
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -201,6 +205,7 @@ func TestPretrustCodexProjects_Concurrent_HighStress_TenGoroutines(t *testing.T)
 }
 
 func TestPretrustCodexProjects_Concurrent_MultiRoundTwoGoroutines(t *testing.T) {
+	t.Parallel()
 	const rounds = 20
 	for round := range rounds {
 		dir := t.TempDir()

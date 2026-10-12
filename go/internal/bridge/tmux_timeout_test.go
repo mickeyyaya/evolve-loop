@@ -8,6 +8,7 @@ import (
 )
 
 func TestRunCmdBounded_KillsHungSubprocess(t *testing.T) {
+	t.Parallel()
 	start := time.Now()
 	_, err := runCmdBounded(context.Background(), 150*time.Millisecond, "sleep", "30")
 	elapsed := time.Since(start)
@@ -21,6 +22,7 @@ func TestRunCmdBounded_KillsHungSubprocess(t *testing.T) {
 }
 
 func TestRunCmdBounded_ReturnsOutputWhenFast(t *testing.T) {
+	t.Parallel()
 	out, err := runCmdBounded(context.Background(), 5*time.Second, "echo", "hello-bounded")
 	if err != nil {
 		t.Fatalf("unexpected error on a fast command: %v", err)
@@ -31,6 +33,7 @@ func TestRunCmdBounded_ReturnsOutputWhenFast(t *testing.T) {
 }
 
 func TestRunCmdBounded_HonorsParentCancellation(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { time.Sleep(100 * time.Millisecond); cancel() }()
 

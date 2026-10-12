@@ -22,6 +22,7 @@ func probeConfig(t *testing.T, session string) *Config {
 }
 
 func TestCaptureControl_ReapsTheEphemeralProbeSession(t *testing.T) {
+	t.Parallel()
 	fake := &FakeTmuxController{CaptureFrames: markerFrames(40)}
 	deps := covDeps()
 	deps.Tmux = fake
@@ -34,6 +35,7 @@ func TestCaptureControl_ReapsTheEphemeralProbeSession(t *testing.T) {
 }
 
 func TestCaptureControl_ReapsTheProbeSessionWhenBootFails(t *testing.T) {
+	t.Parallel()
 	fake := &FakeTmuxController{NewSessionErr: errors.New("tmux: server exited")}
 	deps := covDeps()
 	deps.Tmux = fake
@@ -46,6 +48,7 @@ func TestCaptureControl_ReapsTheProbeSessionWhenBootFails(t *testing.T) {
 }
 
 func TestCaptureControl_NeverKillsANamedSession(t *testing.T) {
+	t.Parallel()
 	fake := &FakeTmuxController{Existing: map[string]bool{"evolve-bridge-named-keep": true}, CaptureFrames: markerFrames(40)}
 	deps := covDeps()
 	deps.Tmux = fake
@@ -64,6 +67,7 @@ func (k killFailTmux) KillSession(context.Context, string) error {
 }
 
 func TestCaptureControl_AFailedReapIsLoud(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	deps := covDeps()
 	deps.Stderr = &stderr

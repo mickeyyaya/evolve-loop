@@ -14,6 +14,7 @@ const (
 )
 
 func TestGoReport_ValidateRejectsAReportThatDoesNotProveItsExitStatus(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, out string
 		rc        int
@@ -43,6 +44,7 @@ func TestGoReport_ValidateRejectsAReportThatDoesNotProveItsExitStatus(t *testing
 }
 
 func TestParityTarget_HostEvidenceNeedsEveryNamedTestToPass(t *testing.T) {
+	t.Parallel()
 	target := parityTarget{pkg: "./p", named: []string{"TestA", "TestB"}, filtered: true}
 	both := newGoReport(`{"Action":"pass","Test":"TestA"}`+"\n"+`{"Action":"pass","Test":"TestB"}`+"\n"+`{"Action":"pass"}`+"\n", 0)
 	if err := target.hostEvidence(both); err != nil {
@@ -61,6 +63,7 @@ func TestParityTarget_HostEvidenceNeedsEveryNamedTestToPass(t *testing.T) {
 }
 
 func TestParityTarget_GoTestArgsBuildTheRunFilterFromTheNamedTests(t *testing.T) {
+	t.Parallel()
 	filtered := parityTarget{pkg: "./p", tags: "integration", named: []string{"TestA", "TestB"}, filtered: true}
 	if got, want := strings.Join(filtered.goTestArgs(), " "), "test -json -count=1 -tags integration -run ^(TestA|TestB)$ ./p"; got != want {
 		t.Fatalf("filtered args = %q, want %q", got, want)

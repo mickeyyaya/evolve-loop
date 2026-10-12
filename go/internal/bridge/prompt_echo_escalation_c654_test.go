@@ -3,6 +3,7 @@ package bridge
 import "testing"
 
 func TestC654_004_EchoedExhaustionStrippedGenuineSurvives(t *testing.T) {
+	t.Parallel()
 	const pattern = `(?i)reached your usage limit`
 
 	// The agent's OWN echoed instructions: identical line present in the prompt.

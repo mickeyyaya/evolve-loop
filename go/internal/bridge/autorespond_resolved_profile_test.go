@@ -7,6 +7,7 @@ import (
 )
 
 func TestAutoResponder_AgySpinnerWithoutFooterGatesEscalateLikeTheCheckpoint(t *testing.T) {
+	t.Parallel()
 	busyPane := "Which absolute path should I write the deliverable to?\n⣷  Editing files...\n────\n>\n────\n"
 	lp := agyLaunchForTest()
 	deps := Deps{Tmux: &fakeTmux{paneSeq: []string{busyPane}}, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)}.withDefaults()

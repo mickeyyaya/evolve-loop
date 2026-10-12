@@ -41,6 +41,7 @@ func itoa(n int) string {
 }
 
 func TestGenerateACSVerdict_ShadowStageEmitsTIADecision(t *testing.T) {
+	t.Parallel()
 	root, ws := tiaFixture(t, "shadow", 4242)
 
 	if err := generateACSVerdict(core.PhaseRequest{
@@ -67,6 +68,7 @@ func TestGenerateACSVerdict_ShadowStageEmitsTIADecision(t *testing.T) {
 }
 
 func TestGenerateACSVerdict_OffStageEmitsNothing(t *testing.T) {
+	t.Parallel()
 	for _, stage := range []string{"", "off"} {
 		root, ws := tiaFixture(t, stage, 4243)
 
@@ -83,6 +85,7 @@ func TestGenerateACSVerdict_OffStageEmitsNothing(t *testing.T) {
 }
 
 func TestGenerateACSVerdict_ShadowEmissionNeverFailsTheAudit(t *testing.T) {
+	t.Parallel()
 	root, ws := tiaFixture(t, "shadow", 4244)
 	missing := filepath.Join(ws, "does", "not", "exist")
 

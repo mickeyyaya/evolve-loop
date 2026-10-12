@@ -3,6 +3,7 @@ package bridge
 import "testing"
 
 func TestManifestIsTmux(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		cli  string
 		tmux bool
@@ -33,6 +34,7 @@ func TestManifestIsTmux(t *testing.T) {
 }
 
 func TestIsTmuxDriver(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		cli  string
 		want bool
@@ -59,6 +61,7 @@ func TestIsTmuxDriver(t *testing.T) {
 }
 
 func TestManifestIsTmux_UnknownCLI(t *testing.T) {
+	t.Parallel()
 	if !IsTmuxDriver("custom-tmux") {
 		t.Error("IsTmuxDriver(custom-tmux)=false, want true (suffix fallback)")
 	}

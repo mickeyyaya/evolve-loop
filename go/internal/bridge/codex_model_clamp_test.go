@@ -9,6 +9,7 @@ import (
 )
 
 func TestCodexAuthMode(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		env  map[string]string
@@ -30,6 +31,7 @@ func TestCodexAuthMode(t *testing.T) {
 }
 
 func TestClampCodexModelForAuth(t *testing.T) {
+	t.Parallel()
 	m := Manifest{
 		ChatGPTSafeModels:   []string{"gpt-5.4-mini", "gpt-5.2"},
 		ChatGPTDefaultModel: "gpt-5.4-mini",
@@ -167,6 +169,7 @@ func TestClampCodexModelForAuth(t *testing.T) {
 }
 
 func TestClampCodexModelForAuth_NoPolicyNoClamp(t *testing.T) {
+	t.Parallel()
 	m := Manifest{}
 	got, from, to := clampCodexModelForAuth([]string{"-m", "gpt-5.4"}, m, "chatgpt")
 	if from != "" || to != "" || strings.Join(got, " ") != "-m gpt-5.4" {
@@ -175,6 +178,7 @@ func TestClampCodexModelForAuth_NoPolicyNoClamp(t *testing.T) {
 }
 
 func TestCodexTmuxManifest_HasChatGPTClampPolicy(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)
@@ -198,6 +202,7 @@ func TestCodexTmuxManifest_HasChatGPTClampPolicy(t *testing.T) {
 }
 
 func TestEffectiveModelSelector_TrailingFlag(t *testing.T) {
+	t.Parallel()
 	if got, ok := effectiveCodexModelSelector([]string{"-m"}); ok {
 		t.Errorf("effectiveCodexModelSelector([\"-m\"]) = %+v, want unavailable", got)
 	}

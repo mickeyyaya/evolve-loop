@@ -84,6 +84,7 @@ func TestAgyModelTierUnknownTierPassthrough(t *testing.T) {
 }
 
 func TestAgyLaunchCmdLineQuotesDisplayNameModel(t *testing.T) {
+	t.Parallel()
 	got := launchCmdLine("agy", []string{"--dangerously-skip-permissions", "--model", "Gemini 3.1 Pro (High)"})
 	want := "agy --dangerously-skip-permissions --model 'Gemini 3.1 Pro (High)'"
 	if got != want {

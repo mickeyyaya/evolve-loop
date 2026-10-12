@@ -11,6 +11,7 @@ import (
 var agyModelName = regexp.MustCompile(`^[A-Za-z0-9.\- ]+ \((Low|Medium|High|Thinking)\)$`)
 
 func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest(agy-tmux): %v", err)
@@ -31,6 +32,7 @@ func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
 }
 
 func TestAgyTierModelsPinnedToVerifiedNames(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest(agy-tmux): %v", err)

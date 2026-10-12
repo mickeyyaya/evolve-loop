@@ -6,6 +6,7 @@ import (
 )
 
 func TestPendingAtInputLine(t *testing.T) {
+	t.Parallel()
 	const nudge = "Please write the deliverable to /ws/build-report.md to complete the phase."
 	cases := []struct {
 		name   string
@@ -45,6 +46,7 @@ func TestPendingAtInputLine(t *testing.T) {
 
 func TestPromptSubmitEcho(t *testing.T) {
 	// The motivating shape: a short first non-empty line under the rune floor.
+	t.Parallel()
 	frontmatter := "---\ntitle: build\n---\n\n## Task\nRefactor the widget pipeline end to end.\n"
 
 	t.Run("short first line still yields an echo at or above the floor", func(t *testing.T) {

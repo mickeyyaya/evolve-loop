@@ -142,6 +142,7 @@ func newTestEngine(d Deps) *Engine {
 }
 
 func TestLaunchArgs_ClaudeP_HappyPath(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "<!-- challenge-token: " + fx.token + " -->\nOK\n"}
 	code, _ := run(t, fr, fx.args("claude-p"))
@@ -158,6 +159,7 @@ func TestLaunchArgs_ClaudeP_HappyPath(t *testing.T) {
 }
 
 func TestLaunchArgs_Codex_HappyPath(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "<!-- challenge-token: " + fx.token + " -->\nFAKE-CODEX\n"}
 	code, _ := run(t, fr, fx.args("codex"))
@@ -173,6 +175,7 @@ func TestLaunchArgs_Codex_HappyPath(t *testing.T) {
 }
 
 func TestLaunchArgs_Agy_HappyPath(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "agy", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "<!-- challenge-token: " + fx.token + " -->\nFAKE-AGY\n"}
 	code, _ := run(t, fr, fx.args("agy"))
@@ -185,6 +188,7 @@ func TestLaunchArgs_Agy_HappyPath(t *testing.T) {
 }
 
 func TestLaunchArgs_ClaudeP_PermissionModePlanReachesInnerArgv(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := run(t, fr, fx.args("claude-p", "--permission-mode=plan"))
@@ -197,6 +201,7 @@ func TestLaunchArgs_ClaudeP_PermissionModePlanReachesInnerArgv(t *testing.T) {
 }
 
 func TestLaunchArgs_ClaudeP_PermissionModeAcceptEditsReachesInnerArgv(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := run(t, fr, fx.args("claude-p", "--permission-mode=acceptEdits"))
@@ -209,6 +214,7 @@ func TestLaunchArgs_ClaudeP_PermissionModeAcceptEditsReachesInnerArgv(t *testing
 }
 
 func TestLaunchArgs_Codex_PermissionModeRejected(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "plan")
 	fr := &fakeRunner{}
 	code, stderr := run(t, fr, fx.args("codex"))
@@ -224,6 +230,7 @@ func TestLaunchArgs_Codex_PermissionModeRejected(t *testing.T) {
 }
 
 func TestLaunchArgs_Agy_PermissionModeRejected(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "agy", "plan")
 	fr := &fakeRunner{}
 	code, stderr := run(t, fr, fx.args("agy"))
@@ -239,6 +246,7 @@ func TestLaunchArgs_Agy_PermissionModeRejected(t *testing.T) {
 }
 
 func TestLaunchArgs_Codex_NoPermissionModeBackCompat(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := run(t, fr, fx.args("codex"))
@@ -251,6 +259,7 @@ func TestLaunchArgs_Codex_NoPermissionModeBackCompat(t *testing.T) {
 }
 
 func TestLaunchArgs_Agy_NoPermissionModeBackCompat(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "agy", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := run(t, fr, fx.args("agy"))
@@ -280,6 +289,7 @@ func TestLaunchArgs_HeadlessDrivers_RunInWorktree(t *testing.T) {
 	// The headless drivers must set the subprocess cwd to cfg.Worktree for source-writing phases, parity
 	// with the tmux driver's `cd <worktree>`: without this, a build agent writes files to the main tree
 	// and the tree-diff guard aborts the cycle.
+	t.Parallel()
 	for _, cli := range []string{"claude-p", "codex", "agy"} {
 		t.Run(cli+"/worktree-set", func(t *testing.T) {
 			fx := newFixture(t, cli, "")
@@ -315,6 +325,7 @@ func TestLaunchArgs_HeadlessDrivers_RunInWorktree(t *testing.T) {
 }
 
 func TestLaunchArgs_MissingRequiredFlag(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
 	// Build args WITHOUT --cli.
@@ -337,6 +348,7 @@ func TestLaunchArgs_MissingRequiredFlag(t *testing.T) {
 }
 
 func TestLaunchArgs_UnknownCLI(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "nope", "")
 	fr := &fakeRunner{}
 	code, stderr := run(t, fr, fx.args("nope"))
@@ -349,6 +361,7 @@ func TestLaunchArgs_UnknownCLI(t *testing.T) {
 }
 
 func TestLaunchArgs_EmptyPromptFile(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	if err := os.WriteFile(fx.promptFile, nil, 0o644); err != nil {
 		t.Fatalf("truncate prompt: %v", err)

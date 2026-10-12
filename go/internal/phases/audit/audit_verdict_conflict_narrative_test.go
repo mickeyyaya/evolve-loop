@@ -13,6 +13,7 @@ func sentinelReport(verdict string) string {
 }
 
 func TestVerdictConflict_SentinelNarrativeMustBeACanonicalVerdict(t *testing.T) {
+	t.Parallel()
 	junk := []struct{ name, narrative string }{
 		{"per-retry-suffix", "PASS-r1"},
 		{"caveat-phrasing", "PASS (2 caveats)"},
@@ -40,6 +41,7 @@ func TestVerdictConflict_SentinelNarrativeMustBeACanonicalVerdict(t *testing.T) 
 }
 
 func TestVerdictConflict_SentinelCanonicalVerdictStillRecorded(t *testing.T) {
+	t.Parallel()
 	for _, v := range []string{core.VerdictPASS, core.VerdictWARN} {
 		t.Run(v, func(t *testing.T) {
 			_, diags := classifyWith(t, sentinelReport(v), func(ws string) {
@@ -51,6 +53,7 @@ func TestVerdictConflict_SentinelCanonicalVerdictStillRecorded(t *testing.T) {
 }
 
 func TestVerdictConflict_RecordVariesOnlyInTheNarrativeToken(t *testing.T) {
+	t.Parallel()
 	reds := func(ws string) { writeACSVerdictReds(t, ws, "cycleX/TestRed_A") }
 	canon := func(v string) string {
 		_, diags := classifyWith(t, sentinelReport(v), reds)
@@ -75,6 +78,7 @@ func TestVerdictConflict_RecordVariesOnlyInTheNarrativeToken(t *testing.T) {
 }
 
 func TestVerdictConflict_RecordNeverCarriesANewline(t *testing.T) {
+	t.Parallel()
 	_, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycleX/TestRed_A")
 	})

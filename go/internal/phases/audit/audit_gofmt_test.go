@@ -21,6 +21,7 @@ func hasDiagContaining(diags []core.Diagnostic, substr string) bool {
 }
 
 func TestRun_GofmtDirty_FAILsAudit(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -44,6 +45,7 @@ func TestRun_GofmtDirty_FAILsAudit(t *testing.T) {
 }
 
 func TestRun_GofmtClean_PASSPreserved(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -59,6 +61,7 @@ func TestRun_GofmtClean_PASSPreserved(t *testing.T) {
 }
 
 func TestRun_GofmtError_FailsOpenWithWarning(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -77,6 +80,7 @@ func TestRun_GofmtError_FailsOpenWithWarning(t *testing.T) {
 }
 
 func TestNewDefault_WiresGofmtCheck(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skips real gofmt subprocess under -short; full `go test` + CI still run it")
 	}

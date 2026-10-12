@@ -34,6 +34,7 @@ func exhaustedTargets(family, pane string) map[string]bool {
 }
 
 func TestUsageWindows_EachCLIReadsItsOwnScreenThroughItsManifest(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		family, fixture string
 		want            map[string]bool
@@ -55,6 +56,7 @@ func TestUsageWindows_EachCLIReadsItsOwnScreenThroughItsManifest(t *testing.T) {
 }
 
 func TestUsageWindows_TheWholeFamilyRegexIsBlindToTheseDrainedScreens(t *testing.T) {
+	t.Parallel()
 	for family, fixtures := range map[string][]string{
 		"agy":    {"agy_usage_claude_drained.txt", "agy_usage_gemini_drained.txt"},
 		"claude": {"claude_usage_session_exhausted.txt", "claude_usage_week_exhausted.txt"},
@@ -68,6 +70,7 @@ func TestUsageWindows_TheWholeFamilyRegexIsBlindToTheseDrainedScreens(t *testing
 }
 
 func TestUsageWindows_AFamilyWhoseManifestDeclaresNoWindowsHasNone(t *testing.T) {
+	t.Parallel()
 	for _, family := range []string{"codex", "ollama", "no-such"} {
 		if got := UsageWindows(family, usagePane(t, "claude_usage_week_exhausted.txt"), usageNow); len(got) != 0 {
 			t.Errorf("%s: windows = %+v; only a manifest's usage.windows reads windows", family, got)
@@ -76,6 +79,7 @@ func TestUsageWindows_AFamilyWhoseManifestDeclaresNoWindowsHasNone(t *testing.T)
 }
 
 func TestUsageWindows_AgyClaudeInheritsTheWindowSpecThroughItsBase(t *testing.T) {
+	t.Parallel()
 	base, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -91,6 +95,7 @@ func TestUsageWindows_AgyClaudeInheritsTheWindowSpecThroughItsBase(t *testing.T)
 }
 
 func TestParseManifest_RefusesABrokenUsageWindowSpec(t *testing.T) {
+	t.Parallel()
 	valid := `"labels":[{"regex":"^Current session$","kind":"session","scope":"session"}],"value_regex":"(?P<pct>\\d+)% used","value_direction":"used","scopes":{"session":{"family":"x"}}`
 	for field, windows := range map[string]string{
 		"value_regex":     strings.Replace(valid, `(?P<pct>\\d+)`, `(\\d+)`, 1),

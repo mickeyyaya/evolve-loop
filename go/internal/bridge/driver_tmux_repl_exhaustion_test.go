@@ -9,6 +9,7 @@ import (
 )
 
 func TestTmuxREPL_ExhaustionWall_FailsOverFast(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// Boots (prompt marker present) and shows the quota wall; no artifact is
 	// ever written, so only the exhaustion override can end the run.
@@ -31,6 +32,7 @@ func TestTmuxREPL_ExhaustionWall_FailsOverFast(t *testing.T) {
 
 // Counts deps.Sleep calls (one per poll) as the iteration proxy.
 func TestTmuxREPL_ExhaustionWall_FastFailNotAtCheckpoint(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
@@ -49,6 +51,7 @@ func TestTmuxREPL_ExhaustionWall_FastFailNotAtCheckpoint(t *testing.T) {
 }
 
 func TestTmuxREPL_HealthyIdle_NotExhausted(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}
 	code, _ := runTmuxNudge(t, fx, tmux)
@@ -58,6 +61,7 @@ func TestTmuxREPL_HealthyIdle_NotExhausted(t *testing.T) {
 }
 
 func TestTmuxREPL_ContentWall_SuppressedByCorroborator(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
@@ -79,6 +83,7 @@ func TestTmuxREPL_ContentWall_SuppressedByCorroborator(t *testing.T) {
 }
 
 func TestTmuxREPL_CheckpointExhaustionCorroboratesIndependently(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &fakeTmux{paneSeq: []string{walled}}

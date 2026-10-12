@@ -26,6 +26,7 @@ func writeACSVerdictWithRoot(t *testing.T, ws string, redCount int, projectRoot 
 }
 
 func TestRun_ACSVerdictForeignRoot_Regenerated(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdictWithRoot(t, ws, 3, "/console-not-plane")
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -70,6 +71,7 @@ func TestRun_ACSVerdictForeignRoot_Regenerated(t *testing.T) {
 }
 
 func TestRun_ACSVerdictMatchingRoot_StillRegenerated(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdictWithRoot(t, ws, 0, "/p")
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"

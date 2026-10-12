@@ -36,6 +36,7 @@ import (
 )
 
 func TestNewUngraduatedPackages_FlagsChangedInternalPkgAbsentFromEnforceList(t *testing.T) {
+	t.Parallel()
 	enforce := []byte("./internal/config\n")
 	changed := []string{"./internal/brandnew/..."}
 	got := NewUngraduatedPackages(changed, enforce)
@@ -46,6 +47,7 @@ func TestNewUngraduatedPackages_FlagsChangedInternalPkgAbsentFromEnforceList(t *
 }
 
 func TestNewUngraduatedPackages_AlreadyGraduatedPackagesNotFlagged(t *testing.T) {
+	t.Parallel()
 	enforce := []byte("./internal/config\n./internal/router\n")
 	changed := []string{"./internal/config/...", "./internal/router/..."}
 	got := NewUngraduatedPackages(changed, enforce)
@@ -55,6 +57,7 @@ func TestNewUngraduatedPackages_AlreadyGraduatedPackagesNotFlagged(t *testing.T)
 }
 
 func TestNewUngraduatedPackages_CmdPackagesNeverFlagged(t *testing.T) {
+	t.Parallel()
 	enforce := []byte("")
 	changed := []string{"./cmd/evolve/...", "./cmd/apicover/..."}
 	got := NewUngraduatedPackages(changed, enforce)
@@ -64,6 +67,7 @@ func TestNewUngraduatedPackages_CmdPackagesNeverFlagged(t *testing.T) {
 }
 
 func TestNewUngraduatedPackages_DedupesAndSorts(t *testing.T) {
+	t.Parallel()
 	enforce := []byte("")
 	changed := []string{"./internal/zeta/...", "./internal/alpha/...", "./internal/zeta/..."}
 	got := NewUngraduatedPackages(changed, enforce)

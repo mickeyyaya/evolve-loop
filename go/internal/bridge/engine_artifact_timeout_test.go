@@ -10,6 +10,7 @@ import (
 )
 
 func TestEngineLaunch_ArtifactTimeout_WrapsSentinel(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitArtifactTimeout}
@@ -31,6 +32,7 @@ func TestEngineLaunch_ArtifactTimeout_WrapsSentinel(t *testing.T) {
 }
 
 func TestEngineLaunch_OtherExit_NoSentinel(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitSafetyGate}

@@ -35,6 +35,7 @@ func (t *waitOrderTmux) CapturePane(_ context.Context, _ string, scrollback int)
 }
 
 func TestRunTmuxREPL_CompletionDetectorErrorIsReportedOnce(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	blockedParent := filepath.Join(fx.ws, "blocked")
 	fx.artifact = filepath.Join(blockedParent, "artifact.md")
@@ -100,6 +101,7 @@ func TestRunTmuxREPL_CompletionDetectorErrorIsReportedOnce(t *testing.T) {
 }
 
 func TestRunTmuxREPL_DetectorErrorThenIncompleteStopRetainsSecondaryEvidence(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	blockedParent := filepath.Join(fx.ws, "blocked")
 	fx.artifact = filepath.Join(blockedParent, "artifact.md")
@@ -159,6 +161,7 @@ func TestRunTmuxREPL_DetectorErrorThenIncompleteStopRetainsSecondaryEvidence(t *
 }
 
 func TestRunTmuxREPL_DetectorErrorThenConfirmedCompletionHasNoTimeoutDiagnostic(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	blockedParent := filepath.Join(fx.ws, "blocked")
 	fx.artifact = filepath.Join(blockedParent, "artifact.md")
@@ -227,6 +230,7 @@ func TestRunTmuxREPL_DetectorErrorThenConfirmedCompletionHasNoTimeoutDiagnostic(
 }
 
 func TestRunTmuxREPL_OrdinaryCompletionPrecedesTickEffects(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name         string
 		stage        string
@@ -365,6 +369,7 @@ func TestRunTmuxREPL_InboxPrecedesAutoRespondOnSameTick(t *testing.T) {
 }
 
 func TestRunTmuxREPL_CancelledCompletionPrecedesTickEffects(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &waitOrderTmux{pane: tmuxPromptMarkerDefault}
 	reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "must not run"}}}
@@ -420,6 +425,7 @@ func TestRunTmuxREPL_CancelledCompletionPrecedesTickEffects(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ACancelDuringADetectorFaultReportsTheFaultBeforeAbandoningTheWait(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	blocked := filepath.Join(fx.ws, "blocked")
 	fx.artifact = filepath.Join(blocked, "artifact.md")

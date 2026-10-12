@@ -36,6 +36,7 @@ func writeGoPredFixture(t *testing.T, root string, cycle int, pass bool) {
 }
 
 func TestNewDefault_WiresVerdictGenerator(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeGoPredFixture(t, root, 7, true)
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
@@ -92,6 +93,7 @@ func TestNewDefault_WiresVerdictGenerator(t *testing.T) {
 }
 
 func TestGenerateACSVerdict_EmptyWorktree_FallsBackToProjectRoot(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	writeGoPredFixture(t, projectRoot, 5, true)
 	evolveDir := t.TempDir()
@@ -112,6 +114,7 @@ func TestGenerateACSVerdict_EmptyWorktree_FallsBackToProjectRoot(t *testing.T) {
 }
 
 func TestGenerateACSVerdict_WriteVerdictError_Propagates(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeGoPredFixture(t, root, 3, true)
 

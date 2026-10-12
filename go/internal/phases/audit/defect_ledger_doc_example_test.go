@@ -38,6 +38,7 @@ func extractDispositionExample(t *testing.T, root, rel string) string {
 }
 
 func TestAuditorPromptDispositionExampleIsAcceptedByProductionReader(t *testing.T) {
+	t.Parallel()
 	root := docExampleRepoRoot(t)
 	example := extractDispositionExample(t, root, "agents/evolve-auditor.md")
 
@@ -83,6 +84,7 @@ func TestAuditorPromptDispositionExampleIsAcceptedByProductionReader(t *testing.
 }
 
 func TestAuditorPromptAndArchDocDispositionExamplesAgree(t *testing.T) {
+	t.Parallel()
 	root := docExampleRepoRoot(t)
 	promptRaw := extractDispositionExample(t, root, "agents/evolve-auditor.md")
 	docRaw := extractDispositionExample(t, root, "docs/architecture/continuation-defect-ledger.md")
