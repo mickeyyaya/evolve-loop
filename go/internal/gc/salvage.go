@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+var salvageReadlink = os.Readlink
+
 func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused map[string]bool) (bool, []error) {
 	var errs []error
 	did := false
@@ -91,7 +93,7 @@ func addTarEntry(tw *tar.Writer, root, name string) error {
 	}
 	link := ""
 	if info.Mode()&os.ModeSymlink != 0 {
-		if link, err = os.Readlink(p); err != nil {
+		if link, err = salvageReadlink(p); err != nil {
 			return err
 		}
 	}

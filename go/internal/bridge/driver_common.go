@@ -226,6 +226,16 @@ func artifactCandidatePaths(cfg *Config) []string {
 	return out
 }
 
+type relocateTempFile interface {
+	Write([]byte) (int, error)
+	Close() error
+	Name() string
+}
+
+var relocateCreateTemp = func(dir, pattern string) (relocateTempFile, error) { return os.CreateTemp(dir, pattern) }
+
+var relocateChmod = os.Chmod
+
 // relocateFile moves src to dst, creating dst's parent directory. It tries an atomic rename first and
 // falls back to copy+remove when rename fails (e.g. a cross-device move), through a temp file in dst's
 // directory that is renamed into place, so a write that fails partway never leaves a truncated non-empty
@@ -244,7 +254,7 @@ func relocateFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("relocate: read src: %w", err)
 	}
-	tf, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp.*")
+	tf, err := relocateCreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp.*")
 	if err != nil {
 		return fmt.Errorf("relocate: create dst tmp: %w", err)
 	}
@@ -258,7 +268,7 @@ func relocateFile(src, dst string) error {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("relocate: close dst tmp: %w", cerr)
 	}
-	if err := os.Chmod(tmp, 0o644); err != nil { // CreateTemp defaults to 0600; match the destination's 0644
+	if err := relocateChmod(tmp, 0o644); err != nil {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("relocate: chmod dst tmp: %w", err)
 	}

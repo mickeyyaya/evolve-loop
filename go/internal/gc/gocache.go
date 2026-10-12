@@ -14,6 +14,8 @@ import (
 var goCacheShardRe = regexp.MustCompile(`^[0-9a-f]{2}$`)
 var goCacheEntryRe = regexp.MustCompile(`^[0-9a-f]+-[ad]$`)
 
+var goCacheEntryInfo = func(e fs.DirEntry) (fs.FileInfo, error) { return e.Info() }
+
 const goMtimeRefresh = time.Hour
 
 const GoCacheInUseWindow = 2 * goMtimeRefresh
@@ -86,7 +88,7 @@ func listShard(shard string) ([]goCacheEntry, []string) {
 		if e.IsDir() || !goCacheEntryRe.MatchString(e.Name()) {
 			continue
 		}
-		info, err := e.Info()
+		info, err := goCacheEntryInfo(e)
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
 			continue
