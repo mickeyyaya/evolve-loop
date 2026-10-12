@@ -5,6 +5,8 @@ metadata:
   type: convention
 ---
 
+> **Amendment (2026-10-12, [ADR-0132](../architecture/adr/0132-documents-are-written-through-one-skill.md)).** A new document under `docs/` does not use the YAML front matter or the `## TLDR` block. It starts with links to its design set and a status line, and a table of contents over 100 lines. On 2026-10-12, only 2 of 367 documents used the front matter, and no tool read it. Skills and agent files keep their front matter, because the CLIs read it to load them. The [docs-write](../../skills/docs-write/SKILL.md) skill has the templates.
+>
 > **Canonical markdown schema.** Every reference, architecture, skill and agent doc in this project follows this schema. Tools: `legacy/scripts/utility/lint-markdown-structure.sh` (WARN linter), `legacy/scripts/utility/extract-tldr.sh` (TLDR extractor).
 
 ## TLDR

@@ -72,6 +72,10 @@ The one exception: a Build can `git rm` the explanation document of the active c
 
 The commit gate (`evolve commit-gate run`) refuses a commit that adds a comment. Loop lanes: the build handoff floor counts the comments that a build adds (`comment_floor`). [The code-comments convention](docs/conventions/code-comments.md) records its rollout stage.
 
+### 11. Documents are written through the `docs-write` skill (2026-10-12)
+
+Before you write or change a document that a person reads, load the `docs-write` skill (`skills/docs-write/SKILL.md`). This covers research, plans, ADRs, architecture specs, conventions, guides and incident records. Each decision in the document cites its evidence and its rejected options. The new text passes `evolve docs ste-lint --strict` and the link check. The kernel preload of its compact form into each loop dispatch that writes a document is plan K2 ([ADR-0132](docs/architecture/adr/0132-documents-are-written-through-one-skill.md)).
+
 ## 12 Core agent rules
 
 These are behavioral rules that every agent must follow, on every CLI. The kernel hooks above catch *structural* breaches. These rules catch *judgment* breaches. Bypass-permissions / autonomous mode overrides rule 4 ("stop and ask"): make the reasonable call and continue. All other rules apply unconditionally.
