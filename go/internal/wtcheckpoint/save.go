@@ -24,7 +24,7 @@ type SaveResult struct {
 }
 
 func Save(ctx context.Context, w Worktree, o SaveOptions) (SaveResult, error) {
-	s := saver{tree: gitexec.Isolated(w.Dir), name: w.Name, opts: o}
+	s := saver{tree: checkpointIsolatedGit(w.Dir), name: w.Name, opts: o}
 	res := SaveResult{Worktree: w.Name, Dir: w.Dir}
 	if _, _, code, err := s.tree.Capture(ctx, "check-ref-format", refPrefix+w.Name+"/"+stampLayout); err != nil || code != 0 {
 		return res, fmt.Errorf("wtcheckpoint: refused: worktree name %q cannot name a ref under %s", w.Name, refPrefix)

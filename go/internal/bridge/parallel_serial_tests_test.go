@@ -84,4 +84,8 @@ var serialTests = map[string]string{
 	"bridge.TestSetModelCatalogDirFn":                                                     "swaps seam modelCatalogDirFn and calls process-global setter SetModelCatalogDirFn",
 	"bridge.TestSmokeLaunchConfig_CarriesTheTierDefaultEffort":                            "swaps seam modelCatalogDirFn",
 	"bridge.TestSmokeTests_AModelOnTheConfigReachesTheLaunchArgv":                         "swaps seam modelCatalogDirFn",
+	"bridge.TestNewAutoResponderBackfillF1_BadTransientRegexSilentWithoutStderr":          "swaps seam bridgeManifestDirFn",
+	"bridge.TestNewAutoResponderBackfillF1_BadTransientRegexWarnsAndDisablesDwell":        "swaps seam bridgeManifestDirFn",
+	"bridge.TestRelocateFileBackfillF1_SameDeviceMoveSkipsTheCopyFallback":                "swaps seam relocateCreateTemp",
+	"bridge.TestRelocateFileBackfillF1_CopyFallbackFailuresNameTheirStepAndLeaveNoTemp":   "swaps seams relocateCreateTemp, relocateChmod",
 }
