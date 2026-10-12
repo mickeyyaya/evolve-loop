@@ -225,6 +225,12 @@ retired at Stage 5. See `go/test/trustkernel/PORTING-LEDGER.md`.
   `make test-integration` ([plan](../../docs/plans/cover-changed-gate-2026-10.md)).
   `make apicover-enforce` writes `coverage.apicover.txt`, so it does not
   replace the integration profile.
+- **The docs-only floor:** when every changed path is a doc in the scope of
+  `evolve docs ste-lint`, no make target runs. Run
+  `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added`,
+  the relative link check, one `code-review-simplify` pass and the commit gate.
+  The lint judges the added text only.
+  A page of `docs/explain/` and the lint standard are not docs-only in CI.
 - **The local floor is 8 targets**, run one at a time after you stage the
   change: `lint`, `test`, `test-integration`, `test-e2e`, `test-acs-durable`,
   `apicover-enforce`, `cover-strict` and `cover-changed`. Run `cover-changed`
@@ -326,10 +332,25 @@ entry point for every pull request and for pushes to `main` and
   empty diffs select everything. After a force-push the `before` commit is
   unreachable, so routing fails closed and `CI required` stays red until a
   manual `workflow_dispatch` run of `required CI` posts a green result.
-- `validate` calls `ci.yml` on every event, documentation-only changes included.
+- `changes` also publishes `docs_only` and `docs`, for a pull request only. A
+  pull request is docs-only when every changed path (old and new) is a doc in
+  the scope of `evolve docs ste-lint`: `docs/**/*.md`, `README.md`, `CLAUDE.md`,
+  `AGENTS.md` and `CHANGELOG.md`. `docs` is true when at least one changed path
+  is such a doc. Two paths never count as docs-only: a page of `docs/explain/`,
+  because it is source of the landing site, and the lint standard
+  `docs/conventions/ste100-writing.md`, because a change to it must not weaken
+  its own check. Both still make `docs` true and select the lint.
+- `ste-lint` runs when `docs` is true. It compiles `evolve` and runs
+  `evolve docs ste-lint --strict --changed <merge-base> --added`, which judges
+  only the new text. A docs-only pull request runs this job and no other
+  suite. A mixed pull request runs it together with the suites of its code
+  paths.
+- `validate` calls `ci.yml` on every event, except on a docs-only pull request.
+  A push to `main` and a manual run keep the full selection. This is the net for
+  tests that read docs.
 - `go` calls `go.yml` when `go/`, `skills/`, `agents/` or any unlisted path
   changed. `landing` calls `landing-validation.yml` when `landing/`,
-  `docs/explain/` or any unlisted path changed. Markdown under `docs/reports/`,
+  `docs/explain/` or any unlisted path changed. On a push, Markdown under `docs/reports/`,
   `docs/research/` and `docs/private/` is the only explicit skip of both;
   other `docs/` Markdown runs both, because Go tests read some of it (for
   example `docs/incidents/`).

@@ -89,6 +89,12 @@ Each criterion has a score from 1 (bad) to 5 (good). Design B wins. Design A hid
 | D14 | Test lanes run on Sonnet. A mechanical lane runs on Haiku. Each lane uses names specific to its file. | R11 |
 | D15 | A new seam is a field of a dependency struct, or a parameter. A package variable is the fallback. | R12 |
 | D16 | Change-scoped iteration inside a lane is a shadow helper. It never replaces the floor. | R13 |
+| D17 | The docs scope is the scope of `stelint.InDocsScope`: `docs/**/*.md`, `README.md`, `CLAUDE.md`, `AGENTS.md` and `CHANGELOG.md`. A pull request is docs-only when every changed path is in this scope. The check uses the old and the new path of a rename. A deleted doc counts as a change. Two paths are never docs-only: `docs/explain/` pages (landing-site source) and `docs/conventions/ste100-writing.md` (it must not weaken its own check). Both still select the lint. | Operator |
+| D18 | On a docs-only `pull_request`, CI runs one job: the STE lint. It runs no `go test`, no plugin validation, no `acs-durable` and no landing test. It compiles `evolve` only to run the lint. | Operator |
+| D19 | In CI the STE lint checks only the new text: `evolve docs ste-lint --strict --changed <merge-base> --added`. A finding counts when its line is an added line, or when its paragraph holds an added line. The lint does not judge old text. A new file is all added. Untracked files do not exist in CI. | Operator |
+| D20 | The STE lint job also runs on each pull request that changes a doc in scope, also a mixed one. The job is required when it runs. | Operator |
+| D21 | A `push` to `main` and a `workflow_dispatch` keep the full selection. This is the net for tests that read docs. If a docs-only merge breaks one, the push run is red and `evolve ci watch --sha` files the fix-forward item. | Operator |
+| D22 | The local policy for a docs-only change is: `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added`, the relative link check, one `code-review-simplify` pass (ADR-0115) and the commit gate. No make target runs. | Operator |
 
 ## 6. Components
 
@@ -106,6 +112,7 @@ Each component is one lane and one pull request. Each lane starts with a red tes
 | T7 | The seam order (D15) in the house rules and the lane brief | A review checklist item; no code | console |
 | T8 | Change-scoped iteration (D16), in shadow | The selected set holds each importer of a changed package | Sonnet |
 | T9 | The `internal/core` pole: the slowest 20 tests, with the remedies of design §7.3 | The package wall time on CI goes down, and the coverage of each touched function stays at 100% | Sonnet |
+| T10 | The STE lint alone for a docs-only pull request (D17 to D22). It has `--added` for `evolve docs ste-lint`, the `ste-lint` job, the routing of `required.yml` and the `internal/ciparity` tests | An old line gives no finding. A docs-only pull request selects only `ste-lint`. A mixed one selects `ste-lint` and the suites of its code paths. A push selects as before. `CI required` accepts a skipped `validate` on a docs-only pull request. It fails when `ste-lint` fails or is missing | Sonnet |
 
 ## 7. Order and lanes
 
@@ -113,7 +120,7 @@ Each component is one lane and one pull request. Each lane starts with a red tes
 2. T1 and T2 next. They give the largest gains: one pole of 479 s and 55% of the floor.
 3. T3 and T4 after T2, because T4 reads the run that T2 defines.
 4. T5 and T6 when a lane slot is free. They stop new duplicates.
-5. T7 with T0 or T2. It is text only.
+5. T7 with T0 or T2. It is text only. T10 is independent of the other components.
 6. T8 and T9 last.
 
 At most four lanes run at one time. The coverage backfill lanes (E1 to E4, F1 to F4) share the four slots. T1 and T2 come before F1 to F4, because each later floor is faster after T1 and T2.
@@ -137,6 +144,8 @@ Each lane reports its before and after numbers from a `go test -json` stream. Th
 | The percent from the profile differs from `go test -cover`. | The T2 equality test on a sample package. |
 | The time filter skips a transcript that counts. | D7 uses 1 minute of slack. A T1 test writes a line inside the window into a file with an old time stamp and checks the documented limit. |
 | Parallel tests expose shared state. | T3 runs `-race -count=3 -shuffle=on` before the merge. |
+| A docs-only merge breaks a test that reads a doc. | D21: the push run to `main` runs every suite. `evolve ci watch --sha` files the fix-forward item. |
+| The paragraph rule of D19 reports an old finding next to a small edit. | The author fixes the paragraph. The lint does not judge the whole file. |
 | A ratchet blocks a valid copy. | The baseline is a file in the repository. A reviewed change can raise it, with the reason in the commit. |
 
 ## 10. Open questions

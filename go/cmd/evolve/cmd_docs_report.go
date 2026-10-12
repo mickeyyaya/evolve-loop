@@ -33,6 +33,11 @@ func lintSteTargets(targets []steTarget, opt stelint.Options, stderr io.Writer) 
 			failed = true
 			continue
 		}
+		if findings, err = keepAddedFindings(t, findings); err != nil {
+			fmt.Fprintf(stderr, "%s%s: %v\n", steLintPrefix, t.display, err)
+			failed = true
+			continue
+		}
 		r.add(t.display, findings)
 	}
 	return r, failed

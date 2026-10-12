@@ -130,6 +130,16 @@ This floor takes effect when plan T2 merges. Until then, the floor in [go/docs/t
 | 6 | `cover-strict` | no |
 | 7 | `apicover-check` | no |
 
+A docs-only change has a smaller floor (plan D22). It has no make target. Run `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added`, the relative link check, one `code-review-simplify` pass and the commit gate. CI applies the same rule to a docs-only pull request. It runs the `ste-lint` job and no test.
+
+A mixed pull request also runs the `ste-lint` job, together with the suites of its code paths. A push to `main` runs every suite.
+
+| Change | Local floor | CI on a pull request | CI on a push to `main` |
+|---|---|---|---|
+| Docs only (every path in the docs scope) | the lint on the added text, the link check, the review pass, the commit gate | `ste-lint` | the full selection |
+| Docs and code | the full floor | `ste-lint` and the suites of the code paths | the full selection |
+| Code only | the full floor | the suites of the code paths | the full selection |
+
 `make test` is not in the floor. It stays as the fast loop of a developer. `lint` still compiles the default build, so a fast test that uses a tagged symbol still fails the floor.
 
 ## 5. Isolation
