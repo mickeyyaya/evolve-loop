@@ -79,7 +79,7 @@ Each criterion has a score from 1 (bad) to 5 (good). Design B wins. Design A hid
 | D4 | `make cover-strict` calls `evolve cover strict`. It runs no test. | R3 |
 | D5 | The local floor is: `lint`, `test-integration`, `test-e2e`, `test-acs-durable`, `cover-changed`, `cover-strict`, `apicover-check`. | R4 |
 | D6 | `make apicover-enforce` stays for a scoped run (`APICOVER_PKGS`). The floor uses `apicover-check`. | R1 |
-| D7 | `ScanConfigRoot` skips a transcript file whose modification time is more than 1 minute before the window start. | R5 |
+| D7 | `ScanConfigRoot` skips a transcript file whose modification time is more than 1 minute before the window start. The skip is silent. It can lose a line in three cases, which we accept. A person sets the time back, a network disk drifts more than 1 minute, or a transcript keeps the old time of another host. | R5 |
 | D8 | A test that builds a real bridge engine sets the Claude config root to a temporary directory. | R6 |
 | D9 | The skills-drift integration tests call `t.Parallel`. Each other slow hermetic test does the same. | R7 |
 | D10 | Each package has a wall budget of 180 s under `-race` on CI. `cmd/testlatency` reports each package over it. | R8 |
