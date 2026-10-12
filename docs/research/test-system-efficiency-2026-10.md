@@ -16,6 +16,7 @@ Date: 2026-10-12. Method: measurement on `main` at `be0a0a979`, a static scan of
 6. [Current practice](#6-current-practice)
 7. [Adopt or reject](#7-adopt-or-reject)
 8. [Refinements to adopt](#8-refinements-to-adopt)
+9. [The timeout investigation](#9-the-timeout-investigation)
 
 ## 1. Inventory and growth
 
@@ -199,3 +200,52 @@ Date: 2026-10-12. Method: measurement on `main` at `be0a0a979`, a static scan of
 | R11 | Test lanes that run at the same time use names that are specific to their file. The merge train builds the package after each merge. | F4.6 |
 | R12 | A new seam is a field of a dependency struct, or a parameter. A package variable is the fallback. | F5.4, F5.5 |
 | R13 | Lanes can iterate on the importer closure of their change. The full floor runs before each pull request. | P6.6 |
+
+## 9. The timeout investigation
+
+The operator wrote this on 2026-10-12: "You should fix the timeout issue and have investigation done first to learn why timeout happened". This section is that investigation. It used the `go test -json` stream of §3 and three new measurements on `main` at `250fb620b`.
+
+**F9.1** In the run of F3.7, `internal/core` failed at 604 s with "test timed out after 10m0s". Its 1,355 top-level tests that finished all ran serially, for 596 s. 594 tests that call `t.Parallel` paused, and none of them started before the timeout (`go test -json` actions: 1,951 run, 594 pause, 1,355 pass).
+*Implication:* Go runs every serial test of a package before it releases the paused parallel tests. The serial sum is the floor of the package wall time, and in `internal/core` that sum alone reached the limit.
+
+**F9.2** The serial tests are serial by omission, not by need. A scan of each test body found:
+
+| Package | Serial tests with no process-state use | Serial tests that set the environment, the directory or the standard streams | Serial tests that swap a package variable |
+|---|---|---|---|
+| `internal/core` | 1,307 tests, 563 s | 36 tests, 18 s | 11 tests, 15 s |
+| `internal/phases/ship` | 593 tests, 567 s | 3 tests, 7 s | 2 tests, 0 s |
+
+Only five helpers in `internal/core` change process state (`chdirTempNonGit`, `demotionRunE4`, `fakeGoOnPath`, `newCycleSourceGitFixture`, `stubGoTool`), and the tests swap 16 package variables. The scan reads test bodies, so a helper can hide a state change; the five helpers above are the ones that it found.
+*Implication:* about 97% of the serial time of each package can run in parallel, after a check of the helpers that each test calls.
+
+**F9.3** The slow tests spend their time in `git` processes. A logging `git` on `PATH` counted these calls for the 15 slowest serial tests of `internal/core`, each run alone:
+
+| Test | `git` calls | Alone |
+|---|---|---|
+| `TestUnwindShipCommit_DeclinesWithoutMovingHEAD` | 500 | 14.3 s |
+| `TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit` | 464 | 17.5 s |
+| `TestShipRecovery_ContentionBudgetScalesWithFleetWidth` | 318 | 5.9 s |
+| `TestVerdictCacheCollisionRegression` | 277 | 7.5 s |
+| `TestOrchestrator_AuditLeakRecover` | 214 | 5.2 s |
+
+A `git` call costs about 25 to 35 ms on this host, and more under load.
+*Implication:* the cost of a slow test is mostly process starts, so it grows with the load of the host. This is why the same package took 352 s on a quiet host and more than 600 s with four lane floors (F3.7).
+
+**F9.4** Two sources make the calls. Test fixtures build repositories with many commits and checkouts (for example, 42 commits and 36 checkouts in `TestUnwindShipCommit_DeclinesWithoutMovingHEAD`). Production code repeats one query: `git status --porcelain -uall` ran 234 times in `TestShipRecovery_ContentionBudgetScalesWithFleetWidth`, about 8 times in each recovery try (`git_porcelain.go:40`, `leak_recovery.go:146`, `continuation_stamp.go:31`).
+*Implication:* a fixture template cuts the setup cost of every test. A cache of the status result inside one recovery try cuts a cost that the live loop also pays.
+
+**F9.5** Eight copies of one `git`-bound test (`TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit`) ran together in 15.1 s; one copy alone took 8.1 s. The host has 14 cores, and its load average was 13 to 17 during the run.
+*Implication:* parallel runs of these tests give about 4.3 times the throughput even on a loaded host. At that rate, the 563 s of serial `internal/core` time becomes about 130 s.
+
+**F9.6** The history explains part of the serial state of `internal/phases/ship`. Its real-git tests were serial for three reasons. `t.Setenv` panics in a parallel test, and package-variable seams race. Also, a darwin EBADF flake in file-descriptor teardown showed under `-race -count=3 -shuffle=on` ([go/docs/testing.md](../../go/docs/testing.md), "Why ship's fast tier was hard to parallelize"). `tempRepoDir` now contains the EBADF case with a best-effort cleanup.
+*Implication:* the move to parallel tests in `internal/phases/ship` needs a stress gate (`-race -count=3 -shuffle=on`) for each file, not a blind change.
+
+**Root cause.** A longer timeout does not fix the defect. The defect is that about 1,900 tests in the two largest packages run one after another, each one starting hundreds of `git` processes. The serial sum grows with the suite and with the load of the host, and it reached the 10-minute limit.
+
+| Id | Refinement | From |
+|---|---|---|
+| R14 | Tests in `internal/core` and `internal/phases/ship` call `t.Parallel` unless they change process state. A structure test keeps the rule. | F9.1, F9.2 |
+| R15 | Each file moves to parallel only after `-race -count=3 -shuffle=on` passes for its package. | F9.6 |
+| R16 | A repository template, built one time for each test binary, replaces the repeated setup of the same fixture. | F9.3, F9.4 |
+| R17 | One recovery try reads `git status --porcelain -uall` one time and passes the result on. | F9.4 |
+| R18 | The 20-minute timeout and the package budget (T4) come after R14, as a guard and an alarm, not as the fix. | F9.1 to F9.5 |
