@@ -40,7 +40,7 @@ func TestRunWorktreeCreateDev_RefusalsAndGitFailures(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = os.Chmod(dev, 0o755) })
-		}, 2, "evolve worktree create --dev: git worktree add rc=", true},
+		}, 2, "evolve worktree create --dev: git worktree add rc=", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

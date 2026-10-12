@@ -122,3 +122,30 @@ func brOut(t *testing.T, dir string, args ...string) string {
 	}
 	return out
 }
+
+func TestWorktreeDev_FailedCreateLeavesNoBranch(t *testing.T) {
+	t.Parallel()
+	runtime, _ := devHubFixture(t)
+	hub := filepath.Dir(runtime)
+	store := filepath.Join(hub, ".repo.git")
+	dev := filepath.Join(hub, "dev")
+	if err := os.Mkdir(dev, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dev, 0o755) })
+
+	out, code := e3DevCreate(t, runtime, "t1", "feat-x")
+
+	if code != 2 || !strings.Contains(out, "git worktree add rc=") {
+		t.Fatalf("code %d out %q, want 2 with a worktree add failure", code, out)
+	}
+	if brBranchExists(t, store, "feat-x") {
+		t.Fatalf("a failed create left branch feat-x behind")
+	}
+	if err := os.Chmod(dev, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, code := e3DevCreate(t, runtime, "t1", "feat-x"); code != 0 {
+		t.Fatalf("retry after the failure: code %d out %q, want 0", code, out)
+	}
+}

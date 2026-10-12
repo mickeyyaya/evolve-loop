@@ -99,6 +99,7 @@ func runWorktreeCreateDev(projectRoot, task, branch string, stdout, stderr io.Wr
 		return 2
 	}
 	if _, gitErr, code, err := store.Capture(ctx, "worktree", "add", "--no-track", "-b", branch, dir, devOriginMain); err != nil || code != 0 {
+		_, _, _, _ = store.Capture(ctx, "branch", "-D", branch)
 		fmt.Fprintf(stderr, "%s: git worktree add rc=%d err=%v: %s\n", name, code, err, strings.TrimSpace(gitErr))
 		return 2
 	}
