@@ -19,9 +19,9 @@ func TestRunner_TheWriteAxisOfTheRequestSelectsEngineeringCraft(t *testing.T) {
 		writable []string
 		want     []string
 	}{
-		{"balanced build", "build", "evolve-builder", false, nil, []string{"engineering-craft", "code-review-simplify"}},
-		{"balanced tdd", "tdd", "evolve-tdd-engineer", false, nil, []string{"engineering-craft", "code-review-simplify"}},
-		{"debugger resolving its conflicts", "debugger", "evolve-debugger", true, []string{"go/internal/x.go"}, []string{"engineering-craft", "code-review-simplify"}},
+		{"balanced build", "build", "evolve-builder", false, nil, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
+		{"balanced tdd", "tdd", "evolve-tdd-engineer", false, nil, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
+		{"debugger resolving its conflicts", "debugger", "evolve-debugger", true, []string{"go/internal/x.go"}, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
 		{"fenced scout", "scout", "evolve-scout", true, nil, nil},
 		{"fenced triage", "triage", "evolve-triage", true, nil, nil},
 		{"fenced audit", "audit", "evolve-auditor", true, nil, nil},

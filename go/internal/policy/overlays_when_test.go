@@ -60,8 +60,8 @@ func TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles(t *testing.T) {
 	doc := map[string]string{config.SignalDeliverableKind: "document"}
 	for phase, want := range map[string]string{"scout": "solution-scout", "build": "solution-build", "audit": "solution-audit"} {
 		got := pol.ResolveOverlays(policy.OverlayDispatch{Phase: phase, Tier: "deep", Signals: doc})
-		if !reflect.DeepEqual(got, []string{"fable", want}) {
-			t.Errorf("document %s at deep = %v, want [fable %s]", phase, got, want)
+		if !reflect.DeepEqual(got, []string{"fable", want, "docs-write"}) {
+			t.Errorf("document %s at deep = %v, want [fable %s docs-write]", phase, got, want)
 		}
 		if got := pol.ResolveOverlays(policy.OverlayDispatch{Phase: phase, Tier: "balanced", Signals: map[string]string{"deliverable_kind": "code"}}); len(got) != 0 {
 			t.Errorf("code %s at balanced = %v, want none (byte-identical to before)", phase, got)
@@ -75,7 +75,7 @@ func TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles(t *testing.T) {
 	for _, s := range registry {
 		have[s] = true
 	}
-	for _, s := range []string{"fable", "solution-scout", "solution-build", "solution-audit"} {
+	for _, s := range []string{"fable", "solution-scout", "solution-build", "solution-audit", "docs-write"} {
 		if !have[s] {
 			t.Errorf("compiled default names skill %q which is not in skills/", s)
 		}
@@ -84,13 +84,62 @@ func TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles(t *testing.T) {
 
 func TestCompiledDefaultOverlaySkills(t *testing.T) {
 	got := policy.CompiledDefaultOverlaySkills()
-	want := []string{"fable", "solution-scout", "solution-build", "solution-audit", "engineering-craft", "code-review-simplify", "architecture-review", "quality-index"}
+	want := []string{"fable", "solution-scout", "docs-write", "solution-build", "solution-audit", "engineering-craft", "code-review-simplify", "architecture-review", "quality-index"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("CompiledDefaultOverlaySkills() = %v, want %v", got, want)
 	}
 	for _, s := range got {
 		if _, err := os.Stat(filepath.Join("..", "..", "..", "skills", s, "SKILL.md")); err != nil {
 			t.Errorf("compiled-default skill %q has no skills/%s/SKILL.md: %v", s, s, err)
+		}
+	}
+}
+
+func TestCompiledDefaultOverlays_TheDocumentSkillFollowsThePersonaOfEachDocumentPhaseAndOfEachCodeWriter(t *testing.T) {
+	var pol policy.Policy
+	doc := map[string]string{config.SignalDeliverableKind: config.DeliverableKindDocument}
+	code := map[string]string{config.SignalDeliverableKind: config.DeliverableKindCode}
+	cases := []struct {
+		name string
+		d    policy.OverlayDispatch
+		want []string
+	}{
+		{"document scout", policy.OverlayDispatch{Phase: "scout", Tier: "balanced", Signals: doc}, []string{"solution-scout", "docs-write"}},
+		{"document build at deep", policy.OverlayDispatch{Phase: "build", Tier: "deep", WritesSource: true, Signals: doc}, []string{"fable", "solution-build", "docs-write"}},
+		{"document audit", policy.OverlayDispatch{Phase: "audit", Tier: "balanced", Signals: doc}, []string{"solution-audit", "docs-write"}},
+		{"code writer", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
+		{"code writer at top", policy.OverlayDispatch{Phase: "tdd", Tier: "top", WritesSource: true, Signals: code}, []string{"fable", "engineering-craft", "code-review-simplify", "docs-write"}},
+		{"code scout reads only", policy.OverlayDispatch{Phase: "scout", Tier: "balanced", Signals: code}, nil},
+		{"code audit reads only", policy.OverlayDispatch{Phase: "audit", Tier: "balanced", Signals: code}, nil},
+		{"code review phase", policy.OverlayDispatch{Phase: "code-review", Tier: "balanced", Signals: code}, []string{"engineering-craft", "code-review-simplify", "architecture-review", "quality-index"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := pol.ResolveOverlays(tc.d)
+			if len(got) == 0 && len(tc.want) == 0 {
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ResolveOverlays(%+v) = %v, want %v", tc.d, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestResolveOverlays_APolicyBlockReplacesTheCompiledDocumentSkillWholesale(t *testing.T) {
+	pol := policy.Policy{Overlays: &policy.OverlaysPolicy{Rules: []policy.OverlayRule{
+		{Phases: []string{"build"}, Skills: []string{"build-lens"}},
+	}}}
+	doc := map[string]string{config.SignalDeliverableKind: config.DeliverableKindDocument}
+	for _, d := range []policy.OverlayDispatch{
+		{Phase: "build", Tier: "deep", WritesSource: true, Signals: doc},
+		{Phase: "scout", Tier: "balanced", Signals: doc},
+	} {
+		got := pol.ResolveOverlays(d)
+		for _, s := range got {
+			if s == "docs-write" {
+				t.Errorf("ResolveOverlays(%+v) = %v, a policy overlays block must not inherit docs-write", d, got)
+			}
 		}
 	}
 }
