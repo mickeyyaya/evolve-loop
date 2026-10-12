@@ -189,7 +189,9 @@ v12.1 utilities + composition:
   cover                     Coverage gate over a change: refuses every
                               changed function below 100%
                               ( cover changed --base <ref> [--profile <path>]
-                              [--json] [--root DIR] )
+                              [--json] [--root DIR] | cover strict
+                              [--profile <path>] [--floors <path>] [--json]
+                              [--root DIR] )
   context-fill              Context-window fill telemetry; correlates each
                               cycle's peak per-phase fill ratio against its
                               dossier final verdict (read-only)

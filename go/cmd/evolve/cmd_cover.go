@@ -15,7 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-const coverUsage = "usage: evolve cover changed --base <ref> [--profile <path>] [--json] [--root DIR]"
+const coverUsage = "usage: evolve cover changed --base <ref> [--profile <path>] [--json] [--root DIR]\n       evolve cover strict [--profile <path>] [--floors <path>] [--json] [--root DIR]"
 
 var coverChangedRunner sysexec.RunFunc = sysexec.DefaultRunner
 
@@ -25,6 +25,13 @@ type coverChangedArgs struct {
 }
 
 func runCover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "strict" {
+		return runCoverStrict(args[1:], stdout, stderr)
+	}
+	return runCoverChanged(args, stdout, stderr)
+}
+
+func runCoverChanged(args []string, stdout, stderr io.Writer) int {
 	in, ok := parseCoverChanged(args, stderr)
 	if !ok {
 		return exitUsage

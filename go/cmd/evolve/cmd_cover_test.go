@@ -165,3 +165,109 @@ func TestCoverChanged_AVerdictItCannotWriteExitsIO(t *testing.T) {
 		}
 	}
 }
+
+const strictFloorsPass = "./p 60\n"
+
+func coverStrictModule(t *testing.T, floors string) string {
+	t.Helper()
+	root := coverModule(t, map[string]string{"go/.cover-strict": floors})
+	return root
+}
+
+func TestCoverStrict_PassesWhenEveryPackageMeetsItsFloor(t *testing.T) {
+	root := coverStrictModule(t, strictFloorsPass)
+
+	out, errOut, code := runDispatch("cover", "strict", "--root", root)
+
+	if code != 0 || !strings.Contains(out, "cover strict: p: 66.7% >= 60.0% ok") {
+		t.Errorf("exit = %d, want 0 and the ok line; out=%s err=%s", code, out, errOut)
+	}
+}
+
+func TestCoverStrict_RefusesAPackageBelowItsFloorWithExit1(t *testing.T) {
+	root := coverStrictModule(t, "./p 100\n")
+
+	out, _, code := runDispatch("cover", "strict", "--root", filepath.Join(root, "go"))
+
+	if code != 1 || !strings.Contains(out, "cover strict: p: 66.7% < 100.0% FAIL") {
+		t.Errorf("exit = %d, want 1 and the FAIL line:\n%s", code, out)
+	}
+}
+
+func TestCoverStrict_JSONCarriesTheResultsAndTheCleanBit(t *testing.T) {
+	root := coverStrictModule(t, "./p 100\n")
+	profile := filepath.Join(root, "go", "coverage.txt")
+	floors := filepath.Join(root, "go", ".cover-strict")
+
+	out, _, code := runDispatch("cover", "strict", "--root", root, "--json", "--profile", profile, "--floors", floors)
+
+	var got struct {
+		Clean   bool `json:"clean"`
+		Results []struct {
+			Pkg     string `json:"pkg"`
+			Problem string `json:"problem"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil || code != 1 || got.Clean || len(got.Results) != 1 || got.Results[0].Pkg != "p" || got.Results[0].Problem == "" {
+		t.Errorf("json = %+v (%v), exit %d; want p refused and clean=false:\n%s", got, err, code, out)
+	}
+}
+
+func TestCoverStrict_ExitCodesSeparateUsageFromRefusalFromIO(t *testing.T) {
+	root := coverStrictModule(t, strictFloorsPass)
+	noProfile := coverStrictModule(t, strictFloorsPass)
+	if err := os.Remove(filepath.Join(noProfile, "go", "coverage.txt")); err != nil {
+		t.Fatal(err)
+	}
+	stale := coverStrictModule(t, strictFloorsPass)
+	coverProfileAt(t, stale, time.Now().Add(-time.Hour))
+	noFloors := coverStrictModule(t, strictFloorsPass)
+	if err := os.Remove(filepath.Join(noFloors, "go", ".cover-strict")); err != nil {
+		t.Fatal(err)
+	}
+	badFloor := coverStrictModule(t, "./p 101\n")
+	for name, tc := range map[string]struct {
+		args []string
+		code int
+		want string
+	}{
+		"an unknown flag":   {[]string{"cover", "strict", "--nope"}, exitUsage, "usage"},
+		"an extra argument": {[]string{"cover", "strict", "--root", root, "extra"}, exitUsage, "extra"},
+		"no module":         {[]string{"cover", "strict", "--root", t.TempDir()}, exitIO, "go.mod"},
+		"no profile yet":    {[]string{"cover", "strict", "--root", noProfile}, exitRefused, "make -C go test-integration"},
+		"a stale profile":   {[]string{"cover", "strict", "--root", stale}, exitRefused, "older than"},
+		"no floors file":    {[]string{"cover", "strict", "--root", noFloors}, exitRefused, "floors file"},
+		"a floor over 100":  {[]string{"cover", "strict", "--root", badFloor}, exitRefused, "over 100"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, errOut, code := runDispatch(tc.args...)
+			if code != tc.code || !strings.Contains(errOut, tc.want) {
+				t.Errorf("exit = %d, want %d; stderr %q must hold %q", code, tc.code, errOut, tc.want)
+			}
+		})
+	}
+}
+
+func TestCoverStrict_AVerdictItCannotWriteExitsIO(t *testing.T) {
+	root := coverStrictModule(t, strictFloorsPass)
+	for name, tc := range map[string]struct {
+		args []string
+		w    *failingWriter
+	}{
+		"text": {[]string{"strict", "--root", root}, &failingWriter{}},
+		"json": {[]string{"strict", "--root", root, "--json"}, &failingWriter{}},
+	} {
+		var errOut strings.Builder
+		if code := runCover(tc.args, nil, tc.w, &errOut); code != exitIO || !strings.Contains(errOut.String(), "broken pipe") {
+			t.Errorf("%s: exit = %d, stderr %q; want exitIO naming the write error", name, code, errOut.String())
+		}
+	}
+}
+
+func TestCoverUsage_NamesBothVerbs(t *testing.T) {
+	_, errOut, code := runDispatch("cover")
+
+	if code != exitUsage || !strings.Contains(errOut, "cover changed") || !strings.Contains(errOut, "cover strict") {
+		t.Errorf("exit = %d; stderr %q must name both verbs", code, errOut)
+	}
+}

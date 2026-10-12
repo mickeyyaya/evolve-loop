@@ -54,4 +54,5 @@
 ./internal/agentmsg/memstore 100
 ./internal/agentmsg/policy 100
 ./internal/covchanged 100
+./internal/coverstrict 100
 ./internal/stelint 100
