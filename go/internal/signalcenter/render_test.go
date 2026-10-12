@@ -1,11 +1,5 @@
 package signalcenter
 
-// render_test.go — RenderCodes projects the registry into the markdown that
-// docs/architecture/signal-codes.md carries between its GENERATED markers
-// (design §5.4, S2). One source (RegisterCode), one projection. The pure
-// projection is tested on a fixed snapshot: the live registry is mutated by
-// parallel registry tests, so two live renders may legitimately differ.
-
 import (
 	"strings"
 	"testing"

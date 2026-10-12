@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// ParseResetHint returns when a CLI wall says its quota resets, capped at resetHintCap, or false when no hint parses.
 func ParseResetHint(pane string, now time.Time) (time.Time, bool) {
 	for _, hint := range resetHints {
 		if at, ok := hint.parse(pane, now); ok {
@@ -17,8 +16,6 @@ func ParseResetHint(pane string, now time.Time) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// resetMargin keeps the canary from probing seconds before the provider's
-// clock actually rolls over.
 const resetMargin = 2 * time.Minute
 
 const resetHintCap = 24 * time.Hour
@@ -54,7 +51,6 @@ func parseClockHint(pane string, now time.Time) (time.Time, bool) {
 	if m == nil {
 		return time.Time{}, false
 	}
-	// An incomplete explicit timezone must not fall back to observer-local time.
 	end := clockHintRe.FindStringIndex(pane)[1]
 	if strings.HasPrefix(strings.TrimLeft(pane[end:], " \t"), "(") {
 		return time.Time{}, false
@@ -72,8 +68,6 @@ func parseClockHint(pane string, now time.Time) (time.Time, bool) {
 	}
 	at := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
 	if !at.After(now) {
-		// One CALENDAR day, not 24h: across a DST transition +24h lands at the
-		// same wall-clock hour in the wrong offset (review finding).
 		at = at.AddDate(0, 0, 1)
 	}
 	return at.Add(resetMargin), true

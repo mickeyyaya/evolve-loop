@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// A credential wall is worth benching for the same reason a quota wall is: re-dispatching into it is
-// guaranteed waste. Wave 14 re-dispatched claude fourteen times into "Please log in".
 func TestBenchable_ACredentialWallBenchesTheFamily(t *testing.T) {
 	if !Benchable(CredentialPattern) {
 		t.Fatalf("%q must bench: every re-dispatch into a login prompt is waste", CredentialPattern)
@@ -34,8 +32,6 @@ func TestOperatorAction_NamesTheFixForACredentialWallOnly(t *testing.T) {
 	}
 }
 
-// The fix is durable on the bench entry, so cli-health.json and every reader of it carry it, not only the
-// log line that happened to print when the family was benched.
 func TestNewBenchEntry_CarriesTheOperatorActionForACredentialWall(t *testing.T) {
 	now := time.Date(2026, 9, 26, 22, 40, 0, 0, time.UTC)
 	e := NewBenchEntry(Entry{}, "claude", CredentialPattern, "Please log in to continue", now)
@@ -47,8 +43,6 @@ func TestNewBenchEntry_CarriesTheOperatorActionForACredentialWall(t *testing.T) 
 	}
 }
 
-// A login pane carries no reset time of its own; a stale hint from an earlier wall in the same scrollback
-// must not set the bench.
 func TestNewBenchEntry_ACredentialWallIgnoresAStaleResetHint(t *testing.T) {
 	now := time.Date(2026, 9, 26, 22, 40, 0, 0, time.UTC)
 	pane := "You've hit your usage limit · try again at 11:30 PM\nPlease log in to continue"
@@ -61,8 +55,6 @@ func TestNewBenchEntry_ACredentialWallIgnoresAStaleResetHint(t *testing.T) {
 	}
 }
 
-// Time says nothing about whether the operator logged in: a credential bench stays active for routing
-// after its cooldown and is due for a probe, until a succeeding probe clears it.
 func TestStore_ACredentialBenchHoldsUntilAProbeClearsIt(t *testing.T) {
 	now := time.Date(2026, 9, 26, 22, 40, 0, 0, time.UTC)
 	clock := now

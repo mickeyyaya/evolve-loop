@@ -16,13 +16,6 @@ const (
 	unknownExcerptBytes = 500
 )
 
-// Classifier turns raw CLI output lines into normalized envelopes. It is
-// stateful: stream_event deltas accumulate and are coalesced into a
-// single progress tick via FlushProgress (called per tail poll-batch),
-// and seq is monotonic across all emitted envelopes.
-//
-// Not safe for concurrent use — the normalizer owns one Classifier per
-// phase and feeds it from a single goroutine.
 type Classifier struct {
 	src     Source
 	traceID string
@@ -34,27 +27,13 @@ type Classifier struct {
 	lastFlush       time.Time
 	corr            *correlator
 
-	// injectedPrompt is the phase's own prompt/instruction text. When set,
-	// an infra-marker line that is a verbatim substring of it is a self-echo
-	// of the agent's OWN prompt (e.g. an Adversarial Reviewer's exploit
-	// checklist "...missing rate limits.") — not a runtime infra signal — and
-	// is NOT emitted as infra_failure (cycle-641/642 lesson). Empty = no
-	// suppression (every marker emits, the pre-fix behaviour).
 	injectedPrompt string
 }
 
-// SetInjectedPrompt threads the phase's prompt/instruction text into the
-// Classifier so infra-marker lines that merely echo it are recognized as the
-// agent quoting its own prompt and suppressed (cycle-641/642 fix-of-record). A
-// no-op when prompt is empty. Not concurrency-safe — set once before feeding
-// lines (the normalizer owns one Classifier per phase, single goroutine).
 func (c *Classifier) SetInjectedPrompt(prompt string) {
 	c.injectedPrompt = prompt
 }
 
-// isPromptEcho reports whether line is a verbatim echo of the injected prompt:
-// its trimmed form is a substring of the prompt text. False when no prompt is
-// set (no suppression) or the line is blank.
 func (c *Classifier) isPromptEcho(line string) bool {
 	if c.injectedPrompt == "" {
 		return false
@@ -66,7 +45,6 @@ func (c *Classifier) isPromptEcho(line string) bool {
 	return strings.Contains(c.injectedPrompt, trimmed)
 }
 
-// NewClassifier builds a Classifier. now defaults to time.Now.
 func NewClassifier(src Source, traceID string, now func() time.Time) *Classifier {
 	if now == nil {
 		now = time.Now
@@ -74,9 +52,6 @@ func NewClassifier(src Source, traceID string, now func() time.Time) *Classifier
 	return &Classifier{src: src, traceID: traceID, now: now, lastFlush: now(), corr: newCorrelator()}
 }
 
-// Emit builds an envelope for a normalizer-originated event (e.g. a stall
-// incident) using the same monotonic seq + source as line events, so the
-// unified stream stays gap-free across both line- and rule-events.
 func (c *Classifier) Emit(kind Kind, sev Severity, data map[string]any) Envelope {
 	return c.newEnvelope(kind, sev, data)
 }
@@ -95,9 +70,6 @@ func (c *Classifier) newEnvelope(kind Kind, sev Severity, data map[string]any) E
 	}
 }
 
-// Line classifies one stdout line into zero or more envelopes. Returns
-// nil for noise (stream_event deltas, system:init, blank/spinner/border
-// lines) — stream_event growth surfaces later via FlushProgress.
 func (c *Classifier) Line(raw []byte) []Envelope {
 	trimmed := strings.TrimSpace(string(raw))
 	if trimmed == "" {
@@ -110,16 +82,10 @@ func (c *Classifier) Line(raw []byte) []Envelope {
 		if err := json.Unmarshal([]byte(trimmed), &probe); err == nil && probe.Type != "" {
 			return c.classifyJSON(probe.Type, []byte(trimmed))
 		}
-		// Looks like JSON but won't parse / has no type — fall through to
-		// plaintext so we never silently lose a line.
 	}
 	return c.classifyPlain(trimmed)
 }
 
-// Stderr classifies one stderr line. Breadcrumb lines (JSON with
-// evolve_channel) are converted to KindCorrelation envelopes first.
-// Infrastructure marker lines emit KindInfraFailure. Everything else is
-// dropped (stderr noise carries no signal for the consumers).
 func (c *Classifier) Stderr(raw []byte) []Envelope {
 	line := strings.TrimSpace(string(raw))
 	if line == "" {
@@ -142,17 +108,13 @@ func (c *Classifier) Stderr(raw []byte) []Envelope {
 	}
 	if marker := detectInfraMarker(line); marker != "" {
 		if c.isPromptEcho(line) {
-			return nil // agent echoing its own prompt — not a runtime infra signal
+			return nil
 		}
 		return []Envelope{c.infraEnvelope(marker, "stderr", line)}
 	}
 	return nil
 }
 
-// infraEnvelope builds the canonical infra_failure envelope for a marker
-// hit, tagging the channel it surfaced on ("stdout" | "stderr"). Shared by
-// Stderr and classifyPlain so both channels carry an identical wire shape —
-// cycleclassify filters kind==infra_failure regardless of source (ADR-0020).
 func (c *Classifier) infraEnvelope(marker, source, line string) Envelope {
 	return c.newEnvelope(KindInfraFailure, SeverityIncident, map[string]any{
 		"marker":  marker,
@@ -161,11 +123,6 @@ func (c *Classifier) infraEnvelope(marker, source, line string) Envelope {
 	})
 }
 
-// FlushProgress emits one coalesced progress envelope when stream_event
-// deltas have accumulated since the last flush, and resets the counter.
-// Returns ok=false when nothing is pending (no-op). The normalizer calls
-// this once per tail poll-batch so liveness stays fresh without the
-// per-delta payload noise.
 func (c *Classifier) FlushProgress() (Envelope, bool) {
 	if c.pendingDeltas == 0 {
 		return Envelope{}, false
@@ -184,8 +141,6 @@ func (c *Classifier) FlushProgress() (Envelope, bool) {
 func (c *Classifier) classifyJSON(typ string, raw []byte) []Envelope {
 	switch typ {
 	case "stream_event":
-		// The dominant noise source. Coalesced into a progress tick
-		// rather than dropped, so the observer keeps a liveness signal.
 		c.pendingDeltas++
 		return nil
 	case "result":
@@ -280,10 +235,6 @@ func (c *Classifier) formatAssistant(raw []byte) []Envelope {
 	return out
 }
 
-// formatToolUse special-cases interactive tools BEFORE the generic
-// 200-byte input clamp: AskUserQuestion / ExitPlanMode carry the
-// question, options, recommendation, or plan — that IS the signal, so
-// it must survive at full fidelity (ADR-0020).
 func (c *Classifier) formatToolUse(blk assistantContent) Envelope {
 	switch blk.Name {
 	case "AskUserQuestion":
@@ -361,7 +312,7 @@ func (c *Classifier) formatSystem(raw []byte) []Envelope {
 		return nil
 	}
 	if s.Subtype == "init" {
-		return nil // session bootstrap — pure noise
+		return nil
 	}
 	data := map[string]any{"subtype": s.Subtype}
 	if s.HookName != "" {
@@ -379,17 +330,12 @@ func (c *Classifier) classifyPlain(line string) []Envelope {
 	if isNoise(line) {
 		return nil
 	}
-	// Plaintext infra markers (CLI error lines, tmux scrollback) surface as
-	// infra_failure, symmetric with Stderr — the legacy cycleclassify
-	// scanned *-stdout.log too (cycle-61 memo-stdout.log 529).
 	if marker := detectInfraMarker(line); marker != "" && !c.isPromptEcho(line) {
 		return []Envelope{c.infraEnvelope(marker, "stdout", line)}
 	}
 	return []Envelope{c.newEnvelope(KindAssistantText, SeverityInfo, map[string]any{"text": line})}
 }
 
-// decodeFull parses a tool-use input blob into a generic structure with
-// no truncation. Falls back to the raw string if it isn't valid JSON.
 func decodeFull(raw json.RawMessage) any {
 	var v any
 	if err := json.Unmarshal(raw, &v); err != nil {
@@ -397,8 +343,6 @@ func decodeFull(raw json.RawMessage) any {
 	}
 	return v
 }
-
-// ---- noise detection (ported from logfilter/plaintext.go) ----
 
 func isNoise(line string) bool {
 	trimmed := strings.TrimSpace(line)

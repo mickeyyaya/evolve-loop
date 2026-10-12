@@ -13,7 +13,7 @@ func TestIntersectEnforced(t *testing.T) {
 		"./internal/config\n" +
 		"\n" +
 		"./internal/router\n" +
-		"  ./internal/policy  \n" + // leading/trailing space tolerated
+		"  ./internal/policy  \n" +
 		"./internal/bridge/panestream\n")
 
 	cases := []struct {
@@ -62,10 +62,6 @@ func TestIntersectEnforced(t *testing.T) {
 	}
 }
 
-// TestPackageDirHasProductionGoFiles — the shared graduation predicate both
-// seams consult (build-entry abort + audit offender list). The test-only row
-// is the cycles-1223/1224/1228 halt class; the recursive-pattern and
-// unreadable-dir rows pin the two documented non-guessing directions.
 func TestPackageDirHasProductionGoFiles(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -86,10 +82,10 @@ func TestPackageDirHasProductionGoFiles(t *testing.T) {
 		pkg  string
 		want bool
 	}{
-		{"./internal/testonly", false}, // vacuous obligation — must not flag
-		{"./internal/mixed", true},     // real surface — obligation stands
-		{"./internal/absent", false},   // unreadable dir — fail-open, backstops judge
-		{"./internal/...", true},       // recursive pattern — stays flagged, never guessed
+		{"./internal/testonly", false},
+		{"./internal/mixed", true},
+		{"./internal/absent", false},
+		{"./internal/...", true},
 	} {
 		if got := PackageDirHasProductionGoFiles(dir, tt.pkg); got != tt.want {
 			t.Errorf("PackageDirHasProductionGoFiles(%q) = %v, want %v", tt.pkg, got, tt.want)

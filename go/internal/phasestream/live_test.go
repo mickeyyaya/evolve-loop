@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// feedFile streams a real CLI log through the classifier the way the
-// live normalizer will: every stdout line, then a final FlushProgress.
-// Returns all emitted envelopes and the raw line count.
 func feedFile(t *testing.T, path string) ([]Envelope, int) {
 	t.Helper()
 	f, err := os.Open(path)
@@ -21,7 +18,7 @@ func feedFile(t *testing.T, path string) ([]Envelope, int) {
 	var out []Envelope
 	lines := 0
 	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 1<<10), 1<<24) // 16MB: real stream-json lines are huge
+	sc.Buffer(make([]byte, 1<<10), 1<<24)
 	for sc.Scan() {
 		lines++
 		out = append(out, c.Line(sc.Bytes())...)
@@ -35,9 +32,6 @@ func feedFile(t *testing.T, path string) ([]Envelope, int) {
 	return out, lines
 }
 
-// Live test against the real claude-p stream-json log committed for
-// logfilter. Exercises authentic multi-event output (claude-p / codex /
-// agy share this format).
 func TestLive_ClaudeP_RealStreamJSON(t *testing.T) {
 	out, lines := feedFile(t, "../logfilter/testdata/streamjson-input.log")
 	if lines < 50 {
@@ -60,15 +54,12 @@ func TestLive_ClaudeP_RealStreamJSON(t *testing.T) {
 		}
 	}
 
-	// stream_event deltas must have been coalesced into >=1 progress tick.
 	if progress < 1 {
 		t.Errorf("expected stream_event coalescing to yield a progress tick, got %d", progress)
 	}
-	// Real logs carry assembled assistant/system content.
 	if contentful < 1 {
 		t.Errorf("expected >=1 contentful envelope from real log, got %d", contentful)
 	}
-	// Noise reduction: emitted envelopes must be well below raw line count.
 	if len(out) >= lines {
 		t.Errorf("no noise reduction: %d envelopes from %d lines", len(out), lines)
 	}
@@ -76,8 +67,6 @@ func TestLive_ClaudeP_RealStreamJSON(t *testing.T) {
 		lines, len(out), progress, contentful)
 }
 
-// Live test against claude-tmux plaintext scrollback. Spinner/border
-// noise must drop; recommendation prose must survive as assistant_text.
 func TestLive_ClaudeTmux_PlaintextScrollback(t *testing.T) {
 	out, lines := feedFile(t, "testdata/claude-tmux.txt")
 	if lines < 5 {

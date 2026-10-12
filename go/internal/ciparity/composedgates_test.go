@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestMissingComposedGates_FullNativeGateSet names MissingComposedGates and
-// RequiredComposedGates (cycle-786): the composed-tree gate contract for the
-// trivial-rebase carry-forward — absent keys and non-"pass" values both keep
-// the fast path closed; only the complete green set returns nil.
 func TestMissingComposedGates_FullNativeGateSet(t *testing.T) {
 	t.Parallel()
 	green := map[string]string{}
@@ -24,8 +20,6 @@ func TestMissingComposedGates_FullNativeGateSet(t *testing.T) {
 		t.Fatalf("test=fail must be reported missing, got %v", got)
 	}
 
-	// An entry recording only a subset must report every absent gate — a
-	// writer cannot narrow the native gate set by omission.
 	partial := map[string]string{"compile": "pass"}
 	if got := MissingComposedGates(partial); len(got) != len(RequiredComposedGates)-1 {
 		t.Fatalf("subset gate map must report all absent gates, got %v", got)
@@ -36,10 +30,6 @@ func TestMissingComposedGates_FullNativeGateSet(t *testing.T) {
 	}
 }
 
-// TestGateStatuses_ProjectsStatusOnly names GateOutcome and GateStatuses
-// (composed-gate-decline-coded-signal, cycle 1772): a gate runner widened to
-// carry each gate's captured output tail must still be able to derive the
-// status-only map MissingComposedGates and the ledger's GateResults expect.
 func TestGateStatuses_ProjectsStatusOnly(t *testing.T) {
 	t.Parallel()
 	outcomes := map[string]GateOutcome{

@@ -1,10 +1,5 @@
 package signalcenter
 
-// summary_test.go — the per-cycle view a listener keeps (design §8): counts by
-// severity and kind and the last INCIDENT. Process-level events (cycle 0)
-// count toward the current cycle; an event for a NEWER cycle resets the view
-// (a loop process runs many cycles and keeps only the current one).
-
 import "testing"
 
 func TestSummary_CountsBySeverityAndKindAndKeepsTheLastIncident(t *testing.T) {

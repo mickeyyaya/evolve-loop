@@ -1,19 +1,4 @@
-// Package clihealth is the durable memory for transient CLI-family outages
-// (cycle-283 forensics): the bridge classifies a quota wall on every dispatch
-// (pattern_name=rate_limit → exit 85) but nothing remembered it, so every
-// phase re-burned the walled CLI's 5-15min boot before falling back. This
-// package stores expiring per-FAMILY bench records in .evolve/cli-health.json;
-// llmroute demotes benched families, the loop canaries expired ones, and
-// preflight reports active ones. Stdlib-only leaf — importable by llmroute,
-// runner, cmd, and looppreflight without cycles.
-//
-// The "walled until T" fact is idempotent, but the per-family Strikes counter is
-// ACCUMULATIVE — concurrent fleet cycles walling the same family must each see the
-// prior strike. An unlocked read-modify-write loses increments and under-escalates
-// the cooldown, so the full RMW (BenchWall/Bench/Clear) runs under the "<file>.lock"
-// sidecar flock (the project-wide convention; EVOLVE_FLEET=1 skips the global cycle
-// lock that previously serialized these writers). Writes stay temp+rename atomic; a
-// corrupt or missing file degrades to empty, never fatal.
+// Package clihealth remembers which CLI families and drivers are walled, and for how long.
 package clihealth
 
 import (
@@ -27,43 +12,29 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 )
 
-// Entry is one benched CLI family.
 type Entry struct {
-	Family       string    `json:"family"` // CLI family ("codex"), never a driver name
-	Reason       string    `json:"reason"` // classifier pattern, e.g. "rate_limit"
-	BenchedAt    time.Time `json:"benched_at"`
-	BenchedUntil time.Time `json:"benched_until"`
-	Evidence     string    `json:"evidence,omitempty"` // truncated wall line from pane_tail
-	Strikes      int       `json:"strikes"`            // consecutive re-benches; doubles cooldown
-	// OperatorAction names the fix for a wall no canary clears on its own; empty for a wall that resets.
-	OperatorAction string `json:"operator_action,omitempty"`
+	Family         string    `json:"family"`
+	Reason         string    `json:"reason"`
+	BenchedAt      time.Time `json:"benched_at"`
+	BenchedUntil   time.Time `json:"benched_until"`
+	Evidence       string    `json:"evidence,omitempty"`
+	Strikes        int       `json:"strikes"`
+	OperatorAction string    `json:"operator_action,omitempty"`
 }
 
-// DefaultCooldown is the bench duration when no reset hint parses; doubled
-// per strike via CooldownForStrikes, capped at MaxCooldown.
 const (
 	DefaultCooldown = 30 * time.Minute
 	MaxCooldown     = 4 * time.Hour
 )
 
-// BootTimeoutPattern is the classifier pattern name for a driver-scoped REPL
-// boot failure (ExitREPLBootTimeout, exit 80). Used as the Reason field in
-// boot-timeout bench entries so the pattern vocabulary stays in a single home.
 const BootTimeoutPattern = "repl_boot_timeout"
 
-// DefaultBootBenchThreshold is how many consecutive RecordBootStrike calls for
-// the same driver (exit-80 events) promote it to an active bench. Below
-// threshold the strikes are tracked but the driver remains retryable.
 const DefaultBootBenchThreshold = 2
 
-// IsBootTimeoutExitCode reports whether exitCode is the REPL boot-timeout class
-// (exit 80 = ExitREPLBootTimeout in bridge/exitcodes.go). Kept as an integer
-// literal to avoid an import cycle (bridge imports clihealth, not vice versa).
-func IsBootTimeoutExitCode(exitCode int) bool { return exitCode == 80 }
+const replBootTimeoutExitCode = 80
 
-// Benchable reports whether an escalation pattern name marks a wall worth benching for. Deliberately a
-// tiny closed set (single home — runner bench-writer and loop canary both consult it): re-dispatching a
-// walled resource is guaranteed waste, while most escalations (trust prompts) are situational.
+func IsBootTimeoutExitCode(exitCode int) bool { return exitCode == replBootTimeoutExitCode }
+
 func Benchable(pattern string) bool {
 	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == QuotaExhaustedPattern || pattern == BootTimeoutPattern || pattern == CredentialPattern
 }
@@ -80,12 +51,8 @@ func QuotaPattern(pattern string) bool {
 	return false
 }
 
-// CredentialPattern is the classifier pattern of a login prompt ("Please log in", "Login expired"): a wall
-// only the operator clears, so the family is benched until a canary probe succeeds after the login.
 const CredentialPattern = "auth_recheck"
 
-// OperatorAction names the fix for a wall no canary can clear on its own; "" for every wall that clears
-// itself when its window resets.
 func OperatorAction(family, pattern string) string {
 	if pattern != CredentialPattern {
 		return ""
@@ -93,26 +60,8 @@ func OperatorAction(family, pattern string) string {
 	return fmt.Sprintf("operator: the %s CLI needs to be logged in again; the bench clears itself once a probe succeeds", family)
 }
 
-// ExhaustedPattern is the OTHER vocabulary a classified quota wall arrives in.
-// codex reports "rate_limit"; agy reports "exhausted" ("Individual quota
-// reached. Please upgrade your subscription… Resets in 6h12m56s"). Same wall,
-// and for four lanes across two waves only one of the two was admitted here, so
-// cli-health never learned agy was walled and the bench-aware chain reorder had
-// no row to act on — every agy-primary phase paid a dead-CLI round-trip.
 const ExhaustedPattern = "exhausted"
 
-// NOTE, deliberate: agy's wall text is "Resets in 6h12m56s", which ParseResetHint
-// does NOT recognize (it keys on "try again at H:MM" / "try again in N hours").
-// So an exhausted bench falls back to CooldownForStrikes — 30 minutes on the
-// first strike — and that is the behavior we want, not an oversight to fix.
-// Teaching the parser this format would newly honor a six-hour hint on ONE
-// refusal, and the evidence says that is wrong: agy claimed "Resets in 6h12m56s"
-// at 17:02Z and then served three successful dispatches at ~19:00Z, inside its
-// own claimed window. Doubling per re-bench (CooldownForStrikes) reaches a long
-// bench only once the wall has actually repeated.
-
-// CooldownForStrikes returns DefaultCooldown doubled per re-bench beyond the
-// first, capped at MaxCooldown. Strikes <=1 → DefaultCooldown.
 func CooldownForStrikes(strikes int) time.Duration {
 	d := DefaultCooldown
 	for s := 1; s < strikes && d < MaxCooldown; s++ {
@@ -124,16 +73,8 @@ func CooldownForStrikes(strikes int) time.Duration {
 	return d
 }
 
-// NewBenchEntry composes the bench record for family after a classified wall:
-// strikes continue from prev (zero-value prev → first strike), benched_until
-// honors the pane's own reset hint when one parses (else the strike-scaled
-// cooldown), and the wall's banner line (the reset-hint line via evidenceLine,
-// or the first line as fallback) is kept as evidence. Single home — the
-// runner's bench-writer and the loop's canary compose entries HERE so the
-// strike/cooldown/evidence logic can never drift between them.
 func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) Entry {
 	strikes := prev.Strikes + 1
-	// A login pane carries no reset time of its own; a hint there is a stale wall in the same scrollback.
 	until, parsed := time.Time{}, false
 	if pattern != CredentialPattern {
 		until, parsed = ParseResetHint(paneText, now)
@@ -157,9 +98,6 @@ func firstLine(s string) string {
 	return s
 }
 
-// truncateRunes truncates on RUNE boundaries — wall text carries multi-byte
-// glyphs (the cycle-283 codex wall opens with '■') and a byte slice could
-// split one, corrupting the stored evidence.
 func truncateRunes(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {
@@ -168,20 +106,16 @@ func truncateRunes(s string, n int) string {
 	return string(r[:n])
 }
 
-// fileSchema is the on-disk shape of .evolve/cli-health.json.
 type fileSchema struct {
 	SchemaVersion int              `json:"schema_version"`
 	Benches       map[string]Entry `json:"benches"`
 }
 
-// Store reads and writes the bench file. now is injectable for tests; nil
-// means time.Now.
 type Store struct {
 	path string
 	now  func() time.Time
 }
 
-// NewStore returns a Store rooted at <projectRoot>/.evolve/cli-health.json.
 func NewStore(projectRoot string, now func() time.Time) *Store {
 	if now == nil {
 		now = time.Now
@@ -189,8 +123,6 @@ func NewStore(projectRoot string, now func() time.Time) *Store {
 	return &Store{path: filepath.Join(projectRoot, ".evolve", "cli-health.json"), now: now}
 }
 
-// Load returns all bench entries. Missing or corrupt file degrades to an
-// empty map with a stderr WARN — bench state must never break a dispatch.
 func (s *Store) Load() (map[string]Entry, error) {
 	b, err := os.ReadFile(s.path)
 	if err != nil {
@@ -211,12 +143,6 @@ func (s *Store) Load() (map[string]Entry, error) {
 	return f.Benches, nil
 }
 
-// BenchWall atomically records a classified wall for family: under the sidecar
-// lock it reads the CURRENT entry, accumulates strikes via NewBenchEntry, and
-// writes — so concurrent fleet cycles walling the same family never lose a strike
-// increment (which would under-escalate the cooldown). It is the single home for
-// the read-prev→compose→write sequence both the runner bench-writer and the loop
-// canary need. Returns the composed entry.
 func (s *Store) BenchWall(family, pattern, paneText string) (Entry, error) {
 	return s.benchComposed(family, func(prev Entry, now time.Time) Entry {
 		return NewBenchEntry(prev, family, pattern, paneText, now)
@@ -250,7 +176,6 @@ func (s *Store) benchComposed(family string, compose func(prev Entry, now time.T
 	return entry, err
 }
 
-// Bench upserts e (keyed by e.Family) via a locked read-modify-write + temp+rename.
 func (s *Store) Bench(e Entry) error {
 	return s.withLock(func() error {
 		benches, _ := s.Load()
@@ -259,8 +184,6 @@ func (s *Store) Bench(e Entry) error {
 	})
 }
 
-// Clear removes family's entry under the sidecar lock; clearing an absent family
-// is a no-op.
 func (s *Store) Clear(family string) error {
 	return s.withLock(func() error {
 		benches, _ := s.Load()
@@ -272,12 +195,6 @@ func (s *Store) Clear(family string) error {
 	})
 }
 
-// ClearBootStrike removes the boot-timeout bench entry for driver if its
-// Reason is BootTimeoutPattern. No-op when driver has no entry or when the
-// stored Reason is not BootTimeoutPattern (guards against clobbering a
-// rate-limit bench keyed under the same name). Called by the engine on any
-// non-ExitREPLBootTimeout exit (REPL booted) to restart the consecutive-
-// strike counter — strike→success→strike must not bench.
 func (s *Store) ClearBootStrike(driver string) error {
 	return s.withLock(func() error {
 		benches, _ := s.Load()
@@ -290,13 +207,6 @@ func (s *Store) ClearBootStrike(driver string) error {
 	})
 }
 
-// RecordBootStrike atomically records one boot-timeout strike for the named
-// driver (keyed by driver name, not CLI family — a tmux-REPL boot failure is
-// driver-specific, not family-wide). Returns benched=true when consecutive
-// strikes reach DefaultBootBenchThreshold; below the threshold the driver's
-// strike count is persisted but it remains retryable (BenchedUntil is not in
-// the future, so Active() excludes it). Single-strike transient retries are
-// preserved. Reason is always BootTimeoutPattern (single home).
 func (s *Store) RecordBootStrike(driver string) (benched bool, err error) {
 	err = s.withLock(func() error {
 		benches, _ := s.Load()
@@ -308,8 +218,6 @@ func (s *Store) RecordBootStrike(driver string) (benched bool, err error) {
 			until = now.Add(CooldownForStrikes(strikes))
 			benched = true
 		} else {
-			// Below threshold: record the strike count but expire immediately so
-			// Active() excludes this entry (the driver stays retryable).
 			until = now
 		}
 		benches[driver] = Entry{
@@ -324,10 +232,6 @@ func (s *Store) RecordBootStrike(driver string) (benched bool, err error) {
 	return benched, err
 }
 
-// withLock serializes a read-modify-write on the bench file. The "<file>.lock"
-// sidecar lives beside the data file, so the dir must exist before we can create
-// the lock — MkdirAll first (the data file itself is rename-replaced, so locking
-// a sidecar, not the inode, is the project convention).
 func (s *Store) withLock(fn func() error) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return fmt.Errorf("clihealth: mkdir: %w", err)
@@ -335,14 +239,10 @@ func (s *Store) withLock(fn func() error) error {
 	return flock.WithPathLock(s.path, fn)
 }
 
-// Active returns the entries routing must still avoid: those within their bench window, and a credential
-// wall until a probe clears it, because time says nothing about whether the operator logged in.
 func (s *Store) Active() map[string]Entry {
 	return s.filter(func(e Entry) bool { return e.Reason == CredentialPattern || s.now().Before(e.BenchedUntil) })
 }
 
-// Expired returns entries past their bench window — canary candidates; a lapsed credential wall is both
-// active and due for its probe.
 func (s *Store) Expired() map[string]Entry {
 	return s.filter(func(e Entry) bool { return !s.now().Before(e.BenchedUntil) })
 }

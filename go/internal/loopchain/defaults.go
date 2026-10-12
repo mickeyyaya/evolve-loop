@@ -14,15 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// GitAhead reports whether HEAD carries commits beyond runningCommit — the
-// ancestor-check idiom `evolve reset-sha` uses, inverted: ahead=true means
-// runningCommit is a STRICT ancestor of HEAD. An empty runningCommit (an
-// unstamped dev binary) is a quiet no-op. Any git/repo failure returns an
-// error the caller treats as "skip this boundary's refresh", never a halt.
-// The Makefile stamps a 12-char SHORT commit while `git rev-parse HEAD`
-// returns the full SHA, and `merge-base --is-ancestor` treats equal commits
-// as ancestors too — so the stamp is resolved to its full SHA FIRST (Q-C1,
-// cycle 1320) or an up-to-date binary would always look ahead.
 func GitAhead(projectRoot, runningCommit string) (ahead bool, err error) {
 	if runningCommit == "" {
 		return false, nil
@@ -45,12 +36,6 @@ func GitAhead(projectRoot, runningCommit string) (ahead bool, err error) {
 	return true, nil
 }
 
-// GitProvenance is the boundary re-pin's provenance: the running binary's
-// build commit (read from runningCommit at every call, never snapshotted)
-// plus a closure asserting a commit is an ancestor of HEAD. An empty commit
-// is unverifiable and returns false — a stripped or tampered binary can never
-// self-authorize a re-pin, and there is no sentinel substitute (cycle 1320:
-// "the rebuild just succeeded, so it must be HEAD" is not a verification).
 func GitProvenance(runningCommit func() string) func(projectRoot string) (string, phaseintegrity.ProvenanceVerified) {
 	return func(projectRoot string) (string, phaseintegrity.ProvenanceVerified) {
 		return runningCommit(), func(c string) bool {
@@ -62,11 +47,6 @@ func GitProvenance(runningCommit func() string) func(projectRoot string) (string
 	}
 }
 
-// RebuiltBinary returns the REBUILT <projectRoot>/go/bin/evolve — the artifact
-// the rebuild just wrote — never os.Args[0], which is the STALE running image
-// the refresh exists to escape. An absent or non-executable target is an
-// error, so the boundary degrades to "no refresh" rather than exec'ing an
-// unknown path.
 func RebuiltBinary(projectRoot string) (string, error) {
 	target := filepath.Join(projectRoot, "go", "bin", "evolve")
 	info, err := os.Stat(target)
@@ -79,7 +59,6 @@ func RebuiltBinary(projectRoot string) (string, error) {
 	return target, nil
 }
 
-// FleetLaneActive reports whether LiveSiblingRun finds a live sibling run under evolveDir.
 func FleetLaneActive(evolveDir string) (active bool, err error) {
 	_, active, err = LiveSiblingRun(evolveDir)
 	return active, err

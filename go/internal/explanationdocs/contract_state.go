@@ -33,9 +33,6 @@ type resultSnapshot struct {
 	View            phaseio.ExplanationView `json:"view"`
 }
 
-// SealBuild binds the final post-planning worktree and base SHA. It is a
-// one-way, idempotent transition so continuation adoption may replace the
-// provisional worktree before Build without weakening later provenance.
 func SealBuild(binding CycleBinding) error {
 	if binding.Worktree == "" || binding.BaseSHA == "" {
 		return fmt.Errorf("worktree and base SHA are required to seal Build context")
@@ -68,9 +65,6 @@ func SealBuild(binding CycleBinding) error {
 	return atomicwrite.JSON(activationPath(binding.ProjectRoot, binding.Cycle), marker)
 }
 
-// SealResult preserves the fully reviewed Builder handoff outside the mutable
-// phase workspace. A legal same-cycle correction replaces the prior result
-// atomically; downstream phases always receive the latest approved generation.
 func SealResult(ctx context.Context, binding CycleBinding) error {
 	binding, active, err := resolveBuildActivation(binding)
 	if err != nil {
@@ -90,9 +84,6 @@ func SealResult(ctx context.Context, binding CycleBinding) error {
 	return err
 }
 
-// reboundUnchanged reports whether the sealed snapshot is a rebound handoff whose change is still exactly
-// what the rebind proved; the host never re-seals such a handoff. A handoff the Builder re-authored takes
-// the normal seal, which replaces the rebind.
 func reboundUnchanged(ctx context.Context, binding CycleBinding) (bool, error) {
 	prior, err := readResultSnapshot(binding)
 	if err != nil || prior.View.AuthoredBaseSHA == "" {
@@ -105,11 +96,6 @@ func reboundUnchanged(ctx context.Context, binding CycleBinding) (bool, error) {
 	return current == prior.View.DiffSHA256, nil
 }
 
-// RefreshResult advances the host snapshot after a legitimate post-Build
-// worktree writer changes only non-material files (for example generated
-// tests). It refuses to bless changed material scope or Builder-owned
-// documentation; requiresBuild tells the orchestrator to route ownership back
-// through Build.
 func RefreshResult(ctx context.Context, binding CycleBinding) (requiresBuild bool, err error) {
 	binding, active, err := resolveBuildActivation(binding)
 	if err != nil || !active {
@@ -120,8 +106,6 @@ func RefreshResult(ctx context.Context, binding CycleBinding) (requiresBuild boo
 		return false, err
 	}
 	if prior.View.AuthoredBaseSHA != "" {
-		// A rebound handoff was proven, not re-authored, so the host never re-seals it: an unchanged
-		// tree needs nothing and any change needs the Builder.
 		current, err := diffSHA256(ctx, binding.Worktree, binding.BaseSHA)
 		if err != nil {
 			return false, fmt.Errorf("derive post-rebind diff: %w", err)
@@ -155,10 +139,6 @@ func RefreshResult(ctx context.Context, binding CycleBinding) (requiresBuild boo
 }
 
 func revalidateResult(ctx context.Context, binding CycleBinding) (*phaseio.ExplanationView, error) {
-	// The optional reviewer runs between the first Build check and this host
-	// seal. Re-derive the complete view here so neither that reviewer nor a
-	// lingering phase process can replace validated workspace fields in the
-	// intervening window.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -208,17 +188,10 @@ func sealResultViewExpected(ctx context.Context, binding CycleBinding, view *pha
 	return false, atomicwrite.JSON(resultSnapshotPath(binding.ProjectRoot, binding.Cycle), snapshot)
 }
 
-// RebaseBuild moves an approved Build contract to a new, verified git base and
-// invalidates its result snapshot. The orchestrator must dispatch Build again
-// so only Builder-authored documentation can bind and explain the rebased diff.
 func RebaseBuild(ctx context.Context, binding CycleBinding, newBaseSHA string) error {
 	return RebaseBuildAndPersist(ctx, binding, newBaseSHA, nil)
 }
 
-// RebaseBuildAndPersist writes the host marker before persisting its matching
-// checkpoint. The marker is the write-ahead authority: an ambiguous persistence
-// error must not roll it back because the checkpoint write may already have
-// committed before a secondary mirror failed.
 func RebaseBuildAndPersist(ctx context.Context, binding CycleBinding, newBaseSHA string, persist func() error) error {
 	binding, active, err := resolveBuildActivation(binding)
 	if err != nil {
@@ -239,9 +212,6 @@ func RebaseBuildAndPersist(ctx context.Context, binding CycleBinding, newBaseSHA
 	return advanceMarker(binding, newBaseSHA, persist)
 }
 
-// advanceMarker writes the host marker's new base before persisting the matching checkpoint. The marker
-// is the write-ahead authority: a persist failure never rolls it back, because the checkpoint write may
-// already have committed before a secondary mirror failed.
 func advanceMarker(binding CycleBinding, newBaseSHA string, persist func() error) error {
 	marker, err := readActivation(binding.ProjectRoot, binding.Cycle)
 	if err != nil {
@@ -260,10 +230,6 @@ func advanceMarker(binding CycleBinding, newBaseSHA string, persist func() error
 	return nil
 }
 
-// RecoverRebaseSplit identifies the single crash window where the host marker
-// reached a verified new base but the cycle checkpoint still names the old
-// base. The approved old-base snapshot is the journal witness; callers must
-// persist the returned base and restart at Build before continuing.
 func RecoverRebaseSplit(ctx context.Context, binding CycleBinding) (newBaseSHA string, recoverable bool, err error) {
 	if binding.ContractVersion == 0 || binding.ProjectRoot == "" || binding.Cycle <= 0 || binding.Worktree == "" || binding.BaseSHA == "" {
 		return "", false, nil
@@ -301,8 +267,6 @@ func RecoverRebaseSplit(ctx context.Context, binding CycleBinding) (newBaseSHA s
 	return marker.BaseSHA, true, nil
 }
 
-// LoadSnapshot returns the host-owned Builder handoff used for downstream
-// PhaseRequests. It never falls back to the mutable workspace manifest.
 func LoadSnapshot(binding CycleBinding) (*phaseio.ExplanationView, error) {
 	snapshot, err := loadResultSnapshot(binding)
 	if err != nil {
@@ -350,10 +314,6 @@ func readResultSnapshotIdentity(binding CycleBinding) (*resultSnapshot, error) {
 	return &snapshot, nil
 }
 
-// ActivationForCycle loads exactly one host-owned marker and reconciles its
-// workspace. Callers obtain cycle from a host checkpoint path or native ship
-// input, so unrelated stale/corrupt markers cannot block the lookup and lookup
-// cost does not grow with cycle history.
 func ActivationForCycle(projectRoot string, cycle int, workspace string) (CycleBinding, bool, error) {
 	if projectRoot == "" || cycle <= 0 || workspace == "" {
 		return CycleBinding{}, false, nil
@@ -430,8 +390,6 @@ func resultSnapshotPath(projectRoot string, cycle int) string {
 	return filepath.Join(projectRoot, filepath.FromSlash(resultSnapshotRel(cycle)))
 }
 
-// SameView compares the complete typed handoff. Audit and Ship use this exact
-// comparison so neither can accept a weaker projection.
 func SameView(a, b *phaseio.ExplanationView) bool {
 	return a != nil && b != nil && reflect.DeepEqual(*a, *b)
 }

@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// A phase that recorded verdict FAIL with its own error-severity diagnostics
-// (cycles 1634/1636: triage's protected-surface admission rejection) is
-// FAILED_EXPLAINED — it already was, by the verdict — but the detail must name
-// the phase's reason so the batch report says WHY, not merely THAT. Warnings
-// are not reasons; without an error-severity diagnostic the detail keeps its
-// verdict-only wording.
 func TestClassifyOutcome_FailVerdictDetailNamesThePhaseOwnReason(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

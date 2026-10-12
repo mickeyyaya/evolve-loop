@@ -239,8 +239,6 @@ func TestVerify_RejectsSamePathContentMutationAfterSeal(t *testing.T) {
 		t.Fatalf("SealResult: %v", err)
 	}
 
-	// Preserve the exact changed path set while changing the implementation
-	// bytes after Build approval. Audit/Ship/Retro must detect this drift.
 	f.write(t, "config/app.yaml", "enabled: compromised\n")
 	if _, active, err := Verify(context.Background(), f.binding()); err == nil || !active || !strings.Contains(err.Error(), "diff SHA256") {
 		t.Fatalf("same-path post-seal mutation was accepted: active=%v err=%v", active, err)
@@ -853,9 +851,6 @@ func TestRecoverRebaseSplit_RecognizesNewMarkerWithOldApprovedSnapshot(t *testin
 		t.Fatalf("RecoverRebaseSplit base=%q recoverable=%v err=%v, want %q/true/nil", got, recoverable, err, newBase)
 	}
 
-	// The first recovery persists the new base before Build runs. If the host
-	// crashes again in that window, the old-base snapshot remains the durable
-	// witness that Build still has to regenerate its explanation.
 	rebased := f.binding()
 	rebased.BaseSHA = newBase
 	got, recoverable, err = RecoverRebaseSplit(context.Background(), rebased)
@@ -977,15 +972,6 @@ func TestResolveActivation_ExistingMarkerFailsClosedForMissingOrWrongRunIdentity
 	}
 }
 
-// Adversarial takeover finding (PR #517 e2e diagnosis): changedSince counts
-// UNTRACKED files, and the orchestrator symlinks .evolve/cycle-state.json into
-// every cycle worktree. On a host whose repo lacks the production .gitignore's
-// `.evolve/*` rule (the e2e temp projects; any fresh operator checkout), that
-// runtime-state symlink read as a MATERIAL change — forcing Status: REQUIRED
-// with a full cycle document for builds that changed no code at all, and
-// hanging every e2e pipeline cycle in the correction ladder until timeout.
-// Runtime state is not a material code change; the classifier must say so
-// itself rather than relying on every host's ignore hygiene.
 func TestMaterialPaths_RuntimeStateIsNeverMaterial(t *testing.T) {
 	got := materialPaths([]string{
 		".evolve/cycle-state.json",
@@ -997,11 +983,6 @@ func TestMaterialPaths_RuntimeStateIsNeverMaterial(t *testing.T) {
 	}
 }
 
-// Review HIGH: the first fix excluded .evolve/ WHOLESALE, which laundered
-// tracked config as non-material — a build whose only change flips
-// .evolve/policy.json (gates, fleet width) could then declare NOT_APPLICABLE
-// and skip the explanation document for exactly the consequential class this
-// contract exists to document. Config is material; bookkeeping is not.
 func TestMaterialPaths_TrackedEvolveConfigIsMaterial(t *testing.T) {
 	got := materialPaths([]string{
 		".evolve/policy.json",

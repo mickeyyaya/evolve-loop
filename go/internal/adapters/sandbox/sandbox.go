@@ -1,11 +1,4 @@
-// Package sandbox ports the OS-level sandboxing layer from
-// scripts/cli_adapters/claude.sh:generate_macos_sandbox_profile
-// (macOS sandbox-exec / SBPL) and its Linux bwrap equivalent.
-//
-// The generators (GenerateSBPL / GenerateBwrapArgv) are pure functions
-// so unit tests run on any host. Probe + Exec dispatch on runtime.GOOS
-// and degrade gracefully (NOTE-level WARN) when the host's sandbox
-// binary is absent — matching the bash semantics at claude.sh:666.
+// Package sandbox generates OS sandbox profiles and measures whether the host applies them.
 package sandbox
 
 import (
@@ -22,24 +15,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Config carries the sandbox parameters extracted from a profile.
-// All paths are absolute (no globs, no placeholders); the orchestrator
-// resolves these before handing them off.
 type Config struct {
-	TerminalPath  string // validated assigned macOS tty; empty means no terminal grant
+	TerminalPath  string
 	RepoRoot      string
 	HomeDir       string
 	ReadOnlyRepo  bool
 	AllowNetwork  bool
-	WritePaths    []string // explicit write allows
-	DenyPaths     []string // explicit write denies (claude.sh:540 deny loop)
-	DenyReadPaths []string // explicit read denies; separate from immutable readable inputs
+	WritePaths    []string
+	DenyPaths     []string
+	DenyReadPaths []string
 	DenySockets   []string
 	DenyLiterals  []string
 }
 
-// homeStateWriteDirs are CLI-owned HOME state dirs that tmux REPLs may update
-// during boot (auth refresh, config pre-trust, PATH aliases, installation ids).
 func homeStateWriteDirs(home string) []string {
 	if home == "" {
 		return nil
@@ -55,53 +43,29 @@ func homeStateWriteDirs(home string) []string {
 	}
 }
 
-// ProbeResult reports the host's sandboxing capability.
 type ProbeResult struct {
-	OS         string // runtime.GOOS
-	Available  bool   // sandbox-exec / bwrap present on PATH
-	BinaryPath string // resolved path when Available
-	Reason     string // diagnostic when !Available or when sandbox_apply fails
+	OS         string
+	Available  bool
+	BinaryPath string
+	Reason     string
 
-	// Capable reports whether the sandbox binary actually APPLIES on this host —
-	// a measured fact, not the env-var nested guess. In some nested macOS
-	// environments sandbox_apply() returns EPERM despite an available binary.
-	// Only meaningful when CapabilityChecked is true.
-	Capable bool
-	// CapabilityChecked distinguishes "Capable=false because measured-incapable"
-	// from "Capable=false because never measured" (no binary, or no probe). A
-	// consumer treats !CapabilityChecked as "unknown — fall back to the legacy
-	// heuristic" so unmeasured callers are byte-identical to pre-measurement.
+	Capable           bool
 	CapabilityChecked bool
 }
 
-// LookPathFunc is the seam for injecting `exec.LookPath` behavior in
-// tests. probeFor exposes both axes (goos + look) for table-driven
-// tests; Probe is the production entry point.
 type LookPathFunc func(string) (string, error)
 
-// capabilityProbe is the seam for MEASURING whether the sandbox binary applies:
-// it execs a trivial no-op confined command and returns the exec error (nil ⇒
-// the sandbox applied). Injected in tests; defaultCapabilityProbe is production.
 type capabilityProbe func(ctx context.Context, binaryPath string) error
 
-// capabilityTimeout bounds the measurement exec. A trivial confined /usr/bin/true
-// returns near-instantly when the sandbox applies and EPERM-fast when it can't;
-// the timeout is the guarantee that a pathological host can never reintroduce the
-// 80s REPL-boot hang this measurement exists to prevent. Timeout ⇒ not capable.
 const capabilityTimeout = 3 * time.Second
 
 var hostOS = runtime.GOOS
 
-// probeOnce caches the process-lifetime probe (including the capability exec) so
-// every consumer — bridge ShouldWrap, preflight — shares ONE measured value and
-// the exec runs at most once.
 var (
 	probeOnce   sync.Once
 	probedValue ProbeResult
 )
 
-// Probe inspects the host for an available sandbox binary AND measures whether
-// it actually applies. Cached once per process.
 func Probe() ProbeResult {
 	probeOnce.Do(func() {
 		probedValue = measureCapability(probeFor(hostOS, exec.LookPath), defaultCapabilityProbe)
@@ -109,10 +73,6 @@ func Probe() ProbeResult {
 	return probedValue
 }
 
-// measureCapability augments a PATH-presence probe with a measured "does it
-// actually apply?" signal. !Available or a nil probe leaves CapabilityChecked
-// false (unknown); otherwise it execs the probe under a bounded timeout and
-// records Capable + (on failure) the diagnostic in Reason.
 func measureCapability(pr ProbeResult, probe capabilityProbe) ProbeResult {
 	if !pr.Available || probe == nil {
 		return pr
@@ -129,8 +89,6 @@ func measureCapability(pr ProbeResult, probe capabilityProbe) ProbeResult {
 	return pr
 }
 
-// defaultCapabilityProbe runs the smallest possible confined no-op (/usr/bin/true
-// has no REPL, so it cannot hang) to measure whether sandbox_apply succeeds.
 func defaultCapabilityProbe(ctx context.Context, binaryPath string) error {
 	var cmd *exec.Cmd
 	switch hostOS {
@@ -139,14 +97,8 @@ func defaultCapabilityProbe(ctx context.Context, binaryPath string) error {
 	case "linux":
 		cmd = sysexec.Command(ctx, binaryPath, "--ro-bind", "/", "/", "/bin/true")
 	default:
-		// Unreachable in production: measureCapability only probes when Available,
-		// which probeFor sets solely for darwin/linux.
 		return fmt.Errorf("no capability probe for GOOS=%s", hostOS)
 	}
-	// WaitDelay bounds the post-kill drain: after the context timeout fires and
-	// the child is signalled, Run() is still guaranteed to return promptly even
-	// if a pathological host (the exact case this probe detects) wedges a
-	// grandchild holding the pipes — it can never reintroduce the boot-hang.
 	cmd.WaitDelay = capabilityTimeout
 	return cmd.Run()
 }
@@ -174,14 +126,6 @@ func probeFor(goos string, look LookPathFunc) ProbeResult {
 	return pr
 }
 
-// GenerateSBPL emits a macOS sandbox-exec profile string for the
-// given Config. Mirrors generate_macos_sandbox_profile at
-// claude.sh:437-560.
-//
-// SBPL rule ordering matters: later rules override earlier ones for
-// overlapping subpaths. The function preserves bash's order so that
-// (deny file-write* (subpath repo)) followed by per-write-path allows
-// produces a read-only repo with cycle-specific write zones.
 func GenerateSBPL(cfg Config) string {
 	var b strings.Builder
 	b.WriteString(sbplPreamble)
@@ -288,19 +232,10 @@ func writeClosingRules(b *strings.Builder, cfg Config) {
 	}
 }
 
-// GenerateBwrapArgv emits the bubblewrap argv for the given Config and
-// inner command. Linux equivalent of generate_macos_sandbox_profile.
-// Equivalent to append(BwrapPrefix(cfg), innerArgv...) — kept for backcompat;
-// new callers that only need the prefix (e.g. the bridge SandboxWrap seam)
-// should call BwrapPrefix directly to avoid the throwaway append.
 func GenerateBwrapArgv(cfg Config, innerArgv []string) []string {
 	return append(BwrapPrefix(cfg), innerArgv...)
 }
 
-// BwrapPrefix returns the bwrap prefix argv (no inner). Workstream B uses it
-// from the bridge SandboxWrap seam, which composes the full argv at the
-// driver call site (the inner argv is the per-CLI binary + flags resolved
-// later).
 func BwrapPrefix(cfg Config) []string {
 	out := []string{
 		"--unshare-user",
@@ -309,20 +244,15 @@ func BwrapPrefix(cfg Config) []string {
 		"--dev", "/dev",
 		"--tmpfs", "/tmp",
 	}
-	// Baseline read-only system paths.
 	for _, p := range []string{"/usr", "/bin", "/lib", "/lib64", "/etc"} {
 		out = append(out, "--ro-bind", p, p)
 	}
-	// HOME read-only by default.
 	if cfg.HomeDir != "" {
 		out = append(out, "--ro-bind", cfg.HomeDir, cfg.HomeDir)
 	}
-	// Re-bind known CLI state dirs rw so REPL boot can update auth/cache/config.
-	// Use bind-try: not every host has every CLI directory.
 	for _, p := range homeStateWriteDirs(cfg.HomeDir) {
 		out = append(out, "--bind-try", p, p)
 	}
-	// Repo: rw or ro by ReadOnlyRepo.
 	for _, wp := range cfg.WritePaths {
 		if coversRepository(wp, cfg.RepoRoot) {
 			out = append(out, "--bind", wp, wp)
@@ -335,7 +265,6 @@ func BwrapPrefix(cfg Config) []string {
 			out = append(out, "--bind", cfg.RepoRoot, cfg.RepoRoot)
 		}
 	}
-	// Re-bind write paths as rw (overrides repo ro for these subdirs).
 	for _, wp := range cfg.WritePaths {
 		if wp == "" {
 			continue
@@ -348,8 +277,6 @@ func BwrapPrefix(cfg Config) []string {
 		}
 		out = append(out, "--bind", wp, wp)
 	}
-	// These overlays follow ALL writable binds. Missing targets fail setup;
-	// --ro-bind-try would silently discard a mandatory restriction.
 	for _, dp := range cfg.DenyPaths {
 		if dp != "" {
 			out = append(out, "--ro-bind", dp, dp)
@@ -363,15 +290,12 @@ func BwrapPrefix(cfg Config) []string {
 	if len(cfg.DenyReadPaths) > 0 {
 		out = append(out, "--cap-drop", "ALL")
 	}
-	// Network: bwrap uses namespace isolation, not allow/deny rules.
 	if !cfg.AllowNetwork {
 		out = append(out, "--unshare-net")
 	}
 	return out
 }
 
-// A broad scratch grant such as /tmp must precede a read-only repository
-// located beneath it. Otherwise the later parent grant reopens the whole repo.
 func coversRepository(path, repo string) bool {
 	if path == "" || repo == "" {
 		return false
@@ -380,23 +304,15 @@ func coversRepository(path, repo string) bool {
 	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// Sandbox is the runtime-dispatching exec wrapper for ad-hoc CLI use. Exec wraps
-// the given argv in the host's sandbox primitive (sandbox-exec/bwrap)
-// when available, else runs unwrapped with a stderr NOTE.
 type Sandbox struct {
 	probe ProbeResult
 	cfg   Config
 }
 
-// New constructs a Sandbox bound to a Config. Probe runs once at
-// construction; subsequent Exec calls don't re-probe.
 func New(cfg Config) *Sandbox {
 	return &Sandbox{probe: Probe(), cfg: cfg}
 }
 
-// Exec runs argv under the host's sandbox. When the host has no
-// available sandbox impl, Exec falls back to plain exec and logs a
-// NOTE to stderr (mirroring bash:666 behavior).
 func (s *Sandbox) Exec(ctx context.Context, argv []string,
 	stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(argv) == 0 {

@@ -1,10 +1,5 @@
 package observerengine
 
-// importgraph_test.go — the package is a leaf (ADR-0103 unit 12 §2): stdlib
-// plus internal/recovery (the StallPolicy strategy) and internal/signalcenter
-// (the module's producer) — never core, adapters, bridge or policy (the
-// failurelearning/importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

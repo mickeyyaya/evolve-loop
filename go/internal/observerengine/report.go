@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 )
 
-// report is the pure phase summary — the 18 keys of schema 1.0; one clock
-// read.
 func (e *Engine) report() map[string]any {
 	now := e.d.Now()
 	return map[string]any{
@@ -32,11 +30,6 @@ func (e *Engine) report() map[string]any {
 	}
 }
 
-// WriteReport persists the summary atomically (.tmp + rename). A failure is
-// reported as OBSERVER_REPORT_WRITE_FAILED AND returned; the host keeps its
-// exit code (the report is best-effort). The marshal and the write fold into
-// one error chain — the marshal of numbers, strings and already-marshalled
-// maps cannot fail, so the chain keeps the handling with one reachable branch.
 func (e *Engine) WriteReport() error {
 	b, err := json.MarshalIndent(e.report(), "", "  ")
 	if err == nil {
@@ -48,8 +41,6 @@ func (e *Engine) WriteReport() error {
 	return err
 }
 
-// writeAtomic creates the directory, writes <path>.tmp and renames it over
-// the target.
 func writeAtomic(path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err

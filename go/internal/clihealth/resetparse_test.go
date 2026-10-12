@@ -1,9 +1,5 @@
 package clihealth
 
-// Slice-2 hardening table for ParseResetHint. The clock-time grammar is the
-// cycle-283 codex wall shape; the relative grammar covers the other wording
-// providers use. Everything time-sensitive injects now — no wall-clock reads.
-
 import (
 	"testing"
 	"time"
@@ -11,7 +7,7 @@ import (
 
 func TestParseResetHintTable(t *testing.T) {
 	t.Parallel()
-	loc := time.FixedZone("TEST", 8*3600) // deterministic non-UTC zone
+	loc := time.FixedZone("TEST", 8*3600)
 	now := time.Date(2026, 6, 11, 0, 30, 0, 0, loc)
 	day := 24 * time.Hour
 
@@ -52,8 +48,6 @@ func TestParseResetHintTable(t *testing.T) {
 	}
 }
 
-// TestParseResetHintHonorsNowLocation: the printed clock time is interpreted
-// in now's location (CLIs print host-local times).
 func TestParseResetHintHonorsNowLocation(t *testing.T) {
 	t.Parallel()
 	tokyo := time.FixedZone("UTC+9", 9*3600)
@@ -71,11 +65,6 @@ func TestParseResetHintHonorsNowLocation(t *testing.T) {
 	}
 }
 
-// TestEvidenceLine_PrefersBannerOverFirstLine pins the bench-evidence accuracy
-// fix (bridge-ratelimit, cycle-314 forensics): the bench Evidence must be the
-// actual wall BANNER line (the one carrying the reset hint), not the pane's
-// first line — which on a scrolled pane caught a later frame ("53 +\tFamily:
-// codex,", an agent edit-diff line) and obscured what really walled the CLI.
 func TestEvidenceLine_PrefersBannerOverFirstLine(t *testing.T) {
 	pane := "   53 +\t\tFamily: \"codex\",\n" +
 		"some intermediate output\n" +
@@ -86,8 +75,6 @@ func TestEvidenceLine_PrefersBannerOverFirstLine(t *testing.T) {
 	}
 }
 
-// TestEvidenceLine_FallsBackToFirstLine: with no reset-hint banner present,
-// keep the legacy firstLine behavior (no regression).
 func TestEvidenceLine_FallsBackToFirstLine(t *testing.T) {
 	pane := "first line here\nsecond line\n"
 	if got := evidenceLine(pane); got != "first line here" {

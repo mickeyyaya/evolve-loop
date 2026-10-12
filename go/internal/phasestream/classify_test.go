@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// fixedNow gives deterministic timestamps for envelope assertions.
 func fixedNow() func() time.Time {
 	t := time.Date(2026, 5, 26, 8, 41, 9, 0, time.UTC)
 	return func() time.Time { return t }
@@ -18,7 +17,6 @@ func newTestClassifier() *Classifier {
 	}, "cycle-12-build-1748246469", fixedNow())
 }
 
-// Real claude-p result-event shape (cycle-107 build-stdout.log, redacted text).
 const realResultLine = `{"type":"result","subtype":"success","is_error":false,"duration_ms":177003,"num_turns":22,"total_cost_usd":0.69127425,"usage":{"input_tokens":17,"cache_creation_input_tokens":66945,"cache_read_input_tokens":1136065,"output_tokens":6624}}`
 
 func TestClassifier_ResultEvent_ExtractsCostAndTokens(t *testing.T) {
@@ -68,7 +66,6 @@ func TestClassifier_StreamEvent_CoalescesIntoProgress(t *testing.T) {
 	if asInt(env.Data["delta_count"]) != 5 {
 		t.Errorf("delta_count: want 5 got %v", env.Data["delta_count"])
 	}
-	// No pending deltas → no tick.
 	if _, ok := c.FlushProgress(); ok {
 		t.Error("FlushProgress should be a no-op when nothing pending")
 	}
@@ -88,8 +85,7 @@ func TestClassifier_AssistantText_Emitted(t *testing.T) {
 
 func TestClassifier_Interaction_AskUserQuestion_FullFidelity(t *testing.T) {
 	c := newTestClassifier()
-	// A long option description that the generic 200-byte tool_use clamp WOULD truncate.
-	longDesc := strings.Repeat("this recommendation explains the tradeoff in detail. ", 12) // ~620 bytes
+	longDesc := strings.Repeat("this recommendation explains the tradeoff in detail. ", 12)
 	line := `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_1","name":"AskUserQuestion","input":{"questions":[{"question":"Which approach?","header":"Approach","options":[{"label":"Full collapse (Recommended)","description":"` + longDesc + `"},{"label":"Shadow","description":"safer"}]}]}}]}}`
 	out := c.Line([]byte(line))
 	if len(out) != 1 || out[0].Kind != KindInteraction {
@@ -99,7 +95,6 @@ func TestClassifier_Interaction_AskUserQuestion_FullFidelity(t *testing.T) {
 	if e.Data["mode"] != "ask_user_question" {
 		t.Errorf("mode: %v", e.Data["mode"])
 	}
-	// Full fidelity: the long description must survive intact (not truncated).
 	blob := flatten(e.Data)
 	if !strings.Contains(blob, longDesc) {
 		t.Errorf("interaction truncated the recommendation/options; full fidelity required")
@@ -177,12 +172,6 @@ func TestClassifier_Stderr_InfraFailureMarkers(t *testing.T) {
 	}
 }
 
-// TestClassifier_Plaintext_InfraMarkerSurfaces guards the parity contract
-// for cycleclassify's hard-switch to the events stream (ADR-0020 task 4):
-// the legacy classifier scanned *-stdout.log too, so infra markers that
-// land on STDOUT (the cycle-61 memo-stdout.log 529) must surface as
-// infra_failure, symmetric with Stderr(). Without this, the events-only
-// filter would silently miss stdout-borne infra.
 func TestClassifier_Plaintext_InfraMarkerSurfaces(t *testing.T) {
 	cases := []struct {
 		name, line, marker string
@@ -222,13 +211,11 @@ func TestClassifier_UnknownType_NotDropped(t *testing.T) {
 
 func TestClassifier_Plaintext_NoiseDroppedTextKept(t *testing.T) {
 	c := newTestClassifier()
-	// tmux spinner / border lines are noise.
 	for _, noise := range []string{"⠋", "╭───────────╮", "   "} {
 		if out := c.Line([]byte(noise)); len(out) != 0 {
 			t.Errorf("noise %q should be dropped, got %#v", noise, out)
 		}
 	}
-	// real prose is signal.
 	out := c.Line([]byte("Auditor is alive and working."))
 	if len(out) != 1 || out[0].Kind != KindAssistantText {
 		t.Fatalf("plaintext prose should be assistant_text, got %#v", out)
@@ -246,7 +233,6 @@ func TestClassifier_SeqMonotonic(t *testing.T) {
 
 func TestClassifier_Stderr_EmitsCorrelationEnvelopes(t *testing.T) {
 	clf := NewClassifier(Source{Phase: "build", Agent: "build"}, "trace", func() time.Time { return time.Unix(0, 0).UTC() })
-	// prime with one content line so seq advances before the breadcrumb
 	_ = clf.Line([]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`))
 	got := clf.Stderr([]byte(`{"evolve_channel":"inject_applied","corr_id":"c1"}`))
 	if len(got) != 1 || got[0].Kind != KindCorrelation {
@@ -255,7 +241,6 @@ func TestClassifier_Stderr_EmitsCorrelationEnvelopes(t *testing.T) {
 	if got[0].Data["sub"] != "request" || got[0].Data["corr_id"] != "c1" {
 		t.Fatalf("data = %+v", got[0].Data)
 	}
-	// at_seq should be 1 (the seq value before Emit increments it for this envelope)
 	if asInt(got[0].Data["at_seq"]) != 1 {
 		t.Errorf("at_seq: want 1 got %v", got[0].Data["at_seq"])
 	}
@@ -263,17 +248,13 @@ func TestClassifier_Stderr_EmitsCorrelationEnvelopes(t *testing.T) {
 
 func TestClassifier_Stderr_CorrelationResponseComplete(t *testing.T) {
 	clf := NewClassifier(Source{Phase: "build", Agent: "build"}, "trace", func() time.Time { return time.Unix(0, 0).UTC() })
-	// prime: seq advances to 1 after this line
 	_ = clf.Line([]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`))
-	// inject_applied: correlator records openAtSeq["c2"]=1; Emit increments seq to 2
 	req := clf.Stderr([]byte(`{"evolve_channel":"inject_applied","corr_id":"c2"}`))
 	if len(req) != 1 || req[0].Kind != KindCorrelation || req[0].Data["sub"] != "request" {
 		t.Fatalf("want request correlation, got %+v", req)
 	}
-	// prime more lines: seq advances to 3, 4
 	_ = clf.Line([]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"a"}]}}`))
 	_ = clf.Line([]byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"b"}]}}`))
-	// idle_reached: currentSeq=4 when observe is called; startSeq=openAtSeq+1=2, endSeq=4; Emit increments seq to 5
 	resp := clf.Stderr([]byte(`{"evolve_channel":"idle_reached","corr_id":"c2"}`))
 	if len(resp) != 1 || resp[0].Kind != KindCorrelation {
 		t.Fatalf("want 1 correlation envelope for response_complete, got %+v", resp)
@@ -288,8 +269,6 @@ func TestClassifier_Stderr_CorrelationResponseComplete(t *testing.T) {
 		t.Errorf("end_seq: want 4 got %v", resp[0].Data["end_seq"])
 	}
 }
-
-// ---- tiny test helpers (assert on map[string]any wire shape) ----
 
 func asFloat(v any) float64 {
 	if f, ok := v.(float64); ok {

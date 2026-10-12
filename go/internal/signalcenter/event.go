@@ -1,15 +1,4 @@
-// Package signalcenter is the ONE event stream every host-side component
-// produces into and the orchestrator listens to (ADR-0101, docs/architecture/
-// signal-center-design.md). It is a leaf: stdlib plus internal/log for the one
-// bounded-field sanitizer. core, bridge and cmd import it; it imports none of
-// them.
-//
-// Vocabulary: Module and Kind are closed sets; Code is MODULE_SNAKE_CASE and
-// registered by its owning module; Severity is the schema-1.0 contract of
-// docs/architecture/observer-severity.md (INFO/WARN/INCIDENT), adopted
-// unchanged. An event that breaks a rule is never dropped — Normalize stamps
-// it with a SIGNALCENTER_* code, keeps the raw values in Fields and raises it
-// to at least WARN, so drift is visible in the same file the operator reads.
+// Package signalcenter is the one event stream that host components emit into and the orchestrator listens to.
 package signalcenter
 
 import (
@@ -18,53 +7,40 @@ import (
 	"strings"
 )
 
-// SchemaVersion is the wire version of Event ("signal/…" so it can never be
-// confused with the phase-observer envelope's "1.0").
 const SchemaVersion = "signal/1.0"
 
-// MaxFields bounds Event.Fields; over-cap keys are dropped and counted in
-// fields.truncated.
 const MaxFields = 12
 
-// MaxLineBytes bounds one rendered JSON line, so an O_APPEND single write stays
-// atomic; over-cap events drop fields largest-first (fields.truncated), then
-// cut Reason to fit (trailing …). Identifiers are bounded to MaxIdentRunes, so
-// the bound holds for any event.
 const MaxLineBytes = 4096
 
-// MaxIdentRunes bounds Origin, Phase and RunID — identifiers, never prose.
 const MaxIdentRunes = 128
 
-// Severity is the response tier of an event — the schema-1.0 contract:
-// INFO (10) log only · WARN (20) note, continue, flag for review · INCIDENT
-// (30) act. There is no fourth tier; the triage identity is Kind + Code.
 type Severity string
 
-// The three tiers of the contract.
 const (
 	SeverityInfo     Severity = "INFO"
 	SeverityWarn     Severity = "WARN"
 	SeverityIncident Severity = "INCIDENT"
 )
 
-var severityLevels = map[Severity]int{SeverityInfo: 10, SeverityWarn: 20, SeverityIncident: 30}
+const (
+	infoLevel     = 10
+	warnLevel     = 20
+	incidentLevel = 30
+)
 
-// Level is the contract's numeric value (10/20/30); 0 for anything else.
+var severityLevels = map[Severity]int{SeverityInfo: infoLevel, SeverityWarn: warnLevel, SeverityIncident: incidentLevel}
+
 func (s Severity) Level() int { return severityLevels[s] }
 
-// Valid reports whether s is one of the three tiers.
 func (s Severity) Valid() bool { return s.Level() != 0 }
 
-// AtLeast reports whether s is min or a higher tier; false for invalid input.
 func (s Severity) AtLeast(min Severity) bool {
 	return s.Valid() && min.Valid() && s.Level() >= min.Level()
 }
 
-// Module names the component that emitted an event — a closed set. Adding one
-// is a reviewed edit of this list and its test.
 type Module string
 
-// The closed module set (design §5.1).
 const (
 	ModuleOrchestrator    Module = "orchestrator"
 	ModuleAdvisor         Module = "advisor"
@@ -102,10 +78,8 @@ var knownModules = map[Module]bool{
 	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true,
 }
 
-// Known reports whether m is in the closed set.
 func (m Module) Known() bool { return knownModules[m] }
 
-// Modules lists the closed set, sorted.
 func Modules() []Module {
 	out := make([]Module, 0, len(knownModules))
 	for m := range knownModules {
@@ -115,16 +89,12 @@ func Modules() []Module {
 	return out
 }
 
-// codePrefix is the MODULE_ prefix a module's codes must carry: the module
-// name upper-cased with dots as underscores ("gate.contract" → "GATE_CONTRACT_").
 func (m Module) codePrefix() string {
 	return strings.ToUpper(strings.ReplaceAll(string(m), ".", "_")) + "_"
 }
 
-// Kind names what happened — a closed, dotted <subject>.<event> vocabulary.
 type Kind string
 
-// The closed kind set (design §5.2).
 const (
 	KindPhaseDispatched        Kind = "phase.dispatched"
 	KindPhaseOutcome           Kind = "phase.outcome"
@@ -169,20 +139,15 @@ var knownKinds = map[Kind]bool{
 	KindLoopEscalation: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 }
 
-// terminalKinds end or change a cycle's course — the kind-first triage entry
-// point (design §9).
 var terminalKinds = map[Kind]bool{
 	KindPhaseAborted: true, KindGateRejected: true, KindShipError: true,
 	KindSystemFailure: true, KindQuotaPaused: true, KindLoopHalt: true,
 }
 
-// Known reports whether k is in the closed set.
 func (k Kind) Known() bool { return knownKinds[k] }
 
-// Terminal reports whether k ends or changes a cycle's course.
 func (k Kind) Terminal() bool { return terminalKinds[k] }
 
-// Kinds lists the closed set, sorted.
 func Kinds() []Kind {
 	out := make([]Kind, 0, len(knownKinds))
 	for k := range knownKinds {
@@ -192,33 +157,22 @@ func Kinds() []Kind {
 	return out
 }
 
-// Code is a registered MODULE_SNAKE_CASE reason code — required on every WARN
-// and INCIDENT, optional on INFO.
 type Code string
 
 var codeRE = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$`)
 
-// Valid reports whether c is well-formed (not whether it is registered).
 func (c Code) Valid() bool { return codeRE.MatchString(string(c)) }
 
-// BelongsTo reports whether c carries m's prefix.
 func (c Code) BelongsTo(m Module) bool {
 	return c.Valid() && strings.HasPrefix(string(c), m.codePrefix())
 }
 
 var originRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$`)
 
-// ValidOrigin reports whether s is a Func or Type.Method name as Go spells it.
 func ValidOrigin(s string) bool { return originRE.MatchString(s) }
 
-// StreamFileName is the per-cycle (or per-root) NDJSON stream the sink writes
-// and readers such as the dashboard open — one spelling, composed onto its
-// directory by the root.
 const StreamFileName = "signals.ndjson"
 
-// Event is the ONE schema (design §4). Emit stamps SchemaVersion, Seq, PID and
-// TS; producers fill the rest. No nested structs: one event is one greppable
-// line; structured detail belongs in the artifact named by fields.path.
 type Event struct {
 	SchemaVersion string            `json:"schema_version"`
 	Seq           uint64            `json:"seq"`

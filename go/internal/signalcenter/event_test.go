@@ -1,11 +1,5 @@
 package signalcenter
 
-// event_test.go — the ONE schema and its closed vocabularies (ADR-0101 decisions 1, 2, 4;
-// design §4–§5). Every rule here is one the Center enforces on Emit: an event that
-// breaks one is never dropped — it is stamped with a SIGNALCENTER_* code, keeps the
-// raw values in Fields, and is raised to at least WARN, so the drift is visible in the
-// same file the operator reads.
-
 import (
 	"encoding/json"
 	"reflect"
@@ -16,7 +10,6 @@ import (
 
 func TestSeverity_LevelsMatchTheSchemaContract(t *testing.T) {
 	t.Parallel()
-	// observer-severity.md: INFO=10, WARN=20, INCIDENT=30; no other tier exists.
 	cases := []struct {
 		sev   Severity
 		level int
@@ -145,10 +138,6 @@ func init() {
 	RegisterCode(ModuleShip, "SHIP_GIT_PUSH_REJECTED", "test fixture: the remote refused the push")
 }
 
-// Normalize is the validation the Center applies before fan-out: it never rejects,
-// it rewrites — the first violation (in the fixed order below) becomes the event's
-// code, every violation is listed in fields.drift, the raw values are kept, and the
-// severity is raised to at least WARN.
 func TestNormalize_ValidEventIsUntouched(t *testing.T) {
 	t.Parallel()
 	in := validEvent()
@@ -164,7 +153,7 @@ func TestNormalize_StampsAndRaisesOnEveryViolation(t *testing.T) {
 		name string
 		mut  func(*Event)
 		code Code
-		raw  string // the fields key that keeps the raw value
+		raw  string
 	}{
 		{"unknown module", func(e *Event) { e.Module = "core" }, CodeUnknownModule, "raw_module"},
 		{"unknown kind", func(e *Event) { e.Kind = "phase.exploded" }, CodeUnknownKind, "raw_kind"},
@@ -269,7 +258,7 @@ func TestNormalize_LineCapDropsLargestFieldsFirst(t *testing.T) {
 	in := validEvent()
 	in.Fields = map[string]string{}
 	for i := 0; i < MaxFields; i++ {
-		in.Fields["f"+string(rune('a'+i))] = strings.Repeat("x", 400) // 12 × 400 ≈ 4.8 KiB > MaxLineBytes
+		in.Fields["f"+string(rune('a'+i))] = strings.Repeat("x", 400)
 	}
 	out, drift := Normalize(in)
 	if len(drift) != 0 {
@@ -285,17 +274,12 @@ func TestNormalize_LineCapDropsLargestFieldsFirst(t *testing.T) {
 	}
 }
 
-// The ≤ MaxLineBytes guarantee (one O_APPEND write stays atomic) must hold for
-// ANY event: a hostile Reason (JSON escapes '<' to six bytes), an over-long but
-// regex-valid Origin, and oversized Phase/RunID — not only for Fields (go
-// review, S1). Fields go first; then Reason is cut to fit; identifiers are
-// bounded to MaxIdentRunes.
 func TestNormalize_LineCapHoldsForAnyEvent(t *testing.T) {
 	t.Parallel()
 	in := validEvent()
 	in.Reason = strings.Repeat("<", 3000)
 	in.Origin = strings.Repeat("A", 2000)
-	in.Phase, in.RunID = strings.Repeat("<", 1000), strings.Repeat("<", 1000) // bounded to 128 runes, 6 bytes each once escaped
+	in.Phase, in.RunID = strings.Repeat("<", 1000), strings.Repeat("<", 1000)
 	in.Fields = map[string]string{}
 	for i := 0; i < MaxFields; i++ {
 		in.Fields["f"+string(rune('a'+i))] = strings.Repeat("&", 400)

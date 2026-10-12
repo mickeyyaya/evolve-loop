@@ -1,10 +1,5 @@
 package loopchain
 
-// importgraph_test.go — the package is a core-free leaf beside cmd/evolve
-// (ADR-0103 unit 13 §2): stdlib plus the six named internal packages — never
-// internal/core, internal/fleet or pkg/version (the running commit and the
-// quota-pause reader are injected) — signalcenter/importgraph_test.go idiom.
-
 import (
 	"go/parser"
 	"go/token"

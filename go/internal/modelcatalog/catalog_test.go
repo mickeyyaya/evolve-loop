@@ -48,8 +48,6 @@ func TestLookup(t *testing.T) {
 }
 
 func TestLookupEmptyModelIsMiss(t *testing.T) {
-	// An explicit empty-string model must be treated as a miss so the caller
-	// falls back to the static manifest instead of dispatching with no model.
 	c := Catalog{CLIs: map[string]CLIEntry{
 		"claude": {TierModels: map[string]string{"fast": ""}},
 	}}
@@ -59,7 +57,7 @@ func TestLookupEmptyModelIsMiss(t *testing.T) {
 }
 
 func TestLookupNilCatalog(t *testing.T) {
-	var c Catalog // zero value, nil CLIs map
+	var c Catalog
 	if got, ok := c.Lookup("claude", "fast"); ok || got != "" {
 		t.Fatalf("zero Catalog Lookup = (%q,%v), want (\"\",false)", got, ok)
 	}
@@ -69,7 +67,7 @@ func TestDispatchModelGatesOnLiveSource(t *testing.T) {
 	c := Catalog{CLIs: map[string]CLIEntry{
 		"codex":  {TierModels: map[string]string{"deep": "gpt-5.5"}, Source: SourceLive},
 		"agy":    {TierModels: map[string]string{"deep": "gemini"}, Source: SourceDetect},
-		"ollama": {TierModels: map[string]string{"deep": "phi4"}}, // no source → not live
+		"ollama": {TierModels: map[string]string{"deep": "phi4"}},
 	}}
 	tests := []struct {
 		name, cli, tier, wantModel string
