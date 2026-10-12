@@ -92,7 +92,7 @@ func (v Variant) LookPath(bin string) (string, error) {
 	return "", exec.ErrNotFound
 }
 
-func (v Variant) PathDir(t *testing.T) string {
+func (v Variant) PathDir(t testing.TB) string {
 	t.Helper()
 	dir := t.TempDir()
 	for _, bin := range v.Installed {
@@ -114,7 +114,7 @@ func (v Variant) ProductionDiscover(p policy.Policy) func() []string {
 
 func (v Variant) RawDiscover() []string { return v.Discovered }
 
-func (v Variant) ProjectRoot(t *testing.T, phases []string) string {
+func (v Variant) ProjectRoot(t testing.TB, phases []string) string {
 	t.Helper()
 	root := t.TempDir()
 	if doc := v.policyDoc(phases); doc != nil {
@@ -132,7 +132,7 @@ func (v Variant) ProjectRoot(t *testing.T, phases []string) string {
 	return root
 }
 
-func (v Variant) Policy(t *testing.T, root string) policy.Policy {
+func (v Variant) Policy(t testing.TB, root string) policy.Policy {
 	t.Helper()
 	p, err := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
 	if err != nil {
@@ -162,7 +162,7 @@ func (v Variant) policyDoc(phases []string) map[string]any {
 	return doc
 }
 
-func writePolicy(t *testing.T, root string, doc map[string]any) {
+func writePolicy(t testing.TB, root string, doc map[string]any) {
 	t.Helper()
 	raw, err := json.Marshal(doc)
 	if err != nil {
@@ -204,18 +204,27 @@ func PhasesOf(agents []string) []string {
 	return out
 }
 
-func RepoRoot(t *testing.T) string {
+func selfFile(t testing.TB, caller func(int) (uintptr, string, int, bool)) string {
 	t.Helper()
-	_, self, _, ok := runtime.Caller(0)
+	_, self, _, ok := caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(self), "..", "..", "..", ".."))
+	return self
 }
 
-func TrackedProfiles(t *testing.T) (string, []string) {
+func RepoRoot(t testing.TB) string {
 	t.Helper()
-	root := RepoRoot(t)
+	return filepath.Clean(filepath.Join(filepath.Dir(selfFile(t, runtime.Caller)), "..", "..", "..", ".."))
+}
+
+func TrackedProfiles(t testing.TB) (string, []string) {
+	t.Helper()
+	return trackedProfilesIn(t, RepoRoot(t))
+}
+
+func trackedProfilesIn(t testing.TB, root string) (string, []string) {
+	t.Helper()
 	dir := filepath.Join(root, ".evolve", "profiles")
 	names, err := profiles.NewFromDir(dir).List()
 	if err != nil {
@@ -261,29 +270,29 @@ func ErrorRecord(resolver, variant, agent, phase, message string) Record {
 	return Record{Resolver: resolver, Variant: variant, Agent: agent, Phase: phase, Error: message}
 }
 
-func GoldenPath(t *testing.T) string {
+func GoldenPath(t testing.TB) string {
 	t.Helper()
 	return testdataPath(t, "legacy-plans.golden.jsonl")
 }
 
-func AdvisorGoldenPath(t *testing.T) string {
+func AdvisorGoldenPath(t testing.TB) string {
 	t.Helper()
 	return testdataPath(t, "legacy-advisor.golden.jsonl")
 }
 
-func testdataPath(t *testing.T, name string) string {
+func testdataPath(t testing.TB, name string) string {
 	t.Helper()
-	_, self, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	return filepath.Join(filepath.Dir(self), "..", "testdata", name)
+	return filepath.Join(filepath.Dir(selfFile(t, runtime.Caller)), "..", "testdata", name)
 }
 
 func Encode(records []Record) ([]byte, error) {
+	return encodeWith(records, json.Marshal)
+}
+
+func encodeWith(records []Record, marshal func(any) ([]byte, error)) ([]byte, error) {
 	var buf bytes.Buffer
 	for _, r := range records {
-		line, err := json.Marshal(r)
+		line, err := marshal(r)
 		if err != nil {
 			return nil, err
 		}
@@ -293,9 +302,14 @@ func Encode(records []Record) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func ReadGolden(t *testing.T) []Record {
+func ReadGolden(t testing.TB) []Record {
 	t.Helper()
-	raw, err := os.ReadFile(GoldenPath(t))
+	return readGoldenAt(t, GoldenPath(t))
+}
+
+func readGoldenAt(t testing.TB, path string) []Record {
+	t.Helper()
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read golden: %v (regenerate with go test ./internal/phases/runner -run TestLegacyDispatchPlans -update)", err)
 	}
@@ -310,14 +324,19 @@ func ReadGolden(t *testing.T) []Record {
 	return out
 }
 
-func AssertGolden(t *testing.T, records []Record, update bool) {
+func AssertGolden(t testing.TB, records []Record, update bool) {
 	t.Helper()
 	AssertGoldenAt(t, GoldenPath(t), records, update)
 }
 
-func AssertGoldenAt(t *testing.T, path string, records []Record, update bool) {
+func AssertGoldenAt(t testing.TB, path string, records []Record, update bool) {
 	t.Helper()
-	got, err := Encode(records)
+	assertGoldenWith(t, path, records, update, Encode)
+}
+
+func assertGoldenWith(t testing.TB, path string, records []Record, update bool, encode func([]Record) ([]byte, error)) {
+	t.Helper()
+	got, err := encode(records)
 	if err != nil {
 		t.Fatalf("encode records: %v", err)
 	}

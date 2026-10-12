@@ -118,6 +118,13 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 	return ExitPass
 }
 
+func (o Options) rel(base, target string) (string, error) {
+	if o.relPath != nil {
+		return o.relPath(base, target)
+	}
+	return filepath.Rel(base, target)
+}
+
 func (o Options) goPackagesByModule(gofiles []string, res *Result) (map[string][]string, bool, int) {
 	type pkgKey struct{ mod, pkg string }
 	keySet := map[pkgKey]bool{}
@@ -130,7 +137,7 @@ func (o Options) goPackagesByModule(gofiles []string, res *Result) (map[string][
 		}
 		inModule = true
 		fdir := filepath.Dir(filepath.Join(o.RepoRoot, f))
-		rel, err := filepath.Rel(mod, fdir)
+		rel, err := o.rel(mod, fdir)
 		if err != nil {
 			res.log("go: cannot relativize %s", f)
 			return nil, true, ExitFail

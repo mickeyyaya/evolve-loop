@@ -158,6 +158,8 @@ type Options struct {
 
 	// land is the landing, lazily built and cached by landing() (gitops_landing.go).
 	land *landing.Landing
+
+	relPath func(base, target string) (string, error)
 }
 
 // Now is a minimal time interface (Unix seconds + RFC3339 formatter) so

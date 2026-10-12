@@ -98,7 +98,7 @@ func publishPair(projectRoot string, n int) error {
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if mdB, err = markdownWriteWouldRender(n, jsonB, mdB); err != nil {
+	if mdB, err = markdownWriteWouldRender(n, jsonB, mdB, RenderMarkdown); err != nil {
 		return err
 	}
 	held, err := corpusHoldsPair(corpus, base, jsonB, mdB)
@@ -178,7 +178,7 @@ func removeIfPresent(path string) error {
 	return nil
 }
 
-func markdownWriteWouldRender(n int, jsonB, mdB []byte) ([]byte, error) {
+func markdownWriteWouldRender(n int, jsonB, mdB []byte, renderMarkdown func(*Dossier) ([]byte, error)) ([]byte, error) {
 	d, err := ParseJSON(jsonB)
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func markdownWriteWouldRender(n int, jsonB, mdB []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	wantMD, err := RenderMarkdown(d)
+	wantMD, err := renderMarkdown(d)
 	if err != nil {
 		return nil, err
 	}
