@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -32,7 +31,7 @@ func Restore(ctx context.Context, h Hub, ref, into string) (RestoreResult, error
 	if err != nil {
 		return RestoreResult{}, err
 	}
-	if err := applyCheckpoint(ctx, gitexec.Isolated(res.Dir), cp); err != nil {
+	if err := applyCheckpoint(ctx, checkpointIsolatedGit(res.Dir), cp); err != nil {
 		return RestoreResult{}, fmt.Errorf("wtcheckpoint: restore %s into %s: %w", cp.ref, res.Dir, err)
 	}
 	return res, nil
@@ -53,7 +52,7 @@ func resolveCheckpoint(ctx context.Context, g gitexec.Git, ref string) (checkpoi
 
 func prepareTarget(ctx context.Context, h Hub, into string, cp checkpoint) (RestoreResult, error) {
 	res := RestoreResult{Ref: cp.ref, Base: cp.base}
-	abs, err := filepath.Abs(into)
+	abs, err := checkpointAbs(into)
 	if err != nil {
 		return res, err
 	}
@@ -72,7 +71,7 @@ func prepareTarget(ctx context.Context, h Hub, into string, cp checkpoint) (Rest
 		return res, err
 	}
 	res.Dir = w.Dir
-	res.Detached, err = readyExisting(ctx, gitexec.Isolated(w.Dir), cp)
+	res.Detached, err = readyExisting(ctx, checkpointIsolatedGit(w.Dir), cp)
 	return res, err
 }
 

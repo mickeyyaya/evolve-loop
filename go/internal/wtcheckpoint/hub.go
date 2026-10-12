@@ -20,7 +20,11 @@ func ResolveHub(projectRoot string) (Hub, error) {
 	return Hub{h}, nil
 }
 
-func (h Hub) git() gitexec.Git { return gitexec.Isolated(h.Store) }
+var checkpointIsolatedGit = gitexec.Isolated
+
+var checkpointAbs = filepath.Abs
+
+func (h Hub) git() gitexec.Git { return checkpointIsolatedGit(h.Store) }
 
 type listedWorktree struct {
 	path     string
@@ -82,7 +86,7 @@ func worktreeAt(dir string) Worktree {
 }
 
 func realPath(p string) string {
-	abs, err := filepath.Abs(p)
+	abs, err := checkpointAbs(p)
 	if err != nil {
 		return filepath.Clean(p)
 	}
