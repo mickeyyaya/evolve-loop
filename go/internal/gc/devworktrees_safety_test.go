@@ -578,3 +578,65 @@ func TestNestedRepo_ReportsAWalkErrorAndAMissingTopDirectory(t *testing.T) {
 		t.Errorf("an empty directory: %q, %v", got, err)
 	}
 }
+
+func localeAwareExec(frenchWithoutCLocale bool, calls *[][]string) sysexec.RunFunc {
+	return func(ctx context.Context, name, dir string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
+		if len(args) >= 2 && args[0] == "branch" && args[1] == "-d" {
+			*calls = append(*calls, env)
+			if frenchWithoutCLocale && !containsEnv(env, "LC_ALL=C") {
+				errw.Write([]byte("erreur : la branche n'est pas totalement fusionnée.\n"))
+				return 1, nil
+			}
+		}
+		return sysexec.DefaultRunner(ctx, name, dir, args, env, in, out, errw)
+	}
+}
+
+func containsEnv(env []string, want string) bool {
+	for _, kv := range env {
+		if kv == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestDeleteBranch_SquashLandedDeleteWithNonEnglishLocale(t *testing.T) {
+	t.Setenv("LC_ALL", "fr_FR.UTF-8")
+	e := newCycleSquashEnv(t)
+	e.repo.Git("switch", "-q", "-c", "cycle-loc-962")
+	commitRepoFile(t, e.repo, "loc962.txt", "x\n")
+	squashMerge(e.repo, "cycle-loc-962")
+	head := e.repo.Git("rev-parse", "refs/heads/cycle-loc-962")
+	var calls [][]string
+	o := e.options()
+	o.Exec = localeAwareExec(true, &calls)
+
+	if err := o.deleteBranch(WorktreeItem{Branch: "cycle-loc-962", Head: head, Action: WorktreeActionDeleteBranch}); err != nil {
+		t.Fatal(err)
+	}
+	if e.repo.Git("branch", "--list", "cycle-loc-962") != "" {
+		t.Error("the squash-landed branch survived under a non-English locale")
+	}
+	if len(calls) != 1 || !containsEnv(calls[0], "LC_ALL=C") {
+		t.Errorf("git branch -d env = %v, want LC_ALL=C", calls)
+	}
+}
+
+func TestDeleteBranch_UnmergedBranchStaysRefusedUnderLocaleOverride(t *testing.T) {
+	e := newCycleSquashEnv(t)
+	e.repo.Git("switch", "-q", "-c", "cycle-loc-963")
+	commitRepoFile(t, e.repo, "loc963.txt", "x\n")
+	e.repo.Git("switch", "-q", "-")
+	head := e.repo.Git("rev-parse", "refs/heads/cycle-loc-963")
+	var calls [][]string
+	o := e.options()
+	o.Exec = localeAwareExec(true, &calls)
+
+	if err := o.deleteBranch(WorktreeItem{Branch: "cycle-loc-963", Head: head, Action: WorktreeActionDeleteBranch}); err == nil {
+		t.Fatal("an unmerged, non-squash-landed branch was deleted")
+	}
+	if e.repo.Git("branch", "--list", "cycle-loc-963") == "" {
+		t.Error("the unmerged branch was removed")
+	}
+}

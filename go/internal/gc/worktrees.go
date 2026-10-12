@@ -538,7 +538,7 @@ const branchNotFullyMerged = "not fully merged"
 
 func (o WorktreeOptions) deleteBranch(it WorktreeItem) error {
 	head := o.branchHead(it.Branch)
-	_, stderr, code, err := o.gitCapture(o.ProjectRoot, "branch", "-d", it.Branch)
+	_, stderr, code, err := o.gitCapture(o.ProjectRoot, cLocaleEnv(), "branch", "-d", it.Branch)
 	switch {
 	case err != nil:
 		return fmt.Errorf("gc: git branch -d %s: %w", it.Branch, err)
@@ -589,8 +589,18 @@ func (o WorktreeOptions) logDeleted(branch, head string) {
 	}
 }
 
-func (o WorktreeOptions) gitCapture(dir string, args ...string) (stdout, stderr string, code int, err error) {
+func cLocaleEnv() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "LC_ALL=") {
+			env = append(env, kv)
+		}
+	}
+	return append(env, "LC_ALL=C")
+}
+
+func (o WorktreeOptions) gitCapture(dir string, env []string, args ...string) (stdout, stderr string, code int, err error) {
 	var out, errOut strings.Builder
-	code, err = o.Exec(context.Background(), "git", dir, args, nil, nil, &out, &errOut)
+	code, err = o.Exec(context.Background(), "git", dir, args, env, nil, &out, &errOut)
 	return out.String(), errOut.String(), code, err
 }
