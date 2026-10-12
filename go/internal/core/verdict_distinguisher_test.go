@@ -23,6 +23,8 @@ func distWS(t *testing.T, decision, report string) string {
 }
 
 func TestVerdictFailDistinguisher_DifferentTasksDiffer(t *testing.T) {
+	t.Parallel()
+
 	a := verdictFailDistinguisher("audit", distWS(t, `{"top_n":[{"id":"task-a"}]}`, ""))
 	b := verdictFailDistinguisher("audit", distWS(t, `{"top_n":[{"id":"task-b"}]}`, ""))
 	if a == b || a == "" {
@@ -31,6 +33,8 @@ func TestVerdictFailDistinguisher_DifferentTasksDiffer(t *testing.T) {
 }
 
 func TestVerdictFailDistinguisher_SameTaskStable(t *testing.T) {
+	t.Parallel()
+
 	a := verdictFailDistinguisher("audit", distWS(t, `{"top_n":[{"id":"task-a"}]}`, ""))
 	b := verdictFailDistinguisher("audit", distWS(t, `{"top_n":[{"id":"task-a"}]}`, ""))
 	if a != b {
@@ -39,6 +43,8 @@ func TestVerdictFailDistinguisher_SameTaskStable(t *testing.T) {
 }
 
 func TestVerdictFailDistinguisher_ReportFallbackWhenNoDecision(t *testing.T) {
+	t.Parallel()
+
 	a := verdictFailDistinguisher("audit", distWS(t, "", "## Verdict\nFAIL\n- D1 CRITICAL: make target exits 2 on clean tree\n"))
 	b := verdictFailDistinguisher("audit", distWS(t, "", "## Verdict\nFAIL\n- D1 HIGH: predicates never exercise production branch\n"))
 	if a == b || a == "" {
@@ -47,6 +53,8 @@ func TestVerdictFailDistinguisher_ReportFallbackWhenNoDecision(t *testing.T) {
 }
 
 func TestVerdictFailDistinguisher_BareWorkspaceEmpty(t *testing.T) {
+	t.Parallel()
+
 	if d := verdictFailDistinguisher("audit", distWS(t, "", "")); d != "" {
 		t.Fatalf("no artifacts → empty distinguisher (constant-reason residual, documented), got %q", d)
 	}

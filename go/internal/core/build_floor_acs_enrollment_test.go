@@ -58,6 +58,8 @@ func enrolledPatterns(t *testing.T, moduleDir string) []string {
 const legacyACSCeiling = 661
 
 func TestAPICoverEnforceDoesNotEnrollModernACSPackages(t *testing.T) {
+	t.Parallel()
+
 	moduleDir := repoModuleDir(t)
 	for _, p := range enrolledPatterns(t, moduleDir) {
 		n, ok := strings.CutPrefix(p, "./acs/cycle")
@@ -79,6 +81,8 @@ func TestAPICoverEnforceDoesNotEnrollModernACSPackages(t *testing.T) {
 }
 
 func TestBuildTagVisiblePackagesDropsACSPackages(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain unavailable")
 	}
@@ -103,6 +107,8 @@ func TestBuildTagVisiblePackagesDropsACSPackages(t *testing.T) {
 }
 
 func TestBuildTagVisiblePackagesFailsOpen(t *testing.T) {
+	t.Parallel()
+
 	if got := buildTagVisiblePackages(context.Background(), "", nil); len(got) != 0 {
 		t.Fatalf("buildTagVisiblePackages(nil) = %v, want empty", got)
 	}

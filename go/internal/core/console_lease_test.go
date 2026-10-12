@@ -37,6 +37,8 @@ func writeLease(t *testing.T, root string, lease consoleLease) {
 }
 
 func TestReadConsoleLease_ActiveLeaseYieldsExactPaths(t *testing.T) {
+	t.Parallel()
+
 	root := leaseRoot(t)
 	now := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
 	writeLease(t, root, consoleLease{
@@ -54,6 +56,8 @@ func TestReadConsoleLease_ActiveLeaseYieldsExactPaths(t *testing.T) {
 }
 
 func TestReadConsoleLease_WorktreeResidentLeaseIsIgnored(t *testing.T) {
+	t.Parallel()
+
 	root := leaseRoot(t)
 	now := time.Now()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -72,6 +76,8 @@ func TestReadConsoleLease_WorktreeResidentLeaseIsIgnored(t *testing.T) {
 }
 
 func TestReadConsoleLease_ExpiredIsEmpty(t *testing.T) {
+	t.Parallel()
+
 	root := leaseRoot(t)
 	now := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
 	writeLease(t, root, consoleLease{
@@ -84,6 +90,8 @@ func TestReadConsoleLease_ExpiredIsEmpty(t *testing.T) {
 }
 
 func TestReadConsoleLease_AbsentMalformedOrNoRepoKeepsGuardArmed(t *testing.T) {
+	t.Parallel()
+
 	if leased := readConsoleLease(t.TempDir(), time.Now()); len(leased) != 0 {
 		t.Fatalf("non-repo root must be empty, got %v", leased)
 	}
@@ -100,6 +108,8 @@ func TestReadConsoleLease_AbsentMalformedOrNoRepoKeepsGuardArmed(t *testing.T) {
 }
 
 func TestReadConsoleLease_MissingExpiryNeverWaives(t *testing.T) {
+	t.Parallel()
+
 	root := leaseRoot(t)
 	writeLease(t, root, consoleLease{Paths: []string{"go/x.go"}})
 	if leased := readConsoleLease(root, time.Now()); len(leased) != 0 {
@@ -108,6 +118,8 @@ func TestReadConsoleLease_MissingExpiryNeverWaives(t *testing.T) {
 }
 
 func TestFilterRealLeaks_LeaseWaiverIsExactAndLoud(t *testing.T) {
+	t.Parallel()
+
 	var warn strings.Builder
 	leaked := []string{"go/internal/core/foo.go", "go/internal/core/bar.go"}
 	leased := map[string]bool{"go/internal/core/foo.go": true}

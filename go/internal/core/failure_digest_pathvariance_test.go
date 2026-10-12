@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestNormalizeReasonForFingerprint_CycleNumberedPathsFold(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		a, b string
@@ -33,6 +35,8 @@ func TestNormalizeReasonForFingerprint_CycleNumberedPathsFold(t *testing.T) {
 }
 
 func TestNormalizeReasonForFingerprint_AttemptDenominatorFolds(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ a, b string }{
 		{"artifact timeout waiting for build-report.md (attempt 1/3)", "artifact timeout waiting for build-report.md (attempt 2/3)"},
 		{"launch refused: no CLI family available, retry 1 of 4", "launch refused: no CLI family available, retry 3 of 4"},
@@ -45,6 +49,8 @@ func TestNormalizeReasonForFingerprint_AttemptDenominatorFolds(t *testing.T) {
 }
 
 func TestNormalizeReasonForFingerprint_DistinctDefectsStayDistinct(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		a, b string
@@ -76,6 +82,8 @@ func TestNormalizeReasonForFingerprint_DistinctDefectsStayDistinct(t *testing.T)
 }
 
 func TestNormalizeReasonForFingerprint_ExistingPinsStayGreen(t *testing.T) {
+	t.Parallel()
+
 	if a, b := normalizeReasonForFingerprint("verdict conflict narrative=PASS"), normalizeReasonForFingerprint("verdict conflict narrative=WARN"); a != b {
 		t.Errorf("narrative=<verdict> pin regressed: %q vs %q", a, b)
 	}

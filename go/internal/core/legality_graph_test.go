@@ -51,6 +51,8 @@ func TestValidateSafetyInvariants_ConfigGraphStrandsShip(t *testing.T) {
 }
 
 func TestOrchestrator_UnsafeLegalGraphFailsClosed(t *testing.T) {
+	t.Parallel()
+
 	ref := kerneltest.Load(t)
 	ship := ref.ShipTerminal()
 	broken := cloneSuccessors(ref.Config.LegalSuccessors)
@@ -79,6 +81,8 @@ func TestOrchestrator_UnsafeLegalGraphFailsClosed(t *testing.T) {
 // test the floor, not this validator. Only ValidateSafetyInvariants accepting
 // the reference config is pinned here.
 func TestOrchestrator_SafeConfigRunsNormally(t *testing.T) {
+	t.Parallel()
+
 	ref := kerneltest.Load(t)
 	cfg := ref.Config
 	cfg.SpineFloor = config.StageShadow

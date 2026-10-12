@@ -33,6 +33,8 @@ func resumeTeardownHarness(t *testing.T, verdicts map[Phase]string, opts ...Opti
 }
 
 func TestRunCycleFromPhase_PrunesItsWorktreeOnNormalCompletion(t *testing.T) {
+	t.Parallel()
+
 	st, wt, o, projectRoot := resumeTeardownHarness(t, nil)
 
 	if _, err := o.RunCycleFromPhase(context.Background(),
@@ -53,6 +55,8 @@ func TestRunCycleFromPhase_PrunesItsWorktreeOnNormalCompletion(t *testing.T) {
 }
 
 func TestRunCycleFromPhase_PreservesAFailedCycleWorktree(t *testing.T) {
+	t.Parallel()
+
 	st, wt, o, projectRoot := resumeTeardownHarness(t, map[Phase]string{PhaseAudit: VerdictFAIL})
 
 	res, err := o.RunCycleFromPhase(context.Background(),
@@ -74,6 +78,8 @@ func TestRunCycleFromPhase_PreservesAFailedCycleWorktree(t *testing.T) {
 }
 
 func TestRunCycleFromPhase_PreservesAnAbnormallyExitedWorktree(t *testing.T) {
+	t.Parallel()
+
 	// Cap the dispatch loop below what the spine needs to reach PhaseEnd, so
 	// the run exits via the iteration bound with completed=false.
 	st, wt, o, projectRoot := resumeTeardownHarness(t, nil, WithMaxPhaseIterations(2))
@@ -93,6 +99,8 @@ func TestRunCycleFromPhase_PreservesAnAbnormallyExitedWorktree(t *testing.T) {
 }
 
 func TestGitWorktreeCleanup_RefusesTheProjectRoot(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	sentinel := filepath.Join(root, "the-repository.txt")
 	if err := os.WriteFile(sentinel, []byte("live tree\n"), 0o644); err != nil {
@@ -116,6 +124,8 @@ func TestGitWorktreeCleanup_RefusesTheProjectRoot(t *testing.T) {
 }
 
 func TestRunCycleFromPhase_ProjectRootCheckpointSurvivesTeardown(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	sentinel := filepath.Join(projectRoot, "the-repository.txt")
 	if err := os.WriteFile(sentinel, []byte("live tree\n"), 0o644); err != nil {
@@ -147,6 +157,8 @@ func TestRunCycleFromPhase_ProjectRootCheckpointSurvivesTeardown(t *testing.T) {
 }
 
 func TestSameDirectory(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	alias := filepath.Join(t.TempDir(), "alias")
 	if err := os.Symlink(root, alias); err != nil {

@@ -16,6 +16,8 @@ import (
 )
 
 func TestIsLegitimateMainTreePath(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		path string
 		want bool
@@ -93,6 +95,8 @@ func minimalRunners(override Phase, r PhaseRunner) map[Phase]PhaseRunner {
 }
 
 func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		leakPhase Phase
@@ -139,6 +143,8 @@ func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
 }
 
 func TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase(t *testing.T) {
+	t.Parallel()
+
 	breakerPath := ".evolve/contract-gate-breaker.json"
 	// dirtyFn flips only after the phase runs, so the leak attributes to the
 	// worktree phase rather than fakeGitDirty's fixed first-call flip.
@@ -169,6 +175,8 @@ func TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase(t *testing.T) {
 }
 
 func TestGuardCatchesDeliverableRenameSmuggle_WorktreePhase(t *testing.T) {
+	t.Parallel()
+
 	leakPhaseRan := false
 	dirtyFn := func(_ context.Context, _ string) ([]string, error) {
 		if leakPhaseRan {
@@ -200,6 +208,8 @@ func TestGuardCatchesDeliverableRenameSmuggle_WorktreePhase(t *testing.T) {
 }
 
 func TestGuardIgnoresLegitimateWorkspaceWrite(t *testing.T) {
+	t.Parallel()
+
 	workspacePath := ".evolve/runs/cycle-1/triage-report.md"
 	dirty := &fakeGitDirty{
 		baseline:  []string{},
@@ -220,10 +230,10 @@ func TestGuardIgnoresLegitimateWorkspaceWrite(t *testing.T) {
 }
 
 func TestDefaultGitDirtyPaths_RenameEmitsBothSides(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
-	t.Parallel()
 	root := t.TempDir()
 	run := func(args ...string) {
 		t.Helper()
@@ -256,6 +266,8 @@ func TestDefaultGitDirtyPaths_RenameEmitsBothSides(t *testing.T) {
 }
 
 func TestGuardIgnoresScoutEvalMaterialization(t *testing.T) {
+	t.Parallel()
+
 	root := initAuditLeakRepo(t)
 	const slug = "ledger-seal-io-coverage"
 	writeLanePin(t, RunWorkspacePath(root, 1), slug)
@@ -283,6 +295,8 @@ func TestGuardIgnoresScoutEvalMaterialization(t *testing.T) {
 }
 
 func TestGuardStillChargesAnEvalNoLiveSiblingHolds(t *testing.T) {
+	t.Parallel()
+
 	root := initAuditLeakRepo(t)
 	const strayEval = ".evolve/evals/another-item.md"
 	writeLanePin(t, RunWorkspacePath(root, 1), "router-silent-errors")
@@ -300,6 +314,8 @@ func TestGuardStillChargesAnEvalNoLiveSiblingHolds(t *testing.T) {
 }
 
 func TestRecoveryFailsAPhaseThatLeftAnEvalNoLiveLaneHolds(t *testing.T) {
+	t.Parallel()
+
 	root := initAuditLeakRepo(t)
 	const strayEval = ".evolve/evals/another-item.md"
 	writeLanePin(t, RunWorkspacePath(root, 1), "router-silent-errors")
@@ -318,6 +334,8 @@ func TestRecoveryFailsAPhaseThatLeftAnEvalNoLiveLaneHolds(t *testing.T) {
 }
 
 func TestGuardRecoversCatalogWritesSourcePhaseLeak(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -354,6 +372,8 @@ func TestGuardRecoversCatalogWritesSourcePhaseLeak(t *testing.T) {
 }
 
 func TestGuardStillAbortsNonSourcePhaseLeak(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

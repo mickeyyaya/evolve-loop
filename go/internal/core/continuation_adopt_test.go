@@ -47,6 +47,8 @@ func cycleDirName(cycle int) string {
 }
 
 func TestGitWorktree_CreateFromSeedsSnapshot(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 81)
 	m := stampedContinuation(t, root, wt, 81)
 
@@ -63,6 +65,8 @@ func TestGitWorktree_CreateFromSeedsSnapshot(t *testing.T) {
 }
 
 func TestValidateContinuation_CleanPassesConflictAndGarbageFail(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 82)
 	m := stampedContinuation(t, root, wt, 82)
 
@@ -88,6 +92,8 @@ func TestValidateContinuation_CleanPassesConflictAndGarbageFail(t *testing.T) {
 }
 
 func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 83)
 	oldExplanation := "docs/explain/builds/cycle-83-old-run.md"
 	if err := os.MkdirAll(filepath.Dir(filepath.Join(wt, oldExplanation)), 0o755); err != nil {
@@ -164,6 +170,8 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 }
 
 func TestRunCycle_InvalidContinuationFallsBackFresh(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 84)
 	m := stampedContinuation(t, root, wt, 84)
 	// Corrupt the stamp BEFORE it reaches the inbox item: point the item at a

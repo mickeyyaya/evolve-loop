@@ -7,6 +7,8 @@ import (
 )
 
 func TestBridgeRequestOf_MarksTheAdvisorsAttempt(t *testing.T) {
+	t.Parallel()
+
 	req := bridgeRequestOf(advisor.LaunchRequest{CLI: "codex-tmux", Model: "deep", Agent: "router"})
 	if !req.ChainAttempt || req.CLI != "codex-tmux" {
 		t.Fatalf("advisor attempts must be marked ChainAttempt: %+v", req)

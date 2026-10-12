@@ -14,6 +14,8 @@ func retireIDs(todos []CarryoverTodo) []string {
 }
 
 func TestRetireCarryoverTodos_CommittedIDRetires(t *testing.T) {
+	t.Parallel()
+
 	todos := []CarryoverTodo{
 		{ID: "carryover-pass-retirement", Action: "add PASS-closeout deletion path", Priority: "HIGH", FirstSeenCycle: 1421},
 		{ID: "unrelated-item", Action: "something else entirely", Priority: "MEDIUM", FirstSeenCycle: 1430},
@@ -25,6 +27,8 @@ func TestRetireCarryoverTodos_CommittedIDRetires(t *testing.T) {
 }
 
 func TestRetireCarryoverTodos_FingerprintVariantRetires(t *testing.T) {
+	t.Parallel()
+
 	todos := []CarryoverTodo{
 		{ID: "committed-id", Action: "Fix the stage refusal router in cycle 1421", FirstSeenCycle: 1421},
 		{ID: "scout-minted-variant", Action: "fix the stage refusal router in cycle-1435", FirstSeenCycle: 1435},
@@ -38,6 +42,8 @@ func TestRetireCarryoverTodos_FingerprintVariantRetires(t *testing.T) {
 }
 
 func TestRetireCarryoverTodos_UnmatchedSurvivesInOrder(t *testing.T) {
+	t.Parallel()
+
 	todos := []CarryoverTodo{
 		{ID: "a", Action: "alpha"},
 		{ID: "b", Action: "bravo"},
@@ -50,6 +56,8 @@ func TestRetireCarryoverTodos_UnmatchedSurvivesInOrder(t *testing.T) {
 }
 
 func TestRetireCarryoverTodos_EdgeInputs(t *testing.T) {
+	t.Parallel()
+
 	todos := []CarryoverTodo{{ID: "keep-me", Action: "work"}, {ID: "", Action: "malformed"}}
 
 	if got := RetireCarryoverTodos(todos, nil); len(got) != 2 {
@@ -67,6 +75,8 @@ func TestRetireCarryoverTodos_EdgeInputs(t *testing.T) {
 }
 
 func TestRetireCarryoverTodos_DoesNotMutateInput(t *testing.T) {
+	t.Parallel()
+
 	todos := []CarryoverTodo{{ID: "gone", Action: "x"}, {ID: "stays", Action: "y"}}
 	_ = RetireCarryoverTodos(todos, []string{"gone"})
 	if len(todos) != 2 || todos[0].ID != "gone" || todos[1].ID != "stays" {

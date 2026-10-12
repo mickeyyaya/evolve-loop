@@ -22,6 +22,8 @@ func writeItem(t *testing.T, dir, id, body string) string {
 }
 
 func TestComposeTaskContract_VerbatimAcceptanceAndLoudGaps(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	a := writeItem(t, dir, "task-a", `{"id":"task-a","title":"Title A","acceptance":["build-prompt.txt carries acceptance[] verbatim","go vet ./... green"]}`)
 	b := writeItem(t, dir, "task-b", `{"id":"task-b","title":"No criteria"}`)
@@ -43,6 +45,8 @@ func TestComposeTaskContract_VerbatimAcceptanceAndLoudGaps(t *testing.T) {
 }
 
 func TestComposeTaskContract_SanitizedCriteriaAreNotClaimedVerbatim(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	item := writeItem(t, dir, "large", `{"id":"large","acceptance":["`+strings.Repeat("a", 700)+`"]}`)
 	got := composeTaskContract([]taskItemRef{{"large", item}}, config.DeliverableKindSpec{Root: "solutions", MinOptions: 2})
@@ -52,6 +56,8 @@ func TestComposeTaskContract_SanitizedCriteriaAreNotClaimedVerbatim(t *testing.T
 }
 
 func TestTaskItemRefs_PathsThenScopeThenTriage(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithScopePathResolver(func(root, id string) string { return filepath.Join(root, id+".json") }))
 	unresolving := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	pinned := func(ids string) string {
@@ -87,6 +93,8 @@ func TestTaskItemRefs_PathsThenScopeThenTriage(t *testing.T) {
 }
 
 func TestTaskItemRefs_DeferredScopeIsNotMandatory(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "triage-decision.json"), []byte(`{"top_n":[{"id":"sub-task-a"}],"deferred":[{"id":"postponed-item","reason":"needs another fix"}]}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -102,6 +110,8 @@ func TestTaskItemRefs_DeferredScopeIsNotMandatory(t *testing.T) {
 }
 
 func TestListACSPredicates_InventoriesTheCyclePackage(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	mod := filepath.Join(wt, "go")
 	if err := os.MkdirAll(filepath.Join(mod, "acs", "cycle7"), 0o755); err != nil {
@@ -134,6 +144,8 @@ func TestListACSPredicates_InventoriesTheCyclePackage(t *testing.T) {
 // "## Task Contract" — is pinned in
 // phases/{tdd,build,audit}/task_contract_prompt_test.go.
 func TestDispatch_TaskContractReachesTDDBuildAndAudit(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	item := writeItem(t, dir, "task-a", `{"id":"task-a","title":"Title A","acceptance":["the build prompt carries this sentence verbatim"]}`)
 	runners := buildRunners(nil)
@@ -175,6 +187,8 @@ func TestDispatch_TaskContractReachesTDDBuildAndAudit(t *testing.T) {
 }
 
 func TestResume_TaskContractSeededOnTheResumeSurface(t *testing.T) {
+	t.Parallel()
+
 	item := writeItem(t, t.TempDir(), "task-r", `{"id":"task-r","title":"Resumed","acceptance":["resume carries the contract"]}`)
 	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictPASS})
 	root := t.TempDir()
@@ -195,6 +209,8 @@ func TestResume_TaskContractSeededOnTheResumeSurface(t *testing.T) {
 }
 
 func TestListACSPredicates_FailureBranchesAreLoud(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	mod := filepath.Join(wt, "go")
 	for _, d := range []string{"acs/cycle11", "acs/cycle12"} {
@@ -222,6 +238,8 @@ func TestListACSPredicates_FailureBranchesAreLoud(t *testing.T) {
 }
 
 func TestTaskContract_MultiSlugProjectionParity(t *testing.T) {
+	t.Parallel()
+
 	for _, pin := range []bool{false, true} {
 		t.Run(fmt.Sprint("pin=", pin), func(t *testing.T) {
 			ws := t.TempDir()
@@ -256,6 +274,8 @@ func TestTaskContract_MultiSlugProjectionParity(t *testing.T) {
 }
 
 func TestLaneScopeIDs(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	if got := LaneScopeIDs(ws); got != nil {
 		t.Fatalf("absent pin = %v", got)
@@ -275,6 +295,8 @@ func TestLaneScopeIDs(t *testing.T) {
 }
 
 func TestDispatch_TaskContractMultiSlugLiveAndResume(t *testing.T) {
+	t.Parallel()
+
 	for _, resume := range []bool{false, true} {
 		t.Run(fmt.Sprint("resume=", resume), func(t *testing.T) {
 			root := t.TempDir()
@@ -324,6 +346,8 @@ func TestDispatch_TaskContractMultiSlugLiveAndResume(t *testing.T) {
 }
 
 func TestLaneScopeIDs_ExplicitEmptyPinIsNoPin(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte(`{"todo_ids":[]}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -334,6 +358,8 @@ func TestLaneScopeIDs_ExplicitEmptyPinIsNoPin(t *testing.T) {
 }
 
 func TestContractTaskIDs(t *testing.T) {
+	t.Parallel()
+
 	decision := `{"top_n":[{"id":"alpha"},{"id":"beta"},{"id":"gamma"}],"deferred":[{"id":"gamma"}]}`
 	t.Run("no pin ⇒ decision top_n minus deferred", func(t *testing.T) {
 		ws := t.TempDir()
@@ -382,6 +408,8 @@ func writeWSFile(t *testing.T, ws, name, body string) {
 }
 
 func TestContractTaskIDs_WhitespacePaddedIDsAreNotPhantomMembers(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeWSFile(t, ws, LaneScopeFile, `{"todo_ids":["alpha"," beta ","","  "]}`)
 	if got := ContractTaskIDs(ws); strings.Join(got, ",") != "alpha,beta" {
@@ -468,6 +496,8 @@ func blockIDs(block string) []string {
 }
 
 func TestTaskItemRefs_ContractTaskIDsParity(t *testing.T) {
+	t.Parallel()
+
 	for _, f := range contractParityFixtures {
 		t.Run(f.name, func(t *testing.T) {
 			ws := f.workspace(t)
@@ -493,6 +523,8 @@ func TestTaskItemRefs_ContractTaskIDsParity(t *testing.T) {
 }
 
 func TestTaskItemRefs_ScopePathsResolvePathsNeverMembership(t *testing.T) {
+	t.Parallel()
+
 	resolver := WithScopePathResolver(func(_, id string) string { return "/resolver/" + id + ".json" })
 	cases := []struct {
 		name, pin, decision string
@@ -552,6 +584,8 @@ func TestTaskItemRefs_ScopePathsResolvePathsNeverMembership(t *testing.T) {
 // A disclosed pair and the resolver point at different records for alpha so
 // the render also proves which one placed it.
 func TestSeedTaskContract_RendersIdenticallyForPinDecisionAndDeferral(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	alphaScope := writeItem(t, dir, "alpha-scope", `{"id":"alpha","title":"Alpha (scope record)","acceptance":["alpha criterion one","alpha criterion two"]}`)
 	writeItem(t, dir, "alpha", `{"id":"alpha","title":"Alpha (resolver record)","acceptance":["alpha resolver criterion"]}`)

@@ -12,6 +12,8 @@ import (
 )
 
 func TestRecoverFromShipError_RebaseInvalidatesExplanationAndReturnsToBuild(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	worktree := filepath.Join(root, "worktree")
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")

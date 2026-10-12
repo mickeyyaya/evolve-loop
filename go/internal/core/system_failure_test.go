@@ -37,6 +37,8 @@ func (v okStubVerifier) VerifyDeliverable(_ context.Context, _ ReviewInput) (Con
 }
 
 func TestDetectVerdictIncoherence_ForgedVerdict_Halts(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -61,6 +63,8 @@ func TestDetectVerdictIncoherence_ForgedVerdict_Halts(t *testing.T) {
 }
 
 func TestDetectVerdictIncoherence_SilentNoShip_DefersToOrchestrator(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -72,6 +76,8 @@ func TestDetectVerdictIncoherence_SilentNoShip_DefersToOrchestrator(t *testing.T
 }
 
 func TestDetectVerdictIncoherence_GenuineFail_NoHalt(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "FAIL", "PASS")
@@ -83,6 +89,8 @@ func TestDetectVerdictIncoherence_GenuineFail_NoHalt(t *testing.T) {
 }
 
 func TestDetectVerdictIncoherence_ReconcileUsesFullVerify(t *testing.T) {
+	t.Parallel()
+
 	newOrch := func(verifyOK bool) *Orchestrator {
 		return &Orchestrator{
 			failurePolicy:    policy.DefaultSystemFailurePolicy(),
@@ -109,6 +117,8 @@ func TestDetectVerdictIncoherence_ReconcileUsesFullVerify(t *testing.T) {
 }
 
 func TestWithFailurePolicy_InjectsResolvedPolicy(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	WithFailurePolicy(policy.DefaultSystemFailurePolicy())(o)
 	if !o.failurePolicy.IsFloor(policy.CategoryVerdictIncoherence) {
@@ -121,6 +131,8 @@ func TestWithFailurePolicy_InjectsResolvedPolicy(t *testing.T) {
 }
 
 func TestDetectVerdictIncoherence_PassVerdict_NoHalt(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -132,6 +144,8 @@ func TestDetectVerdictIncoherence_PassVerdict_NoHalt(t *testing.T) {
 }
 
 func TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -144,6 +158,8 @@ func TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt(t *testing.T) {
 }
 
 func TestDetectVerdictIncoherence_WorkspaceReasonFileAlone_StillHalts(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -159,6 +175,8 @@ func TestDetectVerdictIncoherence_WorkspaceReasonFileAlone_StillHalts(t *testing
 }
 
 func TestDetectVerdictIncoherence_WarningOnlyDiags_StillHalts(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -173,6 +191,8 @@ func TestDetectVerdictIncoherence_WarningOnlyDiags_StillHalts(t *testing.T) {
 }
 
 func TestDetectVerdictIncoherence_ShipPhaseExplainedFail_NoHalt(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -189,6 +209,8 @@ func TestDetectVerdictIncoherence_ShipPhaseExplainedFail_NoHalt(t *testing.T) {
 }
 
 func TestDetectVerdictIncoherence_AuditPhaseBehaviorUnchangedByShipField(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -201,6 +223,8 @@ func TestDetectVerdictIncoherence_AuditPhaseBehaviorUnchangedByShipField(t *test
 }
 
 func TestRecordFloorVerdictFailure_PersistsAuditFailReason(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil)
 	dir := t.TempDir()
 	cs := &CycleState{CycleID: 7, WorkspacePath: dir}
@@ -222,6 +246,8 @@ func TestRecordFloorVerdictFailure_PersistsAuditFailReason(t *testing.T) {
 }
 
 func TestPersistFloorFailReasons_ClobberAndReset(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	cs := &CycleState{CycleID: 8, WorkspacePath: dir}
 

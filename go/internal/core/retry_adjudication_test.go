@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestClampAdjudication(t *testing.T) {
+	t.Parallel()
+
 	retryEnv := retryEnvelope{
 		Legal:  []retryAction{retryActionRetryTDD, retryActionRetryBuild, retryActionDecline},
 		Reason: "policy code-audit-fail ⇒ retry-with-fix, attempt 1/2",
@@ -78,6 +80,8 @@ func TestClampAdjudication(t *testing.T) {
 }
 
 func TestClampAdjudication_HaltingEnvelopeIsNotNegotiable(t *testing.T) {
+	t.Parallel()
+
 	halt := retryEnvelope{Halt: true, Reason: "deterministic floor candidate infra-systemic"}
 
 	got, clamped := clampAdjudication(halt, &adjudication{
@@ -94,6 +98,8 @@ func TestClampAdjudication_HaltingEnvelopeIsNotNegotiable(t *testing.T) {
 }
 
 func TestAdjudicationNeeded(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		env  retryEnvelope

@@ -38,6 +38,8 @@ func findInfraTeardownUnionSpellingsAcross(roots ...string) ([]string, error) {
 }
 
 func TestInfraTeardownUnion_ScanCoversConsumerPackages(t *testing.T) {
+	t.Parallel()
+
 	// The roots must actually exist — a widening that silently names a
 	// nonexistent directory buys the same blindness it claims to remove.
 	for _, root := range infraTeardownUnionScanRoots {
@@ -61,6 +63,8 @@ func TestInfraTeardownUnion_ScanCoversConsumerPackages(t *testing.T) {
 }
 
 func TestInfraTeardownUnion_DetectsPlantedDuplicateOutsideCore(t *testing.T) {
+	t.Parallel()
+
 	// Anti-no-op. Widening the ROOT LIST without widening what the scanner
 	// actually sees would pass "roots include X" and fail this: a synthetic
 	// union planted in a package outside internal/core must be REPORTED.

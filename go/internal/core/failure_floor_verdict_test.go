@@ -10,6 +10,8 @@ import (
 )
 
 func TestFloorVerdictError_JoinsErrorSeverityDiagnostics(t *testing.T) {
+	t.Parallel()
+
 	diags := []Diagnostic{
 		{Severity: "warning", Message: "gofmt gate skipped (could not run)"},
 		{Severity: "error", Message: "skill projection drift: Run `evolve skills generate`. Drifted: skills/retro/SKILL.md"},
@@ -40,6 +42,8 @@ func TestFloorVerdictError_JoinsErrorSeverityDiagnostics(t *testing.T) {
 }
 
 func TestRecordFailedApproachState_RecordsFloorFailToStateAndCarryover(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil)
 	o.now = func() time.Time { return time.Date(2026, 7, 15, 1, 2, 3, 0, time.UTC) }
 	st := &State{}
@@ -88,6 +92,8 @@ func TestRecordFailedApproachState_RecordsFloorFailToStateAndCarryover(t *testin
 }
 
 func TestRecordFailedApproachState_DedupesCarryover(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil)
 	o.now = func() time.Time { return time.Date(2026, 7, 15, 1, 2, 3, 0, time.UTC) }
 	st := &State{}
@@ -110,6 +116,8 @@ func TestRecordFailedApproachState_DedupesCarryover(t *testing.T) {
 }
 
 func TestRecordAndBranch_AuditFAILRecordsFloorFailure(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow() // audit acquires the ship-window lease; free it + its heartbeat
 
@@ -137,6 +145,8 @@ func TestRecordAndBranch_AuditFAILRecordsFloorFailure(t *testing.T) {
 }
 
 func TestRecordAndBranch_AuditPASSDoesNotRecord(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow()
 
@@ -151,6 +161,8 @@ func TestRecordAndBranch_AuditPASSDoesNotRecord(t *testing.T) {
 }
 
 func TestRecordAndBranch_NonAuthoritativePhaseFAILDoesNotRecord(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 
 	dr := dispatchResult{resp: PhaseResponse{Verdict: VerdictFAIL}, attemptCount: 1}

@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestPhaseRole(t *testing.T) {
+	t.Parallel()
+
 	for _, c := range []struct {
 		phase Phase
 		want  string

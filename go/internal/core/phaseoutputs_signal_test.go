@@ -13,6 +13,8 @@ import (
 )
 
 func TestRunCycle_EmitsPhaseOutputsSurveyToUnifiedStream(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	seedCycleStateFile(t, root)
 

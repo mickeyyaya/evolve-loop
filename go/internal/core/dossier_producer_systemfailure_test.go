@@ -49,6 +49,8 @@ func systemFailureBlock(t *testing.T, m map[string]any) map[string]any {
 }
 
 func TestDossierSystemFailure_LostLandingReachesTheCommittedDossier(t *testing.T) {
+	t.Parallel()
+
 	cr, root := closeoutRun(t, 1535, "cycle-1535")
 	if err := cr.completeCycle(); err != nil {
 		t.Fatalf("completeCycle: %v", err)
@@ -93,6 +95,8 @@ func TestDossierSystemFailure_LostLandingReachesTheCommittedDossier(t *testing.T
 }
 
 func TestDossierSystemFailure_LandedSiblingCarriesNone(t *testing.T) {
+	t.Parallel()
+
 	cr, root := closeoutRun(t, 1536, "cycle-1536")
 	if err := cr.completeCycle(); err != nil {
 		t.Fatalf("completeCycle: %v", err)
@@ -137,6 +141,8 @@ func goldenPassDossierParams(projectRoot string) cycleDossierParams {
 }
 
 func TestDossierSystemFailure_OrdinaryPassStaysByteClean(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, goldenPassDossierParams(root)); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
@@ -160,6 +166,8 @@ func TestDossierSystemFailure_OrdinaryPassStaysByteClean(t *testing.T) {
 }
 
 func TestDossierSystemFailure_AbnormalEpilogueThreadsTheSignal(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		signal *SystemFailureSignal

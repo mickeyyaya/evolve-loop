@@ -7,6 +7,8 @@ import (
 )
 
 func TestReleaseDeclinedBinding_RemovesMatchingScopesOnly(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	declined := &continuation.Continuation{Cycle: 1405, SnapshotSHA: "c4f6b41b4dbe"}
 	if err := continuation.WriteRegistryEntry(root, "defect-disposition-contract-unsatisfiable", *declined); err != nil {
@@ -28,6 +30,8 @@ func TestReleaseDeclinedBinding_RemovesMatchingScopesOnly(t *testing.T) {
 }
 
 func TestReleaseDeclinedBinding_NilAndEmptyAreNoops(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	releaseDeclinedBinding(root, nil, nil)
 	releaseDeclinedBinding(root, []string{"a"}, nil)

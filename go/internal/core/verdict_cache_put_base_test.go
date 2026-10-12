@@ -62,6 +62,8 @@ func putBaseWorkspace(t *testing.T) string {
 }
 
 func TestAuditBindingPut_FreshBaseSuppressedWhenMainAdvances(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	projectRoot := putBaseRepo(t)
 	baseSHA := gitOut(t, projectRoot, "rev-parse", "HEAD")
@@ -90,6 +92,8 @@ func TestAuditBindingPut_FreshBaseSuppressedWhenMainAdvances(t *testing.T) {
 }
 
 func TestAuditBindingPut_ChangedWorktreeStillRecords(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	projectRoot := putBaseRepo(t)
 	baseSHA := gitOut(t, projectRoot, "rev-parse", "HEAD")
@@ -122,6 +126,8 @@ func TestAuditBindingPut_ChangedWorktreeStillRecords(t *testing.T) {
 }
 
 func TestAuditBindingPut_NoBaseIdentityFailsClosed(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	projectRoot := putBaseRepo(t)
 	worktree := putBaseClone(t, projectRoot)

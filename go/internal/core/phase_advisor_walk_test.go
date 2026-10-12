@@ -25,6 +25,8 @@ func (b *walledBridge) Launch(_ context.Context, req BridgeRequest) (BridgeRespo
 func (*walledBridge) Probe(context.Context) (BridgeProbe, error) { return BridgeProbe{}, nil }
 
 func TestWithProposerWalk_TheAdvisorWalksTheRouteItIsGiven(t *testing.T) {
+	t.Parallel()
+
 	walk := llmroute.Plan{Candidates: []string{"agy-claude-tmux", "claude-tmux"}, Triggers: []int{85}}
 	for name, tc := range map[string]struct {
 		opts []PhaseAdvisorOption

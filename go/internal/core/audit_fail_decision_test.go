@@ -28,6 +28,8 @@ func auditFailFixture(t *testing.T, class string, defects ...string) string {
 }
 
 func TestDecideAfterAuditFail(t *testing.T) {
+	t.Parallel()
+
 	fp := policy.DefaultSystemFailurePolicy()
 
 	tests := []struct {
@@ -114,6 +116,8 @@ func TestDecideAfterAuditFail(t *testing.T) {
 }
 
 func TestDecideAfterAuditFail_AdjudicatorCannotOverturnTheFloor(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	o.failurePolicy = policy.DefaultSystemFailurePolicy()
 	o.retryAdjudicator = &stubAdjudicator{give: &adjudication{
@@ -133,6 +137,8 @@ func TestDecideAfterAuditFail_AdjudicatorCannotOverturnTheFloor(t *testing.T) {
 }
 
 func TestDecideAfterAuditFail_NilAdjudicatorIsSafe(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	o.failurePolicy = policy.DefaultSystemFailurePolicy()
 	o.retryAdjudicator = nil
@@ -146,6 +152,8 @@ func TestDecideAfterAuditFail_NilAdjudicatorIsSafe(t *testing.T) {
 }
 
 func TestAuditFailReentryEdgesAreLegal(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	for _, target := range []Phase{PhaseTDD, PhaseBuild, PhaseRetro, PhaseShip} {
 		if !sm.CanTransition(PhaseAudit, target) {
@@ -155,6 +163,8 @@ func TestAuditFailReentryEdgesAreLegal(t *testing.T) {
 }
 
 func TestSelectNext_AuditFailUsesTheDecision(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	staticNext, err := sm.Next(PhaseAudit, VerdictFAIL)
 	if err != nil {
@@ -176,6 +186,8 @@ func TestSelectNext_AuditFailUsesTheDecision(t *testing.T) {
 }
 
 func TestOrchestrator_AuditFailRetriesTheDevCycle(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	// Audit always FAILs, so the cycle exhausts its retry budget before reaching retro.
@@ -225,6 +237,8 @@ func (r *classDeclaringAuditRunner) Run(_ context.Context, req PhaseRequest) (Ph
 }
 
 func TestRouterCannotProposeTheAuditReentryEdges(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 
 	for _, to := range []Phase{PhaseTDD, PhaseBuild} {
@@ -244,6 +258,8 @@ func TestRouterCannotProposeTheAuditReentryEdges(t *testing.T) {
 }
 
 func TestDecideAfterAuditFail_SurfacesTheAdjudicatorsReasoning(t *testing.T) {
+	t.Parallel()
+
 	const why = "the tests assert the wrong contract; rebuilding without re-deriving them re-earns this"
 
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
@@ -259,6 +275,8 @@ func TestDecideAfterAuditFail_SurfacesTheAdjudicatorsReasoning(t *testing.T) {
 }
 
 func TestDecideAfterAuditFail_RecordsAClamp(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	o.failurePolicy = policy.DefaultSystemFailurePolicy()
 	o.retryAdjudicator = &stubAdjudicator{give: &adjudication{Action: retryAction("ship-it"), Justification: "trust me"}}

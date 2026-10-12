@@ -60,6 +60,8 @@ func digestFor(t *testing.T, ws string) FailureDigest {
 }
 
 func TestFailureDigest_SameTaskDistinctDefectsGetDistinctFingerprints(t *testing.T) {
+	t.Parallel()
+
 	heads := []string{
 		"CRITICAL: the gc.mode=enforce apply path (cmd_gc.go:147-157) has zero covering tests at any level",
 		"CRITICAL: gc.Policy.Worktrees grace is never defaulted (withDefaults skips it), so KeepRecent=0 ships",
@@ -79,6 +81,8 @@ func TestFailureDigest_SameTaskDistinctDefectsGetDistinctFingerprints(t *testing
 }
 
 func TestFailureDigest_SameDefectAcrossRetryCyclesCollides(t *testing.T) {
+	t.Parallel()
+
 	a := digestFor(t, identityWorkspace(t, "task-x",
 		"acs/cycle1141 predicates never compile; TestC1141_004 drives the enforce path (cycle-1141)"))
 	b := digestFor(t, identityWorkspace(t, "task-x",
@@ -89,6 +93,8 @@ func TestFailureDigest_SameDefectAcrossRetryCyclesCollides(t *testing.T) {
 }
 
 func TestVerdictFailDistinguisher_SentinelDefectsOutrankTaskIDs(t *testing.T) {
+	t.Parallel()
+
 	ws := identityWorkspace(t, "task-x", "CRITICAL: the one true defect")
 	got := verdictFailDistinguisher("audit", ws)
 	if !strings.Contains(got, "defect=") || !strings.Contains(got, "one true defect") {
@@ -100,6 +106,8 @@ func TestVerdictFailDistinguisher_SentinelDefectsOutrankTaskIDs(t *testing.T) {
 }
 
 func TestVerdictFailDistinguisher_FallsBackTasksWhenNoDefects(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	td, _ := json.Marshal(map[string]any{"top_n": []map[string]string{{"id": "task-y"}}})
 	if err := os.WriteFile(filepath.Join(ws, "triage-decision.json"), td, 0o644); err != nil {
@@ -111,6 +119,8 @@ func TestVerdictFailDistinguisher_FallsBackTasksWhenNoDefects(t *testing.T) {
 }
 
 func TestVerdictFailDistinguisher_ClasslessSentinelFallsSoftToBullets(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	report := "# Audit Report\n\n- D1 CRITICAL: the bullet-layer defect\n\n" +
 		`<!-- evolve-verdict: {"phase":"audit","verdict":"FAIL","schema_version":2,"failure":{"defects":["classless sentinel defect"]}} -->` + "\n"
@@ -127,6 +137,8 @@ func TestVerdictFailDistinguisher_ClasslessSentinelFallsSoftToBullets(t *testing
 }
 
 func TestAssembleFailureDigest_BoilerplateOnlyReasonIsUnexplained(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	b, _ := json.Marshal(auditFailReason{SchemaVersion: 1, Phase: "audit",
 		Reasons: []string{agentGradedRouterReason("audit")}})
@@ -155,6 +167,8 @@ func TestAssembleFailureDigest_BoilerplateOnlyReasonIsUnexplained(t *testing.T) 
 }
 
 func TestEvaluateBlockerBreaker_UnexplainedDigestsNeverAssertIdentity(t *testing.T) {
+	t.Parallel()
+
 	shared := []FailureDigest{
 		{Cycle: 1, Fingerprint: "audit|verdict-fail|deadbeef0000", PreClass: "verdict-fail", Unexplained: true},
 		{Cycle: 2, Fingerprint: "audit|verdict-fail|deadbeef0000", PreClass: "verdict-fail", Unexplained: true},
@@ -171,6 +185,8 @@ func TestEvaluateBlockerBreaker_UnexplainedDigestsNeverAssertIdentity(t *testing
 }
 
 func TestAgentGradedRouterReason_MatchesBoilerplateDetector(t *testing.T) {
+	t.Parallel()
+
 	for _, phase := range []string{"audit", "adversarial-review"} {
 		for _, r := range []string{agentGradedRouterReason(phase), abnormalEpilogueReason(phase)} {
 			if !isBoilerplateRouterReason(r) {
@@ -187,6 +203,8 @@ func TestAgentGradedRouterReason_MatchesBoilerplateDetector(t *testing.T) {
 }
 
 func TestAbnormalEpilogue_DigestIsUnexplained(t *testing.T) {
+	t.Parallel()
+
 	cr, _ := epilogueRun(t, false)
 	cr.abnormalEpilogue(nil)
 	raw, err := os.ReadFile(filepath.Join(cr.cs.WorkspacePath, "failure-digest.json"))
@@ -203,6 +221,8 @@ func TestAbnormalEpilogue_DigestIsUnexplained(t *testing.T) {
 }
 
 func TestAbnormalEpilogue_CauseBecomesDistinguisher(t *testing.T) {
+	t.Parallel()
+
 	digestFor := func(t *testing.T, cause error) FailureDigest {
 		t.Helper()
 		cr, _ := epilogueRun(t, false)
@@ -246,6 +266,8 @@ func TestAbnormalEpilogue_CauseBecomesDistinguisher(t *testing.T) {
 }
 
 func TestAbnormalEpilogue_TeardownMarkedAndTailKept(t *testing.T) {
+	t.Parallel()
+
 	cr, _ := epilogueRun(t, false)
 	cr.abnormalEpilogue(fmt.Errorf("build: bridge: %w", ErrArtifactTimeout))
 	raw, err := os.ReadFile(filepath.Join(cr.cs.WorkspacePath, "audit-fail-reason.json"))
@@ -267,6 +289,8 @@ func TestAbnormalEpilogue_TeardownMarkedAndTailKept(t *testing.T) {
 }
 
 func TestFailureDigest_DurationTokensNormalizeOut(t *testing.T) {
+	t.Parallel()
+
 	a := fingerprint("audit", "gate-block", []string{
 		"--- FAIL: TestEveryGateShapedFileIsProtectedSurface (0.02s); file: x_guard_test.go; FAIL\tgo/acs/regression/protectedsurface\t1.478s"})
 	b := fingerprint("audit", "gate-block", []string{

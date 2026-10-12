@@ -8,6 +8,8 @@ import (
 )
 
 func TestDefects_BecomeCarryoverTodos(t *testing.T) {
+	t.Parallel()
+
 	defects := []string{
 		"unbounded fan-out in auditor verify path",
 		"nil pointer in router when signals absent",
@@ -41,6 +43,8 @@ func TestDefects_BecomeCarryoverTodos(t *testing.T) {
 }
 
 func TestDefects_BecomeCarryoverTodos_NegativeEmptyDefects(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{}
 	record := core.FailedRecord{
 		Cycle:   2,

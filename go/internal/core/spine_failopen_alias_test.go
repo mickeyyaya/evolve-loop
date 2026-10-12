@@ -7,6 +7,8 @@ import (
 )
 
 func TestSpineFailOpenAlias_IsTheCyclestateRecord(t *testing.T) {
+	t.Parallel()
+
 	rec := SpineFailOpen{Phase: "ship", MissingArtifact: "build", Reason: "would-block at enforce"}
 	var asLeaf cyclestate.SpineFailOpen = rec // compile-time proof of identity
 	if asLeaf.Phase != "ship" || asLeaf.MissingArtifact != "build" {

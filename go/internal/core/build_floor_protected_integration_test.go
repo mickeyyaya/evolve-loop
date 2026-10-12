@@ -12,6 +12,8 @@ import (
 )
 
 func TestProtectedSurfaceFloorChecks_RefusesTheCycle1689Shape(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -65,6 +67,8 @@ func TestProtectedSurfaceFloorChecks_RefusesTheCycle1689Shape(t *testing.T) {
 }
 
 func TestProtectedSurfaceFloorChecks_SeesARenameOutOfTheSurface(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

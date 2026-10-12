@@ -9,6 +9,8 @@ import (
 )
 
 func TestCompositionSnapshot_ReceivesCycleRunID(t *testing.T) {
+	t.Parallel()
+
 	want := "run-bound-to-cycle"
 	got := ""
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil),

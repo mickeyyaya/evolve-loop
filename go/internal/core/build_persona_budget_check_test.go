@@ -12,6 +12,8 @@ import (
 )
 
 func TestPersonaDocTouched(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name  string
 		paths []string

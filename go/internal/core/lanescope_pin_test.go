@@ -63,6 +63,8 @@ func phaseScopeSeen(t *testing.T, runners map[Phase]PhaseRunner, p Phase) string
 }
 
 func TestLaneScopePin_FileInjectsFleetScopeToPhases(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeLaneScopeFixture(t, RunWorkspacePath(root, 1), []string{"todo-a", "todo-b"}, "goal-1")
 
@@ -79,6 +81,8 @@ func TestLaneScopePin_FileInjectsFleetScopeToPhases(t *testing.T) {
 }
 
 func TestLaneScopePin_TwoLanesSeeOnlyOwnScope(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	lanes := []struct {
 		lastCycle int
@@ -112,6 +116,8 @@ func TestLaneScopePin_TwoLanesSeeOnlyOwnScope(t *testing.T) {
 }
 
 func TestLaneScopePin_AbsentFileFallsBackToEnv(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	runners := buildRunners(nil)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
@@ -129,6 +135,8 @@ func TestLaneScopePin_AbsentFileFallsBackToEnv(t *testing.T) {
 }
 
 func TestLaneScopePin_MaterializedFromEnvBeforePhases(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	if _, err := o.RunCycle(context.Background(), CycleRequest{
@@ -158,6 +166,8 @@ func TestLaneScopePin_MaterializedFromEnvBeforePhases(t *testing.T) {
 }
 
 func TestLaneScopePin_ScoutGoalHashMismatchNormalizesAndProceeds(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	ws := RunWorkspacePath(root, 1)
 	// pinGoalHash / misGoalHash (defined in lanescope_normalize_test.go) mirror
@@ -183,6 +193,8 @@ func TestLaneScopePin_ScoutGoalHashMismatchNormalizesAndProceeds(t *testing.T) {
 }
 
 func TestLaneScopePin_ScoutGoalHashMatchProceeds(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeLaneScopeFixture(t, RunWorkspacePath(root, 1), []string{"todo-a"}, "goal-1")
 
@@ -202,6 +214,8 @@ func TestLaneScopePin_ScoutGoalHashMatchProceeds(t *testing.T) {
 }
 
 func TestLaneScopePin_ScoutReportWithoutGoalHashProceeds(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeLaneScopeFixture(t, RunWorkspacePath(root, 1), []string{"todo-a"}, "goal-1")
 

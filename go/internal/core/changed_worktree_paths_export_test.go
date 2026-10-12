@@ -44,6 +44,8 @@ func changedPathsRepoFixture(t *testing.T) string {
 }
 
 func TestChangedWorktreePaths_ExportedForCLIConsumers(t *testing.T) {
+	t.Parallel()
+
 	dir := changedPathsRepoFixture(t)
 
 	got := ChangedWorktreePaths(context.Background(), dir)
@@ -60,6 +62,8 @@ func TestChangedWorktreePaths_ExportedForCLIConsumers(t *testing.T) {
 }
 
 func TestChangedWorktreePaths_EmptyWorktreeIsEmpty(t *testing.T) {
+	t.Parallel()
+
 	t.Run("clean repo", func(t *testing.T) {
 		dir := t.TempDir()
 		for _, args := range [][]string{

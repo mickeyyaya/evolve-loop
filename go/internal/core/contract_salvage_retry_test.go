@@ -67,6 +67,8 @@ const blockReason = "build deliverable failed contract: [missing_section] requir
 //	    and correction 1's directive is NOT (one bad turn is not a CLI verdict;
 //	    the remedy belongs to the block that would have escalated).
 func TestContractEscalation_SalvageRetry_WhenNoOtherFamily(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
 	probe := newSalvageProbe(neverDemotingThreshold)
@@ -100,6 +102,8 @@ func TestContractEscalation_SalvageRetry_WhenNoOtherFamily(t *testing.T) {
 // also spend its round-2 budget on a structured re-prompt (double-spending the
 // correction cap for one block).
 func TestContractEscalation_SalvageRetry_NotWhenEscalationTargetExists(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := newSalvageProbe(neverDemotingThreshold)
@@ -123,6 +127,8 @@ func TestContractEscalation_SalvageRetry_NotWhenEscalationTargetExists(t *testin
 // the plain correction — otherwise the remedy fires on 99% of honest
 // single-turn slips.
 func TestContractEscalation_SalvageRetry_NotOnFirstBlock(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
 	probe := newSalvageProbe(neverDemotingThreshold)
@@ -146,6 +152,8 @@ func TestContractEscalation_SalvageRetry_NotOnFirstBlock(t *testing.T) {
 // format-compliance failure, so a structured re-prompt of a CONTRACT violation
 // is not the remedy — the ladder must behave exactly as before.
 func TestContractEscalation_SalvageRetry_NotOnNonContractRejection(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
 	probe := newSalvageProbe(neverDemotingThreshold)
@@ -176,6 +184,8 @@ func TestContractEscalation_SalvageRetry_NotOnNonContractRejection(t *testing.T)
 // operator reading the ledger cannot tell an incapable CLI from an unremedied
 // ladder, which is the exact ambiguity the live-evidence note is about.
 func TestContractEscalation_SalvageRetry_LedgerRecordsSalvageAttempted(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
 	probe := newSalvageProbe(3) // third consecutive block opens the circuit

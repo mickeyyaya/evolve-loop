@@ -22,6 +22,8 @@ import (
 // mapping shows; the leaf's own positional pin makes a NEW field a compile
 // error) and of the four response fields back.
 func TestBridgeRequestOf_ProjectsEveryLaunchField(t *testing.T) {
+	t.Parallel()
+
 	env := map[string]string{"EVOLVE_CLI": "claude-tmux"}
 	req := advisor.LaunchRequest{CLI: "claude-tmux", Profile: "/p.json", Model: "deep", Skills: []string{"fable"}, Prompt: "prompt", Workspace: "/ws", Worktree: "/wt",
 		ProjectRoot: "/root", ArtifactPath: "/ws/routing-plan.json", Completion: "artifact", Agent: "router", Contract: "router-replan", Cycle: 7, Env: env}
@@ -44,6 +46,8 @@ func TestBridgeRequestOf_ProjectsEveryLaunchField(t *testing.T) {
 // The leaf is constructed in exactly one non-test file, and the
 // composition root constructs the seam in exactly one.
 func TestPhaseAdvisor_OneConstructionSite(t *testing.T) {
+	t.Parallel()
+
 	for needle, onlySite := range map[string]string{
 		"advisor.New(":          "internal/core/phase_advisor.go",
 		"core.NewPhaseAdvisor(": "cmd/evolve/router_dispatch.go",
@@ -61,6 +65,8 @@ func TestPhaseAdvisor_OneConstructionSite(t *testing.T) {
 // A literal PhaseAdvisor lazily builds ONE brain; a nil bridge yields the
 // legacy error.
 func TestPhaseAdvisor_LiteralGetsTheBrainOnce(t *testing.T) {
+	t.Parallel()
+
 	p := &PhaseAdvisor{identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"}}
 	if p.brain != nil {
 		t.Fatal("a literal starts without a brain")
@@ -79,6 +85,8 @@ func TestPhaseAdvisor_LiteralGetsTheBrainOnce(t *testing.T) {
 // -race on the unsynchronized nil-check (a read-check-write on the pointer
 // field); green under sync.Once.
 func TestPhaseAdvisor_LiteralBuildsOneBrainUnderConcurrentFirstUse(t *testing.T) {
+	t.Parallel()
+
 	p := &PhaseAdvisor{identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"}}
 	const callers = 8
 	brains := make([]*advisor.Advisor, callers)
@@ -102,6 +110,8 @@ func TestPhaseAdvisor_LiteralBuildsOneBrainUnderConcurrentFirstUse(t *testing.T)
 }
 
 func TestNewPhaseAdvisor_NilBridgeYieldsTheLegacyError(t *testing.T) {
+	t.Parallel()
+
 	p := NewPhaseAdvisor(nil)
 	if p.brain == nil {
 		t.Fatal("NewPhaseAdvisor constructs eagerly")
@@ -115,6 +125,8 @@ func TestNewPhaseAdvisor_NilBridgeYieldsTheLegacyError(t *testing.T) {
 }
 
 func TestNewPhaseAdvisor_WiresTheAtomicCaptureWriter(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	in := baseRouteInput()
 	in.Workspace = ws
@@ -256,6 +268,8 @@ func (erroringPlanner) Plan(router.RouteInput) (*router.PhasePlan, error) {
 // The git reader the seam injects: duplicates kept as git prints
 // them, a non-repo is an error, an empty root reads nothing.
 func TestRecentlyChangedFiles_ReadsGitLogAndReportsErrors(t *testing.T) {
+	t.Parallel()
+
 	root := goldenGitRepo(t)
 	files, err := recentlyChangedFiles(root)
 	if err != nil || strings.Join(files, " ") != "a.go c.py docs/README.md a.go b_test.go" {

@@ -7,6 +7,8 @@ import (
 )
 
 func TestRunCycle_MintsChallengeToken(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -34,6 +36,8 @@ func TestRunCycle_MintsChallengeToken(t *testing.T) {
 // A caller-supplied token (resume / fleet hand-down) must not be overwritten
 // by the mint.
 func TestRunCycle_PreservesSuppliedChallengeToken(t *testing.T) {
+	t.Parallel()
+
 	const supplied = "deadbeefdeadbeef"
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}

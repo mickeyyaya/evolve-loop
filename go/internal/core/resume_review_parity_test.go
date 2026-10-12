@@ -8,6 +8,8 @@ import (
 )
 
 func TestRunCycleFromPhase_LegacyCheckpointIsStillReviewed(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	ws := filepath.Join(projectRoot, ".evolve", "runs", "cycle-9")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -47,6 +49,8 @@ func (g gateMarker) VerifiesDeclaredDeliverables() bool { return g.on }
 // proof relies on: it must see through the mandatory-explanation wrapper and
 // chain nesting, and must not be fooled by a gate that reports itself off.
 func TestDeclaredDeliverablesGateWired(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name string
 		opts []Option
@@ -68,6 +72,8 @@ func TestDeclaredDeliverablesGateWired(t *testing.T) {
 }
 
 func TestBuildFloorReviewer_LegacyCheckpointVersionZeroIsExempt(t *testing.T) {
+	t.Parallel()
+
 	r := MandatoryBuildHandoffFloor()
 	res := r.Review(context.Background(), ReviewInput{
 		Phase: string(PhaseBuild), Cycle: 9, Workspace: t.TempDir(), Worktree: t.TempDir(), ProjectRoot: t.TempDir(),

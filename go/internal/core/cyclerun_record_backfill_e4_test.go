@@ -31,6 +31,8 @@ func recordDecisionSeamE4(t *testing.T, decision failureadapter.Decision) {
 }
 
 func TestRecordAndBranch_AnAuditFailThatTheHostHaltsRecordsTheSystemFailureOnce(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name     string
 		existing *SystemFailureSignal
@@ -63,6 +65,8 @@ func TestRecordAndBranch_AnAuditFailThatTheHostHaltsRecordsTheSystemFailureOnce(
 }
 
 func TestRecordAndBranch_AnAuditRepairBranchTheStateMachineForbidsAbortsBeforeItIsScheduled(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		sm        *StateMachine
@@ -147,6 +151,8 @@ func TestRecordAndBranch_ARetroBranchTheStateMachineForbidsAborts(t *testing.T) 
 }
 
 func TestRecordAndBranch_ADebuggerBranchTheStateMachineForbidsAborts(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		sm        *StateMachine

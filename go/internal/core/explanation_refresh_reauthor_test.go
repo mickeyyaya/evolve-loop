@@ -171,6 +171,8 @@ func onlyReauthorSignal(t *testing.T, got []signalcenter.Event) signalcenter.Eve
 }
 
 func TestApplyPostReviewGuards_AStaleCitationAfterTDDRoutesToBuildWithoutSpendingTheBudget(t *testing.T) {
+	t.Parallel()
+
 	for _, attempts := range []int{1, 2} {
 		t.Run(fmt.Sprintf("attempts=%d", attempts), func(t *testing.T) {
 			f := newStaleExplanationFixture(t)
@@ -195,6 +197,8 @@ func TestApplyPostReviewGuards_AStaleCitationAfterTDDRoutesToBuildWithoutSpendin
 }
 
 func TestApplyPostReviewGuards_AStaleCitationAfterABudgetedWriterSpendsOneRepairAttempt(t *testing.T) {
+	t.Parallel()
+
 	for name, tc := range map[string]struct {
 		attempts     int
 		opts         []Option
@@ -234,6 +238,8 @@ func auditRetries(max int) policy.SystemFailurePolicy {
 }
 
 func TestApplyPostReviewGuards_ABudgetedWriterPastItsBudgetEndsTheCycleNotTheBatch(t *testing.T) {
+	t.Parallel()
+
 	f := newStaleExplanationFixture(t)
 	f.postBuildWriterDropsCitedTest(t)
 	c, got := recordingCenter()
@@ -257,6 +263,8 @@ func TestApplyPostReviewGuards_ABudgetedWriterPastItsBudgetEndsTheCycleNotTheBat
 }
 
 func TestApplyPostReviewGuards_BindingMismatchStillAbortsAsBatchFatal(t *testing.T) {
+	t.Parallel()
+
 	f := newStaleExplanationFixture(t)
 	f.postBuildWriterDropsCitedTest(t)
 	c, got := recordingCenter()
@@ -338,6 +346,8 @@ func (rig resumeRig) resumeAt(f staleExplanationFixture, writer Phase) (CycleRes
 }
 
 func TestRunCycleFromPhase_AStaleCitationAfterAResumedTDDRoutesToBuildWithoutSpending(t *testing.T) {
+	t.Parallel()
+
 	f := newStaleExplanationFixture(t)
 	rig := f.resumeRig(2, postBuildWriter{phase: PhaseTDD, effect: f.dropsCitedTest})
 
@@ -358,6 +368,8 @@ func TestRunCycleFromPhase_AStaleCitationAfterAResumedTDDRoutesToBuildWithoutSpe
 }
 
 func TestRunCycleFromPhase_AResumedRefreshAbortStopsBeforeBuild(t *testing.T) {
+	t.Parallel()
+
 	for name, tc := range map[string]struct {
 		writer         func(f staleExplanationFixture) postBuildWriter
 		opts           func(t *testing.T) []Option
@@ -421,6 +433,8 @@ func (f staleExplanationFixture) changesMaterialAfterBuild() error {
 }
 
 func TestApplyPostReviewGuards_AMaterialScopeChangeAfterAWriterRoutesToBuildWithoutCharge(t *testing.T) {
+	t.Parallel()
+
 	for _, writer := range []Phase{PhaseTDD, amplifier} {
 		t.Run(string(writer), func(t *testing.T) {
 			f := newStaleExplanationFixture(t)
@@ -443,6 +457,8 @@ func TestApplyPostReviewGuards_AMaterialScopeChangeAfterAWriterRoutesToBuildWith
 }
 
 func TestRunCycleFromPhase_AResumedMaterialScopeChangeRoutesToBuild(t *testing.T) {
+	t.Parallel()
+
 	f := newStaleExplanationFixture(t)
 	rig := f.resumeRig(2, postBuildWriter{phase: PhaseTDD, effect: f.changesMaterialAfterBuild})
 

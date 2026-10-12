@@ -43,6 +43,8 @@ func replanFullPlanE4() *router.PhasePlan {
 }
 
 func TestPostScoutReplan_OnlyTheAdvisorModeReplans(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name  string
 		stage config.Stage
@@ -88,6 +90,8 @@ func TestPostScoutReplan_AnUnreadableWorkspaceWarnsAndNeverReplans(t *testing.T)
 }
 
 func TestPostScoutReplan_APlanThatAlreadyCoversTheMeasuredNeedIsLeftAlone(t *testing.T) {
+	t.Parallel()
+
 	ws := scoutWorkspace(t)
 	pl := &replanPlanner{plan: replanFullPlanE4()}
 	covering := &router.PhasePlan{Entries: []router.PhasePlanEntry{

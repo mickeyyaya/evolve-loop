@@ -8,6 +8,8 @@ import "testing"
 // at line 12 (a real overlapping edit once line-shifting from earlier,
 // unrelated insertions is accounted for) but the new-side ranges do not.
 func TestScopedReviewImplementations_MustAgreeOnOverlap(t *testing.T) {
+	t.Parallel()
+
 	auditedDiff := []byte("diff --git a/foo.go b/foo.go\n" +
 		"--- a/foo.go\n+++ b/foo.go\n" +
 		"@@ -10,3 +10,3 @@ func A() {\n" +

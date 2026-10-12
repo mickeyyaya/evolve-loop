@@ -43,6 +43,8 @@ func TestScopedCoverFunc_BehindAHeldLockWaitsOnlyItsBoundThenRunsUnserialized(t 
 }
 
 func TestCoverLockWait_IsTheSharedVerificationWaitBound(t *testing.T) {
+	t.Parallel()
+
 	if coverLockWait != verifylock.MaxWait {
 		t.Errorf("coverLockWait = %s, want verifylock.MaxWait (%s): the floor's coverage pass waits for the host lock exactly as long as the ACS suite does", coverLockWait, verifylock.MaxWait)
 	}

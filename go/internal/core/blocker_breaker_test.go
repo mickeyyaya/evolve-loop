@@ -18,6 +18,8 @@ func defaultBreakerCfg() BlockerBreakerConfig {
 }
 
 func TestBlockerBreaker_GuardAbortClassHaltsAtCeiling(t *testing.T) {
+	t.Parallel()
+
 	var v BlockerVerdict = EvaluateBlockerBreaker([]FailureDigest{
 		dg(10, "build|guard-abort|aaa", "guard-abort"),
 		dg(12, "audit|guard-abort|bbb", "guard-abort"),
@@ -31,12 +33,16 @@ func TestBlockerBreaker_GuardAbortClassHaltsAtCeiling(t *testing.T) {
 }
 
 func TestBlockerBreaker_SingleGuardAbortContinues(t *testing.T) {
+	t.Parallel()
+
 	if v := EvaluateBlockerBreaker([]FailureDigest{dg(10, "x", "guard-abort")}, defaultBreakerCfg()); v.Halt {
 		t.Fatalf("one guard-abort is below ceiling, got halt: %+v", v)
 	}
 }
 
 func TestBlockerBreaker_IdenticalFingerprintHaltsAtCeiling(t *testing.T) {
+	t.Parallel()
+
 	fp := "audit|gate-block|deadbeef1234"
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		dg(10, fp, "gate-block"), dg(11, fp, "gate-block"), dg(13, fp, "gate-block"),
@@ -50,6 +56,8 @@ func TestBlockerBreaker_IdenticalFingerprintHaltsAtCeiling(t *testing.T) {
 }
 
 func TestBlockerBreaker_DistinctHonestFailuresContinue(t *testing.T) {
+	t.Parallel()
+
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		dg(10, "audit|gate-block|aaa", "gate-block"),
 		dg(11, "audit|gate-block|bbb", "gate-block"),
@@ -63,6 +71,8 @@ func TestBlockerBreaker_DistinctHonestFailuresContinue(t *testing.T) {
 }
 
 func TestBlockerBreaker_ZeroCeilingsDisable(t *testing.T) {
+	t.Parallel()
+
 	fp := "a|b|c"
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		dg(1, fp, "guard-abort"), dg(2, fp, "guard-abort"), dg(3, fp, "guard-abort"),
@@ -73,6 +83,8 @@ func TestBlockerBreaker_ZeroCeilingsDisable(t *testing.T) {
 }
 
 func TestCollectBatchFailureDigests_ScopesAndTolerates(t *testing.T) {
+	t.Parallel()
+
 	evolveDir := t.TempDir()
 	write := func(cycle int, body string) {
 		d := filepath.Join(evolveDir, "runs", "cycle-"+itoa(cycle))
@@ -100,6 +112,8 @@ func TestCollectBatchFailureDigests_ScopesAndTolerates(t *testing.T) {
 }
 
 func TestLoadResolvedFingerprints_ReadsLedgerRecords(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	body := `[
 		{"fingerprint":"ship|unknown|76d0f4fca190","resolved_at":"2026-08-05T09:30:00Z","resolved_by":"operator-reset"},
@@ -121,6 +135,8 @@ func TestLoadResolvedFingerprints_ReadsLedgerRecords(t *testing.T) {
 }
 
 func TestLoadResolvedFingerprints_MissingFileReturnsEmptyNoError(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	got, err := LoadResolvedFingerprints(dir)
 	if err != nil {
@@ -132,6 +148,8 @@ func TestLoadResolvedFingerprints_MissingFileReturnsEmptyNoError(t *testing.T) {
 }
 
 func TestEvaluateBlockerBreaker_ExcludesAckedFingerprint(t *testing.T) {
+	t.Parallel()
+
 	fp := "ship|unknown|76d0f4fca190"
 	cfg := defaultBreakerCfg()
 	cfg.AckedFingerprints = map[string]bool{fp: true}
@@ -144,6 +162,8 @@ func TestEvaluateBlockerBreaker_ExcludesAckedFingerprint(t *testing.T) {
 }
 
 func TestEvaluateBlockerBreaker_UnackedIdenticalFingerprintStillHalts(t *testing.T) {
+	t.Parallel()
+
 	fp := "ship|unknown|76d0f4fca190"
 	cfg := defaultBreakerCfg()
 	cfg.AckedFingerprints = map[string]bool{"a-different-fingerprint": true}
@@ -156,6 +176,8 @@ func TestEvaluateBlockerBreaker_UnackedIdenticalFingerprintStillHalts(t *testing
 }
 
 func TestAppendResolvedFingerprint_WritesRecord(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	now := time.Date(2026, 8, 5, 10, 0, 0, 0, time.UTC)
 	if err := AppendResolvedFingerprint(dir, "ship|unknown|76d0f4fca190", "operator-reset", now); err != nil {

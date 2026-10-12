@@ -20,6 +20,8 @@ func coverGapLines() []string {
 }
 
 func TestCoverChangedResult_EnforceRejectsEveryGapByName(t *testing.T) {
+	t.Parallel()
+
 	failures, warning := coverChangedResult(config.StageEnforce, "1 of 1 changed function(s) are below 100%", coverGapLines())
 
 	if warning != "" || len(failures) != 1 {
@@ -33,6 +35,8 @@ func TestCoverChangedResult_EnforceRejectsEveryGapByName(t *testing.T) {
 }
 
 func TestCoverChangedResult_ShadowOnlyWarnsAndOffOrNoLinesIsSilent(t *testing.T) {
+	t.Parallel()
+
 	if failures, warning := coverChangedResult(config.StageShadow, "head", coverGapLines()); failures != nil || !strings.Contains(warning, "shadow") || !strings.Contains(warning, "internal/x.F") {
 		t.Errorf("shadow: failures=%v warning=%q, want a warning naming the function and no failure", failures, warning)
 	}
@@ -44,6 +48,8 @@ func TestCoverChangedResult_ShadowOnlyWarnsAndOffOrNoLinesIsSilent(t *testing.T)
 }
 
 func TestCoverChangedPackages_KeepsOnlyLivePackagesOutsideTestdata(t *testing.T) {
+	t.Parallel()
+
 	module := t.TempDir()
 	for _, dir := range []string{"internal/x", "internal/x/testdata/y", "cmd/z"} {
 		if err := os.MkdirAll(filepath.Join(module, dir), 0o755); err != nil {
@@ -60,6 +66,8 @@ func TestCoverChangedPackages_KeepsOnlyLivePackagesOutsideTestdata(t *testing.T)
 }
 
 func TestCoverTestArgs_AddTheTagsOfTheCoverageRunOnlyWhenGiven(t *testing.T) {
+	t.Parallel()
+
 	got := coverTestArgs("/tmp/cover.out", []string{"./p"}, []string{"integration", "acs"})
 
 	want := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", "integration,acs", "-coverprofile", "/tmp/cover.out", "./p"}

@@ -171,6 +171,8 @@ func TestLedgerEntry_Unmarshal_CycleOutOfRange(t *testing.T) {
 }
 
 func TestLedgerEntry_NullCycleAbsorbed(t *testing.T) {
+	t.Parallel()
+
 	raw := `{"ts":"2026-07-22T22:54:50Z","class":"inbox-lifecycle","action":"promote","task_id":"x","cycle":null,"git_sha":null,"reason":"ship-promote-processed"}`
 	var e LedgerEntry
 	if err := json.Unmarshal([]byte(raw), &e); err != nil {

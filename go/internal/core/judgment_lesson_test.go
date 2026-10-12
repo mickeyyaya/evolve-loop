@@ -40,6 +40,8 @@ func renderPersistedPlannerContext(t *testing.T, cr *cycleRun) (string, State) {
 }
 
 func TestJudgmentLessonFullPath_PremiseChallengeSentinelFAILTeachesWithoutHalting(t *testing.T) {
+	t.Parallel()
+
 	const objection = "the proposed premise contradicts the recorded evidence"
 	artifact := strings.Join([]string{
 		"## Stated Premise\nThe implementation is safe.",
@@ -105,6 +107,8 @@ func TestJudgmentLessonFullPath_PremiseChallengeSentinelFAILTeachesWithoutHaltin
 }
 
 func TestJudgmentLessonFullPath_NoLessonWithoutAWellFormedSentinelFAIL(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		artifact string
@@ -136,6 +140,8 @@ func TestJudgmentLessonFullPath_NoLessonWithoutAWellFormedSentinelFAIL(t *testin
 }
 
 func TestJudgmentLessonEndToEnd_ReachesNextCyclePlannerPrompt(t *testing.T) {
+	t.Parallel()
+
 	const objection = "planner-visible premise objection"
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
@@ -166,6 +172,8 @@ func TestJudgmentLessonEndToEnd_ReachesNextCyclePlannerPrompt(t *testing.T) {
 }
 
 func TestJudgmentLessonEndToEnd_SurvivesPlannerPromptCapUnderCrowdedCarryover(t *testing.T) {
+	t.Parallel()
+
 	const objection = "new P1 judgment lesson survives the cap"
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	for i := 0; i < maxCarryoverTodosInPrompt+5; i++ {
@@ -195,6 +203,8 @@ func TestJudgmentLessonEndToEnd_SurvivesPlannerPromptCapUnderCrowdedCarryover(t 
 }
 
 func TestJudgmentLessonEndToEnd_ControlPhaseFAILReachesNoPlannerPrompt(t *testing.T) {
+	t.Parallel()
+
 	for _, phase := range []Phase{PhaseRetro, PhaseDebugger} {
 		t.Run(string(phase), func(t *testing.T) {
 			objection := "control-only-" + string(phase) + "-must-not-teach"
@@ -220,6 +230,8 @@ func TestJudgmentLessonEndToEnd_ControlPhaseFAILReachesNoPlannerPrompt(t *testin
 }
 
 func TestArtifactTimeoutEndToEnd_DiagnosticNeverMutatesRetryOrFailureLearning(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	timeout := fmt.Errorf("bridge dispatch: %w", ErrArtifactTimeout)
 
@@ -252,6 +264,8 @@ func TestArtifactTimeoutEndToEnd_DiagnosticNeverMutatesRetryOrFailureLearning(t 
 }
 
 func TestRecordAndBranch_PremiseChallengeFAILTeaches(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
 		Verdict: VerdictFAIL,
@@ -275,6 +289,8 @@ func TestRecordAndBranch_PremiseChallengeFAILTeaches(t *testing.T) {
 }
 
 func TestRecordAndBranch_PremiseChallengeFAILDoesNotRecordFailedApproach(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
 		Verdict:     VerdictFAIL,
@@ -294,6 +310,8 @@ func TestRecordAndBranch_PremiseChallengeFAILDoesNotRecordFailedApproach(t *test
 }
 
 func TestJudgmentLesson_PriorityIsNotP0(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
 		Verdict:     VerdictFAIL,
@@ -316,6 +334,8 @@ func TestJudgmentLesson_PriorityIsNotP0(t *testing.T) {
 }
 
 func TestJudgmentLesson_ControlPhasesDoNotTeach(t *testing.T) {
+	t.Parallel()
+
 	for _, phase := range []Phase{PhaseRetro, PhaseDebugger} {
 		t.Run(string(phase), func(t *testing.T) {
 			cr := retroGateHarness(t, phasespec.Catalog{})
@@ -335,6 +355,8 @@ func TestJudgmentLesson_ControlPhasesDoNotTeach(t *testing.T) {
 }
 
 func TestJudgmentLesson_PersistedToStorage(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
 		Verdict:     VerdictFAIL,
@@ -360,6 +382,8 @@ func TestJudgmentLesson_PersistedToStorage(t *testing.T) {
 }
 
 func TestJudgmentLesson_DedupedByID(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
 		Verdict:     VerdictFAIL,
@@ -379,6 +403,8 @@ func TestJudgmentLesson_DedupedByID(t *testing.T) {
 // greps source), not a behavioral one: a third dispatch path added later
 // must wire both recorders or fail here.
 func TestJudgmentLesson_WiredInLockstepWithFloorRecorder(t *testing.T) {
+	t.Parallel()
+
 	shared, err := os.ReadFile("phase_completion.go")
 	if err != nil {
 		t.Fatalf("read shared phase completion: %v", err)
@@ -401,6 +427,8 @@ func TestJudgmentLesson_WiredInLockstepWithFloorRecorder(t *testing.T) {
 }
 
 func TestJudgmentLesson_ExpiresAtSurvivesALoopPause(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	dr := dispatchResult{resp: PhaseResponse{
 		Verdict:     VerdictFAIL,
@@ -430,6 +458,8 @@ func TestJudgmentLesson_ExpiresAtSurvivesALoopPause(t *testing.T) {
 }
 
 func TestJudgmentLesson_AuthoritativePhaseYieldsToFloorRecorder(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	// Make the judgment phase authoritative, as an operator ship_floor override would.
 	cr.o.shipFloor = []string{"premise-challenge"}

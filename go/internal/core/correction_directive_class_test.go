@@ -23,6 +23,8 @@ func forbidsFileCreation(directive string) bool {
 }
 
 func TestComposeCorrection_SidecarClassDoesNotForbidTheFix(t *testing.T) {
+	t.Parallel()
+
 	got := composeCorrection(1, gateARejection, gateARemediation)
 
 	if forbidsFileCreation(got) {
@@ -44,6 +46,8 @@ func TestComposeCorrection_SidecarClassDoesNotForbidTheFix(t *testing.T) {
 // Without this, "fix the directive" could silently weaken every other gate's
 // correction.
 func TestComposeCorrection_MalformedClassIsByteIdentical(t *testing.T) {
+	t.Parallel()
+
 	const reason = "audit-report.md missing required section(s): ## Verdict"
 	want := "Your previous output for this phase was REJECTED by the deliverable contract check:\n\n" +
 		reason +
@@ -62,6 +66,8 @@ func TestComposeCorrection_MalformedClassIsByteIdentical(t *testing.T) {
 // SECOND-STRIKE path, so fixing only composeCorrection leaves the defect live
 // on the path that actually decides those cycles.
 func TestComposeContractSalvageRetry_CarriesRemediation(t *testing.T) {
+	t.Parallel()
+
 	got := composeContractSalvageRetry(2, gateARejection, gateARemediation)
 
 	if forbidsFileCreation(got) {
@@ -76,6 +82,8 @@ func TestComposeContractSalvageRetry_CarriesRemediation(t *testing.T) {
 // TestComposeContractSalvageRetry_MalformedClassKeepsTodaysText: the salvage
 // rung for the class it was designed for is unchanged.
 func TestComposeContractSalvageRetry_MalformedClassKeepsTodaysText(t *testing.T) {
+	t.Parallel()
+
 	const reason = "[MISSING_SECTION] build-report.md lacks ## Task:"
 	got := composeContractSalvageRetry(2, reason, "")
 	if !forbidsFileCreation(got) {
@@ -97,6 +105,8 @@ func TestComposeContractSalvageRetry_MalformedClassKeepsTodaysText(t *testing.T)
 // green, and silently restores the 0-for-4 behavior — the gate would compute a
 // remediation nobody reads. Both dispatch paths must pass it.
 func TestCorrectionCallSites_PassTheRemediation(t *testing.T) {
+	t.Parallel()
+
 	var source strings.Builder
 	for _, name := range []string{"cyclerun_review.go", "cyclerun_correction.go", "resume.go"} {
 		src, err := os.ReadFile(name)
@@ -124,6 +134,8 @@ func TestCorrectionCallSites_PassTheRemediation(t *testing.T) {
 // the path that fires for repeat contract blocks. Written as a literal on
 // purpose: an intentional edit SHOULD fail here and be re-approved.
 func TestComposeContractSalvageRetry_EmptyRemediationIsByteIdentical(t *testing.T) {
+	t.Parallel()
+
 	const reason = "[MISSING_SECTION] build-report.md lacks ## Task:"
 	want := composeCorrection(2, reason, "") + "\n\n" + contractSalvageRetryDirectiveHeading + "\n\n" +
 		"This is the second consecutive block reporting the SAME defect, and no other CLI family is " +

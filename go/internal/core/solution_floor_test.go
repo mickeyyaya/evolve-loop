@@ -40,6 +40,8 @@ func documentWorkspace(t *testing.T, kind string) string {
 }
 
 func TestSolutionFloorChecks(t *testing.T) {
+	t.Parallel()
+
 	fn := SolutionFloorChecks(documentSpec())
 	ctx := context.Background()
 
@@ -77,6 +79,8 @@ func TestSolutionFloorChecks(t *testing.T) {
 }
 
 func TestDocumentCycle(t *testing.T) {
+	t.Parallel()
+
 	if DocumentCycle("") {
 		t.Error("empty workspace ⇒ false")
 	}
@@ -89,6 +93,8 @@ func TestDocumentCycle(t *testing.T) {
 }
 
 func TestSolutionViolations(t *testing.T) {
+	t.Parallel()
+
 	ws := documentWorkspace(t, "document")
 	wt := t.TempDir()
 	if got := SolutionViolations(ws, wt, "", documentSpec()); len(got) == 0 || !strings.Contains(got[0], "solutions/netflix-margin") {
@@ -100,6 +106,8 @@ func TestSolutionViolations(t *testing.T) {
 }
 
 func TestBuildHandoffFloor_EveryEngineRunsAndEveryFailureReachesTheLadder(t *testing.T) {
+	t.Parallel()
+
 	floor := BuildHandoffFloor{
 		{Name: "first", Run: func(context.Context, ReviewInput) []string { return []string{"first"} }},
 		{Name: "second", Run: func(context.Context, ReviewInput) []string { return nil }},
@@ -113,6 +121,8 @@ func TestBuildHandoffFloor_EveryEngineRunsAndEveryFailureReachesTheLadder(t *tes
 }
 
 func TestSolutionViolations_EmptyBindingIsLoud(t *testing.T) {
+	t.Parallel()
+
 	ws := documentWorkspace(t, "document")
 	writeWS(t, ws, "triage-decision.json", `{"top_n":[]}`)
 	got := SolutionViolations(ws, t.TempDir(), "", documentSpec())
@@ -131,6 +141,8 @@ func TestSolutionViolations_EmptyBindingIsLoud(t *testing.T) {
 }
 
 func TestSeedTaskContract_DocumentCycle(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	item := writeItem(t, dir, "netflix-margin", `{"id":"netflix-margin","title":"Netflix margin","deliverable_kind":"document","acceptance":["two options compared"]}`)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
@@ -157,6 +169,8 @@ func TestSeedTaskContract_DocumentCycle(t *testing.T) {
 }
 
 func TestBoundTaskIDs(t *testing.T) {
+	t.Parallel()
+
 	ws := documentWorkspace(t, "document")
 	if ids := BoundTaskIDs(ws); len(ids) != 1 || ids[0] != "netflix-margin" {
 		t.Errorf("BoundTaskIDs = %v", ids)
@@ -167,6 +181,8 @@ func TestBoundTaskIDs(t *testing.T) {
 }
 
 func TestSeedDomainDefault(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	if got := seedDomainDefault(map[string]string{"goal": "g"}, PhaseScout, root); got[CtxKeyDeliverableKindDefault] != "" {
 		t.Errorf("no domain.json ⇒ no default key; got %v", got)
@@ -186,6 +202,8 @@ func TestSeedDomainDefault(t *testing.T) {
 }
 
 func TestSeedDomainDefault_MalformedIsLoudNotSilent(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -200,6 +218,8 @@ func TestSeedDomainDefault_MalformedIsLoudNotSilent(t *testing.T) {
 }
 
 func TestSeedDeliverableRoot(t *testing.T) {
+	t.Parallel()
+
 	base := map[string]string{"goal": "g"}
 	if got := seedDeliverableRoot(base, PhaseScout, "solutions"); got[CtxKeyDeliverableRoot] != "solutions" || got["goal"] != "g" {
 		t.Errorf("scout dispatch must carry the root beside the base context; got %v", got)

@@ -65,6 +65,8 @@ func TestBuildTagVisiblePackages_DropsOnlyPackagesWithNoDefaultTagFiles(t *testi
 }
 
 func TestBuildTagVisiblePackages_AllVisibleKeepsTheInputUnchanged(t *testing.T) {
+	t.Parallel()
+
 	moduleDir := filepath.Join(t.TempDir(), "go")
 	writeModuleFiles(t, moduleDir, map[string]string{
 		"go.mod":   "module example.com/tagfixture\n\ngo 1.23\n",
@@ -91,6 +93,8 @@ func TestBuildTagVisiblePackages_GoListFailureFailsOpenWithAWarning(t *testing.T
 }
 
 func TestScopedCoverFunc_GreenRunWritesTheFuncReport(t *testing.T) {
+	t.Parallel()
+
 	moduleDir := filepath.Join(t.TempDir(), "go")
 	writeCoverFixture(t, moduleDir)
 
@@ -107,6 +111,8 @@ func TestScopedCoverFunc_GreenRunWritesTheFuncReport(t *testing.T) {
 }
 
 func TestScopedCoverFunc_FailingTestsAreTestsFailedWithTheirOutput(t *testing.T) {
+	t.Parallel()
+
 	moduleDir := filepath.Join(t.TempDir(), "go")
 	writeCoverFixture(t, moduleDir)
 	writeModuleFiles(t, moduleDir, map[string]string{

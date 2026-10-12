@@ -55,6 +55,8 @@ func writeMatchingDigest(t *testing.T, dir string) {
 }
 
 func TestDispositionGate_RetroFailsLoudWithoutValidDisposition(t *testing.T) {
+	t.Parallel()
+
 	t.Run("absent", func(t *testing.T) {
 		dir := t.TempDir()
 		writeMatchingDigest(t, dir) // digest present, disposition absent
@@ -83,6 +85,8 @@ func TestDispositionGate_RetroFailsLoudWithoutValidDisposition(t *testing.T) {
 }
 
 func TestDispositionGate_CrossChecksFingerprintAgainstDigest(t *testing.T) {
+	t.Parallel()
+
 	t.Run("mismatch_rejected", func(t *testing.T) {
 		dir := t.TempDir()
 		writeMatchingDigest(t, dir)
@@ -118,6 +122,8 @@ func TestDispositionGate_CrossChecksFingerprintAgainstDigest(t *testing.T) {
 }
 
 func TestDispositionGate_RejectsInvalidEnums(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		field string
 		set   func(d map[string]any)
@@ -146,6 +152,8 @@ func TestDispositionGate_RejectsInvalidEnums(t *testing.T) {
 }
 
 func TestDispositionGate_SalvagePointerRequiredWhenValue(t *testing.T) {
+	t.Parallel()
+
 	t.Run("value_without_pointer_rejected", func(t *testing.T) {
 		dir := t.TempDir()
 		writeMatchingDigest(t, dir)
@@ -173,6 +181,8 @@ func TestDispositionGate_SalvagePointerRequiredWhenValue(t *testing.T) {
 }
 
 func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
+	t.Parallel()
+
 	newFL := func(dir string) failureLearningRequest {
 		return failureLearningRequest{
 			CycleRequest: CycleRequest{ProjectRoot: dir},
@@ -238,6 +248,8 @@ func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
 }
 
 func TestFinalizeRetroCompletion_SeamContract(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 
 	missing := t.TempDir()

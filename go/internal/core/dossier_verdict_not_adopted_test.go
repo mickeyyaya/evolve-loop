@@ -5,6 +5,8 @@ import (
 )
 
 func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	r := &CycleResult{}
 	// audit (floor) records FAIL, then retro RUNS and also reports FAIL.
@@ -48,6 +50,8 @@ func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
 }
 
 func TestDossier_AbnormalExitStillRecordsATrueSkip(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	skipped := []SkippedPhase{{Phase: "closeout", Reason: "abnormal exit in phase build"}}
 

@@ -52,6 +52,8 @@ func dispatchedPhases(runners map[Phase]PhaseRunner) []Phase {
 }
 
 func TestRunCycle_AFleetLaneWithoutAWorktreeDefersBeforeAnyDispatch(t *testing.T) {
+	t.Parallel()
+
 	c, got := recordingCenter()
 	st := &fakeStorage{state: State{LastCycleNumber: 1805}}
 	runners := buildRunners(nil)
@@ -104,6 +106,8 @@ func TestRunCycle_AFleetLaneWithoutAWorktreeDefersBeforeAnyDispatch(t *testing.T
 }
 
 func TestRunCycle_AReprovisionedFleetLaneRunsNormally(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 1805}}
 	runners := buildRunners(nil)
 	wt := &flakyWorktree{fakeWorktree: fakeWorktree{path: t.TempDir()}, failures: 1}
@@ -124,6 +128,8 @@ func TestRunCycle_AReprovisionedFleetLaneRunsNormally(t *testing.T) {
 }
 
 func TestRunCycle_ASequentialCycleWithoutAWorktreeKeepsItsBestEffortRun(t *testing.T) {
+	t.Parallel()
+
 	c, got := recordingCenter()
 	st := &fakeStorage{state: State{LastCycleNumber: 1805}}
 	runners := buildRunners(nil)
@@ -152,6 +158,8 @@ func TestRunCycle_ASequentialCycleWithoutAWorktreeKeepsItsBestEffortRun(t *testi
 }
 
 func TestLaneDeferral_NamesTheCycleAndUnwrapsToItsCause(t *testing.T) {
+	t.Parallel()
+
 	cause := errors.New(provisionCause)
 	d := &LaneDeferral{Cycle: 1806, Cause: cause}
 	if d.Unwrap() != cause || !errors.Is(d, cause) {
@@ -163,6 +171,8 @@ func TestLaneDeferral_NamesTheCycleAndUnwrapsToItsCause(t *testing.T) {
 }
 
 func TestRunCycle_ADeferralThatCannotBeRecordedFailsLoudly(t *testing.T) {
+	t.Parallel()
+
 	c, got := recordingCenter()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {

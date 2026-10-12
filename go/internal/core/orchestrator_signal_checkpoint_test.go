@@ -87,6 +87,8 @@ func TestRunCycle_InterruptCheckpointsActivePhaseWithoutRetrospective(t *testing
 }
 
 func TestRunCycle_InterruptCheckpointSelectsActivePhaseOnResume(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	seedCycleStateFile(t, root)
 

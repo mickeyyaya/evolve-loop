@@ -26,6 +26,8 @@ func jsonKeys(t *testing.T, v any) map[string]struct{} {
 }
 
 func TestFailedRecord_SupersetOfFailurelogRecordedShape(t *testing.T) {
+	t.Parallel()
+
 	now := time.Date(2026, 6, 7, 9, 0, 0, 0, time.UTC)
 	recordedKeys := jsonKeys(t, failurelog.Recorded{
 		Cycle:          1,

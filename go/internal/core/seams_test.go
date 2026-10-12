@@ -22,6 +22,8 @@ var (
 )
 
 func TestArchitectureSeams_FoundationsExist(t *testing.T) {
+	t.Parallel()
+
 	// panetrust.redactSecrets is unexported, so it cannot be referenced across
 	// the package boundary like the seams above; this runtime check guards its
 	// name instead.

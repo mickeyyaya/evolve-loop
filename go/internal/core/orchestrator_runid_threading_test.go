@@ -6,6 +6,8 @@ import (
 )
 
 func TestCB5_EveryDispatchedPhaseCarriesRunID(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, &fakeLedger{}, runners, WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}))

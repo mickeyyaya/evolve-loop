@@ -54,6 +54,8 @@ func runExplanationRepairCycle(t *testing.T, defects func(string) []string) (*ex
 }
 
 func TestRunCycle_AnExplanationOnlyAuditFailReDispatchesOnlyTheBuildReauthor(t *testing.T) {
+	t.Parallel()
+
 	audit, tdd, build := runExplanationRepairCycle(t, func(document string) []string {
 		return []string{document + ":8 states 9 lines; the ratchet scanner measures 8", document + ":35 claims the probe pins the order"}
 	})
@@ -74,6 +76,8 @@ func TestRunCycle_AnExplanationOnlyAuditFailReDispatchesOnlyTheBuildReauthor(t *
 }
 
 func TestRunCycle_AMixedAuditFailStillRestartsAtTDD(t *testing.T) {
+	t.Parallel()
+
 	_, tdd, build := runExplanationRepairCycle(t, func(document string) []string {
 		return []string{document + ":8 states 9 lines", "H1: go/internal/cyclesimulator/characterization_test.go:263 builds a raw git repo"}
 	})
@@ -103,6 +107,8 @@ func (b *reauthorDyingBuilder) Run(_ context.Context, req PhaseRequest) (PhaseRe
 }
 
 func TestRunCycle_AReauthorBuildThatDiesIsDigestedFromItsOwnFailure(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(map[Phase]string{PhaseRetro: VerdictFAIL})
 	runners[PhaseAudit] = &explanationAuditRunner{t: t, defects: func(document string) []string {
 		return []string{document + ":8 states 9 lines; the ratchet scanner measures 8"}

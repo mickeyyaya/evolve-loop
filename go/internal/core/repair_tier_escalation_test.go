@@ -23,6 +23,8 @@ const repairBuilderProfile = `{"name":"builder","role":"builder","model_tier_def
 	`"model_tier_overrides":{"audit_retry_2plus":"deep"}}`
 
 func TestRepairRoundTier_RaisesToDeclaredOverrideForSeededPhases(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeRepairProfile(t, root, "builder", repairBuilderProfile)
 	writeRepairProfile(t, root, "tdd-engineer", `{"name":"tdd-engineer","model_tier_default":"balanced","model_tier_overrides":{"audit_retry_2plus":"deep"}}`)
@@ -47,6 +49,8 @@ func TestRepairRoundTier_RaisesToDeclaredOverrideForSeededPhases(t *testing.T) {
 }
 
 func TestRepairRoundTier_RaiseOnlyAndDeclarationRequired(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeRepairProfile(t, root, "builder", repairBuilderProfile)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
@@ -64,6 +68,8 @@ func TestRepairRoundTier_RaiseOnlyAndDeclarationRequired(t *testing.T) {
 }
 
 func TestRepairRoundTier_EnvelopeMaxClampsThroughRealGuardrail(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeRepairProfile(t, root, "builder", `{"name":"builder","model_tier_default":"fast",`+
 		`"model_tier_envelope":{"min":"fast","default":"fast","max":"balanced"},"model_tier_overrides":{"audit_retry_2plus":"deep"}}`)
@@ -79,6 +85,8 @@ func TestRepairRoundTier_EnvelopeMaxClampsThroughRealGuardrail(t *testing.T) {
 }
 
 func TestRepairRoundDispatch_RaisesBuildTierThroughLiveLoop(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeRepairProfile(t, root, "builder", repairBuilderProfile)
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -106,6 +114,8 @@ func TestRepairRoundDispatch_RaisesBuildTierThroughLiveLoop(t *testing.T) {
 }
 
 func TestRepairRoundResume_RaisesBuildTierAndArchivesPromptThroughResumePath(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeRepairProfile(t, root, "builder", repairBuilderProfile)
 	const cycle = 1605

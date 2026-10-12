@@ -11,6 +11,8 @@ import (
 // other users are all integration-tagged, so the repo-wide apicover gate would
 // otherwise score it false-green (named by a test but never executed).
 func TestWithVerdictCacheLookupHook_AppliesObserver(t *testing.T) {
+	t.Parallel()
+
 	var o Orchestrator
 	if o.verdictCacheLookupHook != nil {
 		t.Fatal("hook must be nil before the option is applied")

@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestLeakRecoverablePhase_CoversAllWorktreePhases(t *testing.T) {
+	t.Parallel()
+
 	recoverable := []Phase{PhaseTriage, PhaseAudit, PhaseScout, Phase("bug-reproduction"), PhaseTDD, PhaseBuild}
 	for _, p := range recoverable {
 		if !LeakRecoverablePhase(p) {
@@ -12,6 +14,8 @@ func TestLeakRecoverablePhase_CoversAllWorktreePhases(t *testing.T) {
 }
 
 func TestLeakRecoverablePhase_ExcludesPhasesWithoutAnActiveWorktree(t *testing.T) {
+	t.Parallel()
+
 	nonRecoverable := []Phase{PhaseStart, PhaseIntent, PhaseShip, PhaseRetro, PhaseEnd}
 	for _, p := range nonRecoverable {
 		if LeakRecoverablePhase(p) {
@@ -21,6 +25,8 @@ func TestLeakRecoverablePhase_ExcludesPhasesWithoutAnActiveWorktree(t *testing.T
 }
 
 func TestWorktreePhase_UnchangedByRecoveryDecoupling(t *testing.T) {
+	t.Parallel()
+
 	mustBeTrue := []Phase{PhaseTDD, PhaseBuild}
 	for _, p := range mustBeTrue {
 		if !WorktreePhase(p) {

@@ -25,6 +25,8 @@ func teardownHarness(t *testing.T) (*fakeStorage, *fakeWorktree, func(preserve, 
 }
 
 func TestCycleRunTeardown_ClearsActiveWorktreeAfterPrune(t *testing.T) {
+	t.Parallel()
+
 	st, wt, cleanup := teardownHarness(t)
 
 	cleanup(false /*preserve*/, true /*completedNormally*/)
@@ -38,6 +40,8 @@ func TestCycleRunTeardown_ClearsActiveWorktreeAfterPrune(t *testing.T) {
 }
 
 func TestCycleRunTeardown_PreservedWorktreeKeepsActiveWorktree(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name                        string
 		preserve, completedNormally bool

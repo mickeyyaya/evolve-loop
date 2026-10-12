@@ -12,6 +12,8 @@ import (
 )
 
 func TestBoundedTail(t *testing.T) {
+	t.Parallel()
+
 	for name, tc := range map[string]struct {
 		tail, want string
 		maxBytes   int
@@ -35,6 +37,8 @@ func TestBoundedTail(t *testing.T) {
 }
 
 func TestCompositionCarryForward_HTMLEscapedTailsOfAllFourGatesFitOneEventLine(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	outcomes := map[string]ciparity.GateOutcome{}
 	for _, gate := range ciparity.RequiredComposedGates {

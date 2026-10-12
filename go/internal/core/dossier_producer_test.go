@@ -20,6 +20,8 @@ func initDossierRepo(t *testing.T) string {
 }
 
 func TestDossierVerdict_MapsCycleOutcomes(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]string{
 		VerdictPASS:                      dossier.VerdictPass,
 		CycleOutcomeShippedViaBuild:      dossier.VerdictPass,
@@ -39,6 +41,8 @@ func TestDossierVerdict_MapsCycleOutcomes(t *testing.T) {
 }
 
 func TestWriteCycleDossier_WritesValidArtifact(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	ws := t.TempDir()
 	if err := writeCycleDossier(nil, cycleDossierParams{ProjectRoot: root, WorkspacePath: ws, Cycle: 7, Goal: "improve X", RunID: "run-ulid", Outcome: CycleOutcomeShippedViaBuild}); err != nil {
@@ -64,6 +68,8 @@ func TestWriteCycleDossier_WritesValidArtifact(t *testing.T) {
 }
 
 func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 8, Goal: "fix Y", RunID: "run2", Outcome: VerdictFAIL}); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
@@ -81,6 +87,8 @@ func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
 // Regression: the tree-diff guard trips on any untracked
 // knowledge-base/cycles/* pair left behind.
 func TestWriteCycleDossier_LeavesCleanTree(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 537, Goal: "closeout", RunID: "run3", Outcome: CycleOutcomeShippedViaBuild}); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)

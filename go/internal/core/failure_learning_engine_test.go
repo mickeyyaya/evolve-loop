@@ -13,6 +13,8 @@ import (
 )
 
 func TestFailureLearningEngine_OneConstructionSite(t *testing.T) {
+	t.Parallel()
+
 	const onlySite = "internal/core/failure_learning_engine.go"
 	if offenders := nonTestSourcesMentioning(t, "failurelearning.New(", onlySite); len(offenders) > 0 {
 		t.Errorf("the failure-learning engine has ONE construction file (%s); these non-test files construct their own: %v", onlySite, offenders)
@@ -20,6 +22,8 @@ func TestFailureLearningEngine_OneConstructionSite(t *testing.T) {
 }
 
 func TestFailureLearning_LiteralOrchestratorGetsTheEngineOnce(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{now: func() time.Time { return time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC) }}
 	first := o.failureLearning()
 	if first == nil || first.SignalsWired() || o.failureLearning() != first {
@@ -36,6 +40,8 @@ func TestFailureLearning_LiteralOrchestratorGetsTheEngineOnce(t *testing.T) {
 }
 
 func TestFailureLearning_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	if o.failureLearning().SignalsWired() {
 		t.Fatal("no Center at construction ⇒ not wired")
@@ -61,6 +67,8 @@ func TestFailureLearning_SeesASignalCenterAppliedAfterConstruction(t *testing.T)
 }
 
 func TestFailureLearning_EagerConstructionSharesTheWiredLifecycle(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithSignalCenter(signalcenter.New()))
 	if o.learn == nil || !o.failureLearning().SignalsWired() {

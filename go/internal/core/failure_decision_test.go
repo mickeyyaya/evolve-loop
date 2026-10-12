@@ -14,6 +14,8 @@ func writeDecision(t *testing.T, dir, body string) {
 }
 
 func TestReadFailureDecision(t *testing.T) {
+	t.Parallel()
+
 	t.Run("valid_parses_into_struct", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDecision(t, dir, `{

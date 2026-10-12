@@ -8,6 +8,8 @@ import (
 )
 
 func TestDefaultBuildFloorChecks_NonRepoWorktreeIsClean(t *testing.T) {
+	t.Parallel()
+
 	// A non-git worktree yields no changed packages — the floor must return
 	// no failures rather than erroring (degraded-provisioning shape).
 	if fails := DefaultBuildFloorChecks(context.Background(), ReviewInput{Worktree: t.TempDir()}); len(fails) != 0 {
@@ -16,6 +18,8 @@ func TestDefaultBuildFloorChecks_NonRepoWorktreeIsClean(t *testing.T) {
 }
 
 func TestWithFailureAdvisorPersona_InjectsAndIgnoresEmpty(t *testing.T) {
+	t.Parallel()
+
 	a := &FailureAdvisor{}
 	WithFailureAdvisorPersona("PERSONA-BODY")(a)
 	if a.identity.Persona != "PERSONA-BODY" {
@@ -32,6 +36,8 @@ type stubKB struct{}
 func (stubKB) Lookup(context.Context, research.Query) ([]research.Lesson, error) { return nil, nil }
 
 func TestWithKB_InjectsAndIgnoresNil(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	WithKB(stubKB{})(o)
 	if o.kb == nil {
@@ -45,6 +51,8 @@ func TestWithKB_InjectsAndIgnoresNil(t *testing.T) {
 }
 
 func TestWithGitDirtyPaths_OverridesSeam(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	WithGitDirtyPaths(func(context.Context, string) ([]string, error) {
 		return []string{"seam.go"}, nil

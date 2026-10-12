@@ -27,6 +27,8 @@ func digestOf(t *testing.T, reason string) FailureDigest {
 }
 
 func TestAssembleFailureDigest_AReasonsDetailNeverChangesItsIdentity(t *testing.T) {
+	t.Parallel()
+
 	refusal := "host predicate execution: predicate execution tree includes undeclared inputs absent from the ship tree; explicitly stage intended Build files or remove the inputs, then re-run Audit"
 	bare := digestOf(t, refusal)
 	for _, detail := range []string{
@@ -41,6 +43,8 @@ func TestAssembleFailureDigest_AReasonsDetailNeverChangesItsIdentity(t *testing.
 }
 
 func TestNormalizeReasonForFingerprint_ContractBlocksShareAnIdentityAcrossTheirDetail(t *testing.T) {
+	t.Parallel()
+
 	reason := "contract gate blocked build"
 	if normalizeReasonForFingerprint(cyclestate.WithDetail(reason, "a.go, b.go")) != normalizeReasonForFingerprint(reason) {
 		t.Fatal("a contract block's identity ignores its detail, so the escalation counts repeats")

@@ -50,6 +50,8 @@ func remediateRigE4(t *testing.T, rounds int, reviewer DeliverableReviewer, gate
 }
 
 func TestMaybeRemediate_ALaneWithoutABuildRunnerLeavesTheGateFailStanding(t *testing.T) {
+	t.Parallel()
+
 	rig := remediateRigE4(t, 1, nil, []string{VerdictPASS})
 	delete(rig.cr.o.runners, PhaseBuild)
 
@@ -64,6 +66,8 @@ func TestMaybeRemediate_ALaneWithoutABuildRunnerLeavesTheGateFailStanding(t *tes
 }
 
 func TestMaybeRemediate_ASpentRoundBudgetNeverDispatchesAgain(t *testing.T) {
+	t.Parallel()
+
 	rig := remediateRigE4(t, 2, nil, []string{VerdictPASS})
 	rig.cr.remediationRounds = map[Phase]int{PhaseTDD: 2}
 
@@ -78,6 +82,8 @@ func TestMaybeRemediate_ASpentRoundBudgetNeverDispatchesAgain(t *testing.T) {
 }
 
 func TestMaybeRemediate_ARoundBelowTheCapStillRunsAndCountsItself(t *testing.T) {
+	t.Parallel()
+
 	rig := remediateRigE4(t, 2, nil, []string{VerdictPASS})
 	rig.cr.remediationRounds = map[Phase]int{PhaseTDD: 1}
 

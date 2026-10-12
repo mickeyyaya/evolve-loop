@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestApplyDefectsAsCarryoverTodos_StampsExpiryFromRecord(t *testing.T) {
+	t.Parallel()
+
 	st := &State{}
 	const exp = "2026-07-12T00:00:00Z" // the 7-day stamp the failedApproaches path already computes
 	ApplyDefectsAsCarryoverTodos(st, FailedRecord{
@@ -19,6 +21,8 @@ func TestApplyDefectsAsCarryoverTodos_StampsExpiryFromRecord(t *testing.T) {
 }
 
 func TestApplyDefectsAsCarryoverTodos_NoRecordExpiryLeavesTodoUnstamped(t *testing.T) {
+	t.Parallel()
+
 	st := &State{}
 	ApplyDefectsAsCarryoverTodos(st, FailedRecord{
 		Cycle:   366,

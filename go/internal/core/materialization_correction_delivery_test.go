@@ -98,6 +98,8 @@ func runMaterializationCycle(t *testing.T, scout *materializationScoutRunner) er
 }
 
 func TestMaterializationCorrectionDelivery_RemediationReachesReDispatchAndClearsTheRealGate(t *testing.T) {
+	t.Parallel()
+
 	scout := &materializationScoutRunner{slug: "widget-thing", createEval: true}
 	if err := runMaterializationCycle(t, scout); err != nil {
 		t.Fatalf("complying correction must clear the real materialization gate: %v", err)
@@ -129,6 +131,8 @@ func TestMaterializationCorrectionDelivery_RemediationReachesReDispatchAndClears
 }
 
 func TestMaterializationCorrectionDelivery_NonComplyingReDispatchStaysRejected(t *testing.T) {
+	t.Parallel()
+
 	scout := &materializationScoutRunner{slug: "widget-thing", createEval: false}
 	if err := runMaterializationCycle(t, scout); err == nil {
 		t.Fatal("non-complying correction must remain rejected by the real materialization gate")

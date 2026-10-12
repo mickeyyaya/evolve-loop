@@ -13,6 +13,8 @@ import (
 )
 
 func TestComparePhaseIOShadow_EquivalentNoMismatch(t *testing.T) {
+	t.Parallel()
+
 	sig := router.RoutingSignals{
 		Scout: router.ScoutSignals{CycleSizeEstimate: "medium", ItemCount: 3, BacklogSize: 7, Present: true},
 		Build: router.BuildSignals{Verdict: "PASS", SeverityMax: router.SevHigh, FilesTouched: 3, ACSRed: 1, DiffLOC: 42, Present: true},
@@ -25,6 +27,8 @@ func TestComparePhaseIOShadow_EquivalentNoMismatch(t *testing.T) {
 }
 
 func TestComparePhaseIOShadow_DivergenceDetected(t *testing.T) {
+	t.Parallel()
+
 	sig := router.RoutingSignals{Build: router.BuildSignals{Verdict: "PASS", SeverityMax: router.SevHigh, Present: true}}
 	h := phaseio.NewHandoffs(phaseio.HandoffsInit{}) // build absent → diverges from sig
 	ms := comparePhaseIOShadow(h, sig)
@@ -43,6 +47,8 @@ func TestComparePhaseIOShadow_DivergenceDetected(t *testing.T) {
 }
 
 func TestComparePhaseIOShadow_CoversAllProjectedFields(t *testing.T) {
+	t.Parallel()
+
 	sig := router.RoutingSignals{
 		Triage: router.TriageSignals{CycleSize: "medium", PhaseSkip: []string{"tdd"}, Present: true},
 		Build:  router.BuildSignals{Verdict: "PASS", ACSGreen: 10, ACSTotal: 12, ACSThisCycle: 4, ACSRegression: 8, Present: true},
@@ -66,6 +72,8 @@ func TestComparePhaseIOShadow_CoversAllProjectedFields(t *testing.T) {
 }
 
 func TestPhaseIOShadow_MismatchEmitsLedgerEntry(t *testing.T) {
+	t.Parallel()
+
 	fl := &fakeLedger{}
 
 	appendPhaseIOShadowMismatch(context.Background(), fl, "2026-06-15T00:00:00Z", 7, "run1", PhaseBuild, nil)
@@ -91,6 +99,8 @@ func TestPhaseIOShadow_MismatchEmitsLedgerEntry(t *testing.T) {
 }
 
 func TestAssembleCycleInputs_FromContext(t *testing.T) {
+	t.Parallel()
+
 	ctx := map[string]string{
 		"goal":              "cut latency",
 		"strategy":          "profile-first",
@@ -109,6 +119,8 @@ func TestAssembleCycleInputs_FromContext(t *testing.T) {
 }
 
 func TestAssembleErrorContext_PresentAndAbsent(t *testing.T) {
+	t.Parallel()
+
 	if ec := assembleErrorContext(map[string]string{}); ec != nil {
 		t.Fatalf("no ship_error_* keys → want nil, got %+v", ec)
 	}
@@ -122,6 +134,8 @@ func TestAssembleErrorContext_PresentAndAbsent(t *testing.T) {
 }
 
 func TestRetro_PreviousVerdict_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{"goal": "g", "previous_verdict": VerdictFAIL}
 	ci := assembleCycleInputs(phaseCtx)
 	if ci.PreviousVerdict() != phaseCtx["previous_verdict"] {
@@ -133,6 +147,8 @@ func TestRetro_PreviousVerdict_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestScout_Strategy_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
 	if got := assembleCycleInputs(phaseCtx).Strategy(); got != phaseCtx["strategy"] {
 		t.Fatalf("typed Strategy()=%q != Context[strategy]=%q", got, phaseCtx["strategy"])
@@ -140,6 +156,8 @@ func TestScout_Strategy_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestScout_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
 	if got := assembleCycleInputs(phaseCtx).Goal(); got != phaseCtx["goal"] {
 		t.Fatalf("typed Goal()=%q != Context[goal]=%q", got, phaseCtx["goal"])
@@ -147,6 +165,8 @@ func TestScout_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestScout_ChallengeToken_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
 	if got := assembleCycleInputs(phaseCtx).ChallengeToken(); got != phaseCtx["challengeToken"] {
 		t.Fatalf("typed ChallengeToken()=%q != Context[challengeToken]=%q", got, phaseCtx["challengeToken"])
@@ -154,6 +174,8 @@ func TestScout_ChallengeToken_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestTriage_FleetScope_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{"fleet_scope": "core,bridge", "carryover_summary": "carried: x"}
 	if got := assembleCycleInputs(phaseCtx).FleetScope(); got != phaseCtx["fleet_scope"] {
 		t.Fatalf("typed FleetScope()=%q != Context[fleet_scope]=%q", got, phaseCtx["fleet_scope"])
@@ -161,6 +183,8 @@ func TestTriage_FleetScope_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestTriage_Carryover_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{"fleet_scope": "core", "carryover_summary": "carried: finish the digest fallback"}
 	if got := assembleCycleInputs(phaseCtx).Carryover(); got != phaseCtx["carryover_summary"] {
 		t.Fatalf("typed Carryover()=%q != Context[carryover_summary]=%q", got, phaseCtx["carryover_summary"])
@@ -168,6 +192,8 @@ func TestTriage_Carryover_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestIntent_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{"goal": "add a typed envelope"}
 	if got := assembleCycleInputs(phaseCtx).Goal(); got != phaseCtx["goal"] {
 		t.Fatalf("typed Goal()=%q != Context[goal]=%q", got, phaseCtx["goal"])
@@ -175,6 +201,8 @@ func TestIntent_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestShip_CommitMessage_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{"commit_message": "feat(core): unified phase I/O"}
 	if got := assembleCycleInputs(phaseCtx).CommitMessage(); got != phaseCtx["commit_message"] {
 		t.Fatalf("typed CommitMessage()=%q != Context[commit_message]=%q", got, phaseCtx["commit_message"])
@@ -182,6 +210,8 @@ func TestShip_CommitMessage_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestDebugger_ErrorContext_FromCycleInputs_MatchesContext(t *testing.T) {
+	t.Parallel()
+
 	phaseCtx := map[string]string{
 		"ship_error_code": "E_PUSH", "ship_error_class": "transient",
 		"ship_error_stage": "ship", "ship_error_debug": "non-ff",
@@ -194,6 +224,8 @@ func TestDebugger_ErrorContext_FromCycleInputs_MatchesContext(t *testing.T) {
 }
 
 func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
+	t.Parallel()
+
 	const real, wrong = "real-value", "wrong-value"
 	cases := []struct {
 		name      string
@@ -234,6 +266,8 @@ func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
 }
 
 func TestCompareCycleInputsShadow_ErrorContext(t *testing.T) {
+	t.Parallel()
+
 	ctx := map[string]string{
 		"ship_error_code": "E_PUSH", "ship_error_class": "transient",
 		"ship_error_stage": "ship", "ship_error_debug": "non-ff",
@@ -255,6 +289,8 @@ func TestCompareCycleInputsShadow_ErrorContext(t *testing.T) {
 }
 
 func TestWritePhaseIOShadowFile_Parseable(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	h := router.HandoffsFromSignals(router.RoutingSignals{Build: router.BuildSignals{Verdict: "PASS", Present: true}})
 	if err := writePhaseIOShadowFile(ws, "build", h, 5, nil); err != nil {
@@ -289,6 +325,8 @@ func mismatchFor(ms []phaseIOMismatch, field string) *phaseIOMismatch {
 }
 
 func TestCompareCycleInputsShadow_CapAware_NoFalseMismatch(t *testing.T) {
+	t.Parallel()
+
 	ctx := map[string]string{
 		"carryover_summary": overCapCtxValue('a'),
 		"previous_verdict":  overCapCtxValue('b'),
@@ -310,6 +348,8 @@ func TestCompareCycleInputsShadow_CapAware_NoFalseMismatch(t *testing.T) {
 }
 
 func TestCompareCycleInputsShadow_DetectsRealDrift(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, ctxKey, field string
 		typed               phaseio.CycleInputsInit

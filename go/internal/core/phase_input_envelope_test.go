@@ -13,6 +13,8 @@ import (
 // envelope ONLY at advisory+ with the planner enabled (via WorkflowPolicy.PhaseEnables)
 // and a readable file; every other case returns "".
 func TestReadUpstreamBuildPlan(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "build-plan.md"), []byte("PLAN"), 0o644); err != nil {
 		t.Fatal(err)

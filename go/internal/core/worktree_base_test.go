@@ -56,6 +56,8 @@ func gitRepoWithCommits(t *testing.T) (dir string, commit func(subject string, b
 }
 
 func TestWorktreeReuseBase_SalvageSnapshotHEADResolvesToFirstNonSalvageAncestor(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	commit("initial")
 	wantBase := commit("real work from the prior attempt")
@@ -75,6 +77,8 @@ func TestWorktreeReuseBase_SalvageSnapshotHEADResolvesToFirstNonSalvageAncestor(
 }
 
 func TestWorktreeReuseBase_SalvagedWorkIsPendingInTheReviewDiffAfterNormalize(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	wantBase := commit("initial")
 	if err := os.WriteFile(filepath.Join(wt, "salvaged.txt"), []byte("preserved work\n"), 0o644); err != nil {
@@ -107,6 +111,8 @@ func TestWorktreeReuseBase_SalvagedWorkIsPendingInTheReviewDiffAfterNormalize(t 
 }
 
 func TestWorktreeReuseBase_StackedSalvageSnapshotsResolveToTheCommitBeneathAll(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	wantBase := commit("initial")
 	for range 3 {
@@ -123,6 +129,8 @@ func TestWorktreeReuseBase_StackedSalvageSnapshotsResolveToTheCommitBeneathAll(t
 }
 
 func TestWorktreeReuseBase_OrdinaryHEADIsRecordedVerbatim(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	commit("initial")
 	head := commit("ordinary cycle work")
@@ -137,6 +145,8 @@ func TestWorktreeReuseBase_OrdinaryHEADIsRecordedVerbatim(t *testing.T) {
 }
 
 func TestWorktreeReuseBase_CommitMentioningSalvageInBodyIsNotTreatedAsASnapshot(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	commit("initial")
 	head := commit("ordinary subject", "mentions "+salvageSnapshotSubject)
@@ -151,6 +161,8 @@ func TestWorktreeReuseBase_CommitMentioningSalvageInBodyIsNotTreatedAsASnapshot(
 }
 
 func TestWorktreeReuseBase_UnresolvableSnapshotAncestorFailsLoudly(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	commit(salvageSnapshotSubject)
 	commit(salvageSnapshotSubject)
@@ -168,6 +180,8 @@ func TestWorktreeReuseBase_UnresolvableSnapshotAncestorFailsLoudly(t *testing.T)
 }
 
 func TestNewCycleRun_UnresolvableSnapshotBaseFailsProvisioning(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	commit(salvageSnapshotSubject)
 
@@ -212,6 +226,8 @@ func TestWorktreeReuseBase_UnresolvableAncestorWarnsLoudlyAndDoesNotDegradeSilen
 }
 
 func TestWorktreeReuseBase_ProvisioningPathRecordsGuardedBaseInCycleState(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	wantBase := commit("ordinary base")
 	commit(salvageSnapshotSubject)

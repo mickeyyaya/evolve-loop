@@ -31,6 +31,8 @@ func triageFailOutcomeEvent(t *testing.T, diags []Diagnostic) *signalcenter.Even
 }
 
 func TestEmitPhaseOutcome_FailCarriesTheDiagnosticCodes(t *testing.T) {
+	t.Parallel()
+
 	warn := triageFailOutcomeEvent(t, []Diagnostic{
 		{Severity: cyclestate.SeverityError, Message: protectedSurfaceRejection, Code: cyclestate.DiagCodeTriageProtectedSurface},
 		{Severity: cyclestate.SeverityWarning, Message: "a trail", Code: "NOT_A_REASON"},
@@ -41,6 +43,8 @@ func TestEmitPhaseOutcome_FailCarriesTheDiagnosticCodes(t *testing.T) {
 }
 
 func TestEmitPhaseOutcome_UncodedFailCarriesNoCodesField(t *testing.T) {
+	t.Parallel()
+
 	warn := triageFailOutcomeEvent(t, []Diagnostic{{Severity: cyclestate.SeverityError, Message: protectedSurfaceRejection}})
 	if _, present := warn.Fields["diagnostic_codes"]; present {
 		t.Errorf("an uncoded FAIL must not carry an empty diagnostic_codes field: %v", warn.Fields)

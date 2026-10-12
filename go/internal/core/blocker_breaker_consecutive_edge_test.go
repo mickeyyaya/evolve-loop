@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestConsecutiveFailures_GuardClassRuleWinsOnOverlap(t *testing.T) {
+	t.Parallel()
+
 	cfg := consecCfg(3)
 	cfg.GuardClassCeiling = 2
 	digests := []FailureDigest{
@@ -17,6 +19,8 @@ func TestConsecutiveFailures_GuardClassRuleWinsOnOverlap(t *testing.T) {
 }
 
 func TestConsecutiveFailures_CeilingOneHaltsOnSingleFailure(t *testing.T) {
+	t.Parallel()
+
 	digests := []FailureDigest{{Cycle: 9, Fingerprint: "a|x|1", PreClass: "x"}}
 	v := EvaluateBlockerBreaker(digests, consecCfg(1))
 	if !v.Halt || v.Count != 1 {
@@ -25,6 +29,8 @@ func TestConsecutiveFailures_CeilingOneHaltsOnSingleFailure(t *testing.T) {
 }
 
 func TestConsecutiveFailures_DuplicateDigestsForOneCycleCountOnce(t *testing.T) {
+	t.Parallel()
+
 	digests := []FailureDigest{
 		{Cycle: 5, Fingerprint: "a|x|1", PreClass: "x"},
 		{Cycle: 5, Fingerprint: "a|x|1-dup", PreClass: "x"},
@@ -36,6 +42,8 @@ func TestConsecutiveFailures_DuplicateDigestsForOneCycleCountOnce(t *testing.T) 
 }
 
 func TestConsecutiveFailures_AckSplittingLongRunBelowCeilingNoHalt(t *testing.T) {
+	t.Parallel()
+
 	// A 5-run with the middle acked leaves two 2-runs below the ceiling of 3.
 	cfg := consecCfg(3)
 	cfg.AckedFingerprints = map[string]bool{"mid|fixed|x": true}
@@ -52,6 +60,8 @@ func TestConsecutiveFailures_AckSplittingLongRunBelowCeilingNoHalt(t *testing.T)
 }
 
 func TestConsecutiveFailures_AckCannotMaskAnIndependentlyTrippingHalf(t *testing.T) {
+	t.Parallel()
+
 	// A 7-run with one ack still leaves a 3-run on one side.
 	cfg := consecCfg(3)
 	cfg.AckedFingerprints = map[string]bool{"mid|fixed|x": true}

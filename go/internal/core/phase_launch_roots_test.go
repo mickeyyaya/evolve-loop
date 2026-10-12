@@ -6,6 +6,8 @@ import (
 )
 
 func TestDecisionLaunchPreservesTrustedRoots(t *testing.T) {
+	t.Parallel()
+
 	for _, active := range []bool{false, true} {
 		for _, role := range []string{"advisor", "judge"} {
 			t.Run(role+map[bool]string{false: "/before-worktree", true: "/active-worktree"}[active], func(t *testing.T) {

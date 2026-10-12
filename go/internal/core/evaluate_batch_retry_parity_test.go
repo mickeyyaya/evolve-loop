@@ -49,6 +49,8 @@ func retryParityCycleRun(o *Orchestrator, t *testing.T) *cycleRun {
 }
 
 func TestDispatchRunnerWithRetry_OptionalInfraSkipParity(t *testing.T) {
+	t.Parallel()
+
 	runner := &alwaysFailRunner{name: "evaluator", err: ErrArtifactTimeout}
 	o := retryParityOrchestrator(t, runner, "evaluator", phasespec.PhaseSpec{Optional: true})
 	cr := retryParityCycleRun(o, t)
@@ -70,6 +72,8 @@ func TestDispatchRunnerWithRetry_OptionalInfraSkipParity(t *testing.T) {
 }
 
 func TestDispatchRunnerWithRetry_PostShipObserverSkipParity(t *testing.T) {
+	t.Parallel()
+
 	runner := &alwaysFailRunner{name: "memo", err: errors.New("memo tier/envelope policy error")}
 	o := retryParityOrchestrator(t, runner, "memo", phasespec.PhaseSpec{Optional: true, After: "ship"})
 	cr := retryParityCycleRun(o, t)
@@ -86,6 +90,8 @@ func TestDispatchRunnerWithRetry_PostShipObserverSkipParity(t *testing.T) {
 }
 
 func TestDispatchRunnerWithRetry_NonSkippableErrorStillFatal(t *testing.T) {
+	t.Parallel()
+
 	wantErr := errors.New("boom")
 	runner := &alwaysFailRunner{name: "build", err: wantErr}
 	o := retryParityOrchestrator(t, runner, "build", phasespec.PhaseSpec{Optional: false})

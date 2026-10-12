@@ -47,6 +47,8 @@ func runScoutLeakCycle(t *testing.T, root, leakPath string) error {
 }
 
 func TestGuardExemptsConcurrentLaneMintedPhaseConfig(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	const mintLeak = ".evolve/phases/xlane-mint/phase.json"
 	// The concurrent lane's registrar registered the mint before its files
@@ -67,6 +69,8 @@ func TestGuardExemptsConcurrentLaneMintedPhaseConfig(t *testing.T) {
 }
 
 func TestGuardStillAbortsUnregisteredPhaseConfigLeak(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	const leak = ".evolve/phases/evil/phase.json"
 	// Deliberately NO registry entry for "evil".
@@ -83,6 +87,8 @@ func TestGuardStillAbortsUnregisteredPhaseConfigLeak(t *testing.T) {
 }
 
 func TestGuardAbortsForgedRegistryEntryWithUnclampedSpec(t *testing.T) {
+	t.Parallel()
+
 	const leak = ".evolve/phases/xlane-mint/phase.json"
 	cases := []struct {
 		label string
@@ -112,6 +118,8 @@ func TestGuardAbortsForgedRegistryEntryWithUnclampedSpec(t *testing.T) {
 }
 
 func TestGuardAbortsCompanionPayloadUnderRegisteredMint(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	const payload = ".evolve/phases/xlane-mint/payload.sh"
 	if err := mintregistry.Append(mintregistry.Path(root), "xlane-mint", time.Now()); err != nil {
@@ -125,6 +133,8 @@ func TestGuardAbortsCompanionPayloadUnderRegisteredMint(t *testing.T) {
 }
 
 func TestGuardQuarantinesCorruptRegistryAndStaysArmed(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	const leak = ".evolve/phases/xlane-mint/phase.json"
 	regPath := mintregistry.Path(root)
@@ -153,6 +163,8 @@ func TestGuardQuarantinesCorruptRegistryAndStaysArmed(t *testing.T) {
 }
 
 func TestGuardStillAbortsExpiredMintPhaseConfigLeak(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	const leak = ".evolve/phases/stale-mint/phase.json"
 	if err := mintregistry.Append(mintregistry.Path(root), "stale-mint", time.Now().Add(-mintregistry.TTL-time.Minute)); err != nil {

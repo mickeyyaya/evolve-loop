@@ -11,6 +11,8 @@ import (
 )
 
 func TestWorktreeEvolveInvocation_RunsTheWorktreesOwnEvolveFromItsSource(t *testing.T) {
+	t.Parallel()
+
 	worktree := filepath.Join(t.TempDir(), "lane-7")
 
 	got := WorktreeEvolveInvocation(worktree, "skills", "check")
@@ -26,6 +28,8 @@ func TestWorktreeEvolveInvocation_RunsTheWorktreesOwnEvolveFromItsSource(t *test
 }
 
 func TestChangedWorktreePathsSinceBase_SeesCommittedWorkFromTheBase(t *testing.T) {
+	t.Parallel()
+
 	repo := gittest.Fixture(t)
 	writeFile(t, filepath.Join(repo.Dir, "base.txt"), "base\n")
 	repo.Git("add", "-A")
@@ -55,6 +59,8 @@ func TestChangedWorktreePathsSinceBase_SeesCommittedWorkFromTheBase(t *testing.T
 }
 
 func TestChangedFloorPaths_NoWorktreeListsNothing(t *testing.T) {
+	t.Parallel()
+
 	if got := changedFloorPaths(context.Background(), ReviewInput{WorktreeBaseSHA: "abc123"}); got != nil {
 		t.Errorf("changedFloorPaths without a worktree = %q, want nil (never diff the caller's directory)", got)
 	}

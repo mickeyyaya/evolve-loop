@@ -32,6 +32,8 @@ func writeCommit(t *testing.T, r *gittest.Repo, name, body string) {
 }
 
 func TestLaneStartRef_IntegrationHeadAuthority(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	t.Run("current ⇒ origin/main", func(t *testing.T) {
 		_, runtime := startRefFixture(t)

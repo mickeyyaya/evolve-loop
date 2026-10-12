@@ -87,6 +87,8 @@ func TestComposeRepairBrief_ADefectTheBriefedFindingsCarryIsNotRepeated(t *testi
 }
 
 func TestComposeRepairBrief_AGateRecordKeepsTodaysBriefOverTheFailureBlock(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeAuditReportWithDefects(t, ws, briefRound1, "go/internal/decisionsample/sample.go:14 exports Pick with no production caller")
 	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
@@ -197,6 +199,8 @@ func TestComposeRepairBrief_TheRunnersReasonsNotTheWorkspaceFileDecideTheGateSlo
 }
 
 func TestComposeRepairBrief_TheFindingsHeaderNamesGateReasonsOnlyWhenTheyLead(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeAuditReportWithDefects(t, ws, briefRound1, "go/internal/decisionsample/sample.go:14 exports Pick with no production caller")
 	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}

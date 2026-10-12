@@ -6,6 +6,8 @@ import (
 )
 
 func TestRunCycle_FleetMode_SkipsGlobalLock(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}))
 	if _, err := o.RunCycle(context.Background(), CycleRequest{
@@ -20,6 +22,8 @@ func TestRunCycle_FleetMode_SkipsGlobalLock(t *testing.T) {
 }
 
 func TestRunCycle_Default_AcquiresGlobalLock(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
 	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}); err != nil {

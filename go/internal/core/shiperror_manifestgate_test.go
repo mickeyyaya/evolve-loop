@@ -7,6 +7,8 @@ import (
 )
 
 func TestCodeManifestGate_DualRegistered(t *testing.T) {
+	t.Parallel()
+
 	if CodeManifestGate != shiperr.CodeManifestGate {
 		t.Errorf("core.CodeManifestGate = %q, want the shiperr re-export %q", CodeManifestGate, shiperr.CodeManifestGate)
 	}

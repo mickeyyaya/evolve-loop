@@ -7,6 +7,8 @@ import (
 )
 
 func TestPhaseAgentName_ValuesResolveToCheckedInProfiles(t *testing.T) {
+	t.Parallel()
+
 	profilesDir := findProfilesDir(t)
 	for phase, agent := range phaseAgentName {
 		path := filepath.Join(profilesDir, agent+".json")

@@ -8,6 +8,8 @@ import (
 )
 
 func TestDecideAfterRetro_NthOccurrenceForcesAdapt(t *testing.T) {
+	t.Parallel()
+
 	led := recurrence.NewLedger()
 	pol := recurrence.DefaultEscalationPolicy()
 	// Same pattern closed out in two cycles => count=2 (Nth-occurrence).

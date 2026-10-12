@@ -48,6 +48,8 @@ func exists(path string) bool {
 }
 
 func TestCompleteCycle_APassSealDeletesTheRawToolOutputAndKeepsTheRest(t *testing.T) {
+	t.Parallel()
+
 	res, ws := sealCycle(t, VerdictPASS, true)
 	if res.FinalVerdict != VerdictPASS {
 		t.Fatalf("precondition: the cycle must seal PASS, got %q", res.FinalVerdict)
@@ -66,6 +68,8 @@ func TestCompleteCycle_APassSealDeletesTheRawToolOutputAndKeepsTheRest(t *testin
 }
 
 func TestCompleteCycle_ASealThatIsNotPassKeepsTheRawToolOutput(t *testing.T) {
+	t.Parallel()
+
 	for _, verdict := range []string{VerdictFAIL, VerdictWARN} {
 		res, ws := sealCycle(t, verdict, false)
 		if res.FinalVerdict == VerdictPASS {
@@ -81,12 +85,16 @@ func TestCompleteCycle_ASealThatIsNotPassKeepsTheRawToolOutput(t *testing.T) {
 }
 
 func TestPruneToolOutputOnPass_AMissingFileIsNotAnError(t *testing.T) {
+	t.Parallel()
+
 	if err := pruneToolOutputOnPass(t.TempDir(), VerdictPASS); err != nil {
 		t.Errorf("a PASS run dir with no raw tool output: err = %v, want nil", err)
 	}
 }
 
 func TestPruneToolOutputOnPass_ARemoveFailureIsReturnedWithThePath(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	busy := filepath.Join(ws, gcpolicy.ToolOutputFiles()[0])
 	if err := os.MkdirAll(filepath.Join(busy, "child"), 0o755); err != nil {

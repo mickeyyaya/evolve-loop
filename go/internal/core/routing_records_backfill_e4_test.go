@@ -364,6 +364,8 @@ func TestActiveVerifiedMints_ACorruptRegistryThatCannotBeQuarantinedWarnsTwice(t
 }
 
 func TestGatesOnIntactTree_AFenceThatCannotSnapshotAnUnreadableFileReportsNoGates(t *testing.T) {
+	t.Parallel()
+
 	if os.Geteuid() == 0 {
 		t.Skip("root reads a mode-000 file")
 	}

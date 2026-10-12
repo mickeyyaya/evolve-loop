@@ -8,6 +8,8 @@ import (
 )
 
 func TestSeedAuditRepairContext(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		next     Phase
@@ -44,6 +46,8 @@ func TestSeedAuditRepairContext(t *testing.T) {
 }
 
 func TestSeedAuditRepairContext_MissingArtifactDegradesQuietly(t *testing.T) {
+	t.Parallel()
+
 	cs := CycleState{WorkspacePath: t.TempDir(), AuditRepairAttempts: 1, AuditRepairActive: true}
 
 	got := seedAuditRepairContext(map[string]string{}, PhaseBuild, cs)
@@ -54,6 +58,8 @@ func TestSeedAuditRepairContext_MissingArtifactDegradesQuietly(t *testing.T) {
 }
 
 func TestSeedAuditRepairContext_DoesNotMutateCallerMap(t *testing.T) {
+	t.Parallel()
+
 	cs := CycleState{WorkspacePath: t.TempDir(), AuditRepairAttempts: 1, AuditRepairActive: true}
 	downgradeAudit(t, &cs, "x")
 	original := map[string]string{"a": "b"}
@@ -68,6 +74,8 @@ func TestSeedAuditRepairContext_DoesNotMutateCallerMap(t *testing.T) {
 }
 
 func TestAuditRepairBrief_SeededOnBothDispatchSurfaces(t *testing.T) {
+	t.Parallel()
+
 	for _, f := range []string{"cyclerun_dispatch.go", "resume_execution.go"} {
 		body, err := os.ReadFile(f)
 		if err != nil {
@@ -85,6 +93,8 @@ func TestAuditRepairBrief_SeededOnBothDispatchSurfaces(t *testing.T) {
 }
 
 func TestSeedAuditRepairContext_ShipRecoveryRebuildCarriesStandingFindings(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	report := "# Audit Report\n\n## Verdict\nWARN\n\n## Issues\n\n### M1 (MEDIUM) — claim-discrepancy: the record says five cycle predicates while the tree carries eight\nb\n\n### L1 (LOW) — a nit the builder may ignore\nb\n"
 	if err := os.WriteFile(filepath.Join(dir, "audit-report.md"), []byte(report), 0o644); err != nil {
@@ -127,6 +137,8 @@ func TestSeedAuditRepairContext_ShipRecoveryRebuildCarriesStandingFindings(t *te
 }
 
 func TestSeedAuditRepairContext_RetroRoutedReentryCarriesStandingFindings(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	report := "# Audit Report\n\n## Verdict\nFAIL\n\n## Issues\n\n### M1 (MEDIUM) — superseded predicate: TestC1515_006 contradicts the commissioned change; retire it in-phase\nb\n"
 	if err := os.WriteFile(filepath.Join(dir, "audit-report.md"), []byte(report), 0o644); err != nil {

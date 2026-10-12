@@ -43,6 +43,8 @@ func gradCommitAll(t *testing.T, wt string) {
 // NEW ungraduated go/internal/<pkg> and stays silent on enrolled, out-of-scope,
 // deleted, and renamed-but-reenrolled changes.
 func TestBuildGraduationCheck(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	if got := buildGraduationCheck(ctx, ""); got != "" {

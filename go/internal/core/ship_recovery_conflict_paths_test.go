@@ -8,6 +8,8 @@ import (
 )
 
 func TestRebaseWithDerivedRegen_NamesEveryNonDerivedConflictAndNoDerivedOne(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
 		j := joined(args)
@@ -33,6 +35,8 @@ func TestRebaseWithDerivedRegen_NamesEveryNonDerivedConflictAndNoDerivedOne(t *t
 }
 
 func TestLatchShippedState_ForgetsTheConflictsOfTheRecoveryThatLanded(t *testing.T) {
+	t.Parallel()
+
 	cs := CycleState{ShipRecoveryCode: string(CodeGitFleetRebaseNeeded), ShipRecoveryConflicts: []string{"go/.apicover-enforce"}}
 
 	if !latchShippedState(&cs, PhaseShip, VerdictPASS) || cs.ShipRecoveryConflicts != nil {

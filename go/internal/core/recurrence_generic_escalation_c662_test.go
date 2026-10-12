@@ -8,6 +8,8 @@ import (
 )
 
 func TestC662_EscalateRetroReasonIgnoresGenericPatterns(t *testing.T) {
+	t.Parallel()
+
 	const reason = "proceed: no failures requiring adaptation"
 
 	genericLed := recurrence.NewLedger()

@@ -28,6 +28,8 @@ func (s *scriptedLaunches) launch(_ context.Context, req BridgeRequest) (BridgeR
 var deadShell = BridgeResponse{ExitCode: 81, CauseCode: "dead_shell", SessionRecoverable: true}
 
 func TestLaunchRecoverable_ANonRecoverableEndIsNotRetried(t *testing.T) {
+	t.Parallel()
+
 	s := &scriptedLaunches{responses: []BridgeResponse{{ExitCode: 81, CauseCode: "review_pause"}}}
 	var launch LaunchFunc = s.launch
 
@@ -39,6 +41,8 @@ func TestLaunchRecoverable_ANonRecoverableEndIsNotRetried(t *testing.T) {
 }
 
 func TestLaunchRecoverable_ARecoverableEndGetsOneFreshSessionWithTheHookRequest(t *testing.T) {
+	t.Parallel()
+
 	s := &scriptedLaunches{responses: []BridgeResponse{deadShell, {Stdout: "ok"}}}
 	var seen BridgeResponse
 
@@ -56,6 +60,8 @@ func TestLaunchRecoverable_ARecoverableEndGetsOneFreshSessionWithTheHookRequest(
 }
 
 func TestLaunchRecoverable_ACancelledContextIsNotRetried(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &scriptedLaunches{responses: []BridgeResponse{deadShell, {}}, onLaunch: func(int) { cancel() }}
 
@@ -67,6 +73,8 @@ func TestLaunchRecoverable_ACancelledContextIsNotRetried(t *testing.T) {
 }
 
 func TestLaunchRecoverable_TheSecondRecoverableEndIsIgnoredAndCleared(t *testing.T) {
+	t.Parallel()
+
 	s := &scriptedLaunches{responses: []BridgeResponse{deadShell, deadShell, {}}}
 
 	resp, err := LaunchRecoverable(context.Background(), s.launch, BridgeRequest{Agent: "judge"}, SameRequest(BridgeRequest{Agent: "judge"}))
@@ -77,6 +85,8 @@ func TestLaunchRecoverable_TheSecondRecoverableEndIsIgnoredAndCleared(t *testing
 }
 
 func TestSameRequest_RetriesWithTheRequestUnchanged(t *testing.T) {
+	t.Parallel()
+
 	req := BridgeRequest{Agent: "judge", Prompt: "same"}
 	if got := SameRequest(req)(deadShell); got.Prompt != "same" || got.Agent != "judge" {
 		t.Fatalf("SameRequest = %+v, want %+v", got, req)
@@ -92,6 +102,8 @@ func (b *scriptedBridge) Launch(ctx context.Context, req BridgeRequest) (BridgeR
 func (b *scriptedBridge) Probe(context.Context) (BridgeProbe, error) { return BridgeProbe{}, nil }
 
 func TestLaunchWithFreshSession_RetriesTheSameRequestOnceOnABridge(t *testing.T) {
+	t.Parallel()
+
 	b := &scriptedBridge{scriptedLaunches{responses: []BridgeResponse{deadShell, {Stdout: "ok"}}}}
 	req := BridgeRequest{Agent: "judge", Prompt: "same"}
 

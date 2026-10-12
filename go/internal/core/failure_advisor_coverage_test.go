@@ -30,6 +30,8 @@ func (errVerifier) VerifyDeliverable(context.Context, ReviewInput) (ContractVeri
 }
 
 func TestFailureAdvisorOptionsPromptAndParseCoverage(t *testing.T) {
+	t.Parallel()
+
 	a := NewFailureAdvisor(nil,
 		WithFailureAdvisorCLI("codex-tmux"),
 		WithFailureAdvisorModel("sonnet"),
@@ -69,6 +71,8 @@ func TestFailureAdvisorOptionsPromptAndParseCoverage(t *testing.T) {
 }
 
 func TestCorrectionLadderEvidenceCoverage(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	if out, err := exec.Command("git", "-C", root, "init").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
@@ -108,6 +112,8 @@ func TestCorrectionLadderEvidenceCoverage(t *testing.T) {
 }
 
 func TestCorrectionLadderSafetyHelpersCoverage(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	child := filepath.Join(root, "child")
 	if !withinRoot(child, root) || !withinRoot(root, root) || withinRoot(filepath.Dir(root), root) || withinRoot(child, "") {
@@ -149,6 +155,8 @@ func TestCorrectionLadderSafetyHelpersCoverage(t *testing.T) {
 }
 
 func TestShipErrorAndWrapCoverage(t *testing.T) {
+	t.Parallel()
+
 	se := NewShipError(CodeIntegrityTreeDrift, ShipClassIntegrity, StageAtomicShip, "detail", "path", "worktree", "odd")
 	if !strings.Contains(se.Error(), "TREE_DRIFT") || !strings.Contains(se.DebugString(), "path=worktree") || !strings.Contains(se.DebugString(), "odd=") {
 		t.Fatalf("ship error strings missing detail: %s / %s", se.Error(), se.DebugString())
@@ -165,6 +173,8 @@ func TestShipErrorAndWrapCoverage(t *testing.T) {
 }
 
 func TestResetJSONAndOptionCoverage(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	if pathWithin(filepath.Join(root, "child"), root) != true || pathWithin(filepath.Dir(root), root) || pathWithin(root, "") {
 		t.Fatal("pathWithin boundary mismatch")
@@ -212,6 +222,8 @@ func TestResetJSONAndOptionCoverage(t *testing.T) {
 }
 
 func TestOrchestratorForensicsHelpersCoverage(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil)
 	o.now = func() time.Time { return time.Date(2026, 6, 11, 1, 2, 3, 0, time.UTC) }
@@ -255,6 +267,8 @@ func TestOrchestratorForensicsHelpersCoverage(t *testing.T) {
 }
 
 func TestRecoveryDecisionForensicsCoverage(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	led := &fakeLedger{}
 	o := NewOrchestrator(&fakeStorage{}, led, nil)
@@ -300,6 +314,8 @@ func TestRecoveryDecisionForensicsCoverage(t *testing.T) {
 }
 
 func TestSalvageDeliverableBranchCoverage(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	ws := t.TempDir()
 	wt := t.TempDir()
@@ -335,6 +351,8 @@ func TestSalvageDeliverableBranchCoverage(t *testing.T) {
 }
 
 func TestRunCycleFromPhaseAdditionalBranchesCoverage(t *testing.T) {
+	t.Parallel()
+
 	baseCS := CycleState{CycleID: 0, WorkspacePath: t.TempDir()}
 	req := CycleRequest{ProjectRoot: t.TempDir(), Env: map[string]string{"K": "V"}, Context: map[string]string{"C": "D"}}
 	t.Run("write cycle state failure", func(t *testing.T) {
@@ -443,6 +461,8 @@ func TestGitAndFileHelperCoverage(t *testing.T) {
 }
 
 func TestVerdictReasonTruncationCoverage(t *testing.T) {
+	t.Parallel()
+
 	short := strings.Repeat("界", maxReasonSummaryLen/2)
 	if got := truncateReason(short); got != short {
 		t.Fatalf("short rune-heavy reason changed: %q", got)

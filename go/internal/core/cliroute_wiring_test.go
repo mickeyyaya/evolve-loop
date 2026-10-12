@@ -54,6 +54,8 @@ func TestContractEscalation_NeverLeavesTheAllowedSet(t *testing.T) {
 }
 
 func TestProfileForModelRouting_AMintedPhaseReadsItsOwnProfile(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeRawProfile(t, root, "adversarial-review", map[string]any{
 		"name": "adversarial-review", "cli": "claude-tmux", "model_tier_envelope": map[string]any{"min": "deep", "max": "deep"},
@@ -75,6 +77,8 @@ func routedOrchestrator(r *cliroute.Router) *Orchestrator {
 }
 
 func TestOrchestrator_CLIRouterWiredReportsTheInjectedRouter(t *testing.T) {
+	t.Parallel()
+
 	if (&Orchestrator{}).CLIRouterWired() {
 		t.Fatal("no router injected, none wired")
 	}

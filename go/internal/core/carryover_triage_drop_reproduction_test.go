@@ -8,6 +8,8 @@ import (
 )
 
 func TestFinalizeCycle_RetiresTriageDroppedCarryover(t *testing.T) {
+	t.Parallel()
+
 	const droppedID = "todo-author-bridge-binding-tests-for-replay-contract-boundary"
 
 	workspace := t.TempDir()

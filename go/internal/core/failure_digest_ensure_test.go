@@ -7,6 +7,8 @@ import (
 )
 
 func TestEnsureFailureDigest_WritesDigestWithoutLedger(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	ws := t.TempDir()
 	root := t.TempDir() // no recurrence-ledger.json — fail-soft, recurrence 0
@@ -21,6 +23,8 @@ func TestEnsureFailureDigest_WritesDigestWithoutLedger(t *testing.T) {
 }
 
 func TestEnsureFailureDigest_Idempotent(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	ws := t.TempDir()
 	root := t.TempDir()

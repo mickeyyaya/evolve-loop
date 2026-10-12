@@ -22,6 +22,8 @@ func correctionState() CycleState {
 }
 
 func TestExplanationCorrectionDocument_Cycle1745DefectsNameOnlyTheDocument(t *testing.T) {
+	t.Parallel()
+
 	fb := &phasecontract.FailureBlock{Class: "code-audit-fail", Defects: cycle1745Defects}
 
 	document, ok := explanationCorrectionDocument(correctionState(), fb)
@@ -32,6 +34,8 @@ func TestExplanationCorrectionDocument_Cycle1745DefectsNameOnlyTheDocument(t *te
 }
 
 func TestExplanationCorrectionDocument_LabelledAndQuotedLocationsStillNameTheDocument(t *testing.T) {
+	t.Parallel()
+
 	for _, defect := range []string{
 		"H1: " + correctionDocument + ":8-10 and :18-21 say both sides are pinned",
 		"H1 " + correctionDocument + ":19-24 says blocks were lifted",
@@ -51,6 +55,8 @@ func TestExplanationCorrectionDocument_LabelledAndQuotedLocationsStillNameTheDoc
 }
 
 func TestExplanationCorrectionDocument_ADefectOutsideTheDocumentKeepsTheRepairRound(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		cs      CycleState

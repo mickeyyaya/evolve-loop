@@ -10,6 +10,8 @@ import (
 )
 
 func TestSeedTaskContract_AUserPhaseThatAsksForItInPromptContextGetsTheBlock(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	writeItem(t, dir, "alpha", `{"id":"alpha","title":"Alpha","acceptance":["the refusal path is pinned"]}`)
 	ws := contractParityFixture{decision: `{"top_n":[{"id":"alpha"}]}`}.workspace(t)

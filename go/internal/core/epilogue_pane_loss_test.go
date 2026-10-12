@@ -16,6 +16,8 @@ func artifactTimeoutErr(cause, reason string) error {
 }
 
 func TestEpilogueCauseSuffix_APaneLossNeverMergesWithAReviewPauseTimeout(t *testing.T) {
+	t.Parallel()
+
 	lost := epilogueCauseSuffix(artifactTimeoutErr("pane_lost", "tmux session s is gone"))
 	paused := epilogueCauseSuffix(artifactTimeoutErr("review_pause", "no output during the last 1200s interval"))
 
@@ -29,6 +31,8 @@ func TestEpilogueCauseSuffix_APaneLossNeverMergesWithAReviewPauseTimeout(t *test
 }
 
 func TestAbnormalEpilogue_ADossierOrStateWriteFaultStillLeavesTheDigestAndTheAbortedPhase(t *testing.T) {
+	t.Parallel()
+
 	cr, root := epilogueRun(t, false)
 	if err := os.WriteFile(filepath.Join(root, "knowledge-base"), []byte("not a directory"), 0o644); err != nil {
 		t.Fatal(err)

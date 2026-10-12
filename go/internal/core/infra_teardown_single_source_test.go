@@ -16,6 +16,8 @@ import (
 )
 
 func TestIsInfraTeardownError_UnionSemantics(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name string
 		err  error
@@ -37,6 +39,8 @@ func TestIsInfraTeardownError_UnionSemantics(t *testing.T) {
 }
 
 func TestIsTransientBridgeError_StaysTransientOnly(t *testing.T) {
+	t.Parallel()
+
 	if !isTransientBridgeError(ErrTransientBridgeFailure) {
 		t.Error("isTransientBridgeError must still match ErrTransientBridgeFailure — it is the reusable transient-only component")
 	}
@@ -50,6 +54,8 @@ func TestIsTransientBridgeError_StaysTransientOnly(t *testing.T) {
 }
 
 func TestOptionalInfraSkip_InfraGateUnchangedAfterConsolidation(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, nil, optionalSpecFor("learn"))
 
 	for _, tc := range []struct {
@@ -72,6 +78,8 @@ func TestOptionalInfraSkip_InfraGateUnchangedAfterConsolidation(t *testing.T) {
 }
 
 func TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, nil, optionalSpecFor("learn"))
 	for _, err := range []error{
 		ErrArtifactTimeout,
@@ -90,6 +98,8 @@ func TestOptionalInfraSkip_GateAgreesWithIsOptionalSkippableError(t *testing.T) 
 }
 
 func TestInfraTeardownUnion_SpelledExactlyOnce(t *testing.T) {
+	t.Parallel()
+
 	sites, err := findInfraTeardownUnionSpellings(".")
 	if err != nil {
 		t.Fatalf("scan internal/core: %v", err)

@@ -37,6 +37,8 @@ func phaseNames(entries []phaseTimingEntry) string {
 }
 
 func TestFlushPhaseTimings_ResumePreservesThePreCrashPrefix(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeTimingLog(t, ws, "scout", "triage", "tdd") // pre-crash attempt
 	cr := &cycleRun{cs: CycleState{WorkspacePath: ws}, phaseTimings: []phaseTimingEntry{
@@ -55,6 +57,8 @@ func TestFlushPhaseTimings_ResumePreservesThePreCrashPrefix(t *testing.T) {
 }
 
 func TestFlushPhaseTimings_IsExactlyOnce(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	cr := &cycleRun{cs: CycleState{WorkspacePath: ws}, phaseTimings: []phaseTimingEntry{
 		{Phase: "scout", Verdict: "PASS"}, {Phase: "build", Verdict: "FAIL"},
@@ -74,6 +78,8 @@ func TestFlushPhaseTimings_IsExactlyOnce(t *testing.T) {
 }
 
 func TestFlushPhaseTimings_DuplicatePhasesAreReality(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeTimingLog(t, ws, "build")
 	cr := &cycleRun{cs: CycleState{WorkspacePath: ws}, phaseTimings: []phaseTimingEntry{{Phase: "build", Verdict: "PASS"}}}
@@ -83,6 +89,8 @@ func TestFlushPhaseTimings_DuplicatePhasesAreReality(t *testing.T) {
 }
 
 func TestRecorder_LiteralOrchestratorGetsTheNullObjectRecorderOnce(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{now: func() time.Time { return time.Date(2026, 9, 13, 3, 4, 5, 0, time.UTC) }}
 	first := o.recorder()
 	if first == nil || first.SignalsWired() {
@@ -114,6 +122,8 @@ func TestRecorder_LiteralOrchestratorGetsTheNullObjectRecorderOnce(t *testing.T)
 }
 
 func TestRecorder_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	if o.recorder().SignalsWired() {
 		t.Fatal("no Center at construction: the recorder is unwired")

@@ -23,6 +23,8 @@ type probeRunner struct {
 func (p *probeRunner) PersonaAvailable() error { return p.persona }
 
 func TestAdvisorPlanInput_ListsPhasesWithMissingPersona(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(nil)
 	runners[Phase("amplify-tests")] = &probeRunner{fakeRunner: &fakeRunner{name: "amplify-tests"},
 		persona: fmt.Errorf("amplify-tests: load agent: %w", ErrAgentDocMissing)}
@@ -57,6 +59,8 @@ func TestAdvisorPlanInput_ListsPhasesWithMissingPersona(t *testing.T) {
 }
 
 func TestWriteRoutingContext_UnavailablePhasesAreNamedNotOffered(t *testing.T) {
+	t.Parallel()
+
 	in := router.RouteInput{
 		Cfg:               config.RoutingConfig{Triggers: map[string]config.RoutingBlock{"amplify-tests": {}, "coverage-gate": {}}},
 		UnavailablePhases: []string{"amplify-tests"},

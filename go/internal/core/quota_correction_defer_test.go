@@ -147,6 +147,8 @@ func TestRunCycle_WalledRemediationRerun_DefersLikeAFirstDispatch(t *testing.T) 
 }
 
 func TestReviewResumedDeliverable_WalledCorrection_ReturnsTheExhaustionSentinel(t *testing.T) {
+	t.Parallel()
+
 	reviewer := &rejectFirstResumedBuild{}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	o.reviewer = reviewer
@@ -245,6 +247,8 @@ func TestRunCycleFromPhase_AWalledResumedDispatchNamesItsWalk(t *testing.T) {
 }
 
 func TestErrAllFamiliesExhausted_ClaimsOnlyThatTheDispatchEndedAtAWall(t *testing.T) {
+	t.Parallel()
+
 	if msg := ErrAllFamiliesExhausted.Error(); strings.Contains(msg, "all CLI families") || !strings.Contains(msg, "quota wall") {
 		t.Fatalf("the sentinel must not claim every family walled: %q", msg)
 	}

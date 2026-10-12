@@ -9,6 +9,8 @@ import (
 )
 
 func TestScopedMergeCarryForward_GateDeclineEmitsCodedSignalEvent(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	center := signalcenter.New()
 	var events []signalcenter.Event

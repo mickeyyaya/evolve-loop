@@ -56,6 +56,8 @@ func recordingRegen(failOn string) (func(context.Context, string, string) error,
 }
 
 func TestRebaseWithDerivedRegen_CleanRebase(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{respond: func(args []string) (string, int, error) {
 		if joined(args) != "rebase main" {
 			t.Fatalf("clean rebase should issue only 'rebase main', got %q", joined(args))
@@ -73,6 +75,8 @@ func TestRebaseWithDerivedRegen_CleanRebase(t *testing.T) {
 }
 
 func TestRebaseWithDerivedRegen_AllDerivedConflict_Resolves(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
 		j := joined(args)
@@ -111,6 +115,8 @@ func TestRebaseWithDerivedRegen_AllDerivedConflict_Resolves(t *testing.T) {
 }
 
 func TestRebaseWithDerivedRegen_NonDerivedConflict_AbortsToDebugger(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
 		j := joined(args)
@@ -139,6 +145,8 @@ func TestRebaseWithDerivedRegen_NonDerivedConflict_AbortsToDebugger(t *testing.T
 }
 
 func TestRebaseWithDerivedRegen_MixedConflict_Aborts(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
 		j := joined(args)
@@ -165,6 +173,8 @@ func TestRebaseWithDerivedRegen_MixedConflict_Aborts(t *testing.T) {
 }
 
 func TestRebaseWithDerivedRegen_MultiCommitDerivedConflicts_Resolves(t *testing.T) {
+	t.Parallel()
+
 	continues := 0
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
@@ -199,6 +209,8 @@ func TestRebaseWithDerivedRegen_MultiCommitDerivedConflicts_Resolves(t *testing.
 }
 
 func TestRebaseWithDerivedRegen_RegenFails_Aborts(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
 		j := joined(args)
@@ -224,6 +236,8 @@ func TestRebaseWithDerivedRegen_RegenFails_Aborts(t *testing.T) {
 }
 
 func TestRebaseWithDerivedRegen_InfraFailureNoUnmerged_Aborts(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
 		j := joined(args)
@@ -249,6 +263,8 @@ func TestRebaseWithDerivedRegen_InfraFailureNoUnmerged_Aborts(t *testing.T) {
 }
 
 func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
+	t.Parallel()
+
 	diffCalls := 0
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
@@ -287,6 +303,8 @@ func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
 }
 
 func TestRebaseWithDerivedRegen_ContinueNeverConverges_AbortsAtBound(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
 		j := joined(args)
@@ -321,6 +339,8 @@ func TestRebaseWithDerivedRegen_ContinueNeverConverges_AbortsAtBound(t *testing.
 }
 
 func TestRegenerateDerivedArtifact_UnregisteredPath_Errors(t *testing.T) {
+	t.Parallel()
+
 	err := regenerateDerivedArtifact(context.Background(), "/wt", "no/such/file.md")
 	if err == nil {
 		t.Fatal("want an error for an unregistered derived-artifact path")
@@ -331,6 +351,8 @@ func TestRegenerateDerivedArtifact_UnregisteredPath_Errors(t *testing.T) {
 }
 
 func TestRegenerateDerivedArtifact_Integration(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("compiles cmd/evolve via `go run`; skipped under -short")
 	}
@@ -366,6 +388,8 @@ func TestRegenerateDerivedArtifact_Integration(t *testing.T) {
 }
 
 func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
+	t.Parallel()
+
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
 		j := joined(args)
@@ -398,6 +422,8 @@ func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
 }
 
 func TestRebaseCycleBranchOntoMain_EmptyWorktree(t *testing.T) {
+	t.Parallel()
+
 	ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", "")
 	if ok || len(conflicts) > 0 {
 		t.Fatalf("empty worktree must return (false,false), got (%v,%v)", ok, conflicts)
@@ -409,6 +435,8 @@ func TestRebaseCycleBranchOntoMain_EmptyWorktree(t *testing.T) {
 // production regenerator (go run) is never invoked. Covers the delegation in
 // rebaseCycleBranchOntoMain end-to-end against real git.
 func TestRebaseCycleBranchOntoMain_RealGit_NonDerivedConflict(t *testing.T) {
+	t.Parallel()
+
 	dir := initConflictRepo(t, "foo.go")
 	ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", dir)
 	if ok || len(conflicts) == 0 {
@@ -426,6 +454,8 @@ func TestRebaseCycleBranchOntoMain_RealGit_NonDerivedConflict(t *testing.T) {
 // `flags generate` (so the test needs no go module). This is the real-git proof
 // the fakes cannot give.
 func TestRebaseWithDerivedRegen_RealGit_DerivedConflict(t *testing.T) {
+	t.Parallel()
+
 	dir := initConflictRepo(t, cflags)
 	regen := func(_ context.Context, wt, _ string) error {
 		return os.WriteFile(filepath.Join(wt, cflags), []byte("regenerated\nshared\n"), 0o644)
@@ -486,6 +516,8 @@ func initConflictRepo(t *testing.T, relFile string) string {
 }
 
 func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
+	t.Parallel()
+
 	diffCalls, skips := 0, 0
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
@@ -526,6 +558,8 @@ func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
 }
 
 func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T) {
+	t.Parallel()
+
 	var diffN, skipN, contN int
 	g := &scriptedGit{}
 	g.respond = func(args []string) (string, int, error) {
@@ -574,6 +608,8 @@ func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T
 }
 
 func TestRegenerateDerivedArtifact_RunFails_Errors(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("invokes the go toolchain")
 	}
@@ -588,6 +624,8 @@ func TestRegenerateDerivedArtifact_RunFails_Errors(t *testing.T) {
 }
 
 func TestDerivedEntryOf(t *testing.T) {
+	t.Parallel()
+
 	for path, want := range map[string]string{cflags: "flag-index", "commands/build.md": "skill-projections"} {
 		if got, ok := derivedEntryOf(path); !ok || got != want {
 			t.Errorf("derivedEntryOf(%q) = (%q, %v), want (%q, true)", path, got, ok, want)
@@ -601,6 +639,8 @@ func TestDerivedEntryOf(t *testing.T) {
 }
 
 func TestRegenStaleProjections_RegeneratesAndStages(t *testing.T) {
+	t.Parallel()
+
 	var regened, staged []string
 	regen := func(_ context.Context, _, entry string) error { regened = append(regened, entry); return nil }
 	stage := func(_ context.Context, _, entry string) error { staged = append(staged, entry); return nil }
@@ -616,6 +656,8 @@ func TestRegenStaleProjections_RegeneratesAndStages(t *testing.T) {
 }
 
 func TestRegenStaleProjections_NoStaleEntry_NoOp(t *testing.T) {
+	t.Parallel()
+
 	called := false
 	regen := func(_ context.Context, _, _ string) error { called = true; return nil }
 	done := regenStaleProjections(context.Background(), "/wt", nil, regen, func(context.Context, string, string) error { return nil })
@@ -634,6 +676,8 @@ func flagIndexOnly(t *testing.T) []derived.Entry {
 }
 
 func TestRegenStaleProjections_RegenFails_SkipsWithoutStaging(t *testing.T) {
+	t.Parallel()
+
 	staged := false
 	regen := func(_ context.Context, _, _ string) error { return errors.New("regen boom") }
 	done := regenStaleProjections(context.Background(), "/wt", flagIndexOnly(t), regen, func(context.Context, string, string) error { staged = true; return nil })
@@ -646,6 +690,8 @@ func TestRegenStaleProjections_RegenFails_SkipsWithoutStaging(t *testing.T) {
 }
 
 func TestRegenStaleProjections_StageFails_Skips(t *testing.T) {
+	t.Parallel()
+
 	regen := func(_ context.Context, _, _ string) error { return nil }
 	done := regenStaleProjections(context.Background(), "/wt", flagIndexOnly(t), regen, func(context.Context, string, string) error { return errors.New("add boom") })
 	if len(done) != 0 {
@@ -672,6 +718,8 @@ func initTempRepo(t *testing.T) (string, func(...string)) {
 }
 
 func TestStageDerivedEntry_StagesOnlyTheOutputsOfTheEntry(t *testing.T) {
+	t.Parallel()
+
 	dir, git := initTempRepo(t)
 	writeFile(t, filepath.Join(dir, "base.txt"), "base\n")
 	git("add", "-A")
@@ -690,6 +738,8 @@ func TestStageDerivedEntry_StagesOnlyTheOutputsOfTheEntry(t *testing.T) {
 }
 
 func TestStageDerivedEntry_Refusals(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]struct{ dir, entry string }{
 		"a directory outside git":     {t.TempDir(), "flag-index"},
 		"an entry not in the catalog": {t.TempDir(), "no-such-entry"},
@@ -702,6 +752,8 @@ func TestStageDerivedEntry_Refusals(t *testing.T) {
 }
 
 func TestStageEntryWith_ASpawnFailureIsAnError(t *testing.T) {
+	t.Parallel()
+
 	spawnFails := func(context.Context, string, ...string) (string, int, error) { return "", -1, errors.New("no git") }
 
 	if err := stageEntryWith(context.Background(), spawnFails, "/wt", "flag-index"); err == nil || !strings.Contains(err.Error(), "no git") {
@@ -710,11 +762,15 @@ func TestStageEntryWith_ASpawnFailureIsAnError(t *testing.T) {
 }
 
 func TestNormalizeDerivedProjections_EmptyWorktree_NoOp(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	o.normalizeDerivedProjections(context.Background(), "") // guard: must not panic
 }
 
 func TestNormalizeDerivedProjections_CleanWorktree_NoRegen(t *testing.T) {
+	t.Parallel()
+
 	// A clean repo (no changed paths) → no stale projection → no `go run`, no error.
 	dir, git := initTempRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x\n"), 0o644); err != nil {
@@ -727,6 +783,8 @@ func TestNormalizeDerivedProjections_CleanWorktree_NoRegen(t *testing.T) {
 }
 
 func TestChangedWorktreePaths_RealGit(t *testing.T) {
+	t.Parallel()
+
 	dir, git := initTempRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("base\n"), 0o644); err != nil {
 		t.Fatal(err)

@@ -9,6 +9,8 @@ import (
 )
 
 func TestPolicyCategoryFor_JoinsEveryKnownClassificationOrSaysNone(t *testing.T) {
+	t.Parallel()
+
 	pol := policy.DefaultSystemFailurePolicy()
 	for _, c := range failurelog.KnownClassifications() {
 		cat := policyCategoryFor(c)
@@ -36,6 +38,8 @@ func TestPolicyCategoryFor_JoinsEveryKnownClassificationOrSaysNone(t *testing.T)
 }
 
 func TestComputeRetryEnvelope_DeclineReasonsNameWhichVocabularyFailed(t *testing.T) {
+	t.Parallel()
+
 	pol := policy.DefaultSystemFailurePolicy()
 	reason := func(class string) string {
 		return computeRetryEnvelope(retryEnvelopeInput{DeclaredClass: class, Policy: pol}).Reason

@@ -39,6 +39,8 @@ func (s *mutexSpyLocker) acquire(projectRoot string) (func(), error) {
 }
 
 func TestWriteCycleDossier_AcquiresGitMutationLock(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	spy := &mutexSpyLocker{}
 
@@ -54,6 +56,8 @@ func TestWriteCycleDossier_AcquiresGitMutationLock(t *testing.T) {
 }
 
 func TestWriteCycleDossier_ConcurrentLanesEachAcquireAndRelease(t *testing.T) {
+	t.Parallel()
+
 	const lanes = 4
 	spy := &mutexSpyLocker{}
 	var wg sync.WaitGroup
@@ -82,6 +86,8 @@ func TestWriteCycleDossier_ConcurrentLanesEachAcquireAndRelease(t *testing.T) {
 }
 
 func TestWriteCycleDossier_LockError_FailsOpen(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	spy := &mutexSpyLocker{failErr: errors.New("flock unavailable")}
 
@@ -97,6 +103,8 @@ func TestWriteCycleDossier_LockError_FailsOpen(t *testing.T) {
 }
 
 func TestNewOrchestrator_WiresGitMutationLock(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	if o.gitMutationLock == nil {
 		t.Fatal("NewOrchestrator must wire gitMutationLock; a nil locker makes the dossier commit silently race the shared .git/index (fail-open masks it)")
@@ -104,6 +112,8 @@ func TestNewOrchestrator_WiresGitMutationLock(t *testing.T) {
 }
 
 func TestDefaultGitMutationLock_LocksShipIntegratorFile(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	release, err := defaultGitMutationLock(root)
 	if err != nil {
@@ -116,6 +126,8 @@ func TestDefaultGitMutationLock_LocksShipIntegratorFile(t *testing.T) {
 }
 
 func TestWriteCycleDossier_ConcurrentRealRepo_BothLand(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	var wg sync.WaitGroup
 	errs := make([]error, 2)

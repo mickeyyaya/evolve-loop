@@ -166,6 +166,8 @@ func TestRecordFailureLearning_PersistIsTheLastStorageEffect(t *testing.T) {
 }
 
 func TestRecordFailureLearning_RetroOutcomeIsRecordedAfterTheGateAndBeforeThePersist(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	seedValidDisposition(t, dir)
 	c, _ := recordingCenter()
@@ -198,6 +200,8 @@ func TestRecordFailureLearning_RetroOutcomeIsRecordedAfterTheGateAndBeforeThePer
 }
 
 func TestRunCycle_FailedPhaseOutcomeIsRecordedBeforeTheInlineRetro(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	runners := buildRunners(nil)
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(1), failUntil: 99}
@@ -219,6 +223,8 @@ func TestRunCycle_FailedPhaseOutcomeIsRecordedBeforeTheInlineRetro(t *testing.T)
 }
 
 func TestOptionalInfraSkip_RecordsTheInlineRetroBeforeTheSkipOutcome(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	st := &fakeStorage{}
 	runners := buildRunners(nil)
@@ -274,6 +280,8 @@ func optionalPhaseOrchestrator(t *testing.T, st Storage, led Ledger, runners map
 }
 
 func TestRecordFailureLearning_DigestExistsWhenTheRetroRunnerStarts(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	runners := buildRunners(nil)
 	present := false
@@ -331,6 +339,8 @@ func TestRecordFailureLearning_DocMissingArmWritesTheDigestAndTheFallbackArmsNev
 }
 
 func TestRecordFailureLearning_SuccessfulInlineRetroLeavesPhaseStampedRetro(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	seedValidDisposition(t, dir)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
@@ -456,6 +466,8 @@ func TestRecordFailureLearning_RetroLedgerAppendFailure_RaisesOnlyTheLedgerCode(
 }
 
 func TestFailureLearningGate_IsPureAndOrdered(t *testing.T) {
+	t.Parallel()
+
 	exhausted := fmt.Errorf("outer: %w", fmt.Errorf("phase ship: %w", ErrAllFamiliesExhausted))
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()

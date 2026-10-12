@@ -28,6 +28,8 @@ func catalogOf(t *testing.T, specs ...phasespec.PhaseSpec) phasespec.Catalog {
 }
 
 func TestPhaseCardsFromCatalog_OnDemandPhaseTakesNoSelectSlot(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t,
 		specWith("scout", "plan", ""),
 		specWith("market-sizing", "plan", phasespec.CatalogOnDemand),
@@ -50,6 +52,8 @@ func TestPhaseCardsFromCatalog_OnDemandPhaseTakesNoSelectSlot(t *testing.T) {
 }
 
 func TestPhaseCardsFromCatalog_AbsentKeyIsUnchanged(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t, specWith("scout", "plan", ""), specWith("audit", "evaluate", ""))
 	if got := len(phaseCardsFromCatalog(cat)); got != 2 {
 		t.Fatalf("phases without the key must all render; got %d cards", got)
@@ -57,6 +61,8 @@ func TestPhaseCardsFromCatalog_AbsentKeyIsUnchanged(t *testing.T) {
 }
 
 func TestPhaseCardsFromCatalog_ControlStillExcluded(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t, specWith("ship", "control", ""), specWith("scout", "plan", ""))
 	cards := phaseCardsFromCatalog(cat)
 	if len(cards) != 1 || cards[0].Name != "scout" {
@@ -65,6 +71,8 @@ func TestPhaseCardsFromCatalog_ControlStillExcluded(t *testing.T) {
 }
 
 func TestAdvisorPrompt_OnDemandPhaseLeavesTheMenuButStaysNamed(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t,
 		specWith("scout", "plan", ""),
 		specWith("audit", "evaluate", ""),
@@ -144,6 +152,8 @@ func TestRepoPhaseCatalog_CatalogWordIsKnown(t *testing.T) {
 }
 
 func TestBuildPlanPrompt_CarriesTheOnDemandIndex(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t,
 		specWith("scout", "plan", ""),
 		specWith("market-sizing", "plan", phasespec.CatalogOnDemand),
@@ -168,6 +178,8 @@ func TestBuildPlanPrompt_CarriesTheOnDemandIndex(t *testing.T) {
 }
 
 func TestKnownCatalogWord_RejectsTypos(t *testing.T) {
+	t.Parallel()
+
 	for _, ok := range []string{phasespec.CatalogSelect, phasespec.CatalogOnDemand} {
 		if !phasespec.KnownCatalogWord(ok) {
 			t.Fatalf("%q must be accepted", ok)
@@ -181,6 +193,8 @@ func TestKnownCatalogWord_RejectsTypos(t *testing.T) {
 }
 
 func TestComposePlanPrompt_CarriesTheOnDemandIndex(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t,
 		specWith("scout", "plan", ""),
 		specWith("market-sizing", "plan", phasespec.CatalogOnDemand),
@@ -203,6 +217,8 @@ func TestComposePlanPrompt_CarriesTheOnDemandIndex(t *testing.T) {
 }
 
 func TestAdvisorPlanInput_PopulatesOnDemandFromTheOrchestratorCatalog(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t,
 		specWith("scout", "plan", ""),
 		specWith("market-sizing", "plan", phasespec.CatalogOnDemand),

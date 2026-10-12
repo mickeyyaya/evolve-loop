@@ -87,6 +87,8 @@ func TestCompositionCarryForward_DeclinesBeforeAnyGateOnEachUnverifiableComposit
 }
 
 func TestCompositionCarryForward_MatchingPatchIDWritesTheVerdict(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	p := &compositionProbeE4{}
 	o := p.orchestrator(CompositionAuditSnapshot{LaneAuditRef: "ref-9", AuditedBase: "main", Diff: diff, PatchID: patchID}, nil, nil, nil)
@@ -150,6 +152,8 @@ func TestScopedMergeCarryForward_DeclinesOnEachFailClosedRung(t *testing.T) {
 }
 
 func TestScopedMergeCarryForward_VerifiedResolutionWritesScopedVerdict(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	p := &compositionProbeE4{}
 	o := p.orchestrator(CompositionAuditSnapshot{LaneAuditRef: "ref-4", Diff: diff, PatchID: patchID}, nil, nil,

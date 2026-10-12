@@ -7,6 +7,8 @@ import (
 )
 
 func TestComputeRetryEnvelope(t *testing.T) {
+	t.Parallel()
+
 	fp := policy.DefaultSystemFailurePolicy()
 
 	tests := []struct {
@@ -126,6 +128,8 @@ func TestComputeRetryEnvelope(t *testing.T) {
 // happens to equal it: a hardcoded 2 passes every case above, only changing
 // the table can distinguish them.
 func TestComputeRetryEnvelope_CapComesFromThePolicyTable(t *testing.T) {
+	t.Parallel()
+
 	fp := policy.DefaultSystemFailurePolicy()
 	cat := fp.Categories[policy.CategoryCodeAuditFail]
 	cat.MaxRetries = 5
@@ -143,6 +147,8 @@ func TestComputeRetryEnvelope_CapComesFromThePolicyTable(t *testing.T) {
 }
 
 func TestComputeRetryEnvelope_ZeroCapDisablesRetry(t *testing.T) {
+	t.Parallel()
+
 	fp := policy.DefaultSystemFailurePolicy()
 	cat := fp.Categories[policy.CategoryCodeAuditFail]
 	cat.MaxRetries = 0

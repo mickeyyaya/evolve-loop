@@ -15,6 +15,8 @@ import (
 var errWriterRefused = errors.New("writer refused")
 
 func TestRecover_EveryRecoveryRouteIsALegalEdgeFromShip(t *testing.T) {
+	t.Parallel()
+
 	blockers := []router.Blocker{
 		{Code: string(CodeGitFleetRebaseConflict), Class: "integrity"},
 		{Code: "ANY", Class: "integrity"},
@@ -86,6 +88,8 @@ func legacyCompositionRecovery(t *testing.T, writer func(CompositionVerdictInput
 }
 
 func TestRecoverFromShipError_ALegacyCleanRebaseShipsOnTheTrivialRebaseRung(t *testing.T) {
+	t.Parallel()
+
 	next, recovering, methods := legacyCompositionRecovery(t, func(CompositionVerdictInput) error { return nil })
 
 	if !recovering || next != PhaseShip || len(methods) != 1 || methods[0] != "" {
@@ -94,6 +98,8 @@ func TestRecoverFromShipError_ALegacyCleanRebaseShipsOnTheTrivialRebaseRung(t *t
 }
 
 func TestRecoverFromShipError_ALegacyRebaseTheTrivialRungMissesShipsOnTheScopedReview(t *testing.T) {
+	t.Parallel()
+
 	next, recovering, methods := legacyCompositionRecovery(t, func(in CompositionVerdictInput) error {
 		if in.Method != scopedReviewMethod {
 			return errWriterRefused

@@ -64,6 +64,8 @@ func runEvalGateCycle(t *testing.T, probe *evalGateProbe) *evalGateProbe {
 }
 
 func TestEvalGateEscalation_SecondIdenticalRejectionEscalatesAndRecovers(t *testing.T) {
+	t.Parallel()
+
 	p := runEvalGateCycle(t, &evalGateProbe{
 		phase:        string(PhaseBuild),
 		compliantCLI: universalContractFallbackCLI,
@@ -81,6 +83,8 @@ func TestEvalGateEscalation_SecondIdenticalRejectionEscalatesAndRecovers(t *test
 }
 
 func TestEvalGateEscalation_DifferentReasonsDoNotEscalate(t *testing.T) {
+	t.Parallel()
+
 	p := runEvalGateCycle(t, &evalGateProbe{
 		phase: string(PhaseBuild),
 		reasons: []string{
@@ -97,6 +101,8 @@ func TestEvalGateEscalation_DifferentReasonsDoNotEscalate(t *testing.T) {
 }
 
 func TestEvalGateEscalation_RemediationlessRejectionNeverEscalates(t *testing.T) {
+	t.Parallel()
+
 	p := runEvalGateCycle(t, &evalGateProbe{
 		phase:       string(PhaseBuild),
 		remediation: "",
@@ -109,6 +115,8 @@ func TestEvalGateEscalation_RemediationlessRejectionNeverEscalates(t *testing.T)
 }
 
 func TestEvalGateEscalation_EscalatedDirectiveKeepsTheRemediation(t *testing.T) {
+	t.Parallel()
+
 	seen := []string{}
 	p := &evalGateProbe{
 		phase:        string(PhaseBuild),

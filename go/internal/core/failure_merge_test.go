@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestMergeFailedRecords_UnionsDiskAndIncoming(t *testing.T) {
+	t.Parallel()
+
 	disk := []FailedRecord{
 		{Cycle: 1, TS: "t1", Verdict: "FAIL"},
 		{Cycle: 2, TS: "t2", Verdict: "FAIL"}, // a peer's concurrent record
@@ -31,6 +33,8 @@ func TestMergeFailedRecords_UnionsDiskAndIncoming(t *testing.T) {
 }
 
 func TestMergeCarryoverTodos_DedupByID(t *testing.T) {
+	t.Parallel()
+
 	disk := []CarryoverTodo{{ID: "a"}, {ID: "b"}}     // b = a peer's concurrent todo
 	incoming := []CarryoverTodo{{ID: "a"}, {ID: "c"}} // a = shared, c = new
 	got := mergeCarryoverTodos(disk, incoming)

@@ -21,6 +21,8 @@ func TestGitWorktree_BaseFromConfigNotEnv(t *testing.T) {
 }
 
 func TestWithWorktreeBase_SetsProvisionerBase(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	WithWorktreeBase("/mnt/wt")(o)
 	gw, ok := o.worktree.(gitWorktree)

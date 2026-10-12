@@ -23,6 +23,8 @@ func escalationRun(t *testing.T, root, scopeCSV string, reader func(string) int,
 }
 
 func TestEscalatedBuildTier_RaisesAtThresholdEnvelopeless(t *testing.T) {
+	t.Parallel()
+
 	// No profiles on disk → universal envelope (Max=top) → deep passes.
 	cr := escalationRun(t, t.TempDir(), "item-a,item-b", func(id string) int {
 		return map[string]int{"item-a": 0, "item-b": 1}[id]
@@ -34,6 +36,8 @@ func TestEscalatedBuildTier_RaisesAtThresholdEnvelopeless(t *testing.T) {
 }
 
 func TestEscalatedBuildTier_BelowThresholdOrDisabled(t *testing.T) {
+	t.Parallel()
+
 	cr := escalationRun(t, t.TempDir(), "item-a", func(string) int { return 0 }, 1)
 	if _, raised := cr.escalatedBuildTier(""); raised {
 		t.Fatal("count below threshold must not raise")
@@ -49,6 +53,8 @@ func TestEscalatedBuildTier_BelowThresholdOrDisabled(t *testing.T) {
 }
 
 func TestEscalatedBuildTier_RaiseOnlyNeverLowers(t *testing.T) {
+	t.Parallel()
+
 	cr := escalationRun(t, t.TempDir(), "item-a", func(string) int { return 5 }, 1)
 	if _, raised := cr.escalatedBuildTier("top"); raised {
 		t.Fatal("a top proposal must never be lowered")
@@ -59,6 +65,8 @@ func TestEscalatedBuildTier_RaiseOnlyNeverLowers(t *testing.T) {
 }
 
 func TestEscalatedBuildTier_EnvelopeMaxClampsThroughRealGuardrail(t *testing.T) {
+	t.Parallel()
+
 	// A build profile with envelope Max=balanced must pull the raise back to
 	// no-gain — via the REAL ClampPlanModelRouting, not a second clamp.
 	root := t.TempDir()
@@ -77,6 +85,8 @@ func TestEscalatedBuildTier_EnvelopeMaxClampsThroughRealGuardrail(t *testing.T) 
 }
 
 func TestEscalationScopeIDs_UnionOfLaneScopeAndProcessingClaims(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	proc := filepath.Join(root, ".evolve", "inbox", "processing", "cycle-77")
 	if err := os.MkdirAll(proc, 0o755); err != nil {
@@ -97,6 +107,8 @@ func TestEscalationScopeIDs_UnionOfLaneScopeAndProcessingClaims(t *testing.T) {
 }
 
 func TestWithFailureCountReader_SetsAndIgnoresNil(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	WithFailureCountReader(func(string) int { return 7 })(o)
 	if o.failureCountFor == nil || o.failureCountFor("x") != 7 {

@@ -32,6 +32,8 @@ func sizeBudgetRun(t *testing.T, reportBody string, completed []string) *cycleRu
 }
 
 func TestBuildBudgetScale_FromTriageReport(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		report string
@@ -54,6 +56,8 @@ func TestBuildBudgetScale_FromTriageReport(t *testing.T) {
 }
 
 func TestBuildBudgetScale_AbsentReportIsUnscaled(t *testing.T) {
+	t.Parallel()
+
 	cr := sizeBudgetRun(t, "", []string{"triage"})
 	if got := cr.buildBudgetScale(); got != 1.0 {
 		t.Errorf("no report → 1.0, got %v", got)
@@ -116,6 +120,8 @@ func TestSizeBudget_ComposedLargeCycleExtendsCorrectionLadder(t *testing.T) {
 }
 
 func TestScaledCorrectionLimit_BuildPhaseOnly(t *testing.T) {
+	t.Parallel()
+
 	cr := sizeBudgetRun(t, "cycle_size_estimate: large\n", []string{"triage"})
 	if got := cr.correctionLimitFor(PhaseBuild, 2); got != 3 {
 		t.Errorf("build large: correctionLimitFor = %d, want 3", got)

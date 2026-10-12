@@ -51,6 +51,8 @@ func (r *rejectTwiceResumedBuild) Review(_ context.Context, in ReviewInput) Revi
 }
 
 func TestRunCycleFromPhase_ResumedBuildUsesCorrectionAndLifecycleReview(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-5")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -116,6 +118,8 @@ func TestRunCycleFromPhase_ResumedBuildUsesCorrectionAndLifecycleReview(t *testi
 }
 
 func TestReviewResumedDeliverable_LeakRecoveryFailureStopsBeforeReview(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	for _, args := range [][]string{
 		{"init", "-q"},
@@ -157,6 +161,8 @@ func TestReviewResumedDeliverable_LeakRecoveryFailureStopsBeforeReview(t *testin
 }
 
 func TestReviewResumedDeliverable_LargeBuildUsesScaledCorrectionBudget(t *testing.T) {
+	t.Parallel()
+
 	workspace := t.TempDir()
 	if err := os.WriteFile(filepath.Join(workspace, "triage-report.md"), []byte("cycle_size_estimate: large\n"), 0o644); err != nil {
 		t.Fatal(err)

@@ -9,6 +9,8 @@ import (
 )
 
 func TestEnsureFailureDigest_FallbackWritesReasonArtifactAndDistinctFingerprints(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	root := t.TempDir()
 	wsA, wsB := t.TempDir(), t.TempDir()
@@ -35,6 +37,8 @@ func TestEnsureFailureDigest_FallbackWritesReasonArtifactAndDistinctFingerprints
 }
 
 func TestEnsureFailureDigest_ExistingArtifactBeatsFallback(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	root, ws := t.TempDir(), t.TempDir()
 	floor := []byte(`{"schema_version":1,"phase":"audit","reasons":["EGPS: red_count=1 (cycle ships only when red_count==0)"]}`)
@@ -53,6 +57,8 @@ func TestEnsureFailureDigest_ExistingArtifactBeatsFallback(t *testing.T) {
 }
 
 func TestBlockerBreaker_UnexplainedRuleHonestReason(t *testing.T) {
+	t.Parallel()
+
 	empty := "|unknown|e30d249242ac"
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		{Cycle: 1, Fingerprint: empty, PreClass: "unknown"},
@@ -71,6 +77,8 @@ func TestBlockerBreaker_UnexplainedRuleHonestReason(t *testing.T) {
 }
 
 func TestBlockerBreaker_IdenticalRuleSkipsUnexplained(t *testing.T) {
+	t.Parallel()
+
 	empty := "|unknown|e30d249242ac"
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		{Cycle: 1, Fingerprint: empty, PreClass: "unknown"},

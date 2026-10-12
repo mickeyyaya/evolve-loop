@@ -10,6 +10,8 @@ import (
 )
 
 func TestFreshExplanationRebase_BypassesLegacyCompositionCarryForward(t *testing.T) {
+	t.Parallel()
+
 	dir, preDiff := initCleanRebaseRepoT(t)
 	patchID, err := ledger.PatchID(preDiff)
 	if err != nil {

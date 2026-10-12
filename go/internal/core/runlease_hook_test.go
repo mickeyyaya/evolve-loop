@@ -9,6 +9,8 @@ import (
 )
 
 func TestStartRunLease_WritesInitialLeaseBeforeReturn(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	at := time.Unix(100, 0).UTC()
 	stop := startRunLease(dir, "run-abc", func() time.Time { return at }, time.Hour)
@@ -30,11 +32,15 @@ func TestStartRunLease_WritesInitialLeaseBeforeReturn(t *testing.T) {
 }
 
 func TestStartRunLease_EmptyWorkspace_NoOp(t *testing.T) {
+	t.Parallel()
+
 	stop := startRunLease("", "run-abc", time.Now, time.Hour)
 	stop() // must not panic
 }
 
 func TestRunLeaseHeartbeat_RefreshesOnTick(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	lease := runlease.Lease{RunID: "r1"}
 	if err := runlease.Write(dir, lease, time.Unix(0, 0).UTC()); err != nil {

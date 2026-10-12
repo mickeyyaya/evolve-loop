@@ -125,6 +125,8 @@ func newConflictFixture(t *testing.T, debuggerWrites string, signals map[string]
 }
 
 func TestRecoverFromShipError_ADebuggersBuildRerunRunsOnTheRebasedTree(t *testing.T) {
+	t.Parallel()
+
 	f := newConflictFixture(t, "peer line\n", map[string]any{"debugger.action": "RERUN_PHASE", "debugger.rerun_phase": "build"})
 	if err := runCompositionCycle(t, f.o); err != nil {
 		t.Fatalf("a conflict the debugger resolved must ship: %v", err)
@@ -135,6 +137,8 @@ func TestRecoverFromShipError_ADebuggersBuildRerunRunsOnTheRebasedTree(t *testin
 }
 
 func TestRecoverFromShipError_ADebuggersTestsFirstRequestYieldsToTheRebasedRoute(t *testing.T) {
+	t.Parallel()
+
 	f := newConflictFixture(t, "peer line\n", map[string]any{"debugger.action": "RERUN_PHASE", "debugger.rerun_phase": "tdd"})
 	if err := runCompositionCycle(t, f.o); err != nil {
 		t.Fatalf("a conflict the debugger resolved must ship: %v", err)
@@ -145,6 +149,8 @@ func TestRecoverFromShipError_ADebuggersTestsFirstRequestYieldsToTheRebasedRoute
 }
 
 func TestRecoverFromShipError_AConflictTheDebuggerLeftEndsTheCycleWithoutAReship(t *testing.T) {
+	t.Parallel()
+
 	f := newConflictFixture(t, "lane line\n", nil)
 	_ = runCompositionCycle(t, f.o)
 	if f.dbg.calls != 1 || f.ship.calls != 1 {
@@ -153,6 +159,8 @@ func TestRecoverFromShipError_AConflictTheDebuggerLeftEndsTheCycleWithoutAReship
 }
 
 func TestRecoverFromShipError_ADebuggerResolvedConflictReentersTheRebaseNotAStaleReship(t *testing.T) {
+	t.Parallel()
+
 	f := newConflictFixture(t, "peer line\n", nil)
 	dir, ship, audit, build, dbg, o := f.dir, f.ship, f.audit, f.build, f.dbg, f.o
 
@@ -194,6 +202,8 @@ func (d *fencedDebugger) Run(ctx context.Context, req core.PhaseRequest) (core.P
 }
 
 func TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile(t *testing.T) {
+	t.Parallel()
+
 	f := newConflictFixture(t, "peer line\n", nil)
 	fenced := &fencedDebugger{inner: f.dbg}
 	o := core.NewOrchestrator(&recStorage{}, &fakeLedger{}, newRunners(map[core.Phase]core.PhaseRunner{
@@ -343,6 +353,8 @@ func testMessageBlocks(out, file string) []string {
 // fixture sets gittest.MaintenanceConfig, so no detached `git maintenance`
 // child can touch .git/index while the fence snapshots it.
 func TestInitConflictRebaseRepoT_DisablesBackgroundMaintenance(t *testing.T) {
+	t.Parallel()
+
 	dir := initConflictRebaseRepoT(t)
 	for _, kv := range [][2]string{{"maintenance.auto", "false"}, {"gc.auto", "0"}} {
 		key, want := kv[0], kv[1]
@@ -354,6 +366,8 @@ func TestInitConflictRebaseRepoT_DisablesBackgroundMaintenance(t *testing.T) {
 }
 
 func TestResumeFleetRebaseAfterDebugger_ASpentBudgetOrAnInPlaceWorktreeTouchesNoGit(t *testing.T) {
+	t.Parallel()
+
 	dir := initConflictRebaseRepoT(t)
 	before := runGitT(t, dir, "rev-parse", "HEAD")
 	center := signalcenter.New()
@@ -374,6 +388,8 @@ func TestResumeFleetRebaseAfterDebugger_ASpentBudgetOrAnInPlaceWorktreeTouchesNo
 }
 
 func TestEarliestPhase_KeepsAnUpstreamDebuggerTarget(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct{ decided, routed, want core.Phase }{
 		{core.PhaseTDD, core.PhaseBuild, core.PhaseBuild},
 		{core.PhaseBuild, core.PhaseAudit, core.PhaseBuild},
@@ -389,6 +405,8 @@ func TestEarliestPhase_KeepsAnUpstreamDebuggerTarget(t *testing.T) {
 }
 
 func TestFleetRebaseRecovery_NamesOnlyTheFleetRebaseCodes(t *testing.T) {
+	t.Parallel()
+
 	for _, code := range []string{"", string(core.CodeWorktreeResolve), string(core.CodeAuditBindingHeadMoved)} {
 		if core.FleetRebaseRecoveryForTest(code) {
 			t.Fatalf("%q is not a fleet-rebase recovery", code)

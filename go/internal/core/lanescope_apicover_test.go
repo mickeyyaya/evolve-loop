@@ -14,6 +14,8 @@ import (
 // and LaneScopeFile const, pinning that an env-scoped RunCycle materializes
 // the pin at <workspace>/<LaneScopeFile> with a schema matching LaneScope.
 func TestLaneScope_ExportedSchemaAndFilename(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	if _, err := o.RunCycle(context.Background(), CycleRequest{

@@ -35,6 +35,8 @@ func floorInput(t *testing.T, root string, repo *gittest.Repo, base string) Revi
 }
 
 func TestCommentFloorFailures_ACommittedBuildIsJudgedAgainstItsBase(t *testing.T) {
+	t.Parallel()
+
 	repo, base := floorRepo(t)
 	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\n// restates the helper.\nfunc a() {}\n")
 	repo.Git("commit", "-q", "-am", "build")
@@ -47,6 +49,8 @@ func TestCommentFloorFailures_ACommittedBuildIsJudgedAgainstItsBase(t *testing.T
 }
 
 func TestCommentFloorFailures_WithoutAPolicyBlockItOnlyShadows(t *testing.T) {
+	t.Parallel()
+
 	repo, base := floorRepo(t)
 	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\n// restates the helper.\nfunc a() {}\n")
 
@@ -56,6 +60,8 @@ func TestCommentFloorFailures_WithoutAPolicyBlockItOnlyShadows(t *testing.T) {
 }
 
 func TestCommentFloorFailures_ANewFilesPackageDocIsNotAdded(t *testing.T) {
+	t.Parallel()
+
 	repo, base := floorRepo(t)
 	writeFile(t, filepath.Join(repo.Dir, "go", "q", "q.go"), "// Package q holds the fixture for the floor.\npackage q\n")
 
@@ -65,6 +71,8 @@ func TestCommentFloorFailures_ANewFilesPackageDocIsNotAdded(t *testing.T) {
 }
 
 func TestCommentFloorFailures_AnAdoptedAncestorsArchivedPredicatesAddNoComment(t *testing.T) {
+	t.Parallel()
+
 	repo, base := floorRepo(t)
 	writeFile(t, filepath.Join(repo.Dir, "go", "acs", "cycle42", "predicates_test.go"), "package cycle42\n\n// Cycle 42 pins the retry budget.\nfunc TestPredicate() {}\n")
 	repo.Git("add", "-A")
@@ -82,6 +90,8 @@ func TestCommentFloorFailures_AnAdoptedAncestorsArchivedPredicatesAddNoComment(t
 }
 
 func TestCommentFloorFailures_AnUnreadableDiffFailsOpen(t *testing.T) {
+	t.Parallel()
+
 	repo, base := floorRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo.Dir, "d"), 0o755); err != nil {
 		t.Fatal(err)
@@ -96,6 +106,8 @@ func TestCommentFloorFailures_AnUnreadableDiffFailsOpen(t *testing.T) {
 }
 
 func TestCommentFloorStage_AnUnknownWordIsOff(t *testing.T) {
+	t.Parallel()
+
 	for word, want := range map[string]config.Stage{"enforce": config.StageEnforce, " enforce ": config.StageEnforce, "shadow": config.StageShadow, "enforced": config.StageOff, "Enforce": config.StageOff} {
 		if got := commentFloorStage(floorRoot(t, `{"comment_floor":{"stage":"`+word+`"}}`)); got != want {
 			t.Errorf("stage %q = %s, want %s", word, got, want)
@@ -107,6 +119,8 @@ func TestCommentFloorStage_AnUnknownWordIsOff(t *testing.T) {
 }
 
 func TestWorktreeGit_CarriesGitsOwnErrorInsteadOfPrintingIt(t *testing.T) {
+	t.Parallel()
+
 	repo, _ := floorRepo(t)
 
 	_, err := worktreeGit(context.Background(), repo.Dir)("cat-file", "-e", "HEAD:go/p/missing.go")
@@ -117,6 +131,8 @@ func TestWorktreeGit_CarriesGitsOwnErrorInsteadOfPrintingIt(t *testing.T) {
 }
 
 func TestChangedWorktreePathsSince_NamesANonASCIIPathAsGitStoresIt(t *testing.T) {
+	t.Parallel()
+
 	repo, base := floorRepo(t)
 	writeFile(t, filepath.Join(repo.Dir, "go", "p", "café.go"), "package p\n")
 	repo.Git("add", "go/p/café.go")

@@ -198,6 +198,8 @@ func runCompositionCycle(t *testing.T, o *core.Orchestrator) error {
 }
 
 func TestRecoverFromShipError_CleanRebase_RebuildsBaseBoundExplanationBeforeReaudit(t *testing.T) {
+	t.Parallel()
+
 	dir, preDiff := initCleanRebaseRepoT(t)
 	patchID, err := ledger.PatchID(preDiff)
 	if err != nil {
@@ -235,6 +237,8 @@ func TestRecoverFromShipError_CleanRebase_RebuildsBaseBoundExplanationBeforeReau
 }
 
 func TestRecoverFromShipError_CleanRebase_PatchIdDriftFallsBackToFullAudit(t *testing.T) {
+	t.Parallel()
+
 	dir, _ := initCleanRebaseRepoT(t)
 	var wrote []core.CompositionVerdictInput
 	fx := newCompositionFixture(dir,
@@ -270,6 +274,8 @@ func TestRecoverFromShipError_CleanRebase_PatchIdDriftFallsBackToFullAudit(t *te
 }
 
 func TestRecoverFromShipError_CleanRebase_MissingComposedGateFallsBackToFullAudit(t *testing.T) {
+	t.Parallel()
+
 	dir, preDiff := initCleanRebaseRepoT(t)
 	patchID, err := ledger.PatchID(preDiff)
 	if err != nil {
@@ -309,6 +315,8 @@ func TestRecoverFromShipError_CleanRebase_MissingComposedGateFallsBackToFullAudi
 }
 
 func TestRecoverFromShipError_CleanRebase_WriterFailureFallsBackToFullAudit(t *testing.T) {
+	t.Parallel()
+
 	dir, preDiff := initCleanRebaseRepoT(t)
 	patchID, err := ledger.PatchID(preDiff)
 	if err != nil {

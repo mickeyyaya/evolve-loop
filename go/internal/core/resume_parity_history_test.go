@@ -9,6 +9,8 @@ import (
 )
 
 func TestRunCycleFromPhase_HistoryBranchSurfacesDispositionGate(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	rp.Phase = string(PhaseRetro)
 	st.cycleState.CompletedPhases = append(st.cycleState.CompletedPhases, "audit")

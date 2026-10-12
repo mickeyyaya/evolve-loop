@@ -42,6 +42,8 @@ func buildProposingPlan() *router.PhasePlan {
 }
 
 func TestModelRouting_AutoApplies(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, &fakeLedger{}, runners,
@@ -64,6 +66,8 @@ func TestModelRouting_AutoApplies(t *testing.T) {
 }
 
 func TestModelRouting_AdvisoryLogsNotApplies(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, &fakeLedger{}, runners,
@@ -109,6 +113,8 @@ func TestModelRouting_AdvisoryLogsNotApplies(t *testing.T) {
 }
 
 func TestModelRouting_StaticIsNoop(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, &fakeLedger{}, runners,
@@ -130,6 +136,8 @@ func TestModelRouting_StaticIsNoop(t *testing.T) {
 }
 
 func TestModelRouting_AutoDegradesToProfileStatic(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
 	o := NewOrchestrator(st, &fakeLedger{}, runners,
@@ -157,6 +165,8 @@ func TestModelRouting_AutoDegradesToProfileStatic(t *testing.T) {
 // Proves the injected catalog lookup actually reaches the clamp, not merely
 // stored and ignored.
 func TestModelRouting_CatalogMissClampsUnderAuto(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
 	alwaysMiss := func(cli, tier string) (string, bool) { return "", false }
@@ -180,6 +190,8 @@ func TestModelRouting_CatalogMissClampsUnderAuto(t *testing.T) {
 }
 
 func TestPhaseRequest_ModelRoutingFieldsOmitEmptyByDefault(t *testing.T) {
+	t.Parallel()
+
 	buf, err := json.Marshal(PhaseRequest{Cycle: 1, ProjectRoot: "/p", GoalHash: "g"})
 	if err != nil {
 		t.Fatalf("marshal: %v", err)

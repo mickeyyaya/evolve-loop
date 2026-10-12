@@ -9,6 +9,8 @@ import (
 )
 
 func TestWriteCarryoverTodos_SevereRecentSurvivesTheCut(t *testing.T) {
+	t.Parallel()
+
 	todos := make([]router.CarryoverTodo, 0, maxCarryoverTodosInPrompt+1)
 	// 20 low-priority, oldest entries first (insertion order == on-disk order).
 	for i := 0; i < maxCarryoverTodosInPrompt; i++ {
@@ -44,6 +46,8 @@ func TestWriteCarryoverTodos_SevereRecentSurvivesTheCut(t *testing.T) {
 }
 
 func TestWriteCarryoverTodos_MalformedPriorityDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("writeCarryoverTodos panicked on a malformed Priority: %v", r)
@@ -61,6 +65,8 @@ func TestWriteCarryoverTodos_MalformedPriorityDoesNotPanic(t *testing.T) {
 }
 
 func TestWriteCarryoverTodos_CapBoundaryExact(t *testing.T) {
+	t.Parallel()
+
 	mk := func(n int) []router.CarryoverTodo {
 		out := make([]router.CarryoverTodo, n)
 		for i := range out {

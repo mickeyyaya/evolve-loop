@@ -27,6 +27,8 @@ func (m *memUpdater) UpdateState(_ context.Context, mutate func(*State)) (State,
 }
 
 func TestAllocateCycleNumber_SingleModeEquivalence(t *testing.T) {
+	t.Parallel()
+
 	m := &memUpdater{st: State{LastCycleNumber: 5}}
 	n, err := AllocateCycleNumber(context.Background(), m)
 	if err != nil {
@@ -41,6 +43,8 @@ func TestAllocateCycleNumber_SingleModeEquivalence(t *testing.T) {
 }
 
 func TestAllocateCycleNumber_CrashBurnsNumber(t *testing.T) {
+	t.Parallel()
+
 	// A prior run allocated 6 and crashed before completing.
 	m := &memUpdater{st: State{LastCycleNumber: 5, LastAllocatedCycleNumber: 6}}
 	n, err := AllocateCycleNumber(context.Background(), m)
@@ -53,6 +57,8 @@ func TestAllocateCycleNumber_CrashBurnsNumber(t *testing.T) {
 }
 
 func TestAllocateCycleNumber_ConcurrentAllocatorsDistinct(t *testing.T) {
+	t.Parallel()
+
 	m := &memUpdater{st: State{LastCycleNumber: 10}}
 	const G = 16
 	got := make(chan int, G)
@@ -86,6 +92,8 @@ func TestAllocateCycleNumber_ConcurrentAllocatorsDistinct(t *testing.T) {
 }
 
 func TestOrchestratorAllocateCycle_LegacyStorageFallsBack(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{storage: &fakeStorage{}}
 	st := State{LastCycleNumber: 41}
 	n, err := o.allocateCycle(context.Background(), &st, "")
@@ -107,6 +115,8 @@ func (f *fakeUpdaterStorage) UpdateState(ctx context.Context, mutate func(*State
 }
 
 func TestPersistCycleEndState_NeverRollsBackLease(t *testing.T) {
+	t.Parallel()
+
 	f := &fakeUpdaterStorage{}
 	f.mem.st = State{LastCycleNumber: 7}
 	o := &Orchestrator{storage: f}
@@ -140,6 +150,8 @@ func TestPersistCycleEndState_NeverRollsBackLease(t *testing.T) {
 }
 
 func TestPersistCycleEndState_LegacyStorageFallsBack(t *testing.T) {
+	t.Parallel()
+
 	fs := &fakeStorage{}
 	o := &Orchestrator{storage: fs}
 	if err := o.persistCycleEndState(context.Background(), State{LastCycleNumber: 42}); err != nil {
@@ -151,6 +163,8 @@ func TestPersistCycleEndState_LegacyStorageFallsBack(t *testing.T) {
 }
 
 func TestOrchestratorAllocateCycle_LeaseWhenSupported(t *testing.T) {
+	t.Parallel()
+
 	f := &fakeUpdaterStorage{}
 	f.mem.st = State{LastCycleNumber: 7, LastAllocatedCycleNumber: 8} // 8 crashed
 	o := &Orchestrator{storage: f}
@@ -168,6 +182,8 @@ func TestOrchestratorAllocateCycle_LeaseWhenSupported(t *testing.T) {
 }
 
 func TestNewCycleRun_AllocatesAboveExistingACSPackage(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	occupied := writeNestedCyclePackage(t, projectRoot, 41)
 
@@ -195,6 +211,8 @@ func TestNewCycleRun_AllocatesAboveExistingACSPackage(t *testing.T) {
 }
 
 func TestOrchestratorAllocateCycle_LegacyStorageHonorsACSPackageFloor(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	writeNestedCyclePackage(t, projectRoot, 7)
 
@@ -210,6 +228,8 @@ func TestOrchestratorAllocateCycle_LegacyStorageHonorsACSPackageFloor(t *testing
 }
 
 func TestNewCycleRun_ACSPackageInventoryErrorStopsBeforeAllocation(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	goDir := writeNestedGoModule(t, projectRoot)
 	if err := os.WriteFile(filepath.Join(goDir, "acs"), []byte("not a directory\n"), 0o644); err != nil {
@@ -238,6 +258,8 @@ func TestNewCycleRun_ACSPackageInventoryErrorStopsBeforeAllocation(t *testing.T)
 }
 
 func TestNewCycleRun_ModuleLookupErrorStopsBeforeAllocation(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	if err := os.Symlink("go", filepath.Join(projectRoot, "go")); err != nil {
 		t.Fatal(err)
@@ -265,6 +287,8 @@ func TestNewCycleRun_ModuleLookupErrorStopsBeforeAllocation(t *testing.T) {
 }
 
 func TestNewCycleRun_ProvisionedModuleLookupErrorPreservesWorktree(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	worktreePath := t.TempDir()
 	if err := os.Symlink("go", filepath.Join(worktreePath, "go")); err != nil {
@@ -299,6 +323,8 @@ func TestNewCycleRun_ProvisionedModuleLookupErrorPreservesWorktree(t *testing.T)
 }
 
 func TestOrchestratorAllocateCycle_ConcurrentAllocatorsRespectACSPackageFloor(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	writeNestedCyclePackage(t, projectRoot, 100)
 
@@ -338,6 +364,8 @@ func TestOrchestratorAllocateCycle_ConcurrentAllocatorsRespectACSPackageFloor(t 
 }
 
 func TestOrchestratorAllocateCycle_ExhaustedACSPackageFloorFails(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	writeNestedCyclePackage(t, projectRoot, math.MaxInt)
 
@@ -353,6 +381,8 @@ func TestOrchestratorAllocateCycle_ExhaustedACSPackageFloorFails(t *testing.T) {
 }
 
 func TestAllocateCycleNumber_ExhaustedPersistedLeaseFails(t *testing.T) {
+	t.Parallel()
+
 	storage := &memUpdater{st: State{LastAllocatedCycleNumber: math.MaxInt}}
 	if _, err := AllocateCycleNumber(context.Background(), storage); err == nil || !strings.Contains(err.Error(), "cycle number exhausted") {
 		t.Fatalf("AllocateCycleNumber error = %v, want cycle-number exhaustion", err)
@@ -391,6 +421,8 @@ func (f failingUpdater) UpdateState(context.Context, func(*State)) (State, error
 }
 
 func TestAllocateCycleNumber_ReturnsTheStateUpdateFault(t *testing.T) {
+	t.Parallel()
+
 	fault := errors.New("state.json lock timed out")
 
 	n, err := AllocateCycleNumber(context.Background(), failingUpdater{err: fault})
@@ -401,6 +433,8 @@ func TestAllocateCycleNumber_ReturnsTheStateUpdateFault(t *testing.T) {
 }
 
 func TestAllocateCycleNumber_StartsAboveTheLeaseOfAnUnfinalizedLane(t *testing.T) {
+	t.Parallel()
+
 	m := &memUpdater{st: State{LastCycleNumber: 1837, LastAllocatedCycleNumber: 1838}}
 
 	n, err := AllocateCycleNumber(context.Background(), m)

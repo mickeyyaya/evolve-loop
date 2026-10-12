@@ -85,6 +85,8 @@ func TestBuildSelfCheck_ClearsStaleArtifactOnPass(t *testing.T) {
 }
 
 func TestBuildSelfCheck_NoGoChanges_ClearsStaleArtifact(t *testing.T) {
+	t.Parallel()
+
 	// A non-Go-only cycle must still clear a stale failure artifact (a non-Go
 	// change cannot be a Go regression). Guards the unconditional clear that sits
 	// above the `len(pkgs)==0` early return.
@@ -128,10 +130,14 @@ func TestBuildSelfCheck_NoGoChangesIsNoOp(t *testing.T) {
 }
 
 func TestBuildSelfCheck_EmptyWorktreeIsNoOp(t *testing.T) {
+	t.Parallel()
+
 	(&Orchestrator{}).buildSelfCheck(context.Background(), "") // must not panic
 }
 
 func TestRealGoUnitTest_DetectsPassAndFail(t *testing.T) {
+	t.Parallel()
+
 	mod := t.TempDir()
 	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module x\n\ngo 1.23\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -163,6 +169,8 @@ func TestRealGoUnitTest_DetectsPassAndFail(t *testing.T) {
 // constraints exclude all Go files … [setup failed]" — nothing to unit-test, NOT
 // a regression — so it must report ok, or the self-check WARNs on every cycle.
 func TestRealGoUnitTest_BuildTagExcludedIsNotFailure(t *testing.T) {
+	t.Parallel()
+
 	mod := t.TempDir()
 	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module x\n\ngo 1.23\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -189,6 +197,8 @@ func TestRealGoUnitTest_BuildTagExcludedIsNotFailure(t *testing.T) {
 // report ok — while a package whose directory still exists keeps its real
 // verdict (the failing case below must stay not-ok).
 func TestRealGoUnitTest_DeletedPackageIsNotFailure(t *testing.T) {
+	t.Parallel()
+
 	mod := t.TempDir()
 	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module x\n\ngo 1.23\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -214,6 +224,8 @@ func TestRealGoUnitTest_DeletedPackageIsNotFailure(t *testing.T) {
 // exclusion (nothing to test) from genuine failures (compile error / assertion)
 // that must still be reported.
 func TestGoTestExcludedByBuildTags(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		output string
@@ -271,6 +283,8 @@ func TestNoFleetLeak(t *testing.T) {
 }
 
 func TestChangedGoTestPackages_DerivesUniqueModulePackages(t *testing.T) {
+	t.Parallel()
+
 	paths := []string{
 		"go/internal/bridge/driver_claudetmux.go",
 		"go/internal/bridge/other.go", // same package → deduped
@@ -289,12 +303,16 @@ func TestChangedGoTestPackages_DerivesUniqueModulePackages(t *testing.T) {
 }
 
 func TestChangedGoTestPackages_EmptyWhenNoGoModuleChanges(t *testing.T) {
+	t.Parallel()
+
 	if got := changedGoTestPackages([]string{"docs/x.md", "go/go.sum", "landing/x.go"}); len(got) != 0 {
 		t.Fatalf("expected no packages, got %v", got)
 	}
 }
 
 func TestRunBuildSelfCheck_CollectsOnlyFailingPackages(t *testing.T) {
+	t.Parallel()
+
 	var ran []string
 	run := func(_ context.Context, moduleDir, pkg string) (string, bool) {
 		ran = append(ran, pkg)
@@ -322,6 +340,8 @@ func TestRunBuildSelfCheck_CollectsOnlyFailingPackages(t *testing.T) {
 }
 
 func TestRunBuildSelfCheck_AllGreenReportsNoFailures(t *testing.T) {
+	t.Parallel()
+
 	run := func(_ context.Context, _, _ string) (string, bool) { return "ok", true }
 	if fails := runBuildSelfCheck(context.Background(), "/wt/go", []string{"./internal/bridge"}, run); len(fails) != 0 {
 		t.Fatalf("all-green must report no failures, got %+v", fails)

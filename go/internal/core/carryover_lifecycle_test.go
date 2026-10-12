@@ -15,6 +15,8 @@ import (
 func carryoverTodoExists(todos []CarryoverTodo, id string) bool { return carryover.HasID(todos, id) }
 
 func TestCarryover_LiteralOrchestratorGetsTheLifecycleOnce(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	o := &Orchestrator{storage: st}
 	first := o.carryover()
@@ -35,6 +37,8 @@ func TestCarryover_LiteralOrchestratorGetsTheLifecycleOnce(t *testing.T) {
 }
 
 func TestCarryover_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{failOnWriteState: true}, &fakeLedger{}, buildRunners(nil))
 	if o.carryover().SignalsWired() {
 		t.Fatal("no Center at construction: unwired")
@@ -52,6 +56,8 @@ func TestCarryover_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
 }
 
 func TestWriteFailureLearningState_ReadsTheStoreAtCallTime(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	swapped := &fakeStorage{}
 	o.storage = swapped
@@ -63,6 +69,8 @@ func TestWriteFailureLearningState_ReadsTheStoreAtCallTime(t *testing.T) {
 
 // The golden was captured on the pre-extraction code with this exact fixture.
 func TestWriteFailureLearningState_RMWBranchIsByteIdenticalToTheGolden(t *testing.T) {
+	t.Parallel()
+
 	const golden = `{"lastUpdated":"","lastCycleNumber":41,"version":0,"currentBatch":{"cycleAccruedCostUSD":0},"failedApproaches":[{"ts":"t40","cycle":40,"verdict":"FAIL","recordedAt":"r40","retrospected":true,"summary":"mine"},{"ts":"t9","cycle":9,"verdict":"FAIL","recordedAt":"r9","defects":["d"],"retrospected":false}],"carryoverTodos":[{"id":"peer","action":"peer todo","priority":"P1","first_seen_cycle":40,"cycles_unpicked":0},{"id":"shared","action":"disk","priority":"P0","first_seen_cycle":40,"cycles_unpicked":0,"expiresAt":"2026-01-01T00:00:00Z"},{"id":"new","action":"new todo","priority":"P1","first_seen_cycle":9,"cycles_unpicked":0,"expiresAt":"2026-03-01T00:00:00Z"}],"stateRevision":1}`
 	f := &fakeUpdaterStorage{}
 	f.mem.st = State{LastCycleNumber: 41,
@@ -79,12 +87,16 @@ func TestWriteFailureLearningState_RMWBranchIsByteIdenticalToTheGolden(t *testin
 }
 
 func TestCarryoverPriorityRank_RanksTheUnitsVocabulary(t *testing.T) {
+	t.Parallel()
+
 	if carryoverPriorityBlocking != carryover.PriorityBlocking || carryoverPriorityLesson != carryover.PriorityLesson {
 		t.Fatal("core's priority consts are projections of the unit's")
 	}
 }
 
 func TestCarryoverLifecycle_OneConstructionSite(t *testing.T) {
+	t.Parallel()
+
 	const onlySite = "internal/core/carryover_lifecycle.go"
 	for _, needle := range []string{"carryover.New(", "MergeWorkspaceCarryover(", "MergeWorkspacePrescriptionCarryover(", "ApplyDefectsAsCarryoverTodos("} {
 		if offenders := nonTestSourcesMentioning(t, needle, onlySite); len(offenders) > 0 {
@@ -133,6 +145,8 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 }
 
 func TestFinalizeCycle_CloseoutKeepsTheThreeStepOrder(t *testing.T) {
+	t.Parallel()
+
 	workspace := t.TempDir()
 	for name, body := range map[string]string{
 		"triage-decision.json": `{"cycle":1538,"top_n":[],"dropped":[{"id":"stale-todo","reason":"stale"}]}`,

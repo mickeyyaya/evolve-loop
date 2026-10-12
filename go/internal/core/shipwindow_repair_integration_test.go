@@ -9,6 +9,8 @@ import (
 )
 
 func TestRecordAndBranch_AuditLeaseOnlyForShippableVerdict(t *testing.T) {
+	t.Parallel()
+
 	for _, verdict := range []string{VerdictFAIL, VerdictPASS, VerdictWARN} {
 		t.Run(verdict, func(t *testing.T) {
 			cr := retroGateHarness(t, phasespec.Catalog{})

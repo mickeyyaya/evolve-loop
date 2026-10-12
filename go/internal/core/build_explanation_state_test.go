@@ -9,6 +9,8 @@ import (
 )
 
 func TestNewExplanationLifecycleReviewer_LegacyBuildRequiresNoSnapshot(t *testing.T) {
+	t.Parallel()
+
 	reviewer := NewExplanationLifecycleReviewer()
 	result := reviewer.Review(context.Background(), ReviewInput{Phase: string(PhaseBuild)})
 	if !result.Approve || result.Retry || result.Reason != "" {
@@ -17,6 +19,8 @@ func TestNewExplanationLifecycleReviewer_LegacyBuildRequiresNoSnapshot(t *testin
 }
 
 func TestBuildExplanationHandoff_PreBuildFailureIsNotReportedAsMissing(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	workspace := t.TempDir()
 	if err := explanationdocs.Activate(explanationdocs.CycleBinding{
@@ -36,6 +40,8 @@ func TestBuildExplanationHandoff_PreBuildFailureIsNotReportedAsMissing(t *testin
 }
 
 func TestBuildExplanationHandoff_SealedHostContextCannotBeDowngradedByMutableState(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	workspace := t.TempDir()
 	binding := explanationdocs.CycleBinding{
@@ -64,6 +70,8 @@ func TestBuildExplanationHandoff_SealedHostContextCannotBeDowngradedByMutableSta
 }
 
 func TestBuildExplanationHandoff_LegacyIsExplicit(t *testing.T) {
+	t.Parallel()
+
 	handoff := projectBuildExplanation(t.TempDir(), CycleState{})
 	if handoff.State != BuildExplanationLegacy || handoff.View != nil {
 		t.Fatalf("legacy handoff=%+v", handoff)
@@ -71,6 +79,8 @@ func TestBuildExplanationHandoff_LegacyIsExplicit(t *testing.T) {
 }
 
 func TestPostBuildExplanationRefreshEligibility_IsLimitedToLaterSourceWriters(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	cs := CycleState{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,

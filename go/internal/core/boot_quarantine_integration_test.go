@@ -31,6 +31,8 @@ func seededQuarantineRepo(t *testing.T, files map[string]string) *gittest.Repo {
 }
 
 func TestPorcelainPaths_ReportsTheDestinationOfEveryKindOfDirt(t *testing.T) {
+	t.Parallel()
+
 	repo := seededQuarantineRepo(t, map[string]string{"old.go": "package a\n", "edit.go": "package a\n", "gone.go": "package a\n"})
 	repo.Git("mv", "old.go", "renamed.go")
 	writeFileT(t, filepath.Join(repo.Dir, "edit.go"), "package a\n\nvar x = 1\n")
@@ -57,6 +59,8 @@ func TestPorcelainPaths_ReportsTheDestinationOfEveryKindOfDirt(t *testing.T) {
 }
 
 func TestPorcelainPaths_CleanTreeHasNoPaths(t *testing.T) {
+	t.Parallel()
+
 	repo := seededQuarantineRepo(t, map[string]string{"a.go": "package a\n"})
 
 	got, err := porcelainPaths(context.Background(), repo.Dir)
@@ -79,6 +83,8 @@ func TestPorcelainPaths_NotARepositoryIsAWrappedStatusError(t *testing.T) {
 }
 
 func TestQuarantineDirtyTree_StashesOnlyLeakedSourceUnderTheLabel(t *testing.T) {
+	t.Parallel()
+
 	repo := seededQuarantineRepo(t, map[string]string{
 		"go/internal/x/x.go":  "package x\n",
 		".evolve/state.json":  "{}\n",
@@ -119,6 +125,8 @@ func TestQuarantineDirtyTree_StashesOnlyLeakedSourceUnderTheLabel(t *testing.T) 
 }
 
 func TestQuarantineDirtyTree_LoopManagedDirtAloneIsNoQuarantine(t *testing.T) {
+	t.Parallel()
+
 	repo := seededQuarantineRepo(t, map[string]string{".evolve/state.json": "{}\n"})
 	writeFileT(t, filepath.Join(repo.Dir, ".evolve/state.json"), "{\"cycle\":1}\n")
 
@@ -144,6 +152,8 @@ func TestQuarantineDirtyTree_StatusFailureIsReturned(t *testing.T) {
 }
 
 func TestQuarantineDirtyTree_StashFailureCarriesGitOutput(t *testing.T) {
+	t.Parallel()
+
 	repo := gittest.Fixture(t)
 	writeFileT(t, filepath.Join(repo.Dir, "leak.go"), "package a\n")
 
@@ -158,6 +168,8 @@ func TestQuarantineDirtyTree_StashFailureCarriesGitOutput(t *testing.T) {
 }
 
 func TestQuarantineDirtyTree_CanceledContextNeverStashes(t *testing.T) {
+	t.Parallel()
+
 	repo := seededQuarantineRepo(t, map[string]string{"a.go": "package a\n"})
 	writeFileT(t, filepath.Join(repo.Dir, "a.go"), "package a\n\nvar b = 1\n")
 	ctx, cancel := context.WithCancel(context.Background())

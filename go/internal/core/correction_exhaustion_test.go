@@ -67,6 +67,8 @@ func (h exhaustion) exemptions() []bool {
 }
 
 func TestReviewWithCorrections_AnOptionalEvaluatePhaseThatExhaustsItsCorrectionsIsSkippedNotAborted(t *testing.T) {
+	t.Parallel()
+
 	h := exhaustionHarness(t, Phase(codereview.PhaseName), codeReviewSpec(), "scout", "build")
 
 	act, err := h.cr.reviewWithCorrections(Phase(codereview.PhaseName), h.dr)
@@ -97,6 +99,8 @@ func TestReviewWithCorrections_AnOptionalEvaluatePhaseThatExhaustsItsCorrections
 }
 
 func TestReviewWithCorrections_AnOptionalEvaluatePhaseWhoseDeliverableIsAbsentStillAborts(t *testing.T) {
+	t.Parallel()
+
 	h := exhaustionHarness(t, Phase(codereview.PhaseName), codeReviewSpec(), "scout", "build")
 	h.rev.default_.DeliverableAbsent = true
 
@@ -113,6 +117,8 @@ func TestReviewWithCorrections_AnOptionalEvaluatePhaseWhoseDeliverableIsAbsentSt
 }
 
 func TestReviewWithCorrections_AnotherOptionalEvaluatePhaseDegradesWithoutAReviewSignal(t *testing.T) {
+	t.Parallel()
+
 	smell := phasespec.PhaseSpec{Name: "smell-scan", Role: string(phasespec.RoleEvaluate), Optional: true, After: "build"}
 	h := exhaustionHarness(t, "smell-scan", smell, "scout", "build")
 
@@ -129,6 +135,8 @@ func TestReviewWithCorrections_AnotherOptionalEvaluatePhaseDegradesWithoutARevie
 }
 
 func TestReviewWithCorrections_ABreakerExemptLadderNeverWarnsOfABreakerThatCannotOpen(t *testing.T) {
+	t.Parallel()
+
 	h := exhaustionHarness(t, Phase(codereview.PhaseName), codeReviewSpec(), "scout", "build")
 
 	_, _ = h.cr.reviewWithCorrections(Phase(codereview.PhaseName), h.dr)
@@ -142,6 +150,8 @@ func TestReviewWithCorrections_ABreakerExemptLadderNeverWarnsOfABreakerThatCanno
 }
 
 func TestReviewWithCorrections_APhaseOutsideTheOptionalEvaluateClassStillAborts(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]struct {
 		phase     Phase
 		spec      phasespec.PhaseSpec
@@ -176,6 +186,8 @@ func TestReviewWithCorrections_APhaseOutsideTheOptionalEvaluateClassStillAborts(
 }
 
 func TestReviewWithCorrections_ADegradedReviewStillRecordsItsFailureLearning(t *testing.T) {
+	t.Parallel()
+
 	h := exhaustionHarness(t, Phase(codereview.PhaseName), codeReviewSpec(), "scout", "build")
 
 	_, _ = h.cr.reviewWithCorrections(Phase(codereview.PhaseName), h.dr)
@@ -186,6 +198,8 @@ func TestReviewWithCorrections_ADegradedReviewStillRecordsItsFailureLearning(t *
 }
 
 func TestReviewWithCorrections_ASkippedReviewNamesTheRoundItWouldHaveBeen(t *testing.T) {
+	t.Parallel()
+
 	h := exhaustionHarness(t, Phase(codereview.PhaseName), codeReviewSpec(), "scout", "build")
 
 	_, _ = h.cr.reviewWithCorrections(Phase(codereview.PhaseName), h.dr)
@@ -202,6 +216,8 @@ func TestReviewWithCorrections_ASkippedReviewNamesTheRoundItWouldHaveBeen(t *tes
 }
 
 func TestReviewWithCorrections_OneCorrectionIsCountedInTheAbortMessage(t *testing.T) {
+	t.Parallel()
+
 	h := exhaustionHarness(t, PhaseBuild, codeReviewSpec(), "scout")
 	h.cr.retryConfig.ContractCorrectionRetries = 1
 
@@ -213,6 +229,8 @@ func TestReviewWithCorrections_OneCorrectionIsCountedInTheAbortMessage(t *testin
 }
 
 func TestReviewWithCorrections_AnAbortWithNoCorrectionsTeachesTheRetroItsFirstAttempt(t *testing.T) {
+	t.Parallel()
+
 	h := exhaustionHarness(t, PhaseBuild, codeReviewSpec(), "scout")
 	h.cr.retryConfig.ContractCorrectionRetries = 0
 
@@ -249,6 +267,8 @@ func resumedReview(t *testing.T, phase Phase, spec phasespec.PhaseSpec, verdictO
 }
 
 func TestReviewResumedDeliverable_AResumedReviewIsBreakerExemptAndDegradesLikeAFreshOne(t *testing.T) {
+	t.Parallel()
+
 	_, rev, led, resp, err := resumedReview(t, Phase(codereview.PhaseName), codeReviewSpec(), ReviewResult{Approve: false, Reason: malformedReview}, false)
 
 	if err != nil || resp.Verdict != VerdictSKIPPED {
@@ -265,6 +285,8 @@ func TestReviewResumedDeliverable_AResumedReviewIsBreakerExemptAndDegradesLikeAF
 }
 
 func TestReviewResumedDeliverable_StillAbortsOutsideTheDegrade(t *testing.T) {
+	t.Parallel()
+
 	scan := phasespec.PhaseSpec{Name: "secret-leak-scan", Role: string(phasespec.RoleEvaluate), Optional: true, After: "build"}
 	cases := map[string]struct {
 		phase     Phase

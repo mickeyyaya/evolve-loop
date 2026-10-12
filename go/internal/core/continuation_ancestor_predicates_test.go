@@ -8,6 +8,8 @@ import (
 )
 
 func TestRunCycle_AdoptionRetiresTheAncestorsOwnPredicatePackage(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 83)
 	ancestorPredicate := "go/acs/cycle83/predicates_test.go"
 	if err := os.MkdirAll(filepath.Dir(filepath.Join(wt, ancestorPredicate)), 0o755); err != nil {

@@ -80,6 +80,8 @@ func TestWriteBuildSelfCheckArtifact_HealthyRoundTrip_LargeAndUnicodeContent(t *
 }
 
 func TestWriteBuildSelfCheckArtifact_EmptyNonNilSlice_WritesEmptyJSONArray(t *testing.T) {
+	t.Parallel()
+
 	worktree := t.TempDir()
 	writeBuildSelfCheckArtifact(worktree, []selfCheckFailure{})
 
@@ -94,6 +96,8 @@ func TestWriteBuildSelfCheckArtifact_EmptyNonNilSlice_WritesEmptyJSONArray(t *te
 }
 
 func TestWriteBuildSelfCheckArtifact_Idempotent_SecondCallOverwritesFirst(t *testing.T) {
+	t.Parallel()
+
 	worktree := t.TempDir()
 	writeBuildSelfCheckArtifact(worktree, []selfCheckFailure{{Pkg: "./internal/first", Output: "FAIL 1"}})
 	writeBuildSelfCheckArtifact(worktree, []selfCheckFailure{{Pkg: "./internal/second", Output: "FAIL 2"}})

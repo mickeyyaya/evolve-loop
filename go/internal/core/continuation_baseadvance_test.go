@@ -8,6 +8,8 @@ import (
 )
 
 func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 81)
 	// Lane work on the preserved branch (non-conflicting with main's fix).
 	if err := os.WriteFile(filepath.Join(wt, "lane.go"), []byte("package x\n"), 0o644); err != nil {
@@ -47,6 +49,8 @@ func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
 }
 
 func TestAdvanceContinuationBase_NoOpWhenCurrent(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 82)
 	if healed, err := advanceContinuationBase(context.Background(), wt, 82); err != nil || healed != gitOut(t, root, "rev-parse", "main") {
 		t.Fatalf("advance on an already-current base returned %q, want current main (no-op)", healed)
@@ -54,6 +58,8 @@ func TestAdvanceContinuationBase_NoOpWhenCurrent(t *testing.T) {
 }
 
 func TestAdvanceContinuationBase_ConflictReturnsErrorAndAborts(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 83)
 	// A raced conflict, the shape the adopt-time Clean screen normally excludes.
 	if err := os.WriteFile(filepath.Join(wt, "a.txt"), []byte("lane\n"), 0o644); err != nil {

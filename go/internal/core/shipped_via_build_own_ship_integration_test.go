@@ -8,6 +8,8 @@ import (
 )
 
 func TestResumeLifecycle_ShipPassPersistsTheShipLatch(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t) // resumes at audit → ship PASSes in the resumed session
 	if _, err := o.RunCycleFromPhase(context.Background(), req, rp); err != nil {
 		t.Fatalf("RunCycleFromPhase: %v", err)
@@ -18,6 +20,8 @@ func TestResumeLifecycle_ShipPassPersistsTheShipLatch(t *testing.T) {
 }
 
 func TestResumeLifecycle_PostShipSkippedVerdictReadsTheCheckpointLatch(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		shipped bool

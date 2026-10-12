@@ -26,6 +26,8 @@ func epilogueRun(t *testing.T, completedNormally bool) (*cycleRun, string) {
 }
 
 func TestAbnormalEpilogue_WritesDossierDigestAndCoherentState(t *testing.T) {
+	t.Parallel()
+
 	cr, root := epilogueRun(t, false)
 	cr.abnormalEpilogue(nil)
 
@@ -55,6 +57,8 @@ func TestAbnormalEpilogue_WritesDossierDigestAndCoherentState(t *testing.T) {
 }
 
 func TestAbnormalEpilogue_NoopAfterNormalCloseout(t *testing.T) {
+	t.Parallel()
+
 	cr, root := epilogueRun(t, true)
 	cr.abnormalEpilogue(nil)
 	if _, err := os.Stat(filepath.Join(root, "knowledge-base", "cycles", "cycle-77.json")); err == nil {

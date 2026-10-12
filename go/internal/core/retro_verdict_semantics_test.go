@@ -8,6 +8,8 @@ import (
 )
 
 func TestDecideAfterRetro_RetroPASSIsNotRecovery(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	dir := t.TempDir()
 	// A plain task-level audit FAIL: deterministic floor silent, no agent floor
@@ -23,6 +25,8 @@ func TestDecideAfterRetro_RetroPASSIsNotRecovery(t *testing.T) {
 }
 
 func TestDecideAfterRetro_RetroPASSStillFacesTheFloor(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	dir := t.TempDir()
 	// infra-systemic produces a DETERMINISTIC floor candidate.
@@ -40,6 +44,8 @@ func TestDecideAfterRetro_RetroPASSStillFacesTheFloor(t *testing.T) {
 }
 
 func TestDecideAfterRetro_RetroPASSReachesTheSameLadderAsFAIL(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
@@ -58,6 +64,8 @@ func TestDecideAfterRetro_RetroPASSReachesTheSameLadderAsFAIL(t *testing.T) {
 }
 
 func TestDecideAfterRetro_RetroFAILPathUnchanged(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "infra-systemic", "all CLI families exhausted")
@@ -71,6 +79,8 @@ func TestDecideAfterRetro_RetroFAILPathUnchanged(t *testing.T) {
 }
 
 func TestDecideAfterRetroRouted_RetroPASSCannotDropTheFloorSignal(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "infra-systemic", "all CLI families exhausted")

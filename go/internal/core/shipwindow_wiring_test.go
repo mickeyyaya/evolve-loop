@@ -11,6 +11,8 @@ import (
 )
 
 func TestShipWindowWiring_AuditAcquiresNonAuditReleases(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	cr := &cycleRun{ctx: context.Background(), req: CycleRequest{ProjectRoot: root}}
 	lockPath := shipwindow.PathIn(filepath.Join(root, ".evolve"))

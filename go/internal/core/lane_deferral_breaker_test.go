@@ -23,6 +23,8 @@ func writeTimingFixture(t *testing.T, evolveDir string, cycle int, timing string
 }
 
 func TestCollectBatchLaneDeferrals_CountsOnlyWorktreeDeferralsInTheBatch(t *testing.T) {
+	t.Parallel()
+
 	evolveDir := t.TempDir()
 	writeTimingFixture(t, evolveDir, 9, laneDeferredTiming)
 	writeTimingFixture(t, evolveDir, 10, laneDeferredTiming)
@@ -41,6 +43,8 @@ func TestCollectBatchLaneDeferrals_CountsOnlyWorktreeDeferralsInTheBatch(t *test
 }
 
 func TestEvaluateLaneDeferrals_HaltsOnlyOnAnUnbrokenRun(t *testing.T) {
+	t.Parallel()
+
 	d := func(cycle int) LaneDeferralRecord {
 		return LaneDeferralRecord{Cycle: cycle, Cause: "git fetch origin main: cannot lock ref 'refs/remotes/origin/main'"}
 	}
@@ -57,6 +61,8 @@ func TestEvaluateLaneDeferrals_HaltsOnlyOnAnUnbrokenRun(t *testing.T) {
 }
 
 func TestConsecutiveFailures_LaneDeferredCyclesAreTransparent(t *testing.T) {
+	t.Parallel()
+
 	failed := []FailureDigest{
 		{Cycle: 11, Fingerprint: "scout|infra|aaa", PreClass: "infra"},
 		{Cycle: 13, Fingerprint: "build|verdict-fail|bbb", PreClass: "verdict-fail"},

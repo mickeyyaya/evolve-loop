@@ -55,6 +55,8 @@ func gitOut(t *testing.T, dir string, args ...string) string {
 }
 
 func TestSnapshotPreservedWorktree_CommitsDirtAndUntracked(t *testing.T) {
+	t.Parallel()
+
 	_, wt := initContinuationRepo(t, 71)
 	if err := os.WriteFile(filepath.Join(wt, "a.txt"), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -80,6 +82,8 @@ func TestSnapshotPreservedWorktree_CommitsDirtAndUntracked(t *testing.T) {
 }
 
 func TestSnapshotPreservedWorktree_CleanIsIdempotentHEAD(t *testing.T) {
+	t.Parallel()
+
 	_, wt := initContinuationRepo(t, 72)
 	head := gitOut(t, wt, "rev-parse", "HEAD")
 	sha, err := snapshotPreservedWorktree(context.Background(), "", wt)
@@ -92,6 +96,8 @@ func TestSnapshotPreservedWorktree_CleanIsIdempotentHEAD(t *testing.T) {
 }
 
 func TestStampContinuationManifest_WritesGatedManifest(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 73)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-73")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -128,6 +134,8 @@ func TestStampContinuationManifest_WritesGatedManifest(t *testing.T) {
 }
 
 func TestStampContinuationManifest_ConflictingWorkIsNotStamped(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 74)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-74")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -154,6 +162,8 @@ func TestStampContinuationManifest_ConflictingWorkIsNotStamped(t *testing.T) {
 }
 
 func TestAbnormalEpilogue_StampsContinuation(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 78)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-78")
 	if err := os.MkdirAll(ws, 0o755); err != nil {

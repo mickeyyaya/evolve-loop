@@ -54,6 +54,8 @@ func withCodeAuditFailBudget(n int) policy.SystemFailurePolicy {
 }
 
 func TestAuditGateFail_SkillsDriftOverPassNarrativeGrantsOneBuildRepairLedByItsRemediation(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow()
 
@@ -73,6 +75,8 @@ func TestAuditGateFail_SkillsDriftOverPassNarrativeGrantsOneBuildRepairLedByItsR
 }
 
 func TestAuditGateFail_IdenticalGateFailsAreBoundedByTheEnvelopeBudget(t *testing.T) {
+	t.Parallel()
+
 	shipped := policy.DefaultSystemFailurePolicy().Categories[policy.CategoryCodeAuditFail].MaxRetries
 	for _, budget := range []int{1, shipped} {
 		t.Run(fmt.Sprintf("max_retries=%d", budget), func(t *testing.T) {
@@ -104,6 +108,8 @@ func TestAuditGateFail_IdenticalGateFailsAreBoundedByTheEnvelopeBudget(t *testin
 }
 
 func TestAuditGateFail_ProseInfraSystemicRetroDoesNotHaltAGateDiagnosedFail(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow()
 	cr.o.failurePolicy = withCodeAuditFailBudget(1)
@@ -132,6 +138,8 @@ func TestAuditGateFail_ProseInfraSystemicRetroDoesNotHaltAGateDiagnosedFail(t *t
 }
 
 func TestDecideAfterRetroFloor_StaticGateDiagnosisRefutesProseInfraSystemic(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		reasons []string
@@ -154,6 +162,8 @@ func TestDecideAfterRetroFloor_StaticGateDiagnosisRefutesProseInfraSystemic(t *t
 }
 
 func TestDecideAfterRetroFloor_AGateThatExecutesCodeKeepsTheHalt(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		reasons []string
@@ -178,6 +188,8 @@ func TestDecideAfterRetroFloor_AGateThatExecutesCodeKeepsTheHalt(t *testing.T) {
 }
 
 func TestAuditGateFail_AnIntegrationTierRedKeepsItsRepairAndTheProseInfraSystemicHalt(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow()
 	cr.o.failurePolicy = withCodeAuditFailBudget(1)
@@ -204,6 +216,8 @@ func TestAuditGateFail_AnIntegrationTierRedKeepsItsRepairAndTheProseInfraSystemi
 }
 
 func TestAuditGateFail_AHarnessRedEGPSEarnsNoRepairAndKeepsTheHalt(t *testing.T) {
+	t.Parallel()
+
 	cs := CycleState{CycleID: 9001, WorkspacePath: t.TempDir(), AuditFailReasons: []string{tEGPSHarnessRed, tConflict1828}}
 
 	next, reason, _ := floorOrchestrator(fixedNextStrategy{next: "end"}).decideAfterAuditFail(cs)
@@ -218,6 +232,8 @@ func TestAuditGateFail_AHarnessRedEGPSEarnsNoRepairAndKeepsTheHalt(t *testing.T)
 }
 
 func TestAuditGateFail_AFailNarrativeBesideAGateDiagnosisDerivesNothingAndKeepsTheFloor(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "audit-report.md"), []byte("# Audit\n\n## Verdict\n**FAIL**\n\nCRITICAL: the retry envelope double-grants (H1).\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -236,6 +252,8 @@ func TestAuditGateFail_AFailNarrativeBesideAGateDiagnosisDerivesNothingAndKeepsT
 }
 
 func TestAuditGateFail_TheDerivedRouteIsRetryAtBuild(t *testing.T) {
+	t.Parallel()
+
 	cs := CycleState{CycleID: 1828, WorkspacePath: t.TempDir(), AuditFailReasons: []string{tSkillsDrift1828, tConflict1828}}
 
 	next, reason, sig := floorOrchestrator(fixedNextStrategy{next: "end"}).decideAfterAuditFail(cs)
@@ -246,6 +264,8 @@ func TestAuditGateFail_TheDerivedRouteIsRetryAtBuild(t *testing.T) {
 }
 
 func TestAuditRejectionReasons_AnAuditorDeclaredBlockKeepsTheDerivedGateBlockOut(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "PASS", policy.CategoryCodeAuditFail, "H1 the auditor rejected this build")
 	cs := CycleState{CycleID: 1828, WorkspacePath: dir, AuditFailReasons: []string{tSkillsDrift1828, tConflict1828}}
@@ -259,6 +279,8 @@ func TestAuditRejectionReasons_AnAuditorDeclaredBlockKeepsTheDerivedGateBlockOut
 }
 
 func TestDecideAfterRetroFloor_ProseInfraSystemicWithAnyNonGateReasonStillHalts(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name  string
 		audit []string
@@ -289,6 +311,8 @@ func TestDecideAfterRetroFloor_ProseInfraSystemicWithAnyNonGateReasonStillHalts(
 }
 
 func TestAuditGateFail_BookkeepingConflictStillTakesTheRegrade(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow()
 
@@ -310,6 +334,8 @@ func TestAuditGateFail_BookkeepingConflictStillTakesTheRegrade(t *testing.T) {
 }
 
 func TestAuditGateFail_GateBesideBookkeepingEarnsNeitherRoute(t *testing.T) {
+	t.Parallel()
+
 	cr := retroGateHarness(t, phasespec.Catalog{})
 	defer cr.releaseShipWindow()
 
@@ -331,6 +357,8 @@ func TestAuditGateFail_GateBesideBookkeepingEarnsNeitherRoute(t *testing.T) {
 }
 
 func TestAuditFailEnvelope_AnAuditorDeclaredClassKeepsItsFullEnvelope(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	cs := CycleState{CycleID: 1828, WorkspacePath: auditFailFixture(t, policy.CategoryCodeAuditFail, "H1 the auditor rejected this build"),
 		AuditFailReasons: []string{tGofmtDirty, tConflictWARN}}
@@ -423,6 +451,8 @@ func (gateForcedAuditRunner) Run(_ context.Context, req PhaseRequest) (PhaseResp
 }
 
 func TestResumePath_GateForcedAuditFailRepairsAtBuildWithinTheBudget(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 1828, WorkspacePath: t.TempDir()}}
 	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictFAIL, PhaseRetro: VerdictFAIL})
 	runners[PhaseAudit] = gateForcedAuditRunner{}

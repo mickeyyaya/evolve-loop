@@ -7,6 +7,8 @@ import (
 )
 
 func TestCodeRepoContractGate_DualRegistered(t *testing.T) {
+	t.Parallel()
+
 	if CodeRepoContractGate != shiperr.CodeRepoContractGate {
 		t.Errorf("core.CodeRepoContractGate = %q, want the shiperr re-export %q", CodeRepoContractGate, shiperr.CodeRepoContractGate)
 	}

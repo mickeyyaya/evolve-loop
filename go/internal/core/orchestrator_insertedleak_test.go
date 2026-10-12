@@ -108,6 +108,8 @@ func insertedLeakOrchestrator(t *testing.T, planJSON string, onRun func(PhaseReq
 }
 
 func TestInsertedPhaseMainTreeLeakRecovers(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -162,6 +164,8 @@ func TestInsertedPhaseMainTreeLeakRecovers(t *testing.T) {
 }
 
 func TestInsertedPhaseWorktreeWriteIsClean(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

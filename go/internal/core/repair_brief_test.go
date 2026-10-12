@@ -29,6 +29,8 @@ func writeBriefFixture(t *testing.T, ws, name, body string) {
 }
 
 func TestComposeRepairBrief_GateReasonsThenFindingsThenPersisted(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	auditName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	writeBriefFixture(t, ws, phasecontract.RoundArchiveFilename(auditName, 1), briefRound1)
@@ -58,6 +60,8 @@ func TestComposeRepairBrief_GateReasonsThenFindingsThenPersisted(t *testing.T) {
 }
 
 func TestComposeRepairBrief_FindingsAloneStillSeed(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeBriefFixture(t, ws, phasecontract.ArtifactFilename(string(PhaseAudit)), briefRound1)
 	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
@@ -75,6 +79,8 @@ func TestComposeRepairBrief_FindingsAloneStillSeed(t *testing.T) {
 }
 
 func TestArchiveRepairPrompts_RenamesOnceNeverClobbers(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeBriefFixture(t, ws, "build-prompt.txt", "round one prompt")
 	archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1}, PhaseBuild)
@@ -124,6 +130,8 @@ func (r *findingsAuditRunner) Run(_ context.Context, req PhaseRequest) (PhaseRes
 }
 
 func TestRepairRoundDispatch_BriefCarriesAuditorFindingsAndArchivesPrompt(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(map[Phase]string{PhaseRetro: VerdictFAIL})
 	ar := &findingsAuditRunner{t: t}
@@ -168,6 +176,8 @@ func TestAuditorFindingsBrief_UnreadableReportWarns(t *testing.T) {
 }
 
 func TestTruncateFindings_CutsAtLineBoundary(t *testing.T) {
+	t.Parallel()
+
 	line := strings.Repeat("x", 100) + " — finding…\n" // 100 ASCII + multi-byte tail
 	s := strings.Repeat(line, maxFindingsBytes/len(line)+3)
 	got := truncateFindings(s)

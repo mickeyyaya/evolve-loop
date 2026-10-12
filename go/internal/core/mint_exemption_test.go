@@ -8,6 +8,8 @@ import (
 )
 
 func TestVerifiedActiveMints(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	write := func(name, body string) {
 		t.Helper()
@@ -56,6 +58,8 @@ func TestVerifiedActiveMints(t *testing.T) {
 // Companion end-to-end pins live in treediff_crosslane_mint_test.go
 // (integration tag).
 func TestIsActiveMintPhasePath(t *testing.T) {
+	t.Parallel()
+
 	mints := map[string]bool{"gate-wiring-proof": true, "gate": true}
 	cases := []struct {
 		path string

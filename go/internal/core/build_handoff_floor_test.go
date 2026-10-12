@@ -19,6 +19,8 @@ func recordingCheck(name string, calls *[]string, failures ...string) BuildFloor
 }
 
 func TestBuildHandoffFloor_FailuresRunsEveryCheckInOrderAndNamesThem(t *testing.T) {
+	t.Parallel()
+
 	var calls []string
 	floor := BuildHandoffFloor{
 		recordingCheck("first", &calls, "first: red"),
@@ -39,6 +41,8 @@ func TestBuildHandoffFloor_FailuresRunsEveryCheckInOrderAndNamesThem(t *testing.
 }
 
 func TestBuildHandoffFloor_ReviewRejectsInTheFloorsOwnWords(t *testing.T) {
+	t.Parallel()
+
 	var calls []string
 	floor := BuildHandoffFloor{recordingCheck("only", &calls, "Explanation Documentation: cited path a.go is not in the Build diff")}
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: "/wt"}
@@ -53,6 +57,8 @@ func TestBuildHandoffFloor_ReviewRejectsInTheFloorsOwnWords(t *testing.T) {
 }
 
 func TestWholeBuildHandoffFloor_RunsTheMandatoryExplanationFloorFirst(t *testing.T) {
+	t.Parallel()
+
 	var calls []string
 	composed := BuildHandoffFloor{recordingCheck("production", &calls)}
 	whole := WholeBuildHandoffFloor(composed)
@@ -69,6 +75,8 @@ func TestWholeBuildHandoffFloor_RunsTheMandatoryExplanationFloorFirst(t *testing
 }
 
 func TestMandatoryBuildHandoffFloor_LegacyCycleOwesNoExplanation(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -90,6 +98,8 @@ func TestMandatoryBuildHandoffFloor_LegacyCycleOwesNoExplanation(t *testing.T) {
 }
 
 func TestOrchestrator_BuildHandoffFloorNames_ListsEveryFloorCheckTheReviewerRuns(t *testing.T) {
+	t.Parallel()
+
 	var calls []string
 	composed := BuildHandoffFloor{recordingCheck("production", &calls), recordingCheck("document-solution", &calls)}
 	o := NewOrchestrator(nil, nil, nil, WithReviewer(ChainReviewers(composed, noopReviewer{})))
@@ -107,6 +117,8 @@ func TestOrchestrator_BuildHandoffFloorNames_ListsEveryFloorCheckTheReviewerRuns
 }
 
 func TestReviewInputFor_ProjectsTheCycleBindingTheFloorReviews(t *testing.T) {
+	t.Parallel()
+
 	cs := CycleState{
 		CycleID: 1788, RunID: "01M3SPWPFVP5QQQYYCDBNPN0CT", ExplanationDocumentationVersion: 1,
 		WorktreeBaseSHA: strings.Repeat("6", 40), WorkspacePath: "/p/.evolve/runs/cycle-1788", ActiveWorktree: "/p/.evolve/worktrees/cycle-1788",
@@ -157,6 +169,8 @@ func TestReadRunCycleState_PrefersTheWorkspaceMirrorAndNamesAnUnreadableFile(t *
 }
 
 func TestBuildHandoffProbe_Input_BindsThePersistedCycleOrSaysWhyNot(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	ws := t.TempDir()
 	writeRunState(t, ws, `{"cycle_id":1788,"phase":"build","run_id":"run-1788","explanation_documentation_version":1,"worktree_base_sha":"abc","workspace_path":"`+ws+`","active_worktree":"`+wt+`"}`)

@@ -8,6 +8,8 @@ import (
 )
 
 func TestContractGateDemotion_IntentIsACorrectnessClassedConsoleAutofile(t *testing.T) {
+	t.Parallel()
+
 	in := ContractGateDemotion{Phase: PhaseBuild, CLI: "codex-tmux", Cycle: 42, Blocks: 3, Weight: 0.75, Reason: "the gate demoted itself"}.Intent()
 	if in.PriorityClass != "correctness" {
 		t.Errorf("a gate that stopped judging deliverables is a correctness defect; priority_class = %q", in.PriorityClass)

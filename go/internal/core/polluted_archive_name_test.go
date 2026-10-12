@@ -10,6 +10,8 @@ import (
 )
 
 func TestArchivePollutedWorkspace_MintsANameThatGCDiscoveryAccepts(t *testing.T) {
+	t.Parallel()
+
 	ws := filepath.Join(t.TempDir(), "cycle-1604")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)

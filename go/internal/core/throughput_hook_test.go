@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestShippedOutcome(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name              string
 		verdict           string
@@ -26,6 +28,8 @@ func TestShippedOutcome(t *testing.T) {
 }
 
 func TestThroughputRecorderWired_Probe(t *testing.T) {
+	t.Parallel()
+
 	bare := &Orchestrator{}
 	if bare.ThroughputRecorderWired() {
 		t.Error("zero orchestrator must report recorder unwired")
@@ -38,6 +42,8 @@ func TestThroughputRecorderWired_Probe(t *testing.T) {
 }
 
 func TestIsShippingVerdict_WholeOutcomeVocabulary(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		verdict string
 		want    bool
@@ -61,6 +67,8 @@ func TestIsShippingVerdict_WholeOutcomeVocabulary(t *testing.T) {
 }
 
 func TestIsShippingVerdict_IsTheOneDefinitionShippedOutcomeUses(t *testing.T) {
+	t.Parallel()
+
 	for _, v := range []string{
 		VerdictPASS, VerdictFAIL, VerdictWARN,
 		CycleOutcomeShippedViaBuild, CycleOutcomeSkippedAuditAdvisory,

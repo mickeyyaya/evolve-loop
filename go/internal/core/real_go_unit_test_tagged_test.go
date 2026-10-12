@@ -30,6 +30,8 @@ func taggedModule(t *testing.T) string {
 }
 
 func TestRealGoUnitTestTagged_RunsTheTaggedTests(t *testing.T) {
+	t.Parallel()
+
 	mod := taggedModule(t)
 	cases := []struct {
 		name       string
@@ -55,6 +57,8 @@ func TestRealGoUnitTestTagged_RunsTheTaggedTests(t *testing.T) {
 }
 
 func TestRealGoUnitTestTagged_CancelledContextFails(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 

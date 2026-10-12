@@ -8,6 +8,8 @@ import (
 )
 
 func TestApplyDefects_BlankDefectIgnored(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{}
 	record := core.FailedRecord{
 		Cycle:   3,
@@ -22,6 +24,8 @@ func TestApplyDefects_BlankDefectIgnored(t *testing.T) {
 }
 
 func TestApplyDefects_MixedBlankAndRealDefects(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{}
 	record := core.FailedRecord{
 		Cycle:   4,
@@ -47,6 +51,8 @@ func TestApplyDefects_MixedBlankAndRealDefects(t *testing.T) {
 }
 
 func TestApplyDefects_Idempotent(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{}
 	record := core.FailedRecord{
 		Cycle:   5,
@@ -66,6 +72,8 @@ func TestApplyDefects_Idempotent(t *testing.T) {
 }
 
 func TestApplyDefects_DeterministicIDs(t *testing.T) {
+	t.Parallel()
+
 	record := core.FailedRecord{
 		Cycle:   6,
 		Verdict: "FAIL",
@@ -86,6 +94,8 @@ func TestApplyDefects_DeterministicIDs(t *testing.T) {
 }
 
 func TestApplyDefects_PriorityIsP0(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{}
 	record := core.FailedRecord{
 		Cycle:   7,
@@ -107,6 +117,8 @@ func TestApplyDefects_PriorityIsP0(t *testing.T) {
 }
 
 func TestApplyDefects_CyclesUnpickedStartsAtZero(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{}
 	record := core.FailedRecord{
 		Cycle:   8,
@@ -128,6 +140,8 @@ func TestApplyDefects_CyclesUnpickedStartsAtZero(t *testing.T) {
 }
 
 func TestApplyDefects_FirstSeenCycleMatchesRecord(t *testing.T) {
+	t.Parallel()
+
 	const cycle = 9
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -150,6 +164,8 @@ func TestApplyDefects_FirstSeenCycleMatchesRecord(t *testing.T) {
 }
 
 func TestApplyDefects_EachDefectGetsOwnTodo(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{}
 	defects := []string{"defect alpha", "defect beta", "defect gamma"}
 	record := core.FailedRecord{
@@ -171,6 +187,8 @@ func TestApplyDefects_EachDefectGetsOwnTodo(t *testing.T) {
 }
 
 func TestApplyDefects_NilDefectsSlice(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{}
 	record := core.FailedRecord{
 		Cycle:   11,
@@ -184,6 +202,8 @@ func TestApplyDefects_NilDefectsSlice(t *testing.T) {
 }
 
 func TestApplyDefects_ExistingTodosNotReplaced(t *testing.T) {
+	t.Parallel()
+
 	state := &core.State{
 		CarryoverTodos: []core.CarryoverTodo{
 			{ID: "pre-existing", Action: "existing work", Priority: "P1"},

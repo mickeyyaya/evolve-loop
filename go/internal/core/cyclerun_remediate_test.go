@@ -55,6 +55,8 @@ func remediationDispatches(build *scriptedRunner) []string {
 }
 
 func TestRemediation_GateFailThenPassContinuesSpine(t *testing.T) {
+	t.Parallel()
+
 	// tdd stands in for a deterministic gate: spine-reachable with the fake
 	// runner map and NOT on the judgment deny-list (which the mechanism
 	// enforces regardless of configuration — pinned separately below).
@@ -104,6 +106,8 @@ func (r *buildReviewCounter) Review(_ context.Context, in ReviewInput) ReviewRes
 }
 
 func TestRemediation_BuilderFixPassesThroughBuildReviewChain(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(nil)
 	gate := &scriptedRunner{name: PhaseTDD, verdicts: []string{VerdictFAIL, VerdictPASS}}
 	build := &scriptedRunner{name: PhaseBuild, verdicts: []string{VerdictPASS}}
@@ -121,6 +125,8 @@ func TestRemediation_BuilderFixPassesThroughBuildReviewChain(t *testing.T) {
 }
 
 func TestRemediation_RoundCapIsHard(t *testing.T) {
+	t.Parallel()
+
 	wf := policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"tdd"}}
 	gate, build, res, err := remediationHarness(t, wf, PhaseTDD, []string{VerdictFAIL, VerdictFAIL})
 	if err != nil {
@@ -143,6 +149,8 @@ func TestRemediation_RoundCapIsHard(t *testing.T) {
 }
 
 func TestRemediation_ZeroConfigIsByteIdenticalLegacy(t *testing.T) {
+	t.Parallel()
+
 	_, build, res, err := remediationHarness(t, policy.WorkflowConfig{}, PhaseTDD, []string{VerdictFAIL})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -160,6 +168,8 @@ func TestRemediation_ZeroConfigIsByteIdenticalLegacy(t *testing.T) {
 }
 
 func TestRemediation_UnlistedPhaseUntouched(t *testing.T) {
+	t.Parallel()
+
 	wf := policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"coverage-gate"}}
 	_, build, res, err := remediationHarness(t, wf, PhaseTDD, []string{VerdictFAIL})
 	if err != nil {
@@ -178,6 +188,8 @@ func TestRemediation_UnlistedPhaseUntouched(t *testing.T) {
 // mechanism itself — a builder re-roll against an LLM-judgment verdict would
 // be a gamed verdict, not a fix.
 func TestRemediation_JudgmentPhasesDeniedRegardlessOfConfig(t *testing.T) {
+	t.Parallel()
+
 	wf := policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"audit"}}
 	_, build, res, err := remediationHarness(t, wf, PhaseAudit, []string{VerdictFAIL})
 	if err != nil {
@@ -195,6 +207,8 @@ func TestRemediation_JudgmentPhasesDeniedRegardlessOfConfig(t *testing.T) {
 // fix dispatch appears in the phase record under its own label, never
 // clobbering the build phase's own records.
 func TestRemediation_RecordsFixDispatchInPhaseRecord(t *testing.T) {
+	t.Parallel()
+
 	wf := policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"tdd"}}
 	_, _, res, err := remediationHarness(t, wf, PhaseTDD, []string{VerdictFAIL, VerdictPASS})
 	if err != nil {
@@ -225,6 +239,8 @@ func (r *diagRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, er
 // explanation reaches the result (summary + dossier surfaces), not just
 // workspace artifacts and orchestrator memory.
 func TestFailReasonsSurfaceInResult(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(nil)
 	runners[PhaseAudit] = &diagRunner{name: PhaseAudit}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
@@ -253,6 +269,8 @@ func TestFailReasonsSurfaceInResult(t *testing.T) {
 // actually exercised.
 // See ADR-0097.
 func TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(nil)
 	gate := &scriptedRunner{name: PhaseScout, verdicts: []string{VerdictFAIL, VerdictPASS}}
 	runners[PhaseScout] = gate
@@ -286,6 +304,8 @@ func TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot(t *testing.T) {
 // parallel-evaluate batch. A flag wired on the live loop alone would leave
 // these red.
 func TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces(t *testing.T) {
+	t.Parallel()
+
 	// Resume from audit: the resumed audit is fenced, the ship after it is a
 	// native phase (no worktree writes to fence — and it is not a source writer).
 	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictPASS})
@@ -328,6 +348,8 @@ func (r *cancelProbeRunner) Run(_ context.Context, _ PhaseRequest) (PhaseRespons
 }
 
 func TestObservedRun_TheObserverWatchesTheWholeRun(t *testing.T) {
+	t.Parallel()
+
 	obs := &recordingObserver{}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithObserver(obs))
 	cr := &cycleRun{o: o, ctx: context.Background()}

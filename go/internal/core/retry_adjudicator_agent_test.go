@@ -8,6 +8,8 @@ import (
 )
 
 func TestParseAdjudication(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		stdout     string
@@ -51,6 +53,8 @@ func TestParseAdjudication(t *testing.T) {
 }
 
 func TestParseAdjudication_FallsBackToTheArtifact(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	p := filepath.Join(dir, "failure-adjudication.json")
 	if err := os.WriteFile(p, []byte(`{"action":"retry@tdd","justification":"encode the defects as tests"}`), 0o644); err != nil {
@@ -65,6 +69,8 @@ func TestParseAdjudication_FallsBackToTheArtifact(t *testing.T) {
 }
 
 func TestBridgeRetryAdjudicator_NilBridgeIsANoOp(t *testing.T) {
+	t.Parallel()
+
 	a := NewBridgeRetryAdjudicator(nil, AgentIdentity{}, t.TempDir())
 
 	if got := a.Adjudicate(CycleState{WorkspacePath: t.TempDir()}, retryEnvelope{}); got != nil {
@@ -75,6 +81,8 @@ func TestBridgeRetryAdjudicator_NilBridgeIsANoOp(t *testing.T) {
 // Only the profile path is checkable from this package; the persona↔profile
 // pairing itself is enforced by phasecoherence.TestRepoPersonaProfilePairing.
 func TestAdjudicatorProfilePathMatchesTheShippedProfile(t *testing.T) {
+	t.Parallel()
+
 	root := repoRootForTest(t)
 	a := &bridgeRetryAdjudicator{root: root}
 
@@ -85,6 +93,8 @@ func TestAdjudicatorProfilePathMatchesTheShippedProfile(t *testing.T) {
 }
 
 func TestWithRetryAdjudicator(t *testing.T) {
+	t.Parallel()
+
 	var _ RetryAdjudicator = (*bridgeRetryAdjudicator)(nil)
 	want := NewBridgeRetryAdjudicator(nil, AgentIdentity{}, "")
 
@@ -99,6 +109,8 @@ func TestWithRetryAdjudicator(t *testing.T) {
 }
 
 func TestParseAdjudication_RecoversTheLastObjectAmongSeveral(t *testing.T) {
+	t.Parallel()
+
 	raw := `{"note":"my first draft, ignore"}` + "\n" +
 		`Some reasoning about the failure. Consider {this} aside.` + "\n" +
 		`{"action":"retry@build","justification":"the change is wrong, the tests are right"}`

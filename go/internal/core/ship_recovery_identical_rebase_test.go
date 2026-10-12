@@ -11,6 +11,8 @@ import (
 )
 
 func TestRecoverFromShipError_IdenticalRebaseSkipsBuild(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 	doc, err := os.ReadFile(filepath.Join(fx.worktree, filepath.FromSlash(fx.doc)))
 	if err != nil {
@@ -40,6 +42,8 @@ func TestRecoverFromShipError_IdenticalRebaseSkipsBuild(t *testing.T) {
 }
 
 func TestRecoverFromShipError_NonIdenticalRebaseStillReturnsToBuild(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "shared.txt", editSharedLine(1, "lane edit"), editSharedLine(12, "peer edit"))
 	storage := &fakeStorage{}
 
@@ -58,6 +62,8 @@ func TestRecoverFromShipError_NonIdenticalRebaseStillReturnsToBuild(t *testing.T
 }
 
 func TestRecoverFromShipError_WithoutAnAuditedTreeRebasesTheShipCommit(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 
 	next, recovering, _ := fx.recover(&fakeStorage{})
@@ -74,6 +80,8 @@ func TestRecoverFromShipError_WithoutAnAuditedTreeRebasesTheShipCommit(t *testin
 }
 
 func TestRecoverFromShipError_APredictedConflictIsNotUnwound(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "shared.txt", editSharedLine(1, "lane edit"), editSharedLine(1, "peer edit"))
 
 	fx.recover(&fakeStorage{}, fx.auditRow())
@@ -87,6 +95,8 @@ func TestRecoverFromShipError_APredictedConflictIsNotUnwound(t *testing.T) {
 }
 
 func TestRecoverFromShipError_ALegacyCycleIsNotUnwound(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{fx.auditRow()}}, buildRunners(nil))
 	cs := fx.cycleState()

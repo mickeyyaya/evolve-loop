@@ -76,6 +76,8 @@ func intField(m map[string]any, key string) int {
 }
 
 func TestSealCycle_ConcurrentUpdateStateNoLostUpdate(t *testing.T) {
+	t.Parallel()
+
 	ev := t.TempDir()
 	concurrencySealFixture(t, ev, 42) // state.json{lastCycleNumber:41,version:18,...}
 	statePath := filepath.Join(ev, "state.json")
@@ -140,6 +142,8 @@ func TestSealCycle_ConcurrentUpdateStateNoLostUpdate(t *testing.T) {
 }
 
 func TestSealCycle_ManyConcurrentUpdateStateWritersNoLostUpdate(t *testing.T) {
+	t.Parallel()
+
 	ev := t.TempDir()
 	concurrencySealFixture(t, ev, 42) // state.json{lastCycleNumber:41,version:18,...}
 	statePath := filepath.Join(ev, "state.json")
@@ -194,6 +198,8 @@ func TestSealCycle_ManyConcurrentUpdateStateWritersNoLostUpdate(t *testing.T) {
 }
 
 func TestSealCycle_LockReleasedPromptlyAfterCompletion(t *testing.T) {
+	t.Parallel()
+
 	ev := t.TempDir()
 	concurrencySealFixture(t, ev, 7)
 	fs := storage.New(ev)
