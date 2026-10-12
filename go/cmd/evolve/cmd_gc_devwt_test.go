@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -494,9 +495,30 @@ func TestRunGCHook_LogsEachDeletedBranchWithItsHeadUnderEnforce(t *testing.T) {
 	}
 }
 
-func blockingDevExec(verb, dirPart string) sysexec.RunFunc {
+func endableSweep(t *testing.T) func() {
+	t.Helper()
+	prev := devSweepContext
+	t.Cleanup(func() { devSweepContext = prev })
+	var mu sync.Mutex
+	var end context.CancelFunc = func() {}
+	devSweepContext = func(parent context.Context, _ time.Duration) (context.Context, context.CancelFunc) {
+		ctx, cancel := context.WithCancel(context.WithoutCancel(parent))
+		mu.Lock()
+		end = cancel
+		mu.Unlock()
+		return ctx, cancel
+	}
+	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+		end()
+	}
+}
+
+func blockingDevExec(verb, dirPart string, endSweep func()) sysexec.RunFunc {
 	return func(ctx context.Context, name, d string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
 		if len(args) > 0 && args[0] == verb && strings.Contains(d, dirPart) {
+			endSweep()
 			<-ctx.Done()
 			return -1, ctx.Err()
 		}
@@ -509,13 +531,14 @@ func oneSecondBudget() gc.Policy {
 }
 
 func TestGCRunDevWorktrees_ATreeCutByTheSweepBudgetIsSkippedWithAWarnAndIsNotAFailure(t *testing.T) {
+	endSweep := endableSweep(t)
 	h := newGCDevHub(t, `{}`)
 	h.addDevAt("slow-lane", 40)
 	var stdout, stderr bytes.Buffer
 	r := newGCRun(context.Background(), true, &stdout, &stderr)
 	opts := mustDevOptions(t, h.runtime, h.evolve, oneSecondBudget())
 	opts.OpenPRs = func(context.Context, string) (map[string][]time.Time, error) { return nil, nil }
-	opts.Exec = blockingDevExec("symbolic-ref", "slow-lane")
+	opts.Exec = blockingDevExec("symbolic-ref", "slow-lane", endSweep)
 	if r.devWorktreesWith(opts) {
 		t.Errorf("a budget skip failed gc; stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
@@ -528,12 +551,14 @@ func TestGCRunDevWorktrees_ATreeCutByTheSweepBudgetIsSkippedWithAWarnAndIsNotAFa
 }
 
 func TestGCRunDevWorktrees_ASlowProcessListWarnsArchivesNothingAndIsNotAFailure(t *testing.T) {
+	endSweep := endableSweep(t)
 	h := newGCDevHub(t, `{}`)
 	dir := h.addDevAt("old-lane", 40)
 	var stdout, stderr bytes.Buffer
 	r := newGCRun(context.Background(), false, &stdout, &stderr)
 	opts := mustDevOptions(t, h.runtime, h.evolve, oneSecondBudget())
 	opts.Processes = func(ctx context.Context) ([]gc.Process, error) {
+		endSweep()
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}
@@ -549,6 +574,7 @@ func TestGCRunDevWorktrees_ASlowProcessListWarnsArchivesNothingAndIsNotAFailure(
 }
 
 func TestGCRunDevWorktrees_ASpentBudgetDefersTheArchiveOfTheTreesItJudged(t *testing.T) {
+	endSweep := endableSweep(t)
 	h := newGCDevHub(t, `{}`)
 	oldDir := h.addDevAt("old-lane", 40)
 	h.addDevAt("slow-lane", 40)
@@ -556,7 +582,7 @@ func TestGCRunDevWorktrees_ASpentBudgetDefersTheArchiveOfTheTreesItJudged(t *tes
 	r := newGCRun(context.Background(), false, &stdout, &stderr)
 	opts := mustDevOptions(t, h.runtime, h.evolve, oneSecondBudget())
 	opts.OpenPRs = func(context.Context, string) (map[string][]time.Time, error) { return nil, nil }
-	opts.Exec = blockingDevExec("symbolic-ref", "slow-lane")
+	opts.Exec = blockingDevExec("symbolic-ref", "slow-lane", endSweep)
 	if r.devWorktreesWith(opts) {
 		t.Errorf("a deferred archive failed gc; stderr=%q", stderr.String())
 	}
@@ -594,6 +620,7 @@ func TestGCDevItemLine_ASkippedTreeSaysSkipped(t *testing.T) {
 }
 
 func TestGCRunDevWorktrees_ABudgetThatEndsMidApplyWarnsNamesTheTreeAndIsNotAFailure(t *testing.T) {
+	endSweep := endableSweep(t)
 	h := newGCDevHub(t, `{}`)
 	dir := h.addDevAt("old-lane", 40)
 	var stdout, stderr bytes.Buffer
@@ -603,6 +630,7 @@ func TestGCRunDevWorktrees_ABudgetThatEndsMidApplyWarnsNamesTheTreeAndIsNotAFail
 	var calls atomic.Int32
 	opts.Exec = func(ctx context.Context, name, d string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
 		if len(args) > 0 && args[0] == "symbolic-ref" && strings.Contains(d, "old-lane") && calls.Add(1) > 1 {
+			endSweep()
 			<-ctx.Done()
 			return -1, ctx.Err()
 		}

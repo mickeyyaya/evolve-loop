@@ -24,9 +24,13 @@ func (r gcRun) devWorktrees(projectRoot, evolveDir string, pol gc.Policy) bool {
 	return r.devWorktreesWith(opts)
 }
 
+var devSweepContext = func(parent context.Context, budget time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(parent), budget)
+}
+
 func (r gcRun) devWorktreesWith(opts gc.DevOptions) bool {
 	budget := opts.Policy.SweepBudget()
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.ctx), budget)
+	ctx, cancel := devSweepContext(r.ctx, budget)
 	defer cancel()
 	manifest, err := gc.PlanDevWorktrees(ctx, opts)
 	if err != nil {
