@@ -3,6 +3,8 @@
 > **Authoritative.** This document supersedes `docs/TEST_PLAN.md` (the Phase-1
 > bash→Go parity plan). Once the Go-only consolidation lands, `docs/TEST_PLAN.md`
 > is historical.
+>
+> **The design of record** for the test system is [docs/architecture/test-system.md](../../docs/architecture/test-system.md) ([ADR-0131](../../docs/architecture/adr/0131-one-test-run-feeds-every-coverage-gate.md)): the design of one test case, the run with one instrumented pass, isolation, the helper kits and wall budgets. This file stays the how-to.
 
 The Go binary is the only runtime. Name new permanent tests for the **behavior**
 they pin. Existing cycle/ACS identities remain compatibility contracts until a
