@@ -16,6 +16,7 @@
 8. [Verification](#8-verification)
 9. [Risks](#9-risks)
 10. [Open questions](#10-open-questions)
+11. [Update: the review of every slow test](#11-update-the-review-of-every-slow-test)
 
 ## 1. Request
 
@@ -162,3 +163,62 @@ Each lane reports its before and after numbers from a `go test -json` stream. Th
 
 1. When does the module baseline move to Go 1.25? This decision opens `testing/synctest` (design §7.4). It is not part of this plan.
 2. Does a CI shard (design D) become necessary after T9? Measure after T9.
+
+## 11. Update: the review of every slow test
+
+The operator wrote this on 2026-10-12: "Review all timeout tests to rethink the possible optimization/parallelized computing." Research §10 has the evidence. In short: `git` and the `go` tool hold 81% of the slow-test time. Both are 2 times slower in the full run than alone, because they compete for the same CPUs.
+
+### 11.1 Candidate approaches
+
+Each criterion has a score from 1 (bad) to 5 (good).
+
+| Approach | What it does | Wall time (local and CI) | Effect on contention | Risk to coverage and safety | Cost | Total |
+|---|---|---|---|---|---|---|
+| A. More parallel | T11 in every slow package | 4 | 2 | 4 | 4 | 14 |
+| B. Less work | Repository templates, one `go` build for each test binary, a CPU limit on nested `go` runs, injected sleeps and writers | 5 | 5 | 4 | 3 | 17 |
+| C. A separate heavy step | Run the `go` tool and `tmux` tests in their own step, with fewer packages at a time | 3 | 4 | 4 | 3 | 14 |
+| D. CI shards | Split the packages over more CI runners | 3 | 3 | 5 | 2 | 13 |
+| E. Move to the e2e tier | Run full-cycle tests only in the e2e tier | 4 | 4 | 1 | 4 | 13 |
+
+**B wins** (17). It is the only approach that removes work, so it helps the local floor, CI and a loaded host at the same time. A and C only change when the work runs, and D only helps CI. E loses coverage: the e2e tier does not write the coverage profile that the gates read (D1).
+
+### 11.2 What the final design takes from the others
+
+| From | What the design takes |
+|---|---|
+| B (the winner) | T12 (repository templates), T13 (one status read), and T14 to T16 below |
+| A | T11 in `internal/core`, `internal/phases/ship` and `cmd/evolve` now; T17 extends it to `internal/phases/audit`, `internal/bridge` and `internal/ciparity` after T14 cuts the contention |
+| C | The CPU limit on nested `go` runs (D29) gives most of the gain of a separate step without a second run |
+| D | No change now. Measure again after T17; add shards only if CI passes its budget |
+
+### 11.3 Decisions
+
+| Id | Decision | Because |
+|---|---|---|
+| D28 | A test binary that needs the `evolve` binary or the skills generator builds it one time, in `TestMain` or a `sync.Once`. Its tests share the result. | R20, F10.3 |
+| D29 | A test that runs the `go` tool sets `GOFLAGS=-p=2` and `GOMAXPROCS=2` for that run and uses the host build cache. A test helper in `internal/gotooltest` owns this rule. | R21, F10.2 |
+| D30 | The phase configurations pass `SleepFn` to the runner; the phase tests make the settle free. | R22, F10.5 |
+| D31 | Code that writes to `os.Stderr` takes an `io.Writer` from its dependencies or parameters; its tests stop the swap and run in parallel. | R23, F10.7 |
+| D32 | T11 extends to `internal/phases/audit`, `internal/bridge` and `internal/ciparity` after D28 and D29. | R24, F10.8 |
+| D33 | Learned or impact-based test selection and the move of tests to the e2e tier stay rejected. | §11.1 |
+
+### 11.4 Components
+
+| Id | Component | Red test first | Owner |
+|---|---|---|---|
+| T14 | D28 and D29: one build for each test binary, and the `gotooltest` helper. The first users are the skills-drift tests, `internal/core` and the five tests of research F10.3. | The number of `go build` runs in a package run drops to one for each binary; nested runs carry the limits | Sonnet |
+| T15 | D30: the phase configurations pass `SleepFn` | `TestRun_EmptyArtifact_FAIL` of each phase finishes in under 1 s | Sonnet |
+| T16 | D31: injected writers in place of `os.Stderr` swaps, first in `internal/core` (116 tests) | The guard of T11 accepts the tests as parallel; the outputs stay the same | Sonnet |
+| T17 | D32: T11 for `internal/phases/audit`, `internal/bridge` and `internal/ciparity` | As T11, with the `-count=3 -race -shuffle=on` gate | Sonnet |
+
+### 11.5 Order
+
+1. T11 in the three packages (lanes are open).
+2. T12 and T14 next. They remove the two largest costs: `git` processes and `go` builds.
+3. T13, T15 and T16.
+4. T17 after T14, so that more parallel tests do not raise the contention.
+5. T4 last, as the guard: the 20-minute timeout and the budget report.
+
+### 11.6 Verification
+
+The same full run with `-json` (research §10 method) after each step. The goal is that no package passes the budget of 180 s under `-race` on CI (D10). Each of the six packages of research F10.1 must go down.

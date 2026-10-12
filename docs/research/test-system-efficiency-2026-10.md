@@ -17,6 +17,7 @@ Date: 2026-10-12. Method: measurement on `main` at `be0a0a979`, a static scan of
 7. [Adopt or reject](#7-adopt-or-reject)
 8. [Refinements to adopt](#8-refinements-to-adopt)
 9. [The timeout investigation](#9-the-timeout-investigation)
+10. [A review of every slow test](#10-a-review-of-every-slow-test)
 
 ## 1. Inventory and growth
 
@@ -249,3 +250,70 @@ A `git` call costs about 25 to 35 ms on this host, and more under load.
 | R16 | A repository template, built one time for each test binary, replaces the repeated setup of the same fixture. | F9.3, F9.4 |
 | R17 | One recovery try reads `git status --porcelain -uall` one time and passes the result on. | F9.4 |
 | R18 | The 20-minute timeout and the package budget (T4) come after R14, as a guard and an alarm, not as the fix. | F9.1 to F9.5 |
+
+## 10. A review of every slow test
+
+The operator wrote this on 2026-10-12: "Review all timeout tests to rethink the possible optimization/parallelized computing." Section 9 found the cause of the timeout in three packages. This section reviews every slow test of the suite and asks what removes its cost, not only what runs it in parallel.
+
+Method: one full run of `make test-integration` with `-json` and a 40-minute timeout, on `main` at `aa693e95c` (2026-10-12, a loaded host). Then each of the 150 slowest tests ran alone, with a logging `git`, `go` and `tmux` on `PATH`. A test is `git`-bound when its `git` calls at 30 ms each make half or more of its time alone. A test that starts `go` or `tmux` is in that class first.
+
+**F10.1** The full run passed (285 packages). The sum of all top-level tests was 4,102 s. 894 tests of 1 s or more hold 3,339 s (81%), and 2,504 s of that is serial. Six packages hold most of it:
+
+| Package | Wall time | Tests of 1 s or more | Serial seconds | Parallel seconds |
+|---|---|---|---|---|
+| `internal/core` | 757 s | 305 | 553 | 365 |
+| `internal/phases/ship` | 607 s | 168 | 524 | 4 |
+| `cmd/evolve` | 520 s | 148 | 374 | 282 |
+| `internal/phases/audit` | 358 s | 27 | 348 | 0 |
+| `internal/bridge` | 266 s | 48 | 174 | 44 |
+| `internal/ciparity` | 127 s | 18 | 119 | 0 |
+
+**F10.2** The 150 slowest tests (1,776 s of suite time) have these dominant costs:
+
+| Cost | Tests | Suite seconds | Seconds alone | Suite / alone |
+|---|---|---|---|---|
+| `git` processes | 68 | 743 | 329 | 2.3 |
+| the `go` tool (build, test, run, list) | 45 | 704 | 378 | 1.9 |
+| `git` with waits or CPU | 19 | 155 | 156 | 1.0 |
+| `tmux` | 8 | 88 | 64 | 1.4 |
+| waits or CPU only | 10 | 85 | 66 | 1.3 |
+
+*Implication:* `git` and the `go` tool are 81% of the slow-test time. Both get 2 times slower in the full run than alone, because they compete for the same CPUs.
+
+**F10.3** The `go` tool cost is in a few places:
+
+| Package | Seconds | Tests |
+|---|---|---|
+| `internal/phases/audit` | 297 | the skills-drift gate tests; each one builds and runs the generator of a lane repository |
+| `internal/core` | 155 | `TestCycleScenarios`, the scoped coverage and real `go test` floor tests |
+| `internal/bridge` | 60 | the pane-parity tests |
+| `cmd/evolve` | 56 | several |
+| `internal/ciparity` | 48 | the real `make` recipes |
+| `internal/phases/ship` | 40 | several |
+
+ Five tests compile the whole `evolve` binary for each test, with no shared build (`e2e_cycle_cli_matrix_test.go:203`, `e2e_serve_phase_subprocess_test.go:25`, `flakylint_test.go:373`, `validateprofile_parity_test.go:41`, `test/e2e/version_smoke_test.go:27`).
+*Implication:* a nested `go` run uses all CPUs while 14 test binaries already run. One build for each test binary, and a CPU limit on nested `go` runs, cut both the work and the contention.
+
+**F10.4** The `git` cost is in `cmd/evolve` (328 s), `internal/phases/ship` (183 s) and `internal/core` (159 s). In `cmd/evolve`, loop tests drive full cycles with 180 to 260 `git` calls each. In `internal/core`, `TestCycleScenarios` alone makes 971 calls. Section 9 found that most calls build fixture repositories and that production repeats `git status --porcelain -uall`.
+
+**F10.5** Fixed waits: `TestRun_EmptyArtifact_FAIL` takes 11 to 13 s, alone or in the suite. It does so in six phase packages: scout, triage, build, tdd, audit and intent. The verdict engine retries the artifact settle 15 times at 200 ms with `time.Sleep` (`internal/phases/runner/verdict/verdict.go:36`). The runner tests make it free (`runner_cleanexit_test.go:14`), but the phase packages build the runner without `SleepFn`.
+
+Two other tests wait: `TestInboxWriters_EveryAutofiledItemCarriesAKnownClass` (17 s in the suite, 4 s alone) and `TestIntegrationTierGate_Race` (12 s, 2 s alone).
+*Implication:* a sleep costs wall time but no CPU, and the six packages run at the same time. The gain is small but free: pass `SleepFn` through the phase configuration.
+
+**F10.6** `tmux` tests (8, 88 s) are mostly in `internal/bridge`: `TestAutoRespond_CodexUpdateMenuRulesDoNotMatchThisRepositorysOwnFiles` (37 s in the suite, 15 s alone) and the transient-dwell tests. They also fail most under load (the shared-host flake `TestAgentSandboxContract`).
+
+**F10.7** After T11 in `internal/core` (PR #868), 253 tests stay serial. 116 of them swap `os.Stderr` to read the output of the code under test.
+*Implication:* if the code takes its writer as a dependency (design §5.3), those tests can run in parallel.
+
+**F10.8** A parallel run cannot use more than the CPUs of the host. With 14 cores and 14 package binaries, more parallel tests raise the contention of F10.2 for `git` and `go`.
+*Implication:* parallel runs fix the serial-first timeout (section 9), but they do not remove work. The next gain comes from fewer processes.
+
+| Id | Refinement | From |
+|---|---|---|
+| R19 | Fewer `git` processes: one repository template for each test binary. A test gets a clone that shares the objects, not a new repository and its commits. | F10.2, F10.4 |
+| R20 | One `go` build for each test binary (in `TestMain` or a `sync.Once`), shared by every test that needs the binary or the generator. | F10.3 |
+| R21 | A nested `go` run from a test gets `GOFLAGS=-p=2` and `GOMAXPROCS=2`, and uses the host build cache. | F10.2, F10.3 |
+| R22 | The phase configuration passes `SleepFn` to the runner, so a test makes the settle free. | F10.5 |
+| R23 | Code that writes to `os.Stderr` takes its writer as a dependency, so its tests can run in parallel. | F10.7 |
+| R24 | T11 extends to `internal/phases/audit`, `internal/bridge` and `internal/ciparity` after R20 and R21, so that more parallel tests do not raise the contention. | F10.1, F10.8 |
