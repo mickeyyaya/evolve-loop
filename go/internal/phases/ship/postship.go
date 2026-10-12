@@ -300,7 +300,7 @@ func repinPostCycle(opts *Options, res *RunResult) error {
 	binPath := opts.ShipBinaryPath
 	if binPath == "" {
 		var err error
-		binPath, err = os.Executable()
+		binPath, err = osExecutable()
 		if err != nil {
 			return nil
 		}

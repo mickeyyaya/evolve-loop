@@ -8,38 +8,42 @@ import (
 )
 
 const (
-	seamRepoContract = "swaps the repoContractTestFn package variable through swapRepoContractTest"
-	seamGoTestJSON   = "swaps the goTestJSONFn package variable through swapGoTestJSON"
-	seamMarshalJSON  = "swaps the marshalJSON package variable through stubMarshalJSON"
-	seamExecutable   = "swaps the osExecutable package variable through stubRunningExecutable"
-	seamStdoutPipe   = "swaps the stdoutPipe package variable"
-	seamInboxItem    = "swaps the readInboxItem and marshalInboxItem package variables"
+	seamRepoContract  = "swaps the repoContractTestFn package variable through swapRepoContractTest"
+	seamGoTestJSON    = "swaps the goTestJSONFn package variable through swapGoTestJSON"
+	seamMarshalJSON   = "swaps the marshalJSON package variable through stubMarshalJSON"
+	seamExecutable    = "swaps the osExecutable package variable through stubRunningExecutable"
+	seamMarshalIndent = "swaps the marshalIndentJSON package variable"
+	seamStdoutPipe    = "swaps the stdoutPipe package variable"
+	seamInboxItem     = "swaps the readInboxItem and marshalInboxItem package variables"
 )
 
 var serialTests = map[string]string{
-	"ship.TestAppendShipJournal_ReportsEveryWriteFailure":                       seamMarshalJSON,
-	"ship.TestDiscardBinaryChurn_NeverRemovesRunningExecutable":                 seamExecutable,
-	"ship.TestExplanationViewSHA_HashesTheSealedViewDeterministically":          seamMarshalJSON,
-	"ship.TestItemConsumerStage_EveryFailureIsLoudAndLeavesTheItemPickable":     seamInboxItem,
-	"ship.TestManualShipSuccess_LeavesUntrackedGoBinEvolvePresent":              seamExecutable,
-	"ship.TestRepoContractGate_DiscoveryFailureIsInfra":                         seamRepoContract,
-	"ship.TestRepoContractGate_EnforceGreenPasses":                              seamRepoContract,
-	"ship.TestRepoContractGate_EnforceRedFailsWithDedicatedCode":                seamRepoContract,
-	"ship.TestRepoContractGate_OffSkips":                                        seamRepoContract,
-	"ship.TestRepoContractGate_PersistentAmbiguityIsInfraClassedExactlyTwoRuns": seamRepoContract,
-	"ship.TestRepoContractGate_RealTestFailureIsContractRedWithoutRetry":        seamRepoContract,
-	"ship.TestRepoContractGate_RedErrorMessageNamesFailingTests":                seamRepoContract,
-	"ship.TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests":   seamRepoContract,
-	"ship.TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns":               seamRepoContract,
-	"ship.TestRepoContractGate_TransientFailureRetriesOnceThenShips":            seamRepoContract,
-	"ship.TestRepoContractGate_UnknownStageFailsTowardEnforce":                  seamRepoContract,
-	"ship.TestRepoContractPack_ShipAndTheBuildFloorMakeOneDecision":             seamRepoContract,
-	"ship.TestRunGoTestJSON_AStdoutPipeFailureNeverStartsTheProcess":            seamStdoutPipe,
-	"ship.TestRunNative_RepoContractGateReceivesRunWorkspace":                   seamRepoContract,
-	"ship.TestRunRepoContractPack_NamesRedsOnlyForTheGatesRealRed":              seamRepoContract,
-	"ship.TestRunRepoContractPack_RunsTheGatesOwnPackAndNamesItsReds":           seamRepoContract,
-	"ship.TestRunRepoContractTestsAlone_EveryPackageGreenIsGreen":               seamGoTestJSON,
-	"ship.TestRunRepoContractTestsAlone_KeepsTheUnprovenAndTheStillRed":         seamGoTestJSON,
+	"ship.TestAppendQuarantineManifestCoverfix_AnEncodingFailureLeavesNoManifest": seamMarshalIndent,
+	"ship.TestRepairSelfSHAPinCoverfix_AnUnlocatableExecutableDeclines":           seamExecutable,
+	"ship.TestRepinPostCycleCoverfix_AnUnknownRunningBinaryLeavesThePinUntouched": seamExecutable,
+	"ship.TestAppendShipJournal_ReportsEveryWriteFailure":                         seamMarshalJSON,
+	"ship.TestDiscardBinaryChurn_NeverRemovesRunningExecutable":                   seamExecutable,
+	"ship.TestExplanationViewSHA_HashesTheSealedViewDeterministically":            seamMarshalJSON,
+	"ship.TestItemConsumerStage_EveryFailureIsLoudAndLeavesTheItemPickable":       seamInboxItem,
+	"ship.TestManualShipSuccess_LeavesUntrackedGoBinEvolvePresent":                seamExecutable,
+	"ship.TestRepoContractGate_DiscoveryFailureIsInfra":                           seamRepoContract,
+	"ship.TestRepoContractGate_EnforceGreenPasses":                                seamRepoContract,
+	"ship.TestRepoContractGate_EnforceRedFailsWithDedicatedCode":                  seamRepoContract,
+	"ship.TestRepoContractGate_OffSkips":                                          seamRepoContract,
+	"ship.TestRepoContractGate_PersistentAmbiguityIsInfraClassedExactlyTwoRuns":   seamRepoContract,
+	"ship.TestRepoContractGate_RealTestFailureIsContractRedWithoutRetry":          seamRepoContract,
+	"ship.TestRepoContractGate_RedErrorMessageNamesFailingTests":                  seamRepoContract,
+	"ship.TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests":     seamRepoContract,
+	"ship.TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns":                 seamRepoContract,
+	"ship.TestRepoContractGate_TransientFailureRetriesOnceThenShips":              seamRepoContract,
+	"ship.TestRepoContractGate_UnknownStageFailsTowardEnforce":                    seamRepoContract,
+	"ship.TestRepoContractPack_ShipAndTheBuildFloorMakeOneDecision":               seamRepoContract,
+	"ship.TestRunGoTestJSON_AStdoutPipeFailureNeverStartsTheProcess":              seamStdoutPipe,
+	"ship.TestRunNative_RepoContractGateReceivesRunWorkspace":                     seamRepoContract,
+	"ship.TestRunRepoContractPack_NamesRedsOnlyForTheGatesRealRed":                seamRepoContract,
+	"ship.TestRunRepoContractPack_RunsTheGatesOwnPackAndNamesItsReds":             seamRepoContract,
+	"ship.TestRunRepoContractTestsAlone_EveryPackageGreenIsGreen":                 seamGoTestJSON,
+	"ship.TestRunRepoContractTestsAlone_KeepsTheUnprovenAndTheStillRed":           seamGoTestJSON,
 }
 
 func TestEveryTopLevelTestIsParallelOrListedSerial(t *testing.T) {

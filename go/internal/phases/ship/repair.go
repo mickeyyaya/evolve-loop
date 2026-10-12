@@ -15,6 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 )
 
+var marshalIndentJSON = json.MarshalIndent
+
 type repairOutcome int
 
 const (
@@ -86,7 +88,7 @@ func repairSelfSHAPin(ctx context.Context, opts *Options, res *RunResult, _ *cor
 	binPath := opts.ShipBinaryPath
 	if binPath == "" {
 		var err error
-		if binPath, err = os.Executable(); err != nil {
+		if binPath, err = osExecutable(); err != nil {
 			return repairNone
 		}
 	}
@@ -246,7 +248,7 @@ func appendQuarantineManifest(opts *Options, qDir string, cycle int, paths []str
 	for _, p := range paths {
 		entries = append(entries, entry{Path: p, Reason: "differing-untracked-collider", Cycle: cycle, TS: ts})
 	}
-	buf, err := json.MarshalIndent(entries, "", "  ")
+	buf, err := marshalIndentJSON(entries, "", "  ")
 	if err != nil {
 		return err
 	}
