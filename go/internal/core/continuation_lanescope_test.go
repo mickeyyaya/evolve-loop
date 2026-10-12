@@ -27,6 +27,8 @@ func writeLaneScope(t *testing.T, workspace string, ids ...string) {
 }
 
 func TestStampContinuationManifest_RegistersLaneScopeBinding(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 1078)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1078")
 	writeLaneScope(t, ws, "chain-boundary-loop")
@@ -60,6 +62,8 @@ func TestStampContinuationManifest_RegistersLaneScopeBinding(t *testing.T) {
 }
 
 func TestStampContinuationManifest_RegistersEveryLaneScopeID(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 1079)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1079")
 	writeLaneScope(t, ws, "scope-a", "scope-b")
@@ -79,6 +83,8 @@ func TestStampContinuationManifest_RegistersEveryLaneScopeID(t *testing.T) {
 }
 
 func TestStampContinuationManifest_NoLaneScopeRegistersNothing(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 1080)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1080")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -110,6 +116,8 @@ func TestStampContinuationManifest_NoLaneScopeRegistersNothing(t *testing.T) {
 }
 
 func TestStampContinuationManifest_UnstampableWorkRegistersNothing(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 1082)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1082")
 	writeLaneScope(t, ws, "scope-conflict")
@@ -160,6 +168,8 @@ func productionScopeResolver(t *testing.T) func(string, int, []string) *continua
 }
 
 func TestRunCycle_AdoptsContinuationFromLaneScopeWithoutAnyClaim(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 1083)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1083")
 	writeLaneScope(t, ws, "lane-only-scope")
@@ -210,6 +220,8 @@ func TestRunCycle_AdoptsContinuationFromLaneScopeWithoutAnyClaim(t *testing.T) {
 }
 
 func TestRunCycle_UnrelatedLaneScopeDoesNotAdopt(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 1084)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1084")
 	writeLaneScope(t, ws, "lane-A")
@@ -244,6 +256,8 @@ func TestRunCycle_UnrelatedLaneScopeDoesNotAdopt(t *testing.T) {
 }
 
 func TestAdoptContinuation_PassesLaneScopeIDsToResolver(t *testing.T) {
+	t.Parallel()
+
 	root, _ := initContinuationRepo(t, 1085)
 	var gotScopes [][]string
 	runners := buildRunners(nil)

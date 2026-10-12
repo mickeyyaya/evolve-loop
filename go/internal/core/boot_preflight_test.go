@@ -11,6 +11,8 @@ import (
 )
 
 func TestClassifyDirtyPaths_QuarantinesTrackedSource(t *testing.T) {
+	t.Parallel()
+
 	quarantine, _ := classifyDirtyPaths([]string{"go/internal/triagecap/project.go"})
 	if len(quarantine) != 1 || quarantine[0] != "go/internal/triagecap/project.go" {
 		t.Fatalf("tracked-source dirt must be quarantined; got %v", quarantine)
@@ -18,6 +20,8 @@ func TestClassifyDirtyPaths_QuarantinesTrackedSource(t *testing.T) {
 }
 
 func TestClassifyDirtyPaths_IgnoresLoopManaged(t *testing.T) {
+	t.Parallel()
+
 	quarantine, ignored := classifyDirtyPaths([]string{
 		".evolve/runs/cycle-507/scout-report.md",
 		"knowledge-base/cycles/cycle-507.json",
@@ -31,6 +35,8 @@ func TestClassifyDirtyPaths_IgnoresLoopManaged(t *testing.T) {
 }
 
 func TestClassifyDirtyPaths_ExcludesShipBinary(t *testing.T) {
+	t.Parallel()
+
 	quarantine, ignored := classifyDirtyPaths([]string{"go/bin/evolve"})
 	if len(quarantine) != 0 {
 		t.Fatalf("the ship binary go/bin/evolve must NOT be quarantined (boot re-pins it in the same pass); got %v", quarantine)
@@ -41,6 +47,8 @@ func TestClassifyDirtyPaths_ExcludesShipBinary(t *testing.T) {
 }
 
 func TestClassifyDirtyPaths_CleanTreeNoAction(t *testing.T) {
+	t.Parallel()
+
 	quarantine, ignored := classifyDirtyPaths(nil)
 	if len(quarantine) != 0 || len(ignored) != 0 {
 		t.Fatalf("clean tree must produce no quarantine and no ignored entries; got quarantine=%v ignored=%v", quarantine, ignored)
@@ -48,6 +56,8 @@ func TestClassifyDirtyPaths_CleanTreeNoAction(t *testing.T) {
 }
 
 func TestQuarantineDirtyTree_LeavesStatusCleanAndPreservesContent(t *testing.T) {
+	t.Parallel()
+
 	repo := initTempGitRepo(t)
 	src := filepath.Join(repo, "go", "internal", "foo.go")
 	if err := os.MkdirAll(filepath.Dir(src), 0o755); err != nil {
@@ -75,6 +85,8 @@ func TestQuarantineDirtyTree_LeavesStatusCleanAndPreservesContent(t *testing.T) 
 }
 
 func TestShipSHAMismatch_DetectsTamperNotFalsePositive(t *testing.T) {
+	t.Parallel()
+
 	bin := filepath.Join(t.TempDir(), "evolve")
 	writeFileT(t, bin, "\x7fELF-fake-binary-bytes")
 	sum := sha256.Sum256([]byte("\x7fELF-fake-binary-bytes"))

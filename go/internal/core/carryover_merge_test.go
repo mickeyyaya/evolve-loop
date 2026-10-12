@@ -25,6 +25,8 @@ const memoTwoTodos = `[
 ]`
 
 func TestRunCycle_MergesMemoCarryoverTodosIntoState(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeMemoCarryover(t, ws, memoTwoTodos)
 
@@ -53,6 +55,8 @@ func TestRunCycle_MergesMemoCarryoverTodosIntoState(t *testing.T) {
 }
 
 func TestMergeWorkspaceCarryover_DedupesById(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeMemoCarryover(t, ws, memoTwoTodos)
 
@@ -71,6 +75,8 @@ func TestMergeWorkspaceCarryover_DedupesById(t *testing.T) {
 }
 
 func TestMergeWorkspaceCarryover_CapsActionRunes(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	big := strings.Repeat("x", 5000)
 	writeMemoCarryover(t, ws, `[{"id":"todo-huge","action":"`+big+`","priority":"low"}]`)
@@ -93,6 +99,8 @@ func TestMergeWorkspaceCarryover_CapsActionRunes(t *testing.T) {
 }
 
 func TestMergeWorkspaceCarryover_MalformedFileWarnsNotFails(t *testing.T) {
+	t.Parallel()
+
 	t.Run("wired: the malformed memo is a CARRYOVER_WORKSPACE_MALFORMED signal", func(t *testing.T) {
 		ws := t.TempDir()
 		writeMemoCarryover(t, ws, `{ this is not valid json `)
@@ -142,6 +150,8 @@ func TestMergeWorkspaceCarryover_MalformedFileWarnsNotFails(t *testing.T) {
 }
 
 func TestMergeWorkspaceCarryover_StampsExpiryForPrune(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeMemoCarryover(t, ws, memoTwoTodos)
 

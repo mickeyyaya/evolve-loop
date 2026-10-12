@@ -15,6 +15,8 @@ func writeCarryThroughTheRealLedger(ledgerPath string, in core.CompositionVerdic
 }
 
 func TestCarryRecord_VerifiesAfterItsCycleWorktreeIsRemoved(t *testing.T) {
+	t.Parallel()
+
 	root, worktree, next := core.CarryAPendedIdenticalLaneForTesting(t, writeCarryThroughTheRealLedger)
 	if next != core.PhaseShip {
 		t.Fatalf("route = %s, want Ship: the byte-identical rebase must record its carry", next)

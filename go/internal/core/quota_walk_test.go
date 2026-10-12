@@ -32,6 +32,8 @@ func TestRunCycle_AWalledPauseHandsTheWalkedCLIsToTheCheckpoint(t *testing.T) {
 }
 
 func TestWalkError_KeepsTheWrappedErrorsTextAndIdentity(t *testing.T) {
+	t.Parallel()
+
 	inner := wrapTransient(85)
 	walk := WalkError{CLIs: []string{"claude-tmux"}, Err: inner}
 

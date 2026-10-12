@@ -21,6 +21,8 @@ func cb1Harness(t *testing.T, wt *fakeWorktree) map[Phase]PhaseRunner {
 }
 
 func TestCB1_EveryDispatchedPhaseCarriesWorktree(t *testing.T) {
+	t.Parallel()
+
 	wt := &fakeWorktree{path: t.TempDir()}
 	runners := cb1Harness(t, wt)
 
@@ -62,6 +64,8 @@ func TestCB1_WriteAxisUnchanged(t *testing.T) {
 }
 
 func TestCB1_ProvisioningFailureDegradesToEmptyWorktree(t *testing.T) {
+	t.Parallel()
+
 	wt := &fakeWorktree{createErr: context.DeadlineExceeded}
 	runners := cb1Harness(t, wt)
 

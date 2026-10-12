@@ -21,6 +21,8 @@ func documentContractUnderTddRule(t *testing.T, rule config.CondRule) string {
 }
 
 func TestSeedTaskContract_DocumentCycleStatesTddFromTheRegistryRule(t *testing.T) {
+	t.Parallel()
+
 	block := documentContractUnderTddRule(t, config.DefaultTddRule())
 	for _, want := range []string{
 		"TDD: not required for this cycle",
@@ -34,6 +36,8 @@ func TestSeedTaskContract_DocumentCycleStatesTddFromTheRegistryRule(t *testing.T
 }
 
 func TestSeedTaskContract_ARegistryThatPinsTddForDocumentsSaysSo(t *testing.T) {
+	t.Parallel()
+
 	block := documentContractUnderTddRule(t, config.CondRule{Field: "cycle_size", Op: "!=", Value: "trivial"})
 	if !strings.Contains(block, "TDD: required for this cycle (phase-registry.json conditional_mandatory.tdd = cycle_size!=trivial)") {
 		t.Errorf("the tdd line must follow the registry's rule, not a fixed sentence:\n%s", block)

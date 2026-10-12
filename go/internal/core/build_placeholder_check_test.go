@@ -9,6 +9,8 @@ import (
 )
 
 func TestPlaceholderTokenFailures_RefusesAnUnsubstitutedTemplateToken(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	body := "# Build Report\n\n## Full suite\n`go test -count=1 ./...` → FULLSUITE_PLACEHOLDER\n\nok: ACS_RESULT_PLACEHOLDER\n"
 	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(body), 0o644); err != nil {
@@ -27,6 +29,8 @@ func TestPlaceholderTokenFailures_RefusesAnUnsubstitutedTemplateToken(t *testing
 }
 
 func TestPlaceholderTokenFailures_CleanReportAndProseAreNotTokens(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	body := "# Build Report\n\nThe `_PLACEHOLDER` suffix rule is documented; a placeholder image and PLACEHOLDER_ALPHA are prose, and lowercase full_suite_placeholder is a variable name.\n"
 	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(body), 0o644); err != nil {
@@ -41,6 +45,8 @@ func TestPlaceholderTokenFailures_CleanReportAndProseAreNotTokens(t *testing.T) 
 }
 
 func TestDefaultBuildFloorChecks_IncludesThePlaceholderTokenCheck(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("result: FULLSUITE_PLACEHOLDER\n"), 0o644); err != nil {
 		t.Fatal(err)

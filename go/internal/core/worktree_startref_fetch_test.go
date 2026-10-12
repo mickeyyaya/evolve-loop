@@ -98,6 +98,8 @@ func TestLaneStartRef_PersistentContentionFailsAfterTheBound(t *testing.T) {
 }
 
 func TestLaneStartRef_RealLockOnAnUnrelatedRefDoesNotFailTheBase(t *testing.T) {
+	t.Parallel()
+
 	seed, runtime := startRefFixture(t)
 	seed.Git("push", "-q", "origin", "main:train/wave64-boundary")
 	runtime.Git("fetch", "-q", "origin")

@@ -14,12 +14,16 @@ import (
 // The sidecar's error_message embeds the sentinel's text: a wire contract
 // even though the variable itself never moves.
 func TestErrArtifactTimeout_KeepsTheWireMessage(t *testing.T) {
+	t.Parallel()
+
 	if ErrArtifactTimeout.Error() != "core: bridge artifact timeout" {
 		t.Fatalf("the wire message is part of the on-disk contract: %q", ErrArtifactTimeout.Error())
 	}
 }
 
 func TestFailureDiag_LiteralOrchestratorGetsTheWriterOnce(t *testing.T) {
+	t.Parallel()
+
 	fixed := time.Date(2026, 9, 13, 3, 4, 5, 0, time.UTC)
 	o := &Orchestrator{now: func() time.Time { return fixed }}
 	first := o.failureDiag()
@@ -45,6 +49,8 @@ func TestFailureDiag_LiteralOrchestratorGetsTheWriterOnce(t *testing.T) {
 }
 
 func TestFailureDiag_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	if o.failureDiag().SignalsWired() {
 		t.Fatal("no Center at construction: the writer is unwired")
@@ -69,6 +75,8 @@ func TestFailureDiag_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
 // structurally true: every non-test construction outside the unit must be the
 // orchestrator's wiredFailureDiag.
 func TestFailureDiagWriter_OneConstructionSite(t *testing.T) {
+	t.Parallel()
+
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)

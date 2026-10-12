@@ -10,6 +10,8 @@ import (
 )
 
 func TestWorktreePhase(t *testing.T) {
+	t.Parallel()
+
 	for _, p := range []Phase{PhaseTDD, PhaseBuild} {
 		if !WorktreePhase(p) {
 			t.Errorf("%s should be a worktree (source-writing) phase", p)
@@ -99,6 +101,8 @@ func (f *fakeWorktree) Cleanup(_, worktree string) error {
 }
 
 func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 9}} // cycle 10
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -128,6 +132,8 @@ func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
 }
 
 func TestOrchestrator_WorktreeProvisionFailure_BestEffort(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)

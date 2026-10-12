@@ -77,6 +77,8 @@ func auditLeakReadFile(t *testing.T, path string) string {
 }
 
 func TestOrchestrator_AuditLeakRecover(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

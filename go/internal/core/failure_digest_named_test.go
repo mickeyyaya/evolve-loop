@@ -8,6 +8,8 @@ type fixedCounter struct{ n int }
 func (f fixedCounter) Count(string) int { return f.n }
 
 func TestRecurrenceCounter_CountFlowsIntoDigest(t *testing.T) {
+	t.Parallel()
+
 	var rc RecurrenceCounter = fixedCounter{n: 4}
 	dir := t.TempDir()
 	digest, err := AssembleFailureDigest(1034, dir, rc)

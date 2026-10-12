@@ -43,6 +43,8 @@ func inboxFiles(t *testing.T, root string) []string {
 }
 
 func TestWriteDeterministicLearning_ClassedButDefectlessBlockFilesNothing(t *testing.T) {
+	t.Parallel()
+
 	o, fl, root := remediationFixture(t)
 
 	o.writeDeterministicLearning(fl,
@@ -59,6 +61,8 @@ func TestWriteDeterministicLearning_ClassedButDefectlessBlockFilesNothing(t *tes
 }
 
 func TestWriteDeterministicLearning_EchoDefectListFilesNothing(t *testing.T) {
+	t.Parallel()
+
 	o, fl, root := remediationFixture(t)
 	summary := "audit phase exited 1 after 3 attempts"
 
@@ -72,6 +76,8 @@ func TestWriteDeterministicLearning_EchoDefectListFilesNothing(t *testing.T) {
 }
 
 func TestWriteDeterministicLearning_StructuredDefectsAreFiled(t *testing.T) {
+	t.Parallel()
+
 	o, fl, root := remediationFixture(t)
 
 	o.writeDeterministicLearning(fl,

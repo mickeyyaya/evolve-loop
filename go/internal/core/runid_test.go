@@ -10,6 +10,8 @@ import (
 var crockfordRE = regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{26}$`)
 
 func TestMintRunID_ShapeAndTimeOrdering(t *testing.T) {
+	t.Parallel()
+
 	t0 := time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC)
 	a := MintRunID(t0)
 	b := MintRunID(t0.Add(time.Second))
@@ -24,6 +26,8 @@ func TestMintRunID_ShapeAndTimeOrdering(t *testing.T) {
 }
 
 func TestMintRunID_Unique(t *testing.T) {
+	t.Parallel()
+
 	now := time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC)
 	seen := map[string]bool{}
 	for i := 0; i < 1000; i++ {

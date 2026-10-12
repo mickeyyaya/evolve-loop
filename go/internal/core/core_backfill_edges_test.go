@@ -22,6 +22,8 @@ func (cycleStateReadFailStorage) ReadCycleState(context.Context) (CycleState, er
 }
 
 func TestApplyFailureDecisionFloor_JustificationStandsInForMissingEvidence(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(router.StaticPreset{})
 	cases := []struct {
 		name     string
@@ -51,6 +53,8 @@ func TestApplyFailureDecisionFloor_JustificationStandsInForMissingEvidence(t *te
 }
 
 func TestDefaultPostBuildRepinProvenance_VerifiesAncestryAgainstHEAD(t *testing.T) {
+	t.Parallel()
+
 	r := gittest.Fixture(t)
 	for _, body := range []string{"one", "two"} {
 		if err := os.WriteFile(filepath.Join(r.Dir, "f.txt"), []byte(body), 0o644); err != nil {
@@ -95,6 +99,8 @@ func TestDefaultPostBuildRepinProvenance_VerifiesAncestryAgainstHEAD(t *testing.
 }
 
 func TestLoadResumeBootstrap_ReadCycleStateFailureIsWrapped(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(cycleStateReadFailStorage{&fakeStorage{}}, &fakeLedger{}, buildRunners(nil))
 
 	_, err := o.loadResumeBootstrap(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}, &ResumePoint{CycleID: 3}, PhaseAudit)
@@ -105,6 +111,8 @@ func TestLoadResumeBootstrap_ReadCycleStateFailureIsWrapped(t *testing.T) {
 }
 
 func TestLoadResumeBootstrap_FleetCheckpointForAnotherWorkspaceIsRejected(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	declared := filepath.Join(root, ".evolve", "runs", "cycle-5")
 	other := filepath.Join(root, ".evolve", "runs", "cycle-6")
@@ -120,6 +128,8 @@ func TestLoadResumeBootstrap_FleetCheckpointForAnotherWorkspaceIsRejected(t *tes
 }
 
 func TestLoadResumeBootstrap_CheckpointCycleFillsAnUnnumberedHost(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	storage := &fakeStorage{cycleState: CycleState{WorkspacePath: filepath.Join(root, "ws")}}
 	o := NewOrchestrator(storage, &fakeLedger{}, buildRunners(nil))
@@ -135,6 +145,8 @@ func TestLoadResumeBootstrap_CheckpointCycleFillsAnUnnumberedHost(t *testing.T) 
 }
 
 func TestLoadResumeBootstrap_CycleStateDisagreeingWithTheCheckpointIsRejected(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	storage := &fakeStorage{
 		state:      State{LastCycleNumber: 6},
@@ -150,6 +162,8 @@ func TestLoadResumeBootstrap_CycleStateDisagreeingWithTheCheckpointIsRejected(t 
 }
 
 func TestLoadResumeBootstrap_CorruptActivationMarkerFailsTheRecovery(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	marker := filepath.Join(root, ".evolve", "build-explanation-contracts", "cycle-8.json")
 	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
@@ -175,6 +189,8 @@ func TestLoadResumeBootstrap_CorruptActivationMarkerFailsTheRecovery(t *testing.
 }
 
 func TestLoadResumeBootstrap_RecoveredBaseThatCannotBePersistedIsAnError(t *testing.T) {
+	t.Parallel()
+
 	root, workspace, newBase := rebasedSplitFixture(t)
 	storage := &fakeStorage{failOnWriteCS: true, state: State{LastCycleNumber: 42}, cycleState: CycleState{
 		CycleID: 42, RunID: "run-42", WorkspacePath: workspace, ActiveWorktree: root,
@@ -194,6 +210,8 @@ func TestLoadResumeBootstrap_RecoveredBaseThatCannotBePersistedIsAnError(t *test
 }
 
 func TestLoadResumeBootstrap_RecoveredBaseForcesTheBuildPhase(t *testing.T) {
+	t.Parallel()
+
 	root, workspace, newBase := rebasedSplitFixture(t)
 	storage := &fakeStorage{state: State{LastCycleNumber: 42}, cycleState: CycleState{
 		CycleID: 42, RunID: "run-42", WorkspacePath: workspace, ActiveWorktree: root,

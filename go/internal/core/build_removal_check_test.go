@@ -46,6 +46,8 @@ func claimBlock(paths ...string) string {
 }
 
 func TestRemovalClaimFailures(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		report      string
@@ -141,6 +143,8 @@ func TestRemovalClaimFailures(t *testing.T) {
 }
 
 func TestRemovalClaimFailures_MissingRootsFailOpen(t *testing.T) {
+	t.Parallel()
+
 	for _, in := range []ReviewInput{
 		{Phase: string(PhaseBuild)},
 		{Phase: string(PhaseBuild), Workspace: t.TempDir()},
@@ -153,6 +157,8 @@ func TestRemovalClaimFailures_MissingRootsFailOpen(t *testing.T) {
 }
 
 func TestRemovalClaimFailures_DeliverablesFallback(t *testing.T) {
+	t.Parallel()
+
 	in := removalFixture(t, "", []string{"x.go"})
 	dir := filepath.Join(in.Workspace, "deliverables")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -169,6 +175,8 @@ func TestRemovalClaimFailures_DeliverablesFallback(t *testing.T) {
 
 // A non-git worktree derives zero changed packages, the early return a false claim could hide behind.
 func TestDefaultBuildFloorChecks_IncludesRemovalClaimCheck(t *testing.T) {
+	t.Parallel()
+
 	in := removalFixture(t, claimBlock("go/acs/cycle660/predicates_test.go"), []string{"go/acs/cycle660/predicates_test.go"})
 	got := DefaultBuildFloorChecks(context.Background(), in)
 	if len(got) == 0 {
@@ -180,6 +188,8 @@ func TestDefaultBuildFloorChecks_IncludesRemovalClaimCheck(t *testing.T) {
 }
 
 func TestBuildFloorReviewer_RemovalClaimNotActuallyRemoved(t *testing.T) {
+	t.Parallel()
+
 	r := BuildHandoffFloor{{Name: "default", Run: DefaultBuildFloorChecks}}
 
 	bad := removalFixture(t, claimBlock("stale/scaffold.go"), []string{"stale/scaffold.go"})

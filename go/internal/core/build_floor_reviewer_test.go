@@ -7,6 +7,8 @@ import (
 )
 
 func TestBuildFloorReviewer_RejectsRedSelfcheckThenApproves(t *testing.T) {
+	t.Parallel()
+
 	calls := 0
 	// Named binding exercises the exported check-engine type (apicover).
 	var checks BuildFloorCheckFn = func(ctx context.Context, in ReviewInput) []string {
@@ -34,6 +36,8 @@ func TestBuildFloorReviewer_RejectsRedSelfcheckThenApproves(t *testing.T) {
 }
 
 func TestBuildFloorReviewer_NonBuildPhasesUntouched(t *testing.T) {
+	t.Parallel()
+
 	r := BuildHandoffFloor{{Name: "selfcheck", Run: func(context.Context, ReviewInput) []string {
 		t.Fatal("selfcheck must not run for non-build phases")
 		return nil
@@ -46,6 +50,8 @@ func TestBuildFloorReviewer_NonBuildPhasesUntouched(t *testing.T) {
 }
 
 func TestBuildHandoffFloor_EmptyFloorApproves(t *testing.T) {
+	t.Parallel()
+
 	if res := (BuildHandoffFloor{}).Review(context.Background(), ReviewInput{Phase: string(PhaseBuild)}); !res.Approve {
 		t.Fatalf("a floor with no checks has nothing to reject; got %+v", res)
 	}

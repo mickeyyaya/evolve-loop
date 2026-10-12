@@ -87,6 +87,8 @@ func TestPhaseAdvisor_ParsesValidJSON(t *testing.T) {
 }
 
 func TestPhaseAdvisor_SelectsContractForEachRouterProtocol(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		stdout     string

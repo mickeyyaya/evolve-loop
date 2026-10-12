@@ -12,6 +12,8 @@ const (
 )
 
 func TestParseConsumptionFingerprint_ExtractsFromUnquotedConsumedBy(t *testing.T) {
+	t.Parallel()
+
 	fp, ok := ParseConsumptionFingerprint(realConsumedByText)
 	if !ok {
 		t.Fatalf("must find a fingerprint in a real consumed_by narrative, got ok=false")
@@ -22,6 +24,8 @@ func TestParseConsumptionFingerprint_ExtractsFromUnquotedConsumedBy(t *testing.T
 }
 
 func TestParseConsumptionFingerprint_ExtractsFromQuotedNotes(t *testing.T) {
+	t.Parallel()
+
 	fp, ok := ParseConsumptionFingerprint(realNotesText)
 	if !ok {
 		t.Fatalf("must find a fingerprint in a real auto-filed notes field, got ok=false")
@@ -32,6 +36,8 @@ func TestParseConsumptionFingerprint_ExtractsFromQuotedNotes(t *testing.T) {
 }
 
 func TestParseConsumptionFingerprint_NoMatchReturnsFalse(t *testing.T) {
+	t.Parallel()
+
 	_, ok := ParseConsumptionFingerprint("closed as a duplicate, no root cause recorded here")
 	if ok {
 		t.Fatalf("text with no fingerprint token must report ok=false")
@@ -39,6 +45,8 @@ func TestParseConsumptionFingerprint_NoMatchReturnsFalse(t *testing.T) {
 }
 
 func TestConsumePipelineDefectFingerprint_WritesLedgerFromConsumedBy(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	now := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
 	fp, err := ConsumePipelineDefectFingerprint(dir, realConsumedByText, "", "inbox-consumption", now)
@@ -58,6 +66,8 @@ func TestConsumePipelineDefectFingerprint_WritesLedgerFromConsumedBy(t *testing.
 }
 
 func TestConsumePipelineDefectFingerprint_FallsBackToNotesWhenConsumedByEmpty(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	now := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
 	fp, err := ConsumePipelineDefectFingerprint(dir, "", realNotesText, "inbox-consumption", now)
@@ -77,6 +87,8 @@ func TestConsumePipelineDefectFingerprint_FallsBackToNotesWhenConsumedByEmpty(t 
 }
 
 func TestConsumePipelineDefectFingerprint_ErrorsWhenNoFingerprintFound(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	now := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
 	_, err := ConsumePipelineDefectFingerprint(dir, "closed, no fingerprint recorded", "also nothing here", "inbox-consumption", now)
@@ -93,6 +105,8 @@ func TestConsumePipelineDefectFingerprint_ErrorsWhenNoFingerprintFound(t *testin
 }
 
 func TestConsumePipelineDefectFingerprint_IntegratesWithRuleBExclusion(t *testing.T) {
+	t.Parallel()
+
 	fp := "ship|unknown|76d0f4fca190"
 	digests := []FailureDigest{
 		dg(1329, fp, "gate-block"), dg(1330, fp, "gate-block"), dg(1331, fp, "gate-block"),
@@ -120,6 +134,8 @@ func TestConsumePipelineDefectFingerprint_IntegratesWithRuleBExclusion(t *testin
 }
 
 func TestParseConsumptionFingerprint_IgnoresUnrelatedPipeDelimitedText(t *testing.T) {
+	t.Parallel()
+
 	_, ok := ParseConsumptionFingerprint("see docs/a|b|c.md for details, no fingerprint keyword here")
 	if ok {
 		t.Fatalf("a pipe-delimited substring with no `fingerprint` token must not match")

@@ -113,6 +113,8 @@ func firstDiff(a, b string) int {
 }
 
 func TestAdvisorLaunch_DepthGuardRefusesBeforeLaunch(t *testing.T) {
+	t.Parallel()
+
 	rb := &refusingBridge{t: t}
 	adv := NewPhaseAdvisor(rb, WithDepthCheck(func(map[string]string) bool { return true }))
 	_, err := adv.Plan(baseRouteInput())
@@ -125,6 +127,8 @@ func TestAdvisorLaunch_DepthGuardRefusesBeforeLaunch(t *testing.T) {
 }
 
 func TestPhaseAdvisor_ErrorTextsAreTheOrchestratorsStderrText(t *testing.T) {
+	t.Parallel()
+
 	noWs := baseRouteInput()
 	noWs.Workspace = ""
 	propose := func(p *PhaseAdvisor, in router.RouteInput) error { _, err := p.Propose(in); return err }
@@ -160,6 +164,8 @@ func TestPhaseAdvisor_ErrorTextsAreTheOrchestratorsStderrText(t *testing.T) {
 // The capture lands before the parse, so an unparseable response is still
 // forensically debuggable.
 func TestAdvisorLaunch_CapturesEvenWhenTheResponseIsUnparseable(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	in := baseRouteInput()
 	in.Workspace = ws
@@ -176,6 +182,8 @@ func TestAdvisorLaunch_CapturesEvenWhenTheResponseIsUnparseable(t *testing.T) {
 // Covers the persona-composed plan prompt with the recon off, on (through a
 // real git history), and for the re-plan artifact.
 func TestComposePlanPrompt_MatchesGolden(t *testing.T) {
+	t.Parallel()
+
 	rich := richRouteInput()
 	p := NewPhaseAdvisor(nil, WithPersona(goldenPersona))
 	assertGolden(t, "prompt-plan-persona.golden.txt", p.composePlanPrompt(rich, "routing-plan.json"))
@@ -187,6 +195,8 @@ func TestComposePlanPrompt_MatchesGolden(t *testing.T) {
 }
 
 func TestLaunchRequest_GoldenPerDecision(t *testing.T) {
+	t.Parallel()
+
 	ws, root, wt := t.TempDir(), t.TempDir(), t.TempDir()
 	for _, d := range []struct {
 		name   string

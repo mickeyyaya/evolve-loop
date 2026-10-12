@@ -12,6 +12,8 @@ func spineTelemetryConfig() config.RoutingConfig {
 }
 
 func TestUnsatisfiedSpineAnchor_NamesTheMissingPredecessor(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	cfg := spineTelemetryConfig()
 
@@ -28,6 +30,8 @@ func TestUnsatisfiedSpineAnchor_NamesTheMissingPredecessor(t *testing.T) {
 }
 
 func TestUnsatisfiedSpineAnchor_AgreesWithSpineSatisfiedUpTo(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	cfg := spineTelemetryConfig()
 	var empty router.RoutingSignals
@@ -44,6 +48,8 @@ func TestUnsatisfiedSpineAnchor_AgreesWithSpineSatisfiedUpTo(t *testing.T) {
 }
 
 func TestRecordSpineFailOpen_CarriesPhaseArtifactAndReason(t *testing.T) {
+	t.Parallel()
+
 	cr := &cycleRun{}
 
 	cr.recordSpineFailOpen(PhaseShip, "build", "would-block at enforce")
@@ -67,6 +73,8 @@ func TestRecordSpineFailOpen_CarriesPhaseArtifactAndReason(t *testing.T) {
 }
 
 func TestRecordSpineFailOpen_UnrecordedCycleHasNoFailOpens(t *testing.T) {
+	t.Parallel()
+
 	cr := &cycleRun{}
 	if n := len(cr.result.SpineFailOpens); n != 0 {
 		t.Errorf("a cycle with no fail-open events carries %d records, want 0 — a counter that "+

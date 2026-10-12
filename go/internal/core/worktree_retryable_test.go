@@ -8,6 +8,8 @@ import (
 )
 
 func TestWorktreeAddRetry_NotAGitRepositoryCostsZeroBackoff(t *testing.T) {
+	t.Parallel()
+
 	r := worktreeAddRetry("cycle-lane-1")
 	if r.Retryable == nil {
 		t.Fatal("core supplies no transience classifier — the shared loop then retries EVERYTHING, which is the 198s cmd/evolve tax unchanged (a classifier nothing passes is dead code)")
@@ -18,6 +20,8 @@ func TestWorktreeAddRetry_NotAGitRepositoryCostsZeroBackoff(t *testing.T) {
 }
 
 func TestWorktreeAddRetry_LockCollisionStillRetriesToBound(t *testing.T) {
+	t.Parallel()
+
 	r := worktreeAddRetry("cycle-lane-1")
 	if !r.Retryable(255, "Preparing worktree (new branch 'cycle-lane-1')\n") {
 		t.Error("a lock-shaped rc=255 collision was classified as permanent — PR #401's absorber is disarmed and one collision again costs a lane its cycle")

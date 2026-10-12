@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestPhaseRequest_WritesSource_TheWorktreeFenceDecidesWhoWrites(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	conflicted := CycleState{ShipRecoveryCode: string(CodeGitFleetRebaseNeeded), ShipRecoveryConflicts: []string{"go/internal/x.go"}}
 	otherShipError := CycleState{ShipRecoveryCode: string(CodeWorktreeResolve), ShipRecoveryConflicts: []string{"go/internal/x.go"}}

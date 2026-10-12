@@ -35,6 +35,8 @@ func resolveSharedConflict(t *testing.T, dir string) {
 }
 
 func TestResumeFleetRebaseAfterDebugger_EachFailedStepEndsTheCycleNamingTheStep(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		arrange    func(t *testing.T, dir string)

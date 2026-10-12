@@ -13,6 +13,8 @@ import (
 )
 
 func TestRenderCoveringTests_ReportsOmittedCount(t *testing.T) {
+	t.Parallel()
+
 	small := []string{"go/internal/foo/foo_test.go", "go/internal/bar/bar_test.go"}
 	out, omitted := renderCoveringTests(small)
 	if omitted != 0 {

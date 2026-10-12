@@ -84,6 +84,8 @@ func eventText(e signalcenter.Event) string {
 }
 
 func TestCompositionCarryForward_DeclineEmitsCodedSignalEvent(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	center := signalcenter.New()
 	var events []signalcenter.Event
@@ -113,6 +115,8 @@ func TestCompositionCarryForward_DeclineEmitsCodedSignalEvent(t *testing.T) {
 }
 
 func TestCompositionCarryForward_MultiGateFailure_NamesAllInOneEvent(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	center := signalcenter.New()
 	var events []signalcenter.Event
@@ -155,6 +159,8 @@ func TestCompositionCarryForward_MultiGateFailure_NamesAllInOneEvent(t *testing.
 }
 
 func TestCompositionCarryForward_AllGatesGreen_NoDeclineEvent(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	center := signalcenter.New()
 	var events []signalcenter.Event

@@ -20,6 +20,8 @@ import (
 //	EVOLVE_SPINE_REPLAY_DIR=<project-root> go test -v \
 //	    -run TestSpineReplay_LocalHistory ./internal/core/
 func TestSpineReplay_LocalHistory(t *testing.T) {
+	t.Parallel()
+
 	root := os.Getenv("EVOLVE_SPINE_REPLAY_DIR")
 	if root == "" {
 		t.Skip("replay harness: set EVOLVE_SPINE_REPLAY_DIR to run")

@@ -7,6 +7,8 @@ import (
 )
 
 func TestAuditContractRejection_RedispatchesTheAuditorWithTheReason(t *testing.T) {
+	t.Parallel()
+
 	const reason = `audit deliverable failed contract: [missing_section] required section "## Explanation Documentation" is missing (the explanation-documentation contract v1 is active for this cycle: review the Build explanation document and emit the section with Status, Build status, Document, Document SHA256 and path:line Evidence)`
 	runners := buildRunners(nil)
 	gate := &escalationProbe{phase: string(PhaseAudit), threshold: neverDemotingThreshold, approveAfter: 1, reasonPerBlock: []string{reason}}

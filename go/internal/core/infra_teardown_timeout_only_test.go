@@ -15,6 +15,8 @@ import (
 )
 
 func TestWritePhaseFailureDiag_TimeoutOnlyNotWidened(t *testing.T) {
+	t.Parallel()
+
 	at := time.Date(2026, 8, 4, 7, 0, 0, 0, time.UTC)
 	now := func() time.Time { return at }
 
@@ -78,6 +80,8 @@ type timeoutOnlySite struct {
 }
 
 func TestTimeoutOnlySites_NotWidenedToUnion(t *testing.T) {
+	t.Parallel()
+
 	sites := []timeoutOnlySite{
 		{
 			file: "failure_hook.go", fn: "adviseOnUnclassifiedFailure",

@@ -60,6 +60,8 @@ func resumeFromE4(o *Orchestrator, phase Phase) (CycleResult, error) {
 }
 
 func TestResumeExecution_AVerdictWithNoSuccessorStopsTheResumeNamingTheCursor(t *testing.T) {
+	t.Parallel()
+
 	_, runners, o := resumeRigE4(t, t.TempDir(), nil)
 	runners[PhaseAudit] = &resumeHookRunnerE4{name: "audit", verdict: VerdictSKIPPED}
 
@@ -71,6 +73,8 @@ func TestResumeExecution_AVerdictWithNoSuccessorStopsTheResumeNamingTheCursor(t 
 }
 
 func TestResumeExecution_ABuildResumedWithoutASealedWorktreeContextIsRefused(t *testing.T) {
+	t.Parallel()
+
 	root, workspace := t.TempDir(), t.TempDir()
 	if err := explanationdocs.Activate(explanationdocs.CycleBinding{ProjectRoot: root, Workspace: workspace, Cycle: 61, RunID: "run-e4", ContractVersion: explanationdocs.CurrentContractVersion}); err != nil {
 		t.Fatalf("activate: %v", err)
@@ -91,6 +95,8 @@ func TestResumeExecution_ABuildResumedWithoutASealedWorktreeContextIsRefused(t *
 }
 
 func TestResumeExecution_ANonCanonicalVerdictStopsTheResumeAndIsRecordedAsAFailedPhase(t *testing.T) {
+	t.Parallel()
+
 	_, runners, o := resumeRigE4(t, t.TempDir(), nil)
 	runners[PhaseScout] = &resumeHookRunnerE4{name: "scout", verdict: "MAYBE"}
 
@@ -105,6 +111,8 @@ func TestResumeExecution_ANonCanonicalVerdictStopsTheResumeAndIsRecordedAsAFaile
 }
 
 func TestResumeExecution_APhaseWhoseCompletionCannotBePersistedStopsTheResume(t *testing.T) {
+	t.Parallel()
+
 	st, runners, o := resumeRigE4(t, t.TempDir(), nil)
 	runners[PhaseScout] = &resumeHookRunnerE4{name: "scout", hook: func(PhaseRequest) { st.failOnWriteCS = true }}
 
@@ -116,6 +124,8 @@ func TestResumeExecution_APhaseWhoseCompletionCannotBePersistedStopsTheResume(t 
 }
 
 func TestResumeExecution_AHaltedAuditFailRecordsTheSystemFailureForTheBatchLoop(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	_, runners, o := resumeRigE4(t, ws, nil)
 	runners[PhaseAudit] = &resumeHookRunnerE4{name: "audit", verdict: VerdictFAIL, hook: func(req PhaseRequest) {
@@ -133,6 +143,8 @@ func TestResumeExecution_AHaltedAuditFailRecordsTheSystemFailureForTheBatchLoop(
 }
 
 func TestResumeExecution_ARepairBranchTheStateMachineForbidsAbortsTheResume(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		sm        *StateMachine
@@ -173,6 +185,8 @@ func TestResumeExecution_ARepairBranchTheStateMachineForbidsAbortsTheResume(t *t
 }
 
 func TestResumeExecution_ARetroFloorHaltIsCarriedToTheResult(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeAuditWithFailure(t, ws, "FAIL", policy.CategoryInfraSystemic, "all CLI families exhausted; systemic infrastructure teardown")
 	_, runners, o := resumeRigE4(t, ws, nil)
@@ -216,6 +230,8 @@ func TestResumeExecution_ARetroBranchTheStateMachineForbidsAbortsTheResume(t *te
 }
 
 func TestResumeExecution_ACycleThatCannotBeFinalizedReturnsTheFinalizeError(t *testing.T) {
+	t.Parallel()
+
 	st, runners, o := resumeRigE4(t, t.TempDir(), nil)
 	runners[PhaseShip] = &resumeHookRunnerE4{name: "ship", hook: func(PhaseRequest) { st.failOnWriteState = true }}
 
@@ -227,6 +243,8 @@ func TestResumeExecution_ACycleThatCannotBeFinalizedReturnsTheFinalizeError(t *t
 }
 
 func TestResumeExecution_AFinishedCycleWhoseTerminalStateCannotBeWrittenReportsIt(t *testing.T) {
+	t.Parallel()
+
 	base := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 61, WorkspacePath: t.TempDir()}}
 	o := NewOrchestrator(resumeEndFailingStorageE4{base}, &fakeLedger{}, buildRunners(nil))
 
@@ -249,6 +267,8 @@ func (r *resumeQuotaOnCorrectionRunnerE4) Run(_ context.Context, req PhaseReques
 }
 
 func TestResumeExecution_AQuotaWallHitWhileCorrectingAResumedDeliverablePausesTheResume(t *testing.T) {
+	t.Parallel()
+
 	_, runners, o := resumeRigE4(t, t.TempDir(), nil, WithReviewer(stubReviewer{result: ReviewResult{Approve: false, Reason: "deliverable incomplete"}}))
 	runner := &resumeQuotaOnCorrectionRunnerE4{}
 	runners[PhaseScout] = runner

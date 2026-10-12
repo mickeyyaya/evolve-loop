@@ -7,6 +7,8 @@ import (
 )
 
 func TestProtectedSurfaceFailures_NamesEveryProtectedPath(t *testing.T) {
+	t.Parallel()
+
 	member := func(p string) bool { return p == "go/internal/core/cyclerun.go" || p == "agents/evolve-builder.md" }
 	got := protectedSurfaceFailures([]string{"go/internal/core/lost_landing_floor.go", "go/internal/core/cyclerun.go", "docs/x.md", "agents/evolve-builder.md"}, member, "b279c319")
 	if len(got) != 2 {
@@ -26,6 +28,8 @@ func TestProtectedSurfaceFailures_NamesEveryProtectedPath(t *testing.T) {
 }
 
 func TestProtectedSurfaceFloorChecks_FailsOpenWithoutAWorktree(t *testing.T) {
+	t.Parallel()
+
 	check := ProtectedSurfaceFloorChecks(func(string) bool { return true })
 	if got := check(context.Background(), ReviewInput{Phase: string(PhaseBuild)}); got != nil {
 		t.Errorf("no worktree, nothing to judge: %v", got)

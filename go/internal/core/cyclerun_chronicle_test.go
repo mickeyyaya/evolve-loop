@@ -82,6 +82,8 @@ func chronicleDigestPath(projectRoot string, cycle int) string {
 }
 
 func TestNewCycleRun_SeedsRecentOutcomesDigestAtShadow(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	seedChronicleDossier(t, root, 42, "harden the flux capacitor", "PASS")
 
@@ -102,6 +104,8 @@ func TestNewCycleRun_SeedsRecentOutcomesDigestAtShadow(t *testing.T) {
 }
 
 func TestNewCycleRun_OffStageWritesNoDigest(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	seedChronicleDossier(t, root, 42, "harden the flux capacitor", "PASS")
 
@@ -119,6 +123,8 @@ func TestNewCycleRun_OffStageWritesNoDigest(t *testing.T) {
 }
 
 func TestNewCycleRun_EnforceInjectsRecentOutcomesContext(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	seedChronicleDossier(t, root, 42, "harden the flux capacitor", "PASS")
 

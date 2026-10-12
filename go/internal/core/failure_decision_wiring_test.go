@@ -9,6 +9,8 @@ import (
 )
 
 func TestFailureDecisionWiring(t *testing.T) {
+	t.Parallel()
+
 	sample := `{
   "category": "infra-systemic",
   "level": "system",

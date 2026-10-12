@@ -126,10 +126,10 @@ func phasesRunContains(phases []Phase, want Phase) bool {
 // tracked file, which no recovery branch handles — the canonical
 // still-unrecoverable main-tree mutation.
 func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
-	t.Parallel()
 	root := initOutcomeRepo(t)
 	runners := buildRunners(nil)
 	runners[PhaseBuild] = &outcomeRunner{

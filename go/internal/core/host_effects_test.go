@@ -53,6 +53,8 @@ func assertEffectsPrecedeEveryReview(t *testing.T, log []string, effects *record
 }
 
 func TestPerformEffectsAndReview_PerformsHostEffectsBeforeTheReview(t *testing.T) {
+	t.Parallel()
+
 	var log []string
 	effects := &recordingEffects{log: &log}
 	rev := &orderedReviewer{log: &log}
@@ -71,6 +73,8 @@ func TestPerformEffectsAndReview_PerformsHostEffectsBeforeTheReview(t *testing.T
 }
 
 func TestPerformEffectsAndReview_AFailedHostEffectIsACodedWarningAndStillReviewed(t *testing.T) {
+	t.Parallel()
+
 	var log []string
 	center := signalcenter.New()
 	var got []signalcenter.Event
@@ -87,6 +91,8 @@ func TestPerformEffectsAndReview_AFailedHostEffectIsACodedWarningAndStillReviewe
 }
 
 func TestWithHostEffects_ANilHostEffectsIsUnwired(t *testing.T) {
+	t.Parallel()
+
 	var log []string
 	var none HostEffects
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil, WithHostEffects(none), WithReviewer(&orderedReviewer{log: &log}))
@@ -97,6 +103,8 @@ func TestWithHostEffects_ANilHostEffectsIsUnwired(t *testing.T) {
 }
 
 func TestPerformEffectsAndReview_WithoutHostEffectsOnlyReviews(t *testing.T) {
+	t.Parallel()
+
 	var log []string
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil, WithReviewer(&orderedReviewer{log: &log}))
 	o.performEffectsAndReview(context.Background(), ReviewInput{Phase: string(PhaseTriage)})

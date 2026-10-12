@@ -15,6 +15,8 @@ const boilerplatePrefix = "Review the failed cycle learning and fix before retry
 const maxDefectActionRunes = 600
 
 func TestApplyDefectsAsCarryoverTodosBoundsLength(t *testing.T) {
+	t.Parallel()
+
 	huge := strings.Repeat("x", 5000)
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -36,6 +38,8 @@ func TestApplyDefectsAsCarryoverTodosBoundsLength(t *testing.T) {
 }
 
 func TestApplyDefectsAsCarryoverTodos_ShortDefectPreserved(t *testing.T) {
+	t.Parallel()
+
 	const shortDefect = "nil pointer in router when signals absent"
 	state := &core.State{}
 	record := core.FailedRecord{
@@ -54,6 +58,8 @@ func TestApplyDefectsAsCarryoverTodos_ShortDefectPreserved(t *testing.T) {
 }
 
 func TestCarryoverTodoActionDropsBoilerplatePrefix(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	seedCycleStateFile(t, root)
 

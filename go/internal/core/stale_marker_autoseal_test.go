@@ -11,12 +11,16 @@ import (
 )
 
 func TestMarkerShouldAutoseal_DeadOwner(t *testing.T) {
+	t.Parallel()
+
 	if !markerShouldAutoseal(999999, true /*hasPID*/, func(int) bool { return false /*dead*/ }) {
 		t.Error("a marker whose owner PID is dead must be auto-sealed")
 	}
 }
 
 func TestMarkerShouldAutoseal_LiveOwnerUntouched(t *testing.T) {
+	t.Parallel()
+
 	self := os.Getpid()
 	alive := func(pid int) bool { return pid == self }
 	if markerShouldAutoseal(self, true, alive) {
@@ -25,12 +29,16 @@ func TestMarkerShouldAutoseal_LiveOwnerUntouched(t *testing.T) {
 }
 
 func TestMarkerShouldAutoseal_MissingPidFailsSafe(t *testing.T) {
+	t.Parallel()
+
 	if !markerShouldAutoseal(0, false /*hasPID*/, func(int) bool { return true /*would-be-alive, must be ignored*/ }) {
 		t.Error("a marker that cannot assert liveness (missing/zero pid) must fail SAFE toward auto-seal")
 	}
 }
 
 func TestAutosealStaleMarker_DeadOwnerSealsViaSealCycleAndClearsBlock(t *testing.T) {
+	t.Parallel()
+
 	evolveDir := t.TempDir()
 	workspace := sealFixture(t, evolveDir, 491)
 	// A lease that would read as FRESH (heartbeat == opts.Now) yet whose owner

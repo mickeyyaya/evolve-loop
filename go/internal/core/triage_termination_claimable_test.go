@@ -7,6 +7,8 @@ import (
 )
 
 func TestHasClaimableInboxWork_ConsoleOwnedKindsAreNotClaimable(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {

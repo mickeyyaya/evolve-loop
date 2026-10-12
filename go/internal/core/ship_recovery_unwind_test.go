@@ -11,6 +11,8 @@ func (fx *shippedLane) audited() AuditedChange {
 }
 
 func TestUnwindShipCommit_RestoresTheAuditedTreeOnTheAuditedBase(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 
 	declined, err := unwindShipCommit(context.Background(), fx.worktree, fx.audited(), gitCapture)
@@ -33,6 +35,8 @@ func TestUnwindShipCommit_RestoresTheAuditedTreeOnTheAuditedBase(t *testing.T) {
 }
 
 func TestUnwindShipCommit_DeclinesWithoutMovingHEAD(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name, reason string
 		setup        func(fx *shippedLane) AuditedChange
@@ -118,6 +122,8 @@ func TestUnwindShipCommit_DeclinesWithoutMovingHEAD(t *testing.T) {
 }
 
 func TestPendRebasedChange_LeavesTheChangePendingOnItsForkPoint(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 	ctx := context.Background()
 	if declined, err := unwindShipCommit(ctx, fx.worktree, fx.audited(), gitCapture); err != nil || declined != "" {
@@ -134,6 +140,8 @@ func TestPendRebasedChange_LeavesTheChangePendingOnItsForkPoint(t *testing.T) {
 }
 
 func TestPendRebasedChange_AfterAnAbortedRebaseRestoresTheAuditedShape(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "shared.txt", editSharedLine(1, "lane edit"), editSharedLine(1, "peer edit"))
 	ctx := context.Background()
 	if declined, err := unwindShipCommit(ctx, fx.worktree, fx.audited(), gitCapture); err != nil || declined != "" {
@@ -151,6 +159,8 @@ func TestPendRebasedChange_AfterAnAbortedRebaseRestoresTheAuditedShape(t *testin
 }
 
 func TestUnwindToAuditedShape_LeavesTheAuditedChangePendingOnTheAuditedBase(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 
 	declined, err := UnwindToAuditedShape(context.Background(), fx.worktree, fx.audited())
@@ -162,6 +172,8 @@ func TestUnwindToAuditedShape_LeavesTheAuditedChangePendingOnTheAuditedBase(t *t
 }
 
 func TestUnwindToAuditedShape_DeclinesWithoutTouchingTheLane(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 	fx.write("stray.txt", "left behind\n")
 

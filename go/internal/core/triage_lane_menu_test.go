@@ -12,6 +12,8 @@ import (
 func withholdsEverything(string, []inboxbatch.Item) []inboxbatch.Item { return nil }
 
 func TestHasClaimableInboxWork_AsksTheLaneMenu(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
@@ -48,6 +50,8 @@ func TestRunCycle_EmptyTriageOverWorkTheLaneMenuWithholdsIsPlannedNoWork(t *test
 }
 
 func TestHasClaimableInboxWork_AClaimIsWorkTheCycleTookWhateverTheMenuSays(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	claimed := inboxbatch.ProcessingCycleDir(filepath.Join(root, ".evolve", "inbox"), 7)
 	if err := os.MkdirAll(claimed, 0o755); err != nil {
@@ -62,6 +66,8 @@ func TestHasClaimableInboxWork_AClaimIsWorkTheCycleTookWhateverTheMenuSays(t *te
 }
 
 func TestUnansweredClaimableWork_TheLanePathAsksTheMenuForPendingItemsButNeverForClaims(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	workspace := t.TempDir()

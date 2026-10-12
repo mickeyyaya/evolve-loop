@@ -20,6 +20,8 @@ func assertOneFreshSession(t *testing.T, b *scriptedBridge) {
 }
 
 func TestPlanJudge_SurvivesADeadShellFirstSession(t *testing.T) {
+	t.Parallel()
+
 	b := deadShellThen(`{"score":0.8,"rationale":"covers the bug path","missing_phases":[]}`)
 
 	v := NewPlanJudge(b).GradePlan(context.Background(), judgeInput(), samplePlan())
@@ -31,6 +33,8 @@ func TestPlanJudge_SurvivesADeadShellFirstSession(t *testing.T) {
 }
 
 func TestFailureAdvisor_SurvivesADeadShellFirstSession(t *testing.T) {
+	t.Parallel()
+
 	b := deadShellThen(`{"cause":"dead_shell","pane_substr":"credential vault locked","justification":"the REPL exited to a locked vault prompt"}`)
 
 	adv, err := NewFailureAdvisor(b).Advise(context.Background(), baseFailureInput())
@@ -42,6 +46,8 @@ func TestFailureAdvisor_SurvivesADeadShellFirstSession(t *testing.T) {
 }
 
 func TestBridgeRetryAdjudicator_SurvivesADeadShellFirstSession(t *testing.T) {
+	t.Parallel()
+
 	b := deadShellThen(`{"action":"retry@build","reentry_phase":"build","justification":"the change is wrong"}`)
 
 	got := NewBridgeRetryAdjudicator(b, AgentIdentity{CLI: "claude-tmux", AgentLabel: "failure-adjudicator"}, t.TempDir()).
@@ -54,6 +60,8 @@ func TestBridgeRetryAdjudicator_SurvivesADeadShellFirstSession(t *testing.T) {
 }
 
 func TestPhaseAdvisorLauncher_SurvivesADeadShellFirstSession(t *testing.T) {
+	t.Parallel()
+
 	b := deadShellThen("advice")
 
 	resp, err := bridgeLauncher{b: b}.Launch(context.Background(), advisor.LaunchRequest{CLI: "claude-tmux", Agent: "phase-advisor"})
@@ -65,6 +73,8 @@ func TestPhaseAdvisorLauncher_SurvivesADeadShellFirstSession(t *testing.T) {
 }
 
 func TestFailureAdvisor_RefusesAnEmptyWorkspaceBeforeAnyLaunch(t *testing.T) {
+	t.Parallel()
+
 	b := deadShellThen("unused")
 	in := baseFailureInput()
 	in.Workspace = ""
@@ -77,6 +87,8 @@ func TestFailureAdvisor_RefusesAnEmptyWorkspaceBeforeAnyLaunch(t *testing.T) {
 }
 
 func TestBridgeRetryAdjudicator_ASecondDeadSessionLeavesThePolicyDefault(t *testing.T) {
+	t.Parallel()
+
 	b := &scriptedBridge{scriptedLaunches{responses: []BridgeResponse{deadShell, deadShell}}}
 
 	got := NewBridgeRetryAdjudicator(b, AgentIdentity{CLI: "claude-tmux"}, t.TempDir()).

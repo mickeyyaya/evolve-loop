@@ -10,6 +10,8 @@ import (
 )
 
 func TestListACSPredicates_ModuleAtTheWorktreeRootIsInventoried(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	writeModuleFiles(t, wt, map[string]string{
 		"go.mod":               "module example.com/rootmod\n\ngo 1.22\n",
@@ -37,6 +39,8 @@ func TestListACSPredicates_NoResolvableModuleIsALoudNote(t *testing.T) {
 }
 
 func TestListACSPredicates_LongCompilerOutputKeepsOnlyTheBoundedTail(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	ident := "undefinedIdentifier" + strings.Repeat("Z", 600) + "End"
 	writeModuleFiles(t, wt, map[string]string{
@@ -60,6 +64,8 @@ func TestListACSPredicates_LongCompilerOutputKeepsOnlyTheBoundedTail(t *testing.
 }
 
 func TestListACSPredicates_CanceledContextIsAFailedListNote(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	writeModuleFiles(t, wt, map[string]string{
 		"go/go.mod":               "module example.com/cancelmod\n\ngo 1.22\n",

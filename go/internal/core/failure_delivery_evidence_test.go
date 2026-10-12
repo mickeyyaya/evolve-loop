@@ -40,6 +40,8 @@ func typedWedgedTimeoutErr(cause, reason string) error {
 }
 
 func TestDeliveryFailureCause_PrefersTypedMarkerField(t *testing.T) {
+	t.Parallel()
+
 	want := `prompt submit_wedged (resends=3) with "quoted" evidence`
 	err := typedWedgedTimeoutErr("submit_wedged", want)
 	if got := DeliveryFailureCause(err); got != want {
@@ -48,6 +50,8 @@ func TestDeliveryFailureCause_PrefersTypedMarkerField(t *testing.T) {
 }
 
 func TestDeliveryFailureCause_DoesNotParseCauseTextInsideReason(t *testing.T) {
+	t.Parallel()
+
 	err := typedWedgedTimeoutErr("review_stop", "operator quoted cause=submit_wedged while stopping")
 	if got := DeliveryFailureCause(err); got != "" {
 		t.Fatalf("DeliveryFailureCause() = %q, want empty for actual cause=review_stop", got)
@@ -72,6 +76,8 @@ func readFailureDiag(t *testing.T, phase string, phaseErr error) map[string]any 
 }
 
 func TestWritePhaseFailureDiag_DeliveryFailure_IsMachineReadable(t *testing.T) {
+	t.Parallel()
+
 	if cause := DeliveryFailureCause(wedgedPromptTimeoutErr()); !strings.Contains(cause, "submit_wedged") {
 		t.Fatalf("DeliveryFailureCause() = %q, want classified submit_wedged reason", cause)
 	}
@@ -99,6 +105,8 @@ func TestWritePhaseFailureDiag_DeliveryFailure_IsMachineReadable(t *testing.T) {
 }
 
 func TestWritePhaseFailureDiag_GenericSilence_NoDeliveryFailureAttribution(t *testing.T) {
+	t.Parallel()
+
 	got := readFailureDiag(t, "retro", genericSilenceTimeoutErr())
 
 	if s, _ := got[deliveryFailureDiagField].(string); strings.TrimSpace(s) != "" {
@@ -108,6 +116,8 @@ func TestWritePhaseFailureDiag_GenericSilence_NoDeliveryFailureAttribution(t *te
 }
 
 func TestWritePhaseFailureDiag_NonTimeoutFailure_NoDeliveryFailureAttribution(t *testing.T) {
+	t.Parallel()
+
 	got := readFailureDiag(t, "build", errors.New("bridge: launch exit=2: [bridge] profile not found"))
 
 	if s, _ := got[deliveryFailureDiagField].(string); strings.TrimSpace(s) != "" {

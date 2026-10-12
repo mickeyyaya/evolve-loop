@@ -8,6 +8,8 @@ import (
 )
 
 func TestRetireSupersededAuditArtifacts_ArchivesBothVerdictFiles(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	acsBody := `{"verdict":"PASS","red_count":0,"ship_eligible":false,"audit_verdict":"FAIL"}`
 	reportBody := "## Verdict\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\"} -->\n"
@@ -30,6 +32,8 @@ func TestRetireSupersededAuditArtifacts_ArchivesBothVerdictFiles(t *testing.T) {
 }
 
 func TestRetireSupersededAuditArtifacts_RoundZeroHonorsPreStagedVerdict(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.json"), "operator-pre-stage")
 
@@ -41,6 +45,8 @@ func TestRetireSupersededAuditArtifacts_RoundZeroHonorsPreStagedVerdict(t *testi
 }
 
 func TestRetireSupersededAuditArtifacts_NeverClobbersAnExistingArchive(t *testing.T) {
+	t.Parallel()
+
 	// A dead attempt's partial file is dropped, never archived over the round's first retirement.
 	dir := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.round1.json"), "true-round1-evidence")
@@ -57,11 +63,15 @@ func TestRetireSupersededAuditArtifacts_NeverClobbersAnExistingArchive(t *testin
 }
 
 func TestRetireSupersededAuditArtifacts_MissingFilesAndWorkspaceAreQuiet(t *testing.T) {
+	t.Parallel()
+
 	retireSupersededAuditArtifacts("", 1)          // no workspace: state-only harnesses
 	retireSupersededAuditArtifacts(t.TempDir(), 1) // absent files: fresh shape
 }
 
 func TestCompletedAuditRounds_CountsOnlyAuditOccurrences(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		completed []string
@@ -82,6 +92,8 @@ func TestCompletedAuditRounds_CountsOnlyAuditOccurrences(t *testing.T) {
 }
 
 func TestAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(map[Phase]string{PhaseRetro: VerdictFAIL})
@@ -150,6 +162,8 @@ func mustReadRoundArtifact(t *testing.T, path string) string {
 }
 
 func TestResumedAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
+	t.Parallel()
+
 	// The resume surface takes its workspace from the persisted cycle-state; an empty one would no-op the retirement.
 	ws := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 1603, WorkspacePath: ws}}
@@ -173,6 +187,8 @@ func TestResumedAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
 }
 
 func TestSupersedePreviousAuditRound_AdvancesThePersistedDispatchCounter(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	cs := CycleState{WorkspacePath: ws}
 
@@ -192,6 +208,8 @@ func TestSupersedePreviousAuditRound_AdvancesThePersistedDispatchCounter(t *test
 }
 
 func TestSupersedePreviousAuditRound_LegacyCheckpointFallsBackToCompletions(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(ws, "acs-verdict.json"), "legacy-round-1")
 	cs := CycleState{WorkspacePath: ws, CompletedPhases: []string{"tdd", "build", "audit", "tdd", "build"}}
@@ -207,6 +225,8 @@ func TestSupersedePreviousAuditRound_LegacyCheckpointFallsBackToCompletions(t *t
 }
 
 func TestResumedCrashedAudit_RetiresTheDeadAttemptsVerdict(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(ws, "acs-verdict.json"), `{"verdict":"PASS","ship_eligible":false}`)
 	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{

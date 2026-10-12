@@ -64,6 +64,8 @@ func setupDivergedRepo(t *testing.T, conflict bool) (worktree string) {
 }
 
 func TestRebaseCycleBranchOntoMain_CleanDisjoint_Succeeds(t *testing.T) {
+	t.Parallel()
+
 	wt := setupDivergedRepo(t, false)
 	ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", wt)
 	if !ok || len(conflicts) > 0 {
@@ -72,6 +74,8 @@ func TestRebaseCycleBranchOntoMain_CleanDisjoint_Succeeds(t *testing.T) {
 }
 
 func TestRebaseCycleBranchOntoMain_Conflict(t *testing.T) {
+	t.Parallel()
+
 	wt := setupDivergedRepo(t, true)
 	ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", wt)
 	if ok || len(conflicts) == 0 {
@@ -87,12 +91,16 @@ func TestRebaseCycleBranchOntoMain_Conflict(t *testing.T) {
 }
 
 func TestRebaseCycleBranchOntoMain_EmptyWorktree_False(t *testing.T) {
+	t.Parallel()
+
 	if ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", ""); ok || len(conflicts) > 0 {
 		t.Fatalf("empty worktree: ok=%v conflict=%v, want both false", ok, conflicts)
 	}
 }
 
 func TestRebaseCycleBranchOntoMain_ARealConflictNamesTheConflictedFile(t *testing.T) {
+	t.Parallel()
+
 	wt := setupDivergedRepo(t, true)
 
 	_, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", wt)
@@ -103,6 +111,8 @@ func TestRebaseCycleBranchOntoMain_ARealConflictNamesTheConflictedFile(t *testin
 }
 
 func TestRebaseRecordingConflicts_TheCycleRemembersWhatItsDebuggerMayResolve(t *testing.T) {
+	t.Parallel()
+
 	conflicted := CycleState{ActiveWorktree: setupDivergedRepo(t, true)}
 	if ok, conflict := rebaseRecordingConflicts(context.Background(), "", &conflicted); ok || !conflict {
 		t.Fatalf("rebase = (%v, %v), want the overlapping edit to conflict", ok, conflict)
@@ -121,6 +131,8 @@ func TestRebaseRecordingConflicts_TheCycleRemembersWhatItsDebuggerMayResolve(t *
 }
 
 func TestRebaseCycleBranchOntoMain_NamesAConflictedFileAsTheFenceSeesIt(t *testing.T) {
+	t.Parallel()
+
 	repo := gittest.Fixture(t)
 	writeS5b(t, filepath.Join(repo.Dir, "café notes.md"), "original\n")
 	repo.Git("add", "-A")

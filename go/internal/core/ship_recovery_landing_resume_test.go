@@ -171,6 +171,8 @@ func (l outageLane) shipRequest() core.PhaseRequest {
 }
 
 func TestRecoverFromShipError_ATransientPushFailureResumesTheShipWithoutAReaudit(t *testing.T) {
+	t.Parallel()
+
 	l := newOutageLane(t)
 	outage := &serverOutage{failures: 4}
 	phase := ship.New(ship.Config{Runner: outage.runner(), Sleep: func(time.Duration) {}})

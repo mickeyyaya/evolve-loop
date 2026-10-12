@@ -13,6 +13,8 @@ import (
 )
 
 func TestDispatch_TaskRecallWithoutFailureHistory(t *testing.T) {
+	t.Parallel()
+
 	for _, resume := range []bool{false, true} {
 		t.Run(map[bool]string{false: "fresh", true: "resume"}[resume], func(t *testing.T) {
 			root, corpus := initGitWorktree(t), t.TempDir()

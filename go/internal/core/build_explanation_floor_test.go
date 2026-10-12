@@ -12,6 +12,8 @@ import (
 )
 
 func TestBuildExplanationReviewer_RequiresExplanationForMaterialChange(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -73,6 +75,8 @@ func TestBuildExplanationReviewer_RequiresExplanationForMaterialChange(t *testin
 }
 
 func TestOrchestratorReviewer_ExplanationContractCannotBeReplacedByOptionalReviewer(t *testing.T) {
+	t.Parallel()
+
 	in := ReviewInput{
 		Phase:                           string(PhaseBuild),
 		Cycle:                           42,
@@ -100,6 +104,8 @@ func TestOrchestratorReviewer_ExplanationContractCannotBeReplacedByOptionalRevie
 }
 
 func TestMandatoryExplanationReview_FailsClosedWithoutSealedBuildIdentity(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(nil, nil, nil)
 	got := o.reviewer.Review(context.Background(), ReviewInput{
 		Phase:                           string(PhaseBuild),
@@ -113,6 +119,8 @@ func TestMandatoryExplanationReview_FailsClosedWithoutSealedBuildIdentity(t *tes
 }
 
 func TestSealBuildExplanationContext_FailsClosedWithoutWorktreeOrBase(t *testing.T) {
+	t.Parallel()
+
 	err := sealBuildExplanationContext(t.TempDir(), CycleState{
 		CycleID: 42, RunID: "run-42", WorkspacePath: t.TempDir(),
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,

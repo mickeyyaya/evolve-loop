@@ -109,6 +109,8 @@ func stringContains(s, sub string) bool {
 }
 
 func TestScopedReview_SeesOnlyIntersectingHunks(t *testing.T) {
+	t.Parallel()
+
 	spy := &scopedMergeReviewSpy{outcome: ScopedMergeReviewOutcome{Disposition: ScopedMergeCompatible}}
 	res, err := RunScopedMergeReview(ScopedMergeInput{
 		AuditedDiff:     []byte(auditedDiffSharedPlusAudOnly),
@@ -143,6 +145,8 @@ func TestScopedReview_SeesOnlyIntersectingHunks(t *testing.T) {
 }
 
 func TestScopedReview_CompatibleComposesEntangledEscalates(t *testing.T) {
+	t.Parallel()
+
 	in := ScopedMergeInput{
 		AuditedDiff:  []byte(auditedDiffSharedPlusAudOnly),
 		ComposedDiff: []byte(composedDiffSharedPlusCmpOnly),
@@ -164,6 +168,8 @@ func TestScopedReview_CompatibleComposesEntangledEscalates(t *testing.T) {
 // The spy is armed to return entangled: if the core ever dispatched, the
 // result would be entangled and this test would catch it.
 func TestScopedReview_EmptyIntersectionNoDispatch(t *testing.T) {
+	t.Parallel()
+
 	spy := &scopedMergeReviewSpy{outcome: ScopedMergeReviewOutcome{Disposition: ScopedMergeEntangled}}
 	res, err := RunScopedMergeReview(ScopedMergeInput{
 		AuditedDiff:  []byte(auditedDiffAudOnly),
@@ -187,6 +193,8 @@ func TestScopedReview_EmptyIntersectionNoDispatch(t *testing.T) {
 }
 
 func TestScopedReview_MalformedDiffFailsClosed(t *testing.T) {
+	t.Parallel()
+
 	spy := &scopedMergeReviewSpy{outcome: ScopedMergeReviewOutcome{Disposition: ScopedMergeCompatible}}
 	res, err := RunScopedMergeReview(ScopedMergeInput{
 		AuditedDiff:  []byte(malformedHunkDiff),
@@ -204,6 +212,8 @@ func TestScopedReview_MalformedDiffFailsClosed(t *testing.T) {
 }
 
 func TestLLMResolution_ReentersRung0Verification(t *testing.T) {
+	t.Parallel()
+
 	// compositionPatchID is core's own patch-id (git patch-id --stable); it is
 	// exactly what ResolutionMatchesAudited must recompute internally.
 	auditedPID, err := compositionPatchID([]byte(auditedDiffAudOnly))

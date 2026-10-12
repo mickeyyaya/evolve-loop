@@ -19,6 +19,8 @@ func (c *phaseReviewCounter) Review(_ context.Context, in ReviewInput) ReviewRes
 }
 
 func TestRemediation_GateReRunIsReviewed(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(nil)
 	gate := &scriptedRunner{name: PhaseTDD, verdicts: []string{VerdictFAIL, VerdictPASS}}
 	build := &scriptedRunner{name: PhaseBuild, verdicts: []string{VerdictPASS}}

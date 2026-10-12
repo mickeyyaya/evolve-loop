@@ -196,6 +196,8 @@ func TestRetryPhaseRunner_ABackfilledArtifactTimeoutReturnsTheWarnResponse(t *te
 }
 
 func TestRetryPhaseRunner_NoBackfillableOutputFallsThroughToTheError(t *testing.T) {
+	t.Parallel()
+
 	runner := &alwaysFailRunner{name: "build", err: ErrArtifactTimeout}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, map[Phase]PhaseRunner{PhaseBuild: runner})
 	o.retryConfig.PhaseMaxAttempts = 1

@@ -7,6 +7,8 @@ import (
 )
 
 func TestIsInfraTeardownError(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		err  error

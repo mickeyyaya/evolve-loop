@@ -11,6 +11,8 @@ import (
 // boundary checkpoint) legitimately returns bare, since no phase ran and
 // inventing an outcome for one would be a false record.
 func TestResumePostDispatchExits_RecordTheirOutcome(t *testing.T) {
+	t.Parallel()
+
 	body, err := os.ReadFile("resume_execution.go")
 	if err != nil {
 		t.Fatalf("read resume_execution.go: %v", err)

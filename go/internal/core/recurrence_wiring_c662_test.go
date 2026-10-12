@@ -10,6 +10,8 @@ import (
 )
 
 func TestC662_RetroCloseoutRecordsClosureInLedger(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	seedCycleStateFile(t, root)
 

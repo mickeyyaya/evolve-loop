@@ -30,6 +30,8 @@ const resolvedInjected = "diff --git a/foo.go b/foo.go\n" +
 	" \ta := 1\n \tb := 2\n+\tAUDITED_LINE := 3\n+\tINJECTED := 99\n \treturn\n"
 
 func TestIntersectingHunks_KeepsOverlapDropsDisjoint(t *testing.T) {
+	t.Parallel()
+
 	scoped := string(IntersectingHunks([]byte(auditedFoo), []byte(composedFoo)))
 	if !strings.Contains(scoped, "HUNK_A") {
 		t.Errorf("intersecting hunk HUNK_A dropped:\n%s", scoped)
@@ -43,6 +45,8 @@ func TestIntersectingHunks_KeepsOverlapDropsDisjoint(t *testing.T) {
 }
 
 func TestIntersectingHunks_DisjointFootprintIsEmpty(t *testing.T) {
+	t.Parallel()
+
 	scoped := IntersectingHunks([]byte(auditedFoo), []byte(composedDisjoint))
 	if strings.TrimSpace(string(scoped)) != "" {
 		t.Errorf("disjoint footprints produced non-empty scope: %q", scoped)
@@ -50,6 +54,8 @@ func TestIntersectingHunks_DisjointFootprintIsEmpty(t *testing.T) {
 }
 
 func TestIntersectingHunks_FileOnlyInOneDiffExcluded(t *testing.T) {
+	t.Parallel()
+
 	other := "diff --git a/bar.go b/bar.go\n--- a/bar.go\n+++ b/bar.go\n" +
 		"@@ -1,1 +1,2 @@ func C() {\n z := 1\n+\tONLY_BAR := 2\n"
 	scoped := string(IntersectingHunks([]byte(auditedFoo), []byte(other)))
@@ -62,6 +68,8 @@ func TestIntersectingHunks_FileOnlyInOneDiffExcluded(t *testing.T) {
 }
 
 func TestScopedReviewVerdict_Composes(t *testing.T) {
+	t.Parallel()
+
 	if !ScopedReviewCompatible.Composes() {
 		t.Errorf("compatible must compose")
 	}
@@ -77,6 +85,8 @@ func TestScopedReviewVerdict_Composes(t *testing.T) {
 }
 
 func TestReverifyResolution_MatchAndReject(t *testing.T) {
+	t.Parallel()
+
 	ok, err := ReverifyResolution([]byte(auditedFoo), []byte(auditedFoo))
 	if err != nil {
 		t.Fatalf("identical resolution errored: %v", err)

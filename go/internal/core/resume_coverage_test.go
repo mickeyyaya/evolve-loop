@@ -68,6 +68,8 @@ func TestRunCycleFromPhase_HappyPath(t *testing.T) {
 }
 
 func TestRunCycleFromPhase_RejectsCheckpointIdentityMismatch(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name  string
 		state CycleState

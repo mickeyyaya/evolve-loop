@@ -18,6 +18,8 @@ func hasNotAdopted(recs []VerdictNotAdopted, phase string) bool {
 }
 
 func TestNonFloorPhaseFailure_DoesNotOverrideFloorVerdict(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	r := &CycleResult{}
 
@@ -36,6 +38,8 @@ func TestNonFloorPhaseFailure_DoesNotOverrideFloorVerdict(t *testing.T) {
 }
 
 func TestNonFloorPhaseFailure_FailAudit_StaysFail(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	r := &CycleResult{}
 
@@ -51,6 +55,8 @@ func TestNonFloorPhaseFailure_FailAudit_StaysFail(t *testing.T) {
 }
 
 func TestFloorPhaseFailure_RemainsCycleFatal(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 
 	for _, phase := range []Phase{PhaseAudit, PhaseBuild, PhaseTDD, PhaseShip} {
@@ -70,6 +76,8 @@ func TestFloorPhaseFailure_RemainsCycleFatal(t *testing.T) {
 }
 
 func TestResumeNonFloorPhaseFailure_DoesNotOverrideFloorVerdict(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	r := &CycleResult{FinalVerdict: VerdictPASS}
 	priorSessionLog := []string{"scout", "tdd", "build", "audit", "ship", "retro"}
@@ -84,6 +92,8 @@ func TestResumeNonFloorPhaseFailure_DoesNotOverrideFloorVerdict(t *testing.T) {
 }
 
 func TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	ws := t.TempDir()
 
@@ -119,6 +129,8 @@ func TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn(t *testing.T) {
 }
 
 func TestDossier_RecordsSkippedPhases(t *testing.T) {
+	t.Parallel()
+
 	notAdopted := []VerdictNotAdopted{{Phase: "retrospective", Verdict: VerdictFAIL}}
 	skipped := []SkippedPhase{{Phase: "closeout", Reason: "abnormal exit in phase build"}}
 	d, err := dossier.Build(9, dossier.BuildOpts{

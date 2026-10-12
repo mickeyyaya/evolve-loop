@@ -6,6 +6,8 @@ import (
 )
 
 func TestBuildFloorSelfCheckFailures_KeepsTailDiagnostic(t *testing.T) {
+	t.Parallel()
+
 	noise := strings.Repeat("[engine] WARN: Deps.TokenResolver is nil — token telemetry disabled (fail-open)\n", 40)
 	verdict := "--- FAIL: TestLoop_MaxCyclesExit_ClearsCompletedMarker (6.75s)\n    loop_test.go:88: want 0 got 1\nFAIL\n"
 	got := floorFailureDiagnostic(noise + verdict)

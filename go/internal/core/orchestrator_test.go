@@ -253,6 +253,8 @@ func buildRunners(verdicts map[Phase]string) map[Phase]PhaseRunner {
 }
 
 func TestOrchestrator_HappyPath_RunsAllPhasesInOrder(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 9}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -295,6 +297,8 @@ func TestOrchestrator_HappyPath_RunsAllPhasesInOrder(t *testing.T) {
 }
 
 func TestOrchestrator_CycleEnv_PropagatesToEveryPhase(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -330,6 +334,8 @@ func TestOrchestrator_CycleEnv_PropagatesToEveryPhase(t *testing.T) {
 }
 
 func TestOrchestrator_CycleEnv_IsCopied(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -350,6 +356,8 @@ func TestOrchestrator_CycleEnv_IsCopied(t *testing.T) {
 }
 
 func TestOrchestrator_AuditFAIL_RoutesThroughRetro(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictFAIL})
@@ -371,6 +379,8 @@ func TestOrchestrator_AuditFAIL_RoutesThroughRetro(t *testing.T) {
 }
 
 func TestOrchestrator_AcquiresAndReleasesLock(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -389,6 +399,8 @@ func TestOrchestrator_AcquiresAndReleasesLock(t *testing.T) {
 }
 
 func TestOrchestrator_LockErrorFailsFast(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{lockErr: ErrLockHeld}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -404,6 +416,8 @@ func TestOrchestrator_LockErrorFailsFast(t *testing.T) {
 }
 
 func TestOrchestrator_MissingRunnerErrors(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 	runners := map[Phase]PhaseRunner{
@@ -419,6 +433,8 @@ func TestOrchestrator_MissingRunnerErrors(t *testing.T) {
 }
 
 func TestOrchestrator_AdvancesLastCycleNumber(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 41}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -434,6 +450,8 @@ func TestOrchestrator_AdvancesLastCycleNumber(t *testing.T) {
 }
 
 func TestOrchestrator_ReadStateError(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{failOnReadState: true}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -444,6 +462,8 @@ func TestOrchestrator_ReadStateError(t *testing.T) {
 }
 
 func TestOrchestrator_InitialWriteCycleStateError(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{failOnWriteCS: true}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -454,6 +474,8 @@ func TestOrchestrator_InitialWriteCycleStateError(t *testing.T) {
 }
 
 func TestOrchestrator_WriteCycleStateMidPhaseError(t *testing.T) {
+	t.Parallel()
+
 	// Init=1, pre-scout=2 → fails before scout's run.
 	st := &fakeStorage{writeCSFailAt: 2}
 	led := &fakeLedger{}
@@ -465,6 +487,8 @@ func TestOrchestrator_WriteCycleStateMidPhaseError(t *testing.T) {
 }
 
 func TestOrchestrator_WriteCycleStatePostPhaseError(t *testing.T) {
+	t.Parallel()
+
 	// Init=1, pre-scout=2, post-scout=3 → fail at 3.
 	st := &fakeStorage{writeCSFailAt: 3}
 	led := &fakeLedger{}
@@ -476,6 +500,8 @@ func TestOrchestrator_WriteCycleStatePostPhaseError(t *testing.T) {
 }
 
 func TestOrchestrator_LedgerAppendError(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	led := &fakeLedger{failOnAppend: true}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -486,6 +512,8 @@ func TestOrchestrator_LedgerAppendError(t *testing.T) {
 }
 
 func TestOrchestrator_FinalWriteStateError(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{failOnWriteState: true}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -503,6 +531,8 @@ func (e *erroringRunner) Run(context.Context, PhaseRequest) (PhaseResponse, erro
 }
 
 func TestOrchestrator_RunnerErrorPropagates(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -522,6 +552,8 @@ func (b *badVerdictRunner) Run(context.Context, PhaseRequest) (PhaseResponse, er
 }
 
 func TestOrchestrator_NonCanonicalVerdictRejected(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -534,6 +566,8 @@ func TestOrchestrator_NonCanonicalVerdictRejected(t *testing.T) {
 }
 
 func TestOrchestrator_RecordsCompletedPhases(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -556,6 +590,8 @@ func TestOrchestrator_RecordsCompletedPhases(t *testing.T) {
 }
 
 func TestOrchestrator_FreshCycleActivatesBuildExplanationContract(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{enforceExplanationContract: true}
 	runners := buildRunners(nil)
 	runners[PhaseBuild] = &requiredExplanationBuilder{}
@@ -580,6 +616,8 @@ func TestOrchestrator_FreshCycleActivatesBuildExplanationContract(t *testing.T) 
 }
 
 func TestOrchestrator_NormalizesBuildBeforeSealingExplanationForFirstAudit(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{enforceExplanationContract: true}
 	runners := buildRunners(nil)
 	runners[PhaseBuild] = &normalizingExplanationBuilder{}
@@ -608,6 +646,8 @@ func TestOrchestrator_NormalizesBuildBeforeSealingExplanationForFirstAudit(t *te
 }
 
 func TestOrchestrator_IntentGate_DefaultRunsScoutFirst(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -630,6 +670,8 @@ func TestOrchestrator_IntentGate_DefaultRunsScoutFirst(t *testing.T) {
 }
 
 func TestOrchestrator_IntentGate_PhaseEnableRunsIntentFirst(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -663,6 +705,8 @@ func TestOrchestrator_IntentGate_PhaseEnableRunsIntentFirst(t *testing.T) {
 }
 
 func TestOrchestrator_IntentGate_ContextOverrideRunsIntent(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -682,6 +726,8 @@ func TestOrchestrator_IntentGate_ContextOverrideRunsIntent(t *testing.T) {
 }
 
 func TestStateMachine_NextFromStart(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	if got := sm.NextFromStart(false); got != PhaseScout {
 		t.Errorf("NextFromStart(false)=%s, want scout", got)
@@ -692,6 +738,8 @@ func TestStateMachine_NextFromStart(t *testing.T) {
 }
 
 func TestOrchestrator_RetroPASS_DoesNotRouteToShip(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{
 		LastCycleNumber: 0,
 		FailedAt: []FailedRecord{
@@ -735,6 +783,8 @@ func TestOrchestrator_RetroPASS_DoesNotRouteToShip(t *testing.T) {
 }
 
 func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(map[Phase]string{
@@ -764,6 +814,8 @@ func TestOrchestrator_RetroFAIL_NoHistory_RoutesToEnd(t *testing.T) {
 }
 
 func TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{
 		LastCycleNumber: 5,
 		FailedAt: []FailedRecord{
@@ -792,6 +844,8 @@ func TestOrchestrator_RetroFAIL_RecurringAudit_FluentEnd(t *testing.T) {
 }
 
 func TestEntriesFromRecords_PreservesClassification(t *testing.T) {
+	t.Parallel()
+
 	records := []FailedRecord{
 		{Cycle: 1, Verdict: "FAIL", Classification: "code-build-fail", Retrospected: true},
 		{Cycle: 2, Verdict: "FAIL", Classification: "infrastructure-transient", RecordedAt: "2026-05-23T00:00:00Z"},
@@ -812,6 +866,8 @@ func TestEntriesFromRecords_PreservesClassification(t *testing.T) {
 }
 
 func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -837,6 +893,8 @@ func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
 }
 
 func TestOrchestrator_PhaseArtifactTimeout_AbortsAfterCap(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -856,6 +914,8 @@ func TestOrchestrator_PhaseArtifactTimeout_AbortsAfterCap(t *testing.T) {
 }
 
 func TestOrchestrator_PhaseNonTimeoutError_NoRetry(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)

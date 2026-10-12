@@ -27,6 +27,8 @@ func everyFieldSet(t *testing.T) LedgerEntry {
 }
 
 func TestLedgerEntry_EveryFieldSurvivesTheLedgerRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	want := everyFieldSet(t)
 	raw, err := json.Marshal(want)
 	if err != nil {

@@ -109,6 +109,8 @@ func TestRecoverFromShipError_AContinuationLaneRunsTheIdentityProof(t *testing.T
 }
 
 func TestRecoverFromShipError_AContinuationLaneKeepsItsReleasedContinuation(t *testing.T) {
+	t.Parallel()
+
 	fx := newContinuationLane(t)
 
 	fx.recover(&fakeStorage{}, fx.auditRow())
@@ -125,6 +127,8 @@ func TestRecoverFromShipError_AContinuationLaneKeepsItsReleasedContinuation(t *t
 }
 
 func TestRecoverFromShipError_AContinuationLaneWritesNoCarryShipCannotReProve(t *testing.T) {
+	t.Parallel()
+
 	fx := newContinuationLane(t)
 	h := &carryHarness{fx: fx, gates: allComposedGatesPass()}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{h.auditRow()}}, buildRunners(nil),
@@ -148,6 +152,8 @@ func TestRecoverFromShipError_AContinuationLaneWritesNoCarryShipCannotReProve(t 
 }
 
 func TestRecoverFromShipError_AContinuationLaneWhoseRebaseFailsKeepsShipsCommit(t *testing.T) {
+	t.Parallel()
+
 	fx := newContinuationLane(t)
 	hooks := t.TempDir()
 	if err := os.WriteFile(filepath.Join(hooks, "pre-rebase"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
@@ -166,6 +172,8 @@ func TestRecoverFromShipError_AContinuationLaneWhoseRebaseFailsKeepsShipsCommit(
 }
 
 func TestRebindPendingChange_AnUnreadableHeadIsAnError(t *testing.T) {
+	t.Parallel()
+
 	binding := explanationdocs.CycleBinding{Worktree: t.TempDir()}
 
 	rebound, skipped, err := rebindPendingChange(context.Background(), binding, strings.Repeat("a", 40), func() error { return nil })
@@ -176,6 +184,8 @@ func TestRebindPendingChange_AnUnreadableHeadIsAnError(t *testing.T) {
 }
 
 func TestRouteRebasedExplanation_AnUnresolvedBaseAborts(t *testing.T) {
+	t.Parallel()
+
 	fx := rebasedCommittedLane(t)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	cs := fx.cycleState()
@@ -189,6 +199,8 @@ func TestRouteRebasedExplanation_AnUnresolvedBaseAborts(t *testing.T) {
 }
 
 func TestRouteRebasedExplanation_AContractTheHostCannotReadAborts(t *testing.T) {
+	t.Parallel()
+
 	fx := rebasedCommittedLane(t)
 	fx.git("reset", "-q", "--soft", fx.newBase)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
@@ -202,6 +214,8 @@ func TestRouteRebasedExplanation_AContractTheHostCannotReadAborts(t *testing.T) 
 }
 
 func TestRecoverFromShipError_ALaneAlreadyOnMainEndsWithNoReplay(t *testing.T) {
+	t.Parallel()
+
 	fx := newContinuationLane(t)
 	fx.git("branch", "-f", "main", "cycle")
 
@@ -216,6 +230,8 @@ func TestRecoverFromShipError_ALaneAlreadyOnMainEndsWithNoReplay(t *testing.T) {
 }
 
 func TestRecoverFromShipError_APreScreenFaultFallsThroughToTheRebase(t *testing.T) {
+	t.Parallel()
+
 	fx := newContinuationLane(t)
 	fx.git("branch", "-m", "main", "trunk")
 

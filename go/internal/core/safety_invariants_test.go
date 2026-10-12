@@ -196,6 +196,8 @@ func containsSubstr(ss []string, sub string) bool {
 }
 
 func TestStateMachine_EveryPathReaches(t *testing.T) {
+	t.Parallel()
+
 	cyclic := NewStateMachine().WithLegalGraph(map[Phase]map[Phase]bool{
 		"loop-a": {"loop-b": true},
 		"loop-b": {"loop-a": true},

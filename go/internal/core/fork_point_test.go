@@ -6,6 +6,8 @@ import (
 )
 
 func TestRouteRebasedExplanation_BindsTheForkPointWhenMainMovesOn(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 	fx.git("rebase", "-q", "main")
 	fx.landOnMain("later.txt", "a later landing\n")

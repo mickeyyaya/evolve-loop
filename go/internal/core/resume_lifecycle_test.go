@@ -29,6 +29,8 @@ func resumedLifecycleFixture(t *testing.T) (*Orchestrator, *fakeStorage, CycleRe
 }
 
 func TestResumeLifecycle_CloseoutRecordsLearningAndRejectsReplay(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	if err := os.WriteFile(filepath.Join(st.cycleState.WorkspacePath, "carryover-todos.json"), []byte(`[{"id":"follow-up","action":"verify recovered behavior"}]`), 0644); err != nil {
 		t.Fatal(err)
@@ -64,6 +66,8 @@ func TestResumeLifecycle_CloseoutRecordsLearningAndRejectsReplay(t *testing.T) {
 }
 
 func TestResumeLifecycle_EmptyTriageStopsBeforeImplementation(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	ws := RunWorkspacePath(root, 7)
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -104,6 +108,8 @@ func TestResumeLifecycle_EmptyTriageStopsBeforeImplementation(t *testing.T) {
 }
 
 func TestResumeLifecycle_LostLandingUsesSameTerminalFloor(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	if err := os.WriteFile(filepath.Join(st.cycleState.WorkspacePath, "ship-error.json"), []byte(`{"code":"GIT_FLEET_REBASE_NEEDED","class":"transient","message":"peer conflict"}`), 0644); err != nil {
 		t.Fatal(err)
@@ -118,6 +124,8 @@ func TestResumeLifecycle_LostLandingUsesSameTerminalFloor(t *testing.T) {
 }
 
 func TestResumeLifecycle_IterationExhaustionIsExplicitFailure(t *testing.T) {
+	t.Parallel()
+
 	o, _, req, rp := resumedLifecycleFixture(t)
 	WithMaxPhaseIterations(1)(o)
 	got, err := o.RunCycleFromPhase(context.Background(), req, rp)
@@ -127,6 +135,8 @@ func TestResumeLifecycle_IterationExhaustionIsExplicitFailure(t *testing.T) {
 }
 
 func TestResumeLifecycle_TerminalFailurePreservesContinuation(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 7)
 	ws := RunWorkspacePath(root, 7)
 	if err := os.MkdirAll(ws, 0755); err != nil {
@@ -153,6 +163,8 @@ func TestResumeLifecycle_TerminalFailurePreservesContinuation(t *testing.T) {
 }
 
 func TestResumeLifecycle_RequestRetainsDifficultyAndRecurrence(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	rp.Phase = "build"
 	req.Context = map[string]string{"fleet_scope": "task-a"}
@@ -171,6 +183,8 @@ func TestResumeLifecycle_RequestRetainsDifficultyAndRecurrence(t *testing.T) {
 }
 
 func TestResumeLifecycle_QuotaExhaustionDefersWithoutTerminalDossier(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	o.retryConfig.RetryBackoffBaseS = 0
 	o.runners[PhaseAudit] = &fakeRunner{name: "audit", failErr: wrapTransient(85), failUntil: 99}
@@ -195,6 +209,8 @@ func TestResumeLifecycle_QuotaExhaustionDefersWithoutTerminalDossier(t *testing.
 }
 
 func TestResumeLifecycle_CloseoutNeverRewindsConcurrentCycleCursor(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeUpdaterStorage{}
 	st.mem.st = State{LastCycleNumber: 12, LastAllocatedCycleNumber: 13}
 	o := &Orchestrator{storage: st}
@@ -207,6 +223,8 @@ func TestResumeLifecycle_CloseoutNeverRewindsConcurrentCycleCursor(t *testing.T)
 }
 
 func TestResumeLifecycle_FinalizeAccountingIsIdempotent(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, _ := resumedLifecycleFixture(t)
 	st.state.TriageThroughput = []TriageThroughputEntry{{Cycle: 7, Floors: 3}}
 	o.gitHEAD = func() (string, error) { return "new-head", nil }
@@ -223,6 +241,8 @@ func TestResumeLifecycle_FinalizeAccountingIsIdempotent(t *testing.T) {
 }
 
 func TestResumeLifecycle_PostShipPauseRetainsThroughputBaseline(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	rp.Phase = string(PhaseRetro)
 	st.cycleState.CompletedPhases = append(st.cycleState.CompletedPhases, "audit", "ship")
@@ -256,6 +276,8 @@ func TestResumeLifecycle_PostShipPauseRetainsThroughputBaseline(t *testing.T) {
 }
 
 func TestResumeLifecycle_AuditRoundPropagatesToAuditAndShip(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	st.cycleState.AuditDispatches = 2
 	if _, err := o.RunCycleFromPhase(context.Background(), req, rp); err != nil {
@@ -272,6 +294,8 @@ func TestResumeLifecycle_AuditRoundPropagatesToAuditAndShip(t *testing.T) {
 }
 
 func TestResumeLifecycle_RestoresOriginalGoalAndRejectsReplacement(t *testing.T) {
+	t.Parallel()
+
 	for _, replacement := range []bool{false, true} {
 		t.Run(map[bool]string{false: "restore", true: "reject-replacement"}[replacement], func(t *testing.T) {
 			o, st, req, rp := resumedLifecycleFixture(t)
@@ -307,6 +331,8 @@ func TestResumeLifecycle_RestoresOriginalGoalAndRejectsReplacement(t *testing.T)
 }
 
 func TestResumeLifecycle_FreshCyclePersistsOriginalGoal(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	st := &fakeStorage{}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
@@ -324,6 +350,8 @@ func TestResumeLifecycle_FreshCyclePersistsOriginalGoal(t *testing.T) {
 }
 
 func TestResumeLifecycle_RecurrenceUsesPersistedLaneScope(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	rp.Phase = "build"
 	materializeLaneScope(st.cycleState.WorkspacePath, "task-a", req.GoalHash)
@@ -344,6 +372,8 @@ func TestResumeLifecycle_RecurrenceUsesPersistedLaneScope(t *testing.T) {
 }
 
 func TestResumeLifecycle_FreshQuotaPauseIsNotTerminalFailure(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	runners := buildRunners(nil)
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(85), failUntil: 99}
@@ -363,6 +393,8 @@ func TestResumeLifecycle_FreshQuotaPauseIsNotTerminalFailure(t *testing.T) {
 }
 
 func TestResumeLifecycle_PausedAllocatedCycleUsesHostLeaseIdentity(t *testing.T) {
+	t.Parallel()
+
 	o, st, req, rp := resumedLifecycleFixture(t)
 	st.state.LastCycleNumber = 6
 	st.state.LastAllocatedCycleNumber = 7

@@ -147,6 +147,8 @@ func TestNormalizeWorktreeToBase_ALockedBranchKeepsTheBuilderCommit(t *testing.T
 }
 
 func TestPruneSupersededOrphans_EachGitFailureAbortsWithItsStage(t *testing.T) {
+	t.Parallel()
+
 	noPR := func(string) (bool, error) { return false, nil }
 	t.Run("git cannot start", func(t *testing.T) {
 		v, err := PruneSupersededOrphans(context.Background(), filepath.Join(t.TempDir(), "gone"), "main", noPR)
@@ -174,6 +176,8 @@ func TestPruneSupersededOrphans_EachGitFailureAbortsWithItsStage(t *testing.T) {
 }
 
 func TestKeepOrPrune_ADeleteThatCannotStartIsAnError(t *testing.T) {
+	t.Parallel()
+
 	missing := filepath.Join(t.TempDir(), "gone")
 
 	v, err := keepOrPrune(context.Background(), missing, OrphanVerdict{Ref: "cycle-3", Superseded: true}, false, false, func(string) (bool, error) { return false, nil })
@@ -187,6 +191,8 @@ func TestKeepOrPrune_ADeleteThatCannotStartIsAnError(t *testing.T) {
 }
 
 func TestCheckedOutBranches_AGitThatCannotStartIsAnError(t *testing.T) {
+	t.Parallel()
+
 	got, err := checkedOutBranches(context.Background(), filepath.Join(t.TempDir(), "gone"))
 
 	if err == nil || !strings.HasPrefix(err.Error(), "prune orphans: list worktrees: ") || got != nil {

@@ -10,6 +10,8 @@ import (
 )
 
 func TestOrchestrator_ThreadsIntentRequiredToPlannerInput(t *testing.T) {
+	t.Parallel()
+
 	runIntent := func(t *testing.T, wfCfg policy.WorkflowConfig) router.RouteInput {
 		t.Helper()
 		st := &fakeStorage{state: State{LastCycleNumber: 0}}

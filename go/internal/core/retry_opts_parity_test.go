@@ -69,6 +69,8 @@ func retryOptsCycleRun(t *testing.T) *cycleRun {
 }
 
 func TestRetryOpts_EnumeratesEveryDispatchHook(t *testing.T) {
+	t.Parallel()
+
 	got := retryOptsHookNames(t, retryOpts{})
 	if !reflect.DeepEqual(got, canonicalRetryHooks) {
 		t.Fatalf("retryOpts hook fields = %v, want exactly %v\n"+
@@ -79,6 +81,8 @@ func TestRetryOpts_EnumeratesEveryDispatchHook(t *testing.T) {
 }
 
 func TestMainDispatchRetryOpts_PassesTheFullHookSet(t *testing.T) {
+	t.Parallel()
+
 	cr := retryOptsCycleRun(t)
 	enabled := enabledRetryHooks(t, cr.mainDispatchRetryOpts())
 	for _, hook := range canonicalRetryHooks {
@@ -90,6 +94,8 @@ func TestMainDispatchRetryOpts_PassesTheFullHookSet(t *testing.T) {
 }
 
 func TestEvaluateBatchRetryOpts_WiresBothSkipsButNotShipRecovery(t *testing.T) {
+	t.Parallel()
+
 	cr := retryOptsCycleRun(t)
 	enabled := enabledRetryHooks(t, cr.evaluateBatchRetryOpts())
 
@@ -109,6 +115,8 @@ func TestEvaluateBatchRetryOpts_WiresBothSkipsButNotShipRecovery(t *testing.T) {
 }
 
 func TestDispatchRunnerWithRetry_DelegatesToTheSharedRetryCore(t *testing.T) {
+	t.Parallel()
+
 	viaWrapper := func() (PhaseResponse, int, error) {
 		runner := &alwaysFailRunner{name: "evaluator", err: ErrArtifactTimeout}
 		o := retryParityOrchestrator(t, runner, "evaluator", phasespec.PhaseSpec{Optional: true})

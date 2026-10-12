@@ -27,6 +27,8 @@ func explanationRouteOrchestrator(adj RetryAdjudicator) *Orchestrator {
 }
 
 func TestDecideAfterAuditFail_AnExplanationOnlyFailReauthorsAtBuildNotTDD(t *testing.T) {
+	t.Parallel()
+
 	cs := explanationRouteState(t, 0, cycle1745Defects...)
 
 	next, reason, sig := explanationRouteOrchestrator(nil).decideAfterAuditFail(cs)
@@ -43,6 +45,8 @@ func TestDecideAfterAuditFail_AnExplanationOnlyFailReauthorsAtBuildNotTDD(t *tes
 }
 
 func TestDecideAfterAuditFail_AMixedFailKeepsTDD(t *testing.T) {
+	t.Parallel()
+
 	cs := explanationRouteState(t, 0, cycle1745Defects[0], "H1: go/internal/cyclesimulator/characterization_test.go:263-281 builds a raw git repo outside internal/gittest")
 
 	next, reason, _ := explanationRouteOrchestrator(nil).decideAfterAuditFail(cs)
@@ -80,6 +84,8 @@ func TestDecideAfterAuditFail_AnExplanationOnlyFailBriefsItsDefectsWithoutARecor
 }
 
 func TestDecideAfterAuditFail_AnExplanationOnlyFailAtTheCapDeclinesAsToday(t *testing.T) {
+	t.Parallel()
+
 	cs := explanationRouteState(t, 2, cycle1745Defects...)
 
 	next, reason, _ := explanationRouteOrchestrator(nil).decideAfterAuditFail(cs)
@@ -93,6 +99,8 @@ func TestDecideAfterAuditFail_AnExplanationOnlyFailAtTheCapDeclinesAsToday(t *te
 }
 
 func TestDecideAfterAuditFail_TheAdjudicatorCannotSendAnExplanationOnlyFailToTDD(t *testing.T) {
+	t.Parallel()
+
 	stub := &stubAdjudicator{give: &adjudication{Action: retryActionRetryTDD, Justification: "encode the defects as tests first"}}
 	cs := explanationRouteState(t, 0, cycle1745Defects...)
 
@@ -104,6 +112,8 @@ func TestDecideAfterAuditFail_TheAdjudicatorCannotSendAnExplanationOnlyFailToTDD
 }
 
 func TestExplanationCorrectionEnvelope_NarrowsOnlyAGrantedRetry(t *testing.T) {
+	t.Parallel()
+
 	granted := retryEnvelope{Legal: []retryAction{retryActionRetryTDD, retryActionRetryBuild, retryActionDecline}, Reason: "policy grants"}
 	got := explanationCorrectionEnvelope(granted)
 	if !sameActions(got.Legal, []retryAction{retryActionReauthorExplanation, retryActionDecline}) || !strings.HasPrefix(got.Reason, "policy grants; ") {
@@ -120,6 +130,8 @@ func TestExplanationCorrectionEnvelope_NarrowsOnlyAGrantedRetry(t *testing.T) {
 }
 
 func TestSeedAuditRepairContext_AnExplanationOnlyRoundScopesTheBuild(t *testing.T) {
+	t.Parallel()
+
 	cs := explanationRouteState(t, 1, cycle1745Defects...)
 	cs.AuditRepairActive = true
 

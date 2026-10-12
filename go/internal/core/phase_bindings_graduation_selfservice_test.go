@@ -7,6 +7,8 @@ import (
 )
 
 func TestBuildGraduationCheck_MessageEmitsTheExactTwoEdits(t *testing.T) {
+	t.Parallel()
+
 	wt := initGitWorktree(t)
 	gradWrite(t, wt, "go/.apicover-enforce", "./internal/other\n")
 	gradCommitAll(t, wt)
@@ -33,6 +35,8 @@ func TestBuildGraduationCheck_MessageEmitsTheExactTwoEdits(t *testing.T) {
 }
 
 func TestBuildGraduationCheck_MessageIsPerPackage(t *testing.T) {
+	t.Parallel()
+
 	wt := initGitWorktree(t)
 	gradWrite(t, wt, "go/.apicover-enforce", "./internal/other\n")
 	gradCommitAll(t, wt)
@@ -53,6 +57,8 @@ func TestBuildGraduationCheck_MessageIsPerPackage(t *testing.T) {
 }
 
 func TestBuildGraduationCheck_MessageDistinguishesTheTwoApicoverGates(t *testing.T) {
+	t.Parallel()
+
 	wt := initGitWorktree(t)
 	gradWrite(t, wt, "go/.apicover-enforce", "./internal/other\n")
 	gradCommitAll(t, wt)

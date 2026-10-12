@@ -23,6 +23,8 @@ func routeExplanation(fx *shippedLane, storage *fakeStorage) (Phase, bool, Cycle
 }
 
 func TestRouteRebasedExplanation_APendingIdenticalChangeReturnsToAudit(t *testing.T) {
+	t.Parallel()
+
 	fx := rebasedCommittedLane(t)
 	fx.git("reset", "-q", "--soft", fx.newBase)
 	storage := &fakeStorage{}
@@ -41,6 +43,8 @@ func TestRouteRebasedExplanation_APendingIdenticalChangeReturnsToAudit(t *testin
 }
 
 func TestRouteRebasedExplanation_ACommittedIdenticalChangeReturnsToBuild(t *testing.T) {
+	t.Parallel()
+
 	fx := rebasedCommittedLane(t)
 
 	next, recovering, cs := routeExplanation(fx, &fakeStorage{})
@@ -54,6 +58,8 @@ func TestRouteRebasedExplanation_ACommittedIdenticalChangeReturnsToBuild(t *test
 }
 
 func TestRouteRebasedExplanation_AnIncompleteRebindAborts(t *testing.T) {
+	t.Parallel()
+
 	fx := rebasedCommittedLane(t)
 	fx.git("reset", "-q", "--soft", fx.newBase)
 

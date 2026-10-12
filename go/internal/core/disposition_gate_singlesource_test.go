@@ -43,6 +43,8 @@ func personaDispositionExample(t *testing.T, root string) string {
 }
 
 func TestDispositionExample_PersonaAndGoAgreeAsJSON(t *testing.T) {
+	t.Parallel()
+
 	root := repoRootForDisposition(t)
 	var fromPersona, fromGo map[string]any
 	if err := json.Unmarshal([]byte(personaDispositionExample(t, root)), &fromPersona); err != nil {
@@ -57,6 +59,8 @@ func TestDispositionExample_PersonaAndGoAgreeAsJSON(t *testing.T) {
 }
 
 func TestDispositionExample_PassesProductionGate(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "disposition.json"), []byte(dispositionSchemaExample), 0o644); err != nil {
 		t.Fatal(err)

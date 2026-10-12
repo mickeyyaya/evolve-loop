@@ -69,6 +69,8 @@ func runBuildTierThroughCycle(t *testing.T, projectRoot, proposedTier string) st
 }
 
 func TestModelTierEnvelope_CeilingClampsThroughRealProfileLookup(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeBuilderProfile(t, root, `{"min":"balanced","max":"deep"}`)
 
@@ -79,6 +81,8 @@ func TestModelTierEnvelope_CeilingClampsThroughRealProfileLookup(t *testing.T) {
 }
 
 func TestModelTierEnvelope_UniversalFloorClampsThroughRealDispatch(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeBuilderProfile(t, root, "") // no model_tier_envelope → universal floor governs
 
@@ -91,6 +95,8 @@ func TestModelTierEnvelope_UniversalFloorClampsThroughRealDispatch(t *testing.T)
 // Unlike its siblings, this holds on both the nil-stub and the wired path —
 // it pins precision (no over-clamp), not the wiring fix itself.
 func TestModelTierEnvelope_WithinEnvelopeTierPassesThrough(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeBuilderProfile(t, root, `{"min":"balanced","max":"deep"}`)
 
@@ -101,6 +107,8 @@ func TestModelTierEnvelope_WithinEnvelopeTierPassesThrough(t *testing.T) {
 }
 
 func TestModelTierEnvelope_AbsentProfileDegradesNilSafe(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir() // no .evolve/profiles/ at all
 
 	got := runBuildTierThroughCycle(t, root, "fast")
@@ -110,6 +118,8 @@ func TestModelTierEnvelope_AbsentProfileDegradesNilSafe(t *testing.T) {
 }
 
 func TestModelTierEnvelope_ClampRecordedInPhasePlan(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeBuilderProfile(t, root, `{"min":"balanced","max":"deep"}`)
 

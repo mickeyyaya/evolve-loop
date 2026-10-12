@@ -34,6 +34,8 @@ func phaseIOCfg(phaseIO config.Stage) config.RoutingConfig {
 // literal zero value here — not a NewPhaseInput(empty) result that merely looks
 // zero.
 func TestDispatch_PhaseInput_ZeroValueBelowEnforce(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name  string
 		stage config.Stage
@@ -73,6 +75,8 @@ func TestDispatch_PhaseInput_ZeroValueBelowEnforce(t *testing.T) {
 // PhaseInput whose CycleInputs reproduce the legacy Context values, with identity
 // fields set and (on a non-recovery cycle) no ErrorContext.
 func TestDispatch_PhaseInput_PopulatedAtEnforce(t *testing.T) {
+	t.Parallel()
+
 	const goal, strategy = "cut p99 latency", "profile-first"
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
@@ -117,6 +121,8 @@ func TestDispatch_PhaseInput_PopulatedAtEnforce(t *testing.T) {
 // nil case across a whole cycle; this proves the non-nil mapping without having
 // to drive a real ship failure.
 func TestBuildPhaseInput_ErrorContext_NilUnlessShipErrorKeys(t *testing.T) {
+	t.Parallel()
+
 	cr := &cycleRun{
 		cycle:   7,
 		cs:      CycleState{RunID: "r", WorkspacePath: "/ws"},
@@ -151,6 +157,8 @@ func TestBuildPhaseInput_ErrorContext_NilUnlessShipErrorKeys(t *testing.T) {
 // byte-identity proof above). The cap is a guard on what arrives; it is not a
 // licence to create the bytes it bounds.
 func TestPlanCycle_CarryoverSummary_NoRawWriterBelowEnforce(t *testing.T) {
+	t.Parallel()
+
 	backlog := []CarryoverTodo{
 		{ID: "todo-big-1", Action: strings.Repeat("a", phaseio.MaxFieldBytes*8), Priority: "high"},
 		{ID: "todo-big-2", Action: strings.Repeat("b", phaseio.MaxFieldBytes*8), Priority: "high"},

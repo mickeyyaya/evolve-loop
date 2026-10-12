@@ -127,6 +127,8 @@ const neverDemotingThreshold = 99
 // PRIMARY routing must be untouched — dispatch 1 (initial) and dispatch 2
 // (correction 1) carry no routing override.
 func TestContractCorrection_SecondBlockEscalatesToProfileFallback(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold}
@@ -149,6 +151,8 @@ func TestContractCorrection_SecondBlockEscalatesToProfileFallback(t *testing.T) 
 // (primary) routing — escalating on the first block would reroute 99% of a
 // phase's honest single-turn slips onto a different CLI.
 func TestContractCorrection_FirstBlockDoesNotEscalate(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	// Block once, then approve: the ladder stops after correction 1.
@@ -173,6 +177,8 @@ func TestContractCorrection_FirstBlockDoesNotEscalate(t *testing.T) {
 // block of this phase, escalation must still get its shot before the third
 // strike \u2014 with a correction-ordinal trigger it never would.
 func TestContractCorrection_HotBreakerEscalatesOnFirstCorrection(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{phase: "build", threshold: 3, blocks: 1} // breaker left hot
@@ -208,6 +214,8 @@ func TestContractCorrection_HotBreakerEscalatesOnFirstCorrection(t *testing.T) {
 // format-compliance failure, so a different CLI is not the remedy and the ladder
 // must behave exactly as before.
 func TestContractCorrection_NonContractRejectionNeverEscalates(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold}
@@ -237,6 +245,8 @@ func TestContractCorrection_NonContractRejectionNeverEscalates(t *testing.T) {
 // demotion for every profile, not just the ones whose operator happened to
 // configure a chain.
 func TestContractCorrection_NoDeclaredFallbackEscalatesToUniversalClaude(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", nil)
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold}
@@ -258,6 +268,8 @@ func TestContractCorrection_NoDeclaredFallbackEscalatesToUniversalClaude(t *test
 // escalation target, so the re-dispatch stays on the primary rather than
 // "escalating" to the CLI that just failed the contract.
 func TestContractCorrection_SameFamilyFallbackIsNotAnEscalation(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold}
@@ -277,6 +289,8 @@ func TestContractCorrection_SameFamilyFallbackIsNotAnEscalation(t *testing.T) {
 // does, so the third strike never lands: the cycle completes, the contract
 // gate is NOT demoted, and no demotion evidence is recorded.
 func TestContractCorrection_CompliantFallbackPreventsCircuitOpen(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{phase: "build", compliantCLI: "codex-tmux", threshold: 3}
@@ -308,6 +322,8 @@ func TestContractCorrection_CompliantFallbackPreventsCircuitOpen(t *testing.T) {
 // .evolve/inbox — a mid-flight inbox write races inboxmover.Claim's os.Rename;
 // recurrence.ApplyBoundary is the only sanctioned inbox writer).
 func TestContractCorrection_CircuitOpenWarnsAndFilesItem(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{phase: "build", threshold: 3}
@@ -457,6 +473,8 @@ func TestUniversalContractFallbackMatchesLLMRouteDefault(t *testing.T) {
 // not one incapable CLI, so correction 2 must re-dispatch on the phase's own
 // routing, unescalated.
 func TestContractCorrection_DifferingBlockReasonsDoNotEscalate(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{
@@ -488,6 +506,8 @@ func TestContractCorrection_DifferingBlockReasonsDoNotEscalate(t *testing.T) {
 // "<dur>". A raw `block1.Reason == block2.Reason` comparison would suppress this
 // escalation; the fingerprint-normalized one must still escalate.
 func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{
@@ -526,6 +546,8 @@ func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
 // the blocks are one partially-repaired defect, and the second consecutive
 // block must still escalate off the failing CLI family.
 func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{
@@ -564,6 +586,8 @@ func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 // a second one. A SUPERSET is at least as strong an incapable-CLI signature as a
 // subset, and whole-string identity suppresses it for the identical reason.
 func TestContractCorrection_SupersetRegressionStillEscalates(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{
@@ -597,6 +621,8 @@ func TestContractCorrection_SupersetRegressionStillEscalates(t *testing.T) {
 // ModelRoutingCLI override). An implementation that simply deleted the
 // identity gate to make the subset test pass fails here.
 func TestContractCorrection_DisjointViolationSetsDoNotEscalate(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{
@@ -626,6 +652,8 @@ func TestContractCorrection_DisjointViolationSetsDoNotEscalate(t *testing.T) {
 // (different order, reworded message text). Code-SET identity is invariant to
 // both; any residual text-shaped comparison is not.
 func TestContractCorrection_ReorderedViolationSetEscalates(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{
@@ -660,6 +688,8 @@ func TestContractCorrection_ReorderedViolationSetEscalates(t *testing.T) {
 // non-summarize reason shape. Two IDENTICAL code-less reasons are self-evidently
 // the same defect and must still escalate.
 func TestContractCorrection_UncodedReasonsFallBackToTextIdentity(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	const uncoded = "build deliverable failed contract: artifact absent at the contracted path"

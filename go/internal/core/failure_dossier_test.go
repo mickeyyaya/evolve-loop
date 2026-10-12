@@ -31,6 +31,8 @@ func writeAuditWithFailure(t *testing.T, dir, verdict, class string, defects ...
 }
 
 func TestFailureDossier(t *testing.T) {
+	t.Parallel()
+
 	fp := policy.DefaultSystemFailurePolicy()
 
 	t.Run("incoherent_verdict_floor_candidate_and_artifact", func(t *testing.T) {

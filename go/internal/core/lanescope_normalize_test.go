@@ -42,6 +42,8 @@ func readScoutReport(t *testing.T, workspace string) string {
 }
 
 func TestNormalizeScoutGoalHash_StampsMismatchToPin(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 	writeScoutReportFixture(t, ws, misGoalHash)
@@ -54,6 +56,8 @@ func TestNormalizeScoutGoalHash_StampsMismatchToPin(t *testing.T) {
 }
 
 func TestNormalizeScoutGoalHash_CoherentReportUnchanged(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 	writeScoutReportFixture(t, ws, pinGoalHash)
@@ -67,6 +71,8 @@ func TestNormalizeScoutGoalHash_CoherentReportUnchanged(t *testing.T) {
 }
 
 func TestNormalizeScoutGoalHash_NonCanonicalEchoRefused(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 	writeScoutReportFixture(t, ws, "goal-1") // detected mismatch, but not 64-hex
@@ -82,6 +88,8 @@ func TestNormalizeScoutGoalHash_NonCanonicalEchoRefused(t *testing.T) {
 // Two distinct equal-length hex strings can't be substrings of each other,
 // so a canonical needle only ever replaces genuine echoes.
 func TestNormalizeScoutGoalHash_CorrectsEveryOccurrence(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -105,6 +113,8 @@ func TestNormalizeScoutGoalHash_CorrectsEveryOccurrence(t *testing.T) {
 }
 
 func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no pin leaves report untouched", func(t *testing.T) {
 		ws := t.TempDir()
 		writeScoutReportFixture(t, ws, misGoalHash) // no lane-scope.json
@@ -143,6 +153,8 @@ func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 }
 
 func TestNormalizeScoutGoalHash_WriteFailureIsLoudNoOp(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 	writeScoutReportFixture(t, ws, misGoalHash)

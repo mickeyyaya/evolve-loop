@@ -9,6 +9,8 @@ import (
 )
 
 func TestTruncateGoal_ProjectsTheAdvisorCap(t *testing.T) {
+	t.Parallel()
+
 	long := strings.Repeat("g", maxGoalTextChars+7)
 	if got, want := truncateGoal("  "+long+"  "), advisor.TruncateGoal(long); got != want {
 		t.Fatalf("truncateGoal must be the advisor's cap:\n got %q\nwant %q", got[len(got)-20:], want[len(want)-20:])

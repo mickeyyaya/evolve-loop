@@ -13,6 +13,8 @@ import (
 )
 
 func TestResumeVerdict_PostAuditCloseoutPreservesHostDisposition(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name, persisted, timing, want string
 		failed                        bool
@@ -61,6 +63,8 @@ func TestResumeVerdict_PostAuditCloseoutPreservesHostDisposition(t *testing.T) {
 }
 
 func TestResumeVerdict_FloorCompletionPersistsBeforeNextDispatch(t *testing.T) {
+	t.Parallel()
+
 	for _, resume := range []bool{false, true} {
 		t.Run(map[bool]string{false: "fresh", true: "resumed"}[resume], func(t *testing.T) {
 			o, st, req, rp := resumedLifecycleFixture(t)

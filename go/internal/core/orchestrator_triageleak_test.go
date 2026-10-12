@@ -64,6 +64,8 @@ func initLeakRecoverRepo(t *testing.T) string {
 }
 
 func TestOrchestrator_TriageLeakRecover(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

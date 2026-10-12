@@ -24,6 +24,8 @@ func writeAuditFailReason(t *testing.T, dir, phase string, reasons ...string) {
 }
 
 func TestAssembler_PreClassBucketsFromRealArtifacts(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		phase  string
@@ -55,6 +57,8 @@ func TestAssembler_PreClassBucketsFromRealArtifacts(t *testing.T) {
 }
 
 func TestAssembler_FingerprintComposition(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	writeAuditFailReason(t, dir, "audit", "EGPS floor blocked ship: red_count=1")
 
@@ -85,6 +89,8 @@ func TestAssembler_FingerprintComposition(t *testing.T) {
 }
 
 func TestAssembler_RecurrenceFromLedger(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	writeAuditFailReason(t, dir, "audit", "EGPS floor blocked ship: red_count=1")
 
@@ -118,6 +124,8 @@ func TestAssembler_RecurrenceFromLedger(t *testing.T) {
 }
 
 func TestAssembler_MissingArtifactsDegradeToUnknown(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 
 	got, err := AssembleFailureDigest(1034, dir, emptyCounter{})
@@ -133,6 +141,8 @@ func TestAssembler_MissingArtifactsDegradeToUnknown(t *testing.T) {
 }
 
 func TestAssembler_WritesDigestArtifact(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	writeAuditFailReason(t, dir, "audit", "EGPS floor blocked ship: red_count=1")
 

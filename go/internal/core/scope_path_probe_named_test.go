@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestScopePathProbe_NilResolverReportsUnwired(t *testing.T) {
+	t.Parallel()
+
 	o := &Orchestrator{}
 	if _, wired := o.ScopePathProbe("/p", "id"); wired {
 		t.Fatalf("no resolver means unwired")

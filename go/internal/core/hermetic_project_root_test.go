@@ -19,6 +19,8 @@ const internalTreeRoot = ".."
 var sharedTmpRoot = `"/tmp/` + `p"`
 
 func TestCoreTests_NeverPinSharedTmpProjectRoot(t *testing.T) {
+	t.Parallel()
+
 	if _, err := os.Stat(internalTreeRoot); err != nil {
 		t.Fatalf("go/internal tree not found at %q: %v — the guard would scan nothing and pass vacuously", internalTreeRoot, err)
 	}

@@ -8,6 +8,8 @@ import (
 )
 
 func TestConsumeAuditRepairGrant_IncrementsOnlyOnARepairReason(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		reason string
@@ -60,6 +62,8 @@ func TestConsumeAuditRepairGrant_IncrementsOnlyOnARepairReason(t *testing.T) {
 }
 
 func TestAuditRepairReasonPrefix_IsSingleSourced(t *testing.T) {
+	t.Parallel()
+
 	body, err := os.ReadFile("audit_fail_decision.go")
 	if err != nil {
 		t.Fatalf("read audit_fail_decision.go: %v", err)
@@ -73,6 +77,8 @@ func TestAuditRepairReasonPrefix_IsSingleSourced(t *testing.T) {
 }
 
 func TestResumePath_ReachesTheAuditFailDisposition(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 1577, WorkspacePath: t.TempDir()}}
 	led := &fakeLedger{}
@@ -98,6 +104,8 @@ func TestResumePath_ReachesTheAuditFailDisposition(t *testing.T) {
 }
 
 func TestBlockerBreaker_RepairAttemptsWithinOneCycleCountOnce(t *testing.T) {
+	t.Parallel()
+
 	// One cycle, three distinct audit rejections: the original plus two repairs.
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		dg(1573, "audit|verdict-fail|aaa", "verdict-fail"),

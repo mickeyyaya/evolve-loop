@@ -67,6 +67,8 @@ func declineOrchestrator(t *testing.T, center *signalcenter.Center, diff []byte,
 }
 
 func TestCompositionCarryForward_RealisticTails_EveryFailingGatesLastLineReachesTheEvent(t *testing.T) {
+	t.Parallel()
+
 	for name, failing := range map[string][]string{
 		"two failing gates":              {"test", "acs"},
 		"a compile break fails all four": {"compile", "test", "acs", "apicover"},
@@ -112,6 +114,8 @@ func TestCompositionCarryForward_RealisticTails_EveryFailingGatesLastLineReaches
 }
 
 func TestCompositionCarryForward_AbsentGateIsNamedInTheDeclineEvent(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	outcomes := allComposedGatesPass()
 	delete(outcomes, "apicover")
@@ -205,6 +209,8 @@ func TestIdentityCarryForward_GateDeclineEmitsOneCodedSignalEvent(t *testing.T) 
 }
 
 func TestIdentityCarryForward_NonGateOutcomesEmitNoDeclineEvent(t *testing.T) {
+	t.Parallel()
+
 	for name, tc := range map[string]struct {
 		arrange  func(h *carryHarness)
 		wantNext Phase

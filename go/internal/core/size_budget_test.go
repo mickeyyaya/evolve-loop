@@ -7,6 +7,8 @@ import (
 )
 
 func TestSizeBudgetMultiplier_MapsAndDefaults(t *testing.T) {
+	t.Parallel()
+
 	m := map[string]float64{"large": 1.5, "medium": 1.25}
 	if got := sizeBudgetMultiplier("large", m); got != 1.5 {
 		t.Fatalf("large: got %v", got)
@@ -23,6 +25,8 @@ func TestSizeBudgetMultiplier_MapsAndDefaults(t *testing.T) {
 }
 
 func TestScaledCorrectionLimit_RoundsAndClamps(t *testing.T) {
+	t.Parallel()
+
 	if got := scaledCorrectionLimit(2, 1.0); got != 2 {
 		t.Fatalf("mult 1.0 must be identity, got %d", got)
 	}

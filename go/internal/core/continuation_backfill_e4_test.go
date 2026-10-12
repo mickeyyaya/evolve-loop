@@ -78,6 +78,8 @@ func FuzzReadContinuationFindings_IsBoundedAndRendersEveryReason(f *testing.F) {
 }
 
 func TestPrepareAdoptedTree_AnArchiveFailureStopsAdoptionWithItsStage(t *testing.T) {
+	t.Parallel()
+
 	_, wt := initContinuationRepo(t, 61)
 	base := gitOut(t, wt, "rev-parse", "HEAD")
 	cr := &cycleRun{ctx: context.Background(), cycle: 62}
@@ -141,6 +143,8 @@ func adoptionRunE4(t *testing.T, root string, m continuation.Continuation, wp Wo
 }
 
 func TestAdoptContinuationAfterTriage_AProvisionerThatCannotSeedKeepsTheFreshWorktree(t *testing.T) {
+	t.Parallel()
+
 	root, wt := initContinuationRepo(t, 71)
 	m := stampedContinuation(t, root, wt, 71)
 	ws := t.TempDir()
@@ -158,6 +162,8 @@ func TestAdoptContinuationAfterTriage_AProvisionerThatCannotSeedKeepsTheFreshWor
 }
 
 func TestAdoptContinuationAfterTriage_EachPostSeedFailureIsReturnedWithTheSeededIdentityKept(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name    string
 		plant   func(wt string) error

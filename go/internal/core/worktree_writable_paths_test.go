@@ -7,6 +7,8 @@ import (
 )
 
 func TestWorktreeWritablePaths_OnlyTheDebuggerOfAFleetRebaseMayWriteItsConflicts(t *testing.T) {
+	t.Parallel()
+
 	conflicts := []string{"go/.apicover-enforce"}
 	needed, reclassified := string(CodeGitFleetRebaseNeeded), string(CodeGitFleetRebaseConflict)
 	for name, tc := range map[string]struct {
@@ -27,6 +29,8 @@ func TestWorktreeWritablePaths_OnlyTheDebuggerOfAFleetRebaseMayWriteItsConflicts
 }
 
 func TestResumePath_TheDebuggerOfAFleetRebaseMayWriteItsConflicts(t *testing.T) {
+	t.Parallel()
+
 	conflicts := []string{"go/.apicover-enforce"}
 	st := &fakeStorage{cycleState: CycleState{CycleID: 1725, Phase: string(PhaseDebugger), ShipRecoveryCode: string(CodeGitFleetRebaseNeeded), ShipRecoveryConflicts: conflicts}}
 	runners := buildRunners(map[Phase]string{})

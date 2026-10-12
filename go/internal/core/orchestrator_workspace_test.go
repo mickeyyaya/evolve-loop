@@ -9,6 +9,8 @@ import (
 )
 
 func TestArchivePollutedWorkspace_MissingDirIsNoOp(t *testing.T) {
+	t.Parallel()
+
 	ws := filepath.Join(t.TempDir(), "cycle-108")
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
 	if err := archivePollutedWorkspace(ws, now); err != nil {
@@ -27,6 +29,8 @@ func TestArchivePollutedWorkspace_MissingDirIsNoOp(t *testing.T) {
 
 // Models a mkdir-only init that crashed before any phase wrote anything.
 func TestArchivePollutedWorkspace_EmptyDirIsNoOp(t *testing.T) {
+	t.Parallel()
+
 	ws := filepath.Join(t.TempDir(), "cycle-108")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -41,6 +45,8 @@ func TestArchivePollutedWorkspace_EmptyDirIsNoOp(t *testing.T) {
 }
 
 func TestArchivePollutedWorkspace_NonEmptyDirRenamed(t *testing.T) {
+	t.Parallel()
+
 	parent := t.TempDir()
 	ws := filepath.Join(parent, "cycle-108")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -79,6 +85,8 @@ func TestArchivePollutedWorkspace_NonEmptyDirRenamed(t *testing.T) {
 }
 
 func TestArchivePollutedWorkspace_NotADirReturnsNoOp(t *testing.T) {
+	t.Parallel()
+
 	ws := filepath.Join(t.TempDir(), "cycle-108")
 	if err := os.WriteFile(ws, []byte("a file, not a dir"), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -90,6 +98,8 @@ func TestArchivePollutedWorkspace_NotADirReturnsNoOp(t *testing.T) {
 }
 
 func TestC1735_004_ArchivePollutedWorkspaceStillArchivesGCManifestOnlyDir(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	for _, name := range []string{"gc-shadow-manifest.json", "workspace-gc-manifest.json"} {
 		if err := os.WriteFile(filepath.Join(ws, name), []byte("{}"), 0o644); err != nil {
@@ -109,6 +119,8 @@ func TestC1735_004_ArchivePollutedWorkspaceStillArchivesGCManifestOnlyDir(t *tes
 }
 
 func TestC1735_005_ArchivePollutedWorkspaceIgnoresLaneScopeOnly(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte("{}"), 0o644); err != nil {
 		t.Fatalf("seed: %v", err)

@@ -14,6 +14,8 @@ import (
 )
 
 func TestOptionalPhaseSkip_AdmitsMissingAgentDoc(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t, specWith("defect-disposition-preflight", "evaluate", ""))
 	o := &Orchestrator{catalog: cat}
 	err := fmt.Errorf("defect-disposition-preflight: load agent: %w",
@@ -24,6 +26,8 @@ func TestOptionalPhaseSkip_AdmitsMissingAgentDoc(t *testing.T) {
 }
 
 func TestOptionalPhaseSkip_MissingDocOnMandatoryPhaseStaysFatal(t *testing.T) {
+	t.Parallel()
+
 	spec := specWith("build", "build", "")
 	spec.Optional = false
 	cat := catalogOf(t, spec)
@@ -35,6 +39,8 @@ func TestOptionalPhaseSkip_MissingDocOnMandatoryPhaseStaysFatal(t *testing.T) {
 }
 
 func TestOptionalPhaseSkip_FloorPhaseNeverSkipsOnMissingDoc(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, []string{"build", "audit", "tdd"}, optionalSpecFor("audit"))
 	if o.optionalInfraSkip(Phase("audit"), ErrAgentDocMissing) {
 		t.Fatalf("a ship-floor phase must never skip on a missing persona")
@@ -42,6 +48,8 @@ func TestOptionalPhaseSkip_FloorPhaseNeverSkipsOnMissingDoc(t *testing.T) {
 }
 
 func TestOptionalPhaseSkip_ConfiguredMandatoryNeverSkipsOnMissingDoc(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, []string{"memo"}, nil, optionalSpecFor("memo"))
 	if o.optionalInfraSkip(Phase("memo"), ErrAgentDocMissing) {
 		t.Fatalf("a cfg.Mandatory phase must never skip on a missing persona")
@@ -49,6 +57,8 @@ func TestOptionalPhaseSkip_ConfiguredMandatoryNeverSkipsOnMissingDoc(t *testing.
 }
 
 func TestOptionalPhaseSkip_OtherLoadErrorsUnchanged(t *testing.T) {
+	t.Parallel()
+
 	cat := catalogOf(t, specWith("defect-disposition-preflight", "evaluate", ""))
 	o := &Orchestrator{catalog: cat}
 	if o.optionalInfraSkip(Phase("defect-disposition-preflight"), errors.New("load agent: permission denied")) {
@@ -98,6 +108,8 @@ func TestOptionalPhaseMissingPersonaSkipsShipsAndLedgersOwnKind(t *testing.T) {
 }
 
 func TestOptionalPhaseMissingPersona_LearnsDeterministicallyWithoutRetroAgent(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}

@@ -37,6 +37,8 @@ func trackedThenDeleted(t *testing.T, claimed string) ReviewInput {
 }
 
 func TestRemovalClaimFailures_TrackedButAbsentFromDisk(t *testing.T) {
+	t.Parallel()
+
 	const claimed = ".evolve/inbox/2026-08-18T02-30-00Z-retro-prompt-delivery-stall.json"
 	in := trackedThenDeleted(t, claimed)
 
@@ -51,6 +53,8 @@ func TestRemovalClaimFailures_TrackedButAbsentFromDisk(t *testing.T) {
 }
 
 func TestRemovalClaimFailures_UntrackedAbsent_StaysHonest(t *testing.T) {
+	t.Parallel()
+
 	const claimed = "go/acs/cycle1591/scratch.txt"
 
 	t.Run("untracked and absent in a real repo — honest", func(t *testing.T) {
@@ -70,6 +74,8 @@ func TestRemovalClaimFailures_UntrackedAbsent_StaysHonest(t *testing.T) {
 }
 
 func TestRemovalClaimFailures_TrackedAndPresent_ReportsExactlyOnce(t *testing.T) {
+	t.Parallel()
+
 	const claimed = ".evolve/inbox/still-here.json"
 	in := removalFixture(t, claimBlock(claimed), []string{claimed})
 	gitInIndex(t, in.Worktree, "init", "-q")

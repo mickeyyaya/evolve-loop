@@ -47,6 +47,8 @@ func writeFailureDigest(t *testing.T, dir, fingerprint string, cycle int) {
 const agentFloorClaim = `{"category":"infra-systemic","level":"system","evidence":"prose-declared SYSTEM-class","action":"halt-and-diagnose","fix_type":"pipeline-repair"}`
 
 func TestDecideAfterRetro_RepairsWhenAgentFloorIsContradicted(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	// code-audit-fail keeps the deterministic dossier candidate empty.
@@ -65,6 +67,8 @@ func TestDecideAfterRetro_RepairsWhenAgentFloorIsContradicted(t *testing.T) {
 
 // Byte-identical to the case above, minus disposition.json.
 func TestDecideAfterRetro_HaltsWhenNoDispositionContradictsTheAgent(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
@@ -83,6 +87,8 @@ func TestDecideAfterRetro_HaltsWhenNoDispositionContradictsTheAgent(t *testing.T
 }
 
 func TestDecideAfterRetro_DeterministicFloorBeatsLegitRejection(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	// infra-systemic here DOES produce a deterministic dossier candidate.
@@ -102,6 +108,8 @@ func TestDecideAfterRetro_DeterministicFloorBeatsLegitRejection(t *testing.T) {
 }
 
 func TestDecideAfterRetro_RefusesRepairOnFabricatedFailureIdentity(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
@@ -122,6 +130,8 @@ func TestDecideAfterRetro_RefusesRepairOnFabricatedFailureIdentity(t *testing.T)
 }
 
 func TestDecideAfterRetro_RefusesRepairOnForeignCycleDisposition(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")
@@ -138,6 +148,8 @@ func TestDecideAfterRetro_RefusesRepairOnForeignCycleDisposition(t *testing.T) {
 }
 
 func TestDecideAfterRetro_RefusesRepairWhenIdentityIsUnverifiable(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 staged out-of-lane phase stub")

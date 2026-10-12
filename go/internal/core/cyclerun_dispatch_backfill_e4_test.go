@@ -97,6 +97,8 @@ func TestDispatch_AReconciledTimeoutShipsOnTheAgentsVerdictAndLeavesAnAuditRow(t
 }
 
 func TestDispatch_ANonReconciledPassWritesNoReconciledRow(t *testing.T) {
+	t.Parallel()
+
 	ledger := &kindFailingLedgerE4{failKinds: map[string]bool{}}
 	runner := &dispatchScriptRunnerE4{name: "scout", steps: []func() (PhaseResponse, error){
 		dispatchStepE4(PhaseResponse{Phase: "scout", Verdict: VerdictPASS}, nil),

@@ -48,6 +48,8 @@ func complete(t *testing.T, cr *cycleRun, phase Phase, verdict string) {
 }
 
 func TestCodeReviewCompletion_RecordsItsFindingsAsShadowRowsAndSignalsThem(t *testing.T) {
+	t.Parallel()
+
 	cr, events := reviewHarness(t, "scout", "build")
 	complete(t, cr, Phase(codereview.PhaseName), VerdictPASS)
 
@@ -66,6 +68,8 @@ func TestCodeReviewCompletion_RecordsItsFindingsAsShadowRowsAndSignalsThem(t *te
 }
 
 func TestCodeReviewCompletion_ASecondDispatchIsRoundTwo(t *testing.T) {
+	t.Parallel()
+
 	cr, events := reviewHarness(t, "scout", "build", codereview.PhaseName, "build")
 	complete(t, cr, Phase(codereview.PhaseName), VerdictWARN)
 	got := reviewEvents(*events)
@@ -75,6 +79,8 @@ func TestCodeReviewCompletion_ASecondDispatchIsRoundTwo(t *testing.T) {
 }
 
 func TestCodeReviewCompletion_AFailedReviewOrAnotherPhaseRecordsNothing(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]struct {
 		phase   Phase
 		verdict string
@@ -99,6 +105,8 @@ func TestCodeReviewCompletion_AFailedReviewOrAnotherPhaseRecordsNothing(t *testi
 }
 
 func TestDispatchEvaluateBatch_RecordsTheCodeReviewsFindingsLikeTheSerialPath(t *testing.T) {
+	t.Parallel()
+
 	var active, peak int32
 	runners := buildRunners(nil)
 	runners[Phase(codereview.PhaseName)] = &concurrentRunner{name: codereview.PhaseName, active: &active, maxActive: &peak}

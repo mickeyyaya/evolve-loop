@@ -8,6 +8,8 @@ import (
 )
 
 func TestRecoverFromShipError_TheLandingStopCodesEndTheCycleWithoutAReaudit(t *testing.T) {
+	t.Parallel()
+
 	for code, class := range map[core.ShipErrorCode]core.ShipErrorClass{
 		core.CodeGitLaneNotOnOrigin:       core.ShipClassIntegrity,
 		core.CodeGitLandingUnwindDeclined: core.ShipClassIntegrity,

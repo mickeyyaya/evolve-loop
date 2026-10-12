@@ -22,6 +22,8 @@ func committedRepoE4(t *testing.T, files map[string]string) *gittest.Repo {
 }
 
 func TestReadMainTreeStatus_AnUnlaunchableGitReturnsItsError(t *testing.T) {
+	t.Parallel()
+
 	missing := filepath.Join(t.TempDir(), "gone")
 
 	out, err := readMainTreeStatus(context.Background(), missing)

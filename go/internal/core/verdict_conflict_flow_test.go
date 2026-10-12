@@ -6,6 +6,8 @@ import (
 )
 
 func TestVerdictConflict_ErrorDiagnosticReachesAuditFailReasons(t *testing.T) {
+	t.Parallel()
+
 	const conflict = "verdict-conflict: auditor narrative=PASS but the EGPS gate forces FAIL (red_count=1)"
 
 	dir := t.TempDir()
@@ -30,6 +32,8 @@ func TestVerdictConflict_ErrorDiagnosticReachesAuditFailReasons(t *testing.T) {
 }
 
 func TestVerdictConflict_WarningSeverityWouldBeDropped(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	cs := &CycleState{CycleID: 1124, WorkspacePath: dir}
 	persistFloorFailReasons(cs, PhaseAudit, []Diagnostic{
@@ -54,6 +58,8 @@ func conflictReasons(narrative string) []string {
 }
 
 func TestVerdictConflict_FingerprintIsStableAcrossTheNarrativeAlphabet(t *testing.T) {
+	t.Parallel()
+
 	want := fingerprint(string(PhaseAudit), "gate-block", conflictReasons(VerdictPASS))
 	for _, n := range []string{VerdictWARN, VerdictSKIPPED} {
 		if got := fingerprint(string(PhaseAudit), "gate-block", conflictReasons(n)); got != want {
@@ -65,6 +71,8 @@ func TestVerdictConflict_FingerprintIsStableAcrossTheNarrativeAlphabet(t *testin
 }
 
 func TestVerdictConflict_BreakerHaltsOnTheRecurringConflict(t *testing.T) {
+	t.Parallel()
+
 	var digests []FailureDigest
 	for i, n := range []string{VerdictPASS, VerdictWARN, VerdictSKIPPED} {
 		digests = append(digests, FailureDigest{
@@ -81,6 +89,8 @@ func TestVerdictConflict_BreakerHaltsOnTheRecurringConflict(t *testing.T) {
 }
 
 func TestVerdictConflict_FingerprintStillSeparatesDifferentDefects(t *testing.T) {
+	t.Parallel()
+
 	base := fingerprint(string(PhaseAudit), "gate-block", conflictReasons(VerdictPASS))
 	other := conflictReasons(VerdictPASS)
 	other[0] = "EGPS: red_count=1 [BridgeStaysGreen] (cycle ships only when red_count==0)"
@@ -94,6 +104,8 @@ func TestVerdictConflict_FingerprintStillSeparatesDifferentDefects(t *testing.T)
 }
 
 func TestNormalizeReasonForFingerprint_TouchesOnlyTheNarrativeToken(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct{ in, want string }{
 		{"auditor narrative=PASS but", "auditor narrative=<verdict> but"},
 		{"auditor narrative=SKIPPED but", "auditor narrative=<verdict> but"},

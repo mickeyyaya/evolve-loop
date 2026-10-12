@@ -265,6 +265,8 @@ func TestRunCycleFromPhase_ADotGitRemovedBetweenResumedPhasesDoesNotTurnTheGuard
 }
 
 func TestRetryingDirtyPaths_NoReaderStaysNoReader(t *testing.T) {
+	t.Parallel()
+
 	if got := retryingDirtyPaths(nil); got != nil {
 		t.Fatal("a nil reader must stay nil, so the guard's own no-seam rule applies instead of a call through nil")
 	}

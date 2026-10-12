@@ -39,6 +39,8 @@ func readGolden(t *testing.T, name string) []byte {
 }
 
 func TestWriteCycleDossier_ParamsStructPreservesFixedInputBytes(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, goldenDossierParams(root)); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
@@ -59,6 +61,8 @@ func TestWriteCycleDossier_ParamsStructPreservesFixedInputBytes(t *testing.T) {
 }
 
 func TestWriteCycleDossier_ParamsAreKeyedAndOptional(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	p := cycleDossierParams{
 		ProjectRoot:   root,

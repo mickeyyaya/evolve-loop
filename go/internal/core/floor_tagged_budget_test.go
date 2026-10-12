@@ -8,6 +8,8 @@ import (
 )
 
 func TestTaggedTestArgs_RunAnAddedPackageUnderShipsBackstopBudget(t *testing.T) {
+	t.Parallel()
+
 	got := taggedTestArgs("./acs/cycle1763", []string{"acs"})
 
 	want := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", "acs", "./acs/cycle1763"}
@@ -17,6 +19,8 @@ func TestTaggedTestArgs_RunAnAddedPackageUnderShipsBackstopBudget(t *testing.T) 
 }
 
 func TestUnitTestArgs_RunAChangedPackageUnderTheSharedBudget(t *testing.T) {
+	t.Parallel()
+
 	got := unitTestArgs("./cmd/evolve")
 
 	want := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "./cmd/evolve"}
@@ -26,6 +30,8 @@ func TestUnitTestArgs_RunAChangedPackageUnderTheSharedBudget(t *testing.T) {
 }
 
 func TestCoverTestArgs_RunTheCoveragePassUnderTheSharedBudget(t *testing.T) {
+	t.Parallel()
+
 	got := coverTestArgs("/tmp/cover.out", []string{"./cmd/evolve", "./internal/core"}, nil)
 
 	want := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-coverprofile", "/tmp/cover.out", "./cmd/evolve", "./internal/core"}

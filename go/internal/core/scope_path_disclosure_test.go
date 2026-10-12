@@ -39,6 +39,8 @@ func runScopedCycle(t *testing.T, resolver func(projectRoot, taskID string) stri
 }
 
 func TestScopePaths_ResolvedPathsReachThePhaseContext(t *testing.T) {
+	t.Parallel()
+
 	resolver := func(_, taskID string) string {
 		if taskID == "pipeline-defect-pipeline-blocker" {
 			return "/abs/inbox/2026-08-22T15-02-52Z-pipeline-defect-pipeline-blocker.json"
@@ -61,6 +63,8 @@ func TestScopePaths_ResolvedPathsReachThePhaseContext(t *testing.T) {
 }
 
 func TestScopePaths_NilResolverAddsNothing(t *testing.T) {
+	t.Parallel()
+
 	p := runScopedCycle(t, nil, map[string]string{"EVOLVE_FLEET_SCOPE": "some-id"})
 	if len(p.ctxs) == 0 {
 		t.Fatalf("no dispatches captured")
@@ -71,6 +75,8 @@ func TestScopePaths_NilResolverAddsNothing(t *testing.T) {
 }
 
 func TestScopePaths_UnscopedCycleAddsNothing(t *testing.T) {
+	t.Parallel()
+
 	p := runScopedCycle(t, func(_, _ string) string { return "/never" }, nil)
 	if len(p.ctxs) == 0 {
 		t.Fatalf("no dispatches captured")

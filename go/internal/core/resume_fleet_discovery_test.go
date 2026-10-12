@@ -31,6 +31,8 @@ func fleetCheckpointState(cycle int, savedAt, phase, worktree string) map[string
 }
 
 func TestLoadResumeState_DiscoversFleetPerRunCheckpoint(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	wt := filepath.Join(tmp, "wt")
@@ -60,6 +62,8 @@ func TestLoadResumeState_DiscoversFleetPerRunCheckpoint(t *testing.T) {
 }
 
 func TestLoadResumeState_HostGlobalWinsOverPerRun(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	wt := filepath.Join(tmp, "wt")
@@ -97,6 +101,8 @@ func TestLoadResumeState_EnvOverrideDisablesDiscovery(t *testing.T) {
 }
 
 func TestLoadResumeState_StalePerRunCheckpointReportsStaleNotMissing(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	gone := filepath.Join(tmp, "deleted-worktree")
@@ -109,6 +115,8 @@ func TestLoadResumeState_StalePerRunCheckpointReportsStaleNotMissing(t *testing.
 }
 
 func TestLoadResumeState_NoCheckpointsAnywhereStillErrNoCheckpoint(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	if err := os.MkdirAll(filepath.Join(evolveDir, "runs"), 0o755); err != nil {
@@ -163,6 +171,8 @@ func TestActivateResumeStatePath_NoOpWhenAlreadyResolved(t *testing.T) {
 }
 
 func TestLoadResumeState_PhaseCompleteBreadcrumbIsNotDiscoverable(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	wt := filepath.Join(tmp, "wt")
@@ -180,6 +190,8 @@ func TestLoadResumeState_PhaseCompleteBreadcrumbIsNotDiscoverable(t *testing.T) 
 }
 
 func TestLoadResumeState_FreshLeaseExcludesCandidate(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	wt := filepath.Join(tmp, "wt")
@@ -199,6 +211,8 @@ func TestLoadResumeState_FreshLeaseExcludesCandidate(t *testing.T) {
 }
 
 func TestLoadResumeState_StaleLeaseDoesNotExclude(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	wt := filepath.Join(tmp, "wt")
@@ -221,6 +235,8 @@ func TestLoadResumeState_StaleLeaseDoesNotExclude(t *testing.T) {
 }
 
 func TestLoadResumeState_NewestStaleFallsBackToOlderValidAndSaysSo(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
 	wt := filepath.Join(tmp, "wt")

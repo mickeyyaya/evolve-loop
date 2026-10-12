@@ -111,6 +111,8 @@ func TestWorktreeMutators_RefuseTheProjectRoot(t *testing.T) {
 // SHA (ship then falls back to the auditor's value) — a behavioural contract
 // with ship, pinned here rather than only through the e2e porcelain compare.
 func TestRecordAuditBinding_InPlaceRootDegradesToNoTreeSHA(t *testing.T) {
+	t.Parallel()
+
 	r := newInPlaceRepo(t)
 	ws := filepath.Join(r.root, ".evolve", "runs", "cycle-7")
 	if err := os.MkdirAll(ws, 0o755); err != nil {

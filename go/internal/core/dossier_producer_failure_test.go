@@ -63,6 +63,8 @@ func readDossierPair(t *testing.T, root string, cycle int) (map[string]any, stri
 }
 
 func TestDossierFailure_FailCarriesIdentity(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	ws := t.TempDir()
 	reasons := []string{
@@ -104,6 +106,8 @@ func TestDossierFailure_FailCarriesIdentity(t *testing.T) {
 }
 
 func TestDossierFailure_ReasonsTruncatedAndCapped(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	ws := t.TempDir()
 	var reasons []string
@@ -139,6 +143,8 @@ func TestDossierFailure_ReasonsTruncatedAndCapped(t *testing.T) {
 }
 
 func TestDossierFailure_AbsentArtifactsDegrade(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 11, Goal: "fix V", RunID: "run11", Outcome: VerdictFAIL}); err != nil {
 		t.Fatalf("writeCycleDossier must not fail on absent failure artifacts: %v", err)
@@ -164,6 +170,8 @@ func TestDossierFailure_AbsentArtifactsDegrade(t *testing.T) {
 }
 
 func TestDossierFailure_PassKeepsShape(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	ws := t.TempDir()
 	writeFailureArtifacts(t, ws, []string{"stale reason from a retried attempt"})

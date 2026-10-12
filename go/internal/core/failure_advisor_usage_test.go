@@ -8,6 +8,8 @@ import (
 )
 
 func TestFailureAdvisor_PromptCarriesTheUsageEvidenceRecordedForTheFailure(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	record := `{"origin":"Bridge.Launch","phase":"build","driver":"agy-claude-tmux","trigger":"exit 81","exit_code":81,"summary":"quota exhausted, verified by a usage query: CLAUDE AND GPT MODELS 5h window 100% used, resets 2h 15m"}` + "\n" +
 		`{"origin":"Bridge.Launch","phase":"build","driver":"claude-tmux","trigger":"exit 80","exit_code":80,"summary":"quota ruled out by a usage query: session session window 7% used"}` + "\n"

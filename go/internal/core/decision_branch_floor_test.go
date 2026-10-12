@@ -22,6 +22,8 @@ func floorOrchestrator(strat router.RoutingStrategy) *Orchestrator {
 }
 
 func TestDecideAfterRetroFloor_RoutedRetryOverriddenToHalt(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS") // green → recorded FAIL is incoherent
@@ -45,6 +47,8 @@ func TestDecideAfterRetroFloor_RoutedRetryOverriddenToHalt(t *testing.T) {
 }
 
 func TestDecideAfterRetroFloor_Cycle1001DeterministicHalt(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "infra-systemic",
@@ -65,6 +69,8 @@ func TestDecideAfterRetroFloor_Cycle1001DeterministicHalt(t *testing.T) {
 }
 
 func TestDecideAfterRetroFloor_Cycle1001JudgmentHalt(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	dir := t.TempDir()
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail",
@@ -83,6 +89,8 @@ func TestDecideAfterRetroFloor_Cycle1001JudgmentHalt(t *testing.T) {
 }
 
 func TestDecideAfterRetroFloor_FallbackByteIdentical(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(router.StaticPreset{})
 	cs := CycleState{CycleID: 1002, WorkspacePath: t.TempDir()}
 
@@ -103,6 +111,8 @@ func TestDecideAfterRetroFloor_FallbackByteIdentical(t *testing.T) {
 }
 
 func TestDecideAfterRetroFloor_Cycle1603DiagnosedDowngradeIsNotForgery(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(router.StaticPreset{})
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS") // green → contradicts the prose claim
@@ -119,6 +129,8 @@ func TestDecideAfterRetroFloor_Cycle1603DiagnosedDowngradeIsNotForgery(t *testin
 }
 
 func TestDecideAfterRetroFloor_ProseIncoherenceWithoutDiagnosedReasonsStillHalts(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(router.StaticPreset{})
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "FAIL", "PASS") // red report → deterministic detector silent
@@ -136,6 +148,8 @@ func TestDecideAfterRetroFloor_ProseIncoherenceWithoutDiagnosedReasonsStillHalts
 }
 
 func TestDecideAfterRetroFloor_DiagnosedShipReasonsAlsoContradictProse(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(router.StaticPreset{})
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")

@@ -56,6 +56,8 @@ func persistentContentionShip() *widthShipStub {
 
 // Ship call count = 1 initial + budget (each recovery re-audits then re-ships).
 func TestShipRecovery_ContentionBudgetScalesWithFleetWidth(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		width         string // "" = env key absent
@@ -123,6 +125,8 @@ func TestShipRecovery_JitteredBackoffBetweenReaudits(t *testing.T) {
 }
 
 func TestShipRecovery_NonContentionTransientKeepsConstantBudget(t *testing.T) {
+	t.Parallel()
+
 	ship := &widthShipStub{
 		failFirst: 99,
 		errOnFail: NewShipError(CodeGitPushRejected, ShipClassTransient,
@@ -142,6 +146,8 @@ func TestShipRecovery_NonContentionTransientKeepsConstantBudget(t *testing.T) {
 // rebase (recoverFromShipError performs a real rebase for that code, which a
 // unit cycle cannot stage), plus the solo/garbage-width floor.
 func TestShipRecovery_BudgetClassifierScalesOnlyContentionCodes(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name  string
 		code  ShipErrorCode

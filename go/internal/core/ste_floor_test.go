@@ -161,6 +161,8 @@ func TestDocsFloorWarn_AChangedGeneratedDocIsNotAFinding(t *testing.T) {
 }
 
 func TestSteLintFloorLines_ABrokenStandardIsSilentWhenNoDocChanged(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, filepath.FromSlash(stelint.StandardPath)), "# Broken\n")
 

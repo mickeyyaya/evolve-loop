@@ -30,6 +30,8 @@ func newAmplifyTestOrchestrator(opts ...Option) *Orchestrator {
 }
 
 func TestWithCatalogPublisher_NilFuncIsIgnored(t *testing.T) {
+	t.Parallel()
+
 	o := newAmplifyTestOrchestrator(WithCatalogPublisher(nil))
 	if o.CatalogPublisherWired() {
 		t.Fatalf("WithCatalogPublisher(nil) must be ignored (doc: \"Nil is ignored, leaving the no-publish default\"); CatalogPublisherWired() = true, want false")
@@ -37,6 +39,8 @@ func TestWithCatalogPublisher_NilFuncIsIgnored(t *testing.T) {
 }
 
 func TestWithCatalogPublisher_NoOptionAtAllIsAlsoUnwired(t *testing.T) {
+	t.Parallel()
+
 	o := newAmplifyTestOrchestrator()
 	if o.CatalogPublisherWired() {
 		t.Fatalf("an orchestrator built with no catalog-publisher option must report CatalogPublisherWired() = false")
@@ -44,6 +48,8 @@ func TestWithCatalogPublisher_NoOptionAtAllIsAlsoUnwired(t *testing.T) {
 }
 
 func TestWithCatalogPublisher_TrailingNilDoesNotUnwireAnEarlierValidPublisher(t *testing.T) {
+	t.Parallel()
+
 	valid := func(phasespec.Catalog) {}
 	o := newAmplifyTestOrchestrator(
 		WithCatalogPublisher(valid),
@@ -55,6 +61,8 @@ func TestWithCatalogPublisher_TrailingNilDoesNotUnwireAnEarlierValidPublisher(t 
 }
 
 func TestWithCatalogPublisher_SecondValidPublisherOverridesFirst(t *testing.T) {
+	t.Parallel()
+
 	first := func(phasespec.Catalog) {}
 	second := func(phasespec.Catalog) {}
 	o := newAmplifyTestOrchestrator(

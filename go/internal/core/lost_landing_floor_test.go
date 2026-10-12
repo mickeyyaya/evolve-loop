@@ -31,6 +31,8 @@ func realCycleWorkspace(t *testing.T, cycleDir string) string {
 }
 
 func TestDetectLostLanding_RealCycle1535IsNotAPass(t *testing.T) {
+	t.Parallel()
+
 	ws := realCycleWorkspace(t, "cycle-1535")
 	sig := detectLostLanding(ws, VerdictPASS)
 	if sig == nil {
@@ -45,6 +47,8 @@ func TestDetectLostLanding_RealCycle1535IsNotAPass(t *testing.T) {
 }
 
 func TestDetectLostLanding_RealCycle1536Landed(t *testing.T) {
+	t.Parallel()
+
 	ws := realCycleWorkspace(t, "cycle-1536")
 	if sig := detectLostLanding(ws, VerdictPASS); sig != nil {
 		t.Fatalf("cycle-1536 hit the SAME error code and DID land (ship-binding commit adcbddb2); it must not be flagged: %+v", sig)
@@ -52,12 +56,16 @@ func TestDetectLostLanding_RealCycle1536Landed(t *testing.T) {
 }
 
 func TestDetectLostLanding_CycleThatNeverShippedIsNotFlagged(t *testing.T) {
+	t.Parallel()
+
 	if sig := detectLostLanding(t.TempDir(), VerdictPASS); sig != nil {
 		t.Fatalf("a cycle with no ship artifacts at all did not lose a landing: %+v", sig)
 	}
 }
 
 func TestDetectLostLanding_OnlyShippingVerdictsAreFlagged(t *testing.T) {
+	t.Parallel()
+
 	ws := realCycleWorkspace(t, "cycle-1535")
 	for _, v := range []string{VerdictFAIL, VerdictWARN, VerdictSKIPPED} {
 		if sig := detectLostLanding(ws, v); sig != nil {
@@ -94,6 +102,8 @@ func TestDetectLostLanding_NoWorkspaceDoesNotReadTheProcessCWD(t *testing.T) {
 }
 
 func TestDetectLostLanding_DoesNotHaltTheBatch(t *testing.T) {
+	t.Parallel()
+
 	sig := detectLostLanding(realCycleWorkspace(t, "cycle-1535"), VerdictPASS)
 	if sig == nil {
 		t.Fatalf("expected a signal")
@@ -104,6 +114,8 @@ func TestDetectLostLanding_DoesNotHaltTheBatch(t *testing.T) {
 }
 
 func TestLostLandingVerdict_IsLegalAndNotShipping(t *testing.T) {
+	t.Parallel()
+
 	got := lostLandingVerdict()
 	switch got {
 	case VerdictPASS, VerdictWARN, VerdictFAIL:
@@ -116,6 +128,8 @@ func TestLostLandingVerdict_IsLegalAndNotShipping(t *testing.T) {
 }
 
 func TestFinalizeCycle_LostLandingDowngradesTheVerdictAndRecordsTheSignal(t *testing.T) {
+	t.Parallel()
+
 	ws := realCycleWorkspace(t, "cycle-1535")
 	o := &Orchestrator{storage: &fakeUpdaterStorage{}, gitHEAD: func() (string, error) { return "same-head", nil }}
 	result := &CycleResult{FinalVerdict: VerdictPASS}
@@ -136,6 +150,8 @@ func TestFinalizeCycle_LostLandingDowngradesTheVerdictAndRecordsTheSignal(t *tes
 }
 
 func TestFinalizeCycle_LandedCycleIsUnchanged(t *testing.T) {
+	t.Parallel()
+
 	ws := realCycleWorkspace(t, "cycle-1536")
 	o := &Orchestrator{storage: &fakeUpdaterStorage{}, gitHEAD: func() (string, error) { return "same-head", nil }}
 	result := &CycleResult{FinalVerdict: VerdictPASS}

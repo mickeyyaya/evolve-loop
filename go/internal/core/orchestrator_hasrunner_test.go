@@ -3,6 +3,8 @@ package core
 import "testing"
 
 func TestOrchestrator_HasRunner(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 
 	if !o.HasRunner(PhaseTriage) {

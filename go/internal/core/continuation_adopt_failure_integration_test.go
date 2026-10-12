@@ -12,6 +12,8 @@ import (
 )
 
 func TestRunCycle_ContinuationAdvanceFailureStopsBeforeBuild(t *testing.T) {
+	t.Parallel()
+
 	for _, failSeed := range []bool{false, true} {
 		name := "base-advance"
 		if failSeed {

@@ -28,6 +28,8 @@ func writeReport(t *testing.T, ws, name, body string) {
 }
 
 func TestDispatchSignals(t *testing.T) {
+	t.Parallel()
+
 	scoutDoc := "<!-- challenge-token: x -->\ngoal_type: partnership-deal\ndeliverable_kind: document\n\n## Selected Tasks\n"
 	triageCode := "<!-- challenge-token: x -->\ncycle_size_estimate: small\ndeliverable_kind: code\n\n## top_n\n- a\n"
 	scoutNoKind := "<!-- challenge-token: x -->\ngoal_type: partnership-deal\n\n## Selected Tasks\n"

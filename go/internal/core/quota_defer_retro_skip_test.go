@@ -129,6 +129,8 @@ func TestRunCycle_AllFamiliesExhausted_NeverWritesRetroCycleState(t *testing.T) 
 }
 
 func TestRunCycle_NonQuotaDispatchFailure_StillDispatchesRetroOnce(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -159,6 +161,8 @@ func TestRunCycle_NonQuotaDispatchFailure_StillDispatchesRetroOnce(t *testing.T)
 // by accident and break the moment another wrapper is added, so this test
 // drives the chokepoint directly with a deliberately over-wrapped error.
 func TestRecordFailureLearning_MultiplyWrappedExhausted_SkipsRetro(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -200,6 +204,8 @@ func TestRecordFailureLearning_MultiplyWrappedExhausted_SkipsRetro(t *testing.T)
 }
 
 func TestRecordFailureLearning_ShipExhausted_PreservesCoherenceCarrier(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	state := State{}
 	cs := CycleState{CycleID: 42, WorkspacePath: t.TempDir()}
@@ -221,6 +227,8 @@ func TestRecordFailureLearning_ShipExhausted_PreservesCoherenceCarrier(t *testin
 }
 
 func TestDispatch_SingleFamily85WithSibling_FailureLearningUnchanged(t *testing.T) {
+	t.Parallel()
+
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)

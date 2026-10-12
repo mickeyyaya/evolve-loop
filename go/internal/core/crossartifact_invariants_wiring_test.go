@@ -107,6 +107,8 @@ func xaStatusOf(t *testing.T, r xaWireReport, name string) string {
 }
 
 func TestFinalizeCycle_EmitsAdvisoryCrossArtifactInvariantsArtifact(t *testing.T) {
+	t.Parallel()
+
 	ws := xaIncoherentWorkspace(t)
 	result := &CycleResult{FinalVerdict: VerdictPASS}
 	cs := CycleState{CycleID: 1676, WorkspacePath: ws, ActiveWorktree: t.TempDir()}
@@ -140,6 +142,8 @@ func TestFinalizeCycle_EmitsAdvisoryCrossArtifactInvariantsArtifact(t *testing.T
 }
 
 func TestFinalizeCycle_CrossArtifactViolationsNeverBlockTheCycle(t *testing.T) {
+	t.Parallel()
+
 	ws := xaIncoherentWorkspace(t)
 	result := &CycleResult{FinalVerdict: VerdictPASS}
 	cs := CycleState{CycleID: 1676, WorkspacePath: ws, ActiveWorktree: t.TempDir()}
@@ -162,6 +166,8 @@ func TestFinalizeCycle_CrossArtifactViolationsNeverBlockTheCycle(t *testing.T) {
 // the lane's own tree never had the file. The second half proves the check is
 // not simply always-violated.
 func TestFinalizeCycle_CrossArtifactBindsTheLaneWorktreeNotTheProjectRoot(t *testing.T) {
+	t.Parallel()
+
 	projectRoot, lane := t.TempDir(), t.TempDir()
 	for _, root := range []string{projectRoot} {
 		if err := os.MkdirAll(filepath.Join(root, "docs"), 0o755); err != nil {
@@ -203,6 +209,8 @@ func TestFinalizeCycle_CrossArtifactBindsTheLaneWorktreeNotTheProjectRoot(t *tes
 }
 
 func TestFinalizeCycle_VerdictIncoherenceFloorSurvivesTheAdvisory(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeVerdicts(t, ws, "PASS", "PASS") // green artifacts, no contract verifier configured
 	result := &CycleResult{FinalVerdict: VerdictFAIL}

@@ -23,6 +23,8 @@ func coverChangedModule(t *testing.T, testBody string) string {
 }
 
 func TestScopedCoverProfile_RunsThePackagesUnderTheGivenTags(t *testing.T) {
+	t.Parallel()
+
 	module := coverChangedModule(t, "\tif F(1) != 1 {\n\t\tt.Fatal(\"F(1)\")\n\t}\n")
 
 	profile, out, status := scopedCoverProfile(context.Background(), module, []string{"./p"}, []string{"integration"})

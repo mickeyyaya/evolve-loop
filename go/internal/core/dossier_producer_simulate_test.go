@@ -14,6 +14,8 @@ import (
 )
 
 func TestWriteCycleDossier_CommitFalse_WritesFilesOnly(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir() // deliberately not a git repository
 	ws := t.TempDir()
 	params := cycleDossierParams{ProjectRoot: root, WorkspacePath: ws, Cycle: 3, Goal: "simulate", RunID: "run-sim", Outcome: CycleOutcomeShippedViaBuild}
@@ -44,6 +46,8 @@ func gitCommitCount(t *testing.T, root string) int {
 }
 
 func TestWithDossierDestination_IsTheRootsKnob(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name     string
 		opts     []Option
@@ -78,6 +82,8 @@ func TestWithDossierDestination_IsTheRootsKnob(t *testing.T) {
 }
 
 func TestDossierDestination_AFleetLaneDefersOnlyACommit(t *testing.T) {
+	t.Parallel()
+
 	lane := map[string]string{"EVOLVE_FLEET": "1"}
 	for _, tc := range []struct {
 		configured DossierDestination
@@ -97,6 +103,8 @@ func TestDossierDestination_AFleetLaneDefersOnlyACommit(t *testing.T) {
 }
 
 func TestWriteCycleDossier_APendingDossierTakesNoLockAndCommitsNothing(t *testing.T) {
+	t.Parallel()
+
 	root := initDossierRepo(t)
 	before := gitCommitCount(t, root)
 	spy := &mutexSpyLocker{}

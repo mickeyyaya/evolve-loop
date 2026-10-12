@@ -13,6 +13,8 @@ import (
 )
 
 func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
@@ -99,6 +101,8 @@ func initRealGitRepo(t *testing.T) string {
 }
 
 func TestGitWorktree_Cleanup_DeletesMergedBranch(t *testing.T) {
+	t.Parallel()
+
 	root := initRealGitRepo(t)
 	g := gitWorktree{}
 	wt, err := g.Create(root, 41)
@@ -119,6 +123,8 @@ func TestGitWorktree_Cleanup_DeletesMergedBranch(t *testing.T) {
 }
 
 func TestGitWorktree_Cleanup_UnmergedBranchSurvives(t *testing.T) {
+	t.Parallel()
+
 	root := initRealGitRepo(t)
 	g := gitWorktree{}
 	wt, err := g.Create(root, 42)

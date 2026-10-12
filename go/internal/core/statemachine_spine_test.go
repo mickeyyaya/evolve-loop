@@ -8,6 +8,8 @@ import (
 )
 
 func TestCanTransition_WidenedSkipEdges(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	if !sm.CanTransition(PhaseScout, PhaseBuild) {
 		t.Errorf("scout→build should be legal (trivial-cycle tdd skip)")
@@ -25,6 +27,8 @@ func fullSpineCfg() config.RoutingConfig {
 }
 
 func TestSpineSatisfiedUpTo_ShipRequiresShippableAudit(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	cfg := fullSpineCfg()
 
@@ -51,6 +55,8 @@ func TestSpineSatisfiedUpTo_ShipRequiresShippableAudit(t *testing.T) {
 }
 
 func TestSpineSatisfiedUpTo_BuildRequiresScout(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	cfg := fullSpineCfg()
 
@@ -66,6 +72,8 @@ func TestSpineSatisfiedUpTo_BuildRequiresScout(t *testing.T) {
 }
 
 func TestSpineSatisfiedUpTo_ConfigurableMandatoryWeakensGate(t *testing.T) {
+	t.Parallel()
+
 	sm := NewStateMachine()
 	// Operator dropped audit from the mandatory set (weak-spine).
 	weak := config.RoutingConfig{Mandatory: []string{"scout", "build", "ship"}}

@@ -63,6 +63,8 @@ func workspaceMentions(t *testing.T, workspace, token string) bool {
 }
 
 func TestWorktreeProvisionFailure_PersistsCause(t *testing.T) {
+	t.Parallel()
+
 	const cause = "ZZ-PROVISION-CAUSE-A: git worktree add rc=255 (lock held)"
 	_, ws := provisionCycle(t, errors.New(cause))
 
@@ -72,6 +74,8 @@ func TestWorktreeProvisionFailure_PersistsCause(t *testing.T) {
 }
 
 func TestWorktreeProvisionFailure_DigestUsesProvisioningCause(t *testing.T) {
+	t.Parallel()
+
 	digestOf := func(cause string) FailureDigest {
 		t.Helper()
 		cycle, ws := provisionCycle(t, errors.New(cause))
@@ -101,6 +105,8 @@ func TestWorktreeProvisionFailure_DigestUsesProvisioningCause(t *testing.T) {
 }
 
 func TestWorktreeProvisionFailure_SuccessAddsNoFailureReason(t *testing.T) {
+	t.Parallel()
+
 	cycle, ws := provisionCycle(t, nil)
 
 	for _, token := range []string{"worktree provisioning failed", "provisioning cause", "rc=255"} {
@@ -118,6 +124,8 @@ func TestWorktreeProvisionFailure_SuccessAddsNoFailureReason(t *testing.T) {
 }
 
 func TestWorktreeProvisionFailure_EmptyStderrCauseStillIdentifies(t *testing.T) {
+	t.Parallel()
+
 	const terse = "rc=255"
 	cycle, ws := provisionCycle(t, errors.New(terse))
 

@@ -8,6 +8,8 @@ import (
 )
 
 func TestIsResumableReason_MatchesTheReasonsResumeDiscoveryAccepts(t *testing.T) {
+	t.Parallel()
+
 	for reason, want := range map[string]bool{
 		"quota-likely": true, "batch-cap-near": true, "operator-requested": true, "stall-inactivity": true,
 		"phase-complete": false, "": false, "Quota-Likely": false,
@@ -19,6 +21,8 @@ func TestIsResumableReason_MatchesTheReasonsResumeDiscoveryAccepts(t *testing.T)
 }
 
 func TestCheckpointResumable_IsTheRuleLoopResumeApplies(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	worktree := t.TempDir()
 	write := func(name, body string) string {

@@ -33,6 +33,8 @@ func healthyUnwindGit(fail string, body string) *scriptedGit {
 }
 
 func TestUnwindDecline_AGitFaultIsAnErrorNotADecline(t *testing.T) {
+	t.Parallel()
+
 	audited := AuditedChange{Base: faultBase, Tree: faultTree}
 	for name, tc := range map[string]struct{ fail, body, want string }{
 		"the status":         {fail: "status", want: "read the worktree status"},
@@ -53,6 +55,8 @@ func TestUnwindDecline_AGitFaultIsAnErrorNotADecline(t *testing.T) {
 }
 
 func TestCarryAuditedTree_AGitFaultIsAnError(t *testing.T) {
+	t.Parallel()
+
 	for _, fail := range []string{"-c commit.gpgsign=false commit-tree", "reset"} {
 		t.Run(fail, func(t *testing.T) {
 			err := carryAuditedTree(context.Background(), "/wt", AuditedChange{Base: faultBase, Tree: faultTree}, healthyUnwindGit(fail, "").capture)
@@ -65,6 +69,8 @@ func TestCarryAuditedTree_AGitFaultIsAnError(t *testing.T) {
 }
 
 func TestPendRebasedChange_AnUnresolvedForkPointIsAnError(t *testing.T) {
+	t.Parallel()
+
 	err := pendRebasedChange(context.Background(), "/wt", healthyUnwindGit("merge-base", "").capture)
 
 	if !errors.Is(err, errGitFault) {
@@ -73,6 +79,8 @@ func TestPendRebasedChange_AnUnresolvedForkPointIsAnError(t *testing.T) {
 }
 
 func TestUnwindBeforeFleetRebase_NoWorktreeOrAGitFaultUnwindsNothing(t *testing.T) {
+	t.Parallel()
+
 	row := LedgerEntry{Cycle: unwindCycle, RunID: unwindRunID, Role: "auditor", Kind: "agent_subprocess", WorktreeTreeSHA: faultTree}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: []LedgerEntry{row}}, buildRunners(nil))
 	for name, worktree := range map[string]string{"no worktree": "", "a worktree git cannot read": t.TempDir()} {

@@ -32,6 +32,8 @@ func initTestRepo(t *testing.T) string {
 }
 
 func TestEnsureCleanWorktree_QuarantinesInheritedOrphanRedTest(t *testing.T) {
+	t.Parallel()
+
 	wt := initTestRepo(t)
 	root := t.TempDir()
 
@@ -82,6 +84,8 @@ func TestEnsureCleanWorktree_QuarantinesInheritedOrphanRedTest(t *testing.T) {
 }
 
 func TestEnsureCleanWorktree_CleanWorktreeIsNoOp(t *testing.T) {
+	t.Parallel()
+
 	wt := initTestRepo(t)
 	root := t.TempDir()
 
@@ -98,6 +102,8 @@ func TestEnsureCleanWorktree_CleanWorktreeIsNoOp(t *testing.T) {
 }
 
 func TestEnsureCleanWorktree_RepeatQuarantineNeverOverwritesSalvage(t *testing.T) {
+	t.Parallel()
+
 	wt := initTestRepo(t)
 	root := t.TempDir()
 

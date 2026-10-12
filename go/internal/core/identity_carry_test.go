@@ -8,6 +8,8 @@ import (
 )
 
 func TestIdenticalChange_HoldsAcrossACleanRebaseAndDeclinesAnyByte(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 	ctx := context.Background()
 	if declined, err := unwindShipCommit(ctx, fx.worktree, fx.audited(), gitCapture); err != nil || declined != "" {
@@ -42,6 +44,8 @@ func TestIdenticalChange_HoldsAcrossACleanRebaseAndDeclinesAnyByte(t *testing.T)
 }
 
 func TestTreeDelta_IsByteExactWithFullBlobIDs(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 	fx.write("lane.txt", "the lane file \n")
 	fx.git("add", "lane.txt")

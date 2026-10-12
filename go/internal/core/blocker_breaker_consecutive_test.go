@@ -7,6 +7,8 @@ func consecCfg(ceiling int) BlockerBreakerConfig {
 }
 
 func TestConsecutiveFailures_ThreeDistinctFingerprintsHalt(t *testing.T) {
+	t.Parallel()
+
 	digests := []FailureDigest{
 		{Cycle: 5, Fingerprint: "audit|verdict-fail|aaa", PreClass: "verdict-fail"},
 		{Cycle: 6, Fingerprint: "ship|gate-block|bbb", PreClass: "gate-block"},
@@ -25,6 +27,8 @@ func TestConsecutiveFailures_ThreeDistinctFingerprintsHalt(t *testing.T) {
 }
 
 func TestConsecutiveFailures_PassCycleBreaksTheStreak(t *testing.T) {
+	t.Parallel()
+
 	// The missing digest between 6 and 8 is a PASS, so 5,6 and 8,9 are two separate 2-streaks.
 	digests := []FailureDigest{
 		{Cycle: 5, Fingerprint: "a|x|1", PreClass: "x"},
@@ -38,6 +42,8 @@ func TestConsecutiveFailures_PassCycleBreaksTheStreak(t *testing.T) {
 }
 
 func TestConsecutiveFailures_ZeroCeilingDisables(t *testing.T) {
+	t.Parallel()
+
 	digests := []FailureDigest{
 		{Cycle: 1, Fingerprint: "a|x|1", PreClass: "x"},
 		{Cycle: 2, Fingerprint: "b|y|2", PreClass: "y"},
@@ -49,6 +55,8 @@ func TestConsecutiveFailures_ZeroCeilingDisables(t *testing.T) {
 }
 
 func TestConsecutiveFailures_AckedFingerprintBreaksTheStreak(t *testing.T) {
+	t.Parallel()
+
 	// The middle digest is acked; counting it would re-halt a batch resumed to verify the fix.
 	cfg := consecCfg(3)
 	cfg.AckedFingerprints = map[string]bool{"ship|gate-block|fixed": true}
@@ -63,6 +71,8 @@ func TestConsecutiveFailures_AckedFingerprintBreaksTheStreak(t *testing.T) {
 }
 
 func TestConsecutiveFailures_IdenticalFingerprintRuleWinsOnOverlap(t *testing.T) {
+	t.Parallel()
+
 	cfg := consecCfg(3)
 	cfg.IdenticalFingerprintCeiling = 3
 	digests := []FailureDigest{
@@ -77,6 +87,8 @@ func TestConsecutiveFailures_IdenticalFingerprintRuleWinsOnOverlap(t *testing.T)
 }
 
 func TestConsecutiveFailures_UnexplainedDigestsCountTowardTheStreak(t *testing.T) {
+	t.Parallel()
+
 	digests := []FailureDigest{
 		{Cycle: 5, Fingerprint: "|unknown|deg1", PreClass: "unknown", Unexplained: true},
 		{Cycle: 6, Fingerprint: "|unknown|deg2", PreClass: "unknown", Unexplained: true},
@@ -89,6 +101,8 @@ func TestConsecutiveFailures_UnexplainedDigestsCountTowardTheStreak(t *testing.T
 }
 
 func TestConsecutiveFailures_InputOrderDoesNotMatter(t *testing.T) {
+	t.Parallel()
+
 	digests := []FailureDigest{
 		{Cycle: 7, Fingerprint: "c|z|3", PreClass: "z"},
 		{Cycle: 5, Fingerprint: "a|x|1", PreClass: "x"},
@@ -101,6 +115,8 @@ func TestConsecutiveFailures_InputOrderDoesNotMatter(t *testing.T) {
 }
 
 func TestConsecutiveFailures_TwoLanesOneWaveCountAsTwo(t *testing.T) {
+	t.Parallel()
+
 	// Cycle numbers are batch-global, so a fully failed width-2 wave contributes 2 to the streak.
 	digests := []FailureDigest{
 		{Cycle: 10, Fingerprint: "a|x|1", PreClass: "x"},

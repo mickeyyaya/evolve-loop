@@ -76,6 +76,8 @@ func (h *carryHarness) route(t *testing.T, rows ...LedgerEntry) (Phase, bool, Cy
 }
 
 func TestRouteRebasedExplanation_AByteIdenticalRebaseShipsOnTheCarriedVerdict(t *testing.T) {
+	t.Parallel()
+
 	h := pendedIdenticalLane(t)
 	tree1 := h.fx.git("write-tree")
 
@@ -101,6 +103,8 @@ func TestRouteRebasedExplanation_AByteIdenticalRebaseShipsOnTheCarriedVerdict(t 
 }
 
 func TestRouteRebasedExplanation_AMainThatMovedBeforeTheAuditStillCarries(t *testing.T) {
+	t.Parallel()
+
 	h := pendedIdenticalLane(t)
 	row := h.auditRow()
 	row.GitHEAD = h.fx.newBase
@@ -114,6 +118,8 @@ func TestRouteRebasedExplanation_AMainThatMovedBeforeTheAuditStillCarries(t *tes
 }
 
 func TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit(t *testing.T) {
+	t.Parallel()
+
 	for name, tc := range map[string]struct {
 		arrange func(h *carryHarness) []LedgerEntry
 	}{
@@ -179,6 +185,8 @@ func TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit(t *testi
 }
 
 func TestCarriedAudit_ARowNamingNoBaseNeverCarriesEvenOnAnEmptyBase(t *testing.T) {
+	t.Parallel()
+
 	row := LedgerEntry{Role: "auditor", Kind: "agent_subprocess", RunID: "run", WorktreeTreeSHA: "tree", ArtifactSHA256: "audit-ref"}
 	o := NewOrchestrator(nil, &fakeLedger{entries: []LedgerEntry{row}}, nil)
 

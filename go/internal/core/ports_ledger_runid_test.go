@@ -7,6 +7,8 @@ import (
 )
 
 func TestLedgerEntry_RunID_RoundTrip(t *testing.T) {
+	t.Parallel()
+
 	in := LedgerEntry{TS: "2026-06-11T00:00:00Z", Cycle: 300, Role: "build", Kind: "phase", RunID: "01JXAXAMPLE0000000000000000"}
 	data, err := json.Marshal(in)
 	if err != nil {
@@ -25,6 +27,8 @@ func TestLedgerEntry_RunID_RoundTrip(t *testing.T) {
 }
 
 func TestLedgerEntry_RunID_OmittedWhenEmpty(t *testing.T) {
+	t.Parallel()
+
 	data, err := json.Marshal(LedgerEntry{TS: "2026-06-11T00:00:00Z", Cycle: 300, Role: "build", Kind: "phase"})
 	if err != nil {
 		t.Fatal(err)
@@ -35,6 +39,8 @@ func TestLedgerEntry_RunID_OmittedWhenEmpty(t *testing.T) {
 }
 
 func TestLedgerEntry_RunID_LegacyLineDecodes(t *testing.T) {
+	t.Parallel()
+
 	lines := []string{
 		`{"ts":"2026-06-07T10:00:00Z","cycle":248,"role":"ship","kind":"ship","exit_code":0,"entry_seq":5900,"prev_hash":"abc"}`,
 		`{"ts":"2026-06-07T10:00:00Z","cycle":"manual-release","role":"ship","kind":"ship","exit_code":0}`,

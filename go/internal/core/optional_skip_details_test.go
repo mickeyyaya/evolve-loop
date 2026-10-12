@@ -7,6 +7,8 @@ import (
 )
 
 func TestOptionalSkipDetails_SplitsByErrorClass(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name     string
 		err      error

@@ -11,6 +11,8 @@ import (
 )
 
 func TestRunCycleFromPhase_EmitsPhaseOutputsSurvey(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	st := &fakeStorage{
 		state:      State{LastCycleNumber: 7},

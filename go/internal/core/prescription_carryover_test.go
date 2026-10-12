@@ -28,6 +28,8 @@ const ledgerOnePrescriptionOpen = `{
 }`
 
 func TestMergeWorkspacePrescriptionCarryover_OpenPrescriptionEntryIsCarriedOver(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, ledgerOnePrescriptionOpen)
 
@@ -60,6 +62,8 @@ func TestMergeWorkspacePrescriptionCarryover_OpenPrescriptionEntryIsCarriedOver(
 }
 
 func TestMergeWorkspacePrescriptionCarryover_FixedAndDeferredEntriesAreNotCarriedOver(t *testing.T) {
+	t.Parallel()
+
 	t.Run("FIXED", func(t *testing.T) {
 		ws := t.TempDir()
 		writeDefectLedgerFixture(t, ws, `{
@@ -92,6 +96,8 @@ func TestMergeWorkspacePrescriptionCarryover_FixedAndDeferredEntriesAreNotCarrie
 }
 
 func TestMergeWorkspacePrescriptionCarryover_NonPrescriptionOpenEntryIsIgnored(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, `{
   "origin_cycle": 1258,
@@ -107,6 +113,8 @@ func TestMergeWorkspacePrescriptionCarryover_NonPrescriptionOpenEntryIsIgnored(t
 }
 
 func TestMergeWorkspacePrescriptionCarryover_AbsentLedgerIsNoOp(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir() // no defect-ledger.json written
 	state := &State{}
 	MergeWorkspacePrescriptionCarryover(state, ws, 1375, time.Now().UTC()) // must not panic
@@ -116,6 +124,8 @@ func TestMergeWorkspacePrescriptionCarryover_AbsentLedgerIsNoOp(t *testing.T) {
 }
 
 func TestMergeWorkspacePrescriptionCarryover_MalformedLedgerWarnsNotFails(t *testing.T) {
+	t.Parallel()
+
 	t.Run("wired: the malformed ledger is a CARRYOVER_WORKSPACE_MALFORMED signal", func(t *testing.T) {
 		ws := t.TempDir()
 		writeDefectLedgerFixture(t, ws, `{ this is not valid json `)
@@ -139,6 +149,8 @@ func TestMergeWorkspacePrescriptionCarryover_MalformedLedgerWarnsNotFails(t *tes
 }
 
 func TestMergeWorkspacePrescriptionCarryover_DedupesById(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, ledgerOnePrescriptionOpen)
 
@@ -157,6 +169,8 @@ func TestMergeWorkspacePrescriptionCarryover_DedupesById(t *testing.T) {
 }
 
 func TestRunCycle_MergesPrescriptionCarryoverIntoState(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, ledgerOnePrescriptionOpen)
 

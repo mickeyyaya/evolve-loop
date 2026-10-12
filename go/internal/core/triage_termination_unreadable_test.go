@@ -27,6 +27,8 @@ func writeNoticeOnlyItems(t *testing.T, inbox string) {
 }
 
 func TestHasClaimableInboxWork_ANoticeAboutAReadableItemIsNotUnreadWork(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeNoticeOnlyItems(t, filepath.Join(root, ".evolve", "inbox"))
 	if hasClaimableInboxWork(root, 0, withholdsEverything) {
@@ -35,6 +37,8 @@ func TestHasClaimableInboxWork_ANoticeAboutAReadableItemIsNotUnreadWork(t *testi
 }
 
 func TestHasClaimableInboxWork_AnUnreadableFileIsNeverProofOfNoWork(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeNoticeOnlyItems(t, inbox)
@@ -47,6 +51,8 @@ func TestHasClaimableInboxWork_AnUnreadableFileIsNeverProofOfNoWork(t *testing.T
 }
 
 func TestUnansweredClaimableWork_ANoticeIsNotUnreadWorkOnTheLanePath(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	workspace := t.TempDir()
 	writeLaneScope(t, workspace, "long-title")
@@ -73,6 +79,8 @@ func TestRunCycle_EmptyTriageOverWithheldWorkIsPlannedNoWorkWhenAnItemWasTrimmed
 }
 
 func TestHasClaimableInboxWork_AnUnreadableClaimIsNeverProofOfNoWork(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	claimed := inboxbatch.ProcessingCycleDir(filepath.Join(root, ".evolve", "inbox"), 0)
 	if err := os.MkdirAll(claimed, 0o755); err != nil {

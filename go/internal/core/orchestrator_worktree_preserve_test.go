@@ -65,6 +65,8 @@ func TestOrchestrator_ShipRecoversThenSucceeds_CleansWorktree(t *testing.T) {
 }
 
 func TestPreserveOnVerdict(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		verdict string
 		want    bool

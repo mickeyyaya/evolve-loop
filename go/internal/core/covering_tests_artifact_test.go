@@ -9,6 +9,8 @@ import (
 )
 
 func TestRenderCoveringTests_TruncatesWithVisibleNote(t *testing.T) {
+	t.Parallel()
+
 	var many []string
 	for i := 0; i < 5000; i++ {
 		many = append(many, "go/internal/pkg/a_very_long_package_name_test.go")
@@ -24,6 +26,8 @@ func TestRenderCoveringTests_TruncatesWithVisibleNote(t *testing.T) {
 }
 
 func TestRenderCoveringTests_EmitsEveryPathWhenUnderCap(t *testing.T) {
+	t.Parallel()
+
 	out, _ := renderCoveringTests([]string{"go/internal/foo/foo_test.go", "go/internal/bar/bar_test.go"})
 
 	for _, want := range []string{"go/internal/foo/foo_test.go", "go/internal/bar/bar_test.go"} {
@@ -37,6 +41,8 @@ func TestRenderCoveringTests_EmitsEveryPathWhenUnderCap(t *testing.T) {
 }
 
 func TestWriteCoveringTests_NoOpWithoutWorktreeOrWorkspace(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeCoveringTests(context.Background(), "", ws)
 	if _, err := os.Stat(filepath.Join(ws, coveringTestsArtifact)); !os.IsNotExist(err) {

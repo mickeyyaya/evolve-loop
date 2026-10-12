@@ -10,6 +10,8 @@ import (
 )
 
 func TestDecideAfterAuditFail_EmitsTheRepairDecision(t *testing.T) {
+	t.Parallel()
+
 	auditReport := func(class string) string {
 		return "# Audit\n\n## Verdict\nFAIL\n\n" + phasecontract.RenderVerdictSentinelWithFailure("audit", "FAIL",
 			&phasecontract.FailureBlock{Class: class, Defects: []string{"EGPS: red_count=1 [x]"}}) + "\n"

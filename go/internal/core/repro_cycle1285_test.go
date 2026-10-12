@@ -31,6 +31,8 @@ func collidingDefects() []string {
 // derives the inbox id from remediationSlug(title), and remediationSlug stops
 // at remediationSlugMaxRunes.
 func TestRepro1285_F1_CollidingRemediationSlugSuppressesRetrospectiveAndLesson(t *testing.T) {
+	t.Parallel()
+
 	o, fl, root := remediationFixture(t)
 	defects := collidingDefects()
 	// The fixture premise — two defect lines diverging only after the 60-rune

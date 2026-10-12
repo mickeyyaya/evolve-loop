@@ -14,6 +14,8 @@ import (
 const maxRenderedOversizedTodo = 1000
 
 func TestWriteCarryoverTodosCapsPerItemLength(t *testing.T) {
+	t.Parallel()
+
 	var b strings.Builder
 	writeCarryoverTodos(&b, []router.CarryoverTodo{{
 		ID:             "cycle-366-failed-ship",
@@ -38,6 +40,8 @@ func TestWriteCarryoverTodosCapsPerItemLength(t *testing.T) {
 }
 
 func TestWriteCarryoverTodos_EmptyOmitsSection(t *testing.T) {
+	t.Parallel()
+
 	var b strings.Builder
 	writeCarryoverTodos(&b, nil)
 	if b.String() != "" {
@@ -46,6 +50,8 @@ func TestWriteCarryoverTodos_EmptyOmitsSection(t *testing.T) {
 }
 
 func TestWriteCarryoverTodos_OmittedTrailerFires(t *testing.T) {
+	t.Parallel()
+
 	const total = 25
 	todos := make([]router.CarryoverTodo, total)
 	for i := range todos {

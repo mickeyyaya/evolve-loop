@@ -89,18 +89,26 @@ func assertGoldenKeys(t *testing.T, name string, got, legacy, additive []string)
 }
 
 func TestByteStability_StateKeysAdditiveOnly(t *testing.T) {
+	t.Parallel()
+
 	assertGoldenKeys(t, "core.State", jsonKeysOf(t, State{}), legacyStateKeys, additiveStateKeys)
 }
 
 func TestByteStability_LedgerEntryKeysAdditiveOnly(t *testing.T) {
+	t.Parallel()
+
 	assertGoldenKeys(t, "core.LedgerEntry", jsonKeysOf(t, LedgerEntry{}), legacyLedgerEntryKeys, additiveLedgerEntryKeys)
 }
 
 func TestByteStability_CycleStateKeysAdditiveOnly(t *testing.T) {
+	t.Parallel()
+
 	assertGoldenKeys(t, "core.CycleState", jsonKeysOf(t, CycleState{}), legacyCycleStateKeys, additiveCycleStateKeys)
 }
 
 func TestByteStability_AdditiveFieldsAreOmitempty(t *testing.T) {
+	t.Parallel()
+
 	check := func(v any, additive []string) {
 		rt := reflect.TypeOf(v)
 		for i := 0; i < rt.NumField(); i++ {

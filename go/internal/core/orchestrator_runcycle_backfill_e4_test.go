@@ -28,6 +28,8 @@ func (r *runCycleWritingRunnerE4) Run(_ context.Context, req PhaseRequest) (Phas
 }
 
 func TestRunCycle_ABlockedActivationDirectoryStopsTheCycleBeforeAnyPhase(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ".evolve", "build-explanation-contracts"), "a file where the marker directory belongs\n")
 	runners := buildRunners(nil)
@@ -44,6 +46,8 @@ func TestRunCycle_ABlockedActivationDirectoryStopsTheCycleBeforeAnyPhase(t *test
 }
 
 func TestRunCycle_ABuildCannotStartWithoutASealedWorktreeContext(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(nil)
 	o := NewOrchestrator(&fakeStorage{enforceExplanationContract: true}, &fakeLedger{}, runners)
 
@@ -105,6 +109,8 @@ func evaluateBatchRunCycleE4(t *testing.T, first, second PhaseRunner) (*Orchestr
 }
 
 func TestRunCycle_AContiguousEvaluateRunIsDispatchedAsOneBatchAndTheCycleShips(t *testing.T) {
+	t.Parallel()
+
 	a := &fakeRunner{name: "check-a"}
 	b := &fakeRunner{name: "check-b"}
 	o, runners := evaluateBatchRunCycleE4(t, a, b)
@@ -130,6 +136,8 @@ func TestRunCycle_AContiguousEvaluateRunIsDispatchedAsOneBatchAndTheCycleShips(t
 }
 
 func TestRunCycle_AFailingBatchMemberAbortsTheCycleNamingThePhaseAndNeverReachesAudit(t *testing.T) {
+	t.Parallel()
+
 	a := &fakeRunner{name: "check-a"}
 	b := &fakeRunner{name: "check-b", failErr: errPlainE4("check-b: deliverable forged challenge token"), failUntil: 99}
 	o, runners := evaluateBatchRunCycleE4(t, a, b)

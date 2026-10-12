@@ -47,6 +47,8 @@ func worktreeWithModule(t *testing.T) string {
 }
 
 func TestRepoContractFloorChecks_ARawGitFixtureIsCorrectedAtBuildExitByTheRatchetsName(t *testing.T) {
+	t.Parallel()
+
 	wt := worktreeWithModule(t)
 	pack := ratchetRedPack()
 	var run RepoContractPackFn = pack.run
@@ -88,6 +90,8 @@ func TestRepoContractFloorChecks_GreenOrAnUnnamedExitPassesTheHandoff(t *testing
 }
 
 func TestRepoContractFloorChecks_AnyNamedRedCorrectsTheBuild(t *testing.T) {
+	t.Parallel()
+
 	pack := &fakeRepoContractPack{reds: []string{"pkg.TestX"}}
 	got := RepoContractFloorChecks(pack.run)(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)})
 	if len(got) != 1 || !strings.Contains(got[0], "pkg.TestX") {
@@ -96,6 +100,8 @@ func TestRepoContractFloorChecks_AnyNamedRedCorrectsTheBuild(t *testing.T) {
 }
 
 func TestRepoContractFloorChecks_RunsThePackUnderItsOwnDeadline(t *testing.T) {
+	t.Parallel()
+
 	var remaining time.Duration
 	var hasDeadline bool
 	run := func(ctx context.Context, _ string) ([]string, string, error) {
@@ -135,6 +141,8 @@ func TestRepoContractFloorChecks_ADeadlineKillWarnsAndPassesTheHandoff(t *testin
 }
 
 func TestRepoContractFloorChecks_FollowsTheShipGatesDial(t *testing.T) {
+	t.Parallel()
+
 	wt := worktreeWithModule(t)
 	for word, wantRun := range map[string]bool{"off": false, "enforce": true, "": true, "shadwo": true, "{not json": true} {
 		root := t.TempDir()
@@ -150,6 +158,8 @@ func TestRepoContractFloorChecks_FollowsTheShipGatesDial(t *testing.T) {
 }
 
 func TestRepoContractFloorChecks_WithoutAProjectRootTheWorktreesPolicyDecides(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	writePolicyGate(t, wt, "off")
 	pack := ratchetRedPack()
@@ -174,6 +184,8 @@ func writePolicyGate(t *testing.T, root, word string) {
 }
 
 func TestRepoContractFloor_ARedPackCorrectsTheBuildAndNeverReachesTheAudit(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(nil)
 	build := runners[PhaseBuild].(*fakeRunner)
 	audit := runners[PhaseAudit].(*fakeRunner)

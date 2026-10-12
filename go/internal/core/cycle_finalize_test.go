@@ -49,6 +49,8 @@ func writeFinalizeFixture(t *testing.T, evolveDir string, cycleID, lastCycleNumb
 // removed — AND must leave state.json byte-identical and write neither a
 // `.reset-*` archive nor a faillearn lesson (the ≠SealCycle pin).
 func TestClearCompletedCycleMarker_RemovesTerminalMarker(t *testing.T) {
+	t.Parallel()
+
 	evolveDir := t.TempDir()
 	csPath, statePath, _ := writeFinalizeFixture(t, evolveDir, 5, 5)
 	before, err := os.ReadFile(statePath)
@@ -95,6 +97,8 @@ func TestClearCompletedCycleMarker_RemovesTerminalMarker(t *testing.T) {
 // still in progress (or crashed) — and must be left alone so --resume /
 // quota-pause / a subsequent `evolve cycle reset` can still see it.
 func TestClearCompletedCycleMarker_PreservesUnfinishedMarker(t *testing.T) {
+	t.Parallel()
+
 	evolveDir := t.TempDir()
 	csPath, _, _ := writeFinalizeFixture(t, evolveDir, 6, 5) // 6 > 5 → unfinished
 	before, err := os.ReadFile(csPath)
@@ -126,6 +130,8 @@ func TestClearCompletedCycleMarker_PreservesUnfinishedMarker(t *testing.T) {
 // a live owner (runlease.OwnerLive) — clearing out from under a running loop
 // would let a second `evolve loop` start concurrently on the same state.
 func TestClearCompletedCycleMarker_LiveOwnerUntouched(t *testing.T) {
+	t.Parallel()
+
 	evolveDir := t.TempDir()
 	csPath, _, workspace := writeFinalizeFixture(t, evolveDir, 5, 5)
 

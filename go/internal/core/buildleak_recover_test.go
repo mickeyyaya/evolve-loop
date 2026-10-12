@@ -57,6 +57,8 @@ func (r *correctionLeakReviewer) Review(_ context.Context, in ReviewInput) Revie
 }
 
 func TestCorrectionRedispatch_RecoversLeakBeforeReview(t *testing.T) {
+	t.Parallel()
+
 	repo, wt := realWorktree(t)
 	workspace := t.TempDir()
 	runner := &correctionLeakRunner{projectRoot: repo, calls: 1} // initial dispatch already completed

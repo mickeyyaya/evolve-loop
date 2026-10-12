@@ -6,6 +6,8 @@ import (
 )
 
 func TestLatestAuditedTree_BindsTheRowShipBinds(t *testing.T) {
+	t.Parallel()
+
 	row := func(run, role, kind, tree string) LedgerEntry {
 		return LedgerEntry{Cycle: unwindCycle, RunID: run, Role: role, Kind: kind, WorktreeTreeSHA: tree}
 	}

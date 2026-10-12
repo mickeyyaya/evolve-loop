@@ -13,6 +13,8 @@ import (
 )
 
 func TestCommentFloorResult_EnforceRejectsEveryAddedCommentByName(t *testing.T) {
+	t.Parallel()
+
 	added := []commentaudit.Added{{File: "go/internal/x/a.go", Line: "// restates the helper."}, {File: "go/internal/x/b.go", Line: "// and another."}}
 
 	failures, warning := commentFloorResult(config.StageEnforce, added)
@@ -28,6 +30,8 @@ func TestCommentFloorResult_EnforceRejectsEveryAddedCommentByName(t *testing.T) 
 }
 
 func TestCommentFloorResult_ShadowOnlyWarnsAndOffOrACleanDiffIsSilent(t *testing.T) {
+	t.Parallel()
+
 	added := []commentaudit.Added{{File: "a.go", Line: "// restates the helper."}}
 
 	if failures, warning := commentFloorResult(config.StageShadow, added); failures != nil || !strings.Contains(warning, "a.go: // restates the helper.") || !strings.Contains(warning, "shadow") {
@@ -41,6 +45,8 @@ func TestCommentFloorResult_ShadowOnlyWarnsAndOffOrACleanDiffIsSilent(t *testing
 }
 
 func TestCommentFloorFailures_JudgesTheWorktreeAgainstItsBaseAndSparesAMovedComment(t *testing.T) {
+	t.Parallel()
+
 	repo := gittest.Fixture(t)
 	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\n// keeps the lease across resume.\nfunc a() {}\n")
 	writeFile(t, filepath.Join(repo.Dir, "go", "p", "old.go"), "package p\n\n// renamed along with its file.\nfunc o() {}\n")
@@ -65,6 +71,8 @@ func TestCommentFloorFailures_JudgesTheWorktreeAgainstItsBaseAndSparesAMovedComm
 }
 
 func TestDefaultBuildFloorChecks_RunsTheCommentFloor(t *testing.T) {
+	t.Parallel()
+
 	repo := gittest.Fixture(t)
 	writeFile(t, filepath.Join(repo.Dir, "notes", "a.go"), "package notes\n")
 	repo.Git("add", "-A")

@@ -10,6 +10,8 @@ import (
 )
 
 func TestReviewWithCorrections_EmitsGateCorrectedPerRedispatch(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold, approveAfter: 1}
@@ -38,6 +40,8 @@ func TestReviewWithCorrections_EmitsGateCorrectedPerRedispatch(t *testing.T) {
 }
 
 func TestReviewWithCorrections_EscalatedRedispatchSaysSo(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold, approveAfter: 2}
@@ -59,6 +63,8 @@ func TestReviewWithCorrections_EscalatedRedispatchSaysSo(t *testing.T) {
 }
 
 func TestResumeReviewGate_EmitsGateCorrectedOnTheResumeRoot(t *testing.T) {
+	t.Parallel()
+
 	projectRoot := t.TempDir()
 	ws := filepath.Join(projectRoot, ".evolve", "runs", "cycle-9")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -85,6 +91,8 @@ func TestResumeReviewGate_EmitsGateCorrectedOnTheResumeRoot(t *testing.T) {
 }
 
 func TestGateCorrectionCode_IsRegisteredUnderOrchestrator(t *testing.T) {
+	t.Parallel()
+
 	if m, ok := signalcenter.IsRegistered(CodeGateCorrection); !ok || m != signalcenter.ModuleOrchestrator {
 		t.Fatalf("ORCHESTRATOR_GATE_CORRECTION must be registered under module orchestrator: %v %v", m, ok)
 	}
@@ -103,6 +111,8 @@ func (m gateSignalsMarker) VerifiesDeclaredDeliverables() bool { return m.gate }
 func (m gateSignalsMarker) SignalsWired() bool                 { return m.wired }
 
 func TestContractGateSignalsWired_RequiresTheGateAndItsCenter(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name string
 		rev  DeliverableReviewer

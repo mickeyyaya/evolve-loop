@@ -23,6 +23,8 @@ func amplNewSkipOrchestrator(t *testing.T, mandatory, floor []string, specs []ph
 }
 
 func TestOptionalInfraSkip_WrappedArtifactTimeoutError_StillMatches(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, nil, []phasespec.PhaseSpec{
 		{Name: "learn", Optional: true},
 	})
@@ -33,6 +35,8 @@ func TestOptionalInfraSkip_WrappedArtifactTimeoutError_StillMatches(t *testing.T
 }
 
 func TestOptionalInfraSkip_NonInfraError_NeverMatches(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, nil, []phasespec.PhaseSpec{
 		{Name: "learn", Optional: true},
 	})
@@ -42,6 +46,8 @@ func TestOptionalInfraSkip_NonInfraError_NeverMatches(t *testing.T) {
 }
 
 func TestOptionalInfraSkip_MandatoryOverridesOptionalFlag(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, []string{"build"}, nil, []phasespec.PhaseSpec{
 		{Name: "build", Optional: true},
 	})
@@ -51,6 +57,8 @@ func TestOptionalInfraSkip_MandatoryOverridesOptionalFlag(t *testing.T) {
 }
 
 func TestOptionalInfraSkip_OnFloorPhase_NeverMatches(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, []string{"audit"}, []phasespec.PhaseSpec{
 		{Name: "audit", Optional: true},
 	})
@@ -60,6 +68,8 @@ func TestOptionalInfraSkip_OnFloorPhase_NeverMatches(t *testing.T) {
 }
 
 func TestOptionalInfraSkip_UnknownPhaseNotInCatalog_NeverMatches(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, nil, nil)
 	if o.optionalInfraSkip(Phase("ghost-phase"), ErrArtifactTimeout) {
 		t.Fatalf("expected a phase absent from the catalog to never skip (fail closed on a catalog miss)")
@@ -67,6 +77,8 @@ func TestOptionalInfraSkip_UnknownPhaseNotInCatalog_NeverMatches(t *testing.T) {
 }
 
 func TestPostShipObserverSkip_NotYetShipped_NeverMatchesRegardlessOfPhase(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, nil, []phasespec.PhaseSpec{
 		{Name: "memo", Optional: true, Role: string(phasespec.RoleControl)},
 	})
@@ -76,6 +88,8 @@ func TestPostShipObserverSkip_NotYetShipped_NeverMatchesRegardlessOfPhase(t *tes
 }
 
 func TestPostShipObserverSkip_ShipItself_NeverMatchesEvenIfShipped(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, nil, []phasespec.PhaseSpec{
 		{Name: string(PhaseShip), Optional: true, Role: string(phasespec.RoleControl)},
 	})
@@ -85,6 +99,8 @@ func TestPostShipObserverSkip_ShipItself_NeverMatchesEvenIfShipped(t *testing.T)
 }
 
 func TestPostShipObserverSkip_WrongRole_NeverMatches(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, nil, nil, []phasespec.PhaseSpec{
 		{Name: "evaluate-batch-check", Optional: true, Role: string(phasespec.RoleEvaluate)},
 	})
@@ -94,6 +110,8 @@ func TestPostShipObserverSkip_WrongRole_NeverMatches(t *testing.T) {
 }
 
 func TestPostShipObserverSkip_MandatoryOverridesEvenWhenShippedAndControl(t *testing.T) {
+	t.Parallel()
+
 	o := amplNewSkipOrchestrator(t, []string{"memo"}, nil, []phasespec.PhaseSpec{
 		{Name: "memo", Optional: true, Role: string(phasespec.RoleControl)},
 	})

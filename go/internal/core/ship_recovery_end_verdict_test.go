@@ -21,6 +21,8 @@ func runConflictCycle(t *testing.T, f conflictFixture) core.CycleResult {
 }
 
 func TestRecoverFromShipError_ACycleWhoseRebaseReentryAbortsEndsFAIL(t *testing.T) {
+	t.Parallel()
+
 	f := newConflictFixture(t, "lane line\n", nil)
 	result := runConflictCycle(t, f)
 	if f.ship.calls != 1 || f.dbg.calls != 1 {
@@ -32,6 +34,8 @@ func TestRecoverFromShipError_ACycleWhoseRebaseReentryAbortsEndsFAIL(t *testing.
 }
 
 func TestRecoverFromShipError_ADebuggerThatBlocksAShipRecoveryEndsFAIL(t *testing.T) {
+	t.Parallel()
+
 	f := newConflictFixture(t, "lane line\n", map[string]any{"debugger.action": "BLOCK"})
 	result := runConflictCycle(t, f)
 	if f.ship.calls != 1 || f.dbg.calls != 1 {
@@ -76,6 +80,8 @@ func greenAuditConflictFixture(t *testing.T, signals map[string]any, verifies de
 }
 
 func TestRecoverFromShipError_AnUnlandedShipOverAGreenAuditIsADiagnosedFAILNotAForgedVerdict(t *testing.T) {
+	t.Parallel()
+
 	for name, signals := range map[string]map[string]any{"block": {"debugger.action": "BLOCK"}, "reentry-abort": nil} {
 		for _, verifies := range []deliverableVerdict{false, true} {
 			result := runConflictCycle(t, greenAuditConflictFixture(t, signals, verifies))

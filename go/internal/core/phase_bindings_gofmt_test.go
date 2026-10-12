@@ -8,6 +8,8 @@ import (
 )
 
 func TestNormalizeBuildGofmt_FormatsWorktreeGoModule(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	goDir := filepath.Join(wt, "go")
 	if err := os.MkdirAll(goDir, 0o755); err != nil {
@@ -33,10 +35,14 @@ func TestNormalizeBuildGofmt_FormatsWorktreeGoModule(t *testing.T) {
 
 // An empty worktree (provisioning failed) must be a safe no-op, never a panic.
 func TestNormalizeBuildGofmt_EmptyWorktreeIsNoOp(t *testing.T) {
+	t.Parallel()
+
 	normalizeBuildGofmt("")
 }
 
 func TestNormalizeBuildWorktree_GofmtsAfterNonBuildPhase(t *testing.T) {
+	t.Parallel()
+
 	wt := t.TempDir()
 	goDir := filepath.Join(wt, "go")
 	if err := os.MkdirAll(goDir, 0o755); err != nil {

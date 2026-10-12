@@ -11,6 +11,8 @@ import (
 )
 
 func TestGitWorktree_GuardStateIsRunScoped(t *testing.T) {
+	t.Parallel()
+
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}

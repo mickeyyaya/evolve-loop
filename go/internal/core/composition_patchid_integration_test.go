@@ -39,6 +39,8 @@ diff --git a/a.txt b/a.txt
 `
 
 func TestCompositionPatchID_IsAFortyHexIdentityIndependentOfFileOrder(t *testing.T) {
+	t.Parallel()
+
 	inOrder, err := compositionPatchID([]byte(compositionPatchIDTwoFileDiff))
 	if err != nil {
 		t.Fatalf("compositionPatchID(in order): %v", err)
@@ -56,6 +58,8 @@ func TestCompositionPatchID_IsAFortyHexIdentityIndependentOfFileOrder(t *testing
 }
 
 func TestCompositionPatchID_NonDiffInputHasNoIdentity(t *testing.T) {
+	t.Parallel()
+
 	for _, input := range []string{"", "\n", "not a diff at all\n", "--- a/x\n+++ b/x\n"} {
 		got, err := compositionPatchID([]byte(input))
 		if err == nil || !strings.Contains(err.Error(), "empty output") || got != "" {

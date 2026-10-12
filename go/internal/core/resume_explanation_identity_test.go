@@ -79,6 +79,8 @@ func rebasedSplitFixture(t *testing.T) (root, workspace, newBase string) {
 }
 
 func TestRunCycleFromPhase_RecoversSecondCrashAfterRebaseCheckpointThroughBuild(t *testing.T) {
+	t.Parallel()
+
 	root, workspace, newBase := rebasedSplitFixture(t)
 
 	storage := &fakeStorage{state: State{LastCycleNumber: 42}, cycleState: CycleState{
@@ -143,6 +145,8 @@ func TestRunCycleFromPhase_RejectsCycleAndVersionRewriteThatHidesHostActivation(
 }
 
 func TestRequireResumeExplanationIdentity_RejectsClearedSealedFields(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -174,6 +178,8 @@ func TestRequireResumeExplanationIdentity_RejectsClearedSealedFields(t *testing.
 }
 
 func TestRequireResumeExplanationIdentity_RejectsLegacyDowngradeAgainstAuthoritativeCycle(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	originalWorkspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
 	if err := os.MkdirAll(originalWorkspace, 0o755); err != nil {
@@ -199,6 +205,8 @@ func TestRequireResumeExplanationIdentity_RejectsLegacyDowngradeAgainstAuthorita
 }
 
 func TestRunCycleFromPhase_GlobalCheckpointUsesHostLastCycleIdentity(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-99")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {

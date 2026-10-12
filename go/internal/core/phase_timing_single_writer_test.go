@@ -8,6 +8,8 @@ import (
 )
 
 func TestPhaseTimings_SingleWriter(t *testing.T) {
+	t.Parallel()
+
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)

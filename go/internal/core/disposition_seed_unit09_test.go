@@ -12,6 +12,8 @@ import (
 )
 
 func TestSeedDispositionSkeleton_DecodesThroughTheLeaf_AndReadsAreSignalFree(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	ws := RunWorkspacePath(root, 1431)
 	ancestorWS := RunWorkspacePath(root, 1425)

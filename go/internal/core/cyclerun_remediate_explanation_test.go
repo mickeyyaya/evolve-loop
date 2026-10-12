@@ -50,6 +50,8 @@ func (r remediationResealingReviewer) Review(_ context.Context, in ReviewInput) 
 }
 
 func TestRemediation_GateRerunReceivesResealedExplanationHandoff(t *testing.T) {
+	t.Parallel()
+
 	root := remediationGitRepo(t, true)
 	worktree := remediationGitRepo(t, false)
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-11")

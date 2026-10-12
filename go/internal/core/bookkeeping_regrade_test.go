@@ -44,6 +44,8 @@ func TestBookkeepingRegradeEligible_Matrix(t *testing.T) {
 }
 
 func TestDecideAfterRetro_BookkeepingRegradeBranch(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(nil)
 	cs := CycleState{CycleID: 1430, WorkspacePath: t.TempDir(),
 		AuditFailReasons: []string{tConflictPASS, tLedger}}
@@ -64,6 +66,8 @@ func TestDecideAfterRetro_BookkeepingRegradeBranch(t *testing.T) {
 }
 
 func TestDecideAfterRetro_RegradeOncePerCycle(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(nil)
 	cs := CycleState{CycleID: 1430, WorkspacePath: t.TempDir(),
 		AuditFailReasons:            []string{tConflictPASS, tLedger},
@@ -76,6 +80,8 @@ func TestDecideAfterRetro_RegradeOncePerCycle(t *testing.T) {
 }
 
 func TestDecideAfterRetroRouted_RegradeNotRouterOverridable(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(fixedNextStrategy{next: "tdd"})
 	cs := CycleState{CycleID: 1430, WorkspacePath: t.TempDir(),
 		AuditFailReasons: []string{tConflictWARN, tClosure}}
@@ -122,6 +128,8 @@ func TestRecordAndBranch_RegradeGrantConsumesSlotAndSchedulesAudit(t *testing.T)
 }
 
 func TestDecideAfterRetro_FloorOutranksRegrade(t *testing.T) {
+	t.Parallel()
+
 	o := floorOrchestrator(nil)
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS") // green artifacts + recorded FAIL = incoherent

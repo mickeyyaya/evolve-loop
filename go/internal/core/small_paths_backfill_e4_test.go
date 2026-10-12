@@ -251,6 +251,8 @@ func TestRouteAfterExplanationRefresh_ACleanRefreshRoutesByWhetherBuildIsRequire
 }
 
 func TestCommentFloorFailures_AnOffStageOrNoWorktreeJudgesNothing(t *testing.T) {
+	t.Parallel()
+
 	repo, base := floorRepo(t)
 	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\n// restates the helper.\nfunc a() {}\n")
 	enforce := floorRoot(t, `{"comment_floor":{"stage":"enforce"}}`)

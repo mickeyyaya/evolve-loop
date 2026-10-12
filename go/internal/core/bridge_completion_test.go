@@ -7,6 +7,8 @@ import (
 )
 
 func TestPhaseRequest_BridgeCompletion_ASourceWritingCorrectionCompletesOnWorktreeEvidence(t *testing.T) {
+	t.Parallel()
+
 	req := PhaseRequest{Worktree: "/wt/cycle-1", CorrectionDirective: composeCorrection(1, "[missing_what_why] explanation doc", "")}
 	if got := req.BridgeCompletion(); got != CompletionWorktreeEvidence {
 		t.Fatalf("a correction re-dispatch of a source-writing phase must ask the bridge for the worktree-evidence contract; got %q", got)
@@ -14,6 +16,8 @@ func TestPhaseRequest_BridgeCompletion_ASourceWritingCorrectionCompletesOnWorktr
 }
 
 func TestPhaseRequest_BridgeCompletion_EveryOtherDispatchKeepsTheArtifactContract(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		req  PhaseRequest
@@ -32,6 +36,8 @@ func TestPhaseRequest_BridgeCompletion_EveryOtherDispatchKeepsTheArtifactContrac
 }
 
 func TestPhaseRequest_BridgeCompletion_TheWorktreeFenceDecidesWhoQualifies(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	correction := PhaseRequest{Worktree: "/wt/cycle-1", CorrectionDirective: composeCorrection(1, "rejected", "")}
 	for _, phase := range []Phase{PhaseAudit, Phase("adversarial-review")} {
@@ -47,6 +53,8 @@ func TestPhaseRequest_BridgeCompletion_TheWorktreeFenceDecidesWhoQualifies(t *te
 }
 
 func TestComposeCorrection_AsksForAnAppendedSectionNumberedByTheRound(t *testing.T) {
+	t.Parallel()
+
 	for _, remediation := range []string{"", gateARemediation} {
 		got := composeCorrection(2, "[missing_what_why] docs/explain/builds/cycle-1-r1.md", remediation)
 		want := "Before you finish, append a `## Correction 2` section to the deliverable"
@@ -63,6 +71,8 @@ func TestComposeCorrection_AsksForAnAppendedSectionNumberedByTheRound(t *testing
 }
 
 func TestCorrectionRecord_StatesTheAgentsDutyNeverTheHostsCompletionRule(t *testing.T) {
+	t.Parallel()
+
 	record := correctionRecord(2)
 	for _, completionRule := range []string{"host", "complete"} {
 		if strings.Contains(record, completionRule) {
@@ -72,6 +82,8 @@ func TestCorrectionRecord_StatesTheAgentsDutyNeverTheHostsCompletionRule(t *test
 }
 
 func TestBridgeRequest_EachCompletionContractTravelsAsTheNameTheBridgeParses(t *testing.T) {
+	t.Parallel()
+
 	for contract, wire := range map[CompletionContract]string{
 		CompletionArtifact:         "artifact",
 		CompletionStdout:           "stdout",

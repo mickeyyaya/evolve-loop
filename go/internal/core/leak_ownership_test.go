@@ -22,6 +22,8 @@ func laneOneEightOneOne() mainTreeOwnership {
 }
 
 func TestMainTreeOwnership_ForeignOwnerNamesEveryOwnerKeyedClass(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		path      string
@@ -58,6 +60,8 @@ func TestMainTreeOwnership_ForeignOwnerNamesEveryOwnerKeyedClass(t *testing.T) {
 }
 
 func TestMainTreeOwnership_UnknownIdentityClaimsLikeASingleWriter(t *testing.T) {
+	t.Parallel()
+
 	unknown := mainTreeOwnership{}
 	for _, p := range []string{
 		".evolve/evals/phasespec-roots-silent-policy-error.md",
@@ -75,6 +79,8 @@ func TestMainTreeOwnership_UnknownIdentityClaimsLikeASingleWriter(t *testing.T) 
 }
 
 func TestMainTreeOwnership_OwnsEvalOnlyForTheLanesOwnSlugs(t *testing.T) {
+	t.Parallel()
+
 	owner := laneOneEightOneOne()
 	cases := map[string]bool{
 		".evolve/evals/router-silent-errors.md":                true,
@@ -91,6 +97,8 @@ func TestMainTreeOwnership_OwnsEvalOnlyForTheLanesOwnSlugs(t *testing.T) {
 }
 
 func TestLaneOwnership_ItemsAreTheCommittedSetPlusMaterializedEvals(t *testing.T) {
+	t.Parallel()
+
 	workspace := t.TempDir()
 	pin, err := json.Marshal(LaneScope{TodoIDs: []string{"pinned-item"}, GoalHash: "g"})
 	if err != nil {
@@ -115,6 +123,8 @@ func TestLaneOwnership_ItemsAreTheCommittedSetPlusMaterializedEvals(t *testing.T
 }
 
 func TestLaneOwnership_TriageDecisionBindsWhenNoPinAndDeferralsAreNotOwned(t *testing.T) {
+	t.Parallel()
+
 	workspace := t.TempDir()
 	writeTreeFile(t, workspace, "triage-decision.json",
 		`{"top_n":[{"id":"committed-item"},{"id":"deferred-item"}],"deferred":[{"id":"deferred-item"}]}`)
@@ -127,6 +137,8 @@ func TestLaneOwnership_TriageDecisionBindsWhenNoPinAndDeferralsAreNotOwned(t *te
 }
 
 func TestLaneOwnership_NoRecordedIdentityIsUnknownNotEmpty(t *testing.T) {
+	t.Parallel()
+
 	got := laneOwnership(CycleState{CycleID: 7, WorkspacePath: t.TempDir()}, nil)
 
 	if got.items != nil {
@@ -135,6 +147,8 @@ func TestLaneOwnership_NoRecordedIdentityIsUnknownNotEmpty(t *testing.T) {
 }
 
 func TestMainTreeOwnership_HeldBySiblingNeedsALiveHolder(t *testing.T) {
+	t.Parallel()
+
 	siblings := liveSiblings{
 		projectRoot: "/plane",
 		runs: map[string]bool{
@@ -186,6 +200,8 @@ func writeRunLease(t *testing.T, runDir string, heartbeat time.Time) {
 }
 
 func TestLiveSiblingsOf_ReadsOnlyLiveRunsOtherThanThisLane(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	now := time.Now()
 	own, live, stale, unleased := RunWorkspacePath(root, 1811), RunWorkspacePath(root, 1812), RunWorkspacePath(root, 1700), RunWorkspacePath(root, 1800)
@@ -214,12 +230,16 @@ func TestLiveSiblingsOf_ReadsOnlyLiveRunsOtherThanThisLane(t *testing.T) {
 }
 
 func TestEvalFilePath_IsTheWorkspaceEvalHome(t *testing.T) {
+	t.Parallel()
+
 	if got, want := EvalFilePath("/ws", "router-silent-errors"), filepath.Join("/ws", ".evolve", "evals", "router-silent-errors.md"); got != want {
 		t.Fatalf("EvalFilePath = %q, want %q", got, want)
 	}
 }
 
 func TestLaneOwnership_MaterializedEvalsAloneMakeTheIdentityKnown(t *testing.T) {
+	t.Parallel()
+
 	workspace := t.TempDir()
 	writeTreeFile(t, workspace, evalsDir+"materialized-slug.md", "eval\n")
 
@@ -234,6 +254,8 @@ func TestLaneOwnership_MaterializedEvalsAloneMakeTheIdentityKnown(t *testing.T) 
 }
 
 func TestCycleRun_RecoveryBaselineNeedsASnapshotOfACheckout(t *testing.T) {
+	t.Parallel()
+
 	guard := treediff.New(defaultGitDirtyPaths)
 	checkout := &cycleRun{checkout: &checkoutDecision{decided: true, checkout: true}}
 	if got, want := checkout.recoveryBaselineFor(guard, []string{"operator-notes.md"}), map[string]bool{"operator-notes.md": true}; !reflect.DeepEqual(got, want) {
