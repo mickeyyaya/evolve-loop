@@ -216,6 +216,7 @@ var serialTests = map[string]string{
 	"main.TestGCProject_AnUnparseablePolicyWarnsAndSweepsWithTheZeroPolicy":                                 "sets env through a helper",
 	"main.TestGCProject_RefusesAnUnresolvedRootAndWarnsOnABadPolicy":                                        "sets env through a helper",
 	"main.TestGCRunDevWorktrees_APlanFailureAndAnUnjudgedTreeAreFailures":                                   "sets env through a helper",
+	"main.TestGCProject_AStepAfterASpentReaperDeadlineStillRuns":                                            "sets env through a helper",
 	"main.TestGCRunDevWorktrees_ASweepOutsideAHubIsSkippedWithItsReason":                                    "sets env through a helper",
 	"main.TestGCRunDevWorktrees_AnArchiveRefusalIsReportedAsAFailure":                                       "sets env through a helper",
 	"main.TestGCRunDevWorktrees_ABudgetThatEndsMidApplyWarnsNamesTheTreeAndIsNotAFailure":                   "sets env through a helper",
