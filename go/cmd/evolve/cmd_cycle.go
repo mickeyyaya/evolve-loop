@@ -150,6 +150,8 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+var cycleRunAbsoluteRoot = paths.AbsoluteRoot
+
 type cycleRunFlags struct {
 	projectRoot, goalHash, goalText, evolveDir string
 	simulate, bypassPolicy                     bool
@@ -197,7 +199,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	projectRoot, evolveDir := f.projectRoot, f.evolveDir
 	// Absolutize before deriving any path: a relative root makes worktree-phase
 	// artifact paths diverge between the agent's cwd and the bridge's.
-	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+	projectRoot = cycleRunAbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
 	if evolveDir == "" {
@@ -378,16 +380,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
 	br := bridge.NewDefault(projectRoot, signals)
-	br.SetOnStopReview(func(cycle int, phase, action, reason string) {
-		_ = ld.Append(context.Background(), core.LedgerEntry{
-			TS:      time.Now().UTC().Format(time.RFC3339),
-			Cycle:   cycle,
-			Role:    phase,
-			Kind:    "stop_review",
-			Action:  action,
-			Message: reason,
-		})
-	})
+	br.SetOnStopReview(stopReviewRecorder(ld))
 	prm := cmdutil.NewPromptsLoader(projectRoot)
 
 	// The root is the sole reader of routing env and config. Loaded before the
@@ -429,12 +422,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	// The CLI/tier fallback chain wraps the bridge handle once, and every consumer
 	// below launches through walked. The runner and the advisor walk their own
 	// chains, so they pass straight through.
-	diagf := func(format string, args ...any) { fmt.Fprintf(os.Stderr, format, args...) }
 	explainUsage := usageEvidenceFn(projectRoot, evolveDir, console)
 	walked := bridgechain.New(withUsageEvidence(br, explainUsage, signals),
 		bridgechain.DefaultPlanResolver(cliRouter),
-		bridgechain.WithBench(func(e bridgechain.Escalation) { bridgechain.BenchOnEscalation(e, time.Now, diagf) }),
-		bridgechain.WithLog(diagf))
+		bridgechain.WithBench(cycleBenchOnEscalation),
+		bridgechain.WithLog(cycleDiagf))
 
 	// Every BaseRunner's verdict engine reads the contract verifier through this
 	// accessor, so the engine classifies the bytes the gate approves. Gate off
@@ -555,7 +547,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	// Cycle-start live model-catalog refresh, best-effort under its stage.
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir, pol.CatalogConfig().RefreshStage)))
 	// The refresher's stage, stamped into each catalog_refresh ledger entry.
-	opts = append(opts, core.WithCatalogRefreshStage(func() string { return pol.CatalogConfig().RefreshStage }))
+	opts = append(opts, core.WithCatalogRefreshStage(catalogRefreshStage(pol)))
 
 	// Without this lookup router.ClampPlanModelRouting cannot clear an
 	// unresolvable {cli, tier} and silently does nothing.
@@ -572,18 +564,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithShipFloor(shipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
 	// Retry-tier escalation reads the durable per-item failure counter.
-	opts = append(opts, core.WithFailureCountReader(func(id string) int {
-		n, _ := inboxmover.ReadFailureCount(inboxmover.Options{ProjectRoot: projectRoot}, id)
-		return n
-	}))
+	opts = append(opts, core.WithFailureCountReader(failureCountReader(projectRoot)))
 	// Continuation-on-fail adopts a prior FAILed attempt's salvage for this scope;
 	// a planner-pinned lane resolves from its lane-scope todo ids.
 	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
-	opts = append(opts, core.WithContinuationResolver(func(root string, cycle int, scopeIDs []string) *continuation.Continuation {
-		// The live-scope guard's refusal is the operator's only sign that a ghost
-		// binding was caught, so it must reach stderr.
-		return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr}, cycle, scopeIDs)
-	}))
+	opts = append(opts, core.WithContinuationResolver(continuationForScope))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
 	// A malformed failure_policy keeps the compiled defaults; the floor holds.
@@ -611,6 +596,40 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		Runners:      runners,
 		Router:       cliRouter,
 	}
+}
+
+func stopReviewRecorder(ld core.Ledger) func(cycle int, phase, action, reason string) {
+	return func(cycle int, phase, action, reason string) {
+		_ = ld.Append(context.Background(), core.LedgerEntry{
+			TS:      time.Now().UTC().Format(time.RFC3339),
+			Cycle:   cycle,
+			Role:    phase,
+			Kind:    "stop_review",
+			Action:  action,
+			Message: reason,
+		})
+	}
+}
+
+func cycleDiagf(format string, args ...any) { fmt.Fprintf(os.Stderr, format, args...) }
+
+func cycleBenchOnEscalation(e bridgechain.Escalation) {
+	bridgechain.BenchOnEscalation(e, time.Now, cycleDiagf)
+}
+
+func catalogRefreshStage(pol policy.Policy) func() string {
+	return func() string { return pol.CatalogConfig().RefreshStage }
+}
+
+func failureCountReader(projectRoot string) func(id string) int {
+	return func(id string) int {
+		n, _ := inboxmover.ReadFailureCount(inboxmover.Options{ProjectRoot: projectRoot}, id)
+		return n
+	}
+}
+
+func continuationForScope(root string, cycle int, scopeIDs []string) *continuation.Continuation {
+	return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr}, cycle, scopeIDs)
 }
 
 // hostInboxClaimer claims through the same floor as `evolve inbox-mover claim`.

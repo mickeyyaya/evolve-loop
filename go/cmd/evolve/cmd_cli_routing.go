@@ -34,6 +34,11 @@ type cliRoutingFlags struct {
 	json   bool
 }
 
+var (
+	cliRoutingShowMarshalIndent = json.MarshalIndent
+	cliRoutingGetwd             = os.Getwd
+)
+
 type tierRoute struct {
 	Tier         string   `json:"tier"`
 	CLI          string   `json:"cli,omitempty"`
@@ -104,7 +109,7 @@ func parseCLIRoutingFlags(name string, args []string, stderr io.Writer) (cliRout
 	if err := fs.Parse(args); err != nil {
 		return f, nil, false
 	}
-	root, err := routingProjectRoot(f.root, os.Getwd)
+	root, err := routingProjectRoot(f.root, cliRoutingGetwd)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cli-routing %s: %v\n", name, err)
 		return f, nil, false
@@ -184,7 +189,7 @@ func runCLIRoutingShow(args []string, stdout, stderr io.Writer) int {
 		return exitRoutingFinding
 	}
 	if f.json {
-		raw, err := json.MarshalIndent(report, "", "  ")
+		raw, err := cliRoutingShowMarshalIndent(report, "", "  ")
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve cli-routing show: %v\n", err)
 			return exitRoutingFinding

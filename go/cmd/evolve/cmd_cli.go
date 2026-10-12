@@ -26,6 +26,8 @@ const cliUsage = "usage: evolve cli update [--dry-run] [--json] [--project-root 
 
 const liveCheckPaneLines = 6
 
+var cliUpdateAbsoluteRoot = paths.AbsoluteRoot
+
 type cliUpdateWiring struct {
 	families []cliupdate.Family
 	seams    cliupdate.Seams
@@ -97,7 +99,7 @@ func cliUpdateRoot(flagValue string, stderr io.Writer) string {
 	if root == "" {
 		root = "."
 	}
-	return paths.AbsoluteRoot("--project-root", root, func(m string) {
+	return cliUpdateAbsoluteRoot("--project-root", root, func(m string) {
 		fmt.Fprintf(stderr, "evolve cli update: WARN: %s\n", m)
 	})
 }

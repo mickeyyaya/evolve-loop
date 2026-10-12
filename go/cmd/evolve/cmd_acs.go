@@ -15,6 +15,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
+var (
+	acsRunMarshalIndent = json.MarshalIndent
+	evolveDirAbs        = filepath.Abs
+)
+
 // resolveACSSuiteRoot returns the cycle's active_worktree, or "" when the cycle
 // state is absent or malformed.
 func resolveACSSuiteRoot(evolveDir string, cycle int) string {
@@ -36,7 +41,7 @@ func resolveACSSuiteRoot(evolveDir string, cycle int) string {
 // state. Only the orchestrator-minted cycle-state.json proves a plane: `evolve
 // acs run` mints a bare runs/cycle-N directory under any cwd, worktrees included.
 func suiteProjectRoot(evolveDir string, cycle int, root string) string {
-	if abs, err := filepath.Abs(evolveDir); err == nil {
+	if abs, err := evolveDirAbs(evolveDir); err == nil {
 		state := filepath.Join(abs, "runs", fmt.Sprintf("cycle-%d", cycle), "cycle-state.json")
 		if _, serr := os.Stat(state); serr == nil {
 			return filepath.Dir(abs)
@@ -146,7 +151,7 @@ func (f acsFlags) resolved(name string, stderr io.Writer) (acsFlags, bool) {
 }
 
 func existingEvolveDir(evolveDir string) (string, error) {
-	abs, err := filepath.Abs(evolveDir)
+	abs, err := evolveDirAbs(evolveDir)
 	if err != nil {
 		return "", fmt.Errorf("--evolve-dir %q: %w", evolveDir, err)
 	}
@@ -190,7 +195,7 @@ func runACSRun(args []string, stdout, stderr io.Writer) int {
 	if runErr != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", name, runErr)
 	}
-	buf, mErr := json.MarshalIndent(v, "", "  ")
+	buf, mErr := acsRunMarshalIndent(v, "", "  ")
 	if mErr != nil {
 		fmt.Fprintf(stderr, "%s: marshal: %v\n", name, mErr)
 		return 1

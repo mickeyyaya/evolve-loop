@@ -46,6 +46,8 @@ var bridgeLiveSockets = liveLoopSockets
 
 var bridgeSessionsNow = time.Now
 
+var sessionsMarshalIndent = json.MarshalIndent
+
 func liveLoopSockets() []string {
 	names, err := swarm.ExecListBridgeSockets()
 	if err != nil {
@@ -221,7 +223,7 @@ func firstNonEmpty(values ...string) string {
 }
 
 func writeSessionsJSON(rows []bridgeSessionRow, stdout, stderr io.Writer) int {
-	data, err := json.MarshalIndent(rows, "", "  ")
+	data, err := sessionsMarshalIndent(rows, "", "  ")
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve bridge sessions: %v\n", err)
 		return 1
