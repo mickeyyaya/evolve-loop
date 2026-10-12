@@ -54,6 +54,8 @@ Exit codes: 0 ok | 2 safety-gate | 3 cost-leak | 10 bad-flags |
   86 respond-loop-guard | 99 require-full-unmet | 127 missing-binary
 `
 
+var bridgeProbe = (*bridge.Engine).Probe
+
 var bridgeReadOnlyViews = map[string]func([]string, io.Writer, io.Writer) int{
 	"watch":    cmdBridgeWatch,
 	"sessions": runBridgeSessions,
@@ -85,7 +87,7 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 				return 0
 			}
 		}
-		p, err := eng.Probe(context.Background())
+		p, err := bridgeProbe(eng, context.Background())
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve bridge probe: %v\n", err)
 			return 1

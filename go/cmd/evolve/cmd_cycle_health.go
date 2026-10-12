@@ -14,6 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
+var cycleHealthAbsoluteRoot = paths.AbsoluteRoot
+
 // runCycleHealth implements `evolve cycle-health <N> <workspace>`. It exits 0
 // when healthy or only warned, 1 on a fatal anomaly or an internal error, and
 // 10 on bad arguments.
@@ -67,7 +69,7 @@ func cycleHealthRoot(workspace string, stderr io.Writer) string {
 	if projectRoot == "" {
 		projectRoot = filepath.Dir(filepath.Dir(filepath.Dir(workspace)))
 	}
-	return paths.AbsoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
+	return cycleHealthAbsoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle-health: WARN: %s\n", m)
 	})
 }

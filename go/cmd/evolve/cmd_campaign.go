@@ -35,6 +35,14 @@ const campaignUsage = `Usage:
 
 var campaignLaunchFactory = execCycleLaunch
 
+var (
+	campaignAbs           = filepath.Abs
+	campaignExecutable    = os.Executable
+	campaignReadPlan      = os.ReadFile
+	campaignPlanWaves     = (*campaign.Plan).Waves
+	campaignStudyRegister = phaseregistrar.Registrar.Register
+)
+
 func runCampaign(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprint(stderr, campaignUsage)
@@ -131,7 +139,7 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if *projectRoot != "" {
-		absoluteRoot, err := filepath.Abs(*projectRoot)
+		absoluteRoot, err := campaignAbs(*projectRoot)
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve campaign run: resolve project root: %v\n", err)
 			return 1
@@ -143,18 +151,18 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve campaign run: %v\n", err)
 		return 1
 	}
-	waves, err := plan.Waves()
+	waves, err := campaignPlanWaves(plan)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve campaign run: plan waves: %v\n", err)
 		return 1
 	}
-	binPath, err := os.Executable()
+	binPath, err := campaignExecutable()
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve campaign run: resolve binary: %v\n", err)
 		return 1
 	}
 	goalHash := campaignGoalHash(plan)
-	rawPlan, rerr := os.ReadFile(*planPath)
+	rawPlan, rerr := campaignReadPlan(*planPath)
 	if rerr != nil {
 		fmt.Fprintf(stderr, "evolve campaign run: read plan for progress key: %v\n", rerr)
 		return 1
@@ -357,7 +365,7 @@ func renderCampaignPlan(path string, stdout, stderr io.Writer) int {
 }
 
 func runPreliminaryStudy(workspace, feedback string) error {
-	workspace, err := filepath.Abs(workspace)
+	workspace, err := campaignAbs(workspace)
 	if err != nil {
 		return fmt.Errorf("resolve workspace: %w", err)
 	}
@@ -376,10 +384,10 @@ func runPreliminaryStudy(workspace, feedback string) error {
 		return fmt.Errorf("read preliminary-study prompt: %w", err)
 	}
 	cfg.Prompt = string(prompt)
-	registered, err := (phaseregistrar.Registrar{
+	registered, err := campaignStudyRegister(phaseregistrar.Registrar{
 		Bridge:  bridge.NewDefault(projectRoot, nil),
 		Prompts: prompts.NewForProject(worktree),
-	}).Register(cfg)
+	}, cfg)
 	if err != nil {
 		return err
 	}

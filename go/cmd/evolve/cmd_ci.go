@@ -26,6 +26,8 @@ const (
 	ciClassifyHeader = "label\tpackage\ttest\trule\ttouched\tbase_red\trecurred_on_main\trerun_green"
 )
 
+var ciClassifyMarshalIndent = json.MarshalIndent
+
 type ciClassifyArgs struct {
 	target      ciwatch.Target
 	asJSON      bool
@@ -130,7 +132,7 @@ func goModulePath(goMod string) (string, error) {
 
 func writeClassifyReport(w io.Writer, rep ciwatch.ClassifyReport, asJSON bool) error {
 	if asJSON {
-		raw, err := json.MarshalIndent(rep, "", "  ")
+		raw, err := ciClassifyMarshalIndent(rep, "", "  ")
 		if err != nil {
 			return err
 		}
