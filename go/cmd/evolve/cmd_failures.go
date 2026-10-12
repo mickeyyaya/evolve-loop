@@ -17,6 +17,11 @@ import (
 
 const failuresUsage = "evolve failures: usage: failures list [--class C] [--json] | failures reset [--fingerprint F] | failures prune [--dry-run] (prune also drops expired carryoverTodos; reset and a real prune require --project-root)"
 
+var (
+	failuresAbs           = filepath.Abs
+	failuresMarshalIndent = json.MarshalIndent
+)
+
 func runFailures(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, failuresUsage)
@@ -57,7 +62,7 @@ func failuresReadRoot(root, verb string, stderr io.Writer) (string, bool) {
 	if root != "" {
 		return root, true
 	}
-	wd, err := os.Getwd()
+	wd, err := processGetwd()
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve failures %s: cannot resolve the working directory: %v\n", verb, err)
 		return "", false
@@ -70,7 +75,7 @@ func failuresMutatingRoot(root string, stderr io.Writer) (string, bool) {
 		fmt.Fprintln(stderr, "evolve failures: mutating run refused: --project-root must be explicitly set")
 		return "", false
 	}
-	abs, err := filepath.Abs(root)
+	abs, err := failuresAbs(root)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve failures: resolve --project-root: %v\n", err)
 		return "", false
@@ -135,7 +140,7 @@ func runFailuresList(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if *asJSON {
-		out, err := json.MarshalIndent(shown, "", "  ")
+		out, err := failuresMarshalIndent(shown, "", "  ")
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve failures list: %v\n", err)
 			return 2

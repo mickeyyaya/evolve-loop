@@ -83,6 +83,8 @@ func reconcileConsumedFingerprints(evolveDir string, stderr io.Writer) {
 	}
 }
 
+var consumedStampMarshal = json.Marshal
+
 type inboxConsumedStamp struct {
 	At         string `json:"at"`
 	Via        string `json:"via"`
@@ -188,7 +190,7 @@ func readInboxItemObject(path string) (map[string]json.RawMessage, error) {
 }
 
 func writeConsumedStamp(path string, doc map[string]json.RawMessage, stamp inboxConsumedStamp) error {
-	b, err := json.Marshal(stamp)
+	b, err := consumedStampMarshal(stamp)
 	if err != nil {
 		return err
 	}

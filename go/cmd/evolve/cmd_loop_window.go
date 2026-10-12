@@ -114,7 +114,7 @@ func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig
 	if (!shouldRunWave(*fleetConfig) && !shouldRunPool(*fleetConfig)) || *waveBinary != "" {
 		return
 	}
-	binary, err := os.Executable()
+	binary, err := fleetExecutable()
 	if err != nil {
 		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: cannot resolve binary for fleet dispatch, staying sequential: %v\n", err)
 		fleetConfig.Count = 1

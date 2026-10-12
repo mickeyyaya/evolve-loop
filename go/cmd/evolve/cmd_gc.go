@@ -330,7 +330,7 @@ func resolveGCProjectRoot(projectRoot string, dryRun bool, stderr io.Writer) (st
 		fmt.Fprintf(stderr, "evolve gc: mutating run refused: --project-root must be explicitly set\n")
 		return "", 1, false
 	}
-	cwd, err := os.Getwd()
+	cwd, err := processGetwd()
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve gc: workspace sweep skipped: no --project-root and cwd is unreadable: %v\n", err)
 		return "", 1, false

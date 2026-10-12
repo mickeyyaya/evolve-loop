@@ -21,6 +21,8 @@ const (
 	landPrefix = "evolve land: "
 )
 
+var landDevHub = resolveDevHub
+
 type landArgs struct {
 	branch, patch, salvage, projectRoot string
 }
@@ -67,7 +69,7 @@ func runLand(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if rc := runWorktreeCreateDev(root, task, a.branch, stdout, stderr); rc != 0 {
 		return rc
 	}
-	hub, err := resolveDevHub(root)
+	hub, err := landDevHub(root)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", landPrefix, err)
 		return exitIO

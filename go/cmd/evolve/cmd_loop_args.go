@@ -84,8 +84,13 @@ func registerPerAgentOverrides(fs *flag.FlagSet) (cli, model map[string]string) 
 	return cli, model
 }
 
+var (
+	loopAbsoluteRoot = paths.AbsoluteRoot
+	loopDetachLogAbs = filepath.Abs
+)
+
 func absOrWarn(stderr io.Writer, label, p string) string {
-	return paths.AbsoluteRoot(label, p, func(m string) {
+	return loopAbsoluteRoot(label, p, func(m string) {
 		fmt.Fprintf(stderr, "evolve loop: WARN: %s\n", m)
 	})
 }
@@ -196,7 +201,7 @@ func withDetachLaunch(cfg loopConfig, lf *loopArgFlags, args []string, flagEnd i
 	if !lf.detach {
 		return cfg, 0
 	}
-	logPath, err := filepath.Abs(lf.logPath)
+	logPath, err := loopDetachLogAbs(lf.logPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve loop: --log %q: %v\n", lf.logPath, err)
 		return loopConfig{}, 10
