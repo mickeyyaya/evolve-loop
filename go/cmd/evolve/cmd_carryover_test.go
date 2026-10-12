@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -273,5 +275,234 @@ func TestCarryoverApplyDecisions_DropsConsumedFleetAlias(t *testing.T) {
 	surviving := readCarryoverIDs(t, statePath)
 	if surviving[consumedAlias] || !surviving[liveID] || len(surviving) != 1 {
 		t.Fatalf("surviving ids = %v, want only %q", surviving, liveID)
+	}
+}
+
+type carryoverListRow struct {
+	ID             string `json:"id"`
+	FirstSeenCycle int    `json:"first_seen_cycle"`
+	Age            int    `json:"age"`
+	ExpiresAt      string `json:"expiresAt"`
+	CyclesUnpicked int    `json:"cycles_unpicked"`
+	Priority       string `json:"priority"`
+}
+
+func writeListFixtureState(t *testing.T) string {
+	t.Helper()
+	state := map[string]any{
+		"lastCycleNumber": 100,
+		"carryoverTodos": []map[string]any{
+			{"id": "todo-old", "first_seen_cycle": 60, "cycles_unpicked": 3, "expiresAt": "2026-10-12T00:00:00Z", "priority": "high"},
+			{"id": "todo-new", "first_seen_cycle": 95, "cycles_unpicked": 40, "expiresAt": "2026-10-20T00:00:00Z", "priority": "low"},
+			{"id": "todo-mid", "first_seen_cycle": 80, "cycles_unpicked": 10, "expiresAt": "2026-10-15T00:00:00Z", "priority": "medium"},
+		},
+	}
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	return path
+}
+
+func runCarryoverListJSON(t *testing.T, args ...string) []carryoverListRow {
+	t.Helper()
+	var out, errb bytes.Buffer
+	code := runCarryover(append([]string{"list", "--json"}, args...), nil, &out, &errb)
+	if code != 0 {
+		t.Fatalf("carryover list exit=%d stderr=%s", code, errb.String())
+	}
+	var rows []carryoverListRow
+	if err := json.Unmarshal(out.Bytes(), &rows); err != nil {
+		t.Fatalf("list --json output is not a JSON array: %v\n%s", err, out.String())
+	}
+	return rows
+}
+
+func TestCarryoverList(t *testing.T) {
+	t.Parallel()
+	statePath := writeListFixtureState(t)
+	rows := runCarryoverListJSON(t, "--state", statePath)
+	if len(rows) != 3 {
+		t.Fatalf("rows = %d, want 3", len(rows))
+	}
+	byID := map[string]carryoverListRow{}
+	for _, r := range rows {
+		byID[r.ID] = r
+	}
+	want := map[string]carryoverListRow{
+		"todo-old": {ID: "todo-old", FirstSeenCycle: 60, Age: 40, ExpiresAt: "2026-10-12T00:00:00Z", CyclesUnpicked: 3, Priority: "high"},
+		"todo-new": {ID: "todo-new", FirstSeenCycle: 95, Age: 5, ExpiresAt: "2026-10-20T00:00:00Z", CyclesUnpicked: 40, Priority: "low"},
+		"todo-mid": {ID: "todo-mid", FirstSeenCycle: 80, Age: 20, ExpiresAt: "2026-10-15T00:00:00Z", CyclesUnpicked: 10, Priority: "medium"},
+	}
+	for id, w := range want {
+		if byID[id] != w {
+			t.Errorf("row %s = %+v, want %+v", id, byID[id], w)
+		}
+	}
+}
+
+func TestCarryoverList_SortAndLimit(t *testing.T) {
+	t.Parallel()
+	statePath := writeListFixtureState(t)
+	cases := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"sort age oldest first", []string{"--sort", "age"}, []string{"todo-old", "todo-mid", "todo-new"}},
+		{"sort unpicked most first", []string{"--sort", "unpicked"}, []string{"todo-new", "todo-mid", "todo-old"}},
+		{"limit after sort", []string{"--sort", "age", "--limit", "2"}, []string{"todo-old", "todo-mid"}},
+		{"limit larger than queue", []string{"--limit", "99"}, nil},
+	}
+	for _, c := range cases {
+		rows := runCarryoverListJSON(t, append([]string{"--state", statePath}, c.args...)...)
+		if c.want == nil {
+			if len(rows) != 3 {
+				t.Errorf("%s: rows = %d, want 3", c.name, len(rows))
+			}
+			continue
+		}
+		got := make([]string, 0, len(rows))
+		for _, r := range rows {
+			got = append(got, r.ID)
+		}
+		if strings.Join(got, ",") != strings.Join(c.want, ",") {
+			t.Errorf("%s: order = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestCarryoverList_RejectsBadFlags(t *testing.T) {
+	t.Parallel()
+	statePath := writeListFixtureState(t)
+	if rows := runCarryoverListJSON(t, "--state", statePath, "--sort", "unpicked", "--limit", "0"); len(rows) != 3 {
+		t.Errorf("valid flags with limit 0 listed %d rows, want all 3", len(rows))
+	}
+	for _, args := range [][]string{
+		{"--sort", "bogus"},
+		{"--limit", "-1"},
+	} {
+		var out, errb bytes.Buffer
+		code := runCarryover(append([]string{"list", "--state", statePath}, args...), nil, &out, &errb)
+		if code != 10 {
+			t.Errorf("args %v: exit=%d, want 10", args, code)
+		}
+	}
+}
+
+func TestCarryoverList_AcceptanceWithApplyDecisions(t *testing.T) {
+	t.Parallel()
+	statePath := writeListFixtureState(t)
+	rows := runCarryoverListJSON(t, "--state", statePath)
+	doc := carryoverDecisionsDoc{SourceCount: len(rows)}
+	for _, r := range rows {
+		decision := "keep"
+		if r.ID == "todo-old" {
+			decision = "drop"
+		}
+		doc.Decisions = append(doc.Decisions, carryoverDecisionRow{ID: r.ID, Decision: decision, Reason: "listed id"})
+	}
+	if err := validateCarryoverDecisions(doc); err != nil {
+		t.Fatalf("listed ids rejected by apply-decisions validation: %v", err)
+	}
+	before, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	res, err := applyCarryoverDecisions(statePath, doc)
+	if err != nil {
+		t.Fatalf("applyCarryoverDecisions: %v", err)
+	}
+	if res.Before != 3 || res.Dropped != 1 || res.After != 2 {
+		t.Errorf("apply result = %+v, want Before=3 Dropped=1 After=2", res)
+	}
+	if bytes.Equal(before, mustRead(t, statePath)) {
+		t.Errorf("apply did not mutate the state the list read")
+	}
+	after := runCarryoverListJSON(t, "--state", statePath)
+	if len(after) != 2 {
+		t.Errorf("list after apply = %d rows, want 2", len(after))
+	}
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return raw
+}
+
+func TestCarryoverList_ListIsReadOnly(t *testing.T) {
+	t.Parallel()
+	statePath := writeListFixtureState(t)
+	before := mustRead(t, statePath)
+	runCarryoverListJSON(t, "--state", statePath, "--sort", "age")
+	if !bytes.Equal(before, mustRead(t, statePath)) {
+		t.Errorf("carryover list modified state.json")
+	}
+}
+
+func TestCarryoverList_UnreadableStateExits2(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	malformed := filepath.Join(dir, "bad.json")
+	if err := os.WriteFile(malformed, []byte("{not json"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	unreadable := filepath.Join(dir, "dir-as-state.json")
+	if err := os.Mkdir(unreadable, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	for _, path := range []string{malformed, unreadable} {
+		var out, errb bytes.Buffer
+		code := runCarryover([]string{"list", "--json", "--state", path}, nil, &out, &errb)
+		if code != 2 {
+			t.Errorf("state %s: exit=%d, want 2 (stderr=%s)", filepath.Base(path), code, errb.String())
+		}
+		if out.Len() != 0 {
+			t.Errorf("state %s: stdout not empty on failure: %s", filepath.Base(path), out.String())
+		}
+	}
+}
+
+func TestCarryoverList_EmptyCarryover(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	for name, content := range map[string]string{
+		"empty-array.json": `{"lastCycleNumber": 5, "carryoverTodos": []}`,
+		"absent-key.json":  `{"lastCycleNumber": 5}`,
+	} {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+		rows := runCarryoverListJSON(t, "--state", path)
+		if len(rows) != 0 {
+			t.Errorf("%s: rows = %d, want 0", name, len(rows))
+		}
+		var out, errb bytes.Buffer
+		if code := runCarryover([]string{"list", "--json", "--state", path}, nil, &out, &errb); code != 0 || strings.TrimSpace(out.String()) != "[]" {
+			t.Errorf("%s: exit=%d out=%q, want 0 and []", name, code, out.String())
+		}
+	}
+}
+
+func TestCarryoverList_TableOutputNamesEveryID(t *testing.T) {
+	t.Parallel()
+	statePath := writeListFixtureState(t)
+	var out, errb bytes.Buffer
+	if code := runCarryover([]string{"list", "--state", statePath}, nil, &out, &errb); code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, errb.String())
+	}
+	for _, id := range []string{"todo-old", "todo-new", "todo-mid"} {
+		if !strings.Contains(out.String(), id) {
+			t.Errorf("table output missing %s:\n%s", id, out.String())
+		}
 	}
 }

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
@@ -44,10 +46,138 @@ func runCarryover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "apply-decisions":
 		return runCarryoverApplyDecisions(args[1:], stdout, stderr)
+	case "list":
+		return runCarryoverList(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve carryover: unknown subcommand %q\n", args[0])
 		return 10
 	}
+}
+
+type carryoverListItem struct {
+	ID             string `json:"id"`
+	FirstSeenCycle int    `json:"first_seen_cycle"`
+	Age            int    `json:"age"`
+	ExpiresAt      string `json:"expiresAt"`
+	CyclesUnpicked int    `json:"cycles_unpicked"`
+	Priority       string `json:"priority"`
+}
+
+func runCarryoverList(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve carryover list", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var (
+		jsonOutput bool
+		sortMode   string
+		limit      int
+		statePath  string
+	)
+	fs.BoolVar(&jsonOutput, "json", false, "output carryover items as JSON array")
+	fs.StringVar(&sortMode, "sort", "", "sort order: age or unpicked")
+	fs.IntVar(&limit, "limit", 0, "limit output to N items")
+	fs.StringVar(&statePath, "state", ".evolve/state.json", "path to state.json")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if sortMode != "" && sortMode != "age" && sortMode != "unpicked" {
+		fmt.Fprintf(stderr, "evolve carryover: unknown sort %q (want age|unpicked)\n", sortMode)
+		return 10
+	}
+	if limit < 0 {
+		fmt.Fprintf(stderr, "evolve carryover: limit must be non-negative: %d\n", limit)
+		return 10
+	}
+	state, err := statemap.ReadStateMap(statePath)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve carryover: %v\n", err)
+		return 2
+	}
+	items := readCarryoverItems(state)
+	items = sortAndLimitCarryoverItems(items, sortMode, limit)
+	return renderCarryoverItems(items, jsonOutput, stdout, stderr)
+}
+
+func readCarryoverItems(state map[string]any) []carryoverListItem {
+	lastCycle := 0
+	if v, ok := state["lastCycleNumber"].(float64); ok {
+		lastCycle = int(v)
+	} else if v, ok := state["lastCycleNumber"].(int); ok {
+		lastCycle = v
+	}
+	rawEntries, ok := state["carryoverTodos"].([]any)
+	if !ok {
+		return []carryoverListItem{}
+	}
+	items := make([]carryoverListItem, 0, len(rawEntries))
+	for _, e := range rawEntries {
+		if m, ok := e.(map[string]any); ok {
+			items = append(items, parseCarryoverListItem(m, lastCycle))
+		}
+	}
+	return items
+}
+
+func parseCarryoverListItem(m map[string]any, lastCycle int) carryoverListItem {
+	var item carryoverListItem
+	if v, ok := m["id"].(string); ok {
+		item.ID = v
+	}
+	if v, ok := m["first_seen_cycle"].(float64); ok {
+		item.FirstSeenCycle = int(v)
+	} else if v, ok := m["first_seen_cycle"].(int); ok {
+		item.FirstSeenCycle = v
+	}
+	if v, ok := m["cycles_unpicked"].(float64); ok {
+		item.CyclesUnpicked = int(v)
+	} else if v, ok := m["cycles_unpicked"].(int); ok {
+		item.CyclesUnpicked = v
+	}
+	if v, ok := m["expiresAt"].(string); ok {
+		item.ExpiresAt = v
+	}
+	if v, ok := m["priority"].(string); ok {
+		item.Priority = v
+	}
+	if item.FirstSeenCycle > 0 && lastCycle >= item.FirstSeenCycle {
+		item.Age = lastCycle - item.FirstSeenCycle
+	}
+	return item
+}
+
+func sortAndLimitCarryoverItems(items []carryoverListItem, sortMode string, limit int) []carryoverListItem {
+	switch sortMode {
+	case "age":
+		sort.SliceStable(items, func(i, j int) bool {
+			return items[i].Age > items[j].Age
+		})
+	case "unpicked":
+		sort.SliceStable(items, func(i, j int) bool {
+			return items[i].CyclesUnpicked > items[j].CyclesUnpicked
+		})
+	}
+	if limit > 0 && limit < len(items) {
+		return items[:limit]
+	}
+	return items
+}
+
+func renderCarryoverItems(items []carryoverListItem, jsonOutput bool, stdout, stderr io.Writer) int {
+	if jsonOutput {
+		raw, err := json.MarshalIndent(items, "", "  ")
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve carryover: %v\n", err)
+			return 1
+		}
+		fmt.Fprintln(stdout, string(raw))
+		return 0
+	}
+	tw := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tPRIORITY\tAGE\tUNPICKED\tEXPIRES")
+	for _, item := range items {
+		fmt.Fprintf(tw, "%s\t%s\t%d\t%d\t%s\n", item.ID, item.Priority, item.Age, item.CyclesUnpicked, item.ExpiresAt)
+	}
+	tw.Flush()
+	return 0
 }
 
 func runCarryoverApplyDecisions(args []string, stdout, stderr io.Writer) int {
