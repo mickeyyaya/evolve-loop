@@ -1,6 +1,7 @@
 # ADR-0128: Fleet lanes land through one queue, and their overlap with the peers picks the re-verification
 
 - **Status:** Proposed (2026-10-09). The operator chose the approach on 2026-10-09: Approach A plus two cheap parts of Approach B. The operator decided four details of it on the same day (below). Each decision moves to Accepted as its component lands ([plan](../../plans/concurrent-cycle-landing-2026-10.md) §16).
+- **Amended by (proposed):** [ADR-0134](0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md) (2026-10-13), for 200 concurrent lanes. D3 holds only between candidates with an edge. D10 becomes a review bound to the evidence digest.
 - **Spec of record:** [fleet-landing-queue.md](../fleet-landing-queue.md). It holds the rules, the codes, the config keys and the limits.
 - **Plan:** [concurrent-cycle-landing-2026-10.md](../../plans/concurrent-cycle-landing-2026-10.md).
 - **Research:** [concurrent-cycle-landing-2026-10.md](../../research/concurrent-cycle-landing-2026-10.md).
