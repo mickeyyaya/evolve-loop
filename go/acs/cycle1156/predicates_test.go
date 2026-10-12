@@ -196,11 +196,8 @@ func TestC1156_004_lane_scope_claim_moves_menu_ids_to_processing(t *testing.T) {
 	writeItem(t, inbox, "lane-item-a", 0)
 	writeItem(t, inbox, "lane-item-b", 0)
 
-	claimed, err := inboxmover.ClaimLaneScope(testOpts(root, io.Discard), 1156,
+	claimed := inboxmover.ClaimLaneScope(testOpts(root, io.Discard), 1156,
 		[]string{"lane-item-a", "lane-item-b", "lane-item-absent"})
-	if err != nil {
-		t.Fatalf("ClaimLaneScope returned error %v: an unresolvable id must be tolerated, not abort the lane dispatch", err)
-	}
 
 	if len(claimed) != 2 {
 		t.Errorf("ClaimLaneScope claimed %d id(s) (%v); want exactly the 2 resolvable ones", len(claimed), claimed)

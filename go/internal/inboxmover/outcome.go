@@ -76,9 +76,7 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	}
 
 	// Claim first: the drain bumps only what sits in processing/cycle-N/.
-	if _, err := ClaimLaneScope(opts, oc.Cycle, committed); err != nil {
-		return res, fmt.Errorf("apply-cycle-outcome: claim committed ids: %w", err)
-	}
+	ClaimLaneScope(opts, oc.Cycle, committed)
 	var committedSet map[string]bool
 	if len(committed) > 0 {
 		committedSet = make(map[string]bool, len(committed))
@@ -105,8 +103,8 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	return res, nil
 }
 
-// ClaimLaneScope claims each resolvable id into processing/cycle-<cycle>/, skipping the rest; the error is always nil.
-func ClaimLaneScope(opts Options, cycle int, ids []string) ([]string, error) {
+// ClaimLaneScope claims each resolvable id into processing/cycle-<cycle>/, skipping the rest.
+func ClaimLaneScope(opts Options, cycle int, ids []string) []string {
 	opts.resolveOpts()
 	cycleStr := strconv.Itoa(cycle)
 	var claimed []string
@@ -122,7 +120,7 @@ func ClaimLaneScope(opts Options, cycle int, ids []string) ([]string, error) {
 		}
 		claimed = append(claimed, id)
 	}
-	return claimed, nil
+	return claimed
 }
 
 // CommittedIDs returns the deduped union of a triage decision's top_n ids and skip_shipped task ids, or nil on bad JSON.

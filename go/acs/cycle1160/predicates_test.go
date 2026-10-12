@@ -268,10 +268,7 @@ func TestC1160_005_shared_root_risk_and_its_bounds_are_real(t *testing.T) {
 	root, inbox := newInbox(t)
 	writeItem(t, inbox, "lane-item", 0)
 
-	claimed, err := inboxmover.ClaimLaneScope(testOpts(root, io.Discard), 1160, []string{"lane-item"})
-	if err != nil {
-		t.Fatalf("ClaimLaneScope returned error: %v", err)
-	}
+	claimed := inboxmover.ClaimLaneScope(testOpts(root, io.Discard), 1160, []string{"lane-item"})
 	if len(claimed) != 1 {
 		t.Fatalf("ClaimLaneScope claimed %d id(s) (%v); want 1", len(claimed), claimed)
 	}

@@ -11,8 +11,8 @@ import (
 func TestReleaseCycleProcessing_EntirelyMissingProcessingDir(t *testing.T) {
 	repo := makeRepo(t)
 	procRoot := filepath.Join(repo, ".evolve", "inbox", "processing")
-	if _, err := os.Stat(procRoot); err == nil {
-		t.Skip("processing/ dir was created by makeRepo — test precondition violated")
+	if err := os.RemoveAll(procRoot); err != nil {
+		t.Fatal(err)
 	}
 
 	res, err := ReleaseCycleProcessing(Options{ProjectRoot: repo}, 42)

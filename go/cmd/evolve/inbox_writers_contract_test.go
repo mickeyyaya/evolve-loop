@@ -47,11 +47,10 @@ var autofilers = []autofiler{
 const movesOrRewritesAnExistingItem = "moves or rewrites an item that is already filed, so the item keeps the class it was filed with"
 
 var inboxWritersThatFileNothing = map[string]string{
-	"internal/inboxmover/lifecycle":             "the lifecycle writer: File refuses an item without a known class (ADR-0121 decision 6); every other write " + movesOrRewritesAnExistingItem,
-	"internal/inboxmover.RecordRootTaskFailure": movesOrRewritesAnExistingItem + " (a failed root task's quarantine)",
-	"internal/recurrence.applyIntent":           movesOrRewritesAnExistingItem + " (the escalate path's weight write, which plan P5 deletes)",
-	"internal/phases/ship.stage":                movesOrRewritesAnExistingItem + " (the ship's consumption into consumed/)",
-	"cmd/evolve.runInboxConsume":                movesOrRewritesAnExistingItem + " (evolve inbox consume)",
+	"internal/inboxmover/lifecycle":   "the lifecycle writer: File refuses an item without a known class (ADR-0121 decision 6); every other write " + movesOrRewritesAnExistingItem,
+	"internal/recurrence.applyIntent": movesOrRewritesAnExistingItem + " (the escalate path's weight write, which plan P5 deletes)",
+	"internal/phases/ship.stage":      movesOrRewritesAnExistingItem + " (the ship's consumption into consumed/)",
+	"cmd/evolve.runInboxConsume":      movesOrRewritesAnExistingItem + " (evolve inbox consume)",
 }
 
 func TestInboxWriters_EveryAutofiledItemCarriesAKnownClass(t *testing.T) {

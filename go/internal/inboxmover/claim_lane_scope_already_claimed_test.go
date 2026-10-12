@@ -27,10 +27,7 @@ func TestClaimLaneScope_AlreadyClaimedIdIsNotANotFoundClaim(t *testing.T) {
 	if _, err := Claim(opts, "claimed", "7"); err != nil {
 		t.Fatalf("lane claim: %v", err)
 	}
-	claimed, err := ClaimLaneScope(opts, 7, []string{"claimed", "unclaimed"})
-	if err != nil {
-		t.Fatalf("ClaimLaneScope: %v", err)
-	}
+	claimed := ClaimLaneScope(opts, 7, []string{"claimed", "unclaimed"})
 	if len(claimed) != 2 {
 		t.Errorf("both ids are in processing/cycle-7 afterwards: %v", claimed)
 	}

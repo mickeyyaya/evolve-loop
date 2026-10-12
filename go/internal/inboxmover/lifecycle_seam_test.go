@@ -166,8 +166,7 @@ func TestFacades_KeepEverySpelling(t *testing.T) {
 		_ func(Options, []string, string, PromoteOpts) ([]string, error)       = ReconcileSuperseded
 		_ func(string, string) (Location, error)                               = Locate
 		_ func(Options, CycleOutcome) (OutcomeResult, error)                   = ApplyCycleOutcome
-		_ func(Options, int, []string) ([]string, error)                       = ClaimLaneScope
-		_ func(Options, string, int, string, int) (int, bool, error)           = RecordRootTaskFailure
+		_ func(Options, int, []string) []string                                = ClaimLaneScope
 		_ func(Options, string) DispatchState                                  = ResolveDispatchState
 		_ func(string, string) (int, error)                                    = bumpFailureCount
 		_ func(string, func(map[string]json.RawMessage)) error                 = updateItemJSON

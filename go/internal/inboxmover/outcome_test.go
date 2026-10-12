@@ -81,10 +81,7 @@ func TestClaimLaneScope_ToleratesUnresolvableIDs(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(inbox, "item-a.json"), []byte(`{"id":"a"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	claimed, err := ClaimLaneScope(Options{ProjectRoot: root, Stderr: io.Discard}, 7, []string{"a", "ghost"})
-	if err != nil {
-		t.Fatalf("ClaimLaneScope: %v", err)
-	}
+	claimed := ClaimLaneScope(Options{ProjectRoot: root, Stderr: io.Discard}, 7, []string{"a", "ghost"})
 	if len(claimed) != 1 || claimed[0] != "a" {
 		t.Fatalf("claimed = %v, want [a]", claimed)
 	}
