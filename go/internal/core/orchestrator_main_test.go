@@ -1,9 +1,12 @@
 package core
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
 // TestMain zeroes the retry-backoff sleep for the whole core test suite, so
@@ -14,5 +17,9 @@ import (
 // race-safe.
 func TestMain(m *testing.M) {
 	backoffSleep = func(time.Duration) {}
+	if err := gotooltest.LimitProcess(); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: %v\n", err)
+		os.Exit(1)
+	}
 	os.Exit(m.Run())
 }

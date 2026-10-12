@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
 func TestRun_IntegrationTierGate_Offenders_FAILsAudit(t *testing.T) {
@@ -148,6 +149,7 @@ func TestIntegrationTierGate_RaceFixtureIsRaceOnly(t *testing.T) {
 	root := writeRaceFixtureWorktree(t)
 	cmd := exec.Command("go", "test", "-count=1", "-tags", "integration", "./...")
 	cmd.Dir = filepath.Join(root, "go")
+	cmd.Env = gotooltest.Env(os.Environ())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("race fixture must PASS under plain `-tags integration` (no -race), proving it is a race-only failure; got err %v\n%s", err, out)

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
 // expectedPhasesHappyPath is what the state machine drives on PASS-all.
@@ -195,16 +196,11 @@ func liveBinaryName(cli string) string {
 	}
 }
 
-// buildBinary builds a Go binary into outDir using the repo's go.mod.
-// Caches across sub-tests within the same parent (idempotent because
-// the destination path is deterministic).
-func buildBinary(t *testing.T, outDir, name, pkg, repoRoot string) string {
+func buildBinary(t *testing.T, _ string, name, pkg, repoRoot string) string {
 	t.Helper()
-	out := filepath.Join(outDir, name)
-	cmd := exec.Command("go", "build", "-o", out, pkg)
-	cmd.Dir = filepath.Join(repoRoot, "go")
-	if combined, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("go build %s: %v\n%s", pkg, err, combined)
+	out, err := builtBinaries.Build(gotooltest.Spec{Dir: filepath.Join(repoRoot, "go"), Pkg: pkg, Name: name})
+	if err != nil {
+		t.Fatalf("go build %s: %v", pkg, err)
 	}
 	return out
 }

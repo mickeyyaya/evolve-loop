@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
@@ -20,12 +21,9 @@ func buildEvolveBinaryWithTestPhases(t *testing.T) string {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skipf("go not on PATH: %v", err)
 	}
-	out := filepath.Join(t.TempDir(), "evolve")
-	repoRoot := mustRepoRoot(t)
-	cmd := exec.Command("go", "build", "-tags", "evolve_test_phases", "-o", out, "./cmd/evolve")
-	cmd.Dir = filepath.Join(repoRoot, "go")
-	if combined, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("go build -tags evolve_test_phases: %v\n%s", err, combined)
+	out, err := builtBinaries.Build(gotooltest.Spec{Dir: filepath.Join(mustRepoRoot(t), "go"), Pkg: "./cmd/evolve", Tags: "evolve_test_phases", Name: "evolve"})
+	if err != nil {
+		t.Fatalf("go build -tags evolve_test_phases: %v", err)
 	}
 	return out
 }

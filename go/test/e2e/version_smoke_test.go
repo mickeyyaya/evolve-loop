@@ -4,9 +4,10 @@ package e2e
 
 import (
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
 // E2E tier example (//go:build e2e → excluded from default; run via
@@ -23,10 +24,11 @@ func TestE2E_VersionSubcommandRuns(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH; skipping e2e build")
 	}
-	bin := filepath.Join(t.TempDir(), "evolve")
-	build := exec.Command("go", "build", "-o", bin, "../../cmd/evolve")
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build evolve: %v\n%s", err, out)
+	builds := gotooltest.NewCache(gotooltest.ExecRunner)
+	t.Cleanup(func() { _ = builds.Close() })
+	bin, err := builds.Build(gotooltest.Spec{Pkg: "../../cmd/evolve", Name: "evolve"})
+	if err != nil {
+		t.Fatalf("build evolve: %v", err)
 	}
 
 	out, err := exec.Command(bin, "version").CombinedOutput()

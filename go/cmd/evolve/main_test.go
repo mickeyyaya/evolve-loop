@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/practicewatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
@@ -35,6 +36,10 @@ func TestMain(m *testing.M) {
 	clihealthUsagePaneFn = func(string) (func(context.Context, string) (string, error), func()) {
 		return func(context.Context, string) (string, error) { return "", errors.New("no CLI is launched in tests") }, func() {}
 	}
+	if err := gotooltest.LimitProcess(); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: %v\n", err)
+		os.Exit(1)
+	}
 	tmuxTmp, err := os.MkdirTemp("/tmp", "evtmux")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: isolate TMUX_TMPDIR: %v\n", err)
@@ -45,6 +50,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	code := m.Run()
+	if err := builtBinaries.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: remove the built binaries: %v\n", err)
+	}
 	if err := os.RemoveAll(tmuxTmp); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", tmuxTmp, err)
 	}

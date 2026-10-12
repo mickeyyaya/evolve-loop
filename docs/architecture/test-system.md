@@ -187,6 +187,7 @@ Use rank 3 only when the function has no dependency struct and a new parameter c
 | `go/test/fixtures` | doubles of the `core` ports, the workspace builder, clocks, assertions, `StressN` |
 | `internal/gittest` | git repositories, clones, bare remotes, git config without maintenance |
 | `internal/tmuxtest` | real tmux servers and sessions |
+| `internal/gotooltest` | the CPU limit of a nested `go` run (`Env`, `LimitProcess`) and one `go build` for each test binary (`Cache`) |
 | `internal/fakeclitest` | the fake CLI binaries for the drivers |
 | `internal/routingtest`, `internal/cliroute/cliroutetest` | routing tables and their fixtures |
 | `internal/kerneltest` | the transition kernel fixture |

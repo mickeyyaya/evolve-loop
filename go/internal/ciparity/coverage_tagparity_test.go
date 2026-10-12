@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
 // TestCoverageTags_IncludesACSTag (AC1): the SSOT tag set names BOTH the
@@ -138,7 +140,7 @@ func TestCoverageTestArgs_TagGatedFixtureMeasuresTaggedCoverage(t *testing.T) {
 	runGo := func(a ...string) (string, error) {
 		cmd := exec.Command("go", a...)
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "GOFLAGS=", "GOPROXY=off")
+		cmd.Env = gotooltest.Env(append(os.Environ(), "GOFLAGS=", "GOPROXY=off"))
 		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}
