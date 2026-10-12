@@ -21,6 +21,7 @@ func runTmuxCLI(t *testing.T, fx launchFixture, cli string, tmux *fakeTmux, look
 // --- codex-tmux -----------------------------------------------------------
 
 func TestCodexTmux_PermissionModeRejected(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "plan")
 	code, stderr := runTmuxCLI(t, fx, "codex-tmux", &fakeTmux{}, nil, "--allow-bypass")
 	if code == ExitOK {
@@ -32,6 +33,7 @@ func TestCodexTmux_PermissionModeRejected(t *testing.T) {
 }
 
 func TestCodexTmux_SafetyGateRequiresBypass(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
 	code, stderr := runTmuxCLI(t, fx, "codex-tmux", &fakeTmux{}, nil)
 	if code != ExitSafetyGate {
@@ -43,6 +45,7 @@ func TestCodexTmux_SafetyGateRequiresBypass(t *testing.T) {
 }
 
 func TestCodexTmux_SessionNameRejected(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
 	code, stderr := runTmuxCLI(t, fx, "codex-tmux", &fakeTmux{}, nil, "--allow-bypass", "--session-name=foo")
 	if code != ExitBadFlags {
@@ -54,6 +57,7 @@ func TestCodexTmux_SessionNameRejected(t *testing.T) {
 }
 
 func TestCodexTmux_OpenAIKeyCostLeak(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
 	code, stderr := runTmuxCLI(t, fx, "codex-tmux", &fakeTmux{}, map[string]string{"OPENAI_API_KEY": "sk-x"}, "--allow-bypass")
 	if code != ExitCostLeak {
@@ -65,6 +69,7 @@ func TestCodexTmux_OpenAIKeyCostLeak(t *testing.T) {
 }
 
 func TestCodexTmux_LaunchCmd_ModelMapAndMarker(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "") // profile model=haiku
 	tmux := &fakeTmux{}                   // no marker → REPL boot times out, but launchCmd already sent
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass")
@@ -74,6 +79,7 @@ func TestCodexTmux_LaunchCmd_ModelMapAndMarker(t *testing.T) {
 }
 
 func TestCodexTmux_HappyPath(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
 	if err := os.WriteFile(fx.artifact, []byte("DONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
@@ -91,6 +97,7 @@ func TestCodexTmux_HappyPath(t *testing.T) {
 // --- agy-tmux -------------------------------------------------------------
 
 func TestAgyTmux_PermissionModeRejected(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "agy-tmux", "plan")
 	code, stderr := runTmuxCLI(t, fx, "agy-tmux", &fakeTmux{}, nil, "--allow-bypass")
 	if code == ExitOK {
@@ -102,6 +109,7 @@ func TestAgyTmux_PermissionModeRejected(t *testing.T) {
 }
 
 func TestAgyTmux_SafetyGateRequiresBypass(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "agy-tmux", "")
 	code, stderr := runTmuxCLI(t, fx, "agy-tmux", &fakeTmux{}, nil)
 	if code != ExitSafetyGate {
@@ -113,6 +121,7 @@ func TestAgyTmux_SafetyGateRequiresBypass(t *testing.T) {
 }
 
 func TestAgyTmux_LaunchCmd(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "agy-tmux", "")
 	tmux := &fakeTmux{}
 	runTmuxCLI(t, fx, "agy-tmux", tmux, nil, "--allow-bypass")
@@ -130,6 +139,7 @@ func TestAgyTmux_LaunchCmd(t *testing.T) {
 }
 
 func TestAgyTmux_HappyPath(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "agy-tmux", "")
 	if err := os.WriteFile(fx.artifact, []byte("DONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)

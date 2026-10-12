@@ -31,6 +31,7 @@ const auditorExplanationExample = `## Explanation Documentation
 - Evidence: docs/explain/builds/cycle-42-run-42.md:1 accurately explains the behavior implemented at config/app.yaml:1`
 
 func TestAuditorExplanationLiteralExampleMatchesProductionReader(t *testing.T) {
+	t.Parallel()
 	body, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "agents", "evolve-auditor-reference.md"))
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +75,7 @@ func auditContractExample(t *testing.T, body, name string) string {
 }
 
 func TestExtractHonorsPhaseContract(t *testing.T) {
+	t.Parallel()
 	canonical := phasecontract.Audit.Sections[0].Canonical
 	got, found := extractAuditVerdict(canonical+": PASS\n", config.StageOff)
 	if !found || got != core.VerdictPASS {
@@ -82,6 +84,7 @@ func TestExtractHonorsPhaseContract(t *testing.T) {
 }
 
 func TestExtractPrefersSentinel(t *testing.T) {
+	t.Parallel()
 	body := "## Verdict\n**PASS**\n" + phasecontract.RenderVerdictSentinel("audit", "FAIL") + "\n"
 	got, found := extractAuditVerdict(body, config.StageOff)
 	if !found || got != core.VerdictFAIL {
@@ -162,6 +165,7 @@ func activeMissingExplanationRequest(t *testing.T) core.PhaseRequest {
 }
 
 func TestBindExplanationResult_MissingRequiredHandoffBecomesEGPSRed(t *testing.T) {
+	t.Parallel()
 	req := activeMissingExplanationRequest(t)
 	workspace := req.Workspace
 	writeACSVerdict(t, workspace, 0)
@@ -188,6 +192,7 @@ func TestBindExplanationResult_MissingRequiredHandoffBecomesEGPSRed(t *testing.T
 }
 
 func TestClassify_MissingExplanationReviewStillBlocksAndACompleteOnePasses(t *testing.T) {
+	t.Parallel()
 	workspace := t.TempDir()
 	writeACSVerdict(t, workspace, 0)
 	view := &core.PhaseRequest{
@@ -240,6 +245,7 @@ func needsCorrectionReview() (string, core.PhaseRequest) {
 }
 
 func TestValidateExplanationReview_RejectsTokenEvidenceAndAcceptsNegativeJudgment(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -266,6 +272,7 @@ func TestValidateExplanationReview_RejectsTokenEvidenceAndAcceptsNegativeJudgmen
 }
 
 func TestValidateExplanationReview_PathOnlyEvidenceIsAdvisory(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -288,6 +295,7 @@ func TestValidateExplanationReview_PathOnlyEvidenceIsAdvisory(t *testing.T) {
 }
 
 func TestValidateExplanationReview_NotApplicableDocumentClaimsAreAdvisory(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -307,6 +315,7 @@ func TestValidateExplanationReview_NotApplicableDocumentClaimsAreAdvisory(t *tes
 }
 
 func TestValidateExplanationReview_InvalidPostBuildStateRequiresFail(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationInvalid,
@@ -346,6 +355,7 @@ func writeACSVerdictSkip(t *testing.T, ws string, redCount, skipCount int) {
 }
 
 func TestRun_SkipCountWithRedZero_PASS(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdictSkip(t, ws, 0, 4)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -360,6 +370,7 @@ func TestRun_SkipCountWithRedZero_PASS(t *testing.T) {
 }
 
 func TestRun_RedCountWithSkipsPresent_FAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdictSkip(t, ws, 2, 3)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -374,6 +385,7 @@ func TestRun_RedCountWithSkipsPresent_FAIL(t *testing.T) {
 }
 
 func TestRun_HappyPath_PASS(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n\nNo defects found.\n"
@@ -407,6 +419,7 @@ func TestRun_HappyPath_PASS(t *testing.T) {
 }
 
 func TestRun_AuditPASSButRedCountNonZero_FAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 3)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -430,6 +443,7 @@ func TestRun_AuditPASSButRedCountNonZero_FAIL(t *testing.T) {
 }
 
 func TestRun_AuditFAIL_FAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**FAIL**\n\nDefect: missing auth check.\n"
@@ -444,6 +458,7 @@ func TestRun_AuditFAIL_FAIL(t *testing.T) {
 }
 
 func TestRun_AuditWARN_WARN(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**WARN**\n\nMinor cleanup recommended.\n"
@@ -458,6 +473,7 @@ func TestRun_AuditWARN_WARN(t *testing.T) {
 }
 
 func TestRun_StrictAuditMode_WARNBecomesFAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	proj := t.TempDir()
@@ -480,6 +496,7 @@ func TestRun_StrictAuditMode_WARNBecomesFAIL(t *testing.T) {
 }
 
 func TestRun_NoVerdictHeading_FAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\nSome prose without a verdict heading.\n"
@@ -494,6 +511,7 @@ func TestRun_NoVerdictHeading_FAIL(t *testing.T) {
 }
 
 func TestRun_MissingACSVerdict_FAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -507,6 +525,7 @@ func TestRun_MissingACSVerdict_FAIL(t *testing.T) {
 }
 
 func TestRun_ACSVerdictMalformed_FAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	_ = os.WriteFile(filepath.Join(ws, "acs-verdict.json"), []byte("not json"), 0o644)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -521,6 +540,7 @@ func TestRun_ACSVerdictMalformed_FAIL(t *testing.T) {
 }
 
 func TestRun_EmptyArtifact_FAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	fb := &fakeBridge{writeArtifact: ""}
@@ -534,6 +554,7 @@ func TestRun_EmptyArtifact_FAIL(t *testing.T) {
 }
 
 func TestRun_EmptyArtifact_AuditSettleLadderKeepsProductionBounds(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	var rec runnertest.SleepRecorder
@@ -546,6 +567,7 @@ func TestRun_EmptyArtifact_AuditSettleLadderKeepsProductionBounds(t *testing.T) 
 }
 
 func TestRun_BridgeError_FAIL(t *testing.T) {
+	t.Parallel()
 	bridgeErr := errors.New("bridge fail")
 	fb := &fakeBridge{err: bridgeErr}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
@@ -561,6 +583,7 @@ func TestRun_BridgeError_FAIL(t *testing.T) {
 }
 
 func TestRun_MissingBridge_ReturnsError(t *testing.T) {
+	t.Parallel()
 	phase := New(Config{Prompts: fakePromptsFS("body")})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1})
 	if err == nil || !strings.Contains(err.Error(), "bridge required") {
@@ -569,6 +592,7 @@ func TestRun_MissingBridge_ReturnsError(t *testing.T) {
 }
 
 func TestRun_MissingPrompts_ReturnsError(t *testing.T) {
+	t.Parallel()
 	phase := New(Config{Bridge: &fakeBridge{}})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1})
 	if err == nil || !strings.Contains(err.Error(), "prompts loader required") {
@@ -577,6 +601,7 @@ func TestRun_MissingPrompts_ReturnsError(t *testing.T) {
 }
 
 func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
+	t.Parallel()
 	phase := New(Config{Bridge: &fakeBridge{}, Prompts: prompts.NewFromFS(fstest.MapFS{})})
 	_, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1})
 	if err == nil {
@@ -585,6 +610,7 @@ func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
 }
 
 func TestName(t *testing.T) {
+	t.Parallel()
 	p := New(Config{})
 	if p.Name() != "audit" {
 		t.Errorf("Name=%q, want audit", p.Name())
@@ -592,6 +618,7 @@ func TestName(t *testing.T) {
 }
 
 func TestRun_MissingACSVerdict_GeneratedThenPASS(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -623,6 +650,7 @@ func TestRun_MissingACSVerdict_GeneratedThenPASS(t *testing.T) {
 }
 
 func TestRun_ACSVerdictPresent_HostRegenerates(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -645,6 +673,7 @@ func TestRun_ACSVerdictPresent_HostRegenerates(t *testing.T) {
 }
 
 func TestRun_GeneratorWritesNothing_FAILFloorHolds(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -675,6 +704,7 @@ func writeAuditProfile(t *testing.T, contents string) string {
 }
 
 func TestRun_GeneratorReturnsError_ErrorDiagAndFAIL(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -704,6 +734,7 @@ func TestRun_GeneratorReturnsError_ErrorDiagAndFAIL(t *testing.T) {
 }
 
 func TestGenerateACSVerdict_SuiteRunError_Propagates(t *testing.T) {
+	t.Parallel()
 	err := generateACSVerdict(core.PhaseRequest{
 		Cycle: 0, ProjectRoot: t.TempDir(), Worktree: t.TempDir(), Workspace: t.TempDir(),
 	})
@@ -716,6 +747,7 @@ func TestGenerateACSVerdict_SuiteRunError_Propagates(t *testing.T) {
 }
 
 func TestGenerateACSVerdict_ZeroPredicatesWritesARedVerdictNamingTheCause(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := t.TempDir()
 	ws := filepath.Join(evolveDir, "runs", "cycle-9")
@@ -741,6 +773,7 @@ func TestGenerateACSVerdict_ZeroPredicatesWritesARedVerdictNamingTheCause(t *tes
 }
 
 func TestRegistry_AuditFactory_BuildsRunner(t *testing.T) {
+	t.Parallel()
 	factory, ok := registry.For(string(core.PhaseAudit))
 	if !ok {
 		t.Fatal(`registry.For("audit") returned ok=false; init() did not register`)
@@ -755,6 +788,7 @@ func TestRegistry_AuditFactory_BuildsRunner(t *testing.T) {
 }
 
 func TestExtractAuditVerdict_Formats(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		content   string
@@ -791,6 +825,7 @@ func TestExtractAuditVerdict_Formats(t *testing.T) {
 }
 
 func TestRun_InlineVerdictFormat_PASS(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report — Cycle 148\n<!-- audit_bound_tree_sha: deadbeef -->\n\n**Verdict: PASS**\n**Confidence: 0.92**\n\nNo defects.\n"
@@ -810,6 +845,7 @@ func TestRun_InlineVerdictFormat_PASS(t *testing.T) {
 }
 
 func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\nThe change looks acceptable but I forgot the verdict line.\n"
@@ -835,6 +871,7 @@ func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
 }
 
 func TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -900,6 +937,7 @@ func containsAdvisory(advisories []string, substr string) bool {
 }
 
 func TestClassify_PathOnlyCitationsKeepThePassVerdictAndRecordTheAdvisory(t *testing.T) {
+	t.Parallel()
 	workspace := t.TempDir()
 	writeACSVerdict(t, workspace, 0)
 	req := core.PhaseRequest{
@@ -932,6 +970,7 @@ func TestClassify_PathOnlyCitationsKeepThePassVerdictAndRecordTheAdvisory(t *tes
 }
 
 func TestValidateExplanationReview_DuplicateFieldIsAdvisory(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		BuildExplanationState:           core.BuildExplanationAvailable,
@@ -949,6 +988,7 @@ func TestValidateExplanationReview_DuplicateFieldIsAdvisory(t *testing.T) {
 }
 
 func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "required", DocumentPath: "d.md", DocumentSHA256: "sha"}}
 	report := "## Explanation Documentation\n- Status: VERIFIED\n- Evidence: compared d.md:1 with the diff line by line\n\n## Explanation Documentation\n- Status: VERIFIED\n"
 	advisories, err := validateExplanationReview(report, req)
@@ -958,6 +998,7 @@ func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t 
 }
 
 func TestValidateExplanationReview_MissingDeliveryReviewedAsFailIsCleanAndHostDefectsAreLoud(t *testing.T) {
+	t.Parallel()
 	invalid := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationInvalid}
 	honest := "## Explanation Documentation\n- Status: FAIL\n- Evidence: the Build handoff snapshot is missing from the workspace\n"
 	if advisories, err := validateExplanationReview(honest, invalid); err != nil || len(advisories) != 0 {

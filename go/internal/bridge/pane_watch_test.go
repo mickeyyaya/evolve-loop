@@ -13,6 +13,7 @@ import (
 )
 
 func TestRunTmuxREPL_PublishesThePaneWatchSnapshotWhileWaiting(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	artifact := filepath.Join(ws, "a")
@@ -51,6 +52,7 @@ func TestRunTmuxREPL_PublishesThePaneWatchSnapshotWhileWaiting(t *testing.T) {
 }
 
 func TestPaneWatcher_AgySpinnerTickIsBusyWithoutProgress(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	lp := agyLaunchForTest()
 	w := newPaneWatcher(&Config{Workspace: ws, Agent: "build", Cycle: 3}, lp, paneProfileFor(lp), &bytes.Buffer{}, "[agy-tmux]")
@@ -76,6 +78,7 @@ func TestPaneWatcher_AgySpinnerTickIsBusyWithoutProgress(t *testing.T) {
 }
 
 func TestPaneWatcher_WriteFailureWarnsOnceAndKeepsWaiting(t *testing.T) {
+	t.Parallel()
 	file := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(file, nil, 0o644); err != nil {
 		t.Fatal(err)
@@ -91,6 +94,7 @@ func TestPaneWatcher_WriteFailureWarnsOnceAndKeepsWaiting(t *testing.T) {
 }
 
 func TestPaneWatcher_NoWorkspaceOrBlankPaneIsInert(t *testing.T) {
+	t.Parallel()
 	lp := agyLaunchForTest()
 	if w := newPaneWatcher(&Config{Agent: "build"}, lp, paneProfileFor(lp), &bytes.Buffer{}, "x"); w != nil {
 		t.Error("a launch with no workspace has nowhere to publish; the watcher must be nil")
@@ -106,6 +110,7 @@ func TestPaneWatcher_NoWorkspaceOrBlankPaneIsInert(t *testing.T) {
 }
 
 func TestRunTmuxREPL_RemovesThePaneWatchSnapshotWhenTheWaitEnds(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	artifact := filepath.Join(ws, "a")
@@ -137,6 +142,7 @@ func TestRunTmuxREPL_RemovesThePaneWatchSnapshotWhenTheWaitEnds(t *testing.T) {
 }
 
 func TestPaneWatcher_AgySnapshotCarriesTheTokenLineAndFooterModel(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	lp := agyLaunchForTest()
 	w := newPaneWatcher(&Config{Workspace: ws, Agent: "build"}, lp, paneProfileFor(lp), &bytes.Buffer{}, "[agy-tmux]")
@@ -151,6 +157,7 @@ func TestPaneWatcher_AgySnapshotCarriesTheTokenLineAndFooterModel(t *testing.T) 
 }
 
 func TestCodePhaseStalled_IsRegisteredUnderTheLivenessModule(t *testing.T) {
+	t.Parallel()
 	module, ok := signalcenter.IsRegistered(CodePhaseStalled)
 	if !ok || module != signalcenter.ModuleLiveness {
 		t.Errorf("CodePhaseStalled registered=%v module=%q, want the liveness module beside the other LIVENESS_ codes", ok, module)

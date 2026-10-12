@@ -78,6 +78,7 @@ func diagsText(diags []core.Diagnostic) string {
 }
 
 func TestClassify_RejectingAuditEmitsDefectLedger(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)
@@ -122,6 +123,7 @@ func TestClassify_RejectingAuditEmitsDefectLedger(t *testing.T) {
 }
 
 func TestClassify_PassingAuditWritesNoLedger(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)
@@ -179,6 +181,7 @@ var laundered = []string{
 }
 
 func TestClassify_ContinuationCannotPassWithUnaccountedDefect(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -199,6 +202,7 @@ func TestClassify_ContinuationCannotPassWithUnaccountedDefect(t *testing.T) {
 }
 
 func TestClassify_ContinuationLedgerRetainsEveryEntry(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -234,6 +238,7 @@ func TestClassify_ContinuationLedgerRetainsEveryEntry(t *testing.T) {
 }
 
 func TestClassify_ContinuationWithNoDispositionArtifactCannotPass(t *testing.T) {
+	t.Parallel()
 	_, req := continuationFixture(t, 1255, 1270, laundered)
 
 	verdict, diags, _ := hooks{}.Classify(narrativeReport("PASS"), req, core.BridgeResponse{})
@@ -243,6 +248,7 @@ func TestClassify_ContinuationWithNoDispositionArtifactCannotPass(t *testing.T) 
 }
 
 func TestClassify_NonContinuationPassPathUnchanged(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)

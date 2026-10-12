@@ -10,6 +10,7 @@ import (
 const auditSentinelPASS = "<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":1} -->"
 
 func TestExtractAuditVerdict_EnforceSentinelOnly(t *testing.T) {
+	t.Parallel()
 	prose := "## Verdict\n**PASS**\n"
 	for _, st := range []config.Stage{config.StageOff, config.StageShadow, config.StageAdvisory} {
 		if v, ok := extractAuditVerdict(prose, st); !ok || v != core.VerdictPASS {
@@ -22,6 +23,7 @@ func TestExtractAuditVerdict_EnforceSentinelOnly(t *testing.T) {
 }
 
 func TestExtractAuditVerdict_SentinelWinsBothStages(t *testing.T) {
+	t.Parallel()
 	withSentinel := "## Verdict\n**FAIL**\n" + auditSentinelPASS + "\n"
 	for _, st := range []config.Stage{config.StageOff, config.StageEnforce} {
 		v, ok := extractAuditVerdict(withSentinel, st)

@@ -14,6 +14,7 @@ const (
 )
 
 func TestClassify_DispositionPreflightMissingFileIsNamed(t *testing.T) {
+	t.Parallel()
 	_, req := continuationFixture(t, 1330, 1342, []string{
 		"boundary refresh does not repin the short sha",
 		"symlinked test-suffix bypasses probe quarantine",
@@ -34,6 +35,7 @@ func TestClassify_DispositionPreflightMissingFileIsNamed(t *testing.T) {
 }
 
 func TestClassify_DispositionPreflightIncompleteFileIsNamed(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1330, 1342, []string{
 		"boundary refresh does not repin the short sha",
 		"symlinked test-suffix bypasses probe quarantine",
@@ -63,6 +65,7 @@ func TestClassify_DispositionPreflightIncompleteFileIsNamed(t *testing.T) {
 }
 
 func TestClassify_DispositionPreflightCompleteFileNoFalsePositive(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1330, 1342, []string{
 		"boundary refresh does not repin the short sha",
 		"symlinked test-suffix bypasses probe quarantine",
@@ -88,6 +91,7 @@ func TestClassify_DispositionPreflightCompleteFileNoFalsePositive(t *testing.T) 
 }
 
 func TestClassify_DispositionPreflightNoAncestorNoOp(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)

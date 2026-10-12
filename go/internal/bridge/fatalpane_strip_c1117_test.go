@@ -118,6 +118,7 @@ func TestC1117_AgentDiffSeedTextDoesNotFastFail(t *testing.T) {
 }
 
 func TestC1117_StopEventCarriesInjectedPromptFromDriver(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
 	rev := &scriptedReviewer{}

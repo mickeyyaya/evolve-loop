@@ -25,6 +25,7 @@ func readCLIFrame(t *testing.T, rel string) string {
 // The fake tmux is self-paced off breadcrumbs.live (the answer only after inject_applied, the artifact only
 // after idle_reached), so the test does not depend on goroutine scheduling.
 func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	thinking := readCLIFrame(t, "claude/thinking.txt") // busy: ✽ Inferring… · esc to interrupt
 	answer := readCLIFrame(t, "claude/answer.txt")     // idle: ⏺ bullets, no interrupt affordance

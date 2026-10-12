@@ -97,6 +97,7 @@ func runTmux(t *testing.T, fx launchFixture, tmux *fakeTmux, lookup map[string]s
 // --- safety gate + permission-mode (permission-mode-drivers.bats) ---------
 
 func TestClaudeTmux_SafetyGate_RequiresAllowBypass(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{}
 	code, stderr := runTmux(t, fx, tmux, nil)
@@ -112,6 +113,7 @@ func TestClaudeTmux_SafetyGate_RequiresAllowBypass(t *testing.T) {
 }
 
 func TestClaudeTmux_PermissionModeRelaxesGate(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	code, stderr := runTmux(t, fx, &fakeTmux{}, nil)
 	if strings.Contains(stderr, "safety gate: --allow-bypass is required") {
@@ -123,6 +125,7 @@ func TestClaudeTmux_PermissionModeRelaxesGate(t *testing.T) {
 }
 
 func TestClaudeTmux_ClaudeCmd_PermissionModePlan(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil)
@@ -135,6 +138,7 @@ func TestClaudeTmux_ClaudeCmd_PermissionModePlan(t *testing.T) {
 }
 
 func TestClaudeTmux_ClaudeCmd_BypassWhenNoPermissionMode(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -147,6 +151,7 @@ func TestClaudeTmux_ClaudeCmd_BypassWhenNoPermissionMode(t *testing.T) {
 }
 
 func TestClaudeTmux_ClaudeCmd_PlanWinsOverBypass(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -159,6 +164,7 @@ func TestClaudeTmux_ClaudeCmd_PlanWinsOverBypass(t *testing.T) {
 }
 
 func TestClaudeTmux_CostLeak_AnthropicAPIKey(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan") // gate relaxed so we reach the cost guard
 	tmux := &fakeTmux{}
 	code, stderr := runTmux(t, fx, tmux, map[string]string{"ANTHROPIC_API_KEY": "sk-x"})
@@ -176,6 +182,7 @@ func TestClaudeTmux_CostLeak_AnthropicAPIKey(t *testing.T) {
 // --- REPL state-machine outcomes ------------------------------------------
 
 func TestClaudeTmux_HappyPath_ArtifactAppears(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// Pre-create the artifact so the wait loop exits on its first check.
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
@@ -196,6 +203,7 @@ func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
 	// selection cursor as ❯, the same glyph claude-tmux uses as its REPL
 	// prompt marker, so the boot loop must auto-dismiss the dialog before
 	// delivering the prompt or the paste lands in the dialog and is lost.
+	t.Parallel()
 	dialogs := []struct {
 		name string
 		pane string
@@ -254,6 +262,7 @@ func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
 }
 
 func TestClaudeTmux_REPLBootTimeout(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{} // CapturePane always "" → marker never seen
 	code, _ := runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -263,6 +272,7 @@ func TestClaudeTmux_REPLBootTimeout(t *testing.T) {
 }
 
 func TestClaudeTmux_ArtifactTimeout(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	code, _ := runTmux(t, fx, tmux, nil, "--allow-bypass")

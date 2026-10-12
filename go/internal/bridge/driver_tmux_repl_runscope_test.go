@@ -32,6 +32,7 @@ func TestResolveSessionRunScopedPrefix(t *testing.T) {
 }
 
 func TestLaunchRecordsSessionInRunRegistry(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	cfg.RunID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯"}}
@@ -57,6 +58,7 @@ func TestLaunchRecordsSessionInRunRegistry(t *testing.T) {
 }
 
 func TestRecipeEnsureSessionRecordsInRunRegistry(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	tm := &fakeTmux{paneSeq: []string{"❯"}}
 	d := &recipeSessionDriver{

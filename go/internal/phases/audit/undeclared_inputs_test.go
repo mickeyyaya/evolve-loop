@@ -10,6 +10,7 @@ import (
 )
 
 func TestUndeclaredInputs_NamesThePathsAndBoundsTheList(t *testing.T) {
+	t.Parallel()
 	two := undeclaredInputs([]string{"go/acs/cycle9/predicates_test.go", ".evolve/evals/item.md"}, nil).Error()
 	for _, want := range []string{"go/acs/cycle9/predicates_test.go", ".evolve/evals/item.md", "stage"} {
 		if !strings.Contains(two, want) {

@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadProfile_RefusesTheRetiredEffortFields(t *testing.T) {
+	t.Parallel()
 	for _, body := range []string{
 		`{"name":"builder","effort_level":"medium"}`,
 		`{"name":"builder","effort_overrides":{"deep":"high"}}`,

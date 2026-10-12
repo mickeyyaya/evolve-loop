@@ -11,6 +11,7 @@ import (
 )
 
 func TestRunTmuxREPL_CutsOverInboxBeforeOpeningLiveChannel(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("driver_tmux_repl.go")
 	if err != nil {
 		t.Fatal(err)
@@ -27,6 +28,7 @@ func TestRunTmuxREPL_CutsOverInboxBeforeOpeningLiveChannel(t *testing.T) {
 }
 
 func TestReplInboxCursorRetainsEnvelopeAppendedAfterLiveChannelOpen(t *testing.T) {
+	t.Parallel()
 	workspace := t.TempDir()
 	cfg := &Config{Workspace: workspace, Agent: "build"}
 	appendEnvelope := func(body string) {

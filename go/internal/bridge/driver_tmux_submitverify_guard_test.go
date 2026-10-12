@@ -58,6 +58,7 @@ func parkedPane(text string) string {
 const guardNudge = "Please write the deliverable to /ws/build-report.md to complete the phase."
 
 func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
+	t.Parallel()
 	tm := &fakeTmux{paneSeq: []string{parkedPane(guardNudge)}}
 	var stderr bytes.Buffer
 	lp := tmuxLaunch{
@@ -96,6 +97,7 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 func TestVerifySubmitted_InputLineMarkerDrivesTheMatch(t *testing.T) {
 	// Pending on the FIRST observation, cleared on the re-capture: exactly one
 	// re-send, then the loop exits.
+	t.Parallel()
 	tm := &fakeTmux{paneSeq: []string{"● done\n\n" + tmuxPromptMarkerDefault}}
 	var stderr bytes.Buffer
 	lp := tmuxLaunch{
@@ -116,6 +118,7 @@ func TestVerifySubmitted_InputLineMarkerDrivesTheMatch(t *testing.T) {
 }
 
 func TestVerifySubmitted_CaptureErrorIsLogged(t *testing.T) {
+	t.Parallel()
 	tm := &captureErrTmux{fakeTmux: &fakeTmux{paneSeq: []string{parkedPane(guardNudge)}}, errAfter: 1}
 	var stderr bytes.Buffer
 	lp := tmuxLaunch{
@@ -140,6 +143,7 @@ func TestVerifySubmitted_CaptureErrorIsLogged(t *testing.T) {
 }
 
 func TestRunTmuxREPL_InitialSubmitVerificationCaptureFailureIsLoud(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
@@ -178,6 +182,7 @@ func TestRunTmuxREPL_InitialSubmitVerificationCaptureFailureIsLoud(t *testing.T)
 func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 	// A driver whose boot marker is NOT an input-line prompt declares the field
 	// empty; it must still NAME the field so the choice is visible in review.
+	t.Parallel()
 	noInputLine := map[string]bool{}
 
 	// The guard is textual and cannot see a marker emptied at its DEFINITION.
@@ -289,6 +294,7 @@ func (t *timelineTmux) PasteBuffer(ctx context.Context, session string) error {
 }
 
 func TestTmuxREPL_PromptDelivery_SettlesBeforeBaselineCapture(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	rec := &timelineRecorder{}
 	tm := &timelineTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}, rec: rec}

@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseManifest_DefaultEnvIsRead(t *testing.T) {
+	t.Parallel()
 	m, err := parseManifest("hypo", []byte(`{"cli":"hypo","binary":"h","default_env":{"CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION":"false"}}`))
 	if err != nil {
 		t.Fatal(err)
@@ -18,6 +19,7 @@ func TestParseManifest_DefaultEnvIsRead(t *testing.T) {
 }
 
 func TestParseManifest_DefaultEnvRefusesANonIdentifierKey(t *testing.T) {
+	t.Parallel()
 	for _, key := range []string{"A B", "", "1ABC", "K=V", "K;rm"} {
 		_, err := parseManifest("hypo", []byte(`{"cli":"hypo","binary":"h","default_env":{"`+key+`":"1"}}`))
 		if err == nil {
@@ -33,6 +35,7 @@ func TestParseManifest_DefaultEnvRefusesANonIdentifierKey(t *testing.T) {
 }
 
 func TestParseManifest_DefaultEnvRefusesTheLoopsBridgesAndCredentialVariables(t *testing.T) {
+	t.Parallel()
 	for _, key := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "OPENAI_API_KEY", "EVOLVE_PROJECT_ROOT", "EVOLVE_FLEET", "BRIDGE_TESTING", "BRIDGE_ALLOW_ANTHROPIC_BASE_URL"} {
 		_, err := parseManifest("hypo", []byte(`{"cli":"hypo","binary":"h","default_env":{"`+key+`":"x"}}`))
 		if err == nil || !strings.Contains(err.Error(), "default_env") {
@@ -42,6 +45,7 @@ func TestParseManifest_DefaultEnvRefusesTheLoopsBridgesAndCredentialVariables(t 
 }
 
 func TestParseManifest_DefaultEnvRefusesControlBytesInAValue(t *testing.T) {
+	t.Parallel()
 	for _, value := range []string{`a\nb`, `a\u001bb`, `a\rb`, `\u007f`} {
 		_, err := parseManifest("hypo", []byte(`{"cli":"hypo","binary":"h","default_env":{"K":"`+value+`"}}`))
 		if err == nil || !strings.Contains(err.Error(), "default_env") {
@@ -54,6 +58,7 @@ func TestParseManifest_DefaultEnvRefusesControlBytesInAValue(t *testing.T) {
 }
 
 func TestRealize_DefaultEnvIsCopiedIntoTheRealization(t *testing.T) {
+	t.Parallel()
 	m := Manifest{CLI: "hypo", DefaultEnv: map[string]string{"B": "2", "A": "1"}}
 	got := Realize(m, LaunchIntent{})
 	if !maps.Equal(got.Env, m.DefaultEnv) {
@@ -69,6 +74,7 @@ func TestRealize_DefaultEnvIsCopiedIntoTheRealization(t *testing.T) {
 }
 
 func TestDriverEnv_LayersTheCLIEnvUnderTheRequestOverrides(t *testing.T) {
+	t.Parallel()
 	env := driverEnv(Deps{Env: map[string]string{"REQ": "r"}}, map[string]string{"Z": "1", "A": "two words"})
 	tail := env[len(env)-3:]
 	want := []string{"A=two words", "Z=1", "REQ=r"}
@@ -81,6 +87,7 @@ func TestDriverEnv_LayersTheCLIEnvUnderTheRequestOverrides(t *testing.T) {
 }
 
 func TestExportLines_SortedAndShellQuoted(t *testing.T) {
+	t.Parallel()
 	got := exportLines(map[string]string{"Z": "1", "A": "it's false"})
 	want := []string{"export A='it'\\''s false'", "export Z=1"}
 	if !reflect.DeepEqual(got, want) {

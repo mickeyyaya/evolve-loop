@@ -76,6 +76,7 @@ func reapDeps(h *hostTable, tmux TmuxController, stderr *bytes.Buffer, center *s
 const thisDispatch = "01RUN/1835/build/p4242n1t1"
 
 func TestTmuxCleanup_RecordsThePaneTreeBeforeKillSessionAndTheSweepStopsOnlyOwnedProcesses(t *testing.T) {
+	t.Parallel()
 	var events []string
 	table := []proctree.Process{
 		hostProc(500, 400, ""),
@@ -104,6 +105,7 @@ func TestTmuxCleanup_RecordsThePaneTreeBeforeKillSessionAndTheSweepStopsOnlyOwne
 }
 
 func TestTmuxCleanup_ANamedSessionIsNeverSwept(t *testing.T) {
+	t.Parallel()
 	var events []string
 	h := &hostTable{tables: [][]proctree.Process{{hostProc(501, 500, thisDispatch)}}, events: &events}
 	tmux := &panePIDTmux{fakeTmux: fakeTmux{existing: map[string]bool{"evolve-bridge-named-x": true}}, panePIDs: []int{500}, events: &events}
@@ -120,6 +122,7 @@ func TestTmuxCleanup_ANamedSessionIsNeverSwept(t *testing.T) {
 }
 
 func TestDispatchSweep_ASurvivorIsAnIncidentSignal(t *testing.T) {
+	t.Parallel()
 	var events []string
 	survivor := hostProc(502, 1, thisDispatch)
 	h := &hostTable{tables: [][]proctree.Process{{survivor}}, events: &events}
@@ -146,6 +149,7 @@ func TestDispatchSweep_ASurvivorIsAnIncidentSignal(t *testing.T) {
 }
 
 func TestDispatchSweep_AFailedListingIsAWarnSignal(t *testing.T) {
+	t.Parallel()
 	center := signalcenter.New()
 	var stderr bytes.Buffer
 	deps := Deps{ListProcesses: func(context.Context) ([]proctree.Process, error) { return nil, errors.New("ps: not found") },
@@ -203,6 +207,7 @@ func exportedDispatchIDs(keys []string) []string {
 }
 
 func TestBootTmuxREPL_ExportsTheDispatchTagOfThisLaunch(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 
@@ -220,12 +225,14 @@ func TestBootTmuxREPL_ExportsTheDispatchTagOfThisLaunch(t *testing.T) {
 }
 
 func TestBootTmuxREPL_AnEmptyDispatchIDUnsetsTheTag(t *testing.T) {
+	t.Parallel()
 	if got := dispatchTagLine(""); got != "unset "+ipcenv.DispatchIDKey {
 		t.Errorf("dispatchTagLine(\"\") = %q, want the unset line: the server env can hold a stale tag", got)
 	}
 }
 
 func TestLaunchArgs_EachLaunchMintsANewDispatchID(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	first, second := &fakeTmux{}, &fakeTmux{}
 
@@ -239,6 +246,7 @@ func TestLaunchArgs_EachLaunchMintsANewDispatchID(t *testing.T) {
 }
 
 func TestLaunchArgs_SweepsTheTagAfterTheDriverReturns(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	var sent []int
@@ -264,6 +272,7 @@ func TestLaunchArgs_SweepsTheTagAfterTheDriverReturns(t *testing.T) {
 }
 
 func TestParsePanePIDs_ReadsOnePidPerLineAndRefusesGarbage(t *testing.T) {
+	t.Parallel()
 	got, err := parsePanePIDs("30465\n30470\n\n")
 	if err != nil || !reflect.DeepEqual(got, []int{30465, 30470}) {
 		t.Errorf("parsePanePIDs = %v, %v, want [30465 30470]", got, err)
@@ -274,6 +283,7 @@ func TestParsePanePIDs_ReadsOnePidPerLineAndRefusesGarbage(t *testing.T) {
 }
 
 func TestMintDispatchID_ParsesBackToThisLaunch(t *testing.T) {
+	t.Parallel()
 	id := mintDispatchID(&Config{RunID: "01RUN", Cycle: 1835, Agent: "build"}, 4242)
 
 	got, ok := proctree.ParseDispatchID(id)
@@ -294,6 +304,7 @@ func sharedHelpers(tag string) []proctree.Process {
 }
 
 func TestDispatchSweep_NeverStopsATaggedSharedHelperOutsideTheRecordedTree(t *testing.T) {
+	t.Parallel()
 	var events []string
 	helpers := sharedHelpers(thisDispatch)
 	table := append(helpers, hostProc(803, 1, thisDispatch))
@@ -308,6 +319,7 @@ func TestDispatchSweep_NeverStopsATaggedSharedHelperOutsideTheRecordedTree(t *te
 }
 
 func TestRecordPane_KeepsEveryMemberAndPersistsTheTreeForGC(t *testing.T) {
+	t.Parallel()
 	var events []string
 	root := t.TempDir()
 	first := []proctree.Process{hostProc(500, 400, ""), hostProc(501, 500, "")}
@@ -328,6 +340,7 @@ func TestRecordPane_KeepsEveryMemberAndPersistsTheTreeForGC(t *testing.T) {
 }
 
 func TestDispatchSweep_ACleanSweepRemovesThePersistedTree(t *testing.T) {
+	t.Parallel()
 	var events []string
 	root := t.TempDir()
 	h := &hostTable{tables: [][]proctree.Process{{hostProc(500, 400, "")}, nil}, events: &events}
@@ -344,6 +357,7 @@ func TestDispatchSweep_ACleanSweepRemovesThePersistedTree(t *testing.T) {
 }
 
 func TestKillSessionSwept_StopsTheRecordedTreeOutsideALaunch(t *testing.T) {
+	t.Parallel()
 	var events []string
 	tree := []proctree.Process{hostProc(500, 400, ""), hostProc(501, 500, "")}
 	h := &hostTable{tables: [][]proctree.Process{tree, tree, tree, nil}, events: &events}
@@ -358,6 +372,7 @@ func TestKillSessionSwept_StopsTheRecordedTreeOutsideALaunch(t *testing.T) {
 }
 
 func TestKillSessionSwept_AKilledNamedSessionIsSweptAfterAll(t *testing.T) {
+	t.Parallel()
 	var events []string
 	h := &hostTable{tables: [][]proctree.Process{{hostProc(500, 400, "")}}, events: &events}
 	var stderr bytes.Buffer
@@ -372,6 +387,7 @@ func TestKillSessionSwept_AKilledNamedSessionIsSweptAfterAll(t *testing.T) {
 }
 
 func TestReplWaiterPace_RefreshesThePaneTree(t *testing.T) {
+	t.Parallel()
 	var events []string
 	h := &hostTable{tables: [][]proctree.Process{{hostProc(500, 400, "")}}, events: &events}
 	var stderr bytes.Buffer
@@ -406,6 +422,7 @@ func (f *goneAtCleanupTmux) PasteBuffer(ctx context.Context, session string) err
 }
 
 func TestLaunchArgs_ASessionGoneBeforeCleanupStillHasItsRecordedTree(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	var events []string
 	tmux := &goneAtCleanupTmux{panePIDTmux{fakeTmux: fakeTmux{paneSeq: []string{"❯ "}}, panePIDs: []int{500}, events: &events}}
@@ -433,6 +450,7 @@ func TestLaunchArgs_ASessionGoneBeforeCleanupStillHasItsRecordedTree(t *testing.
 }
 
 func TestDispatchSweep_ARecordedSharedHelperIsStoppedOnlyWhileItIsALiveDescendantOfThePane(t *testing.T) {
+	t.Parallel()
 	var events []string
 	daemon := hostProc(800, 500, "")
 	daemon.Comm, daemon.Args = "claude", []string{"claude", "daemon", "run"}

@@ -9,6 +9,7 @@ import (
 )
 
 func TestClassify_AnnotatedRangeCiteCloses(t *testing.T) {
+	t.Parallel()
 	ws, wt, req := worktreeContinuationFixture(t, 1350, 1356, []string{"carryforward candidates timestamp is stale"})
 	evidenceFile(t, wt, "go/internal/phases/triage/triage.go")
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -27,6 +28,7 @@ func TestClassify_AnnotatedRangeCiteCloses(t *testing.T) {
 }
 
 func TestClassify_AnnotationCannotLaunderARejection(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, evidence string
 	}{

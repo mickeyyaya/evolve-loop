@@ -11,6 +11,7 @@ import (
 )
 
 func TestControllerFactory_PerFamilyIsolation(t *testing.T) {
+	t.Parallel()
 	base := "/proj/.evolve/usage-probe"
 	var f *ControllerFactory = NewControllerFactory("/proj", base, "usage-probe", recipeDeps(&fakeTmux{}))
 
@@ -32,6 +33,7 @@ func TestControllerFactory_PerFamilyIsolation(t *testing.T) {
 }
 
 func TestControllerFactory_ForUnsupported(t *testing.T) {
+	t.Parallel()
 	f := NewControllerFactory(t.TempDir(), t.TempDir(), "", recipeDeps(&fakeTmux{}))
 	_, err := f.For("ollama").Do(context.Background(), "ollama", clicontrol.EventUsage)
 	if !errors.Is(err, clicontrol.ErrUnsupported) {
@@ -40,6 +42,7 @@ func TestControllerFactory_ForUnsupported(t *testing.T) {
 }
 
 func TestControllerFactory_AFleetModeUsageQueryRunsInAnOwnedScratchDirAndReadsTheFakeCLIScreen(t *testing.T) {
+	t.Parallel()
 	base := t.TempDir()
 	tm := &recipeWorkdirTmux{fakeTmux: &fakeTmux{paneSeq: []string{"❯", "Current week (all models) 93% used\n❯"}}}
 	deps := recipeDeps(tm.fakeTmux)

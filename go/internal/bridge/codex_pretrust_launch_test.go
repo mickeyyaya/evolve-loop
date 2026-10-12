@@ -38,6 +38,7 @@ func TestCodexTmuxPreflightTrustsFreshWorktree(t *testing.T) {
 }
 
 func TestRecipeDriverPretrustsCodexWorktree(t *testing.T) {
+	t.Parallel()
 	cfgPath := filepath.Join(t.TempDir(), "codex", "config.toml")
 	freshWorktree := t.TempDir()
 
@@ -55,6 +56,7 @@ func TestRecipeDriverPretrustsCodexWorktree(t *testing.T) {
 }
 
 func TestRecipeDriverSkipsPretrustForNonCodex(t *testing.T) {
+	t.Parallel()
 	cfgPath := filepath.Join(t.TempDir(), "codex", "config.toml")
 
 	deps := recipeDeps(&fakeTmux{})

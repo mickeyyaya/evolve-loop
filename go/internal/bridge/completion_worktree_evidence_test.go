@@ -126,6 +126,7 @@ func (r evidenceResult) evidenceEvents() []signalcenter.Event {
 }
 
 func TestWorktreeEvidence_AFixOutsideAnUntouchedDeliverableCompletesWithoutOperatorAction(t *testing.T) {
+	t.Parallel()
 	launch := correctionOfABuild(t)
 	tmux := idleAgent(func() {
 		writeFile(t, filepath.Join(launch.worktree, "docs", "explain.md"), "# Explanation\n## Changed Areas\n- `src/feature.go` — what and why\n")
@@ -143,6 +144,7 @@ func TestWorktreeEvidence_AFixOutsideAnUntouchedDeliverableCompletesWithoutOpera
 }
 
 func TestWorktreeEvidence_TheBridgeReportsTheCarriedDeliverableAndTheAgentsPaths(t *testing.T) {
+	t.Parallel()
 	launch := correctionOfABuild(t)
 	res := launch.run(t, idleAgent(func() {
 		writeFile(t, filepath.Join(launch.worktree, "docs", "explain.md"), "# Explanation\n- what and why\n")
@@ -169,6 +171,7 @@ func TestWorktreeEvidence_TheBridgeReportsTheCarriedDeliverableAndTheAgentsPaths
 }
 
 func TestWorktreeEvidence_AnAgentThatChangesNothingNeverCompletesOnTheStaleDeliverable(t *testing.T) {
+	t.Parallel()
 	launch := correctionOfABuild(t)
 	tmux := idleAgent(nil)
 	res := launch.run(t, tmux)
@@ -184,6 +187,7 @@ func TestWorktreeEvidence_AnAgentThatChangesNothingNeverCompletesOnTheStaleDeliv
 }
 
 func TestWorktreeEvidence_AFirstDispatchStillRefusesALeftoverDespiteWorktreeEdits(t *testing.T) {
+	t.Parallel()
 	launch := correctionOfABuild(t)
 	launch.completion = ""
 	tmux := idleAgent(func() {
@@ -196,6 +200,7 @@ func TestWorktreeEvidence_AFirstDispatchStillRefusesALeftoverDespiteWorktreeEdit
 }
 
 func TestWorktreeEvidence_HostWritesNeverCountAsAgentAction(t *testing.T) {
+	t.Parallel()
 	worktree := committedWorktree(t)
 	ws := filepath.Join(worktree, "runs", "cycle-7")
 	fx := launchFixture{
@@ -225,6 +230,7 @@ func TestWorktreeEvidence_HostWritesNeverCountAsAgentAction(t *testing.T) {
 }
 
 func TestWorktreeEvidence_ABusyAgentIsNotCompletedMidTurn(t *testing.T) {
+	t.Parallel()
 	launch := correctionOfABuild(t)
 	tmux := &actingAgentTmux{fakeTmux: &fakeTmux{paneSeq: []string{busyClaudePane}}, onPrompt: func() {
 		writeFile(t, filepath.Join(launch.worktree, "src", "feature.go"), "package feature\n\nfunc HalfDone() {}\n")
@@ -239,6 +245,7 @@ func TestWorktreeEvidence_ABusyAgentIsNotCompletedMidTurn(t *testing.T) {
 }
 
 func TestWorktreeEvidence_AnAgentThatActsAfterTheNudgeCompletesAtTheNextIdle(t *testing.T) {
+	t.Parallel()
 	launch := correctionOfABuild(t)
 	tmux := idleAgent(nil)
 	tmux.onNudge = func() {
@@ -254,6 +261,7 @@ func TestWorktreeEvidence_AnAgentThatActsAfterTheNudgeCompletesAtTheNextIdle(t *
 }
 
 func TestWorktreeEvidence_ARewrittenDeliverableStillCompletesByTheArtifactWindow(t *testing.T) {
+	t.Parallel()
 	launch := correctionOfABuild(t)
 	res := launch.run(t, idleAgent(func() {
 		writeArtifact(t, launch.fx.artifact, staleBuildReport+"\n## Correction 1\nfixed the explanation doc\n", fixedMTime.Add(time.Hour))
@@ -267,6 +275,7 @@ func TestWorktreeEvidence_ARewrittenDeliverableStillCompletesByTheArtifactWindow
 }
 
 func TestWorktreeEvidence_NoDispatchSnapshotMeansNoEvidenceEvenOnceGitRecovers(t *testing.T) {
+	t.Parallel()
 	launch := correctionOfABuild(t)
 	launch.worktree = t.TempDir()
 	recovered := gittest.Fixture(t)
@@ -285,6 +294,7 @@ func TestWorktreeEvidence_NoDispatchSnapshotMeansNoEvidenceEvenOnceGitRecovers(t
 }
 
 func TestWorktreeSnapshot_ChangedSinceSeesEveryAgentEditAndNothingElse(t *testing.T) {
+	t.Parallel()
 	repo := gittest.Fixture(t)
 	for _, name := range []string{"clean.go", "dirty.go", "revert.go", "untouched.go"} {
 		writeFile(t, filepath.Join(repo.Dir, name), "package x\n")
@@ -355,6 +365,7 @@ func completesOnIdle(t *testing.T, d *worktreeEvidenceDetector) bool {
 }
 
 func TestWorktreeEvidenceDetector_ARewriteStillSettlingAtIdleIsLeftToTheStabilityWindow(t *testing.T) {
+	t.Parallel()
 	d, cfg := evidenceDetector(t)
 	writeFile(t, filepath.Join(cfg.Worktree, "docs", "explain.md"), "# Explanation\n- what and why\n")
 	writeArtifact(t, cfg.Artifact, staleBuildReport+"## Correction 1\n", fixedMTime.Add(time.Hour))
@@ -370,6 +381,7 @@ func TestWorktreeEvidenceDetector_ARewriteStillSettlingAtIdleIsLeftToTheStabilit
 }
 
 func TestWorktreeEvidenceDetector_WaitsForTheContractsSecondaryDeliverables(t *testing.T) {
+	t.Parallel()
 	secondary := filepath.Join(t.TempDir(), "explanation.md")
 	d, cfg := evidenceDetector(t, secondary)
 	writeFile(t, filepath.Join(cfg.Worktree, "docs", "explain.md"), "# Explanation\n- what and why\n")
@@ -383,6 +395,7 @@ func TestWorktreeEvidenceDetector_WaitsForTheContractsSecondaryDeliverables(t *t
 }
 
 func TestWorktreeEvidenceDetector_AnIdleSnapshotGitCannotTakeIsNoEvidence(t *testing.T) {
+	t.Parallel()
 	d, cfg := evidenceDetector(t)
 	if err := os.RemoveAll(filepath.Join(cfg.Worktree, ".git")); err != nil {
 		t.Fatal(err)
@@ -393,6 +406,7 @@ func TestWorktreeEvidenceDetector_AnIdleSnapshotGitCannotTakeIsNoEvidence(t *tes
 }
 
 func TestWorktreeEvidenceDetector_AWriteAtTheDeliverablesOwnFallbackIsNotAgentEvidence(t *testing.T) {
+	t.Parallel()
 	d, cfg := evidenceDetector(t)
 	writeFile(t, filepath.Join(cfg.Worktree, filepath.Base(cfg.Artifact)), "# Build Report\nwritten at the cwd fallback\n")
 	if completesOnIdle(t, d) {
@@ -401,6 +415,7 @@ func TestWorktreeEvidenceDetector_AWriteAtTheDeliverablesOwnFallbackIsNotAgentEv
 }
 
 func TestWorktreeEvidenceDetector_AnEditInsideAnUntrackedDirectoryIsAgentEvidence(t *testing.T) {
+	t.Parallel()
 	cfg := evidenceConfig(t)
 	untracked := filepath.Join(cfg.Worktree, "newpkg", "x.go")
 	writeFile(t, untracked, "package newpkg\n")

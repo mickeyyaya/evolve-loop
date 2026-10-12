@@ -12,6 +12,7 @@ import (
 )
 
 func TestController_Do_ResolvesAndCaptures(t *testing.T) {
+	t.Parallel()
 	var gotCLI, gotCmd string
 	c := &cliController{
 		resolve: func(cli string) (Manifest, error) {
@@ -40,6 +41,7 @@ func TestController_Do_ResolvesAndCaptures(t *testing.T) {
 }
 
 func TestController_perFamilyConfig(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	c := &cliController{cfg: &Config{Workspace: ws, AllowBypass: true}}
 	got := c.perFamilyConfig("claude-tmux")
@@ -58,6 +60,7 @@ func TestController_perFamilyConfig(t *testing.T) {
 }
 
 func TestController_Do_UnsupportedEvent(t *testing.T) {
+	t.Parallel()
 	c := &cliController{
 		resolve: func(cli string) (Manifest, error) {
 			return Manifest{CLI: cli, Binary: "x"}, nil // no controls block
@@ -74,6 +77,7 @@ func TestController_Do_UnsupportedEvent(t *testing.T) {
 }
 
 func TestNewController_UnsupportedNoBoot(t *testing.T) {
+	t.Parallel()
 	ctrl := NewController(&Config{Workspace: t.TempDir()}, recipeDeps(&fakeTmux{}))
 	_, err := ctrl.Do(context.Background(), "ollama", clicontrol.EventUsage)
 	if !errors.Is(err, clicontrol.ErrUnsupported) {
@@ -82,6 +86,7 @@ func TestNewController_UnsupportedNoBoot(t *testing.T) {
 }
 
 func TestController_Do_ResolveError(t *testing.T) {
+	t.Parallel()
 	wantErr := errors.New("no manifest")
 	c := &cliController{
 		resolve: func(string) (Manifest, error) { return Manifest{}, wantErr },
@@ -93,6 +98,7 @@ func TestController_Do_ResolveError(t *testing.T) {
 }
 
 func TestCaptureControl_SendsGivenCommand(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	tx := &fakeTmux{existing: map[string]bool{"evolve-bridge-named-covctl": true}, paneSeq: []string{"quota healthy ❯"}}
 	cfg := &Config{

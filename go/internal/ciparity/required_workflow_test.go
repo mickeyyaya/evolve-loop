@@ -7,6 +7,7 @@ import (
 )
 
 func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
+	t.Parallel()
 	w := readWorkflowContract(t, RequiredWorkflow)
 	for _, event := range []string{"push", "pull_request", "workflow_dispatch"} {
 		on, ok := w.On[event]
@@ -55,6 +56,7 @@ func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 }
 
 func TestRequiredWorkflow_SteLintJobRunsOnlyTheLintOnTheAddedText(t *testing.T) {
+	t.Parallel()
 	job := readWorkflowContract(t, RequiredWorkflow).Jobs["ste-lint"]
 	if job.If != "needs.changes.outputs.docs == 'true'" || job.Needs.Value != "changes" || job.ContinueOnError != "" || job.Uses != "" {
 		t.Fatalf("ste-lint must run on the docs route of the changes job: %+v", job)
@@ -90,6 +92,7 @@ func TestRequiredWorkflow_SteLintJobRunsOnlyTheLintOnTheAddedText(t *testing.T) 
 }
 
 func TestRequiredResult_WaitsForEveryOtherJob(t *testing.T) {
+	t.Parallel()
 	w := readWorkflowContract(t, RequiredWorkflow)
 	required := w.Jobs["required"]
 	var needs []string
@@ -104,6 +107,7 @@ func TestRequiredResult_WaitsForEveryOtherJob(t *testing.T) {
 }
 
 func TestRequiredWorkflow_ReusableSuitesAreNotDuplicated(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"go.yml", "ci.yml"} {
 		w := readWorkflowContract(t, name)
 		if _, ok := w.On["workflow_call"]; !ok {
@@ -129,6 +133,7 @@ func workflowStep(t *testing.T, workflow, job, id string) workflowStepContract {
 }
 
 func TestRequiredResult_ConsumesEachReusableJobResult(t *testing.T) {
+	t.Parallel()
 	step := workflowStep(t, RequiredWorkflow, "required", "result")
 	if step.If != "" || step.ContinueOnError != "" {
 		t.Fatal("the result step may not be skipped or continue after failure")
@@ -161,6 +166,7 @@ func TestRequiredResult_ConsumesEachReusableJobResult(t *testing.T) {
 }
 
 func TestLandingValidation_PagesUsesCompleteValidatedArtifact(t *testing.T) {
+	t.Parallel()
 	validation := readWorkflowContract(t, "landing-validation.yml")
 	if len(validation.Permissions) != 1 || validation.Permissions["contents"] != "read" {
 		t.Error("shared landing validation requires only read-only contents")

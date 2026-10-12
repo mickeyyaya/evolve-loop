@@ -25,6 +25,7 @@ func (p *fixedStateProbe) Assess(_ string, _ panestream.PaneProfile) (panestream
 // A normal claude-tmux boot-only pane sequence never classifies as Hung on
 // its own, so seeing Hung here can only come from the registered handler.
 func TestRunTmuxREPL_SignalCenterStateWins(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	center := panestream.NewLivenessCenter()
 	probe := &fixedStateProbe{state: panestream.LivenessHung}
@@ -49,6 +50,7 @@ func TestRunTmuxREPL_SignalCenterStateWins(t *testing.T) {
 // driver that never calls the registered probe at all; this checks the call
 // directly.
 func TestRunTmuxREPL_SignalCenterProbeActuallyInvoked(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	center := panestream.NewLivenessCenter()
 	probe := &fixedStateProbe{state: panestream.LivenessBusyButStagnant}
@@ -64,6 +66,7 @@ func TestRunTmuxREPL_SignalCenterProbeActuallyInvoked(t *testing.T) {
 }
 
 func TestStopEvent_BooleanFallbackRetired(t *testing.T) {
+	t.Parallel()
 	r := newDeterministicReviewer(2)
 	ev := StopEvent{Progressed: true, Busy: true, Attempt: 0} // State left zero
 	if got := r.Review(ev).Action; got != ReviewPause {
@@ -72,6 +75,7 @@ func TestStopEvent_BooleanFallbackRetired(t *testing.T) {
 }
 
 func TestRunTmuxREPL_RenderWedgeStillPromotesToBusyStagnant(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{
 		tmuxPromptMarkerDefault, // boot

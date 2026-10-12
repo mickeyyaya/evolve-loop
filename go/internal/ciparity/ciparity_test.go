@@ -8,6 +8,7 @@ import (
 )
 
 func TestIntersectEnforced(t *testing.T) {
+	t.Parallel()
 	enforce := []byte("# comment line\n" +
 		"./internal/config\n" +
 		"\n" +
@@ -66,6 +67,7 @@ func TestIntersectEnforced(t *testing.T) {
 // is the cycles-1223/1224/1228 halt class; the recursive-pattern and
 // unreadable-dir rows pin the two documented non-guessing directions.
 func TestPackageDirHasProductionGoFiles(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mk := func(rel, body string) {
 		p := filepath.Join(dir, filepath.FromSlash(rel))

@@ -8,6 +8,7 @@ import (
 )
 
 func TestComposePrompt_RendersTaskContractVerbatim(t *testing.T) {
+	t.Parallel()
 	contract := "### task-a — Title A\nAcceptance (verbatim from the inbox item — the auditor grades against exactly these):\n1. graded verbatim\n\n### ACS predicates (harness-listed via `go test -list . -tags acs`; every one must be GREEN before the build hands off)\n- TestC7_001_X\n\n"
 	got := (hooks{}).ComposePrompt("PERSONA BODY", core.PhaseRequest{Context: map[string]string{core.CtxKeyTaskContract: contract}})
 	if !strings.Contains(got, "## Task Contract") || !strings.Contains(got, contract) {

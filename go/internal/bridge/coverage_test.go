@@ -67,6 +67,7 @@ func TestDriverRegistry(t *testing.T) {
 }
 
 func TestAllDigits(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]bool{"": false, "0": true, "60": true, "1a": false, "x": false} {
 		if got := allDigits(in); got != want {
 			t.Fatalf("allDigits(%q) = %v, want %v", in, got, want)
@@ -75,6 +76,7 @@ func TestAllDigits(t *testing.T) {
 }
 
 func TestLastLines(t *testing.T) {
+	t.Parallel()
 	if got := lastLines("a\nb\nc", 10); got != "a\nb\nc" {
 		t.Fatalf("lastLines short = %q", got)
 	}
@@ -84,6 +86,7 @@ func TestLastLines(t *testing.T) {
 }
 
 func TestTruncate64(t *testing.T) {
+	t.Parallel()
 	if got := truncate64("short"); got != "short" {
 		t.Fatalf("truncate64 short = %q", got)
 	}
@@ -94,6 +97,7 @@ func TestTruncate64(t *testing.T) {
 }
 
 func TestParseExtendSecs(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]int{"extend:60": 60, "extend:0": 0, "extend:x": 0, "nope": 0, "extend:": 0} {
 		if got := parseExtendSecs(in); got != want {
 			t.Fatalf("parseExtendSecs(%q) = %d, want %d", in, got, want)
@@ -102,6 +106,7 @@ func TestParseExtendSecs(t *testing.T) {
 }
 
 func TestMapCodexModelAndName(t *testing.T) {
+	t.Parallel()
 	m := codexFamilyManifest(t)
 	for in, want := range map[string]string{"haiku": m.ModelTierMap["fast"], "sonnet": m.ModelTierMap["balanced"], "opus": m.ModelTierMap["deep"], "gpt-x": "gpt-x", "weird": "weird"} {
 		if got := resolveTierModel(m, in); got != want {
@@ -117,6 +122,7 @@ func TestMapCodexModelAndName(t *testing.T) {
 
 func TestDecideAutoRespond_ExtraBranches(t *testing.T) {
 	// extend_timeout with non-numeric keys → escalate
+	t.Parallel()
 	prompts := []ManifestPrompt{
 		{Name: "skipEmpty", Regex: "", Policy: "escalate"}, // empty regex → skipped
 		{Name: "badExtend", Regex: "slow", ResponseKeys: "x", Policy: "extend_timeout"},
@@ -132,6 +138,7 @@ func TestDecideAutoRespond_ExtraBranches(t *testing.T) {
 }
 
 func TestDefaultChallengeToken(t *testing.T) {
+	t.Parallel()
 	tok, err := defaultChallengeToken()
 	if err != nil {
 		t.Fatalf("defaultChallengeToken err: %v", err)
@@ -149,6 +156,7 @@ func TestLookupEnv_NilSeamFallsBackToOS(t *testing.T) {
 }
 
 func TestManifestNames_Embedded(t *testing.T) {
+	t.Parallel()
 	names := ManifestNames()
 	want := map[string]bool{"claude-p": true, "claude-tmux": true, "codex": true, "codex-tmux": true, "agy": true, "agy-tmux": true, "agy-claude-tmux": true}
 	for _, n := range names {
@@ -160,6 +168,7 @@ func TestManifestNames_Embedded(t *testing.T) {
 }
 
 func TestDriverEnv_MergesReqEnv(t *testing.T) {
+	t.Parallel()
 	env := driverEnv(Deps{Env: map[string]string{"FOO_COV": "bar"}}, nil)
 	found := false
 	for _, kv := range env {

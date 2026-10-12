@@ -64,6 +64,7 @@ func paneLiveCfg(t *testing.T, ws string) *Config {
 }
 
 func TestRunTmuxREPL_ChannelOff_NoLiveFiles(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	deps := covDeps() // LookupEnv = mapLookup(nil) → EVOLVE_CHANNEL unset
@@ -94,6 +95,7 @@ func TestRunTmuxREPL_ChannelOff_NoLiveFiles(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ChannelOn_StreamsPaneDeltaToFile(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	deps := covDeps()
@@ -136,6 +138,7 @@ func TestRunTmuxREPL_ChannelOn_StreamsPaneDeltaToFile(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	stderr := &bytes.Buffer{}
@@ -207,6 +210,7 @@ func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ChannelOn_LiveFileOpenError_WARN(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	cfg.Agent = "missing/sub" // parent dir ws/missing does not exist → OpenFile fails
@@ -238,6 +242,7 @@ func TestRunTmuxREPL_ChannelOn_LiveFileOpenError_WARN(t *testing.T) {
 }
 
 func TestPaneProfileFor(t *testing.T) {
+	t.Parallel()
 	if p := paneProfileFor(tmuxLaunch{name: "claude-tmux", promptMarker: "❯"}); p.Name != "claude" || p.BoundaryMarker != "❯" {
 		t.Errorf("claude-tmux → %+v, want claude profile", p)
 	}

@@ -40,6 +40,7 @@ type llmCallRecord struct {
 }
 
 func TestEngineLaunch_PopulatesBridgeResponseTokens(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -67,6 +68,7 @@ func TestEngineLaunch_PopulatesBridgeResponseTokens(t *testing.T) {
 }
 
 func TestEngineLaunch_AppendsLLMCallRecordPerFallbackAttempt(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -138,6 +140,7 @@ func TestEngineLaunch_AppendsLLMCallRecordPerFallbackAttempt(t *testing.T) {
 }
 
 func TestEngineLaunch_CollectorErrorNeverFailsLaunch(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens", "")
 	artifact := filepath.Join(ws, "artifact.md")

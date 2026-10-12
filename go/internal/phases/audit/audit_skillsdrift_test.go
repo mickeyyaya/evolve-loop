@@ -13,6 +13,7 @@ import (
 )
 
 func TestRun_SkillsDrift_FAILsAudit(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -36,6 +37,7 @@ func TestRun_SkillsDrift_FAILsAudit(t *testing.T) {
 }
 
 func TestRun_CommandStubDrift_FAILsAudit(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	phase := New(Config{
@@ -58,6 +60,7 @@ func TestRun_CommandStubDrift_FAILsAudit(t *testing.T) {
 }
 
 func TestRun_SkillsDriftClean_PASSPreserved(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	phase := New(Config{
@@ -72,6 +75,7 @@ func TestRun_SkillsDriftClean_PASSPreserved(t *testing.T) {
 }
 
 func TestRun_SkillsDriftError_FailsOpenWithWarning(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	phase := New(Config{
@@ -134,6 +138,7 @@ func skillsDriftCopyTree(t *testing.T, src, dst string) {
 }
 
 func TestNewDefault_WiresSkillsDriftCheck(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skips real skills tree copy under -short; full `go test` + CI still run it")
 	}
@@ -179,6 +184,7 @@ func TestNewDefault_WiresSkillsDriftCheck(t *testing.T) {
 }
 
 func TestSkillsDriftCheckDefault_EmptyRoot_NoOp(t *testing.T) {
+	t.Parallel()
 	got, err := skillsDriftCheckDefault(core.PhaseRequest{})
 	if err != nil || got != nil {
 		t.Errorf("empty root must be a no-op: got %v, %v", got, err)
@@ -186,6 +192,7 @@ func TestSkillsDriftCheckDefault_EmptyRoot_NoOp(t *testing.T) {
 }
 
 func TestSkillsDriftCheckDefault_FallsBackToProjectRoot(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	got, err := skillsDriftCheckDefault(core.PhaseRequest{Worktree: "", ProjectRoot: tmp})
 	if err == nil {
@@ -197,6 +204,7 @@ func TestSkillsDriftCheckDefault_FallsBackToProjectRoot(t *testing.T) {
 }
 
 func TestGofmtCheckDefault_EmptyRoot_NoOp(t *testing.T) {
+	t.Parallel()
 	got, err := gofmtCheckDefault(core.PhaseRequest{})
 	if err != nil || got != nil {
 		t.Errorf("empty root must be a no-op: got %v, %v", got, err)
@@ -204,6 +212,7 @@ func TestGofmtCheckDefault_EmptyRoot_NoOp(t *testing.T) {
 }
 
 func TestGofmtCheckDefault_FallsBackToProjectRoot(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "go"), 0o755); err != nil {
 		t.Fatal(err)

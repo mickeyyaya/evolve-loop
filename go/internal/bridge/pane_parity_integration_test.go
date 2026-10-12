@@ -96,6 +96,7 @@ const (
 type testResults map[string]string
 
 func TestPaneParity_RealTmuxPackagesPassInTheSandboxedPaneAsOnTheHost(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	probe := requireNativeSandbox(t)
 	for _, target := range paneParityTargets {

@@ -10,6 +10,7 @@ import (
 // trivial-rebase carry-forward — absent keys and non-"pass" values both keep
 // the fast path closed; only the complete green set returns nil.
 func TestMissingComposedGates_FullNativeGateSet(t *testing.T) {
+	t.Parallel()
 	green := map[string]string{}
 	for _, g := range RequiredComposedGates {
 		green[g] = "pass"
@@ -40,6 +41,7 @@ func TestMissingComposedGates_FullNativeGateSet(t *testing.T) {
 // carry each gate's captured output tail must still be able to derive the
 // status-only map MissingComposedGates and the ledger's GateResults expect.
 func TestGateStatuses_ProjectsStatusOnly(t *testing.T) {
+	t.Parallel()
 	outcomes := map[string]GateOutcome{
 		"compile": {Status: "pass"},
 		"test":    {Status: "fail", Tail: "boom"},

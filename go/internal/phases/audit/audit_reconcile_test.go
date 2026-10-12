@@ -13,6 +13,7 @@ func auditTimeoutErr() error {
 }
 
 func TestRun_Timeout_PassReport_RedCountZero_ReconcilesToPass(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -32,6 +33,7 @@ func TestRun_Timeout_PassReport_RedCountZero_ReconcilesToPass(t *testing.T) {
 }
 
 func TestRun_Timeout_PassReport_RedCountPositive_StaysFail(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 2)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"

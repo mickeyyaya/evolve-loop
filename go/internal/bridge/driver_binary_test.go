@@ -34,6 +34,7 @@ func TestPaneProfileFor_AgyClaudeTmuxReadsTheAgyBinarysPaneWithTheAgyDetector(t 
 }
 
 func TestDriverBinary_KeysByTheManifestBinaryAndTheStemOnlyWithoutAManifest(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"agy-claude-tmux": "agy",
 		"agy-tmux":        "agy",

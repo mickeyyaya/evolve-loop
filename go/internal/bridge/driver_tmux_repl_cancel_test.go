@@ -28,6 +28,7 @@ func (c *ctxHonoringTmux) CapturePane(ctx context.Context, session string, scrol
 // deliverable and cancels the ctx in the SAME poll gap, so the cancel check
 // runs before any poll ever observes the artifact.
 func TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &ctxHonoringTmux{&fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -73,6 +74,7 @@ func TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout(t *testing.T) {
 }
 
 func TestTmuxREPL_CancelWithoutDeliverable_StillTimesOut(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -114,6 +116,7 @@ func TestTmuxREPL_CancelWithoutDeliverable_StillTimesOut(t *testing.T) {
 }
 
 func TestTmuxREPL_ReviewerStopThenLateCancelKeepsReviewCause(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	ctx, cancel := context.WithCancel(context.Background())

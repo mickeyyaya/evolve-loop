@@ -15,6 +15,7 @@ func checkpointPaneSeq(cp1, cp2 string) []string {
 }
 
 func TestRunTmuxREPL_BusyFromCenter(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	busyPane := tmuxPromptMarkerDefault + "\n⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n"
 	idlePane := tmuxPromptMarkerDefault + "\n⏺ answer complete\n"
@@ -40,6 +41,7 @@ func TestRunTmuxREPL_BusyFromCenter(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ProgressedFromCenter(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	checkpoint1 := tmuxPromptMarkerDefault + "\n⏺ base content\n"
 	checkpoint2 := tmuxPromptMarkerDefault + "\n⏺ base content\n⏺ a new line appeared\n"
@@ -88,6 +90,7 @@ func checkpointRegionSource(t *testing.T) string {
 }
 
 func TestRunTmuxREPL_NoDirectChromeParseAtCheckpoint(t *testing.T) {
+	t.Parallel()
 	region := checkpointRegionSource(t)
 	for _, needle := range []string{"panestream.PaneBusy(", "PaneHasSubstantiveChange("} {
 		if strings.Contains(region, needle) {
@@ -100,6 +103,7 @@ func TestRunTmuxREPL_NoDirectChromeParseAtCheckpoint(t *testing.T) {
 // stub standing in for the real decision logic — same guard as
 // TestWedgeCorpus_UsesRealDeterministicReviewer (livenesscenter_wedge_invariant_test.go).
 func TestRunTmuxREPL_S4MigrationUsesRealDeterministicReviewer(t *testing.T) {
+	t.Parallel()
 	var r StopReviewer = newDeterministicReviewer(defaultArtifactMaxExtends)
 	if _, ok := r.(deterministicReviewer); !ok {
 		t.Fatalf("S4 migration corpus must exercise the real deterministicReviewer, got %T", r)

@@ -45,6 +45,7 @@ type workflowStepContract struct {
 }
 
 func TestRelease_RequiresSharedValidationBeforePublishing(t *testing.T) {
+	t.Parallel()
 	release := readWorkflowContract(t, "release.yml")
 	for job, source := range map[string]string{"test": "go.yml", "validate": "ci.yml"} {
 		if got := release.Jobs[job].Uses; got != "./.github/workflows/"+source {
@@ -71,6 +72,7 @@ func TestRelease_RequiresSharedValidationBeforePublishing(t *testing.T) {
 }
 
 func TestGoWorkflow_UsesSharedIntegrationAndAPIGates(t *testing.T) {
+	t.Parallel()
 	w := readWorkflowContract(t, "go.yml")
 	for _, required := range []string{"make test-integration", "make apicover-check", "make cover-strict", "make test-e2e"} {
 		found := false
@@ -88,6 +90,7 @@ func TestGoWorkflow_UsesSharedIntegrationAndAPIGates(t *testing.T) {
 }
 
 func TestReusableGoValidation_PreservesReleaseHistory(t *testing.T) {
+	t.Parallel()
 	for _, step := range readWorkflowContract(t, "go.yml").Jobs["build-test"].Steps {
 		if strings.HasPrefix(step.Uses, "actions/checkout@") {
 			if step.With["fetch-depth"] != "0" {
@@ -100,6 +103,7 @@ func TestReusableGoValidation_PreservesReleaseHistory(t *testing.T) {
 }
 
 func TestLandingWorkflow_TestsPullRequestsBeforeBuild(t *testing.T) {
+	t.Parallel()
 	w := readWorkflowContract(t, "landing-pages.yml")
 	var needs []string
 	if n := w.Jobs["build"].Needs; n.Kind == yaml.ScalarNode {
@@ -165,6 +169,7 @@ func workflowRepoRoot(t *testing.T) string {
 }
 
 func TestGoWorkflow_RunsCoverChangedRightAfterTheIntegrationProfile(t *testing.T) {
+	t.Parallel()
 	steps := readWorkflowContract(t, "go.yml").Jobs["build-test"].Steps
 	integration, cover := -1, -1
 	for i, step := range steps {

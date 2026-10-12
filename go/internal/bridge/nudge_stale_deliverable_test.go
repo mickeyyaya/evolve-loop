@@ -11,6 +11,7 @@ import (
 )
 
 func TestIdleNudgeFor_NamesAnUnrewrittenDeliverableAndBindsARecheck(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	report := filepath.Join(ws, "build-report.md")
 	if err := os.WriteFile(report, []byte("# Build Report\n"), 0o644); err != nil {
@@ -46,6 +47,7 @@ func TestIdleNudgeFor_NamesAnUnrewrittenDeliverableAndBindsARecheck(t *testing.T
 }
 
 func TestIdleNudgeFor_CarriesANonMarkdownDeliverableForwardInFull(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	plan := filepath.Join(ws, "routing-plan.json")
 	if err := os.WriteFile(plan, []byte(`{"phases":[]}`), 0o644); err != nil {
@@ -59,6 +61,7 @@ func TestIdleNudgeFor_CarriesANonMarkdownDeliverableForwardInFull(t *testing.T) 
 }
 
 func TestIdleNudgeFor_SeesALeftoverAtAFallbackLocation(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "build-report.md")
 	fallback := filepath.Join(ws, "workspace", "build-report.md")
@@ -118,6 +121,7 @@ func launchWithLeftover(t *testing.T, tm func(fx launchFixture) TmuxController) 
 }
 
 func TestTmuxREPL_IdleNudge_ExplainsAnUnrewrittenDeliverable(t *testing.T) {
+	t.Parallel()
 	var tmux *nudgeRecordingTmux
 	code, stderr, _ := launchWithLeftover(t, func(launchFixture) TmuxController {
 		tmux = &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}
@@ -132,6 +136,7 @@ func TestTmuxREPL_IdleNudge_ExplainsAnUnrewrittenDeliverable(t *testing.T) {
 }
 
 func TestTmuxREPL_IdleNudge_AnAgentThatReChecksAndAppendsCompletes(t *testing.T) {
+	t.Parallel()
 	code, stderr, _ := launchWithLeftover(t, func(fx launchFixture) TmuxController {
 		return &appendOnNudgeTmux{nudgeRecordingTmux: &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}}, artifact: fx.artifact}
 	})

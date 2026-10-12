@@ -24,6 +24,7 @@ func scratchPath(ws string) string {
 }
 
 func TestInjectEnvelope_CommandIdle_Pastes(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -46,6 +47,7 @@ func TestInjectEnvelope_CommandIdle_Pastes(t *testing.T) {
 }
 
 func TestInjectEnvelope_CommandMidTurn_Defers(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -65,6 +67,7 @@ func TestInjectEnvelope_CommandMidTurn_Defers(t *testing.T) {
 }
 
 func TestInjectEnvelope_Keystroke_RawSendNoEscNoGate(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -93,6 +96,7 @@ func TestInjectEnvelope_Keystroke_RawSendNoEscNoGate(t *testing.T) {
 }
 
 func TestInjectEnvelope_Keystroke_SuspectWarnsButSends(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -113,6 +117,7 @@ func TestInjectEnvelope_Keystroke_SuspectWarnsButSends(t *testing.T) {
 }
 
 func TestInjectEnvelope_Keystroke_EmptyBodyIsNoop(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -135,6 +140,7 @@ func TestInjectEnvelope_Keystroke_EmptyBodyIsNoop(t *testing.T) {
 // The fake tmux records "<keys>|<enter>", pinning both the body and the
 // no-Enter contract in one string.
 func TestInjectEnvelope_Keystroke_TmuxKeyNames(t *testing.T) {
+	t.Parallel()
 	keys := []string{
 		"Escape", // cancel a modal
 		"Enter",  // confirm a y/N prompt
@@ -173,6 +179,7 @@ func TestInjectEnvelope_Keystroke_TmuxKeyNames(t *testing.T) {
 }
 
 func TestInjectEnvelope_Keystroke_MultiToken(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		body string
 	}{
@@ -204,6 +211,7 @@ func TestInjectEnvelope_Keystroke_MultiToken(t *testing.T) {
 // Some CLIs prompt in non-ASCII (Japanese, Korean, Chinese localizations),
 // and a literal `--body=はい` must reach the REPL byte-for-byte.
 func TestInjectEnvelope_Keystroke_UnicodeBody(t *testing.T) {
+	t.Parallel()
 	cases := []string{
 		"はい",      // Japanese "yes"
 		"네",       // Korean "yes"
@@ -232,6 +240,7 @@ func TestInjectEnvelope_Keystroke_UnicodeBody(t *testing.T) {
 }
 
 func TestInjectEnvelope_Keystroke_DeferCountIgnored(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -254,6 +263,7 @@ func TestInjectEnvelope_Keystroke_DeferCountIgnored(t *testing.T) {
 // 4 KB is well above any realistic operator-scripted body but below macOS
 // ARG_MAX (256 KB) so the test stays portable.
 func TestInjectEnvelope_Keystroke_LongBody(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -279,6 +289,7 @@ func TestInjectEnvelope_Keystroke_LongBody(t *testing.T) {
 }
 
 func TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	stderr := &bytes.Buffer{}
@@ -318,6 +329,7 @@ func (e *errInjectingTmux) PasteBuffer(context.Context, string) error        { r
 func (e *errInjectingTmux) KillSession(context.Context, string) error        { return nil }
 
 func TestInjectEnvelope_Interrupt_EscBeforeBody(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -337,6 +349,7 @@ func TestInjectEnvelope_Interrupt_EscBeforeBody(t *testing.T) {
 }
 
 func TestInjectEnvelope_DeferBudgetExhausted_Drops(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
@@ -356,6 +369,7 @@ func TestInjectEnvelope_DeferBudgetExhausted_Drops(t *testing.T) {
 // --- loop wiring: cursor-at-EOF skips backlog; post-launch append injects ---
 
 func TestRunTmuxREPL_SkipsPreLaunchBacklog(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	artifact := filepath.Join(ws, "a")
@@ -403,6 +417,7 @@ func (c *captureHookTmux) CapturePane(_ context.Context, _ string, _ int) (strin
 }
 
 func TestRunTmuxREPL_InjectsPostLaunchAppend(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	artifact := filepath.Join(ws, "a")

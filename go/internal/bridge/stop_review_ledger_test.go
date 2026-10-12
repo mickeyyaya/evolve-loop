@@ -31,6 +31,7 @@ func runTmuxOnStopReview(t *testing.T, fx launchFixture, tmux *fakeTmux, rev Sto
 }
 
 func TestRunTmuxREPL_OnStopReview_CalledForExtendAndPause(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never lands
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
@@ -66,6 +67,7 @@ func TestRunTmuxREPL_OnStopReview_CalledForExtendAndPause(t *testing.T) {
 }
 
 func TestRunTmuxREPL_OnStopReview_NilSafe(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{

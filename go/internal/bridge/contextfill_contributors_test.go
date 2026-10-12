@@ -16,6 +16,7 @@ import (
 // selected for FillPct via windowOccupancy). Only a fix that carries the peak
 // turn's own components through to the contributor breakdown can pass.
 func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
+	t.Parallel()
 	start := time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
 	end := start.Add(30 * time.Second)
 	ws := t.TempDir()
@@ -61,6 +62,7 @@ func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
 // whole-launch total, which fillpct.go's windowOccupancy already treats as a
 // single reading in that case.
 func TestContextFillWarn_ContributorsFallBackToUsageWithoutPeakData(t *testing.T) {
+	t.Parallel()
 	start := time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
 	end := start.Add(30 * time.Second)
 	ws := t.TempDir()

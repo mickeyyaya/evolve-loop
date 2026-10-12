@@ -20,6 +20,7 @@ func (d detachFailTmux) SendKeys(ctx context.Context, session, keys string, ente
 }
 
 func TestTmuxBoot_AFailedDetachSendStopsTheBootBeforeTheLaunch(t *testing.T) {
+	t.Parallel()
 	tmux := &fakeTmux{}
 	var stderr bytes.Buffer
 	deps := Deps{

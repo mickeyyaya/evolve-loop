@@ -31,6 +31,7 @@ func pollUntilStable(t *testing.T, d *artifactDetector) (bool, error) {
 }
 
 func TestArtifactDetector_HoldsCompletionWhileSecondaryMissing(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cfg := settledPrimary(t, dir)
 	sec := filepath.Join(dir, "disposition.json")
@@ -58,6 +59,7 @@ func TestArtifactDetector_HoldsCompletionWhileSecondaryMissing(t *testing.T) {
 }
 
 func TestArtifactDetector_EmptySecondaryDoesNotCount(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cfg := settledPrimary(t, dir)
 	sec := filepath.Join(dir, "disposition.json")
@@ -72,6 +74,7 @@ func TestArtifactDetector_EmptySecondaryDoesNotCount(t *testing.T) {
 }
 
 func TestArtifactDetector_NoSecondariesIsLegacyBehavior(t *testing.T) {
+	t.Parallel()
 	d := &artifactDetector{cfg: settledPrimary(t, t.TempDir())}
 	if done, err := pollUntilStable(t, d); err != nil || !done {
 		t.Errorf("no-secondaries phase must complete exactly as before (done=%v err=%v)", done, err)
@@ -79,6 +82,7 @@ func TestArtifactDetector_NoSecondariesIsLegacyBehavior(t *testing.T) {
 }
 
 func TestSplitNonEmptyCSV(t *testing.T) {
+	t.Parallel()
 	if got := splitNonEmptyCSV(""); got != nil {
 		t.Errorf("empty flag must yield nil, got %v", got)
 	}

@@ -84,6 +84,7 @@ func apicoverPipelineRunner(goDir string, seen *[]string) sysexec.RunFunc {
 }
 
 func TestApicoverEnforceChanged_NoOps(t *testing.T) {
+	t.Parallel()
 	if off, err := apicoverEnforceChangedDefault(core.PhaseRequest{Worktree: t.TempDir(), Cycle: 1}); off != nil || err != nil {
 		t.Errorf("no module: (%v,%v)", off, err)
 	}

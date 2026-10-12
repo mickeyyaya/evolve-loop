@@ -53,6 +53,7 @@ func sizeDiags(diags []core.Diagnostic) []core.Diagnostic {
 }
 
 func TestAuditReportLength(t *testing.T) {
+	t.Parallel()
 	capBytes := auditReportMaxBytes
 
 	t.Run("cap_value_sane", func(t *testing.T) {

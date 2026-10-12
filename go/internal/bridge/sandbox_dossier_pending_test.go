@@ -8,6 +8,7 @@ import (
 )
 
 func TestNoProfileCanWriteTheDossierPendingDir(t *testing.T) {
+	t.Parallel()
 	for name, prof := range realSandboxProfiles(t) {
 		root := t.TempDir()
 		grants, err := resolveSandboxWriteGrants(prof.Sandbox.WriteSubpaths, root, t.TempDir())

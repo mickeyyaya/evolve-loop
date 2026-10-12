@@ -10,6 +10,7 @@ import (
 )
 
 func TestEngineLaunch_TheResponseCarriesTheClassifiedCauseCode(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	const prompt = "Please produce the retrospective deliverable for this cycle now."
 	eng := newTestEngine(Deps{

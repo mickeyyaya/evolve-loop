@@ -30,6 +30,7 @@ func writeAuditFile(t *testing.T, root, rel, content string) {
 }
 
 func TestChangedPackagesForAudit_GitDerivedNoHandoff(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	gitInAudit(t, root, "init")
 	writeAuditFile(t, root, "go/internal/base/base.go", "package base\n")

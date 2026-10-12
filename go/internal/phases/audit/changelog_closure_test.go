@@ -37,6 +37,7 @@ func classifyClosure(t *testing.T, body string) (string, string) {
 }
 
 func TestC1285_401_ClassifyBlocksUncitedClosureClaim(t *testing.T) {
+	t.Parallel()
 	verdict, diags := classifyClosure(t,
 		"## Bookkeeping\n\nThe CRITICAL defect raised by cycle-1272 is verified closed.")
 
@@ -52,6 +53,7 @@ func TestC1285_401_ClassifyBlocksUncitedClosureClaim(t *testing.T) {
 }
 
 func TestC1285_402_ClassifyAllowsCitedClosureClaim(t *testing.T) {
+	t.Parallel()
 	verdict, diags := classifyClosure(t,
 		"## Bookkeeping\n\nThe CRITICAL defect raised by cycle-1272 is verified closed "+
 			"(per .evolve/runs/cycle-1272/defect-dispositions.json, entry d1 FIXED).")
@@ -65,6 +67,7 @@ func TestC1285_402_ClassifyAllowsCitedClosureClaim(t *testing.T) {
 }
 
 func TestC1285_403_OrdinaryReportUnaffected(t *testing.T) {
+	t.Parallel()
 	verdict, diags := classifyClosure(t,
 		"## Findings\n\nAll acceptance criteria are met. The build is clean and the "+
 			"predicate suite is green; no defects were carried in from an earlier cycle.")
@@ -75,6 +78,7 @@ func TestC1285_403_OrdinaryReportUnaffected(t *testing.T) {
 }
 
 func TestC1285_404_ClosureOffendersAreLineScoped(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		text string

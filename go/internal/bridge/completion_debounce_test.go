@@ -58,6 +58,7 @@ func newArtifactDetectorAt(ws, artifact string) *artifactDetector {
 }
 
 func TestArtifactDetector_ReadyOnlyAfterCrossPollStability(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	d := newArtifactDetectorAt(ws, canonical)
@@ -88,6 +89,7 @@ func TestArtifactDetector_ReadyOnlyAfterCrossPollStability(t *testing.T) {
 }
 
 func TestArtifactDetector_NotReadyWhileArtifactStillGrowing(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	d := newArtifactDetectorAt(ws, canonical)
@@ -104,6 +106,7 @@ func TestArtifactDetector_NotReadyWhileArtifactStillGrowing(t *testing.T) {
 }
 
 func TestArtifactDetector_NotReadyOnSameSizeRewrite(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	d := newArtifactDetectorAt(ws, canonical)
@@ -120,6 +123,7 @@ func TestArtifactDetector_NotReadyOnSameSizeRewrite(t *testing.T) {
 }
 
 func TestArtifactDetector_CtxCancelledShortCircuitsDebounce(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	d := newArtifactDetectorAt(ws, canonical)
@@ -151,6 +155,7 @@ func TestArtifactDetector_CtxCancelledShortCircuitsDebounce(t *testing.T) {
 }
 
 func TestArtifactDetector_RelocationNoteSurvivesUntilStable(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallback := filepath.Join(ws, "workspace", "report.md")
@@ -199,6 +204,7 @@ func (c *churningReviewer) Review(StopEvent) ReviewVerdict {
 // rather than the detector in isolation, so a debounce implemented on a
 // struct nothing reaches cannot pass it.
 func TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &churningReviewer{artifact: fx.artifact, extends: 5}
@@ -239,6 +245,7 @@ func debounceExitDiagnosis(code int) string {
 // artifactStableTicks = 1, which is arithmetically "one observation" — no
 // window at all.
 func TestArtifactStableTicks_IsAMeaningfulWindow(t *testing.T) {
+	t.Parallel()
 	if artifactStableTicks < 2 {
 		t.Fatalf("artifactStableTicks = %d — a window of fewer than 2 consecutive identical "+
 			"observations is not a debounce", artifactStableTicks)

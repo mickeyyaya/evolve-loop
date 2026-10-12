@@ -21,6 +21,7 @@ func (w *workdirRecordingTmux) NewSessionIn(ctx context.Context, name string, wi
 }
 
 func TestFleetModeRefusesEmptyWorktree(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	cfg.Worktree = ""
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯"}}
@@ -45,6 +46,7 @@ func TestFleetModeRefusesEmptyWorktree(t *testing.T) {
 }
 
 func TestSingleModeCwdFallbackWarnsLoudly(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	cfg.Worktree = ""
 	var stderr bytes.Buffer
@@ -70,6 +72,7 @@ func TestSingleModeCwdFallbackWarnsLoudly(t *testing.T) {
 }
 
 func TestNewSessionBindsWorkdirAtBirth(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯"}}
 	tm := &workdirRecordingTmux{FakeTmuxController: base}
@@ -109,6 +112,7 @@ func (w *recipeWorkdirTmux) NewSessionIn(ctx context.Context, name string, width
 }
 
 func TestRecipeFleetModeRefusesEmptyWorktree(t *testing.T) {
+	t.Parallel()
 	deps := recipeDeps(&fakeTmux{})
 	deps.LookupEnv = mapLookup(map[string]string{"EVOLVE_FLEET": "1"})
 	_, _, err := newRecipeDriver(&Config{Workspace: t.TempDir(), Agent: "recipe"}, deps, "claude-tmux")
@@ -118,6 +122,7 @@ func TestRecipeFleetModeRefusesEmptyWorktree(t *testing.T) {
 }
 
 func TestRecipeEnsureSessionBindsWorkdirAtBirth(t *testing.T) {
+	t.Parallel()
 	wd := t.TempDir()
 	tm := &recipeWorkdirTmux{fakeTmux: &fakeTmux{paneSeq: []string{"❯"}}}
 	deps := recipeDeps(tm.fakeTmux)
@@ -140,6 +145,7 @@ func TestRecipeEnsureSessionBindsWorkdirAtBirth(t *testing.T) {
 }
 
 func TestCapabilityAbsentFallsBackToPlainNewSession(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯"}}
 	code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{

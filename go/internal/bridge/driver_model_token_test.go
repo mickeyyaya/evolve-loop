@@ -8,6 +8,7 @@ import (
 // Sweeps the single vocabulary source (unresolvedModelTokens) rather than a
 // local copy, so a token added there is automatically covered here.
 func TestClaudePArgs_OmitsUnresolvedModelToken(t *testing.T) {
+	t.Parallel()
 	for _, tok := range unresolvedModelTokens {
 		t.Run(tok, func(t *testing.T) {
 			args, omitted := claudePArgs(&Config{Model: tok}, "prompt")
@@ -25,6 +26,7 @@ func TestClaudePArgs_OmitsUnresolvedModelToken(t *testing.T) {
 }
 
 func TestClaudePArgs_EmitsConcreteModel(t *testing.T) {
+	t.Parallel()
 	args, omitted := claudePArgs(&Config{Model: "opus"}, "prompt")
 	if !containsToken(args, "--model") || !containsToken(args, "opus") {
 		t.Errorf("claudePArgs(model=opus) = %v, want --model opus — a concrete model must still reach the CLI", args)
@@ -35,6 +37,7 @@ func TestClaudePArgs_EmitsConcreteModel(t *testing.T) {
 }
 
 func TestClaudePArgs_EmptyModelOmitsWithoutClaimingSuppression(t *testing.T) {
+	t.Parallel()
 	args, omitted := claudePArgs(&Config{Model: ""}, "prompt")
 	if containsToken(args, "--model") {
 		t.Errorf("claudePArgs(model=\"\") emitted --model in %v — an empty model must send no flag", args)
@@ -45,6 +48,7 @@ func TestClaudePArgs_EmptyModelOmitsWithoutClaimingSuppression(t *testing.T) {
 }
 
 func TestClaudePArgs_PreservesNonModelArgv(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{
 		Model:          "opus",
 		PermissionMode: "plan",
@@ -64,6 +68,7 @@ func TestClaudePArgs_PreservesNonModelArgv(t *testing.T) {
 }
 
 func TestUnresolvedModelTokens_CoversVocabularyWithoutSwallowingRealModels(t *testing.T) {
+	t.Parallel()
 	for _, tok := range []string{"auto", "high", "fast", "balanced", "deep", "top"} {
 		if !isUnresolvedModelToken(tok) {
 			t.Errorf("isUnresolvedModelToken(%q) = false — %q is vocabulary and must never reach a CLI as a model", tok, tok)

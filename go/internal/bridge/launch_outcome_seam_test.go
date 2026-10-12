@@ -11,6 +11,7 @@ import (
 )
 
 func TestExitCodes_HostAliasesAreTheLeafValues(t *testing.T) {
+	t.Parallel()
 	for name, pair := range map[string][2]int{
 		"ExitOK":               {ExitOK, launchoutcome.ExitOK},
 		"ExitSafetyGate":       {ExitSafetyGate, launchoutcome.ExitSafetyGate},
@@ -105,6 +106,7 @@ func nonTestSourcesWhere(t *testing.T, matches func(body string) bool) []string 
 }
 
 func TestLaunchOutcome_OneClassificationSite(t *testing.T) {
+	t.Parallel()
 	for needle, want := range map[string][]string{
 		"launchoutcome.Classify(":  {"internal/bridge/engine.go"},
 		"launchoutcome.CauseCode(": {"internal/bridge/attempt_telemetry.go"},
@@ -118,6 +120,7 @@ func TestLaunchOutcome_OneClassificationSite(t *testing.T) {
 }
 
 func TestTimeoutCauseVocabulary_DriverAndClassifierAgree(t *testing.T) {
+	t.Parallel()
 	evidence := []artifactTimeoutEvidence{
 		{cancellationErr: errCancelledForTest{}},
 		{terminalDetectorErrored: true},

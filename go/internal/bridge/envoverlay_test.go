@@ -9,6 +9,7 @@ import (
 )
 
 func TestLookupEnv_DepsEnvOverlay(t *testing.T) {
+	t.Parallel()
 	t.Run("overlay is consulted", func(t *testing.T) {
 		if v, ok := lookupEnv(Deps{Env: map[string]string{"K": "x"}}, "K"); !ok || v != "x" {
 			t.Fatalf("lookupEnv(Deps.Env) = (%q,%v), want (x,true)", v, ok)
@@ -29,6 +30,7 @@ func TestLookupEnv_DepsEnvOverlay(t *testing.T) {
 }
 
 func TestEnvInt_DepsEnvOverlay(t *testing.T) {
+	t.Parallel()
 	if got := envInt(Deps{Env: map[string]string{"K": "600"}}, "K", 300); got != 600 {
 		t.Fatalf("envInt from Deps.Env = %d, want 600", got)
 	}
@@ -43,6 +45,7 @@ func TestEnvInt_DepsEnvOverlay(t *testing.T) {
 }
 
 func TestRunTmuxREPL_TimeoutFromDeps(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "stop now"}}}
@@ -67,6 +70,7 @@ func TestRunTmuxREPL_TimeoutFromDeps(t *testing.T) {
 }
 
 func TestRunTmuxREPL_CfgTimeoutWinsOverDeps(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws,

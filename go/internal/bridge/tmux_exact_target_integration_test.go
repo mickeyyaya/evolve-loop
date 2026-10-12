@@ -10,6 +10,7 @@ import (
 )
 
 func TestRealTmux_AMissingSessionNeverResolvesToALongerName(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	ctx := context.Background()
 	gone := itSession("exact")
@@ -58,6 +59,7 @@ func TestRealTmux_AMissingSessionNeverResolvesToALongerName(t *testing.T) {
 }
 
 func TestExactSessionTarget_NamesOnlyThatSession(t *testing.T) {
+	t.Parallel()
 	if got := ExactSessionTarget("evolve-bridge-it-x-12"); got != "=evolve-bridge-it-x-12:" {
 		t.Fatalf("ExactSessionTarget = %q, want =evolve-bridge-it-x-12:", got)
 	}

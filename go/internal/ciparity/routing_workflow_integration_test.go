@@ -120,6 +120,7 @@ func routingPathCases() []routingCase {
 }
 
 func TestRequiredRouting_ConsumedPathsAndExplicitDocumentationSkips(t *testing.T) {
+	t.Parallel()
 	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
 	for _, tc := range routingPathCases() {
 		t.Run(tc.name, func(t *testing.T) {
@@ -146,6 +147,7 @@ func TestRequiredRouting_ConsumedPathsAndExplicitDocumentationSkips(t *testing.T
 }
 
 func TestRequiredRouting_MergeBaseExcludesBaseBranchOnlyChanges(t *testing.T) {
+	t.Parallel()
 	dir, _ := routingRepo(t)
 	routingGit(t, dir, "checkout", "-qb", "feature")
 	routingFile(t, dir, "go/pr.go")
@@ -160,6 +162,7 @@ func TestRequiredRouting_MergeBaseExcludesBaseBranchOnlyChanges(t *testing.T) {
 }
 
 func TestRequiredRouting_NonFastForwardPushDiffsTheReachableOldTip(t *testing.T) {
+	t.Parallel()
 	dir, base := routingRepo(t)
 	routingFile(t, dir, "go/dropped.go")
 	oldTip := routingCommit(t, dir)
@@ -177,6 +180,7 @@ func TestRequiredRouting_NonFastForwardPushDiffsTheReachableOldTip(t *testing.T)
 }
 
 func TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip(t *testing.T) {
+	t.Parallel()
 	dir, head := routingRepo(t)
 	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
 	cases := []struct {
@@ -210,6 +214,7 @@ func TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip(t *testing
 }
 
 func TestRequiredRouting_GitFailuresStopWithoutShellErrexit(t *testing.T) {
+	t.Parallel()
 	dir, head := routingRepo(t)
 	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
 	for _, tc := range []struct{ name, prefix, event, base, head string }{
@@ -274,6 +279,7 @@ func docsRoutingCases() []docsRoutingCase {
 }
 
 func TestRequiredRouting_DocsOnlyPullRequestSelectsOnlyTheLint(t *testing.T) {
+	t.Parallel()
 	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
 	for _, tc := range docsRoutingCases() {
 		t.Run(tc.name, func(t *testing.T) {
@@ -299,6 +305,7 @@ func TestRequiredRouting_DocsOnlyPullRequestSelectsOnlyTheLint(t *testing.T) {
 }
 
 func TestRequiredRouting_AnEmptyPullRequestDiffKeepsTheFullSelection(t *testing.T) {
+	t.Parallel()
 	dir, head := routingRepo(t)
 
 	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "pull_request", head, head)

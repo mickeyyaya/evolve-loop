@@ -67,6 +67,7 @@ func fixtureDeps(tm TmuxController) Deps {
 }
 
 func TestTmuxFixture(t *testing.T) {
+	t.Parallel()
 	t.Run("boot_success", func(t *testing.T) {
 		cfg := fixtureConfig(t)
 		tm := &FakeTmuxController{CaptureFrames: []string{"❯", cycle274BquoteSpill}}
@@ -113,6 +114,7 @@ func TestTmuxFixture(t *testing.T) {
 }
 
 func TestFakeTmuxControllerPanicsOnUnderrun(t *testing.T) {
+	t.Parallel()
 	tm := &FakeTmuxController{}
 	defer func() {
 		if r := recover(); r == nil {
@@ -123,6 +125,7 @@ func TestFakeTmuxControllerPanicsOnUnderrun(t *testing.T) {
 }
 
 func TestCodexUpdateMenuDismiss(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		frames   []string

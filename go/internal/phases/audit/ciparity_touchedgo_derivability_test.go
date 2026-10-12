@@ -17,6 +17,7 @@ var wholeRepoGates = []struct {
 }
 
 func TestWholeRepoGates_UnderivableChangeSet_WarnsNotSilentSkip(t *testing.T) {
+	t.Parallel()
 	root := enforceFixtureNonGit(t)
 	for _, g := range wholeRepoGates {
 		off, err := g.check(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1, Workspace: t.TempDir()})
@@ -44,6 +45,7 @@ func TestWholeRepoGates_CleanDerivableTree_StaySilent(t *testing.T) {
 }
 
 func TestWholeRepoGates_NoGoModule_StaySilent(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for _, g := range wholeRepoGates {
 		off, err := g.check(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1, Workspace: t.TempDir()})

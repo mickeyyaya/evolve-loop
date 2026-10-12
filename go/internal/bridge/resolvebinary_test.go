@@ -3,6 +3,7 @@ package bridge
 import "testing"
 
 func TestResolveBinary(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name        string
 		env         map[string]string

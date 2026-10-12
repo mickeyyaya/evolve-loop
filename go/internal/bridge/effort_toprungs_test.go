@@ -20,6 +20,7 @@ func repoRootForEffort(t *testing.T) string {
 // realizeScalar appends any string; its rows prove the mechanism is wired,
 // not that "max" is a valid claude effort level.
 func TestEffortTopRungs_RealizeOnCodexAndClaude(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		manifest string
 		effort   string

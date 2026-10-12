@@ -8,6 +8,7 @@ import (
 )
 
 func TestAgyClaudeTmux_TheLiveIndividualQuotaWallIsClassifiedByTheManifestsExhaustedRegex(t *testing.T) {
+	t.Parallel()
 	pane, err := os.ReadFile(filepath.Join("testdata", "agy-claude-individual-quota-wall.txt"))
 	if err != nil {
 		t.Fatal(err)

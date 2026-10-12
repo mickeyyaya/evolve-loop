@@ -31,6 +31,7 @@ func ledgerByText(doc ledgerDoc) map[string]string {
 }
 
 func TestClassify_ContinuationRetryDoesNotEraseOwnEntries(t *testing.T) {
+	t.Parallel()
 	inherited := []string{"stale cs.ActiveWorktree survives fleet teardown"}
 	ws, req := continuationFixture(t, 1255, 1270, inherited)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -66,6 +67,7 @@ func TestClassify_ContinuationRetryDoesNotEraseOwnEntries(t *testing.T) {
 }
 
 func TestClassify_LedgerIDsAreContentDerived(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	textA := "symlinked test-suffix bypasses probe quarantine"
 	textB := "DirectImporters parses unbounded input"
@@ -94,6 +96,7 @@ func TestClassify_LedgerIDsAreContentDerived(t *testing.T) {
 }
 
 func TestClassify_ContinuationWithNoAncestorLedgerIsDiagnosed(t *testing.T) {
+	t.Parallel()
 	_, req := continuationFixture(t, 1255, 1270, laundered)
 	if err := os.Remove(filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-1255", ledgerFile)); err != nil {
 		t.Fatalf("remove ancestor ledger: %v", err)
@@ -108,6 +111,7 @@ func TestClassify_ContinuationWithNoAncestorLedgerIsDiagnosed(t *testing.T) {
 }
 
 func TestClassify_NonContinuationEmitsNoLedgerDiagnostic(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)
@@ -124,6 +128,7 @@ func TestClassify_NonContinuationEmitsNoLedgerDiagnostic(t *testing.T) {
 }
 
 func TestClassify_UnresolvableEvidenceDoesNotCloseADefect(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1255, 1270, laundered[:1])
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -148,6 +153,7 @@ func TestClassify_UnresolvableEvidenceDoesNotCloseADefect(t *testing.T) {
 }
 
 func TestClassify_ResolvableEvidenceClosesADefect(t *testing.T) {
+	t.Parallel()
 	_, req := continuationFixture(t, 1255, 1270, laundered[:2])
 	ws := req.Workspace
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -164,6 +170,7 @@ func TestClassify_ResolvableEvidenceClosesADefect(t *testing.T) {
 }
 
 func TestClassify_DispositionArms(t *testing.T) {
+	t.Parallel()
 	realEvidence := "go/internal/core/fleet.go"
 
 	cases := []struct {
@@ -243,6 +250,7 @@ func TestClassify_DispositionArms(t *testing.T) {
 }
 
 func TestClassify_CarriesForwardAlreadyDispositionedAncestorEntry(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	ancestorWS := filepath.Join(root, ".evolve", "runs", "cycle-1255")
 	writeJSON(t, filepath.Join(ancestorWS, ledgerFile), map[string]any{
@@ -290,6 +298,7 @@ func TestClassify_CarriesForwardAlreadyDispositionedAncestorEntry(t *testing.T) 
 }
 
 func TestClassify_WarnWithStructuredDefectsEmitsLedger(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)
@@ -317,6 +326,7 @@ func TestClassify_WarnWithStructuredDefectsEmitsLedger(t *testing.T) {
 }
 
 func TestClassify_WarnWithoutStructuredDefectsMintsNothing(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)

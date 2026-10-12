@@ -38,6 +38,7 @@ func readInteractions(t *testing.T, ws, phase string) []interaction.Outcome {
 }
 
 func TestVerifySubmitted_ReportsOutcome(t *testing.T) {
+	t.Parallel()
 	clean := "● done\n\n" + tmuxPromptMarkerDefault
 	lp := tmuxLaunch{name: "claude-tmux", session: "s",
 		promptMarker: tmuxPromptMarkerDefault, inputLineMarker: tmuxPromptMarkerDefault}
@@ -97,6 +98,7 @@ func TestVerifySubmitted_ReportsOutcome(t *testing.T) {
 // is durable, and the clean row is the denominator — without it, an early
 // "don't spam the ledger" return would pass the recovered-row assertion alone.
 func TestTmuxREPL_SubmitVerify_RecordReachesLedger(t *testing.T) {
+	t.Parallel()
 	run := func(t *testing.T, tm TmuxController) []interaction.Outcome {
 		t.Helper()
 		fx := newFixture(t, "claude-tmux", "")

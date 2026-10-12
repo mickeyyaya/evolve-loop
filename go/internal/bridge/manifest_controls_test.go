@@ -6,6 +6,7 @@ import (
 )
 
 func TestManifestControls_RealManifests(t *testing.T) {
+	t.Parallel()
 	type want struct {
 		event, send string
 	}
@@ -52,6 +53,7 @@ func TestManifestControls_RealManifests(t *testing.T) {
 }
 
 func TestManifestControl_Resolution(t *testing.T) {
+	t.Parallel()
 	data := []byte(`{
 		"cli": "fake-tmux",
 		"binary": "fake",
@@ -96,6 +98,7 @@ func TestManifestControl_Resolution(t *testing.T) {
 }
 
 func TestManifestControl_NoControlsBlock(t *testing.T) {
+	t.Parallel()
 	m, err := parseManifest("bare-tmux", []byte(`{"cli":"bare-tmux","binary":"bare"}`))
 	if err != nil {
 		t.Fatalf("parseManifest: %v", err)

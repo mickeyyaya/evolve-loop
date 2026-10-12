@@ -8,6 +8,7 @@ import (
 )
 
 func TestRunTmuxREPL_PauseWritesEscalationReport(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	defer os.RemoveAll(fx.ws)
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
@@ -55,6 +56,7 @@ func TestRunTmuxREPL_PauseWritesEscalationReport(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ExtendNoEscalationReport(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	defer os.RemoveAll(fx.ws)
 

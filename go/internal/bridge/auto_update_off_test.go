@@ -38,6 +38,7 @@ func TestAutoUpdateOffEnv_EveryDeclaredOffSwitchIsSetInDefaultEnv(t *testing.T) 
 }
 
 func TestRecipeBoot_ExportsTheRealizedEnvBetweenTheCdAndTheLaunch(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"booting", "ready\n❯"}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	d.cfg.Realization = Realization{Env: map[string]string{agyAutoUpdateOffEnv: "1"}}
@@ -63,6 +64,7 @@ func TestRecipeBoot_ExportsTheRealizedEnvBetweenTheCdAndTheLaunch(t *testing.T) 
 }
 
 func TestRecipeBoot_AClaudeModelCaptureLaunchesWithTheRealManifestsDefaultEnv(t *testing.T) {
+	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"booting", "ready\n❯"}}
 	deps := recipeDeps(tx)
 	d, _, err := newRecipeDriver(&Config{Workspace: t.TempDir(), Worktree: t.TempDir(), Agent: "models", Realization: RealizeFor("claude-tmux", LaunchIntent{})}, deps, "claude-tmux")

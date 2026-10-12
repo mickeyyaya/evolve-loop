@@ -9,6 +9,7 @@ import (
 )
 
 func TestTmuxSocket_IsDedicatedNotDefault(t *testing.T) {
+	t.Parallel()
 	if TmuxSocket == "" || TmuxSocket == "default" {
 		t.Fatalf("TmuxSocket = %q; must be a dedicated, non-default socket name", TmuxSocket)
 	}
@@ -54,6 +55,7 @@ func TestTmuxSocketArgs_PerRunOverride(t *testing.T) {
 }
 
 func TestDeriveRunSocket(t *testing.T) {
+	t.Parallel()
 	if s := DeriveRunSocket(12345); s != "evolve-bridge-p12345" {
 		t.Fatalf("DeriveRunSocket(12345) = %q, want evolve-bridge-p12345", s)
 	}
@@ -63,6 +65,7 @@ func TestDeriveRunSocket(t *testing.T) {
 }
 
 func TestDeriveTestSocket_IsPerProcessAndNeverTheSharedOrALoopSocket(t *testing.T) {
+	t.Parallel()
 	got := DeriveTestSocket(4242)
 	if got != "evolve-bridge-t4242" {
 		t.Fatalf("DeriveTestSocket(4242) = %q, want evolve-bridge-t4242", got)

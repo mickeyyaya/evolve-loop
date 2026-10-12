@@ -16,6 +16,7 @@ func passingReport() string {
 }
 
 func TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	planted := []any{}
 	for i := range laundered {
@@ -49,6 +50,7 @@ func TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition(t *testing.T) {
 }
 
 func TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		evidence string
@@ -86,6 +88,7 @@ func TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect(t *testing.T) {
 }
 
 func TestAdversarial_ShadowedIDIsLoudAndBlocking(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	writeJSON(t, filepath.Join(ws, ledgerFile), map[string]any{
 		"origin_cycle": 1255,
@@ -112,6 +115,7 @@ func TestAdversarial_ShadowedIDIsLoudAndBlocking(t *testing.T) {
 }
 
 func TestDefectID_IsWideEnoughToResistASecondPreimage(t *testing.T) {
+	t.Parallel()
 	id := defectID("some defect text")
 	if len(id) != 33 {
 		t.Errorf("defectID() = %q (%d chars); want a 16-byte hex id — a 32-bit id is aimable", id, len(id))
@@ -122,6 +126,7 @@ func TestDefectID_IsWideEnoughToResistASecondPreimage(t *testing.T) {
 }
 
 func TestEmitDefectLedger_CapsUnboundedDefects(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	defects := make([]string, defectLedgerMaxEntries+20)
 	for i := range defects {

@@ -33,6 +33,7 @@ func (b *probeFenceBridge) Launch(ctx context.Context, req core.BridgeRequest) (
 }
 
 func TestAudit_ContentFencePreservesBuilderTestsBeforeHostExecution(t *testing.T) {
+	t.Parallel()
 	for _, mutate := range []bool{false, true} {
 		name := "repair_after_first_audit"
 		if mutate {

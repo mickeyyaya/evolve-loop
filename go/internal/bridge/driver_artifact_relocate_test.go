@@ -9,6 +9,7 @@ import (
 )
 
 func TestArtifactReady_CanonicalPresent(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
 	if err := os.WriteFile(canonical, []byte("## Proposed Tasks\n"), 0o644); err != nil {
@@ -26,6 +27,7 @@ func TestArtifactReady_CanonicalPresent(t *testing.T) {
 }
 
 func TestArtifactReady_RelocatesFromWorkspaceSubdir(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
 	subdir := filepath.Join(ws, "workspace", "scout-report.md")
@@ -61,6 +63,7 @@ func TestArtifactReady_RelocatesFromWorkspaceSubdir(t *testing.T) {
 func TestArtifactReady_RelocatesOverEmptyCanonical(t *testing.T) {
 	// The canonical file is an empty placeholder; the real content lives in
 	// the workspace/ subdir.
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
 	subdir := filepath.Join(ws, "workspace", "scout-report.md")
@@ -87,6 +90,7 @@ func TestArtifactReady_RelocatesOverEmptyCanonical(t *testing.T) {
 }
 
 func TestArtifactReady_NeitherPresent(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := &Config{Workspace: ws, Artifact: filepath.Join(ws, "scout-report.md")}
 
@@ -97,6 +101,7 @@ func TestArtifactReady_NeitherPresent(t *testing.T) {
 }
 
 func TestArtifactReady_EmptyFilesDoNotCount(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
 	subdir := filepath.Join(ws, "workspace", "scout-report.md")
@@ -118,6 +123,7 @@ func TestArtifactReady_EmptyFilesDoNotCount(t *testing.T) {
 }
 
 func TestArtifactReady_RelocationFailureSurfacesError(t *testing.T) {
+	t.Parallel()
 	if os.Geteuid() == 0 {
 		t.Skip("read-only directory permissions are not enforced for root")
 	}
@@ -151,6 +157,7 @@ func TestArtifactReady_RelocationFailureSurfacesError(t *testing.T) {
 }
 
 func TestArtifactReady_RelocatesFromWorktreeRoot(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	wt := t.TempDir()
 	canonical := filepath.Join(ws, "build-report.md")
@@ -179,6 +186,7 @@ func TestArtifactReady_RelocatesFromWorktreeRoot(t *testing.T) {
 }
 
 func TestArtifactReady_RelocatesFromWorktreeWorkspaceSubdir(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	wt := t.TempDir()
 	canonical := filepath.Join(ws, "build-report.md")
@@ -203,6 +211,7 @@ func TestArtifactReady_RelocatesFromWorktreeWorkspaceSubdir(t *testing.T) {
 }
 
 func TestArtifactReady_WorkspaceSubdirWinsOverWorktree(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	wt := t.TempDir()
 	canonical := filepath.Join(ws, "build-report.md")
@@ -233,6 +242,7 @@ func TestArtifactReady_WorkspaceSubdirWinsOverWorktree(t *testing.T) {
 }
 
 func TestArtifactReady_NoWorktreeConfigured_UnchangedBehavior(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := &Config{Workspace: ws, Artifact: filepath.Join(ws, "build-report.md")}
 
@@ -243,6 +253,7 @@ func TestArtifactReady_NoWorktreeConfigured_UnchangedBehavior(t *testing.T) {
 }
 
 func TestRelocateFile_HappyPath(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	src := filepath.Join(dir, "sub", "report.md")
 	dst := filepath.Join(dir, "report.md")
@@ -268,6 +279,7 @@ func TestRelocateFile_HappyPath(t *testing.T) {
 }
 
 func TestListWorkspaceFiles_PrunesDepthIncludesArtifactPaths(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	// depth 0 (canonical) and depth 1 (non-canonical workspace/) are the two
 	// paths the diagnostic must always show; depth 2 is still listed; a file
@@ -298,6 +310,7 @@ func TestListWorkspaceFiles_PrunesDepthIncludesArtifactPaths(t *testing.T) {
 }
 
 func TestListWorkspaceFiles_CapsEntries(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	for i := 0; i < wsListMaxEntries+5; i++ {
 		if err := os.WriteFile(filepath.Join(ws, fmt.Sprintf("f%03d.md", i)), []byte("x"), 0o644); err != nil {

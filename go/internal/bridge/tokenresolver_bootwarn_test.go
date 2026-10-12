@@ -14,6 +14,7 @@ func stubResolver(tokenusage.Window) (tokenusage.Result, error) {
 }
 
 func TestEngine_WarnsOnNilTokenResolver(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	NewEngine(Deps{Stderr: &buf, Signals: sinkDeps(&buf)})
 	out := buf.String()
@@ -26,6 +27,7 @@ func TestEngine_WarnsOnNilTokenResolver(t *testing.T) {
 }
 
 func TestEngine_NoTokenResolverWarnWhenWired(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	NewEngine(Deps{Stderr: &buf, Signals: sinkDeps(&buf), TokenResolver: stubResolver})
 	if out := buf.String(); strings.Contains(out, "TokenResolver") {

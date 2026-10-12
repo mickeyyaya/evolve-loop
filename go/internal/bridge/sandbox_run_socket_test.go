@@ -93,6 +93,7 @@ func TestDefaultSandboxWrap_RefusesASocketGuardItCannotResolve(t *testing.T) {
 }
 
 func TestOSSandboxPrefix_AnUnknownSystemGetsNoPrefix(t *testing.T) {
+	t.Parallel()
 	prefix, ok := osSandboxPrefix("plan9", Deps{}, SandboxWrapRequest{Phase: "build"}, sandbox.Config{})
 
 	if ok || prefix != nil {

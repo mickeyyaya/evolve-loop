@@ -13,6 +13,7 @@ import (
 )
 
 func TestClaudeTmux_StreamOutputNote(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	_, se := runTmux(t, fx, &fakeTmux{}, nil, "--allow-bypass", "--stream-output")
 	if !strings.Contains(se, "stream_output=true is no-op") {
@@ -21,6 +22,7 @@ func TestClaudeTmux_StreamOutputNote(t *testing.T) {
 }
 
 func TestCodex_AutoModelOmitsM(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	prof := writeJSON(t, filepath.Join(t.TempDir(), "nomodel.json"), `{"name":"n"}`) // no model
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
@@ -44,6 +46,7 @@ func TestCodex_AutoModelOmitsM(t *testing.T) {
 }
 
 func TestPreparePrompt_ReadsExistingChallengeToken(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "prompt body $CHALLENGE_TOKEN tail")
 	// Pre-seed challenge-token.txt as if the orchestrator already minted it.
@@ -78,6 +81,7 @@ func TestPreparePrompt_ReadsExistingChallengeToken(t *testing.T) {
 }
 
 func TestPreparePrompt_TokenErrors(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "x $CHALLENGE_TOKEN")
 	if _, err := preparePrompt(&Config{PromptFile: pf, Workspace: ws},
@@ -93,6 +97,7 @@ func TestPreparePrompt_TokenErrors(t *testing.T) {
 }
 
 func TestRunTmuxREPL_EnsureDirsAndPromptWriteErrors(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hello") // valid prompt, no token
 
@@ -117,6 +122,7 @@ func TestRunTmuxREPL_EnsureDirsAndPromptWriteErrors(t *testing.T) {
 }
 
 func TestEngineLaunch_PromptWriteError(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if err := os.Mkdir(filepath.Join(ws, "scout-prompt.txt"), 0o755); err != nil { // promptFile path is a dir
 		t.Fatal(err)
@@ -132,6 +138,7 @@ func TestEngineLaunch_PromptWriteError(t *testing.T) {
 }
 
 func TestBuildReport_WorkspaceIsFile(t *testing.T) {
+	t.Parallel()
 	f := writeJSON(t, filepath.Join(t.TempDir(), "f"), "x")
 	if _, err := BuildReport(f, "artifact.md", time.Now()); err == nil {
 		t.Fatal("a file workspace should error")
@@ -139,6 +146,7 @@ func TestBuildReport_WorkspaceIsFile(t *testing.T) {
 }
 
 func TestLaunchArgs_NoStreamOutput(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	if code, _ := runLookup(t, fr, fx.args("claude-p", "--no-stream-output"), nil); code != ExitOK {
@@ -147,6 +155,7 @@ func TestLaunchArgs_NoStreamOutput(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ZeroBootIntervalDefaults(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	writeJSON(t, filepath.Join(ws, "a"), "done") // artifact present → quick exit
@@ -180,6 +189,7 @@ func TestRunTmuxREPL_ExtendTimeout(t *testing.T) {
 
 func TestRunTmuxREPL_ExtraFlagsAppended(t *testing.T) {
 	// `-- --myflag` → ExtraFlags appended to the REPL launch command.
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	writeJSON(t, fx.artifact, "done")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
@@ -200,6 +210,7 @@ func (zeroErrDriver) Launch(context.Context, *Config, Deps) (int, error) {
 }
 
 func TestEngineLaunch_EmptyModelDefaultsAuto(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeJSON(t, filepath.Join(ws, "p.json"), `{"name":"n","model":"haiku"}`)
 	art := filepath.Join(ws, "a.md")
@@ -213,6 +224,7 @@ func TestEngineLaunch_EmptyModelDefaultsAuto(t *testing.T) {
 }
 
 func TestBuildReport_EmptyArtifactNameDefaults(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeJSON(t, filepath.Join(ws, "artifact.md"), "body")
 	r, err := BuildReport(ws, "", time.Now()) // "" → defaults to artifact.md
@@ -227,6 +239,7 @@ func TestBuildReport_EmptyArtifactNameDefaults(t *testing.T) {
 func TestRunTmuxREPL_TickDuringBoot(t *testing.T) {
 	// tickDuringBoot + a first pane WITHOUT the marker → the boot loop runs
 	// the auto-responder tick before the marker appears on the next poll.
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	writeJSON(t, filepath.Join(ws, "a"), "done") // artifact present → quick exit after boot

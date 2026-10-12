@@ -31,6 +31,7 @@ func freezeSourceDir(t *testing.T, dir string) {
 }
 
 func TestArtifactDetector_FinalPollNeverCopyRemovesAnUnwitnessedFallback(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallbackDir := filepath.Join(ws, "workspace")
@@ -63,6 +64,7 @@ func TestArtifactDetector_FinalPollNeverCopyRemovesAnUnwitnessedFallback(t *test
 }
 
 func TestArtifactDetector_FinalPollStillCanonicalizesByRename(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallback := filepath.Join(ws, "workspace", "report.md")
@@ -97,6 +99,7 @@ func TestArtifactDetector_FinalPollStillCanonicalizesByRename(t *testing.T) {
 }
 
 func TestArtifactDetector_SettledFallbackStillUsesTheFullMover(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallbackDir := filepath.Join(ws, "workspace")
@@ -122,6 +125,7 @@ func TestArtifactDetector_SettledFallbackStillUsesTheFullMover(t *testing.T) {
 }
 
 func TestArtifactDetector_FinalPollOnCanonicalArtifactMovesNothing(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	writeArtifact(t, canonical, "# report\non disk", fixedMTime)
@@ -136,6 +140,7 @@ func TestArtifactDetector_FinalPollOnCanonicalArtifactMovesNothing(t *testing.T)
 }
 
 func TestArtifactDetector_CancelledCtxSharesTheFinalityGuard(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	fallbackDir := filepath.Join(ws, "workspace")
@@ -159,6 +164,7 @@ func TestArtifactDetector_CancelledCtxSharesTheFinalityGuard(t *testing.T) {
 }
 
 func TestArtifactLocate_RejectsSymlinkedCandidates(t *testing.T) {
+	t.Parallel()
 	secretDir := t.TempDir()
 	secret := filepath.Join(secretDir, "credentials.json")
 	writeArtifact(t, secret, `{"token":"sk-not-a-deliverable"}`, fixedMTime)
@@ -188,6 +194,7 @@ func TestArtifactLocate_RejectsSymlinkedCandidates(t *testing.T) {
 }
 
 func TestArtifactLocate_RejectsNonRegularCandidates(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	if err := os.MkdirAll(canonical, 0o755); err != nil {
@@ -199,6 +206,7 @@ func TestArtifactLocate_RejectsNonRegularCandidates(t *testing.T) {
 }
 
 func TestRelocateFile_DoesNotWriteThroughAPredictableTempName(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	srcDir := filepath.Join(ws, "workspace")
@@ -232,6 +240,7 @@ func TestRelocateFile_DoesNotWriteThroughAPredictableTempName(t *testing.T) {
 // artifactDetector.poll's finality branch, so this test pins the mover's own
 // contract directly.
 func TestRenameOnlyRelocate_IsTheDetectorsFinalityMover(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	srcDir := filepath.Join(ws, "workspace")
 	src := filepath.Join(srcDir, "report.md")

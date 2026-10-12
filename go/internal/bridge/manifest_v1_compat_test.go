@@ -7,6 +7,7 @@ import (
 )
 
 func TestManifestV1Compat_TranslatesTierAliasesKeys(t *testing.T) {
+	t.Parallel()
 	v1JSON := []byte(`{
 		"cli": "test-cli",
 		"binary": "test-bin",
@@ -40,6 +41,7 @@ func TestManifestV1Compat_TranslatesTierAliasesKeys(t *testing.T) {
 }
 
 func TestManifestV1Compat_PartialKeysTranslate(t *testing.T) {
+	t.Parallel()
 	v1JSON := []byte(`{
 		"cli": "test-cli",
 		"binary": "test-bin",
@@ -61,6 +63,7 @@ func TestManifestV1Compat_PartialKeysTranslate(t *testing.T) {
 }
 
 func TestManifestV2_LoadsModelTierMapDirectly(t *testing.T) {
+	t.Parallel()
 	v2JSON := []byte(`{
 		"cli": "v2-cli",
 		"binary": "v2-bin",
@@ -90,6 +93,7 @@ func TestManifestV2_LoadsModelTierMapDirectly(t *testing.T) {
 }
 
 func TestManifestV1Compat_NonStandardKeysPassThrough(t *testing.T) {
+	t.Parallel()
 	v1JSON := []byte(`{
 		"cli": "v1-custom",
 		"binary": "x",

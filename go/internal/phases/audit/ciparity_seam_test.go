@@ -20,6 +20,7 @@ import (
 )
 
 func TestCIParityGates_OneConstructionSite(t *testing.T) {
+	t.Parallel()
 	const onlySite = "internal/phases/audit/ciparity.go"
 	if offenders := nonTestSourcesMentioning(t, "ciparitygate.New(", onlySite); len(offenders) > 0 {
 		t.Errorf("ciparitygate.New( belongs to ONE non-test file (%s); these use it too: %v", onlySite, offenders)
@@ -224,6 +225,7 @@ func TestCIParityFacades_ReadThePackageVarSeamsPerCall(t *testing.T) {
 }
 
 func TestChangedPackagesForAudit_HandoffShape(t *testing.T) {
+	t.Parallel()
 	if pkgs, derivable := changedPackagesForAudit("", 1); pkgs != nil || derivable {
 		t.Errorf("no root: (%v, %v)", pkgs, derivable)
 	}
@@ -284,6 +286,7 @@ func TestCIParity_WritesNothingToStderr(t *testing.T) {
 }
 
 func TestApplyCIGate_EmptyNonNilOffendersIsPass(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		offenders []string
 		overrides int

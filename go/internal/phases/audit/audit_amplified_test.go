@@ -9,6 +9,7 @@ import (
 )
 
 func TestSkillsDriftCheckDefault_WithWorktree_NotNoOp(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	got, err := skillsDriftCheckDefault(core.PhaseRequest{Worktree: tmp, ProjectRoot: ""})
 	if err == nil {
@@ -20,6 +21,7 @@ func TestSkillsDriftCheckDefault_WithWorktree_NotNoOp(t *testing.T) {
 }
 
 func TestGofmtCheckDefault_WithWorktree_PreferredOverProjectRoot(t *testing.T) {
+	t.Parallel()
 	worktree := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(worktree, "go"), 0o755); err != nil {
 		t.Fatal(err)
@@ -47,6 +49,7 @@ func TestGofmtCheckDefault_WithWorktree_PreferredOverProjectRoot(t *testing.T) {
 }
 
 func TestGofmtCheckDefault_WithWorktree_CleanWorktree(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "go"), 0o755); err != nil {
 		t.Fatal(err)

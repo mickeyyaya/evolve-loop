@@ -10,6 +10,7 @@ import (
 )
 
 func TestLaunchEffortEqualsTheExplainEffortForAPhaseLabelLaunch(t *testing.T) {
+	t.Parallel()
 	block := policy.CLIRouting{
 		CLIs: []string{"claude"}, Default: []string{"claude"},
 		Tiers:  map[string]policy.TierRule{"deep": {Effort: "high"}},
@@ -46,6 +47,7 @@ func TestLaunchEffortEqualsTheExplainEffortForAPhaseLabelLaunch(t *testing.T) {
 }
 
 func TestLaunchEffortNeverReadsAKeyThatIsNotTheAgentName(t *testing.T) {
+	t.Parallel()
 	block := policy.CLIRouting{Agents: map[string]policy.AgentRule{"audit": {Effort: "low"}}}
 	got := launchIntentFor(&Config{Model: "deep", Agent: "audit"}, Profile{Name: "auditor"}, policy.Policy{CLIRouting: &block}.Efforts()).Effort
 	if got != "medium" {
@@ -67,6 +69,7 @@ func TestCodexModelIDLaunchSendsNoHiddenEffort(t *testing.T) {
 }
 
 func TestLaunchEffort_IsTheOneResolverOfEveryLaunchPath(t *testing.T) {
+	t.Parallel()
 	if got := LaunchEffort("claude-tmux", "", policy.EffortTable{}); got != "medium" {
 		t.Errorf("LaunchEffort(claude-tmux, no model) = %q, want medium (the balanced default)", got)
 	}

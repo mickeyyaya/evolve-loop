@@ -3,18 +3,21 @@ package bridge
 import "testing"
 
 func TestTranslateV1TierKey_HighAliasesToDeep(t *testing.T) {
+	t.Parallel()
 	if got := translateV1TierKey("high"); got != "deep" {
 		t.Errorf(`translateV1TierKey("high") = %q, want "deep"`, got)
 	}
 }
 
 func TestTranslateV1TierKey_TopIsNotConflatedWithHigh(t *testing.T) {
+	t.Parallel()
 	if got := translateV1TierKey("top"); got != "top" {
 		t.Errorf(`translateV1TierKey("top") = %q, want "top" (pass-through — "top" must stay distinct from "deep")`, got)
 	}
 }
 
 func TestTranslateV1TierKey_PreexistingMappingsUnchanged(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"haiku":       "fast",
 		"sonnet":      "balanced",

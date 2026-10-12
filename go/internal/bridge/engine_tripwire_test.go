@@ -88,6 +88,7 @@ func tripwireStderrLine(stderr string) (string, bool) {
 }
 
 func TestRecordTokenUsage_Tripwire_NonClaudeExit0Success_Warns(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 	})
@@ -104,6 +105,7 @@ func TestRecordTokenUsage_Tripwire_NonClaudeExit0Success_Warns(t *testing.T) {
 }
 
 func TestRecordTokenUsage_Tripwire_QuotaAbortShortLaunch_Silent(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 85, durSecs: 5, cycleInDir: true,
 	})
@@ -114,6 +116,7 @@ func TestRecordTokenUsage_Tripwire_QuotaAbortShortLaunch_Silent(t *testing.T) {
 }
 
 func TestRecordTokenUsage_Tripwire_Exit0ShortDuration_Silent(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 5, cycleInDir: true,
 	})
@@ -124,6 +127,7 @@ func TestRecordTokenUsage_Tripwire_Exit0ShortDuration_Silent(t *testing.T) {
 }
 
 func TestRecordTokenUsage_Tripwire_ClaudeBaseline_Silent(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "claude-tmux", agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 	})
@@ -134,6 +138,7 @@ func TestRecordTokenUsage_Tripwire_ClaudeBaseline_Silent(t *testing.T) {
 }
 
 func TestRecordTokenUsage_Tripwire_CoveredNonClaude_Silent(t *testing.T) {
+	t.Parallel()
 	stderr, record := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 90, covered: true, cycleInDir: true,
 	})
@@ -149,6 +154,7 @@ func TestRecordTokenUsage_Tripwire_CoveredNonClaude_Silent(t *testing.T) {
 }
 
 func TestRecordTokenUsage_Tripwire_NoCycleInPath_FailOpen(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 90, cycleInDir: false,
 	})
@@ -165,6 +171,7 @@ func TestRecordTokenUsage_Tripwire_NoCycleInPath_FailOpen(t *testing.T) {
 }
 
 func TestRecordTokenUsage_TripwireRecord_FieldFlips(t *testing.T) {
+	t.Parallel()
 	_, tripped := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 	})

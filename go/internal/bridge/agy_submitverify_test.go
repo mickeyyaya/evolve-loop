@@ -33,6 +33,7 @@ func bareEnters(sent []string) int {
 }
 
 func TestAgyTmux_ParkedPasteChipIsResubmitted(t *testing.T) {
+	t.Parallel()
 	deps, fake, stderr := agySubmitVerifyDeps(agy1217Frame(t, "editing-a.txt"))
 	parked := agy1217Frame(t, "parked-paste.txt")
 	got := verifySubmitted(context.Background(), deps, agyLaunchForTest(), "[agy-tmux]", "prompt", parked,
@@ -44,6 +45,7 @@ func TestAgyTmux_ParkedPasteChipIsResubmitted(t *testing.T) {
 }
 
 func TestAgyTmux_ParkedTypedNudgeIsResubmitted(t *testing.T) {
+	t.Parallel()
 	deps, fake, _ := agySubmitVerifyDeps(agy1217Frame(t, "editing-a.txt"))
 	got := verifySubmitted(context.Background(), deps, agyLaunchForTest(), "[agy-tmux]", "nudge",
 		agy1217Frame(t, "parked-typed.txt"), agyParkedTypedPrompt)
@@ -53,6 +55,7 @@ func TestAgyTmux_ParkedTypedNudgeIsResubmitted(t *testing.T) {
 }
 
 func TestAgyTmux_SubmittedPanesAreVerifiedWithoutResend(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"editing-a.txt", "generating-a.txt", "answer.txt", "idle.txt"} {
 		deps, fake, stderr := agySubmitVerifyDeps()
 		got := verifySubmitted(context.Background(), deps, agyLaunchForTest(), "[agy-tmux]", "prompt",
@@ -64,6 +67,7 @@ func TestAgyTmux_SubmittedPanesAreVerifiedWithoutResend(t *testing.T) {
 }
 
 func TestAgyTmux_TranscriptAngleBracketsNeverShadowTheInputBox(t *testing.T) {
+	t.Parallel()
 	pane := agy1217Frame(t, "editing-a.txt")
 	if !strings.Contains(pane, "> "+agyParkedTypedPrompt[:20]) {
 		t.Fatal("fixture precondition: the submitted prompt is echoed above the input box with a > prefix")
@@ -74,6 +78,7 @@ func TestAgyTmux_TranscriptAngleBracketsNeverShadowTheInputBox(t *testing.T) {
 }
 
 func TestAgyTmux_ParkedPromptContainingAngleBracketsIsStillResubmitted(t *testing.T) {
+	t.Parallel()
 	const prompt = "Make sure x > 0 holds, then run go test ./... > out.txt and report the count."
 	parked := strings.Replace(agy1217Frame(t, "parked-typed.txt"), agyParkedTypedPrompt, prompt, 1)
 	if !strings.Contains(parked, "> "+prompt) {

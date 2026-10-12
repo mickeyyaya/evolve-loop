@@ -16,6 +16,7 @@ import (
 )
 
 func TestNewDefault_HostPredicateExecutionBindsCompleteEvidence(t *testing.T) {
+	t.Parallel()
 	for _, pass := range []bool{true, false} {
 		name := "red"
 		if pass {
@@ -82,6 +83,7 @@ func TestNewDefault_HostPredicateExecutionBindsCompleteEvidence(t *testing.T) {
 }
 
 func TestBeginPredicateEvidence_UnstagedInputsRefuseAudit(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if out, err := exec.Command("git", "init", "-q", root).CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v %s", err, out)

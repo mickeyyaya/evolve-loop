@@ -11,6 +11,7 @@ import (
 )
 
 func TestLaunchErrorIncludesCapturedStderrCause(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	req := core.BridgeRequest{
 		CLI:            "claude-p",
@@ -39,6 +40,7 @@ func TestLaunchErrorIncludesCapturedStderrCause(t *testing.T) {
 }
 
 func TestLaunchFailurePersistsLaunchErrorFile(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	req := core.BridgeRequest{
 		CLI:          "claude-p",

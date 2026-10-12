@@ -53,6 +53,7 @@ func contextFillLine(stderr string) (string, bool) {
 }
 
 func TestContextFillWarn_EmittedAtDispatchNamingPhase(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runContextFillCase(t, 91.4, 60, "build")
 	line, ok := contextFillLine(stderr)
 	if !ok {
@@ -67,6 +68,7 @@ func TestContextFillWarn_EmittedAtDispatchNamingPhase(t *testing.T) {
 // missing sentinel guard would break: exactly at threshold, below it, and
 // unmeasured.
 func TestContextFillWarn_BoundaryAndSentinelStaySilent(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		fill float64
@@ -89,6 +91,7 @@ func TestContextFillWarn_BoundaryAndSentinelStaySilent(t *testing.T) {
 // composition path leaves) must resolve to 60, matching policy's built-in —
 // not to 0, which would warn on every launch.
 func TestContextFillWarn_ZeroDepsResolvesToDefaultThreshold(t *testing.T) {
+	t.Parallel()
 	if stderr, _ := runContextFillCase(t, 59, 0, "scout"); func() bool { _, ok := contextFillLine(stderr); return ok }() {
 		t.Errorf("59%% fill warned under the zero-value threshold — zero must resolve to 60, not to 0")
 	}
@@ -101,6 +104,7 @@ func TestContextFillWarn_ZeroDepsResolvesToDefaultThreshold(t *testing.T) {
 // fill_pct must persist in the llm-calls record, not merely print to stderr:
 // the deferred fill%-vs-verdict correlation report has no corpus without it.
 func TestContextFillWarn_PersistedInLLMCallsRecord(t *testing.T) {
+	t.Parallel()
 	_, record := runContextFillCase(t, 72.5, 60, "audit")
 	var rec struct {
 		Phase   string   `json:"phase"`

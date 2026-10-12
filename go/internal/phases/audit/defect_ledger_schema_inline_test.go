@@ -11,6 +11,7 @@ import (
 var dispositionSchemaTokens = []string{"dispositions", "id", "status", "evidence", "reason"}
 
 func TestClassify_DispositionUnparseableErrorNamesSchema(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -38,6 +39,7 @@ func TestClassify_DispositionUnparseableErrorNamesSchema(t *testing.T) {
 }
 
 func TestClassify_DispositionMissingDiagnosticNotRelabelledUnparseable(t *testing.T) {
+	t.Parallel()
 	_, req := continuationFixture(t, 1398, 1403, oneDefect)
 
 	verdict, diags, _ := hooks{}.Classify(narrativeReport("PASS"), req, core.BridgeResponse{})

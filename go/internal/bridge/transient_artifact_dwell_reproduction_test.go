@@ -3,6 +3,7 @@ package bridge
 import "testing"
 
 func TestRunTmuxREPL_TransientPaneSkipsFullArtifactTimeout(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	const pane = "API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment.\n❯"
 	if !classifyTransientPane("claude-tmux", pane) {

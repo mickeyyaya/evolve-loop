@@ -114,6 +114,7 @@ func TestDefaultWallCorroborator_HungProbeIsWalled(t *testing.T) {
 // --- tick-level wiring: the two decision sites ---
 
 func TestTick_ContentWallSuppressedWhenCorroboratorSaysHealthy(t *testing.T) {
+	t.Parallel()
 	pane := "editing usageclassify_test.go\nfixture: \"You have reached your usage limit\"\nrunning tests...\n"
 	var log strings.Builder
 	probe := &corroboratorProbeRunner{rc: 0}
@@ -141,6 +142,7 @@ func TestTick_ContentWallSuppressedWhenCorroboratorSaysHealthy(t *testing.T) {
 }
 
 func TestTick_CorroboratedWallStillEscalates(t *testing.T) {
+	t.Parallel()
 	pane := "You have reached your usage limit. Resets in 4h.\n"
 	probe := &corroboratorProbeRunner{rc: 1}
 	deps := Deps{Tmux: &fakeTmux{paneSeq: []string{pane}}, Sleep: func(time.Duration) {},
@@ -195,6 +197,7 @@ func TestManifestExhaustedRegexes_WindowWallOnlyNeverBurstOrDisplay(t *testing.T
 }
 
 func TestTick_RealWallProbesExactlyOnceAcrossTicks(t *testing.T) {
+	t.Parallel()
 	pane := "You have reached your usage limit. Resets in 4h.\n"
 	probe := &corroboratorProbeRunner{rc: 1}
 	deps := Deps{Tmux: &fakeTmux{paneSeq: []string{pane}}, Sleep: func(time.Duration) {},

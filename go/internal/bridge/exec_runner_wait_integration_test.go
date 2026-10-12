@@ -16,6 +16,7 @@ type refusingWriter struct{ err error }
 func (w refusingWriter) Write([]byte) (int, error) { return 0, w.err }
 
 func TestExecRunner_ACleanExitWhoseOutputCannotBeDeliveredIsAnUnrecoverableError(t *testing.T) {
+	t.Parallel()
 	sink := errors.New("stdout sink closed")
 	pidFile := filepath.Join(t.TempDir(), "agent.pid")
 	env := append(os.Environ(), bridgePidfileEnv+"="+pidFile)
@@ -35,6 +36,7 @@ func TestExecRunner_ACleanExitWhoseOutputCannotBeDeliveredIsAnUnrecoverableError
 }
 
 func TestExecRunner_ANonZeroExitStillWinsOverAnUndeliverableOutput(t *testing.T) {
+	t.Parallel()
 	sink := errors.New("stdout sink closed")
 
 	code, err := execRunner(context.Background(), "sh", "", []string{"-c", "echo agent-output; exit 5"}, nil, nil, refusingWriter{sink}, refusingWriter{sink})

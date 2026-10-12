@@ -18,6 +18,7 @@ func agyPromptFile(t *testing.T) string {
 }
 
 func TestAgyDriver_RequiredSandboxUnavailableFailsClosed(t *testing.T) {
+	t.Parallel()
 	runner := &fakeRunner{}
 	var stderr bytes.Buffer
 	rc, err := (agyDriver{}).Launch(context.Background(), &Config{
@@ -32,6 +33,7 @@ func TestAgyDriver_RequiredSandboxUnavailableFailsClosed(t *testing.T) {
 }
 
 func TestAgyDriver_RequiredSandboxWrapsInvocation(t *testing.T) {
+	t.Parallel()
 	runner := &fakeRunner{}
 	wrap := &fakeWrap{prefix: []string{"sandbox-exec", "-p", "policy"}, available: true}
 	var stderr bytes.Buffer

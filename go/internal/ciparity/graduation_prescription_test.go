@@ -44,6 +44,7 @@ import (
 // a single ordinary package must render both the literal .apicover-enforce
 // append line and the literal apicover_named_test.go path to create.
 func TestGraduationPrescription_EmitsAppendLineAndTestPath(t *testing.T) {
+	t.Parallel()
 	got := GraduationPrescription([]string{"./internal/brandnew"})
 	if !strings.Contains(got, "append this line to go/.apicover-enforce:  ./internal/brandnew") {
 		t.Errorf("GraduationPrescription([./internal/brandnew]) = %q, want it to contain the literal .apicover-enforce append line", got)
@@ -61,6 +62,7 @@ func TestGraduationPrescription_EmitsAppendLineAndTestPath(t *testing.T) {
 // anti-no-op guard against a naive implementation that always emits a fixed
 // template regardless of input.
 func TestGraduationPrescription_EmptyInputReturnsEmptyString(t *testing.T) {
+	t.Parallel()
 	if got := GraduationPrescription(nil); got != "" {
 		t.Errorf("GraduationPrescription(nil) = %q, want \"\" (nothing to prescribe)", got)
 	}
@@ -76,6 +78,7 @@ func TestGraduationPrescription_EmptyInputReturnsEmptyString(t *testing.T) {
 // instead. Deleting this branch during the relocation (e.g. reusing the
 // ordinary-package path unconditionally) makes this test RED.
 func TestGraduationPrescription_PatternSuffixSkipsBogusPath(t *testing.T) {
+	t.Parallel()
 	got := GraduationPrescription([]string{"./internal/plugins/..."})
 	if strings.Contains(got, ".../apicover_named_test.go") {
 		t.Errorf("GraduationPrescription([./internal/plugins/...]) = %q, must not emit a bogus \".../apicover_named_test.go\" path for a recursive pattern", got)
@@ -93,6 +96,7 @@ func TestGraduationPrescription_PatternSuffixSkipsBogusPath(t *testing.T) {
 // two-step block, not a single block naming only one of them (the class of
 // bug a loop-body typo or early-return would introduce).
 func TestGraduationPrescription_MultiplePackagesEachGetOwnBlock(t *testing.T) {
+	t.Parallel()
 	got := GraduationPrescription([]string{"./internal/alpha", "./internal/beta"})
 	if !strings.Contains(got, "go/internal/alpha/apicover_named_test.go") {
 		t.Errorf("GraduationPrescription([alpha,beta]) = %q, missing alpha's block", got)

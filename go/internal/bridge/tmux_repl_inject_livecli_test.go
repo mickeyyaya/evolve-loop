@@ -43,6 +43,7 @@ done
 }
 
 func TestRealTmux_E2E_LiveInjection_UnblocksAgent(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	const marker = "INJECT-READY"
 	cfg := itConfig(t, "ARTIFACT=PLACEHOLDER")

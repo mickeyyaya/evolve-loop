@@ -12,6 +12,7 @@ import (
 )
 
 func TestNewCompletionDetector_DefaultsToArtifact(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{Artifact: "/tmp/x"}
 	lp := tmuxLaunch{promptMarker: "❯"}
 	for _, mode := range []core.CompletionContract{"", "artifact", "bogus-typo"} {
@@ -26,6 +27,7 @@ func TestNewCompletionDetector_DefaultsToArtifact(t *testing.T) {
 }
 
 func TestArtifactDetector_Poll(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "report.md")
 	d := &artifactDetector{cfg: &Config{Workspace: ws, Artifact: canonical}}
@@ -74,6 +76,7 @@ func stdoutPoll(t *testing.T, marker string, threshold int, panes []string, maxP
 func TestStdoutDetector_ReadyAfterActivityThenIdle(t *testing.T) {
 	// baseline → activity (thinking, differs) → settled output w/ marker.
 	// fakeTmux repeats the last entry, so the idle run accrues to threshold.
+	t.Parallel()
 	panes := []string{"prompt delivered", "thinking…", "⏺ [ {…} ]\n❯"}
 	if got := stdoutPoll(t, "❯", 3, panes, 12); got < 0 {
 		t.Fatal("stdout detector never reported ready despite activity + idle stability")
@@ -83,6 +86,7 @@ func TestStdoutDetector_ReadyAfterActivityThenIdle(t *testing.T) {
 func TestStdoutDetector_NotReadyWhileStreaming(t *testing.T) {
 	// Marker present every tick, but the pane keeps changing (streaming) →
 	// the stability counter resets each poll → never ready.
+	t.Parallel()
 	panes := []string{"a", "b❯", "c❯", "d❯", "e❯", "f❯", "g❯", "h❯"}
 	if got := stdoutPoll(t, "❯", 3, panes, len(panes)); got >= 0 {
 		t.Fatalf("streaming pane must not complete; reported ready at poll %d", got)
@@ -93,6 +97,7 @@ func TestStdoutDetector_NotReadyBeforeActivity(t *testing.T) {
 	// Marker present from the very first capture and the pane never changes:
 	// the agent never demonstrably did work → must NOT false-fire on the
 	// marker that was already visible before the turn began.
+	t.Parallel()
 	panes := []string{"❯ idle prompt"}
 	if got := stdoutPoll(t, "❯", 3, panes, 8); got >= 0 {
 		t.Fatalf("must not complete without observed activity; reported ready at poll %d", got)
@@ -100,6 +105,7 @@ func TestStdoutDetector_NotReadyBeforeActivity(t *testing.T) {
 }
 
 func TestParseLaunchArgs_CompletionFlag(t *testing.T) {
+	t.Parallel()
 	raw, err := parseLaunchArgs([]string{"--completion=stdout"}, nil)
 	if err != nil {
 		t.Fatalf("parse --completion=stdout: %v", err)
@@ -117,6 +123,7 @@ func TestParseLaunchArgs_CompletionFlag(t *testing.T) {
 }
 
 func TestClaudeTmux_StdoutCompletion_NoArtifactNeeded(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{
 		tmuxPromptMarkerDefault,                  // boot loop capture: marker seen → REPL ready
@@ -135,6 +142,7 @@ func TestClaudeTmux_StdoutCompletion_NoArtifactNeeded(t *testing.T) {
 }
 
 func TestGitEvidenceDetector_ClosureCalled(t *testing.T) {
+	t.Parallel()
 	called := false
 	deps := Deps{
 		Runner: func(_ context.Context, _, _ string, _ []string, _ []string,

@@ -48,6 +48,7 @@ func pollUntil(d *gitEvidenceDetector, maxPolls int) (bool, completionEvidence) 
 }
 
 func TestGitEvidence_ReadyOnVerifiedCommit(t *testing.T) {
+	t.Parallel()
 	good := "subject\n" + evidence.Trailer{Phase: "scout", Challenge: "tok", Cycle: 5}.Build()
 	g := &fakeGit{
 		heads:   []string{"sha0", "sha1"},
@@ -67,6 +68,7 @@ func TestGitEvidence_ReadyOnVerifiedCommit(t *testing.T) {
 func TestGitEvidence_FindsEvidenceWhenNotTip(t *testing.T) {
 	// Two commits land between polls: the evidence commit (sha1), then a stray commit (sha2, now HEAD).
 	// Inspecting only HEAD would re-baseline past sha1 and hang forever; the range walk must find it.
+	t.Parallel()
 	good := "build done\n" + evidence.Trailer{Phase: "build", Challenge: "tok"}.Build()
 	g := &fakeGit{
 		heads:   []string{"sha0", "sha2"},
@@ -81,6 +83,7 @@ func TestGitEvidence_FindsEvidenceWhenNotTip(t *testing.T) {
 }
 
 func TestGitEvidence_NotReadyWithoutTrailer(t *testing.T) {
+	t.Parallel()
 	g := &fakeGit{
 		heads:   []string{"sha0", "sha1"},
 		revlist: map[string][]string{"sha0": {"sha1"}},
@@ -93,6 +96,7 @@ func TestGitEvidence_NotReadyWithoutTrailer(t *testing.T) {
 }
 
 func TestGitEvidence_NotReadyWrongToken(t *testing.T) {
+	t.Parallel()
 	msg := "x\n" + evidence.Trailer{Phase: "scout", Challenge: "WRONG"}.Build()
 	g := &fakeGit{
 		heads:   []string{"sha0", "sha1"},
@@ -108,6 +112,7 @@ func TestGitEvidence_NotReadyWrongToken(t *testing.T) {
 func TestGitEvidence_EmptyTokenNeverVerifies(t *testing.T) {
 	// Fail-closed: an empty expected token (challenge-token.txt missing) must
 	// never complete, even for a commit carrying the right phase.
+	t.Parallel()
 	msg := "x\n" + evidence.Trailer{Phase: "scout", Challenge: "anything"}.Build()
 	g := &fakeGit{
 		heads:   []string{"sha0", "sha1"},
@@ -121,6 +126,7 @@ func TestGitEvidence_EmptyTokenNeverVerifies(t *testing.T) {
 }
 
 func TestGitEvidence_NotReadyWhenHeadStatic(t *testing.T) {
+	t.Parallel()
 	g := &fakeGit{heads: []string{"sha0"}, revlist: nil, msgs: nil}
 	d := &gitEvidenceDetector{phase: "scout", expectedTok: "tok", gitCmd: g.cmd}
 	if ready, _ := pollUntil(d, 5); ready {
@@ -129,6 +135,7 @@ func TestGitEvidence_NotReadyWhenHeadStatic(t *testing.T) {
 }
 
 func TestGitEvidence_GitErrorKeepsWaiting(t *testing.T) {
+	t.Parallel()
 	d := &gitEvidenceDetector{phase: "scout", expectedTok: "tok",
 		gitCmd: func(context.Context, ...string) (string, error) { return "", context.DeadlineExceeded }}
 	if ready, _ := pollUntil(d, 3); ready {
@@ -137,6 +144,7 @@ func TestGitEvidence_GitErrorKeepsWaiting(t *testing.T) {
 }
 
 func TestNewGitEvidenceDetector_ReadsToken(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "challenge-token.txt"), []byte("tok-xyz\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -148,6 +156,7 @@ func TestNewGitEvidenceDetector_ReadsToken(t *testing.T) {
 }
 
 func TestNewGitEvidenceDetector_MissingTokenWarns(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	deps := Deps{Stderr: &stderr}.withDefaults()
 	deps.Stderr = &stderr // withDefaults keeps a non-nil Stderr; pin our buffer
@@ -161,6 +170,7 @@ func TestNewGitEvidenceDetector_MissingTokenWarns(t *testing.T) {
 }
 
 func TestNewCompletionDetector_GitMode(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{Workspace: t.TempDir(), Worktree: t.TempDir(), Agent: "scout"}
 	if _, ok := newCompletionDetector("git", cfg, Deps{}.withDefaults(), tmuxLaunch{}, dispatchBaseline{}).(*gitEvidenceDetector); !ok {
 		t.Error("mode \"git\" should build a *gitEvidenceDetector")
@@ -168,6 +178,7 @@ func TestNewCompletionDetector_GitMode(t *testing.T) {
 }
 
 func TestShortSHA(t *testing.T) {
+	t.Parallel()
 	if got := shortSHA("0123456789abcdef"); got != "01234567" {
 		t.Errorf("shortSHA = %q, want 01234567", got)
 	}

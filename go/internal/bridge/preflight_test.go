@@ -11,6 +11,7 @@ import (
 )
 
 func TestCLIPreflight_CodexTmuxImplementsIt(t *testing.T) {
+	t.Parallel()
 	d, ok := LookupDriver("codex-tmux")
 	if !ok {
 		t.Fatal("codex-tmux driver not registered (init() didn't fire?)")
@@ -25,6 +26,7 @@ func TestCLIPreflight_OptOutByOmission(t *testing.T) {
 	// later adopts CLIPreflight (e.g. agy keychain refresh), this list
 	// must be updated. The opt-out is the architectural design — no no-op
 	// stubs in every concrete driver. See driver.go's CLIPreflight godoc.
+	t.Parallel()
 	optOut := []string{"claude-p", "claude-tmux", "agy", "agy-tmux", "codex", "ollama", "ollama-tmux"}
 	for _, name := range optOut {
 		d, ok := LookupDriver(name)
@@ -46,6 +48,7 @@ func TestCLIPreflight_CodexPreflightReturnsHelperError(t *testing.T) {
 	// it just confirms Preflight returns without panic for a plausible
 	// config. Tighter end-to-end coverage is in codex_pretrust_test.go
 	// against the helper's own surface.
+	t.Parallel()
 	d, ok := LookupDriver("codex-tmux")
 	if !ok {
 		t.Fatal("codex-tmux driver not registered (init() didn't fire?)")
@@ -137,6 +140,7 @@ func (d *nonPreflightDriver) Launch(ctx context.Context, cfg *Config, deps Deps)
 // catching the breakage at compile time rather than as a runtime nil
 // assertion in another test.
 func TestCLIPreflight_Compiletime(t *testing.T) {
+	t.Parallel()
 	var _ Driver = (*recordingDriver)(nil)
 	var _ CLIPreflight = (*recordingDriver)(nil)
 	var _ Driver = (*nonPreflightDriver)(nil)
@@ -154,6 +158,7 @@ func TestCLIPreflight_Compiletime(t *testing.T) {
 // building block, but it's worth a standalone smoke check so a refactor
 // of the fake itself doesn't silently invalidate downstream assertions.
 func TestCLIPreflight_RecordingFakePreflightOrder(t *testing.T) {
+	t.Parallel()
 	d := &recordingDriver{name: "fake-tmux"}
 	cfg := &Config{}
 	deps := Deps{}
@@ -169,6 +174,7 @@ func TestCLIPreflight_RecordingFakePreflightOrder(t *testing.T) {
 // interface itself is a transparent pass-through. Sentinel-error patterns
 // (errors.Is) must work across the seam.
 func TestCLIPreflight_ErrorPropagation(t *testing.T) {
+	t.Parallel()
 	sentinel := errors.New("preflight-sentinel")
 	d := &recordingDriver{
 		name: "fake-tmux",
@@ -186,6 +192,7 @@ func TestCLIPreflight_ErrorPropagation(t *testing.T) {
 // that completes without issue returns nil; the Engine's error-log branch
 // stays untaken. Pairs with TestCLIPreflight_ErrorPropagation.
 func TestCLIPreflight_NilErrorPropagation(t *testing.T) {
+	t.Parallel()
 	d := &recordingDriver{name: "fake-tmux"} // default preflightFn returns nil
 	if got := d.Preflight(context.Background(), &Config{}, Deps{}); got != nil {
 		t.Fatalf("Preflight with nil preflightFn must return nil; got %v", got)
@@ -198,6 +205,7 @@ func TestCLIPreflight_NilErrorPropagation(t *testing.T) {
 // lets a Preflight observe orchestrator cancellation (e.g., per-phase
 // timeout) and bail early.
 func TestCLIPreflight_ContextPropagation(t *testing.T) {
+	t.Parallel()
 	var seen context.Context
 	d := &recordingDriver{
 		name: "fake-tmux",
@@ -232,6 +240,7 @@ func TestCLIPreflight_ContextPropagation(t *testing.T) {
 // as-is. A driver-side Preflight that needs cfg.Worktree or deps.Stderr
 // must see what the caller passed.
 func TestCLIPreflight_ConfigAndDepsPassThrough(t *testing.T) {
+	t.Parallel()
 	var seenCfg *Config
 	var seenDeps Deps
 	d := &recordingDriver{
@@ -265,6 +274,7 @@ func TestCLIPreflight_ConfigAndDepsPassThrough(t *testing.T) {
 // genuinely lacks Preflight — catches accidental embedded promotion a
 // refactor might introduce.
 func TestCLIPreflight_OptOutDoesNotPanicOnTypeAssertion(t *testing.T) {
+	t.Parallel()
 	var d Driver = &nonPreflightDriver{name: "opt-out"}
 	if pf, ok := d.(CLIPreflight); ok {
 		t.Fatalf("opt-out driver must not satisfy CLIPreflight; got pf=%v", pf)

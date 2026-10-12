@@ -6,6 +6,7 @@ import (
 )
 
 func TestFleetModeAcceptsScratchCwdWorktree(t *testing.T) {
+	t.Parallel()
 	scratch := t.TempDir() // the shape retro mints: a real, owned, writable dir
 	cfg := fixtureConfig(t)
 	cfg.Worktree = scratch

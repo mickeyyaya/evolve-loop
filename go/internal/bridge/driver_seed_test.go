@@ -19,6 +19,7 @@ func indexOf(seq []string, want string) int {
 }
 
 func TestRunTmuxREPL_SeedREPLInput_BeforePrompt(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	writeJSON(t, filepath.Join(ws, "a"), "done") // artifact present → exits after boot+prompt
@@ -55,6 +56,7 @@ func TestRunTmuxREPL_SeedREPLInput_BeforePrompt(t *testing.T) {
 }
 
 func TestRunTmuxREPL_SeedSkippedOnNamedResume(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	writeJSON(t, filepath.Join(ws, "a"), "done")
@@ -86,6 +88,7 @@ func (f *failLaunchSendTmux) SendKeys(ctx context.Context, session, keys string,
 }
 
 func TestRunTmuxREPL_FailedLaunchSendDoesNotClaimDispatch(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	promptFile := writeJSON(t, filepath.Join(ws, "prompt.txt"), "hi")
 	cfg := &Config{

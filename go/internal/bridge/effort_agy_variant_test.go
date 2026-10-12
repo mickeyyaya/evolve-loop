@@ -46,6 +46,7 @@ func TestAgyClaudeEffortSelectsTheModelVariant(t *testing.T) {
 }
 
 func TestModelVariant_LeavesANameWithoutAVariantAlone(t *testing.T) {
+	t.Parallel()
 	m := Manifest{
 		CLI:          "variant-fixture",
 		ModelTierMap: map[string]string{"deep": "claude-opus-5-5"},
@@ -61,6 +62,7 @@ func TestModelVariant_LeavesANameWithoutAVariantAlone(t *testing.T) {
 }
 
 func TestClaudeTmuxRealizationNeverCapsEffort(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)

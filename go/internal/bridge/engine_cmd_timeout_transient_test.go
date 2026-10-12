@@ -10,6 +10,7 @@ import (
 )
 
 func TestEngineLaunch_CmdTimeout124_WrapsTransient(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitCmdTimeout}
@@ -34,6 +35,7 @@ func TestEngineLaunch_CmdTimeout124_WrapsTransient(t *testing.T) {
 }
 
 func TestEngineLaunch_MissingBinary127_StaysPlain(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitMissingBinary}

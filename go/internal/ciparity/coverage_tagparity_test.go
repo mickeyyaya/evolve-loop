@@ -35,6 +35,7 @@ import (
 // tag-gated test the repo's 6-layer architecture puts behind those tags. RED
 // today: CoverageTags == "integration" (no acs).
 func TestCoverageTags_IncludesACSTag(t *testing.T) {
+	t.Parallel()
 	tags := strings.Fields(CoverageTags)
 	has := func(want string) bool {
 		for _, tg := range tags {
@@ -61,6 +62,7 @@ func TestCoverageTags_IncludesACSTag(t *testing.T) {
 // `go test` measures exactly the scoped set, not the whole module). RED today:
 // the -tags value is "integration" only.
 func TestCoverageTestArgs_ThreadsBothTagsAndPreservesPkgOrder(t *testing.T) {
+	t.Parallel()
 	pkgs := []string{"./internal/core", "./internal/evalgate", "./internal/acssuite"}
 	args := CoverageTestArgs("cov.out", pkgs)
 
@@ -108,6 +110,7 @@ func TestCoverageTestArgs_ThreadsBothTagsAndPreservesPkgOrder(t *testing.T) {
 // it by touching a magic string; only really threading the acs tag through the
 // SSOT makes the fixture's acs-gated code count.
 func TestCoverageTestArgs_TagGatedFixtureMeasuresTaggedCoverage(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skipf("go toolchain not on PATH: %v", err)
 	}
