@@ -134,6 +134,21 @@ Each component is one lane and one pull request. Each lane starts with a red tes
 
 Update of 2026-10-12, after the timeout investigation (research §9). T11 comes next, before T4 and before T9, because it removes the cause of the timeout. T12 and T13 follow T11. T4 then adds the 20-minute timeout and the budget report as a guard. T9 merges into T11 for `internal/core`.
 
+Update of 2026-10-12, T12 (D26). `gittest.FromTemplate` builds a git fixture one time for each test binary. Each test gets an independent copy ([test-system.md](../architecture/test-system.md) §6.1). The copy uses `os.CopyFS` and starts no `git` process.
+
+The copy of a repository of eight commits took 15 to 25 ms. `git clone --local --shared` took 70 to 80 ms. A build with `git` took 450 ms.
+
+These fixtures now use a template:
+
+- the scenario repository of `routingtest`;
+- the lane, binding, verdict-cache and audit-leak repositories of `internal/core`;
+- `makeRepo` of `internal/phases/ship`;
+- three repositories of `cmd/evolve`: boot recovery, boundary refresh and git plane.
+
+The `git` call count of a full run fell from 25,162 to 24,414 in `internal/core`. It fell from 15,897 to 12,017 in `internal/phases/ship`, and from 10,672 to 10,400 in `cmd/evolve`. The pass counts did not change.
+
+The gain is smaller than D26 expected in `internal/core` and `cmd/evolve`. Most of their remaining calls are production calls: `ls-files`, `diff`, `cat-file` and `status`. The multi-repository fixtures keep absolute paths and linked worktrees, and a copy cannot hold them. T13 targets the production calls.
+
 At most four lanes run at one time. The coverage backfill lanes (E1 to E4, F1 to F4) share the four slots. T1 and T2 come before F1 to F4, because each later floor is faster after T1 and T2.
 
 ## 8. Verification

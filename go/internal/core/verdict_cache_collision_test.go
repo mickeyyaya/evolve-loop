@@ -6,11 +6,11 @@ import (
 	"context"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
@@ -93,24 +93,20 @@ type verdictCacheLookupObservation struct {
 	matched bool
 }
 
+func buildVerdictCacheProbeRepo(r *gittest.Repo) error {
+	if err := buildBindingRepo(r); err != nil {
+		return err
+	}
+	r.Write(".gitignore", ".evolve/\n")
+	r.Git("add", ".gitignore")
+	r.Git("commit", "-m", "ignore .evolve")
+	return nil
+}
+
 func initVerdictCacheProbeRepo(t *testing.T) (repo, ws string) {
 	t.Helper()
-	repo, ws = initBindingRepo(t, "cycle-100")
-	runGit := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	runGit("add", ".gitignore")
-	runGit("commit", "-m", "ignore .evolve")
-	return repo, ws
+	repo = gittest.FromTemplate(t, "core-verdict-cache-probe-repo", buildVerdictCacheProbeRepo).Dir
+	return repo, seedBindingWorkspace(t, repo, "cycle-100")
 }
 
 func missingBaseGitRunner(orig sysexec.RunFunc) sysexec.RunFunc {

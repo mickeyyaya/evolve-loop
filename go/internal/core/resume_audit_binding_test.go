@@ -5,41 +5,38 @@ package core
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 // initBindingRepo creates an ephemeral git repo with one commit plus a
 // cycle workspace holding an audit-report.md, mirroring what a resumed
 // audit phase leaves on disk.
-func initBindingRepo(t *testing.T, cycle string) (repo, ws string) {
-	t.Helper()
-	repo = t.TempDir()
-	runGit := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	runGit("init", "-q")
-	if err := os.WriteFile(filepath.Join(repo, "f.txt"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	runGit("add", "f.txt")
-	runGit("commit", "-q", "-m", "init")
+func buildBindingRepo(r *gittest.Repo) error {
+	r.Write("f.txt", "x")
+	r.Git("add", "f.txt")
+	r.Git("commit", "-q", "-m", "init")
+	return nil
+}
 
-	ws = filepath.Join(repo, ".evolve", "runs", cycle)
+func seedBindingWorkspace(t *testing.T, repo, cycle string) string {
+	t.Helper()
+	ws := filepath.Join(repo, ".evolve", "runs", cycle)
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(ws, "audit-report.md"), []byte("## Verdict\n**PASS**\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return repo, ws
+	return ws
+}
+
+func initBindingRepo(t *testing.T, cycle string) (repo, ws string) {
+	t.Helper()
+	repo = gittest.FromTemplate(t, "core-binding-repo", buildBindingRepo).Dir
+	return repo, seedBindingWorkspace(t, repo, cycle)
 }
 
 func TestRunCycleFromPhase_EmitsAuditBinding(t *testing.T) {

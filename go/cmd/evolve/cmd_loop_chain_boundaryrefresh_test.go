@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
@@ -41,21 +42,18 @@ func brfFilteredEnv() []string {
 	return out
 }
 
-// brfInitRepo creates a one-commit git repo and returns (repoDir, commitA).
 func brfInitRepo(t *testing.T) (dir, commitA string) {
 	t.Helper()
-	dir = t.TempDir()
-	brfGit(t, dir, "init", "-q")
-	brfGit(t, dir, "config", "user.email", "ci@example.com")
-	brfGit(t, dir, "config", "user.name", "ci")
-	brfGit(t, dir, "config", "commit.gpgsign", "false")
-	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	brfGit(t, dir, "-C", dir, "add", "a.txt")
-	brfGit(t, dir, "-C", dir, "commit", "-q", "-m", "commit A")
-	commitA = strings.TrimSpace(brfGit(t, dir, "-C", dir, "rev-parse", "HEAD"))
-	return dir, commitA
+	repo := gittest.FromTemplate(t, "cmd-evolve-boundary-refresh-repo", func(r *gittest.Repo) error {
+		r.Git("config", "user.email", "ci@example.com")
+		r.Git("config", "user.name", "ci")
+		r.Git("config", "commit.gpgsign", "false")
+		r.Write("a.txt", "a\n")
+		r.Git("add", "a.txt")
+		r.Git("commit", "-q", "-m", "commit A")
+		return nil
+	})
+	return repo.Dir, repo.Git("rev-parse", "HEAD")
 }
 
 // brfAdvance commits one more file on top and returns the new HEAD.
