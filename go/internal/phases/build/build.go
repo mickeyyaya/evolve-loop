@@ -130,6 +130,7 @@ type Config struct {
 	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
 	// never set to a bare literal here (standing rule: phase-settings-from-config).
 	CompactPrompts bool
+	SleepFn        func(time.Duration)
 }
 
 // Phase is the build phase, a runner.BaseRunner specialized with the
@@ -151,6 +152,7 @@ func New(c Config) *Phase {
 		NowFn:            c.NowFn,
 		PhaseIO:          c.PhaseIO,
 		CompactPrompts:   c.CompactPrompts,
+		SleepFn:          c.SleepFn,
 	})
 	return &Phase{BaseRunner: base}
 }

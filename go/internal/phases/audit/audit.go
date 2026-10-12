@@ -224,6 +224,7 @@ type Config struct {
 	PhaseIO                       config.Stage
 	CompactPrompts                bool
 	Signals                       func() *signalcenter.Center
+	SleepFn                       func(time.Duration)
 }
 
 type Option func(*Config)
@@ -260,6 +261,7 @@ func New(c Config) *Phase {
 			Prompts:          c.Prompts,
 			NowFn:            c.NowFn,
 			CompactPrompts:   c.CompactPrompts,
+			SleepFn:          c.SleepFn,
 		}),
 	}
 }

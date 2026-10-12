@@ -744,3 +744,5 @@
 ./internal/practicewatch
 # gotooltest — the one owner of how a test runs the go tool: the CPU limit of a nested run and one build for each test binary.
 ./internal/gotooltest
+# runnertest — the shared settle-sleep and empty-artifact kit of the phase tests (plan T15).
+./internal/phases/runner/runnertest

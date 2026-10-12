@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner/runnertest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -168,7 +169,7 @@ func TestRun_DeltaMode_IntentUnchanged_SKIPPED(t *testing.T) {
 func TestRun_EmptyArtifact_FAIL(t *testing.T) {
 	ws := t.TempDir()
 	fb := &fakeBridge{writeArtifact: ""}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body"), SleepFn: runnertest.FreeSleep, ContractVerifier: runnertest.EmptyArtifactVerifier})
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle:       1,
 		ProjectRoot: "/tmp/proj",
@@ -180,6 +181,17 @@ func TestRun_EmptyArtifact_FAIL(t *testing.T) {
 	if resp.Verdict != core.VerdictFAIL {
 		t.Errorf("Verdict=%q, want FAIL", resp.Verdict)
 	}
+}
+
+func TestRun_EmptyArtifact_IntentSettleLadderKeepsProductionBounds(t *testing.T) {
+	ws := t.TempDir()
+	var rec runnertest.SleepRecorder
+	phase := New(Config{Bridge: &fakeBridge{writeArtifact: ""}, Prompts: fakePromptsFS("body"), ContractVerifier: runnertest.EmptyArtifactVerifier, SleepFn: rec.Sleep})
+	resp, _ := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/tmp/proj", Workspace: ws})
+	if resp.Verdict != core.VerdictFAIL {
+		t.Errorf("Verdict=%q, want FAIL", resp.Verdict)
+	}
+	rec.AssertProductionLadder(t)
 }
 
 // Pins the line-anchored matching semantics adopted with the

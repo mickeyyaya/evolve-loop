@@ -374,7 +374,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 func (cr *cycleRun) snapshotMainTree(next Phase) (*treediff.Guard, []string, error) {
 	checkout := cr.mainTreeIsCheckout()
 	guard := treediff.New(retryingDirtyPaths(cr.o.gitDirtyPaths))
-	before, err := guard.Snapshot(cr.ctx, cr.req.ProjectRoot)
+	before, err := cr.firstSnapshot(checkout, guard)
 	switch {
 	case err == nil:
 		return guard, before, nil
@@ -382,4 +382,11 @@ func (cr *cycleRun) snapshotMainTree(next Phase) (*treediff.Guard, []string, err
 		return nil, nil, nil
 	}
 	return nil, nil, fmt.Errorf("%w for %s: %w", errPrePhaseSnapshot, next, err)
+}
+
+func (cr *cycleRun) firstSnapshot(checkout bool, guard *treediff.Guard) ([]string, error) {
+	if checkout {
+		return guard.Snapshot(cr.ctx, cr.req.ProjectRoot)
+	}
+	return treediff.New(cr.o.gitDirtyPaths).Snapshot(cr.ctx, cr.req.ProjectRoot)
 }

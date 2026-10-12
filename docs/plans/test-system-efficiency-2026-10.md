@@ -121,7 +121,9 @@ Each component is one lane and one pull request. Each lane starts with a red tes
 | T10 | The STE lint alone for a docs-only pull request (D17 to D22). It has `--added` for `evolve docs ste-lint`, the `ste-lint` job, the routing of `required.yml` and the `internal/ciparity` tests | An old line gives no finding. A docs-only pull request selects only `ste-lint`. A mixed one selects `ste-lint` and the suites of its code paths. A push selects as before. `CI required` accepts a skipped `validate` on a docs-only pull request. It fails when `ste-lint` fails or is missing | Sonnet |
 | T11 | Parallel by default in `internal/core` and `internal/phases/ship` (D23 to D25), with the structure test of D24. It fixes the timeout. | The structure test fails on a serial test with no reason. The package passes `-race -count=3 -shuffle=on`. The serial sum of `internal/core` goes from 596 s to under 180 s. | Sonnet, one lane for each package |
 | T12 | The repository template for git fixtures (D26) | A fixture from the template equals a fixture built step by step; the `git` call count of the slowest tests goes down | Sonnet |
-| T13 | One status read for each recovery try (D27) | A recovery try runs `git status --porcelain -uall` one time; the recovery results stay the same | Sonnet |
+| T13 | One status read for each recovery try (D27) | A recovery try runs `git status --porcelain -uall` one time; the recovery results stay the same. Status: built; the cause was a retry loop (see the update below the table) | Sonnet |
+
+Update of 2026-10-12, T13 (D27). The 234 reads came from the retry loop of `snapshotMainTree`, not from separate readers. A project root with no `.git` retried a read that cannot succeed. That root now gets one read, and a checkout keeps its three attempts. The reads in `TestShipRecovery_ContentionBudgetScalesWithFleetWidth` go from 234 to 78. No reader reuses a snapshot after a write.
 
 ## 7. Order and lanes
 
@@ -222,7 +224,7 @@ Each criterion has a score from 1 (bad) to 5 (good).
 | Id | Component | Red test first | Owner |
 |---|---|---|---|
 | T14 | D28 and D29: one build for each test binary, and the `gotooltest` helper. The first users are the skills-drift tests, `internal/core` and the five tests of research F10.3. Status: built in `internal/gotooltest` (kit at 100% coverage). `cmd/evolve`, `internal/subagent` and `test/e2e` use `Cache`; `internal/core`, `internal/phases/audit` and `cmd/evolve` call `LimitProcess` in `TestMain`. | The number of `go build` runs in a package run drops to one for each binary; nested runs carry the limits | Sonnet |
-| T15 | D30: the phase configurations pass `SleepFn` | `TestRun_EmptyArtifact_FAIL` of each phase finishes in under 1 s | Sonnet |
+| T15 | D30: the phase configurations pass `SleepFn`. Status: built. Six phase configurations carry `SleepFn` to the runner. The 500 ms read grace of `internal/deliverable` adds 8 s over 16 probes, and `SleepFn` does not reach it. The six tests therefore inject a verifier for the empty artifact. A test for each phase proves 15 sleeps of 200 ms. | `TestRun_EmptyArtifact_FAIL` of each phase finishes in under 1 s | Sonnet |
 | T16 | D31: injected writers in place of `os.Stderr` swaps, first in `internal/core` (116 tests) | The guard of T11 accepts the tests as parallel; the outputs stay the same | Sonnet |
 | T17 | D32: T11 for `internal/phases/audit`, `internal/bridge` and `internal/ciparity` | As T11, with the `-count=3 -race -shuffle=on` gate | Sonnet |
 

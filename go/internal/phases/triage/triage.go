@@ -322,6 +322,7 @@ type Config struct {
 	CompactPrompts bool
 	// LaneForbidden marks the declared paths no lane can change; nil judges protected surface only.
 	LaneForbidden func(string) bool
+	SleepFn       func(time.Duration)
 }
 
 func boundItems(workspace string) []string {
@@ -348,6 +349,7 @@ func New(c Config) *Phase {
 			NowFn:            c.NowFn,
 			PhaseIO:          c.PhaseIO,
 			CompactPrompts:   c.CompactPrompts,
+			SleepFn:          c.SleepFn,
 		}),
 	}
 }
