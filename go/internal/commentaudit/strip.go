@@ -66,6 +66,8 @@ func StripCommentsKeepingPackageDoc(name string, src []byte) (StrippedFile, erro
 	return stripComments(name, src, keepPackageDoc)
 }
 
+var formatStrippedSource = format.Source
+
 func stripComments(name string, src []byte, docRule packageDocRule) (StrippedFile, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, name, src, parser.ParseComments|parser.SkipObjectResolution)
@@ -80,7 +82,7 @@ func stripComments(name string, src []byte, docRule packageDocRule) (StrippedFil
 	if len(edits) == 0 {
 		return StrippedFile{Source: src, PackageDocToWrite: docToWrite}, nil
 	}
-	out, err := format.Source(applyEdits(src, edits))
+	out, err := formatStrippedSource(applyEdits(src, edits))
 	if err != nil {
 		return StrippedFile{}, fmt.Errorf("%s: stripped source does not format: %w", name, err)
 	}

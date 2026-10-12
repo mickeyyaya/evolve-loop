@@ -58,6 +58,8 @@ func parseReleasePreflightArgs(args []string, stdout, stderr io.Writer) (f relea
 	return f, 0, false
 }
 
+var releasePreflightRun = releasepreflight.Run
+
 // runReleasePreflight is `evolve release-preflight <target> [--dry-run]
 // [--skip-tests]`. Mirrors legacy/scripts/release/preflight.sh.
 //
@@ -83,7 +85,7 @@ func RunReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		AllowRedCI: f.allowRedCI,
 		Stderr:     stderr,
 	}
-	_, err := releasepreflight.Run(opts)
+	_, err := releasePreflightRun(opts)
 	if err == nil {
 		return 0
 	}
