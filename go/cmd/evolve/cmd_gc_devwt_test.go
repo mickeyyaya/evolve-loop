@@ -277,6 +277,7 @@ func TestGCRunDevWorktrees_AnArchiveRefusalIsReportedAsAFailure(t *testing.T) {
 }
 
 func TestGCDevItemLine_NamesTheVerbTheBranchAndTheIdleDays(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		it     gc.DevItem
@@ -296,6 +297,7 @@ func TestGCDevItemLine_NamesTheVerbTheBranchAndTheIdleDays(t *testing.T) {
 }
 
 func TestGCCheckpointLabel(t *testing.T) {
+	t.Parallel()
 	if got := gcCheckpointLabel(gc.DevArchiveRecord{}); !strings.Contains(got, "clean") {
 		t.Errorf("no checkpoint: %q, want it to say the tree was clean", got)
 	}
@@ -305,6 +307,7 @@ func TestGCCheckpointLabel(t *testing.T) {
 }
 
 func TestParseOpenPRUpdates(t *testing.T) {
+	t.Parallel()
 	got, err := parseOpenPRUpdates([]byte(`[{"headRefName":"a","updatedAt":"2026-10-01T00:00:00Z"},{"headRefName":"a","updatedAt":"2026-10-02T00:00:00Z"},{"headRefName":"b","updatedAt":"2026-10-03T00:00:00Z"}]`))
 	if err != nil || len(got["a"]) != 2 || len(got["b"]) != 1 {
 		t.Fatalf("got %v, %v; want two updates for a and one for b", got, err)
@@ -338,6 +341,7 @@ func TestGhOpenPRUpdates(t *testing.T) {
 }
 
 func TestGhStderr_OnlyAnExitErrorCarriesIt(t *testing.T) {
+	t.Parallel()
 	if got := ghStderr(errors.New("plain")); got != "" {
 		t.Errorf("ghStderr(plain) = %q, want empty", got)
 	}

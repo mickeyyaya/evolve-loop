@@ -65,6 +65,7 @@ func (f *practiceFixture) inboxFiles(t *testing.T) []string {
 }
 
 func TestPracticeWatchVerb_ARunFollowsFirstRunThenChangeFromThePolicySources(t *testing.T) {
+	t.Parallel()
 	f := newPracticeFixture(t, "")
 
 	rc, stdout, stderr := f.verb(t)
@@ -85,6 +86,7 @@ func TestPracticeWatchVerb_ARunFollowsFirstRunThenChangeFromThePolicySources(t *
 }
 
 func TestPracticeWatchVerb_DryRunReportsAndWritesNothing(t *testing.T) {
+	t.Parallel()
 	f := newPracticeFixture(t, "")
 
 	rc, stdout, _ := f.verb(t, "--dry-run")
@@ -98,6 +100,7 @@ func TestPracticeWatchVerb_DryRunReportsAndWritesNothing(t *testing.T) {
 }
 
 func TestPracticeWatchVerb_JSONPrintsTheReport(t *testing.T) {
+	t.Parallel()
 	f := newPracticeFixture(t, "")
 
 	rc, stdout, _ := f.verb(t, "--json")
@@ -109,6 +112,7 @@ func TestPracticeWatchVerb_JSONPrintsTheReport(t *testing.T) {
 }
 
 func TestPracticeWatchVerb_AFetchFailureIsAWarningRowAndExitZero(t *testing.T) {
+	t.Parallel()
 	f := newPracticeFixture(t, `,{"id":"dead","family":"agy","kind":"page","locator":"http://127.0.0.1:1/x"}`)
 
 	rc, stdout, _ := f.verb(t)
@@ -119,6 +123,7 @@ func TestPracticeWatchVerb_AFetchFailureIsAWarningRowAndExitZero(t *testing.T) {
 }
 
 func TestPracticeWatchVerb_ARefusedPolicyExitsOne(t *testing.T) {
+	t.Parallel()
 	for name, policyJSON := range map[string]string{
 		"malformed":    `{"practice_watch":`,
 		"unknown key":  `{"practice_watch":{"timeout":5}}`,
@@ -141,6 +146,7 @@ func TestPracticeWatchVerb_ARefusedPolicyExitsOne(t *testing.T) {
 }
 
 func TestPracticeWatchVerb_UsageErrorsExitTen(t *testing.T) {
+	t.Parallel()
 	for name, args := range map[string][]string{
 		"no subcommand":       nil,
 		"wrong subcommand":    {"update"},
@@ -160,6 +166,7 @@ func TestPracticeWatchVerb_UsageErrorsExitTen(t *testing.T) {
 }
 
 func TestPracticeWatchVerb_AnInterruptedRunExits130(t *testing.T) {
+	t.Parallel()
 	f := newPracticeFixture(t, "")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -196,6 +203,7 @@ func TestPracticeRoot_FallsBackToTheEnvironmentThenTheWorkingDirectory(t *testin
 }
 
 func TestPracticeWatchVerb_IsRegisteredAndListedInTheUsage(t *testing.T) {
+	t.Parallel()
 	if lookupCommand("practice") == nil || !strings.Contains(usage, "practice watch [--dry-run] [--json]") {
 		t.Errorf("registered = %v, usage lists it = %v", lookupCommand("practice") != nil, strings.Contains(usage, "practice watch"))
 	}
