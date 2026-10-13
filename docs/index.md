@@ -59,6 +59,7 @@
 | [token-optimization-guide.md](private/research/archived-2026-05-19/token-optimization-guide.md) | Per-cycle token + cost optimization |
 | [event-notification-protocol-2026-10.md](research/event-notification-protocol-2026-10.md) | Research for ADR-0127: kernel file notification, the cost of local IPC, and topic and channel prior art |
 | [concurrent-cycle-landing-2026-10.md](research/concurrent-cycle-landing-2026-10.md) | Research for ADR-0128: the rebase census, the cycle 1843 finding, why the prefix queue is off, prior art and the cost model |
+| [fleet-landing-at-scale-2026-10.md](research/fleet-landing-at-scale-2026-10.md) | Research for ADR-0134: the cost of a ship scan, rebases at N = 2, 20 and 200, merge queues, speculative chains and content-keyed test selection |
 | [agent-messaging-2026-10.md](research/agent-messaging-2026-10.md) | Research for ADR-0129: agent-to-agent protocols, scope, identity under one uid, delivery to a busy LLM agent, safety and scale |
 | [research-index.md](research-index.md) | Full research-paper index |
 | [research/](research-index.md) | Merged research tree (2026-08-05): research packages + single-file notes from the former `kb/` and `knowledge-base/research/` roots |
