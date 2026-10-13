@@ -17,6 +17,8 @@ func Parse(raw []byte) (Policy, error) {
 	return p, nil
 }
 
+var patchBlocksMarshalIndent = json.MarshalIndent
+
 func PatchBlocks(existing []byte, patch map[string]any) ([]byte, error) {
 	blocks := map[string]json.RawMessage{}
 	if len(bytes.TrimSpace(existing)) > 0 {
@@ -35,7 +37,7 @@ func PatchBlocks(existing []byte, patch map[string]any) ([]byte, error) {
 		}
 		blocks[key] = raw
 	}
-	out, err := json.MarshalIndent(blocks, "", "  ")
+	out, err := patchBlocksMarshalIndent(blocks, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("policy: encoding policy.json: %w", err)
 	}

@@ -314,6 +314,8 @@ type CompleteOptions struct {
 	Now       func() time.Time
 }
 
+var stateMarshalIndent = json.MarshalIndent
+
 func Complete(o CompleteOptions) (string, error) {
 	now := o.Now
 	if now == nil {
@@ -336,7 +338,7 @@ func Complete(o CompleteOptions) (string, error) {
 	obj["setupCompletedAt"] = tsRaw
 	obj["setupVersion"] = verRaw
 
-	out, err := json.MarshalIndent(obj, "", "  ")
+	out, err := stateMarshalIndent(obj, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("setup complete: marshal: %w", err)
 	}

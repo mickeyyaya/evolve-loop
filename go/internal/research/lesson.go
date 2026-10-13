@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
 )
 
 // Lesson is the typed view of one entry in a .evolve/instincts/lessons/*.yaml
@@ -69,7 +69,7 @@ func parseLessonFile(path string) ([]Lesson, error) {
 		return nil, err
 	}
 	var entries []lessonYAML
-	if err := yaml.Unmarshal(raw, &entries); err != nil {
+	if err := yamlcodec.Unmarshal(raw, &entries); err != nil {
 		return nil, err
 	}
 	out := make([]Lesson, 0, len(entries))

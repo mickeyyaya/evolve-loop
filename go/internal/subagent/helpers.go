@@ -20,6 +20,8 @@ type AbnormalEvent struct {
 	SourcePhase     string
 }
 
+var abnormalEventWrite = func(f *os.File, s string) (int, error) { return f.WriteString(s) }
+
 func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Time) error {
 	if now == nil {
 		now = time.Now
@@ -46,7 +48,7 @@ func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Tim
 		return nil
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := f.WriteString(line + "\n"); err != nil {
+	if _, err := abnormalEventWrite(f, line+"\n"); err != nil {
 		return nil
 	}
 	return nil

@@ -61,13 +61,15 @@ func (g Git) TreeOfIndexCopy(ctx context.Context, adds ...[]string) (string, err
 	return onCopy.Output(ctx, "write-tree")
 }
 
+var copyIndexStat = func(f *os.File) (os.FileInfo, error) { return f.Stat() }
+
 func copyIndex(src, dst string) error {
 	f, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	info, err := f.Stat()
+	info, err := copyIndexStat(f)
 	if err != nil {
 		return err
 	}

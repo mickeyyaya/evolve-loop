@@ -124,6 +124,8 @@ func Run(opts Options) (Verdict, error) {
 	return v, nil
 }
 
+var resolveOptionsAbs = filepath.Abs
+
 func resolveOptions(opts Options) (Options, error) {
 	if opts.Root == "" {
 		return Options{}, fmt.Errorf("acssuite: Root required")
@@ -135,7 +137,7 @@ func resolveOptions(opts Options) (Options, error) {
 		if *p == "" {
 			continue
 		}
-		abs, err := filepath.Abs(*p)
+		abs, err := resolveOptionsAbs(*p)
 		if err != nil {
 			return Options{}, fmt.Errorf("acssuite: resolve %q to an absolute path: %w", *p, err)
 		}
@@ -301,6 +303,8 @@ func dirExists(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
+var redEvidenceOpenFile = os.OpenFile
+
 func writeRedEvidence(opts Options, results []Result) {
 	dir := filepath.Join(opts.stateRoot(), ".evolve", "runs", fmt.Sprintf("cycle-%d", opts.Cycle), "acs-red-evidence")
 	for _, r := range results {
@@ -320,7 +324,7 @@ func writeRedEvidence(opts Options, results []Result) {
 			if i > 0 {
 				name = fmt.Sprintf("%s-%d.txt", base, i+1)
 			}
-			f, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+			f, err := redEvidenceOpenFile(filepath.Join(dir, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 			if os.IsExist(err) {
 				collisions++
 				continue
@@ -523,9 +527,10 @@ func extractFailingTests(s string) []string {
 }
 
 var (
-	writeVerdictCreateTemp = os.CreateTemp
-	writeVerdictClose      = func(f *os.File) error { return f.Close() }
-	writeVerdictWriteFile  = os.WriteFile
+	writeVerdictCreateTemp    = os.CreateTemp
+	writeVerdictClose         = func(f *os.File) error { return f.Close() }
+	writeVerdictWriteFile     = os.WriteFile
+	writeVerdictMarshalIndent = json.MarshalIndent
 )
 
 func WriteVerdict(evolveDir string, v Verdict) (string, error) {
@@ -537,7 +542,7 @@ func WriteVerdict(evolveDir string, v Verdict) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("acssuite: mkdir %s: %w", dir, err)
 	}
-	buf, err := json.MarshalIndent(v, "", "  ")
+	buf, err := writeVerdictMarshalIndent(v, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("acssuite: marshal: %w", err)
 	}

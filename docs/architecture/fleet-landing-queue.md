@@ -2,6 +2,8 @@
 
 > [ADR-0128](adr/0128-landing-queue-tiered-reverification.md) (Proposed, 2026-10-09) · plan: [concurrent-cycle-landing-2026-10.md](../plans/concurrent-cycle-landing-2026-10.md) · research: [concurrent-cycle-landing-2026-10.md](../research/concurrent-cycle-landing-2026-10.md) (F2.1 to F9.3, R1 to R33).
 >
+> [ADR-0134](adr/0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md) (Proposed, 2026-10-13) amends this design for 200 concurrent lanes: content-keyed verification, an order by the conflict graph and group commit. Plan: [fleet-landing-at-scale-2026-10.md](../plans/fleet-landing-at-scale-2026-10.md).
+>
 > This file is the spec of record for the landing queue. It holds the lifecycle, the composition, the overlap proof, the tiers, the gates and the review. It also holds ejection, the budgets, the signals, the config, the failure modes and the limits. The plan holds the decisions, the components and the rollout. The ADR holds the decision.
 > Written in the Issue / Gap / Solution shape.
 >

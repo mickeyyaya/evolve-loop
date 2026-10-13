@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
 )
 
 type Scope string
@@ -75,6 +75,8 @@ func RenderRetrospectiveMarkdown(ev FailureEvent) []byte {
 	return b.Bytes()
 }
 
+var marshalYAML = yamlcodec.Marshal
+
 func RenderLessonYAML(ev FailureEvent) (id string, body []byte) {
 	id = lessonID(ev)
 	entry := lessonYAML{
@@ -97,7 +99,7 @@ func RenderLessonYAML(ev FailureEvent) (id string, body []byte) {
 			AuditVerdict:  ev.Verdict,
 		},
 	}
-	body, err := yaml.Marshal([]lessonYAML{entry})
+	body, err := marshalYAML([]lessonYAML{entry})
 	if err != nil {
 		panic("faillearn: yaml.Marshal of lesson entry must not fail: " + err.Error())
 	}

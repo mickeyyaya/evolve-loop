@@ -3,6 +3,7 @@ package ciparity
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -225,5 +226,40 @@ func TestGoWorkflow_ReportsPackageWallBudgetWithoutGatingTheJob(t *testing.T) {
 	}
 	if strings.Contains(step.Run, "fail-over-budget") {
 		t.Error("the budget step is advisory; --fail-over-budget belongs to a later enforce step")
+	}
+}
+
+func TestGoWorkflow_GatesTheSuiteOnAPinnedGovulncheckFromTheMakeTarget(t *testing.T) {
+	t.Parallel()
+	job, ok := readWorkflowContract(t, "go.yml").Jobs["vulncheck"]
+	if !ok {
+		t.Fatal("go.yml has no vulncheck job; a failed job fails the reusable workflow, so it gates the required result")
+	}
+	if job.If != "" || job.ContinueOnError != "" {
+		t.Errorf("the vulncheck job must always run and fail the suite: if=%q continue-on-error=%q", job.If, job.ContinueOnError)
+	}
+	var runs, goVersion string
+	for _, step := range job.Steps {
+		if step.ContinueOnError != "" || step.If != "" {
+			t.Errorf("vulncheck step %q may not skip or ignore its failure", step.Run+step.Uses)
+		}
+		runs += strings.TrimSpace(step.Run) + "\n"
+		if strings.HasPrefix(step.Uses, "actions/setup-go@") {
+			goVersion = step.With["go-version"]
+		}
+	}
+	if !strings.Contains(runs, "make vulncheck\n") || goVersion != "1.27" {
+		t.Errorf("vulncheck job runs %q on Go %q; want `make vulncheck` on the current 1.27 toolchain", runs, goVersion)
+	}
+	makefile, err := os.ReadFile(filepath.Join(workflowRepoRoot(t), "go", "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(makefile)
+	if !regexp.MustCompile(`(?m)^GOVULNCHECK_VERSION := v\d+\.\d+\.\d+$`).MatchString(text) {
+		t.Error("Makefile must pin GOVULNCHECK_VERSION to an exact release")
+	}
+	if !strings.Contains(text, "govulncheck@$(GOVULNCHECK_VERSION) $(PKG)") {
+		t.Error("the vulncheck recipe must run the pinned govulncheck over every package")
 	}
 }

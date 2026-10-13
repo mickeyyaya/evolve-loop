@@ -330,6 +330,11 @@ simulator-cycle: kernel-plumbing validated; no semantic learning produced.
 
 // ── ledger appender ───────────────────────────────────────────────────────
 
+var (
+	simLedgerCompact = jsonCompact
+	simLedgerWrite   = func(f *os.File, s string) (int, error) { return f.WriteString(s) }
+)
+
 // appendSimLedger writes a simulated ledger entry to ledger.jsonl + updates
 // ledger.tip. Mirrors the bash write_sim_ledger byte layout exactly: the JSON
 // object has `simulated: true` and computes prev_hash from the SHA256 of the
@@ -367,7 +372,7 @@ func appendSimLedger(ledgerPath string, cycle int, role, artifactPath, token, pr
 	if runID := core.RunIDFromWorkspace(filepath.Dir(artifactPath)); runID != "" {
 		entry["run_id"] = runID
 	}
-	line, err := jsonCompact(entry)
+	line, err := simLedgerCompact(entry)
 	if err != nil {
 		return err
 	}
@@ -404,7 +409,7 @@ func appendLedgerLine(ledgerPath, line string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := f.WriteString(line + "\n"); err != nil {
+	if _, err := simLedgerWrite(f, line+"\n"); err != nil {
 		_ = f.Close()
 		return err
 	}

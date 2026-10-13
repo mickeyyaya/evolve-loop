@@ -68,6 +68,15 @@ func (c writeConfig) preserveDiagnosis(ev FailureEvent, runDir string, cause err
 	return cause
 }
 
+type stagedFile interface {
+	Write([]byte) (int, error)
+	Chmod(fs.FileMode) error
+	Close() error
+	Name() string
+}
+
+var stageCreateTemp = func(dir, pattern string) (stagedFile, error) { return os.CreateTemp(dir, pattern) }
+
 func writeIfAbsent(path string, data []byte) (skipped bool, err error) {
 	if _, err := os.Stat(path); err == nil {
 		return true, nil
@@ -79,7 +88,7 @@ func writeIfAbsent(path string, data []byte) (skipped bool, err error) {
 		return false, err
 	}
 	// The temp file lives beside path because os.Link cannot cross filesystems.
-	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
+	tmp, err := stageCreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return false, err
 	}

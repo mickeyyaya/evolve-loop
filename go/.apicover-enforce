@@ -30,6 +30,7 @@
 ./internal/adapters/flock
 ./internal/adapters/runner
 ./internal/adapters/storage
+./internal/adapters/yamlcodec
 ./internal/atomicwrite
 ./internal/backfill
 ./internal/bedrock

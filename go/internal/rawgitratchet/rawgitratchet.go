@@ -76,6 +76,8 @@ func skipDir(name string) bool {
 	return name == "vendor" || name == "testdata" || (name != "." && strings.HasPrefix(name, ".")) || strings.HasPrefix(name, "_")
 }
 
+var onDiskRel = filepath.Rel
+
 func onDiskTestFiles(root string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -88,7 +90,7 @@ func onDiskTestFiles(root string) ([]string, error) {
 			}
 			return nil
 		}
-		rel, err := filepath.Rel(root, p)
+		rel, err := onDiskRel(root, p)
 		if err != nil {
 			return err
 		}

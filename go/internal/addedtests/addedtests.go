@@ -106,13 +106,17 @@ func BuildTags(path string) (tags []string, runnable bool, err error) {
 		}
 		ctx := build.Default
 		ctx.BuildTags = candidate
-		if match, matchErr := ctx.MatchFile(dir, name); matchErr != nil {
+		if match, matchErr := matchFileWithContext(ctx, dir, name); matchErr != nil {
 			return nil, false, matchErr
 		} else if match {
 			return candidate, true, nil
 		}
 	}
 	return nil, false, nil
+}
+
+var matchFileWithContext = func(ctx build.Context, dir, name string) (bool, error) {
+	return ctx.MatchFile(dir, name)
 }
 
 func goBuildExpr(path string) (constraint.Expr, error) {
