@@ -52,10 +52,12 @@ func releaseContinuationOnRetire(opts Options, itemPath, taskID, reason string) 
 	}
 }
 
+var marshalReleasedContinuation = func(v releasedContinuation) ([]byte, error) { return json.Marshal(v) }
+
 // appendReleasedContinuation appends c to path's released_continuations[]; a
 // malformed existing value is replaced, because the entry being written is the one that matters.
 func appendReleasedContinuation(path string, c continuation.Continuation, reason, releasedBy string, at time.Time) error {
-	entry, err := json.Marshal(releasedContinuation{
+	entry, err := marshalReleasedContinuation(releasedContinuation{
 		Continuation: c,
 		ReleasedAt:   at.Format(time.RFC3339),
 		Reason:       reason,

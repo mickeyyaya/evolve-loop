@@ -13,6 +13,8 @@ const replBootMarkers = "❯ › ? for shortcuts >>> evolve-fake-repl-ready"
 
 const maxPastedPromptLineBytes = 1 << 20
 
+var replResolveArtifactPath = resolveArtifactPath
+
 func runREPL(stdin io.Reader, stdout, stderr io.Writer, verdict string) int {
 	fmt.Fprintln(stdout, replBootMarkers)
 
@@ -29,7 +31,7 @@ func runREPL(stdin io.Reader, stdout, stderr io.Writer, verdict string) int {
 		if phase == "" || !workspaceLineRE.MatchString(buf.String()) {
 			continue
 		}
-		artifactPath := resolveArtifactPath(buf.String(), phase)
+		artifactPath := replResolveArtifactPath(buf.String(), phase)
 		if artifactPath == "" {
 			continue
 		}

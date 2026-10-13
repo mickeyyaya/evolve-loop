@@ -83,6 +83,8 @@ func severityOf(v usageprobe.Verdict) signalcenter.Severity {
 	return signalcenter.SeverityInfo
 }
 
+var evidenceWrite = func(f *os.File, b []byte) (int, error) { return f.Write(b) }
+
 func appendLine(r Record) error {
 	body, err := json.Marshal(Line{Origin: r.Origin, Phase: r.Phase, Driver: r.Driver, Trigger: r.Trigger, ExitCode: r.ExitCode, Summary: r.Evidence.Summary(), Evidence: r.Evidence})
 	if err != nil {
@@ -92,7 +94,7 @@ func appendLine(r Record) error {
 	if err != nil {
 		return fmt.Errorf("usage evidence: %w", err)
 	}
-	if _, err := f.Write(append(body, '\n')); err != nil {
+	if _, err := evidenceWrite(f, append(body, '\n')); err != nil {
 		_ = f.Close()
 		return fmt.Errorf("usage evidence: %w", err)
 	}

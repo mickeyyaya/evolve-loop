@@ -181,10 +181,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	req.WorktreeVerified = false
 	prep, early, err := b.preparePhaseExecution(req)
 	if err != nil {
-		if early != nil {
-			return *early, err
-		}
-		return core.PhaseResponse{}, err
+		return failedPhase(early, err)
 	}
 	if early != nil {
 		return *early, nil
@@ -192,10 +189,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 
 	dispatchPlan, early, err := b.resolveDispatchPlan(req, prep)
 	if err != nil {
-		if early != nil {
-			return *early, err
-		}
-		return core.PhaseResponse{}, err
+		return failedPhase(early, err)
 	}
 	dispatchResult := b.dispatchPhaseAttempts(ctx, req, prep, dispatchPlan)
 	if errors.Is(dispatchResult.bridgeErr, bridgechain.ErrUnlaunched) {
@@ -207,6 +201,13 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	// Effects first: the judge's first verification must see what the host performed.
 	b.performHostEffects(ctx, d)
 	return b.judge.Judge(ctx, d, b.classifyWith(req, d, dispatchResult.skills))
+}
+
+func failedPhase(early *core.PhaseResponse, err error) (core.PhaseResponse, error) {
+	if early != nil {
+		return *early, err
+	}
+	return core.PhaseResponse{}, err
 }
 
 func (b *BaseRunner) unlaunchedFailure(req core.PhaseRequest, prep phasePreparation, d phaseDispatchResult) (core.PhaseResponse, error) {

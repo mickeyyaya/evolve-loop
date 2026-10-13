@@ -46,6 +46,8 @@ func DirectImporters(repoRoot string, pkgPatterns []string) []string {
 	return out
 }
 
+var importersRel = filepath.Rel
+
 func importersOf(moduleDir string, targets map[string]string, inputs map[string]struct{}) map[string]struct{} {
 	fset := token.NewFileSet()
 	importers := map[string]struct{}{}
@@ -69,7 +71,7 @@ func importersOf(moduleDir string, targets map[string]string, inputs map[string]
 		if perr != nil {
 			return nil
 		}
-		rel, rerr := filepath.Rel(moduleDir, filepath.Dir(p))
+		rel, rerr := importersRel(moduleDir, filepath.Dir(p))
 		if rerr != nil {
 			return nil
 		}

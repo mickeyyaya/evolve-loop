@@ -116,6 +116,8 @@ func PendingActionsPath(escalationsDir string) string {
 	return filepath.Join(escalationsDir, PendingActionsFile)
 }
 
+var stagingWrite = func(f *os.File, b []byte) (int, error) { return f.Write(b) }
+
 // StageIntent appends in as one JSONL record to the pending-actions file under
 // escalationsDir (created on first run) and returns that path. It never writes
 // .evolve/inbox/ — see invariant (2) in the package doc. The append is
@@ -138,7 +140,7 @@ func StageIntent(escalationsDir string, in Intent) (string, error) {
 			return fmt.Errorf("dispositionrouter: open staging file: %w", oerr)
 		}
 		defer func() { _ = f.Close() }()
-		if _, werr := f.Write(append(line, '\n')); werr != nil {
+		if _, werr := stagingWrite(f, append(line, '\n')); werr != nil {
 			return fmt.Errorf("dispositionrouter: append intent: %w", werr)
 		}
 		return nil

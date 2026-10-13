@@ -126,6 +126,10 @@ func runPure(t *testing.T, s ScenarioSpec) {
 
 // --- FullOrchestrator ---
 
+var routingtestRunCycle = func(o *core.Orchestrator, req core.CycleRequest) (core.CycleResult, error) {
+	return o.RunCycle(context.Background(), req)
+}
+
 func runCycle(t *testing.T, s ScenarioSpec) {
 	cfg := buildConfig(s)
 	var strat router.RoutingStrategy = router.StaticPreset{}
@@ -163,7 +167,7 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 		envCopy[k] = v
 	}
 
-	res, err := o.RunCycle(context.Background(), core.CycleRequest{
+	res, err := routingtestRunCycle(o, core.CycleRequest{
 		ProjectRoot:           projectRoot,
 		GoalHash:              "g",
 		Env:                   envCopy,
@@ -177,7 +181,7 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	assertCycleExpectations(t, s, res, decisions, led, agent)
 }
 
-func assertCycleExpectations(t *testing.T, s ScenarioSpec, res core.CycleResult, decisions []router.RouterDecision, led *fixtures.FakeLedger, agent *scriptedProposer) {
+func assertCycleExpectations(t testing.TB, s ScenarioSpec, res core.CycleResult, decisions []router.RouterDecision, led *fixtures.FakeLedger, agent *scriptedProposer) {
 	t.Helper()
 	if s.Expect.PhaseSequence != nil {
 		assertPhaseSeq(t, res.PhasesRun, s.Expect.PhaseSequence)
@@ -243,7 +247,7 @@ func initScenarioRepo(t *testing.T) string {
 
 // --- assertion helpers ---
 
-func assertPhaseSeq(t *testing.T, got, want []core.Phase) {
+func assertPhaseSeq(t testing.TB, got, want []core.Phase) {
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("PhasesRun=%v, want %v", got, want)
