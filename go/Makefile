@@ -5,10 +5,12 @@
 #   make test        — go test -race -cover ./... (excludes acs/ — that's per-cycle)
 #   make cover       — emits coverage.html and prints per-package %
 #   make lint        — go vet + go fmt -d (read-only diff)
+#   make vulncheck   — govulncheck at the pinned version
 #   make tidy        — go mod tidy + go mod verify
 #   make clean       — remove ./bin and coverage outputs
 
 GO       ?= go
+GOVULNCHECK_VERSION := v1.9.0
 PKG      := ./...
 BIN_DIR  := bin
 BIN      := $(BIN_DIR)/evolve
@@ -194,6 +196,9 @@ lint: ## go vet + format diff (read-only)
 	$(GO) vet $(PKG)
 	@diff_out=$$(gofmt -d -s .) ; \
 	if [ -n "$$diff_out" ]; then echo "$$diff_out"; echo "FAIL: gofmt diff above" >&2; exit 1; fi
+
+vulncheck: ## govulncheck over the whole module at the pinned version (no go.mod require); fails on any reachable vulnerability
+	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) $(PKG)
 
 tidy: ## Normalize go.mod / go.sum
 	$(GO) mod tidy
