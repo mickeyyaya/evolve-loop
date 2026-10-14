@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// RetryAdjudicator proposes a disposition for an audit FAIL inside the legal envelope; a nil proposal yields the policy default.
 type RetryAdjudicator interface {
 	Adjudicate(cs CycleState, env retryEnvelope) *adjudication
 }
@@ -24,17 +23,14 @@ func reentryPhase(a retryAction) (Phase, bool) {
 	}
 }
 
-// decideAfterAuditFail consults deterministic evidence, then policy, then judgment among the actions those allowed.
-// See ADR-0093.
 func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *SystemFailureSignal) {
 	d := buildFailureDossier(cs, VerdictFAIL, o.failurePolicy)
-	_ = writeFailureDossier(cs.WorkspacePath, d) // per-cycle forensics; best-effort
+	_ = writeFailureDossier(cs.WorkspacePath, d)
 
 	env, fb := o.auditFailEnvelope(cs, d.FloorCandidate)
 	declared := fb.Class
 
 	if env.Halt {
-		// A halted cycle still gets its retro post-mortem; the signal is what stops the loop.
 		return PhaseRetro, "audit-fail-floor: " + env.Reason, &SystemFailureSignal{
 			Category: firstNonEmpty(d.FloorCandidate, declared),
 			Level:    policy.LevelSystem,
@@ -54,7 +50,6 @@ func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *Syst
 	case clamped:
 		suffix = " [adjudication clamped to the policy envelope]"
 	case proposal != nil && proposal.Justification != "":
-		// Surface the reasoning, not just the verdict word: the justification is the adjudicator's deliverable.
 		suffix = " [adjudicated: " + proposal.Justification + "]"
 	}
 
@@ -90,7 +85,6 @@ func (o *Orchestrator) auditFailEnvelope(cs CycleState, floorCandidate string) (
 	return env, fb
 }
 
-// emitAuditRepairDecision emits one signal: WARN when the repair round is declined, INFO when granted.
 func (o *Orchestrator) emitAuditRepairDecision(cs CycleState, next Phase, declared, reason string) {
 	e := signalcenter.Event{
 		Cycle: cs.CycleID, RunID: o.signalRunID(), Phase: string(PhaseAudit), Attempt: cs.AuditDispatches,
@@ -118,8 +112,6 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-// decisionOnlyEdge reports whether an edge exists only for decideAfterAuditFail to schedule. The routing
-// advisor must never propose it: an advisor-routed re-entry would grant a retry the envelope refused, uncounted.
 func decisionOnlyEdge(from, to Phase) bool {
 	return from == PhaseAudit && (to == PhaseTDD || to == PhaseBuild)
 }

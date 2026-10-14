@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// realConsumedByText and realNotesText are the two real shapes from a live consumed pipeline-defect item.
 const (
 	realConsumedByText = `console-2026-08-05: fingerprint ship|unknown|76d0f4fca190 = REPO_CONTRACT_GATE blocks from the two in-flight lanes' PRE-#415 worktrees`
 	realNotesText      = `Auto-filed by the ADR-0072 halt. Evidence: failure fingerprint "ship|unknown|76d0f4fca190" recurred 3× in one batch (ceiling 3) — identical failure identities cannot be distinct honest defects (rule=identical-fingerprint fingerprint=ship|unknown|76d0f4fca190)`

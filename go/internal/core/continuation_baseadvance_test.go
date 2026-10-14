@@ -11,14 +11,12 @@ func TestAdvanceContinuationBase_HealsStaleBase(t *testing.T) {
 	t.Parallel()
 
 	root, wt := initContinuationRepo(t, 81)
-	// Lane work on the preserved branch (non-conflicting with main's fix).
 	if err := os.WriteFile(filepath.Join(wt, "lane.go"), []byte("package x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := snapshotPreservedWorktree(context.Background(), "", wt); err != nil {
 		t.Fatal(err)
 	}
-	// Main lands a carve-out; the parent is excluded by glob, since an excluded directory cannot be re-included.
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/*\n!.evolve/evals/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +59,6 @@ func TestAdvanceContinuationBase_ConflictReturnsErrorAndAborts(t *testing.T) {
 	t.Parallel()
 
 	root, wt := initContinuationRepo(t, 83)
-	// A raced conflict, the shape the adopt-time Clean screen normally excludes.
 	if err := os.WriteFile(filepath.Join(wt, "a.txt"), []byte("lane\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

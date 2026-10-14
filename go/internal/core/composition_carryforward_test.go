@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// foo.go: audited touches func A() around new line 10; composed touches BOTH
-// func A() (overlap) and func B() around new line 51 (disjoint).
 const auditedFoo = "diff --git a/foo.go b/foo.go\n" +
 	"--- a/foo.go\n+++ b/foo.go\n" +
 	"@@ -10,3 +10,4 @@ func A() {\n" +

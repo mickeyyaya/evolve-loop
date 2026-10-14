@@ -32,7 +32,6 @@ func repoModuleDir(t *testing.T) string {
 	return ""
 }
 
-// enrolledPatterns reads the real go/.apicover-enforce, because the point is to gate the checked-in file.
 func enrolledPatterns(t *testing.T, moduleDir string) []string {
 	t.Helper()
 	f, err := os.Open(filepath.Join(moduleDir, ".apicover-enforce"))
@@ -55,7 +54,6 @@ func enrolledPatterns(t *testing.T, moduleDir string) []string {
 	return out
 }
 
-// legacyACSCeiling is the highest grandfathered acs cycle enrollment; anything above it is the regression.
 const legacyACSCeiling = 661
 
 func TestAPICoverEnforceDoesNotEnrollModernACSPackages(t *testing.T) {

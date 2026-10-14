@@ -11,11 +11,11 @@ import (
 func TestPhaseCardsFromCatalog(t *testing.T) {
 	t.Parallel()
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
-		{Name: "scout"},                     // → plan
-		{Name: "build", WritesSource: true}, // → build
-		{Name: "audit"},                     // → evaluate
-		{Name: "ship"},                      // → control (omitted)
-		{Name: "retro"},                     // → control (omitted)
+		{Name: "scout"},
+		{Name: "build", WritesSource: true},
+		{Name: "audit"},
+		{Name: "ship"},
+		{Name: "retro"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,6 @@ func TestWriteCatalog_TruncatesLongWhenToUse(t *testing.T) {
 
 func TestWriteCatalog_CapsEnrichedCardsKeepsAllSelectable(t *testing.T) {
 	t.Parallel()
-	// 14 optional cards + 2 spine cards: enriched rendering must cap at 12.
 	var cards []router.PhaseCard
 	cards = append(cards,
 		router.PhaseCard{Name: "build", Role: "build"},

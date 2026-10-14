@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// RealInboxForTest holds the real inboxmover functions, injected by the external test package.
 var RealInboxForTest struct {
 	Resolve      func(root string, cycle int) *continuation.Continuation
 	ResolveScope func(root string, cycle int, scopeIDs []string) *continuation.Continuation
@@ -20,8 +19,6 @@ var RealInboxForTest struct {
 	Claim        func(root, taskID, cycle string) error
 }
 
-// stampedContinuation runs the produce side for real over a repo fixture:
-// dirty worktree for oldCycle → snapshot + manifest → returns the manifest.
 func stampedContinuation(t *testing.T, root, wt string, oldCycle int) continuation.Continuation {
 	t.Helper()
 	ws := filepath.Join(root, ".evolve", "runs", cycleDirName(oldCycle))
@@ -80,7 +77,6 @@ func TestValidateContinuation_CleanPassesConflictAndGarbageFail(t *testing.T) {
 		t.Error("missing snapshot commit must fail validation")
 	}
 
-	// main moves and now conflicts with the snapshot → re-screen must reject.
 	if err := os.WriteFile(filepath.Join(root, "prior_work.go"), []byte("package mainside\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -104,8 +100,6 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 	}
 	m := stampedContinuation(t, root, wt, 83)
 
-	// Main lands a canonical record after the snapshot. Adoption must merge
-	// while clean, then classify unpublished records against this effective base.
 	published := "docs/explain/builds/cycle-84-published.md"
 	if err := os.MkdirAll(filepath.Dir(filepath.Join(root, published)), 0o755); err != nil {
 		t.Fatal(err)
@@ -119,7 +113,6 @@ func TestRunCycle_AdoptsContinuationAndServesFindings(t *testing.T) {
 	if err := os.WriteFile(m.FindingsPath, []byte(`{"phase":"build","summary":"export X unnamed in tests"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// As in production, the resolver sees the stamped item only after triage claims it mid-cycle.
 	seedStampedInboxItem(t, root, 83, "task-a")
 
 	runners := buildRunners(nil)
@@ -174,8 +167,6 @@ func TestRunCycle_InvalidContinuationFallsBackFresh(t *testing.T) {
 
 	root, wt := initContinuationRepo(t, 84)
 	m := stampedContinuation(t, root, wt, 84)
-	// Corrupt the stamp BEFORE it reaches the inbox item: point the item at a
-	// snapshot that does not exist.
 	m.SnapshotSHA = "1111111111111111111111111111111111111111"
 	seedStampedItemDirect(t, root, m, "task-a")
 
@@ -201,7 +192,6 @@ func TestRunCycle_InvalidContinuationFallsBackFresh(t *testing.T) {
 	}
 }
 
-// productionResolver mirrors the composition root's closure in cmd_cycle.go.
 func productionResolver(t *testing.T) func(string, int, []string) *continuation.Continuation {
 	t.Helper()
 	return func(root string, cycle int, _ []string) *continuation.Continuation {
@@ -209,7 +199,6 @@ func productionResolver(t *testing.T) func(string, int, []string) *continuation.
 	}
 }
 
-// seedStampedInboxItem stamps through the production release path, landing the item at the inbox root.
 func seedStampedInboxItem(t *testing.T, root string, failedCycle int, taskID string) {
 	t.Helper()
 	procDir := filepath.Join(root, ".evolve", "inbox", "processing", "cycle-"+itoa(failedCycle))
@@ -224,8 +213,6 @@ func seedStampedInboxItem(t *testing.T, root string, failedCycle int, taskID str
 	}
 }
 
-// seedStampedItemDirect writes a stamped item straight to the inbox root (for
-// corrupt-stamp scenarios the production release would never produce).
 func seedStampedItemDirect(t *testing.T, root string, m continuation.Continuation, taskID string) {
 	t.Helper()
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -238,7 +225,6 @@ func seedStampedItemDirect(t *testing.T, root string, m continuation.Continuatio
 	}
 }
 
-// claimingTriageRunner claims its item through the real inboxmover.Claim mid-cycle, as production triage does.
 type claimingTriageRunner struct {
 	*fakeRunner
 	root   string
@@ -252,9 +238,6 @@ func (r *claimingTriageRunner) Run(ctx context.Context, req PhaseRequest) (Phase
 	return r.fakeRunner.Run(ctx, req)
 }
 
-// worktreeProbeRunner records whether probeFile existed in the dispatched
-// worktree at phase-run time (the worktree is pruned on normal completion, so
-// post-RunCycle stats race the cleanup).
 type worktreeProbeRunner struct {
 	*fakeRunner
 	probeFile        string

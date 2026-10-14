@@ -44,7 +44,6 @@ func TestConsecutiveFailures_DuplicateDigestsForOneCycleCountOnce(t *testing.T) 
 func TestConsecutiveFailures_AckSplittingLongRunBelowCeilingNoHalt(t *testing.T) {
 	t.Parallel()
 
-	// A 5-run with the middle acked leaves two 2-runs below the ceiling of 3.
 	cfg := consecCfg(3)
 	cfg.AckedFingerprints = map[string]bool{"mid|fixed|x": true}
 	digests := []FailureDigest{
@@ -62,7 +61,6 @@ func TestConsecutiveFailures_AckSplittingLongRunBelowCeilingNoHalt(t *testing.T)
 func TestConsecutiveFailures_AckCannotMaskAnIndependentlyTrippingHalf(t *testing.T) {
 	t.Parallel()
 
-	// A 7-run with one ack still leaves a 3-run on one side.
 	cfg := consecCfg(3)
 	cfg.AckedFingerprints = map[string]bool{"mid|fixed|x": true}
 	digests := []FailureDigest{

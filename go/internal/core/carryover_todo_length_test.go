@@ -8,10 +8,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// boilerplatePrefix is a literal so the test breaks loudly if the sentence drifts.
 const boilerplatePrefix = "Review the failed cycle learning and fix before retrying:"
 
-// maxDefectActionRunes allows the 500-rune cap plus the "Fix defect from cycle N: " prefix.
 const maxDefectActionRunes = 600
 
 func TestApplyDefectsAsCarryoverTodosBoundsLength(t *testing.T) {

@@ -21,10 +21,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
-// BuildFloorCheckFn runs deterministic, LLM-free build-floor checks for a completed build and returns the failures.
 type BuildFloorCheckFn func(ctx context.Context, in ReviewInput) []string
 
-// DefaultBuildFloorChecks is the production deterministic engine of the build handoff floor.
 func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out := RemovalClaimFailures(ctx, in)
 	out = append(out, PlaceholderTokenFailures(ctx, in)...)
@@ -36,19 +34,16 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 
-// ProtectedSurfaceFloorChecks fails the handoff for every changed path on the protected control plane.
 func ProtectedSurfaceFloorChecks(member func(string) bool) BuildFloorCheckFn {
 	return func(ctx context.Context, in ReviewInput) []string {
 		if in.Worktree == "" {
 			return nil
 		}
 		base := floorBase(in)
-		// Rename detection is off, so a file moved out of the surface is judged by its old path too.
 		return protectedSurfaceFailures(changedWorktreePathsSince(ctx, in.Worktree, base, "--no-renames"), member, base)
 	}
 }
 
-// protectedSurfaceFailures fails open on a nil predicate; ship's tripwire stays armed.
 func protectedSurfaceFailures(paths []string, member func(string) bool, base string) []string {
 	if member == nil {
 		return nil
@@ -77,8 +72,6 @@ func explanationDocumentationFailures(ctx context.Context, in ReviewInput) []str
 	})
 }
 
-// docsFloorWarn prints the documentation floor's WARN to stderr, the phase log the auditor reads.
-// See ADR-0077.
 func docsFloorWarn(in ReviewInput, paths []string) {
 	var cfg docsfloor.Config
 	steStage := policy.Policy{}.DocsFloorConfig().SteStage
@@ -89,7 +82,6 @@ func docsFloorWarn(in ReviewInput, paths []string) {
 		}
 	}
 	steLintWarn(in.Worktree, steStage, paths, in.errOut())
-	// The blocking-grade classifier drops test-only diffs; the verdict still stays WARN.
 	v := docsfloor.Evaluate(cfg, docsfloor.Input{
 		ArchitectureLabeled: docsfloor.IsArchitectureClass(paths),
 		ChangedFiles:        paths,
@@ -99,8 +91,6 @@ func docsFloorWarn(in ReviewInput, paths []string) {
 	}
 }
 
-// changedFloorPaths diffs against the cycle base, not HEAD: the builder commits its work, so a HEAD diff is empty
-// at review time and the floor would approve vacuously.
 func changedFloorPaths(ctx context.Context, in ReviewInput) []string {
 	if in.Worktree == "" {
 		return nil
@@ -115,22 +105,17 @@ func ChangedWorktreePathsSinceBase(ctx context.Context, worktree, baseSHA string
 	return changedWorktreePaths(ctx, worktree)
 }
 
-// changedPackageFloorChecks runs the post-build selfcheck machinery as a rejecting floor, one line per failing
-// package. An inability to run is green, because downstream gates stay armed.
 func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []string) []string {
 	if in.Worktree == "" {
 		return nil
 	}
-	// reviewAndGuard normalizes gofmt and derived projections first, so this tests the tree Audit receives.
 	pkgs := changedGoTestPackages(paths)
 	moduleDir := codequality.ModuleDir(in.Worktree)
 	pkgs = buildTagVisiblePackages(ctx, moduleDir, pkgs, in.errOut())
-	// Added tag-gated packages are invisible to the default-context run, so they run under their own tags.
 	taggedFails := addedTaggedTestFailures(ctx, in, moduleDir)
 	if len(pkgs) == 0 {
 		return floorLinesFor(nil, taggedFails, nil)
 	}
-	// Enforced packages run once, in apicoverNamingFailures' coverage pass, which doubles as their selfcheck.
 	enforcedSet := map[string]bool{}
 	if enforceBytes, err := os.ReadFile(filepath.Join(moduleDir, ".apicover-enforce")); err == nil {
 		for _, p := range ciparity.IntersectEnforced(pkgs, enforceBytes) {
@@ -148,7 +133,6 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	}
 	fails := runBuildSelfCheck(ctx, moduleDir, plain, buildSelfCheckRunner)
 	namingFails := apicoverNamingFailures(ctx, moduleDir, enforced, paths)
-	// The ACS toolchain gate reads this artifact; the advisory binding skips its duplicate run when the floor is enforced.
 	removeBuildSelfCheckArtifact(in.Worktree)
 	if len(fails) > 0 {
 		writeBuildSelfCheckArtifact(in.Worktree, fails)
@@ -156,7 +140,6 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	return floorLinesFor(fails, taggedFails, namingFails)
 }
 
-// floorLinesFor names each tagged failure's tags so the builder re-runs exactly what the floor ran.
 func floorLinesFor(fails, taggedFails []selfCheckFailure, namingFails []string) []string {
 	out := make([]string, 0, len(fails)+len(taggedFails)+len(namingFails))
 	for _, f := range fails {
@@ -169,8 +152,6 @@ func floorLinesFor(fails, taggedFails []selfCheckFailure, namingFails []string) 
 	return out
 }
 
-// addedTaggedTestFailures runs every added test package under its declared build tags, with the ship backstop's
-// seed and grouping. It fails open when the seed cannot be derived.
 func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir string) []selfCheckFailure {
 	if in.Worktree == "" || in.WorktreeBaseSHA == "" {
 		return nil
@@ -201,10 +182,8 @@ func addedTaggedTestFailures(ctx context.Context, in ReviewInput, moduleDir stri
 	return fails
 }
 
-// floorFailureDiagnosticMax bounds one package's output, which becomes the next builder's whole failure story.
 const floorFailureDiagnosticMax = 400
 
-// floorFailureDiagnostic keeps the tail, because `go test` writes its FAIL lines, panics and stack traces last.
 func floorFailureDiagnostic(output string) string {
 	if len(output) <= floorFailureDiagnosticMax {
 		return output
@@ -212,8 +191,6 @@ func floorFailureDiagnostic(output string) string {
 	return "…" + output[len(output)-floorFailureDiagnosticMax:]
 }
 
-// buildTagVisiblePackages drops changed packages with no Go files under the default build tags, whose `go test` is a
-// setup failure rather than a test failure. It fails open: a `go list` error returns the input unchanged.
 func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []string, warn io.Writer) []string {
 	if len(pkgs) == 0 {
 		return pkgs
@@ -252,8 +229,6 @@ func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []strin
 	return kept
 }
 
-// apicoverNamingFailures applies CI's apicover naming floor at handoff. Its coverage run doubles as the enforced
-// packages' selfcheck, and every fail-open plumbing branch WARNs.
 func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []string, changedPaths []string) []string {
 	if len(enforced) == 0 {
 		return nil
@@ -262,9 +237,7 @@ func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []st
 	for _, p := range enforced {
 		dirs = append(dirs, filepath.Join(moduleDir, strings.TrimPrefix(p, "./")))
 	}
-	// Only violations in files this change touched hard-fail; a touched package's older debt only WARNs.
 	changedByDir := changedFileBasenamesByDir(moduleDir, dirs, changedPaths)
-	// apicover's enforce contract needs a coverage profile, or every named export reads as false-green.
 	coverFunc, testOut, status := scopedCoverFunc(ctx, moduleDir, enforced)
 	if coverFunc != "" {
 		defer func() { _ = os.RemoveAll(filepath.Dir(coverFunc)) }()
@@ -312,8 +285,6 @@ func coverTestArgs(profile string, pkgs, tags []string) []string {
 	return append(append(args, "-coverprofile", profile), pkgs...)
 }
 
-// scopedCoverFunc returns the cover -func path, the test output, and a status that separates test failures from
-// plumbing errors. The per-run -timeout keeps one hung package from wedging the check.
 func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path, output string, status int) {
 	profile, out, status := scopedCoverProfile(ctx, moduleDir, pkgs, nil)
 	if status != coverStatusOK {
@@ -354,10 +325,9 @@ func scopedCoverProfile(ctx context.Context, moduleDir string, pkgs, tags []stri
 	return profile, "", coverStatusOK
 }
 
-// changedFileBasenamesByDir maps each enforced package dir to the basenames of its changed .go files.
 func changedFileBasenamesByDir(moduleDir string, dirs []string, changedPaths []string) map[string]map[string]bool {
 	out := make(map[string]map[string]bool, len(dirs))
-	worktree := filepath.Dir(moduleDir) // moduleDir = <worktree>/go
+	worktree := filepath.Dir(moduleDir)
 	for _, d := range dirs {
 		out[d] = map[string]bool{}
 	}

@@ -9,12 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// placeholderTokenRE matches an UPPER_SNAKE token ending in _PLACEHOLDER, the
-// slot shape of a builder's own report scaffolding. No persona emits it, so
-// this grammar is the rule's only home. Prose and lowercase names never match.
 var placeholderTokenRE = regexp.MustCompile(`\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_PLACEHOLDER\b`)
 
-// PlaceholderTokenFailures names each template slot left in the build report; a missing report is the deliverables gate's to refuse.
 func PlaceholderTokenFailures(_ context.Context, in ReviewInput) []string {
 	if in.Workspace == "" {
 		return nil

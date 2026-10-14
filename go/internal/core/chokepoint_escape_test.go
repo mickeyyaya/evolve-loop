@@ -14,7 +14,6 @@ import (
 func TestRunCycle_TransitionCycleGuard_RecordsChokepointEscape(t *testing.T) {
 	t.Parallel()
 	projectRoot := t.TempDir()
-	// The spine needs far more than 2 dispatches, so the loop exits via the iteration bound.
 	orch := core.NewOrchestrator(&recStorage{}, &fakeLedger{}, newRunners(nil),
 		core.WithMaxPhaseIterations(2))
 	res, err := orch.RunCycle(context.Background(), core.CycleRequest{
@@ -42,7 +41,6 @@ func TestRunCycle_TransitionCycleGuard_RecordsChokepointEscape(t *testing.T) {
 	}
 }
 
-// findCycleWorkspace returns the cycle-N run dir that holds a phase-timing.json.
 func findCycleWorkspace(t *testing.T, projectRoot string) string {
 	t.Helper()
 	matches, err := filepath.Glob(filepath.Join(projectRoot, ".evolve", "runs", "cycle-*"))

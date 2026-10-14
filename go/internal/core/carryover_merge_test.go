@@ -88,7 +88,6 @@ func TestMergeWorkspaceCarryover_CapsActionRunes(t *testing.T) {
 		t.Fatalf("RED: expected 1 merged todo, got %d", len(state.CarryoverTodos))
 	}
 	n := utf8.RuneCountInString(state.CarryoverTodos[0].Action)
-	// The cap adds one rune: the truncation ellipsis.
 	if n > carryover.MaxActionRunes+1 {
 		t.Fatalf("RED: Action not capped: got %d runes, want <= %d — apply capRunes(action, carryover.MaxActionRunes)",
 			n, carryover.MaxActionRunes+1)
@@ -140,7 +139,7 @@ func TestMergeWorkspaceCarryover_MalformedFileWarnsNotFails(t *testing.T) {
 	})
 
 	t.Run("absent file is a no-op", func(t *testing.T) {
-		ws := t.TempDir() // no carryover-todos.json written
+		ws := t.TempDir()
 		state := &State{}
 		MergeWorkspaceCarryover(state, ws, 667, time.Now().UTC())
 		if len(state.CarryoverTodos) != 0 {

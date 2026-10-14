@@ -14,7 +14,6 @@ const scopedMergeAuditedDiff = `--- a/pkg/file.go
  gamma
 `
 
-// Overlaps the audited hunk: same file, old-side lines 2-3 vs 1-3.
 const scopedMergeOverlappingDiff = `--- a/pkg/file.go
 +++ b/pkg/file.go
 @@ -2,2 +2,3 @@
@@ -23,7 +22,6 @@ const scopedMergeOverlappingDiff = `--- a/pkg/file.go
  gamma
 `
 
-// Same file but old-side lines 50-51 — no overlap with lines 1-3.
 const scopedMergeDisjointDiff = `--- a/pkg/file.go
 +++ b/pkg/file.go
 @@ -50,2 +50,3 @@
@@ -47,7 +45,7 @@ func TestRunScopedMergeReview_DisjointHunks_CompatibleWithoutReview(t *testing.T
 	if err != nil {
 		t.Fatalf("RunScopedMergeReview: %v", err)
 	}
-	var got ScopedMergeResult = res // names ScopedMergeResult
+	var got ScopedMergeResult = res
 	if got.Disposition != ScopedMergeCompatible {
 		t.Errorf("disposition = %q, want %q (empty intersection composes)", got.Disposition, ScopedMergeCompatible)
 	}
@@ -82,11 +80,10 @@ func TestRunScopedMergeReview_OverlappingHunks_ReviewerDispositionCarried(t *tes
 	if err != nil {
 		t.Fatalf("RunScopedMergeReview: %v", err)
 	}
-	var disp ScopedMergeDisposition = res.Disposition // names ScopedMergeDisposition
+	var disp ScopedMergeDisposition = res.Disposition
 	if disp != ScopedMergeEntangled {
 		t.Errorf("disposition = %q, want the reviewer's %q carried verbatim", disp, ScopedMergeEntangled)
 	}
-	// intersectingHunks appends the audited-side then the composed-side hunk of the one overlapping pair.
 	if !res.Dispatched || len(res.DispatchedHunks) != 2 || len(seenHunks) != 2 {
 		t.Fatalf("overlap must dispatch exactly the 2 intersecting hunks (audited+composed): Dispatched=%v result-hunks=%d reviewer-hunks=%d",
 			res.Dispatched, len(res.DispatchedHunks), len(seenHunks))

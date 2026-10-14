@@ -6,12 +6,10 @@ import (
 	"math"
 )
 
-// StateUpdater is the optional serialized read-modify-write capability the cycle-number allocator needs.
 type StateUpdater interface {
 	UpdateState(ctx context.Context, mutate func(*State)) (State, error)
 }
 
-// AllocateCycleNumber mints the next cycle number through the serialized RMW, so no two allocators receive the same number.
 func AllocateCycleNumber(ctx context.Context, su StateUpdater) (int, error) {
 	return allocateCycleNumberAbove(ctx, su, 0)
 }
@@ -43,8 +41,6 @@ func nextCycleNumber(base int) (int, error) {
 	return base + 1, nil
 }
 
-// allocateCycle folds the highest occupied Go ACS cycle package into the lease. It syncs the in-memory
-// lease so the cycle-end persist cannot clobber it.
 func (o *Orchestrator) allocateCycle(ctx context.Context, state *State, projectRoot string) (int, error) {
 	floor, err := sourceCycleFloor(projectRoot)
 	if err != nil {
@@ -62,8 +58,6 @@ func (o *Orchestrator) allocateCycle(ctx context.Context, state *State, projectR
 	return n, nil
 }
 
-// persistCycleEndState never rolls back the monotonic lease and revision, because the in-memory copy
-// is stale once a concurrent run allocates.
 func (o *Orchestrator) persistCycleEndState(ctx context.Context, state State) error {
 	su, ok := o.storage.(StateUpdater)
 	if !ok {
@@ -76,7 +70,6 @@ func (o *Orchestrator) persistCycleEndState(ctx context.Context, state State) er
 		s.LastAllocatedCycleNumber = max(s.LastAllocatedCycleNumber, diskLease)
 		s.LastCycleNumber = max(s.LastCycleNumber, diskCycle)
 		s.StateRevision = diskRev
-		// Under EVOLVE_FLEET the global lock is skipped, so union a peer run's concurrent outcome records.
 		s.FailedAt = mergeFailedRecords(diskFailed, state.FailedAt)
 		s.CarryoverTodos = mergeCarryoverTodos(diskCarry, state.CarryoverTodos)
 	})

@@ -7,15 +7,10 @@ import (
 	"testing"
 )
 
-// contractEscalationRun builds the minimal cycleRun the target decision needs: the
-// project root it resolves profiles from plus the per-dispatch env snapshot the
-// dispatch resolver reads. No orchestrator handles are touched by this path.
 func contractEscalationRun(root string, env map[string]string) *cycleRun {
 	return &cycleRun{req: CycleRequest{ProjectRoot: root}, envSnap: env}
 }
 
-// writeRawProfile writes an arbitrary profile document (needed for shapes
-// writeCLIProfile does not model, e.g. allowed_clis).
 func writeRawProfile(t *testing.T, root, agent string, doc map[string]any) {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve", "profiles")
@@ -31,16 +26,9 @@ func writeRawProfile(t *testing.T, root, agent string, doc map[string]any) {
 	}
 }
 
-// adversarial-review has a real .evolve/profiles/adversarial-review.json but is
-// absent from phaseAgentName's built-in table; falling back to a nil profile
-// there reads as primary=claude-tmux, "same family", and therefore no
-// escalation — the exact shape of every minted/user phase under
-// .evolve/phases/, which are exactly the phases an operator points at a
-// non-claude CLI.
 func TestContractEscalation_MintedPhaseResolvesItsOwnProfile(t *testing.T) {
 	t.Setenv("EVOLVE_CLI", "")
 	root := t.TempDir()
-	// Not in phaseAgentName — resolvable only by the <phase>.json convention.
 	writeCLIProfile(t, root, "adversarial-review", "agy-tmux", nil)
 	cr := contractEscalationRun(root, nil)
 
@@ -56,11 +44,6 @@ func TestContractEscalation_MintedPhaseResolvesItsOwnProfile(t *testing.T) {
 	}
 }
 
-// TestContractEscalation_EnvOverrideDecidesTheFailedFamily: the failed family must
-// come from the CLI that actually ran, and EVOLVE_CLI / EVOLVE_<AGENT>_CLI outrank
-// profile.cli in the dispatch resolver. Reading profile.cli instead would compute
-// the failed family from a CLI that never ran and "escalate" onto the family that
-// just failed twice — while logging that it escalated.
 func TestContractEscalation_EnvOverrideDecidesTheFailedFamily(t *testing.T) {
 	t.Setenv("EVOLVE_CLI", "")
 	root := t.TempDir()
@@ -79,9 +62,6 @@ func TestContractEscalation_EnvOverrideDecidesTheFailedFamily(t *testing.T) {
 	}
 }
 
-// TestContractEscalation_DispatchOverrideDecidesTheFailedFamily: an advisor soft
-// overlay (model_routing=auto) outranks env and profile alike, so a phase
-// dispatched on the overlay's CLI must be escalated away from THAT family.
 func TestContractEscalation_DispatchOverrideDecidesTheFailedFamily(t *testing.T) {
 	t.Setenv("EVOLVE_CLI", "")
 	root := t.TempDir()
@@ -100,15 +80,9 @@ func TestContractEscalation_DispatchOverrideDecidesTheFailedFamily(t *testing.T)
 	}
 }
 
-// TestContractEscalation_RespectsAllowedCLIs is the security guardrail. The
-// sanctioned ModelRoutingCLI writer only ever emits values validated by
-// policy.ValidatePin (the single validator for a profile's allowed_clis), so the
-// escalation must not become the one path that routes a phase to a CLI family its
-// operator forbade — e.g. a `tester` profile pinned to allowed_clis=["claude"].
 func TestContractEscalation_RespectsAllowedCLIs(t *testing.T) {
 	t.Setenv("EVOLVE_CLI", "")
 	root := t.TempDir()
-	// Primary is claude-family, chain offers codex, but only claude is permitted.
 	writeRawProfile(t, root, "builder", map[string]any{
 		"name": "builder", "role": "builder", "cli": "claude-tmux",
 		"cli_fallback": []string{"codex-tmux"},
@@ -121,10 +95,6 @@ func TestContractEscalation_RespectsAllowedCLIs(t *testing.T) {
 	}
 }
 
-// TestContractEscalation_NoTargetWhenChainIsOneFamily is the precision guard: a
-// phase whose entire chain is the universal-fallback family has nowhere to
-// escalate, and "escalating" onto the CLI that just failed twice would be a lie
-// in the log plus a wasted final correction.
 func TestContractEscalation_NoTargetWhenChainIsOneFamily(t *testing.T) {
 	t.Setenv("EVOLVE_CLI", "")
 	root := t.TempDir()
@@ -136,12 +106,9 @@ func TestContractEscalation_NoTargetWhenChainIsOneFamily(t *testing.T) {
 	}
 }
 
-// TestContractEscalation_AbsentProfileIsNilSafe: a phase with no profile on disk
-// must degrade to the dispatch resolver's own default (claude-tmux) and report no
-// escalation target, rather than panicking or inventing a family.
 func TestContractEscalation_AbsentProfileIsNilSafe(t *testing.T) {
 	t.Setenv("EVOLVE_CLI", "")
-	root := t.TempDir() // no .evolve/profiles at all
+	root := t.TempDir()
 	cr := contractEscalationRun(root, nil)
 
 	if got := cr.contractDispatchCLI(PhaseBuild, ""); got != universalContractFallbackCLI {

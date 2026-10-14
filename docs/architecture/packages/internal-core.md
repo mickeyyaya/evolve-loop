@@ -481,6 +481,80 @@
 - **`gitWorktree.Cleanup`'s `os.RemoveAll` never runs against a path this provisioner did not create.** `deleteCycleBranch` runs non-force `git branch -d` only, relying on git's own merged-check as its safety net rather than escalating to `-D`, and is gated on the `cycle-` leaf prefix so Cleanup never branch-deletes an unrelated path. Pinned by `TestCleanup_DeletesMergedCycleBranch` and `TestCleanup_UnmergedBranchSurvives_WarnsOnly`.
 - **`resolveWorktreeBaseSHA` records a reused worktree's HEAD verbatim as `WorktreeBaseSHA`, unless HEAD is a salvage snapshot, in which case it walks back to the first non-snapshot ancestor.** Recording a snapshot's own SHA as the base would make `normalizeWorktreeToBase` soft-reset onto the very commit salvage exists to protect, reading the preserved diff as empty; the walk applies only to a snapshot HEAD, since an unconditional walk-back would re-base every ordinary lane instead. When HEAD is readable but its ancestry is not, the captured HEAD is still returned verbatim with a WARN rather than an error, because an empty base disables normalization entirely, the worse outcome — `TestVerdictCacheCollisionRegression`'s missing-base scenario depends on this fail-open path, since it stubs `rev-parse HEAD` and needs capture to survive a failed ancestry walk. A chain that is snapshots all the way down has no honest base and fails loudly instead of falling back to either the snapshot or an empty string. Pinned by `TestWorktreeReuseBase_SalvageSnapshotHEADResolvesToFirstNonSalvageAncestor`, `TestWorktreeReuseBase_SalvagedWorkIsPendingInTheReviewDiffAfterNormalize`, `TestWorktreeReuseBase_StackedSalvageSnapshotsResolveToTheCommitBeneathAll`, `TestWorktreeReuseBase_OrdinaryHEADIsRecordedVerbatim`, `TestWorktreeReuseBase_CommitMentioningSalvageInBodyIsNotTreatedAsASnapshot`, `TestWorktreeReuseBase_UnresolvableSnapshotAncestorFailsLoudly`, `TestWorktreeReuseBase_UnreadableAncestryRecordsHEADVerbatim`, `TestNewCycleRun_UnresolvableSnapshotBaseFailsProvisioning` and `TestWorktreeReuseBase_ProvisioningPathRecordsGuardedBaseInCycleState`.
 - **`inPlaceWorktree` is the one predicate every worktree mutator checks before touching a worktree** (`normalizeBuildWorktree`, `recoverBuildLeak`, `worktreeContentSHA`, `snapshotPreservedWorktree`, `rebaseCycleBranchOntoMain`, the provisioner's `Cleanup`, the teardown message), so the operator's project root — including a symlink alias or a relative spelling of it — is never normalized, reverted, staged, committed, rebased or removed by a cycle. An empty `projectRoot` is treated as unknown, never as the root. Pinned by `TestWorktreeMutators_RefuseTheProjectRoot`.
+- **Failure routing and breaker rules.**
+  - A guard abort is pipeline machinery that failed. It is never a task defect, so its pre-class is `guard-class`.
+  - A digest whose fingerprint asserts no defect identity is "unexplained". Distinct failures collapse into such buckets by construction, so the identical-fingerprint rule never counts them. The unexplained rule owns them.
+  - The consecutive-failures rule is evaluated last. When two rules trip together, the more specific rule names the halt.
+  - An acknowledged fingerprint is excluded from the identical-fingerprint count and from the consecutive streak. A resumed batch that counts it will halt again before the fix is verified.
+  - Cycle numbers are batch-global. A fully failed wave of width 2 adds 2 to the streak. A missing digest is a PASS and splits a streak.
+  - `ParseConsumptionFingerprint` needs the literal `fingerprint` token before the triplet, so a pipe-delimited path never matches. It fails closed.
+  - The ack ledger `.evolve/resolved-fingerprints.json` is written by a tmp-and-rename, so no reader sees a partial ledger. A missing ledger is an empty set.
+- **Audit round bookkeeping.**
+  - The previous round's verdict artifacts are retired before the pre-phase cycle-state write on both dispatch surfaces. A crashed round's verdict is therefore retired on resume.
+  - If archiving fails, the stale file is removed. A surviving verdict is replayed.
+  - A counter rollback can leave an archive in place. The first retirement's evidence is never overwritten.
+  - `AuditRepairAttempts` is a monotonic counter, not a flag for "repairing now". Audit re-reads its own artifacts, so re-injecting its own rejection is circular.
+  - A bookkeeping regrade matches only at the start of a record, so a quoted occurrence inside another message cannot match. Producers never emit a `narrative=FAIL` conflict line. The matcher rejects one that is forged.
+  - A FAIL with green artifacts and no `AuditFailReasons` is the signature of a forged verdict.
+- **Audited tree.** The tree is the one on the auditor row that ship binds. A run without such a row gives an empty entry, not an error.
+- **Boot quarantine.** Boot recovery re-pins the ship binary in the same pass. Quarantining it reopens the SHA mismatch that the re-pin heals. Git can report a collapsed untracked parent directory that `classifyDirtyPaths` cannot exclude, so the pathspec excludes the ship binary too.
+- **Console lease.**
+  - The lease lives in the git common dir, outside every worktree, so no lane phase can write or shadow it.
+  - An absent, malformed, expiry-less or expired lease reads as an empty set, and an unresolved hub gives no path. The guard stays armed in every degraded shape.
+  - `expires_at` is required. No expiry means no lease.
+  - The lease is adopted once at cycle start, so a write in mid-cycle cannot waive its own cycle. The logged digest comes from the bytes that were adopted, not from a second read.
+- **Build floor.**
+  - The floor diffs against the cycle base. The builder commits its work, so a HEAD diff is empty at review time and the floor approves with nothing checked.
+  - The protected-surface check turns rename detection off. A file moved out of the surface is judged by its old path too. A nil predicate fails open, and the ship tripwire stays armed.
+  - Changed packages are tested after `reviewAndGuard` normalizes gofmt and derived projections, so the tested tree is the tree that Audit receives.
+  - An added package that is gated by build tags is invisible to the default run. It runs under its own tags. An enforced package runs once, in the coverage pass of the apicover naming check.
+  - That coverage pass needs a coverage profile. Without one, every named export reads as covered.
+  - Only violations in files that the change touched fail hard. Older debt in a touched package only warns.
+  - A failure to run is green, and downstream gates stay armed. Every fail-open branch warns.
+  - A package output keeps its tail, because `go test` writes its FAIL lines, panics and stack traces last. Complete output carries no elision marker, so the marker stays trustworthy.
+  - The documentation floor classifier drops test-only diffs, and the verdict stays WARN.
+- **Build report checks.**
+  - The removal check parses only the claim block. Prose is never parsed, because a matcher on the word "removed" blocks honest reports.
+  - A claim with an absolute or escaping path is not adjudicated. A claim that is absent and untracked, or a Git failure, fails open.
+  - A placeholder token is `UPPER_SNAKE_PLACEHOLDER`. No persona emits one, so this grammar is the only home of the rule.
+  - The persona budget check fails only when a persona document was touched and the prompts package is red. It skips when `changedPackageFloorChecks` already runs the package.
+- **Carry-forward screen.**
+  - Supersession is checked first. A dry-run merge of a change that is already absorbed reads clean.
+  - The check uses `git merge-tree --write-tree`, which is a real three-way merge that writes only to the object database. Exit code 1 is a conflict. The bare one-argument form reports clean on conflicts.
+  - A candidate that is not landable is either superseded or a conflict. Calling a conflict "landed" drops overlapping work in silence, so supersession is screened again.
+  - A conflict routes to the debugger and never short-circuits.
+- **Composition ladder.**
+  - A composed-tree gate decline falls back to a full re-audit at all three trip sites (rung 0, rung 2 and the identity carry-forward).
+  - The rung-2 reviewer is trusted only when its resolution keeps the audited patch-id. A language-model merge is verified, never trusted. An unknown verdict value fails closed.
+  - `compositionPatchID` and `CompositionVerdictInput` mirror the ledger adapter, which core cannot import.
+  - `WithCompositionGateRunner` takes a function that returns statuses and output tails. The orchestrator field keeps its status-only map, and the option projects statuses and hands the full outcomes to the per-call sink.
+  - The snapshot and the gate runner and the verdict writer must all be bound for the fast path. A partial binding is not wired.
+- **Continuation (salvage and resume).**
+  - Salvage snapshots use a fixed committer identity, so preservation never depends on the git identity of the host.
+  - A snapshot stages everything that the run produced, with `add -A`. The staging discipline of a declared manifest applies to ship binding, not to salvage.
+  - A clean worktree is idempotent and returns HEAD. A failed merge of the base is aborted and returned. Stale code never reaches Build. A cancelled context must not leave an unresolved merge in preserved work.
+  - Only a snapshot that the screen classifies as Clean is stamped. AlreadyLanded has nothing to resume. Conflict belongs to the debugger path.
+  - Findings come from `audit-fail-reason.json`, which carries the actual reasons. `failure-digest.json` is only an identity shell. Reasons render as lines, not as escaped JSON.
+  - Findings are cut at the last line break inside the budget. A byte cut can land inside a rune or leave half a finding. An unreadable findings file warns loudly, so "no findings existed" differs from "the manifest points at the wrong path". The continuation still adopts, because the work matters more than the notes.
+  - A declined continuation releases its registry binding. If the binding stays, it outlives its lineage, and the out-of-band check of the defect-ledger gate fails every later lane on that scope. Only the orchestrator releases. A binding for another ancestor cycle is untouched. A failed release leaves the binding, so the next lane declines again.
+  - A lane whose scope came from the wave planner has no inbox item. Its manifest is also registered under each pinned todo id. A blank id is skipped, because `materializeLaneScope` splits an empty scope into one empty string. Every failure is a WARN, because salvage bookkeeping never fails cycle finalization.
+  - Adoption runs right after triage, when this cycle's claims exist on disk. A failure before seeding keeps fresh provisioning. A failure after seeding stops the cycle and preserves the worktree.
+- **Contract escalation.**
+  - Escalation triggers on the gate's own consecutive-block count (`contractEscalateAtBlock`), not on a local ordinal. The breaker is one global file, so an aborted cycle leaves it hot.
+  - Block identity is the set of violation codes in the reason. Two blocks are one defect when their code sets intersect. When a block yields no codes, identity falls back to the fingerprint-normalized reason of the blocker breaker.
+  - The rule is "prior reason known and different suppresses". It is never "equal escalates", because a hot breaker can start a ladder at block 2 with nothing to compare. The zero value reports true.
+  - The code pattern is narrow (no spaces), so bracketed prose in a message cannot fake a code.
+  - `contractArtifactDetermined` is an allowlist and fails closed. A repair that deletes a stray copy leaves the watched artifact byte-identical, so an unchanged hash is not proof of inaction. It has no production caller yet. `TestContractArtifactDetermined_CodesMatchDeliverableVocabulary` keeps its codes equal to the deliverable vocabulary, because `internal/deliverable` imports core.
+  - The salvage retry runs only when no other CLI family exists. It adds no dispatch and consumes no extra correction, so the breaker count is untouched. A remediation from the gate replaces the clause that forbids edits to other files, because a remediation exists for violations whose fix creates something.
+  - A demotion is staged as an intent, never written to `.evolve/inbox`. A write in mid-flight races `inboxmover.Claim` and can revive a claimed item. `recurrence.ApplyBoundary` is the only sanctioned inbox writer. The ledger entry keeps `salvage_attempted` beside `escalated`. A ledger or staging failure never changes the outcome. The intent weight comes from policy, with a compiled default when the load fails.
+  - A demotion is reported even when a later gate in the chain rejects the same deliverable.
+  - The universal fallback CLI equals the llmroute default. `TestUniversalContractFallbackMatchesLLMRouteDefault` pins it.
+- **Correction ladder (salvage rung).**
+  - Salvage relocates only into the workspace or `<ProjectRoot>/.evolve`. The basename check bounds the file name and this bounds the directory, so a faulty verifier cannot make salvage write elsewhere.
+  - `withinRoot` refuses an empty root. Without that rule, a missing `ProjectRoot` can admit every path in the tree as a destination.
+  - The search order is worktree, workspace, then cwd. A phase that writes source most likely misplaced its report in the tree that it edits. A file is relocated first, by an atomic rename, and the destination is verified after.
+  - A candidate must be a regular file (lstat, no symlink), non-empty, no larger than 1 MiB and fresh. An unknown phase or a reject that is not shaped like an artifact does nothing.
+  - The evidence digest has kernel-verified facts only: names from `git status` and the original path of a stray. `gitStatusNames` keeps stdout untrimmed, because the first porcelain line starts with a status column.
 
 ## Findings
 

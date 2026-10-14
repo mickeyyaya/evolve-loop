@@ -20,6 +20,8 @@ func TestEveryTopLevelTestIsParallelOrListedSerial(t *testing.T) {
 const (
 	changesDirectory                = "test changes the process directory"
 	setsEnv                         = "test sets the process environment through a helper"
+	swapsAbsPath                    = "test swaps package variable absPath"
+	swapsWorkingDir                 = "test swaps package variable workingDir"
 	swapsBackoffSleep               = "test swaps package variable backoffSleep"
 	swapsBuildSelfCheckRunner       = "test swaps package variable buildSelfCheckRunner"
 	swapsChallengeTokenRead         = "test swaps package variable challengeTokenRead"
@@ -65,6 +67,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestApplyPostReviewGuards_AnExecutableOutsideTheMainTreeOrUnknownLeavesNoRelativeBinary":  swapsPostReviewExecutable,
 	"core.TestApplyPostReviewGuards_TheKnownGoEvolvePathIsNotDiscardedTwice":                        swapsPostReviewExecutable,
 	"core.TestLaneStartRef_RetriesRefLockContention":                                                swapsGitRunner,
+	"core.TestCoverfixS2_UnresolvablePathsSurfaceAsRefusalNotSuccess":                               swapsAbsPath + "; " + swapsWorkingDir,
 	"core.TestExecuteRetryBackoff_AppliedOnAttempt2":                                                swapsBackoffSleep,
 	"core.TestExecuteRetryBackoff_ZeroBaseDisables":                                                 swapsBackoffSleep,
 	"core.TestShipRecovery_JitteredBackoffBetweenReaudits":                                          swapsBackoffSleep,

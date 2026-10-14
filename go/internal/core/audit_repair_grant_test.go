@@ -106,7 +106,6 @@ func TestResumePath_ReachesTheAuditFailDisposition(t *testing.T) {
 func TestBlockerBreaker_RepairAttemptsWithinOneCycleCountOnce(t *testing.T) {
 	t.Parallel()
 
-	// One cycle, three distinct audit rejections: the original plus two repairs.
 	v := EvaluateBlockerBreaker([]FailureDigest{
 		dg(1573, "audit|verdict-fail|aaa", "verdict-fail"),
 		dg(1573, "audit|verdict-fail|bbb", "verdict-fail"),

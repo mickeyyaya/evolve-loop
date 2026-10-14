@@ -36,7 +36,6 @@ func TestPersonaDocTouched(t *testing.T) {
 	}
 }
 
-// stubSelfCheckRunner returns the packages the stubbed go-test seam was asked to run.
 func stubSelfCheckRunner(t *testing.T, output string, passed bool) *[]string {
 	t.Helper()
 	old := buildSelfCheckRunner
@@ -80,7 +79,7 @@ func TestPersonaBudgetFailures(t *testing.T) {
 	})
 
 	t.Run("no persona path never runs the package", func(t *testing.T) {
-		ran := stubSelfCheckRunner(t, "", false) // RED if it were ever run
+		ran := stubSelfCheckRunner(t, "", false)
 		if got := personaBudgetFailures(ctx, t.TempDir(), []string{"docs/notes.md", "go/internal/core/x.go"}); len(got) != 0 {
 			t.Errorf("a lane that never touches agents/evolve-*.md must see zero behaviour change; got %v", got)
 		}
@@ -111,7 +110,6 @@ func TestPersonaBudgetFailures(t *testing.T) {
 	})
 }
 
-// A real git fixture, because the production path derives changed paths from git.
 func TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -135,7 +133,6 @@ func TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck(t *testing.T) {
 	base := repo.Git("rev-parse", "HEAD")
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: wt, WorktreeBaseSHA: base}
 
-	// The builder protocol commits its work.
 	write("agents/evolve-scout.md", "# Evolve Scout\n\nlines that blow the budget\n")
 	repo.Git("add", "-A")
 	repo.Git("commit", "-q", "-m", "persona edit")

@@ -31,7 +31,6 @@ func TestBookkeepingRegradeEligible_Matrix(t *testing.T) {
 		{"conflict-only", []string{tConflictPASS}, false},
 		{"conflict+ledger+egps", []string{tConflictPASS, tLedger, tEGPS}, false},
 		{"empty", nil, false},
-		// Producers never emit a narrative=FAIL conflict line, but the matcher must reject a smuggled one.
 		{"forged-fail-narrative", []string{"verdict-conflict: auditor narrative=FAIL but 1 deterministic gate(s) forced FAIL [defect-ledger]", tLedger}, false},
 	}
 	for _, tc := range cases {
@@ -132,9 +131,8 @@ func TestDecideAfterRetro_FloorOutranksRegrade(t *testing.T) {
 
 	o := floorOrchestrator(nil)
 	dir := t.TempDir()
-	writeVerdicts(t, dir, "PASS", "PASS") // green artifacts + recorded FAIL = incoherent
+	writeVerdicts(t, dir, "PASS", "PASS")
 	cs := CycleState{CycleID: 1430, WorkspacePath: dir}
-	// No AuditFailReasons: an unexplained FAIL with green artifacts is the forged-verdict floor signature.
 
 	next, _, _, sig := o.decideAfterRetro(cs, VerdictFAIL, nil)
 	if sig == nil || next != PhaseEnd {
