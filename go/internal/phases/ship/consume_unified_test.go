@@ -1,12 +1,5 @@
 package ship
 
-// consume_unified_test.go — a VALIDATED unified_commitment closes all-or-nothing
-// at the in-commit consumption seam (triage-unified-solution-synthesis: members
-// close TRANSACTIONALLY with landing). The triage phase stamps
-// unified_projection only beside a claim it validated (triage/unified.go), so the
-// projection — never the raw claim — marks the member set as one atomic unit.
-// Every other id keeps consume.go's per-item fail-open contract.
-
 import (
 	"context"
 	"encoding/json"
@@ -27,9 +20,6 @@ const (
 	corruptItemBytes = "{not valid json"
 )
 
-// unifiedDecision renders a triage-decision.json committing topN. A non-empty
-// members list is declared as a unified_commitment; projected adds the
-// unified_projection the triage phase writes only for a claim it validated.
 func unifiedDecision(t *testing.T, topN, members []string, projected bool) string {
 	t.Helper()
 	top := make([]map[string]string, 0, len(topN))
@@ -59,10 +49,6 @@ func unifiedDecision(t *testing.T, topN, members []string, projected bool) strin
 	return string(raw)
 }
 
-// unifiedConsumeFixture lays out a project root whose inbox holds one file per
-// id — present but unparseable for every id in corrupt, the shape the lookup
-// can never resolve — and a workspace carrying decision plus a PASS verdict.
-// It returns each id's inbox basename and original bytes.
 func unifiedConsumeFixture(t *testing.T, decision string, ids []string, corrupt ...string) (root, workspace string, base, orig map[string]string) {
 	t.Helper()
 	root = t.TempDir()
@@ -85,9 +71,6 @@ func unifiedConsumeFixture(t *testing.T, decision string, ids []string, corrupt 
 	return root, workspace, base, orig
 }
 
-// failStageFor accepts every command except the `git add` that stages
-// itemBase — a stage fault (index lock, permission) that lands only after an
-// earlier sibling has already been moved and staged.
 func failStageFor(itemBase string) CmdRunner {
 	return func(_ context.Context, name, _ string, args []string, _ []string, _ io.Reader, _ io.Writer, _ io.Writer) (int, error) {
 		if name != "git" || !containsArg(args, "add") {
@@ -118,9 +101,6 @@ func runUnifiedConsume(root, workspace string, runner CmdRunner) (*Options, *Run
 	return opts, res
 }
 
-// assertPickable fails unless id's item is back at the inbox root with its
-// original bytes, has no consumed/ record, and is not in the ship's drift
-// sanction set.
 func assertPickable(t *testing.T, opts *Options, res *RunResult, root, id, base, orig string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(root, ".evolve", "inbox", base))
@@ -164,8 +144,6 @@ func sanctionsBase(opts *Options, base string) bool {
 	return false
 }
 
-// unifiedWarn reports whether one ship WARN names the unified commitment and
-// the member that could not close.
 func unifiedWarn(res *RunResult, failing string) bool {
 	for _, l := range res.Logs {
 		if strings.Contains(l, "WARN") && strings.Contains(l, "unified_commitment") && strings.Contains(l, failing) {
@@ -195,9 +173,6 @@ func TestConsumeCommittedItems_UnifiedRollsBackAllOnPartialFailure(t *testing.T)
 		for _, id := range members {
 			assertPickable(t, opts, res, root, id, base[id], orig[id])
 		}
-		// A rolled-back member leaves BOTH stores as they were: releasing its
-		// continuation binding would strand the salvage pointer of an item that
-		// is still pickable.
 		if _, ok, err := continuation.ReadRegistryEntry(root, unifiedMemberA); err != nil || !ok {
 			t.Errorf("rolled-back member %q lost its continuation binding (ok=%v err=%v)", unifiedMemberA, ok, err)
 		}
@@ -245,9 +220,6 @@ func TestConsumeCommittedItems_UnifiedAllSucceed(t *testing.T) {
 	}
 }
 
-// The atomic unit is exactly the validated member set: an ordinary batch, a
-// claim the triage phase rejected, and an independent item beside a commitment
-// all keep the per-item fail-open contract.
 func TestConsumeCommittedItems_UnifiedScopeIsOnlyTheValidatedMembers(t *testing.T) {
 	t.Parallel()
 	pair := []string{unifiedMemberA, unifiedMemberB}

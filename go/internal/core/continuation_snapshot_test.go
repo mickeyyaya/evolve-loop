@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// initContinuationRepo creates a real repo with main checked out plus a cycle
-// worktree via the REAL provisioner, returning (root, worktree).
 func initContinuationRepo(t *testing.T, cycle int) (string, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -30,7 +28,6 @@ func initContinuationRepo(t *testing.T, cycle int) (string, string) {
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("base\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// linkGuardDeps plants gitignored infrastructure in every worktree; a snapshot must not see it as dirt.
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +139,6 @@ func TestStampContinuationManifest_ConflictingWorkIsNotStamped(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := gitOut(t, wt, "rev-parse", "HEAD")
-	// Diverge: main edits a.txt one way, the worktree another → 3-way conflict.
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("main-side\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

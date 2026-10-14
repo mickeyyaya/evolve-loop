@@ -125,3 +125,116 @@
 - The added-test detector (`addedtests.Groups`) and the importer backstop have deliberately distinct, complementary scopes: the detector selects only newly ADDED `_test.go` files (a modified tracked test or a newly added non-test file are never its candidates, and an empty candidate set runs nothing), while a modified tracked test that goes red is instead caught by the importer backstop, which runs every package the diff's import closure touches. (TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles)
 - An honestly `t.Skip`-ped newly added test is not a hidden failure and must never trip the repo-contract gate — skip stays an honest, non-blocking signal here as elsewhere in the pipeline. (TestRunNative_AddedSkippedTestDoesNotBlockShip)
 - A newly added test file that is genuinely un-runnable on the current host (e.g. a `requires_tmux` build constraint) is never silently claimed green nor silently skipped with no record: both would launder a real coverage gap. The gate does not fail the ship over a candidate it correctly cannot run, but it does leave a durable, explicit EXCLUDED record in the scan log naming the file and its exclusion reason. (TestRepoContractGate_AddedEnvExclusiveTestBackstopRecorded)
+
+## Invariants the code comments used to carry
+
+These rules held in comments before the comment-zero change. Tests pin the ones that name a test. The code shape must keep the rest.
+
+### Audit binding and verdict parse
+
+- `findLatestAudit` binds to the newest auditor row of the run in `opts.RunID`. With an empty run id it takes the newest row of any run. A miss is an integrity stop. It never falls back to another run's audit.
+- The report SHA binds the host receipt. The mutable verdict must also match its exact execution identity and bytes before it can authorize ship.
+- `readAuditArtifact` hashes and reads the same bytes once. No second read sits between the SHA check and the verdict parse.
+- When a composition entry carries forward, the composed tree is already bound. The base-tree check is then superseded. Each rejected composition condition falls back to a full re-audit. The path can only narrow what ships.
+- Review verdicts follow the patch-id (the change). Native gates must still follow the tree.
+- `parseVerdicts` accepts two shapes. One is an inline `Verdict: <X>` line, case-insensitive, with optional asterisks. The other is a `## Verdict` heading with `**X**` or a bare verdict word within 5 lines. A sentence that contains the word must not match. At `StageEnforce` and above, the sentinel line is the only source.
+- `computeTreeStateSHA` hashes `git diff HEAD`. A tracked-file change after audit invalidates the ship. A git exit above 1 is fatal. Exit 1 means differences exist, and the hash handles it.
+- `integrity.go` joins the tracked diff and the untracked list without dedup. The two sets are disjoint by definition.
+- `underlyingErr` keeps the `git_err` debug field equal to the raw runner message.
+- `verifyNativeExplanation` lives below the Phase adapter. A direct `evolve ship` then cannot bypass the Build explanation contract.
+- A standalone ship resolves the identity from host-owned global state. It never uses the Builder-writable run mirror. Each Run freezes one identity snapshot, and later stages do not re-read mutable cycle mirrors.
+- The activation belt lives in `explanationdocs`, and audit runs the same check. A `Require=true` refusal after the belt is dead code. `ship.go` derives the handoff requirement from a non-zero version.
+
+### Class verification and confirmation
+
+- `verifyManualConfirm` stages with `git add -A` so the diff shows what will ship. The commit-gate attestation check must run after it. The computed tree SHA is then the tree that is committed. `Options.BypassCommitGate` skips only the attestation.
+- `--class manual` refuses a stdin that is not a terminal, because an LLM agent cannot answer the prompt. `EVOLVE_SHIP_AUTO_CONFIRM` is the CI escape. Only the exact word `yes` confirms.
+- The bypass flags are explicit CLI flags. The ship package does not read bypass environment variables.
+- `errEmptyDiff` is the sentinel that `Run` turns into a clean exit. Nothing staged means exit 0.
+- `Config` zero values are the safe defaults. `PhaseIO` zero is `StageOff`, which keeps the prose verdict parse. `ManifestGate` zero is shadow. `RepoContractGate` zero is off, so a construction site is safe. The cmd_cycle wiring test asserts that the production site passes `enforce`.
+- A nil `Signals` is a Null Object. It drops warnings and does not panic.
+- `defaultCommitMessage` builds a deterministic message when `Context["commit_message"]` is absent. The autonomous path does not always set it. The manual CLI always passes one.
+- A document cycle commits under `solution(<slug>)`. The scope takes one slug, because the prefix grammar admits only `[a-z0-9-]`. Further slugs go in the subject.
+
+### Manifest gate
+
+- Shadow is the default and never blocks. Enforce fails closed on any path that no phase report declared. It uses `core.CodeManifestGate`, so the ledger and the debugger can tell a manifest block from a real `git add` failure.
+- The mode comes from `policy.json` `gates.manifest_gate`. It never comes from a code literal.
+- `shipmanifest` also extracts bare root-level filenames. A legitimate root-file change is then not a false block under enforce.
+- The changed set is the porcelain dirt plus the commits already on the cycle branch. `detectColliders` binds the same inputs. A run with no readable reports skips the gate.
+
+### Repo-contract gate
+
+- A pack outcome has failures only when the pack said the code is broken. That means a `go test -json` fail event with a test name, or a build or setup failure.
+- A nonzero exit with no failures is ambiguous. It retries once and then classes as `CodeRepoContractInfra`.
+- A named red never retries. A retry doubles the wall time of every red ship. It also lets a flaky-but-real suite launder a violation onto main.
+- A package-level fail with no test name counts only when the output marks a build or setup failure. A compile break shows twice. One is a `build-fail` action with no package on go1.26. The other is a `FAIL pkg [build failed]` line.
+- The classifier collects build failures per package and appends them after the loop. One broken package reads as one failure. A build failure with no package still counts as a real red.
+- A line that is not a JSON object is teed verbatim and skipped. One stray line cannot blind the classifier to later failures.
+- The runner drains the event pipe to completion before `Wait`. An undrained pipe deadlocks the child.
+- `lockedWriter` serializes the child's stderr copy and the event tee onto one writer. It implements `Write` only, so `io.Copy` takes the lock per chunk. Without it, a `bytes.Buffer` has a data race and loses tee writes made during a blocking read.
+- The scan log `ship-repocontract-scan.log` is best effort and is truncated for each run. A missing run dir, an open failure or a close failure never fails a ship.
+- The scan log is written on green runs too, with a header first. The green baseline disproves a false red.
+- The alone re-run keeps the whole package, so same-package state stays in play. It removes only the pack's concurrent load. A package that is green alone contributes nothing. A package that is still red contributes the tests still red. A re-run that names nothing keeps the first-run reds.
+- `aloneRerunMaxFailures` caps the reds worth a re-run. More named reds are a broken contract and not a timing window.
+- `CodeBackstopFlake` is the warning for a cleared red. A recurrence across cycles marks a hygiene item. A nil Signal Center hears nothing.
+- Discovery of the seed files retries once after `discoveryRetryPause`. A concurrent lane's `index.lock` is the known transient. A second failure is `CodeRepoContractInfra` and never a silent green.
+- `importerBackstopTimeout` bounds the run so the ship phase ends. A timeout exits with no test-level failure and classes as infra. `importerBackstopRetryMaxTargets` caps the pack size that is worth a second full run.
+- `repoContractGateRoot` fails closed with `CodeWorktreeResolve` for an unresolvable typed worktree. The gate then never tests the project root in the lane's place and reports a false green.
+
+### Inbox consumption and post-ship
+
+- Post-ship work is bookkeeping. Every failure is a warning and never a ship failure, because the commit is already on the remote. The exception is a read error while the code advances `lastCycleNumber`. That error propagates. Only a write or lock error there is the non-fatal warning.
+- All `state.json` read-and-write sections share one lock (ADR-0049).
+- `retireCommittedCarryover` deletes the carryover entries that this cycle committed, with their cross-cycle class twins. It edits the raw entries, so a field that this binary does not model survives. A missing `state.json` is not an error.
+- Without this retirement, a shipped entry persisted. It then filled the 20-slot carryover window of the router prompt.
+- Promotion, superseded reconcile and carryover retirement all ride the same landing check. `isLanded` is true when the commit is an ancestor of local HEAD or of `origin/<branch>`. An empty sha is never landed.
+- Retiring on an unlanded ship erases the only record of work that never shipped. In the post-ship caller, an absent `res.CommitSHA` fails open. No recorded commit is not evidence of an unlanded push.
+- The residual drain always runs, also without `triage-decision.json`. It releases every claim left in `processing/cycle-<cid>/` back to the inbox root. Triage Step 0a reads that root at depth 1.
+- When the landing check refused promotion, the ledger reason carries `unlanded`. Operators can then tell a delivery-failure retry from an ordinary drain.
+- Promotion and drain are the two halves of one PASS transition, so both go through `ApplyCycleOutcome`. The "drain complete" line is a success claim and stays inside the success branch.
+- `triageDecisionBytes` prefers the companion that the agent wrote, because it carries `skip_shipped`. Next it uses a deterministic projection of `triage-report.md`, which has `top_n` only. Last it returns nil. An unreadable companion keeps its WARN and is never lowered to INFO. The projection is saved, so a re-run sees the same companion.
+- `committedInboxIDs` widens by lane scope only for a PASS landing. A non-PASS verdict leaves work pickable. A nil decision body falls back to the lane-scope ids.
+- The widening relies on `lane-scope.json` living in a freshly provisioned per-cycle workspace. A change that recycles a workspace must re-check it.
+- If triage names a scope id, only the named scope ids consume. A menu mate that triage left unmentioned stays pickable.
+- `consumeCommittedItems` is gated on the verdict string PASS alone. This is the same authority as `landedPASS` in postship. `acsrunner` writes `red_count:0` beside a FAIL verdict for a suite that never finished, so `red_count` is weaker.
+- On the cycle path, `acssuite.ReadVerdict` already refuses that shape. The manual path has no such reader, so this gate is its only guard. A missing verdict is a loud warning and not a silent skip.
+- Every consumption step is fail-open per item and loud. The one atomic unit is a validated unified commitment (`consumeUnified`). Its members close all-or-nothing, and a failure rolls back files and index together. A member that is already in `consumed/` counts as closed.
+- The raw `unified_commitment` claim alone never forms an atomic unit. Triage stamps `unified_projection` beside a claim that it accepted.
+- A manual ship that claims a workspace consumes in the landing commit. A manual ship with no workspace has nothing to consume and returns silently (`consumesInboxAtLanding`). A cycle ship with no workspace still reaches the loud missing-verdict warning.
+- The consumed id set also drives the continuation-binding release (`readBindingForConsume`, `released_continuations`, the registry delete). Lane-scope and Closes-Inbox ids reach it too.
+- The binding is read from the root-owned registry. The registry delete waits for `record`, after the move is final. A rollback then leaves both stores unchanged. `DeleteRegistryEntryIfCycle` keeps a fresh binding of a sibling lane.
+- The consumed item is tracked and public. `released_continuations` collapses host paths to `~`.
+- With an audit binding set, the consumed bytes must equal what the audited tree carried. A file planted after the binding rolls back loudly and stays pickable.
+- `shipDirect` has no binding and keeps consuming plane-side failure-count write-backs. A rolled-back move restores the filesystem, because on `shipDirect` the tree is the runtime plane.
+- `treeDriftExplainedByConsumption` fails closed. No consumed paths, or a diff-tree that cannot run, explains nothing. It reads paths raw and unquotes them (`shipmanifest.RawPathRead`, `UnquoteGitPath`), so a non-ASCII filename matches the sanctioned set.
+- The offender suffix in the refusal is bounded, because the message travels into digests.
+- `workspaceACSVerdict` returns the empty string for an unreadable verdict. That fails closed for consumption.
+
+### Staging and git
+
+- `stageBinaryGuard` refuses an owner-executable staged file above `binaryStagingMaxBytes`. Files under `go/bin/**` and `go/evolve` are exempt. The guard fails open on the git query itself.
+- A `git add` refusal is kept in a memo for each lane, keyed by the sorted path set. A first refusal keeps its retry. The same pathspec refused twice in a row is deterministic and escalates. A successful stage clears the memo. An unwritable workspace costs only the escalation.
+- `stageReleaseSet` takes the `versionbump` paths as the single source for marker files. A new marker is then staged and never ships one version behind. It skips paths that are absent on disk, so a partial layout never fails on a missing pathspec.
+- `isRunningExecutable` resolves symlinks on both sides. An untracked file is removed unless it is the running binary.
+- `activeWorktreeForShip` takes the typed host identity. A Builder-writable `run.json` may corroborate it. It never selects or clears the tree that ship changes.
+- A push rejection retries once through an inline fetch and ff-merge. A true divergence reclassifies to needs-reaudit. After the push, the landed tree is checked against the audit binding. This is the same defense as the pre-commit index check.
+- `maybeCreateRelease` is best effort. A missing `gh` or a nonzero exit logs WARN, because the release may exist. `runCommitPrefixGate` passes a missing manifest through.
+- `buildDiffFooter` matches the legacy `ship.sh` footer byte for byte. `acquireShipLock` is a blocking flock (ADR-0049).
+- `landing()` is built lazily and cached on `*Options`. Streams and the Signal Center are read through accessors at each use. `Run` sets the default streams after `Options` is built.
+
+### Repair ladder
+
+- `repairNone` means the original error stands. `repairRetryStage` re-runs the failed stage once. `repairCompleted` means the repair finished the ship itself (push-only closure), so the other mutating stages are skipped.
+- A repair is conservative. Any doubt gives `repairNone`.
+- `GIT_PUSH_REJECTED` has no ladder entry. Its retry runs inline at the push site. That keeps the post-push tree check and the binding sidecar on the healed path.
+- `repairColliders` plans first. It verifies each collider as readable and comparable before any change. A partial heal never re-runs the stage, so no merge lands over a half-healed tree.
+- Quarantined content is moved and never deleted. The manifest is an atomic append-merge. The stage re-run finds colliders again from scratch.
+- `repairSelfSHAPin` holds the `state.json` lock across read, check and write. Any lock, read or write error declines. `committedBinSHA` is shared with `repinPostCycle`.
+
+### Test fixtures
+
+- `tempRepoDir` removes best effort. On macOS runners, `os.RemoveAll` of a git work tree sometimes fails with EBADF under `-race` load. The failure turns a passing test red. The chmod walk makes git's read-only objects removable.
+- `redPack` is a nonzero exit with named failures. `ambiguousPack` is a nonzero exit with none. `swapRepoContractTest` repeats its last outcome, so an over-eager retry loop shows in the invocation count.
+- The seam tests cannot reach `classifyPackEvents`. `TestClassifyPackEvents_SeparatesRealFailuresFromNoise` pins it directly.
+- The `landing_pins_test.go` goldens drive the three push sites against the repair matrix. They pin the argv, the stream routing, the logs, the result fields and the errors byte for byte. The capture was taken before the landing leaf was extracted.

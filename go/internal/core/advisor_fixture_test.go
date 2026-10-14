@@ -10,13 +10,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// goldenWorkspace is rendered into the artifact-path instruction and never touched on disk, so it needs no templating.
 const goldenWorkspace = "/ws/cycle-42"
 
-// goldenPersona is a stub, because the real agents/evolve-router.md would break the goldens on every persona edit.
 const goldenPersona = "# evolve-router\nYou are the ROUTER persona stub (PERSONA_MARKER_42)."
 
-// richRouteInput renders every advisor prompt section at once, so the goldens cover all of them.
 func richRouteInput() router.RouteInput {
 	return router.RouteInput{
 		Current:   "build",
@@ -63,14 +60,13 @@ func richRouteInput() router.RouteInput {
 	}
 }
 
-// richCarryoverTodos mixes every priority spelling and both FirstSeenCycle orders to exercise rank, recency and ties.
 func richCarryoverTodos() []router.CarryoverTodo {
 	priorities := []string{"P0", "P1", "H", "HIGH", "P2", "P3", "M", "MED", "MEDIUM", "L", "LOW", "", "blocking", " p1 ", "p0", "P2", "P1", "P0", "LOW", "P3", "H", "P0", "M"}
 	todos := make([]router.CarryoverTodo, 0, len(priorities))
 	for i, p := range priorities {
 		action := fmt.Sprintf("carryover action %02d", i)
 		if i == 4 {
-			action = strings.Repeat("é", 700) // 700 runes, capped at 600 in the prompt
+			action = strings.Repeat("é", 700)
 		}
 		todos = append(todos, router.CarryoverTodo{
 			ID:             fmt.Sprintf("cycle-%d-todo-%02d", 40-(i%5), i),
@@ -83,7 +79,6 @@ func richCarryoverTodos() []router.CarryoverTodo {
 	return todos
 }
 
-// richCatalog interleaves its cards so the stable partition is visible in the golden.
 func richCatalog() []router.PhaseCard {
 	return []router.PhaseCard{
 		{Name: "scout", Role: "plan"},
@@ -102,7 +97,6 @@ func richCatalog() []router.PhaseCard {
 	}
 }
 
-// launchRouteInput carries a secret-shaped token in the goal so the capture golden covers redaction.
 func launchRouteInput(ws, root, wt string) router.RouteInput {
 	return router.RouteInput{
 		Current:        "build",

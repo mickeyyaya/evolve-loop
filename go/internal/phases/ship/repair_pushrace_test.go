@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// failFirstPushRunner wraps execRunner, failing the first `git push` with
-// exit 1 (simulated transient rejection) and delegating everything else.
 func failFirstPushRunner() CmdRunner {
 	failed := false
 	return func(ctx context.Context, name, cwd string, args, env []string,

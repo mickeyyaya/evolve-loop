@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// TestManualShip_ClosesInboxItemInShipCommit reproduces the stale-inbox path:
-// a valid manual ship lands the declared fix but leaves its tracked inbox item
-// available for every later cycle to rediscover.
 func TestManualShip_ClosesInboxItemInShipCommit(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -33,8 +30,6 @@ func TestManualShip_ClosesInboxItemInShipCommit(t *testing.T) {
 		`{"schema_version":1,"top_n":[{"id":"manual-widget"}],"deferred":[],"dropped":[]}`)
 	mustWrite(t, filepath.Join(workspace, "acs-verdict.json"), `{"verdict":"PASS","red_count":0}`)
 
-	// The manual path must satisfy its normal review gate; this test then proves
-	// inbox retirement is part of the production ship, not a direct helper call.
 	writeAttestation(t, repo, treeStateSHA(t, repo))
 	res, err := runShip(t, repo, Options{
 		Class: ClassManual, CommitMessage: "fix: manual widget",

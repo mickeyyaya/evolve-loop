@@ -9,12 +9,10 @@ import (
 	"testing"
 )
 
-// gitInIndex uses `git -C` so the fixture repo never resolves from the process cwd.
 func gitInIndex(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	full := append([]string{"-C", dir}, args...)
 	cmd := exec.Command("git", full...)
-	// Hermetic: a developer's global config (gpgsign=true) must not reach the fixture repo.
 	cmd.Env = append(os.Environ(),
 		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
 		"GIT_AUTHOR_NAME=cycle1591", "GIT_AUTHOR_EMAIL=cycle1591@example.invalid",

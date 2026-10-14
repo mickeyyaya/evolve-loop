@@ -11,18 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// noopRunner is an inert subprocess seam: the wiring assertions never shell out.
 func noopRunner(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	return 0, nil
 }
 
-// TestShipOptions_ThreadsManifestGate pins that the ship PhaseRunner's
-// PhaseRequest→Options translation carries the config-sourced manifest-gate
-// mode.
-//
-// The translation is asserted through the exported constructor + the
-// shipOptions seam (the extracted Options literal runNative uses), so the test
-// exercises the real production path rather than a source-grep.
 func TestShipOptions_ThreadsManifestGate(t *testing.T) {
 	t.Parallel()
 	req := core.PhaseRequest{
@@ -51,10 +43,6 @@ func TestShipOptions_ThreadsManifestGate(t *testing.T) {
 	}
 }
 
-// A policy.json `gates.manifest_gate: "enforce"` resolves through
-// GatesConfig(), threads into the ship Options, and actually BLOCKS an
-// out-of-manifest path with the dedicated code. The shadow row is the negative
-// axis — the same chain with the default value must NOT block.
 func TestManifestGate_PolicyToBlockEndToEnd(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

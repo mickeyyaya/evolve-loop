@@ -6,18 +6,13 @@ import (
 	"testing"
 )
 
-// gateARejection is a real Gate A reject reason, verbatim from a production
-// scout-prompt dispatch.
 const gateARejection = "scout did not materialize evals for selected slug(s): " +
 	"judgment-phase-shadow-config, judgment-verdict-shadow-classifier"
 
-// gateARemediation is what the gate should supply alongside that reason.
 const gateARemediation = "Create each missing eval file at " +
 	"<workspace>/.evolve/evals/<slug>.md (also accepted: <projectRoot>/.evolve/evals/<slug>.md), " +
 	"each containing at least one [code] grader."
 
-// forbidsFileCreation reports whether a directive tells the agent not to touch
-// other files — fatal when the remedy REQUIRES creating them.
 func forbidsFileCreation(directive string) bool {
 	return strings.Contains(directive, "Do not change unrelated files")
 }
@@ -41,10 +36,6 @@ func TestComposeCorrection_SidecarClassDoesNotForbidTheFix(t *testing.T) {
 	}
 }
 
-// TestComposeCorrection_MalformedClassIsByteIdentical pins the no-regression
-// half: the class the generic template WAS written for must not change at all.
-// Without this, "fix the directive" could silently weaken every other gate's
-// correction.
 func TestComposeCorrection_MalformedClassIsByteIdentical(t *testing.T) {
 	t.Parallel()
 
@@ -62,9 +53,6 @@ func TestComposeCorrection_MalformedClassIsByteIdentical(t *testing.T) {
 	}
 }
 
-// TestComposeContractSalvageRetry_CarriesRemediation: Gate A failures reach the
-// SECOND-STRIKE path, so fixing only composeCorrection leaves the defect live
-// on the path that actually decides those cycles.
 func TestComposeContractSalvageRetry_CarriesRemediation(t *testing.T) {
 	t.Parallel()
 
@@ -79,8 +67,6 @@ func TestComposeContractSalvageRetry_CarriesRemediation(t *testing.T) {
 	}
 }
 
-// TestComposeContractSalvageRetry_MalformedClassKeepsTodaysText: the salvage
-// rung for the class it was designed for is unchanged.
 func TestComposeContractSalvageRetry_MalformedClassKeepsTodaysText(t *testing.T) {
 	t.Parallel()
 
@@ -95,15 +81,6 @@ func TestComposeContractSalvageRetry_MalformedClassKeepsTodaysText(t *testing.T)
 	}
 }
 
-// TestCorrectionCallSites_PassTheRemediation pins the JOIN. The gate half
-// (evalgate) proves Remediation reaches ReviewResult; the composer half above
-// proves a non-empty remediation changes the directive. Neither covers the one
-// line that connects them, and composeCorrection is unexported so no
-// cross-package test can reach it.
-//
-// A call site that still passes only rr.Reason compiles, keeps every other test
-// green, and silently restores the 0-for-4 behavior — the gate would compute a
-// remediation nobody reads. Both dispatch paths must pass it.
 func TestCorrectionCallSites_PassTheRemediation(t *testing.T) {
 	t.Parallel()
 
@@ -128,11 +105,6 @@ func TestCorrectionCallSites_PassTheRemediation(t *testing.T) {
 	}
 }
 
-// TestComposeContractSalvageRetry_EmptyRemediationIsByteIdentical is the golden
-// twin of TestComposeCorrection_MalformedClassIsByteIdentical. The salvage rung
-// had only substring assertions, so a reworded clause could drift unnoticed on
-// the path that fires for repeat contract blocks. Written as a literal on
-// purpose: an intentional edit SHOULD fail here and be re-approved.
 func TestComposeContractSalvageRetry_EmptyRemediationIsByteIdentical(t *testing.T) {
 	t.Parallel()
 

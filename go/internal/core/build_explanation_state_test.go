@@ -61,8 +61,7 @@ func TestBuildExplanationHandoff_SealedHostContextCannotBeDowngradedByMutableSta
 		CycleID: 42, RunID: "run-42", WorkspacePath: workspace,
 		ActiveWorktree: binding.Worktree, WorktreeBaseSHA: binding.BaseSHA,
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
-		// Deliberately forge the Builder-writable lifecycle projection.
-		CompletedPhases: []string{string(PhaseScout)},
+		CompletedPhases:                 []string{string(PhaseScout)},
 	})
 	if handoff.State != BuildExplanationInvalid || handoff.View != nil || handoff.Error == "" {
 		t.Fatalf("sealed host context was downgraded to pre-Build: %+v", handoff)

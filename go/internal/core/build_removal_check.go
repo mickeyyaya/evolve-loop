@@ -11,13 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// removalClaim is the only claim surface; prose is never parsed, because a
-// matcher on "removed" would false-block honest reports.
 type removalClaim struct {
 	RemovedPaths []string `json:"removedPaths"`
 }
 
-// RemovalClaimFailures names each path the build report claims removed that still exists in the worktree or its Git index.
 func RemovalClaimFailures(ctx context.Context, in ReviewInput) []string {
 	if in.Workspace == "" || in.Worktree == "" {
 		return nil
@@ -30,12 +27,11 @@ func RemovalClaimFailures(ctx context.Context, in ReviewInput) []string {
 	for _, claimed := range parseRemovalClaims(body) {
 		abs, ok := resolveInWorktree(in.Worktree, claimed)
 		if !ok {
-			continue // absolute or escaping path — not ours to adjudicate
+			continue
 		}
 		if _, err := os.Stat(abs); err != nil {
-			_, code, gitErr := gitCapture(ctx, in.Worktree, "ls-files", "--error-unmatch", "--", claimed)
-			if gitErr != nil || code != 0 {
-				continue // absent and untracked, or Git is unavailable — fail open
+			if !trackedInGitIndex(ctx, in.Worktree, claimed) {
+				continue
 			}
 			failures = append(failures, fmt.Sprintf(
 				"build report claims %q was removed, but it still exists in the Git index — retire it as a tracked deletion or correct the claim",
@@ -49,8 +45,6 @@ func RemovalClaimFailures(ctx context.Context, in ReviewInput) []string {
 	return failures
 }
 
-// readBuildReport loads the build report from its canonical location, falling
-// back to the promoted copy the correction ladder writes under deliverables/.
 func readBuildReport(workspace string) (string, bool) {
 	name := phasecontract.ArtifactFilename(string(PhaseBuild))
 	for _, rel := range []string{name, filepath.Join("deliverables", name)} {
@@ -61,7 +55,6 @@ func readBuildReport(workspace string) (string, bool) {
 	return "", false
 }
 
-// parseRemovalClaims skips unparseable blocks rather than failing.
 func parseRemovalClaims(body string) []string {
 	var out []string
 	for _, block := range fencedJSONBlocks(body) {
@@ -78,7 +71,6 @@ func parseRemovalClaims(body string) []string {
 	return out
 }
 
-// fencedJSONBlocks returns the bodies of every ```json fenced block in body.
 func fencedJSONBlocks(body string) []string {
 	var blocks []string
 	var cur []string
@@ -101,8 +93,6 @@ func fencedJSONBlocks(body string) []string {
 	return blocks
 }
 
-// resolveInWorktree maps a claimed worktree-relative path to an absolute path,
-// rejecting absolute paths and any path that escapes the worktree.
 func resolveInWorktree(worktree, claimed string) (string, bool) {
 	if filepath.IsAbs(claimed) {
 		return "", false
@@ -113,4 +103,9 @@ func resolveInWorktree(worktree, claimed string) (string, bool) {
 		return "", false
 	}
 	return abs, true
+}
+
+func trackedInGitIndex(ctx context.Context, worktree, path string) bool {
+	_, code, gitErr := gitCapture(ctx, worktree, "ls-files", "--error-unmatch", "--", path)
+	return gitErr == nil && code == 0
 }

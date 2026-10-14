@@ -2,12 +2,6 @@
 
 package ship
 
-// consume_unified_integration_test.go — the real-git reachability half of the
-// unified all-or-nothing consume: driven through shipFromWorktree (the cycle
-// ship path), the LANDING COMMIT carries every member's consumed/ record or
-// none of them. A rollback that restores the files but leaves the index staged
-// still ships a split closeout, which only a real commit can show.
-
 import (
 	"context"
 	"fmt"
@@ -18,9 +12,6 @@ import (
 	"testing"
 )
 
-// unifiedShipScenario is consumeScenario with a validated two-member unified
-// commitment: both member items are staged in the cycle worktree, and every id
-// in corrupt is present but unparseable.
 func unifiedShipScenario(t *testing.T, corrupt ...string) (repo, wt, ws string, rel, orig map[string]string) {
 	t.Helper()
 	repo, wt = makeWorktreeScenario(t)

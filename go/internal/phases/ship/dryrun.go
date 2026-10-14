@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// Best-effort: a missing or unwritable journal dir does not fail the run.
 func writeDryRunJournal(ctx context.Context, opts *Options, res *RunResult, exitReason string) {
 	if !opts.DryRun {
 		return
@@ -59,7 +58,6 @@ func writeDryRunJournal(ctx context.Context, opts *Options, res *RunResult, exit
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] DRY-RUN: journal preview written to %s", path))
 }
 
-// tryGitOneShot is fire-and-forget; the caller never sees a failure.
 func tryGitOneShot(ctx context.Context, opts *Options, args ...string) string {
 	var buf strings.Builder
 	exit, err := opts.run(ctx, "git", args, &buf, io.Discard)

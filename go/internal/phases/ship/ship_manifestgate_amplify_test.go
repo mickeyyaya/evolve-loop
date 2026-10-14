@@ -6,15 +6,6 @@ import (
 	"testing"
 )
 
-// TestReconcileManifest_OnlyExactEnforceLiteralBlocks amplifies the existing
-// shadow-regression test (which only exercises "" and "shadow"): it pins
-// that reconcileManifest's block/no-block decision is a STRICT equality
-// against the exact ManifestGateEnforce literal, not a case-insensitive or
-// whitespace-tolerant match. A hand-edited policy.json typo ("Enforce",
-// padded, wrong-case) must silently behave as shadow (log-only) rather than
-// either blocking unexpectedly or panicking — and every leak must still be
-// logged regardless of the gate value, so the operator has evidence even
-// when the gate itself is misconfigured.
 func TestReconcileManifest_OnlyExactEnforceLiteralBlocks(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []string{"Enforce", "ENFORCE", " enforce", "enforce ", "off", "strict", "block"} {

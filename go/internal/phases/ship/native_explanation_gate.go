@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// verifyNativeExplanation is the canonical ship boundary. It deliberately
-// lives below the Phase adapter so direct `evolve ship` invocations cannot
-// bypass the Build explanation contract.
 func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 	if opts.Class != ClassCycle {
 		return nil
@@ -24,8 +21,6 @@ func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 	runID := opts.RunID
 	version := opts.ExplanationDocumentationVersion
 	if workspace == "" {
-		// Standalone `evolve ship` has no PhaseRequest. Resolve from the
-		// host-owned global state, never the Builder-writable run mirror.
 		state, err := readStateMap(filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json"))
 		if err != nil {
 			return fmt.Errorf("read host cycle identity: %w", err)
@@ -36,8 +31,6 @@ func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 		workspace = stateString(state, "workspace_path")
 		baseSHA = stateString(state, "worktree_base_sha")
 		runID = stateString(state, "run_id")
-		// Freeze the one host-owned identity snapshot that this Run will verify
-		// and mutate. Later stages must not re-read mutable cycle mirrors.
 		opts.CycleID = cycle
 		opts.AuditRound, _ = stateInt(state, "audit_dispatches")
 		opts.ExplanationDocumentationVersion = version
@@ -55,17 +48,11 @@ func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 		RunID:           runID,
 		ContractVersion: version,
 	}
-	// The activation belt lives in explanationdocs (single home; audit runs
-	// the same check). Inactive means the host agrees this is a legacy
-	// cycle; a ship that still demands the handoff keeps its refusal.
 	hostActive, err := explanationdocs.CrossCheckActivation(binding)
 	if err != nil {
 		return err
 	}
 	if !hostActive {
-		// A Require=true refusal here would be dead code: ship.go derives
-		// RequireBuildExplanationHandoff from version != 0, and the belt
-		// already refused every inactive+version!=0 identity.
 		return nil
 	}
 	var verified *phaseio.ExplanationView

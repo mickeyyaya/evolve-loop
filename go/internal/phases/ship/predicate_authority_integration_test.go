@@ -49,7 +49,6 @@ func TestVerifyAuditBinding_PredicateEvidenceCannotChangeAfterAudit(t *testing.T
 				"git_head": runGitOut(t, repo, "rev-parse", "HEAD"), "tree_state_sha": treeStateSHA(t, repo),
 				"worktree_tree_sha": strings.TrimSpace(runGitOut(t, repo, "write-tree")),
 			}
-			// git command output includes a newline; the production recorder trims it.
 			entry["git_head"] = strings.TrimSpace(entry["git_head"].(string))
 			line, _ := json.Marshal(entry)
 			mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), string(line)+"\n")

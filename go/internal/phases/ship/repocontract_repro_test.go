@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// TestBugReproduction_AddedTestLiteralBuildConstraintIsNotExcluded: a textual
-// mention of a build constraint is not itself a build constraint — the
-// detector must not exclude this real failing test, or the ship would
-// proceed with a red test in its staged diff.
 func TestBugReproduction_AddedTestLiteralBuildConstraintIsNotExcluded(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)

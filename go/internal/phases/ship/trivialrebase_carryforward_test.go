@@ -36,8 +36,6 @@ func trPatchID(t *testing.T, repo string) string {
 	return fields[0]
 }
 
-// trAppendLedgerLine appends one raw JSONL entry, preserving the auditor
-// entry seedAudit already wrote.
 func trAppendLedgerLine(t *testing.T, repo string, entry map[string]any) {
 	t.Helper()
 	line, err := json.Marshal(entry)
@@ -55,22 +53,17 @@ func trAppendLedgerLine(t *testing.T, repo string, entry map[string]any) {
 	}
 }
 
-// trScenario is the trivial-rebase fixture: a lane change audited at
-// auditedHead, then main moved to newHead via an unrelated landing while the
-// lane's (uncommitted) change — and therefore its patch-id — stayed intact.
 type trScenario struct {
 	repo        string
 	auditedHead string
 	newHead     string
-	patchID     string // patch-id of the AUDITED lane diff
-	auditRef    string // artifact_sha256 of the bound auditor entry
+	patchID     string
+	auditRef    string
 }
 
 func trSetup(t *testing.T) trScenario {
 	t.Helper()
 	repo := makeRepo(t)
-	// The lane's change: uncommitted edit, exactly what the audit binds
-	// (worktree flow: git_head = base, tree_state_sha = the uncommitted diff).
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nlane change\n")
 	seedAudit(t, repo, "PASS")
 	auditedHead := strings.TrimSpace(runGitOut(t, repo, "rev-parse", "HEAD"))
@@ -78,10 +71,8 @@ func trSetup(t *testing.T) trScenario {
 	mustWrite(t, filepath.Join(repo, ".evolve", "runs", "cycle-1", "audited.diff"),
 		runGitOut(t, repo, "diff", "HEAD"))
 
-	runGit(t, repo, "reset", "--", "fixture.txt") // Separate the staged lane diff from the simulated peer commit.
+	runGit(t, repo, "reset", "--", "fixture.txt")
 
-	// Main moves: another lane lands an UNRELATED file, so the rebase is
-	// conflict-free and the lane diff's patch-id is unchanged.
 	mustWrite(t, filepath.Join(repo, "other-lane.txt"), "another lane landed\n")
 	runGit(t, repo, "add", "other-lane.txt")
 	runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "other lane lands on main")
@@ -123,8 +114,6 @@ func TestTrivialRebase_ChangedTreeRequiresPredicateReaudit(t *testing.T) {
 func TestTrivialRebase_PatchIdDriftFallsBackToReaudit(t *testing.T) {
 	t.Parallel()
 	s := trSetup(t)
-	// Semantic drift after the audit: the composed diff no longer matches
-	// the audited patch-id the entry claims.
 	mustWrite(t, filepath.Join(s.repo, "fixture.txt"), "fixture line 1\nlane change\npost-audit drift\n")
 	trAppendLedgerLine(t, s.repo, s.entry(t, s.patchID, trPassingGates()))
 

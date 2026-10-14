@@ -14,12 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// CodeComposedGateDeclined marks a composed-tree gate decline at any of the three
-// MissingComposedGates trip sites (RUNG 0 compositionCarryForward, RUNG 2
-// scopedMergeCarryForward, the ADR-0105 B3 identityCarryForward): a required gate did not
-// report "pass" on the composed tree, so the cycle falls back to a full re-audit instead of
-// carrying the audit verdict forward. Mirrors CodeRebaseReentryAborted's precedent
-// (ship_recovery_debugger.go).
 const CodeComposedGateDeclined signalcenter.Code = "ORCHESTRATOR_COMPOSED_GATE_DECLINED"
 
 func init() {
@@ -86,15 +80,13 @@ func (o *Orchestrator) runComposedGates(ctx context.Context, cycle int, cs Cycle
 	return nil, false
 }
 
-// CompositionAuditSnapshot is what the bound audit reviewed before a peer moved main.
 type CompositionAuditSnapshot struct {
-	LaneAuditRef string // artifact_sha256 of the bound auditor entry
-	AuditedBase  string // git HEAD the audit originally bound
-	Diff         []byte // unified diff the audit reviewed
-	PatchID      string // patch-id of Diff
+	LaneAuditRef string
+	AuditedBase  string
+	Diff         []byte
+	PatchID      string
 }
 
-// CompositionVerdictInput mirrors ledger.CompositionVerdictInput field for field; core cannot import the ledger adapter.
 type CompositionVerdictInput struct {
 	Cycle          int
 	Method         string
@@ -109,16 +101,10 @@ type CompositionVerdictInput struct {
 	ComposedDiff   []byte
 }
 
-// WithCompositionSnapshot injects the capture of the lane's pre-rebase audited state; nil keeps the fast path off.
 func WithCompositionSnapshot(fn func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)) Option {
 	return func(o *Orchestrator) { o.compositionSnapshot = fn }
 }
 
-// WithCompositionGateRunner injects the composed-tree gate run over the rebased worktree; nil keeps the fast
-// path off. fn returns each gate's status AND its captured output tail; orchestrator.go's compositionGateRunner
-// field itself keeps its pre-existing status-only map[string]string shape (a protected control-plane surface
-// this ticket does not touch), so this Option projects statuses via ciparity.GateStatuses and hands the full
-// outcomes back to the caller through the per-call sink runGateSet/publishGateOutcomes install.
 func WithCompositionGateRunner(fn func(ctx context.Context, worktree string) map[string]ciparity.GateOutcome) Option {
 	return func(o *Orchestrator) {
 		o.compositionGateRunner = func(ctx context.Context, worktree string) map[string]string {
@@ -129,20 +115,16 @@ func WithCompositionGateRunner(fn func(ctx context.Context, worktree string) map
 	}
 }
 
-// WithCompositionVerdictWriter injects the composition-verdict ledger writer; nil keeps the fast path off.
 func WithCompositionVerdictWriter(fn func(ledgerPath string, in CompositionVerdictInput) error) Option {
 	return func(o *Orchestrator) { o.compositionVerdictWriter = fn }
 }
 
-// CompositionFastPathWired reports whether all three composition closures are bound; a partial binding is not wired.
 func (o *Orchestrator) CompositionFastPathWired() bool {
 	return o.compositionSnapshot != nil &&
 		o.compositionGateRunner != nil &&
 		o.compositionVerdictWriter != nil
 }
 
-// compositionCarryForward is RUNG 0: a clean rebase whose composed patch-id matches the
-// audited one and whose gates are green reships without a re-audit. Any miss returns false.
 func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, cs CycleState, projectRoot string) bool {
 	if o.compositionSnapshot == nil || o.compositionGateRunner == nil || o.compositionVerdictWriter == nil {
 		return false
@@ -195,18 +177,14 @@ func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, c
 	return true
 }
 
-// WithScopedMergeReviewer injects the RUNG 2 reviewer; nil sends a RUNG 0 miss straight to the full re-audit.
 func WithScopedMergeReviewer(fn ScopedMergeReviewer) Option {
 	return func(o *Orchestrator) { o.scopedMergeReviewer = fn }
 }
 
-// ScopedMergeReviewWired reports whether the composition root bound the RUNG 2 reviewer.
 func (o *Orchestrator) ScopedMergeReviewWired() bool {
 	return o.scopedMergeReviewer != nil
 }
 
-// scopedMergeCarryForward is RUNG 2: after a RUNG 0 miss it reviews only the intersecting
-// hunks. Only a compatible verdict whose resolution re-verifies composes; any miss returns false.
 func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, cs CycleState, projectRoot string) bool {
 	if o.scopedMergeReviewer == nil || o.compositionSnapshot == nil ||
 		o.compositionGateRunner == nil || o.compositionVerdictWriter == nil {
@@ -240,8 +218,6 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: %s — escalating to full re-audit\n", res.Disposition)
 		return false
 	}
-	// A compatible verdict is trusted only when its resolution re-verifies by
-	// patch-id against the audited change, never on the reviewer's word.
 	resolution := res.ResolutionDiff
 	if len(resolution) == 0 {
 		resolution = []byte(composedDiff)
@@ -281,7 +257,6 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 	return true
 }
 
-// compositionPatchID mirrors ledger.PatchID, which core cannot import.
 func compositionPatchID(diff []byte) (string, error) {
 	cmd := sysexec.Command(context.Background(), "git", "patch-id", "--stable")
 	cmd.Stdin = bytes.NewReader(diff)

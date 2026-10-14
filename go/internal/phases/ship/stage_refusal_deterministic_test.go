@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 )
 
-// stagingRefusalRunner scripts `git status --porcelain` to report the given
-// changed paths and makes `git add` refuse with a stderr shape the
-// stderr-based classifier cannot place, isolating the two-strikes memo under
-// test from stderr classification.
 func stagingRefusalRunner(porcelain string) *scriptedRunner {
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string

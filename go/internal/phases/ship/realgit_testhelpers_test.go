@@ -23,8 +23,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
-// mustWrite creates parent dirs and writes content to path, failing the test
-// on any error.
 func mustWrite(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -35,7 +33,6 @@ func mustWrite(t *testing.T, path, content string) {
 	}
 }
 
-// mustMkdir creates path (and all parents), failing the test on error.
 func mustMkdir(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(path, 0o755); err != nil {
@@ -43,7 +40,6 @@ func mustMkdir(t *testing.T, path string) {
 	}
 }
 
-// containsLog reports whether any entry in res.Logs contains substr.
 func containsLog(res RunResult, substr string) bool {
 	for _, l := range res.Logs {
 		if strings.Contains(l, substr) {
@@ -53,10 +49,6 @@ func containsLog(res RunResult, substr string) bool {
 	return false
 }
 
-// writeAttestation writes a commit-gate attestation JSON under
-// <repo>/.commit-gate/attestation.json with three canonical reviewers.
-// Used by reviewtrailer_test.go (fast tier) and commitgate_test.go
-// (integration tier).
 func writeAttestation(t *testing.T, repo, treeSHA string) {
 	t.Helper()
 	writeGateAttestation(t, repo, commitgate.Attestation{
@@ -78,16 +70,6 @@ func writeGateAttestation(t *testing.T, repo string, att commitgate.Attestation)
 	mustWrite(t, filepath.Join(repo, ".commit-gate", "attestation.json"), string(body))
 }
 
-// tempRepoDir returns a fresh temp directory for a git repo whose cleanup is
-// BEST-EFFORT — unlike t.TempDir(), a RemoveAll failure does NOT fail the test.
-//
-// On macOS CI runners, os.RemoveAll of a git work tree intermittently fails
-// with EBADF ("bad file descriptor") on .git internals (e.g. a hooks/*.sample
-// file) under -race load, which would otherwise fail an otherwise-passing
-// test and force a full CI re-run. The temp dir is ephemeral — CI reclaims it
-// regardless — so best-effort removal is safe and keeps a cosmetic cleanup
-// race from gating a green build. The chmod-walk makes git's 0444 pack/object
-// files removable.
 func tempRepoDir(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "shiptest-*")
@@ -106,15 +88,6 @@ func tempRepoDir(t *testing.T) string {
 	return dir
 }
 
-// makeRepo creates a fresh git repo with:
-//   - fixture.txt tracked
-//   - .gitignore (.evolve/)
-//   - empty .evolve/{ledger.jsonl,state.json}
-//   - a stub ship-binary-fixture file (TOFU pins its SHA)
-//   - initial commit "initial test repo"
-//
-// Returns the absolute repo path. The repo is a gittest.Fixture, so git's
-// automatic maintenance stays off and teardown is retried.
 func makeRepo(t *testing.T) string {
 	t.Helper()
 	return gittest.FromTemplate(t, "ship-make-repo", func(r *gittest.Repo) error {
@@ -135,9 +108,6 @@ func makeRepo(t *testing.T) string {
 	}).Dir
 }
 
-// addRemote creates a bare repo to serve as origin and registers it.
-// Also forces branch to main and pushes initial commit so `git push`
-// is fast-forward later.
 func addRemote(t *testing.T, repo string) string {
 	t.Helper()
 	bare := gittest.Bare(t).Dir
@@ -146,12 +116,6 @@ func addRemote(t *testing.T, repo string) string {
 	return bare
 }
 
-// seedAudit writes audit-report.md + ledger.jsonl entry mirroring the
-// bash seed_audit helper. exitCode defaults to 0; pass -1 to use the
-// override. verdict text is embedded into the report body.
-//
-// optOverrides: optional map with keys "head", "tree", "exit_code" to
-// override the ledger entry fields. Use to test mismatch cases.
 func seedAudit(t *testing.T, repo, verdict string, optOverrides ...map[string]string) {
 	t.Helper()
 	overrides := map[string]string{}
@@ -180,7 +144,6 @@ func seedAudit(t *testing.T, repo, verdict string, optOverrides ...map[string]st
 	if testedRoot == "" {
 		testedRoot = repo
 	}
-	// Model Builder explicitly staging its intended fixture inputs before Audit.
 	runGit(t, testedRoot, "add", "-A")
 	snap, err := treefence.TakeStaged(context.Background(), testedRoot, nil)
 	if err != nil {
@@ -230,8 +193,6 @@ func seedAudit(t *testing.T, repo, verdict string, optOverrides ...map[string]st
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), string(line)+"\n")
 }
 
-// treeStateSHA computes sha256(git diff HEAD) — the same fingerprint
-// the audit-binding model uses. Wraps the git invocation for test setup.
 func treeStateSHA(t *testing.T, repo string) string {
 	t.Helper()
 	out := runGitOut(t, repo, "diff", "HEAD")
@@ -279,8 +240,6 @@ func runGitOut(t *testing.T, repo string, args ...string) string {
 	return string(out)
 }
 
-// filteredEnv strips evolve-loop env vars from the parent test process
-// so we don't pick up the operator's actual state.
 func filteredEnv() []string {
 	var out []string
 	for _, kv := range os.Environ() {
@@ -292,8 +251,6 @@ func filteredEnv() []string {
 	return out
 }
 
-// runShip invokes the native Run() with sensible defaults for testing.
-// Returns the result; tests assert on .ExitCode and .Logs.
 func runShip(t *testing.T, repo string, opts Options) (RunResult, error) {
 	t.Helper()
 	if opts.ProjectRoot == "" {
@@ -305,11 +262,9 @@ func runShip(t *testing.T, repo string, opts Options) (RunResult, error) {
 	if opts.ShipBinaryPath == "" {
 		opts.ShipBinaryPath = filepath.Join(repo, "ship-binary-fixture")
 	}
-	// Use real exec runner for tests — they assert real git semantics.
 	if opts.Runner == nil {
 		opts.Runner = execRunner
 	}
-	// Default to bytes.Buffer for stderr capture so tests can assert log lines.
 	var stderr bytes.Buffer
 	if opts.Stderr == nil {
 		opts.Stderr = &stderr
@@ -325,9 +280,6 @@ func runShip(t *testing.T, repo string, opts Options) (RunResult, error) {
 	return Run(ctx, opts)
 }
 
-// makeWorktree adds a git worktree of repo on a fresh branch at main and
-// returns its absolute path. The worktree shares repo's object store, so a
-// commit there is ff-mergeable into main.
 func makeWorktree(t *testing.T, repo, branch string) string {
 	t.Helper()
 	wt := filepath.Join(t.TempDir(), "wt")
@@ -335,19 +287,12 @@ func makeWorktree(t *testing.T, repo, branch string) string {
 	return wt
 }
 
-// seedAuditWithBoundTree is seedAudit plus an `audit_bound_tree_sha:` line
-// in the report body, so verifyAuditBinding stashes it into
-// opts.internalAuditBoundTreeSHA and gitops enforces the pre-merge check.
 func seedAuditWithBoundTree(t *testing.T, repo, verdict, boundTreeSHA string) {
 	t.Helper()
 	seedAudit(t, repo, verdict, map[string]string{"bound_tree": boundTreeSHA})
 
 }
 
-// makeWorktreeScenario returns (mainRepo, worktreePath) where:
-//   - mainRepo has a remote, a committed file, and a seeded audit
-//   - worktreePath is a linked worktree on branch "cycle-1"
-//     with one staged change so there are uncommitted changes to ship
 func makeWorktreeScenario(t *testing.T) (string, string) {
 	t.Helper()
 	repo := makeRepo(t)
@@ -357,15 +302,12 @@ func makeWorktreeScenario(t *testing.T) (string, string) {
 	wt := tempRepoDir(t)
 	runGit(t, repo, "worktree", "add", "-b", "cycle-1", wt)
 
-	// Stage a file in the worktree so worktreeCleanNoCommit == false.
 	mustWrite(t, filepath.Join(wt, "wt-change.txt"), "worktree change\n")
 	runGit(t, wt, "add", "wt-change.txt")
 
 	return repo, wt
 }
 
-// predicateVerdictFixture describes complete host execution for ship tests.
-// Audit integration tests separately prove the real runner produces this shape.
 func predicateVerdictFixture(cycle, green, red, skip int) acssuite.Verdict {
 	v := acssuite.Verdict{SchemaVersion: "1.0", Cycle: cycle, GreenCount: green, RedCount: red, SkipCount: skip, Verdict: "PASS", ShipEligible: red == 0,
 		PredicateSuite: acssuite.PredicateSuite{Total: green + red + skip, ThisCycleCount: green + red + skip, SkippedCount: skip}}
@@ -402,12 +344,9 @@ func sealTestPredicateEvidence(t *testing.T, id acssuite.EvidenceIdentity, repor
 	}
 }
 
-// auditOpts returns an Options wired for verifyAuditBinding unit tests: real
-// exec runner, ship-binary-fixture for TOFU, project root = repo.
 func auditOpts(t *testing.T, repo string) *Options {
 	t.Helper()
 	bin := filepath.Join(repo, "ship-binary-fixture")
-	// Pin the TOFU state upfront so verifyAuditBinding doesn't fail on TOFU.
 	preSeedTOFU(t, repo, bin)
 	return &Options{
 		ProjectRoot: repo,
@@ -419,8 +358,6 @@ func auditOpts(t *testing.T, repo string) *Options {
 	}
 }
 
-// preSeedTOFU writes the current ship binary SHA into state.json:expected_ship_sha
-// so verifySelfSHA passes without re-pinning during test.
 func preSeedTOFU(t *testing.T, repo, binPath string) {
 	t.Helper()
 	sha, err := sha256File(binPath)

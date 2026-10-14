@@ -73,7 +73,7 @@ func TestShipDirect_GitPushFails_Errors(t *testing.T) {
 
 func TestShipDirect_NoStagedChanges_CleanExit(t *testing.T) {
 	t.Parallel()
-	repo := makeRepo(t) // clean tree, nothing to stage
+	repo := makeRepo(t)
 	opts := &Options{Class: ClassCycle, CommitMessage: "msg", ProjectRoot: repo,
 		Runner: execRunner, Stdout: io.Discard, Stderr: io.Discard}
 	res := &RunResult{}
@@ -116,7 +116,7 @@ func TestComputeTreeStateSHA_RunnerError_Errors(t *testing.T) {
 
 func TestFinalize_ClassifiesExitCodes(t *testing.T) {
 	t.Parallel()
-	opts := &Options{ProjectRoot: t.TempDir()} // DryRun=false → journal no-op
+	opts := &Options{ProjectRoot: t.TempDir()}
 	t.Run("integrity-error", func(t *testing.T) {
 		breach := shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip, "breach")
 		out, err := finalize(context.Background(), opts, &RunResult{}, breach, "r")

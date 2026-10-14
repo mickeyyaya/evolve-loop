@@ -10,7 +10,6 @@ import (
 	"testing"
 )
 
-// ledgerLineFor returns the ledger.jsonl lines mentioning taskID.
 func ledgerLinesFor(t *testing.T, root, taskID string) []string {
 	t.Helper()
 	body, err := os.ReadFile(filepath.Join(root, ".evolve", "ledger.jsonl"))
@@ -26,11 +25,6 @@ func ledgerLinesFor(t *testing.T, root, taskID string) []string {
 	return out
 }
 
-// An unlanded ship (merge-base --is-ancestor exit 1) must still release the
-// item back to the inbox root AND leave durable per-item evidence — a ledger
-// entry for the released item whose reason notes the unlanded ship — so
-// triage/operators can tell a delivery failure from an ordinary residual
-// drain.
 func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -38,7 +32,7 @@ func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
 	const id = "inbox-promotion-requires-landed-ship"
 	writeInboxFixture(t, root, cid, id)
 
-	r := landingScriptedRunner(1) // unlanded: not an ancestor of HEAD or origin
+	r := landingScriptedRunner(1)
 	opts := &Options{ProjectRoot: root, Runner: r.runner(), Stderr: io.Discard}
 	res := &RunResult{
 		CommitSHA:     "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
@@ -49,13 +43,10 @@ func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
 		t.Fatalf("promoteInbox: %v", err)
 	}
 
-	// The item is back at the inbox root, not stranded in processing/ and not
-	// buried in processed/.
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "inbox", id+".json")); err != nil {
 		t.Fatalf("unlanded ship must release the item back to the inbox root: %v", err)
 	}
 
-	// The release must carry a durable unlanded note.
 	lines := ledgerLinesFor(t, root, id)
 	if len(lines) == 0 {
 		t.Fatalf("no ledger entry recorded for released item %q", id)
@@ -72,10 +63,6 @@ func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
 	}
 }
 
-// A LANDED cycle whose processing/ dir holds an extra residual claim (not in
-// top_n) drains that residual with the ordinary generic reason — the
-// unlanded note must NOT appear (guards against a stub that stamps
-// "unlanded" on every release).
 func TestPromoteInbox_LandedResidualReleaseKeepsGenericReason(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -89,7 +76,7 @@ func TestPromoteInbox_LandedResidualReleaseKeepsGenericReason(t *testing.T) {
 		t.Fatalf("write residual item: %v", err)
 	}
 
-	r := landingScriptedRunner(0) // landed: ancestor of HEAD
+	r := landingScriptedRunner(0)
 	opts := &Options{ProjectRoot: root, Runner: r.runner(), Stderr: io.Discard}
 	res := &RunResult{CommitSHA: "cafebabecafebabecafebabecafebabecafebabe"}
 
@@ -97,7 +84,6 @@ func TestPromoteInbox_LandedResidualReleaseKeepsGenericReason(t *testing.T) {
 		t.Fatalf("promoteInbox: %v", err)
 	}
 
-	// The residual (not in top_n) drains back to the inbox root as before.
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "inbox", residual+".json")); err != nil {
 		t.Fatalf("landed cycle must still drain residual claims to the inbox root: %v", err)
 	}

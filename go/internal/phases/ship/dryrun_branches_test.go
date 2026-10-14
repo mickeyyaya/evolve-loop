@@ -11,10 +11,6 @@ import (
 	"testing"
 )
 
-// Note: shipDirect with DryRun=true skips "git add -A" but still checks
-// for staged changes via "git diff --cached --quiet". We stage manually
-// here so the diff check sees staged changes and proceeds to the DryRun
-// short-circuit (the path after the "no staged changes" early return).
 func TestShipDirect_DryRun_LogsAndNoCommit(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -70,19 +66,11 @@ func TestShipDirect_DryRun_NoStagedChanges_CleanExit(t *testing.T) {
 	}
 }
 
-// The worktree has an uncommitted file so that the "not ahead" early-exit
-// does NOT fire, and the code reaches the DryRun commit+merge short-circuit.
 func TestShipFromWorktree_DryRun_LogsAndNoFFMerge(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "dry-run-branch")
-	// Write an UNTRACKED file in the worktree. shipFromWorktree runs
-	// "git -C wt diff --cached --quiet"; a new untracked file is not staged,
-	// so the worktree appears clean (exit 0). However the branch IS ahead once
-	// we pre-stage it. To reliably exercise the DryRun commit path we need
-	// an UNSTAGED change — but the code only checks --cached. Instead, stage
-	// a change in the worktree so exit 1 fires (staged-changes path).
 	mustWrite(t, filepath.Join(wt, "dry-change.txt"), "dry content\n")
 	runGit(t, wt, "add", "dry-change.txt")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
@@ -170,7 +158,6 @@ func TestShipFromWorktree_CleanWorktreeAheadBranch_Merges(t *testing.T) {
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "ahead-branch")
 
-	// Commit directly in the worktree so the branch is ahead of main.
 	mustWrite(t, filepath.Join(wt, "already-committed.txt"), "already in wt\n")
 	runGit(t, wt, "add", "-A")
 	runGit(t, wt, "-c", "commit.gpgsign=false", "commit", "-m", "pre-committed in worktree")

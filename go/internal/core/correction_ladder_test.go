@@ -15,16 +15,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// fakeVerifier implements ContractVerifier over a configurable contracted
-// destination (a SUBDIR of the workspace so a workspace-root stray is a
-// legitimate candidate ≠ dest). destExisted records, per call, whether the
-// destination existed AT CALL TIME — the relocate-FIRST-then-verify (TOCTOU,
-// S2) order proof.
 type fakeVerifier struct {
 	mu          sync.Mutex
-	destSub     string // contracted path relative to the workspace
-	absDest     string // when set, the contracted path verbatim (S2 confinement tests)
-	alwaysBad   bool   // verify !OK even when the destination exists
+	destSub     string
+	absDest     string
+	alwaysBad   bool
 	destExisted []bool
 }
 
@@ -45,7 +40,6 @@ func (f *fakeVerifier) VerifyDeliverable(_ context.Context, in ReviewInput) (Con
 	return v, nil
 }
 
-// ladderOrchestrator builds the RunCycle harness at a given recovery stage.
 func ladderOrchestrator(rev DeliverableReviewer, fv ContractVerifier, stage config.Stage) (*Orchestrator, map[Phase]PhaseRunner) {
 	cfg := config.RoutingConfig{}
 	cfg.PhaseRecovery = stage
@@ -75,14 +69,10 @@ func readLadderOutcomes(t *testing.T, ws string) []interaction.Outcome {
 	return outs
 }
 
-// strayWriterRunner delegates to fakeRunner and plants a stray deliverable at
-// the LIVE workspace root on its first dispatch — modeling an agent that wrote
-// a valid report at the wrong path. (RunCycle provisions a fresh workspace, so
-// pre-seeding from the test would be wiped.)
 type strayWriterRunner struct {
 	*fakeRunner
 	strayName string
-	planted   string // absolute path actually planted (read by assertions)
+	planted   string
 }
 
 func (s *strayWriterRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
@@ -95,18 +85,12 @@ func (s *strayWriterRunner) Run(ctx context.Context, req PhaseRequest) (PhaseRes
 	return s.fakeRunner.Run(ctx, req)
 }
 
-// plantStray swaps the build runner for a stray-planting one.
 func plantStray(runners map[Phase]PhaseRunner) *strayWriterRunner {
 	sw := &strayWriterRunner{fakeRunner: runners[PhaseBuild].(*fakeRunner), strayName: "build-report.md"}
 	runners[PhaseBuild] = sw
 	return sw
 }
 
-// TestSalvage_RelocatesThenVerifiesDESTINATION: a misplaced-but-valid
-// deliverable is salvaged in rung 1 with ZERO agent re-dispatches; the
-// verifier saw the destination absent on the locate call and PRESENT on the
-// verify-after-move call (relocate-first order, S2); the relocated artifact
-// still went through the review gate (final outcome).
 func TestSalvage_RelocatesThenVerifiesDESTINATION(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -159,10 +143,6 @@ func TestSalvage_RelocatesThenVerifiesDESTINATION(t *testing.T) {
 	}
 }
 
-// TestSalvage_InvalidDestinationFallsThrough — found-but-invalid: the
-// relocation lands but the destination fails verification ⇒ the ladder falls
-// through to re-dispatch, whose directive carries the kernel evidence digest
-// including the misplaced file's original path (§8 evidence-enriched rung 3).
 func TestSalvage_InvalidDestinationFallsThrough(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -211,9 +191,6 @@ func TestSalvage_InvalidDestinationFallsThrough(t *testing.T) {
 	}
 }
 
-// TestLadder_ShadowLogsOnly_ByteIdenticalLegacy — shadow (the default):
-// the stray stays where it is, the dispatch counts and directive are exactly
-// today's, and the would-act soak signal lands in the ledger.
 func TestLadder_ShadowLogsOnly_ByteIdenticalLegacy(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -251,9 +228,6 @@ func TestLadder_ShadowLogsOnly_ByteIdenticalLegacy(t *testing.T) {
 	}
 }
 
-// TestLadder_BudgetsExhaust_CycleAbortsAsToday — nothing salvageable and the
-// reviewer never approves ⇒ the ladder exhausts and aborts with EXACTLY
-// today's error and dispatch counts.
 func TestLadder_BudgetsExhaust_CycleAbortsAsToday(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -288,9 +262,6 @@ func TestLadder_BudgetsExhaust_CycleAbortsAsToday(t *testing.T) {
 	}
 }
 
-// TestSalvageHelper_RejectsUnsafeCandidates — the S2 candidate gates, helper
-// level: symlinks, directories, oversize, stale, and candidate==dest are all
-// refused; worktree precedes workspace in the search order.
 func TestSalvageHelper_RejectsUnsafeCandidates(t *testing.T) {
 	t.Parallel()
 	newO := func(fv ContractVerifier) *Orchestrator {
@@ -350,8 +321,6 @@ func TestSalvageHelper_RejectsUnsafeCandidates(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		// Contracted path IS the workspace root file: the only candidate
-		// equals the destination — nothing to relocate.
 		fv := &fakeVerifier{destSub: "build-report.md", alwaysBad: true}
 		sr := newO(fv).salvageDeliverable(ctx, ReviewInput{Phase: "build", Workspace: ws})
 		if sr.Relocated {
@@ -382,9 +351,6 @@ func TestSalvageHelper_RejectsUnsafeCandidates(t *testing.T) {
 	})
 
 	t.Run("dest_outside_roots_refused", func(t *testing.T) {
-		// S2 defense-in-depth: a verifier returning a contracted dest OUTSIDE
-		// the workspace/.evolve roots must never make salvage relocate there,
-		// even when a valid candidate exists in the workspace.
 		ws := t.TempDir()
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
@@ -401,8 +367,6 @@ func TestSalvageHelper_RejectsUnsafeCandidates(t *testing.T) {
 	})
 
 	t.Run("evolve_dir_dest_allowed", func(t *testing.T) {
-		// The guard must NOT break TargetEvolveDir contracts (router/advisor
-		// JSON under <ProjectRoot>/.evolve): a dest there is legitimate.
 		root := t.TempDir()
 		ws := filepath.Join(root, "ws")
 		if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -423,10 +387,6 @@ func TestSalvageHelper_RejectsUnsafeCandidates(t *testing.T) {
 	})
 }
 
-// TestLadder_ZeroCorrections_SalvageFails_LegacyAbortMessage — the decision-id
-// condition expansion enables the ladder when corrections are DISABLED
-// (maxCorrections==0) but a verifier is wired. A failed salvage must then
-// abort with the legacy zero-corrections message, byte-identical.
 func TestLadder_ZeroCorrections_SalvageFails_LegacyAbortMessage(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

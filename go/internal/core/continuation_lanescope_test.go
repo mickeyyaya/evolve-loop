@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// writeLaneScope writes lane-scope.json exactly as materializeLaneScope does.
 func writeLaneScope(t *testing.T, workspace string, ids ...string) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -105,7 +104,6 @@ func TestStampContinuationManifest_NoLaneScopeRegistersNothing(t *testing.T) {
 		t.Error("a cycle with no lane scope must not create a registry (phantom binding)")
 	}
 
-	// materializeLaneScope splits an empty scope into [""], which must never become a key.
 	ws2 := filepath.Join(root, ".evolve", "runs", "cycle-1081")
 	writeLaneScope(t, ws2, "")
 	cs2 := CycleState{CycleID: 1081, WorkspacePath: ws2, ActiveWorktree: wt, WorktreeBaseSHA: gitOut(t, wt, "rev-parse", "HEAD")}
@@ -122,7 +120,6 @@ func TestStampContinuationManifest_UnstampableWorkRegistersNothing(t *testing.T)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1082")
 	writeLaneScope(t, ws, "scope-conflict")
 	base := gitOut(t, wt, "rev-parse", "HEAD")
-	// One path edited on both sides, so the carry-forward screen reports a conflict.
 	if err := os.WriteFile(filepath.Join(wt, "a.txt"), []byte("worktree side\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +142,6 @@ func TestStampContinuationManifest_UnstampableWorkRegistersNothing(t *testing.T)
 	}
 }
 
-// laneScopeTriageRunner claims nothing and pins the lane scope, as production triage does for a non-claim lane.
 type laneScopeTriageRunner struct {
 	*fakeRunner
 	todoIDs []string
@@ -159,7 +155,6 @@ func (r *laneScopeTriageRunner) Run(ctx context.Context, req PhaseRequest) (Phas
 	return r.fakeRunner.Run(ctx, req)
 }
 
-// productionScopeResolver mirrors the composition root's claim-then-lane-scope resolver in cmd_cycle.go.
 func productionScopeResolver(t *testing.T) func(string, int, []string) *continuation.Continuation {
 	t.Helper()
 	return func(root string, cycle int, scopeIDs []string) *continuation.Continuation {

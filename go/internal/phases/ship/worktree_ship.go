@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 )
 
-// worktreeShip is the transaction for a cycle worktree; its methods run in
-// the order shipFromWorktree enforces: resolve, lock, preflight, stage,
-// commit, integrate.
 type worktreeShip struct {
 	ctx      context.Context
 	opts     *Options

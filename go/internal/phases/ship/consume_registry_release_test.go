@@ -16,8 +16,6 @@ func stubRunner(_ context.Context, _ string, _ string, _ []string, _ []string, _
 	return 0, nil
 }
 
-// consumeFixture builds a project root whose workspace declares id in top_n
-// with a PASS acs verdict, plus an inbox item carrying id.
 func consumeFixture(t *testing.T, id string) (root, workspace, itemBase string) {
 	t.Helper()
 	root = t.TempDir()

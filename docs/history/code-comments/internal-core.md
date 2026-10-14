@@ -12881,3 +12881,32 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // ship when the carry proves it, else only Audit re-runs (ADR-0105); otherwise the snapshot is invalidated
 // and Build re-authors the explanation.
 ```
+
+## comment-zero s2
+
+### `go/internal/core/audit_round_artifacts_test.go:125` — above `type verdictStagingAuditRunner struct {`
+
+```text
+// verdictStagingAuditRunner pre-writes the verdict in round 1, like the live auditor, and checks its retirement in round 2.
+```
+
+### `go/internal/core/composition_carryforward.go:17` — above `const CodeComposedGateDeclined signalcenter.Code = "ORCHESTRATOR_COMPOSED_GATE_DECLINED"`
+
+```text
+// CodeComposedGateDeclined marks a composed-tree gate decline at any of the three
+// MissingComposedGates trip sites (RUNG 0 compositionCarryForward, RUNG 2
+// scopedMergeCarryForward, the ADR-0105 B3 identityCarryForward): a required gate did not
+// report "pass" on the composed tree, so the cycle falls back to a full re-audit instead of
+// carrying the audit verdict forward. Mirrors CodeRebaseReentryAborted's precedent
+// (ship_recovery_debugger.go).
+```
+
+### `go/internal/core/contract_salvage_retry_test.go:99` — above `func TestContractEscalation_SalvageRetry_NotWhenEscalationTargetExists(t *testing.T) {`
+
+```text
+// TestContractEscalation_SalvageRetry_NotWhenEscalationTargetExists is the
+// precision guard: the two remedies are DISJOINT. A phase with a real
+// cross-family escalation target escalates exactly as it does today and must NOT
+// also spend its round-2 budget on a structured re-prompt (double-spending the
+// correction cap for one block).
+```

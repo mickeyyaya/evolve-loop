@@ -47,7 +47,6 @@ func TestDefaultBuildFloorChecks_SeesCommittedBuilderWork(t *testing.T) {
 	}
 	base := strings.TrimSpace(string(baseOut))
 
-	// The builder adds a package whose test fails and commits it, as its protocol requires.
 	write("go/bad/bad.go", "package bad\n\nfunc Two() int { return 3 }\n")
 	write("go/bad/bad_test.go", "package bad\n\nimport \"testing\"\n\nfunc TestTwo(t *testing.T) {\n\tif Two() != 2 {\n\t\tt.Fatal(\"Two() != 2\")\n\t}\n}\n")
 	run("add", "-A")
@@ -66,7 +65,6 @@ func TestDefaultBuildFloorChecks_SeesCommittedBuilderWork(t *testing.T) {
 	write("go/bad/extra.go", "package bad\n\n// Unnamed is exported but no test names it.\nfunc Unnamed() int { return 1 }\n")
 	run("add", "-A")
 	run("commit", "-q", "-m", "unnamed export")
-	// Make the unit test pass so only the naming defect remains.
 	write("go/bad/bad.go", "package bad\n\nfunc Two() int { return 2 }\n")
 	run("add", "-A")
 	run("commit", "-q", "-m", "fix Two")

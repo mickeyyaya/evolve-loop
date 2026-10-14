@@ -26,8 +26,6 @@ func TestCommittedInboxIDs_UnionsLaneScopeWhenTriageDroppedTheScope(t *testing.T
 	}
 }
 
-// Triage decomposed the scope id into sub-ids that are not inbox files; the
-// sub-ids stay in the set too — FindFileByTaskID misses them harmlessly.
 func TestCommittedInboxIDs_UnionsLaneScopeWithDecomposedTopN(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -46,10 +44,6 @@ func TestCommittedInboxIDs_UnionsLaneScopeWithDecomposedTopN(t *testing.T) {
 	}
 }
 
-// Triage renamed the work (top_n names only sub-ids, so the rename arm would
-// union the whole scope) while explicitly deferring one scope id. The
-// deferral must beat the rename-shape union — this is exactly the overlap
-// the guard exists to resolve.
 func TestCommittedInboxIDs_TriageDeferredScopeIDStaysPickable(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -68,7 +62,6 @@ func TestCommittedInboxIDs_TriageDeferredScopeIDStaysPickable(t *testing.T) {
 	}
 }
 
-// Nil body (no triage decision at all) keeps the existing lane-scope fallback.
 func TestCommittedInboxIDs_NilBodyStillResolvesLaneScope(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -79,10 +72,6 @@ func TestCommittedInboxIDs_NilBodyStillResolvesLaneScope(t *testing.T) {
 	}
 }
 
-// The declined-menu contract survives the union: a present decision that
-// committed zero ids and says nothing about the scope id keeps it pickable —
-// lane-scope must not override an explicit empty commitment (also pinned by
-// TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen in postship).
 func TestCommittedInboxIDs_DeclinedMenuUnmentionedScopeStaysPickable(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -93,9 +82,6 @@ func TestCommittedInboxIDs_DeclinedMenuUnmentionedScopeStaysPickable(t *testing.
 	}
 }
 
-// Lane scopes are multi-item menus: triage may commit a subset and leave a
-// menu mate pending as dispatchable backlog. When triage engages the scope by
-// name, the unmentioned mate must not be consumed.
 func TestCommittedInboxIDs_PendingMenuMateStaysPickable(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -113,8 +99,6 @@ func TestCommittedInboxIDs_PendingMenuMateStaysPickable(t *testing.T) {
 	}
 }
 
-// Only close-class drop reasons consume; an unknown reason keeps the item —
-// forgetting a live todo is worse than carrying a stale one.
 func TestCommittedInboxIDs_DropReasonGate(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -128,9 +112,6 @@ func TestCommittedInboxIDs_DropReasonGate(t *testing.T) {
 		{"out-of-scope for this lane", false},
 		{"needs redesign first", false},
 		{"", false},
-		// A "stale:" drop reason is a premise re-check the console must
-		// confirm — a PASS landing never consumes a stale-dropped menu mate,
-		// whatever words follow the tag.
 		{"stale: superseded by #535 (acssuite.ReadVerdict)", false},
 		{"stale", false},
 	} {
@@ -147,8 +128,6 @@ func TestCommittedInboxIDs_DropReasonGate(t *testing.T) {
 	}
 }
 
-// The widened union is PASS-only: a WARN landing promotes exactly the
-// pre-union set, so partial work stays pickable.
 func TestCommittedInboxIDs_WarnLandingGetsNoScopeUnion(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

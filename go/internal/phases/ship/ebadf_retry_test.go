@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// ebadfPathError mirrors the exact error shape the flake produces:
-// (*os.PathError){Op: "read", Path: "|0", Err: syscall.EBADF}.
 func ebadfPathError() error {
 	return &os.PathError{Op: "read", Path: "|0", Err: syscall.EBADF}
 }

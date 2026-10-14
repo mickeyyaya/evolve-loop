@@ -62,7 +62,6 @@ func TestPluginVersion_Exported(t *testing.T) {
 	}
 }
 
-// ExitMissingBin matches the shell's conventional "command not found" code.
 func TestExitMissingBin(t *testing.T) {
 	t.Parallel()
 	if ExitMissingBin != 127 {

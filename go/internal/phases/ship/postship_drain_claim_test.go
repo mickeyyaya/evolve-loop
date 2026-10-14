@@ -10,7 +10,6 @@ import (
 	"testing"
 )
 
-// writeDrainCycleState drops a cycle-state.json carrying cycle_id.
 func writeDrainCycleState(t *testing.T, root string, cycleID int) {
 	t.Helper()
 	mustWriteState(t, filepath.Join(root, ".evolve", "cycle-state.json"), map[string]any{
@@ -18,8 +17,6 @@ func writeDrainCycleState(t *testing.T, root string, cycleID int) {
 	})
 }
 
-// writeDrainTriageDecision drops the triage-decision.json promoteInbox reads for the
-// committed set.
 func writeDrainTriageDecision(t *testing.T, root string, cycleID int, ids ...string) {
 	t.Helper()
 	type entry struct {
@@ -44,7 +41,6 @@ func writeDrainTriageDecision(t *testing.T, root string, cycleID int, ids ...str
 	}
 }
 
-// writeDrainInboxItem drops an inbox item JSON with the given id into dir.
 func writeDrainInboxItem(t *testing.T, dir, id string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -56,10 +52,6 @@ func writeDrainInboxItem(t *testing.T, dir, id string) {
 	}
 }
 
-// blockDrainPath writes a regular FILE where a directory is needed, so the
-// destination MkdirAll inside Promote fails — the infrastructure non-delivery
-// this makes loud.
-// See ADR-0079.
 func blockDrainPath(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -70,10 +62,6 @@ func blockDrainPath(t *testing.T, path string) {
 	}
 }
 
-// TestPromoteInbox_DrainFailure_NoFalseSuccessLog: when the inbox outcome apply
-// fails, promoteInbox must NOT also claim the drain completed. The success line
-// lives in the success branch; the failure branch says INCOMPLETE, so the two
-// claims cannot both appear for one cycle.
 func TestPromoteInbox_DrainFailure_NoFalseSuccessLog(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -81,8 +69,6 @@ func TestPromoteInbox_DrainFailure_NoFalseSuccessLog(t *testing.T) {
 	writeDrainTriageDecision(t, root, 42, "committed-task")
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeDrainInboxItem(t, inbox, "committed-task")
-	// processed/ is a FILE ⇒ processed/cycle-42/ cannot be created ⇒ the
-	// committed promote is a non-delivery and ApplyCycleOutcome returns an error.
 	blockDrainPath(t, filepath.Join(inbox, "processed"))
 
 	res := &RunResult{}
@@ -100,9 +86,6 @@ func TestPromoteInbox_DrainFailure_NoFalseSuccessLog(t *testing.T) {
 	}
 }
 
-// A failed committed-id promote must not skip the residual drain — the early
-// return would strand every item parked in processing/cycle-N/. The residual
-// item must be back at the inbox root even though the promote failed.
 func TestPromoteInbox_PromoteError_StillDrainsResidualClaims(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -110,7 +93,6 @@ func TestPromoteInbox_PromoteError_StillDrainsResidualClaims(t *testing.T) {
 	writeDrainTriageDecision(t, root, 43, "committed-task")
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeDrainInboxItem(t, inbox, "committed-task")
-	// A residual claim from this cycle, sitting where only the drain can free it.
 	writeDrainInboxItem(t, filepath.Join(inbox, "processing", "cycle-43"), "residual-task")
 	blockDrainPath(t, filepath.Join(inbox, "processed"))
 

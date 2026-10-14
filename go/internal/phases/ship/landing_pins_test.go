@@ -25,18 +25,12 @@ const (
 	pinItemBlob      = "55555555555555555555555555555555abcdef03"
 )
 
-// scriptedCall is one scripted git response; a queue per argv is consumed
-// FIFO and the last entry is sticky, so the SAME argv (the retry push) can
-// answer differently on its second call.
 type scriptedCall struct {
 	stdout string
 	exit   int
 	err    error
 }
 
-// argvCall is one recorded git call: the argv joined by spaces and which
-// writers it streamed to — the merge and the pushes write to the operator
-// streams, the probes to io.Discard, the captures to a builder.
 type argvCall struct {
 	Argv    string `json:"argv"`
 	Streams string `json:"streams"`
@@ -59,7 +53,6 @@ func (r *argvRecorder) on(argv string, calls ...scriptedCall) *argvRecorder {
 	return r
 }
 
-// set replaces the queue for argv (a row that needs BOTH pushes rejected).
 func (r *argvRecorder) set(argv string, calls ...scriptedCall) *argvRecorder {
 	r.scripts[argv] = calls
 	return r
@@ -99,8 +92,6 @@ func (r *argvRecorder) runner() CmdRunner {
 	}
 }
 
-// argvs renders the recorded calls with the project root templated as
-// <root>, so the goldens are environment-free.
 func (r *argvRecorder) argvs() []string {
 	out := make([]string, 0, len(r.calls))
 	for _, c := range r.calls {
@@ -113,7 +104,6 @@ func (r *argvRecorder) argvs() []string {
 	return out
 }
 
-// goldenError is the ShipError shape the goldens record.
 type goldenError struct {
 	Code    string            `json:"code"`
 	Class   string            `json:"class"`
@@ -122,8 +112,6 @@ type goldenError struct {
 	Debug   map[string]string `json:"debug"`
 }
 
-// goldenRow is one observed scenario: argv + streams, logs, the result's
-// fields and the error.
 type goldenRow struct {
 	Name            string       `json:"name"`
 	Argv            []string     `json:"argv"`
@@ -171,8 +159,6 @@ func loadGolden(t *testing.T, name string) goldenFile {
 	return g
 }
 
-// pinOptions is the host fixture every pin drives: a temp project root, the
-// operator streams as buffers, a fake integrator lock, cycle 7, no release.
 func pinOptions(t *testing.T, class Class) (*Options, *strings.Builder, *strings.Builder) {
 	t.Helper()
 	var stdout, stderr strings.Builder
@@ -190,7 +176,6 @@ func pinOptions(t *testing.T, class Class) (*Options, *strings.Builder, *strings
 	return opts, &stdout, &stderr
 }
 
-// scriptGreenPost scripts the post-push reads every green landing performs.
 func scriptGreenPost(r *argvRecorder) {
 	r.on("rev-parse HEAD", scriptedCall{stdout: pinHead + "\n"})
 	r.on("rev-parse HEAD^{tree}", scriptedCall{stdout: pinTree + "\n"})
@@ -207,8 +192,6 @@ func scriptGreenLanding(r *argvRecorder, wt string) {
 	r.on("rev-parse "+pinBranch, scriptedCall{stdout: pinOriginRef + "\n"})
 }
 
-// pushSiteDriver drives one of the three push sites to its push with the
-// stage/commit prelude scripted green.
 type pushSiteDriver struct {
 	name  string
 	drive func(t *testing.T, opts *Options, r *argvRecorder, res *RunResult) error
@@ -217,7 +200,7 @@ type pushSiteDriver struct {
 var pushSites = []pushSiteDriver{
 	{name: "direct", drive: func(t *testing.T, opts *Options, r *argvRecorder, res *RunResult) error {
 		opts.Class = ClassManual
-		r.on("diff --cached --quiet", scriptedCall{exit: 1}) // staged changes exist
+		r.on("diff --cached --quiet", scriptedCall{exit: 1})
 		return shipDirect(context.Background(), opts, res, pinBranch)
 	}},
 	{name: "pushonly", drive: func(t *testing.T, opts *Options, r *argvRecorder, res *RunResult) error {
@@ -229,7 +212,6 @@ var pushSites = []pushSiteDriver{
 	}},
 }
 
-// repairRow scripts the rejected push and one repair scenario.
 type repairRow struct {
 	name   string
 	script func(opts *Options, r *argvRecorder)
@@ -260,7 +242,7 @@ var repairRows = []repairRow{
 	{name: "ancestor-retry-rc1", script: func(_ *Options, r *argvRecorder) {
 		r.on("rev-parse origin/"+pinBranch, scriptedCall{stdout: pinOriginRef + "\n"})
 		r.on("merge-base --is-ancestor "+pinOriginRef+" HEAD", scriptedCall{exit: 0})
-		r.set("push origin "+pinBranch, scriptedCall{exit: 1}, scriptedCall{exit: 1}) // the retry is rejected too
+		r.set("push origin "+pinBranch, scriptedCall{exit: 1}, scriptedCall{exit: 1})
 	}},
 	{name: "diverged", script: func(_ *Options, r *argvRecorder) {
 		r.on("rev-parse origin/"+pinBranch, scriptedCall{stdout: pinOriginRef + "\n"})
@@ -274,9 +256,6 @@ var repairRows = []repairRow{
 	}},
 }
 
-// pushRow drives one site through one repair scenario. Every row but
-// push-ok rejects the first push (rc=1); the worktree site's own wording
-// probe (`rev-parse HEAD`) answers the head so its message can name it.
 func pushRow(t *testing.T, site pushSiteDriver, row repairRow) goldenRow {
 	t.Helper()
 	opts, _, _ := pinOptions(t, ClassCycle)
@@ -318,9 +297,6 @@ func assertRowsMatchGolden(t *testing.T, got []goldenRow, golden goldenFile) {
 	}
 }
 
-// assertGoldenError compares a ShipError with the golden's; the `step` Debug
-// key is the unit's own declared addition to the moved errors and is
-// compared by the leaf's own tests, so it is excluded here.
 func assertGoldenError(t *testing.T, name string, got, want *goldenError) {
 	t.Helper()
 	if (got == nil) != (want == nil) {
@@ -345,11 +321,6 @@ func assertGoldenError(t *testing.T, name string, got, want *goldenError) {
 	}
 }
 
-// The three push sites × the repair matrix, byte-identical to the capture:
-// argv (the probes, the retry, no rebase/force), the REPAIR lines,
-// RepairAttempted/RepairOutcome, CommitSHA, and the error per site. Kills:
-// the once-guard dropped, declined building a new error, needs-reaudit made
-// transient, the retry push streamed to io.Discard, the worktree head omitted.
 func TestPushSites_GoldenRejectionAndRepairMatrix(t *testing.T) {
 	t.Parallel()
 	for _, site := range pushSites {
@@ -374,10 +345,6 @@ func TestPushSites_GoldenRejectionAndRepairMatrix(t *testing.T) {
 	}
 }
 
-// The binding writer's bytes (2-space indent, trailing newline, an empty
-// commit_sha still present), the 0o755 dir, no temp file left, the
-// no-cycle_id error and the MkdirAll error. Kills: the newline dropped,
-// MarshalIndent → Marshal, Rename skipped.
 func TestWriteShipBinding_GoldenBytesAndAtomicity(t *testing.T) {
 	t.Parallel()
 	want, err := os.ReadFile(filepath.Join("landing", "testdata", "ship-binding.golden.json"))
@@ -420,9 +387,6 @@ func TestWriteShipBinding_GoldenBytesAndAtomicity(t *testing.T) {
 	}
 }
 
-// The writer and the idempotency reader agree on the path: the consumer pin
-// on the run-workspace layout (core.RunWorkspacePath + dossier.ShipBindingFile),
-// green before and after the projection. Kills: cycle-%d → cycle_%d at either site.
 func TestShipBinding_WriterAndIdempotencyReaderAgreeOnThePath(t *testing.T) {
 	t.Parallel()
 	opts, _, _ := pinOptions(t, ClassCycle)
@@ -442,9 +406,6 @@ func TestShipBinding_WriterAndIdempotencyReaderAgreeOnThePath(t *testing.T) {
 	}
 }
 
-// The exit>1 rule and the two message texts of captureGitOutput: a spawn
-// error and rc=2 are GIT_IO with git_args + git_err / git_rc; rc=1 is
-// success (git diff's "differences exist").
 func TestCaptureGitOutput_ExitRuleAndErrorTexts(t *testing.T) {
 	t.Parallel()
 	opts, _, _ := pinOptions(t, ClassCycle)

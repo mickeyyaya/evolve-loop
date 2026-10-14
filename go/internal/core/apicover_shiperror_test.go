@@ -12,7 +12,6 @@ type shipCodeCase struct {
 	stage     ShipStage
 }
 
-// allShipCodeCases pairs each code with the Class and Stage its production call site in internal/phases/ship uses.
 func allShipCodeCases() []shipCodeCase {
 	return []shipCodeCase{
 		{CodeExplanationDocumentation, ShipClassPrecondition, StageVerifyExplanation},
@@ -55,14 +54,12 @@ func allShipCodeCases() []shipCodeCase {
 		{CodeCommitPrefixGate, ShipClassPrecondition, StageAtomicShip},
 
 		{CodeArgs, ShipClassConfig, StageArgs},
-		// CodeUnknown has no fixed production class, so it is exercised separately.
 	}
 }
 
 func TestShipError_TypesAreUsable(t *testing.T) {
 	t.Parallel()
 
-	// Typed declarations name each type for apicover.
 	var code ShipErrorCode = CodeArgs
 	var class ShipErrorClass = ShipClassConfig
 	var stage ShipStage = StageArgs

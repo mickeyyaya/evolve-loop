@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// mustShipErr recovers a *core.ShipError from err or fails the test.
 func mustShipErr(t *testing.T, err error) *core.ShipError {
 	t.Helper()
 	se, ok := core.AsShipError(err)
@@ -17,9 +16,6 @@ func mustShipErr(t *testing.T, err error) *core.ShipError {
 	return se
 }
 
-// wantShipErr recovers the ShipError, asserts its Code + Class, and (when
-// msgSubstr != "") asserts the message contains msgSubstr. Returns it for
-// any further assertions.
 func wantShipErr(t *testing.T, err error, code core.ShipErrorCode, class core.ShipErrorClass, msgSubstr string) *core.ShipError {
 	t.Helper()
 	se := mustShipErr(t, err)

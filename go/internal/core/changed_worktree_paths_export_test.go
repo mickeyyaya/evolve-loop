@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// changedPathsRepoFixture leaves a tracked modification and an untracked addition.
 func changedPathsRepoFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -32,7 +31,6 @@ func changedPathsRepoFixture(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(dir, "base.txt"), []byte("changed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Untracked addition under an architecture surface.
 	newFile := filepath.Join(dir, "go", "internal", "policy", "policy.go")
 	if err := os.MkdirAll(filepath.Dir(newFile), 0o755); err != nil {
 		t.Fatal(err)

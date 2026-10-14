@@ -13,8 +13,6 @@ import (
 	"time"
 )
 
-// --- atomicShip: currentBranch runner error (gitops.go:33) -----------------
-
 func TestAtomicShip_CurrentBranchRunnerError_Errors(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -32,8 +30,6 @@ func TestAtomicShip_CurrentBranchRunnerError_Errors(t *testing.T) {
 		t.Fatal("want currentBranch error, got nil")
 	}
 }
-
-// --- shipDirect: buildDiffFooter --name-status error (gitops.go:94) --------
 
 func TestShipDirect_BuildDiffFooterNameStatusError_Errors(t *testing.T) {
 	t.Parallel()
@@ -60,13 +56,10 @@ func TestShipDirect_BuildDiffFooterNameStatusError_Errors(t *testing.T) {
 	}
 }
 
-// --- promoteInbox: readStateMap error (postship.go:83) ----------------------
-
 func TestPromoteInbox_CycleStateReadError_ReturnsError(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 
-	// Replace cycle-state.json with a directory so readStateMap errors.
 	csPath := filepath.Join(repo, ".evolve", "cycle-state.json")
 	if err := os.MkdirAll(csPath, 0o755); err != nil {
 		t.Fatal(err)
@@ -79,8 +72,6 @@ func TestPromoteInbox_CycleStateReadError_ReturnsError(t *testing.T) {
 		t.Fatal("want readStateMap error, got nil")
 	}
 }
-
-// --- verifyManualConfirm: git add -A runner error (verify.go:157) -----------
 
 func TestVerifyManualConfirm_GitAddAFails_Errors(t *testing.T) {
 	t.Parallel()
@@ -102,8 +93,6 @@ func TestVerifyManualConfirm_GitAddAFails_Errors(t *testing.T) {
 	}
 }
 
-// --- verifyTrivial: diff --name-only runner error (verify.go:267) -----------
-
 func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -115,7 +104,6 @@ func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
 		ProjectRoot: repo,
 		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-			// verifyTrivial's second diff call is --name-only without --cached.
 			if name == "git" && argsContain(args, "--name-only") && !argsContain(args, "--cached") {
 				return -1, errors.New("diff name-only exploded")
 			}
@@ -129,8 +117,6 @@ func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
 		t.Fatal("want runner error from diff --name-only, got nil")
 	}
 }
-
-// --- verifyTrivial: ls-files runner error (verify.go:271) ------------------
 
 func TestVerifyTrivial_LSFilesRunnerError_Errors(t *testing.T) {
 	t.Parallel()
@@ -157,8 +143,6 @@ func TestVerifyTrivial_LSFilesRunnerError_Errors(t *testing.T) {
 	}
 }
 
-// --- native.go:213: postShip WARN log (postShip returns error) --------------
-
 func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -166,10 +150,8 @@ func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, "warn.txt"), "change\n")
 	seedAudit(t, repo, "PASS")
 
-	// Making cycle-state.json a directory fails advanceLastCycleNumber's
-	// readStateMap, so postShip returns an error for Run to WARN-and-continue.
 	csPath := filepath.Join(repo, ".evolve", "cycle-state.json")
-	_ = os.Remove(csPath) // harmless if absent
+	_ = os.Remove(csPath)
 	if err := os.MkdirAll(csPath, 0o755); err != nil {
 		t.Fatal(err)
 	}

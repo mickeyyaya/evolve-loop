@@ -15,10 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 )
 
-// excludeCommitGate adds .commit-gate/ to the repo's local git excludes so
-// ship's `git add -A` never stages the attestation (which would otherwise
-// mutate the tree and invalidate its own SHA). Mirrors the real repo's
-// .gitignore entry.
 func excludeCommitGate(t *testing.T, repo string) {
 	t.Helper()
 	p := filepath.Join(repo, ".git", "info", "exclude")
@@ -54,9 +50,6 @@ func TestCommitGate_ManualValidAttestation_Ships(t *testing.T) {
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nreviewed change\n")
 
-	// git diff HEAD is identical whether the change is staged or not, and
-	// .commit-gate/ is excluded, so this SHA matches what ship computes after
-	// its own `git add -A`.
 	writeAttestation(t, repo, treeStateSHA(t, repo))
 
 	res, _ := runShip(t, repo, Options{
@@ -78,7 +71,6 @@ func TestCommitGate_ManualStaleAttestation_Refuses(t *testing.T) {
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nactual change\n")
-	// Attestation for some OTHER tree state.
 	writeAttestation(t, repo, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 
 	res, _ := runShip(t, repo, Options{
@@ -158,9 +150,6 @@ func TestCommitGate_GitLogTellsAWaivedCommitFromABypassedOne(t *testing.T) {
 	}
 }
 
-// writePersonaFixture writes agents/evolve-<name>.md (tools frontmatter) and
-// .evolve/profiles/<name>.json (allowed_tools) under root, mirroring the real
-// repo layout that phasecoherence.Options consumes.
 func writePersonaFixture(t *testing.T, root, name string, personaTools, allowedTools []string) {
 	t.Helper()
 	quoted := make([]string, len(personaTools))
@@ -181,7 +170,6 @@ func writePersonaFixture(t *testing.T, root, name string, personaTools, allowedT
 	mustWrite(t, filepath.Join(root, ".evolve", "profiles", name+".json"), string(prof)+"\n")
 }
 
-// lintOpts builds the minimal Options for unit-calling runPersonaLint.
 func lintOpts(root string) *Options {
 	return &Options{
 		Class:       ClassCycle,
@@ -203,7 +191,6 @@ func TestPersonaLint_CleanTreePasses(t *testing.T) {
 func TestPersonaLint_ViolationBlocks(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// Persona claims Bash; profile only allows Read → Kind "disallowed".
 	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read"})
 
 	res := &RunResult{}
@@ -242,7 +229,7 @@ func TestPersonaLint_MissingDirsSkips(t *testing.T) {
 func TestPersonaLint_BypassSkipsLint(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read"}) // would block
+	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read"})
 
 	opts := lintOpts(root)
 	opts.BypassCommitGate = true

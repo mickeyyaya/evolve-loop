@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// apicoverGuard is a Guard double, because core cannot import internal/guards, which imports core.
 type apicoverGuard struct {
 	gotIn    GuardInput
 	decision GuardDecision

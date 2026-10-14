@@ -12,20 +12,15 @@ import (
 	"time"
 )
 
-// BlockerBreakerConfig carries the breaker's policy ceilings; a zero ceiling disables its rule.
 type BlockerBreakerConfig struct {
 	GuardClassCeiling           int
 	IdenticalFingerprintCeiling int
-	// UnexplainedCeiling halts on this many digests that carry no machine-readable failure reason.
-	UnexplainedCeiling int
-	// AckedFingerprints excludes each acknowledged fingerprint from Rule B's count, never Rule B as a whole.
-	AckedFingerprints map[string]bool
-	// ConsecutiveFailuresCeiling halts on this many back-to-back failed cycles, whatever their fingerprints.
-	ConsecutiveFailuresCeiling int
-	LaneDeferredCycles         map[int]bool
+	UnexplainedCeiling          int
+	AckedFingerprints           map[string]bool
+	ConsecutiveFailuresCeiling  int
+	LaneDeferredCycles          map[int]bool
 }
 
-// ResolvedFingerprint is one record in the append-only ack ledger, .evolve/resolved-fingerprints.json.
 type ResolvedFingerprint struct {
 	Fingerprint string `json:"fingerprint"`
 	ResolvedAt  string `json:"resolved_at"`
@@ -34,7 +29,6 @@ type ResolvedFingerprint struct {
 
 const resolvedFingerprintsFile = "resolved-fingerprints.json"
 
-// LoadResolvedFingerprints returns the acknowledged fingerprints; a missing ledger is an empty set, not an error.
 func LoadResolvedFingerprints(evolveDir string) (map[string]bool, error) {
 	raw, err := os.ReadFile(filepath.Join(evolveDir, resolvedFingerprintsFile))
 	if err != nil {
@@ -56,7 +50,6 @@ func LoadResolvedFingerprints(evolveDir string) (map[string]bool, error) {
 	return out, nil
 }
 
-// AppendResolvedFingerprint appends one ack record through a tmp+rename write, so no reader sees a partial ledger.
 func AppendResolvedFingerprint(evolveDir, fingerprint, resolvedBy string, resolvedAt time.Time) error {
 	if strings.TrimSpace(fingerprint) == "" {
 		return fmt.Errorf("AppendResolvedFingerprint: fingerprint must not be empty")
@@ -92,10 +85,8 @@ func AppendResolvedFingerprint(evolveDir, fingerprint, resolvedBy string, resolv
 	return nil
 }
 
-// consumptionFingerprintRe requires the literal `fingerprint` token before the triplet, so a pipe-delimited path never matches.
 var consumptionFingerprintRe = regexp.MustCompile(`fingerprint\s*=?\s*"?([A-Za-z0-9_.\-]+\|[A-Za-z0-9_.\-]+\|[A-Za-z0-9_.\-]+)"?`)
 
-// ParseConsumptionFingerprint extracts a failure fingerprint from free text; it fails closed without a `fingerprint` token.
 func ParseConsumptionFingerprint(text string) (string, bool) {
 	m := consumptionFingerprintRe.FindStringSubmatch(text)
 	if m == nil {
@@ -104,7 +95,6 @@ func ParseConsumptionFingerprint(text string) (string, bool) {
 	return m[1], true
 }
 
-// ConsumePipelineDefectFingerprint acks the fingerprint named in consumedBy or notes, and writes nothing if neither names one.
 func ConsumePipelineDefectFingerprint(evolveDir, consumedBy, notes, resolvedBy string, resolvedAt time.Time) (string, error) {
 	fp, ok := ParseConsumptionFingerprint(consumedBy)
 	if !ok {
@@ -119,25 +109,20 @@ func ConsumePipelineDefectFingerprint(evolveDir, consumedBy, notes, resolvedBy s
 	return fp, nil
 }
 
-// BlockerVerdict is the breaker's decision; Halt stops the batch and escalates instead of dispatching another cycle.
 type BlockerVerdict struct {
 	Halt        bool
-	Rule        string // "guard-class" | "identical-fingerprint" | "unexplained-failures" | "consecutive-failures"
-	Fingerprint string // Rule B: the recurring identity; Rule A: representative
+	Rule        string
+	Fingerprint string
 	Count       int
 	Reason      string
 }
 
-// guardAbortClass is the pre-class of guard aborts, which are pipeline machinery failing and never task defects.
 const guardAbortClass = "guard-abort"
 
-// isUnexplainedDigest reports a digest whose fingerprint asserts no defect identity. Distinct failures collapse into
-// such buckets by construction, so they never count as identical; the unexplained rule owns them.
 func isUnexplainedDigest(d FailureDigest) bool {
 	return d.Unexplained || (d.PreClass == "unknown" && strings.HasPrefix(d.Fingerprint, "|unknown|"))
 }
 
-// EvaluateBlockerBreaker applies the breaker's rules to a batch's failure digests; the first rule that trips names the halt.
 func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) BlockerVerdict {
 	if cfg.GuardClassCeiling > 0 {
 		var guard []FailureDigest
@@ -185,7 +170,6 @@ func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) B
 			}
 		}
 	}
-	// Evaluated last, so a more specific rule names the halt when both trip.
 	if cfg.ConsecutiveFailuresCeiling > 0 {
 		counted := map[int]FailureDigest{}
 		for _, d := range digests {
@@ -224,7 +208,6 @@ func consecutiveRun(sortedCycles []int, ceiling int, transparent map[int]bool) (
 	return 0, 0, false
 }
 
-// CollectBatchFailureDigests reads runs/cycle-N/failure-digest.json for N >= fromCycle, skipping missing or malformed ones.
 func CollectBatchFailureDigests(evolveDir string, fromCycle int) []FailureDigest {
 	entries, err := os.ReadDir(filepath.Join(evolveDir, "runs"))
 	if err != nil {

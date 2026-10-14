@@ -49,9 +49,6 @@ func verifySelfSHA(_ context.Context, opts *Options, res *RunResult) error {
 	pluginVer := pluginVersion(opts.PluginRoot)
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
-	// Holds the shared state.json lock across the whole TOFU read→decide→repin
-	// so a concurrent allocator/UpdateState write cannot interleave.
-	// See ADR-0049.
 	release, lockErr := lockStateFile(statePath)
 	if lockErr != nil {
 		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifySelfSHA,
@@ -84,7 +81,6 @@ func verifySelfSHA(_ context.Context, opts *Options, res *RunResult) error {
 		if expectedVer == "" && pluginVer != "" {
 			return repin("schema migration (no expected_ship_version recorded)")
 		}
-		// clean pass
 		return nil
 	case expectedVer == "":
 		return repin("migrating legacy SHA-only pin to version-aware schema")
@@ -102,11 +98,9 @@ func verifySelfSHA(_ context.Context, opts *Options, res *RunResult) error {
 	}
 }
 
-// IntegrityError wraps a *core.ShipError for legacy exit-code-2 matching;
-// construct only via shipErr.
 type IntegrityError struct {
-	Msg string          // human text (== wrapped ShipError.Message)
-	se  *core.ShipError // the authoritative structured error
+	Msg string
+	se  *core.ShipError
 }
 
 func (e *IntegrityError) Error() string {
@@ -116,8 +110,6 @@ func (e *IntegrityError) Error() string {
 	return e.Msg
 }
 
-// Unwrap exposes the wrapped *core.ShipError so core.AsShipError (and any
-// errors.As targeting *core.ShipError) recovers it through an IntegrityError.
 func (e *IntegrityError) Unwrap() error {
 	if e.se == nil {
 		return nil
@@ -125,8 +117,6 @@ func (e *IntegrityError) Unwrap() error {
 	return e.se
 }
 
-// shipErr builds a *core.ShipError, wrapping it in *IntegrityError only when
-// class is ShipClassIntegrity (see IntegrityError).
 func shipErr(code core.ShipErrorCode, class core.ShipErrorClass, stage core.ShipStage, message string, debugKV ...string) error {
 	se := core.NewShipError(code, class, stage, message, debugKV...)
 	if class == core.ShipClassIntegrity {
@@ -135,7 +125,6 @@ func shipErr(code core.ShipErrorCode, class core.ShipErrorClass, stage core.Ship
 	return se
 }
 
-// verifyClass may stage worktree changes: verifyManualConfirm runs `git add -A`.
 func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 	switch opts.Class {
 	case ClassCycle:
@@ -161,8 +150,6 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		if err := verifyManualConfirm(ctx, opts, res); err != nil {
 			return err
 		}
-		// Runs after verifyManualConfirm's `git add -A` so the attestation's SHA
-		// reflects the staged tree. Bypassed by Options.BypassCommitGate.
 		if err := verifyCommitGateAttestation(ctx, opts, res); err != nil {
 			return err
 		}
@@ -177,7 +164,6 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 }
 
 func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) error {
-	// Stage everything so diff --cached reflects what will ship.
 	exitCode, err := opts.run(ctx, "git", []string{"add", "-A"}, io.Discard, opts.Stderr)
 	if err != nil || exitCode != 0 {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
@@ -220,8 +206,8 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 	fmt.Fprintln(opts.Stderr, strings.Join(lines, "\n"))
 	fmt.Fprintln(opts.Stderr)
 
-	// LLM agents cannot answer an interactive prompt; refuse when stdin isn't a tty.
-	if !isTerminal(opts.Stdin) {
+	stdinCannotAnswerPrompt := !isTerminal(opts.Stdin)
+	if stdinCannotAnswerPrompt {
 		return shipErr(core.CodeManualNotTTY, core.ShipClassConfig, core.StageVerifyClass,
 			fmt.Sprintf("--class manual requires interactive stdin (not a tty). Set %s=1 for non-interactive use (CI), or run from a real terminal.", envShipAutoConfirm))
 	}
@@ -241,8 +227,6 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 	return nil
 }
 
-// errEmptyDiff is a sentinel for "no staged changes — exit 0 cleanly."
-// Caller (Run) recognizes this and short-circuits to ExitOK.
 var errEmptyDiff = &cleanExitError{}
 
 type cleanExitError struct{}

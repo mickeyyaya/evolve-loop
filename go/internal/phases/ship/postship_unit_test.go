@@ -8,9 +8,6 @@ import (
 	"testing"
 )
 
-// Given a state.json with several pre-existing fields and a
-// cycle-state.json:cycle_id, advancing the counter must (a) set
-// lastCycleNumber = cycle_id and (b) leave EVERY other field intact.
 func TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -49,8 +46,6 @@ func TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings(t *testing.T) {
 	}
 }
 
-// TestAdvanceLastCycleNumber_NoCycleIDIsNoop: a cycle-state.json without
-// cycle_id must leave state.json untouched (bash silently skips).
 func TestAdvanceLastCycleNumber_NoCycleIDIsNoop(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -68,8 +63,6 @@ func TestAdvanceLastCycleNumber_NoCycleIDIsNoop(t *testing.T) {
 	}
 }
 
-// TestRepinPostCycle_NoopWhenSHAMatches: when the binary's current SHA
-// already equals state.json:expected_ship_sha, repin is a no-op.
 func TestRepinPostCycle_NoopWhenSHAMatches(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -97,8 +90,6 @@ func TestRepinPostCycle_NoopWhenSHAMatches(t *testing.T) {
 	}
 }
 
-// TestRepinPostCycle_RepinsOnSHAChange: when the shipped commit changed
-// the binary (current SHA != stored), repin writes the new SHA and logs.
 func TestRepinPostCycle_RepinsOnSHAChange(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -131,8 +122,6 @@ func TestRepinPostCycle_RepinsOnSHAChange(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_NoCycleIDIsNoop: without cycle_id, promote returns nil
-// silently (no triage lookup attempted).
 func TestPromoteInbox_NoCycleIDIsNoop(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -143,9 +132,6 @@ func TestPromoteInbox_NoCycleIDIsNoop(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_NoTriageDecisionStillDrains: cycle_id present but no
-// triage-decision.json ⇒ promote-to-processed is skipped (logged) but the
-// residual drain STILL runs (no early-return strand).
 func TestPromoteInbox_NoTriageDecisionStillDrains(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

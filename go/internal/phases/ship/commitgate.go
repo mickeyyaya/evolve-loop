@@ -42,8 +42,6 @@ func writeTrailer(b *strings.Builder, key, value string) {
 	}
 }
 
-// verifyCommitGateAttestation must run after verifyManualConfirm's `git add
-// -A`, so the computed SHA reflects the tree that will be committed.
 func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunResult) error {
 	if opts.DryRun {
 		res.Logs = append(res.Logs, "[ship] commit-gate: dry-run — review attestation not required (no commit)")

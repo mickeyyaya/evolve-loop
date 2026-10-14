@@ -18,11 +18,6 @@ func manifestTestHasArg(args []string, needle string) bool {
 	return false
 }
 
-// Under enforce, a worktree carrying an untracked file that no phase report
-// declared — typically a sibling fleet-lane's leaked artifact — must FAIL the
-// ship closed, not silently commit it to main. Shadow (the default) must NOT
-// block. The workspace build-report declares only docs/declared.md; the fake
-// `git status --porcelain -uall` reports an undeclared untracked file.
 func TestReconcileManifest_EnforceBlocksCrossLaneLeak(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -50,8 +45,6 @@ func TestReconcileManifest_EnforceBlocksCrossLaneLeak(t *testing.T) {
 	}
 }
 
-// An enforce ship whose entire dirty set IS declared by the manifest must
-// pass cleanly (false-positive guard).
 func TestReconcileManifest_EnforceAllowsFullyDeclaredChange(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

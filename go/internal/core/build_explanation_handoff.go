@@ -22,8 +22,6 @@ type buildExplanationHandoff struct {
 	Error string
 }
 
-// projectBuildExplanation projects the reviewed host-owned snapshot, never the mutable workspace copy,
-// and makes every absence explicit.
 func projectBuildExplanation(projectRoot string, cs CycleState) buildExplanationHandoff {
 	if cs.ExplanationDocumentationVersion == 0 {
 		return buildExplanationHandoff{State: BuildExplanationLegacy}
@@ -64,12 +62,12 @@ func compactHandoffError(err error) string {
 
 func activateBuildExplanationContract(projectRoot string, cs CycleState) error {
 	binding := explanationBinding(projectRoot, cs)
-	// Activation precedes Triage continuation adoption. The final worktree/base
-	// are sealed separately immediately before Build dispatch.
 	binding.Worktree = ""
 	binding.BaseSHA = ""
 	return explanationdocs.Activate(binding)
 }
+
+var absPath = filepath.Abs
 
 type resumeCheckpointIdentity struct {
 	workspace string
@@ -81,18 +79,18 @@ func authoritativeResumeIdentity(projectRoot, statePath, declaredWorkspace strin
 	if statePath == "" {
 		return resumeCheckpointIdentity{workspace: declaredWorkspace}, nil
 	}
-	statePath, err := filepath.Abs(statePath)
+	statePath, err := absPath(statePath)
 	if err != nil {
 		return resumeCheckpointIdentity{}, fmt.Errorf("resume identity mismatch: resolve checkpoint path: %w", err)
 	}
-	runsRoot, err := filepath.Abs(filepath.Join(projectRoot, ".evolve", "runs"))
+	runsRoot, err := absPath(filepath.Join(projectRoot, ".evolve", "runs"))
 	if err != nil {
 		return resumeCheckpointIdentity{}, fmt.Errorf("resume identity mismatch: resolve runs root: %w", err)
 	}
 	workspace := filepath.Dir(statePath)
 	rel, relErr := filepath.Rel(runsRoot, workspace)
 	if relErr != nil || rel == ".." || filepath.IsAbs(rel) || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return resumeCheckpointIdentity{workspace: declaredWorkspace}, nil // host-global, non-fleet cycle-state.json
+		return resumeCheckpointIdentity{workspace: declaredWorkspace}, nil
 	}
 	if filepath.Base(statePath) != CycleStateFile || declaredWorkspace == "" || filepath.Clean(declaredWorkspace) != workspace {
 		return resumeCheckpointIdentity{}, fmt.Errorf("resume identity mismatch: fleet checkpoint path does not match declared workspace")
@@ -201,7 +199,6 @@ func explanationBinding(projectRoot string, cs CycleState) explanationdocs.Cycle
 	}
 }
 
-// NewExplanationLifecycleReviewer is the final production reviewer; it seals a Build output only after all earlier ones approve.
 func NewExplanationLifecycleReviewer() DeliverableReviewer {
 	return explanationLifecycleReviewer{}
 }

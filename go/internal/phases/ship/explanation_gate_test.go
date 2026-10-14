@@ -94,9 +94,6 @@ func TestNativeRun_EnforcesExplanationGateWithoutPhaseWrapper(t *testing.T) {
 	if err := explanationdocs.SealBuild(binding); err != nil {
 		t.Fatal(err)
 	}
-	// The workspace mirror is Builder-writable and deliberately lies about
-	// every activation field. Native Ship must use the explicit host identity
-	// carried by Options, not this file.
 	runState := `{"cycle_id":999,"run_id":"attacker","explanation_documentation_version":0}`
 	if err := os.WriteFile(filepath.Join(workspace, core.RunStateFile), []byte(runState), 0o644); err != nil {
 		t.Fatal(err)
@@ -132,7 +129,6 @@ func TestVerifyNativeExplanation_IncompleteTypedIdentityCannotHideActiveMarker(t
 	}
 	err := verifyNativeExplanation(context.Background(), &Options{
 		Class: ClassCycle, ProjectRoot: root, WorkspacePath: workspace,
-		// Deliberately omit CycleID, RunID, and contract version.
 	})
 	if err == nil || !strings.Contains(err.Error(), "host activation") {
 		t.Fatalf("incomplete typed identity hid active marker: %v", err)
@@ -148,7 +144,6 @@ func TestVerifyNativeExplanation_LegacyNoMarkerIgnoresSyntheticWorkspaceCycle(t 
 	}
 	err := verifyNativeExplanation(context.Background(), &Options{
 		Class: ClassCycle, ProjectRoot: root, WorkspacePath: workspace, CycleID: 42,
-		// Version zero and no host marker are the explicit legacy contract.
 	})
 	if err != nil {
 		t.Fatalf("legacy no-marker ship was rejected by synthetic workspace identity: %v", err)

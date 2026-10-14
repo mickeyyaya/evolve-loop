@@ -48,7 +48,6 @@ func TestRetireSupersededAuditArtifacts_RoundZeroHonorsPreStagedVerdict(t *testi
 func TestRetireSupersededAuditArtifacts_NeverClobbersAnExistingArchive(t *testing.T) {
 	t.Parallel()
 
-	// A dead attempt's partial file is dropped, never archived over the round's first retirement.
 	dir := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.round1.json"), "true-round1-evidence")
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.json"), "partial-from-dead-attempt")
@@ -66,8 +65,8 @@ func TestRetireSupersededAuditArtifacts_NeverClobbersAnExistingArchive(t *testin
 func TestRetireSupersededAuditArtifacts_MissingFilesAndWorkspaceAreQuiet(t *testing.T) {
 	t.Parallel()
 
-	retireSupersededAuditArtifacts("", 1, io.Discard)          // no workspace: state-only harnesses
-	retireSupersededAuditArtifacts(t.TempDir(), 1, io.Discard) // absent files: fresh shape
+	retireSupersededAuditArtifacts("", 1, io.Discard)
+	retireSupersededAuditArtifacts(t.TempDir(), 1, io.Discard)
 }
 
 func TestCompletedAuditRounds_CountsOnlyAuditOccurrences(t *testing.T) {
@@ -122,7 +121,6 @@ func TestAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
 
 const round1VerdictBody = `{"verdict":"PASS","red_count":0,"ship_eligible":false}`
 
-// verdictStagingAuditRunner pre-writes the verdict in round 1, like the live auditor, and checks its retirement in round 2.
 type verdictStagingAuditRunner struct {
 	t                   *testing.T
 	runs                int
@@ -165,7 +163,6 @@ func mustReadRoundArtifact(t *testing.T, path string) string {
 func TestResumedAuditRedispatch_RetiresPreviousRoundVerdicts(t *testing.T) {
 	t.Parallel()
 
-	// The resume surface takes its workspace from the persisted cycle-state; an empty one would no-op the retirement.
 	ws := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 1603, WorkspacePath: ws}}
 	led := &fakeLedger{}
@@ -193,13 +190,13 @@ func TestSupersedePreviousAuditRound_AdvancesThePersistedDispatchCounter(t *test
 	ws := t.TempDir()
 	cs := CycleState{WorkspacePath: ws}
 
-	supersedePreviousAuditRound(&cs) // first dispatch: nothing to retire
+	supersedePreviousAuditRound(&cs)
 	if cs.AuditDispatches != 1 {
 		t.Fatalf("AuditDispatches = %d after first dispatch, want 1", cs.AuditDispatches)
 	}
 	mustWriteRoundArtifact(t, filepath.Join(ws, "acs-verdict.json"), "attempt-1")
 
-	supersedePreviousAuditRound(&cs) // re-dispatch: attempt 1 is superseded
+	supersedePreviousAuditRound(&cs)
 	if cs.AuditDispatches != 2 {
 		t.Fatalf("AuditDispatches = %d after second dispatch, want 2", cs.AuditDispatches)
 	}
@@ -234,7 +231,7 @@ func TestResumedCrashedAudit_RetiresTheDeadAttemptsVerdict(t *testing.T) {
 		CycleID:         1603,
 		WorkspacePath:   ws,
 		Phase:           string(PhaseAudit),
-		AuditDispatches: 1, // the crashed round persisted its dispatch pre-flight
+		AuditDispatches: 1,
 	}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
@@ -254,7 +251,6 @@ func TestResumedCrashedAudit_RetiresTheDeadAttemptsVerdict(t *testing.T) {
 	}
 }
 
-// retirementProbeRunner records at its first dispatch whether acs-verdict.json was already retired.
 type retirementProbeRunner struct{ sawRetirement bool }
 
 func (r *retirementProbeRunner) Name() string { return string(PhaseAudit) }

@@ -9,14 +9,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// seamGit answers each git subcommand separately, because gitRec's one canned
-// response cannot drive the exit-code branches. A nil respond answers ("", 0).
 type seamGit struct {
 	respond func(args []string) (stdout string, exit int)
 	calls   [][]string
 }
 
-func (s *seamGit) run(_ context.Context, _ /*name*/, _ /*dir*/ string, args, _ []string, _ io.Reader, out, _ io.Writer) (int, error) {
+func (s *seamGit) run(_ context.Context, _, _ string, args, _ []string, _ io.Reader, out, _ io.Writer) (int, error) {
 	s.calls = append(s.calls, append([]string(nil), args...))
 	stdout, exit := "", 0
 	if s.respond != nil {
@@ -28,7 +26,6 @@ func (s *seamGit) run(_ context.Context, _ /*name*/, _ /*dir*/ string, args, _ [
 	return exit, nil
 }
 
-// useSeamGit swaps the package gitRunner seam for the scripted fake.
 func useSeamGit(t *testing.T, s *seamGit) {
 	t.Helper()
 	orig := gitRunner
@@ -36,7 +33,6 @@ func useSeamGit(t *testing.T, s *seamGit) {
 	t.Cleanup(func() { gitRunner = orig })
 }
 
-// calledWith reports whether any recorded call's args start with the prefix.
 func (s *seamGit) calledWith(prefix ...string) bool {
 	for _, c := range s.calls {
 		if has(c, prefix...) {
@@ -50,11 +46,11 @@ func TestCarryforwardCandidateLandable_CleanMergeIsLandable(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		switch {
 		case has(args, "merge-base", "--is-ancestor"):
-			return "", 1 // not an ancestor → not fast-forward-superseded
+			return "", 1
 		case has(args, "cherry"):
-			return "+ deadbeef\n", 0 // one commit not on base → not a patch-id duplicate
+			return "+ deadbeef\n", 0
 		case has(args, "merge-tree", "--write-tree"):
-			return "treesha\n", 0 // clean 3-way merge
+			return "treesha\n", 0
 		}
 		return "", 0
 	}}
@@ -80,7 +76,7 @@ func TestCarryforwardCandidateLandable_ConflictIsFalseNotError(t *testing.T) {
 		case has(args, "cherry"):
 			return "+ deadbeef\n", 0
 		case has(args, "merge-tree", "--write-tree"):
-			return "<<<<<<< conflict\n", 1 // exit 1 == genuine 3-way conflict
+			return "<<<<<<< conflict\n", 1
 		}
 		return "", 0
 	}}
@@ -98,7 +94,7 @@ func TestCarryforwardCandidateLandable_ConflictIsFalseNotError(t *testing.T) {
 func TestCarryforwardCandidateLandable_SupersededShortCircuitsBeforeMerge(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		if has(args, "merge-base", "--is-ancestor") {
-			return "", 0 // ref IS an ancestor of base → already landed
+			return "", 0
 		}
 		return "", 0
 	}}
@@ -119,7 +115,7 @@ func TestCarryforwardCandidateLandable_PatchIdDuplicateSuperseded(t *testing.T) 
 		case has(args, "merge-base", "--is-ancestor"):
 			return "", 1
 		case has(args, "cherry"):
-			return "- aaa111\n- bbb222\n", 0 // all equivalent on base, none new
+			return "- aaa111\n- bbb222\n", 0
 		}
 		return "", 0
 	}}
@@ -134,7 +130,6 @@ func TestCarryforwardCandidateLandable_PatchIdDuplicateSuperseded(t *testing.T) 
 	}
 }
 
-// has reports whether args begins with the given subcommand tokens.
 func has(args []string, prefix ...string) bool {
 	if len(args) < len(prefix) {
 		return false
@@ -151,17 +146,17 @@ func TestClassifyFleetRebaseCandidate_ThreeWayVerdicts(t *testing.T) {
 		{"clean-merge-not-superseded", func(args []string) (string, int) {
 			switch {
 			case has(args, "merge-base", "--is-ancestor"):
-				return "", 1 // not an ancestor
+				return "", 1
 			case has(args, "cherry"):
-				return "+ deadbeef\n", 0 // new commits exist
+				return "+ deadbeef\n", 0
 			case has(args, "merge-tree", "--write-tree"):
-				return "", 0 // clean 3-way merge
+				return "", 0
 			}
 			return "", 0
 		}, FleetRebaseClean},
 		{"ancestor-already-landed", func(args []string) (string, int) {
 			if has(args, "merge-base", "--is-ancestor") {
-				return "", 0 // ancestor → superseded
+				return "", 0
 			}
 			return "", 0
 		}, FleetRebaseAlreadyLanded},
@@ -172,7 +167,7 @@ func TestClassifyFleetRebaseCandidate_ThreeWayVerdicts(t *testing.T) {
 			case has(args, "cherry"):
 				return "+ deadbeef\n", 0
 			case has(args, "merge-tree", "--write-tree"):
-				return "", 1 // real 3-way conflict
+				return "", 1
 			}
 			return "", 0
 		}, FleetRebaseConflict},
@@ -185,7 +180,7 @@ func TestClassifyFleetRebaseCandidate_ThreeWayVerdicts(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ClassifyFleetRebaseCandidate: %v", err)
 			}
-			var want FleetRebaseVerdict = tc.want // named binding for the exported type
+			var want FleetRebaseVerdict = tc.want
 			if got != want {
 				t.Errorf("verdict=%d, want %d", got, want)
 			}
@@ -199,7 +194,7 @@ func TestClassifyFleetRebaseCandidate_GitInfraErrorIsError(t *testing.T) {
 			return "", 1
 		}
 		if has(args, "cherry") {
-			return "", 2 // git infrastructure failure
+			return "", 2
 		}
 		return "", 0
 	}}

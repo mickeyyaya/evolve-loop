@@ -58,7 +58,6 @@ func TestProtectedSurfaceFloorChecks_RefusesTheCycle1689Shape(t *testing.T) {
 	if len(got) != 1 || !strings.Contains(got[0], "go/internal/core/cyclerun.go") {
 		t.Fatalf("the committed protected change is named, alone: %v", got)
 	}
-	// No cycle base recorded: the floor falls back to the HEAD diff plus untracked files.
 	write("go/internal/core/cyclerun.go", "package core\n\n// an uncommitted shell edit\n")
 	got = ProtectedSurfaceFloorChecks(member)(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: wt})
 	if len(got) != 1 || !strings.Contains(got[0], "go/internal/core/cyclerun.go") {

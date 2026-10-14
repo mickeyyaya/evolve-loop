@@ -12,7 +12,6 @@ import (
 	"testing"
 )
 
-// memUpdater is an in-memory StateUpdater; the cross-process case runs against FilesystemStorage in adapters/storage.
 type memUpdater struct {
 	mu sync.Mutex
 	st State
@@ -45,7 +44,6 @@ func TestAllocateCycleNumber_SingleModeEquivalence(t *testing.T) {
 func TestAllocateCycleNumber_CrashBurnsNumber(t *testing.T) {
 	t.Parallel()
 
-	// A prior run allocated 6 and crashed before completing.
 	m := &memUpdater{st: State{LastCycleNumber: 5, LastAllocatedCycleNumber: 6}}
 	n, err := AllocateCycleNumber(context.Background(), m)
 	if err != nil {
@@ -166,7 +164,7 @@ func TestOrchestratorAllocateCycle_LeaseWhenSupported(t *testing.T) {
 	t.Parallel()
 
 	f := &fakeUpdaterStorage{}
-	f.mem.st = State{LastCycleNumber: 7, LastAllocatedCycleNumber: 8} // 8 crashed
+	f.mem.st = State{LastCycleNumber: 7, LastAllocatedCycleNumber: 8}
 	o := &Orchestrator{storage: f}
 	st := State{LastCycleNumber: 7}
 	n, err := o.allocateCycle(context.Background(), &st, "")

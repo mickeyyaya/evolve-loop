@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// fakeStagedFilesRun scripts `git diff --cached --name-only` to return a
-// fixed staged-file list; every other subcommand returns rc=0, empty stdout,
-// since stageBinaryGuard only ever shells that one query.
 type fakeStagedFilesRun struct {
 	staged []string
 }
@@ -41,7 +38,7 @@ func TestBinaryStagingGuard_RejectsLargeExecutableOutsideAllowlist(t *testing.T)
 	t.Parallel()
 	root := t.TempDir()
 	const rel = "go/acs/cycle536/evolve"
-	writeStagedFile(t, root, rel, 2*1024*1024, 0o755) // 2MB, executable bit set
+	writeStagedFile(t, root, rel, 2*1024*1024, 0o755)
 
 	opts := &Options{ProjectRoot: root, Runner: (&fakeStagedFilesRun{staged: []string{rel}}).run}
 

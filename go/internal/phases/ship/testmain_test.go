@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// shipControlFlowEnvVars lists the env vars ship's control flow reads via
-// os.Getenv; TestMain unsets them so the suite stays hermetic regardless of
-// the operator's shell, and a test needing one sets it via t.Setenv.
 var shipControlFlowEnvVars = []string{
 	"EVOLVE_SHIP_AUTO_CONFIRM",
 	"EVOLVE_SHIP_RELEASE_NOTES",

@@ -49,7 +49,6 @@ func TestVerifyAuditBinding_FailVerdict_IntegrityError(t *testing.T) {
 func TestVerifyAuditBinding_WarnWithStrictAudit_IntegrityError(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
-	// No git changes needed — just need a WARN verdict + matching HEAD/tree.
 	seedAudit(t, repo, "WARN")
 	writeStrictAuditPolicy(t, repo)
 	opts := auditOpts(t, repo)
@@ -140,7 +139,7 @@ func TestVerifyAuditBinding_LegacyEntryNoGitHead_IntegrityError(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), entry)
 
 	opts := auditOpts(t, repo)
-	opts.RunID = ""                                                     // Exercise legacy binding diagnostics without claiming a modern host run.
+	opts.RunID = ""
 	err := verifyAuditBinding(context.Background(), opts, &RunResult{}) //nolint:staticcheck
 	wantShipErr(t, err, core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, "predates v8.13.0")
 }
@@ -173,8 +172,6 @@ func TestCheckEGPSGate_RedCountWithSkipsPresent_Blocks(t *testing.T) {
 	_, err = checkEGPSGate(path, res)
 	wantShipErr(t, err, core.CodeEGPSRedCount, core.ShipClassPrecondition, "RED predicate")
 }
-
-// --- helpers ----------------------------------------------------------------
 
 func seedCustomAudit(t *testing.T, repo, body string, exitCode int) {
 	t.Helper()

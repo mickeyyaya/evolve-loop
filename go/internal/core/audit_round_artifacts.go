@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// supersedePreviousAuditRound retires the previous round's verdict artifacts and advances the dispatch counter.
-// Both dispatch surfaces call it before the pre-phase cycle-state write, so a crashed round's verdict is retired on resume.
 func supersedePreviousAuditRound(cs *CycleState) {
 	round := cs.AuditDispatches
 	if c := completedAuditRounds(cs.CompletedPhases); c > round {
@@ -21,7 +19,6 @@ func supersedePreviousAuditRound(cs *CycleState) {
 	cs.AuditDispatches = round + 1
 }
 
-// completedAuditRounds is the round index for checkpoints persisted before AuditDispatches existed.
 func completedAuditRounds(completed []string) int {
 	n := 0
 	for _, p := range completed {
@@ -32,8 +29,6 @@ func completedAuditRounds(completed []string) int {
 	return n
 }
 
-// retireSupersededAuditArtifacts archives the superseded round's verdict artifacts so the fresh audit regenerates its
-// verdict. When archiving fails it removes the stale file instead, because a surviving verdict would be replayed.
 func retireSupersededAuditArtifacts(workspace string, round int, warn io.Writer) {
 	if workspace == "" || round < 1 {
 		return
@@ -42,7 +37,6 @@ func retireSupersededAuditArtifacts(workspace string, round int, warn io.Writer)
 		src := filepath.Join(workspace, name)
 		dst := filepath.Join(workspace, phasecontract.RoundArchiveFilename(name, round))
 		if _, err := os.Stat(dst); err == nil {
-			// A counter rollback left the archive in place: never clobber the first retirement's evidence.
 			rmErr := os.Remove(src)
 			switch {
 			case rmErr == nil:

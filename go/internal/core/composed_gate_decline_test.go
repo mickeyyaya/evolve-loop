@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// realisticGateTail is a 20-line, >2 KB gate tail shaped like `make test` output. Its lines carry no
-// tabs: the Signal Center turns control characters into spaces, and the last line must compare verbatim.
 func realisticGateTail(gate string) (tail, lastLine string) {
 	lines := make([]string, 0, 20)
 	for i := 1; i < 20; i++ {
@@ -32,8 +30,6 @@ func declineEvents(events []signalcenter.Event) []signalcenter.Event {
 	return out
 }
 
-// assertDeclineStderrTagged fails when a composed-gate decline dumps any line of a gate's tail to stderr, or
-// writes a line about the gates that names neither the cycle nor the decline's event code.
 func assertDeclineStderrTagged(t *testing.T, stderr string, cycle int, tails ...string) {
 	t.Helper()
 	cycleTag := regexp.MustCompile(fmt.Sprintf(`\bcycle[ =:-]?%d\b`, cycle))

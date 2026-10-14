@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// consumedPathsAssignRe matches an assignment or append-assignment to
-// internalConsumedPaths. Reads and comparisons are not matched.
 var consumedPathsAssignRe = regexp.MustCompile(`\binternalConsumedPaths\s*=[^=]`)
 
 func TestInternalConsumedPaths_OnlyWrittenInConsumeGo(t *testing.T) {
@@ -21,9 +19,6 @@ func TestInternalConsumedPaths_OnlyWrittenInConsumeGo(t *testing.T) {
 		name := e.Name()
 		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") ||
 			name == "consume.go" || name == "native.go" {
-			// native.go holds the field declaration (a struct tag line, not an
-			// assignment) — the regex would not match it anyway; excluded for
-			// clarity alongside the sanctioned writer.
 			continue
 		}
 		body, err := os.ReadFile(name)

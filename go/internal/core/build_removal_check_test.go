@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// removalFixture writes report (unless empty) and creates each present path in the worktree.
 func removalFixture(t *testing.T, report string, present []string) ReviewInput {
 	t.Helper()
 	root := t.TempDir()
@@ -173,7 +172,6 @@ func TestRemovalClaimFailures_DeliverablesFallback(t *testing.T) {
 	}
 }
 
-// A non-git worktree derives zero changed packages, the early return a false claim could hide behind.
 func TestDefaultBuildFloorChecks_IncludesRemovalClaimCheck(t *testing.T) {
 	t.Parallel()
 

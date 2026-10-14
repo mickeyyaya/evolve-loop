@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec: a pathspec
-// the check-ignore probe is BLIND to (a directory-form rule) but git add
-// refuses must not kill the ship — git names it in the refusal, the stager
-// drops exactly that, retries once, and the legit path lands. Modeled
-// through the fake runner so the contract holds for any producer that puts a
-// probe-blind path into the pathspec.
 func TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec(t *testing.T) {
 	t.Parallel()
 	root := stageExplicitTree(t)
@@ -21,8 +15,6 @@ func TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec(t *testing.
 		"go/internal/phases/ship/gitops.go",
 		blind)
 	cap := &porcelainCapture{
-		// The blind path arrives via the changed set (mirrors the live shape:
-		// upstream filters passed it; only git's own add refused it).
 		porcelain:      " M go/internal/phases/ship/gitops.go\n?? " + blind + "\n",
 		refuseAddPaths: []string{blind},
 	}
@@ -62,10 +54,6 @@ func TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec(t *testing.
 	}
 }
 
-// A refusal whose named offenders match NOTHING in the pathspec (form
-// mismatch, foreign path) must fail honestly after exactly ONE add — the
-// progress guard, pinned so it cannot be simplified away into a doomed
-// identical retry.
 func TestShipDirect_CycleClass_ForeignOffenderMeansNoRetry(t *testing.T) {
 	t.Parallel()
 	root := stageExplicitTree(t)
