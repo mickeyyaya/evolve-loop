@@ -60,3 +60,5 @@
 ./internal/practicewatch 100
 ./internal/gotooltest 100
 ./internal/phases/runner/runnertest 100
+./internal/testkey 100
+./internal/testverdict 100
