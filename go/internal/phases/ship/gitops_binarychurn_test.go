@@ -22,13 +22,13 @@ func TestDiscardBinaryChurn_NeverRemovesRunningExecutable(t *testing.T) {
 	mustWrite(t, runningBin, "running-binary\n")
 	stubRunningExecutable(t, runningBin)
 
-	cap := &stagingCapture{} // every ls-files → exit 0, empty stdout = untracked
+	cap := &stagingCapture{}
 	var warn strings.Builder
 	opts := &Options{
 		ProjectRoot:    root,
 		Runner:         cap.runner(),
 		Stderr:         &warn,
-		ShipBinaryPath: "", // cmd_ship.go never sets it in production.
+		ShipBinaryPath: "",
 	}
 
 	if err := discardBinaryChurn(context.Background(), opts, root); err != nil {
@@ -57,7 +57,7 @@ func TestManualShipSuccess_LeavesUntrackedGoBinEvolvePresent(t *testing.T) {
 		CommitMessage:  "manual: operator commit",
 		Runner:         cap.runner(),
 		Stderr:         io.Discard,
-		ShipBinaryPath: "", // CLI parity: manual ships resolve via os.Executable
+		ShipBinaryPath: "",
 	}
 
 	if err := shipDirect(context.Background(), opts, &RunResult{}, "main"); err != nil {

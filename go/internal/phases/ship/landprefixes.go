@@ -5,8 +5,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// LandPrefixes lands lanes per cfg.Landing, resolving culprits through verify
-// and returning the landed and ejected lane IDs.
 func LandPrefixes(cfg policy.FleetConfig, lanes []fleet.LaneCandidate, verify func(laneIDs []string) bool) (landed, ejected []string) {
 	if len(lanes) == 0 {
 		return nil, nil

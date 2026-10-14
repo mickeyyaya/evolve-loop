@@ -20,18 +20,15 @@ func TestShipDirect_RefusesAnUnsatisfiedBinding(t *testing.T) {
 	runGit(t, repo, "push", "-q", "origin", "main")
 	seedAudit(t, repo, "PASS")
 
-	// An ordinary uncommitted change in the main tree: no worktree, so
-	// atomicShip would route here and shipDirect stages and commits it.
 	mustWrite(t, filepath.Join(repo, "direct-change.txt"), "direct-path change\n")
 
 	opts := &Options{
-		Class:         ClassCycle,
-		CommitMessage: "feat: direct-path change",
-		ProjectRoot:   repo,
-		Runner:        execRunner,
-		Stdout:        io.Discard,
-		Stderr:        io.Discard,
-		// The binding the auditor approved — deliberately not this tree.
+		Class:                     ClassCycle,
+		CommitMessage:             "feat: direct-path change",
+		ProjectRoot:               repo,
+		Runner:                    execRunner,
+		Stdout:                    io.Discard,
+		Stderr:                    io.Discard,
 		internalAuditBoundTreeSHA: "0000000000000000000000000000000000dead",
 	}
 	res := &RunResult{}
@@ -88,9 +85,6 @@ func TestShipDirect_LegitimateBoundShipIsNotBlocked(t *testing.T) {
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")
 
-	// The cycle's change must exist BEFORE the audit is sealed, because
-	// seedAudit stages the tree and binds exactly what it staged — the same
-	// order the live pipeline uses (Builder writes, then Audit binds).
 	mustWrite(t, filepath.Join(repo, "direct-change.txt"), "the cycle's change\n")
 	seedAudit(t, repo, "PASS")
 

@@ -5,8 +5,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// PlanLanding routes fleet lanes to a landing plan for the fleet main-push path,
-// per cfg.Landing.
 func PlanLanding(cfg policy.FleetConfig, lanes []fleet.LaneCandidate) [][]string {
 	if len(lanes) == 0 {
 		return nil

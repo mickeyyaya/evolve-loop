@@ -30,7 +30,6 @@ type carriedLane struct {
 	cycle                                      int
 }
 
-// rebasedLane is a lane whose audited change (tree0 on base0) is pended byte for byte on a peer's later base (tree1 on base1).
 func rebasedLane(t *testing.T) carriedLane {
 	t.Helper()
 	return rebasedLaneOn(t, makeRepo(t), 1715)
@@ -60,7 +59,6 @@ func writeCarry(t *testing.T, l carriedLane, ref, auditedTree string) {
 	writeCarryStating(t, l, ref, auditedTree, l.tree1)
 }
 
-// writeCarryStating writes a chained carry record that names auditedTree and treeState, whatever the truth.
 func writeCarryStating(t *testing.T, l carriedLane, ref, auditedTree, treeState string) {
 	t.Helper()
 	audited, composed, _, err := treedelta.Identical(context.Background(), testGit, l.repo, l.base0, l.tree0, l.base1, l.tree1)

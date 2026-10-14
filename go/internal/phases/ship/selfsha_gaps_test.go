@@ -12,8 +12,6 @@ import (
 	"testing"
 )
 
-// --- Run: input validation -------------------------------------------------
-
 func TestRun_MissingCommitMessage_Errors(t *testing.T) {
 	t.Parallel()
 	_, err := Run(context.Background(), Options{
@@ -48,14 +46,12 @@ func TestRun_EmptyProjectRoot_Errors(t *testing.T) {
 	}
 }
 
-// --- verifySelfSHA ---------------------------------------------------------
-
 func TestVerifySelfSHA_BinaryUnreadable_Errors(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	opts := &Options{
 		ProjectRoot:    dir,
-		ShipBinaryPath: dir, // a directory, not a file — sha256File will fail
+		ShipBinaryPath: dir,
 	}
 	mustWrite(t, filepath.Join(dir, ".evolve", "state.json"), `{}`)
 	res := &RunResult{}
@@ -73,7 +69,6 @@ func TestVerifySelfSHA_StateMapReadError_Errors(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary\n")
-	// Create a directory where state.json should be — readStateMap will fail.
 	stateDir := filepath.Join(dir, ".evolve", "state.json")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -98,10 +93,8 @@ func TestVerifySelfSHA_SchemaMigration_RepinsVersion(t *testing.T) {
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-content\n")
 	sha, _ := sha256File(bin)
-	// expectedSHA matches; expectedVer is absent; pluginVer is set.
 	mustWrite(t, filepath.Join(dir, ".evolve", "state.json"),
 		`{"expected_ship_sha":"`+sha+`"}`)
-	// Create plugin.json so pluginVer is non-empty.
 	mustWrite(t, filepath.Join(dir, ".claude-plugin", "plugin.json"),
 		`{"version":"12.5.0"}`)
 	opts := &Options{
@@ -127,7 +120,6 @@ func TestVerifySelfSHA_LegacySHAOnlyPin_Migrates(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-content-v2\n")
-	// Stale SHA in state.json (no expectedVer).
 	mustWrite(t, filepath.Join(dir, ".evolve", "state.json"),
 		`{"expected_ship_sha":"stale-sha"}`)
 	opts := &Options{
@@ -149,10 +141,8 @@ func TestVerifySelfSHA_PluginVersionChange_Repins(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-v3\n")
-	// State has old SHA + old version.
 	mustWrite(t, filepath.Join(dir, ".evolve", "state.json"),
 		`{"expected_ship_sha":"old-sha","expected_ship_version":"11.0.0"}`)
-	// New plugin version.
 	mustWrite(t, filepath.Join(dir, ".claude-plugin", "plugin.json"),
 		`{"version":"12.0.0"}`)
 	opts := &Options{
@@ -174,7 +164,6 @@ func TestVerifySelfSHA_SameVersionSHATamper_IntegrityError(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-v3\n")
-	// State: correct version, wrong SHA (tampering scenario).
 	mustWrite(t, filepath.Join(dir, ".evolve", "state.json"),
 		`{"expected_ship_sha":"expected-but-different","expected_ship_version":"12.0.0"}`)
 	mustWrite(t, filepath.Join(dir, ".claude-plugin", "plugin.json"),
@@ -195,13 +184,10 @@ func TestVerifySelfSHA_SameVersionSHATamper_IntegrityError(t *testing.T) {
 	}
 }
 
-// --- advanceLastCycleNumber: state.json read error -------------------------
-
 func TestAdvanceLastCycleNumber_StateReadError_ReturnsError(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":5}`)
-	// Create state.json as a directory — readStateMap will error.
 	stateDir := filepath.Join(root, ".evolve", "state.json")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -212,12 +198,6 @@ func TestAdvanceLastCycleNumber_StateReadError_ReturnsError(t *testing.T) {
 	}
 }
 
-// --- postShip: cycle class with inbox-promote error silently WARNs ----------
-
-// TestPostShip_ClassCycle_InboxPromoteErrorIsWarn: an unreadable (present but
-// corrupt/dir) triage-decision.json must NOT block ship — it logs a WARN and
-// still proceeds to the DONE log. Distinct from an ABSENT companion (which
-// logs INFO).
 func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -225,8 +205,6 @@ func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 	mustWrite(t, bin, "fake bin\n")
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":11}`)
 	mustWrite(t, filepath.Join(root, ".evolve", "state.json"), `{}`)
-	// A directory in place of the file forces ReadFile to error, simulating an
-	// unreadable companion.
 	triagePath := filepath.Join(root, ".evolve", "runs", "cycle-11", "triage-decision.json")
 	if err := os.MkdirAll(triagePath, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -250,12 +228,9 @@ func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 	}
 }
 
-// --- Run: cleanExitError path (no staged changes in manual class) ----------
-
 func TestRun_ManualClass_NoStagedChanges_ExitOK(t *testing.T) {
 	t.Parallel()
-	repo := makeRepo(t) // clean tree, no staged changes
-	// No seedAudit needed — manual class skips audit.
+	repo := makeRepo(t)
 	res, err := runShip(t, repo, Options{
 		Class:         ClassManual,
 		CommitMessage: "manual: clean exit",
@@ -269,8 +244,6 @@ func TestRun_ManualClass_NoStagedChanges_ExitOK(t *testing.T) {
 	}
 }
 
-// --- readActiveWorktree: corrupt cycle-state.json --------------------------
-
 func TestReadActiveWorktree_CorruptState_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -281,8 +254,6 @@ func TestReadActiveWorktree_CorruptState_ReturnsEmpty(t *testing.T) {
 		t.Errorf("corrupt state must return empty; got %q", got)
 	}
 }
-
-// --- captureGitOutput: runner error propagates ----------------------------
 
 func TestCaptureGitOutput_RunnerError_Propagates(t *testing.T) {
 	t.Parallel()
@@ -296,8 +267,6 @@ func TestCaptureGitOutput_RunnerError_Propagates(t *testing.T) {
 		t.Fatalf("runner error must propagate; got %v", err)
 	}
 }
-
-// --- writeShipBinding: cycle_id present, successful write -----------------
 
 func TestWriteShipBinding_ValidCycleID_WritesFile(t *testing.T) {
 	t.Parallel()

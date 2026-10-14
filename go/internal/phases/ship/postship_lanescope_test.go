@@ -25,7 +25,6 @@ func TestPromoteInbox_LaneScopeFallbackPromotesOnPass(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeDrainCycleState(t, root, 51)
-	// NO triage-decision.json — the continuation/lane shape.
 	writeDrainLaneScope(t, root, 51, "salvage-lane")
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeDrainInboxItem(t, inbox, "salvage-lane")
@@ -39,12 +38,9 @@ func TestPromoteInbox_LaneScopeFallbackPromotesOnPass(t *testing.T) {
 	}
 }
 
-// The landing gate must bind the FALLBACK entry path exactly as it binds the
-// triage path: an unlanded ship with a lane-scope committed set promotes
-// nothing and drains with the retry reason.
 func TestPromoteInbox_UnlandedShipSkipsLaneFallbackPromotion(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir() // not a git repo → isLanded fails closed (not landed)
+	root := t.TempDir()
 	writeDrainCycleState(t, root, 53)
 	writeDrainLaneScope(t, root, 53, "salvage-lane")
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -67,7 +63,7 @@ func TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeDrainCycleState(t, root, 52)
-	writeDrainTriageDecision(t, root, 52) // present, zero committed ids
+	writeDrainTriageDecision(t, root, 52)
 	writeDrainLaneScope(t, root, 52, "declined-item")
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeDrainInboxItem(t, inbox, "declined-item")

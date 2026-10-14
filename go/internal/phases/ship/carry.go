@@ -92,7 +92,6 @@ func reProveCarry(ctx context.Context, opts *Options, held heldCarry) string {
 	return ""
 }
 
-// gitAt returns git's real exit code, as treedelta's contract requires.
 func gitAt(opts *Options) treedelta.Git {
 	return func(ctx context.Context, dir string, args ...string) (string, int, error) {
 		var out bytes.Buffer
@@ -101,7 +100,6 @@ func gitAt(opts *Options) treedelta.Git {
 	}
 }
 
-// isAncestorAt is the ancestry question asked in dir, where exit 1 is the answer "no", not a fault.
 func isAncestorAt(ctx context.Context, opts *Options, dir, anc, desc string) bool {
 	exit, err := opts.run(ctx, "git", []string{"-C", dir, "merge-base", "--is-ancestor", anc, desc}, io.Discard, io.Discard)
 	return err == nil && exit == 0

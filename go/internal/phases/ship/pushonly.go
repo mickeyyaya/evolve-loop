@@ -69,7 +69,6 @@ func journalHasSHA(projectRoot, sha string) bool {
 	return found
 }
 
-// runPushOnly never commits, stages, or releases — push is its only mutation.
 func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 	if exit, err := opts.run(ctx, "git", []string{"diff", "--cached", "--quiet"}, opts.Stdout, opts.Stderr); err != nil || exit != 0 {
 		return fmt.Errorf("ship --push-only: staged changes present — push-only completes an already-committed strand; run a normal `evolve ship` for new work")
@@ -79,7 +78,6 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 		return fmt.Errorf("ship --push-only: resolve branch: %w", err)
 	}
 	branch := strings.TrimSpace(branchOut)
-	// Best-effort refresh: an offline push still fails loudly below.
 	_, _ = opts.run(ctx, "git", []string{"fetch", "origin", branch}, opts.Stdout, opts.Stderr)
 	aheadOut, err := captureGitOutput(ctx, opts, "rev-list", "origin/"+branch+"..HEAD")
 	if err != nil {
@@ -101,7 +99,6 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 		return fmt.Errorf("ship --push-only: REFUSED — %d ahead commit(s) lack ship provenance (not in %s, not a sync-main reconcile merge): [%s]. Push-only is a recovery for attested strands, never a guard bypass; land un-provenanced work through a normal `evolve ship`",
 			len(unprovenanced), shipJournalName, strings.Join(unprovenanced, ", "))
 	}
-	// Same push + reject-repair policy as an ordinary ship (gitops_landing.go).
 	if err := pushWithRepair(ctx, opts, res, landing.PushRequest{Branch: branch, Site: landing.SitePushOnly}); err != nil {
 		return err
 	}
@@ -115,7 +112,7 @@ func isSyncMainMerge(ctx context.Context, opts *Options, sha, branch string) boo
 		return false
 	}
 	fields := strings.Fields(out)
-	if len(fields) < 3 { // [self parent1 parent2 ...] — a merge has ≥2 parents
+	if len(fields) < 3 {
 		return false
 	}
 	for _, parent := range fields[1:] {

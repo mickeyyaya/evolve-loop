@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// --- checkEGPSGate -------------------------------------------------------
-
 func TestCheckEGPSGate_MissingFile(t *testing.T) {
 	t.Parallel()
 	res := &RunResult{}
@@ -67,8 +65,6 @@ func TestCheckEGPSGate_MalformedJSON(t *testing.T) {
 	}
 }
 
-// TestCheckEGPSGate_ReadError points the gate at a directory: os.ReadFile of a
-// dir errors but is not os.ErrNotExist, exercising the non-ErrNotExist branch.
 func TestCheckEGPSGate_ReadError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -83,8 +79,6 @@ func TestCheckEGPSGate_ReadError(t *testing.T) {
 	}
 }
 
-// --- verifyTrivial -------------------------------------------------------
-
 func TestVerifyTrivial_RejectsNonTrivialEstimate(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -94,14 +88,12 @@ func TestVerifyTrivial_RejectsNonTrivialEstimate(t *testing.T) {
 	wantShipErr(t, err, core.CodeTrivialNotTrivial, core.ShipClassConfig, "trivial")
 }
 
-// TestVerifyTrivial_RejectsPipelineCriticalPath drives the critical path via
-// the untracked file list, to avoid the scriptedRunner "git diff" key collision.
 func TestVerifyTrivial_RejectsPipelineCriticalPath(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeCycleState(t, root, "trivial")
 	r := &scriptedRunner{}
-	r.runner() // init map
+	r.runner()
 	r.scripts["git ls-files"] = scriptResult(t, "skills/loop/SKILL.md\n", 0)
 	opts := &Options{ProjectRoot: root, Runner: r.runner()}
 	err := verifyTrivial(context.Background(), opts, &RunResult{})
@@ -114,7 +106,6 @@ func TestVerifyTrivial_AcceptsCleanTrivialCycle(t *testing.T) {
 	writeCycleState(t, root, "trivial")
 	r := &scriptedRunner{}
 	r.runner()
-	// All three file-list queries return only a non-critical file.
 	r.scripts["git diff"] = scriptResult(t, "README.md\n", 0)
 	r.scripts["git ls-files"] = scriptResult(t, "", 0)
 	res := &RunResult{}
@@ -137,13 +128,10 @@ func devNullFile(t *testing.T) *os.File {
 	return f
 }
 
-// --- verifyManualConfirm -------------------------------------------------
-
 func TestVerifyManualConfirm_NothingStaged(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{}
 	r.runner()
-	// git add -A → exit 0 (default); git diff --cached --quiet → exit 0 = nothing staged.
 	r.scripts["git diff"] = scriptResult(t, "", 0)
 	opts := &Options{ProjectRoot: t.TempDir(), Runner: r.runner(), Stderr: devNullFile(t)}
 	err := verifyManualConfirm(context.Background(), opts, &RunResult{})
@@ -156,7 +144,6 @@ func TestVerifyManualConfirm_AutoConfirm(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{}
 	r.runner()
-	// git diff --cached --quiet → exit 1 = changes staged ⇒ proceed.
 	r.scripts["git diff"] = scriptResult(t, "", 1)
 	res := &RunResult{}
 	opts := &Options{
@@ -172,8 +159,6 @@ func TestVerifyManualConfirm_AutoConfirm(t *testing.T) {
 		t.Errorf("provenance=%q want auto-confirmed", res.Provenance)
 	}
 }
-
-// --- helpers -------------------------------------------------------------
 
 func writeACSVerdict(t *testing.T, doc any) string {
 	t.Helper()
@@ -201,7 +186,6 @@ func writeCycleState(t *testing.T, root, estimate string) {
 	}
 }
 
-// scriptResult builds the anonymous-struct value scriptedRunner.scripts expects.
 func scriptResult(t *testing.T, stdout string, exit int) struct {
 	stdout string
 	stderr string

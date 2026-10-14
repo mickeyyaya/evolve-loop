@@ -11,8 +11,6 @@ import (
 func TestShipDirect_CycleClass_DropsGitignoredDeclaredPaths(t *testing.T) {
 	t.Parallel()
 	root := stageExplicitTree(t)
-	// The eval file exists in the tree (isFile passes — that is how it slips
-	// into the pathspec).
 	evalRel := ".evolve/evals/persona-budget-inlane-gate.md"
 	mustWrite(t, filepath.Join(root, filepath.FromSlash(evalRel)), "# eval\n")
 	ws := writeWorkspaceReports(t,
@@ -39,8 +37,6 @@ func TestShipDirect_CycleClass_DropsGitignoredDeclaredPaths(t *testing.T) {
 	if !slices.Contains(pathspec, "go/internal/phases/ship/gitops.go") {
 		t.Errorf("legit declared path missing from pathspec %v", pathspec)
 	}
-	// The drop must be LOUD — an operator reading the ship log sees what was
-	// excluded and why, never a silent shrink of the staged set.
 	var logged bool
 	for _, l := range res.Logs {
 		if strings.Contains(l, "gitignored") && strings.Contains(l, evalRel) {
@@ -52,9 +48,6 @@ func TestShipDirect_CycleClass_DropsGitignoredDeclaredPaths(t *testing.T) {
 	}
 }
 
-// TestShipDirect_CheckIgnoreProbeFailure_FailsOpen: a broken probe (rc>1)
-// must not block staging — the full declared set flows through unchanged,
-// and the probe failure is logged.
 func TestShipDirect_CheckIgnoreProbeFailure_FailsOpen(t *testing.T) {
 	t.Parallel()
 	root := stageExplicitTree(t)

@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// Git identity is pinned for deterministic commits.
 func initPushOnlyRepo(t *testing.T) (string, func(dir string, args ...string) string) {
 	t.Helper()
 	remote := gittest.Bare(t).Dir
@@ -131,8 +130,6 @@ func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 	}
 }
 
-// A merge of two LOCAL unprovenanced branches has no origin-side parent; a
-// degenerate isSyncMainMerge accepting any merge would push it.
 func TestPushOnly_LocalOnlyMergeRefuses(t *testing.T) {
 	t.Parallel()
 	root, run := initPushOnlyRepo(t)

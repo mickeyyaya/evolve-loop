@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// colliderFixture is shipWorktreeFixture plus one incoming worktree file and
-// a main-side untracked collider at the same path with the given content.
 func colliderFixture(t *testing.T, cycleBranch, path, wtContent, mainContent string) (repo, wt string) {
 	t.Helper()
 	repo = makeRepo(t)

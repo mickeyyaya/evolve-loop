@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// manifestLeakOpts builds a reconcileManifest fixture whose declared manifest
-// covers docs/declared.md while `git status --porcelain -uall` reports an
-// UNDECLARED untracked file — the cross-lane leak shape.
 func manifestLeakOpts(t *testing.T) *Options {
 	t.Helper()
 	ws := t.TempDir()
@@ -27,10 +24,6 @@ func manifestLeakOpts(t *testing.T) *Options {
 	return &Options{WorkspacePath: ws, ProjectRoot: t.TempDir(), Runner: runner, Stdout: io.Discard, Stderr: io.Discard}
 }
 
-// The enforce-mode block must surface the DEDICATED core.CodeManifestGate,
-// never the generic CodeGitStageFailed a real failing `git add` also emits.
-// Ledger/debugger triage keys off Code, so reuse would make an integrity
-// block indistinguishable from a transient git failure.
 func TestReconcileManifest_EnforceCarriesManifestGateCode(t *testing.T) {
 	t.Parallel()
 	opts := manifestLeakOpts(t)
@@ -61,10 +54,6 @@ func TestReconcileManifest_EnforceCarriesManifestGateCode(t *testing.T) {
 	}
 }
 
-// Introducing the dedicated code must not disturb the SHADOW path, which
-// still returns nil and only logs; shadow returning a MANIFEST_GATE error
-// would block every cycle today, since the gate is permanently shadow in
-// production.
 func TestReconcileManifest_ShadowUnaffectedByCodeChange(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []string{"", "shadow"} {

@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// laneAuditedInWorktree seeds a PASS audit for a change staged in a linked worktree, the way a fleet
-// lane reaches ship, and returns the plane repo and the worktree.
 func laneAuditedInWorktree(t *testing.T) (string, string) {
 	t.Helper()
 	repo := makeRepo(t)

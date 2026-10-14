@@ -14,9 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// scriptedRunner returns a CmdRunner that responds to (binary, firstArg)
-// pairs with scripted stdout + exit code. Unknown pairs return exit 0.
-// Records the call sequence so tests can assert order.
 type scriptedRunner struct {
 	scripts map[string]struct {
 		stdout string
@@ -38,9 +35,6 @@ func (s *scriptedRunner) runner() CmdRunner {
 	}
 	return func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-		// Scan past leading flags (-C path, -c foo=bar) to find the
-		// git subcommand, so test keys read as "git symbolic-ref" rather
-		// than "git -C".
 		key := name
 		for i := 0; i < len(args); i++ {
 			a := args[i]
@@ -48,7 +42,6 @@ func (s *scriptedRunner) runner() CmdRunner {
 				key = name + " " + a
 				break
 			}
-			// Skip the next arg if this flag takes a value.
 			if a == "-C" || a == "-c" {
 				i++
 			}
@@ -108,7 +101,6 @@ func TestAtomicShip_TypedWorktreeRejectsTamperedRunMirror(t *testing.T) {
 	}
 }
 
-// TestTryGitOneShot_Success — exit 0 + stdout returns trimmed.
 func TestTryGitOneShot_Success(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
@@ -170,8 +162,6 @@ func TestTryGitOneShot_RunnerError_ReturnsEmpty(t *testing.T) {
 	}
 }
 
-// TestWriteDryRunJournal_NoOpWhenDryRunFalse — opts.DryRun=false is a
-// no-op; no file written, no DryRunPath set.
 func TestWriteDryRunJournal_NoOpWhenDryRunFalse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -182,7 +172,6 @@ func TestWriteDryRunJournal_NoOpWhenDryRunFalse(t *testing.T) {
 	if res.DryRunPath != "" {
 		t.Errorf("DryRunPath=%q, want empty", res.DryRunPath)
 	}
-	// No journal directory should exist.
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "release-journal")); err == nil {
 		t.Errorf("journal dir created despite DryRun=false")
 	}
@@ -245,8 +234,6 @@ func TestWriteDryRunJournal_HappyPath_WritesJSON(t *testing.T) {
 	}
 }
 
-// TestWriteDryRunJournal_MissingGitDefaults_PlaceholderBranchSHA —
-// when git probes return empty, branch/headSHA default to "unknown".
 func TestWriteDryRunJournal_MissingGitDefaults_PlaceholderBranchSHA(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -256,13 +243,12 @@ func TestWriteDryRunJournal_MissingGitDefaults_PlaceholderBranchSHA(t *testing.T
 		exit   int
 		err    error
 	}{}}
-	// Don't script any git command; runner returns exit 0 with empty stdout.
 	r.scripts["git rev-parse"] = struct {
 		stdout string
 		stderr string
 		exit   int
 		err    error
-	}{stdout: "", exit: 1} // simulate failure
+	}{stdout: "", exit: 1}
 	opts := &Options{DryRun: true, ProjectRoot: root, Class: Class("cycle"), Runner: r.runner()}
 	res := &RunResult{}
 	writeDryRunJournal(context.Background(), opts, res, "test")
@@ -291,8 +277,6 @@ func TestWriteDryRunJournal_LogAppended(t *testing.T) {
 	}
 }
 
-// TestCaptureGitOutputAtDir_Success — happy path: subprocess succeeds,
-// returns trimmed stdout.
 func TestCaptureGitOutputAtDir_Success(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
@@ -317,8 +301,6 @@ func TestCaptureGitOutputAtDir_Success(t *testing.T) {
 	}
 }
 
-// TestCaptureGitOutputAtDir_ExitGreaterThan1_ReturnsError — captureGitOutput
-// only errors on exit > 1 (rc=1 means "differences exist" for git diff).
 func TestCaptureGitOutputAtDir_ExitGreaterThan1_ReturnsError(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
@@ -340,8 +322,6 @@ func TestCaptureGitOutputAtDir_ExitGreaterThan1_ReturnsError(t *testing.T) {
 	}
 }
 
-// TestCaptureGitOutputAtDir_Exit1_NotError — rc=1 is the "differences
-// exist" signal from git diff; the function treats it as success.
 func TestCaptureGitOutputAtDir_Exit1_NotError(t *testing.T) {
 	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
@@ -388,7 +368,7 @@ func TestMaybeCreateRelease_MissingPluginJson_LogsAndContinues(t *testing.T) {
 	opts := &Options{
 		Class:       Class("release"),
 		ProjectRoot: root,
-		PluginRoot:  root, // no plugin.json present
+		PluginRoot:  root,
 		Runner:      r.runner(),
 	}
 	res := &RunResult{}

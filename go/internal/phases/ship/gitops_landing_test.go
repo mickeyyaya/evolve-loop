@@ -20,10 +20,6 @@ func recordingCenter() (*signalcenter.Center, *[]signalcenter.Event) {
 	return c, got
 }
 
-// `landing.New(` is spelled in exactly ONE non-test file of the module (the
-// seam); the leaf itself spells `New(`. moduleRoot is three levels up — a
-// copy at the wrong depth would scan the wrong root and pass vacuously, so
-// the count of scanned files is asserted too.
 func TestLanding_OneConstructionSite(t *testing.T) {
 	t.Parallel()
 	const onlySite = "internal/phases/ship/gitops_landing.go"
@@ -36,9 +32,6 @@ func TestLanding_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioning lists the module's non-test Go files outside the
-// landing leaf and the one allowed site whose source contains needle, and
-// how many files it scanned.
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) ([]string, int) {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -104,12 +97,6 @@ func TestWorktreeShipLand_BinaryResetFailureIsTheLandingCodeNotStderr(t *testing
 	}
 }
 
-// pushWithRepair projects the host's once-guard: after a declined repair the
-// ledger, res.RepairAttempted and res.RepairOutcome are written even though
-// an error is returned, res.CommitSHA is untouched; a second rejection in
-// the SAME Options returns the original error with zero probes (the stage
-// re-run would otherwise repair twice); on success res.CommitSHA is the
-// landed head; PhaseResponse.Signals through addRepairSignals are unchanged.
 func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
 	t.Parallel()
 	opts, _, _ := pinOptions(t, ClassCycle)
@@ -174,9 +161,6 @@ func TestShipFromWorktreeGreen_StreamIsByteIdenticalApartFromTheDeclaredCodes(t 
 	}
 }
 
-// shipOptions copies the Phase's Center into Options.Signals and
-// (*Phase).signalsWired reports it (a Config field the translation forgets
-// would be silently never wired).
 func TestShipOptions_ThreadsSignals(t *testing.T) {
 	t.Parallel()
 	c, _ := recordingCenter()
@@ -193,9 +177,6 @@ func TestShipOptions_ThreadsSignals(t *testing.T) {
 	}
 }
 
-// The run-workspace layout is spelled once: no non-test ship source spells
-// "ship-binding.json" (dossier.ShipBindingFile is the spelling) and neither
-// gitops.go nor native.go spells "cycle-%d" (core.RunWorkspacePath).
 func TestShipBindingLayout_IsSpelledOnce(t *testing.T) {
 	t.Parallel()
 	entries, err := os.ReadDir(".")

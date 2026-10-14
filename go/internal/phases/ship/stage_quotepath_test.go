@@ -6,19 +6,13 @@ import (
 	"testing"
 )
 
-// TestStageExplicitPaths_QuotePathDisabledOnGitReads is the behavioural
-// (non-source-grep) proof: drive a real cycle ship through shipDirect and
-// read the argv git was actually invoked with. Both classification reads
-// must carry `-c core.quotePath=false` BEFORE the subcommand (git config
-// args are only legal there), which is the zero-parsing fix for the common
-// non-ASCII case.
 func TestStageExplicitPaths_QuotePathDisabledOnGitReads(t *testing.T) {
 	t.Parallel()
 	root := stageExplicitTree(t)
 	ws := writeWorkspaceReports(t, "go/internal/phases/ship/gitops.go")
 	cap := &porcelainCapture{
 		porcelain: " M go/internal/phases/ship/gitops.go\n",
-		ignored:   []string{"go/internal/phases/ship/gitops.go"}, // force the probe to run
+		ignored:   []string{"go/internal/phases/ship/gitops.go"},
 	}
 	opts := stageExplicitOpts(root, ws, ClassCycle, cap.runner())
 
@@ -45,7 +39,6 @@ func TestStageExplicitPaths_QuotePathDisabledOnGitReads(t *testing.T) {
 	}
 }
 
-// configArgIndex returns the index of the `-c` whose value is want, or -1.
 func configArgIndex(args []string, want string) int {
 	for i := 0; i+1 < len(args); i++ {
 		if args[i] == "-c" && args[i+1] == want {

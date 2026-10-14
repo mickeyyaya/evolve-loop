@@ -45,9 +45,6 @@ func TestName(t *testing.T) {
 	}
 }
 
-// TestExecRunner_Success drives the production CmdRunner against
-// /bin/true (exit 0). Locked to POSIX paths; tests skip on Windows
-// (we don't ship Windows per parent plan §7).
 func TestExecRunner_Success(t *testing.T) {
 	t.Parallel()
 	if _, err := os.Stat("/bin/true"); err != nil {

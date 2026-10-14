@@ -22,14 +22,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
-// auditEntry is the auditor ledger row ship binds to.
 type auditEntry = auditledger.Entry
 
-// verifyAuditBinding implements the full audit-binding contract.
-// res.Provenance is set on success; integrity errors return *IntegrityError.
-//
-// Sets opts.internalAuditBoundTreeSHA from the ledger's worktree_tree_sha for
-// the gitops layer's pre-commit and post-push tree checks.
 func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) error {
 	ledgerPath := filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl")
 	entry, err := findLatestAudit(ledgerPath, opts.RunID)
@@ -76,8 +70,6 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		return shipErr(core.CodeAuditBindingNoLedger, core.ShipClassPrecondition, core.StageVerifyClass,
 			"Auditor ledger entry predates v8.13.0 cycle-binding (no git_head/tree_state_sha) — re-run audit")
 	}
-	// The report SHA above binds the host receipt; the mutable verdict must also
-	// match its exact execution identity and bytes before it can authorize ship.
 	if err := verifyPredicateReceipt(opts, entry, string(body), res); err != nil {
 		return err
 	}
@@ -92,8 +84,6 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	}
 	currentHEAD = strings.TrimSpace(currentHEAD)
 	if currentHEAD != entry.GitHEAD {
-		// The composition entry binds the composed tree already, so the
-		// base-tree check below is superseded when it carries forward.
 		carried, cfErr := tryTrivialRebaseCarryForward(ctx, opts, res, ledgerPath, entry, currentHEAD)
 		if cfErr != nil {
 			return cfErr
@@ -174,9 +164,6 @@ func bindResumedAudit(opts *Options, entry *auditEntry) {
 	opts.internalAuditArtifactSHA = entry.ArtifactSHA256
 }
 
-// findLatestAudit returns the auditor ledger entry ship binds to: the newest
-// auditor row of opts.RunID's run, or of any run when runID is empty. A miss is
-// an integrity stop, never a fallback to another run's audit.
 func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 	entry, err := auditledger.LatestAuditorEntry(ledgerPath, runID)
 	switch {
@@ -195,12 +182,8 @@ func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 	}
 }
 
-// parseVerdicts recognizes two verdict shapes in the audit report: an inline
-// `Verdict: <X>` line, or a heading-style `# Verdict` followed by `**X**`
-// within 5 lines.
 func parseVerdicts(body string, stage config.Stage) (pass, warn, fail bool) {
 	if stage >= config.StageEnforce {
-		// See ADR-0050.
 		if s, ok := phasecontract.ParseVerdictSentinelFull(body); ok && s.Phase == string(core.PhaseAudit) {
 			switch s.Verdict {
 			case core.VerdictPASS:
@@ -219,23 +202,12 @@ func parseVerdicts(body string, stage config.Stage) (pass, warn, fail bool) {
 	return
 }
 
-// inlineVerdictRe matches lines like:
-//
-//	Verdict: PASS
-//	Verdict:  **PASS**
-//	**Verdict: PASS**
-//
-// The pattern is case-insensitive on the verdict word and allows
-// surrounding asterisks.
 var inlineVerdictRe = map[string]*regexp.Regexp{
 	"PASS": regexp.MustCompile(`(?i)Verdict\s*:\s*\*?\*?\s*PASS(\s|$|\*)`),
 	"WARN": regexp.MustCompile(`(?i)Verdict\s*:\s*\*?\*?\s*WARN(\s|$|\*)`),
 	"FAIL": regexp.MustCompile(`(?i)Verdict\s*:\s*\*?\*?\s*FAIL(\s|$|\*)`),
 }
 
-// headingVerdictRe matches the `## Verdict` heading followed, within 5
-// lines, by either `**X**` or a bare verdict line (exactly `X`; a sentence
-// containing the word must not match).
 var headingVerdictRe = map[string]*regexp.Regexp{
 	"PASS": regexp.MustCompile(`(?m)^#+[ \t]+Verdict[ \t]*\n(?:.*\n){0,4}(?:.*\*\*PASS\*\*|[ \t]*PASS[ \t]*$)`),
 	"WARN": regexp.MustCompile(`(?m)^#+[ \t]+Verdict[ \t]*\n(?:.*\n){0,4}(?:.*\*\*WARN\*\*|[ \t]*WARN[ \t]*$)`),
@@ -249,8 +221,6 @@ func hasVerdict(body, verdict string) bool {
 	return headingVerdictRe[verdict].MatchString(body)
 }
 
-// readAuditArtifact checks the exact bytes consumed below, avoiding a second
-// read between SHA verification and interpretation.
 func readAuditArtifact(entry *auditEntry) ([]byte, error) {
 	switch entry.ExitCode {
 	case 0, 1:
@@ -299,7 +269,6 @@ func verifyPostPushPredicateEvidence(ctx context.Context, opts *Options, res *Ru
 	return verifyPredicateReceipt(opts, entry, string(body), res)
 }
 
-// checkEGPSGate refuses incomplete or internally contradictory evidence.
 func checkEGPSGate(path string, res *RunResult) ([]byte, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -345,14 +314,11 @@ func verifyPredicateReceipt(opts *Options, entry *auditEntry, report string, res
 		"ship predicate evidence invalid; re-run Audit: "+err.Error(), "path", path)
 }
 
-// computeTreeStateSHA computes sha256(git diff HEAD): a tracked-file
-// mutation after audit invalidates the ship.
 func computeTreeStateSHA(ctx context.Context, opts *Options) (string, error) {
 	sum, err := treestate.SHA(ctx, opts.runner(), opts.ProjectRoot, os.Environ())
 	if err != nil {
 		var re *treestate.RunError
 		if errors.As(err, &re) && re.Err == nil {
-			// Fatal git exit (>1) — rc=1 (differences) is handled inside SHA.
 			return "", shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
 				fmt.Sprintf("ship: git diff HEAD exit %d", re.ExitCode), "git_rc", fmt.Sprintf("%d", re.ExitCode))
 		}
@@ -363,9 +329,6 @@ func computeTreeStateSHA(ctx context.Context, opts *Options) (string, error) {
 	return sum, nil
 }
 
-// underlyingErr returns the runner error carried by a treestate.RunError, or
-// the error itself otherwise, so the "git_err" field stays the raw runner
-// message.
 func underlyingErr(err error) error {
 	var re *treestate.RunError
 	if errors.As(err, &re) && re.Err != nil {

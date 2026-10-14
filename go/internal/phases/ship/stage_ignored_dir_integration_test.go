@@ -16,7 +16,6 @@ func TestShipFromWorktree_DropsGitignoredDirectoryPathspec(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
 	runGit(t, wt, "reset", "HEAD", "wt-change.txt")
 
-	// The live shape: dir-form rule, content inside, the DIRECTORY declared.
 	mustWrite(t, filepath.Join(wt, ".gitignore"), ".evolve/inbox/processed/\n")
 	runGit(t, wt, "add", ".gitignore")
 	procRel := ".evolve/inbox/processed"
@@ -50,10 +49,4 @@ func TestShipFromWorktree_DropsGitignoredDirectoryPathspec(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(wt, filepath.FromSlash(procRel), "item.json")); err != nil {
 		t.Errorf("runtime inbox state must survive being excluded from staging: %v", err)
 	}
-	// NOTE: in THIS fixture shape the manifest∩changed intersection already
-	// excludes the ignored dir before add (ignored content never reaches
-	// porcelain), so no refusal fires — the retry seam's loud-log contract is
-	// pinned by the unit half (TestShipDirect_CycleClass_Retries…). This
-	// real-git test pins the OUTCOME: the scenario ships, the runtime state
-	// survives, nothing ignored lands.
 }

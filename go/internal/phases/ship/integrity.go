@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
-// See ADR-0064.
 func verifyNoControlPlaneEdits(ctx context.Context, opts *Options, res *RunResult) error {
 	paths, err := cycleChangedPaths(ctx, opts)
 	if err != nil {
@@ -41,7 +40,5 @@ func cycleChangedPaths(ctx context.Context, opts *Options) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	// `git diff HEAD` (tracked) and `ls-files --others` (untracked) are disjoint by
-	// definition, so a plain concat is the complete set — no dedup needed.
 	return append(splitNonEmpty(tracked), splitNonEmpty(untracked)...), nil
 }

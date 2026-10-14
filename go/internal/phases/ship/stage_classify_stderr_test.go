@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 )
 
-// classifyStageRunner scripts the three git calls stageExplicitPaths makes:
-// `status --porcelain` (the changed set), `check-ignore` (rc=1 — nothing
-// ignored, so the pathspec survives to the add), and `add`, which fails with
-// the fixture's exit code, stderr, and Go-level error.
 func classifyStageRunner(porcelain, addStderr string, addExit int, addErr error) CmdRunner {
 	return func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
@@ -34,7 +30,6 @@ func classifyStageRunner(porcelain, addStderr string, addExit int, addErr error)
 			_, _ = io.WriteString(stdout, porcelain)
 			return 0, nil
 		case "check-ignore":
-			// rc=1 = no path is ignored (a success for captureGitOutput).
 			return 1, nil
 		case "add":
 			_, _ = io.WriteString(stderr, addStderr)
@@ -44,16 +39,11 @@ func classifyStageRunner(porcelain, addStderr string, addExit int, addErr error)
 	}
 }
 
-// stageWithGitFailure drives the PRODUCTION seam (stageExplicitPaths, the sole
-// caller of the classifier) against a scripted failing `git add` and returns the
-// typed ShipError it must produce. Driving the real caller — rather than calling
-// a classifier helper directly — is what keeps this a reachability proof: a
-// classifier that exists but is never consulted leaves this RED.
 func stageWithGitFailure(t *testing.T, porcelain, addStderr string, addExit int, addErr error) *core.ShipError {
 	t.Helper()
 	opts := &Options{
 		ProjectRoot:   t.TempDir(),
-		WorkspacePath: writeWorkspaceReports(t, shipmanifest.ChangedPaths(porcelain)...), // fresh workspace ⇒ this is always strike ONE
+		WorkspacePath: writeWorkspaceReports(t, shipmanifest.ChangedPaths(porcelain)...),
 		Runner:        classifyStageRunner(porcelain, addStderr, addExit, addErr),
 		Stderr:        io.Discard,
 	}
@@ -71,11 +61,6 @@ func stageWithGitFailure(t *testing.T, porcelain, addStderr string, addExit int,
 	return se
 }
 
-// TestStageFailureClassification is the cycle's verifiableBy target
-// (`go test ./internal/phases/ship -run 'TestStageFailureClassification'`). Each
-// row is a real git stderr fixture; every row is strike ONE (fresh workspace),
-// so any non-transient verdict here can only come from the stderr classifier and
-// never from the pre-existing two-strikes memo.
 func TestStageFailureClassification(t *testing.T) {
 	t.Parallel()
 	const porcelain = " M docs/architecture/control-flags.md\n"
@@ -159,11 +144,6 @@ func TestStageFailureClassification(t *testing.T) {
 	}
 }
 
-// TestStageFailureClassification_PreservesCapturedStderr pins the evidence half
-// of the contract: whatever the class, the captured git stderr must still travel
-// in Debug["git_stderr"]. That field is what the failure digest, retro, and
-// escalation report read — and it is the classifier's own input, so a
-// refactor that stops capturing it would silently disable classification.
 func TestStageFailureClassification_PreservesCapturedStderr(t *testing.T) {
 	t.Parallel()
 	const marker = "fatal: Invalid path '/go/bin/evolve'"
@@ -176,11 +156,6 @@ func TestStageFailureClassification_PreservesCapturedStderr(t *testing.T) {
 	}
 }
 
-// TestStageFailureClassification_TwoStrikesStillApplies is the regression
-// guard for the router that already ships: an UNRECOGNISED refusal keeps its
-// first retry and still escalates on the second consecutive attempt with the
-// same pathspec. The new stderr classifier must sit in FRONT of that rule,
-// not replace it.
 func TestStageFailureClassification_TwoStrikesStillApplies(t *testing.T) {
 	t.Parallel()
 	const porcelain = " M docs/architecture/control-flags.md\n"

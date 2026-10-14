@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// landing lazily builds and caches the leaf on *Options; Run threads the
-// same pointer to every stage, so the cache never leaks back to the caller.
 func (o *Options) landing() *landing.Landing {
 	if o.land == nil {
 		o.land = o.wiredLanding()
@@ -21,9 +19,6 @@ func (o *Options) landing() *landing.Landing {
 	return o.land
 }
 
-// Streams and the Center are read through accessors at every use, not
-// captured eagerly: Run defaults the streams after Options is built, and
-// the root sets Signals separately.
 func (o *Options) wiredLanding() *landing.Landing {
 	opts := []landing.Option{
 		landing.WithRun(phaseName, o.CycleID, o.RunID),
@@ -40,7 +35,6 @@ func (o *Options) wiredLanding() *landing.Landing {
 		opts...)
 }
 
-// logTo is the res.Logs sink the landing writes its lines through.
 func logTo(res *RunResult) func(string) {
 	return func(line string) { res.Logs = append(res.Logs, line) }
 }

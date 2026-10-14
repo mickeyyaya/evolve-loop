@@ -39,7 +39,7 @@ func TestPhaseRun_NativeDispatch_Ships(t *testing.T) {
 
 func TestPhaseRun_NativeDispatch_NoAuditor_FailVerdict(t *testing.T) {
 	t.Parallel()
-	repo := makeRepo(t) // no seedAudit → audit binding fails
+	repo := makeRepo(t)
 
 	p := New(Config{Runner: execRunner})
 	resp, err := p.Run(context.Background(), core.PhaseRequest{

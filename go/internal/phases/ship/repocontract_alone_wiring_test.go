@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// The wiring proof through the production caller: a test that reds once under the backstop's full-closure run
-// and is green when run by itself is flake evidence, said loudly, and the ship proceeds.
 func TestRepoContractGate_AnImporterRedThatIsGreenAloneShipsAsFlakeEvidence(t *testing.T) {
 	t.Parallel()
 	repo, goDir := importerFixture(t)

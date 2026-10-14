@@ -12,8 +12,6 @@ import (
 	"testing"
 )
 
-// preConsumptionTree stages everything in wt and returns its write-tree —
-// the tree the audit would have bound (consumption has not run yet).
 func preConsumptionTree(t *testing.T, wt string) string {
 	t.Helper()
 	add := exec.Command("git", "-C", wt, "add", "-A")
@@ -53,15 +51,10 @@ func TestShipFromWorktree_ConsumptionDriftIsSanctioned(t *testing.T) {
 	}
 }
 
-// The tolerance is exactly the sanctioned consumption set — an unsanctioned
-// extra file in the drift still refuses.
 func TestShipFromWorktree_UnsanctionedDriftStillRefuses(t *testing.T) {
 	t.Parallel()
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
-	// Staged explicitly so the file is guaranteed to be in the tree the
-	// pre-commit check verifies; whether ship's own `git add -A` would pick up
-	// an untracked file is a separate policy this test doesn't pin.
 	if err := os.WriteFile(filepath.Join(wt, "smuggled.go"), []byte("package smuggled\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -86,8 +79,6 @@ func TestShipFromWorktree_UnsanctionedDriftStillRefuses(t *testing.T) {
 	}
 }
 
-// A second, unconsumed inbox file staged post-binding must still refuse: the
-// tolerance is the exact consumption set, never an .evolve/inbox/ prefix.
 func TestShipFromWorktree_SecondUnconsumedInboxFileRefuses(t *testing.T) {
 	t.Parallel()
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
@@ -113,9 +104,6 @@ func TestShipFromWorktree_SecondUnconsumedInboxFileRefuses(t *testing.T) {
 	}
 }
 
-// An item tampered with after audit binding must not be sanctioned:
-// consumption refuses the move (rolled back, pickable), and the ship proceeds
-// without it — nothing unaudited rides the commit.
 func TestShipFromWorktree_TamperedItemIsNotSanctioned(t *testing.T) {
 	t.Parallel()
 	repo, wt, ws, itemRel := consumeScenario(t, "PASS")
@@ -138,9 +126,6 @@ func TestShipFromWorktree_TamperedItemIsNotSanctioned(t *testing.T) {
 		t.Fatalf("tampered item must be loudly refused sanctioning; logs=%v err=%v", res.Logs, err)
 	}
 	if err != nil {
-		// The tampered file differs from the bound tree AND was rolled back to
-		// its tampered on-disk state — if ship's own staging then carries the
-		// tamper into the tree, the drift check must refuse it as unsanctioned.
 		if !strings.Contains(err.Error(), "INTEGRITY") {
 			t.Fatalf("if the tamper reaches the tree the refusal must be the integrity class: %v", err)
 		}
@@ -152,8 +137,6 @@ func TestShipFromWorktree_TamperedItemIsNotSanctioned(t *testing.T) {
 	}
 }
 
-// No binding set: legacy behavior is byte-identical (the check self-skips) —
-// pinned so this fix cannot accidentally arm the check where it never ran.
 func TestShipFromWorktree_NoBindingStillSkipsCheck(t *testing.T) {
 	t.Parallel()
 	repo, wt, ws, _ := consumeScenario(t, "PASS")

@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// The two member states consumeUnified decides beyond the TDD contract: a
-// member an earlier landing already consumed counts as closed, and a member
-// this ship does not commit keeps the whole unit open.
 func TestConsumeCommittedItems_UnifiedMemberEdges(t *testing.T) {
 	t.Parallel()
 	pair := []string{unifiedMemberA, unifiedMemberB}

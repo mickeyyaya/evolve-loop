@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// writeClosesBuildReport drops the build-report.md promoteInbox must read for
-// the current cycle, carrying a line-anchored Closes-Inbox marker for each id.
-// With no ids it writes a marker-free report (the negative fixture).
 func writeClosesBuildReport(t *testing.T, root string, cycleID int, ids ...string) {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve", "runs", "cycle-"+strconv.Itoa(cycleID))
@@ -27,14 +24,10 @@ func writeClosesBuildReport(t *testing.T, root string, cycleID int, ids ...strin
 	}
 }
 
-// promotedPath is where a consumed item must land for the cycle.
 func promotedPath(root string, cycleID int, id string) string {
 	return filepath.Join(root, ".evolve", "inbox", "processed", "cycle-"+strconv.Itoa(cycleID), id+".json")
 }
 
-// Triage committed to ONE id; the landing also closed a second item the
-// Builder marked. Both must be consumed by this ship. CommitSHA is empty so
-// the landing gate fails OPEN, isolating this test to the committed-set change.
 func TestPromoteInbox_ClosesInboxMarkerConsumesUnnamedItemOnLandedShip(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -59,15 +52,11 @@ func TestPromoteInbox_ClosesInboxMarkerConsumesUnnamedItemOnLandedShip(t *testin
 	}
 }
 
-// A continuation/lane cycle carries NO triage-decision.json and no
-// lane-scope pin, so the promotion branch was never entered at all; a marker
-// alone must be a sufficient committed set on a landed ship.
 func TestPromoteInbox_ClosesInboxMarkerConsumesWithNoTriageDecision(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	const cid = 1453
 	writeDrainCycleState(t, root, cid)
-	// No triage-decision.json, no triage-report.md to project from, no lane-scope.json.
 	writeClosesBuildReport(t, root, cid, "schema-aligned-salvage-layer")
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeDrainInboxItem(t, inbox, "schema-aligned-salvage-layer")
@@ -81,9 +70,6 @@ func TestPromoteInbox_ClosesInboxMarkerConsumesWithNoTriageDecision(t *testing.T
 	}
 }
 
-// The landing gate must bind the marker path exactly as it binds the triage
-// and lane-scope paths. A non-git TempDir with a real-looking SHA makes
-// isLanded fail closed.
 func TestPromoteInbox_ClosesInboxMarkerSkippedOnUnlandedShip(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -105,16 +91,13 @@ func TestPromoteInbox_ClosesInboxMarkerSkippedOnUnlandedShip(t *testing.T) {
 	}
 }
 
-// A build-report with no marker must leave every unnamed item open; an
-// implementation that infers closure from the diff, the cycle dir, or
-// `connects_to` proximity fails here.
 func TestPromoteInbox_LandedShipWithoutMarkerConsumesOnlyTriageNamedItems(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	const cid = 1455
 	writeDrainCycleState(t, root, cid)
 	writeDrainTriageDecision(t, root, cid, "named-by-triage")
-	writeClosesBuildReport(t, root, cid) // report present, NO marker
+	writeClosesBuildReport(t, root, cid)
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeDrainInboxItem(t, inbox, "named-by-triage")
 	writeDrainInboxItem(t, inbox, "untouched-item")
@@ -131,15 +114,12 @@ func TestPromoteInbox_LandedShipWithoutMarkerConsumesOnlyTriageNamedItems(t *tes
 	}
 }
 
-// Cycles that skip the build phase have no build-report.md at all, and the
-// triage-sourced promotion must be untouched by that read.
 func TestPromoteInbox_AbsentBuildReportIsNotAnError(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	const cid = 1456
 	writeDrainCycleState(t, root, cid)
 	writeDrainTriageDecision(t, root, cid, "named-by-triage")
-	// No build-report.md written at all.
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeDrainInboxItem(t, inbox, "named-by-triage")
 

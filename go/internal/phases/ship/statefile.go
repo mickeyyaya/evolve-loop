@@ -10,15 +10,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
 
-// readStateMap projects the single-source statemap.ReadStateMap under the
-// short name ship's call sites already use.
 func readStateMap(path string) (map[string]any, error) {
 	return statemap.ReadStateMap(path)
 }
 
-// writeStateMap projects the single-source statemap.WriteStateMap under the
-// short name ship's call sites already use; it stays unlocked because callers
-// hold withStateLock around their own read+write.
 func writeStateMap(path string, m map[string]any) error {
 	return statemap.WriteStateMap(path, m)
 }
@@ -52,8 +47,6 @@ func stateInt(m map[string]any, key string) (int, bool) {
 	return 0, false
 }
 
-// PluginVersion reads .claude-plugin/plugin.json:version; empty when the file
-// or key is missing.
 func PluginVersion(pluginRoot string) string { return pluginVersion(pluginRoot) }
 
 func pluginVersion(pluginRoot string) string {
@@ -71,9 +64,6 @@ func pluginVersion(pluginRoot string) string {
 	return p.Version
 }
 
-// lockStateFile acquires the same `<path>.lock` advisory lock storage.UpdateState
-// holds, via flock.PathLock.
-// See ADR-0049.
 func lockStateFile(statePath string) (release func(), err error) {
 	return flock.PathLock(statePath)
 }

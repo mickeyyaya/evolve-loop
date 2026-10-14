@@ -9,7 +9,6 @@ import (
 func TestWriteStateMap_MkdirError(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// A regular file where writeStateMap will try to MkdirAll a directory.
 	blocker := filepath.Join(root, "blocker")
 	mustWrite(t, blocker, "i am a file\n")
 	err := writeStateMap(filepath.Join(blocker, "state.json"), map[string]any{"k": "v"})

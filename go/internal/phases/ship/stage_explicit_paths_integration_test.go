@@ -15,13 +15,10 @@ func TestShipFromWorktree_StagesDeclaredPathsOnly_ExcludesUndeclaredStray(t *tes
 	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
-	// Un-stage so the ship's own staging step is what decides the commit.
 	runGit(t, wt, "reset", "HEAD", "wt-change.txt")
 
-	// An undeclared untracked file in the worktree — a sibling lane's leak.
 	mustWrite(t, filepath.Join(wt, "sibling-lane-leak.txt"), "not declared by any phase report\n")
 
-	// Workspace whose phase reports declare ONLY wt-change.txt.
 	ws := t.TempDir()
 	mustWrite(t, filepath.Join(ws, "build-report.md"),
 		"# Build Report\n\n## Files Changed\n\n- `wt-change.txt`\n")
@@ -47,14 +44,11 @@ func TestShipFromWorktree_StagesDeclaredPathsOnly_ExcludesUndeclaredStray(t *tes
 	if strings.Contains(files, "sibling-lane-leak.txt") {
 		t.Errorf("RED (add -A sweep): undeclared stray rode into the ship commit; files=%q", files)
 	}
-	// The stray must still exist on disk — excluded from staging, not deleted.
 	if _, err := os.Stat(filepath.Join(wt, "sibling-lane-leak.txt")); err != nil {
 		t.Errorf("explicit staging must not remove the undeclared file: %v", err)
 	}
 }
 
-// commitFileList returns the newline-joined file list of the tip commit of
-// branch in the given git dir.
 func commitFileList(t *testing.T, dir, branch string) string {
 	t.Helper()
 	return runGitOut(t, dir, "show", "--pretty=format:", "--name-only", branch)

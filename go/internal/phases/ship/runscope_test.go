@@ -9,11 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// See ADR-0049.
-// TestReadActiveWorktree_PrefersRunJSON_OverGlobal: when a run workspace is
-// set, ship reads active_worktree from the per-run run.json mirror, NOT the
-// host-global cycle-state.json — so a concurrent cycle's global write can't
-// make ship integrate the WRONG run's worktree.
 func TestReadActiveWorktree_PrefersRunJSON_OverGlobal(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
@@ -27,25 +22,20 @@ func TestReadActiveWorktree_PrefersRunJSON_OverGlobal(t *testing.T) {
 	}
 }
 
-// TestReadActiveWorktree_FallsBackToGlobal_NoWorkspace: standalone `evolve ship`
-// (no WorkspacePath) keeps reading the host-global cycle-state.json.
 func TestReadActiveWorktree_FallsBackToGlobal_NoWorkspace(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"active_worktree":"/global/wt"}`)
-	opts := &Options{ProjectRoot: repo} // no WorkspacePath
+	opts := &Options{ProjectRoot: repo}
 	if got := readActiveWorktree(opts); got != "/global/wt" {
 		t.Errorf("readActiveWorktree=%q, want global fallback", got)
 	}
 }
 
-// TestReadActiveWorktree_FallsBackToGlobal_RunJSONAbsent: WorkspacePath set but
-// the mirror not yet written → fall back to the global file (current behavior;
-// fail-safe, never an empty worktree from a missing mirror).
 func TestReadActiveWorktree_FallsBackToGlobal_RunJSONAbsent(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
-	ws := filepath.Join(repo, ".evolve", "runs", "cycle-7") // no run.json written
+	ws := filepath.Join(repo, ".evolve", "runs", "cycle-7")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"active_worktree":"/global/wt"}`)
 	opts := &Options{ProjectRoot: repo, WorkspacePath: ws}
 	if got := readActiveWorktree(opts); got != "/global/wt" {
@@ -53,11 +43,6 @@ func TestReadActiveWorktree_FallsBackToGlobal_RunJSONAbsent(t *testing.T) {
 	}
 }
 
-// See ADR-0049.
-// TestFindLatestAudit_PrefersThisRunsEntry: with a runID set, ship binds to
-// THIS run's auditor entry, not a concurrent run's later one. Ledger: run B
-// auditor (older) then run A auditor (newer/latest); findLatestAudit(ledger,
-// "B") must return B, not the latest A.
 func TestFindLatestAudit_PrefersThisRunsEntry(t *testing.T) {
 	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
@@ -73,8 +58,6 @@ func TestFindLatestAudit_PrefersThisRunsEntry(t *testing.T) {
 	}
 }
 
-// TestFindLatestAudit_EmptyRunID_ReturnsLatest: standalone (runID=="") keeps
-// binding the latest auditor entry overall.
 func TestFindLatestAudit_EmptyRunID_ReturnsLatest(t *testing.T) {
 	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
@@ -90,10 +73,6 @@ func TestFindLatestAudit_EmptyRunID_ReturnsLatest(t *testing.T) {
 	}
 }
 
-// TestFindLatestAudit_RunIDNoMatch_RefusesUnstampedBind: runID set but every
-// auditor entry is unstamped → hard integrity stop (NO_AUDITOR), never a
-// bind. "This run produced no independent review" is an integrity stop, not
-// a recoverable lookup miss.
 func TestFindLatestAudit_RunIDNoMatch_RefusesUnstampedBind(t *testing.T) {
 	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
@@ -104,11 +83,6 @@ func TestFindLatestAudit_RunIDNoMatch_RefusesUnstampedBind(t *testing.T) {
 	wantShipErr(t, err, core.CodeAuditBindingNoAuditor, core.ShipClassPrecondition, "independent review")
 }
 
-// TestFindLatestAudit_ForeignRunOnly_RefusesBind: the only auditor entries
-// belong to a DIFFERENT run (a sibling lane in the same HEAD window). Binding
-// them lets one cycle's ship gate be satisfied by another cycle's audit; the
-// error must name the refused foreign entry so an operator can see what
-// would have been bound.
 func TestFindLatestAudit_ForeignRunOnly_RefusesBind(t *testing.T) {
 	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")

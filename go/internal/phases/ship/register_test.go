@@ -7,13 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// TestShipSelfRegisters asserts the ship phase publishes its own factory to the
-// phase registry in package init() — exactly like every other built-in phase
-// (intent/scout/...). The flow/dispatcher must never know HOW to construct
-// ship; it looks the factory up by name. This is the phase-agnostic invariant
-// (ADR-0035/0038): adding/owning a phase lives in the phase's package + JSON,
-// never in a dispatcher switch. This is the permanent regression guard for
-// that invariant — the test does not import the dispatcher.
 func TestShipSelfRegisters(t *testing.T) {
 	t.Parallel()
 	factory, ok := registry.For(string(core.PhaseShip))

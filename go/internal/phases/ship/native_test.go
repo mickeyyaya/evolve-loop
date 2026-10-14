@@ -17,9 +17,6 @@ func TestNative_A_NoAuditor_Refuses(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "test commit"})
-	// No-auditor is a re-establishable precondition, not a genuine integrity
-	// breach, so this fails with AUDIT_BINDING_NO_AUDITOR rather than
-	// ExitIntegrity.
 	if res.ExitCode != ExitFailure {
 		t.Fatalf("want ExitFailure, got %d (err=%v, logs=%v)", res.ExitCode, err, res.Logs)
 	}
@@ -77,7 +74,6 @@ func TestNative_C2_StrictAudit_WARN_Refused(t *testing.T) {
 	}
 }
 
-// writeStrictAuditPolicy turns on the strict (legacy-blocking) audit posture.
 func writeStrictAuditPolicy(t *testing.T, root string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -133,8 +129,6 @@ func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
 		t.Fatalf("first ship: want ExitOK got %d (logs=%v)", res1.ExitCode, res1.Logs)
 	}
 
-	// Simulates an attacker editing ship.sh while plugin.json:version is
-	// unchanged.
 	mustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v1\n# malicious comment\n")
 
 	mustWrite(t, filepath.Join(repo, "another.txt"), "another change\n")
@@ -159,7 +153,7 @@ func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
 		BypassCommitGate: true,
 		Env: map[string]string{
 			"EVOLVE_SHIP_AUTO_CONFIRM":  "1",
-			"EVOLVE_BYPASS_SHIP_VERIFY": "1", // silently ignored
+			"EVOLVE_BYPASS_SHIP_VERIFY": "1",
 		},
 	})
 	if res.ExitCode != ExitOK {
@@ -189,7 +183,6 @@ func TestNative_I_ManualNoTTY_Refuses(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "manual.txt"), "manual change\n")
 	addRemote(t, repo)
-	// Stdin is bytes.Buffer (non-tty), no EVOLVE_SHIP_AUTO_CONFIRM.
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassManual,
 		CommitMessage: "manual change",
@@ -211,9 +204,7 @@ func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
 		Class:            ClassManual,
 		CommitMessage:    "ci change",
 		BypassCommitGate: true,
-		// Bypass commit-gate: this test exercises the manual auto-confirm ship
-		// mechanics, not the review-attestation gate (covered in commitgate_test.go).
-		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		Env:              map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
@@ -349,7 +340,6 @@ func TestNative_Q_PluginVersionBump_RePins(t *testing.T) {
 		t.Fatalf("first ship: want ExitOK got %d (logs=%v)", res1.ExitCode, res1.Logs)
 	}
 
-	// Bump version + modify the ship binary to simulate plugin update.
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.1.0"}`)
 	mustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v2\n# v1.1.0 tweak\n")
 	mustWrite(t, filepath.Join(repo, "q2.txt"), "second\n")
@@ -368,8 +358,6 @@ func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
 	repo := makeRepo(t)
 	mustMkdir(t, filepath.Join(repo, ".claude-plugin"))
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"2.0.0"}`)
-	// Pre-populate state.json with expected_ship_sha matching current binary
-	// but NO expected_ship_version (legacy schema).
 	binPath := filepath.Join(repo, "ship-binary-fixture")
 	currentSHA := mustHashFile(t, binPath)
 	mustWrite(t, filepath.Join(repo, ".evolve", "state.json"),
@@ -426,9 +414,7 @@ func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
 		Class:            ClassManual,
 		CommitMessage:    "manual: ad-hoc fix",
 		BypassCommitGate: true,
-		// Bypass commit-gate: this test asserts lastCycleNumber semantics, not
-		// the review-attestation gate (covered in commitgate_test.go).
-		Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
+		Env:              map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
 	})
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)

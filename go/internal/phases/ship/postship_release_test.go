@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// TestInboxPromote_UnfinishedClaimReleasedOnShip: on a successful class=cycle
-// ship, a claimed-but-not-in-top_n item ("dropped") is released back to the
-// inbox root while the committed item ("kept") is promoted to processed/.
 func TestInboxPromote_UnfinishedClaimReleasedOnShip(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -57,8 +54,6 @@ func TestInboxPromote_UnfinishedClaimReleasedOnShip(t *testing.T) {
 	}
 }
 
-// The residual drain must run regardless of triage-decision.json's presence
-// (Step 0a reads only inbox/ root).
 func TestInboxPromote_NoTriageDecision_StillDrainsClaims(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -80,8 +75,6 @@ func TestInboxPromote_NoTriageDecision_StillDrainsClaims(t *testing.T) {
 		t.Fatalf("promoteInbox: %v", err)
 	}
 
-	// Must be released back to the inbox ROOT (visible to the next triage scan),
-	// not stranded in processing/.
 	if _, err := os.Stat(filepath.Join(inbox, "claimed-defect.json")); err != nil {
 		t.Errorf("claim not released to inbox root when triage-decision.json absent: %v", err)
 	}

@@ -19,8 +19,6 @@ func TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding(t *testing.T) {
 	mustWrite(t, filepath.Join(wt, "feature.txt"), "worktree feature\n")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":1,"phase":"ship","active_worktree":"`+wt+`"}`)
-	// PASS audit bound to main's clean HEAD/tree (worktree edits don't touch
-	// main's working tree, so the diff-based binding still matches).
 	seedAudit(t, repo, "PASS")
 
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: worktree ship"})
@@ -64,7 +62,6 @@ func TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit(t *testing.T) {
 	mustWrite(t, filepath.Join(wt, "feature.txt"), "worktree feature\n")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":9,"phase":"ship","active_worktree":"`+wt+`"}`)
-	// Bogus audit-bound tree SHA — will never equal the real staged tree.
 	seedAuditWithBoundTree(t, repo, "PASS", strings.Repeat("a", 40))
 
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "feat: should breach pre-commit"})
@@ -92,7 +89,6 @@ func TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips(t *testing.T) {
 	wt := makeWorktree(t, repo, "cycle-10-branch")
 	mustWrite(t, filepath.Join(wt, "feature.txt"), "worktree feature\n")
 	runGit(t, wt, "add", "feature.txt")
-	// The tree a commit from this staged index would carry == the bound tree.
 	stagedTree := strings.TrimSpace(runGitOut(t, wt, "write-tree"))
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":10,"phase":"ship","active_worktree":"`+wt+`"}`)
@@ -111,7 +107,6 @@ func TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips(t *testing.T) {
 	if !containsLog(res, "committed in worktree") {
 		t.Errorf("expected a commit after verification passed: %v", res.Logs)
 	}
-	// The verified worktree edit must now live on main.
 	mainFiles := runGitOut(t, repo, "log", "-1", "--name-only", "--format=")
 	if !strings.Contains(mainFiles, "feature.txt") {
 		t.Errorf("worktree edit not merged into main; HEAD files: %q", mainFiles)
@@ -122,7 +117,7 @@ func TestShipFromWorktree_CleanWorktreeNotAhead_ExitsCleanly(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
-	wt := makeWorktree(t, repo, "cycle-3-branch") // at main, no edits
+	wt := makeWorktree(t, repo, "cycle-3-branch")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":3,"phase":"ship","active_worktree":"`+wt+`"}`)
 	seedAudit(t, repo, "PASS")

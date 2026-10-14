@@ -10,11 +10,6 @@ import (
 	"testing"
 )
 
-// mergedUnpushedFixture provisions a post-merge-pre-push death state:
-// worktree commit created, ff-merged into main, origin NOT yet updated. The
-// audit is seeded BEFORE the merge (git_head = pre-merge main HEAD) with
-// audit_bound_tree_sha = the worktree commit's tree — exactly what a real
-// cycle's binding looks like at the moment the push fails.
 func mergedUnpushedFixture(t *testing.T, cycleBranch string) string {
 	t.Helper()
 	repo := makeRepo(t)
@@ -71,7 +66,6 @@ func TestRepair_Resume_BoundTreeMismatch_NoRepair(t *testing.T) {
 	runGit(t, wt, "add", "-A")
 	runGit(t, wt, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "cycle work")
 
-	// Audit bound to a DIFFERENT tree than the commit that moved HEAD.
 	seedAuditWithBoundTree(t, repo, "PASS", strings.Repeat("d", 40))
 	runGit(t, repo, "merge", "--ff-only", "-q", "cycle-246-mismatch")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
@@ -121,8 +115,6 @@ func TestRepair_Resume_OriginDiverged_NoRepair(t *testing.T) {
 	}
 }
 
-// pushDivergentCommit clones the bare remote, commits an independent change
-// on main and pushes it — simulating a second writer racing this repo.
 func pushDivergentCommit(t *testing.T, bare string) {
 	t.Helper()
 	clone := filepath.Join(tempRepoDir(t), "clone2")
@@ -134,9 +126,6 @@ func pushDivergentCommit(t *testing.T, bare string) {
 	if err != nil {
 		t.Fatalf("git clone: %v\n%s", err, out)
 	}
-	// CI parity: the bare remote's HEAD may point at an unborn default branch
-	// (init.defaultBranch is unset on CI runners), leaving the clone's HEAD
-	// unborn too. Pin the clone to main explicitly.
 	runGit(t, clone, "checkout", "-q", "-B", "main", "origin/main")
 	runGit(t, clone, "config", "user.email", "second@evolve-loop.test")
 	runGit(t, clone, "config", "user.name", "Second Writer")
