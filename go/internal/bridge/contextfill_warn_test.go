@@ -12,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// contextFillMarker is the stable grep key the WARN line must carry: keying on
-// the agent name alone would false-green on the pre-existing per-driver
-// coverage WARN, which also names the agent.
 var contextFillMarker = string(CodeContextFillHigh)
 
 func runContextFillCase(t *testing.T, fill float64, warnPct int, agent string) (stderr, record string) {
@@ -64,9 +61,6 @@ func TestContextFillWarn_EmittedAtDispatchNamingPhase(t *testing.T) {
 	}
 }
 
-// Three ways a WARN must not fire, each of which a naive `>=` comparison or a
-// missing sentinel guard would break: exactly at threshold, below it, and
-// unmeasured.
 func TestContextFillWarn_BoundaryAndSentinelStaySilent(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -87,9 +81,6 @@ func TestContextFillWarn_BoundaryAndSentinelStaySilent(t *testing.T) {
 	}
 }
 
-// An unconfigured ContextFillWarnPct (the zero value every existing
-// composition path leaves) must resolve to 60, matching policy's built-in —
-// not to 0, which would warn on every launch.
 func TestContextFillWarn_ZeroDepsResolvesToDefaultThreshold(t *testing.T) {
 	t.Parallel()
 	if stderr, _ := runContextFillCase(t, 59, 0, "scout"); func() bool { _, ok := contextFillLine(stderr); return ok }() {
@@ -101,8 +92,6 @@ func TestContextFillWarn_ZeroDepsResolvesToDefaultThreshold(t *testing.T) {
 	}
 }
 
-// fill_pct must persist in the llm-calls record, not merely print to stderr:
-// the deferred fill%-vs-verdict correlation report has no corpus without it.
 func TestContextFillWarn_PersistedInLLMCallsRecord(t *testing.T) {
 	t.Parallel()
 	_, record := runContextFillCase(t, 72.5, 60, "audit")

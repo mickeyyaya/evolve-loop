@@ -57,7 +57,6 @@ func TestAgyTmuxManifest_SessionRating_NoFalsePositives(t *testing.T) {
 	})
 }
 
-// nudgeRecordingTmux also records pasted buffer content, so a nudge counts whether the driver pastes it or sends keys.
 type nudgeRecordingTmux struct {
 	*fakeTmux
 	pastes []string
@@ -70,7 +69,6 @@ func (n *nudgeRecordingTmux) LoadBuffer(ctx context.Context, session, file strin
 	return n.fakeTmux.LoadBuffer(ctx, session, file)
 }
 
-// deliveriesNaming counts pasted buffers and sent keys that mention sub; the fixture prompt and launch line never hold the artifact path.
 func (n *nudgeRecordingTmux) deliveriesNaming(sub string) int {
 	count := 0
 	for _, p := range n.pastes {
@@ -86,7 +84,6 @@ func (n *nudgeRecordingTmux) deliveriesNaming(sub string) int {
 	return count
 }
 
-// runTmuxNudge drives an idle claude-tmux launch under a 30s deadline, so a runaway nudge loop fails the count instead of hanging go test.
 func runTmuxNudge(t *testing.T, fx launchFixture, tmux *nudgeRecordingTmux) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{

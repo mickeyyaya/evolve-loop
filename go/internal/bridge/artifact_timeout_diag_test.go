@@ -15,8 +15,7 @@ import (
 func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never lands
-	// Two extends then a pause, so extends_used is 2 and the pause reason must survive.
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
 		{Action: ReviewExtend, Reason: "still working"},
 		{Action: ReviewExtend, Reason: "still working"},
@@ -50,7 +49,6 @@ func TestRunTmuxREPL_ArtifactTimeout_SummaryCarriesWaitedAndExtends(t *testing.T
 			t.Errorf("summary is missing %q — a reader cannot tell 'too slow' from 'wedged'\n  got: %s", want, summary)
 		}
 	}
-	// A 2s interval and three review checkpoints mean the driver waited at least 4s.
 	if strings.Contains(summary, "waited=0s") {
 		t.Errorf("waited=0s after three review intervals — the elapsed wait is not being recorded\n  got: %s", summary)
 	}
@@ -119,8 +117,6 @@ func TestEngineLaunch_ArtifactTimeout_ErrorCarriesWaitAndExtends(t *testing.T) {
 	}
 }
 
-// panestream.LivenessState has no String method, so the summary publishes its own closed word list;
-// the zero value is named, never blank.
 func TestTimeoutSummaryVocabulary(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -145,7 +141,6 @@ func TestTimeoutSummaryVocabulary(t *testing.T) {
 		{ReviewExtend, "extend"},
 		{ReviewPause, "pause"},
 		{ReviewStop, "stop"},
-		// The wait ended before any checkpoint (ctx cancel); a blank would read as a missing measurement.
 		{"", "none"},
 	} {
 		if got := reviewActionOrNone(tc.in); got != tc.want {
@@ -154,8 +149,6 @@ func TestTimeoutSummaryVocabulary(t *testing.T) {
 	}
 }
 
-// chattyTimeoutDriver reproduces a timed-out launch's real stderr: [bridge] chatter before the wait, the
-// driver's own diagnostics, then the marker summary last. It is its own CLI so no other driver's tests see it.
 type chattyTimeoutDriver struct{}
 
 func (chattyTimeoutDriver) Name() string { return "acs-chatty-timeout" }

@@ -48,7 +48,6 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 	}
 	defer closeFn()
 
-	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
 	observeModelDispatch(deps, defaultModelDispatch())
 	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, dispatchEnv(deps, cfg), nil, stdoutF, stderrF)
 	if err != nil {

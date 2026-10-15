@@ -45,7 +45,6 @@ func TestPendingAtInputLine(t *testing.T) {
 }
 
 func TestPromptSubmitEcho(t *testing.T) {
-	// The motivating shape: a short first non-empty line under the rune floor.
 	t.Parallel()
 	frontmatter := "---\ntitle: build\n---\n\n## Task\nRefactor the widget pipeline end to end.\n"
 
@@ -55,7 +54,6 @@ func TestPromptSubmitEcho(t *testing.T) {
 			t.Fatalf("echo %q is %d runes, below the %d floor — it can never match, so a parked "+
 				"prompt goes undetected (the stall this helper exists to catch)", got, n, submitVerifyMinEchoRunes)
 		}
-		// And it must actually detect the parked prompt end-to-end.
 		pane := "● scrollback\n\n" + tmuxPromptMarkerDefault + " " + normalizeWS(frontmatter)
 		if !pendingAtInputLine(pane, tmuxPromptMarkerDefault, []string{promptSubmitEcho(frontmatter)}) {
 			t.Error("parked frontmatter prompt not detected — firstNonEmptyLine would yield \"---\" (3 runes), below the floor")

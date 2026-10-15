@@ -15,11 +15,10 @@ type billingSnapshot struct {
 	Label                 string `json:"label"`
 	CredSize              int64  `json:"cred_size"`
 	CredTokenHash         string `json:"cred_token_hash"`
-	AnthropicAPIKeyInEnv  string `json:"anthropic_api_key_in_env"`  // "yes" | "no"
-	AnthropicBaseURLInEnv string `json:"anthropic_base_url_in_env"` // "" when unset
+	AnthropicAPIKeyInEnv  string `json:"anthropic_api_key_in_env"`
+	AnthropicBaseURLInEnv string `json:"anthropic_base_url_in_env"`
 }
 
-// BillingSnapshot writes a credential-state snapshot to dir and returns its path; the token is stored only as a hash.
 func (e *Engine) BillingSnapshot(dir, label string) (string, error) {
 	if dir == "" || label == "" {
 		return "", fmt.Errorf("bridge:billing: snapshot requires dir and label")
@@ -54,7 +53,6 @@ func (e *Engine) BillingSnapshot(dir, label string) (string, error) {
 	return out, nil
 }
 
-// billingTokenHash hashes the access-token prefix, never the whole token, or returns a sentinel.
 func billingTokenHash(b []byte) string {
 	s := string(b)
 	i := strings.Index(s, `"accessToken":"`)
@@ -69,7 +67,6 @@ func billingTokenHash(b []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-// BillingCompare diffs two snapshots: exit 0 PASS, 1 FAIL (override env leak), 2 INCONCLUSIVE.
 func BillingCompare(beforePath, afterPath string) (string, int) {
 	var before, after billingSnapshot
 	if !readBillingSnap(beforePath, &before) || !readBillingSnap(afterPath, &after) {

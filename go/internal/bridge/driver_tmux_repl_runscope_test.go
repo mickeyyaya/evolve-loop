@@ -81,8 +81,6 @@ func TestRecipeEnsureSessionRecordsInRunRegistry(t *testing.T) {
 	}
 }
 
-// runIDPinDriver records the Config the engine's full args-build → parse
-// pipeline delivered (the middle hop no other test exercises end-to-end).
 type runIDPinDriver struct{ got *string }
 
 func (runIDPinDriver) Name() string { return "cb5-runid-pin" }
@@ -91,7 +89,6 @@ func (d runIDPinDriver) Launch(_ context.Context, cfg *Config, _ Deps) (int, err
 	return ExitOK, nil
 }
 
-// Not parallel: mutates the global driver registry.
 func TestEngineLaunchThreadsRunID(t *testing.T) {
 	var got string
 	Register(runIDPinDriver{got: &got})

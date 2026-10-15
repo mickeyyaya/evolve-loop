@@ -103,7 +103,7 @@ func TestLoadManifest_LiveCatalogOverlays(t *testing.T) {
 	if err := modelcatalog.Write(dir, cat); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := modelcatalog.Read(dir); err != nil { // sanity
+	if _, err := modelcatalog.Read(dir); err != nil {
 		t.Fatal(err)
 	}
 	injectCatalogDir(t, dir)
@@ -125,5 +125,5 @@ func TestModelCatalogDirFn_Injectable(t *testing.T) {
 	if got := modelCatalogDirFn(); got != want {
 		t.Errorf("modelCatalogDirFn() = %q, want %q (injection seam broken)", got, want)
 	}
-	_ = filepath.Join(want, modelcatalog.FileName) // suppress unused import warning
+	_ = filepath.Join(want, modelcatalog.FileName)
 }

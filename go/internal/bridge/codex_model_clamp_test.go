@@ -152,7 +152,6 @@ func TestClampCodexModelForAuth(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Snapshot the whole input, NUL-joined so element boundaries cannot alias, to catch any in-place mutation.
 			before := strings.Join(tc.flags, "\x00")
 			got, from, to := clampCodexModelForAuth(tc.flags, m, tc.auth)
 			if strings.Join(got, " ") != strings.Join(tc.wantFlags, " ") {
@@ -189,7 +188,6 @@ func TestCodexTmuxManifest_HasChatGPTClampPolicy(t *testing.T) {
 	if m.ChatGPTDefaultModel == "" {
 		t.Fatal("codex-tmux manifest must declare chatgpt_default_model")
 	}
-	// The default must itself be safe, or the clamp would produce an unsafe model.
 	safe := false
 	for _, s := range m.ChatGPTSafeModels {
 		if s == m.ChatGPTDefaultModel {

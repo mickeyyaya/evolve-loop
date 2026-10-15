@@ -77,11 +77,6 @@ func TestRunTmuxREPL_ExtendNoEscalationReport(t *testing.T) {
 	}
 }
 
-// writingReviewer models the agent finishing its deliverable mid-wait: the
-// artifact is written ONCE, at the first review checkpoint, then left alone.
-// A reviewer that rewrote the file at every checkpoint would bump its mtime
-// on every tick, so the cross-poll stability window could never close and
-// this fixture would spin forever.
 type writingReviewer struct {
 	artifact string
 	wrote    bool

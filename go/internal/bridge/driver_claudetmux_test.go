@@ -12,14 +12,14 @@ import (
 
 type fakeTmux struct {
 	existing          map[string]bool
-	sentKeys          []string // recorded SendKeys (keys only)
-	sentSeq           []string // recorded SendKeys as "keys|enter", preserving order
-	paneSeq           []string // CapturePane returns, consumed in order; last value repeats
+	sentKeys          []string
+	sentSeq           []string
+	paneSeq           []string
 	paneIdx           int
-	captureScrollback []int  // recorded scrollback (3rd) arg of each CapturePane call
-	newSessErr        error  // when set, NewSession fails (covers the spawn-error path)
-	lastPane          string // most recent CapturePane return — the pane "on screen"
-	pasteContext      string // the pane on screen when PasteBuffer was last called
+	captureScrollback []int
+	newSessErr        error
+	lastPane          string
+	pasteContext      string
 }
 
 func (f *fakeTmux) HasSession(_ context.Context, name string) bool { return f.existing[name] }
@@ -58,10 +58,6 @@ func (f *fakeTmux) CapturePane(_ context.Context, _ string, scrollback int) (str
 
 func (f *fakeTmux) LoadBuffer(_ context.Context, _, _ string) error { return nil }
 func (f *fakeTmux) PasteBuffer(_ context.Context, _ string) error {
-	// Record the paste as an ordered event so tests can assert that boot-time
-	// dialog dismissals (auto-respond sends) happen BEFORE prompt delivery, and
-	// capture the pane that was on screen so tests can assert the prompt lands
-	// on a clean REPL — not a still-open dialog (where the paste would be lost).
 	f.sentSeq = append(f.sentSeq, "paste-buffer")
 	f.pasteContext = f.lastPane
 	return nil
@@ -80,8 +76,6 @@ func (f *fakeTmux) sentContains(sub string) bool {
 	return false
 }
 
-// runTmux drives a claude-tmux launch with the fake tmux + no-op sleep +
-// controlled env.
 func runTmux(t *testing.T, fx launchFixture, tmux *fakeTmux, lookup map[string]string, extra ...string) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{
@@ -93,8 +87,6 @@ func runTmux(t *testing.T, fx launchFixture, tmux *fakeTmux, lookup map[string]s
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", extra...), nil, &stdout, &stderr)
 	return code, stderr.String()
 }
-
-// --- safety gate + permission-mode (permission-mode-drivers.bats) ---------
 
 func TestClaudeTmux_SafetyGate_RequiresAllowBypass(t *testing.T) {
 	t.Parallel()
@@ -165,7 +157,7 @@ func TestClaudeTmux_ClaudeCmd_PlanWinsOverBypass(t *testing.T) {
 
 func TestClaudeTmux_CostLeak_AnthropicAPIKey(t *testing.T) {
 	t.Parallel()
-	fx := newFixture(t, "claude-tmux", "plan") // gate relaxed so we reach the cost guard
+	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	code, stderr := runTmux(t, fx, tmux, map[string]string{"ANTHROPIC_API_KEY": "sk-x"})
 	if code != ExitCostLeak {
@@ -179,12 +171,9 @@ func TestClaudeTmux_CostLeak_AnthropicAPIKey(t *testing.T) {
 	}
 }
 
-// --- REPL state-machine outcomes ------------------------------------------
-
 func TestClaudeTmux_HappyPath_ArtifactAppears(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// Pre-create the artifact so the wait loop exits on its first check.
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
@@ -199,10 +188,6 @@ func TestClaudeTmux_HappyPath_ArtifactAppears(t *testing.T) {
 }
 
 func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
-	// Table-ized over both trust-dialog generations: each renders its
-	// selection cursor as ❯, the same glyph claude-tmux uses as its REPL
-	// prompt marker, so the boot loop must auto-dismiss the dialog before
-	// delivering the prompt or the paste lands in the dialog and is lost.
 	t.Parallel()
 	dialogs := []struct {
 		name string
@@ -216,8 +201,6 @@ func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
 	for _, d := range dialogs {
 		t.Run(d.name, func(t *testing.T) {
 			fx := newFixture(t, "claude-tmux", "")
-			// Seed the artifact so a correctly-delivered prompt completes —
-			// this isolates boot-time trust handling, not the artifact wait.
 			if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 				t.Fatalf("seed artifact: %v", err)
 			}
@@ -239,9 +222,6 @@ func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
 			if pasteIdx < 0 {
 				t.Fatalf("prompt was never delivered (no paste-buffer); sentSeq=%v", tmux.sentSeq)
 			}
-			// A dismissal keystroke (bare keys, "|true" suffix) must precede
-			// the paste: cd/launch carry non-empty keys, so a bare-key send
-			// before the paste is the auto-responder dismissing the dialog.
 			dismissedBeforePaste := false
 			for _, sent := range tmux.sentSeq[:pasteIdx] {
 				if strings.HasSuffix(sent, "|true") {
@@ -252,8 +232,6 @@ func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
 			if !dismissedBeforePaste {
 				t.Fatalf("trust dialog was not auto-dismissed before prompt delivery; sentSeq=%v", tmux.sentSeq)
 			}
-			// The decisive property (the live rc=81): the prompt must be
-			// pasted onto a CLEAN REPL, never the still-open dialog.
 			if strings.Contains(tmux.pasteContext, "trust this folder") {
 				t.Fatalf("prompt pasted while the trust dialog was still on screen — paste lost; pasteContext=%q", tmux.pasteContext)
 			}
@@ -264,7 +242,7 @@ func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
 func TestClaudeTmux_REPLBootTimeout(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	tmux := &fakeTmux{} // CapturePane always "" → marker never seen
+	tmux := &fakeTmux{}
 	code, _ := runTmux(t, fx, tmux, nil, "--allow-bypass")
 	if code != ExitREPLBootTimeout {
 		t.Fatalf("exit = %d, want %d (ExitREPLBootTimeout)", code, ExitREPLBootTimeout)

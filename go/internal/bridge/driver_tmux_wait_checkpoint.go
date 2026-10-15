@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// checkpointReviewResult tells the wait coordinator whether checkpoint
-// adjudication completed normally or selected the cross-CLI failover path.
 type checkpointReviewResult uint8
 
 const (
@@ -16,22 +14,13 @@ const (
 	checkpointFailover
 )
 
-// reviewCheckpoint retains the latest pane evidence, updates liveness and
-// exhaustion gates, builds the StopEvent, and publishes exactly one verdict.
-// Pane capture/recovery and verdict disposition stay with the wait coordinator
-// so this function has no hidden polling or loop-control side effects.
 func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane string, renderWedged bool) checkpointReviewResult {
 	state.result.recordTokens(curPane)
-	// Evidence survives the session's death: when the server is killed
-	// mid-phase every later capture is empty, so retain the last non-empty
-	// pane as the freshest real evidence.
 	if strings.TrimSpace(curPane) != "" {
 		state.result.lastGoodPane = curPane
 	}
 	evidencePane := state.result.lastGoodPane
 
-	// Exhaustion is decided separately on a stripped, persistence-gated pane;
-	// it must not replace the converging/idle signal given to the reviewer.
 	state.livenessCenter.Observe(w.launch.session, curPane, state.livenessProfile)
 	livenessState := state.livenessCenter.Aggregate()
 	walled := state.livenessCenter.ExhaustedOf(
@@ -55,24 +44,19 @@ func (w replWaiter) reviewCheckpoint(state *replWaitState, elapsed int, curPane 
 		livenessState = panestream.LivenessBusyButStagnant
 	}
 	state.lastEvent = StopEvent{
-		Kind:       StopArtifactTimeout,
-		Phase:      w.cfg.Agent,
-		Cycle:      w.cfg.Cycle,
-		ElapsedS:   elapsed,
-		IntervalS:  state.intervalS,
-		Attempt:    state.attempt,
-		Progressed: progressed,
-		Busy:       state.livenessCenter.Busy(w.launch.session) || renderWedged,
-		StdoutTail: lastLines(evidencePane, 40),
-		// The fatal and exhaustion detectors strip against the same delivered
-		// prompt, so they cannot disagree about agent-authored prompt echoes.
+		Kind:           StopArtifactTimeout,
+		Phase:          w.cfg.Agent,
+		Cycle:          w.cfg.Cycle,
+		ElapsedS:       elapsed,
+		IntervalS:      state.intervalS,
+		Attempt:        state.attempt,
+		Progressed:     progressed,
+		Busy:           state.livenessCenter.Busy(w.launch.session) || renderWedged,
+		StdoutTail:     lastLines(evidencePane, 40),
 		InjectedPrompt: w.responder.injectedPrompt,
 		State:          livenessState,
 	}
 
-	// The persistence gate is called exactly once per checkpoint. At enforce,
-	// a crossed fatal gate preempts the reviewer and records one durable
-	// outcome; every other observation falls through to the reviewer.
 	verdict, preempted := state.checkpointFatal.verdict(
 		state.fatalDetector,
 		state.lastEvent,

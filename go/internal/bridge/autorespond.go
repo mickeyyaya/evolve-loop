@@ -17,11 +17,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// autoRespondLoopGuardLimit caps the matches of one pattern; the next match abandons the run with rc 86.
 const autoRespondLoopGuardLimit = 5
 
-// agentDiffLineRE matches an agent-authored diff line, numbered or bare. CLI chrome is never
-// diff-prefixed, so such a line is the agent's content and must not drive prompt matching.
 var agentDiffLineRE = regexp.MustCompile(`^[ \t]*(?:\d+[ \t]+)?[+-]`)
 
 func isAgentDiffLine(ln string) bool {
@@ -44,8 +41,6 @@ func stripAgentDiffLines(pane string) string {
 	return strings.Join(kept, "\n")
 }
 
-// stripPromptEchoLines drops each line whose trimmed text is a substring of the injected prompt.
-// An empty prompt strips nothing: fail open rather than suppress a genuine signal.
 func stripPromptEchoLines(pane, injectedPrompt string) string {
 	if strings.TrimSpace(injectedPrompt) == "" {
 		return pane
@@ -62,33 +57,24 @@ func stripPromptEchoLines(pane, injectedPrompt string) string {
 	return strings.Join(kept, "\n")
 }
 
-// strippedForExhaustionScan is the one pane treatment both exhaustion scans (tick and stop review) use.
-// Stripping only reduces the surface; the persistence gate is what spares a working agent.
 func strippedForExhaustionScan(pane, injectedPrompt string) string {
 	return stripAgentDiffLines(stripPromptEchoLines(pane, injectedPrompt))
 }
 
-// strippedForFatalPaneScan delegates to recovery.StripAgentContent, which core's advise hook shares.
-// It differs from strippedForExhaustionScan on purpose: it blanks lines in place and honors a protect list.
 func strippedForFatalPaneScan(pane, injectedPrompt string, protected []string) string {
 	return recovery.StripAgentContent(pane, injectedPrompt, protected)
 }
 
-// decideAutoRespond returns the action and rc of the first manifest prompt that matches the
-// diff-stripped pane; counts feeds the loop guard.
 func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]int, paneBusy bool) (string, int) {
 	pane = stripAgentDiffLines(pane)
-	suppressedOnce := "" // a fire-once prompt that matched but was already handled
+	suppressedOnce := ""
 	for _, p := range prompts {
 		if !promptMatches(p, pane) {
 			continue
 		}
-		// A busy CLI cannot be blocked on an escalate prompt, so a match is the agent quoting a banner.
 		if paneBusy && (p.Policy == "escalate" || p.Policy == "hold") {
 			continue
 		}
-		// A handled fire-once prompt lingers in scrollback: skip it without counting toward the loop
-		// guard, and keep scanning so a new prompt on the same pane still fires.
 		if p.Once && counts[p.Name] >= 1 {
 			if suppressedOnce == "" {
 				suppressedOnce = p.Name
@@ -112,11 +98,10 @@ func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]
 			return "extend:" + p.ResponseKeys, 2
 		case "hold":
 			return "hold:" + p.Name, 4
-		default: // escalate
+		default:
 			return "escalate:" + p.Name, 85
 		}
 	}
-	// A lingering fire-once prompt reports suppress_once (rc 0) so the caller can warn once.
 	if suppressedOnce != "" {
 		return "suppress_once:" + suppressedOnce, 0
 	}
@@ -150,59 +135,38 @@ func allDigits(s string) bool {
 	return true
 }
 
-// autoResponder holds one tmux launch's prompt rules, match counts and in-flight send.
 type autoResponder struct {
-	prompts []ManifestPrompt
-	// transientRegex is the manifest's temporary-upstream signature, compiled once per launch.
-	transientRegex   string
-	transientPattern *regexp.Regexp
-	// transientGate measures a 60s dwell on the wait loop's 2s cadence. Only the wait loop
-	// enables it, because other tick callers discard rc.
+	prompts               []ManifestPrompt
+	transientRegex        string
+	transientPattern      *regexp.Regexp
 	transientGate         *exhaustionGate
 	transientDwellEnabled bool
 	transientFired        bool
-	// exhaustedRegex is the manifest's quota-wall pattern, checked every tick so a wall
-	// escalates without waiting for the stop-review checkpoint.
-	exhaustedRegex string
-	// exhaustGate requires the wall on consecutive ticks before rc 85, so a wall-shaped frame a
-	// working agent renders never kills it.
-	exhaustGate *exhaustionGate
-	// injectedPrompt is stripped from the scans so the agent quoting its own instructions never escalates.
-	injectedPrompt string
-	// wallScanSuppressed disables the exhaustion scan for the phase once a live probe finds the CLI healthy.
-	wallScanSuppressed bool
-	// wallProbed and wallConfirmed latch the one corroboration per responder: callers that discard
-	// rc would otherwise re-probe a confirmed wall every tick.
-	wallProbed    bool
-	wallConfirmed bool
-	workspace     string
-	cli           string
-	counts        map[string]int
-	deps          Deps
-	human         bool // when true, deliver keys with human-input cadence
-	// scrollback is the capture depth: 0 for visible-pane CLIs, >0 for alt-screen CLIs whose visible pane is blank.
-	scrollback int
-	// suppressLogged holds the fire-once prompts already warned about, so each warns once.
-	suppressLogged map[string]bool
-	// rec records every send with its resolved outcome; nil disables telemetry (recipe capability
-	// runs). pending is the one send awaiting resolution.
-	// See ADR-0045.
-	rec     *interaction.Recorder
-	phase   string
-	cycle   int
-	pending *pendingAutoRespond
-	// broker answers a blocking question the kernel knows, once per launch (brokerTried), instead of
-	// escalating. A nil broker, a non-enforce stage or a miss falls through to rc 85.
-	broker      *interaction.KernelAnswerer
-	brokerStage string
-	brokerTried bool
-	// shadowRules match observe-only and record would_fire once per rule (shadowFired); they send nothing.
-	shadowRules []shadowObserver
-	shadowFired map[string]bool
-	paneProfile panestream.PaneProfile
+	exhaustedRegex        string
+	exhaustGate           *exhaustionGate
+	injectedPrompt        string
+	wallScanSuppressed    bool
+	wallProbed            bool
+	wallConfirmed         bool
+	workspace             string
+	cli                   string
+	counts                map[string]int
+	deps                  Deps
+	human                 bool
+	scrollback            int
+	suppressLogged        map[string]bool
+	rec                   *interaction.Recorder
+	phase                 string
+	cycle                 int
+	pending               *pendingAutoRespond
+	broker                *interaction.KernelAnswerer
+	brokerStage           string
+	brokerTried           bool
+	shadowRules           []shadowObserver
+	shadowFired           map[string]bool
+	paneProfile           panestream.PaneProfile
 }
 
-// firedRuleName names the rule whose count just advanced, so the send log attributes the keystroke.
 func (ar *autoResponder) firedRuleName(prevCounts map[string]int) string {
 	for _, p := range ar.prompts {
 		if ar.counts[p.Name] > prevCounts[p.Name] {
@@ -212,18 +176,15 @@ func (ar *autoResponder) firedRuleName(prevCounts map[string]int) string {
 	return "unknown"
 }
 
-// pendingAutoRespond is one injection awaiting its outcome on the next capture. An auto-respond
-// send and a kernel answer resolve the same way, so they share it.
 type pendingAutoRespond struct {
 	rule    string
 	re      *regexp.Regexp
 	keys    string
 	at      time.Time
-	kind    string // interaction.Kind* (default KindAutoRespond)
+	kind    string
 	trigger string
 }
 
-// newAutoResponder loads the CLI's manifest rules; a missing manifest yields none (tick is a noop).
 func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback int) *autoResponder {
 	var prompts []ManifestPrompt
 	var exhaustedRegex string
@@ -243,7 +204,6 @@ func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback i
 	return &autoResponder{paneProfile: cliPaneProfile(cli), prompts: prompts, transientRegex: transientRegex, transientPattern: transientPattern, transientGate: &exhaustionGate{threshold: transientDwellObservations}, exhaustedRegex: exhaustedRegex, exhaustGate: newExhaustionGate(), workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
 }
 
-// tick captures the pane and applies one observation, returning (action, rc) for runTmuxREPL.
 func (ar *autoResponder) tick(ctx context.Context, session string) (string, int) {
 	pane, err := ar.deps.Tmux.CapturePane(ctx, session, ar.scrollback)
 	return ar.tickPane(ctx, session, pane, err == nil)
@@ -268,16 +228,10 @@ func (ar *autoResponder) endBoot() {
 	ar.prompts = slices.DeleteFunc(slices.Clone(ar.prompts), func(p ManifestPrompt) bool { return p.Policy == "hold" })
 }
 
-// transientDwellObservations is the 60s dwell at the wait loop's 2s cadence. Change it together
-// with exhaustionPersistObservations, or say why not.
 const transientDwellObservations = 30
 
-// tickPane applies one observation to a pane the wait loop already captured. A failed capture
-// (captureOK false) is no observation, never a recovered pane, so it cannot reset the dwell.
 func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, captureOK bool) (string, int) {
-	// Resolve the in-flight send first: its pattern no longer matching is the proof it worked.
 	ar.resolvePending(pane)
-	// Shadow rules record a would-fire once per rule and change nothing.
 	if ar.rec != nil {
 		for _, so := range ar.shadowRules {
 			if !ar.shadowFired[so.id] && so.re.MatchString(pane) {
@@ -292,20 +246,15 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 			}
 		}
 	}
-	// decideAutoRespond advances the fired rule's counter; the snapshot identifies that rule.
 	prevCounts := make(map[string]int, len(ar.counts))
 	for k, v := range ar.counts {
 		prevCounts[k] = v
 	}
-	// pane stays raw for resolvePending, shadow rules and writeEscalation; only the decision strips it.
-	// BusyOf is nil-safe and stateless, so this read never disturbs the checkpoint's Observe baseline.
 	paneBusy := ar.deps.LivenessCenter.BusyOf(pane, ar.paneProfile)
-	// scanPane drops prompt echoes so neither scan fires on the agent's own instructions.
 	scanPane := stripPromptEchoLines(pane, ar.injectedPrompt)
 	action, rc := decideAutoRespond(scanPane, ar.prompts, ar.counts, paneBusy)
 	if ar.transientDwellEnabled && ar.transientPattern != nil && captureOK {
 		if ar.transientGate == nil {
-			// A nil gate from direct struct construction degrades to a disabled dwell, never a panic.
 			ar.transientGate = &exhaustionGate{threshold: transientDwellObservations}
 		}
 		matched := !paneBusy && ar.transientPattern.MatchString(strippedForExhaustionScan(pane, ar.injectedPrompt))
@@ -332,17 +281,12 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 			}
 		}
 	}
-	// A quota wall escalates regardless of busy and overrides a lesser verdict: the artifact will never
-	// come. It scans the stripped pane and is persistence-gated, so wall text a working agent renders
-	// never fast-fails it.
 	if rc != 85 && ar.exhaustedRegex != "" && !ar.wallScanSuppressed {
-		if ar.exhaustGate == nil { // bulletproof against a direct struct construction
+		if ar.exhaustGate == nil {
 			ar.exhaustGate = newExhaustionGate()
 		}
 		walled := ar.deps.LivenessCenter.ExhaustedOf(strippedForExhaustionScan(pane, ar.injectedPrompt), panestream.PaneProfile{ExhaustedRegex: ar.exhaustedRegex})
 		if ar.exhaustGate.observe(walled) {
-			// Exactly one live probe per responder, because work content can hold wall vocabulary
-			// on-pane. Both answers latch: callers that discard rc would re-probe every tick.
 			if !ar.wallProbed {
 				ar.wallProbed = true
 				ar.wallConfirmed = wallCorroborated(ctx, ar.deps.CorroborateWall, ar.cli)
@@ -372,14 +316,12 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 		fmt.Fprintf(ar.deps.Stderr, "[auto-respond] extend_timeout signal: %s\n", action)
 		return action, 2
 	case 85:
-		// Before escalating, let the kernel answer a blocking question it knows; a miss still escalates.
 		if ar.tryKernelAnswer(ctx, session, pane) {
 			return "", 1
 		}
 		ar.writeEscalation(pane, strings.TrimPrefix(action, "escalate:"), "escalate", session)
 		return "", 85
 	case 86:
-		// The same pattern kept matching, so the pending send demonstrably did not clear it.
 		name := strings.TrimPrefix(action, "loop_guard:")
 		if ar.pending != nil && ar.pending.rule == name {
 			ar.record(ar.pending, interaction.ResultNoEffect)
@@ -388,8 +330,6 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 		ar.writeEscalation(pane, name, "loop_guard", session)
 		return action, 86
 	default:
-		// A fire-once prompt still matches after its response. That is indistinguishable from an
-		// unanswered dialog here, so record suppressed_lingering and warn once.
 		if name, ok := strings.CutPrefix(action, "suppress_once:"); ok {
 			if ar.pending != nil && ar.pending.rule == name {
 				ar.record(ar.pending, interaction.ResultSuppressedLingering)
@@ -405,8 +345,6 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 	}
 }
 
-// resolvePending records prompt_cleared once the pending pattern stops matching. A nil pattern is
-// left for flushPending, so no outcome is fabricated.
 func (ar *autoResponder) resolvePending(pane string) {
 	if ar.pending == nil || ar.pending.re == nil {
 		return
@@ -417,8 +355,6 @@ func (ar *autoResponder) resolvePending(pane string) {
 	}
 }
 
-// openPending closes a still-pending predecessor as no_effect and opens the outcome window for the
-// send that just fired. No-op without a recorder.
 func (ar *autoResponder) openPending(prevCounts map[string]int, keysCSV string) {
 	if ar.rec == nil {
 		return
@@ -435,19 +371,18 @@ func (ar *autoResponder) openPending(prevCounts map[string]int, keysCSV string) 
 		}
 	}
 	if name == "" {
-		return // defensive: a send without a counted rule is unreachable
+		return
 	}
 	var re *regexp.Regexp
 	for _, p := range ar.prompts {
 		if p.Name == name {
-			re, _ = regexp.Compile(p.Regex) // compiled in decide already (it matched)
+			re, _ = regexp.Compile(p.Regex)
 			break
 		}
 	}
 	ar.pending = &pendingAutoRespond{rule: name, re: re, keys: keysCSV, at: ar.deps.Now()}
 }
 
-// flushPending records run_ended for a send the run ends on, so no outcome is dropped.
 func (ar *autoResponder) flushPending() {
 	if ar.pending == nil {
 		return
@@ -456,7 +391,6 @@ func (ar *autoResponder) flushPending() {
 	ar.pending = nil
 }
 
-// record emits one resolved injection outcome under the pending send's own kind and trigger.
 func (ar *autoResponder) record(p *pendingAutoRespond, result string) {
 	kind := p.kind
 	if kind == "" {
@@ -480,23 +414,19 @@ func (ar *autoResponder) record(p *pendingAutoRespond, result string) {
 	})
 }
 
-// tryKernelAnswer extracts the blocking question through the panetrust boundary (never raw pane) and
-// injects the kernel's answer once in enforce stage. Every other path returns false, so the caller escalates.
 func (ar *autoResponder) tryKernelAnswer(ctx context.Context, session, pane string) bool {
 	if ar.broker == nil || ar.brokerTried || ar.brokerStage == "off" || ar.brokerStage == "" {
 		return false
 	}
 	q, err := panetrust.Extract(pane, panetrust.ExtractSpec{Kind: panetrust.ExtractQuestion})
 	if err != nil {
-		return false // no typed question → fall through to the chain, never guess
+		return false
 	}
 	answer, ok := ar.broker.Answer(q.Value)
 	if !ok {
-		return false // kernel doesn't know → the 85 chain is the floor
+		return false
 	}
 	if ar.brokerStage != "enforce" {
-		// Shadow records what it would answer. brokerTried bounds injection, not recording; the
-		// escalate rule's loop guard caps how often this path runs.
 		fmt.Fprintf(ar.deps.Stderr, "[ask-broker] shadow: would answer %q with %q (EVOLVE_PHASE_RECOVERY=%s)\n", q.Value, answer, ar.brokerStage)
 		if ar.rec != nil {
 			ar.rec.Record(interaction.Outcome{
@@ -506,16 +436,14 @@ func (ar *autoResponder) tryKernelAnswer(ctx context.Context, session, pane stri
 		}
 		return false
 	}
-	// The agent is blocked at a prompt, so it is idle by construction and needs no busy guard.
 	ar.brokerTried = true
 	if ar.human {
 		humanReadingPause(ar.deps, pane)
 	}
 	_ = ar.deps.Tmux.SendKeys(ctx, session, answer, true)
 	fmt.Fprintf(ar.deps.Stderr, "[ask-broker] answered %q with kernel fact %q\n", q.Value, answer)
-	// Resolve like an auto-respond send: prompt_cleared if the question clears, else run_ended.
 	if ar.rec != nil {
-		ar.flushPending() // resolve any prior auto-respond send first
+		ar.flushPending()
 		re, _ := regexp.Compile(regexp.QuoteMeta(strings.TrimSpace(q.Value)))
 		ar.pending = &pendingAutoRespond{
 			rule:    "kernel_answer",
@@ -529,17 +457,13 @@ func (ar *autoResponder) tryKernelAnswer(ctx context.Context, session, pane stri
 	return true
 }
 
-// autoRespondInterKeyPause gives the TUI a render frame between keys: claude's multi-select fails
-// to submit on a burst. It runs through Deps.Sleep, so tests stay fast.
 const autoRespondInterKeyPause = 500 * time.Millisecond
 
-// sendKeySequence sends each comma-separated token as its own paced keystroke; an "Enter" token is
-// a bare Enter. Collapsing the Enters would submit a multi-select with nothing selected.
 func sendKeySequence(ctx context.Context, deps Deps, session, csv string) {
 	first := true
 	for _, tok := range strings.Split(csv, ",") {
 		if tok == "" {
-			continue // empty token (e.g. "y,,Enter") → no keystroke
+			continue
 		}
 		if !first {
 			deps.Sleep(autoRespondInterKeyPause)
@@ -553,7 +477,6 @@ func sendKeySequence(ctx context.Context, deps Deps, session, csv string) {
 	}
 }
 
-// writeEscalation writes escalation-report.json from the final pane, the operator's repair trail.
 func (ar *autoResponder) writeEscalation(pane, patternName, reason, session string) {
 	report := struct {
 		SchemaVersion int      `json:"schema_version"`

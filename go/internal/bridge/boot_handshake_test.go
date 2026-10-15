@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// shellWedgeTmux reports a shell as the pane process after the prompt paste: the CLI exited and the paste spilled into the shell.
 type shellWedgeTmux struct {
 	*FakeTmuxController
 	postPasteCmd string
@@ -19,7 +18,6 @@ func (s *shellWedgeTmux) PasteBuffer(ctx context.Context, session string) error 
 	return nil
 }
 
-// markerOverDeadShell is a stale prompt marker in scrollback above a wedged zsh continuation prompt.
 const markerOverDeadShell = `❯ previous output above
 user@host evolve-loop % knowledge-base/research/
 bquote>
@@ -50,7 +48,6 @@ func TestBootRejectsMarkerOverDeadShell(t *testing.T) {
 func TestBootAcceptsMarkerWithCLIProcess(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig(t)
-	// Two frames: boot marker + the deferred cleanup's final-scrollback capture.
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ done"}, PaneCmd: "node"}
 	code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
 		name: "claude-tmux", session: "handshake-ok", launchCmd: "claude",
@@ -64,8 +61,6 @@ func TestBootAcceptsMarkerWithCLIProcess(t *testing.T) {
 func TestPostPasteShellSpillFailsFast(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig(t)
-	// Frames: boot marker (process node), then the post-paste interval baseline showing the spill (process zsh),
-	// then the deferred-cleanup final scrollback. No artifact is ever written.
 	base := &FakeTmuxController{
 		CaptureFrames: []string{"❯", cycle274BquoteSpill, cycle274BquoteSpill},
 		PaneCmd:       "node",
@@ -88,8 +83,6 @@ func TestPostPasteShellSpillFailsFast(t *testing.T) {
 func TestPostPasteSpillLookalikeWithCLIProcessIgnored(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig(t)
-	// The pane quotes spill text while the foreground process is still the CLI, so the run must complete.
-	// The lookalike frame is queued twice: the cross-poll stability window captures the settled pane once more.
 	base := &FakeTmuxController{
 		CaptureFrames: []string{"❯", cycle274BquoteSpill + "\n❯", cycle274BquoteSpill + "\n❯", "final", "cleanup"},
 		PaneCmd:       "node",
@@ -104,7 +97,6 @@ func TestPostPasteSpillLookalikeWithCLIProcessIgnored(t *testing.T) {
 	}
 }
 
-// A harness whose REPL is a shell script (the RealTmux integration fixtures) must boot when guardDeadShell is unset.
 func TestGuardOffShellREPLBoots(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig(t)

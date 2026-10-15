@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
-// loadAgyManifestOffline pins the catalog overlay to an empty dir, so assertions see the manifest's own offline defaults.
 func loadAgyManifestOffline(t *testing.T) Manifest {
 	t.Helper()
 	injectCatalogDir(t, t.TempDir())

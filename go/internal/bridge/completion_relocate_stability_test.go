@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-// growingFallback writes body at path with a monotonically advancing mtime,
-// modelling an agent appending to a deliverable it wrote to the wrong place.
 func growingFallback(t *testing.T, path string, i int) {
 	t.Helper()
 	writeArtifact(t, path,

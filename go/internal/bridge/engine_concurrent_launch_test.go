@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// The request fast-fails inside LaunchArgs (a nonexistent profile) only after
-// Launch has installed its OnBoot hook, so the shared mutation is exercised
-// deterministically without spawning any real driver.
 func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
 	t.Parallel()
 	eng := NewEngine(Deps{
@@ -29,7 +26,7 @@ func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
 		wg.Add(1)
 		go func(g int) {
 			defer wg.Done()
-			<-start // release all goroutines together to maximize overlap
+			<-start
 			for i := 0; i < iters; i++ {
 				agent := fmt.Sprintf("a%d-%d", g, i)
 				_, _ = eng.Launch(context.Background(), core.BridgeRequest{
@@ -38,7 +35,7 @@ func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
 					Workspace:    ws,
 					ArtifactPath: filepath.Join(ws, agent+"-artifact.md"),
 					Prompt:       "x",
-					Agent:        agent, // unique => no prompt/log/artifact file collisions
+					Agent:        agent,
 				})
 			}
 		}(g)

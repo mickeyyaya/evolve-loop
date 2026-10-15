@@ -5,17 +5,11 @@ import (
 	"fmt"
 )
 
-// claudeTmuxDriver drives an interactive `claude` REPL through tmux — the
-// Go port of drivers/claude-tmux.sh. Subscription-billing path (no API
-// key). Preflight here (safety gate, cost guards, claude_cmd) then hands
-// the shared REPL state machine (runTmuxREPL) the per-driver spec.
 type claudeTmuxDriver struct{}
 
 func (claudeTmuxDriver) Name() string { return "claude-tmux" }
 
 func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
-	// Safety gate: require --allow-bypass only when the driver would fall
-	// back to --dangerously-skip-permissions (i.e. no permission_mode).
 	if !cfg.AllowBypass && cfg.PermissionMode == "" {
 		fmt.Fprintln(deps.Stderr, "[claude-tmux] safety gate: --allow-bypass is required.")
 		fmt.Fprintln(deps.Stderr, "[claude-tmux] This driver runs claude with --dangerously-skip-permissions inside tmux.")
@@ -26,7 +20,6 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 		fmt.Fprintln(deps.Stderr, "[claude-tmux] NOTE: stream_output=true is no-op for this driver — tmux scrollback already streams to stdout-log")
 	}
 
-	// Cost-leak guards (the inner REPL inherits ambient env).
 	if v, ok := lookupEnv(deps, "ANTHROPIC_API_KEY"); ok && v != "" {
 		fmt.Fprintln(deps.Stderr, "[claude-tmux] ANTHROPIC_API_KEY is set — would create an ambiguous credential path; abort")
 		return ExitCostLeak, nil
@@ -44,25 +37,19 @@ func (claudeTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-")
 
-	// Launch flags come from the per-CLI Realization (ADR-0022): model,
-	// permission (plan → --permission-mode plan; bypass → --dangerously-skip-
-	// permissions), and any claude-keyed raw flags. The Realizer is the single
-	// owner, so the flag set never leaks claude argv into agy/codex.
 	launchCmd := launchCmdLine(resolveBinary(deps, "claude"), cfg.Realization.LaunchFlags)
 
-	// TODO(manifest slice): prompt marker from the claude-tmux manifest; default ❯.
 	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
-		name:          "claude-tmux",
-		session:       session,
-		named:         named,
-		launchCmd:     launchCmd,
-		modelDispatch: modelDispatchForTmux("claude-tmux", cfg.Realization, cfg.ExtraFlags),
-		promptMarker:  tmuxPromptMarkerDefault,
-		// Same glyph: claude's boot-ready marker IS its input-line prompt.
+		name:            "claude-tmux",
+		session:         session,
+		named:           named,
+		launchCmd:       launchCmd,
+		modelDispatch:   modelDispatchForTmux("claude-tmux", cfg.Realization, cfg.ExtraFlags),
+		promptMarker:    tmuxPromptMarkerDefault,
 		inputLineMarker: tmuxPromptMarkerDefault,
-		bootScrollback:  0, // claude renders to the visible pane
+		bootScrollback:  0,
 		bootIntervalS:   1,
-		tickDuringBoot:  true, // claude shows boot-time folder-trust dialogs whose ❯ cursor collides with the REPL marker (see the manifest trust_prompt* rules)
+		tickDuringBoot:  true,
 		exitSeq:         []tmuxKey{{keys: "/exit", enter: true, pauseS: 2}},
 		bootOnly:        cfg.BootOnly,
 		guardDeadShell:  true,

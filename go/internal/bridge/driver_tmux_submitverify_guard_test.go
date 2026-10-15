@@ -18,18 +18,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
-// Matchers for the keep-guard below. Whitespace-tolerant so gofmt realignment
-// can never turn a green guard red.
 var (
 	emptyMarkerRe    = regexp.MustCompile(`inputLineMarker:\s*""`)
 	declaredMarkerRe = regexp.MustCompile(`inputLineMarker:\s*\S`)
 )
 
-// captureErrTmux fails CapturePane from the errAfter'th call onward, so a test
-// can drive the re-send loop into the error branch deterministically.
 type captureErrTmux struct {
 	*fakeTmux
-	errAfter int // 1 = the first capture inside the loop fails
+	errAfter int
 	n        int
 }
 
@@ -50,7 +46,6 @@ func submitVerifyDeps(tm TmuxController, stderr *bytes.Buffer) Deps {
 	}.withDefaults()
 }
 
-// parkedPane renders text sitting unsubmitted at a claude-shaped input line.
 func parkedPane(text string) string {
 	return "● earlier scrollback\n\n" + tmuxPromptMarkerDefault + " " + text
 }
@@ -64,7 +59,7 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 	lp := tmuxLaunch{
 		name:         "nomarker-tmux",
 		session:      "s",
-		promptMarker: "? for shortcuts", // a FOOTER — not where input begins
+		promptMarker: "? for shortcuts",
 	}
 	got := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
 		"[agy-tmux]", "prompt", parkedPane(guardNudge), guardNudge)
@@ -79,9 +74,6 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 		t.Errorf("skipping verification must be LOUD: stderr does not explain why\ngot: %q", stderr.String())
 	}
 
-	// This second pane renders the footer MID-PANE with the echo after it, so
-	// only an actual early return (not a lucky marker-absence) keeps Resends
-	// at zero.
 	footerPane := "● scrollback\n? for shortcuts\n" + guardNudge
 	tm2 := &fakeTmux{paneSeq: []string{footerPane}}
 	var stderr2 bytes.Buffer
@@ -95,15 +87,13 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 }
 
 func TestVerifySubmitted_InputLineMarkerDrivesTheMatch(t *testing.T) {
-	// Pending on the FIRST observation, cleared on the re-capture: exactly one
-	// re-send, then the loop exits.
 	t.Parallel()
 	tm := &fakeTmux{paneSeq: []string{"● done\n\n" + tmuxPromptMarkerDefault}}
 	var stderr bytes.Buffer
 	lp := tmuxLaunch{
 		name:            "claude-tmux",
 		session:         "s",
-		promptMarker:    "boot-ready-banner", // deliberately NOT the input line
+		promptMarker:    "boot-ready-banner",
 		inputLineMarker: tmuxPromptMarkerDefault,
 	}
 	got := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
@@ -150,7 +140,7 @@ func TestRunTmuxREPL_InitialSubmitVerificationCaptureFailureIsLoud(t *testing.T)
 	}
 	tmux := &captureErrTmux{
 		fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
-		errAfter: 2, // boot capture succeeds; wait admission's baseline capture fails
+		errAfter: 2,
 	}
 	eng := newTestEngine(Deps{
 		Tmux:            tmux,
@@ -180,21 +170,13 @@ func TestRunTmuxREPL_InitialSubmitVerificationCaptureFailureIsLoud(t *testing.T)
 }
 
 func TestRealDriversDeclareInputLineMarker(t *testing.T) {
-	// A driver whose boot marker is NOT an input-line prompt declares the field
-	// empty; it must still NAME the field so the choice is visible in review.
 	t.Parallel()
 	noInputLine := map[string]bool{}
 
-	// The guard is textual and cannot see a marker emptied at its DEFINITION.
-	// claude/codex point inputLineMarker at shared constants, so pin the shared
-	// one here for free rather than leaving that hole entirely open.
 	if tmuxPromptMarkerDefault == "" {
 		t.Fatal("tmuxPromptMarkerDefault is empty — every driver pointing inputLineMarker at it goes inert while this guard stays green")
 	}
 
-	// Bind git-TRACKED state, not whatever sits on disk (ADR-0084 lens 5a): an
-	// untracked scratch driver_*tmux.go would otherwise become a subject of
-	// this guard and produce a false RED.
 	root, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		t.Fatalf("git rev-parse --show-toplevel: %v", err)
@@ -207,17 +189,11 @@ func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 	var drivers []string
 	for _, rel := range tracked {
 		base := filepath.Base(rel)
-		// Select by CONTENT, not filename: a driver named gemini_tmux_driver.go
-		// would escape a `driver_*tmux.go` pattern and inherit exactly the silent
-		// inertness this guard exists to prevent. Test harnesses are excluded —
-		// they are not dispatch surfaces.
 		if strings.HasSuffix(base, "_test.go") {
 			continue
 		}
 		src, err := os.ReadFile(base)
 		if err != nil {
-			// Tracked but not on disk (staged deletion, mid-rebase): not this
-			// guard's failure to report.
 			t.Logf("skipping %s: %v", base, err)
 			continue
 		}
@@ -236,17 +212,11 @@ func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 				"silently inert for this family (cycle-1526 audit: agy's footer marker)", d)
 			continue
 		}
-		// Whitespace-tolerant on purpose: gofmt re-pads struct-literal keys when a
-		// sibling field name grows, so a single-space literal match would FALSE-RED
-		// on a file nobody edited.
 		declaresEmpty := emptyMarkerRe.MatchString(src) || !declaredMarkerRe.MatchString(src)
 		if noInputLine[d] && !declaresEmpty {
 			t.Errorf("%s is listed as having no input-line marker but now declares one — "+
 				"delist it from noInputLine (self-pruning exception list)", d)
 		}
-		// Symmetry: without this, a driver regressing to an empty marker
-		// passes green and silently joins agy on the inert path — the
-		// exception list must bite in both directions.
 		if !noInputLine[d] && declaresEmpty {
 			t.Errorf("%s constructs tmuxLaunch with no (or an empty) inputLineMarker — submit-verify "+
 				"goes inert for this family; add the marker, or list it in noInputLine with a reason", d)
@@ -254,8 +224,6 @@ func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 	}
 }
 
-// timelineRecorder captures the ORDER of the driver's tmux calls and sleeps, so
-// a test can assert on the interleaving rather than on wall-clock timing.
 type timelineRecorder struct {
 	mu     sync.Mutex
 	events []string
@@ -326,10 +294,8 @@ func TestTmuxREPL_PromptDelivery_SettlesBeforeBaselineCapture(t *testing.T) {
 	settled := false
 	for i := enter + 1; i < len(ev); i++ {
 		if ev[i] == "capture" {
-			break // first observation reached without settling
+			break
 		}
-		// Pin the constant: accepting any non-zero sleep would let a 1ns
-		// settle — or an unrelated pause — satisfy this contract.
 		if ev[i] == "sleep:"+submitVerifySettle.String() {
 			settled = true
 			break

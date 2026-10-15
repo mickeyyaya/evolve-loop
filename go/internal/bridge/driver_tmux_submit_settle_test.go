@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// recordingSleepDeps is submitVerifyDeps with every Sleep duration recorded.
 func recordingSleepDeps(tm TmuxController, stderr *bytes.Buffer, sleeps *[]time.Duration) Deps {
 	d := submitVerifyDeps(tm, stderr)
 	d.Sleep = func(dur time.Duration) { *sleeps = append(*sleeps, dur) }
@@ -31,7 +30,7 @@ func writePrompt(t *testing.T, size int) string {
 func enterCount(seq []string) int {
 	n := 0
 	for _, s := range seq {
-		if s == "|true" { // the fake records SendKeys as "keys|enter"; a bare Enter is "|true"
+		if s == "|true" {
 			n++
 		}
 	}
@@ -44,7 +43,7 @@ func TestPastePrompt_WaitsForTheStablePaneBeforeEnter(t *testing.T) {
 		"› [Pasted Content 1 +40 lines]",
 		"› [Pasted Content 1 +900 lines]",
 		"› [Pasted Content 1 +1750 lines]",
-		"› [Pasted Content 1 +1750 lines]", // stable: two captures agree
+		"› [Pasted Content 1 +1750 lines]",
 	}}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
@@ -93,7 +92,7 @@ func TestVerifySubmitted_BacksOffBetweenResends(t *testing.T) {
 	t.Parallel()
 	prompt := guardNudge
 	parked := parkedPane(prompt)
-	tm := &fakeTmux{paneSeq: []string{parked, parked, "● done\n\n" + tmuxPromptMarkerDefault + " "}} // the initial pane is the argument; three captures follow the three re-sends
+	tm := &fakeTmux{paneSeq: []string{parked, parked, "● done\n\n" + tmuxPromptMarkerDefault + " "}}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
 	deps := recordingSleepDeps(tm, &stderr, &sleeps)
@@ -110,7 +109,6 @@ func TestVerifySubmitted_BacksOffBetweenResends(t *testing.T) {
 	}
 }
 
-// countingTmux returns a different pane on every capture.
 type countingTmux struct {
 	fakeTmux
 	captures int
@@ -225,7 +223,7 @@ func TestInjectText_SharesTheDeliveryTail(t *testing.T) {
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
 	deps := recordingSleepDeps(tm, &stderr, &sleeps)
-	big := strings.Repeat("inject body line\n", 400) // ≈ 6.8 KB
+	big := strings.Repeat("inject body line\n", 400)
 	if err := injectText(context.Background(), cfg, deps, "s", big); err != nil {
 		t.Fatal(err)
 	}
@@ -254,8 +252,6 @@ func TestRecordSubmitVerify_CarriesThePasteEvidence(t *testing.T) {
 	}
 }
 
-// writePromptSized writes a prompt of at least size bytes and returns its path
-// and EXACT size, so expectations are computed from the real fixture.
 func writePromptSized(t *testing.T, size int) (string, int) {
 	t.Helper()
 	pf := writePrompt(t, size)

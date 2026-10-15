@@ -66,8 +66,6 @@ func TestRunTmuxREPL_ProgressedFromCenter(t *testing.T) {
 	}
 }
 
-// checkpointRegionSource loads the extracted checkpoint boundary across the
-// coordinator, checkpoint, and disposition modules.
 func checkpointRegionSource(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -99,9 +97,6 @@ func TestRunTmuxREPL_NoDirectChromeParseAtCheckpoint(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_S4MigrationUsesRealDeterministicReviewer guards against a
-// stub standing in for the real decision logic — same guard as
-// TestWedgeCorpus_UsesRealDeterministicReviewer (livenesscenter_wedge_invariant_test.go).
 func TestRunTmuxREPL_S4MigrationUsesRealDeterministicReviewer(t *testing.T) {
 	t.Parallel()
 	var r StopReviewer = newDeterministicReviewer(defaultArtifactMaxExtends)

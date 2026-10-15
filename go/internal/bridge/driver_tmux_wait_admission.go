@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// admitPrompt verifies the prompt after dispatch and returns ExitOK when the
-// completion loop may begin. It deliberately reuses one pane capture for token
-// telemetry, dead-shell detection, and submission verification so admission
-// cannot consume different fixture frames or disagree about what was visible.
 func (w replWaiter) admitPrompt(state *replWaitState) int {
 	pane, captureErr := w.deps.Tmux.CapturePane(w.ctx, w.launch.session, w.launch.bootScrollback)
 	if captureErr != nil {

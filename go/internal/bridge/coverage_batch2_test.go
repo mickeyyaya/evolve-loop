@@ -52,14 +52,11 @@ func TestLoadProfile_AllBranches(t *testing.T) {
 	if !p.StreamOutput || p.SessionName != "ok-1" || p.PermissionMode != "plan" || len(p.AllowedTools) != 2 {
 		t.Fatalf("valid profile fields wrong: %+v", p)
 	}
-	// sandbox.allow_network must parse into ProfileSandbox.AllowNetwork — the
-	// snake_case key only maps with the json tag, so this guards a silent drop.
 	if p.Sandbox == nil || !reflect.DeepEqual(*p.Sandbox, ProfileSandbox{AllowNetwork: true}) {
 		t.Fatalf("sandbox = %+v, want &{AllowNetwork:true}", p.Sandbox)
 	}
 }
 
-// An absent sandbox block leaves Sandbox nil: v1 profiles never carried one.
 func TestLoadProfile_NoSandbox(t *testing.T) {
 	t.Parallel()
 	p, err := LoadProfile(writeJSON(t, filepath.Join(t.TempDir(), "nosb.json"),
@@ -196,7 +193,7 @@ func TestEnsureDirsAndOpenLogs_Error(t *testing.T) {
 	t.Parallel()
 	f := filepath.Join(t.TempDir(), "afile")
 	writeJSON(t, f, "x")
-	cfg := &Config{Workspace: f} // Workspace is a regular file → MkdirAll fails
+	cfg := &Config{Workspace: f}
 	if err := ensureDirs(cfg); err == nil {
 		t.Fatal("ensureDirs should fail when Workspace is a file")
 	}
@@ -219,7 +216,6 @@ func TestEngineLaunch_ValidationAndMkdir(t *testing.T) {
 			t.Fatalf("req[%d] missing field should error", i)
 		}
 	}
-	// mkdir failure: Workspace is a file
 	f := filepath.Join(t.TempDir(), "f")
 	writeJSON(t, f, "x")
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{CLI: "claude-p", Profile: "p", Workspace: f, ArtifactPath: "a"}); err == nil {
@@ -239,7 +235,7 @@ func TestRunTmuxREPL_WorkingDirMissing(t *testing.T) {
 func TestRunTmuxREPL_NamedSessionResume(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	writeJSON(t, fx.artifact, "done") // artifact already present
+	writeJSON(t, fx.artifact, "done")
 	tmux := &fakeTmux{existing: map[string]bool{"evolve-bridge-named-mysess": true}}
 	code, se := runTmux(t, fx, tmux, nil, "--allow-bypass", "--session-name=mysess")
 	if code != ExitOK {

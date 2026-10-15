@@ -16,7 +16,6 @@ func settledPrimary(t *testing.T, dir string) *Config {
 	return &Config{Workspace: dir, Artifact: p}
 }
 
-// pollUntilStable drives the detector past the 2-tick settle window.
 func pollUntilStable(t *testing.T, d *artifactDetector) (bool, error) {
 	t.Helper()
 	var done bool

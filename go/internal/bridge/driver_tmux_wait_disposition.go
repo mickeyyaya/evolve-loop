@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// checkpointDispositionResult tells the wait coordinator whether the verdict
-// starts another interval or ends the completion wait. Stop is the zero value
-// so an unrecognized review action fails closed.
 type checkpointDispositionResult uint8
 
 const (
@@ -19,9 +16,6 @@ const (
 	checkpointContinueWaiting
 )
 
-// applyCheckpointDisposition translates the published review verdict into the
-// next wait transition. Checkpoint review and its callback have already run;
-// this method owns only extension accounting and the optional idle nudge.
 func (w replWaiter) applyCheckpointDisposition(state *replWaitState, elapsed int) checkpointDispositionResult {
 	if state.lastVerdict.Action == ReviewExtend {
 		state.attempt++
@@ -63,15 +57,10 @@ func (w replWaiter) completeOnIdle(state *replWaitState) bool {
 	return true
 }
 
-// idleNudge is the ONE decision the idle reminder's text, the operator log
-// label and the interaction trigger all come from.
 type idleNudge struct {
 	msg, label, trigger string
 }
 
-// idleNudgeFor words the reminder by what the host sees: a stale leftover
-// deliverable gets a reminder bound to a re-check (see carryForwardRemedy),
-// never a blind "touch it"; otherwise the plain reminder.
 func idleNudgeFor(cfg *Config, base dispatchBaseline) idleNudge {
 	if path, found := artifactLocate(cfg); found {
 		if fi, err := os.Lstat(path); err == nil && base.matches(path, fi) {
@@ -89,10 +78,6 @@ func idleNudgeFor(cfg *Config, base dispatchBaseline) idleNudge {
 	}
 }
 
-// carryForwardRemedy carries a re-checked deliverable forward by its format:
-// a markdown report takes an appended attestation line; any other format (a
-// JSON plan) is written again in full — an appended line would break its
-// parse.
 func carryForwardRemedy(artifact string) string {
 	if strings.EqualFold(filepath.Ext(artifact), ".md") {
 		return "if it still holds, append a line recording what this attempt changed and that you re-verified it; if not, rewrite it."
@@ -100,15 +85,10 @@ func carryForwardRemedy(artifact string) string {
 	return "if it still holds, write it again in full, in the same format; if not, rewrite it with this attempt's result."
 }
 
-// deliverArtifactNudge sends and verifies the one permitted idle reminder. A
-// wedged submission ends the wait with its classified reason; every other
-// verification result records the nudge and begins one final interval.
 func (w replWaiter) deliverArtifactNudge(state *replWaitState, elapsed int) checkpointDispositionResult {
 	nudge := idleNudgeFor(w.cfg, w.dispatchBase)
 	nudgeMsg := nudge.msg
 	_ = w.deps.Tmux.SendKeys(w.ctx, w.launch.session, nudgeMsg, true)
-	// Announce the nudge before verification so a re-send diagnostic cannot
-	// appear before the operator is told that the nudge exists.
 	fmt.Fprintf(w.deps.Stderr, "%s %s; sent one-shot nudge: %s\n", w.prefix, nudge.label, nudgeMsg)
 	w.deps.Sleep(submitVerifySettle)
 	nudgePane, captureErr := w.deps.Tmux.CapturePane(w.ctx, w.launch.session, w.launch.bootScrollback)
@@ -116,7 +96,7 @@ func (w replWaiter) deliverArtifactNudge(state *replWaitState, elapsed int) chec
 		fmt.Fprintf(w.deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", w.prefix, captureErr)
 	}
 	outcome := verifySubmitted(w.ctx, w.deps, w.launch, w.prefix, "nudge", nudgePane, nudgeMsg)
-	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "nudge", outcome, pasteOutcome{}) // a nudge is a SendKeys, not a paste
+	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "nudge", outcome, pasteOutcome{})
 	if outcome.Result == interaction.ResultSubmitWedged {
 		state.submitWedged = true
 		state.lastVerdict.Reason = fmt.Sprintf("nudge %s (resends=%d)", outcome.Result, outcome.Resends)

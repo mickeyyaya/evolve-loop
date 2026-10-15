@@ -24,7 +24,6 @@ type replPreparation struct {
 	artifactScrollback int
 }
 
-// prepareTmuxREPL finishes before any tmux side effect.
 func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (replPreparation, int, error) {
 	prep := replPreparation{prefix: "[" + lp.name + "]"}
 

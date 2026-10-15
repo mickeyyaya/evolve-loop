@@ -9,18 +9,16 @@ import (
 	"testing"
 )
 
-// dyingServerTmux serves scripted frames, then reports the session (and any
-// capture) gone: a server killed under a live launch.
 type dyingServerTmux struct {
 	*FakeTmuxController
 	captures  int
-	aliveCaps int // captures while the server still lives
+	aliveCaps int
 }
 
 func (d *dyingServerTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
 	d.captures++
 	if d.captures > d.aliveCaps {
-		return "", nil // dead server: nothing to capture
+		return "", nil
 	}
 	return d.FakeTmuxController.CapturePane(ctx, session, scrollback)
 }
@@ -29,16 +27,10 @@ func (d *dyingServerTmux) HasSession(ctx context.Context, session string) bool {
 	return d.captures <= d.aliveCaps
 }
 
-// This scenario's baseline capture comes back empty; the first interval
-// checkpoint is the only good frame before the server dies, so lastGoodPane
-// must come from the checkpoint, not only the baseline.
 func TestEscalationFinalPaneFromEmptyBaseline(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig(t)
 	const evidence = "Working… (esc to interrupt) — mid-turn frame"
-	// Frame budget (the auto-respond tick consumes one capture per loop
-	// iteration before the checkpoint): boot marker → empty baseline →
-	// tick(iter1) → tick(iter2) → checkpoint(iter2)=evidence → dead after.
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "", evidence, evidence, evidence}}
 	tm := &dyingServerTmux{FakeTmuxController: base, aliveCaps: 5}
 

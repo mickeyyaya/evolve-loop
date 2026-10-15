@@ -12,14 +12,9 @@ import (
 func TestEngineLaunch_BootMS_CapturedOnColdBoot(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// Pre-seed the artifact so the post-boot wait loop exits on its first check
-	// and the launch reaches ExitOK — isolating the boot window we assert on.
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	// paneSeq=[marker] → the REPL prompt appears on the first CapturePane, i.e.
-	// the first poll iteration. claude-tmux bootIntervalS=1, so the modelled
-	// boot = 2000ms (two fixed readiness sleeps) + 1×1000ms (one poll) = 3000ms.
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	var onBoot []int64
 	eng := NewEngine(Deps{
@@ -55,8 +50,6 @@ func TestEngineLaunch_BootMS_CapturedOnColdBoot(t *testing.T) {
 func TestEngineLaunch_BootMS_ZeroWhenBootNeverCompletes(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// CapturePane always returns "", so the prompt marker is never seen and
-	// boot times out before OnBoot fires.
 	tmux := &fakeTmux{}
 	var onBoot []int64
 	eng := NewEngine(Deps{
@@ -91,8 +84,6 @@ func TestEngineLaunch_BootMS_ZeroOnWarmNamedSession(t *testing.T) {
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	// A pre-existing named session (namedExists=true) resumes and skips the
-	// cold-boot block entirely, so OnBoot never fires and BootMS stays 0.
 	const sessName = "warm1"
 	tmux := &fakeTmux{
 		existing: map[string]bool{NamedSessionName(sessName): true},

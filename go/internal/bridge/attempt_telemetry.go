@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// LLMCallsLogFilename is the attempt ledger's filename, an alias of llmcalls.Filename.
 const LLMCallsLogFilename = llmcalls.Filename
 
 type attemptLogContext struct {
@@ -34,7 +33,6 @@ func (e *Engine) attemptContext(req core.BridgeRequest, callID string, attempt i
 		callID: callID, cli: req.CLI, agent: req.Agent, attempt: attempt}
 }
 
-// event is the shape every telemetry signal of this attempt shares. origin names the producer; it has no default.
 func (c attemptLogContext) event(origin string, kind signalcenter.Kind, code signalcenter.Code, reason string) signalcenter.Event {
 	return signalcenter.Event{
 		Cycle: c.cycle, RunID: c.runID, Phase: c.phase, Attempt: c.attempt,
@@ -44,12 +42,10 @@ func (c attemptLogContext) event(origin string, kind signalcenter.Kind, code sig
 	}
 }
 
-// warn emits a bridge.warning with no step; the root's stderr sink renders it.
 func (c attemptLogContext) warn(code signalcenter.Code, detail string) {
 	c.launchWarn("attemptLogContext.warn", "", code, detail, nil)
 }
 
-// tripwire flags a successful attempt that ran past the threshold with no measured token usage.
 func (c attemptLogContext) tripwire(durationMS int64) {
 	e := c.event("attemptLogContext.tripwire", signalcenter.KindBridgeTripwire, CodeTelemetryTripwire,
 		"unmeasured successful launch: past the tripwire threshold with source=none — build a per-CLI usage collector")
@@ -57,8 +53,6 @@ func (c attemptLogContext) tripwire(durationMS int64) {
 	c.signals.Emit(e)
 }
 
-// launchWarn is the module's one bridge.warning producer: fields.step names the host step when set.
-// A nil Center is a Null Object, so Emit is a no-op.
 func (c attemptLogContext) launchWarn(origin, step string, code signalcenter.Code, reason string, fields map[string]string) {
 	e := c.event(origin, signalcenter.KindBridgeWarning, code, reason)
 	if step != "" {
@@ -70,13 +64,10 @@ func (c attemptLogContext) launchWarn(origin, step string, code signalcenter.Cod
 	c.signals.Emit(e)
 }
 
-// diagnosticField bounds untrusted text to one ASCII-quoted field, so errors stay on one parseable line.
 func diagnosticField(value string) string {
 	return evolog.DiagnosticField(value)
 }
 
-// recordModelAttempt is the one attempt-ledger writer. It returns the attempt context so every later
-// signal of the same Launch carries the ledger row's identity.
 func (e *Engine) recordModelAttempt(
 	req core.BridgeRequest,
 	requestedModel string,
@@ -233,7 +224,6 @@ func isTelemetryTripwire(cli string, code int, start, end time.Time, source toke
 		!strings.HasPrefix(strings.ToLower(cli), "claude")
 }
 
-// recordTokenUsage is a test seam over recordModelAttempt; production Launch calls recordModelAttempt directly.
 func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int, start time.Time, resp *core.BridgeResponse) {
 	e.recordModelAttempt(req, model, code, start, e.deps.Now(), modelDispatch{}, "", resp)
 }

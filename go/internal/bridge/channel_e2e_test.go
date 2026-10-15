@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 )
 
-// readCLIFrame loads a real capture from panestream's testdata, so one set of captures drives both suites.
 func readCLIFrame(t *testing.T, rel string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("panestream", "testdata", rel))
@@ -22,13 +21,11 @@ func readCLIFrame(t *testing.T, rel string) string {
 	return string(b)
 }
 
-// The fake tmux is self-paced off breadcrumbs.live (the answer only after inject_applied, the artifact only
-// after idle_reached), so the test does not depend on goroutine scheduling.
 func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	thinking := readCLIFrame(t, "claude/thinking.txt") // busy: ✽ Inferring… · esc to interrupt
-	answer := readCLIFrame(t, "claude/answer.txt")     // idle: ⏺ bullets, no interrupt affordance
+	thinking := readCLIFrame(t, "claude/thinking.txt")
+	answer := readCLIFrame(t, "claude/answer.txt")
 	bcPath := filepath.Join(ws, "build-breadcrumbs.live")
 	artifact := filepath.Join(ws, "a")
 
@@ -41,23 +38,20 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 	deps.Stderr = io.Discard
 	deps.RecoveryStage = "enforce"
 
-	tmux := &paneScriptTmux{pane: thinking} // boot marker ❯ present → REPL boots
+	tmux := &paneScriptTmux{pane: thinking}
 	deps.Tmux = tmux
-	// Driver tick 3 ms, producer poll 1 ms: inject_applied reaches the feed before the answer and idle_reached pair.
 	deps.Sleep = func(d time.Duration) {
 		if d != 2*time.Second {
-			time.Sleep(200 * time.Microsecond) // boot/prompt 1 s sleeps
+			time.Sleep(200 * time.Microsecond)
 			return
 		}
 		bc, _ := os.ReadFile(bcPath)
 		switch {
 		case !strings.Contains(string(bc), "inject_applied"):
-			tmux.setPane(thinking) // busy; marker present → the ask delivers, sawBusy set
+			tmux.setPane(thinking)
 		case !strings.Contains(string(bc), "idle_reached"):
-			tmux.setPane(answer) // PaneBusy=false + ⏺ answer above the box → idle_reached + pane.live
+			tmux.setPane(answer)
 		default:
-			// Written once: under the cross-poll stability window a file rewritten every tick keeps bumping its
-			// mtime and never settles.
 			if _, err := os.Stat(artifact); err != nil {
 				_ = os.WriteFile(artifact, []byte("done"), 0o644)
 			}
@@ -83,8 +77,6 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 		driverDone <- code
 	}()
 
-	// The driver seeks the inbox cursor to EOF at boot, so an ask appended before the seek is never delivered.
-	// It creates build-pane.live after the seek in the same goroutine, so waiting for that file syncs positively.
 	paneLivePath := filepath.Join(ws, "build-pane.live")
 	for bootDeadline := time.Now().Add(30 * time.Second); ; time.Sleep(time.Millisecond) {
 		if _, err := os.Stat(paneLivePath); err == nil {
@@ -95,8 +87,6 @@ func TestChannelE2E_RealFixtures_ClaudeSpan(t *testing.T) {
 		}
 	}
 
-	// The supervisor's clock must advance: its Ask deadline reads the injected Now, and a frozen clock turns a
-	// lost answer into an endless poll instead of a 10s ErrResponseTimeout.
 	var supTick int64
 	supNow := func() time.Time {
 		supTick++

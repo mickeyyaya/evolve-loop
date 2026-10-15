@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// Pane fixtures are verbatim captures from claude v2.1.150, codex v0.133.0 and agy 1.0.2.
 const agyIgnoredModelPane = "⚠ failed to construct executor: plan model not specified; you must specify a valid model\n" +
 	"⚠ Warning\n  ⎿  model Claude Opus 5.5 (High) is not recognized as a known model or custom model in settings. Ignoring the flag."
 
@@ -15,7 +14,6 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		name, cli, pane, wantAction string
 		wantRC                      int
 	}{
-		// --- claude-tmux: AskUserQuestion menus hang even under --dangerously-skip-permissions.
 		{
 			"claude single-select menu → Enter (recommended/first)", "claude-tmux",
 			"What's your favorite?\n❯ 1. Alpha\n     Option 1\n  2. Beta\n  3. Gamma\nEnter to select · ↑/↓ to navigate · Esc to cancel",
@@ -38,39 +36,30 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		},
 		{"claude auth-recheck → escalate", "claude-tmux", "Please log in to continue", "escalate:auth_recheck", 85},
 		{"claude rate-limit → escalate", "claude-tmux", "Error: rate limit exceeded (429)", "escalate:rate_limit", 85},
-		// An agent grepping detection code prints the token "rate_limit"; that is not a banner.
 		{"claude rate_limit code-grep → noop (no false escalate)", "claude-tmux",
 			"Bash(grep -rn \"rate_limit|error_spike|cost_anomaly\" internal/phaseobserver)\n  detection rules (infinite_loop, error_spike, cost_anomaly, rate_limit) emit",
 			"noop", 0},
 		{"claude normal output → noop", "claude-tmux", "Wrote 3 files; running the test suite now.", "noop", 0},
 
-		// --- codex-tmux: trust dialog on first launch in an untrusted dir.
 		{"codex trust → 1,Enter", "codex-tmux", "Do you trust the contents of this directory?", "send:1,Enter", 1},
 		{"codex auth → escalate", "codex-tmux", "Please sign in to ChatGPT to continue", "escalate:auth_recheck", 85},
 		{"codex rate-limit → escalate", "codex-tmux", "quota exceeded — too many requests", "escalate:rate_limit", 85},
-		// A rejected model is a wall like a quota wall: escalate at once so the family fallback runs in seconds.
 		{"codex model-unsupported 400 → escalate", "codex-tmux",
 			"⚠ Model metadata for gpt-5.6-sol not found. Using default model metadata.\n■ {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account.\"}}\n\n›",
 			"escalate:model_unsupported", 85},
-		// The same JSON quoted by an agent reading a write-up must not fire: the rule matches the
-		// pane tail only, and the busy gate holds.
 		{"codex model-unsupported quoted far above the tail → noop", "codex-tmux",
 			"■ {\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"The 'x' model is not supported when using Codex with a ChatGPT account.\"}}\n" + strings.Repeat("  reading docs/incidents/...\n", 40) + "›",
 			"noop", 0},
-		// The real codex banner puts "hit" before "usage limit"; it must fail fast.
 		{"codex usage-limit ChatGPT quota → escalate", "codex-tmux",
 			"■ You've hit your usage limit. Upgrade to Plus to continue using Codex (https://chatgpt.com/explore/plus), or try again at Jun 4th, 2026 3:45 PM.",
 			"escalate:rate_limit", 85},
-		// A bare "Upgrade to Plus to continue" is pricing text an agent may echo; it must stay noop.
 		{"codex generic upgrade CTA (no limit) → noop", "codex-tmux",
 			"Doc excerpt: 'Upgrade to Plus to continue using advanced features' — noted for the pricing section.",
 			"noop", 0},
-		// codex's per-edit approval modal: '1' selects 'Yes, proceed'. Defense in depth behind the --yolo boot flag.
 		{"codex per-edit-approval → 1,Enter (cycle-124 G1b)", "codex-tmux",
 			"Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again for these files\n  3. No, and tell Codex what to do differently\n\nPress enter to confirm or esc to cancel",
 			"send:1,Enter", 1},
 
-		// --- agy-tmux: trust + a belt-and-suspenders permission prompt.
 		{"agy trust → Enter", "agy-tmux", "Do you trust the contents of this project?", "send:Enter", 1},
 		{"agy permission → y,Enter", "agy-tmux", "Allow write to /tmp/out.txt?", "send:y,Enter", 1},
 		{"agy quota → escalate", "agy-tmux", "You have exceeded your daily limit for the free tier", "escalate:quota_exhausted", 85},
@@ -84,7 +73,6 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 			if err != nil {
 				t.Fatalf("LoadManifest(%s): %v", tc.cli, err)
 			}
-			// Fresh counts per case so the loop guard never bleeds across rows.
 			gotAction, gotRC := decideAutoRespond(tc.pane, m.InteractivePrompts, map[string]int{}, false)
 			if gotAction != tc.wantAction || gotRC != tc.wantRC {
 				t.Fatalf("decide[%s] on %q\n  = (%q, %d)\n  want (%q, %d)",
@@ -102,13 +90,11 @@ func TestAutoRespond_TrustPromptFiresOnce(t *testing.T) {
 			if err != nil {
 				t.Fatalf("LoadManifest(%s): %v", cli, err)
 			}
-			// A real trust dialog (matches a specific question disjunct, not just
-			// the generic affirmative).
 			pane := "Do you trust the contents of this directory?\n  1. Yes, continue\n  2. No, exit"
 			if cli == "agy-tmux" {
 				pane = "Do you trust the contents of this project?\n  1. Yes\n  2. No"
 			}
-			counts := map[string]int{} // shared across ticks, like the live ar.counts
+			counts := map[string]int{}
 
 			a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 			if a == "noop" || rc == 0 {
@@ -134,7 +120,7 @@ func TestAutoRespond_FeedbackRatingFiresOnce(t *testing.T) {
 				t.Fatalf("LoadManifest(%s): %v", cli, err)
 			}
 			pane := "How's the CLI experience so far?\n  Rate 0-9 then Enter"
-			counts := map[string]int{} // shared across ticks, like the live ar.counts
+			counts := map[string]int{}
 
 			a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
 			if a == "noop" || rc == 0 {
@@ -191,7 +177,6 @@ func TestAutoRespond_CodexPerEditApprovalRegex(t *testing.T) {
 			"What now?\n  1. Yes, proceed\n  2. Refuse",
 			"send:1,Enter", 1,
 		},
-		// The full modal text, with all three disjuncts.
 		{
 			"full modal: all three branches present (cycle-123 reproduction)",
 			"Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again for these files\n  3. No, and tell Codex what to do differently\n\nPress enter to confirm or esc to cancel",
@@ -244,8 +229,6 @@ func TestAutoRespond_CodexPerEditApproval_PartialDoesNotMatch(t *testing.T) {
 	}
 }
 
-// Both rules send "1,Enter", so the order only decides which pattern the log names; pinning it keeps
-// that attribution stable.
 func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
 	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
@@ -278,7 +261,6 @@ func TestAutoRespond_CodexTrustWinsOverPerEditOnOverlap(t *testing.T) {
 	}
 }
 
-// Pins a known footgun: an agent printing "Yes, proceed" still fires once; the loop guard is the safety net.
 func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.T) {
 	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
@@ -293,7 +275,6 @@ func TestAutoRespond_CodexPerEditApproval_AgentOutputFalseMatchGuard(t *testing.
 		t.Logf("DOCUMENTED FOOTGUN: agent code-grep mentioning %q matches per_edit_approval; got (%q, %d); want (send:1,Enter, 1)",
 			"Yes, proceed", gotAction, gotRC)
 		t.Logf("If this test changes behavior to 'noop', tighten the per_edit_approval regex to require the option-list context")
-		// t.Fail, not t.Fatalf, so both log lines print when the contract shifts.
 		t.Fail()
 	}
 }
@@ -304,7 +285,6 @@ func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)
 	}
-	// Verbatim live capture from claude 2.1.252.
 	pane := ` Accessing workspace:
  /private/var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/tmp.j6PN2iejzV
  Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this
@@ -328,7 +308,6 @@ func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
 	if a, rc := decideAutoRespond(cursorOnYes, m.InteractivePrompts, map[string]int{}, false); a != "send:Enter" || rc != 1 {
 		t.Fatalf("the cursor-on-Yes dialog = (%q,%d), want (send:Enter,1)", a, rc)
 	}
-	// Older claude builds stay launchable, so the numbered-dialog rule must still win on the old pane.
 	oldPane := "Quick safety check: Is this a project you created or one you trust?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n Enter to confirm"
 	a, rc := decideAutoRespond(oldPane, m.InteractivePrompts, map[string]int{}, false)
 	if a != "send:Enter" || rc != 1 {
@@ -336,8 +315,6 @@ func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
 	}
 }
 
-// This repo quotes both trust dialogs verbatim in tracked files an agent reads. The bottom anchor
-// (footer, \z and tail_lines) keeps a quoted dialog from firing mid-document.
 func TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles(t *testing.T) {
 	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
@@ -354,9 +331,9 @@ func TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles(t *testing.T) {
 		t.Fatalf("expected both trust rules under test, got %d", len(trustRules))
 	}
 	files := []string{
-		"autorespond_decision_test.go", // both pane fixtures verbatim
-		"driver_claudetmux_test.go",    // the boot-path dialog fixtures
-		"manifests/claude-tmux.json",   // the rules and their notes
+		"autorespond_decision_test.go",
+		"driver_claudetmux_test.go",
+		"manifests/claude-tmux.json",
 		"../../../docs/incidents/2026-09-01-claude-2252-trust-default-flip.md",
 		"../../../docs/architecture/adr/0118-confirm-a-menu-only-on-the-observed-choice.md",
 		"trust_dialog_verify_test.go",

@@ -11,14 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// fixedMTime is an arbitrary but STABLE modification time. Tests set it
-// explicitly with os.Chtimes rather than relying on the host filesystem's
-// timestamp granularity, so a debounce keyed on mtime is exercised
-// deterministically on every platform.
 var fixedMTime = time.Unix(1_700_000_000, 0)
 
-// writeArtifact writes body at path and pins its mtime, so the detector sees
-// exactly the (size, mtime) pair the test intends.
 func writeArtifact(t *testing.T, path, body string, mtime time.Time) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -32,10 +26,6 @@ func writeArtifact(t *testing.T, path, body string, mtime time.Time) {
 	}
 }
 
-// pollUntilReady drives d.poll up to maxPolls times, invoking mutate(i) (when
-// non-nil) immediately BEFORE each poll to model what the agent did to the file
-// between two wait-loop ticks. It returns the 1-based poll index at which the
-// detector reported ready and the note it carried, or (-1, "") if it never did.
 func pollUntilReady(t *testing.T, d *artifactDetector, maxPolls int, mutate func(i int)) (int, string) {
 	t.Helper()
 	for i := 1; i <= maxPolls; i++ {
@@ -111,7 +101,7 @@ func TestArtifactDetector_NotReadyOnSameSizeRewrite(t *testing.T) {
 	canonical := filepath.Join(ws, "report.md")
 	d := newArtifactDetectorAt(ws, canonical)
 
-	bodies := []string{"verdict: PASS\n", "verdict: FAIL\n"} // identical length
+	bodies := []string{"verdict: PASS\n", "verdict: FAIL\n"}
 	rewrite := func(i int) {
 		writeArtifact(t, canonical, bodies[i%len(bodies)],
 			fixedMTime.Add(time.Duration(i)*time.Second))
@@ -132,8 +122,6 @@ func TestArtifactDetector_CtxCancelledShortCircuitsDebounce(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	// A brand-new detector with no stability history at all: the cancelled ctx
-	// must still make this single poll authoritative.
 	ready, _, note, err := d.poll(ctx)
 	if err != nil {
 		t.Fatalf("cancelled ctx with artifact present: unexpected error %v", err)
@@ -180,10 +168,6 @@ func TestArtifactDetector_RelocationNoteSurvivesUntilStable(t *testing.T) {
 	}
 }
 
-// churningReviewer models an agent that keeps rewriting its deliverable: every
-// review checkpoint appends another section, so the file's size changes on
-// every tick and the stability window can never close. After `extends` verdicts
-// it pauses, so the loop terminates deterministically instead of spinning.
 type churningReviewer struct {
 	artifact string
 	calls    int
@@ -200,9 +184,6 @@ func (c *churningReviewer) Review(StopEvent) ReviewVerdict {
 	return ReviewVerdict{Action: ReviewExtend, Reason: "still working"}
 }
 
-// Drives the real driver (Engine.LaunchArgs → runTmuxREPL → detector.poll)
-// rather than the detector in isolation, so a debounce implemented on a
-// struct nothing reaches cannot pass it.
 func TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
@@ -224,8 +205,6 @@ func TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop(t *testing.T) {
 	}
 }
 
-// debounceExitDiagnosis names the exits that mean "the driver never reached the
-// artifact wait loop", so a red says WHERE it died rather than only that it did.
 func debounceExitDiagnosis(code int) string {
 	switch code {
 	case ExitOK:
@@ -241,9 +220,6 @@ func debounceExitDiagnosis(code int) string {
 	}
 }
 
-// Guards the constant directly: every test above could pass with
-// artifactStableTicks = 1, which is arithmetically "one observation" — no
-// window at all.
 func TestArtifactStableTicks_IsAMeaningfulWindow(t *testing.T) {
 	t.Parallel()
 	if artifactStableTicks < 2 {
@@ -254,17 +230,12 @@ func TestArtifactStableTicks_IsAMeaningfulWindow(t *testing.T) {
 		t.Fatalf("artifactStableTicks = %d — each extra tick costs ~2s on EVERY phase and "+
 			"underruns the short-ArtifactTimeoutS fixtures (inbox MUST-ALSO (c))", artifactStableTicks)
 	}
-	// Keep the stdout twin in view: the two contracts should stay comparable.
 	if stdoutIdlePolls < artifactStableTicks {
 		t.Errorf("artifact window (%d) exceeds the stdout idle window (%d) — unexplained asymmetry",
 			artifactStableTicks, stdoutIdlePolls)
 	}
 }
 
-// With EVOLVE_FLEET=1 exported into the process, the caller proof must still
-// reach the wait loop and time out rather than refuse early on
-// errWorktreeRequired: fixtures must never read the ambient process
-// environment.
 func TestRunTmuxREPL_ArtifactDebounceHermeticUnderAmbientFleetEnv(t *testing.T) {
 	t.Setenv(ipcenv.FleetKey, "1")
 

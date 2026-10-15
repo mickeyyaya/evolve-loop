@@ -90,10 +90,8 @@ func TestRunTmuxREPL_StalePreDispatchArtifactTimesOutInsteadOfCompleting(t *test
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	writeArtifact(t, fx.artifact, "verdict: FAIL\nprior attempt's report\n", fixedMTime)
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; agent never writes
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "agent idle"}}}
-	// Explicit REAL capture: the shared runner defaults fakes to
-	// zeroBaselineCapture, and this test exists to drive the production gate.
 	code, stderr := runTmuxOnStopReview(t, fx, tmux, rev, nil,
 		Deps{ArtifactTimeoutS: 2, ArtifactMaxExtends: 5, CaptureBaseline: captureArtifactBaseline}, "--allow-bypass")
 	if code != ExitArtifactTimeout {
@@ -102,10 +100,6 @@ func TestRunTmuxREPL_StalePreDispatchArtifactTimesOutInsteadOfCompleting(t *test
 	}
 }
 
-// Size is load-bearing in the baseline key: on a coarse-mtime filesystem a
-// fast post-dispatch write can land inside the same mtime second as the prior
-// attempt's report — the size delta is then the only post-dispatch evidence,
-// and the write must still certify normally.
 func TestArtifactDetector_SameMTimeDifferentSizeWriteIsPostDispatch(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -122,8 +116,6 @@ func TestArtifactDetector_SameMTimeDifferentSizeWriteIsPostDispatch(t *testing.T
 	}
 }
 
-// zeroBaselineCapture models a fake session, which cannot write files, as
-// already mid-session: no pre-dispatch baseline exists.
 func zeroBaselineCapture(*Config) dispatchBaseline { return dispatchBaseline{} }
 
 func TestDepsWithDefaults_CaptureBaselineIsReal(t *testing.T) {
@@ -138,10 +130,6 @@ func TestDepsWithDefaults_CaptureBaselineIsReal(t *testing.T) {
 	}
 }
 
-// A pre-dispatch stray at a fallback location, shadowed by the stale
-// canonical at capture time, must also be baselined: if the canonical
-// vanishes mid-session (a rm-then-rewrite gap), the stray would otherwise
-// start a fresh window and launder the same class through the fallback path.
 func TestArtifactDetector_ShadowedFallbackStrayIsAlsoBaselined(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -155,7 +143,7 @@ func TestArtifactDetector_ShadowedFallbackStrayIsAlsoBaselined(t *testing.T) {
 	writeArtifact(t, fallback, "stale stray\n", fixedMTime)
 	d := newArtifactDetectorWithBaselineAt(ws, canonical)
 
-	if err := os.Remove(canonical); err != nil { // the rm-then-rewrite gap
+	if err := os.Remove(canonical); err != nil {
 		t.Fatal(err)
 	}
 	for poll := 1; poll <= artifactStableTicks+1; poll++ {

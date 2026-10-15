@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// Sweeps the single vocabulary source (unresolvedModelTokens) rather than a
-// local copy, so a token added there is automatically covered here.
 func TestClaudePArgs_OmitsUnresolvedModelToken(t *testing.T) {
 	t.Parallel()
 	for _, tok := range unresolvedModelTokens {
@@ -74,8 +72,6 @@ func TestUnresolvedModelTokens_CoversVocabularyWithoutSwallowingRealModels(t *te
 			t.Errorf("isUnresolvedModelToken(%q) = false — %q is vocabulary and must never reach a CLI as a model", tok, tok)
 		}
 	}
-	// haiku/sonnet/opus are both legacy tier aliases (translateV1TierKey) and
-	// real claude models, and must pass through as models here.
 	for _, model := range []string{"haiku", "sonnet", "opus", "claude-opus-5", "gpt-5.5", "Gemini 3.1 Pro (High)", "qwen3:30b"} {
 		if isUnresolvedModelToken(model) {
 			t.Errorf("isUnresolvedModelToken(%q) = true — suppressing a real model id disables model routing entirely for that CLI", model)

@@ -14,8 +14,6 @@ func mapLookup(m map[string]string) func(string) (string, bool) {
 	}
 }
 
-// runLookup drives LaunchArgs with the fake runner and a controlled env
-// lookup (nil = empty, so guards stay inert).
 func runLookup(t *testing.T, fr *fakeRunner, args []string, lookup map[string]string) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(lookup)})
@@ -24,8 +22,6 @@ func runLookup(t *testing.T, fr *fakeRunner, args []string, lookup map[string]st
 	return code, stderr.String()
 }
 
-// codexArgs builds a codex launch argv with an explicit model (the
-// shared fixture hardcodes --model=auto; the mapping tests need a tier).
 func codexArgs(fx launchFixture, model string) []string {
 	return []string{
 		"--cli=codex",
@@ -38,8 +34,6 @@ func codexArgs(fx launchFixture, model string) []string {
 		"--artifact=" + fx.artifact,
 	}
 }
-
-// --- claude-p credential-isolation guards ---------------------------------
 
 func TestLaunchArgs_ClaudeP_AnthropicAPIKey_CostLeak(t *testing.T) {
 	t.Parallel()
@@ -86,8 +80,6 @@ func TestLaunchArgs_ClaudeP_AnthropicBaseURL_AllowedProceeds(t *testing.T) {
 	}
 }
 
-// --- codex credential-isolation guard --------------------------------------
-
 func TestLaunchArgs_Codex_OpenAIKey_CostLeak(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "codex", "")
@@ -114,8 +106,6 @@ func TestLaunchArgs_Codex_OpenAIKey_AllowedProceeds(t *testing.T) {
 	}
 }
 
-// --- codex model-tier mapping ----------------------------------------------
-
 func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
 	t.Parallel()
 	fam := codexFamilyManifest(t)
@@ -137,9 +127,6 @@ func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
 			if !fr.argvContainsPair("-m", tc.codexModel) {
 				t.Fatalf("codex argv should map %s → -m %s; calls=%+v", tc.tier, tc.codexModel, fr.calls)
 			}
-			// codex has a second model layer: without -c
-			// model_reasoning_effort=high alongside -m, the model runs at
-			// the CLI's own default effort.
 			if !fr.argvContainsPair("-c", "model_reasoning_effort=high") {
 				t.Fatalf("codex argv must carry -c model_reasoning_effort=high; calls=%+v", fr.calls)
 			}
