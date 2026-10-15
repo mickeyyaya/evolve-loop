@@ -12,19 +12,12 @@ import (
 
 const carryoverPriorityLesson = carryover.PriorityLesson
 
-// judgmentTeachingPhases are the phases whose FAIL verdict is a reasoned
-// objection worth carrying to the next cycle.
 var judgmentTeachingPhases = map[Phase]bool{
-	Phase("premise-challenge"): true,
-	// plan-review has no .evolve/phases/plan-review/phase.json today (it exists
-	// as an agent persona + slash command); listed so the lesson works the day
-	// it becomes a catalog phase.
+	Phase("premise-challenge"):  true,
 	Phase("plan-review"):        true,
 	Phase("adversarial-review"): true,
 }
 
-// recordJudgmentLesson records a judgment phase's FAIL verdict as a carryover
-// todo; a no-op for any phase outside judgmentTeachingPhases.
 func (o *Orchestrator) recordJudgmentLesson(ctx context.Context, cycle int, workspace string, failed Phase, state *State, diags []Diagnostic) {
 	if state == nil || !judgmentTeachingPhases[failed] {
 		return

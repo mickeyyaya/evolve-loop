@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// goldenDossierParams is the fixed input the golden was captured from. Do not
-// change a value here without regenerating the golden through the pre-refactor
-// producer — the point is that the bytes come from the OLD signature.
 func goldenDossierParams(projectRoot string) cycleDossierParams {
 	return cycleDossierParams{
 		ProjectRoot:        projectRoot,

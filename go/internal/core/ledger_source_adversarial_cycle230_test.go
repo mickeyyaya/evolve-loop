@@ -72,8 +72,6 @@ func TestLedgerEntrySource_NonRouterSourcePreserved_Amp(t *testing.T) {
 	}
 }
 
-// Uses reflection (same pattern as ledger_source_test.go) so this file
-// compiles even if the field is absent.
 func TestLedgerEntrySource_DirectMarshal_Amp(t *testing.T) {
 	t.Parallel()
 	var e LedgerEntry

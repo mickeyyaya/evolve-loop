@@ -9,7 +9,6 @@ func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
 
 	o := &Orchestrator{}
 	r := &CycleResult{}
-	// audit (floor) records FAIL, then retro RUNS and also reports FAIL.
 	o.recordFinalVerdict(r, PhaseAudit, VerdictFAIL, o.floorAlreadyCompleted([]string{"scout", "tdd", "build", "audit"}))
 	o.recordFinalVerdict(r, PhaseRetro, VerdictFAIL, o.floorAlreadyCompleted([]string{"scout", "tdd", "build", "audit", "retro"}))
 

@@ -6,8 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
-// hasNotAdopted reports whether a phase's declined verdict was preserved in
-// CycleResult.VerdictsNotAdopted.
 func hasNotAdopted(recs []VerdictNotAdopted, phase string) bool {
 	for _, s := range recs {
 		if s.Phase == phase {
@@ -109,20 +107,15 @@ func TestContractExhaustion_NonFloorPhase_DegradesToSkippedWarn(t *testing.T) {
 		t.Errorf("degraded response must carry the workspace dir, got %q", degraded.ArtifactsDir)
 	}
 
-	// The degrade then flows through recordFinalVerdict as a non-clobbering
-	// verdict-not-adopted entry (floor already passed).
 	r := &CycleResult{FinalVerdict: VerdictPASS}
 	o.recordFinalVerdict(r, PhaseRetro, degraded.Verdict, o.floorAlreadyCompleted([]string{"tdd", "build", "audit", "retro"}))
 	if r.FinalVerdict != VerdictPASS || !hasNotAdopted(r.VerdictsNotAdopted, string(PhaseRetro)) {
 		t.Errorf("degraded retro must preserve PASS and record the declined verdict: verdict=%q notAdopted=%+v", r.FinalVerdict, r.VerdictsNotAdopted)
 	}
 
-	// A floor phase's exhaustion stays fatal (no degrade path).
 	if _, ok := o.nonFloorExhaustionDegrade(PhaseAudit, ws, floorDone); ok {
 		t.Errorf("floor phase audit exhaustion must NOT degrade — it stays cycle-fatal")
 	}
-	// A non-floor phase BEFORE the floor (scout) stays fatal too — you cannot
-	// proceed on an unparseable scout verdict.
 	if _, ok := o.nonFloorExhaustionDegrade(PhaseScout, ws, o.floorAlreadyCompleted(nil)); ok {
 		t.Errorf("pre-floor scout exhaustion must NOT degrade — no floor verdict exists yet")
 	}

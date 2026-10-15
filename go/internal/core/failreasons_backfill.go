@@ -6,9 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// backfillFailReasons reads only orchestrator-authored phase-timing state,
-// never an agent-writable workspace file, so a failure identity cannot be
-// forged from the workspace.
 func backfillFailReasons(result *CycleResult, timings []phaseTimingEntry) {
 	if result == nil || result.FinalVerdict != VerdictFAIL || len(result.FailReasons) > 0 {
 		return

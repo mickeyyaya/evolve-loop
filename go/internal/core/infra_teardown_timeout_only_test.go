@@ -67,15 +67,10 @@ func TestWritePhaseFailureDiag_TimeoutOnlyNotWidened(t *testing.T) {
 	}
 }
 
-// timeoutOnlySite names one function that the inbox item explicitly excludes
-// from the union predicate, together with why it is excluded.
 type timeoutOnlySite struct {
 	file string
 	fn   string
 	why  string
-	// gate is the timeout-only expression the body must reference; "" means
-	// the sentinel itself. internal/core/failurediag cannot import either
-	// sentinel, so the injected isArtifactTimeout gate is what the pin reads.
 	gate string
 }
 
@@ -127,8 +122,6 @@ func TestTimeoutOnlySites_NotWidenedToUnion(t *testing.T) {
 	}
 }
 
-// funcBodyText returns the source text of the named function's body from the
-// named non-test file in this package's directory.
 func funcBodyText(file, fnName string) (string, error) {
 	fset := token.NewFileSet()
 	parsed, err := parser.ParseFile(fset, file, nil, 0)

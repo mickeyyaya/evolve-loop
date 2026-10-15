@@ -12910,3 +12910,39 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // also spend its round-2 budget on a structured re-prompt (double-spending the
 // correction cap for one block).
 ```
+
+## comment-zero core-3
+
+### `go/internal/core/disposition_gate.go:55` — above `validRouting = map[string]bool{"inbox": true, "carryover": true, "console": true, "drop": true}`
+
+```text
+// "console" (not "escalate") is the operator-owned routing term — one
+// vocabulary with ADR-0074's route field and the plan-time gate.
+```
+
+### `go/internal/core/failure_decision.go:40` — above `func validDecisionAction(action string) bool {`
+
+```text
+// validDecisionAction reports whether action is in the ADR-0072 action vocabulary.
+```
+
+### `go/internal/core/failure_decision.go:50` — above `func validDecisionLevel(level string) bool {`
+
+```text
+// validDecisionLevel reports whether level is in the ADR-0072 level vocabulary.
+```
+
+### `go/internal/core/failure_hook.go:32` — above `func WithFailureAdviser(a FailureAdviser) Option {`
+
+```text
+// WithFailureAdviser injects the ADR-0044 LLM failure-advisor tail. Nil (the
+// default) keeps the hook inert regardless of stage.
+```
+
+### `go/internal/core/identity_carry_forward.go:19` — above `func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs CycleState, base0, projectRoot string) bo…`
+
+```text
+// identityCarryForward is ADR-0105 B3. After the rebind proved the pended change identical, it proves the
+// same on the trees, runs the composed-tree gates under the fence, records the carry and lets ship take the
+// audited verdict; any doubt returns false and the change is audited again.
+```

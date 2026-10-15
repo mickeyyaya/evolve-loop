@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The sidecar's error_message embeds the sentinel's text: a wire contract
-// even though the variable itself never moves.
 func TestErrArtifactTimeout_KeepsTheWireMessage(t *testing.T) {
 	t.Parallel()
 
@@ -71,9 +69,6 @@ func TestFailureDiag_SeesASignalCenterAppliedAfterConstruction(t *testing.T) {
 	}
 }
 
-// The writer is exported now, so visibility no longer makes "one wired writer"
-// structurally true: every non-test construction outside the unit must be the
-// orchestrator's wiredFailureDiag.
 func TestFailureDiagWriter_OneConstructionSite(t *testing.T) {
 	t.Parallel()
 

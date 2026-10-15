@@ -240,6 +240,105 @@
 - **`emitShipError` projects only the triage whitelist (`shiperr.SignalDebugKeys`) from a `ShipError`'s Debug map into the event's fields, never any other Debug key, and never an empty whitelisted value.** Pinned by `TestEmitShipError_ProjectsSignalDebugKeys`.
 - **The ship-window lease (`internal/shipwindow`) serializes the audit→ship critical section across fleet lanes.** `acquireShipWindow` takes it immediately before the audit-binding HEAD snapshot (`emitPhaseBindings` → `recordAuditBinding`) and holds it through ship's push — deliberately not across the audit agent itself — so a sibling landing on main inside that window queues instead of forcing this lane into a deep-tier re-audit. A re-audit while already holding releases first (FIFO fairness to waiting siblings, a fresh heartbeat on the new hold). `releaseShipWindow` is idempotent and runs on the first non-audit phase completion and from `RunCycle`'s exit defer, so no abort path leaves a sibling waiting out the TTL. Acquisition is fail-open: a timeout or acquire error WARNs and proceeds unleased, since the pre-lease behavior (risking an `AUDIT_BINDING_HEAD_MOVED` re-audit) is strictly better than wedging the loop; `shipWindowAcquireTimeout` is a var so a test can shrink it. Pinned by `TestShipWindowWiring_AuditAcquiresNonAuditReleases` and `TestShipWindowWiring_FailOpenWhenSiblingHolds`; the audit-lease/verdict interaction is also pinned by `TestRecordAndBranch_AuditLeaseOnlyForShippableVerdict` (integration tier).
 
+## Core file group 3 rationale
+
+The reasons that the comments of the decision, disposition, dossier, failure-learning, lane-scope, leak-recovery, scoped-merge and mint-exemption files carried. The code and the tests state the what.
+
+- **Decision-branch reason strings are a contract.**
+  - The reason prefix (`proceed:`, `retry-with-fallback:` and the rest) is grepped by dashboards and scenario pins.
+  - When the advisor agrees with the deterministic decision, the deterministic reason string is kept.
+  - A rerun target clamps to the upstream phases (audit, build, tdd). Re-shipping is the dedicated RESHIP action. Thus `rerun_phase: ship` must not become a reship that skips the precondition.
+  - A nil validation plan writes `[]`, so a validated-clean plan differs from validation that never ran.
+- **Disposition vocabulary.**
+  - An out-of-vocabulary value is rejected with the offending field named, so a document that parses as JSON still fails the gate.
+  - The routing term is `console`, not `escalate`: one vocabulary with the route field of ADR-0074 and the plan-time gate.
+  - The seeded skeleton leaves `Reason` empty, so the auditor's upgrade is a value edit and not a shape edit.
+  - Seeding never clobbers an existing disposition file.
+  - The defect-ledger gate is the loud enforcement.
+- **Dossier and digest identity.**
+  - The dossier producer takes phase timings as a parameter. `RunCycle` writes `phase-timing.json` in a deferred call that lands after the producer. A re-read then finds no phases.
+  - The dossier builder has no `ContractVerifier`, so `DeliverableValid` stays false and the live floor owns reconcile.
+  - `backfillFailReasons` reads only orchestrator-authored phase-timing state, never an agent-writable file, so a failure identity cannot be forged from the workspace.
+  - Display and identity are two projections of one reason string. The digest, the dossier and `audit-fail-reason.json` keep the reason verbatim. Only the hash input is normalized.
+  - The fingerprint carries the phase as a prefix and as a hash input, so two failures that differ only in phase never share an id.
+  - The boilerplate router and epilogue templates are single sources shared with their detectors, so the writer and the content-free check cannot drift.
+  - The boilerplate patterns are anchored at both ends, so appended text makes a reason content-bearing.
+  - Cause chains grow prefix-first, so the cause head is tail-kept.
+- **Failure advisor trust boundary.**
+  - The model sees the neutralized pane, but the promoted `pane_substr` is matched against RAW panes. A quoted neutralization artifact then promotes a signature that can never fire.
+  - `parseFailureAdvice` applies the checks of `recovery.PromoteAdvice` early, so a bad verdict fails at the parse with the raw output in the error.
+  - The hook scans the agent-stripped pane, so a novel wedge that quotes a seeded signature in diff content is not read as already classified.
+  - It passes an empty prompt on purpose: the echo half is neutered by the protect list.
+  - A pane the registry already classifies gets no LLM consultation.
+  - The advise timeout is long enough to learn one novel signature. Each promotion saves about 20 minutes of `maxExtends` burn. The abort never hangs on a wedged advisor.
+  - A composition-root enforce flip with no adviser wired skips the advise-then-promote path silently. Thus `FailureAdviserWired` exists.
+  - The clamp in `router.ClampPlanModelRouting` short-circuits on a nil lookup, hence `ModelCatalogLookupWired`.
+- **Failure learning.**
+  - `phaseOutcomeFrom` records a canonical agent verdict as-is and synthesizes FAIL for anything else, so a synthesized PASS is structurally impossible.
+  - `recordPhaseOutcome` is the one chokepoint, so `PhasesRun`, `phase-timing.json` and `<phase>-usage.json` agree.
+  - The learning gate orders incomplete, canceled and quota-deferred.
+  - A cancellation is an operator stop, and an all-families quota exhaustion is a resume checkpoint: neither is evidence that the phase failed.
+  - The cancel check comes BEFORE the quota sentinel.
+  - A ship dispatch explanation is preserved for the coherence floor even when the quota boundary skips learning.
+  - A missing persona doc is a known configuration absence and learns deterministically with no LLM dispatch.
+  - `completeRetro` is a divergent twin of `phaseCompletionRecord.persist`, kept and named. A PASS retro must still deliver a valid disposition that agrees with the digest. If not, the completion surfaces a gate reason.
+  - An out-of-band retro keeps the no-main-tree-cwd invariant.
+  - The recorder and the learning engine are built lazily for an orchestrator assembled as a literal. The clock goes through a closure and the Center through an accessor. Tests swap `o.now` and apply `WithSignalCenter` after construction.
+- **Final-verdict floor.**
+  - Only an authoritative phase (the resolved ship floor plus ship) sets `FinalVerdict`.
+  - A later non-floor phase must not clobber it: its non-PASS outcome is appended to `VerdictsNotAdopted`.
+  - A non-floor phase degrades to SKIPPED with a WARN only after the floor passed.
+  - Before that, an unparseable verdict of scout, triage or intent stays cycle-fatal.
+- **Lost-landing floor.**
+  - An absent or unreadable `ship-error.json` means ship never ran.
+  - Any other reading invents a landing loss on every pre-ship cycle.
+- **Lane scope.**
+  - `scoutArtifactName` derives from the phasecontract registry. A frozen copy degrades goal-hash normalization into its fail-open branch when the registry moves. That is a lane-identity bug that looks like an absent report.
+  - `LaneScope` is an alias of the leaf declaration because exactly one non-test file may declare the wire tags.
+  - A broken or empty pin falls back to the legacy env fleet scope with a WARN. It never aborts. It never yields a silently empty contract.
+  - The scope is pinned to disk BEFORE any phase output exists.
+  - The LAST fenced JSON block with a `goal_hash` wins, since the Decision Trace is the final block of a report.
+- **Leak recovery.**
+  - The deliverable-path test matches a directory prefix but needs exact equality for a file, so a look-alike name cannot false-positive.
+  - `-uall` lists every untracked file, so leaks relocate at file granularity.
+  - A tracked-edit relocation assumes the worktree copy is at HEAD (the caller checks), so it never clobbers independent work.
+  - `git checkout HEAD -- p` resets index and tree, so a staged-only leak is discarded too.
+  - A non-zero git exit comes back as `(c != 0, e == nil)`. The code branches on it. It never wraps a nil error, because that renders `<nil>` and breaks `errors.Is`.
+  - `git check-ignore -q` exits 0 when ignored and 1 when not.
+  - A launch error on `git diff --quiet` counts as not clean, so the caller takes the conservative discard path.
+  - `moveFile` copies and removes when `os.Rename` fails with EXDEV across mounts.
+  - Build artifacts a builder may rebuild into the main tree, non-deliverable `.evolve/` state at any depth, and bare directory entries from `-uall` are legitimate.
+  - The evolve deliverable prefixes (`evals/`, `phases/`, `commit-prefix-scope.json`) flow only through worktree-based phases and must never escape.
+- **Mint exemption.**
+  - Registry names are attacker-influenceable path segments, so the kebab-case floor runs BEFORE any filesystem access, and a forged `../x` never leaves `.evolve/phases/`.
+  - The spec read is capped at 1 MiB against a planted giant file.
+  - A mint writes EXACTLY `phase.json`: a companion payload still fires the guard.
+  - With the OS sandbox off, any on-disk `phase.json` is forgeable, so the exemption trusts clamp parity and not provenance.
+  - It reads after `Lstat`, so a FIFO, a symlink or an oversized file is never read.
+- **Scoped merge review (rung 2).**
+  - The reviewer is injected so the core stays pure, and a nil reviewer leaves the rung dark.
+  - An empty intersection is compatible and wastes no review.
+  - A malformed diff or hunk header fails closed: a non-nil error, no reviewer call, no partial result.
+  - A resolution is trusted by recomputed patch-id and never on the reviewer's word.
+  - A zero-count old-side range is a unit-width point, so an insertion still overlaps a change that spans it.
+  - `scopedReviewMethod` mirrors the ledger constant because core cannot import the ledger adapter, and the two strings must stay identical.
+- **Errors.**
+  - `ErrArtifactTimeout` covers exit 81.
+  - Exit 127 (a missing binary) is NOT transient: an absent CLI is an environment defect and must fail loud.
+  - `isArtifactTimeout` must never widen to the teardown union: it feeds only the exit-code and delivery-cause attribution of the failure-diagnostic writer.
+  - `ErrUnsafeConfig` marks a flow that can ship without the integrity floor (ADR-0060).
+- **Git seam.**
+  - `gitRunner` is the one git-execution seam of the package, so tests fake git.
+  - A dirty-path error propagates so the guard degrades to snapshot missed and never misreports leaks.
+- **Identity carry-forward (ADR-0105 B3).**
+  - After the rebind proved the pended change identical, the carry proves the same on the trees and runs the composed-tree gates under the fence.
+  - Any doubt returns false and the change is audited again.
+  - The gates count only when they ran on the tree that ship commits.
+- **Judgment lessons.**
+  - `plan-review` is listed although it has no catalog phase today, so the lesson works the day it becomes one.
+- **ADR pointers moved here:**
+  - ADR-0039 (audit-declared envelope), ADR-0044 (failure advisor and recorder), ADR-0045, ADR-0048 (shadow stage), ADR-0052 (agent identity), ADR-0072 (failure decision and dossier).
+
 ## Invariants
 
 - **A cycle number is never reused.** The lease is minted before any run artifact exists, and a crashed run burns its number, because a burned number may have orphaned artifacts and reuse would mix two runs' state. Pinned by `TestAllocateCycleNumber_ConcurrentAllocatorsDistinct` and `TestAllocateCycleNumber_CrashBurnsNumber`.

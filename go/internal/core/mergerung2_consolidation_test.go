@@ -2,11 +2,6 @@ package core
 
 import "testing"
 
-// TestScopedReviewImplementations_MustAgreeOnOverlap builds one audited hunk
-// (old-side [10,13), new-side [10,13)) and one composed hunk in the same
-// file (old-side [12,16), new-side [20,24)): the old-side ranges intersect
-// at line 12 (a real overlapping edit once line-shifting from earlier,
-// unrelated insertions is accounted for) but the new-side ranges do not.
 func TestScopedReviewImplementations_MustAgreeOnOverlap(t *testing.T) {
 	t.Parallel()
 

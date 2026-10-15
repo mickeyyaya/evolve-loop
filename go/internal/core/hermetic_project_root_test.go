@@ -8,14 +8,8 @@ import (
 	"testing"
 )
 
-// internalTreeRoot is the go/internal tree — the parent of this package. `go
-// test` runs each test binary with its own package directory as the working
-// directory, so ".." is go/internal regardless of where the module was invoked
-// from.
 const internalTreeRoot = ".."
 
-// sharedTmpRoot is assembled by concatenation so this guard's own source
-// can never match itself.
 var sharedTmpRoot = `"/tmp/` + `p"`
 
 func TestCoreTests_NeverPinSharedTmpProjectRoot(t *testing.T) {
@@ -29,8 +23,6 @@ func TestCoreTests_NeverPinSharedTmpProjectRoot(t *testing.T) {
 		if werr != nil {
 			return werr
 		}
-		// Only *_test.go: the class is TESTS pinning a shared root. Production
-		// code that merely names a tmp path is not cross-process mutable state.
 		if d.IsDir() || !strings.HasSuffix(d.Name(), "_test.go") {
 			return nil
 		}

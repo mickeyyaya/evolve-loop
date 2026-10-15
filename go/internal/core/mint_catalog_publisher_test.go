@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// publisherOrchestrator builds an orchestrator with the built-in spine only — no
-// minted phase in catalog/order/runners — plus a fake minter and a catalog
-// publisher that records the last published catalog into *sink.
 func publisherOrchestrator(t *testing.T, sink *phasespec.Catalog) *Orchestrator {
 	t.Helper()
 	cfg := config.RoutingConfig{
@@ -27,9 +24,6 @@ func publisherOrchestrator(t *testing.T, sink *phasespec.Catalog) *Orchestrator 
 	)
 }
 
-// stale models the pre-fix binding (a method value over the pre-mint catalog
-// value) and must still miss, proving the publisher — not aliasing — carries
-// the new catalog across; live models the post-fix binding and must hit.
 func TestRegisterMintedPhases_PublishesCatalogToLiveResolver(t *testing.T) {
 	t.Parallel()
 
@@ -49,20 +43,14 @@ func TestRegisterMintedPhases_PublishesCatalogToLiveResolver(t *testing.T) {
 
 	o.registerMintedPhases(mintPlan(minted))
 
-	// 1. The publisher fired at all, with a catalog that knows the minted phase.
 	if _, ok := published.Get(minted); !ok {
 		t.Fatalf("registerMintedPhases did not publish a catalog containing %q — the live contract resolver stays bound to the pre-mint snapshot for the rest of the cycle (cycle-1424: 600s artifact-timeout on a naked dispatch)", minted)
 	}
 
-	// 2. The live resolver now RESOLVES the minted phase's deliverable contract,
-	//    same cycle, no disk refresh, no cycle-start wait.
 	c, ok := live.Resolve(minted)
 	if !ok {
 		t.Fatalf("live CatalogResolver still MISSES %q immediately after the mint — the contract-injection path falls back to the unresolved-agent branch (adapters/bridge/bridge.go injectContract)", minted)
 	}
-	// The contract must be the spec-derived one for this phase:
-	// PhaseSpec.AgentName() = "evolve-"+Name when the spec declares no explicit
-	// agent, which every persona lookup depends on.
 	if c.Phase != minted {
 		t.Errorf("resolved contract Phase=%q, want %q (spec-derived contract must name the minted phase)", c.Phase, minted)
 	}
@@ -73,8 +61,6 @@ func TestRegisterMintedPhases_PublishesCatalogToLiveResolver(t *testing.T) {
 		t.Errorf("resolved contract ArtifactName=%q, want %q (phasecontract.artifactNameFromSpec convention fallback)", c.ArtifactName, want)
 	}
 
-	// 3. The stale binding must still miss. If this ever HITS, the two resolvers
-	//    are aliasing the same map and the assertion above is vacuous.
 	if _, ok := stale.Resolve(minted); ok {
 		t.Errorf("the pre-mint snapshot resolver unexpectedly resolves %q — Catalog.Merge no longer copies its map, and this test's proof is vacuous; re-derive the contract before touching the fix", minted)
 	}
@@ -122,7 +108,7 @@ func TestRegisterMintedPhases_RejectedMintPublishesNothing(t *testing.T) {
 func TestRegisterMintedPhases_NoPublisherIsNoop(t *testing.T) {
 	t.Parallel()
 
-	o := mintOrchestrator(t, fakeMinter{}) // no WithCatalogPublisher
+	o := mintOrchestrator(t, fakeMinter{})
 	o.registerMintedPhases(mintPlan("minted-reviewer"))
 	if _, ok := o.runners[Phase("minted-reviewer")]; !ok {
 		t.Error("mint must still register the runner when no catalog publisher is wired")

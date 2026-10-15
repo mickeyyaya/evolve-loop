@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 )
 
-// Reason is pre-created empty so the auditor's upgrade is a value edit, not a
-// shape edit.
 type seededDisposition struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
@@ -18,9 +16,6 @@ type seededDisposition struct {
 	Reason string `json:"reason"`
 }
 
-// SeedDispositionSkeleton writes a status-OPEN disposition skeleton for a
-// continuation's inherited defects, or no-ops (never clobbering an existing
-// dispositions file); the defect-ledger gate is the loud enforcement.
 func SeedDispositionSkeleton(workspace, projectRoot string, ancestorCycle int) {
 	if workspace == "" || projectRoot == "" {
 		return

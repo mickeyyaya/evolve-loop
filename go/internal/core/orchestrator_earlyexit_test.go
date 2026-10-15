@@ -20,15 +20,12 @@ func (endFromScoutStrategy) Recover(router.RouteInput) router.RouterDecision {
 	return router.RouterDecision{}
 }
 
-// noShipPlanner runs only scout, so planRunsShip is false and early-exit is
-// permitted.
 type noShipPlanner struct{}
 
 func (noShipPlanner) Plan(router.RouteInput) (*router.PhasePlan, error) {
 	return &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: string(PhaseScout), Run: true}}}, nil
 }
 
-// shipPlanner runs the full ship-intended spine, so early-exit must be refused.
 type shipPlanner struct{}
 
 func (shipPlanner) Plan(router.RouteInput) (*router.PhasePlan, error) {
@@ -42,7 +39,7 @@ func (shipPlanner) Plan(router.RouteInput) (*router.PhasePlan, error) {
 
 func dynamicCfg() config.RoutingConfig {
 	cfg := shadowCfg(config.StageEnforce)
-	cfg.Mode = config.ModeDynamicLLM // so the planner is consulted (planRunsShip reads its plan)
+	cfg.Mode = config.ModeDynamicLLM
 	return cfg
 }
 

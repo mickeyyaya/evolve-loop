@@ -22,8 +22,6 @@ var evolveDeliverablePrefixes = []string{
 	".evolve/commit-prefix-scope.json",
 }
 
-// isEvolveDeliverablePath matches a directory prefix but requires exact
-// equality for a file entry, so a look-alike name cannot false-positive.
 func isEvolveDeliverablePath(p string) bool {
 	for _, pfx := range evolveDeliverablePrefixes {
 		if strings.HasSuffix(pfx, "/") {
@@ -369,9 +367,6 @@ func stageRelocated(ctx context.Context, worktree string, paths []string, warn i
 	return true
 }
 
-// moveFile relocates src→dst, falling back to copy+remove when os.Rename
-// fails. os.Rename returns EXDEV when src and dst are on different
-// filesystems, e.g. when the worktree base resolves to another mount.
 func moveFile(src, dst string) error {
 	if err := os.Rename(src, dst); err == nil {
 		return nil
@@ -397,22 +392,14 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, data, mode)
 }
 
-// relocateTrackedEdit assumes the worktree's copy of p is at HEAD (the
-// caller checks), so overlaying the leaked content never clobbers
-// independent in-worktree work.
 func relocateTrackedEdit(ctx context.Context, projectRoot, worktree, p string) error {
 	if err := copyFile(filepath.Join(projectRoot, p), filepath.Join(worktree, p)); err != nil {
 		return fmt.Errorf("relocate content of %s: %w", p, err)
 	}
-	return discardMainLeak(ctx, projectRoot, p) // restore main to HEAD; the worktree now holds the edit
+	return discardMainLeak(ctx, projectRoot, p)
 }
 
-// `git checkout HEAD -- p` resets both index and working tree, so it also
-// discards a staged-only leak (plain `git checkout -- p` would no-op).
 func discardMainLeak(ctx context.Context, projectRoot, p string) error {
-	// gitCapture reports a non-zero exit as (c!=0, e==nil); branch instead of
-	// wrapping a nil error with %w, which would render "<nil>" and break
-	// errors.Is/As.
 	_, c, e := gitCapture(ctx, projectRoot, "checkout", "HEAD", "--", p)
 	if e != nil {
 		return fmt.Errorf("git checkout HEAD -- %s: %w", p, e)
@@ -424,45 +411,27 @@ func discardMainLeak(ctx context.Context, projectRoot, p string) error {
 }
 
 func isGitignored(ctx context.Context, dir, p string) bool {
-	// git check-ignore -q exits 0 if the path is ignored, 1 if not ignored.
 	_, code, err := gitCapture(ctx, dir, "check-ignore", "-q", "--", p)
 	return err == nil && code == 0
 }
 
-// `git diff --quiet HEAD -- p` exits 0 (clean) / 1 (differs); a launch error
-// is treated as "not clean" so the caller falls back to the conservative
-// discard path.
 func worktreeCleanForPath(ctx context.Context, worktree, p string) bool {
 	_, c, e := gitCapture(ctx, worktree, "diff", "--quiet", "HEAD", "--", p)
 	return e == nil && c == 0
 }
 
-// buildArtifacts are the tracked build outputs a leaked rebuild targets.
-// go/bin/evolve is gitignored and normally never appears in `git status`,
-// but is listed defensively.
 var buildArtifacts = map[string]bool{
 	"go/evolve":     true,
 	"go/bin/evolve": true,
 }
 
-// isLegitimateMainTreePath reports whether a main-tree path is a write
-// target that must not trigger the tree-diff guard: tracked build artifacts,
-// non-deliverable `.evolve/` state at any nesting depth, and bare directory
-// entries from `-uall`. It is the one classification both recoverBuildLeak
-// and the boundary guard consult.
 func isLegitimateMainTreePath(p string) bool {
-	// Build artifacts: a builder may rebuild these into the main tree.
 	if buildArtifacts[p] {
 		return true
 	}
-	// Trailing "/" = a bare directory entry (nested worktree/submodule that
-	// `-uall` reports without recursing): never a file we can act on.
 	if strings.HasSuffix(p, "/") {
 		return true
 	}
-	// `.evolve/` paths at any nesting depth are runtime state — EXCEPT the
-	// evolve deliverable prefixes (evals/, phases/, commit-prefix-scope.json)
-	// which only flow through worktree-based phases and must never escape.
 	if p == ".evolve" || strings.HasPrefix(p, ".evolve/") || strings.Contains(p, "/.evolve/") {
 		return !isEvolveDeliverablePath(p)
 	}

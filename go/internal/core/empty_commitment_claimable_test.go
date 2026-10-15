@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// claimableInboxItem is a dispatchable lane item: route "lane", no protected
-// fix surface, no continuation — exactly what inboxmover.Claim would accept.
 const claimableInboxItem = `{
   "id": "claimable-lane-item",
   "title": "a real queued task the lane could have claimed",
@@ -20,9 +18,6 @@ const claimableInboxItem = `{
   "acceptance": ["the item is claimed and built"]
 }`
 
-// writeClaimableInbox materializes <root>/.evolve/inbox/<n> claimable items
-// and returns the root. n == 0 creates the inbox directory but leaves it empty
-// (the legitimate no-work control: the directory exists, nothing is queued).
 func writeClaimableInbox(t *testing.T, n int) string {
 	t.Helper()
 	root := t.TempDir()
@@ -43,11 +38,8 @@ func writeClaimableInbox(t *testing.T, n int) string {
 	return root
 }
 
-// implementationPhases are the phases an empty commitment must never reach.
 var implementationPhases = []Phase{PhaseTDD, PhaseBuildPlanner, PhaseSwarmPlan, PhaseBuild, PhaseAudit, PhaseShip}
 
-// assertNoImplementationDispatch is the anti-1623 core: zero requests reached
-// any implementation runner AND the recorded history ends at triage.
 func assertNoImplementationDispatch(t *testing.T, runners map[Phase]PhaseRunner, result CycleResult) {
 	t.Helper()
 	for _, phase := range implementationPhases {
@@ -71,9 +63,6 @@ func assertNoImplementationDispatch(t *testing.T, runners map[Phase]PhaseRunner,
 	}
 }
 
-// assertNamedNonNoWorkTermination pins the disposition side of AC1: the cycle
-// records a reason, that reason is not the legitimate-no-work reason, the
-// verdict is never PASS, and the result is not credited as planned no-work.
 func assertNamedNonNoWorkTermination(t *testing.T, result CycleResult) {
 	t.Helper()
 	if result.TerminationReason == "" {
@@ -108,8 +97,6 @@ func TestRunCycle_EmptyTriageClaimableWorkStopsBeforeImplementation(t *testing.T
 			decision: `{"cycle":1623,"top_n":[],"committed_floors":[],"deferred_floors":[],"deferred":[{"id":"claimable-lane-item"}],"dropped":[],"skip_shipped":[],"skip_rejected":[],"escalate_block":[],"phase_skip":[]}`,
 		},
 		{
-			// A FAIL verdict over the same evidence must not be granted planned
-			// no-work: the claimable item is still the fact.
 			name:     "failed-triage-with-claimable-inbox",
 			verdict:  VerdictFAIL,
 			decision: `{"top_n":[]}`,
@@ -135,8 +122,6 @@ func TestRunCycle_EmptyTriageClaimableWorkStopsBeforeImplementation(t *testing.T
 			if triage.calls > 2 {
 				t.Errorf("RED: triage dispatched %d times — at most one re-dispatch is allowed for a claim race", triage.calls)
 			}
-			// The claimable item must still be where a later cycle can claim it:
-			// the gate reads the inbox, it never consumes it.
 			if _, statErr := os.Stat(filepath.Join(root, ".evolve", "inbox", "2026-09-13T00-00-00Z-claimable-lane-item.json")); statErr != nil {
 				t.Errorf("RED: the claimable inbox item vanished from the inbox root during the cycle: %v", statErr)
 			}
@@ -144,8 +129,6 @@ func TestRunCycle_EmptyTriageClaimableWorkStopsBeforeImplementation(t *testing.T
 	}
 }
 
-// countingTriageRunner wraps triageDecisionRunner to count dispatches (the
-// "re-dispatch once" bound).
 type countingTriageRunner struct {
 	inner triageDecisionRunner
 	calls int

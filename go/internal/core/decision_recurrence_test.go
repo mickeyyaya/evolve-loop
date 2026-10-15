@@ -12,7 +12,6 @@ func TestDecideAfterRetro_NthOccurrenceForcesAdapt(t *testing.T) {
 
 	led := recurrence.NewLedger()
 	pol := recurrence.DefaultEscalationPolicy()
-	// Same pattern closed out in two cycles => count=2 (Nth-occurrence).
 	if err := led.RecordClosure("loop-fatal", 1, nil, nil, pol); err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +27,6 @@ func TestDecideAfterRetro_NthOccurrenceForcesAdapt(t *testing.T) {
 		t.Fatalf("want adapt-with-escalation wording, got %q", got)
 	}
 
-	// A single-occurrence (or unseen) pattern keeps the deterministic branch.
 	if got := escalateRetroReason("proceed: none", "unseen-pattern", led); got != "proceed: none" {
 		t.Fatalf("single/zero-occurrence must stay 'proceed', got %q", got)
 	}

@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestLaneScope_ExportedSchemaAndFilename names the exported LaneScope type
-// and LaneScopeFile const, pinning that an env-scoped RunCycle materializes
-// the pin at <workspace>/<LaneScopeFile> with a schema matching LaneScope.
 func TestLaneScope_ExportedSchemaAndFilename(t *testing.T) {
 	t.Parallel()
 
