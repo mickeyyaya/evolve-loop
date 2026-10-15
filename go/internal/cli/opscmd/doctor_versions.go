@@ -31,15 +31,18 @@ func defaultInstalledVersions() map[string]string {
 	return res
 }
 
+var npmLatestReleaseURLs = map[string]string{
+	"claude": "https://registry.npmjs.org/@anthropic-ai/claude-code/latest",
+	"codex":  "https://registry.npmjs.org/@openai/codex/latest",
+}
+
 func defaultLatestRelease(bin string) (string, error) {
-	client := &http.Client{Timeout: 3 * time.Second}
-	var url string
-	switch bin {
-	case "claude":
-		url = "https://registry.npmjs.org/@anthropic-ai/claude-code/latest"
-	case "codex":
-		url = "https://registry.npmjs.org/@openai/codex/latest"
-	default:
+	return latestRelease(&http.Client{Timeout: 3 * time.Second}, npmLatestReleaseURLs, bin)
+}
+
+func latestRelease(client *http.Client, urls map[string]string, bin string) (string, error) {
+	url, ok := urls[bin]
+	if !ok {
 		return "", fmt.Errorf("no release source configured for %s", bin)
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
