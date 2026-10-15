@@ -12,47 +12,29 @@ import (
 
 type PushSite uint8
 
-// The three push sites.
 const (
 	SiteDirect PushSite = iota
 	SiteWorktree
 	SitePushOnly
 )
 
-// PushRequest is the push step's input: the branch, the site's wording, and
-// the host's two guards on the inline repair — --dry-run and the once-per-Run
-// ledger opts.repairAttempted[GIT_PUSH_REJECTED], which the host owns because
-// it is shared with the repair ladder and survives the stage re-run.
 type PushRequest struct {
-	Branch string
-	Commit string
-	Site   PushSite
-	// DryRun skips the repair (repairs mutate); the push itself still runs —
-	// push-only under --dry-run pushes today, preserved verbatim.
-	DryRun bool
-	// RepairAttempted is the host's once-guard IN: true → the rejection is
-	// returned untouched with zero repair probes.
+	Branch          string
+	Commit          string
+	Site            PushSite
+	DryRun          bool
 	RepairAttempted bool
-	// Log receives the `[ship] REPAIR:` lines in their positions; nil is the
-	// Null Object.
-	Log func(string)
+	Log             func(string)
 }
 
-// PushResult is what the push step derived: the landed head (empty when the
-// push failed or HEAD was unreadable), whether the repair ran (written back
-// by the host even on error — the repair sets it before its probes), and the
-// repair's outcome.
 type PushResult struct {
 	Head            string
 	RepairAttempted bool
 	RepairOutcome   RepairOutcome
 }
 
-// RepairOutcome is the res.RepairOutcome vocabulary of the push repair,
-// verbatim (postship_landing*_test.go and acs/cycle752 pin the strings).
 type RepairOutcome string
 
-// The push repair's outcomes.
 const (
 	RepairDeclined      RepairOutcome = "declined"
 	RepairAlreadyPushed RepairOutcome = "already-pushed"
@@ -187,15 +169,6 @@ func (l *Landing) retryTransport(ctx context.Context, req PushRequest, rejected 
 	return l.declined(req, rejected, out, "transport_retry")
 }
 
-// repairPush is the inline push-race repair (ADR-0039 §8 mode #4), run at
-// the push site so the healed path still flows through the post-push
-// verification and the binding. Returns nil when the push landed (retried,
-// or already present on origin); otherwise the error to surface — the
-// original transient rejection (declined, with Debug stamped), or a
-// precondition reclassification (repair_outcome=needs-reaudit) when origin
-// diverged and the only legitimate route is a re-audit on the new base.
-// Never rebases, never force-pushes. The host's guards come in on the
-// request; out reports what ran.
 func (l *Landing) repairPush(ctx context.Context, req PushRequest, rejected *shiperr.ShipError, out *PushResult) error {
 	emitLog(req.Log, "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry")
 	originRef, head, probe := l.probeOrigin(ctx, req)
@@ -246,9 +219,6 @@ func (l *Landing) probeOrigin(ctx context.Context, req PushRequest) (originRef, 
 	return strings.TrimSpace(originRef), strings.TrimSpace(head), ""
 }
 
-// declined records a declined repair on the result and on the original
-// error's Debug map, reports which probe declined, and returns that SAME
-// error — the callers recover it through AsShipError.
 func (l *Landing) declined(req PushRequest, rejected *shiperr.ShipError, out *PushResult, probe string) *shiperr.ShipError {
 	out.RepairOutcome = RepairDeclined
 	rejected.Debug["repair_attempted"] = string(shiperr.CodeGitPushRejected)
@@ -258,9 +228,6 @@ func (l *Landing) declined(req PushRequest, rejected *shiperr.ShipError, out *Pu
 	return rejected
 }
 
-// readHead is the post-push `rev-parse HEAD` (a blank-identifier capture at
-// all three sites before the move): an error or an empty SHA is the WARN,
-// the result's head stays empty and the ship proceeds exactly as before.
 func (l *Landing) readHead(ctx context.Context) string {
 	head, err := l.Capture(ctx, "rev-parse", "HEAD")
 	head = strings.TrimSpace(head)
@@ -276,16 +243,11 @@ func (l *Landing) readHead(ctx context.Context) string {
 	return head
 }
 
-// IsAncestor reports whether anc is an ancestor of desc (git merge-base):
-// true only on exit 0 without a spawn error.
 func (l *Landing) IsAncestor(ctx context.Context, anc, desc string) bool {
 	exit, err := l.git(ctx, []string{"merge-base", "--is-ancestor", anc, desc}, io.Discard, io.Discard)
 	return err == nil && exit == 0
 }
 
-// Capture runs `git <args>` and returns its stdout. A spawn error or an exit
-// above 1 is a transient GIT_IO (rc=1 from git diff is "differences exist",
-// not an error). It carries no step: the caller's step is unknown here.
 func (l *Landing) Capture(ctx context.Context, args ...string) (string, error) {
 	var buf strings.Builder
 	exitCode, err := l.git(ctx, args, &buf, io.Discard)

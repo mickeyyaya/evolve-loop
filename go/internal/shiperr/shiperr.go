@@ -7,52 +7,23 @@ import (
 	"strings"
 )
 
-// ShipError is the structured ship→orchestrator error protocol. The ship
-// phase is a PURE EXECUTOR: it verifies the process is right and executes
-// (commit / ff-merge / push), but it has NO power to reject a cycle's changes
-// — that decision was already made by audit. When ship cannot execute, it
-// returns a ShipError carrying a precise Code, a severity Class, the Stage it
-// failed at, and a Debug map with enough content to diagnose the problem. The
-// orchestrator (not ship) decides what to do with it: route to the debugger
-// phase, re-run an upstream phase, or block.
-//
-// It lives in this zero-dependency leaf (internal/shiperr), imported by BOTH the
-// ship phase (which constructs it) and core's orchestrator (which errors.As
-// matches it) — so the shared protocol type can never form an import cycle in
-// either direction. core re-exports the symbols via aliases for back-compat.
-//
-// Why a structured envelope: the old boundary collapsed ~50 distinct ship
-// failure points into one generic "ship: native exit=N" + joined logs, so the
-// orchestrator could not tell a transient push race from a stale audit-binding
-// from a real tampering breach. Each is now a distinct Code with its own Class
-// and Debug context (cycle-148/150/151 incident family).
 type ShipError struct {
-	Code    ShipErrorCode     // the precise failure identity
-	Class   ShipErrorClass    // severity vocabulary (drives recursion + framing)
-	Stage   ShipStage         // which ship stage failed
-	Message string            // human-readable summary
-	Debug   map[string]string // expected/actual SHAs, paths, git stderr, exit codes, …
+	Code    ShipErrorCode
+	Class   ShipErrorClass
+	Stage   ShipStage
+	Message string
+	Debug   map[string]string
 }
 
-// ShipErrorClass is the severity vocabulary. It informs how the debugger frames
-// the problem and the bounded-recursion policy; it does NOT let ship reject —
-// every class still routes to the orchestrator's resolver.
 type ShipErrorClass string
 
 const (
-	// ShipClassTransient: a retry/relaunch may succeed (network, push race).
-	ShipClassTransient ShipErrorClass = "transient"
-	// ShipClassPrecondition: an upstream precondition is stale/missing but
-	// re-establishable (audit-binding HEAD moved, tree mismatch, stale audit).
+	ShipClassTransient    ShipErrorClass = "transient"
 	ShipClassPrecondition ShipErrorClass = "precondition"
-	// ShipClassIntegrity: a genuine integrity breach (tamper, tree drift).
-	// The debugger defaults these to BLOCK unless it can prove safety.
-	ShipClassIntegrity ShipErrorClass = "integrity"
-	// ShipClassConfig: operator/config error (bad class, missing attestation).
-	ShipClassConfig ShipErrorClass = "config"
+	ShipClassIntegrity    ShipErrorClass = "integrity"
+	ShipClassConfig       ShipErrorClass = "config"
 )
 
-// ShipStage names the ship stage a failure occurred in (for triage + debug).
 type ShipStage string
 
 const (
@@ -64,19 +35,14 @@ const (
 	StageArgs              ShipStage = "args"
 )
 
-// ShipErrorCode is the precise, debuggable failure identity. Grouped by stage;
-// names are stable (ledger, the debugger persona, and tests key off them).
 type ShipErrorCode string
 
 const (
-	// verify-explanation
 	CodeExplanationDocumentation ShipErrorCode = "EXPLANATION_DOCUMENTATION"
 
-	// verify-self-sha
 	CodeSelfSHATampered ShipErrorCode = "SELF_SHA_TAMPERED"
 	CodeSelfSHAIO       ShipErrorCode = "SELF_SHA_IO"
 
-	// verify-class — audit binding (cycle class)
 	CodeAuditBindingHeadMoved       ShipErrorCode = "AUDIT_BINDING_HEAD_MOVED"
 	CodeAuditBindingTreeMismatch    ShipErrorCode = "AUDIT_BINDING_TREE_MISMATCH"
 	CodeAuditBindingArtifactSHA     ShipErrorCode = "AUDIT_BINDING_ARTIFACT_SHA"
@@ -90,17 +56,10 @@ const (
 	CodeAuditBindingAuditorExit     ShipErrorCode = "AUDIT_BINDING_AUDITOR_EXIT"
 	CodeAuditBindingNoLedger        ShipErrorCode = "AUDIT_BINDING_NO_LEDGER"
 
-	// verify-class — EGPS gate
 	CodeEGPSRedCount ShipErrorCode = "EGPS_RED_COUNT"
 
-	// verify-class — pipeline control-plane integrity boundary (ADR-0064).
-	// A --class cycle commit whose diff touches the integrity surface (gates,
-	// metric SSOT, guards, contract, grading rubrics, hook wiring) — a cycle may
-	// not edit the gate that grades it. Precondition-class (not retryable); the
-	// fix is to ship the control-plane change via --class manual instead.
 	CodeControlPlaneViolation ShipErrorCode = "CONTROL_PLANE_VIOLATION"
 
-	// verify-class — manual / trivial / commit-gate
 	CodeInvalidClass         ShipErrorCode = "INVALID_CLASS"
 	CodeManualNotTTY         ShipErrorCode = "MANUAL_NOT_TTY"
 	CodeManualDeclined       ShipErrorCode = "MANUAL_DECLINED"
@@ -110,70 +69,30 @@ const (
 	CodeTrivialNotTrivial    ShipErrorCode = "TRIVIAL_NOT_TRIVIAL"
 	CodeTrivialCriticalPaths ShipErrorCode = "TRIVIAL_CRITICAL_PATHS"
 
-	// atomic-ship — git
-	CodeGitDetachedHead    ShipErrorCode = "GIT_DETACHED_HEAD"
-	CodeGitStageFailed     ShipErrorCode = "GIT_STAGE_FAILED"
-	CodeGitCommitFailed    ShipErrorCode = "GIT_COMMIT_FAILED"
-	CodeGitFFMergeDiverged ShipErrorCode = "GIT_FF_MERGE_DIVERGED"
-	// CodeGitFleetRebaseNeeded (ADR-0049 S5b): under fleet mode a ff-merge
-	// divergence is EXPECTED — a peer cycle moved main while this cycle was
-	// mid-pipeline. NOT a terminal failure: the cycle must rebase onto the new
-	// main and re-verify the merged tree (test-the-merged-tree / merge-queue
-	// pattern) before re-shipping. Transient so the failure floor routes it to
-	// recovery rather than aborting the cycle.
-	CodeGitFleetRebaseNeeded ShipErrorCode = "GIT_FLEET_REBASE_NEEDED"
-	// CodeGitFleetRebaseConflict (ADR-0049 G13a): the fleet rebase onto main hit a
-	// genuine MERGE CONFLICT — two concurrent cycles edited the same lines, which
-	// the advisor's disjoint-file partition should have kept apart. Unlike
-	// RebaseNeeded (a clean replay → re-audit), a conflict cannot be re-audited
-	// away, so it is an INTEGRITY-class blocker routed to the debugger for triage
-	// (recommend sequential retry / partition split), not a silent abort.
+	CodeGitDetachedHead        ShipErrorCode = "GIT_DETACHED_HEAD"
+	CodeGitStageFailed         ShipErrorCode = "GIT_STAGE_FAILED"
+	CodeGitCommitFailed        ShipErrorCode = "GIT_COMMIT_FAILED"
+	CodeGitFFMergeDiverged     ShipErrorCode = "GIT_FF_MERGE_DIVERGED"
+	CodeGitFleetRebaseNeeded   ShipErrorCode = "GIT_FLEET_REBASE_NEEDED"
 	CodeGitFleetRebaseConflict ShipErrorCode = "GIT_FLEET_REBASE_CONFLICT"
 	CodeGitPushRejected        ShipErrorCode = "GIT_PUSH_REJECTED"
 	CodeCommitPrefixGate       ShipErrorCode = "COMMIT_PREFIX_GATE"
-	// CodeManifestGate (cycle-1064): the ship-bind manifest gate refused to
-	// commit path(s) no build/TDD report declared — the cross-lane untracked-leak
-	// guard firing under enforce. Dedicated rather than reusing
-	// CodeGitStageFailed (a TRANSIENT, retry-friendly `git add` failure) so the
-	// ledger/debugger can tell an integrity-flavoured BLOCK from a flaky stage:
-	// re-running audit can never re-establish the precondition, only re-declaring
-	// the path in a phase report can. Mirrors CodeCommitPrefixGate, the sibling
-	// ship-local gate that already owns a code.
-	CodeManifestGate ShipErrorCode = "MANIFEST_GATE"
-	// CodeRepoContractGate (2026-08-05): the ship-time repo-contract scanner
-	// pack found a repo-wide guard suite RED in the lane worktree — pushing
-	// would turn main red (the week's four scope-disease landings). Distinct
-	// code so the ledger/debugger can tell a contract block from git failures.
-	CodeRepoContractGate ShipErrorCode = "REPO_CONTRACT_GATE"
-	// CodeRepoContractInfra (cycle-1409): the repo-contract scanner pack exited
-	// nonzero TWICE without a single test-level failure event — the toolchain
-	// died (build-cache contention, module fetch, OOM kill), the guard suites
-	// did not say "your code is broken". Deliberately NOT an alias of
-	// CodeRepoContractGate: before this split, `cmd.Run()`'s bare exit error was
-	// wrapped as a contract RED, so an infra flake blocked three audit-green
-	// ships (cycles 1402/1403/1405 — the preserved worktree re-ran 4/4 GREEN on
-	// the identical tree). The router/debugger need to tell "fix your code" from
-	// "safe to re-dispatch"; precondition-class because a re-dispatch can
-	// re-establish it, unlike a genuine contract violation.
-	CodeRepoContractInfra  ShipErrorCode = "REPO_CONTRACT_INFRA"
-	CodeWorktreeResolve    ShipErrorCode = "WORKTREE_RESOLVE"
-	CodeIntegrityTreeDrift ShipErrorCode = "INTEGRITY_TREE_DRIFT"
+	CodeManifestGate           ShipErrorCode = "MANIFEST_GATE"
+	CodeRepoContractGate       ShipErrorCode = "REPO_CONTRACT_GATE"
+	CodeRepoContractInfra      ShipErrorCode = "REPO_CONTRACT_INFRA"
+	CodeWorktreeResolve        ShipErrorCode = "WORKTREE_RESOLVE"
+	CodeIntegrityTreeDrift     ShipErrorCode = "INTEGRITY_TREE_DRIFT"
 
 	CodeGitLaneNotOnOrigin       ShipErrorCode = "GIT_LANE_NOT_ON_ORIGIN"
 	CodeGitLandingUnwindDeclined ShipErrorCode = "GIT_LANDING_UNWIND_DECLINED"
 	CodeGitPushPolicyRefused     ShipErrorCode = "GIT_PUSH_POLICY_REFUSED"
 
-	// generic / fallthrough
 	CodeArgs    ShipErrorCode = "ARGS"
 	CodeGitIO   ShipErrorCode = "GIT_IO"
 	CodeStateIO ShipErrorCode = "STATE_IO"
 	CodeUnknown ShipErrorCode = "UNKNOWN"
 )
 
-// NewShipError builds a ShipError. debug pairs are flattened key,value,key,value.
-// An odd trailing key (caller miscount) is preserved with an empty value rather
-// than silently dropped — the Debug map is the diagnostic signal, so losing a
-// key is worse than recording a blank one. Nil-safe.
 func NewShipError(code ShipErrorCode, class ShipErrorClass, stage ShipStage, message string, debugKV ...string) *ShipError {
 	d := map[string]string{}
 	for i := 0; i < len(debugKV); i += 2 {
@@ -186,7 +105,6 @@ func NewShipError(code ShipErrorCode, class ShipErrorClass, stage ShipStage, mes
 	return &ShipError{Code: code, Class: class, Stage: stage, Message: message, Debug: d}
 }
 
-// Error renders a single-line summary: "[CODE/class @stage] message".
 func (e *ShipError) Error() string {
 	if e == nil {
 		return "<nil ShipError>"
@@ -194,8 +112,6 @@ func (e *ShipError) Error() string {
 	return fmt.Sprintf("[%s/%s @%s] %s", e.Code, e.Class, e.Stage, e.Message)
 }
 
-// DebugString renders the Debug map deterministically (sorted keys) for ledger
-// summaries and the debugger prompt.
 func (e *ShipError) DebugString() string {
 	if e == nil || len(e.Debug) == 0 {
 		return ""
@@ -215,8 +131,6 @@ func (e *ShipError) DebugString() string {
 	return b.String()
 }
 
-// AsShipError recovers a *ShipError from anywhere in an error chain. Returns
-// (nil, false) when none is present.
 func AsShipError(err error) (*ShipError, bool) {
 	var se *ShipError
 	if errors.As(err, &se) {

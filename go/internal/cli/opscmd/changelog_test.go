@@ -52,7 +52,6 @@ func TestRunChangelogGen_ExtraPositional(t *testing.T) {
 }
 
 func TestRunChangelogGen_IdempotentSkipInProcess(t *testing.T) {
-	// Seed an existing CHANGELOG.md with the target version already present.
 	tmp := t.TempDir()
 	cl := filepath.Join(tmp, "CHANGELOG.md")
 	if err := os.WriteFile(cl, []byte("# Changelog\n\n## [1.0.0]\n\n- existing\n"), 0o644); err != nil {
@@ -100,7 +99,6 @@ func TestRunChangelogGen_DryRunAgainstRealGit(t *testing.T) {
 	if rc != 0 {
 		t.Fatalf("rc=%d err=%q", rc, errOut)
 	}
-	// v0.1.0..HEAD excludes commits AT v0.1.0 (the feat one), so only "fix: second" is in range.
 	if !strings.Contains(out, "### Fixed") {
 		t.Errorf("missing Fixed section in dry-run:\n%s", out)
 	}

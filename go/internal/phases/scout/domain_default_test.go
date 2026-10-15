@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestComposePrompt_RendersDomainDefaults — ADR-0099: the scout (whose report
-// declares the kind and names the deliverable paths) sees the project default
-// kind the orchestrator seeds from .evolve/domain.json and the registry's
-// document root, so its prose never restates either; absent ⇒ byte-identical.
 func TestComposePrompt_RendersDomainDefaults(t *testing.T) {
 	h := hooks{}
 	with := h.ComposePrompt("body", core.PhaseRequest{Cycle: 1, Context: map[string]string{core.CtxKeyDeliverableKindDefault: "document", core.CtxKeyDeliverableRoot: "solutions"}})

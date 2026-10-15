@@ -15,35 +15,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// updatestate.go — CA.3 (concurrency-factory plan, Track C-A): the
-// serialized lossless read-modify-write for state.json. The plain
-// ReadState→mutate→WriteState sequence has two failure modes this fixes:
-//
-//  1. Lost updates: two mutators (goroutines or PROCESSES — the 278/279
-//     two-session launch race) interleave their reads and the loser's
-//     write erases the winner's. UpdateState holds a blocking flock on
-//     state.json.lock across the whole RMW, so writes serialize; the
-//     stateRevision counter (++ per write) is the audit trail — a gap
-//     or repeat means some writer bypassed UpdateState.
-//  2. Subset clobber: core.State models only the orchestrator-load-bearing
-//     keys, so WriteState drops operator keys (expected_ship_sha …).
-//     UpdateState merges the mutated typed view over the raw JSON map —
-//     unmodeled keys survive verbatim; modeled keys the mutation cleared
-//     are deleted, not resurrected.
-//
-// Single-mode byte-stability: stateRevision is omitempty and everything
-// else round-trips — states never touched by UpdateState are byte-stable.
-
-// UpdateState locks, reads, applies mutate, bumps StateRevision, and writes
-// back losslessly. Returns the post-mutation state. The mutate func must be
-// fast and side-effect-free — it runs under the cross-process lock — and
-// must NOT call UpdateState (the blocking flock would deadlock the
-// re-entrant call). A panicking mutate still releases the lock (deferred).
 func (s *FilesystemStorage) UpdateState(_ context.Context, mutate func(*core.State)) (core.State, error) {
-	// Resolve a worktree symlink first: the lock sidecar is then the canonical
-	// one statemap writers contend on, and the rename keeps the link intact.
 	path := statemap.ResolveWriteTarget(filepath.Join(s.evolveDir, "state.json"))
-	release, err := flock.PathLock(path) // CA.3: "<state.json>.lock" sidecar
+	release, err := flock.PathLock(path)
 	if err != nil {
 		return core.State{}, fmt.Errorf("update state: %w", err)
 	}
@@ -67,7 +41,7 @@ func (s *FilesystemStorage) UpdateState(_ context.Context, mutate func(*core.Sta
 	mutate(&st)
 	st.StateRevision++
 
-	typed, err := json.Marshal(st)
+	typed, err := marshalState(st)
 	if err != nil {
 		return core.State{}, fmt.Errorf("update state: marshal: %w", err)
 	}
@@ -75,9 +49,6 @@ func (s *FilesystemStorage) UpdateState(_ context.Context, mutate func(*core.Sta
 	if err := json.Unmarshal(typed, &typedMap); err != nil {
 		return core.State{}, fmt.Errorf("update state: remap: %w", err)
 	}
-	// Modeled keys are owned by the typed view: delete then overlay, so a
-	// key the mutation cleared (omitempty → absent from typedMap) is not
-	// resurrected from the raw map. Unmodeled keys pass through untouched.
 	for _, k := range modeledKeys {
 		delete(obj, k)
 	}
@@ -90,13 +61,10 @@ func (s *FilesystemStorage) UpdateState(_ context.Context, mutate func(*core.Sta
 	return st, nil
 }
 
-// modeledKeys caches the reflection walk — the set is fixed at compile time,
-// and UpdateState calls it inside the lock-held section.
+var marshalState = json.Marshal
+
 var modeledKeys = modeledStateKeys()
 
-// modeledStateKeys derives the JSON keys core.State owns from its struct
-// tags — reflection keeps the delete-then-overlay set drift-free as fields
-// are added.
 func modeledStateKeys() []string {
 	t := reflect.TypeOf(core.State{})
 	keys := make([]string, 0, t.NumField())

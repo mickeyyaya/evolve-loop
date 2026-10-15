@@ -1,9 +1,5 @@
 package landing
 
-// landing_test.go — the leaf's fixtures (a scripted Git keyed on the FULL
-// argv, a recording Center) and the module-contract tests: the codes, the
-// Null-Object Center, the happy paths silent, never the terminal kind.
-
 import (
 	"context"
 	"io"
@@ -29,10 +25,6 @@ type scripted struct {
 	err    error
 }
 
-// fakeGit scripts git by its full argv (FIFO per argv, the last entry
-// sticky) and records every call with the writers it streamed to —
-// "discard" (both io.Discard), "streams" (the operator streams), "capture"
-// (a builder + io.Discard) — the same classification the host goldens use.
 type fakeGit struct {
 	scripts map[string][]scripted
 	calls   []string
@@ -93,9 +85,6 @@ func recordingCenter() (*signalcenter.Center, *[]signalcenter.Event) {
 	return c, got
 }
 
-// newLanding builds a Landing over the fake git with a recording Center,
-// phase "ship" (the host's spelling, handed in — the leaf spells no phase),
-// cycle 7 and run r7.
 func newLanding(f *fakeGit) (*Landing, *[]signalcenter.Event) {
 	c, got := recordingCenter()
 	l := New(f.git, f.streams, WithRun("ship", 7, "r7"), WithSignals(func() *signalcenter.Center { return c }))
@@ -142,9 +131,6 @@ func wantShipError(t *testing.T, err error, code shiperr.ShipErrorCode, class sh
 	return se
 }
 
-// Test 28 — a recording Center over green Integrate / Push (three sites) /
-// WriteBinding sees ZERO events; every fault fixture emits exactly its code
-// once; no event of the terminal kind ship.error on any row.
 func TestLanding_NeverEmitsShipErrorAndHappyPathsAreSilent(t *testing.T) {
 	f := resumableGit()
 	f.on("rev-parse HEAD", scripted{stdout: testHead + "\n"})
@@ -189,10 +175,6 @@ func TestLanding_NeverEmitsShipErrorAndHappyPathsAreSilent(t *testing.T) {
 	}
 }
 
-// Test 29 — a nil accessor and a nil Center are the Null Object: a failing
-// reset neither panics nor emits; SignalsWired reports the truth; WithRun
-// stamps phase, cycle and run_id (without it all three are empty — the leaf
-// hard-codes no phase name; the host passes core.PhaseShip's spelling).
 func TestWarn_IsANullObjectWithoutACenter(t *testing.T) {
 	f := newFakeGit()
 	f.on("checkout HEAD -- go/evolve", scripted{exit: 1})
@@ -223,9 +205,6 @@ func TestWarn_IsANullObjectWithoutACenter(t *testing.T) {
 	}
 }
 
-// Test 30 — the four codes are registered under module ship with docs, match
-// the code grammar, and share no name with a projected ShipErrorCode; 30b:
-// every error the leaf builds is transient or precondition at atomic-ship.
 func TestCodes_RegisteredUnderModuleShipDisjointFromShipErrorCodes(t *testing.T) {
 	codes := []signalcenter.Code{CodeBinaryResetFailed, CodePushRepairDeclined, CodeHeadReadFailed, CodeBindingWriteFailed, CodeAdvanceFailed, CodeOriginFetchFailed}
 	docs := map[signalcenter.Code]string{}
@@ -287,9 +266,6 @@ func TestCodes_RegisteredUnderModuleShipDisjointFromShipErrorCodes(t *testing.T)
 	}
 }
 
-// New takes the Git port and applies its Options in any order (WithRun and
-// WithSignals are independent) — the two exported types named here for the
-// API gate are the leaf's construction contract.
 func TestNew_TakesTheGitPortAndAppliesOptionsInAnyOrder(t *testing.T) {
 	f := newFakeGit()
 	var git Git = f.git

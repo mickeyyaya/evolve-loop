@@ -9,14 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
 )
 
-// runDoctor implements `evolve doctor <subcommand>`: `probe <tool>` (CLI
-// discovery), `boot <driver>` (real bridge-boot smoke-test), and
-// `live <driver>` (boot + submit one trivial prompt — the probe that can see
-// a quota wall). Returns the process exit code.
 func RunDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve doctor: missing subcommand (try: probe <tool> | boot <driver> | live <driver> | plane [root] | versions [--latest] [--json])")
-		return 10
+		return exitUsage
 	}
 	switch args[0] {
 	case "probe":
@@ -31,9 +27,14 @@ func RunDoctor(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runDoctorVersions(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve doctor: unknown subcommand %q\n", args[0])
-		return 10
+		return exitUsage
 	}
 }
+
+var (
+	doctorProbe    = doctor.Probe
+	doctorEmitJSON = doctor.EmitJSON
+)
 
 func runDoctorProbe(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve doctor probe", flag.ContinueOnError)
@@ -43,23 +44,23 @@ func runDoctorProbe(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&asJSON, "json", false, "emit JSON payload")
 	fs.BoolVar(&quiet, "quiet", false, "suppress stdout on success/failure")
 	if err := fs.Parse(cmdutil.ReorderArgs(args)); err != nil {
-		return 10
+		return exitUsage
 	}
 	if fs.NArg() != 1 {
 		fmt.Fprintln(stderr, "evolve doctor probe: usage: evolve doctor probe <tool> [--json] [--quiet]")
-		return 10
+		return exitUsage
 	}
 	tool := fs.Arg(0)
-	r, err := doctor.Probe(tool)
+	r, err := doctorProbe(tool)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve doctor probe: %v\n", err)
-		return 10
+		return exitUsage
 	}
 	if asJSON {
-		buf, err := doctor.EmitJSON(r)
+		buf, err := doctorEmitJSON(r)
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve doctor probe: %v\n", err)
-			return 10
+			return exitUsage
 		}
 		fmt.Fprintf(stdout, "%s\n", buf)
 	} else if !quiet {
@@ -75,7 +76,7 @@ func runDoctorProbe(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	if !r.Found {
-		return 1
+		return exitFail
 	}
-	return 0
+	return exitOK
 }

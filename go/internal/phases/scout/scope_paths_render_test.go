@@ -1,9 +1,5 @@
 package scout
 
-// scope_paths_render_test.go — the scope-paths disclosure must reach the PROMPT
-// with the directive that makes it load-bearing: read these exact files, ignore
-// same-named consumed/processed namesakes.
-
 import (
 	"strings"
 	"testing"
@@ -27,7 +23,6 @@ func TestComposePrompt_ScopePathsRenderTheLiveRecordsDirective(t *testing.T) {
 	}
 }
 
-// NO-REGRESSION: absent key ⇒ byte-identical prompt (every pre-fix run).
 func TestComposePrompt_NoScopePathsIsByteIdentical(t *testing.T) {
 	h := hooks{}
 	base := core.PhaseRequest{Cycle: 1, Context: map[string]string{"fleet_scope": "a-task"}}

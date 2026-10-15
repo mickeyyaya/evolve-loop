@@ -14,14 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 )
 
-// updatestate_test.go — CA.3 (concurrency-factory plan, Track C-A):
-// Storage.UpdateState is the serialized lossless read-modify-write for
-// state.json. Plain ReadState→mutate→WriteState loses updates when two
-// mutators interleave (the 278/279 two-session class) and DROPS unmodeled
-// keys (core.State is a subset view). UpdateState fixes both: blocking
-// flock around the RMW, revision++ per write, raw-merge preserving
-// unmodeled keys.
-
 func TestUpdateState_InProcessConcurrentMutators_ZeroLostUpdates(t *testing.T) {
 	s, _ := newStore(t)
 	const G, perG = 8, 25
@@ -56,7 +48,6 @@ func TestUpdateState_InProcessConcurrentMutators_ZeroLostUpdates(t *testing.T) {
 const updStressEnv = "EVOLVE_UPDATESTATE_STRESS_DIR"
 const updStressN = 60
 
-// TestHelperStateUpdater is the child-process body for the two-process test.
 func TestHelperStateUpdater(t *testing.T) {
 	dir := os.Getenv(updStressEnv)
 	if dir == "" {
@@ -73,8 +64,6 @@ func TestHelperStateUpdater(t *testing.T) {
 	}
 }
 
-// TestUpdateState_TwoProcessStress — the 278/279 class directly: two OS
-// processes mutate state.json concurrently; zero lost updates.
 func TestUpdateState_TwoProcessStress(t *testing.T) {
 	if testing.Short() {
 		t.Skip("two-process stress skipped in -short")
@@ -106,9 +95,6 @@ func TestUpdateState_TwoProcessStress(t *testing.T) {
 	}
 }
 
-// TestUpdateState_PreservesUnmodeledKeys — core.State is a SUBSET view;
-// UpdateState must never drop operator keys like expected_ship_sha (the
-// WriteState hazard the setup marker's raw-merge precedent exists for).
 func TestUpdateState_PreservesUnmodeledKeys(t *testing.T) {
 	s, evolveDir := newStore(t)
 	seed := `{"lastCycleNumber":5,"expected_ship_sha":"abc123","customOperatorKey":{"nested":true}}`
@@ -143,9 +129,6 @@ func TestUpdateState_PreservesUnmodeledKeys(t *testing.T) {
 	}
 }
 
-// TestUpdateState_ClearedModeledFieldStaysCleared — the raw-merge must not
-// resurrect a modeled key the mutation emptied (omitempty drops it from the
-// typed marshal; the old raw value must not survive).
 func TestUpdateState_ClearedModeledFieldStaysCleared(t *testing.T) {
 	s, evolveDir := newStore(t)
 	if err := s.WriteState(context.Background(), core.State{
@@ -172,9 +155,6 @@ func TestUpdateState_ClearedModeledFieldStaysCleared(t *testing.T) {
 	}
 }
 
-// TestUpdateState_RevisionOmittedAtZero — byte-stability (CA.6 additive-
-// fields-only): states that never went through UpdateState carry no
-// stateRevision key.
 func TestUpdateState_RevisionOmittedAtZero(t *testing.T) {
 	data, err := json.Marshal(core.State{LastCycleNumber: 3})
 	if err != nil {
@@ -189,9 +169,6 @@ func TestUpdateState_RevisionOmittedAtZero(t *testing.T) {
 	}
 }
 
-// The carryover lifecycle probes the store for its Updater at run time
-// (`store.(carryover.Updater)`); a signature drift would silently demote
-// production to the legacy whole-state write. Pin both ports at compile time.
 var (
 	_ carryover.Store   = (*FilesystemStorage)(nil)
 	_ carryover.Updater = (*FilesystemStorage)(nil)

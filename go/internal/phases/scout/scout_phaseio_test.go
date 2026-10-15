@@ -8,13 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// ADR-0050 §3.10 Slice 3: scout reads strategy/goal/challengeToken from the typed
-// envelope at enforce (req.Input.Active()) and the legacy Context map below it. The
-// strategy read is verdict-affecting (convergence-confirmation → SKIPPED), so both
-// ComposePrompt AND Classify must consult the typed source.
-
-// Typed envelope and legacy map carrying the same values render the identical prompt
-// — the byte-identity proof for the migrated reads.
 func TestScout_ComposePrompt_TypedVsMap_Identical(t *testing.T) {
 	const strategy, goal, tok = "convergence-confirmation", "ship the typed envelope", "abc123token"
 	ctx := map[string]string{"strategy": strategy, "goal": goal, "challengeToken": tok}
@@ -33,8 +26,6 @@ func TestScout_ComposePrompt_TypedVsMap_Identical(t *testing.T) {
 	}
 }
 
-// At enforce all three fields come from the typed envelope even with NO Context
-// (proves the typed source is genuinely consulted, not silently reading the map).
 func TestScout_ComposePrompt_EnforceReadsTypedNotMap(t *testing.T) {
 	req := core.PhaseRequest{
 		Input: phaseio.NewPhaseInput(phaseio.PhaseInputInit{
@@ -54,10 +45,6 @@ func TestScout_ComposePrompt_EnforceReadsTypedNotMap(t *testing.T) {
 	}
 }
 
-// Classify's strategy read is verdict-affecting: convergence-confirmation with an
-// empty backlog maps to SKIPPED. The typed envelope (no Context) must produce the
-// SAME verdict as the legacy map — verdict-equivalence AND proof the typed source is
-// consulted (map-only-reading code would FAIL the empty-backlog artifact instead).
 func TestScout_Classify_TypedStrategy_Identical(t *testing.T) {
 	const artifact = "# Scout Report\n\nConvergence confirmed — no new backlog this cycle.\n"
 	mapReq := core.PhaseRequest{Context: map[string]string{"strategy": "convergence-confirmation"}}

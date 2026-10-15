@@ -14,19 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestCycleState_ConcurrentWriters_BothUpdatesSurvive is the G7 (ADR-0049)
-// regression. Two writers read-modify-write the SAME cycle-state.json:
-//   - the phase writer (storage.WriteCycleState) owns "phase" and preserves the
-//     "checkpoint" block it reads;
-//   - the checkpoint writer (checkpoint.ApplyToStateFile) owns "checkpoint" and
-//     preserves the "phase" it reads.
-//
-// Under fleet mode the whole-cycle project lock is skipped, so the two run
-// concurrently. Without a SHARED per-file lock, one writer renames over a stale
-// read and the peer's update is silently reverted (lost update). Both serialized
-// orders yield the SAME outcome — phase=audit AND checkpoint.gitHead=CP1 (both
-// updates applied) — so any other result is a lost update. A start barrier makes
-// the two RMWs overlap, so the bug trips reliably across the iterations.
 func TestCycleState_ConcurrentWriters_BothUpdatesSurvive(t *testing.T) {
 	ctx := context.Background()
 	now := time.Unix(0, 0).UTC()
@@ -47,13 +34,11 @@ func TestCycleState_ConcurrentWriters_BothUpdatesSurvive(t *testing.T) {
 		start := make(chan struct{})
 		var wg sync.WaitGroup
 		wg.Add(2)
-		// Writer A: advance phase build->audit (preserves the checkpoint block).
 		go func() {
 			defer wg.Done()
 			<-start
 			_ = st.WriteCycleState(ctx, core.CycleState{CycleID: 1, Phase: "audit"})
 		}()
-		// Writer B: advance checkpoint CP0->CP1 (preserves the phase).
 		go func() {
 			defer wg.Done()
 			<-start

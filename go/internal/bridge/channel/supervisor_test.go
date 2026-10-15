@@ -94,29 +94,23 @@ func TestSupervisor_Ask_CtxCancel(t *testing.T) {
 	}
 }
 
-// TestSupervisor_DefaultNewID ensures NewSupervisor applies its default NewID
-// and the minted ID is non-empty (exercises the default branch in NewSupervisor).
 func TestSupervisor_DefaultNewID(t *testing.T) {
 	s := NewSupervisor(SupervisorConfig{
 		Workspace: t.TempDir(),
 		Agent:     "build",
 		Transport: "claude-tmux",
-		// NewID intentionally omitted → default applied
 		PollEvery: time.Millisecond,
 		Timeout:   5 * time.Millisecond,
 	})
-	// The default NewID path is exercised; we just need Ask to reach awaitReply
-	// (which it does before timing out).
 	_, err := s.Ask(context.Background(), "x")
 	if !errors.Is(err, ErrResponseTimeout) {
 		t.Fatalf("expected timeout, got %v", err)
 	}
 }
 
-// TestAnswer_Text_NilData exercises the nil-data branch in Answer.Text.
 func TestAnswer_Text_NilData(t *testing.T) {
 	a := Answer{Events: []map[string]any{
-		{"seq": int64(1), "kind": "assistant_text"}, // no "data" key
+		{"seq": int64(1), "kind": "assistant_text"},
 		{"seq": int64(2), "kind": "assistant_text", "data": map[string]any{"text": "hello"}},
 	}}
 	if got := a.Text(); got != "hello" {
@@ -124,7 +118,6 @@ func TestAnswer_Text_NilData(t *testing.T) {
 	}
 }
 
-// TestToI64 covers the int, int64, float64, and unknown branches.
 func TestToI64(t *testing.T) {
 	cases := []struct {
 		in   any
@@ -143,8 +136,6 @@ func TestToI64(t *testing.T) {
 	}
 }
 
-// TestTailLines_MissingFile confirms tailLines returns (nil, off) for a
-// non-existent feed path without panicking.
 func TestTailLines_MissingFile(t *testing.T) {
 	lines, off := tailLines("/no/such/path/feed.ndjson", 0)
 	if lines != nil || off != 0 {
@@ -152,17 +143,13 @@ func TestTailLines_MissingFile(t *testing.T) {
 	}
 }
 
-// TestTailLines_Truncation confirms that tailLines resets the offset to 0
-// when the file is shorter than the provided offset (truncation guard).
 func TestTailLines_Truncation(t *testing.T) {
 	ws := t.TempDir()
 	appendFeed(t, ws, "build", `{"seq":1,"kind":"assistant_text","data":{"text":"hi"}}`)
 	path := FeedPath(ws, "build")
 	fi, _ := os.Stat(path)
 	size := fi.Size()
-	// Pass an offset larger than the file to simulate truncation.
 	lines, newOff := tailLines(path, size+100)
-	// Should reset to 0 and re-read from the start.
 	if len(lines) == 0 {
 		t.Fatal("expected lines after truncation reset, got none")
 	}
@@ -171,7 +158,6 @@ func TestTailLines_Truncation(t *testing.T) {
 	}
 }
 
-// TestCollectSpan_MissingFile confirms collectSpan returns nil gracefully.
 func TestCollectSpan_MissingFile(t *testing.T) {
 	result := collectSpan("/no/such/path/feed.ndjson", 1, 10)
 	if result != nil {
@@ -179,8 +165,6 @@ func TestCollectSpan_MissingFile(t *testing.T) {
 	}
 }
 
-// TestFindResponseComplete_EdgeCases exercises the skip branches:
-// malformed JSON, missing data, wrong sub, wrong corrID.
 func TestFindResponseComplete_EdgeCases(t *testing.T) {
 	lines := []string{
 		`not json`,
@@ -193,11 +177,8 @@ func TestFindResponseComplete_EdgeCases(t *testing.T) {
 	}
 }
 
-// TestSupervisor_Ask_InboxWriteError confirms Ask surfaces an inbox.Append
-// error (unwritable directory) rather than silently swallowing it.
 func TestSupervisor_Ask_InboxWriteError(t *testing.T) {
 	ws := t.TempDir()
-	// Create the inbox dir as a file so os.MkdirAll inside Append fails.
 	inboxDir := ws + "/.bridge-inbox"
 	if err := os.WriteFile(inboxDir, []byte("blocker"), 0o444); err != nil {
 		t.Fatal(err)
@@ -211,15 +192,11 @@ func TestSupervisor_Ask_InboxWriteError(t *testing.T) {
 	}
 }
 
-// TestSupervisor_Ask_TimeoutAfterWait exercises the post-tick timeout check
-// in awaitReply by using a Now clock that advances past the deadline exactly
-// on the second call (after the first ticker wait).
 func TestSupervisor_Ask_TimeoutAfterWait(t *testing.T) {
 	calls := 0
 	base := time.Unix(1000, 0)
 	now := func() time.Time {
 		calls++
-		// First 3 calls: before deadline. After that: past it.
 		if calls <= 3 {
 			return base
 		}
@@ -235,7 +212,6 @@ func TestSupervisor_Ask_TimeoutAfterWait(t *testing.T) {
 	}
 }
 
-// TestCollectSpan_MalformedLine confirms collectSpan skips malformed JSON lines.
 func TestCollectSpan_MalformedLine(t *testing.T) {
 	ws := t.TempDir()
 	appendFeed(t, ws, "build",
@@ -248,12 +224,9 @@ func TestCollectSpan_MalformedLine(t *testing.T) {
 	}
 }
 
-// TestCollectSpan_RecoversLineOver64KB confirms a single content envelope longer
-// than bufio.Scanner's default 64 KB token cap is fully recovered (a long answer
-// line must not be silently truncated out of the span). RT4.
 func TestCollectSpan_RecoversLineOver64KB(t *testing.T) {
 	ws := t.TempDir()
-	big := strings.Repeat("x", 100*1024) // 100 KB > the 64 KB default Scanner cap
+	big := strings.Repeat("x", 100*1024)
 	appendFeed(t, ws, "build",
 		`{"seq":5,"kind":"assistant_text","data":{"text":"`+big+`"}}`,
 	)
@@ -267,9 +240,6 @@ func TestCollectSpan_RecoversLineOver64KB(t *testing.T) {
 	}
 }
 
-// TestSupervisor_Ask_SpanWithInt64Seq confirms collectSpan works when seq
-// values are encoded as int64 (not float64) — exercises the int64 toI64 branch
-// in a realistic end-to-end path.
 func TestSupervisor_Ask_SpanWithInt64Seq(t *testing.T) {
 	ws := t.TempDir()
 	now := func() time.Time { return time.Unix(0, 0).UTC() }
@@ -280,8 +250,6 @@ func TestSupervisor_Ask_SpanWithInt64Seq(t *testing.T) {
 	})
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		// Write lines with integer seq values (Go json.Unmarshal decodes as float64,
-		// but toI64 must handle int64 when the caller builds the map directly).
 		appendFeed(t, ws, "scout",
 			`{"seq":10,"kind":"assistant_text","data":{"text":"result"}}`,
 			`{"seq":11,"kind":"correlation","data":{"sub":"response_complete","corr_id":"c2","start_seq":10,"end_seq":11}}`)

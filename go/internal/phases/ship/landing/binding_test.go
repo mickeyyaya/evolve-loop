@@ -17,8 +17,6 @@ func binding() dossier.ShipBinding {
 	return dossier.ShipBinding{AuditBoundTreeSHA: "bound-tree", TreeSHACommitted: "committed-tree", CommitSHA: testHead, Cycle: 42}
 }
 
-// bindingFailureFixture provokes CodeBindingWriteFailed on l (a file where
-// the directory should be).
 func bindingFailureFixture(t *testing.T, l *Landing) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "runs")
@@ -30,10 +28,6 @@ func bindingFailureFixture(t *testing.T, l *Landing) {
 	}
 }
 
-// Test 25 — the bytes equal the golden captured on the host's writer before
-// the move (2-space indent, trailing newline), the file is named by
-// dossier.ShipBindingFile in a 0o755 dir, and no temp file remains. Kills:
-// indent, newline, rename.
 func TestWriteBinding_BytesMatchTheGoldenAndNoTempRemains(t *testing.T) {
 	want, err := os.ReadFile(filepath.Join("testdata", "ship-binding.golden.json"))
 	if err != nil {
@@ -70,12 +64,6 @@ func TestWriteBinding_BytesMatchTheGoldenAndNoTempRemains(t *testing.T) {
 	}
 }
 
-// Test 26 — a failed write is returned AND one SHIP_LANDING_BINDING_WRITE_FAILED
-// {step=binding, path, err} from Landing.WriteBinding: a regular file at dir
-// (the MkdirAll error), a read-only dir (the CreateTemp error — asserted to
-// have actually failed, so a root runner cannot pass it vacuously), and a
-// directory at the target (the Rename error). Kills: warn dropped, error
-// swallowed, warn before the attempt.
 func TestWriteBinding_FailureWarnsBindingWriteFailedAndReturnsTheError(t *testing.T) {
 	rows := map[string]func(t *testing.T) string{
 		"file at dir": func(t *testing.T) string {
@@ -94,7 +82,7 @@ func TestWriteBinding_FailureWarnsBindingWriteFailedAndReturnsTheError(t *testin
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
-			if probe, err := os.CreateTemp(dir, "probe"); err == nil { // never t.Skip: a fixture that cannot fail is a failed fixture
+			if probe, err := os.CreateTemp(dir, "probe"); err == nil {
 				_ = probe.Close()
 				t.Fatal("the read-only fixture must refuse writes (the test runs as root?)")
 			}
@@ -126,16 +114,13 @@ func TestWriteBinding_FailureWarnsBindingWriteFailedAndReturnsTheError(t *testin
 	}
 }
 
-// Test 27 — the folded Write/Close chain through commitTemp with an O_RDONLY
-// file: the write error is returned, the temp path removed, no rename.
-// Kills: temp left behind, rename on error.
 func TestWriteBinding_TempRemovedWhenTheWriteFails(t *testing.T) {
 	dir := t.TempDir()
 	tmpPath := filepath.Join(dir, "ship-binding.ro.tmp")
 	if err := os.WriteFile(tmpPath, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ro, err := os.Open(tmpPath) // O_RDONLY: Write fails, Close succeeds
+	ro, err := os.Open(tmpPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,15 +138,6 @@ func TestWriteBinding_TempRemovedWhenTheWriteFails(t *testing.T) {
 	}
 }
 
-// Test 46 — the guard behind binding.go's fold of MarshalIndent's error check
-// into CreateTemp's chain: dossier.ShipBinding must stay a type json.Marshal
-// cannot fail on. Every marshalled field, recursively, is a bool, an integer
-// or a string (or a struct, slice or array of those); never a float (NaN and
-// ±Inf fail), a pointer (a cycle fails), a map, an interface, a channel, a
-// func or a complex; and no type on the way implements json.Marshaler or
-// encoding.TextMarshaler (a custom marshaler can return an error). A field
-// outside that set fails HERE, so the fold is re-split before a real marshal
-// error could be swallowed.
 func TestWriteBinding_ShipBindingCannotFailToMarshal(t *testing.T) {
 	assertMarshalCannotFail(t, reflect.TypeOf(dossier.ShipBinding{}), "dossier.ShipBinding")
 }
@@ -184,7 +160,7 @@ func assertMarshalCannotFail(t *testing.T, typ reflect.Type, path string) {
 	case reflect.Struct:
 		for i := 0; i < typ.NumField(); i++ {
 			f := typ.Field(i)
-			if f.PkgPath != "" || f.Tag.Get("json") == "-" { // not marshalled: unexported or json:"-"
+			if f.PkgPath != "" || f.Tag.Get("json") == "-" {
 				continue
 			}
 			assertMarshalCannotFail(t, f.Type, path+"."+f.Name)

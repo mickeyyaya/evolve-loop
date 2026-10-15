@@ -1,12 +1,5 @@
 package reportdoc
 
-// review_fields_test.go — the explanation-review section as auditors actually
-// write it (cycles 1604, 1605, 1606 verbatim). Five of eleven consecutive
-// FAILs were this section's FORMAT, not its substance: several `- Evidence:`
-// lines, a line range in a citation, backticks around a value, prose under
-// other field names. The parser reads what a careful reviewer wrote; the
-// substance gates (every material path cited at a line) are unchanged.
-
 import (
 	"os"
 	"path/filepath"
@@ -14,8 +7,6 @@ import (
 	"testing"
 )
 
-// section loads a verbatim audit-report section from testdata (raw strings
-// cannot hold the backticks auditors write).
 func section(t *testing.T, cycle string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", "explanation-review-cycle-"+cycle+".md"))
@@ -50,8 +41,6 @@ func TestFields_EvidenceIsListValued_Cycle1604(t *testing.T) {
 	if err := RequirePathLineEvidence(ev, "docs/explain/builds/cycle-1604-01m1fd688vm2a4y7kz2nqyt870.md", "go/internal/phaseio/digest.go"); err != nil {
 		t.Fatalf("the document and digest.go are cited at a line across the Evidence lines and must pass: %v", err)
 	}
-	// The substance rule is untouched: 1604 never cited tdd.go at a line, so the
-	// ONE remaining correction is a real one, not "duplicate evidence fields".
 	if err := RequirePathLineEvidence(ev, "go/internal/phases/tdd/tdd.go"); err == nil || !strings.Contains(err.Error(), "tdd.go with path:line") {
 		t.Fatalf("tdd.go is not cited at a line in 1604 and must still be required: %v", err)
 	}
@@ -112,8 +101,6 @@ func TestEvidenceOrBody_FallsBackToTheSectionProse_Cycle1606(t *testing.T) {
 	}
 }
 
-// TestReviewFields_ParsesOnceForBothGates — the single home both phase gates
-// call: Fields over the allowed keys with the evidence text resolved once.
 func TestReviewFields_ParsesOnceForBothGates(t *testing.T) {
 	t.Parallel()
 	body, _, _ := Section(section(t, "1606"), "Explanation Documentation")
@@ -133,7 +120,7 @@ func TestHasSection_ExactLevelTwoHeadingOnVisibleLinesOnly(t *testing.T) {
 	t.Parallel()
 	cases := map[string]bool{
 		"## Verdict\nPASS\n\n## Explanation Documentation\n- Status: VERIFIED\n": true,
-		"## Explanation Documentation\n\n## Explanation Documentation\n":         true, // duplicated ⇒ present (the gate reports the duplicate)
+		"## Explanation Documentation\n\n## Explanation Documentation\n":         true,
 		"### Explanation Documentation\n- Status: VERIFIED\n":                    false,
 		"## Explanation Documentation Review\n":                                  false,
 		"```\n## Explanation Documentation\n```\n":                               false,

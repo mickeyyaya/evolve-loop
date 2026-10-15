@@ -38,7 +38,6 @@ func TestSwarmRunner_CoverageHelpers(t *testing.T) {
 			t.Fatalf("annotate all_ok = %#v", resp.Signals["swarm.all_ok"])
 		}
 	})
-
 }
 
 func TestSwarmRunner_CoveragePlanLoadingAndDeps(t *testing.T) {

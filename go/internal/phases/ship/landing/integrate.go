@@ -8,21 +8,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
-// Integration is the ff-merge request: the cycle branch that lands on the
-// integration branch, the tracked binary reset to HEAD before the merge (the
-// host's belief — the leaf spells no path), and whether the ship runs under
-// a fleet (the host reads EVOLVE_FLEET; the leaf never reads the environment).
 type Integration struct {
 	Branch      string
 	CycleBranch string
 	Commit      string
 	Binary      string
-	// Fleet selects the divergence class: true → GIT_FLEET_REBASE_NEEDED /
-	// transient (a peer lane moved main; core's rebase engine recovers),
-	// false → GIT_FF_MERGE_DIVERGED / precondition (the in-ship repair ladder).
-	Fleet bool
-	// Log receives the `[ship]   OK: ff-merged` line; nil is the Null Object.
-	Log func(string)
+	Fleet       bool
+	Log         func(string)
 }
 
 func (l *Landing) CheckFastForward(ctx context.Context, req Integration) error {
@@ -51,9 +43,6 @@ func (l *Landing) Integrate(ctx context.Context, req Integration) {
 	emitLog(req.Log, fmt.Sprintf("[ship]   OK: ff-merged %s into %s", req.CycleBranch, req.Branch))
 }
 
-// diverged classifies a failed ff-merge: under a fleet it is the expected
-// concurrency case (transient, rebase + re-verify); otherwise the terminal
-// precondition the collider ladder may repair.
 func (l *Landing) diverged(req Integration, exit int, err error) *shiperr.ShipError {
 	kv := []string{shiperr.GitRCKey, fmt.Sprintf("%d", exit), "git_err", errText(err), shiperr.CycleBranchKey, req.CycleBranch, shiperr.BranchKey, req.Branch}
 	if req.Fleet {

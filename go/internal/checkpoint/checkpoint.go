@@ -1,16 +1,6 @@
-// Package checkpoint ports the pre-emptive cycle-checkpoint logic from
-// scripts/lifecycle/cycle-state.sh:cycle_state_checkpoint.
-//
-// The on-disk shape is an additive "checkpoint" block inside
-// .evolve/cycle-state.json (not a separate file, despite older docs).
-// The block schema mirrors bash exactly so `evolve cycle resume` and
-// `bash scripts/dispatch/resume-cycle.sh` consume the same data.
-//
-// Checkpoints are written for the escalation reasons (quota-likely,
-// batch-cap-near, operator-requested, stall-inactivity) plus the
-// lowest-priority phase-complete boundary. The former cost-percentage
-// trigger (EVOLVE_CHECKPOINT_*_PCT) was removed with the token-budget
-// cost gates; cost is no longer a checkpoint signal.
+// Package checkpoint writes the cycle checkpoint that lets an interrupted cycle resume.
+// The checkpoint is an additive block inside .evolve/cycle-state.json.
+// See docs/architecture/packages/internal-checkpoint.md.
 package checkpoint
 
 import (
@@ -30,7 +20,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
-// Reason mirrors the four bash-canonical checkpoint reasons.
 type Reason string
 
 const (
@@ -41,7 +30,6 @@ const (
 	ReasonPhaseComplete   Reason = "phase-complete"
 )
 
-// IsValid reports whether r is one of the five canonical reasons.
 func (r Reason) IsValid() bool {
 	switch r {
 	case ReasonQuotaLikely, ReasonBatchCapNear, ReasonOperatorRequest, ReasonStallInactivity, ReasonPhaseComplete:
@@ -50,35 +38,25 @@ func (r Reason) IsValid() bool {
 	return false
 }
 
-// Checkpoint mirrors the bash jq spec at cycle-state.sh:511-524.
 type Checkpoint struct {
-	Enabled               bool     `json:"enabled"`
-	Reason                Reason   `json:"reason"`
-	SavedAt               string   `json:"savedAt"`
-	ResumeFromPhase       string   `json:"resumeFromPhase"`
-	WorktreePath          string   `json:"worktreePath"`
-	CompletedPhases       []string `json:"completedPhases"`
-	GitHead               string   `json:"gitHead"`
-	CostAtCheckpoint      float64  `json:"costAtCheckpoint"`
-	QuotaResetAt          string   `json:"quotaResetAt"`
-	QuotaResetSource      string   `json:"quotaResetSource"`
-	AutoResumeAttempts    int      `json:"autoResumeAttempts"`
-	AutoResumeMaxAttempts int      `json:"autoResumeMaxAttempts"`
-	OperatorAction        string   `json:"operatorAction,omitempty"`
-	// PhaseIntegrity is the per-phase agent-block digest chain (ADR-0065).
-	// Additive + omitempty: absent on pre-field checkpoints, so old state
-	// round-trips byte-clean and plain Compose stays integrity-free.
-	PhaseIntegrity []phaseblock.Digest `json:"phaseIntegrity,omitempty"`
+	Enabled               bool                `json:"enabled"`
+	Reason                Reason              `json:"reason"`
+	SavedAt               string              `json:"savedAt"`
+	ResumeFromPhase       string              `json:"resumeFromPhase"`
+	WorktreePath          string              `json:"worktreePath"`
+	CompletedPhases       []string            `json:"completedPhases"`
+	GitHead               string              `json:"gitHead"`
+	CostAtCheckpoint      float64             `json:"costAtCheckpoint"`
+	QuotaResetAt          string              `json:"quotaResetAt"`
+	QuotaResetSource      string              `json:"quotaResetSource"`
+	AutoResumeAttempts    int                 `json:"autoResumeAttempts"`
+	AutoResumeMaxAttempts int                 `json:"autoResumeMaxAttempts"`
+	OperatorAction        string              `json:"operatorAction,omitempty"`
+	PhaseIntegrity        []phaseblock.Digest `json:"phaseIntegrity,omitempty"`
 }
 
-// DefaultAutoResumeAttempts is the default cap on automatic resume attempts
-// after a checkpoint (used by Compose).
 const DefaultAutoResumeAttempts = 3
 
-// Compose builds a Checkpoint block from a CycleState + the
-// orchestrator-supplied reason/cost/gitHead/now. Pure; no I/O.
-// Does NOT validate the reason — use ComposeChecked when the reason
-// origin is untrusted.
 func Compose(cs core.CycleState, reason Reason, cost float64, gitHead string, now time.Time) Checkpoint {
 	completed := cs.CompletedPhases
 	if completed == nil {
@@ -98,17 +76,12 @@ func Compose(cs core.CycleState, reason Reason, cost float64, gitHead string, no
 	}
 }
 
-// ComposeWithIntegrity is Compose plus the per-phase integrity chain (ADR-0065),
-// so a phase-complete checkpoint write carries (never clobbers) the recorded
-// chain. Pure; no I/O. Plain Compose stays integrity-free for back-compat.
 func ComposeWithIntegrity(cs core.CycleState, reason Reason, cost float64, gitHead string, now time.Time, integrity []phaseblock.Digest) Checkpoint {
 	cp := Compose(cs, reason, cost, gitHead, now)
 	cp.PhaseIntegrity = integrity
 	return cp
 }
 
-// ComposeChecked is Compose with reason validation. Returns an error
-// if reason is not one of the four bash-canonical values.
 func ComposeChecked(cs core.CycleState, reason Reason, cost float64, gitHead string, now time.Time) (Checkpoint, error) {
 	if !reason.IsValid() {
 		return Checkpoint{}, fmt.Errorf("checkpoint: invalid reason %q (want quota-likely | batch-cap-near | operator-requested | stall-inactivity | phase-complete)", reason)
@@ -116,9 +89,6 @@ func ComposeChecked(cs core.CycleState, reason Reason, cost float64, gitHead str
 	return Compose(cs, reason, cost, gitHead, now), nil
 }
 
-// hooks bundles every I/O + serialization primitive ApplyToStateFile
-// touches so tests can drive each error branch independently. The
-// production zero value (defaultHooks) wires to the stdlib.
 type hooks struct {
 	readFile      func(string) ([]byte, error)
 	writeFile     func(string, []byte, os.FileMode) error
@@ -139,16 +109,6 @@ func defaultHooks() hooks {
 	}
 }
 
-// ApplyToStateFile reads a cycle-state.json, splices the checkpoint
-// block into it (preserving every existing field), and atomically
-// writes back. Mirrors bash cycle_state_checkpoint at cycle-state.sh:479.
-//
-// ADR-0049 G7: the read-modify-write holds the SAME cycle-state.json sidecar
-// lock storage.WriteCycleState holds, so a concurrent fleet cycle's phase write
-// (which owns "phase" and preserves "checkpoint") and this checkpoint write
-// (which owns "checkpoint" and preserves "phase") serialize instead of clobbering
-// each other's key. flock.WithPathLock is the single home for the "<file>.lock"
-// convention shared across packages.
 func ApplyToStateFile(path string, cp Checkpoint) error {
 	return flock.WithPathLock(path, func() error {
 		return applyWithHooks(defaultHooks(), path, cp)
@@ -291,11 +251,6 @@ func usageResetOf(projectRoot string, families []string, now time.Time) func() (
 	return func() (time.Time, bool) { return UsageReset(projectRoot, families, now) }
 }
 
-// hasEscalationCheckpoint reports whether path already holds a checkpoint
-// block with a canonical reason other than phase-complete. It reads WITHOUT
-// taking the cycle-state lock, so the caller MUST already hold
-// flock.WithPathLock(path) (ADR-0049 N17) — otherwise the check and the
-// caller's subsequent write straddle the lock and a peer escalation is lost.
 func hasEscalationCheckpoint(path string) (bool, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

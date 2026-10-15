@@ -1,15 +1,4 @@
-// Package scout implements the discovery and planning phase. The
-// phase boilerplate lives in internal/phases/runner; this file only
-// encodes scout-specific variation points.
-//
-// Verdict mapping (artifact body inspected, all checks case-sensitive):
-//   - convergence-confirmation strategy + no tasks section → SKIPPED
-//   - "## Proposed Tasks" or "## Selected Tasks" section with at least one
-//     list item or "### " task subheading → PASS
-//   - empty/missing artifact, or tasks section absent/empty → FAIL
-//
-// Convergence is the only path that maps to SKIPPED. Empty backlog
-// elsewhere is a real failure (Scout has nothing to feed Triage).
+// Package scout implements the discovery and planning phase.
 package scout
 
 import (
@@ -27,9 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// proposedTasksRE confirms a non-empty backlog: the tasks heading followed by a
-// list item OR a "### " task subheading. The accepted headings come from
-// phasecontract.Scout (single source); the "≥1 item" shape is stable here.
 var proposedTasksRE = buildScoutBacklogRE()
 
 func buildScoutBacklogRE() *regexp.Regexp {
@@ -53,9 +39,6 @@ func (hooks) DefaultModel() string { return "auto" }
 func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
-	// ADR-0050 §3.10 Slice 3: read strategy/goal/challengeToken from the typed
-	// envelope at enforce, the legacy Context map below it (byte-identical —
-	// Active() is false unless enforce, and the typed getters mirror these keys).
 	strategy, goal, tok := req.Context["strategy"], req.Context["goal"], req.Context["challengeToken"]
 	if req.Input.Active() {
 		ci := req.Input.CycleInputs()
@@ -64,56 +47,25 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if strategy != "" {
 		fmt.Fprintf(&b, "- strategy: %s\n", strategy)
 	}
-	// ADR-0099 slice 2: the project's default deliverable kind (.evolve/domain.json)
-	// — a task that declares no kind inherits it; scout writes the cycle's
-	// `deliverable_kind:` header line from the tasks it selects.
 	if kind := req.Context[core.CtxKeyDeliverableKindDefault]; kind != "" {
 		fmt.Fprintf(&b, "- deliverable_kind_default: %s\n", kind)
 	}
 	if root := req.Context[core.CtxKeyDeliverableRoot]; root != "" {
 		fmt.Fprintf(&b, "- deliverable_root: %s\n", root)
 	}
-	// Goal text propagates via Context["goal"] when the operator
-	// passed --goal-text. Scout reads it as a CONSTRAINT — its
-	// backlog-vs-goal selection should treat the goal as canonical.
-	// (Pre-fix, Scout had only the hash and read backlog regardless.)
 	if goal != "" {
 		fmt.Fprintf(&b, "- goal: %s\n", goal)
 	}
-	// Cycle-135 fix (PR 6): plumb the cycle's challenge token into the
-	// Cycle Context block so scout doesn't have to mint its own. Per
-	// agent-templates.md PR 5, every phase report must include
-	// `<!-- challenge-token: <value> -->` on line 2 — the source-of-truth
-	// is the orchestrator-minted token, surfaced via
-	// Context["challengeToken"]. Scout was previously inventing tokens
-	// (cycle 134 audit C1: `no-token-manual-run-cycle-134`; cycle 135
-	// audit C1: `59576594e2e8d5c3` mint vs `5b96ecb69a0c848f` truth)
-	// when this line was absent. Pairs with the runner-side write of
-	// `<workspace>/challenge-token.txt` so the fallback source (per
-	// agent-templates.md PR 5 precedence step 2) is also populated.
 	if tok != "" {
 		fmt.Fprintf(&b, "- challenge_token: %s\n", tok)
 	}
-	// Cycle-776 (fleet-lane-provisioning-split residual): cycle-766 pinned the
-	// lane scope into Context, but only triage rendered it — so scout scouted
-	// out-of-scope tasks (cycle-640/-776 incidents). Render the directive, and
-	// instruct the Decision Trace goal_hash echo so the scout→triage coherence
-	// gate (core/lanescope.go) can fire on a mismatch instead of failing open.
 	if scope := runner.LaneScope(req); scope != "" {
 		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; scout ONLY within this assigned todo-id set, ignore all other candidate work: %s\n", scope)
-		// The LIVE record per assigned id (cycle-1548: a bare id name-searched
-		// into a consumed namesake from a halt cured two weeks earlier — 17
-		// records shared the id). The path alone is not enough; the directive
-		// must forbid the name-search it replaces, or the agent still greps.
 		if paths := req.Context["fleet_scope_paths"]; paths != "" {
 			fmt.Fprintf(&b, "- fleet_scope_records: the LIVE inbox record for each assigned id — READ THESE EXACT FILES; same-named files under inbox/consumed|processed|rejected are STALE NAMESAKES of already-handled work, never your task: %s\n", paths)
 		}
 		b.WriteString("- lane_coherence: echo the pinned goal_hash verbatim under a \"goal_hash\" key in your report's Decision Trace JSON block\n")
 	}
-	// Chronicle S3 (digest stage=enforce): the orchestrator seeds
-	// Context["recent_outcomes"] with the recent-outcomes digest at cycle
-	// start. Appended AFTER the stable prefix lines (cache-friendly ordering);
-	// absent/empty key keeps the prompt byte-identical (shadow/off pin).
 	if ro := req.Context["recent_outcomes"]; ro != "" {
 		fmt.Fprintf(&b, "- recent_outcomes: %s\n", ro)
 	}
@@ -121,9 +73,6 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 }
 
 func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	// ADR-0050 §3.10 Slice 3: the strategy gate is verdict-affecting
-	// (convergence-confirmation → SKIPPED), so Classify reads the typed envelope at
-	// enforce too. Byte-identical below enforce (Active() == false).
 	strategy := req.Context["strategy"]
 	if req.Input.Active() {
 		strategy = req.Input.CycleInputs().Strategy()
@@ -146,34 +95,19 @@ func classify(content, strategy string) string {
 	return core.VerdictPASS
 }
 
-// Config holds the dependencies for constructing a scout Phase: the bridge
-// used to dispatch the agent, the prompt loader, an optional clock, and the
-// PhaseIO stage.
 type Config struct {
-	Bridge  core.Bridge
-	Prompts *prompts.Loader
-	// ContractVerifier is the deliverables gate's verifier accessor for the
-	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
-	// and engine (research F22). nil = the catalog-aware default.
+	Bridge           core.Bridge
+	Prompts          *prompts.Loader
 	ContractVerifier func() runner.ContractVerifier
 	HostEffects      func() core.HostEffects
 	NowFn            func() time.Time
-	// PhaseIO threads the EVOLVE_PHASE_IO stage into the reconcile rung (ADR-0050
-	// §3.10 Slice 1). Zero value (StageOff) = byte-identical.
-	PhaseIO config.Stage
-	// CompactPrompts strips the on-demand reference tail from the disk-loaded agent
-	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
-	// never set to a bare literal here (standing rule: phase-settings-from-config).
-	CompactPrompts bool
-	SleepFn        func(time.Duration)
+	PhaseIO          config.Stage
+	CompactPrompts   bool
+	SleepFn          func(time.Duration)
 }
 
-// Phase is the scout discovery-and-planning phase, a runner.BaseRunner
-// specialized with the scout-specific hooks.
 type Phase struct{ *runner.BaseRunner }
 
-// New constructs a scout Phase from c, wiring the scout hooks, bridge,
-// prompts, clock, and PhaseIO stage into a runner.BaseRunner.
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
