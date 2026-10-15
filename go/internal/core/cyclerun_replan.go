@@ -8,38 +8,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// rePlanner is the optional re-invokable extension of router.Planner: a
-// planner that can produce a second, post-scout plan from measured signals.
-// The composition root's PhaseAdvisor implements it; the re-plan
-// type-asserts the wired planner to it and no-ops when the planner is not
-// re-invokable (fail-safe to the initial plan). Kept separate from
-// router.Planner so a non-re-invokable planner (e.g. a scripted test
-// proposer) need not grow a RePlan method.
-// See ADR-0052.
 type rePlanner interface {
 	RePlan(in router.RouteInput) (*router.PhasePlan, error)
 }
 
-// postScoutReplanProbe is a test seam: when non-nil it is invoked each time
-// the post-scout re-plan hook fires, so a test can assert the hook's
-// call-site contract (fires exactly once per cycle, after scout's handoff is
-// recorded, never after build). nil in production. Mirrors the
-// PhaseBoundaryCheckpointer package-hook idiom (a DI seam set out-of-band).
 var postScoutReplanProbe func(cr *cycleRun)
 
-// postScoutReplan is the hook point invoked once per cycle immediately after
-// scout's handoff has been recorded (CompletedPhases appended + cycle-state
-// persisted + phase-boundary checkpoint, all inside recordAndBranch) and
-// before the next selectNext. Firing post-record is precisely what keeps the
-// re-plan from widening the run-set or bypassing SpineSatisfiedUpTo — the
-// completed scout anchor already exists when it runs.
-//
-// Shadow (the default, EVOLVE_ROUTER_REPLAN=shadow): the re-plan is computed
-// from measured scout signals, clamped to the integrity floor, and recorded
-// (phase-replan.json) for soak diffing — but the cycle keeps driving on the
-// initial clampedPlan; static still wins. EVOLVE_ROUTER_REPLAN=advisory flips
-// to a swap. Off means nothing happens (byte-identical). Every failure path
-// (not re-invokable, no signals, RePlan error) fails safe to the initial plan.
 func (cr *cycleRun) postScoutReplan() {
 	if postScoutReplanProbe != nil {
 		postScoutReplanProbe(cr)
@@ -47,20 +21,15 @@ func (cr *cycleRun) postScoutReplan() {
 	if cr.o.cfg.RouterReplan == config.StageOff {
 		return
 	}
-	// Same advisor preconditions as the initial plan: DynamicLLM + Advisory.
 	if cr.o.cfg.Stage < config.StageAdvisory || cr.o.cfg.Mode != config.ModeDynamicLLM {
 		return
 	}
 	planner, ok := cr.o.planner.(rePlanner)
 	if !ok {
-		return // wired planner is not re-invokable — fail-safe to the initial plan
+		return
 	}
-	// The re-plan exists to MEASURE need: require scout's handoff signals. Absent
-	// (a failed/empty scout) ⇒ no re-plan — there is nothing measured to act on.
 	signals, err := router.Digest(cr.cs.WorkspacePath, cr.cs.CompletedPhases)
 	if err != nil {
-		// Fail-open (like selectNext's digest): a degraded read must not abort the
-		// shadow re-plan — log and fall through; Scout.Present below gates the rest.
 		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN post-scout digest degraded (cycle %d): %v\n", cr.cycle, err)
 	}
 	if !signals.Scout.Present {
@@ -68,16 +37,12 @@ func (cr *cycleRun) postScoutReplan() {
 	}
 	in := cr.o.advisorPlanInput(cr.ctx, string(PhaseScout), signals, cr.req, cr.state, cr.cs, cr.cycle, cr.envSnap, cr.benchedCLIs)
 
-	// Re-plan only on material divergence — a measured insert_when trigger the
-	// initial plan missed — and cap the depth so a thrashing signal can't
-	// loop. No mismatch means the plan already covers the measured need. At
-	// the cap, escalate instead of re-planning again.
 	if !router.PlanMismatch(in, cr.clampedPlan) {
 		return
 	}
 	maxDepth := cr.o.cfg.RePlanMaxDepth
 	if maxDepth <= 0 {
-		maxDepth = 1 // a directly-constructed cfg (tests) gets the safe default
+		maxDepth = 1
 	}
 	if cr.replanDepth >= maxDepth {
 		fmt.Fprintf(cr.o.errOut(), "[orchestrator] re-plan depth cap (%d) reached at cycle %d — escalating, not re-planning\n", maxDepth, cr.cycle)
@@ -90,39 +55,19 @@ func (cr *cycleRun) postScoutReplan() {
 		if err != nil {
 			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN post-scout re-plan failed (keeping initial plan): %v\n", err)
 		}
-		return // fail open: the initial plan stands
+		return
 	}
-	// Increment ONLY on a successful dispatch (we passed the < maxDepth check
-	// above): a nil/error re-plan is fail-open and must NOT consume a depth slot.
 	cr.replanDepth++
-	// Record the structural validation of the raw re-plan, pre-clamp, so the
-	// advisor's intent is what gets recorded. Validating the clamped plan
-	// would record nothing, since the clamp has already dropped the unknown
-	// phase — exactly the failure dropUnknownPhases (router/floor.go) exists
-	// to make visible. Report-only: the clamp below remains the sole
-	// disposer. Keyed by depth so each re-plan under RePlanMaxDepth>1 keeps
-	// its own record.
 	cr.o.recordPlanRejectionsKind(cr.ctx, cr.cycle, cr.cs, router.ValidatePlan(in, raw), fmt.Sprintf("replan-%d", cr.replanDepth))
 	clamped, clamps := router.ClampPlanToFloorWith(in, raw, cr.o.resolvedShipFloor(), cr.cs.IntentRequired)
 	cr.o.recordPhasePlanKind(cr.ctx, cr.cycle, cr.cs, clamped, clamps, "replan")
 
-	// At EVOLVE_ROUTER_REPLAN=advisory the re-plan replaces the drive plan,
-	// but only the clamped re-plan: ClampPlanToFloorWith ran just above and
-	// re-asserts the integrity floor (ship⇒build∧audit∧tdd) on the re-plan
-	// path, so a re-plan can never weaken ship. registerMintedPhases is
-	// idempotent, so re-minting a phase the stage-1 plan already wired leaves
-	// it once. Below advisory (shadow, the default) the re-plan is recorded
-	// only — static still drives.
 	if cr.o.cfg.RouterReplan == config.StageAdvisory {
 		cr.clampedPlan = clamped
 		cr.o.registerMintedPhases(clamped)
 	}
 }
 
-// recordReplanEscalation appends a forensic marker when the re-plan depth cap
-// is hit: the cycle escalates rather than re-planning again, so a persistent
-// mismatch surfaces to the operator/debugger instead of looping. Best-effort
-// — a ledger failure WARNs and is swallowed.
 func (cr *cycleRun) recordReplanEscalation(maxDepth int) {
 	if err := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 		TS: cr.o.now().UTC().Format(time.RFC3339), Cycle: cr.cycle, Role: "orchestrator",

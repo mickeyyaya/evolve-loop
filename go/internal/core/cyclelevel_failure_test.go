@@ -31,9 +31,6 @@ func TestErrCycleLevelFailure_WrapsCauseForErrorsIs(t *testing.T) {
 	}
 }
 
-// bridgeDeadRunner models a persistently-dead bridge: every launch fails
-// with a transient bridge error, so the orchestrator's self-heal retry
-// ladder runs to exhaustion before aborting.
 type bridgeDeadRunner struct {
 	name  string
 	calls int
@@ -70,7 +67,6 @@ func TestOrchestrator_BridgeExhaustion_CycleLevelFailure(t *testing.T) {
 	}
 }
 
-// integrityErrRunner fails with the given kernel-integrity sentinel.
 type integrityErrRunner struct {
 	name string
 	err  error
@@ -108,8 +104,6 @@ func TestOrchestrator_IntegrityBreach_StillBatchFatal(t *testing.T) {
 		})
 	}
 
-	// Lock contention short-circuits before any phase runs; it must also
-	// stay batch-fatal (another runner would just hit the same lock).
 	t.Run("lock_held", func(t *testing.T) {
 		lockedSt := &lockHeldStorage{recStorage: &recStorage{}}
 		orch := core.NewOrchestrator(lockedSt, &fakeLedger{}, newRunners(nil))
@@ -127,7 +121,6 @@ func TestOrchestrator_IntegrityBreach_StillBatchFatal(t *testing.T) {
 	})
 }
 
-// lockHeldStorage decorates recStorage so AcquireLock always refuses.
 type lockHeldStorage struct {
 	*recStorage
 }
@@ -136,8 +129,6 @@ func (s *lockHeldStorage) AcquireLock(context.Context) (func() error, error) {
 	return nil, core.ErrLockHeld
 }
 
-// countingPassRunner is passRunner plus an invocation counter, to bound the
-// audit↔ship recovery traversal.
 type countingPassRunner struct {
 	name  string
 	calls int
@@ -162,14 +153,12 @@ func TestOrchestrator_RecoveryDepthBudget(t *testing.T) {
 	if err == nil {
 		t.Fatal("a never-resolving ship precondition must fail the cycle once the recovery budget is exhausted")
 	}
-	// Budget: initial + maxRecoveryDepth(2) recoveries — never more.
 	if ship.calls != 3 {
 		t.Errorf("ship attempts = %d, want 3 (initial + maxRecoveryDepth=2)", ship.calls)
 	}
 	if audit.calls > 3 {
 		t.Errorf("audit ran %d times — the audit↔ship loop must be capped by the same budget (want <= 3)", audit.calls)
 	}
-	// Exhausted precondition recovery = cycle-level, not batch-fatal.
 	var clf *core.ErrCycleLevelFailure
 	if !errors.As(err, &clf) {
 		t.Errorf("recovery-budget exhaustion (precondition class) must classify cycle-level (ErrCycleLevelFailure), got: %v", err)

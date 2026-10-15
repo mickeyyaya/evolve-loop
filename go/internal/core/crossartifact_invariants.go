@@ -10,13 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
 )
 
-// crossArtifactInvariantsFile is the advisory record's workspace filename.
 const crossArtifactInvariantsFile = "crossartifact-invariants.json"
 
-// recordCrossArtifactInvariants evaluates the advisory stack over the cycle's
-// workspace + lane worktree and writes the result to the workspace. It is
-// best-effort and LOUD: a write failure warns on stderr and is otherwise
-// ignored, because an advisory observer must never be able to fail a cycle.
 func recordCrossArtifactInvariants(cycle int, workspace, worktree string) {
 	if strings.TrimSpace(workspace) == "" {
 		return

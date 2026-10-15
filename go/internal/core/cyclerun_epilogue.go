@@ -8,11 +8,6 @@ import (
 	"regexp"
 )
 
-// checkpointInterruptedPhase preserves the current phase when the cycle
-// context is canceled. The normal phase-boundary checkpoint names the last
-// completed phase, which is deliberately conservative for crashes but would
-// make a graceful operator interrupt repeat expensive completed work. A typed
-// quota pause already owns a richer checkpoint and must remain authoritative.
 func (cr *cycleRun) checkpointInterruptedPhase(cause error) {
 	if cr.ctx.Err() == nil || cr.cycleCompletedNormally || ResumeBoundaryCheckpointer == nil {
 		return

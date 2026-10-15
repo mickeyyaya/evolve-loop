@@ -11,9 +11,6 @@ import (
 
 var postReviewExecutable = os.Executable
 
-// applyPostReviewGuards runs only after the deliverable review and correction
-// ladder approves. It owns explanation refresh, Ship success latching, and the
-// final main-tree leak verdict.
 func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopAction, error) {
 	if cr.o.explanationRefreshEligible(cr.cs, next) {
 		requiresBuild, err := explanationdocs.RefreshResult(cr.ctx, explanationBinding(cr.req.ProjectRoot, cr.cs))
@@ -29,15 +26,7 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 		}
 	}
 
-	// cr.cs.Shipped is also the latch read by postShipObserverSkip on the
-	// dispatch abort path (a post-ship observer failure degrades to WARN
-	// rather than turning a shipped cycle abnormal) and by the outcome label
-	// at closeout; it lives on cr.cs so the next persist checkpoints it.
 	if latchShippedState(&cr.cs, next, dr.resp.Verdict) {
-		// Ship landed AND survived the deliverable review gate above — the
-		// worktree is merged, normal exit cleanup applies. Deliberately
-		// AFTER the review gate: a review-rejected ship abort must still
-		// preserve the worktree for triage.
 		cr.preserveWorktree = false
 	}
 
@@ -46,7 +35,6 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 		if res.SnapshotMissed {
 			return cr.abortUncheckedPhase(next, dr)
 		} else if !res.OK() {
-			// Attempt phase-agnostic binary churn discard for build artifacts
 			var relBin string
 			if execPath, err := postReviewExecutable(); err == nil {
 				if rel, err := filepath.Rel(cr.req.ProjectRoot, execPath); err == nil && !strings.HasPrefix(rel, "..") {
@@ -85,9 +73,6 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 				if len(leaked) > 0 {
 					phaseErr := fmt.Errorf("tree-diff guard: phase %q wrote to the main tree outside its worktree %q — leaked paths: %v",
 						string(next), dr.phaseWorktree, leaked)
-					// The build ran, PASSed, and burned tokens before the guard
-					// caught its main-tree leak. The abort is correct; erasing
-					// the outcome would not be.
 					cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 					cr.recordFailureLearning(next, phaseErr, 1)
 					evolveBinPath := filepath.Join(cr.req.ProjectRoot, "go/bin/evolve")

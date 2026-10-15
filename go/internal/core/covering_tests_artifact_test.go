@@ -49,6 +49,5 @@ func TestWriteCoveringTests_NoOpWithoutWorktreeOrWorkspace(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws, coveringTestsArtifact)); !os.IsNotExist(err) {
 		t.Fatalf("artifact written with no worktree (err=%v) — nothing was derivable", err)
 	}
-	// No workspace: nowhere to write; must return without touching the filesystem.
 	writeCoveringTests(context.Background(), t.TempDir(), "", io.Discard)
 }

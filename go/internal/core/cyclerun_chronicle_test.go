@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// ctxCaptureRunner is a PASS runner that records every PhaseRequest it
-// receives so tests can assert on the Context a phase actually observed.
 type ctxCaptureRunner struct {
 	name string
 	mu   sync.Mutex
@@ -38,8 +36,6 @@ func (r *ctxCaptureRunner) lastContext(key string) string {
 	return r.reqs[len(r.reqs)-1].Context[key]
 }
 
-// seedChronicleDossier writes a minimal dossier JSON where the digest
-// assembler must find it: <projectRoot>/knowledge-base/cycles/cycle-<n>.json.
 func seedChronicleDossier(t *testing.T, projectRoot string, cycle int, goal, verdict string) {
 	t.Helper()
 	dir := filepath.Join(projectRoot, "knowledge-base", "cycles")
@@ -53,8 +49,6 @@ func seedChronicleDossier(t *testing.T, projectRoot string, cycle int, goal, ver
 	}
 }
 
-// runChronicleCycle runs one full cycle against projectRoot with a
-// context-capturing scout and returns (result, error, scoutCapture).
 func runChronicleCycle(t *testing.T, projectRoot string, disableGuard bool, opts ...core.Option) (core.CycleResult, error, *ctxCaptureRunner) {
 	t.Helper()
 	scout := &ctxCaptureRunner{name: string(core.PhaseScout)}
@@ -68,7 +62,6 @@ func runChronicleCycle(t *testing.T, projectRoot string, disableGuard bool, opts
 	return res, err, scout
 }
 
-// newTestOrchestratorOpts mirrors newTestOrchestrator but forwards Options.
 func newTestOrchestratorOpts(t *testing.T, runners map[core.Phase]core.PhaseRunner, opts ...core.Option) (*core.Orchestrator, *recStorage, *fakeLedger) {
 	t.Helper()
 	st := &recStorage{}
@@ -149,7 +142,6 @@ func TestNewCycleRun_DigestFailureWarnsNotAborts(t *testing.T) {
 
 	root := t.TempDir()
 	seedChronicleDossier(t, root, 42, "harden the flux capacitor", "PASS")
-	// Fresh state → allocateCycle mints cycle 1; pre-create the collision there.
 	ws := core.RunWorkspacePath(root, 1)
 	if err := os.MkdirAll(filepath.Join(ws, "recent-outcomes.md"), 0o755); err != nil {
 		t.Fatalf("pre-create digest collision dir: %v", err)

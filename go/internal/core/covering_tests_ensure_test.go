@@ -13,8 +13,6 @@ func TestCoveringTests_AbsentCorpusIsAnnouncedNotSilent(t *testing.T) {
 	t.Parallel()
 
 	worktree, workspace := t.TempDir(), t.TempDir()
-	// A bare temp dir is not a git repository, so the corpus is genuinely
-	// underivable — the fail-open path, exercised for real rather than stubbed.
 	var sink injectedStderr
 	ensureCoveringTests(context.Background(), worktree, workspace, &sink)
 	out := sink.String()
@@ -44,7 +42,6 @@ func TestCoveringTests_AvailableToTestAmplificationWithoutFreshBuild(t *testing.
 		}
 	}
 
-	// No PhaseBuild completed in this process — the resume-past-build shape.
 	var sink injectedStderr
 	ensureCoveringTests(context.Background(), worktree, workspace, &sink)
 	out := sink.String()
@@ -58,8 +55,6 @@ func TestCoveringTests_AvailableToTestAmplificationWithoutFreshBuild(t *testing.
 		t.Errorf("warned about a corpus it successfully derived:\n\t%q", out)
 	}
 
-	// Already on disk ⇒ silent no-op. The build path's fresh derivation stays
-	// authoritative and a normal cycle never pays a second `go list`.
 	var again injectedStderr
 	ensureCoveringTests(context.Background(), worktree, workspace, &again)
 	out = again.String()

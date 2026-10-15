@@ -12,37 +12,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// collectWorkspaceRejections and replanRecordPresent read every
-// advisor-rejections*.json in the workspace and recover rejections from any
-// nesting, attributing each to a plan-kind via the filename and the JSON keys
-// on its path — these tests pin BEHAVIOUR, not a file format, so the on-disk
-// shape stays free to change. What is NOT negotiable: a re-plan's rejections
-// must be recoverable and attributable to the re-plan, and recording them
-// must not destroy the upfront plan's record.
-
-// phantomReplanPhase / phantomReplanPhase2 are names no known-phase channel can
-// supply: not canonical, not in Cfg.Order/Mandatory/Triggers/Conditional, not in
-// the catalog, and not minted by the plan (no Mint on the entry). ValidatePlan
-// must therefore classify them "unknown-phase".
 const (
 	phantomReplanPhase  = "phantom-replan-1155"
 	phantomReplanPhase2 = "phantom-replan-1155-b"
-	// seededInitialPhase stands in for a rejection the upfront plan already
-	// recorded before the re-plan runs (the shape recordPlanRejections writes:
-	// a flat array in advisor-rejections.json). It must survive.
-	seededInitialPhase = "phantom-initial-1155"
+	seededInitialPhase  = "phantom-initial-1155"
 )
 
-// recordedRejection is one rejection recovered from workspace telemetry, plus
-// the kind hint (lowercased filename + JSON key path) it was found under.
 type recordedRejection struct {
 	Kind   string
 	Phase  string
 	Reason string
 }
 
-// collectWorkspaceRejections reads every advisor-rejections*.json under ws and
-// recovers every rejection object in it, regardless of nesting or key naming.
 func collectWorkspaceRejections(t *testing.T, ws string) []recordedRejection {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join(ws, "advisor-rejections*.json"))
@@ -82,8 +63,6 @@ func walkRejections(node any, hint string, out *[]recordedRejection) {
 	}
 }
 
-// asRejection recognises a router.PlanRejection however it was keyed (Go's
-// default exported-field casing or an explicit lowercase json tag).
 func asRejection(m map[string]any) (recordedRejection, bool) {
 	pick := func(keys ...string) string {
 		for _, k := range keys {
@@ -100,11 +79,6 @@ func asRejection(m map[string]any) (recordedRejection, bool) {
 	return recordedRejection{Phase: pick("Phase", "phase"), Reason: reason}, true
 }
 
-// replanRecordPresent reports whether the workspace holds a rejection record
-// ATTRIBUTED TO THE RE-PLAN — a file whose name says "replan" or a JSON key that
-// does. It is deliberately satisfied by an EMPTY finding set: recordPlanRejections'
-// contract is that "[]" means validated-clean, distinct from "validation never
-// ran", so a clean re-plan must still leave proof that ValidatePlan ran on it.
 func replanRecordPresent(t *testing.T, ws string) bool {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join(ws, "advisor-rejections*.json"))
@@ -160,8 +134,6 @@ func hasRejection(rejs []recordedRejection, phase, reason string, fromReplan boo
 	return false
 }
 
-// seqReplanPlanner returns a DIFFERENT plan on each RePlan call, so a cycle with
-// RePlanMaxDepth > 1 produces distinguishable per-re-plan rejection sets.
 type seqReplanPlanner struct {
 	plans  []*router.PhasePlan
 	calls  int
@@ -181,9 +153,6 @@ func (p *seqReplanPlanner) RePlan(router.RouteInput) (*router.PhasePlan, error) 
 	return plan, nil
 }
 
-// replanRejOrchestrator mirrors replanOrchestrator (cyclerun_replan_test.go) but
-// takes the re-plan depth cap, so the multi-re-plan accumulation case is
-// expressible. Shadow stage: the re-plan is RECORDED, never swapped in.
 func replanRejOrchestrator(t *testing.T, pl router.Planner, maxDepth int) *Orchestrator {
 	t.Helper()
 	cfg := shadowCfg(config.StageAdvisory)
@@ -201,10 +170,8 @@ func replanRejCycleRun(t *testing.T, ws string, o *Orchestrator, cycle int) *cyc
 	return &cycleRun{
 		o: o, ctx: context.Background(),
 		req: CycleRequest{ProjectRoot: ws}, cycle: cycle,
-		cs:      CycleState{WorkspacePath: ws, CompletedPhases: []string{"scout"}},
-		envSnap: map[string]string{},
-		// Omits "tester", which the measured signals (item_count=2) trigger — the
-		// material divergence that makes postScoutReplan actually re-plan.
+		cs:          CycleState{WorkspacePath: ws, CompletedPhases: []string{"scout"}},
+		envSnap:     map[string]string{},
 		clampedPlan: &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}}},
 	}
 }
@@ -222,9 +189,6 @@ func planWithPhantom(phantom string) *router.PhasePlan {
 	return p
 }
 
-// TestReplan_UnknownPhase_RecordsRejection pins that validation runs on the
-// RAW re-plan, before the floor clamp: validating the clamped plan would
-// record nothing, since the clamp already removed the unknown phase.
 func TestReplan_UnknownPhase_RecordsRejection(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
@@ -240,22 +204,14 @@ func TestReplan_UnknownPhase_RecordsRejection(t *testing.T) {
 	if !hasRejection(rejs, phantomReplanPhase, "unknown-phase", true) {
 		t.Errorf("re-plan naming unknown phase %q recorded no attributable unknown-phase rejection; recovered=%+v", phantomReplanPhase, rejs)
 	}
-	// The drop itself must still happen — telemetry is report-only and must not
-	// have been bought by weakening the floor.
 	if planEntryRuns(cr.clampedPlan, phantomReplanPhase) {
 		t.Errorf("the integrity floor must still DROP %q from the plan", phantomReplanPhase)
 	}
 }
 
-// TestReplan_KnownPhasesOnly_NoSpuriousRejection: a clean re-plan records no
-// unknown-phase rejection, still proves validation ran ("[]" means
-// validated-clean, distinct from never having run), and must not erase the
-// upfront plan's already-written record.
 func TestReplan_KnownPhasesOnly_NoSpuriousRejection(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
-	// Seed the upfront plan's record in the exact shape recordPlanRejections
-	// writes (a flat PlanRejection array).
 	seeded, err := json.MarshalIndent([]router.PlanRejection{{
 		Phase: seededInitialPhase, Reason: "unknown-phase", Detail: "recorded by the upfront plan",
 	}}, "", "  ")
@@ -288,9 +244,6 @@ func TestReplan_KnownPhasesOnly_NoSpuriousRejection(t *testing.T) {
 	}
 }
 
-// TestReplan_MultipleReplans_AllRejectionsRecorded: RePlanMaxDepth allows more
-// than one re-plan per cycle, and each must keep its own record — a fix that
-// only tracked the latest re-plan would still lose the intermediate one.
 func TestReplan_MultipleReplans_AllRejectionsRecorded(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
@@ -300,8 +253,8 @@ func TestReplan_MultipleReplans_AllRejectionsRecorded(t *testing.T) {
 	}}
 	cr := replanRejCycleRun(t, ws, replanRejOrchestrator(t, pl, 2), 13)
 
-	cr.postScoutReplan() // depth 0 → 1
-	cr.postScoutReplan() // depth 1 → 2 (cap is 2, so this one re-plans too)
+	cr.postScoutReplan()
+	cr.postScoutReplan()
 
 	if pl.calls != 2 {
 		t.Fatalf("RePlan called %d times, want 2 (depth cap 2)", pl.calls)
