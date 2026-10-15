@@ -6,10 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestPhaseInput_SealedContext_NoMutation is the named RED anchor for 3.1: the
-// Env channel is sealed — mutating the init map after construction, or mutating
-// a map returned by EnvCopy, must not change the input a phase observes. This
-// is the "no shared mutable state between filters" guarantee (P4/P5).
 func TestPhaseInput_SealedContext_NoMutation(t *testing.T) {
 	env := map[string]string{"EVOLVE_PHASE_IO": "shadow"}
 	in := NewPhaseInput(PhaseInputInit{
@@ -17,7 +13,6 @@ func TestPhaseInput_SealedContext_NoMutation(t *testing.T) {
 		Env:   env,
 	})
 
-	// (1) Mutating the source map after construction must not leak in.
 	env["EVOLVE_PHASE_IO"] = "enforce"
 	env["INJECTED"] = "x"
 	if v, ok := in.Env("EVOLVE_PHASE_IO"); !ok || v != "shadow" {
@@ -27,7 +22,6 @@ func TestPhaseInput_SealedContext_NoMutation(t *testing.T) {
 		t.Fatalf("Env leaked source insertion")
 	}
 
-	// (2) Mutating the EnvCopy result must not affect subsequent reads.
 	cp := in.EnvCopy()
 	cp["EVOLVE_PHASE_IO"] = "enforce"
 	delete(cp, "EVOLVE_PHASE_IO")
@@ -36,8 +30,6 @@ func TestPhaseInput_SealedContext_NoMutation(t *testing.T) {
 	}
 }
 
-// TestPhaseInput_ZeroValue_Safe pins the documented contract that the zero
-// PhaseInput is safe to read (every accessor is nil-tolerant).
 func TestPhaseInput_ZeroValue_Safe(t *testing.T) {
 	var in PhaseInput
 	if _, ok := in.Env("x"); ok {
@@ -94,16 +86,11 @@ func TestPhaseInput_Env_AbsentKey(t *testing.T) {
 	}
 }
 
-// TestPhaseInput_Sealed_NoMutationViaInit is the missing half of the seal proof:
-// the typed Error/Correction channels must be deep-copied at construction so a
-// caller that retains and mutates the init pointer cannot change what a phase
-// observes. (Mirrors TestHandoffs_Sealed_NoMutationViaInitOrAccessor.)
 func TestPhaseInput_Sealed_NoMutationViaInit(t *testing.T) {
 	ec := &ErrorContext{Code: "E1", Class: "transient", Stage: "ship", Debug: "d"}
 	cs := &CorrectionState{Directive: "redispatch", Attempt: 1}
 	in := NewPhaseInput(PhaseInputInit{Error: ec, Correction: cs})
 
-	// Mutate the init pointers AFTER construction.
 	ec.Code = "MUTATED"
 	ec.Stage = "MUTATED"
 	cs.Directive = "MUTATED"
@@ -126,7 +113,6 @@ func TestPhaseInput_Spec_PassthroughPointer(t *testing.T) {
 	if got == nil || got.Name != "build" {
 		t.Fatalf("Spec passthrough: %+v", got)
 	}
-	// Absent spec is nil.
 	if NewPhaseInput(PhaseInputInit{}).Spec() != nil {
 		t.Fatalf("absent Spec should be nil")
 	}
@@ -171,9 +157,6 @@ func TestPhaseInput_Correction_PresentAndAbsent(t *testing.T) {
 	}
 }
 
-// TestPhaseInput_ErrorContext_SealedByValue proves the typed channels are
-// returned by value: a caller mutating the returned struct cannot reach back
-// into the sealed input.
 func TestPhaseInput_ErrorContext_SealedByValue(t *testing.T) {
 	in := NewPhaseInput(PhaseInputInit{Error: &ErrorContext{Code: "E1"}})
 	ec, _ := in.ErrorContext()

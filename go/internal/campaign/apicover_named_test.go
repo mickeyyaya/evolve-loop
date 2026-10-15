@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// TestLoadFile_NamesCampaignPublicTypesAndFileLoader graduates the campaign
-// package into the public-API gate while pinning the file-backed entrypoint.
 func TestLoadFile_NamesCampaignPublicTypesAndFileLoader(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "campaign-plan.json")
 	data := []byte(`{"version":1,"goal":"g","research":{"summary":"s","citations":[{"title":"source"}]},"cycles":[{"id":"c1"}]}`)

@@ -1,12 +1,5 @@
 package shiperr
 
-// signalcodes.go — ADR-0101 S2: the ship vocabulary in the Signal Center's
-// code space. Projection, not copy: SignalCode(c) is "SHIP_" + c, and every
-// code is registered under the ship module with a one-line doc so
-// docs/architecture/signal-codes.md and the ship.error events share ONE
-// vocabulary. AllCodes is the sorted list the registration walks; the vocab
-// test pins each constant's wire string, this table pins that each has a doc.
-
 import (
 	"sort"
 
@@ -61,8 +54,6 @@ var codeDocs = map[ShipErrorCode]string{
 	CodeUnknown:                     "an unclassified ship failure",
 }
 
-// AllCodes lists every ship error code, sorted — the one enumeration of the
-// vocabulary (the constants cannot be walked at runtime).
 func AllCodes() []ShipErrorCode {
 	out := make([]ShipErrorCode, 0, len(codeDocs))
 	for c := range codeDocs {
@@ -72,18 +63,8 @@ func AllCodes() []ShipErrorCode {
 	return out
 }
 
-// SignalCode is the Signal Center code for a ship error: the literal SHIP_
-// prefix, nothing clever, so a grep for either spelling finds the other.
 func SignalCode(c ShipErrorCode) signalcenter.Code { return signalcenter.Code("SHIP_" + string(c)) }
 
-// The Debug keys the ONE ship.error producer projects onto the signal line
-// (ADR-0103 unit 07), each spelled ONCE so a producer cannot respell one out
-// of the projection (the field would still reach ship-error.json but vanish
-// from the ship.error event). Homed here, the leaf both the ship phase and
-// core import, so the landing stamps them and core reads them without either
-// importing the other. StepKey names the landing step an error was built in:
-// "integrate" for the ff-merge, "push" for the push and its inline repair,
-// "binding" for the ship-binding witness.
 const (
 	StepKey          = "step"
 	GitRCKey         = "git_rc"
@@ -93,14 +74,6 @@ const (
 	RepairOutcomeKey = "repair_outcome"
 )
 
-// SignalDebugKeys are the Debug keys the ONE ship.error producer (core's
-// emitShipError) projects into Event.Fields when non-empty — the triage
-// whitelist: the step, the git exit code, the worktree, the branches and the
-// repair outcome, built from the constants above. Nothing else in Debug
-// (SHAs, gate output, paths) rides the signal line; it stays in
-// ship-error.json. A key is added as a constant, here and in the vocab test
-// together; the landing leaf's source scan refuses a bare literal of any of
-// them, the host's sites adopt the constants as they move (07b/07c).
 var SignalDebugKeys = []string{StepKey, GitRCKey, WorktreeKey, BranchKey, CycleBranchKey, RepairOutcomeKey}
 
 func init() {
@@ -109,11 +82,6 @@ func init() {
 	}
 }
 
-// SignalSeverity is the Signal Center severity of a ship error of this class
-// (design §5.3): the integrity class is an INCIDENT — act; every other class,
-// including one this switch does not name yet, is a WARN — note, continue,
-// the router recovers. The rule lives with the vocabulary; the table test
-// walks every declared class from source, so a new class gets a row.
 func (c ShipErrorClass) SignalSeverity() signalcenter.Severity {
 	switch c {
 	case ShipClassIntegrity:

@@ -32,15 +32,9 @@ func TestExplanationView_JSONRoundTrip(t *testing.T) {
 	}
 }
 
-// TestHandoffs_AuditAccessor_AbsentReturnsFalse is the named RED anchor for
-// 3.1: an absent typed view yields the zero value AND ok=false, never a
-// fabricated present view. This is the "tolerant of fields it doesn't use" (P5)
-// contract — a phase that reads Upstream.Audit() must be able to distinguish
-// "no audit yet" from "audit said zero".
 func TestHandoffs_AuditAccessor_AbsentReturnsFalse(t *testing.T) {
-	h := NewHandoffs(HandoffsInit{}) // nothing populated
+	h := NewHandoffs(HandoffsInit{})
 
-	// AuditView holds a map, so it is not == comparable; check ok + a field.
 	if v, ok := h.Audit(); ok || v.RedCount != 0 || v.DefectsBySeverity != nil {
 		t.Fatalf("absent Audit: got (%+v, %v), want (zero, false)", v, ok)
 	}
@@ -61,8 +55,6 @@ func TestHandoffs_AuditAccessor_AbsentReturnsFalse(t *testing.T) {
 	}
 }
 
-// TestHandoffs_ZeroValue_Empty pins the documented contract that the zero
-// Handoffs is a valid, safe empty value (no constructor required to read it).
 func TestHandoffs_ZeroValue_Empty(t *testing.T) {
 	var h Handoffs
 	if _, ok := h.Scout(); ok {
@@ -116,15 +108,13 @@ func TestHandoffs_UpstreamDigest_RendersAndCaps(t *testing.T) {
 	}
 }
 
-// TestHandoffs_Audit_NilDefectMap covers the real case of an audit with zero
-// defects emitting a nil DefectsBySeverity — the sealed copy must stay nil-safe.
 func TestHandoffs_Audit_NilDefectMap(t *testing.T) {
 	h := NewHandoffs(HandoffsInit{Audit: &AuditView{Verdict: "PASS", RedCount: 0}})
 	a, ok := h.Audit()
 	if !ok || a.Verdict != "PASS" || a.DefectsBySeverity != nil {
 		t.Fatalf("nil-defect audit: (%+v, %v)", a, ok)
 	}
-	if a.DefectsBySeverity["HIGH"] != 0 { // reading a nil map is safe
+	if a.DefectsBySeverity["HIGH"] != 0 {
 		t.Fatalf("nil map read non-zero")
 	}
 }
@@ -144,15 +134,11 @@ func TestHandoffs_Generic_NamespacedLookup(t *testing.T) {
 	}
 }
 
-// TestHandoffs_Generic_NestedValue_Sealed proves the generic plane is deep-sealed:
-// a nested map/slice value (JSON objects/arrays are valid signal values) must be
-// copied so mutating the source after construction does not leak through Generic.
 func TestHandoffs_Generic_NestedValue_Sealed(t *testing.T) {
 	nested := map[string]any{"inner": "orig"}
 	arr := []any{"a", map[string]any{"k": "orig"}}
 	h := NewHandoffs(HandoffsInit{Generic: map[string]any{"obj": nested, "arr": arr}})
 
-	// Mutate the sources after construction.
 	nested["inner"] = "MUTATED"
 	arr[0] = "MUTATED"
 	arr[1].(map[string]any)["k"] = "MUTATED"
@@ -176,10 +162,6 @@ func TestHandoffs_Degraded_ListsReadMisses(t *testing.T) {
 	}
 }
 
-// TestHandoffs_Sealed_NoMutationViaInitOrAccessor proves the seal (P5
-// idempotency / no shared mutable state): mutating the init maps/slices AFTER
-// construction, or mutating a returned slice/copy, must not change the sealed
-// Handoffs.
 func TestHandoffs_Sealed_NoMutationViaInitOrAccessor(t *testing.T) {
 	gen := map[string]any{"k": "v"}
 	deg := []string{"miss-1"}
@@ -193,7 +175,6 @@ func TestHandoffs_Sealed_NoMutationViaInitOrAccessor(t *testing.T) {
 		Degraded: deg,
 	})
 
-	// Mutate every source after construction.
 	gen["k"] = "MUTATED"
 	gen["new"] = "X"
 	deg[0] = "MUTATED"
@@ -210,7 +191,6 @@ func TestHandoffs_Sealed_NoMutationViaInitOrAccessor(t *testing.T) {
 	if len(gotDeg) != 1 || gotDeg[0] != "miss-1" {
 		t.Fatalf("Degraded leaked init mutation: %v", gotDeg)
 	}
-	// Mutating the returned Degraded slice must not affect the next read.
 	gotDeg[0] = "MUTATED-RETURN"
 	if again := h.Degraded(); again[0] != "miss-1" {
 		t.Fatalf("Degraded leaked accessor mutation: %v", again)

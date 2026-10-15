@@ -17,7 +17,7 @@ func TestPartitionPackages(t *testing.T) {
 
 	t.Run("chunks into n contiguous slices, all packages preserved", func(t *testing.T) {
 		t.Parallel()
-		pkgs := []string{"a", "j", "c", "e", "b", "h", "d", "g", "f", "i"} // 10, unsorted
+		pkgs := []string{"a", "j", "c", "e", "b", "h", "d", "g", "f", "i"}
 		got := partitionPackages(pkgs, 4)
 		if len(got) != 4 {
 			t.Fatalf("want 4 slices, got %d: %+v", len(got), got)
@@ -25,7 +25,6 @@ func TestPartitionPackages(t *testing.T) {
 		if n := sliceCount(got); n != 10 {
 			t.Errorf("want 10 packages across slices, got %d", n)
 		}
-		// chunked ceil(10/4)=3 ⇒ [3,3,3,1]; sorted+contiguous
 		if !reflect.DeepEqual(got[0].Packages, []string{"a", "b", "c"}) {
 			t.Errorf("slice-1 = %v, want [a b c] (sorted+contiguous)", got[0].Packages)
 		}
@@ -41,8 +40,8 @@ func TestPartitionPackages(t *testing.T) {
 		t.Parallel()
 		pkgs := []string{
 			"github.com/x/go/internal/config",
-			"github.com/x/go/internal/core",          // hub — excluded
-			"github.com/x/go/internal/core/evidence", // hub subpkg — excluded
+			"github.com/x/go/internal/core",
+			"github.com/x/go/internal/core/evidence",
 			"github.com/x/go/internal/dossier",
 		}
 		got := partitionPackages(pkgs, 4)
@@ -77,9 +76,6 @@ func TestPartitionPackages(t *testing.T) {
 	})
 }
 
-// Uneven chunking (len not divisible by n) leaves a trailing slot empty;
-// partitionPackages must compact it — pinning that the compaction is NOT dead
-// code (5 pkgs at n=4: chunks [2,2,1] fill 3 slots, the 4th would be empty).
 func TestPartitionPackages_UnevenLeavesNoEmptySlices(t *testing.T) {
 	t.Parallel()
 	got := partitionPackages([]string{"a", "b", "c", "d", "e"}, 4)

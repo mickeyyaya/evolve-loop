@@ -105,32 +105,24 @@ func parseReleasePipelineArgs(args []string, stdout, stderr io.Writer) (f releas
 
 func releasePipelineExitCode(err error, stderr io.Writer) int {
 	if err == nil {
-		return 0
+		return exitOK
 	}
 	if errors.Is(err, releasepipeline.ErrPrePublishFailed) {
 		fmt.Fprintf(stderr, "[release-pipeline] FAIL: %v\n", err)
-		return 1
+		return exitFail
 	}
 	if errors.Is(err, releasepipeline.ErrShipFailed) {
 		fmt.Fprintf(stderr, "[release-pipeline] FAIL: %v\n", err)
-		return 2
+		return exitRuntime
 	}
 	if errors.Is(err, releasepipeline.ErrPostPublishFailed) {
 		fmt.Fprintf(stderr, "[release-pipeline] FAIL: %v\n", err)
-		return 3
+		return exitPostPublish
 	}
 	fmt.Fprintf(stderr, "[release-pipeline] FAIL: %v\n", err)
-	return 1
+	return exitFail
 }
 
-// runReleasePipeline is `evolve release <target> [flags]` (alias: release-pipeline).
-// Mirrors legacy/scripts/release-pipeline.sh:
-//
-//	0  — published + propagated
-//	1  — pre-publish step failed
-//	2  — ship.sh failed (nothing pushed)
-//	3  — post-publish failed; auto-rollback ran or was skipped
-//	10 — invalid arguments
 func RunReleasePipeline(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	f, code, done := parseReleasePipelineArgs(args, stdout, stderr)
 	if done {

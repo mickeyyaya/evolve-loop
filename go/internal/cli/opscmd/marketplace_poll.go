@@ -109,28 +109,19 @@ func parseMarketplacePollArgs(args []string, stdout, stderr io.Writer) (f market
 
 func marketplacePollExitCode(err error, stderr io.Writer) int {
 	if err == nil {
-		return 0
+		return exitOK
 	}
 	if errors.Is(err, marketplacepoll.ErrTimeout) {
-		return 1
+		return exitFail
 	}
 	if errors.Is(err, marketplacepoll.ErrRuntime) {
 		fmt.Fprintf(stderr, "[marketplace-poll] FAIL: %v\n", err)
-		return 2
+		return exitRuntime
 	}
 	fmt.Fprintf(stderr, "[marketplace-poll] FAIL: %v\n", err)
-	return 2
+	return exitRuntime
 }
 
-// runMarketplacePoll is `evolve marketplace-poll <target> [--max-wait-s N]
-// [--poll-interval-s N] [--marketplace-dir DIR] [--dry-run]`.
-//
-// Mirrors legacy/scripts/release/marketplace-poll.sh exit codes:
-//
-//	0  — converged + release.sh refresh OK
-//	1  — timeout
-//	2  — runtime error (missing dir, bad plugin.json, semver, release.sh fail)
-//	10 — invalid arguments
 func RunMarketplacePoll(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	f, code, done := parseMarketplacePollArgs(args, stdout, stderr)
 	if done {

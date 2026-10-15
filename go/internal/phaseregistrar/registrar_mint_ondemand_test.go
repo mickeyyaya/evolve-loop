@@ -1,13 +1,5 @@
 package phaseregistrar
 
-// registrar_mint_ondemand_test.go — instance #5 of the persona-less-phase
-// class (cycle-1567/1568 halt): a minted phase.json persisted WITHOUT a
-// resolvable persona and without catalog:"on-demand" reds the tracked-menu
-// guard in every lane worktree that stages it, and its next-cycle scheduled
-// dispatch dies at load-agent. The registrar now stamps on-demand at mint
-// time — the #493 architect's deferred suggestion (4b), landed after the
-// prediction came true.
-
 import (
 	"encoding/json"
 	"os"
@@ -27,7 +19,6 @@ func mintCfg(name string) phaseconfig.PhaseConfig {
 	return cfg
 }
 
-// No persona anywhere → the persisted spec carries catalog:"on-demand".
 func TestRegister_PersonalessMintStampedOnDemand(t *testing.T) {
 	dir := t.TempDir()
 	r := Registrar{Bridge: fakeBridge{}, Prompts: prompts.NewFromFS(fstest.MapFS{}),
@@ -52,7 +43,6 @@ func TestRegister_PersonalessMintStampedOnDemand(t *testing.T) {
 	}
 }
 
-// A mint whose persona DOES resolve keeps full menu presence.
 func TestRegister_ResolvablePersonaMintStaysOnMenu(t *testing.T) {
 	r := Registrar{Bridge: fakeBridge{},
 		Prompts: prompts.NewFromFS(fstest.MapFS{
@@ -68,7 +58,6 @@ func TestRegister_ResolvablePersonaMintStaysOnMenu(t *testing.T) {
 	}
 }
 
-// An explicit advisor-specified catalog word is kept verbatim.
 func TestRegister_ExplicitCatalogWordKeptVerbatim(t *testing.T) {
 	cfg := mintCfg("explicit-word")
 	cfg.Catalog = phasespec.CatalogOnDemand

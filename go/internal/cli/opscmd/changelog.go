@@ -13,8 +13,6 @@ import (
 
 var changelogWriteEntry = changeloggen.WriteEntry
 
-// runChangelogGen is `evolve changelog-gen <from-ref> <to-ref> <version> [--dry-run]`.
-// Mirrors legacy/scripts/release/changelog-gen.sh.
 func RunChangelogGen(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fromRef, toRef, version, dryRun, code, done := parseChangelogGenArgs(args, stdout, stderr)
 	if done {
@@ -24,12 +22,10 @@ func RunChangelogGen(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	clPath := changeloggen.ResolveChangelogPath(repoRoot)
 
-	// Idempotency pre-check: matches bash behavior of returning OK before
-	// running git log if the entry already exists.
 	if body, err := os.ReadFile(clPath); err == nil {
 		if changeloggen.HasEntry(string(body), version) {
 			fmt.Fprintf(stderr, "[changelog-gen] CHANGELOG.md already has [%s] entry — preserving (idempotent skip)\n", version)
-			return 0
+			return exitOK
 		}
 	}
 
@@ -43,22 +39,22 @@ func RunChangelogGen(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "----- BEGIN GENERATED -----")
 		fmt.Fprint(stdout, entry)
 		fmt.Fprintln(stdout, "----- END GENERATED -----")
-		return 0
+		return exitOK
 	}
 
 	wrote, skipped, err := changelogWriteEntry(clPath, version, entry)
 	if err != nil {
 		fmt.Fprintf(stderr, "[changelog-gen] FAIL: %v\n", err)
-		return 1
+		return exitFail
 	}
 	if skipped {
 		fmt.Fprintf(stderr, "[changelog-gen] CHANGELOG.md already has [%s] entry — preserving (idempotent skip)\n", version)
-		return 0
+		return exitOK
 	}
 	if wrote {
 		fmt.Fprintf(stderr, "[changelog-gen] OK: prepended [%s] entry to %s\n", version, clPath)
 	}
-	return 0
+	return exitOK
 }
 
 func parseChangelogGenArgs(args []string, stdout, stderr io.Writer) (fromRef, toRef, version string, dryRun bool, code int, done bool) {

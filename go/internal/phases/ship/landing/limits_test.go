@@ -1,11 +1,5 @@
 package landing
 
-// limits_test.go — the clean-code limits the design promises (ADR-0103 unit
-// 07 §4), enforced by a test rather than by review: every function < 50
-// lines, nesting depth ≤ 4, every file < 800 lines (the failurelearning/
-// limits_test.go copy; comments inside a function count, its doc comment
-// does not).
-
 import (
 	"testing"
 

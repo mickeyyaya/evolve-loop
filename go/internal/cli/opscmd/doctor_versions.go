@@ -50,7 +50,7 @@ func defaultLatestRelease(bin string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
@@ -193,25 +193,25 @@ func runDoctorVersions(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&asJSON, "json", false, "emit JSON payload")
 	fs.BoolVar(&checkLatest, "latest", false, "compare against latest releases")
 	if err := fs.Parse(cmdutil.ReorderArgs(args)); err != nil {
-		return 10
+		return exitUsage
 	}
 	if fs.NArg() > 0 {
 		fmt.Fprintf(stderr, "evolve doctor versions: unexpected arguments: %v\n", fs.Args())
-		return 10
+		return exitUsage
 	}
 
 	rows, anyLagging := collectDoctorVersionRows(checkLatest)
 	if asJSON {
 		if err := printDoctorVersionsJSON(stdout, rows); err != nil {
 			fmt.Fprintf(stderr, "evolve doctor versions: %v\n", err)
-			return 1
+			return exitFail
 		}
 	} else {
 		printDoctorVersionsText(stdout, rows, checkLatest)
 	}
 
 	if checkLatest && anyLagging {
-		return 1
+		return exitFail
 	}
-	return 0
+	return exitOK
 }

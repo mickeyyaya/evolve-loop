@@ -1,15 +1,5 @@
 package phaseregistrar
 
-// registrar_clamp_binding_test.go — cross-binding pin for the two enforcement
-// styles of `writes_source ⟹ sandboxed dispatch profile` (ADR-0073): the
-// registrar enforces it by CONSTRUCTION (Register forces Sandbox.Enabled into
-// the profile it persists), the discovery clamp by VERIFICATION
-// (phasespec.SandboxedProfilePredicate over the same on-disk profile). This
-// test drives a real writes_source mint through Register and asserts the
-// persisted profile passes the discovery-side predicate — so the two paths
-// can never drift into a state where a legitimately-minted writer is
-// stripped (or a strip-evading profile shape passes).
-
 import (
 	"path/filepath"
 	"strings"

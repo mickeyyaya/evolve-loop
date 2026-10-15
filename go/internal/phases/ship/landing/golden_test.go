@@ -1,12 +1,5 @@
 package landing
 
-// golden_test.go — test 22: the goldens captured on the HOST before the move
-// (testdata/*.golden.json, 8e8f080f) replayed through the leaf. A golden row
-// is a whole host scenario; the leaf owns the window from the reset (or the
-// push) up to its post-push head read, and the `[ship]   OK: ff-merged` and
-// `[ship] REPAIR:` log lines — the host's prelude, its `rev-parse HEAD^{tree}`
-// and its own OK lines are outside the leaf and are cut before comparing.
-
 import (
 	"context"
 	"encoding/json"
@@ -58,9 +51,6 @@ func loadGolden(t *testing.T, name string) goldenFile {
 	return g
 }
 
-// leafWindow cuts a host argv sequence down to the calls the leaf owns:
-// from the first reset/push through the last call before the host's
-// `rev-parse HEAD^{tree}` (the verification read that stays with the host).
 func leafWindow(argv []string) []string {
 	start := -1
 	for i, a := range argv {
@@ -82,8 +72,6 @@ func leafWindow(argv []string) []string {
 	return out
 }
 
-// leafLogs keeps the log lines the leaf writes (the ff-merge OK line and the
-// REPAIR lines); the host's own lines are dropped.
 func leafLogs(logs []string) []string {
 	var out []string
 	for _, l := range logs {
@@ -94,8 +82,6 @@ func leafLogs(logs []string) []string {
 	return out
 }
 
-// scriptScenario scripts the fake git for a golden row by its name — the
-// same responses the host recorder gave when the golden was captured.
 func scriptScenario(f *fakeGit, name string) {
 	scenario := name[strings.LastIndex(name, "/")+1:]
 	if scenario != "push-ok" {
@@ -110,11 +96,6 @@ func scriptScenario(f *fakeGit, name string) {
 	case "origin-ref-error":
 		f.on("rev-parse origin/"+testBranch, scripted{exit: 128})
 	case "head-error":
-		// The capture answered `rev-parse HEAD` [ok, error] at every site: on
-		// the worktree site the wording probe takes the ok and the REPAIR's
-		// head probe declines; on the direct and push-only sites the repair
-		// probe takes the ok, the retry lands, and the POST-PUSH head read
-		// fails (Head empty, no error) — two scenarios under one name.
 		f.on("rev-parse origin/"+testBranch, scripted{stdout: testOriginRef + "\n"})
 		f.set("rev-parse HEAD", scripted{stdout: testHead + "\n"}, scripted{err: errors.New("spawn: no git")})
 	case "already-pushed":
@@ -172,7 +153,6 @@ func assertErrorMatchesGolden(t *testing.T, name string, err error, want *golden
 	}
 }
 
-// Test 22 (push rows) — every push_<site> golden row replays through Push.
 func TestPush_ArgvAndLogSequencesMatchTheGoldens(t *testing.T) {
 	for name, site := range map[string]PushSite{"direct": SiteDirect, "pushonly": SitePushOnly} {
 		for _, row := range loadGolden(t, "push_"+name+".golden.json").Rows {

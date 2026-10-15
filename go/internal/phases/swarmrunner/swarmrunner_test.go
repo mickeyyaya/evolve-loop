@@ -14,8 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// artifactBridge writes a per-worker report to the requested ArtifactPath so the
-// reader fan-in has real worker summaries to synthesize.
 type artifactBridge struct{ launches int32 }
 
 func (b *artifactBridge) Launch(_ context.Context, r core.BridgeRequest) (core.BridgeResponse, error) {
@@ -31,7 +29,6 @@ func (b *artifactBridge) Probe(context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// fakeInner is a core.PhaseRunner that records whether it ran.
 type fakeInner struct {
 	name string
 	ran  int32
@@ -43,7 +40,6 @@ func (f *fakeInner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse,
 	return core.PhaseResponse{Phase: f.name, Verdict: core.VerdictPASS, Signals: map[string]any{"inner": true}}, nil
 }
 
-// fakeBridge counts launches (one per dispatched worker).
 type fakeBridge struct{ launches int32 }
 
 func (b *fakeBridge) Launch(context.Context, core.BridgeRequest) (core.BridgeResponse, error) {
@@ -74,8 +70,6 @@ func reqWithRoot(root, ws string, env map[string]string) core.PhaseRequest {
 	return core.PhaseRequest{Cycle: 1, ProjectRoot: root, Workspace: ws, Env: env}
 }
 
-// gitInitForTest makes a throwaway repo with one commit so writer-mode
-// worktree provisioning never touches the developer's repository.
 func gitInitForTest(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -107,7 +101,6 @@ func TestDecorator_ShadowDelegates(t *testing.T) {
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
 
-	// Config{} (Stage="") → stageOff → pure delegate, NO dispatch.
 	resp, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
 		t.Fatal(err)
@@ -182,8 +175,6 @@ func TestDecorator_EnforceReaderSynthesizesArtifact(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Reader enforce must fold both workers' reports into ONE synthesized artifact
-	// at the phase's canonical report path (<phase>-report.md).
 	synth := filepath.Join(ws, "scout-report.md")
 	data, rerr := os.ReadFile(synth)
 	if rerr != nil {
@@ -203,7 +194,6 @@ func TestDecorator_EnforceReaderSynthesizesArtifact(t *testing.T) {
 	}
 }
 
-// envBridge captures the env the bridge received, to assert the per-worker overlay.
 type envBridge struct{ gotEnv map[string]string }
 
 func (b *envBridge) Launch(_ context.Context, r core.BridgeRequest) (core.BridgeResponse, error) {
@@ -220,7 +210,7 @@ func TestBridgeLauncher_MergesPerWorkerEnvOverPhaseEnv(t *testing.T) {
 	l := bridgeLauncher{bridge: b, env: map[string]string{"A": "1", "PORT": "9000"}}
 
 	if _, err := l.Launch(context.Background(), swarm.LaunchRequest{
-		Env: map[string]string{"PORT": "52000"}, // per-worker overlay
+		Env: map[string]string{"PORT": "52000"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +222,6 @@ func TestBridgeLauncher_MergesPerWorkerEnvOverPhaseEnv(t *testing.T) {
 	}
 }
 
-// skillsBridge captures the Skills the launcher resolved onto the BridgeRequest.
 type skillsBridge struct{ gotSkills []string }
 
 func (b *skillsBridge) Launch(_ context.Context, r core.BridgeRequest) (core.BridgeResponse, error) {
@@ -253,13 +242,8 @@ func skillsContain(got []string, want string) bool {
 	return false
 }
 
-// TestSwarmRunnerBridgeLauncherThreadsSkills is the C2 manual-verify predicate:
-// the unexported bridgeLauncher (unreachable from the external cycle943 ACS
-// package) must resolve the tier-gated overlay and thread its NAMES onto the
-// BridgeRequest — deep tier attaches fable, balanced attaches nothing — exactly
-// like the phase runner and the other non-phase dispatch sites.
 func TestSwarmRunnerBridgeLauncherThreadsSkills(t *testing.T) {
-	root := t.TempDir() // no policy.json ⇒ compiled-default overlays (deep/top→fable)
+	root := t.TempDir()
 
 	deep := &skillsBridge{}
 	l := bridgeLauncher{bridge: deep, env: map[string]string{}}
@@ -295,7 +279,6 @@ func TestBridgeLauncher_NoOverlayKeepsPhaseEnv(t *testing.T) {
 	if b.gotEnv["A"] != "1" {
 		t.Errorf("no overlay must pass phase env through, got %v", b.gotEnv)
 	}
-	// Must not mutate the caller's phase-env map.
 	if _, leaked := phaseEnv["PORT"]; leaked {
 		t.Error("merge must not mutate the shared phase-env map")
 	}
@@ -303,7 +286,7 @@ func TestBridgeLauncher_NoOverlayKeepsPhaseEnv(t *testing.T) {
 
 func TestDecorator_EnforceReaderMarksMissingArtifact(t *testing.T) {
 	inner := &fakeInner{name: "scout"}
-	bridge := &fakeBridge{} // succeeds but writes NO report file
+	bridge := &fakeBridge{}
 	d := New(inner, bridge, swarm.ModeReader, Config{Stage: "enforce"})
 	ws := t.TempDir()
 	writePlan(t, ws, swarm.ModeReader)
@@ -312,8 +295,6 @@ func TestDecorator_EnforceReaderMarksMissingArtifact(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A 0-exit worker that produced no report must be surfaced loudly in the
-	// synthesis, not silently dropped (Rule 12 — fail loudly).
 	data, rerr := os.ReadFile(filepath.Join(ws, "scout-report.md"))
 	if rerr != nil {
 		t.Fatalf("synthesis must still be written: %v", rerr)
@@ -349,7 +330,6 @@ func TestDecorator_Name(t *testing.T) {
 	}
 }
 
-// errBridge simulates a total transport failure (bridge is unreachable / crashed).
 type errBridge struct{}
 
 func (b *errBridge) Launch(_ context.Context, _ core.BridgeRequest) (core.BridgeResponse, error) {
@@ -360,7 +340,6 @@ func (b *errBridge) Probe(context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// writeWriterPlan writes a valid WRITER swarm plan (disjoint files, two workers).
 func writeWriterPlan(t *testing.T, ws string) {
 	t.Helper()
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -374,14 +353,12 @@ func writeWriterPlan(t *testing.T, ws string) {
 	}
 }
 
-// branchByID must return a worker_id → branch map for every worker in the plan.
 func TestBranchByID_Empty(t *testing.T) {
 	if m := branchByID(swarm.SwarmPlan{}); len(m) != 0 {
 		t.Errorf("empty plan must produce empty map, got %v", m)
 	}
 }
 
-// annotate must emit swarm.error only when derr is non-nil.
 func TestAnnotate_RecordsDispatchError(t *testing.T) {
 	resp := &core.PhaseResponse{Signals: map[string]any{}}
 	annotate(resp, swarm.SwarmPlan{Mode: swarm.ModeReader}, swarm.SwarmResult{},
@@ -399,7 +376,6 @@ func TestAnnotate_NoDispatchError_NoErrorSignal(t *testing.T) {
 	}
 }
 
-// bridgeLauncher must propagate launch errors from the underlying bridge.
 func TestBridgeLauncher_PropagatesLaunchError(t *testing.T) {
 	l := bridgeLauncher{bridge: &errBridge{}, env: map[string]string{}}
 	_, err := l.Launch(context.Background(), swarm.LaunchRequest{})
@@ -408,7 +384,6 @@ func TestBridgeLauncher_PropagatesLaunchError(t *testing.T) {
 	}
 }
 
-// dispatchDeps: writer mode must inject a WorkerProvisioner; reader must not.
 func TestDecorator_DispatchDeps_WriterMode_SetsProvisioner(t *testing.T) {
 	d := New(&fakeInner{name: "build"}, &fakeBridge{}, swarm.ModeWriter, Config{})
 	deps := d.dispatchDeps(reqWith(t.TempDir(), map[string]string{}))
@@ -425,7 +400,6 @@ func TestDecorator_DispatchDeps_ReaderMode_NoProvisioner(t *testing.T) {
 	}
 }
 
-// enforce must return FAIL when all workers fail due to transport errors.
 func TestDecorator_EnforceReader_WorkerFailureReturnsFail(t *testing.T) {
 	d := New(&fakeInner{name: "scout"}, &errBridge{}, swarm.ModeReader, Config{Stage: "enforce"})
 	ws := t.TempDir()
@@ -440,12 +414,10 @@ func TestDecorator_EnforceReader_WorkerFailureReturnsFail(t *testing.T) {
 	}
 }
 
-// A non-partitionable plan must collapse to the inner runner even in enforce mode.
 func TestDecorator_ValidateCollapse_FallsBackToInner(t *testing.T) {
 	inner := &fakeInner{name: "build"}
 	d := New(inner, &fakeBridge{}, swarm.ModeWriter, Config{Stage: "enforce"})
 	ws := t.TempDir()
-	// Non-partitionable → Validate returns Collapse=true → inner must run.
 	plan := `{"swarm_plan":{"task_id":"t","mode":"writer","partitionable":false,` +
 		`"workers":[{"worker_id":"w0","cli":"claude"},{"worker_id":"w1","cli":"codex"}]}}`
 	_ = os.MkdirAll(ws, 0o755)
@@ -460,7 +432,6 @@ func TestDecorator_ValidateCollapse_FallsBackToInner(t *testing.T) {
 	}
 }
 
-// parseSwarmStage must map "shadow" (explicit) and any unknown value to stageOff.
 func TestParseSwarmStage_ShadowAndUnknownMapToOff(t *testing.T) {
 	for _, input := range []string{"shadow", "SHADOW", "", "unknown_value"} {
 		if st := parseSwarmStage(input); st != stageOff {
@@ -469,13 +440,11 @@ func TestParseSwarmStage_ShadowAndUnknownMapToOff(t *testing.T) {
 	}
 }
 
-// loadPlan must return ok=false for a workspace with neither swarm-plan.json nor
-// swarm-plan.md, ensuring a graceful N=1 fallback rather than a panic.
 func TestDecorator_NoPlanFile_FallsBackToInner(t *testing.T) {
 	inner := &fakeInner{name: "build"}
 	bridge := &fakeBridge{}
 	d := New(inner, bridge, swarm.ModeWriter, Config{Stage: "enforce"})
-	ws := t.TempDir() // no plan file written
+	ws := t.TempDir()
 
 	_, err := d.Run(context.Background(), reqWith(ws, map[string]string{}))
 	if err != nil {
@@ -489,8 +458,6 @@ func TestDecorator_NoPlanFile_FallsBackToInner(t *testing.T) {
 	}
 }
 
-// mergeEnv must produce a new map (not alias the base or overlay) so concurrent
-// workers that receive the same base env can't corrupt each other's copies.
 func TestMergeEnv_NoAliasOfBase(t *testing.T) {
 	base := map[string]string{"A": "1", "B": "2"}
 	overlay := map[string]string{"B": "override", "C": "3"}
@@ -505,7 +472,6 @@ func TestMergeEnv_NoAliasOfBase(t *testing.T) {
 	if out["C"] != "3" {
 		t.Errorf("overlay-only key C missing: %v", out)
 	}
-	// Mutating the output must not affect the base (no aliasing).
 	out["A"] = "mutated"
 	if base["A"] != "1" {
 		t.Error("mergeEnv must not alias the base map (mutation leaked)")
@@ -526,10 +492,8 @@ func TestMergeEnv_NilOverlay(t *testing.T) {
 	}
 }
 
-// annotate must initialise Signals if the response had a nil map (defensive
-// nil-safety for callers that produce a bare PhaseResponse).
 func TestAnnotate_InitialisesNilSignals(t *testing.T) {
-	resp := &core.PhaseResponse{} // Signals is nil
+	resp := &core.PhaseResponse{}
 	annotate(resp, swarm.SwarmPlan{Mode: swarm.ModeWriter}, swarm.SwarmResult{}, nil, "enforce")
 	if resp.Signals == nil {
 		t.Error("annotate must initialise a nil Signals map")
@@ -539,8 +503,6 @@ func TestAnnotate_InitialisesNilSignals(t *testing.T) {
 	}
 }
 
-// parseSwarmStage must correctly parse advisory and enforce, and default to stageOff
-// for any other input (fail-safe: a typo or env mismatch never silently enables swarm).
 func TestParseSwarmStage_AdvisoryAndEnforce(t *testing.T) {
 	if st := parseSwarmStage("advisory"); st != stageAdvisory {
 		t.Errorf("parseSwarmStage(\"advisory\") = %v, want stageAdvisory", st)
@@ -556,8 +518,6 @@ func TestParseSwarmStage_AdvisoryAndEnforce(t *testing.T) {
 	}
 }
 
-// enforce reader with a valid plan and workers that write their reports must
-// synthesise a combined report at <phase>-report.md in the workspace.
 func TestDecorator_EnforceReaderSynthesisPath(t *testing.T) {
 	inner := &fakeInner{name: "scout"}
 	bridge := &artifactBridge{}
@@ -581,12 +541,9 @@ func TestDecorator_EnforceReaderSynthesisPath(t *testing.T) {
 	}
 }
 
-// Enforce writer path: when all workers fail → FAIL verdict + non-nil error.
 func TestDecorator_EnforceWriter_WorkerFailureReturnsFail(t *testing.T) {
 	inner := &fakeInner{name: "build"}
 	root := gitInitForTest(t)
-	// Exercise the Config.WorktreeBase DI seam (replaces the former
-	// EVOLVE_WORKTREE_BASE env read; flag-reduction, ADR-0064).
 	d := New(inner, &errBridge{}, swarm.ModeWriter, Config{Stage: "enforce", WorktreeBase: filepath.Join(root, ".evolve", "worktrees")})
 	ws := t.TempDir()
 	writeWriterPlan(t, ws)
@@ -598,13 +555,11 @@ func TestDecorator_EnforceWriter_WorkerFailureReturnsFail(t *testing.T) {
 	if resp.Verdict != core.VerdictFAIL {
 		t.Errorf("enforce writer transport failure must produce VerdictFAIL, got %s", resp.Verdict)
 	}
-	// inner runner must NOT have run (swarm is authoritative in enforce mode).
 	if atomic.LoadInt32(&inner.ran) != 0 {
 		t.Error("enforce writer must not run the inner runner")
 	}
 }
 
-// TestBranchByID verifies the pure plan→branchMap helper.
 func TestBranchByID(t *testing.T) {
 	plan := swarm.SwarmPlan{Workers: []swarm.WorkerSpec{
 		{WorkerID: "w0", Branch: "cycle-1-w0"},
@@ -619,7 +574,6 @@ func TestBranchByID(t *testing.T) {
 	}
 }
 
-// TestDecorator_Enforce_WorkerFail covers the !sr.AllOK() path in enforce.
 func TestDecorator_Enforce_WorkerFail(t *testing.T) {
 	d := New(&fakeInner{name: "scout"}, &fakeBridge{}, swarm.ModeReader, Config{})
 	plan := swarm.SwarmPlan{Mode: swarm.ModeReader, Workers: []swarm.WorkerSpec{{WorkerID: "w0"}}}

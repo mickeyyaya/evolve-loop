@@ -6,22 +6,13 @@ import (
 	"strings"
 )
 
-// partition.go — scout map-reduce MAP-step slicing (pure). The codebase is
-// partitioned into N independent ScanSlices; one scout-scan worker scans each
-// slice in parallel. The "core" hub (fan-in=33) is excluded — it is scanned by
-// the reduce synthesizer only, so a single edit lands per hub file.
-
-// ScanSlice is one MAP unit: a contiguous group of package import paths a single
-// scout-scan worker scans and digests.
 type ScanSlice struct {
 	ID       string   `json:"id"`
 	Packages []string `json:"packages"`
 }
 
-// partitionPackages groups packages into at most n contiguous ScanSlices for
-// parallel scanning, excluding the core hub. Deterministic: packages are sorted,
-// then chunked so related (lexically adjacent) packages stay together — which
-// keeps cross-package findings within a single worker. n<1 ⇒ 1; n>len ⇒ len.
+var sliceIndex = func(i, per int) int { return i / per }
+
 func partitionPackages(packages []string, n int) []ScanSlice {
 	if n < 1 {
 		n = 1
@@ -40,13 +31,13 @@ func partitionPackages(packages []string, n int) []ScanSlice {
 	if n > len(pkgs) {
 		n = len(pkgs)
 	}
-	per := (len(pkgs) + n - 1) / n // ceil
+	per := (len(pkgs) + n - 1) / n
 	slices := make([]ScanSlice, n)
 	for i := range slices {
 		slices[i].ID = fmt.Sprintf("slice-%d", i+1)
 	}
 	for i, p := range pkgs {
-		idx := i / per
+		idx := sliceIndex(i, per)
 		if idx >= n {
 			idx = n - 1
 		}
@@ -61,8 +52,6 @@ func partitionPackages(packages []string, n int) []ScanSlice {
 	return out
 }
 
-// isCoreHub reports whether a package is the high-fan-in core hub, which the
-// reduce synthesizer scans (never a MAP worker), so hub edits stay single-writer.
 func isCoreHub(pkg string) bool {
 	return strings.HasSuffix(pkg, "/internal/core") || strings.Contains(pkg, "/internal/core/")
 }

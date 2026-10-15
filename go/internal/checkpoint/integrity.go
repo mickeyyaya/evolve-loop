@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseblock"
 )
 
-// upsertIntegrity returns a NEW chain with d appended, or with the existing
-// entry for d.Phase replaced (idempotent regenerate/retrigger). It never
-// mutates the input slice. Pure.
 func upsertIntegrity(existing []phaseblock.Digest, d phaseblock.Digest) []phaseblock.Digest {
 	out := make([]phaseblock.Digest, 0, len(existing)+1)
 	replaced := false
@@ -29,22 +26,12 @@ func upsertIntegrity(existing []phaseblock.Digest, d phaseblock.Digest) []phaseb
 	return out
 }
 
-// RecordPhaseIntegrity appends/upserts a phase's integrity digest into the
-// checkpoint block of cycle-state.json, under the shared sidecar lock,
-// atomically (temp + rename). Under fleet each lane's `path` is its OWN per-run
-// file (core.ResolveCycleStatePath / ipcenv.CycleStateFileKey), so concurrent
-// lanes' RecordPhaseIntegrity calls operate on DISTINCT files — no cross-lane
-// clobber; flock still serializes same-file (intra-lane) goroutines (flock.go:8-9)
-// so a read-modify-write never loses a peer's update. Every other state +
-// checkpoint field is preserved.
 func RecordPhaseIntegrity(path string, d phaseblock.Digest) error {
 	return flock.WithPathLock(path, func() error {
 		return recordIntegrityWithHooks(defaultHooks(), path, d)
 	})
 }
 
-// recordIntegrityWithHooks is the lock-free inner (the hooks seam drives each
-// error branch in tests). Callers MUST already hold flock.WithPathLock(path).
 func recordIntegrityWithHooks(h hooks, path string, d phaseblock.Digest) error {
 	b, err := h.readFile(path)
 	if err != nil {
@@ -70,9 +57,6 @@ func recordIntegrityWithHooks(h hooks, path string, d phaseblock.Digest) error {
 	if err != nil {
 		return fmt.Errorf("checkpoint: marshal state: %w", err)
 	}
-	// Distinct temp suffix (not the shared ".tmp" applyWithHooks uses): writers
-	// already serialize under the same sidecar lock, but a unique name makes a
-	// cross-writer temp collision structurally impossible, not merely guarded.
 	tmp := path + ".integrity.tmp"
 	if err := h.writeFile(tmp, out, 0o644); err != nil {
 		return fmt.Errorf("checkpoint: write tmp: %w", err)
@@ -84,10 +68,6 @@ func recordIntegrityWithHooks(h hooks, path string, d phaseblock.Digest) error {
 	return nil
 }
 
-// readExistingIntegrity reads the recorded chain from path's checkpoint block,
-// best-effort (missing file / garbled → nil). The phase-complete chokepoint
-// calls this under the lock so its Compose write CARRIES the chain instead of
-// clobbering it. Caller must already hold flock.WithPathLock(path).
 func readExistingIntegrity(path string) []phaseblock.Digest {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -104,12 +84,6 @@ func readExistingIntegrity(path string) []phaseblock.Digest {
 	return s.Checkpoint.PhaseIntegrity
 }
 
-// decodeIntegrity reads the existing phaseIntegrity (an untyped map slice) back
-// into typed digests. A missing/garbled value yields an empty chain rather than
-// an error — capture is best-effort and never blocks the cycle. The
-// tamper-evident record of record is the append-only hash-chained LEDGER anchor
-// (the second SSOT, ADR-0065); a security consumer verifies chain continuity
-// there, so a reset of this resume-facing copy cannot silently erase the truth.
 func decodeIntegrity(h hooks, v any) []phaseblock.Digest {
 	if v == nil {
 		return nil
@@ -125,8 +99,6 @@ func decodeIntegrity(h hooks, v any) []phaseblock.Digest {
 	return out
 }
 
-// roundTripToAny normalizes typed digests into the untyped map form the state
-// document holds, so a single json.Marshal of the whole state stays canonical.
 func roundTripToAny(h hooks, chain []phaseblock.Digest) (any, error) {
 	b, err := h.jsonMarshal(chain)
 	if err != nil {

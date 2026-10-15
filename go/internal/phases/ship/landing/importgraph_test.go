@@ -1,11 +1,5 @@
 package landing
 
-// importgraph_test.go — the package is a leaf under the ship phase (ADR-0103
-// unit 07 §2): stdlib plus the three named internal packages, never
-// internal/core or internal/phases/ship (the compiler is the cycle guard;
-// this is the leaf-ness declaration — the failurelearning/importgraph_test.go
-// idiom).
-
 import (
 	"go/parser"
 	"go/token"

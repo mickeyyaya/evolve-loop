@@ -1,14 +1,4 @@
-// Package campaign is the multi-cycle campaign planner. It loads the
-// preliminary-study phase's campaign-plan.json, deterministically VERIFIES it
-// (the trust boundary — versioned, unique cycles, an acyclic depends_on DAG with
-// every dependency resolvable), and turns it into dependency-ordered execution
-// waves via fleet.PlanWaves.
-//
-// Per the 2026 finding that intrinsic LLM self-critique is unreliable for plan
-// validation, verification here is PURELY DETERMINISTIC; the LLM plan-reviewer is
-// advisory and lives in the driver, never the trust boundary. The per-cycle
-// integrity floor (build∧audit∧tdd before ship) is enforced downstream by each
-// launched cycle's pipeline — a campaign plan has no field to weaken it.
+// Package campaign is the multi-cycle campaign planner.
 package campaign
 
 import (
@@ -28,8 +18,6 @@ const (
 	MaxWaveWidth = 10
 )
 
-// Plan is the decomposition the preliminary-study phase emits: a versioned,
-// dependency-annotated backlog of cycle-tasks plus the research that grounds it.
 type Plan struct {
 	Version  int          `json:"version"`
 	Goal     string       `json:"goal"`
@@ -37,23 +25,17 @@ type Plan struct {
 	Cycles   []fleet.Todo `json:"cycles"`
 }
 
-// Research records the planning evidence (cited sources) so the decomposition is
-// grounded, not vibe — surfaced in the human-readable render before approval.
 type Research struct {
 	Summary   string     `json:"summary,omitempty"`
 	Citations []Citation `json:"citations,omitempty"`
 }
 
-// Citation is one grounding source for the decomposition strategy.
 type Citation struct {
 	Title string `json:"title"`
 	URL   string `json:"url,omitempty"`
 	Note  string `json:"note,omitempty"`
 }
 
-// PlanFromUnifiedCommitment projects a validated large commitment onto the
-// existing campaign DAG, preserving each member's files, dependencies, evidence,
-// and acceptance contract.
 func PlanFromUnifiedCommitment(c inboxbatch.UnifiedCommitment, items []inboxbatch.Item) (*Plan, error) {
 	if err := c.Validate(items); err != nil {
 		return nil, err
@@ -89,8 +71,6 @@ func PlanFromUnifiedCommitment(c inboxbatch.UnifiedCommitment, items []inboxbatc
 	return plan, nil
 }
 
-// Load parses campaign-plan.json, rejecting unknown fields so schema drift fails
-// loud rather than silently dropping data.
 func Load(data []byte) (*Plan, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -101,7 +81,6 @@ func Load(data []byte) (*Plan, error) {
 	return &p, nil
 }
 
-// LoadFile reads and parses a campaign-plan.json file.
 func LoadFile(path string) (*Plan, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -110,10 +89,6 @@ func LoadFile(path string) (*Plan, error) {
 	return Load(data)
 }
 
-// Verify is the deterministic trust boundary: a plan executes only if it has a
-// version + goal, at least one cycle, unique non-empty cycle ids, and a
-// depends_on DAG that is acyclic with every dependency resolvable (no dangling
-// refs). Returns the first violation.
 func (p *Plan) Verify() error {
 	if p.Version <= 0 {
 		return fmt.Errorf("campaign: plan version must be >= 1")
@@ -140,7 +115,6 @@ func (p *Plan) Verify() error {
 		}
 		seen[c.ID] = true
 	}
-	// DAG validity (acyclic + every depends_on resolvable) — reuse the wave planner.
 	waves, err := fleet.PlanWaves(p.Cycles)
 	if err != nil {
 		return fmt.Errorf("campaign: invalid cycle DAG: %w", err)
@@ -153,14 +127,10 @@ func (p *Plan) Verify() error {
 	return nil
 }
 
-// Waves returns the dependency-ordered execution waves (each wave's cycles are
-// file-disjoint and run concurrently; waves run in order). Verify should pass first.
 func (p *Plan) Waves() ([][]fleet.CycleSpec, error) {
 	return fleet.PlanWaves(p.Cycles)
 }
 
-// Diff summarizes cycle-level changes between two plan versions for the
-// approve→replan loop, deterministically (added/removed/modified cycle ids).
 func Diff(old, updated *Plan) string {
 	oldByID := indexByID(old)
 	newByID := indexByID(updated)
@@ -194,7 +164,6 @@ func indexByID(p *Plan) map[string]fleet.Todo {
 	return m
 }
 
-// sameCycle reports whether two cycle-tasks are equivalent for diff purposes.
 func sameCycle(a, b fleet.Todo) bool {
 	return eqStrings(a.Files, b.Files) &&
 		eqStrings(a.DependsOn, b.DependsOn) &&

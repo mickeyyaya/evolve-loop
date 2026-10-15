@@ -19,7 +19,6 @@ import (
 
 const maxCitationBytes = 16 << 20
 
-// Section returns one exact level-two section. Duplicate headings are invalid.
 func Section(markdown, heading string) (string, bool, error) {
 	lines := visibleLines(markdown)
 	start := -1
@@ -61,30 +60,13 @@ var (
 	statFile            = (*os.File).Stat
 )
 
-// listValuedFields may repeat: a careful reviewer writes one `- Evidence:` line
-// per claim (cycle-1604 wrote four and was rejected as "duplicate evidence
-// fields" — five of eleven consecutive FAILs were this section's format). Their
-// values are joined with newlines; every other key stays single-valued, so a
-// repeated Status is still the ambiguity it always was.
 var listValuedFields = map[string]bool{"evidence": true}
 
-// HasSection reports whether a level-two heading with exactly this title is
-// present on a visible line — the one presence predicate the deliverable
-// contract and the phase gates share, so a heading inside a fence, a comment,
-// or at another level counts for neither (two matchers would let a report the
-// gate refuses slip past the correction ladder). A duplicated heading is
-// present.
 func HasSection(markdown, title string) bool {
-	// err is non-nil only for a duplicate heading, and Section already reports
-	// that case as found=true, so found alone carries both outcomes.
 	_, found, _ := Section(markdown, title)
 	return found
 }
 
-// Fields parses allowed "- Key: value" metadata lines case-insensitively.
-// Unknown prose fields are ignored; a value's surrounding backticks are
-// stripped (cycle-1606 wrote `Document: `path“); list-valued keys accumulate,
-// single-valued keys reject a repeat.
 func Fields(body string, allowed ...string) (map[string]string, error) {
 	allow := make(map[string]bool, len(allowed))
 	for _, key := range allowed {
@@ -117,10 +99,6 @@ func Fields(body string, allowed ...string) (map[string]string, error) {
 	return fields, nil
 }
 
-// RequireReasoning is the reasoning floor: a review's Evidence must say
-// something — token or canned evidence is not a review. Since 2026-09-13
-// (ADR-0102) this is the one blocking rule the audit and retro gates keep;
-// the citation form checked below is advisory there.
 func RequireReasoning(evidence string) error {
 	if len(strings.TrimSpace(evidence)) < 20 {
 		return fmt.Errorf("explanation review requires concrete Evidence")
@@ -128,15 +106,6 @@ func RequireReasoning(evidence string) error {
 	return nil
 }
 
-// ReasonedReview is the ONE reading of a review section every phase gate
-// shares (ADR-0102, "absence is never laxer than thinness"): the section is
-// located by heading, its fields are parsed, and the reasoning floor is
-// applied — a missing section is a missing reasoning (error, naming doc), a
-// duplicated section is a parser finding with no attributable review text
-// (advisory + the floor on ""), a garbled field is a finding with the floor
-// on the Evidence as written (advisory, fields nil; no Evidence line is no
-// reasoning), and thin Evidence fails the floor. The gates apply their phase policy to the fields on top; the guard
-// TestExplanationReviewGates_ShareContractCore forbids them the ladder.
 func ReasonedReview(report, doc, heading string, allowed ...string) (fields map[string]string, advisories []string, err error) {
 	body, found, err := Section(report, heading)
 	if err != nil {
@@ -147,18 +116,12 @@ func ReasonedReview(report, doc, heading string, allowed ...string) (fields map[
 	}
 	fields, err = ReviewFields(body, allowed...)
 	if err != nil {
-		// A garbled field is a shape finding; the floor applies to the Evidence
-		// line as written — a garbled section earns no body fallback (the
-		// well-formed path keeps EvidenceOrBody), so boilerplate is not reasoning.
 		evidence, _ := Fields(body, "Evidence")
 		return nil, []string{err.Error()}, RequireReasoning(evidence["evidence"])
 	}
 	return fields, nil, RequireReasoning(fields["evidence"])
 }
 
-// RequirePathLineEvidence rejects token/canned evidence and requires every
-// authoritative path to be cited at a concrete line. This keeps qualitative
-// review grounded in inspected source rather than path-name repetition.
 func RequirePathLineEvidence(evidence string, references ...string) error {
 	evidence = strings.TrimSpace(evidence)
 	if err := RequireReasoning(evidence); err != nil {
@@ -175,8 +138,6 @@ func RequirePathLineEvidence(evidence string, references ...string) error {
 	return nil
 }
 
-// RequirePathLineEvidenceAt additionally proves that every cited line exists
-// in the current file, or in the base blob when the Build deleted that path.
 func RequirePathLineEvidenceAt(ctx context.Context, root, baseSHA, evidence string, references ...string) error {
 	if err := RequirePathLineEvidence(evidence, references...); err != nil {
 		return err
@@ -234,9 +195,6 @@ func citationLine(evidence, reference string) (int, bool) {
 	return 0, false
 }
 
-// citationRangeContinues accepts the range and column forms reviewers write
-// after a line number — `:23-48`, `:12:3`, `#L7-L9` — so the first line still
-// counts as the citation (cycle-1605 cited sampler.go:23-48 and was rejected).
 func citationRangeContinues(rest string) bool {
 	if len(rest) < 2 || (rest[0] != '-' && rest[0] != ':') {
 		return false
@@ -245,10 +203,6 @@ func citationRangeContinues(rest string) bool {
 	return rest != "" && rest[0] >= '0' && rest[0] <= '9'
 }
 
-// ReviewFields parses an explanation-review section the way both phase gates
-// and the shared review contract read it: Fields over the allowed keys, then
-// the evidence text resolved once (EvidenceOrBody). One home, so a tolerance
-// added here reaches the audit gate and the retro gate together.
 func ReviewFields(body string, allowed ...string) (map[string]string, error) {
 	fields, err := Fields(body, allowed...)
 	if err != nil {
@@ -258,11 +212,6 @@ func ReviewFields(body string, allowed ...string) (map[string]string, error) {
 	return fields, nil
 }
 
-// EvidenceOrBody returns the review's evidence text: the Evidence field when
-// the reviewer wrote one, else the whole section body — a reviewer who put the
-// citations under `- Binding:` and `- Correction still required:` (cycle-1606)
-// still has to cite every material path at a line; only the field name is
-// forgiven, never the grounding.
 func EvidenceOrBody(body, evidence string) string {
 	if strings.TrimSpace(evidence) != "" {
 		return evidence
@@ -306,10 +255,6 @@ func referencedLineCount(ctx context.Context, root, baseSHA, reference string) (
 	return lines, nil
 }
 
-// ValidReference reports whether reference is a safe, clean, relative path —
-// the single home of the "is this relative path safe?" belief, shared with
-// explanationdocs (architecture review 2026-09-01: the two packages had
-// divergent validators judging the same string differently).
 func ValidReference(reference string) bool {
 	clean := filepath.ToSlash(filepath.Clean(filepath.FromSlash(reference)))
 	return reference != "" && clean == reference && clean != "." && !filepath.IsAbs(reference) &&
@@ -424,10 +369,6 @@ func visibleLines(markdown string) []string {
 	return out
 }
 
-// visibleLinesIdx is visibleLines plus, for each visible line, the index of
-// the raw line it came from — so a caller that must bound a RAW scan (the
-// findings TSV block) to a section located on the VISIBLE stream uses this one
-// fence/comment state machine for both, never a second one.
 func visibleLinesIdx(markdown string) (out []string, rawIdx []int) {
 	lines := strings.Split(markdown, "\n")
 	out = make([]string, 0, len(lines))

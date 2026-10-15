@@ -2,23 +2,22 @@ package channel
 
 import "testing"
 
-// TestResolveStage covers all branches of ResolveStage (ADR-0045 I6).
 func TestResolveStage(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		raw  string
 		want string
 	}{
-		{"", "shadow"},         // unset → shadow default
-		{"shadow", "shadow"},   // canonical
-		{"off", "off"},         // canonical
-		{"0", "off"},           // config.StageOff.String(): the word the cycle root forwards for off (F27)
-		{"enforce", "enforce"}, // canonical
-		{"SHADOW", "shadow"},   // case-insensitive
+		{"", "shadow"},
+		{"shadow", "shadow"},
+		{"off", "off"},
+		{"0", "off"},
+		{"enforce", "enforce"},
+		{"SHADOW", "shadow"},
 		{"OFF", "off"},
 		{"ENFORCE", "enforce"},
-		{"  enforce  ", "enforce"}, // trim whitespace
-		{"typo", "off"},            // unknown → off (fail-safe)
+		{"  enforce  ", "enforce"},
+		{"typo", "off"},
 		{"yes", "off"},
 		{"1", "off"},
 	}
@@ -32,9 +31,6 @@ func TestResolveStage(t *testing.T) {
 	}
 }
 
-// TestEnabled_UsesStageOnly — ADR-0045 I6 (EVOLVE_CHANNEL removed in v19.x):
-// the channel is implied solely by the EVOLVE_PHASE_RECOVERY stage.
-// shadow/off → byte-identical (channel off); enforce → on.
 func TestEnabled_UsesStageOnly(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

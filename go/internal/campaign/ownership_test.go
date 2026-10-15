@@ -106,8 +106,6 @@ func TestAcquireOwnership_CreatesMissingLeaseDir(t *testing.T) {
 }
 
 func TestOwnershipLease_PublicTypeIsNamed(t *testing.T) {
-	// apicover: name the exported lease type in-package — it is otherwise only
-	// reachable through AcquireOwnership's inferred return type.
 	var _ *OwnershipLease
 }
 

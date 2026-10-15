@@ -2,11 +2,6 @@ package shiperr
 
 import "testing"
 
-// TestVocabularyWireStrings pins the EXACT wire string of every Code/Class/Stage
-// constant. These strings are stable contract: ledger entries, the debugger
-// persona, and downstream tests key off them verbatim, so a drift is a
-// trust-kernel break. Slice-of-struct (not map) so the constant IDENTIFIER is
-// asserted against its literal — a typo'd const value is caught.
 func TestVocabularyWireStrings(t *testing.T) {
 	codes := []struct {
 		got  ShipErrorCode

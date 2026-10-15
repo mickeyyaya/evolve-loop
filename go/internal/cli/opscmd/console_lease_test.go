@@ -1,11 +1,5 @@
 package opscmd
 
-// console_lease_test.go — ADR-0080 S4 writer surface: the lease lands in the
-// git COMMON dir (outside every worktree), paths are normalized to the exact
-// repo-relative form the guard compares, value flags survive the documented
-// paths-first invocation (the ReorderArgs regression class), and --clear
-// removes the lease — and only the lease.
-
 import (
 	"bytes"
 	"encoding/json"
@@ -22,8 +16,6 @@ func TestRunConsoleLease_WritesHubLeaseThenClears(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "notes.md"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// The documented form is paths-first with space-separated value flags —
-	// exactly the shape the bool-only ReorderArgs used to scatter.
 	var out, errb bytes.Buffer
 	rc := RunConsoleLease([]string{"./notes.md", "--project-root", root, "--ttl", "10m", "--reason", "test edit"}, nil, &out, &errb)
 	if rc != 0 {
@@ -64,7 +56,6 @@ func TestRunConsoleLease_WritesHubLeaseThenClears(t *testing.T) {
 
 func TestRunConsoleLease_RejectsUnleasablePaths(t *testing.T) {
 	root := planePrimaryRoot(t, false)
-	// Seed an active lease: a rejected invocation must leave it untouched.
 	leasePath := filepath.Join(root, ".git", plane.ConsoleLeaseFileName)
 	sentinel := []byte(`{"paths":["keep.md"],"expires_at":"2099-01-01T00:00:00Z"}`)
 	if err := os.WriteFile(leasePath, sentinel, 0o644); err != nil {

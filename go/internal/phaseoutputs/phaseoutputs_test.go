@@ -1,17 +1,5 @@
 package phaseoutputs
 
-// phaseoutputs_test.go — per-cycle, per-phase output accounting: for every
-// phase a cycle COMPLETED, did the workspace end up holding the data a
-// reviewer needs?
-//
-// The question this answers is the operator's, verbatim: "can the system
-// correctly track the output, and did each phase generate enough data for
-// review?" Today nobody can answer it without hand-listing a workspace —
-// which is how the pipeline ran for weeks with orchestrator-report.md having
-// zero writers, dossiers 89% stubs, and a shadow record whose absence
-// conflated "didn't comply" with "never ran". Absence only means something
-// when somebody is looking for the presence.
-
 import (
 	"encoding/json"
 	"strings"
@@ -23,7 +11,7 @@ import (
 func files(names ...string) map[string]int64 {
 	m := map[string]int64{}
 	for _, n := range names {
-		m[n] = 1000 // non-trivial size by default
+		m[n] = 1000
 	}
 	return m
 }
@@ -45,13 +33,10 @@ func TestSurvey_CompletePhaseIsAccountedComplete(t *testing.T) {
 	}
 }
 
-// The load-bearing direction: a phase that COMPLETED but left no report is the
-// silent-disposal shape again — work happened and nothing reviewable remains.
 func TestSurvey_MissingReportIsAGap(t *testing.T) {
 	t.Parallel()
 	got := Survey([]string{"build", "audit"}, files(
 		"build-report.md", "build-prompt.txt", "build-events.ndjson", "build-usage.json",
-		// audit completed but wrote nothing at all
 	), phasecontract.BuiltinResolver{})
 	gaps := got.Gaps()
 	if len(gaps) == 0 {
@@ -63,8 +48,6 @@ func TestSurvey_MissingReportIsAGap(t *testing.T) {
 	}
 }
 
-// An EMPTY artifact is not data. A zero-byte report satisfies a stat check and
-// tells a reviewer nothing, so presence must be size-aware.
 func TestSurvey_EmptyArtifactIsNotEnoughData(t *testing.T) {
 	t.Parallel()
 	fs := files("build-prompt.txt", "build-events.ndjson", "build-usage.json")
@@ -79,17 +62,6 @@ func TestSurvey_EmptyArtifactIsNotEnoughData(t *testing.T) {
 	}
 }
 
-// Phase→artifact naming is not uniform, and retro is the proof — its LIVE
-// shape (verified in cycles 1432/1441/1442, corrected by review after a wrong
-// first guess) is: registry-named report (retrospective-report.md), AGENT-named
-// prompt (retrospective-prompt.txt — retro dispatches outside the runner path
-// that keys streams on the phase name), PHASE-named usage (retro-usage.json —
-// the C1 chokepoint writes %s-usage.json from the phase), and NO events stream
-// under either name (retro-observer-events.ndjson exists but is the observer's,
-// a different mechanism). This test pins all three namings — including the
-// agent-named fallback candidate, whose only live consumer is retro's prompt —
-// and pins that the missing events stream IS reported: it is a real
-// instrumentation gap this tool exists to surface, not a naming artifact.
 func TestSurvey_RetroLiveShapeExercisesTheAgentFallbackAndSurfacesTheEventsGap(t *testing.T) {
 	t.Parallel()
 	got := Survey([]string{"retro"}, files(
@@ -111,11 +83,6 @@ func TestSurvey_RetroLiveShapeExercisesTheAgentFallbackAndSurfacesTheEventsGap(t
 	}
 }
 
-// No phase gets a blanket exemption: both development-time guesses
-// (inherited-defect-reconcile, coverage-gate) turned out to be fully-dispatched
-// phases with complete outputs in live workspaces (cycles 1432/1442). The only
-// trimming is PER-ARTIFACT, for phases with cited live evidence (nativePhases)
-// — and even those always owe usage.
 func TestSurvey_NoPhaseIsExemptWithoutLiveEvidence(t *testing.T) {
 	t.Parallel()
 	got := Survey([]string{"inherited-defect-reconcile", "coverage-gate"}, map[string]int64{}, phasecontract.BuiltinResolver{})
@@ -125,12 +92,6 @@ func TestSurvey_NoPhaseIsExemptWithoutLiveEvidence(t *testing.T) {
 	}
 }
 
-// Ship is a NATIVE phase — it completes in Go with no agent dispatch. Live
-// citation (the register's admission requirement): cycles 1452/1453, ship in
-// completed_phases with ship-usage.json only. The registry already carries the
-// no-report fact as NoArtifact:true; prompt/events come from the native
-// register. Usage is ALWAYS owed — the C1 chokepoint writes it for every
-// recorded phase, so its absence is a real recording failure even for ship.
 func TestSurvey_NativeShipOwesOnlyUsage(t *testing.T) {
 	t.Parallel()
 	got := Survey([]string{"ship"}, files("ship-usage.json"), phasecontract.BuiltinResolver{})
@@ -149,9 +110,6 @@ func TestSurvey_NativeShipOwesOnlyUsage(t *testing.T) {
 	}
 }
 
-// memoAwareResolver simulates the catalog-aware resolver both live callers
-// pass: memo resolves to its spec-derived contract (memo.md), everything else
-// falls through to the builtins — the exact CatalogResolver shape.
 type memoAwareResolver struct{}
 
 func (memoAwareResolver) Resolve(name string) (phasecontract.Contract, bool) {
@@ -161,14 +119,6 @@ func (memoAwareResolver) Resolve(name string) (phasecontract.Contract, bool) {
 	return phasecontract.BuiltinResolver{}.Resolve(name)
 }
 
-// Memo's report is memo.md — declared by its spec, written live every PASS
-// cycle. Cycle-1452 surveyed a FALSE gap (memo-report.md) because resolution
-// went through the compiled map alone and fell back to the convention. The fix
-// is the RESOLVER, not a builtin entry: review caught that a builtin memo
-// entry would shadow the spec-derived contract and silently drop its required
-// sections from the live gate. This pins both directions — a catalog-aware
-// resolver finds memo.md, and the builtin-only degrade still names the
-// conventional fallback rather than inventing anything.
 func TestSurvey_ReportNameComesFromTheResolver(t *testing.T) {
 	t.Parallel()
 	live := files("memo.md", "memo-prompt.txt", "memo-events.ndjson", "memo-usage.json")
@@ -181,9 +131,6 @@ func TestSurvey_ReportNameComesFromTheResolver(t *testing.T) {
 	}
 }
 
-// The native register grows ONLY with a cited live cycle — enforced by a pin,
-// not a comment. Ship entered on cycles 1452/1453; anything else appearing
-// here must bring its own citation and change this test deliberately.
 func TestNativePhases_RegisterIsExactlyShip(t *testing.T) {
 	t.Parallel()
 	if len(nativePhases) != 1 || !nativePhases["ship"] {
@@ -191,9 +138,6 @@ func TestNativePhases_RegisterIsExactlyShip(t *testing.T) {
 	}
 }
 
-// run.json records a re-dispatched phase once per completion (cycle-1452:
-// audit appears twice). One phase = one row — duplicate rows inflate the
-// completeness denominator and double-count the same files.
 func TestSurvey_DuplicateCompletedPhasesCollapseToOneRow(t *testing.T) {
 	t.Parallel()
 	got := Survey([]string{"audit", "audit"}, files(
@@ -207,8 +151,6 @@ func TestSurvey_DuplicateCompletedPhasesCollapseToOneRow(t *testing.T) {
 	}
 }
 
-// The summary is what the wave monitor prints per cycle: phases surveyed,
-// complete, and the gap list — one line an operator can scan.
 func TestSurvey_SummaryLineIsScannable(t *testing.T) {
 	t.Parallel()
 	got := Survey([]string{"build", "audit"}, files(
@@ -223,10 +165,6 @@ func TestSurvey_SummaryLineIsScannable(t *testing.T) {
 	}
 }
 
-// TestRowArtifactResult_AreTheWireShape names the three exported types
-// (apicover) and pins the contract their JSON consumers depend on: the CLI's
-// -json envelope embeds Row verbatim, so a renamed field here silently blanks
-// a column in whatever the operator's tooling reads.
 func TestRowArtifactResult_AreTheWireShape(t *testing.T) {
 	t.Parallel()
 	var res Result = Survey([]string{"build"}, files(
@@ -244,8 +182,6 @@ func TestRowArtifactResult_AreTheWireShape(t *testing.T) {
 			t.Errorf("Row lost wire key %s: %s", key, raw)
 		}
 	}
-	// Artifact's own keys are part of the same contract — a rename here blanks
-	// a COLUMN in the consumer, not a row, which is quieter and worse.
 	for _, key := range []string{`"name"`, `"present"`, `"bytes"`} {
 		if !strings.Contains(string(raw), key) {
 			t.Errorf("Artifact lost wire key %s: %s", key, raw)

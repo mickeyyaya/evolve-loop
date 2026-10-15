@@ -2,13 +2,6 @@ package shiperr
 
 import "testing"
 
-// TestCodeRepoContractInfra_Vocab pins the cycle-1409 infra-classification
-// code's wire value and — the load-bearing half — its NON-ALIASING of
-// CodeRepoContractGate. The whole point of the split is that a router or
-// dashboard can distinguish "a repo-wide guard suite is genuinely RED in this
-// lane" (fix your code) from "the scanner pack died twice with no test-level
-// failure" (infra fault, safe to re-dispatch). If these two ever collapse onto
-// one value, the cycle-1402/1403/1405 false-RED storm is back with no signal.
 func TestCodeRepoContractInfra_Vocab(t *testing.T) {
 	if got, want := string(CodeRepoContractInfra), "REPO_CONTRACT_INFRA"; got != want {
 		t.Errorf("CodeRepoContractInfra = %q, want %q", got, want)
