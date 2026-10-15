@@ -22,6 +22,8 @@ const depsTimeout = 120 * time.Second
 
 var regressionDir = filepath.Join("acs", "regression")
 
+var depsRunner sysexec.RunFunc = sysexec.DefaultRunner
+
 type Decision struct {
 	Stage           string   `json:"stage"`
 	ChangedPackages []string `json:"changed_packages,omitempty"`
@@ -163,11 +165,11 @@ func listCorpusDeps(moduleDir string, patterns []string) (map[string][]string, s
 	ctx, cancel := context.WithTimeout(context.Background(), depsTimeout)
 	defer cancel()
 
-	modPath, err := sysexec.Output(ctx, sysexec.DefaultRunner, moduleDir, "go", "list", "-m")
+	modPath, err := sysexec.Output(ctx, depsRunner, moduleDir, "go", "list", "-m")
 	if err != nil || modPath == "" {
 		return nil, ""
 	}
-	out, err := sysexec.Output(ctx, sysexec.DefaultRunner, moduleDir, "go", "list", "-e", "-tags", "acs", "-test",
+	out, err := sysexec.Output(ctx, depsRunner, moduleDir, "go", "list", "-e", "-tags", "acs", "-test",
 		"-f", "{{.ImportPath}}|{{join .Deps \" \"}}", "./"+filepath.ToSlash(regressionDir)+"/...")
 	if err != nil {
 		return nil, ""
