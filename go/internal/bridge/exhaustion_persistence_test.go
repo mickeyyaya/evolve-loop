@@ -22,8 +22,6 @@ func TestExhaustion_TransientWallTextDoesNotFastFail(t *testing.T) {
 	}
 
 	t.Run("transient wall text (agent reads a file, then continues) never fast-fails", func(t *testing.T) {
-		// tick 1: wall text visible; tick 2+: fresh agent output (fakeTmux replays
-		// the LAST paneSeq entry), so the wall is gone and the streak resets.
 		ar := newAR(t, []string{wall, fresh})
 		for i := 0; i < 5; i++ {
 			if _, rc := ar.tick(context.Background(), "s"); rc == 85 {
@@ -33,7 +31,7 @@ func TestExhaustion_TransientWallTextDoesNotFastFail(t *testing.T) {
 	})
 
 	t.Run("persistent wall (CLI parked) still fast-fails once it crosses the threshold", func(t *testing.T) {
-		ar := newAR(t, []string{wall}) // replays every capture — the CLI is parked at the wall
+		ar := newAR(t, []string{wall})
 		fired := false
 		for i := 0; i < exhaustionPersistObservations+2 && !fired; i++ {
 			if _, rc := ar.tick(context.Background(), "s"); rc == 85 {

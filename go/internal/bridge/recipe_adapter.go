@@ -14,32 +14,18 @@ import (
 )
 
 const (
-	// recipeBootScrollback is the universal capture depth for recipe READs: 200
-	// surfaces the prompt marker for both visible-pane CLIs (claude/ollama) and
-	// alt-screen CLIs (codex/agy), so the adapter needs no per-CLI scrollback
-	// table.
 	recipeBootScrollback = 200
-	// recipeSessionPrefix names ephemeral recipe sessions distinctly from the
-	// cycle drivers' sessions.
-	recipeSessionPrefix = "evolve-recipe-"
+	recipeSessionPrefix  = "evolve-recipe-"
 )
 
-// sleepClock adapts deps.Sleep to recipe.Clock so tests' no-op sleep flows
-// through to the engine's poll loop.
 type sleepClock struct{ sleep func(time.Duration) }
 
 func (c sleepClock) Sleep(d time.Duration) { c.sleep(d) }
 
-// shellSingleQuote wraps s in single quotes for safe use in a shell command
-// line sent via tmux send-keys (e.g. `cd <dir>`), escaping interior single
-// quotes. Keeps a workspace path containing spaces or shell metacharacters
-// from being re-interpreted by the inner shell.
 func shellSingleQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// recipeSessionDriver is the production recipe.SessionDriver. It owns one tmux
-// session for the lifetime of a recipe run.
 type recipeSessionDriver struct {
 	cfg        *Config
 	deps       Deps
@@ -51,9 +37,6 @@ type recipeSessionDriver struct {
 	ar         *autoResponder
 }
 
-// EnsureSession attaches to an already-running session or boots a fresh one
-// (spawn → cd → launch → wait for the prompt marker, ticking the
-// auto-responder so a boot trust modal is dismissed before we declare ready).
 func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	if d.deps.Tmux.HasSession(ctx, d.session) {
 		fmt.Fprintf(d.deps.Stderr, "[recipe] attaching to existing session %s\n", d.session)
@@ -109,13 +92,7 @@ func (d *recipeSessionDriver) Capture(ctx context.Context) (string, error) {
 	return d.deps.Tmux.CapturePane(ctx, d.session, d.scrollback)
 }
 
-// SendCommand pastes body then Enter (the slash-command idiom) and propagates
-// any transport error so the engine surfaces a dead session immediately
-// instead of waiting out the step's full timeout.
 func (d *recipeSessionDriver) SendCommand(ctx context.Context, body string) error {
-	// The recipe path has no single resolved prompt file — every body injected
-	// is prompt text the pane may echo back, so accumulate it for tick()'s
-	// stripPromptEchoLines exhaustion guard.
 	if d.ar != nil {
 		d.ar.injectedPrompt += body + "\n"
 	}
@@ -126,8 +103,6 @@ func (d *recipeSessionDriver) SendKeys(ctx context.Context, tokens string) error
 	return d.deps.Tmux.SendKeys(ctx, d.session, tokens, false)
 }
 
-// AutoRespond runs one auto-responder tick and reports escalation. rc 85
-// (policy=escalate / missing keys) and 86 (loop-guard) are the abandon codes.
 func (d *recipeSessionDriver) AutoRespond(ctx context.Context) (bool, error) {
 	if d.ar == nil {
 		return false, nil
@@ -136,9 +111,6 @@ func (d *recipeSessionDriver) AutoRespond(ctx context.Context) (bool, error) {
 	return rc == 85 || rc == 86, nil
 }
 
-// newRecipeDriver builds a recipeSessionDriver for cli, resolving the session
-// name, launch command, prompt marker, and auto-responder from the manifest +
-// config. Shared by the recipe engine and the /help-capture path.
 func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, string, error) {
 	m, err := LoadManifest(cli)
 	if err != nil {
@@ -171,7 +143,6 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 	return drv, m.PromptMarker, nil
 }
 
-// newRecipeEngine builds a recipe.Engine wired to a recipeSessionDriver for cli.
 func newRecipeEngine(cfg *Config, deps Deps, cli string) (*recipe.Engine, error) {
 	drv, marker, err := newRecipeDriver(cfg, deps, cli)
 	if err != nil {
@@ -185,15 +156,8 @@ func newRecipeEngine(cfg *Config, deps Deps, cli string) (*recipe.Engine, error)
 	}, nil
 }
 
-// helpCaptureSettleTicks bounds the post-/help poll for the prompt marker.
 const helpCaptureSettleTicks = 8
 
-// captureControl launches-or-attaches the CLI's REPL, sends a single command,
-// polls up to settleTicks for the prompt marker to reappear, and returns the
-// captured pane. It is the table-driven generalization of the original /help
-// capture: the command is a parameter, so the same primitive drives `/help`
-// (introspect) and any abstract control event (usage/status/clean_ctx) whose
-// concrete command the caller resolved from the mapping table.
 func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command string, settleTicks int) (string, error) {
 	deps = deps.withDefaults()
 	drv, marker, err := newRecipeDriver(cfg, deps, cli)
@@ -209,12 +173,12 @@ func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command st
 	}
 	var pane string
 	for i := 0; i < settleTicks; i++ {
-		if ctx.Err() != nil { // the caller's interrupt wins over the settle ticks
+		if ctx.Err() != nil {
 			return pane, ctx.Err()
 		}
 		deps.Sleep(time.Second)
 		if drv.ar != nil {
-			drv.ar.tick(ctx, drv.session) // dismiss any modal; harmless otherwise
+			drv.ar.tick(ctx, drv.session)
 		}
 		pane, _ = drv.Capture(ctx)
 		if marker != "" && strings.Contains(pane, marker) {
@@ -233,18 +197,10 @@ func reapEphemeralSession(cfg *Config, deps Deps, session string) {
 	}
 }
 
-// CaptureHelp launches-or-attaches the CLI's REPL, sends `/help`, and returns
-// the resulting pane — the live half of `evolve bridge introspect`. The parse
-// + catalog diff is done by the capabilities package on the returned text.
 func CaptureHelp(ctx context.Context, cfg *Config, deps Deps, cli string) (string, error) {
 	return captureControl(ctx, cfg, deps, cli, "/help", helpCaptureSettleTicks)
 }
 
-// RunRecipe loads the named recipe and executes it against cli using the tmux
-// primitives configured in cfg/deps. It is the independent, orchestrator-free
-// entry the `evolve bridge recipe run` CLI drives — the bridge can install a
-// plugin (or run any scripted slash-command sequence) with nothing but a CLI
-// name, a workspace, and parameters.
 func RunRecipe(ctx context.Context, cfg *Config, deps Deps, cli, recipeName string, params map[string]string) (recipe.Result, error) {
 	deps = deps.withDefaults()
 	r, err := recipe.LoadRecipe(recipeName)

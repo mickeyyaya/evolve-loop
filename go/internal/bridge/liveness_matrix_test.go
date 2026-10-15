@@ -8,7 +8,7 @@ import (
 
 func TestLivenessMatrix(t *testing.T) {
 	t.Parallel()
-	const max = 6 // maxExtends for this test suite
+	const max = 6
 	r := NewDeterministicReviewer(max)
 
 	cases := []struct {
@@ -16,23 +16,19 @@ func TestLivenessMatrix(t *testing.T) {
 		ev   StopEvent
 		want ReviewAction
 	}{
-		// Converging → ReviewExtend unconditionally: no cap on real output.
 		{"converging attempt=0", StopEvent{State: panestream.LivenessConverging, Attempt: 0}, ReviewExtend},
 		{"converging attempt=max", StopEvent{State: panestream.LivenessConverging, Attempt: max}, ReviewExtend},
 		{"converging attempt=max+3", StopEvent{State: panestream.LivenessConverging, Attempt: max + 3}, ReviewExtend},
 
-		// BusyButStagnant → extend under cap, pause at/over cap.
 		{"busy-stagnant attempt=0", StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: 0}, ReviewExtend},
 		{"busy-stagnant attempt=max-1", StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: max - 1}, ReviewExtend},
 		{"busy-stagnant attempt=max", StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: max}, ReviewPause},
 		{"busy-stagnant attempt=max+1", StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: max + 1}, ReviewPause},
 
-		// Hung → fast-fails before the maxExtends backstop (the detector's fast path).
 		{"hung attempt=0", StopEvent{State: panestream.LivenessHung, Attempt: 0}, ReviewPause},
 		{"hung attempt=1", StopEvent{State: panestream.LivenessHung, Attempt: 1}, ReviewPause},
 		{"hung attempt=max-1", StopEvent{State: panestream.LivenessHung, Attempt: max - 1}, ReviewPause},
 
-		// Idle → pause immediately (no liveness signal)
 		{"idle attempt=0", StopEvent{State: panestream.LivenessIdle, Attempt: 0}, ReviewPause},
 	}
 
@@ -46,9 +42,6 @@ func TestLivenessMatrix(t *testing.T) {
 	}
 }
 
-// TestLivenessMatrix_HungFastFailBeforeMaxExtends pins the latency win: a Hung sequence returns non-Extend
-// at attempt=1, strictly less than maxExtends=6, so the detector fast-fails well before the
-// maxExtends×300s backstop would otherwise trigger on BusyButStagnant.
 func TestLivenessMatrix_HungFastFailBeforeMaxExtends(t *testing.T) {
 	t.Parallel()
 	r := NewDeterministicReviewer(6)

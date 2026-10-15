@@ -26,7 +26,6 @@ func resolveTier(m Manifest, hasBinary func(string) bool) string {
 	return declared
 }
 
-// Probe satisfies core.Bridge: it enumerates the embedded CLI manifests and reports each CLI's tier via the LookPath seam.
 func (e *Engine) Probe(_ context.Context) (core.BridgeProbe, error) {
 	hasBinary := func(bin string) bool {
 		_, err := e.deps.LookPath(bin)

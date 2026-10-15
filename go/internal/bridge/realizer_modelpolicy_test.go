@@ -44,12 +44,12 @@ func TestRealize_ConcreteTiersStillEmit(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		tier string
-		want string // concrete value expected after --model
+		want string
 	}{
-		{"balanced", "sonnet"}, // canonical map key
+		{"balanced", "sonnet"},
 		{"deep", "opus"},
-		{"sonnet", "sonnet"},                   // legacy alias resolves via translateV1TierKey → balanced → sonnet
-		{"claude-opus-4-8", "claude-opus-4-8"}, // raw model identifier passes through
+		{"sonnet", "sonnet"},
+		{"claude-opus-4-8", "claude-opus-4-8"},
 	}
 	for _, tc := range cases {
 		flags := launchFlagsForModel(t, modelPolicyManifest(), tc.tier)

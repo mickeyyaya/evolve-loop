@@ -12,9 +12,6 @@ import (
 	"time"
 )
 
-// A line-reading shell fixture cannot expose paste corruption in a TUI. This
-// child requests bracketed paste and treats Enter outside a paste as submission.
-// Drive the real shared REPL path and compare every byte, including newlines.
 func TestRealTmux_BracketedMultilinePromptPreservesBytes(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
@@ -64,7 +61,6 @@ while True:
 	if err != nil || rc != ExitOK {
 		t.Fatalf("REPL launch: rc=%d err=%v", rc, err)
 	}
-	// The driver pastes resolved-prompt.txt: the prompt, the identity statement, one LF.
 	want := readFile(t, filepath.Join(cfg.Workspace, "resolved-prompt.txt"))
 	if !strings.HasPrefix(want, prompt+"\n\n") || len(want) <= len(prompt)+2 {
 		t.Fatalf("resolved-prompt.txt must be the prompt followed by the identity statement; got %d bytes", len(want))

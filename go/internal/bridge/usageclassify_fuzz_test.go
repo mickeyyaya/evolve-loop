@@ -1,9 +1,5 @@
 package bridge
 
-// Seeded from the TestClassifyExhausted_RealManifests goldens (real
-// claude/codex/agy /usage pane shapes) plus known-adversarial family/pane
-// combinations, then explores mutations.
-
 import "testing"
 
 func FuzzClassifyExhausted(f *testing.F) {

@@ -27,11 +27,6 @@ func TestRetrospectiveGrantRejectsRetargetedLessonScope(t *testing.T) {
 					t.Fatal(err)
 				}
 				wrap := defaultSandboxWrapWithProbe(Deps{}, fakeProbe("darwin", true))
-				// The lesson-dir grant is the retrospective profile's declared
-				// sandbox.write_subpaths entry, carried on the request (launch.go
-				// projects it there) rather than a phase-name literal in the
-				// wrapper. A declared grant whose path is symlink-retargeted must
-				// still refuse the launch, for every profile's declarations.
 				if prefix, ok := wrap(SandboxWrapRequest{
 					Phase: "retrospective", RepoRoot: root, Worktree: t.TempDir(), Workspace: t.TempDir(),
 					WriteSubpaths: []string{".evolve/instincts/lessons"},

@@ -37,7 +37,6 @@ func pasteSettleFor(size int) time.Duration {
 	return d
 }
 
-// pfx is the per-driver console prefix used in the stderr messages below.
 func settlePasteThenEnter(ctx context.Context, deps Deps, pfx, session string, settle time.Duration, size int) (pasteOutcome, error) {
 	out := pasteOutcome{Settle: settle, Stability: pasteSkipped}
 	deps.Sleep(settle)
@@ -47,8 +46,6 @@ func settlePasteThenEnter(ctx context.Context, deps Deps, pfx, session string, s
 	return out, deps.Tmux.SendKeys(ctx, session, "", true)
 }
 
-// waitPaneStable captures scrollback 0 on purpose: history never changes and
-// would only mask motion at the input line.
 func waitPaneStable(ctx context.Context, deps Deps, pfx, session string) string {
 	captureFault := func(err error) {
 		fmt.Fprintf(deps.Stderr, "%s paste settle: capture failed, pane state unknown — pressing Enter anyway: %v\n", pfx, err)

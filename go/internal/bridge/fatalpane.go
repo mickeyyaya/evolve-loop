@@ -9,16 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// channel.ResolveStage is the single home of this resolution rule, so
-// in-process and subprocess readers cannot drift.
-// See ADR-0045.
 func recoveryStageFromEnv(deps Deps) string {
 	return channel.ResolveStage(deps.RecoveryStage)
 }
 
-// fatalPaneObservation carries what the wait loop reports about a preempting
-// fatal verdict; the engine's fresh-session gate reads these facts from the
-// driver instead of re-deriving them.
 type fatalPaneObservation struct {
 	cause     recovery.TerminalCause
 	named     bool
@@ -35,8 +29,6 @@ func fatalPaneStageOf(deps Deps) string {
 	return channel.ResolveStage(deps.FatalPaneStage)
 }
 
-// fatalPaneClassifies is the one gate fatalPaneVerdict and fatalPaneGate both
-// call, so they can never disagree about whether the detector applies at all.
 func fatalPaneClassifies(det *recovery.FatalPaneDetector, stage string) bool {
 	return det != nil && stage != "off" && stage != ""
 }

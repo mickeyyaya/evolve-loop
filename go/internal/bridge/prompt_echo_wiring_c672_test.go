@@ -12,12 +12,8 @@ import (
 
 const c672ExhaustedPattern = `(?i)reached your usage limit`
 
-// c672PromptEchoLine is the agent's OWN instruction line: present verbatim in
-// the injected prompt AND echoed to the pane.
 const c672PromptEchoLine = "Deliverable-Contract: If you have reached your usage limit, stop and hand off."
 
-// newC672TickResponder builds a tick-ready responder over a scripted pane with
-// a controlled exhaustion pattern and no auto-respond rules.
 func newC672TickResponder(t *testing.T, pane string) *autoResponder {
 	t.Helper()
 	deps := Deps{Tmux: &fakeTmux{paneSeq: []string{pane}}, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)}.withDefaults()
@@ -39,18 +35,12 @@ func TestC672_003_TickEchoedExhaustionDoesNotEscalate(t *testing.T) {
 	}
 }
 
-// TestC672_004_TickGenuineExhaustionStillEscalates is the negative guard: a
-// genuine CLI quota banner ABSENT from the injected prompt must still
-// escalate — the echo-veto wiring must not blanket-disable the wall.
 func TestC672_004_TickGenuineExhaustionStillEscalates(t *testing.T) {
 	t.Parallel()
 	pane := "You have reached your usage limit. Resets in 4h.\n"
 	ar := newC672TickResponder(t, pane)
-	ar.injectedPrompt = "Instructions: do the task and report." // banner is NOT a substring
+	ar.injectedPrompt = "Instructions: do the task and report."
 
-	// The genuine banner survives prompt-echo stripping, but the persistence
-	// guard requires it to persist for exhaustionPersistObservations consecutive
-	// ticks before escalating, so the loop drives that many ticks.
 	var rc int
 	for i := 0; i < exhaustionPersistObservations; i++ {
 		_, rc = ar.tick(context.Background(), "s")
@@ -60,10 +50,6 @@ func TestC672_004_TickGenuineExhaustionStillEscalates(t *testing.T) {
 	}
 }
 
-// TestC672_005_ResponderConstructionSitesCarryInjectedPrompt is a
-// source-reader anti-gaming check: both production construction sites of
-// autoResponder must reference injectedPrompt, or the behavioral tests above
-// could pass on a field production never populates.
 func TestC672_005_ResponderConstructionSitesCarryInjectedPrompt(t *testing.T) {
 	t.Parallel()
 	_, thisFile, _, ok := runtime.Caller(0)

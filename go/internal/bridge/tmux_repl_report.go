@@ -20,11 +20,6 @@ func writeTokenUsage(workspace string, peakTokens int) {
 	_ = os.WriteFile(filepath.Join(workspace, "token-usage.json"), append(data, '\n'), 0o644)
 }
 
-// tmuxNonClaudePreflight runs the rejections shared by codex-tmux and
-// agy-tmux: permission_mode is claude-only, named sessions are
-// claude-tmux-only, and --allow-bypass is mandatory (these drivers run
-// the inner CLI with bypass-like semantics). Returns (exitCode, handled);
-// when handled, the driver returns immediately.
 func tmuxNonClaudePreflight(name string, cfg *Config, deps Deps) (int, bool) {
 	pfx := "[" + name + "]"
 	if cfg.PermissionMode != "" {

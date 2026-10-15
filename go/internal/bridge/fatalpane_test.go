@@ -12,7 +12,7 @@ func fatalEv(tail string, busy bool) StopEvent {
 	return StopEvent{
 		Kind: StopArtifactTimeout, Phase: "build", Cycle: 262,
 		ElapsedS: 300, IntervalS: 300, Attempt: 0,
-		Progressed: true, // the nudge-echo trap: a dead pane CAN read as progressed
+		Progressed: true,
 		Busy:       busy,
 		StdoutTail: tail,
 	}

@@ -8,14 +8,12 @@ import (
 	"time"
 )
 
-// FileRef describes a workspace file's presence + size.
 type FileRef struct {
 	Path      string `json:"path"`
 	Exists    bool   `json:"exists"`
 	SizeBytes int64  `json:"size_bytes"`
 }
 
-// ArtifactRef is the artifact's presence + challenge-token match.
 type ArtifactRef struct {
 	Path              string `json:"path"`
 	Exists            bool   `json:"exists"`
@@ -23,7 +21,6 @@ type ArtifactRef struct {
 	HasChallengeToken bool   `json:"has_challenge_token"`
 }
 
-// Report is the structured workspace summary (mirrors report.sh's JSON).
 type Report struct {
 	Workspace      string      `json:"workspace"`
 	ScannedAt      string      `json:"scanned_at"`
@@ -41,7 +38,6 @@ type Report struct {
 	TokenUsage        int     `json:"token_usage"`
 }
 
-// statRef builds a FileRef by stat'ing path.
 func statRef(path string) FileRef {
 	r := FileRef{Path: path}
 	if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
@@ -51,12 +47,6 @@ func statRef(path string) FileRef {
 	return r
 }
 
-// BuildReport scans a workspace and derives the summary + verdict:
-//
-//	escalated                  — escalation-report.json present
-//	complete                   — artifact present + (token matches or no token file)
-//	incomplete-token-mismatch  — artifact present but token file value not in artifact
-//	incomplete                 — no artifact, no escalation
 func BuildReport(workspace, artifactName string, now time.Time) (Report, error) {
 	if artifactName == "" {
 		artifactName = "artifact.md"

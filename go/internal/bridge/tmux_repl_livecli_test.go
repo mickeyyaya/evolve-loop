@@ -14,19 +14,16 @@ import (
 )
 
 type liveCLISpec struct {
-	name           string // driver name (also the manifest key for auto-respond)
-	bin            string // binary to LookPath
-	launchCmd      string // exact REPL launch line
-	marker         string // boot-ready marker the driver greps for
+	name           string
+	bin            string
+	launchCmd      string
+	marker         string
 	bootScrollback int
 	bootIntervalS  int
 	tickDuringBoot bool
 	exitSeq        []tmuxKey
 }
 
-// liveCLISpecs mirrors the production *-tmux drivers + the captured
-// ground truth. Keep in sync with driver_claudetmux.go / driver_codextmux.go
-// / driver_agytmux.go and the knowledge-base capture doc.
 var liveCLISpecs = []liveCLISpec{
 	{
 		name: "claude-tmux", bin: "claude",
@@ -56,17 +53,10 @@ func liveCLIGate(t *testing.T, envKey string) {
 	requireTmux(t)
 }
 
-// --- boot-marker tier (cheap: no prompt, no inference) --------------------
-
-// TestLiveCLI_BootMarkerDetected validates that each driver's boot marker
-// actually appears in the real CLI's pane within the boot budget — the
-// load-bearing assumption of runTmuxREPL; if it drifts, launches die with
-// EC80. It mirrors runTmuxREPL's boot loop exactly, including ticking the
-// auto-responder for tickDuringBoot CLIs to dismiss a boot-time trust prompt.
 func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 	t.Parallel()
 	liveCLIGate(t, "EVOLVE_BRIDGE_LIVE_CLI")
-	wd, _ := os.Getwd() // a real, trusted dir for the CLI to start in
+	wd, _ := os.Getwd()
 	tx := execTmux{}
 	ctx := context.Background()
 
@@ -81,8 +71,6 @@ func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 
 			var stderr strings.Builder
 			deps := Deps{Tmux: tx, Now: time.Now, Stderr: &stderr}.withDefaults()
-			// auto-responder seeded from sp.name's manifest → handles the
-			// codex/agy boot trust prompt, same as runTmuxREPL.
 			ar := newAutoResponder(sp.name, t.TempDir(), deps, false, 0)
 
 			if err := tx.NewSession(ctx, sess, tmuxPaneWidth, tmuxPaneHeight); err != nil {
@@ -93,8 +81,6 @@ func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 			time.Sleep(time.Second)
 			_ = tx.SendKeys(ctx, sess, sp.launchCmd, true)
 
-			// Poll for the marker using the SAME deadline as production
-			// (tmuxREPLBootTimeoutS) so a pass here means a pass in a real launch.
 			const budget = tmuxREPLBootTimeoutS
 			interval := sp.bootIntervalS
 			if interval <= 0 {
@@ -109,7 +95,7 @@ func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 					break
 				}
 				if sp.tickDuringBoot {
-					ar.tick(ctx, sess) // dismiss trust prompt (free, no inference)
+					ar.tick(ctx, sess)
 				}
 			}
 			if !found {
@@ -122,12 +108,6 @@ func TestLiveCLI_BootMarkerDetected(t *testing.T) {
 	}
 }
 
-// --- full round-trip tier (real LLM spend) --------------------------------
-
-// TestLiveCLI_FullRoundtrip drives a complete runTmuxREPL launch against the
-// real CLI: boot → paste a prompt that asks the model to write the artifact
-// → artifact-wait → scrollback → exit. Proves the whole bridge contract end
-// to end against the live CLI. Gated separately because it spends tokens.
 func TestLiveCLI_FullRoundtrip(t *testing.T) {
 	t.Parallel()
 	liveCLIGate(t, "EVOLVE_BRIDGE_LIVE_CLI_ROUNDTRIP")
@@ -147,9 +127,6 @@ func TestLiveCLI_FullRoundtrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			promptFile := filepath.Join(root, "prompt.txt")
-			// $ARTIFACT_PATH is substituted by preparePrompt → cfg.Artifact.
-			// Values are separated by a phase-sized multiline body. Receiving only
-			// the tail (the live failure) cannot satisfy this output contract.
 			head, middle, tail := "head-"+filepath.Base(root), "middle-台灣", "tail-λ"
 			want := head + "|" + middle + "|" + tail
 			padding := strings.Repeat("PADDING: benign transport fixture text, no task or instructions.\n", 400)

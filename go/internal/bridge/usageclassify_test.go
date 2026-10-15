@@ -2,12 +2,6 @@ package bridge
 
 import "testing"
 
-// TestClassifyExhausted_RealManifests verifies the manifest-backed cap
-// classifier on real /usage|/status output shapes. The critical guard is the
-// HEALTHY "100% left" / "91% left" line: a naive "0% left" pattern matches the
-// "0% left" substring inside "100% left" and would falsely bench a healthy CLI,
-// so the pattern must be word-boundaried. Conservative by design — only an
-// unambiguous exhaustion phrase benches.
 func TestClassifyExhausted_RealManifests(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -55,18 +49,13 @@ func TestClassifyExhausted_RealManifests(t *testing.T) {
 	}
 }
 
-// TestClassifyExhausted_FallsBackToRateLimitPattern verifies that a usage
-// control with no exhausted_regex falls back to the manifest's maintained
-// rate_limit interactive-prompt regex (single source for "what a wall looks
-// like"), and that a manifest that cannot be loaded fails open to "not capped".
 func TestClassifyExhausted_FallsBackToRateLimitPattern(t *testing.T) {
-	// No exhausted_regex on the control → use the rate_limit prompt regex.
 	t.Parallel()
 	m := Manifest{
 		CLI:    "x-tmux",
 		Binary: "x",
 		Controls: map[string]ControlSpec{
-			"usage": {Send: "/usage"}, // no ExhaustedRegex
+			"usage": {Send: "/usage"},
 		},
 		InteractivePrompts: []ManifestPrompt{
 			{Name: "rate_limit", Regex: "(?i)too many requests"},
@@ -79,7 +68,6 @@ func TestClassifyExhausted_FallsBackToRateLimitPattern(t *testing.T) {
 		t.Error("fallback pattern matched a healthy line")
 	}
 
-	// Unloadable family → fail open (not capped), never panic.
 	if ClassifyExhausted("no-such-family", "0% left") {
 		t.Error("unknown family classified as capped; want fail-open false")
 	}

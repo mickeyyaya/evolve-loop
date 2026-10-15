@@ -507,7 +507,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/bridge/clicontrol` | 2 | [internal-bridge-clicontrol.md](internal-bridge-clicontrol.md) |
 | `internal/bridge/keyspec` | 1 | [internal-bridge-keyspec.md](internal-bridge-keyspec.md) |
 | `internal/bridge/panestream` | 44 | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
-| `internal/bridge` | 433 | [internal-bridge.md](internal-bridge.md) |
+| `internal/bridge` | 434 | [internal-bridge.md](internal-bridge.md) |
 | `internal/campaign` | 4 | [internal-campaign.md](internal-campaign.md) |
 | `internal/changedpkgs` | 13 | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/checkpoint` | 14 | [internal-checkpoint.md](internal-checkpoint.md) |

@@ -11,9 +11,6 @@ import (
 	"time"
 )
 
-// flakyPaneTmux is paneScriptTmux plus a per-tick failure switch: while fail is
-// set, CapturePane returns the transport error a real `tmux capture-pane`
-// returns when the server is momentarily unreachable.
 type flakyPaneTmux struct {
 	fakeTmux
 	mu   sync.Mutex
@@ -38,9 +35,6 @@ func (p *flakyPaneTmux) CapturePane(_ context.Context, _ string, _ int) (string,
 
 var errCapture = errors.New("capture-pane: no server running")
 
-// TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta drives a good → good →
-// ERROR → good frame sequence and asserts the answer line reaches pane.live
-// exactly once.
 func TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -58,13 +52,13 @@ func TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta(t *testing.T) {
 		tick++
 		switch tick {
 		case 1:
-			tmux.set(paneThinkingFrame, false) // primes the baseline
+			tmux.set(paneThinkingFrame, false)
 		case 2:
-			tmux.set(paneAnswerFrame, false) // answer becomes stable → emitted once
+			tmux.set(paneAnswerFrame, false)
 		case 3:
-			tmux.set(paneAnswerFrame, true) // capture fails; nothing may be consumed
+			tmux.set(paneAnswerFrame, true)
 		case 4:
-			tmux.set(paneAnswerFrame, false) // unchanged pane → nothing new to emit
+			tmux.set(paneAnswerFrame, false)
 		case 5:
 			_ = os.WriteFile(cfg.Artifact, []byte("done"), 0o644)
 		}
@@ -85,9 +79,6 @@ func TestRunTmuxREPL_CaptureErrorDoesNotReanchorPaneDelta(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_CaptureErrorStillCompletes asserts a pane that never
-// captures successfully after priming still completes on its artifact and
-// emits nothing spurious.
 func TestRunTmuxREPL_CaptureErrorStillCompletes(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

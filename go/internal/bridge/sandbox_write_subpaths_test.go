@@ -11,8 +11,6 @@ import (
 	"testing"
 )
 
-// realProfilesDir is the checked-in profile set. Tests that read it need
-// -count=1 (the Go test cache does not see reads that escape the module).
 func realProfilesDir(t *testing.T) string {
 	t.Helper()
 	dir, err := filepath.Abs(filepath.Join("..", "..", "..", ".evolve", "profiles"))
@@ -25,7 +23,6 @@ func realProfilesDir(t *testing.T) string {
 	return dir
 }
 
-// renderSBPL runs the real darwin wrapper for req and returns the profile text.
 func renderSBPL(t *testing.T, req SandboxWrapRequest) string {
 	t.Helper()
 	wrap := defaultSandboxWrapWithProbe(Deps{}, fakeProbe("darwin", true))
@@ -44,9 +41,6 @@ func allowWriteLine(path string) string {
 	return "(allow file-write* (subpath " + strconv.Quote(path) + "))"
 }
 
-// TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir pins that the
-// triage profile's own write_subpaths declaration appears as a write grant
-// in the rendered profile.
 func TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir(t *testing.T) {
 	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
@@ -70,9 +64,6 @@ func TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir(t *testing.T) {
 		WriteSubpaths: prof.Sandbox.WriteSubpaths,
 	})
 
-	// SBPL (subpath X) covers everything below X, so the claim dir may be
-	// granted by its own line or by a parent's — the profile also grants
-	// .evolve/inbox, the rename's SOURCE directory.
 	claimDir := filepath.Join(canonicalRoot, ".evolve", "inbox", "processing", "cycle-1623")
 	var granted []string
 	for _, m := range subpathArgRe.FindAllStringSubmatch(sbpl, -1) {
@@ -85,9 +76,6 @@ func TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir(t *testing.T) {
 	}
 }
 
-// realSandboxProfiles returns every checked-in profile that enables the
-// sandbox, keyed by file name. Profiles without a sandbox block never reach
-// the wrapper's grant path and are out of scope by construction.
 func realSandboxProfiles(t *testing.T) map[string]Profile {
 	t.Helper()
 	dir := realProfilesDir(t)
@@ -101,10 +89,6 @@ func realSandboxProfiles(t *testing.T) map[string]Profile {
 			continue
 		}
 		path := filepath.Join(dir, e.Name())
-		// Decide membership from the data, not a skip list: the directory
-		// also holds non-phase documents (tool-policy.json) that the strict
-		// profile loader rightly rejects. Only a file that enables the
-		// sandbox can reach the wrapper's grant path.
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
@@ -127,12 +111,6 @@ func realSandboxProfiles(t *testing.T) map[string]Profile {
 	return out
 }
 
-// TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper is the wiring proof
-// for the first hop: the real launch path (Engine.LaunchArgs → profile load →
-// Config → sandboxPrefixForLaunch) carries the profile's declared
-// write_subpaths, verbatim, to the sandbox wrapper. The real profiles'
-// declarations are proven at the second hop by
-// TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath.
 func TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper(t *testing.T) {
 	t.Parallel()
 	declared := []string{".evolve/inbox/processing", "{worktree_path}/tests"}
@@ -152,8 +130,6 @@ func TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper(t *testing.T) {
 	var captured []SandboxWrapRequest
 	capture := func(req SandboxWrapRequest) ([]string, bool) {
 		captured = append(captured, req)
-		// The profile REQUIRES confinement, so declining would (correctly)
-		// fail the launch closed; report a wrap as available.
 		return []string{"sandbox-exec", "-f", "/tmp/x.sb"}, true
 	}
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
@@ -169,10 +145,6 @@ func TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper(t *testing.T) {
 	}
 }
 
-// TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath is the durable
-// regression gate: for every sandbox-enabled profile, every declared
-// write_subpaths entry — as the production resolver resolves it and the
-// generator widens it — appears as a write grant in the rendered SBPL.
 func TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath(t *testing.T) {
 	t.Parallel()
 	for name, prof := range realSandboxProfiles(t) {
@@ -189,10 +161,6 @@ func TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath(t *testing.T) {
 			if len(grants) == 0 {
 				t.Fatalf("profile declares %v but nothing resolved — every profile declares at least its run dir", prof.Sandbox.WriteSubpaths)
 			}
-			// The adapter's contract is "literal absolute paths only": the resolver
-			// owns glob widening, so what it returns must appear VERBATIM, and no
-			// rendered subpath may still carry a glob (SBPL would match nothing;
-			// bwrap would fail the bind).
 			for _, m := range subpathArgRe.FindAllStringSubmatch(sbpl, -1) {
 				if strings.ContainsAny(m[1], "*?[") {
 					t.Errorf("a glob reached the sandbox generator, which cannot interpret it: subpath %q", m[1])
@@ -207,10 +175,6 @@ func TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath(t *testing.T) {
 	}
 }
 
-// TestResolveSandboxWriteGrants pins the resolver's contract entry by entry:
-// each base kind, the climb refusal, the retarget refusal, the skipped
-// template-without-worktree, and — the projection the adapters no longer
-// own — glob widening to the longest glob-free ancestor, terminal or not.
 func TestResolveSandboxWriteGrants(t *testing.T) {
 	t.Parallel()
 	root, wt := t.TempDir(), t.TempDir()
@@ -270,9 +234,6 @@ func TestResolveSandboxWriteGrants(t *testing.T) {
 	}
 }
 
-// TestResolveSandboxWriteGrants_RefusesASymlinkRetargetBelowTheBase is the
-// generalized form of retro_lessons_test.go: any declared grant whose path
-// below its base is a symlink is refused, whatever profile declared it.
 func TestResolveSandboxWriteGrants_RefusesASymlinkRetargetBelowTheBase(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -288,14 +249,8 @@ func TestResolveSandboxWriteGrants_RefusesASymlinkRetargetBelowTheBase(t *testin
 	}
 }
 
-// subpathArgRe captures the quoted path of every SBPL (subpath "...") form.
 var subpathArgRe = regexp.MustCompile(`\(subpath "([^"]*)"\)`)
 
-// TestTriageProfile_GrantsTheClaimMove pins the grant against the OPERATION
-// the triage persona performs, not just a path: `evolve inbox-mover claim`
-// renames <inbox>/<item>.json → <inbox>/processing/cycle-N/<item>.json, and a
-// rename writes BOTH directories (unlink at the source, create at the
-// destination).
 func TestTriageProfile_GrantsTheClaimMove(t *testing.T) {
 	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
@@ -319,8 +274,6 @@ func TestTriageProfile_GrantsTheClaimMove(t *testing.T) {
 	}
 }
 
-// coveredByAGrant reports whether dir is a granted path or lies below one —
-// the SBPL (subpath …) semantics the generator emits.
 func coveredByAGrant(dir string, grants []string) bool {
 	for _, g := range grants {
 		if dir == g || strings.HasPrefix(dir, g+string(filepath.Separator)) {
@@ -330,11 +283,6 @@ func coveredByAGrant(dir string, grants []string) bool {
 	return false
 }
 
-// TestTriageProfile_DeniesTheInboxAuditTrail is the negative space of the
-// claim grant. `.evolve/inbox` is granted so a rename can unlink its source,
-// and SBPL subpath grants are recursive — so the history directories under
-// it must be denied explicitly, and the generator must emit those denies
-// AFTER the grant (later rules win) or the carve-out is decorative.
 func TestTriageProfile_DeniesTheInboxAuditTrail(t *testing.T) {
 	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
