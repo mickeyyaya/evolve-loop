@@ -14,14 +14,12 @@ func TestInteractiveFamiliesFrom(t *testing.T) {
 	}
 	installed := map[string]bool{"claude": true, "codex": true, "agy": false, "ollama": true}
 	got := interactiveFamiliesFrom(names, manifest, func(bin string) bool { return installed[bin] })
-	want := []string{"claude", "codex", "ollama"} // agy uninstalled; claude-p not tmux
+	want := []string{"claude", "codex", "ollama"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("interactiveFamiliesFrom = %v, want %v", got, want)
 	}
 }
 
-// The exact set is host-dependent (only installed CLIs), so this asserts only
-// the stable invariants: sorted and deduped.
 func TestInteractiveFamilies_Invariants(t *testing.T) {
 	t.Parallel()
 	got := InteractiveFamilies()

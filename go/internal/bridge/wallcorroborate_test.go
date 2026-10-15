@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// corroboratorProbeRunner scripts the probe subprocess and records argv/stdin.
 type corroboratorProbeRunner struct {
 	calls  [][]string
 	stdins []string
@@ -88,9 +87,6 @@ func TestDefaultWallCorroborator_UnknownFamilyStaysConservative(t *testing.T) {
 }
 
 func TestDefaultWallCorroborator_HungProbeIsWalled(t *testing.T) {
-	// NOT parallel — this test WRITES the package-level wallProbeTimeout var;
-	// Go runs serial tests to completion before any t.Parallel test resumes,
-	// which is the only ordering that makes the write race-free.
 	hang := func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
 		<-ctx.Done()
 		return 1, ctx.Err()
@@ -110,8 +106,6 @@ func TestDefaultWallCorroborator_HungProbeIsWalled(t *testing.T) {
 		t.Fatal("corroborator hung past its own deadline — it must bound the probe")
 	}
 }
-
-// --- tick-level wiring: the two decision sites ---
 
 func TestTick_ContentWallSuppressedWhenCorroboratorSaysHealthy(t *testing.T) {
 	t.Parallel()
@@ -161,8 +155,6 @@ func TestTick_CorroboratedWallStillEscalates(t *testing.T) {
 		t.Fatalf("corroborated real wall must escalate rc 85, got %d", rc)
 	}
 }
-
-// --- taxonomy: burst/display vocabulary out of the exhaustion regexes ---
 
 func TestManifestExhaustedRegexes_WindowWallOnlyNeverBurstOrDisplay(t *testing.T) {
 	t.Parallel()

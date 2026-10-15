@@ -1,20 +1,7 @@
 package bridge
 
-// usageclassify.go — the manifest-backed cap classifier the usage probe injects
-// as its Classify seam. Given a family + a captured /usage|/status pane, it
-// reports whether the pane shows the family is CURRENTLY out of quota. It is
-// deliberately conservative: only an unambiguous exhaustion phrase benches, so a
-// healthy report (which also mentions reset times and remaining percentages) is
-// never a false positive. The pattern is config-driven — the family's
-// controls.usage.exhausted_regex, falling back to the manifest's maintained
-// rate_limit interactive-prompt regex.
-
 import "regexp"
 
-// ClassifyExhausted reports whether pane (the captured usage/status output for
-// family) indicates the family is currently capped. Fail-open: an unloadable
-// manifest or an empty/uncompilable pattern returns false (the probe must never
-// invent a cap).
 func ClassifyExhausted(family, pane string) bool {
 	m, err := LoadManifest(family + "-tmux")
 	if err != nil {
@@ -23,9 +10,6 @@ func ClassifyExhausted(family, pane string) bool {
 	return matchExhausted(manifestExhaustedPattern(m), pane)
 }
 
-// manifestExhaustedPattern resolves the exhaustion regex for m: the usage
-// control's exhausted_regex when set, else the rate_limit interactive-prompt
-// regex (the single maintained source for "what a wall looks like"), else "".
 func manifestExhaustedPattern(m Manifest) string {
 	if spec, ok := m.Control("usage"); ok && spec.ExhaustedRegex != "" {
 		return spec.ExhaustedRegex
@@ -38,8 +22,6 @@ func manifestExhaustedPattern(m Manifest) string {
 	return ""
 }
 
-// matchExhausted compiles pattern and tests it against pane. An empty or
-// invalid pattern matches nothing (fail-open).
 func matchExhausted(pattern, pane string) bool {
 	if pattern == "" {
 		return false
@@ -51,12 +33,6 @@ func matchExhausted(pattern, pane string) bool {
 	return re.MatchString(pane)
 }
 
-// classifyTransientPane reports whether pane shows a recognized TEMPORARY
-// upstream error for the tmux driver named driver (e.g. "claude-tmux"). pane
-// MUST already be agent-stripped: a raw-pane scan fires on error text the agent
-// merely quoted or echoed, which is the same false-positive class the
-// exhaustion detector strips for. Fail-open — an unloadable manifest or an
-// unset transient_regex reports false (the driver must never invent a cause).
 func classifyTransientPane(driver, pane string) bool {
 	m, err := LoadManifest(driver)
 	if err != nil {

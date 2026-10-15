@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// InteractiveFamilies returns the installed interactive families: the sorted,
-// deduped manifest binaries of registered *-tmux drivers found on PATH.
 func InteractiveFamilies() []string {
 	return interactiveFamiliesFrom(DriverNames(), loadManifestRaw, func(bin string) bool {
 		_, err := exec.LookPath(bin)

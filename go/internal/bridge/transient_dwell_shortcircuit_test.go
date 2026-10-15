@@ -14,12 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// transientRedispatchDelayFloor is a floor, not the exact value: it only pins
-// that the enforce shortcircuit's re-dispatch delay is meaningful (visibly
-// longer than the 2s poll and the 500ms submit-verify settle).
 const transientRedispatchDelayFloor = 15 * time.Second
 
-// transientDwellRun is one real driver launch's observable outcome.
 type transientDwellRun struct {
 	code    int
 	stderr  string
@@ -28,12 +24,6 @@ type transientDwellRun struct {
 	ws      string
 }
 
-// runTransientDwell drives a REAL claude-tmux launch through Engine.LaunchArgs
-// with a scripted pane sequence and an explicit RecoveryStage. It does not
-// reuse runTmuxOnStopReview because that helper overwrites Deps.Sleep with a
-// no-op unconditionally, and Deps.Sleep is the only seam through which the
-// enforce path's re-dispatch delay is observable; sleeps are recorded, not
-// slept, so the loops still iterate instantly.
 func runTransientDwell(t *testing.T, fx launchFixture, paneSeq []string, stage string, timeoutS int) transientDwellRun {
 	t.Helper()
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "full artifact timeout reached"}}}
@@ -54,7 +44,6 @@ func runTransientDwell(t *testing.T, fx launchFixture, paneSeq []string, stage s
 	return transientDwellRun{code: code, stderr: stderr.String(), sleeps: sleeps, reviews: rev.events, ws: fx.ws}
 }
 
-// longestSleep is the biggest pause the driver asked for.
 func (r transientDwellRun) longestSleep() time.Duration {
 	var max time.Duration
 	for _, d := range r.sleeps {
@@ -65,11 +54,6 @@ func (r transientDwellRun) longestSleep() time.Duration {
 	return max
 }
 
-// transientOutcomes reads the DURABLE interaction ledger this launch wrote
-// (<workspace>/<phase>-interactions.ndjson) and returns the transient-dwell
-// records. Reading the emitted artifact — not an in-memory spy — is the
-// point: the soak reporter and the would/did parity check read exactly this
-// file, and stderr-only evidence would leave the soak blind.
 func (r transientDwellRun) transientOutcomes(t *testing.T) []map[string]any {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join(r.ws, "*-interactions.ndjson"))
@@ -99,7 +83,6 @@ func (r transientDwellRun) transientOutcomes(t *testing.T) []map[string]any {
 	return out
 }
 
-// resultsOf projects the ledger records onto their result field.
 func resultsOf(recs []map[string]any) []string {
 	var out []string
 	for _, r := range recs {
@@ -109,10 +92,6 @@ func resultsOf(recs []map[string]any) []string {
 	return out
 }
 
-// alternatingPanes builds a pane sequence that flips between the live 529 pane
-// and a clean idle REPL, so the transient pattern is never present on two
-// consecutive observations. n entries, long enough that fakeTmux never falls
-// back to repeating its last value inside the wait window.
 func alternatingPanes(t *testing.T, n int) []string {
 	t.Helper()
 	transient := livePane529(t)
@@ -126,8 +105,6 @@ func alternatingPanes(t *testing.T, n int) []string {
 	}
 	return seq
 }
-
-// --- AC-1 -----------------------------------------------------------------
 
 func TestAutoResponder_TransientRegexResolvedAtConstruction(t *testing.T) {
 	t.Parallel()
@@ -154,7 +131,6 @@ func TestAutoResponder_TransientRegexResolvedAtConstruction(t *testing.T) {
 	}
 }
 
-// fieldNames lists a struct type's fields for a diagnosable RED message.
 func fieldNames(rt reflect.Type) []string {
 	out := make([]string, 0, rt.NumField())
 	for i := 0; i < rt.NumField(); i++ {
@@ -180,8 +156,6 @@ func TestAutoResponder_TransientRegexIsFamilyAgnostic(t *testing.T) {
 		}
 	}
 }
-
-// --- AC-2 / AC-3 / AC-6 ---------------------------------------------------
 
 func TestRunTmuxREPL_TransientDwell_EnforceStopsBeforeTheArtifactReviewer(t *testing.T) {
 	t.Parallel()
@@ -269,8 +243,6 @@ func TestRunTmuxREPL_TransientDwell_ResetsOnNonMatchingFrame(t *testing.T) {
 	}
 }
 
-// --- AC-4 -----------------------------------------------------------------
-
 func TestRunTmuxREPL_TransientDwell_BusyPaneIsNeverPreempted(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
@@ -288,8 +260,6 @@ func TestRunTmuxREPL_TransientDwell_BusyPaneIsNeverPreempted(t *testing.T) {
 		t.Errorf("AC-7: re-dispatch delay (%v) applied although the shortcircuit was (correctly) not taken", d)
 	}
 }
-
-// --- AC-5 -----------------------------------------------------------------
 
 func TestRunTmuxREPL_TransientDwell_ShadowObservesWithoutActing(t *testing.T) {
 	t.Parallel()
@@ -338,8 +308,6 @@ func TestRunTmuxREPL_TransientDwell_OffStageIsLegacy(t *testing.T) {
 		t.Errorf("stage=off must not classify (no observation on a disabled path); got %+v", recs)
 	}
 }
-
-// --- AC-7 -----------------------------------------------------------------
 
 func TestRunTmuxREPL_TransientDwell_EnforceDelaysRedispatch(t *testing.T) {
 	t.Parallel()
@@ -426,7 +394,6 @@ func TestRunTmuxREPL_TransientDwell_NoDelayOnOrdinaryTimeout(t *testing.T) {
 	}
 }
 
-// contains reports whether needle is in hay.
 func contains(hay []string, needle string) bool {
 	for _, s := range hay {
 		if s == needle {
@@ -436,8 +403,6 @@ func contains(hay []string, needle string) bool {
 	return false
 }
 
-// alternatingFlakyTmux returns the 529 pane on even captures and a transport
-// error on odd ones — the realistic shape of a tmux server under load.
 type alternatingFlakyTmux struct {
 	fakeTmux
 	pane string
@@ -446,9 +411,6 @@ type alternatingFlakyTmux struct {
 
 func (a *alternatingFlakyTmux) CapturePane(context.Context, string, int) (string, error) {
 	a.n++
-	// Boot cleanly (the boot wait shares CapturePane), then flake every other
-	// capture for the rest of the run — the artifact wait's dwell must ride
-	// through the errors on the successful frames alone.
 	if a.n <= 8 {
 		return a.pane, nil
 	}

@@ -16,10 +16,6 @@ func runTmuxOnStopReview(t *testing.T, fx launchFixture, tmux *fakeTmux, rev Sto
 	d.Tmux = tmux
 	d.Sleep = func(time.Duration) {}
 	if d.CaptureBaseline == nil {
-		// Harness default ONLY: pre-seeded artifacts stand in for mid-session
-		// writes. A test whose scenario is a STALE pre-dispatch artifact must
-		// pass CaptureBaseline: captureArtifactBaseline explicitly (see
-		// TestRunTmuxREPL_StalePreDispatchArtifactTimesOutInsteadOfCompleting).
 		d.CaptureBaseline = zeroBaselineCapture
 	}
 	d.Reviewer = rev
@@ -33,7 +29,7 @@ func runTmuxOnStopReview(t *testing.T, fx launchFixture, tmux *fakeTmux, rev Sto
 func TestRunTmuxREPL_OnStopReview_CalledForExtendAndPause(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never lands
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
 		{Action: ReviewExtend, Reason: "still working"},
 		{Action: ReviewPause, Reason: "stalled"},
@@ -42,7 +38,6 @@ func TestRunTmuxREPL_OnStopReview_CalledForExtendAndPause(t *testing.T) {
 	spy := func(phase, action, reason string) {
 		got = append(got, stopReviewRec{phase, action, reason})
 	}
-	// Tiny timeout so each loop iteration crosses a review boundary.
 	code, stderr := runTmuxOnStopReview(t, fx, tmux, rev, spy,
 		Deps{ArtifactTimeoutS: 2}, "--allow-bypass")
 
@@ -73,7 +68,7 @@ func TestRunTmuxREPL_OnStopReview_NilSafe(t *testing.T) {
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
 		{Action: ReviewPause, Reason: "stalled"},
 	}}
-	code, stderr := runTmuxOnStopReview(t, fx, tmux, rev, nil, // nil callback
+	code, stderr := runTmuxOnStopReview(t, fx, tmux, rev, nil,
 		Deps{ArtifactTimeoutS: 2}, "--allow-bypass")
 	if code != ExitArtifactTimeout {
 		t.Fatalf("nil OnStopReview must not change behavior; exit = %d, want %d; stderr=%q",

@@ -81,8 +81,6 @@ func TestRunTmuxREPL_FatalCheckpointReportsItsTypedCause(t *testing.T) {
 	}
 }
 
-// scriptedSessionTmux: the first `dead` sessions' REPLs boot, take the prompt, and die to a bare shell
-// echoing the nudge; every later session is healthy and its prompt delivery writes the artifact.
 type scriptedSessionTmux struct {
 	*fakeTmux
 	sessions, dead int
@@ -108,8 +106,6 @@ func (d *scriptedSessionTmux) PasteBuffer(context.Context, string) error {
 	return nil
 }
 
-// launchScripted drives the real Engine.Launch → runScoped → claude-tmux driver
-// → checkpoint path against scriptedSessionTmux.
 func launchScripted(t *testing.T, dead int, stage string, mutate func(*core.BridgeRequest)) (*scriptedSessionTmux, core.BridgeResponse, error, *llmcalls.ReadResult, int) {
 	t.Helper()
 	return launchScriptedWith(t, dead, stage, mutate, func(*Deps) {})

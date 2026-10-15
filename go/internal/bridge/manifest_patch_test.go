@@ -15,7 +15,6 @@ func useBridgeManifestDir(t *testing.T, dir string) {
 }
 
 func TestAddRule_ErrorPaths(t *testing.T) {
-	// MkdirAll error: override dir is under a regular file.
 	blocker := filepath.Join(t.TempDir(), "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -25,7 +24,6 @@ func TestAddRule_ErrorPaths(t *testing.T) {
 		t.Fatal("AddRule should fail when the override dir can't be created")
 	}
 
-	// WriteFile error: target manifest path is a directory.
 	d := t.TempDir()
 	useBridgeManifestDir(t, d)
 	if err := os.Mkdir(filepath.Join(d, "claude-p.json"), 0o755); err != nil {
@@ -35,7 +33,6 @@ func TestAddRule_ErrorPaths(t *testing.T) {
 		t.Fatal("AddRule should fail when the manifest path is a directory")
 	}
 
-	// MarshalIndent error: swap the seam.
 	d2 := t.TempDir()
 	useBridgeManifestDir(t, d2)
 	orig := marshalIndent
@@ -50,10 +47,10 @@ func TestAppendInteractiveRule(t *testing.T) {
 	t.Parallel()
 	base := []ManifestPrompt{{Name: "existing", Regex: "x", Policy: "escalate"}}
 	bad := []ManifestPrompt{
-		{},                                       // missing all
-		{Name: "n", Regex: "r", Policy: "bogus"}, // bad policy
-		{Name: "n", Regex: "r", Policy: "auto_respond"},    // auto_respond w/o keys
-		{Name: "existing", Regex: "r", Policy: "escalate"}, // duplicate name
+		{},
+		{Name: "n", Regex: "r", Policy: "bogus"},
+		{Name: "n", Regex: "r", Policy: "auto_respond"},
+		{Name: "existing", Regex: "r", Policy: "escalate"},
 	}
 	for i, rule := range bad {
 		if _, err := AppendInteractiveRule(base, rule); err == nil {
@@ -79,7 +76,6 @@ func TestAddRule_RoundTrip(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("override manifest not written: %v", err)
 	}
-	// LoadManifest now reads the override and sees the new rule.
 	m, err := LoadManifest("claude-p")
 	if err != nil {
 		t.Fatalf("LoadManifest err: %v", err)
@@ -93,7 +89,6 @@ func TestAddRule_RoundTrip(t *testing.T) {
 	if !found {
 		t.Fatal("override manifest should contain the added rule")
 	}
-	// Re-adding the same name now collides (it's in the override).
 	if _, err := AddRule("claude-p", rule); err == nil {
 		t.Fatal("duplicate AddRule should error")
 	}

@@ -46,11 +46,6 @@ func sandboxDiagnosis(probe sandbox.ProbeResult) string {
 		probe.BinaryPath, probe.Reason, err, strings.TrimSpace(string(out)), capabilityProbeSBPL)
 }
 
-// writeFakeREPL writes a scripted fake CLI to dir and returns its launch
-// command. mode selects behavior; marker is the boot-ready string the fake
-// prints once on startup. The marker is baked into the script body, never
-// passed as an argv token, so the shell's echo of the launch command cannot
-// trip a false boot-ready before the CLI actually starts.
 func writeFakeREPL(t *testing.T, dir, mode, marker string) string {
 	t.Helper()
 	script := fmt.Sprintf(`#!/usr/bin/env bash
@@ -85,12 +80,9 @@ done
 `, marker)
 	path := filepath.Join(dir, "fake-repl-"+mode+".sh")
 	fakeclitest.Install(t, path, script)
-	// launch command carries ONLY the mode — never the marker (see above).
 	return path + " " + mode
 }
 
-// itConfig builds a fully-populated Config rooted under a fresh temp dir,
-// with the prompt file carrying the given lines (joined by "\n").
 func itConfig(t *testing.T, promptLines ...string) *Config {
 	t.Helper()
 	root := t.TempDir()
@@ -108,7 +100,7 @@ func itConfig(t *testing.T, promptLines ...string) *Config {
 		Model:       "haiku",
 		Agent:       "itest",
 		Cycle:       0,
-		Worktree:    root, // a real dir for the REPL to cd into
+		Worktree:    root,
 		Workspace:   ws,
 		PromptFile:  promptFile,
 		Artifact:    filepath.Join(root, "artifact"),
@@ -117,8 +109,6 @@ func itConfig(t *testing.T, promptLines ...string) *Config {
 	}
 }
 
-// itDeps returns real-tmux Deps with a scaled Sleep. perTick is the wall
-// time each poll-loop Sleep actually blocks (regardless of requested d).
 func itDeps(perTick time.Duration) Deps {
 	d := Deps{
 		Tmux:  execTmux{},
@@ -128,9 +118,6 @@ func itDeps(perTick time.Duration) Deps {
 	return d.withDefaults()
 }
 
-// itLaunch is a tmuxLaunch with the synthetic name "itest-tmux" (no
-// manifest → auto-responder is a no-op, so the fake's output never trips
-// an unexpected auto-response).
 func itLaunch(session, launchCmd, marker string, scrollback int, named bool) tmuxLaunch {
 	return tmuxLaunch{
 		name:            "itest-tmux",
@@ -149,14 +136,11 @@ func itSession(tag string) string {
 	return fmt.Sprintf("evolve-bridge-it-%s-%d", tag, os.Getpid())
 }
 
-// --- 1. Happy path end-to-end against real tmux ---------------------------
-
 func TestRealTmux_HappyPath(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
 	const marker = "READY-IT"
 	cfg := itConfig(t, "ARTIFACT="+"PLACEHOLDER")
-	// Rewrite the prompt with the real artifact path now that cfg exists.
 	mustWrite(t, cfg.PromptFile, "ARTIFACT="+cfg.Artifact)
 
 	launchCmd := writeFakeREPL(t, cfg.Worktree, "happy", marker)
@@ -173,9 +157,6 @@ func TestRealTmux_HappyPath(t *testing.T) {
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK; stderr=%s", code, stderr.String())
 	}
-	// The fake models a CLEAN real REPL (marker redrawn after every consumed
-	// line): submit-verify must see a clear input line, not lean on the
-	// ground-truth belt.
 	if strings.Contains(stderr.String(), "re-sending Enter") {
 		t.Fatalf("clean-REPL fake triggered submit-verify resends; stderr=%s", stderr.String())
 	}
@@ -189,8 +170,6 @@ func TestRealTmux_HappyPath(t *testing.T) {
 		t.Fatalf("stdout-log scrollback should have been captured")
 	}
 }
-
-// --- 2. Boot timeout (real tmux, marker never appears) → EC 80 ------------
 
 func TestRealTmux_BootTimeout(t *testing.T) {
 	t.Parallel()
@@ -210,25 +189,11 @@ func TestRealTmux_BootTimeout(t *testing.T) {
 	}
 }
 
-// --- 3. Artifact timeout (REPL boots, artifact never written) → EC 81 -----
-
 func TestRealTmux_ArtifactTimeout(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
 	const marker = "AT-READY"
-	// The artifact-timeout fake never writes regardless of the ARTIFACT
-	// directive, so the path is a don't-care; runTmuxREPL still polls the
-	// real cfg.Artifact (set by itConfig) and never sees it appear.
 	cfg := itConfig(t, "ARTIFACT=/dev/null")
-	// This test asserts the *artifact*-timeout path (EC 81), which requires
-	// boot to succeed first. itDeps scales BOTH the boot-wait (60 polls) and
-	// the artifact-wait with one perTick, so a tight perTick that keeps the
-	// artifact-wait short also starves the boot budget: at 10ms the boot got
-	// only 60×10ms=600ms real, which raced real-tmux boot under parallel-suite
-	// load and returned ExitREPLBootTimeout(80) instead of 81. Decouple them:
-	// a generous perTick gives boot a 60×150ms=9s budget (it breaks early on
-	// the marker), while a short ArtifactTimeoutS bounds the artifact-wait to
-	// (4/2)×150ms≈300ms so the test stays fast.
 	cfg.ArtifactTimeoutS = 4
 	launchCmd := writeFakeREPL(t, cfg.Worktree, "artifact-timeout", marker)
 	sess := itSession("artto")
@@ -244,17 +209,12 @@ func TestRealTmux_ArtifactTimeout(t *testing.T) {
 	}
 }
 
-// --- 4. Multi-line + special-char prompt delivery via paste-buffer --------
-
 func TestRealTmux_MultilineSpecialCharPrompt(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
 	const marker = "ML-READY"
 	const special = `a"b'c;d $x |f &g`
 	cfg := itConfig(t, "x")
-	// SPECIAL line then ARTIFACT line — the fake echoes SPECIAL into the
-	// artifact, so an exact match proves multi-line + special chars were
-	// delivered intact (paste-buffer, not send-keys, preserves them).
 	mustWrite(t, cfg.PromptFile, "SPECIAL="+special+"\nARTIFACT="+cfg.Artifact)
 	launchCmd := writeFakeREPL(t, cfg.Worktree, "happy", marker)
 	sess := itSession("multiline")
@@ -270,8 +230,6 @@ func TestRealTmux_MultilineSpecialCharPrompt(t *testing.T) {
 	}
 }
 
-// --- 5. Named session: create → preserve → resume(reattach) → kill --------
-
 func TestRealTmux_NamedSessionResume(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
@@ -279,8 +237,6 @@ func TestRealTmux_NamedSessionResume(t *testing.T) {
 	sess := itSession("named")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	// Run 1: create-named. Session must PERSIST after the run (no kill,
-	// exit seq skipped).
 	cfg1 := itConfig(t, "x")
 	mustWrite(t, cfg1.PromptFile, "ARTIFACT="+cfg1.Artifact)
 	launchCmd := writeFakeREPL(t, cfg1.Worktree, "happy", marker)
@@ -296,14 +252,8 @@ func TestRealTmux_NamedSessionResume(t *testing.T) {
 		t.Fatalf("run 1 artifact = %q, want PONG", got)
 	}
 
-	// Run 2: resume. Same session already exists → reattach, skip relaunch,
-	// deliver a new prompt to the still-running fake REPL, get a new
-	// artifact at a fresh path.
 	cfg2 := itConfig(t, "x")
 	mustWrite(t, cfg2.PromptFile, "ARTIFACT="+cfg2.Artifact)
-	// "false" as launchCmd proves the resume path NEVER relaunches: if it
-	// did, `false` would exit non-zero, no marker, boot timeout. Success here
-	// means runTmuxREPL reattached to the run-1 REPL instead.
 	code2, _ := runTmuxREPL(context.Background(), cfg2, itDeps(120*time.Millisecond),
 		itLaunch(sess, "false", marker, 0, true))
 	if code2 != ExitOK {
@@ -316,10 +266,6 @@ func TestRealTmux_NamedSessionResume(t *testing.T) {
 		t.Fatalf("named session must still be preserved after resume")
 	}
 }
-
-// --- 6. Concurrent sessions: each gets its OWN artifact content -----------
-// Exercises real parallel tmux sessions on the shared server. Guards
-// against prompt cross-contamination between concurrent launches.
 
 func TestRealTmux_ConcurrentSessionsIsolated(t *testing.T) {
 	t.Parallel()
@@ -336,11 +282,7 @@ func TestRealTmux_ConcurrentSessionsIsolated(t *testing.T) {
 	for i := 0; i < n; i++ {
 		cfg := itConfig(t, "x")
 		want := fmt.Sprintf("PAYLOAD-%d", i)
-		// Each session must write ITS OWN payload to ITS OWN artifact.
 		mustWrite(t, cfg.PromptFile, "SPECIAL="+want+"\nARTIFACT="+cfg.Artifact)
-		// Write the fake CLI HERE (main goroutine) — writeFakeREPL calls
-		// t.Fatalf, which is illegal from a non-test goroutine and would
-		// silently swallow a write error if invoked inside the goroutine below.
 		runs[i] = run{
 			cfg:       cfg,
 			sess:      itSession(fmt.Sprintf("cc%d", i)),
@@ -376,8 +318,6 @@ func TestRealTmux_ConcurrentSessionsIsolated(t *testing.T) {
 	}
 }
 
-// --- small file helpers ----------------------------------------------------
-
 func mustWrite(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
@@ -399,8 +339,6 @@ func TestRealTmux_NewSessionInBindsPaneCwd(t *testing.T) {
 	requireTmux(t)
 	ctx := context.Background()
 	workdir := t.TempDir()
-	// macOS: /var/folders/... is a symlink target under /private — resolve like
-	// the shell will so the comparison is on canonical paths.
 	canonical, err := filepath.EvalSymlinks(workdir)
 	if err != nil {
 		t.Fatalf("EvalSymlinks(%s): %v", workdir, err)
@@ -411,8 +349,6 @@ func TestRealTmux_NewSessionInBindsPaneCwd(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = itTmuxCtl.KillSession(ctx, session) })
 
-	// The session lives on the bridge's isolated socket (itTmuxCtl uses -L
-	// TmuxSocket), so this raw inspection must target the same socket.
 	out, err := exec.Command("tmux", TmuxSocketArgs("display-message", "-p", "-t", session, "#{pane_current_path}")...).Output()
 	if err != nil {
 		t.Fatalf("display-message: %v", err)

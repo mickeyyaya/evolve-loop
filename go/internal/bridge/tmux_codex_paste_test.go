@@ -23,8 +23,6 @@ func (p *codexPasteChipTmux) CapturePane(ctx context.Context, session string, sc
 	return p.fakeTmux.CapturePane(ctx, session, scrollback)
 }
 
-// The fixture prompt is under the stability floor, so it settles 1s and
-// skips the capture.
 func TestTmuxPromptCodexPasteChipRecovery(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ name, driver, marker, pane, want string }{
@@ -36,7 +34,6 @@ func TestTmuxPromptCodexPasteChipRecovery(t *testing.T) {
 			cfg := fixtureConfig(t)
 			tm := &codexPasteChipTmux{pasteStickyTmux: &pasteStickyTmux{fakeTmux: &fakeTmux{paneSeq: []string{tc.marker}}}, pane: tc.pane}
 			rc, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{name: tc.driver, session: "codex-chip", launchCmd: "fixture", promptMarker: tc.marker, inputLineMarker: tc.marker, bootIntervalS: 1})
-			// No artifact is produced; only the parked Codex input licenses a resend.
 			if err != nil || rc != ExitArtifactTimeout {
 				t.Fatalf("rc=%d err=%v", rc, err)
 			}

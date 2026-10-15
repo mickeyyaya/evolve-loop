@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// runScrollbackPhase runs a happy-path claude-tmux launch (artifact pre-seeded)
-// with the given scrollbackLines typed field and returns recorded CapturePane
-// scrollback arguments.
 func runScrollbackPhase(t *testing.T, scrollbackLines int) []int {
 	t.Helper()
 	fx := newFixture(t, "claude-tmux", "")
@@ -19,7 +16,7 @@ func runScrollbackPhase(t *testing.T, scrollbackLines int) []int {
 	}
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	eng := newTestEngine(Deps{
-		CaptureBaseline: zeroBaselineCapture, // harness seeds model mid-session writes
+		CaptureBaseline: zeroBaselineCapture,
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		ScrollbackLines: scrollbackLines,
@@ -32,7 +29,6 @@ func runScrollbackPhase(t *testing.T, scrollbackLines int) []int {
 	return tmux.captureScrollback
 }
 
-// containsInt reports whether xs holds v.
 func containsInt(xs []int, v int) bool {
 	for _, x := range xs {
 		if x == v {
@@ -61,7 +57,6 @@ func TestScrollbackLines(t *testing.T) {
 		}
 	})
 
-	// Non-positive values must fall back to the 10000 default (defaultIfZero semantics).
 	for _, bad := range []int{0, -5} {
 		bad := bad
 		t.Run("non-positive falls back to 10000", func(t *testing.T) {

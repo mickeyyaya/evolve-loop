@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// healthyTail is ordinary working-agent output, the frame that follows a
-// transient fatal-shaped render and must reset the streak.
 const healthyTail = "⏺ Reading incident-report.md … done. Now writing the audit."
 
 type gateObs struct {
@@ -131,9 +129,9 @@ func TestFatalPaneGate_BusyObservationResetsStreak(t *testing.T) {
 	rec := interaction.NewRecorder(t.TempDir())
 
 	for i, obs := range []gateObs{
-		observeFatal(t, g, rec, "enforce", fatalTail, false), // match
-		observeFatal(t, g, rec, "enforce", fatalTail, true),  // BUSY → reset
-		observeFatal(t, g, rec, "enforce", fatalTail, false), // lone match again
+		observeFatal(t, g, rec, "enforce", fatalTail, false),
+		observeFatal(t, g, rec, "enforce", fatalTail, true),
+		observeFatal(t, g, rec, "enforce", fatalTail, false),
 	} {
 		if obs.preempted {
 			t.Fatalf("observation %d preempted: a Busy checkpoint between two lone matches must reset the streak (busy = working agent, not a fatal pane); verdict=%+v", i+1, obs.verdict)

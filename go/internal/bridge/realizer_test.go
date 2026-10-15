@@ -15,7 +15,6 @@ func claudeTmuxManifest() Manifest {
 			"session_mode":   {Channel: "controller"},
 			"allowed_tools":  {Channel: "flag", Flag: "--allowedTools"},
 		},
-		// no tier_aliases → claude uses the literal tier as the model name
 	}
 }
 
@@ -24,8 +23,8 @@ func codexTmuxManifest() Manifest {
 		CLI: "codex-tmux", Binary: "codex",
 		ModelTierMap: map[string]string{"haiku": "gpt-5.4-mini", "sonnet": "gpt-5.4", "opus": "gpt-5.5"},
 		Params: map[string]ParamSpec{
-			"model_tier":     {Channel: "flag", Flag: "-m", From: "tier_alias"}, // matches the real codex-tmux manifest + `codex -m` driver
-			"permission":     {Channel: "controller"},                           // codex has no bypass flag; trust handled by the auto-responder
+			"model_tier":     {Channel: "flag", Flag: "-m", From: "tier_alias"},
+			"permission":     {Channel: "controller"},
 			"settings_scope": {Channel: "noop"},
 			"session_mode":   {Channel: "controller"},
 		},
@@ -35,8 +34,6 @@ func codexTmuxManifest() Manifest {
 func agyTmuxManifest() Manifest {
 	return Manifest{
 		CLI: "agy-tmux", Binary: "agy",
-		// Mirrors the real manifest: agy's --model launch flag selects
-		// display-name tokens (spaces/parens).
 		ModelTierMap: map[string]string{"fast": "Gemini 3.5 Flash (Low)", "balanced": "Gemini 3.5 Flash (High)", "deep": "Gemini 3.1 Pro (High)"},
 		Params: map[string]ParamSpec{
 			"model_tier":     {Channel: "flag", Flag: "--model", From: "model_tier_map"},
@@ -68,7 +65,6 @@ func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
 		if !got.Ephemeral {
 			t.Fatal("session_mode=ephemeral must set controller Ephemeral=true")
 		}
-		// The bug guard: a print-mode flag must NEVER appear.
 		if containsToken(got.LaunchFlags, "--no-session-persistence") {
 			t.Fatal("--no-session-persistence must not be emitted for an interactive REPL")
 		}
@@ -76,7 +72,6 @@ func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
 
 	t.Run("agy-tmux: permission flag + --model display-name token (cycle-447)", func(t *testing.T) {
 		got := Realize(agyTmuxManifest(), intent)
-		// intent tier "sonnet" → legacy ladder → "balanced" → display name.
 		wantFlags := []string{"--dangerously-skip-permissions", "--model", "Gemini 3.5 Flash (High)"}
 		if !sameFlags(got.LaunchFlags, wantFlags) {
 			t.Fatalf("LaunchFlags = %v, want (any order) %v", got.LaunchFlags, wantFlags)
@@ -103,10 +98,6 @@ func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
 	})
 }
 
-// TestRealize_REPLChannel covers the post-boot REPL-injection channel — a
-// supported engine capability for CLIs whose model can only be set
-// in-session. No production manifest uses it today, so it's pinned here with
-// a synthetic manifest to keep the channel covered and reserved.
 func TestRealize_REPLChannel(t *testing.T) {
 	t.Parallel()
 	m := Manifest{
@@ -168,8 +159,6 @@ func TestRealize_AllowedToolsExpandsFlag(t *testing.T) {
 }
 
 func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
-	// Synthetic manifest: default_args + one per-param scalar. Tokens MUST
-	// appear in this exact order.
 	t.Parallel()
 	m := Manifest{
 		CLI:         "hypo",
@@ -182,8 +171,6 @@ func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 		t.Fatalf("default_args must land FIRST; got %v, want %v", got.LaunchFlags, want)
 	}
 
-	// Empty default_args produces unchanged behavior — a regression guard for
-	// manifests that emptied default_args and rely on params.permission alone.
 	mEmpty := Manifest{
 		CLI:         "hypo-empty",
 		DefaultArgs: []string{},
@@ -194,7 +181,6 @@ func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 		t.Fatalf("empty default_args must be a no-op; got %v, want [--bypass]", gotEmpty.LaunchFlags)
 	}
 
-	// Nil default_args is also a no-op (covers the unset-key case in JSON).
 	mNil := Manifest{
 		CLI:    "hypo-nil",
 		Params: map[string]ParamSpec{"permission": {Channel: "flag", Values: map[string][]string{"bypass": {"--bypass"}}}},
@@ -206,8 +192,6 @@ func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 }
 
 func TestRealize_DefaultArgs_Deduped(t *testing.T) {
-	// Collision case: default_args declares the same flag the bypass channel
-	// emits. Result must contain it exactly ONCE, at the leading position.
 	t.Parallel()
 	m := Manifest{
 		CLI:         "hypo",
@@ -219,8 +203,6 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 		t.Fatalf("colliding token must dedupe to one; got %v, want [--bypass]", got.LaunchFlags)
 	}
 
-	// Distinct-value case: different VALUES of the same FLAG NAME each survive
-	// as their own pair.
 	m2 := Manifest{
 		CLI:         "hypo2",
 		DefaultArgs: []string{"--model", "gpt-5.4"},
@@ -230,17 +212,11 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 		ModelTierMap: map[string]string{"sonnet": "gpt-5.5"},
 	}
 	got2 := Realize(m2, LaunchIntent{ModelTier: "sonnet"})
-	// Both pairs survive, and last-one-wins lets the param-resolved tier take
-	// effect. Declaring the same flag in both default_args and params remains
-	// poor hygiene, but is no longer harmful.
 	if !reflect.DeepEqual(got2.LaunchFlags, []string{"--model", "gpt-5.4", "--model", "gpt-5.5"}) {
 		t.Fatalf("pair-level dedupe expected; got %v, want [--model gpt-5.4 --model gpt-5.5]", got2.LaunchFlags)
 	}
 }
 
-// TestDedupeLaunchFlags_Edges drives dedupeLaunchFlags across every plausible
-// input shape so future refactors surface here first. Order-preservation
-// (first occurrence wins) is the load-bearing contract.
 func TestDedupeLaunchFlags_Edges(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -288,8 +264,6 @@ func TestDedupeLaunchFlags_Edges(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := dedupeLaunchFlags(tc.in)
-			// Compare as slices; an "empty == nil" wash matches Realize's call
-			// site behavior (it iterates either to the same empty result).
 			if len(got) == 0 && len(tc.want) == 0 {
 				return
 			}
@@ -300,15 +274,12 @@ func TestDedupeLaunchFlags_Edges(t *testing.T) {
 	}
 }
 
-// TestDedupeLaunchFlags_AliasSafety pins that dedupeLaunchFlags returns a
-// slice that shares no backing storage with its input, in either direction.
 func TestDedupeLaunchFlags_AliasSafety(t *testing.T) {
 	t.Parallel()
 	in := []string{"--a", "--b", "--a", "--c"}
 	original := append([]string(nil), in...)
 	got := dedupeLaunchFlags(in)
 
-	// Mutating the returned slice must NOT mutate the input.
 	if len(got) > 0 {
 		got[0] = "--MUTATED"
 	}
@@ -316,22 +287,12 @@ func TestDedupeLaunchFlags_AliasSafety(t *testing.T) {
 		t.Fatalf("dedupe result aliases input backing array; in mutated to %v (was %v)", in, original)
 	}
 
-	// And vice versa — mutating the input must NOT mutate the returned slice.
 	in[0] = "--TAMPERED"
 	if got[0] == "--TAMPERED" {
 		t.Fatalf("input mutation leaked into dedupe result; got[0]=%q", got[0])
 	}
 }
 
-// TestRealize_DefaultArgs_StackInteraction pins the FULL ordering invariant
-// across all 4 launch-flag sources Realize composes:
-//
-//	[default_args] + [model_tier] + [permission] + [settings_scope]
-//	  + [allowed_tools] + [raw_by_cli]   → dedupe → r.LaunchFlags
-//
-// Default_args land FIRST, per-param scalars next (in the realizer's
-// internal order), raw escape-hatch flags last. This is the documented
-// contract for a single CLI; cross-CLI tests live in realizer_realmanifest_test.go.
 func TestRealize_DefaultArgs_StackInteraction(t *testing.T) {
 	t.Parallel()
 	m := Manifest{
@@ -353,21 +314,17 @@ func TestRealize_DefaultArgs_StackInteraction(t *testing.T) {
 	got := Realize(m, intent)
 
 	want := []string{
-		"--default-1", "--default-2", // default_args
-		"--model", "model-x", // model_tier (tier_alias resolved)
-		"--bypass",           // permission bypass
-		"--scope", "project", // settings_scope
-		"--raw-tail", // raw_by_cli (last)
+		"--default-1", "--default-2",
+		"--model", "model-x",
+		"--bypass",
+		"--scope", "project",
+		"--raw-tail",
 	}
 	if !reflect.DeepEqual(got.LaunchFlags, want) {
 		t.Fatalf("stack order broken;\ngot:  %v\nwant: %v", got.LaunchFlags, want)
 	}
 }
 
-// TestRealize_DefaultArgs_DegenerateManifest covers manifests with NO params
-// table — default_args still fires. This protects the "minimum-viable
-// manifest" path: a brand-new driver with only DefaultArgs and a Binary can
-// still emit boot flags before its param table is fleshed out.
 func TestRealize_DefaultArgs_DegenerateManifest(t *testing.T) {
 	t.Parallel()
 	m := Manifest{CLI: "bare", DefaultArgs: []string{"--only-this"}}
@@ -380,9 +337,6 @@ func TestRealize_DefaultArgs_DegenerateManifest(t *testing.T) {
 	}
 }
 
-// TestRealize_DefaultArgs_InternalDuplicates pins that dedupe handles
-// repeats WITHIN default_args itself, not just collisions WITH the params
-// channel. A typo'd manifest `["--yolo", "--yolo"]` shouldn't double-emit.
 func TestRealize_DefaultArgs_InternalDuplicates(t *testing.T) {
 	t.Parallel()
 	m := Manifest{
@@ -395,10 +349,6 @@ func TestRealize_DefaultArgs_InternalDuplicates(t *testing.T) {
 	}
 }
 
-// TestRealize_DefaultArgs_OrthogonalToREPLChannel ensures default_args
-// does NOT leak into REPLInput (the post-boot injection channel). REPL
-// channel params write to REPLInput; default_args writes to LaunchFlags.
-// They must remain orthogonal so a manifest can use both safely.
 func TestRealize_DefaultArgs_OrthogonalToREPLChannel(t *testing.T) {
 	t.Parallel()
 	m := Manifest{
@@ -418,26 +368,15 @@ func TestRealize_DefaultArgs_OrthogonalToREPLChannel(t *testing.T) {
 	}
 }
 
-// TestRealize_DefaultArgs_EmptyTokenDefensive covers a typo'd manifest
-// declaring default_args with an empty string in the list. The dedupe
-// keeps one empty (defensive) so the realizer doesn't crash, but the
-// downstream launch helpers (driver_tmux_repl.go launchCmdLine,
-// driver_ollamatmux.go ollamaComposeLaunchCmd) treat empty tokens as
-// no-ops. This pins that contract at the realizer level.
 func TestRealize_DefaultArgs_EmptyTokenDefensive(t *testing.T) {
 	t.Parallel()
 	m := Manifest{CLI: "typo", DefaultArgs: []string{"", "--real", ""}}
 	got := Realize(m, LaunchIntent{})
-	// Dedupe collapses the two empties to one. The downstream join paths
-	// drop empties — the realizer's job is just to not crash on them.
 	if len(got.LaunchFlags) != 2 || got.LaunchFlags[1] != "--real" {
 		t.Fatalf("empty + real tokens; got %v (want a 2-elem slice with --real)", got.LaunchFlags)
 	}
 }
 
-// --- small test helpers ----------------------------------------------------
-
-// sameFlags reports whether got and want contain the same tokens (order-insensitive).
 func sameFlags(got, want []string) bool {
 	if len(got) != len(want) {
 		return false

@@ -5788,3 +5788,13 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // and the scan disables for the rest of the phase (exactly ONE probe, not one
 // per tick).
 ```
+
+## comment-zero bridge-2
+
+### `go/internal/bridge/tmux_inject.go:25` — above `func channelEnabled(deps Deps) bool {`
+
+```text
+// channelEnabled reports whether the live bidirectional channel (ADR-0037) is
+// on: the channel is implied by the recovery stage (enforce → on; off/shadow
+// → off, byte-identical).
+```

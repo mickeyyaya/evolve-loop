@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/keyspec"
 )
 
-// emitChannelBreadcrumb writes one structured channel marker to w; an empty
-// corrID is a no-op so non-correlated injects add no noise.
 func emitChannelBreadcrumb(w io.Writer, channel, corrID string) {
 	if corrID == "" {
 		return
@@ -22,18 +20,10 @@ func emitChannelBreadcrumb(w io.Writer, channel, corrID string) {
 	fmt.Fprintf(w, "{\"evolve_channel\":%q,\"corr_id\":%q}\n", channel, corrID)
 }
 
-// channelEnabled reports whether the live bidirectional channel (ADR-0037) is
-// on: the channel is implied by the recovery stage (enforce → on; off/shadow
-// → off, byte-identical).
 func channelEnabled(deps Deps) bool {
 	return channel.Enabled(recoveryStageFromEnv(deps))
 }
 
-// injectEnvelope delivers one live-injection envelope into the running REPL.
-// command/nudge/system_rule are idle-gated and re-queued (bounded by
-// maxInjectDefer) when the agent isn't at the prompt; interrupt sends ESC
-// first then injects regardless of state; keystroke sends raw tmux key
-// tokens with no gating, no ESC prefix, and no Enter suffix.
 func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, env inbox.Envelope) string {
 	pfx := "[" + lp.name + "]"
 	if env.Kind == inbox.KindKeystroke {
@@ -50,12 +40,11 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 	if env.Kind == inbox.KindInterrupt {
 		_ = deps.Tmux.SendKeys(ctx, lp.session, "Escape", false)
 		deps.Sleep(injectInterruptSettle)
-		_ = injectText(ctx, cfg, deps, lp.session, env.Body) // fire-and-forget live injection
+		_ = injectText(ctx, cfg, deps, lp.session, env.Body)
 		fmt.Fprintf(deps.Stderr, "%s injected interrupt (source=%s)\n", pfx, env.Source)
 		return ""
 	}
 
-	// Idle-gated kinds: only inject when the agent is waiting at the prompt.
 	pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 	if !strings.Contains(pane, lp.promptMarker) {
 		if env.DeferCount >= maxInjectDefer {
@@ -73,7 +62,7 @@ func injectEnvelope(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch, 
 	if env.Kind == inbox.KindSystemRule {
 		body = "## Rules\n" + body
 	}
-	_ = injectText(ctx, cfg, deps, lp.session, body) // fire-and-forget live injection
+	_ = injectText(ctx, cfg, deps, lp.session, body)
 	fmt.Fprintf(deps.Stderr, "%s injected %s (source=%s)\n", pfx, env.Kind, env.Source)
 	return env.CorrID
 }

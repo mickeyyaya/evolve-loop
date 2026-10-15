@@ -8,19 +8,10 @@ import (
 	"time"
 )
 
-// WallCorroborator reports whether the CLI family is REALLY walled, via a
-// check independent of pane content. true = wall corroborated (escalate);
-// false = provider answered (suppress the pane match as content-induced).
 type WallCorroborator func(ctx context.Context, cli string) bool
 
-// wallProbeTimeout bounds one corroboration probe. Var: the hung-probe
-// contract is test-pinned. A provider that cannot answer one token within
-// this budget is walled in every sense that matters to a dispatch.
 var wallProbeTimeout = 60 * time.Second
 
-// wallProbeRecipes is the per-family probe DATA: the cheapest one-shot
-// headless request each CLI supports. Families without an entry cannot be
-// corroborated and stay conservative (walled=true — legacy behavior).
 var wallProbeRecipes = map[string]struct {
 	argv  []string
 	stdin string
@@ -29,14 +20,9 @@ var wallProbeRecipes = map[string]struct {
 	"codex":  {argv: []string{"codex", "exec", "-"}, stdin: "reply with exactly: OK"},
 }
 
-// DefaultWallCorroborator builds the production strategy over the given
-// runner. One probe per call; success (rc=0) is proof of service. Probe
-// errors, non-zero exits, and deadline expiry all corroborate the wall —
-// the conservative direction (a missed suppression merely fails over, the
-// pre-fix behavior; a missed wall would burn the artifact window).
 func DefaultWallCorroborator(run CmdRunner, log io.Writer) WallCorroborator {
 	if run == nil {
-		run = execRunner // production subprocess seam (withDefaults precedent)
+		run = execRunner
 	}
 	if log == nil {
 		log = io.Discard
@@ -45,7 +31,7 @@ func DefaultWallCorroborator(run CmdRunner, log io.Writer) WallCorroborator {
 		binary := driverBinary(cli)
 		recipe, ok := wallProbeRecipes[binary]
 		if !ok {
-			return true // no recipe — cannot corroborate, stay conservative
+			return true
 		}
 		pctx, cancel := context.WithTimeout(ctx, wallProbeTimeout)
 		defer cancel()
@@ -62,10 +48,6 @@ func DefaultWallCorroborator(run CmdRunner, log io.Writer) WallCorroborator {
 	}
 }
 
-// wallCorroborated is the shared site decision: nil corroborator preserves
-// the legacy verdict (pane match = wall); otherwise the strategy decides.
-// Both fast-fail sites (the autorespond tick and the stop-review checkpoint)
-// route through here so their semantics can never drift.
 func wallCorroborated(ctx context.Context, corroborate WallCorroborator, cli string) bool {
 	if corroborate == nil {
 		return true
@@ -73,20 +55,12 @@ func wallCorroborated(ctx context.Context, corroborate WallCorroborator, cli str
 	return corroborate(ctx, cli)
 }
 
-// checkpointWallState carries the stop-review site's one-probe latch,
-// extracted from runTmuxREPL's checkpoint block because the site's logic
-// needed a direct test — inline it was untestable without contriving a pane
-// the fast poll cannot see first.
 type checkpointWallState struct {
 	suppressed bool
 	probed     bool
 	confirmed  bool
 }
 
-// decide consumes one gate observation. escalate=true means the wall is
-// corroborated (site returns rc 85); suppressNow=true exactly once, on the
-// healthy verdict, so the caller logs the suppression a single time. The
-// probe runs at most ONCE for the lifetime of the state, whatever it answers.
 func (st *checkpointWallState) decide(ctx context.Context, corroborate WallCorroborator, cli string, gateCrossed bool) (escalate, suppressNow bool) {
 	if st.suppressed || !gateCrossed {
 		return false, false

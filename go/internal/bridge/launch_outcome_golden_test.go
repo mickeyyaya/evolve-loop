@@ -17,14 +17,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// launchGoldenCodes is every exit the classifier distinguishes plus one
-// unknown (42) and the signal death (-1).
 var launchGoldenCodes = []int{0, 2, 3, 10, 80, 81, 85, 86, 99, 124, 127, -1, 42}
 
 var launchGoldenFixtures = []string{"empty", "first-bridge-line", "last-line-only", "marker-submit-wedged", "marker-prose", "long-line", "long-marker"}
 
-// launchOutcomeRow is one golden row: (code, ctx, stderr fixture) → what
-// Launch returned and what the ledger recorded.
 type launchOutcomeRow struct {
 	Code      int    `json:"code"`
 	Ctx       string `json:"ctx"`
@@ -34,7 +30,6 @@ type launchOutcomeRow struct {
 	CauseCode string `json:"cause_code"`
 }
 
-// launchSentinelOf names which port sentinel err wraps.
 func launchSentinelOf(err error) string {
 	switch {
 	case err == nil:
@@ -47,7 +42,6 @@ func launchSentinelOf(err error) string {
 	return "plain"
 }
 
-// launchCtx returns a live or an already-cancelled context.
 func launchCtx(state string) context.Context {
 	if state == "live" {
 		return context.Background()
@@ -57,10 +51,6 @@ func launchCtx(state string) context.Context {
 	return ctx
 }
 
-// launchThroughFixture drives one scripted launch through the real
-// Engine.Launch on a fresh workspace (or req.Workspace when a test prepared
-// one) and returns the response, the workspace and the error; deps are the
-// caller's (Now/Signals/BootTimeoutStore), defaulted hermetic.
 func launchThroughFixture(t *testing.T, ctx context.Context, deps Deps, script []string, req core.BridgeRequest) (core.BridgeResponse, string, error) {
 	t.Helper()
 	ensureLaunchFixtureDriver(t)
@@ -83,7 +73,6 @@ func launchThroughFixture(t *testing.T, ctx context.Context, deps Deps, script [
 	return resp, ws, err
 }
 
-// lastLedgerRecord reads the attempt ledger's last row.
 func lastLedgerRecord(t *testing.T, ws string) llmcalls.Record {
 	t.Helper()
 	res, err := llmcalls.ReadWorkspace(ws)
@@ -93,7 +82,6 @@ func lastLedgerRecord(t *testing.T, ws string) llmcalls.Record {
 	return res.Records[len(res.Records)-1]
 }
 
-// goldenJSON compares got with the committed golden, capturing it when absent.
 func goldenJSON(t *testing.T, path string, got any) {
 	t.Helper()
 	want, err := os.ReadFile(path)
@@ -122,8 +110,6 @@ func goldenJSON(t *testing.T, path string, got any) {
 	}
 }
 
-// The err carries no temp path today (the fixtures are path-free) — templated anyway so a future fixture
-// can't leak one.
 func TestLaunchOutcome_Golden_Capture(t *testing.T) {
 	var rows []launchOutcomeRow
 	for _, code := range launchGoldenCodes {
@@ -169,10 +155,6 @@ func TestLaunchArgs_Golden_FullArgvVector(t *testing.T) {
 	}
 }
 
-// launchStreamPaths enumerates the Launch paths whose signal sequence the
-// stream golden pins: the exit, the ctx state, whether the artifact is
-// readable on exit 0, whether the boot-strike store is writable, and whether
-// the launch-error file can be persisted.
 type launchStreamPath struct {
 	name, ctx    string
 	code         int
@@ -195,10 +177,6 @@ var launchStreamPaths = []launchStreamPath{
 	{name: "-1-live", ctx: "live", code: -1},
 }
 
-// brokenBootStrikeStore returns a clihealth.Store whose <root>/.evolve is a
-// regular FILE: withLock's MkdirAll fails with ENOTDIR before Load runs, so
-// both ClearBootStrike and RecordBootStrike return an error deterministically
-// (a directory at the store path degrades to an empty map and a nil no-op).
 func brokenBootStrikeStore(t *testing.T) *clihealth.Store {
 	t.Helper()
 	root := t.TempDir()
@@ -208,7 +186,6 @@ func brokenBootStrikeStore(t *testing.T) *clihealth.Store {
 	return clihealth.NewStore(root, nil)
 }
 
-// signalSequence renders the ordered {module, kind, code} of every event.
 func signalSequence(events []signalcenter.Event) []string {
 	out := []string{}
 	for _, e := range events {
@@ -217,9 +194,6 @@ func signalSequence(events []signalcenter.Event) []string {
 	return out
 }
 
-// runLaunchStreamPath drives one path under a recording Center and returns
-// the ordered sequence (the construction-time BRIDGE_TOKEN_RESOLVER_MISSING is
-// the first entry of every path: the fixture engine has no TokenResolver).
 func runLaunchStreamPath(t *testing.T, p launchStreamPath) []string {
 	t.Helper()
 	c, got := recordingSignals()
@@ -235,7 +209,6 @@ func runLaunchStreamPath(t *testing.T, p launchStreamPath) []string {
 	}
 	req := core.BridgeRequest{Agent: "build", Cycle: 3, RunID: "run-3"}
 	if p.launchErrDir {
-		// The persist target pre-exists as a directory in a prepared workspace: the write fails, the launch does not.
 		req.Workspace = t.TempDir()
 		if err := os.MkdirAll(filepath.Join(req.Workspace, "build-launch-error.txt"), 0o755); err != nil {
 			t.Fatal(err)
@@ -245,7 +218,6 @@ func runLaunchStreamPath(t *testing.T, p launchStreamPath) []string {
 	return signalSequence(*got)
 }
 
-// A commit that changes this golden's signal sequence carries the diff as its own declaration of the change.
 func TestEngineLaunch_SignalStream_Golden(t *testing.T) {
 	got := map[string][]string{}
 	for _, p := range launchStreamPaths {
@@ -254,8 +226,6 @@ func TestEngineLaunch_SignalStream_Golden(t *testing.T) {
 	goldenJSON(t, filepath.Join("testdata", "launch-signals.golden.json"), got)
 }
 
-// TestLaunchOutcome_GoldenRowsCoverEveryCodeCtxAndFixture keeps the oracle
-// honest about its own shape: 13 codes × 2 contexts × 7 fixtures.
 func TestLaunchOutcome_GoldenRowsCoverEveryCodeCtxAndFixture(t *testing.T) {
 	t.Parallel()
 	data, err := os.ReadFile(filepath.Join("testdata", "launch-outcome.golden.json"))

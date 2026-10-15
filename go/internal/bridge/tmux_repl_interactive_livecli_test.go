@@ -24,10 +24,6 @@ func claudeLiveSpec(t *testing.T) liveCLISpec {
 	return liveCLISpec{}
 }
 
-// assertMenuAutoAnswered drives real claude to an AskUserQuestion menu and
-// asserts the auto-responder submitted it — proving the workflow continues
-// without hanging for human input. Reads the final scrollback the deferred
-// tmux cleanup captures (written even on the EC81 short-timeout path).
 func assertMenuAutoAnswered(t *testing.T, prompt string) {
 	t.Helper()
 	sp := claudeLiveSpec(t)
@@ -43,24 +39,18 @@ func assertMenuAutoAnswered(t *testing.T, prompt string) {
 	if err := os.WriteFile(promptFile, []byte(prompt), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	wd, _ := os.Getwd() // a real, already-trusted dir for claude to start in
+	wd, _ := os.Getwd()
 	cfg := &Config{
 		Model: "haiku", Agent: "claude-tmux", Worktree: wd, Workspace: ws,
-		PromptFile: promptFile,
-		Artifact:   filepath.Join(root, "artifact"),
-		StdoutLog:  filepath.Join(ws, "stdout.log"),
-		StderrLog:  filepath.Join(ws, "stderr.log"),
-		// The prompt has no artifact step, so the run ends at this cap, not
-		// 300s. ~45s comfortably covers boot + menu render + auto-answer +
-		// claude's acknowledgement.
+		PromptFile:       promptFile,
+		Artifact:         filepath.Join(root, "artifact"),
+		StdoutLog:        filepath.Join(ws, "stdout.log"),
+		StderrLog:        filepath.Join(ws, "stderr.log"),
 		ArtifactTimeoutS: 45,
 	}
 	sess := fmt.Sprintf("evolve-bridge-liveint-%d", os.Getpid())
 	defer func() { _ = execTmux{}.KillSession(context.Background(), sess) }()
 
-	// Real Deps: real tmux, real Sleep, real Now → the auto-responder ticks the
-	// artifact-wait loop and answers the menu exactly as in production. Name
-	// "claude-tmux" loads the real manifest (askuserquestion_select / _multiselect).
 	deps := Deps{Tmux: execTmux{}, Sleep: time.Sleep, Now: time.Now}.withDefaults()
 	lp := tmuxLaunch{
 		name: sp.name, session: sess, launchCmd: sp.launchCmd,
@@ -72,9 +62,6 @@ func assertMenuAutoAnswered(t *testing.T, prompt string) {
 		t.Fatalf("runTmuxREPL err: %v", err)
 	}
 
-	// The deferred tmuxCleanup captures the final pane to this file even on the
-	// EC81 path. "User answered Claude's questions" is claude's confirmation
-	// that the AskUserQuestion was submitted → the auto-reply unblocked the REPL.
 	scrollback := readFile(t, filepath.Join(ws, "tmux-final-scrollback.txt"))
 	if !strings.Contains(scrollback, "User answered") {
 		t.Fatalf("auto-responder did not answer the menu — REPL hung on human input.\n"+

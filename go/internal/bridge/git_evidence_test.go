@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
-// fakeGit scripts the three git calls the detector makes: rev-parse HEAD (advances once per call, last
-// repeats), rev-list <base>..HEAD (commits in the range, keyed by the base SHA, newest-first), and
-// log -1 --format=%B <sha>.
 type fakeGit struct {
 	heads   []string
 	hi      int
@@ -66,13 +63,11 @@ func TestGitEvidence_ReadyOnVerifiedCommit(t *testing.T) {
 }
 
 func TestGitEvidence_FindsEvidenceWhenNotTip(t *testing.T) {
-	// Two commits land between polls: the evidence commit (sha1), then a stray commit (sha2, now HEAD).
-	// Inspecting only HEAD would re-baseline past sha1 and hang forever; the range walk must find it.
 	t.Parallel()
 	good := "build done\n" + evidence.Trailer{Phase: "build", Challenge: "tok"}.Build()
 	g := &fakeGit{
 		heads:   []string{"sha0", "sha2"},
-		revlist: map[string][]string{"sha0": {"sha2", "sha1"}}, // newest-first
+		revlist: map[string][]string{"sha0": {"sha2", "sha1"}},
 		msgs:    map[string]string{"sha2": "chore: stray commit\n", "sha1": good},
 	}
 	d := &gitEvidenceDetector{phase: "build", expectedTok: "tok", gitCmd: g.cmd}
@@ -110,8 +105,6 @@ func TestGitEvidence_NotReadyWrongToken(t *testing.T) {
 }
 
 func TestGitEvidence_EmptyTokenNeverVerifies(t *testing.T) {
-	// Fail-closed: an empty expected token (challenge-token.txt missing) must
-	// never complete, even for a commit carrying the right phase.
 	t.Parallel()
 	msg := "x\n" + evidence.Trailer{Phase: "scout", Challenge: "anything"}.Build()
 	g := &fakeGit{
@@ -159,7 +152,7 @@ func TestNewGitEvidenceDetector_MissingTokenWarns(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
 	deps := Deps{Stderr: &stderr}.withDefaults()
-	deps.Stderr = &stderr // withDefaults keeps a non-nil Stderr; pin our buffer
+	deps.Stderr = &stderr
 	d := newGitEvidenceDetector(&Config{Workspace: t.TempDir(), Agent: "scout"}, deps)
 	if d.expectedTok != "" {
 		t.Errorf("expectedTok = %q, want empty when token file absent", d.expectedTok)
