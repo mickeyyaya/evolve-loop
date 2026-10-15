@@ -22,8 +22,6 @@ var phasePlanMarshal = json.MarshalIndent
 var failureDecide = failureadapter.Decide
 
 func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs CycleState, seq int, retroVerdict string, history []FailedRecord, in router.RouteInput) (Phase, map[string]string, string, *SystemFailureSignal) {
-	// The reason string's prefix ("proceed:"/"retry-with-fallback:"/…) is
-	// grepped by dashboards and scenario pins, so it must stay stable.
 	detNext, extraEnv, detReason, sig := o.decideAfterRetro(cs, retroVerdict, history)
 	if sig != nil {
 		return PhaseEnd, nil, detReason, sig
@@ -56,14 +54,14 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	}
 	o.recordRoutingDecision(ctx, cycle, cs, seq, rdec)
 	if branch == detNext {
-		return branch, extraEnv, detReason, nil // advisor agrees; keep the contract string
+		return branch, extraEnv, detReason, nil
 	}
 	return branch, extraEnv, "retro-routed: " + rdec.Reason, nil
 }
 
 func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict string) *SystemFailureSignal {
 	d := buildFailureDossier(cs, retroVerdict, o.failurePolicy)
-	_ = writeFailureDossier(cs.WorkspacePath, d) // per-cycle forensics; best-effort
+	_ = writeFailureDossier(cs.WorkspacePath, d)
 
 	if d.FloorCandidate != "" && o.failurePolicy.IsFloor(d.FloorCandidate) {
 		return &SystemFailureSignal{
@@ -128,7 +126,7 @@ func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, hist
 		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseTDD), dec.SetEnv, "retry-with-fallback: " + dec.Reason, nil
 	case failureadapter.ActionBlockCode, failureadapter.ActionBlockOperatorAction:
 		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseEnd), nil, string(dec.Action) + ": " + dec.Reason, nil
-	default: // ActionProceed
+	default:
 		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseEnd), dec.SetEnv, "proceed: " + dec.Reason, nil
 	}
 }
@@ -150,9 +148,6 @@ func (o *Orchestrator) decideAfterDebugger(resp PhaseResponse) Phase {
 	case "RESHIP":
 		return o.recoveryTarget(PhaseDebugger, "RESHIP", PhaseShip)
 	case "RERUN_PHASE":
-		// Rerun targets clamp to upstream phases (audit/build/tdd): re-shipping
-		// is the dedicated RESHIP action, so "rerun_phase: ship" must not become
-		// a reship that skips re-establishing the precondition.
 		rerun, _ := resp.Signals["debugger.rerun_phase"].(string)
 		switch o.candidatePhase(rerun) {
 		case PhaseAudit:
@@ -164,7 +159,7 @@ func (o *Orchestrator) decideAfterDebugger(resp PhaseResponse) Phase {
 		default:
 			return o.recoveryTarget(PhaseDebugger, "RERUN_PHASE", PhaseAudit)
 		}
-	default: // BLOCK, empty, unknown
+	default:
 		return o.recoveryTarget(PhaseDebugger, "BLOCK", PhaseEnd)
 	}
 }
@@ -266,8 +261,6 @@ func (o *Orchestrator) recordPlanRejectionsKind(ctx context.Context, cycle int, 
 	if kind != "" && kind != "plan" {
 		name = "advisor-rejections-" + kind + ".json"
 	}
-	// nil marshals identically to an empty slice, but writing "[]" distinguishes
-	// a validated-clean plan from validation never having run.
 	if rejections == nil {
 		rejections = []router.PlanRejection{}
 	}

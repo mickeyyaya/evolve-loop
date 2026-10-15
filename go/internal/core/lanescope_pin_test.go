@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// writeLaneScopeFixture writes <workspace>/lane-scope.json the way the fleet
-// supervisor is contracted to (raw JSON on purpose — the fixture must pin the
-// on-disk schema, not whatever helper the implementation ends up with).
 func writeLaneScopeFixture(t *testing.T, workspace string, todoIDs []string, goalHash string) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -28,11 +25,9 @@ func writeLaneScopeFixture(t *testing.T, workspace string, todoIDs []string, goa
 	}
 }
 
-// scoutReportRunner is a scout fake that writes a scout-report.md carrying a
-// Decision Trace goal_hash — the artifact the coherence gate must parse.
 type scoutReportRunner struct {
 	fakeRunner
-	goalHash string // "" ⇒ write a report WITHOUT a goal_hash key
+	goalHash string
 }
 
 func (s *scoutReportRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
@@ -89,7 +84,7 @@ func TestLaneScopePin_TwoLanesSeeOnlyOwnScope(t *testing.T) {
 		cycle     int
 		ownScope  string
 		ownGoal   string
-		driftEnv  string // the OTHER lane's scope, leaked via env
+		driftEnv  string
 	}{
 		{lastCycle: 10, cycle: 11, ownScope: "todo-lane-a", ownGoal: "goal-a", driftEnv: "todo-lane-b"},
 		{lastCycle: 20, cycle: 21, ownScope: "todo-lane-b", ownGoal: "goal-b", driftEnv: "todo-lane-a"},
@@ -170,8 +165,6 @@ func TestLaneScopePin_ScoutGoalHashMismatchNormalizesAndProceeds(t *testing.T) {
 
 	root := t.TempDir()
 	ws := RunWorkspacePath(root, 1)
-	// pinGoalHash / misGoalHash (defined in lanescope_normalize_test.go) mirror
-	// a one-digit transcription flip, the shape the machine-stamp guard reconciles.
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 
 	runners := buildRunners(nil)
@@ -220,7 +213,7 @@ func TestLaneScopePin_ScoutReportWithoutGoalHashProceeds(t *testing.T) {
 	writeLaneScopeFixture(t, RunWorkspacePath(root, 1), []string{"todo-a"}, "goal-1")
 
 	runners := buildRunners(nil)
-	runners[PhaseScout] = &scoutReportRunner{fakeRunner: fakeRunner{name: string(PhaseScout)}} // no goal_hash key
+	runners[PhaseScout] = &scoutReportRunner{fakeRunner: fakeRunner{name: string(PhaseScout)}}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
 	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "goal-1"})
 	if err != nil {

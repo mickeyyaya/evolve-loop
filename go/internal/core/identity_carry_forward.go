@@ -13,12 +13,8 @@ import (
 
 var identityPatchID = compositionPatchID
 
-// identicalRebaseMethod is the carry record's method; cmd pins it equal to the ledger adapter's constant.
 const identicalRebaseMethod = "identical-rebase"
 
-// identityCarryForward is ADR-0105 B3. After the rebind proved the pended change identical, it proves the
-// same on the trees, runs the composed-tree gates under the fence, records the carry and lets ship take the
-// audited verdict; any doubt returns false and the change is audited again.
 func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs CycleState, base0, projectRoot string) bool {
 	if !o.CompositionFastPathWired() || cs.ActiveWorktree == "" {
 		return false
@@ -84,8 +80,6 @@ func (o *Orchestrator) carriedAudit(ctx context.Context, runID, base0 string) (a
 	}
 }
 
-// gatesOnIntactTree runs the composed-tree gates under the fence and reports them only when the tree they ran on
-// is the tree ship will commit.
 func (o *Orchestrator) gatesOnIntactTree(ctx context.Context, worktree, tree string) (map[string]string, map[string]ciparity.GateOutcome, bool) {
 	fence := treefence.Begin(ctx, worktree, true)
 	gates, outcomes := o.runGateSet(ctx, worktree)

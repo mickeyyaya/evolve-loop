@@ -2,7 +2,6 @@ package core
 
 import "testing"
 
-// fixedCounter is a minimal RecurrenceCounter: every fingerprint has count n.
 type fixedCounter struct{ n int }
 
 func (f fixedCounter) Count(string) int { return f.n }

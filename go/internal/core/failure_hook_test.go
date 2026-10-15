@@ -52,7 +52,6 @@ func TestPhaseRecovery_ShadowDefault_NoCorrectiveAction(t *testing.T) {
 	writeEscalation(t, ws, "build", "⚠ some never-seen fatal pane state, definitely novel")
 	fa := &fakeAdviser{advice: &recovery.FailureAdvice{Cause: "dead_shell", PaneSubstr: "never-seen fatal pane", Justification: "j"}}
 
-	// Shadow (the program default) AND off must both keep the advisor cold.
 	for _, stage := range []config.Stage{config.StageShadow, config.StageOff} {
 		o := hookOrchestrator(t, stage, fa)
 		o.adviseOnUnclassifiedFailure(context.Background(), 1, ws, root, PhaseBuild, wrapTimeout(), nil)
@@ -82,8 +81,6 @@ func TestPhaseRecovery_Enforce_AdvisesAndPromotes(t *testing.T) {
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("validated advice must be promoted durably; entries=%d err=%v", len(entries), err)
 	}
-	// A second occurrence must be caught deterministically — zero further
-	// advisor calls.
 	o.adviseOnUnclassifiedFailure(context.Background(), 263, ws, root, PhaseBuild, wrapTimeout(), nil)
 	if fa.calls != 1 {
 		t.Fatalf("the promoted signature must make the second occurrence deterministic; advisor called %d time(s)", fa.calls)
@@ -94,8 +91,6 @@ func TestPhaseRecovery_Enforce_KnownPaneSkipsAdvisor(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	ws := filepath.Join(root, "ws")
-	// A real claude pane the registry already seeds, so it must classify
-	// deterministically.
 	writeEscalation(t, ws, "retro", "⏺ There's an issue with the selected model (auto). It may not exist.")
 	fa := &fakeAdviser{advice: &recovery.FailureAdvice{Cause: "model_invalid", PaneSubstr: "irrelevant long substring", Justification: "j"}}
 	o := hookOrchestrator(t, config.StageEnforce, fa)
@@ -113,7 +108,6 @@ func TestPhaseRecovery_Enforce_AdvisorErrorIsBestEffort(t *testing.T) {
 	writeEscalation(t, ws, "build", "⚠ some never-seen fatal pane state, definitely novel")
 	fa := &fakeAdviser{err: wrapTimeout()}
 	o := hookOrchestrator(t, config.StageEnforce, fa)
-	// Must not panic, must not promote.
 	o.adviseOnUnclassifiedFailure(context.Background(), 1, ws, root, PhaseBuild, wrapTimeout(), nil)
 	if entries, _ := os.ReadDir(fatalSignaturesDir(root)); len(entries) != 0 {
 		t.Fatal("an advisor failure must promote nothing (escalate only)")

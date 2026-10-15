@@ -24,8 +24,6 @@ func judgmentLessonTodos(cr *cycleRun, phase Phase) []CarryoverTodo {
 	return out
 }
 
-// renderPersistedPlannerContext crosses the same storage-to-advisor boundary
-// used by the next cycle's plan instead of rendering cr.state directly.
 func renderPersistedPlannerContext(t *testing.T, cr *cycleRun) (string, State) {
 	t.Helper()
 	persisted, err := cr.o.storage.ReadState(context.Background())
@@ -72,9 +70,6 @@ func TestJudgmentLessonFullPath_PremiseChallengeSentinelFAILTeachesWithoutHaltin
 		t.Fatalf("write premise-challenge report: %v", err)
 	}
 	failedBefore := append([]FailedRecord(nil), cr.state.FailedAt...)
-	// SentinelStageEnforce obtains its FAIL from this same parser but emits no
-	// diagnostic for a matched sentinel. The production recorder must therefore
-	// recover the structured objection from this phase report.
 	action, err := cr.recordAndBranch(Phase(parsed.Phase), dispatchResult{resp: PhaseResponse{
 		Verdict: parsed.Verdict,
 	}, attemptCount: 1})
@@ -399,9 +394,6 @@ func TestJudgmentLesson_DedupedByID(t *testing.T) {
 	}
 }
 
-// TestJudgmentLesson_WiredInLockstepWithFloorRecorder is a wiring proof (it
-// greps source), not a behavioral one: a third dispatch path added later
-// must wire both recorders or fail here.
 func TestJudgmentLesson_WiredInLockstepWithFloorRecorder(t *testing.T) {
 	t.Parallel()
 
@@ -448,9 +440,6 @@ func TestJudgmentLesson_ExpiresAtSurvivesALoopPause(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ExpiresAt %q is not RFC3339: %v", todos[0].ExpiresAt, err)
 	}
-	// A week is the discriminator: the 1-day fallback bucket fails this and
-	// every long-lived classification passes; asserting behavior rather than
-	// an exact constant survives a TTL retune.
 	if minWanted := cr.o.now().UTC().Add(7 * 24 * time.Hour); got.Before(minWanted) {
 		t.Errorf("lesson expires at %s, less than a week out — a multi-day loop pause would drop it "+
 			"before Scout ever reads it (the 1-day unknown-classification fallback bucket)", got)
@@ -461,7 +450,6 @@ func TestJudgmentLesson_AuthoritativePhaseYieldsToFloorRecorder(t *testing.T) {
 	t.Parallel()
 
 	cr := retroGateHarness(t, phasespec.Catalog{})
-	// Make the judgment phase authoritative, as an operator ship_floor override would.
 	cr.o.shipFloor = []string{"premise-challenge"}
 	if !cr.o.isAuthoritativePhase(Phase("premise-challenge")) {
 		t.Skip("ship_floor override did not take effect through this harness; guard is untestable here")

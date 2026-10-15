@@ -28,11 +28,9 @@ func TestCanTerminateEarly_ConfigDriven(t *testing.T) {
 	if !sm.CanTerminateEarly(firstAnchor, false) {
 		t.Error("the discovery anchor declares early_exit — a no-ship cycle may terminate there")
 	}
-	// The shipPlanned guard (a Go invariant) always blocks early-exit.
 	if sm.CanTerminateEarly(firstAnchor, true) {
 		t.Error("a ship-intended cycle must NEVER early-exit, regardless of config")
 	}
-	// The ship terminal does not declare early_exit → cannot early-exit.
 	if sm.CanTerminateEarly(phaseFromRouter(ref.ShipTerminal()), false) {
 		t.Error("the ship terminal must not be early-exit eligible")
 	}

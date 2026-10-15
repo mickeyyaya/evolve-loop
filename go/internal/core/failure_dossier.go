@@ -1,7 +1,5 @@
 package core
 
-// See ADR-0072.
-
 import (
 	"encoding/json"
 	"os"
@@ -13,20 +11,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// auditDeclared is the audit phase's self-declared failure envelope, surfaced
-// verbatim so the orchestrator judgment layer can classify a system-class
-// fault the deterministic floor cannot catch.
-//
-// See ADR-0039.
 type auditDeclared struct {
 	Class   string   `json:"class,omitempty"`
 	Level   string   `json:"level,omitempty"`
 	Defects []string `json:"defects,omitempty"`
 }
 
-// nonProgress carries the policy thresholds (deterministic) alongside the
-// counters computed from cycle history — the raw material for the non-progress
-// system-level category.
 type nonProgress struct {
 	RepeatCeiling            int `json:"repeat_ceiling"`
 	VerifiedNotLandedCeiling int `json:"verified_not_landed_ceiling"`
@@ -35,8 +25,6 @@ type nonProgress struct {
 	RepeatCount              int `json:"repeat_count"`
 }
 
-// failureDossier is the independent-evidence packet written to
-// <workspace>/failure-dossier.json.
 type failureDossier struct {
 	CycleID         int           `json:"cycle_id"`
 	RecordedVerdict string        `json:"recorded_verdict"`
@@ -59,8 +47,6 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 		},
 	}
 
-	// The dossier builder has no ContractVerifier, so DeliverableValid stays
-	// false: reconcile is the live floor's job, not the dossier's.
 	audit, acs, auditRan := coherence.ReadCycleVerdicts(cs.WorkspacePath)
 	coh := coherence.CheckVerdictCoherence(coherence.VerdictInputs{
 		Recorded:         finalVerdict,
@@ -78,7 +64,6 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 		}
 	}
 
-	// Floor candidate: a broken pipeline cannot be talked out of these.
 	switch {
 	case coh.Incoherent && fp.IsFloor(coh.Category):
 		d.FloorCandidate = coh.Category
@@ -91,9 +76,6 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 	return d
 }
 
-// sameClassStreak counts the trailing run of history records sharing the
-// most-recent failure classification — the same-class recurrence counter the
-// non-progress category keys off. Empty history or a blank latest class → 0.
 func sameClassStreak(history []FailedRecord) int {
 	if len(history) == 0 {
 		return 0
@@ -112,9 +94,6 @@ func sameClassStreak(history []FailedRecord) int {
 	return n
 }
 
-// writeFailureDossier persists the dossier to <workspace>/failure-dossier.json.
-// Best-effort at the call site (forensics must never abort a cycle); a blank
-// workspace or nil dossier is a no-op.
 func writeFailureDossier(workspace string, d *failureDossier) error {
 	if workspace == "" || d == nil {
 		return nil

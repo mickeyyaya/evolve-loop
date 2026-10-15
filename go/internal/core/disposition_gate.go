@@ -46,15 +46,11 @@ func readDispositionLegitimacy(workspace string, cycle int) string {
 	return d.Legitimacy
 }
 
-// Disposition enum vocabularies. Out-of-vocabulary values are rejected with the
-// offending field named, so a JSON-parses-cleanly document still fails the gate.
 var (
 	validLegitimacy = map[string]bool{"legit-rejection": true, "false-rejection": true, "infra-failure": true, "indeterminate": true}
 	validLayer      = map[string]bool{"task-code": true, "pipeline-code": true, "harness": true, "infra": true, "eval-contract": true}
 	validUrgency    = map[string]bool{"P0": true, "P1": true, "P2": true, "P3": true}
-	// "console" (not "escalate") is the operator-owned routing term — one
-	// vocabulary with ADR-0074's route field and the plan-time gate.
-	validRouting = map[string]bool{"inbox": true, "carryover": true, "console": true, "drop": true}
+	validRouting    = map[string]bool{"inbox": true, "carryover": true, "console": true, "drop": true}
 )
 
 const dispositionSchemaExample = `{
@@ -70,9 +66,6 @@ const dispositionSchemaExample = `{
   "proposed_item": ""
 }`
 
-// VerifyDisposition enforces the disposition contract for a retro workspace.
-// nil means the disposition is valid and its failure identity agrees with the
-// assembler's digest.
 func VerifyDisposition(workspace string) error {
 	raw, err := os.ReadFile(filepath.Join(workspace, "disposition.json"))
 	if err != nil {

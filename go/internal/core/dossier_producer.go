@@ -40,11 +40,6 @@ func dossierVerdict(outcome string) string {
 	}
 }
 
-// writeCycleDossier builds and persists the closeout dossier for one completed
-// cycle as cycle-N.{json,md} in the corpus (knowledge-base/cycles), or in the
-// pending dir the loop publishes from, as p.Destination says. goal must be
-// non-blank; callers fall back to the goal hash when there is no human-readable
-// text. Returns an error the best-effort caller logs; it never panics.
 func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
 	d, err := dossier.Build(p.Cycle, dossier.BuildOpts{
 		WorkspacePath:      p.WorkspacePath,
@@ -55,10 +50,7 @@ func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
 		SkippedPhases:      p.SkippedPhases,
 		VerdictsNotAdopted: p.VerdictsNotAdopted,
 		SpineFailOpens:     p.SpineFailOpens,
-		// Passed explicitly, not re-read from phase-timing.json: RunCycle
-		// writes that file via a deferred call that lands after this producer
-		// runs, so reading it here would see no phases.
-		PhaseTimings: p.PhaseTimings,
+		PhaseTimings:       p.PhaseTimings,
 	})
 	if err != nil {
 		return fmt.Errorf("build dossier: %w", err)

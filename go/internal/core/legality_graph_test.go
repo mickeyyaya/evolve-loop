@@ -76,10 +76,6 @@ func TestOrchestrator_UnsafeLegalGraphFailsClosed(t *testing.T) {
 	}
 }
 
-// SpineFloor is dialed to shadow here because this test's fake runners write
-// no artifacts, which the spine floor would otherwise abort on — that would
-// test the floor, not this validator. Only ValidateSafetyInvariants accepting
-// the reference config is pinned here.
 func TestOrchestrator_SafeConfigRunsNormally(t *testing.T) {
 	t.Parallel()
 
