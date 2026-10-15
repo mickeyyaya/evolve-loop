@@ -80,6 +80,12 @@ func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
+func cycleResetRootWarner(stderr io.Writer) func(string) {
+	return func(m string) {
+		fmt.Fprintf(stderr, "evolve cycle reset: WARN: %s\n", m)
+	}
+}
+
 func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle reset", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -98,9 +104,7 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
-	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
-		fmt.Fprintf(stderr, "evolve cycle reset: WARN: %s\n", m)
-	})
+	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, cycleResetRootWarner(stderr))
 	if evolveDir == "" {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}

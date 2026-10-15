@@ -25,6 +25,10 @@ func runContextFill(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 }
 
 func writeReportAtomic(path, content string) error {
+	return writeReportAtomicWith(os.Rename, path, content)
+}
+
+func writeReportAtomicWith(rename func(string, string) error, path, content string) error {
 	if fi, err := os.Lstat(path); err == nil && !fi.Mode().IsRegular() {
 		return fmt.Errorf("refusing to write %s: not a regular file (mode %s)", path, fi.Mode())
 	} else if err != nil && !os.IsNotExist(err) {
@@ -34,7 +38,7 @@ func writeReportAtomic(path, content string) error {
 	if err := os.WriteFile(tmp, []byte(content), 0o644); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}

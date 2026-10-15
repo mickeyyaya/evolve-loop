@@ -158,8 +158,12 @@ func sortAndLimitCarryoverItems(items []carryoverListItem, sortMode string, limi
 }
 
 func renderCarryoverItems(items []carryoverListItem, jsonOutput bool, stdout, stderr io.Writer) int {
+	return renderCarryoverItemsWith(json.MarshalIndent, items, jsonOutput, stdout, stderr)
+}
+
+func renderCarryoverItemsWith(marshalIndent func(any, string, string) ([]byte, error), items []carryoverListItem, jsonOutput bool, stdout, stderr io.Writer) int {
 	if jsonOutput {
-		raw, err := json.MarshalIndent(items, "", "  ")
+		raw, err := marshalIndent(items, "", "  ")
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve carryover: %v\n", err)
 			return 1
