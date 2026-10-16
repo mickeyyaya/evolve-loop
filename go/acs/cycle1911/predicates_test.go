@@ -27,6 +27,20 @@ const (
 
 var agyChain = []string{"agy-tmux", "agy-claude-tmux", "claude-tmux"}
 
+func TestMain(m *testing.M) {
+	emptyCatalogDir, err := os.MkdirTemp("", "acs-cycle1911-catalog-")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "mktemp for the empty model catalog: %v\n", err)
+		os.Exit(1)
+	}
+	bridge.SetModelCatalogDirFn(func() string { return emptyCatalogDir })
+	code := m.Run()
+	if err := os.RemoveAll(emptyCatalogDir); err != nil {
+		fmt.Fprintf(os.Stderr, "remove the empty model catalog %s: %v\n", emptyCatalogDir, err)
+	}
+	os.Exit(code)
+}
+
 func fixedNow() time.Time { return time.Date(2026, 10, 17, 2, 17, 0, 0, time.UTC) }
 
 func seatPlan(tier string) llmroute.Plan {
