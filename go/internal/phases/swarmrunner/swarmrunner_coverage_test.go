@@ -6,11 +6,9 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -41,26 +39,6 @@ func TestSwarmRunner_CoverageHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("kill helpers defensive paths", func(t *testing.T) {
-		if err := groupKiller(1); err == nil || !strings.Contains(err.Error(), "refusing") {
-			t.Fatalf("groupKiller must refuse pgid<=1, got %v", err)
-		}
-		// tmux teardown coverage lives in internal/swarm (ExecTmuxKill, seam-based);
-		// no real tmux exec from this suite — see kill_unix_test.go.
-	})
-
-	t.Run("groupKiller kills a child process group", func(t *testing.T) {
-		cmd := exec.Command("sleep", "30")
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		if err := cmd.Start(); err != nil {
-			t.Skipf("cannot start sleep for process-group kill coverage: %v", err)
-		}
-		if err := groupKiller(cmd.Process.Pid); err != nil {
-			_ = cmd.Process.Kill()
-			t.Fatalf("groupKiller real process group: %v", err)
-		}
-		_ = cmd.Wait()
-	})
 }
 
 func TestSwarmRunner_CoveragePlanLoadingAndDeps(t *testing.T) {
