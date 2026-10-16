@@ -16,7 +16,7 @@ func (f fakeSecondaryHooks) SecondaryArtifacts(_ core.PhaseRequest) []string { r
 
 func TestSecondaryArtifactsProvider_FeedsResolutionGlue(t *testing.T) {
 	want := []string{filepath.Join("ws", "disposition.json")}
-	var _ SecondaryArtifactsProvider = fakeSecondaryHooks{} // named interface binding
+	var _ SecondaryArtifactsProvider = fakeSecondaryHooks{}
 
 	got := secondaryArtifacts(fakeSecondaryHooks{paths: want}, core.PhaseRequest{})
 	if len(got) != 1 || got[0] != want[0] {

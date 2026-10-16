@@ -7,10 +7,6 @@ import (
 	"unicode/utf8"
 )
 
-// SanitizeField is the unquoted twin of DiagnosticField: the same UTF-8 repair
-// and rune cap (ONE rule, shared), with control characters and line separators
-// replaced by a space instead of escaped — for values that land inside a JSON
-// string or a single-line log record (the Signal Center's fields, ADR-0101).
 func TestSanitizeField_SharesTheBoundWithDiagnosticFieldAndStripsControls(t *testing.T) {
 	t.Parallel()
 	in := "line\nbreak\ttab\x1b[31mred sep\xffbad"
@@ -26,7 +22,6 @@ func TestSanitizeField_SharesTheBoundWithDiagnosticFieldAndStripsControls(t *tes
 	if utf8.RuneCountInString(capped) != maxDiagnosticRunes || !strings.HasSuffix(capped, "…") {
 		t.Errorf("rune-capped at %d with an ellipsis, got %d runes", maxDiagnosticRunes, utf8.RuneCountInString(capped))
 	}
-	// The quoted twin bounds identically: DiagnosticField(x) == QuoteToASCII(bounded x).
 	if DiagnosticField(long) != strconv.QuoteToASCII(capped) {
 		t.Error("DiagnosticField and SanitizeField must share the same bound")
 	}

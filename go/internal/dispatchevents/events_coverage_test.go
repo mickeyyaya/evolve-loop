@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// TestEmit_MarshalError covers the marshalFn error branch. json.Marshal
-// of our well-typed Event struct can't fail in practice; the seam lets
-// us prove the defensive error wrapping works.
 func TestEmit_MarshalError(t *testing.T) {
 	prev := marshalFn
 	defer func() { marshalFn = prev }()
@@ -25,8 +22,6 @@ func TestEmit_MarshalError(t *testing.T) {
 	}
 }
 
-// TestEmit_WriteError covers the writeFn error branch (rare; would
-// fire on disk-full or pipe-closed).
 func TestEmit_WriteError(t *testing.T) {
 	prev := writeFn
 	defer func() { writeFn = prev }()

@@ -13,7 +13,7 @@ import (
 
 func TestRunnerMissingProfile_NoProfilesDir(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir() // no .evolve/profiles inside
+	root := t.TempDir()
 	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "auto", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "# build artifact\n## Files Modified\n- a.go\n"}
 	r := New(Options{
@@ -69,7 +69,6 @@ func TestRunnerMissingProfile_AgentNameStripping(t *testing.T) {
 	if err := os.MkdirAll(profileDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Write "scout.json" (not "evolve-scout.json") — proves the prefix strip.
 	profileContent := `{"name":"scout","role":"scout","cli":"claude-tmux"}`
 	if err := os.WriteFile(filepath.Join(profileDir, "scout.json"), []byte(profileContent), 0o644); err != nil {
 		t.Fatal(err)

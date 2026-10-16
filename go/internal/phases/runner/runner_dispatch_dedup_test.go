@@ -52,7 +52,7 @@ func TestRunnerDispatch_CallsLlmrouteDispatch(t *testing.T) {
 				resp: core.BridgeResponse{ExitCode: 80, Stderr: "REPL boot timeout"},
 				err:  errors.New("bridge: launch exit=80"),
 			},
-			"claude-tmux": {}, // empty = success
+			"claude-tmux": {},
 		},
 	}
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})

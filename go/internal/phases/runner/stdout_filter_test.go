@@ -124,7 +124,6 @@ func TestRun_StdoutFilter_E2E_WritesCompanionFile(t *testing.T) {
 		Bridge:  &fakeBridge{writeArtifact: "ok\n"},
 		Prompts: fakePromptsFS("evolve-builder", "body"),
 		NowFn:   fixtures.FixedClock(time.Unix(1, 0), time.Millisecond),
-		// StdoutFilter is unset, so the real logfilter.Process runs.
 	})
 
 	if _, err := r.Run(context.Background(), core.PhaseRequest{

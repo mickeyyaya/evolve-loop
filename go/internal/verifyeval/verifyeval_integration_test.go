@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// TestDefaultRunner_Success — /bin/true exits 0 cleanly.
 func TestDefaultRunner_Success(t *testing.T) {
 	if _, err := os.Stat("/bin/true"); err != nil {
 		t.Skip("/bin/true not present")
@@ -26,7 +25,6 @@ func TestDefaultRunner_Success(t *testing.T) {
 	}
 }
 
-// TestDefaultRunner_NonZeroExit — /bin/false maps to exit 1, err nil.
 func TestDefaultRunner_NonZeroExit(t *testing.T) {
 	if _, err := os.Stat("/bin/false"); err != nil {
 		t.Skip("/bin/false not present")
@@ -40,7 +38,6 @@ func TestDefaultRunner_NonZeroExit(t *testing.T) {
 	}
 }
 
-// TestDefaultRunner_StdoutCaptured — echo writes to stdout buffer.
 func TestDefaultRunner_StdoutCaptured(t *testing.T) {
 	stdout, _, _, err := DefaultRunner(context.Background(), "", "echo hello-from-runner")
 	if err != nil {
@@ -51,12 +48,7 @@ func TestDefaultRunner_StdoutCaptured(t *testing.T) {
 	}
 }
 
-// TestDefaultRunner_BinaryMissing — non-existent command returns
-// non-nil error (spawn failure, distinct from exit-error).
 func TestDefaultRunner_BinaryMissing(t *testing.T) {
 	_, _, _, err := DefaultRunner(context.Background(), "", "/no/such/binary/zzz")
-	// Bash interprets the path and exits non-zero with "not found".
-	// That's still an exit-error (mapped to exitCode), so err should be nil.
-	// We just confirm the call doesn't panic.
 	_ = err
 }

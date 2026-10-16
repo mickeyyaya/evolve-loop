@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// The settle retry sits on the clean-exit path, so the test binary sleeps for free; retry-count tests inject SleepFn.
 func init() { settleSleep = func(time.Duration) {} }
 
 func TestRun_NonTimeout_CleanExitIdle_DeliverableSettlesOnRetry_PrefersFile(t *testing.T) {
@@ -23,7 +22,6 @@ func TestRun_NonTimeout_CleanExitIdle_DeliverableSettlesOnRetry_PrefersFile(t *t
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	nb := &noisyStdoutBridge{fileContent: genuine, stdout: noisyStdout}
 
-	// The probe misses twice while the agent idles; the third check, inside the settle window, sees the PASS.
 	calls := 0
 	settling := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
@@ -37,7 +35,7 @@ func TestRun_NonTimeout_CleanExitIdle_DeliverableSettlesOnRetry_PrefersFile(t *t
 		Bridge:   nb,
 		Prompts:  fakePromptsFS("evolve-auditor", "x"),
 		VerifyFn: settling,
-		SleepFn:  func(time.Duration) {}, // deterministic: no real settle delay
+		SleepFn:  func(time.Duration) {},
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
@@ -64,7 +62,7 @@ func TestRun_NonTimeout_CleanExitIdle_GenuineFAILOnDisk_RecordsFromFileNotScroll
 		Hooks:    hooks,
 		Bridge:   nb,
 		Prompts:  fakePromptsFS("evolve-auditor", "x"),
-		VerifyFn: verifyReturns(deliverable.Result{OK: true}, nil), // a well-formed FAIL verifies OK
+		VerifyFn: verifyReturns(deliverable.Result{OK: true}, nil),
 		SleepFn:  func(time.Duration) {},
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})

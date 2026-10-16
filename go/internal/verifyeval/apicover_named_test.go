@@ -2,10 +2,6 @@ package verifyeval
 
 import "testing"
 
-// TestVerify_ResultContract names the verifyeval.Result type (returned by Verify
-// but never named in a test) and pins the constructor's contract: a satisfied
-// eval yields Verdict=="PASS", echoes the source Path, and records exactly one
-// passing CommandResult per executed command.
 func TestVerify_ResultContract(t *testing.T) {
 	path := writeEval(t, "```bash\ngo test ./...\n```\n\n## Expected\n\nexit_code: 0\n")
 	fr := &fakeRunner{scripts: map[string]struct {

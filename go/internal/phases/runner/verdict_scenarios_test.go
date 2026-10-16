@@ -18,7 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// goldenBridgeResponse is returned on the error arms too, because the reconcile arms read its cost, tokens and boot time.
 var goldenBridgeResponse = core.BridgeResponse{ExitCode: 81, CostUSD: 1.5, Tokens: core.TokenUsage{Input: 42}, BootMS: 7}
 
 type goldenBridge struct {
@@ -48,11 +47,11 @@ func transientErr() error {
 type verifyKind int
 
 const (
-	verifyOK         verifyKind = iota // contracted + well-formed (bytes read from disk)
-	verifyNotOK                        // contracted + malformed/absent, codes carried
-	verifyErr                          // no contract for the phase (the pane stays the source)
-	verifyEmptyNotOK                   // not-OK with NO bytes (an infra read fault) — the late-read arm
-	verifySettlesOn                    // not-OK until the settleOn-th probe, then OK
+	verifyOK verifyKind = iota
+	verifyNotOK
+	verifyErr
+	verifyEmptyNotOK
+	verifySettlesOn
 )
 
 type verifySpec struct {
@@ -101,14 +100,13 @@ type verdictScenario struct {
 	verdict   string
 	nextPhase string
 	diags     []core.Diagnostic
-	stale     bool   // seed a byte-identical pre-dispatch leftover
-	acs       string // "" | PASS | FAIL — stage the ACS-floor workspace
+	stale     bool
+	acs       string
 	wantErr   bool
 	wantErrIs error
 }
 
 const (
-	// unverifiedReport outgrows the 160-byte forensic tail, so the tail is a real suffix; a wider tail changes the golden.
 	unverifiedReport = "# audit\n(partial — no verdict sentinel, no challenge token)\n" +
 		"## Findings\n- one\n- two\n- three\n- four\n- five\n- six\n- seven\n- eight\n- nine\n- ten\n- eleven\n- twelve\n- thirteen\n- fourteen\n- fifteen\n- sixteen\n- seventeen\n- eighteen\n- nineteen\n- twenty\n"
 	panePASS = "pane says PASS\n"
@@ -169,7 +167,6 @@ func runVerdictScenario(t *testing.T, sc verdictScenario, extra ...func(*Options
 	return run
 }
 
-// templatePaths replaces the temp roots with stable tokens, so a golden captured on one machine compares on another.
 func (r *scenarioRun) templatePaths(s string) string {
 	repl := []struct{ path, token string }{{r.ws, "{ws}"}, {r.wt, "{wt}"}, {r.root, "{root}"}}
 	sort.Slice(repl, func(i, j int) bool { return len(repl[i].path) > len(repl[j].path) })

@@ -527,6 +527,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/committedset` | 1 | [internal-committedset.md](internal-committedset.md) |
 | `internal/config` | 56 | [internal-config.md](internal-config.md) |
 | `internal/consensusdispatch` | 3 | [internal-consensusdispatch.md](internal-consensusdispatch.md) |
+| `internal/contextfillcorrelate` | 3 | [internal-contextfillcorrelate.md](internal-contextfillcorrelate.md) |
 | `internal/continuation` | 11 | [internal-continuation.md](internal-continuation.md) |
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/carryover` | 11 | [internal-core-carryover.md](internal-core-carryover.md) |
@@ -543,6 +544,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/deliverable/gatesignal` | 2 | [internal-deliverable-gatesignal.md](internal-deliverable-gatesignal.md) |
 | `internal/deliverable` | 116 | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/digest` | 3 | [internal-digest.md](internal-digest.md) |
+| `internal/dispatchevents` | 1 | [internal-dispatchevents.md](internal-dispatchevents.md) |
 | `internal/dossier` | 38 | [internal-dossier.md](internal-dossier.md) |
 | `internal/evalgate` | 31 | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/evalqualitycheck` | 15 | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
@@ -566,6 +568,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/ledgerverify` | 4 | [internal-ledgerverify.md](internal-ledgerverify.md) |
 | `internal/llmcalls` | 1 | [internal-llmcalls.md](internal-llmcalls.md) |
 | `internal/llmroute` | 23 | [internal-llmroute.md](internal-llmroute.md) |
+| `internal/log` | 2 | [internal-log.md](internal-log.md) |
 | `internal/loopchain` | 12 | [internal-loopchain.md](internal-loopchain.md) |
 | `internal/looppreflight` | 28 | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/loopwave` | 15 | [internal-loopwave.md](internal-loopwave.md) |
@@ -597,6 +600,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phasespec` | 61 | [internal-phasespec.md](internal-phasespec.md) |
 | `internal/phasestream` | 20 | [internal-phasestream.md](internal-phasestream.md) |
 | `internal/phasetiming` | 9 | [internal-phasetiming.md](internal-phasetiming.md) |
+| `internal/phasewatchdog` | 1 | [internal-phasewatchdog.md](internal-phasewatchdog.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
 | `internal/preflight` | 4 | [internal-preflight.md](internal-preflight.md) |
 | `internal/profiles` | 30 | [internal-profiles.md](internal-profiles.md) |
@@ -614,6 +618,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/repostate` | 1 | [internal-repostate.md](internal-repostate.md) |
 | `internal/research` | 3 | [internal-research.md](internal-research.md) |
 | `internal/resolvellm` | 1 | [internal-resolvellm.md](internal-resolvellm.md) |
+| `internal/retrofile` | 1 | [internal-retrofile.md](internal-retrofile.md) |
 | `internal/rollback` | 3 | [internal-rollback.md](internal-rollback.md) |
 | `internal/router` | 93 | [internal-router.md](internal-router.md) |
 | `internal/routingtest` | 13 | [internal-routingtest.md](internal-routingtest.md) |

@@ -30,7 +30,7 @@ func TestRun_Timeout_StalePreDispatchLeftoverIsNotReconciled(t *testing.T) {
 	ws := t.TempDir()
 	seedStaleReport(t, ws, "audit")
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
-	fb := &fakeBridge{err: artifactTimeoutErr()} // writes nothing: the leftover stands alone
+	fb := &fakeBridge{err: artifactTimeoutErr()}
 	r := New(Options{
 		Hooks:    hooks,
 		Bridge:   fb,
@@ -117,12 +117,11 @@ func TestRun_Timeout_AcsFloorRefusesStaleLeftover(t *testing.T) {
 		t.Fatal(err)
 	}
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
-	fb := &fakeBridge{err: artifactTimeoutErr()} // writes nothing
+	fb := &fakeBridge{err: artifactTimeoutErr()}
 	r := New(Options{
-		Hooks:   hooks,
-		Bridge:  fb,
-		Prompts: fakePromptsFS("evolve-auditor", "x"),
-		// Verify not-OK, the shape that routes into the ACS floor.
+		Hooks:    hooks,
+		Bridge:   fb,
+		Prompts:  fakePromptsFS("evolve-auditor", "x"),
 		VerifyFn: verifyReturns(deliverable.Result{OK: false}, nil),
 	})
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: ws})

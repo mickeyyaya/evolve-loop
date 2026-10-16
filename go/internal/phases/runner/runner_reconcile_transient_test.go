@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// transientBridgeErr wraps core.ErrTransientBridgeFailure as bridge.Engine.Launch does, so errors.Is sees the real shape.
 func transientBridgeErr(code int) error {
 	return fmt.Errorf("bridge: launch exit=%d: %w", code, core.ErrTransientBridgeFailure)
 }
@@ -69,14 +68,14 @@ func TestRun_TransientError_SentinelFAIL_StaysFail(t *testing.T) {
 
 func TestRun_TransientError_NotWellFormed_Mandatory_StaysFail(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
-	fb := &fakeBridge{err: transientBridgeErr(85)} // no artifact written
+	fb := &fakeBridge{err: transientBridgeErr(85)}
 	notOK := deliverable.Result{OK: false, Violations: []deliverable.Violation{{Code: deliverable.CodeMissingArtifact, Message: "deliverable not found"}}}
 	r := New(Options{
 		Hooks:    hooks,
 		Bridge:   fb,
 		Prompts:  fakePromptsFS("evolve-auditor", "x"),
 		VerifyFn: verifyReturns(notOK, nil),
-		SleepFn:  func(time.Duration) {}, // skip the settle-retry delay on the miss path
+		SleepFn:  func(time.Duration) {},
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})

@@ -175,3 +175,12 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/budgethistory` | rolls recent cycles' timing, cost and token telemetry into the pace estimate that sizes a fleet wave | [internal-budgethistory.md](internal-budgethistory.md) |
 | `internal/capability` | parses adapter capability manifests into WARN lines, the dispatch plan and the quality tier | [internal-capability.md](internal-capability.md) |
 | `internal/posteditvalidate` | the PostToolUse hook that checks a just-edited json, shell or python file and warns without blocking | [internal-posteditvalidate.md](internal-posteditvalidate.md) |
+| `internal/mergegate` | the merge-to-main gate's deterministic kernel: the cadence advisor and the promoter | [internal-mergegate.md](internal-mergegate.md) |
+| `internal/dispatchevents` | writes the dispatcher-level abnormal events of a cycle workspace and owns the event vocabulary | [internal-dispatchevents.md](internal-dispatchevents.md) |
+| `internal/contextfillcorrelate` | joins the per-phase context fill ratio with the final verdict of each cycle and reports the FAIL rate for each fill band | [internal-contextfillcorrelate.md](internal-contextfillcorrelate.md) |
+| `internal/versionbump` | updates the version markers of a release atomically, port of the shell version-bump script | [internal-versionbump.md](internal-versionbump.md) |
+| `internal/verifyeval` | re-runs the commands of an eval file in a workspace and compares the outcome with its expectations | [internal-verifyeval.md](internal-verifyeval.md) |
+| `internal/runscope` | the one source of the run-, cycle- and lane-scoped names of worktree branches, directories and tmux sessions | [internal-runscope.md](internal-runscope.md) |
+| `internal/retrofile` | lifts the preventive actions of a retro report into weighted inbox todos | [internal-retrofile.md](internal-retrofile.md) |
+| `internal/log` | JSONL sidecar events, slog channels, the operator console and the safe rendering of untrusted diagnostic fields | [internal-log.md](internal-log.md) |
+| `internal/phasewatchdog` | kills the process group of a phase that shows no file activity for longer than a threshold | [internal-phasewatchdog.md](internal-phasewatchdog.md) |

@@ -17,7 +17,6 @@ const (
 	swappedFAIL  = "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\"} -->\n(swapped in AFTER Verify read the file)\n"
 )
 
-// swapAfterVerify overwrites the deliverable right after verifying it: the racing writer, placed in the verify-classify window.
 func swapAfterVerify(t *testing.T, res deliverable.Result) func(string, phasecontract.Roots) (deliverable.Result, error) {
 	t.Helper()
 	return func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
@@ -76,7 +75,6 @@ func TestRun_DispatchedArtifactDiffersFromContractPath_ClassifiesTheDispatchedFi
 	const partial = "[intent-unchanged] goal_hash=abc12345\n"
 	hooks := &fakeHooks{phase: "intent", artifact: "intent-delta.md", agent: "evolve-intent", model: "auto", prompt: "x", verdict: core.VerdictSKIPPED}
 	nb := &noisyStdoutBridge{fileContent: partial, stdout: "pane scrollback\n"}
-	// Verify resolved the contract path (intent.md), found nothing, and reports missing_artifact with no content.
 	verifyOtherPath := func(_ string, roots phasecontract.Roots) (deliverable.Result, error) {
 		return deliverable.Result{
 			Phase:        "intent",

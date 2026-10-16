@@ -51,7 +51,7 @@ func TestRun_CancelledCtx_TeardownReconcileStillSettles(t *testing.T) {
 		return verifiedFrom(deliverable.Result{OK: true}, phase, roots), nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // the cancel that produced this very teardown
+	cancel()
 	r := New(Options{
 		Hooks:    hooks,
 		Bridge:   fb,
@@ -88,7 +88,7 @@ func TestRun_CtxCancelledDuringSettleWait_StopsReprobing(t *testing.T) {
 		VerifyFn: neverSettles,
 		SleepFn: func(time.Duration) {
 			sleeps++
-			cancel() // the cycle is torn down mid-wait
+			cancel()
 		},
 	})
 

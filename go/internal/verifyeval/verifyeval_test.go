@@ -20,8 +20,6 @@ func writeEval(t *testing.T, body string) string {
 	return path
 }
 
-// fakeRunner returns scripted outputs keyed by command. Tests inject
-// it via Options.Runner to drive Verify without real shell execution.
 type fakeRunner struct {
 	scripts map[string]struct {
 		stdout, stderr string
@@ -42,7 +40,6 @@ func (f *fakeRunner) run() CmdRunner {
 	}
 }
 
-// TestVerify_HappyPath_PASS — all commands pass expectations.
 func TestVerify_HappyPath_PASS(t *testing.T) {
 	path := writeEval(t, "```bash\ngo test ./...\n```\n\n## Expected\n\nexit_code: 0\nstdout_contains: ok\n")
 	fr := &fakeRunner{scripts: map[string]struct {
@@ -113,8 +110,6 @@ func TestVerify_ExplicitNonzeroExit_PASS(t *testing.T) {
 	}
 }
 
-// TestVerify_ExitCodeMismatch_FAIL — non-matching exit code flips
-// verdict to FAIL with a descriptive reason.
 func TestVerify_ExitCodeMismatch_FAIL(t *testing.T) {
 	path := writeEval(t, "```bash\nrun\n```\n\n## Expected\n\nexit_code: 0\n")
 	fr := &fakeRunner{scripts: map[string]struct {
@@ -133,7 +128,6 @@ func TestVerify_ExitCodeMismatch_FAIL(t *testing.T) {
 	}
 }
 
-// TestVerify_StdoutContainsMismatch_FAIL — expected substring absent.
 func TestVerify_StdoutContainsMismatch_FAIL(t *testing.T) {
 	path := writeEval(t, "```bash\nrun\n```\n\n## Expected\n\nstdout_contains: hello\n")
 	fr := &fakeRunner{scripts: map[string]struct {
@@ -149,7 +143,6 @@ func TestVerify_StdoutContainsMismatch_FAIL(t *testing.T) {
 	}
 }
 
-// TestVerify_StdoutAbsent_Mismatch — string present when it shouldn't be.
 func TestVerify_StdoutAbsent_Mismatch(t *testing.T) {
 	path := writeEval(t, "```bash\nrun\n```\n\n## Expected\n\nstdout_absent: FAIL\n")
 	fr := &fakeRunner{scripts: map[string]struct {
@@ -165,7 +158,6 @@ func TestVerify_StdoutAbsent_Mismatch(t *testing.T) {
 	}
 }
 
-// TestVerify_StderrContains — stderr predicate works the same as stdout.
 func TestVerify_StderrContains(t *testing.T) {
 	path := writeEval(t, "```bash\nrun\n```\n\n## Expected\n\nstderr_contains: panic\n")
 	fr := &fakeRunner{scripts: map[string]struct {
@@ -181,8 +173,6 @@ func TestVerify_StderrContains(t *testing.T) {
 	}
 }
 
-// TestVerify_RunnerError_FAIL — runner returning err marks the command
-// failed but continues to subsequent commands.
 func TestVerify_RunnerError_FAIL(t *testing.T) {
 	path := writeEval(t, "```bash\nbad\n```\n```bash\ngood\n```\n\n## Expected\n\nexit_code: 0\n")
 	fr := &fakeRunner{scripts: map[string]struct {
@@ -202,29 +192,24 @@ func TestVerify_RunnerError_FAIL(t *testing.T) {
 	}
 }
 
-// TestVerify_MissingPath_Error — required-field validation.
 func TestVerify_MissingPath_Error(t *testing.T) {
 	if _, err := Verify(Options{Workspace: "/tmp"}); err == nil {
 		t.Error("Verify with empty Path: want error")
 	}
 }
 
-// TestVerify_MissingWorkspace_Error — required-field validation.
 func TestVerify_MissingWorkspace_Error(t *testing.T) {
 	if _, err := Verify(Options{Path: "/tmp/x"}); err == nil {
 		t.Error("Verify with empty Workspace: want error")
 	}
 }
 
-// TestVerify_FileNotFound_Error — open failure surfaces as error.
 func TestVerify_FileNotFound_Error(t *testing.T) {
 	if _, err := Verify(Options{Path: "/no/such/file.md", Workspace: "/tmp"}); err == nil {
 		t.Error("Verify on missing file: want error")
 	}
 }
 
-// TestVerify_NoScripts_Error prevents an empty acceptance definition from
-// passing without executing evidence.
 func TestVerify_NoScripts_Error(t *testing.T) {
 	path := writeEval(t, "## Expected\n\nexit_code: 0\n")
 	_, err := Verify(Options{Path: path, Workspace: "/tmp", Runner: (&fakeRunner{}).run()})
@@ -233,8 +218,6 @@ func TestVerify_NoScripts_Error(t *testing.T) {
 	}
 }
 
-// TestParseExpectedLine_AllKeys — direct unit test of the parser
-// because the format is the operator-facing contract.
 func TestParseExpectedLine_AllKeys(t *testing.T) {
 	var e Expectations
 	parseExpectedLine("exit_code: 42", &e)
@@ -258,8 +241,6 @@ func TestParseExpectedLine_AllKeys(t *testing.T) {
 	}
 }
 
-// TestParseExpectedLine_MalformedExitCode — unparseable int is silently
-// ignored so a malformed eval doesn't crash the verifier.
 func TestParseExpectedLine_MalformedExitCode(t *testing.T) {
 	var e Expectations
 	parseExpectedLine("exit_code: not-a-number", &e)
@@ -268,15 +249,13 @@ func TestParseExpectedLine_MalformedExitCode(t *testing.T) {
 	}
 }
 
-// TestMatchExpectations_AllPathsDirect — direct table coverage of
-// matchExpectations covering each predicate's pass + fail branches.
 func TestMatchExpectations_AllPathsDirect(t *testing.T) {
 	mkInt := func(n int) *int { return &n }
 	cases := []struct {
 		name      string
 		cr        CommandResult
 		e         Expectations
-		wantEmpty bool // true → predicate passed (empty reason)
+		wantEmpty bool
 	}{
 		{"exit-pass", CommandResult{ExitCode: 0}, Expectations{ExitCode: mkInt(0)}, true},
 		{"exit-fail", CommandResult{ExitCode: 1}, Expectations{ExitCode: mkInt(0)}, false},
@@ -301,9 +280,6 @@ func TestMatchExpectations_AllPathsDirect(t *testing.T) {
 	}
 }
 
-// TestParseEval_BashBlockAfterExpected — a bash block reopened after
-// the Expected section still emits its commands (regression: prior
-// behavior incorrectly stayed in inExpected mode).
 func TestParseEval_BashBlockAfterExpected(t *testing.T) {
 	path := writeEval(t, "## Expected\nexit_code: 0\n\n## Setup\n```bash\nrun\n```\n")
 	cmds, _, err := parseEval(path)
@@ -321,10 +297,6 @@ func TestParseEval_BashBlockAfterExpected(t *testing.T) {
 	}
 }
 
-// TestParseEval_ScannerError — a bash-block line longer than
-// bufio.MaxScanTokenSize (64KiB) makes the Scanner return ErrTooLong,
-// which parseEval must surface as an error rather than silently
-// truncating commands. Deterministic: no clock/net/repo.
 func TestParseEval_ScannerError(t *testing.T) {
 	huge := strings.Repeat("x", bufio.MaxScanTokenSize+1)
 	path := writeEval(t, "```bash\n"+huge+"\n```\n")
@@ -337,9 +309,6 @@ func TestParseEval_ScannerError(t *testing.T) {
 	}
 }
 
-// TestDefaultRunner_DefaultBuild covers the production CmdRunner in the
-// DEFAULT build (the integration-tagged file only runs under -tags
-// integration). It uses Bash builtins so it is deterministic and offline.
 func TestDefaultRunner_DefaultBuild(t *testing.T) {
 	if _, err := os.Stat("/bin/bash"); err != nil {
 		t.Skip("/bin/bash not present")
@@ -391,15 +360,12 @@ func TestDefaultRunner_DefaultBuild(t *testing.T) {
 		if exit != 0 {
 			t.Errorf("exit=%d, want 0", exit)
 		}
-		// macOS symlinks /var → /private/var; match on the tail to stay portable.
 		if !strings.Contains(stdout, filepath.Base(dir)) {
 			t.Errorf("pwd=%q, want it to reflect workdir %q", strings.TrimSpace(stdout), dir)
 		}
 	})
 }
 
-// TestVerify_MultipleBashBlocks_AllRun — every block contributes
-// commands; expectations apply to each.
 func TestVerify_MultipleBashBlocks_AllRun(t *testing.T) {
 	path := writeEval(t, "```bash\nfirst\n```\n## Section\n```bash\nsecond\n```\n\n## Expected\n\nexit_code: 0\n")
 	fr := &fakeRunner{scripts: map[string]struct {

@@ -23,7 +23,6 @@ func diagsContain(diags []core.Diagnostic, substr string) bool {
 
 func TestRun_ContractedPhase_UnverifiedDeliverable_NonShipVerdictPassesThrough(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-intent", "claude-tmux", nil)
-	// Classify returns SKIPPED from partial content; the file is present but lacks a required section.
 	hooks := &fakeHooks{phase: "intent", agent: "evolve-intent", model: "auto", prompt: "x", verdict: core.VerdictSKIPPED}
 	const partial = "[intent-unchanged] goal_hash=abc12345\n"
 	bridge := &divergentBridge{fileContent: partial, stdoutContent: partial}

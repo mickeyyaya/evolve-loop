@@ -160,7 +160,6 @@ func TestNeutralize_MultiLineLargePayload(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	rec := interaction.NewRecorder(ws)
-	// Each line fits Digest's per-line cap; only the joined digest exceeds 200 runes.
 	payload := strings.Join([]string{
 		strings.Repeat("a", 180),
 		strings.Repeat("b", 180),

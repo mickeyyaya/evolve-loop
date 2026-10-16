@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-// EmitGoalStallEscalated must append a WARN goal-stall-escalated event naming the
-// stalled goal to abnormal-events.jsonl, so the observer can react. The outcome
-// class must ride along: two breakers share this event type (empty-only and the
-// wider non-shipping union), and a mixed FAIL/EMPTY streak reported as
-// empty-only would point diagnosis at the wrong evidence.
 func TestEmitGoalStallEscalated(t *testing.T) {
 	dir := t.TempDir()
 	w := NewWriter(dir)

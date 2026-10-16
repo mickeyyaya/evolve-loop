@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/contextfill"
 )
 
-// TestAPICoverNamedExports names and EXERCISES every exported symbol of this
-// package (ADR-0069 new-package graduation) along the one path a consumer takes:
-// Load the real corpus shape off disk, Correlate it into a Report, read the
-// Bucket / VerdictSplit tallies back out, round-trip the report through the
-// Bucket JSON codec the CLI's --json projection depends on, and render Markdown.
 func TestAPICoverNamedExports(t *testing.T) {
 	root := t.TempDir()
 	write(t, filepath.Join(root, "knowledge-base", "cycles", "cycle-11.json"),
@@ -67,8 +62,6 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Errorf("top Bucket = %+v, want the single hot FAIL cycle tallied", bucket)
 	}
 
-	// Bucket.MarshalJSON / Bucket.UnmarshalJSON: the open-ended Max survives the
-	// round trip as +Inf via a JSON null.
 	encoded, err := bucket.MarshalJSON()
 	if err != nil {
 		t.Fatalf("Bucket.MarshalJSON returned error %v, want nil", err)

@@ -10,17 +10,6 @@ import (
 	"time"
 )
 
-// EmitAbnormal appends a JSON line to abnormal-events.jsonl with the
-// shape documented in CLAUDE.md (and observed in .evolve/abnormal-events.jsonl):
-//
-//	{event_type, timestamp, ...arbitrary fields}
-//
-// Two real-world shapes coexist in the corpus:
-//   - subscription-auth-mode → {event_type, ts, cycle, mode, notes}
-//   - stall-detected         → {event_type, timestamp, source_phase, severity, details, remediation_hint}
-//
-// The Go port standardises on `timestamp` (ISO8601 UTC, second precision)
-// and writes arbitrary extra fields flat alongside event_type.
 func TestEmitAbnormal_WritesJSONL(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "abnormal-events.jsonl")
@@ -94,7 +83,6 @@ func TestEmitAbnormal_AppendsMultipleLines(t *testing.T) {
 			t.Errorf("line %d invalid JSON: %v: %q", i, err, line)
 			continue
 		}
-		// JSON numbers decode as float64
 		if int(got["i"].(float64)) != i {
 			t.Errorf("line %d: i=%v, want %d", i, got["i"], i)
 		}
@@ -134,9 +122,6 @@ func TestEmitAbnormal_ConcurrentSafe(t *testing.T) {
 	}
 }
 
-// EmitPhase records phase lifecycle into a structured slog channel. We
-// don't pin the exact slog handler output (depends on stdlib version);
-// we just verify it doesn't error and that any provided fields appear.
 func TestEmitPhase_StructuredFields(t *testing.T) {
 	var buf strings.Builder
 	logger := NewJSONLogger(&buf, "info")
@@ -227,7 +212,6 @@ func TestParseLevel(t *testing.T) {
 }
 
 func TestEmitPhase_NilLoggerIsNoOp(t *testing.T) {
-	// Should not panic.
 	EmitPhase(nil, "scout", "started", nil)
 }
 
@@ -247,7 +231,6 @@ func TestEmitAbnormal_OpenFileError(t *testing.T) {
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "abnormal-events.jsonl")
-	// Pre-create as 0o000 so OpenFile O_APPEND can't open it.
 	if err := os.WriteFile(path, []byte{}, 0o000); err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +248,6 @@ func TestEmitAbnormal_MarshalError(t *testing.T) {
 	path := filepath.Join(dir, "abnormal-events.jsonl")
 	w := NewSidecarWriter(path)
 	defer w.Close()
-	// channels cannot marshal — drives marshalSorted's error branch.
 	if err := w.EmitAbnormal(Event{
 		EventType: "x",
 		Fields:    map[string]any{"chan": make(chan int)},
@@ -280,7 +262,6 @@ func TestEmitAbnormal_MkdirParentError(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Sidecar path under a regular file — mkdir parent fails.
 	w := NewSidecarWriter(filepath.Join(blocker, "child", "abnormal.jsonl"))
 	defer w.Close()
 	if err := w.EmitAbnormal(Event{EventType: "x"}); err == nil {

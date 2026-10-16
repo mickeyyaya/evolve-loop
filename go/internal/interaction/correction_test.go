@@ -92,8 +92,6 @@ func TestNextCorrection_BudgetsExhaust(t *testing.T) {
 	}
 }
 
-// The recovery agent repairs the deliverable around logic the phase already built, so it comes after the
-// phase's own preserved agent (live-fix) and before any fresh run of the phase.
 func TestNextCorrection_RecoverPrecedesARedispatch(t *testing.T) {
 	t.Parallel()
 	in := interaction.CorrectionInput{
@@ -118,7 +116,6 @@ func TestNextCorrection_RecoverPrecedesARedispatch(t *testing.T) {
 	}
 }
 
-// A judgment phase's verdict is never restructured: with budget but without Repairable the rung is skipped.
 func TestNextCorrection_RecoverNeedsARepairableViolation(t *testing.T) {
 	t.Parallel()
 	in := interaction.CorrectionInput{

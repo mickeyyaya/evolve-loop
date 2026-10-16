@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// artifactTimeoutErr wraps core.ErrArtifactTimeout as bridge.Engine.Launch does on exit 81, so errors.Is sees the real shape.
 func artifactTimeoutErr() error {
 	return fmt.Errorf("bridge: launch exit=%d: %w", 81, core.ErrArtifactTimeout)
 }
@@ -23,7 +22,7 @@ func TestRun_OptionalPhase_ArtifactTimeout_DegradesToWarn(t *testing.T) {
 		Bridge:   fb,
 		Prompts:  fakePromptsFS("evolve-build-planner", "x"),
 		Optional: true,
-		SleepFn:  func(time.Duration) {}, // skip the real settle-retry delay on the miss path
+		SleepFn:  func(time.Duration) {},
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
@@ -43,7 +42,7 @@ func TestRun_OptionalPhase_ArtifactTimeout_DegradesToWarn(t *testing.T) {
 
 func TestRun_OptionalPhase_OtherBridgeError_StillFails(t *testing.T) {
 	hooks := &fakeHooks{phase: "build-planner", agent: "evolve-build-planner", model: "opus", prompt: "x"}
-	fb := &fakeBridge{err: errors.New("bridge: launch exit=2")} // safety-gate, not a timeout
+	fb := &fakeBridge{err: errors.New("bridge: launch exit=2")}
 	r := New(Options{
 		Hooks:    hooks,
 		Bridge:   fb,
@@ -67,7 +66,7 @@ func TestRun_MandatoryPhase_ArtifactTimeout_StillFails(t *testing.T) {
 		Hooks:   hooks,
 		Bridge:  fb,
 		Prompts: fakePromptsFS("evolve-builder", "x"),
-		SleepFn: func(time.Duration) {}, // skip the real settle-retry delay on the miss path
+		SleepFn: func(time.Duration) {},
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
