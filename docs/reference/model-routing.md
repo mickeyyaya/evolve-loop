@@ -52,7 +52,7 @@ On `agy-claude-tmux`, the effort selects the variant suffix of the model name, b
 Since v22.27.0, one table in `.evolve/policy.json` (`cli_routing`) decides which CLI runs each dispatch ([ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md)). The table of this repository has these rules:
 
 - A phase below the deep tier runs agy first, at the `balanced` tier (see the table above). Then it runs agy-owned Claude (`agy-claude`), then Claude Code. `evolve cli-routing explain <agent>` prints the chain and the model at the tier of the agent.
-- A phase at the deep or the top tier runs agy-owned Claude first, then agy's Gemini 4 Argon, then Claude Code. Gemini 4 Argon is the successor of Gemini 3.1 Pro, which agy no longer lists. The operator added it on 2026-10-16, so a benched agy Claude group falls to agy's own quota before Claude Code.
+- A phase at the deep or the top tier runs agy-owned Claude first, then Claude Code. Gemini 4 Argon, the successor of Gemini 3.1 Pro, is agy's deep model. It was in the chain on 2026-10-16 and is out again from 2026-10-17. A quota wall on Argon benched all of agy, Flash included (inbox `agy-model-429-benches-whole-family`).
 - The Claude-family floor agents (the auditor, the adversarial review, the tdd engineer, the code reviewer and the spec verifiers) run Claude Code only.
 - Codex runs only under `--bypass-policy`.
 

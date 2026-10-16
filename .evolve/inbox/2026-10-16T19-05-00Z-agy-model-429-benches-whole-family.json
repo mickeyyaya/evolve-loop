@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A clihealth unit test feeds the agy pane text `Individual quota reached ... Resets in 148h8m53s.` and gets Evidence equal to that line, not the pane's first line. BenchedUntil is now+24h, because ParseResetHint caps every hint at resetHintCap.",
+    "A bridgechain unit test benches only the wall's model: an Argon-scoped entry in the clihealth store leaves a balanced agy-tmux dispatch on Gemini 3.8 Flash dispatchable, while the deep agy seat walks on.",
+    "clihealth.Entry and Store gain a scope finer than Family (the model or quota group), with existing family-wide entries still read correctly."
+  ],
+  "created_at": "2026-10-16T19:05:00Z",
+  "files": [
+    "go/internal/clihealth/clihealth.go",
+    "go/internal/clihealth/resetparse.go",
+    "go/internal/bridgechain/bridgechain.go"
+  ],
+  "fix": "Two defects, and their order matters. (2) First, scope a quota bench to the model or quota group that hit the wall, not the routing family. bridgechain.go benches llmroute.Family(e.CLI) through store.BenchWall, and clihealth.Entry carries only Family. agy pools quota per model: on 2026-10-17, Argon was exhausted for 148h while Flash answered. (1) Then add a reset-hint pattern for agy's compact `Resets in 148h8m53s` form, so evidenceLine keeps the 429 line and ParseResetHint returns the real (capped) reset. Do not ship (1) before (2). Parsing the reset alone stretches today's 30-minute family bench to 24h on all of agy, Flash included.",
+  "id": "agy-model-429-benches-whole-family",
+  "kind": "bug",
+  "priority_class": "pipeline",
+  "source": "console, wave 111 observation, 2026-10-17",
+  "summary": "On 2026-10-17 at 02:17, a Gemini 4 Argon 429 (`Individual quota reached ... Resets in 148h8m53s`) benched the whole agy family for 30 minutes. agy's Gemini 3.8 Flash still answered. Wave 111 started inside that window, so every phase of cycles 1907 and 1908 ran on Claude Code. The bench record also kept the wrong line, the pane's first line of unrelated text, because no reset hint matched agy's compact duration. The 148h reset was never parsed, so the bench fell back to the 30-minute strike cooldown. Every later deep dispatch that tries Argon can bench the family again.",
+  "title": "A quota wall on one agy model benches the whole agy family, and the bench keeps the wrong evidence line",
+  "weight": 0.6
+}
