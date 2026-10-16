@@ -1,8 +1,5 @@
 package launchoutcome
 
-// exit_test.go — the numeric contract and the ledger projection (design §6
-// tests 27, 31).
-
 import "testing"
 
 func TestExitCodes_NumericContractUnchanged(t *testing.T) {

@@ -69,7 +69,7 @@ func TestShip_AllowsNonShipBash(t *testing.T) {
 		"git log -1",
 		"git diff",
 		"go test ./...",
-		"echo 'commit time'", // contains 'commit' but not a verb
+		"echo 'commit time'",
 	}
 	for _, cmd := range cases {
 		dec := g.Decide(context.Background(), core.GuardInput{

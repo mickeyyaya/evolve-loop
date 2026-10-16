@@ -6,19 +6,8 @@ import (
 	"testing"
 )
 
-// This file closes the apicover gap for the recipe types/consts that existing
-// tests drive through Engine.Run but never NAME by their exported identifier.
-// apicover flags those UNCOVERED. Each test below binds a value to an
-// explicitly-typed variable (naming the type/const) AND exercises it through
-// the real executor, asserting a load-bearing contract.
-
-// TestSessionDriver_SatisfiedAndExercised names the SessionDriver port and
-// proves the package's fakeDriver satisfies it, then drives a real one-step
-// recipe through Engine.Run via that interface value — exercising every
-// SessionDriver method (EnsureSession, SendCommand, AutoRespond, Capture).
 func TestSessionDriver_SatisfiedAndExercised(t *testing.T) {
 	fd := &fakeDriver{paneSeq: []string{"all done"}}
-	// Compile-time + run-time proof of interface satisfaction.
 	var d SessionDriver = fd
 	eng := &Engine{Driver: d, Clock: noClock{}, PromptMarker: "❯"}
 
@@ -32,7 +21,6 @@ func TestSessionDriver_SatisfiedAndExercised(t *testing.T) {
 	if res.Status != StatusComplete {
 		t.Fatalf("status=%v, want complete", res.Status)
 	}
-	// The driver was actually exercised through the interface.
 	if len(fd.commands) != 1 || fd.commands[0] != "/go" {
 		t.Errorf("SessionDriver.SendCommand not exercised: commands=%v", fd.commands)
 	}
@@ -41,10 +29,6 @@ func TestSessionDriver_SatisfiedAndExercised(t *testing.T) {
 	}
 }
 
-// TestSendKind_AndAwaitKind_DriveStepBehavior names SendKind and AwaitKind by
-// binding their constants to explicitly-typed variables, then proves they
-// select real behavior: a KindKeys send routes to SendKeys (not SendCommand),
-// and an AwaitPromptMarker await is satisfied by the prompt marker.
 func TestSendKind_AndAwaitKind_DriveStepBehavior(t *testing.T) {
 	var sk SendKind = KindKeys
 	var ak AwaitKind = AwaitPromptMarker
@@ -60,14 +44,12 @@ func TestSendKind_AndAwaitKind_DriveStepBehavior(t *testing.T) {
 	if res.Status != StatusComplete {
 		t.Fatalf("status=%v, want complete", res.Status)
 	}
-	// KindKeys routed to SendKeys, NOT SendCommand.
 	if len(fd.keys) != 1 || fd.keys[0] != "Down Enter" {
 		t.Errorf("SendKind KindKeys did not route to SendKeys: keys=%v", fd.keys)
 	}
 	if len(fd.commands) != 0 {
 		t.Errorf("KindKeys must not use SendCommand: commands=%v", fd.commands)
 	}
-	// The two kinds are the documented string labels.
 	if KindKeys != "keys" || KindCommand != "command" {
 		t.Errorf("SendKind labels: KindKeys=%q KindCommand=%q", KindKeys, KindCommand)
 	}
@@ -76,11 +58,6 @@ func TestSendKind_AndAwaitKind_DriveStepBehavior(t *testing.T) {
 	}
 }
 
-// TestOnTimeoutAbort_FailsRecipe names the OnTimeoutAbort const and proves its
-// contract: a step whose await never matches and whose OnTimeout is
-// OnTimeoutAbort fails the whole recipe (ErrStepTimeout, StepTimedOut). This is
-// the abort half of the on_timeout strategy (the continue half lives in
-// executor_test.go's StepTimeoutContinue test).
 func TestOnTimeoutAbort_FailsRecipe(t *testing.T) {
 	r := Recipe{Name: "x", Steps: []Step{
 		{
@@ -106,9 +83,6 @@ func TestOnTimeoutAbort_FailsRecipe(t *testing.T) {
 	}
 }
 
-// TestResult_StepResult_StepStatus_BoundFromProducer names Result, StepResult,
-// and StepStatus by binding them to explicitly-typed variables from Engine.Run's
-// output and asserting their fields on a successful two-step recipe.
 func TestResult_StepResult_StepStatus_BoundFromProducer(t *testing.T) {
 	r := Recipe{Name: "plugin-install", Steps: []Step{
 		cmdStep("add", "/add", Await{Kind: AwaitAnyOf, Substrs: []string{"added"}, TimeoutS: 6, IntervalS: 1}),
@@ -139,7 +113,6 @@ func TestResult_StepResult_StepStatus_BoundFromProducer(t *testing.T) {
 	if st != StepOK {
 		t.Errorf("StepStatus=%v, want StepOK", st)
 	}
-	// StepStatus is the documented string label set.
 	if StepOK != "ok" {
 		t.Errorf("StepOK=%q, want ok", StepOK)
 	}

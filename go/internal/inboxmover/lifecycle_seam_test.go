@@ -18,7 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// nonTestSourcesMentioning lists non-test module sources, outside the lifecycle leaf and allowed, that contain needle.
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
@@ -171,17 +170,16 @@ func TestFacades_KeepEverySpelling(t *testing.T) {
 		_ func(string, string) (int, error)                                    = bumpFailureCount
 		_ func(string, func(map[string]json.RawMessage)) error                 = updateItemJSON
 		_ func(Options, int, string, *quarantinePolicy) (RecoverResult, error) = releaseCycleProcessing
-		// Compiles only while quarantinePolicy is an alias of lifecycle.Policy, never a mirror struct.
-		_ *lifecycle.Policy                                   = (*quarantinePolicy)(nil)
-		_ lifecycle.ClaimResult                               = ClaimResult{}
-		_ lifecycle.PromoteOpts                               = PromoteOpts{}
-		_ lifecycle.PromoteResult                             = PromoteResult{}
-		_ lifecycle.RecoverResult                             = RecoverResult{}
-		_ lifecycle.Location                                  = Location{}
-		_ LedgerAppender                                      = (*ledger.FileLedger)(nil)
-		_ lifecycle.LedgerAppender                            = LedgerAppender(nil)
-		_ func(context.Context, ledger.LifecycleRecord) error = (*ledger.FileLedger)(nil).AppendLifecycle
-		_ *signalcenter.Center                                = Options{}.Signals
+		_ *lifecycle.Policy                                                    = (*quarantinePolicy)(nil)
+		_ lifecycle.ClaimResult                                                = ClaimResult{}
+		_ lifecycle.PromoteOpts                                                = PromoteOpts{}
+		_ lifecycle.PromoteResult                                              = PromoteResult{}
+		_ lifecycle.RecoverResult                                              = RecoverResult{}
+		_ lifecycle.Location                                                   = Location{}
+		_ LedgerAppender                                                       = (*ledger.FileLedger)(nil)
+		_ lifecycle.LedgerAppender                                             = LedgerAppender(nil)
+		_ func(context.Context, ledger.LifecycleRecord) error                  = (*ledger.FileLedger)(nil).AppendLifecycle
+		_ *signalcenter.Center                                                 = Options{}.Signals
 	)
 	for name, pair := range map[string][2]error{
 		"ErrNotFound": {ErrNotFound, lifecycle.ErrNotFound}, "ErrMvFailed": {ErrMvFailed, lifecycle.ErrMvFailed},
@@ -263,7 +261,6 @@ func TestGolden_LifecycleSequence_WiredRootStderr(t *testing.T) {
 	}
 }
 
-// gitRepoWithMain returns a repo root, a sha on main and a sha on a side branch.
 func gitRepoWithMain(t *testing.T) (root, onMain, onSide string) {
 	t.Helper()
 	root = t.TempDir()
@@ -333,7 +330,7 @@ func TestShaLandedOnMain_ReportsWhatGitCannotAnswer_PromoteFailsOpenLoudly(t *te
 }
 
 func TestInboxMoverPrefix_OneHome(t *testing.T) {
-	const needle = `"[inbox-mover] ` // the opening quote pins string literals, not prose
+	const needle = `"[inbox-mover] `
 	homes := map[string]int{}
 	err := filepath.WalkDir(".", func(path string, entry os.DirEntry, err error) error {
 		if err != nil {

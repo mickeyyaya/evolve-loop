@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestPorcelainChangedPaths_QuotePathUnescapesNonASCII — AC1. The scout's named
-// round-trip: a raw C-quoted porcelain line yields the literal path, not the
-// escaped text. Each case is fed exactly as git writes it (backslashes are real
-// bytes in the input, hence the raw-string literals).
 func TestPorcelainChangedPaths_QuotePathUnescapesNonASCII(t *testing.T) {
 	tests := []struct {
 		name string
@@ -38,7 +34,7 @@ func TestPorcelainChangedPaths_QuotePathUnescapesNonASCII(t *testing.T) {
 		{
 			name: "rename decodes BOTH sides",
 			out:  `R  "old\303\251.txt" -> "new\303\251.txt"` + "\n",
-			want: []string{"newé.txt", "oldé.txt"}, // sorted
+			want: []string{"newé.txt", "oldé.txt"},
 		},
 		{
 			name: "mixed quoted and raw entries",
@@ -56,11 +52,6 @@ func TestPorcelainChangedPaths_QuotePathUnescapesNonASCII(t *testing.T) {
 	}
 }
 
-// TestPorcelainChangedPaths_QuotePathAsciiUnchanged — AC2, the no-behavior-change
-// half. The overwhelmingly common ASCII cases (and the quoted-but-unescaped
-// space case git produces regardless of core.quotePath) must decode to exactly
-// what they decode to today: an unquote helper that mangles ordinary paths
-// would be a far worse regression than the bug it fixes.
 func TestPorcelainChangedPaths_QuotePathAsciiUnchanged(t *testing.T) {
 	tests := []struct {
 		name string
@@ -103,51 +94,6 @@ func TestPorcelainChangedPaths_QuotePathAsciiUnchanged(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// cycle-1469 top_n task `gitstage-rename-arrow-parse` — RED contract.
-//
-// Cycle-1466 audit H2 left this open: both porcelain rename readers treat
-// " -> " as an unconditional token separator over the WHOLE payload —
-//
-//	porcelainChangedPaths: strings.Split(line[3:], " -> ")   (pre-cycle-1469 ship/manifest.go)
-//	stagedGonePaths:       strings.Cut(line[3:], " -> ")     (pre-cycle-1469 ship/manifest.go)
-//
-// — but ` -> ` is a legal byte sequence inside a filename, and git quotes such
-// a name rather than escaping the spaces. Verified against real git 2.50.1
-// (2026-08-15):
-//
-//	$ git status --porcelain
-//	?? "we -> ird.txt"              # space-quoted, NOT backslash-escaped
-//	$ git -c core.quotePath=false status --porcelain
-//	?? "we -> ird.txt"              # quotePath=false does NOT suppress this
-//
-// So a staged rename of that file prints `R  "we -> ird.txt" -> renamed.txt`,
-// and today's readers tear it apart:
-//
-//	Split → ["\"we", "ird.txt\"", "renamed.txt"]   3 fragments, none decodable
-//	Cut   → gone["\"we"]                            a path on no disk
-//
-// The fragments are unbalanced-quote tokens, so UnquoteGitPath returns them
-// verbatim and they flow straight into the `git add -- <paths>` pathspec.
-// `git add` exits 128 ("did not match any files") on the first such token and
-// fails the ENTIRE add — the rc=128 ship-killer GonePaths exists to
-// prevent, reproduced by the very input class it was written for. Inbox
-// reconciliation produces renames by construction, so this is a live boundary-
-// ship hazard, not a hypothetical.
-//
-// Contract pinned here:
-//  1. Only the STRUCTURAL rename delimiter splits — a ` -> ` inside quoted
-//     path content is retained, and both endpoints decode to literal paths.
-//  2. GonePaths takes the same quote-aware source endpoint.
-//  3. Malformed quoted input (unbalanced quote, empty side, bare arrow) is
-//     safe: no panic, no fragments, degrade to the verbatim token.
-//  4. Ordinary unquoted renames and non-rename lines are byte-identical to
-//     pre-change behaviour.
-// ---------------------------------------------------------------------------
-
-// TestPorcelainChangedPaths_QuotedRenameArrowKeepsBothEndpoints — AC1, the
-// crux. A quoted name containing the delimiter yields EXACTLY its two
-// endpoints, decoded; never three fragments.
 func TestPorcelainChangedPaths_QuotedRenameArrowKeepsBothEndpoints(t *testing.T) {
 	tests := []struct {
 		name string
@@ -185,15 +131,12 @@ func TestPorcelainChangedPaths_QuotedRenameArrowKeepsBothEndpoints(t *testing.T)
 	}
 }
 
-// TestStagedGonePaths_QuotedRenameArrowSourceDecodes — AC2. The gone-set keys
-// are compared against the DECODED paths Pathspec produced, so a torn
-// source endpoint fails to filter the vanished path and it rides into the add.
 func TestStagedGonePaths_QuotedRenameArrowSourceDecodes(t *testing.T) {
 	tests := []struct {
 		name      string
 		porcelain string
 		wantGone  []string
-		wantLive  []string // must NOT be in the gone set
+		wantLive  []string
 	}{
 		{
 			name:      "quoted source holding the delimiter",
@@ -231,10 +174,6 @@ func TestStagedGonePaths_QuotedRenameArrowSourceDecodes(t *testing.T) {
 	}
 }
 
-// TestPorcelainChangedPaths_RenameArrowMalformedIsSafe — AC3, the edge/OOD
-// axis. Real git never emits these, but a truncated pipe or a future porcelain
-// change can: the parser must degrade to the verbatim token, never panic and
-// never invent endpoints.
 func TestPorcelainChangedPaths_RenameArrowMalformedIsSafe(t *testing.T) {
 	tests := []struct {
 		name string
@@ -267,10 +206,6 @@ func TestPorcelainChangedPaths_RenameArrowMalformedIsSafe(t *testing.T) {
 	}
 }
 
-// TestPorcelainChangedPaths_OrdinaryRenameArrowUnchanged — AC4, the
-// no-regression guard. Every shape git actually emits today must parse
-// byte-identically after the tokenizer change; a fix that only handled the
-// quoted case while breaking plain renames trades one ship-killer for another.
 func TestPorcelainChangedPaths_OrdinaryRenameArrowUnchanged(t *testing.T) {
 	tests := []struct {
 		name string

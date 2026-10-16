@@ -12,7 +12,6 @@ import (
 )
 
 func TestReviewerReview_SalvageSurfacesSummaryLine(t *testing.T) {
-	// A sole, fenced, single-candidate bad_verdict that re-verifies clean: the one shape salvage acts on.
 	const soleFencedPass = "## Verdict\n" +
 		"```json\n" + `{"phase":"audit","verdict":"PASS"}` + "\n```\n"
 
@@ -24,7 +23,6 @@ func TestReviewerReview_SalvageSurfacesSummaryLine(t *testing.T) {
 	}
 
 	var logged []string
-	// PhaseIO=enforce makes the sentinel strictly required, so the fenced payload lands as a bad_verdict.
 	r := newTestReviewerPhaseIO(config.StageEnforce, config.StageEnforce, filepath.Join(t.TempDir(), "b.json"), 3)
 	r.logf = func(format string, args ...any) {
 		logged = append(logged, fmt.Sprintf(format, args...))

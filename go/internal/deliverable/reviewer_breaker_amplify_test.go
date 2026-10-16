@@ -31,12 +31,12 @@ func TestWriteBreaker_TmpWriteFailure_WARNsAndLeavesPriorStateUnchanged(t *testi
 	dir := t.TempDir()
 	path := filepath.Join(dir, "breaker.json")
 
-	writeBreaker(path, 5) // establish a healthy prior state
+	writeBreaker(path, 5)
 
-	if err := os.Chmod(dir, 0o555); err != nil { // read+execute only: blocks new file creation
+	if err := os.Chmod(dir, 0o555); err != nil {
 		t.Fatalf("setup chmod: %v", err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) }) // restore so TempDir cleanup can remove it
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
 
 	stderr := amplCaptureStderrBreaker(t, func() {
 		writeBreaker(path, 99)
@@ -53,7 +53,6 @@ func TestWriteBreaker_TmpWriteFailure_WARNsAndLeavesPriorStateUnchanged(t *testi
 func TestWriteBreaker_RenameOntoExistingDir_WARNsDistinctFromWriteFailure(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "breaker-as-dir")
-	// A non-empty directory at path lets the tmp write succeed and fails only the rename.
 	if err := os.Mkdir(path, 0o755); err != nil {
 		t.Fatalf("setup mkdir: %v", err)
 	}
@@ -103,5 +102,5 @@ func TestReadBreaker_EmptyPath_ReturnsZero(t *testing.T) {
 }
 
 func TestWriteBreaker_EmptyPath_NoPanic(t *testing.T) {
-	writeBreaker("", 42) // must be a safe no-op, not a panic
+	writeBreaker("", 42)
 }

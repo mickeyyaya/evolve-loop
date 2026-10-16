@@ -1,14 +1,5 @@
 package cycleoutcome
 
-// lanescope_fallback_test.go — RED contract for the stable failure identity
-// (2026-08-10 investigation, agent C): continuation/retry cycles have NO
-// triage-decision.json (the continuation path binds the task directly), so
-// ApplyFailure derived a nil committed set and the durable failure_count was
-// never bumped — all 81 live inbox items sat at 0 after 15 FAILs, leaving
-// TaskRetryCeiling quarantine and deep-escalation permanently unreachable.
-// Fallback: when triage committed nothing, the lane-scope pin
-// (<workspace>/lane-scope.json TodoIDs) is the worked set.
-
 import (
 	"encoding/json"
 	"os"
@@ -48,14 +39,11 @@ func TestApplyFailure_LaneScopeFallbackBumpsFailureCount(t *testing.T) {
 	item := filepath.Join(root, ".evolve", "inbox", "salvage-lane.json")
 	writeJSON(t, item, map[string]any{"id": "salvage-lane", "weight": 0.9})
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1431")
-	// NO triage-decision.json — the continuation shape. The lane-scope pin
-	// carries the worked id.
 	writeJSON(t, filepath.Join(ws, "lane-scope.json"), map[string]any{"todo_ids": []string{"salvage-lane"}, "goal_hash": "h"})
 
 	if _, err := ApplyFailure(FailureInputs{ProjectRoot: root, Workspace: ws, Cycle: 1431, Ceiling: 3}); err != nil {
 		t.Fatalf("ApplyFailure: %v", err)
 	}
-	// The item was claimed then released back open; find it wherever it landed.
 	moved := findItemFile(t, filepath.Join(root, ".evolve", "inbox"), "salvage-lane")
 	if got := itemFailureCount(t, moved); got != 1 {
 		t.Fatalf("failure_count = %d, want 1 — the continuation FAIL never reached the durable counter (quarantine/escalation blind)", got)
@@ -109,8 +97,6 @@ func TestApplyFailure_APinAnEmptyDecisionLeftUnansweredIsCharged(t *testing.T) {
 	}
 }
 
-// A workspace with NEITHER triage-decision nor lane-scope keeps the legacy
-// whole-dir-drain semantics (nil committed set, no bumps).
 func TestApplyFailure_NoScopeStaysLegacy(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

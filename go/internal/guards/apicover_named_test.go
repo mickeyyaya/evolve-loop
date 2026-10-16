@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// The typed declarations below name each guard type, which apicover needs to count the type as covered.
 func TestChainType_SatisfiesGuardAndDenies(t *testing.T) {
 	var g *Chain = NewChain(nil)
 	var _ core.Guard = g

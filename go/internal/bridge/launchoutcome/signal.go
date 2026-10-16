@@ -2,13 +2,6 @@ package launchoutcome
 
 import "github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 
-// The BRIDGE_EXIT_* projection the Signal Center design promised: one WARN
-// code per non-zero launch exit, spelled by class name (fields.exit_code
-// carries the number) — the table's signal column, read as Outcome.Signal.
-// The naming rule code == "BRIDGE_EXIT_" + upper(name) is a test, not a
-// computation. The host emits exactly one per failed Launch, after the
-// launch-error persist and the boot-strike record, with the classified error
-// as the reason.
 const (
 	CodeExitSafetyGate              signalcenter.Code = "BRIDGE_EXIT_SAFETY_GATE"
 	CodeExitCostLeak                signalcenter.Code = "BRIDGE_EXIT_COST_LEAK"

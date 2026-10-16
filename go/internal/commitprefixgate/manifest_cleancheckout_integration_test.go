@@ -39,9 +39,6 @@ func trackedManifestAnchorExists(t *testing.T, root string) func(string) bool {
 	}
 }
 
-// TestManifestRequiredPaths_CleanCheckoutResolvesWithoutGeneratedOutput is the
-// clean-checkout contract. It is integration-tagged because Git subprocesses
-// are outside the default unit-test cost envelope.
 func TestManifestRequiredPaths_CleanCheckoutResolvesWithoutGeneratedOutput(t *testing.T) {
 	root := findRepoRoot(t)
 	manifest := loadManifest(t, root)

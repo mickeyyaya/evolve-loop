@@ -45,7 +45,6 @@ func writeLedger(t *testing.T, root string, lines ...string) {
 	}
 }
 
-// retroReceipt is the ledger line a real retro dispatch leaves for cycle.
 func retroReceipt(cycle int) string {
 	return fmt.Sprintf(`{"ts":"2026-07-14T01:12:21Z","cycle":%d,"role":"retro","kind":"agent_subprocess","exit_code":0,"artifact_path":"/x/.evolve/runs/cycle-%d/retro-report.md","git_head":"b140da6b","entry_seq":57180,"prev_hash":"146689a4","run_id":"01KXEYRET2P9R0CXBEMYPK5FFC"}`, cycle, cycle)
 }
@@ -69,7 +68,7 @@ func TestPhaseSkipEvidence_LegacyRetroSkipIsNeverTrusted(t *testing.T) {
 			SkipEvidenceUnverified},
 		{"ledger present but nothing for THIS cycle's retro run: unverified", func(t *testing.T, root string, cycle int) {
 			writeLedger(t, root,
-				retroReceipt(cycle+1), // another cycle's receipt must not corroborate this one
+				retroReceipt(cycle+1),
 				fmt.Sprintf(`{"ts":"2026-07-14T01:12:21Z","cycle":%d,"role":"retro","kind":"phase_skipped","exit_code":0,"source":"router"}`, cycle),
 				fmt.Sprintf(`{"ts":"2026-07-14T01:12:21Z","cycle":%d,"role":"scout","kind":"agent_subprocess","exit_code":0}`, cycle),
 				"{not json — a corrupt line must be skipped, never fatal",
@@ -99,7 +98,7 @@ func TestPhaseSkipEvidence_LegacyRetroSkipIsNeverTrusted(t *testing.T) {
 }
 
 func TestPhaseSkipEvidence_VersionedAndAbsentEntries(t *testing.T) {
-	root := t.TempDir() // deliberately empty: no runs, no ledger
+	root := t.TempDir()
 	versioned := legacyRetroSkipDossier(4300)
 	versioned.SchemaVersion = CurrentSchemaVersion
 	if got := PhaseSkipEvidence(root, versioned, "retro"); got != SkipEvidenceTrusted {

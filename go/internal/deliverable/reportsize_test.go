@@ -20,7 +20,6 @@ func TestEstimateTokens(t *testing.T) {
 			t.Errorf("%s: EstimateTokens(len=%d) = %d, want %d", c.name, len(c.s), got, c.want)
 		}
 	}
-	// Monotonic, so a stub returning a constant fails.
 	if EstimateTokens(strings.Repeat("y", 4000)) <= EstimateTokens(strings.Repeat("y", 40)) {
 		t.Error("EstimateTokens must grow with content length (monotonic); got a flat/constant result")
 	}
@@ -67,7 +66,7 @@ func TestCheckHandoffBudget(t *testing.T) {
 		}
 	})
 	t.Run("over budget: violated", func(t *testing.T) {
-		big := strings.Repeat("word ", 5000) // ~25000 chars => ~6250 estimated tokens
+		big := strings.Repeat("word ", 5000)
 		content := "## Handoff Summary\n" + big
 		violated, estimated := CheckHandoffBudget(content, 2000)
 		if !violated {

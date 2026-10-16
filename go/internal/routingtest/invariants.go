@@ -7,14 +7,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// invariantFn asserts a kernel-floor property over one PureKernel decision.
 type invariantFn func(t *testing.T, in router.RouteInput, proposal *router.Proposal, got router.RouterDecision)
 
-// invariantChecks are the non-bypassable floor properties ("model proposes,
-// kernel disposes") asserted across the adversarial cross-product.
 var invariantChecks = map[string]invariantFn{
-	// The keystone: a proposal — however adversarial — can NEVER change the
-	// kernel's chosen NextPhase. applyProposal only records a clamp.
 	"proposal-never-weakens": func(t *testing.T, in router.RouteInput, _ *router.Proposal, got router.RouterDecision) {
 		base := router.Route(in, nil)
 		if got.NextPhase != base.NextPhase {
@@ -56,13 +51,9 @@ var invariantChecks = map[string]invariantFn{
 			t.Errorf("duplicate phase %q in plan", phase)
 		}
 	},
-	// ADR-0024 §1 integrity floor: a CLAMPED plan that runs ship MUST also run
-	// build and audit. Asserts on in.Plan AS THREADED (already floor-clamped by
-	// the engine/orchestrator) — the non-configurable guarantee the kernel keeps
-	// regardless of what the advisor proposed or how small cfg.Mandatory is.
 	"ship-implies-audit-in-plan": func(t *testing.T, in router.RouteInput, _ *router.Proposal, _ router.RouterDecision) {
 		if in.Plan == nil || !planRunsTest(in.Plan, "ship") {
-			return // no plan, or no-ship cycle: floor imposes nothing
+			return
 		}
 		for _, req := range []string{"build", "audit"} {
 			if !planRunsTest(in.Plan, req) {
@@ -88,8 +79,6 @@ func duplicatePlanPhases(plan *router.PhasePlan) []string {
 	return duplicates
 }
 
-// planRunsTest reports whether plan schedules phase with Run==true (test-side
-// mirror of router.planRuns, which is unexported).
 func planRunsTest(plan *router.PhasePlan, phase string) bool {
 	for _, e := range plan.Entries {
 		if e.Phase == phase {

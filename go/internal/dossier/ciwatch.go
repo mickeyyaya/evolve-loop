@@ -7,12 +7,8 @@ import (
 	"strings"
 )
 
-// CIWatchVerdictFile is the workspace artifact the post-push CI watch writes
-// and Build ingests.
 const CIWatchVerdictFile = "ci-watch-verdict.json"
 
-// CIWatchRecord is the remote CI verdict for the cycle's pushed commit. The
-// watch writes this type, so writer and reader share one definition.
 type CIWatchRecord struct {
 	SHA         string `json:"sha"`
 	Conclusion  string `json:"conclusion"`
@@ -21,8 +17,6 @@ type CIWatchRecord struct {
 	CheckedAt   string `json:"checked_at,omitempty"`
 }
 
-// ciWatchRecord reads the CI-watch verdict; ok is false when it is absent,
-// malformed, or lacks a SHA or conclusion.
 func ciWatchRecord(workspace string) (*CIWatchRecord, bool) {
 	body, err := os.ReadFile(filepath.Join(workspace, CIWatchVerdictFile))
 	if err != nil {

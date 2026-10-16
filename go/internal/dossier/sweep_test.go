@@ -14,8 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// interceptExec wraps the real git runner and makes every `git commit` naming
-// blockBase fail permanently, without racing a real index.lock.
 type interceptExec struct {
 	blockBase string
 }

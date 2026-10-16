@@ -74,3 +74,27 @@
 - **cycle 1675** (the 2026-09-14 poison loop): `ClaimLaneScope` re-claimed ids the lane already held and raised a false `INBOX_CLAIM_NOT_FOUND` on every closeout, and `RouteConsole` became the breaker. See [the incident](../../incidents/2026-09-14-triage-refusal-poison-loop.md).
 - **F40 architecture review** (cycle 1691): `stale` used to be close-class, which would have let a lane's PASS consume a stale-dropped menu-mate unverified, and a substring match read any mention of a close-class word as retirement. Classification moved to the leading tag. The re-review found 6 of 16 real close-class reasons are hyphen-joined (`already-shipped-in-797b8518`), so an exact-match rule would have dropped them. See [the incident](../../incidents/2026-09-26-stale-premise-reached-build.md).
 - **Root-resident accounting** (landed with the ADR-0080 slices, #372, though that ADR does not describe it): wave lanes never entered `processing/`, so graded FAILs bumped nothing; workspace-hygiene burned 12 lanes and quarantine-dead 7 with `failure_count` still 0. That produced `RecordRootTaskFailure`, and its review found the unserialized read-modify-write race that the bump lock closes.
+
+## Rules kept from code comments
+
+- **Consumption retires only close-class drops.** `closedDropReasons` lists the only drop reasons that consumption may retire. An unknown reason keeps the item pickable. So does `stale`. A live todo outranks a stale one.
+- **A reason is classified by the text before its first `:`.** So `stale: superseded by X` stays stale.
+- **`dropped[]` has two sibling readers with other policies.** They are `triageDroppedIDs` in carryover and `committedset.DispositionsFrom`. A schema change must land in all three.
+- **A `Closes-Inbox` marker is anchored to a line start.** An optional markdown bullet may precede it. The match ignores case. A mention in the middle of a sentence is not a marker. Too much consumption loses data.
+- **The id pattern drops anything that is not an id.** A `<id>` placeholder is an example. A documented example must never consume a real item.
+- **Retirement releases the binding loudly and never blocks.** It preserves the continuation pointer before it releases. A crash then cannot lose the pointer.
+- **The preserved pointer rides the ship commit to a public remote.** Host paths are redacted first.
+- **The delete happens only if the binding is still this cycle's.** A fresh rebinding of a sibling lane survives.
+- **A malformed released-continuations list is replaced.** The entry that is written now is the one that matters.
+- **A scope is live only at the inbox root or in a claim.** The batch loader can pick it from those places only.
+- **Only positive evidence of a retired copy counts.** Carryover lane scopes never have an inbox file. A retired copy with no stamp is unknown, not stale. The ordinary quarantine copy has no stamp.
+- **A copy older than its binding was re-filed and rebound since.** A release on it destroys live work. A re-filed live copy owns the binding.
+- **A binding is a ghost when its scope is retired and has no live copy.** It is released, so it stops re-arming.
+- **A scoped lane skips the claims of a peer lane.** Two lanes must not work one task. A lane that declares no ids stays scope-blind.
+- **A claim that this cycle holds is not claimed again from the root.** That raises a false not-found.
+- **Dispatch state resolves the newest cycle first.** A hit is almost always recent, and the nested trees only grow.
+- **A bare id is unsafe to give to an agent.** Ids repeat across `consumed/` namesakes. A pending state carries the path of the live record.
+- **`retirementStates` is the one list for every "has this id retired" reader.** The list is in resolution order. The dispatch gate fails open on unknown. A missing state relaunches a retired item.
+- **`releaseCycleProcessing` stays unexported.** `ApplyCycleOutcome` stays the one door into the failure drain. A second entry point lets PASS and FAIL drift.
+- **The failure drain claims first.** It bumps only what sits in `processing/cycle-N/`.
+- **`IsLandedFn` fails open.** `shaLandedOnMain` answers exit 0 as landed and exit 1 as unlanded. Any other answer is landed, with the error. A missing git never blocks a promotion.

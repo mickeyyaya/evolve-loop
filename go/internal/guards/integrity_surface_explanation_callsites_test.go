@@ -13,8 +13,6 @@ import (
 	"testing"
 )
 
-// explanationLifecycleVocabulary derives the explanation-lifecycle API names from beliefs that already
-// exist: the pin tables and the declarations of build_explanation_handoff.go and explanationdocs.
 func explanationLifecycleVocabulary(t *testing.T) map[string]bool {
 	t.Helper()
 	vocab := map[string]bool{
@@ -27,7 +25,6 @@ func explanationLifecycleVocabulary(t *testing.T) map[string]bool {
 	for _, pin := range explanationLifecycleAssignPins {
 		vocab[pin.value] = true
 	}
-	// Gate entry points count too: audit.go wires verifyExplanationDocumentation as a struct-literal value.
 	for _, pin := range explanationActivationBeltPins {
 		vocab[pin.fn] = true
 	}
@@ -48,8 +45,6 @@ func explanationLifecycleVocabulary(t *testing.T) map[string]bool {
 	return vocab
 }
 
-// parseFuncDeclNames returns path's top-level free function names. Methods are left out: one is never
-// called by its bare name, so a bare-name entry could only collide with a same-named free function.
 func parseFuncDeclNames(path string) (map[string]bool, error) {
 	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
@@ -70,11 +65,8 @@ func TestParseFuncDeclNames_MissingFileErrors(t *testing.T) {
 	}
 }
 
-// explanationDocsExcludedDocumentPath stays out of the vocabulary: it only formats a prompt-hint path,
-// and its one caller, phases/build, is deliberately not a protected surface.
 const explanationDocsExcludedDocumentPath = "DocumentPath"
 
-// explanationDocsExportedNames returns the exported free functions of dir's non-test files, minus the excluded name.
 func explanationDocsExportedNames(dir string) (map[string]bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -158,8 +150,6 @@ func TestExplanationDocsVocabulary_IncludesKnownVerificationFunctions(t *testing
 	}
 }
 
-// explanationLifecycleImportAliases lists the non-test files under root that alias or dot-import
-// explanationdocs; either form hides a call site from the scanner's qualified-name match.
 func explanationLifecycleImportAliases(root string) ([]string, error) {
 	var offenders []string
 	fset := token.NewFileSet()
@@ -178,7 +168,7 @@ func explanationLifecycleImportAliases(root string) ([]string, error) {
 		}
 		file, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
 		if err != nil {
-			return nil // malformed file: a build/vet concern, not an alias-detection one
+			return nil
 		}
 		for _, imp := range file.Imports {
 			importPath, err := strconv.Unquote(imp.Path.Value)
@@ -189,12 +179,11 @@ func explanationLifecycleImportAliases(root string) ([]string, error) {
 				continue
 			}
 			if imp.Name == nil {
-				continue // ordinary "explanationdocs.Fn" — matched as-is
+				continue
 			}
 			if imp.Name.Name == "_" {
-				continue // blank import: no call sites to obscure
+				continue
 			}
-			// Rel cannot fail: path is root joined with a WalkDir descendant.
 			rel, _ := filepath.Rel(root, path)
 			offenders = append(offenders, filepath.ToSlash(rel))
 		}
@@ -231,9 +220,6 @@ func TestExplanationLifecycleImportAliases_SyntheticAliasTrips(t *testing.T) {
 	}
 }
 
-// explanationCallSiteFiles returns the root-relative paths of non-test files under root that call a vocab
-// name or assign one as a struct-literal value, since the assignment is where the wiring decision lives.
-// It resolves names with expressionName, like the pin tables, and skips vendor/, testdata/ and unparsable files.
 func explanationCallSiteFiles(root string, vocab map[string]bool) ([]string, error) {
 	var hits []string
 	fset := token.NewFileSet()
@@ -274,7 +260,6 @@ func explanationCallSiteFiles(root string, vocab map[string]bool) ([]string, err
 			return true
 		})
 		if found {
-			// Rel cannot fail: path is root joined with a WalkDir descendant.
 			rel, _ := filepath.Rel(root, path)
 			hits = append(hits, filepath.ToSlash(rel))
 		}
@@ -300,7 +285,6 @@ func TestExplanationCallSiteScanner_SyntheticCallSiteTrips(t *testing.T) {
 	}
 }
 
-// The one real hit keeps a walker that skips everything from passing.
 func TestExplanationCallSiteScanner_SkipsNoiseAndSurvivesMalformedFiles(t *testing.T) {
 	root := t.TempDir()
 	writeGoFile(t, root, "pkg/real.go", "package pkg\nfunc user() { projectBuildExplanation() }\n")

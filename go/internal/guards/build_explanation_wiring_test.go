@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// explanationLifecycleCallPins is package-level so the call-site scanner's vocabulary reads the same pins.
 var explanationLifecycleCallPins = []struct {
 	path     string
 	function string
@@ -27,7 +26,6 @@ var explanationLifecycleCallPins = []struct {
 	{"../core/resume_execution.go", "run", "projectBuildExplanation"},
 }
 
-// explanationLifecycleAssignPins pins lifecycle values wired by struct-literal field; they feed the vocabulary too.
 var explanationLifecycleAssignPins = []struct {
 	path, function, field, value string
 }{

@@ -38,7 +38,6 @@ func TestVerifyCodes_InvalidJSON(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// orchestrator's WriteTarget is evolve_dir, so the artifact resolves under .evolve/.
 	writeFile(t, evolveDir, "cycle-state.json", "this is not json {")
 
 	res, err := Verify("orchestrator", phasecontract.Roots{EvolveDir: evolveDir})

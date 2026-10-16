@@ -15,7 +15,6 @@ import (
 const triageReport = "# Triage Decision — Cycle 7\n\ncycle_size_estimate: small\ndeliverable_kind: code\nphase_skip: []\n\n" +
 	"## top_n (this cycle)\n- lineage-datestamp-normalization: extend LineageKey\n\n## deferred\n(none)\n\n## dropped\n(none)\n"
 
-// derivingCatalog declares triage's decision as derived from its report, as the registry does.
 func derivingCatalog(t *testing.T) phasespec.Catalog {
 	t.Helper()
 	cat, warnings := (phasespec.Catalog{}).Merge([]phasespec.PhaseSpec{{
@@ -96,7 +95,6 @@ func TestHostEffects_ADeclinedDerivationIsLoudAndLeavesTheFileAbsent(t *testing.
 	}
 }
 
-// The registry, not Go, declares what is derivable, and every declaration has a deriver behind it.
 func TestHostEffects_TheRegistryDeclaresTriagesDerivation(t *testing.T) {
 	cat, err := phasespec.Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"))
 	if err != nil {
@@ -113,8 +111,6 @@ func TestHostEffects_TheRegistryDeclaresTriagesDerivation(t *testing.T) {
 	}
 }
 
-// A built-in contract's primary can differ from the registry's; the host derives only from the primary
-// the registry named, never from whatever file happens to be first.
 func TestHostEffects_DerivesOnlyFromTheDeclaredPrimary(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "other-report.md", triageReport)

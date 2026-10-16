@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// failDrain leaves CommittedIDs nil, so the drain bumps every item in the cycle dir.
 func failDrain(opts Options, cycle, ceiling int, systemLevel bool) (OutcomeResult, error) {
 	return ApplyCycleOutcome(opts, CycleOutcome{
 		Cycle:       cycle,
@@ -105,7 +104,6 @@ func TestReleaseWithQuarantine_SystemLevelNeverQuarantines(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeProcItem(t, inbox, "5", "sys-task")
-	// Pre-seed a high failure_count so only the systemLevel flag can suppress it.
 	p := filepath.Join(inbox, "processing", "cycle-5", "sys-task.json")
 	if err := os.WriteFile(p, []byte(`{"id":"sys-task","failure_count":9}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -157,11 +155,11 @@ func TestShouldQuarantine_NamesThePredicate(t *testing.T) {
 		system         bool
 		want           bool
 	}{
-		{2, 3, false, false}, // below ceiling
-		{3, 3, false, true},  // at ceiling
-		{9, 3, false, true},  // over ceiling
-		{9, 3, true, false},  // system-level: never quarantines
-		{9, 0, false, false}, // ceiling 0 = disabled
+		{2, 3, false, false},
+		{3, 3, false, true},
+		{9, 3, false, true},
+		{9, 3, true, false},
+		{9, 0, false, false},
 	}
 	for _, tc := range cases {
 		if got := ShouldQuarantine(tc.count, tc.ceiling, tc.system); got != tc.want {

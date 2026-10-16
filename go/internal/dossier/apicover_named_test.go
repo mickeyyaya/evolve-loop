@@ -199,8 +199,6 @@ func TestDossier_JSONRoundTrip(t *testing.T) {
 	}
 }
 
-// Production reaches these accessors only through text/template reflection,
-// which apicover's AST scan cannot see.
 func TestCommitmentAccessors_NamedAndExercised(t *testing.T) {
 	var unrecorded Dossier
 	if unrecorded.HasCommitment() || unrecorded.CommitmentLine() != "" {

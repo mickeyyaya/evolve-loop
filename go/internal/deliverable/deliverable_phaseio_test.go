@@ -8,7 +8,7 @@ import (
 
 func TestVerdictPresent_EnforceRequiresSentinel(t *testing.T) {
 	verdicts := []string{"PASS", "FAIL", "WARN", "SKIPPED"}
-	prose := "# Report\n## Verdict\n**PASS**\n" // contains the "PASS" substring, no sentinel
+	prose := "# Report\n## Verdict\n**PASS**\n"
 	sentinel := "# Report\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n"
 
 	if !verdictPresent(prose, verdicts, config.StageAdvisory) {
@@ -24,12 +24,10 @@ func TestVerdictPresent_EnforceRequiresSentinel(t *testing.T) {
 		t.Error("off: a valid sentinel must be accepted")
 	}
 
-	// At enforce an out-of-vocabulary sentinel gets no prose rescue, though "PASS" appears in the prose.
 	oov := "# Report\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"BOGUS\",\"schema_version\":1} -->\nPASS appears in prose\n"
 	if verdictPresent(oov, verdicts, config.StageEnforce) {
 		t.Error("enforce: out-of-vocab sentinel must be rejected (no prose rescue)")
 	}
-	// Below enforce the prose scan rescues the same sentinel.
 	if !verdictPresent(oov, verdicts, config.StageAdvisory) {
 		t.Error("advisory: out-of-vocab sentinel falls through to the prose rescue")
 	}

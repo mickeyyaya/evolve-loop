@@ -1,10 +1,5 @@
 package shipwindow
 
-// shipwindow_edge_test.go — Builder-added edge coverage on top of the TDD
-// contract in shipwindow_test.go (which is the spec and stays unmodified):
-// break-safety of Release, corrupt-lock recovery, dead-waiter queue sweep,
-// and the enqueue error path.
-
 import (
 	"context"
 	"os"
@@ -14,15 +9,12 @@ import (
 	"time"
 )
 
-// PathIn is built from FileName — the exported identity gc/operators grep.
 func TestFileName_IsPathInBasename(t *testing.T) {
 	if got := filepath.Base(PathIn("/x/.evolve")); got != FileName {
 		t.Errorf("PathIn basename = %q, want FileName %q", got, FileName)
 	}
 }
 
-// Release must be a no-op (not a removal) when the lease was broken and
-// re-acquired by another lane: the token no longer matches.
 func TestRelease_TokenMismatchLeavesForeignLease(t *testing.T) {
 	dir := t.TempDir()
 	l, err := Acquire(context.Background(), dir, Options{})
@@ -41,8 +33,6 @@ func TestRelease_TokenMismatchLeavesForeignLease(t *testing.T) {
 	}
 }
 
-// A corrupt lock is crash debris: Release treats it as already-broken (no-op,
-// no error), and a waiter's Acquire breaks it as stale and proceeds.
 func TestCorruptLock_ReleasedQuietlyAndBrokenByAcquire(t *testing.T) {
 	dir := t.TempDir()
 	l, err := Acquire(context.Background(), dir, Options{})
@@ -67,15 +57,12 @@ func TestCorruptLock_ReleasedQuietlyAndBrokenByAcquire(t *testing.T) {
 	}
 }
 
-// A crashed WAITER's ticket (dead pid) must not wedge FIFO: later waiters
-// sweep it and proceed.
 func TestQueue_DeadWaiterTicketSwept(t *testing.T) {
 	dir := t.TempDir()
 	queueDir := filepath.Join(dir, queueDirName)
 	if err := os.MkdirAll(queueDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// Lexicographically FIRST ticket, owned by a dead pid.
 	stale := filepath.Join(queueDir, "00000000000000000001-000000001-4194000")
 	if err := os.WriteFile(stale, []byte("4194000\n"), 0o644); err != nil {
 		t.Fatalf("stale ticket: %v", err)
@@ -99,8 +86,6 @@ func TestQueue_DeadWaiterTicketSwept(t *testing.T) {
 	}
 }
 
-// A queue entry with no parsable pid is fail-safe: never swept, so it holds
-// the head and a live waiter blocks until its context expires.
 func TestQueue_UnparsableTicketIsNeverSwept(t *testing.T) {
 	dir := t.TempDir()
 	queueDir := filepath.Join(dir, queueDirName)
@@ -123,7 +108,6 @@ func TestQueue_UnparsableTicketIsNeverSwept(t *testing.T) {
 	}
 }
 
-// pidAlive: non-positive pids are never alive; the running test process is.
 func TestPidAliveBounds(t *testing.T) {
 	if pidAlive(0) || pidAlive(-1) {
 		t.Error("pidAlive(non-positive) = true, want false")
@@ -133,7 +117,6 @@ func TestPidAliveBounds(t *testing.T) {
 	}
 }
 
-// ticketPID: unparsable names yield 0 (fail-safe: never swept).
 func TestTicketPIDParsing(t *testing.T) {
 	for name, want := range map[string]int{"nodash": 0, "1-notanumber": 0, "1-2-345": 345} {
 		if got := ticketPID(name); got != want {
@@ -142,16 +125,13 @@ func TestTicketPIDParsing(t *testing.T) {
 	}
 }
 
-// Release surfaces a genuine lock-read I/O failure (path readable as neither
-// absent nor a lease) instead of guessing.
 func TestRelease_ReadErrorSurfaces(t *testing.T) {
-	l := &Lease{path: t.TempDir(), token: "x"} // a directory: ReadFile errors, not ENOENT
+	l := &Lease{path: t.TempDir(), token: "x"}
 	if err := l.Release(); err == nil {
 		t.Fatal("Release on unreadable lock path: want error, got nil")
 	}
 }
 
-// tryAcquire fails loudly when the lease cannot be staged (read-only dir).
 func TestTryAcquire_StageWriteFailure(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root ignores file modes")
@@ -175,8 +155,6 @@ func TestTryAcquire_StageWriteFailure(t *testing.T) {
 	}
 }
 
-// The enqueue path fails loudly when the queue directory cannot be created
-// (evolveDir path occupied by a regular file).
 func TestAcquire_QueueDirCreateFailure(t *testing.T) {
 	parent := t.TempDir()
 	notADir := filepath.Join(parent, "evolve-as-file")

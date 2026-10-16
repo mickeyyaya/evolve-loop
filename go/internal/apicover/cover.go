@@ -8,21 +8,14 @@ import (
 	"strings"
 )
 
-// CoverEntry is one row of `go tool cover -func` output.
 type CoverEntry struct {
-	Path string // import-path-qualified file, e.g. "github.com/x/y/foo.go"
-	File string // basename, e.g. "foo.go"
-	Line int    // the func's line
-	Func string // bare func/method name as cover prints it (no receiver)
+	Path string
+	File string
+	Line int
+	Func string
 	Pct  float64
 }
 
-// ParseCoverFunc parses `go tool cover -func` output. Each data row is
-// "path:line:\tFuncName\tNN.N%"; the trailing "total:" summary line is skipped.
-// The func name and percentage are taken as the last two whitespace fields and
-// everything before them is the location, so a path containing spaces (common
-// on developer machines) parses correctly. Malformed lines are skipped rather
-// than failing the whole report.
 func ParseCoverFunc(r io.Reader) ([]CoverEntry, error) {
 	var out []CoverEntry
 	sc := bufio.NewScanner(r)

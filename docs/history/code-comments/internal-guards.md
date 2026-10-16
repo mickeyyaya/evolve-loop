@@ -464,3 +464,11 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // legitimately mentions `git push` and `git commit` (the v11.7.5
 // failure mode that triggered this fix).
 ```
+
+## comment-zero D4
+
+### `go/internal/guards/docdelete_uncommitted_test.go:22` — above `var draftCycle = activeCycle{cs: core.CycleState{CycleID: 2, RunID: "draft"}}`
+
+```text
+// cycle 2 of run "draft" owns docs/explain/builds/cycle-2-draft.md (explanationdocs.DocumentPath).
+```

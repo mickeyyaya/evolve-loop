@@ -23,7 +23,6 @@ func TestSystemFailurePolicy_FloorAndLevelPredicates(t *testing.T) {
 		}
 	}
 
-	// These lines name the value types and the level/action vocabulary for apicover.
 	var _ SystemFailurePolicy = fp
 	_ = fp.Thresholds
 	system := FailureCategory{Level: LevelSystem, Action: ActionHaltAndDiagnose}

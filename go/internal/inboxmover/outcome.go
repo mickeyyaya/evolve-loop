@@ -11,31 +11,26 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 )
 
-// CycleOutcome is one cycle's verdict as the inbox lifecycle consumes it.
 type CycleOutcome struct {
 	Cycle        int
-	Passed       bool     // PASS promotes the committed ids; FAIL bumps and may quarantine them
-	CommittedIDs []string // the worked set (top_n + skip_shipped); on FAIL, nil bumps the whole cycle dir
-	CommitSHA    string   // PASS only; "" means no SHA prefix
-	Reason       string   // ledger reason; "" means the default
-	Ceiling      int      // FAIL only; <= 0 disables quarantine
-	SystemLevel  bool     // a system-level failure, which never quarantines
-	Routed       bool     // FAIL only: the closeout already routed the refused item console-manual, so no bump or park
+	Passed       bool
+	CommittedIDs []string
+	CommitSHA    string
+	Reason       string
+	Ceiling      int
+	SystemLevel  bool
+	Routed       bool
 }
 
-// OutcomeResult reports what the seam moved, by task id or destination path.
 type OutcomeResult struct {
-	Promoted        []string // committed ids moved to processed/cycle-N/
-	RetiredUnbacked []string // committed ids no inbox item backs, retired as processed/cycle-N/ records
+	Promoted        []string
+	RetiredUnbacked []string
 	Released        []string
 	Quarantined     []string
 }
 
-// shipUnbackedReason is the retirement reason of a shipped id no inbox item backs.
 const shipUnbackedReason = "ship-promote-processed: no inbox item backs the id"
 
-// ApplyCycleOutcome applies one cycle's verdict to the inbox lifecycle.
-// See ADR-0079.
 func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	opts.resolveOpts()
 	res := OutcomeResult{}
@@ -43,8 +38,6 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 
 	if oc.Passed {
 		cycleStr := strconv.Itoa(oc.Cycle)
-		// Promote errors are collected, not returned early: the residual drain
-		// below must always run, or claimed items strand in processing/.
 		var errs []error
 		var notMoved []string
 		for _, id := range committed {
@@ -75,7 +68,6 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		return res, nil
 	}
 
-	// Claim first: the drain bumps only what sits in processing/cycle-N/.
 	ClaimLaneScope(opts, oc.Cycle, committed)
 	var committedSet map[string]bool
 	if len(committed) > 0 {
@@ -103,13 +95,11 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	return res, nil
 }
 
-// ClaimLaneScope claims each resolvable id into processing/cycle-<cycle>/, skipping the rest.
 func ClaimLaneScope(opts Options, cycle int, ids []string) []string {
 	opts.resolveOpts()
 	cycleStr := strconv.Itoa(cycle)
 	var claimed []string
 	for _, id := range dedupeIDs(ids) {
-		// Already claimed by this cycle: re-claiming from the root would raise a false not-found.
 		if loc, lerr := lifecycle.Locate(opts.InboxDir, id); lerr == nil && loc.Cycle == cycle {
 			claimed = append(claimed, id)
 			continue
@@ -123,7 +113,6 @@ func ClaimLaneScope(opts Options, cycle int, ids []string) []string {
 	return claimed
 }
 
-// CommittedIDs returns the deduped union of a triage decision's top_n ids and skip_shipped task ids, or nil on bad JSON.
 func CommittedIDs(body []byte) []string {
 	var d struct {
 		TopN []struct {
@@ -146,7 +135,6 @@ func CommittedIDs(body []byte) []string {
 	return dedupeIDs(out)
 }
 
-// DeferredIDs returns the ids triage explicitly deferred, which consumption must never retire.
 func DeferredIDs(body []byte) []string {
 	var d struct {
 		Deferred []struct {
@@ -163,14 +151,9 @@ func DeferredIDs(body []byte) []string {
 	return dedupeIDs(out)
 }
 
-// closedDropReasons are the only drop reasons consumption may retire; an unknown
-// reason, or "stale", keeps the item pickable because a live todo outranks a stale one.
 var closedDropReasons = []string{"already-shipped", "already-done", "already-landed", "duplicate", "superseded", "obsolete"}
 
-// ClosedDroppedIDs returns the ids triage dropped with a close-class reason.
 func ClosedDroppedIDs(body []byte) []string {
-	// dropped[] has two sibling readers with other policies (carryover's triageDroppedIDs,
-	// committedset.DispositionsFrom); a schema change must land in all three.
 	var d struct {
 		Dropped []struct {
 			ID     string `json:"id"`
@@ -193,8 +176,6 @@ func ClosedDroppedIDs(body []byte) []string {
 	return dedupeIDs(out)
 }
 
-// dropReasonTag returns the lowercased text before a reason's first ':'. A reason
-// is classified by what it leads with, so "stale: superseded by X" stays stale.
 func dropReasonTag(reason string) string {
 	if i := strings.IndexByte(reason, ':'); i >= 0 {
 		reason = reason[:i]
@@ -202,7 +183,6 @@ func dropReasonTag(reason string) string {
 	return strings.ToLower(strings.TrimSpace(reason))
 }
 
-// dedupeIDs drops empties and duplicates, preserving first-seen order; it returns nil when none remain.
 func dedupeIDs(ids []string) []string {
 	if len(ids) == 0 {
 		return nil

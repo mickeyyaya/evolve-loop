@@ -81,7 +81,7 @@ func TestReadDeliverableWithGrace_BlankConfirmsEmptyAfterWindow(t *testing.T) {
 
 func TestReadDeliverableWithGrace_NonAbsenceIOFailsImmediatelyAsInfra(t *testing.T) {
 	calls := withGraceSeam(t, nil)
-	dir := t.TempDir() // reading a DIRECTORY: EISDIR-class, never clears on its own
+	dir := t.TempDir()
 	_, _, err := readDeliverableWithGrace(dir)
 	if err == nil {
 		t.Fatal("a non-absence read fault must surface as an error (infra), not a violation")

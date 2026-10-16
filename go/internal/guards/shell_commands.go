@@ -7,20 +7,11 @@ import (
 	"unicode"
 )
 
-// shellCommand is one simple command the shell runs: its text for verb matching and its words, unquoted,
-// for naming what it executes.
 type shellCommand struct {
 	text  string
 	words []string
 }
 
-// splitShellCommands splits a Bash tool command into the simple commands the shell would run.
-// Commands end at ; & | newline and parentheses. A command substitution, $( ) or backticks, is a
-// command of its own even inside double quotes, because the shell runs it. Comments and heredoc
-// bodies are dropped. Only an unquoted << outside a comment and outside parentheses opens a heredoc,
-// since inside them << may be an arithmetic shift, as in $((x<<y)).
-// It is a guard's approximation, not a parser: a close it cannot place ends a heredoc early, which
-// shows the guard more text, never less.
 func splitShellCommands(cmd string) []shellCommand {
 	s := &shellScanner{src: cmd}
 	s.push(0)
@@ -45,7 +36,6 @@ type shellScanner struct {
 	out      []shellCommand
 }
 
-// scanContext is the top level or one open command substitution, closed by closer.
 type scanContext struct {
 	closer   byte
 	depth    int
@@ -280,7 +270,6 @@ func anyCommand(words []string, runs func(name string, args []string) bool) bool
 	return false
 }
 
-// gitOptionsWithValue are git's global options that take the next word as their value.
 var gitOptionsWithValue = map[string]bool{
 	"-C": true, "-c": true, "--git-dir": true, "--work-tree": true,
 	"--namespace": true, "--super-prefix": true, "--config-env": true,
@@ -348,8 +337,6 @@ func (s *shellScanner) heredocOrHereString(c *scanContext) {
 	s.i += n + width
 }
 
-// heredocWord reads the heredoc delimiter word at the start of src and returns its width and its
-// quote-removed text, which is the line bash waits for: the whole word, not an identifier prefix.
 func heredocWord(src string) (int, string) {
 	var marker strings.Builder
 	i := 0
@@ -377,8 +364,6 @@ func heredocWord(src string) (int, string) {
 	return min(i, len(src)), marker.String()
 }
 
-// dquotedWordPart appends the quote-removed text of a double-quoted part to marker and returns the
-// width consumed, through the closing quote. A backslash escapes only $ ` " \ and newline, as in bash.
 func dquotedWordPart(src string, marker *strings.Builder) int {
 	i := 0
 	for i < len(src) && src[i] != '"' {
@@ -395,9 +380,6 @@ func dquotedWordPart(src string, marker *strings.Builder) int {
 	return i + 1
 }
 
-// skipHeredocBodies drops the bodies of the heredocs opened on the line just ended, in order. A body
-// ends at a line holding its marker after leading blanks, or the marker then ")"; the scan resumes
-// right after the marker. An unterminated body runs to the end of the input, as in bash.
 func (s *shellScanner) skipHeredocBodies() {
 	for _, marker := range s.heredocs {
 		for s.i < len(s.src) {
@@ -419,7 +401,6 @@ func (s *shellScanner) skipHeredocBodies() {
 	s.heredocs = nil
 }
 
-// commandBuilder accumulates one command's text and words.
 type commandBuilder struct {
 	text   strings.Builder
 	word   strings.Builder

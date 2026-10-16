@@ -8,17 +8,11 @@ import (
 	"testing"
 )
 
-// TestAppendGuardsLog_AllowLine verifies the audit-trail line format
-// matches the bash counterpart in scripts/guards/*.sh — `[ts] [tag] ALLOW`
-// or `[ts] [tag] DENY: reason`. Parity is load-bearing: external tooling
-// greps guards.log and must see the same lines whether the bash hook or
-// the Go shim wrote them.
 func TestAppendGuardsLog_AllowLine(t *testing.T) {
 	dir := t.TempDir()
 	appendGuardsLog(filepath.Join(dir, "guards.log"), "ship", true, "")
 
 	got := readLog(t, filepath.Join(dir, "guards.log"))
-	// Format: `[YYYY-MM-DDTHH:MM:SSZ] [ship-gate] ALLOW\n`
 	if !strings.Contains(got, "] [ship-gate] ALLOW") {
 		t.Errorf("missing tag/decision in line: %q", got)
 	}
@@ -37,8 +31,6 @@ func TestAppendGuardsLog_DenyLine(t *testing.T) {
 	}
 }
 
-// Each Go guard subcommand name must map to the bash audit-trail tag so
-// parity-audit.sh's diff against scripts/guards/*.sh stays clean.
 func TestAppendGuardsLog_TagMapping(t *testing.T) {
 	cases := []struct {
 		guardName string
@@ -61,8 +53,6 @@ func TestAppendGuardsLog_TagMapping(t *testing.T) {
 	}
 }
 
-// Unknown guard names fall through to using the raw name as the tag.
-// Matches bash behavior where no-op tags pass through.
 func TestAppendGuardsLog_UnknownGuardFallsThrough(t *testing.T) {
 	dir := t.TempDir()
 	appendGuardsLog(filepath.Join(dir, "guards.log"), "novel", true, "")
@@ -72,8 +62,6 @@ func TestAppendGuardsLog_UnknownGuardFallsThrough(t *testing.T) {
 	}
 }
 
-// TestAppendGuardsLog_CustomPath verifies that appendGuardsLog writes to the
-// logPath passed directly, not to the default guards.log location.
 func TestAppendGuardsLog_CustomPath(t *testing.T) {
 	dir := t.TempDir()
 	custom := filepath.Join(dir, "subdir", "custom.log")
@@ -87,12 +75,7 @@ func TestAppendGuardsLog_CustomPath(t *testing.T) {
 	}
 }
 
-// Best-effort guarantee: appendGuardsLog must never panic or surface an
-// error to the caller, since hook latency is in the critical path and the
-// audit-log is a secondary concern.
 func TestAppendGuardsLog_UnwritablePathSilent(t *testing.T) {
-	// Point at a path under a non-existent unwritable parent; MkdirAll
-	// will fail, function must return without panic.
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("panic on unwritable path: %v", r)
@@ -110,9 +93,6 @@ func readLog(t *testing.T, path string) string {
 	return string(b)
 }
 
-// TestRunGuard_EmitsAuditLine wires runGuard end-to-end and asserts the
-// audit-log side-effect happens. Uses the `chain` guard with empty input
-// (no ledger entries → Allow) to avoid needing a full ship-gate fixture.
 func TestRunGuard_EmitsAuditLine(t *testing.T) {
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer

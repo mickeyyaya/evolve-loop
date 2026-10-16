@@ -76,7 +76,6 @@ func TestLoopSummary_RollsUpSpineFailOpensPerBatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build quiet cycle: %v", err)
 	}
-	// A cycle over the threshold of 3: four events, three of them on audit.
 	noisy, err := Build(1161, spineFailOpenBuildOpts(t, []cyclestate.SpineFailOpen{
 		{Phase: "audit", MissingArtifact: "build", Reason: "would-block at enforce"},
 		{Phase: "audit", MissingArtifact: "build", Reason: "would-block at enforce"},

@@ -94,7 +94,6 @@ func TestRetryPolicy_UnmarshalJSON(t *testing.T) {
 
 	t.Run("absent-uses-defaults", func(t *testing.T) {
 		var rp policy.RetryPolicy
-		// Called directly so apicover sees the method named.
 		if err := rp.UnmarshalJSON([]byte(`{"phase_max_attempts":3}`)); err != nil {
 			t.Fatalf("UnmarshalJSON: %v", err)
 		}

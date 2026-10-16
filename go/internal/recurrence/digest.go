@@ -1,12 +1,5 @@
 package recurrence
 
-// Chronicle S2: deterministic token-capped recent-outcomes digest
-// (chronicle-s2-digest-writer). WriteDigest renders the caller-assembled
-// recent cycle history into <workspacePath>/recent-outcomes.md so downstream
-// prompts can cite what actually happened lately. The function is pure with
-// respect to inputs: the CALLER assembles DigestInput (dossiers, failed
-// approaches, recurrence index) — WriteDigest only renders and writes.
-
 import (
 	"fmt"
 	"os"
@@ -18,36 +11,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 )
 
-// DigestInput is the caller-assembled history WriteDigest renders.
 type DigestInput struct {
 	Dossiers         []dossier.Dossier
 	FailedApproaches []failureadapter.Entry
 	Index            *Ledger
 }
 
-// DigestConfig bounds the rendered digest: TokenBudget caps the whole file
-// (local len/4 estimator), Cycles caps the dossier window.
 type DigestConfig struct {
 	TokenBudget int
 	Cycles      int
 }
 
-// digestFileName is the single artifact WriteDigest owns.
 const digestFileName = "recent-outcomes.md"
 
-// digestTopPatterns caps the non-generic PatternStats section (compiled
-// constant per the chronicle plan, not policy-tunable).
 const digestTopPatterns = 5
 
-// estimateDigestTokens is the LOCAL chars/4 token estimator (same heuristic as
-// deliverable.charsPerToken — deliberately not imported: deliverable would be
-// an import cycle from this core package).
 func estimateDigestTokens(s string) int { return len(s) / 4 }
 
-// sanitizeLine collapses newlines, carriage returns, and tabs to spaces (the
-// triage sanitizePromptValue idiom). Digest values are LLM-authored and are
-// re-injected into later prompts, so an embedded "\n- directive" is a prompt
-// injection channel — every rendered value passes through here.
 func sanitizeLine(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r == '\n' || r == '\r' || r == '\t' {
@@ -57,10 +37,6 @@ func sanitizeLine(s string) string {
 	}, s)
 }
 
-// WriteDigest renders in to <workspacePath>/recent-outcomes.md, newest cycle
-// first, one line per cycle, truncated to cfg.TokenBudget by dropping the
-// oldest content first. Empty history writes no file (a headers-only artifact
-// would waste prompt tokens every cycle and signal false coverage).
 func WriteDigest(workspacePath string, in DigestInput, cfg DigestConfig) error {
 	lines := digestLines(in, cfg)
 	if len(lines) == 0 {
@@ -86,9 +62,6 @@ func WriteDigest(workspacePath string, in DigestInput, cfg DigestConfig) error {
 	return nil
 }
 
-// digestLines renders the body lines in priority order: cycle outcomes newest
-// first, then failed approaches, then pattern stats. Truncation later drops
-// from the END, so priority order doubles as retention order.
 func digestLines(in DigestInput, cfg DigestConfig) []string {
 	var lines []string
 
@@ -112,8 +85,6 @@ func digestLines(in DigestInput, cfg DigestConfig) []string {
 	return lines
 }
 
-// cycleLine renders one dossier as a single sanitized bullet:
-// cycle, goal, verdict, one-line why, carryover ids.
 func cycleLine(d dossier.Dossier) string {
 	parts := []string{fmt.Sprintf("cycle %d %s — %s", d.Cycle, sanitizeLine(d.FinalVerdict), sanitizeLine(d.Goal))}
 	if len(d.Defects) > 0 {
@@ -149,10 +120,6 @@ func failedApproachLines(entries []failureadapter.Entry) []string {
 	return lines
 }
 
-// patternLines renders the top-K non-generic recurrence patterns one per line
-// and rolls ALL generic (classification-vocabulary) patterns up into ONE
-// aggregate line — e.g. "158 floor lessons: operator-reset x96, loop-fatal x62"
-// — so vocabulary noise can never crowd out actionable patterns.
 func patternLines(idx *Ledger) []string {
 	if idx == nil {
 		return nil

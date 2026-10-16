@@ -11,8 +11,6 @@ import (
 
 const tokenFixture = "67dffdcb2fb3ab46"
 
-// writeTokenWorkspace lays out a workspace with challenge-token.txt and a
-// build-report.md of the given content; returns the roots.
 func writeTokenWorkspace(t *testing.T, report string, withTokenFile bool) phasecontract.Roots {
 	t.Helper()
 	ws := t.TempDir()
@@ -27,7 +25,6 @@ func writeTokenWorkspace(t *testing.T, report string, withTokenFile bool) phasec
 	return phasecontract.Roots{Workspace: ws}
 }
 
-// wellFormedBuildReport satisfies every other build rule, so the token echo is the only variable.
 func wellFormedBuildReport(token string) string {
 	tok := ""
 	if token != "" {

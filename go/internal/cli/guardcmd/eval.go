@@ -50,11 +50,6 @@ func runEvalQualityCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "  L%d %s   %s\n", c.Level, c.Reason, c.Line)
 	}
 	overall := res.Overall
-	// Keyed on flag PRESENCE, not on a non-empty value: `-predicates "$DIR"` with
-	// DIR unset is the realistic shell slip, and skipping the lint on it printed a
-	// clean PASS with no receipt at all — the same silent-clean class as the
-	// dropped flag this loop already exists to prevent. An empty value now reaches
-	// the lint, which reports it as the error it is.
 	if flagWasSet(fs, "predicates") {
 		for _, lint := range predicateLints() {
 			overall = maxEvalLevel(overall, lint.advise(*predicates, stdout, stderr))
@@ -73,21 +68,6 @@ func runEvalQualityCheck(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-// parseInterspersed parses args into fs, accepting flags BEFORE or AFTER the
-// positionals, and returns the positionals (ok=false on a flag error, already
-// reported to fs.Output()).
-//
-// stdlib flag stops at the first positional, so the documented
-// `quality-check <eval.md> -predicates <dir>` order silently DROPPED the flag —
-// probed live 2026-07-30: the lint ran on nothing and reported a clean PASS.
-// cmdutil.ReorderArgs is bool-flag-only by contract and would scatter
-// -predicates' VALUE into the positional list, so this collects positionals one
-// at a time and re-parses the remainder (the opscmd console-lease shape). Each
-// iteration strictly shrinks `remaining`, so the loop terminates.
-//
-// Contract note: an unknown flag placed after a positional was previously
-// absorbed as an ignored extra positional and now errors (rc 10) — stricter, and
-// the only in-repo caller passes a single positional.
 func parseInterspersed(fs *flag.FlagSet, args []string) (positional []string, ok bool) {
 	remaining := args
 	for {
@@ -102,9 +82,6 @@ func parseInterspersed(fs *flag.FlagSet, args []string) (positional []string, ok
 	}
 }
 
-// flagWasSet reports whether name was given on the command line at all,
-// regardless of the value parsed. The interspersed-parse loop above calls
-// fs.Parse repeatedly, and fs.Visit reflects every set flag across those calls.
 func flagWasSet(fs *flag.FlagSet, name string) bool {
 	set := false
 	fs.Visit(func(f *flag.Flag) {
@@ -115,10 +92,6 @@ func flagWasSet(fs *flag.FlagSet, name string) bool {
 	return set
 }
 
-// maxEvalLevel is the monotonic severity join: PASS(0) < WARN(1) < HALT(2), so
-// the result is never LESS severe than either input. Every advisory contribution
-// to the quality-check verdict goes through it, which is what makes "advisory can
-// never lower a HALT" a property of the code rather than of one conjunct.
 func maxEvalLevel(a, b evalqualitycheck.Level) evalqualitycheck.Level {
 	if b > a {
 		return b
@@ -173,9 +146,6 @@ func unsatisfiableLintFindings(path string) (int, []string, error) {
 	return report.Linted(), findings, err
 }
 
-// runEvalDiversityCheck implements `evolve eval diversity-check <evalsDir> [slug]`.
-// Scores a directory of evals for adversarial diversity (negative + edge cases).
-// Exit codes: 0 PASS, 1 WARN, 2 HALT, 10 bad args, 1 internal error.
 func runEvalDiversityCheck(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("eval diversity-check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -214,9 +184,6 @@ func runEvalDiversityCheck(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-// runEvalVerify implements `evolve eval verify <eval.md> <workspace>`.
-// Exit codes:
-//   - 0 verdict PASS, 1 verdict FAIL, 10 bad args, 1 internal error.
 func runEvalVerify(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("eval verify", flag.ContinueOnError)
 	fs.SetOutput(stderr)

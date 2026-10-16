@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// makeRepo returns a temp project root holding an empty .evolve/inbox.
 func makeRepo(t *testing.T) string {
 	t.Helper()
 	ws := fixtures.NewWorkspace(t).Build()
@@ -260,7 +259,6 @@ func TestPromote_InboxFallback(t *testing.T) {
 	if res.NoOp {
 		t.Error("NoOp = true, want false (inbox/ fallback)")
 	}
-	// A root item's ledger From double-nests inbox/ (a preserved quirk).
 	body, _ := os.ReadFile(filepath.Join(repo, ".evolve", "ledger.jsonl"))
 	if !strings.Contains(string(body), `.evolve/inbox/inbox/task-1.json`) {
 		t.Errorf("ledger missing inbox-fallback entry: %s", body)

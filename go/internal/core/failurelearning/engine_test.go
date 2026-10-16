@@ -20,7 +20,6 @@ var fixedNow = time.Date(2026, 7, 15, 1, 2, 3, 0, time.UTC)
 
 func clock() time.Time { return fixedNow }
 
-// observed builds an engine reporting into a recording Center.
 func observed(t *testing.T) (*Engine, *[]signalcenter.Event) {
 	t.Helper()
 	c := signalcenter.New()
@@ -30,7 +29,6 @@ func observed(t *testing.T) (*Engine, *[]signalcenter.Event) {
 	return e, got
 }
 
-// seedBlock writes a phase report carrying a structured failure block.
 func seedBlock(t *testing.T, ws, phase string, fb *phasecontract.FailureBlock) {
 	t.Helper()
 	body := "## " + strings.ToUpper(phase[:1]) + phase[1:] + "\nFAIL\n" + phasecontract.RenderVerdictSentinelWithFailure(phase, "FAIL", fb) + "\n"
@@ -43,8 +41,6 @@ func auditFailure(root, ws string) Failure {
 	return Failure{Cycle: 1279, Phase: cyclestate.PhaseAudit, Err: errors.New("audit phase exited 1 after 3 attempts"), ProjectRoot: root, Workspace: ws}
 }
 
-// Test 14 — the recorder mints the FailedRecord and the P0 todo over the SAME
-// state, stamps LastCycleNumber, and returns what it derived.
 func TestRecordFailedApproach_MintsRecordAndTodoAndStampsState(t *testing.T) {
 	e := New(clock, carryover.New())
 	st := &cyclestate.State{LastCycleNumber: 1278}
@@ -76,8 +72,6 @@ func TestRecordFailedApproach_MintsRecordAndTodoAndStampsState(t *testing.T) {
 	}
 }
 
-// Test 15 — the State's wire shape is byte-identical to the golden captured
-// on 97825125 (a seeded structured block, the fixed clock).
 func TestRecordFailedApproach_MarshalsByteIdenticalToTheGolden(t *testing.T) {
 	ws := t.TempDir()
 	seedBlock(t, ws, "audit", &phasecontract.FailureBlock{Class: "code-build-fail", Defects: []string{"d1", "d2"}, EvidencePaths: []string{"go/x_test.go"}})
@@ -135,7 +129,6 @@ func TestRecordFailedApproach_NilStatePanicsAsBefore(t *testing.T) {
 	New(clock, carryover.New()).RecordFailedApproach(nil, auditFailure("", ""))
 }
 
-// Test 16 — the ADR-0039 §7 trust boundary (moved verbatim from core).
 func TestAdoptStructuredFailure_TrustBoundary(t *testing.T) {
 	ws := t.TempDir()
 	seedBlock(t, ws, "triage", &phasecontract.FailureBlock{Class: "totally-novel-class", Defects: []string{"d"}})
@@ -155,7 +148,7 @@ func TestAdoptStructuredFailure_TrustBoundary(t *testing.T) {
 	if len(fb.Defects) != maxAdoptedDefects {
 		t.Errorf("defect list not capped: %d", len(fb.Defects))
 	}
-	if r := []rune(fb.Defects[0]); len(r) != maxAdoptedDefectRunes+1 { // +1 for the ellipsis
+	if r := []rune(fb.Defects[0]); len(r) != maxAdoptedDefectRunes+1 {
 		t.Errorf("defect entry not capped: %d runes", len(r))
 	}
 	if adoptStructuredFailure(t.TempDir(), "triage") != nil {
@@ -174,8 +167,6 @@ func TestCapStrings_BoundsEntriesAndRunesWithTheCarryoverCap(t *testing.T) {
 	}
 }
 
-// Test 27 — construction contract: options, the live accessor, the Null
-// Object, the registered codes. Every export is named here (apicover).
 func TestWithSignals_NilIsTheNullObject(t *testing.T) {
 	for _, opts := range [][]Option{nil, {WithSignals(nil)}, {WithSignals(func() *signalcenter.Center { return nil })}} {
 		e := New(clock, carryover.New(), opts...)
@@ -186,7 +177,7 @@ func TestWithSignals_NilIsTheNullObject(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(root, ".evolve", "policy.json"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		e.WriteFloor(Failure{Cycle: 1, Phase: cyclestate.PhaseAudit, ProjectRoot: root, Workspace: t.TempDir()}, Learned{Summary: "s"}) // a provoked fault emits into nothing
+		e.WriteFloor(Failure{Cycle: 1, Phase: cyclestate.PhaseAudit, ProjectRoot: root, Workspace: t.TempDir()}, Learned{Summary: "s"})
 	}
 }
 
@@ -220,9 +211,6 @@ func TestFailureLearningCodes_AreRegisteredWithDocs(t *testing.T) {
 	}
 }
 
-// The two request shapes are constructed positionally so a new field breaks
-// this test at compile time and the ONE projection (core's failureOf) and the
-// floor-verdict producer are revisited (the 11-field DTO's silent-zero hazard).
 func TestRequestShapes_HaveExactlyTheDeclaredFields(t *testing.T) {
 	f := Failure{1, cyclestate.PhaseAudit, errors.New("e"), "root", "ws"}
 	l := Learned{"summary", "todo", &phasecontract.FailureBlock{}}

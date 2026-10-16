@@ -12,9 +12,8 @@ func TestSweepResult_FieldsReportOnePassOutcome(t *testing.T) {
 	initSweepRepo(t, dir)
 	writePairFile(t, dir, "knowledge-base/cycles/cycle-7.json", `{"cycle":7}`)
 	writePairFile(t, dir, "knowledge-base/cycles/cycle-7.md", "# cycle 7\n")
-	writePairFile(t, dir, "knowledge-base/cycles/cycle-8.json", `{"cycle":8}`) // lone half-pair
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-8.json", `{"cycle":8}`)
 
-	// Typed explicitly so apicover sees the SweepResult identifier in the test AST.
 	var got SweepResult
 	got, err := SweepOrphans(gitexec.Default(dir), io.Discard)
 	if err != nil {

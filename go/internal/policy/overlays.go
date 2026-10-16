@@ -10,14 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// OverlaysPolicy is the "overlays" block; a dispatch may match several rules, and their skills union.
 type OverlaysPolicy struct {
-	Rules []OverlayRule `json:"rules,omitempty"`
-	// Advisor bounds what the advisor may propose; nil means allow all, deny none, max 2.
+	Rules   []OverlayRule         `json:"rules,omitempty"`
 	Advisor *AdvisorOverlayPolicy `json:"advisor,omitempty"`
 }
 
-// AdvisorOverlayPolicy is the operator's clamp on advisor-proposed skills.
 type AdvisorOverlayPolicy struct {
 	AllowList            []string `json:"allow_list,omitempty"`
 	DenyList             []string `json:"deny_list,omitempty"`
@@ -26,27 +23,21 @@ type AdvisorOverlayPolicy struct {
 
 const defaultMaxSkillsPerDispatch = 2
 
-// AdvisorSkillRejection records one clamped-out proposal, logged to advisor-rejections.json.
 type AdvisorSkillRejection struct {
-	Skill string `json:"skill"`
-	// Reason is "not-in-registry", "not-allowlisted", "denylisted" or "over-max-skills-per-dispatch".
+	Skill  string `json:"skill"`
 	Reason string `json:"reason"`
 }
 
-// OverlayRule matches when every non-empty selector glob-matches (path.Match) and every When clause holds.
 type OverlayRule struct {
-	Phases []string `json:"phases,omitempty"`
-	CLIs   []string `json:"clis,omitempty"`
-	Models []string `json:"models,omitempty"`
-	Tiers  []string `json:"tiers,omitempty"`
-	// When keys the rule on the cycle's signals; a clause on an absent signal never matches.
-	// See ADR-0099.
+	Phases       []string           `json:"phases,omitempty"`
+	CLIs         []string           `json:"clis,omitempty"`
+	Models       []string           `json:"models,omitempty"`
+	Tiers        []string           `json:"tiers,omitempty"`
 	When         []config.Condition `json:"when,omitempty"`
 	WritesSource bool               `json:"writes_source,omitempty"`
 	Skills       []string           `json:"skills,omitempty"`
 }
 
-// OverlayDispatch describes one agent launch for overlay resolution; nil Signals leaves every When rule inert.
 type OverlayDispatch struct {
 	Phase        string
 	CLI          string
@@ -60,7 +51,6 @@ const SelfReviewSkill = "code-review-simplify"
 
 const DocumentWriteSkill = "docs-write"
 
-// compiledDefaultOverlays is the only built-in tier→skills mapping; a policy overlays block replaces it wholesale.
 func compiledDefaultOverlays() []OverlayRule {
 	document := []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindDocument}}
 	code := []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindCode}}
@@ -74,7 +64,6 @@ func compiledDefaultOverlays() []OverlayRule {
 	}
 }
 
-// CompiledDefaultOverlaySkills lists the compiled-default skills; ProtectedSurfaceManifest is pinned to it.
 func CompiledDefaultOverlaySkills() []string {
 	var out []string
 	seen := map[string]struct{}{}
@@ -90,7 +79,6 @@ func CompiledDefaultOverlaySkills() []string {
 	return out
 }
 
-// ResolveOverlays returns the deduped skills, in first-seen order, of every rule matching d.
 func (p Policy) ResolveOverlays(d OverlayDispatch) []string {
 	rules := compiledDefaultOverlays()
 	if p.Overlays != nil {
@@ -116,15 +104,12 @@ func (p Policy) ResolveOverlays(d OverlayDispatch) []string {
 	return out
 }
 
-// DispatchFromPhaseRequest builds an OverlayDispatch; pass tier="" unless model_routing=auto produced a tier.
 func DispatchFromPhaseRequest(phase, cli, model, tier string) OverlayDispatch {
 	return OverlayDispatch{Phase: phase, CLI: cli, Model: model, Tier: tier}
 }
 
-// ResolveLaunchOverlaysFailOpen resolves overlays for the non-phase launch seams, where model doubles as the tier.
 func ResolveLaunchOverlaysFailOpen(projectRoot, phase, cli, model string) []string {
 	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
-	// Fail open: these seams have no report to carry the error, unlike the phase runner.
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[overlays] WARN policy load failed (%v) — using compiled-default overlays\n", err)
 		pol = Policy{}
@@ -132,7 +117,6 @@ func ResolveLaunchOverlaysFailOpen(projectRoot, phase, cli, model string) []stri
 	return pol.ResolveOverlays(DispatchFromPhaseRequest(phase, cli, model, model))
 }
 
-// SkillRegistryFromFS lists skillsDir's subdirectories that contain a SKILL.md; none is a valid empty registry.
 func SkillRegistryFromFS(skillsDir string) ([]string, error) {
 	entries, err := os.ReadDir(skillsDir)
 	if err != nil {
@@ -151,9 +135,7 @@ func SkillRegistryFromFS(skillsDir string) ([]string, error) {
 	return out, nil
 }
 
-// ClampAdvisorSkills filters proposals by registry and overlays.advisor in order, recording each rejection.
 func (p Policy) ClampAdvisorSkills(proposed, registry []string) (accepted []string, rejections []AdvisorSkillRejection) {
-	// Exact string membership, never path-normalized, so a path-like proposal can never resolve.
 	inRegistry := make(map[string]struct{}, len(registry))
 	for _, s := range registry {
 		inRegistry[s] = struct{}{}
@@ -196,7 +178,6 @@ func (p Policy) ClampAdvisorSkills(proposed, registry []string) (accepted []stri
 	return accepted, rejections
 }
 
-// ResolveOverlaysWithAdvisor appends already-clamped advisor skills, deduped, after ResolveOverlays' result.
 func (p Policy) ResolveOverlaysWithAdvisor(d OverlayDispatch, clampedAdvisorSkills []string) []string {
 	out := p.ResolveOverlays(d)
 	if len(clampedAdvisorSkills) == 0 {
@@ -233,8 +214,6 @@ func (r OverlayRule) matches(d OverlayDispatch) bool {
 		matchWhen(r.When, d.Signals)
 }
 
-// matchWhen fails closed: an absent signal, a non-string value or an unknown op
-// never matches, in either polarity.
 func matchWhen(when []config.Condition, signals map[string]string) bool {
 	for _, c := range when {
 		v, ok := signals[c.Field]

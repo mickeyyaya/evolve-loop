@@ -72,7 +72,6 @@ func TestShip_GitGlobalOptionsDoNotHideTheSubcommand(t *testing.T) {
 	}
 }
 
-// bash closes each of these heredocs at its marker line and then runs the git push after it.
 func TestShip_AHeredocMarkerIsTheWholeShellWord(t *testing.T) {
 	for _, cmd := range []string{
 		"cat <<EOF-MARKER\ndata\nEOF-MARKER\ngit push origin main",

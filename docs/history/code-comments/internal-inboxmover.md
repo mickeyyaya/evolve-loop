@@ -1027,3 +1027,11 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // root-resident twin: bump the durable counter where the item actually
 // lives; at the ceiling, move it to the terminal quarantine/ dir.
 ```
+
+## comment-zero D4
+
+### `go/internal/inboxmover/extra_coverage_test.go:94` — above `if err := os.WriteFile(filepath.Join(repo, ".evolve", "inbox", "processed"), []byte("x"), 0o644); err != nil {`
+
+```text
+// Occupy processed/ with a file so processed/cycle-0 cannot be created.
+```

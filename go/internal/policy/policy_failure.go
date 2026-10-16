@@ -2,8 +2,6 @@ package policy
 
 import "fmt"
 
-// Level and action vocabularies of the failure_policy table.
-// See ADR-0072.
 const (
 	LevelSystem = "system"
 	LevelTask   = "task"
@@ -13,7 +11,6 @@ const (
 	ActionDeferOrQuarantine = "defer-or-quarantine"
 )
 
-// Category keys of the failure_policy table; the dossier layer maps failureadapter classifications onto them.
 const (
 	CategoryVerdictIncoherence = "verdict-incoherence"
 	CategoryInfraSystemic      = "infra-systemic"
@@ -24,40 +21,27 @@ const (
 	CategoryIntentMalformed    = "intent-malformed"
 )
 
-// FailureCategory is one row of the failure_policy category table.
 type FailureCategory struct {
 	Level      string `json:"level"`
 	Action     string `json:"action"`
 	FixType    string `json:"fix_type,omitempty"`
 	Signature  string `json:"signature,omitempty"`
-	Floor      bool   `json:"floor,omitempty"`       // Go always halts; not overridable
-	MaxRetries int    `json:"max_retries,omitempty"` // task-level retries before quarantine
+	Floor      bool   `json:"floor,omitempty"`
+	MaxRetries int    `json:"max_retries,omitempty"`
 }
 
-// FailureThresholds are the non-progress, retry and halt counters.
 type FailureThresholds struct {
-	// RepeatCeiling: the same task or failure class recurring this many cycles without landed progress is non-progress.
-	RepeatCeiling int `json:"repeat_ceiling,omitempty"`
-	// VerifiedNotLandedCeiling: this many verified-green cycles that do not land is non-progress.
-	VerifiedNotLandedCeiling int `json:"verified_not_landed_ceiling,omitempty"`
-	// TaskRetryCeiling: a task-level failure count reaching this quarantines the todo.
-	TaskRetryCeiling int `json:"task_retry_ceiling,omitempty"`
-	// GuardClassHaltCeiling: this many guard-abort failures in one batch halt it,
-	// since guard aborts are pipeline failures, never task defects.
-	GuardClassHaltCeiling int `json:"guard_class_halt_ceiling,omitempty"`
-	// IdenticalFingerprintHaltCeiling: one failure fingerprint recurring this many times in a batch halts it.
+	RepeatCeiling                   int `json:"repeat_ceiling,omitempty"`
+	VerifiedNotLandedCeiling        int `json:"verified_not_landed_ceiling,omitempty"`
+	TaskRetryCeiling                int `json:"task_retry_ceiling,omitempty"`
+	GuardClassHaltCeiling           int `json:"guard_class_halt_ceiling,omitempty"`
 	IdenticalFingerprintHaltCeiling int `json:"identical_fingerprint_halt_ceiling,omitempty"`
-	// UnexplainedFailuresHaltCeiling: this many failures with no machine-readable reason in a batch halt it.
-	UnexplainedFailuresHaltCeiling int `json:"unexplained_failures_halt_ceiling,omitempty"`
-	// ConsecutiveFailuresHaltCeiling: this many back-to-back failing cycles, any fingerprints, halt the batch.
-	ConsecutiveFailuresHaltCeiling int `json:"consecutive_failures_halt_ceiling,omitempty"`
-	LaneDeferralHaltCeiling        int `json:"lane_deferral_halt_ceiling,omitempty"`
-	// BuildDeepEscalateAtFailures: an item with this many failures builds next at the
-	// deep tier (raise-only; the envelope still clamps).
-	BuildDeepEscalateAtFailures int `json:"build_deep_escalate_at_failures,omitempty"`
+	UnexplainedFailuresHaltCeiling  int `json:"unexplained_failures_halt_ceiling,omitempty"`
+	ConsecutiveFailuresHaltCeiling  int `json:"consecutive_failures_halt_ceiling,omitempty"`
+	LaneDeferralHaltCeiling         int `json:"lane_deferral_halt_ceiling,omitempty"`
+	BuildDeepEscalateAtFailures     int `json:"build_deep_escalate_at_failures,omitempty"`
 }
 
-// SystemFailurePolicy is the failure_policy decision table (Policy.FailurePolicy resolves failure_floor instead).
 type SystemFailurePolicy struct {
 	Categories         map[string]FailureCategory `json:"categories,omitempty"`
 	Thresholds         FailureThresholds          `json:"thresholds,omitempty"`
@@ -65,7 +49,6 @@ type SystemFailurePolicy struct {
 	OnSystemLevel      string                     `json:"on_system_level,omitempty"`
 }
 
-// DefaultSystemFailurePolicy returns the compiled decision table used when the block is absent.
 func DefaultSystemFailurePolicy() SystemFailurePolicy {
 	return SystemFailurePolicy{
 		Categories: map[string]FailureCategory{
@@ -87,14 +70,11 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 	}
 }
 
-// floorCategories always halt: FailurePolicyConfig re-stamps their default rows over any override.
 var floorCategories = []string{CategoryVerdictIncoherence, CategoryInfraSystemic}
 
-// FailurePolicyConfig merges failure_policy over the defaults, rejecting unknown levels and actions.
 func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 	out := DefaultSystemFailurePolicy()
 	if c := p.SystemFailurePolicy; c != nil {
-		// An override replaces a whole category row; unmentioned rows keep their defaults.
 		for name, cat := range c.Categories {
 			if err := validateCategory(name, cat); err != nil {
 				return SystemFailurePolicy{}, err
@@ -109,7 +89,6 @@ func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 			out.OnSystemLevel = c.OnSystemLevel
 		}
 	}
-	// The floor categories are re-stamped whatever the override said.
 	def := DefaultSystemFailurePolicy()
 	for _, key := range floorCategories {
 		out.Categories[key] = def.Categories[key]
@@ -138,19 +117,16 @@ func positiveOr(v, fallback int) int {
 	return fallback
 }
 
-// IsFloor reports whether the named category is a Go-enforced floor halt.
 func (fp SystemFailurePolicy) IsFloor(category string) bool {
 	c, ok := fp.Categories[category]
 	return ok && c.Floor
 }
 
-// RetryPolicyFor returns the category's row; callers treat ok=false as "no retry", never a default allow.
 func (fp SystemFailurePolicy) RetryPolicyFor(category string) (FailureCategory, bool) {
 	c, ok := fp.Categories[category]
 	return c, ok
 }
 
-// IsSystemLevel reports whether the named category halts the loop.
 func (fp SystemFailurePolicy) IsSystemLevel(category string) bool {
 	c, ok := fp.Categories[category]
 	return ok && c.Level == LevelSystem

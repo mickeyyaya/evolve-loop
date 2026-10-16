@@ -1,10 +1,3 @@
-// Package failureadapter ports scripts/failure/failure-adapter.sh —
-// the deterministic failure-adaptation kernel introduced in v8.22.0.
-//
-// The bash source is at scripts/failure/failure-adapter.sh and its
-// taxonomy at scripts/failure/failure-classifications.sh. This Go port
-// must produce the SAME Decision for the SAME inputs so the trust
-// kernel stays host-CLI-agnostic.
 package failureadapter
 
 import (
@@ -12,17 +5,12 @@ import (
 	"time"
 )
 
-// fixedTime returns a deterministic clock anchor for tests.
-// All RecordedAt/ExpiresAt comparisons use this as "now".
 func fixedTime() time.Time {
 	return time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
 }
 
-// iso formats t as RFC3339 (the schema used by recordedAt/expiresAt).
 func iso(t time.Time) string { return t.UTC().Format(time.RFC3339) }
 
-// TestDecide_NoEntries — empty failedApproaches → PROCEED.
-// Mirrors the "no state.json present" early-exit at bash line 82-93.
 func TestDecide_NoEntries(t *testing.T) {
 	d := Decide(nil, Options{Now: fixedTime()})
 	if d.Action != ActionProceed {
@@ -33,9 +21,6 @@ func TestDecide_NoEntries(t *testing.T) {
 	}
 }
 
-// TestDecide_AllExpired_Proceed — entries past their expiresAt are
-// pruned by the adapter and do not influence the decision. The bash
-// auto-prune behavior (line 95-130) is replicated here.
 func TestDecide_AllExpired_Proceed(t *testing.T) {
 	now := fixedTime()
 	past := now.Add(-2 * 24 * time.Hour)
@@ -52,14 +37,9 @@ func TestDecide_AllExpired_Proceed(t *testing.T) {
 	}
 }
 
-// TestDecide_LegacyMissingExpiresAt_OneDayTTL — bash v8.23.1 fix:
-// when expiresAt is missing but recordedAt is present, effective TTL
-// is recordedAt + 1d. Replicates failure-adapter.sh:124-130.
 func TestDecide_LegacyMissingExpiresAt_OneDayTTL(t *testing.T) {
 	now := fixedTime()
-	// Recorded 12h ago, no expiresAt → still within 1d TTL.
 	fresh := iso(now.Add(-12 * time.Hour))
-	// Recorded 2d ago, no expiresAt → past 1d TTL.
 	stale := iso(now.Add(-48 * time.Hour))
 
 	entries := []Entry{
@@ -72,9 +52,6 @@ func TestDecide_LegacyMissingExpiresAt_OneDayTTL(t *testing.T) {
 	}
 }
 
-// TestDecide_TrulyLegacy_BothMissingKept — when BOTH expiresAt AND
-// recordedAt are missing, the entry is kept (defensive; rare and
-// inert). bash:126.
 func TestDecide_TrulyLegacy_BothMissingKept(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{{Cycle: 1, Classification: ""}}
@@ -84,8 +61,6 @@ func TestDecide_TrulyLegacy_BothMissingKept(t *testing.T) {
 	}
 }
 
-// TestDecide_IntentRejected_BlocksInStrict — rule 1: any non-expired
-// intent-rejected → BLOCK-CODE / SCOPE-REJECTED. bash:249-254.
 func TestDecide_IntentRejected_BlocksInStrict(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{
@@ -103,8 +78,6 @@ func TestDecide_IntentRejected_BlocksInStrict(t *testing.T) {
 	}
 }
 
-// TestDecide_IntentRejected_FluentAwareness — fluent mode (default):
-// the same input → PROCEED with awareness in the reason. bash:229-242.
 func TestDecide_IntentRejected_FluentAwareness(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{
@@ -119,10 +92,6 @@ func TestDecide_IntentRejected_FluentAwareness(t *testing.T) {
 	}
 }
 
-// TestDecide_InfraSystemic_BlocksWithLastSummary — rule 2: any
-// non-expired infrastructure-systemic → BLOCK-OPERATOR-ACTION /
-// BLOCKED-SYSTEMIC; last entry's summary is appended to the reason.
-// bash:257-265.
 func TestDecide_InfraSystemic_BlocksWithLastSummary(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{
@@ -141,11 +110,6 @@ func TestDecide_InfraSystemic_BlocksWithLastSummary(t *testing.T) {
 	}
 }
 
-// TestDecide_TwoCodeAuditFail_DistinctCycles_Blocks — rule 3: 2+
-// distinct cycles with code-audit-fail → BLOCK-CODE /
-// BLOCKED-RECURRING-AUDIT-FAIL. bash:268-273.
-// Note: distinct cycles, not raw count — multiple entries from one
-// cycle should not count twice. bash:162-164.
 func TestDecide_TwoCodeAuditFail_DistinctCycles_Blocks(t *testing.T) {
 	now := fixedTime()
 	withinRetention := iso(now.Add(7 * 24 * time.Hour))
@@ -162,9 +126,6 @@ func TestDecide_TwoCodeAuditFail_DistinctCycles_Blocks(t *testing.T) {
 	}
 }
 
-// TestDecide_OneCycle_TwoCodeAuditFailEntries_DoesNotBlock — same cycle,
-// two entries (e.g., retry artifact) → distinct-cycle count is 1, not 2.
-// bash:162-164 docstring confirms this is the intended dedup.
 func TestDecide_OneCycle_TwoCodeAuditFailEntries_DoesNotBlock(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(7 * 24 * time.Hour))
@@ -179,8 +140,6 @@ func TestDecide_OneCycle_TwoCodeAuditFailEntries_DoesNotBlock(t *testing.T) {
 	}
 }
 
-// TestDecide_TwoCodeBuildFail_DistinctCycles_Blocks — rule 4: same as
-// rule 3, different classification. bash:276-281.
 func TestDecide_TwoCodeBuildFail_DistinctCycles_Blocks(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(7 * 24 * time.Hour))
@@ -194,9 +153,6 @@ func TestDecide_TwoCodeBuildFail_DistinctCycles_Blocks(t *testing.T) {
 	}
 }
 
-// TestDecide_InfraTransientTailStreak_BlocksAt3 — rule 5: 3+
-// consecutive infrastructure-transient at the TAIL (most recent) →
-// BLOCK-OPERATOR-ACTION / BLOCKED-SYSTEMIC. bash:284-289.
 func TestDecide_InfraTransientTailStreak_BlocksAt3(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(12 * time.Hour))
@@ -215,9 +171,6 @@ func TestDecide_InfraTransientTailStreak_BlocksAt3(t *testing.T) {
 	}
 }
 
-// TestDecide_InfraTransientTailStreak_BrokenByOtherClass — tail streak
-// resets when a non-infra-transient entry is encountered while walking
-// from the tail backwards. bash:142-152.
 func TestDecide_InfraTransientTailStreak_BrokenByOtherClass(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(12 * time.Hour))
@@ -225,7 +178,6 @@ func TestDecide_InfraTransientTailStreak_BrokenByOtherClass(t *testing.T) {
 	entries := []Entry{
 		{Cycle: 1, Classification: InfraTransient, RecordedAt: iso(now.Add(-4 * time.Hour)), ExpiresAt: exp},
 		{Cycle: 2, Classification: InfraTransient, RecordedAt: iso(now.Add(-3 * time.Hour)), ExpiresAt: exp},
-		// This breaks the tail streak.
 		{Cycle: 3, Classification: CodeAuditFail, RecordedAt: iso(now.Add(-2 * time.Hour)), ExpiresAt: codeExp},
 		{Cycle: 4, Classification: InfraTransient, RecordedAt: iso(now.Add(-1 * time.Hour)), ExpiresAt: exp},
 	}
@@ -236,10 +188,6 @@ func TestDecide_InfraTransientTailStreak_BrokenByOtherClass(t *testing.T) {
 	}
 }
 
-// TestDecide_OneInfraTransient_RetryWithFallback_StrictMode — rule 6:
-// any non-expired infrastructure-transient → RETRY-WITH-FALLBACK in strict mode.
-// EVOLVE_SANDBOX_FALLBACK_ON_EPERM was retired in cycle-10; sandbox fallback is
-// now auto-managed by the binary from nest detection, not injected via set_env.
 func TestDecide_OneInfraTransient_RetryWithFallback_StrictMode(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(12 * time.Hour))
@@ -252,8 +200,6 @@ func TestDecide_OneInfraTransient_RetryWithFallback_StrictMode(t *testing.T) {
 	}
 }
 
-// TestDecide_OneInfraTransient_FluentMergesSetEnv — fluent mode keeps PROCEED.
-// EVOLVE_SANDBOX_FALLBACK_ON_EPERM was retired in cycle-10; no env injection needed.
 func TestDecide_OneInfraTransient_FluentMergesSetEnv(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(12 * time.Hour))
@@ -266,9 +212,6 @@ func TestDecide_OneInfraTransient_FluentMergesSetEnv(t *testing.T) {
 	}
 }
 
-// TestDecide_StrictMode_FirstMatchWins — in strict mode, intent-rejected
-// (rule 1) wins over infrastructure-systemic (rule 2). bash decision-tree
-// priority — first emit_or_advise that fires in strict mode exits.
 func TestDecide_StrictMode_FirstMatchWins(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{
@@ -281,9 +224,6 @@ func TestDecide_StrictMode_FirstMatchWins(t *testing.T) {
 	}
 }
 
-// TestDecide_Evidence_ByClassPopulated — evidence.by_class must report
-// raw counts per classification (not distinct cycles — those drive
-// thresholds but raw counts go into forensics). bash:133.
 func TestDecide_Evidence_ByClassPopulated(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(7 * 24 * time.Hour))
@@ -301,9 +241,6 @@ func TestDecide_Evidence_ByClassPopulated(t *testing.T) {
 	}
 }
 
-// TestAgeOutSeconds_Taxonomy — exercises every branch of the
-// classification → retention-window mapping from
-// failure-classifications.sh:66-86.
 func TestAgeOutSeconds_Taxonomy(t *testing.T) {
 	cases := []struct {
 		class Classification
@@ -320,7 +257,7 @@ func TestAgeOutSeconds_Taxonomy(t *testing.T) {
 		{HumanAbort, 3600},
 		{ExitTransportHang, 3600},
 		{IntegrityBreach, 604800},
-		{"some-unknown-class", 86400}, // bash default.
+		{"some-unknown-class", 86400},
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.class), func(t *testing.T) {
@@ -331,21 +268,17 @@ func TestAgeOutSeconds_Taxonomy(t *testing.T) {
 	}
 }
 
-// TestDecide_DefaultClock — Options.Now zero value defaults to time.Now.
-// Verified by passing entries with expiresAt far in the future; we
-// only assert NonExpiredCount, not absolute timing.
 func TestDecide_DefaultClock(t *testing.T) {
 	farFuture := time.Now().Add(365 * 24 * time.Hour).UTC().Format(time.RFC3339)
 	entries := []Entry{
 		{Cycle: 1, Classification: CodeAuditFail, RecordedAt: time.Now().UTC().Format(time.RFC3339), ExpiresAt: farFuture},
 	}
-	d := Decide(entries, Options{}) // Now defaults to time.Now()
+	d := Decide(entries, Options{})
 	if d.Evidence.NonExpiredCount != 1 {
 		t.Errorf("NonExpiredCount=%d, want 1 (default clock)", d.Evidence.NonExpiredCount)
 	}
 }
 
-// TestDecide_InfraSystemic_FluentAwareness — fluent path through rule 2.
 func TestDecide_InfraSystemic_FluentAwareness(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{
@@ -360,12 +293,10 @@ func TestDecide_InfraSystemic_FluentAwareness(t *testing.T) {
 	}
 }
 
-// TestDecide_InfraSystemic_NoSummary — exercises the "(no summary)"
-// fallback when the matching entry has empty Summary. bash:259.
 func TestDecide_InfraSystemic_NoSummary(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{
-		{Cycle: 5, Classification: InfraSystemic, RecordedAt: iso(now), ExpiresAt: iso(now.Add(7 * 24 * time.Hour))}, // no Summary
+		{Cycle: 5, Classification: InfraSystemic, RecordedAt: iso(now), ExpiresAt: iso(now.Add(7 * 24 * time.Hour))},
 	}
 	d := Decide(entries, Options{Now: now, Strict: true})
 	if !containsStr(d.Reason, "(no summary)") {
@@ -373,11 +304,8 @@ func TestDecide_InfraSystemic_NoSummary(t *testing.T) {
 	}
 }
 
-// TestDecide_LongSummaryTruncatedAt200 — bash `| head -c 200` truncates
-// the summary to 200 bytes. The Go port replicates this for log parity.
 func TestDecide_LongSummaryTruncatedAt200(t *testing.T) {
 	now := fixedTime()
-	// Use 'Z' — no surrounding word in the bash reason template contains it.
 	longSummary := ""
 	for i := 0; i < 300; i++ {
 		longSummary += "Z"
@@ -397,7 +325,6 @@ func TestDecide_LongSummaryTruncatedAt200(t *testing.T) {
 	}
 }
 
-// TestDecide_TwoAuditFail_Fluent — rule 3 fluent awareness path.
 func TestDecide_TwoAuditFail_Fluent(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(7 * 24 * time.Hour))
@@ -414,7 +341,6 @@ func TestDecide_TwoAuditFail_Fluent(t *testing.T) {
 	}
 }
 
-// TestDecide_TwoBuildFail_Fluent — rule 4 fluent awareness path.
 func TestDecide_TwoBuildFail_Fluent(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(7 * 24 * time.Hour))
@@ -431,7 +357,6 @@ func TestDecide_TwoBuildFail_Fluent(t *testing.T) {
 	}
 }
 
-// TestDecide_InfraTailStreak_Fluent — rule 5 fluent awareness path.
 func TestDecide_InfraTailStreak_Fluent(t *testing.T) {
 	now := fixedTime()
 	exp := iso(now.Add(12 * time.Hour))
@@ -449,8 +374,6 @@ func TestDecide_InfraTailStreak_Fluent(t *testing.T) {
 	}
 }
 
-// TestIsNonExpired_UnparseableExpiresAt_KeptAsLive — bash try-catch on
-// fromdateiso8601 falls back to ($now + 1) → entry kept.
 func TestIsNonExpired_UnparseableExpiresAt_KeptAsLive(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{
@@ -462,8 +385,6 @@ func TestIsNonExpired_UnparseableExpiresAt_KeptAsLive(t *testing.T) {
 	}
 }
 
-// TestIsNonExpired_UnparseableRecordedAt_NoExpiresAt_Drops — bash falls
-// back to recordedAt=0 + 1d, which is before now → entry dropped.
 func TestIsNonExpired_UnparseableRecordedAt_NoExpiresAt_Drops(t *testing.T) {
 	now := fixedTime()
 	entries := []Entry{
@@ -475,9 +396,6 @@ func TestIsNonExpired_UnparseableRecordedAt_NoExpiresAt_Drops(t *testing.T) {
 	}
 }
 
-// TestLastSummaryOf_NoMatch_ReturnsEmpty — direct test of the helper
-// for the empty-class branch (used when distinctCyclesByClass returns 0
-// but the caller of lastSummaryOf needs the empty-string sentinel).
 func TestLastSummaryOf_NoMatch_ReturnsEmpty(t *testing.T) {
 	entries := []Entry{
 		{Cycle: 1, Classification: CodeAuditFail, Summary: "x"},
@@ -487,9 +405,6 @@ func TestLastSummaryOf_NoMatch_ReturnsEmpty(t *testing.T) {
 	}
 }
 
-// containsStr — small helper since strings.Contains would import
-// strings just for tests; inlined for clarity (and matches the
-// projecthash_test convention of self-contained tests).
 func containsStr(haystack, needle string) bool {
 	if needle == "" {
 		return true

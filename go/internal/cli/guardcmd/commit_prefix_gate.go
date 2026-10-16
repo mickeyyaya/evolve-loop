@@ -9,13 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
 )
 
-// runCommitPrefixGate is `evolve commit-prefix-gate --msg "<msg>" [flags]`.
-// Mirrors legacy/scripts/guards/commit-prefix-gate.sh exit codes:
-//
-//	0 = prefix matches scope (or unknown prefix / pass-through cases)
-//	2 = scope violation
-//	3 = bad arguments
-//	4 = manifest missing or malformed
 func RunCommitPrefixGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		commitMsg    string

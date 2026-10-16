@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// The hooks in .claude/settings.json run `evolve guard <name>` on every matching tool call, so a name the
-// binary does not build turns each of those calls into a hook error.
 func TestHookWiring_EveryWiredGuardIsAGuardTheBinaryBuilds(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", ".claude", "settings.json"))
 	if err != nil {

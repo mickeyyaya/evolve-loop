@@ -36,7 +36,6 @@ func assertGolden(t *testing.T, name, got, root string) {
 	}
 }
 
-// treeOf lists every path under dir, sorted and relative, with directories marked by a trailing slash.
 func treeOf(t *testing.T, dir string) string {
 	t.Helper()
 	var lines []string
@@ -147,7 +146,7 @@ func TestGolden_RecoverOrphans_ActiveSkipped(t *testing.T) {
 	repo := makeRepo(t)
 	var stderr strings.Builder
 	opts := goldenOptions(repo, &stderr)
-	opts.ActiveCycleFn = nil // the default reader over cycle-state.json
+	opts.ActiveCycleFn = nil
 	setCycleState(t, repo, "2")
 	dropProcessingFile(t, repo, "1", "task-a.json", "task-a")
 	dropProcessingFile(t, repo, "2", "task-b.json", "task-b")
@@ -178,7 +177,6 @@ func TestGolden_ReleaseFromQuarantine_ItemBytes(t *testing.T) {
 	assertGolden(t, "g4.ledger.golden", readLedger(t, repo), repo)
 }
 
-// lifecycleSequence provokes one fault per replaced stderr line class; mk lets both goldens run the identical script.
 func lifecycleSequence(t *testing.T, repo string, mk func() Options) {
 	t.Helper()
 	inbox := filepath.Join(repo, ".evolve", "inbox")
@@ -188,44 +186,36 @@ func lifecycleSequence(t *testing.T, repo string, mk func() Options) {
 	_, _ = Claim(mk(), "t1", "7")
 	writeItemAt(t, filepath.Join(inbox, "c1.json"), `{"id":"c1","route":"console-manual"}`)
 	_, _ = Claim(mk(), "c1", "7")
-	// A FILE at processing/ makes the cycle dir's mkdir fail.
 	writeItemAt(t, filepath.Join(inbox, "t1.json"), `{"id":"t1","payload":"x"}`)
 	writeItemAt(t, filepath.Join(inbox, "processing"), "x")
 	_, _ = Claim(mk(), "t1", "7")
 	mustRemove(t, filepath.Join(inbox, "processing"))
-	// A directory at the destination file path makes the rename fail.
 	mustMkdirAll(t, proc(7, "t1.json"))
 	_, _ = Claim(mk(), "t1", "7")
 	mustRemove(t, proc(7, "t1.json"))
 	_, _ = Claim(mk(), "t1", "7")
 	_, _ = Claim(mk(), "", "7")
-	_, _ = Claim(mk(), "t1", "x") // t1 is already claimed, so not-found fires before the cycle check
+	_, _ = Claim(mk(), "t1", "x")
 	_, _ = Promote(mk(), "ghost", "processed", PromoteOpts{Cycle: "7"})
 	_, _ = Promote(mk(), "t1", "bogus", PromoteOpts{})
-	// An unlanded sha reroutes to retry/.
 	_, _ = Promote(mk(), "t1", "processed", PromoteOpts{Cycle: "7", CommitSHA: "unlanded00"})
-	// A FILE at processed/ makes the destination mkdir fail.
 	writeItemAt(t, proc(7, "t2.json"), `{"id":"t2"}`)
 	writeItemAt(t, filepath.Join(inbox, "processed"), "x")
 	_, _ = Promote(mk(), "t2", "processed", PromoteOpts{Cycle: "7"})
 	mustRemove(t, filepath.Join(inbox, "processed"))
-	// A directory at the destination basename makes the rename fail.
 	mustMkdirAll(t, filepath.Join(inbox, "processed", "cycle-7", "t2.json"))
 	_, _ = Promote(mk(), "t2", "processed", PromoteOpts{Cycle: "7"})
 	mustRemove(t, filepath.Join(inbox, "processed", "cycle-7", "t2.json"))
 	_, _ = Promote(mk(), "t2", "processed", PromoteOpts{Cycle: "7", CommitSHA: "abcdef1234567890"})
-	// A directory at the manifest path, and a root twin of t3.
 	mustMkdirAll(t, filepath.Join(repo, ".evolve", "runs", "cycle-8", "continuation-manifest.json"))
 	writeItemAt(t, filepath.Join(inbox, "t3.json"), `{"id":"t3-root"}`)
 	writeItemAt(t, proc(8, "t3.json"), `{"id":"t3"}`)
 	writeItemAt(t, proc(8, "t4.json"), `{"id":"t4"}`)
 	_, _ = ReleaseCycleProcessing(mk(), 8)
-	// A directory at <path>.tmp.<pid> makes the continuation stamp fail.
 	writeItemAt(t, filepath.Join(repo, ".evolve", "runs", "cycle-9", "continuation-manifest.json"), `{"snapshot_sha":"abc123","cycle":9}`)
 	writeItemAt(t, proc(9, "t5.json"), `{"id":"t5"}`)
 	mustMkdirAll(t, proc(9, "t5.json.tmp."+strconv.Itoa(os.Getpid())))
 	_, _ = ReleaseCycleProcessing(mk(), 9)
-	// The cycle dir made non-writable makes the release rename fail.
 	writeItemAt(t, proc(10, "t6.json"), `{"id":"t6"}`)
 	lockDir(t, proc(10, ""))
 	_, _ = ReleaseCycleProcessing(mk(), 10)
@@ -233,19 +223,15 @@ func lifecycleSequence(t *testing.T, repo string, mk func() Options) {
 	if _, err := os.Stat(proc(10, "t6.json")); err != nil {
 		t.Fatalf("the read-only cycle dir must have kept t6 (the fault did not happen): %v", err)
 	}
-	// A FILE at quarantine/: the park's mkdir fails, the item releases.
 	writeItemAt(t, proc(11, "t7.json"), `{"id":"t7"}`)
 	writeItemAt(t, filepath.Join(inbox, "quarantine"), "x")
 	_, _ = ApplyCycleOutcome(mk(), CycleOutcome{Cycle: 11, CommittedIDs: []string{"t7"}, Ceiling: 1})
 	mustRemove(t, filepath.Join(inbox, "quarantine"))
-	// A DIRECTORY at quarantine/<base>: the park's rename fails (NoOp).
 	writeItemAt(t, proc(12, "t8.json"), `{"id":"t8"}`)
 	mustMkdirAll(t, filepath.Join(inbox, "quarantine", "t8.json"))
 	_, _ = ApplyCycleOutcome(mk(), CycleOutcome{Cycle: 12, CommittedIDs: []string{"t8"}, Ceiling: 1})
 	writeItemAt(t, filepath.Join(inbox, "quarantine", "q1.json"), `{"id":"q1","failure_count":3,"last_failure_reason":"x"}`)
 	_, _ = ReleaseFromQuarantine(mk(), "q1")
-	// The active dir is skipped, t10's root directory twin fails the move, and the t3 the
-	// double-move guard left behind clobbers its root twin (a preserved quirk).
 	writeItemAt(t, proc(13, "t9.json"), `{"id":"t9"}`)
 	writeItemAt(t, proc(14, "t10.json"), `{"id":"t10"}`)
 	mustMkdirAll(t, filepath.Join(inbox, "t10.json"))
@@ -253,7 +239,6 @@ func lifecycleSequence(t *testing.T, repo string, mk func() Options) {
 	_, _ = RecoverOrphans(mk())
 }
 
-// lockDir makes dir read-only until cleanup; callers assert the fault happened, since root ignores the mode.
 func lockDir(t *testing.T, dir string) {
 	t.Helper()
 	if err := os.Chmod(dir, 0o500); err != nil {

@@ -19,22 +19,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 )
 
-// Claimer claims the ids still pending in inboxDir for cycle.
 type Claimer func(inboxDir string, cycle int, ids []string) error
 
-// HostEffects performs the declared effects the host owns, resolving the
-// phase and its roots exactly as the gate that verifies them.
 type HostEffects struct {
 	resolver phasecontract.Resolver
 	claim    Claimer
 }
 
-// NewHostEffects resolves effects from cat, the catalog the gate reads.
 func NewHostEffects(cat phasespec.Catalog, claim Claimer) *HostEffects {
 	return &HostEffects{resolver: phasecontract.NewCatalogResolver(cat.Get), claim: claim}
 }
 
-// Perform runs the host's half of each effect in.Phase declares.
 func (h *HostEffects) Perform(_ context.Context, in core.ReviewInput) error {
 	c, ok := h.resolver.Resolve(in.Phase)
 	if !ok {
@@ -55,7 +50,6 @@ func (h *HostEffects) Perform(_ context.Context, in core.ReviewInput) error {
 	return errors.Join(errs...)
 }
 
-// deriver builds an owed secondary from the phase's primary output; a decline is an error naming why.
 type deriver func(primary []byte, roots phasecontract.Roots) ([]byte, error)
 
 var derivers = map[string]deriver{
@@ -64,9 +58,6 @@ var derivers = map[string]deriver{
 	},
 }
 
-// derive writes each declared derivable secondary the agent left absent or empty, from the primary the
-// registry names; a file the agent wrote is never touched (the read waits out a write in flight, as the gate's
-// does), and a decline leaves it absent for the gate.
 func (h *HostEffects) derive(c phasecontract.Contract, roots phasecontract.Roots) []error {
 	var errs []error
 	for _, owed := range slices.Sorted(maps.Keys(c.DerivedFrom)) {

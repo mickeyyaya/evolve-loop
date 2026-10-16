@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// makeRepo writes a manifest at .evolve/commit-prefix-scope.json with the
-// given prefix entries. Returns the repo dir.
 func makeRepo(t *testing.T, manifestJSON string) string {
 	t.Helper()
 	b := fixtures.NewWorkspace(t)
@@ -22,14 +20,12 @@ func makeRepo(t *testing.T, manifestJSON string) string {
 	return b.Build().Root
 }
 
-// stubDiffPaths returns a GetDiffPaths seam that returns a fixed list.
 func stubDiffPaths(paths []string) func(string, Mode, string) ([]string, error) {
 	return func(string, Mode, string) ([]string, error) {
 		return paths, nil
 	}
 }
 
-// === Happy path: prefix matches scope =====================================
 func TestRun_HappyPath(t *testing.T) {
 	manifest := `{
   "prefixes": {
@@ -57,7 +53,6 @@ func TestRun_HappyPath(t *testing.T) {
 	}
 }
 
-// === Required-paths violation: NO diff path under required_paths → DENY ====
 func TestRun_RequiredPathsViolated(t *testing.T) {
 	manifest := `{
   "prefixes": {
@@ -76,7 +71,6 @@ func TestRun_RequiredPathsViolated(t *testing.T) {
 	}
 }
 
-// === Forbidden-only violation: ALL diff paths under forbidden → DENY ======
 func TestRun_ForbiddenOnlyViolated(t *testing.T) {
 	manifest := `{
   "prefixes": {
@@ -95,7 +89,6 @@ func TestRun_ForbiddenOnlyViolated(t *testing.T) {
 	}
 }
 
-// === Forbidden-only NOT violated when at least one real path ==============
 func TestRun_ForbiddenOnly_HasRealPath(t *testing.T) {
 	manifest := `{
   "prefixes": {
@@ -117,7 +110,6 @@ func TestRun_ForbiddenOnly_HasRealPath(t *testing.T) {
 	}
 }
 
-// === diff_must_be_subset enforces strict membership =======================
 func TestRun_DiffMustBeSubset_Violated(t *testing.T) {
 	manifest := `{
   "prefixes": {
@@ -139,7 +131,6 @@ func TestRun_DiffMustBeSubset_Violated(t *testing.T) {
 	}
 }
 
-// === Bypass: manual class permits, cycle class denies =====================
 func TestRun_Bypass_ManualClass(t *testing.T) {
 	repo := makeRepo(t, "")
 	res, err := Run(Options{
@@ -171,9 +162,8 @@ func TestRun_Bypass_CycleClass(t *testing.T) {
 	}
 }
 
-// === Missing manifest = pass-through ======================================
 func TestRun_MissingManifest(t *testing.T) {
-	repo := makeRepo(t, "") // no manifest
+	repo := makeRepo(t, "")
 	res, err := Run(Options{
 		CommitMsg:    "feat: msg",
 		RepoDir:      repo,
@@ -187,7 +177,6 @@ func TestRun_MissingManifest(t *testing.T) {
 	}
 }
 
-// === Malformed manifest → ErrBadManifest ==================================
 func TestRun_MalformedManifest(t *testing.T) {
 	repo := makeRepo(t, "{not json")
 	_, err := Run(Options{
@@ -200,9 +189,6 @@ func TestRun_MalformedManifest(t *testing.T) {
 	}
 }
 
-// === No conventional prefix = pass-through ================================
-// Use a message that does NOT match `^[a-z][a-z-]*(\([a-z0-9-]+\))?!?:`
-// (uppercase, no colon, etc.)
 func TestRun_NoPrefix(t *testing.T) {
 	repo := makeRepo(t, `{"prefixes":{}}`)
 	res, err := Run(Options{
@@ -218,7 +204,6 @@ func TestRun_NoPrefix(t *testing.T) {
 	}
 }
 
-// === Unknown prefix = pass-through ========================================
 func TestRun_UnknownPrefix(t *testing.T) {
 	repo := makeRepo(t, `{"prefixes":{"feat":{"any_path":true}}}`)
 	res, err := Run(Options{
@@ -234,7 +219,6 @@ func TestRun_UnknownPrefix(t *testing.T) {
 	}
 }
 
-// === any_path: true is permissive =========================================
 func TestRun_AnyPath(t *testing.T) {
 	repo := makeRepo(t, `{"prefixes":{"feat":{"any_path":true}}}`)
 	res, err := Run(Options{
@@ -250,7 +234,6 @@ func TestRun_AnyPath(t *testing.T) {
 	}
 }
 
-// === Empty diff = pass-through ============================================
 func TestRun_EmptyDiff(t *testing.T) {
 	repo := makeRepo(t, `{"prefixes":{"feat":{"required_paths":["go/**"]}}}`)
 	res, err := Run(Options{
@@ -266,7 +249,6 @@ func TestRun_EmptyDiff(t *testing.T) {
 	}
 }
 
-// === Bad args (missing CommitMsg or RepoDir) → ErrBadArgs ================
 func TestRun_BadArgs_MissingCommitMsg(t *testing.T) {
 	_, err := Run(Options{RepoDir: t.TempDir()})
 	if !errors.Is(err, ErrBadArgs) {
@@ -281,7 +263,6 @@ func TestRun_BadArgs_MissingRepoDir(t *testing.T) {
 	}
 }
 
-// === guards.log appended ==================================================
 func TestRun_AppendsGuardsLog(t *testing.T) {
 	repo := makeRepo(t, `{"prefixes":{"docs":{"any_path":true}}}`)
 	fixedNow := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
@@ -299,7 +280,6 @@ func TestRun_AppendsGuardsLog(t *testing.T) {
 	fixtures.WantFileContains(t, filepath.Join(repo, ".evolve", "guards.log"), "2026-05-24T12:00:00Z")
 }
 
-// === matchPath table =======================================================
 func TestMatchPath(t *testing.T) {
 	cases := []struct {
 		pat, path string
@@ -325,7 +305,6 @@ func TestMatchPath(t *testing.T) {
 	}
 }
 
-// === globMatch handles class and ? edge cases ==============================
 func TestGlobMatch(t *testing.T) {
 	cases := []struct {
 		pat, path string
@@ -348,7 +327,6 @@ func TestGlobMatch(t *testing.T) {
 	}
 }
 
-// === Mode=Ref with missing diffRef → error returned by default =============
 func TestRun_ModeRef_NoDiffRef(t *testing.T) {
 	repo := makeRepo(t, `{"prefixes":{"feat":{"required_paths":["go/**"]}}}`)
 	getDiffPaths := func(string, Mode, string) ([]string, error) {

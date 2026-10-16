@@ -27,7 +27,7 @@ func TestResolveDispatchState(t *testing.T) {
 	writeTask(t, inbox, "task-pending", []string{"dep-a"})
 	writeTask(t, filepath.Join(inbox, "processing", "cycle-748"), "task-inflight", nil)
 	writeTask(t, filepath.Join(inbox, "processed"), "task-done", nil)
-	writeTask(t, filepath.Join(inbox, "processed", "cycle-1679"), "task-shipped", nil) // the production layout nests processed/ by cycle
+	writeTask(t, filepath.Join(inbox, "processed", "cycle-1679"), "task-shipped", nil)
 	writeTask(t, filepath.Join(inbox, "consumed"), "task-consumed", nil)
 	writeTask(t, filepath.Join(inbox, "rejected"), "task-nope", nil)
 	writeTask(t, filepath.Join(inbox, "retry"), "task-again", nil)

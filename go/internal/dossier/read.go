@@ -11,23 +11,15 @@ import (
 	"strings"
 )
 
-// SkipEvidence classifies whether a dossier's skipped_phases entry can be
-// trusted as evidence that the named phase did not run.
 type SkipEvidence string
 
 const (
-	// SkipEvidenceNone means the dossier has no skipped_phases entry for the phase.
-	SkipEvidenceNone SkipEvidence = "none"
-	// SkipEvidenceTrusted means a versioned dossier's skip entry is taken at face value.
-	SkipEvidenceTrusted SkipEvidence = "trusted"
-	// SkipEvidenceContradicted means an execution receipt proves the phase ran.
+	SkipEvidenceNone         SkipEvidence = "none"
+	SkipEvidenceTrusted      SkipEvidence = "trusted"
 	SkipEvidenceContradicted SkipEvidence = "contradicted"
-	// SkipEvidenceUnverified means a legacy skip entry has no receipt either way.
-	SkipEvidenceUnverified SkipEvidence = "unverified"
+	SkipEvidenceUnverified   SkipEvidence = "unverified"
 )
 
-// PhaseSkipEvidence interprets a skipped_phases entry. It trusts only a
-// versioned record; a surviving receipt contradicts a legacy claim.
 func PhaseSkipEvidence(projectRoot string, d *Dossier, phase string) SkipEvidence {
 	if d == nil || phase == "" || !dossierNamesSkippedPhase(d, phase) {
 		return SkipEvidenceNone
@@ -81,10 +73,6 @@ func phaseExecutionReceiptExists(projectRoot string, cycle int, phase string) bo
 	return false
 }
 
-// ReadCommitted returns the committed dossiers for cycles >= minCycle in
-// ascending order, windowing by filename before opening any file. It is
-// best-effort: unreadable or unparsable files are skipped, and minCycle <= 0
-// reads the whole corpus.
 func ReadCommitted(projectRoot string, minCycle int) []*Dossier {
 	dir := CyclesDir(projectRoot)
 	entries, err := os.ReadDir(dir)

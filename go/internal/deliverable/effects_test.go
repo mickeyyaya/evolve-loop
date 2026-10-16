@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// triageSpecWithClaim is the registry's triage declaration in miniature: the report plus the claim effect.
 func triageSpecWithClaim(effects ...string) phasespec.PhaseSpec {
 	return phasespec.PhaseSpec{
 		Name: "triage", Role: "triage",
@@ -23,11 +22,9 @@ func triageSpecWithClaim(effects ...string) phasespec.PhaseSpec {
 
 const validTriageReport = "# Triage Decision\n\n## top_n\n- x: fix the thing — priority=H, files=a.go, source=scout\n"
 
-// claimFixture lays out a workspace committed to item "x" and an inbox whose
-// copy of "x" sits where the case says. cycle is the verifying cycle.
 type claimFixture struct {
-	decision string // triage-decision.json body; "" = none written
-	itemIn   string // "" = no inbox file for x; "inbox" = root; "cycle-N" = processing/cycle-N/
+	decision string
+	itemIn   string
 }
 
 func (f claimFixture) layout(t *testing.T) (ws, evolveDir string) {
@@ -62,7 +59,7 @@ func TestVerify_DeclaredEffectInboxClaim(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		fx       claimFixture
-		wantCode string // "" = OK
+		wantCode string
 		mentions []string
 	}{
 		{"committed item still in the inbox root", claimFixture{committedToX, "inbox"}, CodeMissingEffect, []string{"inbox-claim", "x", strconv.Itoa(cycle)}},
@@ -112,7 +109,7 @@ func TestVerify_UnboundDeclaredEffect(t *testing.T) {
 
 func TestVerify_DeclaredEffectNeedsCycleInRoots(t *testing.T) {
 	ws, evolveDir := claimFixture{committedToX, "inbox"}.layout(t)
-	roots := phasecontract.Roots{Workspace: ws, EvolveDir: evolveDir} // no Cycle
+	roots := phasecontract.Roots{Workspace: ws, EvolveDir: evolveDir}
 	if _, err := VerifyWithStage("triage", roots, resolverFor(triageSpecWithClaim("inbox-claim")), config.StageOff); err == nil {
 		t.Fatal("verifying a declared effect without the cycle in Roots must error (fail open), not decide")
 	}

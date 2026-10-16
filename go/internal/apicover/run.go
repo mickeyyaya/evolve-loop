@@ -11,32 +11,14 @@ import (
 	"strings"
 )
 
-// Config parameterizes a Run.
 type Config struct {
-	Dirs       []string // package directories to measure
-	CoverPath  string   // optional `go tool cover -func` output file
-	RequireDoc bool     // also flag exported decls missing a godoc comment
-	Enforce    bool     // exit non-zero when uncovered/false-green symbols exist
-	// ChangedFilesByDir diff-scopes enforcement (cycle-1048: four PRE-EXISTING
-	// false-green core symbols floor-blocked every core-touching lane). Keyed
-	// by the Dirs entry; the inner set holds changed file basenames in that
-	// package. When set, violations in files OUTSIDE the change are reported
-	// under a PRE-EXISTING DEBT header and do NOT count toward the Enforce
-	// exit code. Nil = classic behavior (CI's repo-wide run is unchanged).
+	Dirs              []string
+	CoverPath         string
+	RequireDoc        bool
+	Enforce           bool
 	ChangedFilesByDir map[string]map[string]bool
 }
 
-// Run measures each configured directory and writes a per-package report to w.
-// It returns the process exit code: 0 in warning-only mode (the default), or 1
-// under Enforce when any uncovered or false-green symbol remains. A non-nil
-// error (returned with code 2) means the measurement itself failed.
-//
-// ctx bounds the measurement (checked at each dir and file boundary): the
-// audit's in-process enforce gate runs Run under its apicoverTimeout, and
-// without the ctx thread a wedged AST walk (pathological package, hung
-// filesystem) escaped the gate's own deadline (apicover-inprocess-ctx-timeout).
-// Cancellation surfaces as the code-2 measurement error with ctx.Err() in the
-// chain, so callers can distinguish infra interruption from a real finding.
 func Run(ctx context.Context, cfg Config, w io.Writer) (int, error) {
 	coverByPath, err := loadCoverByPath(cfg.CoverPath)
 	if err != nil {
@@ -62,17 +44,13 @@ func Run(ctx context.Context, cfg Config, w io.Writer) (int, error) {
 }
 
 func loadCoverByPath(coverPath string) (map[string]float64, error) {
-	// Join coverage to symbols on the import-path-qualified path + line. A method
-	// prints under its bare name in `go tool cover -func`, so name-keying is
-	// impossible; the qualified path:line is exact and collision-free across
-	// packages that share a filename (config.go, doc.go, …).
 	coverByPath := map[string]float64{}
 	if coverPath != "" {
 		f, err := os.Open(coverPath)
 		if err != nil {
 			return nil, err
 		}
-		defer func() { _ = f.Close() }() // read-only file; close error is not actionable
+		defer func() { _ = f.Close() }()
 		entries, err := ParseCoverFunc(f)
 		if err != nil {
 			return nil, err
@@ -125,12 +103,6 @@ func coverPctByName(syms []Symbol, imp string, coverByPath map[string]float64) m
 	return coverPct
 }
 
-// packageImportPath derives the import path of the package rooted at dir by
-// walking up to the enclosing go.mod, reading its module line, and appending the
-// directory's path relative to the module root. `go/build` cannot resolve
-// module import paths (it predates modules), and we avoid golang.org/x/tools, so
-// this stdlib-only derivation is what makes the import-path-qualified cover join
-// exact.
 func packageImportPath(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -196,8 +168,6 @@ func printList(w io.Writer, header string, syms []Symbol) {
 	}
 }
 
-// printIgnored always prints the full //apicover:ignore list (with reasons) so a
-// suppression is never silent.
 func printIgnored(w io.Writer, syms []Symbol) {
 	if len(syms) == 0 {
 		return
@@ -213,9 +183,6 @@ func printIgnored(w io.Writer, syms []Symbol) {
 	}
 }
 
-// splitPreExisting removes violations whose defining file is NOT in the
-// change set, returning them separately: a lane owns the hygiene of the files
-// it touches, never the debt of files it didn't (cycle-1048).
 func splitPreExisting(r Report, changed map[string]bool) (Report, []Symbol) {
 	var pre []Symbol
 	keep := func(in []Symbol) []Symbol {

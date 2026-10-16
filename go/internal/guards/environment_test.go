@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// A guard's decision comes from its constructor arguments and cycle state, never from an exported
-// variable, so no shell an operator runs the suite from can turn a deny into an allow. The one read
-// is $HOME, taken once by NewRole for the <home>/.claude always-safe rule.
 func TestGuards_ReadNoEnvironmentButHome(t *testing.T) {
 	files, err := filepath.Glob("*.go")
 	if err != nil {
@@ -41,7 +38,6 @@ func TestGuards_ReadNoEnvironmentButHome(t *testing.T) {
 	}
 }
 
-// osImportName is the identifier a file binds package os to: "os", an alias, ".", or "" when not imported.
 func osImportName(f *ast.File) string {
 	for _, imp := range f.Imports {
 		if path, err := strconv.Unquote(imp.Path.Value); err != nil || path != "os" {

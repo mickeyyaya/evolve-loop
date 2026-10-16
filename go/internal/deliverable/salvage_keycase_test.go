@@ -12,7 +12,6 @@ func TestCandidateCount_CountsDecoderVisibleVerdictKeys(t *testing.T) {
 		{"capitalized", `{"phase":"audit","Verdict":"PASS"}`},
 		{"upper", `{"phase":"audit","VERDICT":"PASS"}`},
 		{"mixed", `{"phase":"audit","VeRdIcT":"PASS"}`},
-		// A literal \u escape of 'v': invisible to a byte-literal count, decoded to "verdict" by encoding/json.
 		{"unicode-escaped", `{"phase":"audit","` + `\` + `u0076erdict":"PASS"}`},
 	}
 	for _, tc := range tests {
@@ -37,8 +36,8 @@ func TestUnescapeJSONShort_LeavesNonASCIIAndPlainTextAlone(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{`no escapes here`, `no escapes here`},
 		{`"verdict":`, `"verdict":`},
-		{`"éclair"`, `"éclair"`}, // non-ASCII: left as written
-		{`"\uZZZZ"`, `"\uZZZZ"`}, // malformed: left as written
+		{`"éclair"`, `"éclair"`},
+		{`"\uZZZZ"`, `"\uZZZZ"`},
 		{`trailing backslash \u`, `trailing backslash \u`},
 	}
 	for _, tc := range tests {

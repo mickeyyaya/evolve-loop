@@ -135,7 +135,7 @@ func TestRenderJSON_NilDossier(t *testing.T) {
 
 func TestRenderJSON_InvalidDossierReturnsError(t *testing.T) {
 	bad := &Dossier{
-		Cycle:        0, // fails Validate
+		Cycle:        0,
 		Goal:         "bad",
 		FinalVerdict: VerdictPass,
 		Phases:       []PhaseRecord{{Name: "p", Verdict: VerdictPass}},
@@ -229,7 +229,6 @@ func TestRenderMarkdown_InvalidDossierReturnsError(t *testing.T) {
 }
 
 func TestRenderMarkdown_TrailingNewline(t *testing.T) {
-	// ampFail populates the trailing optional sections.
 	d := ampFail()
 	out, err := RenderMarkdown(d)
 	if err != nil {
@@ -307,8 +306,8 @@ func TestParseJSON_InvalidJSON(t *testing.T) {
 	cases := []string{
 		"not-json",
 		`{bad:`,
-		`"string"`, // valid JSON but not an object
-		`42`,       // valid JSON but not an object
+		`"string"`,
+		`42`,
 	}
 	for _, c := range cases {
 		_, err := ParseJSON([]byte(c))
@@ -374,7 +373,6 @@ func TestWrite_NilDossier(t *testing.T) {
 func TestWrite_BlankDir(t *testing.T) {
 	err := Write(ampPass(), "", false)
 	if err == nil {
-		// Attempt cleanup in case it wrote a stray file to CWD.
 		_ = os.Remove("cycle-5.json")
 		_ = os.Remove("cycle-5.md")
 		t.Error("GAP: Write(d, blank-dir, ...) must return error (writes to CWD without error)")

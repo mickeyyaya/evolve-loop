@@ -80,7 +80,6 @@ func TestVerify_WarnOrFailSentinel_StillRequiresSections(t *testing.T) {
 			t.Errorf("verdict %s: want %s, got %+v", verdict, CodeMissingSection, res.Violations)
 		}
 
-		// Control: with its section present the report is not missing_section, though other violations may fire.
 		ws2 := t.TempDir()
 		writeFile(t, ws2, "build-report.md", sentinel+"\n# Build Report\n\n## Changes\n- foo.go\n")
 		res2, err := Verify("build", phasecontract.Roots{Workspace: ws2})
@@ -216,10 +215,9 @@ func TestVerify_InvalidJSON(t *testing.T) {
 	}
 }
 
-// Uses orchestrator because the router contract declares no required keys.
 func TestVerify_MissingJSONKey(t *testing.T) {
 	ws := t.TempDir()
-	writeFile(t, ws, "cycle-state.json", `{"phase":"build"}`) // missing cycle_id
+	writeFile(t, ws, "cycle-state.json", `{"phase":"build"}`)
 	res, _ := Verify("orchestrator", phasecontract.Roots{EvolveDir: ws})
 	if res.OK {
 		t.Fatal("want !OK: orchestrator cycle-state.json missing required cycle_id")

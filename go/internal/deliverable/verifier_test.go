@@ -36,7 +36,6 @@ func TestLadder_RungRechecksAreBreakerNeutral(t *testing.T) {
 		t.Fatalf("THREE rung re-checks must not create/touch the breaker (stat err=%v) — one flaky deliverable would demote the gate batch-wide", err)
 	}
 
-	// Control: the GATE on the same input does count.
 	r := newReviewer(config.StageEnforce, phasecontract.BuiltinResolver{}, config.StageOff)
 	r.breakerPath = breaker
 	if rr := r.Review(context.Background(), in); rr.Approve {

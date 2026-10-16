@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Empty roots.EvolveDir takes the BuiltinResolver branch, so these match VerifyWithStage for built-in phases.
 func TestVerifyCatalogAwareStage_FailWithoutBlock_BlocksAtEnforce(t *testing.T) {
 	for phase, fx := range phaseioFailFixtures {
 		t.Run(phase, func(t *testing.T) {
@@ -59,7 +58,6 @@ func TestVerifyCatalogAware_EqualsStageOff(t *testing.T) {
 	}
 }
 
-// equalViolationCodes compares ordered violation codes, which is stricter than comparing counts.
 func equalViolationCodes(a, b Result) bool {
 	if len(a.Violations) != len(b.Violations) {
 		return false

@@ -72,3 +72,17 @@
 - **cycle-1166**: one width-3 batch took 76 spine fail-opens and nothing summed them. See retry-hooks-and-spine-telemetry.md §3.
 - **Failure identity**: FAIL dossiers once recorded only "see the audit report", so convergence briefs and cross-batch forensics had to dig through gitignored workspaces. By dossier time `core` has already written both failure artifacts, so `Build` projects them.
 - **cycle-1623** (CHANGELOG, 2026-09-11): a cycle that ran twelve phases and shipped recorded one synthetic PASS phase and no commit, because the dossier read `phase-timing.json` before the deferred write landed. The healthier the cycle, the emptier its record. The same change set `CommitSHA` for the first time (so historical dossiers lack it and the ship-rate series has a discontinuity), moved the ship binding to the shared `ShipBinding` type after a reader keyed on `commit` instead of `commit_sha` and passed its own tests because they re-typed the same key, and routed `Tasks` through `committedset` after runtime cycle-1621 showed a lane pin naming two tasks where `top_n` named one.
+
+## Rules kept from code comments
+
+- **The commit of the pair is bounded.** `commitMaxAttempts` is one try plus three retries. A stuck lock then fails and does not hang the finalization of the cycle.
+- **The backoff is linear.** Try N waits N times `commitBackoffBase`. That is long enough for the `index.lock` of a concurrent lane to clear. The whole budget stays under a second. A permanent error fails fast.
+- **`unstagePair` is best effort.** The caller returns the commit error in both cases.
+- **A stale digest is ignored.** A failure digest with another cycle in its cycle field is a leftover. A false identity is worse than none.
+- **Failure reasons are bounded.** They are head-truncated at a rune boundary, because the identifying content leads a reason. Whitespace collapses before the byte bound. A newline then cannot put a fake `## ` heading into the markdown record.
+- **`PhaseSkipEvidence` trusts only a versioned record.** The unversioned legacy corpus reads as schema version zero. A surviving execution receipt contradicts a legacy skip claim. A legacy claim with no receipt either way is unverified.
+- **`ModelSource` is `profile`, `pin` or `advisor`.** It and `ResolvedModel` are empty when the timing log predates model provenance.
+- **`ReadCommitted` is best effort.** It windows by filename before it opens any file. `minCycle <= 0` reads the whole corpus.
+- **`RollupSpineFailOpens` escalates a cycle only on its own count.** `threshold <= 0` disables escalation. Nil dossiers are skipped.
+- **`CommitSHA` has no `omitempty` on purpose.** An empty value is the "did not deliver" signal. The ship phase writes the binding only after the commit exists. `core.detectLostLanding` keys on the same file.
+- **The location of the corpus is a protocol.** `CyclesDir` is `knowledge-base/cycles`. A move is a protocol change (ADR-0094).

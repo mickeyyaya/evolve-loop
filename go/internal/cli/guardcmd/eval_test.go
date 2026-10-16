@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// writeEval writes a single eval markdown file into dir and returns its path.
 func writeEval(t *testing.T, dir, name, body string) string {
 	t.Helper()
 	p := filepath.Join(dir, name)
@@ -19,8 +18,6 @@ func writeEval(t *testing.T, dir, name, body string) string {
 
 func fenceCmd(cmd string) string { return "```bash\n" + cmd + "\n```\n" }
 
-// TestRunEval_DiversityCheck_ExitCodes exercises the CLI dispatch + exit-code
-// contract (0 PASS, 1 WARN, 2 HALT, 10 bad args) for diversity-check.
 func TestRunEval_DiversityCheck_ExitCodes(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -58,7 +55,6 @@ func TestRunEval_DiversityCheck_ExitCodes(t *testing.T) {
 	}
 }
 
-// TestRunEval_DiversityCheck_BadArgs covers the missing-path and unknown-dir paths.
 func TestRunEval_DiversityCheck_BadArgs(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if rc := RunEval([]string{"diversity-check"}, nil, &stdout, &stderr); rc != 10 {
@@ -71,7 +67,6 @@ func TestRunEval_DiversityCheck_BadArgs(t *testing.T) {
 	}
 }
 
-// TestRunEval_UnknownSubcommand covers the dispatch default arm.
 func TestRunEval_UnknownSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if rc := RunEval([]string{"bogus"}, nil, &stdout, &stderr); rc != 10 {

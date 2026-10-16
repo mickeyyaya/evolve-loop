@@ -14,10 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
-// diffAbs returns |a-b| for float epsilon comparisons.
 func diffAbs(a, b float64) float64 { return math.Abs(a - b) }
 
-// writeLog seeds an events-ndjson file in workspace.
 func writeLog(t *testing.T, workspace, name, content string) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -28,8 +26,6 @@ func writeLog(t *testing.T, workspace, name, content string) {
 	}
 }
 
-// resultEnvelope generates one normalized kind==result envelope line
-// (the shape phasestream.Classifier emits) with the given cost + tokens.
 func resultEnvelope(cost float64, in, out, cacheR, cacheC int64) string {
 	b, _ := json.Marshal(map[string]any{
 		"schema_version": "2.0",
@@ -49,8 +45,6 @@ func resultEnvelope(cost float64, in, out, cacheR, cacheC int64) string {
 	return string(b)
 }
 
-// textEnvelope is a non-result envelope (carries no cost) — used to verify
-// such lines are ignored and a phase with only them is skipped.
 func textEnvelope(text string) string {
 	b, _ := json.Marshal(map[string]any{
 		"schema_version": "2.0",
@@ -62,8 +56,6 @@ func textEnvelope(text string) string {
 	return string(b)
 }
 
-// writeUsageSidecar seeds a <phase>-usage.json sidecar in workspace, matching
-// the shape core.recordPhaseOutcome writes at the ADR-0044 C1 chokepoint.
 func writeUsageSidecar(t *testing.T, workspace, phase string, cost float64, in, out, cacheR, cacheW int64) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -87,21 +79,11 @@ func writeUsageSidecar(t *testing.T, workspace, phase string, cost float64, in, 
 	}
 }
 
-// TestCycleCost_PrefersSidecarOverEvents is the S7 RED test: the usage
-// sidecar (ADR-0044 C1) is written at the recording chokepoint and survives
-// abort paths that never reach the tmux normalizer, so it must recover a
-// phase whose events.ndjson is entirely missing. A phase that DOES have an
-// events.ndjson keeps that value (the richer, per-line-verified source) —
-// the sidecar only fills gaps, never overrides an existing events log. The
-// bridge's unrelated token-usage.json global snapshot must not be mistaken
-// for a phase named "token".
 func TestCycleCost_PrefersSidecarOverEvents(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-11")
-	// "scout" has both sources — events.ndjson must win.
 	writeLog(t, ws, "scout-events.ndjson", resultEnvelope(0.99, 900, 90, 9, 9))
 	writeUsageSidecar(t, ws, "scout", 0.05, 100, 20, 3, 4)
-	// "build" aborted before the tmux normalizer ran — sidecar-only evidence.
 	writeUsageSidecar(t, ws, "build", 0.30, 500, 60, 7, 8)
 	if err := os.WriteFile(filepath.Join(ws, "token-usage.json"), []byte(`{"peak_tokens":12345}`), 0o644); err != nil {
 		t.Fatalf("write token-usage.json: %v", err)
@@ -167,7 +149,6 @@ func TestSummarizeCycle_WorkspaceIsFile(t *testing.T) {
 func TestSummarizeCycle_SingleEventsLog(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-1")
-	// Unified stream: intermediate non-result envelopes, one result at the end.
 	content := strings.Join([]string{
 		textEnvelope("thinking..."),
 		`{"schema_version":"2.0","seq":2,"kind":"tool_use","severity":"INFO","data":{"name":"Read"}}`,
@@ -217,7 +198,6 @@ func TestSummarizeCycle_MultipleLogsSummed(t *testing.T) {
 	if len(s.Phases) != 3 {
 		t.Fatalf("phases=%d want 3", len(s.Phases))
 	}
-	// Sorted scan → phases ordered alphabetically: auditor, builder, scout.
 	wantOrder := []string{"auditor", "builder", "scout"}
 	for i, want := range wantOrder {
 		if s.Phases[i].Phase != want {
@@ -234,12 +214,11 @@ func TestSummarizeCycle_MultipleLogsSummed(t *testing.T) {
 
 func TestSummarizeCycle_LastResultWins(t *testing.T) {
 	t.Parallel()
-	// Two result envelopes in one stream — the LAST one wins.
 	ws := filepath.Join(t.TempDir(), "cycle-3")
 	content := strings.Join([]string{
-		resultEnvelope(0.99, 100, 100, 0, 0), // older, ignored
+		resultEnvelope(0.99, 100, 100, 0, 0),
 		textEnvelope("another turn"),
-		resultEnvelope(0.05, 200, 50, 0, 0), // newer, wins
+		resultEnvelope(0.05, 200, 50, 0, 0),
 	}, "\n")
 	writeLog(t, ws, "scout-events.ndjson", content)
 
@@ -257,8 +236,6 @@ func TestSummarizeCycle_LastResultWins(t *testing.T) {
 
 func TestSummarizeCycle_NoResultEnvelopeSkipped(t *testing.T) {
 	t.Parallel()
-	// A phase that produced output but never a result envelope contributes
-	// nothing (no raw-fallback exists for the clean stream).
 	ws := filepath.Join(t.TempDir(), "cycle-5")
 	content := strings.Join([]string{
 		textEnvelope("did some work"),
@@ -282,7 +259,7 @@ func TestSummarizeCycle_EmptyLogSkipped(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-6")
 	writeLog(t, ws, "scout-events.ndjson", resultEnvelope(0.01, 1, 1, 0, 0))
-	writeLog(t, ws, "builder-events.ndjson", "") // empty
+	writeLog(t, ws, "builder-events.ndjson", "")
 	s, err := SummarizeCycle(ws, 6)
 	if err != nil {
 		t.Fatalf("Summarize: %v", err)
@@ -308,7 +285,6 @@ func TestSummarizeCycle_MalformedLineSkipped(t *testing.T) {
 
 func TestSummarizeCycle_NonStandardPhaseName(t *testing.T) {
 	t.Parallel()
-	// Phase name with dots (parallel-worker logs) — full name minus suffix.
 	ws := filepath.Join(t.TempDir(), "cycle-8")
 	writeLog(t, ws, "subagent.scout.parallel-worker-1-events.ndjson",
 		resultEnvelope(0.01, 1, 1, 0, 0))
@@ -321,9 +297,6 @@ func TestSummarizeCycle_NonStandardPhaseName(t *testing.T) {
 	}
 }
 
-// TestSummarizeCycle_LargeResultEnvelopeParsed verifies the scanner handles
-// large envelopes (the happy path; the over-cap failure path is covered by
-// TestParseEventsLog_ScannerErrLineTooLong).
 func TestSummarizeCycle_LargeResultEnvelopeParsed(t *testing.T) {
 	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "cycle-9")
@@ -339,7 +312,6 @@ func TestSummarizeCycle_LargeResultEnvelopeParsed(t *testing.T) {
 	}
 }
 
-// TestSummarizeCycle_UnreadableLog covers the os.Open error branch.
 func TestSummarizeCycle_UnreadableLog(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -365,12 +337,6 @@ func TestSummarizeCycle_UnreadableLog(t *testing.T) {
 	}
 }
 
-// TestSummarizeCycle_ParityViaProduce is the ADR-0020 cutover gate: a raw
-// <phase>-stdout.log written by the bridge, run through the actual production
-// path (phasestream.Produce, exactly as runner.go now calls it), yields an
-// events.ndjson from which cyclecost recovers the SAME cost + tokens the raw
-// result carried. This is the end-to-end billing-parity guarantee for the
-// no-runtime-fallback collapse.
 func TestSummarizeCycle_ParityViaProduce(t *testing.T) {
 	t.Parallel()
 	const (
@@ -412,10 +378,6 @@ func TestSummarizeCycle_ParityViaProduce(t *testing.T) {
 	}
 }
 
-// TestSummarizeCycle_ParityRawVsEvents is the migration guarantee: a real raw
-// stream-json sequence fed through the actual phasestream.Classifier (exactly
-// as the live normalizer would) produces an events.ndjson from which cyclecost
-// recovers the SAME cost + token values the raw result event carried.
 func TestSummarizeCycle_ParityRawVsEvents(t *testing.T) {
 	t.Parallel()
 	const (
@@ -433,7 +395,6 @@ func TestSummarizeCycle_ParityRawVsEvents(t *testing.T) {
 			rawCost, rawIn, rawOut, rawCR, rawCC),
 	}
 
-	// Run the raw lines through the real Classifier to build events.ndjson.
 	clf := phasestream.NewClassifier(
 		phasestream.Source{Producer: "normalizer", CLI: "claude-p", Cycle: 1, Phase: "scout", Agent: "scout"},
 		"parity-trace", nil)

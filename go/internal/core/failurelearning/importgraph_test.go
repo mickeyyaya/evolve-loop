@@ -1,10 +1,5 @@
 package failurelearning
 
-// importgraph_test.go — the package is a leaf under core (ADR-0103 unit 03b
-// §2): stdlib plus the nine named internal packages, never internal/core
-// itself (the compiler is the cycle guard; this is the leaf-ness declaration —
-// signalcenter/importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

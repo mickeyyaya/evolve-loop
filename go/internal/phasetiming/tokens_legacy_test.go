@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// TestTimingEntry_LegacyLogParses guards backward compatibility for the S4
-// tokens field: a phase-timing.json entry written before the field existed
-// must still unmarshal, leaving Tokens zero-valued (never a parse error). New
-// entries carry the terminal attempt's token counts beside cost_usd.
 func TestTimingEntry_LegacyLogParses(t *testing.T) {
 	t.Parallel()
 
@@ -26,7 +22,6 @@ func TestTimingEntry_LegacyLogParses(t *testing.T) {
 		t.Errorf("legacy entry tokens = %+v, want zero value", entries[0].Tokens)
 	}
 
-	// A new entry round-trips its tokens.
 	fresh := Entry{Phase: "build", Tokens: cyclestate.TokenUsage{Input: 10, Output: 5}}
 	data, err := json.Marshal(fresh)
 	if err != nil {

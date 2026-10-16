@@ -10,7 +10,6 @@ import (
 
 var ErrWaitingOnDependency = errors.New("inboxmover: item waits on a dependency that has not landed — refusing claim")
 
-// ClaimPending claims the root-pending ids, leaving absent, held and console-routed ones for the effects gate.
 func ClaimPending(opts Options, cycle int, ids []string) error {
 	opts.resolveOpts()
 	cycleStr := strconv.Itoa(cycle)

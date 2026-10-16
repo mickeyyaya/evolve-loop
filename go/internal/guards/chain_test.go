@@ -61,7 +61,6 @@ func TestChain_DeniesBroken(t *testing.T) {
 	}
 }
 
-// erroringLedger fails Verify with an error unrelated to a broken chain.
 type erroringLedger struct{}
 
 func (e *erroringLedger) Append(_ context.Context, _ core.LedgerEntry) error { return nil }

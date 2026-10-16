@@ -48,7 +48,6 @@ func TestClaim_ConsoleRouteCheckPrecedesCycleValidation(t *testing.T) {
 	}
 }
 
-// The locked root fails only the rename: the reset's tmp write lives in quarantine/, which stays writable.
 func TestReleaseFromQuarantine_CounterResetPrecedesRename(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")
@@ -143,7 +142,6 @@ func TestRecoverOrphans_UnreadableCycleState_RecoversTheLiveDir(t *testing.T) {
 	}
 }
 
-// A directory at the rewrite's tmp path fails the bump while the item's id still resolves.
 func TestDrain_BumpFailure_FallsOpenToRelease(t *testing.T) {
 	repo := makeRepo(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")

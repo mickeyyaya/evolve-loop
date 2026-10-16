@@ -1,14 +1,5 @@
 package cycleoutcome
 
-// refusal_route_test.go — the FAIL closeout's per-item breaker. A phase-refusal
-// (cycleclassify.ClassPhaseRefusal, read from the C1 record) is TASK-level, so
-// the drain's failure_count bump and the ADR-0072 S5 ceiling finally reach the
-// item; and the one refusal that is deterministic AND operator-owned — a top_n
-// card naming a protected surface — routes the committed item to
-// console-manual on the FIRST hit, in place, before the drain releases it
-// (docs/incidents/2026-09-14-triage-refusal-poison-loop.md: one item drew nine
-// lanes, cycles 1650–1675, because none of this was reachable).
-
 import (
 	"encoding/json"
 	"io"
@@ -74,11 +65,6 @@ func TestIsTaskLevelResult_RefusalsBlameByCode(t *testing.T) {
 	}
 }
 
-// The lane's triage claimed the item into processing/cycle-7/ and then refused
-// it for a protected surface: the closeout routes it console-manual IN PLACE,
-// the drain releases it to the root already routed, no failure_count is
-// bumped, the ceiling does not quarantine it (the route is the disposition),
-// and the stream carries INBOX_ITEM_ROUTED_CONSOLE naming the refusal.
 func TestApplyFailure_ProtectedSurfaceRefusal_RoutesTheItemConsole(t *testing.T) {
 	root, inbox, ws := seedProject(t, "poison", []string{"poison"})
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "poison", "7"); err != nil {
@@ -125,14 +111,11 @@ func TestApplyFailure_ProtectedSurfaceRefusal_RoutesTheItemConsole(t *testing.T)
 	if claimNotFound {
 		t.Errorf("an already-claimed committed id is not a not-found claim: %+v", *events)
 	}
-	// The breaker closes: the next lane's claim is refused.
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "poison", "8"); err == nil {
 		t.Error("a routed item must refuse the next lane claim")
 	}
 }
 
-// A refusal that is NOT operator-owned (an empty top_n) is task-level but not
-// routed: the bump reaches the item and the S5 ceiling parks it.
 func TestApplyFailure_OtherRefusal_BumpsAndQuarantinesAtCeiling(t *testing.T) {
 	root, inbox, ws := seedProject(t, "flaky", []string{"flaky"})
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "flaky", "7"); err != nil {
@@ -156,7 +139,6 @@ func TestApplyFailure_OtherRefusal_BumpsAndQuarantinesAtCeiling(t *testing.T) {
 	}
 }
 
-// An uncoded FAIL keeps the pre-fix reading: system-level, nothing bumped.
 func TestFailureInputsFor_UncodedFailStaysSystemLevel(t *testing.T) {
 	root, _, ws := seedProject(t, "x", []string{"x"})
 	writeRefusalRecord(t, ws, "", "")
@@ -166,8 +148,6 @@ func TestFailureInputsFor_UncodedFailStaysSystemLevel(t *testing.T) {
 	}
 }
 
-// Two committed ids, one refused: only the Subject is routed; the other was
-// never worked (triage stopped the cycle) and returns untouched — no bump.
 func TestApplyFailure_TwoCommitted_OnlyTheSubjectIsRouted(t *testing.T) {
 	root, inbox, ws := seedProject(t, "poison", []string{"poison", "innocent"})
 	body, _ := json.Marshal(map[string]any{"id": "innocent", "title": "fixture innocent", "kind": "bug"})
@@ -196,9 +176,6 @@ func TestApplyFailure_TwoCommitted_OnlyTheSubjectIsRouted(t *testing.T) {
 	}
 }
 
-// A protected-surface refusal whose Subject is empty or names an id outside
-// the committed set (an LLM mis-copy) routes NOTHING: the fallback is the
-// task-level bump, and stderr says why (architecture review HIGH-1).
 func TestApplyFailure_SubjectNotCommitted_FallsBackToTheBump(t *testing.T) {
 	for _, subject := range []string{"", "someone-elses-item"} {
 		root, inbox, ws := seedProject(t, "flaky", []string{"flaky"})
@@ -222,8 +199,6 @@ func TestApplyFailure_SubjectNotCommitted_FallsBackToTheBump(t *testing.T) {
 	}
 }
 
-// TRIAGE_COMMITMENT_INVALID is stamped on I/O faults reading the decision —
-// the pipeline's fault: system-level, nothing bumped (architecture review HIGH-2).
 func TestFailureInputsFor_CommitmentInvalidIsSystemLevel(t *testing.T) {
 	root, inbox, ws := seedProject(t, "x", []string{"x"})
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "x", "7"); err != nil {

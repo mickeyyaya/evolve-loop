@@ -10,7 +10,7 @@ import (
 )
 
 func TestReviewer_CircuitBreaker_MarksDemoted(t *testing.T) {
-	ws := t.TempDir() // empty → every Verify violates
+	ws := t.TempDir()
 	pr := t.TempDir()
 	r := newTestReviewer(config.StageEnforce, filepath.Join(t.TempDir(), "breaker.json"), 3)
 

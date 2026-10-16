@@ -65,7 +65,6 @@ func TestFleetConfig_BudgetResolution(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			budget := tc.budget
-			// Declared by type name: apicover does not count the .Budget field access.
 			var b *policy.FleetBudgetConfig = policy.Policy{Fleet: &policy.FleetPolicy{Budget: &budget}}.FleetConfig().Budget
 			if b == nil {
 				t.Fatalf("FleetConfig().Budget = nil, want non-nil for a present block")

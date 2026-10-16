@@ -15,9 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// floorFixture is the remediation fixture (retro_remediation_filter_test.go):
-// a project root whose .evolve/inbox can be inspected and the cycle workspace
-// under it; the clock is Unix 1754000000.
 func floorFixture(t *testing.T) (root, ws string, f Failure) {
 	t.Helper()
 	root = t.TempDir()
@@ -71,7 +68,6 @@ func warnsOf(events []signalcenter.Event, code signalcenter.Code) []signalcenter
 	return out
 }
 
-// Test 17 — the pure projection of a Failure + Learned onto the lesson event.
 func TestFloorEvent_ProjectsTheFailureAndPrefersTheStructuredBlock(t *testing.T) {
 	f := Failure{Cycle: 9, Phase: cyclestate.PhaseBuild, ProjectRoot: "root", Workspace: "ws"}
 	ev := floorEvent(f, Learned{Summary: "s"}, fixedNow)
@@ -92,8 +88,6 @@ func TestFloorEvent_ProjectsTheFailureAndPrefersTheStructuredBlock(t *testing.T)
 	}
 }
 
-// Test 18 — the floor's artifacts are byte-identical to the goldens captured
-// on 97825125: the report, the lesson, the two inbox items, the ledger.
 func TestWriteFloor_WritesLessonAndReportByteIdenticalToTheGolden(t *testing.T) {
 	root, ws, f := floorFixture(t)
 	e := New(floorClock, carryover.New())
@@ -141,9 +135,6 @@ func TestWriteFloor_FilesOnlyStructuredDefectsAsInbox(t *testing.T) {
 	}
 }
 
-// Test 19 — ONE policy read: a present-but-unreadable policy.json is exactly
-// one FAILURELEARNING_POLICY_LOAD_FAILED; the floor proceeds on the compiled
-// defaults; an absent file is silent.
 func TestWriteFloor_PolicyLoadFailsOnceAndFallsBackToCompiledDefaults(t *testing.T) {
 	root, _, f := floorFixture(t)
 	if err := os.MkdirAll(filepath.Join(root, ".evolve", "policy.json"), 0o755); err != nil {
@@ -173,8 +164,6 @@ func TestWriteFloor_PolicyLoadFailsOnceAndFallsBackToCompiledDefaults(t *testing
 	}
 }
 
-// Test 20 — a floor write failure is one WARN with the wrapped error, and the
-// recurrence closure STILL lands (the closure is unconditional).
 func TestWriteFloor_WriteFailureIsAWarnSignalAndTheClosureStillLands(t *testing.T) {
 	root := t.TempDir()
 	ws := filepath.Join(root, "not-a-dir")
@@ -195,8 +184,6 @@ func TestWriteFloor_WriteFailureIsAWarnSignalAndTheClosureStillLands(t *testing.
 	}
 }
 
-// Test 21 — the closure is keyed by the class and records the cycle; the
-// guard (empty root / blank class) writes nothing.
 func TestWriteFloor_RecordsTheRecurrenceClosureKeyedByCycleAndLast(t *testing.T) {
 	root, _, f := floorFixture(t)
 	e, _ := observed(t)
@@ -215,10 +202,6 @@ func TestWriteFloor_RecordsTheRecurrenceClosureKeyedByCycleAndLast(t *testing.T)
 	}
 }
 
-// Test 22 — the ledger WARN names the failing call: op=load for a directory
-// at the ledger path; op=save under a read-only .evolve whose lock file
-// already exists (a prior Save created it — flock keeps it), so the load
-// succeeds and only the save fails.
 func TestRecurrenceClosure_OpNamesTheFailingCall(t *testing.T) {
 	t.Run("load", func(t *testing.T) {
 		root := t.TempDir()
@@ -241,7 +224,7 @@ func TestRecurrenceClosure_OpNamesTheFailingCall(t *testing.T) {
 			t.Fatal(err)
 		}
 		e, got := observed(t)
-		e.recurrenceClosure(Failure{Cycle: 3, ProjectRoot: root}, "p") // a prior Save: the ledger AND its lock file now exist
+		e.recurrenceClosure(Failure{Cycle: 3, ProjectRoot: root}, "p")
 		if len(*got) != 0 {
 			t.Fatalf("the seeding save must succeed: %+v", *got)
 		}
@@ -260,7 +243,6 @@ func TestRecurrenceClosure_OpNamesTheFailingCall(t *testing.T) {
 	})
 }
 
-// Test 23 — the remediation cap is recorded, never silent.
 func TestRemediationItems_CapsAtThirtyTwoAndSignalsTheTruncation(t *testing.T) {
 	e, got := observed(t)
 	defects := make([]string, 33)
@@ -278,7 +260,6 @@ func TestRemediationItems_CapsAtThirtyTwoAndSignalsTheTruncation(t *testing.T) {
 	}
 }
 
-// Test 24 — the item shape and the unnameable-defect rule.
 func TestRemediationItems_ShapeAndUnnameableDefectsSkipped(t *testing.T) {
 	e := New(floorClock, carryover.New())
 	long := strings.Repeat("d", 600)
@@ -294,7 +275,6 @@ func TestRemediationItems_ShapeAndUnnameableDefectsSkipped(t *testing.T) {
 	}
 }
 
-// Test 25 — the cycle-1285 premise: ids are injective over the FULL title.
 func TestRemediationItems_IDsAreInjectiveOverTheFullTitle(t *testing.T) {
 	if remediationSlugMaxRunes != 60 {
 		t.Fatalf("the fixture below assumes a 60-rune slug bound, got %d", remediationSlugMaxRunes)
@@ -306,7 +286,6 @@ func TestRemediationItems_IDsAreInjectiveOverTheFullTitle(t *testing.T) {
 	}
 }
 
-// Test 26 — the pure id helpers.
 func TestRemediationSlug_LowercasesHyphenatesAndStopsAtSixty(t *testing.T) {
 	if got := remediationSlug("  Hello, World!!  x"); got != "hello-world-x" {
 		t.Fatalf("lowercase, runs of non-alphanumerics to one hyphen, trimmed: %q", got)

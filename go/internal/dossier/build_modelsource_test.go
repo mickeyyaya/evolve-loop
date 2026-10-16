@@ -55,7 +55,6 @@ func TestBuild_ProjectsModelSourceAndResolvedModel(t *testing.T) {
 func TestBuild_LegacyWorkspaceWithoutModelMetadataDegradesSafely(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	// Deliberately the OLD shape: no model_source/resolved_model keys.
 	legacy := `[{"phase":"scout","duration_ms":100,"verdict":"PASS","archetype":"plan","attempt_count":1}]`
 	if err := os.WriteFile(filepath.Join(ws, phasetiming.FileName), []byte(legacy), 0o644); err != nil {
 		t.Fatal(err)

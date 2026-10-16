@@ -6,10 +6,8 @@ import (
 	"testing"
 )
 
-// explanationActivationBeltCallee is package-level so the call-site scanner's vocabulary reads the same name.
 const explanationActivationBeltCallee = "explanationdocs.CrossCheckActivation"
 
-// explanationActivationBeltPins is package-level so the call-site scanner's vocabulary reads the same pins.
 var explanationActivationBeltPins = []struct{ path, fn string }{
 	{"../phases/ship/native_explanation_gate.go", "verifyNativeExplanation"},
 	{"../phases/audit/audit.go", "verifyExplanationDocumentation"},

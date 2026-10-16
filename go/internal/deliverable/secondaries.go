@@ -10,11 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// verifySecondaries adds one violation per agent-owed file that is absent, blank or unparseable. A read fault
-// other than absence is infra ambiguity and returns an error, so the caller fails open.
 func verifySecondaries(res *Result, c phasecontract.Contract, roots phasecontract.Roots) error {
 	for _, name := range c.AgentOwedFiles {
-		// OwedPath is the one join the prompt tail also renders, and it keeps the read inside the workspace.
 		path := phasecontract.OwedPath(roots.Workspace, name)
 		base := filepath.Base(path)
 		res.Owed = append(res.Owed, base)
@@ -37,7 +34,6 @@ func verifySecondaries(res *Result, c phasecontract.Contract, roots phasecontrac
 	return nil
 }
 
-// secondaryParseError says why a .json or .ndjson secondary does not parse, or "" when it does or has no parse rule.
 func secondaryParseError(base, content string) string {
 	switch strings.ToLower(filepath.Ext(base)) {
 	case ".json":
@@ -57,5 +53,4 @@ func secondaryParseError(base, content string) string {
 	return ""
 }
 
-// VerifiesDeclaredDeliverables marks the gate for core's declared-deliverables wiring proof; true unless the gate is off.
 func (r *Reviewer) VerifiesDeclaredDeliverables() bool { return r.stage != config.StageOff }

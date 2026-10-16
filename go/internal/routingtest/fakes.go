@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// verdictsByPhase converts a phase-name→verdict map (the routingtest spec form)
-// into the core.Phase-keyed map fixtures.BuildRunners expects.
 func verdictsByPhase(verdicts map[string]string) map[core.Phase]string {
 	if verdicts == nil {
 		return nil
@@ -24,8 +22,6 @@ func verdictsByPhase(verdicts map[string]string) map[core.Phase]string {
 	return out
 }
 
-// failedRecords converts FailedRecordSpec into core.FailedRecord with a
-// non-expired RecordedAt so the retro failure-adapter sees them as active.
 func failedRecords(specs []FailedRecordSpec) []core.FailedRecord {
 	out := make([]core.FailedRecord, 0, len(specs))
 	for i, s := range specs {
@@ -39,7 +35,6 @@ func failedRecords(specs []FailedRecordSpec) []core.FailedRecord {
 	return out
 }
 
-// seedWorkspace writes handoff files into the cycle workspace and returns it.
 func seedWorkspace(t *testing.T, projectRoot string, cycle int, files map[string]string) string {
 	t.Helper()
 	ws := filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
@@ -54,7 +49,6 @@ func seedWorkspace(t *testing.T, projectRoot string, cycle int, files map[string
 	return ws
 }
 
-// readRoutingDecisions parses every routing-decision-*.json in the workspace.
 func readRoutingDecisions(t *testing.T, workspace string) []router.RouterDecision {
 	t.Helper()
 	paths, _ := filepath.Glob(filepath.Join(workspace, "routing-decision-*.json"))

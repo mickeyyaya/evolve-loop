@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// stageBuildWorkspace writes a build-report.md with the given body.
 func stageBuildWorkspace(t *testing.T, body string) string {
 	t.Helper()
 	ws := t.TempDir()
