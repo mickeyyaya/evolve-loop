@@ -14,8 +14,6 @@ import (
 func TestRoleAndPhaseGuards_ReadOwnRunState(t *testing.T) {
 
 	root := t.TempDir()
-	// A fake non-/tmp worktree: on Linux t.TempDir() is under /tmp, where isAlwaysSafe decides before
-	// cycle state is read. The role gate only compares prefixes, so the worktree need not exist.
 	wt := "/work/wt-cycle-7"
 	linkHost := filepath.Join(root, "wt-evolve")
 	runWS := filepath.Join(root, ".evolve", "runs", "cycle-7")
@@ -25,7 +23,6 @@ func TestRoleAndPhaseGuards_ReadOwnRunState(t *testing.T) {
 		}
 	}
 
-	// The host-global state belongs to a different concurrent run, in scout with no worktree.
 	global := `{"cycle_id":99,"phase":"scout","workspace_path":"/elsewhere"}`
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "cycle-state.json"), []byte(global), 0o644); err != nil {
 		t.Fatal(err)
@@ -34,7 +31,6 @@ func TestRoleAndPhaseGuards_ReadOwnRunState(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(runWS, core.RunStateFile), []byte(own), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// The core.linkGuardDeps layout: the worktree's cycle-state.json links to this run's run.json.
 	if err := os.Symlink(filepath.Join(runWS, core.RunStateFile), filepath.Join(linkHost, "cycle-state.json")); err != nil {
 		t.Fatal(err)
 	}

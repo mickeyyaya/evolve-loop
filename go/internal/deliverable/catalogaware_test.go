@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// seedCatalogProject builds a project with a minimal built-in registry and
-// one user phase, returning (projectRoot, evolveDir, workspace).
 func seedCatalogProject(t *testing.T) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()

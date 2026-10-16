@@ -27,7 +27,7 @@ func TestRouteConsole_NamesTheFacadeAndRoutesThroughOptions(t *testing.T) {
 	if err != nil || res.Path != path {
 		t.Fatalf("res = %+v err = %v", res, err)
 	}
-	var _ RouteResult = res // the host re-exports the leaf's receipt type
+	var _ RouteResult = res
 	body, _ := os.ReadFile(path)
 	var item map[string]any
 	if err := json.Unmarshal(body, &item); err != nil || item["route"] != "console-manual" || item["routed_reason"] != "triage refused" {

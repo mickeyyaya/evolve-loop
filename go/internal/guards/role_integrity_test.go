@@ -9,7 +9,7 @@ import (
 )
 
 func TestRole_DeniesControlPlaneEditInBuildPhase(t *testing.T) {
-	worktree := "/work/wt/cycle-20" // non-/tmp so isAlwaysSafe doesn't short-circuit
+	worktree := "/work/wt/cycle-20"
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID:        20,
 		Phase:          "build",
@@ -54,7 +54,7 @@ func TestRole_AllowsLegitWorktreeWritesUnderProtection(t *testing.T) {
 
 	for _, rel := range []string{
 		"go/internal/core/observer.go",
-		"go/acs/cycle20/predicates_test.go", // the cycle's own predicates, not under regression/
+		"go/acs/cycle20/predicates_test.go",
 	} {
 		dec := g.Decide(context.Background(), core.GuardInput{
 			ToolName:  "Write",
@@ -103,10 +103,10 @@ func TestRole_C1_DeniesGlobalSettingsUnsetHome(t *testing.T) {
 		ActiveWorktree: "/work/wt/cycle-31",
 		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-31"),
 	})
-	g := newRoleWithHome(s, false, "") // HOME unset / sandboxed runner
+	g := newRoleWithHome(s, false, "")
 	for _, path := range []string{
 		"/Users/operator/.claude/settings.json",
-		"/tmp/.claude/settings.json", // a protected file inside an always-safe dir
+		"/tmp/.claude/settings.json",
 	} {
 		dec := g.Decide(context.Background(), core.GuardInput{
 			ToolName:  "Edit",
@@ -155,7 +155,7 @@ func TestRole_BypassProtectedPathAlarms(t *testing.T) {
 }
 
 func TestRole_DeniesRelocatedExplanationCallSitesInBuildPhase(t *testing.T) {
-	worktree := "/work/wt/cycle-1630" // non-/tmp so isAlwaysSafe doesn't short-circuit
+	worktree := "/work/wt/cycle-1630"
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID:        1630,
 		Phase:          "build",
@@ -184,7 +184,6 @@ func TestRole_DeniesRelocatedExplanationCallSitesInBuildPhase(t *testing.T) {
 		}
 	}
 
-	// Control: neighbors that hold no lifecycle call site stay writable, so the protection is file-narrow.
 	for _, rel := range []string{
 		"go/internal/core/cyclerun_record.go",
 		"go/internal/core/resume_cursor.go",

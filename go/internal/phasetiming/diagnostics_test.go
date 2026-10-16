@@ -10,11 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// Diagnostics is the phase's OWN structured notes (severity + message), carried
-// on the C1 record so a phase that returns FAIL by its own Classify (triage's
-// protected-surface admission rejection, cycles 1634/1636) seals with the
-// reason it gave, not with a synthesized "phase-infra class" marker. omitempty:
-// a legacy log without the key parses to nil — absent, never fabricated.
 func TestEntry_DiagnosticsRideTheRecordAndAreOmittedWhenAbsent(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

@@ -9,12 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/posteditvalidate"
 )
 
-// runPostEditValidate is `evolve postedit-validate` — reads a PostToolUse
-// payload from stdin and runs the by-extension validator. Mirrors
-// legacy/scripts/verification/postedit-validate.sh.
-//
-// Always exits 0 (PostToolUse cannot block); WARN goes to stderr where
-// Claude Code surfaces it to the LLM as a reminder.
 func RunPostEditValidate(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve postedit-validate", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -26,7 +20,6 @@ func RunPostEditValidate(args []string, stdin io.Reader, stdout, stderr io.Write
 		fmt.Fprintln(stdout, "Always exits 0. WARN to stderr is surfaced to the LLM.")
 	}
 	if err := fs.Parse(args); err != nil {
-		// PostToolUse cannot block; parse errors are warnings only.
 		return 0
 	}
 

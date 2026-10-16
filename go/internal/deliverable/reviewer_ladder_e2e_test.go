@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// stubPhase is a PhaseRunner that records its requests and PASSes; onRun, when
-// set, plays the agent (writes the artifact).
 type stubPhase struct {
 	name     string
 	requests []core.PhaseRequest
@@ -32,7 +30,6 @@ func (s *stubPhase) Run(_ context.Context, req core.PhaseRequest) (core.PhaseRes
 	return core.PhaseResponse{Phase: s.name, Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// auditOnly scopes the real reviewer to audit; the stub phases write no artifacts.
 type auditOnly struct{ inner core.DeliverableReviewer }
 
 func (a auditOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewResult {
@@ -43,12 +40,11 @@ func (a auditOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewR
 }
 
 func TestLadder_AuditWithoutExplanationSectionIsCorrectedNotFailed(t *testing.T) {
-	root := gitRepoWithOneCommit(t) // the explanation contract seals against a real base SHA
+	root := gitRepoWithOneCommit(t)
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// A no-change build declares NOT_APPLICABLE, which meets the build explanation floor and activates the audit's contract.
 	build := &stubPhase{name: string(core.PhaseBuild)}
 	build.onRun = func(_ int, req core.PhaseRequest) {
 		report := "# Build Report\n\n## Changes\nnone\n\n## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: no material change in this fixture cycle\n"
@@ -59,7 +55,7 @@ func TestLadder_AuditWithoutExplanationSectionIsCorrectedNotFailed(t *testing.T)
 	audit := &stubPhase{name: string(core.PhaseAudit)}
 	audit.onRun = func(n int, req core.PhaseRequest) {
 		report := "# Audit Report\n\n## Verdict\n**PASS**\n\n## Issues\nnone\n\n" + phasecontract.RenderVerdictSentinel("audit", "PASS") + "\n"
-		if n > 1 { // the correction round adds the section
+		if n > 1 {
 			report += "\n## Explanation Documentation\n- Status: VERIFIED\n- Evidence: docs/explain/builds/cycle-1.md:1 matches go/app.go:19\n"
 		}
 		if err := os.WriteFile(filepath.Join(req.Workspace, "audit-report.md"), []byte(report), 0o644); err != nil {
@@ -90,7 +86,6 @@ func TestLadder_AuditWithoutExplanationSectionIsCorrectedNotFailed(t *testing.T)
 func gitRepoWithOneCommit(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	// Mirror the real repo's ignores, or the orchestrator's own files read as a material Build diff.
 	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

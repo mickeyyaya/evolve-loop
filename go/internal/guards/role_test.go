@@ -9,11 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// fixtureHome is a synthetic operator home: it cannot exist, cannot be under /tmp and cannot vary by
-// machine, so a <home>/.claude test exercises that rule and never the /tmp one.
 const fixtureHome = "/fixture-home/operator"
 
-// The t.Setenv is a tripwire: these assertions fail only if isAlwaysSafe starts reading the environment.
 func TestIsAlwaysSafe_DecidesAgainstTheGivenHome(t *testing.T) {
 	if !isAlwaysSafe(filepath.Join(fixtureHome, ".claude", "somefile"), fixtureHome) {
 		t.Errorf("%s/.claude/somefile is not always-safe against its OWN home", fixtureHome)
@@ -90,7 +87,7 @@ func TestRole_BuilderWritesInWorktree(t *testing.T) {
 }
 
 func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
-	worktree := "/work/wt/cycle-50" // non-/tmp so isAlwaysSafe doesn't short-circuit
+	worktree := "/work/wt/cycle-50"
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID:        50,
 		Phase:          "tdd",
@@ -110,7 +107,7 @@ func TestRole_TDDWritesTestsInWorktree(t *testing.T) {
 }
 
 func TestRole_NonWorktreePhaseDeniedWorktreeWrite(t *testing.T) {
-	worktree := "/work/wt/cycle-51" // non-/tmp so isAlwaysSafe doesn't short-circuit
+	worktree := "/work/wt/cycle-51"
 	s, _ := setupStorageWithCS(t, core.CycleState{
 		CycleID:        51,
 		Phase:          "scout",
@@ -281,8 +278,6 @@ func TestRole_MissingFilePathAllows(t *testing.T) {
 }
 
 func TestRoleGuard_RelativeWorkspacePath(t *testing.T) {
-	// Run from a temp cwd: WriteCycleState mirrors run.json into the relative workspace, which would
-	// otherwise land in the package source tree.
 	orig, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)

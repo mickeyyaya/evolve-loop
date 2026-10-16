@@ -17,81 +17,63 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
-// Violation is one confirmed well-formedness failure with an actionable message.
 type Violation struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
-// Result is the verifier verdict for one deliverable.
 type Result struct {
 	OK           bool        `json:"ok"`
 	Phase        string      `json:"phase"`
 	ArtifactPath string      `json:"artifact_path"`
 	Violations   []Violation `json:"violations,omitempty"`
-	// Content is the exact bytes this verdict was computed from, so a consumer never
-	// re-reads the path; empty when the artifact was absent or blank, or declared no file.
-	Content string `json:"-"`
+	Content      string      `json:"-"`
 
-	// Owed and Effects name the owed files (basenames) and effects this verdict checked,
-	// so the verified signal never re-resolves the declaration.
 	Owed    []string `json:"-"`
 	Effects []string `json:"-"`
 }
 
-// Violation codes (stable; consumed by tests, the CLI, and the gate).
 const (
-	CodeMissingArtifact = "missing_artifact"
-	CodeEmptyArtifact   = "empty_artifact"
-	CodeMissingSection  = "missing_section"
-	// CodeMissingChallengeToken: the report does not echo the minted challenge token (proof of read).
+	CodeMissingArtifact       = "missing_artifact"
+	CodeEmptyArtifact         = "empty_artifact"
+	CodeMissingSection        = "missing_section"
 	CodeMissingChallengeToken = "missing_challenge_token"
 	CodeBadVerdict            = "bad_verdict"
 	CodeStrayInWorktree       = "stray_in_worktree"
 	CodeInvalidJSON           = "invalid_json"
 	CodeMissingKey            = "missing_key"
-	// CodeFailureContextMissing: a sentinel-declared FAIL/WARN lacks the structured failure block.
 	CodeFailureContextMissing = "failure_context_missing"
-	// CodeFailureClassUnknown: the failure block's class is outside the failurelog vocabulary.
-	CodeFailureClassUnknown = "failure_class_unknown"
-	// Agent-owed secondaries: one code per class so the ladder's same-defect identity sees a repeat.
-	CodeMissingSecondary   = "missing_secondary"
-	CodeEmptySecondary     = "empty_secondary"
-	CodeMalformedSecondary = "malformed_secondary"
-	// Declared effects: missing_effect is an unperformed effect, unbound_effect a registry name no check binds.
-	CodeMissingEffect = "missing_effect"
-	CodeUnboundEffect = "unbound_effect"
+	CodeFailureClassUnknown   = "failure_class_unknown"
+	CodeMissingSecondary      = "missing_secondary"
+	CodeEmptySecondary        = "empty_secondary"
+	CodeMalformedSecondary    = "malformed_secondary"
+	CodeMissingEffect         = "missing_effect"
+	CodeUnboundEffect         = "unbound_effect"
 
 	CodeBadGrammar     = "bad_grammar"
 	CodeUnboundGrammar = "unbound_grammar"
 )
 
-// Verify checks a phase's deliverable against the built-in registry: an error is ambiguity (fail open), !OK a confirmed violation (fail closed).
 func Verify(phase string, roots phasecontract.Roots) (Result, error) {
 	return VerifyWith(phase, roots, phasecontract.BuiltinResolver{})
 }
 
-// VerifyWith is Verify resolving the contract through resolver, so user and minted phases verify against their spec.
 func VerifyWith(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver) (Result, error) {
 	return VerifyWithStage(phase, roots, resolver, config.StageOff)
 }
 
-// VerifyWithStage is VerifyWith with the EVOLVE_PHASE_IO stage, which gates only the RequireFailureContextPhaseIO check.
 func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver, phaseIO config.Stage) (Result, error) {
 	c, ok := resolver.Resolve(phase)
 	if !ok {
-		// Without a contract there is no definition of well-formed: fail open.
 		return Result{}, fmt.Errorf("deliverable: no contract registered for phase %q", phase)
 	}
 	if c.NoArtifact {
-		// ship's deliverable is the pushed commit, which the ship and commit gates verify.
 		return Result{Phase: phase, OK: true}, nil
 	}
 	res, err := verifyPrimary(phase, c, roots, phaseIO)
 	if err != nil {
 		return Result{}, err
 	}
-	// Secondaries, then effects, after the primary: one correction names everything still owed.
 	if err := verifySecondaries(&res, c, roots); err != nil {
 		return Result{}, err
 	}
@@ -102,10 +84,8 @@ func VerifyWithStage(phase string, roots phasecontract.Roots, resolver phasecont
 	return res, nil
 }
 
-// verifyPrimary checks the primary artifact and returns the Result unfinished, for the secondary and effect checks.
 func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.Roots, phaseIO config.Stage) (Result, error) {
 	path := c.ArtifactPath(roots)
-	// The runner owns which file this run was asked to write; the contract still owns its shape.
 	if roots.DispatchedArtifact != "" {
 		path = roots.DispatchedArtifact
 	}
@@ -113,7 +93,6 @@ func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.R
 
 	content, exists, err := readDeliverableWithGrace(path)
 	if err != nil {
-		// A read fault other than absence is infra ambiguity, not an agent violation.
 		return Result{}, fmt.Errorf("deliverable: read %s: %w", path, err)
 	}
 	res.Content = content
@@ -138,18 +117,13 @@ func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.R
 	return res, nil
 }
 
-// A final write is not atomic with the verify after it, so absence or emptiness is provisional for readGraceWindow.
-// Partial content is closed upstream: completion.go waits artifactStableTicks consecutive polls of an unchanged (size, mtime) key.
 const (
 	readGraceWindow = 500 * time.Millisecond
 	readGracePoll   = 20 * time.Millisecond
 )
 
-// graceSleep is a test seam, not a dial.
 var graceSleep = time.Sleep
 
-// readDeliverableWithGrace reads first and polls only while the file is absent or blank. The window delays
-// a missing or empty verdict but never changes it, and a non-absence read fault returns at once as infra.
 func readDeliverableWithGrace(path string) (content string, exists bool, err error) {
 	deadline := time.Now().Add(readGraceWindow)
 	for {
@@ -173,7 +147,6 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 			res.add(CodeMissingSection, fmt.Sprintf("required section %q is missing", s.Canonical))
 		}
 	}
-	// reportdoc.HasSection is the audit gate's own predicate, so a report that gate refuses cannot pass here.
 	if roots.ExplanationDocumentationVersion != 0 {
 		for _, s := range c.ExplanationSections {
 			if !reportdoc.HasSection(content, s.Title()) {
@@ -187,11 +160,9 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	if err := verifyGrammars(res, c, content, roots); err != nil {
 		return err
 	}
-	// A sentinel FAIL/WARN owes the structured failure block; PhaseIO phases owe it only at enforce, prose-only verdicts never.
 	if c.RequireFailureContext || (c.RequireFailureContextPhaseIO && phaseIO >= config.StageEnforce) {
 		s, ok := phasecontract.ParseVerdictSentinelFull(content)
 		isFailOrWarn := ok && (s.Verdict == "FAIL" || s.Verdict == "WARN")
-		// Only the audit's class feeds a decision (retry envelope, failure record); NormalizeLegacy's aliases pass on purpose.
 		if c.RequireFailureContext && isFailOrWarn && s.Failure != nil && s.Failure.Class != "" && failurelog.NormalizeLegacy(s.Failure.Class) == failurelog.UnknownClassification {
 			res.add(CodeFailureClassUnknown, fmt.Sprintf(
 				"verdict %s declares failure class %q, which is not in the failure vocabulary — re-emit the evolve-verdict sentinel with \"class\" set to one of [%s] (on FAIL the class drives the retry envelope — an unknown class forfeits the direct repair; on FAIL and WARN it is what the failure record and the carryover read). Keep your judgment in the defects and prescription entries.",
@@ -202,7 +173,6 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 				"verdict %s declares no structured failure context — re-emit the evolve-verdict sentinel as schema_version 2 with a failure block: {\"class\":\"<failure class>\",\"defects\":[\"<one line per defect>\"],\"evidence_paths\":[\"<artifact>\"]}", s.Verdict))
 		}
 	}
-	// Checked here so the correction ladder can fix a missing echo before audit; no minted token owes nothing.
 	if c.RequireChallengeToken {
 		if tok, err := os.ReadFile(filepath.Join(roots.Workspace, "challenge-token.txt")); err == nil {
 			if t := strings.TrimSpace(string(tok)); t != "" && !strings.Contains(content, t) {
@@ -215,7 +185,6 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	return nil
 }
 
-// checkStray flags a deliverable written into the worktree root instead of the workspace.
 func checkStray(res *Result, c phasecontract.Contract, roots phasecontract.Roots) {
 	if c.WriteTarget != phasecontract.TargetWorkspace {
 		return
@@ -223,7 +192,6 @@ func checkStray(res *Result, c phasecontract.Contract, roots phasecontract.Roots
 	if roots.Worktree == "" || roots.Worktree == roots.Workspace {
 		return
 	}
-	// Name the dispatched file: delta-mode intent writes intent-delta.md, not intent.md.
 	name := c.ArtifactName
 	if roots.DispatchedArtifact != "" {
 		name = filepath.Base(roots.DispatchedArtifact)
@@ -260,7 +228,6 @@ func verifyJSON(res *Result, c phasecontract.Contract, content string) {
 		res.add(CodeInvalidJSON, fmt.Sprintf("not valid JSON object: %v", err))
 		return
 	}
-	// Tolerant reader: unknown keys are ignored for forward compatibility.
 	for _, k := range c.RequiredKeys {
 		if _, ok := top[k]; !ok {
 			res.add(CodeMissingKey, fmt.Sprintf("required key %q is missing", k))
@@ -268,9 +235,6 @@ func verifyJSON(res *Result, c phasecontract.Contract, content string) {
 	}
 }
 
-// verdictPresent reports whether content declares an allowed verdict: the sentinel first, then the legacy
-// prose scan, which is off at enforce so an out-of-vocabulary sentinel gets no prose rescue.
-// See ADR-0050.
 func verdictPresent(content string, verdicts []string, phaseIO config.Stage) bool {
 	if v, ok := phasecontract.ParseVerdictSentinel(content); ok {
 		for _, allowed := range verdicts {
@@ -295,7 +259,6 @@ func (r *Result) add(code, msg string) {
 
 func (r *Result) finish() { r.OK = len(r.Violations) == 0 }
 
-// onlyViolation reports whether r fails solely on code; salvage and the warn-only size gate need sole, never membership.
 func (r Result) deliverableAbsent() bool {
 	return r.hasCode(CodeMissingArtifact) || r.hasCode(CodeEmptyArtifact)
 }

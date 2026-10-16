@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
 )
 
-// runPreflight is the `evolve preflight-environment [--write|--summary|--json]` subcommand.
-// Ports legacy/scripts/dispatch/preflight-environment.sh.
 func RunPreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	mode := "json"
 	write := false
@@ -34,7 +32,6 @@ func RunPreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			return 10
 		}
 	}
-	// envOrCwd absolutizes a relative $EVOLVE_PROJECT_ROOT (cycle-119 class).
 	root := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	pluginRoot := os.Getenv("EVOLVE_PLUGIN_ROOT")
 	if pluginRoot == "" {

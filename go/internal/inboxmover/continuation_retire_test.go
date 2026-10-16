@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// retireFixture seeds root with a live item + binding for each id.
 func retireFixture(t *testing.T, ids ...string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -150,7 +149,6 @@ func TestResolveContinuationForScope_RetiredDirsAreNotLive(t *testing.T) {
 	for _, dir := range []string{"quarantine", "consumed", "processed", "rejected", "retry"} {
 		t.Run(dir, func(t *testing.T) {
 			root := t.TempDir()
-			// Nested under cycle-N, the layout processed/ and rejected/ use, so the scan must recurse.
 			seedItemIn(t, filepath.Join(root, ".evolve", "inbox", dir, "cycle-1506"), id)
 			seedRegistryOnly(t, root, id, 1484)
 

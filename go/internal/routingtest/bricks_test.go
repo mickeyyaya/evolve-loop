@@ -7,12 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestBricks_VariadicSlicesAreDefensivelyCopied pins the cycle-263 audit
-// finding (C263_002): Mandatory() and Done() stored the caller's variadic
-// backing array directly, so a caller mutating (or reusing) its slice after
-// building the spec silently corrupted the scenario — shared-backing-storage
-// aliasing. Immutability rule: return/store new objects, never alias caller
-// memory.
 func TestBricks_VariadicSlicesAreDefensivelyCopied(t *testing.T) {
 	t.Parallel()
 	args := []string{"scout", "build"}

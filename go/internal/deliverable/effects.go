@@ -10,12 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// effectCheck appends violations for one declared effect, or returns an
-// error when it cannot decide (the caller then fails open).
 type effectCheck func(res *Result, roots phasecontract.Roots) error
 
-// effectPerform is the host's performance of an effect before the review;
-// nil leaves the effect to the agent.
 type effectPerform func(h *HostEffects, roots phasecontract.Roots) error
 
 type effect struct {
@@ -46,8 +42,6 @@ func inboxDir(roots phasecontract.Roots) string {
 	return filepath.Join(roots.EvolveDir, "inbox")
 }
 
-// checkInboxClaim owes a claim under this cycle's processing/ dir for every committed id that is an inbox item;
-// an id with no inbox file, or an empty commitment, owes nothing. The message is the correction directive.
 func checkInboxClaim(res *Result, roots phasecontract.Roots) error {
 	if roots.Cycle == 0 || roots.EvolveDir == "" {
 		return errors.New("deliverable: effect inbox-claim needs Roots.Cycle and Roots.EvolveDir to locate processing/cycle-N/")
@@ -66,7 +60,6 @@ func checkInboxClaim(res *Result, roots phasecontract.Roots) error {
 		}
 		switch loc.Cycle {
 		case roots.Cycle:
-			// claimed by this cycle — the effect happened
 		case 0:
 			res.add(CodeMissingEffect, fmt.Sprintf("declared effect inbox-claim not performed for committed item %q — the host's claim did not land and it is still pending at %s; `evolve inbox-mover claim %q %d` shows why (exit 3 = console-routed): defer or drop it", id, loc.Path, id, roots.Cycle))
 		default:

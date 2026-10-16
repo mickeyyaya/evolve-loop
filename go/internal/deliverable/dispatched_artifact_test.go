@@ -12,7 +12,6 @@ import (
 func TestVerify_DispatchedArtifactOverridesContractPath(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	// Leave the contract's intent.md absent and write the dispatched delta artifact.
 	delta := filepath.Join(ws, "intent-delta.md")
 	if err := os.WriteFile(delta, []byte("[intent-unchanged]\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -29,7 +28,6 @@ func TestVerify_DispatchedArtifactOverridesContractPath(t *testing.T) {
 		t.Fatalf("verified bytes are not the dispatched file's: %q", res.Content)
 	}
 
-	// Without the override the contract path stays authoritative, so the miss is reported there.
 	res2, err := Verify("intent", phasecontract.Roots{Workspace: ws})
 	if err != nil {
 		t.Fatalf("Verify (no override): %v", err)

@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// phaseioFailFixtures give each phase one required section, so the failure-context check is the only possible violation.
 var phaseioFailFixtures = map[string]struct {
 	artifact string
 	section  string
@@ -17,7 +16,6 @@ var phaseioFailFixtures = map[string]struct {
 	"triage": {"triage-report.md", "## top_n"},
 }
 
-// failReport returns a section-complete FAIL report, with or without the structured failure block.
 func failReport(phase, section string, withBlock bool) string {
 	var line string
 	if withBlock {

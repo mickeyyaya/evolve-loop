@@ -11,11 +11,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// soleFencedPass is the one shape salvage may act on: a sole, fenced, single-candidate bad_verdict that re-verifies clean.
 const soleFencedPass = "## Verdict\n" +
 	"```json\n" + `{"phase":"audit","verdict":"PASS"}` + "\n```\n"
 
-// salvageFixture returns (workspace, projectRoot, artifactPath) holding one salvageable deliverable.
 func salvageFixture(t *testing.T) (string, string, string) {
 	t.Helper()
 	ws := t.TempDir()
@@ -33,7 +31,6 @@ func TestReviewerReview_ShadowStage_NoSideEffects(t *testing.T) {
 			ws, pr, artifact := salvageFixture(t)
 			sidecar := filepath.Join(pr, ".evolve", SalvageAppliedFile)
 			breaker := filepath.Join(t.TempDir(), "b.json")
-			// Seed a real count: resetBreaker writes nothing at zero, so an absent file would prove nothing.
 			if n := incrBreaker(breaker); n != 1 {
 				t.Fatalf("fixture: incr = %d, want 1", n)
 			}
@@ -47,7 +44,6 @@ func TestReviewerReview_ShadowStage_NoSideEffects(t *testing.T) {
 			r.logf = func(string, ...any) {}
 			got := r.Review(context.Background(), reviewInput("audit", ws, pr))
 
-			// Shadow approves either way; the verdict is not what is under test.
 			if !got.Approve {
 				t.Fatalf("precondition: stage=%s always approves; got block (%s)", stage, got.Reason)
 			}
@@ -75,7 +71,6 @@ func TestReviewerReview_PersistFailure_FailsClosed(t *testing.T) {
 	}
 	ws, pr, _ := salvageFixture(t)
 
-	// An unwritable workspace fails atomicwrite's rename while the artifact stays readable for the verify half.
 	if err := os.Chmod(ws, 0o555); err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +156,7 @@ func TestCountSalvageApplied_TolerantOfTornLines(t *testing.T) {
 	}
 	content := strings.Join([]string{
 		rec("fenced-json"),
-		`{"event_type":"salvage_applied","pattern":"trunc`, // torn by a crash mid-append
+		`{"event_type":"salvage_applied","pattern":"trunc`,
 		rec("displaced-line"),
 		"",
 		"not json at all",
@@ -180,7 +175,6 @@ func TestCountSalvageApplied_TolerantOfTornLines(t *testing.T) {
 }
 
 func TestSalvageVerdict_RefusesUnrepairablePayload(t *testing.T) {
-	// Recoverable-looking, but broken beyond a trailing comma, so no repair yields valid JSON.
 	const content = "## Verdict\n" +
 		"```json\n" + `{"phase":"audit","verdict":"PASS" "stray":}` + "\n```\n"
 
@@ -214,7 +208,6 @@ func TestPersistSalvagedArtifact_NoArtifactPathIsNoOp(t *testing.T) {
 	if err := persistSalvagedArtifact("", "judged", "repaired"); err != nil {
 		t.Errorf("empty ArtifactPath must be a no-op success, got %v", err)
 	}
-	// This test also covers a path that vanished under the gate: it must refuse, never blind-write.
 	gone := filepath.Join(t.TempDir(), "vanished.md")
 	if err := persistSalvagedArtifact(gone, "judged", "repaired"); err == nil {
 		t.Error("an unreadable artifact must refuse the write-back, not blind-write over it")

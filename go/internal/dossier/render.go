@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// RenderJSON serialises d to indented JSON bytes with a trailing newline.
 func RenderJSON(d *Dossier) ([]byte, error) {
 	if d == nil {
 		return nil, fmt.Errorf("dossier: RenderJSON: nil dossier")
@@ -24,7 +23,6 @@ func RenderJSON(d *Dossier) ([]byte, error) {
 	return append(raw, '\n'), nil
 }
 
-// ParseJSON deserialises raw JSON bytes into a Dossier.
 func ParseJSON(data []byte) (*Dossier, error) {
 	var d Dossier
 	if err := json.Unmarshal(data, &d); err != nil {
@@ -115,7 +113,6 @@ var markdownTmpl = template.Must(template.New("dossier-md").
 {{end}}{{- end}}
 `))
 
-// RenderMarkdown renders d as a human-readable markdown document.
 func RenderMarkdown(d *Dossier) ([]byte, error) {
 	if d == nil {
 		return nil, fmt.Errorf("dossier: RenderMarkdown: nil dossier")

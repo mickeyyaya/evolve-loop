@@ -12,13 +12,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// ResolveContinuation returns the first stamped continuation among this cycle's claims, in filename order, or nil.
 func ResolveContinuation(opts Options, cycle int) *continuation.Continuation {
 	return resolveClaim(opts, cycle, nil)
 }
 
-// resolveClaim returns the first stamped claim that inScope admits; nil admits all.
-// A scoped lane must skip a peer lane's claim, or two lanes work one task.
 func resolveClaim(opts Options, cycle int, inScope map[string]bool) *continuation.Continuation {
 	opts.resolveOpts()
 	cycleDir := inboxbatch.ProcessingCycleDir(opts.InboxDir, cycle)
@@ -59,7 +56,6 @@ func resolveClaim(opts Options, cycle int, inScope map[string]bool) *continuatio
 	return nil
 }
 
-// scopeSet returns nil when the lane declares no ids, keeping a solo cycle scope-blind.
 func scopeSet(scopeIDs []string) map[string]bool {
 	set := map[string]bool{}
 	for _, id := range scopeIDs {
@@ -73,7 +69,6 @@ func scopeSet(scopeIDs []string) map[string]bool {
 	return set
 }
 
-// ResolveContinuationForScope tries this lane's stamped claims, then the registry for scopeIDs in order.
 func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *continuation.Continuation {
 	opts.resolveOpts()
 	if c := resolveClaim(opts, cycle, scopeSet(scopeIDs)); c != nil {
@@ -89,8 +84,6 @@ func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *co
 			return nil
 		}
 		if ok && c.SnapshotSHA != "" {
-			// A binding whose scope is retired, with no live copy, is a ghost: release it so it
-			// stops re-arming, unless the retired copy is older than the binding.
 			retiredPath, retiredIn := scopeRetiredAt(opts, id)
 			if retiredIn != "" && !scopeHasLiveItem(opts, id) {
 				if rc := retiredAtCycle(retiredPath); rc > 0 && rc < c.Cycle {

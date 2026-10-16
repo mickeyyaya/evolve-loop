@@ -124,3 +124,20 @@
   `TestProtectedSurfaceManifest_CoversTheLeakRecoveryRules` pins it.
 - **The floor's go-test budget (2026-10-05)**: `core/phase_bindings_selfcheck.go`, which builds the floor's unit and tagged `go test` argvs, and `addedtests/budget.go`, which holds `PackageTimeout`, joined the manifest as file entries. Lane 1763 had raised the floor's tagged deadline to survive its own predicate (inst-L1763b), and after the floor moved onto the shared budget, its value lives in `budget.go`, so either file would let a lane move the deadline it is graded under. `addedtests.go`, the added-test grouping, stays cycle territory. Pinned by `TestProtectedSurfaceManifest_CoversTheFloorsGoTestBudget`.
 - **The one-ranking guard (2026-10-06)**: `inboxrank/weightsort_ban_test.go` joined the manifest as a file entry, at the operator's approval. It bans any ordering of inbox items outside `inboxrank` (ADR-0121, inbox rank P2), so the queue a lane is graded from has one order. A lane that could edit the guard could reorder that queue, which is why the file is protected and not just tested.
+
+## Rules kept from code comments
+
+- **The role guard decides in a fixed order.** The path is cleaned once, first. A bypass of the control plane is alarmed, even in an emergency. A protected path inside an always-safe directory still faces the integrity check. Outside a cycle the operator may edit anything, the control plane too.
+- **The control-plane check comes before every allowance.** The retro lessons allowance comes after it, so no protected path can use it.
+- **A deleted draft is proven, not parsed.** `retractsOwnDraft` compares one exact path. The host fixes that path (`explanationdocs.DocumentPath`). The guard does not interpret the shell. An expansion, a pathspec or another spelling is not that path.
+- **The draft counts as never committed only in four conditions.**
+  - `cwd` is the repository root.
+  - `HEAD` holds nothing of that name, compared case-folded.
+  - Every directory on the path is a real directory. A symlinked parent can resolve the name elsewhere.
+  - An existing draft is a regular file.
+- **The doc roots match case-folded.** A case-insensitive filesystem resolves `DOCS/` to `docs/`.
+- **The scanner shows the guard more text, never less.** `splitShellCommands` is an approximation for a guard, not a parser. A close that it cannot place ends a heredoc early.
+- **A heredoc body ends at a marker line.** The line holds the marker after leading blanks, or the marker then `)`. An unterminated body runs to the end of the input, as in bash. In double quotes a backslash escapes only `$`, a backtick, `"`, `\` and newline.
+- **The manifest is compiled, not config.** A cycle cannot write the knob that disarms it. A directory entry is used only if every file in it is control plane.
+- **Two projections of the manifest have two owners.** Routing and the breaker of triage compose `IsProtectedScope` with the build sandbox (lanerouting). The ship tripwire and the role guard keep `IsProtectedSurface`.
+- **A fragment matches under a directory wherever that directory is rooted.** `fragmentInside` excludes the bare root `/`, because every fragment starts with it. A directory spelling is a trailing slash, or a last segment with no dot after its first character. So `.evolve` counts.

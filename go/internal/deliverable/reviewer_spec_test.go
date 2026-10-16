@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// userCatalogWithFoo builds a catalog carrying one user phase "foo" with a
-// spec-derived contract requiring a ## Findings section.
 func userCatalogWithFoo() phasespec.Catalog {
 	foo := phasespec.PhaseSpec{
 		Name:     "foo",
@@ -35,7 +33,6 @@ func TestReviewerWithCatalog_BlocksMalformedUserPhase(t *testing.T) {
 	}
 	breaker := filepath.Join(root, "breaker.json")
 	rev := NewReviewerWithCatalog(config.StageEnforce, userCatalogWithFoo())
-	// Reach into the concrete type to point the breaker at a temp file.
 	rev.(*Reviewer).breakerPath = breaker
 
 	got := rev.Review(context.Background(), core.ReviewInput{

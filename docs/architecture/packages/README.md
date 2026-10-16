@@ -19,6 +19,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/inboxrank/rankinputs` | the one loader of the rank's inputs for an evolve dir: the policy's `inbox_priority` block and the recurrence ledger's item counts (ADR-0121, P2) | [internal-inboxrank-rankinputs.md](internal-inboxrank-rankinputs.md) |
 | `internal/convergence` | the convergence policy's pure decision: the next rung of a repeat-until-accepted loop, the round to land, and what is deferred or filed (ADR-0126) | [internal-convergence.md](internal-convergence.md) |
 | `internal/recurrence` | the recurrence ledger over lesson patterns, its escalation policy, and the snapshot read and item counts the inbox rank uses | [internal-recurrence.md](internal-recurrence.md) |
+| `internal/cycleoutcome` | the closeout seam for a cycle that did not ship: the failure lifecycle of the committed ids and the planned no-work hand-over | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/ipcenv` | the lane protocol keys a parent evolve process sets for its children, their set (`ProtocolKeys`), and the `EVOLVE_` scrub every judging `go test` runs under | [internal-ipcenv.md](internal-ipcenv.md) |
 | `internal/looppreflight` | the readiness gate `evolve loop` runs before the first wave | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/cliupdate` | updates each subscribed CLI family at a loop boundary, smoke-tests a changed version and records the change for the drift check | [internal-cliupdate.md](internal-cliupdate.md) |
@@ -141,3 +142,17 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/textcap` | the two rune-cap text rules: trim and ` …[truncated]`, or the bare ellipsis | [internal-textcap.md](internal-textcap.md) |
 | `internal/phases/flakererunscan` | the native flake-rerun phase: reruns a test and flags it flaky when its outcomes disagree | [internal-phases-flakererunscan.md](internal-phases-flakererunscan.md) |
 | `internal/guardslog` | appends one timestamped guard-log line and returns the close error | [internal-guardslog.md](internal-guardslog.md) |
+| `internal/continuation` | the continuation binding: the one schema, the per-cycle manifest, the scope-keyed registry and the release authority gate (ADR-0076) | [internal-continuation.md](internal-continuation.md) |
+| `internal/routingtest` | the composable scenario framework for the dynamic phase-routing kernel: specs, bricks, matrices and kernel-floor invariants | [internal-routingtest.md](internal-routingtest.md) |
+| `internal/phasetiming` | the per-phase latency record in `phase-timing.json` and its cycle roll-up | [internal-phasetiming.md](internal-phasetiming.md) |
+| `internal/bridge/recipe` | scripted multi-step slash-command sequences that run through the tmux REPL of an LLM CLI | [internal-bridge-recipe.md](internal-bridge-recipe.md) |
+| `internal/shipwindow` | the lease that serializes the audit-binding-to-push window across concurrent lanes | [internal-shipwindow.md](internal-shipwindow.md) |
+| `internal/cyclecost` | per-phase and per-cycle cost and token totals from the phase event streams and the usage sidecars | [internal-cyclecost.md](internal-cyclecost.md) |
+| `internal/consensusdispatch` | the cross-CLI consensus audit: filters the voters, writes the worker commands, fans out and aggregates by vote | [internal-consensusdispatch.md](internal-consensusdispatch.md) |
+| `internal/fleetbudget` | the pure allocator that sizes a wave of fleet lanes from measured quota and pace, and the shadow join of quota with token burn | [internal-fleetbudget.md](internal-fleetbudget.md) |
+| `internal/apicover` | measures the public-API coverage of a package: the exported symbols that no test names, and the named symbols that never run | [internal-apicover.md](internal-apicover.md) |
+| `internal/failureadapter` | the pure decision kernel that turns recorded failures into a proceed, retry or block action | [internal-failureadapter.md](internal-failureadapter.md) |
+| `internal/commitprefixgate` | refuses a commit whose conventional prefix does not match the diff scope the manifest declares | [internal-commitprefixgate.md](internal-commitprefixgate.md) |
+| `internal/bridge/launchoutcome` | what one bridge launch exit means: the exit table, the cause line and the outcome projections | [internal-bridge-launchoutcome.md](internal-bridge-launchoutcome.md) |
+| `internal/installer` | copies and removes the evolve-loop agents and loop skill under `~/.claude`, and validates the plugin layout in CI | [internal-installer.md](internal-installer.md) |
+| `internal/core/failurelearning` | the deterministic half of learning from a failed phase: the recorder, the floor and the recurrence closure | [internal-core-failurelearning.md](internal-core-failurelearning.md) |

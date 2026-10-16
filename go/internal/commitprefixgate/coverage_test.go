@@ -9,21 +9,8 @@ import (
 	"time"
 )
 
-// fixedTime is a deterministic timestamp for log-append edge tests.
 func fixedTime() time.Time { return time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC) }
 
-// coverage_test.go targets the branches the behavior suite in
-// commitprefixgate_test.go does not yet exercise: the SHIP_CLASS-defaulting
-// bypass-deny path, the matchPath `**`-collapse and `prefix/**` forms, the
-// globMatchRec `?`/`[` end-of-path edges, defaultGetDiffPaths via the execGit
-// seam (no real git subprocess), and appendGuardsLog's empty-path and
-// open-error early returns.
-
-// === Bypass with empty SHIP_CLASS defaults to "cycle" and is denied ========
-// Hits the `shipClass == ""` default branch (commitprefixgate.go:131-133):
-// an empty class must resolve to "cycle", which is NOT manual, so bypass is
-// rejected with ErrScopeViolation — proving an unset ship class can never
-// silently unlock the bypass.
 func TestRun_Bypass_EmptyShipClassDefaultsToCycle(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t, "")
@@ -31,7 +18,7 @@ func TestRun_Bypass_EmptyShipClassDefaultsToCycle(t *testing.T) {
 		CommitMsg:    "feat: msg",
 		RepoDir:      repo,
 		Bypass:       true,
-		ShipClass:    "", // unset → defaults to "cycle" → bypass denied
+		ShipClass:    "",
 		GetDiffPaths: stubDiffPaths(nil),
 	})
 	if !errors.Is(err, ErrScopeViolation) {
@@ -42,17 +29,13 @@ func TestRun_Bypass_EmptyShipClassDefaultsToCycle(t *testing.T) {
 	}
 }
 
-// === matchPath: `**`-collapse and `prefix/**` HasPrefix branches ===========
 func TestMatchPath_CollapseAndPrefixForms(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name, pat, path string
 		want            bool
 	}{
-		// `**` between literals: bash case-glob crosses `/`, so a double-star
-		// mid-pattern matches a nested path.
 		{"double-star-mid", "go**internal", "go/x/internal", true},
-		// `prefix/**` matches any path nested under the prefix.
 		{"prefix-slash-star-nested", "docs/**", "docs/a/b/c.md", true},
 		{"prefix-slash-star-non-member", "docs/**", "src/a.md", false},
 	}
@@ -66,21 +49,15 @@ func TestMatchPath_CollapseAndPrefixForms(t *testing.T) {
 	}
 }
 
-// === globMatchRec: `?` and `[` at end-of-path edges ========================
 func TestGlobMatch_EndOfPathEdges(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name, pat, path string
 		want            bool
 	}{
-		// `?` when path is exhausted (si >= len(path)) → false (line 357-359).
 		{"question-past-end", "ab?", "ab", false},
-		// `[` class when path is exhausted (si >= len(path)) → false (line 368-370).
 		{"class-past-end", "ab[cd]", "ab", false},
-		// `[` class with no closing `]` → false (end >= len(pat), line 368-370).
 		{"class-unterminated", "a[bc", "abc", false},
-		// sanity: a valid class still matches so the edge cases above are the
-		// only thing failing, not the class machinery itself.
 		{"class-valid", "a[bc]", "ab", true},
 	}
 	for _, tc := range cases {
@@ -93,12 +70,6 @@ func TestGlobMatch_EndOfPathEdges(t *testing.T) {
 	}
 }
 
-// === defaultGetDiffPaths via execGit seam (no real git) ====================
-// Overrides the package-level execGit var to return a deterministic command
-// (printf-style via `exec.Command`), so the production code path is exercised
-// without a real git repo, subprocess timing, or network. Mutates a package
-// global → no t.Parallel; restored via t.Cleanup.
-
 func swapExecGit(t *testing.T, fn func(args ...string) *exec.Cmd) {
 	t.Helper()
 	prev := execGit
@@ -108,7 +79,6 @@ func swapExecGit(t *testing.T, fn func(args ...string) *exec.Cmd) {
 
 func TestDefaultGetDiffPaths_StagedParsesAndTrims(t *testing.T) {
 	swapExecGit(t, func(args ...string) *exec.Cmd {
-		// Assert the staged-mode argv is exactly what the bash port shelled out.
 		want := []string{"-C", "/repo", "diff", "--cached", "--name-only"}
 		if len(args) != len(want) {
 			t.Errorf("argv = %v, want %v", args, want)
@@ -119,7 +89,6 @@ func TestDefaultGetDiffPaths_StagedParsesAndTrims(t *testing.T) {
 				}
 			}
 		}
-		// Output with a trailing newline + a blank line → blanks filtered out.
 		return exec.Command("printf", "a.go\nb.go\n\n")
 	})
 	got, err := defaultGetDiffPaths("/repo", ModeStaged, "")
@@ -175,7 +144,6 @@ func TestDefaultGetDiffPaths_RefModeRequiresDiffRef(t *testing.T) {
 
 func TestDefaultGetDiffPaths_CommandError(t *testing.T) {
 	swapExecGit(t, func(args ...string) *exec.Cmd {
-		// A command that exits non-zero → cmd.Output() returns an error.
 		return exec.Command("false")
 	})
 	_, err := defaultGetDiffPaths("/repo", ModeStaged, "")
@@ -184,9 +152,6 @@ func TestDefaultGetDiffPaths_CommandError(t *testing.T) {
 	}
 }
 
-// === Run wires defaultGetDiffPaths when no seam is provided ================
-// Leaving GetDiffPaths nil forces the `opts.GetDiffPaths == nil` default
-// branch (commitprefixgate.go:113-115); execGit is stubbed so no real git runs.
 func TestRun_DefaultsGetDiffPathsWhenNil(t *testing.T) {
 	swapExecGit(t, func(args ...string) *exec.Cmd {
 		return exec.Command("printf", "go/internal/x.go\n")
@@ -196,7 +161,6 @@ func TestRun_DefaultsGetDiffPathsWhenNil(t *testing.T) {
 		CommitMsg: "feat: real change",
 		RepoDir:   repo,
 		Mode:      ModeStaged,
-		// GetDiffPaths intentionally nil → defaultGetDiffPaths via stubbed execGit
 	})
 	if err != nil {
 		t.Fatalf("err = %v", err)
@@ -209,25 +173,20 @@ func TestRun_DefaultsGetDiffPathsWhenNil(t *testing.T) {
 	}
 }
 
-// === appendGuardsLog edges ==================================================
 func TestAppendGuardsLog_EmptyPathNoOp(t *testing.T) {
 	t.Parallel()
-	// Empty path → early return, no panic, nothing written.
 	appendGuardsLog("", fixedTime(), "ignored")
 }
 
 func TestAppendGuardsLog_OpenErrorIsSwallowed(t *testing.T) {
 	t.Parallel()
-	// Point the log at a path whose parent is a regular FILE, so MkdirAll and
-	// OpenFile both fail — appendGuardsLog must swallow the error (best-effort).
 	dir := t.TempDir()
 	notADir := filepath.Join(dir, "afile")
 	if err := os.WriteFile(notADir, []byte("x"), 0o644); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	logPath := filepath.Join(notADir, "guards.log") // parent is a file → open fails
+	logPath := filepath.Join(notADir, "guards.log")
 	appendGuardsLog(logPath, fixedTime(), "should not panic")
-	// The open failed and was swallowed: no readable log exists at the path.
 	if _, err := os.ReadFile(logPath); err == nil {
 		t.Errorf("guards.log unexpectedly readable at %q despite open error", logPath)
 	}

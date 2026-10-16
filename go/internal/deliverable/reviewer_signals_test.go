@@ -164,7 +164,7 @@ func TestReviewerSignals_OffAndUnwiredAreSilent(t *testing.T) {
 	if plain.SignalsWired() {
 		t.Fatal("no Center: unwired (the Null Object)")
 	}
-	plain.Review(context.Background(), reviewInput("build", t.TempDir(), t.TempDir())) // must not panic
+	plain.Review(context.Background(), reviewInput("build", t.TempDir(), t.TempDir()))
 	if wired, _ := observedReviewer(t, config.StageEnforce); !wired.SignalsWired() {
 		t.Fatal("a Center: wired")
 	}
@@ -182,8 +182,6 @@ func TestReviewer_ExposesTheSignalsWiredCapabilityThroughTheCoreInterface(t *tes
 	}
 }
 
-// ownedResolver overlays declared secondaries and effects onto a
-// built-in contract, the way CatalogResolver overlays the registry's.
 type ownedResolver struct{ owed, effects []string }
 
 func (o ownedResolver) Resolve(name string) (phasecontract.Contract, bool) {

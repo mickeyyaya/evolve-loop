@@ -20,58 +20,39 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Sentinel errors are the leaf's own pointers, so errors.Is holds across the seam.
 var (
-	ErrNotFound = lifecycle.ErrNotFound
-	ErrMvFailed = lifecycle.ErrMvFailed
-	ErrBadArgs  = lifecycle.ErrBadArgs
-	ErrBadState = lifecycle.ErrBadState
-	// ErrConsoleRouted refuses the lane handoff of an operator-owned item.
-	// See ADR-0074.
+	ErrNotFound      = lifecycle.ErrNotFound
+	ErrMvFailed      = lifecycle.ErrMvFailed
+	ErrBadArgs       = lifecycle.ErrBadArgs
+	ErrBadState      = lifecycle.ErrBadState
 	ErrConsoleRouted = lifecycle.ErrConsoleRouted
 	ErrInvalidItem   = lifecycle.ErrInvalidItem
 )
 
 type (
-	// LedgerAppender is the chained-append seam, satisfied by *ledger.FileLedger.
 	LedgerAppender = lifecycle.LedgerAppender
-	// ClaimResult describes what a claim did.
-	ClaimResult = lifecycle.ClaimResult
-	// PromoteOpts gathers the optional flag-bearing promote arguments.
-	PromoteOpts = lifecycle.PromoteOpts
-	// PromoteResult describes what a promote did.
-	PromoteResult = lifecycle.PromoteResult
-	// RecoverResult counts how many files were moved back to inbox/.
-	RecoverResult = lifecycle.RecoverResult
+	ClaimResult    = lifecycle.ClaimResult
+	PromoteOpts    = lifecycle.PromoteOpts
+	PromoteResult  = lifecycle.PromoteResult
+	RecoverResult  = lifecycle.RecoverResult
 )
 
-// Options configures every mover call; each zero field takes a default, most derived from ProjectRoot.
 type Options struct {
 	ProjectRoot string
-	InboxDir    string // defaults to <ProjectRoot>/.evolve/inbox
-	// LedgerPath defaults to <ProjectRoot>/.evolve/ledger.jsonl; only its
-	// directory is used, because FileLedger owns its file names.
-	LedgerPath string
-	// Ledger defaults to the chained FileLedger in LedgerPath's directory.
-	Ledger LedgerAppender
-	Stderr io.Writer
-	Now    func() time.Time
+	InboxDir    string
+	LedgerPath  string
+	Ledger      LedgerAppender
+	Stderr      io.Writer
+	Now         func() time.Time
 
-	// ActiveCycleFn defaults to reading cycle_id from .evolve/cycle-state.json.
 	ActiveCycleFn func() (string, error)
 
-	// IsLandedFn gates a processed promotion that carries a CommitSHA. It fails
-	// open (landed) on a probe fault and returns the error, so a non-git root never blocks.
 	IsLandedFn func(sha string) (bool, error)
 
 	MainHeadFn func() (string, error)
 
-	// IsProtectedPath is the lane-routing predicate (cmd/evolve laneForbidden) behind the files-derived
-	// half of the console-routing claim floor; nil disables only that half, and route:"console-*" always refuses.
 	IsProtectedPath func(path string) bool
 
-	// Signals receives the mover's inbox.warning events; nil prints the legacy
-	// [inbox-mover] line instead, so nothing goes silent on a Center-less root.
 	Signals *signalcenter.Center
 
 	PriorityClasses []string
@@ -112,8 +93,6 @@ func (o *Options) resolveOpts() {
 	}
 }
 
-// shaLandedOnMain answers exit 0 as landed and exit 1 as unlanded. Any other
-// answer fails open (landed) with the error, so missing git never blocks a promotion.
 func shaLandedOnMain(root, sha string) (bool, error) {
 	_, stderr, code, err := gitexec.Default(root).Capture(context.Background(), "merge-base", "--is-ancestor", sha, "main")
 	switch {
@@ -145,8 +124,6 @@ func (o *Options) logf(prefix, format string, args ...any) {
 	fmt.Fprintf(o.Stderr, lifecycle.LegacyPrefix+prefix+format+"\n", args...)
 }
 
-// mover is the one place a lifecycle Mover is built. The hooks close over the
-// resolved copy, because releaseContinuationOnRetire reads its defaults.
 func (o Options) mover() *lifecycle.Mover {
 	o.resolveOpts()
 	return lifecycle.New(o.InboxDir, o.Ledger,
@@ -168,56 +145,44 @@ func (o Options) mover() *lifecycle.Mover {
 		}))
 }
 
-// Claim moves taskID's item from inbox/ to processing/cycle-N/, or returns ErrNotFound.
 func Claim(opts Options, taskID, cycle string) (ClaimResult, error) {
 	return opts.mover().Claim(taskID, cycle)
 }
 
-// Promote moves taskID's item to newState's dir; a missing source is a NoOp, never an error.
 func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResult, error) {
 	return opts.mover().Promote(taskID, newState, p)
 }
 
-// ShouldQuarantine is the pure retry-ceiling decision; a system-level failure never quarantines.
-// See ADR-0072.
 func ShouldQuarantine(failureCount, ceiling int, systemLevelFailure bool) bool {
 	return lifecycle.ShouldQuarantine(failureCount, ceiling, systemLevelFailure)
 }
 
-// ReleaseFromQuarantine moves an item from quarantine/ to the inbox root and resets its failure_count.
 func ReleaseFromQuarantine(opts Options, taskID string) (PromoteResult, error) {
 	return opts.mover().ReleaseFromQuarantine(taskID)
 }
 
-// RecoverOrphans idempotently returns items claimed by inactive cycles to the inbox root.
 func RecoverOrphans(opts Options) (RecoverResult, error) {
 	return opts.mover().RecoverOrphans()
 }
 
-// ReleaseCycleProcessing drains one cycle's claims to the inbox root, never clobbering an existing root copy.
 func ReleaseCycleProcessing(opts Options, cycle int) (RecoverResult, error) {
 	return ReleaseCycleProcessingWithReason(opts, cycle, "")
 }
 
-// ReleaseCycleProcessingWithReason is ReleaseCycleProcessing with a ledger reason ("" means "cycle-release").
 func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (RecoverResult, error) {
 	return releaseCycleProcessing(opts, cycle, reason, nil)
 }
 
 type quarantinePolicy = lifecycle.Policy
 
-// releaseCycleProcessing stays unexported so ApplyCycleOutcome remains the one
-// door into the failure drain; a second entry point would let PASS and FAIL drift.
 func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quarantinePolicy) (RecoverResult, error) {
 	return opts.mover().Release(cycle, reason, quar)
 }
 
-// ReadFailureCount returns taskID's durable failure_count and whether the item was found.
 func ReadFailureCount(opts Options, taskID string) (int, bool) {
 	return opts.mover().ReadFailureCount(taskID)
 }
 
-// FindFileByTaskID resolves a task id to its file in one inbox directory; ids live inside the JSON.
 func FindFileByTaskID(dir, taskID string) (string, error) {
 	return lifecycle.FindFileByTaskID(dir, taskID)
 }
@@ -226,7 +191,6 @@ func bumpFailureCount(path, reason string) (int, error) {
 	return lifecycle.BumpFailureCount(path, reason)
 }
 
-// updateItemJSON rewrites an inbox item atomically.
 func updateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {
 	return lifecycle.UpdateItemJSON(path, mutate)
 }
@@ -239,7 +203,6 @@ func IsMoverWritten(key string) bool {
 	return lifecycle.IsMoverWritten(key)
 }
 
-// SupersededInboxIDs returns the deduped "superseded" ids of a triage decision, or nil on bad JSON.
 func SupersededInboxIDs(triageDecisionJSON []byte) []string {
 	var doc struct {
 		Superseded []string `json:"superseded"`
@@ -262,7 +225,6 @@ func SupersededInboxIDs(triageDecisionJSON []byte) []string {
 	return out
 }
 
-// ReconcileSuperseded promotes each listed id to newState by id alone and returns the ids it retired.
 func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, p PromoteOpts) ([]string, error) {
 	var retired []string
 	m := opts.mover()
@@ -281,7 +243,6 @@ func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, 
 	return retired, nil
 }
 
-// RouteResult is the leaf's route receipt (the rewritten item's path).
 type RouteResult = lifecycle.RouteResult
 
 func RouteLane(opts Options, taskID, reason string) (RouteResult, error) {
@@ -294,7 +255,6 @@ func File(opts Options, raw []byte) (FileResult, error) {
 	return opts.mover().File(raw)
 }
 
-// RouteConsole rewrites the item in place as route:console-manual, so the claim floor refuses every later lane.
 func RouteConsole(opts Options, taskID, reason string, cycle int) (RouteResult, error) {
 	return opts.mover().RouteConsole(taskID, reason, cycle)
 }

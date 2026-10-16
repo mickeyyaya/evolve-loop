@@ -5,22 +5,12 @@ import (
 	"testing"
 )
 
-// TestOperatorConfirmEnv pins the environment variable's SPELLING. Operators
-// type it and the runtime docs quote it, so a rename is a breaking change to a
-// public contract and must fail here rather than silently disarm every
-// script's authority path (an unrecognised name reads as "not set", which is a
-// refusal — the failure would be a stall, not an erasure, but it would be
-// silent).
 func TestOperatorConfirmEnv(t *testing.T) {
 	if OperatorConfirmEnv != "EVOLVE_OPERATOR_CONFIRM" {
 		t.Errorf("OperatorConfirmEnv = %q, want EVOLVE_OPERATOR_CONFIRM", OperatorConfirmEnv)
 	}
 }
 
-// TestRequireOperatorAuthority covers all four states of the gate. The
-// load-bearing one is the last: a gate written as os.Getenv(...) != "" reads a
-// set-but-negative value as consent, which would authorize exactly the erasure
-// an operator had just declined.
 func TestRequireOperatorAuthority(t *testing.T) {
 	t.Run("no flag and no env refuses, naming both authority paths", func(t *testing.T) {
 		t.Setenv(OperatorConfirmEnv, "")

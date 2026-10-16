@@ -15,11 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// fixedNow is the deterministic clock for pure-kernel decisions.
 var fixedNow = time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC)
 
-// RunAll executes a set of specs, each as its own subtest. This is the entry
-// point a catalog calls: "send a set of test configurations."
 func RunAll(t *testing.T, specs []ScenarioSpec) {
 	t.Helper()
 	if len(specs) == 0 {
@@ -31,8 +28,6 @@ func RunAll(t *testing.T, specs []ScenarioSpec) {
 	}
 }
 
-// Run executes one spec against its Surface and asserts the embedded
-// expectations + invariants.
 func Run(t *testing.T, s ScenarioSpec) {
 	t.Helper()
 	switch s.Surface {
@@ -43,8 +38,6 @@ func Run(t *testing.T, s ScenarioSpec) {
 	}
 }
 
-// buildConfig resolves a ScenarioSpec's knobs into a RoutingConfig, filling the
-// same safe defaults config.Load would (so a zero spec behaves like production).
 func buildConfig(s ScenarioSpec) config.RoutingConfig {
 	cfg := config.RoutingConfig{
 		Stage:         s.Stage,
@@ -75,8 +68,6 @@ func buildConfig(s ScenarioSpec) config.RoutingConfig {
 	return cfg
 }
 
-// --- PureKernel ---
-
 func runPure(t *testing.T, s ScenarioSpec) {
 	in := router.RouteInput{
 		Current:   s.Current,
@@ -87,20 +78,23 @@ func runPure(t *testing.T, s ScenarioSpec) {
 		Strict:    s.Strict,
 		Now:       fixedNow,
 	}
-	// Thread the advisor's CLAMPED whole-cycle plan exactly as the orchestrator
-	// does: clamp the scripted (unclamped) plan to the integrity floor, then hand
-	// it to the pure kernel. Only when a plan is scripted (and not a forced
-	// error) — otherwise in.Plan stays nil and shouldRun runs the legacy trigger
-	// path. The PureKernel surface thus proves the floor-clamped plan drives
-	// run/skip independently of any orchestrator I/O.
 	if len(s.Agent.Plan) > 0 {
 		raw := &router.PhasePlan{Entries: append([]router.PhasePlanEntry(nil), s.Agent.Plan...)}
 		plan, _ := router.ClampPlanToFloor(in, raw)
 		in.Plan = plan
 	}
-	proposal := s.Agent.Proposals[s.Current] // nil if none scripted at Current
+	proposal := s.Agent.Proposals[s.Current]
 	got := router.Route(in, proposal)
 
+	checkPureExpectations(t, s, got)
+	assertInvariants(t, s, in, proposal, got)
+}
+
+type errorReporter interface {
+	Errorf(format string, args ...any)
+}
+
+func checkPureExpectations(t errorReporter, s ScenarioSpec, got router.RouterDecision) {
 	if s.Expect.NextPhase != "" && got.NextPhase != s.Expect.NextPhase {
 		t.Errorf("NextPhase=%q, want %q (decision=%+v)", got.NextPhase, s.Expect.NextPhase, got)
 	}
@@ -121,10 +115,7 @@ func runPure(t *testing.T, s ScenarioSpec) {
 	if s.Expect.Justification != "" && !strings.Contains(got.Justification, s.Expect.Justification) {
 		t.Errorf("Justification=%q, want substring %q", got.Justification, s.Expect.Justification)
 	}
-	assertInvariants(t, s, in, proposal, got)
 }
-
-// --- FullOrchestrator ---
 
 var routingtestRunCycle = func(o *core.Orchestrator, req core.CycleRequest) (core.CycleResult, error) {
 	return o.RunCycle(context.Background(), req)
@@ -136,19 +127,13 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	var agent *scriptedProposer
 	if s.Agent.active() {
 		cfg.Mode = config.ModeDynamicLLM
-		// ONE agent instance backs both router ports (Proposer + Planner),
-		// mirroring production where a single PhaseAdvisor satisfies both.
 		agent = &scriptedProposer{spec: s.Agent}
 		strat = router.LLMProposal{Proposer: agent}
 	}
-	// WithRouting leads (a later WithPlanner lands on a struct whose strategy is
-	// already set); WithPlanner is appended only when a plan is scripted.
 	opts := []core.Option{core.WithRouting(cfg, strat)}
 	if agent != nil && s.Agent.hasPlan() {
 		opts = append(opts, core.WithPlanner(agent))
 	}
-	// Mirror s.Enable into WorkflowConfig.PhaseEnables so orchestrator-level
-	// intent-gate logic (cyclerun.go) sees the same enables as the router.
 	if len(s.Enable) > 0 {
 		opts = append(opts, core.WithWorkflowConfig(policy.WorkflowConfig{PhaseEnables: phaseEnablesOf(s.Enable)}))
 	}
@@ -206,9 +191,6 @@ func assertCycleExpectations(t testing.TB, s ScenarioSpec, res core.CycleResult,
 			t.Errorf("routing_decision ledger entries=%d, want >=%d", n, s.Expect.RoutingLedgerMin)
 		}
 	}
-	// Contains, not HasPrefix: the disposition gate (cycle-1046 verdict-path
-	// wiring) prefixes a loud reason when a scenario fixture delivers no
-	// disposition.json — the branch decision marker must still be present.
 	if s.Expect.RetroPrefix != "" && !strings.Contains(res.RetroDecision, s.Expect.RetroPrefix) {
 		t.Errorf("RetroDecision=%q, want marker %q", res.RetroDecision, s.Expect.RetroPrefix)
 	}
@@ -244,8 +226,6 @@ func initScenarioRepo(t *testing.T) string {
 		return nil
 	}).Dir
 }
-
-// --- assertion helpers ---
 
 func assertPhaseSeq(t testing.TB, got, want []core.Phase) {
 	t.Helper()
@@ -305,7 +285,6 @@ func containsPhase(xs []core.Phase, want core.Phase) bool {
 	return false
 }
 
-// sameSet reports order-insensitive equality of two string slices.
 func sameSet(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -322,7 +301,6 @@ func sameSet(a, b []string) bool {
 	return true
 }
 
-// subset reports whether every element of want is in have.
 func subset(want, have []string) bool {
 	set := map[string]bool{}
 	for _, h := range have {

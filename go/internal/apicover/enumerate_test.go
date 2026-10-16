@@ -37,7 +37,7 @@ func TestEnumerate_FindsExportedFuncTypeVar(t *testing.T) {
 		"unexportedFunc",
 		"ExportedType.unexportedMethod",
 		"unexportedVar",
-		"IntegrationOnlyFunc", // behind //go:build integration — must be skipped
+		"IntegrationOnlyFunc",
 	}
 	for _, name := range notWant {
 		if _, ok := got[name]; ok {

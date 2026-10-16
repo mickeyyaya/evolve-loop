@@ -19,7 +19,7 @@ func TestFloorGate_ParsedFromFloorKey(t *testing.T) {
 	if len(p.Floor) != 1 {
 		t.Fatalf("want 1 floor gate parsed, got %d", len(p.Floor))
 	}
-	var g FloorGate = p.Floor[0] // names the type for apicover
+	var g FloorGate = p.Floor[0]
 	if g.ID != "dossier-closeout" {
 		t.Errorf("ID = %q, want dossier-closeout", g.ID)
 	}

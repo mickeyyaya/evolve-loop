@@ -8,11 +8,6 @@ import (
 
 const ignoreMarker = "apicover:ignore"
 
-// parseIgnore inspects a declaration's doc comment for an `//apicover:ignore
-// reason=...` directive. The reason is mandatory and must be non-empty — an
-// ignore with no reason is an error, so the suppression is always justified in
-// the source and auditable. Returns (false, "", nil) when no directive is
-// present (including a nil doc).
 func parseIgnore(doc *ast.CommentGroup) (ignored bool, reason string, err error) {
 	if doc == nil {
 		return false, "", nil
@@ -34,8 +29,6 @@ func parseIgnore(doc *ast.CommentGroup) (ignored bool, reason string, err error)
 	return false, "", nil
 }
 
-// MissingDoc returns the exported symbols lacking a godoc comment, excluding any
-// flagged //apicover:ignore. It backs the -require-doc mode.
 func MissingDoc(syms []Symbol) []Symbol {
 	var out []Symbol
 	for _, s := range syms {

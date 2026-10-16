@@ -13,7 +13,6 @@ func TestDeferredIDs(t *testing.T) {
 	if got := DeferredIDs([]byte("not json")); got != nil {
 		t.Fatalf("unmarshal error must yield nil, got %v", got)
 	}
-	// Only the "id" key resolves, matching the sibling dropped[] reader.
 	if got := DeferredIDs([]byte(`{"deferred":[{"task_id":"x"}]}`)); len(got) != 0 {
 		t.Fatalf("task_id must not resolve for deferred entries, got %v", got)
 	}
@@ -33,8 +32,6 @@ func TestClosedDroppedIDs(t *testing.T) {
 		{"id":"invented","reason":"stale-completed"},
 		{"id":"shipped"}
 	]}`)
-	// Real triage-corpus shapes: a reason is classified by its leading tag, so a
-	// hyphen-joined close-class tag retires and anything leading with "stale" stays queued.
 	if got := ClosedDroppedIDs(body); !reflect.DeepEqual(got, []string{"shipped", "dupe", "replaced", "hyphen-joined"}) {
 		t.Fatalf("ClosedDroppedIDs = %v, want [shipped dupe replaced hyphen-joined] — close-class leading tags only, case-insensitive, deduped", got)
 	}

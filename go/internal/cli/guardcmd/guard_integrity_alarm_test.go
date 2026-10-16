@@ -27,9 +27,6 @@ func writeBuildCycleState(t *testing.T, evolveDir, worktree string) {
 	}
 }
 
-// TestRunGuard_RoleControlPlaneEdit_DeniesAndAlarms is the end-to-end cycle-20
-// regression at the hook layer: a build-phase Edit of a protected gate file is
-// DENIED (exit 2) AND writes a CRITICAL record to .evolve/integrity-alarm.jsonl.
 func TestRunGuard_RoleControlPlaneEdit_DeniesAndAlarms(t *testing.T) {
 	dir := t.TempDir()
 	evolveDir := filepath.Join(dir, ".evolve")
@@ -63,9 +60,6 @@ func TestRunGuard_RoleControlPlaneEdit_DeniesAndAlarms(t *testing.T) {
 	}
 }
 
-// TestRunGuard_RoleNormalSourceEdit_NoAlarm confirms a legit worktree source
-// write allows (exit 0) and writes NO integrity alarm — the boundary must not
-// over-block ordinary build work.
 func TestRunGuard_RoleNormalSourceEdit_NoAlarm(t *testing.T) {
 	dir := t.TempDir()
 	evolveDir := filepath.Join(dir, ".evolve")

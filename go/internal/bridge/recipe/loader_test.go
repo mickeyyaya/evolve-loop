@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// fakeSource drives the ReadFile/ReadDir error branches the always-valid
-// embedded FS cannot reach.
 type fakeSource struct {
 	files   map[string][]byte
 	readErr error
@@ -41,7 +39,6 @@ func withRecipeFS(t *testing.T, s recipeSource) {
 }
 
 func TestLoadRecipe_Embedded(t *testing.T) {
-	// The real embedded plugin-install.json must load + validate.
 	r, err := LoadRecipe("plugin-install")
 	if err != nil {
 		t.Fatalf("LoadRecipe: %v", err)

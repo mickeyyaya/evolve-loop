@@ -41,7 +41,6 @@ func TestIgnoreDirective_NoDirectiveReturnsFalse(t *testing.T) {
 	if err != nil || ignored {
 		t.Fatalf("got (ignored=%v, err=%v), want (false, nil)", ignored, err)
 	}
-	// nil doc must be safe too.
 	if ig, _, err := parseIgnore(nil); ig || err != nil {
 		t.Fatalf("nil doc: got (ignored=%v, err=%v), want (false, nil)", ig, err)
 	}

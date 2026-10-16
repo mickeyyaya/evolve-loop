@@ -1,34 +1,11 @@
 package recurrence
 
-// backfill_c662_test.go — cycle-662 RED contract for chronicle-s1-recurrence-index
-// gap G2 (HISTORICAL BACKFILL). Cycle 661 (395d8b7e) landed the ledger core but
-// it starts EMPTY, so Count()==0 for every historical pattern and the recurrence
-// signal is dormant. This file pins the backfill scan over
-// .evolve/instincts/lessons/*.yaml that seeds the ledger with the 267-lesson
-// history.
-//
-// Builder contract (do NOT modify this file — implement production code):
-//
-//	func BackfillFromLessons(lessonsDir string, pol EscalationPolicy) (*Ledger, []string, error)
-//	    - scans lessonsDir/*.yaml, tolerating BOTH lesson shapes:
-//        deterministic-floor (one-element list, pattern==errorCategory) AND the
-//        richer LLM shape (description/governingVariable/preventiveAction blocks);
-//	    - records each (pattern, cycle) closure into a fresh ledger, cycle parsed
-//	      from the `cycle-<N>-` id prefix; recurrence count == distinct cycles;
-//	    - a malformed/unparseable file is SKIPPED (its basename returned in the
-//	      second result) and never aborts the scan — err is non-nil only for a
-//	      fatal I/O error (dir unreadable), not per-file parse failures.
-//
-// RED today: BackfillFromLessons does not exist, so package recurrence fails to
-// compile and none of these tests run. GREEN once Builder adds backfill.go.
-
 import (
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// writeLesson writes a lesson YAML file (name without extension) into dir.
 func writeLesson(t *testing.T, dir, name, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(body), 0o644); err != nil {
@@ -36,8 +13,6 @@ func writeLesson(t *testing.T, dir, name, body string) {
 	}
 }
 
-// llmLesson renders the richer LLM lesson shape (distinct pattern, non-echo
-// errorCategory, prose fields) for a given id/pattern.
 func llmLesson(id, pattern string) string {
 	return "- id: " + id + "\n" +
 		"  pattern: \"" + pattern + "\"\n" +
@@ -50,8 +25,6 @@ func llmLesson(id, pattern string) string {
 		"  failureContext:\n    failedStep: build\n    errorCategory: cycle-mid-execution-fail\n    auditVerdict: FAIL\n"
 }
 
-// floorLesson renders the deterministic-floor shape: pattern == errorCategory
-// (the echo that marks it Generic), minimal fields.
 func floorLesson(id, pattern string) string {
 	return "- id: " + id + "\n" +
 		"  pattern: " + pattern + "\n" +
@@ -62,10 +35,6 @@ func floorLesson(id, pattern string) string {
 		"  failureContext:\n    failedStep: retro\n    errorCategory: " + pattern + "\n    auditVerdict: RESET\n"
 }
 
-// TestC662_BackfillCountsRecurrenceAcrossLessonShapes — AC2a. The parser must
-// tolerate BOTH lesson shapes and accumulate a per-pattern recurrence count
-// across distinct cycles. Two LLM-shape files sharing one pattern (cycles 100,
-// 101) must count 2; a floor-shape file (cycle 102) must also parse and count 1.
 func TestC662_BackfillCountsRecurrenceAcrossLessonShapes(t *testing.T) {
 	dir := t.TempDir()
 	writeLesson(t, dir, "cycle-100-alpha", llmLesson("cycle-100-alpha", "specific-defect-alpha"))
@@ -94,13 +63,9 @@ func TestC662_BackfillCountsRecurrenceAcrossLessonShapes(t *testing.T) {
 	}
 }
 
-// TestC662_BackfillSkipsMalformedYAMLWithoutError — AC2b (negative / edge axis).
-// A malformed lesson must be recorded in the SkippedFiles diagnostic and never
-// abort the scan; the valid file alongside it must still be counted.
 func TestC662_BackfillSkipsMalformedYAMLWithoutError(t *testing.T) {
 	dir := t.TempDir()
 	writeLesson(t, dir, "cycle-200-ok", llmLesson("cycle-200-ok", "valid-pattern-x"))
-	// Not a valid lesson: not a YAML list of entries with a pattern key.
 	writeLesson(t, dir, "cycle-201-broken", ": : : [ } garbage\n\t- no structure here")
 
 	led, skipped, err := BackfillFromLessons(dir, DefaultEscalationPolicy())
@@ -121,11 +86,6 @@ func TestC662_BackfillSkipsMalformedYAMLWithoutError(t *testing.T) {
 	}
 }
 
-// TestC662_BackfillTaskBindingChainCountsAtLeastSix — AC3 (replay acceptance from
-// the chronicle plan: the historical task-binding recurrence chain must be
-// visible with its real multi-cycle occurrence count). Six same-pattern floor/LLM
-// closeouts across the chain's real cycle numbers must count >= 6 — proof the
-// backfill surfaces the long-tail chain the advisory channel merely noticed.
 func TestC662_BackfillTaskBindingChainCountsAtLeastSix(t *testing.T) {
 	dir := t.TempDir()
 	const chain = "execution-phase-binds-scout-selected-tasks-not-triage-topn"

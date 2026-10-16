@@ -33,7 +33,6 @@ func TestCommitPairGit_RollsBackStagedOnPermanentFailure(t *testing.T) {
 	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
 
 	dir := t.TempDir()
-	// A baseline commit gives `git reset -- <path>` a resolvable HEAD.
 	for _, args := range [][]string{
 		{"init"},
 		{"-c", "user.email=seed@example.com", "-c", "user.name=seed", "commit", "--allow-empty", "-m", "baseline"},
@@ -46,8 +45,6 @@ func TestCommitPairGit_RollsBackStagedOnPermanentFailure(t *testing.T) {
 		}
 	}
 
-	// An empty ident makes `git commit` fail permanently on any host. Set after the
-	// baseline commit, so only commitPairGit inherits it.
 	for _, k := range []string{"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"} {
 		t.Setenv(k, "")
 	}

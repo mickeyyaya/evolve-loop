@@ -9,18 +9,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// CodeHandoffBudgetExceeded is the stable code for a Handoff Summary estimated over its token budget.
 const CodeHandoffBudgetExceeded = "handoff_budget_exceeded"
 
-// charsPerToken is the common ~4-characters-per-token heuristic; the repo carries no tokenizer.
 const charsPerToken = 4
 
-// EstimateTokens returns a deterministic token estimate for s at ~4 characters per token.
 func EstimateTokens(s string) int {
 	return len(s) / charsPerToken
 }
 
-// HandoffSectionContent returns the "## Handoff Summary" body up to the next "## " heading; ok is false when it is absent.
 func HandoffSectionContent(content string) (string, bool) {
 	const heading = "## Handoff Summary"
 	lines := strings.Split(content, "\n")
@@ -44,7 +40,6 @@ func HandoffSectionContent(content string) (string, bool) {
 	return strings.Join(body, "\n"), true
 }
 
-// CheckHandoffBudget reports whether the Handoff Summary exceeds budgetTokens; an absent section is never a violation.
 func CheckHandoffBudget(content string, budgetTokens int) (violated bool, estimated int) {
 	body, ok := HandoffSectionContent(content)
 	if !ok {
@@ -54,7 +49,6 @@ func CheckHandoffBudget(content string, budgetTokens int) (violated bool, estima
 	return estimated > budgetTokens, estimated
 }
 
-// VerifyWithReportSize is VerifyWithStage plus the Handoff Summary budget, recorded from advisory; the Reviewer blocks on it only at enforce.
 func VerifyWithReportSize(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver, phaseIO, reportSizeGate config.Stage, budgetTokens int) (Result, error) {
 	res, err := VerifyWithStage(phase, roots, resolver, phaseIO)
 	if err != nil {
@@ -65,7 +59,6 @@ func VerifyWithReportSize(phase string, roots phasecontract.Roots, resolver phas
 	}
 	data, readErr := os.ReadFile(res.ArtifactPath)
 	if readErr != nil {
-		// VerifyWithStage already reported the missing artifact.
 		return res, nil
 	}
 	if violated, estimated := CheckHandoffBudget(string(data), budgetTokens); violated {

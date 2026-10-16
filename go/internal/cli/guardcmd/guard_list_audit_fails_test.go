@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// seedState writes a state.json into dir/.evolve with the given failedApproaches.
 func seedState(t *testing.T, dir string, failedApproaches []map[string]any) {
 	t.Helper()
 	evolveDir := filepath.Join(dir, ".evolve")
@@ -87,7 +86,6 @@ func TestRunGuard_ListAuditFails_NoStateFile(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// No state.json on purpose.
 	var stdout, stderr bytes.Buffer
 	rc := RunGuard([]string{"--evolve-dir", filepath.Join(dir, ".evolve"), "list-audit-fails"}, nil, &stdout, &stderr)
 	if rc != 1 {
@@ -112,8 +110,6 @@ func TestRunGuard_ListAuditFails_EmptyState(t *testing.T) {
 }
 
 func TestRunGuard_ListAuditFails_FlagAfterSubcommand(t *testing.T) {
-	// Operator may put --evolve-dir AFTER list-audit-fails. Both orders
-	// must work.
 	dir := t.TempDir()
 	seedState(t, dir, nil)
 	var stdout, stderr bytes.Buffer

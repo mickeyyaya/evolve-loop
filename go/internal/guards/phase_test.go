@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// setupStorageWithCS writes cs through storage, which mirrors run.json into cs.WorkspacePath; a test
-// that sets a workspace gives it a writable t.TempDir() path even when the decision never reads it.
 func setupStorageWithCS(t *testing.T, cs core.CycleState) (*storage.FilesystemStorage, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -82,7 +80,6 @@ func TestPhase_NonAgentToolsPass(t *testing.T) {
 	}
 }
 
-// erroringStorage wraps a real storage but injects ReadCycleState errors.
 type erroringStorage struct{ core.Storage }
 
 func (e erroringStorage) ReadCycleState(_ context.Context) (core.CycleState, error) {

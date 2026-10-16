@@ -1,18 +1,5 @@
 package continuation
 
-// registry_test.go — ADR-0076 slice C, G2 (cycle-1104): the scope-id-keyed
-// continuation registry. G1 binds preserved work to an INBOX CLAIM (the stamp
-// on .evolve/inbox/processing/cycle-N/<item>.json). Cycle-1078's failing lane
-// (`chain-boundary-loop`) had its scope come from the wave planner, not a
-// claim, so there was no item file to stamp and the preserved snapshot was
-// orphaned. The registry is the second scope-identity class: a root-owned
-// <projectRoot>/.evolve/continuation-registry.json mapping lane-scope todo id →
-// the SAME Continuation value the manifest carries.
-//
-// The hard invariant these tests pin: ONE schema. The registry stores
-// continuation.Continuation verbatim — no forked manifest format, no
-// registry-only fields — so writer and every reader can never drift.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -23,8 +10,6 @@ import (
 	"testing"
 )
 
-// regFixture returns a project root with .evolve/ present (the registry's
-// parent must be created by the writer when absent — see the missing-dir case).
 func regFixture(t *testing.T) string {
 	t.Helper()
 	return t.TempDir()
@@ -41,9 +26,6 @@ func sampleContinuation(cycle int, sha string) Continuation {
 	}
 }
 
-// TestRegistry_RoundTripByScopeID — the core produce→resolve contract: what a
-// FAILed non-claim lane writes under its lane-scope todo id is what a later
-// cycle reads back, field-for-field.
 func TestRegistry_RoundTripByScopeID(t *testing.T) {
 	root := regFixture(t)
 	want := sampleContinuation(1078, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -58,17 +40,11 @@ func TestRegistry_RoundTripByScopeID(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("registry round-trip lost fields:\n got %+v\nwant %+v", got, want)
 	}
-	// The registry lives at a single well-known root-owned path (readers must
-	// not have to guess it).
 	if _, err := os.Stat(RegistryPath(root)); err != nil {
 		t.Errorf("registry must exist at RegistryPath(%q) = %q: %v", root, RegistryPath(root), err)
 	}
 }
 
-// TestRegistry_SecondScopeDoesNotClobberFirst — the registry is a MAP, written
-// read-modify-write. A naive "write the whole file with one entry" producer
-// (the obvious wrong implementation) destroys every other lane's binding; with
-// a fleet running lanes concurrently that silently orphans preserved work.
 func TestRegistry_SecondScopeDoesNotClobberFirst(t *testing.T) {
 	root := regFixture(t)
 	first := sampleContinuation(1078, "1111111111111111111111111111111111111111")
@@ -93,8 +69,6 @@ func TestRegistry_SecondScopeDoesNotClobberFirst(t *testing.T) {
 		t.Errorf("scope-b = %+v ok=%v err=%v, want snapshot %q", b, ok, err, second.SnapshotSHA)
 	}
 
-	// A re-attempt of the SAME scope replaces its own entry (latest preserved
-	// work wins) without touching the neighbour.
 	third := sampleContinuation(1090, "3333333333333333333333333333333333333333")
 	if err := WriteRegistryEntry(root, "scope-a", third); err != nil {
 		t.Fatalf("rewrite scope-a: %v", err)
@@ -108,10 +82,6 @@ func TestRegistry_SecondScopeDoesNotClobberFirst(t *testing.T) {
 	}
 }
 
-// TestRegistry_MissingFileAndUnknownScopeAreCleanMiss — NEGATIVE. A repo that
-// has never stamped a non-claim continuation, and a scope with no binding, are
-// both clean (zero, false, nil) — never an error, never a phantom binding. A
-// resolver that treated absence as an error would break every ordinary cycle.
 func TestRegistry_MissingFileAndUnknownScopeAreCleanMiss(t *testing.T) {
 	root := regFixture(t)
 
@@ -127,16 +97,11 @@ func TestRegistry_MissingFileAndUnknownScopeAreCleanMiss(t *testing.T) {
 	if err != nil || ok || got != (Continuation{}) {
 		t.Errorf("unknown scope in a present registry must be a clean miss, got %+v ok=%v err=%v", got, ok, err)
 	}
-	// An empty scope id is never a valid key — it must not match anything.
 	if _, ok, _ := ReadRegistryEntry(root, ""); ok {
 		t.Error("empty scope id must never resolve a binding")
 	}
 }
 
-// TestRegistry_CorruptFileIsLoudError — NEGATIVE, the schema-drift rule
-// ReadManifest already enforces: a present-but-unparseable registry is an
-// ERROR, never a silent fresh start. Silent recovery here would hide exactly
-// the orphaned-work class this slice exists to close.
 func TestRegistry_CorruptFileIsLoudError(t *testing.T) {
 	root := regFixture(t)
 	if err := os.MkdirAll(filepath.Dir(RegistryPath(root)), 0o755); err != nil {
@@ -149,9 +114,6 @@ func TestRegistry_CorruptFileIsLoudError(t *testing.T) {
 	if _, ok, err := ReadRegistryEntry(root, "scope-a"); err == nil {
 		t.Errorf("corrupt registry must be a LOUD error, got ok=%v err=nil", ok)
 	}
-	// The producer must not silently swallow it either: a write over a corrupt
-	// registry either errors or repairs it — it must never leave the file
-	// unparseable while reporting success.
 	err := WriteRegistryEntry(root, "scope-a", sampleContinuation(1078, "abc"))
 	if err == nil {
 		if _, ok, rerr := ReadRegistryEntry(root, "scope-a"); rerr != nil || !ok {
@@ -161,10 +123,6 @@ func TestRegistry_CorruptFileIsLoudError(t *testing.T) {
 	}
 }
 
-// TestRegistry_StoresTheContinuationSchemaVerbatim — the no-fork invariant.
-// The on-disk value under a scope key must deserialise into the SAME
-// Continuation type with the SAME json field names the manifest uses; a
-// second, registry-only schema is exactly what this item forbids.
 func TestRegistry_StoresTheContinuationSchemaVerbatim(t *testing.T) {
 	root := regFixture(t)
 	want := sampleContinuation(1078, "4444444444444444444444444444444444444444")
@@ -184,9 +142,6 @@ func TestRegistry_StoresTheContinuationSchemaVerbatim(t *testing.T) {
 		t.Errorf("registry entry != Continuation verbatim:\n got %+v\nwant %+v", byScope["scope-a"], want)
 	}
 
-	// Field-name parity with the manifest: marshal the same value through the
-	// manifest writer and compare key sets. Any registry-only or renamed key
-	// is schema drift.
 	ws := t.TempDir()
 	if err := WriteManifest(ws, want); err != nil {
 		t.Fatalf("WriteManifest: %v", err)
@@ -218,13 +173,6 @@ func TestRegistry_StoresTheContinuationSchemaVerbatim(t *testing.T) {
 	}
 }
 
-// TestRegistry_ConcurrentLaneWritesDoNotLoseBindings — the fleet-concurrency
-// half of the "read-modify-write, never a whole-file overwrite" invariant this
-// registry claims. The registry lives at the shared PROJECT ROOT, so every lane
-// of a fleet wave writes the same map; an unserialized read-modify-write loses
-// updates exactly like a whole-file overwrite (lane A reads {}, lane B reads {},
-// both write) — orphaning preserved work, which is the very defect class G2
-// exists to close. Each lane must find its own binding afterwards.
 func TestRegistry_ConcurrentLaneWritesDoNotLoseBindings(t *testing.T) {
 	root := regFixture(t)
 	const lanes = 8

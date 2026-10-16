@@ -14,21 +14,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// DocDelete denies Bash commands that would remove content from docs/ or knowledge-base/, or move it out.
-// Its one exception is a Build retracting the active cycle's own explanation draft that was never
-// committed.
 type DocDelete struct {
 	allow   bool
 	storage core.Storage
 }
 
-// NewDocDelete returns a DocDelete guard; allow (workflow.allow_doc_delete) disables it, and storage
-// names the active cycle whose draft may be retracted.
 func NewDocDelete(allow bool, storage core.Storage) *DocDelete {
 	return &DocDelete{allow: allow, storage: storage}
 }
 
-// Name reports "docdelete".
 func (d *DocDelete) Name() string { return "docdelete" }
 
 const docRoot = `(?i:docs|knowledge-base)`
@@ -44,11 +38,6 @@ var (
 
 const archiveAdvice = "archive committed content with `git mv <file> docs/private/research/archived-YYYY-MM-DD/<file>`, which keeps the archived copy staged"
 
-// Decide denies a removal that could reach content under docs/ or knowledge-base/ (removesUnderADocRoot),
-// unless it retracts only the active cycle's own explanation draft, and denies an mv of doc content
-// outside docs/. The doc roots match case-folded, because a case-insensitive filesystem resolves DOCS/ to
-// docs/. A doc root anywhere on an rm's line counts, even in another command: a command substitution can
-// feed the rm a path that only another command names.
 func (d *DocDelete) Decide(ctx context.Context, in core.GuardInput) core.GuardDecision {
 	if d.allow || in.ToolName != "Bash" {
 		return core.GuardDecision{Allow: true}
@@ -284,10 +273,6 @@ func gitDirIsADocRootAs(name string, args []string) bool {
 	return false
 }
 
-// retractsOwnDraft reports whether every rm in cmd removes only the active cycle's explanation draft,
-// which HEAD never held. The host fixes the draft's name (explanationdocs.DocumentPath), so the proof
-// compares one exact path instead of interpreting the shell: an expansion, a pathspec or another
-// spelling is not that path.
 func (d *DocDelete) retractsOwnDraft(ctx context.Context, cwd string, cmds []shellCommand) bool {
 	draft, ok := d.activeDraft(ctx)
 	if !ok {
@@ -324,7 +309,6 @@ func (d *DocDelete) activeDraft(ctx context.Context) (string, bool) {
 	return draft, err == nil
 }
 
-// rmArgs returns the operands of a plain `rm` or `git rm`, and false for any other command.
 func rmArgs(words []string) ([]string, bool) {
 	switch {
 	case len(words) > 0 && words[0] == "rm":
@@ -346,9 +330,6 @@ func rmArgs(words []string) ([]string, bool) {
 	return operands, true
 }
 
-// neverCommitted reports whether cwd is the repository root, HEAD holds nothing named draft (compared
-// case-folded), and every directory on draft's path is a real directory: a symlinked parent would resolve
-// the name somewhere else. A draft that exists must be a regular file.
 func neverCommitted(ctx context.Context, cwd, draft string) bool {
 	if cwd == "" {
 		return false
@@ -383,8 +364,6 @@ func isDocPath(p string) bool {
 	return docPathRe.MatchString(p)
 }
 
-// isDocsDest reports whether an mv destination stays under docs/, the single documentation root.
-// knowledge-base/ is not a destination: its research/ subtree is retired and cycles/ is runtime state.
 func isDocsDest(p string) bool {
 	return docsDestRe.MatchString(p)
 }

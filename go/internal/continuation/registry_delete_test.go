@@ -1,12 +1,5 @@
 package continuation
 
-// registry_delete_test.go — pins DeleteRegistryEntry, the missing half of the
-// registry lifecycle (2026-08-10 stall investigation: 84 immortal entries,
-// ~60 pointing at dead state, no delete API anywhere). A binding the adopter
-// declines must be releasable, or every lane on that scope auto-FAILs at the
-// defect-ledger gate's out-of-band check forever (cycles 1412/1418 — the
-// absorbing-FAIL state).
-
 import (
 	"os"
 	"path/filepath"
@@ -56,9 +49,6 @@ func TestDeleteRegistryEntry_EmptyScopeRejected(t *testing.T) {
 }
 
 func TestDeleteRegistryEntryIfCycle_ReleasesOnlyTheNamedAncestor(t *testing.T) {
-	// The TOCTOU pin (adversarial-review HIGH): a sibling lane that rebinds
-	// the scope to a FRESH ancestor between an unlocked read and the delete
-	// must keep its binding — check and delete share one lock hold.
 	root := t.TempDir()
 	if err := WriteRegistryEntry(root, "todo-42", Continuation{Cycle: 1409, SnapshotSHA: "fresh"}); err != nil {
 		t.Fatal(err)
@@ -83,9 +73,6 @@ func TestDeleteRegistryEntryIfCycle_ReleasesOnlyTheNamedAncestor(t *testing.T) {
 	}
 }
 
-// In-package pin for AppendReleased (apicover-enforce): the ONE released-
-// pointer shape every consumption route writes — prior entries preserved,
-// host paths redacted, reason recorded.
 func TestAppendReleased(t *testing.T) {
 	home, herr := os.UserHomeDir()
 	if herr != nil {

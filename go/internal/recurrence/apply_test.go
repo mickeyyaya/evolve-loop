@@ -61,8 +61,6 @@ func stage(t *testing.T, root, action, id, pattern string, count int, weight flo
 	}
 }
 
-// TestApplyBoundary_BumpsThenIsIdempotent pins the escalation math and the
-// per-cycle stamp: the first pass bumps to Target, the second changes nothing.
 func TestApplyBoundary_BumpsThenIsIdempotent(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -86,8 +84,6 @@ func TestApplyBoundary_BumpsThenIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_NeverLowersWeight pins the negative case: a target below
-// the item's current weight leaves the item alone and reports it skipped.
 func TestApplyBoundary_NeverLowersWeight(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -106,8 +102,6 @@ func TestApplyBoundary_NeverLowersWeight(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_SkipsClaimedItems pins the fleet race: an item a lane has
-// already claimed is neither bumped nor resurrected into the open inbox.
 func TestApplyBoundary_SkipsClaimedItems(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -141,8 +135,6 @@ func TestApplyBoundary_SkipsClaimedItems(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_ShadowWritesReportOnly pins the compiled-default stage:
-// the report artifact is written and nothing else moves.
 func TestApplyBoundary_ShadowWritesReportOnly(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -169,9 +161,6 @@ func TestApplyBoundary_ShadowWritesReportOnly(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_AutofileUsesRetrofile pins that the autofile backend is the
-// existing retrofile filer (its own item shape reaches disk), and that a second
-// pass does not double-file.
 func TestApplyBoundary_AutofileUsesRetrofile(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -213,8 +202,6 @@ func TestApplyBoundary_AutofileUsesRetrofile(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_NothingStagedStillReports pins that an absent staging file
-// is a no-op, not an error, and still emits the artifact.
 func TestApplyBoundary_NothingStagedStillReports(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -231,8 +218,6 @@ func TestApplyBoundary_NothingStagedStillReports(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_MalformedStagingSurfaces pins that a corrupt staging file
-// errors rather than silently applying nothing.
 func TestApplyBoundary_MalformedStagingSurfaces(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -248,8 +233,6 @@ func TestApplyBoundary_MalformedStagingSurfaces(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_UnknownActionIsSkipped pins the closed-vocabulary default:
-// an unrecognised action never mutates the inbox.
 func TestApplyBoundary_UnknownActionIsSkipped(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -264,9 +247,6 @@ func TestApplyBoundary_UnknownActionIsSkipped(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_PatternOnlyIntentAndNoReportPath pins two fallbacks in one
-// pass: an intent with no explicit item id addresses its pattern, and an empty
-// ReportPath skips report writing instead of erroring.
 func TestApplyBoundary_PatternOnlyIntentAndNoReportPath(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -291,8 +271,6 @@ func TestApplyBoundary_PatternOnlyIntentAndNoReportPath(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_CorruptStampSurfaces pins that an unreadable idempotency
-// stamp errors rather than silently re-escalating everything.
 func TestApplyBoundary_CorruptStampSurfaces(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -306,16 +284,12 @@ func TestApplyBoundary_CorruptStampSurfaces(t *testing.T) {
 	}
 }
 
-// TestApplyBoundary_CorruptInboxItemSurfaces pins that a malformed target item
-// errors instead of being overwritten with a synthesised one.
 func TestApplyBoundary_CorruptInboxItemSurfaces(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, "inbox")
 	path := seedItem(t, inboxDir, "x", 0.10)
 	stage(t, root, dispositionrouter.ActionEscalate, "x", "pattern:x", 3, 0.50)
-	// Corrupt AFTER staging so findItem still matched a well-formed id earlier
-	// in the same pass is not required — the write path must fail loudly.
 	if err := os.WriteFile(path, []byte(`{"id":"x","weight":0.1`), 0o644); err != nil {
 		t.Fatalf("corrupt item: %v", err)
 	}

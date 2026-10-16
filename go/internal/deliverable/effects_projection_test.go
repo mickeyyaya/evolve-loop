@@ -18,7 +18,7 @@ func checkedInRegistry(t *testing.T) phasespec.Catalog {
 
 func TestPhaseRegistry_EveryDeclaredEffectHasACheck(t *testing.T) {
 	cat := checkedInRegistry(t)
-	declared := map[string][]string{} // effect → phases declaring it
+	declared := map[string][]string{}
 	for _, spec := range cat.All() {
 		for _, e := range spec.Effects {
 			declared[e] = append(declared[e], spec.Name)

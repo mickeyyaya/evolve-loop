@@ -1,11 +1,5 @@
 package cycleoutcome
 
-// lanescope_apicover_named_test.go — apicover named binding for the exported
-// LaneScopeIDs (issue #433 class: a newly exported surface needs a NAMED
-// covering test in its owning package; the ship-side consumer and the
-// ApplyFailure path exercise it indirectly). Behavior is pinned by
-// lanescope_fallback_test.go end-to-end; this binds the exported name.
-
 import (
 	"os"
 	"path/filepath"

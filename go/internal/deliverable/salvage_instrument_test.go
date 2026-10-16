@@ -87,7 +87,6 @@ func TestClassifyBadVerdict_Patterns(t *testing.T) {
 	}
 }
 
-// Purity is checked as determinism: the classifier takes no Result it could mutate.
 func TestClassifyBadVerdict_IsPure(t *testing.T) {
 	t.Parallel()
 	const content = "```json\n{\"verdict\":\"PASS\"}\n```\n"
@@ -101,7 +100,6 @@ func TestClassifyBadVerdict_IsPure(t *testing.T) {
 func TestRecordBadVerdictBaseline_OnlyOnBadVerdict(t *testing.T) {
 	t.Parallel()
 	ws, pr := t.TempDir(), t.TempDir()
-	// A well-formed sentinel with the build contract's "## Changes" section absent: a block without bad_verdict.
 	writeFile(t, ws, "build-report.md", "## Something Else\n<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"PASS\"} -->\n")
 
 	r := NewReviewerWithCatalogStageReportSize(config.StageEnforce, phasespec.Catalog{}, config.StageEnforce, config.StageOff, 0)
@@ -115,10 +113,8 @@ func TestRecordBadVerdictBaseline_OnlyOnBadVerdict(t *testing.T) {
 	}
 }
 
-// strayBacktickPreamble puts a lone, never-closed backtick in prose ahead of the report's own verdict.
 const strayBacktickPreamble = "The auditor noted a stray ` tick in the transcript and moved on.\n\n"
 
-// Each shape is classified as written and behind the preamble; the two results must match.
 func TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -179,7 +175,6 @@ func TestClassifyBadVerdict_UnmatchedBacktickDoesNotMisclassify(t *testing.T) {
 	}
 }
 
-// The symbol scan skips test files, which name the banned helpers.
 func TestNoQuotedEchoRegression(t *testing.T) {
 	t.Parallel()
 
@@ -247,7 +242,6 @@ func TestRecordBadVerdictBaseline_RecordShape(t *testing.T) {
 	}
 }
 
-// decoyCorpusPath is read rather than re-typed, so this suite and phasecontract's tests share one set of bytes.
 const decoyCorpusPath = "../phasecontract/testdata/cycle1298-quoted-decoys.md"
 
 func readDecoyCorpus(t *testing.T) string {
@@ -261,7 +255,6 @@ func readDecoyCorpus(t *testing.T) string {
 	return string(raw)
 }
 
-// First-match selection fails the second subtest and last-match alone fails the third.
 func TestClassifyBadVerdict_QuotedDecoyCorpus(t *testing.T) {
 	t.Parallel()
 	corpus := readDecoyCorpus(t)
@@ -324,7 +317,6 @@ func TestClassifyBadVerdict_UnmatchedBacktickFalsePositive(t *testing.T) {
 	}
 }
 
-// The padded and double-run cases are the ones a flush-adjacency check misses.
 func TestClassifyBadVerdict_QuotedEchoStillSuppressed(t *testing.T) {
 	t.Parallel()
 	const decoy = "<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"PASS\",\"schema_version\":1,} -->"

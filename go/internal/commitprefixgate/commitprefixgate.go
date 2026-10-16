@@ -1,21 +1,5 @@
-// Package commitprefixgate ports legacy/scripts/guards/commit-prefix-gate.sh.
-//
-// Layer 1 of the Reward-Hacking Defense System (ADR-0012). Verifies that
-// the commit-message prefix matches the diff scope declared in
-// .evolve/commit-prefix-scope.json. Rejects mislabeled commits with rc=2.
-//
-// Closes the cycle-70/72/75 mislabeling pattern (feat() commits that were
-// actually role-gate fixes or pure-docs).
-//
-// Exit codes (cmd layer maps from sentinel errors):
-//
-//	0 = prefix matches scope (or unknown prefix = pass-through)
-//	2 = scope violation (ErrScopeViolation)
-//	3 = bad arguments (ErrBadArgs)
-//	4 = manifest missing or malformed (ErrBadManifest)
-//
-// Bash 3.2 glob semantics are reproduced — case-statement style matching
-// where `*` matches arbitrary characters including `/`.
+// Package commitprefixgate refuses a commit whose conventional prefix does not match its diff scope.
+// See docs/architecture/packages/internal-commitprefixgate.md.
 package commitprefixgate
 
 import (
@@ -32,56 +16,48 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guardslog"
 )
 
-// Sentinel errors.
 var (
 	ErrScopeViolation = errors.New("commitprefixgate: scope violation")
 	ErrBadArgs        = errors.New("commitprefixgate: bad arguments")
 	ErrBadManifest    = errors.New("commitprefixgate: manifest missing or malformed")
 )
 
-// Mode for gathering diff paths.
 type Mode int
 
 const (
-	ModeStaged Mode = iota // git diff --cached --name-only
-	ModeRef                // git diff <ref>..HEAD --name-only
+	ModeStaged Mode = iota
+	ModeRef
 )
 
-// Options drives a Run() invocation.
 type Options struct {
 	CommitMsg    string
 	RepoDir      string
 	Mode         Mode
-	DiffRef      string // required when Mode == ModeRef
-	ManifestPath string // defaulted to <RepoDir>/.evolve/commit-prefix-scope.json
-	GuardsLog    string // defaulted to <RepoDir>/.evolve/guards.log
+	DiffRef      string
+	ManifestPath string
+	GuardsLog    string
 	Stderr       io.Writer
 
-	// Explicit command inputs.
 	Bypass    bool
-	ShipClass string // SHIP_CLASS
+	ShipClass string
 
-	// Seams for testing.
 	Now          func() time.Time
 	GetDiffPaths func(repoDir string, mode Mode, diffRef string) ([]string, error)
 }
 
-// Result describes what happened.
 type Result struct {
 	Prefix     string
 	Allowed    bool
 	DiffPaths  []string
 	Manifest   *PrefixManifest
 	PrefixRule *PrefixRule
-	Reason     string // human-readable allow/deny reason
+	Reason     string
 }
 
-// PrefixManifest is the shape of .evolve/commit-prefix-scope.json.
 type PrefixManifest struct {
 	Prefixes map[string]PrefixRule `json:"prefixes"`
 }
 
-// PrefixRule is one prefix's scope declaration.
 type PrefixRule struct {
 	AnyPath            bool     `json:"any_path"`
 	RequiredPaths      []string `json:"required_paths"`
@@ -89,11 +65,8 @@ type PrefixRule struct {
 	DiffMustBeSubset   bool     `json:"diff_must_be_subset"`
 }
 
-// prefixRE matches conventional-commits prefix: type[(scope)][!]:
-// e.g. "feat:", "fix(scope):", "feat(token-opt)!:"
 var prefixRE = regexp.MustCompile(`^([a-z][a-z-]*(\([a-z0-9-]+\))?)!?:`)
 
-// Run executes the gate logic.
 func Run(opts Options) (Result, error) {
 	res := Result{}
 
@@ -127,7 +100,6 @@ func Run(opts Options) (Result, error) {
 		fmt.Fprintf(opts.Stderr, "[commit-prefix-gate] "+format+"\n", args...)
 	}
 
-	// Bypass check.
 	if opts.Bypass {
 		shipClass := opts.ShipClass
 		if shipClass == "" {
@@ -144,10 +116,8 @@ func Run(opts Options) (Result, error) {
 		return res, fmt.Errorf("%w: bypass-with-non-manual-class", ErrScopeViolation)
 	}
 
-	// Manifest check.
 	body, err := os.ReadFile(opts.ManifestPath)
 	if err != nil {
-		// Missing manifest = pass-through (gate not provisioned yet).
 		logf("WARN: manifest missing at %s — pass-through (gate not yet provisioned)", opts.ManifestPath)
 		stderrf("WARN: manifest missing at %s — pass-through", opts.ManifestPath)
 		res.Allowed = true
@@ -161,7 +131,6 @@ func Run(opts Options) (Result, error) {
 	}
 	res.Manifest = &manifest
 
-	// Extract prefix from first line.
 	firstLine := strings.TrimLeft(strings.SplitN(opts.CommitMsg, "\n", 2)[0], " \t")
 	m := prefixRE.FindStringSubmatch(firstLine)
 	prefix := ""
@@ -189,7 +158,6 @@ func Run(opts Options) (Result, error) {
 	}
 	res.PrefixRule = &rule
 
-	// Permissive escape hatch.
 	if rule.AnyPath {
 		logf("ALLOW: prefix '%s' has any_path=true (permissive)", prefix)
 		res.Allowed = true
@@ -197,7 +165,6 @@ func Run(opts Options) (Result, error) {
 		return res, nil
 	}
 
-	// Gather diff paths.
 	diffPaths, err := opts.GetDiffPaths(opts.RepoDir, opts.Mode, opts.DiffRef)
 	if err != nil {
 		logf("WARN: GetDiffPaths failed: %v — pass-through", err)
@@ -215,7 +182,6 @@ func Run(opts Options) (Result, error) {
 		return res, nil
 	}
 
-	// Rule 1: required_paths — at least one diff path must match.
 	if len(rule.RequiredPaths) > 0 {
 		matched := false
 		for _, p := range diffPaths {
@@ -239,7 +205,6 @@ func Run(opts Options) (Result, error) {
 		logf("required_paths check passed")
 	}
 
-	// Rule 2: forbidden_only_paths — diff must NOT be entirely under forbidden patterns.
 	if len(rule.ForbiddenOnlyPaths) > 0 {
 		allForbidden := true
 		for _, p := range diffPaths {
@@ -265,7 +230,6 @@ func Run(opts Options) (Result, error) {
 		logf("forbidden_only_paths check passed")
 	}
 
-	// Rule 3: diff_must_be_subset — every diff path must match at least one required pattern.
 	if rule.DiffMustBeSubset && len(rule.RequiredPaths) > 0 {
 		violators := []string{}
 		for _, p := range diffPaths {
@@ -296,30 +260,20 @@ func Run(opts Options) (Result, error) {
 	return res, nil
 }
 
-// matchPath reproduces bash case-statement glob semantics + the bash port's
-// three matching strategies:
-//
-//  1. direct glob (`*` matches anything including `/`)
-//  2. `**` collapsed to `*` and retried
-//  3. `prefix/**` matches `prefix/...anything`
-//  4. `**/suffix` matches `...anything/suffix` or just `suffix`
 func matchPath(pattern, path string) bool {
 	if globMatch(pattern, path) {
 		return true
 	}
-	// ** → * collapse.
 	flat := strings.ReplaceAll(pattern, "**", "*")
 	if flat != pattern && globMatch(flat, path) {
 		return true
 	}
-	// prefix/** form.
 	if strings.HasSuffix(pattern, "/**") {
 		prefix := strings.TrimSuffix(pattern, "/**")
 		if strings.HasPrefix(path, prefix+"/") {
 			return true
 		}
 	}
-	// **/suffix form.
 	if strings.HasPrefix(pattern, "**/") {
 		suffix := strings.TrimPrefix(pattern, "**/")
 		if path == suffix || strings.HasSuffix(path, "/"+suffix) {
@@ -329,14 +283,6 @@ func matchPath(pattern, path string) bool {
 	return false
 }
 
-// globMatch implements bash case-statement glob semantics where:
-//   - `*` matches arbitrary chars including `/`
-//   - `?` matches one char
-//   - `[abc]` matches a char in the class
-//   - literal chars match themselves
-//
-// path/filepath.Match is NOT used because it treats `*` as
-// non-separator-crossing. Bash's case-glob crosses `/`.
 func globMatch(pattern, path string) bool {
 	return globMatchRec(pattern, 0, path, 0)
 }
@@ -345,7 +291,6 @@ func globMatchRec(pat string, pi int, path string, si int) bool {
 	for pi < len(pat) {
 		switch pat[pi] {
 		case '*':
-			// Greedy: try matching 0..N chars.
 			if pi == len(pat)-1 {
 				return true
 			}
@@ -362,7 +307,6 @@ func globMatchRec(pat string, pi int, path string, si int) bool {
 			pi++
 			si++
 		case '[':
-			// Class. Find ']'.
 			end := pi + 1
 			for end < len(pat) && pat[end] != ']' {
 				end++
@@ -400,7 +344,6 @@ func globMatchRec(pat string, pi int, path string, si int) bool {
 	return si == len(path)
 }
 
-// defaultGetDiffPaths shells out to git for the production code path.
 func defaultGetDiffPaths(repoDir string, mode Mode, diffRef string) ([]string, error) {
 	var args []string
 	switch mode {
@@ -427,11 +370,6 @@ func defaultGetDiffPaths(repoDir string, mode Mode, diffRef string) ([]string, e
 	return result, nil
 }
 
-// appendGuardsLog is a best-effort NDJSON-ish append. The open/write/close is
-// centralized in guardslog.Append (which surfaces the close error so it is
-// testable); this guard is fire-and-forget by design — a read-only sandbox is
-// expected to fail here and must never surface — so the error is discarded
-// explicitly at this boundary.
 func appendGuardsLog(path string, ts time.Time, msg string) {
 	_ = guardslog.Append(path, "commit-prefix-gate", msg, ts)
 }

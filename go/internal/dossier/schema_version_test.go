@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// legacyRetroMislabelRecord mirrors the unversioned corpus: no discriminator,
-// one synthesized phase, and retro listed in skipped_phases.
 const legacyRetroMislabelRecord = `{
   "cycle": 823,
   "goal": "legacy fixture",
