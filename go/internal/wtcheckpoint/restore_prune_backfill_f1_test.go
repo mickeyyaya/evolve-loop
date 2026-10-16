@@ -186,32 +186,36 @@ func TestHasLandedBackfillF1(t *testing.T) {
 	boom := errors.New("diff failed")
 	r := refEntry{name: "refs/checkpoints/task/20261006T060000Z", oid: "oid1"}
 	t.Run("the checkpoint's own diff cannot be read", func(t *testing.T) {
-		landed, err := hasLanded(context.Background(), newScriptF1(stepF1{prefix: "diff --name-only", err: boom}).git("/s"), r)
-		if !errors.Is(err, boom) || landed {
+		landed, err := hasLanded(context.Background(), newScriptF1(stepF1{prefix: "diff --raw", err: boom}).git("/s"), r)
+		if err == nil || !strings.Contains(err.Error(), "diff failed") || landed {
 			t.Fatalf("landed=%v err=%v", landed, err)
 		}
 	})
 	t.Run("the comparison with origin/main cannot be read", func(t *testing.T) {
 		s := newScriptF1(
-			stepF1{prefix: "diff --name-only -z --no-renames oid1~2 oid1", outs: []string{"a.go\x00"}},
-			stepF1{prefix: "diff --name-only", err: boom},
+			stepF1{prefix: "diff --raw", outs: []string{":100644 100644 111111 222222 M\x00a.go\x00"}},
+			stepF1{prefix: "cat-file --batch", err: boom},
 		)
 		landed, err := hasLanded(context.Background(), s.git("/s"), r)
-		if !errors.Is(err, boom) || landed {
+		if err == nil || !strings.Contains(err.Error(), "diff failed") || landed {
 			t.Fatalf("landed=%v err=%v", landed, err)
 		}
 	})
 	t.Run("a checkpoint that changed nothing never counts as landed", func(t *testing.T) {
-		landed, err := hasLanded(context.Background(), newScriptF1(stepF1{prefix: "diff --name-only", outs: []string{""}}).git("/s"), r)
+		landed, err := hasLanded(context.Background(), newScriptF1(stepF1{prefix: "diff --raw", outs: []string{""}}).git("/s"), r)
 		if err != nil || landed {
 			t.Fatalf("landed=%v err=%v", landed, err)
 		}
 	})
 	t.Run("landed only when none of its changed paths still differ from main", func(t *testing.T) {
-		mk := func(stillDiffers string) bool {
+		mk := func(mainContent string) bool {
 			s := newScriptF1(
-				stepF1{prefix: "diff --name-only -z --no-renames oid1~2 oid1", outs: []string{"a.go\x00b.go\x00"}},
-				stepF1{prefix: "diff --name-only", outs: []string{stillDiffers}},
+				stepF1{prefix: "diff --raw", outs: []string{":100644 100644 111111 222222 M\x00a.go\x00"}},
+				stepF1{prefix: "cat-file --batch", outs: []string{
+					"oid1~2:a.go blob 4\nbase\n" +
+						"refs/remotes/origin/main:a.go blob " + strconv.Itoa(len(mainContent)) + "\n" + mainContent + "\n" +
+						"oid1:a.go blob 4\nwork\n",
+				}},
 			)
 			landed, err := hasLanded(context.Background(), s.git("/s"), r)
 			if err != nil {
@@ -219,11 +223,11 @@ func TestHasLandedBackfillF1(t *testing.T) {
 			}
 			return landed
 		}
-		if !mk("") || !mk("unrelated.go\x00") {
-			t.Error("paths identical to main (or differing only elsewhere) mean the work landed")
+		if !mk("work") {
+			t.Error("paths identical to main mean the work landed")
 		}
-		if mk("b.go\x00") {
-			t.Error("one changed path still differing from main means it has not landed")
+		if mk("diff") {
+			t.Error("a changed path still differing from main means it has not landed")
 		}
 	})
 }

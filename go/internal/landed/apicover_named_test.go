@@ -34,3 +34,15 @@ func TestBlob_NamedAMissingPathIsAnAbsentBlobNotAnEmptyOne(t *testing.T) {
 		t.Errorf("gone=%+v empty=%+v: a missing path is absent, an empty file is a present zero-length blob", gone, empty)
 	}
 }
+
+func TestChangesOption_NamedWithCommitAndWithExactAreChangesOptions(t *testing.T) {
+	t.Parallel()
+	tr := newTree(t, map[string]string{"seed.txt": "seed\n"})
+
+	var opts []landed.ChangesOption = []landed.ChangesOption{landed.WithCommit(tr.base), landed.WithExact()}
+	v, err := landed.Changes(context.Background(), gitexec.Default(tr.repo.Dir), tr.base, opts...)
+
+	if err != nil || !v.Landed {
+		t.Errorf("Changes with WithCommit(base) and WithExact = %+v (err=%v), want landed", v, err)
+	}
+}

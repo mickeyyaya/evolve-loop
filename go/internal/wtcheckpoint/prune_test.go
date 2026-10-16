@@ -2,6 +2,7 @@ package wtcheckpoint_test
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -94,5 +95,34 @@ func TestPrune_LandedWithoutOriginMainFailsAndDeletesNothing(t *testing.T) {
 	}
 	if got := refsIn(t, h); got != "refs/checkpoints/task/20261006T060000Z" {
 		t.Errorf("refs left = %s, want the checkpoint kept", got)
+	}
+}
+
+func TestPrune_LandedKeepsExactEqualityAndSparesACheckpointMainOnlyMerges(t *testing.T) {
+	t.Parallel()
+	h := newHub(t)
+	seed := h.addWorktree("dev/seed", "feat/seed")
+	var body strings.Builder
+	for i := 1; i <= 20; i++ {
+		body.WriteString("line " + strconv.Itoa(i) + "\n")
+	}
+	writeFile(t, seed.Dir, "big.txt", body.String())
+	h.git(seed.Dir, "add", "-A")
+	h.git(seed.Dir, "commit", "-q", "-m", "big")
+	h.git(h.store.Dir, "update-ref", "refs/heads/main", "feat/seed")
+	h.git(h.store.Dir, "update-ref", "refs/remotes/origin/main", "feat/seed")
+	merged := h.addWorktree("dev/merged", "feat/merged")
+	writeFile(t, merged.Dir, "big.txt", strings.Replace(body.String(), "line 3\n", "lane edit\n", 1))
+	save(t, merged, wtcheckpoint.SaveOptions{Keep: 20, Now: clockAt("20261006T060000Z")})
+	landing := h.addWorktree("dev/landing", "feat/landing")
+	writeFile(t, landing.Dir, "big.txt", strings.Replace(strings.Replace(body.String(), "line 3\n", "lane edit\n", 1), "line 18\n", "later main edit\n", 1))
+	h.git(landing.Dir, "add", "-A")
+	h.git(landing.Dir, "commit", "-q", "-m", "land")
+	h.git(landing.Dir, "update-ref", "refs/remotes/origin/main", "HEAD")
+
+	pruned, err := wtcheckpoint.Prune(context.Background(), h.hub(), wtcheckpoint.PruneOptions{Keep: 20, Landed: true})
+
+	if err != nil || len(pruned) != 0 {
+		t.Errorf("Prune --landed = %+v, %v; want nothing deleted: a ref is deleted only on byte-equal proof", pruned, err)
 	}
 }

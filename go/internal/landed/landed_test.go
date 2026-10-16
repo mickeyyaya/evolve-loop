@@ -268,3 +268,103 @@ func TestParseCatFileBatch_ReadsBlobsAndRefusesAMalformedAnswer(t *testing.T) {
 		}
 	}
 }
+
+func (tr tree) commitThenResetDisk(files map[string]string) string {
+	tr.t.Helper()
+	tr.writeAll(files)
+	tr.repo.Git("add", "-A")
+	tr.repo.Git("commit", "-q", "-m", "tree under judgement")
+	oid := tr.repo.Git("rev-parse", "HEAD")
+	tr.repo.Git("reset", "-q", "--hard", tr.base)
+	return strings.TrimSpace(oid)
+}
+
+func (tr tree) commitChanges(oid string, opts ...landed.ChangesOption) landed.Verdict {
+	tr.t.Helper()
+	opts = append([]landed.ChangesOption{landed.WithCommit(oid)}, opts...)
+	v, err := landed.Changes(context.Background(), gitexec.Default(tr.repo.Dir), tr.base, opts...)
+	if err != nil {
+		tr.t.Fatalf("Changes: %v", err)
+	}
+	return v
+}
+
+func TestChanges_CommitTree_ACommitWithNoChangeIsLanded(t *testing.T) {
+	t.Parallel()
+	tr := newTree(t, map[string]string{"big.txt": lines(nil)})
+
+	if v := tr.commitChanges(tr.base); !v.Landed {
+		t.Errorf("a commit equal to the base = %+v, want landed", v)
+	}
+}
+
+func TestChanges_CommitTree_AChangeMainCarriesIsLandedWithoutReadingTheDisk(t *testing.T) {
+	t.Parallel()
+	tr := newTree(t, map[string]string{"big.txt": lines(nil)})
+	tr.landOnMain(func() { tr.write("big.txt", lines(map[int]string{3: "lane edit", 18: "later main edit"})) })
+	oid := tr.commitThenResetDisk(map[string]string{"big.txt": lines(map[int]string{3: "lane edit"})})
+
+	if v := tr.commitChanges(oid); !v.Landed {
+		t.Errorf("a committed edit main carries = %+v, want landed", v)
+	}
+}
+
+func TestChanges_CommitTree_AChangeMainLacksIsNotLandedAndNamesItsPath(t *testing.T) {
+	t.Parallel()
+	tr := newTree(t, map[string]string{"big.txt": lines(nil)})
+	oid := tr.commitThenResetDisk(map[string]string{"big.txt": lines(map[int]string{3: "only in the commit"})})
+
+	v := tr.commitChanges(oid)
+
+	if v.Landed || !strings.Contains(v.Reason, "big.txt") {
+		t.Errorf("a committed edit main lacks = %+v, want not landed naming big.txt", v)
+	}
+}
+
+func TestChanges_CommitTree_ACommittedDeletionIsLandedOnlyWhenMainDeletedTheFileToo(t *testing.T) {
+	t.Parallel()
+	tr := newTree(t, map[string]string{"gone.txt": "x\n", "keep.txt": "y\n"})
+	tr.repo.Git("rm", "-q", "gone.txt")
+	tr.repo.Git("commit", "-q", "-m", "delete")
+	oid := strings.TrimSpace(tr.repo.Git("rev-parse", "HEAD"))
+	tr.repo.Git("reset", "-q", "--hard", tr.base)
+
+	if v := tr.commitChanges(oid); v.Landed {
+		t.Errorf("a deletion main still has = %+v, want not landed", v)
+	}
+	tr.landOnMain(func() {
+		if err := os.Remove(tr.path("gone.txt")); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if v := tr.commitChanges(oid); !v.Landed {
+		t.Errorf("a deletion main also made = %+v, want landed", v)
+	}
+}
+
+func TestChanges_CommitTree_ExactAcceptsOnlyByteEqualContent(t *testing.T) {
+	t.Parallel()
+	tr := newTree(t, map[string]string{"big.txt": lines(nil)})
+	tr.landOnMain(func() { tr.write("big.txt", lines(map[int]string{3: "lane edit", 18: "later main edit"})) })
+	merged := tr.commitThenResetDisk(map[string]string{"big.txt": lines(map[int]string{3: "lane edit"})})
+
+	if v := tr.commitChanges(merged, landed.WithExact()); v.Landed {
+		t.Errorf("exact mode accepted content that only merges onto main: %+v", v)
+	}
+	tr.repo.Git("branch", "-q", "twin", plane.OriginMainRef)
+	twin := strings.TrimSpace(tr.repo.Git("rev-parse", "twin"))
+	if v := tr.commitChanges(twin, landed.WithExact()); !v.Landed {
+		t.Errorf("exact mode refused a commit byte-equal to main: %+v", v)
+	}
+}
+
+func TestChanges_CommitTree_AnUnknownCommitIsAnErrorNotAVerdict(t *testing.T) {
+	t.Parallel()
+	tr := newTree(t, map[string]string{"big.txt": lines(nil)})
+
+	_, err := landed.Changes(context.Background(), gitexec.Default(tr.repo.Dir), tr.base, landed.WithCommit("0123456789abcdef0123456789abcdef01234567"))
+
+	if err == nil {
+		t.Error("Changes on a commit that does not exist returned no error")
+	}
+}

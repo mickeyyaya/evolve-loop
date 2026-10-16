@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/landed"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
@@ -83,25 +83,9 @@ func pruneCandidates(ctx context.Context, g gitexec.Git, groups map[string][]ref
 }
 
 func hasLanded(ctx context.Context, g gitexec.Git, r refEntry) (bool, error) {
-	changed, err := changedPaths(ctx, g, r.oid+"~2", r.oid)
-	if err != nil || len(changed) == 0 {
+	v, err := landed.Changes(ctx, g, r.oid+"~2", landed.WithCommit(r.oid), landed.WithExact())
+	if err != nil || v.Empty {
 		return false, err
 	}
-	differs, err := changedPaths(ctx, g, plane.OriginMainRef, r.oid)
-	if err != nil {
-		return false, err
-	}
-	notOnMain := map[string]bool{}
-	for _, p := range differs {
-		notOnMain[p] = true
-	}
-	return !slices.ContainsFunc(changed, func(p string) bool { return notOnMain[p] }), nil
-}
-
-func changedPaths(ctx context.Context, g gitexec.Git, from, to string) ([]string, error) {
-	out, err := g.Output(ctx, "diff", "--name-only", "-z", "--no-renames", from, to)
-	if err != nil {
-		return nil, err
-	}
-	return strings.FieldsFunc(out, func(r rune) bool { return r == 0 }), nil
+	return v.Landed, nil
 }

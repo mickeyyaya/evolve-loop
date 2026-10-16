@@ -29,6 +29,26 @@ const (
 type Verdict struct {
 	Landed bool
 	Reason string
+	Empty  bool
+}
+
+type ChangesOption func(*changesConfig)
+
+type changesConfig struct {
+	commit string
+	exact  bool
+}
+
+func WithCommit(commit string) ChangesOption {
+	return func(c *changesConfig) {
+		c.commit = commit
+	}
+}
+
+func WithExact() ChangesOption {
+	return func(c *changesConfig) {
+		c.exact = true
+	}
 }
 
 type Blob struct {
@@ -55,12 +75,18 @@ func notLanded(format string, args ...any) Verdict {
 	return Verdict{Reason: fmt.Sprintf(format, args...)}
 }
 
-func Changes(ctx context.Context, worktree gitexec.Git, base string) (Verdict, error) {
-	changes, err := listChanges(ctx, worktree, base)
-	if err != nil || len(changes) == 0 {
-		return Verdict{Landed: err == nil}, err
+func Changes(ctx context.Context, worktree gitexec.Git, base string, opts ...ChangesOption) (Verdict, error) {
+	var cfg changesConfig
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
+		}
 	}
-	blobs, err := readBlobs(ctx, worktree, base, changes)
+	changes, err := listChanges(ctx, worktree, base, cfg.commit)
+	if err != nil || len(changes) == 0 {
+		return Verdict{Landed: err == nil, Empty: len(changes) == 0}, err
+	}
+	blobs, err := readBlobs(ctx, worktree, base, changes, cfg.commit)
 	if err != nil {
 		return Verdict{}, err
 	}
@@ -69,12 +95,18 @@ func Changes(ctx context.Context, worktree gitexec.Git, base string) (Verdict, e
 		return Verdict{}, err
 	}
 	for _, ch := range changes {
-		tree, err := worktreeContent(worktree.Dir, ch)
-		if err != nil {
-			return Verdict{}, err
+		var tree Blob
+		if cfg.commit != "" {
+			tree = blobs[cfg.commit+":"+ch.path]
+		} else {
+			var err error
+			tree, err = worktreeContent(worktree.Dir, ch)
+			if err != nil {
+				return Verdict{}, err
+			}
 		}
 		v := pathVersions{base: blobs[base+":"+ch.path], main: blobs[plane.OriginMainRef+":"+ch.path], tree: tree, mainMode: modes[ch.path]}
-		verdict, err := judgePath(ctx, worktree, ch, v)
+		verdict, err := judgePath(ctx, worktree, ch, v, cfg.exact)
 		if err != nil || !verdict.Landed {
 			return verdict, err
 		}
@@ -82,8 +114,12 @@ func Changes(ctx context.Context, worktree gitexec.Git, base string) (Verdict, e
 	return landedVerdict, nil
 }
 
-func listChanges(ctx context.Context, worktree gitexec.Git, base string) ([]change, error) {
-	out, err := gitIn(ctx, worktree, "", "diff", "--raw", "-z", "--no-renames", "--no-ext-diff", "--no-relative", base)
+func listChanges(ctx context.Context, worktree gitexec.Git, base string, commit ...string) ([]change, error) {
+	args := []string{"diff", "--raw", "-z", "--no-renames", "--no-ext-diff", "--no-relative", base}
+	if len(commit) > 0 && commit[0] != "" {
+		args = append(args, commit[0])
+	}
+	out, err := gitIn(ctx, worktree, "", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -102,10 +138,17 @@ func listChanges(ctx context.Context, worktree gitexec.Git, base string) ([]chan
 	return changes, nil
 }
 
-func readBlobs(ctx context.Context, worktree gitexec.Git, base string, changes []change) (map[string]Blob, error) {
+func readBlobs(ctx context.Context, worktree gitexec.Git, base string, changes []change, commit ...string) (map[string]Blob, error) {
+	c := ""
+	if len(commit) > 0 {
+		c = commit[0]
+	}
 	var specs []string
 	for _, ch := range changes {
 		specs = append(specs, base+":"+ch.path, plane.OriginMainRef+":"+ch.path)
+		if c != "" {
+			specs = append(specs, c+":"+ch.path)
+		}
 	}
 	out, err := gitIn(ctx, worktree, strings.Join(specs, "\n")+"\n", "cat-file", "--batch")
 	if err != nil {
@@ -186,7 +229,8 @@ func worktreeContent(dir string, ch change) (Blob, error) {
 	return Blob{Data: data, Present: true}, err
 }
 
-func judgePath(ctx context.Context, worktree gitexec.Git, ch change, v pathVersions) (Verdict, error) {
+func judgePath(ctx context.Context, worktree gitexec.Git, ch change, v pathVersions, exact ...bool) (Verdict, error) {
+	exactMode := len(exact) > 0 && exact[0]
 	switch {
 	case ch.status == "U" || ch.newMode == gitModeGitlink || ch.oldMode == gitModeGitlink:
 		return notLanded("%s is unmerged or a submodule, which the proof does not judge", ch.path), nil
@@ -200,7 +244,7 @@ func judgePath(ctx context.Context, worktree gitexec.Git, ch change, v pathVersi
 		return notLanded("%s has mode %s in the tree but %s in origin/main", ch.path, ch.newMode, modeOrAbsent(v.mainMode)), nil
 	case bytes.Equal(v.tree.Data, v.main.Data):
 		return landedVerdict, nil
-	case !v.base.Present || ch.newMode == gitModeSymlink || isBinary(v.base.Data, v.main.Data, v.tree.Data):
+	case exactMode || !v.base.Present || ch.newMode == gitModeSymlink || isBinary(v.base.Data, v.main.Data, v.tree.Data):
 		return notLanded("%s differs from origin/main", ch.path), nil
 	}
 	kept, err := mergeKeepsMain(ctx, worktree.Exec, v)

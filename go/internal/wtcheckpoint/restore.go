@@ -147,3 +147,11 @@ func applyCheckpoint(ctx context.Context, tree gitexec.Git, cp checkpoint) error
 	}
 	return nil
 }
+
+func changedPaths(ctx context.Context, g gitexec.Git, from, to string) ([]string, error) {
+	out, err := g.Output(ctx, "diff", "--name-only", "-z", "--no-renames", from, to)
+	if err != nil {
+		return nil, err
+	}
+	return strings.FieldsFunc(out, func(r rune) bool { return r == 0 }), nil
+}
