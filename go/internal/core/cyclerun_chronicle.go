@@ -15,10 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
-// seedChronicleDigest writes <workspace>/recent-outcomes.md from the last-N
-// committed dossiers + the live failure/recurrence state, and at enforce
-// injects the rendered bytes into ctxSnap["recent_outcomes"] — the single
-// per-cycle resolution point (called once from planCycle).
 func seedChronicleDigest(projectRoot string, cs CycleState, state State, cfg policy.ChronicleConfig, ctxSnap map[string]string, warn io.Writer) {
 	if cfg.Digest == "off" || cs.WorkspacePath == "" {
 		return
@@ -27,8 +23,6 @@ func seedChronicleDigest(projectRoot string, cs CycleState, state State, cfg pol
 		Dossiers:         loadRecentDossiers(projectRoot, cfg.DigestCycles),
 		FailedApproaches: entriesFromRecords(state.FailedAt),
 	}
-	// Best-effort recurrence index: a missing file is an empty ledger (not an
-	// error); any real load error just drops the Pattern Stats section.
 	if idx, err := recurrence.Load(filepath.Join(projectRoot, ".evolve", "recurrence-ledger.json")); err == nil {
 		in.Index = idx
 	}
@@ -41,9 +35,6 @@ func seedChronicleDigest(projectRoot string, cs CycleState, state State, cfg pol
 	if cfg.Digest != "enforce" {
 		return
 	}
-	// Enforce: carry the written digest (already token-capped and per-line
-	// sanitized by WriteDigest) into every phase request. Empty history writes
-	// no file — nothing to inject then.
 	data, err := os.ReadFile(filepath.Join(cs.WorkspacePath, "recent-outcomes.md"))
 	if err != nil || len(data) == 0 {
 		return
@@ -51,10 +42,6 @@ func seedChronicleDigest(projectRoot string, cs CycleState, state State, cfg pol
 	ctxSnap["recent_outcomes"] = strings.TrimSpace(string(data))
 }
 
-// loadRecentDossiers reads the newest `limit` committed cycle dossiers from
-// <projectRoot>/knowledge-base/cycles/cycle-<n>.json. Selection is by the
-// filename's cycle number (descending) so only the window is read, not the
-// whole history; unparseable files are skipped (best-effort).
 func loadRecentDossiers(projectRoot string, limit int) []dossier.Dossier {
 	matches, err := filepath.Glob(filepath.Join(dossier.CyclesDir(projectRoot), "cycle-*.json"))
 	if err != nil || len(matches) == 0 {

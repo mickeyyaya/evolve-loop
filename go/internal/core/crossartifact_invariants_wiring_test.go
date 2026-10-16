@@ -10,11 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// crossArtifactArtifact is the on-disk advisory record this cycle adds.
 const crossArtifactArtifact = "crossartifact-invariants.json"
 
-// xaWireReport is the wire view of that artifact — decoded by field name, so
-// the Builder may add fields but may not rename these.
 type xaWireReport struct {
 	Advisory   bool `json:"advisory"`
 	Invariants []struct {
@@ -24,8 +21,6 @@ type xaWireReport struct {
 	} `json:"invariants"`
 }
 
-// xaWireSentinel writes an audit-report.md whose canonical evolve-verdict
-// sentinel carries verdict and (optionally) cited evidence paths.
 func xaWireSentinel(t *testing.T, dir, verdict string, evidencePaths []string) {
 	t.Helper()
 	payload := map[string]any{"phase": "audit", "verdict": verdict, "schema_version": 1}
@@ -47,10 +42,6 @@ func xaWireSentinel(t *testing.T, dir, verdict string, evidencePaths []string) {
 	}
 }
 
-// xaIncoherentWorkspace builds a workspace that violates all four invariants:
-// the sentinel says FAIL while acs-verdict.json says PASS, the claimed counts
-// contradict the results beside them, a cited evidence path exists nowhere, and
-// the phase chain runs backwards.
 func xaIncoherentWorkspace(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -71,8 +62,6 @@ func xaIncoherentWorkspace(t *testing.T) string {
 	return ws
 }
 
-// xaReadWireReport reads and decodes the advisory artifact, failing loudly when
-// the real path never produced it.
 func xaReadWireReport(t *testing.T, ws string) xaWireReport {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(ws, crossArtifactArtifact))
@@ -94,7 +83,6 @@ func xaOrchestrator() *Orchestrator {
 	}
 }
 
-// xaStatusOf returns the reported status of one invariant from the artifact.
 func xaStatusOf(t *testing.T, r xaWireReport, name string) string {
 	t.Helper()
 	for _, inv := range r.Invariants {
@@ -158,13 +146,9 @@ func TestFinalizeCycle_CrossArtifactViolationsNeverBlockTheCycle(t *testing.T) {
 	if result.SystemFailure != nil {
 		t.Errorf("cross-artifact violations raised a system failure (%+v) — advisory findings must not halt or escalate", result.SystemFailure)
 	}
-	xaReadWireReport(t, ws) // the finding is still RECORDED; it just does not bite
+	xaReadWireReport(t, ws)
 }
 
-// The cited evidence path exists only under the projectRoot argument, so an
-// implementation that resolves against the project root would report ok while
-// the lane's own tree never had the file. The second half proves the check is
-// not simply always-violated.
 func TestFinalizeCycle_CrossArtifactBindsTheLaneWorktreeNotTheProjectRoot(t *testing.T) {
 	t.Parallel()
 
@@ -212,7 +196,7 @@ func TestFinalizeCycle_VerdictIncoherenceFloorSurvivesTheAdvisory(t *testing.T) 
 	t.Parallel()
 
 	ws := t.TempDir()
-	writeVerdicts(t, ws, "PASS", "PASS") // green artifacts, no contract verifier configured
+	writeVerdicts(t, ws, "PASS", "PASS")
 	result := &CycleResult{FinalVerdict: VerdictFAIL}
 	cs := CycleState{CycleID: 1676, WorkspacePath: ws, ActiveWorktree: t.TempDir()}
 

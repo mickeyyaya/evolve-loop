@@ -5,8 +5,6 @@ import (
 	"io"
 )
 
-// dr is a pointer because a successful correction re-dispatch updates dr.resp
-// and dr.phaseReq's CorrectionDirective, which recordAndBranch then consumes.
 func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, error) {
 	if phaseErr := cr.prepareForReview(next, dr); phaseErr != nil {
 		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
@@ -21,8 +19,6 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 	return cr.applyPostReviewGuards(next, dr)
 }
 
-// Recovery must precede host normalization, and both must finish before the
-// initial review or any corrected re-review.
 func (cr *cycleRun) prepareForReview(next Phase, dr *dispatchResult) error {
 	if err := cr.recoverBeforeReview(next, dr); err != nil {
 		return err
@@ -41,11 +37,6 @@ func (cr *cycleRun) recoverBeforeReview(next Phase, dr *dispatchResult) error {
 	})
 }
 
-// filterRealLeaks checks the cycle-start console lease last: it waives exact
-// paths only, and each waiver prints one WARN so a leased leak can never
-// masquerade as a clean phase.
-//
-// See ADR-0080.
 func filterRealLeaks(leaked []string, exempt leakExemptions, warn io.Writer) (real []string, waived int) {
 	for _, p := range leaked {
 		if isLegitimateMainTreePath(p) || exempt.heldElsewhere(p) {

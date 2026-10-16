@@ -9,27 +9,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
 )
 
-// dispatch runs the per-phase runner lookup, the pre-phase cycle-state write +
-// tree-diff snapshot, the phase-request build, and the whole inner attempt loop
-// (self-heal retries, backfill, optional-infra-skip, ship-error recovery).
-//
-// Returns:
-//   - loopAbort + error: missing built-in/mandatory runner, pre-phase state
-//     write failure, or an exhausted/non-recoverable phase failure.
-//   - loopContinue: a non-dispatchable optional USER phase skipped (cr.current
-//     advanced), or a ShipError routed to a recovery phase (cr.scheduledNext set).
-//   - loopNext + a populated dispatchResult: the phase produced a usable verdict;
-//     reviewAndGuard/recordAndBranch consume the dispatchResult.
 func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	runner, ok := cr.o.runners[next]
 	if !ok {
-		// The routing surface (registry order + catalog) can know phases
-		// the dispatch surface cannot run. A non-dispatchable OPTIONAL USER
-		// phase is skipped loudly and the walk continues; a missing
-		// BUILT-IN or configured-mandatory runner stays fatal — that is a
-		// wiring bug, not routing-surface drift (built-ins always have
-		// factories; only registry/user phases can be known to routing yet
-		// unregistered).
 		if next.IsValid() || isConfiguredMandatory(cr.o.cfg, string(next)) {
 			return dispatchResult{}, loopAbort, fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
 		}
@@ -43,43 +25,17 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	cr.cs.PhaseStartedAt = phaseStarted.Format(time.RFC3339)
 	cr.cs.ActiveAgent = string(next)
 	if next == PhaseAudit {
-		// A (re-)dispatch supersedes any prior attempt's diagnosed-FAIL
-		// explanation (ship-error recovery re-audits, debugger RERUN_PHASE):
-		// stale reasons must never mark a later, differently-caused FAIL as
-		// diagnosed to the ADR-0072 floor. Cleared BEFORE the pre-phase
-		// cycle-state write below so the cleared state is also what persists.
 		resetFloorFailReason(&cr.cs, next)
-		// Same supersession rule for the round's verdict ARTIFACTS: a
-		// re-dispatched audit must not replay the previous round's
-		// pre-staged acs-verdict.json/audit-report.md through the
-		// verdict-exists gate. First dispatch (round 0) retires nothing, so
-		// an operator/CI pre-stage keeps its honor.
 		supersedePreviousAuditRound(&cr.cs)
 	}
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		return dispatchResult{}, loopAbort, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 	}
 	if next == PhaseRetro {
-		// The failure digest must exist BEFORE the retro agent runs — it is
-		// the identity the disposition gate cross-checks and the blocker
-		// breaker reads. Idempotent with the phase-error path in
-		// recordFailureLearning. Router line + per-failure distinguisher
-		// (defect-first) so distinct failures never collide — composed in
-		// failure_digest.go beside the content-free detector it must never
-		// drift from.
 		cr.o.ensureFailureDigest(cr.cycle, cr.req.ProjectRoot, cr.cs.WorkspacePath, string(cr.current),
 			agentGradedFailReason(string(cr.current), cr.cs.WorkspacePath))
 	}
 
-	// Every phase runs with cwd = the cycle worktree — not just the source
-	// writers (tdd/build, role-gate-permitted) and audit, whose verification
-	// commands must inspect the builder's pending work. A read-only phase's
-	// cwd in the main tree let stray writes and guard misfires land in the
-	// live checkout; with the worktree provisioned at cycle start, no phase
-	// subprocess touches main at all. cwd is NOT write permission: the write
-	// axis (role-gate / tree-diff guard / normalize) still keys off
-	// worktreePhase. Empty when provisioning failed — the pre-existing
-	// degraded mode.
 	phaseWorktree := cr.cs.ActiveWorktree
 	treeGuard, beforeDirty, snapErr := cr.snapshotMainTree(next)
 	if snapErr != nil {
@@ -93,18 +49,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 		phaseCtx["previous_verdict"] = cr.lastVerdict
 	}
-	// Audit-repair re-dispatch: hand tdd/build the audit's OWN rejection so the
-	// repair is targeted instead of blind. State-derived (see
-	// seedAuditRepairContext) and copy-on-write, so it cannot leak into later
-	// phases or diverge from the resume path.
 	phaseCtx = seedAuditRepairContext(phaseCtx, next, cr.cs)
 	phaseCtx = cr.o.seedDispatchContext(cr.ctx, phaseCtx, next, cr.cs, cr.req.ProjectRoot)
-	// Archive the previous attempt's prompt beside the audit archives so each
-	// round's brief stays recoverable; the bridge rewrites the file on this
-	// dispatch.
 	archiveRepairPrompts(cr.cs, next)
-	// The repair round ENDS at its own audit: past this point a later re-entry
-	// into tdd/build is unrelated work and must not inherit the brief.
 	if next == PhaseAudit {
 		cr.cs.AuditRepairActive = false
 	}
@@ -123,18 +70,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		Context:                         phaseCtx,
 		Signals:                         dispatchSignals(next, cr.cs.WorkspacePath, cr.req.ProjectRoot),
 		BypassPolicy:                    cr.req.BypassPolicy,
-		// Runtime operator directives snapshotted once at cycle start (same value
-		// for every phase this cycle); empty ⇒ byte-identical dispatch.
-		OperatorDirectives: cr.directivesSet.Merged,
+		OperatorDirectives:              cr.directivesSet.Merged,
 	}
 	phaseReq = cr.o.withWorktreeFence(phaseReq, next, cr.cs)
-	// Project this phase's clamped {cli,tier} plan proposal onto the
-	// dispatched request ONLY under model_routing=auto — the mode gate that
-	// distinguishes "auto applies" from "advisory logs, never applies" (the
-	// clamp itself already ran, and was persisted to phase-plan.json, for both
-	// modes in planCycle). A nil cr.clampedPlan (advisor outage) or no
-	// matching/proposing entry for this phase leaves both fields empty — the
-	// degrade-to-profile-static floor.
 	if cr.o.cfg.ModelRouting == config.ModelRoutingAuto && cr.clampedPlan != nil {
 		for _, e := range cr.clampedPlan.Entries {
 			if e.Phase == string(next) {
@@ -145,58 +83,19 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 	}
 	cr.applyDispatchPolicy(next, &phaseReq)
-	// At advisory+, serve the build phase's upstream build-plan via the typed
-	// envelope (read once here at the seam) instead of an ad-hoc disk read
-	// inside the phase. Off/shadow leave it empty → the phase reads disk as
-	// before (byte-identical dispatch).
 	phaseReq.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, next, cr.workflowConfig.PhaseEnables, cr.cs.WorkspacePath)
 	if next != PhaseBuild {
 		projectBuildExplanation(cr.req.ProjectRoot, cr.cs).apply(&phaseReq)
 	}
-	// When EVOLVE_PHASE_IO>=shadow, assemble the typed Upstream view from the
-	// same upstream this phase is about to receive, compare it to the legacy
-	// routing digest, and record any divergence (shadow artifact + ledger).
-	// At >=enforce, the same pass also returns the authoritative typed
-	// PhaseInput the phase consumes in place of the legacy Context map. At
-	// EVOLVE_PHASE_IO=off (default) this is skipped entirely and
-	// phaseReq.Input stays the zero value — byte-identical dispatch; below
-	// enforce the assembled Input is still zero, so only the flip to enforce
-	// changes what a phase observes.
 	if cr.o.cfg.PhaseIO >= config.StageShadow {
 		phaseReq.Input = cr.assemblePhaseIO(next, phaseWorktree, phaseCtx)
 	}
-	// Attach the per-phase observer goroutine BEFORE runner.Run and cancel it
-	// AFTER. noopObserver (default when WithObserver wasn't used) makes this
-	// byte-identical to a dispatch with no observer wired. Real
-	// implementations spawn a stall detector that watches
-	// <workspace>/<agent>-stdout.log and emits stall events to
-	// <workspace>/<agent>-observer-events.ndjson.
-	//
-	// Self-heal: a bridge ArtifactTimeout (exit=81) is the recoverable
-	// "agent produced no artifact within the wait window" case
-	// — a stalled launch where a fresh relaunch usually succeeds. Retry the
-	// phase a bounded number of times on THAT sentinel only; every other
-	// error (and exhaustion of the budget) aborts the cycle as before. A
-	// deterministic timeout (e.g. a misconfigured agent) simply fails again
-	// and aborts after the cap — at most one wasted retry. The observer is
-	// (re)started per attempt so each launch is watched.
 	var resp PhaseResponse
 	var err error
-	// shipRecovered marks that a ShipError was intercepted and routed to a
-	// recovery phase instead of aborting; the caller continues the outer loop
-	// (skipping verdict/ledger handling for the failed ship).
 	shipRecovered := false
 	maxAttempts := cr.retryConfig.PhaseMaxAttempts
 	var attemptCount int
-	// attemptExits collects each failed attempt's bridge exit code so the
-	// exhaustion arm can recognize the all-families quota-terminal signature
-	// (every attempt exit=85) and checkpoint-and-defer instead of failing
-	// forward.
 	var attemptExits []int
-	// The sequential loop is the REFERENCE hook set (retry_opts.go): it consults
-	// every recovery hook through this one registry rather than calling the
-	// predicates directly, so the evaluate-batch path can be built from the same
-	// enumeration instead of re-remembering it by hand.
 	retryHooks := cr.mainDispatchRetryOpts()
 	for attempt := 1; ; attempt++ {
 		attemptCount = attempt
@@ -206,11 +105,6 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			obsCancel()
 		}
 		if err == nil && IsVerdict(resp.Verdict) {
-			// Self-healing trail: a bridge artifact-wait timeout (exit 81) was
-			// reconciled by the runner against a well-formed, gate-passing
-			// deliverable, so this phase ships on the agent's own verdict
-			// instead of a synthesized FAIL. Record it (mirrors the backfill
-			// entry) so the recovery is auditable, never silent.
 			if resp.Reconciled {
 				if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 					TS:       cr.o.now().UTC().Format(time.RFC3339),
@@ -227,85 +121,36 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		if err != nil {
 			attemptExits = append(attemptExits, bridgeExitCode(err))
 			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
-				// All-families quota exhaustion: every attempt returned
-				// exit=85, so the cross-family failover has no remaining
-				// target — quota is a resource that resets in hours, not a
-				// per-attempt transient. Spending more attempts
-				// (or degrading an optional phase to WARN and advancing the
-				// next LLM phase into the same wall) guarantees a FAIL plus a
-				// quota-consuming retro. Instead: write a quota-likely
-				// checkpoint (resumeFromPhase = this phase, completed phases +
-				// worktree preserved) and abort with the typed sentinel so the
-				// loop stops resumable (rc=5) and classification is DEFERRED,
-				// not FAILED. Checked FIRST in the arm — before backfill
-				// (disjoint: exit-81-only) and before optionalInfraSkip, which
-				// would otherwise fail forward. Single-family 85 with a healthy
-				// sibling never reaches here all-85 (the sibling attempt's exit
-				// differs), so normal failover is unchanged.
 				if retryHooks.quotaExhausted(attemptExits) {
 					return dispatchResult{}, loopAbort, cr.pauseForQuota(next, resp, attempt, err)
 				}
-				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
-				// try to reconstruct the artifact from stdout.clean.txt before aborting.
-				// Default-on; policy.json can disable artifact backfill for the cycle.
 				if backfilled, ok := retryHooks.backfill(next, err, attempt, maxAttempts); ok {
 					resp = backfilled
 					break
 				}
-				// Optional-phase infra skip: an enrichment phase must not
-				// veto completed spine work. When backfill could not reconstruct
-				// the artifact, a catalog-Optional, non-floor phase whose
-				// exhaustion is infra-shaped degrades to a synthesized WARN and
-				// the cycle advances toward audit/ship. The failed attempts stay
-				// in failure-learning and the ledger — recovered, never silent.
 				if retryHooks.optionalInfraSkip(next, err) {
 					kind, msg, _ := optionalSkipDetails(next, err)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
 					resp = cr.recordPhaseSkip(next, err, kind, msg)
 					break
 				}
-				// Ship-error recovery seam: ship is a pure
-				// executor — a structured ShipError is resolved by the advisor's
-				// recovery chain (Strategy + CoR), not by aborting the cycle. The
-				// resolver records the error, picks the recovery phase
-				// (re-audit / retry-ship / debugger), and bounds the depth.
-				// Integrity breaches, an illegal edge, or exhausted depth return
-				// (_, false) and fall through to the loud abort below.
 				if retryHooks.shipRecovery(next, err, resp, attemptCount) {
 					shipRecovered = true
 					break
 				}
-				// Post-ship observer skip: a best-effort RoleControl observer
-				// (memo / post-ship-monitor)
-				// that fails AFTER a healthy ship must not turn a shipped cycle
-				// abnormal. Unlike optionalInfraSkip this fires on ANY error
-				// shape (the memo tier/envelope error is a policy error, not
-				// infra), gated on ship having already landed and the same
-				// floor/mandatory guards so it can never weaken the integrity
-				// floor. Record SKIPPED with a warning and advance; the failed
-				// attempts stay in failure-learning and the ledger — recovered,
-				// never silent.
 				if retryHooks.postShipObserverSkip(next) {
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: %w", next, err), attempt)
 					resp = cr.recordPhaseSkip(next, err, "post_ship_observer_skip", fmt.Sprintf("phase %s: best-effort observer failed after Ship (%v); skipping", next, err))
 					break
 				}
 				phaseErr := fmt.Errorf("phase %s: %w", next, err)
-				// Record the dispatch outcome BEFORE the failure-learning
-				// retro so the timing record stays chronological (failed
-				// phase, then retro). No canonical agent verdict exists on
-				// this path → synthesized FAIL.
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, err, attempt)
-				// Enforce-only, best-effort — classify the unclassified pane
-				// via the LLM tail and promote, so the NEXT occurrence is
-				// deterministic. Never alters the abort.
 				cr.o.adviseOnUnclassifiedFailure(cr.ctx, cr.cycle, cr.cs.WorkspacePath, cr.req.ProjectRoot, next, err, cr.envSnap)
 				cr.recordFailureLearning(next, phaseErr, attempt)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
 			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, maxAttempts)
-			// Emit structured audit trail for the self-heal retry.
 			if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 				TS:       cr.o.now().UTC().Format(time.RFC3339),
 				Cycle:    cr.cycle,
@@ -320,11 +165,6 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 		if err == nil && !IsVerdict(resp.Verdict) {
 			if attempt >= maxAttempts {
-				// An unparseable verdict after retries exhausted is cycle-fatal
-				// ONLY for a floor/ship phase. A non-floor post-verdict phase
-				// degrades to SKIPPED+WARN and the cycle advances —
-				// recordFinalVerdict then records the degrade into
-				// VerdictsNotAdopted without clobbering the floor verdict.
 				if degraded, ok := cr.o.nonFloorExhaustionDegrade(next, cr.cs.WorkspacePath, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases)); ok {
 					fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s exhausted retries with non-canonical verdict %q; non-floor phase degrading to SKIPPED and advancing (%s)\n", next, resp.Verdict, ledgerKindContractExhaustionSkip)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: non-canonical verdict %q after %d attempts", next, resp.Verdict, attempt), attempt)
@@ -333,15 +173,12 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 					break
 				}
 				ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
-				// A non-canonical verdict is never recorded raw and never
-				// upgraded — phaseOutcomeFrom synthesizes FAIL.
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, ferr.Error(), cr.cs.PhaseStartedAt))
 				cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, ferr, attempt)
 				cr.recordFailureLearning(next, ferr, attempt)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, ferr)
 			}
 			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, maxAttempts, resp.Verdict)
-			// Emit structured audit trail for the self-heal retry.
 			if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 				TS:       cr.o.now().UTC().Format(time.RFC3339),
 				Cycle:    cr.cycle,
@@ -356,7 +193,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		}
 	}
 	if shipRecovered {
-		return dispatchResult{}, loopContinue, nil // run the recovery phase (scheduledNext) next iteration
+		return dispatchResult{}, loopContinue, nil
 	}
 
 	return dispatchResult{

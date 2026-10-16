@@ -12,7 +12,6 @@ import (
 )
 
 func TestCycleLoop_PostScoutHookFiresOncePreBuild(t *testing.T) {
-	// NOT parallel: mutates the package-level probe seam.
 	var fires int
 	var completedAtFire [][]string
 	prev := postScoutReplanProbe
@@ -58,9 +57,6 @@ func replanOrchestrator(t *testing.T, led *fakeLedger, pl *replanPlanner) *Orche
 	cfg.Mode = config.ModeDynamicLLM
 	cfg.RouterReplan = config.StageShadow
 	cfg.RePlanMaxDepth = 1
-	// A measured-scope trigger: "tester" inserts when scout.item_count >= 1; the
-	// initial plans below omit tester, so the measured signals diverge from the
-	// plan, producing a material mismatch that triggers a re-plan.
 	cfg.Triggers = map[string]config.RoutingBlock{
 		"tester": {InsertWhen: []config.Condition{{Field: "scout.item_count", Op: "gte", Value: 1}}},
 	}
@@ -105,7 +101,7 @@ func TestPlanCycle_RePlanAfterScoutInShadow(t *testing.T) {
 
 func TestPlanCycle_NoRePlanWhenSignalsAbsent(t *testing.T) {
 	t.Parallel()
-	ws := t.TempDir() // no handoff-scout.json ⇒ Scout.Present=false
+	ws := t.TempDir()
 	pl := &replanPlanner{plan: &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}}}}
 	cr := &cycleRun{
 		o: replanOrchestrator(t, &fakeLedger{}, pl), ctx: context.Background(),
@@ -124,8 +120,6 @@ func TestPlanCycle_NoRePlanWhenSignalsAbsent(t *testing.T) {
 	}
 }
 
-// scoutWorkspace writes a handoff-scout.json with ItemCount=2, which fires the
-// mismatch gate (tester inserts at item_count>=1) for a plan that omits tester.
 func scoutWorkspace(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -149,8 +143,8 @@ func TestRePlan_DepthCappedAndEscalates(t *testing.T) {
 		clampedPlan: &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}}},
 	}
 
-	cr.postScoutReplan() // depth 0 → re-plans, depth → 1
-	cr.postScoutReplan() // depth 1 == cap → escalates, no second re-plan
+	cr.postScoutReplan()
+	cr.postScoutReplan()
 
 	if pl.replanCalls != 1 {
 		t.Fatalf("RePlan called %d times, want 1 (capped at depth 1)", pl.replanCalls)
@@ -172,7 +166,7 @@ func TestRePlan_DepthCappedAndEscalates(t *testing.T) {
 func TestRePlan_FailOpenToStage1Plan(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
-	pl := &replanPlanner{} // plan==nil ⇒ RePlan returns (nil, nil) ⇒ treated as no usable re-plan
+	pl := &replanPlanner{}
 	initial := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "scout", Run: true}}}
 	cr := &cycleRun{
 		o: replanOrchestrator(t, &fakeLedger{}, pl), ctx: context.Background(),
@@ -218,7 +212,7 @@ func TestRePlan_AdvisoryReplacesPlanAfterClamp(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
 	pl := &replanPlanner{plan: &router.PhasePlan{Entries: []router.PhasePlanEntry{
-		{Phase: "scout", Run: true}, {Phase: "build", Run: true}, {Phase: "ship", Run: true}, // no audit
+		{Phase: "scout", Run: true}, {Phase: "build", Run: true}, {Phase: "ship", Run: true},
 	}}}
 	o := replanOrchestrator(t, &fakeLedger{}, pl)
 	o.cfg.RouterReplan = config.StageAdvisory
@@ -246,7 +240,7 @@ func TestRePlan_NeverWeakensFloorOnReplace(t *testing.T) {
 	t.Parallel()
 	ws := scoutWorkspace(t)
 	pl := &replanPlanner{plan: &router.PhasePlan{Entries: []router.PhasePlanEntry{
-		{Phase: "scout", Run: true}, {Phase: "ship", Run: true}, // ship with neither build nor audit
+		{Phase: "scout", Run: true}, {Phase: "ship", Run: true},
 	}}}
 	o := replanOrchestrator(t, &fakeLedger{}, pl)
 	o.cfg.RouterReplan = config.StageAdvisory
@@ -274,8 +268,8 @@ func TestRePlan_NeverWeakensFloorOnReplace(t *testing.T) {
 func TestRePlan_MintRegistrationIdempotent(t *testing.T) {
 	t.Parallel()
 	o := mintOrchestrator(t, fakeMinter{})
-	o.registerMintedPhases(mintPlan("phase-a"))            // stage-1: A
-	o.registerMintedPhases(mintPlan("phase-a", "phase-b")) // re-plan: re-mint A + new B
+	o.registerMintedPhases(mintPlan("phase-a"))
+	o.registerMintedPhases(mintPlan("phase-a", "phase-b"))
 
 	if _, ok := o.runners[Phase("phase-a")]; !ok {
 		t.Error("phase-a must be registered (stage-1 mint)")

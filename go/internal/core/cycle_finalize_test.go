@@ -21,10 +21,6 @@ func mustParseFinalizeNow(t *testing.T) time.Time {
 	return ts
 }
 
-// writeFinalizeFixture lays out a minimal evolveDir with cycle-state.json
-// (cycleID/workspace) and state.json (lastCycleNumber), mirroring the field
-// names core.CycleState / reset.go's raw-map use (cycle_id, workspace_path,
-// lastCycleNumber).
 func writeFinalizeFixture(t *testing.T, evolveDir string, cycleID, lastCycleNumber int) (csPath, statePath, workspace string) {
 	t.Helper()
 	workspace = filepath.Join(evolveDir, "runs", "cycle-finalize-fixture")
@@ -44,10 +40,6 @@ func writeFinalizeFixture(t *testing.T, evolveDir string, cycleID, lastCycleNumb
 	return csPath, statePath, workspace
 }
 
-// TestClearCompletedCycleMarker_RemovesTerminalMarker: a completed cycle
-// (cycle_id <= lastCycleNumber) with no live owner must have its marker
-// removed — AND must leave state.json byte-identical and write neither a
-// `.reset-*` archive nor a faillearn lesson (the ≠SealCycle pin).
 func TestClearCompletedCycleMarker_RemovesTerminalMarker(t *testing.T) {
 	t.Parallel()
 
@@ -92,15 +84,11 @@ func TestClearCompletedCycleMarker_RemovesTerminalMarker(t *testing.T) {
 	}
 }
 
-// TestClearCompletedCycleMarker_PreservesUnfinishedMarker: cycle_id greater
-// than lastCycleNumber means the cycle never advanced the counter — it is
-// still in progress (or crashed) — and must be left alone so --resume /
-// quota-pause / a subsequent `evolve cycle reset` can still see it.
 func TestClearCompletedCycleMarker_PreservesUnfinishedMarker(t *testing.T) {
 	t.Parallel()
 
 	evolveDir := t.TempDir()
-	csPath, _, _ := writeFinalizeFixture(t, evolveDir, 6, 5) // 6 > 5 → unfinished
+	csPath, _, _ := writeFinalizeFixture(t, evolveDir, 6, 5)
 	before, err := os.ReadFile(csPath)
 	if err != nil {
 		t.Fatalf("read cycle-state.json before: %v", err)
@@ -125,10 +113,6 @@ func TestClearCompletedCycleMarker_PreservesUnfinishedMarker(t *testing.T) {
 	}
 }
 
-// TestClearCompletedCycleMarker_LiveOwnerUntouched: even a "completed"-looking
-// marker (cycle_id<=lastCycleNumber) must NOT be cleared while its lease shows
-// a live owner (runlease.OwnerLive) — clearing out from under a running loop
-// would let a second `evolve loop` start concurrently on the same state.
 func TestClearCompletedCycleMarker_LiveOwnerUntouched(t *testing.T) {
 	t.Parallel()
 
@@ -136,8 +120,6 @@ func TestClearCompletedCycleMarker_LiveOwnerUntouched(t *testing.T) {
 	csPath, _, workspace := writeFinalizeFixture(t, evolveDir, 5, 5)
 
 	now := mustParseFinalizeNow(t)
-	// Fresh lease, OwnerPID=0 (no pid tracked) — runlease.OwnerLive falls back
-	// to freshness-only for such a lease, so this alone must block the clear.
 	if err := runlease.Write(workspace, runlease.Lease{}, now); err != nil {
 		t.Fatalf("write lease: %v", err)
 	}
