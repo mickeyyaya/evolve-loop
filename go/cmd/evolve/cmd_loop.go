@@ -33,6 +33,7 @@ type loopConfig struct {
 	EvolveDir   string `json:"evolve_dir"`
 	GoalHash    string `json:"goal_hash"`
 	GoalText    string `json:"goal_text,omitempty"`
+	GoalSource  string `json:"goal_source,omitempty"`
 	Strategy    string `json:"strategy"`
 	MaxCycles   int    `json:"max_cycles"`
 	// MaxCyclesExplicit is true only when the operator set --max-cycles/--cycles
@@ -93,6 +94,7 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if cfg.Detach {
 		return runLoopDetached(cfg, stdout, stderr)
 	}
+	recordLaunchGoal(cfg, stderr)
 	cfg.ResumeWaves, cfg.HandedOff = takeReexecHandoff(cfg.EvolveDir, stderr)
 	chainCfg := loadChainConfig(cfg.EvolveDir)
 	cfg.ChainMode = cfg.ChainMode || chainCfg.Enabled

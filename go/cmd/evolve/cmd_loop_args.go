@@ -17,6 +17,8 @@ type loopArgFlags struct {
 	evolveDir         string
 	goalHash          string
 	goalText          string
+	goalFile          string
+	goalFromLast      bool
 	strategy          string
 	maxCyclesFlag     int
 	cyclesFlag        int
@@ -42,6 +44,8 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.StringVar(&lf.evolveDir, "evolve-dir", "", "path to .evolve/ (default <project-root>/.evolve)")
 	fs.StringVar(&lf.goalHash, "goal-hash", "", "explicit 64-char (or 8-char prefix) SHA256 of goal; mutually exclusive with --goal-text")
 	fs.StringVar(&lf.goalText, "goal-text", "", "goal text; hashed via goalhash.Compute (normalize+SHA256)")
+	fs.StringVar(&lf.goalFile, "goal-file", "", "read the goal text from file F; excludes every other goal source")
+	fs.BoolVar(&lf.goalFromLast, "goal-from-last", false, "replay the goal recorded by the last launch in <evolve-dir>/last-goal.txt; excludes every other goal source")
 	fs.StringVar(&lf.strategy, "strategy", "", "balanced|innovate|harden|repair|ultrathink|autoresearch (default: balanced)")
 	fs.IntVar(&lf.maxCyclesFlag, "max-cycles", 0, "maximum iterations to run: cycles when sequential, waves of fleet.count lanes in fleet mode (default 1; aliased by --cycles)")
 	fs.IntVar(&lf.cyclesFlag, "cycles", 0, "alias for --max-cycles")
@@ -136,7 +140,7 @@ func resolveGoal(stderr io.Writer, goalHash, goalText, posGoal string, resume, d
 		hash = goalhash.Compute(text)
 	}
 	if hash == "" && !resume && !dryRun {
-		fmt.Fprintln(stderr, "evolve loop: a goal is required — pass --goal-hash, --goal-text, or a positional goal (or --resume to continue a checkpointed cycle)")
+		fmt.Fprintln(stderr, "evolve loop: a goal is required — pass --goal-hash, --goal-text, --goal-file, --goal-from-last, or a positional goal (or --resume to continue a checkpointed cycle)")
 		return "", "", 10
 	}
 	return hash, text, 0
@@ -174,17 +178,22 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		return loopConfig{}, 10
 	}
 
-	resolvedGoalHash, resolvedGoalText, rc := resolveGoal(stderr, lf.goalHash, lf.goalText, posGoal, lf.resume, lf.dryRun || lf.preflightOnly)
-	if rc != 0 {
-		return loopConfig{}, rc
-	}
-
 	if lf.evolveDir == "" {
 		lf.evolveDir = filepath.Join(lf.projectRoot, ".evolve")
 	}
 	lf.evolveDir = absOrWarn(stderr, "--evolve-dir", lf.evolveDir)
 
+	goalText, rc := loadGoalSourceText(stderr, lf, posGoal)
+	if rc != 0 {
+		return loopConfig{}, rc
+	}
+	resolvedGoalHash, resolvedGoalText, rc := resolveGoal(stderr, lf.goalHash, goalText, posGoal, lf.resume, lf.dryRun || lf.preflightOnly)
+	if rc != 0 {
+		return loopConfig{}, rc
+	}
+
 	cfg := buildLoopConfig(lf, resolvedGoalHash, resolvedGoalText, resolvedStrategy, resolvedCycles, posCycles, perAgentCLI, perAgentModel)
+	cfg.GoalSource = goalSourceName(lf, posGoal)
 	return withDetachLaunch(cfg, lf, args, len(args)-len(fs.Args()), stderr)
 }
 
