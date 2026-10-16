@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// healthyCorpus stands in for the embedded corpus of lines from normal driver-CLI panes.
 var healthyCorpus = []string{
 	"● Writing scout-report.md to the workspace…",
 	"❯ ",
@@ -32,7 +31,6 @@ func TestRuleValidate_RejectsShortPatternHealthyCorpusMatch(t *testing.T) {
 
 func TestRuleValidate_KeyspecSuspectREJECTED(t *testing.T) {
 	t.Parallel()
-	// "Excape" is the canonical keyspec ClassSuspect example (mistyped Escape).
 	if err := interaction.ValidateRule("Press Escape to dismiss the dialog", "Excape", healthyCorpus); err == nil {
 		t.Error("a ClassSuspect response key must REJECT the rule (stricter than keyspec.Validate's WARN-but-send)")
 	}

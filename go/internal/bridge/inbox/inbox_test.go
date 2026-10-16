@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// fixedNow returns a deterministic clock for TS minting assertions.
 func fixedNow() time.Time {
 	return time.Date(2026, 5, 26, 12, 0, 0, 0, time.UTC)
 }
@@ -99,7 +98,6 @@ func TestCursorDrainOnlyNew(t *testing.T) {
 	ws := t.TempDir()
 	c := NewCursor(ws, "build")
 
-	// Missing file → no envelopes, no error.
 	envs, err := c.Drain()
 	if err != nil || len(envs) != 0 {
 		t.Fatalf("drain on missing file: envs=%d err=%v", len(envs), err)
@@ -114,7 +112,6 @@ func TestCursorDrainOnlyNew(t *testing.T) {
 		t.Fatalf("want [first], got %+v", envs)
 	}
 
-	// Second drain with no new writes → nothing.
 	envs, _ = c.Drain()
 	if len(envs) != 0 {
 		t.Fatalf("want no re-delivery, got %+v", envs)
@@ -133,7 +130,6 @@ func TestCursorPartialTrailingLineNotParsed(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// One complete line + one partial (no trailing newline yet).
 	complete, _ := json.Marshal(Envelope{Kind: KindCommand, Body: "done", Source: "cli"})
 	partial, _ := json.Marshal(Envelope{Kind: KindCommand, Body: "half", Source: "cli"})
 	if err := os.WriteFile(p, append(append(complete, '\n'), partial...), 0o644); err != nil {
@@ -144,7 +140,6 @@ func TestCursorPartialTrailingLineNotParsed(t *testing.T) {
 	if len(envs) != 1 || envs[0].Body != "done" {
 		t.Fatalf("partial line should not parse: got %+v", envs)
 	}
-	// Now complete the partial line.
 	f, _ := os.OpenFile(p, os.O_APPEND|os.O_WRONLY, 0o644)
 	_, _ = f.Write([]byte("\n"))
 	_ = f.Close()
@@ -163,7 +158,7 @@ func TestCursorSetOffsetSkipsBacklog(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := NewCursor(ws, "build")
-	c.SetOffset(fi.Size()) // skip pre-existing backlog (T3 resume fix)
+	c.SetOffset(fi.Size())
 	if envs, _ := c.Drain(); len(envs) != 0 {
 		t.Fatalf("backlog should be skipped, got %+v", envs)
 	}
@@ -176,17 +171,12 @@ func TestCursorSetOffsetSkipsBacklog(t *testing.T) {
 
 func TestCursorTruncationResets(t *testing.T) {
 	ws := t.TempDir()
-	// Two lines so the post-rotation single line is strictly shorter than
-	// the cursor offset (the realistic rotation case: file shrinks below
-	// where we last read). Same-size in-place rewrites within one tick are
-	// intentionally not detected — see reader.go.
 	mustAppend(t, ws, "first")
 	mustAppend(t, ws, "second")
 	c := NewCursor(ws, "build")
 	if envs, _ := c.Drain(); len(envs) != 2 {
 		t.Fatalf("setup drain: want 2, got %d", len(envs))
 	}
-	// Rotate: clear and write a single shorter line (size < offset).
 	if err := os.WriteFile(Path(ws, "build"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -212,13 +202,11 @@ func TestDrainSkipsMalformedLine(t *testing.T) {
 	}
 }
 
-// TestDrainSeekError covers reader.go:68 — the f.Seek error branch.
-// A negative SetOffset forces Seek(negative, SeekStart) → "invalid argument".
 func TestDrainSeekError(t *testing.T) {
 	ws := t.TempDir()
 	mustAppend(t, ws, "existing")
 	c := NewCursor(ws, "build")
-	c.SetOffset(-1) // negative offset → Seek from start returns EINVAL
+	c.SetOffset(-1)
 	_, err := c.Drain()
 	if err == nil {
 		t.Fatal("want Seek error for negative offset, got nil")
@@ -248,11 +236,6 @@ func mustAppend(t *testing.T, ws, body string) {
 	}
 }
 
-// TestKind_Valid_AllRecognizedKinds pins the exhaustive set of envelope kinds
-// the bridge accepts. Adding a Kind constant requires extending Valid() in
-// the same change; this test fails if either drifts. Cycle-124 F4 added
-// KindKeystroke to the set (per ADR-0023 addendum) so the operator can send
-// raw tmux key tokens through `evolve bridge send --kind=keystroke`.
 func TestKind_Valid_AllRecognizedKinds(t *testing.T) {
 	for _, k := range []Kind{KindCommand, KindInterrupt, KindNudge, KindSystemRule, KindKeystroke} {
 		if !k.Valid() {
@@ -261,9 +244,6 @@ func TestKind_Valid_AllRecognizedKinds(t *testing.T) {
 	}
 }
 
-// TestKind_Valid_RejectsUnknown is the negative pin: an unknown string value
-// MUST be rejected. This is the gate cmd_bridge.go relies on to keep
-// operator typos from reaching the dispatch switch in injectEnvelope.
 func TestKind_Valid_RejectsUnknown(t *testing.T) {
 	for _, bad := range []Kind{"", "unknown", "Command", "KEYSTROKE", "key-stroke"} {
 		if bad.Valid() {
@@ -272,11 +252,6 @@ func TestKind_Valid_RejectsUnknown(t *testing.T) {
 	}
 }
 
-// TestKindKeystroke_JSONRoundTrip pins that a keystroke envelope survives the
-// full Append→ReadFile→Unmarshal cycle byte-for-byte. Operators script
-// `evolve bridge send --kind=keystroke --body=Enter` which writes one NDJSON
-// line; the driver's drain loop reads it back and dispatches. A serialization
-// drift here would silently corrupt the operator's "full tmux control" hatch.
 func TestKindKeystroke_JSONRoundTrip(t *testing.T) {
 	ws := t.TempDir()
 	cases := []struct {
@@ -291,8 +266,6 @@ func TestKindKeystroke_JSONRoundTrip(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Each subtest gets its own agent to avoid Append's append-to-same
-			// file behavior bleeding across cases.
 			agent := "agent-" + tc.name
 			env := Envelope{Kind: KindKeystroke, Body: tc.body, Source: tc.source}
 			if err := Append(ws, agent, env, fixedNow); err != nil {
@@ -322,10 +295,6 @@ func TestKindKeystroke_JSONRoundTrip(t *testing.T) {
 	}
 }
 
-// TestKindKeystroke_AppendOrderPreserved pins that multiple keystroke
-// envelopes for the same agent drain in the order they were appended.
-// This matters when the operator scripts a multi-step recovery
-// ("Escape" then "y Enter") — the bridge must inject them in that order.
 func TestKindKeystroke_AppendOrderPreserved(t *testing.T) {
 	ws := t.TempDir()
 	bodies := []string{"Escape", "y Enter", "Up", "Down", "C-c"}
@@ -351,10 +320,6 @@ func TestKindKeystroke_AppendOrderPreserved(t *testing.T) {
 	}
 }
 
-// TestKindKeystroke_MixedWithOtherKinds pins that an inbox with mixed
-// envelope kinds — keystroke + command + interrupt + nudge — drains all
-// of them with each Kind preserved. The cursor doesn't filter; the
-// driver's dispatch switch reads Kind and routes per-envelope.
 func TestKindKeystroke_MixedWithOtherKinds(t *testing.T) {
 	ws := t.TempDir()
 	sends := []Envelope{

@@ -1,10 +1,5 @@
 package build
 
-// prior_findings_test.go — ADR-0076 slice C (C7): an adopted continuation's
-// prior-attempt findings render as a dedicated prompt block so the builder
-// resumes INFORMED (what failed, what to finish) instead of rediscovering.
-// Absent findings pin a byte-identical legacy prompt.
-
 import (
 	"strings"
 	"testing"

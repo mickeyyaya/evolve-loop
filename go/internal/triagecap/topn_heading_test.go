@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 )
 
-// The parser's top_n heading and phasecontract.Triage's canonical section are one belief.
 func TestTopNHeadingIsTheContracts(t *testing.T) {
 	if len(phasecontract.Triage.Sections) == 0 {
 		t.Fatal("phasecontract.Triage has no sections")

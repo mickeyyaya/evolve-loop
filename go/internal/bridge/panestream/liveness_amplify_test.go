@@ -11,7 +11,7 @@ func TestAmp_DefaultDetector_StallCounterResetsOnContent(t *testing.T) {
 	const stall = 3
 	det := NewDefaultDetector(stall)
 
-	det.Assess("⏺ initial output\n❯ \n", profile) // prime
+	det.Assess("⏺ initial output\n❯ \n", profile)
 
 	spinner := "⏺ initial output\n✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n"
 	for i := 0; i < stall-1; i++ {
@@ -41,7 +41,7 @@ func TestAmp_DefaultDetector_ConfidenceAlwaysInRange(t *testing.T) {
 	profile := Profiles["claude"]
 	det := NewDefaultDetector(2)
 
-	det.Assess("⏺ content\n❯ \n", profile) // prime
+	det.Assess("⏺ content\n❯ \n", profile)
 
 	cases := []struct {
 		tag  string
@@ -64,9 +64,9 @@ func TestAmp_DefaultDetector_ConfidenceAlwaysInRange(t *testing.T) {
 
 func TestAmp_DefaultDetector_StallThresholdOneBoundary(t *testing.T) {
 	profile := Profiles["claude"]
-	det := NewDefaultDetector(1) // threshold=1: first stall → Hung immediately
+	det := NewDefaultDetector(1)
 
-	det.Assess("⏺ content\n❯ \n", profile) // prime
+	det.Assess("⏺ content\n❯ \n", profile)
 	s, _ := det.Assess("⏺ content\n✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n", profile)
 	if s != LivenessHung {
 		t.Errorf("stallThreshold=1: first stall interval got %v, want LivenessHung", s)
@@ -103,7 +103,7 @@ func TestAmp_ClaudeDetector_LargeTokenNoOverflow(t *testing.T) {
 		"✽ Generating… (5s · ↓ 999999999 tokens)\n❯ \n",
 		"✽ Generating… (10s · ↓ 9999999999 tokens)\n❯ \n",
 	}
-	det.Assess(largeFrames[0], profile) // prime
+	det.Assess(largeFrames[0], profile)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -130,7 +130,7 @@ func TestAmp_DetectorFor_UnknownProfileReturnsProbe(t *testing.T) {
 		t.Fatal("DetectorFor(unknown profile) = nil; want non-nil probe (safe default expected)")
 	}
 
-	probe.Assess("some content\n$ \n", unknown) // prime
+	probe.Assess("some content\n$ \n", unknown)
 	state, conf := probe.Assess("some more content\n$ \n", unknown)
 
 	if conf < 0 || conf > 1.0 {
@@ -152,7 +152,7 @@ func TestAmp_DefaultDetector_QuietFramesNeverHung(t *testing.T) {
 	const stall = 2
 	det := NewDefaultDetector(stall)
 
-	det.Assess("⏺ content\n❯ \n", profile) // prime
+	det.Assess("⏺ content\n❯ \n", profile)
 
 	quietFrame := "⏺ content\n❯ \n"
 	for i := 0; i < stall+5; i++ {
@@ -205,7 +205,7 @@ func TestAmp_DefaultDetector_LargeFrameNoTimeout(t *testing.T) {
 		}
 	}()
 
-	det.Assess(bigFrame, profile) // prime
+	det.Assess(bigFrame, profile)
 
 	var sb2 strings.Builder
 	for i := 0; i < 2001; i++ {

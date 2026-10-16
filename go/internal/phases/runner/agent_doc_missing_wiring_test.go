@@ -15,7 +15,7 @@ func TestRun_MissingAgentDocCarriesTheTypedSentinel(t *testing.T) {
 	b := New(Options{
 		Hooks:   &fakeHooks{phase: "defect-disposition-preflight", agent: "evolve-defect-disposition-preflight"},
 		Bridge:  &fakeBridge{},
-		Prompts: prompts.NewFromFS(fstest.MapFS{}), // no docs at all
+		Prompts: prompts.NewFromFS(fstest.MapFS{}),
 	})
 	_, err := b.Run(context.Background(), core.PhaseRequest{Cycle: 1551, Workspace: t.TempDir()})
 	if err == nil {
@@ -26,7 +26,6 @@ func TestRun_MissingAgentDocCarriesTheTypedSentinel(t *testing.T) {
 	}
 }
 
-// The doc path is a directory, so ReadFile fails with an error other than NotExist.
 func TestRun_UnreadableAgentDocDoesNotCarryTheSentinel(t *testing.T) {
 	b := New(Options{
 		Hooks:  &fakeHooks{phase: "p", agent: "evolve-p"},
@@ -44,7 +43,6 @@ func TestRun_UnreadableAgentDocDoesNotCarryTheSentinel(t *testing.T) {
 	}
 }
 
-// A nil prompts source fails every load with fs.ErrNotExist, yet that is a wiring defect, not a missing doc.
 func TestRun_NilPromptsSourceDoesNotCarryTheSentinel(t *testing.T) {
 	b := New(Options{
 		Hooks:   &fakeHooks{phase: "p", agent: "evolve-p"},

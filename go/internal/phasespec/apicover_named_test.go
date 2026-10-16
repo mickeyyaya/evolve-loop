@@ -42,7 +42,6 @@ func TestApplyArchetypeDefaults_NonEvaluateNoOp(t *testing.T) {
 		t.Errorf("plan archetype PromptContext = %v, want empty", plan.PromptContext)
 	}
 
-	// Also covers an evaluate spec: its explicit values are preserved, not overwritten.
 	preset := &PhaseSpec{
 		Name:          "audit",
 		Role:          "evaluate",
@@ -65,7 +64,6 @@ func TestRoots_DefaultAndOverride(t *testing.T) {
 		t.Fatalf("RootsWithPolicy(default) = %v, want [%s]", got, wantDefault)
 	}
 
-	// The "::" leaves an empty segment, which must be dropped.
 	abs := filepath.Join(root, "abs-phases")
 	got = RootsWithPolicy(root, policy.PathsConfig{PhaseRoots: "custom/phases::" + abs})
 	wantRel := filepath.Join(root, "custom/phases")

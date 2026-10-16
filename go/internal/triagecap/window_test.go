@@ -30,7 +30,7 @@ func TestK_MeanOverWindow(t *testing.T) {
 				{Cycle: 281, Floors: 5},
 				{Cycle: 285, Floors: 4},
 			},
-			want: 5, // 4.5 → 5
+			want: 5,
 		},
 		{
 			name: "mean floors down below half",
@@ -39,7 +39,7 @@ func TestK_MeanOverWindow(t *testing.T) {
 				{Cycle: 285, Floors: 4},
 				{Cycle: 286, Floors: 3},
 			},
-			want: 4, // 4.0
+			want: 4,
 		},
 		{
 			name:   "floor of one is preserved",
@@ -58,11 +58,11 @@ func TestK_MeanOverWindow(t *testing.T) {
 
 func TestCap_CeilOnePointTwoFiveK(t *testing.T) {
 	tests := []struct{ k, want int }{
-		{5, 7},  // ceil(6.25)
-		{4, 5},  // ceil(5.0)
-		{1, 2},  // ceil(1.25)
-		{0, 2},  // degenerate K clamps to 1 → ceil(1.25)=2 (never reject-everything)
-		{-3, 2}, // negative is degenerate too
+		{5, 7},
+		{4, 5},
+		{1, 2},
+		{0, 2},
+		{-3, 2},
 	}
 	for _, tt := range tests {
 		if got := Cap(tt.k); got != tt.want {
@@ -94,7 +94,7 @@ func TestRecord_ZeroFloorsIsNoOp(t *testing.T) {
 }
 
 func TestRecord_DoesNotMutateInput(t *testing.T) {
-	in := make([]core.TriageThroughputEntry, 0, 8) // spare capacity invites aliasing bugs
+	in := make([]core.TriageThroughputEntry, 0, 8)
 	in = append(in, core.TriageThroughputEntry{Cycle: 281, Floors: 5})
 	snapshot := []core.TriageThroughputEntry{{Cycle: 281, Floors: 5}}
 	_ = Record(in, 282, 3)

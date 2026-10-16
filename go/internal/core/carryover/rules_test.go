@@ -1,10 +1,5 @@
 package carryover
 
-// rules_test.go — unit 03 (ADR-0103, design decomposition/03-carryover-lifecycle.md):
-// the pure rules — identity, unions, retirement, expiry, caps, the summary and
-// the priority vocabulary. RED first; every rule is byte-for-byte the
-// pre-extraction behaviour.
-
 import (
 	"errors"
 	"strings"
@@ -184,9 +179,6 @@ func TestPriorities_AreTheProducersSpellings(t *testing.T) {
 	}
 }
 
-// ADR-0103 unit 03b: the THIRD rune cap — the advisor prompt's and the
-// remediation title's — moved beside CapRunes and Summary so the three rules
-// are enumerable in one file. Distinct marker from both (the F5 twin).
 func TestTruncateRunes_TrimsCapsAndMarks(t *testing.T) {
 	long := strings.Repeat("é", 501)
 	if got := TruncateRunes("  "+strings.Repeat("é", 499)+"  ", 500); got != strings.Repeat("é", 499) {

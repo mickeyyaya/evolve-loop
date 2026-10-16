@@ -12,7 +12,6 @@ import (
 
 const rebaselineNote = "operator sign-off: pre-CA.1 fleet-concurrency damage accepted"
 
-// damagedLedger has three distinct prev_hash breaks, a shape one per-line anchor cannot repair.
 func damagedLedger(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -122,7 +121,7 @@ func TestRebaseline_RefusesUngatedAndEmptyChain(t *testing.T) {
 	})
 
 	t.Run("empty_chain_is_not_fabricated", func(t *testing.T) {
-		dir := t.TempDir() // no ledger.jsonl at all
+		dir := t.TempDir()
 		if err := New(dir).Rebaseline(context.Background(), rebaselineNote); err == nil {
 			t.Fatal("Rebaseline against a nonexistent chain must be refused, not minted")
 		}

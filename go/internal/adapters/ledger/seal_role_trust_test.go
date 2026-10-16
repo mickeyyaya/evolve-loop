@@ -2,7 +2,6 @@ package ledger
 
 import "testing"
 
-// autosealLine is hash-valid and shaped exactly like a real in-band seal, but with the autoseal role.
 func autosealLine(prevSHA string) string {
 	return `{"ts":"2026-05-01T00:04:00Z","cycle":0,"cycle_label":"reset-seal-cycle-4",` +
 		`"role":"operator-autoseal","kind":"reset","exit_code":0,"entry_seq":4,"prev_hash":"` + prevSHA + `"}`

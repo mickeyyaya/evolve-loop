@@ -1,9 +1,5 @@
 package research
 
-// research_adversarial_test.go — cycle-281 test amplification.
-// Targets: SearchPathsFromEnv (0%), Digest (75%), firstSentence (75%),
-// SplitSearchPaths edge cases, and Query.terms() deduplication.
-
 import (
 	"strings"
 	"testing"
@@ -11,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestSearchPathsFromEnv_AllBranches — adversarial: the three branches of
-// SearchPathsFromEnv (cfg set/non-empty, cfg empty, cfg whitespace-only).
 func TestSearchPathsFromEnv_AllBranches(t *testing.T) {
 	t.Run("cfg.KBSearchPaths set to explicit paths returns those paths", func(t *testing.T) {
 		cfg := policy.PathsConfig{KBSearchPaths: "/a/b:/c/d"}
@@ -49,20 +43,18 @@ func TestSearchPathsFromEnv_AllBranches(t *testing.T) {
 	})
 }
 
-// TestSplitSearchPaths_EdgeCases — adversarial: empty string, colons only,
-// whitespace-padded entries, and mixed empty/valid entries.
 func TestSplitSearchPaths_EdgeCases(t *testing.T) {
 	cases := []struct {
 		raw     string
 		wantLen int
 	}{
 		{"", 0},
-		{":", 0},             // colon-only splits to two empties → both dropped
-		{"::", 0},            // all empties
-		{"/a:/b", 2},         // normal case
-		{"/a::/b", 2},        // empty middle entry dropped
-		{"  /a  :  /b  ", 2}, // whitespace-trimmed entries
-		{"/single", 1},       // no colon
+		{":", 0},
+		{"::", 0},
+		{"/a:/b", 2},
+		{"/a::/b", 2},
+		{"  /a  :  /b  ", 2},
+		{"/single", 1},
 	}
 	for _, c := range cases {
 		got := SplitSearchPaths(c.raw)
@@ -72,8 +64,6 @@ func TestSplitSearchPaths_EdgeCases(t *testing.T) {
 	}
 }
 
-// TestFirstSentence_AllBranches — adversarial: empty string, no sentence
-// terminator, terminator at position 0 (edge), and multi-sentence strings.
 func TestFirstSentence_AllBranches(t *testing.T) {
 	cases := []struct {
 		input string
@@ -85,8 +75,6 @@ func TestFirstSentence_AllBranches(t *testing.T) {
 		{"No terminator here", "No terminator here"},
 		{"  Leading whitespace. More.", "Leading whitespace"},
 		{"Line\nbreak here", "Line"},
-		// Edge: period is position 0 — IndexAny returns 0 which is NOT > 0,
-		// so the whole trimmed string is returned.
 		{". starts with period", ". starts with period"},
 	}
 	for _, c := range cases {
@@ -97,8 +85,6 @@ func TestFirstSentence_AllBranches(t *testing.T) {
 	}
 }
 
-// TestLessonDigest_AllPaths — adversarial: Digest uses PreventiveAction when
-// set, falls back to Description when empty. Both paths must be covered.
 func TestLessonDigest_AllPaths(t *testing.T) {
 	t.Run("PreventiveAction set → used in digest", func(t *testing.T) {
 		l := Lesson{
@@ -140,20 +126,17 @@ func TestLessonDigest_AllPaths(t *testing.T) {
 			PreventiveAction: "First line.\nSecond line.",
 		}
 		digest := l.Digest()
-		// firstSentence trims at \n, so the digest must be single-line.
 		if strings.Contains(digest, "\n") {
 			t.Errorf("Digest must be single-line; got %q", digest)
 		}
 	})
 }
 
-// TestQueryTerms_Deduplication — adversarial: duplicate tokens across
-// FailureMode/Consequence/Keywords must appear exactly once in terms().
 func TestQueryTerms_Deduplication(t *testing.T) {
 	q := Query{
 		FailureMode: "egps red count",
-		Consequence: "egps gate fail",                 // "egps" already in FailureMode
-		Keywords:    []string{"red", "egps", "count"}, // all already seen
+		Consequence: "egps gate fail",
+		Keywords:    []string{"red", "egps", "count"},
 	}
 	terms := q.terms()
 	seen := map[string]int{}
@@ -167,8 +150,6 @@ func TestQueryTerms_Deduplication(t *testing.T) {
 	}
 }
 
-// TestQueryTerms_ShortTokensDropped — adversarial: tokens shorter than 3 chars
-// must be silently dropped (the noise filter).
 func TestQueryTerms_ShortTokensDropped(t *testing.T) {
 	q := Query{
 		FailureMode: "a b cd efg hijklmn",
@@ -180,7 +161,6 @@ func TestQueryTerms_ShortTokensDropped(t *testing.T) {
 			t.Errorf("term %q has length < 3; noise tokens must be dropped", term)
 		}
 	}
-	// "efg" and "hijklmn" are ≥3 and must be present.
 	found := map[string]bool{}
 	for _, term := range terms {
 		found[term] = true

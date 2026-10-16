@@ -49,6 +49,11 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/tmuxtest` | gives a test binary that runs real tmux a tmux server only its own process owns | [internal-tmuxtest.md](internal-tmuxtest.md) |
 | `internal/testhost` | a missing host tool skips a local test and fails a macOS CI test | [internal-testhost.md](internal-testhost.md) |
 | `internal/fakeclitest` | stands in for a command-line tool in tests without writing a new executable file | [internal-fakeclitest.md](internal-fakeclitest.md) |
+| `pkg/acsassert` | the assertion DSL that ACS Go predicates write against | [pkg-acsassert.md](pkg-acsassert.md) |
+| `internal/phaseintegrity` | the production digest source of the per-phase integrity chain and the sanctioned ship-sha re-pin | [internal-phaseintegrity.md](internal-phaseintegrity.md) |
+| `internal/preflight` | probes the host once and emits the capability profile the dispatcher configures itself from | [internal-preflight.md](internal-preflight.md) |
+| `internal/paths` | resolves the canonical `.evolve/*` layout once per command | [internal-paths.md](internal-paths.md) |
+| `internal/panetrust` | the single trust boundary for text captured from a tmux pane | [internal-panetrust.md](internal-panetrust.md) |
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/ledgerartifacts` | the ledger's write-once, content-addressed evidence store (`.evolve/ledger-artifacts/sha256/<2>/<62>`) | [internal-ledgerartifacts.md](internal-ledgerartifacts.md) |
 | `internal/attemptpostmortem` | records how a phase dispatch ended (the cause, the last commands, the suspect command, the pane tail) and renders it into the next prompt (ADR-0130, R2) | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |
@@ -156,3 +161,26 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/bridge/launchoutcome` | what one bridge launch exit means: the exit table, the cause line and the outcome projections | [internal-bridge-launchoutcome.md](internal-bridge-launchoutcome.md) |
 | `internal/installer` | copies and removes the evolve-loop agents and loop skill under `~/.claude`, and validates the plugin layout in CI | [internal-installer.md](internal-installer.md) |
 | `internal/core/failurelearning` | the deterministic half of learning from a failed phase: the recorder, the floor and the recurrence closure | [internal-core-failurelearning.md](internal-core-failurelearning.md) |
+| `internal/core/carryover` | the lifecycle of the `carryoverTodos[]` array in `state.json`: mint admission, closeout merges, retirement and persist | [internal-core-carryover.md](internal-core-carryover.md) |
+| `internal/phases/build` | the GREEN code-writer phase: its prompt blocks and its verdict classification | [internal-phases-build.md](internal-phases-build.md) |
+| `internal/fanoutdispatch` | runs the commands of a TSV file as bounded parallel workers and merges their exit codes | [internal-fanoutdispatch.md](internal-fanoutdispatch.md) |
+| `internal/cyclesimulator` | walks every phase of a cycle with no LLM call and appends simulated ledger entries | [internal-cyclesimulator.md](internal-cyclesimulator.md) |
+| `pkg/phaseproto` | the public wire protocol between the orchestrator and out-of-process phase agents | [pkg-phaseproto.md](pkg-phaseproto.md) |
+| `internal/research` | the typed, deterministic query port over the lessons corpus | [internal-research.md](internal-research.md) |
+| `internal/logfilter` | writes the human-readable clean companion of a raw phase stdout log | [internal-logfilter.md](internal-logfilter.md) |
+| `internal/ledgerverify` | asserts from the ledger that a cycle ran its required roles end to end | [internal-ledgerverify.md](internal-ledgerverify.md) |
+| `internal/envchain` | the four-tier env-precedence chain, the typed environment getters and the registry of `EVOLVE_*` key names | [internal-envchain.md](internal-envchain.md) |
+| `internal/bridge/inbox` | the file-based NDJSON channel for live command injection into a running tmux REPL agent | [internal-bridge-inbox.md](internal-bridge-inbox.md) |
+| `internal/reflection` | reads, writes and validates the per-phase Reflection Journal YAML sidecar | [internal-reflection.md](internal-reflection.md) |
+| `internal/budgethistory` | rolls recent cycles' timing, cost and token telemetry into the pace estimate that sizes a fleet wave | [internal-budgethistory.md](internal-budgethistory.md) |
+| `internal/capability` | parses adapter capability manifests into WARN lines, the dispatch plan and the quality tier | [internal-capability.md](internal-capability.md) |
+| `internal/posteditvalidate` | the PostToolUse hook that checks a just-edited json, shell or python file and warns without blocking | [internal-posteditvalidate.md](internal-posteditvalidate.md) |
+| `internal/mergegate` | the merge-to-main gate's deterministic kernel: the cadence advisor and the promoter | [internal-mergegate.md](internal-mergegate.md) |
+| `internal/dispatchevents` | writes the dispatcher-level abnormal events of a cycle workspace and owns the event vocabulary | [internal-dispatchevents.md](internal-dispatchevents.md) |
+| `internal/contextfillcorrelate` | joins the per-phase context fill ratio with the final verdict of each cycle and reports the FAIL rate for each fill band | [internal-contextfillcorrelate.md](internal-contextfillcorrelate.md) |
+| `internal/versionbump` | updates the version markers of a release atomically, port of the shell version-bump script | [internal-versionbump.md](internal-versionbump.md) |
+| `internal/verifyeval` | re-runs the commands of an eval file in a workspace and compares the outcome with its expectations | [internal-verifyeval.md](internal-verifyeval.md) |
+| `internal/runscope` | the one source of the run-, cycle- and lane-scoped names of worktree branches, directories and tmux sessions | [internal-runscope.md](internal-runscope.md) |
+| `internal/retrofile` | lifts the preventive actions of a retro report into weighted inbox todos | [internal-retrofile.md](internal-retrofile.md) |
+| `internal/log` | JSONL sidecar events, slog channels, the operator console and the safe rendering of untrusted diagnostic fields | [internal-log.md](internal-log.md) |
+| `internal/phasewatchdog` | kills the process group of a phase that shows no file activity for longer than a threshold | [internal-phasewatchdog.md](internal-phasewatchdog.md) |

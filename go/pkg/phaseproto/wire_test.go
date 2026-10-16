@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Wire-protocol version pin. The wire format is the load-bearing contract
-// between the orchestrator and out-of-process phase agents; bumping this
-// requires a coordinated rollout, so we pin it in the test as well.
 const wantWireVersion = 1
 
 func TestEnvelope_RoundTripRequest(t *testing.T) {
@@ -44,7 +41,6 @@ func TestEnvelope_RoundTripRequest(t *testing.T) {
 		t.Fatal("Payload empty")
 	}
 
-	// Wire bytes must be deterministic JSON (encoding/json default ordering).
 	raw, err := json.Marshal(env)
 	if err != nil {
 		t.Fatalf("Marshal envelope: %v", err)
@@ -222,7 +218,6 @@ func TestDecodeRequest_MalformedPayload(t *testing.T) {
 
 func TestWireError_IsError(t *testing.T) {
 	werr := &WireError{Code: "X", Message: "boom"}
-	// Must implement the error interface so callers can return it as `error`.
 	var _ error = werr
 	if !strings.Contains(werr.Error(), "boom") {
 		t.Errorf("Error()=%q must contain message", werr.Error())
@@ -231,7 +226,6 @@ func TestWireError_IsError(t *testing.T) {
 		t.Errorf("Error()=%q must contain code", werr.Error())
 	}
 
-	// errors.Is should match by Code.
 	other := &WireError{Code: "X", Message: "different"}
 	if !errors.Is(werr, other) {
 		t.Error("errors.Is must match by Code")
@@ -258,7 +252,6 @@ func TestWireError_NilReceiver(t *testing.T) {
 
 func TestWireError_IsAgainstNonWireError(t *testing.T) {
 	werr := &WireError{Code: "X"}
-	// errors.Is must return false when target is not a *WireError.
 	if errors.Is(werr, errors.New("plain")) {
 		t.Error("Is must return false for non-*WireError target")
 	}
@@ -271,7 +264,6 @@ func TestDecodeResponse_MalformedPayload(t *testing.T) {
 	}
 }
 
-// Drive the defensive json.Marshal error branch via the testable seam.
 func TestEncodeRequest_MarshalError(t *testing.T) {
 	saved := marshalJSON
 	t.Cleanup(func() { marshalJSON = saved })

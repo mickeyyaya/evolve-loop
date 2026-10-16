@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// ParsePlan extracts the SwarmPlan from the first ```json block of a swarm-plan.md artifact, or from bare JSON.
 func ParsePlan(artifact string) (SwarmPlan, error) {
 	block, err := firstJSONBlock(artifact)
 	if err != nil {

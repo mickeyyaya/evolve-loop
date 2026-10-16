@@ -85,7 +85,6 @@ func TestParseVerdictSentinel_DelegatesToFull(t *testing.T) {
 
 func TestReadFailureBlock_FallsThroughCandidates(t *testing.T) {
 	ws := t.TempDir()
-	// tdd's registered artifact, test-report.md, differs from the conventional tdd-report.md.
 	mustWrite(t, ws, "test-report.md", "## Tests\nprose only\n")
 	mustWrite(t, ws, "tdd-report.md", "## Tests\n"+
 		RenderVerdictSentinelWithFailure("tdd", "FAIL", &FailureBlock{Class: "code-build-fail"})+"\n")

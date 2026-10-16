@@ -7,19 +7,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// ExpandWithClusterMates deepens each selected lane with same-file backlog mates, up to perLane members in all.
-// A mate joins only a lane it alone overlaps, then claims its files for that lane; a candidate touching no lane
-// stays width material, and one touching two lanes would bridge two worktrees, so it joins neither.
 func ExpandWithClusterMates(selection, backlog []FleetCandidate, perLane int) [][]FleetCandidate {
 	menus := make([][]FleetCandidate, 0, len(selection))
-	owner := map[string]int{} // normalized file → owning lane index
+	owner := map[string]int{}
 	inMenu := make(map[string]bool, len(selection))
 	for lane, rep := range selection {
 		menus = append(menus, []FleetCandidate{rep})
 		inMenu[rep.ID] = true
 		for _, f := range rep.Files {
 			cf := filepath.Clean(f)
-			if _, taken := owner[cf]; !taken { // a committed prefix may overlap itself; the first lane keeps the file
+			if _, taken := owner[cf]; !taken {
 				owner[cf] = lane
 			}
 		}
@@ -44,7 +41,6 @@ func ExpandWithClusterMates(selection, backlog []FleetCandidate, perLane int) []
 	return menus
 }
 
-// soleOwningLane is ok=false for zero owners (independent work) and for two or more (a bridge).
 func soleOwningLane(owner map[string]int, files []string) (lane int, ok bool) {
 	lane = -1
 	for _, f := range files {
@@ -60,8 +56,6 @@ func soleOwningLane(owner map[string]int, files []string) (lane int, ok bool) {
 	return lane, lane != -1
 }
 
-// SelectWaveSeedMenus keeps the live committed prefix, widens it to count disjoint lanes, and deepens each lane.
-// An empty prefix uses SelectFleetWidthTopN, which still yields one lane at count<2 where widening yields none.
 func SelectWaveSeedMenus(evolveDir string, committed []FleetCandidate, count, perLane int, isProtected func(string) bool) [][]FleetCandidate {
 	backlog := ReadInboxBacklog(evolveDir, isProtected)
 	committed = PruneUndispatchable(evolveDir, committed)

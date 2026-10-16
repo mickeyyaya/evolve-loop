@@ -107,8 +107,6 @@ func TestRepinShipSHA_RejectsRelativeStatePath(t *testing.T) {
 }
 
 func TestRepinShipSHA_SurfacesReadError(t *testing.T) {
-	// Authorized + absolute path, but the state file does not exist → the read
-	// inside the lock must surface as an error (not a silent success).
 	missing := filepath.Join(t.TempDir(), "no-such-dir", "state.json")
 	if _, err := RepinShipSHA(missing, "SHA", "abc", "v", trueProv, false); err == nil {
 		t.Fatal("expected a read error for a missing state file")
@@ -125,9 +123,6 @@ func TestRepinShipSHA_EmptyPluginVer_LeavesVersionUntouched(t *testing.T) {
 	}
 }
 
-// Concurrent re-pins (e.g. competing resume attempts / fleet) on the shared
-// state.json must serialize under flock: no torn JSON, no lost unrelated keys,
-// and the final pin is the (single) written value. Run with -race.
 func TestRepinShipSHA_ConcurrentSafe(t *testing.T) {
 	t.Parallel()
 	p := seedStateJSON(t, t.TempDir(), map[string]any{"keepMe": "survive"})
@@ -143,7 +138,7 @@ func TestRepinShipSHA_ConcurrentSafe(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	s := readState(t, p) // also asserts JSON not torn
+	s := readState(t, p)
 	if s["expected_ship_sha"] != "CONVERGED_SHA" || s["keepMe"] != "survive" {
 		t.Errorf("concurrent re-pin left bad state: %+v", s)
 	}

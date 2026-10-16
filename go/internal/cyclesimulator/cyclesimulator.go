@@ -1,19 +1,5 @@
-// Package cyclesimulator ports legacy/scripts/dispatch/cycle-simulator.sh.
-//
-// No-LLM cycle plumbing simulator (v8.50.0+). Walks every phase of an
-// /evo:loop cycle writing deterministic artifacts and appending
-// tamper-evident ledger entries WITHOUT making any LLM API calls.
-//
-// What this validates:
-//   - cycle-state.json advances correctly through every phase
-//   - phase-gate.sh accepts every transition
-//   - prev_hash chain remains intact post-run
-//   - ship.sh --dry-run executes inside a real cycle context
-//
-// What this does NOT validate:
-//   - LLM output quality (no LLM is invoked)
-//   - Real Builder file edits (no source code changes)
-//   - Real Auditor judgment (verdict is hardcoded PASS)
+// Package cyclesimulator walks every phase of a cycle with no LLM call and appends simulated ledger entries.
+// See docs/architecture/packages/internal-cyclesimulator.md.
 package cyclesimulator
 
 import (
@@ -34,31 +20,24 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Exit codes (matches cycle-simulator.sh):
-//
-//	0 — every phase completed and ledger chain intact
-//	1 — runtime failure
-//	2 — phase-gate refused a transition
 const (
 	ExitOK         = 0
 	ExitRuntimeErr = 1
 	ExitGateRefuse = 2
 )
 
-// Inputs for the simulator.
 type Inputs struct {
-	Cycle        int    // required, positive integer
-	Workspace    string // required, will be created if absent
-	ProjectRoot  string // EVOLVE_PROJECT_ROOT — ledger location
-	PluginRoot   string // EVOLVE_PLUGIN_ROOT — helper scripts
-	Token        string // optional simulator token; defaults to "sim-token-<cycle>-<pid>"
+	Cycle        int
+	Workspace    string
+	ProjectRoot  string
+	PluginRoot   string
+	Token        string
 	Now          func() time.Time
-	AdvanceFn    func(phase, agent string) error // injectable seam for tests
-	ShipDryRunFn func(msg string) (int, error)   // returns rc, err
-	VerifyFn     func() error                    // verify-ledger-chain
+	AdvanceFn    func(phase, agent string) error
+	ShipDryRunFn func(msg string) (int, error)
+	VerifyFn     func() error
 }
 
-// Run executes the simulator. stderr receives [simulator] log lines.
 func Run(in Inputs, stderr io.Writer) int {
 	logf := func(format string, args ...any) {
 		fmt.Fprintf(stderr, "[simulator] "+format+"\n", args...)
@@ -101,7 +80,6 @@ func Run(in Inputs, stderr io.Writer) int {
 type logFunc func(format string, args ...any)
 
 func (in *Inputs) validate(logf logFunc) bool {
-	// validation
 	if in.Cycle <= 0 {
 		logf("cycle must be positive integer, got: %d", in.Cycle)
 		return false
@@ -132,7 +110,6 @@ func (in *Inputs) applyDefaults() {
 func (in *Inputs) installDefaultSeams() {
 	pluginScript := func(p string) string { return filepath.Join(in.PluginRoot, "legacy", "scripts", p) }
 
-	// default advance: shell out to cycle-state.sh
 	if in.AdvanceFn == nil {
 		in.AdvanceFn = func(phase, agent string) error {
 			cmd := sysexec.Command(context.Background(), "bash", pluginScript("lifecycle/cycle-state.sh"), "advance", phase, agent)
@@ -161,16 +138,10 @@ func (in *Inputs) installDefaultSeams() {
 }
 
 func (in *Inputs) walkPipeline(ledgerPath string, logf logFunc) int {
-	// pipeline: (phase, agent, artifact-writer)
 	phases := []struct {
 		phase, agent, fname string
 		writer              func(string) string
 	}{
-		// Filenames come from the phasecontract registry (artifact-name SSOT):
-		// the simulator's whole job is to prove the real plumbing accepts what
-		// it writes, which it cannot do from its own copy of the names. Note
-		// the "research" phase key is the simulator's legacy gate vocabulary —
-		// the ARTIFACT is scout's, hence the "scout" lookup.
 		{"intent", "intent", phasecontract.ArtifactName("intent"), in.writeIntent},
 		{"research", "scout", phasecontract.ArtifactName("scout"), in.writeScout},
 		{"build", "builder", phasecontract.ArtifactName("build"), in.writeBuild},
@@ -196,7 +167,6 @@ func (in *Inputs) walkPipeline(ledgerPath string, logf logFunc) int {
 }
 
 func (in *Inputs) simulateShip(logf logFunc) (shipRC, rc int) {
-	// ship phase
 	if err := in.AdvanceFn("ship", "orchestrator"); err != nil {
 		logf("FAIL: cycle-state advance to ship refused")
 		return 0, ExitGateRefuse
@@ -212,7 +182,6 @@ func (in *Inputs) simulateShip(logf logFunc) (shipRC, rc int) {
 }
 
 func (in *Inputs) simulateRetrospective(ledgerPath string, logf logFunc) int {
-	// retrospective
 	if err := in.AdvanceFn("retrospective", "retrospective"); err != nil {
 		logf("FAIL: cycle-state advance to retrospective refused")
 		return ExitGateRefuse
@@ -231,7 +200,6 @@ func (in *Inputs) simulateRetrospective(ledgerPath string, logf logFunc) int {
 }
 
 func (in *Inputs) verifyChain(logf logFunc) {
-	// chain verify
 	logf("verifying ledger chain post-simulation...")
 	if err := in.VerifyFn(); err == nil {
 		logf("OK: ledger chain intact")
@@ -241,7 +209,6 @@ func (in *Inputs) verifyChain(logf logFunc) {
 }
 
 func (in *Inputs) writeSimReport(shipRC int, logf logFunc) int {
-	// simulator-report
 	reportPath := filepath.Join(in.Workspace, "simulator-report.md")
 	report := fmt.Sprintf(
 		"<!-- challenge-token: %s -->\n# Cycle Simulator Report — Cycle %d\n\n"+
@@ -256,8 +223,6 @@ func (in *Inputs) writeSimReport(shipRC int, logf logFunc) int {
 	}
 	return ExitOK
 }
-
-// ── artifact templates ─────────────────────────────────────────────────────
 
 func (in *Inputs) writeIntent(token string) string {
 	return fmt.Sprintf(`<!-- challenge-token: %s -->
@@ -328,17 +293,11 @@ simulator-cycle: kernel-plumbing validated; no semantic learning produced.
 `, token, in.Cycle)
 }
 
-// ── ledger appender ───────────────────────────────────────────────────────
-
 var (
 	simLedgerCompact = jsonCompact
 	simLedgerWrite   = func(f *os.File, s string) (int, error) { return f.WriteString(s) }
 )
 
-// appendSimLedger writes a simulated ledger entry to ledger.jsonl + updates
-// ledger.tip. Mirrors the bash write_sim_ledger byte layout exactly: the JSON
-// object has `simulated: true` and computes prev_hash from the SHA256 of the
-// last line.
 func appendSimLedger(ledgerPath string, cycle int, role, artifactPath, token, projectRoot string, now func() time.Time) error {
 	artifactSHA := fileSHA256(artifactPath)
 	gitHEAD, treeStateSHA := gitTreeState(projectRoot)
@@ -365,10 +324,6 @@ func appendSimLedger(ledgerPath string, cycle int, role, artifactPath, token, pr
 		"prev_hash":       prevHash,
 		"simulated":       true,
 	}
-	// Cycle-1571 H1: a run-scoped binding lookup refuses an entry with no run
-	// identity. The simulator writes into the SAME ledger as the real loop, so
-	// its entries carry it too — resolved from the artifact's own run workspace.
-	// Set only when resolvable, mirroring core's `json:"run_id,omitempty"`.
 	if runID := core.RunIDFromWorkspace(filepath.Dir(artifactPath)); runID != "" {
 		entry["run_id"] = runID
 	}
@@ -464,23 +419,8 @@ func runGit(dir string, args ...string) string {
 	return strings.TrimRight(string(out), "\n")
 }
 
-// jsonCompact serializes a map[string]any with a stable key order matching
-// the bash jq -nc output: ts, cycle, run_id, role, kind, model, exit_code,
-// duration_s, artifact_path, artifact_sha256, challenge_token, git_head,
-// tree_state_sha, entry_seq, prev_hash, simulated. Stable order is load-bearing
-// for downstream hash-chain verifiers that recompute SHA over the raw line.
-//
-// The list below is an ALLOWLIST, not a sort order: a key absent from it is
-// silently dropped however the caller populated the map. That is how run_id was
-// first "added" to the simulator and emitted nothing (go-review CRITICAL) — keep
-// this comment and the slice in step.
 func jsonCompact(m map[string]any) (string, error) {
 	keys := []string{
-		// run_id sits right after cycle, matching the field order the other
-		// agent_subprocess writers emit. jsonCompact is an ALLOWLIST: a key
-		// absent from this slice is silently dropped no matter what the caller
-		// put in the map, which is how the first attempt at stamping the
-		// simulator looked correct and emitted nothing (go-review CRITICAL).
 		"ts", "cycle", "run_id", "role", "kind", "model", "exit_code", "duration_s",
 		"artifact_path", "artifact_sha256", "challenge_token",
 		"git_head", "tree_state_sha", "entry_seq", "prev_hash", "simulated",

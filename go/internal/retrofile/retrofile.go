@@ -1,14 +1,5 @@
-// Package retrofile closes the learning→action loop: it lifts a retro
-// report's machine-readable "preventive_actions" block into weighted
-// .evolve/inbox todos, so a diagnosed recurrence becomes queued work instead
-// of a lesson that is written and then forgotten.
-//
-// It is a stdlib-only leaf package deliberately kept free of loop/policy
-// imports so it can be wired at the same deterministic post-cycle seam the
-// FAILED_UNEXPLAINED classifier already uses
-// (cmd/evolve/cmd_loop_outcome.go:fileUnexplainedOutcomeDefect). The caller
-// supplies the default weight (resolved from policy, never a Go literal) and
-// the clock, keeping this package pure and its output byte-stable.
+// Package retrofile lifts the preventive actions of a retro report into weighted inbox todos.
+// See docs/architecture/packages/internal-retrofile.md.
 package retrofile
 
 import (
@@ -23,16 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// preventiveHeading is the retro-report section under which the autofiler
-// looks for the machine-readable action block. The retro agent doc
-// (agents/evolve-retrospective.md) documents the matching FORMAT.
 const preventiveHeading = "## Recommended preventive actions"
 
-// PreventiveAction is one structured recommendation lifted from a retro
-// report. ID is the stable inbox slug (reused across cycles so a recurrence
-// deduplicates rather than spamming). A positive WeightHint overrides the
-// caller's default weight — the recurrence-escalation lever. Recurrence is the
-// count the retro attached (advisory; surfaced in the filed item's evidence).
 type PreventiveAction struct {
 	ID            string   `json:"id"`
 	Title         string   `json:"title"`
@@ -43,11 +26,6 @@ type PreventiveAction struct {
 	PriorityClass string   `json:"priority_class"`
 }
 
-// ParsePreventiveActions lifts the JSON array from the fenced ```json block
-// under the "## Recommended preventive actions" heading of a retro report.
-// A report with no such block yields (nil, nil) — the common
-// no-recommendations case must no-op, not error. A present-but-malformed
-// block is a real error the caller should surface.
 func ParsePreventiveActions(report []byte) ([]PreventiveAction, error) {
 	text := string(report)
 	hIdx := strings.Index(text, preventiveHeading)
@@ -72,13 +50,6 @@ func ParsePreventiveActions(report []byte) ([]PreventiveAction, error) {
 	return actions, nil
 }
 
-// FileActions writes one auto-retro-<cycle>-<slug>.json inbox item per action
-// into inboxDir, at the action's WeightHint when positive else defaultWeight.
-// An action whose ID already exists as an inbox item — open (anywhere under
-// inboxDir) or already consumed (under inboxDir/processed/**) — is skipped, so
-// a recurrence does not re-file a fix that is still queued or already done.
-// It returns the paths actually written. now stamps injected_at, keeping the
-// output deterministic for the caller.
 func FileActions(inboxDir string, cycle int, actions []PreventiveAction, defaultWeight float64, now time.Time) (written []string, err error) {
 	if len(actions) == 0 {
 		return nil, nil
@@ -122,16 +93,11 @@ func FileActions(inboxDir string, cycle int, actions []PreventiveAction, default
 			return written, fmt.Errorf("retrofile: write item %s: %w", a.ID, err)
 		}
 		written = append(written, path)
-		// Guard against duplicate IDs within a single batch.
 		existing[a.ID] = true
 	}
 	return written, nil
 }
 
-// existingIDs returns the set of "id" values carried by every *.json item
-// anywhere under inboxDir (open items at the top level and consumed items
-// under processed/**), so an action already queued or already shipped is
-// deduplicated regardless of where its item currently lives.
 func existingIDs(inboxDir string) (map[string]bool, error) {
 	ids := map[string]bool{}
 	err := filepath.WalkDir(inboxDir, func(path string, d fs.DirEntry, walkErr error) error {
@@ -147,7 +113,6 @@ func existingIDs(inboxDir string) (map[string]bool, error) {
 		}
 		var m map[string]any
 		if err := json.Unmarshal(raw, &m); err != nil {
-			// A non-item JSON file (or garbage) must not abort dedup.
 			return nil
 		}
 		if id, ok := m["id"].(string); ok && id != "" {

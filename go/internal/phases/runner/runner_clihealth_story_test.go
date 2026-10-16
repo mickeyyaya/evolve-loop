@@ -29,11 +29,9 @@ func storyRun(t *testing.T, root string, bridge core.Bridge, now time.Time) {
 
 func TestCLIHealthFullStory(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
-	// A fixed zone, not time.Local: ParseResetHint reads the wall clock in now's location.
 	loc := time.FixedZone("STORY", 8*3600)
 	t0 := time.Date(2026, 6, 11, 0, 30, 0, 0, loc)
 
-	// capturedAt must not precede the run start, and the injected clock returns t0 to the runner.
 	wallBridge := func() *escalatingBridge {
 		return &escalatingBridge{
 			scriptedBridge: scriptedBridge{responses: map[string]scriptedResp{
@@ -54,7 +52,6 @@ func TestCLIHealthFullStory(t *testing.T) {
 	if bench.Family == "" {
 		t.Fatal("t0: wall not benched")
 	}
-	// The pane's own hint (6:11 AM plus a 2-minute margin) wins over the default cooldown.
 	wantUntil := time.Date(2026, 6, 11, 6, 13, 0, 0, loc)
 	if !bench.BenchedUntil.Equal(wantUntil) {
 		t.Errorf("benched_until=%v, want %v (the wall's own reset hint)", bench.BenchedUntil, wantUntil)

@@ -1,12 +1,5 @@
-// Package capability parses adapter capability manifests
-// (<adapter>.capabilities.json) and emits the WARN messages + dispatch-plan
-// JSON envelope used by cmd_validate_profile in
-// legacy/scripts/dispatch/subagent-run.sh.
-//
-// The manifest defines which kernel capabilities the adapter natively
-// supports. Missing capabilities trigger WARN-level substitutions
-// (e.g. wall-clock timeout instead of native budget cap) that the runner
-// surfaces to operators before the agent fires.
+// Package capability parses adapter capability manifests and renders the WARN lines, dispatch plan and quality tier.
+// See docs/architecture/packages/internal-capability.md.
 package capability
 
 import (
@@ -15,27 +8,16 @@ import (
 	"strings"
 )
 
-// Manifest is the parsed shape of an adapter capabilities.json. Only the
-// fields cmd_validate_profile inspects are typed — other keys are tolerated
-// but ignored. The two booleans default to true when absent (matches bash
-// `if . == null then "true" else tostring`).
 type Manifest struct {
 	BudgetNative      bool
 	PermissionScoping bool
 }
 
-// Inspection is the output of Inspect: parsed manifest + the ordered list of
-// WARN lines bash would print to stderr. CLI consumers print these verbatim;
-// programmatic consumers serialize them into the dispatch-plan envelope.
 type Inspection struct {
 	Manifest Manifest
-	Warns    []string // each element is the full "[adapter-cap] WARN cli=... missing=... substitute=..." line
+	Warns    []string
 }
 
-// Inspect loads <adaptersDir>/<cli>.capabilities.json and returns the
-// inspection. Missing file → both supports default to true, no warns (bash:
-// the manifest is optional and silently absent for adapters that haven't
-// declared a manifest yet). I/O errors other than ENOENT bubble up.
 func Inspect(adaptersDir, cli string) (Inspection, error) {
 	path := fmt.Sprintf("%s/%s.capabilities.json", adaptersDir, cli)
 	body, err := os.ReadFile(path)
@@ -50,9 +32,6 @@ func Inspect(adaptersDir, cli string) (Inspection, error) {
 	return inspectBytes(body, cli), nil
 }
 
-// inspectBytes is the pure-string entry point for tests. Same defaults: both
-// supports true when the field is absent or null. Bash uses jq with
-// `if . == null then "true" else tostring end`; we mirror that.
 func inspectBytes(body []byte, cli string) Inspection {
 	man := Manifest{
 		BudgetNative:      extractBool(string(body), "budget_cap_native", true),
@@ -74,12 +53,7 @@ func inspectBytes(body []byte, cli string) Inspection {
 	return Inspection{Manifest: man, Warns: warns}
 }
 
-// extractBool locates `"<field>": <bool>` inside the supports block. Returns
-// def when the field is absent, null, or not a literal bool. Defensive
-// against minor whitespace + ordering differences across manifests.
 func extractBool(body, field string, def bool) bool {
-	// Walk to the supports block first so a stray match outside .supports
-	// can't fool us. Bash uses `jq -r '.supports.<field>'`.
 	supports, ok := extractObject(body, "supports")
 	if !ok {
 		return def
@@ -104,9 +78,6 @@ func extractBool(body, field string, def bool) bool {
 	}
 }
 
-// extractObject returns the inner contents of `"<name>": { ... }` (without
-// braces) or ("", false) on miss. Tolerates whitespace + nested objects.
-// Pure string scanning — keeps the package free of encoding/json.
 func extractObject(body, name string) (string, bool) {
 	needle := fmt.Sprintf("\"%s\"", name)
 	idx := strings.Index(body, needle)
@@ -136,8 +107,6 @@ func extractObject(body, name string) (string, bool) {
 	return "", false
 }
 
-// DispatchPlan is the serialized envelope written to $EVOLVE_DISPATCH_PLAN_LOG.
-// Field order matches bash printf so byte-for-byte file diff stays clean.
 type DispatchPlan struct {
 	CLI                string
 	Model              string
@@ -147,9 +116,6 @@ type DispatchPlan struct {
 	Warns              []string
 }
 
-// PlanJSON renders a single-line JSON envelope identical to bash printf at
-// subagent-run.sh:555 — same field order, same boolean rendering. The
-// caller writes the result to EVOLVE_DISPATCH_PLAN_LOG.
 func (p DispatchPlan) PlanJSON() string {
 	return fmt.Sprintf(
 		`{"cli":"%s","model":"%s","cli_resolution_source":"%s","cap_budget_native":%s,"cap_permission_scoping":%s,"capability_warns":%s}`,
@@ -169,11 +135,6 @@ func boolToken(v bool) string {
 	return "false"
 }
 
-// jsonEscape quotes the special characters JSON would. Bash uses sed
-// 's/"/\\"/g' only for the warn entries; the top-level fields use printf
-// %s without escaping, so values containing " would break bash too. Mirror
-// that: only escape " in our top-level fields for consistency. Keeps the
-// envelope a valid one-line JSON object.
 func jsonEscape(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)
@@ -190,8 +151,6 @@ func warnsJSON(warns []string) string {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		// Bash strips the leading "[adapter-cap] WARN " prefix and stores
-		// just "cli=... missing=... substitute=...". Mirror that.
 		stripped := strings.TrimPrefix(w, "[adapter-cap] WARN ")
 		b.WriteByte('"')
 		b.WriteString(jsonEscape(stripped))

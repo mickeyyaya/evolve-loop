@@ -12,7 +12,7 @@ import (
 )
 
 type quotaExhaustedBridge struct {
-	attempts []string // "cli@model", in the order the runner attempted them
+	attempts []string
 }
 
 func (q *quotaExhaustedBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -25,7 +25,6 @@ func (q *quotaExhaustedBridge) Probe(_ context.Context) (core.BridgeProbe, error
 	return core.BridgeProbe{}, nil
 }
 
-// writeQuotaExhaustionProfile takes the tier explicitly: writeFallbackProfile's "sonnet" is the floor and cannot step down.
 func writeQuotaExhaustionProfile(t *testing.T, agentName, primaryCLI, modelTier string, fallback []string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -45,7 +44,6 @@ func writeQuotaExhaustionProfile(t *testing.T, agentName, primaryCLI, modelTier 
 	return root
 }
 
-// The name records the defect this reproduced; the test asserts a quota-exhausted tier steps down and re-walks the chain.
 func TestRun_QuotaExhaustedAcrossChain_NeverStepsDownTier(t *testing.T) {
 	hooks := &fakeHooks{phase: "auditor", agent: "evolve-auditor", model: "opus", prompt: "x"}
 	qb := &quotaExhaustedBridge{}

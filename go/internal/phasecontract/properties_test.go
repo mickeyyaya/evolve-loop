@@ -43,7 +43,6 @@ func TestProperty_BuiltinAndCatalogResolversAgreeOnBuiltins(t *testing.T) {
 	for _, c := range Contracts() {
 		b, okB := BuiltinResolver{}.Resolve(c.Phase)
 		if !okB {
-			// An entry keyed by an alias resolves only by its key; resolver_test.go pins aliases.
 			continue
 		}
 		exercised++

@@ -47,7 +47,6 @@ func TestSeal_ChainStaysVerifiableEndToEnd(t *testing.T) {
 		t.Fatalf("live tail = %d lines, want 6 (5 kept + anchor)", len(live))
 	}
 
-	// Only VerifyDeep can pass here: the first kept line chains from a sealed line plain Verify cannot see.
 	if err := l.VerifyDeep(context.Background()); err != nil {
 		t.Fatalf("VerifyDeep after seal: %v", err)
 	}
@@ -65,7 +64,7 @@ func TestSeal_ChainStaysVerifiableEndToEnd(t *testing.T) {
 		rebuilt.Write(ln)
 		rebuilt.WriteByte('\n')
 	}
-	for _, ln := range live[:len(live)-1] { // drop the anchor
+	for _, ln := range live[:len(live)-1] {
 		rebuilt.Write(ln)
 		rebuilt.WriteByte('\n')
 	}
@@ -377,7 +376,6 @@ func TestSeal_ResumeAfterCrashBeforeTruncate(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := splitLines(raw)
-	// Simulate the crash: segment exists for lines 0..6, live file untouched.
 	segPath := filepath.Join(dir, segmentsDirName, "seg-0001.jsonl.gz")
 	if err := writeSegment(segPath, raw[:prefixLen(raw, 7)]); err != nil {
 		t.Fatal(err)
@@ -392,7 +390,7 @@ func TestSeal_ResumeAfterCrashBeforeTruncate(t *testing.T) {
 		t.Fatalf("VerifyDeep after resume: %v", err)
 	}
 	liveRaw, _ := os.ReadFile(filepath.Join(dir, "ledger.jsonl"))
-	if got := len(splitLines(liveRaw)); got != len(lines)-7+1 { // tail + anchor
+	if got := len(splitLines(liveRaw)); got != len(lines)-7+1 {
 		t.Errorf("resume must complete the original truncation (7 sealed): live=%d", got)
 	}
 }
@@ -422,12 +420,10 @@ func TestSeal_ResumeAfterCrashBeforeAnchor(t *testing.T) {
 	}
 }
 
-// Asserts verdict preservation: sealing a real ledger never changes what VerifyDeep says about it.
 func TestSeal_RealLedgerCopy(t *testing.T) {
 	candidates := []string{
 		filepath.Join("..", "..", "..", "..", ".evolve"),
 		filepath.Join("..", "..", "..", "..", "..", ".evolve"),
-		// A worktree at <root>/.claude/worktrees/<name> sits three levels below the real ledger's checkout.
 		filepath.Join("..", "..", "..", "..", "..", "..", "..", ".evolve"),
 	}
 	var src string
@@ -472,7 +468,7 @@ func TestSeal_RealLedgerCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(splitLines(liveRaw)); got != 101 { // 100 kept + anchor
+	if got := len(splitLines(liveRaw)); got != 101 {
 		t.Errorf("real-copy live tail = %d lines, want 101", got)
 	}
 }

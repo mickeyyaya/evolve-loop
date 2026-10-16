@@ -19,7 +19,7 @@ func TestCommitEvidence_EnvParse(t *testing.T) {
 		{"0", StageOff, false},
 		{"shadow", StageShadow, false},
 		{"enforce", StageEnforce, false},
-		{"advisory", StageOff, true}, // no advisory state for this axis
+		{"advisory", StageOff, true},
 		{"garbage", StageOff, true},
 	}
 	for _, c := range cases {

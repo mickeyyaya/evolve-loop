@@ -21,7 +21,7 @@ func TestRun_VerdictDiagnostics_OrderIsClassifyFenceViolationsReconcileOverride(
 	classifyDiags := []core.Diagnostic{{Severity: "warning", Message: "classify one"}, {Severity: "error", Message: "classify two"}}
 	clean := runVerdictScenario(t, verdictScenario{name: "order", phase: "audit", agent: "evolve-auditor", file: unverifiedReport, stdout: panePASS,
 		verify: verifySpec{kind: verifyNotOK, codes: []string{"a_code", "b_code"}}, verdict: core.VerdictPASS, diags: classifyDiags},
-		func(o *Options) {}, // no fence here: Worktree is a plain temp dir and the phase is not read-only
+		func(o *Options) {},
 	)
 	if clean.err != nil {
 		t.Fatal(clean.err)
@@ -32,7 +32,6 @@ func TestRun_VerdictDiagnostics_OrderIsClassifyFenceViolationsReconcileOverride(
 		t.Errorf("clean-path order %q, want %q", got, want)
 	}
 
-	// A read-only phase in a non-repository worktree yields one fence diagnostic, between Classify's and the violations.
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS, diagnostics: classifyDiags}
 	var counts probeCounts
 	r := New(Options{Hooks: hooks, Bridge: &goldenBridge{fileContent: unverifiedReport, stdout: panePASS}, Prompts: fakePromptsFS("evolve-auditor", "x"),

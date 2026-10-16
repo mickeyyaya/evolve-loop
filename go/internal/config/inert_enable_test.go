@@ -11,7 +11,6 @@ func inertEnableWarn(ws []Warning) (Warning, bool) {
 	return Warning{}, false
 }
 
-// Despite its name, nothing is enabled here: this is the advisory baseline with no inert warning.
 func TestLoad_PlanReviewEnabled_StageAdvisory_NoInertWarning(t *testing.T) {
 	_, ws := Load("", map[string]string{
 		"EVOLVE_DYNAMIC_ROUTING": "advisory",
@@ -37,7 +36,7 @@ func TestLoad_NoEnables_NoInertWarning(t *testing.T) {
 
 func TestLoad_OtherWarningsStillEmit(t *testing.T) {
 	_, ws := Load("", map[string]string{
-		"EVOLVE_MANDATORY_PHASES": "scout,build", // omits audit+ship → weak-spine
+		"EVOLVE_MANDATORY_PHASES": "scout,build",
 	})
 	var sawWeak bool
 	for _, w := range ws {

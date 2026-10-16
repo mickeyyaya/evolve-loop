@@ -8,7 +8,6 @@ import (
 )
 
 func TestDeferredFloorPackages_Cycle281Replay(t *testing.T) {
-	// The fixture defers cmd/evolve (basename "evolve"); its bridge item names bridge only inside hyphenated slugs.
 	pkgs := append([]string{"evolve"}, knownPkgsFixture...)
 	got := DeferredFloorPackages(readFixture(t, "triage-cycle281.md"), pkgs)
 	want := []string{"evolve"}
@@ -81,7 +80,6 @@ func TestDeferredFloorPackages_Table(t *testing.T) {
 	}
 }
 
-// writeDeferredCompanion omits deferred_floors for a nil slice and writes it for a non-nil, possibly empty, one.
 func writeDeferredCompanion(t *testing.T, dir string, deferredFloors []string) string {
 	t.Helper()
 	quote := func(xs []string) string {

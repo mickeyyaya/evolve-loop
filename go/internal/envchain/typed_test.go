@@ -16,7 +16,7 @@ func TestInt(t *testing.T) {
 		{"valid-positive", map[string]string{key: "42"}, 7, 42},
 		{"valid-negative", map[string]string{key: "-5"}, 7, -5},
 		{"zero", map[string]string{key: "0"}, 7, 0},
-		{"leading-space-is-unparseable", map[string]string{key: " 3"}, 7, 7}, // strconv.Atoi parity
+		{"leading-space-is-unparseable", map[string]string{key: " 3"}, 7, 7},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -27,8 +27,6 @@ func TestInt(t *testing.T) {
 	}
 }
 
-// TestIntMin pins the "below-min is invalid → default" semantics that mirror
-// the phase-latency ceiling's `num > 0 else fall back` guard (NOT clamp-to-min).
 func TestIntMin(t *testing.T) {
 	const key = "TEST_TYPED_INTMIN"
 	cases := []struct {
@@ -58,9 +56,6 @@ func TestIntMin(t *testing.T) {
 	}
 }
 
-// TestIntMin_ReproducesPhaseMaxAttempts proves IntMin + an explicit upper cap
-// reproduces resolvePhaseMaxAttempts exactly (the Step-3 migration target):
-// <1 → def(2), >5 → 5, else n.
 func TestIntMin_ReproducesPhaseMaxAttempts(t *testing.T) {
 	const key = "TEST_TYPED_MAXATTEMPTS"
 	resolve := func(val string, set bool) int {
@@ -79,12 +74,12 @@ func TestIntMin_ReproducesPhaseMaxAttempts(t *testing.T) {
 		set  bool
 		want int
 	}{
-		{"", false, 2}, // unset → def
-		{"0", true, 2}, // below min → def (NOT 1)
-		{"1", true, 1}, // at min
-		{"3", true, 3}, // in range
-		{"6", true, 5}, // above max → cap
-		{"x", true, 2}, // unparseable → def
+		{"", false, 2},
+		{"0", true, 2},
+		{"1", true, 1},
+		{"3", true, 3},
+		{"6", true, 5},
+		{"x", true, 2},
 	}
 	for _, c := range cases {
 		if got := resolve(c.val, c.set); got != c.want {
@@ -123,14 +118,9 @@ func TestBool(t *testing.T) {
 	}
 }
 
-// TestBoolValue_NoEnvLookup confirms BoolValue interprets the raw string only
-// and never consults the process env — the property that makes it safe for
-// frozen-snapshot reads.
 func TestBoolValue_NoEnvLookup(t *testing.T) {
 	const key = "TEST_TYPED_BOOLVALUE"
-	t.Setenv(key, "1") // process env set to truthy...
-	// ...but BoolValue is handed an empty raw value, so it must use def, NOT
-	// pick up the process env.
+	t.Setenv(key, "1")
 	if got := BoolValue("", false); got != false {
 		t.Errorf("BoolValue(\"\")=%v, want false (must ignore process env)", got)
 	}
@@ -142,8 +132,6 @@ func TestBoolValue_NoEnvLookup(t *testing.T) {
 	}
 }
 
-// TestTyped_ReqEnvBeatsProcessEnv confirms the typed getters honor the same
-// reqEnv > os.Getenv precedence as Resolve.
 func TestTyped_ReqEnvBeatsProcessEnv(t *testing.T) {
 	const key = "TEST_TYPED_PRECEDENCE"
 	t.Setenv(key, "100")

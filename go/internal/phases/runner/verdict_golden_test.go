@@ -49,7 +49,7 @@ func TestRun_VerdictProbeCounts_MatchTheGolden(t *testing.T) {
 	}
 	cancelled := 0
 	for name, w := range want {
-		if strings.HasPrefix(name, "cancelled_") { // pinned by TestRun_VerdictProbeCounts_CancelledCtx
+		if strings.HasPrefix(name, "cancelled_") {
 			cancelled++
 			continue
 		}

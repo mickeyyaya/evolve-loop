@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// withTmuxRunStub swaps a package variable, so tests that use it must not call t.Parallel().
 func withTmuxRunStub(t *testing.T, stub func(ctx context.Context, args ...string) error) *[][]string {
 	t.Helper()
 	var calls [][]string

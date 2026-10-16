@@ -12,7 +12,6 @@ import (
 
 func repoRoot() string { return filepath.Join("..", "..", "..") }
 
-// loadUserCatalog runs the same discovery and merge as evolve phases list and validate.
 func loadUserCatalog(t *testing.T) Catalog {
 	t.Helper()
 	cat, _, _, err := MergedCatalog(repoRoot())
@@ -22,7 +21,6 @@ func loadUserCatalog(t *testing.T) Catalog {
 	return cat
 }
 
-// readPhaseSpec returns name's spec, failing unless the loader merged it as a user overlay.
 func readPhaseSpec(t *testing.T, cat Catalog, name string) PhaseSpec {
 	t.Helper()
 	s, ok := cat.Get(name)
@@ -60,7 +58,6 @@ func hasInsertWhen(s PhaseSpec, field string, ops []string, value string) bool {
 	return false
 }
 
-// condValueEquals matches a JSON condition value, number or string, against want.
 func condValueEquals(v interface{}, want string) bool {
 	switch tv := v.(type) {
 	case string:
@@ -108,7 +105,6 @@ func outputSignals(s PhaseSpec, want ...string) bool {
 	return true
 }
 
-// fileContains reports whether the repo-relative file contains needle, ignoring case.
 func fileContains(t *testing.T, rel, needle string) bool {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repoRoot(), filepath.FromSlash(rel)))
@@ -118,7 +114,6 @@ func fileContains(t *testing.T, rel, needle string) bool {
 	return strings.Contains(strings.ToLower(string(data)), strings.ToLower(needle))
 }
 
-// fileMatches reports whether the repo-relative file matches pattern, ignoring case.
 func fileMatches(t *testing.T, rel, pattern string) bool {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repoRoot(), filepath.FromSlash(rel)))
@@ -128,7 +123,6 @@ func fileMatches(t *testing.T, rel, pattern string) bool {
 	return regexp.MustCompile("(?i)" + pattern).Match(data)
 }
 
-// profileRequiredKeys are checked on raw JSON because max_budget_usd is not a typed Profile field.
 var profileRequiredKeys = []string{
 	"name", "cli", "model_tier_default", "role", "sandbox",
 	"max_turns", "max_budget_usd", "allowed_tools", "output_artifact",
@@ -151,13 +145,12 @@ func loadProfileJSON(t *testing.T, name string) map[string]json.RawMessage {
 	return m
 }
 
-// The bash suites' stale fail_if_signal rows are deliberately not ported.
 func TestUserPhases_BashSuiteParity(t *testing.T) {
 	t.Parallel()
 	cat := loadUserCatalog(t)
 
 	tests := []struct {
-		name   string // <bash-script>/<assertion>
+		name   string
 		assert func(t *testing.T)
 	}{
 		{"security-scan.sh/validate-OK", func(t *testing.T) {
@@ -502,7 +495,6 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 	}
 }
 
-// wave3 lists the release, feature and memory phases one ported suite covers.
 var wave3 = []string{"changelog-sync", "post-ship-monitor", "api-contract-design", "context-condense"}
 
 func registryMaxOptionalInsertions(t *testing.T) int {

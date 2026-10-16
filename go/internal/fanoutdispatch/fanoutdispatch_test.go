@@ -93,14 +93,12 @@ func TestRun_AllWorkersSucceed(t *testing.T) {
 	if len(lines) != 2 {
 		t.Errorf("results lines: got %d, want 2 (body=%q)", len(lines), body)
 	}
-	// preserve input order
 	if !strings.HasPrefix(lines[0], "alpha\t") {
 		t.Errorf("order broken: first line %q", lines[0])
 	}
 	if !strings.HasPrefix(lines[1], "beta\t") {
 		t.Errorf("order broken: second line %q", lines[1])
 	}
-	// exit codes are 0
 	for _, line := range lines {
 		fields := strings.Split(line, "\t")
 		if len(fields) < 2 {
@@ -169,14 +167,8 @@ func TestRun_StdoutCapturedPerWorker(t *testing.T) {
 	}
 }
 
-// TestRun_DoesNotMutateProcessEnv pins ADR-0049 S1 / gap G8: Run must inject
-// per-worker budget/cache-prefix into each WORKER's env, never via a
-// process-global os.Setenv — two concurrent DispatchParallel in one process
-// would otherwise clobber each other's budget. Not t.Parallel: it asserts on
-// the shared process env (t.Setenv pins the pre-state and restores it). RED
-// before the fix (os.Setenv leaks "0.33" into the parent), GREEN after.
 func TestRun_DoesNotMutateProcessEnv(t *testing.T) {
-	t.Setenv("EVOLVE_MAX_BUDGET_USD", "") // ensure unset → cfg default would be injected
+	t.Setenv("EVOLVE_MAX_BUDGET_USD", "")
 	dir := t.TempDir()
 	cmds := filepath.Join(dir, "cmds.tsv")
 	writeFile(t, cmds, "w1\ttrue\n")
@@ -190,16 +182,11 @@ func TestRun_DoesNotMutateProcessEnv(t *testing.T) {
 	}
 }
 
-// TestRun_WorkerReceivesCachePrefix proves the S1 fix PRESERVES cache-prefix
-// delivery: each worker still sees EVOLVE_FANOUT_CACHE_PREFIX_FILE in its own
-// env (via cmd.Env, not parent inheritance). The former per-worker budget
-// injection (EVOLVE_MAX_BUDGET_USD) was removed with the token-budget cost
-// gates — this test also pins that the worker no longer receives it.
 func TestRun_WorkerReceivesCachePrefix(t *testing.T) {
-	t.Setenv("EVOLVE_MAX_BUDGET_USD", "") // not inherited; must NOT be injected
+	t.Setenv("EVOLVE_MAX_BUDGET_USD", "")
 	dir := t.TempDir()
 	cachePrefix := filepath.Join(dir, "cache-prefix.txt")
-	writeFile(t, cachePrefix, "x") // Run stats this file; must exist
+	writeFile(t, cachePrefix, "x")
 	cmds := filepath.Join(dir, "cmds.tsv")
 	writeFile(t, cmds, "w1\tprintenv EVOLVE_MAX_BUDGET_USD; printenv EVOLVE_FANOUT_CACHE_PREFIX_FILE\n")
 	var b bytes.Buffer
@@ -225,7 +212,6 @@ func TestRun_BoundedConcurrency(t *testing.T) {
 	dir := t.TempDir()
 	cmds := filepath.Join(dir, "cmds.tsv")
 	results := filepath.Join(dir, "r.tsv")
-	// 4 workers, concurrency 2 — should still complete
 	var sb strings.Builder
 	for i := 1; i <= 4; i++ {
 		fmt.Fprintf(&sb, "w%d\techo %d\n", i, i)
@@ -253,7 +239,6 @@ func TestReadCommands_IgnoresMalformedLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// should pick up "name\tcmd" and "empty-tab\t" (empty command is valid)
 	if len(cmds) != 2 {
 		t.Errorf("got %d commands, want 2: %v", len(cmds), cmds)
 	}
@@ -282,7 +267,6 @@ func TestRun_TrackWorkersInvokesHelper(t *testing.T) {
 	results := filepath.Join(dir, "r.tsv")
 	writeFile(t, cmds, "alpha\techo ok\n")
 
-	// fake cycle-state helper that records each invocation
 	logFile := filepath.Join(dir, "helper.log")
 	helper := filepath.Join(dir, "cycle-state.sh")
 	writeFile(t, helper, `#!/usr/bin/env bash
@@ -304,7 +288,6 @@ exit 0
 		t.Fatalf("rc=%d", rc)
 	}
 	body, _ := os.ReadFile(logFile)
-	// Should have set-worker-status running + done
 	if !strings.Contains(string(body), "running") {
 		t.Errorf("helper not called with running: %s", body)
 	}
@@ -315,8 +298,6 @@ exit 0
 
 func TestRun_CachePrefixFileExported(t *testing.T) {
 	t.Parallel()
-	// Verify EVOLVE_FANOUT_CACHE_PREFIX_FILE is set by checking it from inside the worker.
-	// Each test runs in its own process, so the env is contained.
 	dir := t.TempDir()
 	prefix := filepath.Join(dir, "prefix.txt")
 	writeFile(t, prefix, "static cache bytes")
@@ -340,5 +321,4 @@ func TestRun_CachePrefixFileExported(t *testing.T) {
 	}
 }
 
-// safeStr is a sentinel for the parallel race detector path.
 var _ = sync.Mutex{}

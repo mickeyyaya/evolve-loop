@@ -89,7 +89,6 @@ func TestRun_FullPipelineWithStubs(t *testing.T) {
 		t.Error("VerifyFn not called")
 	}
 
-	// expect 5 artifacts in workspace
 	for _, name := range []string{
 		"intent.md", "scout-report.md", "build-report.md",
 		"audit-report.md", "retrospective-report.md", "simulator-report.md",
@@ -98,14 +97,12 @@ func TestRun_FullPipelineWithStubs(t *testing.T) {
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("artifact missing: %s", name)
 		}
-		// must contain challenge-token
 		body, _ := os.ReadFile(p)
 		if !strings.Contains(string(body), "challenge-token:") {
 			t.Errorf("%s missing challenge-token", name)
 		}
 	}
 
-	// expect 5 ledger entries (intent, scout, builder, auditor, retrospective)
 	ledger := filepath.Join(root, ".evolve", "ledger.jsonl")
 	data, err := os.ReadFile(ledger)
 	if err != nil {
@@ -116,7 +113,6 @@ func TestRun_FullPipelineWithStubs(t *testing.T) {
 		t.Errorf("ledger lines: got %d, want 5", len(lines))
 	}
 
-	// chain integrity: each line's prev_hash must equal sha256(prev-line)
 	for i := 1; i < len(lines); i++ {
 		var e map[string]any
 		if err := json.Unmarshal([]byte(lines[i]), &e); err != nil {
@@ -129,7 +125,6 @@ func TestRun_FullPipelineWithStubs(t *testing.T) {
 		}
 	}
 
-	// first entry's prev_hash must be the zero seed
 	var first map[string]any
 	_ = json.Unmarshal([]byte(lines[0]), &first)
 	if first["prev_hash"] != zeroSeed {
@@ -254,7 +249,6 @@ func TestJSONCompact_StableKeyOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	// keys should appear in canonical order; ts comes before cycle, etc.
 	tsIdx := strings.Index(got, `"ts"`)
 	cycleIdx := strings.Index(got, `"cycle"`)
 	roleIdx := strings.Index(got, `"role"`)
@@ -268,9 +262,6 @@ func TestJSONCompact_StableKeyOrder(t *testing.T) {
 
 func TestRun_DefaultFnsAreConstructible(t *testing.T) {
 	t.Parallel()
-	// Drive Run with all defaults — advance/ship/verify will shell out to
-	// nonexistent scripts and produce errors, but that's an expected and
-	// tolerated path (verify failure logs WARN; advance failure aborts).
 	root := t.TempDir()
 	var stderr bytes.Buffer
 	rc := Run(Inputs{
@@ -279,7 +270,6 @@ func TestRun_DefaultFnsAreConstructible(t *testing.T) {
 		ProjectRoot: root,
 		PluginRoot:  root,
 	}, &stderr)
-	// advance shells out to a nonexistent bash script → error → gate refuse
 	if rc != ExitGateRefuse {
 		t.Errorf("default shell-outs against nonexistent scripts should refuse gate, got rc=%d", rc)
 	}
@@ -288,7 +278,6 @@ func TestRun_DefaultFnsAreConstructible(t *testing.T) {
 func TestRun_WorkspaceMkdirError(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// Put a regular file where the workspace should be — mkdir will fail.
 	conflict := filepath.Join(root, "conflict")
 	if err := os.WriteFile(conflict, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -296,7 +285,7 @@ func TestRun_WorkspaceMkdirError(t *testing.T) {
 	var stderr bytes.Buffer
 	rc := Run(Inputs{
 		Cycle:        1,
-		Workspace:    conflict, // not a directory
+		Workspace:    conflict,
 		ProjectRoot:  root,
 		AdvanceFn:    func(string, string) error { return nil },
 		ShipDryRunFn: func(string) (int, error) { return 0, nil },
@@ -310,7 +299,6 @@ func TestRun_WorkspaceMkdirError(t *testing.T) {
 func TestRun_AdvanceShipPhaseRefuse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// AdvanceFn returns nil for everything EXCEPT ship → ship-phase advance refused
 	advanceCount := 0
 	rc := Run(Inputs{
 		Cycle:       3,

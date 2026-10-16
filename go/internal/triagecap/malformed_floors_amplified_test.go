@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// writeEmptyCompanion writes a 0-byte companion: present, so malformed rather than absent.
 func writeEmptyCompanion(t *testing.T, dir string) string {
 	t.Helper()
 	path := filepath.Join(dir, triageDecisionFile)
@@ -16,7 +15,6 @@ func writeEmptyCompanion(t *testing.T, dir string) string {
 	return path
 }
 
-// writeTruncatedCompanion cuts the JSON off mid-value, unlike writeMalformedCompanion's garbage tokens.
 func writeTruncatedCompanion(t *testing.T, dir string) string {
 	t.Helper()
 	path := filepath.Join(dir, triageDecisionFile)

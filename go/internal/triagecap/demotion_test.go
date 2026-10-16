@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Verbatim summaries from state.json failedApproaches.
 const (
 	summary301 = `cycle 301 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 6 committed coverage floors exceed the capacity cap 5 (= ceil(1.25×K), K=4 observed floors/turn over 1 shipped cycles). Re-emit the triage report keeping at most 5 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
 	summary302 = `cycle 302 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 7 committed coverage floors exceed the capacity cap 5 (= ceil(1.25×K), K=4 observed floors/turn over 1 shipped cycles). Re-emit the triage report keeping at most 5 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
@@ -100,7 +99,6 @@ func TestShouldDemote(t *testing.T) {
 	})
 }
 
-// overpackedArtifact counts three floors, one distinct package per bullet.
 const overpackedArtifact = `## top_n (commit to THIS cycle)
 - coverage-a: push swarmrunner coverage to ≥98%
 - coverage-b: push bridge coverage to ≥98%
@@ -109,7 +107,6 @@ const overpackedArtifact = `## top_n (commit to THIS cycle)
 ## deferred (carry to NEXT cycle's carryoverTodos)
 `
 
-// newDemotionFixture enforces cap 2 (a K=1 window) against the 3-floor artifact; an empty cycleID omits run.json.
 func newDemotionFixture(t *testing.T, cycleID string, fails []FailEntry) (*CapReviewer, core.ReviewInput, string) {
 	t.Helper()
 	root := t.TempDir()

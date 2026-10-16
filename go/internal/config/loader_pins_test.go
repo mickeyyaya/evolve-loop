@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// kitchenSinkEnv makes every env arm that can warn do so, keeps the registry on with a
-// non-"0" EVOLVE_USE_PHASE_REGISTRY, and weakens the spine so validateSpine fires.
 func kitchenSinkEnv() map[string]string {
 	return map[string]string{
 		"EVOLVE_SANDBOX":                 "bogus",
@@ -156,8 +154,6 @@ func TestLoad_MalformedRegistryFallsBackToTheCompiledBaseline(t *testing.T) {
 	}
 }
 
-// Despite its name, this loads the frozen copy in testdata: cycles edit the live registry,
-// which TestLoad_RealRegistry guards instead.
 func TestLoad_RealRegistry_MatchesTheGolden(t *testing.T) {
 	cfg, ws := Load(filepath.Join("testdata", "frozen_registry.json"), map[string]string{})
 	if len(ws) != 0 {
@@ -180,7 +176,6 @@ func TestLoad_BuiltinDefaults_MatchTheGoldenThroughTheDefaultReader(t *testing.T
 
 func TestLoad_KitchenSink_WarningsMatchTheGolden(t *testing.T) {
 	_, ws := Load(kitchenSinkRegistry(), kitchenSinkEnv())
-	// The golden projects {Code, Message}: Fields would otherwise marshal into it.
 	type cm struct{ Code, Message string }
 	got := make([]cm, 0, len(ws))
 	for _, w := range ws {
@@ -197,7 +192,7 @@ func TestLoad_KitchenSink_WarningsMatchTheGolden(t *testing.T) {
 func TestLoadDomain_ReadErrorOtherThanAbsenceIsReturned(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, ".evolve", "domain.json")
-	if err := os.MkdirAll(path, 0o755); err != nil { // a directory at the path: a read fault, not absence
+	if err := os.MkdirAll(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	_, ok, err := LoadDomain(root)

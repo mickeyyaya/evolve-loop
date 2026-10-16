@@ -9,7 +9,6 @@ import (
 
 const userSpecFile = "phase.json"
 
-// DiscoverUserSpecs reads <phasesDir>/<name>/phase.json specs sorted by directory; a missing dir or bad file is skipped, never fatal.
 func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) {
 	entries, err := os.ReadDir(phasesDir)
 	if err != nil {
@@ -27,7 +26,7 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 		path := filepath.Join(phasesDir, dir, userSpecFile)
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			continue // a dir without phase.json is not a phase
+			continue
 		}
 		var s PhaseSpec
 		if err := json.Unmarshal(raw, &s); err != nil {
@@ -35,7 +34,6 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 			continue
 		}
 		if s.Name == "" {
-			// The directory name is untrusted input, so it must pass the kebab-case floor before naming a phase.
 			if !nameRE.MatchString(dir) {
 				warnings = append(warnings, "skipped "+path+": directory name "+dir+" is not valid kebab-case and phase.json has no name")
 				continue
@@ -43,9 +41,6 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 			s.Name = dir
 		}
 		ApplyArchetypeDefaults(&s)
-		// Transition-activating fields are built-in only, so an overlay can never inject a branch
-		// into the kernel; this is the one ingestion point where provenance is known.
-		// See ADR-0058.
 		if s.OnPass != "" || s.OnFail != "" || s.BranchingStrategy != "" {
 			warnings = append(warnings, "user phase "+s.Name+" in "+path+" declares transition-activating fields (on_pass/on_fail/branching_strategy) — stripped; these are restricted to built-in phases (ADR-0058)")
 			s.OnPass, s.OnFail, s.BranchingStrategy = "", "", ""
@@ -55,7 +50,6 @@ func DiscoverUserSpecs(phasesDir string) (specs []PhaseSpec, warnings []string) 
 	return specs, warnings
 }
 
-// DiscoverUserSpecsFromRoots discovers specs across roots; the left-most root wins a name clash, and sources maps name to root.
 func DiscoverUserSpecsFromRoots(roots []string) (specs []PhaseSpec, sources map[string]string, warnings []string) {
 	sources = make(map[string]string)
 	for _, root := range roots {
@@ -73,7 +67,6 @@ func DiscoverUserSpecsFromRoots(roots []string) (specs []PhaseSpec, sources map[
 	return specs, sources, warnings
 }
 
-// Merge returns a new Catalog with user specs appended over the built-ins, which win every clash except an optional built-in's overlay.
 func (c Catalog) Merge(user []PhaseSpec) (Catalog, []string) {
 	merged := Catalog{
 		order:     append([]string(nil), c.order...),
@@ -90,8 +83,6 @@ func (c Catalog) Merge(user []PhaseSpec) (Catalog, []string) {
 			continue
 		}
 		if _, isBuiltin := c.byName[s.Name]; isBuiltin {
-			// An optional built-in's overlay (memo) is adopted in place. The built-in's own Optional
-			// flag, not the overlay's, keeps an operator from hijacking a mandatory spine phase.
 			if isOptionalBuiltinName(s.Name, c) {
 				merged.byName[s.Name] = s
 				merged.userNames[s.Name] = true
@@ -111,5 +102,4 @@ func (c Catalog) Merge(user []PhaseSpec) (Catalog, []string) {
 	return merged, warnings
 }
 
-// IsUser reports whether name was contributed by an operator overlay.
 func (c Catalog) IsUser(name string) bool { return c.userNames[name] }

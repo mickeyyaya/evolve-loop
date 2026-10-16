@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// fakeHooks is embedded by pointer so the test reads back what ComposePrompt recorded; a value embed records into a copy.
 type inlineHooks struct {
 	*fakeHooks
 	body  string
@@ -18,7 +17,6 @@ type inlineHooks struct {
 
 func (h inlineHooks) InlinePromptBody() (string, bool) { return h.body, h.hasIt }
 
-// emptyPromptsFS fails every agent load, so only an inline body can compose.
 func emptyPromptsFS() *prompts.Loader {
 	return prompts.NewFromFS(fstest.MapFS{})
 }

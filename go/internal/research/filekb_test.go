@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// writeLesson writes a minimal valid lesson YAML file into dir.
 func writeLesson(t *testing.T, dir, name, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
@@ -82,8 +81,6 @@ func TestFileKBLookup(t *testing.T) {
 
 func TestFileKBHigherConfidenceWinsTie(t *testing.T) {
 	dir := t.TempDir()
-	// Two lessons with identical textual overlap on the keyword "predicate"
-	// but different confidence; the higher-confidence one must rank first.
 	writeLesson(t, dir, "a.yaml", `- id: inst-A
   pattern: p
   description: "predicate predicate"
@@ -109,7 +106,7 @@ func TestFileKBHigherConfidenceWinsTie(t *testing.T) {
 func TestFileKBDedupesByIDAcrossRoots(t *testing.T) {
 	r1, r2 := t.TempDir(), t.TempDir()
 	writeLesson(t, r1, "a.yaml", auditEgpsLesson)
-	writeLesson(t, r2, "a-copy.yaml", auditEgpsLesson) // same id inst-L001
+	writeLesson(t, r2, "a-copy.yaml", auditEgpsLesson)
 	kb := NewFileKB([]string{r1, r2})
 	got, err := kb.Lookup(context.Background(), Query{Source: "audit"})
 	if err != nil {

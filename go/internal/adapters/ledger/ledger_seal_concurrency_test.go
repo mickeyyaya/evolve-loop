@@ -16,7 +16,6 @@ func TestSeal_ConcurrentWithCrossProcessAppend_ChainStaysVerifiable(t *testing.T
 	l, dir := seedLedger(t, seedN)
 	ctx := context.Background()
 
-	// A separate process: l.mu does not cross processes, so ledger.lock alone serializes it with Seal.
 	cmd := exec.Command(os.Args[0], "-test.run=^TestHelperLedgerAppender$", "-test.v=false")
 	cmd.Env = append(os.Environ(), stressDirEnv+"="+dir)
 	cmd.Stderr = os.Stderr
@@ -26,7 +25,6 @@ func TestSeal_ConcurrentWithCrossProcessAppend_ChainStaysVerifiable(t *testing.T
 	childDone := make(chan error, 1)
 	go func() { childDone <- cmd.Wait() }()
 
-	// Seal until the child exits so each seal's lock handoff keeps overlapping its appends.
 sealLoop:
 	for {
 		select {
@@ -46,7 +44,6 @@ sealLoop:
 		t.Fatalf("VerifyDeep failed after concurrent seal+append: %v", err)
 	}
 
-	// Iter reads only the live tail; the appends under test are mostly sealed.
 	lines, err := l.gatherAllLines()
 	if err != nil {
 		t.Fatalf("gatherAllLines: %v", err)
@@ -97,7 +94,6 @@ func TestAnchor_ConcurrentWithSeal_NoCorruptAnchor(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 60; i++ {
-			// A miss while the line is mid-relocation is fine; only the recorded anchor is asserted.
 			_ = l.Anchor(ctx, seedN/2, "concurrent-seal-stress")
 		}
 	}()
@@ -117,7 +113,7 @@ func TestAnchor_ConcurrentWithSeal_NoCorruptAnchor(t *testing.T) {
 	}
 	anchorSHA := l.loadAnchorSHA()
 	if anchorSHA == "" {
-		return // every attempt missed mid-relocation
+		return
 	}
 	lines, err := l.gatherAllLines()
 	if err != nil {

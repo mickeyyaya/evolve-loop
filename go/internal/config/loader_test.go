@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// observed builds a Loader reporting into a recording Center.
 func observed(t *testing.T, opts ...Option) (*Loader, *[]signalcenter.Event) {
 	t.Helper()
 	c := signalcenter.New()

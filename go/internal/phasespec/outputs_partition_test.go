@@ -12,7 +12,7 @@ func TestValidateOutputsPartition(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		s    PhaseSpec
-		want string // "" = valid; else a substring of one violation
+		want string
 	}{
 		{"primary only", spec([]string{"a/r.md"}, nil, nil), ""},
 		{"no outputs", spec(nil, nil, nil), ""},

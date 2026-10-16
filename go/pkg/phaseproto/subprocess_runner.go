@@ -13,25 +13,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Stable error codes used across the wire. Subprocess agents written in
-// other languages MUST agree on these strings; do not rename without a
-// version bump.
 const (
 	CodeHandlerError = "HANDLER_ERROR"
 	CodeChildCrashed = "CHILD_CRASHED"
 	CodeDecodeFailed = "DECODE_FAILED"
 )
 
-// correlationIDFn is a testable seam over CorrelationID minting.
 var correlationIDFn = defaultCorrelationID
 
-// SubprocessRunner satisfies core.PhaseRunner by launching a child
-// process per call, writing one request envelope to its stdin, and
-// reading one response envelope from its stdout.
-//
-// One process per Run keeps the protocol synchronous and avoids
-// cross-cycle state leakage in the child — the orchestrator owns
-// lifecycle, the child owns just this one phase invocation.
 type SubprocessRunner struct {
 	name string
 	bin  string
@@ -39,32 +28,18 @@ type SubprocessRunner struct {
 	env  []string
 }
 
-// NewSubprocessRunner builds a runner that exec.LookPath-style invokes
-// `bin args...` with the given extra env. Inherits the parent process
-// PATH so callers can pass a name plus relative args.
 func NewSubprocessRunner(name, bin string, args, extraEnv []string) *SubprocessRunner {
 	return &SubprocessRunner{name: name, bin: bin, args: args, env: extraEnv}
 }
 
-// Name returns the phase identity. Matches core.PhaseRunner.Name().
 func (r *SubprocessRunner) Name() string { return r.name }
 
-// buildCmd materialises an *exec.Cmd. Broken out for testability.
 func (r *SubprocessRunner) buildCmd(ctx context.Context) *exec.Cmd {
 	cmd := sysexec.Command(ctx, r.bin, r.args...)
 	cmd.Env = append(os.Environ(), r.env...)
 	return cmd
 }
 
-// Run launches the child, hands it a request envelope on stdin, and
-// reads one response envelope from stdout.
-//
-// Behaviour summary:
-//   - Child returns response → returned to caller.
-//   - Child writes error envelope → returned as *WireError.
-//   - Child writes garbage / no envelope → CodeDecodeFailed.
-//   - Child crashes (non-zero exit) → CodeChildCrashed wrapping exit error.
-//   - Context cancelled → child is signalled by exec.CommandContext.
 func (r *SubprocessRunner) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 	cmd := r.buildCmd(ctx)
 
@@ -92,7 +67,6 @@ func (r *SubprocessRunner) Run(ctx context.Context, req core.PhaseRequest) (core
 		}
 	}
 
-	// Parse one envelope from stdout (we only ever speak request/response).
 	line, err := readOneEnvelopeLine(&stdout)
 	if err != nil {
 		return core.PhaseResponse{}, &WireError{
@@ -122,10 +96,6 @@ func (r *SubprocessRunner) Run(ctx context.Context, req core.PhaseRequest) (core
 	return resp, nil
 }
 
-// readOneEnvelopeLine pulls one logical line (newline-terminated or EOF)
-// from r. Returns the line bytes WITHOUT the trailing newline. An EOF
-// reached after some bytes is not an error — io.Reader contract permits
-// returning data + io.EOF together.
 func readOneEnvelopeLine(r *bytes.Buffer) ([]byte, error) {
 	br := bufio.NewReader(r)
 	line, err := br.ReadBytes('\n')
@@ -139,9 +109,6 @@ func readOneEnvelopeLine(r *bytes.Buffer) ([]byte, error) {
 	return line, nil
 }
 
-// defaultCorrelationID returns a small unique ID. Doesn't need to be
-// cryptographic — orchestrator already tags ledger entries. PID +
-// nanos is plenty for matching request/response within one Run.
 func defaultCorrelationID() string {
 	return fmt.Sprintf("pp-%d", os.Getpid())
 }

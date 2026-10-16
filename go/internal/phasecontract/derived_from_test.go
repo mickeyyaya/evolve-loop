@@ -6,8 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// A derivation is declared in the registry alone; it reaches the built-in contract by overlay and a user
-// phase's contract by projection.
 func TestDerivedFrom_ReachesTheContractFromTheRegistry(t *testing.T) {
 	cat, warnings := (phasespec.Catalog{}).Merge([]phasespec.PhaseSpec{
 		{Name: "triage", Role: "triage", Outputs: phasespec.IO{

@@ -16,7 +16,6 @@ func TestPromoteRule_ConcurrentSameID_NoLostWrite(t *testing.T) {
 
 	for i := 0; i < iters; i++ {
 		dir := t.TempDir()
-		// The start barrier maximizes overlap, so a shared temp file would collide within the iterations.
 		start := make(chan struct{})
 		errs := make([]error, writers)
 		var wg sync.WaitGroup

@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// DefaultPortBase is writer worker 0's port when Deps.PortBase is unset, chosen in the dynamic/private range.
 const DefaultPortBase = 51000
 
 func portBaseOrDefault(base int) int {
@@ -21,18 +20,15 @@ func portBaseOrDefault(base int) int {
 	return base
 }
 
-// DispatchRequest carries the cycle-scoped context a plan runs in, which the plan itself does not hold.
 type DispatchRequest struct {
 	ProjectRoot string
 	Cycle       int
-	Workspace   string // each worker gets a <workspace>/<agent> subdirectory
+	Workspace   string
 }
 
-// Dispatch provisions, launches and reaps a validated plan's workers and returns every result; it neither merges nor synthesizes.
 func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Deps) (SwarmResult, error) {
 	res := SwarmResult{Mode: plan.Mode, IntegrationBranch: plan.IntegrationBranch}
 
-	// Provisioning is serialized: worktree creation writes shared .git/worktrees metadata.
 	worktrees := make(map[string]string, len(plan.Workers))
 	if plan.Mode == ModeWriter && deps.Provisioner != nil {
 		integWT, err := deps.Provisioner.CreateIntegration(ctx, req.ProjectRoot, req.Cycle)
@@ -43,7 +39,6 @@ func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Dep
 		for _, w := range plan.Workers {
 			wt, err := deps.Provisioner.CreateWorker(ctx, req.ProjectRoot, req.Cycle, w.WorkerID, plan.IntegrationBranch)
 			if err != nil {
-				// The launch section never starts, so the post-wait Reap cannot release these.
 				for _, done := range worktrees {
 					_ = deps.Provisioner.Cleanup(ctx, req.ProjectRoot, done)
 				}
@@ -68,7 +63,6 @@ func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Dep
 
 	for i, w := range plan.Workers {
 		wg.Add(1)
-		// Writers get base+i so concurrent dev servers never collide; readers run no server.
 		port := 0
 		if plan.Mode == ModeWriter {
 			port = portBaseOrDefault(deps.PortBase) + i
@@ -83,7 +77,7 @@ func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Dep
 				return
 			}
 			wr := launchWorker(rootCtx, plan, req, w, worktrees[w.WorkerID], port, deps)
-			results[i] = wr // each index has exactly one writing goroutine
+			results[i] = wr
 			if wr.Err != nil {
 				fatalOnce.Do(func() { fatalErr = wr.Err; cancel() })
 			}
@@ -91,7 +85,6 @@ func Dispatch(ctx context.Context, plan SwarmPlan, req DispatchRequest, deps Dep
 	}
 	wg.Wait()
 
-	// No session may outlive Dispatch; context.Background keeps teardown running after cancel-on-fatal.
 	if deps.Registry != nil && deps.Killer != nil {
 		_ = Reap(context.Background(), deps.Registry, deps.Killer)
 	}
@@ -109,20 +102,17 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 	agent := w.agentName(plan)
 	wr := WorkerResult{WorkerID: w.WorkerID, Agent: agent, Branch: w.Branch, Worktree: worktree}
 
-	// Named from cycle and worker_id, not the task slug, so it stays short and never truncates into a collision.
 	var sessionName, tmuxSession string
 	if bridge.IsTmuxDriver(w.CLI) {
 		sessionName = fmt.Sprintf("swarm-c%d-%s", req.Cycle, w.WorkerID)
 		tmuxSession = bridge.NamedSessionName(sessionName)
 	}
 
-	// Register before Launch so a spawn cancelled mid-flight is still reapable by name.
 	if deps.Registry != nil {
 		if err := deps.Registry.Register(SessionHandle{
 			WorkerID: w.WorkerID, Agent: agent, TmuxSession: tmuxSession,
 			Worktree: worktree, Branch: w.Branch,
 		}); err != nil {
-			// A session the manifest never recorded is an invisible orphan, so abort before any spawn.
 			wr.Err = fmt.Errorf("pre-register session %s: %w", w.WorkerID, err)
 			return wr
 		}
@@ -151,7 +141,7 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 	})
 	if err != nil {
 		wr.Err = err
-		return wr // already registered, so the post-wait Reap tears it down
+		return wr
 	}
 	wr.ExitCode = lr.ExitCode
 	wr.CostUSD = lr.CostUSD
@@ -159,7 +149,6 @@ func launchWorker(ctx context.Context, plan SwarmPlan, req DispatchRequest, w Wo
 	return wr
 }
 
-// agentName is the collision-safe tmux/inbox key "<task-or-mode>-<workerID>".
 func (w WorkerSpec) agentName(plan SwarmPlan) string {
 	prefix := string(plan.Mode)
 	if plan.TaskID != "" {

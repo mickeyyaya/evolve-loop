@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 )
 
-// logWritingBridge writes the artifact and the raw phase logs, as a tmux driver does, so the producer classifies real input.
 type logWritingBridge struct {
 	artifact   string
 	stderrLine string
@@ -91,7 +90,6 @@ func TestC672_002_RunnerThreadsComposedPromptToEventsProducer(t *testing.T) {
 				Hooks:   hooks,
 				Bridge:  &logWritingBridge{artifact: "# build artifact\n## Files Modified\n- a.go\n", stderrLine: tc.stderrLine},
 				Prompts: fakePromptsFS("evolve-builder", "agent body"),
-				// EventsProducer is left unset on purpose: the test pins the real default producer.
 			})
 
 			if _, err := r.Run(context.Background(), core.PhaseRequest{

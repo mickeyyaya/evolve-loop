@@ -6,10 +6,6 @@ import (
 	"strings"
 )
 
-// NewJSONLogger returns a slog.Logger that writes JSON-encoded records to w.
-// level is a case-insensitive string ("debug", "info", "warn", "error").
-// Unknown values fall back to info. The returned logger has no source
-// (caller info) attached — keeps the line compact for log aggregation.
 func NewJSONLogger(w io.Writer, level string) *slog.Logger {
 	h := slog.NewJSONHandler(w, &slog.HandlerOptions{
 		Level:     parseLevel(level),

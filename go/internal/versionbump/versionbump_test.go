@@ -62,8 +62,6 @@ func TestDefaultPaths(t *testing.T) {
 	if p.SkillMD != "/repo/skills/loop/SKILL.md" {
 		t.Errorf("SkillMD=%q", p.SkillMD)
 	}
-	// Files() is the SSOT release staging consumes — it MUST include the Codex
-	// mirror, in canonical order, so the release commit can't omit it.
 	want := []string{
 		"/repo/.claude-plugin/plugin.json",
 		"/repo/.claude-plugin/marketplace.json",
@@ -80,7 +78,6 @@ func TestDefaultPaths(t *testing.T) {
 			t.Errorf("Files()[%d] = %q, want %q", i, got[i], want[i])
 		}
 	}
-	// Empty fields are skipped (partial Paths in tests).
 	if g := (Paths{PluginJSON: "/a", CodexPluginJSON: "/c"}).Files(); len(g) != 2 || g[0] != "/a" || g[1] != "/c" {
 		t.Errorf("sparse Files() = %v, want [/a /c]", g)
 	}
@@ -179,7 +176,6 @@ func TestBumpJSONVersion_MissingFile(t *testing.T) {
 }
 
 func TestBumpJSONVersion_MarketplaceShape(t *testing.T) {
-	// marketplace.json has plugins[].version + a top-level version stub.
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "marketplace.json")
 	writeFile(t, p, `{"plugins":[{"name":"evo","version":"11.6.6"},{"name":"other","version":"11.6.6"}]}`)
@@ -191,7 +187,6 @@ func TestBumpJSONVersion_MarketplaceShape(t *testing.T) {
 		t.Errorf("expected change")
 	}
 	body, _ := os.ReadFile(p)
-	// Both plugin versions bumped.
 	if strings.Count(string(body), `"version": "11.7.0"`) != 2 {
 		t.Errorf("expected 2 occurrences of new version, got: %s", body)
 	}
@@ -435,7 +430,6 @@ func TestRun_FullBumpPipeline(t *testing.T) {
 	if len(res.Modified) != 5 {
 		t.Errorf("expected 5 modified, got %d: %v", len(res.Modified), res.Modified)
 	}
-	// All files reflect 11.7.0 now.
 	body, _ := os.ReadFile(paths.PluginJSON)
 	if !strings.Contains(string(body), `"version": "11.7.0"`) {
 		t.Errorf("plugin.json not bumped")
@@ -457,9 +451,6 @@ func TestRun_FullBumpPipeline(t *testing.T) {
 	}
 }
 
-// TestRun_BumpsCodexPluginJSON pins the D3 fix: the generated Codex mirror is
-// version-bumped in lockstep with the Claude manifest, so a release never leaves
-// the Codex install surface stale.
 func TestRun_BumpsCodexPluginJSON(t *testing.T) {
 	tmp := t.TempDir()
 	paths := Paths{
@@ -482,7 +473,6 @@ func TestRun_BumpsCodexPluginJSON(t *testing.T) {
 	if !strings.Contains(string(body), `"version": "21.4.2"`) {
 		t.Errorf(".codex-plugin/plugin.json not bumped: %s", body)
 	}
-	// surgical replace preserves the rest (drift gate stays green post-release)
 	if !strings.Contains(string(body), `"skills":"./skills/"`) {
 		t.Errorf("surgical bump altered non-version content: %s", body)
 	}
@@ -497,15 +487,12 @@ func TestRun_BumpsCodexPluginJSON(t *testing.T) {
 	}
 }
 
-// TestRun_CodexPluginJSON_ToleratedAbsent — a checkout without the generated
-// Codex mirror must not fail the bump (the file is generated, not hand-tracked
-// in every working tree).
 func TestRun_CodexPluginJSON_ToleratedAbsent(t *testing.T) {
 	tmp := t.TempDir()
 	paths := Paths{
 		PluginJSON:      filepath.Join(tmp, "plugin.json"),
 		MarketplaceJSON: filepath.Join(tmp, "marketplace.json"),
-		CodexPluginJSON: filepath.Join(tmp, ".codex-plugin", "plugin.json"), // never created
+		CodexPluginJSON: filepath.Join(tmp, ".codex-plugin", "plugin.json"),
 		SkillMD:         filepath.Join(tmp, "SKILL.md"),
 		ReadmeMD:        filepath.Join(tmp, "README.md"),
 	}
@@ -591,9 +578,6 @@ func TestResultJSON_EmptyModified(t *testing.T) {
 	}
 }
 
-// roDir creates a directory containing `file` with given content, then makes
-// the directory read-only so that atomicwrite.Bytes's tmp-write fails. The cleanup
-// restores write permission so t.TempDir teardown can remove it.
 func roDir(t *testing.T, content string) string {
 	t.Helper()
 	tmp := t.TempDir()
@@ -612,8 +596,6 @@ func roDir(t *testing.T, content string) string {
 	return p
 }
 
-// TestBumpJSONVersion_InvalidJSON pins that a file whose version regex matches
-// but whose body is not valid JSON surfaces a "parse" error rather than writing.
 func TestBumpJSONVersion_InvalidJSON(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "plugin.json")
@@ -624,8 +606,6 @@ func TestBumpJSONVersion_InvalidJSON(t *testing.T) {
 	}
 }
 
-// TestBumpJSONVersion_AtomicWriteError pins that a write failure (read-only
-// parent dir) propagates an error and does not silently report success.
 func TestBumpJSONVersion_AtomicWriteError(t *testing.T) {
 	p := roDir(t, `{"version":"11.6.6"}`)
 	changed, err := BumpJSONVersion(p, "11.7.0", false)
@@ -637,8 +617,6 @@ func TestBumpJSONVersion_AtomicWriteError(t *testing.T) {
 	}
 }
 
-// TestBumpSkillHeading_DryRunReportsButDoesNotWrite pins dry-run semantics:
-// reports would-change without mutating the file.
 func TestBumpSkillHeading_DryRunReportsButDoesNotWrite(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "SKILL.md")
@@ -656,8 +634,6 @@ func TestBumpSkillHeading_DryRunReportsButDoesNotWrite(t *testing.T) {
 	}
 }
 
-// TestBumpSkillHeading_ReadErrorNonNotExist pins that a non-IsNotExist read
-// error (a directory at the path) surfaces a wrapped read error.
 func TestBumpSkillHeading_ReadErrorNonNotExist(t *testing.T) {
 	dir := t.TempDir()
 	_, err := BumpSkillHeading(dir, "11.7", false)
@@ -666,7 +642,6 @@ func TestBumpSkillHeading_ReadErrorNonNotExist(t *testing.T) {
 	}
 }
 
-// TestBumpSkillHeading_AtomicWriteError pins write-failure propagation.
 func TestBumpSkillHeading_AtomicWriteError(t *testing.T) {
 	p := roDir(t, "# Evolve Loop v11.6.6\nbody")
 	changed, err := BumpSkillHeading(p, "11.7", false)
@@ -678,7 +653,6 @@ func TestBumpSkillHeading_AtomicWriteError(t *testing.T) {
 	}
 }
 
-// TestCurrentReadmeCurrent_MissingFile pins the read-error return.
 func TestCurrentReadmeCurrent_MissingFile(t *testing.T) {
 	_, err := CurrentReadmeCurrent(filepath.Join(t.TempDir(), "missing"))
 	if err == nil {
@@ -686,7 +660,6 @@ func TestCurrentReadmeCurrent_MissingFile(t *testing.T) {
 	}
 }
 
-// TestCurrentReadmeCurrent_NoMatch pins the empty-result (no version) path.
 func TestCurrentReadmeCurrent_NoMatch(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "README.md")
@@ -697,7 +670,6 @@ func TestCurrentReadmeCurrent_NoMatch(t *testing.T) {
 	}
 }
 
-// TestBumpReadmeCurrent_DryRunReportsButDoesNotWrite pins dry-run semantics.
 func TestBumpReadmeCurrent_DryRunReportsButDoesNotWrite(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "README.md")
@@ -715,7 +687,6 @@ func TestBumpReadmeCurrent_DryRunReportsButDoesNotWrite(t *testing.T) {
 	}
 }
 
-// TestBumpReadmeCurrent_ReadErrorNonNotExist pins a directory-path read error.
 func TestBumpReadmeCurrent_ReadErrorNonNotExist(t *testing.T) {
 	dir := t.TempDir()
 	_, err := BumpReadmeCurrent(dir, "11.7", false)
@@ -724,7 +695,6 @@ func TestBumpReadmeCurrent_ReadErrorNonNotExist(t *testing.T) {
 	}
 }
 
-// TestBumpReadmeHistory_ReadErrorNonNotExist pins a directory-path read error.
 func TestBumpReadmeHistory_ReadErrorNonNotExist(t *testing.T) {
 	dir := t.TempDir()
 	_, err := BumpReadmeHistory(dir, "11.7.0", time.Unix(0, 0).UTC(), false)
@@ -733,17 +703,11 @@ func TestBumpReadmeHistory_ReadErrorNonNotExist(t *testing.T) {
 	}
 }
 
-// TestRun_PropagatesBumpErrors pins that a failure in any single bump phase
-// aborts Run and returns that error, rather than silently continuing. One
-// subtest per phase positions the failure so the earlier phases are clean
-// no-ops (already at target) and the targeted phase errors.
 func TestRun_PropagatesBumpErrors(t *testing.T) {
 	const target = "11.7.0"
 	const mm = "11.7"
 	now := time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC)
 
-	// cleanJSON / cleanSkill / cleanReadme write files already at target so
-	// their bump phases are no-op-clean (changed=false, no error).
 	cleanJSON := func(t *testing.T, dir, name string) string {
 		t.Helper()
 		p := filepath.Join(dir, name)
@@ -790,7 +754,7 @@ func TestRun_PropagatesBumpErrors(t *testing.T) {
 		paths := Paths{
 			PluginJSON:      cleanJSON(t, tmp, "plugin.json"),
 			MarketplaceJSON: cleanJSON(t, tmp, "marketplace.json"),
-			SkillMD:         skillDir, // directory → non-IsNotExist read error
+			SkillMD:         skillDir,
 			ReadmeMD:        filepath.Join(tmp, "README.md"),
 		}
 		_, err := Run(paths, target, false, now)
@@ -808,8 +772,8 @@ func TestRun_PropagatesBumpErrors(t *testing.T) {
 		paths := Paths{
 			PluginJSON:      cleanJSON(t, tmp, "plugin.json"),
 			MarketplaceJSON: cleanJSON(t, tmp, "marketplace.json"),
-			SkillMD:         filepath.Join(tmp, "missing-skill.md"), // IsNotExist → no-op
-			ReadmeMD:        readmeDir,                              // directory → read error
+			SkillMD:         filepath.Join(tmp, "missing-skill.md"),
+			ReadmeMD:        readmeDir,
 		}
 		_, err := Run(paths, target, false, now)
 		if err == nil || !strings.Contains(err.Error(), "read") {
@@ -818,10 +782,6 @@ func TestRun_PropagatesBumpErrors(t *testing.T) {
 	})
 
 	t.Run("readme history write error", func(t *testing.T) {
-		// Position failure at the history phase: plugin/marketplace clean,
-		// skill missing, README's "Current" already at target so the Current
-		// phase is a no-op, but the README has an unbumped history row AND
-		// lives in a read-only dir so atomicwrite.Bytes fails in the history phase.
 		tmp := t.TempDir()
 		dir := filepath.Join(tmp, "ro")
 		if err := os.Mkdir(dir, 0o755); err != nil {
@@ -835,7 +795,6 @@ func TestRun_PropagatesBumpErrors(t *testing.T) {
 		}
 		writeFile(t, paths.PluginJSON, `{"version":"`+target+`"}`)
 		writeFile(t, paths.MarketplaceJSON, `{"version":"`+target+`"}`)
-		// "Current" already at target (no-op), history row unbumped (needs write).
 		writeFile(t, paths.ReadmeMD, "Current (v"+mm+")\n| v11.6 | May 23 | shipped |\n")
 		if err := os.Chmod(dir, 0o555); err != nil {
 			t.Fatalf("chmod: %v", err)

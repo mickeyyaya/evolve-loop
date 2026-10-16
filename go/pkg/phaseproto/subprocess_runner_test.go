@@ -15,13 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// SubprocessRunner must satisfy core.PhaseRunner — compile-time assert.
 var _ core.PhaseRunner = (*SubprocessRunner)(nil)
 
-// TestHelperProcess is the canonical Go re-exec trick. When the parent
-// launches `go test -run=TestHelperProcess` with GO_WANT_HELPER_PROCESS=1,
-// this function plays the role of "the subprocess" the SubprocessRunner
-// is talking to. Behaviour is steered by HELPER_MODE.
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -59,7 +54,6 @@ func TestHelperProcess(t *testing.T) {
 		}
 
 	case "plain_error":
-		// Handler returns a non-WireError; ServeStdio must convert it.
 		err := ServeStdio(os.Stdin, os.Stdout, func(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 			return core.PhaseResponse{}, errors.New("something bad")
 		})
@@ -69,14 +63,12 @@ func TestHelperProcess(t *testing.T) {
 		}
 
 	case "garbage_stdout":
-		// Print non-envelope JSON; parent's DecodeResponse must reject.
 		fmt.Fprintln(os.Stdout, `{"this":"is","not":"an envelope"}`)
 
 	case "crash":
 		os.Exit(7)
 
 	case "hang":
-		// Block forever; parent must use ctx timeout.
 		time.Sleep(60 * time.Second)
 
 	default:
@@ -85,7 +77,6 @@ func TestHelperProcess(t *testing.T) {
 	}
 }
 
-// helperCmd builds the re-exec command for a given HELPER_MODE.
 func helperCmd(mode string) (string, []string, []string) {
 	bin := os.Args[0]
 	args := []string{"-test.run=TestHelperProcess"}
@@ -202,14 +193,10 @@ func TestSubprocessRunner_ContextCancellation(t *testing.T) {
 	if err == nil {
 		t.Fatal("Run must error on context cancel")
 	}
-	// Allow generous slack for CI; we just need to confirm we didn't wait 60s.
 	if elapsed > 5*time.Second {
 		t.Errorf("Run did not honour context cancel; took %v", elapsed)
 	}
 }
-
-// ServeStdio direct tests — exercised in-process so coverage covers the
-// reader/writer/handler paths without the subprocess re-exec.
 
 func TestServeStdio_HappyPath(t *testing.T) {
 	req := core.PhaseRequest{Cycle: 7, Workspace: "/x"}
@@ -291,7 +278,6 @@ func TestServeStdio_RejectsMalformedInput(t *testing.T) {
 }
 
 func TestServeStdio_RejectsWrongKind(t *testing.T) {
-	// A response envelope sent to a server should be rejected.
 	env, _ := EncodeResponse("c", core.PhaseResponse{Phase: "p", Verdict: core.VerdictPASS})
 	raw, _ := json.Marshal(env)
 	in := bytes.NewReader(append(raw, '\n'))
@@ -305,13 +291,7 @@ func TestServeStdio_RejectsWrongKind(t *testing.T) {
 	}
 }
 
-// Error-envelope-with-nil-Error is a malicious-child case the Run path
-// guards against; the helper subprocess can't easily produce one, so we
-// drive readOneEnvelopeLine + Unmarshal directly.
 func TestSubprocessRunner_ErrorEnvelopeMissingErrorField(t *testing.T) {
-	// Run a runner whose subprocess emits an error envelope with no error
-	// field — synthesised by a tiny shell command rather than the Go
-	// helper process. Use /bin/sh -c to print a hand-crafted line.
 	bogus := `{"v":1,"kind":"error","correlation_id":"x"}`
 	r := NewSubprocessRunner("p", "/bin/sh", []string{"-c", "echo '" + bogus + "'"}, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -326,7 +306,6 @@ func TestSubprocessRunner_ErrorEnvelopeMissingErrorField(t *testing.T) {
 	}
 }
 
-// Drive the Run path's EncodeRequest failure branch via the testable seam.
 func TestSubprocessRunner_EncodeRequestFailure(t *testing.T) {
 	saved := marshalJSON
 	t.Cleanup(func() { marshalJSON = saved })
@@ -340,7 +319,6 @@ func TestSubprocessRunner_EncodeRequestFailure(t *testing.T) {
 	}
 }
 
-// Drive empty-stdout decode-failed path.
 func TestSubprocessRunner_EmptyStdout(t *testing.T) {
 	r := NewSubprocessRunner("p", "/bin/sh", []string{"-c", ":"}, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -355,13 +333,9 @@ func TestSubprocessRunner_EmptyStdout(t *testing.T) {
 	}
 }
 
-// Drive ServeStdio's EncodeResponse marshal-failure branch.
 func TestServeStdio_EncodeResponseFailure(t *testing.T) {
 	saved := marshalJSON
 	t.Cleanup(func() { marshalJSON = saved })
-	// First call (EncodeRequest is consumed by us before ServeStdio runs);
-	// ServeStdio's first marshalJSON is inside EncodeResponse.
-	// Build the request envelope WITHOUT the seam by swapping it after.
 	env, _ := EncodeRequest("c", core.PhaseRequest{Cycle: 1})
 	raw, _ := json.Marshal(env)
 	in := bytes.NewReader(append(raw, '\n'))
@@ -378,7 +352,6 @@ func TestServeStdio_EncodeResponseFailure(t *testing.T) {
 	}
 }
 
-// Drive ServeStdio's "read failed with no data" branch.
 func TestServeStdio_EmptyInput(t *testing.T) {
 	in := bytes.NewReader(nil)
 	out := &bytes.Buffer{}
@@ -391,7 +364,6 @@ func TestServeStdio_EmptyInput(t *testing.T) {
 	}
 }
 
-// Drive ServeStdio's write-failure branch via a failing writer.
 type failingWriter struct{}
 
 func (f *failingWriter) Write(p []byte) (int, error) { return 0, errors.New("disk full") }
@@ -408,7 +380,6 @@ func TestServeStdio_WriteFailure(t *testing.T) {
 	}
 }
 
-// Drive ServeStdio's "request decode rejected (wrong version)" branch.
 func TestServeStdio_RejectsBadVersion(t *testing.T) {
 	bogus := []byte(`{"v":999,"kind":"request","correlation_id":"x","payload":{}}` + "\n")
 	in := bytes.NewReader(bogus)
@@ -422,8 +393,6 @@ func TestServeStdio_RejectsBadVersion(t *testing.T) {
 	}
 }
 
-// Smoke: an exec.Cmd built from helperCmd should be plumbable through.
-// Guards against accidental Path/Args plumbing regressions.
 func TestSubprocessRunner_CmdShape(t *testing.T) {
 	r := NewSubprocessRunner("p", "/bin/echo", []string{"hello"}, []string{"K=v"})
 	cmd := r.buildCmd(context.Background())
@@ -433,7 +402,6 @@ func TestSubprocessRunner_CmdShape(t *testing.T) {
 	if len(cmd.Args) < 1 || cmd.Args[0] != "/bin/echo" {
 		t.Errorf("Args[0]=%q, want /bin/echo", cmd.Args[0])
 	}
-	// env should include our K=v plus inherited PATH.
 	found := false
 	for _, e := range cmd.Env {
 		if e == "K=v" {
@@ -443,6 +411,5 @@ func TestSubprocessRunner_CmdShape(t *testing.T) {
 	if !found {
 		t.Errorf("env missing K=v: %v", cmd.Env)
 	}
-	// Type confirmation it really is exec.Cmd.
 	var _ *exec.Cmd = cmd
 }

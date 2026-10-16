@@ -9,11 +9,8 @@ import (
 	"strings"
 )
 
-// prosePathRE requires a slash and a known source extension, so ordinary prose is never read as a path.
 var prosePathRE = regexp.MustCompile(`[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+\.(?:go|md|json|ya?ml|sh|ts|js|html)\b`)
 
-// proseMetadataRE, unlike metadataFieldRE, drops the evidence= value: the contract requires one on
-// every card and it is usually a path, so keeping it would warn on nearly every footprint-free card.
 var proseMetadataRE = regexp.MustCompile(`\bdefer_reason=[^\n]*|\b(?:source|priority|evidence)=\S+`)
 
 type cardShape struct {
@@ -22,7 +19,6 @@ type cardShape struct {
 	Files  []string `json:"files"`
 }
 
-// cardCheck keeps usable and declaredRaw apart: a declaration that filters to nothing looks compliant yet matches no card.
 type cardCheck struct {
 	id          string
 	text        string
@@ -30,8 +26,6 @@ type cardCheck struct {
 	declaredRaw int
 }
 
-// MissingCardFilesWarning names committed cards that cite a repo path but declare no usable files= footprint.
-// It returns "" when there is nothing to say, including when there is no top_n (the contract gate owns presence).
 func MissingCardFilesWarning(artifact, companionPath string) string {
 	cards, ok := committedCards(artifact, companionPath)
 	if !ok {
@@ -45,7 +39,6 @@ func MissingCardFilesWarning(artifact, companionPath string) string {
 		case c.declaredRaw > 0:
 			offenders = append(offenders, fmt.Sprintf("%s (declared %d footprint token(s), none of them a usable repo-relative path)", c.id, c.declaredRaw))
 		default:
-			// Undeclared cards offend only when their own text names a path; footprint-free work stays silent.
 			paths := prosePathRE.FindAllString(proseMetadataRE.ReplaceAllString(c.text, " "), -1)
 			if len(paths) == 0 {
 				continue
@@ -64,8 +57,6 @@ func MissingCardFilesWarning(artifact, companionPath string) string {
 		len(offenders), strings.Join(offenders, "; "))
 }
 
-// committedCards prefers a parseable companion, which is what the lane planner reads; otherwise it reads the
-// report items, which ProjectDecisionJSON will project. ok is false only when neither source has a top_n.
 func committedCards(artifact, companionPath string) ([]cardCheck, bool) {
 	if cards, ok := companionCards(companionPath); ok {
 		return cards, true
@@ -87,7 +78,6 @@ func committedCards(artifact, companionPath string) ([]cardCheck, bool) {
 	return cards, len(cards) > 0
 }
 
-// companionCards applies the same repo-relative filter as the report path: a JSON array is not automatically usable.
 func companionCards(companionPath string) ([]cardCheck, bool) {
 	if companionPath == "" {
 		return nil, false

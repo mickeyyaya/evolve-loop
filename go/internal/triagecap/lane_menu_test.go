@@ -64,7 +64,6 @@ func TestExpandWithClusterMates_CrossLaneFilesStayDisjoint(t *testing.T) {
 	}
 	backlog := []FleetCandidate{
 		cand("m1", 0.7, "go/internal/x/a.go", "go/internal/x/extra.go"),
-		// m2 touches m1's extra file (claimed once m1 joins lane-a) and lane-b's file.
 		cand("m2", 0.6, "go/internal/x/extra.go", "go/internal/y/b.go"),
 	}
 	menus := ExpandWithClusterMates(sel, backlog, 4)
@@ -154,7 +153,7 @@ func writeInboxTodo(t *testing.T, evolveDir, id string, weight float64, files ..
 func TestExpandWithClusterMates_OverlappingSelectionFirstLaneKeepsFile(t *testing.T) {
 	sel := []FleetCandidate{
 		cand("first", 0.9, "go/internal/x/a.go"),
-		cand("second", 0.8, "go/internal/x/a.go"), // a committed prefix may overlap itself
+		cand("second", 0.8, "go/internal/x/a.go"),
 	}
 	backlog := []FleetCandidate{cand("mate", 0.7, "go/internal/x/a.go")}
 	menus := ExpandWithClusterMates(sel, backlog, 4)
@@ -171,7 +170,7 @@ func TestSelectWaveSeedMenus_PreservesCommittedPrefix(t *testing.T) {
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
 	writeInboxTodo(t, evolveDir, "a2", 0.7, "go/internal/x/a.go")
 	writeInboxTodo(t, evolveDir, "b1", 0.8, "go/internal/y/b.go")
-	writeInboxTodo(t, evolveDir, "c1", 0.1, "go/internal/z/c.go") // committed, lowest weight
+	writeInboxTodo(t, evolveDir, "c1", 0.1, "go/internal/z/c.go")
 
 	committed := []FleetCandidate{cand("c1", 0.1, "go/internal/z/c.go")}
 	menus := SelectWaveSeedMenus(evolveDir, committed, 2, 4, nil)
@@ -192,7 +191,7 @@ func TestSelectWaveSeedMenus_CommittedNotInBacklogStillSeeded(t *testing.T) {
 	writeInboxTodo(t, evolveDir, "a1", 0.9, "go/internal/x/a.go")
 	writeInboxTodo(t, evolveDir, "b1", 0.8, "go/internal/y/b.go")
 
-	committed := []FleetCandidate{cand("gone", 0.5, "go/internal/z/gone.go")} // absent from the inbox
+	committed := []FleetCandidate{cand("gone", 0.5, "go/internal/z/gone.go")}
 	menus := SelectWaveSeedMenus(evolveDir, committed, 2, 4, nil)
 
 	if len(menus) == 0 || menus[0][0].ID != "gone" {
@@ -206,7 +205,7 @@ func TestSelectWaveSeedMenus_CommittedOverlapNeverDropped(t *testing.T) {
 
 	committed := []FleetCandidate{
 		cand("c1", 0.4, "go/internal/z/c.go"),
-		cand("c2", 0.3, "go/internal/z/c.go"), // overlaps c1 on purpose
+		cand("c2", 0.3, "go/internal/z/c.go"),
 	}
 	menus := SelectWaveSeedMenus(evolveDir, committed, 2, 4, nil)
 

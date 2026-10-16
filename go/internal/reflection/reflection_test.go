@@ -1,9 +1,3 @@
-// Package reflection ports the per-phase Reflection Journal YAML
-// schema. Bash-side enforcement lives in
-// scripts/lifecycle/phase-gate.sh (when EVOLVE_REFLECTION_JOURNAL=1)
-// and scripts/observability/aggregate-reflections.sh. This Go port
-// owns reading, writing, validating, and computing canonical paths so
-// phase impls don't have to reach back into bash.
 package reflection
 
 import (
@@ -14,7 +8,6 @@ import (
 	"testing"
 )
 
-// canonicalYAML matches the fixture written by reflection-schema-test.sh.
 const canonicalYAML = `schema_version: 1
 cycle: 1001
 phase: scout
@@ -37,9 +30,6 @@ phase_tracker_refs:
   turns: 10
 `
 
-// TestRead_CanonicalSchema verifies every required field round-trips.
-// The schema is documented in agents/reflection-journal-schema.md and
-// pinned by reflection-schema-test.sh T1.
 func TestRead_CanonicalSchema(t *testing.T) {
 	r, err := Parse([]byte(canonicalYAML))
 	if err != nil {
@@ -84,8 +74,6 @@ func TestRead_CanonicalSchema(t *testing.T) {
 	}
 }
 
-// TestRead_FrictionReceivedFrom — T5 of reflection-schema-test.sh:
-// upstream/downstream pair must parse.
 func TestRead_FrictionReceivedFrom(t *testing.T) {
 	src := `schema_version: 1
 cycle: 5001
@@ -116,9 +104,6 @@ phase_tracker_refs:
 	}
 }
 
-// TestRead_PhaseSmooth_EmptySlowdowns — T3: smooth phase has empty
-// slowdowns array; aggregator counts the reflection but emits no
-// category. The reader must produce []Slowdown{} (empty, not nil).
 func TestRead_PhaseSmooth_EmptySlowdowns(t *testing.T) {
 	src := `schema_version: 1
 cycle: 3001
@@ -145,7 +130,6 @@ phase_tracker_refs:
 	}
 }
 
-// TestValidate_HappyPath — canonical reflection passes validation.
 func TestValidate_HappyPath(t *testing.T) {
 	r, _ := Parse([]byte(canonicalYAML))
 	if err := r.Validate(); err != nil {
@@ -153,7 +137,6 @@ func TestValidate_HappyPath(t *testing.T) {
 	}
 }
 
-// TestValidate_MissingRequiredFields — empty Reflection must fail.
 func TestValidate_MissingRequiredFields(t *testing.T) {
 	r := &Reflection{}
 	if err := r.Validate(); err == nil {
@@ -161,8 +144,6 @@ func TestValidate_MissingRequiredFields(t *testing.T) {
 	}
 }
 
-// TestValidate_InvalidSeverity — slowdown severity must be one of
-// low/medium/high.
 func TestValidate_InvalidSeverity(t *testing.T) {
 	r, _ := Parse([]byte(canonicalYAML))
 	r.Slowdowns[0].Severity = "ultra-critical"
@@ -171,8 +152,6 @@ func TestValidate_InvalidSeverity(t *testing.T) {
 	}
 }
 
-// TestValidate_InvalidPriority — improvement priority must be
-// low/medium/high.
 func TestValidate_InvalidPriority(t *testing.T) {
 	r, _ := Parse([]byte(canonicalYAML))
 	r.SuggestedImprovements[0].Priority = "nuclear"
@@ -181,7 +160,6 @@ func TestValidate_InvalidPriority(t *testing.T) {
 	}
 }
 
-// TestValidate_ConfidenceRange — reflection_confidence must be [0, 1].
 func TestValidate_ConfidenceRange(t *testing.T) {
 	for _, bad := range []float64{-0.1, 1.1, 2.0} {
 		r, _ := Parse([]byte(canonicalYAML))
@@ -192,8 +170,6 @@ func TestValidate_ConfidenceRange(t *testing.T) {
 	}
 }
 
-// TestValidate_SchemaVersion — only v1 is recognized today; future
-// versions surface as errors so consumers can upgrade in lockstep.
 func TestValidate_SchemaVersion(t *testing.T) {
 	r, _ := Parse([]byte(canonicalYAML))
 	r.SchemaVersion = 99
@@ -202,8 +178,6 @@ func TestValidate_SchemaVersion(t *testing.T) {
 	}
 }
 
-// TestSidecar_CanonicalPath — phase-gate.sh expects sidecars at
-// <runs_dir>/cycle-<N>/<phase>-reflection.yaml.
 func TestSidecar_CanonicalPath(t *testing.T) {
 	got := Sidecar("/x/.evolve/runs", 42, "scout")
 	want := "/x/.evolve/runs/cycle-42/scout-reflection.yaml"
@@ -212,9 +186,6 @@ func TestSidecar_CanonicalPath(t *testing.T) {
 	}
 }
 
-// TestWriteAndRead_RoundTrip — write to disk, read back, compare.
-// Atomic write semantics (tmp file + rename) verified by file existence
-// at the final path with the expected payload.
 func TestWriteAndRead_RoundTrip(t *testing.T) {
 	tmp := t.TempDir()
 	cyc := filepath.Join(tmp, "cycle-7")
@@ -242,10 +213,6 @@ func TestWriteAndRead_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestWrite_AtomicReplace — overwriting an existing file must not
-// leave a corrupt half-write if the underlying syscall fails mid-flight.
-// We can't simulate ENOSPC easily; instead we verify the tmp file is
-// cleaned up on success and the destination matches new content.
 func TestWrite_AtomicReplace(t *testing.T) {
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "x-reflection.yaml")
@@ -267,7 +234,6 @@ func TestWrite_AtomicReplace(t *testing.T) {
 	if strings.Contains(string(b), "old") {
 		t.Errorf("Destination still has old content: %q", b)
 	}
-	// No leftover .tmp file in the dir.
 	entries, _ := os.ReadDir(tmp)
 	for _, e := range entries {
 		if strings.Contains(e.Name(), ".tmp") {
@@ -276,7 +242,6 @@ func TestWrite_AtomicReplace(t *testing.T) {
 	}
 }
 
-// TestParse_InvalidYAML — surface a parse error with context.
 func TestParse_InvalidYAML(t *testing.T) {
 	_, err := Parse([]byte("not: yaml: :::"))
 	if err == nil {
@@ -284,7 +249,6 @@ func TestParse_InvalidYAML(t *testing.T) {
 	}
 }
 
-// TestReadFile_NotFound — ErrNotExist propagates.
 func TestReadFile_NotFound(t *testing.T) {
 	_, err := ReadFile("/nonexistent-path-xyz")
 	if err == nil {
@@ -295,10 +259,6 @@ func TestReadFile_NotFound(t *testing.T) {
 	}
 }
 
-// TestParse_AbsentSlowdownsNormalized — when slowdowns field is
-// absent in the YAML (vs explicitly []), the parser must normalize
-// to a non-nil empty slice. The aggregator depends on this distinction
-// when emitting empty `slowdown_categories: []`.
 func TestParse_AbsentSlowdownsNormalized(t *testing.T) {
 	src := `schema_version: 1
 cycle: 1
@@ -323,16 +283,9 @@ phase_tracker_refs:
 	}
 }
 
-// TestWrite_RenameFailure_RemovesTmp — when rename fails (e.g.,
-// destination becomes a directory), tmp file must be cleaned up.
-// Simulating rename failure: create a directory at the destination
-// path so os.Rename(file → directory) refuses on macOS/Linux.
 func TestWrite_RenameFailure_RemovesTmp(t *testing.T) {
 	tmp := t.TempDir()
 	dest := filepath.Join(tmp, "block-reflection.yaml")
-	// Make dest a non-empty directory so rename can't replace it
-	// (POSIX: rename(file, dir) fails when dir is non-empty or
-	// when the dest is a directory and src is a file).
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -346,14 +299,11 @@ func TestWrite_RenameFailure_RemovesTmp(t *testing.T) {
 	if err := Write(dest, r); err == nil {
 		t.Error("Write into existing non-empty dir: want error")
 	}
-	// Tmp must not linger.
 	if _, err := os.Stat(dest + ".tmp"); !os.IsNotExist(err) {
 		t.Errorf("tmp file lingered at %s", dest+".tmp")
 	}
 }
 
-// TestValidate_NilReceiver — defensive: r.Validate on nil pointer
-// must return an error, not panic.
 func TestValidate_NilReceiver(t *testing.T) {
 	var r *Reflection
 	if err := r.Validate(); err == nil {
@@ -361,7 +311,6 @@ func TestValidate_NilReceiver(t *testing.T) {
 	}
 }
 
-// TestValidate_ZeroOrNegativeCycle — cycle must be positive.
 func TestValidate_ZeroOrNegativeCycle(t *testing.T) {
 	r, _ := Parse([]byte(canonicalYAML))
 	r.Cycle = 0
@@ -370,7 +319,6 @@ func TestValidate_ZeroOrNegativeCycle(t *testing.T) {
 	}
 }
 
-// TestValidate_EmptyPhase — phase required.
 func TestValidate_EmptyPhase(t *testing.T) {
 	r, _ := Parse([]byte(canonicalYAML))
 	r.Phase = ""
@@ -379,7 +327,6 @@ func TestValidate_EmptyPhase(t *testing.T) {
 	}
 }
 
-// TestValidate_EmptyAgent — agent required.
 func TestValidate_EmptyAgent(t *testing.T) {
 	r, _ := Parse([]byte(canonicalYAML))
 	r.Agent = ""
@@ -388,13 +335,10 @@ func TestValidate_EmptyAgent(t *testing.T) {
 	}
 }
 
-// TestWrite_RefusesInvalid — Write Validates before serializing.
-// A malformed sidecar is worse than no sidecar (phase-gate.sh would
-// pass an invalid file as "present", masking the producer bug).
 func TestWrite_RefusesInvalid(t *testing.T) {
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "bad-reflection.yaml")
-	bad := &Reflection{SchemaVersion: 1, Phase: "x", Agent: "a", Slowdowns: []Slowdown{}, ReflectionConfidence: 0.5} // cycle=0
+	bad := &Reflection{SchemaVersion: 1, Phase: "x", Agent: "a", Slowdowns: []Slowdown{}, ReflectionConfidence: 0.5}
 	if err := Write(out, bad); err == nil {
 		t.Error("Write(invalid): want error, got nil")
 	}
@@ -403,8 +347,6 @@ func TestWrite_RefusesInvalid(t *testing.T) {
 	}
 }
 
-// TestWrite_NonexistentDir — tmp-file path goes through a missing
-// parent dir; the write must fail (os.WriteFile error path).
 func TestWrite_NonexistentDir(t *testing.T) {
 	r := &Reflection{
 		SchemaVersion: 1, Cycle: 1, Phase: "x", Agent: "a", PhaseSmooth: true,
@@ -416,10 +358,6 @@ func TestWrite_NonexistentDir(t *testing.T) {
 	}
 }
 
-// TestAcceptedByAggregator — the aggregator filter is confidence > 0.5
-// (per reflection-schema-test.sh T2: 0.2 is skipped, 0.8 is counted).
-// Expose a predicate matching the bash threshold so callers don't
-// re-derive it.
 func TestAcceptedByAggregator(t *testing.T) {
 	r, _ := Parse([]byte(canonicalYAML))
 	if !r.AcceptedByAggregator() {

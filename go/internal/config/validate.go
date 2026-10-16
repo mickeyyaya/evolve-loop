@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// staticSpinePhases are the agent phases the static state machine drives. It is a local copy
-// because config cannot import core; TestStaticSpineMatchesStateMachine pins it.
 var staticSpinePhases = map[string]struct{}{
 	"intent":        {},
 	"scout":         {},
@@ -21,8 +19,6 @@ var staticSpinePhases = map[string]struct{}{
 	"retro":         {},
 }
 
-// validateInertEnables warns on a force-enabled phase that is neither mandatory nor in the static
-// spine while the router is below advisory: the static state machine drives there, so it never runs.
 func validateInertEnables(cfg RoutingConfig, ws *[]Warning) {
 	if cfg.Stage >= StageAdvisory {
 		return
@@ -69,8 +65,6 @@ func validateSpine(cfg RoutingConfig, ws *[]Warning) {
 		warn(ws, codeWeakSpine, "mandatory_phases omits "+strings.Join(missing, "+")+" — audit-before-ship guarantee weakened",
 			map[string]string{"missing": strings.Join(missing, "+")})
 	}
-	// The spine floor positions anchors by configured order, so ship before audit would skip the
-	// shippable-audit check; the legality graph still blocks it, but the order must not be the only guard.
 	auditPos, shipPos := -1, -1
 	for i, p := range cfg.Order {
 		switch p {

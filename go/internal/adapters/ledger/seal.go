@@ -23,19 +23,14 @@ const (
 	segmentMode     = 0o600
 )
 
-// SealKind is the Kind of the chained entry that binds a segment to its uncompressed SHA.
 const SealKind = "segment_seal"
 
-// ErrSealResidue marks an interrupted seal; re-running Seal completes it.
 var ErrSealResidue = errors.New("ledger seal residue — re-run `evolve ledger seal` to complete")
 
-// Seal moves all but the newest keepTail (at least 1) lines into the next gzip segment and appends its anchor.
 func (l *FileLedger) Seal(_ context.Context, keepTail int) error {
 	if keepTail < 1 {
 		keepTail = 1
 	}
-	// seal.lock stops a second Seal's resume path anchoring a segment this one has not anchored yet.
-	// Order is seal.lock then ledger.lock, and Append takes only ledger.lock, so there is no inversion.
 	sealRelease, err := flock.Lock(l.lockPath + ".seal")
 	if err != nil {
 		return fmt.Errorf("ledger seal: %w", err)
@@ -68,8 +63,6 @@ func (l *FileLedger) sealAndAnchor(keepTail int) (*core.LedgerEntry, error) {
 	return anchor, l.appendChainedLocked(chainInto(anchor))
 }
 
-// sealLocked does the segment write + truncation under the caller-held
-// locks and returns the anchor entry to append (nil = nothing to do).
 func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
 	evolveDir := filepath.Dir(l.ledgerPath)
 	segDir := filepath.Join(evolveDir, segmentsDirName)
@@ -80,8 +73,6 @@ func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
 	}
 	lines := splitLines(raw)
 
-	// Resume case A: the newest segment's first line is still live, so a seal crashed before truncation.
-	// Truncate only after the whole segment matches the live prefix.
 	segs, err := segmentFiles(segDir)
 	if err != nil {
 		return nil, err
@@ -100,7 +91,6 @@ func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
 			}
 			return l.anchorFor(segs[len(segs)-1], segSHA, len(segLines))
 		}
-		// Resume case B: segment fully sealed but its anchor never landed.
 		if missing, segSHA, n, err := l.unanchoredSegment(segs, lines); err != nil {
 			return nil, err
 		} else if missing != "" {
@@ -125,7 +115,6 @@ func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
 	return l.anchorFor(segPath, sha256Hex(prefix), n)
 }
 
-// anchorFor builds the segment_seal entry; its path is relative to the evolve dir so the ledger stays portable.
 func (l *FileLedger) anchorFor(segPath, uncompressedSHA string, lineCount int) (*core.LedgerEntry, error) {
 	rel, err := filepath.Rel(filepath.Dir(l.ledgerPath), segPath)
 	if err != nil {
@@ -140,8 +129,6 @@ func (l *FileLedger) anchorFor(segPath, uncompressedSHA string, lineCount int) (
 	}, nil
 }
 
-// unanchoredSegment reports the newest segment that has no segment_seal
-// anchor in (segments + live) — the truncated-but-unanchored crash case.
 func (l *FileLedger) unanchoredSegment(segs []string, liveLines [][]byte) (path, sha string, lineCount int, err error) {
 	type segData struct {
 		lines [][]byte
@@ -215,7 +202,6 @@ func (l *FileLedger) readChain() ([]sealedSegment, [][]byte, error) {
 	return segs, splitLines(liveRaw), nil
 }
 
-// gatherAllLines returns every line in chain order: sealed segments, oldest first, then the live tail.
 func (l *FileLedger) gatherAllLines() ([][]byte, error) {
 	segs, live, err := l.readChain()
 	if err != nil {
@@ -232,13 +218,11 @@ func chainOrder(segs []sealedSegment, live [][]byte) [][]byte {
 	return append(full, live...)
 }
 
-// VerifyDeep walks segments plus live tail with Verify's chain walk and checks each segment against its anchor.
 func (l *FileLedger) VerifyDeep(ctx context.Context) error {
 	_, err := l.VerifyDeepScope(ctx)
 	return err
 }
 
-// VerifyDeepScope is VerifyDeep plus the verified scope, which must match what VerifyScope reports.
 func (l *FileLedger) VerifyDeepScope(_ context.Context) (VerifiedScope, error) {
 	var segs []sealedSegment
 	var live [][]byte
@@ -255,7 +239,6 @@ func (l *FileLedger) VerifyDeepScope(_ context.Context) (VerifiedScope, error) {
 
 func (l *FileLedger) verifyChain(segs []sealedSegment, live [][]byte, checkTip func(lastSeq int, lastSha string) error) (VerifiedScope, error) {
 	for _, s := range segs {
-		// Every segment, not just the newest: a first line still live means a truncation never completed.
 		if len(s.lines) > 0 && len(live) > 0 && bytes.Equal(s.lines[0], live[0]) {
 			return VerifiedScope{}, fmt.Errorf("%w: segment %s written but live file not truncated", ErrSealResidue, filepath.Base(s.rel))
 		}
@@ -313,7 +296,6 @@ func (l *FileLedger) sealedPredecessor(live [][]byte) ([]byte, error) {
 	return nil, nil
 }
 
-// segmentFiles lists seg-*.jsonl.gz sorted; the fixed-width counter makes lexical order chronological.
 func segmentFiles(segDir string) ([]string, error) {
 	entries, err := os.ReadDir(segDir)
 	if errors.Is(err, os.ErrNotExist) {
@@ -333,7 +315,6 @@ func segmentFiles(segDir string) ([]string, error) {
 	return out, nil
 }
 
-// writeSegment gzips raw into path atomically (tmp + rename + dir create).
 func writeSegment(path string, raw []byte) error {
 	return writeSegmentVia(&bytes.Buffer{}, path, raw)
 }
@@ -364,7 +345,6 @@ func gzipSegment(dst io.Writer, raw []byte) error {
 	return nil
 }
 
-// readSegment gunzips a segment and returns its lines and the sha256 of the uncompressed bytes.
 func readSegment(path string) ([][]byte, string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -385,8 +365,6 @@ func readSegment(path string) ([][]byte, string, error) {
 	return splitLines(raw), sha256Hex(raw), nil
 }
 
-// rewriteLive atomically replaces ledger.jsonl with lines as their original bytes, never re-marshaled,
-// so the hash chain over them is untouched.
 func (l *FileLedger) rewriteLive(lines [][]byte) error {
 	var buf bytes.Buffer
 	for _, line := range lines {
@@ -419,7 +397,6 @@ func (l *FileLedger) rewriteLive(lines [][]byte) error {
 	return nil
 }
 
-// prefixLen returns the byte length of the first n lines of raw, newlines included.
 func prefixLen(raw []byte, n int) int {
 	off := 0
 	for i := 0; i < n; i++ {

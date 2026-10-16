@@ -1,24 +1,15 @@
 package config
 
-// PolicyStages is the root's projection of the .evolve/policy.json dials. config cannot import
-// policy, so the dials cross as plain values. Tests construct it positionally so a new field breaks the build.
 type PolicyStages struct {
-	// The gates.* keys, on the GateStage trichotomy.
 	ContractGate, EvalGate, TriageCapGate, TopNGate, ReviewGate string
-	// The recovery.* keys, on the GateStage trichotomy.
-	PhaseRecovery, SpineFloor, FatalPane string
-	// router.router_replan, on the RouterStage ladder.
-	RouterReplan string
-	// parallel_evaluate.stage, on the RouterStage ladder; policy sanitises it first, so it never warns here.
-	ParallelEvaluate string
-	// Copied as policy resolved them.
-	ParallelEvaluateConcurrency int
-	RoutingJudge, ReconDigest   bool
-	RePlanMaxDepth              int
+	PhaseRecovery, SpineFloor, FatalPane                        string
+	RouterReplan                                                string
+	ParallelEvaluate                                            string
+	ParallelEvaluateConcurrency                                 int
+	RoutingJudge, ReconDigest                                   bool
+	RePlanMaxDepth                                              int
 }
 
-// ApplyPolicyStages returns cfg with the policy dials applied; a stage word outside its ladder
-// resolves to off with a warning that names the policy key.
 func (l *Loader) ApplyPolicyStages(cfg RoutingConfig, ps PolicyStages) (RoutingConfig, []Warning) {
 	var ws []Warning
 	cfg.ContractGate = parseEvidenceStage(ps.ContractGate, "gates.contract_gate", &ws)

@@ -10,7 +10,6 @@ import (
 	"strconv"
 )
 
-// registryDoc is the subset of phase-registry.json this loader reads.
 type registryDoc struct {
 	Config registryConfig  `json:"config"`
 	Phases []registryPhase `json:"phases"`
@@ -43,8 +42,6 @@ type registryPhase struct {
 
 const baselineNote = "running on the built-in baseline — no triage, no registry order"
 
-// readRegistry is silent only on absence. An unreadable or malformed registry warns, because the
-// loop would otherwise run on the triage-less baseline with no trace.
 func (l *Loader) readRegistry(path string, ws *[]Warning) (registryDoc, bool) {
 	raw, err := l.readFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -71,8 +68,6 @@ func applyRegistry(cfg *RoutingConfig, doc registryDoc, ws *[]Warning) {
 	applyPhases(cfg, doc.Phases, ws)
 }
 
-// applyRegistryDials keeps the compiled default for any value the registry omits; the pointer
-// fields tell an explicit 0 or false from absence.
 func applyRegistryDials(cfg *RoutingConfig, c registryConfig, ws *[]Warning) {
 	if c.DynamicRouting != "" {
 		cfg.Stage = parseStage(c.DynamicRouting, "dynamic_routing", ws)
@@ -103,8 +98,6 @@ func applyRegistryDials(cfg *RoutingConfig, c registryConfig, ws *[]Warning) {
 	}
 }
 
-// applyDeliverableKinds installs a spec even when it warns: the registry owns root and
-// min_options, so a consumer must see the hole rather than a silent default.
 func applyDeliverableKinds(cfg *RoutingConfig, kinds map[string]DeliverableKindSpec, ws *[]Warning) {
 	if len(kinds) == 0 {
 		return
@@ -119,7 +112,6 @@ func applyDeliverableKinds(cfg *RoutingConfig, kinds map[string]DeliverableKindS
 	}
 }
 
-// applyConditional merges over the compiled rules, so the tdd default survives a registry that omits it.
 func applyConditional(cfg *RoutingConfig, rules map[string]string, ws *[]Warning) {
 	for _, phase := range slices.Sorted(maps.Keys(rules)) {
 		expr := rules[phase]

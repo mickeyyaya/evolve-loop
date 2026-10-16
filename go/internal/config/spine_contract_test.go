@@ -8,7 +8,6 @@ import (
 )
 
 func TestStaticSpineMatchesStateMachine(t *testing.T) {
-	// start and end are sentinels, not agent runs, so want omits them.
 	want := map[string]struct{}{
 		string(core.PhaseIntent):       {},
 		string(core.PhaseScout):        {},

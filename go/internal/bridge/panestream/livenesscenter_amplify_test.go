@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// fixedProbe always returns a predetermined state.
 type fixedProbe struct {
 	state LivenessState
 	conf  float64
@@ -75,7 +74,7 @@ func TestAmp_SignalCenter_AggregationPriority_ConvergingWinsAll(t *testing.T) {
 		{"idle-all", LivenessIdle},
 	}
 	for _, s := range states {
-		state := s.state // loop-variable capture
+		state := s.state
 		sc.RegisterHandler(s.name, func() LivenessProbe {
 			return &fixedProbe{state: state, conf: 0.9}
 		})
@@ -244,7 +243,7 @@ func TestAmp_SignalCenter_SingleObservationPerSession(t *testing.T) {
 	}()
 
 	sc.Observe("sess-single", "content\n❯ \n", p)
-	_ = sc.Aggregate() // must not panic; state is implementation-defined
+	_ = sc.Aggregate()
 }
 
 func TestAmp_SignalCenter_RegisteredHandlerOverridesBuiltin(t *testing.T) {

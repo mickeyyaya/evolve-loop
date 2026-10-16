@@ -8,9 +8,6 @@ const (
 	noTestsWarning    = "testing: warning: no tests to run"
 )
 
-// executionEvidenceReason rejects the successful exit Go reports when a -run
-// selector matches nothing. A recursive command may legitimately report the
-// marker for some packages, so one package or test execution is enough.
 func executionEvidenceReason(result CommandResult) string {
 	if !hasNarrowedGoTest(result.Command) {
 		return ""

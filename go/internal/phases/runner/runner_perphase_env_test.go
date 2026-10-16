@@ -10,10 +10,10 @@ import (
 func TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed(t *testing.T) {
 	cases := []struct {
 		name        string
-		phase       string // PhaseName() — what the runner thinks the phase is
-		agentPrompt string // AgentPromptName() — `evolve-<profile>`
-		envKey      string // the env var cmd_loop.go writes
-		want        string // the model value the runner MUST resolve to
+		phase       string
+		agentPrompt string
+		envKey      string
+		want        string
 	}{
 		{
 			name:        "tdd phase / tdd-engineer agent — EVOLVE_TDD_ENGINEER_MODEL beats profile default",
@@ -56,7 +56,7 @@ func TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed(t *testing.T) {
 			hooks := &fakeHooks{
 				phase:   tc.phase,
 				agent:   tc.agentPrompt,
-				model:   "auto", // simulates the production "auto" sentinel
+				model:   "auto",
 				verdict: core.VerdictPASS,
 			}
 			fb := &fakeBridge{writeArtifact: "x"}

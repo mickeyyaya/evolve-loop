@@ -1,13 +1,5 @@
-// Package phasewatchdog ports legacy/scripts/dispatch/phase-watchdog.sh.
-//
-// Activity-based phase watchdog. Background loop that polls file mtimes
-// within a workspace and kills a stalled process group when no file
-// activity has been detected for longer than the threshold.
-//
-// v9.4.0 phase-aware baseline: the effective idle baseline is the LATER of
-// (a) the freshest watched-file mtime and (b) the current phase's start
-// time. A new phase advance resets the clock — preventing false positives
-// when a phase produces zero writes but is actively progressing.
+// Package phasewatchdog kills the process group of a phase that shows no file activity for too long.
+// See docs/architecture/packages/internal-phasewatchdog.md.
 package phasewatchdog
 
 import (
@@ -22,42 +14,33 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 )
 
-// Config is the runtime configuration for the watchdog. All durations are
-// in seconds. Defaults are applied when zero values are provided.
 type Config struct {
-	Workspace      string // required
-	TargetPGID     int    // required > 0
-	Cycle          int    // required > 0
-	CycleStatePath string // required
-	ProjectRoot    string // optional, enables ledger.jsonl mtime tracking
-	ThresholdS     int    // default 600
-	PollS          int    // default 15
-	WarnPct        int    // default 75
-	GraceS         int    // default 10
-	Disabled       bool   // ObserverPolicy.WatchdogDisabled
+	Workspace      string
+	TargetPGID     int
+	Cycle          int
+	CycleStatePath string
+	ProjectRoot    string
+	ThresholdS     int
+	PollS          int
+	WarnPct        int
+	GraceS         int
+	Disabled       bool
 	Now            func() time.Time
 	Sleep          func(d time.Duration)
 	KillPgrp       func(pgid int, sig syscall.Signal) error
-	StopAfter      int // testing seam: stop loop after N iterations (0 = unlimited)
+	StopAfter      int
 }
 
-// Exit codes:
-//
-//	0 — fired completed kill sequence OR watchdog disabled
-//	1 — invalid arguments / workspace missing
 const (
 	ExitOK         = 0
 	ExitInvalidArg = 1
 )
 
-// Run executes the watchdog loop. stderr receives [phase-watchdog] log lines.
-// Returns 0 on completion (fire or disabled exit) or 1 on validation errors.
 func Run(cfg Config, stderr io.Writer) int {
 	logf := func(format string, args ...any) {
 		fmt.Fprintf(stderr, "[phase-watchdog] "+format+"\n", args...)
 	}
 
-	// defaults
 	if cfg.ThresholdS == 0 {
 		cfg.ThresholdS = 600
 	}
@@ -80,7 +63,6 @@ func Run(cfg Config, stderr io.Writer) int {
 		cfg.KillPgrp = defaultKillPgrp
 	}
 
-	// validation
 	if cfg.Workspace == "" {
 		logf("ERROR: workspace required")
 		return ExitInvalidArg
@@ -124,7 +106,6 @@ func Run(cfg Config, stderr io.Writer) int {
 		bestMtime := int64(0)
 		bestPath := ""
 
-		// phase transition detection
 		if currentPhase := readPhase(cfg.CycleStatePath); currentPhase != "" && currentPhase != lastPhase {
 			if lastPhase != "" {
 				logf("phase advance: '%s' → '%s' (resetting baseline to now)", lastPhase, currentPhase)
@@ -136,7 +117,6 @@ func Run(cfg Config, stderr io.Writer) int {
 			warnEmitted = false
 		}
 
-		// workspace globs — match phase-watchdog.sh's 4 patterns
 		patterns := []string{"*.log", "*.md", "*.json", "*-observer-events.ndjson"}
 		for _, pat := range patterns {
 			m, p := newestMatch(filepath.Join(cfg.Workspace, pat))
@@ -146,13 +126,11 @@ func Run(cfg Config, stderr io.Writer) int {
 			}
 		}
 
-		// cycle-state path
 		if m := mtimeUnix(cfg.CycleStatePath); m > bestMtime {
 			bestMtime = m
 			bestPath = cfg.CycleStatePath
 		}
 
-		// ledger (optional)
 		if cfg.ProjectRoot != "" {
 			ledger := filepath.Join(cfg.ProjectRoot, ".evolve", "ledger.jsonl")
 			if m := mtimeUnix(ledger); m > bestMtime {
@@ -196,8 +174,6 @@ func Run(cfg Config, stderr io.Writer) int {
 	}
 }
 
-// fireSequence writes stall-progress.json + abnormal-events.jsonl, then
-// sends SIGTERM → grace → SIGKILL to the target process group.
 func (cfg Config) fireSequence(idleS int64, lastPath string, logf func(string, ...any)) {
 	checkpointTS := cfg.Now().UTC().Format("2006-01-02T15:04:05Z")
 	stallEntry := map[string]any{
@@ -216,21 +192,17 @@ func (cfg Config) fireSequence(idleS int64, lastPath string, logf func(string, .
 	appendAbnormalEvent(cfg.Workspace, fmt.Sprintf("idle_s=%d threshold_s=%d last_file=%s cycle=%d",
 		idleS, cfg.ThresholdS, lastPath, cfg.Cycle), cfg.Now)
 
-	// SIGTERM
 	logf("sending SIGTERM to pgid %d", cfg.TargetPGID)
 	_ = cfg.KillPgrp(cfg.TargetPGID, syscall.SIGTERM)
 
-	// grace
 	cfg.Sleep(time.Duration(cfg.GraceS) * time.Second)
 
-	// SIGKILL
 	logf("sending SIGKILL to pgid %d (post-grace)", cfg.TargetPGID)
 	_ = cfg.KillPgrp(cfg.TargetPGID, syscall.SIGKILL)
 
 	logf("kill sequence complete for pgid %d", cfg.TargetPGID)
 }
 
-// readPhase reads cycle-state.json:phase. Returns "" on any error.
 func readPhase(path string) string {
 	if path == "" {
 		return ""
@@ -248,8 +220,6 @@ func readPhase(path string) string {
 	return doc.Phase
 }
 
-// mtimeUnix returns the file's modification time as a Unix timestamp, or 0
-// if the file doesn't exist or can't be stat'd.
 func mtimeUnix(path string) int64 {
 	if path == "" {
 		return 0
@@ -261,7 +231,6 @@ func mtimeUnix(path string) int64 {
 	return info.ModTime().Unix()
 }
 
-// newestMatch scans a glob pattern and returns the newest mtime + its path.
 func newestMatch(pattern string) (int64, string) {
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -279,8 +248,6 @@ func newestMatch(pattern string) (int64, string) {
 	return best, bestPath
 }
 
-// appendAbnormalEvent writes a one-line JSON event to abnormal-events.jsonl
-// in the workspace (best-effort; ignores errors).
 func appendAbnormalEvent(workspace, details string, now func() time.Time) {
 	if _, err := os.Stat(workspace); err != nil {
 		return
@@ -288,10 +255,6 @@ func appendAbnormalEvent(workspace, details string, now func() time.Time) {
 	if now == nil {
 		now = time.Now
 	}
-	// Vocabulary shared with the dispatcher, the other writer of this file:
-	// the severity enum is WARN|ERROR (a bare "HIGH" parsed into the field and
-	// was then dropped by every severity filter), and the event type is
-	// declared in dispatchevents so a typed consumer can switch on it.
 	entry := map[string]any{
 		"event_type":       string(dispatchevents.EventStallDetected),
 		"timestamp":        now().UTC().Format("2006-01-02T15:04:05Z"),
@@ -313,8 +276,6 @@ func appendAbnormalEvent(workspace, details string, now func() time.Time) {
 	_, _ = f.Write(append(b, '\n'))
 }
 
-// defaultKillPgrp sends sig to the process group identified by pgid.
-// On Unix systems, sending to -pgid signals the entire group.
 func defaultKillPgrp(pgid int, sig syscall.Signal) error {
 	return syscall.Kill(-pgid, sig)
 }

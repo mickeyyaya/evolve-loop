@@ -1,13 +1,5 @@
-// Package dispatchevents writes abnormal-events.jsonl entries from the
-// dispatcher level — counter-non-advance, circuit-breaker trips, verify
-// failures, classifier verdicts. Port of the inline JSONL emission at
-// archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:983-993 plus the
-// post-classifier records added in cycle-61 follow-ups.
-//
-// Distinct from internal/adapters/observer/, which watches per-phase
-// stdout for stalls. dispatchevents emits at the *cycle* boundary;
-// observer emits within a phase. Both write JSONL, but to different
-// files and consumed by different audiences.
+// Package dispatchevents writes the dispatcher-level entries of abnormal-events.jsonl.
+// See docs/architecture/packages/internal-dispatchevents.md.
 package dispatchevents
 
 import (
@@ -19,9 +11,6 @@ import (
 	"time"
 )
 
-// Severity values mirror the bash strings ("INFO" / "WARN" / "ERROR").
-// Kept as a typed alias rather than a separate enum so JSON marshaling
-// is a no-op.
 type Severity string
 
 const (
@@ -30,9 +19,6 @@ const (
 	SeverityError Severity = "ERROR"
 )
 
-// EventType enumerates the dispatch-level abnormal events that
-// cmd_loop emits. The string values are wire-compatible with the bash
-// dispatcher.
 type EventType string
 
 const (
@@ -41,26 +27,10 @@ const (
 	EventVerifyFailed          EventType = "verify-failed"
 	EventClassification        EventType = "classification"
 	EventGoalStallEscalated    EventType = "goal-stall-escalated"
-	// EventStallDetected is the phase watchdog's kill-sequence record. It lives
-	// HERE, with its siblings, because abnormal-events.jsonl has two writers
-	// and a value declared in only one of them is invisible to every typed
-	// reader of the other — records that parse but fall outside the vocabulary
-	// are skipped silently by exactly the queries an operator runs when a phase
-	// went missing.
-	EventStallDetected EventType = "stall-detected"
-	// EventPhaseOutputsSurveyed is the per-cycle phase-output accounting
-	// (internal/phaseoutputs): did every completed phase leave the data a
-	// reviewer needs, and what is the cycle's chain status. Emitted at cycle
-	// finalize — INFO when complete, WARN on any gap or chain anomaly — so
-	// the unified stream carries the answer instead of only whoever runs
-	// `evolve cycle outputs` seeing it. A cycle that aborts and later
-	// resumes finalizes twice and so appears twice; consumers must take the
-	// LAST event per cycle (each snapshot was true at its moment).
-	EventPhaseOutputsSurveyed EventType = "phase-outputs-surveyed"
+	EventStallDetected         EventType = "stall-detected"
+	EventPhaseOutputsSurveyed  EventType = "phase-outputs-surveyed"
 )
 
-// knownEventTypes is the closed vocabulary. Membership is exported because the
-// second writer must be able to assert it rather than reproduce the list.
 var knownEventTypes = map[EventType]bool{
 	EventCounterNonAdvance:     true,
 	EventCircuitBreakerTripped: true,
@@ -71,15 +41,8 @@ var knownEventTypes = map[EventType]bool{
 	EventPhaseOutputsSurveyed:  true,
 }
 
-// IsKnownEventType reports whether t is a declared abnormal-event type.
 func IsKnownEventType(t EventType) bool { return knownEventTypes[t] }
 
-// Event is one line in abnormal-events.jsonl.
-//
-// Fields use the bash dispatcher names verbatim so existing operator
-// `jq` filters keep working. SourcePhase identifies the dispatch
-// sub-system (always "dispatch" for this writer); RemediationHint is a
-// short operator-readable suggestion.
 type Event struct {
 	EventType       EventType `json:"event_type"`
 	Timestamp       string    `json:"timestamp"`
@@ -87,27 +50,16 @@ type Event struct {
 	Severity        Severity  `json:"severity"`
 	Details         string    `json:"details"`
 	RemediationHint string    `json:"remediation_hint,omitempty"`
-	// Cycle is the cycle number the event applies to. Useful in
-	// post-hoc grep beyond what the workspace path already encodes.
-	Cycle int `json:"cycle,omitempty"`
-	// Classification is set on EventClassification events; mirrors the
-	// cycleclassify.Classification string.
-	Classification string `json:"classification,omitempty"`
+	Cycle           int       `json:"cycle,omitempty"`
+	Classification  string    `json:"classification,omitempty"`
 }
 
-// Writer appends to abnormal-events.jsonl in a cycle workspace.
-// Safe for concurrent use across goroutines (mutex-guarded). One
-// Writer per cycle workspace is the intended pattern; reuse is fine.
 type Writer struct {
 	path string
 	mu   sync.Mutex
 	now  func() time.Time
 }
 
-// NewWriter constructs a Writer that targets
-// <workspace>/abnormal-events.jsonl. The workspace dir is NOT created
-// automatically — the dispatcher already created it before any phase
-// ran, so a failed os.MkdirAll here would mask a real bug.
 func NewWriter(workspace string) *Writer {
 	return &Writer{
 		path: filepath.Join(workspace, "abnormal-events.jsonl"),
@@ -115,20 +67,11 @@ func NewWriter(workspace string) *Writer {
 	}
 }
 
-// marshalFn + writeFn are test seams for the marshal-error and
-// write-error branches. Production paths use json.Marshal +
-// (*os.File).Write directly; tests replace these to drive the rare
-// error paths (disk full, malformed Event) without contriving them on
-// a real filesystem.
 var (
 	marshalFn = json.Marshal
 	writeFn   = func(f *os.File, b []byte) (int, error) { return f.Write(b) }
 )
 
-// Emit serializes e and appends it to abnormal-events.jsonl. Timestamp
-// is filled in automatically if zero. Returns an error only on
-// marshal/I/O failures; bash equivalent uses `|| true` to swallow these
-// silently, but Go callers should at least log on error.
 func (w *Writer) Emit(e Event) error {
 	if e.Timestamp == "" {
 		e.Timestamp = w.now().UTC().Format(time.RFC3339)
@@ -154,10 +97,6 @@ func (w *Writer) Emit(e Event) error {
 	return nil
 }
 
-// EmitCounterNonAdvance is the shorthand for the most common dispatch
-// abnormal — lastCycleNumber didn't move forward after a cycle. Used
-// by cmd_loop when state.lastCycleNumber is unchanged across a
-// RunCycle invocation.
 func (w *Writer) EmitCounterNonAdvance(cycle int) error {
 	return w.Emit(Event{
 		EventType:       EventCounterNonAdvance,
@@ -168,8 +107,6 @@ func (w *Writer) EmitCounterNonAdvance(cycle int) error {
 	})
 }
 
-// EmitVerifyFailed records a ledger pipeline verification failure.
-// `missing` lists the roles whose ledger entries were absent.
 func (w *Writer) EmitVerifyFailed(cycle int, missing []string) error {
 	return w.Emit(Event{
 		EventType:       EventVerifyFailed,
@@ -180,9 +117,6 @@ func (w *Writer) EmitVerifyFailed(cycle int, missing []string) error {
 	})
 }
 
-// EmitClassification records the classifier verdict. Severity is INFO
-// for recoverable classes, ERROR for integrity-breach (the kernel
-// signal that demands human investigation).
 func (w *Writer) EmitClassification(cycle int, classification string) error {
 	sev := SeverityInfo
 	if classification == "integrity-breach" {
@@ -197,8 +131,6 @@ func (w *Writer) EmitClassification(cycle int, classification string) error {
 	})
 }
 
-// EmitCircuitBreakerTripped records the same-cycle circuit-breaker.
-// streak is the consecutive same-cycle count that crossed threshold.
 func (w *Writer) EmitCircuitBreakerTripped(cycle, streak, threshold int) error {
 	return w.Emit(Event{
 		EventType:       EventCircuitBreakerTripped,
@@ -209,14 +141,6 @@ func (w *Writer) EmitCircuitBreakerTripped(cycle, streak, threshold int) error {
 	})
 }
 
-// EmitGoalStallEscalated records that one goal produced `streak` consecutive
-// non-shipping cycles, crossing a stall threshold — the loop self-filed an inbox
-// todo naming the goal instead of re-dispatching it blindly again. goalHash
-// identifies the stalled goal; outcomes names the counted class ("empty/blocked"
-// for the empty-only breaker, the wider fail/empty/blocked union for the
-// non-progress breaker) so the event says WHICH ceiling fired — a mixed
-// FAIL/EMPTY streak reported as empty-only would point diagnosis at the wrong
-// evidence.
 func (w *Writer) EmitGoalStallEscalated(cycle, streak, threshold int, goalHash, outcomes string) error {
 	return w.Emit(Event{
 		EventType:       EventGoalStallEscalated,
@@ -227,11 +151,6 @@ func (w *Writer) EmitGoalStallEscalated(cycle, streak, threshold int, goalHash, 
 	})
 }
 
-// EmitPhaseOutputsSurveyed records the loop's per-cycle phase-output
-// accounting. The caller (the phaseoutputs pure layer) has already decided
-// abnormality; this maps it onto the stream's severity vocabulary — INFO is
-// the healthy every-cycle heartbeat a dashboard baselines on, WARN is the
-// review-data-went-missing signal an operator acts on.
 func (w *Writer) EmitPhaseOutputsSurveyed(cycle int, details string, abnormal bool) error {
 	e := Event{
 		EventType:   EventPhaseOutputsSurveyed,

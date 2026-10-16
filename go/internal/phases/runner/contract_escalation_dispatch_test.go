@@ -34,7 +34,6 @@ func TestRunner_ContractEscalation_RedispatchesOnEscalatedCLIWithDirective(t *te
 func TestRunner_ContractEscalation_KeepsOriginalPrimaryInChain(t *testing.T) {
 	root := writeFallbackProfile(t, "evolve-auditor", "agy-tmux", []string{"codex-tmux"})
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "deep", prompt: "x", verdict: core.VerdictPASS}
-	// The escalated primary hits a boot timeout (exit 80), so the walk must reach the profile's own candidates.
 	sb := &scriptedBridge{responses: map[string]scriptedResp{
 		"claude-tmux": {
 			resp: core.BridgeResponse{ExitCode: 80, Stderr: "REPL boot timeout"},

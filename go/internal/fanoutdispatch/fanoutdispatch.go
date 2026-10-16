@@ -1,15 +1,5 @@
-// Package fanoutdispatch ports legacy/scripts/dispatch/fanout-dispatch.sh.
-//
-// Bounded-concurrency parallel worker dispatcher (Sprint 1).
-// Reads a TSV commands file (`<worker_name>\t<command>\n`) and runs each
-// command concurrently, bounded by EVOLVE_FANOUT_CONCURRENCY (default 2).
-// Each worker is wrapped in a per-worker timeout (default 600s). WAIT-ALL
-// semantics: every worker runs to completion or timeout regardless of
-// others' failures.
-//
-// Optional consensus-cancel (EVOLVE_FANOUT_CANCEL_ON_CONSENSUS=1) polls
-// workers' stdout for FAIL verdicts and SIGTERMs survivors once K workers
-// have voted FAIL.
+// Package fanoutdispatch runs the commands of a TSV file as bounded parallel workers and merges their exit codes.
+// See docs/architecture/packages/internal-fanoutdispatch.md.
 package fanoutdispatch
 
 import (
@@ -28,34 +18,31 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Exit codes:
-//
-//	0 — every worker exited 0
-//	1 — one or more workers had non-zero exit codes
-//	2 — bad arguments / setup failure
 const (
 	ExitOK         = 0
 	ExitWorkerFail = 1
 	ExitSetupErr   = 2
 )
 
-// Config controls the dispatcher behavior.
+const (
+	exitWorkerTimedOut   = 124
+	exitWorkerTerminated = 143
+)
+
 type Config struct {
-	CommandsFile        string // path to TSV (<name>\t<command>\n)
-	ResultsFile         string // path to write merged results TSV
-	Concurrency         int    // default 2 ≥1
-	TimeoutSecs         int    // default 600 ≥1
-	CancelOnConsensus   bool   // EVOLVE_FANOUT_CANCEL_ON_CONSENSUS=1
-	ConsensusK          int    // ≥1; how many FAILs trigger cancel
-	ConsensusPollSecs   int    // default 1
-	CachePrefixFile     string // optional; exported as EVOLVE_FANOUT_CACHE_PREFIX_FILE
-	CycleStateHelperBin string // optional; if set + TrackWorkers, shell out for status writes
-	TrackWorkers        bool   // EVOLVE_FANOUT_TRACK_WORKERS=1
-	// Testing seams:
-	Now func() time.Time
+	CommandsFile        string
+	ResultsFile         string
+	Concurrency         int
+	TimeoutSecs         int
+	CancelOnConsensus   bool
+	ConsensusK          int
+	ConsensusPollSecs   int
+	CachePrefixFile     string
+	CycleStateHelperBin string
+	TrackWorkers        bool
+	Now                 func() time.Time
 }
 
-// Run executes the dispatcher. stderr receives [fanout-dispatch] lines.
 func Run(cfg Config, stderr io.Writer) int {
 	logf := func(format string, args ...any) {
 		fmt.Fprintf(stderr, "[fanout-dispatch] "+format+"\n", args...)
@@ -76,7 +63,6 @@ func Run(cfg Config, stderr io.Writer) int {
 		return ExitSetupErr
 	}
 
-	// defaults
 	if cfg.Concurrency < 1 {
 		cfg.Concurrency = 2
 	}
@@ -99,25 +85,16 @@ func Run(cfg Config, stderr io.Writer) int {
 		return ExitSetupErr
 	}
 
-	// Read commands.
 	commands, err := ReadCommands(cfg.CommandsFile)
 	if err != nil {
 		logf("read commands: %v", err)
 		return ExitSetupErr
 	}
 	if len(commands) == 0 {
-		// empty input → empty output, exit 0
 		_ = os.WriteFile(cfg.ResultsFile, []byte{}, 0o644)
 		return ExitOK
 	}
 
-	// Per-worker cache-prefix is injected into each worker's OWN env in
-	// runWorker (cfg.workerEnv), NOT via process-global os.Setenv: the process
-	// environment is a single MT-Unsafe global, so two concurrent
-	// DispatchParallel in one process would clobber each other (ADR-0049 S1 /
-	// gap G8).
-
-	// Per-worker state.
 	type result struct {
 		name     string
 		exitCode int
@@ -126,11 +103,9 @@ func Run(cfg Config, stderr io.Writer) int {
 	results := make(map[string]result, len(commands))
 	resultsMu := sync.Mutex{}
 
-	// Shared cancel signal for consensus-cancel.
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
-	// Semaphore for bounded concurrency.
 	sema := make(chan struct{}, cfg.Concurrency)
 	var wg sync.WaitGroup
 
@@ -153,7 +128,6 @@ func Run(cfg Config, stderr io.Writer) int {
 			}
 			cfg.setWorkerStatus(c.Name, term, rc)
 
-			// write meta file
 			metaPath := filepath.Join(resultsDir, c.Name+".meta")
 			_ = os.WriteFile(metaPath,
 				[]byte(fmt.Sprintf("%s\t%d\t%d\n", c.Name, rc, dur)),
@@ -165,7 +139,6 @@ func Run(cfg Config, stderr io.Writer) int {
 		}()
 	}
 
-	// Optional consensus-cancel polling.
 	if cfg.CancelOnConsensus {
 		go func() {
 			ticker := time.NewTicker(time.Duration(cfg.ConsensusPollSecs) * time.Second)
@@ -180,7 +153,6 @@ func Run(cfg Config, stderr io.Writer) int {
 						rootCancel()
 						return
 					}
-					// also exit poll if all are done
 					resultsMu.Lock()
 					done := len(results) >= len(commands)
 					resultsMu.Unlock()
@@ -194,7 +166,6 @@ func Run(cfg Config, stderr io.Writer) int {
 
 	wg.Wait()
 
-	// Merge meta files into RESULTS_FILE in input order.
 	anyFail := false
 	var b strings.Builder
 	for _, c := range commands {
@@ -206,7 +177,6 @@ func Run(cfg Config, stderr io.Writer) int {
 				anyFail = true
 			}
 		} else {
-			// missing meta = SIGTERM'd worker; sentinel row
 			fmt.Fprintf(&b, "%s\t-1\t0\n", c.Name)
 			anyFail = true
 		}
@@ -222,13 +192,6 @@ func Run(cfg Config, stderr io.Writer) int {
 	return ExitOK
 }
 
-// runWorker executes a single worker command with timeout. Stdout → name.out,
-// stderr → name.err. Returns the exit code (124 for timeout, 143 for SIGTERM).
-// workerEnv builds the explicit environment for a fan-out worker subprocess —
-// the parent env plus cache-prefix (when configured). Injecting per-child
-// (exec.Cmd.Env) rather than mutating the process-global env (os.Setenv) keeps
-// two concurrent DispatchParallel calls in one process from clobbering each
-// other (ADR-0049 S1 / gap G8). A later duplicate key wins in exec.
 func (cfg Config) workerEnv() []string {
 	env := os.Environ()
 	if cfg.CachePrefixFile != "" {
@@ -242,7 +205,7 @@ func (cfg Config) runWorker(parent context.Context, name, command, resultsDir st
 	defer cancel()
 
 	cmd := sysexec.Command(ctx, "/bin/sh", "-c", command)
-	cmd.Env = cfg.workerEnv() // per-worker env snapshot (ADR-0049 S1 / G8)
+	cmd.Env = cfg.workerEnv()
 	outF, _ := os.Create(filepath.Join(resultsDir, name+".out"))
 	errF, _ := os.Create(filepath.Join(resultsDir, name+".err"))
 	if outF != nil {
@@ -256,10 +219,10 @@ func (cfg Config) runWorker(parent context.Context, name, command, resultsDir st
 
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return 124 // matches coreutils timeout exit code
+			return exitWorkerTimedOut
 		}
 		if ctx.Err() == context.Canceled {
-			return 143 // SIGTERM-equivalent
+			return exitWorkerTerminated
 		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return exitErr.ExitCode()
@@ -269,7 +232,6 @@ func (cfg Config) runWorker(parent context.Context, name, command, resultsDir st
 	return 0
 }
 
-// setWorkerStatus optionally shells out to cycle-state.sh for worker status.
 func (cfg Config) setWorkerStatus(name, status string, rc int) {
 	if !cfg.TrackWorkers || cfg.CycleStateHelperBin == "" {
 		return
@@ -283,16 +245,11 @@ func (cfg Config) setWorkerStatus(name, status string, rc int) {
 	_ = cmd.Run()
 }
 
-// ── helpers ────────────────────────────────────────────────────────────────
-
-// Command represents a row from the commands TSV.
 type Command struct {
 	Name    string
 	Command string
 }
 
-// ReadCommands parses a TSV of (name\tcommand) pairs. Empty lines and lines
-// without a tab are ignored.
 func ReadCommands(path string) ([]Command, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -319,12 +276,8 @@ func ReadCommands(path string) ([]Command, error) {
 	return out, nil
 }
 
-// failVerdictRe matches inline "Verdict: FAIL" (case-insensitive, optional
-// markdown bold/asterisks around FAIL).
 var failVerdictRe = regexp.MustCompile(`(?i)^\s*verdict:\s*\**\s*FAIL\b`)
 
-// checkFailConsensus scans .out files in resultsDir for FAIL verdicts and
-// returns true if at least k workers have voted FAIL.
 func checkFailConsensus(resultsDir string, k int) bool {
 	matches, err := filepath.Glob(filepath.Join(resultsDir, "*.out"))
 	if err != nil {

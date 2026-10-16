@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// mutatingBridge plays a probing auditor: it rewrites a material file, drops a probe test, then writes its report.
 type mutatingBridge struct{ launches int }
 
 func (b *mutatingBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -51,7 +50,6 @@ func fenceRepo(t *testing.T) string {
 	}
 	run("add", "-A")
 	run("commit", "-q", "-m", "base")
-	// The builder's uncommitted change, which the audit must judge.
 	if err := os.WriteFile(filepath.Join(dir, "src", "mat.go"), []byte("package src // builder change\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -63,8 +61,6 @@ func runFenced(t *testing.T, phase string, readOnly bool) (dir string, resp core
 	return dir, resp
 }
 
-// runFencedObserving also returns what src/mat.go held when Classify ran: the audit's explanation binding runs
-// inside Classify, so the restore must precede it, not merely happen.
 func runFencedObserving(t *testing.T, phase string, readOnly bool) (dir string, resp core.PhaseResponse, atClassify string) {
 	t.Helper()
 	dir = fenceRepo(t)

@@ -166,7 +166,6 @@ func TestExtractResponseTokens_NotMatchingFormats(t *testing.T) {
 			name: "bare_number_no_arrow",
 			pane: "5200 tokens",
 		},
-		// "↓5.2k tokens" (no space) is deliberately absent: the regex accepts it.
 		{
 			name: "singular_token_word",
 			pane: "↓ 5.2k token",

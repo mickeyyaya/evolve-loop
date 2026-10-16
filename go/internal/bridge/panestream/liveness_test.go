@@ -29,7 +29,7 @@ func TestDefaultDetector_Converging(t *testing.T) {
 		t.Run(c.cli, func(t *testing.T) {
 			det := NewDefaultDetector(3)
 			p := Profiles[c.cli]
-			det.Assess(testdataFrame(t, c.think), p) // prime
+			det.Assess(testdataFrame(t, c.think), p)
 			state, _ := det.Assess(testdataFrame(t, c.answer), p)
 			if state != LivenessConverging {
 				t.Errorf("[%s] thinking→answer: got %v, want LivenessConverging", c.cli, state)
@@ -42,7 +42,6 @@ func TestDefaultDetector_SpinnerOnlyIsNotConverging(t *testing.T) {
 	p := Profiles["claude"]
 	det := NewDefaultDetector(3)
 	det.Assess("⏺ real content\n❯ \n", p)
-	// Spinner-only frame: only the chrome/affordance changes, content is identical.
 	spinner := "⏺ real content\n✽ Thinking… (5s · ↓ 50 tokens)\n❯ \n"
 	state, _ := det.Assess(spinner, p)
 	if state == LivenessConverging {
@@ -56,8 +55,8 @@ func TestDefaultDetector_PrimingNotHung(t *testing.T) {
 		"❯ \n",
 		"⏺ some content\n❯ \n",
 	} {
-		det := NewDefaultDetector(1) // stallThreshold=1 — soonest possible Hung
-		det.Assess(frame, p)         // prime
+		det := NewDefaultDetector(1)
+		det.Assess(frame, p)
 		state, _ := det.Assess(frame, p)
 		if state == LivenessHung {
 			t.Errorf("single stall after prime must NOT be Hung (stallThreshold=1); got %v for %q", state, frame)
@@ -69,7 +68,7 @@ func TestDefaultDetector_HungAfterThreshold(t *testing.T) {
 	p := Profiles["claude"]
 	const stall = 2
 	det := NewDefaultDetector(stall)
-	det.Assess("⏺ initial\n❯ \n", p) // prime
+	det.Assess("⏺ initial\n❯ \n", p)
 	s1, _ := det.Assess("⏺ initial\n✽ Thinking… (5s · ↓ 10 tokens)\n❯ \n", p)
 	if s1 == LivenessHung {
 		t.Fatalf("interval 1/%d: must NOT be Hung yet (got %v)", stall, s1)
@@ -83,7 +82,7 @@ func TestDefaultDetector_HungAfterThreshold(t *testing.T) {
 func TestDefaultDetector_IdleResetsStalls(t *testing.T) {
 	p := Profiles["claude"]
 	det := NewDefaultDetector(2)
-	det.Assess("⏺ content\n❯ \n", p) // prime
+	det.Assess("⏺ content\n❯ \n", p)
 	det.Assess("⏺ content\n✽ Thinking… (3s · ↓ 5 tokens)\n❯ \n", p)
 	det.Assess("⏺ content\n❯ \n", p)
 	s, _ := det.Assess("⏺ content\n✽ Thinking… (3s · ↓ 5 tokens)\n❯ \n", p)
@@ -207,7 +206,6 @@ func TestExtractResponseTokens(t *testing.T) {
 		pane string
 		want int
 	}{
-		// k-form is claude's real rendering; plain integers appear in synthetic frames.
 		{"k-form integer", "↓ 12k tokens", 12000},
 		{"k-form fractional", "↓ 5.2k tokens", 5200},
 		{"k-form half", "↓ 3.5k tokens", 3500},

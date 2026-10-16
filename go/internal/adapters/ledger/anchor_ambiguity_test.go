@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-// siblingLedger has two fork-sibling lines carrying entry_seq=2 and returns each line's SHA, index-aligned.
 func siblingLedger(t *testing.T) (dir string, sha []string) {
 	t.Helper()
 	dir = t.TempDir()
@@ -29,7 +28,6 @@ func siblingLedger(t *testing.T) (dir string, sha []string) {
 	if err := os.WriteFile(filepath.Join(dir, "ledger.jsonl"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Verify checks the tip once the chain is anchored, so the fixture needs one.
 	tip := fmt.Sprintf("%d:%s", 3, sha256Of(c))
 	if err := os.WriteFile(filepath.Join(dir, "ledger.tip"), []byte(tip), 0o644); err != nil {
 		t.Fatal(err)
@@ -75,7 +73,6 @@ func TestAnchor_RejectsAmbiguousSeq(t *testing.T) {
 	}
 }
 
-// This anchor must resolve: byte-identical lines share one SHA, so they are one line to bind.
 func TestAnchor_RejectsAmbiguousSeq_ByteIdenticalLinesAreNotAmbiguous(t *testing.T) {
 	dir := t.TempDir()
 	lines, sha := chainLines()
@@ -114,7 +111,7 @@ func TestAnchor_LineSHANegatives(t *testing.T) {
 	}{
 		{
 			name:    "sha_carries_a_different_seq",
-			sha:     func(s []string) string { return s[1] }, // entry_seq 1
+			sha:     func(s []string) string { return s[1] },
 			wantMsg: "entry_seq=1",
 		},
 		{

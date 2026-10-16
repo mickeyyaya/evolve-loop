@@ -118,7 +118,6 @@ func TestPersistLocked_InMemoryMode(t *testing.T) {
 }
 
 func TestPersistLocked_UnwritableDir(t *testing.T) {
-	// A read-only parent makes MkdirAll of the manifest's subdirectory fail.
 	parent := t.TempDir()
 	if err := os.Chmod(parent, 0o555); err != nil {
 		t.Skip("cannot set read-only dir on this system")

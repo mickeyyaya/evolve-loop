@@ -1,11 +1,4 @@
 // Package acsassert is the assertion DSL ACS predicates write against.
-//
-// Each Go predicate under go/acs/{cycle<N>,regression,redteam}/ uses these
-// helpers in the same way the retired bash predicates used [ -f ], grep -q,
-// jq -e, etc. (ADR-0042). The helpers
-// take a TB instead of *testing.T so they're testable in isolation
-// (the test for FileExists doesn't have to fail itself when checking
-// missing-file behaviour).
 package acsassert
 
 import (
@@ -28,26 +21,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// deepEqualOrPanic is a thin wrapper that's testable and can be
-// short-circuited to reflect.DeepEqual semantics.
 func deepEqualOrPanic(a, b any) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-// TB is a minimal interface over *testing.T — accepts anything that
-// can log a failure and mark itself as a test helper. Implemented by
-// the stdlib *testing.T and by acsassert's internal fakeT (tests).
 type TB interface {
 	Errorf(format string, args ...any)
 	Helper()
 }
 
-// ErrSubprocessNotFound is returned by SubprocessOutput when the
-// binary cannot be located on PATH.
 var ErrSubprocessNotFound = errors.New("acsassert: subprocess binary not found")
 
-// movedHint names the relocation possibility when a predicate's path does not
-// exist, since a stale path after a file move is the usual cause.
 func movedHint(err error) string {
 	if errors.Is(err, fs.ErrNotExist) {
 		return " (the file may have moved or been renamed; repoint the predicate at its current location)"
@@ -55,8 +39,6 @@ func movedHint(err error) string {
 	return ""
 }
 
-// FileExists reports whether path is a regular file (or symlink to one)
-// that os.Stat can read. Logs an Errorf when it isn't.
 func FileExists(tb TB, path string) bool {
 	tb.Helper()
 	if _, err := os.Stat(path); err != nil {
@@ -66,7 +48,6 @@ func FileExists(tb TB, path string) bool {
 	return true
 }
 
-// FileContains reports whether path's contents include the substring.
 func FileContains(tb TB, path, substring string) bool {
 	tb.Helper()
 	raw, err := os.ReadFile(path)
@@ -81,16 +62,6 @@ func FileContains(tb TB, path, substring string) bool {
 	return true
 }
 
-// FileNotContains is the correct primitive for an ABSENCE assertion (e.g. "a
-// removed flag no longer appears in this source file"). It returns true and
-// logs nothing when the substring is absent, and logs an Errorf + returns false
-// when the substring is PRESENT (or the file cannot be read).
-//
-// Use this instead of inverting FileContains. FileContains is a POSITIVE
-// assertion that Errorf's "missing" when the substring is absent, so the idiom
-// `if FileContains(tb, f, flag) { tb.Errorf("present") }` red-fails on the
-// CORRECT (absent) state: the FileContains call still fires its internal Errorf
-// even though the if body is skipped (cycle-352 broken-predicate incident).
 func FileNotContains(tb TB, path, substring string) bool {
 	tb.Helper()
 	raw, err := os.ReadFile(path)
@@ -105,8 +76,6 @@ func FileNotContains(tb TB, path, substring string) bool {
 	return true
 }
 
-// FileMatchesRegex reports whether path's contents match pattern
-// (Go's RE2 syntax). Logs an Errorf on no match or invalid pattern.
 func FileMatchesRegex(tb TB, path, pattern string) bool {
 	tb.Helper()
 	raw, err := os.ReadFile(path)
@@ -126,10 +95,6 @@ func FileMatchesRegex(tb TB, path, pattern string) bool {
 	return true
 }
 
-// JSONFieldEquals navigates a dot path (e.g. "a.b.c") through the
-// JSON in path and reports whether the resolved value equals want.
-// Scalars compare via Go's == operator; for numbers, want should be
-// float64 (encoding/json's default for JSON numbers).
 func JSONFieldEquals(tb TB, path, dotPath string, want any) bool {
 	tb.Helper()
 	raw, err := os.ReadFile(path)
@@ -147,11 +112,6 @@ func JSONFieldEquals(tb TB, path, dotPath string, want any) bool {
 		tb.Errorf("JSONFieldEquals(%q): path %q not found", path, dotPath)
 		return false
 	}
-	// Guard against panic from comparing non-comparable types (e.g.
-	// when dotPath resolves to a map). DeepEqual handles both.
-	defer func() {
-		// Nothing to do — equalAny below uses reflect so won't panic.
-	}()
 	if !equalAny(got, want) {
 		tb.Errorf("JSONFieldEquals(%q) at %q: got %v (%T), want %v (%T)", path, dotPath, got, got, want, want)
 		return false
@@ -159,17 +119,11 @@ func JSONFieldEquals(tb TB, path, dotPath string, want any) bool {
 	return true
 }
 
-// equalAny compares two any values without panicking on non-comparable
-// types. Uses reflect.DeepEqual which handles maps/slices/structs.
 func equalAny(a, b any) bool {
-	// Fast path for comparable types; reflect.DeepEqual is the
-	// fallback for maps/slices.
 	defer func() { _ = recover() }()
 	return deepEqualOrPanic(a, b)
 }
 
-// navigateDotPath walks a top-level JSON object via dot-separated keys.
-// Returns the resolved value + true; or nil + false if any key is missing.
 func navigateDotPath(doc any, dotPath string) (any, bool) {
 	cur := doc
 	if dotPath == "" {
@@ -189,10 +143,6 @@ func navigateDotPath(doc any, dotPath string) (any, bool) {
 	return cur, true
 }
 
-// SubprocessOutput runs name+args and returns stdout, stderr, and the
-// exit code. A non-zero exit code is surfaced as an error so callers
-// can treat it as a failure with ergonomic if-err handling. A missing
-// binary path returns ErrSubprocessNotFound wrapped with context.
 func SubprocessOutput(name string, args ...string) (stdout, stderr string, code int, err error) {
 	if _, lookErr := exec.LookPath(name); lookErr != nil {
 		return "", "", -1, fmt.Errorf("%w: %s: %v", ErrSubprocessNotFound, name, lookErr)
@@ -214,9 +164,6 @@ func SubprocessOutput(name string, args ...string) (stdout, stderr string, code 
 	return stdout, stderr, -1, fmt.Errorf("subprocess %s: %w", name, runErr)
 }
 
-// AllOf returns true if every predicate returns true. Short-circuits
-// on the first false. Predicates take a TB so they can log their own
-// failure context.
 func AllOf(tb TB, predicates ...func(TB) bool) bool {
 	tb.Helper()
 	for i, p := range predicates {
@@ -228,8 +175,6 @@ func AllOf(tb TB, predicates ...func(TB) bool) bool {
 	return true
 }
 
-// SetupTempProject creates a typical evolve-loop project layout under
-// t.TempDir() and returns the project root path.
 func SetupTempProject(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -241,10 +186,6 @@ func SetupTempProject(t *testing.T) string {
 	return dir
 }
 
-// RepoRoot resolves the repository root via `git rev-parse --show-toplevel`.
-// Skips the test when not inside a git work tree — predicate suites can
-// then run cleanly on bare exports without false failures. Shared across
-// every go/acs/ predicate package.
 func RepoRoot(t *testing.T) string {
 	t.Helper()
 	stdout, _, code, err := SubprocessOutput("git", "rev-parse", "--show-toplevel")
@@ -254,22 +195,11 @@ func RepoRoot(t *testing.T) string {
 	return strings.TrimSpace(stdout)
 }
 
-// FileContainsAny reports whether path's content contains at least one of
-// the substring variants. Returns false if the file is missing or no
-// variant matches. Pure boolean (no TB) so callers control failure mode.
-// A lenient wrapper over FileContainsAnyChecked for callers that don't need
-// to distinguish "file missing" from "content absent"; prefer the Checked
-// form in a predicate that reports its own failure message.
 func FileContainsAny(path string, variants ...string) bool {
 	hit, _ := FileContainsAnyChecked(path, variants...)
 	return hit
 }
 
-// FileContainsAnyChecked is FileContainsAny's message-carrying sibling: on a
-// missing path it returns a non-nil error naming the path and the moved-file
-// hint (wrapping fs.ErrNotExist), instead of silently returning false —
-// indistinguishable, in the bool-only form, from "file present, content
-// absent".
 func FileContainsAnyChecked(path string, variants ...string) (bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -284,21 +214,11 @@ func FileContainsAnyChecked(path string, variants ...string) (bool, error) {
 	return false, nil
 }
 
-// CountOccurrencesAny returns the count of lines in path that match any
-// of the given substring variants. Used by "at least N named gates"
-// predicates. Returns 0 if the file is missing.
-// A lenient wrapper over CountOccurrencesAnyChecked; prefer the Checked form
-// in a predicate that reports its own failure message.
 func CountOccurrencesAny(path string, variants ...string) int {
 	n, _ := CountOccurrencesAnyChecked(path, variants...)
 	return n
 }
 
-// CountOccurrencesAnyChecked is CountOccurrencesAny's message-carrying
-// sibling: on a missing path it returns a non-nil error naming the path and
-// the moved-file hint (wrapping fs.ErrNotExist), instead of silently
-// returning 0 — indistinguishable, in the int-only form, from "file
-// present, zero matches".
 func CountOccurrencesAnyChecked(path string, variants ...string) (int, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -316,21 +236,11 @@ func CountOccurrencesAnyChecked(path string, variants ...string) (int, error) {
 	return count, nil
 }
 
-// LineContainsAll reports whether at least one line of path contains
-// every substring in needles. Useful for table-row predicates like
-// "row containing `P-NEW-20` AND `DONE`".
-// A lenient wrapper over LineContainsAllChecked; prefer the Checked form in
-// a predicate that reports its own failure message.
 func LineContainsAll(path string, needles ...string) bool {
 	hit, _ := LineContainsAllChecked(path, needles...)
 	return hit
 }
 
-// LineContainsAllChecked is LineContainsAll's message-carrying sibling: on a
-// missing path it returns a non-nil error naming the path and the
-// moved-file hint (wrapping fs.ErrNotExist), instead of silently returning
-// false — indistinguishable, in the bool-only form, from "file present, no
-// matching line".
 func LineContainsAllChecked(path string, needles ...string) (bool, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -351,15 +261,6 @@ func LineContainsAllChecked(path string, needles ...string) (bool, error) {
 	return false, nil
 }
 
-// CountInGoFunc returns the count of lines INSIDE the named top-level
-// function of the Go source file at path that contain any of the given
-// substring variants. Methods match by bare name too (receiver ignored);
-// on a name collision the FIRST declaration in the file wins. Function-scoped counting is rot-resistant where
-// file-wide CountOccurrencesAny is not: a later cycle adding occurrences
-// elsewhere in the file cannot flip a function-scoped predicate. Unlike the
-// lenient file-wide helpers, a missing file, unparsable source, or missing
-// function returns a non-nil error — a renamed function must fail a
-// predicate LOUDLY, never satisfy an ==0 assertion silently.
 func CountInGoFunc(path, funcName string, variants ...string) (int, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {

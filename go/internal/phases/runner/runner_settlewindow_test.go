@@ -12,14 +12,13 @@ import (
 
 func TestRun_CleanExitIdle_DeliverableSettlesLate_WidenedWindowCatchesIt(t *testing.T) {
 	genuine := "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
-	// The pane carries echoed example sentinels, a FAIL among them, which would synthesize a false FAIL.
 	noisyStdout := "Deliverable Contract example (FAIL):\n" +
 		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\"} -->\n" +
 		"(prompt-echoed example, not the agent's real report)\n"
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	nb := &noisyStdoutBridge{fileContent: genuine, stdout: noisyStdout}
 
-	const settleOnCall = 10 // beyond a 3-retry window, within the current one
+	const settleOnCall = 10
 	calls := 0
 	settlesLate := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
@@ -33,7 +32,7 @@ func TestRun_CleanExitIdle_DeliverableSettlesLate_WidenedWindowCatchesIt(t *test
 		Bridge:   nb,
 		Prompts:  fakePromptsFS("evolve-auditor", "x"),
 		VerifyFn: settlesLate,
-		SleepFn:  func(time.Duration) {}, // deterministic: no real settle delay in tests
+		SleepFn:  func(time.Duration) {},
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})

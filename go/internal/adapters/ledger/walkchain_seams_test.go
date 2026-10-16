@@ -44,7 +44,7 @@ func writeChain(t *testing.T, lines [][]byte, lastSeq int) *FileLedger {
 func TestWalkChain_ReGenesisSeamAccepted(t *testing.T) {
 	e0 := rawEntry(t, 0, ZeroSeed, "a")
 	e1 := rawEntry(t, 1, sha256Hex(e0), "b")
-	seam := rawEntry(t, 0, ZeroSeed, "restart") // lost-tip re-genesis
+	seam := rawEntry(t, 0, ZeroSeed, "restart")
 	e2 := rawEntry(t, 1, sha256Hex(seam), "c")
 	l := writeChain(t, [][]byte{e0, e1, seam, e2}, 1)
 	if err := l.Verify(context.Background()); err != nil {
@@ -64,7 +64,7 @@ func TestWalkChain_ZeroPrevWithNonzeroSeqIsBroken(t *testing.T) {
 func TestWalkChain_ForkSiblingAccepted(t *testing.T) {
 	e0 := rawEntry(t, 0, ZeroSeed, "a")
 	e1 := rawEntry(t, 1, sha256Hex(e0), "child-A")
-	sib := rawEntry(t, 1, sha256Hex(e0), "child-B") // same parent as e1
+	sib := rawEntry(t, 1, sha256Hex(e0), "child-B")
 	e2 := rawEntry(t, 2, sha256Hex(sib), "after-fork")
 	l := writeChain(t, [][]byte{e0, e1, sib, e2}, 2)
 	if err := l.Verify(context.Background()); err != nil {
@@ -99,7 +99,6 @@ func TestWalkChain_DuplicatePrevWithoutSiblingSignatureIsBroken(t *testing.T) {
 	e0 := rawEntry(t, 0, ZeroSeed, "a")
 	e1 := rawEntry(t, 1, sha256Hex(e0), "b")
 	e2 := rawEntry(t, 2, sha256Hex(e1), "c")
-	// Re-uses e1's parent hash but is not adjacent to e1, so it is not a sibling.
 	dup := rawEntry(t, 3, sha256Hex(e0), "late-dup")
 	l := writeChain(t, [][]byte{e0, e1, e2, dup}, 3)
 	if err := l.Verify(context.Background()); !errors.Is(err, core.ErrLedgerChainBroken) {

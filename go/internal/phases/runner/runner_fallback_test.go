@@ -78,7 +78,7 @@ func TestRun_FallbackOnBootTimeout_PrimaryFailsSecondarySucceeds(t *testing.T) {
 				resp: core.BridgeResponse{ExitCode: 80, Stderr: "REPL boot timeout"},
 				err:  errors.New("bridge: launch exit=80"),
 			},
-			"claude-tmux": {}, // empty = success
+			"claude-tmux": {},
 		},
 	}
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
@@ -167,7 +167,6 @@ func TestRun_ChainExhausted_LastErrorSurfaces(t *testing.T) {
 	}
 }
 
-// The profile omits cli_fallback_on_exit, so the default trigger list is what fires.
 func TestRun_FallbackOnArtifactTimeout_DefaultTriggerListIncludes81(t *testing.T) {
 	hooks := &fakeHooks{
 		phase: "tdd", agent: "evolve-tdd-engineer", model: "sonnet",
@@ -179,7 +178,7 @@ func TestRun_FallbackOnArtifactTimeout_DefaultTriggerListIncludes81(t *testing.T
 				resp: core.BridgeResponse{ExitCode: 81, Stderr: "bridge artifact timeout"},
 				err:  errors.New("bridge: launch exit=81: core: bridge artifact timeout"),
 			},
-			"claude-tmux": {}, // success
+			"claude-tmux": {},
 		},
 	}
 	root := writeFallbackProfile(t, "evolve-tdd-engineer", "codex-tmux", []string{"claude-tmux"})
@@ -250,7 +249,7 @@ func TestRun_NoFallback_ByteIdentical(t *testing.T) {
 		phase: "scout", agent: "evolve-scout", model: "sonnet",
 		prompt: "x", verdict: core.VerdictPASS,
 	}
-	sb := &scriptedBridge{} // empty → default success for any cli
+	sb := &scriptedBridge{}
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	r := New(Options{
 		Hooks:    hooks,

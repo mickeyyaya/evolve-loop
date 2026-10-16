@@ -1,14 +1,7 @@
 package budgethistory
 
-// apicover_named_test.go — ADR-0050 Phase 5 public-API coverage: name and
-// exercise every exported budgethistory symbol by identifier (apicover counts
-// field access as "uses", not "names"). Each test asserts a REAL contract.
-
 import "testing"
 
-// TestThroughput_CollectNamed names the Throughput type and Collect by
-// identifier, pinning the core contract: a single 1h cycle yields SampleCount 1,
-// a 1h median, and a per-lane pace of exactly 1.0 cycles/hour.
 func TestThroughput_CollectNamed(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

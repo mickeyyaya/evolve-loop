@@ -1,21 +1,5 @@
-// Package posteditvalidate ports legacy/scripts/verification/postedit-validate.sh.
-//
-// PostToolUse hook for Edit|Write tool calls. Validates the file that was
-// just edited or written by extension:
-//
-//	.json → jq empty (parse check)
-//	.sh   → bash -n  (syntax check)
-//	.py   → python3 -m py_compile
-//	other → silent no-op
-//
-// This hook NEVER blocks (PostToolUse fires AFTER the tool ran). On a
-// detected issue, it emits a stderr WARN that Claude Code surfaces to the
-// LLM, prompting an immediate re-edit.
-//
-// Bypass: Options.Bypass, wired from the command's --bypass flag.
-//
-// Always returns nil error — exit codes are non-blocking by design. The
-// cmd layer always exits 0.
+// Package posteditvalidate checks a just-edited json, shell or python file and warns the model without blocking.
+// See docs/architecture/packages/internal-posteditvalidate.md.
 package posteditvalidate
 
 import (
@@ -33,32 +17,26 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Options drives a Run() invocation.
 type Options struct {
-	Payload     []byte    // raw JSON tool_use_input payload from stdin
-	ProjectRoot string    // for guards.log path; required
-	LLMStderr   io.Writer // visible to the LLM via Claude Code's reminder mechanism
-	GuardsLog   string    // optional override; defaults to <ProjectRoot>/.evolve/guards.log
-	Bypass      bool      // explicit emergency bypass
+	Payload     []byte
+	ProjectRoot string
+	LLMStderr   io.Writer
+	GuardsLog   string
+	Bypass      bool
 	Now         func() time.Time
 
-	// Validator seams: each takes the file path, returns (ok, errMsg).
-	// Defaults shell out to jq / bash / python3 respectively.
 	ValidateJSON func(filePath string) (bool, string)
 	ValidateBash func(filePath string) (bool, string)
 	ValidatePy   func(filePath string) (bool, string)
 }
 
-// Result describes what happened (mostly for tests + observability).
 type Result struct {
-	Kind        string // "skip" | "json" | "sh" | "py" | "noop" | "bypass"
+	Kind        string
 	FilePath    string
 	OK          bool
 	WarnEmitted bool
 }
 
-// Run validates the just-edited file. Always returns nil error to keep
-// the cmd layer's exit code at 0 (PostToolUse cannot block).
 func Run(opts Options) Result {
 	res := Result{}
 
@@ -84,7 +62,6 @@ func Run(opts Options) Result {
 }
 
 func guardsLogger(opts Options) func(format string, args ...any) {
-	// Resolve guards.log path.
 	guardsLog := opts.GuardsLog
 	if guardsLog == "" && opts.ProjectRoot != "" {
 		guardsLog = filepath.Join(opts.ProjectRoot, ".evolve", "guards.log")
@@ -123,7 +100,6 @@ func resolveTarget(opts Options, logf func(string, ...any)) (filePath, skipKind 
 }
 
 func resolveValidators(opts Options) (vJSON, vBash, vPy func(string) (bool, string)) {
-	// Resolve validator defaults.
 	vJSON = opts.ValidateJSON
 	if vJSON == nil {
 		vJSON = defaultValidateJSON
@@ -168,7 +144,6 @@ func validateFile(opts Options, filePath string, logf, warnLLM func(string, ...a
 		ok, errMsg = vPy(filePath)
 		if ok {
 			logf("OK: %s (py_compile)", filePath)
-			// Clean up __pycache__ left behind by py_compile.
 			cleanPyCache(filePath)
 		} else {
 			logf("WARN: python compile error in %s: %s", filePath, errMsg)
@@ -180,8 +155,6 @@ func validateFile(opts Options, filePath string, logf, warnLLM func(string, ...a
 		return "noop", true
 	}
 }
-
-// --- Payload parsing -------------------------------------------------------
 
 type payloadShape struct {
 	ToolInput struct {
@@ -197,10 +170,7 @@ func extractFilePath(payload []byte) string {
 	return ""
 }
 
-// --- Default validators ----------------------------------------------------
-
 func defaultValidateJSON(filePath string) (bool, string) {
-	// Prefer jq for byte-parity with bash; fall back to encoding/json if jq is missing.
 	if _, err := exec.LookPath("jq"); err == nil {
 		cmd := sysexec.Command(context.Background(), "jq", "empty", filePath)
 		out, err := cmd.CombinedOutput()
@@ -222,7 +192,7 @@ func defaultValidateJSON(filePath string) (bool, string) {
 
 func defaultValidateBash(filePath string) (bool, string) {
 	if _, err := exec.LookPath("bash"); err != nil {
-		return true, "" // bash unavailable: don't false-positive
+		return true, ""
 	}
 	cmd := sysexec.Command(context.Background(), "bash", "-n", filePath)
 	out, err := cmd.CombinedOutput()
@@ -240,7 +210,7 @@ func defaultValidatePy(filePath string) (bool, string) {
 		py = "python"
 	}
 	if py == "" {
-		return true, "" // no python: don't false-positive
+		return true, ""
 	}
 	cmd := sysexec.Command(context.Background(), py, "-m", "py_compile", filePath)
 	out, err := cmd.CombinedOutput()
@@ -250,8 +220,6 @@ func defaultValidatePy(filePath string) (bool, string) {
 	return false, strings.TrimSpace(string(out))
 }
 
-// cleanPyCache removes py_compile's stamped pyc files for the just-checked
-// file. Mirrors bash: rm -rf "$(dirname)/__pycache__/$(basename .py)".*.pyc
 func cleanPyCache(filePath string) {
 	dir := filepath.Dir(filePath)
 	base := strings.TrimSuffix(filepath.Base(filePath), ".py")
@@ -269,13 +237,6 @@ func cleanPyCache(filePath string) {
 	}
 }
 
-// --- Guards-log append (best-effort) ---------------------------------------
-
-// appendGuardsLog is a best-effort NDJSON-ish append. The open/write/close is
-// centralized in guardslog.Append (which surfaces the close error so it is
-// testable); this guard is fire-and-forget by design — a read-only sandbox is
-// expected to fail here and must never surface — so the error is discarded
-// explicitly at this boundary.
 func appendGuardsLog(path string, ts time.Time, msg string) {
 	_ = guardslog.Append(path, "postedit-validate", msg, ts)
 }

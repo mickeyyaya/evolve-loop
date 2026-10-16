@@ -9,45 +9,38 @@ import (
 	"sync"
 )
 
-// SessionStatus is a worker session's lifecycle state in the registry and manifest.
 type SessionStatus string
 
 const (
-	// StatusLive marks a dispatched worker whose tmux session should exist.
-	StatusLive SessionStatus = "live"
-	// StatusReaped marks a worker torn down cleanly or by the reaper.
+	StatusLive   SessionStatus = "live"
 	StatusReaped SessionStatus = "reaped"
 )
 
-// SessionHandle identifies one worker session, both in memory and in the crash-safe manifest.
 type SessionHandle struct {
 	WorkerID    string        `json:"worker_id"`
-	Agent       string        `json:"agent"`        // the tmux/inbox key
-	TmuxSession string        `json:"tmux_session"` // empty for headless workers
-	PGID        int           `json:"pgid"`         // 0 = unknown
-	Worktree    string        `json:"worktree"`     // writers only
-	Branch      string        `json:"branch"`       // writers only
-	StartedAt   string        `json:"started_at"`   // RFC3339, stamped by the caller
+	Agent       string        `json:"agent"`
+	TmuxSession string        `json:"tmux_session"`
+	PGID        int           `json:"pgid"`
+	Worktree    string        `json:"worktree"`
+	Branch      string        `json:"branch"`
+	StartedAt   string        `json:"started_at"`
 	Status      SessionStatus `json:"status"`
 }
 
-// manifest is rewritten on every mutation so `evolve swarm reap` can find orphans after a SIGKILL.
 type manifest struct {
 	Cycle    int             `json:"cycle"`
 	Phase    string          `json:"phase"`
-	PID      int             `json:"pid"` // the orchestrator process that owns these sessions
+	PID      int             `json:"pid"`
 	Updated  string          `json:"updated,omitempty"`
 	Sessions []SessionHandle `json:"sessions"`
 }
 
-// SessionRegistry tracks worker sessions in memory, mirrors them to the on-disk manifest, and is safe for concurrent use.
 type SessionRegistry struct {
 	mu           sync.Mutex
 	manifestPath string
 	m            manifest
 }
 
-// NewSessionRegistry returns a registry backed by manifestPath, or kept in memory only when the path is empty.
 func NewSessionRegistry(manifestPath string, cycle int, phase string, pid int) *SessionRegistry {
 	return &SessionRegistry{
 		manifestPath: manifestPath,
@@ -55,7 +48,6 @@ func NewSessionRegistry(manifestPath string, cycle int, phase string, pid int) *
 	}
 }
 
-// Register records h as Live and persists; re-registering a WorkerID replaces the prior entry.
 func (r *SessionRegistry) Register(h SessionHandle) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -65,7 +57,6 @@ func (r *SessionRegistry) Register(h SessionHandle) error {
 	return r.persistOrRollbackLocked(prev)
 }
 
-// MarkReaped flips a session to Reaped and persists; an unknown WorkerID is a no-op.
 func (r *SessionRegistry) MarkReaped(workerID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -78,14 +69,12 @@ func (r *SessionRegistry) MarkReaped(workerID string) error {
 	return r.persistOrRollbackLocked(prev)
 }
 
-// snapshotSessionsLocked relies on SessionHandle holding only value fields, so a slice copy is a full snapshot.
 func (r *SessionRegistry) snapshotSessionsLocked() []SessionHandle {
 	prev := make([]SessionHandle, len(r.m.Sessions))
 	copy(prev, r.m.Sessions)
 	return prev
 }
 
-// persistOrRollbackLocked undoes an in-memory mutation the manifest never recorded, since the manifest is the reaper's truth.
 func (r *SessionRegistry) persistOrRollbackLocked(prev []SessionHandle) error {
 	if err := r.persistLocked(); err != nil {
 		r.m.Sessions = prev
@@ -94,7 +83,6 @@ func (r *SessionRegistry) persistOrRollbackLocked(prev []SessionHandle) error {
 	return nil
 }
 
-// Snapshot returns a copy of the sessions, sorted by WorkerID.
 func (r *SessionRegistry) Snapshot() []SessionHandle {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -104,7 +92,6 @@ func (r *SessionRegistry) Snapshot() []SessionHandle {
 	return out
 }
 
-// Live returns the sessions still marked Live: the teardown work list.
 func (r *SessionRegistry) Live() []SessionHandle {
 	var live []SessionHandle
 	for _, h := range r.Snapshot() {
@@ -147,7 +134,6 @@ func (r *SessionRegistry) persistLocked() error {
 	return nil
 }
 
-// LoadManifest reads a persisted manifest; a missing file yields an empty result, not an error.
 func LoadManifest(path string) (cycle int, phase string, pid int, sessions []SessionHandle, err error) {
 	data, rerr := os.ReadFile(path)
 	if rerr != nil {

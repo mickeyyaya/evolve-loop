@@ -73,7 +73,7 @@ func TestTopN_FleetWidthAware_EmptyCandidates_ReturnsEmptyNoPanic(t *testing.T) 
 
 func assertMutuallyDisjoint(t *testing.T, got []FleetCandidate) {
 	t.Helper()
-	seen := map[string]string{} // file -> owning candidate id
+	seen := map[string]string{}
 	for _, c := range got {
 		for _, f := range c.Files {
 			if owner, ok := seen[f]; ok {

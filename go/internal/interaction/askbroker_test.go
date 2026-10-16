@@ -28,6 +28,7 @@ func TestKernelAnswerer_ClosedVocabularyOnly(t *testing.T) {
 		{"Which directory should I edit in?", "/wt/cycle-7"},
 		{"What cycle number is this?", "7"},
 		{"What is the scratch space for this run?", "/ws/cycle-7"},
+		{"Which directory is the scratch directory?", "/ws/cycle-7"},
 	}
 	for _, h := range hits {
 		got, ok := a.Answer(h.q)

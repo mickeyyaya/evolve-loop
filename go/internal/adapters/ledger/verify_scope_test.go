@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// sealedFixture: genesis, one line, preserved damage, a hash-valid operator seal (entry_seq 4), a valid tail.
 func sealedFixture() (lines []string, sealSHA string) {
 	base, _ := chainLines()
 	g, a := base[0], base[1]
@@ -75,7 +74,6 @@ func TestVerifyScope_ReportsTheSealItResumedFrom(t *testing.T) {
 func TestVerifyScope_SeqIsReadFromTheAnchorLineNotTheSidecar(t *testing.T) {
 	lines, sealSHA := sealedFixture()
 	dir := writeLedgerDir(t, lines, 5)
-	// The sidecar points at line 1 (entry_seq 1); the seal sits past it.
 	writeSidecarAnchor(t, dir, 1, sha256Of(lines[1]))
 
 	scope, err := New(dir).VerifyScope(context.Background())
@@ -93,7 +91,6 @@ func TestVerifyScope_SeqIsReadFromTheAnchorLineNotTheSidecar(t *testing.T) {
 func TestVerifyScope_SidecarOnlyAnchorReportsThatLine(t *testing.T) {
 	lines, _ := chainLines()
 	dir := writeLedgerDir(t, lines, 3)
-	// Deliberately disagree with the line: the JSON says 99, the line says 1.
 	writeSidecarAnchor(t, dir, 99, sha256Of(lines[1]))
 
 	scope, err := New(dir).VerifyScope(context.Background())

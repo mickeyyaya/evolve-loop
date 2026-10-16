@@ -25,11 +25,11 @@ func TestSource_TreeSHA_RealGitWorktree(t *testing.T) {
 	if err := run("add", "-A"); err != nil {
 		t.Fatalf("git add: %v", err)
 	}
-	got, err := (Source{WorktreePath: dir}).TreeSHA() // GitTree nil → defaultGitTree
+	got, err := (Source{WorktreePath: dir}).TreeSHA()
 	if err != nil {
 		t.Fatalf("TreeSHA real git: %v", err)
 	}
-	if len(got) != 40 && len(got) != 64 { // sha1 or sha256 tree oid
+	if len(got) != 40 && len(got) != 64 {
 		t.Errorf("write-tree sha = %q, want a 40/64-char hex oid", got)
 	}
 }
@@ -46,7 +46,6 @@ func TestSource_ProfileSHA_SurfacesNonENOENTStatError(t *testing.T) {
 	if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// A child path UNDER a regular file → ENOTDIR (not IsNotExist) → must surface.
 	if _, err := (Source{ProfilePath: filepath.Join(f, "child")}).ProfileSHA(); err == nil {
 		t.Fatal("expected a non-ENOENT stat error to surface (fail loudly)")
 	}
@@ -66,7 +65,6 @@ func TestSource_BinarySHA_FromPathOrRunning(t *testing.T) {
 	if err != nil || len(got) != 64 {
 		t.Fatalf("BinarySHA from path = %q err=%v", got, err)
 	}
-	// empty BinaryPath → the running executable.
 	got2, err := Source{}.BinarySHA()
 	if err != nil || len(got2) != 64 {
 		t.Fatalf("BinarySHA running = %q err=%v", got2, err)
@@ -83,11 +81,9 @@ func TestSource_ProfileAndReportSHA_BestEffort(t *testing.T) {
 	if err != nil || got == "" {
 		t.Fatalf("ProfileSHA present = %q err=%v", got, err)
 	}
-	// absent report path → "" (no error).
 	if got, err := (Source{}).ReportSHA(); err != nil || got != "" {
 		t.Fatalf("ReportSHA absent path = %q err=%v", got, err)
 	}
-	// set-but-missing file → "" (best-effort, never blocks the cycle).
 	if got, err := (Source{ReportPath: filepath.Join(dir, "missing.md")}).ReportSHA(); err != nil || got != "" {
 		t.Fatalf("ReportSHA missing file = %q err=%v", got, err)
 	}
@@ -113,8 +109,6 @@ func TestSource_TreeSHA_ErrorPropagates(t *testing.T) {
 }
 
 func TestSource_TreeSHA_DefaultRejectsRelativePath(t *testing.T) {
-	// GitTree nil → defaultGitTree → a non-absolute worktree (which could be
-	// read as a git flag) must be rejected, not executed.
 	if _, err := (Source{WorktreePath: "relative/wt"}).TreeSHA(); err == nil {
 		t.Fatal("expected an error for a non-absolute worktree path")
 	}
@@ -136,9 +130,6 @@ func TestSource_Compute_EndToEnd(t *testing.T) {
 	}
 }
 
-// Source is a read-only value; concurrent digest computation from a shared
-// Source must be race-free and deterministic (capture happens from each phase's
-// goroutine). Run with -race.
 func TestSource_ConcurrentSafe(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

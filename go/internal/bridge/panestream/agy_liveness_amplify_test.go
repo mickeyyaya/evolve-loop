@@ -11,7 +11,6 @@ const (
 	agyEscText      = "esc to cancel"
 )
 
-// agyFrame appends the empty ">" input box to the content lines.
 func agyFrame(contentLines ...string) string {
 	var sb strings.Builder
 	for _, line := range contentLines {
@@ -30,8 +29,8 @@ func TestAmp_AgyDetector_PrimeCallReturnsBaseBehavior(t *testing.T) {
 	det := NewAgyDetector(3)
 	base := NewDefaultDetector(3)
 
-	detState, detConf := det.Assess(generating, p)    // prime
-	baseState, baseConf := base.Assess(generating, p) // prime
+	detState, detConf := det.Assess(generating, p)
+	baseState, baseConf := base.Assess(generating, p)
 
 	if detState != baseState {
 		t.Errorf("prime call on generating frame: AgyDetector state %v ≠ DefaultDetector %v; "+
@@ -45,7 +44,7 @@ func TestAmp_AgyDetector_PrimeCallReturnsBaseBehavior(t *testing.T) {
 
 func TestAmp_AgyDetector_PartialSpinnerNotConverging(t *testing.T) {
 	p := Profiles["agy"]
-	const partialSpinner = "⣯ Generat" // deliberately truncated — missing "ing..."
+	const partialSpinner = "⣯ Generat"
 	primeFrame := agyFrame("> what is tmux?")
 	partialFrame := agyFrame("> what is tmux?", partialSpinner)
 
@@ -90,7 +89,7 @@ func TestAmp_AgyDetector_SpinnerEmbeddedMidLineNotDetected(t *testing.T) {
 func TestAmp_AgyDetector_EscToCancelAloneNotConverging(t *testing.T) {
 	p := Profiles["agy"]
 	primeFrame := agyFrame("> what is tmux?")
-	escOnlyFrame := agyFrame("> what is tmux?", agyEscText) // busy affordance, no spinner
+	escOnlyFrame := agyFrame("> what is tmux?", agyEscText)
 
 	det := NewAgyDetector(3)
 	base := NewDefaultDetector(3)
@@ -156,7 +155,7 @@ func TestAmp_AgyDetector_MalformedEdgeCasesNoPanic(t *testing.T) {
 		{"empty", ""},
 		{"whitespace-only", "   \n  \n"},
 		{"partial-spinner-only", "⣯ Generat\n>\n"},
-		{"spinner-suffix-only", "Generating...\n>\n"}, // missing leading "⣯ " rune
+		{"spinner-suffix-only", "Generating...\n>\n"},
 		{"binary-garbage", "\x00\xff\xfe\n>\n"},
 		{"newlines-only", "\n\n\n"},
 		{"only-boundary", ">\n"},
@@ -173,8 +172,8 @@ func TestAmp_AgyDetector_MalformedEdgeCasesNoPanic(t *testing.T) {
 			}()
 			det := NewAgyDetector(3)
 			base := NewDefaultDetector(3)
-			det.Assess(tc.frame, p)  // prime
-			base.Assess(tc.frame, p) // prime
+			det.Assess(tc.frame, p)
+			base.Assess(tc.frame, p)
 
 			_, baseConf := base.Assess(tc.frame, p)
 			_, detConf := det.Assess(tc.frame, p)
@@ -204,8 +203,8 @@ func TestAmp_AgyDetector_WithNonAgyProfile(t *testing.T) {
 		}
 	}()
 
-	det.Assess(codexThink, codexProfile)  // prime
-	base.Assess(codexThink, codexProfile) // prime
+	det.Assess(codexThink, codexProfile)
+	base.Assess(codexThink, codexProfile)
 
 	detState, detConf := det.Assess(codexAnswer, codexProfile)
 	baseState, baseConf := base.Assess(codexAnswer, codexProfile)
@@ -254,8 +253,8 @@ func TestAmp_AgyDetector_ExtendedAnswerFrameParityManyIterations(t *testing.T) {
 	det := NewAgyDetector(3)
 	base := NewDefaultDetector(3)
 
-	det.Assess(answerFrame, p)  // prime
-	base.Assess(answerFrame, p) // prime
+	det.Assess(answerFrame, p)
+	base.Assess(answerFrame, p)
 
 	for i := 1; i <= 10; i++ {
 		detState, detConf := det.Assess(answerFrame, p)

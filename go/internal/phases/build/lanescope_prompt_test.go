@@ -1,10 +1,5 @@
 package build
 
-// Cycle-776 RED contract — fleet-lane-provisioning-split (residual slice):
-// build's composed prompt must render the pinned lane scope so the builder
-// binds to THIS lane's todo ids (cycle-766 put the scope into Context; only
-// triage renders it — see scout/lanescope_prompt_test.go for the incident).
-
 import (
 	"regexp"
 	"strings"
@@ -13,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// RENDER + ISOLATION: the lane scope appears as a fleet_scope directive line
-// naming the assigned id, and a foreign lane's id never appears.
 func TestBuild_ComposePrompt_RendersFleetScope(t *testing.T) {
 	req := core.PhaseRequest{Context: map[string]string{"fleet_scope": "todo-lane-a"}}
 	out := hooks{}.ComposePrompt("BODY", req)
@@ -26,7 +19,6 @@ func TestBuild_ComposePrompt_RendersFleetScope(t *testing.T) {
 	}
 }
 
-// EDGE: no lane scope ⇒ no fleet_scope line (sequential cycles byte-identical).
 func TestBuild_ComposePrompt_NoFleetScope_NoScopeLine(t *testing.T) {
 	out := hooks{}.ComposePrompt("BODY", core.PhaseRequest{Context: map[string]string{}})
 	if strings.Contains(out, "fleet_scope") {

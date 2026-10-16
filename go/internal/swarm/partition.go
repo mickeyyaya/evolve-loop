@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// Validate is the pure, mode-aware partition check that runs after the planner and before any worker launches.
 func Validate(plan SwarmPlan) ValidationResult {
 	if plan.IsFallback() {
 		return ValidationResult{
@@ -16,7 +15,6 @@ func Validate(plan SwarmPlan) ValidationResult {
 		}
 	}
 
-	// A duplicate worker_id would silently dedupe in the ownership and DAG maps, so reject it before any mode check.
 	if dup := duplicateWorkerID(plan.Workers); dup != "" {
 		return ValidationResult{
 			Collapse: true,
@@ -108,7 +106,6 @@ func duplicateWorkerID(workers []WorkerSpec) string {
 	return ""
 }
 
-// normalizePath case-folds because macOS and Windows filesystems are case-insensitive: Foo/A.go and foo/a.go are one file.
 func normalizePath(p string) string {
 	p = strings.TrimSpace(p)
 	if p == "" {

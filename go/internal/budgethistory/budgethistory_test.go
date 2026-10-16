@@ -10,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// writeRun materializes one cycle's run workspace under
-// projectRoot/.evolve/runs/cycle-<n>: a phase-timing.json built from the given
-// per-phase durations, plus (when costUSD > 0) a *-events.ndjson result
-// envelope carrying that cost — the exact on-disk layout Collect walks.
 func writeRun(t *testing.T, root string, cycle int, durationsMS []int64, costUSD float64) {
 	t.Helper()
 	ws := filepath.Join(root, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
@@ -26,7 +22,7 @@ func writeRun(t *testing.T, root string, cycle int, durationsMS []int64, costUSD
 			Phase:      fmt.Sprintf("phase%d", i),
 			DurationMS: d,
 			Verdict:    "PASS",
-			CostUSD:    0, // per-phase cost stays $0 (subscription); batch cost comes from the event log
+			CostUSD:    0,
 		})
 	}
 	data, err := json.Marshal(entries)
@@ -41,9 +37,6 @@ func writeRun(t *testing.T, root string, cycle int, durationsMS []int64, costUSD
 	}
 }
 
-// writeEventLog drops a single-result *-events.ndjson (the cyclecost source)
-// into an existing cycle workspace, carrying the given cost — including $0, to
-// exercise the "genuine subscription $0" vs "no event log at all" distinction.
 func writeEventLog(t *testing.T, root string, cycle int, costUSD float64) {
 	t.Helper()
 	ws := filepath.Join(root, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
@@ -53,12 +46,10 @@ func writeEventLog(t *testing.T, root string, cycle int, costUSD float64) {
 	}
 }
 
-// oneHour is a tiny fixture helper: a single-phase cycle of exactly one hour.
 func oneHour() []int64 { return []int64{3_600_000} }
 
 func TestCollect_MedianDurationAndThroughput(t *testing.T) {
 	root := t.TempDir()
-	// Three cycles of 1h, 30m, 2h → sorted [30m, 1h, 2h] → median = 1h.
 	writeRun(t, root, 10, []int64{3_600_000}, 0)
 	writeRun(t, root, 11, []int64{1_800_000}, 0)
 	writeRun(t, root, 12, []int64{7_200_000}, 0)
@@ -71,7 +62,6 @@ func TestCollect_MedianDurationAndThroughput(t *testing.T) {
 	if got.MedianCycleDurationMS != 3_600_000 {
 		t.Errorf("MedianCycleDurationMS = %d, want 3600000", got.MedianCycleDurationMS)
 	}
-	// One median-length (1h) cycle per hour → 1.0 cycles/hour per lane.
 	if got.CyclesPerHour != 1.0 {
 		t.Errorf("CyclesPerHour = %v, want 1.0", got.CyclesPerHour)
 	}
@@ -82,7 +72,6 @@ func TestCollect_MedianDurationAndThroughput(t *testing.T) {
 
 func TestCollect_SumsPhasesPerCycle(t *testing.T) {
 	root := t.TempDir()
-	// A single cycle whose phases sum to 1h → median == that sum.
 	writeRun(t, root, 5, []int64{1_200_000, 1_200_000, 1_200_000}, 0)
 
 	got := Collect(root, []int{5})
@@ -97,7 +86,6 @@ func TestCollect_SumsPhasesPerCycle(t *testing.T) {
 
 func TestCollect_EvenCountAveragesMiddle(t *testing.T) {
 	root := t.TempDir()
-	// Four cycles → median averages the two middle values: (2000+3000)/2 = 2500.
 	writeRun(t, root, 1, []int64{1_000}, 0)
 	writeRun(t, root, 2, []int64{2_000}, 0)
 	writeRun(t, root, 3, []int64{3_000}, 0)
@@ -112,8 +100,6 @@ func TestCollect_EvenCountAveragesMiddle(t *testing.T) {
 
 func TestCollect_MissingCyclesAreAbsentEvidence(t *testing.T) {
 	root := t.TempDir()
-	// Request three, but only 20 and 22 exist on disk. 21 is absent evidence,
-	// skipped — never an error.
 	writeRun(t, root, 20, oneHour(), 0)
 	writeRun(t, root, 22, oneHour(), 0)
 
@@ -141,8 +127,6 @@ func TestCollect_AllMissingIsZeroValue(t *testing.T) {
 
 func TestCollect_ZeroDurationCycleNotCounted(t *testing.T) {
 	root := t.TempDir()
-	// A cycle whose phases all took 0ms carries no measurable pace → skipped,
-	// so it can't produce a divide-by-zero CyclesPerHour.
 	writeRun(t, root, 7, []int64{0, 0}, 0)
 	writeRun(t, root, 8, oneHour(), 0)
 
@@ -156,17 +140,13 @@ func TestCollect_ZeroDurationCycleNotCounted(t *testing.T) {
 	}
 }
 
-// TestCollect_CostCarriedButNotSizing is the plan's core invariant: cost is
-// display-only, never the sizing input. Two batches with IDENTICAL durations
-// but DIFFERENT costs must yield the SAME MedianCycleDurationMS + CyclesPerHour
-// and only differ in MedianCostUSD.
 func TestCollect_CostCarriedButNotSizing(t *testing.T) {
 	cheapRoot := t.TempDir()
-	writeRun(t, cheapRoot, 1, oneHour(), 0) // subscription $0
+	writeRun(t, cheapRoot, 1, oneHour(), 0)
 	writeRun(t, cheapRoot, 2, oneHour(), 0)
 
 	dearRoot := t.TempDir()
-	writeRun(t, dearRoot, 1, oneHour(), 5.00) // metered, same durations
+	writeRun(t, dearRoot, 1, oneHour(), 5.00)
 	writeRun(t, dearRoot, 2, oneHour(), 5.00)
 
 	cheap := Collect(cheapRoot, []int{1, 2})
@@ -186,23 +166,17 @@ func TestCollect_CostCarriedButNotSizing(t *testing.T) {
 	if dear.CostSampleCount != 2 {
 		t.Errorf("dear CostSampleCount = %d, want 2 (both cycles logged cost)", dear.CostSampleCount)
 	}
-	// cheap cycles have timing but no event log → cost is absent evidence.
 	if cheap.MedianCostUSD != 0 || cheap.CostSampleCount != 0 {
 		t.Errorf("cheap cost = %v over %d samples, want 0 over 0 (no event log = no cost data)",
 			cheap.MedianCostUSD, cheap.CostSampleCount)
 	}
 }
 
-// TestCollect_CostSampleCountDistinguishesNoDataFromZero pins the reviewer's
-// honesty concern: a genuine subscription $0 (event log present, cost 0) is
-// counted in CostSampleCount, while a cycle with no event log at all is NOT —
-// so a caller can tell "$0 measured" from "cost unknown", both of which show
-// MedianCostUSD == 0.
 func TestCollect_CostSampleCountDistinguishesNoDataFromZero(t *testing.T) {
 	root := t.TempDir()
-	writeRun(t, root, 1, oneHour(), 0) // timing only...
-	writeEventLog(t, root, 1, 0)       // ...plus a genuine $0 event log
-	writeRun(t, root, 2, oneHour(), 0) // timing only, no event log
+	writeRun(t, root, 1, oneHour(), 0)
+	writeEventLog(t, root, 1, 0)
+	writeRun(t, root, 2, oneHour(), 0)
 
 	got := Collect(root, []int{1, 2})
 

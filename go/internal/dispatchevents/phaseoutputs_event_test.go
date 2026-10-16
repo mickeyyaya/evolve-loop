@@ -1,12 +1,5 @@
 package dispatchevents
 
-// phaseoutputs_event_test.go — the per-cycle phase-output survey signal
-// (EventPhaseOutputsSurveyed + EmitPhaseOutputsSurveyed). The abnormality
-// DECISION belongs to internal/phaseoutputs; this writer only maps it onto the
-// stream's severity vocabulary, and these tests pin that mapping — a healthy
-// survey must not WARN (it would drown the stream) and an abnormal one must
-// not report INFO (it would hide the exact silence the survey exists to end).
-
 import (
 	"encoding/json"
 	"os"

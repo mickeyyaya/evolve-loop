@@ -9,27 +9,20 @@ import (
 	"time"
 )
 
-// fixedNow is a deterministic clock for ledger-entry tests.
 func fixedNow() time.Time { return time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC) }
 
-// TestRunGit_SuccessInRealRepo covers runGit's success return — every other
-// test runs against a non-git tempdir so git always errors and only the
-// failure branch was exercised.
 func TestRunGit_SuccessInRealRepo(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
 		t.Skipf("git init unavailable: %v (%s)", err, out)
 	}
-	// --is-inside-work-tree succeeds right after init (no commit/author needed).
 	got := runGit(dir, "rev-parse", "--is-inside-work-tree")
 	if got != "true" {
 		t.Errorf("runGit success branch: got %q, want \"true\"", got)
 	}
 }
 
-// TestReadChainLink_WhitespaceOnlyFile covers the lines[0]=="" branch: a file
-// of non-zero size that trims to empty (passes the Size()==0 guard).
 func TestReadChainLink_WhitespaceOnlyFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -46,8 +39,6 @@ func TestReadChainLink_WhitespaceOnlyFile(t *testing.T) {
 	}
 }
 
-// TestReadChainLink_UnreadableFile covers the ReadFile error branch: a
-// non-empty file that stat sees but ReadFile cannot open.
 func TestReadChainLink_UnreadableFile(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -65,9 +56,6 @@ func TestReadChainLink_UnreadableFile(t *testing.T) {
 	}
 }
 
-// TestAppendSimLedger_MissingArtifact covers the artifactSHA="" branch: the
-// artifact path does not exist, so ReadFile fails and the SHA stays empty but
-// the entry is still written.
 func TestAppendSimLedger_MissingArtifact(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -86,12 +74,9 @@ func TestAppendSimLedger_MissingArtifact(t *testing.T) {
 	}
 }
 
-// TestAppendSimLedger_MkdirFails covers the MkdirAll error branch: the parent
-// .evolve path is a regular file, so the ledger dir cannot be created.
 func TestAppendSimLedger_MkdirFails(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// Occupy .evolve with a file so MkdirAll(.evolve) fails with ENOTDIR.
 	if err := os.WriteFile(filepath.Join(root, ".evolve"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -106,8 +91,6 @@ func TestAppendSimLedger_MkdirFails(t *testing.T) {
 	}
 }
 
-// TestAppendSimLedger_ReadChainLinkErr covers the readChainLink error branch:
-// the existing ledger is non-empty but unreadable, so chain-link read fails.
 func TestAppendSimLedger_ReadChainLinkErr(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -132,13 +115,11 @@ func TestAppendSimLedger_ReadChainLinkErr(t *testing.T) {
 	}
 }
 
-// TestAppendSimLedger_OpenFileErr covers the OpenFile error branch: the ledger
-// path itself is a directory, so append-mode open fails.
 func TestAppendSimLedger_OpenFileErr(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	ledgerPath := filepath.Join(root, ".evolve", "ledger.jsonl")
-	if err := os.MkdirAll(ledgerPath, 0o755); err != nil { // ledger.jsonl is a dir
+	if err := os.MkdirAll(ledgerPath, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	art := filepath.Join(root, "a.md")
@@ -150,12 +131,6 @@ func TestAppendSimLedger_OpenFileErr(t *testing.T) {
 	}
 }
 
-// TestRun_WriteAndLedgerFailBranches covers four Run error branches that share
-// identical stubs and differ only in how they block a write path:
-//   - artifact-write:        intent.md is a directory → first phase WriteFile fails
-//   - ledger-append:         .evolve is a file → MkdirAll for the ledger dir fails
-//   - retro-write:           retrospective-report.md is a directory → retro WriteFile fails
-//   - simulator-report-write: simulator-report.md is a directory → final WriteFile fails
 func TestRun_WriteAndLedgerFailBranches(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -163,7 +138,6 @@ func TestRun_WriteAndLedgerFailBranches(t *testing.T) {
 		setup func(t *testing.T, root, ws string)
 	}{
 		{
-			// workspace pre-exists with intent.md as a dir → WriteFile to that path fails.
 			name: "artifact-write",
 			setup: func(t *testing.T, _, ws string) {
 				t.Helper()
@@ -173,7 +147,6 @@ func TestRun_WriteAndLedgerFailBranches(t *testing.T) {
 			},
 		},
 		{
-			// .evolve is a regular file → MkdirAll(.evolve) inside appendSimLedger fails.
 			name: "ledger-append",
 			setup: func(t *testing.T, root, _ string) {
 				t.Helper()
@@ -183,7 +156,6 @@ func TestRun_WriteAndLedgerFailBranches(t *testing.T) {
 			},
 		},
 		{
-			// four pipeline phases succeed; retro artifact path is a dir → WriteFile fails.
 			name: "retro-write",
 			setup: func(t *testing.T, _, ws string) {
 				t.Helper()
@@ -193,7 +165,6 @@ func TestRun_WriteAndLedgerFailBranches(t *testing.T) {
 			},
 		},
 		{
-			// all six phases succeed; simulator-report path is a dir → final WriteFile fails.
 			name: "simulator-report-write",
 			setup: func(t *testing.T, _, ws string) {
 				t.Helper()
@@ -226,9 +197,6 @@ func TestRun_WriteAndLedgerFailBranches(t *testing.T) {
 	}
 }
 
-// TestAppendSimLedger_TipWriteFails covers the ledger.tip temp-write error
-// branch: the ledger line is appended, then the tip temp path is a directory
-// so the atomic tip write fails.
 func TestAppendSimLedger_TipWriteFails(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -236,7 +204,6 @@ func TestAppendSimLedger_TipWriteFails(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Occupy the tip temp path with a directory so WriteFile(tmp) fails.
 	if err := os.MkdirAll(filepath.Join(evolveDir, "ledger.tip.tmp"), 0o755); err != nil {
 		t.Fatal(err)
 	}

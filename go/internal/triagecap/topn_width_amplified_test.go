@@ -60,7 +60,7 @@ func TestC541Amp_CountBelowTwo_PreservesCommittedUnchanged(t *testing.T) {
 	for _, count := range []int{-3, -1, 0, 1} {
 		committed := []FleetCandidate{
 			c541ampCand("committed-1", 0.5, "shared.go"),
-			c541ampCand("committed-2", 0.4, "shared.go"), // committed items may overlap each other
+			c541ampCand("committed-2", 0.4, "shared.go"),
 		}
 		got := WidenTopNToFleetWidth(committed, backlog, count)
 		if !reflect.DeepEqual(got, committed) {
@@ -141,9 +141,9 @@ func TestC541Amp_SkipsOverlapAmongBackfillCandidatesThemselves(t *testing.T) {
 	committed := []FleetCandidate{c541ampCand("committed-1", 1.0, "core/committed.go")}
 	backlog := []FleetCandidate{
 		c541ampCand("backlog-high", 0.9, "pkg/shared.go"),
-		c541ampCand("backlog-also-high", 0.85, "pkg/shared.go"), // overlaps backlog-high, not committed
+		c541ampCand("backlog-also-high", 0.85, "pkg/shared.go"),
 	}
-	got := WidenTopNToFleetWidth(committed, backlog, 3) // room for both if disjoint, but they collide
+	got := WidenTopNToFleetWidth(committed, backlog, 3)
 	if c541ampContainsID(got, "backlog-high") && c541ampContainsID(got, "backlog-also-high") {
 		t.Fatalf("two backlog candidates sharing a file must never both be added: %v", c541ampIDs(got))
 	}
@@ -159,7 +159,7 @@ func TestC541Amp_SkipsOverlapAmongBackfillCandidatesThemselves(t *testing.T) {
 func TestC541Amp_SkipsDuplicateIDAgainstCommitted(t *testing.T) {
 	committed := []FleetCandidate{c541ampCand("dup-id", 0.5, "committed/file.go")}
 	backlog := []FleetCandidate{
-		c541ampCand("dup-id", 0.99, "backlog/other-file.go"), // same ID, DIFFERENT files
+		c541ampCand("dup-id", 0.99, "backlog/other-file.go"),
 		c541ampCand("fresh", 0.3, "backlog/fresh.go"),
 	}
 	got := WidenTopNToFleetWidth(committed, backlog, 3)
@@ -181,7 +181,7 @@ func TestC541Amp_SkipsDuplicateIDWithinBacklogItself(t *testing.T) {
 	committed := []FleetCandidate{c541ampCand("committed-1", 1.0, "core/c.go")}
 	backlog := []FleetCandidate{
 		c541ampCand("stale-dup", 0.9, "pkg/a.go"),
-		c541ampCand("stale-dup", 0.9, "pkg/b.go"), // same ID reappears (disjoint files, stale inbox re-seed)
+		c541ampCand("stale-dup", 0.9, "pkg/b.go"),
 	}
 	got := WidenTopNToFleetWidth(committed, backlog, 3)
 	count := 0
@@ -211,7 +211,7 @@ func TestC541Amp_NeverAddsOverlapToReachCount(t *testing.T) {
 func TestC541Amp_CommittedInternalOverlapPreservedVerbatim(t *testing.T) {
 	committed := []FleetCandidate{
 		c541ampCand("committed-a", 0.6, "shared/file.go"),
-		c541ampCand("committed-b", 0.5, "shared/file.go"), // overlaps committed-a; still authoritative
+		c541ampCand("committed-b", 0.5, "shared/file.go"),
 	}
 	backlog := []FleetCandidate{
 		c541ampCand("backlog-disjoint", 0.99, "pkg/other.go"),
@@ -226,7 +226,7 @@ func TestC541Amp_CommittedInternalOverlapPreservedVerbatim(t *testing.T) {
 }
 
 func TestC541Amp_EmptyFilesCandidatesNeverCollide(t *testing.T) {
-	committed := []FleetCandidate{c541ampCand("committed-1", 1.0)} // no declared files
+	committed := []FleetCandidate{c541ampCand("committed-1", 1.0)}
 	backlog := []FleetCandidate{
 		c541ampCand("no-files-a", 0.9),
 		c541ampCand("no-files-b", 0.8),
@@ -287,7 +287,7 @@ func TestC541Amp_LargeScaleDisjointBackfill(t *testing.T) {
 	for i := 0; i < n; i++ {
 		backlog = append(backlog, c541ampCand(fmt.Sprintf("b-%d", i), float64(i), fmt.Sprintf("pkg%d/f.go", i)))
 	}
-	const count = 51 // 1 committed + 50 backfilled
+	const count = 51
 	got := WidenTopNToFleetWidth(committed, backlog, count)
 	if len(got) != count {
 		t.Fatalf("large disjoint backlog should fully satisfy count=%d, got %d", count, len(got))
@@ -319,7 +319,6 @@ func TestC541Amp_CommittedAlreadyAtCount_BacklogNotConsumed(t *testing.T) {
 func TestC541Amp_MultiFileCandidatePartialOverlapStillBlocks(t *testing.T) {
 	committed := []FleetCandidate{c541ampCand("committed-1", 1.0, "shared/only.go")}
 	backlog := []FleetCandidate{
-		// touches 3 files; only ONE collides with committed -> whole candidate must be skipped
 		c541ampCand("multi-file-partial-overlap", 0.99, "pkg/a.go", "shared/only.go", "pkg/b.go"),
 		c541ampCand("fully-disjoint", 0.5, "pkg/c.go", "pkg/d.go"),
 	}

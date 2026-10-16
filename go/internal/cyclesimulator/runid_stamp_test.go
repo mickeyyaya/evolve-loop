@@ -9,16 +9,6 @@ import (
 	"time"
 )
 
-// runid_stamp_test.go — go-review CRITICAL #2. The simulator writes into the
-// SAME ledger as the real loop, so its agent_subprocess entries are subject to
-// the same run-scoped binding contract. Setting entry["run_id"] is NOT enough:
-// jsonCompact emits only the keys in its own hardcoded allowlist, so a key that
-// is not on that list is computed and then silently discarded.
-//
-// This is the exact unit-green/live-dark shape the rest of this PR exists to
-// close, and the source-scanning class guard is structurally blind to it — it
-// can see that RunIDFromWorkspace is CALLED, never that the value reaches the
-// emitted bytes. Only a behavioural test over the real writer can.
 func TestAppendSimLedger_StampsRunIDIntoEmittedLine(t *testing.T) {
 	dir := t.TempDir()
 	workspace := filepath.Join(dir, ".evolve", "runs", "cycle-42")

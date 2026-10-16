@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// skillsCapturingBridge records each attempt's tier and skills and always exits 85, so the whole tier chain is walked.
 type skillsCapturingBridge struct {
 	attempts []skillsAttempt
 }

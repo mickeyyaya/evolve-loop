@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// validAggregateStates is every value Aggregate may return: 0 for an empty center plus the five states.
 var validAggregateStates = map[LivenessState]bool{
 	0:                       true,
 	LivenessIdle:            true,
@@ -66,7 +65,6 @@ func TestSignalCenter_ParallelEvaluateStress_MixedOpsRaceClean(t *testing.T) {
 	wg.Wait()
 	<-readerDone
 
-	// Reading sc.sessions without the lock is safe: wg.Wait and <-readerDone order every write before it.
 	if got := len(sc.sessions); got != numProducers {
 		t.Errorf("after stress: len(sc.sessions) = %d, want %d (a session key was lost or duplicated under concurrency)", got, numProducers)
 	}
@@ -78,7 +76,7 @@ func TestSignalCenter_ObserveAggregateSameKeyRaceClean(t *testing.T) {
 	sc := NewLivenessCenter()
 	p := Profiles["claude"]
 	key := "shared-key"
-	sc.Observe(key, "⏺ priming\n❯ \n", p) // create the key before racing reads against it
+	sc.Observe(key, "⏺ priming\n❯ \n", p)
 
 	var wg sync.WaitGroup
 	wg.Add(2)

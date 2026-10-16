@@ -33,14 +33,11 @@ func SelectFleetWidthTopN(ranked []FleetCandidate, count int) []FleetCandidate {
 		if len(b) == 0 {
 			continue
 		}
-		// Partition keeps input order, so b[0] is the bucket's top-ranked member.
 		out = append(out, byID[b[0].ID])
 	}
 	return out
 }
 
-// WidenTopNToFleetWidth keeps every committed candidate verbatim, even overlapping ones, and backfills
-// top-ranked backlog candidates that touch no claimed file, up to count. count<2 returns committed unchanged.
 func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []FleetCandidate {
 	if count < 2 {
 		return committed
@@ -48,7 +45,7 @@ func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []Fle
 	out := make([]FleetCandidate, len(committed))
 	copy(out, committed)
 
-	claimed := map[string]bool{} // normalized file -> already owned by the selection
+	claimed := map[string]bool{}
 	seenID := make(map[string]bool, len(committed))
 	for _, c := range committed {
 		seenID[c.ID] = true
@@ -76,7 +73,6 @@ func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []Fle
 	return out
 }
 
-// overlapsClaimed cleans paths as fleet.Partition does; Partition itself would drop overlapping committed items.
 func overlapsClaimed(files []string, claimed map[string]bool) bool {
 	for _, f := range files {
 		if claimed[filepath.Clean(f)] {

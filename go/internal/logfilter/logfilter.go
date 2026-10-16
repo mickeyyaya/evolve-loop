@@ -1,10 +1,5 @@
-// Package logfilter writes a human-readable <phase>-stdout.clean.txt
-// companion alongside each raw <phase>-stdout.log captured by the bridge.
-// The raw file is never touched.
-//
-// Each line is classified as stream-json (claude-p/codex/agy) or plain
-// text (claude-tmux) by attempting JSON parse first; a single entry point
-// covers all drivers without format-mode flags.
+// Package logfilter writes a human-readable clean companion next to each raw phase stdout log.
+// See docs/architecture/packages/internal-logfilter.md.
 package logfilter
 
 import (
@@ -16,13 +11,8 @@ import (
 	"path/filepath"
 )
 
-// maxScannerBufBytes mirrors cyclecost's 16 MB cap so stream-json events
-// with deeply nested usage stats don't blow up the line scanner.
 const maxScannerBufBytes = 1 << 24
 
-// Process reads <workspace>/<phase>-stdout.log and writes
-// <workspace>/<phase>-stdout.clean.txt atomically.
-// Returns nil when the raw file is missing (phase never reached the bridge).
 func Process(workspace, phase string) error {
 	rawPath := filepath.Join(workspace, phase+"-stdout.log")
 	cleanPath := filepath.Join(workspace, phase+"-stdout.clean.txt")
@@ -61,10 +51,6 @@ func Process(workspace, phase string) error {
 	return nil
 }
 
-// filterStream drives the per-line classifier. Exported for tests.
-// The trailing `return out.Flush()` is the sole flush — every error
-// path returns early before reaching it, leaving no buffered bytes
-// behind because partial output on error is undesirable anyway.
 func filterStream(r io.Reader, w io.Writer) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
