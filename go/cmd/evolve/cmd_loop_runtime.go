@@ -11,14 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// loopSignalContext is a package var so tests can cancel a batch without a
-// real process signal.
 var loopSignalContext = func(parent context.Context) (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(parent, syscall.SIGINT, syscall.SIGTERM)
 }
 
-// loopBatchRuntime.close runs closeSocket before stopSignal, preserving the
-// previous defer order.
 type loopBatchRuntime struct {
 	ctx         context.Context
 	stopSignal  context.CancelFunc
@@ -42,7 +38,6 @@ func (r loopBatchRuntime) close() {
 	r.stopSignal()
 }
 
-// runSocketTeardownTimeout bounds exit-time cleanup when tmux is wedged.
 const runSocketTeardownTimeout = 10 * time.Second
 
 func runSocketTeardown(socket string, kill func(context.Context, string) error) func() {

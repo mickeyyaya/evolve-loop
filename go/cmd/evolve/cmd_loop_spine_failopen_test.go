@@ -14,8 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
-// spineFailOpenCycles is the fixture batch: a quiet cycle (1 event) and a noisy
-// one (4 events, over the threshold of 3).
 func spineFailOpenCycles() []core.CycleResult {
 	return []core.CycleResult{
 		{Cycle: 1160, FinalVerdict: "PASS", SpineFailOpens: []cyclestate.SpineFailOpen{
@@ -98,7 +96,6 @@ func TestLoopSummary_RollsUpFleetLaneCyclesFromCommittedDossiers(t *testing.T) {
 		{Phase: "audit", MissingArtifact: "tdd", Reason: "digest degraded: test-report.md"},
 		{Phase: "audit", MissingArtifact: "build", Reason: "would-block at enforce"},
 	})
-	// A pre-batch cycle that must NOT be counted: the window starts at 1200.
 	writeSpineDossier(t, root, 1199, []cyclestate.SpineFailOpen{
 		{Phase: "ship", MissingArtifact: "audit", Reason: "would-block at enforce"},
 	})
@@ -133,7 +130,6 @@ func TestSpineFailOpenRollup_PrefersTheCommittedDossierPerCycle(t *testing.T) {
 		{Phase: "ship", MissingArtifact: "build", Reason: "would-block at enforce"},
 	})
 	var warn bytes.Buffer
-	// 1160 is in both sources; 1161 (4 events) only in memory.
 	rollup := spineFailOpenRollup(spineFailOpenCycles(), root, 1160, &warn)
 	if rollup == nil {
 		t.Fatal("rollup = nil for a batch with fail-opens in both sources")

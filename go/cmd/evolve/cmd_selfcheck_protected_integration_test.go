@@ -45,8 +45,6 @@ func TestProductionBuildFloorChecks_RefusesAProtectedFileThroughTheRealManifest(
 	run("commit", "-q", "-m", "base")
 	base := run("rev-parse", "HEAD")
 	write("go/internal/core/cyclerun.go", "package core\n\n// the builder reached the control plane through a shell tool\n")
-	// A placeholder token in the build report proves the deterministic engine
-	// is composed too — a pointer pin alone cannot (architecture review F37 M2).
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("# Build Report\n\n`go test -count=1 ./...` → FULLSUITE_PLACEHOLDER\n"), 0o644); err != nil {
 		t.Fatal(err)

@@ -7,11 +7,8 @@ import (
 	"testing"
 )
 
-// errTest is a generic injected-failure sentinel for the matrix dep stubs.
 var errTest = errors.New("injected verify failure")
 
-// okDeps returns matrixDeps where every CLI install/projection and every binary
-// subcommand succeeds — the all-green baseline each negative test perturbs.
 func okDeps() matrixDeps {
 	return matrixDeps{
 		installClaude: func(srcDir, home string) error { return nil },
@@ -124,8 +121,6 @@ func TestCoreSubcommandsRegistered(t *testing.T) {
 	}
 }
 
-// TestBinAnswersStartFailureIsLoud exercises the real default binAnswers, not a
-// stub, so a genuinely missing binary is exercised.
 func TestBinAnswersStartFailureIsLoud(t *testing.T) {
 	t.Parallel()
 	d := defaultMatrixDeps()

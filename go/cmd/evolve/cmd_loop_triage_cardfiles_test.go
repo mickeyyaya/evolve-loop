@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// cardFilesTriageReport is the shape triage writes: the declared footprint
-// rides the item's metadata tail (agents/evolve-triage.md).
 const cardFilesTriageReport = `<!-- challenge-token: abc -->
 <!-- ANCHOR:triage_decision -->
 # Triage Decision — Cycle 1167

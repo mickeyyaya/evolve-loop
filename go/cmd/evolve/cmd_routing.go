@@ -69,8 +69,6 @@ func runRoutingExplain(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// Replay always uses the DEFAULT ship floor, since a per-cycle policy-floor
-// override is not persisted; the run-set comparison stays floor-anchored.
 func runRoutingReplay(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("routing replay", flag.ContinueOnError)
 	fs.SetOutput(stderr)

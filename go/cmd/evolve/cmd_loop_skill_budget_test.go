@@ -15,8 +15,6 @@ func TestLoopSkill_NoBudgetReferences(t *testing.T) {
 		t.Fatalf("read loop SKILL.md: %v", err)
 	}
 	low := strings.ToLower(string(raw))
-	// Bans the cost-budget terms only; the live cycle-budget feature
-	// (advisor-decided termination) legitimately uses the word "budget".
 	for _, banned := range []string{"--budget", "budget-usd", "cost-driven", "stop_reason=budget"} {
 		if strings.Contains(low, banned) {
 			t.Errorf("skills/loop/SKILL.md references the unsupported cost-budget feature (%q); "+

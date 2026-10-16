@@ -103,8 +103,6 @@ func TestWidenNarrowDecision_CommittedFloorsShortCircuit(t *testing.T) {
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// A same-file mate AND a disjoint item: both expansion and widening would
-	// fire if the floors guard is missing.
 	writeInboxItemFiles(t, inbox, "mate.json", "mate", 0.70, "go/internal/x/a.go")
 	writeInboxItemFiles(t, inbox, "other.json", "other", 0.80, "go/internal/y/b.go")
 

@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
-// maintainBatchState's failures are reported, never fatal, so batch-startup
-// maintenance cannot block a cycle.
 func maintainBatchState(cfg loopConfig, autoPrune bool, stderr io.Writer) {
 	statePath := filepath.Join(cfg.EvolveDir, "state.json")
 	if autoPrune {

@@ -10,15 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// deadBridgePID is above every OS's pid_max, so the liveness probe always
-// reports its socket's owner dead.
 const deadBridgePID = 999999999
 
-// TestRunLoopBatch_OrphanSocketGCReapsOnlyDeadSocketsInTheEnvNamedDir pins that
-// isolating the loop tests from the host's tmux socket dir redirects the loop's
-// orphan-socket sweep instead of disabling it: the sweep a batch runs must still
-// reap a dead-pid per-run socket, and spare a live-pid one, in the socket dir
-// TMUX_TMPDIR names.
 func TestRunLoopBatch_OrphanSocketGCReapsOnlyDeadSocketsInTheEnvNamedDir(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -39,8 +32,6 @@ func TestRunLoopBatch_OrphanSocketGCReapsOnlyDeadSocketsInTheEnvNamedDir(t *test
 		t.Fatal(err)
 	}
 	dead := filepath.Join(sockDir, fmt.Sprintf("evolve-bridge-p%d", deadBridgePID))
-	// The parent is alive for the whole test, and unlike os.Getpid() it never
-	// names the loop's own per-run socket, which the batch's teardown removes.
 	live := filepath.Join(sockDir, fmt.Sprintf("evolve-bridge-p%d", os.Getppid()))
 	for _, p := range []string{dead, live} {
 		if err := os.WriteFile(p, nil, 0o600); err != nil {

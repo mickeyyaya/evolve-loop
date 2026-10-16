@@ -23,7 +23,6 @@ var (
 	resetSHAAbsRoot   = paths.AbsoluteRoot
 )
 
-// See ADR-0065.
 func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve reset-sha", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -66,8 +65,6 @@ func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// Mirrors runShipCmd: an absolute root keeps this aligned with the
-// audit/commit-gate paths; RepinShipSHA's IsAbs guard is the terminal check.
 func resetSHAProjectRoot(projectRoot string, stderr io.Writer) (string, error) {
 	if projectRoot == "" {
 		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")

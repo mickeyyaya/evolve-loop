@@ -18,19 +18,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// worktreeGitRunner is the command seam evolve worktree create provisions
-// through, mirroring core's gitRunner and swarm's newGit precedents.
 var worktreeGitRunner sysexec.RunFunc = sysexec.DefaultRunner
 
 var worktreeRemoveAll = os.RemoveAll
 
-// worktreeAddRetry shares gitexec's single retry contract; Retryable is the
-// same classifier core and swarm pass, so a non-repository fails immediately
-// instead of waiting out a retry ladder that cannot help.
 var worktreeAddRetry = gitexec.WorktreeAddRetry{Retryable: gitexec.RetryableWorktreeAddFailure}
 
-// absWorktreeRoot absolutizes a worktree subcommand's --project-root so the
-// recorded worktree path and base dir are cwd-independent.
 func absWorktreeRoot(projectRoot string, stderr io.Writer) string {
 	return paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve worktree: WARN: %s\n", m)
@@ -90,12 +83,7 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve worktree create: mkdir: %v\n", err)
 		return 1
 	}
-	// runscope gives the SAME lane-namespaced path core.gitWorktree provisions,
-	// so concurrent worktrees never collide.
 	wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
-	// The shared gitexec retry surfaces git's own exit code and stderr, so an
-	// operator can tell lane contention from a real fault (a raw err only ever
-	// reports "exit status 255").
 	_, gitErr, code, err := gitexec.Git{Dir: projectRoot, Exec: worktreeGitRunner}.
 		AddWorktreeWithRetry(context.Background(), worktreeAddRetry, "--detach", wt, "HEAD")
 	if err != nil || code != 0 {

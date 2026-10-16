@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// interleavedFailEmpty alternates FAIL and EMPTY, landing nothing every cycle.
 var interleavedFailEmpty = []string{
 	core.VerdictFAIL,
 	core.CycleOutcomeSkippedUnknown,
@@ -80,7 +79,7 @@ func TestNonShippingOutcome_Classification(t *testing.T) {
 		{core.CycleOutcomeSkippedUnknown, true},
 		{core.CycleOutcomeSkippedAuditAdvisory, true},
 		{core.VerdictSKIPPED, true},
-		{"", true}, // no verdict recorded ⇒ certainly nothing shipped
+		{"", true},
 	} {
 		if got := nonShippingOutcome(tc.verdict); got != tc.want {
 			t.Errorf("nonShippingOutcome(%q) = %v, want %v", tc.verdict, got, tc.want)
@@ -127,9 +126,6 @@ func TestStallKinds_DistinctInboxIdentity(t *testing.T) {
 	}
 }
 
-// verdictSeqOrch replays a fixed verdict sequence per RunCycle, since the real
-// orchestrator cannot be scripted to emit an interleaved stream without a full
-// phase machine.
 type verdictSeqOrch struct {
 	noSignals
 	verdicts []string
@@ -155,12 +151,6 @@ func TestRunLoop_NonprogressBreaker_CallSite(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// max_consecutive_fails=2 keeps the FAIL breaker from halting (this stream
-	// never hits 2 consecutive FAILs), and goal_stall.threshold=3 leaves the
-	// empty-only breaker unable to fire (its longest EMPTY run is 1).
-	// nonprogress_threshold is deliberately 3, not the compiled default 5, so the
-	// filed streak below proves policy.json is actually read rather than
-	// matching the default by accident.
 	policyJSON := `{"dispatch":{"policy":"off"},"workflow":{"max_consecutive_fails":2},` +
 		`"goal_stall":{"threshold":3,"nonprogress_threshold":3}}`
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(policyJSON), 0o644); err != nil {

@@ -43,8 +43,6 @@ func TestUnfinishedCycle(t *testing.T) {
 
 func TestRunLoop_UnfinishedCycleGuardRefuses(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
-	// Real storage over the seeded dir, so the guard refuses before any
-	// orchestrator phase runs and the stub orchestrator is never invoked.
 	restore := installStubDeps(t, storage.New(evolveDir), ledger.New(evolveDir))
 	defer restore()
 
@@ -68,7 +66,6 @@ func TestRunLoop_UnfinishedCycleGuardRefuses(t *testing.T) {
 
 func TestRunLoop_CorruptedCycleStateRefuses(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
-	// Simulate a SIGKILL mid-write: truncated/garbage cycle-state.json.
 	if err := os.WriteFile(filepath.Join(evolveDir, "cycle-state.json"), []byte(`{"cycle_id": 108, "phas`), 0o644); err != nil {
 		t.Fatalf("corrupt cycle-state: %v", err)
 	}
@@ -90,12 +87,6 @@ func TestRunLoop_CorruptedCycleStateRefuses(t *testing.T) {
 	}
 }
 
-// PID 999999 is a real, guaranteed-dead pid (same convention as
-// TestDefaultBootRecovery_AutosealsDeadOwnerMarker), so the production
-// pidAlive probe drives the decision with no injection needed. bootRecoverFn
-// is stubbed to a no-op so this test isolates the guard's own liveness check,
-// independent of whether boot-time AutosealStaleMarker would also heal the
-// same marker first.
 func TestUnfinishedCycleGuard_DeadOwnerFreshLease_NotReportedAsLive(t *testing.T) {
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	ws := filepath.Join(evolveDir, "runs", "cycle-108")

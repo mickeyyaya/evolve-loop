@@ -72,7 +72,6 @@ func TestSweepRulePromotions(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()
 			id := promoteSweepRule(t, root)
-			// Spread the evidence across two cycles (the sweep aggregates).
 			plantFires(t, root, 1, tc.fires/2, id, false)
 			plantFires(t, root, 2, tc.fires-tc.fires/2, id, tc.bad)
 

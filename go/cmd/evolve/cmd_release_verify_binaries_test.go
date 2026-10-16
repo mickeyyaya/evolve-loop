@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/releasetargets"
 )
 
-// fixtureConfig is a small but realistic release matrix used to drive the
-// verifier orchestration without touching the network or the real config.
 func fixtureConfig() releasetargets.Config {
 	return releasetargets.Config{
 		Targets: []releasetargets.Target{
@@ -62,7 +60,6 @@ func TestVerifyReleaseBinaries_AllPresent(t *testing.T) {
 func TestVerifyReleaseBinaries_MissingArchive(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig()
-	// linux_arm64 archive deliberately absent.
 	list := func(owner, repo, tag string) ([]string, error) {
 		return []string{"evolve_darwin_amd64.tar.gz", "checksums.txt"}, nil
 	}
@@ -132,7 +129,7 @@ func TestReportBinaryVerification_SomeMissing(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig()
 	list := func(owner, repo, tag string) ([]string, error) {
-		return []string{"evolve_darwin_amd64.tar.gz"}, nil // arm64 + checksums missing
+		return []string{"evolve_darwin_amd64.tar.gz"}, nil
 	}
 	var out, errb strings.Builder
 	rc := reportBinaryVerification(cfg, "v1.2.3", list, &out, &errb)

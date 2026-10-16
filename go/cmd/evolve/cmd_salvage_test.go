@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 )
 
-// salvageCLIFixture writes a project root whose .evolve holds a baseline
-// sidecar (2 records, 1 recoverable) and an applied sidecar (1 salvage, plus
-// one crash-torn line).
 func salvageCLIFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -28,7 +25,7 @@ func salvageCLIFixture(t *testing.T) string {
 		t.Fatal(err)
 	}
 	applied := `{"event_type":"salvage_applied","phase":"audit","pattern":"fenced-json"}` + "\n" +
-		`{"event_type":"salvage_app` + "\n" // torn by a crash mid-append
+		`{"event_type":"salvage_app` + "\n"
 	if err := os.WriteFile(filepath.Join(evolve, deliverable.SalvageAppliedFile), []byte(applied), 0o644); err != nil {
 		t.Fatal(err)
 	}

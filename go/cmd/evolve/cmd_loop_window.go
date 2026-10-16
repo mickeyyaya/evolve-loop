@@ -32,15 +32,10 @@ type batchDecision struct {
 
 const loopOperatorBrakeStop = "loop_operator_brake"
 
-// prepareIteration refreshes every batch-wide input at the only safe boundary:
-// after the previous window drained and before the next dispatch begins.
 func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *policy.FleetConfig, waveBinary *string, batchStartCycle int) batchDecision {
 	if b.ctx.Err() != nil {
 		return b.interruptReturn(iteration, "")
 	}
-	// Every iteration, sequential and fleet: a SIGKILLed lane's live-phase
-	// residue is invisible to the once-per-batch unfinishedCycle guard.
-	// Before the breaker, so even a halted batch leaves a coherent record.
 	reconcileStaleCycleState(b.ctx, b.deps.Storage, b.cfg.ProjectRoot, time.Now(), b.stderr)
 	if exitCode, halted := blockerBreakerHalt(b.cfg.EvolveDir, b.cfg.ProjectRoot, batchStartCycle, b.stderr, b.deps.Signals); halted {
 		b.result.StopReason = "pipeline_blocker_halt"
@@ -79,8 +74,6 @@ func (b *loopBatchCoordinator) runPreWave(iteration int) (batchDecision, bool) {
 }
 
 func (b *loopBatchCoordinator) probeSyncAndPublish(iteration int) (batchDecision, bool) {
-	// An interrupt that landed during the probes must not dispatch a wave
-	// that would be cancelled at spawn.
 	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr); err != nil {
 		return b.interruptReturn(iteration, "during the pre-wave probes "), true
 	}
@@ -123,8 +116,6 @@ func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig
 	*waveBinary = binary
 }
 
-// interruptReturn reports a SIGINT/SIGTERM caught at an iteration boundary
-// check point and returns the decision that stops the batch cleanly.
 func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batchDecision {
 	signalStop(b.stdout, b.stderr, b.result, fmt.Sprintf("%sbefore cycle %d — stopping", when, iteration+1))
 	return batchDecision{flow: batchReturn, exitCode: 130}

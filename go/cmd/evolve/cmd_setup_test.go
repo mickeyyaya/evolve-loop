@@ -34,7 +34,6 @@ func TestRunSetup_Dispatch(t *testing.T) {
 	}
 }
 
-// detectPhase is the subset of a detect-report phase entry the setup tests assert on.
 type detectPhase struct {
 	Role         string `json:"role"`
 	Source       string `json:"source"`
@@ -77,7 +76,6 @@ func TestRunSetup_DetectPinsAndComplete(t *testing.T) {
 	}`)
 	policyPath := filepath.Join(evolveDir, "policy.json")
 
-	// Within-envelope pin → detect overlays it as policy-pin, no violation.
 	setupWrite(t, policyPath, `{"pins":{"auditor":{"cli":"codex","model":"opus"}}}`)
 	a := phaseFromDetectJSON(t, "auditor")
 	if a.Source != "policy-pin" || a.CurrentCLI != "codex" || a.CurrentTier != "opus" {
@@ -87,14 +85,12 @@ func TestRunSetup_DetectPinsAndComplete(t *testing.T) {
 		t.Fatalf("clean pin should have no violation, got %q", a.PinViolation)
 	}
 
-	// Below-envelope pin → detect surfaces a pin_violation (deep..deep rejects balanced).
 	setupWrite(t, policyPath, `{"pins":{"auditor":{"cli":"codex","model":"balanced"}}}`)
 	a = phaseFromDetectJSON(t, "auditor")
 	if a.PinViolation == "" {
 		t.Fatalf("below-envelope pin should report a violation, got %+v", a)
 	}
 
-	// Complete stamps the marker.
 	var out, errb bytes.Buffer
 	if rc := runSetup([]string{"complete"}, nil, &out, &errb); rc != 0 {
 		t.Fatalf("complete: rc=%d want 0 (%s)", rc, errb.String())
@@ -204,7 +200,6 @@ func TestRunSetup_ApplyWritesPolicy(t *testing.T) {
 			t.Error("apply rc=0 should have added pins")
 		}
 	case 1:
-		// Degraded refusal (no authed CLI on this host): policy.json untouched.
 		if _, ok := obj["pins"]; ok {
 			t.Error("refused apply must NOT write pins")
 		}
@@ -218,7 +213,6 @@ func TestRunSetup_ApplyUnreadablePolicy_FailsLoud(t *testing.T) {
 	evolveDir := filepath.Join(project, ".evolve")
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", project)
-	// policy.json as a directory → os.ReadFile returns a non-ENOENT error.
 	if err := os.MkdirAll(filepath.Join(evolveDir, "policy.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}

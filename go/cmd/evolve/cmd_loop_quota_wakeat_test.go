@@ -22,7 +22,6 @@ func TestDetectQuotaPause_EmitsNonEmptyWakeAtAndSource(t *testing.T) {
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// The checkpointer splices into an existing cycle-state.json.
 	seed, err := json.Marshal(map[string]any{"cycle_id": 656, "phase": "build"})
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +52,6 @@ func TestDetectQuotaPause_EmitsNonEmptyWakeAtAndSource(t *testing.T) {
 	if qp.Cycle != 656 {
 		t.Errorf("cycle = %d, want 656", qp.Cycle)
 	}
-	// Either shape must parse: skills/loop/SKILL.md's delay computation accepts both.
 	if _, err := time.Parse("2006-01-02T15:04:05-0700", qp.WakeAt); err != nil {
 		if _, err2 := time.Parse(time.RFC3339, qp.WakeAt); err2 != nil {
 			t.Errorf("wake-at %q is neither ISO-8601-with-offset nor RFC3339: %v / %v", qp.WakeAt, err, err2)

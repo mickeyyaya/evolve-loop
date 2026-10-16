@@ -17,8 +17,6 @@ func TestParseLoopArgs_ProjectRootResolvedAbsolute(t *testing.T) {
 		{"default_dot_is_absolutized", []string{"--goal-text", "x"}, abs(".")},
 		{"explicit_relative_is_absolutized", []string{"--project-root", "sub/dir", "--goal-text", "x"}, abs("sub/dir")},
 		{"already_absolute_is_idempotent", []string{"--project-root", "/tmp/evolve-x", "--goal-text", "x"}, "/tmp/evolve-x"},
-		// --evolve-dir is a separately-passed path with the same cwd-independence
-		// requirement, so it must absolutize independent of the project root.
 		{"explicit_relative_evolve_dir_is_absolutized", []string{"--project-root", "/tmp/evolve-x", "--evolve-dir", "rel/.evolve", "--goal-text", "x"}, "/tmp/evolve-x"},
 	}
 	for _, tc := range cases {

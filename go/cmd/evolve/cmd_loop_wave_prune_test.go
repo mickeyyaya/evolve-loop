@@ -10,15 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// writeLifecycleItem places an inbox todo in the lifecycle dir that makes
-// inboxmover.ResolveDispatchState classify id as `state`. state=="pending" is
-// the inbox root; state=="processing" lives under processing/cycle-N/.
 func writeLifecycleItem(t *testing.T, evolveDir, state, id string, files ...string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox")
 	switch state {
 	case inboxmover.StatePending:
-		// inbox root
 	case inboxmover.StateProcessing:
 		dir = filepath.Join(dir, "processing", "cycle-1181")
 	default:

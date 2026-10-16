@@ -12,25 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// runPlanAndExecute implements `evolve plan-and-execute <phase>`, the
-// operator-facing convenience for a two-pass dispatch:
-//
-//  1. Pass A: run the phase with --permission-mode=plan, writing the
-//     plan to EVOLVE_<PHASE>_PLAN_OUTPUT (default: <workspace>/<phase>-plan.md).
-//  2. Pass B: re-run the phase with --permission-mode=acceptEdits,
-//     prepending the plan to the prompt via EVOLVE_<PHASE>_PLAN_INPUT.
-//
-// Each pass sets EVOLVE_<PHASE>_PERMISSION_MODE; the phase runner resolves
-// it into the typed BridgeRequest.PermissionMode, which the bridge realizes
-// per-CLI via the LaunchIntent. This subcommand orchestrates the two
-// dispatches and threads the plan artifact between them.
-//
-// Exit codes:
-//   - 0  both passes succeeded
-//   - 1  pass A failed
-//   - 2  pass B failed (after pass A succeeded)
-//   - 10 bad args
-//   - 11 plan artifact missing after pass A
 func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("plan-and-execute", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -53,16 +34,12 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		return 10
 	}
 
-	// The phase request envelope is read from stdin (same as `evolve phase`)
-	// and re-fed to each pass.
 	envReq, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve plan-and-execute: read stdin: %v\n", err)
 		return 1
 	}
 
-	// Resolve plan-output path. Default: <workspace>/<phase>-plan.md.
-	// We don't have workspace from the bare CLI; derive from --workspace or use cwd.
 	planPath := *planOutput
 	if planPath == "" {
 		if *workspace != "" {
@@ -109,9 +86,6 @@ func runPlanAndExecute(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	return 0
 }
 
-// runPassWithEnv invokes runPhase with the given extra env vars set
-// in the process env for the duration of the call. Saves and restores
-// the previous values so concurrent invocations don't collide.
 func runPassWithEnv(phase string, req []byte, env map[string]string, stdout, stderr io.Writer) int {
 	saved := map[string]string{}
 	for k, v := range env {
@@ -130,8 +104,6 @@ func runPassWithEnv(phase string, req []byte, env map[string]string, stdout, std
 	return runPhase([]string{phase}, bytes.NewReader(req), stdout, stderr)
 }
 
-// joinNames is a small slice-to-comma-separated helper. Could use
-// strings.Join but keeping the import surface minimal in this file.
 func joinNames(names []string) string {
 	out := ""
 	for i, n := range names {
