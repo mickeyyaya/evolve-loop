@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// want is the chain with excludeProfileCLI=false (Resolve); wantExcl with true (ChainFor).
 type unifiedCase struct {
 	name     string
 	primary  string
@@ -116,7 +115,6 @@ func TestUnifiedCandidateBuilder_ChainForDelegates(t *testing.T) {
 	}
 }
 
-// The env map forces the primary, leaving prof.CLI free to play the swapped-away original.
 func TestUnifiedCandidateBuilder_ResolveDelegates(t *testing.T) {
 	for _, tc := range unifiedCases() {
 		t.Run(tc.name, func(t *testing.T) {

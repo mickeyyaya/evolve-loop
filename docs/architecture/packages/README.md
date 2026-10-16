@@ -238,3 +238,20 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/failuregrade` | the graduated-enforcement classifier: grades a failure to abort, correct, quarantine or repair | [internal-failuregrade.md](internal-failuregrade.md) |
 | `internal/phases/swarmplan` | the optional swarm-plan phase: an LLM planner that splits a task into worker assignments | [internal-phases-swarmplan.md](internal-phases-swarmplan.md) |
 | `internal/mintregistry` | the per-project record of advisor-minted phase names that lets the tree-diff guard exempt a sanctioned mint | [internal-mintregistry.md](internal-mintregistry.md) |
+| `internal/directives` | the runtime operator-directives cascade: global and per-loop layers re-read each cycle and injected into phase prompts | [internal-directives.md](internal-directives.md) |
+| `internal/bridge/capabilities` | the per-CLI capability catalog and its drift check against a live `/help` | [internal-bridge-capabilities.md](internal-bridge-capabilities.md) |
+| `internal/detectcli` | detects which AI coding CLI drives the session, and owns the CLI-name alias table | [internal-detectcli.md](internal-detectcli.md) |
+| `internal/cyclebudget` | the pure decision of when a loop batch stops: completion-driven, bounded by a safety cap | [internal-cyclebudget.md](internal-cyclebudget.md) |
+| `internal/semvercheck` | the one strict `X.Y.Z` version check | [internal-semvercheck.md](internal-semvercheck.md) |
+| `internal/detectnested` | detects a nested Claude Code parent from its environment beacons | [internal-detectnested.md](internal-detectnested.md) |
+| `internal/dag` | deterministic dependency leveling shared by the wave planner and the merge train | [internal-dag.md](internal-dag.md) |
+| `internal/phaseorder` | the pipeline phase order from the registry, with a hardcoded fallback | [internal-phaseorder.md](internal-phaseorder.md) |
+| `internal/selfsha` | the sha256 of a file or of the running executable | [internal-selfsha.md](internal-selfsha.md) |
+| `internal/auditledger` | the one reader of auditor rows in `.evolve/ledger.jsonl` | [internal-auditledger.md](internal-auditledger.md) |
+| `internal/auditcalibration` | a calibration report of auditor narratives against ship-gate outcomes | [internal-auditcalibration.md](internal-auditcalibration.md) |
+| `internal/paralleltest` | the parallel-by-default guard of the package test trees | [internal-paralleltest.md](internal-paralleltest.md) |
+| `test/structure` | source-structure checks shared between package tests | [test-structure.md](test-structure.md) |
+| `test/e2e` | the end-to-end test tier | [test-e2e.md](test-e2e.md) |
+| `test/component` | the component test tier | [test-component.md](test-component.md) |
+| `test/integration` | the integration test tier | [test-integration.md](test-integration.md) |
+| `cmd/apicover` | the standalone binary over `internal/apicover` | [cmd-apicover.md](cmd-apicover.md) |

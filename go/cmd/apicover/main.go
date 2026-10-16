@@ -1,9 +1,5 @@
-// Command apicover is a thin CLI wrapper over the importable internal/apicover
-// package (folded there so the evolve binary — the `evolve apicover` subcommand
-// and the audit's in-process API-gate — and this standalone binary all share one
-// measurement implementation, never rebuilt at runtime). See package apicover
-// for the flag and behavior documentation, plus
-// docs/architecture/adr/0050-modularization-and-unified-phase-io.md.
+// Command apicover is the standalone binary over internal/apicover, the measurement the evolve subcommand shares.
+// See docs/architecture/packages/cmd-apicover.md.
 package main
 
 import (

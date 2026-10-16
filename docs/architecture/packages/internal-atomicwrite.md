@@ -16,6 +16,7 @@
 
 ## Invariants
 
+- **Seam-swapping tests are serial.** `withSeams` overrides package-level seams, so a test that calls it must not call `t.Parallel()`. Only the seam-free happy-path and marshal tests run in parallel.
 - **The durable contract.** `Durable` writes the exact bytes with the requested mode, handles an empty payload, replaces an existing target (a read-only one too), and leaves no temporary file on a create or rename failure. Pinned by `TestDurable_WritesTheBytesWithTheRequestedMode`, `TestDurable_WritesAZeroLengthPayload`, `TestDurable_ReplacesAnExistingTarget`, `TestDurable_ARenameFailureLeavesNoTempFile` and `TestDurable_ACreateFailureLeavesNoTempFile`.
 - **A directory that cannot be synced is an error, never a silent success.** Pinned by `TestDurable_ReportsADirectoryItCannotSync` (a real write-and-search-only directory) and `TestDurable_DirectorySyncFaults` (open, sync and close faults through the seam).
 - **Only `Durable` syncs.** Pinned by `TestDurable_SyncError_CleansUpTemp` and `TestBytes_NeverSyncs`.

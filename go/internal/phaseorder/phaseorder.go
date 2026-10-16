@@ -1,10 +1,5 @@
-// Package phaseorder ports legacy/scripts/dispatch/list-phase-order.sh.
-//
-// Reads docs/architecture/phase-registry.json and emits the phases in
-// order. Falls back to a hardcoded canonical order when:
-//   - EVOLVE_USE_PHASE_REGISTRY=0
-//   - registry file is missing
-//   - registry parse fails (and registry is enabled)
+// Package phaseorder lists the pipeline phases in order from the phase registry, with a hardcoded fallback.
+// See docs/architecture/packages/internal-phaseorder.md.
 package phaseorder
 
 import (
@@ -13,18 +8,12 @@ import (
 	"os"
 )
 
-// HardcodedOrder is the canonical phase sequence used as fallback.
 var HardcodedOrder = []string{
 	"intent", "scout", "triage", "plan-review",
 	"tdd", "build-planner", "build", "tester",
 	"audit", "ship", "retrospective", "memo",
 }
 
-// List returns the phase names in order. registryPath should be the
-// absolute path to phase-registry.json. If useRegistry is false or
-// registryPath does not exist, returns HardcodedOrder. Returns an
-// error only when the registry exists but cannot be parsed (matches
-// bash exit-code 1 contract).
 func List(registryPath string, useRegistry bool) ([]string, error) {
 	if !useRegistry {
 		return HardcodedOrder, nil

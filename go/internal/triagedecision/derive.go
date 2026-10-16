@@ -1,8 +1,5 @@
-// Package triagedecision is the one reader of triage's report as a decision (ADR-0106 H1). The report is the
-// phase's primary deliverable and states the commitment in prose sections. Derive is the strict reading the
-// host writes before any judge when the phase left the decision absent; Project is the lenient reading ship
-// writes for the inbox lifecycle. Nothing the report does not state is written: floors, skipped items and an
-// undeclared footprint are left to their readers' own fallbacks.
+// Package triagedecision is the one reader of triage's report as a decision.
+// See docs/architecture/packages/internal-triagedecision.md.
 package triagedecision
 
 import (
@@ -28,7 +25,6 @@ type dropped struct {
 	Reason string `json:"reason,omitempty"`
 }
 
-// decision omits floor declarations and skip lists on purpose; consumers treat each absence as safe.
 type decision struct {
 	Cycle      int             `json:"cycle"`
 	TopN       []card          `json:"top_n"`
@@ -39,9 +35,6 @@ type decision struct {
 	Projected  bool            `json:"projected_by_orchestrator"`
 }
 
-// Derive is the strict reading: `## top_n` must be present and state cards or none, every present bucket must
-// be readable, and every pinned lane item must be committed. An absent deferred, dropped or superseded section
-// is empty, which commits more, never less.
 func Derive(report []byte, cycle int, lanePin []string) ([]byte, error) {
 	d, err := build(string(report), cycle, true)
 	if err != nil {
@@ -53,7 +46,6 @@ func Derive(report []byte, cycle int, lanePin []string) ([]byte, error) {
 	return json.MarshalIndent(d, "", "  ")
 }
 
-// Project is the lenient reading: a missing or unreadable section projects as [].
 func Project(report string, cycle int) ([]byte, error) {
 	d, _ := build(report, cycle, false)
 	return json.MarshalIndent(d, "", "  ")
@@ -102,8 +94,6 @@ func build(report string, cycle int, strict bool) (decision, error) {
 	return d, nil
 }
 
-// section reads one bucket's cards; present is false when the section is absent. In strict mode a present
-// bucket states cards or none and nothing else, except that an optional bucket left empty states no cards.
 func section(report, name string, strict, required bool) (items []Item, present bool, err error) {
 	body, ok := SectionBody(report, name)
 	if !ok {
@@ -118,7 +108,6 @@ func section(report, name string, strict, required bool) (items []Item, present 
 	return sec.Items, true, nil
 }
 
-// empty reports a section with nothing under its heading.
 func (s Section) empty() bool {
 	return !s.None && len(s.Items) == 0 && len(s.Rejected) == 0 && len(s.Prose) == 0
 }
@@ -137,7 +126,6 @@ func sectionError(name string, sec Section) error {
 	return nil
 }
 
-// supersededIDs lists each id once: ship retires them by id alone.
 func supersededIDs(items []Item) []string {
 	seen := map[string]bool{}
 	var ids []string

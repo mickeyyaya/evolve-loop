@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// TestMain unsets EVOLVE_CLI so an operator's shell cannot leak into the profile and default tiers.
 func TestMain(m *testing.M) {
 	os.Unsetenv("EVOLVE_CLI")
 	os.Exit(m.Run())
@@ -191,7 +190,6 @@ func TestProbe_UnknownCLIKeepsPosition(t *testing.T) {
 }
 
 func TestProbe_NilLookPathDefaultsToExecLookPath(t *testing.T) {
-	// The order depends on the host PATH, so only the length is asserted.
 	p := Plan{Candidates: []string{"codex-tmux", "claude-tmux"}}
 	got := Probe(p, nil)
 	if len(got.Candidates) != 2 {
@@ -309,7 +307,6 @@ func TestResolve_PinBaseFamilyNormalizesToDefaultDriver(t *testing.T) {
 		{"ollama", "ollama-tmux"},
 		{"codex-tmux", "codex-tmux"},
 		{"claude-tmux", "claude-tmux"},
-		// no "claude-p-tmux" driver is registered
 		{"claude-p", "claude-p"},
 	} {
 		pin := &policy.Pin{CLI: tc.pinCLI}

@@ -86,7 +86,6 @@ func Conclude(c Chain) Conclusion {
 	diag := Diagnose(c)
 	switch {
 	case len(missing) > 0:
-		// A missing link is FAIL, never WARN: omission must not be gentler than an honest incoherent answer.
 		return Conclusion{Verdict: VerdictFAIL, Diagnoses: diag,
 			Rationale: "the chain is incomplete — missing link(s): " + strings.Join(missing, ", ") +
 				". A relationship nobody reported is not a relationship nobody needed to check."}

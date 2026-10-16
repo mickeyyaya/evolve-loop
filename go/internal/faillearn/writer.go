@@ -87,7 +87,6 @@ func writeIfAbsent(path string, data []byte) (skipped bool, err error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return false, err
 	}
-	// The temp file lives beside path because os.Link cannot cross filesystems.
 	tmp, err := stageCreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return false, err
@@ -104,7 +103,6 @@ func writeIfAbsent(path string, data []byte) (skipped bool, err error) {
 	if err := tmp.Close(); err != nil {
 		return false, err
 	}
-	// Link, not rename: it fails EEXIST against a concurrent winner instead of clobbering it.
 	if err := os.Link(tmp.Name(), path); err != nil {
 		if os.IsExist(err) {
 			return true, nil

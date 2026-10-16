@@ -69,9 +69,6 @@ func TestList_EmptyPhasesArray(t *testing.T) {
 	}
 }
 
-// TestList_StatOKButReadFails covers the read-error branch: the path exists
-// (os.Stat succeeds) but os.ReadFile fails. A directory satisfies Stat yet
-// ReadFile returns EISDIR — exercising the error wrap without a custom seam.
 func TestList_StatOKButReadFails(t *testing.T) {
 	dirAsRegistry := filepath.Join(t.TempDir(), "registry-dir")
 	if err := os.Mkdir(dirAsRegistry, 0o755); err != nil {

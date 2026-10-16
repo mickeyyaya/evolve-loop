@@ -101,11 +101,8 @@ func TestDetect_AllProbes(t *testing.T) {
 	}
 }
 
-// TestDetect_ZeroValueOptions exercises the default-fall-through branches
-// (production defaults; no overrides).
 func TestDetect_ZeroValueOptions(t *testing.T) {
 	r := Detect(Options{})
-	// Result depends on the test environment — just verify a CLI is set.
 	if r.CLI == "" {
 		t.Errorf("empty CLI")
 	}

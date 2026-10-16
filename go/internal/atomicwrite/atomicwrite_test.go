@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// withSeams temporarily overrides the package seams and restores them on
-// cleanup. Tests that call it mutate package-level state, so they must NOT call
-// t.Parallel() (only the seam-free happy-path/marshal tests do).
 func withSeams(t *testing.T, set func()) {
 	t.Helper()
 	origMkdir, origRename, origRemove, origCreate, origOpenDir := mkdirAll, renameFile, removeFile, createTemp, openDir
@@ -21,7 +18,6 @@ func withSeams(t *testing.T, set func()) {
 	set()
 }
 
-// fakeTemp is an injectable tempFile whose ops fail on demand.
 type fakeTemp struct {
 	name                                  string
 	writeErr, chmodErr, syncErr, closeErr error
@@ -41,7 +37,6 @@ func (f *fakeTemp) Close() error            { f.closed = true; return f.closeErr
 
 func TestBytes_HappyPath_WritesAtomicallyWith0644(t *testing.T) {
 	t.Parallel()
-	// Parent dir does not exist yet → also covers the MkdirAll path.
 	path := filepath.Join(t.TempDir(), "sub", "out.txt")
 	if err := Bytes(path, []byte("hello")); err != nil {
 		t.Fatalf("Bytes: %v", err)
@@ -57,7 +52,6 @@ func TestBytes_HappyPath_WritesAtomicallyWith0644(t *testing.T) {
 	if info.Mode().Perm() != 0o644 {
 		t.Errorf("mode = %v, want 0644", info.Mode().Perm())
 	}
-	// No temp file left behind.
 	entries, _ := os.ReadDir(filepath.Dir(path))
 	for _, e := range entries {
 		if strings.Contains(e.Name(), ".tmp") {
@@ -81,7 +75,6 @@ func TestJSON_ProducesIndentedJSONNoTrailingNewline(t *testing.T) {
 
 func TestJSON_MarshalError(t *testing.T) {
 	t.Parallel()
-	// A channel cannot be marshaled → exercises the marshal-error branch.
 	err := JSON(filepath.Join(t.TempDir(), "x.json"), make(chan int))
 	if err == nil || !strings.Contains(err.Error(), "marshal") {
 		t.Fatalf("want marshal error, got %v", err)

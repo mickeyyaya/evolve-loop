@@ -1,8 +1,5 @@
-// Package dag provides deterministic dependency-graph leveling (Kahn's algorithm
-// by level). It is the single home for the topological logic shared by the
-// campaign wave planner (which needs concurrent waves) and the swarm merge-train
-// ordering (which needs the flattened serial order) — so Kahn's lives in exactly
-// one place.
+// Package dag provides deterministic dependency-graph leveling (Kahn's
+// algorithm by level).
 package dag
 
 import (
@@ -10,15 +7,6 @@ import (
 	"sort"
 )
 
-// Levels groups nodes into dependency waves: level 0 holds every node with no
-// dependencies; level k holds nodes whose dependencies all resolve in levels < k.
-// Nodes within a level have no inter-dependency and may run concurrently. Order
-// within a level is ascending so the result is deterministic across runs.
-//
-// deps maps a node to the nodes it depends on (which must run first). Levels
-// returns an error if a dependency references an unknown node (dangling ref), a
-// dependency key is not a known node, a node depends on itself, or the graph
-// contains a cycle — each makes a valid leveling impossible.
 func Levels(nodes []string, deps map[string][]string) ([][]string, error) {
 	indegree, dependents, err := dependencyEdges(nodes, deps)
 	if err != nil {
@@ -65,7 +53,7 @@ func dependencyEdges(nodes []string, deps map[string][]string) (map[string]int, 
 	indegree := make(map[string]int, len(nodes))
 	dependents := make(map[string][]string, len(nodes))
 	for _, n := range nodes {
-		indegree[n] = 0 // isolated nodes (no deps) still appear
+		indegree[n] = 0
 	}
 	for node, ds := range deps {
 		if !known[node] {
@@ -85,8 +73,6 @@ func dependencyEdges(nodes []string, deps map[string][]string) (map[string]int, 
 	return indegree, dependents, nil
 }
 
-// Flatten concatenates levels into a single serial topological order (level order
-// preserved, ascending within each level).
 func Flatten(levels [][]string) []string {
 	var out []string
 	for _, lvl := range levels {

@@ -46,7 +46,6 @@ func TestApplySoftOverlay_BareFamilyWithNoFamilyEntryStillDefaults(t *testing.T)
 
 func TestApplySoftOverlay_ExactChainMatchStillWinsForBothNames(t *testing.T) {
 	t.Parallel()
-	// "codex" is both a family name and a registered driver.
 	in := Plan{Candidates: []string{"claude-p", "codex"}}
 	out := ApplySoftOverlay(in, Overlay{CLI: "codex"}, nil)
 	if out.Candidates[0] != "codex" {

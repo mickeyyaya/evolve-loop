@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// TestAPICoverNamedExports names every exported symbol through the shapes its consumers use: the host
-// derivation (Derive), ship's projection (Project), and triagecap's card scans (the parser).
 func TestAPICoverNamedExports(t *testing.T) {
 	raw, err := Derive([]byte(report1707), 1707, nil)
 	if err != nil || len(raw) == 0 {

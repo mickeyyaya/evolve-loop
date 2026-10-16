@@ -30,7 +30,6 @@ func TestDetect_AllPaths(t *testing.T) {
 }
 
 func TestDetect_ZeroOptions(t *testing.T) {
-	// Production defaults; result depends on the test env.
 	got := Detect(Options{})
 	if got != "nested" && got != "standalone" {
 		t.Errorf("unexpected: %q", got)

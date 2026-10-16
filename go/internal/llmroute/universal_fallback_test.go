@@ -38,7 +38,7 @@ func TestApplyUniversalFallback_NoDiscovered_FailLoudPreserved(t *testing.T) {
 
 func TestApplyUniversalFallback_DedupesAndPreservesOtherFields(t *testing.T) {
 	p := Plan{
-		Candidates: []string{"claude-tmux", "agy-tmux"}, // agy already present in chain
+		Candidates: []string{"claude-tmux", "agy-tmux"},
 		Triggers:   []int{80, 85},
 		Model:      "auto",
 		Tiers:      []string{"deep"},

@@ -1,9 +1,5 @@
 package directives_test
 
-// Black-box, environment-agnostic coverage of the runtime operator-directives
-// loader. Driven ONLY through the public API (Load/Resolve) and explicit file
-// paths — never t.Setenv/os.Getenv. Per the Flag→Parameter Conversion Standard.
-
 import (
 	"os"
 	"path/filepath"
@@ -13,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/directives"
 )
 
-// writeTempFile writes body to a temp file and returns its path.
 func writeTempFile(t *testing.T, name, body string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), name)
@@ -28,11 +23,11 @@ const lane = "campaign"
 func TestLoad_Resolution(t *testing.T) {
 	cases := []struct {
 		name          string
-		global        string // file body; "" written as a real empty file
+		global        string
 		perLoop       string
-		globalAbsent  bool // true ⇒ pass "" path (no file)
+		globalAbsent  bool
 		perLoopAbsent bool
-		wantMerged    bool // expect a non-empty Merged block + Version
+		wantMerged    bool
 		wantContains  []string
 	}{
 		{name: "both-absent", globalAbsent: true, perLoopAbsent: true, wantMerged: false},
@@ -74,14 +69,12 @@ func TestLoad_Resolution(t *testing.T) {
 func TestLoad_SafetyPreambleAlwaysPresentWhenRendered(t *testing.T) {
 	g := writeTempFile(t, "directives.md", "Be env-agnostic.")
 	set := directives.Load(g, "", lane)
-	// The gates-are-authoritative preamble must accompany any injected directives.
 	if !strings.Contains(set.Merged, "Binary gates") || !strings.Contains(set.Merged, "guidance does not override a gate") {
 		t.Errorf("rendered block missing the gates-authoritative safety preamble; got:\n%s", set.Merged)
 	}
 }
 
 func TestLoad_FailOpenOnUnreadable(t *testing.T) {
-	// A path that does not exist must fail open to an absent layer, never panic.
 	missing := filepath.Join(t.TempDir(), "nope.md")
 	var got directives.Set = directives.Load(missing, missing, lane)
 	var lay directives.Layer = got.Global
@@ -95,8 +88,8 @@ func TestLoad_FailOpenOnUnreadable(t *testing.T) {
 
 func TestLoad_VersionDeterminismAndSensitivity(t *testing.T) {
 	g1 := writeTempFile(t, "a.md", "Rule A.")
-	g2 := writeTempFile(t, "b.md", "Rule A.") // identical content, different file
-	g3 := writeTempFile(t, "c.md", "Rule B.") // different content
+	g2 := writeTempFile(t, "b.md", "Rule A.")
+	g3 := writeTempFile(t, "c.md", "Rule B.")
 
 	v1 := directives.Load(g1, "", lane).Version
 	v2 := directives.Load(g2, "", lane).Version
@@ -111,12 +104,9 @@ func TestLoad_VersionDeterminismAndSensitivity(t *testing.T) {
 	if v1 == v3 {
 		t.Errorf("different content must yield different Version, both = %q", v1)
 	}
-	// Global-only directives are lane-independent (lane is rendered only in the
-	// per-loop section), so the version must NOT change with the lane here.
 	if diff := directives.Load(g1, "", "other-lane").Version; diff != v1 {
 		t.Errorf("global-only version must be lane-independent: %q vs %q", v1, diff)
 	}
-	// With a per-loop layer present, the lane IS rendered and must affect version.
 	lPath := writeTempFile(t, "loop.md", "Loop rule.")
 	if vA, vB := directives.Load("", lPath, "lane-a").Version, directives.Load("", lPath, "lane-b").Version; vA == vB {
 		t.Errorf("different lane with a per-loop layer must change Version, both = %q", vA)
@@ -124,12 +114,8 @@ func TestLoad_VersionDeterminismAndSensitivity(t *testing.T) {
 }
 
 func TestLoad_LaneSanitizedInHeading(t *testing.T) {
-	// A lane carrying line breaks must not inject extra lines / fake headings into
-	// the rendered block — the per-loop heading stays on one line.
 	lPath := writeTempFile(t, "loop.md", "Loop rule.")
 	set := directives.Load("", lPath, "evil\n## Injected\nlane")
-	// The danger is a NEWLINE-prefixed fake heading; sanitization removes the line
-	// breaks (the literal "## Injected" survives mid-line, which markdown ignores).
 	if strings.Contains(set.Merged, "\n## Injected") {
 		t.Errorf("lane line breaks leaked a line-start heading into the block; got:\n%s", set.Merged)
 	}

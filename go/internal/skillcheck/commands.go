@@ -119,7 +119,6 @@ func RenderCommandStub(name, desc, argHint string) string {
 	)
 }
 
-// Escaping the controls keeps a multi-line description round-tripping; YAML folds a raw newline, so the stub would drift forever.
 func yamlQuote(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)

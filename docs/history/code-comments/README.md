@@ -544,6 +544,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/core/failurelearning` | 14 | [internal-core-failurelearning.md](internal-core-failurelearning.md) |
 | `internal/core/outcome` | 4 | [internal-core-outcome.md](internal-core-outcome.md) |
 | `internal/core` | 948 | [internal-core.md](internal-core.md) |
+| `internal/cyclebudget` | 1 | [internal-cyclebudget.md](internal-cyclebudget.md) |
 | `internal/cycleclassify` | 16 | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/cyclecost` | 6 | [internal-cyclecost.md](internal-cyclecost.md) |
 | `internal/cyclehealth` | 11 | [internal-cyclehealth.md](internal-cyclehealth.md) |
@@ -554,6 +555,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/deliverable/gatesignal` | 2 | [internal-deliverable-gatesignal.md](internal-deliverable-gatesignal.md) |
 | `internal/deliverable` | 116 | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/digest` | 3 | [internal-digest.md](internal-digest.md) |
+| `internal/directives` | 1 | [internal-directives.md](internal-directives.md) |
 | `internal/dispatchevents` | 1 | [internal-dispatchevents.md](internal-dispatchevents.md) |
 | `internal/docsfloor` | 5 | [internal-docsfloor.md](internal-docsfloor.md) |
 | `internal/dossier` | 38 | [internal-dossier.md](internal-dossier.md) |
@@ -592,6 +594,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/modelquery` | 11 | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/observerengine` | 10 | [internal-observerengine.md](internal-observerengine.md) |
 | `internal/panetrust` | 7 | [internal-panetrust.md](internal-panetrust.md) |
+| `internal/paralleltest` | 1 | [internal-paralleltest.md](internal-paralleltest.md) |
 | `internal/paths` | 4 | [internal-paths.md](internal-paths.md) |
 | `internal/phaseblock` | 1 | [internal-phaseblock.md](internal-phaseblock.md) |
 | `internal/phasecoherence` | 25 | [internal-phasecoherence.md](internal-phasecoherence.md) |
@@ -653,6 +656,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/routingtest` | 13 | [internal-routingtest.md](internal-routingtest.md) |
 | `internal/runlease` | 1 | [internal-runlease.md](internal-runlease.md) |
 | `internal/scopedelta` | 3 | [internal-scopedelta.md](internal-scopedelta.md) |
+| `internal/selfsha` | 1 | [internal-selfsha.md](internal-selfsha.md) |
 | `internal/sessionreaper` | 3 | [internal-sessionreaper.md](internal-sessionreaper.md) |
 | `internal/sessionrecord` | 3 | [internal-sessionrecord.md](internal-sessionrecord.md) |
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
@@ -672,6 +676,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |
 | `internal/treefence` | 3 | [internal-treefence.md](internal-treefence.md) |
 | `internal/triagecap` | 69 | [internal-triagecap.md](internal-triagecap.md) |
+| `internal/triagedecision` | 3 | [internal-triagedecision.md](internal-triagedecision.md) |
 | `internal/usageprobe` | 2 | [internal-usageprobe.md](internal-usageprobe.md) |
 | `internal/verdictcache` | 6 | [internal-verdictcache.md](internal-verdictcache.md) |
 | `internal/verifylock` | 2 | [internal-verifylock.md](internal-verifylock.md) |

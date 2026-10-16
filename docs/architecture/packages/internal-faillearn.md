@@ -49,7 +49,7 @@
 - An existing artifact is never clobbered and no temp residue remains; an empty `runDir` skips the report. Pinned by `TestWriteArtifacts_DedupesByLessonID`, `TestWriteArtifacts_PreservesExistingReport`, `TestWriteArtifacts_NoTmpResidue` and `TestWriteArtifacts_EmptyRunDirSkipsReport`.
 - Every published artifact is 0644, with or without the inbox option, and a preserved artifact's mode is left alone. Pinned by `TestWriteArtifacts_PublishedArtifactsHaveMode0644`, `TestWriteArtifacts_ModeParityAlsoHoldsWithoutTheInboxOption` and `TestWriteArtifacts_ExistingArtifactModeIsNotRewritten`.
 - The novelty gate suppresses a recurring observation, still writes the retrospective, keeps a distinct failure, is inert on corpus rot, and honors a valid threshold while clamping a malformed one. Pinned by the `TestWriteArtifacts_NoveltyGate*` and `TestWriteArtifacts_NoveltyThresholdOption*` tests in `novelty_test.go`, `TestTokenizeObservation_SplitsOnNonASCIIAlphanumericsAndDropsBareNumbers`, and `policy`'s `TestResearchConfig_NoveltyThresholdRangeResolution` for the shared 0.9 default.
-- `writeIfAbsent` publishes by `os.Link` from a temp file in the destination's directory. Not yet pinned by a test (no concurrent-writer or cross-filesystem test); `writer.go` keeps a one-line why at each site.
+- `writeIfAbsent` publishes by `os.Link` from a temp file in the destination's directory. Not yet pinned by a test (no concurrent-writer or cross-filesystem test); the reason is the `writeIfAbsent` bullet under Design.
 
 ## Findings
 
