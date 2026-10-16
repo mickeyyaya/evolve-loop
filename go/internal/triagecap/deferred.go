@@ -9,10 +9,8 @@ import (
 	"strings"
 )
 
-// deferredHeadingRE matches by word, case-insensitively: models add suffixes and sometimes capitalize the headings.
 var deferredHeadingRE = regexp.MustCompile(`(?mi)^## (?:deferred|dropped)\b`)
 
-// DeferredFloorPackages returns the sorted candidates mentioned by floor items in ## deferred and ## dropped.
 func DeferredFloorPackages(artifact string, candidatePkgs []string) []string {
 	seen := map[string]bool{}
 	for _, loc := range deferredHeadingRE.FindAllStringIndex(artifact, -1) {
@@ -41,7 +39,6 @@ func DeferredFloorPackages(artifact string, candidatePkgs []string) []string {
 	return pkgs
 }
 
-// ReadDeferredFloors reads deferred_floors from the companion; a missing file or field is (nil, false, nil).
 func ReadDeferredFloors(companionPath string) ([]string, bool, error) {
 	data, err := os.ReadFile(companionPath)
 	if err != nil {
@@ -65,7 +62,6 @@ func ReadDeferredFloors(companionPath string) ([]string, bool, error) {
 	return floors, true, nil
 }
 
-// DeferredFloorPackagesDecl returns declared deferred_floors filtered to candidatePkgs, else the prose scan.
 func DeferredFloorPackagesDecl(artifact, companionPath string, candidatePkgs []string) []string {
 	if declared, ok, err := ReadDeferredFloors(companionPath); err == nil && ok {
 		return filterDeclaredPackages(declared, candidatePkgs)
@@ -73,7 +69,6 @@ func DeferredFloorPackagesDecl(artifact, companionPath string, candidatePkgs []s
 	return DeferredFloorPackages(artifact, candidatePkgs)
 }
 
-// MalformedDeferredFloorWarning names the parse error of a present-but-malformed companion; otherwise "".
 func MalformedDeferredFloorWarning(companionPath string) string {
 	data, err := os.ReadFile(companionPath)
 	if err != nil {
@@ -94,7 +89,6 @@ func MalformedDeferredFloorWarning(companionPath string) string {
 	return ""
 }
 
-// DeferredFloorDivergence returns a satisfiable correction when prose deferrals and deferred_floors disagree, else "".
 func DeferredFloorDivergence(artifact, companionPath string, knownPkgs []string) string {
 	declared, ok, err := ReadDeferredFloors(companionPath)
 	if err != nil || !ok {

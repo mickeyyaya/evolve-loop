@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 )
 
-// cardFilesReport's first top_n item declares its footprint; the second names a path in prose only.
 const cardFilesReport = `<!-- challenge-token: abc -->
 <!-- ANCHOR:triage_decision -->
 # Triage Decision — Cycle 1167
@@ -123,7 +122,6 @@ func TestMissingCardFilesWarning_SilentWhenNothingToSay(t *testing.T) {
 		t.Errorf("all cards declare files=, yet warning = %q", msg)
 	}
 
-	// The card's only path is its contract-required evidence= pointer.
 	noPaths := `## top_n (commit to THIS cycle)
 - research-token-frontier: read the vendor changelog and summarize — priority=L, evidence=go/internal/clihealth/clihealth.go, source=scout
 `
@@ -174,7 +172,6 @@ func TestMissingCardFilesWarning_AgentCompanionIsTheAuthority(t *testing.T) {
 	}
 }
 
-// compliantCardFilesReport is cardFilesReport with both cards declaring their footprint.
 func compliantCardFilesReport() string {
 	return strings.Replace(cardFilesReport,
 		"- surface-verdict-conflict-in-audit-classify: capture pre-override agent verdict in Classify (go/internal/phases/audit/audit.go) — priority=H, source=scout",
@@ -255,7 +252,6 @@ func TestDeclaredFilesNeverInflateFloorCount(t *testing.T) {
 `,
 		},
 		{
-			// Not floor-bearing on its own; only the declared path contains the trigger word "floor".
 			name: "footprint path containing a floor trigger word",
 			bare: `## top_n (commit to THIS cycle)
 - cut-flake-rate: cut the flake rate by 40% — priority=H, source=scout

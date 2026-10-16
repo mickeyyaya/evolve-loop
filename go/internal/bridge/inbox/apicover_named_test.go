@@ -2,10 +2,6 @@ package inbox
 
 import "testing"
 
-// TestCursor_NewCursorStartsAtZeroOffset names the inbox.Cursor type (NewCursor
-// returns *Cursor but the bare type is never named in a test) and pins the
-// constructor's start-of-file contract: a fresh cursor is byte-offset 0 with its
-// path wired to Path(workspace, agent), so the first Drain replays from the top.
 func TestCursor_NewCursorStartsAtZeroOffset(t *testing.T) {
 	ws := t.TempDir()
 	got := NewCursor(ws, "build")

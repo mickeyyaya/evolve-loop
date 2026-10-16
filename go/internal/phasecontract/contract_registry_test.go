@@ -74,7 +74,7 @@ func TestContract_ArtifactNames(t *testing.T) {
 	cases := map[string]string{
 		"build":        "build-report.md",
 		"scout":        "scout-report.md",
-		"tdd":          "test-report.md", // not tdd-report.md
+		"tdd":          "test-report.md",
 		"audit":        "audit-report.md",
 		"intent":       "intent.md",
 		"triage":       "triage-report.md",
@@ -135,7 +135,6 @@ func TestContracts_ReturnsWholeRegistry(t *testing.T) {
 }
 
 func TestContract_JSONContractsDeclareRequiredKeys(t *testing.T) {
-	// router writes a bare JSON array, so only orchestrator declares keys.
 	advisor, _ := For("advisor")
 	if len(advisor.RequiredKeys) != 0 {
 		t.Errorf("advisor/router RequiredKeys=%v, want none (bare array)", advisor.RequiredKeys)

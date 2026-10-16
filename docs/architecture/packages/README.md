@@ -169,3 +169,9 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/research` | the typed, deterministic query port over the lessons corpus | [internal-research.md](internal-research.md) |
 | `internal/logfilter` | writes the human-readable clean companion of a raw phase stdout log | [internal-logfilter.md](internal-logfilter.md) |
 | `internal/ledgerverify` | asserts from the ledger that a cycle ran its required roles end to end | [internal-ledgerverify.md](internal-ledgerverify.md) |
+| `internal/envchain` | the four-tier env-precedence chain, the typed environment getters and the registry of `EVOLVE_*` key names | [internal-envchain.md](internal-envchain.md) |
+| `internal/bridge/inbox` | the file-based NDJSON channel for live command injection into a running tmux REPL agent | [internal-bridge-inbox.md](internal-bridge-inbox.md) |
+| `internal/reflection` | reads, writes and validates the per-phase Reflection Journal YAML sidecar | [internal-reflection.md](internal-reflection.md) |
+| `internal/budgethistory` | rolls recent cycles' timing, cost and token telemetry into the pace estimate that sizes a fleet wave | [internal-budgethistory.md](internal-budgethistory.md) |
+| `internal/capability` | parses adapter capability manifests into WARN lines, the dispatch plan and the quality tier | [internal-capability.md](internal-capability.md) |
+| `internal/posteditvalidate` | the PostToolUse hook that checks a just-edited json, shell or python file and warns without blocking | [internal-posteditvalidate.md](internal-posteditvalidate.md) |

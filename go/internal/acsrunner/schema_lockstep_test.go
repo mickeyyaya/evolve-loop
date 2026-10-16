@@ -1,27 +1,11 @@
 package acsrunner
 
-// schema_lockstep_test.go — the two producers of acs-verdict.json must write a
-// shape the SAME reader can grade.
-//
-// The runner's own doc comment claimed the producers "stay in schema lockstep".
-// They did not: `evolve acs run` omitted `ship_eligible`, and the audit gate
-// reads that field as a POINTER precisely so a pre-stamp verdict stays
-// back-compatible — absent means "no opinion", which the gate honours by NOT
-// blocking. So a verdict written through this path silently disabled the
-// ship-eligibility gate, and the comment asserted the opposite.
-//
-// The lesson this pins is the session's recurring one: a claim of lockstep in
-// prose is not lockstep. The only durable form is a test that decodes BOTH
-// writers' output through the reader's own expectations.
-
 import (
 	"encoding/json"
 	"strings"
 	"testing"
 )
 
-// greenStream / redStream are `go test -json` transcripts in the shape the
-// runner really consumes (same fixture style as runner_test.go).
 func greenStream() string {
 	return strings.Join([]string{
 		`{"Action":"run","Package":"acs/cycle-42","Test":"TestC42_001"}`,
@@ -38,7 +22,6 @@ func redStream() string {
 	}, "\n") + "\n"
 }
 
-// ParseTestJSONForTest is the parse the production runner performs.
 func ParseTestJSONForTest(t *testing.T, stream string, cycle int) Verdict {
 	t.Helper()
 	v, err := ParseTestJSON(strings.NewReader(stream), cycle)
@@ -48,10 +31,6 @@ func ParseTestJSONForTest(t *testing.T, stream string, cycle int) Verdict {
 	return v
 }
 
-// gateView is what the audit's EGPS reader actually looks for
-// (internal/phases/audit readACSVerdict). ShipEligible is a POINTER on purpose:
-// nil is the back-compat "unstamped" case the gate must not block on, which is
-// exactly why a producer that omits it is dangerous rather than merely untidy.
 type gateView struct {
 	SchemaVersion string   `json:"schema_version"`
 	Cycle         int      `json:"cycle"`
@@ -74,8 +53,6 @@ func decodeAsGate(t *testing.T, v Verdict) gateView {
 	return got
 }
 
-// A GREEN run must present as shippable to the gate, explicitly — not by the
-// gate failing to find an opinion.
 func TestVerdict_GreenRunIsExplicitlyShipEligible(t *testing.T) {
 	t.Parallel()
 	v := ParseTestJSONForTest(t, greenStream(), 42)
@@ -95,8 +72,6 @@ func TestVerdict_GreenRunIsExplicitlyShipEligible(t *testing.T) {
 	}
 }
 
-// And the direction that matters most: a RED run must be unambiguously
-// unshippable through every field the gate consults.
 func TestVerdict_RedRunIsExplicitlyNotShipEligible(t *testing.T) {
 	t.Parallel()
 	v := ParseTestJSONForTest(t, redStream(), 42)
@@ -116,17 +91,6 @@ func TestVerdict_RedRunIsExplicitlyNotShipEligible(t *testing.T) {
 	}
 }
 
-// TestVerdict_TruncatedStreamIsNotShipEligible — the review BLOCK, and the
-// defect this change introduced while closing another.
-//
-// A predicate whose stream carries `run` but never `pass`/`fail`/`skip` is what
-// a SIGKILLed, timed-out or panic-aborted `go test -json` produces — the
-// watchdog kills hung suites, so it is a real shape, not a hypothetical. The
-// aggregation's default arm counted that as GREEN. Before this change the
-// producer wrote no opinion at all and the gate's nil back-compat treated the
-// file as unstamped; making the opinion explicit turned silence into an
-// affirmative "PASS, ship-eligible" — and cmd_acs writes the verdict even on
-// the error path by design, so nothing downstream would have caught it.
 func TestVerdict_TruncatedStreamIsNotShipEligible(t *testing.T) {
 	t.Parallel()
 	truncated := strings.Join([]string{
@@ -148,9 +112,6 @@ func TestVerdict_TruncatedStreamIsNotShipEligible(t *testing.T) {
 	}
 }
 
-// The ship gate reads predicate_suite.total; acsrunner wrote only a flat
-// `total`, so every acsrunner-written verdict printed "total=0" in the block
-// message an operator reads while holding a block (review MEDIUM).
 func TestVerdict_CarriesTheNestedTotalTheShipGateReads(t *testing.T) {
 	t.Parallel()
 	v := ParseTestJSONForTest(t, redStream(), 42)
@@ -164,9 +125,6 @@ func TestVerdict_CarriesTheNestedTotalTheShipGateReads(t *testing.T) {
 	if err := json.Unmarshal(raw, &view); err != nil {
 		t.Fatal(err)
 	}
-	// Names PredicateSuiteCounts: the nested block exists solely so the ship
-	// gate reads a real number, and a type nobody names is one a future
-	// refactor drops without noticing which message went blank.
 	var _ PredicateSuiteCounts = v.PredicateSuite
 	if view.PredicateSuite.Total != view.Total || view.Total == 0 {
 		t.Errorf("predicate_suite.total = %d, flat total = %d — the ship gate reads the nested one and printed 0",

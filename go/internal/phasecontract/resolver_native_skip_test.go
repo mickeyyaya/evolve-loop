@@ -47,7 +47,7 @@ func TestResolveNativeExecutorWithDeclaredOutputsKeepsContract(t *testing.T) {
 func TestResolveLLMPhaseWithoutOutputsKeepsConventionContract(t *testing.T) {
 	t.Parallel()
 	r := NewCatalogResolver(lookupFor(phasespec.PhaseSpec{
-		Name: "smell-scan", // empty Kind defaults to llm
+		Name: "smell-scan",
 	}))
 	c, ok := r.Resolve("smell-scan")
 	if !ok {
@@ -61,7 +61,7 @@ func TestResolveLLMPhaseWithoutOutputsKeepsConventionContract(t *testing.T) {
 func TestResolveBuiltinStaysAuthoritative(t *testing.T) {
 	t.Parallel()
 	r := NewCatalogResolver(lookupFor(phasespec.PhaseSpec{
-		Name: "audit", Kind: "native", // contradicts the built-in audit contract
+		Name: "audit", Kind: "native",
 	}))
 	c, ok := r.Resolve("audit")
 	if !ok || c.ArtifactName != "audit-report.md" {

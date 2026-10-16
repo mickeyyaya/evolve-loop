@@ -2,11 +2,6 @@ package capability
 
 import "testing"
 
-// TestInspection_MissingManifestShape names the capability.Inspection type
-// (Inspect returns it but the bare type is never named in a test) and pins the
-// absent-manifest contract the subagent validators rely on: both supports
-// default true and the warn list is empty. Inspection holds a []string, so it is
-// asserted field-by-field.
 func TestInspection_MissingManifestShape(t *testing.T) {
 	var insp Inspection
 	insp, err := Inspect(t.TempDir(), "no-such-adapter")

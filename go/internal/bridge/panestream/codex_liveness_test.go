@@ -23,7 +23,7 @@ func TestCodexLiveness_ThinkingToAnswerConverging(t *testing.T) {
 	det := NewDefaultDetector(3)
 	think := codexFrame(t, "thinking.txt")
 	answer := codexFrame(t, "answer.txt")
-	det.Assess(think, p) // prime
+	det.Assess(think, p)
 	state, conf := det.Assess(answer, p)
 	if state != LivenessConverging {
 		t.Errorf("thinking→answer: got %v, want LivenessConverging", state)
@@ -36,7 +36,6 @@ func TestCodexLiveness_ThinkingToAnswerConverging(t *testing.T) {
 func TestCodexLiveness_PrimingNotHung(t *testing.T) {
 	p := Profiles["codex"]
 	answer := codexFrame(t, "answer.txt")
-	// Use stallThreshold=1 so Hung fires as early as possible if the invariant breaks.
 	det := NewDefaultDetector(1)
 	state, conf := det.Assess(answer, p)
 	if state == LivenessHung {
@@ -55,7 +54,7 @@ func TestCodexLiveness_StalledIdleNotHung(t *testing.T) {
 	}
 
 	det := NewDefaultDetector(3)
-	det.Assess(answer, p) // prime
+	det.Assess(answer, p)
 
 	for i := 1; i <= 5; i++ {
 		state, conf := det.Assess(answer, p)

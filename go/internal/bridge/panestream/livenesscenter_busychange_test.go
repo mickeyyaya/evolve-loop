@@ -44,7 +44,7 @@ func TestSignalCenter_ChangedProjection(t *testing.T) {
 		t.Fatal("Changed(sess-1) = false, want true after a content-bearing second Observe")
 	}
 
-	sc.Observe("sess-1", "❯ starting task\n⏺ line one\n⏺ line two (new content)\n❯ \n", p) // identical content again
+	sc.Observe("sess-1", "❯ starting task\n⏺ line one\n⏺ line two (new content)\n❯ \n", p)
 	if sc.Changed("sess-1") {
 		t.Fatal("Changed(sess-1) = true after an identical-content Observe, want false")
 	}

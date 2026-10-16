@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// readFrame loads a real capture copied from the tmux live-capture research notes in docs/research.
 func readFrame(t *testing.T, name string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", name))
@@ -121,7 +120,6 @@ func TestPaneDelta_AllCLIs(t *testing.T) {
 
 func TestPaneDelta_NoMarkerFallback(t *testing.T) {
 	d := &PaneDelta{}
-	// No boundary marker, so the last volatileFallbackRows rows are volatile.
 	frame := "line1\nline2\nline3\nfooter1\nfooter2\nfooter3\n"
 	if primed := d.Next(frame, claudeProfile); primed != nil {
 		t.Fatalf("prime returned %v, want nil", primed)
@@ -258,15 +256,14 @@ func TestPaneDelta_Agy_BlockquoteNotBoundary(t *testing.T) {
 		"> what is tmux?",
 		"▸ Thought for 1s",
 		"• tmux is a multiplexer.",
-		"> A wise user once said this is quoted wisdom.", // blockquote IN content
+		"> A wise user once said this is quoted wisdom.",
 		"• Final point about panes.",
 		"────────────────────",
-		">", // the real empty input box
+		">",
 		"? for shortcuts",
 	}, "\n")
 
 	d := &PaneDelta{}
-	// Prime on a small frame so the subsequent full frame produces new content.
 	_ = d.Next("> what is tmux?\n▸ Thinking...", Profiles["agy"])
 	got := strings.Join(d.Next(frame, Profiles["agy"]), "\n")
 

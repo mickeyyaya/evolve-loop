@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// Each worker observes its own session key; run with -cpu=1,2,4,8 to expose lock contention.
 func BenchmarkSignalCenter_ParallelObserve(b *testing.B) {
 	sc := NewLivenessCenter()
 	profile := Profiles["claude"]

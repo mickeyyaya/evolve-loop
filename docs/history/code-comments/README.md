@@ -506,11 +506,14 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/binaryguard` | 1 | [internal-binaryguard.md](internal-binaryguard.md) |
 | `internal/bridge/channel` | 11 | [internal-bridge-channel.md](internal-bridge-channel.md) |
 | `internal/bridge/clicontrol` | 2 | [internal-bridge-clicontrol.md](internal-bridge-clicontrol.md) |
+| `internal/bridge/inbox` | 3 | [internal-bridge-inbox.md](internal-bridge-inbox.md) |
 | `internal/bridge/keyspec` | 1 | [internal-bridge-keyspec.md](internal-bridge-keyspec.md) |
 | `internal/bridge/launchoutcome` | 6 | [internal-bridge-launchoutcome.md](internal-bridge-launchoutcome.md) |
 | `internal/bridge/panestream` | 44 | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge` | 434 | [internal-bridge.md](internal-bridge.md) |
+| `internal/budgethistory` | 2 | [internal-budgethistory.md](internal-budgethistory.md) |
 | `internal/campaign` | 4 | [internal-campaign.md](internal-campaign.md) |
+| `internal/capability` | 1 | [internal-capability.md](internal-capability.md) |
 | `internal/changedpkgs` | 13 | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/checkpoint` | 14 | [internal-checkpoint.md](internal-checkpoint.md) |
 | `internal/ciparity` | 10 | [internal-ciparity.md](internal-ciparity.md) |
@@ -572,7 +575,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/panetrust` | 7 | [internal-panetrust.md](internal-panetrust.md) |
 | `internal/paths` | 4 | [internal-paths.md](internal-paths.md) |
 | `internal/phasecoherence` | 25 | [internal-phasecoherence.md](internal-phasecoherence.md) |
-| `internal/phasecontract` | 62 | [internal-phasecontract.md](internal-phasecontract.md) |
+| `internal/phasecontract` | 67 | [internal-phasecontract.md](internal-phasecontract.md) |
 | `internal/phaseintegrity` | 5 | [internal-phaseintegrity.md](internal-phaseintegrity.md) |
 | `internal/phaseinventory` | 1 | [internal-phaseinventory.md](internal-phaseinventory.md) |
 | `internal/phaseio` | 9 | [internal-phaseio.md](internal-phaseio.md) |
@@ -603,6 +606,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/recovery` | 39 | [internal-recovery.md](internal-recovery.md) |
 | `internal/recurrence` | 12 | [internal-recurrence.md](internal-recurrence.md) |
+| `internal/reflection` | 1 | [internal-reflection.md](internal-reflection.md) |
 | `internal/regressiontia` | 5 | [internal-regressiontia.md](internal-regressiontia.md) |
 | `internal/releasepipeline` | 25 | [internal-releasepipeline.md](internal-releasepipeline.md) |
 | `internal/releasepreflight` | 14 | [internal-releasepreflight.md](internal-releasepreflight.md) |

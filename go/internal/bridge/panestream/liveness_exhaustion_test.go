@@ -7,7 +7,7 @@ var _ LivenessProbe = (*ExhaustionProbe)(nil)
 func TestExhaustionProbe_OverridesLiveness(t *testing.T) {
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota (exceeded|reached)`}
 	probe := NewExhaustionProbe(NewDefaultDetector(3))
-	probe.Assess("some earlier output\n", p) // prime the inner delta
+	probe.Assess("some earlier output\n", p)
 	wall := "some earlier output\n⚠ Individual quota reached. Resets in 52h\n"
 	got, conf := probe.Assess(wall, p)
 	if got != LivenessExhausted {
@@ -24,7 +24,7 @@ func TestExhaustionProbe_DelegatesWhenNoMatch(t *testing.T) {
 	probe := NewExhaustionProbe(NewDefaultDetector(3))
 	f1, f2 := "hello\n", "hello\nworld\n"
 	inner.Assess(f1, p)
-	probe.Assess(f1, p) // prime both identically
+	probe.Assess(f1, p)
 	wantState, wantConf := inner.Assess(f2, p)
 	gotState, gotConf := probe.Assess(f2, p)
 	if gotState != wantState || gotConf != wantConf {

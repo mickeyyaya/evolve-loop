@@ -88,7 +88,6 @@ func TestCatalogResolver_OverlaysDeclaredFieldsOntoBuiltins(t *testing.T) {
 
 func TestRealRegistry_EveryBuiltinWithArtifactResolvesARegistryEntry(t *testing.T) {
 	cat := realRegistry(t)
-	// Control-plane contracts, not phases, so they have no registry entry by design.
 	notInRegistry := map[string]bool{"router": true, "router-proposal": true, "router-replan": true, "orchestrator": true}
 	for _, c := range Contracts() {
 		name := c.Phase

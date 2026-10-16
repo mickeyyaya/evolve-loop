@@ -91,7 +91,6 @@ func TestInspectBytes_MissingSupportsBlockDefaults(t *testing.T) {
 }
 
 func TestInspectBytes_NullValuesDefault(t *testing.T) {
-	// bash: `if . == null then "true" else tostring`
 	insp := inspectBytes([]byte(`{"supports":{"budget_cap_native":null,"permission_scoping":null}}`), "x")
 	if !insp.Manifest.BudgetNative || !insp.Manifest.PermissionScoping {
 		t.Errorf("null supports values should default true, got %+v", insp.Manifest)

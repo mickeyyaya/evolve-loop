@@ -13,7 +13,6 @@ import (
 
 const triageDecisionFile = "triage-decision.json"
 
-// writeCompanion omits committed_floors for a nil slice and writes it for a non-nil, possibly empty, one.
 func writeCompanion(t *testing.T, dir string, committedFloors []string) string {
 	t.Helper()
 	var body string
@@ -33,7 +32,6 @@ func writeCompanion(t *testing.T, dir string, committedFloors []string) string {
 	return path
 }
 
-// proseFloors3's prose counts three floors, so a declaration can be shown to win in either direction.
 const proseFloors3 = "## top_n\n" +
 	"- coverage-multi: add tests for swarmrunner, swarmplan, bridge coverage ≥98% — priority=H, source=scout\n"
 
@@ -177,16 +175,16 @@ func TestFloorDivergenceCorrective(t *testing.T) {
 
 func TestReviewer_UsesDeclaredFloors(t *testing.T) {
 	t.Run("honest declaration overrides overpacked prose -> approve", func(t *testing.T) {
-		ws := writeTriageWorkspace(t, readFixture(t, "triage-cycle283.md")) // prose = 12 floors
-		writeCompanion(t, ws, []string{"clihealth", "ledger"})              // declared = 2 <= cap 7
-		r := newTestReviewer(config.StageEnforce, nil, nil)                 // empty window -> K=5, cap=7
+		ws := writeTriageWorkspace(t, readFixture(t, "triage-cycle283.md"))
+		writeCompanion(t, ws, []string{"clihealth", "ledger"})
+		r := newTestReviewer(config.StageEnforce, nil, nil)
 		if rr := r.Review(context.Background(), reviewIn(ws)); !rr.Approve {
 			t.Errorf("declared 2 floors <= cap 7 must approve despite 12-floor prose; reason: %s", rr.Reason)
 		}
 	})
 
 	t.Run("over-declared companion overrides lean prose -> reject", func(t *testing.T) {
-		ws := writeTriageWorkspace(t, readFixture(t, "triage-cycle281.md")) // prose = 1 floor
+		ws := writeTriageWorkspace(t, readFixture(t, "triage-cycle281.md"))
 		over := make([]string, 12)
 		for i := range over {
 			over[i] = string(rune('a' + i))

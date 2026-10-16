@@ -4,15 +4,13 @@ import (
 	"testing"
 )
 
-// TestResolve_PrecedenceOrder exhaustively walks the four-tier chain
-// in a single table so the precedence semantics are visible at a glance.
 func TestResolve_PrecedenceOrder(t *testing.T) {
 	t.Setenv("TEST_KEY", "")
 
 	cases := []struct {
 		name    string
 		reqEnv  map[string]string
-		procEnv string // applied via t.Setenv
+		procEnv string
 		profile string
 		def     string
 		want    string
@@ -37,8 +35,6 @@ func TestResolve_PrecedenceOrder(t *testing.T) {
 	}
 }
 
-// TestResolve_DistinctKeysDoNotCollide — sanity that two keys with
-// the same value type don't leak across each other.
 func TestResolve_DistinctKeysDoNotCollide(t *testing.T) {
 	t.Setenv("KEY_A", "a-val")
 	t.Setenv("KEY_B", "b-val")
@@ -53,8 +49,6 @@ func TestResolve_DistinctKeysDoNotCollide(t *testing.T) {
 	}
 }
 
-// TestPhaseEnvKey_CanonicalForm — every canonical phase maps to its
-// documented env-var key. Includes hyphenated names for future-proofing.
 func TestPhaseEnvKey_CanonicalForm(t *testing.T) {
 	cases := []struct {
 		phase, suffix, want string
@@ -75,8 +69,6 @@ func TestPhaseEnvKey_CanonicalForm(t *testing.T) {
 	}
 }
 
-// TestPhaseEnvKey_EmptyInputs — boundary cases. Empty phase and empty
-// suffix are caller errors but we want defined (not panicking) behavior.
 func TestPhaseEnvKey_EmptyInputs(t *testing.T) {
 	if got := PhaseEnvKey("", "MODEL"); got != "EVOLVE__MODEL" {
 		t.Errorf("empty phase: %q", got)

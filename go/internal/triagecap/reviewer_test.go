@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// newTestReviewer fixes the package vocabulary and window, and logs only format strings.
 func newTestReviewer(stage config.Stage, window []core.TriageThroughputEntry, logs *[]string) *CapReviewer {
 	r := newCapReviewer(stage)
 	r.pkgsFn = func(string) []string { return knownPkgsFixture }
@@ -61,7 +60,6 @@ func TestCapReviewer_Cycle281ShapePasses(t *testing.T) {
 }
 
 func TestCapReviewer_ObservedWindowTightensCap(t *testing.T) {
-	// K = mean(2,2,2) = 2 → cap = ceil(2.5) = 3; a 4-floor commit rejects.
 	window := []core.TriageThroughputEntry{
 		{Cycle: 290, Floors: 2}, {Cycle: 291, Floors: 2}, {Cycle: 292, Floors: 2},
 	}

@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// Names the LivenessHandler type for apicover.
 var _ LivenessHandler = func(LivenessEvent) {}
 
 func TestSignalCenter_ExhaustedDominatesAggregate(t *testing.T) {
@@ -30,7 +29,7 @@ func TestSignalCenter_DispatchesExhaustionToHandler(t *testing.T) {
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota reached`}
 	sc.Observe("s1", "working normally\n", p)
 	sc.Observe("s1", "⚠ quota reached\n", p)
-	sc.Observe("s1", "⚠ quota reached now\n", p) // still Exhausted: no re-dispatch
+	sc.Observe("s1", "⚠ quota reached now\n", p)
 
 	exhausted := 0
 	for _, ev := range events {
@@ -67,11 +66,11 @@ func TestSignalCenter_ConcurrentDispatchAndRegister_RaceClean(t *testing.T) {
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota reached`}
 
 	var wg sync.WaitGroup
-	for h := 0; h < 3; h++ { // late registrations racing the producers
+	for h := 0; h < 3; h++ {
 		wg.Add(1)
 		go func() { defer wg.Done(); sc.RegisterLivenessHandler(func(LivenessEvent) {}) }()
 	}
-	for s := 0; s < 8; s++ { // distinct-session producers, each ending walled
+	for s := 0; s < 8; s++ {
 		wg.Add(1)
 		key := fmt.Sprintf("sess-%d", s)
 		go func(k string) {

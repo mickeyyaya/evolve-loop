@@ -3,8 +3,6 @@ package panestream
 import "testing"
 
 func TestPaneBusy_RealFrames(t *testing.T) {
-	// codex's thinking.txt is its idle boot frame (the PaneDelta baseline), so its
-	// generating frame is generating.txt.
 	cases := []struct {
 		cli, genFrame string
 	}{
@@ -60,7 +58,7 @@ func TestPaneBusy_SpinnerStatsVariants(t *testing.T) {
 	}
 	idleLines := []string{
 		"❯ \n  ⏵⏵ bypass permissions on (shift+tab to cycle)",
-		"The cost line said it used 3.1k tokens overall.", // prose mentioning tokens, no structural spinner
+		"The cost line said it used 3.1k tokens overall.",
 	}
 	for _, line := range idleLines {
 		if PaneBusy(line, Profiles["claude"]) {

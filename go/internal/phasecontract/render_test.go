@@ -73,7 +73,6 @@ func TestRenderContractBlock_Deterministic(t *testing.T) {
 }
 
 func TestRenderContractBlock_JSON_UsesRequiredKeys(t *testing.T) {
-	// Uses orchestrator: router's bare JSON array has no keys.
 	c, _ := For("orchestrator")
 	block := RenderContractBlock(c)
 	if !strings.Contains(block, "cycle_id") {

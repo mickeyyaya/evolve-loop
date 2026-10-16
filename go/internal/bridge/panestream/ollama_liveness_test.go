@@ -9,13 +9,11 @@ func TestOllamaDetector_ThinkingConverging(t *testing.T) {
 	base := NewDefaultDetector(3)
 	det := NewOllamaDetector(3)
 
-	// Minimal thinking frame: "Thinking..." is present; no idle "Send a message".
 	thinkingFrame := "user@host /tmp % ollama run gemma4:latest\n>>> what is tmux?\nThinking...\n"
 
 	base.Assess(thinkingFrame, p)
 	det.Assess(thinkingFrame, p)
 
-	// Same frame again: no new content, so DefaultDetector reads BusyButStagnant.
 	baseState, baseConf := base.Assess(thinkingFrame, p)
 	ollamaState, ollamaConf := det.Assess(thinkingFrame, p)
 
@@ -72,7 +70,7 @@ func TestOllamaDetector_Malformed(t *testing.T) {
 			}()
 			base := NewDefaultDetector(3)
 			det := NewOllamaDetector(3)
-			base.Assess(tc.frame, p) // prime
+			base.Assess(tc.frame, p)
 			det.Assess(tc.frame, p)
 			_, baseConf := base.Assess(tc.frame, p)
 			_, detConf := det.Assess(tc.frame, p)
