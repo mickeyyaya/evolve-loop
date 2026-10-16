@@ -40,7 +40,7 @@ The package uses two other packages:
 - **`lossless`.** `Listen` appends the record inside the Center drain, in one locked write. It waits at most the lock deadline. A second append of the same channel in this process waits for the first one. Thus the channel never sees two lock calls of one process.
 - **`best_effort`.** `Listen` puts the record on a bounded queue and returns. The queue holds at most `QueueEvents` records and `QueueBytes` bytes of record lines. A full queue waits up to `EnqueueDeadline` for space; with 0 it never waits. Each put sends on a wake channel, and the writer goroutine takes the whole queue and appends it as one batch. Nothing polls.
 
-  A take sends one space signal. A put that leaves space sends it again, so each waiting put gets the space. A closed queue refuses a put at once and never waits. A record that does not encode is a `write_error` loss, so the byte count never misses it.
+  A take sends one space signal. A put that leaves space sends it again, so each waiting put gets the space. Close sends one space signal, and a put that finds the queue closed sends it again, so every blocked put returns at close. A closed queue refuses a put at once and never waits. A record that does not encode is a `write_error` loss, so the byte count never misses it.
 - **A loss.** These results are a counted loss:
   - a lock deadline or `ErrLockPending` (reason `lock_deadline`);
   - any other append error (reason `write_error`);

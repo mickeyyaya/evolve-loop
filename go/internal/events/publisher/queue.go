@@ -59,6 +59,7 @@ func (q *queue) push(rec channel.Record) (string, bool) {
 		case pushed:
 			return "", true
 		case closed:
+			notify(q.space)
 			return channel.ReasonQueueFull, false
 		}
 		select {
@@ -104,6 +105,7 @@ func (q *queue) closeQueue() []channel.Record {
 	defer q.mu.Unlock()
 	left := q.items
 	q.items, q.bytes, q.closed = nil, 0, true
+	notify(q.space)
 	return left
 }
 

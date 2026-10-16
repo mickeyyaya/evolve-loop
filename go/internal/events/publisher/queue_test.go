@@ -342,3 +342,81 @@ func TestPublisher_ARecordThatDoesNotEncodeIsAWriteErrorLoss(t *testing.T) {
 		t.Fatalf("records = %+v, want one write_error gap and no signal", got)
 	}
 }
+
+func fullQueueWithLongDeadline(t *testing.T) *queue {
+	t.Helper()
+	cfg := testConfig(t, bestEffort("signals", ""))
+	cfg.QueueEvents = 1
+	cfg.EnqueueDeadline = time.Hour
+	q := newQueue(cfg)
+	if reason, ok := q.push(channel.Record{}); !ok {
+		t.Fatalf("first push = %q, want accepted", reason)
+	}
+	return q
+}
+
+func TestPublisher_ABlockedPutReturnsAtClose(t *testing.T) {
+	t.Parallel()
+	q := fullQueueWithLongDeadline(t)
+	type outcome struct {
+		reason string
+		ok     bool
+	}
+	got := make(chan outcome, 1)
+	go func() {
+		reason, ok := q.push(channel.Record{})
+		got <- outcome{reason, ok}
+	}()
+	time.Sleep(200 * time.Millisecond)
+
+	q.closeQueue()
+
+	done := make(chan struct{})
+	var res outcome
+	go func() {
+		res = <-got
+		close(done)
+	}()
+	finishes(t, done, "a put blocked on a full queue at close")
+	if res.ok || res.reason != channel.ReasonQueueFull {
+		t.Fatalf("blocked put = (%q, %v), want (%q, false)", res.reason, res.ok, channel.ReasonQueueFull)
+	}
+}
+
+func TestPublisher_EveryBlockedPutReturnsAtClose(t *testing.T) {
+	t.Parallel()
+	q := fullQueueWithLongDeadline(t)
+	dones := make([]chan struct{}, 3)
+	for i := range dones {
+		dones[i] = make(chan struct{})
+		go func(done chan struct{}) {
+			q.push(channel.Record{})
+			close(done)
+		}(dones[i])
+	}
+	time.Sleep(200 * time.Millisecond)
+
+	q.closeQueue()
+
+	for _, done := range dones {
+		finishes(t, done, "one of several puts blocked on a full queue at close")
+	}
+}
+
+func TestPublisher_APutAfterCloseIsRefusedWithoutWaiting(t *testing.T) {
+	t.Parallel()
+	q := fullQueueWithLongDeadline(t)
+	q.closeQueue()
+
+	done := make(chan struct{})
+	var ok bool
+	go func() {
+		_, ok = q.push(channel.Record{})
+		close(done)
+	}()
+
+	finishes(t, done, "a put after close")
+	if ok {
+		t.Fatalf("put after close was accepted")
+	}
+}
