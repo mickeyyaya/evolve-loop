@@ -21,14 +21,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// Interactive policies: how a phase agent resolves its own interactive prompts without blocking the loop.
 const (
 	PolicyRecommendedOrFirst = "recommended_or_first"
 	PolicyEscalate           = "escalate"
 	PolicyAutoYes            = "auto_yes"
 )
 
-// The policy blocks stay constant and under ~200 tokens so the cached prompt prefix stays stable.
 const policyBlockRecommendedOrFirst = "## Subagent Interactive Policy (recommended_or_first)\n\n" +
 	"If you would invoke AskUserQuestion or any equivalent interactive prompt, instead\n" +
 	"auto-resolve as follows:\n" +
@@ -45,30 +43,21 @@ const policyBlockAutoYes = "## Subagent Interactive Policy (auto_yes)\n\n" +
 	"- Otherwise pick the first listed option.\n" +
 	"Never block on operator input; the loop is autonomous.\n\n---\n\n"
 
-// Adapter is the core.Bridge implementation: it assembles the prompt, then delegates to the in-process Engine.
 type Adapter struct {
-	engineFactory func(env map[string]string) core.Bridge
-	// onStopReview receives every stop-review decision (extend and pause), scoped to the request's Cycle.
-	onStopReview func(cycle int, phase, action, reason string)
-	resolver     phasecontract.Resolver
-	// signals is the Center every engine this Adapter builds produces into; nil is the Null Object.
-	signals *signalcenter.Center
-	phaseIO config.Stage
-	// recoveryStage is the phase-recovery program dial (channel, ask-broker, transient-dwell).
-	recoveryStage string
-	// fatalPaneStage is the fatal-pane fast-fail's own dial, independent of recoveryStage.
-	fatalPaneStage string
-	// bridgeConfig holds the policy.json timing overrides; zero values mean the engine's built-in defaults.
-	bridgeConfig policy.BridgePolicy
-	efforts      policy.EffortTable
-	// contextFillWarnPct is the validated policy threshold; zero lets the engine apply its built-in default.
+	engineFactory       func(env map[string]string) core.Bridge
+	onStopReview        func(cycle int, phase, action, reason string)
+	resolver            phasecontract.Resolver
+	signals             *signalcenter.Center
+	phaseIO             config.Stage
+	recoveryStage       string
+	fatalPaneStage      string
+	bridgeConfig        policy.BridgePolicy
+	efforts             policy.EffortTable
 	contextFillWarnPct  int
 	paneCaptureMaxBytes int
-	// bootTimeoutStore records driver-scoped boot-timeout bench strikes.
-	bootTimeoutStore *clihealth.Store
+	bootTimeoutStore    *clihealth.Store
 }
 
-// New constructs an Adapter backed by the in-process bridge.Engine, resolving built-in contracts only.
 func New() *Adapter {
 	return &Adapter{
 		engineFactory: func(env map[string]string) core.Bridge {
@@ -78,7 +67,6 @@ func New() *Adapter {
 	}
 }
 
-// NewDefault constructs the production Adapter, seeding it from <projectRoot>/.evolve/policy.json (fail-open to built-in defaults).
 func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	a := New()
 	a.signals = signals
@@ -117,17 +105,14 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 	}
 }
 
-// BootTimeoutStoreWired reports whether a boot-timeout strike store is wired (true for NewDefault, false for New).
 func (a *Adapter) BootTimeoutStoreWired() bool {
 	return a.bootTimeoutStore != nil
 }
 
-// SetOnStopReview sets the callback for every stop-review decision made during Launch; nil clears it.
 func (a *Adapter) SetOnStopReview(fn func(cycle int, phase, action, reason string)) {
 	a.onStopReview = fn
 }
 
-// SetContractResolver installs a catalog-aware contract resolver for user and minted phases; nil restores built-ins only.
 func (a *Adapter) SetContractResolver(r phasecontract.Resolver) {
 	if r == nil {
 		r = phasecontract.BuiltinResolver{}
@@ -135,29 +120,23 @@ func (a *Adapter) SetContractResolver(r phasecontract.Resolver) {
 	a.resolver = r
 }
 
-// SetPhaseIOStage sets the phase-I/O stage; at StageAdvisory or above the contract block asks for structured failure sentinels.
 func (a *Adapter) SetPhaseIOStage(stage config.Stage) {
 	a.phaseIO = stage
 }
 
-// SetRecoveryStage sets the phase-recovery stage (channel, ask-broker, transient-dwell); "" normalizes to shadow.
 func (a *Adapter) SetRecoveryStage(stage string) {
 	a.recoveryStage = stage
 }
 
-// SetFatalPaneStage sets the fatal-pane fast-fail's own stage, independent of SetRecoveryStage; "" normalizes to shadow.
 func (a *Adapter) SetFatalPaneStage(stage string) {
 	a.fatalPaneStage = stage
 }
 
-// Launch assembles the prompt (contract, policy, rules, skills, directives, correction) and delegates to the Engine.
 func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	if err := validate(req); err != nil {
 		return core.BridgeResponse{}, err
 	}
 	inproc := req
-	// Each inject wraps the previous result, so Correction lands outermost. Nothing per-cycle may
-	// precede the body: the prefix stays cacheable and the path lands in the tail.
 	contractID := req.Agent
 	if req.Contract != "" {
 		contractID = req.Contract
@@ -172,7 +151,6 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	withDirectives := injectOperatorDirectives(withSkills, req.OperatorDirectives)
 	inproc.Prompt = injectCorrectionPrefix(withDirectives, req.CorrectionDirective)
 
-	// The cycle-scoped OnStopReview needs this launch's own Deps, so this branch bypasses engineFactory.
 	if a.onStopReview != nil {
 		cycle := req.Cycle
 		cb := a.onStopReview
@@ -184,14 +162,12 @@ func (a *Adapter) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	return a.engineFactory(req.Env).Launch(ctx, inproc)
 }
 
-// Probe delegates environment/CLI discovery to the Engine.
 func (a *Adapter) Probe(ctx context.Context) (core.BridgeProbe, error) {
 	return a.engineFactory(nil).Probe(ctx)
 }
 
 func validate(req core.BridgeRequest) error { return gobridge.ValidateRequest(req) }
 
-// resolvePolicy prefers a non-default policy.json value, then the profile's policy, then recommended_or_first.
 func resolvePolicy(projectRoot string, agent string, profilePolicy string) string {
 	pol := policy.InteractivePolicyFor(projectRoot, agent)
 	if pol != "recommended_or_first" {
@@ -203,8 +179,6 @@ func resolvePolicy(projectRoot string, agent string, profilePolicy string) strin
 	return PolicyRecommendedOrFirst
 }
 
-// injectPolicyPrefix prepends the policy block. escalate adds none; an unknown value gets the default
-// block so a typo cannot break the loop's autonomy.
 func injectPolicyPrefix(prompt, policy string) string {
 	switch policy {
 	case PolicyEscalate:
@@ -224,8 +198,6 @@ func (a *Adapter) contractResolver() phasecontract.Resolver {
 	return resolver
 }
 
-// injectContract puts the resolved contract's invariant block before the body and its exact-path tail after it.
-// See ADR-0034.
 func (a *Adapter) injectContract(prompt, contractID, artifactPath, workspace string) string {
 	resolver := a.contractResolver()
 	c, ok := resolver.Resolve(contractID)
@@ -233,19 +205,13 @@ func (a *Adapter) injectContract(prompt, contractID, artifactPath, workspace str
 		if artifactPath == "" {
 			return prompt
 		}
-		// The engine polls artifactPath, so the prompt must name it. Footer only: the full tail's
-		// `evolve phase verify <agent>` self-check always exits 10 for an unregistered phase.
 		c = phasecontract.Contract{Phase: contractID, AgentName: contractID, ArtifactName: filepath.Base(artifactPath)}
 		return prompt + phasecontract.RenderContractFooter(c, artifactPath)
 	}
-	// Off and shadow keep the prompt byte-identical: the classifier's sentinel pass is not stage-gated.
-	// See ADR-0050.
 	includePhaseIO := a.phaseIO >= config.StageAdvisory
 	return phasecontract.RenderContractBlockStage(c, includePhaseIO) + prompt + phasecontract.RenderContractTail(c, artifactPath, workspace)
 }
 
-// injectRulesPrefix prepends the agent's launch-time system prompt as a "## Rules" block.
-// See ADR-0023.
 func injectRulesPrefix(prompt, rules string) string {
 	if rules == "" {
 		return prompt
@@ -253,8 +219,6 @@ func injectRulesPrefix(prompt, rules string) string {
 	return "## Rules\n\n" + rules + "\n\n---\n\n" + prompt
 }
 
-// injectSkillOverlays prepends req.Skills, read from <ProjectRoot>/skills/<name>/SKILL.md. A skill
-// that cannot be read is WARNed and skipped, never fatal.
 func injectSkillOverlays(prompt string, req core.BridgeRequest) string {
 	if req.ProjectRoot == "" || len(req.Skills) == 0 {
 		return prompt
@@ -270,7 +234,6 @@ func injectSkillOverlays(prompt string, req core.BridgeRequest) string {
 	return overlay + "---\n\n" + prompt
 }
 
-// injectCorrectionPrefix prepends the orchestrator's contract-correction directive as a "## Correction" block.
 func injectCorrectionPrefix(prompt, directive string) string {
 	if directive == "" {
 		return prompt
@@ -278,7 +241,6 @@ func injectCorrectionPrefix(prompt, directive string) string {
 	return "## Correction\n\n" + directive + "\n\n---\n\n" + prompt
 }
 
-// injectOperatorDirectives prepends the already-rendered "## Operator Directives" block verbatim.
 func injectOperatorDirectives(prompt, directives string) string {
 	if directives == "" {
 		return prompt
@@ -286,15 +248,12 @@ func injectOperatorDirectives(prompt, directives string) string {
 	return directives + "\n\n---\n\n" + prompt
 }
 
-// SetModelCatalogDirFn sets the inner bridge's process-wide model-catalog directory resolver.
 func SetModelCatalogDirFn(fn func() string) {
 	gobridge.SetModelCatalogDirFn(fn)
 }
 
-// SignalsWired reports whether a Signal Center was injected at construction.
 func (a *Adapter) SignalsWired() bool { return a.signals != nil }
 
-// Signals returns the injected Signal Center for the phase runner to adopt; nil for the Null Object and a nil receiver.
 func (a *Adapter) Signals() *signalcenter.Center {
 	if a == nil {
 		return nil

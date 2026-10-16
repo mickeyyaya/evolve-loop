@@ -227,3 +227,14 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/skilloverlay` | turns policy-resolved skill overlays into a prompt prefix | [internal-skilloverlay.md](internal-skilloverlay.md) |
 | `internal/goalhash` | hashes a loop goal string, byte for byte as the legacy bash pipeline did | [internal-goalhash.md](internal-goalhash.md) |
 | `examples/secure-orchestrator` | a reference program with four defenses against agent reward hacking | [examples-secure-orchestrator.md](examples-secure-orchestrator.md) |
+| `cmd/evolve/cmdutil` | the small helpers shared by the `evolve` subcommand handlers: help gate, root resolution, argument reorder, env filter and prompts loader | [cmd-evolve-cmdutil.md](cmd-evolve-cmdutil.md) |
+| `pkg/version` | the build-stamped binary identity: version string and build commit | [pkg-version.md](pkg-version.md) |
+| `internal/phases/buildplanner` | the optional build-planner phase that moves the Builder's design step into its own session | [internal-phases-buildplanner.md](internal-phases-buildplanner.md) |
+| `internal/guards/treediff` | the post-phase main-tree diff guard: flags a write that escaped the worktree | [internal-guards-treediff.md](internal-guards-treediff.md) |
+| `internal/rawgitratchet` | the ratchet that keeps new raw git fixtures out of the module's tests | [internal-rawgitratchet.md](internal-rawgitratchet.md) |
+| `internal/sessionreaper` | removes tmux sessions orphaned by runs whose lease is stale, found only through each run's session registry | [internal-sessionreaper.md](internal-sessionreaper.md) |
+| `internal/gcpolicy` | the zero-dependency leaf for the `gc` block of policy.json: the retention engine's configuration vocabulary | [internal-gcpolicy.md](internal-gcpolicy.md) |
+| `internal/doctor` | `evolve doctor probe`: finds a CLI tool on PATH and fallback locations and shows the trail | [internal-doctor.md](internal-doctor.md) |
+| `internal/failuregrade` | the graduated-enforcement classifier: grades a failure to abort, correct, quarantine or repair | [internal-failuregrade.md](internal-failuregrade.md) |
+| `internal/phases/swarmplan` | the optional swarm-plan phase: an LLM planner that splits a task into worker assignments | [internal-phases-swarmplan.md](internal-phases-swarmplan.md) |
+| `internal/mintregistry` | the per-project record of advisor-minted phase names that lets the tree-diff guard exempt a sanctioned mint | [internal-mintregistry.md](internal-mintregistry.md) |

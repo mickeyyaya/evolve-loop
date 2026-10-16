@@ -32,10 +32,6 @@ func itemIDs(items []unifiedFixtureItem) []string {
 	return ids
 }
 
-// writeUnifiedFixture lays out an inbox holding items and a triage decision
-// committing topN; members (when non-nil) is declared as unified_commitment,
-// and spoofProjection plants a projection the triage phase never validated.
-// A stale campaign-plan.json is always present so every branch must decide it.
 func writeUnifiedFixture(t *testing.T, items []unifiedFixtureItem, topN, members []string, spoofProjection bool) core.PhaseRequest {
 	t.Helper()
 	root, ws := t.TempDir(), t.TempDir()

@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// TestReorderArgs verifies flags are moved ahead of positionals (order within
-// each class preserved), so flag.Parse accepts flag-after-positional input.
 func TestReorderArgs(t *testing.T) {
 	cases := []struct {
 		in   []string

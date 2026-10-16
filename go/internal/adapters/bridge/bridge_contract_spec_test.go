@@ -43,7 +43,6 @@ func TestLaunch_InjectsContract_ForUserPhase(t *testing.T) {
 	}
 }
 
-// build has no Verdicts, so "evolve-verdict" reaches its prompt only through the failure instruction.
 func TestLaunch_PhaseIOFailureInstruction_GatedByStage(t *testing.T) {
 	launchBuild := func(stage config.Stage) string {
 		fe := &fakeEngine{}

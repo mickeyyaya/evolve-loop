@@ -11,7 +11,6 @@ import (
 	"testing/fstest"
 )
 
-// sampleProfile carries un-modeled keys (budget fields, _comment) that must not break parsing.
 const sampleProfile = `{
   "name": "scout",
   "role": "scout",
@@ -256,7 +255,7 @@ func TestSmoke_RealProfiles(t *testing.T) {
 func TestList_SkipsSubdirectories(t *testing.T) {
 	fsys := fstest.MapFS{
 		"good.json":         &fstest.MapFile{Data: []byte(minimalProfile)},
-		"subdir/inner.json": &fstest.MapFile{Data: []byte(minimalProfile)}, // creates subdir entry
+		"subdir/inner.json": &fstest.MapFile{Data: []byte(minimalProfile)},
 	}
 	names, err := NewFromFS(fsys).List()
 	if err != nil {

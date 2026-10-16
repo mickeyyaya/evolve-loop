@@ -23,6 +23,16 @@
 - **`fleet_scope`.** Under `evolve fleet --plan`, `ComposePrompt` steers triage's selection to only the ids in `runner.LaneScope`'s assigned scope, so concurrent cycles never pick work touching the same files (ADR-0049 decision E). A control character in an advisor-authored id is sanitized before it reaches the prompt, so it cannot forge a new context bullet.
 - **Typed phase I/O.** At `phaseio` enforce, `ComposePrompt` reads `carryover_summary` and `fleet_scope` from the typed `req.Input.CycleInputs()` envelope instead of the legacy `Context` map; below enforce the two sources render byte-identical prompts (ADR-0050 §3.10).
 - **Every refusal `Classify` raises itself** (not the agent's verdict) carries a stable `Diagnostic.Code`, so the C1 record and a FAIL closeout can tell an operator-owned refusal from an ordinary agent failure without regexing prose. See [the triage-refusal poison-loop incident](../../incidents/2026-09-14-triage-refusal-poison-loop.md).
+- **Premise drift is bounded like the carry-forward sweep.** Git work here must never stall prompt composition.
+  - It covers at most five items (a lane's scope is one item or a small menu).
+  - It lists at most five declared-path commits and three id-naming or package-only commits per item.
+  - It keeps 100 runes of each id, subject and path list.
+  - One five-second deadline covers the whole section.
+  - A directory gets a trailing `/`, so `packageDirs` still reads it as a directory.
+  - When the HEAD tree cannot be read, the helper reports unavailable. It never reports "everything vanished".
+  - An item whose evidence cannot be gathered gets a visible unavailable line. Silence reads as "no drift".
+- **`Config` knobs.** The `PhaseIO` stage threads into the reconcile rung, and its zero value (`StageOff`) is byte-identical ([ADR-0050](../adr/0050-modularization-and-unified-phase-io.md)). `CompactPrompts` strips the on-demand reference tail from the agent document before dispatch and flows from `workflow.compact_prompts` in policy.json, never from a literal. `LaneForbidden` marks the declared paths no lane can change; nil judges the protected surface only. `ContractVerifier` is the verifier accessor of the deliverables gate; nil uses the catalog-aware default.
+- **A malformed decision is reported elsewhere.** `unified.go` returns no commitment for a malformed `triage-decision.json`, because the existing decision digest reports malformed JSON loudly.
 
 ## Invariants
 

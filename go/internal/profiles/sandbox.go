@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// Denies reports whether a repo-relative path lies under a denied subpath, or as a
-// directory spelling ("dir/") contains one; the deny list is the one the OS sandbox enforces.
 func (s SandboxConfig) Denies(rel string) bool {
 	p := cleanRepoPath(rel)
 	if p == "" {

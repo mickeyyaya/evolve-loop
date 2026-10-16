@@ -491,6 +491,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `acs/regression/pluginnamespace` | 1 | [acs-regression-pluginnamespace.md](acs-regression-pluginnamespace.md) |
 | `acs/regression/pluginschema` | 1 | [acs-regression-pluginschema.md](acs-regression-pluginschema.md) |
 | `acs/regression/protectedsurface` | 2 | [acs-regression-protectedsurface.md](acs-regression-protectedsurface.md) |
+| `cmd/evolve/cmdutil` | 2 | [cmd-evolve-cmdutil.md](cmd-evolve-cmdutil.md) |
 | `cmd/evolve-fake-cli` | 1 | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
 | `cmd/evolve` | 456 | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/acssuite` | 27 | [internal-acssuite.md](internal-acssuite.md) |
@@ -561,13 +562,16 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/explanationdocs` | 9 | [internal-explanationdocs.md](internal-explanationdocs.md) |
 | `internal/faillearn` | 19 | [internal-faillearn.md](internal-faillearn.md) |
 | `internal/failureadapter` | 9 | [internal-failureadapter.md](internal-failureadapter.md) |
+| `internal/failuregrade` | 2 | [internal-failuregrade.md](internal-failuregrade.md) |
 | `internal/failurelog` | 9 | [internal-failurelog.md](internal-failurelog.md) |
 | `internal/fanoutdispatch` | 4 | [internal-fanoutdispatch.md](internal-fanoutdispatch.md) |
 | `internal/flagregistry` | 7 | [internal-flagregistry.md](internal-flagregistry.md) |
 | `internal/fleet` | 30 | [internal-fleet.md](internal-fleet.md) |
 | `internal/fleetbudget` | 2 | [internal-fleetbudget.md](internal-fleetbudget.md) |
 | `internal/gc` | 10 | [internal-gc.md](internal-gc.md) |
+| `internal/gcpolicy` | 1 | [internal-gcpolicy.md](internal-gcpolicy.md) |
 | `internal/gitexec` | 15 | [internal-gitexec.md](internal-gitexec.md) |
+| `internal/guards/treediff` | 2 | [internal-guards-treediff.md](internal-guards-treediff.md) |
 | `internal/guards` | 34 | [internal-guards.md](internal-guards.md) |
 | `internal/inboxbatch` | 44 | [internal-inboxbatch.md](internal-inboxbatch.md) |
 | `internal/inboxmover/lifecycle` | 24 | [internal-inboxmover-lifecycle.md](internal-inboxmover-lifecycle.md) |
@@ -583,6 +587,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/looppreflight` | 28 | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/loopwave` | 15 | [internal-loopwave.md](internal-loopwave.md) |
 | `internal/marketplacepoll` | 3 | [internal-marketplacepoll.md](internal-marketplacepoll.md) |
+| `internal/mintregistry` | 1 | [internal-mintregistry.md](internal-mintregistry.md) |
 | `internal/modelcatalog` | 2 | [internal-modelcatalog.md](internal-modelcatalog.md) |
 | `internal/modelquery` | 11 | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/observerengine` | 10 | [internal-observerengine.md](internal-observerengine.md) |
@@ -600,6 +605,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phases/audit/ciparitygate` | 18 | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
 | `internal/phases/audit` | 170 | [internal-phases-audit.md](internal-phases-audit.md) |
 | `internal/phases/build` | 13 | [internal-phases-build.md](internal-phases-build.md) |
+| `internal/phases/buildplanner` | 4 | [internal-phases-buildplanner.md](internal-phases-buildplanner.md) |
 | `internal/phases/debugger` | 3 | [internal-phases-debugger.md](internal-phases-debugger.md) |
 | `internal/phases/intent` | 6 | [internal-phases-intent.md](internal-phases-intent.md) |
 | `internal/phases/retro` | 25 | [internal-phases-retro.md](internal-phases-retro.md) |
@@ -609,9 +615,10 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phases/ship/landing` | 6 | [internal-phases-ship-landing.md](internal-phases-ship-landing.md) |
 | `internal/phases/ship` | 271 | [internal-phases-ship.md](internal-phases-ship.md) |
 | `internal/phases/specrunner` | 15 | [internal-phases-specrunner.md](internal-phases-specrunner.md) |
+| `internal/phases/swarmplan` | 1 | [internal-phases-swarmplan.md](internal-phases-swarmplan.md) |
 | `internal/phases/swarmrunner` | 9 | [internal-phases-swarmrunner.md](internal-phases-swarmrunner.md) |
 | `internal/phases/tdd` | 9 | [internal-phases-tdd.md](internal-phases-tdd.md) |
-| `internal/phases/triage` | 26 | [internal-phases-triage.md](internal-phases-triage.md) |
+| `internal/phases/triage` | 27 | [internal-phases-triage.md](internal-phases-triage.md) |
 | `internal/phasespec` | 61 | [internal-phasespec.md](internal-phasespec.md) |
 | `internal/phasestream` | 20 | [internal-phasestream.md](internal-phasestream.md) |
 | `internal/phasetiming` | 9 | [internal-phasetiming.md](internal-phasetiming.md) |
@@ -619,13 +626,15 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/plane` | 6 | [internal-plane.md](internal-plane.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
 | `internal/preflight` | 4 | [internal-preflight.md](internal-preflight.md) |
-| `internal/profiles` | 30 | [internal-profiles.md](internal-profiles.md) |
+| `internal/profiles` | 33 | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | 51 | [internal-prompts.md](internal-prompts.md) |
 | `internal/pruneephemeral` | 2 | [internal-pruneephemeral.md](internal-pruneephemeral.md) |
 | `internal/quotareset` | 1 | [internal-quotareset.md](internal-quotareset.md) |
 | `internal/quotastate` | 1 | [internal-quotastate.md](internal-quotastate.md) |
+| `internal/rawgitratchet` | 2 | [internal-rawgitratchet.md](internal-rawgitratchet.md) |
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/recovery` | 42 | [internal-recovery.md](internal-recovery.md) |
+| `internal/recoveryguard` | 1 | [internal-recoveryguard.md](internal-recoveryguard.md) |
 | `internal/recurrence` | 12 | [internal-recurrence.md](internal-recurrence.md) |
 | `internal/redteamcheck` | 4 | [internal-redteamcheck.md](internal-redteamcheck.md) |
 | `internal/reflection` | 1 | [internal-reflection.md](internal-reflection.md) |
@@ -644,6 +653,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/routingtest` | 13 | [internal-routingtest.md](internal-routingtest.md) |
 | `internal/runlease` | 1 | [internal-runlease.md](internal-runlease.md) |
 | `internal/scopedelta` | 3 | [internal-scopedelta.md](internal-scopedelta.md) |
+| `internal/sessionreaper` | 3 | [internal-sessionreaper.md](internal-sessionreaper.md) |
 | `internal/sessionrecord` | 3 | [internal-sessionrecord.md](internal-sessionrecord.md) |
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
 | `internal/shiperr` | 13 | [internal-shiperr.md](internal-shiperr.md) |
@@ -667,3 +677,4 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/verifylock` | 2 | [internal-verifylock.md](internal-verifylock.md) |
 | `pkg/acsassert` | 5 | [pkg-acsassert.md](pkg-acsassert.md) |
 | `pkg/phaseproto` | 1 | [pkg-phaseproto.md](pkg-phaseproto.md) |
+| `pkg/version` | 2 | [pkg-version.md](pkg-version.md) |

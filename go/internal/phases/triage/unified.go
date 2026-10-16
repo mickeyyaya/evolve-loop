@@ -30,7 +30,7 @@ func processUnifiedCommitment(req core.PhaseRequest) ([]core.Diagnostic, error) 
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
-		return nil, nil // existing decision digest reports malformed JSON loudly
+		return nil, nil
 	}
 	claimRaw, declared := fields["unified_commitment"]
 	if !declared || bytes.Equal(bytes.TrimSpace(claimRaw), []byte("null")) {

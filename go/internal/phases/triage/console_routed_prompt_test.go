@@ -28,8 +28,6 @@ func TestTriageComposePrompt_ExcludesConsoleRoutedItems(t *testing.T) {
 	}
 }
 
-// Guards-manifest membership is asserted first so a manifest change surfaces
-// as a loud pin move, not a silent pass.
 func TestTriageComposePrompt_ProtectedFixSurfaceAutoExcluded(t *testing.T) {
 	if !guards.IsProtectedSurface("go/internal/guards/role.go") {
 		t.Fatal("pin moved: go/internal/guards/role.go no longer on ProtectedSurfaceManifest — update this test AND the routing rationale")

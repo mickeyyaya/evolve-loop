@@ -37,7 +37,6 @@ func TestTriageComposePrompt_InjectsInboxBatches(t *testing.T) {
 	}
 }
 
-// Same root for both renders so BaseCycleContext's path lines cannot differ.
 func TestTriageComposePrompt_EmptyInboxIsByteIdentical(t *testing.T) {
 	root := t.TempDir()
 	req := core.PhaseRequest{ProjectRoot: root}

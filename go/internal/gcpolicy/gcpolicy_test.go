@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
 
-// TestWithDefaults pins the retention defaults AND the deliberate non-default:
-// the archive/delete day counts stay zero ("never"), because a retention engine
-// must not invent a deletion horizon the operator never configured.
 func TestWithDefaults(t *testing.T) {
 	got := gcpolicy.Policy{}.WithDefaults()
 	want := gcpolicy.Policy{
@@ -29,9 +26,6 @@ func TestWithDefaults(t *testing.T) {
 	}
 }
 
-// TestWithDefaultsPreservesExplicitValues proves defaults never overwrite an
-// operator setting, and that WithDefaults is a value copy (the receiver is
-// unchanged).
 func TestWithDefaultsPreservesExplicitValues(t *testing.T) {
 	in := gcpolicy.Policy{
 		Mode:           "enforce",
@@ -46,9 +40,6 @@ func TestWithDefaultsPreservesExplicitValues(t *testing.T) {
 	}
 }
 
-// TestPolicyJSONRoundTrip pins the wire contract: these tags are what operators
-// write in .evolve/policy.json under "gc", and internal/policy embeds this
-// struct directly, so a tag change is a silent config break.
 func TestPolicyJSONRoundTrip(t *testing.T) {
 	raw := `{"mode":"shadow","runs":{"keep_full":4,"archive_after_days":7,"delete_after_days":30},
 	         "salvage_ttl_days":11,"logs_ttl_days":12,"tracker_ttl_days":13,

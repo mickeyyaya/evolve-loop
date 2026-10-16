@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// The parity test skips empty tiers, so an empty default needs its own guard.
 func TestAllProfilesModelTierDefaultIsNonEmpty(t *testing.T) {
 	t.Parallel()
 
@@ -27,7 +26,6 @@ func TestAllProfilesModelTierDefaultIsNonEmpty(t *testing.T) {
 	}
 }
 
-// Manifest resolution alone would accept a tier added to a manifest but not to CanonicalTiers.
 func TestAllProfilesModelTierOverridesValuesAreCanonical(t *testing.T) {
 	t.Parallel()
 
@@ -82,8 +80,6 @@ func TestEnvelopeTierHierarchyOrdering(t *testing.T) {
 	}
 }
 
-// allowed_clis restricts dispatch, not tier vocabulary: these profiles' tiers
-// must still resolve on every swappable driver.
 func TestRestrictedClisProfilesTiersAreDriverAgnostic(t *testing.T) {
 	t.Parallel()
 
@@ -150,13 +146,11 @@ func TestModelTierOverridesWithinEnvelope(t *testing.T) {
 		minR, okMin := tierRank[env.Min]
 		maxR, okMax := tierRank[env.Max]
 		if !okMin || !okMax {
-			// Non-canonical bounds are TestAllProfilesAreDriverAgnostic's concern.
 			continue
 		}
 		for key, tier := range profile.ModelTierOverrides {
 			r, ok := tierRank[tier]
 			if !ok {
-				// Non-canonical values are TestAllProfilesModelTierOverridesValuesAreCanonical's concern.
 				continue
 			}
 			if r < minR || r > maxR {
