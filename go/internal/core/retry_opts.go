@@ -10,36 +10,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/failurediag"
 )
 
-// retryOpts carries the per-path recovery hooks consulted when a phase's retry
-// budget is exhausted (or the error is not infra-shaped). Every field is a func;
-// nil ⇒ that hook is disabled for this path. Adding a hook to a retry loop means
-// adding a field here — retry_opts_parity_test.go pins the set by reflection, so
-// a hook that skips this struct fails the build's test suite.
 type retryOpts struct {
-	// quotaExhausted classifies an all-family pause only for dispatch paths
-	// whose caller writes the corresponding durable quota checkpoint.
-	quotaExhausted func(attemptExits []int) bool
-	// backfill attempts to reconstruct a phase's artifact from the driver's
-	// stdout after an ErrArtifactTimeout exhaustion. Returns the synthesized
-	// response and true when it recovered the phase.
-	backfill func(phase Phase, err error, attempt, maxAttempts int) (PhaseResponse, bool)
-	// optionalInfraSkip reports whether a catalog-Optional, off-floor phase
-	// whose exhaustion is infra-shaped may return SKIPPED with a warning and advance.
-	optionalInfraSkip func(phase Phase, err error) bool
-	// postShipObserverSkip reports whether a best-effort post-ship Control
-	// observer's failure may return SKIPPED with a warning (shipped state read at call time).
+	quotaExhausted       func(attemptExits []int) bool
+	backfill             func(phase Phase, err error, attempt, maxAttempts int) (PhaseResponse, bool)
+	optionalInfraSkip    func(phase Phase, err error) bool
 	postShipObserverSkip func(phase Phase) bool
-	// shipRecovery routes a structured ShipError to the advisor's recovery
-	// chain, returning true when the cycle is recovering rather than aborting.
-	// It rewrites the sequential loop's control flow (scheduledNext/current),
-	// which the concurrent batch path must never do — see retryPhaseRunner.
-	shipRecovery func(phase Phase, err error, resp PhaseResponse, attempts int) bool
+	shipRecovery         func(phase Phase, err error, resp PhaseResponse, attempts int) bool
 }
 
-// mainDispatchRetryOpts is the sequential dispatch loop's hook set — the
-// REFERENCE set, wiring every hook. cyclerun_dispatch.go consults these rather
-// than calling the underlying predicates directly, so "what can the main loop
-// recover from" has exactly one enumeration.
 func (cr *cycleRun) mainDispatchRetryOpts() retryOpts {
 	return retryOpts{
 		quotaExhausted:       allFamiliesQuotaExhausted,
@@ -50,17 +28,6 @@ func (cr *cycleRun) mainDispatchRetryOpts() retryOpts {
 	}
 }
 
-// evaluateBatchRetryOpts is the evaluate-batch path's hook set: the two degrade
-// predicates (the parity gap this item was filed for), and deliberately NOT
-//   - backfill: it writes into the workspace, and the batch runs its phases
-//     concurrently — artifact reconstruction stays on the serial path;
-//   - shipRecovery: an evaluate batch never contains ship, and the recovery
-//     mutates cycleRun control flow that this path contracts not to touch.
-//   - quotaExhausted: the batch has no resumable partial-batch checkpoint;
-//     retain its existing optional-skip / mandatory-error disposition.
-//
-// The nil fields ARE the documentation: this path's divergence from the
-// reference set is declared, not accidental.
 func (cr *cycleRun) evaluateBatchRetryOpts() retryOpts {
 	return retryOpts{
 		optionalInfraSkip:    func(p Phase, err error) bool { return cr.o.optionalInfraSkip(p, err) },
@@ -68,13 +35,6 @@ func (cr *cycleRun) evaluateBatchRetryOpts() retryOpts {
 	}
 }
 
-// backfillExhaustedArtifact is the sequential loop's backfill hook: when the
-// exhaustion is specifically an ErrArtifactTimeout and backfill is enabled
-// (default-on; policy.json can disable it for the cycle), reconstruct the
-// phase's artifact from stdout.clean.txt and synthesize a WARN response rather
-// than aborting the cycle over a driver that died after doing the work. Returns
-// (_, false) when backfill is off, the exhaustion is a different shape, or
-// nothing could be extracted — the caller then falls through to the next hook.
 func (cr *cycleRun) backfillExhaustedArtifact(next Phase, err error, attempt, maxAttempts int) (PhaseResponse, bool) {
 	if !cr.workflowConfig.BackfillEnabled || attempt < maxAttempts || !errors.Is(err, ErrArtifactTimeout) {
 		return PhaseResponse{}, false
@@ -101,53 +61,30 @@ func (cr *cycleRun) backfillExhaustedArtifact(next Phase, err error, attempt, ma
 	return PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}, true
 }
 
-// recoverShipError is the sequential loop's ship-recovery hook: ship is a
-// pure executor, so a structured ShipError is resolved by the
-// advisor's recovery chain — which records the error, picks the recovery phase
-// (re-audit / retry-ship / debugger) and bounds the depth — not by aborting the
-// cycle. Returns true when the cycle is RECOVERING (the loop must break and let
-// the scheduled recovery phase run); false for a non-ship error, an integrity
-// breach, an illegal edge, or exhausted depth, all of which fall through to the
-// loud abort. Mutates the loop cursor (scheduledNext/current), which is why only
-// the sequential path may wire it.
 func (cr *cycleRun) recoverShipError(next Phase, err error, resp PhaseResponse, attempts int) bool {
 	se, ok := AsShipError(err)
 	if !ok {
 		return false
 	}
-	// Preserve the worktree from the exit cleanup while a ship failure is
-	// unresolved — cleared when a later ship succeeds.
-	// See ADR-0039.
 	cr.preserveWorktree = true
 	fleetWidth := fleetWidthFromEnv(cr.req.Env)
 	rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.req.ProjectRoot, cr.cycle, &cr.cs, se, cr.recoveryDepth, fleetWidth)
 	if !recovering {
 		return false
 	}
-	cr.cs.ShipRecoveryCode = string(se.Code) // persisted at the next checkpoint; the ship latch clears it
+	cr.cs.ShipRecoveryCode = string(se.Code)
 	cr.ctxSnap[CtxKeyShipErrorCode] = string(se.Code)
 	cr.ctxSnap["ship_error_class"] = string(se.Class)
 	cr.ctxSnap["ship_error_stage"] = string(se.Stage)
 	cr.ctxSnap["ship_error_debug"] = se.DebugString()
-	// The failed ship attempt ran and burned budget — record it before
-	// routing to recovery. A later successful ship records its own.
-	// See ADR-0044.
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts,
 		fmt.Sprintf("ship error %s: recovering via %s (attempt %d/%d)", se.Code, rec, cr.recoveryDepth+1, shipRecoveryBudget(se.Code, fleetWidth)), cr.cs.PhaseStartedAt))
 	cr.recoveryDepth++
 	cr.scheduledNext = rec
-	cr.current = PhaseShip // ship ran (and failed); keep forensics accurate
+	cr.current = PhaseShip
 	return true
 }
 
-// retryPhaseRunner is the shared self-heal retry core: run the phase, relaunch on
-// an infra teardown (artifact timeout / transient bridge) up to the configured
-// cap, and on exhaustion consult opts' recovery hooks before surfacing the
-// error. It reads only immutable cr handles (runners, observer, retryConfig) and
-// mutates nothing, so it is safe to call concurrently — which is why
-// opts.shipRecovery is NOT consulted here: that hook rewrites the sequential
-// loop's cursor, so the sequential loop consults it inline where that mutation
-// is legal. Returns (resp, attempts, err).
 func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOpts) (PhaseResponse, int, error) {
 	maxAttempts := cr.retryConfig.PhaseMaxAttempts
 	runner := cr.o.runners[phase]
@@ -169,9 +106,6 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 				if opts.quotaExhausted != nil && opts.quotaExhausted(attemptExits) {
 					return resp, attempt, fmt.Errorf("phase %s: %w", phase, quotaWall{err})
 				}
-				// Hook order mirrors the sequential loop: reconstruct the
-				// artifact if possible, else degrade an optional off-floor
-				// phase, else degrade a best-effort post-ship observer.
 				if opts.backfill != nil {
 					if backfilled, ok := opts.backfill(phase, err, attempt, maxAttempts); ok {
 						return backfilled, attempt, nil
@@ -186,16 +120,13 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 				}
 				return resp, attempt, err
 			}
-		} else if attempt >= maxAttempts { // err==nil but non-canonical verdict
+		} else if attempt >= maxAttempts {
 			return resp, attempt, fmt.Errorf("phase %s returned non-canonical verdict %q", phase, resp.Verdict)
 		}
 		executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
 	}
 }
 
-// recordPhaseSkip is used only after the host admits an absent deliverable.
-// SKIPPED keeps contract review from redispatching the missing phase; the
-// warning and ledger retain its failure without making a success claim.
 func (cr *cycleRun) recordPhaseSkip(phase Phase, cause error, kind, msg string) PhaseResponse {
 	fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN %s (%s)\n", msg, kind)
 	if err := cr.o.ledger.Append(cr.ctx, LedgerEntry{

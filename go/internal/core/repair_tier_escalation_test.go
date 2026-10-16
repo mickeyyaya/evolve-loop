@@ -123,15 +123,12 @@ func TestRepairRoundResume_RaisesBuildTierAndArchivesPromptThroughResumePath(t *
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// The previous attempt's dispatched prompt, as the bridge leaves it.
 	if err := os.WriteFile(filepath.Join(ws, "build-prompt.txt"), []byte("round-1 brief"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	runners := buildRunners(map[Phase]string{PhaseRetro: VerdictFAIL})
 	ar := &verdictStagingAuditRunner{t: t}
 	runners[PhaseAudit] = ar
-	// The persisted cycle state a crash-resume reads back: the workspace is the
-	// one the previous attempt dispatched into.
 	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: cycle, Phase: string(PhaseAudit), WorkspacePath: ws}}
 	o := NewOrchestrator(st, &fakeLedger{}, runners)
 

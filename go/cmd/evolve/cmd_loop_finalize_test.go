@@ -29,14 +29,10 @@ func writeLoopFinalizeFixture(t *testing.T, evolveDir string, cycleID, lastCycle
 	}
 }
 
-// TestLoop_MaxCyclesExit_ClearsCompletedMarker: a normal (non-signal,
-// non-FAIL) batch exit hitting its --cycles budget must clear a completed
-// (cycle_id<=lastCycleNumber, no live owner) on-disk cycle-state.json —
-// eliminating the forced `evolve cycle reset --force` before the next launch.
 func TestLoop_MaxCyclesExit_ClearsCompletedMarker(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
-	writeLoopFinalizeFixture(t, evolveDir, 5, 5) // completed, no live owner
+	writeLoopFinalizeFixture(t, evolveDir, 5, 5)
 
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
@@ -58,13 +54,10 @@ func TestLoop_MaxCyclesExit_ClearsCompletedMarker(t *testing.T) {
 	}
 }
 
-// TestLoop_SignalExit_PreservesMarker: a SIGINT/SIGTERM-interrupted batch must
-// NOT clear the marker — the interrupted cycle (or a still-unfinished prior
-// one) must remain resumable via `evolve loop --resume`.
 func TestLoop_SignalExit_PreservesMarker(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
-	writeLoopFinalizeFixture(t, evolveDir, 5, 5) // would clear if (wrongly) finalized
+	writeLoopFinalizeFixture(t, evolveDir, 5, 5)
 
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()

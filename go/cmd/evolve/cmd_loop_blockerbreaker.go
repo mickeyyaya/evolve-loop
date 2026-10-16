@@ -11,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// blockerBreakerHalt evaluates the batch's failure digests (cycles after
-// batchStartCycle) against the policy ceilings. halted=false means continue
-// dispatching; on halt it writes the escalation + P0 item and returns the
-// loop exit code. Policy reloads fresh on every check; a missing or
-// malformed policy falls back to compiled defaults rather than disabling
-// the breaker.
 func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stderr io.Writer, signals *signalcenter.Center) (rc int, halted bool) {
 	pol, _ := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	fp, err := pol.FailurePolicyConfig()
@@ -66,9 +60,6 @@ func haltPipelineBlocker(evolveDir, projectRoot string, cycle int, category stri
 		Evidence: v.Reason + " (rule=" + v.Rule + " fingerprint=" + v.Fingerprint + ")",
 		Halt:     true,
 	}
-	// The rule's fields flow into the one loop.halt INCIDENT the shared halt
-	// action emits, so nothing is signalled twice.
-	// See ADR-0101.
 	rule := loopHaltRule{code: CodeLoopPipelineBlockerHalt, fields: map[string]string{"rule": v.Rule, "fingerprint": v.Fingerprint}}
 	return haltOnSystemFailure(evolveDir, projectRoot, cycle, workspace, sf, stderr, signals, rule)
 }

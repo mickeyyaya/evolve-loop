@@ -18,9 +18,6 @@ func TestPhaseAgentName_ValuesResolveToCheckedInProfiles(t *testing.T) {
 	}
 }
 
-// findProfilesDir walks up from the test's working directory (go/internal/core)
-// to the repo root and returns <root>/.evolve/profiles. Fails the test if it is
-// not found, so the drift guard never silently no-ops.
 func findProfilesDir(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()

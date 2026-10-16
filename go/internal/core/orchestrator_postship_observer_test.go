@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// postShipObserverOrchestrator builds a minimal orchestrator: nil
-// storage/ledger/runners are fine because postShipObserverSkip is a pure
-// decision over (catalog, cfg, phase, shipped).
 func postShipObserverOrchestrator(t *testing.T) *Orchestrator {
 	t.Helper()
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{

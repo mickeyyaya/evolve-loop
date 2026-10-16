@@ -20,7 +20,7 @@ func TestPruneSupersededOrphans_SupersededNoPRIsPruned(t *testing.T) {
 		case has(args, "for-each-ref"):
 			return "cycle-1\n", 0
 		case has(args, "merge-base", "--is-ancestor"):
-			return "", 0 // superseded (already landed)
+			return "", 0
 		case has(args, "branch", "-D"):
 			return "Deleted branch cycle-1\n", 0
 		}
@@ -29,7 +29,7 @@ func TestPruneSupersededOrphans_SupersededNoPRIsPruned(t *testing.T) {
 	useSeamGit(t, s)
 
 	verdicts, err := PruneSupersededOrphans(context.Background(), "/wt", "main",
-		func(string) (bool, error) { return false, nil }) // no open PR
+		func(string) (bool, error) { return false, nil })
 	if err != nil {
 		t.Fatalf("prune err %v, want nil", err)
 	}
@@ -48,14 +48,14 @@ func TestPruneSupersededOrphans_OpenPRFlaggedButKept(t *testing.T) {
 		case has(args, "for-each-ref"):
 			return "cycle-2\n", 0
 		case has(args, "merge-base", "--is-ancestor"):
-			return "", 0 // superseded
+			return "", 0
 		}
 		return "", 0
 	}}
 	useSeamGit(t, s)
 
 	verdicts, err := PruneSupersededOrphans(context.Background(), "/wt", "main",
-		func(string) (bool, error) { return true, nil }) // open PR present
+		func(string) (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatalf("prune err %v, want nil", err)
 	}
@@ -74,9 +74,9 @@ func TestPruneSupersededOrphans_DistinctBranchUntouched(t *testing.T) {
 		case has(args, "for-each-ref"):
 			return "cycle-3\n", 0
 		case has(args, "merge-base", "--is-ancestor"):
-			return "", 1 // not an ancestor
+			return "", 1
 		case has(args, "cherry"):
-			return "+ feed1234\n", 0 // has a commit not on base → distinct work
+			return "+ feed1234\n", 0
 		}
 		return "", 0
 	}}
@@ -106,7 +106,7 @@ func TestPruneSupersededOrphans_HasOpenPRErrorAborts(t *testing.T) {
 		case has(args, "for-each-ref"):
 			return "cycle-4\n", 0
 		case has(args, "merge-base", "--is-ancestor"):
-			return "", 0 // superseded → hasOpenPR consulted
+			return "", 0
 		}
 		return "", 0
 	}}
@@ -122,8 +122,6 @@ func TestPruneSupersededOrphans_HasOpenPRErrorAborts(t *testing.T) {
 	}
 }
 
-// worktreePorcelain renders `git worktree list --porcelain` for a main tree on
-// main plus one linked worktree per checked-out branch.
 func worktreePorcelain(branches ...string) string {
 	var b strings.Builder
 	b.WriteString("worktree /repo\nHEAD 1111111111111111111111111111111111111111\nbranch refs/heads/main\n\n")
@@ -133,7 +131,6 @@ func worktreePorcelain(branches ...string) string {
 	return b.String()
 }
 
-// bindBranch records a continuation binding naming branch in root's registry.
 func bindBranch(t *testing.T, root, scope, branch string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -144,7 +141,6 @@ func bindBranch(t *testing.T, root, scope, branch string) {
 	}
 }
 
-// recordPRChecks answers "no open PR" and records every ref it was asked about.
 func recordPRChecks(consulted *[]string) func(string) (bool, error) {
 	return func(ref string) (bool, error) {
 		*consulted = append(*consulted, ref)
@@ -160,9 +156,9 @@ func TestPruneSupersededOrphans_CheckedOutRefSkippedNotAborted(t *testing.T) {
 		case has(args, "worktree", "list", "--porcelain"):
 			return worktreePorcelain("cycle-1"), 0
 		case has(args, "merge-base", "--is-ancestor"):
-			return "", 0 // both superseded
+			return "", 0
 		case has(args, "branch", "-D", "cycle-1"):
-			return "", 1 // real git refuses a branch checked out in a worktree
+			return "", 1
 		case has(args, "branch", "-D", "cycle-2"):
 			return "Deleted branch cycle-2\n", 0
 		}
@@ -229,8 +225,6 @@ func TestPruneSupersededOrphans_MultipleConsecutiveCheckedOutRefsAllSkipped(t *t
 	}
 }
 
-// The porcelain carries a detached worktree and a locked one; cycle-1 is a
-// name prefix of the checked-out cycle-10 and must not be mistaken for it.
 func TestPruneSupersededOrphans_CheckedOutMatchIsExactBranchName(t *testing.T) {
 	porcelain := "worktree /repo\nHEAD 1111111111111111111111111111111111111111\nbranch refs/heads/main\n\n" +
 		"worktree /repo/.evolve/worktrees/det\nHEAD 2222222222222222222222222222222222222222\ndetached\n\n" +
@@ -276,7 +270,7 @@ func TestPruneSupersededOrphans_ContinuationBoundIsKept(t *testing.T) {
 		case has(args, "worktree", "list", "--porcelain"):
 			return worktreePorcelain(), 0
 		case has(args, "merge-base", "--is-ancestor"):
-			return "", 0 // both superseded
+			return "", 0
 		case has(args, "branch", "-D"):
 			return "Deleted branch\n", 0
 		}
@@ -342,7 +336,6 @@ func TestPruneSupersededOrphans_CheckedOutAndBoundReportsOneReason(t *testing.T)
 	}
 }
 
-// Exit 128 is a fatal git error that has nothing to do with worktrees.
 func TestPruneSupersededOrphans_DeleteFailureReportedPerRefNotAborted(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		switch {
@@ -430,8 +423,6 @@ func TestPruneSupersededOrphans_CorruptRegistryAbortsBeforeAnyDelete(t *testing.
 	}
 }
 
-// The keep must not widen into swallowing unrelated errors: a later hasOpenPR
-// failure still aborts the walk.
 func TestPruneSupersededOrphans_HasOpenPRErrorStillAbortsAfterCheckedOutSkip(t *testing.T) {
 	s := &seamGit{respond: func(args []string) (string, int) {
 		switch {

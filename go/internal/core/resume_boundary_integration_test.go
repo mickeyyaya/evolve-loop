@@ -22,8 +22,6 @@ import (
 )
 
 func TestResumeBoundaryCheckpointer_FailureStopsDispatchAndPreservesPause(t *testing.T) {
-	// External package permits the real storage/checkpoint adapters; their
-	// shared state file must survive the consumer's normal failure closeout.
 	w := fixtures.NewWorkspace(t).WithState(core.State{LastCycleNumber: 6, LastAllocatedCycleNumber: 7}).Build()
 	initMaterializationRepo(t, w.Root)
 	pendingPath := w.Write("feature.go", "package feature\n")
@@ -53,8 +51,6 @@ func TestResumeBoundaryCheckpointer_FailureStopsDispatchAndPreservesPause(t *tes
 		if err := json.Unmarshal(raw, &state); err != nil {
 			t.Fatal(err)
 		}
-		// Storage may reindent the enclosing document. Preserve every checkpoint
-		// value while ignoring that insignificant serialization whitespace.
 		var compact bytes.Buffer
 		if err := json.Compact(&compact, state["checkpoint"]); err != nil {
 			t.Fatal(err)

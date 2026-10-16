@@ -8,14 +8,10 @@ import (
 	"testing"
 )
 
-// realConsumedByNarrative is a consumed_by string in the exact shape a real
-// consumed inbox item carries; fixtures use that shape, never a synthetic one.
 const realConsumedByNarrative = "console-2026-08-05: fingerprint ship|unknown|76d0f4fca190 = root cause fixed"
 
 const incidentFingerprint = "ship|unknown|76d0f4fca190"
 
-// writeConsumedItem drops one JSON item into .evolve/inbox/consumed/, the
-// operator-managed terminal ledger.
 func writeConsumedItem(t *testing.T, evolveDir, name, body string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox", "consumed")
@@ -27,12 +23,6 @@ func writeConsumedItem(t *testing.T, evolveDir, name, body string) {
 	}
 }
 
-// TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem reconciles when the P0
-// naming the fingerprint already sits in consumed/ before the ledger exists:
-// the breaker must not halt, and must materialize the ledger so the
-// projection is durable rather than recomputed silently. The fixture's kind
-// is "pipeline-repair" — production items never carry "pipeline-defect" — so
-// a kind-gated implementation must fail this predicate.
 func TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -56,10 +46,6 @@ func TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem(t *testing.T) {
 	}
 }
 
-// TestBlockerBreakerHalt_ReconcilesItemWithNoKindFromNotes proves the gate
-// is parse-success and nothing else: an item carrying NO kind field at all,
-// whose fingerprint lives in the auto-filed notes field (the shape an item
-// has before a consumed_by narrative is written), is still reconciled.
 func TestBlockerBreakerHalt_ReconcilesItemWithNoKindFromNotes(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -76,10 +62,6 @@ func TestBlockerBreakerHalt_ReconcilesItemWithNoKindFromNotes(t *testing.T) {
 	}
 }
 
-// TestBlockerBreakerHalt_ReconcileDoesNotWeakenRuleB is the negative half:
-// a consumed corpus that acks a DIFFERENT fingerprint leaves the halting one
-// untouched. The exclusion stays scoped to one named fingerprint at a time —
-// never a blanket Rule B disable.
 func TestBlockerBreakerHalt_ReconcileDoesNotWeakenRuleB(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -96,10 +78,6 @@ func TestBlockerBreakerHalt_ReconcileDoesNotWeakenRuleB(t *testing.T) {
 	}
 }
 
-// TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem pins the
-// fail-loud-but-never-block contract: a corrupt file in consumed/ must WARN
-// and let the sweep continue to the good item beside it. A reconciler defect
-// must never become a new boot blocker.
 func TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -120,9 +98,6 @@ func TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem(t *testing.T) {
 	}
 }
 
-// TestBlockerBreakerHalt_NoConsumedDirIsQuiet is the zero-value edge: with no
-// consumed/ directory, reconciliation is a silent no-op and the breaker
-// halts exactly as it always did.
 func TestBlockerBreakerHalt_NoConsumedDirIsQuiet(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

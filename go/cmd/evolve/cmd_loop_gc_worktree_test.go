@@ -14,9 +14,6 @@ import (
 
 const workspaceGCManifestName = "workspace-gc-manifest.json"
 
-// gcOrphanBranch is a merged cycle-* branch with no worktree — PlanWorktrees'
-// "merged orphan branch (no worktree)" delete-branch case, reachable without
-// provisioning real worktrees.
 const gcOrphanBranch = "cycle-777"
 
 func gcGit(t *testing.T, dir string, args ...string) string {
@@ -110,8 +107,6 @@ func TestRunGCHook_DefaultModeIsShadow(t *testing.T) {
 	}
 }
 
-// The manifest must name the merged orphan branch: an empty-but-present
-// manifest would pass a mere existence check without PlanWorktrees running.
 func TestRunGCHook_ShadowWritesWorkspaceManifest(t *testing.T) {
 	projectRoot, evolveDir, workspace := gcWorktreeEnv(t, "shadow")
 
@@ -144,8 +139,6 @@ func TestRunGCHook_EnforceAppliesWorktreeSweep(t *testing.T) {
 	}
 }
 
-// The negative case: without it, an "always sweep" implementation would pass
-// every positive test above.
 func TestRunGCHook_ExplicitOffSkipsWorktreeSweep(t *testing.T) {
 	projectRoot, evolveDir, workspace := gcWorktreeEnv(t, "off")
 

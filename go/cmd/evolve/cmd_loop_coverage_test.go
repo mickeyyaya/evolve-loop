@@ -18,8 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// writeDispatchPolicy writes policy.json to evolveDir with dispatch.policy set.
-// Creates evolveDir if absent. Replaces t.Setenv("EVOLVE_DISPATCH_POLICY",...).
 func writeDispatchPolicy(t *testing.T, evolveDir, policyVal string) {
 	t.Helper()
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -31,7 +29,6 @@ func writeDispatchPolicy(t *testing.T, evolveDir, policyVal string) {
 	}
 }
 
-// writeDispatchPolicyFull writes policy.json with both policy and repeat_threshold.
 func writeDispatchPolicyFull(t *testing.T, evolveDir, policyVal string, repeatThreshold int) {
 	t.Helper()
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -43,8 +40,6 @@ func writeDispatchPolicyFull(t *testing.T, evolveDir, policyVal string, repeatTh
 	}
 }
 
-// TestRunLoop_DryRun verifies the --dry-run short-circuit prints the
-// resolved config and exits 0 without invoking the orchestrator.
 func TestRunLoop_DryRun(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	rc := runLoop([]string{
@@ -74,14 +69,7 @@ func TestRunLoop_DryRun(t *testing.T) {
 	}
 }
 
-// TestRunLoop_EnvFlagPropagation drives the ConsensusAudit / Reset env
-// var setters via --dry-run so we exercise the assignment without
-// running a real cycle. The dry-run output doesn't include cycleEnv
-// directly, but buildCycleEnv still runs before the dry-run short-circuit.
 func TestRunLoop_EnvFlagPropagation(t *testing.T) {
-	// Force the env-setting branches to fire by passing the flags.
-	// Dry-run still applies AFTER the env-map build, so all three
-	// conditional branches run.
 	var stdout, stderr bytes.Buffer
 	rc := runLoop([]string{
 		"--dry-run",
@@ -94,10 +82,6 @@ func TestRunLoop_EnvFlagPropagation(t *testing.T) {
 	}
 }
 
-// TestRunLoop_EnvFlagPropagationNonDry covers the env var assignments by
-// running with --consensus-audit and --reset against a real (stubbed)
-// cycle; the dry-run-based test exercises parsing but short-circuits
-// before those branches run.
 func TestRunLoop_EnvFlagPropagationNonDry(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -123,16 +107,12 @@ func TestRunLoop_EnvFlagPropagationNonDry(t *testing.T) {
 	}
 }
 
-// erroringReadStorage returns an error on ReadState, driving the
-// err != nil branch in readLastCycleNumber.
 type erroringReadStorage struct{ fixtures.FakeStorage }
 
 func (e *erroringReadStorage) ReadState(context.Context) (core.State, error) {
 	return core.State{}, errors.New("synthetic ReadState error")
 }
 
-// TestReadLastCycleNumber_ReadStateError covers the err != nil branch
-// in readLastCycleNumber.
 func TestReadLastCycleNumber_ReadStateError(t *testing.T) {
 	t.Parallel()
 	s := &erroringReadStorage{}
@@ -145,8 +125,6 @@ func TestReadLastCycleNumber_ReadStateError(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_FlagParseError covers parseLoopArgs's fs.Parse error
-// branch. Passing an unknown flag triggers it.
 func TestParseLoopArgs_FlagParseError(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
@@ -156,8 +134,6 @@ func TestParseLoopArgs_FlagParseError(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_MaxCyclesFlag covers the maxCyclesFlag>0 branch in the
-// resolve-cycles switch. Only --max-cycles set.
 func TestParseLoopArgs_MaxCyclesFlag(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
@@ -170,9 +146,6 @@ func TestParseLoopArgs_MaxCyclesFlag(t *testing.T) {
 	}
 }
 
-// TestRunLoop_PolicyUnknownLogs covers the default branch in
-// resolveDispatchPolicy (unknown value → verify with WARN). The WARN line
-// is what we need to see.
 func TestRunLoop_PolicyUnknownLogs(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
@@ -185,8 +158,6 @@ func TestRunLoop_PolicyUnknownLogs(t *testing.T) {
 	}
 }
 
-// TestRunLoop_ResumePhaseRunnerError exercises the resume err != nil
-// branch by stubbing the build runner to return an error.
 func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
@@ -246,7 +217,7 @@ func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 		}}
 		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
-			core.PhaseBuild: errorRunner{phase: "build"}, // errors → resume err branch
+			core.PhaseBuild: errorRunner{phase: "build"},
 			core.PhaseAudit: noopRunner{name: "audit"},
 			core.PhaseShip:  noopRunner{name: "ship"},
 			core.PhaseRetro: noopRunner{name: "retro"},
@@ -264,8 +235,6 @@ func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 	}
 }
 
-// TestRunLoop_ResumeFailVerdict covers the resume result.FinalVerdict
-// == FAIL branch.
 func TestRunLoop_ResumeFailVerdict(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
@@ -324,7 +293,6 @@ func TestRunLoop_ResumeFailVerdict(t *testing.T) {
 			CycleID: 1, Phase: string(core.PhaseAudit), ActiveWorktree: wt,
 		}}
 		ld := newFakeLedger()
-		// Audit + downstream all FAIL → final verdict is FAIL
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseAudit: failVerdictRunner{name: "audit"},
 			core.PhaseRetro: failVerdictRunner{name: "retro"},
@@ -346,7 +314,6 @@ func TestRunLoop_ResumeFailVerdict(t *testing.T) {
 	}
 }
 
-// errorRunner satisfies core.PhaseRunner but always returns an error.
 type errorRunner struct{ phase string }
 
 func (e errorRunner) Name() string { return e.phase }
@@ -354,7 +321,6 @@ func (e errorRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse
 	return core.PhaseResponse{}, fmt.Errorf("synthetic phase error in %s", e.phase)
 }
 
-// fatalRunner satisfies core.PhaseRunner but returns a batch-fatal error.
 type fatalRunner struct{ phase string }
 
 func (f fatalRunner) Name() string { return f.phase }
@@ -362,9 +328,6 @@ func (f fatalRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse
 	return core.PhaseResponse{}, core.ErrLedgerChainBroken
 }
 
-// TestRunLoop_OrchestratorError covers the cycle error path: replace the
-// scout runner with fatalRunner so the orchestrator returns a batch-fatal
-// error on the very first phase.
 func TestRunLoop_OrchestratorError(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -405,16 +368,12 @@ func TestRunLoop_OrchestratorError(t *testing.T) {
 	}
 }
 
-// erroringLedger satisfies core.Ledger but always errors on Iter,
-// driving the verify-error branch in cmd_loop.
 type erroringLedger struct{ *fakeLedgerNoAppend }
 
 func (l *erroringLedger) Iter(context.Context) (core.LedgerIterator, error) {
 	return nil, errors.New("synthetic ledger iter error")
 }
 
-// TestRunLoop_VerifyIterError covers the vErr != nil branch: VerifyCycle
-// returns an error but the loop continues — verify-error is non-fatal.
 func TestRunLoop_VerifyIterError(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -441,8 +400,6 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 		}
 		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners)}
 	}
-	// Workspace must exist so the orchestrator's WriteCycleState
-	// succeeds for the first phase write.
 	if err := os.MkdirAll(cycleWorkspace(projectRoot, 1), 0o755); err != nil {
 		t.Fatalf("mkdir ws: %v", err)
 	}
@@ -457,8 +414,6 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 		"--goal-text", "x",
 		"--cycles", "1",
 	}, nil, &stdout, &stderr)
-	// Verify error is non-fatal — rc=0 because the cycle completed and
-	// no breach was detected.
 	if rc != 0 {
 		t.Fatalf("rc=%d want 0 (verify error is non-fatal); stderr=%q stdout=%q", rc, stderr.String(), stdout.String())
 	}
@@ -467,8 +422,6 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 	}
 }
 
-// failVerdictRunner returns a FAIL verdict so the FinalVerdict==FAIL
-// branch fires.
 type failVerdictRunner struct{ name string }
 
 func (f failVerdictRunner) Name() string { return f.name }
@@ -485,8 +438,6 @@ func (f failVerdictRunner) Run(_ context.Context, req core.PhaseRequest) (core.P
 	return core.PhaseResponse{Verdict: core.VerdictFAIL}, nil
 }
 
-// TestRunLoop_FailVerdictBreaks covers the result.FinalVerdict == FAIL
-// branch: audit returns FAIL, the loop breaks with stop_reason=fail, rc=2.
 func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 	t.Setenv("EVOLVE_LOOP_MAX_CONSECUTIVE_FAILS", "1")
 
@@ -496,15 +447,12 @@ func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	initLoopContractRepo(t, projectRoot)
-	writeDispatchPolicy(t, evolveDir, "off") // skip verify so policy doesn't intercept
+	writeDispatchPolicy(t, evolveDir, "off")
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		st := &fixtures.FakeStorage{}
 		ld := newFakeLedger()
-		// Every phase returns FAIL so the final verdict at retro is FAIL.
-		// build-planner uses noopRunner (PASS) because its ShouldSkip
-		// would return SKIPPED in shadow mode; FAIL at build is sufficient.
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseIntent:       failVerdictRunner{name: "intent"},
 			core.PhaseScout:        failVerdictRunner{name: "scout"},
@@ -534,16 +482,12 @@ func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 	}
 }
 
-// TestRunLoop_ResumeMissingCheckpoint covers the --resume path with no
-// cycle-state.json present (LoadResumeState returns ErrNoCheckpoint).
-// runLoop must exit with rc=2 and stop_reason=error.
 func TestRunLoop_ResumeMissingCheckpoint(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// No cycle-state.json → LoadResumeState fails.
 
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
@@ -568,10 +512,6 @@ func TestRunLoop_ResumeMissingCheckpoint(t *testing.T) {
 	}
 }
 
-// TestRunLoop_ResumeFullProtocol exercises the full --resume path
-// (LoadResumeState success → RunCycleFromPhase → resumed_complete).
-// Requires a real git repo so LoadResumeState's git rev-parse HEAD
-// succeeds and matches the checkpoint's gitHead.
 func TestRunLoop_ResumeFullProtocol(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
@@ -582,7 +522,6 @@ func TestRunLoop_ResumeFullProtocol(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	// Initialize a real git repo with one commit so HEAD is real.
 	gitInit := func(args ...string) {
 		cmd := exec.Command("git", args...)
 		cmd.Dir = projectRoot
@@ -610,13 +549,11 @@ func TestRunLoop_ResumeFullProtocol(t *testing.T) {
 	}
 	head := strings.TrimSpace(string(headBytes))
 
-	// Create a worktree dir so PathExists check succeeds.
 	worktree := filepath.Join(projectRoot, ".evolve", "worktrees", "cycle-1")
 	if err := os.MkdirAll(worktree, 0o755); err != nil {
 		t.Fatalf("mkdir worktree: %v", err)
 	}
 
-	// Write cycle-state.json with a checkpoint block.
 	csContent := fmt.Sprintf(`{
   "cycle_id": 1,
   "phase": "build",

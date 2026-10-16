@@ -10,12 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestRunLoop_FingerprintAck_AppendsLedgerRecord is the caller proof for the
-// blocker-breaker fingerprint-ack CLI flag: `evolve loop --reset
-// --fingerprint <fp>`, driven from the real production entrypoint (runLoop),
-// must append the ack ledger record. A predicate that calls
-// core.AppendResolvedFingerprint directly proves nothing about the
-// operator-facing flag actually being wired end-to-end.
 func TestRunLoop_FingerprintAck_AppendsLedgerRecord(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

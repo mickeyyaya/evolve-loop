@@ -15,16 +15,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// noopLedger satisfies the ledgerAppender method set structurally (the
-// interface itself is unexported in package core, but Go interface
-// satisfaction is structural, so this external type works as an argument).
 type noopLedger struct{}
 
 func (noopLedger) Append(context.Context, core.LedgerEntry) error { return nil }
 
-// concurrencySealFixture seeds a minimal .evolve/{cycle-state.json,state.json}
-// pair for cycle cycleID, mirroring reset_test.go's unexported sealFixture
-// (duplicated here since that helper is unreachable from core_test).
 func concurrencySealFixture(t *testing.T, evolveDir string, cycleID int) {
 	t.Helper()
 	workspace := filepath.Join(evolveDir, "runs", "cycle-"+strconv.Itoa(cycleID))
@@ -79,7 +73,7 @@ func TestSealCycle_ConcurrentUpdateStateNoLostUpdate(t *testing.T) {
 	t.Parallel()
 
 	ev := t.TempDir()
-	concurrencySealFixture(t, ev, 42) // state.json{lastCycleNumber:41,version:18,...}
+	concurrencySealFixture(t, ev, 42)
 	statePath := filepath.Join(ev, "state.json")
 	fs := storage.New(ev)
 
@@ -90,12 +84,12 @@ func TestSealCycle_ConcurrentUpdateStateNoLostUpdate(t *testing.T) {
 		_, err := fs.UpdateState(context.Background(), func(st *core.State) {
 			close(mutateEntered)
 			<-releaseUpdate
-			st.Version++ // an UNRELATED field SealCycle never touches
+			st.Version++
 		})
 		updateErr <- err
 	}()
 
-	<-mutateEntered // UpdateState holds state.json.lock, has read stale state, is paused
+	<-mutateEntered
 
 	sealErr := make(chan error, 1)
 	go func() {
@@ -109,10 +103,6 @@ func TestSealCycle_ConcurrentUpdateStateNoLostUpdate(t *testing.T) {
 		sealErr <- err
 	}()
 
-	// Bounded window that gives SealCycle's RMW a chance to run while
-	// UpdateState deliberately holds the lock; if SealCycle also locks, this
-	// loop just times out harmlessly — no assertion is made until after
-	// releaseUpdate below, in either case.
 	cycleStatePath := filepath.Join(ev, "cycle-state.json")
 	deadline := time.Now().Add(300 * time.Millisecond)
 	for time.Now().Before(deadline) {
@@ -145,7 +135,7 @@ func TestSealCycle_ManyConcurrentUpdateStateWritersNoLostUpdate(t *testing.T) {
 	t.Parallel()
 
 	ev := t.TempDir()
-	concurrencySealFixture(t, ev, 42) // state.json{lastCycleNumber:41,version:18,...}
+	concurrencySealFixture(t, ev, 42)
 	statePath := filepath.Join(ev, "state.json")
 	fs := storage.New(ev)
 

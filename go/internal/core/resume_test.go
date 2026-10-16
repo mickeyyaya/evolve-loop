@@ -207,8 +207,6 @@ func TestLoadResumeState_UnknownHeadSkipsValidation(t *testing.T) {
 			"gitHead":         "unknown",
 		},
 	})
-	// CurrentHead reports a different value, but checkpoint's gitHead is
-	// "unknown" so validation must skip and not call CurrentHead at all.
 	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
 		CurrentHead: func(_ string) (string, error) { return "any-head", nil },
 		PathExists:  func(_ string) bool { return true },

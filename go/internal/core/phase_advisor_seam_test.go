@@ -17,10 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The ONE projection of the leaf's fourteen-field request onto the
-// bridge request (every field set to a distinct value so a dropped or swapped
-// mapping shows; the leaf's own positional pin makes a NEW field a compile
-// error) and of the four response fields back.
 func TestBridgeRequestOf_ProjectsEveryLaunchField(t *testing.T) {
 	t.Parallel()
 
@@ -30,7 +26,7 @@ func TestBridgeRequestOf_ProjectsEveryLaunchField(t *testing.T) {
 	got := bridgeRequestOf(req)
 	want := BridgeRequest{CLI: "claude-tmux", Profile: "/p.json", Model: "deep", Skills: []string{"fable"}, Prompt: "prompt", Workspace: "/ws", Worktree: "/wt",
 		ProjectRoot: "/root", ArtifactPath: "/ws/routing-plan.json", Completion: "artifact", Agent: "router", Contract: "router-replan", Cycle: 7, Env: env,
-		ChainAttempt: true} // the advisor walks its own chain: every launch is one attempt of it
+		ChainAttempt: true}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("bridgeRequestOf:\n got %+v\nwant %+v", got, want)
 	}
@@ -43,8 +39,6 @@ func TestBridgeRequestOf_ProjectsEveryLaunchField(t *testing.T) {
 	}
 }
 
-// The leaf is constructed in exactly one non-test file, and the
-// composition root constructs the seam in exactly one.
 func TestPhaseAdvisor_OneConstructionSite(t *testing.T) {
 	t.Parallel()
 
@@ -62,8 +56,6 @@ func TestPhaseAdvisor_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// A literal PhaseAdvisor lazily builds ONE brain; a nil bridge yields the
-// legacy error.
 func TestPhaseAdvisor_LiteralGetsTheBrainOnce(t *testing.T) {
 	t.Parallel()
 
@@ -80,10 +72,6 @@ func TestPhaseAdvisor_LiteralGetsTheBrainOnce(t *testing.T) {
 	}
 }
 
-// The lazy cache is safe by construction: concurrent FIRST uses of a literal
-// PhaseAdvisor build ONE brain and every caller sees the same one. Red under
-// -race on the unsynchronized nil-check (a read-check-write on the pointer
-// field); green under sync.Once.
 func TestPhaseAdvisor_LiteralBuildsOneBrainUnderConcurrentFirstUse(t *testing.T) {
 	t.Parallel()
 
@@ -142,7 +130,7 @@ func TestNewPhaseAdvisor_WiresTheAtomicCaptureWriter(t *testing.T) {
 	}
 	c, got := recordingCenter()
 	blocked := t.TempDir()
-	if err := os.Mkdir(filepath.Join(blocked, "advisor-prompt-plan.txt"), 0o755); err != nil { // a directory at the path: the rename fails
+	if err := os.Mkdir(filepath.Join(blocked, "advisor-prompt-plan.txt"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	in.Workspace = blocked
@@ -155,8 +143,6 @@ func TestNewPhaseAdvisor_WiresTheAtomicCaptureWriter(t *testing.T) {
 	}
 }
 
-// Every facade projects the leaf; resume and replay re-parse a reserved mint
-// silently.
 func TestCoreFacades_ProjectTheLeaf(t *testing.T) {
 	raw := `[{"phase":"scout","run":true,"tier":"opus"},{"phase":"router","run":true,"mint":{"prompt":"x"}},{"phase":"new-helper","run":true,"mint":{"prompt":"y"}}]`
 	c, got := recordingCenter()
@@ -232,9 +218,6 @@ func TestCoreFacades_ProjectTheLeaf(t *testing.T) {
 	var _ AgentIdentity = advisor.Identity{}
 }
 
-// A failing Planner under RunCycle emits NO orchestrator code naming the
-// plan (the advisor reports its own fault) while the verbatim
-// `[orchestrator] WARN phase advisor Plan failed` line still prints.
 func TestRunCycle_PlanDegradeEmitsNoOrchestratorCode(t *testing.T) {
 	t.Parallel()
 
@@ -254,8 +237,6 @@ func TestRunCycle_PlanDegradeEmitsNoOrchestratorCode(t *testing.T) {
 		t.Errorf("the orchestrator's verbatim degrade line stays until unit 05: %q", out)
 	}
 	for _, e := range *got {
-		// An unregistered code is rewritten to SIGNALCENTER_UNREGISTERED_CODE with
-		// the raw spelling under fields.raw_code — look at both, and at the reason.
 		if e.Module == signalcenter.ModuleOrchestrator && (strings.Contains(string(e.Code)+e.Fields["raw_code"], "PLAN") || strings.Contains(e.Reason, "planner: boom")) {
 			t.Errorf("no orchestrator code names the plan degrade before unit 05: %+v", e)
 		}
@@ -268,8 +249,6 @@ func (erroringPlanner) Plan(router.RouteInput) (*router.PhasePlan, error) {
 	return nil, errors.New("planner: boom")
 }
 
-// The git reader the seam injects: duplicates kept as git prints
-// them, a non-repo is an error, an empty root reads nothing.
 func TestRecentlyChangedFiles_ReadsGitLogAndReportsErrors(t *testing.T) {
 	t.Parallel()
 
@@ -289,9 +268,6 @@ func TestRecentlyChangedFiles_ReadsGitLogAndReportsErrors(t *testing.T) {
 	}
 }
 
-// The Center reaches the brain through the option: without it a
-// reserved mint drops silently; with it the drop is one ADVISOR_MINT_REJECTED
-// stamped with the cycle and the decision.
 func TestPhaseAdvisor_SeesTheSignalCenterAppliedThroughTheOption(t *testing.T) {
 	stdout := `[{"phase":"scout","run":true},{"phase":"router","run":true,"mint":{"prompt":"be a router"}}]`
 	in := baseRouteInput()

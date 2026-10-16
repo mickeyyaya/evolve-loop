@@ -12,32 +12,22 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// retryEscalationTier is the floor a retried item's build is raised to.
 const retryEscalationTier = "deep"
 
-// clampedRaise is the shared raise-only skeleton for both dispatch-time
-// escalations: it clamps target through the phase profile's envelope
-// (ClampPlanModelRouting) and returns it only when it still beats currentTier.
 func (o *Orchestrator) clampedRaise(projectRoot string, phase Phase, currentTier, target string) (string, bool) {
 	if policy.TierRank(currentTier) >= policy.TierRank(target) {
-		return "", false // raise-only: never lower an equal/higher proposal
+		return "", false
 	}
 	tmp := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: string(phase), Run: true, Tier: target}}}
 	profileFor := func(p string) *profiles.Profile { return o.profileForModelRouting(projectRoot, p) }
 	clamped, _ := router.ClampPlanModelRouting(tmp, profileFor, o.modelCatalogLookup)
 	tier := clamped.Entries[0].Tier
 	if policy.TierRank(tier) <= policy.TierRank(currentTier) {
-		return "", false // envelope pulled the raise back — no effective gain
+		return "", false
 	}
 	return tier, true
 }
 
-// escalatedBuildTier decides the dispatch-time raise for THIS cycle's build.
-// currentTier is whatever the (mode-gated) plan projection already set — the
-// raise never lowers it. Returns ("", false) when escalation does not apply:
-// no reader wired, threshold disabled, no scoped items, counts below
-// threshold, already at/above the floor, or the envelope clamp pulled the
-// raise back to no gain.
 func (cr *cycleRun) escalatedBuildTier(currentTier string) (string, bool) {
 	threshold := cr.o.failurePolicy.Thresholds.BuildDeepEscalateAtFailures
 	if cr.o.failureCountFor == nil || threshold <= 0 {
@@ -60,10 +50,6 @@ func (cr *cycleRun) escalatedBuildTier(currentTier string) (string, bool) {
 	return tier, true
 }
 
-// escalationScopeIDs returns the item ids driving this cycle: the lane scope
-// (wave path / pinned sequential) plus any items already claimed into this
-// cycle's processing dir (the sequential triage-claim path — on disk before
-// build dispatches on both paths).
 func (cr *cycleRun) escalationScopeIDs() []string {
 	seen := map[string]bool{}
 	var ids []string
@@ -82,11 +68,6 @@ func (cr *cycleRun) escalationScopeIDs() []string {
 	return ids
 }
 
-// processingClaimIDs reads the item ids claimed into
-// <root>/.evolve/inbox/processing/cycle-<n>/ through the ONE inbox item reader
-// (inboxbatch.LoadDir — a malformed claim is skipped, never breaks dispatch).
-// inboxmover cannot be imported from core (it reaches core via the ledger
-// adapter), so the leaf reader is the shared belief.
 func processingClaimIDs(projectRoot string, cycle int) []string {
 	items, _, _ := inboxbatch.LoadDir(inboxbatch.ProcessingCycleDir(filepath.Join(projectRoot, ".evolve", "inbox"), cycle))
 	var ids []string
@@ -98,9 +79,6 @@ func processingClaimIDs(projectRoot string, cycle int) []string {
 	return ids
 }
 
-// auditRepairSituation is the model_tier_overrides key an in-cycle audit-repair
-// round activates. builder.json and tdd-engineer.json have declared it since
-// the override table landed; this is its producer.
 const auditRepairSituation = "audit_retry_2plus"
 
 func (o *Orchestrator) repairRoundTier(projectRoot string, phase Phase, cs CycleState, currentTier string) (string, bool) {

@@ -18,26 +18,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// selfCheckFailure is one changed package whose unit tests failed, with the
-// captured output for builder/debugger feedback.
 type selfCheckFailure struct {
 	Pkg    string `json:"pkg"`
 	Output string `json:"output"`
 }
 
-// buildSelfCheckRunner runs a package's unit tests in moduleDir and reports the
-// combined output and whether they passed. A package-level seam so tests drive
-// the pass/fail branches without spawning `go test`.
 var buildSelfCheckRunner = realGoUnitTest
 
-// buildSelfCheckTaggedRunner runs one ADDED package under the build tags its
-// files declare (addedtests.Groups) — the floor's twin of the ship gate's
-// added-test backstop. Same seam shape as buildSelfCheckRunner.
 var buildSelfCheckTaggedRunner = realGoUnitTestTagged
 
-// changedWorktreePathsSince lists paths changed relative to baseSHA (committed
-// work included — the build-floor reviewer's axis) plus untracked additions.
-// diffFlags extend the diff (the protected-surface floor passes --no-renames).
 func changedWorktreePathsSince(ctx context.Context, worktree, baseSHA string, diffFlags ...string) []string {
 	var out []string
 	if diff, code, err := gitCapture(ctx, worktree, append([]string{"diff", baseSHA, "--name-only", "-z"}, diffFlags...)...); err == nil && code == 0 {
@@ -59,10 +48,6 @@ func nulSeparated(out string) []string {
 	return paths
 }
 
-// changedGoTestPackages maps the cycle's changed repo paths to the unique,
-// sorted set of go-module package patterns to unit-test (e.g.
-// "go/internal/bridge/x.go" → "./internal/bridge"). Only paths under the go/
-// module that end in .go contribute; everything else is skipped.
 func changedGoTestPackages(paths []string) []string {
 	seen := map[string]bool{}
 	var pkgs []string
@@ -81,9 +66,6 @@ func changedGoTestPackages(paths []string) []string {
 	return pkgs
 }
 
-// runBuildSelfCheck runs each package's unit tests through run and returns only
-// the failures. Pure over its inputs (the runner is injected) so the collection
-// logic is unit-tested without git or `go test`.
 func runBuildSelfCheck(ctx context.Context, moduleDir string, pkgs []string, run func(context.Context, string, string) (string, bool)) []selfCheckFailure {
 	var fails []selfCheckFailure
 	for _, pkg := range pkgs {
@@ -102,9 +84,6 @@ func taggedTestArgs(pkg string, tags []string) []string {
 	return []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", strings.Join(tags, ","), pkg}
 }
 
-// realGoUnitTestTagged is realGoUnitTest with `-tags`: a tag-gated package is
-// invisible to the default context, so its tests run only when asked for by
-// the tags its files declare.
 func realGoUnitTestTagged(ctx context.Context, moduleDir, pkg string, tags []string) (output string, passed bool) {
 	cmd := sysexec.Command(ctx, "go", taggedTestArgs(pkg, tags)...)
 	cmd.Dir = moduleDir
@@ -113,17 +92,7 @@ func realGoUnitTestTagged(ctx context.Context, moduleDir, pkg string, tags []str
 	return string(out), err == nil
 }
 
-// realGoUnitTest runs `go test` (UNIT only — no integration tag) for one package
-// in moduleDir. passed == (exit 0), EXCEPT a package whose files are all excluded
-// by build tags is "nothing to unit-test" rather than a failure (see
-// goTestExcludedByBuildTags). The subprocess env is scrubbed (ipcenv.Scrub)
-// so the campaign's runtime flags don't flip env-sensitive tests. A bounded
-// timeout keeps a wedged test from hanging the build phase.
 func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, passed bool) {
-	// A changed path whose package directory no longer exists means the diff
-	// DELETED that package (changedGoTestPackages is pure over paths): nothing
-	// is left to unit-test. Checked on the filesystem, not by output text, so a
-	// present package keeps its real verdict.
 	if _, err := os.Stat(filepath.Join(moduleDir, pkg)); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Sprintf("%s: package directory removed — nothing to unit-test\n", pkg), true
 	}
@@ -135,37 +104,15 @@ func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, 
 	return s, err == nil || goTestExcludedByBuildTags(s)
 }
 
-// goTestExcludedByBuildTags reports whether a non-zero `go test` result is the
-// "the package under test has no Go files under the current (untagged) build
-// constraints" setup condition rather than a real unit-test failure. This check
-// runs untagged by design (no integration tag — see realGoUnitTest), but every
-// cycle materializes a //go:build-gated acceptance package (acs/cycleN); an
-// untagged `go test` of one reports "build constraints exclude all Go files …
-// [setup failed]" — nothing to unit-test here, NOT a regression. Flagging it
-// would WARN on every cycle and bury real signal.
-//
-// The "imports " guard keeps this narrow: when a transitive *dependency* (not the
-// tested package) is the excluded one, `go test` prints an "imports <dep>:" chain
-// and the tested package's own build genuinely failed — that must still be
-// reported. A real compile error ("[build failed]") or assertion ("--- FAIL")
-// also carries different text and is reported.
 func goTestExcludedByBuildTags(output string) bool {
 	return strings.Contains(output, "build constraints exclude all Go files") &&
 		!strings.Contains(output, "imports ")
 }
 
-// buildSelfCheck runs the changed packages' unit tests after the build phase and
-// records ground-truth when any fail. Best-effort: no changed Go packages → a
-// no-op; failures WARN and write a `.evolve/build-selfcheck.json` artifact for
-// the audit/retro to consume. NEVER aborts the cycle.
 func (o *Orchestrator) buildSelfCheck(ctx context.Context, worktree string) {
 	if worktree == "" {
 		return
 	}
-	// Clear any prior artifact FIRST so a passing (re)build never inherits a stale
-	// failure. The toolchain gate (go/acs/regression/buildselfcheck) reads this
-	// artifact at audit and HARD-FAILS on it; without the clear, a retry that fixes
-	// the build would still see the previous attempt's failures and loop forever.
 	removeBuildSelfCheckArtifact(worktree)
 	pkgs := changedGoTestPackages(changedWorktreePaths(ctx, worktree))
 	if len(pkgs) == 0 {
@@ -183,16 +130,10 @@ func (o *Orchestrator) buildSelfCheck(ctx context.Context, worktree string) {
 	writeBuildSelfCheckArtifact(worktree, fails)
 }
 
-// removeBuildSelfCheckArtifact deletes any prior build-selfcheck artifact so a
-// passing rebuild does not leave a stale failure for the toolchain gate to read.
-// Best-effort: a missing file (the common case) is not an error.
 func removeBuildSelfCheckArtifact(worktree string) {
 	_ = os.Remove(filepath.Join(worktree, ".evolve", "build-selfcheck.json"))
 }
 
-// writeBuildSelfCheckArtifact records the failing packages under the worktree's
-// .evolve dir so the audit and the next attempt can read the exact failures.
-// Best-effort: a write error is non-fatal (the WARN already surfaced it).
 func writeBuildSelfCheckArtifact(worktree string, fails []selfCheckFailure) {
 	dir := filepath.Join(worktree, ".evolve")
 	dst := filepath.Join(dir, "build-selfcheck.json")

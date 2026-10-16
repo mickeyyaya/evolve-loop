@@ -12,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// resumeExecution owns execution of the validated checkpoint suffix. Bootstrap
-// identity and process resources are established by RunCycleFromPhase before
-// this component starts.
 type resumeExecution struct {
 	orchestrator    *Orchestrator
 	ctx             context.Context
@@ -56,9 +53,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 
 	var phaseTimings []phaseTimingEntry
 	completed := false
-	// One owner spans both abnormal and normal exits: recreating cycleRun at
-	// either boundary would append the resumed segment twice and make
-	// phase-timing.json disagree with the dossier.
 	timingOwner := &cycleRun{
 		o: o, ctx: context.Background(), req: req, cycle: cycle,
 		cs: cs, state: state, result: result,
@@ -74,10 +68,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		result = timingOwner.result
 	}()
 	defer func() {
-		// Survey emission is unconditional (a resumed cycle that dispatched
-		// nothing still has pre-crash outputs to account); the timings write
-		// keeps its emptiness guard. cs.CompletedPhases carries the pre-crash
-		// completions plus everything this resume appended.
 		emitPhaseOutputsSignal(cs.WorkspacePath, cycle, cs.CompletedPhases,
 			phasecontract.NewCatalogResolver(o.catalog.Get))
 		if len(phaseTimings) == 0 {
@@ -161,7 +151,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		retryHooks := retryOpts{quotaExhausted: allFamiliesQuotaExhausted, optionalInfraSkip: o.optionalInfraSkip}
 		phaseBaseline, resp, attempts, err := dispatch.snapshotThenDispatch(next, phaseReq, retryHooks)
-		// pauseForQuota records through dispatch, so the resume's own accumulators go in and come back.
 		pauseOnQuotaWall := func() {
 			dispatch.result, dispatch.phaseTimings = result, phaseTimings
 			err = dispatch.pauseForQuota(next, resp, attempts, err)
@@ -279,10 +268,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	}
 
 	if !cursor.reachedEnd {
-		// timingOwner.ctx is reassigned to the live ctx here, replacing the
-		// context.Background() it was constructed with: recordChokepointEscape's
-		// failure-learning dispatch skips its retrospective call only when ITS
-		// ctx is already cancelled, so it must see the real, possibly-cancelled one.
 		timingOwner.ctx, timingOwner.cs, timingOwner.state = ctx, cs, state
 		timingOwner.result, timingOwner.phaseTimings = result, phaseTimings
 		timingOwner.current = cursor.current

@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// writableMintPlanJSON's mint block omits writes_source. parsePhasePlan is the
-// real advisor-output parser, so the test exercises the genuine
-// mint→register→dispatch seam, not a mock.
 const writableMintPlanJSON = `[{"phase":"test-amplification","run":true,"justification":"amplify adversarial tests for this cycle","mint":{"prompt":"You amplify the test suite with adversarial fault cases.","tier":"balanced","cli":"claude"}}]`
 
 const readOnlyMintPlanJSON = `[{"phase":"lint-advisor","run":true,"justification":"read-only style advisory, writes nothing","mint":{"prompt":"You report lint findings; you never edit files.","tier":"fast","cli":"claude","writes_source":false}}]`

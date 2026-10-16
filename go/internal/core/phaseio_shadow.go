@@ -14,16 +14,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// phaseIOMismatch records one field where the assembled typed Upstream view
-// diverged from the legacy routing digest during the EVOLVE_PHASE_IO shadow stage.
 type phaseIOMismatch struct {
 	Field string `json:"field"`
-	Want  string `json:"want"` // the legacy router.RoutingSignals value
-	Got   string `json:"got"`  // the assembled phaseio.Handoffs value
+	Want  string `json:"want"`
+	Got   string `json:"got"`
 }
 
-// phaseIOShadowDoc is the on-disk shadow artifact (phaseio-shadow-<phase>.json):
-// the assembled upstream presence + any divergences, for soak inspection.
 type phaseIOShadowDoc struct {
 	Phase         string            `json:"phase"`
 	Cycle         int               `json:"cycle"`
@@ -34,9 +30,6 @@ type phaseIOShadowDoc struct {
 	Mismatches    []phaseIOMismatch `json:"mismatches,omitempty"`
 }
 
-// comparePhaseIOShadow re-derives the expected values directly from sig, not
-// via HandoffsFromSignals, so a projection bug in HandoffsFromSignals surfaces
-// as a mismatch instead of being masked.
 func comparePhaseIOShadow(h phaseio.Handoffs, sig router.RoutingSignals) []phaseIOMismatch {
 	var ms []phaseIOMismatch
 	add := func(field, want, got string) {
@@ -86,9 +79,6 @@ func comparePhaseIOShadow(h phaseio.Handoffs, sig router.RoutingSignals) []phase
 		add("audit.confidence",
 			strconv.FormatFloat(sig.Audit.Confidence, 'g', -1, 64),
 			strconv.FormatFloat(a.Confidence, 'g', -1, 64))
-		// DefectsBySeverity keys legacy by severity ordinal and the assembled
-		// view by the canonical word; both are compared through the same
-		// .String() conversion.
 		add("audit.defect_buckets", strconv.Itoa(len(sig.Audit.DefectsBySeverity)), strconv.Itoa(len(a.DefectsBySeverity)))
 		for sev, n := range sig.Audit.DefectsBySeverity {
 			add("audit.defects."+sev.String(), strconv.Itoa(n), strconv.Itoa(a.DefectsBySeverity[sev.String()]))
@@ -97,11 +87,6 @@ func comparePhaseIOShadow(h phaseio.Handoffs, sig router.RoutingSignals) []phase
 	return ms
 }
 
-// assembleCycleInputs builds the typed CycleInputs from the legacy per-phase
-// Context map, reading the same keys the phases read today: challengeToken is
-// camelCase (the live Context key, not the snake_case wire-JSON field name),
-// and carryover reads the legacy carryover_summary key.
-// See ADR-0050.
 func assembleCycleInputs(ctx map[string]string) phaseio.CycleInputs {
 	return phaseio.NewCycleInputs(phaseio.CycleInputsInit{
 		Goal:            ctx["goal"],
@@ -114,8 +99,6 @@ func assembleCycleInputs(ctx map[string]string) phaseio.CycleInputs {
 	})
 }
 
-// assembleErrorContext builds the typed ErrorContext from the ship_error_* keys
-// the recovery path injects, or nil when none are present (no upstream error).
 func assembleErrorContext(ctx map[string]string) *phaseio.ErrorContext {
 	code, class := ctx[CtxKeyShipErrorCode], ctx["ship_error_class"]
 	stage, debug := ctx["ship_error_stage"], ctx["ship_error_debug"]
@@ -125,10 +108,6 @@ func assembleErrorContext(ctx map[string]string) *phaseio.ErrorContext {
 	return &phaseio.ErrorContext{Code: code, Class: class, Stage: stage, Debug: debug}
 }
 
-// compareCycleInputsShadow compares the typed CycleInputs/ErrorContext against
-// the legacy Context map; "want" is keyed by what the phases actually read, so
-// an assembler drifting to a wrong key (e.g. snake_case vs camelCase) surfaces
-// as a mismatch.
 func compareCycleInputsShadow(ci phaseio.CycleInputs, ec *phaseio.ErrorContext, ctx map[string]string) []phaseIOMismatch {
 	var ms []phaseIOMismatch
 	add := func(field, want, got string) {
@@ -155,8 +134,6 @@ func compareCycleInputsShadow(ci phaseio.CycleInputs, ec *phaseio.ErrorContext, 
 	return ms
 }
 
-// summarizePhaseIOMismatches renders mismatches into a human-readable ledger
-// Message (e.g. `build.present(want="true" got="false"); ...`).
 func summarizePhaseIOMismatches(ms []phaseIOMismatch) string {
 	parts := make([]string, 0, len(ms))
 	for _, m := range ms {
@@ -165,9 +142,6 @@ func summarizePhaseIOMismatches(ms []phaseIOMismatch) string {
 	return strings.Join(parts, "; ")
 }
 
-// appendPhaseIOShadowMismatch appends a single phaseio_shadow_mismatch ledger
-// entry iff ms is non-empty. Best-effort: a shadow-stage ledger failure must
-// never affect the cycle, so the append error is intentionally dropped.
 func appendPhaseIOShadowMismatch(ctx context.Context, l Ledger, ts string, cycle int, runID string, phase Phase, ms []phaseIOMismatch) {
 	if len(ms) == 0 {
 		return
@@ -201,9 +175,6 @@ func writePhaseIOShadowFile(workspace, phase string, h phaseio.Handoffs, cycle i
 	return os.WriteFile(filepath.Join(workspace, "phaseio-shadow-"+phase+".json"), data, 0o644)
 }
 
-// emitPhaseIOShadowWithSig is the dispatch-time shadow comparison, active only
-// under EVOLVE_PHASE_IO>=shadow; it never returns an error or affects
-// dispatchResult.
 func (cr *cycleRun) emitPhaseIOShadowWithSig(phase Phase, phaseCtx map[string]string, sig router.RoutingSignals) {
 	h := router.HandoffsFromSignals(sig)
 	ms := comparePhaseIOShadow(h, sig)

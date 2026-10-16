@@ -50,10 +50,6 @@ func TestComposeCorrection_CarriesReasonVerbatim(t *testing.T) {
 	}
 }
 
-// Pins the structure the verbatim reason sits inside (framing before it,
-// remediation instruction after it): a degenerate implementation returning
-// the bare reason would satisfy verbatim-inclusion alone while destroying the
-// directive's meaning.
 func TestComposeCorrection_FramingSurroundsTheReason(t *testing.T) {
 	t.Parallel()
 	const reason = "[missing_artifact] no file at the contracted path"

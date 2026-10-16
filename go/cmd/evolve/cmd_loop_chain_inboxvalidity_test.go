@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// writeInboxFile is a local fixture helper: it drops a raw body at
-// .evolve/inbox/<name> (bypassing chainTestEnv's well-formed-item seeding so
-// malformed shapes can be planted).
 func writeInboxFile(t *testing.T, evolveDir, name, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(evolveDir, "inbox", name), []byte(body), 0o644); err != nil {
@@ -20,20 +17,9 @@ func writeInboxFile(t *testing.T, evolveDir, name, body string) {
 	}
 }
 
-// TestInboxPendingCount_SkipsMalformedAndNamesThem: only files that parse as
-// an inbox item (a JSON object carrying `id`) are pending work; every other
-// root-level `*.json` is skipped and returned by name so the caller can fail
-// loudly instead of swallowing a real item lost to a typo.
-//
-// The signature this pins is:
-//
-//	inboxPendingCount(evolveDir string) (pending int, skipped []string, err error)
-//
-// — the skip list is returned, not printed, so the predicate stays pure and the
-// diagnostic lives at the call site (runLoopChain).
 func TestInboxPendingCount_SkipsMalformedAndNamesThem(t *testing.T) {
 	t.Parallel()
-	cfg := chainTestEnv(t, 2, "") // two well-formed items
+	cfg := chainTestEnv(t, 2, "")
 	writeInboxFile(t, cfg.EvolveDir, "broken.json", `{"id": "truncated"`)
 
 	n, skipped, err := inboxPendingCount(cfg.EvolveDir)
@@ -49,9 +35,6 @@ func TestInboxPendingCount_SkipsMalformedAndNamesThem(t *testing.T) {
 	}
 }
 
-// TestInboxPendingCount_MissingInboxIsZeroWithNoSkips: a missing inbox is
-// legitimately zero pending with a nil error and nothing to report —
-// validation must not turn it into a skip or an error.
 func TestInboxPendingCount_MissingInboxIsZeroWithNoSkips(t *testing.T) {
 	t.Parallel()
 	n, skipped, err := inboxPendingCount(filepath.Join(t.TempDir(), "nope"))
@@ -60,10 +43,6 @@ func TestInboxPendingCount_MissingInboxIsZeroWithNoSkips(t *testing.T) {
 	}
 }
 
-// TestInboxPendingCount_MalformedShapes: each non-item shape must be
-// skipped-and-named; lifecycle subdirectories and non-json files stay
-// invisible (neither pending nor skipped — they were never claimed to be
-// items).
 func TestInboxPendingCount_MalformedShapes(t *testing.T) {
 	t.Parallel()
 	cfg := chainTestEnv(t, 0, "")
@@ -74,7 +53,6 @@ func TestInboxPendingCount_MalformedShapes(t *testing.T) {
 	writeInboxFile(t, cfg.EvolveDir, "array.json", `[{"id":"a"}]`)
 	writeInboxFile(t, cfg.EvolveDir, "noid.json", `{"weight":0.5}`)
 	writeInboxFile(t, cfg.EvolveDir, "blankid.json", `{"id":""}`)
-	// A well-formed item parked in a lifecycle subdir is claimed work, not pending.
 	if err := os.WriteFile(filepath.Join(inbox, "processed", "done.json"), []byte(`{"id":"done"}`), 0o644); err != nil {
 		t.Fatalf("seed processed item: %v", err)
 	}
@@ -99,15 +77,10 @@ func TestInboxPendingCount_MalformedShapes(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_MalformedOnlyInboxDoesNotBurnToCap: an inbox holding
-// nothing but a malformed file has zero real pending work — the chain must
-// run the single min-one-batch cycle and stop as drained, not relaunch to
-// the cap on a false pending signal, and must name the skipped file on
-// stderr so the operator can fix the typo.
 func TestRunLoopChain_MalformedOnlyInboxDoesNotBurnToCap(t *testing.T) {
 	cfg := chainTestEnv(t, 0, "")
 	writeInboxFile(t, cfg.EvolveDir, "typo-item.json", `{"id": `)
-	seen := stubBatches(t, func(int, loopConfig) int { return 0 }) // consumes nothing
+	seen := stubBatches(t, func(int, loopConfig) int { return 0 })
 
 	rc, res, stderr := runChain(t, cfg, policy.ChainConfig{Enabled: true, MaxBatches: 3})
 
@@ -126,10 +99,6 @@ func TestRunLoopChain_MalformedOnlyInboxDoesNotBurnToCap(t *testing.T) {
 	}
 }
 
-// TestInboxPendingCount_ValidItemFixtureIsRepresentative is a fixture-integrity
-// guard: the shape chainTestEnv seeds must be one a REAL inbox item validator
-// accepts, otherwise the tests above would pass against a validator that
-// rejects everything.
 func TestInboxPendingCount_ValidItemFixtureIsRepresentative(t *testing.T) {
 	t.Parallel()
 	var doc map[string]any

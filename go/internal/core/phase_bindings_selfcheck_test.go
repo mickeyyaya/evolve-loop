@@ -40,7 +40,7 @@ func TestBuildSelfCheck_WritesArtifactOnFailure(t *testing.T) {
 	old := buildSelfCheckRunner
 	t.Cleanup(func() { buildSelfCheckRunner = old })
 	buildSelfCheckRunner = func(_ context.Context, _, pkg string) (string, bool) {
-		return "--- FAIL: TestFoo", pkg != "./internal/foo" // foo fails, others pass
+		return "--- FAIL: TestFoo", pkg != "./internal/foo"
 	}
 
 	(&Orchestrator{}).buildSelfCheck(context.Background(), wt)
@@ -55,9 +55,6 @@ func TestBuildSelfCheck_WritesArtifactOnFailure(t *testing.T) {
 }
 
 func TestBuildSelfCheck_ClearsStaleArtifactOnPass(t *testing.T) {
-	// A prior failed attempt wrote the artifact; the retry's changed package now
-	// PASSES. The artifact must be cleared so the toolchain gate (which reads it)
-	// does not loop forever on a stale failure.
 	wt := initGitWorktree(t)
 	fp := filepath.Join(wt, "go", "internal", "foo", "foo.go")
 	if err := os.MkdirAll(filepath.Dir(fp), 0o755); err != nil {
@@ -87,9 +84,6 @@ func TestBuildSelfCheck_ClearsStaleArtifactOnPass(t *testing.T) {
 func TestBuildSelfCheck_NoGoChanges_ClearsStaleArtifact(t *testing.T) {
 	t.Parallel()
 
-	// A non-Go-only cycle must still clear a stale failure artifact (a non-Go
-	// change cannot be a Go regression). Guards the unconditional clear that sits
-	// above the `len(pkgs)==0` early return.
 	wt := initGitWorktree(t)
 	if err := os.WriteFile(filepath.Join(wt, "notes.md"), []byte("hi"), 0o644); err != nil {
 		t.Fatal(err)
@@ -132,7 +126,7 @@ func TestBuildSelfCheck_NoGoChangesIsNoOp(t *testing.T) {
 func TestBuildSelfCheck_EmptyWorktreeIsNoOp(t *testing.T) {
 	t.Parallel()
 
-	(&Orchestrator{}).buildSelfCheck(context.Background(), "") // must not panic
+	(&Orchestrator{}).buildSelfCheck(context.Background(), "")
 }
 
 func TestRealGoUnitTest_DetectsPassAndFail(t *testing.T) {
@@ -162,12 +156,6 @@ func TestRealGoUnitTest_DetectsPassAndFail(t *testing.T) {
 	}
 }
 
-// TestRealGoUnitTest_BuildTagExcludedIsNotFailure guards the false-positive a
-// live cycle surfaced: the self-check runs untagged `go test` (by design — no
-// integration tag), but every cycle materializes a //go:build-gated acceptance
-// package (acs/cycleN). An untagged `go test` of such a package reports "build
-// constraints exclude all Go files … [setup failed]" — nothing to unit-test, NOT
-// a regression — so it must report ok, or the self-check WARNs on every cycle.
 func TestRealGoUnitTest_BuildTagExcludedIsNotFailure(t *testing.T) {
 	t.Parallel()
 
@@ -179,7 +167,6 @@ func TestRealGoUnitTest_BuildTagExcludedIsNotFailure(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Only file is behind a build tag, mirroring acs/cycleN's //go:build acs.
 	body := "//go:build acs\n\npackage tagged\n\nimport \"testing\"\n\nfunc TestGated(t *testing.T) {}\n"
 	if err := os.WriteFile(filepath.Join(dir, "tagged_test.go"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
@@ -189,13 +176,6 @@ func TestRealGoUnitTest_BuildTagExcludedIsNotFailure(t *testing.T) {
 	}
 }
 
-// TestRealGoUnitTest_DeletedPackageIsNotFailure guards a false RED a live
-// cycle surfaced: a diff that DELETES a package's only .go files still maps those
-// paths to the package pattern (changedGoTestPackages is pure over paths), and
-// `go test` on the now-missing directory reports "directory not found …
-// [setup failed]". A deleted package has nothing left to unit-test, so it must
-// report ok — while a package whose directory still exists keeps its real
-// verdict (the failing case below must stay not-ok).
 func TestRealGoUnitTest_DeletedPackageIsNotFailure(t *testing.T) {
 	t.Parallel()
 
@@ -220,9 +200,6 @@ func TestRealGoUnitTest_DeletedPackageIsNotFailure(t *testing.T) {
 	}
 }
 
-// TestGoTestExcludedByBuildTags asserts the classifier separates a build-tag
-// exclusion (nothing to test) from genuine failures (compile error / assertion)
-// that must still be reported.
 func TestGoTestExcludedByBuildTags(t *testing.T) {
 	t.Parallel()
 
@@ -245,14 +222,8 @@ func TestGoTestExcludedByBuildTags(t *testing.T) {
 	}
 }
 
-// TestRealGoUnitTest_SanitizesCampaignEnv proves end-to-end that the
-// self-check does NOT leak the campaign's runtime env into its `go test`
-// subprocess: an inherited EVOLVE_FLEET=1 would flip internal/bridge's
-// fleet-mode worktree guard into a false failure. The temp package's test
-// fails iff it observes EVOLVE_FLEET — so realGoUnitTest passing proves the
-// env was sanitized.
 func TestRealGoUnitTest_SanitizesCampaignEnv(t *testing.T) {
-	t.Setenv("EVOLVE_FLEET", "1") // campaign runtime flag present in the parent env
+	t.Setenv("EVOLVE_FLEET", "1")
 	mod := t.TempDir()
 	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module x\n\ngo 1.23\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -287,13 +258,13 @@ func TestChangedGoTestPackages_DerivesUniqueModulePackages(t *testing.T) {
 
 	paths := []string{
 		"go/internal/bridge/driver_claudetmux.go",
-		"go/internal/bridge/other.go", // same package → deduped
+		"go/internal/bridge/other.go",
 		"go/internal/cycleclassify/classify.go",
-		"go/cmd/evolve/cmd_x_test.go", // _test.go still maps to its package
-		"docs/foo.md",                 // non-.go → skipped
-		"README.md",                   // skipped
-		"go/go.mod",                   // not .go → skipped
-		"landing/main.go",             // not under the go/ module → skipped
+		"go/cmd/evolve/cmd_x_test.go",
+		"docs/foo.md",
+		"README.md",
+		"go/go.mod",
+		"landing/main.go",
 	}
 	got := changedGoTestPackages(paths)
 	want := []string{"./cmd/evolve", "./internal/bridge", "./internal/cycleclassify"}
@@ -319,7 +290,6 @@ func TestRunBuildSelfCheck_CollectsOnlyFailingPackages(t *testing.T) {
 		if moduleDir == "" {
 			t.Fatal("runner must receive the module dir")
 		}
-		// bridge breaks a unit test; cycleclassify passes.
 		if pkg == "./internal/bridge" {
 			return "--- FAIL: TestClaudeTmux_CostGuards_BaseURL", false
 		}

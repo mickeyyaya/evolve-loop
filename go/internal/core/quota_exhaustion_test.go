@@ -33,7 +33,6 @@ func TestAllFamiliesQuotaExhausted(t *testing.T) {
 	}
 }
 
-// seqFailRunner returns errs[i] on the i-th call (nil entry → success).
 type seqFailRunner struct {
 	name  string
 	errs  []error
@@ -50,7 +49,6 @@ func (f *seqFailRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse,
 	return PhaseResponse{Phase: f.name, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// NOT t.Parallel: it swaps the package-level QuotaBoundaryCheckpointer hook.
 func TestRunCycle_AllFamilies85_CheckpointsAndDefers(t *testing.T) {
 	prevHook := QuotaBoundaryCheckpointer
 	defer func() { QuotaBoundaryCheckpointer = prevHook }()
@@ -100,13 +98,11 @@ func TestRunCycle_AllFamilies85_CheckpointsAndDefers(t *testing.T) {
 	if !found {
 		t.Errorf("ledger entries %+v: missing kind=all_families_exhausted", led.entries)
 	}
-	// Attempts stop at the retry cap — no extra spend past one chain pass.
 	if calls := runners[PhaseScout].(*fakeRunner).calls; calls > 3 {
 		t.Errorf("scout calls=%d, want <= retry cap (no burn past exhaustion)", calls)
 	}
 }
 
-// NOT t.Parallel: it swaps both package-level checkpoint hooks.
 func TestRunCycle_InterruptDuringQuotaCheckpointPreservesQuotaPause(t *testing.T) {
 	previousQuota := QuotaBoundaryCheckpointer
 	previousResume := ResumeBoundaryCheckpointer

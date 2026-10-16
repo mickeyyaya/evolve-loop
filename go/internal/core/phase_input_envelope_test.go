@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// TestReadUpstreamBuildPlan pins the dispatch-seam population rule: the
-// build phase's upstream build-plan body is served via the
-// envelope ONLY at advisory+ with the planner enabled (via WorkflowPolicy.PhaseEnables)
-// and a readable file; every other case returns "".
 func TestReadUpstreamBuildPlan(t *testing.T) {
 	t.Parallel()
 

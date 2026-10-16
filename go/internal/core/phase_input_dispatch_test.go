@@ -11,28 +11,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// phaseIOCfg is shadowCfg with the EVOLVE_PHASE_IO dial set independently of the
-// routing Stage, so a test can vary PhaseIO while the routing decision stays a
-// deterministic StaticPreset (isolating the variable under test to the dial).
 func phaseIOCfg(phaseIO config.Stage) config.RoutingConfig {
 	cfg := shadowCfg(config.StageEnforce)
 	cfg.PhaseIO = phaseIO
 	return cfg
 }
 
-// TestDispatch_PhaseInput_ZeroValueBelowEnforce is the Slice-0 byte-identity
-// proof: at EVOLVE_PHASE_IO off/shadow/advisory the typed
-// PhaseInput envelope is NEVER assembled onto the PhaseRequest, so every
-// dispatched request carries the zero PhaseInput. The shadow stage still runs its
-// comparison — that is unchanged — but the dispatch *field* stays zero until
-// enforce, which is what keeps the live loop byte-identical pre-cutover.
-//
-// The check uses reflect.DeepEqual against a struct literal (PhaseInput seals
-// channels behind unexported fields, so it is not ==-comparable). This is valid
-// because the guard lives in the CODE PATH, not the comparison: assemblePhaseIO
-// returns early (before any NewPhaseInput call) below enforce, so the field is the
-// literal zero value here — not a NewPhaseInput(empty) result that merely looks
-// zero.
 func TestDispatch_PhaseInput_ZeroValueBelowEnforce(t *testing.T) {
 	t.Parallel()
 
@@ -70,10 +54,6 @@ func TestDispatch_PhaseInput_ZeroValueBelowEnforce(t *testing.T) {
 	}
 }
 
-// TestDispatch_PhaseInput_PopulatedAtEnforce: at EVOLVE_PHASE_IO=enforce the typed
-// envelope becomes authoritative — every dispatched request carries a populated
-// PhaseInput whose CycleInputs reproduce the legacy Context values, with identity
-// fields set and (on a non-recovery cycle) no ErrorContext.
 func TestDispatch_PhaseInput_PopulatedAtEnforce(t *testing.T) {
 	t.Parallel()
 
@@ -114,12 +94,6 @@ func TestDispatch_PhaseInput_PopulatedAtEnforce(t *testing.T) {
 	}
 }
 
-// TestBuildPhaseInput_ErrorContext_NilUnlessShipErrorKeys pins the critic's
-// invariant directly on the assembler: ErrorContext is non-nil ONLY when the
-// ship-error recovery keys are present in the phase context (the debugger
-// recovery path), and nil otherwise. The integration test above proves the
-// nil case across a whole cycle; this proves the non-nil mapping without having
-// to drive a real ship failure.
 func TestBuildPhaseInput_ErrorContext_NilUnlessShipErrorKeys(t *testing.T) {
 	t.Parallel()
 
@@ -150,12 +124,6 @@ func TestBuildPhaseInput_ErrorContext_NilUnlessShipErrorKeys(t *testing.T) {
 	}
 }
 
-// TestPlanCycle_CarryoverSummary_NoRawWriterBelowEnforce pins the true
-// baseline: with a populated carryover backlog in state and no
-// carryover_summary in the request Context, NO dispatched request carries the
-// key at StageOff/StageShadow (and the typed PhaseInput stays zero, per the
-// byte-identity proof above). The cap is a guard on what arrives; it is not a
-// licence to create the bytes it bounds.
 func TestPlanCycle_CarryoverSummary_NoRawWriterBelowEnforce(t *testing.T) {
 	t.Parallel()
 

@@ -15,7 +15,7 @@ type fakeBridge struct {
 	stdout     string
 	err        error
 	durationMS int64
-	tokens     TokenUsage // the span golden threads token usage
+	tokens     TokenUsage
 	gotReq     BridgeRequest
 	calls      int
 }
@@ -281,7 +281,7 @@ func TestPhaseAdvisor_PlanPromptUsesAbsoluteArtifactPath(t *testing.T) {
 	if _, err := NewPhaseAdvisor(fb, WithPersona("PERSONA")).Plan(router.RouteInput{Workspace: ws, Cycle: 7}); err != nil {
 		t.Fatal(err)
 	}
-	want := ws + "/routing-plan.json" // absolute — must equal advisorLaunch's watched ArtifactPath
+	want := ws + "/routing-plan.json"
 	if !strings.Contains(fb.gotReq.Prompt, want) {
 		t.Errorf("plan prompt must instruct the ABSOLUTE artifact path %q so the agent writes where the bridge watches; a relative path lands in the REPL cwd → the cycle-210 artifact-timeout. Prompt:\n%s", want, fb.gotReq.Prompt)
 	}
@@ -290,17 +290,13 @@ func TestPhaseAdvisor_PlanPromptUsesAbsoluteArtifactPath(t *testing.T) {
 	}
 }
 
-// Proves the configured {cli,model} actually reach BridgeRequest.{CLI,Model}
-// on a Plan launch, and that the uniform contract (artifact completion,
-// routing-plan.json, injected persona) holds identically for non-claude CLIs
-// — the any-CLI × any-model invariant.
 func TestPhaseAdvisor_DispatchWiringFlowsToBridge(t *testing.T) {
 	t.Parallel()
 	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
 	cases := []struct{ cli, model string }{
-		{"codex-tmux", "gpt-5.5"},   // openai family, deep model
-		{"agy", "gemini-3.5-flash"}, // google family, headless
-		{"claude-tmux", "opus"},     // anthropic default
+		{"codex-tmux", "gpt-5.5"},
+		{"agy", "gemini-3.5-flash"},
+		{"claude-tmux", "opus"},
 	}
 	for _, c := range cases {
 		c := c

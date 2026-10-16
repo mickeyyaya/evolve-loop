@@ -13,12 +13,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// walledCorrectionProbe passes its first dispatch, blocks it at review, and answers the correction
-// re-dispatch with the quota wall the runner returns after its whole family chain was walled.
 type walledCorrectionProbe struct {
 	*escalationProbe
 	dispatches int
-	wall       error // the correction's answer; nil means the quota wall (exit 85)
+	wall       error
 }
 
 func (p *walledCorrectionProbe) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
@@ -77,8 +75,6 @@ func TestRunCycle_WalledCorrectionRedispatch_DefersLikeAFirstDispatch(t *testing
 	if calls := runners[PhaseRetro].(*fakeRunner).calls; calls != 0 {
 		t.Fatalf("retro ran %d time(s) on a deferral; a wall is nothing to learn from", calls)
 	}
-	// The harness has no worktree provisioner, so the cycle start writes the one "worktree|…" digest; the
-	// deferral must not add a build one for the consecutive-failure breaker to count.
 	digests, _ := filepath.Glob(filepath.Join(root, ".evolve", "runs", "*", "failure-digest.json"))
 	if len(digests) != 1 {
 		t.Fatalf("digests = %v, want the harness's one worktree digest and nothing from the deferral", digests)
@@ -91,7 +87,6 @@ func TestRunCycle_WalledCorrectionRedispatch_DefersLikeAFirstDispatch(t *testing
 	}
 }
 
-// walledGateRunner fails its gate verdict once, then answers the remediation re-run with the wall.
 type walledGateRunner struct {
 	name  Phase
 	calls int
@@ -174,8 +169,6 @@ func TestRunCycleFromPhase_WalledResumedCorrection_Defers(t *testing.T) {
 
 	workspace := t.TempDir()
 	storage := &fakeStorage{cycleState: CycleState{CycleID: 5, RunID: "run-5", WorkspacePath: workspace}}
-	// tdd stands in for the resumed phase: it carries no explanation binding, so the resume reaches the
-	// review gate with the harness's fakes alone.
 	probe := &walledCorrectionProbe{escalationProbe: &escalationProbe{phase: string(PhaseTDD), threshold: 99}}
 	runners := buildRunners(nil)
 	runners[PhaseTDD] = probe

@@ -17,7 +17,6 @@ func TestArchivePollutedWorkspace_MissingDirIsNoOp(t *testing.T) {
 		t.Fatalf("missing dir must be no-op, got %v", err)
 	}
 	if _, err := os.Stat(ws + ".polluted-*"); !os.IsNotExist(err) {
-		// Glob form not used; explicit check via ReadDir of parent:
 		entries, _ := os.ReadDir(filepath.Dir(ws))
 		for _, e := range entries {
 			if strings.Contains(e.Name(), "polluted") {
@@ -27,7 +26,6 @@ func TestArchivePollutedWorkspace_MissingDirIsNoOp(t *testing.T) {
 	}
 }
 
-// Models a mkdir-only init that crashed before any phase wrote anything.
 func TestArchivePollutedWorkspace_EmptyDirIsNoOp(t *testing.T) {
 	t.Parallel()
 

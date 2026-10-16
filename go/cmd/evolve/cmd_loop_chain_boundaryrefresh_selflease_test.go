@@ -13,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// TestDefaultChainBoundaryFleetLaneActive_OwnFreshLeaseIsNotASibling is the
-// direct unit-level regression guard: a run dir carrying THIS process's own
-// pid in a fresh lease must not count as an active sibling.
 func TestDefaultChainBoundaryFleetLaneActive_OwnFreshLeaseIsNotASibling(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
@@ -38,10 +35,6 @@ func TestDefaultChainBoundaryFleetLaneActive_OwnFreshLeaseIsNotASibling(t *testi
 	}
 }
 
-// TestDefaultChainBoundaryFleetLaneActive_OwnLeasePlusRealSiblingStillDetected
-// proves self-exclusion never masks a GENUINE sibling: this process's own
-// lease and a sibling's lease coexist under runs/, and the sibling must still
-// be found.
 func TestDefaultChainBoundaryFleetLaneActive_OwnLeasePlusRealSiblingStillDetected(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
@@ -61,9 +54,6 @@ func TestDefaultChainBoundaryFleetLaneActive_OwnLeasePlusRealSiblingStillDetecte
 		t.Fatal(err)
 	}
 	brflWriteRunMarker(t, siblingDir)
-	// A different pid — never our own os.Getpid() — so it must still count.
-	// A sibling is a different live process (liveness is the lease owner's,
-	// not the heartbeat's), so hold a real child for the duration.
 	sibling := exec.Command("sleep", "30")
 	if err := sibling.Start(); err != nil {
 		t.Fatalf("spawn a live sibling: %v", err)
@@ -83,10 +73,6 @@ func TestDefaultChainBoundaryFleetLaneActive_OwnLeasePlusRealSiblingStillDetecte
 	}
 }
 
-// TestMaybeRefreshChainBoundary_OwnFreshLeaseStillRefreshes is the end-to-end
-// regression guard through the actual call site: with only this process's
-// own fresh lease present (no other lane running), maybeRefreshChainBoundary
-// must proceed to rebuild, not refuse.
 func TestMaybeRefreshChainBoundary_OwnFreshLeaseStillRefreshes(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -100,7 +86,7 @@ func TestMaybeRefreshChainBoundary_OwnFreshLeaseStillRefreshes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	restore := brfStubSeams(t, true, nil, nil) // stale=true (ahead)
+	restore := brfStubSeams(t, true, nil, nil)
 	defer restore()
 
 	prevCommit, prevProv := chainRunningCommitFn, chainBoundaryRepinProvenanceFn

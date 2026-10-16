@@ -17,21 +17,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// bootRefreshMarkerFile (under EvolveDir) records the healed-to HEAD of the
-// last boot refresh, consumed exactly once by the next boot. A FILE, not an
-// env var, deliberately: the flag-ceiling gate forbids new EVOLVE_* readers,
-// and darwin resolves duplicate env entries first-wins, making an appended
-// env marker invisible to the child.
 const bootRefreshMarkerFile = "boot-refresh-marker"
 
 type bootBinaryRefreshResult struct {
-	Stale   bool // binary build-commit differs from HEAD with a go/ source delta
-	Rebuilt bool // the canonical rebuild succeeded (exec follows unless it errors)
+	Stale   bool
+	Rebuilt bool
 }
 
-// Seams (package vars, mirrors bootRecoverFn) so the refresh logic is
-// deterministic under test: git reads, the rebuild, and the process re-exec
-// are all injectable.
 var (
 	bootBinaryRefreshFn       = bootBinaryRefresh
 	bootRefreshBinaryCommitFn = version.Commit
@@ -39,26 +31,17 @@ var (
 	bootRefreshSourceDeltaFn  = defaultBootRefreshSourceDelta
 	bootRefreshRebuildFn      = defaultBootRefreshRebuild
 	bootRefreshExecFn         = defaultBootRefreshExec
-	// bootRefreshRepinFn reconciles the ship pin to the rebuilt binary through
-	// the same provenance-gated primitive the boot heal uses.
-	bootRefreshRepinFn = attemptBootRepin
-	// bootRefreshExecTargetFn reports whether the running executable is the
-	// plane binary the rebuild writes (go/bin/evolve).
-	bootRefreshExecTargetFn = defaultBootRefreshExecTarget
-	// bootRefreshFleetLaneFn reports whether another fleet lane is
-	// concurrently active, since the plane binary is shared by every lane.
-	bootRefreshFleetLaneFn = defaultBootRefreshFleetLane
+	bootRefreshRepinFn        = attemptBootRepin
+	bootRefreshExecTargetFn   = defaultBootRefreshExecTarget
+	bootRefreshFleetLaneFn    = defaultBootRefreshFleetLane
 )
 
-// defaultBootRefreshFleetLane reports a concurrently active fleet lane from
-// the shared per-run .lease heartbeat (internal/runlease). An unreadable or
-// unparsable lease is an error, not "no lane active".
 func defaultBootRefreshFleetLane(cfg loopConfig) (bool, error) {
 	runsDir := filepath.Join(cfg.EvolveDir, "runs")
 	entries, err := os.ReadDir(runsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return false, nil // no runs ever recorded — nothing can be live
+			return false, nil
 		}
 		return false, err
 	}
@@ -99,8 +82,6 @@ func defaultBootRefreshHead(projectRoot string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
-// defaultBootRefreshSourceDelta reports whether binaryCommit..head touches
-// go/, the only tree the binary embeds.
 func defaultBootRefreshSourceDelta(projectRoot, from, to string) (bool, error) {
 	out, err := sysexec.Command(context.Background(), "git", "-C", projectRoot, "diff", "--name-only", from+".."+to, "--", "go/").Output()
 	if err != nil {
@@ -109,20 +90,14 @@ func defaultBootRefreshSourceDelta(projectRoot, from, to string) (bool, error) {
 	return strings.TrimSpace(string(out)) != "", nil
 }
 
-// defaultBootRefreshRebuild runs the canonical build target so the ldflags
-// stamp (version/commit/builtAt) is owned by exactly one place, the Makefile.
 func defaultBootRefreshRebuild(projectRoot string, stderr io.Writer) error {
 	cmd := sysexec.Command(context.Background(), "make", "-C", "go", "build")
 	cmd.Dir = projectRoot
-	cmd.Stdout = stderr // build chatter is diagnostics, not loop stdout
+	cmd.Stdout = stderr
 	cmd.Stderr = stderr
 	return cmd.Run()
 }
 
-// defaultBootRefreshExec replaces the current process with the freshly built
-// binary at the same executable path, same argv and environment (the
-// loop-prevention marker travels as a consume-once FILE, not env). On
-// success it never returns.
 func defaultBootRefreshExec() error {
 	self, err := os.Executable()
 	if err != nil {
@@ -131,10 +106,6 @@ func defaultBootRefreshExec() error {
 	return syscall.Exec(self, os.Args, os.Environ())
 }
 
-// shipPinPresent reports whether state.json carries an expected_ship_sha pin.
-// An unreadable state file is treated as PRESENT (conservative: the guarded
-// repin path runs and its decline blocks the exec — never exec into a state
-// we could not judge).
 func shipPinPresent(cfg loopConfig) bool {
 	b, err := os.ReadFile(filepath.Join(cfg.EvolveDir, "state.json"))
 	if err != nil {
@@ -153,8 +124,6 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	var res bootBinaryRefreshResult
 	projectRoot := cfg.ProjectRoot
 
-	// A policy load error resolves to the compiled default ("auto") — the
-	// self-heal is integrity posture, so a malformed policy must not disable it.
 	if pol, _ := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json")); pol.BootBinaryRefresh() == "off" {
 		fmt.Fprintf(stderr, "[loop] boot-refresh: policy boot.binary_refresh=off — staleness self-heal disabled by operator\n")
 		return res
@@ -170,16 +139,12 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 		fmt.Fprintf(stderr, "[loop] boot-refresh: cannot resolve HEAD (%v) — skipping staleness check\n", err)
 		return res
 	}
-	// Dev builds stamp a short (12-hex) commit; HEAD is full-width. Prefix
-	// equality in either direction means the binary matches the checkout.
 	if strings.HasPrefix(head, binCommit) || strings.HasPrefix(binCommit, head) {
 		return res
 	}
 
 	delta, err := bootRefreshSourceDeltaFn(projectRoot, binCommit, head)
 	if err != nil {
-		// Unknown/absent commit (stripped stamp, rewritten history): loudly
-		// unverifiable, never a boot blocker.
 		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN delta %s..%s unverifiable (%v) — booting as-is\n", binCommit, head[:12], err)
 		return res
 	}
@@ -189,8 +154,6 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	}
 	res.Stale = true
 
-	// Checked before the marker is consumed, so a skipped boot leaves the
-	// next one's staleness judgment untouched.
 	laneActive, lerr := bootRefreshFleetLaneFn(cfg)
 	if lerr != nil {
 		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN fleet-lane check unverifiable (%v) — cannot prove the plane is idle, so refusing to rebuild the shared binary; booting as-is\n", lerr)

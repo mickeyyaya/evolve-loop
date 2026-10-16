@@ -15,7 +15,6 @@ import (
 	"testing"
 )
 
-// Real filesystem/git closeout; runners replace external agents only.
 func resumedLifecycleFixture(t *testing.T) (*Orchestrator, *fakeStorage, CycleRequest, *ResumePoint) {
 	t.Helper()
 	root := initDossierRepo(t)
@@ -246,7 +245,7 @@ func TestResumeLifecycle_PostShipPauseRetainsThroughputBaseline(t *testing.T) {
 	o, st, req, rp := resumedLifecycleFixture(t)
 	rp.Phase = string(PhaseRetro)
 	st.cycleState.CompletedPhases = append(st.cycleState.CompletedPhases, "audit", "ship")
-	st.cycleState.FinalVerdict = VerdictPASS // the completed Ship's persisted host disposition
+	st.cycleState.FinalVerdict = VerdictPASS
 	raw, err := json.Marshal(st.cycleState)
 	if err != nil {
 		t.Fatal(err)

@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// intoUserPhaseStrategy routes scout → target (a catalog user phase), then
-// leaves the static walk alone.
 type intoUserPhaseStrategy struct{ target string }
 
 func (s intoUserPhaseStrategy) Decide(in router.RouteInput) router.RouterDecision {
@@ -28,7 +26,6 @@ func TestRunCycle_UnregisteredOptionalPhase_SkippedLoudly(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	// user-a is dispatchable; ghost-phase is catalog/order-known but has no runner.
 	runners[Phase("user-a")] = &fakeRunner{name: "user-a"}
 
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{

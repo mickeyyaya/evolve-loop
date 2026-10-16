@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// fakeMinter is a core.PhaseMinter: it normalizes the spec (forces Optional,
-// like the real registrar) and returns a fakeRunner, or an error for names it
-// is told to reject.
 type fakeMinter struct {
 	reject map[string]bool
 }
@@ -31,8 +28,6 @@ type errTest string
 
 func (e errTest) Error() string { return string(e) }
 
-// mintOrchestrator builds an orchestrator with the built-in spine only — NO
-// minted phase in catalog/order/runners yet — plus a fake minter.
 func mintOrchestrator(t *testing.T, minter PhaseMinter) *Orchestrator {
 	t.Helper()
 	cfg := config.RoutingConfig{
@@ -89,7 +84,7 @@ func TestRegisterMintedPhases_DoesNotClobberBuiltin(t *testing.T) {
 	t.Parallel()
 	o := mintOrchestrator(t, fakeMinter{})
 	before := o.runners[PhaseBuild]
-	o.registerMintedPhases(mintPlan("build")) // collides with built-in
+	o.registerMintedPhases(mintPlan("build"))
 	if o.runners[PhaseBuild] != before {
 		t.Error("minted phase must not clobber the built-in build runner")
 	}

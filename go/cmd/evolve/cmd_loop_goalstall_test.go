@@ -68,7 +68,7 @@ func TestGoalStallItem_WriteIdempotentByGoal(t *testing.T) {
 	esc := &goalStallEscalation{streak: 3, reasons: []string{"SKIPPED_UNKNOWN", "SKIPPED_AUDIT_ADVISORY"}}
 	goalHash := "805f6cedd62d9c2b3592ec1750943ec1bf238e920f34884edead2205d01d7d55"
 
-	item := buildGoalStallItem(goalStallKind, goalHash, esc, 0.5 /* below floor */, 644, "2026-07-18T00:00:00Z")
+	item := buildGoalStallItem(goalStallKind, goalHash, esc, 0.5, 644, "2026-07-18T00:00:00Z")
 	if item.Weight < goalStallWeightFloor {
 		t.Errorf("weight %v not clamped up to floor %v", item.Weight, goalStallWeightFloor)
 	}
@@ -106,7 +106,7 @@ func TestGoalStallItem_ValidateRejectsMalformed(t *testing.T) {
 		t.Fatalf("a well-formed item must validate: %v", err)
 	}
 	under := good
-	under.Weight = 0.5 // below the floor; direct assignment bypasses buildGoalStallItem's clamp
+	under.Weight = 0.5
 	if err := under.validate(); err == nil {
 		t.Error("validate() accepted a weight below the floor — a silent under-weight would slip through")
 	}
@@ -177,8 +177,6 @@ func TestNonShippingOutcome_ExactNegationOfCoreShipping(t *testing.T) {
 			t.Errorf("nonShippingOutcome(%q) = %v, want %v (negation of core.IsShippingVerdict)", v, got, want)
 		}
 	}
-	// The two labels that DO ship must not count as non-progress, or a streak
-	// could accumulate across shipping cycles.
 	for _, v := range []string{core.VerdictPASS, core.CycleOutcomeShippedViaBuild} {
 		if nonShippingOutcome(v) {
 			t.Errorf("verdict %q ships — it must never advance the non-progress streak", v)

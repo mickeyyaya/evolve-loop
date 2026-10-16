@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// canonicalRetryHooks is the full hook set, including the quota-checkpoint
-// classifier shared by fresh and resumed dispatch. Adding a hook to the
-// dispatch loop without adding it here (and to retryOpts) fails this table —
-// which is the whole point of the pin.
 var canonicalRetryHooks = []string{
 	"backfill",
 	"optionalInfraSkip",
@@ -20,10 +16,6 @@ var canonicalRetryHooks = []string{
 	"shipRecovery",
 }
 
-// retryOptsHookNames reflects over a retryOpts value and returns its field
-// names, sorted. Reflection (not a hand-maintained list inside the production
-// struct) is what makes the pin non-gameable: a new field appears here whether
-// or not the implementer remembers this test.
 func retryOptsHookNames(t *testing.T, v any) []string {
 	t.Helper()
 	rt := reflect.TypeOf(v)
@@ -38,9 +30,6 @@ func retryOptsHookNames(t *testing.T, v any) []string {
 	return names
 }
 
-// enabledRetryHooks reports, per hook name, whether that hook is wired (non-nil)
-// on the given retryOpts value. A nil func field means "this path does not run
-// that hook" — the explicit, inspectable form of the divergence the item is about.
 func enabledRetryHooks(t *testing.T, v any) map[string]bool {
 	t.Helper()
 	rv := reflect.ValueOf(v)
@@ -59,8 +48,6 @@ func enabledRetryHooks(t *testing.T, v any) map[string]bool {
 	return out
 }
 
-// retryOptsCycleRun builds a cycleRun wired well enough for the two hook-set
-// constructors, reusing this package's existing parity harness.
 func retryOptsCycleRun(t *testing.T) *cycleRun {
 	t.Helper()
 	runner := &alwaysFailRunner{name: "evaluator", err: ErrArtifactTimeout}

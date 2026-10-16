@@ -93,9 +93,6 @@ func (r *passRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseRe
 	return core.PhaseResponse{Phase: r.name, Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// explanationTestWorktree gives black-box orchestrator tests a real Git base
-// so fresh-cycle explanation activation stays enabled. The tests exercise the
-// production contract instead of silently downgrading to legacy version zero.
 type explanationTestWorktree struct{}
 
 func (explanationTestWorktree) Create(projectRoot string, cycle int) (string, error) {
@@ -224,8 +221,6 @@ func TestRunCycle_ShipControlPlaneViolation_RebuildsThenShips(t *testing.T) {
 		failFirst: 1,
 		errOnFail: core.NewShipError(core.CodeControlPlaneViolation, core.ShipClassPrecondition, core.StageVerifyClass, "INTEGRITY VIOLATION: go/internal/core/cyclerun.go"),
 	}
-	// build reuses explanationWritingRunner from ship_recovery_composition_test.go
-	// so the re-entered Build authors Explanation Documentation like a real builder.
 	build := &explanationWritingRunner{}
 	audit := &countingRunner{name: "audit"}
 	_, err, ld := runRecoveryCycle(t, map[core.Phase]core.PhaseRunner{core.PhaseShip: ship, core.PhaseBuild: build, core.PhaseAudit: audit})
@@ -280,7 +275,6 @@ func TestRunCycle_ShipRecoveryExhausted_Aborts(t *testing.T) {
 	if err == nil {
 		t.Fatal("a never-resolving ship error must abort once recovery depth is exhausted")
 	}
-	// depth 0 (initial) + 2 recoveries = 3 ship attempts, then abort.
 	if ship.calls != 3 {
 		t.Fatalf("ship calls = %d, want 3 (initial + maxRecoveryDepth=2)", ship.calls)
 	}
@@ -359,6 +353,5 @@ func containsKind(ld *fakeLedger, kind string) bool {
 	return false
 }
 
-// guard: keep the errors+strings imports meaningful if assertions evolve.
 var _ = errors.Is
 var _ = strings.Contains

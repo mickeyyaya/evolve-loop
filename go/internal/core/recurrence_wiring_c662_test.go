@@ -35,7 +35,6 @@ func TestC662_RetroCloseoutRecordsClosureInLedger(t *testing.T) {
 		t.Fatalf("RED: recurrence-ledger.json has no entries after a FAIL cycle — " +
 			"RecordClosure is not wired into the retro-closeout seam (Count()==0 forever)")
 	}
-	// The closure must be keyed by the failing cycle (seeded cycle_id=1).
 	foundCycle := false
 	for _, e := range led.Entries {
 		for _, c := range e.Cycles {

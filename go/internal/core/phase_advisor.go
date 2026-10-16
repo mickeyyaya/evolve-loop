@@ -17,34 +17,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// PhaseAdvisor is the bridge-backed DynamicLLM brain. It satisfies two router
-// ports: router.Proposer (Propose — the per-transition "insert this optional
-// phase?" advice) and router.Planner (Plan — the upfront whole-cycle run/skip
-// plan). Both ask an LLM via the core.Bridge port given the objective digest.
-// All output is ADVISORY: the pure router.Route() clamp pass re-validates it
-// against the kernel floor (mandatory spine, TDD-pin, ship-needs-real-audit),
-// so a hallucinated or malformed proposal can never weaken the ship
-// guarantee. Any failure is returned as an error and the caller degrades
-// cleanly to the deterministic static path — "model proposes, kernel
-// disposes", fail-safe to the floor.
 type PhaseAdvisor struct {
-	bridge   Bridge
-	identity AgentIdentity // the shared dispatch identity (cli/model/profile/persona/label)
-	// checkDepth is an injectable depth guard (defense-in-depth recursion check).
-	// nil = skip the check. Wire AdvisorDepthExceeded via WithDepthCheck for production.
+	bridge     Bridge
+	identity   AgentIdentity
 	checkDepth func(env map[string]string) bool
-	signals    *signalcenter.Center // set by WithAdvisorSignals at the composition root
-	brainOnce  sync.Once            // guards the ONE construction of brain (a literal may be first-used concurrently)
-	brain      *advisor.Advisor     // the unit-04 leaf, built once
+	signals    *signalcenter.Center
+	brainOnce  sync.Once
+	brain      *advisor.Advisor
 	walk       llmroute.Plan
 }
 
-// PhaseAdvisorOption customizes a PhaseAdvisor.
 type PhaseAdvisorOption func(*PhaseAdvisor)
 
-// WithProposerCLI overrides the CLI the advisor dispatches to. The composition
-// root resolves this from the router profile + EVOLVE_ROUTER_CLI (same path as
-// phases), so the brain is configurable to any LLM CLI (claude/codex/agy).
 func WithProposerCLI(cli string) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		if cli != "" {
@@ -53,8 +37,6 @@ func WithProposerCLI(cli string) PhaseAdvisorOption {
 	}
 }
 
-// WithProposerModel overrides the model tier the advisor requests. Resolved by
-// the composition root from the router profile + EVOLVE_ROUTER_MODEL.
 func WithProposerModel(model string) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		if model != "" {
@@ -67,19 +49,12 @@ func WithProposerWalk(walk llmroute.Plan) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) { p.walk = walk }
 }
 
-// WithDepthCheck injects the recursion-depth guard (defense-in-depth).
-// When fn returns true for the dispatch env, the launch errors before the bridge.
-// Pass AdvisorDepthExceeded for production behavior; nil (the zero-field default) skips the check.
-// See ADR-0052.
 func WithDepthCheck(fn func(env map[string]string) bool) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		p.checkDepth = fn
 	}
 }
 
-// WithPersona injects the advisor's persona body (agents/evolve-router.md),
-// making the brain defined identically to every phase agent (persona + profile +
-// artifact). Empty ⇒ the legacy inline framing is used as a fail-safe.
 func WithPersona(body string) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		if body != "" {
@@ -88,19 +63,10 @@ func WithPersona(body string) PhaseAdvisorOption {
 	}
 }
 
-// WithAdvisorSignals hands the root's Signal Center to the advisor: the brain
-// reports its faults as advisor.warning through it. The composition root
-// builds the Center before the advisor in the same function, so this is
-// honest construction-time DI — the ONE declared root spelling change.
 func WithAdvisorSignals(c *signalcenter.Center) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) { p.signals = c }
 }
 
-// NewPhaseAdvisor builds the routing brain over the given bridge. The cli/model
-// FALLBACK is deep (opus) on the tmux Claude driver — composing the cycle and
-// inventing phases is deep-reasoning work, not lightweight routing — but the
-// composition root normally overrides both from the router profile + env so the
-// brain is configurable to any CLI/model.
 func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 	p := &PhaseAdvisor{
 		bridge:   bridge,
@@ -109,24 +75,15 @@ func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 	for _, o := range opts {
 		o(p)
 	}
-	p.advisor() // eager, through the same once-guarded accessor
+	p.advisor()
 	return p
 }
 
-// advisor returns the unit-04 brain, built exactly once — eagerly by
-// NewPhaseAdvisor, on first use for a PhaseAdvisor assembled as a literal —
-// under a sync.Once, so the lazy cache is safe by construction rather than by
-// caller discipline (a bare nil-check is a read-check-write race).
 func (p *PhaseAdvisor) advisor() *advisor.Advisor {
 	p.brainOnce.Do(func() { p.brain = p.wiredAdvisor() })
 	return p.brain
 }
 
-// wiredAdvisor is the ONE construction of the leaf
-// (TestPhaseAdvisor_OneConstructionSite): the bridge behind the Launcher port
-// (a nil bridge stays nil so the legacy "nil bridge" fail-safe survives), the
-// atomic capture writer the ledger's hash-bind relies on, the depth guard, the
-// git reader and the Center through an accessor read live.
 func (p *PhaseAdvisor) wiredAdvisor() *advisor.Advisor {
 	return advisor.New(launcherOf(p.bridge), p.identity, writeArtifactAtomically,
 		advisor.WithDepthCheck(p.checkDepth),
@@ -135,7 +92,6 @@ func (p *PhaseAdvisor) wiredAdvisor() *advisor.Advisor {
 		advisor.WithRoute(p.walk))
 }
 
-// launcherOf adapts a Bridge to the leaf's port; nil stays nil.
 func launcherOf(b Bridge) advisor.Launcher {
 	if b == nil {
 		return nil
@@ -143,9 +99,6 @@ func launcherOf(b Bridge) advisor.Launcher {
 	return bridgeLauncher{b}
 }
 
-// bridgeLauncher is the Adapter from the leaf-owned Launcher port onto
-// core.Bridge — the one place the fourteen launch fields meet the bridge's
-// request.
 type bridgeLauncher struct{ b Bridge }
 
 func (l bridgeLauncher) Launch(ctx context.Context, req advisor.LaunchRequest) (advisor.LaunchResponse, error) {
@@ -153,75 +106,54 @@ func (l bridgeLauncher) Launch(ctx context.Context, req advisor.LaunchRequest) (
 	return launchResponseOf(resp), err
 }
 
-// bridgeRequestOf is the ONE projection of the leaf's request onto the bridge's.
 func bridgeRequestOf(r advisor.LaunchRequest) BridgeRequest {
 	return BridgeRequest{
-		// dispatch identity
-		CLI:     r.CLI,
-		Profile: r.Profile,
-		Model:   r.Model,
-		Skills:  r.Skills,
-		// the prompt and the roots
-		Prompt:      r.Prompt,
-		Workspace:   r.Workspace,
-		Worktree:    r.Worktree,
-		ProjectRoot: r.ProjectRoot,
-		// the deliverable contract
+		CLI:          r.CLI,
+		Profile:      r.Profile,
+		Model:        r.Model,
+		Skills:       r.Skills,
+		Prompt:       r.Prompt,
+		Workspace:    r.Workspace,
+		Worktree:     r.Worktree,
+		ProjectRoot:  r.ProjectRoot,
 		ArtifactPath: r.ArtifactPath,
 		Completion:   CompletionContract(r.Completion),
 		Agent:        r.Agent,
 		Contract:     r.Contract,
-		// the cycle
-		Cycle: r.Cycle,
-		Env:   r.Env,
-		// one attempt of the advisor's own chain walk (llmroute.Dispatch): a
-		// chain-walking bridge handle must pass it through, not walk it again.
+		Cycle:        r.Cycle,
+		Env:          r.Env,
 		ChainAttempt: true,
 	}
 }
 
-// launchResponseOf projects the four response fields the advisor reads.
 func launchResponseOf(r BridgeResponse) advisor.LaunchResponse {
 	return advisor.LaunchResponse{ExitCode: r.ExitCode, Stdout: r.Stdout, DurationMS: r.DurationMS, Tokens: r.Tokens}
 }
 
-// Propose implements router.Proposer.
 func (p *PhaseAdvisor) Propose(in router.RouteInput) (*router.Proposal, error) {
 	return p.advisor().Propose(in)
 }
 
-// Plan implements router.Planner — the upfront whole-cycle run/skip plan.
 func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 	return p.advisor().Plan(in)
 }
 
-// RePlan is the post-scout re-plan, called in shadow every
-// cycle by the orchestrator under the cfg.RouterReplan dial.
 func (p *PhaseAdvisor) RePlan(in router.RouteInput) (*router.PhasePlan, error) {
 	return p.advisor().RePlan(in)
 }
 
-// compile-time assertions that PhaseAdvisor satisfies the router ports and
-// the orchestrator's re-plan seam.
 var (
 	_ router.Proposer = (*PhaseAdvisor)(nil)
 	_ router.Planner  = (*PhaseAdvisor)(nil)
 	_ rePlanner       = (*PhaseAdvisor)(nil)
 )
 
-// AdvisorSpan is the OTel-GenAI decision span — the leaf's
-// Span, kept under its core spelling for the routing explain command.
 type AdvisorSpan = advisor.Span
 
-// ReplayPlanFromResponse reparses a captured advisor response through the
-// SAME parse + integrity-floor clamp the live planning path runs (WS3-S5
-// replay, the routing-eval corpus) — the leaf's, under its core spelling.
 func ReplayPlanFromResponse(raw string, in router.RouteInput, floor []string) (*router.PhasePlan, []router.Clamp, error) {
 	return advisor.ReplayPlanFromResponse(raw, in, floor)
 }
 
-// parsePhasePlan is resume's re-parse of routing-plan.json: the leaf's parser
-// with the rejected mints dropped (they were reported at decision time).
 func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 	parsed, err := advisor.ParsePhasePlan(stdout)
 	if err != nil {
@@ -230,20 +162,14 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 	return parsed.Plan, nil
 }
 
-// lastBalancedSpan is the plan judge's and the retry adjudicator's
-// string-literal-aware span scanner — the leaf's.
 func lastBalancedSpan(s string, open, close byte) (start, end int, ok bool) {
 	return advisor.LastBalancedSpan(s, open, close)
 }
 
-// truncateGoal is the plan judge's goal cap — the advisor's.
 func truncateGoal(s string) string { return advisor.TruncateGoal(s) }
 
-// maxGoalTextChars is the task-recall digest's bound — the advisor's.
 const maxGoalTextChars = advisor.MaxGoalTextRunes
 
-// composePlanPrompt renders the whole-cycle plan prompt through the brain.
-//
 // Deprecated: test facade — the ACS-named tier-elicitation and replay tests
 // (acs/cycle463, cycle476) and the resident catalog/recon/mint tests call it;
 // production goes through Plan/RePlan.
@@ -251,49 +177,35 @@ func (p *PhaseAdvisor) composePlanPrompt(in router.RouteInput, artifactFile stri
 	return p.advisor().ComposePlanPrompt(in, artifactFile)
 }
 
-// sanitizeAdvisorTier confines an advisor-emitted tier to the canonical set.
-//
 // Deprecated: test facade — acs/cycle517 names TestSanitizeAdvisorTier.
 func sanitizeAdvisorTier(tier string) string { return advisor.SanitizeTier(tier) }
 
-// writeCatalog renders the SELECT menu with no on-demand index.
-//
 // Deprecated: test facade — acs/cycle420 names the TestWriteCatalog_* pins.
 func writeCatalog(b *strings.Builder, cards []router.PhaseCard) { advisor.WriteCatalog(b, cards) }
 
-// writeCatalogWithOnDemand renders the SELECT menu and the on-demand index.
-//
 // Deprecated: test facade — the resident on-demand wiring tests build their
 // cards from the orchestrator's catalog.
 func writeCatalogWithOnDemand(b *strings.Builder, cards []router.PhaseCard, onDemand []string) {
 	advisor.WriteCatalogWithOnDemand(b, cards, onDemand)
 }
 
-// writeRoutingContext renders the shared decision context.
-//
 // Deprecated: test facade — the judgment-lesson tests (acs/cycle1532/1549)
 // and the resident unavailable-phase pin call it.
 func writeRoutingContext(b *strings.Builder, in router.RouteInput) {
 	advisor.WriteRoutingContext(b, in)
 }
 
-// writeCarryoverTodos renders the carryover section.
-//
 // Deprecated: test facade — acs/cycle488 and cycle507 name the length and
 // order pins.
 func writeCarryoverTodos(b *strings.Builder, todos []router.CarryoverTodo) {
 	advisor.WriteCarryoverTodos(b, todos)
 }
 
-// The prompt bounds the by-name tests read — projections of the leaf's.
 const (
 	maxCarryoverTodosInPrompt = advisor.MaxCarryoverTodosInPrompt
 	maxEnrichedCatalogCards   = advisor.MaxEnrichedCatalogCards
 )
 
-// mintConfigsFrom reconstructs the minted phase configs, the recursion
-// guard's drops discarded.
-//
 // Deprecated: test facade — the protected phase_advisor_guard_test.go and the
 // ADR-0052 seams guard name it.
 func mintConfigsFrom(entries []router.PhasePlanEntry) []phaseconfig.PhaseConfig {
@@ -301,16 +213,9 @@ func mintConfigsFrom(entries []router.PhasePlanEntry) []phaseconfig.PhaseConfig 
 	return mints
 }
 
-// reservedAdvisorMintReason is the recursion guard's reason for a name.
-//
 // Deprecated: test facade — the protected phase_advisor_guard_test.go names it.
 func reservedAdvisorMintReason(name string) string { return advisor.ReservedMintReason(name) }
 
-// writeArtifactAtomically writes via a temp file + rename, so a capture
-// artifact on disk is always either absent or complete — never a truncated
-// half-write. This keeps the ledger's disk-read SHA equal to the span's
-// in-memory SHA for the same bytes. Single-writer per (workspace, kind) per
-// cycle, so the fixed .tmp suffix cannot collide.
 func writeArtifactAtomically(path string, data []byte) error {
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
@@ -319,10 +224,6 @@ func writeArtifactAtomically(path string, data []byte) error {
 	return os.Rename(tmp, path)
 }
 
-// benchedCLIsForRouting projects the cli-health store's ACTIVE benches into
-// the advisor's environmental context, sorted by family for a deterministic
-// (prompt-prefix-cache-friendly) prompt. Empty when the store is empty or
-// unreadable — CLI health is advice, never a planning prerequisite.
 func benchedCLIsForRouting(projectRoot string) []router.BenchedCLI {
 	active := clihealth.NewStore(projectRoot, nil).Active()
 	if len(active) == 0 {
@@ -336,20 +237,10 @@ func benchedCLIsForRouting(projectRoot string) []router.BenchedCLI {
 	return out
 }
 
-// recentChangeCommits bounds the git-log window the pre-plan recon scans for
-// changed files (churn signal). Small + fixed ⇒ cheap and deterministic.
 const recentChangeCommits = "30"
 
-// reconGitTimeout bounds the recon's git subprocess so a hung/huge repo can never
-// stall plan composition — the recon is advisory and fails open, so a timeout
-// just yields no file facts (same as any other git error).
 const reconGitTimeout = 5 * time.Second
 
-// recentlyChangedFiles returns the files touched across the last
-// recentChangeCommits commits (duplicates kept — frequency = churn), or the
-// git error (the advisor leaf reports it and composes without file facts);
-// an empty root reads nothing. One git call; reuses gitexec. The I/O lives
-// HERE (core, the I/O layer) and is injected into the leaf.
 func recentlyChangedFiles(projectRoot string) ([]string, error) {
 	if projectRoot == "" {
 		return nil, nil

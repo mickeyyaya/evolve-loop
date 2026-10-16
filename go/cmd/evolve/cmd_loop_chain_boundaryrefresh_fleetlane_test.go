@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// brflRunsDir creates evolveDir/runs and returns its path.
 func brflRunsDir(t *testing.T, evolveDir string) string {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "runs")
@@ -23,8 +22,6 @@ func brflRunsDir(t *testing.T, evolveDir string) string {
 	return dir
 }
 
-// brflWriteRunMarker plants the run.json marker gc.Discover requires as
-// evidence before it will even classify a directory as a run dir.
 func brflWriteRunMarker(t *testing.T, runDir string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(runDir, "run.json"), []byte(`{}`), 0o644); err != nil {
@@ -32,10 +29,6 @@ func brflWriteRunMarker(t *testing.T, runDir string) {
 	}
 }
 
-// TestMaybeRefreshChainBoundary_FleetLaneActiveRefusesRebuild: an active
-// sibling fleet lane (fresh .lease heartbeat under a different run dir) must
-// refuse the boundary heal before either rebuild or re-exec, even though the
-// local binary is stale.
 func TestMaybeRefreshChainBoundary_FleetLaneActiveRefusesRebuild(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -49,7 +42,7 @@ func TestMaybeRefreshChainBoundary_FleetLaneActiveRefusesRebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	restore := brfStubSeams(t, true, nil, nil) // stale=true (ahead)
+	restore := brfStubSeams(t, true, nil, nil)
 	defer restore()
 
 	rebuildCalled, reexecCalled := false, false
@@ -72,14 +65,10 @@ func TestMaybeRefreshChainBoundary_FleetLaneActiveRefusesRebuild(t *testing.T) {
 	}
 }
 
-// TestMaybeRefreshChainBoundary_FleetLaneCheckErrorRefusesRebuild: an
-// unverifiable fleet-lane check (scan error) must refuse the rebuild exactly
-// like an active lane, while the chain itself still degrades to "no refresh"
-// rather than halting.
 func TestMaybeRefreshChainBoundary_FleetLaneCheckErrorRefusesRebuild(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
-	restore := brfStubSeams(t, true, nil, nil) // stale=true (ahead)
+	restore := brfStubSeams(t, true, nil, nil)
 	defer restore()
 
 	prevLane := chainBoundaryFleetLaneFn
@@ -108,22 +97,12 @@ func TestMaybeRefreshChainBoundary_FleetLaneCheckErrorRefusesRebuild(t *testing.
 	}
 }
 
-// TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes is a
-// regression guard: with no active sibling lane (an empty or absent runs/
-// dir), the boundary heal must proceed exactly as before the fleet-lane
-// guard was added.
 func TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
-	// runs/ deliberately left absent — gc.Discover on a missing dir returns an
-	// empty list, not an error (see internal/gc/discover.go doc comment).
 
-	restore := brfStubSeams(t, true, nil, nil) // stale=true (ahead)
+	restore := brfStubSeams(t, true, nil, nil)
 	defer restore()
 
-	// Same provenance/commit stubs the existing lag-triggers-rebuild test
-	// uses: without them, the real defaultChainBoundaryRepinProvenance runs
-	// git against a non-repo temp dir and always refuses, an unrelated
-	// fixture gap.
 	prevCommit, prevProv := chainRunningCommitFn, chainBoundaryRepinProvenanceFn
 	defer func() { chainRunningCommitFn, chainBoundaryRepinProvenanceFn = prevCommit, prevProv }()
 	chainRunningCommitFn = func() string { return "cafebabe1234" }
@@ -145,10 +124,6 @@ func TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes(t *testing.T)
 	}
 }
 
-// TestDefaultChainBoundaryFleetLaneActive_DetectsLiveSiblingDiscoveredByGC
-// exercises the production implementation directly (not through the
-// maybeRefreshChainBoundary seam), so the real gc.Discover scanner, not just
-// the fake, is exercised at least once.
 func TestDefaultChainBoundaryFleetLaneActive_DetectsLiveSiblingDiscoveredByGC(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
@@ -171,9 +146,6 @@ func TestDefaultChainBoundaryFleetLaneActive_DetectsLiveSiblingDiscoveredByGC(t 
 	}
 }
 
-// TestDefaultChainBoundaryFleetLaneActive_NoRunsDirIsInactive is the
-// no-runs-dir baseline: a plane that has never recorded a run must report
-// inactive, not an error.
 func TestDefaultChainBoundaryFleetLaneActive_NoRunsDirIsInactive(t *testing.T) {
 	t.Parallel()
 	active, err := defaultChainBoundaryFleetLaneActive(loopConfig{EvolveDir: t.TempDir()})

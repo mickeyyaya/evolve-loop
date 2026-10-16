@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// stagingScopeRepo builds an ephemeral lane worktree: one commit holding
-// base.txt and the .gitignore the provisioner plants (so .evolve/ dirt is never
-// part of the question), with the index clean at HEAD.
 func stagingScopeRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
@@ -29,7 +26,6 @@ func stagingScopeRepo(t *testing.T) string {
 	return repo
 }
 
-// treeNames lists every path recorded in a tree object.
 func treeNames(t *testing.T, repo, tree string) []string {
 	t.Helper()
 	out := gitOut(t, repo, "ls-tree", "-r", "--name-only", tree)
@@ -49,8 +45,6 @@ func treeHas(t *testing.T, repo, tree, name string) bool {
 	return false
 }
 
-// writeFile is the fixture's disk mutator; a helper so each pin reads as the
-// scenario it encodes rather than as error plumbing.
 func writeFile(t *testing.T, path, body string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -64,12 +58,7 @@ func writeFile(t *testing.T, path, body string) {
 func TestWorktreeContentSHA_ExcludesUnrelatedUntrackedResidue(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
-	// A declared change, so the lane is genuinely dirty and the identity is not
-	// trivially the base tree.
 	writeFile(t, filepath.Join(repo, "base.txt"), "base\ndeclared edit\n")
-	// Residue: an unrelated untracked file. Not gitignored — that is the whole
-	// point; .gitignore already excludes the families it knows about, but not
-	// every class of stray file.
 	writeFile(t, filepath.Join(repo, "foreign-residue.txt"), "must not enter the audit binding\n")
 
 	tree := worktreeContentSHA(context.Background(), "", repo, t.TempDir())
@@ -83,16 +72,11 @@ func TestWorktreeContentSHA_ExcludesUnrelatedUntrackedResidue(t *testing.T) {
 	}
 }
 
-// A NEW file the builder declared by staging it must be RETAINED — the
-// over-correction pin: a fix that simply stops staging anything, or that
-// binds HEAD^{tree}, drops legitimate new source from the tree ship will
-// commit.
 func TestWorktreeContentSHA_StagesDeclaredNewFile(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
 	declared := filepath.Join("go", "internal", "newpkg", "newpkg.go")
 	writeFile(t, filepath.Join(repo, declared), "package newpkg\n")
-	// Declared = the builder put it in the lane's index.
 	gitOut(t, repo, "add", declared)
 
 	tree := worktreeContentSHA(context.Background(), "", repo, t.TempDir())
@@ -106,10 +90,6 @@ func TestWorktreeContentSHA_StagesDeclaredNewFile(t *testing.T) {
 	}
 }
 
-// A modification to a TRACKED file that was never `git add`ed must still be
-// captured. Without this, the cheapest way to pass the other pins — return
-// the base tree, or stage nothing at all — would look correct while making
-// every binding identical to its base.
 func TestWorktreeContentSHA_CapturesUnstagedTrackedModification(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
@@ -129,11 +109,6 @@ func TestWorktreeContentSHA_CapturesUnstagedTrackedModification(t *testing.T) {
 	}
 }
 
-// The empty-selection case: a lane whose ONLY difference from its base is
-// unrelated residue must keep its base identity exactly — adopting residue
-// here would manufacture a "changed" identity for an untouched worktree,
-// which is precisely what ProbeEligible reads to decide whether a verdict may
-// be cached or reused.
 func TestWorktreeContentSHA_ResidueOnlyWorktreeKeepsBaseIdentity(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
@@ -151,21 +126,12 @@ func TestWorktreeContentSHA_ResidueOnlyWorktreeKeepsBaseIdentity(t *testing.T) {
 	}
 }
 
-// The seam must be reached from the PRODUCTION caller, not merely be
-// correct in isolation: emitPhaseBindings → recordAuditBinding →
-// worktreeContentSHA is the path that writes WorktreeTreeSHA into the
-// auditor ledger entry ship verifies. A predicate that only called the
-// helper would pass on dead code. This drives the real orchestrator
-// method against a real repository and reads the identity back off the real
-// ledger entry.
 func TestEmitPhaseBindings_AuditBindingTreeExcludesUnrelatedResidue(t *testing.T) {
 	t.Parallel()
 	repo := stagingScopeRepo(t)
 	base := gitOut(t, repo, "rev-parse", "HEAD")
 	ws := filepath.Join(repo, ".evolve", "runs", "cycle-1594")
 	writeFile(t, filepath.Join(ws, "audit-report.md"), "## Verdict\n**PASS**\n")
-	// The cycle's ISOLATED worktree, as production provisions it: the binding
-	// stages the worktree's index, never the project root's (inPlaceWorktree).
 	wt := filepath.Join(t.TempDir(), "cycle-1594")
 	gitOut(t, repo, "worktree", "add", "--detach", "-q", wt, "HEAD")
 

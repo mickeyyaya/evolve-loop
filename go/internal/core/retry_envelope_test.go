@@ -81,8 +81,6 @@ func TestComputeRetryEnvelope(t *testing.T) {
 			wantHalt:  false,
 		},
 		{
-			// defer-or-quarantine is task-level but NOT retryable: rebuilding
-			// cannot fix a malformed intent.
 			name: "defer-or-quarantine offers only decline",
 			in: retryEnvelopeInput{
 				DeclaredClass: policy.CategoryIntentMalformed,
@@ -124,9 +122,6 @@ func TestComputeRetryEnvelope(t *testing.T) {
 	}
 }
 
-// The envelope must be driven by the policy table, not by a constant that
-// happens to equal it: a hardcoded 2 passes every case above, only changing
-// the table can distinguish them.
 func TestComputeRetryEnvelope_CapComesFromThePolicyTable(t *testing.T) {
 	t.Parallel()
 
@@ -137,7 +132,7 @@ func TestComputeRetryEnvelope_CapComesFromThePolicyTable(t *testing.T) {
 
 	got := computeRetryEnvelope(retryEnvelopeInput{
 		DeclaredClass: policy.CategoryCodeAuditFail,
-		Attempts:      3, // over the compiled default of 2, under the table's 5
+		Attempts:      3,
 		Policy:        fp,
 	})
 
