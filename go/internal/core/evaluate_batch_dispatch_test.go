@@ -26,8 +26,6 @@ func TestMergeVerdict(t *testing.T) {
 	}
 }
 
-// concurrentRunner records the peak number of runners executing simultaneously,
-// so a batch test can PROVE the phases overlapped rather than ran serially.
 type concurrentRunner struct {
 	name              string
 	active, maxActive *int32
@@ -44,7 +42,7 @@ func (r *concurrentRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespon
 			break
 		}
 	}
-	time.Sleep(20 * time.Millisecond) // hold the slot so a concurrent peer overlaps
+	time.Sleep(20 * time.Millisecond)
 	atomic.AddInt32(r.active, -1)
 	if r.err != nil {
 		return PhaseResponse{}, r.err
@@ -56,7 +54,6 @@ func (r *concurrentRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespon
 	return PhaseResponse{Phase: r.name, Verdict: v, ArtifactsDir: req.Workspace}, nil
 }
 
-// newBatchCycleRun wires a minimal cycleRun for dispatchEvaluateBatch unit tests.
 func newBatchCycleRun(t *testing.T, runners map[Phase]PhaseRunner, conc int) *cycleRun {
 	t.Helper()
 	root := t.TempDir()
@@ -145,8 +142,6 @@ func TestDispatchEvaluateBatch_CrashSafety(t *testing.T) {
 	if !batchHas(cr, "tester") || !batchHas(cr, "evaluator") {
 		t.Errorf("all batch outcomes must be recorded even on abort; PhasesRun=%v", cr.result.PhasesRun)
 	}
-	// Both batch phases must have a timing entry (a retro entry from
-	// failure-learning may also be present — that's the abort path firing).
 	n := 0
 	for _, e := range cr.phaseTimings {
 		if e.Phase == "tester" || e.Phase == "evaluator" {

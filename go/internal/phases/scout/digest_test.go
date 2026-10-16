@@ -18,16 +18,14 @@ func TestMergeDigests(t *testing.T) {
 			SliceID:  "slice-2",
 			Findings: []Finding{{File: "b.go", Kind: "debt", Severity: "MEDIUM", Note: "dup"}},
 			CandidateTasks: []CandidateTask{
-				// same slug+files as slice-1's fix-nil ⇒ dedups, occurrences=2, conf=max
 				{Slug: "fix-nil", Type: "stability", Complexity: "S", Files: []string{"a.go"}, Confidence: 0.9},
 			},
-			CrossSliceSignals: []CrossSignal{{Pattern: "os.ReadFile+json.Unmarshal"}}, // same pattern in 2 slices
+			CrossSliceSignals: []CrossSignal{{Pattern: "os.ReadFile+json.Unmarshal"}},
 		},
 	}
 
 	var m MergedFindings = mergeDigests(digests)
 
-	// dedup: fix-nil collapses to one task, occurrences=2, confidence=max(0.6,0.9)=0.9
 	if len(m.Tasks) != 2 {
 		t.Fatalf("want 2 deduped tasks, got %d: %+v", len(m.Tasks), m.Tasks)
 	}
@@ -40,11 +38,9 @@ func TestMergeDigests(t *testing.T) {
 	if m.Tasks[0].Confidence != 0.9 {
 		t.Errorf("fix-nil confidence=%.2f, want 0.9 (max)", m.Tasks[0].Confidence)
 	}
-	// single-slice task ranks below the 2-occurrence one despite irrelevant conf
 	if m.Tasks[1].Slug != "dedup-json" || m.Tasks[1].Occurrences != 1 {
 		t.Errorf("second task = %+v, want dedup-json occ=1", m.Tasks[1])
 	}
-	// cross-cutting: pattern in >=2 slices is confirmed
 	if len(m.CrossCutting) != 1 || m.CrossCutting[0].Pattern != "os.ReadFile+json.Unmarshal" {
 		t.Errorf("pattern flagged by 2 slices must be cross-cutting; got %+v", m.CrossCutting)
 	}
@@ -56,7 +52,6 @@ func TestMergeDigests(t *testing.T) {
 	}
 }
 
-// A pattern flagged by only ONE slice is not cross-cutting.
 func TestMergeDigests_SingleSliceSignalNotCrossCutting(t *testing.T) {
 	t.Parallel()
 	m := mergeDigests([]ScanDigest{

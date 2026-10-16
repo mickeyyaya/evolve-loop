@@ -13,15 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
-// writeInteractiveFake writes a per-scenario fake CLI. Everything is BAKED
-// into the script body (never argv) so tmux's echo of the launch command can't
-// leak the marker or prompt text into the pane and trip a false match — the
-// same discipline writeFakeREPL documents.
-//
-//	timing "boot" → emit the prompt BEFORE the marker (trust dialogs; needs
-//	                tickDuringBoot). "mid" → emit after the prompt is delivered.
-//	mode   "unblock" → wait for `expect` then continue. "persist" → never
-//	                unblock (escalate / loop-guard; runTmuxREPL returns on its own).
 func writeInteractiveFake(t *testing.T, dir, marker, promptText, expect, timing, mode string) string {
 	t.Helper()
 	script := fmt.Sprintf(`#!/usr/bin/env bash
@@ -91,9 +82,6 @@ func interactiveLaunch(cli, session, launchCmd, marker string, tickDuringBoot bo
 	}
 }
 
-// interactiveConfig wires the prompt file to carry "ARTIFACT=$ARTIFACT_PATH";
-// preparePrompt substitutes the real artifact path, and the fake echoes it
-// back into a real on-disk write the artifact-wait loop observes.
 func interactiveConfig(t *testing.T) *Config {
 	t.Helper()
 	cfg := itConfig(t, "x")
@@ -103,14 +91,10 @@ func interactiveConfig(t *testing.T) *Config {
 
 const itMarker = "ITREADY"
 
-// --- 1. claude single-select AskUserQuestion → bare Enter unblocks ----------
-
 func TestRealTmux_Interactive_ClaudeSingleSelect_AutoEnter(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
-	// Footer matches askuserquestion_select; no "[ ]" so the multiselect rule
-	// does not fire. Auto-reply is a bare Enter (response_keys "Enter").
 	launch := writeInteractiveFake(t, cfg.Worktree, itMarker,
 		"Pick one — Enter to select · up/down to navigate · Esc to cancel", "", "mid", "unblock")
 	sess := itSession("isingle")
@@ -126,17 +110,10 @@ func TestRealTmux_Interactive_ClaudeSingleSelect_AutoEnter(t *testing.T) {
 	}
 }
 
-// --- 1b. claude multi-select → "Enter,Right,Enter" sequence unblocks --------
-
 func TestRealTmux_Interactive_ClaudeMultiSelect_AutoSubmit(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
-	// Prompt carries the highlighted checkbox row → matches askuserquestion_
-	// multiselect (response "Enter,Right,Enter"). The fake unblocks only after
-	// the full two-Enter sequence reaches it through real tmux send-keys, so a
-	// green run proves the multi-keystroke delivery (incl. the "Right" named
-	// key) end to end — the deterministic counterpart to the live-CLI proof.
 	launch := writeInteractiveFake(t, cfg.Worktree, itMarker,
 		"Which toppings?\n❯ 1. [ ] Cheese\n  2. [ ] Mushroom\nEnter to select · up/down to navigate", "", "mid", "multiselect")
 	sess := itSession("imulti")
@@ -152,8 +129,6 @@ func TestRealTmux_Interactive_ClaudeMultiSelect_AutoSubmit(t *testing.T) {
 	}
 }
 
-// --- 2. codex trust dialog at boot → "1,Enter" unblocks ---------------------
-
 func TestRealTmux_Interactive_CodexTrust_AutoRespondAtBoot(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
@@ -163,7 +138,6 @@ func TestRealTmux_Interactive_CodexTrust_AutoRespondAtBoot(t *testing.T) {
 	sess := itSession("itrust")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	// tickDuringBoot=true: the codex/agy boot-time trust path.
 	code, _ := runTmuxREPL(context.Background(), cfg, itDeps(250*time.Millisecond),
 		interactiveLaunch("codex-tmux", sess, launch+" x", itMarker, true))
 	if code != ExitOK {
@@ -173,8 +147,6 @@ func TestRealTmux_Interactive_CodexTrust_AutoRespondAtBoot(t *testing.T) {
 		t.Fatalf("artifact = %q, want DONE (boot trust not dismissed → workflow stalled)", got)
 	}
 }
-
-// --- 3. agy permission prompt → "y,Enter" unblocks --------------------------
 
 func TestRealTmux_Interactive_AgyPermission_AutoYes(t *testing.T) {
 	t.Parallel()
@@ -195,14 +167,10 @@ func TestRealTmux_Interactive_AgyPermission_AutoYes(t *testing.T) {
 	}
 }
 
-// --- 4. escalate prompt → EC85 fast, no hang, escalation report written -----
-
 func TestRealTmux_Interactive_Escalate_FailsFastWithReport(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
-	// auth_recheck is policy=escalate → the bridge cannot self-resolve OAuth,
-	// so it must abandon FAST (EC85) rather than hang for a human.
 	launch := writeInteractiveFake(t, cfg.Worktree, itMarker,
 		"Please log in to continue", "", "mid", "persist")
 	sess := itSession("iesc")
@@ -218,14 +186,9 @@ func TestRealTmux_Interactive_Escalate_FailsFastWithReport(t *testing.T) {
 	}
 }
 
-// --- 5b. Config.ArtifactTimeoutS overrides the 300s default deadline --------
-
 func TestRealTmux_Interactive_ArtifactTimeoutOverride(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
-	// The fake boots but never writes the artifact; ArtifactTimeoutS=2 (not the
-	// 300s default) must bound the wait → fast EC81. Guards the per-launch
-	// timeout seam the live auto-reply tests rely on.
 	cfg := itConfig(t, "ARTIFACT=/dev/null")
 	cfg.ArtifactTimeoutS = 2
 	launchCmd := writeFakeREPL(t, cfg.Worktree, "artifact-timeout", "OVR-READY")
@@ -239,14 +202,10 @@ func TestRealTmux_Interactive_ArtifactTimeoutOverride(t *testing.T) {
 	}
 }
 
-// --- 6. stuck auto_respond prompt → loop guard EC86, no infinite hang -------
-
 func TestRealTmux_Interactive_StuckAutoRespond_TripsLoopGuard(t *testing.T) {
 	t.Parallel()
 	requireTmux(t)
 	cfg := interactiveConfig(t)
-	// model_deprecation is auto_respond (y,Enter), but the fake never clears
-	// it: the engine re-sends each tick and the >5× loop guard must abandon.
 	launch := writeInteractiveFake(t, cfg.Worktree, itMarker,
 		"Warning: this model is deprecated. Continue?", "", "mid", "persist")
 	sess := itSession("iloop")

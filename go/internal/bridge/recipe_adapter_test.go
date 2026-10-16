@@ -124,7 +124,6 @@ func TestRecipeDriver_SendCommand_Pastes(t *testing.T) {
 	if string(body) != "/plugin install ecc@ecc" {
 		t.Errorf("scratch=%q", body)
 	}
-	// injectText commits the paste with a trailing Enter.
 	if tx.sentSeq[len(tx.sentSeq)-1] != "|true" {
 		t.Errorf("expected trailing Enter, sentSeq=%v", tx.sentSeq)
 	}
@@ -134,8 +133,6 @@ func TestRecipeDriver_SendCommand_PropagatesError(t *testing.T) {
 	t.Parallel()
 	tx := &fakeTmux{}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
-	// Make .bridge-inbox a regular file so injectText's MkdirAll fails — the
-	// transport error must surface, not be swallowed.
 	if err := os.WriteFile(filepath.Join(d.cfg.Workspace, ".bridge-inbox"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +154,6 @@ func TestRecipeDriver_SendKeys_Raw(t *testing.T) {
 }
 
 func TestRecipeDriver_AutoRespond_Escalation(t *testing.T) {
-	// claude-tmux manifest's auth_recheck rule escalates on "Please log in".
 	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"Please log in to continue"}}
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
@@ -204,8 +200,6 @@ func TestNewRecipeEngine_UnknownCLI(t *testing.T) {
 }
 
 func TestRunRecipe_PluginInstallHappyPath(t *testing.T) {
-	// One benign pane satisfies boot-marker + all three step awaits and trips
-	// no fail_regex / interactive_prompt rule.
 	t.Parallel()
 	pane := "❯ marketplace added; plugin installed; plugins reloaded; ready ❯"
 	tx := &fakeTmux{existing: map[string]bool{}, paneSeq: []string{pane}}
@@ -213,10 +207,10 @@ func TestRunRecipe_PluginInstallHappyPath(t *testing.T) {
 		CLI:         "claude-tmux",
 		Workspace:   t.TempDir(),
 		Agent:       "recipe",
-		SessionName: "covrecipe", // named → deterministic, pre-create to attach
+		SessionName: "covrecipe",
 		Realization: RealizeFor("claude-tmux", LaunchIntent{}),
 	}
-	tx.existing["evolve-bridge-named-covrecipe"] = true // attach, skip boot
+	tx.existing["evolve-bridge-named-covrecipe"] = true
 	res, err := RunRecipe(context.Background(), cfg, recipeDeps(tx), "claude-tmux", "plugin-install",
 		map[string]string{"marketplace": "https://github.com/affaan-m/ECC", "plugin": "ecc@ecc"})
 	if err != nil {
@@ -225,8 +219,7 @@ func TestRunRecipe_PluginInstallHappyPath(t *testing.T) {
 	if res.Status != "complete" || len(res.Steps) != 3 {
 		t.Fatalf("result=%+v", res)
 	}
-	// The marketplace + plugin params reached the REPL via the paste path.
-	if !tx.sentContains("") { // trailing Enter commits each paste
+	if !tx.sentContains("") {
 		t.Error("expected paste-commit Enter keys")
 	}
 }
@@ -265,7 +258,6 @@ func TestCaptureHelp_UnknownCLI(t *testing.T) {
 }
 
 func TestCaptureHelp_BootFailure(t *testing.T) {
-	// Session does not exist and the marker never appears → EnsureSession errors.
 	t.Parallel()
 	tx := &fakeTmux{paneSeq: []string{"no marker here"}}
 	cfg := &Config{CLI: "claude-tmux", Workspace: t.TempDir(), Agent: "introspect", Realization: RealizeFor("claude-tmux", LaunchIntent{})}
@@ -275,7 +267,6 @@ func TestCaptureHelp_BootFailure(t *testing.T) {
 }
 
 func TestRunRecipe_UnknownCLIEngineError(t *testing.T) {
-	// Recipe loads, but newRecipeEngine fails resolving an unknown CLI's manifest.
 	t.Parallel()
 	cfg := &Config{CLI: "no-such-cli", Workspace: t.TempDir(), Agent: "recipe"}
 	if _, err := RunRecipe(context.Background(), cfg, recipeDeps(&fakeTmux{}), "no-such-cli", "list-capabilities", nil); err == nil {

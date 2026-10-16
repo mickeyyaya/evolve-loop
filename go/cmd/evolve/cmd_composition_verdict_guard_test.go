@@ -61,8 +61,6 @@ func TestRequireReusableAudit_UnreadableArtifactFailsClosed(t *testing.T) {
 	}
 }
 
-// The worktree is deliberately not a git repo: a refusal here also proves the
-// guard runs before gitDiffCapture and spares the composed-tree gate run.
 func TestReadCompositionSnapshot_RefusesFailBeforeAnyGitWork(t *testing.T) {
 	t.Parallel()
 	worktree := t.TempDir()

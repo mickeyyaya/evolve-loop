@@ -98,10 +98,6 @@ func TestGateCorrectionCode_IsRegisteredUnderOrchestrator(t *testing.T) {
 	}
 }
 
-// gateSignalsMarker stands in for the contract gate in the chain: the
-// composition-root proof must require BOTH capabilities — a chain member with
-// a SignalsWired method that is not the declared-deliverables gate proves
-// nothing, and the gate without a Center is the silence the proof exists for.
 type gateSignalsMarker struct{ gate, wired bool }
 
 func (m gateSignalsMarker) Review(context.Context, ReviewInput) ReviewResult {

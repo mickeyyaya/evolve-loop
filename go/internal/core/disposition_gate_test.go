@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// validDisposition returns a schema-valid disposition whose fingerprint and
-// recurrence match writeMatchingDigest below. Callers mutate one field to drive
-// a specific rejection case.
 func validDisposition() map[string]any {
 	return map[string]any{
 		"cycle":       1034,
@@ -42,8 +39,6 @@ func writeJSON(t *testing.T, dir, name string, v any) {
 	}
 }
 
-// writeMatchingDigest writes a failure-digest.json whose fingerprint+recurrence
-// match validDisposition() — the "identity agrees" baseline.
 func writeMatchingDigest(t *testing.T, dir string) {
 	t.Helper()
 	writeJSON(t, dir, "failure-digest.json", map[string]any{
@@ -59,7 +54,7 @@ func TestDispositionGate_RetroFailsLoudWithoutValidDisposition(t *testing.T) {
 
 	t.Run("absent", func(t *testing.T) {
 		dir := t.TempDir()
-		writeMatchingDigest(t, dir) // digest present, disposition absent
+		writeMatchingDigest(t, dir)
 		if err := VerifyDisposition(dir); err == nil {
 			t.Fatal("absent disposition.json must return a loud error (fail-HARD), got nil")
 		}
@@ -91,7 +86,7 @@ func TestDispositionGate_CrossChecksFingerprintAgainstDigest(t *testing.T) {
 		dir := t.TempDir()
 		writeMatchingDigest(t, dir)
 		d := validDisposition()
-		d["fingerprint"] = "build|guard-abort|statemap" // invented, != digest
+		d["fingerprint"] = "build|guard-abort|statemap"
 		writeJSON(t, dir, "disposition.json", d)
 		err := VerifyDisposition(dir)
 		if err == nil {
@@ -103,9 +98,9 @@ func TestDispositionGate_CrossChecksFingerprintAgainstDigest(t *testing.T) {
 	})
 	t.Run("recurrence_mismatch_rejected", func(t *testing.T) {
 		dir := t.TempDir()
-		writeMatchingDigest(t, dir) // recurrence 0
+		writeMatchingDigest(t, dir)
 		d := validDisposition()
-		d["recurrence"] = 7 // disagrees with the digest's ledger-derived count
+		d["recurrence"] = 7
 		writeJSON(t, dir, "disposition.json", d)
 		if err := VerifyDisposition(dir); err == nil {
 			t.Fatal("recurrence disagreeing with the digest must be rejected")
@@ -200,7 +195,7 @@ func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
 
 	t.Run("missing_disposition_surfaces_loud_error", func(t *testing.T) {
 		dir := t.TempDir()
-		writeMatchingDigest(t, dir) // digest present, disposition absent
+		writeMatchingDigest(t, dir)
 		o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 		fl := newFL(dir)
 		o.recordFailureLearning(context.Background(), fl)
@@ -212,8 +207,6 @@ func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
 
 	t.Run("valid_disposition_completes", func(t *testing.T) {
 		dir := t.TempDir()
-		// Model a compliant agent: seed the real input artifact, derive the
-		// digest as the assembler will, and copy it verbatim into the disposition.
 		writeJSON(t, dir, "audit-fail-reason.json", map[string]any{
 			"schema_version": 1, "phase": "audit",
 			"reasons": []string{"EGPS: red_count=1 (cycle ships only when red_count==0)"},
@@ -236,7 +229,7 @@ func TestDispositionGate_WiredIntoRetroCompletion(t *testing.T) {
 
 	t.Run("assembler_overwrites_foreign_digest_on_composed_path", func(t *testing.T) {
 		dir := t.TempDir()
-		writeMatchingDigest(t, dir) // foreign fixture digest
+		writeMatchingDigest(t, dir)
 		writeJSON(t, dir, "disposition.json", validDisposition())
 		o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 		fl := newFL(dir)

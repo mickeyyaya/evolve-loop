@@ -9,15 +9,11 @@ import (
 	"time"
 )
 
-// failCloser accepts writes but fails Close — to prove Append surfaces the
-// close error (the errcheck bug being fixed: the close error was discarded).
 type failCloser struct{ closeErr error }
 
 func (f failCloser) Write(p []byte) (int, error) { return len(p), nil }
 func (f failCloser) Close() error                { return f.closeErr }
 
-// writeFailCloser fails Write — to prove a write error takes precedence over
-// (and is surfaced ahead of) the close error.
 type writeFailCloser struct{ writeErr error }
 
 func (w writeFailCloser) Write([]byte) (int, error) { return 0, w.writeErr }
@@ -36,7 +32,6 @@ func TestAppend_SurfacesCloseError(t *testing.T) {
 }
 
 func TestAppend_WritesLine(t *testing.T) {
-	// Real file (default openAppend), nested missing dir → MkdirAll creates it.
 	path := filepath.Join(t.TempDir(), "sub", "guards.log")
 	if err := Append(path, "commit-prefix-gate", "hello", time.Unix(0, 0).UTC()); err != nil {
 		t.Fatalf("Append returned %v, want nil on a writable path", err)
@@ -69,7 +64,6 @@ func TestAppend_WriteErrorTakesPrecedence(t *testing.T) {
 }
 
 func TestAppend_MkdirErrorSurfaced(t *testing.T) {
-	// Make the parent path a FILE so MkdirAll(filepath.Dir(path)) fails.
 	dir := t.TempDir()
 	blocker := filepath.Join(dir, "notadir")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {

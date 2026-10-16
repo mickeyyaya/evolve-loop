@@ -14,12 +14,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
-// quotaCheckpointFixture seeds a project root with a cycle-state.json and a
-// cycle workspace, and returns the CycleState the dispatch seam would pass.
 func quotaCheckpointFixture(t *testing.T) (root string, cs core.CycleState) {
 	t.Helper()
 	root = t.TempDir()
-	seedCycleState(t, root, "") // no prior checkpoint block
+	seedCycleState(t, root, "")
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-656")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatal(err)
@@ -31,7 +29,6 @@ func quotaCheckpointFixture(t *testing.T) (root string, cs core.CycleState) {
 	}
 }
 
-// readQuotaWakeAt returns the persisted (quotaResetAt, quotaResetSource) pair.
 func readQuotaWakeAt(t *testing.T, root string) (at, source string) {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(root, ".evolve", "cycle-state.json"))
@@ -54,11 +51,6 @@ func readQuotaWakeAt(t *testing.T, root string) (at, source string) {
 	return state.Checkpoint.QuotaResetAt, state.Checkpoint.QuotaResetSource
 }
 
-// TestQuotaBoundaryCheckpointer_UsesWorkspaceHint — when the CLI adapter scraped
-// Anthropic's "resets HH:MMam" message into the cycle workspace, THAT is the
-// authoritative wake time and the source must say so (not the blind estimate).
-// This is also the proof that the checkpointer passes cs.WorkspacePath through:
-// a hard-coded empty workspace would silently fall back to the estimate.
 func TestQuotaBoundaryCheckpointer_UsesWorkspaceHint(t *testing.T) {
 	root, cs := quotaCheckpointFixture(t)
 	if err := os.WriteFile(filepath.Join(cs.WorkspacePath, "quota-reset-hint.txt"), []byte("resets 4:10pm\n"), 0o644); err != nil {
@@ -79,14 +71,8 @@ func TestQuotaBoundaryCheckpointer_UsesWorkspaceHint(t *testing.T) {
 	}
 }
 
-// TestQuotaBoundaryCheckpointer_HonoursOperatorOverride — policy.json
-// quota_reset.reset_at is the top of the source chain, so an operator who knows
-// the real reset instant wins over both the hint and the estimate. Also pins that
-// the checkpointer reads its config from policy, never a Go literal
-// (feedback_phase_settings_from_config_not_code).
 func TestQuotaBoundaryCheckpointer_HonoursOperatorOverride(t *testing.T) {
 	root, cs := quotaCheckpointFixture(t)
-	// A hint file is present too: the override must still win.
 	if err := os.WriteFile(filepath.Join(cs.WorkspacePath, "quota-reset-hint.txt"), []byte("resets 4:10pm\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -104,10 +90,6 @@ func TestQuotaBoundaryCheckpointer_HonoursOperatorOverride(t *testing.T) {
 	}
 }
 
-// TestPhaseBoundaryCheckpointer_DoesNotFabricateWakeAt is the paired negative:
-// only the quota wall has a reset instant. A phase-complete breadcrumb must NOT
-// grow one, or every routine checkpoint would advertise a fictional wake time
-// that a resume consumer could act on.
 func TestPhaseBoundaryCheckpointer_DoesNotFabricateWakeAt(t *testing.T) {
 	root := t.TempDir()
 	seedCycleState(t, root, "")

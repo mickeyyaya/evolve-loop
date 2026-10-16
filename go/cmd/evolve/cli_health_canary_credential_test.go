@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 )
 
-// A credential wall clears itself the way a quota wall does — the canary probes the expired bench and the
-// operator's login makes the probe succeed — but while it stands, every re-bench names the fix.
 func TestCanaryCredentialWallRebenchesAndNamesTheOperator(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

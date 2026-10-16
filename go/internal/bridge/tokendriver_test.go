@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// TestRecordTokenUsage_PassesDriverToResolver: the Window the resolver
-// receives carries req.CLI as its Driver, alongside the existing
-// worktree/artifact/window context.
 func TestRecordTokenUsage_PassesDriverToResolver(t *testing.T) {
 	t.Parallel()
 	start := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)

@@ -5,11 +5,6 @@ import (
 	"strings"
 )
 
-// Render produces the human-readable campaign plan (Markdown) shown for approval
-// before any execution — goal, cited research strategy, the cycle table, and the
-// computed dependency-ordered execution waves. This is the "plan mode" view: the
-// operator reads it, then approves or sends suggestions to replan. Verify should
-// pass first; Render surfaces the wave-computation error if the DAG is invalid.
 func (p *Plan) Render() (string, error) {
 	waves, err := p.Waves()
 	if err != nil {

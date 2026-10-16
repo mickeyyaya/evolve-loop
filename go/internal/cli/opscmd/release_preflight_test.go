@@ -42,12 +42,9 @@ func TestCmd_ReleasePreflight_ExtraPositional(t *testing.T) {
 }
 
 func TestCmd_ReleasePreflight_MissingProjectRoot(t *testing.T) {
-	// With no repo state, step 1 will fail (no git). The cmd should
-	// surface exit 1, not 10.
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	var stdout, stderr bytes.Buffer
 	rc := RunReleasePreflight([]string{"1.0.0", "--dry-run", "--skip-tests"}, nil, &stdout, &stderr)
-	// Dry-run bypasses git but step 3 will fail because no plugin.json.
 	if rc != 1 {
 		t.Fatalf("rc = %d, want 1", rc)
 	}

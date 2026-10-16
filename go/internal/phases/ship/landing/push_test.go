@@ -37,12 +37,10 @@ func sleepingLanding(f *fakeGit) (*Landing, *[]signalcenter.Event, *sleeps) {
 	return l, got, slept
 }
 
-// rejectPush scripts the first push rejected (rc=1) and the second accepted.
 func rejectPush(f *fakeGit) *fakeGit {
 	return f.set("push origin "+testBranch, scripted{exit: 1}, scripted{exit: 0})
 }
 
-// declinedFixture provokes CodePushRepairDeclined on l (a failed fetch).
 func declinedFixture(t *testing.T, l *Landing, f *fakeGit) {
 	t.Helper()
 	rejectPush(f)
@@ -54,7 +52,6 @@ func declinedFixture(t *testing.T, l *Landing, f *fakeGit) {
 	f.set("fetch origin "+testBranch, scripted{})
 }
 
-// headReadFailureFixture provokes CodeHeadReadFailed on l.
 func headReadFailureFixture(t *testing.T, l *Landing, f *fakeGit) {
 	t.Helper()
 	f.set("rev-parse HEAD", scripted{exit: 128})
@@ -156,9 +153,6 @@ func TestPush_RepairDeclinesOnEveryProbeFailure(t *testing.T) {
 	}
 }
 
-// Test 17 — origin already at HEAD: already-pushed, nil error, the two
-// REPAIR lines in order, no retry push, no warning, then the head read.
-// Kills: push despite equality, the head read skipped.
 func TestPush_RepairAlreadyPushed(t *testing.T) {
 	f := newFakeGit()
 	rejectPush(f)
@@ -225,11 +219,6 @@ func TestPush_RepairFastForwardRetry_NeverRebasesNeverForcePushes(t *testing.T) 
 	}
 }
 
-// Test 19 — origin diverged: needs-reaudit, a precondition GIT_PUSH_REJECTED
-// with the :467-472 message and Debug{branch, origin_ref, head,
-// repair_attempted, repair_outcome=needs-reaudit, step=push}; no push, no
-// warning. Kills: class transient, repair_outcome missing, origin_ref
-// untrimmed.
 func TestPush_RepairDivergedReclassifiesNeedsReaudit(t *testing.T) {
 	f := newFakeGit()
 	rejectPush(f)
@@ -258,9 +247,6 @@ func TestPush_RepairDivergedReclassifiesNeedsReaudit(t *testing.T) {
 	}
 }
 
-// Test 20 — the once-guard and --dry-run skip the repair: the rejection is
-// returned, zero probes, PushResult{false, ""}. Kills: guard ignored, DryRun
-// repaired, RepairAttempted reported on the guarded path.
 func TestPush_OnceGuardAndDryRunSkipTheRepair(t *testing.T) {
 	for name, req := range map[string]PushRequest{
 		"once-guard": {Branch: testBranch, Site: SiteDirect, RepairAttempted: true},
@@ -282,10 +268,6 @@ func TestPush_OnceGuardAndDryRunSkipTheRepair(t *testing.T) {
 	}
 }
 
-// Test 21 — after the push landed, an unreadable or empty `rev-parse HEAD`
-// leaves Head empty, returns nil and emits exactly ONE
-// SHIP_LANDING_HEAD_READ_FAILED{step=push, ref=HEAD, err}. Kills: an error
-// returned instead of proceeding, a warning on a readable HEAD.
 func TestPush_HeadReadFailureWarnsAndLeavesHeadEmpty(t *testing.T) {
 	for name, call := range map[string]scripted{"unreadable": {exit: 128}, "empty": {stdout: ""}} {
 		t.Run(name, func(t *testing.T) {
@@ -314,8 +296,6 @@ func TestPush_HeadReadFailureWarnsAndLeavesHeadEmpty(t *testing.T) {
 	}
 }
 
-// Test 23 — IsAncestor is true only on rc 0 without an error; the argv is
-// `merge-base --is-ancestor a b` to io.Discard. Kills: the error ignored.
 func TestIsAncestor_TrueOnlyOnRcZeroWithoutError(t *testing.T) {
 	f := newFakeGit()
 	f.on("merge-base --is-ancestor a b", scripted{exit: 0}, scripted{exit: 1}, scripted{err: errors.New("no git")})
@@ -330,10 +310,6 @@ func TestIsAncestor_TrueOnlyOnRcZeroWithoutError(t *testing.T) {
 	}
 }
 
-// Test 24 — Capture: a spawn error and rc > 1 are GIT_IO with the two
-// message texts and Debug{git_args, git_err} / {git_args, git_rc}; rc=1 is
-// success; no step (the caller's step is unknown here). Kills: > 1 → >= 1,
-// message drift.
 func TestCapture_ExitRuleAndErrorTexts(t *testing.T) {
 	f := newFakeGit()
 	f.on("rev-parse HEAD", scripted{err: errors.New("boom")}, scripted{exit: 2}, scripted{stdout: "out\n", exit: 1})

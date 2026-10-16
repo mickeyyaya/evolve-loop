@@ -58,8 +58,5 @@ func runFanoutDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) int
 	cfg.CommandsFile = pos[0]
 	cfg.ResultsFile = pos[1]
 	cfg.CachePrefixFile = cachePrefix
-	// CycleStateHelperBin is intentionally left unset: the zero value disables
-	// worker-status tracking, and the seam remains for callers that inject
-	// their own helper.
 	return fanoutdispatch.Run(cfg, stderr)
 }

@@ -11,7 +11,7 @@ func TestEnsureFailureDigest_WritesDigestWithoutLedger(t *testing.T) {
 
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	ws := t.TempDir()
-	root := t.TempDir() // no recurrence-ledger.json — fail-soft, recurrence 0
+	root := t.TempDir()
 	o.ensureFailureDigest(1046, root, ws, "", "")
 	raw, err := os.ReadFile(filepath.Join(ws, "failure-digest.json"))
 	if err != nil {
@@ -38,7 +38,6 @@ func TestEnsureFailureDigest_Idempotent(t *testing.T) {
 }
 
 func TestEnsureFailureDigest_MissingWorkspaceNeverWritesToWorkingDirectory(t *testing.T) {
-	// This test must remain sequential: Chdir is process-wide on Go 1.23.
 	previous, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)

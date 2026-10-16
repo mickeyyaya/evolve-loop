@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// Both heading shapes observed live (cycle-1605 final round, cycle-1604 round 1)
-// must parse, and the Reflection section's `###` headings must not.
 const reportBothShapes = `# Audit Report — Cycle 1605 (round 3)
 
 ## Verdict
@@ -30,7 +28,6 @@ body
 not a finding
 `
 
-// TestFindings_BothHeadingShapes names Finding and Findings.
 func TestFindings_BothHeadingShapes(t *testing.T) {
 	t.Parallel()
 	got := Findings(reportBothShapes)
@@ -44,9 +41,6 @@ func TestFindings_BothHeadingShapes(t *testing.T) {
 	}
 }
 
-// The two other layouts live in recorded reports: cycle 1605 rounds 1–2 and
-// cycle 1596 tabulate issues; cycle 1604 writes `### C1 — CRITICAL · title`.
-// Header and separator rows are not findings.
 func TestFindings_TableRowsAndDashHeadings(t *testing.T) {
 	t.Parallel()
 	table := "## Issues\n\n| ID | Severity | Defect | Root cause | Evidence |\n|---|---|---|---|---|\n" +
@@ -62,7 +56,6 @@ func TestFindings_TableRowsAndDashHeadings(t *testing.T) {
 		got[1] != (Finding{ID: "M3", Severity: "MEDIUM", Title: "prescription not applied"}) {
 		t.Fatalf("dash Findings = %+v", got)
 	}
-	// A table row from round 1 and a heading from round 3 about the same defect share a key.
 	if FindingKey(got0Title(table)) != FindingKey("caller-proof hard floor violated for the third consecutive round") {
 		t.Fatalf("cross-layout key mismatch: %q vs %q", FindingKey(got0Title(table)), FindingKey("caller-proof hard floor violated for the third consecutive round"))
 	}
@@ -70,8 +63,6 @@ func TestFindings_TableRowsAndDashHeadings(t *testing.T) {
 
 func got0Title(md string) string { return Findings(md)[0].Title }
 
-// Cycles 1595/1596 bold the id and severity cells and lead the defect with a
-// bold sentence; cycle 1606 writes `### H3 — title` with no severity token.
 func TestFindings_BoldCellsAndImpliedSeverity(t *testing.T) {
 	t.Parallel()
 	bold := "## Issues\n| ID | Sev | Finding | Evidence |\n|---|---|---|---|\n" +
@@ -90,8 +81,6 @@ func TestFindings_BoldCellsAndImpliedSeverity(t *testing.T) {
 	}
 }
 
-// The three phrasings cycle 1605 used for its H1 across rounds 1–3 must share
-// one key: the lead clause is the identity, the tail is commentary.
 func TestFindingKey_LeadClauseIsTheIdentity(t *testing.T) {
 	t.Parallel()
 	phrasings := []string{
@@ -120,9 +109,6 @@ func TestFindings_NoIssuesSectionScansWholeOrYieldsNone(t *testing.T) {
 	}
 }
 
-// A template or example inside a fence, an indented block, or an HTML comment
-// must not raise a phantom finding — the same visibility rule Section/Fields
-// apply, and the hole the architecture review found in the first cut.
 func TestFindings_IgnoresFencedIndentedAndCommentedExamples(t *testing.T) {
 	t.Parallel()
 	doc := "## Issues\n\n```markdown\n### H9 (CRITICAL) — example finding in a fence\n```\n\n" +
@@ -134,11 +120,6 @@ func TestFindings_IgnoresFencedIndentedAndCommentedExamples(t *testing.T) {
 	}
 }
 
-// TestVerdict_MatchesTheAuditGatesProseFallback pins that Verdict is the SAME
-// grammar phases/audit.extractAuditVerdict falls back to below enforce: the
-// canonical heading, the colon-bearing inline forms, SKIPPED in the vocabulary,
-// and — deliberately — NOT a prose sentence without a colon, NOT a lowercase
-// JSON key, NOT a lowercase heading.
 func TestVerdict_MatchesTheAuditGatesProseFallback(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
@@ -176,9 +157,6 @@ func TestFindingKey_MatchesAcrossRoundOrdinals(t *testing.T) {
 	}
 }
 
-// The reference template (agents/evolve-auditor-reference.md) writes the
-// issues as a fenced ```tsv block under ## Issues: Severity⇥Description⇥File⇥Line.
-// That block IS the table, not an example, and must yield findings (id-less).
 func TestFindings_ReferenceTemplateTSVBlock(t *testing.T) {
 	t.Parallel()
 	doc := "## Verdict\n\n**FAIL**\n\n<!-- ANCHOR:defects -->\n## Issues\n```tsv\nSeverity\tDescription\tFile\tLine\n" +
@@ -187,15 +165,11 @@ func TestFindings_ReferenceTemplateTSVBlock(t *testing.T) {
 	if len(got) != 2 || got[0] != (Finding{Severity: "HIGH", Title: "The wiring half is undelivered"}) || got[1].Severity != "MEDIUM" {
 		t.Fatalf("TSV Findings = %+v", got)
 	}
-	// A tsv fence OUTSIDE ## Issues is an example and stays invisible.
 	if got := Findings("## Notes\n```tsv\nHIGH\tnot a finding\n```\n## Issues\n### M1 (MEDIUM) — real\n"); len(got) != 1 || got[0].ID != "M1" {
 		t.Fatalf("tsv outside Issues leaked: %+v", got)
 	}
 }
 
-// Outside an ## Issues section, an id-shaped heading without a severity token
-// is not a finding: PASS-shaped or differently organised reports must not
-// grow phantom issues.
 func TestFindings_NoIssuesSectionRequiresExplicitSeverity(t *testing.T) {
 	t.Parallel()
 	doc := "## Plan Adherence\n### S1 — the tdd phase was skipped\n### G2 — landed autonomously\n### Q3: follow-up\n### H1 (HIGH) — an explicit one\n"
@@ -205,10 +179,6 @@ func TestFindings_NoIssuesSectionRequiresExplicitSeverity(t *testing.T) {
 	}
 }
 
-// A report that quotes the whole reference template inside a fence BEFORE its
-// own Issues section (the template is one skeleton, ## Issues and its tsv
-// included) must yield only the real findings: the section is located on the
-// visible stream, so the fenced copy is never mistaken for it.
 func TestFindings_QuotedTemplateBeforeRealIssuesSection(t *testing.T) {
 	t.Parallel()
 	doc := "## Notes\n````markdown\n## Issues\n```tsv\nSeverity\tDescription\tFile\tLine\nHIGH\t<issue>\t<file>\t<line>\n```\n## Verdict\n**PASS**\n````\n\n" +

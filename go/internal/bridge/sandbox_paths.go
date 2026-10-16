@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
-// Keep the lexical path as well as its existing symlink target. Resolving the
-// nearest existing ancestor also covers policies for not-yet-created files.
 func resolveSandboxDenials(paths []string, root, worktree string, write bool) ([]string, error) {
 	var out []string
 	for _, path := range paths {
@@ -33,8 +31,6 @@ func resolveSandboxDenials(paths []string, root, worktree string, write bool) ([
 			if base == "" && !filepath.IsAbs(clean) {
 				continue
 			}
-			// The worktree's .git is its own pointer file. Do not convert that
-			// deny into a blanket denial of the shared repository object store.
 			if write && clean == ".git" && worktree != "" && root != worktree && base == root {
 				continue
 			}
@@ -59,8 +55,6 @@ func resolveSandboxDenials(paths []string, root, worktree string, write bool) ([
 	return out, nil
 }
 
-// Only staging/checkpoint metadata is writable. Control-file denials also
-// override broad scratch grants when the common repository lives under /tmp.
 func sandboxGitWritePaths(worktree, goos string) (writes, denies []string, err error) {
 	if worktree == "" {
 		return nil, nil, nil
@@ -69,9 +63,6 @@ func sandboxGitWritePaths(worktree, goos string) (writes, denies []string, err e
 	if err != nil || !info.IsLinkedWorktree {
 		return nil, nil, nil
 	}
-	// bubblewrap needs the whole gitdir writable to create/rename lockfiles;
-	// that also exposes commondir and future config files. Do not claim the
-	// narrower metadata boundary on a backend unable to express it.
 	if goos != "darwin" {
 		return nil, nil, fmt.Errorf("linked-worktree Git metadata isolation unsupported on %s: atomic lockfiles require precise file grants", goos)
 	}
@@ -90,7 +81,7 @@ func sandboxGitWritePaths(worktree, goos string) (writes, denies []string, err e
 	}
 	if info.Branch == "" {
 		return writes, denies, nil
-	} // detached HEAD uses its exact GitDir path
+	}
 	if filepath.Clean(info.Branch) != info.Branch || strings.HasPrefix(info.Branch, "..") || strings.ContainsAny(info.Branch, "*?[]{}\x00\n\r") {
 		return nil, nil, fmt.Errorf("invalid linked-worktree branch for sandbox grants")
 	}
@@ -119,16 +110,8 @@ func canonicalSandboxPath(path string) (string, error) {
 	}
 }
 
-// worktreePathTemplate is the profile-side placeholder for the cycle's
-// worktree in sandbox.write_subpaths (e.g. "{worktree_path}/tests"). It is
-// the same token the persona files and the bash-era dispatcher used.
 const worktreePathTemplate = "{worktree_path}"
 
-// resolveSandboxWriteGrants turns a profile's declared sandbox.write_subpaths
-// into the absolute paths the SBPL generator grants: it is the write-side
-// sibling of resolveSandboxDenials, but fails closed on retarget rather than
-// resolving through it, since honoring a symlinked grant would hand the phase
-// write access to wherever the link points.
 func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]string, error) {
 	var out []string
 	for _, declared := range subpaths {
@@ -138,10 +121,6 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]stri
 		var base, rel string
 		switch {
 		case filepath.IsAbs(declared):
-			// An absolute entry is its own base: granted as declared (cleaned).
-			// The retarget check below is vacuous for it by design (base == the
-			// path, rel == "."), so a symlinked absolute declaration is followed
-			// to its target — the operator declared that exact path.
 			base, rel = filepath.Clean(declared), "."
 		case strings.HasPrefix(declared, worktreePathTemplate):
 			if worktree == "" {
@@ -155,9 +134,6 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]stri
 		if escapesBase(rel) {
 			return nil, fmt.Errorf("write grant escapes its base: %q", declared)
 		}
-		// A glob names a family of paths ("cycle-*"); the grant is that family's
-		// home — the longest glob-free ancestor. The adapters receive only
-		// literal absolute paths, so this is the one place glob-widening happens.
 		rel = globFreeAncestor(rel)
 		if base == "" || !filepath.IsAbs(base) {
 			return nil, fmt.Errorf("write grant %q needs an absolute project root or worktree", declared)
@@ -181,9 +157,6 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]stri
 	return out, nil
 }
 
-// globFreeAncestor returns the longest leading portion of a cleaned relative
-// path whose segments contain no glob metacharacter, or "." when the first
-// segment already does.
 func globFreeAncestor(rel string) string {
 	segments := strings.Split(rel, string(filepath.Separator))
 	keep := 0
@@ -199,9 +172,6 @@ func globFreeAncestor(rel string) string {
 	return filepath.Join(segments[:keep]...)
 }
 
-// escapesBase reports whether a Cleaned relative path climbs above its base
-// via a literal ".." component. Shared by the denial and grant resolvers so
-// the two sides of the sandbox contract cannot drift on this check.
 func escapesBase(rel string) bool {
 	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

@@ -1,10 +1,5 @@
 package phaseoutputs
 
-// io_test.go — the one sanctioned workspace reader, shared by both adapters
-// (`evolve cycle outputs` and the loop's post-cycle signal emitter) so the two
-// cannot drift into reading different files or classifying a read differently.
-// Survey/CycleChainStatus/Signal stay pure; this file is their I/O companion.
-
 import (
 	"encoding/json"
 	"os"

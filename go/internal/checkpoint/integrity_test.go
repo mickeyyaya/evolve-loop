@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseblock"
 )
 
-// seedState writes a cycle-state.json with an existing checkpoint block plus
-// any extra top-level keys, so we can assert nothing is clobbered.
 func seedState(t *testing.T, dir string, extra map[string]any) string {
 	t.Helper()
 	p := filepath.Join(dir, "cycle-state.json")
@@ -40,8 +38,6 @@ func seedState(t *testing.T, dir string, extra map[string]any) string {
 	return p
 }
 
-// readIntegrity parses the file and returns the recorded chain — and FAILS the
-// test if the JSON is torn/corrupt (the atomic-write assertion).
 func readIntegrity(t *testing.T, path string) []phaseblock.Digest {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -110,11 +106,6 @@ func TestRecordPhaseIntegrity_PreservesOtherFields(t *testing.T) {
 	}
 }
 
-// THE concurrency test the design hinges on: simulate concurrent pipeline
-// phases (and fleet cycles sharing the host-global cycle-state.json) all
-// appending their per-phase integrity at once. flock serializes goroutines +
-// processes alike (flock.go:8-9), so EVERY entry must survive (no lost
-// updates) and the file must never be torn (atomic temp+rename). Run -race.
 func TestRecordPhaseIntegrity_ConcurrentPipeline_NoLostUpdates(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -137,7 +128,7 @@ func TestRecordPhaseIntegrity_ConcurrentPipeline_NoLostUpdates(t *testing.T) {
 	}
 	wg.Wait()
 
-	got := readIntegrity(t, p) // also asserts JSON is not torn
+	got := readIntegrity(t, p)
 	if len(got) != phases {
 		t.Fatalf("lost updates under concurrency: got %d entries, want %d", len(got), phases)
 	}
@@ -152,9 +143,6 @@ func TestRecordPhaseIntegrity_ConcurrentPipeline_NoLostUpdates(t *testing.T) {
 	}
 }
 
-// The phase-complete chokepoint must CARRY a recorded chain, not clobber it
-// (the borderline-HIGH review finding): a phase boundary write that used plain
-// Compose would drop phaseIntegrity via omitempty.
 func TestPhaseBoundaryCheckpointer_CarriesIntegrityChain(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -195,15 +183,12 @@ func TestPhaseBoundaryCheckpointer_CarriesIntegrityChain(t *testing.T) {
 	}
 }
 
-// ComposeWithIntegrity must carry the chain so the phase-complete checkpoint
-// write does not clobber recorded integrity.
 func TestComposeWithIntegrity_CarriesChain(t *testing.T) {
 	chain := []phaseblock.Digest{{Phase: "scout", Combined: "c1"}, {Phase: "build", Combined: "c2"}}
 	cp := ComposeWithIntegrity(core.CycleState{Phase: "build"}, ReasonPhaseComplete, 0, "", time.Unix(0, 0).UTC(), chain)
 	if len(cp.PhaseIntegrity) != 2 || cp.PhaseIntegrity[1].Phase != "build" {
 		t.Errorf("ComposeWithIntegrity dropped the chain: %+v", cp.PhaseIntegrity)
 	}
-	// Plain Compose must remain integrity-free (back-compat, omitempty).
 	plain := Compose(core.CycleState{Phase: "build"}, ReasonPhaseComplete, 0, "", time.Unix(0, 0).UTC())
 	if plain.PhaseIntegrity != nil {
 		t.Errorf("plain Compose must not set PhaseIntegrity: %+v", plain.PhaseIntegrity)

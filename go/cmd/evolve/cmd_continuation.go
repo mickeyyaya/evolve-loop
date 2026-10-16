@@ -30,8 +30,6 @@ func runContinuation(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// continuationRoot resolves the project root from the flag, else the working
-// directory. Never $EVOLVE_PROJECT_ROOT: inside a lane it names another tree.
 func continuationRoot(fs *flag.FlagSet, args []string, rootFlag *string, stderr io.Writer) (string, bool) {
 	if err := fs.Parse(args); err != nil {
 		return "", false
@@ -47,8 +45,6 @@ func continuationRoot(fs *flag.FlagSet, args []string, rootFlag *string, stderr 
 	return wd, true
 }
 
-// runContinuationList prints every scope→binding pair. An absent registry is a
-// healthy project's normal state, so it exits 0.
 func runContinuationList(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("continuation list", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -85,10 +81,6 @@ func runContinuationList(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// runContinuationRelease drops one binding through the shared
-// preserve-then-delete transaction. Its refusals, cheapest first, leave the
-// registry untouched: no authority (checked before any read), no such binding,
-// and a live lane.
 func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("continuation release", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -111,8 +103,6 @@ func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 
-	// Read first to tell "no such binding" from a release, which the runtime
-	// reports as the same clean miss; the value also names the lane checked next.
 	bound, isBound, err := continuation.ReadRegistryEntry(root, scopeID)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve continuation release: registry unreadable while looking up %q: %v\n", scopeID, err)
@@ -154,9 +144,6 @@ func runContinuationRelease(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// continuationLaneIsLive judges by lease heartbeat freshness alone. A dead
-// lane's stale or unreadable lease must not block a release, or it would brick
-// the scope for good.
 func continuationLaneIsLive(root string, c continuation.Continuation, now time.Time, stderr io.Writer) bool {
 	if c.Cycle <= 0 {
 		return false

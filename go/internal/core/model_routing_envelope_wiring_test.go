@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// envelopeProbePlan proposes a single {cli,tier} for the build phase (the phase
-// whose fakeRunner request this suite inspects). CLI is left as a real driver so
-// the entry is a genuine advisor proposal; only the tier is under test.
 func envelopeProbePlan(tier string) *router.PhasePlan {
 	return &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true},
@@ -23,11 +20,6 @@ func envelopeProbePlan(tier string) *router.PhasePlan {
 	}}
 }
 
-// writeBuilderProfile writes .evolve/profiles/builder.json under root (the
-// AGENT-named file the "build" phase resolves to: strip "evolve-" from
-// AgentPromptName "evolve-builder"). envelope may be "" for the no-envelope
-// (universal-floor) case. The file is intentionally minimal — no $include_policy
-// sentinels — so profiles.Loader.Get parses it without a tool-policy file.
 func writeBuilderProfile(t *testing.T, root, envelope string) {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve", "profiles")
@@ -44,10 +36,6 @@ func writeBuilderProfile(t *testing.T, root, envelope string) {
 	}
 }
 
-// runBuildTierThroughCycle drives a full RunCycle under model_routing=auto with
-// the given proposed build tier and returns the tier the build phase was
-// actually dispatched with (empty when the guard emptied the whole proposal).
-// projectRoot must already contain any .evolve/profiles/*.json fixtures.
 func runBuildTierThroughCycle(t *testing.T, projectRoot, proposedTier string) string {
 	t.Helper()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -84,7 +72,7 @@ func TestModelTierEnvelope_UniversalFloorClampsThroughRealDispatch(t *testing.T)
 	t.Parallel()
 
 	root := t.TempDir()
-	writeBuilderProfile(t, root, "") // no model_tier_envelope → universal floor governs
+	writeBuilderProfile(t, root, "")
 
 	got := runBuildTierThroughCycle(t, root, "fast")
 	if got != "balanced" {
@@ -92,8 +80,6 @@ func TestModelTierEnvelope_UniversalFloorClampsThroughRealDispatch(t *testing.T)
 	}
 }
 
-// Unlike its siblings, this holds on both the nil-stub and the wired path —
-// it pins precision (no over-clamp), not the wiring fix itself.
 func TestModelTierEnvelope_WithinEnvelopeTierPassesThrough(t *testing.T) {
 	t.Parallel()
 
@@ -109,7 +95,7 @@ func TestModelTierEnvelope_WithinEnvelopeTierPassesThrough(t *testing.T) {
 func TestModelTierEnvelope_AbsentProfileDegradesNilSafe(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir() // no .evolve/profiles/ at all
+	root := t.TempDir()
 
 	got := runBuildTierThroughCycle(t, root, "fast")
 	if got != "fast" {

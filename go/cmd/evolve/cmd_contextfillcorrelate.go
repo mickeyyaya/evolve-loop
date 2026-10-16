@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/contextfillcorrelate"
 )
 
-// runContextFill implements `evolve context-fill <correlate>`.
 func runContextFill(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve context-fill: missing subcommand (correlate)")
@@ -25,10 +24,11 @@ func runContextFill(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// writeReportAtomic writes through temp-then-rename, so a reader never sees a
-// half-written report. It refuses a non-regular destination: writing through a
-// pre-planted symlink would truncate whatever it points at.
 func writeReportAtomic(path, content string) error {
+	return writeReportAtomicWith(os.Rename, path, content)
+}
+
+func writeReportAtomicWith(rename func(string, string) error, path, content string) error {
 	if fi, err := os.Lstat(path); err == nil && !fi.Mode().IsRegular() {
 		return fmt.Errorf("refusing to write %s: not a regular file (mode %s)", path, fi.Mode())
 	} else if err != nil && !os.IsNotExist(err) {
@@ -38,16 +38,13 @@ func writeReportAtomic(path, content string) error {
 	if err := os.WriteFile(tmp, []byte(content), 0o644); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp) // best-effort cleanup; the rename error is the one that matters
+	if err := rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
 		return err
 	}
 	return nil
 }
 
-// runContextFillCorrelate emits the fill-vs-verdict correlation as --json,
-// --out markdown, or markdown on stdout. A root with no dossier corpus exits
-// non-zero: absent evidence must never read as a measured zero.
 func runContextFillCorrelate(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve context-fill correlate", flag.ContinueOnError)
 	fs.SetOutput(stderr)

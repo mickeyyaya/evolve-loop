@@ -1,15 +1,5 @@
 package scout
 
-// Chronicle S3 RED contract (cycle-784, chronicle-s3-digest-wiring, task
-// inject-recent-outcomes-prompts). At digest stage=enforce the orchestrator
-// injects Context["recent_outcomes"] (the seeded recent-outcomes.md bytes);
-// scout's ComposePrompt must render it as a context line APPENDED AFTER the
-// existing stable-prefix lines (strategy/goal/challenge_token — cache-friendly
-// ordering). When the key is absent or empty the composed prompt is
-// byte-identical to today's output (the shadow-stage regression pin).
-//
-// Builder implements; must NOT modify these tests.
-
 import (
 	"strings"
 	"testing"
@@ -17,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// RENDER: a Context-carried digest appears in the composed prompt, after the
-// existing stable lines.
 func TestScoutComposePrompt_InjectsRecentOutcomes(t *testing.T) {
 	req := core.PhaseRequest{Context: map[string]string{
 		"strategy":        "strategy-under-test",
@@ -37,8 +25,6 @@ func TestScoutComposePrompt_InjectsRecentOutcomes(t *testing.T) {
 	}
 }
 
-// PIN: absent key and empty key produce byte-identical output with no
-// recent_outcomes line at all — shadow/off stages keep today's prompt bytes.
 func TestComposePrompt_NoDigestContextKeyIsByteIdentical(t *testing.T) {
 	base := map[string]string{"strategy": "s-1", "goal": "g-1", "challengeToken": "tok-1"}
 	withEmpty := map[string]string{"strategy": "s-1", "goal": "g-1", "challengeToken": "tok-1", "recent_outcomes": ""}

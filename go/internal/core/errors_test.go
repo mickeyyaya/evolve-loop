@@ -22,7 +22,6 @@ func TestSentinels_ErrorsIs(t *testing.T) {
 			if !errors.Is(wrapped, s) {
 				t.Errorf("errors.Is(wrap(%v), %v) = false; want true", s, s)
 			}
-			// And distinct sentinels must NOT be aliases.
 			for _, other := range sentinels {
 				if other == s {
 					continue

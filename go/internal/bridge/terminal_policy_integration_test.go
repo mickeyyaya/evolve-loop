@@ -126,8 +126,6 @@ process.stdin.resume();
 	}
 }
 
-// Invoked only inside the native terminal fixture's sandbox. TIOCGETD is a
-// harmless query, supported by the unwrapped control, outside the allowlist.
 func TestSandboxTerminalIoctlFixture(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("EVOLVE_TERMINAL_IOCTL_FIXTURE") != "1" {
@@ -138,7 +136,6 @@ func TestSandboxTerminalIoctlFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer terminal.Close()
-	// Different clients choose immediate, drained, or flushed attribute updates.
 	var attrs syscall.Termios
 	if _, _, errno := syscall.Syscall(syscall.SYS_IOCTL, terminal.Fd(), syscall.TIOCGETA, uintptr(unsafe.Pointer(&attrs))); errno != 0 {
 		t.Fatalf("read termios: %v", errno)

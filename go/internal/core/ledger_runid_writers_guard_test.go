@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// agentSubprocessWriters is the closed set of files that construct an
-// agent_subprocess ledger entry.
 var agentSubprocessWriters = map[string]string{
 	"internal/core/phase_bindings.go":           "orchestrator bindings — stamped centrally, see centrallyStamped",
 	"internal/subagent/subagentrun/ledger.go":   "out-of-process `evolve subagent run` — the cycle-1571 H1 writer, since ADR-0103 unit 16 the dispatcher's ledger step; stamped through a port, see centrallyStamped",
@@ -18,8 +16,6 @@ var agentSubprocessWriters = map[string]string{
 	"internal/cyclesimulator/cyclesimulator.go": "simulator",
 }
 
-// centrallyStamped names writers that append through the Orchestrator's
-// stampingLedger (core/runid.go), which stamps every entry for them.
 var centrallyStamped = map[string]string{
 	"internal/core/phase_bindings.go":         "appends via o.ledger == stampingLedger (core/runid.go stamps run_id)",
 	"internal/subagent/subagentrun/ledger.go": "a leaf that cannot import core: its Dispatcher takes the resolver as the Deps.RunID port, which the ONE wired construction in internal/subagent/run.go (wiredDispatcher) binds to core.RunIDFromWorkspace, resolved once after admission; subagentrun/ledger_test.go and resolve_test.go are the behavioural pins (the run id reaches the emitted bytes)",
@@ -31,9 +27,6 @@ func TestAgentSubprocessWriters_AllStampRunID(t *testing.T) {
 
 	for _, rel := range found {
 		body := mustReadRepoFile(t, rel)
-		// Matching a CALL (the open paren), not the bare identifier, is
-		// deliberate: a doc comment merely naming the resolver must not satisfy
-		// the requirement or false-red an exemption.
 		mentionsRunID := strings.Contains(body, "RunIDFromWorkspace(")
 		reason, exempt := centrallyStamped[rel]
 
@@ -68,11 +61,9 @@ func TestAgentSubprocessWriters_SetIsClosed(t *testing.T) {
 	}
 }
 
-// scanAgentSubprocessWriters walks the module for non-test .go files whose
-// source ASSIGNS kind=agent_subprocess.
 func scanAgentSubprocessWriters(t *testing.T) []string {
 	t.Helper()
-	root := filepath.Join("..", "..") // go/internal/core -> go/
+	root := filepath.Join("..", "..")
 	var out []string
 	for _, sub := range []string{"internal", "cmd"} {
 		err := filepath.Walk(filepath.Join(root, sub), func(path string, info os.FileInfo, err error) error {
@@ -107,15 +98,13 @@ func scanAgentSubprocessWriters(t *testing.T) []string {
 	return out
 }
 
-// writesAgentSubprocessKind reports whether any single line both names the kind
-// and assigns it, as opposed to comparing it (readers) or naming it in prose.
 func writesAgentSubprocessKind(body string) bool {
 	for _, line := range strings.Split(body, "\n") {
 		if !strings.Contains(line, "agent_subprocess") {
 			continue
 		}
 		if strings.Contains(line, "!=") || strings.Contains(line, "==") {
-			continue // a comparison — this is a reader
+			continue
 		}
 		if strings.Contains(line, "Kind:") || strings.Contains(line, `"kind":`) {
 			return true

@@ -98,7 +98,7 @@ func TestCampaignProgress_SaveCreatesParentDir(t *testing.T) {
 func TestCampaignProgress_MarkWaveCompleteIdempotent(t *testing.T) {
 	p := &CampaignProgress{}
 	p.MarkWaveComplete(0, []string{"a", "b"})
-	p.MarkWaveComplete(0, []string{"a", "b"}) // repeat must not duplicate
+	p.MarkWaveComplete(0, []string{"a", "b"})
 	if !p.IsWaveComplete(0) {
 		t.Fatal("IsWaveComplete(0) = false after MarkWaveComplete")
 	}

@@ -19,8 +19,6 @@ func apicoverGoRoot(t *testing.T) string {
 	return filepath.Join(filepath.Dir(thisFile), "..", "..")
 }
 
-// apicover.Main is the whole of the standalone binary's main, so comparing
-// against it proves byte parity with cmd/apicover.
 func TestApicoverSubcommand_ByteParityWithStandalone(t *testing.T) {
 	t.Parallel()
 	root := apicoverGoRoot(t)
@@ -47,7 +45,6 @@ func TestApicoverSubcommand_ByteParityWithStandalone(t *testing.T) {
 		if subErr.String() != libErr.String() {
 			t.Errorf("%s: stderr diverged\n--sub--\n%s\n--lib--\n%s", pkg, subErr.String(), libErr.String())
 		}
-		// Two identical no-ops would also match; the summary line proves a run.
 		if !strings.Contains(subOut.String(), "summary:") {
 			t.Errorf("%s: subcommand produced no apicover report:\n%s", pkg, subOut.String())
 		}

@@ -1,11 +1,5 @@
 package statemap
 
-// statemap_extra_test.go — apicover DoD coverage for the WriteStateMap
-// primitive (named + happy-path + the error branches) and ReadStateMap's
-// null-JSON edge. The behavioral contract for ReadStateMap/UpdateStateMap lives
-// in statemap_test.go; this file only lifts coverage on paths that file's
-// higher-level assertions do not reach.
-
 import (
 	"errors"
 	"os"
@@ -13,11 +7,6 @@ import (
 	"testing"
 )
 
-// TestWriteStateMap_TempFileFailures covers the write/sync/close error branches
-// by seaming the temp-file syscalls (the same white-box technique
-// adapters/storage.writeJSONAtomic uses for these otherwise-untriggerable
-// paths). Each case asserts the correct error surfaces AND that no file is left
-// at the target path.
 func TestWriteStateMap_TempFileFailures(t *testing.T) {
 	boom := errors.New("boom")
 	saved := writeHooks
@@ -34,7 +23,7 @@ func TestWriteStateMap_TempFileFailures(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			writeHooks = saved // reset before each case
+			writeHooks = saved
 			tc.apply()
 			path := filepath.Join(t.TempDir(), "state.json")
 			err := WriteStateMap(path, map[string]any{"k": "v"})
@@ -51,10 +40,8 @@ func TestWriteStateMap_TempFileFailures(t *testing.T) {
 	}
 }
 
-// TestWriteStateMap_RoundTrip names WriteStateMap directly and asserts the
-// atomic write is readable back with every field intact.
 func TestWriteStateMap_RoundTrip(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "nested", "state.json") // exercises MkdirAll
+	path := filepath.Join(t.TempDir(), "nested", "state.json")
 	want := map[string]any{"expected_ship_sha": "abc", "n": float64(2)}
 	if err := WriteStateMap(path, want); err != nil {
 		t.Fatalf("WriteStateMap: %v", err)
@@ -68,8 +55,6 @@ func TestWriteStateMap_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestWriteStateMap_MkdirError covers the MkdirAll failure branch: the parent
-// path component is a regular file, so a directory cannot be created under it.
 func TestWriteStateMap_MkdirError(t *testing.T) {
 	blocker := filepath.Join(t.TempDir(), "iamafile")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
@@ -80,8 +65,6 @@ func TestWriteStateMap_MkdirError(t *testing.T) {
 	}
 }
 
-// TestWriteStateMap_MarshalError covers the json.MarshalIndent failure branch:
-// a value the encoder cannot represent (a func).
 func TestWriteStateMap_MarshalError(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
 	if err := WriteStateMap(path, map[string]any{"bad": func() {}}); err == nil {
@@ -89,8 +72,6 @@ func TestWriteStateMap_MarshalError(t *testing.T) {
 	}
 }
 
-// TestWriteStateMap_CreateTempError covers the CreateTemp failure branch: the
-// target directory exists but is read-only, so a temp file cannot be created.
 func TestWriteStateMap_CreateTempError(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "ro")
 	if err := os.Mkdir(dir, 0o500); err != nil {
@@ -102,9 +83,6 @@ func TestWriteStateMap_CreateTempError(t *testing.T) {
 	}
 }
 
-// TestWriteStateMap_RenameError covers the os.Rename failure branch: the target
-// path is an existing (non-empty) directory, so renaming the temp file over it
-// fails.
 func TestWriteStateMap_RenameError(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "state.json")
 	if err := os.Mkdir(target, 0o755); err != nil {
@@ -118,9 +96,6 @@ func TestWriteStateMap_RenameError(t *testing.T) {
 	}
 }
 
-// TestReadStateMap_NullJSON covers the `m == nil` normalization branch: a
-// literal JSON `null` unmarshals to a nil map, which must be normalized to an
-// empty non-nil map.
 func TestReadStateMap_NullJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
 	if err := os.WriteFile(path, []byte("null"), 0o644); err != nil {

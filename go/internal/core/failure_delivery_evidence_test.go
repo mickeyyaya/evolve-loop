@@ -11,23 +11,14 @@ import (
 	"time"
 )
 
-// deliveryFailureDiagField is the machine-readable JSON key the terminal
-// failure diagnostic must expose. Named here once so the contract is a single
-// string, not a pattern repeated across assertions.
 const deliveryFailureDiagField = "delivery_failure"
 
-// wedgedPromptTimeoutErr reproduces the exact error shape Engine.Launch
-// returns for a verified delivery failure: the bridge prefix, the driver's
-// artifact-timeout marker line carrying the classified reason, and the
-// ErrArtifactTimeout sentinel the dispatcher matches on.
 func wedgedPromptTimeoutErr() error {
 	return fmt.Errorf("bridge: launch exit=81: artifact-timeout: phase=retro waited=0s interval=300s "+
 		"extends_used=0 max_extends=6 last_review=none liveness=idle progressed=false busy=false "+
 		"transient=false reason=%q: %w", "prompt submit_wedged (resends=3)", ErrArtifactTimeout)
 }
 
-// genericSilenceTimeoutErr is the SAME shape for an ordinary silent agent —
-// identical in every field except the classified reason.
 func genericSilenceTimeoutErr() error {
 	return fmt.Errorf("bridge: launch exit=81: artifact-timeout: phase=retro waited=1800s interval=900s "+
 		"extends_used=2 max_extends=6 last_review=pause liveness=idle progressed=false busy=false "+

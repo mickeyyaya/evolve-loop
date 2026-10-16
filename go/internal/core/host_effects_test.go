@@ -23,7 +23,6 @@ func (r *recordingEffects) Perform(_ context.Context, in ReviewInput) error {
 	return r.err
 }
 
-// orderedReviewer rejects each phase in reject that many times.
 type orderedReviewer struct {
 	log    *[]string
 	ins    []ReviewInput

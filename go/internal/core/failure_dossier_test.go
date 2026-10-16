@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// writeAuditWithFailure writes an audit-report.md carrying a v2 verdict
-// sentinel with a structured failure block — the shape the dossier parses to
-// surface the audit's self-declared class/defects.
 func writeAuditWithFailure(t *testing.T, dir, verdict, class string, defects ...string) {
 	t.Helper()
 	blk := map[string]any{"class": class}
@@ -37,7 +34,7 @@ func TestFailureDossier(t *testing.T) {
 
 	t.Run("incoherent_verdict_floor_candidate_and_artifact", func(t *testing.T) {
 		dir := t.TempDir()
-		writeVerdicts(t, dir, "PASS", "PASS") // green artifacts contradict a recorded FAIL
+		writeVerdicts(t, dir, "PASS", "PASS")
 		cs := CycleState{CycleID: 1002, WorkspacePath: dir, FailedAt: []FailedRecord{
 			{Cycle: 1000, Verdict: "FAIL", Classification: "code-audit-fail"},
 			{Cycle: 1001, Verdict: "FAIL", Classification: "code-audit-fail"},
@@ -72,11 +69,9 @@ func TestFailureDossier(t *testing.T) {
 		if !ok {
 			t.Fatalf("artifact must carry a non_progress object, got %T", got["non_progress"])
 		}
-		// Policy thresholds are composed into the dossier (deterministic).
 		if rc, _ := np["repeat_ceiling"].(float64); int(rc) != fp.Thresholds.RepeatCeiling {
 			t.Errorf("non_progress.repeat_ceiling = %v, want %d", np["repeat_ceiling"], fp.Thresholds.RepeatCeiling)
 		}
-		// The same-class recurrence counter reflects the injected history.
 		if scs, _ := np["same_class_streak"].(float64); int(scs) < 1 {
 			t.Errorf("non_progress.same_class_streak = %v, want >= 1 for two same-class fails", np["same_class_streak"])
 		}

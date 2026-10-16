@@ -1,27 +1,5 @@
 package statemap
 
-// statemap_test.go — RED contract for the cycle-659 task
-// `statefile-rmw-flock-single-source`.
-//
-// The single source of truth for state.json read-modify-write is promoted here
-// from ship/statefile.go's readStateMap/writeStateMap: a NEW LEAF PACKAGE
-// importing ONLY internal/adapters/flock + stdlib (the verified-acyclic home
-// from cycle-644's retrospective; storage was rejected because storage imports
-// core, and stateutil was rejected as orphaned scaffolding). core/reset.go
-// (SealCycle), phaseintegrity/repin.go (RepinShipSHA) and ship become callers;
-// their three duplicate RMW implementations are deleted.
-//
-// This file is `package statemap` in a dir that (until Builder writes
-// statemap.go) has NO non-test Go file, so `go test ./internal/adapters/statemap/`
-// FAILS TO COMPILE — the RED state. Builder makes it GREEN by implementing:
-//
-//	func ReadStateMap(path string) (map[string]any, error)
-//	func UpdateStateMap(path string, mutate func(map[string]any)) error
-//
-// UpdateStateMap MUST hold flock.PathLock(path) across the whole read→mutate→
-// write and write atomically (tmp + rename), mirroring ship/statefile.go's
-// documented contract and storage.UpdateState's lock discipline (CA.3).
-
 import (
 	"encoding/json"
 	"os"
@@ -30,8 +8,6 @@ import (
 	"testing"
 )
 
-// writeRawState is a local fixture helper — the test may NOT depend on the
-// SUT's own writer to seed state (that would make the round-trip test circular).
 func writeRawState(t *testing.T, path string, body any) {
 	t.Helper()
 	raw, err := json.MarshalIndent(body, "", "  ")
@@ -56,23 +32,17 @@ func readRawState(t *testing.T, path string) map[string]any {
 	return m
 }
 
-// TestUpdateStateMap_PreservesUnmodelledFields is the AC4 legacy-compat axis:
-// full-fidelity map round-trip. A mutation touching ONE key must leave every
-// other key — including keys no typed struct models (expected_ship_sha) and
-// nested objects (currentBatch) — byte-for-byte intact. This is the exact
-// property that makes a map-based RMW necessary instead of the typed storage
-// adapter (which drops unmodelled keys).
 func TestUpdateStateMap_PreservesUnmodelledFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
 	writeRawState(t, path, map[string]any{
 		"lastCycleNumber":   41,
 		"version":           18,
-		"expected_ship_sha": "deadbeef-must-survive", // unmodelled by core.State
+		"expected_ship_sha": "deadbeef-must-survive",
 		"currentBatch":      map[string]any{"cycleAccruedCostUSD": 239.2},
 	})
 
 	if err := UpdateStateMap(path, func(m map[string]any) {
-		m["lastCycleNumber"] = 42 // the ONLY field this writer touches
+		m["lastCycleNumber"] = 42
 	}); err != nil {
 		t.Fatalf("UpdateStateMap: %v", err)
 	}
@@ -97,13 +67,6 @@ func TestUpdateStateMap_PreservesUnmodelledFields(t *testing.T) {
 	}
 }
 
-// TestUpdateStateMap_SerializesConcurrentWriters is the AC1 primitive-level
-// serialization axis (run under -race). N goroutines each do a read→+1→write of
-// the same counter via UpdateStateMap. If UpdateStateMap does NOT hold
-// flock.PathLock across the whole RMW, two goroutines read the same value and
-// one increment is lost, so the final counter is < N (lost update). A correct
-// lock-owning implementation yields exactly N. This is the anti-no-op behavioral
-// core of the whole task: an implementation that skips the lock FAILS here.
 func TestUpdateStateMap_SerializesConcurrentWriters(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
 	writeRawState(t, path, map[string]any{"counter": 0})
@@ -136,10 +99,6 @@ func TestUpdateStateMap_SerializesConcurrentWriters(t *testing.T) {
 	}
 }
 
-// TestReadStateMap_MissingFileReturnsEmptyMap is the edge/OOD axis: a not-yet-
-// created state.json must read as an empty map with no error (mirrors
-// ship/statefile.go:readStateMap and reset.go:readJSONMapFile), so the first
-// writer of a fresh project does not crash.
 func TestReadStateMap_MissingFileReturnsEmptyMap(t *testing.T) {
 	m, err := ReadStateMap(filepath.Join(t.TempDir(), "does-not-exist.json"))
 	if err != nil {
@@ -150,11 +109,6 @@ func TestReadStateMap_MissingFileReturnsEmptyMap(t *testing.T) {
 	}
 }
 
-// TestUpdateStateMap_MalformedJSONRefusesToClobber is the negative axis (the
-// strongest anti-no-op signal): when state.json is present but malformed,
-// UpdateStateMap MUST return an error and leave the file untouched, never
-// silently overwrite an operator's hand-broken file with a fresh empty map.
-// Mirrors storage.UpdateState's "malformed (...); refusing to clobber" contract.
 func TestUpdateStateMap_MalformedJSONRefusesToClobber(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
 	const garbage = "{ this is not valid json"
@@ -178,10 +132,6 @@ func TestUpdateStateMap_MalformedJSONRefusesToClobber(t *testing.T) {
 	}
 }
 
-// TestReadStateMap_EmptyFileReturnsEmptyMap is a second edge case: a
-// zero-length state.json (a truncated-write artifact) reads as an empty map,
-// not a parse error — matching the existing readStateMap/readJSONMapFile
-// helpers this package consolidates.
 func TestReadStateMap_EmptyFileReturnsEmptyMap(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "state.json")
 	if err := os.WriteFile(path, nil, 0o644); err != nil {

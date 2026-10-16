@@ -12,19 +12,15 @@ func c1117Ev(tail, injectedPrompt string) StopEvent {
 	return StopEvent{
 		Kind: StopArtifactTimeout, Phase: "build", Cycle: 1117,
 		ElapsedS: 300, IntervalS: 300, Attempt: 0,
-		Progressed:     true, // the nudge-echo trap: a dead pane CAN read as progressed
+		Progressed:     true,
 		Busy:           false,
 		StdoutTail:     tail,
 		InjectedPrompt: injectedPrompt,
 	}
 }
 
-// c1117EchoLine carries no fatal signature of its own — it is the plain
-// instruction echo the stripper must neutralize.
 const c1117EchoLine = "Write the report to workspace/build-report.md when you are done."
 
-// c1117AnchoredSeeds are newline-anchored so a bare word cannot false-positive;
-// line position is load-bearing for every one of them.
 var c1117AnchoredSeeds = []string{"\nquote>", "\nbquote>", "\ndquote>", "\nheredoc>"}
 
 func TestC1117_AnchoredSeedSurvivesEchoStripping(t *testing.T) {
@@ -102,7 +98,6 @@ func TestC1117_AgentDiffSeedTextDoesNotFastFail(t *testing.T) {
 		t.Fatal("raw pane does not detect — fixture is wrong; this test only means something if the RAW pane would fast-fail")
 	}
 
-	// an empty prompt exercises the diff half alone; the echo half fails open.
 	stripped := strippedForFatalPaneScan(pane, "", det.Signatures())
 	if _, _, ok := det.Detect(stripped); ok {
 		t.Errorf("seed text on an agent DIFF line still detects after stripping — the fatal-pane path is reading agent-authored content as CLI chrome; stripped=%q", stripped)
@@ -120,7 +115,7 @@ func TestC1117_AgentDiffSeedTextDoesNotFastFail(t *testing.T) {
 func TestC1117_StopEventCarriesInjectedPromptFromDriver(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{}
 
 	code, _ := runTmuxRev(t, fx, tmux, rev, Deps{ArtifactTimeoutS: 2}, "--allow-bypass")

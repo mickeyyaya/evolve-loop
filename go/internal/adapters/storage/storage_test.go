@@ -18,15 +18,10 @@ import (
 
 func newStore(t *testing.T) (*FilesystemStorage, string) {
 	t.Helper()
-	// The temp-project + .evolve/ layout is built by the shared harness so this
-	// (previously copy-pasted across ~20 packages) lives in exactly one place.
 	ws := fixtures.NewWorkspace(t).Build()
 	return New(ws.EvolveDir), ws.EvolveDir
 }
 
-// ReadState on a fresh repo (no state.json) returns the zero value and no error.
-// Matches the bash behaviour of scripts/lifecycle/cycle-state.sh: missing
-// state.json bootstraps an empty State.
 func TestReadState_MissingFileReturnsZero(t *testing.T) {
 	s, _ := newStore(t)
 	got, err := s.ReadState(context.Background())
@@ -82,8 +77,6 @@ func TestStateJSON_RoundTrip(t *testing.T) {
 func TestWriteState_AtomicNoPartialFile(t *testing.T) {
 	s, dir := newStore(t)
 	path := filepath.Join(dir, "state.json")
-	// Pre-fill with a sentinel; the atomic write must replace it entirely
-	// rather than ever leaving the file truncated to zero bytes mid-rename.
 	if err := os.WriteFile(path, []byte(`{"lastCycleNumber": 999}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +84,6 @@ func TestWriteState_AtomicNoPartialFile(t *testing.T) {
 	if err := s.WriteState(context.Background(), in); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	// After the write, the file must contain the new state, not the old.
 	got, err := s.ReadState(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +91,6 @@ func TestWriteState_AtomicNoPartialFile(t *testing.T) {
 	if got.LastCycleNumber != 5 {
 		t.Errorf("lastCycleNumber=%d, want 5", got.LastCycleNumber)
 	}
-	// No leftover .tmp files in the dir.
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		if filepath.Ext(e.Name()) == ".tmp" {
@@ -150,7 +141,6 @@ func TestReadCycleState_MissingFile(t *testing.T) {
 	}
 }
 
-// AcquireLock — exclusive, returns release fn.
 func TestAcquireLock_ExclusiveWithinProcess(t *testing.T) {
 	s, _ := newStore(t)
 	rel, err := s.AcquireLock(context.Background())
@@ -159,7 +149,6 @@ func TestAcquireLock_ExclusiveWithinProcess(t *testing.T) {
 	}
 	defer rel()
 
-	// Within the same process a second AcquireLock must fail fast.
 	_, err = s.AcquireLock(context.Background())
 	if !errors.Is(err, core.ErrLockHeld) {
 		t.Errorf("second acquire: err=%v, want ErrLockHeld", err)
@@ -175,7 +164,6 @@ func TestAcquireLock_ReleasedAfterCallback(t *testing.T) {
 	if err := rel(); err != nil {
 		t.Fatalf("release: %v", err)
 	}
-	// After release, a fresh acquire must succeed.
 	rel2, err := s.AcquireLock(context.Background())
 	if err != nil {
 		t.Fatalf("re-acquire: %v", err)
@@ -218,8 +206,6 @@ func TestReadState_EmptyFile(t *testing.T) {
 }
 
 func TestWriteState_NonExistentParent(t *testing.T) {
-	// New(...) under a path that doesn't exist yet — WriteState must
-	// create the parent dir.
 	dir := t.TempDir()
 	s := New(filepath.Join(dir, "deep", "nested", ".evolve"))
 	if err := s.WriteState(context.Background(), core.State{LastCycleNumber: 1}); err != nil {
@@ -251,7 +237,7 @@ func TestWriteState_MkdirParentFailsViaBlocker(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := New(filepath.Join(blocker, "child")) // child is under a regular file
+	s := New(filepath.Join(blocker, "child"))
 	err := s.WriteState(context.Background(), core.State{})
 	if err == nil {
 		t.Fatal("expected error writing into a path under a regular file")
@@ -267,7 +253,6 @@ func TestWriteState_TmpCreateFailsInReadOnlyDir(t *testing.T) {
 	if err := os.MkdirAll(ro, 0o555); err != nil {
 		t.Fatal(err)
 	}
-	// Make absolutely sure we can't write in it.
 	if err := os.Chmod(ro, 0o555); err != nil {
 		t.Fatal(err)
 	}
@@ -293,8 +278,6 @@ func TestWriteJSONAtomic_MarshalError(t *testing.T) {
 }
 
 func TestAcquireLock_FailsWhenLockPathUnwritable(t *testing.T) {
-	// Point storage at a non-existent root with a path component that
-	// can't be created (e.g. a file in place of a directory).
 	dir := t.TempDir()
 	blocker := filepath.Join(dir, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
@@ -307,11 +290,8 @@ func TestAcquireLock_FailsWhenLockPathUnwritable(t *testing.T) {
 }
 
 func TestAcquireLock_OpenFileErrorWhenPathIsADirectory(t *testing.T) {
-	// Make the lock path itself a directory; OpenFile with O_CREATE on a
-	// dir-named path returns EISDIR — exercises the OpenFile error
-	// branch in acquire() (separate from the MkdirAll branch).
 	dir := t.TempDir()
-	s := New(dir) // lockPath = <dir>/.lock
+	s := New(dir)
 	if err := os.MkdirAll(filepath.Join(dir, ".lock"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +301,6 @@ func TestAcquireLock_OpenFileErrorWhenPathIsADirectory(t *testing.T) {
 	}
 }
 
-// readJSON: non-ENOENT read error path.
 func TestReadJSON_NonENOENTError(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root bypasses permission bits")
@@ -382,7 +361,6 @@ func TestReleaseLock_CloseError(t *testing.T) {
 	})
 }
 
-// Concurrent AcquireLock callers — exactly one must hold at a time.
 func TestAcquireLock_ConcurrentExclusive(t *testing.T) {
 	s, _ := newStore(t)
 
@@ -398,7 +376,7 @@ func TestAcquireLock_ConcurrentExclusive(t *testing.T) {
 			defer wg.Done()
 			rel, err := s.AcquireLock(context.Background())
 			if err != nil {
-				return // ErrLockHeld races are expected
+				return
 			}
 			cur := atomic.AddInt32(&held, 1)
 			for {

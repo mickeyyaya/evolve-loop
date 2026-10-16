@@ -13,9 +13,6 @@ import (
 
 const systemFailureKey = "system_failure"
 
-// closeoutRun drives the REAL closeout chain (finalizeCycle → emitCycleClose →
-// writeCycleDossier), not a direct producer call, so a seam only reachable via
-// a hand-rolled call is not mistaken for wired.
 func closeoutRun(t *testing.T, cycle int, fixture string) (*cycleRun, string) {
 	t.Helper()
 	root := initDossierRepo(t)
@@ -37,8 +34,6 @@ func closeoutRun(t *testing.T, cycle int, fixture string) (*cycleRun, string) {
 	return cr, root
 }
 
-// systemFailureBlock decodes the pinned wire object, or fails the test naming
-// the keys that ARE present so a mis-spelled key is diagnosable from the log.
 func systemFailureBlock(t *testing.T, m map[string]any) map[string]any {
 	t.Helper()
 	sf, ok := m[systemFailureKey].(map[string]any)
@@ -55,7 +50,6 @@ func TestDossierSystemFailure_LostLandingReachesTheCommittedDossier(t *testing.T
 	if err := cr.completeCycle(); err != nil {
 		t.Fatalf("completeCycle: %v", err)
 	}
-	// Precondition: keeps a floor regression distinguishable from a dossier-sink one.
 	sig := cr.result.SystemFailure
 	if sig == nil || sig.Category != "landing-lost" {
 		t.Fatalf("precondition: finalizeCycle must record the landing-lost signal on the result; got %+v", sig)
@@ -121,9 +115,6 @@ func TestDossierSystemFailure_LandedSiblingCarriesNone(t *testing.T) {
 	}
 }
 
-// goldenPassDossierParams is the fixed ordinary-PASS input the byte-clean
-// golden was captured from, through a producer with no signal support at all.
-// Do not change a value here without regenerating the golden the same way.
 func goldenPassDossierParams(projectRoot string) cycleDossierParams {
 	return cycleDossierParams{
 		ProjectRoot:   projectRoot,

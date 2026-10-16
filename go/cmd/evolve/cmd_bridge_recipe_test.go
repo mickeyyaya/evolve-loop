@@ -97,7 +97,6 @@ func TestRecipeCLI_RunUnknownRecipe(t *testing.T) {
 
 func TestRecipeCLI_RunUnsupportedCLI(t *testing.T) {
 	t.Parallel()
-	// ollama has no recipe steps, so the run fails before any tmux spawn.
 	tmp := t.TempDir()
 	code, _, _ := runRecipeCLI("run", "plugin-install", "--cli=ollama-tmux", "--workspace="+tmp,
 		"--param=marketplace=x", "--param=plugin=y")
@@ -108,7 +107,6 @@ func TestRecipeCLI_RunUnsupportedCLI(t *testing.T) {
 
 func TestRecipeCLI_RunAllFlagsParsed(t *testing.T) {
 	t.Parallel()
-	// ollama fails after the parse and before any tmux spawn.
 	tmp := t.TempDir()
 	code, _, _ := runRecipeCLI("run", "plugin-install", "--cli=ollama-tmux", "--workspace="+tmp,
 		"--agent=installer", "--session-name=sess", "--worktree="+tmp,

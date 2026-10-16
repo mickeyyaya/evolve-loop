@@ -9,9 +9,6 @@ import (
 
 const defaultUpstreamDigestRunes = 1024
 
-// UpstreamDigest returns a deterministic, rune-capped rendering of the sealed
-// upstream handoffs. It is intended only for prompt context, so untrusted
-// strings are JSON-quoted before a caller places the digest in a text fence.
 func (h Handoffs) UpstreamDigest(capRunes int) string {
 	var lines []string
 	if h.scout != nil {
@@ -54,8 +51,6 @@ func (h Handoffs) UpstreamDigest(capRunes int) string {
 		return joined
 	}
 
-	// Reserve space for separators, then share the remaining budget so one
-	// oversized section cannot evict every section rendered after it.
 	remaining := capRunes - len(lines) + 1
 	if remaining < 0 {
 		return string([]rune(joined)[:capRunes])

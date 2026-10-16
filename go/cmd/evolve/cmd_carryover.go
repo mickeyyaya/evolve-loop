@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 )
 
-// carryoverApplyCeiling is reported, never enforced: an apply that keeps a few
-// extra live items still succeeds.
 const carryoverApplyCeiling = 25
 
 type carryoverDecisionRow struct {
@@ -36,8 +34,6 @@ type carryoverApplyResult struct {
 	Clustered int
 }
 
-// runCarryover applies a reviewed keep/drop/cluster decisions file to the
-// carryover todos, which the TTL prune cannot judge.
 func runCarryover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve carryover: missing subcommand (apply-decisions)")
@@ -162,8 +158,12 @@ func sortAndLimitCarryoverItems(items []carryoverListItem, sortMode string, limi
 }
 
 func renderCarryoverItems(items []carryoverListItem, jsonOutput bool, stdout, stderr io.Writer) int {
+	return renderCarryoverItemsWith(json.MarshalIndent, items, jsonOutput, stdout, stderr)
+}
+
+func renderCarryoverItemsWith(marshalIndent func(any, string, string) ([]byte, error), items []carryoverListItem, jsonOutput bool, stdout, stderr io.Writer) int {
 	if jsonOutput {
-		raw, err := json.MarshalIndent(items, "", "  ")
+		raw, err := marshalIndent(items, "", "  ")
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve carryover: %v\n", err)
 			return 1
@@ -176,7 +176,7 @@ func renderCarryoverItems(items []carryoverListItem, jsonOutput bool, stdout, st
 	for _, item := range items {
 		fmt.Fprintf(tw, "%s\t%s\t%d\t%d\t%s\n", item.ID, item.Priority, item.Age, item.CyclesUnpicked, item.ExpiresAt)
 	}
-	tw.Flush()
+	_ = tw.Flush()
 	return 0
 }
 
@@ -197,7 +197,6 @@ func runCarryoverApplyDecisions(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve carryover: %v\n", err)
 		return 10
 	}
-	// Validate before touching state.json so a bad file never half-mutates it.
 	if err := validateCarryoverDecisions(doc); err != nil {
 		fmt.Fprintf(stderr, "evolve carryover: %v\n", err)
 		return 10
@@ -246,8 +245,6 @@ func loadCarryoverDecisions(path string) (carryoverDecisionsDoc, error) {
 	return doc, nil
 }
 
-// validateCarryoverDecisions requires a reason on every row, so no drop goes
-// unjustified.
 func validateCarryoverDecisions(doc carryoverDecisionsDoc) error {
 	seen := make(map[string]bool, len(doc.Decisions))
 	for i, d := range doc.Decisions {
@@ -273,9 +270,6 @@ func validateCarryoverDecisions(doc carryoverDecisionsDoc) error {
 	return nil
 }
 
-// applyCarryoverDecisions removes drop and cluster ids; cluster ids live on as
-// sweep-group inbox items, so keeping them would count them twice. The doc must
-// already be validated.
 func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carryoverApplyResult, error) {
 	remove := make(map[string]string, len(doc.Decisions))
 	for _, d := range doc.Decisions {
@@ -284,9 +278,8 @@ func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carry
 		}
 	}
 
-	// A missing state file is a path mistake, not an empty apply.
-	if _, err := os.Stat(statePath); err != nil {
-		return carryoverApplyResult{}, fmt.Errorf("read state %s: %w", statePath, err)
+	if err := requireStateFile(statePath); err != nil {
+		return carryoverApplyResult{}, err
 	}
 
 	if res, ok := carryoverNoOpFastPath(statePath, remove); ok {
@@ -320,10 +313,6 @@ func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carry
 	return res, err
 }
 
-// carryoverNoOpFastPath does an unlocked pre-read to short-circuit a no-op
-// apply; UpdateStateMap re-reads under the lock, so this is never a
-// correctness gate. ok=false (on a read error or a matching removal id)
-// means the caller must fall through to the locked update.
 func carryoverNoOpFastPath(statePath string, remove map[string]string) (carryoverApplyResult, bool) {
 	if _, err := os.Stat(statePath); err != nil {
 		return carryoverApplyResult{}, false
@@ -341,4 +330,11 @@ func carryoverNoOpFastPath(statePath string, remove map[string]string) (carryove
 		}
 	}
 	return carryoverApplyResult{Before: len(entries), After: len(entries)}, true
+}
+
+func requireStateFile(statePath string) error {
+	if _, err := os.Stat(statePath); err != nil {
+		return fmt.Errorf("read state %s: %w", statePath, err)
+	}
+	return nil
 }

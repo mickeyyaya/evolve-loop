@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// writeIntentProfile writes a migrated-shape profile (extra_flags_by_cli, no
-// permission_mode) and returns its path.
 func writeIntentProfile(t *testing.T, dir, name, cli string, extraByCLI map[string][]string) string {
 	t.Helper()
 	body := map[string]any{
@@ -35,8 +33,6 @@ func writeIntentProfile(t *testing.T, dir, name, cli string, extraByCLI map[stri
 	return path
 }
 
-// launchedCmd returns the recorded SendKeys line that launched the inner CLI
-// (the one beginning with the binary name), or "" if none was sent.
 func launchedCmd(tmux *fakeTmux, binary string) string {
 	for _, k := range tmux.sentKeys {
 		if strings.HasPrefix(k, binary+" ") || k == binary {
@@ -47,9 +43,7 @@ func launchedCmd(tmux *fakeTmux, binary string) string {
 }
 
 func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
-	injectCatalogDir(t, t.TempDir()) // pin manifest offline defaults (no host-catalog overlay)
-	// claudeRaw is keyed under claude-tmux so a profile switched to agy/codex
-	// realizes none of these flags.
+	injectCatalogDir(t, t.TempDir())
 	claudeRaw := []string{
 		"--exclude-dynamic-system-prompt-sections",
 		"--disable-slash-commands",
@@ -62,8 +56,8 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 		cli    string
 		binary string
 		marker string
-		want   string   // exact launch command line
-		absent []string // flags that must NOT appear (cross-CLI leak)
+		want   string
+		absent []string
 	}{
 		{
 			cli:    "claude-tmux",
@@ -76,10 +70,6 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "agy-tmux",
 			binary: "agy",
 			marker: "? for shortcuts",
-			// The -m short flag stays in `absent` (space-delimited so the
-			// substring can't match inside --model). Model "sonnet" resolves via
-			// the legacy ladder → balanced → offline default; the display-name
-			// token is shell-quoted by launchCmdLine.
 			want:   "agy --model 'Gemini 3.8 Flash (High)' --dangerously-skip-permissions",
 			absent: []string{" -m ", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
@@ -87,14 +77,6 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "codex-tmux",
 			binary: "codex",
 			marker: "›",
-			// --yolo (default_args) lands FIRST, ahead of the per-param scalars;
-			// the second -c is the plan-mode effort override. This launch runs
-			// with no OPENAI_API_KEY, so the codex auth-mode clamp stays armed
-			// but does not fire — the whole gpt-5.6 family is in
-			// chatgpt_safe_models, so the realized balanced tier (gpt-5.6-terra)
-			// passes through unclamped. This is the end-to-end launch string
-			// reaching tmux, so it is also the wiring proof that the flag
-			// survives realization, dedupe and quoting.
 			want:   "codex --yolo -c 'check_for_update_on_startup=false' -m gpt-5.6-terra -c 'model_reasoning_effort=medium' -c 'plan_mode_reasoning_effort=medium'",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
@@ -139,10 +121,6 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 	}
 }
 
-// TestEngineLaunch_EnablesBypassForInProcessPath pins that the runner's
-// in-process entry (engine.Launch) lets the tmux safety gates pass without
-// the caller threading --allow-bypass, since the autonomous orchestrator is
-// the trusted bypass authority.
 func TestEngineLaunch_EnablesBypassForInProcessPath(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// identityWorkspace materializes the minimal artifacts the distinguisher
-// consults: an audit-report.md carrying a schema-v2 verdict sentinel with a
-// defects list, and a triage-decision.json committing taskID.
 func identityWorkspace(t *testing.T, taskID string, defects ...string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -39,9 +36,6 @@ func identityWorkspace(t *testing.T, taskID string, defects ...string) string {
 	return ws
 }
 
-// digestFor runs the REAL dispatch-composed reason through the REAL assembler
-// — the same two calls cyclerun_dispatch.go makes — so the test covers the
-// production path, not a reimplementation.
 func digestFor(t *testing.T, ws string) FailureDigest {
 	t.Helper()
 	reason := agentGradedFailReason("audit", ws)
@@ -245,20 +239,14 @@ func TestAbnormalEpilogue_CauseBecomesDistinguisher(t *testing.T) {
 	if compile.Unexplained || compile.Fingerprint == timeout.Fingerprint {
 		t.Fatalf("distinct causes must yield distinct fingerprints: %q vs %q", compile.Fingerprint, timeout.Fingerprint)
 	}
-	// Same cause twice ⇒ same fingerprint (the breaker's recurrence signal).
 	if again := digestFor(t, fmt.Errorf("build: bridge: launch exit=81: [claude-tmux] session killed: core: bridge artifact timeout")); again.Fingerprint != timeout.Fingerprint {
 		t.Fatalf("identical causes must share a fingerprint: %q vs %q", again.Fingerprint, timeout.Fingerprint)
 	}
-	// The same cause on consecutive RETRY cycles carries cycle-numbered tokens
-	// that must normalize out — otherwise recurrence never accumulates and the
-	// breaker goes blind (the raw-cause degenerate implementation fails here).
 	c1 := digestFor(t, fmt.Errorf("build: acs/cycle1197 worktree: bridge artifact timeout"))
 	c2 := digestFor(t, fmt.Errorf("build: acs/cycle1207 worktree: bridge artifact timeout"))
 	if c1.Fingerprint != c2.Fingerprint {
 		t.Fatalf("same cause across retry cycles must share a fingerprint: %q vs %q", c1.Fingerprint, c2.Fingerprint)
 	}
-	// A multi-line cause must flatten — a raw newline inside the reason breaks
-	// downstream line-oriented consumers.
 	multi := digestFor(t, fmt.Errorf("build: vet failed:\n./pkg/x.go:10: undefined: y\n"))
 	if multi.Unexplained {
 		t.Fatalf("multi-line cause must still be content-bearing: %+v", multi)

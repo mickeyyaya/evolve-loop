@@ -46,8 +46,6 @@ func seedResetDir(t *testing.T, cycleID, lastCycle int) (projectRoot, evolveDir 
 	})
 	writeJSONT(t, filepath.Join(evolveDir, "state.json"), map[string]any{
 		"lastCycleNumber": lastCycle, "version": 18,
-		// Unmodelled-by-core.State field: must survive the seal's state.json
-		// mutation at the CLI integration layer too, not just in core.
 		"expected_ship_sha": "deadbeef-must-survive",
 	})
 	return projectRoot, evolveDir
@@ -76,7 +74,7 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 
 	t.Run("fallback when no profile and no rc", func(t *testing.T) {
 		t.Parallel()
-		cli, model := mustRouterDispatch(t, t.TempDir(), policy.RouterPolicy{}) // empty dir ⇒ no profile file
+		cli, model := mustRouterDispatch(t, t.TempDir(), policy.RouterPolicy{})
 		if cli != "claude-tmux" || model != "opus" {
 			t.Errorf("fallback = (%q,%q), want (claude-tmux,opus)", cli, model)
 		}
@@ -113,7 +111,7 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 	t.Run("partial profile: cli only keeps fallback model", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		writeRouterProfile(t, dir, "codex-tmux", "") // no model_tier_default
+		writeRouterProfile(t, dir, "codex-tmux", "")
 		cli, model := mustRouterDispatch(t, dir, policy.RouterPolicy{})
 		if cli != "codex-tmux" || model != "opus" {
 			t.Errorf("partial = (%q,%q), want (codex-tmux,opus) — model falls back", cli, model)
@@ -150,7 +148,6 @@ func TestRunCycleReset_DryRun(t *testing.T) {
 	if !strings.Contains(out, "108") || !strings.Contains(out, "109") {
 		t.Errorf("dry-run output should mention sealed 108 → next 109; got %q", out)
 	}
-	// Dry-run mutates nothing.
 	if _, err := os.Stat(filepath.Join(evolveDir, "cycle-state.json")); err != nil {
 		t.Errorf("dry-run must not remove cycle-state.json: %v", err)
 	}
@@ -168,11 +165,9 @@ func TestRunCycleReset_Seals(t *testing.T) {
 	if rc != 0 {
 		t.Fatalf("rc=%d stderr=%q", rc, stderr.String())
 	}
-	// cycle-state cleared.
 	if _, err := os.Stat(filepath.Join(evolveDir, "cycle-state.json")); !os.IsNotExist(err) {
 		t.Errorf("cycle-state.json should be removed after seal; err=%v", err)
 	}
-	// state advanced; the unmodelled field survives the CLI-layer round-trip.
 	sm := readJSONT(t, filepath.Join(evolveDir, "state.json"))
 	if n, _ := sm["lastCycleNumber"].(float64); int(n) != 108 {
 		t.Errorf("lastCycleNumber=%v want 108", sm["lastCycleNumber"])
@@ -180,12 +175,10 @@ func TestRunCycleReset_Seals(t *testing.T) {
 	if got, _ := sm["expected_ship_sha"].(string); got != "deadbeef-must-survive" {
 		t.Errorf("expected_ship_sha must survive the seal at the CLI layer; got %q", got)
 	}
-	// archive exists with the preserved workspace file.
 	matches, _ := filepath.Glob(filepath.Join(evolveDir, "runs", "cycle-108.reset-*", "scout-report.md"))
 	if len(matches) != 1 {
 		t.Errorf("expected one sealed archive containing scout-report.md, got %v", matches)
 	}
-	// ledger entry written.
 	if _, err := os.Stat(filepath.Join(evolveDir, "ledger.jsonl")); err != nil {
 		t.Errorf("ledger.jsonl should exist after seal: %v", err)
 	}
@@ -194,7 +187,6 @@ func TestRunCycleReset_Seals(t *testing.T) {
 func TestRunCycleReset_HeldLockAloneDoesNotBlock(t *testing.T) {
 	t.Parallel()
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
-	// Hold the .evolve lock; write NO lease (no live owner is proven).
 	st := storage.New(evolveDir)
 	release, err := st.AcquireLock(context.Background())
 	if err != nil {

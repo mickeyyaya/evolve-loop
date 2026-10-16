@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// TestCodeManifestGate_DistinctFromEntireVocabulary broadens the existing
-// distinctness check (which only pins CodeManifestGate != CodeGitStageFailed,
-// the one code it replaced) to the FULL wire vocabulary. The ledger and
-// debugger persona key routing off the wire string; a collision with ANY
-// other code — not just the one it replaced — would silently misroute.
 func TestCodeManifestGate_DistinctFromEntireVocabulary(t *testing.T) {
 	others := []ShipErrorCode{
 		CodeSelfSHATampered, CodeSelfSHAIO,
@@ -32,11 +27,6 @@ func TestCodeManifestGate_DistinctFromEntireVocabulary(t *testing.T) {
 	}
 }
 
-// TestCodeManifestGate_WireStringNamingConvention pins the wire string's
-// exact byte content: uppercase, underscore-separated, no surrounding
-// whitespace — the convention every sibling code in vocab_test.go follows. A
-// future refactor that accidentally lowercases or pads the constant would
-// break ledger string-matching silently.
 func TestCodeManifestGate_WireStringNamingConvention(t *testing.T) {
 	wire := string(CodeManifestGate)
 	if wire != "MANIFEST_GATE" {

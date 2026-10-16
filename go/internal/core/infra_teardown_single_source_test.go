@@ -116,16 +116,10 @@ func TestInfraTeardownUnion_SpelledExactlyOnce(t *testing.T) {
 	}
 }
 
-// optionalSpecFor is a tiny local helper so the table tests above read cleanly;
-// it mirrors the catalog shape amplNewSkipOrchestrator expects.
 func optionalSpecFor(name string) []phasespec.PhaseSpec {
 	return []phasespec.PhaseSpec{{Name: name, Optional: true}}
 }
 
-// findInfraTeardownUnionSpellings walks dir's non-test Go files and returns
-// "file:funcName" for each function whose body contains a binary expression
-// joining the artifact-timeout sentinel and the transient-bridge sentinel
-// (either as `||` of positives or `&&` of negations).
 func findInfraTeardownUnionSpellings(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -155,7 +149,7 @@ func findInfraTeardownUnionSpellings(dir string) ([]string, error) {
 				src := exprText(fset, be)
 				if mentionsTimeoutSentinel(src) && mentionsTransientSentinel(src) {
 					sites = append(sites, fmt.Sprintf("%s:%s", name, fn.Name.Name))
-					return false // one report per spelling, not per nested node
+					return false
 				}
 				return true
 			})
@@ -179,8 +173,6 @@ func mentionsTimeoutSentinel(src string) bool {
 	return strings.Contains(src, "ErrArtifactTimeout")
 }
 
-// The transient half may appear either as the sentinel itself or via its
-// transient-ONLY component helper — both spell "transient bridge failure".
 func mentionsTransientSentinel(src string) bool {
 	return strings.Contains(src, "ErrTransientBridgeFailure") || strings.Contains(src, "isTransientBridgeError")
 }

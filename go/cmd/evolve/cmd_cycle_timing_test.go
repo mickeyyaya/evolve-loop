@@ -65,7 +65,6 @@ func TestRunCycleTiming_ParallelProjection(t *testing.T) {
 	if !strings.Contains(s, "Parallel-evaluate projection") {
 		t.Errorf("expected the shadow projection line; got:\n%s", s)
 	}
-	// audit is excluded as the brancher, so the group is coverage-gate + adversarial-review.
 	if !strings.Contains(s, "coverage-gate") || strings.Contains(s, "audit — ") {
 		t.Errorf("projection group must include checking phases and exclude audit; got:\n%s", s)
 	}

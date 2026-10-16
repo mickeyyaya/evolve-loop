@@ -13,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// modelRoutingCfg builds a DynamicLLM cfg at StageAdvisory, the combination
-// that opens the planner gate (Stage>=Advisory && Mode==DynamicLLM &&
-// planner!=nil) required for the whole-cycle plan to run.
 func modelRoutingCfg(mr config.ModelRouting) config.RoutingConfig {
 	cfg := shadowCfg(config.StageAdvisory)
 	cfg.Mode = config.ModeDynamicLLM
@@ -162,8 +159,6 @@ func TestModelRouting_AutoDegradesToProfileStatic(t *testing.T) {
 	}
 }
 
-// Proves the injected catalog lookup actually reaches the clamp, not merely
-// stored and ignored.
 func TestModelRouting_CatalogMissClampsUnderAuto(t *testing.T) {
 	t.Parallel()
 

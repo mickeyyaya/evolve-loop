@@ -39,9 +39,6 @@ func TestOrchestrator_AdvisoryPlanVetoSurvivesSpineDecline(t *testing.T) {
 	cfg.Order = []string{"scout", "triage", "tdd", "build-planner", "build",
 		"tester", "phase-a", "phase-b", "audit", "ship"}
 
-	// fakeRunners write no handoff artifacts, so SpineSatisfiedUpTo(audit)
-	// stays false all cycle — the exact decline condition that falls back to
-	// the static nextInOrder successor.
 	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true}, {Phase: "tdd", Run: true},
 		{Phase: "build", Run: true}, {Phase: "phase-a", Run: true},

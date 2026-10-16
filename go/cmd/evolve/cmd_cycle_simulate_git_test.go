@@ -32,8 +32,6 @@ func initRepoWithCommit(t *testing.T, root string) {
 	gitOut(t, root, "commit", "-q", "-m", "seed")
 }
 
-// simulateCaptureStderr redirects os.Stderr around fn (the orchestrator's
-// host WARNs go there) and returns what was written. Not parallel-safe.
 func simulateCaptureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
@@ -63,8 +61,6 @@ func simulateCaptureStderr(t *testing.T, fn func()) string {
 	return out
 }
 
-// statusWithoutWalkRecords drops the walk's own untracked records, so the
-// comparison sees only the operator's tree; a staged or modified path still counts.
 func statusWithoutWalkRecords(status string) string {
 	var kept []string
 	for _, line := range strings.Split(status, "\n") {
@@ -76,8 +72,6 @@ func statusWithoutWalkRecords(status string) string {
 	return strings.Join(kept, "\n")
 }
 
-// The seed repo holds a Go module, an unformatted tracked file and an
-// uncommitted edit, so the host's gofmt -w and leak-recovery checkout would show.
 func TestWireSimulateOrchestrator_NeverMutatesGit(t *testing.T) {
 	root := t.TempDir()
 	initRepoWithCommit(t, root)
@@ -95,7 +89,6 @@ func TestWireSimulateOrchestrator_NeverMutatesGit(t *testing.T) {
 	mustSeed("go/seed.go", unformatted)
 	gitOut(t, root, "add", "go")
 	gitOut(t, root, "commit", "-q", "-m", "seed module with an unformatted file")
-	// Leak recovery on an in-place root would `git checkout` this edit away.
 	mustSeed("README.md", "seed\noperator's uncommitted edit\n")
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

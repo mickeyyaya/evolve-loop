@@ -104,40 +104,34 @@ func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
 	switch {
 	case rc == bridge.ExitOK:
 		fmt.Fprintf(stderr, "[doctor] LIVE OK: %s answered the probe\n", target)
-		return 0
+		return exitOK
 	case rc == bridge.ExitBadFlags:
 		fmt.Fprintf(stderr, "[doctor] live: %q is not a known *-tmux driver\n", target.driver)
-		return 10
+		return exitUsage
 	case rc == bridge.ExitModelMismatch:
 		fmt.Fprintf(stderr, "[doctor] LIVE WRONG MODEL: %s rc=%d — the REPL booted a model outside the target's model family, or showed no readable model label, so the prompt was never sent\n", target, rc)
 		if tail := bridge.ScrollbackTail(scrollback, 6); tail != "" {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
 		printUsage(stderr, usage)
-		return 1
+		return exitFail
 	case pattern != "":
 		fmt.Fprintf(stderr, "[doctor] LIVE WALLED: %s rc=%d pattern=%s\n", target, rc, pattern)
 		if tail := bridge.ScrollbackTail(scrollback, 6); tail != "" {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
 		printUsage(stderr, usage)
-		return 1
+		return exitFail
 	default:
 		fmt.Fprintf(stderr, "[doctor] LIVE FAILED: %s rc=%d\n", target, rc)
 		if tail := bridge.ScrollbackTail(scrollback, 12); tail != "" {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
 		printUsage(stderr, usage)
-		return 1
+		return exitFail
 	}
 }
 
-// runDoctorLive implements `evolve doctor live <driver> [--json]`: a REAL
-// launch that submits one trivial prompt via bridge.LiveSmokeTest — the only
-// probe shape that can see a provider quota wall (boot smoke passes against a
-// rate-limited CLI; the wall appears only after work is submitted —
-// cycle-283). Exit: 0 healthy, 1 walled (the escalation pattern is printed,
-// e.g. rate_limit) or failed, 10 usage (unknown or non-tmux driver).
 func runDoctorLive(args []string, stdout, stderr io.Writer) int {
 	return runDoctorLiveWith(args, stdout, bridge.Deps{Stderr: stderr})
 }
@@ -152,18 +146,18 @@ func runDoctorLiveWith(args []string, stdout io.Writer, deps bridge.Deps) int {
 	fs.StringVar(&target.model, "model", "", "launch this model: a tier (fast|balanced|deep|top) or a model name the CLI accepts")
 	positional, err := cmdutil.ParseInterspersed(fs, args)
 	if err != nil {
-		return 10
+		return exitUsage
 	}
 	if len(positional) != 1 {
 		fmt.Fprintln(stderr, "evolve doctor live: usage: evolve doctor live <driver> [--model <model>] [--json]")
-		return 10
+		return exitUsage
 	}
 	target.driver = positional[0]
 
 	ws, err := os.MkdirTemp("", "evolve-doctorlive-*")
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve doctor live: temp workspace: %v\n", err)
-		return 1
+		return exitFail
 	}
 	defer func() { _ = os.RemoveAll(ws) }()
 	cwd, _ := os.Getwd()

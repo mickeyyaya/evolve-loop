@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// staticVerdictRunner succeeds at the transport level but returns a fixed
-// (possibly non-canonical) verdict, modeling a retro that ran but produced garbage.
 type staticVerdictRunner struct {
 	name    string
 	verdict string
@@ -117,10 +115,6 @@ func TestRecordFailureLearning_RetroSucceeds_NoDeterministicFallback(t *testing.
 	}
 }
 
-// reportingErrRunner writes a report carrying a v2 failure-block sentinel,
-// then fails — the phase was healthy enough to self-report.
-//
-// See ADR-0039.
 type reportingErrRunner struct{ name string }
 
 func (r *reportingErrRunner) Name() string { return r.name }

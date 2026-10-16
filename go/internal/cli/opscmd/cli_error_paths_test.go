@@ -9,15 +9,6 @@ import (
 	"testing"
 )
 
-// cli_error_paths_test.go — cycle-543 Task 3 (cli-command-layer-test-coverage).
-// In-package exit-code / stderr-content tests for the opscmd wrapper
-// arg-parsing + error branches (moving past the package apicover-smoke test's
-// "produced some output" bar). Kept in-package so they count toward opscmd's
-// coverage floor; the ACS predicates in go/acs/cycle543 assert the same
-// behaviors but live in a different package.
-
-// --- RunDoctor / probe ------------------------------------------------------
-
 func TestRunDoctor_ArgAndProbeBranches(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -44,8 +35,6 @@ func TestRunDoctor_ArgAndProbeBranches(t *testing.T) {
 	}
 }
 
-// TestRunDoctorProbe_FoundGo drives the found-tool branch (go is on PATH in CI)
-// plus the --json and --quiet output forms.
 func TestRunDoctorProbe_FoundAndJSON(t *testing.T) {
 	for _, args := range [][]string{
 		{"probe", "go"},
@@ -60,32 +49,24 @@ func TestRunDoctorProbe_FoundAndJSON(t *testing.T) {
 	}
 }
 
-// TestRunDoctor_BootLive drives runDoctorBoot / runDoctorLive. An unknown
-// (non -tmux) driver is rejected FAST by bridge.Boot/LiveSmokeTest (ExitBadFlags,
-// no REPL launch), so these exercise the full wrapper body — temp-workspace
-// setup, the SmokeTest call, and the JSON/plain output switch — without hanging
-// on a real boot. The usage branch (no driver) is also covered.
 func TestRunDoctor_BootLive(t *testing.T) {
 	cases := [][]string{
-		{"boot"},                              // usage → 10
-		{"boot", "bogus-driver"},              // unknown driver → fast reject
-		{"boot", "--json", "bogus-driver"},    // JSON output branch
-		{"boot", "--sandbox", "bogus-driver"}, // sandbox worktree-setup branch
-		{"live"},                              // usage → 10
-		{"live", "bogus-driver"},              // unknown driver → fast reject
-		{"live", "--json", "bogus-driver"},    // JSON output branch
+		{"boot"},
+		{"boot", "bogus-driver"},
+		{"boot", "--json", "bogus-driver"},
+		{"boot", "--sandbox", "bogus-driver"},
+		{"live"},
+		{"live", "bogus-driver"},
+		{"live", "--json", "bogus-driver"},
 	}
 	for _, args := range cases {
 		var out, errb bytes.Buffer
 		rc := RunDoctor(args, nil, &out, &errb)
-		// Any documented non-crash exit (0 never happens for a bogus driver; 1/10 do).
 		if rc != 1 && rc != 10 {
 			t.Fatalf("RunDoctor(%v) rc = %d, want 1 or 10 (fast reject / usage)\nstderr=%s", args, rc, errb.String())
 		}
 	}
 }
-
-// --- RunVersionBump ---------------------------------------------------------
 
 func TestRunVersionBump_ArgBranches(t *testing.T) {
 	cases := []struct {
@@ -117,8 +98,6 @@ func TestRunVersionBump_ArgBranches(t *testing.T) {
 	}
 }
 
-// TestRunVersionBump_DryRun drives the versionbump.Run delegation against an
-// empty project root (dry-run, no writes) — exercising the result-print path.
 func TestRunVersionBump_DryRun(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	var out, errb bytes.Buffer
@@ -127,8 +106,6 @@ func TestRunVersionBump_DryRun(t *testing.T) {
 		t.Fatalf("dry-run rc = %d, want 0 or 1\nstderr=%s", rc, errb.String())
 	}
 }
-
-// --- RunChangelogGen --------------------------------------------------------
 
 func TestRunChangelogGen_ArgBranches(t *testing.T) {
 	cases := []struct {
@@ -162,9 +139,6 @@ func TestRunChangelogGen_ArgBranches(t *testing.T) {
 	}
 }
 
-// TestRunChangelogGen_DryRunRealRepo drives the git-log → classify → render →
-// dry-run print path against a real 2-commit repo (VerifyRef, ReadGitLog,
-// ClassifyAll, RenderEntry, dry-run branch — the bulk of RunChangelogGen).
 func TestRunChangelogGen_DryRunRealRepo(t *testing.T) {
 	git, err := exec.LookPath("git")
 	if err != nil {
@@ -196,14 +170,11 @@ func TestRunChangelogGen_DryRunRealRepo(t *testing.T) {
 
 	t.Setenv("EVOLVE_PROJECT_ROOT", dir)
 
-	// Bad from-ref → VerifyRef failure branch (rc 1).
 	var o0, e0 bytes.Buffer
 	if rc := RunChangelogGen([]string{"no-such-ref", "HEAD", "1.2.3"}, nil, &o0, &e0); rc != 1 {
 		t.Fatalf("bad-ref rc = %d, want 1\nstderr=%s", rc, e0.String())
 	}
 
-	// Real write → WriteEntry + "wrote" branch (rc 0), then a second call for the
-	// SAME version → idempotent-skip branch (rc 0), covering both outcomes.
 	var o1, e1 bytes.Buffer
 	if rc := RunChangelogGen([]string{from, "HEAD", "1.2.3"}, nil, &o1, &e1); rc != 0 {
 		t.Fatalf("write rc = %d, want 0\nstderr=%s", rc, e1.String())
@@ -230,8 +201,6 @@ func gitOut(t *testing.T, git, dir string, args ...string) string {
 	}
 	return string(out)
 }
-
-// --- RunReleaseConsistency --------------------------------------------------
 
 func TestRunReleaseConsistency_ArgBranches(t *testing.T) {
 	cases := []struct {
@@ -262,8 +231,6 @@ func TestRunReleaseConsistency_ArgBranches(t *testing.T) {
 	}
 }
 
-// TestRunReleaseConsistency_MissingPlugin drives the ErrInconsistent branch
-// (no .claude-plugin/plugin.json) — exit 1, matching ACS predicate C543_014.
 func TestRunReleaseConsistency_MissingPlugin(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	var out, errb bytes.Buffer

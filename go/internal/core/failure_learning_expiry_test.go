@@ -137,8 +137,6 @@ func TestRecordFailureLearning_CreatedTodoSurvivesImmediatePrune(t *testing.T) {
 	survivor, _ := todos[0].(map[string]any)
 	expiresAt, _ := survivor["expiresAt"].(string)
 	if expiresAt == "" {
-		// Surviving with Removed==0 alone is not sufficient proof: an unstamped
-		// todo also survives, by prune's own "age unknown, never delete" rule.
 		t.Fatal("surviving todo has no expiresAt — it survived by the legacy no-stamp rule, " +
 			"not because a real TTL stamp hasn't elapsed yet; recordFailureLearning must stamp ExpiresAt")
 	}

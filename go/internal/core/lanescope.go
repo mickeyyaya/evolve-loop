@@ -14,30 +14,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// scoutArtifactName is DERIVED from the phasecontract registry (the report-
-// filename SSOT), not re-typed here: a frozen copy would silently degrade
-// goal_hash normalization into its fail-open branch the moment the registry
-// moves — a lane-identity bug that looks like an absent report.
 var scoutArtifactName = func() string {
 	c, _ := phasecontract.For("scout")
 	return c.ArtifactName
 }()
 
-// LaneScopeFile is the on-disk lane-identity pin inside the run workspace.
 const LaneScopeFile = "lane-scope.json"
 
-// LaneScope is the pinned lane identity: the todo ids assigned to this lane
-// and the goal hash the lane was provisioned for. It is an ALIAS of the leaf
-// package's declaration, not a second one: exactly one non-test file may
-// declare the pin's wire tags (cycleoutcome's
-// TestLaneScopeProjection_SingleWireShapeDeclaration), and an alias carries no
-// struct tag of its own, so every existing composite literal and field read
-// here is unchanged.
 type LaneScope = committedset.LanePinDoc
 
-// loadLaneScope reads <workspace>/lane-scope.json. nil when the workspace is
-// empty-pathed, the file is absent, or it is unreadable/malformed — fail-open:
-// a broken pin degrades to the legacy env fleet scope with a WARN, never an abort.
 func loadLaneScope(workspace string) *LaneScope {
 	if workspace == "" {
 		return nil
@@ -57,18 +42,13 @@ func loadLaneScope(workspace string) *LaneScope {
 	return &ls
 }
 
-// LaneScopeIDs projects the ordered pinned members for contracts and outcome
-// accounting. Absent or malformed pins retain the caller's legacy fallback.
 func LaneScopeIDs(workspace string) []string {
 	if scope := loadLaneScope(workspace); scope != nil && len(scope.TodoIDs) > 0 {
 		return scope.TodoIDs
 	}
-	return nil // absent, malformed or EMPTY pin ⇒ the caller's legacy fallback (never a silent empty contract)
+	return nil
 }
 
-// materializeLaneScope pins an env-provided fleet scope to disk so the lane
-// identity exists on disk BEFORE any phase output does. Best-effort: a write
-// failure WARNs — the Context injection still carries the scope this cycle.
 func materializeLaneScope(workspace, scope, goalHash string) {
 	if workspace == "" {
 		return
@@ -88,13 +68,8 @@ func materializeLaneScope(workspace, scope, goalHash string) {
 	}
 }
 
-// fencedJSONRe matches ```json fenced blocks in a report. The Decision Trace
-// is conventionally the report's FINAL block, so the last block carrying a
-// goal_hash wins.
 var fencedJSONRe = regexp.MustCompile("(?s)```json\\s*(.*?)```")
 
-// scoutReportGoalHash extracts the Decision Trace goal_hash from
-// <workspace>/scout-report.md. "" on absence or any parse failure (fail-open).
 func scoutReportGoalHash(workspace string) string {
 	b, err := os.ReadFile(filepath.Join(workspace, scoutArtifactName))
 	if err != nil {
@@ -103,11 +78,6 @@ func scoutReportGoalHash(workspace string) string {
 	return scoutReportGoalHashFromBytes(b)
 }
 
-// scoutReportGoalHashFromBytes extracts the Decision Trace goal_hash from raw
-// scout-report bytes. The LAST fenced-json block carrying a goal_hash wins (the
-// Decision Trace is conventionally the report's final block). "" when no block
-// carries the key. Shared by scoutReportGoalHash and normalizeScoutGoalHash so
-// the parse — and the single file read behind it — is single-sourced.
 func scoutReportGoalHashFromBytes(b []byte) string {
 	hash := ""
 	for _, m := range fencedJSONRe.FindAllSubmatch(b, -1) {
@@ -121,8 +91,6 @@ func scoutReportGoalHashFromBytes(b []byte) string {
 	return hash
 }
 
-// canonicalGoalHashRe matches the lower-hex 64-char SHA256 shape
-// goalhash.Compute emits.
 var canonicalGoalHashRe = regexp.MustCompile("^[0-9a-f]{64}$")
 
 func normalizeScoutGoalHash(workspace string, warn io.Writer) {

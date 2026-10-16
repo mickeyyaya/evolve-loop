@@ -5863,3 +5863,13 @@ The history this package's comments carried, by the rule `commentaudit check` us
 ```text
 // true => workspace lives under .evolve/runs/cycle-1005
 ```
+
+## comment-zero bridge-2
+
+### `go/internal/bridge/tmux_inject.go:25` — above `func channelEnabled(deps Deps) bool {`
+
+```text
+// channelEnabled reports whether the live bidirectional channel (ADR-0037) is
+// on: the channel is implied by the recovery stage (enforce → on; off/shadow
+// → off, byte-identical).
+```

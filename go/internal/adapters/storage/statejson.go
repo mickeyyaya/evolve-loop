@@ -16,22 +16,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// cycleStatePath resolves where THIS process reads/writes cycle state via the
-// SSOT core.ResolveCycleStatePath: the fleet per-run override when set, else
-// <evolveDir>/cycle-state.json. Delegating (not re-deriving) keeps every reader
-// on one resolver so the isolation hole can't be reopened.
 func (s *FilesystemStorage) cycleStatePath() string {
 	return core.ResolveCycleStatePath(s.evolveDir)
 }
 
-// FilesystemStorage reads/writes JSON state files under a fixed .evolve
-// directory. Concurrent-safe via flock on .evolve/.lock (see lock.go).
 type FilesystemStorage struct {
 	evolveDir string
 	pl        *processLock
 }
 
-// New returns a storage adapter rooted at evolveDir.
 func New(evolveDir string) *FilesystemStorage {
 	return &FilesystemStorage{
 		evolveDir: evolveDir,
@@ -39,7 +32,6 @@ func New(evolveDir string) *FilesystemStorage {
 	}
 }
 
-// ReadState parses .evolve/state.json. Missing file → zero State (no error).
 func (s *FilesystemStorage) ReadState(_ context.Context) (core.State, error) {
 	var st core.State
 	path := filepath.Join(s.evolveDir, "state.json")
@@ -49,17 +41,11 @@ func (s *FilesystemStorage) ReadState(_ context.Context) (core.State, error) {
 	return st, nil
 }
 
-// WriteState atomically replaces .evolve/state.json. A cycle worktree's
-// state.json is a symlink to the canonical file (core/worktree.go
-// linkGuardDeps); the rename lands on the resolved target so the link survives
-// (cycle-999 sever).
 func (s *FilesystemStorage) WriteState(_ context.Context, st core.State) error {
 	path := statemap.ResolveWriteTarget(filepath.Join(s.evolveDir, "state.json"))
 	return writeJSONAtomic(path, st)
 }
 
-// ReadCycleState parses .evolve/cycle-state.json. Missing file → zero
-// CycleState (no error) — matches bash cycle-state.sh bootstrap behaviour.
 func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, error) {
 	var cs core.CycleState
 	path := s.cycleStatePath()
@@ -69,34 +55,14 @@ func (s *FilesystemStorage) ReadCycleState(_ context.Context) (core.CycleState, 
 	return cs, nil
 }
 
-// WriteCycleState atomically replaces .evolve/cycle-state.json while preserving
-// the checkpoint block written by the checkpoint package. core.CycleState does
-// not model that key, so a plain struct rewrite would erase resume state.
-// It then dual-writes the state to <WorkspacePath>/run.json (CB.4): the
-// per-run mirror the worktree provisioner symlinks guard hooks at, so guards
-// inside a cycle worktree read this run's phase — not whichever concurrent
-// run last wrote the global file.
 func (s *FilesystemStorage) WriteCycleState(_ context.Context, cs core.CycleState) error {
-	// A worktree's cycle-state.json links to the run's run.json: lock, read and
-	// rename on the resolved target so the link survives (cycle-999 sever).
 	path := statemap.ResolveWriteTarget(s.cycleStatePath())
-	// ADR-0049 G7: serialize the whole read-modify-write (and the run.json
-	// mirror) on the cycle-state.json sidecar lock. checkpoint.ApplyToStateFile
-	// (the other read-modify-writer of this file) holds the SAME lock, so a
-	// concurrent fleet cycle that owns a different key (the checkpoint block)
-	// never renames over a stale read and reverts this write — or vice versa.
-	// No-op cost for the live sequential loop (uncontended); shared with the
-	// checkpoint writer across packages via flock.WithPathLock (the single
-	// sidecar-lock home).
 	return flock.WithPathLock(path, func() error {
 		checkpoint, ok, err := readExistingCheckpoint(path)
 		if err != nil {
 			return err
 		}
 
-		// Determine the value to persist at the global path. When a checkpoint
-		// block already exists it must be spliced in (the CycleState struct does
-		// not model it, so a plain rewrite would erase resume state).
 		var global any = cs
 		if ok {
 			raw, err := json.Marshal(cs)
@@ -117,12 +83,6 @@ func (s *FilesystemStorage) WriteCycleState(_ context.Context, cs core.CycleStat
 	})
 }
 
-// mirrorRunState writes the run.json guard mirror into the run workspace.
-// The checkpoint block is deliberately NOT mirrored: it is resume state owned
-// by the global cycle-state.json (guards never read it, and resume reads the
-// global file directly). A failed mirror surfaces as an error — guards inside
-// the worktree deciding on a stale phase would be a fail-open, not a
-// degradation.
 func mirrorRunState(cs core.CycleState) error {
 	if cs.WorkspacePath == "" {
 		return nil
@@ -156,8 +116,6 @@ func readExistingCheckpoint(path string) (json.RawMessage, bool, error) {
 	return checkpoint, true, nil
 }
 
-// readJSON reads a JSON file into v. Missing file is not an error;
-// returns nil and leaves v untouched.
 func readJSON(path string, v any) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -179,15 +137,10 @@ type ioHooks struct {
 	marshal func(v any) ([]byte, error)
 }
 
-// hooks is the default I/O surface. Tests swap fields temporarily via
-// withHooks to inject failures.
 var hooks = ioHooks{
 	marshal: func(v any) ([]byte, error) { return json.MarshalIndent(v, "", "  ") },
 }
 
-// withHooks temporarily replaces hooks for the duration of fn. Used by
-// tests only; the calling test must hold the package-level test mutex
-// (see hooks_test_helpers.go).
 func withHooks(replacement ioHooks, fn func()) {
 	prev := hooks
 	if replacement.marshal != nil {
@@ -197,9 +150,6 @@ func withHooks(replacement ioHooks, fn func()) {
 	fn()
 }
 
-// writeJSONAtomic writes v as indented JSON to path via a sibling tmp
-// file + rename. Crash-safe: either the old file or the new file is
-// visible, never a half-written truncation.
 func writeJSONAtomic(path string, v any) error {
 	buf, err := hooks.marshal(v)
 	if err != nil {

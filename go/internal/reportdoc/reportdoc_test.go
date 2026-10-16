@@ -255,8 +255,6 @@ func TestRequirePathLineEvidenceAt_RejectsOversizedDeletedBaseBlob(t *testing.T)
 	}
 }
 
-// RequireReasoning is the reasoning floor (ADR-0102): the one blocking rule
-// the audit and retro review gates keep — a token Evidence is not a review.
 func TestRequireReasoning_TokenEvidenceFailsAProseSentencePasses(t *testing.T) {
 	if err := RequireReasoning("  x  "); err == nil || !strings.Contains(err.Error(), "concrete") {
 		t.Fatalf("token evidence must fail the floor: %v", err)
@@ -269,8 +267,6 @@ func TestRequireReasoning_TokenEvidenceFailsAProseSentencePasses(t *testing.T) {
 	}
 }
 
-// ReasonedReview is the one reading of a review section both phase gates
-// share (ADR-0102): absence is never laxer than thinness.
 func TestReasonedReview_AbsenceIsNeverLaxerThanThinness(t *testing.T) {
 	allowed := []string{"Status", "Evidence"}
 	fields, advisories, err := ReasonedReview("## Verdict\n**PASS**\n", "audit-report.md", "Explanation Documentation", allowed...)
@@ -298,9 +294,6 @@ func TestReasonedReview_AbsenceIsNeverLaxerThanThinness(t *testing.T) {
 	}
 }
 
-// A garbled section whose only content is duplicated boilerplate — no
-// Evidence line — is no reasoning: the floor measures the Evidence as
-// written, never the section's bulk (go review, ADR-0102).
 func TestReasonedReview_GarbledBoilerplateWithoutEvidenceFailsTheFloor(t *testing.T) {
 	boilerplate := "## Explanation Documentation\n- Status: VERIFIED\n- Status: VERIFIED\n- Build status: required\n- Document: docs/explain/builds/cycle-42.md\n"
 	fields, advisories, err := ReasonedReview(boilerplate, "audit-report.md", "Explanation Documentation", "Status", "Build status", "Document", "Evidence")

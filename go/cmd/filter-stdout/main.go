@@ -1,7 +1,5 @@
-// filter-stdout is an operator utility: feed it a workspace + phase and
-// it writes the <phase>-stdout.clean.txt companion using the same
-// logfilter.Process the runner calls. Useful for retroactively cleaning
-// pre-v12.2 cycle workspaces.
+// filter-stdout writes the <phase>-stdout.clean.txt companion of a workspace.
+// It runs the same logfilter that the runner uses.
 package main
 
 import (

@@ -60,8 +60,6 @@ func TestExitCodes_HostAliasesAreTheLeafValues(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioning lists the module's non-test Go files outside the
-// launchoutcome leaf whose source contains needle (sorted, module-relative).
 func nonTestSourcesMentioning(t *testing.T, needle string) []string {
 	t.Helper()
 	return nonTestSourcesWhere(t, func(body string) bool { return strings.Contains(body, needle) })

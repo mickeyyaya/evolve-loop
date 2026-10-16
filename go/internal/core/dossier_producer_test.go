@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// initDossierRepo makes root a git working tree so writeCycleDossier's commit
-// (dossier.Write(..., true)) has a repo to add+commit into. Production always
-// runs against the git main tree; the tests mirror that precondition.
 func initDossierRepo(t *testing.T) string {
 	t.Helper()
 	return gittest.Fixture(t).Dir
@@ -84,8 +81,6 @@ func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
 	}
 }
 
-// Regression: the tree-diff guard trips on any untracked
-// knowledge-base/cycles/* pair left behind.
 func TestWriteCycleDossier_LeavesCleanTree(t *testing.T) {
 	t.Parallel()
 

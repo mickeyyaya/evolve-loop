@@ -173,8 +173,8 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 			waves[wi][i].GoalHash = goalHash
 		}
 	}
-	// --simulate is a plumbing check, not an owned run, so it takes no lease.
-	if !*simulate {
+	ownsRun := !*simulate
+	if ownsRun {
 		lease, lerr := campaign.AcquireOwnership(campaignLeaseDir(*projectRoot), goalHash, campaignOwnerSelf(*projectRoot))
 		if lerr != nil {
 			var held *campaign.HeldError
@@ -187,8 +187,6 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 		}
 		defer lease.Release()
 	}
-	// An interrupt reaps in-flight cycles; the checkpoint of completed waves
-	// survives, so a rerun resumes after the last one.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	supervisor := &fleet.Supervisor{
@@ -214,14 +212,10 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// campaignGoalHash keys both each cycle's --goal-hash and the progress file, so
-// run and status agree.
 func campaignGoalHash(plan *campaign.Plan) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(plan.Goal)))
 }
 
-// campaignQuotaCooldown waits out the longest active quota bench, capped, so a
-// walled wave does not retry straight into the wall.
 func campaignQuotaCooldown(projectRoot string) func() time.Duration {
 	return func() time.Duration {
 		store := clihealth.NewStore(projectRoot, nil)
@@ -238,8 +232,6 @@ func campaignQuotaCooldown(projectRoot string) func() time.Duration {
 	}
 }
 
-// campaignEvolveDir always absolutizes the root, so status, which passes the raw
-// flag, reads the same progress file that run wrote.
 func campaignEvolveDir(projectRoot string) string {
 	root := projectRoot
 	if root == "" {
@@ -255,9 +247,6 @@ func campaignEvolveDir(projectRoot string) string {
 	return filepath.Join(root, ".evolve")
 }
 
-// campaignLeaseDir puts the ownership lease in the git common dir, so sessions in
-// different worktrees contend on one file.
-// See ADR-0059.
 func campaignLeaseDir(projectRoot string) string {
 	root := projectRoot
 	if root == "" {
@@ -281,7 +270,6 @@ func campaignLeaseDir(projectRoot string) string {
 	return filepath.Join(campaignEvolveDir(projectRoot), "campaign-leases")
 }
 
-// campaignOwnerSelf is informational only; the flock is the liveness signal.
 func campaignOwnerSelf(projectRoot string) campaign.Owner {
 	worktree := projectRoot
 	if worktree == "" {
@@ -415,8 +403,6 @@ func cycleFromWorkspace(workspace string) int {
 	return n
 }
 
-// campaignBeforeWave installs no hook under --simulate, because the probes
-// launch real CLIs.
 func campaignBeforeWave(simulate bool, projectRoot string, stderr io.Writer) func(context.Context) error {
 	if simulate {
 		return nil

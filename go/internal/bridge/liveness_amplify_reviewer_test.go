@@ -8,7 +8,7 @@ import (
 
 func TestAmp_Reviewer_IdleStateNotExtend(t *testing.T) {
 	t.Parallel()
-	r := NewDeterministicReviewer(6) // maxExtends=6
+	r := NewDeterministicReviewer(6)
 	for _, attempt := range []int{0, 1, 3, 6, 9} {
 		ev := StopEvent{State: panestream.LivenessIdle, Attempt: attempt}
 		verdict := r.Review(ev)
@@ -22,7 +22,6 @@ func TestAmp_Reviewer_BusyButStagnantUnderMaxExtendsExtends(t *testing.T) {
 	t.Parallel()
 	const maxExtends = 4
 	r := NewDeterministicReviewer(maxExtends)
-	// attempts strictly under the cap: 0, 1, maxExtends-1
 	for _, attempt := range []int{0, 1, maxExtends - 1} {
 		ev := StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: attempt}
 		verdict := r.Review(ev)
@@ -36,7 +35,6 @@ func TestAmp_Reviewer_BusyButStagnantAtMaxExtendsBackstops(t *testing.T) {
 	t.Parallel()
 	const maxExtends = 3
 	r := NewDeterministicReviewer(maxExtends)
-	// attempts at or past the cap
 	for _, attempt := range []int{maxExtends, maxExtends + 1, maxExtends + 5} {
 		ev := StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: attempt}
 		verdict := r.Review(ev)
@@ -48,7 +46,7 @@ func TestAmp_Reviewer_BusyButStagnantAtMaxExtendsBackstops(t *testing.T) {
 
 func TestAmp_Reviewer_HungAtAttemptZeroFastFails(t *testing.T) {
 	t.Parallel()
-	r := NewDeterministicReviewer(6) // maxExtends=6
+	r := NewDeterministicReviewer(6)
 	ev := StopEvent{State: panestream.LivenessHung, Attempt: 0}
 	verdict := r.Review(ev)
 	if verdict.Action == ReviewExtend {
@@ -60,19 +58,16 @@ func TestAmp_Reviewer_StateZeroIgnoresRetiredLegacyFields(t *testing.T) {
 	t.Parallel()
 	r := NewDeterministicReviewer(2)
 
-	// The retired fallback would have extended on Progressed=true; must now pause.
 	progEv := StopEvent{Progressed: true, Attempt: 0}
 	if got := r.Review(progEv).Action; got != ReviewPause {
 		t.Errorf("State=0, Progressed=true, attempt=0: got %q, want ReviewPause (boolean fallback retired)", got)
 	}
 
-	// Same past maxExtends — still must pause; Progressed carries no weight now.
 	progPastCap := StopEvent{Progressed: true, Attempt: 9}
 	if got := r.Review(progPastCap).Action; got != ReviewPause {
 		t.Errorf("State=0, Progressed=true, attempt=9: got %q, want ReviewPause (boolean fallback retired)", got)
 	}
 
-	// Legacy idle shape (Progressed=false, Busy=false) pauses via the default/zero-State case now, not a boolean read.
 	idleEv := StopEvent{Progressed: false, Busy: false, Attempt: 0}
 	if got := r.Review(idleEv).Action; got == ReviewExtend {
 		t.Errorf("State=0, Progressed=false, Busy=false, attempt=0: got ReviewExtend, want non-extend")

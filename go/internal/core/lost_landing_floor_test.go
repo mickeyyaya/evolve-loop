@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// realCycleWorkspace copies a vendored cycle's ship artifacts into a temp
-// workspace, so the detector reads the same bytes the live cycle wrote.
 func realCycleWorkspace(t *testing.T, cycleDir string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -74,9 +72,6 @@ func TestDetectLostLanding_OnlyShippingVerdictsAreFlagged(t *testing.T) {
 	}
 }
 
-// filepath.Join("", "ship-error.json") is "ship-error.json", i.e. a read
-// from the process CWD, so without the guard an empty workspace silently
-// inspects the working directory. Deliberately not t.Parallel — it chdirs.
 func TestDetectLostLanding_NoWorkspaceDoesNotReadTheProcessCWD(t *testing.T) {
 	decoy := t.TempDir()
 	if err := os.WriteFile(filepath.Join(decoy, "ship-error.json"),

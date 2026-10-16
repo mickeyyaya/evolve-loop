@@ -1,13 +1,5 @@
 package storage
 
-// cycle-999 sever regression (atomicwrite-linked-state-sweep, cycle 1694):
-// core/worktree.go linkGuardDeps symlinks a cycle worktree's
-// .evolve/state.json and .evolve/cycle-state.json at their canonical files. A
-// tmp+rename onto the UNRESOLVED path replaces the link with a regular file, so
-// every later write strands in a detached copy. Each writer below must keep the
-// link intact and land its bytes on the canonical target — for an absolute
-// link, a relative link, and a link that dangles until the first write.
-
 import (
 	"context"
 	"os"
@@ -18,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// linkedEvolveDir lays out <root>/canon/.evolve/<name> (seeded with seed
-// unless shape is "dangling") and a worktree view <root>/wt/.evolve/<name>
-// linking to it. It returns the worktree evolve dir, the link, its literal
-// target, and the canonical path.
 func linkedEvolveDir(t *testing.T, shape, name, seed string) (evolveDir, link, target, canonical string) {
 	t.Helper()
 	root := t.TempDir()
@@ -49,7 +37,6 @@ func linkedEvolveDir(t *testing.T, shape, name, seed string) (evolveDir, link, t
 	return evolveDir, link, target, canonical
 }
 
-// requireLinkIntact fails unless link is still a symlink pointing at target.
 func requireLinkIntact(t *testing.T, link, target string) {
 	t.Helper()
 	fi, err := os.Lstat(link)
@@ -95,7 +82,7 @@ func TestUpdateState_WritesThroughSymlinkedStatePath(t *testing.T) {
 			}
 			requireLinkIntact(t, link, target)
 			got := readStateMap(t, canonical)
-			wantRev := float64(8) // bumped from the canonical value read through the link
+			wantRev := float64(8)
 			if shape == "dangling" {
 				wantRev = 1
 			}
@@ -112,7 +99,7 @@ func TestUpdateState_WritesThroughSymlinkedStatePath(t *testing.T) {
 func TestWriteCycleState_WritesThroughSymlinkedCycleStatePath(t *testing.T) {
 	for _, shape := range linkShapes {
 		t.Run(shape, func(t *testing.T) {
-			t.Setenv(ipcenv.CycleStateFileKey, "") // never write the live lane's cycle-state
+			t.Setenv(ipcenv.CycleStateFileKey, "")
 			evolveDir, link, target, canonical := linkedEvolveDir(t, shape, "cycle-state.json",
 				`{"cycle_id":1694,"phase":"tdd","checkpoint":{"marker":"keep"}}`)
 

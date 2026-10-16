@@ -10,19 +10,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// Profile is the parsed agent profile JSON, loaded once per launch and folded into the resolved Config.
 type Profile struct {
-	Name           string
-	Model          string
-	AllowedTools   []string
-	PermissionMode string
-	StreamOutput   bool
-	SessionName    string
-	Sandbox        *ProfileSandbox
-	// ExtraFlagsByCLI is the per-CLI raw-flag escape hatch, realized only for
-	// the matching CLI so a profile switched to another CLI carries none of
-	// the original CLI's argv.
-	// See ADR-0022.
+	Name            string
+	Model           string
+	AllowedTools    []string
+	PermissionMode  string
+	StreamOutput    bool
+	SessionName     string
+	Sandbox         *ProfileSandbox
 	ExtraFlagsByCLI map[string][]string
 }
 
@@ -43,12 +38,8 @@ func manifestDefaultTier(cli string) string {
 	return untieredLaunchTier
 }
 
-// ProfileSandbox shares the canonical profile schema so launch cannot silently
-// drop filesystem restrictions parsed by the profile loader.
 type ProfileSandbox = profiles.SandboxConfig
 
-// validPermissionModes mirrors claude's --permission-mode set; "" means
-// "let the driver/CLI decide" (v1 profile back-compat).
 var validPermissionModes = map[string]bool{
 	"":                  true,
 	"plan":              true,
@@ -59,13 +50,8 @@ var validPermissionModes = map[string]bool{
 	"dontAsk":           true,
 }
 
-// sessionNameRE matches the safe tmux session-name charset (no shell
-// metachars), mirroring profile.sh + bin/bridge.
 var sessionNameRE = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 
-// profileWire is the JSON-facing shape. stream_output is a *bool so a
-// non-boolean JSON value surfaces as an unmarshal error (the bash side
-// rejects non-bool stream_output too); absent → nil → default false.
 type profileWire struct {
 	Name            string              `json:"name"`
 	Model           string              `json:"model"`
@@ -79,7 +65,6 @@ type profileWire struct {
 	ExtraFlagsByCLI map[string][]string `json:"extra_flags_by_cli"`
 }
 
-// LoadProfile reads and validates an agent profile JSON, returning the parsed Profile.
 func LoadProfile(path string) (Profile, error) {
 	if path == "" {
 		return Profile{}, fmt.Errorf("bridge:profile: empty path")

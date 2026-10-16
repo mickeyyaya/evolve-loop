@@ -14,9 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// runCompose runs the named phases in order through the orchestrator's
-// factories without consulting the state machine. It exits 1 when any phase
-// fails, 2 for ship without --ship-anyway, and 10 on bad arguments.
 func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("compose", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -47,7 +44,6 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return rc
 	}
 
-	// In compose mode the kernel phase guard warns instead of blocking.
 	req.ComposePhases = true
 
 	fmt.Fprintf(stdout, "[compose] sequence: %s\n", strings.Join(phases, " -> "))

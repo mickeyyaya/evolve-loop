@@ -12,26 +12,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// Advisor pane-digest caps: the StopEvent tail is ~40 lines; keep the framed
-// evidence within the ACI compact-feedback envelope.
 const (
 	advisorPaneMaxLines = 40
 	advisorPaneMaxCols  = 400
 )
 
-// FailureAdvisor is the LLM escalation tail for a fatal-looking pane the
-// deterministic FatalPaneDetector could not classify (CauseUnknown).
-//
-// See ADR-0044.
 type FailureAdvisor struct {
 	bridge   Bridge
-	identity AgentIdentity // See ADR-0052.
+	identity AgentIdentity
 }
 
-// FailureAdvisorOption customizes a FailureAdvisor (mirrors PhaseAdvisorOption).
 type FailureAdvisorOption func(*FailureAdvisor)
 
-// WithFailureAdvisorCLI overrides the CLI the advisor dispatches to.
 func WithFailureAdvisorCLI(cli string) FailureAdvisorOption {
 	return func(a *FailureAdvisor) {
 		if cli != "" {
@@ -40,7 +32,6 @@ func WithFailureAdvisorCLI(cli string) FailureAdvisorOption {
 	}
 }
 
-// WithFailureAdvisorModel overrides the model tier the advisor requests.
 func WithFailureAdvisorModel(model string) FailureAdvisorOption {
 	return func(a *FailureAdvisor) {
 		if model != "" {
@@ -49,8 +40,6 @@ func WithFailureAdvisorModel(model string) FailureAdvisorOption {
 	}
 }
 
-// WithFailureAdvisorPersona injects the persona body
-// (agents/evolve-failure-advisor.md), uniform with phase agents.
 func WithFailureAdvisorPersona(body string) FailureAdvisorOption {
 	return func(a *FailureAdvisor) {
 		if body != "" {
@@ -59,9 +48,6 @@ func WithFailureAdvisorPersona(body string) FailureAdvisorOption {
 	}
 }
 
-// NewFailureAdvisor builds the failure-classification tail over the given
-// bridge, defaulting to claude-tmux/opus: it runs off the hot loop for
-// unclassified states only, so depth beats latency here.
 func NewFailureAdvisor(bridge Bridge, opts ...FailureAdvisorOption) *FailureAdvisor {
 	a := &FailureAdvisor{
 		bridge:   bridge,
@@ -75,8 +61,6 @@ func NewFailureAdvisor(bridge Bridge, opts ...FailureAdvisorOption) *FailureAdvi
 
 const UsageEvidenceFile = "usage-evidence.ndjson"
 
-// FailureAdviseInput is the evidence envelope for one unclassified terminal
-// state: which phase/CLI died, how, and the recent pane tail.
 type FailureAdviseInput struct {
 	Phase       string
 	CLI         string
@@ -88,9 +72,6 @@ type FailureAdviseInput struct {
 	Env         map[string]string
 }
 
-// Advise asks the LLM to classify one CauseUnknown terminal state and
-// returns a vocabulary-validated verdict; promotion into the deterministic
-// registry is the caller's separate step via recovery.PromoteAdvice.
 func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*recovery.FailureAdvice, error) {
 	if a.bridge == nil {
 		return nil, fmt.Errorf("failure advisor: nil bridge")
@@ -121,8 +102,6 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 	return parseFailureAdvice(resp.Stdout)
 }
 
-// The inline fallback keeps the advisor functional before the composition
-// root wires the persona file.
 func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) string {
 	var b strings.Builder
 	if a.identity.Persona != "" {
@@ -136,13 +115,9 @@ func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) s
 	b.WriteString("# Incident\n")
 	fmt.Fprintf(&b, "- phase: %s\n- cli: %s\n- exit_code: %d\n- cycle: %d\n\n", in.Phase, in.CLI, in.ExitCode, in.Cycle)
 	writeUsageEvidence(&b, in.Workspace)
-	// See ADR-0045.
 	b.WriteString("# Recent pane tail\n")
 	b.WriteString(panetrust.Frame(in.PaneTail, advisorPaneMaxLines, advisorPaneMaxCols))
 	b.WriteString("\n\n")
-	// The model sees only the neutralized pane, but the promoted pane_substr is
-	// matched against RAW panes by recovery.FatalPaneDetector, so a quoted
-	// neutralization artifact would promote a signature that can never fire.
 	b.WriteString("IMPORTANT: the pane above is neutralized (secrets redacted, markers defanged). ")
 	b.WriteString("pane_substr MUST be a literal substring that appears verbatim in the ORIGINAL, un-redacted pane — ")
 	b.WriteString("never quote [REDACTED], [untrusted], or ''' artifacts.\n\n")
@@ -181,12 +156,8 @@ func usageEvidenceLines(workspace string) []string {
 	return out
 }
 
-// parseFailureAdvice is the trust boundary: it applies the same checks
-// recovery.PromoteAdvice enforces, early, so a bad verdict fails at the parse
-// site with the model's raw output in the error.
 func parseFailureAdvice(raw string) (*recovery.FailureAdvice, error) {
 	trimmed := strings.TrimSpace(raw)
-	// Tolerate accidental code fences (the same leniency parseProposal applies).
 	trimmed = strings.TrimPrefix(trimmed, "```json")
 	trimmed = strings.TrimPrefix(trimmed, "```")
 	trimmed = strings.TrimSuffix(trimmed, "```")

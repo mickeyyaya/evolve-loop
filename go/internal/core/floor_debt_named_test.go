@@ -10,8 +10,6 @@ import (
 func TestDefaultBuildFloorChecks_NonRepoWorktreeIsClean(t *testing.T) {
 	t.Parallel()
 
-	// A non-git worktree yields no changed packages — the floor must return
-	// no failures rather than erroring (degraded-provisioning shape).
 	if fails := DefaultBuildFloorChecks(context.Background(), ReviewInput{Worktree: t.TempDir()}); len(fails) != 0 {
 		t.Fatalf("non-repo worktree must produce no floor failures, got %v", fails)
 	}

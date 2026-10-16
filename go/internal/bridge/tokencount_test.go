@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// TestExtractTokenCount pins the parser contract: a visible "↓ N.Nk tokens"
-// counter → integer token count (k = thousands), the PEAK across multiple
-// counters, and 0 for any no-match / malformed / empty input.
 func TestExtractTokenCount(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -30,9 +27,6 @@ func TestExtractTokenCount(t *testing.T) {
 		{"no counter at all", "❯ ready\nTool: Read main.go\n", 0},
 		{"empty pane", "", 0},
 		{"malformed: no digits", "↓ k tokens", 0},
-		// ExtractResponseTokens also accepts a plain-integer count (no "k" suffix);
-		// production panes always render the k-form, so this form only appears in
-		// synthetic test frames.
 		{"unified extractor: plain-integer → 5200", "↓ 5200 tokens", 5200},
 		{"malformed: missing tokens word", "↓ 5.2k", 0},
 		{"malformed: non-numeric", "↓ abck tokens", 0},
@@ -63,19 +57,12 @@ func TestReplWaitResult_RecordTokensRetainsPeak(t *testing.T) {
 	}
 }
 
-// TestTmuxPhase_WritesTokenUsage drives the real claude-tmux REPL engine with a
-// pane that carries a token counter and asserts the phase writes
-// workspace/token-usage.json with the peak the pane showed. Behavioral: it
-// invokes the engine end-to-end, not a string check on source.
 func TestTmuxPhase_WritesTokenUsage(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// Pre-seed the artifact so the wait loop completes on its first poll.
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	// Every capture returns a pane carrying the REPL marker (so boot succeeds)
-	// AND a "↓ 5.2k tokens" counter (so the extractor sees 5200).
 	pane := tmuxPromptMarkerDefault + " working\n↓ 5.2k tokens · 1m 2s\n"
 	tmux := &fakeTmux{paneSeq: []string{pane}}
 	code, stderr := runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -102,9 +89,6 @@ func TestTmuxPhase_WritesTokenUsage(t *testing.T) {
 	}
 }
 
-// TestBuildReport_TokenUsage pins the report field: a valid token-usage.json
-// populates Report.TokenUsage; a missing or malformed sidecar leaves it 0 and
-// never breaks report generation (best-effort telemetry).
 func TestBuildReport_TokenUsage(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 6, 8, 0, 0, 0, 0, time.UTC)

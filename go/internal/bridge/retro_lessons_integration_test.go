@@ -81,8 +81,6 @@ func TestNativeRetrospectiveLessonBoundary(t *testing.T) {
 	}
 }
 
-// The caller tests pin root propagation; this half exercises the checked-in
-// Router profile through the real launch parser and native sandbox.
 func TestNativeDecisionProfileOwnedCWD(t *testing.T) {
 	t.Parallel()
 	probe := requireNativeSandbox(t)

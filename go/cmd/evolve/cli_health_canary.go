@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
-// defaultLiveProbe is the one canary probe the loop and the campaign runner
-// share, so its semantics and bound cannot drift between them.
 func defaultLiveProbe(ctx context.Context, projectRoot string, stderr io.Writer) liveProbe {
 	return liveProbeWith(ctx, projectRoot, bridge.Deps{Stderr: stderr})
 }
@@ -29,19 +27,12 @@ func liveProbeWith(ctx context.Context, projectRoot string, deps bridge.Deps) li
 	}
 }
 
-// liveProbe returns the bridge exit code, the escalation pattern of a
-// classified wall (else empty), and the scrollback that carries its reset hint.
 type liveProbe func(driver string) (rc int, pattern, scrollback string)
 
-// runCLIHealthCanary probes each expired bench once before a cycle: recovered
-// clears it, walled again re-benches it, and any other failure clears it,
-// because non-wall classes belong to the normal dispatch machinery.
 func runCLIHealthCanary(ctx context.Context, projectRoot string, env map[string]string, probe liveProbe, stderr io.Writer) {
 	if !envchain.BoolValue(envchain.Resolve("EVOLVE_CLI_HEALTH", env, "", "1"), true) {
 		return
 	}
-	// A cancelled probe reports "not a wall", which would clear a bench that is
-	// still walled, so cancellation touches no bench.
 	if ctx.Err() != nil {
 		fmt.Fprintf(stderr, "[loop] cli-health canary: cancelled (%v) — benches untouched\n", ctx.Err())
 		return

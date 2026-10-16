@@ -9,7 +9,7 @@ import (
 )
 
 type pinnedLedgerRoot struct {
-	unobserved int // constructions in the file that pass no WithSignals
+	unobserved int
 	reason     string
 }
 
@@ -47,7 +47,6 @@ func TestUnobservedLedgerRootsArePinned(t *testing.T) {
 			return nil
 		}
 		rel, _ := filepath.Rel(moduleRoot, path)
-		// Counted per file, so an unobserved ledger.New( beside an observed one fails.
 		seen[filepath.ToSlash(rel)] = calls - strings.Count(string(src), "ledger.WithSignals(")
 		return nil
 	})

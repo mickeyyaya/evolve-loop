@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// writeCycleStateN honors its cycle argument, unlike writeCycleState, so a test
-// can prove the resolver reads the requested cycle's file.
 func writeCycleStateN(t *testing.T, evolveDir string, cycle int, body string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "runs", "cycle-"+strconv.Itoa(cycle))

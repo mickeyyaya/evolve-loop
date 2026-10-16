@@ -77,7 +77,6 @@ func TestWaves_DependencyOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Waves: %v", err)
 	}
-	// a (no deps) in wave 0; b (deps a) in wave 1.
 	if len(waves) != 2 || len(waves[0]) != 1 || waves[0][0].Scope[0] != "a" || waves[1][0].Scope[0] != "b" {
 		t.Errorf("unexpected waves: wave0=%v wave1=%v", waves[0], waves[1])
 	}
@@ -86,8 +85,8 @@ func TestWaves_DependencyOrder(t *testing.T) {
 func TestDiff(t *testing.T) {
 	old := validPlan()
 	updated := validPlan()
-	updated.Cycles[1].Files = []string{"fb", "fc"}               // modify b
-	updated.Cycles = append(updated.Cycles, fleet.Todo{ID: "c"}) // add c
+	updated.Cycles[1].Files = []string{"fb", "fc"}
+	updated.Cycles = append(updated.Cycles, fleet.Todo{ID: "c"})
 	d := Diff(old, updated)
 	if !strings.Contains(d, "added: [c]") || !strings.Contains(d, "modified: [b]") || !strings.Contains(d, "removed: []") {
 		t.Errorf("Diff = %q, want added [c], modified [b], removed []", d)

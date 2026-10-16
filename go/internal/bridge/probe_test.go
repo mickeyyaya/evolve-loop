@@ -55,7 +55,6 @@ func TestEngineProbe_NoBinaries_AllNone(t *testing.T) {
 }
 
 func TestEngineProbe_ClaudeTmuxAvailable(t *testing.T) {
-	// claude + tmux present → claude-tmux resolves to its declared tier (hybrid).
 	t.Parallel()
 	eng := NewEngine(Deps{LookPath: func(b string) (string, error) {
 		if b == "claude" || b == "tmux" {

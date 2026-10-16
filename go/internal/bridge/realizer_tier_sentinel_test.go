@@ -2,14 +2,6 @@ package bridge
 
 import "testing"
 
-// emittedModelValue returns the model value this realization delivers through
-// spec's flag, or "" when none was emitted. It reads spec.Flag rather than a
-// hardcoded "--model" so a manifest using a different flag name (codex uses
-// "-m") cannot pass the assertion vacuously.
-//
-// Flag-only by design: no embedded manifest declares channel:"repl" for
-// model_tier, and the repl path is covered by realizer_modelpolicy_test.go;
-// an unreachable branch here would be untested code in a test helper.
 func emittedModelValue(r Realization, spec ParamSpec) string {
 	for i, f := range r.LaunchFlags {
 		if f == spec.Flag && i+1 < len(r.LaunchFlags) {
@@ -32,7 +24,7 @@ func TestRealizeScalar_OmitsModelWhenResolutionLeavesATierName(t *testing.T) {
 		}
 		spec := m.Params["model_tier"]
 		if spec.Channel != "flag" {
-			continue // positional/noop/repl drivers emit no launch flag here
+			continue
 		}
 		for _, tok := range unresolvedModelTokens {
 			t.Run(name+"/"+tok, func(t *testing.T) {

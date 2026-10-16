@@ -9,12 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
 
-// runVersionBump is `evolve version-bump <target> [--dry-run]`.
-// Mirrors legacy/scripts/release/version-bump.sh exit codes:
-//
-//	0  — success or no-op idempotent
-//	1  — a write failed
-//	10 — invalid arguments
 func RunVersionBump(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var (
 		target string
@@ -25,24 +19,24 @@ func RunVersionBump(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		case a == "--help" || a == "-h":
 			fmt.Fprintln(stdout, "Usage: evolve version-bump <target-version> [--dry-run]")
 			fmt.Fprintln(stdout, "Bumps .claude-plugin/*.json, SKILL.md, README.md atomically.")
-			return 0
+			return exitOK
 		case a == "--dry-run":
 			dryRun = true
 		case len(a) >= 2 && a[:2] == "--":
 			fmt.Fprintf(stderr, "[version-bump] unknown flag: %s\n", a)
-			return 10
+			return exitUsage
 		default:
 			if target == "" {
 				target = a
 			} else {
 				fmt.Fprintf(stderr, "[version-bump] extra positional arg: %s\n", a)
-				return 10
+				return exitUsage
 			}
 		}
 	}
 	if target == "" {
 		fmt.Fprintln(stderr, "[version-bump] usage: version-bump <target-version> [--dry-run]")
-		return 10
+		return exitUsage
 	}
 
 	repoRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
@@ -50,7 +44,7 @@ func RunVersionBump(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	res, err := versionbump.Run(paths, target, dryRun, time.Now())
 	if err != nil {
 		fmt.Fprintf(stderr, "[version-bump] FAIL: %v\n", err)
-		return 1
+		return exitFail
 	}
 	if len(res.Modified) == 0 {
 		fmt.Fprintf(stderr, "[version-bump] no-op: all files already at %s\n", target)
@@ -60,5 +54,5 @@ func RunVersionBump(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 	fmt.Fprint(stdout, res.ResultJSON())
-	return 0
+	return exitOK
 }

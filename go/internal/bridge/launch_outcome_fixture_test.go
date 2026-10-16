@@ -16,9 +16,6 @@ const (
 	launchFixtureMarkerSubmitWed = "[bridge] artifact-timeout: cause=submit_wedged reason=\"prompt submit wedged\" phase=build cycle=3 driver=claude-tmux artifact=\"a.md\" waited=300s interval=300s extends_used=0 max_extends=6 last_review=none liveness=hung progressed=false busy=false transient=false detector_error=\"\""
 )
 
-// launchStderrFixtures are the seven captured-stderr shapes the classifier sees: nothing; a gauntlet cause
-// first; driver chatter ending in the causal line; tmux chatter then the artifact-timeout marker with a
-// typed cause; a marker whose only `cause=` token is quoted prose; a 301-rune last line; a 1100-rune marker line.
 var launchStderrFixtures = map[string]string{
 	"empty": "",
 	"first-bridge-line": "[bridge] launch: missing required (flag or env): --profile\n" +
@@ -36,7 +33,6 @@ var launchStderrFixtures = map[string]string{
 	"long-marker": "[bridge] artifact-timeout: cause=incomplete " + strings.Repeat("界", 1100) + "\n",
 }
 
-// launchOutcomeFixtureDriver replays its ExtraFlags script.
 type launchOutcomeFixtureDriver struct{}
 
 func (launchOutcomeFixtureDriver) Name() string { return launchOutcomeFixtureCLI }
@@ -57,9 +53,6 @@ func (launchOutcomeFixtureDriver) Launch(_ context.Context, cfg *Config, deps De
 	return code, nil
 }
 
-// ensureLaunchFixtureDriver registers the fixture driver on demand rather than at init, so the
-// registry-reset tests (which restore only the seven builtins) and TestDriverRegistry's strict count are
-// unaffected; Register panics on a duplicate, so a prior launch's registration is skipped.
 func ensureLaunchFixtureDriver(t *testing.T) {
 	t.Helper()
 	if _, ok := LookupDriver(launchOutcomeFixtureCLI); !ok {
@@ -67,7 +60,6 @@ func ensureLaunchFixtureDriver(t *testing.T) {
 	}
 }
 
-// launchFixtureScript builds the ExtraFlags script for one launch.
 func launchFixtureScript(code int, stderrFixture string, extra ...string) []string {
 	script := []string{"exit=" + strconv.Itoa(code)}
 	if stderrFixture != "" {

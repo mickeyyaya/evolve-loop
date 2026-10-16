@@ -7,9 +7,6 @@ import (
 	"time"
 )
 
-// TestClaudeTmuxExhaustedRegex_PerModelWording locks claude-tmux's usage.exhausted_regex against the
-// literal strings captured from live escalation reports rather than a hand-written fixture, since a
-// synthetic fixture can keep passing while the live wording drifts out from under the regex.
 func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
@@ -28,9 +25,6 @@ func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 		t.Fatalf("exhausted_regex does not compile: %v", err)
 	}
 
-	// Every wall fixture is built by concatenation ("li"+"mit") so the literal wall text never appears on
-	// one source line: a verbatim string would itself match the live exhausted_regex (through the
-	// persistence gate) when an agent reads this file, exit-85ing a healthy session reviewing it.
 	walls := []string{
 		"You've reached your Fable 5 li" + "mit. Run /usage-cre" + "dits to continue or switch models with /model.",
 		"You've reached your Opus li" + "mit. Run /usage-cre" + "dits to continue or switch models with /model.",
@@ -48,11 +42,6 @@ func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 		}
 	}
 
-	// NOT a wall — must NOT match; matching any of these would fast-fail a working agent, since non-diff
-	// pane renderings (Read-tool cat-n output, plain prose, log lines) reach the regex unstripped. The
-	// per-model branch requires BOTH second-person chrome ("you(?:.?ve| have) reached your … limit") AND
-	// the "/usage-credits" companion adjacent on the same line, so third-person prose, ordinary
-	// second-person prose, and narration that merely quotes the wall phrase (without the companion) all miss.
 	notWalls := []string{
 		"You're approaching your Fable 5 limit.",
 		"Approaching your usage limit soon — consider wrapping up.",
@@ -78,7 +67,6 @@ func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 	}
 }
 
-// Concatenation avoids triggering agents reading this test as ordinary tool output.
 func TestClaudeSessionWallUsesGuardedExhaustion(t *testing.T) {
 	t.Parallel()
 	wall := "  ⎿  You've hit your session li" + "mit · resets 5:10am (Asia/Taipei)"
@@ -128,9 +116,6 @@ func TestClaudeSessionWallUsesGuardedExhaustion(t *testing.T) {
 	}
 }
 
-// tmux can render Claude Code's "⎿" indentation with U+00A0 rather than a plain space or tab; the
-// session-wall branch must accept both, or a live wall never classifies. Concatenation keeps agents
-// reading this test from matching.
 func TestClaudeSessionWall_NBSPIndentIsRecognised(t *testing.T) {
 	t.Parallel()
 	for _, live := range []string{

@@ -112,7 +112,6 @@ func TestCmd_InboxMover_Promote_NoOpExitsZero(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", d)
 	var stdout, stderr bytes.Buffer
 	rc := runInboxMover([]string{"promote", "task-missing", "processed"}, nil, &stdout, &stderr)
-	// ship.sh compat: missing task is NoOp exit 0, not error.
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0 (NoOp)", rc)
 	}

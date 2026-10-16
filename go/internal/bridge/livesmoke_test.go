@@ -17,8 +17,6 @@ func liveSmokeDeps(tmux TmuxController) Deps {
 	}
 }
 
-// liveArtifactTmux writes the live-smoke artifact when the prompt is pasted —
-// the fake's stand-in for a healthy model answering the probe.
 type liveArtifactTmux struct {
 	*FakeTmuxController
 	artifact string
@@ -34,8 +32,6 @@ func (a *liveArtifactTmux) PasteBuffer(ctx context.Context, session string) erro
 func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	// The extra "working ❯" is the settling tick: the cross-poll stability window (completion.go) completes
-	// the artifact one tick after it first appears, so the pane is captured once more before cleanup.
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "done ❯", "cleanup"}}
 	tm := &liveArtifactTmux{FakeTmuxController: base, artifact: filepath.Join(ws, LiveSmokeArtifact)}
 	rc, pattern, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))

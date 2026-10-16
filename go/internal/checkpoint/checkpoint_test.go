@@ -1,7 +1,3 @@
-// Package checkpoint ports the pre-emptive cycle-checkpoint logic from
-// scripts/lifecycle/cycle-state.sh:cycle_state_checkpoint. The
-// checkpoint block is written INTO cycle-state.json (additive schema)
-// — there is no separate checkpoint.json on disk despite earlier docs.
 package checkpoint
 
 import (
@@ -15,15 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// fixedTime returns a deterministic timestamp for tests.
 func fixedTime() time.Time {
 	return time.Date(2026, 5, 22, 17, 0, 0, 0, time.UTC)
 }
 
-// TestCompose_FromCycleState pulls all the load-bearing fields from a
-// CycleState and bash semantics. resumeFromPhase comes from .phase;
-// completedPhases from .completed_phases; worktreePath from
-// .active_worktree.
 func TestCompose_FromCycleState(t *testing.T) {
 	cs := core.CycleState{
 		CycleID:         42,
@@ -61,8 +52,6 @@ func TestCompose_FromCycleState(t *testing.T) {
 	}
 }
 
-// TestCompose_InvalidReason_Errors — reason is validated by Reason
-// type, but Compose with a bare string must surface an error.
 func TestCompose_InvalidReason_Panics(t *testing.T) {
 	_, err := ComposeChecked(core.CycleState{CycleID: 1, Phase: "x"}, Reason("nope"), 0, "", fixedTime())
 	if err == nil {
@@ -70,8 +59,6 @@ func TestCompose_InvalidReason_Panics(t *testing.T) {
 	}
 }
 
-// TestApplyToStateFile_AddsCheckpointBlock — read cycle-state.json,
-// add checkpoint block via Apply, write back; verify round-trip.
 func TestApplyToStateFile_AddsCheckpointBlock(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "cycle-state.json")
@@ -94,7 +81,6 @@ func TestApplyToStateFile_AddsCheckpointBlock(t *testing.T) {
 	if err := ApplyToStateFile(path, cp); err != nil {
 		t.Fatalf("ApplyToStateFile: %v", err)
 	}
-	// Re-read and verify checkpoint sub-block exists with required fields.
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -103,11 +89,9 @@ func TestApplyToStateFile_AddsCheckpointBlock(t *testing.T) {
 	if err := json.Unmarshal(b, &got); err != nil {
 		t.Fatal(err)
 	}
-	// Pre-existing fields preserved.
 	if got["phase"] != "build" {
 		t.Errorf("phase mutated: %v", got["phase"])
 	}
-	// Checkpoint block present.
 	bl, ok := got["checkpoint"].(map[string]any)
 	if !ok {
 		t.Fatalf("checkpoint block missing or wrong type: %v", got["checkpoint"])
@@ -120,7 +104,6 @@ func TestApplyToStateFile_AddsCheckpointBlock(t *testing.T) {
 	}
 }
 
-// TestApplyToStateFile_AtomicReplace — failed rename leaves no tmp.
 func TestApplyToStateFile_AtomicReplace(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "cs.json")
@@ -142,14 +125,7 @@ func TestApplyToStateFile_AtomicReplace(t *testing.T) {
 	}
 }
 
-// TestApplyToStateFile_MissingFile_Errors — checkpoint can't be applied
-// without an existing cycle-state.json (bash:486 same precondition).
 func TestApplyToStateFile_MissingFile_Errors(t *testing.T) {
-	// A missing cycle-state.json inside an existing (writable) dir — the realistic
-	// precondition. ADR-0049 G7 wraps the apply in the cycle-state sidecar lock,
-	// which creates "<file>.lock" in the (present) dir, then the read of the absent
-	// data file surfaces ErrNotExist. (Production always calls under .evolve/, so a
-	// nonexistent parent dir is not a real path.)
 	missing := filepath.Join(t.TempDir(), core.CycleStateFile)
 	err := ApplyToStateFile(missing, Checkpoint{Reason: ReasonBatchCapNear})
 	if err == nil {
@@ -160,12 +136,8 @@ func TestApplyToStateFile_MissingFile_Errors(t *testing.T) {
 	}
 }
 
-// TestCompose_NilCompletedPhases_NormalizedToEmptySlice — Compose must
-// emit a non-nil empty slice when CycleState.CompletedPhases is nil,
-// so the JSON write produces `"completedPhases": []` not `null` (bash
-// readers depend on the empty-array shape).
 func TestCompose_NilCompletedPhases_NormalizedToEmptySlice(t *testing.T) {
-	cs := core.CycleState{CycleID: 1, Phase: "build"} // CompletedPhases nil
+	cs := core.CycleState{CycleID: 1, Phase: "build"}
 	cp := Compose(cs, ReasonBatchCapNear, 0, "", fixedTime())
 	if cp.CompletedPhases == nil {
 		t.Error("CompletedPhases=nil, want empty []string{}")
@@ -175,7 +147,6 @@ func TestCompose_NilCompletedPhases_NormalizedToEmptySlice(t *testing.T) {
 	}
 }
 
-// TestComposeChecked_ValidReason — happy path for the checked variant.
 func TestComposeChecked_ValidReason(t *testing.T) {
 	cs := core.CycleState{CycleID: 1, Phase: "build"}
 	cp, err := ComposeChecked(cs, ReasonOperatorRequest, 1.0, "abc", fixedTime())
@@ -187,8 +158,6 @@ func TestComposeChecked_ValidReason(t *testing.T) {
 	}
 }
 
-// TestApplyToStateFile_MalformedJSON_Errors — the existing state file
-// must be valid JSON; surface a parse error rather than overwriting.
 func TestApplyToStateFile_MalformedJSON_Errors(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "bad.json")
@@ -201,16 +170,12 @@ func TestApplyToStateFile_MalformedJSON_Errors(t *testing.T) {
 	}
 }
 
-// TestApplyToStateFile_RenameFailure_CleansTmp — when the destination
-// path is a non-empty directory, rename fails; tmp must not linger.
 func TestApplyToStateFile_RenameFailure_CleansTmp(t *testing.T) {
 	tmp := t.TempDir()
 	dest := filepath.Join(tmp, "cs.json")
-	// Write valid state first.
 	if err := os.WriteFile(dest, []byte(`{"phase":"build"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Now turn dest into a non-empty dir to force rename failure.
 	if err := os.Remove(dest); err != nil {
 		t.Fatal(err)
 	}
@@ -220,24 +185,15 @@ func TestApplyToStateFile_RenameFailure_CleansTmp(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dest, "x"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// ApplyToStateFile reads dest first; reading a directory will
-	// return an error before we even reach the rename branch. This
-	// is fine for coverage of the read-error path.
 	if err := ApplyToStateFile(dest, Checkpoint{Reason: ReasonBatchCapNear}); err == nil {
 		t.Error("ApplyToStateFile(dir as state): want error")
 	}
 }
 
-// TestApplyWithHooks_ErrorBranches drives each error path of
-// applyWithHooks independently. This is the I/O hooks pattern Phase 1
-// established for ≥95% coverage on filesystem-bound funcs (see
-// feedback_session_handoff_at_400k.md hooks pattern note).
 func TestApplyWithHooks_ErrorBranches(t *testing.T) {
 	base := func() hooks { return defaultHooks() }
 	good := func(_ string) ([]byte, error) { return []byte(`{"phase":"build"}`), nil }
 	failJSONMarshalChk := func(v any) ([]byte, error) {
-		// Marshal the state map normally; fail when asked for the
-		// Checkpoint struct.
 		if _, ok := v.(Checkpoint); ok {
 			return nil, errors.New("forced marshal err")
 		}
@@ -276,10 +232,10 @@ func TestApplyWithHooks_ErrorBranches(t *testing.T) {
 				calls := 0
 				h.jsonUnmarshal = func(b []byte, v any) error {
 					calls++
-					if calls == 1 { // first call = state parse → succeed
+					if calls == 1 {
 						return json.Unmarshal(b, v)
 					}
-					return errors.New("re-parse fail") // second call = checkpoint block re-parse
+					return errors.New("re-parse fail")
 				}
 			},
 			want: "re-parse block",
@@ -291,7 +247,7 @@ func TestApplyWithHooks_ErrorBranches(t *testing.T) {
 				calls := 0
 				h.jsonMarshal = func(v any) ([]byte, error) {
 					calls++
-					if calls == 1 { // first call = checkpoint block marshal → succeed
+					if calls == 1 {
 						return json.Marshal(v)
 					}
 					return nil, errors.New("state marshal fail")
@@ -315,7 +271,7 @@ func TestApplyWithHooks_ErrorBranches(t *testing.T) {
 				removeCalled := false
 				h.rename = func(string, string) error { return errors.New("rename fail") }
 				h.remove = func(string) error { removeCalled = true; return nil }
-				_ = removeCalled // captured for visibility; assert via no-error path elsewhere
+				_ = removeCalled
 			},
 			want: "rename",
 		},
@@ -335,7 +291,6 @@ func TestApplyWithHooks_ErrorBranches(t *testing.T) {
 	}
 }
 
-// contains — local helper.
 func contains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {
@@ -345,7 +300,6 @@ func contains(s, sub string) bool {
 	return false
 }
 
-// TestReason_Validate — only the 4 bash-canonical reasons are accepted.
 func TestReason_Validate(t *testing.T) {
 	for _, ok := range []Reason{ReasonQuotaLikely, ReasonBatchCapNear, ReasonOperatorRequest, ReasonStallInactivity} {
 		if !ok.IsValid() {

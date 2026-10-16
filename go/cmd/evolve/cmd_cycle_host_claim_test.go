@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// wiredWithRealPhases wires the production root over a project that has the
-// repo's personas and phase registry, so the builtin fallback runners register.
 func wiredWithRealPhases(t *testing.T) orchDeps {
 	t.Helper()
 	repoRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))

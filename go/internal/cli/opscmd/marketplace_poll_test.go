@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// makeMarketplace mirrors the package test helper so the cmd tests stay
-// independent of internal/marketplacepoll exports.
 func cmdMakeMarketplace(t *testing.T, version string) string {
 	t.Helper()
 	d := t.TempDir()
@@ -107,8 +105,6 @@ func TestCmd_MarketplacePoll_ExtraPositional(t *testing.T) {
 	}
 }
 
-// TestCmd_MarketplacePoll_BadSemver verifies that a non-semver target
-// surfaces as exit 2 (matches bash test 9: "non-semver target → exit 2").
 func TestCmd_MarketplacePoll_BadSemver(t *testing.T) {
 	m := cmdMakeMarketplace(t, "1.0.0")
 	var stdout, stderr bytes.Buffer

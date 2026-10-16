@@ -9,10 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// TestSwarmMerge_SumsWorkerTokens — S5, token-telemetry. The N→1 swarm merge
-// must sum every worker's LLM token usage (the token twin of TotalCostUSD), so
-// the aggregated ledger entry carries counts, not just dollars. Previously
-// per-worker tokens were dropped at the merge.
 func TestSwarmMerge_SumsWorkerTokens(t *testing.T) {
 	sr := swarm.SwarmResult{Workers: []swarm.WorkerResult{
 		{WorkerID: "w0", Tokens: cyclestate.TokenUsage{Input: 100, Output: 20, CacheRead: 5, CacheWrite: 1}},
@@ -26,8 +22,6 @@ func TestSwarmMerge_SumsWorkerTokens(t *testing.T) {
 	}
 }
 
-// tokenBridge is a minimal core.Bridge returning a fixed token usage, so the
-// launcher-adapter mapping can be verified in isolation.
 type tokenBridge struct{ tokens cyclestate.TokenUsage }
 
 func (b tokenBridge) Launch(context.Context, core.BridgeRequest) (core.BridgeResponse, error) {
@@ -38,9 +32,6 @@ func (b tokenBridge) Probe(context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// TestSwarmMerge_LauncherCarriesTokens verifies the swarmrunner→swarm launcher
-// adapter maps core.BridgeResponse.Tokens onto swarm.LaunchResult.Tokens rather
-// than dropping them (the seam where the attribution gap lived).
 func TestSwarmMerge_LauncherCarriesTokens(t *testing.T) {
 	want := cyclestate.TokenUsage{Input: 42, Output: 7, CacheRead: 2, CacheWrite: 1}
 	bl := bridgeLauncher{bridge: tokenBridge{tokens: want}}

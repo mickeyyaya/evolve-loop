@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// A go test run inside a fleet lane inherits the lane's override. Its fixtures write through this
-// adapter, and none of them may land in the lane's live cycle state.
 func TestWriteCycleState_AFixtureNeverWritesAnotherTreesLiveLaneFile(t *testing.T) {
 	live := filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1700", core.CycleStateFile)
 	mkParents(t, live)

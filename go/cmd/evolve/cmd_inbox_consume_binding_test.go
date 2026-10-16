@@ -105,8 +105,6 @@ func TestBlockerBreakerBootPath_RunsBindingReconcile(t *testing.T) {
 	}
 }
 
-// A consumed copy OLDER than the binding is stale evidence (recency guard);
-// the sweep must skip it, loudly.
 func TestReconcileConsumedBindings_NewerBindingSurvivesStaleConsumedCopy(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -119,7 +117,7 @@ func TestReconcileConsumedBindings_NewerBindingSurvivesStaleConsumedCopy(t *test
 		[]byte(`{"id":"refiled-item","consumed":{"cycle":5}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	writeBinding(t, root, "refiled-item", 9) // rebound AFTER the cycle-5 retirement
+	writeBinding(t, root, "refiled-item", 9)
 	var errb bytes.Buffer
 	reconcileConsumedBindings(root, evolveDir, &errb)
 	if _, ok, _ := continuation.ReadRegistryEntry(root, "refiled-item"); !ok {
@@ -130,11 +128,6 @@ func TestReconcileConsumedBindings_NewerBindingSurvivesStaleConsumedCopy(t *test
 	}
 }
 
-// The LIVE-COPY guard: an id consumed once and later legitimately RE-FILED
-// into the pending root still has a reachable item — the binding belongs to
-// the live copy, and the sweep must not release it on the old consumed copy's
-// evidence (the consumed copy often carries no cycle stamp, so the recency
-// guard alone cannot save it).
 func TestReconcileConsumedBindings_RefiledLiveCopyKeepsItsBinding(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -144,7 +137,7 @@ func TestReconcileConsumedBindings_RefiledLiveCopyKeepsItsBinding(t *testing.T) 
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(consumed, "refiled-live.json"),
-		[]byte(`{"id":"refiled-live"}`), 0o644); err != nil { // no cycle stamp — the common shape
+		[]byte(`{"id":"refiled-live"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(evolveDir, "inbox", "refiled-live.json"),

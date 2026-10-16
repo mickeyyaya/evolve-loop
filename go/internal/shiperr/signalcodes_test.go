@@ -1,10 +1,5 @@
 package shiperr
 
-// signalcodes_test.go — ADR-0101 S2: every ShipErrorCode is projected, not
-// copied, into the Signal Center's code space as SHIP_<code>, registered under
-// the ship module with a one-line doc so docs/architecture/signal-codes.md and
-// the ship.error events share ONE vocabulary.
-
 import (
 	"go/ast"
 	"go/parser"
@@ -58,10 +53,6 @@ func TestSignalSeverity_IntegrityIsAnIncidentEverythingElseAWarn(t *testing.T) {
 	}
 }
 
-// Completeness by construction: every ShipErrorCode constant DECLARED in
-// shiperr.go has a doc, and nothing is documented that is not declared —
-// parsed from the source, so a new constant cannot slip into the vocabulary
-// undocumented (and therefore unregistered and absent from signal-codes.md).
 func TestCodeDocs_CoverEveryDeclaredShipErrorCode(t *testing.T) {
 	t.Parallel()
 	declared := declaredStringConsts(t, "ShipErrorCode")
@@ -80,8 +71,6 @@ func TestCodeDocs_CoverEveryDeclaredShipErrorCode(t *testing.T) {
 	}
 }
 
-// A new ShipErrorClass constant needs a row in the severity table: the
-// classes are walked from source, not from a hand-kept list.
 func TestSignalSeverity_EveryDeclaredClassHasARow(t *testing.T) {
 	t.Parallel()
 	rows := map[string]bool{string(ShipClassIntegrity): true, string(ShipClassTransient): true, string(ShipClassPrecondition): true, string(ShipClassConfig): true}
@@ -92,8 +81,6 @@ func TestSignalSeverity_EveryDeclaredClassHasARow(t *testing.T) {
 	}
 }
 
-// declaredStringConsts parses shiperr.go and returns the string values of
-// every constant declared with the named type.
 func declaredStringConsts(t *testing.T, typeName string) map[string]bool {
 	t.Helper()
 	f, err := parser.ParseFile(token.NewFileSet(), "shiperr.go", nil, 0)

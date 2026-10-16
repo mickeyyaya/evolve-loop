@@ -50,27 +50,19 @@ func parseRollbackArgs(args []string, stdout, stderr io.Writer) (journalPath, re
 
 func rollbackExitCode(err error, stderr io.Writer) int {
 	if err == nil {
-		return 0
+		return exitOK
 	}
 	if errors.Is(err, rollback.ErrJournalNotFound) || errors.Is(err, rollback.ErrJournalMalformed) {
 		fmt.Fprintf(stderr, "[rollback] FAIL: %v\n", err)
-		return 2
+		return exitRuntime
 	}
 	if errors.Is(err, rollback.ErrPartial) {
-		// Already logged via Stderr; partial = exit 1.
-		return 1
+		return exitFail
 	}
 	fmt.Fprintf(stderr, "[rollback] FAIL: %v\n", err)
-	return 1
+	return exitFail
 }
 
-// runRollback is `evolve rollback <journal.json> [--reason "..."] [--dry-run]`.
-// Mirrors legacy/scripts/release/rollback.sh exit codes:
-//
-//	0  — rollback complete (all 3 steps OK or skipped)
-//	1  — rollback partial (some step failed)
-//	2  — journal not found / malformed
-//	10 — invalid arguments
 func RunRollback(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	journalPath, reason, dryRun, code, done := parseRollbackArgs(args, stdout, stderr)
 	if done {

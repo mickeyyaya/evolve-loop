@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
-// anyRenderedFlagToken returns the backticked name of the first registered flag,
-// for assertions that "some registry content was rendered" without hardcoding a
-// specific flag name, since the flag-reduction campaign continually deletes
-// flags and a pinned name would eventually 404. Skips the test when the
-// registry is empty.
 func anyRenderedFlagToken(t *testing.T) string {
 	t.Helper()
 	if len(flagregistry.All) == 0 {
@@ -122,8 +117,8 @@ func TestFlagsUnknownSubcommand(t *testing.T) {
 }
 
 func TestFlagsCheck_ResolvesWorktreeRootOverProjectRoot(t *testing.T) {
-	worktree := seedFlagsProject(t) // brought in sync with the registry
-	mainRoot := seedFlagsProject(t) // stays the bare seed → stale vs registry
+	worktree := seedFlagsProject(t)
+	mainRoot := seedFlagsProject(t)
 
 	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
 	t.Setenv("EVOLVE_PROJECT_ROOT", worktree)

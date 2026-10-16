@@ -14,13 +14,6 @@ import (
 
 const wiringNote = "operator sign-off: cycle-1433 wiring proof"
 
-// writeWiringLedger materializes a ledger whose entry_seq=2 is carried by TWO
-// distinct fork-sibling lines — the ambiguity the anchor half must refuse.
-// Returns the dir and both seq-2 SHAs.
-//
-// It plants no chain break: whether the sealed prefix was damaged is the ledger
-// package's contract (TestRebaseline_SealsDamagedPrefix), and what these tests
-// prove is the SEAM — that the subcommand and flag reach that contract at all.
 func writeWiringLedger(t *testing.T) (dir, firstSeq2, secondSeq2 string) {
 	t.Helper()
 	dir = t.TempDir()

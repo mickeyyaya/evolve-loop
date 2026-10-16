@@ -35,9 +35,9 @@ func parseReleasePreflightArgs(args []string, stdout, stderr io.Writer) (f relea
 			f.dryRun = true
 		case a == "--skip-tests":
 			f.skipTests = true
-		case a == "--strict-pass": // flag "strict-pass": reject WARN verdicts
+		case a == "--strict-pass":
 			f.strictPass = true
-		case a == "--allow-red-ci": // explicit red-CI override (never silent)
+		case a == "--allow-red-ci":
 			f.allowRedCI = true
 		case len(a) >= 2 && a[:2] == "--":
 			fmt.Fprintf(stderr, "[preflight] unknown flag: %s\n", a)
@@ -60,14 +60,6 @@ func parseReleasePreflightArgs(args []string, stdout, stderr io.Writer) (f relea
 
 var releasePreflightRun = releasepreflight.Run
 
-// runReleasePreflight is `evolve release-preflight <target> [--dry-run]
-// [--skip-tests]`. Mirrors legacy/scripts/release/preflight.sh.
-//
-// Exit codes:
-//
-//	0  — all checks pass
-//	1  — some check failed
-//	10 — invalid arguments
 func RunReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	f, code, done := parseReleasePreflightArgs(args, stdout, stderr)
 	if done {
@@ -87,12 +79,12 @@ func RunReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) i
 	}
 	_, err := releasePreflightRun(opts)
 	if err == nil {
-		return 0
+		return exitOK
 	}
 	if errors.Is(err, releasepreflight.ErrCheckFailed) {
 		fmt.Fprintf(stderr, "[preflight] FAIL: %v\n", err)
-		return 1
+		return exitFail
 	}
 	fmt.Fprintf(stderr, "[preflight] FAIL: %v\n", err)
-	return 1
+	return exitFail
 }
