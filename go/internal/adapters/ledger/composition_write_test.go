@@ -117,7 +117,6 @@ func TestWriteCompositionVerdict_RoundTrip(t *testing.T) {
 	}
 }
 
-// Also covers missing and failed required gates, not only a patch-id mismatch.
 func TestWriteCompositionVerdict_RejectsPatchIDMismatch(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -140,7 +139,6 @@ func TestWriteCompositionVerdict_RejectsPatchIDMismatch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			ledgerPath := filepath.Join(dir, "ledger.jsonl")
-			// Pre-populated, so "appends nothing" is a byte-length delta rather than "file still absent".
 			preexisting := []byte(`{"kind":"unrelated"}` + "\n")
 			if err := os.WriteFile(ledgerPath, preexisting, 0o644); err != nil {
 				t.Fatalf("seed ledger: %v", err)

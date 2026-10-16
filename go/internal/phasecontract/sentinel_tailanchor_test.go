@@ -51,7 +51,7 @@ func TestSentinelTailAnchor_AllMalformedStillNotOK(t *testing.T) {
 	doc := strings.Join([]string{
 		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":…} -->",
 		"<!-- evolve-verdict: {not json at all} -->",
-		"<!-- evolve-verdict: {\"phase\":\"audit\"} -->", // parses, but verdict is empty
+		"<!-- evolve-verdict: {\"phase\":\"audit\"} -->",
 	}, "\n")
 
 	if s, ok := ParseVerdictSentinelFull(doc); ok {

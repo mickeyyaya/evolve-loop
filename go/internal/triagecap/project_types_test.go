@@ -1,6 +1,5 @@
 package triagecap
 
-// The projection's wire shape, as the tests decode it; the writer is triagedecision.Project.
 type projTopN struct {
 	ID     string   `json:"id"`
 	Action string   `json:"action,omitempty"`

@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
-// TrackedPhaseDirs returns the .evolve/phases subdirs whose phase.json git tracks, or nil (bind all) when git state is unusable.
-// It is exported from a _test.go file so the external phasespec_test package can call it too.
 func TrackedPhaseDirs(t *testing.T, projectRoot string) map[string]bool {
 	t.Helper()
 	phasesDir := filepath.Join(projectRoot, ".evolve", "phases")
@@ -29,7 +27,6 @@ func TrackedPhaseDirs(t *testing.T, projectRoot string) map[string]bool {
 			continue
 		}
 		sawDir = true
-		// TrackedFiles lists only direct children, so each subdirectory is asked separately.
 		files, ferr := repostate.TrackedFiles(projectRoot, filepath.Join(".evolve", "phases", e.Name()))
 		if ferr != nil {
 			t.Logf("TrackedPhaseDirs: %v — binding all on-disk phases", ferr)
@@ -41,7 +38,6 @@ func TrackedPhaseDirs(t *testing.T, projectRoot string) map[string]bool {
 			}
 		}
 	}
-	// An empty filter would silently unbind every gate, so fall back to binding all.
 	if sawDir && len(set) == 0 {
 		t.Logf("TrackedPhaseDirs: empty tracked set under %s — misresolved root or sparse checkout; binding all on-disk phases", phasesDir)
 		return nil
@@ -49,7 +45,6 @@ func TrackedPhaseDirs(t *testing.T, projectRoot string) map[string]bool {
 	return set
 }
 
-// TrackedUserPhaseNames returns the catalog names of tracked phase dirs (dir name plus declared name), or nil to bind all.
 func TrackedUserPhaseNames(t *testing.T, projectRoot string) map[string]bool {
 	t.Helper()
 	dirs := TrackedPhaseDirs(t, projectRoot)
@@ -73,7 +68,6 @@ func TrackedUserPhaseNames(t *testing.T, projectRoot string) map[string]bool {
 	return names
 }
 
-// trackedRepoProfileNames returns the git-tracked profile names, or nil (bind all) when git state is unusable.
 func trackedRepoProfileNames(t *testing.T, projectRoot string) map[string]bool {
 	t.Helper()
 	set, err := repostate.TrackedSet(projectRoot, ".evolve/profiles", ".json")

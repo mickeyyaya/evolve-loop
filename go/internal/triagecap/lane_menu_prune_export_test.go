@@ -9,13 +9,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// writeLifecycleTodo places id where inboxmover.ResolveDispatchState classifies it as state.
 func writeLifecycleTodo(t *testing.T, evolveDir, state, id string, deps ...string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox")
 	switch state {
 	case inboxmover.StatePending:
-		// inbox root
 	case inboxmover.StateProcessing:
 		dir = filepath.Join(dir, "processing", "cycle-1181")
 	default:

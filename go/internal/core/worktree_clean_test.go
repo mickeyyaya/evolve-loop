@@ -37,8 +37,6 @@ func TestEnsureCleanWorktree_QuarantinesInheritedOrphanRedTest(t *testing.T) {
 	wt := initTestRepo(t)
 	root := t.TempDir()
 
-	// The reuse candidate carries a prior attempt's uncommitted orphan RED
-	// test (untracked) AND a tracked-file modification.
 	orphan := filepath.Join(wt, "go", "internal", "echo", "veto_red_test.go")
 	if err := os.MkdirAll(filepath.Dir(orphan), 0o755); err != nil {
 		t.Fatal(err)

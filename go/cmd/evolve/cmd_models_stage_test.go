@@ -77,7 +77,6 @@ func TestRunStagedCatalogRefresh_ShadowWritesShadowOnly(t *testing.T) {
 func TestRunStagedCatalogRefresh_ShadowTTLGatesOnShadowFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	// Live catalog long stale; shadow catalog fresh.
 	if err := modelcatalog.Write(dir, cannedCatalog(stageNow().Add(-72*time.Hour), "codex", "gpt-5.5")); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +91,6 @@ func TestRunStagedCatalogRefresh_ShadowTTLGatesOnShadowFile(t *testing.T) {
 	if err != nil || calls != 0 {
 		t.Fatalf("fresh shadow should gate the run: err=%v calls=%d", err, calls)
 	}
-	// Stale shadow → runs, and Prior IS the shadow catalog.
 	if err := modelcatalog.WriteShadow(dir, cannedCatalog(stageNow().Add(-48*time.Hour), "codex", "gpt-5.6")); err != nil {
 		t.Fatal(err)
 	}

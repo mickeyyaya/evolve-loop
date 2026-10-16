@@ -11,7 +11,6 @@ type envDial struct {
 	apply func(cfg *RoutingConfig, v string, ws *[]Warning)
 }
 
-// envDials is ordered as its warnings appear; the kitchen-sink golden pins the order.
 var envDials = []envDial{
 	{key: "EVOLVE_DYNAMIC_ROUTING", apply: envDynamicRouting},
 	{key: "EVOLVE_ROUTING_MODE", apply: envRoutingMode},
@@ -23,8 +22,6 @@ var envDials = []envDial{
 	{key: "EVOLVE_MAX_OPTIONAL_INSERTIONS", apply: envMaxOptionalInsertions},
 }
 
-// applyEnv stamps each dial's warnings with the env var name, so fields.key names the var while
-// the message keeps its registry spelling.
 func applyEnv(cfg *RoutingConfig, env map[string]string, ws *[]Warning) {
 	for _, d := range envDials {
 		v := env[d.key]
@@ -71,7 +68,6 @@ func parseSandboxMode(v, current string, ws *[]Warning) string {
 	return current
 }
 
-// envConditionalMandatory installs one phase:expr rule; a malformed value is ignored with a warning.
 func envConditionalMandatory(cfg *RoutingConfig, v string, ws *[]Warning) {
 	phase, expr, ok := strings.Cut(v, ":")
 	if !ok {

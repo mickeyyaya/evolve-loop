@@ -12,13 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// TestSpineReplay_LocalHistory is an env-gated operator harness (skipped in
-// CI/normal runs) that replays a project's real .evolve/runs history to check
-// whether any historical cycle would trip the spine floor at enforce. Re-run
-// before widening the floor (new anchors, new gates):
-//
-//	EVOLVE_SPINE_REPLAY_DIR=<project-root> go test -v \
-//	    -run TestSpineReplay_LocalHistory ./internal/core/
 func TestSpineReplay_LocalHistory(t *testing.T) {
 	t.Parallel()
 
@@ -32,7 +25,6 @@ func TestSpineReplay_LocalHistory(t *testing.T) {
 	}
 	sort.Strings(runs)
 
-	// Production registry resolution (cmd_cycle.go).
 	cfg, _ := config.Load(filepath.Join(root, "docs", "architecture", "phase-registry.json"), map[string]string{})
 	sm := NewStateMachine()
 
@@ -46,7 +38,7 @@ func TestSpineReplay_LocalHistory(t *testing.T) {
 		}
 		b, rerr := os.ReadFile(filepath.Join(dir, "run.json"))
 		if rerr != nil {
-			continue // no run.json: pre-marker dir, not replayable
+			continue
 		}
 		if json.Unmarshal(b, &rj) != nil || len(rj.CompletedPhases) == 0 {
 			continue
@@ -57,7 +49,6 @@ func TestSpineReplay_LocalHistory(t *testing.T) {
 			misses = append(misses, miss{dir, "-", "digest error: " + derr.Error()})
 			continue
 		}
-		// Replay the gate for each transition the live loop actually took.
 		for i := 1; i < len(rj.CompletedPhases); i++ {
 			next := Phase(rj.CompletedPhases[i])
 			prefixSig, _ := router.Digest(dir, rj.CompletedPhases[:i])

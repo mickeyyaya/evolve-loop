@@ -1,11 +1,5 @@
 package core
 
-// These tests drive the REAL RunCycle path (o.newCycleRun provisions through
-// the injected WorktreeProvisioner) and read the REAL assembler
-// (AssembleFailureDigest) over the cycle's own workspace — no reimplementation
-// of either. They deliberately do NOT pin a field name or a file name: any
-// existing fail-reason/digest seam that carries the cause satisfies them.
-
 import (
 	"context"
 	"errors"
@@ -16,9 +10,6 @@ import (
 	"testing"
 )
 
-// provisionCycle runs one real cycle with the injected provisioner outcome and
-// returns the cycle number and the workspace the run actually used. createErr
-// nil ⇒ provisioning succeeds (the control axis).
 func provisionCycle(t *testing.T, createErr error) (cycle int, workspace string) {
 	t.Helper()
 	st := &fakeStorage{state: State{LastCycleNumber: 1473}}
@@ -39,10 +30,6 @@ func provisionCycle(t *testing.T, createErr error) (cycle int, workspace string)
 	return res.Cycle, ws
 }
 
-// workspaceMentions reports whether ANY artifact the cycle wrote carries the
-// token. Format-agnostic on purpose: the requirement is that the cause is
-// PERSISTED where the failure surfaces read, not that it lands in one
-// particular file.
 func workspaceMentions(t *testing.T, workspace, token string) bool {
 	t.Helper()
 	found := false

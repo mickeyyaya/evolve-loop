@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// resultEchoLauncher returns a canned result slice regardless of specs, so
-// tests can prove dispatchIteration propagates lane outcomes verbatim.
 type resultEchoLauncher struct {
 	canned []fleet.Result
 	calls  int

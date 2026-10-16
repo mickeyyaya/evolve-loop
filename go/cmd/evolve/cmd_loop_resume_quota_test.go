@@ -29,8 +29,6 @@ func (resumedQuotaRunner) Run(context.Context, core.PhaseRequest) (core.PhaseRes
 }
 
 func TestRunLoop_ResumeQuotaPauseReturnsFiveAndPreservesCheckpoint(t *testing.T) {
-	// Stub only the tmux process boundary: this CLI test must not sweep host
-	// sessions while exercising real storage, checkpoint and orchestration.
 	bin := t.TempDir()
 	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -56,7 +54,7 @@ func TestRunLoop_ResumeQuotaPauseReturnsFiveAndPreservesCheckpoint(t *testing.T)
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
 	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
-		ledger := newFakeLedger() // satisfies rootLedger; see ADR-0101.
+		ledger := newFakeLedger()
 		orch := core.NewOrchestrator(st, ledger, map[core.Phase]core.PhaseRunner{core.PhaseAudit: resumedQuotaRunner{}}, core.WithRetryConfig(policy.RetryConfig{PhaseMaxAttempts: 2}))
 		return orchDeps{Storage: st, Ledger: ledger, Orchestrator: orch}
 	}

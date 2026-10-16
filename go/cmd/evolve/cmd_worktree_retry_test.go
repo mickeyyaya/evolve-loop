@@ -28,9 +28,6 @@ func cliAddFailRunner(failures, attempts *int) sysexec.RunFunc {
 	}
 }
 
-// installCLIRetryFakes swaps in the injectable git runner + a sleep recorder
-// and restores both, so the operator CLI can be driven without touching a real
-// repo or paying real backoff.
 func installCLIRetryFakes(t *testing.T, failures, attempts *int, slept *[]time.Duration) {
 	t.Helper()
 	prevRunner, prevRetry := worktreeGitRunner, worktreeAddRetry

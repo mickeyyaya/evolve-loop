@@ -17,18 +17,6 @@ var (
 	dispatchLogCatalog = gcpolicy.Policy.LogCatalog
 )
 
-// runPruneEphemeral is `evolve prune-ephemeral [--dry-run] [--quiet]
-//
-//	[--tracker-ttl-days N] [--dispatch-log-ttl-days N]`.
-//
-// Mirrors legacy/scripts/observability/prune-ephemeral.sh exit codes:
-//
-//	0  — success (whether anything was pruned or not)
-//	10 — bad arguments
-//
-// Env honored:
-//
-//	EVOLVE_PROJECT_ROOT  (default: cwd)
 func runPruneEphemeral(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("prune-ephemeral", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -42,7 +30,6 @@ func runPruneEphemeral(args []string, _ io.Reader, stdout, stderr io.Writer) int
 	fs.BoolVar(&quiet, "quiet", false, "suppress progress output")
 	fs.IntVar(&trackerTTLDays, "tracker-ttl-days", 7, "tracker retention days")
 	fs.IntVar(&logTTLDays, "dispatch-log-ttl-days", 30, "dispatch log retention days; when unset, the TTL of the gc log catalog (gc.logs.dispatch.ttl_days, else gc.logs_ttl_days, else 30)")
-	// intercept -h/--help before fs.Parse to write to stdout
 	for _, a := range args {
 		if a == "-h" || a == "--help" {
 			fmt.Fprintln(stdout, "Usage: evolve prune-ephemeral [--dry-run] [--quiet] [--tracker-ttl-days N] [--dispatch-log-ttl-days N]")

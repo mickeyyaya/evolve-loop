@@ -146,8 +146,8 @@ func TestSignalCenter_BusyOf_LargeRenderedPaneBuried(t *testing.T) {
 		return b.String()
 	}
 
-	busyRendered := buildPane(numFillerLines - 10) // buried near the end
-	idleRendered := buildPane(-1)                  // no affordance anywhere
+	busyRendered := buildPane(numFillerLines - 10)
+	idleRendered := buildPane(-1)
 
 	if want := PaneBusy(busyRendered, p); !want {
 		t.Fatalf("fixture bug: PaneBusy(large buried-affordance pane) = false, want true")

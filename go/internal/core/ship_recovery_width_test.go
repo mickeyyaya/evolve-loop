@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// widthShipStub returns errOnFail for its first failFirst calls, then PASS.
-// Mirrors core_test's shipErrorStub (that harness lives in the external test
-// package and cannot be imported here without a cycle).
 type widthShipStub struct {
 	failFirst int
 	errOnFail error
@@ -26,8 +23,6 @@ func (s *widthShipStub) Run(_ context.Context, _ PhaseRequest) (PhaseResponse, e
 	return PhaseResponse{Phase: "ship", Verdict: VerdictPASS}, nil
 }
 
-// runWidthRecoveryCycle runs one full cycle over the internal fakes with the
-// given ship runner and Env, returning RunCycle's error.
 func runWidthRecoveryCycle(t *testing.T, ship PhaseRunner, env map[string]string) error {
 	t.Helper()
 	st := &fakeStorage{}
@@ -44,8 +39,6 @@ func runWidthRecoveryCycle(t *testing.T, ship PhaseRunner, env map[string]string
 	return err
 }
 
-// persistentContentionShip builds a ship runner that always fails with a
-// contention error (a sibling landed during the audit→ship gap).
 func persistentContentionShip() *widthShipStub {
 	return &widthShipStub{
 		failFirst: 99,
@@ -54,13 +47,12 @@ func persistentContentionShip() *widthShipStub {
 	}
 }
 
-// Ship call count = 1 initial + budget (each recovery re-audits then re-ships).
 func TestShipRecovery_ContentionBudgetScalesWithFleetWidth(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
 		name          string
-		width         string // "" = env key absent
+		width         string
 		wantShipCalls int
 	}{
 		{"width-absent-keeps-constant-budget", "", 3},
@@ -89,8 +81,6 @@ func TestShipRecovery_ContentionBudgetScalesWithFleetWidth(t *testing.T) {
 	}
 }
 
-// NOT t.Parallel: swaps the package seam (same save/restore discipline as the
-// executeRetryBackoff unit tests).
 func TestShipRecovery_JitteredBackoffBetweenReaudits(t *testing.T) {
 	prev := backoffSleep
 	var sleeps []time.Duration
@@ -98,8 +88,6 @@ func TestShipRecovery_JitteredBackoffBetweenReaudits(t *testing.T) {
 	defer func() { backoffSleep = prev }()
 
 	ship := persistentContentionShip()
-	// width 4 → budget max(2,5) = 5 contention recoveries → ≥2 inter-attempt
-	// backoffs even under the loosest "between attempts" reading.
 	err := runWidthRecoveryCycle(t, ship, map[string]string{ipcenv.FleetWidthKey: "4"})
 	if err == nil {
 		t.Fatal("persistent contention error must abort after the scaled budget")
@@ -117,8 +105,6 @@ func TestShipRecovery_JitteredBackoffBetweenReaudits(t *testing.T) {
 		}
 		distinct[d] = true
 	}
-	// Anti-lockstep: with millisecond-or-finer jitter, >=5 draws collapsing to
-	// one identical duration is (deliberately) astronomically unlikely.
 	if len(distinct) < 2 {
 		t.Errorf("all %d backoff sleeps were identical (%v) — backoff is not jittered", len(sleeps), sleeps[0])
 	}
@@ -142,9 +128,6 @@ func TestShipRecovery_NonContentionTransientKeepsConstantBudget(t *testing.T) {
 	}
 }
 
-// Pins GIT_FLEET_REBASE_NEEDED as contention-class WITHOUT needing a live git
-// rebase (recoverFromShipError performs a real rebase for that code, which a
-// unit cycle cannot stage), plus the solo/garbage-width floor.
 func TestShipRecovery_BudgetClassifierScalesOnlyContentionCodes(t *testing.T) {
 	t.Parallel()
 

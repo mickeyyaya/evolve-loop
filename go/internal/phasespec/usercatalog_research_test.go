@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// repoRoot returns the repo root, located from this file's path.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
@@ -54,9 +53,6 @@ func TestResearchPhasesAreConfigOnly(t *testing.T) {
 		sections   []string
 		hasVerdict bool
 	}
-	// Plan and control phases may carry verdict_on_pass, but contract derivation
-	// leaves it inert, so their hasVerdict is false.
-	// See ADR-0035.
 	cases := map[string]want{
 		"adversarial-review": {
 			artifact:   "adversarial-review-report.md",

@@ -12,14 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// The retry backoff is REAL time.Sleep in production; without this init every
-// core test whose fixture makes worktree provisioning fail pays the full
-// backoff ladder. Tests that COUNT sleeps install their own recorder and
-// restore this no-op.
 func init() { worktreeAddRetrySleep = func(time.Duration) {} }
 
-// initRetryRepo makes a minimal real repo with one commit so `git worktree
-// add` has a HEAD to cut from.
 func initRetryRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -40,9 +34,6 @@ func initRetryRepo(t *testing.T) string {
 	return root
 }
 
-// failingAddRunner fails the first `worktree add` invocations with rc=255 and
-// "Preparing worktree" stderr noise, and delegates everything else — and
-// later attempts — to the real runner.
 func failingAddRunner(failures *int, attempts *int) sysexec.RunFunc {
 	return func(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if len(args) >= 2 && args[0] == "worktree" && args[1] == "add" {

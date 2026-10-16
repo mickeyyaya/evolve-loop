@@ -33,6 +33,7 @@
 - **Handlers (Observer).** `RegisterLivenessHandler` observers receive a `LivenessEvent` on each state transition. The handler list is copied under the structural lock and dispatched outside every lock.
 - **`LivenessState.String`** is each state's one spelling (`idle`, `busy-stagnant`, `converging`, `hung`, `exhausted`). `pane.liveness` signals carry it in `fields.state`, and the bridge's timeout summary derives its snake_case word from it.
 - **apicover anchors in tests.** Some test files hold `var _ … = …` blocks only so `apicover -enforce` finds each exported type and method named in a test AST (`livenesscenter_apicover_test.go`, the conformance blocks in `liveness_conformance_test.go`, `liveness_exhaustion_test.go` and `livenesscenter_exhaustion_test.go`).
+- **The zero `LivenessState` means "not set".** The reviewer pauses on it. It is not a fifth state.
 
 ## Invariants
 

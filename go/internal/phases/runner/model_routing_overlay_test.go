@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestResolveRouting_AdvisorOverlayPreservesFamilyTransport drives the advisor projection through
-// BaseRunner.Run -> resolveDispatchPlan (routing.go); the contract-escalation projection, which also sets
-// ModelRoutingCLI, is TestRunner_ContractEscalation_RedispatchesOnEscalatedCLIWithDirective.
 func TestResolveRouting_AdvisorOverlayPreservesFamilyTransport(t *testing.T) {
 	tests := []struct {
 		name, primary, overlay, failCLI string
@@ -109,7 +106,7 @@ func TestRunner_ModelRoutingAuto_BenchedOverlayPrimaryFallsBack(t *testing.T) {
 
 	_, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		ModelRoutingCLI: "codex-tmux", // the advisor's proposal — but it's benched
+		ModelRoutingCLI: "codex-tmux",
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)

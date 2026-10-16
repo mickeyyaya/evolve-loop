@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestComposePrompt_RendersTaskContractVerbatim — the harness-owned block
-// reaches the builder under its own heading, verbatim, and only when seeded.
 func TestComposePrompt_RendersTaskContractVerbatim(t *testing.T) {
 	contract := "### task-a — Title A\nAcceptance (verbatim from the inbox item — the auditor grades against exactly these):\n1. build-prompt.txt carries acceptance[] verbatim\n\n### ACS predicates (harness-listed via `go test -list . -tags acs`; every one must be GREEN before handoff)\n- TestC7_001_X\n\n"
 	got := hooks{}.ComposePrompt("body", core.PhaseRequest{Context: map[string]string{core.CtxKeyTaskContract: contract}})

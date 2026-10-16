@@ -12,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// fakeLedger lets a test drive VerifyCycle from a slice of entries
-// without touching the real FileLedger format. Useful for the error
-// branch (iter returns an error) which a healthy FileLedger never hits.
 type fakeLedger struct {
 	entries []core.LedgerEntry
 	iterErr error
@@ -49,7 +46,6 @@ func (it *fakeIter) Next() (core.LedgerEntry, bool, error) {
 }
 func (it *fakeIter) Close() error { return nil }
 
-// entry is a terse helper for table-driven tests.
 func entry(cycle int, role, kind string, rc int) core.LedgerEntry {
 	return core.LedgerEntry{Cycle: cycle, Role: role, Kind: kind, ExitCode: rc}
 }
@@ -149,7 +145,7 @@ func TestVerifyCycle_NonZeroExitDoesNotCount(t *testing.T) {
 	t.Parallel()
 	l := &fakeLedger{entries: []core.LedgerEntry{
 		entry(1, "scout", "agent_subprocess", 0),
-		entry(1, "builder", "agent_subprocess", 124), // timeout — does not count
+		entry(1, "builder", "agent_subprocess", 124),
 		entry(1, "auditor", "agent_subprocess", 0),
 	}}
 	r, err := VerifyCycle(context.Background(), l, 1, Options{})
@@ -167,7 +163,6 @@ func TestVerifyCycle_NonZeroExitDoesNotCount(t *testing.T) {
 func TestVerifyCycle_WrongCycleIgnored(t *testing.T) {
 	t.Parallel()
 	l := &fakeLedger{entries: []core.LedgerEntry{
-		// Wrong cycle — must not satisfy cycle 1's requirement.
 		entry(2, "scout", "agent_subprocess", 0),
 		entry(2, "builder", "agent_subprocess", 0),
 		entry(2, "auditor", "agent_subprocess", 0),
@@ -184,12 +179,10 @@ func TestVerifyCycle_WrongCycleIgnored(t *testing.T) {
 	}
 }
 
-// Bookkeeping kinds (agent_fanout, cycle_terminal, routing_decision, …)
-// must NOT satisfy a required role — only agent_subprocess and phase do.
 func TestVerifyCycle_BookkeepingKindIgnored(t *testing.T) {
 	t.Parallel()
 	l := &fakeLedger{entries: []core.LedgerEntry{
-		entry(1, "scout", "routing_decision", 0), // bookkeeping kind
+		entry(1, "scout", "routing_decision", 0),
 		entry(1, "builder", "agent_subprocess", 0),
 		entry(1, "auditor", "agent_subprocess", 0),
 	}}
@@ -202,20 +195,16 @@ func TestVerifyCycle_BookkeepingKindIgnored(t *testing.T) {
 	}
 }
 
-// cycle-137 regression: the Go-native orchestrator records kind="phase"
-// with PHASE-name roles (scout, build, audit) — never agent_subprocess.
-// VerifyCycle must accept this vocabulary or it false-negatives every
-// native cycle as "missing [scout builder auditor]".
 func TestVerifyCycle_GoNativePhaseVocabulary(t *testing.T) {
 	t.Parallel()
 	l := &fakeLedger{entries: []core.LedgerEntry{
 		entry(1, "scout", "phase", 0),
-		entry(1, "triage", "phase", 0),        // not required; ignored
-		entry(1, "tdd", "phase", 0),           // not required; ignored
-		entry(1, "build-planner", "phase", 0), // not required; ignored
-		entry(1, "build", "phase", 0),         // canonicalizes to builder
-		entry(1, "audit", "phase", 0),         // canonicalizes to auditor
-		entry(1, "retro", "phase", 0),         // not required; ignored
+		entry(1, "triage", "phase", 0),
+		entry(1, "tdd", "phase", 0),
+		entry(1, "build-planner", "phase", 0),
+		entry(1, "build", "phase", 0),
+		entry(1, "audit", "phase", 0),
+		entry(1, "retro", "phase", 0),
 	}}
 	r, err := VerifyCycle(context.Background(), l, 1, Options{})
 	if err != nil {
@@ -229,14 +218,12 @@ func TestVerifyCycle_GoNativePhaseVocabulary(t *testing.T) {
 	}
 }
 
-// Mixed vocabularies (a cycle with both bash agent_subprocess and Go
-// phase entries) must not double-fault: either spelling satisfies a role.
 func TestVerifyCycle_MixedVocabularies(t *testing.T) {
 	t.Parallel()
 	l := &fakeLedger{entries: []core.LedgerEntry{
-		entry(1, "scout", "agent_subprocess", 0),   // bash spelling
-		entry(1, "build", "phase", 0),              // Go spelling → builder
-		entry(1, "auditor", "agent_subprocess", 0), // bash spelling
+		entry(1, "scout", "agent_subprocess", 0),
+		entry(1, "build", "phase", 0),
+		entry(1, "auditor", "agent_subprocess", 0),
 	}}
 	r, err := VerifyCycle(context.Background(), l, 1, Options{})
 	if err != nil {
@@ -247,7 +234,6 @@ func TestVerifyCycle_MixedVocabularies(t *testing.T) {
 	}
 }
 
-// The Go-native PASS path: intent + memo also arrive as kind="phase".
 func TestVerifyCycle_GoNativeIntentAndMemoPhases(t *testing.T) {
 	t.Parallel()
 	l := &fakeLedger{entries: []core.LedgerEntry{
@@ -389,9 +375,6 @@ func TestVerifyCycle_LedgerNextError(t *testing.T) {
 
 func TestVerifyCycle_AgainstRealFileLedger(t *testing.T) {
 	t.Parallel()
-	// Integration smoke: write entries via the real ledger adapter,
-	// then verify reads them back correctly. Catches any
-	// LedgerEntry-json-shape drift between writer and counter.
 	dir := t.TempDir()
 	l := ledger.New(dir)
 	ctx := context.Background()
@@ -421,7 +404,6 @@ func TestLoadVerifyContext_PerCyclePriority(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	ev := t.TempDir()
-	// Per-cycle says true, global says false — per-cycle must win.
 	if err := os.WriteFile(filepath.Join(ws, "cycle-state.json"), []byte(`{"intent_required":true}`), 0o644); err != nil {
 		t.Fatalf("write per-cycle: %v", err)
 	}
@@ -436,7 +418,7 @@ func TestLoadVerifyContext_PerCyclePriority(t *testing.T) {
 
 func TestLoadVerifyContext_FallbackToGlobal(t *testing.T) {
 	t.Parallel()
-	ws := t.TempDir() // no cycle-state.json
+	ws := t.TempDir()
 	ev := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ev, "state.json"), []byte(`{"intent_required":true}`), 0o644); err != nil {
 		t.Fatalf("write global: %v", err)
@@ -482,7 +464,6 @@ func TestLoadVerifyContext_BadJSON(t *testing.T) {
 func TestLoadVerifyContext_NonBoolField(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	// intent_required as a string ("true") — must NOT coerce to bool.
 	if err := os.WriteFile(filepath.Join(ws, "cycle-state.json"), []byte(`{"intent_required":"true"}`), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}

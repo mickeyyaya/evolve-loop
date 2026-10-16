@@ -11,10 +11,6 @@ import (
 	"testing"
 )
 
-// ParseTestJSON consumes `go test -json` output and aggregates per-test
-// verdicts into a Verdict struct. This is the pure parser; Run() in
-// runner.go wraps it with go-test invocation.
-
 func TestParseTestJSON_SimplePassFail(t *testing.T) {
 	input := strings.Join([]string{
 		`{"Time":"2026-05-22T10:00:00Z","Action":"run","Package":"acs/cycle-104","Test":"TestPredicateA"}`,
@@ -39,7 +35,6 @@ func TestParseTestJSON_SimplePassFail(t *testing.T) {
 	if len(v.Predicates) != 2 {
 		t.Fatalf("predicates=%d, want 2", len(v.Predicates))
 	}
-	// Find each by name.
 	got := map[string]Predicate{}
 	for _, p := range v.Predicates {
 		got[p.Name] = p
@@ -59,8 +54,6 @@ func TestParseTestJSON_SimplePassFail(t *testing.T) {
 }
 
 func TestParseTestJSON_SkipsPackageLevelEvents(t *testing.T) {
-	// Lines without Test name are package-level (run/pass for the
-	// package itself) and must not be counted.
 	input := strings.Join([]string{
 		`{"Action":"start","Package":"acs/cycle-1"}`,
 		`{"Action":"run","Package":"acs/cycle-1","Test":"TestX"}`,
@@ -99,8 +92,6 @@ func TestParseTestJSON_SkipAction(t *testing.T) {
 }
 
 func TestParseTestJSON_InvalidLineIgnored(t *testing.T) {
-	// Mixed valid + invalid; the parser should skip invalid lines
-	// without bailing the whole verdict.
 	input := strings.Join([]string{
 		`not json`,
 		`{"Action":"run","Package":"x","Test":"TestA"}`,
@@ -251,9 +242,6 @@ func TestWriteVerdict_RenameError(t *testing.T) {
 }
 
 func TestRun_EmptyPackageNoTests(t *testing.T) {
-	// Create a throwaway module with no test files; go test should
-	// exit 0 with zero tests emitted, exercising Run's happy path
-	// without actually executing any user-supplied test code.
 	mod := t.TempDir()
 	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module example.test\n\ngo 1.23\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -261,8 +249,6 @@ func TestRun_EmptyPackageNoTests(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(mod, "x.go"), []byte("package x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// We need to cd into the module so go test resolves it. Use a
-	// subshell-equivalent — exec.Cmd.Dir.
 	cwd, _ := os.Getwd()
 	defer func() { _ = os.Chdir(cwd) }()
 	if err := os.Chdir(mod); err != nil {
@@ -280,9 +266,6 @@ func TestRun_EmptyPackageNoTests(t *testing.T) {
 func TestRun_CompileFailureBubblesUp(t *testing.T) {
 	mod := t.TempDir()
 	_ = os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module example.test\n\ngo 1.23\n"), 0o644)
-	// Intentionally broken test file — go test will fail with no
-	// tests reported, so red_count stays 0 and Run must surface a
-	// non-nil error.
 	_ = os.WriteFile(filepath.Join(mod, "broken_test.go"), []byte("package x\nfunc TestBroken(t Bogus) {}\n"), 0o644)
 	cwd, _ := os.Getwd()
 	defer func() { _ = os.Chdir(cwd) }()
@@ -308,9 +291,6 @@ func TestRun_CommanderStartError(t *testing.T) {
 	})
 }
 
-// scanErrReader returns a single oversize line so bufio.Scanner's
-// internal MaxScanTokenSize trips and surfaces a scan error — drives
-// ParseTestJSON's scanner.Err() return branch.
 type scanErrReader struct {
 	b   []byte
 	off int
@@ -327,7 +307,6 @@ func (s *scanErrReader) Read(p []byte) (int, error) {
 func (s *scanErrReader) Close() error { return nil }
 
 func TestParseTestJSON_ScannerError(t *testing.T) {
-	// 2MB single line — exceeds the 1MB scanner buffer max.
 	big := make([]byte, 2*1024*1024)
 	for i := range big {
 		big[i] = 'x'

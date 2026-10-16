@@ -82,9 +82,7 @@ func TestReasonFromDiagnostics(t *testing.T) {
 
 func TestReasonFromDiagnosticsTruncatesRuneSafe(t *testing.T) {
 	t.Parallel()
-	// A multibyte message longer than the cap must be truncated on a rune
-	// boundary — never producing invalid UTF-8.
-	msg := strings.Repeat("é", maxReasonSummaryLen+10) // 2 bytes/rune
+	msg := strings.Repeat("é", maxReasonSummaryLen+10)
 	got := ReasonFromDiagnostics(VerdictFAIL, []Diagnostic{{Severity: "error", Message: msg}}, Taxonomy{})
 	if !utf8.ValidString(got.Summary) {
 		t.Fatal("truncated summary is not valid UTF-8")

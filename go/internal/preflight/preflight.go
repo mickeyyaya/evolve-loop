@@ -1,12 +1,5 @@
-// Package preflight ports legacy/scripts/dispatch/preflight-environment.sh.
-//
-// Single capability-detection probe (v8.25.0). Probes the host environment
-// ONCE at dispatcher start and emits a JSON capability profile. The
-// dispatcher reads the profile and auto-configures the auto-relaxable flags.
-//
-// Design principle: Discover, Decide, Log, Verify.
-// This package implements Discover + Decide + Log. Verify happens elsewhere
-// (phase-gate, ledger-SHA, role-gate, ship-gate).
+// Package preflight probes the host once and emits the JSON capability profile.
+// See docs/architecture/packages/internal-preflight.md.
 package preflight
 
 import (
@@ -22,15 +15,10 @@ import (
 	"strings"
 	"time"
 
-	// sbx is the single source of truth for nested-Claude detection + the
-	// inner-sandbox wrap policy, shared with the bridge launch path. Aliased
-	// because a local variable in Probe() is named `sandbox`.
 	sbx "github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Profile is the JSON shape emitted to stdout / .evolve/environment.json.
-// Schema version 3 (matches preflight-environment.sh).
 type Profile struct {
 	SchemaVersion int        `json:"schema_version"`
 	ProbedAt      string     `json:"probed_at"`
@@ -42,20 +30,17 @@ type Profile struct {
 	AutoConfig    AutoConfig `json:"auto_config"`
 }
 
-// Host captures os/version/shell.
 type Host struct {
 	OS        string `json:"os"`
 	OSVersion string `json:"os_version"`
 	Shell     string `json:"shell"`
 }
 
-// ClaudeCode captures nested-claude detection.
 type ClaudeCode struct {
 	Nested        bool    `json:"nested"`
 	ClaudecodeEnv *string `json:"claudecode_env"`
 }
 
-// Sandbox captures sandbox-exec / bwrap availability.
 type Sandbox struct {
 	SandboxExecAvailable bool   `json:"sandbox_exec_available"`
 	BwrapAvailable       bool   `json:"bwrap_available"`
@@ -63,7 +48,6 @@ type Sandbox struct {
 	Reason               string `json:"reason"`
 }
 
-// Filesystem captures writability probes.
 type Filesystem struct {
 	StateDirWritable           bool   `json:"state_dir_writable"`
 	InProjectWorktreesWritable bool   `json:"in_project_worktrees_writable"`
@@ -72,7 +56,6 @@ type Filesystem struct {
 	StateDir                   string `json:"state_dir"`
 }
 
-// CLIBins maps each CLI to its resolved path (nil when absent).
 type CLIBins struct {
 	Claude *string `json:"claude"`
 	Gemini *string `json:"gemini"`
@@ -82,7 +65,6 @@ type CLIBins struct {
 	Git    *string `json:"git"`
 }
 
-// AutoConfig records the dispatcher's derived posture.
 type AutoConfig struct {
 	SandboxFallbackOnEPERM string `json:"EVOLVE_SANDBOX_FALLBACK_ON_EPERM"`
 	WorktreeBase           string `json:"worktree_base"`
@@ -92,32 +74,18 @@ type AutoConfig struct {
 	Reasoning              string `json:"reasoning"`
 }
 
-// Options exposes seams for testing.
 type Options struct {
-	ProjectRoot string
-	PluginRoot  string
-	Now         func() time.Time
-	LookPath    func(string) (string, error)
-	// Env stubs os.Getenv; used to control TMPDIR/HOME/SHELL etc in tests.
-	Env func(string) string
-	// IsNested overrides detection (defaults to checking $CLAUDECODE != "").
-	IsNested func() bool
-	// OSType overrides runtime detection ("darwin", "linux", "other").
-	OSType string
-	// SandboxCapable injects the MEASURED sandbox-apply capability
-	// (capable, checked) — the ground-truth replacement for the nested env-var
-	// guess. Production wires it to sandbox.Probe()'s measurement at the
-	// composition root; nil (the default) leaves the result UNMEASURED so the
-	// legacy unmeasured decision behavior is retained.
+	ProjectRoot    string
+	PluginRoot     string
+	Now            func() time.Time
+	LookPath       func(string) (string, error)
+	Env            func(string) string
+	IsNested       func() bool
+	OSType         string
 	SandboxCapable func() (capable bool, checked bool)
-	// WorktreeBase is the operator override for the per-cycle worktree base,
-	// resolved from policy.json (worktree.base) at the composition root. Empty ⇒
-	// preflight selects a default writable base. Replaces the former
-	// EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
-	WorktreeBase string
+	WorktreeBase   string
 }
 
-// Probe runs the discover+decide pipeline and returns the populated Profile.
 func Probe(opts Options) Profile {
 	getEnv := opts.Env
 	if getEnv == nil {
@@ -144,11 +112,9 @@ func Probe(opts Options) Profile {
 		}
 	}
 
-	// Host
 	osVersion := unameR()
 	shell := filepath.Base(getEnvDefault(getEnv, "SHELL", "/bin/sh"))
 
-	// Nested
 	nested := false
 	if opts.IsNested != nil {
 		nested = opts.IsNested()
@@ -160,7 +126,6 @@ func Probe(opts Options) Profile {
 		claudecodePtr = &v
 	}
 
-	// Sandbox capability
 	sandboxExec := false
 	bwrap := false
 	if _, err := opts.LookPath("sandbox-exec"); err == nil {
@@ -169,14 +134,11 @@ func Probe(opts Options) Profile {
 	if _, err := opts.LookPath("bwrap"); err == nil {
 		bwrap = true
 	}
-	// Measured capability (opt-in seam; nil ⇒ legacy unmeasured decision).
 	var capable, capChecked bool
 	if opts.SandboxCapable != nil {
 		capable, capChecked = opts.SandboxCapable()
 	}
 
-	// Host readiness and launch use the same measured wrapping decision. Session
-	// markers describe context; they do not establish sandbox capability.
 	innerSandbox, innerReason := sbx.ShouldWrap(nested, sbx.ProbeResult{
 		OS:        osType,
 		Available: (osType == "darwin" && sandboxExec) || (osType == "linux" && bwrap),
@@ -187,7 +149,6 @@ func Probe(opts Options) Profile {
 		ExpectedToWork: innerSandbox, Reason: innerReason,
 	}
 
-	// Filesystem
 	stateDir := filepath.Join(opts.ProjectRoot, ".evolve")
 	_ = os.MkdirAll(stateDir, 0o755)
 	fs := Filesystem{
@@ -207,10 +168,8 @@ func Probe(opts Options) Profile {
 		fs.CacheDirWritable = probeWritable(probeCache)
 	}
 
-	// Worktree base selection
 	wtBase, wtReason := selectWorktreeBase(opts, nested, fs, filepath.Join(stateDir, "worktrees"), probeTmpDir, probeCache)
 
-	// CLI binaries
 	bins := CLIBins{
 		Claude: lookPathPtr(opts.LookPath, "claude"),
 		Gemini: lookPathPtr(opts.LookPath, "gemini"),
@@ -220,7 +179,6 @@ func Probe(opts Options) Profile {
 		Git:    lookPathPtr(opts.LookPath, "git"),
 	}
 
-	// Auto-config
 	autoEPERM := "0"
 	if nested && !innerSandbox {
 		autoEPERM = "1"
@@ -258,44 +216,32 @@ func Probe(opts Options) Profile {
 	}
 }
 
-// MeasuredSandboxCapability returns the cached sandbox.Probe() measurement of
-// whether the OS sandbox actually applies on this host. Production call sites
-// wire it into Options.SandboxCapable so the host-capability report reflects a
-// measured fact rather than the nested env-var guess.
 func MeasuredSandboxCapability() (capable bool, checked bool) {
 	pr := sbx.Probe()
 	return pr.Capable, pr.CapabilityChecked
 }
 
 func selectWorktreeBase(opts Options, nested bool, fs Filesystem, inProject, tmpdir, cacheDir string) (string, string) {
-	// 1. Operator override (policy.json worktree.base)
 	if v := opts.WorktreeBase; v != "" {
 		if probeWritable(v) {
 			return v, "operator-provided worktree.base (writable)"
 		}
-		// fall-through with WARN attached to reason field
-		// (mirrors bash setting WORKTREE_BASE_REASON but proceeding)
 	}
-	// 2. Standalone + in-project
 	if !nested && fs.InProjectWorktreesWritable {
 		return inProject, "standalone shell: in-project location preferred (easy operator inspection)"
 	}
-	// 3. TMPDIR
 	if fs.TmpdirWritable && tmpdir != "" {
 		return tmpdir, "TMPDIR (sandbox-friendly default for nested-Claude)"
 	}
-	// 4. Cache dir
 	if fs.CacheDirWritable && cacheDir != "" {
 		return cacheDir, "user cache dir (TMPDIR unavailable)"
 	}
-	// 5. Last resort in-project
 	if fs.InProjectWorktreesWritable {
 		return inProject, "in-project (TMPDIR/cache unavailable; isolation degraded if parent sandbox blocks at exec time)"
 	}
 	return "", ""
 }
 
-// probeWritable mimics bash probe_writable: mkdir -p, touch sentinel, rm sentinel.
 func probeWritable(dir string) bool {
 	if dir == "" {
 		return false
@@ -360,20 +306,16 @@ func lookPathPtr(look func(string) (string, error), name string) *string {
 	return &p
 }
 
-// MarshalJSON returns the profile's JSON bytes (compact, matches the bash
-// jq -n output topology).
 func (p Profile) MarshalJSON() ([]byte, error) {
 	type alias Profile
 	return json.Marshal(alias(p))
 }
 
-// PrettyJSON returns the profile's JSON with 2-space indentation.
 func (p Profile) PrettyJSON() string {
 	b, _ := json.MarshalIndent(p, "", "  ")
 	return string(b)
 }
 
-// Summary returns the human-readable summary form (--summary mode).
 func (p Profile) Summary() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Environment Profile (probed %s)\n", p.ProbedAt)
@@ -397,9 +339,6 @@ func (p Profile) Summary() string {
 	return b.String()
 }
 
-// WriteToFile persists the profile to <projectRoot>/.evolve/environment.json
-// using atomic rename. Best-effort: silent failure is acceptable per bash
-// contract (file is a cache, not a source of truth).
 func (p Profile) WriteToFile(projectRoot string) error {
 	target := filepath.Join(projectRoot, ".evolve", "environment.json")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {

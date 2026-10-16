@@ -6,7 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// memoLikeOverlay mirrors the real .evolve/phases/memo/phase.json activation overlay.
 func memoLikeOverlay() PhaseSpec {
 	return PhaseSpec{
 		Name:     "memo",
@@ -18,7 +17,6 @@ func memoLikeOverlay() PhaseSpec {
 	}
 }
 
-// builtinCatalogFixture mirrors the registry: "memo" is optional with no routing of its own, "audit" is mandatory.
 func builtinCatalogFixture() Catalog {
 	return Catalog{
 		order: []string{"audit", "memo"},

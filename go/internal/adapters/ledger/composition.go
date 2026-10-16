@@ -16,19 +16,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// CompositionVerdictKind is the kind of an audit carry-forward entry that ledger verify kernel-recomputes.
 const CompositionVerdictKind = "composition-verdict"
 
-// TrivialRebaseMethod is the RUNG 0 composition method; the writer and the ship-side reader share it.
 const TrivialRebaseMethod = "trivial-rebase"
 
-// ScopedReviewMethod is the RUNG 2 method, recorded when a scoped merge review resolved an overlapping change.
 const ScopedReviewMethod = "scoped-review"
 
-// IdenticalRebaseMethod is the ADR-0105 B3 method: a byte-identical rebase carrying the verdict of the audited tree it names.
 const IdenticalRebaseMethod = "identical-rebase"
 
-// compositionFields is the kernel-recomputable subset of a composition-verdict line.
 type compositionFields struct {
 	PatchID            string `json:"patch_id"`
 	AuditedDiffPath    string `json:"audited_diff_path"`
@@ -112,7 +107,6 @@ func (idx compositionEvidenceIndex) resolve(f compositionFields, line []byte) co
 	return f
 }
 
-// PatchID returns the `git patch-id --stable` content identity of diff; it needs no repository.
 func PatchID(diff []byte) (string, error) {
 	cmd := sysexec.Command(context.Background(), "git", "patch-id", "--stable")
 	cmd.Stdin = bytes.NewReader(diff)
@@ -127,23 +121,20 @@ func PatchID(diff []byte) (string, error) {
 	return fields[0], nil
 }
 
-// CompositionVerdictInput is what a caller supplies to persist a composition verdict; the writer trusts none of it.
 type CompositionVerdictInput struct {
 	Cycle          int
-	Method         string            // composition method; blank defaults to TrivialRebaseMethod (RUNG 0)
-	LaneAuditRef   string            // artifact_sha256 of the bound auditor entry
-	PatchID        string            // caller-claimed patch-id of the change
-	AuditedBase    string            // git HEAD the audit originally bound
-	GitHead        string            // composed HEAD the verdict carries forward to
-	TreeStateSHA   string            // composed tree state the gates ran on
-	AuditedTreeSHA string            // the audited changes tree the carry binds (identical-rebase only)
-	GateResults    map[string]string // must record "pass" for every required composed gate
-	AuditedDiff    []byte            // unified diff the audit reviewed
-	ComposedDiff   []byte            // unified diff of the composed (rebased) tree
+	Method         string
+	LaneAuditRef   string
+	PatchID        string
+	AuditedBase    string
+	GitHead        string
+	TreeStateSHA   string
+	AuditedTreeSHA string
+	GateResults    map[string]string
+	AuditedDiff    []byte
+	ComposedDiff   []byte
 }
 
-// compositionRecord is the on-disk line: the union of ship's compositionEntry and compositionFields,
-// plus the chain fields appendChained fills in.
 type compositionRecord struct {
 	TS                 string            `json:"ts"`
 	Cycle              int               `json:"cycle"`
@@ -164,7 +155,6 @@ type compositionRecord struct {
 	PrevHash           string            `json:"prev_hash"`
 }
 
-// WriteCompositionVerdict validates in, persists both diffs and appends one chained line; validation writes nothing.
 func WriteCompositionVerdict(ledgerPath string, in CompositionVerdictInput) error {
 	if err := checkCompositionLedgerPath(ledgerPath); err != nil {
 		return err
@@ -261,8 +251,6 @@ func storeCompositionDiff(store ledgerartifacts.Store, diff []byte) (composition
 	return compositionEvidence{digest: digest, path: path}, err
 }
 
-// verifyCompositionLine checks both persisted diffs recompute the recorded patch_id. Failures wrap
-// core.ErrLedgerChainBroken so `evolve ledger verify` exits 2 as for a hash break.
 func verifyCompositionLine(i int, line []byte, evidence compositionEvidenceIndex) error {
 	var f compositionFields
 	if err := json.Unmarshal(line, &f); err != nil {
@@ -288,7 +276,6 @@ func verifyCompositionLine(i int, line []byte, evidence compositionEvidenceIndex
 	return nil
 }
 
-// CompositionVerdict is one carry record as ship reads it back; the diffs stay on disk at the recorded paths.
 type CompositionVerdict struct {
 	Cycle            int
 	Method           string
@@ -303,8 +290,6 @@ type CompositionVerdict struct {
 	ComposedDiffPath string
 }
 
-// LatestCompositionVerdict returns the newest carry record of method for the audit laneAuditRef names;
-// an absent ledger or no such record is simply no carry.
 func LatestCompositionVerdict(ledgerPath, method, laneAuditRef string) (CompositionVerdict, bool, error) {
 	body, err := os.ReadFile(ledgerPath)
 	if os.IsNotExist(err) {

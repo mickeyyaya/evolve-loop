@@ -21,9 +21,6 @@ func seedStateJSON(t *testing.T, evolveDir string, body string) {
 	}
 }
 
-// writeStdoutLog seeds both the legacy <phase>-stdout.log and the unified
-// <phase>-events.ndjson that cyclecost reads.
-// See ADR-0020.
 func writeStdoutLog(t *testing.T, workspace, phase string, costUSD float64) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -59,7 +56,7 @@ func TestRunLoop_M5_RecordsRecoverable(t *testing.T) {
 	writeDispatchPolicy(t, evolveDir, "verify")
 
 	storage := &fixtures.FakeStorage{}
-	ledger := newFakeLedger() // empty → verify fails
+	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
 	workspace := cycleWorkspace(projectRoot, 1)
@@ -95,7 +92,6 @@ func TestRunLoop_M5_RecordsRecoverable(t *testing.T) {
 		t.Fatalf("failedApproaches len=%d want 1; state=%v", len(entries), state)
 	}
 	entry := entries[0].(map[string]any)
-	// Either is acceptable: which of Verdict/build-fail wins depends on ordering.
 	class := entry["classification"].(string)
 	if class != "code-audit-fail" && class != "code-build-fail" {
 		t.Fatalf("classification=%q want code-{audit,build}-fail", class)

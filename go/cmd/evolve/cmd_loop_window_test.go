@@ -14,10 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// haltMarker is the operator-facing string blockerBreakerHalt prints on a
-// trip (cmd_loop_blockerbreaker.go). Asserting on the breadcrumb rather than
-// on runLoop's exit code keeps these predicates pinned to the BREAKER's
-// behavior and immune to unrelated changes in the loop's own exit vocabulary.
 const haltMarker = "LOOP_PIPELINE_BLOCKER_HALT"
 
 func TestReadBatchWindowFloor_PrefersAllocationLease(t *testing.T) {
@@ -84,9 +80,6 @@ func TestRunLoop_AbortedCycleDigestsFallOutsideBatchWindow(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	writeDispatchPolicy(t, evolveDir, "off")
-	// The exact live shape: three aborted cycles' digests share one
-	// fingerprint (ceiling is 3), the completion counter is stuck behind
-	// them, the allocation lease is ahead of them.
 	writeDigestFixture(t, evolveDir, 1326, incidentFingerprint, "gate-block")
 	writeDigestFixture(t, evolveDir, 1328, incidentFingerprint, "gate-block")
 	writeDigestFixture(t, evolveDir, 1329, incidentFingerprint, "gate-block")

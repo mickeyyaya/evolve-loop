@@ -59,19 +59,13 @@ func TestRun_DisabledShortCircuits(t *testing.T) {
 	}
 }
 
-// TestRun_FireSequence drives a watchdog with a controlled clock: artifacts
-// have stale mtimes, the simulated now jumps past the threshold, and we
-// observe the FIRE path writes stall-progress.json + abnormal-events.jsonl
-// + invokes KillPgrp twice (TERM then KILL).
 func TestRun_FireSequence(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
-	// Seed a stale activity file
 	activity := filepath.Join(ws, "build.log")
 	if err := os.WriteFile(activity, []byte("started"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Set its mtime to a known past value
 	staleTime := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	if err := os.Chtimes(activity, staleTime, staleTime); err != nil {
 		t.Fatal(err)
@@ -81,13 +75,10 @@ func TestRun_FireSequence(t *testing.T) {
 	if err := os.WriteFile(cycleState, []byte(`{"phase":"build"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Make cycle-state mtime stale too — otherwise its real-now mtime dominates
-	// best_mtime and baseline > test-clock → idleS clamps to 0 → never fires.
 	if err := os.Chtimes(cycleState, staleTime, staleTime); err != nil {
 		t.Fatal(err)
 	}
 
-	// Simulated clock: starts at staleTime+1s, jumps to staleTime+700s on iter 2 (past threshold 600)
 	currentNow := staleTime.Add(1 * time.Second)
 	iter := 0
 	nowFn := func() time.Time {
@@ -123,7 +114,7 @@ func TestRun_FireSequence(t *testing.T) {
 		Now:            nowFn,
 		Sleep:          sleepFn,
 		KillPgrp:       killFn,
-		StopAfter:      20, // safety net — FIRE should happen before this
+		StopAfter:      20,
 	}, &stderr)
 
 	if rc != ExitOK {
@@ -141,7 +132,6 @@ func TestRun_FireSequence(t *testing.T) {
 		t.Errorf("second kill: got %v, want SIGKILL", killCalls[1])
 	}
 
-	// stall-progress.json written
 	stallBody, err := os.ReadFile(filepath.Join(ws, "stall-progress.json"))
 	if err != nil {
 		t.Errorf("stall-progress.json missing: %v", err)
@@ -149,7 +139,6 @@ func TestRun_FireSequence(t *testing.T) {
 	if !strings.Contains(string(stallBody), `"idle_s"`) {
 		t.Errorf("stall-progress missing idle_s: %s", stallBody)
 	}
-	// abnormal-events.jsonl appended
 	abBody, err := os.ReadFile(filepath.Join(ws, "abnormal-events.jsonl"))
 	if err != nil {
 		t.Errorf("abnormal-events.jsonl missing: %v", err)
@@ -175,9 +164,6 @@ func TestRun_WarnEmittedOnceAtThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// startTime anchors at staleTime+5s, then now jumps to staleTime+460s
-	// (past warn=450 but not threshold=600). Stale anchor matters because
-	// phaseStartTime initializes to startTime; we need now-startTime >= warnS.
 	callIdx := 0
 	nowFn := func() time.Time {
 		callIdx++
@@ -217,16 +203,12 @@ func TestRun_PhaseTransitionResetsBaseline(t *testing.T) {
 	staleTime := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	_ = os.Chtimes(activity, staleTime, staleTime)
 
-	// iteration timeline: now starts well past threshold from staleTime
-	// but the phase change resets baseline to current iteration's now —
-	// so FIRE should not happen.
 	iter := 0
 	nowFn := func() time.Time {
 		iter++
 		base := staleTime.Add(time.Duration(700+iter) * time.Second)
 		return base
 	}
-	// rewrite cycle-state on iter 2 to trigger phase advance
 	go func() {
 		time.Sleep(100 * time.Millisecond)
 	}()
@@ -239,12 +221,11 @@ func TestRun_PhaseTransitionResetsBaseline(t *testing.T) {
 		Now:       nowFn,
 		Sleep:     func(time.Duration) {},
 		KillPgrp:  func(int, syscall.Signal) error { killCalled = true; return nil },
-		StopAfter: 1, // only one iteration — phase observed but no fire
+		StopAfter: 1,
 	}, &stderr)
 	if rc != ExitOK {
 		t.Errorf("rc=%d", rc)
 	}
-	// First iteration anchors phase; baseline = now → idle_s ≈ 0 → no fire
 	if killCalled {
 		t.Errorf("kill should not fire when phase was just observed (baseline reset)")
 	}
@@ -310,7 +291,6 @@ func TestNewestMatch_PicksNewest(t *testing.T) {
 
 func TestAppendAbnormalEvent_BadWorkspaceNoop(t *testing.T) {
 	t.Parallel()
-	// no panic, no file created
 	appendAbnormalEvent("/nonexistent-dir-xyz", "x", time.Now)
 }
 
@@ -343,8 +323,6 @@ func TestMtimeUnix_ReturnsModTime(t *testing.T) {
 	}
 }
 
-// TestNewestMatch_GlobError — a malformed glob pattern (unterminated '[')
-// returns the (0, "") zero result rather than panicking (phasewatchdog.go:265).
 func TestNewestMatch_GlobError(t *testing.T) {
 	t.Parallel()
 	m, p := newestMatch(filepath.Join(t.TempDir(), "x[", "*.log"))
@@ -353,8 +331,6 @@ func TestNewestMatch_GlobError(t *testing.T) {
 	}
 }
 
-// TestAppendAbnormalEvent_NilNowUsesWallClock — when now is nil the helper falls
-// back to time.Now and still writes a timestamped event (phasewatchdog.go:286-288).
 func TestAppendAbnormalEvent_NilNowUsesWallClock(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -368,17 +344,12 @@ func TestAppendAbnormalEvent_NilNowUsesWallClock(t *testing.T) {
 	}
 }
 
-// TestAppendAbnormalEvent_OpenFileErrorNoop — when the target jsonl path already
-// exists as a DIRECTORY, OpenFile fails and the helper returns silently without
-// panicking and without leaving a stray file (phasewatchdog.go:303-305).
 func TestAppendAbnormalEvent_OpenFileErrorNoop(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	// Block the append target by pre-creating it as a directory.
 	if err := os.Mkdir(filepath.Join(dir, "abnormal-events.jsonl"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Must not panic; the dir must remain a dir (no write).
 	appendAbnormalEvent(dir, "idle_s=1", time.Now)
 	info, err := os.Stat(filepath.Join(dir, "abnormal-events.jsonl"))
 	if err != nil {
@@ -389,10 +360,6 @@ func TestAppendAbnormalEvent_OpenFileErrorNoop(t *testing.T) {
 	}
 }
 
-// TestDefaultKillPgrp_Signal0Succeeds — exercises the real defaultKillPgrp
-// (phasewatchdog.go:312-314). Signal 0 is the POSIX existence probe: it performs
-// no kill, so targeting this test process's own group is safe and deterministic,
-// and it must return nil (the group exists).
 func TestDefaultKillPgrp_Signal0Succeeds(t *testing.T) {
 	t.Parallel()
 	pgid, err := syscall.Getpgid(os.Getpid())
@@ -404,13 +371,7 @@ func TestDefaultKillPgrp_Signal0Succeeds(t *testing.T) {
 	}
 }
 
-// TestRun_PhaseAdvanceLogsTransition — when the phase in cycle-state.json changes
-// from one non-empty value to another between iterations, Run logs the "phase
-// advance: 'X' → 'Y'" line and resets the baseline (phasewatchdog.go:127-129).
-// The Sleep seam rewrites the phase file between iterations to drive the change
-// deterministically (no real sleep, no goroutine race).
 func TestRun_PhaseAdvanceLogsTransition(t *testing.T) {
-	// Not parallel: drives shared file state across iterations via the Sleep seam.
 	ws := tempWorkspace(t)
 	cycleState := filepath.Join(ws, "cycle-state.json")
 	if err := os.WriteFile(cycleState, []byte(`{"phase":"build"}`), 0o644); err != nil {
@@ -419,8 +380,6 @@ func TestRun_PhaseAdvanceLogsTransition(t *testing.T) {
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	nowFn := func() time.Time { return base.Add(1 * time.Second) }
 
-	// After the first iteration's Sleep, flip the phase to "audit" so iteration 2
-	// observes a non-empty→non-empty transition (the advance branch).
 	sleeps := 0
 	sleepFn := func(time.Duration) {
 		sleeps++
@@ -451,22 +410,14 @@ func TestRun_PhaseAdvanceLogsTransition(t *testing.T) {
 	}
 }
 
-// TestRun_CycleStateMtimeIsFreshestActivity — when cycle-state.json has the
-// newest mtime (no log/md/json activity files beat it), it is selected as the
-// last-activity baseline (phasewatchdog.go:148-151). With a fresh mtime the
-// baseline is recent → no FIRE; the test asserts no kill and clean exit.
 func TestRun_CycleStateMtimeIsFreshestActivity(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
-	// cycle-state.json lives OUTSIDE the workspace so the workspace "*.json" glob
-	// does not catch it — that forces the explicit cycle-state mtime branch
-	// (phasewatchdog.go:148-151) to be the source that beats bestMtime.
 	cycleState := filepath.Join(t.TempDir(), "cycle-state.json")
 	if err := os.WriteFile(cycleState, []byte(`{"phase":"build"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	// Seed a stale workspace log so the (fresh) cycle-state is strictly newer.
 	stale := filepath.Join(ws, "old.log")
 	if err := os.WriteFile(stale, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -475,7 +426,6 @@ func TestRun_CycleStateMtimeIsFreshestActivity(t *testing.T) {
 	if err := os.Chtimes(stale, staleT, staleT); err != nil {
 		t.Fatal(err)
 	}
-	// cycle-state mtime equals "now" → idle ≈ 0 → never fires.
 	if err := os.Chtimes(cycleState, base, base); err != nil {
 		t.Fatal(err)
 	}
@@ -499,10 +449,6 @@ func TestRun_CycleStateMtimeIsFreshestActivity(t *testing.T) {
 	}
 }
 
-// TestRun_LedgerMtimeIsFreshestActivity — when ProjectRoot is set and
-// .evolve/ledger.jsonl has the newest mtime, the ledger is selected as the
-// last-activity source (phasewatchdog.go:154-159). A fresh ledger mtime keeps
-// idle near 0 → no fire.
 func TestRun_LedgerMtimeIsFreshestActivity(t *testing.T) {
 	t.Parallel()
 	ws := tempWorkspace(t)
@@ -519,7 +465,6 @@ func TestRun_LedgerMtimeIsFreshestActivity(t *testing.T) {
 	if err := os.Chtimes(ledger, base, base); err != nil {
 		t.Fatal(err)
 	}
-	// Seed a stale workspace log so the ledger (fresh) is strictly newer.
 	stale := filepath.Join(ws, "old.log")
 	if err := os.WriteFile(stale, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -528,7 +473,7 @@ func TestRun_LedgerMtimeIsFreshestActivity(t *testing.T) {
 	if err := os.Chtimes(stale, staleT, staleT); err != nil {
 		t.Fatal(err)
 	}
-	nowFn := func() time.Time { return base } // == ledger mtime → idle ≈ 0
+	nowFn := func() time.Time { return base }
 
 	killed := false
 	var stderr bytes.Buffer

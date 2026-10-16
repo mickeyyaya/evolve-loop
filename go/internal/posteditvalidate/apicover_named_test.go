@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// TestRun_ResultContract names the posteditvalidate.Result type (returned by Run
-// but never named in a test) and pins the dispatch-and-warn contract: a .json
-// edit routed through a failing validator yields the full Result struct
-// {Kind:"json", FilePath echoed, OK:false, WarnEmitted:true}.
 func TestRun_ResultContract(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "bad.json")

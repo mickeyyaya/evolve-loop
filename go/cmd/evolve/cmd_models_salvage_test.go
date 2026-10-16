@@ -24,7 +24,6 @@ func TestSalvageProbeDiagnostics_DurableBeforeTeardown(t *testing.T) {
 	writeFile(scratch, "model-classifier-launch-error.txt", "boom stderr")
 	writeFile(scratch, "llm-calls.ndjson", `{"call_id":"call-2","phase":"model-probe","cli":"codex","call":2}`+"\n")
 	writeFile(scratch, "model-classifier-artifact.txt", "not a diagnostic — must not be salvaged")
-	// Pre-seed the durable ledger: salvage must APPEND, never clobber.
 	durable := filepath.Join(evolveDir, "models-probe")
 	if err := os.MkdirAll(durable, 0o755); err != nil {
 		t.Fatal(err)
@@ -33,8 +32,6 @@ func TestSalvageProbeDiagnostics_DurableBeforeTeardown(t *testing.T) {
 
 	var log bytes.Buffer
 	salvageProbeDiagnostics(scratch, evolveDir, "", salvageNow, &log)
-	// A retry can salvage the same scratch directory again. Identity-aware
-	// import must keep the performance index from counting the call twice.
 	salvageProbeDiagnostics(scratch, evolveDir, "", salvageNow, &log)
 
 	esc, err := os.ReadFile(filepath.Join(durable, "escalation-report-20260805T230000Z.json"))

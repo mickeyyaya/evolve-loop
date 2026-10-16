@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// findRepoRootForBinding walks up from CWD to the directory holding agents/
-// (the commitprefixgate manifest_realpaths_test.go idiom).
 func findRepoRootForBinding(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()

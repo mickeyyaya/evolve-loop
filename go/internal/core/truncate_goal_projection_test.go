@@ -24,7 +24,6 @@ func TestTruncateGoal_ProjectsTheAdvisorCap(t *testing.T) {
 	if advisor.MaxGoalTextRunes != 4000 {
 		t.Fatalf("the advisor's bound = %d, want 4000", advisor.MaxGoalTextRunes)
 	}
-	// task_recall.go's exact call: the lesson digest capped at the advisor's bound.
 	if got := truncateRunes(strings.Repeat("g", maxGoalTextChars+7), maxGoalTextChars); !strings.HasSuffix(got, " …[truncated]") || len([]rune(got)) != 4000+len([]rune(" …[truncated]")) {
 		t.Fatalf("the recall digest cap renders the marker after 4000 runes: %d runes", len([]rune(got)))
 	}

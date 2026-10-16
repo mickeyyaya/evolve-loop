@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestComposePrompt_InjectsBuildPlanWhenPresent verifies the envelope injection
-// path: when req.BuildPlan is non-empty (set at the dispatch seam at advisory+
-// with planner enabled), ComposePrompt includes the build plan section.
 func TestComposePrompt_InjectsBuildPlanWhenPresent(t *testing.T) {
 	planContent := "## Implementation Steps\n\n1. Extend ComposePrompt\n"
 	req := core.PhaseRequest{
@@ -25,7 +22,7 @@ func TestComposePrompt_InjectsBuildPlanWhenPresent(t *testing.T) {
 }
 
 func TestComposePrompt_SkipsBuildPlanWhenAbsent(t *testing.T) {
-	req := core.PhaseRequest{} // BuildPlan empty → no injection
+	req := core.PhaseRequest{}
 	result := hooks{}.ComposePrompt("body text", req)
 	if strings.Contains(result, "## Build Plan") {
 		t.Errorf("ComposePrompt injected '## Build Plan' when BuildPlan empty; got:\n%s", result)

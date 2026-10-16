@@ -59,7 +59,6 @@ func TestCmd_PruneEphemeral_BadLogTTLFlag(t *testing.T) {
 
 func TestCmd_PruneEphemeral_HappyPath(t *testing.T) {
 	d := t.TempDir()
-	// Set up stale ephemeral so something is prunable.
 	cyclePath := filepath.Join(d, ".evolve", "runs", "cycle-1", ".ephemeral")
 	if err := os.MkdirAll(cyclePath, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)

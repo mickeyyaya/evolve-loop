@@ -1,18 +1,5 @@
-// Package versionbump ports legacy/scripts/release/version-bump.sh.
-//
-// Atomic version updater across the canonical version markers:
-//   - .claude-plugin/plugin.json         (always)
-//   - .claude-plugin/marketplace.json    (always; updates every plugins[].version)
-//   - skills/loop/SKILL.md        (only major.minor)
-//   - README.md "Current (vX.Y)" cell    (only major.minor)
-//   - README.md history table            (only major.minor; adds new row)
-//
-// Atomicity: every write goes through `<file>.tmp` + rename. Partial
-// bump = mismatched JSON files; the next release.sh consistency check
-// catches it.
-//
-// Idempotency: a marker already at the target is a silent no-op; the
-// per-file Bump funcs return (didChange=false) without writing.
+// Package versionbump updates the version markers of a release atomically.
+// See docs/architecture/packages/internal-versionbump.md.
 package versionbump
 
 import (
@@ -30,23 +17,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
-// Result is the JSON-compatible summary version-bump prints to stdout.
 type Result struct {
 	Target   string   `json:"target"`
 	Modified []string `json:"modified"`
 }
 
-// Paths gathers the file paths version-bump touches. Defaults derived
-// from a repoRoot — tests pin individual paths for isolation.
 type Paths struct {
-	PluginJSON      string // <repo>/.claude-plugin/plugin.json
-	MarketplaceJSON string // <repo>/.claude-plugin/marketplace.json
-	CodexPluginJSON string // <repo>/.codex-plugin/plugin.json (generated Codex mirror; tolerated-absent)
-	SkillMD         string // <repo>/skills/loop/SKILL.md
-	ReadmeMD        string // <repo>/README.md
+	PluginJSON      string
+	MarketplaceJSON string
+	CodexPluginJSON string
+	SkillMD         string
+	ReadmeMD        string
 }
 
-// DefaultPaths returns the canonical layout under repoRoot.
 func DefaultPaths(repoRoot string) Paths {
 	return Paths{
 		PluginJSON:      filepath.Join(repoRoot, ".claude-plugin", "plugin.json"),
@@ -57,11 +40,6 @@ func DefaultPaths(repoRoot string) Paths {
 	}
 }
 
-// Files returns every marker file a bump may touch, in canonical order,
-// skipping any field left empty. It is the single source of truth for "which
-// files does a version bump write" — release-time staging
-// (ship.stageReleaseSet) consumes it so a marker added to Paths can never be
-// silently left unstaged (the .codex-plugin/plugin.json regression).
 func (p Paths) Files() []string {
 	out := make([]string, 0, 5)
 	for _, f := range []string{p.PluginJSON, p.MarketplaceJSON, p.CodexPluginJSON, p.SkillMD, p.ReadmeMD} {
@@ -72,7 +50,6 @@ func (p Paths) Files() []string {
 	return out
 }
 
-// MajorMinor extracts "X.Y" from "X.Y.Z".
 func MajorMinor(version string) string {
 	parts := strings.Split(version, ".")
 	if len(parts) < 2 {
@@ -81,9 +58,6 @@ func MajorMinor(version string) string {
 	return parts[0] + "." + parts[1]
 }
 
-// Run applies the full bump pipeline. Returns the modified-list result.
-// When dryRun is true, mutations are skipped but the would-modify list
-// still populates (mirrors bash --dry-run semantics).
 func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error) {
 	if !semvercheck.IsSemver(target) {
 		return Result{}, fmt.Errorf("versionbump: target version not semver: %s", target)
@@ -124,18 +98,11 @@ func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error)
 	return res, nil
 }
 
-// .codex-plugin/plugin.json is a generated mirror of the Claude manifest
-// (skillcheck Codex projection); bump its version in lockstep so a release
-// never leaves the Codex install surface stale. Tolerated-absent: a checkout
-// without the generated file is skipped, not failed.
 func bumpCodexPlugin(path, target string, dryRun bool) (string, error) {
 	if path == "" {
 		return "", nil
 	}
 	if _, statErr := os.Stat(path); statErr != nil {
-		// Absent → generated mirror not in this checkout; skip. Any other
-		// stat error (permission, unreadable parent) must fail loudly, never
-		// silently leave the Codex surface on a stale version.
 		if !errors.Is(statErr, os.ErrNotExist) {
 			return "", fmt.Errorf("versionbump: stat %s: %w", path, statErr)
 		}
@@ -151,14 +118,8 @@ func bumpCodexPlugin(path, target string, dryRun bool) (string, error) {
 	return "", nil
 }
 
-// --- JSON version bumps ---
-
-// jsonVersionRE finds `"version": "<x>"` for current-version reads. The
-// bash original uses sed; we keep a regex for the same lenient behavior.
 var jsonVersionRE = regexp.MustCompile(`"version"\s*:\s*"([^"]+)"`)
 
-// CurrentJSONVersion returns the first "version" string found in the
-// file, or "" on miss. Matches bash current_json_version.
 func CurrentJSONVersion(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -171,9 +132,6 @@ func CurrentJSONVersion(path string) (string, error) {
 	return m[1], nil
 }
 
-// BumpJSONVersion rewrites both top-level .version and every
-// .plugins[].version to target. Idempotent: returns (false, nil) when
-// already at target. Atomic via .tmp + rename.
 func BumpJSONVersion(path, target string, dryRun bool) (bool, error) {
 	current, err := CurrentJSONVersion(path)
 	if err != nil {
@@ -193,10 +151,6 @@ func BumpJSONVersion(path, target string, dryRun bool) (bool, error) {
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return false, fmt.Errorf("versionbump: parse %s: %w", path, err)
 	}
-	// Re-encoding via json.MarshalIndent would reorder keys; the bash
-	// version uses jq which preserves order. To stay close to bash output
-	// (which the operator + diff tools care about), we do an in-place
-	// string substitution of just the version values instead.
 	updated := jsonVersionRE.ReplaceAllString(string(data), fmt.Sprintf(`"version": "%s"`, target))
 	if err := atomicwrite.Bytes(path, []byte(updated)); err != nil {
 		return false, err
@@ -204,12 +158,8 @@ func BumpJSONVersion(path, target string, dryRun bool) (bool, error) {
 	return true, nil
 }
 
-// --- SKILL.md heading bump ---
-
 var skillHeadingRE = regexp.MustCompile(`(?m)^# Evolve Loop v([0-9]+\.[0-9]+)(?:\.[0-9]+)?`)
 
-// CurrentSkillHeading returns the "X.Y" from the SKILL.md "# Evolve Loop
-// vX.Y[.Z]" heading, or "" on miss.
 func CurrentSkillHeading(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -222,10 +172,6 @@ func CurrentSkillHeading(path string) (string, error) {
 	return m[1], nil
 }
 
-// BumpSkillHeading rewrites the first SKILL.md "# Evolve Loop vX.Y" heading
-// to majorMinor. Idempotent and missing-file tolerant: returns (false, nil)
-// when already at majorMinor, the heading is absent, or the file is missing.
-// Atomic via .tmp + rename.
 func BumpSkillHeading(path, majorMinor string, dryRun bool) (bool, error) {
 	current, err := CurrentSkillHeading(path)
 	if err != nil {
@@ -244,8 +190,6 @@ func BumpSkillHeading(path, majorMinor string, dryRun bool) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	// Bash awk uses `sub(/v[0-9]+\.[0-9]+(\.[0-9]+)?/, "v" target)` on the
-	// FIRST matching heading only. Mirror with a one-shot replacement.
 	replaced := false
 	out := skillHeadingRE.ReplaceAllStringFunc(string(data), func(match string) string {
 		if replaced {
@@ -260,12 +204,8 @@ func BumpSkillHeading(path, majorMinor string, dryRun bool) (bool, error) {
 	return true, nil
 }
 
-// --- README "Current (vX.Y)" bump ---
-
 var readmeCurrentRE = regexp.MustCompile(`Current \(v([0-9]+\.[0-9]+)\)`)
 
-// CurrentReadmeCurrent returns the "X.Y" from the README "Current (vX.Y)"
-// cell, or "" on miss.
 func CurrentReadmeCurrent(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -278,10 +218,6 @@ func CurrentReadmeCurrent(path string) (string, error) {
 	return m[1], nil
 }
 
-// BumpReadmeCurrent rewrites the README "Current (vX.Y)" cell to majorMinor.
-// Idempotent and missing-file tolerant: returns (false, nil) when already at
-// majorMinor, the cell is absent, or the file is missing. Atomic via .tmp +
-// rename.
 func BumpReadmeCurrent(path, majorMinor string, dryRun bool) (bool, error) {
 	current, err := CurrentReadmeCurrent(path)
 	if err != nil {
@@ -304,12 +240,8 @@ func BumpReadmeCurrent(path, majorMinor string, dryRun bool) (bool, error) {
 	return true, atomicwrite.Bytes(path, []byte(out))
 }
 
-// --- README history-table row bump ---
-
 var readmeHistoryRowRE = regexp.MustCompile(`(?m)^\| v[0-9]+\.[0-9]+ \|`)
 
-// HasHistoryRow reports whether the table already has a row for the given
-// major.minor. Mirrors bash `grep -qE "^\| v${target} \|"`.
 func HasHistoryRow(path, majorMinor string) (bool, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -353,14 +285,10 @@ func BumpReadmeHistory(path, version string, now time.Time, dryRun bool) (bool, 
 	return true, atomicwrite.Bytes(path, []byte(strings.Join(updated, "\n")))
 }
 
-// formatHistoryDate mirrors bash `date +"%b %-d"` ("May 24", "May 4").
-// Go's "Jan _2" pads single-digit days with a leading space — strip it.
 func formatHistoryDate(t time.Time) string {
 	return fmt.Sprintf("%s %d", t.Format("Jan"), t.Day())
 }
 
-// ResultJSON renders the bash-compatible JSON summary line. Returns it
-// WITH a trailing newline, matching the bash `printf '...\n'` call.
 func (r Result) ResultJSON() string {
 	var b strings.Builder
 	b.WriteString(`{"target":"`)
@@ -371,8 +299,6 @@ func (r Result) ResultJSON() string {
 			b.WriteByte(',')
 		}
 		b.WriteByte('"')
-		// Bash builds the list with raw string interpolation; we mirror
-		// (no escape needed since the names are literals controlled by us).
 		b.WriteString(m)
 		b.WriteByte('"')
 	}

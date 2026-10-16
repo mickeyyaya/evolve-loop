@@ -20,12 +20,10 @@ import (
 )
 
 const (
-	iscsLastCycle  = 1332 // the batch has completed through this cycle
-	iscsStaleCycle = 1330 // a lane the batch already moved past
+	iscsLastCycle  = 1332
+	iscsStaleCycle = 1330
 )
 
-// iscsProject is a plain temp project (no .git, no policy.json): every other
-// prepareIteration step no-ops cleanly on it, so batchProceed is reachable.
 func iscsProject(t *testing.T) (root, evolveDir string) {
 	t.Helper()
 	root = t.TempDir()
@@ -45,9 +43,6 @@ func iscsRunDir(t *testing.T, root string, cycle int) string {
 	return dir
 }
 
-// iscsExitedPID returns the pid of a process that has already exited and been
-// reaped — a SIGKILLed lane's owner pid, discovered at runtime (never a
-// literal pid).
 func iscsExitedPID(t *testing.T) int {
 	t.Helper()
 	for attempt := 0; attempt < 3; attempt++ {
@@ -102,8 +97,6 @@ func iscsCoordinator(root, evolveDir string, st core.Storage) (*loopBatchCoordin
 	return b, &console
 }
 
-// iscsPrepare requires the iteration top to reach batchProceed: a fixture
-// that halts earlier proves nothing about the coherence check.
 func iscsPrepare(t *testing.T, b *loopBatchCoordinator, console *bytes.Buffer, iteration int) {
 	t.Helper()
 	fc := policy.FleetConfig{Count: 1}
@@ -167,7 +160,6 @@ func TestPrepareIteration_StaleCanonicalState(t *testing.T) {
 			lease:     func(*testing.T, string) {},
 		},
 		{
-			// retro is live until it completes, per cyclerun_epilogue.go's state floor.
 			name:      "killed_mid_retro",
 			phase:     "retro",
 			completed: []string{"scout", "triage", "tdd", "build", "audit", "ship"},

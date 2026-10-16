@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// tokenFastPace is fastPace() plus a measured median token count (S8's new
-// Throughput field) — the token half of the join.
 func tokenFastPace(medianTokens int64) budgethistory.Throughput {
 	tp := fastPace()
 	tp.MedianTokensPerCycle = medianTokens
@@ -57,7 +55,6 @@ func TestQuotaAwareWaveConfig_EnforceStillJoinsAndDecidesUnchanged(t *testing.T)
 	if !strings.Contains(buf.String(), "[budget] shadow-join") {
 		t.Errorf("enforce stage must also emit the shadow join (observation, not a decision); got:\n%s", buf.String())
 	}
-	// Golden from TestQuotaAwareWaveConfig_EnforceResizesDown — unchanged by S8.
 	if got.Count != 1 {
 		t.Errorf("Count = %d, want 1 (enforce sizing unchanged by the join)", got.Count)
 	}
@@ -73,7 +70,6 @@ func TestQuotaAwareWaveConfig_NoTokenEvidenceEmitsNoJoin(t *testing.T) {
 		Budget: &policy.FleetBudgetConfig{Stage: "shadow", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
 	var buf bytes.Buffer
 
-	// fastPace() carries no MedianTokensPerCycle — half a join is not a join.
 	quotaAwareWaveConfig(fc, t.TempDir(), &buf, tightQuota(now), fastPace(), now)
 
 	log := buf.String()

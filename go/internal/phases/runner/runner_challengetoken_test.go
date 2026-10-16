@@ -62,7 +62,6 @@ func TestRun_TokenRequiredPhase_NoTokenFile_PromptUnchanged(t *testing.T) {
 
 func TestRun_NonTokenPhase_PromptUnchangedEvenWithFile(t *testing.T) {
 	t.Parallel()
-	// scout mints the token, so its prompt never carries the echo instruction.
 	prompt := runWithToken(t, "scout", "evolve-scout", true)
 	if strings.Contains(strings.ToLower(prompt), "challenge") {
 		t.Errorf("non-token-required phase must not receive the block; got: %q", prompt)

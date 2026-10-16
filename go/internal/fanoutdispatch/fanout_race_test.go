@@ -10,20 +10,6 @@ import (
 	"testing"
 )
 
-// fanout_race_test.go — B5 concurrency-stability coverage for the fan-out
-// executor. The existing TestRun_BoundedConcurrency only asserts that all
-// workers COMPLETE under a concurrency cap; it never observes that the cap is
-// actually honored (it would pass even with a broken semaphore). These tests
-// (a) observe the live concurrency bound, and (b) stress isolation +
-// partial-failure aggregation at higher N. Run under `-race`.
-
-// TestRun_ConcurrencyBoundIsObserved genuinely verifies the semaphore: each
-// worker drops a marker file for the duration of its command, snapshots how
-// many markers exist, and records that count. Since a marker's lifetime is a
-// subset of the worker's held semaphore slot, no snapshot can exceed the
-// configured concurrency — and with N≫concurrency and an overlap sleep, at
-// least one snapshot must observe genuine parallelism (guarding against a
-// vacuous pass where everything ran serially).
 func TestRun_ConcurrencyBoundIsObserved(t *testing.T) {
 	t.Parallel()
 	const (
@@ -42,7 +28,6 @@ func TestRun_ConcurrencyBoundIsObserved(t *testing.T) {
 	var sb strings.Builder
 	for i := 1; i <= workers; i++ {
 		name := fmt.Sprintf("w%d", i)
-		// touch marker → snapshot active count → hold → remove marker.
 		cmd := fmt.Sprintf(
 			"touch %s/%s; n=$(ls %s | wc -l | tr -d ' '); echo $n > %s/%s.probe; sleep 0.2; rm -f %s/%s",
 			active, name, active, probe, name, active, name)
@@ -79,11 +64,6 @@ func TestRun_ConcurrencyBoundIsObserved(t *testing.T) {
 	}
 }
 
-// TestRun_HighFanoutIsolationPartialFailure stresses the results map, the
-// per-worker meta/out files, and the aggregate exit code at higher N than the
-// existing N=4 cases: 12 workers at concurrency 4, half failing. Each worker's
-// recorded exit code must match its intent (no cross-worker clobbering), Run
-// must return non-zero (a worker failed), and every worker must appear once.
 func TestRun_HighFanoutIsolationPartialFailure(t *testing.T) {
 	t.Parallel()
 	const (
@@ -96,11 +76,10 @@ func TestRun_HighFanoutIsolationPartialFailure(t *testing.T) {
 	for i := 1; i <= workers; i++ {
 		name := fmt.Sprintf("w%d", i)
 		rc := 0
-		if i%2 == 0 { // even workers fail
+		if i%2 == 0 {
 			rc = 1
 		}
 		wantRC[name] = rc
-		// Echo a worker-unique line, then exit with the intended code.
 		fmt.Fprintf(&sb, "%s\tprintf 'artifact-%s\\n'; exit %d\n", name, name, rc)
 	}
 	cmds := filepath.Join(dir, "cmds.tsv")
@@ -119,11 +98,9 @@ func TestRun_HighFanoutIsolationPartialFailure(t *testing.T) {
 	}
 	resultsStr := string(body)
 	for name, want := range wantRC {
-		// Results TSV rows are "<name>\t<rc>\t<dur>".
 		if !strings.Contains(resultsStr, fmt.Sprintf("%s\t%d\t", name, want)) {
 			t.Errorf("results missing/incorrect for %s (want rc=%d):\n%s", name, want, resultsStr)
 		}
-		// Each worker's isolated .out file must carry only its own artifact line.
 		out, err := os.ReadFile(filepath.Join(dir, name+".out"))
 		if err != nil {
 			t.Errorf("worker %s wrote no .out: %v", name, err)

@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// realReport is a production-shaped report: canonical headings, "- {id}: {action} — metadata" items, reason= tails.
 const realReport = `<!-- challenge-token: abc -->
 <!-- ANCHOR:triage_decision -->
 # Triage Decision — Cycle 322

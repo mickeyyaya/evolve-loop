@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
-// tightQuota is a probed family with only 10% of a 1-hour reset window left —
-// enough headroom pressure that a modest budget sizes below a 3-lane wave.
 func tightQuota(now time.Time) []quotastate.QuotaState {
 	return []quotastate.QuotaState{{
 		Family:     "claude",
@@ -22,7 +20,6 @@ func tightQuota(now time.Time) []quotastate.QuotaState {
 	}}
 }
 
-// fastPace: 10 cycles/hour/lane, 6-minute median — the sizing denominator.
 func fastPace() budgethistory.Throughput {
 	return budgethistory.Throughput{SampleCount: 5, MedianCycleDurationMS: 360000, CyclesPerHour: 10}
 }
@@ -76,10 +73,6 @@ func TestQuotaAwareWaveConfig_EnforceResizesDown(t *testing.T) {
 
 	got, pace := quotaAwareWaveConfig(fc, t.TempDir(), &buf, tightQuota(now), fastPace(), now)
 
-	// budgetCycles = 0.1*10 = 1; affordable = 1*0.5/(10*1h) = 0.05 → clamp up to
-	// floor 1. affordable (0.05) < floor (1), so even the single floor lane is
-	// floor-forced: the near-exhausted budget throttles it, PaceDelay capping at
-	// the 1h reset horizon (run ~a cycle, then wait for the budget to refresh).
 	if got.Count != 1 {
 		t.Errorf("Count = %d, want 1 (enforce sizes to the affordable floor)", got.Count)
 	}
@@ -94,9 +87,6 @@ func TestQuotaAwareWaveConfig_EnforceResizesDown(t *testing.T) {
 func TestQuotaAwareWaveConfig_EnforceFloorForcedPaces(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
-	// rem 0.2, capacity 10 ⇒ 2 budget cycles; safety 0.5, 2 cyc/h, dt 1h ⇒
-	// affordable = 2*0.5/(2*1) = 0.5 < floor 2 ⇒ Lanes clamps up to floor 2 and
-	// the surplus is paced: PaceDelay = 360000ms*(2/0.5 - 1) = 18m (< 1h cap).
 	fc := policy.FleetConfig{Count: 4, Concurrency: 4, MinLanes: 2,
 		Budget: &policy.FleetBudgetConfig{Stage: "enforce", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
 	states := []quotastate.QuotaState{{

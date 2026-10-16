@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// loaderWithPersonas builds a prompts.Loader rooted at a temp dir containing
-// agents/<name>.md for each given persona name.
 func loaderWithPersonas(t *testing.T, names ...string) *prompts.Loader {
 	t.Helper()
 	dir := t.TempDir()
@@ -33,23 +31,19 @@ func loaderWithPersonas(t *testing.T, names ...string) *prompts.Loader {
 
 func TestRegisterBuiltinSpecRunners(t *testing.T) {
 	t.Parallel()
-	// Catalog: an Evaluate-archetype spec phase WITH a persona (should wire),
-	// a Plan-archetype spec phase WITHOUT a persona (should WARN+skip), a Control
-	// phase (should be excluded regardless of persona), and a non-llm phase.
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
-		{Name: "tester", Kind: "llm"},              // Evaluate (inferred) + persona present
-		{Name: "plan-review", Kind: "llm"},         // Plan (inferred) + NO persona
-		{Name: "memo", Kind: "llm"},                // Control (inferred) → excluded
-		{Name: "ship", Kind: "native"},             // non-llm → skipped
-		{Name: "architecture-design", Kind: "llm"}, // Plan + persona present
+		{Name: "tester", Kind: "llm"},
+		{Name: "plan-review", Kind: "llm"},
+		{Name: "memo", Kind: "llm"},
+		{Name: "ship", Kind: "native"},
+		{Name: "architecture-design", Kind: "llm"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Personas exist for tester + architecture-design only (NOT plan-review).
 	prm := loaderWithPersonas(t, "evolve-tester", "evolve-architecture-design", "evolve-memo")
 
-	runners := map[core.Phase]core.PhaseRunner{} // empty: nothing hand-wired
+	runners := map[core.Phase]core.PhaseRunner{}
 	var warn strings.Builder
 	registerBuiltinSpecRunners(runners, cat, specrunner.Config{Prompts: prm}, &warn)
 

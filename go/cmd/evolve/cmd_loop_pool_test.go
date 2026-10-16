@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// poolSpecID reads the todo ID from Scope[0], letting a main-package test
-// identify lanes without importing fleet's internal scopeID helper.
 func poolSpecID(spec fleet.CycleSpec) string {
 	if len(spec.Scope) == 0 {
 		return ""
@@ -70,11 +68,6 @@ func TestShouldRunWaveAndPool_MutuallyExclusive(t *testing.T) {
 	}
 }
 
-// poolTestSyncTimeout bounds each wait on a pool lane's goroutine handoff. The
-// handoff normally takes milliseconds, but -race plus coverage on a loaded
-// shared CI runner stretched it past the former 2s bound, so a slow start read
-// as a scheduling defect; 10s keeps a real hang loud without betting on the
-// runner's speed.
 const poolTestSyncTimeout = 10 * time.Second
 
 func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *testing.T) {
@@ -130,8 +123,6 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 		t.Fatalf("initial fill dispatched %v, want exactly {A,B}", seen)
 	}
 
-	// Callback entry order is scheduler-dependent even though RunPool selects A
-	// before B, so both are awaited before releasing B.
 	releaseB()
 	select {
 	case id := <-dispatched:

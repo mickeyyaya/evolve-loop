@@ -8,25 +8,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// TestArchitectureSeams_FoundationsExist guards a set of load-bearing seams
-// against rename or removal: the package-level references below name each
-// seam by its exact identity (receiver + method/func name via a method
-// expression), so a rename or signature-incompatible move breaks the build.
 var (
-	_ = (*cycleRun).recordAndBranch          // post-scout re-plan hook site
-	_ = (*cycleRun).selectNext               // next-phase selection (re-plan precedes it)
-	_ = (*Orchestrator).registerMintedPhases // mint-registration idempotency target
-	_ = mintConfigsFrom                      // recursion-guard / denylist target
-	_ = (*StateMachine).SpineSatisfiedUpTo   // floor's artifact-backed spine check
-	_ = router.ClampPlanToFloorWith          // the sole trust boundary (integrity floor)
+	_ = (*cycleRun).recordAndBranch
+	_ = (*cycleRun).selectNext
+	_ = (*Orchestrator).registerMintedPhases
+	_ = mintConfigsFrom
+	_ = (*StateMachine).SpineSatisfiedUpTo
+	_ = router.ClampPlanToFloorWith
 )
 
 func TestArchitectureSeams_FoundationsExist(t *testing.T) {
 	t.Parallel()
 
-	// panetrust.redactSecrets is unexported, so it cannot be referenced across
-	// the package boundary like the seams above; this runtime check guards its
-	// name instead.
 	src, err := os.ReadFile("../panetrust/panetrust.go")
 	if err != nil {
 		t.Fatalf("read panetrust source: %v", err)

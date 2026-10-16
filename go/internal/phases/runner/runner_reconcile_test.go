@@ -22,8 +22,6 @@ func verifyReturns(res deliverable.Result, err error) func(string, phasecontract
 	}
 }
 
-// verifiedFrom stamps the judged path and bytes as deliverable.Verify does, because the runner classifies those bytes.
-// Without a file the Result stays path-less, as a NoArtifact contract presents, so the pane stays the verdict source.
 func verifiedFrom(res deliverable.Result, phase string, roots phasecontract.Roots) deliverable.Result {
 	path := filepath.Join(roots.Workspace, phase+"-report.md")
 	data, err := os.ReadFile(path)
@@ -90,14 +88,14 @@ func TestRun_Timeout_SentinelFAIL_StaysFail(t *testing.T) {
 
 func TestRun_Timeout_NotWellFormed_StaysFail(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
-	fb := &fakeBridge{err: artifactTimeoutErr()} // no artifact written
+	fb := &fakeBridge{err: artifactTimeoutErr()}
 	notOK := deliverable.Result{OK: false, Violations: []deliverable.Violation{{Code: deliverable.CodeMissingArtifact, Message: "deliverable not found"}}}
 	r := New(Options{
 		Hooks:    hooks,
 		Bridge:   fb,
 		Prompts:  fakePromptsFS("evolve-auditor", "x"),
 		VerifyFn: verifyReturns(notOK, nil),
-		SleepFn:  func(time.Duration) {}, // skip the real settle-retry delay on the miss path
+		SleepFn:  func(time.Duration) {},
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})
@@ -143,7 +141,7 @@ func TestRun_OptionalPhase_Timeout_WellFormedPASS_ReconcilesToPass(t *testing.T)
 
 func TestRun_NonTimeoutError_StaysFail_Unchanged(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
-	fb := &fakeBridge{err: errors.New("bridge: launch exit=2"), writeArtifact: "# audit\nPASS\n"} // safety-gate, not a timeout
+	fb := &fakeBridge{err: errors.New("bridge: launch exit=2"), writeArtifact: "# audit\nPASS\n"}
 	verifyCalled := false
 	r := New(Options{
 		Hooks:   hooks,
@@ -173,7 +171,6 @@ func TestRun_NonTimeoutError_StaysFail_Unchanged(t *testing.T) {
 	}
 }
 
-// noisyStdoutBridge exits cleanly with stdout full of the contract's echoed PASS and FAIL example sentinels.
 type noisyStdoutBridge struct {
 	fileContent string
 	stdout      string
@@ -231,7 +228,6 @@ func hasWarningDiag(diags []core.Diagnostic) bool {
 func TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-auditor", model: "opus", prompt: "x", verdict: core.VerdictPASS}
 	fb := &fakeBridge{err: artifactTimeoutErr(), writeArtifact: "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"}
-	// The first two verifies miss a file still being written; the third, inside the settle window, sees the PASS.
 	calls := 0
 	settling := func(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		calls++
@@ -245,7 +241,7 @@ func TestRun_Timeout_DeliverableSettlesOnRetry_ReconcilesToPass(t *testing.T) {
 		Bridge:   fb,
 		Prompts:  fakePromptsFS("evolve-auditor", "x"),
 		VerifyFn: settling,
-		SleepFn:  func(time.Duration) {}, // deterministic: no real settle delay in tests
+		SleepFn:  func(time.Duration) {},
 	})
 
 	resp, err := r.Run(context.Background(), core.PhaseRequest{Workspace: t.TempDir()})

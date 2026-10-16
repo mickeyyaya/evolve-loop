@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// cancelOnRunOrch simulates a signal landing mid-cycle.
 type cancelOnRunOrch struct {
 	noSignals
 	cancel context.CancelFunc

@@ -50,7 +50,7 @@ func TestC1_003_ConcurrentTest_NameAndSeamPresent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	path := filepath.Join(root, "go", "internal", "bridge", "codex_pretrust_concurrent_test.go")
 	acsassert.FileMatchesRegex(t, path, `TestPretrustCodexProjects_Concurrent`)
-	acsassert.FileContains(t, path, `EVOLVE_CODEX_CONFIG_PATH`)
+	acsassert.FileContains(t, path, `codexConfigPath:`)
 }
 
 func TestC1_004_ConcurrentTest_NoProductionFilesModified(t *testing.T) {

@@ -1,6 +1,3 @@
-// `evolve loop` drives the cycle dispatcher loop with batch budget
-// enforcement. Sequential by design: each cycle blocks the next until
-// it completes or trips the batch cap.
 package main
 
 import (
@@ -10,8 +7,6 @@ import (
 	"os"
 	"time"
 
-	// Blank import: checkpoint's init() registers the orchestrator's
-	// phase-boundary checkpointer; without it checkpointing silently no-ops.
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
@@ -29,23 +24,17 @@ var validStrategies = map[string]struct{}{
 }
 
 type loopConfig struct {
-	ProjectRoot string `json:"project_root"`
-	EvolveDir   string `json:"evolve_dir"`
-	GoalHash    string `json:"goal_hash"`
-	GoalText    string `json:"goal_text,omitempty"`
-	GoalSource  string `json:"goal_source,omitempty"`
-	Strategy    string `json:"strategy"`
-	MaxCycles   int    `json:"max_cycles"`
-	// MaxCyclesExplicit is true only when the operator set --max-cycles/--cycles
-	// or a positional count; false lets an enforced cycle-budget policy raise
-	// the ceiling to the safety cap instead of defaulting to 1.
-	MaxCyclesExplicit bool `json:"max_cycles_explicit,omitempty"`
-	Resume            bool `json:"resume,omitempty"`
-	AutoResume        bool `json:"auto_resume,omitempty"`
-	Reset             bool `json:"reset,omitempty"`
-	// Fingerprint is the --fingerprint value for --reset: it acknowledges one
-	// failure fingerprint so the blocker-breaker excludes it going forward.
-	// See ADR-0072.
+	ProjectRoot       string            `json:"project_root"`
+	EvolveDir         string            `json:"evolve_dir"`
+	GoalHash          string            `json:"goal_hash"`
+	GoalText          string            `json:"goal_text,omitempty"`
+	GoalSource        string            `json:"goal_source,omitempty"`
+	Strategy          string            `json:"strategy"`
+	MaxCycles         int               `json:"max_cycles"`
+	MaxCyclesExplicit bool              `json:"max_cycles_explicit,omitempty"`
+	Resume            bool              `json:"resume,omitempty"`
+	AutoResume        bool              `json:"auto_resume,omitempty"`
+	Reset             bool              `json:"reset,omitempty"`
 	Fingerprint       string            `json:"fingerprint,omitempty"`
 	ConsensusAudit    bool              `json:"consensus_audit,omitempty"`
 	DryRun            bool              `json:"dry_run,omitempty"`
@@ -64,22 +53,16 @@ type loopConfig struct {
 	HandedOff         bool              `json:"-"`
 }
 
-// emitSignalStop assumes the caller polled ctx.Err() before the cycle error,
-// so a cancellation reads as a clean signal stop, not "context canceled".
 func emitSignalStop(stdout, stderr io.Writer, lr *loopResult, cycle int) {
 	signalStop(stdout, stderr, lr, fmt.Sprintf("at cycle %d — checkpointed", cycle))
 }
 
-// signalStop is the one interrupt disposition; every caller shares it so the
-// stop reason, resume hint and result emit never fork.
 func signalStop(stdout, stderr io.Writer, lr *loopResult, where string) {
 	fmt.Fprintf(stderr, "[loop] received interrupt (SIGINT/SIGTERM) %s; resume with: evolve loop --resume\n", where)
 	lr.StopReason = "signal"
 	lr.emit(stdout)
 }
 
-// runLoop is the `evolve loop` entry point. Chaining is never entered
-// implicitly: an absent flag and an absent policy block both leave it off.
 func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if isLoopStatusInvocation(args) {
 		return runLoopStatus(args[1:], stdout, stderr)
@@ -117,14 +100,9 @@ func printLoopDryRun(cfg loopConfig, stdout io.Writer) int {
 	return 0
 }
 
-// runLoopBatch runs exactly one batch of cycles.
 func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	maybePrintSetupNudge(stderr, cfg.EvolveDir)
 
-	// A loop launched into the primary checkout shares its tree with the
-	// operator console; classification failure is non-fatal, the tripwire
-	// just stays dark.
-	// See ADR-0080.
 	if pi, perr := plane.Classify(cfg.ProjectRoot); perr == nil {
 		fmt.Fprintln(stderr, plane.BootLine(pi))
 	} else {
@@ -139,9 +117,6 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	defer runtime.close()
 	ctx := runtime.ctx
 
-	// Reaps tmux sessions left by a prior crashed run, before any cycle runs:
-	// a SIGKILL'd loop never ran its teardown, so the per-run registry reaper
-	// cannot see them. Liveness-scoped, so a live concurrent run is never touched.
 	gcOrphanSessions("startup", stderr)
 
 	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr, routingRun{bypass: cfg.BypassPolicy, env: buildCycleEnv(cfg, os.Environ())})
@@ -150,10 +125,6 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		return exitRoutingRefused
 	}
 	defer deps.Signals.Flush()
-	// orch is narrowed to loopCycleRunner so a test can inject a scripted
-	// orchestrator (loopOrchOverride); the real *core.Orchestrator cannot be
-	// driven to emit FinalVerdict=FAIL without a faithful phase machine. A nil
-	// override runs the production orchestrator unchanged.
 	var orch loopCycleRunner = deps.Orchestrator
 	if loopOrchOverride != nil {
 		orch = loopOrchOverride
@@ -212,9 +183,6 @@ func readCarryoverCount(statePath string) (count int, ok bool) {
 	return len(s.CarryoverTodos), true
 }
 
-// finalizeCompletedCycle clears a completed cycle's on-disk cycle-state.json
-// marker at a clean batch exit, so the operator need not run
-// `evolve cycle reset --force` before the next launch.
 func finalizeCompletedCycle(cfg loopConfig, stderr io.Writer) {
 	cleared, err := core.ClearCompletedCycleMarker(cfg.EvolveDir, core.FinalizeOptions{Now: time.Now, PidAlive: pidAlive})
 	if err != nil {

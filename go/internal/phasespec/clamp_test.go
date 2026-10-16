@@ -32,7 +32,7 @@ func TestClampDiscoveredSpecs_KeepsVerifiedWriterAndForcesOptional(t *testing.T)
 		{Name: "minted-writer", Agent: "evolve-minted-writer", Optional: false, WritesSource: true},
 	}
 	clamped, warns := ClampDiscoveredSpecs(specs, func(profile string) bool {
-		return profile == "minted-writer" // the registrar-persisted, sandbox-enabled profile
+		return profile == "minted-writer"
 	})
 	if !clamped[0].WritesSource {
 		t.Fatal("a writer with a verified sandboxed profile must keep writes_source")
@@ -57,7 +57,6 @@ func TestSandboxedProfilePredicate_ReadsDispatchProfile(t *testing.T) {
 	write("sandboxed", `{"name":"sandboxed","sandbox":{"enabled":true}}`)
 	write("unsandboxed", `{"name":"unsandboxed"}`)
 	write("disabled", `{"name":"disabled","sandbox":{"enabled":false}}`)
-	// A read-only sandbox grants eligibility without write capability, so it must not verify.
 	write("readonly", `{"name":"readonly","sandbox":{"enabled":true,"read_only_repo":true}}`)
 
 	pred := SandboxedProfilePredicate(dir)

@@ -90,8 +90,6 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if err != nil {
-		// finalize() classifies err into ExitCode (integrity → ExitIntegrity, else
-		// ExitFailure); early-validation errors bypass it, leaving ExitCode==ExitOK.
 		if res.ExitCode != ship.ExitOK {
 			return int(res.ExitCode)
 		}

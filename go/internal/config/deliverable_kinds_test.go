@@ -13,7 +13,7 @@ func TestLoad_DeliverableKinds_FromRegistry(t *testing.T) {
 	if !ok {
 		t.Fatalf("registry declares no deliverable_kinds.document: %+v", cfg.DeliverableKinds)
 	}
-	var _ DeliverableKindSpec = doc // apicover: the registry-declared contract type is named here
+	var _ DeliverableKindSpec = doc
 	if doc.Root != "solutions" || doc.MinOptions < 2 || doc.EvidenceFile == "" {
 		t.Errorf("document spec = %+v, want root=solutions, min_options>=2, evidence_file set", doc)
 	}

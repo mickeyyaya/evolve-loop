@@ -1,15 +1,5 @@
-// Package reflection ports the Reflection Journal YAML schema
-// (CLAUDE.md env-var EVOLVE_REFLECTION_JOURNAL; v10.20 advisory,
-// v10.21 enforce). It reads, writes, and validates per-phase YAML
-// sidecars at .evolve/runs/cycle-<N>/<phase>-reflection.yaml.
-//
-// The bash source is at scripts/lifecycle/phase-gate.sh (enforcement
-// half) and scripts/observability/aggregate-reflections.sh (consumer
-// half). This Go port owns the data structures so phase impls and the
-// aggregator (Phase 3) work against the same types.
-//
-// Schema reference: agents/reflection-journal-schema.md;
-// fixtures pinned by scripts/tests/reflection-schema-test.sh.
+// Package reflection reads, writes and validates the per-phase Reflection Journal YAML sidecar.
+// See docs/architecture/packages/internal-reflection.md.
 package reflection
 
 import (
@@ -21,17 +11,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
 )
 
-// SchemaVersionV1 is the only schema currently recognized. Future
-// versions surface as validation errors so consumers and producers
-// upgrade in lockstep.
 const SchemaVersionV1 = 1
 
-// AggregatorConfidenceThreshold is the aggregator's filter: only
-// reflections with strictly greater confidence are rolled up. Mirrors
-// reflection-schema-test.sh T2 (0.2 skipped, 0.8 counted).
 const AggregatorConfidenceThreshold = 0.5
 
-// Reflection is the typed shape of a phase reflection sidecar.
 type Reflection struct {
 	SchemaVersion         int              `yaml:"schema_version"`
 	Cycle                 int              `yaml:"cycle"`
@@ -45,59 +28,46 @@ type Reflection struct {
 	PhaseTrackerRefs      PhaseTrackerRefs `yaml:"phase_tracker_refs"`
 }
 
-// Slowdown describes one friction point a phase observed in itself.
 type Slowdown struct {
 	Category string `yaml:"category"`
 	Evidence string `yaml:"evidence"`
-	Severity string `yaml:"severity"` // low | medium | high
+	Severity string `yaml:"severity"`
 }
 
-// Friction describes friction RECEIVED from an upstream phase.
 type Friction struct {
 	UpstreamPhase string `yaml:"upstream_phase"`
 	Issue         string `yaml:"issue"`
 	Evidence      string `yaml:"evidence,omitempty"`
 }
 
-// Improvement is a suggested-improvement entry consumed by retrospective.
 type Improvement struct {
 	Action          string `yaml:"action"`
 	TargetFile      string `yaml:"target_file"`
 	EvidencePointer string `yaml:"evidence_pointer"`
-	Priority        string `yaml:"priority"` // low | medium | high
+	Priority        string `yaml:"priority"`
 }
 
-// PhaseTrackerRefs holds the numeric refs into the phase-tracker NDJSON
-// log so the retrospective can cross-reference cost/latency claims.
 type PhaseTrackerRefs struct {
 	LatencyMS int     `yaml:"latency_ms"`
 	CostUSD   float64 `yaml:"cost_usd"`
 	Turns     int     `yaml:"turns"`
 }
 
-// Sidecar returns the canonical reflection-file path:
-// <runsDir>/cycle-<N>/<phase>-reflection.yaml.
-// This is the path phase-gate.sh:reflection-required check looks for.
 func Sidecar(runsDir string, cycle int, phase string) string {
 	return filepath.Join(runsDir, fmt.Sprintf("cycle-%d", cycle), phase+"-reflection.yaml")
 }
 
-// Parse deserializes YAML into a Reflection.
 func Parse(data []byte) (*Reflection, error) {
 	r := &Reflection{}
 	if err := yamlcodec.Unmarshal(data, r); err != nil {
 		return nil, fmt.Errorf("reflection: parse: %w", err)
 	}
-	// yaml.v3 leaves `slowdowns: []` as nil; normalize to non-nil
-	// empty slice so callers can distinguish "empty array per schema"
-	// from "field absent".
 	if r.Slowdowns == nil {
 		r.Slowdowns = []Slowdown{}
 	}
 	return r, nil
 }
 
-// ReadFile reads + parses a reflection YAML file.
 func ReadFile(path string) (*Reflection, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -108,10 +78,6 @@ func ReadFile(path string) (*Reflection, error) {
 
 var marshalYAML = yamlcodec.Marshal
 
-// Write serializes a Reflection to YAML and writes it to path
-// atomically (tmp file + rename, so concurrent readers never see a
-// half-written file). Validates the Reflection first; a malformed
-// sidecar is worse than no sidecar.
 func Write(path string, r *Reflection) error {
 	if err := r.Validate(); err != nil {
 		return fmt.Errorf("reflection: refusing to write invalid: %w", err)
@@ -131,9 +97,6 @@ func Write(path string, r *Reflection) error {
 	return nil
 }
 
-// Validate enforces the schema constraints not captured by yaml.v3's
-// type system: required fields, severity/priority enums, confidence
-// range, and schema_version recognition.
 func (r *Reflection) Validate() error {
 	if r == nil {
 		return errors.New("reflection: nil")
@@ -166,8 +129,6 @@ func (r *Reflection) Validate() error {
 	return nil
 }
 
-// AcceptedByAggregator reports whether this reflection's confidence
-// passes the aggregator's filter (> 0.5; cf. reflection-schema-test.sh T2).
 func (r *Reflection) AcceptedByAggregator() bool {
 	return r.ReflectionConfidence > AggregatorConfidenceThreshold
 }

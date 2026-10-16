@@ -49,10 +49,10 @@ func TestRoutingExplain_RendersPlanAndClampsForCycle(t *testing.T) {
 	}
 	s := out.String()
 	for _, want := range []string{
-		"scout", "RUN", "fresh discovery work", // plan: run entry
-		"triage", "SKIP", "carryover already queued", // plan: skip entry
-		"ship-requires-audit", "ship", "audit", // clamp
-		"opus", "claude", "deadbeefprompt", "1234", // span
+		"scout", "RUN", "fresh discovery work",
+		"triage", "SKIP", "carryover already queued",
+		"ship-requires-audit", "ship", "audit",
+		"opus", "claude", "deadbeefprompt", "1234",
 	} {
 		if !bytes.Contains([]byte(s), []byte(want)) {
 			t.Errorf("explain output missing %q:\n%s", want, s)
@@ -62,7 +62,7 @@ func TestRoutingExplain_RendersPlanAndClampsForCycle(t *testing.T) {
 
 func TestRoutingExplain_MissingArtifactsAreCleanExitZero(t *testing.T) {
 	t.Parallel()
-	pr := t.TempDir() // no .evolve/runs/cycle-9 at all
+	pr := t.TempDir()
 
 	var out, errb bytes.Buffer
 	code := runRouting([]string{"explain", "--cycle", "9", "--project-root", pr}, nil, &out, &errb)
@@ -81,7 +81,6 @@ func TestRoutingReplay_MatchesRecordedRunSet(t *testing.T) {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// A no-build, no-ship plan: the floor imposes nothing, so clamped == parsed.
 	raw := `[{"phase":"scout","run":true,"justification":"x"},{"phase":"triage","run":false,"justification":"queued"}]`
 	if err := os.WriteFile(filepath.Join(ws, "advisor-response-plan.txt"), []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
@@ -114,7 +113,7 @@ func TestRoutingReplay_MatchesRecordedRunSet(t *testing.T) {
 
 func TestRoutingReplay_MissingCaptureIsCleanExitZero(t *testing.T) {
 	t.Parallel()
-	pr := t.TempDir() // no capture at all
+	pr := t.TempDir()
 	var out, errb bytes.Buffer
 	if code := runRouting([]string{"replay", "--cycle", "3", "--project-root", pr}, nil, &out, &errb); code != 0 {
 		t.Fatalf("no captured response ⇒ clean exit 0, got %d", code)

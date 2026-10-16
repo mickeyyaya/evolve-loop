@@ -6,10 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
-// TestWithVerdictCacheLookupHook_AppliesObserver names AND executes
-// WithVerdictCacheLookupHook in the default (untagged) build: the option's
-// other users are all integration-tagged, so the repo-wide apicover gate would
-// otherwise score it false-green (named by a test but never executed).
 func TestWithVerdictCacheLookupHook_AppliesObserver(t *testing.T) {
 	t.Parallel()
 

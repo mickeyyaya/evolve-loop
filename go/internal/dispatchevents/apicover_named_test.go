@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-// TestWriter_NamedConstructAndEmit names the Writer type explicitly and pins
-// its core contract: NewWriter returns a *Writer targeting the workspace's
-// abnormal-events.jsonl, and Emit appends one decodable JSONL line carrying
-// the event verbatim (with SourcePhase defaulted to "dispatch").
 func TestWriter_NamedConstructAndEmit(t *testing.T) {
 	ws := t.TempDir()
 	var w *Writer = NewWriter(ws)

@@ -1,30 +1,3 @@
-// White-box behavioral suite for the retro→inbox preventive-actions
-// autofiler (task retro-preventive-actions-autofile-inbox, cycle 657).
-//
-// These tests encode the acceptance criteria for the NEW leaf package
-// internal/retrofile, which closes the learning→action loop: a retro's
-// structured "preventive_actions" become weighted .evolve/inbox todos on the
-// SAME deterministic seam the FAILED_UNEXPLAINED classifier already uses
-// (cmd/evolve/cmd_loop_outcome.go:fileUnexplainedOutcomeDefect). They are the
-// system-under-test for the cycle-657 ACS predicates
-// (go/acs/cycle657/predicates_test.go), which shell `go test -run <name>
-// ./internal/retrofile/` — so a predicate greens only when the real injector
-// files/deduplicates the right items, never on a source-grep.
-//
-// RED until the Builder writes retrofile.go implementing:
-//
-//	type PreventiveAction struct {
-//	    ID, Title  string
-//	    WeightHint float64  // >0 overrides defaultWeight (recurrence hint)
-//	    Files      []string
-//	    Evidence   string
-//	    Recurrence int
-//	}
-//	func ParsePreventiveActions(report []byte) ([]PreventiveAction, error)
-//	func FileActions(inboxDir string, cycle int, actions []PreventiveAction,
-//	    defaultWeight float64, now time.Time) (written []string, err error)
-//
-// DO NOT modify this file — implement production code to make it GREEN.
 package retrofile
 
 import (
@@ -35,12 +8,8 @@ import (
 	"time"
 )
 
-// fixedNow is a deterministic timestamp so filed items are byte-stable.
 var fixedNow = time.Date(2026, 7, 10, 14, 30, 0, 0, time.UTC)
 
-// fixtureRetro is a retro-report fragment carrying a machine-readable
-// preventive_actions block under the "## Recommended preventive actions"
-// heading — the FORMAT change the retro agent doc gains this cycle.
 const fixtureRetro = "# Cycle 640 Retrospective\n\n" +
 	"## Recommended preventive actions\n\n" +
 	"```json\n" +
@@ -50,9 +19,6 @@ const fixtureRetro = "# Cycle 640 Retrospective\n\n" +
 ]` + "\n```\n\n" +
 	"## Out of scope\n\n- unrelated\n"
 
-// readInboxIDs returns the "id" of every *.json item directly under dir
-// (non-recursive), keyed by filename, so a test can assert exactly which
-// actions were filed.
 func readInboxIDs(t *testing.T, dir string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
@@ -81,7 +47,6 @@ func readInboxIDs(t *testing.T, dir string) map[string]string {
 	return out
 }
 
-// writeInboxItem writes a minimal open/processed inbox item carrying id.
 func writeInboxItem(t *testing.T, path, id string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -93,8 +58,6 @@ func writeInboxItem(t *testing.T, path, id string) {
 	}
 }
 
-// TestParsePreventiveActions_FromRetroReport — AC1 (parse half): the structured
-// preventive_actions block is lifted verbatim into typed actions.
 func TestParsePreventiveActions_FromRetroReport(t *testing.T) {
 	actions, err := ParsePreventiveActions([]byte(fixtureRetro))
 	if err != nil {
@@ -117,9 +80,6 @@ func TestParsePreventiveActions_FromRetroReport(t *testing.T) {
 	}
 }
 
-// TestParsePreventiveActions_AbsentReturnsNil — edge/OOD: a retro with no
-// preventive_actions block yields no actions and no error (the injector must
-// no-op, not crash, on the common no-recommendations case).
 func TestParsePreventiveActions_AbsentReturnsNil(t *testing.T) {
 	actions, err := ParsePreventiveActions([]byte("# Cycle 1 Retrospective\n\n## Out of scope\n- none\n"))
 	if err != nil {
@@ -130,9 +90,6 @@ func TestParsePreventiveActions_AbsentReturnsNil(t *testing.T) {
 	}
 }
 
-// TestFileActions_EndToEndFromFixtureRetro — AC1 (full): parse a fixture retro,
-// file its actions, and assert one auto-retro-<cycle>-<slug>.json inbox item
-// per action, each carrying the action id.
 func TestFileActions_EndToEndFromFixtureRetro(t *testing.T) {
 	inbox := t.TempDir()
 	actions, err := ParsePreventiveActions([]byte(fixtureRetro))
@@ -150,7 +107,6 @@ func TestFileActions_EndToEndFromFixtureRetro(t *testing.T) {
 	ids := map[string]bool{}
 	for fname, id := range got {
 		ids[id] = true
-		// Filename must be the documented auto-retro-<cycle>-<slug>.json form.
 		if len(fname) < len("auto-retro-640-") || fname[:len("auto-retro-640-")] != "auto-retro-640-" {
 			t.Errorf("filed item %q does not use the auto-retro-<cycle>-<slug>.json convention", fname)
 		}
@@ -160,8 +116,6 @@ func TestFileActions_EndToEndFromFixtureRetro(t *testing.T) {
 	}
 }
 
-// TestFileActions_DedupSkipsExistingOpenItem — AC2 (open): an action whose id
-// already exists as an OPEN inbox item is skipped (no duplicate filed).
 func TestFileActions_DedupSkipsExistingOpenItem(t *testing.T) {
 	inbox := t.TempDir()
 	writeInboxItem(t, filepath.Join(inbox, "2026-07-06-builder-task-binding-topn-gate.json"), "builder-task-binding-topn-gate")
@@ -174,15 +128,11 @@ func TestFileActions_DedupSkipsExistingOpenItem(t *testing.T) {
 	if len(written) != 0 {
 		t.Errorf("wrote %d items, want 0 — an open item with the same id must suppress the re-file", len(written))
 	}
-	// No auto-retro file should have been created.
 	if _, err := os.Stat(filepath.Join(inbox, "auto-retro-640-builder-task-binding-topn-gate.json")); !os.IsNotExist(err) {
 		t.Errorf("auto-retro item was filed despite an existing open item (dedup failed)")
 	}
 }
 
-// TestFileActions_DedupSkipsExistingProcessedItem — AC2 (processed): an action
-// whose id was already consumed (lives under inbox/processed/**) is skipped, so
-// a recurrence does not re-file a completed fix.
 func TestFileActions_DedupSkipsExistingProcessedItem(t *testing.T) {
 	inbox := t.TempDir()
 	writeInboxItem(t, filepath.Join(inbox, "processed", "cycle-646", "builder-task-binding-topn-gate.json"), "builder-task-binding-topn-gate")
@@ -197,9 +147,6 @@ func TestFileActions_DedupSkipsExistingProcessedItem(t *testing.T) {
 	}
 }
 
-// TestFileActions_DedupAcrossTwoConsecutiveFailsFilesOnce — AC2 (regression):
-// the exact scenario the item names — the same preventive action emitted by two
-// consecutive FAIL cycles files exactly once while the first remains open.
 func TestFileActions_DedupAcrossTwoConsecutiveFailsFilesOnce(t *testing.T) {
 	inbox := t.TempDir()
 	actions := []PreventiveAction{{ID: "recurring-fix", Title: "recurring", WeightHint: 0.9, Recurrence: 2, PriorityClass: "correctness"}}
@@ -230,8 +177,6 @@ func TestFileActions_DedupAcrossTwoConsecutiveFailsFilesOnce(t *testing.T) {
 	}
 }
 
-// TestFileActions_UsesDefaultWeightWhenNoHint — AC3 (default): an action with no
-// WeightHint is filed at the caller-supplied policy default weight.
 func TestFileActions_UsesDefaultWeightWhenNoHint(t *testing.T) {
 	inbox := t.TempDir()
 	actions := []PreventiveAction{{ID: "plain-action", Title: "no hint", PriorityClass: "correctness"}}
@@ -244,8 +189,6 @@ func TestFileActions_UsesDefaultWeightWhenNoHint(t *testing.T) {
 	}
 }
 
-// TestFileActions_UsesHintForRecurrenceFlagged — AC3 (hint): a recurrence-flagged
-// action carries its higher WeightHint instead of the default.
 func TestFileActions_UsesHintForRecurrenceFlagged(t *testing.T) {
 	inbox := t.TempDir()
 	actions := []PreventiveAction{{ID: "hot-action", Title: "recurring", WeightHint: 0.95, Recurrence: 5, PriorityClass: "correctness"}}
@@ -258,7 +201,6 @@ func TestFileActions_UsesHintForRecurrenceFlagged(t *testing.T) {
 	}
 }
 
-// readItemWeight returns the numeric "weight" field of a filed inbox item.
 func readItemWeight(t *testing.T, path string) float64 {
 	t.Helper()
 	raw, err := os.ReadFile(path)

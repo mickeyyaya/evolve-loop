@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// wiringFakeLauncher records every Run call's specs — distinct name from the
-// other fake launchers in this package's test files (each scoped to its own
-// file to avoid cross-file coupling), per the minWidthFakeLauncher precedent.
 type wiringFakeLauncher struct {
 	calls [][]fleet.CycleSpec
 }

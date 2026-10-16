@@ -1,23 +1,11 @@
 package mergegate_test
 
-// DecideCadence — the merge-cadence advisor. These tests pin two things:
-//  1. DEFER-WINS: any single safety violation (audit not passed, CI not green,
-//     ledger unverified, conflicts present, severity blocks) forces Fire=false /
-//     Cadence=defer regardless of how much progress has accumulated. This is the
-//     deterministic floor the LLM gate can only ever be MORE conservative than.
-//  2. The cadence Strategy when the floor is clear: feature-complete (all waves
-//     done) > anti-starvation flush > per-wave (batch<=1) > batch-threshold > keep
-//     accumulating.
-// Pure + table-driven: zero I/O, same input → same output.
-
 import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/mergegate"
 )
 
-// clear is the all-green safety baseline: every floor predicate satisfied, so the
-// cadence Strategy (not the floor) decides. Cases override only what they probe.
 func clearInput() mergegate.DecisionInput {
 	return mergegate.DecisionInput{
 		WavesDone:       1,
@@ -51,7 +39,7 @@ func TestDecideCadence_DeferWins(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			in := clearInput()
-			in.WavesDone, in.WavesTotal = 4, 4 // even "all waves done" must not override the floor
+			in.WavesDone, in.WavesTotal = 4, 4
 			tc.mutate(&in)
 			got := mergegate.DecideCadence(in, perWave())
 			if got.Fire || got.Cadence != mergegate.CadenceDefer {
@@ -71,7 +59,7 @@ func TestDecideCadence_Strategy(t *testing.T) {
 		{
 			name: "all-waves-done-feature-complete",
 			in:   mut(clearInput(), func(in *mergegate.DecisionInput) { in.WavesDone, in.WavesTotal = 4, 4 }),
-			th:   mergegate.Thresholds{BatchWaveCount: 9, BatchChurnLOC: 800, CarryoverStallCycles: 8}, // high batch must NOT suppress feature-complete
+			th:   mergegate.Thresholds{BatchWaveCount: 9, BatchChurnLOC: 800, CarryoverStallCycles: 8},
 			want: mergegate.Decision{Fire: true, Cadence: mergegate.CadenceFeatureComplete},
 		},
 		{
@@ -81,9 +69,6 @@ func TestDecideCadence_Strategy(t *testing.T) {
 			want: mergegate.Decision{Fire: true, Cadence: mergegate.CadencePerWave},
 		},
 		{
-			// WavesTotal==0 means "unknown/non-campaign": the feature-complete branch
-			// must NOT fire (0 >= 0 is true but total==0 guards it off), and per-wave
-			// cadence applies.
 			name: "unknown-total-does-not-feature-complete",
 			in:   mut(clearInput(), func(in *mergegate.DecisionInput) { in.WavesDone, in.WavesTotal = 0, 0 }),
 			th:   perWave(),
@@ -127,7 +112,6 @@ func TestDecideCadence_Strategy(t *testing.T) {
 	}
 }
 
-// mut applies f to a copy of in and returns it — keeps the table literals terse.
 func mut(in mergegate.DecisionInput, f func(*mergegate.DecisionInput)) mergegate.DecisionInput {
 	f(&in)
 	return in

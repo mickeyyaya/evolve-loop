@@ -21,9 +21,6 @@ const (
 	itemBody    = "{\"id\":\"item\"}\n"
 )
 
-// shippedLane is a lane in the shape a fleet ship leaves when main moved under it: the Builder's change
-// and document on the audited base, audited as auditedTree, committed by ship (with its inbox
-// consumption unless built by newCommittedLane), while a peer landed newBase on main.
 type shippedLane struct {
 	t                         *testing.T
 	root, worktree, workspace string
@@ -58,7 +55,6 @@ func newShippedLane(t *testing.T, lanePath string, lane, peer laneEdit) *shipped
 	return newLane(t, lanePath, lane, peer, true)
 }
 
-// newCommittedLane is a shipped lane whose ship commit carries no inbox consumption.
 func newCommittedLane(t *testing.T, lanePath string, lane, peer laneEdit) *shippedLane {
 	t.Helper()
 	return newLane(t, lanePath, lane, peer, false)
@@ -106,7 +102,6 @@ func newLane(t *testing.T, lanePath string, lane, peer laneEdit, consumes bool) 
 	return fx
 }
 
-// build is the Builder: it changes lanePath, authors the explanation and seals the approved result.
 func (fx *shippedLane) build(lanePath string, lane laneEdit) {
 	t := fx.t
 	activation := fx.bindingAt("")
@@ -167,8 +162,6 @@ func (fx *shippedLane) commitAll(message string) {
 	fx.git("commit", "-q", "-m", message)
 }
 
-// landOnMain lands a later peer commit on main from a second worktree, as a peer lane landing after the
-// rebase would, and returns it.
 func (fx *shippedLane) landOnMain(rel, body string) string {
 	t := fx.t
 	t.Helper()
@@ -215,8 +208,6 @@ func (fx *shippedLane) recover(storage *fakeStorage, rows ...LedgerEntry) (Phase
 	return next, recovering, cs
 }
 
-// requirePendingLaneChangeOn asserts HEAD is base and exactly the audited lane change is pending on it, with
-// ship's consumption undone so the next ship consumes the item again.
 func (fx *shippedLane) requirePendingLaneChangeOn(base string) {
 	t := fx.t
 	t.Helper()

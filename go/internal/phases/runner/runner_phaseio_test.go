@@ -15,7 +15,6 @@ import (
 )
 
 func TestRun_DefaultProbeHonorsPhaseIO(t *testing.T) {
-	// A section-complete build report whose only possible violation is the missing failure block.
 	report := "# Report\n\n## Changes\n- x\n\n" + phasecontract.RenderVerdictSentinel("build", "FAIL") + "\n"
 	run := func(stage config.Stage) (core.PhaseResponse, *fakeHooks) {
 		t.Helper()

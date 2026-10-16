@@ -9,14 +9,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/contextfill"
 )
 
-// TestCorrelateBucketsByPeakFill is the table-driven core of the join: each case
-// pins which band a cycle's PEAK per-phase ratio lands in, including the
-// open-ended top band whose lower bound is contextfill.HotThreshold.
 func TestCorrelateBucketsByPeakFill(t *testing.T) {
 	cases := []struct {
 		name     string
 		fills    []float64
-		wantBand float64 // expected bucket Min
+		wantBand float64
 	}{
 		{"low band takes the peak, not the first entry", []float64{0.05, 0.42}, 0.00},
 		{"mid band", []float64{0.10, 0.55}, 0.50},
@@ -43,14 +40,11 @@ func TestCorrelateBucketsByPeakFill(t *testing.T) {
 	}
 }
 
-// TestCorrelateNeverFabricatesAZeroRatio pins the negative case at the unit
-// level: absent fill data and an absent verdict are both no-data, and the
-// lowest band must stay untouched by them.
 func TestCorrelateNeverFabricatesAZeroRatio(t *testing.T) {
 	rep := Correlate([]CycleFill{
 		{Cycle: 1, Verdict: "PASS"},
 		{Cycle: 2, Verdict: "", Fills: []float64{0.9}},
-		{Cycle: 3, Verdict: "PASS", Fills: []float64{0}}, // omitempty zero == absent
+		{Cycle: 3, Verdict: "PASS", Fills: []float64{0}},
 	})
 	if rep.CyclesJoined != 0 {
 		t.Errorf("CyclesJoined = %d, want 0 — none of these rows is joinable", rep.CyclesJoined)
@@ -65,15 +59,12 @@ func TestCorrelateNeverFabricatesAZeroRatio(t *testing.T) {
 	}
 }
 
-// TestCorrelateTalliesEveryRecognisedVerdict exercises all three arms of the
-// tally — WARN included, which no test, predicate, or corpus row previously
-// reached even though Bucket.Warn and the report's warn column are exported.
 func TestCorrelateTalliesEveryRecognisedVerdict(t *testing.T) {
 	rep := Correlate([]CycleFill{
 		{Cycle: 1, Verdict: "FAIL", Fills: []float64{0.10}},
 		{Cycle: 2, Verdict: "PASS", Fills: []float64{0.10}},
 		{Cycle: 3, Verdict: "WARN", Fills: []float64{0.10}},
-		{Cycle: 4, Verdict: "warn", Fills: []float64{0.10}}, // case-folded, same arm
+		{Cycle: 4, Verdict: "warn", Fills: []float64{0.10}},
 	})
 	if rep.CyclesJoined != 4 {
 		t.Fatalf("CyclesJoined = %d, want 4", rep.CyclesJoined)
@@ -86,19 +77,15 @@ func TestCorrelateTalliesEveryRecognisedVerdict(t *testing.T) {
 		t.Errorf("tally sums to %d but Cycles = %d — a counted cycle went untallied",
 			b.Fail+b.Pass+b.Warn, b.Cycles)
 	}
-	// WARN is not a failure: it must not move the FAIL rate.
 	if b.FailRate != 0.25 {
 		t.Errorf("FailRate = %v, want 0.25 (1 FAIL of 4)", b.FailRate)
 	}
 }
 
-// TestCorrelateExcludesUnrecognisedVerdicts is the D1 regression: an unknown
-// verdict must land in NoData, not raise a bucket's denominator. Before the
-// fix it was counted as a cycle that could never be a FAIL, diluting FailRate.
 func TestCorrelateExcludesUnrecognisedVerdicts(t *testing.T) {
 	rep := Correlate([]CycleFill{
 		{Cycle: 1, Verdict: "FAIL", Fills: []float64{0.10}},
-		{Cycle: 2, Verdict: "BLOCKED", Fills: []float64{0.10}}, // schema drift
+		{Cycle: 2, Verdict: "BLOCKED", Fills: []float64{0.10}},
 	})
 	if rep.CyclesJoined != 1 {
 		t.Errorf("CyclesJoined = %d, want 1 — BLOCKED is not a tallyable verdict", rep.CyclesJoined)
@@ -114,9 +101,6 @@ func TestCorrelateExcludesUnrecognisedVerdicts(t *testing.T) {
 	}
 }
 
-// TestLoadRejectsADuplicateBodyCycleID is the D2 regression: two dossiers whose
-// bodies claim one id must stay two distinct cycles, identified by their
-// (unique-by-construction) filenames.
 func TestLoadRejectsADuplicateBodyCycleID(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "knowledge-base", "cycles")
@@ -124,7 +108,6 @@ func TestLoadRejectsADuplicateBodyCycleID(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	for _, name := range []string{"cycle-11.json", "cycle-12.json"} {
-		// Both bodies lie, claiming to be cycle 11.
 		body := []byte(`{"cycle": 11, "final_verdict": "FAIL"}`)
 		if err := os.WriteFile(filepath.Join(dir, name), body, 0o644); err != nil {
 			t.Fatalf("write %s: %v", name, err)
@@ -150,16 +133,12 @@ func TestLoadRejectsADuplicateBodyCycleID(t *testing.T) {
 	}
 }
 
-// TestLoadRequiresACorpus pins the loud failure: an empty project root is an
-// error, not an empty report.
 func TestLoadRequiresACorpus(t *testing.T) {
 	if _, err := Load(t.TempDir()); err == nil {
 		t.Fatal("Load over a corpus-less root returned nil error, want a failure")
 	}
 }
 
-// TestLoadAccountsForACorruptDossier pins conservation against the ugly case: a
-// dossier that will not parse still occupies its slot, as no-data.
 func TestLoadAccountsForACorruptDossier(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "knowledge-base", "cycles", "cycle-9.json")

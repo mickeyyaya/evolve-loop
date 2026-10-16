@@ -506,8 +506,6 @@ func sourceRoot() string {
 	return envOrCwd("EVOLVE_PROJECT_ROOT")
 }
 
-// DiffComplexityDisabled is read inline (shared with the resolve-tier
-// handler), not via this struct.
 type subagentRunFlags struct {
 	adversarialAudit    bool
 	legacyAgentDispatch bool

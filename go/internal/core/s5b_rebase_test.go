@@ -30,10 +30,6 @@ func writeS5b(t *testing.T, path, content string) {
 	}
 }
 
-// setupDivergedRepo builds a repo whose cycle-branch worktree diverged from main
-// (a peer cycle committed after the worktree branched). conflict=true makes the
-// peer and the cycle touch the SAME file so the rebase conflicts; conflict=false
-// keeps them disjoint (the advisor-partitioned case) so the rebase is clean.
 func setupDivergedRepo(t *testing.T, conflict bool) (worktree string) {
 	t.Helper()
 	repo := t.TempDir()
@@ -81,12 +77,8 @@ func TestRebaseCycleBranchOntoMain_Conflict(t *testing.T) {
 	if ok || len(conflicts) == 0 {
 		t.Fatalf("conflicting rebase: ok=%v conflict=%v, want ok=false conflict=true", ok, conflicts)
 	}
-	// The rebase must have been aborted (worktree left clean, not mid-rebase).
 	if _, err := os.Stat(filepath.Join(wt, ".git", "rebase-merge")); !os.IsNotExist(err) {
-		// .git in a worktree is a file pointer; rebase state lives in the repo's
-		// worktrees/<name> dir, so a strict path check is brittle — instead assert
-		// a subsequent rebase can start (no "rebase in progress").
-		gitS5b(t, wt, "status") // fails the test via gitS5b if the tree is wedged
+		gitS5b(t, wt, "status")
 	}
 }
 

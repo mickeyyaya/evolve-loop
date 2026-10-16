@@ -213,13 +213,22 @@ func TestC1647_004_FocusedRunnerRegressionCoversAdvisorProjectionAndNamesCaller(
 	if file == "" {
 		t.Fatalf("RED: no *_test.go under internal/phases/runner defines func %s", focusedRunnerTest)
 	}
-	for _, want := range []string{"resolveDispatchPlan", "routing.go", "ModelRoutingCLI", `"claude-p"`, `"codex"`, `"claude-tmux"`} {
+	if !acsassert.FileContains(t, filepath.Join(dir, "internal", "phases", "runner", "routing.go"), "func (b *BaseRunner) resolveDispatchPlan(") {
+		t.Errorf("RED: the production caller resolveDispatchPlan is no longer defined in internal/phases/runner/routing.go")
+	}
+	for _, want := range []string{"ModelRoutingCLI", `"claude-p"`, `"codex"`, `"claude-tmux"`} {
 		if !acsassert.FileContains(t, file, want) {
-			t.Errorf("RED: %s does not mention %q — the focused test must name the production caller and drive the AC's literal inputs", filepath.Base(file), want)
+			t.Errorf("RED: %s does not mention %q — the focused test must drive the AC's literal inputs", filepath.Base(file), want)
 		}
 	}
-	if !acsassert.FileContainsAny(file, "ContractEscalation", "contract-escalation", "contract_escalation") {
-		t.Errorf("RED: %s does not distinguish the advisor projection from the contract-escalation projection (both reach llmroute.ApplySoftOverlay through resolveDispatchPlan; AC4 asks the caller to be named for each)", filepath.Base(file))
+	escalationFile := fileDefiningTest(t, filepath.Join(dir, "internal", "phases", "runner"), contractEscalationTest)
+	if escalationFile == "" {
+		t.Fatalf("RED: no *_test.go under internal/phases/runner defines func %s", contractEscalationTest)
+	}
+	for _, want := range []string{"ModelRoutingCLI", "CorrectionDirective"} {
+		if !acsassert.FileContains(t, escalationFile, want) {
+			t.Errorf("RED: %s does not mention %q — the contract-escalation projection must be driven through its own test, distinct from the advisor projection", filepath.Base(escalationFile), want)
+		}
 	}
 }
 

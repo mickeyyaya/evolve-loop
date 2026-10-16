@@ -75,7 +75,6 @@ func TestSpineSatisfiedUpTo_ConfigurableMandatoryWeakensGate(t *testing.T) {
 	t.Parallel()
 
 	sm := NewStateMachine()
-	// Operator dropped audit from the mandatory set (weak-spine).
 	weak := config.RoutingConfig{Mandatory: []string{"scout", "build", "ship"}}
 	sig := router.RoutingSignals{
 		Scout: router.ScoutSignals{Present: true},

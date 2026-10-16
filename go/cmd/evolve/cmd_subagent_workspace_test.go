@@ -22,7 +22,7 @@ func TestRunSubagentRun_RelativeWorkspaceResolvesAgainstProjectRootNotCwd(t *tes
 	t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 	t.Setenv("EVOLVE_PROJECT_ROOT", projectRoot)
-	t.Setenv("PROMPT_FILE_OVERRIDE", "") // force stdin path is irrelevant; we fail before reading it
+	t.Setenv("PROMPT_FILE_OVERRIDE", "")
 
 	const rel = "runs/cycle-9"
 	if err := os.MkdirAll(filepath.Join(projectRoot, rel), 0o755); err != nil {
@@ -294,10 +294,6 @@ func TestRunSubagentRun_WorkspaceOutsideProjectRootRejected(t *testing.T) {
 	}
 }
 
-// This does not assert containment (a relative arg escaping the project root
-// is a separate invariant, see TestRunSubagentRun_WorkspaceOutsideProjectRootRejected);
-// it pins only that the invoking cwd is never touched, regardless of how ".."
-// is handled.
 func TestRunSubagentRun_ParentTraversalRelativeWorkspaceDoesNotPolluteCwd(t *testing.T) {
 	parent := t.TempDir()
 	projectRoot := filepath.Join(parent, "proj")

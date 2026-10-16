@@ -2,8 +2,6 @@ package verifyeval
 
 import "strings"
 
-// shellCommandSubstitutions returns executable $(...) bodies, including those
-// inside double quotes. Single-quoted substitutions are literal text.
 func shellCommandSubstitutions(script string) []string {
 	var substitutions []string
 	var quote byte
@@ -93,9 +91,6 @@ func shellCommandSubstitutionEnd(script string, start int) (int, bool) {
 	return 0, false
 }
 
-// shellCommands splits only at unquoted shell command boundaries. It is a
-// bounded recognizer for locating go test invocations, not a shell interpreter;
-// Bash remains authoritative when DefaultRunner executes the complete script.
 func shellCommands(script string) []string {
 	var commands []string
 	start := 0
@@ -163,8 +158,6 @@ func beginsShellComment(script string, at int) bool {
 	return strings.ContainsRune(" \t\r\n;|&(", rune(script[at-1]))
 }
 
-// shellWords tokenizes one command enough to keep quoted arguments intact.
-// It deliberately leaves expansion and execution to Bash.
 func shellWords(command string) []string {
 	var words []string
 	var word strings.Builder

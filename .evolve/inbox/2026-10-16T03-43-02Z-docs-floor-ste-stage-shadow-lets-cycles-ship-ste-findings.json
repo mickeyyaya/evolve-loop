@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "With ste_stage=enforce, a build that changes a docs/**/*.md file containing an ste-lint finding fails the build floor (a unit test in go/internal/core covers this); with shadow it only warns.",
+    "`evolve docs ste-lint --strict docs/architecture/packages/internal-modelquery.md docs/architecture/model-discovery-and-catalog.md` exits 0 with no findings."
+  ],
+  "created_at": "2026-10-16T03:43:02Z",
+  "files": [
+    "go/internal/core/ste_floor.go",
+    "go/internal/core/build_floor_reviewer.go",
+    "go/internal/policy/budgets_recovery.go",
+    "docs/architecture/packages/internal-modelquery.md",
+    "docs/architecture/model-discovery-and-catalog.md"
+  ],
+  "fix": "Move docs_floor.ste_stage from shadow to enforce for the loop (default in policy.DocsFloorConfig and the project .evolve/policy.json), so steLintWarn blocks a build whose changed docs/**/*.md have ste-lint findings. Do not add a second ste-lint call to go/internal/phases/ship. Then clear the findings in the two docs: 51 in internal-modelquery.md and 58 in model-discovery-and-catalog.md. Before the flip, count how many existing docs carry findings: a build that touches one would then block, so the flip may need a diff-scoped (added lines only) check first.",
+  "id": "docs-floor-ste-stage-shadow-lets-cycles-ship-ste-findings",
+  "kind": "bug",
+  "priority_class": "hygiene",
+  "source": "console, comment-zero lane M3 verification, 2026-10-16",
+  "summary": "Wave 101's cycle shipped docs that fail `evolve docs ste-lint --strict`: internal-modelquery.md:43 has a 32-word sentence, and model-discovery-and-catalog.md:13 has a 30-word numbered item. The build floor already runs ste-lint (core/ste_floor.go via docsFloorWarn), but the policy default docs_floor.ste_stage is \"shadow\", so findings only warn and never block. Console commits pass ste-lint as a rule, so cycle-shipped docs bypass the docs convention and the next console lane that diffs against main sees the findings.",
+  "title": "The build floor's ste-lint runs in shadow, so loop cycles ship docs that fail ste-lint --strict",
+  "weight": 0.3
+}

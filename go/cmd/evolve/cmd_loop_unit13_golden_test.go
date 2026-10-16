@@ -42,8 +42,6 @@ func u13Golden(t *testing.T, dir, name string) string {
 func u13Template(s, root, evolveDir string) string {
 	s = strings.ReplaceAll(s, evolveDir, "{EVOLVE_DIR}")
 	s = strings.ReplaceAll(s, root, "{ROOT}")
-	// os.ReadDir's fault PathError Op is Go-version- and OS-dependent (`open` /
-	// `fdopendir` / `readdirent`); the goldens canonicalize it to `open`.
 	s = u13ReadDirOp.ReplaceAllString(s, "open $1: not a directory")
 	return u13RFC3339.ReplaceAllString(s, "{TS}")
 }
@@ -124,9 +122,6 @@ func TestWaveDispatch_StepErrorsAreByteIdenticalToTheGolden(t *testing.T) {
 	}
 }
 
-// u13PruneFixture seeds the prior cycle's decision with one pending and one
-// consumed id, with alpha the only pending item, so the widen stage has
-// nothing to add and the plan's bytes are exactly the prune's.
 func u13PruneFixture(t *testing.T, decision string) (plan func(stderr io.Writer) []byte, root string) {
 	t.Helper()
 	root = t.TempDir()
@@ -264,8 +259,6 @@ func u13WaveStderrSections(t *testing.T) string {
 	section("launcher_all_stale", func(w io.Writer) {
 		root := t.TempDir()
 		for _, id := range []string{"a", "b"} {
-			// lifecycle.promoteDestPath nests processed/ by cycle; the fixture
-			// mirrors that real layout rather than a flat processed/ dir.
 			u13WriteJSON(t, filepath.Join(root, ".evolve", "inbox", "processed", "cycle-9", id+".json"), map[string]any{"id": id, "weight": 0.5, "files": []string{id + ".go"}})
 		}
 		productionWaveLauncher(policy.FleetConfig{Concurrency: 1}, "", root, "", "", io.Discard, w).Run(context.Background(), []fleet.CycleSpec{{Scope: []string{"a"}}, {Scope: []string{"b"}}})
@@ -317,8 +310,6 @@ func TestWaveStderr_EveryLineIsByteIdentical(t *testing.T) {
 	}
 }
 
-// u13ChainEnv seeds a chain project with a stale pin so a scripted refresh
-// can fire.
 func u13ChainEnv(t *testing.T, items int) (root, evolveDir string) {
 	t.Helper()
 	root, evolveDir, _ = brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
@@ -328,8 +319,6 @@ func u13ChainEnv(t *testing.T, items int) (root, evolveDir string) {
 	return root, evolveDir
 }
 
-// u13StubRefresh scripts every refresh seam so rebuild/re-exec are recorded,
-// never actually run.
 func u13StubRefresh(t *testing.T, ahead func() bool) {
 	t.Helper()
 	prevAhead, prevCommit, prevProv := chainBoundaryAheadFn, chainRunningCommitFn, chainBoundaryRepinProvenanceFn
@@ -511,8 +500,6 @@ func u13DriverSections(t *testing.T) string {
 		_, _, stderr := u13ChainStdout(t, c)
 		fmt.Fprintf(&b, "== %s\n%s", c.reason, stderr)
 	}
-	// Combines an invalid inbox item with a quota defer that carries no
-	// checkpoint, in one run.
 	root, evolveDir := u13ChainEnv(t, 1)
 	if err := os.WriteFile(filepath.Join(evolveDir, "inbox", "typo-item.json"), nil, 0o644); err != nil {
 		t.Fatal(err)

@@ -17,42 +17,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// cliVerify is one row of the release verification matrix: a target (an LLM CLI,
-// or the binaryRowKey pseudo-target) and whether it passed, with a human Detail.
 type cliVerify struct {
 	CLI    string
 	OK     bool
 	Detail string
 }
 
-// matrixDeps are the injectable effects the matrix performs. Tests stub these to
-// drive every branch deterministically; defaultMatrixDeps() supplies the real
-// install/projection/exec implementations.
 type matrixDeps struct {
-	// installClaude installs the Claude payload from srcDir into an isolated
-	// home and reports a non-nil error if the install is empty or fails.
 	installClaude func(srcDir, home string) error
-	// projectTarget renders the skill projection for a codex/agy target from
-	// srcDir, reporting a non-nil error if the projection fails.
 	projectTarget func(srcDir, target string) error
-	// geminiLayout asserts srcDir contains the payload Gemini discovers in-repo.
-	geminiLayout func(srcDir string) error
-	// binAnswers reports a non-nil error if the release binary at binPath does
-	// not answer subcommand sub.
-	binAnswers func(binPath, sub string) error
+	geminiLayout  func(srcDir string) error
+	binAnswers    func(binPath, sub string) error
 }
 
-// releaseVerifyCLIs is the closed set of LLM CLIs the release must support. The
-// matrix iterates this list, so coverage is driven by it.
 var releaseVerifyCLIs = []string{"claude", "codex", "agy", "gemini"}
 
-// binaryRowKey labels the single matrix row that verifies the release binary
-// answers every core subcommand (distinct from the per-CLI install rows).
 const binaryRowKey = "binary:core-subcommands"
 
-// coreSubcommands are the subcommands the installed skills shell out to. If the
-// release binary stopped answering any of these, the installed skills would
-// silently break — that is the regression this gate catches.
 var coreSubcommands = []string{
 	"loop",
 	"subagent",
@@ -65,10 +46,6 @@ var coreSubcommands = []string{
 	"release",
 }
 
-// verifyReleaseCLIMatrix runs the full matrix: one row per supported CLI (each
-// install/projection isolated from the others) plus one binary row across all
-// core subcommands. It never returns early — every failure is reported so the
-// operator sees the complete picture, not just the first fault.
 func verifyReleaseCLIMatrix(srcDir, binPath string, d matrixDeps) []cliVerify {
 	results := make([]cliVerify, 0, len(releaseVerifyCLIs)+1)
 	for _, cli := range releaseVerifyCLIs {
@@ -94,8 +71,6 @@ func verifyReleaseCLIMatrix(srcDir, binPath string, d matrixDeps) []cliVerify {
 	return results
 }
 
-// verifyClaudeInstall isolates the Claude install in a throwaway home so the
-// matrix never touches the operator's real ~/.claude.
 func verifyClaudeInstall(srcDir string, install func(srcDir, home string) error) error {
 	home, err := os.MkdirTemp("", "evolve-relverify-claude-")
 	if err != nil {
@@ -105,7 +80,6 @@ func verifyClaudeInstall(srcDir string, install func(srcDir, home string) error)
 	return install(srcDir, home)
 }
 
-// rowFor builds a per-CLI row from the verification error (nil == OK).
 func rowFor(cli string, err error) cliVerify {
 	if err != nil {
 		return cliVerify{CLI: cli, OK: false, Detail: err.Error()}
@@ -113,8 +87,6 @@ func rowFor(cli string, err error) cliVerify {
 	return cliVerify{CLI: cli, OK: true, Detail: "install/projection verified"}
 }
 
-// binaryRow builds the single binary row, naming any unanswered subcommands so a
-// failure is actionable.
 func binaryRow(missing []string) cliVerify {
 	if len(missing) > 0 {
 		return cliVerify{
@@ -181,8 +153,6 @@ func binaryAnswersSubcommandDep(binPath, sub string) error {
 	return nil
 }
 
-// defaultMatrixDeps wires the real install/projection/exec effects used by the
-// release flow.
 func defaultMatrixDeps() matrixDeps {
 	return matrixDeps{
 		installClaude: installClaudeDep,
@@ -192,9 +162,6 @@ func defaultMatrixDeps() matrixDeps {
 	}
 }
 
-// runReleaseVerifyCLIs is the `evolve release-verify-clis` handler: it runs the
-// matrix against the in-repo payload (sourceRoot) and the running binary
-// (os.Executable), prints a table, and exits non-zero if any row failed.
 func runReleaseVerifyCLIs(_ []string, _ io.Reader, stdout, stderr io.Writer) int {
 	srcDir := sourceRoot()
 	binPath, err := os.Executable()

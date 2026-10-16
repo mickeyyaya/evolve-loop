@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// writeRaw is a test helper that writes a raw <phase>-stdout.log into a
-// fresh temp workspace and returns the workspace path.
 func writeRaw(t *testing.T, phase, body string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -19,7 +17,6 @@ func writeRaw(t *testing.T, phase, body string) string {
 	return ws
 }
 
-// readClean returns <workspace>/<phase>-stdout.clean.txt or "" if absent.
 func readClean(t *testing.T, ws, phase string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(ws, phase+"-stdout.clean.txt"))

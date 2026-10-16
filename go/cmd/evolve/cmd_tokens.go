@@ -15,19 +15,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// PhaseTokenTotal is one phase's summed token usage across the walked cycles.
 type PhaseTokenTotal struct {
 	Phase      string                `json:"phase"`
 	Tokens     cyclestate.TokenUsage `json:"tokens"`
 	CycleCount int                   `json:"cycle_count"`
 }
 
-// TokensReport is the walked-window aggregate `evolve tokens report` emits.
 type TokensReport struct {
 	CyclesWalked   []int                 `json:"cycles_walked"`
-	Phases         []PhaseTokenTotal     `json:"phases"` // ranked, highest InputTokens first
+	Phases         []PhaseTokenTotal     `json:"phases"`
 	TotalTokens    cyclestate.TokenUsage `json:"total_tokens"`
-	WastedTokens   cyclestate.TokenUsage `json:"wasted_tokens"` // FAIL-verdict phases (work that didn't ship)
+	WastedTokens   cyclestate.TokenUsage `json:"wasted_tokens"`
 	CacheHitRatio  float64               `json:"cache_hit_ratio"`
 	PhasesWithData int                   `json:"phases_with_data"`
 	PhasesRun      int                   `json:"phases_run"`
@@ -35,7 +33,6 @@ type TokensReport struct {
 	Tripwires      []TripwireEvent       `json:"tripwires"`
 }
 
-// TripwireEvent is one surfaced telemetry-coverage tripwire.
 type TripwireEvent struct {
 	Cycle      int    `json:"cycle"`
 	CLI        string `json:"cli"`

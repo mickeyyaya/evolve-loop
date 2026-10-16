@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// writeVerdicts writes a fully-valid audit-report.md (the required ## Verdict
-// section + a PASS-vocabulary sentinel) plus the acs-verdict.json.
 func writeVerdicts(t *testing.T, dir, audit, acs string) {
 	t.Helper()
 	if audit != "" {
@@ -27,9 +25,6 @@ func writeVerdicts(t *testing.T, dir, audit, acs string) {
 	}
 }
 
-// okStubVerifier is a controllable ContractVerifier double: VerifyDeliverable
-// returns ok verbatim, distinct from correction_ladder_test.go's path-aware
-// fakeVerifier — this one needs no filesystem fixture.
 type okStubVerifier struct{ ok bool }
 
 func (v okStubVerifier) VerifyDeliverable(_ context.Context, _ ReviewInput) (ContractVerification, error) {

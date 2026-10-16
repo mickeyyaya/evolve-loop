@@ -14,7 +14,6 @@ func (b *BaseRunner) bench(projectRoot, phase string, plan llmroute.Plan, env ma
 	return bridgechain.ApplyCLIHealthBench(projectRoot, phase, plan, env, b.nowFn, runnerLogf)
 }
 
-// maybeBenchOnEscalation benches the candidate's family when this dispatch's escalation report classifies a benchable wall.
 func (b *BaseRunner) maybeBenchOnEscalation(e bridgechain.Escalation) {
 	bridgechain.BenchOnEscalation(e, b.nowFn, runnerLogf)
 }

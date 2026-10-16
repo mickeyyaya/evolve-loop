@@ -1,8 +1,5 @@
 package carryover
 
-// lifecycle_test.go — unit 03: the Lifecycle's mint admission, the workspace
-// readers, the closeout order, the persist, the Null Object and the codes.
-
 import (
 	"context"
 	"encoding/json"
@@ -65,7 +62,7 @@ func TestLifecycle_Append_FingerprintTwinWithOlderStampIsNotRefreshed(t *testing
 }
 
 func TestLifecycle_Append_IDTwinIsSkippedNilStateInertElseAppendsLast(t *testing.T) {
-	New().Append(nil, cyclestate.CarryoverTodo{ID: "a"}) // inert
+	New().Append(nil, cyclestate.CarryoverTodo{ID: "a"})
 	st := &cyclestate.State{CarryoverTodos: []cyclestate.CarryoverTodo{{ID: "a", Action: "one"}}}
 	New().Append(st, cyclestate.CarryoverTodo{ID: "a", Action: "two"})
 	if len(st.CarryoverTodos) != 1 || st.CarryoverTodos[0].Action != "one" {
@@ -196,7 +193,7 @@ func TestLifecycle_MergePrescriptions_KeepsOnlyOpenPrefixedRows(t *testing.T) {
 	if p.ID != "p1" || p.Action != "PRESCRIPTION: add the guard" || p.Priority != PriorityPrescription || p.FirstSeenCycle != 42 || p.ExpiresAt != "2026-08-10T00:00:00Z" {
 		t.Fatalf("the prefix stays inside the action, priority high, stamped now+30d: %+v", p)
 	}
-	l.MergePrescriptions(st, t.TempDir(), 43, now) // absent: silent
+	l.MergePrescriptions(st, t.TempDir(), 43, now)
 	if len(*got) != 0 {
 		t.Fatal("absent ledger is silent")
 	}
@@ -396,7 +393,7 @@ func TestWithSignals_NilIsTheNullObject(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "carryover-todos.json", "{broken")
 	st := &cyclestate.State{}
-	l.MergeMemo(st, ws, 1, time.Now()) // the malformed path with no Center must not panic
+	l.MergeMemo(st, ws, 1, time.Now())
 	if len(st.CarryoverTodos) != 0 {
 		t.Fatal("skipped")
 	}
@@ -428,9 +425,6 @@ func TestCarryoverCodes_AreRegisteredWithDocs(t *testing.T) {
 	}
 }
 
-// The workspace merges are ID-only unions (no fingerprint suppression — the
-// critic's fold): a memo entry whose action fingerprints an existing P0 todo
-// is still appended, exactly as carryover_merge.go did.
 func TestLifecycle_MergeMemo_IsAnIDOnlyUnionNeverFingerprintSuppressed(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "carryover-todos.json", `[{"id":"memo-1","action":"cycle 2 failed during build: x"}]`)
@@ -451,9 +445,6 @@ func TestLifecycle_MergePrescriptions_NilStateAndBlankWorkspaceAreInert(t *testi
 	}
 }
 
-// ApplyDefects keeps the pre-extraction contract on a nil state — a panic,
-// not a silent no-op (only Append guards nil); pinned so the ONE admission
-// rule cannot quietly widen it.
 func TestLifecycle_ApplyDefects_NilStatePanicsAsBefore(t *testing.T) {
 	defer func() {
 		if recover() == nil {

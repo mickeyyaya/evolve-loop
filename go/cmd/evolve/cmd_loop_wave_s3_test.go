@@ -16,9 +16,6 @@ func waveEligibleFC() policy.FleetConfig {
 
 func passingPreflight() error { return nil }
 
-// TestDispatchIteration_CtxReachesPlanFn threads a context value through ctx
-// so a re-minted context.Background() (which could never carry it) is
-// distinguishable from the caller's actual ctx reaching the plan function.
 func TestDispatchIteration_CtxReachesPlanFn(t *testing.T) {
 	t.Parallel()
 	const key = waveCtxKey("wave-ctx-probe")

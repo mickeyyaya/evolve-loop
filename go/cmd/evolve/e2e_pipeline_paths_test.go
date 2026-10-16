@@ -11,13 +11,6 @@ import (
 	"time"
 )
 
-// pipelineCycle runs one headless claude-p cycle with the given env overlay and
-// returns the ledger entries. It never fails the test on a non-zero cycle exit
-// — callers assert on ledger-observable routing via ledgerHasRole.
-
-// strictPolicyMarker is a harness-only sentinel; it never reaches the cycle
-// subprocess. Present in extraEnv, it makes pipelineCycle drop a
-// .evolve/policy.json with workflow.strict_audit:true into the project root.
 const strictPolicyMarker = "TEST_WRITE_STRICT_POLICY=1"
 
 func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, extraEnv ...string) ([]ledgerEntry, error) {
@@ -30,17 +23,13 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		"BRIDGE_TESTING=1",
 		"BRIDGE_CLAUDE_BINARY="+fakeBin,
-		// Explicit opt-out of OS confinement: these tests exercise pipeline
-		// semantics with fake CLIs, not confinement, and CI runners cannot
-		// promise a working sandbox wrap (e.g. no bwrap on Ubuntu images). The
-		// gate's own classification is pinned by TestSandboxGate_* in internal/bridge.
 		"EVOLVE_SANDBOX=off",
 	)
 	env = append(env, isolatedHome(t)...)
 	for _, e := range extraEnv {
 		if e == strictPolicyMarker {
 			writeProjectPolicy(t, projRoot, map[string]any{"workflow": map[string]any{"strict_audit": true}})
-			continue // marker is harness-only; never forward it to the subprocess
+			continue
 		}
 		env = append(env, e)
 	}
@@ -52,9 +41,6 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 	)
 	cmd.Env = env
 	cmd.Dir = projRoot
-	// 300s: a probe cycle runs contract activation, the build handoff floor's
-	// git diffs, the audit review gate, and up to two correction re-dispatches
-	// (a shorter bound kills cycles mid-flight and loses the subprocess output).
 	out, err := runWithTimeout(cmd, 300*time.Second)
 	t.Logf("cycle run (%s) err=%v\n%s", goalHash, err, lastN(out, 1200))
 

@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// swarmAddFailRunner fails the first *failures worktree adds with the transient shape (rc=255, only "Preparing worktree" on stderr).
 func swarmAddFailRunner(failures, attempts *int) sysexec.RunFunc {
 	return func(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if len(args) >= 2 && args[0] == "worktree" && args[1] == "add" {

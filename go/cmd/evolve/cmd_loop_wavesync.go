@@ -18,8 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// waveSyncTimeout bounds the fetch — a wedged network must delay one wave by
-// at most this, never hang the boundary.
 const waveSyncTimeout = 60 * time.Second
 
 var errMainCIRed = errors.New("main CI red")
@@ -32,9 +30,6 @@ type mainCheckRuns struct {
 	} `json:"check_runs"`
 }
 
-// mainCIRedForSHA reads the latest origin/main check-runs through the gh CLI.
-// An unavailable API is returned as an error for the caller's loud fail-open
-// path; only a completed failing conclusion is positive evidence of RED.
 func mainCIRedForSHA(ctx context.Context, projectRoot, sha string) (bool, []string, error) {
 	cmd := sysexec.Command(ctx, "gh", "api", "--method", "GET",
 		"repos/{owner}/{repo}/commits/"+sha+"/check-runs", "-f", "filter=latest", "-f", "per_page=100")
@@ -66,12 +61,6 @@ func mainCIRedForSHA(ctx context.Context, projectRoot, sha string) (bool, []stri
 	return len(failed) > 0, failed, nil
 }
 
-// syncMainFromOriginAtWaveBoundary fetches origin and fast-forwards a
-// checked-out `main` onto origin/main; synced is true only when the tree
-// actually moved. A DIVERGED relation halts rather than skips, since
-// gitexec.RelationToRemote is the one main-relation resolver laneStartRef
-// also reads — continuing here would let the two consumers disagree about
-// whether main is safe to lane from.
 func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, warn io.Writer) (synced bool, halt error) {
 	if info, err := plane.Classify(projectRoot); err != nil || info.Branch != "main" {
 		return false, nil
@@ -102,19 +91,14 @@ func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, w
 	}
 	switch rel.Kind {
 	case gitexec.RelationCurrent:
-		return false, nil // the steady state stays silent
+		return false, nil
 	case gitexec.RelationAhead:
-		// --ff-only would "succeed" without moving HEAD here; say what is true.
 		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %s; the next lane ship's push publishes them\n", rel)
 		return false, nil
 	case gitexec.RelationDiverged:
 		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %s\n", rel)
 		return false, fmt.Errorf("wave-boundary sync: %s", rel)
 	}
-	// Behind: fast-forward. --ff-only can still refuse when LOCAL TRACKED
-	// CHANGES would be overwritten — a normal runtime state (rebuilt-binary
-	// churn) that must be named as such, never as divergence (whose "next
-	// ship reconciles" remedy is the stowaway class).
 	if !fastForwardWithInboxStamps(sctx, g, warn) {
 		return false, nil
 	}

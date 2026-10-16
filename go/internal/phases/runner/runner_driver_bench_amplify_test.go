@@ -15,7 +15,7 @@ func TestAmplify_C426_ExpiredDriverBenchNoReorder(t *testing.T) {
 		Family:       "codex-tmux",
 		Reason:       clihealth.BootTimeoutPattern,
 		BenchedAt:    now.Add(-2 * time.Hour),
-		BenchedUntil: now.Add(-time.Hour), // expired
+		BenchedUntil: now.Add(-time.Hour),
 		Strikes:      clihealth.DefaultBootBenchThreshold,
 	}); err != nil {
 		t.Fatalf("Bench(codex-tmux, expired): %v", err)

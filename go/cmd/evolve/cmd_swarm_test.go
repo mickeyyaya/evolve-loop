@@ -1,14 +1,5 @@
 package main
 
-// SAFETY: runSwarmReap's production killer sends a REAL syscall.Kill(-pgid,
-// SIGKILL) when a session's PGID>1, and a real tmux kill-session when
-// TmuxSession != "" (see internal/swarm/kill.go). Fixtures here use PGID=0 and
-// an empty TmuxSession so ExecSessionKiller.Kill's gates (h.PGID > 1 /
-// h.TmuxSession != "") skip those calls, exercising the reap path end to end
-// (manifest load, registry rebuild, Reap dispatch, output) without ever
-// touching a real process group or tmux server. reap-orphans tests
-// additionally pass --dry-run, which the CLI itself stubs to a no-op Kill.
-
 import (
 	"fmt"
 	"os"
@@ -19,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// writeEmptyManifest writes a valid, session-less swarm manifest at path
-// (SessionRegistry has no exported Persist(); mirroring the on-disk shape
-// LoadManifest reads is simplest and keeps this file decoupled from that
-// package's internals).
 func writeEmptyManifest(t *testing.T, path string, cycle int, phase string, pid int) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -52,8 +39,6 @@ func TestRunSwarmStatus_MissingCycle_ExitTwo(t *testing.T) {
 	}
 }
 
-// LoadManifest is documented fail-open on a missing file (internal/swarm), so
-// a cycle with no swarm dispatch at all must report cleanly, not error.
 func TestRunSwarmStatus_ManifestMissing_ExitZero(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr strings.Builder
@@ -163,7 +148,7 @@ func TestRunSwarmReap_LiveSession_ReapsWithoutTouchingOS(t *testing.T) {
 
 func TestRunSwarmReapOrphans_NoRunsDir_ExitZero(t *testing.T) {
 	t.Parallel()
-	evolveDir := t.TempDir() // no runs/ subdir at all
+	evolveDir := t.TempDir()
 	var stdout, stderr strings.Builder
 	code := runSwarmReapOrphans([]string{"--evolve-dir", evolveDir, "--dry-run"}, &stdout, &stderr)
 	if code != 0 {
@@ -212,9 +197,6 @@ func TestRunSwarm_DispatchesStatus(t *testing.T) {
 	}
 }
 
-// sanity: manifestPath's directory must actually exist after Persist, so the
-// fixtures above are exercising the real on-disk format runSwarmStatus/Reap
-// read — not a shortcut.
 func TestSwarmFixture_PersistsRealManifestFile(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()

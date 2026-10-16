@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// phasePreparation is the pre-dispatch stage's immutable output for routing, dispatch and judging.
 type phasePreparation struct {
 	start          time.Time
 	phase          string
@@ -31,9 +30,6 @@ type phasePreparation struct {
 	profile        *profiles.Profile
 }
 
-// preparePhaseExecution validates the runner, resolves the prompt and profile,
-// and snapshots the artifact before any bridge side effect. A non-nil early
-// response represents a phase-owned skip or a typed configuration failure.
 func (b *BaseRunner) preparePhaseExecution(req core.PhaseRequest) (phasePreparation, *core.PhaseResponse, error) {
 	prep := phasePreparation{start: b.nowFn(), phase: b.hooks.PhaseName()}
 	if b.bridge == nil {

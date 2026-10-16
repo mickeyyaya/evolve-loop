@@ -9,22 +9,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// CodeRebaseReentryAborted marks a debugger-resolved fleet rebase the host could not finish; the cycle ends there.
 const CodeRebaseReentryAborted signalcenter.Code = "ORCHESTRATOR_REBASE_REENTRY_ABORTED"
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeRebaseReentryAborted, "after a debugger resolved a fleet-rebase conflict, the host could not carry, rebase, pend or route the resolved tree (the reason names which), or the recovery budget was spent; the cycle ended instead of a reship on the base the ship diverged from")
 }
 
-// resumeFleetRebaseAfterDebugger re-enters the fleet rebase once the debugger has resolved its conflict: the
-// worktree still sits on the base the ship diverged from, so the debugger's target would only rediscover the
-// divergence one phase later. Inside the ship-recovery budget and after the contention backoff, the resolved
-// tree is carried as a commit, rebased onto main, pended again, and routed as any rebased change is (carry,
-// rebind, or a Build that re-authors); a re-run the debugger asked for upstream of that route still happens, on
-// the rebased tree. Every other recovery is left to the debugger's decision. A conflict that survives the
-// resolution, a rebase the host cannot finish, or a spent budget ends the cycle, on stderr and in the Signal
-// Center. The sequence has no checkpoint of its own; an interrupted re-entry leaves a carrier commit that keeps
-// the change intact and is the resume heal's to finish.
 func (o *Orchestrator) resumeFleetRebaseAfterDebugger(ctx context.Context, projectRoot string, cycle int, cs *CycleState, decided Phase, depth, fleetWidth int) (Phase, bool) {
 	if !fleetRebaseRecovery(cs.ShipRecoveryCode) || cs.ActiveWorktree == "" || inPlaceWorktree(cs.ActiveWorktree, projectRoot) {
 		return "", false
@@ -72,8 +62,6 @@ func (o *Orchestrator) abortRebaseReentry(cycle int, cs CycleState, reason strin
 	return PhaseEnd, true
 }
 
-// fleetRebaseRecovery reports whether the recovery the debugger served began as a fleet rebase: the state keeps
-// the ship's own code, and the conflict is the rebase's reclassification of it.
 func fleetRebaseRecovery(code string) bool {
 	return code == string(CodeGitFleetRebaseNeeded) || code == string(CodeGitFleetRebaseConflict)
 }
@@ -85,9 +73,6 @@ func worktreeWritablePaths(next Phase, cs CycleState) []string {
 	return cs.ShipRecoveryConflicts
 }
 
-// earliestPhase keeps the debugger's own target when it lies upstream of the routed phase, so a Build or Audit
-// re-run it asked for still happens — on the rebased tree. A tests-first request cannot follow a rebase (the
-// explanation contract refreshes after TDD against a binding the route has just moved), so it yields to the route.
 func earliestPhase(decided, routed Phase) Phase {
 	order := map[Phase]int{PhaseBuild: 0, PhaseAudit: 1, PhaseShip: 2}
 	d, dok := order[decided]
@@ -98,10 +83,6 @@ func earliestPhase(decided, routed Phase) Phase {
 	return routed
 }
 
-// carryResolvedTree commits the worktree's tracked state — the debugger's resolution included — on the fork
-// point, so the fleet rebase has a commit to replay; untracked files never ride (a resolution edits tracked
-// paths, and the ship stages by manifest). The branch's earlier commits stay reachable from the reflog only;
-// every downstream check recomputes the fork point and the tree instead of naming them.
 func carryResolvedTree(ctx context.Context, worktree string, git gitFn, label string) error {
 	if _, err := gitStdout(ctx, git, worktree, "add", "-u"); err != nil {
 		return err

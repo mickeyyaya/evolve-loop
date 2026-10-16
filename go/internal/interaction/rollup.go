@@ -12,23 +12,16 @@ import (
 
 const summarySchemaVersion = 1
 
-// Summary is the per-cycle interaction rollup written to interaction-summary.json.
 type Summary struct {
-	SchemaVersion int `json:"schema_version"`
-	// Total is the number of interaction outcomes recorded this cycle.
-	Total int `json:"total"`
-	// ByKind, ByResult and ByRung count outcomes per kind, result and ladder rung ("none" outside the ladder).
-	ByKind   map[string]int `json:"by_kind"`
-	ByResult map[string]int `json:"by_result"`
-	ByRung   map[string]int `json:"by_rung"`
-	// Decisions counts distinct non-empty DecisionIDs, so re-dispatches averted are computable.
-	Decisions int `json:"decisions"`
-	// CostUSD is the advisor spend attributed to interactions this cycle.
-	CostUSD float64 `json:"cost_usd"`
+	SchemaVersion int            `json:"schema_version"`
+	Total         int            `json:"total"`
+	ByKind        map[string]int `json:"by_kind"`
+	ByResult      map[string]int `json:"by_result"`
+	ByRung        map[string]int `json:"by_rung"`
+	Decisions     int            `json:"decisions"`
+	CostUSD       float64        `json:"cost_usd"`
 }
 
-// Rollup aggregates every *-interactions.ndjson under workspace, skipping corrupt lines.
-// ok is false when there is nothing to summarize.
 func Rollup(workspace string) (Summary, bool) {
 	if workspace == "" {
 		return Summary{}, false
@@ -81,8 +74,6 @@ func Rollup(workspace string) (Summary, bool) {
 
 var rollupMarshalIndent = json.MarshalIndent
 
-// WriteRollup writes interaction-summary.json beside the ledgers via tmp and rename;
-// a workspace with nothing to summarize gets no file.
 func WriteRollup(workspace string) error {
 	s, ok := Rollup(workspace)
 	if !ok {

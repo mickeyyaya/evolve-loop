@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// phaseRoots is the cmd-local alias for phasespec.Roots.
-// See ADR-0038.
 func phaseRoots(projectRoot string) []string {
 	return phasespec.Roots(projectRoot)
 }

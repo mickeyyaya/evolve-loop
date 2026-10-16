@@ -2,7 +2,6 @@ package panestream
 
 import "testing"
 
-// Names every detector type for apicover and pins LivenessProbe conformance at compile time.
 var (
 	_ LivenessProbe = (*DefaultDetector)(nil)
 	_ LivenessProbe = (*ClaudeDetector)(nil)
@@ -23,7 +22,7 @@ func TestLivenessProbe_StrategyConformance(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.cli, func(t *testing.T) {
 			p := Profiles[c.cli]
-			c.probe.Assess(testdataFrame(t, c.cli+"/thinking.txt"), p) // prime
+			c.probe.Assess(testdataFrame(t, c.cli+"/thinking.txt"), p)
 			state, conf := c.probe.Assess(testdataFrame(t, c.cli+"/answer.txt"), p)
 			if state != LivenessConverging {
 				t.Errorf("[%s] thinking→answer through LivenessProbe: got %v, want LivenessConverging", c.cli, state)

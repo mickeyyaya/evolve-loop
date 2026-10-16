@@ -10,7 +10,7 @@ import (
 
 func TestApplyUserRouting_AnchorToLaterSpecInBatchIsHonored(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "triage", "tdd", "build", "audit", "ship"}}
-	specs := []PhaseSpec{ // alphabetical, exactly as DiscoverUserSpecs sorts them
+	specs := []PhaseSpec{
 		{Name: "bug-reproduction", Optional: true, After: "fault-localization"},
 		{Name: "fault-localization", Optional: true, After: "triage"},
 	}
@@ -73,7 +73,7 @@ func TestApplyUserRouting_AnchorCycleTerminatesWithOneWarning(t *testing.T) {
 func TestApplyUserRouting_CycleTailStillFollowsItsAnchor(t *testing.T) {
 	cfg := config.RoutingConfig{Order: []string{"scout", "audit", "ship"}}
 	warns := ApplyUserRouting(&cfg, []PhaseSpec{
-		{Name: "a-tail", Optional: true, After: "ouro-a"}, // tail FIRST in input: the batch-order hazard
+		{Name: "a-tail", Optional: true, After: "ouro-a"},
 		{Name: "ouro-a", Optional: true, After: "ouro-b"},
 		{Name: "ouro-b", Optional: true, After: "ouro-a"},
 	}, Catalog{})

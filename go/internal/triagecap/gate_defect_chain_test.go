@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// gapGoldenPkgs holds the goldens' true targets, the phantom sources (scout, sysexec) and distractors;
-// with it, a counter that reads evidence citations counts 7 on triage-cycle449-golden.md.
 var gapGoldenPkgs = []string{
 	"core", "bridge", "audit",
 	"scout", "sysexec",
@@ -45,7 +43,6 @@ func TestCountCommittedFloors_EvidenceCitationDoesNotCount(t *testing.T) {
 	}
 }
 
-// newGateDefectReviewer captures formatted log lines; newTestReviewer keeps only format strings, which hide args.
 func newGateDefectReviewer(stage config.Stage, window []core.TriageThroughputEntry, fails []FailEntry, logs *[]string) *CapReviewer {
 	r := newCapReviewer(stage)
 	r.pkgsFn = func(string) []string { return []string{"swarmrunner", "bridge", "evalgate"} }
@@ -59,7 +56,6 @@ func newGateDefectReviewer(stage config.Stage, window []core.TriageThroughputEnt
 	return r
 }
 
-// tightWindow yields K=1 ⇒ cap 2, so the 3-floor overpackedArtifact rejects.
 var tightWindow = []core.TriageThroughputEntry{{Cycle: 300, Floors: 1}}
 
 func TestCapReviewer_RejectReasonStatesDeclarationEscape(t *testing.T) {
@@ -93,13 +89,11 @@ func TestCapReviewer_RejectReasonListsCountedPackages(t *testing.T) {
 	}
 }
 
-// These summaries share every digit-run length, so ReasonTemplateHash collapses them.
 const (
 	gapSummary448 = `cycle 448 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 4 committed coverage floors exceed the capacity cap 3 (= ceil(1.25×K), K=2 observed floors/turn over 5 shipped cycles). Re-emit the triage report keeping at most 3 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
 	gapSummary449 = `cycle 449 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 7 committed coverage floors exceed the capacity cap 3 (= ceil(1.25×K), K=2 observed floors/turn over 5 shipped cycles). Re-emit the triage report keeping at most 3 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
 )
 
-// writeGapWorkspace shares one project root across cycles so relief consumption is observable.
 func writeGapWorkspace(t *testing.T, root string, cycle int) core.ReviewInput {
 	t.Helper()
 	ws := filepath.Join(root, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))

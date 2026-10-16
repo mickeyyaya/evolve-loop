@@ -760,3 +760,36 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // rejection, the verdict-vocabulary check, and rejection of captures whose
 // leading value is not a verdict-bearing object.
 ```
+
+## comment-zero d7
+
+### `go/internal/phasecontract/contract_from_spec.go:10` — above `func FromSpec(spec phasespec.PhaseSpec) Contract {`
+
+```text
+// FromSpec derives a well-formedness-only Contract from a PhaseSpec, for phases the built-in map lacks. See ADR-0035.
+```
+
+### `go/internal/phasecontract/contract_registry.go:78` — above `AgentOwedFiles []string`
+
+```text
+// AgentOwedFiles and Effects come only from the registry declaration, never a built-in literal. See ADR-0100.
+```
+
+### `go/internal/phasecontract/contract_registry.go:81` — above `DerivedFrom map[string]string`
+
+```text
+// DerivedFrom maps an agent-owed secondary to the primary the host derives it from when the agent leaves
+// it absent. See ADR-0106.
+```
+
+### `go/internal/phasecontract/round_archive.go:10` — above `func RoundArchiveFilename(name string, round int) string {`
+
+```text
+// RoundArchiveFilename names a repair round's archived copy: audit-report.md round 2 becomes audit-report.round2.md.
+```
+
+### `go/internal/phasecontract/sentinel.go:17` — above `type FailureBlock struct {`
+
+```text
+// FailureBlock is the structured failure context a FAIL/WARN sentinel may carry. See ADR-0039.
+```

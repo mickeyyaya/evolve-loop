@@ -9,10 +9,10 @@ import (
 
 func TestTwoTierNaming_DigitsRejected_Amp(t *testing.T) {
 	digitNames := []string{
-		"phase2-check", // digit in first segment
-		"my-phase2",    // digit in second segment
-		"a-1-b",        // pure-digit middle segment
-		"2-check",      // starts with digit (also breaks legacy nameRE)
+		"phase2-check",
+		"my-phase2",
+		"a-1-b",
+		"2-check",
 	}
 	for _, name := range digitNames {
 		spec := phasespec.PhaseSpec{
@@ -51,10 +51,10 @@ func TestTwoTierNaming_ThreePlusWordsAccepted_Amp(t *testing.T) {
 
 func TestTwoTierNaming_UnderscoreAndSpecialRejected_Amp(t *testing.T) {
 	badSep := []string{
-		"my_phase",   // underscore separator
-		"my.phase",   // period separator
-		"my phase",   // space separator
-		"my-phase_b", // mixed valid and invalid separators
+		"my_phase",
+		"my.phase",
+		"my phase",
+		"my-phase_b",
 	}
 	for _, name := range badSep {
 		spec := phasespec.PhaseSpec{

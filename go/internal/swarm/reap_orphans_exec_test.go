@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// Tests that swap the tmuxListRun or socketGlob seams must not call t.Parallel().
-
 func TestExecPidAlive(t *testing.T) {
 	t.Parallel()
 	if !ExecPidAlive(os.Getpid()) {

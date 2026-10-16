@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
-// runQuotaReset is the `evolve estimate-quota-reset [WORKSPACE]` subcommand.
-// Ports legacy/scripts/dispatch/estimate-quota-reset.sh. Prints the
-// 2-line stdout shape: ISO timestamp + "source=...".
 func runQuotaReset(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var workspace string
 	for _, a := range args {

@@ -155,8 +155,8 @@ func TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried(t *
 		t.Fatal(err)
 	}
 	type writer struct {
-		raw     bool            // calls a raw chained-line writer directly
-		callees map[string]bool // every other call, by bare name
+		raw     bool
+		callees map[string]bool
 	}
 	writers := map[string]*writer{}
 	rawWriters := map[string]bool{"appendChained": true, "appendChainedFromTail": true, "appendLineAndReplaceTip": true}
@@ -183,7 +183,7 @@ func TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried(t *
 				case name == "":
 				case rawWriters[name]:
 					w.raw = true
-				case name != "Append": // a call INTO the chokepoint is observed; stop there
+				case name != "Append":
 					w.callees[name] = true
 				}
 				return true
@@ -191,7 +191,6 @@ func TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried(t *
 			writers[fd.Name.Name] = w
 		}
 	}
-	// Calls are keyed by bare name, so methods and functions share one name space here.
 	var reachesRaw func(name string, seen map[string]bool) bool
 	reachesRaw = func(name string, seen map[string]bool) bool {
 		if seen[name] {

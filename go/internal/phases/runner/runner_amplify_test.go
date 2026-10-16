@@ -11,9 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// divergentBridge writes one string to the artifact and returns another as stdout, so a test sees which one Classify gets.
 type divergentBridge struct {
-	fileContent   string // written to req.ArtifactPath when non-empty; left unwritten when empty
+	fileContent   string
 	stdoutContent string
 	err           error
 	gotReq        core.BridgeRequest
@@ -36,7 +35,6 @@ func (f *divergentBridge) Probe(ctx context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// alwaysOKVerify reports every deliverable well-formed, isolating the runner's file-versus-stdout choice from parsing.
 func alwaysOKVerify(phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 	return verifiedFrom(deliverable.Result{OK: true, Phase: phase}, phase, roots), nil
 }
@@ -98,7 +96,7 @@ func TestRun_NonTimeout_DeliverableFileNeverWritten_FallsBackToStdout(t *testing
 	root := writeFallbackProfile(t, "evolve-scout", "claude-tmux", nil)
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", prompt: "x", verdict: core.VerdictPASS}
 	const stdout = "# scout\n<!-- evolve-verdict: {\"phase\":\"scout\",\"verdict\":\"PASS\"} -->\n"
-	bridge := &divergentBridge{stdoutContent: stdout} // fileContent left empty: nothing written to ArtifactPath
+	bridge := &divergentBridge{stdoutContent: stdout}
 	r := New(Options{
 		Hooks: hooks, Bridge: bridge, Prompts: fakePromptsFS("evolve-scout", "x"),
 		VerifyFn: alwaysOKVerify,

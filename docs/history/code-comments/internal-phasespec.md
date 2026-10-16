@@ -787,3 +787,12 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // The two known writers are pinned here (the architecture review found both
 // undeclared); add a name when a new persona writes source.
 ```
+
+## comment-zero d6
+
+### `go/internal/phasespec/phasespec.go:26` — above `DerivedFrom map[string]string 'json:"derived_from,omitempty"'`
+
+```text
+// DerivedFrom maps an agent-owed secondary to the primary output the host
+// derives it from when the agent leaves it absent. See ADR-0106.
+```

@@ -21,16 +21,11 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeLaneDeferred, "a fleet lane could not provision its worktree (after the fetch retries and one re-provision) and ended before any phase dispatched: outcome DEFERRED, its claims released to the queue unbumped, no failure digest, failure learning or retrospective; the lane exits 5, and lane_deferral_halt_ceiling consecutive deferrals halt the batch (LOOP_PIPELINE_BLOCKER_HALT rule lane-deferrals); fields.step=worktree, cause")
 }
 
-// signalRunID is the run id the orchestrator stamps on its own events.
 func (o *Orchestrator) signalRunID() string {
 	runID, _ := o.currentRunID.Load().(string)
 	return runID
 }
 
-// emitCycleClose ends the cycle's event stream: a system.failure first when
-// the closeout attached one, then the cycle.sealed that names the final
-// verdict. origin is the caller's own name, so the callee never asserts its
-// caller's identity.
 func (cr *cycleRun) emitCycleClose(result CycleResult, origin string) {
 	o := cr.o
 	base := signalcenter.Event{
@@ -63,10 +58,6 @@ func (cr *cycleRun) emitCycleClose(result CycleResult, origin string) {
 	o.signals.Emit(e)
 }
 
-// emitShipError projects a recorded ShipError verbatim, including the
-// ship-error.json path when it was written and the Debug keys the triage
-// whitelist names (shiperr.SignalDebugKeys) when non-empty.
-// See ADR-0103.
 func (o *Orchestrator) emitShipError(cycle int, cs CycleState, se *ShipError, artifactPath string) {
 	fields := map[string]string{"class": string(se.Class), "stage": string(se.Stage)}
 	if artifactPath != "" {
@@ -84,8 +75,6 @@ func (o *Orchestrator) emitShipError(cycle int, cs CycleState, se *ShipError, ar
 	})
 }
 
-// emitQuotaPaused names the phase a quota pause interrupted; a resource
-// event, resumable, never terminal evidence.
 func (cr *cycleRun) emitQuotaPaused(phase Phase, cause error) {
 	cr.o.signals.Emit(signalcenter.Event{
 		Cycle: cr.cycle, RunID: cr.cs.RunID, Phase: string(phase), Module: signalcenter.ModuleOrchestrator, Origin: "cycleRun.pauseForQuota",

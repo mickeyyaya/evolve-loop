@@ -18,12 +18,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
-// expectedPhasesHappyPath is what the state machine drives on PASS-all.
 var expectedPhasesHappyPath = []string{"scout", "triage", "tdd", "build", "audit", "ship"}
 
-// allCLIs is the matrix domain. The order matches the existing bridge
-// driver script set (no `claude-tmux` here — tmux is for interactive
-// sessions, not the headless cycle path).
 var allCLIs = []string{"claude-p", "codex", "agy"}
 
 func TestE2ECycleCLIMatrix(t *testing.T) {
@@ -57,9 +53,6 @@ func TestE2ECycleCLIMatrix(t *testing.T) {
 		})
 	}
 
-	// Live opt-in: EVOLVE_E2E_LIVE=1 runs ONE real-CLI cycle per backend.
-	// Costs real money (~$0.50–2.00 per cycle, capped via --budget-usd).
-	// agy is auto-skipped if its binary is not on PATH.
 	if os.Getenv("EVOLVE_E2E_LIVE") != "1" {
 		t.Logf("EVOLVE_E2E_LIVE not set; skipping live sub-tests. Set EVOLVE_E2E_LIVE=1 to run.")
 		return
@@ -67,12 +60,10 @@ func TestE2ECycleCLIMatrix(t *testing.T) {
 	for _, cli := range allCLIs {
 		cli := cli
 		t.Run("live_"+cli, func(t *testing.T) {
-			// Do NOT parallel: live cycles can rate-limit each other on
-			// the same provider, and we want clearer cost attribution.
 			runOneCycle(t, cycleRunConfig{
 				CLI:       cli,
 				EvolveBin: evolveBin,
-				FakeBin:   fakeBin, // unused in live mode, but plumbed
+				FakeBin:   fakeBin,
 				RepoRoot:  repoRoot,
 				Live:      true,
 			})
@@ -80,8 +71,6 @@ func TestE2ECycleCLIMatrix(t *testing.T) {
 	}
 }
 
-// cycleRunConfig bundles the per-cycle parameters so the same driver
-// works for both offline and live modes.
 type cycleRunConfig struct {
 	CLI       string
 	EvolveBin string
@@ -90,24 +79,17 @@ type cycleRunConfig struct {
 	Live      bool
 }
 
-// runOneCycle is the heart of the matrix — it sets up a fresh isolated
-// project root, runs `evolve cycle run`, and asserts the ledger +
-// committed-state invariants.
 func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 	t.Helper()
 	projRoot := setupTempProject(t, cfg.RepoRoot)
 	shipScript := writeFakeShipScript(t, projRoot)
 
 	env := append(os.Environ(),
-		"EVOLVE_SANDBOX=off", // host opt-out: pipeline-semantics tests, runners cannot promise a wrap (see e2e_pipeline_paths_test.go)
+		"EVOLVE_SANDBOX=off",
 		"EVOLVE_CLI="+cfg.CLI,
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_SHIP_SCRIPT="+shipScript,
-		// Pin the legacy shell-out path: EVOLVE_SHIP_SCRIPT only takes effect
-		// when the dispatcher routes to bash, and the fake-cli harness depends
-		// on the script substitution.
 		"EVOLVE_NATIVE_SHIP=0",
-		// Skip the deep-research quota for this test.
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 	)
 	if !cfg.Live {
@@ -170,7 +152,6 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 		t.Errorf("state.json:lastCycleNumber=%d, want >=1", state.LastCycleNumber)
 	}
 
-	// The fake ship.sh made the commit; git log should show our message.
 	logOut, err := exec.Command("git", "-C", projRoot, "log", "--format=%s", "-1").Output()
 	if err != nil {
 		t.Fatalf("git log: %v", err)
@@ -180,9 +161,6 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 	}
 }
 
-// liveBinaryName maps the bridge --cli identifier back to the executable
-// name we look for on PATH. claude-p uses the `claude` binary, codex
-// uses `codex`, agy uses `agy`.
 func liveBinaryName(cli string) string {
 	switch cli {
 	case "claude-p", "claude-tmux":
@@ -205,9 +183,6 @@ func buildBinary(t *testing.T, _ string, name, pkg, repoRoot string) string {
 	return out
 }
 
-// mustRepoRoot resolves the evolve-loop repo root from this test's
-// file location (go/cmd/evolve/<this>.go). Walks up until it finds the
-// go/go.mod module marker.
 func mustRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -225,31 +200,11 @@ func mustRepoRoot(t *testing.T) string {
 	return ""
 }
 
-// setupTempProject builds an isolated project root in t.TempDir() with
-// everything the cycle path needs:
-//   - git init + initial commit (so ship's git commit has a parent)
-//   - .evolve/profiles/{intent,scout,triage,tdd,build,audit,retro}.json
-//     (stubs — bridge profile loader only requires `name`)
-//   - .evolve/state.json bootstrapped to cycle 0
-//   - committed durable Go predicate input for native Audit
-//
-// The in-process Go bridge resolves paths from the request (no
-// tools/agent-bridge tree is symlinked).
 func setupTempProject(t *testing.T, repoRoot string) string {
 	t.Helper()
-	_ = repoRoot // reserved; the Go bridge needs no project-local bridge tree
+	_ = repoRoot
 	root := t.TempDir()
 
-	// Stub profiles. Names match what the Go phase runner constructs:
-	// strings.TrimPrefix(AgentPromptName, "evolve-") → AGENT-named, not
-	// phase-named. This aligns with the production .evolve/profiles/
-	// layout (tdd-engineer.json, builder.json, auditor.json,
-	// retrospective.json) AND with CLAUDE.md's documented env-var
-	// convention (EVOLVE_TDD_ENGINEER_PERMISSION_MODE, etc.).
-	//
-	// Disable the cycle-start live model-catalog refresh (compiled default is
-	// on): an unseeded policy here launches real CLI probes for every family
-	// before the first phase and can exceed the harness timeout budget.
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir .evolve: %v", err)
 	}
@@ -267,16 +222,12 @@ func setupTempProject(t *testing.T, repoRoot string) string {
 		}
 	}
 
-	// .evolve/state.json — minimal seed so storage adapter doesn't bail.
 	statePath := filepath.Join(root, ".evolve", "state.json")
 	seed := `{"lastUpdated":"2026-01-01T00:00:00Z","lastCycleNumber":0,"version":1,"currentBatch":{"cycleAccruedCostUSD":0}}`
 	if err := os.WriteFile(statePath, []byte(seed), 0o644); err != nil {
 		t.Fatalf("write state.json: %v", err)
 	}
 
-	// Native Audit retires agent-authored verdict candidates and executes real
-	// predicates. Seed its inputs before gitInit commits the fixture so every
-	// worktree inherits the same declared execution tree.
 	for rel, body := range map[string]string{
 		"go/go.mod": "module e2e.local/fixture\n\ngo 1.23\n",
 		"go/acs/regression/auditfixture/predicate_test.go": `//go:build acs
@@ -305,7 +256,6 @@ func TestAuditFixture(t *testing.T) {
 		}
 	}
 
-	// Git init + identity + initial commit (ship phase needs a parent).
 	gitInit(t, root)
 
 	return root
@@ -341,14 +291,10 @@ func gitInit(t *testing.T, root string) {
 	run("config", "user.email", "e2e@test.local")
 	run("config", "user.name", "E2E Test")
 	run("config", "commit.gpgsign", "false")
-	// COMMITTED so worktrees inherit it: an uncommitted root .gitignore never
-	// reaches a worktree checkout, and without excluding .evolve/ and go/bin/
-	// those paths read as untracked changes to every base-bound diff consumer.
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"),
 		[]byte("tools/\n.evolve/\ngo/bin/\n"), 0o644); err != nil {
 		t.Fatalf("write .gitignore: %v", err)
 	}
-	// Seed file so the initial commit isn't empty.
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("# e2e\n"), 0o644); err != nil {
 		t.Fatalf("write README: %v", err)
 	}
@@ -356,11 +302,6 @@ func gitInit(t *testing.T, root string) {
 	run("commit", "-q", "-m", "initial")
 }
 
-// writeFakeShipScript drops a tiny ship.sh into the temp project. It
-// substitutes for the real ship.sh, which would refuse to run in this
-// synthetic environment because the audit-binding checks have no real
-// cycle state to bind to. The fake just stages the workspace + makes a
-// commit, which is enough to validate that the Ship phase ran end-to-end.
 func writeFakeShipScript(t *testing.T, projRoot string) string {
 	t.Helper()
 	path := filepath.Join(projRoot, "fake-ship.sh")
@@ -383,8 +324,6 @@ echo "fake-ship: committed class=$class msg=$msg"
 	return path
 }
 
-// runWithTimeout runs cmd with a hard timeout, returning combined
-// stdout+stderr regardless of outcome.
 func runWithTimeout(cmd *exec.Cmd, d time.Duration) (string, error) {
 	type result struct {
 		out []byte
@@ -399,12 +338,6 @@ func runWithTimeout(cmd *exec.Cmd, d time.Duration) (string, error) {
 	case r := <-done:
 		return string(r.out), r.err
 	case <-time.After(d):
-		// Kill the child, then DRAIN the goroutine: CombinedOutput is still
-		// blocked reading the child's pipes and only returns once they close
-		// (after the kill propagates). Without this wait the goroutine outlives
-		// the test — in long live-soak runs it survives past t.TempDir teardown
-		// and can read a deleted dir. Bounded by a short grace so a wedged child
-		// can't hang the test forever.
 		_ = cmd.Process.Kill()
 		select {
 		case <-done:
@@ -414,9 +347,6 @@ func runWithTimeout(cmd *exec.Cmd, d time.Duration) (string, error) {
 	}
 }
 
-// ledgerEntry is a partial view of the ledger.jsonl rows. We only deserialize
-// the fields the e2e assertions read: role/kind for shape, cost_usd for the
-// live budget-ceiling accounting.
 type ledgerEntry struct {
 	Role    string  `json:"role"`
 	Kind    string  `json:"kind"`
@@ -483,9 +413,6 @@ func readState(t *testing.T, projRoot string) stateFile {
 	return s
 }
 
-// dumpWorkspaceLogs walks .evolve/runs/cycle-*/ in projRoot and prints
-// every *.log file it finds. Bridge truncates stderr at 200 chars in
-// its returned error; the full stderr lives on disk in <agent>-stderr.log.
 func dumpWorkspaceLogs(t *testing.T, projRoot string) {
 	runs := filepath.Join(projRoot, ".evolve", "runs")
 	_ = filepath.Walk(runs, func(path string, info os.FileInfo, err error) error {

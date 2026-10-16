@@ -29,34 +29,24 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Hooks holds the per-phase variation points BaseRunner delegates to.
 type Hooks interface {
-	// PhaseName returns the canonical phase id: the profile, bridge Agent and model-key name.
 	PhaseName() string
 
-	// AgentPromptName returns the agent doc to load, e.g. "evolve-builder".
 	AgentPromptName() string
 
-	// ArtifactFilename returns the contracted artifact's name relative to req.Workspace.
 	ArtifactFilename(req core.PhaseRequest) string
 
-	// DefaultModel returns the model used when neither the per-agent MODEL env nor the profile sets one.
 	DefaultModel() string
 
-	// ComposePrompt assembles the final prompt from the pre-loaded agent doc body.
 	ComposePrompt(agentBody string, req core.PhaseRequest) string
 
-	// Classify judges the artifact; the engine handles a bridge error or missing artifact before calling it.
 	Classify(artifact string, req core.PhaseRequest, bres core.BridgeResponse) (verdict string, diagnostics []core.Diagnostic, nextPhase string)
 }
 
-// Skipper is an optional Hooks extension: a skip returns its response without touching the bridge.
 type Skipper interface {
 	ShouldSkip(req core.PhaseRequest) (skipped bool, verdict, nextPhase string, diags []core.Diagnostic)
 }
 
-// SecondaryArtifactsProvider is an optional Hooks extension naming deliverables beyond the primary
-// artifact; the bridge holds phase-complete until each exists.
 type SecondaryArtifactsProvider interface {
 	SecondaryArtifacts(req core.PhaseRequest) []string
 }
@@ -68,12 +58,10 @@ func secondaryArtifacts(h Hooks, req core.PhaseRequest) []string {
 	return nil
 }
 
-// InlinePromptProvider is an optional Hooks extension: ok=true supplies the prompt body in-band, so no agent doc is read.
 type InlinePromptProvider interface {
 	InlinePromptBody() (string, bool)
 }
 
-// Options configures New; Hooks is required and every nil seam takes its production default.
 type Options struct {
 	Hooks               Hooks
 	Bridge              core.Bridge
@@ -97,12 +85,10 @@ type Options struct {
 	AttemptClock        func() time.Time
 }
 
-// ContractVerifier is the deliverables gate's verification, salvage included, offered to the verdict engine.
 type ContractVerifier interface {
 	VerifyForClassification(check gatesignal.Check, phase string, roots phasecontract.Roots) (deliverable.Result, error)
 }
 
-// BaseRunner is the Template Method phase runner, a core.PhaseRunner built by New.
 type BaseRunner struct {
 	hooks            Hooks
 	bridge           core.Bridge
@@ -169,15 +155,11 @@ func New(opts Options) *BaseRunner {
 	return b
 }
 
-// settleSleep is a variable so the package's tests can make the settle window free: it sits on the clean-exit path.
 var settleSleep = time.Sleep
 
-// Name implements core.PhaseRunner.
 func (b *BaseRunner) Name() string { return b.hooks.PhaseName() }
 
-// Run implements core.PhaseRunner: prepare, plan, dispatch inside the worktree fence, perform host effects, judge.
 func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
-	// Only this run's fence may vouch for the tree, never the caller.
 	req.WorktreeVerified = false
 	prep, early, err := b.preparePhaseExecution(req)
 	if err != nil {
@@ -198,7 +180,6 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	req.WorktreeVerified = dispatchResult.worktreeVerified
 
 	d := dispatchOf(req, prep, dispatchPlan, dispatchResult)
-	// Effects first: the judge's first verification must see what the host performed.
 	b.performHostEffects(ctx, d)
 	return b.judge.Judge(ctx, d, b.classifyWith(req, d, dispatchResult.skills))
 }
@@ -253,11 +234,8 @@ func requiresExplanationSandbox(phase string, req core.PhaseRequest) bool {
 	return phase == string(core.PhaseBuild) && req.ExplanationDocumentationVersion != 0
 }
 
-// cycleContextBoundary splits a prompt's cache-stable prefix from its per-cycle tail. One literal serves
-// BaseCycleContext and StaticPrefix, so they cannot drift apart and bust the provider prompt cache.
 const cycleContextBoundary = "\n\n## Cycle Context\n"
 
-// BaseCycleContext appends the shared "## Cycle Context" block to body; phases append their own fields after it.
 func BaseCycleContext(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(body)
@@ -273,8 +251,6 @@ func BaseCycleContext(body string, req core.PhaseRequest) string {
 	return b.String()
 }
 
-// AppendExplanationContext writes the verified Build-explanation handoff. Audit and Retro share it,
-// so their prompts carry exactly the evidence their report validators require.
 func AppendExplanationContext(b *strings.Builder, req core.PhaseRequest) {
 	if req.ExplanationDocumentationVersion != 0 {
 		fmt.Fprintf(b, "- explanation_documentation_version: %d\n", req.ExplanationDocumentationVersion)
@@ -295,7 +271,6 @@ func AppendExplanationContext(b *strings.Builder, req core.PhaseRequest) {
 	}
 }
 
-// StaticPrefix returns the prompt before the Cycle Context boundary, the prefix provider prompt caches key on.
 func StaticPrefix(prompt string) string {
 	if i := strings.Index(prompt, cycleContextBoundary); i >= 0 {
 		return prompt[:i]
@@ -303,18 +278,15 @@ func StaticPrefix(prompt string) string {
 	return prompt
 }
 
-// FormatDigestShadowLog renders the role projection's dispatch-time evidence.
 func FormatDigestShadowLog(phase string, record digest.ShadowRecord) string {
 	return fmt.Sprintf("[runner] phase=%s digest-shadow outcome=%s full_bytes=%d digest_bytes=%d parity=%t",
 		phase, record.Outcome, record.FullBytes, record.DigestBytes, record.Parity)
 }
 
-// ComposePrompt runs the phase's prompt hook without dispatching, for the cache-stable-prefix audit.
 func (b *BaseRunner) ComposePrompt(body string, req core.PhaseRequest) string {
 	return b.hooks.ComposePrompt(body, req)
 }
 
-// PersonaAvailable implements core.PersonaProber, resolving the persona doc exactly as Run does without dispatching.
 func (b *BaseRunner) PersonaAvailable() error {
 	if ip, ok := b.hooks.(InlinePromptProvider); ok {
 		if _, inline := ip.InlinePromptBody(); inline {

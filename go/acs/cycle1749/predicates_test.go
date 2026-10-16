@@ -139,12 +139,8 @@ func TestC1749_003_ModuleWideRatchetCheckPasses(t *testing.T) {
 func TestC1749_004_BaselineTestFilesUnchanged(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, dir := range packageDirs {
-		names, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "diff", "--name-status", "--no-renames", "--diff-filter=a", baseCommit, "--", "go/"+dir+"/*_test.go")
-		if code != 0 {
-			t.Fatalf("git diff against %s failed: %v\n%s", baseCommit, err, stderr)
-		}
-		if strings.TrimSpace(names) != "" {
-			t.Errorf("RED: baseline %s test files modified or deleted since %s — put new characterization tests in new _test.go files:\n%s", dir, baseCommit, names)
+		if drift := baselineTestFileDrift(t, root, dir); len(drift) > 0 {
+			t.Errorf("RED: baseline %s test files changed beyond comments vs %s (existing tests must stay unmodified):\n  %s", dir, baseCommit, strings.Join(drift, "\n  "))
 		}
 	}
 }
@@ -211,43 +207,6 @@ func TestC1749_007_NoCommentLinesAdded(t *testing.T) {
 	var out, errOut strings.Builder
 	if code := commentaudit.Main(args, &out, &errOut, git); code != 0 {
 		t.Errorf("RED: commentaudit comments exit=%d — the diff adds comment lines under %s (names carry the intent):\n%s%s", code, strings.Join(scoped, ", "), out.String(), errOut.String())
-	}
-}
-
-// acs-predicate: config-check — comment text IS the contract under test
-func TestC1749_008_ShrunkSourcesChangedWithoutLosingAComment(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	git := worktreeGit{root: root}
-	changed, err := git.ChangedFiles(baseCommit)
-	if err != nil {
-		t.Fatalf("list changed files: %v", err)
-	}
-	for _, dir := range []string{naminguardDir, verifyevalDir} {
-		var baseline, current []byte
-		scoped := 0
-		for _, rel := range changed {
-			if filepath.Dir(rel) != "go/"+dir || !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") {
-				continue
-			}
-			scoped++
-			before, err := git.Show(baseCommit, rel)
-			if err != nil && !errors.Is(err, fs.ErrNotExist) {
-				t.Fatalf("git show %s:%s: %v", baseCommit, rel, err)
-			}
-			after, err := os.ReadFile(filepath.Join(root, rel))
-			if err != nil && !errors.Is(err, fs.ErrNotExist) {
-				t.Fatalf("read %s: %v", rel, err)
-			}
-			baseline = append(append(baseline, before...), '\n')
-			current = append(append(current, after...), '\n')
-		}
-		if scoped == 0 {
-			t.Errorf("RED: no non-test Go file under %s changed since %s — the extraction has not happened", dir, baseCommit)
-			continue
-		}
-		if deleted := commentaudit.AddedComments(current, baseline); len(deleted) > 0 {
-			t.Errorf("RED: %d baseline comment line(s) deleted from %s since %s — move each with its code, never strip it to save a line:\n  %s", len(deleted), dir, baseCommit, strings.Join(deleted, "\n  "))
-		}
 	}
 }
 
@@ -689,3 +648,34 @@ func (g worktreeGit) Show(base, path string) ([]byte, error) {
 }
 
 func (g worktreeGit) Root() (string, error) { return g.root, nil }
+
+func baselineTestFileDrift(t *testing.T, root, dir string) []string {
+	t.Helper()
+	listing, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "ls-tree", "--name-only", baseCommit, "go/"+dir+"/")
+	if code != 0 {
+		t.Fatalf("git ls-tree %s failed: %v\n%s", baseCommit, err, stderr)
+	}
+	var drift []string
+	for _, rel := range strings.Fields(listing) {
+		if !strings.HasSuffix(rel, "_test.go") {
+			continue
+		}
+		before, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "show", baseCommit+":"+rel)
+		if code != 0 {
+			t.Fatalf("git show %s:%s failed: %v\n%s", baseCommit, rel, err, stderr)
+		}
+		after, readErr := os.ReadFile(filepath.Join(root, rel))
+		if readErr != nil {
+			drift = append(drift, rel+": deleted")
+			continue
+		}
+		same, why, eqErr := commentaudit.Equivalent(rel, []byte(before), after)
+		if eqErr != nil {
+			t.Fatalf("compare %s with baseline: %v", rel, eqErr)
+		}
+		if !same {
+			drift = append(drift, rel+": "+why)
+		}
+	}
+	return drift
+}

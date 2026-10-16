@@ -8,7 +8,6 @@ import (
 )
 
 func TestExecTmuxKill_TargetsIsolatedBridgeSocket(t *testing.T) {
-	// Clear the per-run socket so the test pins the default socket name whatever the shell sets.
 	t.Setenv(bridge.TmuxSocketEnv, "")
 	var got []string
 	orig := tmuxRun

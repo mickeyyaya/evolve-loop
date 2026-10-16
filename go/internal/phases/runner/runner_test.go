@@ -32,18 +32,17 @@ func TestMain(m *testing.M) {
 }
 
 type fakeHooks struct {
-	phase         string
-	agent         string
-	artifact      string
-	model         string
-	prompt        string
-	verdict       string
-	diagnostics   []core.Diagnostic
-	nextPhase     string
-	classifyCalls int
-	gotArtifact   string
-	gotComposeReq core.PhaseRequest
-	// onClassify observes the request at classify time, after the fence has restored the tree.
+	phase          string
+	agent          string
+	artifact       string
+	model          string
+	prompt         string
+	verdict        string
+	diagnostics    []core.Diagnostic
+	nextPhase      string
+	classifyCalls  int
+	gotArtifact    string
+	gotComposeReq  core.PhaseRequest
 	onClassify     func(core.PhaseRequest)
 	gotComposeBody string
 }
@@ -319,7 +318,6 @@ func TestRun_EventsProducerError_NonBlocking(t *testing.T) {
 	}
 }
 
-// scout is used because its phase and agent names coincide; runner_perphase_env_test.go pins the pairs that differ.
 func TestRun_EnvOverridesModel(t *testing.T) {
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "x"}
@@ -654,7 +652,7 @@ func TestRun_CLIResolutionPrecedence(t *testing.T) {
 			if tc.envCLI != "" {
 				env = map[string]string{"EVOLVE_CLI": tc.envCLI}
 			} else {
-				t.Setenv("EVOLVE_CLI", "") // isolate from an operator shell's EVOLVE_CLI
+				t.Setenv("EVOLVE_CLI", "")
 			}
 			got := runOne(t, tc.profileCLI, env)
 			if got != tc.wantCLI {
@@ -678,7 +676,6 @@ func TestRunnerAutoModel_ResolvesConcreteModel(t *testing.T) {
 		Prompts: fakePromptsFS("evolve-auditor", "body"),
 		ResolveLLM: func(phase string, opts resolvellm.Options) (resolvellm.Result, error) {
 			stubCalled = true
-			// resolvellm yields a tier, which reaches the bridge as the model; the realizer maps it downstream.
 			return resolvellm.Result{ModelTier: wantModel, CLI: "claude-p"}, nil
 		},
 	})

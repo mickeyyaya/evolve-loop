@@ -23,7 +23,7 @@ func TestRunnerDispatch_AllDefaultTriggerExitCodesFallBackThroughRun(t *testing.
 						resp: core.BridgeResponse{ExitCode: code, Stderr: fmt.Sprintf("exit=%d", code)},
 						err:  fmt.Errorf("bridge: launch exit=%d", code),
 					},
-					"claude-tmux": {}, // empty = success
+					"claude-tmux": {},
 				},
 			}
 			root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
@@ -66,7 +66,7 @@ func TestRunnerDispatch_ThreeCLIChainPreservesOrderThroughRun(t *testing.T) {
 				resp: core.BridgeResponse{ExitCode: 80},
 				err:  errors.New("bridge: launch exit=80"),
 			},
-			"claude-tmux": {}, // empty = success
+			"claude-tmux": {},
 		},
 	}
 	root := writeFallbackProfile(t, "evolve-auditor", "agy-tmux", []string{"codex-tmux", "claude-tmux"})

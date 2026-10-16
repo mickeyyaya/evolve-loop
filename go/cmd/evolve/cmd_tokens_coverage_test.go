@@ -90,15 +90,10 @@ func TestTokensReport_TripwireSilentOnClaudeShortAndAbort(t *testing.T) {
 		{Phase: "build", Verdict: "PASS", Tokens: cyclestate.TokenUsage{Input: 200, Output: 20}},
 	})
 	writeTokensLLMCalls(t, root, "8", []map[string]any{
-		// claude baseline: out of tripwire scope regardless of duration/exit.
 		{"agent": "builder", "phase": "build", "cli": "claude-tmux", "source": "events_result",
 			"duration_ms": 90000, "exit_code": 0, "tripwire": false},
-		// non-claude success UNDER the 60s threshold: too short to have burned
-		// unmeasured tokens.
 		{"agent": "scout", "phase": "scout", "cli": "agy", "source": "none",
 			"duration_ms": 3000, "exit_code": 0, "tripwire": false},
-		// non-claude quota-abort (exit 85): a failed launch, not an unmeasured
-		// success.
 		{"agent": "auditor", "phase": "audit", "cli": "codex", "source": "none",
 			"duration_ms": 90000, "exit_code": 85, "tripwire": false},
 	})

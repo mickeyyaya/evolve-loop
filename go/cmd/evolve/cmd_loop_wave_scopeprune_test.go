@@ -12,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// scopePruneEnv builds a project root whose .evolve/ carries an inbox and a
-// prior cycle's triage-decision.json at cycleWorkspace(projectRoot, lastCycle).
-// Returns the loopConfig the planner is built from.
 func scopePruneEnv(t *testing.T, lastCycle int, topN []map[string]any) loopConfig {
 	t.Helper()
 	projectRoot := t.TempDir()
@@ -39,8 +36,6 @@ func scopePruneEnv(t *testing.T, lastCycle int, topN []map[string]any) loopConfi
 	return loopConfig{ProjectRoot: projectRoot, EvolveDir: evolveDir}
 }
 
-// scopePruneItem writes an inbox item into `sub` ("" = the pending root,
-// "processed" = consumed) with its own distinct file so lanes stay disjoint.
 func scopePruneItem(t *testing.T, cfg loopConfig, sub, id string, weight float64, file string) {
 	t.Helper()
 	dir := filepath.Join(cfg.EvolveDir, "inbox")
@@ -59,8 +54,6 @@ func scopePruneItem(t *testing.T, cfg loopConfig, sub, id string, weight float64
 	}
 }
 
-// planTopNIDs drives productionWavePlanFn's primary (prior-decision) path and
-// returns the planned top_n ids.
 func planTopNIDs(t *testing.T, cfg loopConfig, lastCycle, count int) []string {
 	t.Helper()
 	storage := &fixtures.FakeStorage{State: core.State{LastCycleNumber: lastCycle}}

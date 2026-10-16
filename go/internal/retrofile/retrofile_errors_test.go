@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// TestParsePreventiveActions_UnterminatedFence — a heading with an opening
-// ```json but no closing fence is a malformed contract the caller must see.
 func TestParsePreventiveActions_UnterminatedFence(t *testing.T) {
 	bad := "## Recommended preventive actions\n\n```json\n[{\"id\":\"x\"}]\n"
 	if _, err := ParsePreventiveActions([]byte(bad)); err == nil {
@@ -16,8 +14,6 @@ func TestParsePreventiveActions_UnterminatedFence(t *testing.T) {
 	}
 }
 
-// TestParsePreventiveActions_MalformedJSON — a well-fenced but invalid JSON
-// payload is surfaced, not silently dropped.
 func TestParsePreventiveActions_MalformedJSON(t *testing.T) {
 	bad := "## Recommended preventive actions\n\n```json\n{not json}\n```\n"
 	if _, err := ParsePreventiveActions([]byte(bad)); err == nil {
@@ -25,8 +21,6 @@ func TestParsePreventiveActions_MalformedJSON(t *testing.T) {
 	}
 }
 
-// TestParsePreventiveActions_HeadingButNoFence — a heading with no ```json
-// block yields no actions and no error (prose-only preventive actions).
 func TestParsePreventiveActions_HeadingButNoFence(t *testing.T) {
 	doc := "## Recommended preventive actions\n- just a prose bullet\n"
 	actions, err := ParsePreventiveActions([]byte(doc))
@@ -38,8 +32,6 @@ func TestParsePreventiveActions_HeadingButNoFence(t *testing.T) {
 	}
 }
 
-// TestFileActions_EmptyIDSkipped — an action with an empty ID is skipped
-// (it has no dedup key and no valid slug), never filed.
 func TestFileActions_EmptyIDSkipped(t *testing.T) {
 	inbox := t.TempDir()
 	written, err := FileActions(inbox, 640, []PreventiveAction{{ID: "", Title: "no id"}}, 0.75, time.Unix(0, 0).UTC())
@@ -51,9 +43,6 @@ func TestFileActions_EmptyIDSkipped(t *testing.T) {
 	}
 }
 
-// TestFileActions_MkdirFailsWhenInboxIsFile — a non-directory at inboxDir is a
-// real error surfaced to the caller (best-effort callers can ignore it, but the
-// function must not silently succeed).
 func TestFileActions_MkdirFailsWhenInboxIsFile(t *testing.T) {
 	base := t.TempDir()
 	inboxPath := filepath.Join(base, "inbox")
@@ -65,9 +54,6 @@ func TestFileActions_MkdirFailsWhenInboxIsFile(t *testing.T) {
 	}
 }
 
-// TestFileActions_NonItemJSONIgnoredDuringDedup — a non-item JSON file under
-// the inbox (an object with no id, or a JSON array) must not abort dedup nor
-// suppress a legitimately new action.
 func TestFileActions_NonItemJSONIgnoredDuringDedup(t *testing.T) {
 	inbox := t.TempDir()
 	if err := os.WriteFile(filepath.Join(inbox, "manifest.json"), []byte("[1,2,3]"), 0o644); err != nil {

@@ -1,6 +1,5 @@
 package panestream
 
-// Names LivenessCenter and its methods as identifiers so apicover -enforce tracks them.
 var (
 	_ *LivenessCenter = NewLivenessCenter()
 	_ bool            = NewLivenessCenter().Busy("")

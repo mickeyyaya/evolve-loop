@@ -30,7 +30,6 @@ func TestRun_PolicyPin_HonoredAbsolutely(t *testing.T) {
 
 	_, err := r.Run(context.Background(), core.PhaseRequest{
 		ProjectRoot: root, Workspace: t.TempDir(),
-		// An explicit per-agent env CLI, which must still lose to the pin.
 		Env: map[string]string{"EVOLVE_SCOUT_CLI": "agy-tmux"},
 	})
 	if err != nil {
@@ -70,7 +69,7 @@ func TestRun_PolicyPin_InvalidFailsLoudly(t *testing.T) {
 	writeFile(t, filepath.Join(root, ".evolve", "profiles", "scout.json"),
 		`{"name":"scout","cli":"claude-tmux","allowed_clis":["claude","agy"]}`)
 	writeFile(t, filepath.Join(root, ".evolve", "policy.json"),
-		`{"pins":{"scout":{"cli":"codex-tmux"}}}`) // codex not in allowed_clis
+		`{"pins":{"scout":{"cli":"codex-tmux"}}}`)
 
 	hooks := &fakeHooks{phase: "scout", agent: "evolve-scout", model: "auto", verdict: core.VerdictPASS}
 	fb := &fakeBridge{writeArtifact: "x"}
@@ -90,7 +89,6 @@ func TestRun_PolicyPin_InvalidFailsLoudly(t *testing.T) {
 	}
 }
 
-// Discriminating only on a host without the pinned binary but with a fallback's; elsewhere it passes trivially.
 func TestRun_PolicyPin_NotDemotedByProbe(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, ".evolve", "profiles", "scout.json"),

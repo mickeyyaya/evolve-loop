@@ -8,7 +8,7 @@ func TestValidateSpine_ShipBeforeAuditWarns(t *testing.T) {
 	var scrambled []Warning
 	validateSpine(RoutingConfig{
 		Mandatory: []string{"scout", "build", "audit", "ship"},
-		Order:     []string{"scout", "build", "ship", "audit"}, // ship before audit
+		Order:     []string{"scout", "build", "ship", "audit"},
 	}, &scrambled)
 	if !hasWarning(scrambled, "spine-order") {
 		t.Errorf("expected spine-order warning when ship precedes audit; got %v", scrambled)

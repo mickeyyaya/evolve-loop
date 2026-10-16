@@ -36,7 +36,7 @@ func TestLoad_RejectsMalformedActivatingFields(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "phase-registry.json")
-	const malformed = `{"phases":[{"name":"audit","role":"audit","on_pass":"ship"}]}` // on_fail missing
+	const malformed = `{"phases":[{"name":"audit","role":"audit","on_pass":"ship"}]}`
 	if err := os.WriteFile(path, []byte(malformed), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}

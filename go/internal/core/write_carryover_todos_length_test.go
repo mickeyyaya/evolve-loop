@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// maxRenderedOversizedTodo bounds what a correct per-item cap must produce: a
-// single todo with a 4000-rune Action renders to ~4130 bytes uncapped, and the
-// bound is loose enough for any reasonable per-item cap yet tight enough that
-// an uncapped passthrough still fails it.
 const maxRenderedOversizedTodo = 1000
 
 func TestWriteCarryoverTodosCapsPerItemLength(t *testing.T) {
@@ -32,8 +28,6 @@ func TestWriteCarryoverTodosCapsPerItemLength(t *testing.T) {
 		t.Errorf("oversized Action rendered unbounded: section is %d bytes, want <= %d — writeCarryoverTodos must cap per-item Action length at render time",
 			n, maxRenderedOversizedTodo)
 	}
-	// The todo must still be identifiable after truncation — capping length must
-	// not erase the ID/priority the router needs to reason about it.
 	if !strings.Contains(out, "cycle-366-failed-ship") {
 		t.Errorf("per-item cap must preserve the todo ID; got %q", out)
 	}
@@ -56,7 +50,7 @@ func TestWriteCarryoverTodos_OmittedTrailerFires(t *testing.T) {
 	todos := make([]router.CarryoverTodo, total)
 	for i := range todos {
 		todos[i] = router.CarryoverTodo{
-			ID:       "todo-" + strings.Repeat("a", 1), // short, distinct enough
+			ID:       "todo-" + strings.Repeat("a", 1),
 			Action:   "short action",
 			Priority: "P0",
 		}

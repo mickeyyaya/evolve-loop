@@ -1,32 +1,5 @@
-// Package verifyeval independently re-executes the commands inside an
-// eval Markdown file against a workspace and compares the observed
-// outcome to the eval's expectations. It is the trust-boundary check
-// the orchestrator uses pre-ship: "don't trust Auditor's claim that
-// the eval passed — re-run it ourselves."
-//
-// Eval format (the contract this package consumes):
-//
-//	```bash
-//	go test ./internal/foo/...
-//	```
-//
-//	## Expected
-//
-//	exit_code: 0
-//	stdout_contains: "FAIL"  # (negated when prefixed with !)
-//	stderr_contains: ""
-//
-// The package executes each ```bash``` block as one isolated script, captures
-// stdout/stderr/exit, and applies the Expected predicates.
-// Any failure flips the overall verdict to FAIL.
-// Without a machine-readable exit_code, each script must return zero when its
-// assertion holds; surrounding prose is not interpreted as an expectation.
-//
-// Production execution shells out via opts.Runner. Tests inject a
-// fake runner so no real shell ever runs in unit tests. The shell-
-// out path itself is exercised via the //go:build integration tag.
-//
-// v12.1 Phase 2A port. CLI: `evolve eval verify <eval.md> <workspace>`.
+// Package verifyeval re-executes the commands of an eval Markdown file and checks the outcome.
+// See docs/architecture/packages/internal-verifyeval.md.
 package verifyeval
 
 import (
@@ -40,51 +13,36 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// CmdRunner is the seam for command execution. The production implementation
-// runs Bash scripts with pipeline failure propagation; tests inject a fake.
 type CmdRunner func(ctx context.Context, workdir, command string) (stdout, stderr string, exitCode int, err error)
 
-// Expectations captures the global predicates parsed from the eval's ## Expected
-// section. ExitCode defaults to zero; the output predicates are enforced only
-// when present.
 type Expectations struct {
-	ExitCode       *int   // defaults to zero; an explicit value overrides it
-	StdoutContains string // when non-empty, stdout must contain this substring
-	StdoutAbsent   string // when non-empty, stdout must NOT contain this
-	StderrContains string // same for stderr
+	ExitCode       *int
+	StdoutContains string
+	StdoutAbsent   string
+	StderrContains string
 }
 
-// Options configures Verify. Path is the eval markdown file;
-// Workspace is the directory commands run in; Runner overrides
-// execution (defaults to DefaultRunner).
 type Options struct {
 	Path      string
 	Workspace string
 	Runner    CmdRunner
 }
 
-// CommandResult captures the outcome of one executed fence script. Command is
-// retained as the public field name for compatibility.
 type CommandResult struct {
 	Command  string
 	Stdout   string
 	Stderr   string
 	ExitCode int
 	Passed   bool
-	Reason   string // populated when Passed is false
+	Reason   string
 }
 
-// Result is the overall verdict + per-command outcomes.
 type Result struct {
 	Path     string
-	Verdict  string // "PASS" or "FAIL"
+	Verdict  string
 	Commands []CommandResult
 }
 
-// Verify executes every bash fence in the eval and checks each script against
-// the parsed Expectations. Returns Verdict=PASS when every script satisfies the
-// predicates; subsequent scripts still run after a mismatch so the operator
-// sees the full failure picture.
 func Verify(opts Options) (Result, error) {
 	if opts.Path == "" {
 		return Result{}, fmt.Errorf("verifyeval: Path required")
@@ -143,9 +101,6 @@ func runScript(ctx context.Context, runner CmdRunner, workspace, script string, 
 	return cr
 }
 
-// matchExpectations checks one script's outcome against the parsed
-// predicates. Returns "" when all checks pass; otherwise a one-line
-// reason naming the first failed predicate.
 func matchExpectations(cr CommandResult, e Expectations) string {
 	if e.ExitCode != nil && cr.ExitCode != *e.ExitCode {
 		return fmt.Sprintf("exit_code=%d, expected %d", cr.ExitCode, *e.ExitCode)
@@ -162,9 +117,6 @@ func matchExpectations(cr CommandResult, e Expectations) string {
 	return ""
 }
 
-// parseEval extracts bash scripts and the Expected predicate block from the
-// eval markdown file. One fence is one shell so state and multiline syntax are
-// preserved; separate fences remain isolated executions.
 func parseEval(path string) ([]string, Expectations, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -234,9 +186,6 @@ func scriptHasCommand(script string) bool {
 	return false
 }
 
-// parseExpectedLine populates Expectations from one `key: value` line
-// inside the ## Expected section. Unknown keys are silently ignored
-// for forward compatibility.
 func parseExpectedLine(line string, e *Expectations) {
 	colon := strings.Index(line, ":")
 	if colon < 0 {
@@ -244,7 +193,6 @@ func parseExpectedLine(line string, e *Expectations) {
 	}
 	key := strings.TrimSpace(line[:colon])
 	val := strings.TrimSpace(line[colon+1:])
-	// Strip optional surrounding quotes.
 	val = strings.Trim(val, `"'`)
 	switch key {
 	case "exit_code":
@@ -261,9 +209,6 @@ func parseExpectedLine(line string, e *Expectations) {
 	}
 }
 
-// DefaultRunner executes one fenced script with Bash pipeline failure
-// propagation. The script keeps normal Bash status-handling semantics, including
-// the ability to inspect an expected failure with $?.
 func DefaultRunner(ctx context.Context, workdir, command string) (string, string, int, error) {
 	cmd := sysexec.Command(ctx, "/bin/bash", "-o", "pipefail", "-c", command)
 	if workdir != "" {
@@ -276,7 +221,7 @@ func DefaultRunner(ctx context.Context, workdir, command string) (string, string
 	exitCode := 0
 	if exitErr, ok := err.(*exec.ExitError); ok {
 		exitCode = exitErr.ExitCode()
-		err = nil // exit-error is not a runner error
+		err = nil
 	}
 	return stdoutBuf.String(), stderrBuf.String(), exitCode, err
 }

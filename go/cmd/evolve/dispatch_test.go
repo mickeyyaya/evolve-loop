@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestDispatch_NoArgs prints usage and returns 2.
 func TestDispatch_NoArgs(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
@@ -116,7 +115,6 @@ func TestDispatch_DoctorProbe_Found(t *testing.T) {
 func TestDispatch_DoctorProbe_JSON_ReorderedFlag(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	// flag after positional — exercises reorderArgs.
 	code := dispatch([]string{"doctor", "probe", "go", "--json"}, nil, &stdout, &stderr)
 	if code != 0 {
 		t.Errorf("want 0, got %d, stderr=%s", code, stderr.String())
@@ -180,7 +178,6 @@ func TestDispatch_Doctor_BadSub(t *testing.T) {
 
 func TestDispatch_GuardShip_Allow(t *testing.T) {
 	t.Parallel()
-	// ship.sh-shaped command — guard should allow.
 	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"bash scripts/lifecycle/ship.sh msg"}}`)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"guard", "ship", "--evolve-dir", t.TempDir()}, in, &stdout, &stderr)
@@ -190,9 +187,6 @@ func TestDispatch_GuardShip_Allow(t *testing.T) {
 }
 
 func TestDispatch_GuardShip_Deny(t *testing.T) {
-	// Hermetic: a guard-deny assertion must not be flipped by an ambient
-	// operator bypass env (e.g. EVOLVE_BYPASS_SHIP_GATE=1 set in a dev
-	// session's settings.local.json). Clear it for this test.
 	t.Setenv("EVOLVE_BYPASS_SHIP_GATE", "")
 	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"git commit -m bypass"}}`)
 	var stdout, stderr bytes.Buffer
@@ -345,7 +339,6 @@ func TestDispatch_ACS_Run_NoPkg(t *testing.T) {
 	}
 }
 
-// Helper to silence unused io import warning when needed.
 var _ = io.EOF
 
 func TestReorderArgs(t *testing.T) {

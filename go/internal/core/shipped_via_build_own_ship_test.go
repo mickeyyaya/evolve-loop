@@ -17,8 +17,6 @@ func TestRunCycle_EmptyTriageCommitmentSurvivesSiblingLanding(t *testing.T) {
 	o := NewOrchestrator(storage, &fakeLedger{}, runners,
 		WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}),
 		WithThroughputRecorder(func(*State, int, string) { throughputCredits++ }))
-	// A sibling lane lands on main mid-cycle: the probe at cycle start and the
-	// probe at closeout return different SHAs.
 	heads := []string{"a2e60952-cycle-start", "b496a8dc-sibling-landed"}
 	o.gitHEAD = func() (string, error) {
 		head := heads[0]

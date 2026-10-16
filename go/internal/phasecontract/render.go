@@ -8,15 +8,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 )
 
-// FooterMarker prefixes the volatile path line at the end of the prompt.
 const FooterMarker = "DELIVERABLE PATH:"
 
-// RenderContractBlock returns the invariant, cache-safe instruction block: deterministic and free of absolute paths.
 func RenderContractBlock(c Contract) string {
 	return RenderContractBlockStage(c, false)
 }
 
-// RenderContractBlockStage renders the block, adding the PhaseIO self-report-failure instruction when includePhaseIO is set.
 func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "## Deliverable Contract (%s)\n\n", c.Phase)
@@ -42,7 +39,6 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 			fmt.Fprintf(&b, "- On FAIL or WARN, the sentinel MUST carry your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it). \"class\" MUST be one of [%s] — it drives the retry envelope, so an invented class forfeits the repair round; put your judgment in defects/prescription:\n  %s\n",
 				failurelog.VocabularyList(), RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
 		} else if c.RequireFailureContextPhaseIO && includePhaseIO {
-			// A successful run emits no verdict: the gate bites only on a FAIL/WARN sentinel without the block.
 			fmt.Fprintf(&b, "- If this phase fails or you must flag a blocking problem, emit a machine-readable verdict line declaring FAIL (or WARN) that ALSO carries your structured failure context (one defect per list entry; evidence_paths are workspace-relative artifacts that prove it):\n  %s\n  A successful run needs no verdict line.\n",
 				RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
 		}
@@ -59,12 +55,10 @@ func RenderContractBlockStage(c Contract, includePhaseIO bool) string {
 	return b.String()
 }
 
-// RenderContractFooter returns the volatile path line appended as the last line of the prompt.
 func RenderContractFooter(c Contract, artifactPath string) string {
 	return fmt.Sprintf("\n\n%s %s\n", FooterMarker, artifactPath)
 }
 
-// RenderContractTail returns the footer plus an XML <deliverable-contract> block; owed files resolve against workspace.
 func RenderContractTail(c Contract, artifactPath, workspace string) string {
 	footer := RenderContractFooter(c, artifactPath)
 	if c.NoArtifact {
@@ -93,8 +87,6 @@ func RenderContractTail(c Contract, artifactPath, workspace string) string {
 			b.WriteString("  </required-sections>\n")
 		}
 		if len(c.Verdicts) > 0 {
-			// The tail is the copy the agent follows, so where a FAIL/WARN without a
-			// failure block is a violation, the exemplar must carry the block.
 			if c.RequireFailureContext || c.RequireFailureContextPhaseIO {
 				fmt.Fprintf(&b, "  <verdict-sentinel verdicts=%q note=\"a FAIL or WARN verdict MUST carry the failure block shown here\">%s</verdict-sentinel>\n",
 					bracketJoin(c.Verdicts), RenderVerdictSentinelWithFailure(c.Phase, "FAIL", failureExemplar(c.Phase)))
@@ -118,18 +110,15 @@ func RenderContractTail(c Contract, artifactPath, workspace string) string {
 		}
 		b.WriteString("  </effects>\n")
 	}
-	// Placeholders stay literal, not XML-escaped: an agent pastes this into a shell verbatim.
 	fmt.Fprintf(&b, "  <self-check>%s</self-check>\n", selfCheckCommand(c.Phase))
 	b.WriteString("</deliverable-contract>\n")
 	return b.String()
 }
 
-// selfCheckCommand is the one rendering of the self-check invocation, shared by the block and the tail.
 func selfCheckCommand(phase string) string {
 	return fmt.Sprintf("evolve phase verify %s --workspace <your workspace dir>", phase)
 }
 
-// failureExemplar is the placeholder failure block every failure instruction shows.
 func failureExemplar(phase string) *FailureBlock {
 	return &FailureBlock{
 		Class:         exemplarClass(phase),
@@ -158,12 +147,10 @@ func bracketJoin(vs []string) string {
 	return strings.Join(vs, "|")
 }
 
-// OwedPath joins an agent-owed file's basename to the workspace; the gate and the prompt tail both use it.
 func OwedPath(workspace, name string) string {
 	return filepath.Join(workspace, filepath.Base(name))
 }
 
-// exemplarClass draws the exemplar's class from the failurelog vocabulary, which the gate validates against.
 func exemplarClass(phase string) string {
 	if phase == "audit" {
 		return string(failurelog.CodeAuditFail)

@@ -364,7 +364,6 @@ func TestSplitTip_StripsTrailingNewline(t *testing.T) {
 	}
 }
 
-// An adjacent duplicate passes as a fork sibling; the stale tip is what breaks this chain.
 func TestVerify_DuplicatePrevHash(t *testing.T) {
 	l, dir := newLedger(t)
 	_ = l.Append(context.Background(), core.LedgerEntry{Role: "a", Cycle: 1})

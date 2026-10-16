@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// A true halt means the result was already emitted with exitCode.
 func prepareFreshBatch(
 	ctx context.Context,
 	cfg loopConfig,
@@ -18,8 +17,6 @@ func prepareFreshBatch(
 	lr *loopResult,
 	stdout, stderr io.Writer,
 ) (exitCode int, halt bool) {
-	// A stale binary must not run recovery logic; a successful refresh re-execs
-	// and never returns.
 	bootBinaryRefreshFn(cfg, stderr)
 	if br := bootRecoverFn(ctx, cfg, deps.Ledger, stderr); br.HaltSelfSHA {
 		lr.StopReason = "self_sha_boot_halt"
@@ -59,8 +56,6 @@ func prepareFreshBatch(
 		return 2, true
 	}
 
-	// Drains worktrees a prior crashed batch left finalized; this batch's own
-	// finalized worktrees are handled by the end sweep.
 	gcHookFn(cfg, filepath.Join(gcManifestDir(cfg.EvolveDir), "pre-batch"), stderr)
 	return 0, false
 }

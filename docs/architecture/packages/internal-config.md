@@ -39,6 +39,23 @@
 - **`RubricHint`** lines render into the advisor's decision rubric, so rubric guidance is registry data. A hint also decides admission on the plan path: `RoutingBlock.TriggerIsTheWholeRule` holds for an `insert_when` with no hint, and the router then skips a planned phase whose trigger does not fire (`insert-when-gates-plan`, ADR-0052 amendment 2026-09-28), so a hint that only restates its trigger still opens the phase to the advisor. A rubric-only routing block is walk-inert: mandatory phases never consult `Triggers`, and an empty `insert_when` never fires (`TestWalk_MandatoryPhaseWithRubricOnlyRoutingBlockUnchanged`).
 - **`LoadDomain` and `DefaultDeliverableKind`.** Writing and research projects default to document deliverables. Everything else defaults to code, the conservative side that keeps the tdd pin ([ADR-0099](../adr/0099-deliverable-kinds.md)). Only the `domain` field is read; the other fields are parsed for round-trip fidelity.
 
+- **Small contracts the code cannot show.**
+  - `mustCondRule` is the only panic of the package. It fires for a compiled expression that does not parse.
+  - `parseCondClause` matches the two-character operators before the one-character ones.
+  - `applyEnv` stamps the env var name on the warnings of each dial. Thus `fields.key` names the var, and the message keeps its registry spelling.
+  - The message of `parseMode` names the registry key, also for the env dial.
+  - Tests build `PolicyStages` by position, so a new field breaks the build.
+  - `applyRegistryDials` uses pointer fields to tell an explicit 0 or false from absence.
+  - `applyDeliverableKinds` installs a spec also when it warns. The registry owns the root and `min_options`, so a consumer must see the hole and not a silent default.
+  - `staticSpinePhases` is a local copy, because `config` cannot import `core`. `TestStaticSpineMatchesStateMachine` pins it.
+  - A missing `signalCodes` entry reaches the Center empty and is stamped `SIGNALCENTER_MISSING_CODE`.
+  - The `config.warning` event has no cycle number, because the loader runs before one exists.
+  - The kitchen-sink golden pins the order of `envDials`.
+  - The gate dials of `defaultRollout` must equal the compiled defaults of `policy`. `ApplyPolicyStages` resolves them again at the root. `TestDefaults_GateDialsMatchPolicyCompiledDefaults` pins this.
+  - `ModelRoutingAdvisory` logs the proposal of the advisor for each phase and never applies it. `ModelRoutingAuto` applies it as a soft overlay that `router.ClampPlanModelRouting` clamps.
+  - `AuditFailRoutesTo` comes from the `failure_floor` of the policy, and `LegalSuccessors` edits are gated by `ValidateSafetyInvariants`.
+- **Machine-read comment.** `acs/cycle1141` (`TestC1141_005`) reads `config.go` as text. It needs a `phasecontract` derivation, or a comment that names `phasecontract` or `RequiredRoles` together with `mandatory`, `diverg` or `deliberately`. The one comment above `defaultMandatory` stays until that predicate reads these notes. `config.go` must also stay free of the four retired router env names that `acs/cycle37` searches for.
+
 ## Invariants
 
 - **Unknown words take the fail-safe side, with a warning.** A stage word resolves to off, `routing_mode` to llm, `model_routing` to static, `enabled` to content, and `EVOLVE_SANDBOX` to the current mode. A bad conditional rule or insertion cap is ignored. A typo must never silently enable a kill path or a staged rollout.

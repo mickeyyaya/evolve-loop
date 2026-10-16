@@ -48,7 +48,6 @@ func setupRoots(projectRootFlag, evolveDirFlag string, stderr io.Writer) (projec
 		if cwd, err := os.Getwd(); err == nil {
 			project = cwd
 		} else {
-			// Surfaced rather than silently falling through to a relative path.
 			fmt.Fprintf(stderr, "[setup] WARN: could not determine cwd (%v); marker/state paths may be relative\n", err)
 		}
 	}
@@ -75,8 +74,6 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&asJSON, "json", false, "emit the digest as JSON (default human table)")
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
 	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
-	// No positional args, so parsed directly: reorderArgs would let a
-	// space-separated flag value swallow the next flag (see cmd_phase_verify.go).
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -248,14 +245,13 @@ func printDetectHuman(w io.Writer, rep setup.DetectReport) {
 	}
 }
 
-// Reads the marker directly, bypassing core.State's lossy round-trip.
 func maybePrintSetupNudge(stderr io.Writer, evolveDir string) {
 	if b, err := os.ReadFile(filepath.Join(evolveDir, "state.json")); err == nil {
 		var m struct {
 			SetupCompletedAt string `json:"setupCompletedAt"`
 		}
 		if json.Unmarshal(b, &m) == nil && m.SetupCompletedAt != "" {
-			return // already onboarded
+			return
 		}
 	}
 	fmt.Fprintln(stderr, "[setup] First run — run /setup to pick per-phase models + learn the pipeline (using defaults for now).")
@@ -267,7 +263,6 @@ func runSetupComplete(args []string, stdout, stderr io.Writer) int {
 	var evolveDirFlag, projectRootFlag string
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
 	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
-	// No positional args; parsed directly, as in runSetupDetect.
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}

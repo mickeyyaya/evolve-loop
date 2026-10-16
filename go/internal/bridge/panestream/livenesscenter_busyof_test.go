@@ -24,7 +24,7 @@ func TestSignalCenter_BusyOf_MatchesStandalonePaneBusy(t *testing.T) {
 
 func TestSignalCenter_BusyOf_EmptyPaneUnknownProfileNoPanic(t *testing.T) {
 	sc := NewLivenessCenter()
-	unknown := Profiles["does-not-exist"] // zero-value PaneProfile (map miss)
+	unknown := Profiles["does-not-exist"]
 
 	defer func() {
 		if r := recover(); r != nil {

@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-// readEvents parses every NDJSON line in <workspace>/abnormal-events.jsonl
-// for round-trip assertions. Returns nil on missing file.
 func readEvents(t *testing.T, workspace string) []Event {
 	t.Helper()
 	f, err := os.Open(filepath.Join(workspace, "abnormal-events.jsonl"))
@@ -109,8 +107,6 @@ func TestEmit_ConcurrentSafe(t *testing.T) {
 	if len(events) != N {
 		t.Fatalf("len=%d want %d (atomic append failed)", len(events), N)
 	}
-	// Each line must be valid JSON. readEvents would have failed
-	// already if any line was corrupt, but be explicit.
 	for i, e := range events {
 		if e.EventType != EventCounterNonAdvance {
 			t.Fatalf("event %d type=%q want counter-non-advance", i, e.EventType)
@@ -134,7 +130,6 @@ func TestEmit_CustomNowFunc(t *testing.T) {
 
 func TestEmit_OpenError(t *testing.T) {
 	t.Parallel()
-	// Workspace dir doesn't exist → OpenFile fails.
 	w := NewWriter(filepath.Join(t.TempDir(), "does-not-exist", "sub"))
 	if err := w.Emit(Event{EventType: EventCounterNonAdvance}); err == nil {
 		t.Fatalf("expected error when workspace missing")

@@ -13,10 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// twoPassStub records the env at each Run call so tests can confirm
-// both passes ran with the correct PERMISSION_MODE / PLAN_INPUT /
-// PLAN_OUTPUT env vars. It also writes the plan artifact during pass A
-// so pass B's existence check succeeds.
 type twoPassStub struct {
 	calls    []map[string]string
 	planPath string
@@ -29,7 +25,6 @@ func (s *twoPassStub) Run(ctx context.Context, req core.PhaseRequest) (core.Phas
 		"EVOLVE_BUILD_PLAN_INPUT":      os.Getenv("EVOLVE_BUILD_PLAN_INPUT"),
 	}
 	s.calls = append(s.calls, snapshot)
-	// First call: emulate the plan-mode agent writing the plan file.
 	if len(s.calls) == 1 && s.planPath != "" {
 		_ = os.MkdirAll(filepath.Dir(s.planPath), 0o755)
 		_ = os.WriteFile(s.planPath, []byte("# scripted plan\n"), 0o644)
@@ -45,7 +40,6 @@ func TestRunPlanAndExecute_TwoPass_HappyPath(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()
 	registry.Register("build", func(req core.PhaseRequest) core.PhaseRunner {
-		// Wrap stub in a real core.PhaseRunner-satisfying type.
 		return &realStubRunner{stub: stub}
 	})
 
@@ -79,7 +73,6 @@ func TestRunPlanAndExecute_TwoPass_HappyPath(t *testing.T) {
 	}
 }
 
-// realStubRunner adapts twoPassStub to core.PhaseRunner.
 type realStubRunner struct{ stub *twoPassStub }
 
 func (r *realStubRunner) Name() string { return "build" }
@@ -137,7 +130,6 @@ func TestRunPlanAndExecute_SkipExecute_OnlyRunsPassA(t *testing.T) {
 func TestRunPlanAndExecute_PlanArtifactMissing_Exit11(t *testing.T) {
 	planDir := t.TempDir()
 	planPath := filepath.Join(planDir, "no-plan-written.md")
-	// stub.planPath is empty so the stub does NOT write the artifact.
 	stub := &twoPassStub{}
 	defer registry.SnapshotForTest()()
 	registry.ResetForTesting()

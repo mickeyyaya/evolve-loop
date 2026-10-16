@@ -29,8 +29,6 @@ func TestE2ECLIFallbackChain(t *testing.T) {
 	evolveBin := buildBinary(t, binDir, "evolve", "./cmd/evolve", repoRoot)
 	fakeBin := buildBinary(t, binDir, "evolve-fake-cli", "./cmd/evolve-fake-cli", repoRoot)
 
-	// ONE representative trigger walks the whole spine end to end: 81
-	// (artifact-timeout) is the code that actually fires in production.
 	t.Run("trigger_81_falls_back_to_codex", func(t *testing.T) {
 		t.Parallel()
 		runFallbackCycle(t, fallbackCfg{
@@ -39,8 +37,6 @@ func TestE2ECLIFallbackChain(t *testing.T) {
 		})
 	})
 
-	// 99 (ExitRequireFullUnmet) is NOT a fallback trigger — the primary fails,
-	// the runner does NOT try codex, and the cycle must fail.
 	t.Run("nontrigger_99_does_not_fall_back", func(t *testing.T) {
 		t.Parallel()
 		runFallbackCycle(t, fallbackCfg{
@@ -64,16 +60,12 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 	writeFallbackProfiles(t, projRoot, "claude-p", []string{"codex"})
 
 	env := append(os.Environ(),
-		"EVOLVE_SANDBOX=off", // host opt-out: pipeline-semantics tests, runners cannot promise a wrap (see e2e_pipeline_paths_test.go)
+		"EVOLVE_SANDBOX=off",
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
-		// No EVOLVE_CLI: the per-agent profile (cli + cli_fallback) drives the
-		// chain. claude-p is primary; codex is the fallback.
 		"BRIDGE_TESTING=1",
 		"BRIDGE_CLAUDE_BINARY="+cfg.FakeBin,
 		"BRIDGE_CODEX_BINARY="+cfg.FakeBin,
-		// Make every claude-p invocation fail with the chosen code; codex
-		// (the fallback) is uninjected and succeeds.
 		fmt.Sprintf("FAKE_CLI_CLAUDE_EXIT=%d", cfg.PrimaryExitCode),
 	)
 	env = append(env, isolatedHome(t)...)
@@ -86,16 +78,8 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 	cmd := exec.Command(cfg.EvolveBin, args...)
 	cmd.Env = env
 	cmd.Dir = projRoot
-	// CEILING, not a target: the harness polls the ledger and stops as soon as
-	// the target role appears, so a fast host pays nothing extra and a slow one
-	// still gets the full ceiling — the result depends on the invariant, not
-	// the host's speed.
 	out, err := runUntilLedgerRole(cmd, projRoot, "ship", cfg.ExpectShip, 1500*time.Second)
 
-	// Whether the cycle reaches ship is read from the ledger role, not a landed
-	// commit (native ship cannot ff-merge in this fixture). Reaching ship at
-	// all proves every phase fell back to codex, since the primary fails on
-	// every invocation.
 	entries := readLedger(t, projRoot)
 	reachedShip := ledgerHasRole(entries, "ship")
 
@@ -115,9 +99,6 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 	}
 }
 
-// writeFallbackProfiles rewrites every phase profile with a primary cli + an
-// ordered cli_fallback list. cli_fallback_on_exit is left unset so the runner
-// uses the documented default trigger set {80,81,124,127}.
 func writeFallbackProfiles(t *testing.T, projRoot, primary string, fallback []string) {
 	t.Helper()
 	profilesDir := filepath.Join(projRoot, ".evolve", "profiles")
@@ -137,22 +118,15 @@ func writeFallbackProfiles(t *testing.T, projRoot, primary string, fallback []st
 	}
 }
 
-// gitLogContains reports whether the latest commit subject contains sub.
 func gitLogContains(t *testing.T, projRoot, sub string) bool {
 	t.Helper()
 	logOut, err := exec.Command("git", "-C", projRoot, "log", "--format=%s", "-1").Output()
 	if err != nil {
-		// No commits beyond init is possible on the fail path; treat as "not found".
 		return false
 	}
 	return strings.Contains(string(logOut), sub)
 }
 
-// runUntilLedgerRole starts cmd and returns as soon as the ledger records role
-// (when wantRole is true), else waits for the process to exit on its own. The
-// poll interval is coarse on purpose: the ledger is appended once per phase, so
-// sub-second polling buys nothing. Returns the child's combined output captured
-// so far and its exit error (nil when we stopped it after observing the role).
 func runUntilLedgerRole(cmd *exec.Cmd, projRoot, role string, wantRole bool, ceiling time.Duration) (string, error) {
 	var buf syncBuffer
 	cmd.Stdout = &buf
@@ -164,8 +138,6 @@ func runUntilLedgerRole(cmd *exec.Cmd, projRoot, role string, wantRole bool, cei
 	go func() { done <- cmd.Wait() }()
 
 	if !wantRole {
-		// Non-trigger case: the cycle MUST fail on its own and fail fast. Waiting
-		// for the real exit is the assertion.
 		select {
 		case err := <-done:
 			return buf.String(), err
@@ -181,7 +153,6 @@ func runUntilLedgerRole(cmd *exec.Cmd, projRoot, role string, wantRole bool, cei
 	for {
 		select {
 		case err := <-done:
-			// Exited on its own — the caller reads the ledger either way.
 			return buf.String(), err
 		default:
 		}
@@ -199,9 +170,6 @@ func runUntilLedgerRole(cmd *exec.Cmd, projRoot, role string, wantRole bool, cei
 	}
 }
 
-// syncBuffer is a mutex-guarded buffer: the child's output is written from the
-// exec goroutine while the poll loop may read it, which a bare bytes.Buffer
-// cannot serve race-free.
 type syncBuffer struct {
 	mu  sync.Mutex
 	buf bytes.Buffer

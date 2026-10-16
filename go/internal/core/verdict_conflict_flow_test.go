@@ -45,9 +45,6 @@ func TestVerdictConflict_WarningSeverityWouldBeDropped(t *testing.T) {
 	}
 }
 
-// conflictReasons renders the reason set one recurrence of one defect
-// produces: the gate's own evidence plus the audit verdict-conflict record,
-// whose only varying token is the auditor's own narrative verdict.
 func conflictReasons(narrative string) []string {
 	return []string{
 		"EGPS: red_count=1 [ProbeIsolation] (cycle ships only when red_count==0)",
@@ -109,8 +106,6 @@ func TestNormalizeReasonForFingerprint_TouchesOnlyTheNarrativeToken(t *testing.T
 	for _, tc := range []struct{ in, want string }{
 		{"auditor narrative=PASS but", "auditor narrative=<verdict> but"},
 		{"auditor narrative=SKIPPED but", "auditor narrative=<verdict> but"},
-		// Not the token: a non-canonical value stays verbatim (it can only reach a
-		// reason via some other writer, and blurring it would hide a real defect).
 		{"auditor narrative=PASSABLE but", "auditor narrative=PASSABLE but"},
 		{"verdict=PASS but the gate", "verdict=PASS but the gate"},
 		{"EGPS: red_count=1 [ProbeIsolation]", "EGPS: red_count=1 [ProbeIsolation]"},

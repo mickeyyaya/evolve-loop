@@ -21,9 +21,8 @@ func writeUserPhase(t *testing.T, phasesDir, name, body string) {
 func TestDiscoverUserSpecs(t *testing.T) {
 	phasesDir := t.TempDir()
 	writeUserPhase(t, phasesDir, "security-scan", `{"name":"security-scan","optional":true,"kind":"llm"}`)
-	writeUserPhase(t, phasesDir, "lint-pass", `{"optional":true}`) // name defaults to dir
+	writeUserPhase(t, phasesDir, "lint-pass", `{"optional":true}`)
 	writeUserPhase(t, phasesDir, "broken", `{not json`)
-	// a directory with no phase.json is silently ignored
 	if err := os.MkdirAll(filepath.Join(phasesDir, "notaphase"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -48,14 +47,14 @@ func TestDiscoverUserSpecs_MissingDir(t *testing.T) {
 }
 
 func TestCatalog_Merge(t *testing.T) {
-	builtin, err := Load(writeRegistry(t, fullRegistry)) // scout, security-scan (built-in)
+	builtin, err := Load(writeRegistry(t, fullRegistry))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	user := []PhaseSpec{
-		{Name: "scout", Optional: true},     // clashes with a NON-optional builtin → dropped
-		{Name: "lint-pass", Optional: true}, // new → added
-		{Name: ""},                          // empty → skipped
+		{Name: "scout", Optional: true},
+		{Name: "lint-pass", Optional: true},
+		{Name: ""},
 	}
 	merged, warnings := builtin.Merge(user)
 
@@ -81,7 +80,7 @@ func TestValidateUserSpec(t *testing.T) {
 		name      string
 		spec      PhaseSpec
 		wantClean bool
-		wantSub   string // substring expected in a violation when not clean
+		wantSub   string
 	}{
 		{"valid llm optional", PhaseSpec{Name: "security-scan", Optional: true, Kind: "llm"}, true, ""},
 		{"valid default kind", PhaseSpec{Name: "lint-pass", Optional: true}, true, ""},

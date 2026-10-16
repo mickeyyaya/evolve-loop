@@ -9,7 +9,6 @@ import (
 func TestSignalCenter_ObserveAndAggregate(t *testing.T) {
 	sc := NewLivenessCenter()
 	p := Profiles["claude"]
-	// The second observation raises the ↓ token count, so ClaudeDetector reads Converging.
 	sc.Observe("sess-1", "⏺ thinking\n(4s · ↓ 50 tokens)\n❯ \n", p)
 	sc.Observe("sess-1", "⏺ thinking\n(4s · ↓ 100 tokens)\n❯ \n", p)
 	state := sc.Aggregate()
@@ -59,7 +58,7 @@ func TestSignalCenter_ParallelProducerRaceClean(t *testing.T) {
 			defer wg.Done()
 			key := fmt.Sprintf("sess-%d", id)
 			if id%2 == 0 {
-				key = sharedKey // contention: multiple writers on same session key
+				key = sharedKey
 			}
 			sc.Observe(key, fmt.Sprintf("content-%d\n❯ \n", id), claudeProfile)
 		}(i)

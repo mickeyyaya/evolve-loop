@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// knownPkgsFixture must keep evidence, scout and paths: they collide with contract metadata and coverage
-// prose, and without them the replay pins pass against a vocabulary production does not have.
 var knownPkgsFixture = []string{
 	"swarmrunner", "swarmplan", "swarm",
 	"bridge", "phasecoherence", "looppreflight", "modelcatalog",

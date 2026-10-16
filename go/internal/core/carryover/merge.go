@@ -6,10 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// MergeTodos unions the on-disk and incoming todos by id, disk first, the
-// DISK copy kept on a shared id (a peer's concurrent todo is never clobbered;
-// an in-memory refresh of an already-persisted todo does not land — the
-// preserved quirk Q3). Returns a new slice.
 func MergeTodos(disk, incoming []cyclestate.CarryoverTodo) []cyclestate.CarryoverTodo {
 	out := append([]cyclestate.CarryoverTodo(nil), disk...)
 	for _, td := range incoming {
@@ -20,9 +16,6 @@ func MergeTodos(disk, incoming []cyclestate.CarryoverTodo) []cyclestate.Carryove
 	return out
 }
 
-// MergeFailedRecords unions the on-disk and incoming records by the key
-// cycle+ts+verdict+recordedAt, disk order first, incoming winning on a shared
-// key. Returns a new slice.
 func MergeFailedRecords(disk, incoming []cyclestate.FailedRecord) []cyclestate.FailedRecord {
 	key := func(r cyclestate.FailedRecord) string {
 		return fmt.Sprintf("%d\x00%s\x00%s\x00%s", r.Cycle, r.TS, r.Verdict, r.RecordedAt)
@@ -40,7 +33,7 @@ func MergeFailedRecords(disk, incoming []cyclestate.FailedRecord) []cyclestate.F
 		add(r)
 	}
 	for _, r := range incoming {
-		add(r) // incoming overrides disk for a shared key
+		add(r)
 	}
 	out := make([]cyclestate.FailedRecord, 0, len(order))
 	for _, k := range order {

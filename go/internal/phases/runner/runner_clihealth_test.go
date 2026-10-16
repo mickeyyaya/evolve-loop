@@ -13,15 +13,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// cycle283WallTail is a verbatim wall line from a real escalation report.
 const cycle283WallTail = "■ You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), " +
 	"visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 6:11 AM."
 
-// escalatingBridge writes escalation-report.json as bridge/autorespond.go does: unprefixed, before rc 85 propagates.
 type escalatingBridge struct {
 	scriptedBridge
-	escalateCLI string // CLI whose launch drops the report
-	reportCLI   string // "cli" field in the report (mismatch tests)
+	escalateCLI string
+	reportCLI   string
 	capturedAt  time.Time
 	pattern     string
 }
@@ -30,7 +28,7 @@ func (e *escalatingBridge) Launch(ctx context.Context, req core.BridgeRequest) (
 	if req.CLI == e.escalateCLI {
 		capturedAt := e.capturedAt
 		if capturedAt.IsZero() {
-			capturedAt = time.Now() // autorespond stamps DURING the launch
+			capturedAt = time.Now()
 		}
 		rep := map[string]any{
 			"schema_version": 1,
@@ -77,7 +75,7 @@ func TestRun_Exit85RateLimitBenchesFamily(t *testing.T) {
 			"claude-tmux": {},
 		}},
 		escalateCLI: "codex-tmux", reportCLI: "codex-tmux",
-		pattern: "rate_limit", // capturedAt zero → stamped at launch (fresh)
+		pattern: "rate_limit",
 	}
 	runPhase(t, root, eb)
 
@@ -133,8 +131,8 @@ func TestRun_CLIMismatchReportDoesNotBench(t *testing.T) {
 			"codex-tmux":  exit85(),
 			"claude-tmux": {},
 		}},
-		escalateCLI: "codex-tmux", reportCLI: "claude-tmux", // mismatch
-		pattern: "rate_limit", // fresh stamp; only the cli mismatch rejects
+		escalateCLI: "codex-tmux", reportCLI: "claude-tmux",
+		pattern: "rate_limit",
 	}
 	runPhase(t, root, eb)
 	if benches, _ := clihealth.NewStore(root, nil).Load(); len(benches) != 0 {
@@ -150,7 +148,7 @@ func TestRun_StaleReportDoesNotBench(t *testing.T) {
 			"claude-tmux": {},
 		}},
 		escalateCLI: "codex-tmux", reportCLI: "codex-tmux",
-		capturedAt: time.Now().Add(-time.Hour), pattern: "rate_limit", // stale
+		capturedAt: time.Now().Add(-time.Hour), pattern: "rate_limit",
 	}
 	runPhase(t, root, eb)
 	if benches, _ := clihealth.NewStore(root, nil).Load(); len(benches) != 0 {
@@ -166,7 +164,7 @@ func TestRun_NonBenchablePatternDoesNotBench(t *testing.T) {
 			"claude-tmux": {},
 		}},
 		escalateCLI: "codex-tmux", reportCLI: "codex-tmux",
-		pattern: "trust_prompt", // fresh stamp; only the pattern rejects
+		pattern: "trust_prompt",
 	}
 	runPhase(t, root, eb)
 	if benches, _ := clihealth.NewStore(root, nil).Load(); len(benches) != 0 {
@@ -204,7 +202,6 @@ func TestRun_AllFamiliesBenchedNeverStrands(t *testing.T) {
 		BenchedAt: now, BenchedUntil: now.Add(time.Hour)})
 	_ = st.Bench(clihealth.Entry{Family: "claude", Reason: "rate_limit",
 		BenchedAt: now.Add(-time.Minute), BenchedUntil: now.Add(time.Hour)})
-	// claude was benched earlier, so it is tried first.
 	sb := &scriptedBridge{responses: map[string]scriptedResp{"claude-tmux": {}}}
 	runPhase(t, root, sb)
 	if len(sb.calls) == 0 {

@@ -52,7 +52,6 @@ func TestTokensReport_RanksPhasesByInputTokens(t *testing.T) {
 	if len(report.Phases) != 3 {
 		t.Fatalf("phases=%d want 3: %+v", len(report.Phases), report.Phases)
 	}
-	// build (10000) > audit (2000) > scout (500)
 	wantOrder := []string{"build", "audit", "scout"}
 	for i, want := range wantOrder {
 		if report.Phases[i].Phase != want {
@@ -100,10 +99,6 @@ func TestRunTokensReport_NoLogsErrors(t *testing.T) {
 	}
 }
 
-// writeTokensLLMCalls writes an llm-calls.ndjson fixture (one JSON object per
-// line) into the given cycle's run dir — the same on-disk shape
-// engine.recordTokenUsage emits. Each record is a map so a test sets only the
-// fields it asserts on.
 func writeTokensLLMCalls(t *testing.T, root, cycle string, records []map[string]any) {
 	t.Helper()
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-"+cycle)
@@ -124,7 +119,6 @@ func writeTokensLLMCalls(t *testing.T, root, cycle string, records []map[string]
 	}
 }
 
-// lineContaining returns the first line of text that contains needle, or "".
 func lineContaining(text, needle string) string {
 	for _, ln := range strings.Split(text, "\n") {
 		if strings.Contains(ln, needle) {
@@ -137,8 +131,6 @@ func lineContaining(text, needle string) string {
 func TestRunTokensReport_SurfacesTripwireInTextAndJSON(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// Cycle 5 is discovered via its phase-timing log; duration 90000 / exit 0
-	// deliberately carry no stray "5" digit so the cycle-number assertion is real.
 	writeTokensTimingFixture(t, root, "5", []phasetiming.Entry{
 		{Phase: "build", Verdict: "PASS", Tokens: cyclestate.TokenUsage{Input: 100, Output: 10}},
 	})

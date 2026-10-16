@@ -175,7 +175,7 @@ func TestFromSpec_RequireFailureContext(t *testing.T) {
 		t.Error("evaluate+verdict_on_pass+require_failure_context must set RequireFailureContext")
 	}
 	noVerdict := phasespec.PhaseSpec{
-		Name:     "notes", // no role: defaults to plan, which emits no verdicts
+		Name:     "notes",
 		Classify: &phasespec.ClassifyRules{RequireFailureContext: true},
 	}
 	if c := FromSpec(noVerdict); c.RequireFailureContext {

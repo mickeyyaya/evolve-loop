@@ -1,9 +1,5 @@
 package reflection
 
-// apicover_named_test.go — ADR-0050 Phase 5 public-API coverage: name and
-// exercise the exported reflection consts/types that no existing test names by
-// identifier. Each test asserts a REAL contract through a real consumer.
-
 import (
 	"strings"
 	"testing"
@@ -11,10 +7,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TestSchemaVersionV1_GatesValidation pins the const through its only
-// consumer, Validate(): a Reflection stamped SchemaVersionV1 passes the
-// version check; SchemaVersionV1+1 (an unrecognized future version) fails, so
-// producers and consumers upgrade in lockstep. Also pins the documented value.
 func TestSchemaVersionV1_GatesValidation(t *testing.T) {
 	t.Parallel()
 	if SchemaVersionV1 != 1 {
@@ -36,10 +28,6 @@ func TestSchemaVersionV1_GatesValidation(t *testing.T) {
 	}
 }
 
-// TestAggregatorConfidenceThreshold_StrictBoundary pins the const through its
-// consumer, AcceptedByAggregator(): confidence strictly GREATER than the
-// threshold is accepted; confidence EQUAL to it is rejected (the >, not >=,
-// boundary that mirrors reflection-schema-test.sh T2). Also pins value 0.5.
 func TestAggregatorConfidenceThreshold_StrictBoundary(t *testing.T) {
 	t.Parallel()
 	if AggregatorConfidenceThreshold != 0.5 {
@@ -55,12 +43,6 @@ func TestAggregatorConfidenceThreshold_StrictBoundary(t *testing.T) {
 	}
 }
 
-// TestFriction_FullStruct names Friction by full-struct construction and
-// asserts it round-trips as the FrictionReceivedFrom element it models: the
-// upstream phase, the issue, and the optional evidence pointer. The assertion
-// exercises real production serialization (yaml.Marshal/Unmarshal honoring the
-// struct's yaml tags): the <phase>-reflection.yaml sidecar these structs marshal
-// to is parsed by downstream consumers, so the yaml keys are the wire contract.
 func TestFriction_YAMLRoundTrip(t *testing.T) {
 	t.Parallel()
 	want := Friction{
@@ -90,9 +72,6 @@ func TestFriction_YAMLRoundTrip(t *testing.T) {
 	}
 }
 
-// TestImprovement_FullStruct names Improvement by full-struct construction and
-// asserts the suggested-improvement contract: action, target file, evidence
-// pointer, and a priority the validator accepts.
 func TestImprovement_FullStruct(t *testing.T) {
 	t.Parallel()
 	want := Improvement{
@@ -109,7 +88,6 @@ func TestImprovement_FullStruct(t *testing.T) {
 	if r.SuggestedImprovements[0] != want {
 		t.Fatalf("Improvement round-trip: got %+v, want %+v", r.SuggestedImprovements[0], want)
 	}
-	// A valid priority must let the whole Reflection pass validation.
 	if err := r.Validate(); err != nil {
 		t.Errorf("Reflection with a medium-priority Improvement must validate: %v", err)
 	}

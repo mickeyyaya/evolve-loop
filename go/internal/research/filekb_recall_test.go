@@ -8,12 +8,6 @@ import (
 	"testing"
 )
 
-// filekb_recall_test.go — the policy-resolved recall bound (cycle-1494,
-// `sleep-time-kb-consolidation`).
-
-// recallCorpus writes n all-matching lessons with descending confidence, so the
-// deterministic ranking has a stable, non-tied order a prefix assertion can
-// rely on.
 func recallCorpus(t *testing.T, n int) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -60,10 +54,6 @@ func lookupIDs(t *testing.T, kb KB) []string {
 	return out
 }
 
-// TestFileKB_ConfiguredRecallTakesRankingPrefix proves the bound is enforced by
-// the KB AND that narrowing is a strict PREFIX of the existing deterministic
-// ranking — the k highest-ranked lessons, not an arbitrary subset or a
-// re-ranking under a different bound.
 func TestFileKB_ConfiguredRecallTakesRankingPrefix(t *testing.T) {
 	dir := recallCorpus(t, 7)
 
@@ -83,9 +73,6 @@ func TestFileKB_ConfiguredRecallTakesRankingPrefix(t *testing.T) {
 	}
 }
 
-// TestFileKB_DefaultConstructorRecallUnchanged is the anti-regression half: the
-// existing constructor — the one every caller used before the knob existed —
-// must still return 5.
 func TestFileKB_DefaultConstructorRecallUnchanged(t *testing.T) {
 	dir := recallCorpus(t, 7)
 	if got := lookupIDs(t, NewFileKB([]string{dir})); len(got) != 5 {
@@ -93,9 +80,6 @@ func TestFileKB_DefaultConstructorRecallUnchanged(t *testing.T) {
 	}
 }
 
-// TestFileKB_NonPositiveRecallFallsBackToDefault pins the degradation an
-// operator typo must NOT be able to cause: a zero or negative recall silently
-// disabling the advisor's recall memory.
 func TestFileKB_NonPositiveRecallFallsBackToDefault(t *testing.T) {
 	dir := recallCorpus(t, 7)
 	for _, k := range []int{0, -1} {
@@ -105,8 +89,6 @@ func TestFileKB_NonPositiveRecallFallsBackToDefault(t *testing.T) {
 	}
 }
 
-// TestFileKB_RecallAboveCorpusSizeReturnsAll checks the upper edge: a bound
-// larger than the match count is not an error and does not pad the result.
 func TestFileKB_RecallAboveCorpusSizeReturnsAll(t *testing.T) {
 	dir := recallCorpus(t, 3)
 	if got := lookupIDs(t, NewFileKBWithRecall([]string{dir}, 25)); len(got) != 3 {
@@ -114,9 +96,6 @@ func TestFileKB_RecallAboveCorpusSizeReturnsAll(t *testing.T) {
 	}
 }
 
-// TestFileKB_ZeroValueRecallStillRecalls names the struct-literal path: a
-// FileKB built without a constructor has recall 0, which must mean "built-in",
-// never "none".
 func TestFileKB_ZeroValueRecallStillRecalls(t *testing.T) {
 	dir := recallCorpus(t, 7)
 	if got := lookupIDs(t, &FileKB{roots: []string{dir}}); len(got) != 5 {

@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
-// writeFleetPolicy writes .evolve-style policy.json with a fleet block into
-// dir and returns dir (the evolveDir the loaders take).
 func writeFleetPolicy(t *testing.T, dir, fleetJSON string) string {
 	t.Helper()
 	doc := `{"fleet":` + fleetJSON + `}`
@@ -31,7 +29,6 @@ func TestFleetDispatch_ReloadsMinLanesAtWaveBoundary(t *testing.T) {
 		t.Fatalf("fixture sanity: batch-start snapshot = count=%d min_lanes=%d, want 10/3", prev.Count, prev.MinLanes)
 	}
 
-	// Operator commits the width directive mid-batch.
 	writeFleetPolicy(t, dir, `{"count":10,"min_lanes":10,"plan_source":"triage"}`)
 
 	var warn bytes.Buffer

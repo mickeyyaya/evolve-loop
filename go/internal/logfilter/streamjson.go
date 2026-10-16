@@ -14,16 +14,9 @@ const (
 	toolUseInputBytes   = 200
 )
 
-// classifyJSON inspects one line. Returns (handled=true) when the line
-// is recognized as a stream-json envelope and writes its filtered form
-// into the second return. (handled=false) means the line is not JSON;
-// caller routes to the plain-text path.
-//
-// formatted="" with handled=true is legal — it means "drop this line".
 func classifyJSON(line []byte) (handled bool, formatted string) {
 	trimmed := strings.TrimSpace(string(line))
 	if trimmed == "" {
-		// Blank line — neither JSON nor signal; drop.
 		return true, ""
 	}
 	if trimmed[0] != '{' {
@@ -31,8 +24,6 @@ func classifyJSON(line []byte) (handled bool, formatted string) {
 	}
 	var probe envelope
 	if err := json.Unmarshal([]byte(trimmed), &probe); err != nil {
-		// Looks like JSON but won't parse — pass through to plain-text
-		// so we never silently lose a malformed line.
 		return false, ""
 	}
 	if probe.Type == "" {
@@ -41,7 +32,6 @@ func classifyJSON(line []byte) (handled bool, formatted string) {
 	return true, formatEvent(probe.Type, []byte(trimmed))
 }
 
-// envelope is the minimal probe used to route by .type.
 type envelope struct {
 	Type    string `json:"type"`
 	Subtype string `json:"subtype"`
@@ -50,7 +40,6 @@ type envelope struct {
 func formatEvent(eventType string, raw []byte) string {
 	switch eventType {
 	case "stream_event":
-		// Entirely redundant with the assembled assistant event.
 		return ""
 	case "system":
 		return formatSystem(raw)
@@ -63,12 +52,9 @@ func formatEvent(eventType string, raw []byte) string {
 	case "rate_limit_event":
 		return formatRateLimit(raw)
 	default:
-		// Unknown — keep raw line so we never silently drop signal.
 		return "[unknown:" + eventType + "] " + textutil.TruncateInline(string(raw), 500)
 	}
 }
-
-// ----- system events -----
 
 type systemEvent struct {
 	Subtype   string `json:"subtype"`
@@ -99,12 +85,9 @@ func formatSystem(raw []byte) string {
 	case "status":
 		return "[status] " + s.Status
 	default:
-		// Unknown system subtype — keep one compressed line.
 		return "[system:" + s.Subtype + "] " + textutil.TruncateInline(string(raw), 400)
 	}
 }
-
-// ----- assistant events -----
 
 type assistantEvent struct {
 	Message struct {
@@ -150,8 +133,6 @@ func formatAssistant(raw []byte) string {
 	return strings.Join(parts, "\n")
 }
 
-// ----- user / tool_result events -----
-
 type userEvent struct {
 	Message struct {
 		Content []userContent `json:"content"`
@@ -175,8 +156,6 @@ func formatUser(raw []byte) string {
 			parts = append(parts, "[user:"+c.Type+"]")
 			continue
 		}
-		// Content may be a JSON string or a nested array/object — render
-		// as string and truncate either way.
 		var asStr string
 		if err := json.Unmarshal(c.Content, &asStr); err != nil {
 			asStr = string(c.Content)
@@ -186,8 +165,6 @@ func formatUser(raw []byte) string {
 	}
 	return strings.Join(parts, "\n")
 }
-
-// ----- result + rate_limit -----
 
 type resultEvent struct {
 	Subtype      string  `json:"subtype"`
@@ -219,6 +196,5 @@ func formatResult(raw []byte) string {
 }
 
 func formatRateLimit(raw []byte) string {
-	// Keep one compact line — rate_limit events are tiny but useful.
 	return "[rate_limit] " + textutil.TruncateInline(string(raw), 400)
 }

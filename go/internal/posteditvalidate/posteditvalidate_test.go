@@ -14,13 +14,11 @@ func payload(filePath string) []byte {
 	return []byte(fmt.Sprintf(`{"tool_input":{"file_path":"%s"}}`, filePath))
 }
 
-// passingValidators are stub validators that always return OK.
 func passingValidators() (json, sh, py func(string) (bool, string)) {
 	ok := func(string) (bool, string) { return true, "" }
 	return ok, ok, ok
 }
 
-// === No payload → skip =====================================================
 func TestRun_NoPayload(t *testing.T) {
 	res := Run(Options{ProjectRoot: t.TempDir()})
 	if res.Kind != "skip" {
@@ -28,7 +26,6 @@ func TestRun_NoPayload(t *testing.T) {
 	}
 }
 
-// === Bypass env honored ===================================================
 func TestRun_Bypass(t *testing.T) {
 	res := Run(Options{
 		Payload:     payload("/tmp/whatever.json"),
@@ -40,7 +37,6 @@ func TestRun_Bypass(t *testing.T) {
 	}
 }
 
-// === No file_path in payload → skip ========================================
 func TestRun_NoFilePathInPayload(t *testing.T) {
 	res := Run(Options{
 		Payload:     []byte(`{"tool_input":{"other":"x"}}`),
@@ -51,7 +47,6 @@ func TestRun_NoFilePathInPayload(t *testing.T) {
 	}
 }
 
-// === File doesn't exist (deleted) → skip ===================================
 func TestRun_FileDoesNotExist(t *testing.T) {
 	res := Run(Options{
 		Payload:     payload("/tmp/this-file-definitely-does-not-exist-postedit.json"),
@@ -62,7 +57,6 @@ func TestRun_FileDoesNotExist(t *testing.T) {
 	}
 }
 
-// === Other extensions (.md, .txt) → noop ===================================
 func TestRun_OtherExtension(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "readme.md")
@@ -78,7 +72,6 @@ func TestRun_OtherExtension(t *testing.T) {
 	}
 }
 
-// === Valid JSON → OK, no WARN ===============================================
 func TestRun_ValidJSON(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "good.json")
@@ -101,7 +94,6 @@ func TestRun_ValidJSON(t *testing.T) {
 	}
 }
 
-// === Invalid JSON → WARN to LLM stderr =====================================
 func TestRun_InvalidJSON(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "bad.json")
@@ -127,7 +119,6 @@ func TestRun_InvalidJSON(t *testing.T) {
 	}
 }
 
-// === Bash syntax error → WARN ==============================================
 func TestRun_BashError(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "bad.sh")
@@ -153,7 +144,6 @@ func TestRun_BashError(t *testing.T) {
 	}
 }
 
-// === Python compile error → WARN ===========================================
 func TestRun_PyError(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "bad.py")
@@ -176,7 +166,6 @@ func TestRun_PyError(t *testing.T) {
 	}
 }
 
-// === Valid bash → OK, no WARN, OK logged ===================================
 func TestRun_ValidBash(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "good.sh")
@@ -208,7 +197,6 @@ func TestRun_ValidBash(t *testing.T) {
 	}
 }
 
-// === Valid python → OK, no WARN, OK logged =================================
 func TestRun_ValidPy(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "good.py")
@@ -238,7 +226,6 @@ func TestRun_ValidPy(t *testing.T) {
 	}
 }
 
-// === guards.log gets appended ==============================================
 func TestRun_AppendsGuardsLog(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "ok.json")
@@ -265,7 +252,6 @@ func TestRun_AppendsGuardsLog(t *testing.T) {
 	}
 }
 
-// === extractFilePath table =================================================
 func TestExtractFilePath(t *testing.T) {
 	cases := []struct {
 		name string
@@ -288,7 +274,6 @@ func TestExtractFilePath(t *testing.T) {
 	}
 }
 
-// === defaultValidators on real fixtures ====================================
 func TestDefaultValidateJSON_Fallback(t *testing.T) {
 	d := t.TempDir()
 	p := filepath.Join(d, "x.json")
@@ -327,7 +312,6 @@ func TestDefaultValidateBash(t *testing.T) {
 	}
 }
 
-// === cleanPyCache removes stamped pyc =====================================
 func TestCleanPyCache(t *testing.T) {
 	d := t.TempDir()
 	pyFile := filepath.Join(d, "mod.py")
@@ -335,7 +319,6 @@ func TestCleanPyCache(t *testing.T) {
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// Drop both a stamped pyc for mod.py and an unrelated one.
 	for _, name := range []string{
 		"mod.cpython-312.pyc",
 		"mod.cpython-311.pyc",
@@ -346,7 +329,6 @@ func TestCleanPyCache(t *testing.T) {
 		}
 	}
 	cleanPyCache(pyFile)
-	// mod.* should be gone, other.* should remain.
 	for _, gone := range []string{"mod.cpython-312.pyc", "mod.cpython-311.pyc"} {
 		if _, err := os.Stat(filepath.Join(cacheDir, gone)); err == nil {
 			t.Errorf("%s should have been removed", gone)
@@ -357,7 +339,6 @@ func TestCleanPyCache(t *testing.T) {
 	}
 }
 
-// === appendGuardsLog tolerates missing parent dir =========================
 func TestAppendGuardsLog_CreatesDir(t *testing.T) {
 	d := t.TempDir()
 	path := filepath.Join(d, "nested", "deeper", "guards.log")

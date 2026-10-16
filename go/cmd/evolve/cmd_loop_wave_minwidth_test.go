@@ -9,10 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// minWidthFakeLauncher records every Run call's specs so tests can assert
-// exactly one isolated lane was dispatched (or none, for the empty-backlog
-// case) — a locally-scoped fake (distinct name from fakeWaveLauncher in
-// cmd_loop_wave_test.go) to avoid touching existing test files.
 type minWidthFakeLauncher struct {
 	calls [][]fleet.CycleSpec
 }

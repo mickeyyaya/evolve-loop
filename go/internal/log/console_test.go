@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// Console is the unified human-facing logger that concentrates the codebase's
-// scattered fmt.Fprintf(os.Stderr/Stdout, ...) printers behind one injectable
-// seam. These tests pin the routing contract: Info -> Out, Warn/Error -> Err,
-// Quiet suppresses Info but never Warn/Error, and nil sinks are safe.
-
 func TestConsole_Warnf_WritesToErrNotOut(t *testing.T) {
 	t.Parallel()
 	var out, errb strings.Builder
@@ -63,7 +58,7 @@ func TestConsole_Errorf_WritesToErr(t *testing.T) {
 
 func TestConsole_NilSinks_NoPanic(t *testing.T) {
 	t.Parallel()
-	c := Console{} // nil Out/Err must be safe (no-op)
+	c := Console{}
 	c.Infof("x")
 	c.Warnf("y")
 	c.Errorf("z")
@@ -80,7 +75,6 @@ func TestDefault_WiresStdStreams(t *testing.T) {
 func TestDiag_SendsInfoToStderr(t *testing.T) {
 	t.Parallel()
 	c := Diag()
-	// Diag routes Info to stderr (not stdout) — the diagnostics convention.
 	if c.Out != os.Stderr || c.Err != os.Stderr {
 		t.Errorf("Diag() = {Out:%v Err:%v}, want both os.Stderr", c.Out, c.Err)
 	}
