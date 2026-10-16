@@ -6,71 +6,52 @@ import (
 	"slices"
 )
 
-// WorkflowPolicy is the .evolve/policy.json "workflow" block.
 type WorkflowPolicy struct {
-	MaxConsecutiveFails   int               `json:"max_consecutive_fails,omitempty"`
-	MaxCyclesCap          int               `json:"max_cycles_cap,omitempty"`
-	AutoPrune             *bool             `json:"auto_prune,omitempty"`
-	BackfillEnabled       *bool             `json:"backfill_enabled,omitempty"`
-	CycleBudget           string            `json:"cycle_budget,omitempty"`
-	AllowDocDelete        bool              `json:"allow_doc_delete,omitempty"`
-	DiffComplexityDisable bool              `json:"diff_complexity_disable,omitempty"`
-	AuditorTierOverride   string            `json:"auditor_tier_override,omitempty"`
-	PhaseEnables          map[string]string `json:"phase_enables,omitempty"`
-	ConsensusAuditEnabled *bool             `json:"consensus_audit_enabled,omitempty"`
-	// PSMASEnabled opts in to the Phase Scheduling and Management Advisor Subsystem.
-	PSMASEnabled *bool `json:"psmas_enabled,omitempty"`
-	// StrictAudit promotes a WARN audit verdict to FAIL in the audit phase and the
-	// ship audit-binding, and makes the failure-adapter block. False is the default.
-	StrictAudit bool `json:"strict_audit,omitempty"`
-	// CompactPrompts strips "## Reference Index (Layer 3, on-demand)" and everything
-	// after it from agent docs before dispatch; nil means on.
-	CompactPrompts    *bool `json:"compact_prompts,omitempty"`
-	UniversalFallback *bool `json:"universal_fallback,omitempty"`
-	// UniversalFallbackExclude: absent means ["agy"]; an explicit [] lifts the ban.
-	UniversalFallbackExclude []string `json:"universal_fallback_exclude,omitempty"`
-	RemediationRounds        *int     `json:"remediation_rounds,omitempty"`
-	// SizeBudgetMultipliers scale per-cycle budgets by cycle_size_estimate; each positive key overrides its default.
-	// See ADR-0076.
-	SizeBudgetMultipliers map[string]float64    `json:"size_budget_multipliers,omitempty"`
-	RemediablePhases      []string              `json:"remediable_phases,omitempty"`
-	BuildFloor            *bool                 `json:"build_floor,omitempty"`
-	InteractivePolicy     string                `json:"interactive_policy,omitempty"`
-	InteractivePolicies   map[string]string     `json:"interactive_policies,omitempty"`
-	FindingsRepair        *FindingsRepairPolicy `json:"findings_repair,omitempty"`
-	QualityIndex          *QualityIndexPolicy   `json:"quality_index,omitempty"`
-	Convergence           *ConvergencePolicy    `json:"convergence,omitempty"`
+	MaxConsecutiveFails      int                   `json:"max_consecutive_fails,omitempty"`
+	MaxCyclesCap             int                   `json:"max_cycles_cap,omitempty"`
+	AutoPrune                *bool                 `json:"auto_prune,omitempty"`
+	BackfillEnabled          *bool                 `json:"backfill_enabled,omitempty"`
+	CycleBudget              string                `json:"cycle_budget,omitempty"`
+	AllowDocDelete           bool                  `json:"allow_doc_delete,omitempty"`
+	DiffComplexityDisable    bool                  `json:"diff_complexity_disable,omitempty"`
+	AuditorTierOverride      string                `json:"auditor_tier_override,omitempty"`
+	PhaseEnables             map[string]string     `json:"phase_enables,omitempty"`
+	ConsensusAuditEnabled    *bool                 `json:"consensus_audit_enabled,omitempty"`
+	PSMASEnabled             *bool                 `json:"psmas_enabled,omitempty"`
+	StrictAudit              bool                  `json:"strict_audit,omitempty"`
+	CompactPrompts           *bool                 `json:"compact_prompts,omitempty"`
+	UniversalFallback        *bool                 `json:"universal_fallback,omitempty"`
+	UniversalFallbackExclude []string              `json:"universal_fallback_exclude,omitempty"`
+	RemediationRounds        *int                  `json:"remediation_rounds,omitempty"`
+	SizeBudgetMultipliers    map[string]float64    `json:"size_budget_multipliers,omitempty"`
+	RemediablePhases         []string              `json:"remediable_phases,omitempty"`
+	BuildFloor               *bool                 `json:"build_floor,omitempty"`
+	InteractivePolicy        string                `json:"interactive_policy,omitempty"`
+	InteractivePolicies      map[string]string     `json:"interactive_policies,omitempty"`
+	FindingsRepair           *FindingsRepairPolicy `json:"findings_repair,omitempty"`
+	QualityIndex             *QualityIndexPolicy   `json:"quality_index,omitempty"`
+	Convergence              *ConvergencePolicy    `json:"convergence,omitempty"`
 }
 
-// WorkflowConfig is the resolved workflow configuration with defaults applied.
 type WorkflowConfig struct {
-	MaxConsecutiveFails   int
-	MaxCyclesCap          int
-	AutoPrune             bool
-	BackfillEnabled       bool
-	CycleBudget           string
-	AllowDocDelete        bool
-	DiffComplexityDisable bool
-	AuditorTierOverride   string
-	PhaseEnables          map[string]string
-	ConsensusAuditEnabled bool
-	PSMASEnabled          bool
-	StrictAudit           bool
-	CompactPrompts        bool
-	// BuildFloorEnforced rejects the build deliverable while the changed packages'
-	// self-check fails; false makes the self-check advisory.
-	BuildFloorEnforced    bool
-	SizeBudgetMultipliers map[string]float64
-	// RemediationRounds is how many times a FAIL from a RemediablePhases gate
-	// re-dispatches the builder with that gate's report, then re-runs the gate; 0 disables.
-	RemediationRounds int
-	// RemediablePhases must list only deterministic gates, never judgment phases such as audit.
-	RemediablePhases []string
-	// UniversalFallback appends the installed, phase-allowed CLIs to a launch chain
-	// whose configured CLIs are all missing, instead of halting.
-	UniversalFallback bool
-	// UniversalFallbackExclude names families never used as the last-resort tail;
-	// they may still be a profile's configured primary.
+	MaxConsecutiveFails      int
+	MaxCyclesCap             int
+	AutoPrune                bool
+	BackfillEnabled          bool
+	CycleBudget              string
+	AllowDocDelete           bool
+	DiffComplexityDisable    bool
+	AuditorTierOverride      string
+	PhaseEnables             map[string]string
+	ConsensusAuditEnabled    bool
+	PSMASEnabled             bool
+	StrictAudit              bool
+	CompactPrompts           bool
+	BuildFloorEnforced       bool
+	SizeBudgetMultipliers    map[string]float64
+	RemediationRounds        int
+	RemediablePhases         []string
+	UniversalFallback        bool
 	UniversalFallbackExclude []string
 	InteractivePolicy        string
 	InteractivePolicies      map[string]string
@@ -78,12 +59,10 @@ type WorkflowConfig struct {
 	QualityIndex             QualityIndexConfig
 }
 
-// WorkflowConfig returns workflow configuration with built-in defaults resolved.
 func (p Policy) WorkflowConfig() WorkflowConfig {
 	c := WorkflowConfig{
-		MaxConsecutiveFails: 1,
-		MaxCyclesCap:        25,
-		// "enforce" lets the advisor choose the cycle count when --cycles is omitted, capped by MaxCyclesCap.
+		MaxConsecutiveFails:      1,
+		MaxCyclesCap:             25,
 		CycleBudget:              "enforce",
 		AutoPrune:                true,
 		BackfillEnabled:          true,
@@ -163,7 +142,6 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	return c
 }
 
-// StrictAuditFor loads projectRoot's policy and returns workflow.strict_audit, or false if the file is unreadable.
 func StrictAuditFor(projectRoot string) bool {
 	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if err != nil {
@@ -172,7 +150,6 @@ func StrictAuditFor(projectRoot string) bool {
 	return pol.WorkflowConfig().StrictAudit
 }
 
-// InteractivePolicyFor returns agent's interactive policy: per-agent, else global, else "recommended_or_first".
 func InteractivePolicyFor(projectRoot string, agent string) string {
 	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if err != nil {

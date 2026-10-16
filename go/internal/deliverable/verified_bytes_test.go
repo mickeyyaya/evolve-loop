@@ -27,7 +27,6 @@ func TestVerify_OKResultCarriesTheVerifiedBytes(t *testing.T) {
 	}
 }
 
-// Content survives a failed verify because a phase can derive a legitimate non-ship verdict from partial content.
 func TestVerify_MalformedResultStillCarriesTheBytes(t *testing.T) {
 	ws := t.TempDir()
 	const partial = "# Build Report\n\nno changes section here\nVerdict: PASS\n"

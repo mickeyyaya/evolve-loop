@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// fakeEscalator records Bump calls and answers OpenItemForPattern from a map.
 type fakeEscalator struct {
 	open  map[string]InboxItem
 	bumps []bumpCall
@@ -26,7 +25,6 @@ func (f *fakeEscalator) Bump(id string, w float64) error {
 	return nil
 }
 
-// fakeAutofiler counts Autofile calls.
 type fakeAutofiler struct {
 	calls []string
 }
@@ -36,13 +34,8 @@ func (f *fakeAutofiler) Autofile(pattern string, count int) error {
 	return nil
 }
 
-// TestLedger_ThreeSamePatternCountsThreeAndBumpsOnce (AC1): three same-pattern
-// retro closeouts yield ledger count=3 and exactly ONE deterministic weight
-// bump on the linked open inbox item — idempotent across a re-run of the same
-// cycle's closeout.
 func TestLedger_ThreeSamePatternCountsThreeAndBumpsOnce(t *testing.T) {
 	pat := "self-sha-tamper"
-	// Seed prior history (cycles 100, 200) so this cycle's close reaches count 3.
 	led := &Ledger{Entries: map[string]*Entry{
 		pat: {Pattern: pat, Cycles: []int{100, 200}, Count: 2, LastSeen: 200},
 	}}
@@ -51,7 +44,6 @@ func TestLedger_ThreeSamePatternCountsThreeAndBumpsOnce(t *testing.T) {
 	}}
 	pol := DefaultEscalationPolicy()
 
-	// Cycle 300's closeout runs three times (idempotent re-invocation).
 	for i := 0; i < 3; i++ {
 		if err := led.RecordClosure(pat, 300, esc, nil, pol); err != nil {
 			t.Fatalf("RecordClosure: %v", err)
@@ -64,34 +56,27 @@ func TestLedger_ThreeSamePatternCountsThreeAndBumpsOnce(t *testing.T) {
 	if len(esc.bumps) != 1 {
 		t.Fatalf("bumps = %d, want exactly 1 (idempotent per cycle)", len(esc.bumps))
 	}
-	// Target = min(0.99, 0.90 + 0.03*(3-1)) = 0.96.
 	if got := esc.bumps[0]; got.id != "self-sha-fix" || got.weight < 0.9599 || got.weight > 0.9601 {
 		t.Fatalf("bump = %+v, want {self-sha-fix 0.96}", got)
 	}
 }
 
-// TestLedger_CountGE2NoOpenItemAutofilesOnce (AC2): a pattern that reaches
-// count>=2 with NO open inbox item is handed to the autofile seam EXACTLY ONCE
-// while open — never zero, never twice.
 func TestLedger_CountGE2NoOpenItemAutofilesOnce(t *testing.T) {
 	pat := "orphan-recurrence"
 	led := NewLedger()
-	esc := &fakeEscalator{open: map[string]InboxItem{}} // no open item for pat
+	esc := &fakeEscalator{open: map[string]InboxItem{}}
 	af := &fakeAutofiler{}
 	pol := DefaultEscalationPolicy()
 
-	// count=1: below threshold, no autofile.
 	if err := led.RecordClosure(pat, 100, esc, af, pol); err != nil {
 		t.Fatal(err)
 	}
 	if len(af.calls) != 0 {
 		t.Fatalf("autofile at count=1: got %d, want 0", len(af.calls))
 	}
-	// count=2: threshold, autofile #1.
 	if err := led.RecordClosure(pat, 200, esc, af, pol); err != nil {
 		t.Fatal(err)
 	}
-	// count=3: still no open item, must NOT autofile again.
 	if err := led.RecordClosure(pat, 300, esc, af, pol); err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +88,6 @@ func TestLedger_CountGE2NoOpenItemAutofilesOnce(t *testing.T) {
 	}
 }
 
-// TestEscalationPolicy_TargetCapsAtCap pins the pure formula, including the cap.
 func TestEscalationPolicy_TargetCapsAtCap(t *testing.T) {
 	pol := DefaultEscalationPolicy()
 	if got := pol.Target(0.90, 3); got < 0.9599 || got > 0.9601 {
@@ -117,12 +101,9 @@ func TestEscalationPolicy_TargetCapsAtCap(t *testing.T) {
 	}
 }
 
-// TestLedger_LoadSaveRoundTrip exercises the persistence exports (Load/Save)
-// and Patterns' descending-count ordering.
 func TestLedger_LoadSaveRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "recurrence-ledger.json")
 
-	// Load of a missing file is an empty ledger, not an error.
 	empty, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load missing: %v", err)

@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// fooSpecLookup returns a lookup serving a single user phase "foo" whose
-// contract is derived from its spec (require_sections: ["Findings"]).
 func fooSpecLookup() func(string) (phasespec.PhaseSpec, bool) {
 	foo := phasespec.PhaseSpec{
 		Name:     "foo",

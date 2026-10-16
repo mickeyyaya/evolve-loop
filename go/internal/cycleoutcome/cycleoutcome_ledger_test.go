@@ -1,10 +1,5 @@
 package cycleoutcome
 
-// cycleoutcome_ledger_test.go — ADR-0101 S4a: the failure walk appends its
-// inbox-lifecycle lines through the ledger the caller injects (the root's
-// Signal-Center-observed one), never through a self-constructed FileLedger
-// over the same file (S4a architecture review HIGH-1).
-
 import (
 	"context"
 	"io"
@@ -15,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 )
 
-// recordingLifecycleLedger is the injected chained-append seam.
 type recordingLifecycleLedger struct{ records []ledger.LifecycleRecord }
 
 func (r *recordingLifecycleLedger) AppendLifecycle(_ context.Context, rec ledger.LifecycleRecord) error {

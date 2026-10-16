@@ -58,7 +58,7 @@ func TestLoad_ParsesMandatoryAndPins(t *testing.T) {
 }
 
 func TestLoad_ReadErrorNotMissing(t *testing.T) {
-	dir := t.TempDir() // exists, but os.ReadFile fails on a directory
+	dir := t.TempDir()
 	p, err := Load(dir)
 	if err == nil {
 		t.Fatalf("reading a directory as policy must error, got policy %+v", p)
@@ -208,7 +208,6 @@ func TestPolicy_QuotaResetConfig(t *testing.T) {
 }
 
 func TestPolicy_ConfigAccessors(t *testing.T) {
-	// The typed var declarations name each *Policy type for apicover.
 	var bridge BridgePolicy = (Policy{}).BridgeConfig()
 	if !reflect.DeepEqual(bridge, BridgePolicy{}) {
 		t.Errorf("absent Bridge must yield zero BridgePolicy, got %+v", bridge)

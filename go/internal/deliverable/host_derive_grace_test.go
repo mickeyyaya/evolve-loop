@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-// The agent's final write is not atomic with the host's read after it: the derivation waits out a write in
-// flight, as the gate does, so a decision the agent is landing is never replaced by a derived one.
 func TestHostEffects_WaitsOutTheAgentsWriteInFlight(t *testing.T) {
 	const written = `{"top_n":[{"id":"chosen-by-the-agent"}]}`
 	in := triageInput(t, "/project", "", "")
@@ -31,7 +29,6 @@ func TestHostEffects_WaitsOutTheAgentsWriteInFlight(t *testing.T) {
 	}
 }
 
-// A decision that is present but cannot be read is not absent: the host declines rather than overwrite it.
 func TestHostEffects_DeclinesWhenTheDecisionIsPresentButUnreadable(t *testing.T) {
 	in := triageInput(t, "/project", "", "")
 	writeFile(t, in.Workspace, "triage-report.md", triageReport)

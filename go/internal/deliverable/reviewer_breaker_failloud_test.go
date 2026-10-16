@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// captureStderr swaps the process-global os.Stderr, so its callers must not run in parallel.
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
@@ -27,7 +26,6 @@ func captureStderr(t *testing.T, fn func()) string {
 	return string(buf[:n])
 }
 
-// A missing parent directory makes os.WriteFile fail deterministically on every platform.
 func TestBreakerWriteFailureLogged(t *testing.T) {
 	badPath := filepath.Join(t.TempDir(), "nonexistent-subdir", "breaker.json")
 

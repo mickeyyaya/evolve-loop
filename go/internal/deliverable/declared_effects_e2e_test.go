@@ -18,7 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// triageOnly scopes the real reviewer to triage; the stub phases write no artifacts.
 type triageOnly struct{ inner core.DeliverableReviewer }
 
 func (r triageOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewResult {
@@ -30,7 +29,6 @@ func (r triageOnly) Review(ctx context.Context, in core.ReviewInput) core.Review
 
 const pendingItemFile = "2026-09-12T00-00-00Z-x.json"
 
-// seedPendingItem drops inbox item "x" at the plane's inbox root.
 func seedPendingItem(t *testing.T, root string) {
 	t.Helper()
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -42,8 +40,6 @@ func seedPendingItem(t *testing.T, root string) {
 	}
 }
 
-// effectRunners' triage commits to "x" on every call and claims it through inboxmover.Claim from attempt claimFrom
-// (0 = never); commit=false writes an explicit empty commitment instead.
 func effectRunners(t *testing.T, claimFrom int, commit bool) (map[core.Phase]core.PhaseRunner, *stubPhase) {
 	t.Helper()
 	triage := &stubPhase{name: string(core.PhaseTriage)}
@@ -63,13 +59,11 @@ func effectRunners(t *testing.T, claimFrom int, commit bool) (map[core.Phase]cor
 			}
 		}
 		if claimFrom > 0 && n >= claimFrom {
-			// The production writer, so the proof holds only if the gate reads where the claim really lands.
 			if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: req.ProjectRoot, Stderr: io.Discard}, "x", strconv.Itoa(req.Cycle)); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
-	// The build floor needs a contract-valid build-report.md for the corrected cycle to reach ship.
 	build := &stubPhase{name: string(core.PhaseBuild)}
 	build.onRun = func(_ int, req core.PhaseRequest) {
 		report := contractValidBuildReport
@@ -87,7 +81,6 @@ func effectRunners(t *testing.T, claimFrom int, commit bool) (map[core.Phase]cor
 	return runners, triage
 }
 
-// effectCatalog is the registry's triage declaration in miniature, so the proof does not depend on the checked-in registry.
 func effectCatalog(t *testing.T) phasespec.Catalog {
 	t.Helper()
 	cat, warnings := (phasespec.Catalog{}).Merge([]phasespec.PhaseSpec{{
@@ -112,7 +105,7 @@ func effectOrchestrator(t *testing.T, root string, runners map[core.Phase]core.P
 	}
 	cat := effectCatalog(t)
 	reviewer := NewReviewerWithCatalog(config.StageEnforce, cat).(*Reviewer)
-	reviewer.threshold = 99 // the breaker is not what this proof is about
+	reviewer.threshold = 99
 	reviewer.breakerPath = filepath.Join(t.TempDir(), "breaker.json")
 	return core.NewOrchestrator(storage.New(evolveDir), ledger.New(evolveDir), runners, append([]core.Option{core.WithCatalog(cat), core.WithReviewer(triageOnly{reviewer})}, opts...)...)
 }
@@ -128,7 +121,7 @@ func TestDeclaredEffects_HostClaim(t *testing.T) {
 	t.Run("an unclaimed commitment is claimed by the host: zero corrections", func(t *testing.T) {
 		root := gitRepoWithOneCommit(t)
 		seedPendingItem(t, root)
-		runners, triage := effectRunners(t, 0, true) // the agent never claims
+		runners, triage := effectRunners(t, 0, true)
 		o := effectOrchestrator(t, root, runners, hostEffects(t))
 
 		if _, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true}); err != nil {
@@ -191,7 +184,7 @@ func TestDeclaredEffects_CommittedItemNotClaimed_IsCorrectedThenFails(t *testing
 func TestDeclaredEffects_ClaimedCommitment_IsAccepted(t *testing.T) {
 	root := gitRepoWithOneCommit(t)
 	seedPendingItem(t, root)
-	runners, triage := effectRunners(t, 2, true) // the correction round claims it
+	runners, triage := effectRunners(t, 2, true)
 	o := effectOrchestrator(t, root, runners)
 
 	if _, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true}); err != nil {
@@ -205,11 +198,10 @@ func TestDeclaredEffects_ClaimedCommitment_IsAccepted(t *testing.T) {
 	}
 }
 
-// An empty commitment owes no claim; beside a still-claimable item triage stops as claim-failed, not as no-work.
 func TestDeclaredEffects_EmptyCommitment_OwesNoClaim(t *testing.T) {
 	t.Run("claimable item left alone: no claim owed, stopped as claim-failed", func(t *testing.T) {
 		root := gitRepoWithOneCommit(t)
-		seedPendingItem(t, root) // pending and claimable
+		seedPendingItem(t, root)
 		runners, triage := effectRunners(t, 0, false)
 		o := effectOrchestrator(t, root, runners)
 

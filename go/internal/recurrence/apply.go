@@ -1,26 +1,5 @@
 package recurrence
 
-// apply.go — S4 of the failure-disposition-router design (subsumes
-// chronicle-s6-escalation-boundary): the BOUNDARY APPLIER that consumes the
-// intents S3 (internal/dispositionrouter) staged and is the only writer allowed
-// to mutate .evolve/inbox/ on the recurrence path.
-//
-// Why a separate boundary pass exists at all: staging happens mid-cycle, while
-// fleet lanes are in flight. An inbox write at that moment races
-// inboxmover.Claim's os.Rename and resurrects a claimed item into double work
-// across lanes. ApplyBoundary therefore runs at the loop's per-iteration
-// boundary (cmd_loop.go, after dispatchIteration returns with no lane running)
-// and holds the inbox lock for the whole read-modify-write.
-//
-// Four safety properties, each pinned by a predicate in go/acs/cycle1062:
-//   - idempotent per cycle (a stamp file, so a re-run never double-escalates);
-//   - never LOWERS a weight (an already-hot item is left alone);
-//   - CLAIMED items (under inbox/processing/) are skipped, never resurrected;
-//   - shadow stage writes the report artifact and mutates nothing.
-//
-// The autofile path goes through internal/retrofile — the existing (until now
-// caller-less) inbox filer — rather than a second hand-rolled writer.
-
 import (
 	"encoding/json"
 	"errors"
@@ -37,33 +16,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/retrofile"
 )
 
-// appliedStampFile is the per-cycle idempotency stamp's basename, written
-// beside the staging file so one escalations dir carries its own history.
 const appliedStampFile = "applied-stamp.json"
 
-// ApplyOptions is the boundary applier's injected configuration. Every path is
-// caller-supplied so tests (and fleet lanes) stay off the live tree, and Now is
-// injected so filed items are byte-stable.
 type ApplyOptions struct {
-	// InboxDir is the .evolve/inbox root: open items at the top level, claimed
-	// items under processing/cycle-<N>/.
-	InboxDir string
-	// EscalationsPath is the staged pending-actions.jsonl file S3 appends to.
+	InboxDir        string
 	EscalationsPath string
-	// ReportPath receives the JSON apply report (written in every stage).
-	ReportPath string
-	// Cycle is the loop iteration this pass belongs to (the idempotency key).
-	Cycle int
-	// Shadow selects report-only mode: plan everything, mutate nothing.
-	Shadow bool
-	// Policy is the injected count->weight formula (never a Go literal here).
-	Policy EscalationPolicy
-	// Now stamps filed items.
-	Now time.Time
+	ReportPath      string
+	Cycle           int
+	Shadow          bool
+	Policy          EscalationPolicy
+	Now             time.Time
 }
 
-// ApplyResult reports what the pass did, by inbox item id. In shadow the three
-// action lists are empty and Planned carries what an enforce pass would do.
 type ApplyResult struct {
 	Bumped  []string `json:"bumped"`
 	Filed   []string `json:"filed"`
@@ -74,10 +38,6 @@ type ApplyResult struct {
 	Cycle   int      `json:"cycle"`
 }
 
-// ApplyBoundary consumes the staged intents and applies them to the inbox,
-// then writes the report to opts.ReportPath. An absent staging file is not an
-// error (nothing was staged — the common case); the report is still written so
-// the artifact's presence never depends on there being work.
 func ApplyBoundary(opts ApplyOptions) (ApplyResult, error) {
 	res := ApplyResult{Shadow: opts.Shadow, Cycle: opts.Cycle}
 	intents, err := dispositionrouter.LoadIntents(opts.EscalationsPath)
@@ -100,12 +60,8 @@ func ApplyBoundary(opts ApplyOptions) (ApplyResult, error) {
 		}
 		for _, in := range intents {
 			key := stampKey(in)
-			// Presence-checked: a missing key reads as the map zero value, and
-			// fleet boundaries pass the 0-based pool iteration as Cycle — a bare
-			// `stamp[key] == opts.Cycle` silently skipped every never-applied
-			// intent on iteration 0 (2026-08-10 enforce-flip swallow).
 			if prev, ok := stamp[key]; ok && prev == opts.Cycle {
-				continue // already applied this cycle — the idempotency guard
+				continue
 			}
 			applied, aerr := applyIntent(opts, in, &res)
 			if aerr != nil {
@@ -123,9 +79,6 @@ func ApplyBoundary(opts ApplyOptions) (ApplyResult, error) {
 	return res, writeApplyReport(opts.ReportPath, res)
 }
 
-// applyIntent applies one intent, appending its id to the matching result list.
-// It reports whether the intent consumed its per-cycle stamp slot (a skip that
-// can never succeed later — a claimed or absent item — does not).
 func applyIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResult) (bool, error) {
 	id := intentID(in)
 	switch in.Action {
@@ -135,13 +88,11 @@ func applyIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResul
 	case dispositionrouter.ActionEscalate:
 		path, weight, state := findItem(opts.InboxDir, id)
 		if state != itemOpen {
-			// Claimed (in flight in another lane) or absent: never touch it.
 			res.Skipped = append(res.Skipped, id)
 			return false, nil
 		}
 		target := opts.Policy.Target(in.Weight, in.Recurrence)
 		if target <= weight {
-			// Escalation never lowers a weight.
 			res.Skipped = append(res.Skipped, id)
 			return true, nil
 		}
@@ -182,7 +133,6 @@ func autofileIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyRe
 	return true, nil
 }
 
-// itemState distinguishes a dispatchable item from one a lane already claimed.
 type itemState int
 
 const (
@@ -191,9 +141,6 @@ const (
 	itemClaimed
 )
 
-// findItem locates the inbox item carrying id anywhere under inboxDir and
-// reports its path, current weight and state. An item under processing/ has
-// been claimed by a fleet lane (inboxmover.Claim) and is off-limits.
 func findItem(inboxDir, id string) (path string, weight float64, state itemState) {
 	_ = filepath.Walk(inboxDir, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || filepath.Ext(p) != ".json" || state != itemAbsent {
@@ -222,8 +169,6 @@ func findItem(inboxDir, id string) (path string, weight float64, state itemState
 	return path, weight, state
 }
 
-// setItemWeight rewrites just the "weight" field of the inbox item at path,
-// preserving every other field the item carries.
 func setItemWeight(path string, weight float64) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -237,8 +182,6 @@ func setItemWeight(path string, weight float64) error {
 	return atomicwrite.JSON(path, item)
 }
 
-// intentID is the inbox id an intent addresses, falling back to its pattern
-// when the router staged no explicit item id.
 func intentID(in dispositionrouter.Intent) string {
 	if in.ItemID != "" {
 		return in.ItemID
@@ -246,12 +189,10 @@ func intentID(in dispositionrouter.Intent) string {
 	return in.Pattern
 }
 
-// stampKey identifies one intent for the per-cycle idempotency stamp.
 func stampKey(in dispositionrouter.Intent) string {
 	return in.Action + "|" + intentID(in)
 }
 
-// loadStamp reads the applied-intent stamp map (missing file ⇒ empty map).
 func loadStamp(path string) (map[string]int, error) {
 	out := map[string]int{}
 	raw, err := os.ReadFile(path)
@@ -270,7 +211,6 @@ func loadStamp(path string) (map[string]int, error) {
 	return out, nil
 }
 
-// saveStamp persists the applied-intent stamp map atomically.
 func saveStamp(path string, stamp map[string]int) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("recurrence: create stamp dir: %w", err)
@@ -278,7 +218,6 @@ func saveStamp(path string, stamp map[string]int) error {
 	return atomicwrite.JSON(path, stamp)
 }
 
-// writeApplyReport persists the pass's report (skipped when no path is set).
 func writeApplyReport(path string, res ApplyResult) error {
 	if path == "" {
 		return nil

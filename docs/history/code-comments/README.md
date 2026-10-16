@@ -524,7 +524,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/core` | 943 | [internal-core.md](internal-core.md) |
 | `internal/cycleclassify` | 16 | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/cyclehealth` | 11 | [internal-cyclehealth.md](internal-cyclehealth.md) |
-| `internal/cycleoutcome` | 1 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
+| `internal/cycleoutcome` | 25 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/cyclestate` | 24 | [internal-cyclestate.md](internal-cyclestate.md) |
 | `internal/dashboard` | 8 | [internal-dashboard.md](internal-dashboard.md) |
 | `internal/deliverable/gatesignal` | 2 | [internal-deliverable-gatesignal.md](internal-deliverable-gatesignal.md) |
@@ -552,7 +552,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/looppreflight` | 28 | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/loopwave` | 15 | [internal-loopwave.md](internal-loopwave.md) |
 | `internal/modelcatalog` | 2 | [internal-modelcatalog.md](internal-modelcatalog.md) |
-| `internal/modelquery` | 10 | [internal-modelquery.md](internal-modelquery.md) |
+| `internal/modelquery` | 11 | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/observerengine` | 10 | [internal-observerengine.md](internal-observerengine.md) |
 | `internal/phasecoherence` | 25 | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/phasecontract` | 62 | [internal-phasecontract.md](internal-phasecontract.md) |
@@ -581,6 +581,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/quotastate` | 1 | [internal-quotastate.md](internal-quotastate.md) |
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/recovery` | 39 | [internal-recovery.md](internal-recovery.md) |
+| `internal/recurrence` | 12 | [internal-recurrence.md](internal-recurrence.md) |
 | `internal/regressiontia` | 5 | [internal-regressiontia.md](internal-regressiontia.md) |
 | `internal/releasepipeline` | 25 | [internal-releasepipeline.md](internal-releasepipeline.md) |
 | `internal/releasepreflight` | 14 | [internal-releasepreflight.md](internal-releasepreflight.md) |

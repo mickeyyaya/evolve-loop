@@ -5,39 +5,29 @@ package policy
 
 import "github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 
-// Pin is a hard per-phase dispatch pin; an empty field leaves that dimension unpinned.
 type Pin struct {
 	CLI   string `json:"cli,omitempty"`
 	Model string `json:"model,omitempty"`
 }
 
-// FloorGate is one entry of the `floor` closeout-gate array, such as "dossier-closeout".
-// See ADR-0055.
 type FloorGate struct {
 	ID                 string `json:"id"`
 	Description        string `json:"description,omitempty"`
 	EnforcedSinceCycle int    `json:"enforced_since_cycle,omitempty"`
 }
 
-// Policy is the user-controlled rule set from .evolve/policy.json; a nil block means compiled defaults.
 type Policy struct {
-	// MandatoryPhases can only add to the mandatory set; the integrity floor still applies on top.
-	MandatoryPhases []string             `json:"mandatory_phases,omitempty"`
-	Pins            map[string]Pin       `json:"pins,omitempty"`
-	CLIRouting      *CLIRouting          `json:"cli_routing,omitempty"`
-	InboxPriority   *InboxPriorityPolicy `json:"inbox_priority,omitempty"`
-	// ShipFloor lists the phases a shipping plan must run; empty means the router's default, and FloorPhases always adds "audit".
-	ShipFloor []string `json:"ship_floor,omitempty"`
-	// Floor lists closeout gates, not phases (contrast ShipFloor).
-	Floor []FloorGate `json:"floor,omitempty"`
-	// FailureFloor tunes only the LLM-learning layer; the deterministic failure floor is not configurable.
-	FailureFloor *FailureFloor `json:"failure_floor,omitempty"`
-	// SystemFailurePolicy is the failure decision table, distinct from FailureFloor.
+	MandatoryPhases     []string             `json:"mandatory_phases,omitempty"`
+	Pins                map[string]Pin       `json:"pins,omitempty"`
+	CLIRouting          *CLIRouting          `json:"cli_routing,omitempty"`
+	InboxPriority       *InboxPriorityPolicy `json:"inbox_priority,omitempty"`
+	ShipFloor           []string             `json:"ship_floor,omitempty"`
+	Floor               []FloorGate          `json:"floor,omitempty"`
+	FailureFloor        *FailureFloor        `json:"failure_floor,omitempty"`
 	SystemFailurePolicy *SystemFailurePolicy `json:"failure_policy,omitempty"`
-	// GC cannot relax the hard retention rules: quarantine is manual-only, and the ledger and live runs are never touched.
-	GC       *gcpolicy.Policy `json:"gc,omitempty"`
-	Fanout   *FanoutPolicy    `json:"fanout,omitempty"`
-	Observer *ObserverPolicy  `json:"observer,omitempty"`
+	GC                  *gcpolicy.Policy     `json:"gc,omitempty"`
+	Fanout              *FanoutPolicy        `json:"fanout,omitempty"`
+	Observer            *ObserverPolicy      `json:"observer,omitempty"`
 
 	Boot               *BootPolicy               `json:"boot,omitempty"`
 	CIWatch            *CIWatchPolicy            `json:"ci_watch,omitempty"`
@@ -78,8 +68,7 @@ type Policy struct {
 	Chain              *ChainPolicy              `json:"chain,omitempty"`
 	GoalStall          *GoalStallPolicy          `json:"goal_stall,omitempty"`
 	ObservationMask    *ObservationMaskPolicy    `json:"observation_mask,omitempty"`
-	// Overlays: nil applies the compiled default; a block with empty Rules opts out of all overlays.
-	Overlays          *OverlaysPolicy          `json:"overlays,omitempty"`
-	Wave              *WavePolicy              `json:"wave,omitempty"`
-	AttemptPostmortem *AttemptPostmortemPolicy `json:"attempt_postmortem,omitempty"`
+	Overlays           *OverlaysPolicy           `json:"overlays,omitempty"`
+	Wave               *WavePolicy               `json:"wave,omitempty"`
+	AttemptPostmortem  *AttemptPostmortemPolicy  `json:"attempt_postmortem,omitempty"`
 }

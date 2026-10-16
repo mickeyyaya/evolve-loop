@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// buildSpecWithHandoff is the registry's build declaration in miniature: two files, the second owed by the agent.
 func buildSpecWithHandoff() phasespec.PhaseSpec {
 	return phasespec.PhaseSpec{
 		Name: "build", Role: "build",
@@ -35,8 +34,8 @@ const validBuildReport = "# Build Report\n\n## Changes\n- foo.go\n\n## Handoff S
 func TestVerify_AgentOwedSecondary(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
-		handoff  *string // nil = absent
-		wantCode string  // "" = OK
+		handoff  *string
+		wantCode string
 	}{
 		{"absent", nil, CodeMissingSecondary},
 		{"empty", strPtr(""), CodeEmptySecondary},
@@ -135,7 +134,6 @@ func TestReviewer_VerifiesDeclaredDeliverables(t *testing.T) {
 	}
 }
 
-// A directory where the file should be is a non-absence read fault.
 func TestVerify_UnreadableSecondaryIsAmbiguity(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "build-report.md", validBuildReport)

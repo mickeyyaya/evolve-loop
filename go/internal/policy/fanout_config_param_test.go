@@ -107,7 +107,6 @@ func TestFanoutConfig_WiringToDispatch(t *testing.T) {
 		ConsensusPollSecs: fc.ConsensusPollSecs,
 		TrackWorkers:      derefBool(t, "TrackWorkers", fc.TrackWorkers),
 	}
-	// fanoutdispatch.Config has a func field (Now), so it cannot be compared with ==.
 	if cfg.Concurrency != 2 || cfg.TimeoutSecs != 0 || cfg.CancelOnConsensus ||
 		cfg.ConsensusK != 0 || cfg.ConsensusPollSecs != 0 || !cfg.TrackWorkers {
 		t.Errorf("wired fanoutdispatch.Config = %+v, want default-resolved {Concurrency:2, TrackWorkers:true, rest zero}", cfg)

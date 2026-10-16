@@ -15,7 +15,7 @@ func TestBaseCLI_StripsKnownDriverSuffixes(t *testing.T) {
 		{"claude", "claude"},
 		{"", ""},
 		{"  claude-tmux  ", "claude"},
-		{"codex-tmux-p", "codex"}, // never occurs in practice; pins the repeated strip
+		{"codex-tmux-p", "codex"},
 	}
 	for _, tc := range cases {
 		if got := BaseCLI(tc.in); got != tc.want {

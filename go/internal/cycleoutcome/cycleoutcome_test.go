@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 )
 
-// seedProject writes an inbox item plus the cycle workspace's
-// triage-decision.json and returns (projectRoot, inboxDir, workspace).
 func seedProject(t *testing.T, id string, committed []string) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -62,10 +60,6 @@ func hasItem(t *testing.T, dir, id string) bool {
 	return false
 }
 
-// TestApplyFailureQuarantinesAtCeiling proves the seam reaches the durable
-// lifecycle: at Ceiling 1 the committed id is parked in quarantine/ and gone
-// from the inbox root. This is the transition the wave path could not reach at
-// all before the seam existed.
 func TestApplyFailureQuarantinesAtCeiling(t *testing.T) {
 	root, inbox, ws := seedProject(t, "poison", []string{"poison"})
 
@@ -91,8 +85,6 @@ func TestApplyFailureQuarantinesAtCeiling(t *testing.T) {
 	}
 }
 
-// TestApplyFailureSystemLevelDoesNotQuarantine pins ADR-0072 AC4: a pipeline
-// failure releases the committed id but must never walk it toward the ceiling.
 func TestApplyFailureSystemLevelDoesNotQuarantine(t *testing.T) {
 	root, inbox, ws := seedProject(t, "healthy", []string{"healthy"})
 
@@ -114,8 +106,6 @@ func TestApplyFailureSystemLevelDoesNotQuarantine(t *testing.T) {
 	}
 }
 
-// TestCommittedIDsForReadsTopN covers the workspace reader, including the
-// absent-decision case that must yield nil rather than an error.
 func TestCommittedIDsForReadsTopN(t *testing.T) {
 	_, _, ws := seedProject(t, "a", []string{"a", "b"})
 
@@ -128,7 +118,6 @@ func TestCommittedIDsForReadsTopN(t *testing.T) {
 	}
 }
 
-// TestIsTaskLevelFailure pins the blame rule both call sites depend on.
 func TestIsTaskLevelFailure(t *testing.T) {
 	for _, tc := range []struct {
 		c    cycleclassify.Classification
@@ -146,9 +135,6 @@ func TestIsTaskLevelFailure(t *testing.T) {
 	}
 }
 
-// TestFailureInputsForDerivesCeilingAndBlame proves the derivation helper wires
-// a real ceiling and flips SystemLevel off for a task-level classification —
-// without it each call site would re-derive (and could re-derive differently).
 func TestFailureInputsForDerivesCeilingAndBlame(t *testing.T) {
 	root, _, ws := seedProject(t, "a", []string{"a"})
 	evolveDir := filepath.Join(root, ".evolve")

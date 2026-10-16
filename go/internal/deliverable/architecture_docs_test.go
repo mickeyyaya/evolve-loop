@@ -7,10 +7,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// archFloorBuildReport passes every other build contract check, so any !OK below is the docs floor's.
 const archFloorBuildReport = "# Build Report\n\n## Changes\n- go/internal/policy/policy.go\n\nVerdict: PASS\n"
 
-// adrPath is a changed-path set element that satisfies the floor.
 const adrPath = "docs/architecture/adr/0077-fleet-landing-prefix-queue.md"
 
 func TestArchitectureDocs_CodeConstantIsStable(t *testing.T) {

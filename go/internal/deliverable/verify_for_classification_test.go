@@ -22,7 +22,7 @@ func TestVerifyForClassification_SalvagesPersistsAndReportsOnce(t *testing.T) {
 	var events []signalcenter.Event
 	c.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
 	r := newTestReviewer(config.StageEnforce, filepath.Join(t.TempDir(), "breaker.json"), 3)
-	r.phaseIO = config.StageEnforce // production: the prose fallback is gated off, the sentinel is the sole verdict source
+	r.phaseIO = config.StageEnforce
 	WithSignals(c)(r)
 	in := core.ReviewInput{Phase: "audit", Workspace: ws, ProjectRoot: root, Cycle: 1685, RunID: "r1685"}
 	check := gatesignal.Check{Cycle: 1685, RunID: "r1685", Phase: "audit"}
@@ -83,7 +83,6 @@ func TestVerifyForClassification_BaselineIsRecordedOncePerBlock(t *testing.T) {
 		}
 		return len(strings.Split(strings.TrimSpace(string(b)), "\n"))
 	}
-	// salvageable: recorded once by the engine path; Review then sees a clean file
 	fenced := "# Audit Report\n\n## Verdict\n**PASS**\n\n## Issues\nnone\n\n```json\n{\"verdict\": \"PASS\"}\n```\n"
 	ws, root := writeAuditReport(t, fenced)
 	r := newTestReviewer(config.StageEnforce, filepath.Join(t.TempDir(), "breaker.json"), 3)
@@ -96,7 +95,6 @@ func TestVerifyForClassification_BaselineIsRecordedOncePerBlock(t *testing.T) {
 	if got := rows(root); got != 1 {
 		t.Fatalf("a salvaged block leaves exactly one baseline row, got %d", got)
 	}
-	// unrecoverable (two candidates): the engine path records nothing however often settle re-probes; Review records once
 	two := fenced + "\n```json\n{\"verdict\": \"FAIL\"}\n```\n"
 	ws2, root2 := writeAuditReport(t, two)
 	r2 := newTestReviewer(config.StageEnforce, filepath.Join(t.TempDir(), "breaker.json"), 3)

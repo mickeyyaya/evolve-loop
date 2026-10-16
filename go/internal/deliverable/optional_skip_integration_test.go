@@ -80,8 +80,6 @@ func TestOptionalSkip_RealDeliverableGateFreshAndResume(t *testing.T) {
 					cfg.Mandatory = append(cfg.Mandatory, string(optionalPhase))
 				}
 				reviewer := NewReviewerWithCatalog(config.StageEnforce, cat).(*Reviewer)
-				// Keep the independent circuit-breaker policy out of this
-				// admission test: every allowed correction remains enforced.
 				reviewer.threshold = 99
 				o := core.NewOrchestrator(store, log, runners, core.WithCatalog(cat),
 					core.WithRouting(cfg, router.StaticPreset{}), core.WithPlanner(optionalPlanner{}),

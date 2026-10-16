@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// buildOnly scopes the real reviewer to build; the stub phases write no artifacts.
 type buildOnly struct{ inner core.DeliverableReviewer }
 
 func (b buildOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewResult {
@@ -29,13 +28,10 @@ func (b buildOnly) Review(ctx context.Context, in core.ReviewInput) core.ReviewR
 
 const contractValidBuildReport = "# Build Report\n\n## Changes\nnone\n\n## Handoff Summary\n- nothing to hand off\n\n## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: no material change in this fixture cycle\n"
 
-// declaredRunners builds a spine whose builder writes the report on every call
-// and the handoff only from attempt `handoffFrom` (0 = never).
 func declaredRunners(t *testing.T, handoffFrom int) (map[core.Phase]core.PhaseRunner, *stubPhase) {
 	t.Helper()
 	build := &stubPhase{name: string(core.PhaseBuild)}
 	build.onRun = func(n int, req core.PhaseRequest) {
-		// Echo the minted challenge token, or the fixture would be rejected for the wrong reason.
 		report := contractValidBuildReport
 		if tok, err := os.ReadFile(filepath.Join(req.Workspace, "challenge-token.txt")); err == nil {
 			report = "<!-- challenge-token: " + strings.TrimSpace(string(tok)) + " -->\n" + report
@@ -56,7 +52,6 @@ func declaredRunners(t *testing.T, handoffFrom int) (map[core.Phase]core.PhaseRu
 	return runners, build
 }
 
-// fixtureCatalog declares an owed secondary for build alone, so the proof does not depend on the checked-in registry.
 func fixtureCatalog(t *testing.T) phasespec.Catalog {
 	t.Helper()
 	cat, warnings := (phasespec.Catalog{}).Merge([]phasespec.PhaseSpec{{
@@ -80,7 +75,7 @@ func declaredOrchestrator(t *testing.T, root string, runners map[core.Phase]core
 	}
 	cat := fixtureCatalog(t)
 	reviewer := NewReviewerWithCatalog(config.StageEnforce, cat).(*Reviewer)
-	reviewer.threshold = 99 // the breaker is not what this proof is about
+	reviewer.threshold = 99
 	reviewer.breakerPath = filepath.Join(t.TempDir(), "breaker.json")
 	store := storage.New(evolveDir)
 	return core.NewOrchestrator(store, ledger.New(evolveDir), runners, core.WithCatalog(cat), core.WithReviewer(buildOnly{reviewer})), store
@@ -121,7 +116,7 @@ func TestDeclaredDeliverables_MissingHandoff_IsCorrectedThenFails(t *testing.T) 
 
 func TestDeclaredDeliverables_CorrectedHandoff_IsAccepted(t *testing.T) {
 	root := gitRepoWithOneCommit(t)
-	runners, build := declaredRunners(t, 2) // the correction round writes it
+	runners, build := declaredRunners(t, 2)
 	o, _ := declaredOrchestrator(t, root, runners)
 
 	if _, err := o.RunCycle(context.Background(), core.CycleRequest{ProjectRoot: root, GoalHash: "g", DisableWorkspaceGuard: true}); err != nil {
@@ -138,7 +133,6 @@ func TestDeclaredDeliverables_CorrectedHandoff_IsAccepted(t *testing.T) {
 	}
 }
 
-// The resume twin: RunCycleFromPhase is a separate loop implementation.
 func TestDeclaredDeliverables_Resume_MissingHandoff_IsCorrectedThenFails(t *testing.T) {
 	root := gitRepoWithOneCommit(t)
 	runners, build := declaredRunners(t, 0)

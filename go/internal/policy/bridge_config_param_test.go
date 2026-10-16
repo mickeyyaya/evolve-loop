@@ -62,7 +62,6 @@ func TestBridgePolicy_PhaseArtifactTimeouts(t *testing.T) {
 	}{
 		{"compiled-agent-label", nil, "retrospective", 900},
 		{"compiled-phase-alias", nil, "retro", 900},
-		// scout, not build, is the unlisted probe: build/audit/tdd carry compiled budgets.
 		{"unlisted-phase-uses-builtin-sentinel", nil, "scout", 0},
 		{"operator-adds-entry", map[string]int{"scout": 600}, "scout", 600},
 		{"operator-raises-compiled", map[string]int{"retrospective": 1200}, "retrospective", 1200},

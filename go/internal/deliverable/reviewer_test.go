@@ -100,7 +100,7 @@ func TestReviewer_Ambiguity_FailsOpen(t *testing.T) {
 }
 
 func TestReviewer_CircuitBreaker_DemotesAfterN(t *testing.T) {
-	ws := t.TempDir() // empty → always violates
+	ws := t.TempDir()
 	pr := t.TempDir()
 	bp := filepath.Join(t.TempDir(), "breaker.json")
 	r := newTestReviewer(config.StageEnforce, bp, 3)
@@ -121,8 +121,8 @@ func TestReviewer_CircuitBreaker_ResetsOnSuccess(t *testing.T) {
 	pr := t.TempDir()
 	bp := filepath.Join(t.TempDir(), "breaker.json")
 	r := newTestReviewer(config.StageEnforce, bp, 3)
-	r.Review(context.Background(), reviewInput("build", wsBad, pr))  // block, n=1
-	r.Review(context.Background(), reviewInput("build", wsGood, pr)) // success → reset
+	r.Review(context.Background(), reviewInput("build", wsBad, pr))
+	r.Review(context.Background(), reviewInput("build", wsGood, pr))
 	if n := readBreaker(bp); n != 0 {
 		t.Errorf("breaker should reset to 0 after success; got %d", n)
 	}
