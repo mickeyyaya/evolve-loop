@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Report names come from the phasecontract registry so this gate never re-declares them.
 var (
 	triageReportName = phasecontract.ArtifactName("triage")
 	buildReportName  = phasecontract.ArtifactName("build")
@@ -21,16 +20,12 @@ var (
 	scoutReportName  = phasecontract.ArtifactName(string(core.PhaseScout))
 )
 
-// gate is one inter-phase check. check returns a reason for every finding and
-// block=true only for a certain violation; any ambiguity fails open.
 type gate interface {
 	name() string
 	appliesTo(phase string) bool
 	check(in core.ReviewInput) (reason string, block bool)
 }
 
-// topNBindingGate compares build-report.md's ## Task: slug with triage's
-// ## top_n. It never blocks.
 type topNBindingGate struct{}
 
 func (topNBindingGate) name() string { return "topn-task-binding" }
@@ -51,23 +46,15 @@ func (topNBindingGate) check(in core.ReviewInput) (string, bool) {
 			return "", false
 		}
 	}
-	// Label drift is advisory: the lane exists because triage committed these
-	// ids, so the committed set binds, not the report's label.
 	return "label drift (advisory since 2026-07-22): build-report labels its task '" + claimed + "' but triage committed {" + strings.Join(topN, ", ") + "} — binding to the committed set", false
 }
 
-// tddScopeGate checks the TDD phase's declared members and authored test files
-// against the committed task set.
 type tddScopeGate struct{}
 
 func (tddScopeGate) name() string { return "topn-tdd-scope" }
 
 func (tddScopeGate) appliesTo(phase string) bool { return phase == string(core.PhaseTDD) }
 
-// check requires exact set equality for a multi-member lane, then judges file
-// scope against the union of the members' scopes. For a zero- or single-member
-// lane it blocks only files authored under an empty top_n; label drift and
-// file-scope drift are advisory.
 func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	topN, haveReport := readTopNSlugs(in.Workspace)
 	claimed, declared, authored, ok := readTDDScope(in.Workspace)
@@ -83,8 +70,6 @@ func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 			topN = committed
 		}
 	}
-	// Multi-member lanes bind to the contract's ids, not the markdown top_n,
-	// whose decomposition sub-ids would block a lane that declared its contract.
 	if len(committed) > 1 {
 		if reason, block := reconcileMemberSets(committed, normalizedSlugs(declared)); block {
 			return reason, true
@@ -103,18 +88,14 @@ func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
 	}
 	for _, s := range topN {
 		if s == claimed {
-			// A matching label proves nothing about the files authored, so check their scope too.
 			return fileScopeAdvisory(in.Workspace, claimed, authored), false
 		}
 	}
-	// Label drift is advisory here for the same reason as in topNBindingGate.
 	return "label drift (advisory since 2026-07-23): TDD authored test file(s) {" + strings.Join(authored, ", ") +
 		"} labelled '" + claimed + "' but triage committed {" + strings.Join(topN, ", ") +
 		"} — binding to the committed set", false
 }
 
-// fileScopeAdvisory returns a reason when no authored file shares a scope with
-// the committed item's scout targetFiles, and "" on any ambiguity.
 func fileScopeAdvisory(workspace, slug string, authored []string) string {
 	declared := readScoutTargetFiles(workspace, slug)
 	if len(declared) == 0 || len(authored) == 0 || anyPathOverlaps(authored, declared) {
@@ -125,9 +106,6 @@ func fileScopeAdvisory(workspace, slug string, authored []string) string {
 		"} — zero path overlap"
 }
 
-// fileScopeAdvisoryMulti returns a reason when no authored file shares a scope
-// with ANY committed member's targetFiles. A member without a declared scope
-// could own any file, so it makes the judgement ambiguous and returns "".
 func fileScopeAdvisoryMulti(workspace string, members, authored []string) string {
 	if len(authored) == 0 {
 		return ""
@@ -159,15 +137,11 @@ func anyPathOverlaps(authored, declared []string) bool {
 	return false
 }
 
-// pathsOverlap treats one directory as one scope: scout names the production
-// file while TDD authors its sibling _test.go.
 func pathsOverlap(a, b string) bool {
 	a, b = filepath.Clean(a), filepath.Clean(b)
 	return a == b || filepath.Dir(a) == filepath.Dir(b)
 }
 
-// readScoutTargetFiles returns the backticked paths on the "- **targetFiles:**"
-// line of scout-report.md's "### Task N: <slug>" block for slug, or nil.
 func readScoutTargetFiles(workspace, slug string) []string {
 	body, ok := readWorkspaceFile(workspace, scoutReportName)
 	if !ok {
@@ -194,7 +168,6 @@ func readScoutTargetFiles(workspace, slug string) []string {
 	return nil
 }
 
-// taskHeaderSlug returns the slug of a "### Task N: <slug>" header, or "".
 func taskHeaderSlug(trimmed string) string {
 	rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "### "))
 	i := strings.Index(rest, ":")
@@ -207,7 +180,7 @@ func taskHeaderSlug(trimmed string) string {
 func backtickedPaths(line string) []string {
 	var paths []string
 	parts := strings.Split(line, "`")
-	for i := 1; i < len(parts); i += 2 { // odd indices are the quoted spans
+	for i := 1; i < len(parts); i += 2 {
 		if p := strings.TrimSpace(parts[i]); p != "" {
 			paths = append(paths, p)
 		}
@@ -215,7 +188,6 @@ func backtickedPaths(line string) []string {
 	return paths
 }
 
-// reconcileMemberSets blocks unless declared equals committed as a set.
 func reconcileMemberSets(committed, declared []string) (string, bool) {
 	var missing, extra []string
 	for _, id := range committed {
@@ -234,7 +206,6 @@ func reconcileMemberSets(committed, declared []string) (string, bool) {
 	return "", false
 }
 
-// normalizedSlugs makes set comparisons and defect messages order-independent.
 func normalizedSlugs(slugs []string) []string {
 	out := make([]string, 0, len(slugs))
 	for _, slug := range slugs {
@@ -246,7 +217,6 @@ func normalizedSlugs(slugs []string) []string {
 	return slices.Compact(out)
 }
 
-// readTDDScope parses test-report.md; ok is false only when the report is unreadable.
 func readTDDScope(workspace string) (slug string, slugs, testFiles []string, ok bool) {
 	body, ok := readWorkspaceFile(workspace, tddReportName)
 	if !ok {
@@ -256,10 +226,6 @@ func readTDDScope(workspace string) (slug string, slugs, testFiles []string, ok 
 	return slug, slugs, testFiles, true
 }
 
-// parseTDDReport takes slugs from the first declaring JSON fence under
-// "## Handoff to Builder", else from the comma-separated ## Task: header.
-// A fence closes only on its own delimiter character, at least as long as the
-// opener, so a fence nested inside an example stays part of the example.
 func parseTDDReport(body string) (slug string, slugs, testFiles []string) {
 	var fence string
 	var block []string
@@ -274,7 +240,6 @@ func parseTDDReport(body string) (slug string, slugs, testFiles []string) {
 						Slugs     []string `json:"slugs"`
 						TestFiles []string `json:"testFiles"`
 					}
-					// A fence declaring neither slugs nor testFiles must not shadow a later declaration.
 					if json.Unmarshal([]byte(strings.Join(block, "\n")), &payload) == nil && (len(payload.Slugs) > 0 || len(payload.TestFiles) > 0) {
 						slugs, testFiles, found = payload.Slugs, payload.TestFiles, true
 					}
@@ -305,8 +270,6 @@ func parseTDDReport(body string) (slug string, slugs, testFiles []string) {
 	return slug, slugs, testFiles
 }
 
-// readTopNSlugs returns the slugs under triage-report.md's ## top_n. ok is
-// false only when the report is unreadable, so an empty top_n stays visible.
 func readTopNSlugs(workspace string) ([]string, bool) {
 	body, ok := readWorkspaceFile(workspace, triageReportName)
 	if !ok {
@@ -330,7 +293,6 @@ func readTopNSlugs(workspace string) ([]string, bool) {
 	return slugs, true
 }
 
-// listItemSlug returns the slug of a "- <slug>: description" bullet, or "".
 func listItemSlug(trimmed string) string {
 	if !strings.HasPrefix(trimmed, "- ") {
 		return ""
@@ -342,8 +304,6 @@ func listItemSlug(trimmed string) string {
 	return strings.TrimSpace(rest)
 }
 
-// readClaimedSlug returns build-report.md's "## Task: <slug>" value; ok is
-// false only when the report is unreadable.
 func readClaimedSlug(workspace string) (string, bool) {
 	body, ok := readWorkspaceFile(workspace, buildReportName)
 	if !ok {
@@ -358,7 +318,6 @@ func readClaimedSlug(workspace string) (string, bool) {
 	return "", true
 }
 
-// readWorkspaceFile refuses an empty workspace, which would resolve name against the cwd.
 func readWorkspaceFile(workspace, name string) (string, bool) {
 	if workspace == "" {
 		return "", false

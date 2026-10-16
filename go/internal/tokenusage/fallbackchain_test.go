@@ -19,7 +19,6 @@ func eventsLogFixture(t *testing.T, in, out, cacheR, cacheC int) string {
 	return log
 }
 
-// transcriptFixture writes a cwd-attributed, in-window transcript reporting Input=200 Output=40.
 func transcriptFixture(t *testing.T, root, worktree string) {
 	t.Helper()
 	sessionDir := filepath.Join(root, "projects", "-repo-worktrees-cycle-754")

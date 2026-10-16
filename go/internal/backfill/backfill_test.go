@@ -1,19 +1,5 @@
 package backfill
 
-// RED tests for cycle-171 T3 (artifact-backfill). The backfill package does not
-// exist yet, so this test file fails to BUILD at the baseline (undefined:
-// TryExtract) — the correct RED for a brand-new package, isolated to this
-// package's own test binary. Builder makes it GREEN by creating backfill.go with
-//
-//	func TryExtract(workspace, phase, artifactPath string, minLen int) (bool, error)
-//
-// which reads <workspace>/<phase>-stdout.clean.txt, finds the LAST occurrence of
-// the phase's markdown header (scout→"# Scout Report", build→"# Build Report",
-// audit→"# Audit Report", tdd→"# TDD", intent→"# Intent", triage→"# Triage"),
-// extracts header..EOF (trimmed), and — only when len >= minLen — writes it to
-// artifactPath atomically. Returns (true,nil) on success, (false,nil) on
-// no-header / too-short / unknown-phase, (false,err) on I/O error.
-
 import (
 	"os"
 	"path/filepath"
@@ -21,17 +7,10 @@ import (
 	"testing"
 )
 
-// Error axis: header present + content above minLen, but the artifact's parent
-// path is an existing regular file → atomicwrite.Bytes's mkdir-parent fails
-// ("not a directory") → TryExtract returns (false, err) with the wrapped
-// "backfill write" context, and no artifact is left behind. Pins the I/O-error
-// branch (backfill.go:59-61).
 func TestTryExtract_WriteErrorReturnsWrappedError(t *testing.T) {
 	ws := t.TempDir()
 	report := "# Scout Report\n\nReconstructed scout body long enough to clear the minimum-length floor.\n"
 	seedClean(t, ws, "scout", report)
-	// "blocker" is a regular file, so using it as the artifact's parent dir
-	// makes mkdir-parent fail ("not a directory").
 	blocker := filepath.Join(ws, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatalf("seed blocker file: %v", err)
@@ -63,12 +42,9 @@ func seedClean(t *testing.T, ws, phase, body string) {
 	}
 }
 
-// AC-2 positive: header present + content above minLen → extracted=true and the
-// artifact file is written containing the reconstructed report.
 func TestTryExtract_PositiveWritesArtifact(t *testing.T) {
 	ws := t.TempDir()
 	report := "# Scout Report\n\nReconstructed scout body long enough to clear the minimum-length floor for backfill extraction.\n"
-	// Header must be found even with leading log noise; "last occurrence" wins.
 	seedClean(t, ws, "scout", "spinner noise line\nmore stdout chatter\n"+report)
 	artifact := filepath.Join(ws, "scout-report.md")
 
@@ -88,7 +64,6 @@ func TestTryExtract_PositiveWritesArtifact(t *testing.T) {
 	}
 }
 
-// AC-3 dimension: header absent → extracted=false, no artifact written.
 func TestTryExtract_NoHeaderReturnsFalse(t *testing.T) {
 	ws := t.TempDir()
 	seedClean(t, ws, "scout", "just spinner noise, no markdown header at all, plenty of bytes here\n")
@@ -106,7 +81,6 @@ func TestTryExtract_NoHeaderReturnsFalse(t *testing.T) {
 	}
 }
 
-// AC-4 dimension: header present but body below minLen → extracted=false, no write.
 func TestTryExtract_TooShortReturnsFalse(t *testing.T) {
 	ws := t.TempDir()
 	seedClean(t, ws, "scout", "# Scout Report\nshort")
@@ -124,7 +98,6 @@ func TestTryExtract_TooShortReturnsFalse(t *testing.T) {
 	}
 }
 
-// AC-3 dimension: a phase with no header mapping → extracted=false, no error.
 func TestTryExtract_UnknownPhaseReturnsFalse(t *testing.T) {
 	ws := t.TempDir()
 	seedClean(t, ws, "bogus", "# Bogus Header\n"+strings.Repeat("x", 300))
@@ -139,11 +112,8 @@ func TestTryExtract_UnknownPhaseReturnsFalse(t *testing.T) {
 	}
 }
 
-// Edge axis: clean.txt absent → extracted=false (no panic). Whether a missing
-// source file is reported as an error is left to the implementation; this test
-// only pins the observable extracted=false.
 func TestTryExtract_MissingCleanFileReturnsFalse(t *testing.T) {
-	ws := t.TempDir() // no clean.txt seeded
+	ws := t.TempDir()
 	artifact := filepath.Join(ws, "scout-report.md")
 
 	ok, _ := TryExtract(ws, "scout", artifact, 50)
@@ -155,22 +125,10 @@ func TestTryExtract_MissingCleanFileReturnsFalse(t *testing.T) {
 	}
 }
 
-// --- cycle-187: backfill coverage extended to retro + build-planner ---
-
-// AC-1 / AC-7 (cycle-187): "retro" is a newly backfill-covered phase. The
-// retrospective agent's stdout carries the canonical "# Retrospective Report"
-// header — the exact form every real retrospective-report.md on disk uses
-// (e.g. ".evolve/runs/cycle-29/retrospective-report.md" → "# Retrospective
-// Report — Cycle 29"). With "retro" in phaseHeaders, that report must be
-// reconstructed and written to the artifact path.
-//
-// RED at baseline: phaseHeaders has no "retro" entry → TryExtract takes the
-// unknown-phase branch and returns (false, nil) → ok==false, artifact absent.
 func TestTryExtract_Retro_PositiveWritesArtifact(t *testing.T) {
 	ws := t.TempDir()
 	report := "# Retrospective Report — Cycle 187\n\n## Verdict trigger\n" +
 		"Auditor verdict: FAIL. Root cause reconstructed from stdout for backfill recovery.\n"
-	// "last occurrence" wins even with leading bridge/spinner noise.
 	seedClean(t, ws, "retro", "bridge boot timeout noise\nspinner chatter line\n"+report)
 	artifact := filepath.Join(ws, "retrospective-report.md")
 
@@ -190,12 +148,6 @@ func TestTryExtract_Retro_PositiveWritesArtifact(t *testing.T) {
 	}
 }
 
-// AC-2 / AC-7 (cycle-187): "build-planner" is a newly backfill-covered phase.
-// Its artifact is build-plan.md, headed "# Build Plan" (real on-disk form:
-// "# Build Plan — Cycle 121"). With "build-planner" in phaseHeaders, the plan
-// must be reconstructed from its stdout.clean.txt.
-//
-// RED at baseline: no "build-planner" entry in phaseHeaders → (false, nil).
 func TestTryExtract_BuildPlanner_PositiveWritesArtifact(t *testing.T) {
 	ws := t.TempDir()
 	report := "# Build Plan — Cycle 187\n\n## Approach\n" +

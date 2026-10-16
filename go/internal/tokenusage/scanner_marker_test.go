@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Every fixture records a foreign cwd, so the cwd fallback can never rescue a match and mask the anchor.
 func TestAttributes_MarkerAnchored(t *testing.T) {
 	const (
 		worktree = "/repo/worktrees/cycle-1457"

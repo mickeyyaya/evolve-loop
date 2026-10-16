@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// setHangClassifierForTest swaps the package-level hangClassifierFn, so callers cannot run in parallel.
 func setHangClassifierForTest(t *testing.T, enabled bool) {
 	t.Helper()
 	prev := hangClassifierFn
@@ -15,7 +14,6 @@ func setHangClassifierForTest(t *testing.T, enabled bool) {
 }
 
 func TestSetHangClassifier_WiresToggleFromPolicy(t *testing.T) {
-	// Not parallel: mutates the package-level hangClassifierFn.
 	prev := hangClassifierFn
 	t.Cleanup(func() { hangClassifierFn = prev })
 
@@ -30,7 +28,6 @@ func TestSetHangClassifier_WiresToggleFromPolicy(t *testing.T) {
 }
 
 func TestClassify_HangClassifier_ReclassifiesSHIPPED(t *testing.T) {
-	// Not parallel: mutates the package-level gitLogFn and hangClassifierFn.
 	setHangClassifierForTest(t, true)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
@@ -75,10 +72,10 @@ func TestClassify_HangClassifier_NoCommitFalsePositive(t *testing.T) {
 }
 
 func TestClassify_HangClassifier_DisabledByDefault(t *testing.T) {
-	setHangClassifierForTest(t, false) // pins the disabled branch; the package default is also off
+	setHangClassifierForTest(t, false)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
-	gitLogFn = func(string) bool { return true } // would match if checked
+	gitLogFn = func(string) bool { return true }
 
 	parent := t.TempDir()
 	ws := filepath.Join(parent, "cycle-44")
@@ -101,7 +98,6 @@ func TestClassify_HangClassifier_NonShippedNoReclassify(t *testing.T) {
 	parent := t.TempDir()
 	ws := filepath.Join(parent, "cycle-45")
 	_ = os.MkdirAll(ws, 0o755)
-	// FAILED sits on the Verdict line itself so the line-by-line audit-fail regex matches first.
 	report := "Verdict: FAILED — auditor rejected\n"
 	_ = os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte(report), 0o644)
 

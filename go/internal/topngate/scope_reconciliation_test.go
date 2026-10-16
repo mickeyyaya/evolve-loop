@@ -12,11 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// mdFence exists because a raw string literal cannot contain a backtick.
 const mdFence = "```"
 
-// writeScopedTDDReport states declared in both the ## Task: header and the
-// handoff slugs[]; preamble goes between the header and the RED output.
 func writeScopedTDDReport(t *testing.T, workspace string, declared []string, preamble string) {
 	t.Helper()
 	writeMemberTDDReport(t, workspace, declared, preamble, "go/acs/cycle1480/predicates_test.go")
@@ -183,7 +180,6 @@ func TestTDDScopeGate_AppliesBeforeBuildNotAfter(t *testing.T) {
 	}
 }
 
-// twoMemberLane commits alpha-member and beta-member, each declaring its own package.
 func twoMemberLane(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()

@@ -42,7 +42,6 @@ func TestCollectorChain_AllEmptyYieldsNone(t *testing.T) {
 
 func TestChain_RealAdaptersPreferHigherFidelity(t *testing.T) {
 	dir := t.TempDir()
-	// No projects/ subdir under dir → the transcript tier is empty.
 	log := filepath.Join(dir, "scout-events.ndjson")
 	writeFile(t, log, `{"kind":"result","data":{"tokens":{"in":700,"out":70,"cache_r":5,"cache_c":2}}}`+"\n")
 	pane := "boot output\n↓ 5k tokens\n"

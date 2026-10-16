@@ -1,11 +1,3 @@
-// treestate_test.go — golden + parity coverage for SHA.
-//
-// Two layers: (1) a deterministic table over the injected sysexec.RunFunc seam
-// (fixed git-diff bytes -> independently-computed sha256, plus the exit-code and
-// runner-error failure shapes), and (2) a real-git parity check that hashes
-// `git diff HEAD` in a temp repo and cross-validates against the shell
-// `git diff HEAD | shasum -a 256` the bash Auditor uses — proving the Go and
-// shell fingerprints are byte-identical. Tests are -race-safe (no shared state).
 package treestate
 
 import (
@@ -23,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// fakeRunner returns a sysexec.RunFunc that writes diffOut to stdout and returns
-// (exit, runErr), capturing the args it was called with for assertion.
 func fakeRunner(diffOut string, exit int, runErr error, gotArgs *[]string, gotDir *string) sysexec.RunFunc {
 	return func(_ context.Context, name, dir string, args, _ []string,
 		_ io.Reader, stdout, _ io.Writer) (int, error) {
@@ -56,25 +46,22 @@ func TestSHA_TableSeam(t *testing.T) {
 		runErr   error
 		wantSHA  string
 		wantErr  bool
-		wantExit int   // expected RunError.ExitCode when wantErr
-		wantWrap error // expected RunError.Err (nil for fatal-exit shape)
+		wantExit int
+		wantWrap error
 	}{
 		{
-			// Empty diff (clean tree) hashes the empty string.
 			name:    "clean-tree-exit0",
 			diff:    "",
 			exit:    0,
 			wantSHA: sha256Hex(""),
 		},
 		{
-			// rc=1 means "differences present" — NOT an error; the diff is hashed.
 			name:    "differences-exit1-hashed",
 			diff:    "diff --git a/x b/x\n",
 			exit:    1,
 			wantSHA: sha256Hex("diff --git a/x b/x\n"),
 		},
 		{
-			// rc=128 (fatal git error) — RunError with nil Err.
 			name:     "fatal-exit128",
 			diff:     "ignored",
 			exit:     128,
@@ -83,7 +70,6 @@ func TestSHA_TableSeam(t *testing.T) {
 			wantWrap: nil,
 		},
 		{
-			// Unrecoverable runner failure (binary missing etc.) — RunError wraps Err.
 			name:     "runner-error",
 			diff:     "",
 			exit:     -1,
@@ -102,7 +88,6 @@ func TestSHA_TableSeam(t *testing.T) {
 			run := fakeRunner(tc.diff, tc.exit, tc.runErr, &gotArgs, &gotDir)
 			got, err := SHA(context.Background(), run, "/some/dir", nil)
 
-			// The seam must always be invoked as `git diff HEAD` in the given dir.
 			wantArgs := []string{"git", "diff", "HEAD"}
 			if strings.Join(gotArgs, " ") != strings.Join(wantArgs, " ") {
 				t.Fatalf("git invocation = %v, want %v", gotArgs, wantArgs)
@@ -140,13 +125,9 @@ func TestSHA_TableSeam(t *testing.T) {
 	}
 }
 
-// TestRunError_MessagesAndUnwrap names and exercises RunError.Error and
-// RunError.Unwrap directly, locking the exact message strings the ship wrapper
-// re-derives so the post-extraction error text stays byte-identical.
 func TestRunError_MessagesAndUnwrap(t *testing.T) {
 	t.Parallel()
 
-	// Fatal-exit shape: Err nil, message carries the code, Unwrap is nil.
 	fatal := &RunError{ExitCode: 128}
 	if got, want := fatal.Error(), "git diff HEAD exit 128"; got != want {
 		t.Errorf("fatal.Error() = %q, want %q", got, want)
@@ -155,7 +136,6 @@ func TestRunError_MessagesAndUnwrap(t *testing.T) {
 		t.Errorf("fatal.Unwrap() = %v, want nil", fatal.Unwrap())
 	}
 
-	// Runner-error shape: Err wrapped, message includes it, Unwrap returns it.
 	boom := errors.New("boom")
 	runErr := &RunError{ExitCode: -1, Err: boom}
 	if got, want := runErr.Error(), "git diff HEAD: boom"; got != want {
@@ -169,9 +149,6 @@ func TestRunError_MessagesAndUnwrap(t *testing.T) {
 	}
 }
 
-// TestSHA_RealGitParity proves the Go fingerprint equals the shell pipeline
-// `git diff HEAD | shasum -a 256` over a real working tree — the exact invariant
-// the commit-gate/audit binding depends on.
 func TestSHA_RealGitParity(t *testing.T) {
 	t.Parallel()
 	gitBin, err := exec.LookPath("git")
@@ -185,7 +162,6 @@ func TestSHA_RealGitParity(t *testing.T) {
 		t.Helper()
 		cmd := exec.Command(gitBin, args...)
 		cmd.Dir = dir
-		// Deterministic identity so the diff (and thus the SHA) is reproducible.
 		cmd.Env = append(os.Environ(),
 			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
 			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
@@ -199,18 +175,15 @@ func TestSHA_RealGitParity(t *testing.T) {
 	}
 	runGit("add", "f.txt")
 	runGit("commit", "-q", "-m", "init")
-	// Mutate a tracked file so `git diff HEAD` is non-empty.
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("one\ntwo\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	// Go path.
 	goSHA, err := SHA(context.Background(), sysexec.DefaultRunner, dir, os.Environ())
 	if err != nil {
 		t.Fatalf("treestate.SHA: %v", err)
 	}
 
-	// Shell path: `git diff HEAD` piped through the system hasher.
 	diffCmd := exec.Command(gitBin, "diff", "HEAD")
 	diffCmd.Dir = dir
 	diffOut, err := diffCmd.Output()
@@ -227,7 +200,6 @@ func TestSHA_RealGitParity(t *testing.T) {
 	}
 }
 
-// lookHasher finds shasum (-a 256) or sha256sum, skipping if neither exists.
 func lookHasher(t *testing.T) (string, []string) {
 	t.Helper()
 	if p, err := exec.LookPath("shasum"); err == nil {
@@ -240,8 +212,6 @@ func lookHasher(t *testing.T) (string, []string) {
 	return "", nil
 }
 
-// hashViaShell runs the system sha256 tool over data and returns the lowercase
-// hex digest (the leading field of the tool's output).
 func hashViaShell(t *testing.T, tool string, args []string, data []byte) string {
 	t.Helper()
 	cmd := exec.Command(tool, args...)

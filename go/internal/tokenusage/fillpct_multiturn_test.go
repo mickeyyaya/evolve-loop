@@ -12,7 +12,6 @@ import (
 
 const pctTolerance = 0.05
 
-// multiTurnFixture's turns carry no timestamp, so withinWindow admits all of them.
 func multiTurnFixture(t *testing.T, artifactPath string, turns []string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -32,7 +31,6 @@ func assistantTurn(id string, input, output, cacheRead, cacheWrite int) string {
 		`,"cache_creation_input_tokens":` + strconv.Itoa(cacheWrite) + `}}}`
 }
 
-// inflatedTurns' prompt sides are 70K, 130K and 180K: 190% of the window summed, 90% at the peak.
 func inflatedTurns() []string {
 	return []string{
 		assistantTurn("m1", 5_000, 1_000, 60_000, 5_000),
@@ -41,7 +39,6 @@ func inflatedTurns() []string {
 	}
 }
 
-// The fill reads the peak turn; these fixtures grow monotonically, as real transcripts do, so the terminal turn is the peak.
 func TestFillPct_UsesTerminalTurnNotSumOfTurns(t *testing.T) {
 	const artifact = "/ws/cycle-1455/scout-report.md"
 	root := multiTurnFixture(t, artifact, inflatedTurns())
@@ -125,7 +122,6 @@ func TestFillWarn_CorrectedFixtureDoesNotFalsePositive(t *testing.T) {
 	}
 }
 
-// The only assistant turn is timestamped outside the launch window.
 func TestFillPct_ZeroObservedTurns_IsUnmeasured(t *testing.T) {
 	const artifact = "/ws/cycle-1455/test-report.md"
 	root := t.TempDir()

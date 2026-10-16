@@ -33,13 +33,11 @@ func TestClassify_EventsReadError(t *testing.T) {
 	}
 }
 
-// Not parallel: mutates the package-level maxScannerBufBytes.
 func TestClassify_EventsLineTooLong(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte("clean, no markers"), 0o644); err != nil {
 		t.Fatalf("write report: %v", err)
 	}
-	// The effective cap is max(1024-byte initial buffer, maxScannerBufBytes), so the line must exceed 1024 bytes.
 	pad := strings.Repeat("x", 2000)
 	line := `{"kind":"infra_failure","data":{"marker":"eperm","pad":"` + pad + `"}}`
 	if err := os.WriteFile(filepath.Join(ws, "scout-events.ndjson"), []byte(line+"\n"), 0o644); err != nil {
@@ -56,7 +54,6 @@ func TestClassify_EventsLineTooLong(t *testing.T) {
 	}
 }
 
-// Not parallel: mutates the package-level globFn.
 func TestClassify_GlobError(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "orchestrator-report.md"), []byte("OK"), 0o644); err != nil {

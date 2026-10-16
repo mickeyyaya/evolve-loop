@@ -211,3 +211,19 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/sysexec` | the single seam for running external commands | [internal-sysexec.md](internal-sysexec.md) |
 | `internal/sessionrecord` | the per-run tmux session registry schema | [internal-sessionrecord.md](internal-sessionrecord.md) |
 | `internal/pruneephemeral` | TTL retention for phase-tracker ephemeral data | [internal-pruneephemeral.md](internal-pruneephemeral.md) |
+| `internal/dispositionrouter` | routes a classified failure to the operator console or the lane queue, and stages the intents | [internal-dispositionrouter.md](internal-dispositionrouter.md) |
+| `internal/gopkgpattern` | the shared rule that recognizes and normalizes `go test` package patterns in Go source | [internal-gopkgpattern.md](internal-gopkgpattern.md) |
+| `internal/phases/registry` | the Factory Method that maps a phase name to its runner factory | [internal-phases-registry.md](internal-phases-registry.md) |
+| `internal/treestate` | computes the tree-state SHA, the sha256 of `git diff HEAD`, that binds an audit to a tree | [internal-treestate.md](internal-treestate.md) |
+| `cmd/testlatency` | turns a `go test -json` stream into a Markdown latency report | [cmd-testlatency.md](cmd-testlatency.md) |
+| `internal/codequality` | runs the deterministic gofmt gates that mirror the CI format step | [internal-codequality.md](internal-codequality.md) |
+| `internal/plane` | tells the console checkout from a linked runtime worktree | [internal-plane.md](internal-plane.md) |
+| `internal/contextfill` | derives how full the context window of a phase got from its token counts | [internal-contextfill.md](internal-contextfill.md) |
+| `internal/solutioncheck` | the deterministic judge of the deliverable shape of a document cycle | [internal-solutioncheck.md](internal-solutioncheck.md) |
+| `internal/redteamcheck` | the standing anti-gaming ledger-integrity checks | [internal-redteamcheck.md](internal-redteamcheck.md) |
+| `internal/core/evidence` | the commit-as-evidence trailer that proves a phase delivered | [internal-core-evidence.md](internal-core-evidence.md) |
+| `internal/routingeval` | the golden corpus that replays advisor responses through the routing floor | [internal-routingeval.md](internal-routingeval.md) |
+| `internal/backfill` | rebuilds a missing phase artifact from the clean stdout of the phase | [internal-backfill.md](internal-backfill.md) |
+| `internal/skilloverlay` | turns policy-resolved skill overlays into a prompt prefix | [internal-skilloverlay.md](internal-skilloverlay.md) |
+| `internal/goalhash` | hashes a loop goal string, byte for byte as the legacy bash pipeline did | [internal-goalhash.md](internal-goalhash.md) |
+| `examples/secure-orchestrator` | a reference program with four defenses against agent reward hacking | [examples-secure-orchestrator.md](examples-secure-orchestrator.md) |
