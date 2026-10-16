@@ -274,6 +274,7 @@ approaches / decision / results / retro) — lives at
 | [research/model-capability-practice-2026-10.md](research/model-capability-practice-2026-10.md) | Research: the size and the emphatic words of the phase prompts, the share of console commits, the full-disk stop, and the watch that exists. It also covers the current guidance of Anthropic, OpenAI and Google, and the sources that a watch can read. Findings F2.1 to F3.3 and P4.1 to P4.6, refinements R1 to R7. |
 | [plans/model-capability-practice-2026-10.md](plans/model-capability-practice-2026-10.md) | Plan: four approaches for less scaffolding and four for the practice watch, each with scores, a winner and what it takes from the others. Decisions D1 to D11 and components M0 to M5. |
 | [architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md](architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md) | Decision: a deterministic watch files a research item when a source changes. Prompt trims are measured, one persona at a time. |
+| [research/practice-gemini-prompting-guide-2026-10.md](research/practice-gemini-prompting-guide-2026-10.md) | Research: the Gemini prompting guide change (Gemini 4 Argon, the end of custom `temperature`, `top_p` and `top_k`) read as data. The loop sends none of these parameters, and no persona changes before the M2 baseline. |
 
 ## 2026-10-13 — fleet landing at scale: 200 concurrent lanes (ADR-0134)
 
