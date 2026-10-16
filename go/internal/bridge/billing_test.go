@@ -45,12 +45,10 @@ func TestBillingSnapshot(t *testing.T) {
 	if _, err := eng.BillingSnapshot(dir, ""); err == nil {
 		t.Fatal("missing label should error")
 	}
-	// mkdir error: dir under a regular file
 	blocker := writeJSON(t, filepath.Join(t.TempDir(), "blk"), "x")
 	if _, err := eng.BillingSnapshot(filepath.Join(blocker, "sub"), "x"); err == nil {
 		t.Fatal("mkdir error should propagate")
 	}
-	// write error: the deterministic output path is pre-created as a directory
 	wdir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(wdir, "snap-pre-"+itoa(fixed.Unix())+".json"), 0o755); err != nil {
 		t.Fatal(err)
@@ -58,7 +56,6 @@ func TestBillingSnapshot(t *testing.T) {
 	if _, err := eng.BillingSnapshot(wdir, "pre"); err == nil {
 		t.Fatal("write error (path is a dir) should propagate")
 	}
-	// marshal error via the shared seam
 	orig := marshalIndent
 	marshalIndent = func(any, string, string) ([]byte, error) { return nil, errors.New("boom") }
 	defer func() { marshalIndent = orig }()

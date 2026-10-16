@@ -36,10 +36,6 @@ func TestCompletionContractName_IsTheStrategyKey(t *testing.T) {
 	}
 }
 
-// No non-test source outside completion.go assigns the artifact literal or
-// compares against the stdout literal; engine.go's readResult and
-// driver_tmux_repl.go's DONE line project completionContractName /
-// completionStdout instead.
 func TestCompletionContractVocabulary_SpelledOnce(t *testing.T) {
 	t.Parallel()
 	for needle, want := range map[string][]string{

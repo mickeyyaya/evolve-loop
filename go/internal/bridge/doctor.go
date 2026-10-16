@@ -12,44 +12,35 @@ import (
 	"time"
 )
 
-// BinaryInfo describes a CLI binary's presence on PATH.
 type BinaryInfo struct {
 	Present bool   `json:"present"`
 	Path    string `json:"path"`
 	Version string `json:"version"`
 }
 
-// AuthInfo describes a CLI's configured auth (file signals).
 type AuthInfo struct {
 	Configured       bool   `json:"configured"`
 	Source           string `json:"source"`
 	SubscriptionType string `json:"subscription_type,omitempty"`
 	Hint             string `json:"hint,omitempty"`
-	// AuthOptional flips the doctor verdict so a CLI that runs unauthenticated
-	// (e.g. local-only ollama) is NOT marked "blocked" when Configured=false.
-	// Default false preserves the previous fail-loud posture for every other
-	// driver where missing auth genuinely blocks the launch.
-	AuthOptional bool `json:"auth_optional,omitempty"`
+	AuthOptional     bool   `json:"auth_optional,omitempty"`
 }
 
-// DeepProbe is the optional live-noop result.
 type DeepProbe struct {
 	Ran        bool  `json:"ran"`
 	Passed     bool  `json:"passed"`
 	DurationMS int64 `json:"duration_ms"`
 }
 
-// DoctorResult is one CLI's preflight outcome.
 type DoctorResult struct {
 	CLI         string     `json:"cli"`
 	Binary      BinaryInfo `json:"binary"`
 	Auth        AuthInfo   `json:"auth"`
 	EnvWarnings []string   `json:"env_warnings"`
 	DeepProbe   DeepProbe  `json:"deep_probe"`
-	Verdict     string     `json:"verdict"` // ready | warning | blocked
+	Verdict     string     `json:"verdict"`
 }
 
-// DoctorReport is the full preflight summary.
 type DoctorReport struct {
 	ScannedAt string         `json:"scanned_at"`
 	Host      string         `json:"host"`
@@ -69,9 +60,6 @@ func (e *Engine) doctorHome() string {
 	return os.Getenv("HOME")
 }
 
-// defaultKeychainProbe builds the production KeychainProbe seam: on macOS it shells to
-// `security find-generic-password -s <service>` and reports presence by exit code; on every other OS
-// there is no login Keychain, so it returns a probe that is always false.
 func defaultKeychainProbe(d Deps) func(service string) bool {
 	if runtime.GOOS != "darwin" {
 		return func(string) bool { return false }
@@ -81,7 +69,6 @@ func defaultKeychainProbe(d Deps) func(service string) bool {
 		if runner == nil || service == "" {
 			return false
 		}
-		// Bound the probe so a stalled securityd can't hang `setup detect`; a local Keychain lookup is sub-second.
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		rc, err := runner(ctx, "security", "",
@@ -90,8 +77,6 @@ func defaultKeychainProbe(d Deps) func(service string) bool {
 	}
 }
 
-// doctorAuth probes auth signals for cli (file/env, plus the macOS Keychain
-// for claude).
 func (e *Engine) doctorAuth(cli string) AuthInfo {
 	home := e.doctorHome()
 	switch driverBinary(cli) {
@@ -99,7 +84,6 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 		if fileNonEmpty(filepath.Join(home, ".claude", ".credentials.json")) {
 			return AuthInfo{Configured: true, Source: "file:credentials.json"}
 		}
-		// Claude Code stores OAuth in the macOS login Keychain, not a file.
 		if e.deps.KeychainProbe != nil && e.deps.KeychainProbe("Claude Code-credentials") {
 			return AuthInfo{Configured: true, Source: "keychain:Claude Code-credentials"}
 		}
@@ -118,8 +102,6 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 		}
 		return AuthInfo{Hint: "Run `agy` once to trigger OAuth login + directory trust"}
 	case "ollama":
-		// Local-only ollama needs no auth. Cloud (:cloud-tagged models) needs
-		// OLLAMA_API_KEY OR an ollama signin OAuth key at ~/.ollama/id_ed25519.
 		if v, ok := lookupEnv(e.deps, "OLLAMA_API_KEY"); ok && v != "" {
 			return AuthInfo{Configured: true, Source: "env:OLLAMA_API_KEY", SubscriptionType: "ollama-cloud"}
 		}
@@ -131,7 +113,6 @@ func (e *Engine) doctorAuth(cli string) AuthInfo {
 	return AuthInfo{Hint: "unknown CLI"}
 }
 
-// doctorEnvWarnings warns when an env var would silently change the CLI's billing or auth path.
 func (e *Engine) doctorEnvWarnings(cli string) []string {
 	var w []string
 	set := func(k string) bool { v, ok := lookupEnv(e.deps, k); return ok && v != "" }
@@ -153,11 +134,10 @@ func (e *Engine) doctorEnvWarnings(cli string) []string {
 	return w
 }
 
-// doctorDeep runs a bounded live-noop for the headless CLIs.
 func (e *Engine) doctorDeep(ctx context.Context, cli, binary string) DeepProbe {
 	switch cli {
 	case "claude-tmux", "codex-tmux", "agy-tmux", "ollama-tmux":
-		return DeepProbe{Ran: false} // deep covers the headless backend only
+		return DeepProbe{Ran: false}
 	}
 	var probeArgs []string
 	switch cli {
@@ -192,8 +172,6 @@ func (e *Engine) doctorOne(ctx context.Context, cli string, deep bool) DoctorRes
 	case !r.Binary.Present:
 		r.Verdict = "blocked"
 	case !r.Auth.Configured && !r.Auth.AuthOptional:
-		// AuthOptional=true (local-only ollama) skips the blocked verdict since no auth is required; every
-		// other driver keeps the fail-loud posture where missing auth blocks the launch.
 		r.Verdict = "blocked"
 	case r.DeepProbe.Ran && !r.DeepProbe.Passed:
 		r.Verdict = "blocked"
@@ -205,7 +183,6 @@ func (e *Engine) doctorOne(ctx context.Context, cli string, deep bool) DoctorRes
 	return r
 }
 
-// doctorVersion captures `binary --version` (best-effort, first line).
 func doctorVersion(ctx context.Context, deps Deps, binary string) string {
 	var out bytes.Buffer
 	if _, err := deps.Runner(ctx, binary, "", []string{"--version"}, driverEnv(deps, familyEnv(binary)), nil, &out, &out); err != nil {
@@ -218,8 +195,6 @@ func doctorVersion(ctx context.Context, deps Deps, binary string) string {
 	return strings.TrimSpace(line)
 }
 
-// Doctor runs preflight across the manifest CLIs (or a single filter) and
-// returns the report + exit code (0 ready, 1 warning, 2 blocked).
 func (e *Engine) Doctor(ctx context.Context, filter string, deep bool) (DoctorReport, int) {
 	rep := DoctorReport{
 		ScannedAt: e.deps.Now().UTC().Format("2006-01-02T15:04:05Z"),

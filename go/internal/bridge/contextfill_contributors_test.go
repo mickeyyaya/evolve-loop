@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// Fixture: an early, large-cache_read turn dominates the whole-launch sum, but
-// a later, smaller turn is the actual peak (the one the resolver already
-// selected for FillPct via windowOccupancy). Only a fix that carries the peak
-// turn's own components through to the contributor breakdown can pass.
 func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
 	t.Parallel()
 	start := time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
@@ -29,16 +25,11 @@ func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
 		ContextFillWarnPct: 60,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{
-				// Whole-launch summed total: dominated by an EARLIER turn's stale
-				// cache_read that no longer reflects what made THIS turn hot.
-				Usage: cyclestate.TokenUsage{Input: 1_200, CacheRead: 7_800},
-				// The fullest SINGLE turn's own components — smaller input, but its
-				// own cache_read alone crosses the window. This is the turn FillPct
-				// below is actually derived from.
+				Usage:            cyclestate.TokenUsage{Input: 1_200, CacheRead: 7_800},
 				PeakUsage:        cyclestate.TokenUsage{Input: 200, CacheRead: 6_800},
 				PeakPromptTokens: 7_000,
 				Source:           tokenusage.SourceTranscript,
-				FillPct:          70.0, // 7000 / 10000 — derived from the peak turn, not the sum
+				FillPct:          70.0,
 			}, nil
 		},
 	})
@@ -58,9 +49,6 @@ func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
 	}
 }
 
-// A tier with no per-turn breakdown (PeakPromptTokens == 0) has only the
-// whole-launch total, which fillpct.go's windowOccupancy already treats as a
-// single reading in that case.
 func TestContextFillWarn_ContributorsFallBackToUsageWithoutPeakData(t *testing.T) {
 	t.Parallel()
 	start := time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
@@ -76,7 +64,7 @@ func TestContextFillWarn_ContributorsFallBackToUsageWithoutPeakData(t *testing.T
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{
 				Usage:            cyclestate.TokenUsage{Input: 100_000, CacheRead: 20_000},
-				PeakPromptTokens: 0, // no per-turn breakdown observed (events/scrollback tier)
+				PeakPromptTokens: 0,
 				Source:           tokenusage.SourceEventsResult,
 				FillPct:          70.0,
 			}, nil

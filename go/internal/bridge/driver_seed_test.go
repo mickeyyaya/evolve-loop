@@ -22,7 +22,7 @@ func TestRunTmuxREPL_SeedREPLInput_BeforePrompt(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
-	writeJSON(t, filepath.Join(ws, "a"), "done") // artifact present → exits after boot+prompt
+	writeJSON(t, filepath.Join(ws, "a"), "done")
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws, Worktree: ws,
 		Artifact: filepath.Join(ws, "a"), StdoutLog: filepath.Join(ws, "o"), StderrLog: filepath.Join(ws, "e"),
 		Realization: Realization{REPLInput: []string{"/model sonnet", "/foo"}}}
@@ -43,8 +43,6 @@ func TestRunTmuxREPL_SeedREPLInput_BeforePrompt(t *testing.T) {
 	if seedIdx < 0 || indexOf(tmux.sentSeq, "/foo|true") < 0 {
 		t.Fatalf("seed lines not sent; sentSeq=%v", tmux.sentSeq)
 	}
-	// The prompt is delivered via paste + a bare Enter ("|true"); the seed
-	// must precede it.
 	promptEnter := indexOf(tmux.sentSeq, "|true")
 	if promptEnter < 0 || seedIdx >= promptEnter {
 		t.Fatalf("seed must precede prompt Enter; seedIdx=%d promptEnter=%d seq=%v", seedIdx, promptEnter, tmux.sentSeq)

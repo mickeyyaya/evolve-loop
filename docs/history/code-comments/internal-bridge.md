@@ -5788,3 +5788,78 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // and the scan disables for the rest of the phase (exactly ONE probe, not one
 // per tick).
 ```
+
+## comment-zero bridge-g1
+
+### `go/internal/bridge/autorespond_decision_test.go:8` — above `const agyIgnoredModelPane = "⚠ failed to construct executor: plan model not specified; you must specify a valid model\n"…`
+
+```text
+// Pane fixtures are verbatim captures from claude v2.1.150, codex v0.133.0 and agy 1.0.2.
+```
+
+### `go/internal/bridge/autorespond_planmode_test.go:105` — above `"../../../docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md",`
+
+```text
+// the incident write-up
+```
+
+### `go/internal/bridge/driver_agytmux.go:33` — above `return tmuxLaunch{`
+
+```text
+// Launch flags come from the per-CLI Realization (ADR-0022): agy realizes
+// permission=bypass → --dangerously-skip-permissions and model_tier →
+// --model "<display name>"; launchCmdLine quotes the space/paren tokens.
+// claude-keyed raw flags realize to nothing.
+```
+
+### `go/internal/bridge/driver_claudetmux.go:47` — above `launchCmd := launchCmdLine(resolveBinary(deps, "claude"), cfg.Realization.LaunchFlags)`
+
+```text
+// Launch flags come from the per-CLI Realization (ADR-0022): model,
+// permission (plan → --permission-mode plan; bypass → --dangerously-skip-
+// permissions), and any claude-keyed raw flags. The Realizer is the single
+// owner, so the flag set never leaks claude argv into agy/codex.
+```
+
+### `go/internal/bridge/driver_codextmux.go:42` — above `flags := cfg.Realization.LaunchFlags`
+
+```text
+// Launch flags come from the per-CLI Realization (ADR-0022): codex resolves
+// the model tier via its manifest model_tier_map and emits it as -m;
+// permission is a controller no-op (trust handled by the auto-responder).
+// No claude argv reaches codex.
+```
+
+### `go/internal/bridge/driver_tmux_submitverify_guard_test.go:195` — above `root, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()`
+
+```text
+// Bind git-TRACKED state, not whatever sits on disk (ADR-0084 lens 5a): an
+// untracked scratch driver_*tmux.go would otherwise become a subject of
+// this guard and produce a false RED.
+```
+
+### `go/internal/bridge/engine.go:265` — above `Realization Realization`
+
+```text
+// Realization is the per-CLI launch realization (ADR-0022): the model,
+// permission and raw flags this CLI understands, resolved from a
+// LaunchIntent against its manifest; drivers build launch commands from
+// Realization.LaunchFlags so one CLI's argv never leaks into another.
+```
+
+### `go/internal/bridge/engine.go:586` — above `func (e *Engine) readResult(c attemptLogContext, req core.BridgeRequest, stdoutLog string, resp *core.BridgeResponse) {`
+
+```text
+// readResult is the strategy-aware result read (ADR-0027): the stdout
+// contract writes no artifact file — its answer is the captured scrollback
+// (stdoutLog), so reading req.ArtifactPath would always miss. Every other
+// contract reads the artifact file. An unreadable result is
+// BRIDGE_RESULT_READ_FAILED, never an error: the on-disk report is the
+// verdict source and Launch still returns nil with an empty Stdout.
+```
+
+### `go/internal/bridge/engine_tripwire_test.go:23` — above `cycleInDir bool`
+
+```text
+// true => workspace lives under .evolve/runs/cycle-1005
+```

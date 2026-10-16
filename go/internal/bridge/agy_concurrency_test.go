@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// A frozen clock gives every lane the same timestamp, so only the atomic nonce can separate the names.
 func TestResolveSession_AgyConcurrent_UniqueUnderRace(t *testing.T) {
 	t.Parallel()
 	frozen := time.Unix(1_700_000_000, 0)
@@ -21,8 +20,7 @@ func TestResolveSession_AgyConcurrent_UniqueUnderRace(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			<-start // release all goroutines at once to maximize contention
-			// Same run, cycle and agent for every lane: a fleet dispatching one phase across lanes in one second.
+			<-start
 			cfg := &Config{Cycle: 100, Agent: "audit", RunID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
 			names[i], _ = resolveSession(cfg, deps, "evolve-bridge-agy-")
 		}(i)
@@ -78,7 +76,6 @@ func TestResolveSession_AgyConcurrent_MixedRunsAndCycles(t *testing.T) {
 			t.Fatalf("cross-run/cycle agy session collision: %q", r.name)
 		}
 		seen[r.name] = struct{}{}
-		// run-scope token = first 8 chars of the ULID after the "r" marker.
 		wantTok := "r" + r.run[:8]
 		if !strings.Contains(r.name, wantTok) {
 			t.Errorf("agy session %q missing run-scope token %q (unattributable pane)", r.name, wantTok)

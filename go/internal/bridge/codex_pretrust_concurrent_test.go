@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// cfg.codexConfigPath, not EVOLVE_CODEX_CONFIG_PATH, points both goroutines at one shared temp config, so the
-// real ~/.codex is never touched. The start barrier makes both read the same empty file, the lost-update window.
 func TestPretrustCodexProjects_ConcurrentTwoGoroutines(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -33,7 +31,7 @@ func TestPretrustCodexProjects_ConcurrentTwoGoroutines(t *testing.T) {
 		errs[1] = pretrustCodexProjects(cfgB)
 	}()
 
-	close(start) // release both goroutines simultaneously
+	close(start)
 	wg.Wait()
 
 	for i, err := range errs {

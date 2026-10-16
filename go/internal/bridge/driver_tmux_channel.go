@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// replLiveChannel owns the optional live pane and breadcrumb files plus the
-// correlation span that brackets a delivered operator injection. When the
-// channel is disabled its methods are inert and no files are created.
 type replLiveChannel struct {
 	on               bool
 	paneWriter       io.Writer
@@ -81,15 +78,10 @@ func (c *replLiveChannel) injectionDelivered(corrID string) {
 	c.sawBusy = false
 }
 
-// observeIdle closes a correlation span after a real busy-to-idle transition.
-// LivenessCenter remains the only authority for CLI-specific busy detection.
 func (c *replLiveChannel) observeIdle(pane string, center *panestream.LivenessCenter) {
 	if !c.on || c.openCorrID == "" {
 		return
 	}
-	// Bracket the open ask using the real per-CLI busy signal. The input marker
-	// remains visible while some CLIs generate, so marker presence is not an
-	// idle signal.
 	if center.BusyOf(pane, c.profile) {
 		c.sawBusy = true
 		return

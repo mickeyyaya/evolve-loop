@@ -37,8 +37,6 @@ func TestEngineLaunch_DurationStopsBeforeTokenResolution(t *testing.T) {
 	eng := NewEngine(Deps{
 		Runner: fr.runner(), LookupEnv: mapLookup(nil), Now: now,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
-			// Simulate enrichment consuming later clock budget. The attempt's end
-			// must already be frozen before this callback begins.
 			_ = now()
 			return tokenusage.Result{Usage: cyclestate.TokenUsage{Output: 4}, Source: tokenusage.SourceTranscript}, nil
 		},
@@ -480,7 +478,7 @@ func TestEngineLaunch_AgyLogOpenFailureDoesNotClaimProcessDispatch(t *testing.T)
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "agy", Profile: prof, Model: "auto", Prompt: "work",
 		Workspace: ws, ArtifactPath: artifact, Agent: "build",
-		StdoutLog: ws, // opening a directory as a file fails before Runner dispatch
+		StdoutLog: ws,
 	})
 	if err == nil || resp.ExitCode != ExitBadFlags {
 		t.Fatalf("Launch = exit %d err %v, want pre-dispatch bad-flags failure", resp.ExitCode, err)

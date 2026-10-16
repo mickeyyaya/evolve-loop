@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 )
 
-// artifactTimeoutCause aliases launchoutcome.TimeoutCause, so the emitter
-// and the parser read the same closed cause vocabulary.
 type artifactTimeoutCause = launchoutcome.TimeoutCause
 
 const (

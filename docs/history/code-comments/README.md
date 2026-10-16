@@ -500,7 +500,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/adapters/sandbox` | 2 | [internal-adapters-sandbox.md](internal-adapters-sandbox.md) |
 | `internal/auditchain` | 6 | [internal-auditchain.md](internal-auditchain.md) |
 | `internal/bridge/panestream` | 44 | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
-| `internal/bridge` | 424 | [internal-bridge.md](internal-bridge.md) |
+| `internal/bridge` | 433 | [internal-bridge.md](internal-bridge.md) |
 | `internal/changedpkgs` | 13 | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/checkpoint` | 4 | [internal-checkpoint.md](internal-checkpoint.md) |
 | `internal/ciparity` | 10 | [internal-ciparity.md](internal-ciparity.md) |

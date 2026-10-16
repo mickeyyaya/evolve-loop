@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// livePane529 is the unedited final pane of a real router death at exit 81, read from testdata so it stays
-// auditable against the escalation report it came from.
 func livePane529(t *testing.T) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", "cycle-1523-router-529-pane.txt"))
@@ -19,7 +17,6 @@ func livePane529(t *testing.T) string {
 		t.Fatalf("read live 529 pane fixture: %v", err)
 	}
 	pane := string(b)
-	// A truncated or scrubbed fixture would make every assertion below vacuous.
 	if !strings.Contains(pane, "API Error: 529 Overloaded") {
 		t.Fatalf("fixture no longer carries the live 529 error text — the evidence was lost")
 	}
@@ -32,7 +29,7 @@ func livePane529(t *testing.T) string {
 func TestRunTmuxREPL_ArtifactTimeout_MarkerFlagsTransientOnLivePane(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	tmux := &fakeTmux{paneSeq: []string{livePane529(t)}} // boots; artifact never lands
+	tmux := &fakeTmux{paneSeq: []string{livePane529(t)}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
 		{Action: ReviewExtend, Reason: "still working"},
 		{Action: ReviewPause, Reason: "agent produced no output"},
@@ -54,7 +51,6 @@ func TestRunTmuxREPL_ArtifactTimeout_MarkerFlagsTransientOnLivePane(t *testing.T
 	if !strings.Contains(summary, "cause=transient_upstream") {
 		t.Errorf("the recognized upstream failure lacks a stable cause code; summary=%q", summary)
 	}
-	// The field must be driver-authored: provider prose on the cause is a prompt-injection path.
 	if strings.Contains(summary, "Overloaded") || strings.Contains(summary, "status.claude.com") {
 		t.Errorf("raw pane text reached the recorded cause — the transient field must be driver-authored\n  got: %s", summary)
 	}
@@ -79,19 +75,16 @@ func TestRunTmuxREPL_ArtifactTimeout_SilentPaneIsNotTransient(t *testing.T) {
 	}
 }
 
-// transientFamilyCase is one CLI family's transient-recognition contract. Only claude's exemplar is
-// live-captured; the others are the providers' documented error shapes.
 type transientFamilyCase struct {
 	cli       string
-	transient []string // MUST read as transient for this family
-	walls     []string // that family's real quota walls — MUST NOT read as transient
+	transient []string
+	walls     []string
 }
 
 func transientFamilyCases() []transientFamilyCase {
 	return []transientFamilyCase{
 		{
 			cli: "claude-tmux",
-			// Live-captured from a router escalation report.
 			transient: []string{
 				"API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again in a moment.",
 				"API Error: 503 Service Unavailable",
@@ -100,7 +93,6 @@ func transientFamilyCases() []transientFamilyCase {
 		},
 		{
 			cli: "codex-tmux",
-			// OpenAI documented error surface (not live-captured).
 			transient: []string{
 				"stream error: server_error; retrying",
 				"The server had an error while processing your request",
@@ -110,7 +102,6 @@ func transientFamilyCases() []transientFamilyCase {
 		},
 		{
 			cli: "agy-tmux",
-			// Gemini documented error surface (not live-captured).
 			transient: []string{
 				"503 UNAVAILABLE: The model is overloaded. Please try again later.",
 				"500 INTERNAL",
@@ -129,12 +120,11 @@ func transientFamilyCases() []transientFamilyCase {
 		},
 		{
 			cli: "ollama-tmux",
-			// Local server surface (not live-captured).
 			transient: []string{
 				"Error: 500 Internal Server Error",
 				"Error: llama runner process has terminated: exit status 2",
 			},
-			walls: nil, // ollama is local: it declares no quota wall
+			walls: nil,
 		},
 	}
 }
@@ -153,8 +143,6 @@ func TestArtifactTimeoutTransient_LivePaneIsFamilyScopedNotHardCodedText(t *test
 	}
 }
 
-// bridgeAuthoredChatter is stderr the bridge itself writes on the exit-81 path. None of it may read as
-// transient for any family, or the classifier is reading stderr instead of the pane.
 var bridgeAuthoredChatter = map[string]string{
 	"exit-81 drift alarm (exhaustion_drift.go:39-41)": "POSSIBLE EXHAUSTION-REGEX DRIFT: the teardown pane matches a broad quota-wall heuristic but claude-tmux's controls.usage.exhausted_regex did not — the wall wording may have changed; update the exhausted_regex (diagnostic only, this exit-81 verdict is unchanged).",
 	"workspace file listing (driver_common.go:388)":   "routing-plan.json (0 bytes)",
@@ -204,7 +192,6 @@ func TestEveryTmuxFamilyDeclaresTransientRecognition(t *testing.T) {
 			}
 		})
 	}
-	// The case table must cover every embedded tmux family, so a new CLI cannot skip this contract.
 	covered := map[string]bool{}
 	for _, tc := range cases {
 		covered[tc.cli] = true
@@ -226,7 +213,6 @@ func TestEveryTmuxFamilyDeclaresTransientRecognition(t *testing.T) {
 func TestRunTmuxREPL_ArtifactTimeout_TransientFieldIsFamilyAgnostic(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
-	// codex's own marker and error text: the claude manifest can neither produce nor recognize this pane.
 	pane := "› working…\nstream error: server_error; retrying\n›"
 	tmux := &fakeTmux{paneSeq: []string{pane}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "no output"}}}
@@ -280,16 +266,13 @@ func TestArtifactTimeoutTransient_EchoedProviderTextNeverClassifiesForAnyFamily(
 	}
 }
 
-// The only test that fails if the driver hands the classifier the raw pane instead of the stripped one.
 func TestRunTmuxREPL_ArtifactTimeout_EchoedPromptIsNotTransient(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// The task quotes the provider error verbatim, as this repo's own backlog does.
 	const taskLine = "Task: recognize API Error: 529 Overloaded inside an artifact timeout."
 	if err := os.WriteFile(fx.promptFile, []byte("Instructions.\n"+taskLine+"\nWrite the deliverable.\n"), 0o644); err != nil {
 		t.Fatalf("write prompt: %v", err)
 	}
-	// The agent echoes its instructions and stalls; the pane holds no genuine provider error.
 	pane := tmuxPromptMarkerDefault + "\n" + taskLine + "\nthinking...\n" + tmuxPromptMarkerDefault
 	tmux := &fakeTmux{paneSeq: []string{pane}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "agent idle"}}}

@@ -24,7 +24,7 @@ func TestClaudeTmux_StreamOutputNote(t *testing.T) {
 func TestCodex_AutoModelOmitsM(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "codex", "")
-	prof := writeJSON(t, filepath.Join(t.TempDir(), "nomodel.json"), `{"name":"n"}`) // no model
+	prof := writeJSON(t, filepath.Join(t.TempDir(), "nomodel.json"), `{"name":"n"}`)
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	args := []string{
 		"--cli=codex", "--profile=" + prof, "--model=auto",
@@ -49,13 +49,10 @@ func TestPreparePrompt_ReadsExistingChallengeToken(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "prompt body $CHALLENGE_TOKEN tail")
-	// Pre-seed challenge-token.txt as if the orchestrator already minted it.
 	existing := "orchestrator-minted-12345678"
 	if err := os.WriteFile(filepath.Join(ws, "challenge-token.txt"), []byte(existing+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Mint would return a DIFFERENT value — proves the existing-token path
-	// is taken when it returns the orchestrator's value, not the mint's.
 	mintCalls := 0
 	out, err := preparePrompt(&Config{PromptFile: pf, Workspace: ws}, Deps{
 		NewChallengeToken: func() (string, error) {
@@ -88,7 +85,6 @@ func TestPreparePrompt_TokenErrors(t *testing.T) {
 		Deps{NewChallengeToken: func() (string, error) { return "", errors.New("no tok") }}); err == nil {
 		t.Fatal("token-mint error should propagate")
 	}
-	// challenge-token.txt write error (Workspace is a file)
 	fileWS := writeJSON(t, filepath.Join(ws, "notadir"), "x")
 	if _, err := preparePrompt(&Config{PromptFile: pf, Workspace: fileWS},
 		Deps{NewChallengeToken: func() (string, error) { return "tok", nil }}); err == nil {
@@ -99,9 +95,8 @@ func TestPreparePrompt_TokenErrors(t *testing.T) {
 func TestRunTmuxREPL_EnsureDirsAndPromptWriteErrors(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hello") // valid prompt, no token
+	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hello")
 
-	// ensureDirs error: Workspace is a file
 	fileWS := writeJSON(t, filepath.Join(ws, "wsfile"), "x")
 	cfg := &Config{Model: "m", AllowBypass: true, PromptFile: pf, Workspace: fileWS,
 		Artifact: filepath.Join(ws, "a"), StdoutLog: filepath.Join(ws, "o"), StderrLog: filepath.Join(ws, "e")}
@@ -109,7 +104,6 @@ func TestRunTmuxREPL_EnsureDirsAndPromptWriteErrors(t *testing.T) {
 		t.Fatalf("ensureDirs error → code=%d, want ExitBadFlags", code)
 	}
 
-	// resolved-prompt write error: workspace/resolved-prompt.txt is a directory
 	ws2 := t.TempDir()
 	if err := os.Mkdir(filepath.Join(ws2, "resolved-prompt.txt"), 0o755); err != nil {
 		t.Fatal(err)
@@ -124,7 +118,7 @@ func TestRunTmuxREPL_EnsureDirsAndPromptWriteErrors(t *testing.T) {
 func TestEngineLaunch_PromptWriteError(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	if err := os.Mkdir(filepath.Join(ws, "scout-prompt.txt"), 0o755); err != nil { // promptFile path is a dir
+	if err := os.Mkdir(filepath.Join(ws, "scout-prompt.txt"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	prof := writeJSON(t, filepath.Join(ws, "prof.json"), `{"name":"n"}`)
@@ -158,7 +152,7 @@ func TestRunTmuxREPL_ZeroBootIntervalDefaults(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
-	writeJSON(t, filepath.Join(ws, "a"), "done") // artifact present → quick exit
+	writeJSON(t, filepath.Join(ws, "a"), "done")
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws,
 		Artifact: filepath.Join(ws, "a"), StdoutLog: filepath.Join(ws, "o"), StderrLog: filepath.Join(ws, "e")}
 	deps := covDeps()
@@ -170,17 +164,15 @@ func TestRunTmuxREPL_ZeroBootIntervalDefaults(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ExtendTimeout(t *testing.T) {
-	// Inject a manifest with an extend_timeout rule via the FS seam; a pane
-	// that always matches it drives the extend path until the loop guard.
 	swapManifestFS(t, fakeManifestFS{files: map[string][]byte{
 		"manifests/extendcli.json": []byte(`{"cli":"extendcli","binary":"x","interactive_prompts":[{"name":"w","regex":"WAITING","response_keys":"30","policy":"extend_timeout"}]}`),
 	}})
 	ws := t.TempDir()
-	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi") // no artifact → keeps polling
+	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws,
 		Artifact: filepath.Join(ws, "a"), StdoutLog: filepath.Join(ws, "o"), StderrLog: filepath.Join(ws, "e")}
 	deps := covDeps()
-	deps.Tmux = &fakeTmux{paneSeq: []string{"❯ WAITING"}} // boots (❯) + matches WAITING
+	deps.Tmux = &fakeTmux{paneSeq: []string{"❯ WAITING"}}
 	lp := tmuxLaunch{name: "extendcli", session: "s", launchCmd: "x", promptMarker: "❯", bootIntervalS: 1}
 	if code, _ := runTmuxREPL(context.Background(), cfg, deps, lp); code != ExitRespondLoopGuard {
 		t.Fatalf("repeated extend_timeout should trip the loop guard; code=%d", code)
@@ -188,7 +180,6 @@ func TestRunTmuxREPL_ExtendTimeout(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ExtraFlagsAppended(t *testing.T) {
-	// `-- --myflag` → ExtraFlags appended to the REPL launch command.
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	writeJSON(t, fx.artifact, "done")
@@ -227,7 +218,7 @@ func TestBuildReport_EmptyArtifactNameDefaults(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	writeJSON(t, filepath.Join(ws, "artifact.md"), "body")
-	r, err := BuildReport(ws, "", time.Now()) // "" → defaults to artifact.md
+	r, err := BuildReport(ws, "", time.Now())
 	if err != nil {
 		t.Fatalf("BuildReport err: %v", err)
 	}
@@ -237,16 +228,14 @@ func TestBuildReport_EmptyArtifactNameDefaults(t *testing.T) {
 }
 
 func TestRunTmuxREPL_TickDuringBoot(t *testing.T) {
-	// tickDuringBoot + a first pane WITHOUT the marker → the boot loop runs
-	// the auto-responder tick before the marker appears on the next poll.
 	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
-	writeJSON(t, filepath.Join(ws, "a"), "done") // artifact present → quick exit after boot
+	writeJSON(t, filepath.Join(ws, "a"), "done")
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws,
 		Artifact: filepath.Join(ws, "a"), StdoutLog: filepath.Join(ws, "o"), StderrLog: filepath.Join(ws, "e")}
 	deps := covDeps()
-	deps.Tmux = &fakeTmux{paneSeq: []string{"booting...", "❯"}} // marker only on 2nd poll
+	deps.Tmux = &fakeTmux{paneSeq: []string{"booting...", "❯"}}
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", launchCmd: "x", promptMarker: "❯", bootIntervalS: 1, tickDuringBoot: true}
 	if code, _ := runTmuxREPL(context.Background(), cfg, deps, lp); code != ExitOK {
 		t.Fatalf("tick-during-boot path → code=%d, want ExitOK", code)

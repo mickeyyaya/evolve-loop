@@ -7,12 +7,8 @@ import (
 	"testing"
 )
 
-// codexDeepModel is the one value pin for codex's deep and top tiers; every other codex tier test asserts
-// relationally against the family manifest. The reasoning rung is pinned in profiles/effort_defaults_test.go.
 const codexDeepModel = "gpt-5.6-sol"
 
-// codexFamilyManifest loads the codex family manifest without the live-catalog overlay, so a stale catalog
-// cannot mask a manifest regression. codex-tmux.json is the family's one tier table.
 func codexFamilyManifest(t *testing.T) Manifest {
 	t.Helper()
 	m, err := loadManifestRaw("codex-tmux")
@@ -22,7 +18,6 @@ func codexFamilyManifest(t *testing.T) Manifest {
 	return m
 }
 
-// The clamp's safe set must admit the deep model, or the clamp would rewrite every deep launch to its default.
 func TestCodexManifest_DeepTopTiers_ValuePin(t *testing.T) {
 	t.Parallel()
 	m := codexFamilyManifest(t)
@@ -48,7 +43,6 @@ func TestCodexManifest_DeepTopTiers_ValuePin(t *testing.T) {
 	}
 }
 
-// The pointer is explicit, so a headless manifest that legitimately declares no map (claude-p) is never changed.
 func TestCodexHeadlessManifest_PointsAtFamilyTable(t *testing.T) {
 	t.Parallel()
 	raw, err := loadManifestRaw("codex")
@@ -137,8 +131,6 @@ func TestLaunch_Codex_ResolvesTierViaFamilyManifest(t *testing.T) {
 	}
 }
 
-// The realistic trigger is a corrupt operator override in bridgeManifestDir(): loadManifestRaw does not fall
-// back to the embedded copy on a parse error. The CLI default beats a fatal `-m deep` boot.
 func TestLaunch_Codex_ManifestUnavailable_OmitsModelFlag(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "codex-tmux.json"), []byte("{not json"), 0o644); err != nil {
@@ -164,10 +156,9 @@ func TestLaunch_Codex_ManifestUnavailable_OmitsModelFlag(t *testing.T) {
 	}
 }
 
-// gpt-6-astra is out of the tier table and the clamp's safe set, so even a stray pin is rewritten to the family default.
 func TestCodexFamilyManifest_AstraIsNotSelectable(t *testing.T) {
 	t.Parallel()
-	m := codexFamilyManifest(t) // raw: a stale live catalog must not mask a manifest regression
+	m := codexFamilyManifest(t)
 	for tier, model := range m.ModelTierMap {
 		if model == "gpt-6-astra" {
 			t.Errorf("tier %s still maps to gpt-6-astra", tier)

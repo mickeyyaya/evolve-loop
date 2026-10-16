@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-// doctorEngine builds an Engine with controlled env (incl. HOME), binary
-// presence, and a runner (version line on --version; rc/err otherwise).
 func doctorEngine(env map[string]string, present map[string]bool, runnerRC int, runnerErr error) *Engine {
 	return NewEngine(Deps{
 		LookupEnv: mapLookup(env),
@@ -27,11 +25,6 @@ func doctorEngine(env map[string]string, present map[string]bool, runnerRC int, 
 			}
 			return runnerRC, runnerErr
 		},
-		// Hermetic default: no Keychain. Tests that exercise the macOS Keychain
-		// claude-auth path inject their own KeychainProbe (see
-		// TestDoctorAuth_ClaudeKeychain); without this, the production default
-		// would shell out to `security` and pick up the dev host's real login
-		// Keychain, making auth assertions host-dependent.
 		KeychainProbe: func(string) bool { return false },
 		Now:           time.Now,
 	})
@@ -54,7 +47,6 @@ func TestDoctorHome_Fallback(t *testing.T) {
 	if h := doctorEngine(map[string]string{"HOME": "/x"}, nil, 0, nil).doctorHome(); h != "/x" {
 		t.Fatalf("HOME from env = %q", h)
 	}
-	// no HOME in env → os.Getenv fallback (non-empty on any real host).
 	e := NewEngine(Deps{LookupEnv: mapLookup(nil)})
 	if e.doctorHome() != os.Getenv("HOME") {
 		t.Fatal("doctorHome should fall back to os.Getenv")
@@ -99,12 +91,9 @@ func TestDoctorAuth(t *testing.T) {
 	}
 }
 
-// claude OAuth lives in the macOS login Keychain (service
-// "Claude Code-credentials"), not a file, so doctorAuth must consult the
-// KeychainProbe seam or a file-only check false-negatives.
 func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
 	t.Parallel()
-	home := t.TempDir() // deliberately NO ~/.claude/.credentials.json
+	home := t.TempDir()
 
 	eng := NewEngine(Deps{
 		LookupEnv:     mapLookup(map[string]string{"HOME": home}),
@@ -139,7 +128,6 @@ func TestDoctorEnvWarnings(t *testing.T) {
 	if w := e.doctorEnvWarnings("agy"); len(w) != 0 {
 		t.Fatalf("agy warnings = %v", w)
 	}
-	// OPENAI allowed → no warning
 	e2 := doctorEngine(map[string]string{"OPENAI_API_KEY": "o", "BRIDGE_ALLOW_OPENAI_API_KEY": "1"}, nil, 0, nil)
 	if w := e2.doctorEnvWarnings("codex-tmux"); len(w) != 0 {
 		t.Fatalf("codex allowed warnings = %v", w)
@@ -164,7 +152,6 @@ func TestDoctorDeep(t *testing.T) {
 	if dp := e.doctorDeep(context.Background(), "zzz", "zzz"); dp.Ran {
 		t.Fatal("unknown cli deep should not run")
 	}
-	// headless fail (runner rc!=0)
 	ef := doctorEngine(nil, nil, 1, nil)
 	if dp := ef.doctorDeep(context.Background(), "claude-p", "claude"); !dp.Ran || dp.Passed {
 		t.Fatalf("claude-p deep fail = %+v", dp)
@@ -196,17 +183,14 @@ func TestDoctor_VerdictsAndExitCodes(t *testing.T) {
 	if code != ExitOK || rep.Summary.Ready != 1 {
 		t.Fatalf("ready exit=%d summary=%+v", code, rep.Summary)
 	}
-	// warning: binary + auth + an env leak
 	_, code = doctorEngine(map[string]string{"HOME": home, "ANTHROPIC_API_KEY": "k"}, map[string]bool{"claude": true}, 0, nil).Doctor(context.Background(), "claude-p", false)
 	if code != 1 {
 		t.Fatalf("warning exit = %d, want 1", code)
 	}
-	// blocked via deep failure
 	_, code = doctorEngine(map[string]string{"HOME": home}, map[string]bool{"claude": true}, 1, nil).Doctor(context.Background(), "claude-p", true)
 	if code != 2 {
 		t.Fatalf("deep-fail exit = %d, want 2", code)
 	}
-	// full sweep (no filter) runs all manifests
 	repAll, _ := doctorEngine(map[string]string{"HOME": home}, nil, 0, nil).Doctor(context.Background(), "", false)
 	if len(repAll.Results) < 6 || repAll.Host == "" || repAll.ScannedAt == "" {
 		t.Fatalf("full sweep results=%d host=%q", len(repAll.Results), repAll.Host)

@@ -44,7 +44,6 @@ func TestAutoResponderTick_IdleGateViaCenter_Escalates(t *testing.T) {
 	}
 }
 
-// autorespondTickRegionSource returns tick's busy-gate region of autorespond.go, anchored on two unique code lines.
 func autorespondTickRegionSource(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)

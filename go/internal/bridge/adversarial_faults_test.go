@@ -85,7 +85,6 @@ func adversarialFaultCases() []adversarialFaultCase {
 	return out
 }
 
-// rateLimitWallFor returns each family's real wall phrasing; the codex text is verbatim from a real escalation report.
 func rateLimitWallFor(family string) string {
 	switch family {
 	case "codex":
@@ -93,7 +92,7 @@ func rateLimitWallFor(family string) string {
 			"visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 6:11 AM."
 	case "claude":
 		return "Claude usage limit reached. Your limit will reset at 6:11 AM."
-	default: // agy / gemini family
+	default:
 		return "RESOURCE_EXHAUSTED: rate limit exceeded — try again in 2 hours."
 	}
 }

@@ -17,7 +17,7 @@ func TestCodexTmuxPreflightTrustsFreshWorktree(t *testing.T) {
 	old := codexVersionPathFn
 	t.Cleanup(func() { codexVersionPathFn = old })
 	codexVersionPathFn = func() (string, error) { return versionPath, nil }
-	freshWorktree := t.TempDir() // fresh = no prior trust entry anywhere
+	freshWorktree := t.TempDir()
 
 	cfg := &Config{CLI: "codex-tmux", Worktree: freshWorktree, Workspace: t.TempDir(), codexConfigPath: cfgPath}
 	if err := (codexTmuxDriver{}).Preflight(context.Background(), cfg, Deps{}.withDefaults()); err != nil {
@@ -68,7 +68,6 @@ func TestRecipeDriverSkipsPretrustForNonCodex(t *testing.T) {
 	}
 }
 
-// orderPinDriver records the relative order of Preflight and Launch.
 type orderPinDriver struct{ calls *[]string }
 
 func (orderPinDriver) Name() string { return "cb3-orderpin" }
@@ -81,7 +80,6 @@ func (d orderPinDriver) Launch(context.Context, *Config, Deps) (int, error) {
 	return ExitOK, nil
 }
 
-// Not parallel: it mutates the global driver registry.
 func TestLaunchDispatchesPreflightBeforeDriverLaunch(t *testing.T) {
 	var calls []string
 	Register(orderPinDriver{calls: &calls})

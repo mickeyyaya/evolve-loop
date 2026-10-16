@@ -23,10 +23,8 @@ func (w replWaiter) handleTickInteractions(state *replWaitState, elapsed int, pa
 	w.observeTickPane(state, pane, captureOK)
 	action, rc := w.responder.tickPane(w.ctx, w.launch.session, pane, captureOK)
 	switch rc {
-	case 0, 1: // noop / responded
+	case 0, 1:
 	case 2:
-		// Agent self-signalled progress restarts the interval so the extend
-		// counts as activity.
 		if parseExtendSecs(action) > 0 {
 			state.intervalStartS = elapsed
 			fmt.Fprintf(w.deps.Stderr, "%s agent extend signal — review interval refreshed\n", w.prefix)

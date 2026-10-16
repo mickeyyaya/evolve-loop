@@ -40,7 +40,6 @@ func TestEngineLaunch_RequiredFields_FourSentinelStrings(t *testing.T) {
 			}
 		})
 	}
-	// The ORDER: with every later field also missing, the first missing one is named.
 	for _, tc := range []struct {
 		req  core.BridgeRequest
 		want string

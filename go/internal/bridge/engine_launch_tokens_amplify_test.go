@@ -85,8 +85,6 @@ func TestEngineLaunch_NilResolver_RecordsUnavailableAttempt(t *testing.T) {
 	}
 }
 
-// Attempt is left at its zero value, unlike the append test's explicit 1/2,
-// to catch an off-by-one that would write 0.
 func TestEngineLaunch_ZeroAttempt_DefaultsToOne(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -108,9 +106,6 @@ func TestEngineLaunch_ZeroAttempt_DefaultsToOne(t *testing.T) {
 	}
 }
 
-// The append test alone starts from a fresh temp dir, so a truncate-on-open
-// regression would still pass it; this seeds a pre-existing record to catch
-// that.
 func TestEngineLaunch_AppendPreservesExistingRecords(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -197,8 +192,6 @@ func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
 	}
 	line := strings.TrimRight(string(raw), "\n")
 
-	// Typed decode: omitempty on a zero-ish field still decodes to the zero
-	// value asserted below.
 	var rec llmCallRecord
 	if err := json.Unmarshal([]byte(line), &rec); err != nil {
 		t.Fatalf("record not valid JSON: %v (%q)", err, line)
@@ -243,8 +236,6 @@ func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
 		t.Errorf("model/measurement provenance = %+v", rec)
 	}
 
-	// Physical key presence: these top-level keys cannot be dropped by
-	// omitempty on a success record.
 	var top map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(line), &top); err != nil {
 		t.Fatalf("record not a JSON object: %v", err)

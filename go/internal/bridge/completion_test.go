@@ -35,8 +35,6 @@ func TestArtifactDetector_Poll(t *testing.T) {
 	if ready, _, note, err := d.poll(context.Background()); ready || err != nil || note != "" {
 		t.Fatalf("absent artifact: got (ready=%v, note=%q, err=%v), want (false, \"\", nil)", ready, note, err)
 	}
-	// Readiness follows the cross-poll stability window (completion_debounce_test.go),
-	// not first sight.
 	if err := os.WriteFile(canonical, []byte("DONE\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -49,9 +47,6 @@ func TestArtifactDetector_Poll(t *testing.T) {
 	}
 }
 
-// stdoutPoll drives a stdoutDetector across a pane sequence (last value
-// repeats, matching fakeTmux) and returns the poll index at which it reported
-// ready, or -1 if it never did within maxPolls.
 func stdoutPoll(t *testing.T, marker string, threshold int, panes []string, maxPolls int) int {
 	t.Helper()
 	tmux := &fakeTmux{paneSeq: panes}
@@ -74,8 +69,6 @@ func stdoutPoll(t *testing.T, marker string, threshold int, panes []string, maxP
 }
 
 func TestStdoutDetector_ReadyAfterActivityThenIdle(t *testing.T) {
-	// baseline → activity (thinking, differs) → settled output w/ marker.
-	// fakeTmux repeats the last entry, so the idle run accrues to threshold.
 	t.Parallel()
 	panes := []string{"prompt delivered", "thinking…", "⏺ [ {…} ]\n❯"}
 	if got := stdoutPoll(t, "❯", 3, panes, 12); got < 0 {
@@ -84,8 +77,6 @@ func TestStdoutDetector_ReadyAfterActivityThenIdle(t *testing.T) {
 }
 
 func TestStdoutDetector_NotReadyWhileStreaming(t *testing.T) {
-	// Marker present every tick, but the pane keeps changing (streaming) →
-	// the stability counter resets each poll → never ready.
 	t.Parallel()
 	panes := []string{"a", "b❯", "c❯", "d❯", "e❯", "f❯", "g❯", "h❯"}
 	if got := stdoutPoll(t, "❯", 3, panes, len(panes)); got >= 0 {
@@ -94,9 +85,6 @@ func TestStdoutDetector_NotReadyWhileStreaming(t *testing.T) {
 }
 
 func TestStdoutDetector_NotReadyBeforeActivity(t *testing.T) {
-	// Marker present from the very first capture and the pane never changes:
-	// the agent never demonstrably did work → must NOT false-fire on the
-	// marker that was already visible before the turn began.
 	t.Parallel()
 	panes := []string{"❯ idle prompt"}
 	if got := stdoutPoll(t, "❯", 3, panes, 8); got >= 0 {
@@ -126,11 +114,11 @@ func TestClaudeTmux_StdoutCompletion_NoArtifactNeeded(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{
-		tmuxPromptMarkerDefault,                  // boot loop capture: marker seen → REPL ready
-		tmuxPromptMarkerDefault,                  // boot-time auto-respond tick capture (tickDuringBoot)
-		tmuxPromptMarkerDefault,                  // interval baseline pre-capture
-		"thinking…",                              // detector baseline (poll 1)
-		"⏺ [ done ]\n" + tmuxPromptMarkerDefault, // settles here; repeats → idle accrues
+		tmuxPromptMarkerDefault,
+		tmuxPromptMarkerDefault,
+		tmuxPromptMarkerDefault,
+		"thinking…",
+		"⏺ [ done ]\n" + tmuxPromptMarkerDefault,
 	}}
 	code, stderr := runTmux(t, fx, tmux, nil, "--allow-bypass", "--completion=stdout")
 	if code != ExitOK {

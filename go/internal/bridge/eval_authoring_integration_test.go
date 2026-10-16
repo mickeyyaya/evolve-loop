@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
-// Use the checked-in role profiles through Engine.LaunchArgs, then execute the
-// resulting OS policy. A copied synthetic profile would miss the live defect.
 func TestNativeRoleEvalAuthoringBoundary(t *testing.T) {
 	t.Parallel()
 	probe := requireNativeSandbox(t)

@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// escalatePrompt is a manifest rule with no response keys, so a matching pane escalates with rc 85.
 var escalatePrompt = []ManifestPrompt{{
 	Name:   "unknown_path_question",
 	Regex:  "Which absolute path should I write the deliverable to\\?",
@@ -34,7 +33,6 @@ const blockedQ = "Which absolute path should I write the deliverable to?"
 func TestPre85Rung_KernelHitInjectsOnce_ClearedContinues(t *testing.T) {
 	t.Parallel()
 	facts := interaction.KernelFacts{ArtifactPath: "/ws/cycle-7/build-report.md"}
-	// Both panes hold the same blocking question, so the second tick escalates again.
 	ar, tmux, rec := brokerResponder(t, []string{blockedQ, blockedQ}, "enforce", facts)
 	ctx := context.Background()
 
@@ -64,7 +62,6 @@ func TestPre85Rung_KernelHitInjectsOnce_ClearedContinues(t *testing.T) {
 
 func TestPre85Rung_MissFallsThroughToFallbackChainUnchanged(t *testing.T) {
 	t.Parallel()
-	// Empty facts → every question misses.
 	ar, tmux, _ := brokerResponder(t, []string{blockedQ}, "enforce", interaction.KernelFacts{})
 	if _, rc := ar.tick(context.Background(), "s"); rc != 85 {
 		t.Fatalf("a kernel miss must fall through to rc 85 unchanged; got rc=%d", rc)

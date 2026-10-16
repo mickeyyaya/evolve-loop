@@ -16,14 +16,11 @@ func mustPanic(t *testing.T, fn func()) {
 	fn()
 }
 
-// stubDriver is a registry test double.
 type stubDriver struct{ name string }
 
 func (s stubDriver) Name() string                                     { return s.name }
 func (stubDriver) Launch(context.Context, *Config, Deps) (int, error) { return 0, nil }
 
-// registerBuiltins re-registers the seven production drivers after a ResetDriversForTesting, so the
-// global registry is restored for other tests.
 func registerBuiltins() {
 	Register(claudePDriver{})
 	Register(codexDriver{})
@@ -36,8 +33,6 @@ func registerBuiltins() {
 }
 
 func TestDriverRegistry(t *testing.T) {
-	// Strict count over the real (init-registered) set: an accidental init() registration (e.g. a test
-	// stub forgetting deferred cleanup) gets caught immediately; a deliberate addition bumps this constant.
 	names := DriverNames()
 	if len(names) != 8 {
 		t.Fatalf("DriverNames = %v (len %d), want exactly 8 builtins", names, len(names))
@@ -61,9 +56,9 @@ func TestDriverRegistry(t *testing.T) {
 		t.Fatal("LookupDriver should miss an unregistered name")
 	}
 
-	mustPanic(t, func() { Register(nil) })                  // nil driver
-	mustPanic(t, func() { Register(stubDriver{""}) })       // empty name
-	mustPanic(t, func() { Register(stubDriver{"stub-x"}) }) // duplicate
+	mustPanic(t, func() { Register(nil) })
+	mustPanic(t, func() { Register(stubDriver{""}) })
+	mustPanic(t, func() { Register(stubDriver{"stub-x"}) })
 }
 
 func TestAllDigits(t *testing.T) {
@@ -121,16 +116,14 @@ func TestMapCodexModelAndName(t *testing.T) {
 }
 
 func TestDecideAutoRespond_ExtraBranches(t *testing.T) {
-	// extend_timeout with non-numeric keys → escalate
 	t.Parallel()
 	prompts := []ManifestPrompt{
-		{Name: "skipEmpty", Regex: "", Policy: "escalate"}, // empty regex → skipped
+		{Name: "skipEmpty", Regex: "", Policy: "escalate"},
 		{Name: "badExtend", Regex: "slow", ResponseKeys: "x", Policy: "extend_timeout"},
 	}
 	if a, rc := decideAutoRespond("slow op", prompts, map[string]int{}, false); a != "escalate:badExtend" || rc != 85 {
 		t.Fatalf("extend_timeout bad keys = (%q,%d), want escalate", a, rc)
 	}
-	// extend_timeout with numeric keys → extend
 	prompts = []ManifestPrompt{{Name: "ext", Regex: "slow", ResponseKeys: "90", Policy: "extend_timeout"}}
 	if a, rc := decideAutoRespond("slow", prompts, map[string]int{}, false); a != "extend:90" || rc != 2 {
 		t.Fatalf("extend_timeout good = (%q,%d), want extend:90,2", a, rc)
@@ -143,7 +136,7 @@ func TestDefaultChallengeToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("defaultChallengeToken err: %v", err)
 	}
-	if len(tok) != 16 { // 8 bytes hex
+	if len(tok) != 16 {
 		t.Fatalf("token len = %d, want 16", len(tok))
 	}
 }

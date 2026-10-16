@@ -31,8 +31,6 @@ func TestPretrustCodexProjects(t *testing.T) {
 			},
 		},
 		{
-			// Idempotent only when the trust entries and the [notice] nudge suppression are both present;
-			// a fixture missing the notice is rewritten.
 			name: "IdempotentWhenAlreadyTrusted",
 			existing: `model = "gpt-5.5"
 
@@ -107,7 +105,7 @@ trust_level = "trusted"
 		},
 		{
 			name:      "MissingNewlineAtEnd_NormalizesBeforeAppend",
-			existing:  `model = "gpt-5.5"`, // no trailing newline
+			existing:  `model = "gpt-5.5"`,
 			worktree:  "/tmp/wt",
 			workspace: "",
 			wantSubstrings: []string{
@@ -125,7 +123,6 @@ trust_level = "trusted"
 			},
 		},
 		{
-			// Control characters in a path would corrupt config.toml and stop codex from starting.
 			name:      "PathWithControlChars_AllEscaped",
 			existing:  "",
 			worktree:  "/tmp/with\nnewline\tand\rcr",
@@ -134,13 +131,11 @@ trust_level = "trusted"
 				`[projects."/tmp/with\nnewline\tand\rcr"]`,
 			},
 			wantAbsent: []string{
-				"\n[projects",  // newline must NOT split the header line
-				"newline\nand", // raw newline must not leak through
+				"\n[projects",
+				"newline\nand",
 			},
 		},
 		{
-			// strings.Replacer applies every escape at once, not in sequence, so a path holding both a
-			// backslash and a quote must still produce the right bytes.
 			name:      "PathWithBackslashAndQuote_EscapedOnce",
 			existing:  "",
 			worktree:  `/tmp/a\b"c`,
@@ -168,7 +163,7 @@ trust_level = "trusted"
 			got, err := os.ReadFile(path)
 			if err != nil {
 				if os.IsNotExist(err) && tt.wantUnchanged && tt.existing == "" {
-					return // no-op + no seed = no file is correct
+					return
 				}
 				t.Fatalf("read merged: %v", err)
 			}
@@ -197,7 +192,6 @@ trust_level = "trusted"
 				t.Errorf("trust_level lines (%d) < project headers (%d)\n%s",
 					trustCount, headerCount, gotStr)
 			}
-			// When worktree equals workspace the section appears exactly once.
 			if tt.worktree != "" && tt.worktree == tt.workspace {
 				h := codexProjectHeader(tt.worktree)
 				if got := strings.Count(gotStr, h); got != 1 {
@@ -208,7 +202,6 @@ trust_level = "trusted"
 	}
 }
 
-// A start barrier makes every reader see the same empty file, so a lost update trips reliably across iterations.
 func TestPretrustCodexProjects_ConcurrentCalls_AllEntriesSurvive(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

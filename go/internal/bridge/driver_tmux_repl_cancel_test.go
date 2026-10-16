@@ -9,12 +9,6 @@ import (
 	"time"
 )
 
-// ctxHonoringTmux wraps fakeTmux with production CapturePane semantics: a
-// dead ctx cannot fork tmux (exec.CommandContext refuses a cancelled
-// context), so the capture errors instead of returning canned data. It
-// exists to prove the benign-cancel completion path still falls back to
-// lastGoodPane instead of writing empty logs — the ctx-blind shared fake
-// cannot exercise that.
 type ctxHonoringTmux struct{ *fakeTmux }
 
 func (c *ctxHonoringTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
@@ -24,9 +18,6 @@ func (c *ctxHonoringTmux) CapturePane(ctx context.Context, session string, scrol
 	return c.fakeTmux.CapturePane(ctx, session, scrollback)
 }
 
-// TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout writes the
-// deliverable and cancels the ctx in the SAME poll gap, so the cancel check
-// runs before any poll ever observes the artifact.
 func TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
@@ -37,10 +28,6 @@ func TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout(t *testing.T) {
 	var stderr bytes.Buffer
 	fired := false
 	sleep := func(time.Duration) {
-		// The FIRST wait-loop Sleep follows "prompt delivered" on stderr
-		// (printed right before the loop's baseline capture), so firing here
-		// matches the real ordering: deliverable written, then teardown,
-		// inside one poll gap.
 		if !fired && strings.Contains(stderr.String(), "prompt delivered") {
 			fired = true
 			if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nPROTOTYPE OK\n"), 0o644); err != nil {
@@ -85,7 +72,7 @@ func TestTmuxREPL_CancelWithoutDeliverable_StillTimesOut(t *testing.T) {
 	sleep := func(time.Duration) {
 		if !fired && strings.Contains(stderr.String(), "detected") {
 			fired = true
-			cancel() // teardown lands, deliverable never written
+			cancel()
 		}
 	}
 	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})

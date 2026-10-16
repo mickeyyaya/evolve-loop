@@ -23,7 +23,6 @@ func TestCodexEffortRealizesPlanModeOverride(t *testing.T) {
 		if !strings.Contains(joined, "model_reasoning_effort="+tier) {
 			t.Errorf("effort %q does not set model_reasoning_effort: %v", tier, args)
 		}
-		// Plan mode is where the hardest thinking happens, so it must carry the same tier.
 		if !strings.Contains(joined, "plan_mode_reasoning_effort="+tier) {
 			t.Errorf("effort %q does not set plan_mode_reasoning_effort — entering plan mode will silently drop to codex's built-in preset (observed xhigh -> medium): %v",
 				tier, args)

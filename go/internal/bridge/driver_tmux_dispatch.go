@@ -6,9 +6,6 @@ import (
 	"time"
 )
 
-// dispatchTmuxPrompt requires the completion-evidence baseline to be captured
-// before any input, and submit verification to observe the pane only after
-// the REPL redraws.
 func dispatchTmuxPrompt(
 	ctx context.Context,
 	cfg *Config,

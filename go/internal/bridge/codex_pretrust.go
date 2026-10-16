@@ -3,6 +3,7 @@ package bridge
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
 
-// tomlKeyEscaper escapes backslash, quote and the control characters that have a TOML short escape.
-// An unescaped newline in a path would corrupt ~/.codex/config.toml and stop codex from starting.
 var tomlKeyEscaper = strings.NewReplacer(
 	`\`, `\\`,
 	`"`, `\"`,
@@ -23,11 +22,22 @@ var tomlKeyEscaper = strings.NewReplacer(
 	"\r", `\r`,
 )
 
-// pretrustCodexProjects trusts cfg.Worktree and cfg.Workspace in the codex config so codex never renders its
-// "Press enter to confirm" modal, and hides the rate-limit model-switch modal. The merge is append-only and
-// idempotent. It runs under flock.WithPathLock because concurrent fleet cycles share this host-global file.
-// Callers log an error and continue: a pretrust failure must not block a launch.
-// See ADR-0049.
+type codexConfigTemp interface {
+	io.Writer
+	Close() error
+	Name() string
+}
+
+var createCodexConfigTemp = func(dir, pattern string) (codexConfigTemp, error) {
+	f, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+var renameCodexConfig = os.Rename
+
 func pretrustCodexProjects(cfg *Config) error {
 	paths := codexPretrustPaths(cfg)
 	if len(paths) == 0 {
@@ -37,7 +47,6 @@ func pretrustCodexProjects(cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("resolve codex config path: %w", err)
 	}
-	// Create the dir at 0o700 before the lock, because PathLock's own MkdirAll would use 0o755.
 	if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
 		return fmt.Errorf("ensure codex config dir: %w", err)
 	}
@@ -47,15 +56,13 @@ func pretrustCodexProjects(cfg *Config) error {
 			return fmt.Errorf("read codex config: %w", err)
 		}
 		merged := appendCodexTrustEntries(string(existing), paths)
-		// Also hide codex's rate-limit model-switch modal, which the auto-responder cannot dismiss.
 		merged = appendCodexNotice(merged)
 		if merged == string(existing) {
-			return nil // every path already trusted + notice already present
+			return nil
 		}
-		// A unique temp file keeps lock-free readers from seeing a partial write.
 		dir := filepath.Dir(configPath)
 		base := filepath.Base(configPath)
-		f, err := os.CreateTemp(dir, base+".tmp.*")
+		f, err := createCodexConfigTemp(dir, base+".tmp.*")
 		if err != nil {
 			return fmt.Errorf("create codex config tmp: %w", err)
 		}
@@ -69,9 +76,7 @@ func pretrustCodexProjects(cfg *Config) error {
 			_ = os.Remove(tmp)
 			return fmt.Errorf("close codex config tmp: %w", err)
 		}
-		// CreateTemp creates the file 0o600, so no Chmod is needed.
-		if err := os.Rename(tmp, configPath); err != nil {
-			// Best-effort cleanup; a leftover .tmp.* file is harmless.
+		if err := renameCodexConfig(tmp, configPath); err != nil {
 			_ = os.Remove(tmp)
 			return fmt.Errorf("rename codex config: %w", err)
 		}
@@ -79,7 +84,6 @@ func pretrustCodexProjects(cfg *Config) error {
 	})
 }
 
-// codexPretrustPaths returns cfg.Worktree then cfg.Workspace, skipping empty and duplicate paths.
 func codexPretrustPaths(cfg *Config) []string {
 	if cfg == nil {
 		return nil
@@ -94,7 +98,6 @@ func codexPretrustPaths(cfg *Config) []string {
 	return out
 }
 
-// resolveCodexConfigPath returns cfg.codexConfigPath when set, else ~/.codex/config.toml.
 func resolveCodexConfigPath(cfg *Config) (string, error) {
 	if cfg != nil && cfg.codexConfigPath != "" {
 		return cfg.codexConfigPath, nil
@@ -110,7 +113,6 @@ func defaultCodexConfigPath() (string, error) {
 	return filepath.Join(home, ".codex", "config.toml"), nil
 }
 
-// codexVersionPathFn is the seam tests replace to redirect the codex version file.
 var codexVersionPathFn func() (string, error) = defaultCodexVersionPath
 
 func defaultCodexVersionPath() (string, error) {
@@ -150,8 +152,6 @@ func dismissCodexUpdateNag() error {
 	return os.WriteFile(path, body, 0o600)
 }
 
-// appendCodexTrustEntries appends a trusted [projects."<path>"] block for each path whose header text is absent.
-// Presence is a substring match; the result ends with a newline.
 func appendCodexTrustEntries(existing string, paths []string) string {
 	out := existing
 	if out != "" && !strings.HasSuffix(out, "\n") {
@@ -170,10 +170,8 @@ func appendCodexTrustEntries(existing string, paths []string) string {
 	return out
 }
 
-// codexRateLimitNudgeKey is the [notice] key that hides codex's "Switch to <mini>?" rate-limit modal.
 const codexRateLimitNudgeKey = "hide_rate_limit_model_nudge"
 
-// appendCodexNotice appends a [notice] table setting codexRateLimitNudgeKey unless the key text already appears.
 func appendCodexNotice(existing string) string {
 	if strings.Contains(existing, codexRateLimitNudgeKey) {
 		return existing
@@ -182,14 +180,12 @@ func appendCodexNotice(existing string) string {
 	if out != "" && !strings.HasSuffix(out, "\n") {
 		out += "\n"
 	}
-	// [notice] is a top-level table, so it gets an extra blank line of separation.
 	if out != "" {
 		out += "\n"
 	}
 	return out + "[notice]\n" + codexRateLimitNudgeKey + " = true\n"
 }
 
-// codexProjectHeader builds the [projects."<path>"] header with the path TOML-escaped.
 func codexProjectHeader(path string) string {
 	return fmt.Sprintf(`[projects."%s"]`, tomlKeyEscaper.Replace(path))
 }

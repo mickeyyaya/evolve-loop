@@ -12,13 +12,11 @@ import (
 func runTmuxCLI(t *testing.T, fx launchFixture, cli string, tmux *fakeTmux, lookup map[string]string, extra ...string) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(lookup),
-		CaptureBaseline: zeroBaselineCapture}) // harness seeds model mid-session writes
+		CaptureBaseline: zeroBaselineCapture})
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args(cli, extra...), nil, &stdout, &stderr)
 	return code, stderr.String()
 }
-
-// --- codex-tmux -----------------------------------------------------------
 
 func TestCodexTmux_PermissionModeRejected(t *testing.T) {
 	t.Parallel()
@@ -70,8 +68,8 @@ func TestCodexTmux_OpenAIKeyCostLeak(t *testing.T) {
 
 func TestCodexTmux_LaunchCmd_ModelMapAndMarker(t *testing.T) {
 	t.Parallel()
-	fx := newFixture(t, "codex-tmux", "") // profile model=haiku
-	tmux := &fakeTmux{}                   // no marker → REPL boot times out, but launchCmd already sent
+	fx := newFixture(t, "codex-tmux", "")
+	tmux := &fakeTmux{}
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass")
 	if !tmux.sentContains("codex --yolo -c 'check_for_update_on_startup=false' -m gpt-5.6-luna") {
 		t.Fatalf("codex-tmux launch should map haiku→gpt-5.6-luna after the --yolo and update-check-off prefix; sentKeys=%v", tmux.sentKeys)
@@ -84,7 +82,7 @@ func TestCodexTmux_HappyPath(t *testing.T) {
 	if err := os.WriteFile(fx.artifact, []byte("DONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	tmux := &fakeTmux{paneSeq: []string{"›"}} // codex marker
+	tmux := &fakeTmux{paneSeq: []string{"›"}}
 	code, stderr := runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass")
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)
@@ -93,8 +91,6 @@ func TestCodexTmux_HappyPath(t *testing.T) {
 		t.Fatalf("codex-tmux should exit via /quit; sentKeys=%v", tmux.sentKeys)
 	}
 }
-
-// --- agy-tmux -------------------------------------------------------------
 
 func TestAgyTmux_PermissionModeRejected(t *testing.T) {
 	t.Parallel()
@@ -125,8 +121,6 @@ func TestAgyTmux_LaunchCmd(t *testing.T) {
 	fx := newFixture(t, "agy-tmux", "")
 	tmux := &fakeTmux{}
 	runTmuxCLI(t, fx, "agy-tmux", tmux, nil, "--allow-bypass")
-	// agy selects its model via the --model launch flag; the tokens are
-	// display names, shell-quoted by launchCmdLine. `-m` remains undefined.
 	if !tmux.sentContains("--model") {
 		t.Fatalf("agy-tmux launch cmd should carry --model (agy 1.0.15); sentKeys=%v", tmux.sentKeys)
 	}

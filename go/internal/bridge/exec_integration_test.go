@@ -43,7 +43,6 @@ func TestExecRunner_Real(t *testing.T) {
 	if err != nil || code != 0 {
 		t.Fatalf("pwd: code=%d err=%v", code, err)
 	}
-	// macOS /tmp is a symlink to /private/tmp, so resolve both sides before compare.
 	gotPwd, _ := filepath.EvalSymlinks(strings.TrimSpace(out.String()))
 	wantPwd, _ := filepath.EvalSymlinks(dir)
 	if gotPwd != wantPwd {

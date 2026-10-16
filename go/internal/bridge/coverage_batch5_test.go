@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// fakeManifestFS is a swappable manifestSource for error injection.
 type fakeManifestFS struct {
 	entries    []fs.DirEntry
 	readDirErr error

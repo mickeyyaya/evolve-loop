@@ -114,7 +114,7 @@ func TestRecordTokenUsage_TripwireRecord_FalseFieldPresentAcrossAllSilentPaths(t
 func TestRecordTokenUsage_Tripwire_VeryLongDuration_NoOverflowStillWarns(t *testing.T) {
 	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
-		cli: "agy", agent: "builder", code: 0, durSecs: 365 * 24 * 60 * 60, cycleInDir: true, // 1 year
+		cli: "agy", agent: "builder", code: 0, durSecs: 365 * 24 * 60 * 60, cycleInDir: true,
 	})
 	if _, ok := tripwireStderrLine(stderr); !ok {
 		t.Errorf("a pathologically long non-claude exit-0 source=none launch must still trip without overflow; stderr:\n%s", stderr)

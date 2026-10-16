@@ -11,8 +11,6 @@ import (
 func TestTmuxREPL_ExhaustionWall_FailsOverFast(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// Boots (prompt marker present) and shows the quota wall; no artifact is
-	// ever written, so only the exhaustion override can end the run.
 	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
 	code, stderr := runTmuxNudge(t, fx, tmux)
@@ -20,8 +18,6 @@ func TestTmuxREPL_ExhaustionWall_FailsOverFast(t *testing.T) {
 		t.Fatalf("exit = %d, want %d (ExitUnknownPrompt — exhaustion fast-fail, not %d ExitArtifactTimeout); stderr=%q",
 			code, ExitUnknownPrompt, ExitArtifactTimeout, stderr)
 	}
-	// The poll loop must catch the wall before any stop-review checkpoint
-	// runs, and before the walled CLI is nudged.
 	if strings.Contains(stderr, "stop-review") {
 		t.Errorf("exhaustion must fast-fail on the poll loop before any stop-review checkpoint; stderr=%q", stderr)
 	}
@@ -30,7 +26,6 @@ func TestTmuxREPL_ExhaustionWall_FailsOverFast(t *testing.T) {
 	}
 }
 
-// Counts deps.Sleep calls (one per poll) as the iteration proxy.
 func TestTmuxREPL_ExhaustionWall_FastFailNotAtCheckpoint(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
@@ -65,7 +60,7 @@ func TestTmuxREPL_ContentWall_SuppressedByCorroborator(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
-	healthy := func(context.Context, string) bool { return false } // probe answered ⇒ not walled
+	healthy := func(context.Context, string) bool { return false }
 	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CorroborateWall: healthy})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
