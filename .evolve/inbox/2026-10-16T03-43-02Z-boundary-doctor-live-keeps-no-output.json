@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "When a boundary step fails, the wave next --json envelope carries the step's stderr tail (last 40 lines) beside rc",
+    "A doctor live failure names its failing stage (launch, trust prompt, REPL prompt, delivery, artifact) in that tail"
+  ],
+  "created_at": "2026-10-16T03:43:02Z",
+  "files": [
+    "go/cmd/evolve/cmd_wave_next.go",
+    "go/cmd/evolve/cmd_boundary.go"
+  ],
+  "fix": "In waveStepRecorder.dispatch (go/cmd/evolve/cmd_wave_next.go), tee each boundary step's stderr into a bounded buffer. Append its last 40 lines to the step's Detail beside rc=N, and write the same tail to the boundary log in cmd_boundary.go. Then reproduce the first-attempt `evolve doctor live claude-tmux` failure from the kept output and fix its cause.",
+  "id": "boundary-doctor-live-keeps-no-output",
+  "kind": "bug",
+  "priority_class": "debuggability",
+  "source": "console wave boundaries 101 and 102, 2026-10-16",
+  "summary": "At both the wave 101 and wave 102 boundaries, the first `evolve wave next` failed at step `evolve doctor live claude-tmux` with detail rc=1. A manual re-run of the probe passed both times, and the second launch went through. The envelope keeps only the exit code, so the cause of the first failure cannot be read. Claude Code 2.1.301 was installed hours earlier, so a version-upgrade first-launch screen does not explain it.",
+  "title": "The boundary's live claude-tmux probe fails on the first attempt and the wave envelope keeps no output",
+  "weight": 0.4
+}
