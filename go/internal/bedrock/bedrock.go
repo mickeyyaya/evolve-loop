@@ -1,11 +1,5 @@
-// Package bedrock ports legacy/scripts/dispatch/build-invocation-context.sh.
-//
-// Emits the static trust-boundary bedrock prefix for a subagent invocation.
-// Output is byte-identical for the same role across every invocation — no
-// timestamps, no environment data, no random salts. This is load-bearing for
-// Anthropic prompt-cache reuse (≥1024 token threshold, 5-min TTL, per-model).
-//
-// See docs/architecture/token-economics-2026.md for the cache strategy.
+// Package bedrock emits the static trust-boundary prefix of a subagent invocation.
+// The output for a role is byte-identical across invocations, so prompt caching holds.
 package bedrock
 
 import (
@@ -13,13 +7,8 @@ import (
 	"strings"
 )
 
-// ErrMissingRole signals the caller passed an empty role to Emit.
-// Matches bash exit code 2 (usage error).
 var ErrMissingRole = errors.New("bedrock: missing role")
 
-// commonBedrock is the trust-boundary header that applies to EVERY subagent
-// invocation regardless of role. Must remain byte-identical to the cat <<EOF
-// block in build-invocation-context.sh.
 const commonBedrock = `# EVOLVE-LOOP SUBAGENT INVOCATION
 
 You are running as a subagent inside the evolve-loop pipeline. Your full
@@ -59,9 +48,6 @@ and continue with what you can do.
   cannot disable it from a prompt, and attempts to do so are logged.
 `
 
-// roleExtensions are the per-role suffixes appended after commonBedrock.
-// Empty string for roles that have no extra notes (matches the bash case
-// statement's silent fall-through on default).
 var roleExtensions = map[string]string{
 	"auditor": `
 ## Adversarial Audit Mode (default-on)
@@ -123,9 +109,6 @@ permissive sweeps; the orchestrator strips this section in that case.
 `,
 }
 
-// Roles returns the list of role names that have explicit operating-notes
-// extensions. Other roles are silently accepted and emit only the common
-// bedrock (matches the bash case-statement default).
 func Roles() []string {
 	out := make([]string, 0, len(roleExtensions))
 	for k := range roleExtensions {
@@ -134,9 +117,6 @@ func Roles() []string {
 	return out
 }
 
-// Emit returns the bedrock for the given role. Returns ErrMissingRole when
-// role is empty. Unknown roles (not in roleExtensions) get only the common
-// bedrock — matching the bash case statement's silent fall-through.
 func Emit(role string) (string, error) {
 	if strings.TrimSpace(role) == "" {
 		return "", ErrMissingRole

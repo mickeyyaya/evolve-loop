@@ -1,11 +1,5 @@
 package gatesignal
 
-// reporter_test.go — ADR-0101 S2b (design signal-center-design.md §15.5): the
-// contract gate's producer. RED first: every decision the gate can reach is
-// ONE event under module gate.contract with the origin Reviewer.Review, the
-// kind gate.passed (the phase advanced) or gate.rejected (it did not), a
-// registered GATE_CONTRACT_* code, and fields that name what was checked.
-
 import (
 	"errors"
 	"strings"
@@ -157,8 +151,6 @@ func TestCodes_AreRegisteredUnderTheGateModule(t *testing.T) {
 	}
 }
 
-// Architecture review of S2b (LOW): emit filters into its own map; the
-// caller's map is never mutated.
 func TestReporter_EmitDoesNotMutateTheCallersFields(t *testing.T) {
 	r, got := recording()
 	r.Verified(check, Verified{Artifact: "a.md", Bytes: 1, Stage: "enforce"})

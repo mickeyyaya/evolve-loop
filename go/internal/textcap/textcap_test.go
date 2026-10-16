@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// Test 10 — the two rune-cap rules the advisor prompt and the carryover
-// lifecycle project (ADR-0103 unit 04): distinct markers, rune-safe bounds,
-// TrimSpace on one rule only.
 func TestTruncateRunes_TrimsCapsAndMarks(t *testing.T) {
 	under, at, over := strings.Repeat("é", 499), strings.Repeat("é", 500), strings.Repeat("é", 501)
 	if got := TruncateRunes(under, 500); got != under {

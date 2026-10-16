@@ -11,9 +11,6 @@ func body(lines int) string {
 	return strings.Repeat("\t_ = 0\n", lines-2)
 }
 
-// TestWalk_KeysEveryNonTestFunctionByDirAndReceiver names Walk and FuncSpan:
-// sizes exclude the doc comment, methods key by receiver base type, and test
-// files and skipped directories are not read.
 func TestWalk_KeysEveryNonTestFunctionByDirAndReceiver(t *testing.T) {
 	root := t.TempDir()
 	src := "package p\n\ntype T[K any] struct{}\n\n// Doc.\nfunc F() {\n" + body(MaxLines+1) + "}\n\nfunc (t *T[K]) M() {\n" + body(3) + "}\n"
@@ -37,7 +34,6 @@ func TestWalk_KeysEveryNonTestFunctionByDirAndReceiver(t *testing.T) {
 	}
 }
 
-// TestLoadOffenders_RejectsAllowancesWithinTheLimit names LoadOffenders.
 func TestLoadOffenders_RejectsAllowancesWithinTheLimit(t *testing.T) {
 	dir := t.TempDir()
 	for body, wantErr := range map[string]bool{`{"p.F": 51}`: false, `{"p.F": 50}`: true, `null`: true, `{"p.F": 5`: true} {
@@ -51,8 +47,6 @@ func TestLoadOffenders_RejectsAllowancesWithinTheLimit(t *testing.T) {
 	}
 }
 
-// TestCheck_OnlyGrowthOrANewOffenderFails names Check: an allowance is a
-// ceiling, so growth and a new offender fail while slack and stale entries pass.
 func TestCheck_OnlyGrowthOrANewOffenderFails(t *testing.T) {
 	slack := map[string]struct {
 		spans     []FuncSpan

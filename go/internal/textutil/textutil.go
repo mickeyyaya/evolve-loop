@@ -2,8 +2,8 @@ package textutil
 
 import "fmt"
 
-// TruncateInline returns s shortened to at most n bytes, appending an
-// elision marker when shortened.
+const middleElisionSlack = 32
+
 func TruncateInline(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -11,10 +11,8 @@ func TruncateInline(s string, n int) string {
 	return s[:n] + fmt.Sprintf("… (%d bytes elided)", len(s)-n)
 }
 
-// TruncateMiddle keeps the first head and last tail bytes of s, with an
-// elision marker in the middle. Returns s unchanged when short enough.
 func TruncateMiddle(s string, head, tail int) string {
-	if len(s) <= head+tail+32 {
+	if len(s) <= head+tail+middleElisionSlack {
 		return s
 	}
 	elided := len(s) - head - tail

@@ -7,9 +7,6 @@ import (
 	"time"
 )
 
-// refNow anchors relative reset times deterministically: 2026-07-03 in
-// Asia/Taipei (the tz the golden pane was captured in), before both the 4:10pm
-// session reset and the Jul 5 weekly reset.
 func refNow(t *testing.T) time.Time {
 	t.Helper()
 	loc, err := time.LoadLocation("Asia/Taipei")
@@ -79,7 +76,6 @@ func TestStatesOf_NoWindowsIsNoState(t *testing.T) {
 	}
 }
 
-// TestParseResetWhen pins the two reset formats claude emits.
 func TestParseResetWhen(t *testing.T) {
 	now := refNow(t)
 	cases := []struct {
@@ -90,7 +86,7 @@ func TestParseResetWhen(t *testing.T) {
 		{"9pm", time.Date(2026, 7, 3, 21, 0, 0, 0, now.Location())},
 		{"Jul 5 at 9pm", time.Date(2026, 7, 5, 21, 0, 0, 0, now.Location())},
 		{"Jul 5 at 9:30pm", time.Date(2026, 7, 5, 21, 30, 0, 0, now.Location())},
-		{"11am", time.Date(2026, 7, 4, 11, 0, 0, 0, now.Location())}, // already past noon → tomorrow
+		{"11am", time.Date(2026, 7, 4, 11, 0, 0, 0, now.Location())},
 	}
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {

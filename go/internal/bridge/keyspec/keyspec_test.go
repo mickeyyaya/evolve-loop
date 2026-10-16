@@ -11,7 +11,7 @@ func TestClassify(t *testing.T) {
 		want  Class
 	}{
 		{"Enter", ClassNamed},
-		{"escape", ClassNamed}, // case-insensitive
+		{"escape", ClassNamed},
 		{"Esc", ClassNamed},
 		{"Tab", ClassNamed},
 		{"Up", ClassNamed},
@@ -19,13 +19,13 @@ func TestClassify(t *testing.T) {
 		{"F12", ClassNamed},
 		{"C-c", ClassModifier},
 		{"M-x", ClassModifier},
-		{"S-Tab", ClassModifier},     // modifier + named remainder
-		{"C-M-Enter", ClassModifier}, // stacked modifiers
-		{"C-Excape", ClassSuspect},   // modifier + mistyped remainder
+		{"S-Tab", ClassModifier},
+		{"C-M-Enter", ClassModifier},
+		{"C-Excape", ClassSuspect},
 		{"y", ClassLiteral},
-		{"hello", ClassLiteral}, // lowercase literal text
+		{"hello", ClassLiteral},
 		{"3", ClassLiteral},
-		{"Excape", ClassSuspect}, // looks like a key name, isn't
+		{"Excape", ClassSuspect},
 		{"Etner", ClassSuspect},
 		{"", ClassLiteral},
 	}

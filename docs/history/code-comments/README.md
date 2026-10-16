@@ -498,15 +498,17 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/adapters/ledger` | 27 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/adapters/observer` | 30 | [internal-adapters-observer.md](internal-adapters-observer.md) |
 | `internal/adapters/sandbox` | 2 | [internal-adapters-sandbox.md](internal-adapters-sandbox.md) |
+| `internal/addedtests` | 2 | [internal-addedtests.md](internal-addedtests.md) |
 | `internal/auditchain` | 6 | [internal-auditchain.md](internal-auditchain.md) |
 | `internal/binaryguard` | 1 | [internal-binaryguard.md](internal-binaryguard.md) |
+| `internal/bridge/keyspec` | 1 | [internal-bridge-keyspec.md](internal-bridge-keyspec.md) |
 | `internal/bridge/panestream` | 44 | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge` | 433 | [internal-bridge.md](internal-bridge.md) |
 | `internal/changedpkgs` | 13 | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/checkpoint` | 4 | [internal-checkpoint.md](internal-checkpoint.md) |
 | `internal/ciparity` | 10 | [internal-ciparity.md](internal-ciparity.md) |
 | `internal/cli/phasecmd` | 32 | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
-| `internal/clihealth` | 13 | [internal-clihealth.md](internal-clihealth.md) |
+| `internal/clihealth` | 14 | [internal-clihealth.md](internal-clihealth.md) |
 | `internal/coherence` | 16 | [internal-coherence.md](internal-coherence.md) |
 | `internal/commitgate` | 3 | [internal-commitgate.md](internal-commitgate.md) |
 | `internal/committedset` | 1 | [internal-committedset.md](internal-committedset.md) |
@@ -519,6 +521,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/cycleoutcome` | 1 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/cyclestate` | 24 | [internal-cyclestate.md](internal-cyclestate.md) |
 | `internal/dashboard` | 8 | [internal-dashboard.md](internal-dashboard.md) |
+| `internal/deliverable/gatesignal` | 2 | [internal-deliverable-gatesignal.md](internal-deliverable-gatesignal.md) |
 | `internal/deliverable` | 116 | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/digest` | 3 | [internal-digest.md](internal-digest.md) |
 | `internal/dossier` | 38 | [internal-dossier.md](internal-dossier.md) |
@@ -544,7 +547,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/loopwave` | 15 | [internal-loopwave.md](internal-loopwave.md) |
 | `internal/modelcatalog` | 2 | [internal-modelcatalog.md](internal-modelcatalog.md) |
 | `internal/modelquery` | 10 | [internal-modelquery.md](internal-modelquery.md) |
-| `internal/observerengine` | 9 | [internal-observerengine.md](internal-observerengine.md) |
+| `internal/observerengine` | 10 | [internal-observerengine.md](internal-observerengine.md) |
 | `internal/phasecoherence` | 25 | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/phasecontract` | 62 | [internal-phasecontract.md](internal-phasecontract.md) |
 | `internal/phaseinventory` | 1 | [internal-phaseinventory.md](internal-phaseinventory.md) |
@@ -565,6 +568,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/profiles` | 30 | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | 51 | [internal-prompts.md](internal-prompts.md) |
 | `internal/quotareset` | 1 | [internal-quotareset.md](internal-quotareset.md) |
+| `internal/quotastate` | 1 | [internal-quotastate.md](internal-quotastate.md) |
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/recovery` | 39 | [internal-recovery.md](internal-recovery.md) |
 | `internal/regressiontia` | 5 | [internal-regressiontia.md](internal-regressiontia.md) |
@@ -582,6 +586,8 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/subagent/subagentrun` | 6 | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
 | `internal/subagent` | 26 | [internal-subagent.md](internal-subagent.md) |
 | `internal/swarm` | 18 | [internal-swarm.md](internal-swarm.md) |
+| `internal/systemprompt` | 1 | [internal-systemprompt.md](internal-systemprompt.md) |
+| `internal/textcap` | 4 | [internal-textcap.md](internal-textcap.md) |
 | `internal/tokenusage` | 24 | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |
 | `internal/triagecap` | 69 | [internal-triagecap.md](internal-triagecap.md) |
