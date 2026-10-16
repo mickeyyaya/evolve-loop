@@ -78,8 +78,6 @@ func TestBridgeRetryAdjudicator_NilBridgeIsANoOp(t *testing.T) {
 	}
 }
 
-// Only the profile path is checkable from this package; the persona↔profile
-// pairing itself is enforced by phasecoherence.TestRepoPersonaProfilePairing.
 func TestAdjudicatorProfilePathMatchesTheShippedProfile(t *testing.T) {
 	t.Parallel()
 

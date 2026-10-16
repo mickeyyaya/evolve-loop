@@ -16,9 +16,6 @@ func pbSHA256Hex(b []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// pbSetupProject lays down <root>/go/bin/evolve (with binBytes) and
-// <root>/.evolve/state.json (with the given pin), returning (projectRoot, binPath,
-// statePath). A nil binBytes ⇒ no binary written.
 func pbSetupProject(t *testing.T, pin string, binBytes []byte) (string, string, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -120,7 +117,7 @@ func TestBootRecovery_PostBuildRepin_UnverifiedProvenance_KeepsPin(t *testing.T)
 }
 
 func TestBootRecovery_PostBuildRepin_NoBinaryIsNoOp(t *testing.T) {
-	root, _, statePath := pbSetupProject(t, "SOME_PIN", nil) // no binary written
+	root, _, statePath := pbSetupProject(t, "SOME_PIN", nil)
 	withVerifiedProvenance(t, true)
 
 	res := repinShipSHAAfterBuild(root)

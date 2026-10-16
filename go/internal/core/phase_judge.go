@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// JudgeVerdict is the LLM-as-judge route-quality grade; Score is in [0,1], or the sentinel -1 when the judge has no opinion.
 type JudgeVerdict struct {
 	Score         float64  `json:"score"`
 	Rationale     string   `json:"rationale"`
@@ -19,20 +18,16 @@ type JudgeVerdict struct {
 
 var judgeNoOpinion = JudgeVerdict{Score: -1}
 
-// PlanJudge is the optional LLM-as-judge that scores a routing plan against the cycle goal.
-// See ADR-0052.
 type PlanJudge struct {
 	bridge Bridge
 	cli    string
 	model  string
 }
 
-// NewPlanJudge builds the judge over the given bridge on the fast tier.
 func NewPlanJudge(bridge Bridge) *PlanJudge {
 	return &PlanJudge{bridge: bridge, cli: "claude-tmux", model: "haiku"}
 }
 
-// GradePlan scores plan against the cycle goal and returns a JudgeVerdict, failing open to Score=-1 on any error.
 func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *router.PhasePlan) JudgeVerdict {
 	if j.bridge == nil || in.Workspace == "" || plan == nil {
 		return judgeNoOpinion
@@ -66,7 +61,6 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 	return parseJudgeVerdict(resp.Stdout)
 }
 
-// composeJudgePrompt orders phases deterministically so the prompt prefix stays cache-friendly.
 func (j *PlanJudge) composeJudgePrompt(in router.RouteInput, plan *router.PhasePlan, artifactPath string) string {
 	var b strings.Builder
 	b.WriteString("You are the evolve-loop ROUTE-QUALITY JUDGE. Score how well the proposed phase plan ")
@@ -86,9 +80,6 @@ func (j *PlanJudge) composeJudgePrompt(in router.RouteInput, plan *router.PhaseP
 	return b.String()
 }
 
-// parseJudgeVerdict takes the LAST balanced JSON object in stdout, since a
-// brace inside the rationale must not be miscounted and the prompt's echoed
-// example must not be mistaken for the answer.
 func parseJudgeVerdict(stdout string) JudgeVerdict {
 	start, end, ok := lastBalancedSpan(stdout, '{', '}')
 	if !ok {

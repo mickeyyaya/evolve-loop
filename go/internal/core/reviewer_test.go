@@ -8,13 +8,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// recordingReviewer is a DeliverableReviewer test double that records every
-// Review call and returns a scripted decision per phase. nil entry = approve.
 type recordingReviewer struct {
 	calls    []ReviewInput
 	decide   map[string]ReviewResult
 	reason   string
-	mu       []ReviewInput // history of inputs in call order
+	mu       []ReviewInput
 	default_ ReviewResult
 }
 
@@ -100,9 +98,6 @@ func TestOrchestrator_ReviewerRejects_CycleAborts(t *testing.T) {
 	if !strings.Contains(err.Error(), "deliverable missing required header") {
 		t.Errorf("error should surface the reviewer's Reason; got %v", err)
 	}
-	// Kind=="phase" marks a success append; a contract-correction re-dispatch
-	// appends Kind=="contract_correction" instead, so this checks for a
-	// build SUCCESS specifically, not just any build-role entry.
 	for _, e := range led.entries {
 		if e.Role == "build" && e.Kind == "phase" {
 			t.Errorf("rejected phase 'build' was recorded as a success in the ledger: %+v", e)
@@ -110,9 +105,6 @@ func TestOrchestrator_ReviewerRejects_CycleAborts(t *testing.T) {
 	}
 }
 
-// sequencedReviewer returns results[i] on the i-th Review of `phase`; once the
-// slice is exhausted it returns the last element. Other phases approve. Used to
-// script reject→approve sequences for the contract-correction loop.
 type sequencedReviewer struct {
 	phase   string
 	results []ReviewResult
@@ -205,9 +197,6 @@ func TestCorrectionLoop_ExhaustsThenAborts(t *testing.T) {
 	}
 }
 
-// sequencedRunner returns verdicts[i] on the i-th Run (clamped to the last
-// element), with no error. Used to script a correction re-dispatch that returns
-// a non-canonical verdict.
 type sequencedRunner struct {
 	name     string
 	verdicts []string
@@ -227,7 +216,7 @@ func TestCorrectionLoop_NonCanonicalVerdictAborts(t *testing.T) {
 	led := &fakeLedger{}
 	rev := &sequencedReviewer{phase: "build", results: []ReviewResult{
 		{Approve: false, Reason: "missing header"},
-		{Approve: true}, // never reached — the bad verdict aborts first
+		{Approve: true},
 	}}
 	runners := buildRunners(nil)
 	runners[PhaseBuild] = &sequencedRunner{name: "build", verdicts: []string{VerdictPASS, ""}}

@@ -92,23 +92,18 @@ func TestArchiveRepairPrompts_RenamesOnceNeverClobbers(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws, "build-prompt.txt")); !os.IsNotExist(err) {
 		t.Fatal("live prompt must be moved, not copied (the bridge rewrites it)")
 	}
-	// A counter rollback re-archives round 1: the first evidence wins.
 	writeBriefFixture(t, ws, "build-prompt.txt", "a later prompt")
 	archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1}, PhaseBuild)
 	if b, _ := os.ReadFile(archived); string(b) != "round one prompt" {
 		t.Fatalf("existing archive clobbered: %q", b)
 	}
-	archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairActive: true}, PhaseBuild)                                // round 0: no-op
-	archiveRepairPrompts(CycleState{AuditRepairActive: true, AuditRepairAttempts: 1}, PhaseBuild)                           // no workspace: no-op
-	archiveRepairPrompts(CycleState{WorkspacePath: t.TempDir(), AuditRepairActive: true, AuditRepairAttempts: 1}, PhaseTDD) // absent prompt: quiet
-	archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairAttempts: 1}, PhaseBuild)                                 // repair not active: self-guarded no-op
-	archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1}, PhaseAudit)        // audit is never repair-seeded: no-op
+	archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairActive: true}, PhaseBuild)
+	archiveRepairPrompts(CycleState{AuditRepairActive: true, AuditRepairAttempts: 1}, PhaseBuild)
+	archiveRepairPrompts(CycleState{WorkspacePath: t.TempDir(), AuditRepairActive: true, AuditRepairAttempts: 1}, PhaseTDD)
+	archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairAttempts: 1}, PhaseBuild)
+	archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1}, PhaseAudit)
 }
 
-// findingsAuditRunner is a live-shape auditor: round 1 writes a real-format
-// FAIL report with headings (and, standing in for the bridge, the build prompt
-// the round was given); round 2 PASSes. The build fakeRunner captures the
-// requests, so the round-2 brief is asserted on the dispatched Context.
 type findingsAuditRunner struct {
 	t    *testing.T
 	runs int
@@ -162,7 +157,7 @@ func TestAuditorFindingsBrief_UnreadableReportWarns(t *testing.T) {
 
 	ws := t.TempDir()
 	auditName := phasecontract.ArtifactFilename(string(PhaseAudit))
-	if err := os.MkdirAll(filepath.Join(ws, auditName), 0o755); err != nil { // a directory where the file should be
+	if err := os.MkdirAll(filepath.Join(ws, auditName), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	var brief string
@@ -185,7 +180,7 @@ func TestAuditorFindingsBrief_UnreadableReportWarns(t *testing.T) {
 func TestTruncateFindings_CutsAtLineBoundary(t *testing.T) {
 	t.Parallel()
 
-	line := strings.Repeat("x", 100) + " — finding…\n" // 100 ASCII + multi-byte tail
+	line := strings.Repeat("x", 100) + " — finding…\n"
 	s := strings.Repeat(line, maxFindingsBytes/len(line)+3)
 	got := truncateFindings(s)
 	body, marker, ok := strings.Cut(got, "\n…[truncated ")

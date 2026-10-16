@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseoutputs"
 )
 
-// emitPhaseOutputsSignal surveys a finished cycle's workspace and appends the
-// result to the unified signal stream. Completed phases come from the
-// caller's in-memory CycleState, the authority over run.json's mirror.
-// Best-effort but never silent: every skip or emit failure lands on stderr
-// with the cycle number.
 func emitPhaseOutputsSignal(workspace string, cycle int, completed []string, resolver phasecontract.Resolver) {
 	if workspace == "" {
 		return

@@ -16,9 +16,7 @@ func TestRunCycleFromPhase_LegacyCheckpointIsStillReviewed(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := &fakeStorage{
-		state: State{LastCycleNumber: 9},
-		// ExplanationDocumentationVersion deliberately 0: a checkpoint written
-		// before the explanation contract existed.
+		state:      State{LastCycleNumber: 9},
 		cycleState: CycleState{CycleID: 9, WorkspacePath: ws, ActiveWorktree: t.TempDir()},
 	}
 	reviews := &phaseReviewCounter{}
@@ -36,8 +34,6 @@ func TestRunCycleFromPhase_LegacyCheckpointIsStillReviewed(t *testing.T) {
 	}
 }
 
-// gateMarker stands in for the production contract gate (which core cannot
-// import): it satisfies the declaredDeliverablesGate capability.
 type gateMarker struct{ on bool }
 
 func (g gateMarker) Review(context.Context, ReviewInput) ReviewResult {
@@ -45,9 +41,6 @@ func (g gateMarker) Review(context.Context, ReviewInput) ReviewResult {
 }
 func (g gateMarker) VerifiesDeclaredDeliverables() bool { return g.on }
 
-// TestDeclaredDeliverablesGateWired pins the predicate the composition-root
-// proof relies on: it must see through the mandatory-explanation wrapper and
-// chain nesting, and must not be fooled by a gate that reports itself off.
 func TestDeclaredDeliverablesGateWired(t *testing.T) {
 	t.Parallel()
 

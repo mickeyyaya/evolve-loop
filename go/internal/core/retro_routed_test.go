@@ -29,8 +29,6 @@ func TestDecideAfterRetro_EmitsRoutingDecisionArtifact(t *testing.T) {
 
 	next, _, reason, _ := o.decideAfterRetroRouted(context.Background(), 5, CycleState{WorkspacePath: ws}, 3, VerdictFAIL, nil, router.RouteInput{})
 
-	// Empty history, non-strict → adapter PROCEED → end (kernel default).
-	// The advisor agrees, so the operator-facing reason contract holds.
 	if next != PhaseEnd {
 		t.Errorf("next = %s, want end", next)
 	}
@@ -57,8 +55,6 @@ func TestDecideAfterRetroRouted_PassArmIsAFailureBranch(t *testing.T) {
 	}
 }
 
-// fixedNextStrategy returns a canned decision — used to drive branches a
-// real Route would not produce from this fixture.
 type fixedNextStrategy struct{ next string }
 
 func (s fixedNextStrategy) Decide(router.RouteInput) router.RouterDecision {

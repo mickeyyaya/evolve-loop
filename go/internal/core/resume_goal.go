@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
-// restoreResumeGoal never treats a new caller goal as permission to retarget
-// an existing run. Legacy fleet checkpoints use their lane pin, never a sibling's
-// mutable batch goal. A descriptive fallback keeps old closeout records valid
-// while explicitly admitting that their original human goal was not persisted.
 func restoreResumeGoal(req CycleRequest, cs CycleState, state State, fleet bool) (CycleRequest, error) {
 	hash, goal := cs.GoalHash, cs.GoalText
 	if hash == "" {

@@ -13054,3 +13054,121 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // workspace is empty or git fails (callers degrade — ship falls back to the
 // auditor comment; the cache simply does not record/match).
 ```
+
+## comment-zero core-5
+
+### `go/internal/core/phase.go:117` — above `Signals       map[string]string 'json:"signals,omitempty"'`
+
+```text
+// Signals is the cycle's objective signals projected for the dispatch-time
+// selectors (the skill-overlay `when` rule), keyed by the kernel's routable
+// field names (config.Signal*). Core sets it at dispatch (dispatchSignals);
+// the phase runner copies it onto policy.OverlayDispatch and digests nothing
+// itself (ADR-0099 slice 3).
+```
+
+### `go/internal/core/phase.go:227` — above `CommitSHA string 'json:"commit_sha,omitempty"'`
+
+```text
+// CommitSHA is the commit that anchors this phase's deliverable
+// (ADR-0027 commit-as-evidence). Empty when the phase committed nothing.
+```
+
+### `go/internal/core/ports.go:62` — above `type LedgerEntry struct {`
+
+```text
+// LedgerEntry is one .jsonl line in .evolve/ledger.jsonl. The cycle field has
+// a custom unmarshaler accepting int (canonical) or string (legacy manual
+// entries, e.g. "manual-release-v10.16.0"). On-disk bytes are never
+// rewritten — doing so would cascade SHA256 hash-chain breaks through every
+// subsequent entry.
+```
+
+### `go/internal/core/prune_superseded_orphans.go:13` — above `Ref string`
+
+```text
+// Ref is the branch's short name (e.g. "cycle-100").
+```
+
+### `go/internal/core/prune_superseded_orphans_test.go:232` — above `func TestPruneSupersededOrphans_CheckedOutMatchIsExactBranchName(t *testing.T) {`
+
+```text
+// The porcelain carries a detached worktree and a locked one; cycle-1 is a
+// name prefix of the checked-out cycle-10 and must not be mistaken for it.
+```
+
+### `go/internal/core/repair_brief.go:96` — above `func auditorFindingsBrief(workspace string, round int, warn io.Writer) string {`
+
+```text
+// auditorFindingsBrief reads the live audit report (the round that just
+// rejected) and the previous round's archive, and renders the findings the
+// builder must act on. round is the audit dispatch count (the live report's
+// round number); the previous archive is round-1.
+```
+
+### `go/internal/core/repair_brief_test.go:95` — above `writeBriefFixture(t, ws, "build-prompt.txt", "a later prompt")`
+
+```text
+// A counter rollback re-archives round 1: the first evidence wins.
+```
+
+### `go/internal/core/repair_brief_test.go:101` — above `archiveRepairPrompts(CycleState{WorkspacePath: ws, AuditRepairActive: true}, PhaseBuild)`
+
+```text
+// round 0: no-op
+```
+
+### `go/internal/core/repair_brief_test.go:108` — above `type findingsAuditRunner struct {`
+
+```text
+// findingsAuditRunner is a live-shape auditor: round 1 writes a real-format
+// FAIL report with headings (and, standing in for the bridge, the build prompt
+// the round was given); round 2 PASSes. The build fakeRunner captures the
+// requests, so the round-2 brief is asserted on the dispatched Context.
+```
+
+### `go/internal/core/resume_dynamic_transition_test.go:31` — above `func fullRunnerSet() map[Phase]PhaseRunner {`
+
+```text
+// fullRunnerSet is buildRunners plus the two spine runners it omits
+// (PhaseSwarmPlan, PhaseDebugger) so that whichever static successor a degrade
+// path selects always has a registered runner — isolating the transition-kernel
+// behavior under test from an incidental missing-runner abort.
+```
+
+### `go/internal/core/resume_normalize_test.go:136` — above `st := &fakeStorage{state: State{LastCycleNumber: 10}}`
+
+```text
+// cycle 11
+```
+
+### `go/internal/core/retry_envelope.go:36` — above `DeterministicFloorCandidate string`
+
+```text
+// DeterministicFloorCandidate is failureDossier.FloorCandidate. Non-empty ⇒
+// halt, evaluated before any policy lookup (ADR-0072 gate 1 is absolute).
+```
+
+### `go/internal/core/retry_envelope.go:45` — above `Policy policy.SystemFailurePolicy`
+
+```text
+// Policy is the resolved ADR-0072 failure policy.
+```
+
+### `go/internal/core/reviewer.go:126` — above `func ChainReviewers(reviewers ...DeliverableReviewer) DeliverableReviewer {`
+
+```text
+// ChainReviewers composes reviewers into one that approves only when ALL
+// approve; the first rejection short-circuits and is returned verbatim (Chain
+// of Responsibility). nil entries are skipped. Used to mount the evalgate gates
+// and the deliverable-contract gate (ADR-0034) at the single orchestrator seam.
+```
+
+### `go/internal/core/reviewer.go:186` — above `func (o *Orchestrator) DeclaredDeliverablesGateWired() bool {`
+
+```text
+// DeclaredDeliverablesGateWired reports whether the reviewer chain contains a
+// reviewer that verifies every agent-owed declared output (ADR-0100), looking
+// through the mandatory-explanation wrapper and chain nesting. Introspection
+// for composition-root wiring tests (mirrors ThroughputRecorderWired).
+```

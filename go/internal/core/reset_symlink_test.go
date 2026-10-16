@@ -12,12 +12,10 @@ import (
 )
 
 func TestSealCycle_SymlinkedStateLocksCanonicalTarget(t *testing.T) {
-	// Under a live fleet lane this names the RUNNING cycle's state, which
-	// SealCycle would otherwise seal and delete.
 	t.Setenv("EVOLVE_CYCLE_STATE_FILE", "")
 
 	canonDir := t.TempDir()
-	concurrencySealFixture(t, canonDir, 42) // canonical state.json{lastCycleNumber:41}
+	concurrencySealFixture(t, canonDir, 42)
 	canonical := filepath.Join(canonDir, "state.json")
 
 	ev := t.TempDir()

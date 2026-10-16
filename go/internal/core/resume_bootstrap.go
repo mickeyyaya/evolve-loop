@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
-// resumeBootstrap is the validated persistent identity of one paused cycle.
-// It is resolved while the storage lock is held and before any phase dispatch.
 type resumeBootstrap struct {
 	request    CycleRequest
 	state      State
@@ -103,8 +101,6 @@ type resumeInputs struct {
 	preResumeHEAD string
 }
 
-// snapshotResumeInputs copies caller-owned maps and restores derived runtime
-// inputs after the run identity and lease have been activated.
 func (o *Orchestrator) snapshotResumeInputs(boot *resumeBootstrap) resumeInputs {
 	req := boot.request
 	cs := &boot.cycleState

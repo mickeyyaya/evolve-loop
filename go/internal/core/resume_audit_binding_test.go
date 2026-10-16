@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// initBindingRepo creates an ephemeral git repo with one commit plus a
-// cycle workspace holding an audit-report.md, mirroring what a resumed
-// audit phase leaves on disk.
 func buildBindingRepo(r *gittest.Repo) error {
 	r.Write("f.txt", "x")
 	r.Git("add", "f.txt")

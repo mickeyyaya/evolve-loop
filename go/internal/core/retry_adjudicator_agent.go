@@ -9,17 +9,12 @@ import (
 	"strings"
 )
 
-// bridgeRetryAdjudicator dispatches the failure-adjudication persona at the tier
-// its phase config declares.
 type bridgeRetryAdjudicator struct {
 	bridge   Bridge
 	identity AgentIdentity
 	root     string
 }
 
-// NewBridgeRetryAdjudicator builds the production adjudicator. A nil bridge is
-// legal and yields a no-op adjudicator — the composition root may wire this
-// before the bridge exists without changing the loop's behaviour.
 func NewBridgeRetryAdjudicator(b Bridge, identity AgentIdentity, projectRoot string) RetryAdjudicator {
 	return &bridgeRetryAdjudicator{bridge: b, identity: identity, root: projectRoot}
 }
@@ -63,8 +58,6 @@ func (a *bridgeRetryAdjudicator) profilePath() string {
 	return filepath.Join(a.root, ".evolve", "profiles", "failure-adjudicator.json")
 }
 
-// parseAdjudication reads the agent's proposal from stdout, falling back to the
-// artifact on disk. An unparseable or empty proposal is nil — the policy default.
 func parseAdjudication(stdout, artifactPath string) *adjudication {
 	raw := strings.TrimSpace(stdout)
 	if raw == "" || !strings.Contains(raw, "{") {
@@ -93,10 +86,6 @@ func parseAdjudication(stdout, artifactPath string) *adjudication {
 	}
 }
 
-// composePrompt renders the persona (when injected) plus the evidence the
-// adjudicator reasons over: the envelope it must stay inside, and the audit's own
-// findings. The legal set is stated EXPLICITLY so the agent is choosing, not
-// guessing at what it may propose.
 func (a *bridgeRetryAdjudicator) composePrompt(cs CycleState, env retryEnvelope, artifact string) string {
 	var b strings.Builder
 	if persona := a.loadPersona(); persona != "" {
@@ -122,9 +111,6 @@ func (a *bridgeRetryAdjudicator) composePrompt(cs CycleState, env retryEnvelope,
 	return b.String()
 }
 
-// loadPersona reads the adjudicator persona when the repo ships one. Absent, the
-// inline framing above is sufficient — the same degrade FailureAdvisor uses so the
-// advisor is functional before the composition root wires a persona file.
 func (a *bridgeRetryAdjudicator) loadPersona() string {
 	if a.root == "" {
 		return ""

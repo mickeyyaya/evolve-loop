@@ -1,8 +1,5 @@
 package core
 
-// resumeCursor is the persisted suffix's execution position. It centralizes
-// first-phase replay, explicit repair scheduling, and ordinary transition-plan
-// lookup without changing any branch policy.
 type resumeCursor struct {
 	current       Phase
 	lastVerdict   string

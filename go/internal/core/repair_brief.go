@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
-// maxBriefFindings bounds how many auditor findings the brief carries; the
-// byte budget (maxFindingsBytes) still applies after.
 const maxBriefFindings = 8
 
 const (
@@ -22,9 +20,6 @@ const (
 	findingsLeadAfterGate = "fix THESE; the gate reasons above are their symptoms"
 )
 
-// composeRepairBrief renders the repair brief for a cycle in an audit-repair
-// round: gate reasons (absent a gate record, the audit's failure-block defects),
-// then the rejecting round's auditor findings. Empty when there is nothing to tell.
 func composeRepairBrief(cs CycleState, warn io.Writer) string {
 	findings := actionableAuditFindings(cs.WorkspacePath, warn)
 	lead := findingsLead
@@ -93,10 +88,6 @@ func alphanumericKey(s string) string {
 	}, s)
 }
 
-// auditorFindingsBrief reads the live audit report (the round that just
-// rejected) and the previous round's archive, and renders the findings the
-// builder must act on. round is the audit dispatch count (the live report's
-// round number); the previous archive is round-1.
 func auditorFindingsBrief(workspace string, round int, warn io.Writer) string {
 	return renderAuditorFindings(workspace, round, actionableAuditFindings(workspace, warn), findingsLead)
 }
@@ -105,7 +96,6 @@ func actionableAuditFindings(workspace string, warn io.Writer) []reportdoc.Findi
 	reportName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	current, err := os.ReadFile(filepath.Join(workspace, reportName))
 	if err != nil {
-		// Absence is legitimate (the audit crashed before writing a report).
 		if !os.IsNotExist(err) {
 			fmt.Fprintf(warn, "[orchestrator] WARN audit-repair: %s unreadable (%v) — builder gets no auditor findings\n", reportName, err)
 		}
@@ -151,10 +141,6 @@ func renderAuditorFindings(workspace string, round int, findings []reportdoc.Fin
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// actionable orders findings CRITICAL, HIGH, MEDIUM and drops LOW (advisory
-// on the ship gate; a builder's budget goes to what blocks the ship). The
-// rank is reportdoc's (the dashboard sorts by the same function), so a
-// severity added to the grammar reaches both readers or neither.
 func actionable(fs []reportdoc.Finding) []reportdoc.Finding {
 	low := reportdoc.SeverityRank("LOW")
 	var out []reportdoc.Finding
@@ -169,23 +155,11 @@ func actionable(fs []reportdoc.Finding) []reportdoc.Finding {
 	return out
 }
 
-// archiveRepairPrompts retires the previous attempt's prompt file for a
-// tdd/build re-dispatch inside a repair round to <phase>-prompt.round<N>.txt —
-// the same rule the audit archives use (phasecontract.RoundArchiveFilename) —
-// so every round's brief stays recoverable. Self-guarding on the persisted
-// repair state (the one predicate seedAuditRepairContext and repairRoundTier
-// key on), so the live loop and the resume path call it identically. An
-// existing archive is never clobbered (a counter rollback would otherwise
-// erase the first attempt's evidence); a rename failure is reported, never
-// fatal.
 func archiveRepairPrompts(cs CycleState, phase Phase) {
 	workspace, round := cs.WorkspacePath, cs.AuditRepairAttempts
 	if !cs.AuditRepairActive || !repairSeededPhase(phase) || workspace == "" || round < 1 {
 		return
 	}
-	// The bridge names the prompt file after the PHASE (runner.go sets Agent
-	// to the phase name; the filename rule is phasecontract's), so there is
-	// exactly one file to retire.
 	name := phasecontract.PromptArtifactFilename(string(phase))
 	src := filepath.Join(workspace, name)
 	if _, err := os.Stat(src); err != nil {

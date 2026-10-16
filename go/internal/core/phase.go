@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// Phase is the phase vocabulary type, re-exported from internal/cyclestate
-// (the alias carries its String/IsValid methods).
 type Phase = cyclestate.Phase
 
 const (
@@ -42,14 +40,8 @@ const (
 	CycleTerminationTriageNoWork     = cyclestate.CycleTerminationTriageNoWork
 )
 
-// IsVerdict re-exports cyclestate.IsVerdict via a thin wrapper (not a var) so
-// the symbol stays an immutable func — identical call signature, can't be
-// reassigned by an importer, and renders as a function in godoc.
 func IsVerdict(s string) bool { return cyclestate.IsVerdict(s) }
 
-// TokenUsage, Diagnostic, and CycleResult — the cycle/phase execution-result
-// value types — are defined in the internal/cyclestate leaf and re-exported here
-// so existing call sites are unchanged (see cyclestate/result.go).
 type (
 	TokenUsage          = cyclestate.TokenUsage
 	Diagnostic          = cyclestate.Diagnostic
@@ -69,197 +61,72 @@ const (
 	BuildExplanationInvalid     BuildExplanationState = "missing_or_invalid"
 )
 
-// PhaseRequest is the input envelope to PhaseRunner.Run. JSON-tagged
-// so the subprocess override path (pkg/phaseproto) can serialise the
-// same struct over stdin/stdout.
 type PhaseRequest struct {
-	Cycle int `json:"cycle"`
-	// AuditRound is the host dispatch counter binding audit evidence to this round.
-	AuditRound int `json:"audit_round,omitempty"`
-	// ProjectRoot is the MAIN repo root — the RUNTIME-DATA root. All `.evolve/`
-	// state (runs/, evals/, the ledger, baselines) lives here, and it is what a
-	// subprocess sees as EVOLVE_PROJECT_ROOT. Stable across the whole cycle.
-	ProjectRoot string `json:"project_root"`
-	// Workspace is this cycle's per-phase scratch dir, under
-	// <ProjectRoot>/.evolve/runs/cycle-<N>/ — where artifacts, phase logs, and
-	// the observer's sinks are written.
-	Workspace string `json:"workspace"`
-	// Worktree is the per-cycle git worktree — the SHIPPED-TREE root, kept
-	// distinct from ProjectRoot (the RUNTIME-DATA root); collapsing them lets
-	// a predicate run against the wrong tree. Set for every phase since CB.1;
-	// empty only when provisioning failed, the degraded mode where phases run
-	// against ProjectRoot.
-	Worktree string `json:"worktree"`
-	// WorktreeBaseSHA is the host-owned cycle base. Downstream integrity checks
-	// must diff against this value, never a mutable workspace manifest field.
-	WorktreeBaseSHA                 string `json:"worktree_base_sha,omitempty"`
-	ExplanationDocumentationVersion int    `json:"explanation_documentation_version,omitempty"`
-	// WorktreeReadOnly marks a phase that is not a declared source writer
-	// (registry writes_source=false — audit, adversarial-review, retro, …). The
-	// phase runner fences the worktree around such a dispatch: the tree the
-	// phase hands downstream is byte-identical to the tree it was given, and
-	// any write the agent made in between is reported and undone. Derived
-	// from the orchestrator's write-permission predicate at dispatch, never
-	// set by a phase.
-	WorktreeReadOnly      bool     `json:"worktree_read_only,omitempty"`
-	WorktreeWritablePaths []string `json:"worktree_writable_paths,omitempty"`
-	// WorktreeVerified is local classification evidence set by BaseRunner only
-	// after restoring its snapshot. It never crosses the subprocess envelope.
-	WorktreeVerified bool `json:"-"`
-	// RunID is the CA.5 event-sourced run identity, threaded to every phase
-	// dispatch (CB.5) so the bridge mints run-scoped tmux session names
-	// (evolve-bridge-r<runid8>-…) and the per-run session registry records
-	// the right owner. Empty on legacy/degraded paths — names then keep the
-	// pre-CB.5 format.
-	RunID    string            `json:"run_id,omitempty"`
-	GoalHash string            `json:"goal_hash"`
-	Context  map[string]string `json:"context,omitempty"`
-	// Signals is the cycle's objective signals projected for the dispatch-time
-	// selectors (the skill-overlay `when` rule), keyed by the kernel's routable
-	// field names (config.Signal*). Core sets it at dispatch (dispatchSignals);
-	// the phase runner copies it onto policy.OverlayDispatch and digests nothing
-	// itself (ADR-0099 slice 3).
-	Signals       map[string]string `json:"signals,omitempty"`
-	PreviousPhase string            `json:"previous_phase,omitempty"`
-	Env           map[string]string `json:"env,omitempty"`
+	Cycle                           int               `json:"cycle"`
+	AuditRound                      int               `json:"audit_round,omitempty"`
+	ProjectRoot                     string            `json:"project_root"`
+	Workspace                       string            `json:"workspace"`
+	Worktree                        string            `json:"worktree"`
+	WorktreeBaseSHA                 string            `json:"worktree_base_sha,omitempty"`
+	ExplanationDocumentationVersion int               `json:"explanation_documentation_version,omitempty"`
+	WorktreeReadOnly                bool              `json:"worktree_read_only,omitempty"`
+	WorktreeWritablePaths           []string          `json:"worktree_writable_paths,omitempty"`
+	WorktreeVerified                bool              `json:"-"`
+	RunID                           string            `json:"run_id,omitempty"`
+	GoalHash                        string            `json:"goal_hash"`
+	Context                         map[string]string `json:"context,omitempty"`
+	Signals                         map[string]string `json:"signals,omitempty"`
+	PreviousPhase                   string            `json:"previous_phase,omitempty"`
+	Env                             map[string]string `json:"env,omitempty"`
 
-	// BuildPlan is the build phase's upstream build-plan.md body, served via the
-	// typed envelope instead of an ad-hoc disk read inside the phase. Populated
-	// once at the dispatch seam, and only at EVOLVE_PHASE_IO>=advisory with the
-	// planner enabled; empty at off/shadow so the build phase reads disk
-	// exactly as before (byte-identical dispatch).
-	// See ADR-0050.
 	BuildPlan string `json:"build_plan,omitempty"`
 
-	// BuildExplanation is the verified secondary Build handoff. The primary
-	// watched artifact remains build-report.md; this typed view carries only the
-	// permanent documentation paths and hashes that Audit, Ship, Retro, Memo,
-	// and optional post-Build phases need to inspect the same evidence.
-	BuildExplanation *phaseio.ExplanationView `json:"build_explanation,omitempty"`
-	// BuildExplanationState distinguishes a legitimate pre-Build failure Retro
-	// from a post-Build missing/corrupt handoff. Error is host-derived diagnostic
-	// data and is never treated as prompt instructions.
-	BuildExplanationState BuildExplanationState `json:"build_explanation_state,omitempty"`
-	BuildExplanationError string                `json:"build_explanation_error,omitempty"`
+	BuildExplanation      *phaseio.ExplanationView `json:"build_explanation,omitempty"`
+	BuildExplanationState BuildExplanationState    `json:"build_explanation_state,omitempty"`
+	BuildExplanationError string                   `json:"build_explanation_error,omitempty"`
 
-	// Input is the unified typed phase-I/O envelope. It is
-	// assembled once at the dispatch seam and ONLY at EVOLVE_PHASE_IO>=enforce; the
-	// zero value at off/shadow/advisory keeps dispatch byte-identical (no phase
-	// consumes it until the enforce cutover migrates readers off the Context map).
-	// Excluded from JSON: PhaseInput seals its channels behind unexported fields so
-	// it is not wire-serializable — the subprocess override path keeps using
-	// Context, and in-core phases read this envelope when composing prompts before
-	// any subprocess launch.
-	// See ADR-0050.
 	Input phaseio.PhaseInput `json:"-"`
 
-	// BypassPolicy skips policy.json pin enforcement for this phase.
-	// Set by the orchestrator from CycleRequest.BypassPolicy; operators may
-	// trigger it via --bypass-policy at the cycle or compose call site.
-	BypassPolicy bool `json:"bypass_policy,omitempty"`
-	// ComposePhases signals that phases are being run via `evolve compose`
-	// (ad-hoc composition bypassing the state machine). The kernel guard
-	// downgrades from BLOCK to WARN when this field is true. Replaces the
-	// retired EVOLVE_COMPOSE_PHASES env signal.
-	ComposePhases bool `json:"compose_phases,omitempty"`
-	// CorrectionDirective is set by the orchestrator's contract-correction loop
-	// on a re-dispatch after a deliverable reject; the runner copies it into the
-	// BridgeRequest. Empty on the first dispatch.
+	BypassPolicy        bool   `json:"bypass_policy,omitempty"`
+	ComposePhases       bool   `json:"compose_phases,omitempty"`
 	CorrectionDirective string `json:"correction_directive,omitempty"`
-	// OperatorDirectives is the rendered runtime operator-directives block the
-	// orchestrator snapshots once at cycle start (internal/directives) and passes
-	// to every phase this cycle; the runner copies it into the BridgeRequest.
-	// Empty = no directives configured (byte-identical dispatch).
-	OperatorDirectives string `json:"operator_directives,omitempty"`
+	OperatorDirectives  string `json:"operator_directives,omitempty"`
 
-	// Spec is the brick's own declarative definition. A spec-driven (kind:llm)
-	// phase reads all of its behavior from here; built-in Go phases ignore it.
-	// Additive in Stage 1 (nothing sets it until the orchestrator becomes a pure
-	// driver in Stage 3).
 	Spec *phasespec.PhaseSpec `json:"spec,omitempty"`
 
-	// UpstreamSignals is the accumulating signal bus piped in from prior phases,
-	// namespaced <phase>.<key> (e.g. "build.files_touched"). A phase keys its
-	// own routing/classify decisions off these without re-reading artifacts.
 	UpstreamSignals map[string]any `json:"upstream_signals,omitempty"`
 
-	// ModelRoutingCLI/ModelRoutingTier carry the whole-cycle
-	// plan's clamped {cli,tier} proposal for THIS phase — but ONLY when
-	// config.ModelRouting==ModelRoutingAuto (advisory computes and logs the
-	// same clamped proposal to phase-plan.json but leaves these empty; static
-	// never sets them). The runner applies them as a SOFT dispatch overlay
-	// (llmroute.ApplySoftOverlay): promote to chain primary without discarding
-	// the profile's fallback chain, so a benched/failing proposal still falls
-	// back via the ordinary cli-health chain. Empty on every dispatch before
-	// this field existed and on any mode other than auto — omitempty keeps a zero-value
-	// PhaseRequest's JSON shape byte-identical.
-	ModelRoutingCLI  string `json:"model_routing_cli,omitempty"`
-	ModelRoutingTier string `json:"model_routing_tier,omitempty"`
-	// BudgetScale is the difficulty multiplier for this
-	// dispatch's artifact budget, set for the BUILD phase from the cycle's
-	// digest-resolved size estimate. 0/1 = unscaled (byte-identical dispatch).
-	// See ADR-0076.
-	BudgetScale float64 `json:"budget_scale,omitempty"`
+	ModelRoutingCLI  string  `json:"model_routing_cli,omitempty"`
+	ModelRoutingTier string  `json:"model_routing_tier,omitempty"`
+	BudgetScale      float64 `json:"budget_scale,omitempty"`
 }
 
-// PhaseResponse is the output envelope from PhaseRunner.Run.
 type PhaseResponse struct {
-	Phase        string     `json:"phase"`
-	Verdict      string     `json:"verdict"`
-	ArtifactsDir string     `json:"artifacts_dir"`
-	NextPhase    string     `json:"next_phase,omitempty"`
-	CostUSD      float64    `json:"cost_usd"`
-	Tokens       TokenUsage `json:"tokens"`
-	DurationMS   int64      `json:"duration_ms"`
-	// BootMS is the cold REPL-boot latency carried up from the bridge. It is
-	// the slice of DurationMS that was pure dispatch overhead
-	// (tmux new-session → prompt marker), not model think time. 0 = no cold boot.
-	// See ADR-0043.
-	BootMS      int64        `json:"boot_ms,omitempty"`
-	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
+	Phase        string       `json:"phase"`
+	Verdict      string       `json:"verdict"`
+	ArtifactsDir string       `json:"artifacts_dir"`
+	NextPhase    string       `json:"next_phase,omitempty"`
+	CostUSD      float64      `json:"cost_usd"`
+	Tokens       TokenUsage   `json:"tokens"`
+	DurationMS   int64        `json:"duration_ms"`
+	BootMS       int64        `json:"boot_ms,omitempty"`
+	Diagnostics  []Diagnostic `json:"diagnostics,omitempty"`
 
-	// Signals is the namespaced signal map this phase emits onto the bus — the
-	// typed "message on the pipe." The router (Stage 3) consumes these directly
-	// instead of re-parsing markdown. Keys are <phase>.<key>. Additive in
-	// Stage 1: emitted but not yet read by routing.
 	Signals map[string]any `json:"signals,omitempty"`
 
-	// CommitSHA is the commit that anchors this phase's deliverable
-	// (ADR-0027 commit-as-evidence). Empty when the phase committed nothing.
 	CommitSHA string `json:"commit_sha,omitempty"`
 
-	// Reconciled is set when the bridge reported a process failure
-	// (ErrArtifactTimeout) but the agent's deliverable was on disk, well-formed,
-	// and gate-passing — so the runner trusted the deliverable's verdict instead
-	// of synthesizing FAIL. Surfaced for the auditable self-healing trail
-	// (orchestrator appends a reconciled_timeout ledger entry).
 	Reconciled bool `json:"reconciled,omitempty"`
 
-	// ModelSource + ResolvedModel (T3) record WHICH resolution path
-	// won this phase's dispatch — "profile" (neither pin nor advisor overlay),
-	// "pin" (an operator policy.json pin, which always wins), or "advisor" (the
-	// MR4c soft overlay applied) — plus the concrete resolved model/tier. Closes
-	// the P3 observability gap: per-phase model provenance was previously
-	// unrecorded, so a dormant advisor overlay had no artifact proving it.
 	ModelSource   string `json:"model_source,omitempty"`
 	ResolvedModel string `json:"resolved_model,omitempty"`
 }
 
-// PhaseRunner runs a single phase. The orchestrator never knows which
-// runner impl is in play (in-process vs subprocess) — that's the
-// independence guarantee for Approach C.
 type PhaseRunner interface {
 	Name() string
 	Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error)
 }
 
-// PersonaProber is implemented by phase runners that can answer, before any
-// dispatch, whether their persona doc exists. A nil error means available; an
-// error wrapping ErrAgentDocMissing means the doc is absent — the same
-// sentinel the dispatch path raises, so the plan-time exclusion and the skip
-// classifier agree on the cause. Any other error is reported but does not
-// exclude the phase: only a KNOWN absence is deterministic enough to remove a
-// phase from the menu.
 type PersonaProber interface {
 	PersonaAvailable() error
 }

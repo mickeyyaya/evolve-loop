@@ -19,10 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// ResumePoint describes a checkpointed cycle that can be resumed.
-// Field shape mirrors the relevant subset of
-// .evolve/cycle-state.json:checkpoint plus the cycle_id + project_root
-// the operator needs to drive the resume.
 type ResumePoint struct {
 	CycleID         int
 	Phase           string
@@ -37,7 +33,6 @@ type ResumePoint struct {
 	StatePath       string
 }
 
-// ResumeOptions wires test seams + operator overrides for LoadResumeState.
 type ResumeOptions struct {
 	AllowHeadMoved bool
 	CurrentHead    func(projectRoot string) (string, error)
@@ -45,21 +40,10 @@ type ResumeOptions struct {
 	Log            io.Writer
 }
 
-// ErrNoCheckpoint is returned when cycle-state.json lacks a usable
-// checkpoint block. Operator-facing message: "nothing to resume".
 var ErrNoCheckpoint = errors.New("resume: no live checkpoint")
 
-// ErrStaleCheckpoint is returned when validation fails: HEAD drifted
-// without the override, worktree missing, or required fields absent.
 var ErrStaleCheckpoint = errors.New("resume: checkpoint stale")
 
-// LoadResumeState reads .evolve/cycle-state.json under evolveDir,
-// extracts the checkpoint block, validates git HEAD + worktree, and
-// returns a ResumePoint.
-//
-// projectRoot is the writable host repo (where git lives). evolveDir is
-// typically projectRoot + "/.evolve" but is passed separately so
-// tests can place a synthetic state file anywhere.
 func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts ResumeOptions) (*ResumePoint, error) {
 	opts = opts.withDefaults()
 
@@ -81,8 +65,6 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 	return rp, nil
 }
 
-// errNoPerRunCandidates reports that the per-run scan found no live
-// checkpoint blocks at all (as opposed to finding one that failed validation).
 var errNoPerRunCandidates = errors.New("resume: no per-run checkpoint candidates")
 
 var resumableReasons = map[string]bool{
@@ -158,9 +140,6 @@ func discoverPerRunResumeState(evolveDir, projectRoot string, opts ResumeOptions
 	return nil, firstErr
 }
 
-// loadResumeStateFrom reads one state file, validates HEAD + worktree, and
-// returns a ResumePoint; the primary and per-run-discovery paths share this
-// loader so they cannot drift.
 func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -203,8 +182,6 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 		return nil, fmt.Errorf("%w: checkpoint.resumeFromPhase missing", ErrStaleCheckpoint)
 	}
 
-	// checkpoint.gitHead == "unknown" means the original capture failed; skip
-	// validation in that case.
 	if rp.GitHead != "" && rp.GitHead != "unknown" {
 		current, err := opts.CurrentHead(projectRoot)
 		if err == nil && strings.TrimSpace(current) != rp.GitHead && !opts.AllowHeadMoved {
@@ -213,8 +190,6 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 		}
 	}
 
-	// An empty worktree path skips the check: the cycle didn't use a
-	// per-cycle worktree.
 	if rp.WorktreePath != "" && !opts.PathExists(rp.WorktreePath) {
 		return nil, fmt.Errorf("%w: worktree %s no longer exists",
 			ErrStaleCheckpoint, rp.WorktreePath)
@@ -223,9 +198,6 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 	return rp, nil
 }
 
-// ActivateResumeStatePath points this process's cycle-state resolution at
-// rp's origin file when it differs from the current resolution, returning a
-// restore func (a no-op when nothing needed to change).
 func ActivateResumeStatePath(rp *ResumePoint, evolveDir string) func() {
 	if rp == nil || rp.StatePath == "" || rp.StatePath == ResolveCycleStatePath(evolveDir) {
 		return func() {}
@@ -241,10 +213,6 @@ func ActivateResumeStatePath(rp *ResumePoint, evolveDir string) func() {
 	}
 }
 
-// RunCycleFromPhase resumes an in-flight cycle from the given phase,
-// skipping completedPhases and replaying the rest of the cycle. Unlike
-// RunCycle it never allocates a cycle number; it shares RunCycle's storage
-// lock and terminal closeout.
 func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, resumePoint *ResumePoint) (result CycleResult, retErr error) {
 	if err := o.ensureSafeConfig(); err != nil {
 		return CycleResult{}, err
@@ -357,8 +325,6 @@ func (o *Orchestrator) reviewResumedDeliverable(
 		if err := o.recoverPhaseLeak(ctx, phaseLeakScope{projectRoot: projectRoot, cycleState: cs, phase: phase, baseline: phaseBaseline}); err != nil {
 			return resp, err
 		}
-		// Correction output is a fresh worktree mutation. Normalize it before
-		// re-running the reviewer so a newly sealed snapshot is final.
 		o.normalizeBuildWorktree(ctx, phase, cs, projectRoot)
 		review = o.performEffectsAndReview(ctx, o.reviewInputFor(cs, phase, projectRoot, resp))
 	}
@@ -373,9 +339,6 @@ func (o *Orchestrator) reviewResumedDeliverable(
 }
 
 func defaultCurrentHead(projectRoot string) (string, error) {
-	// Capture, not gitexec's HEAD/Output helper, is deliberate: callers depend
-	// on the raw, untrimmed `git rev-parse HEAD` stdout, trailing newline
-	// included.
 	out, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "rev-parse", "HEAD")
 	if err != nil {
 		return "", err

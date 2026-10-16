@@ -85,12 +85,8 @@ func TestRunCycleFromPhase_RecoversSecondCrashAfterRebaseCheckpointThroughBuild(
 
 	storage := &fakeStorage{state: State{LastCycleNumber: 42}, cycleState: CycleState{
 		CycleID: 42, RunID: "run-42", WorkspacePath: workspace, ActiveWorktree: root,
-		// The first recovery already persisted newBase, then the host crashed
-		// before the forced Build could replace the stale old-base snapshot.
 		WorktreeBaseSHA: newBase, ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 	}}
-	// Materialize the memory-storage fixture's checkpoint file, matching what
-	// the production caller writes before dispatch.
 	writeStateFile(t, filepath.Join(root, ".evolve"), storage.cycleState)
 	builder := &rebaseRecoveryBuilder{}
 	runners := buildRunners(nil)
@@ -169,8 +165,7 @@ func TestRequireResumeExplanationIdentity_RejectsClearedSealedFields(t *testing.
 	err := requireResumeExplanationIdentity(root, workspace, 42, CycleState{
 		CycleID: 42, RunID: "run-42", WorkspacePath: workspace,
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
-		// Deliberately clear the mutable projection of the sealed host fields.
-		ActiveWorktree: "", WorktreeBaseSHA: "",
+		ActiveWorktree:                  "", WorktreeBaseSHA: "",
 	}, 42)
 	if err == nil || !strings.Contains(err.Error(), "worktree/base") {
 		t.Fatalf("cleared sealed resume identity was accepted: %v", err)

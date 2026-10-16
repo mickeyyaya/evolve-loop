@@ -183,7 +183,6 @@ func TestSealCycle_DryRunMutatesNothing(t *testing.T) {
 func TestSealCycle_EmptyWorkspaceStillSeals(t *testing.T) {
 	t.Parallel()
 	ev := t.TempDir()
-	// cycle-state present but the workspace dir was never created.
 	workspace := filepath.Join(ev, "runs", "cycle-108")
 	writeJSONFixture(t, filepath.Join(ev, "cycle-state.json"), map[string]any{
 		"cycle_id": 108, "phase": "scout", "workspace_path": workspace,
@@ -258,7 +257,6 @@ func TestSealCycle_RegressionCycle395(t *testing.T) {
 
 func TestSealCycle_LeaseFencing(t *testing.T) {
 	t.Parallel()
-	// sealClock matches sealOpts().Now — the single clock the fence uses.
 	sealClock := time.Date(2026, 5, 27, 8, 0, 0, 0, time.UTC)
 	writeLease := func(t *testing.T, ws string, hb time.Time) {
 		t.Helper()
@@ -293,7 +291,7 @@ func TestSealCycle_LeaseFencing(t *testing.T) {
 	t.Run("stale lease auto-seals without --force", func(t *testing.T) {
 		ev := t.TempDir()
 		ws := sealFixture(t, ev, 108)
-		writeLease(t, ws, sealClock.Add(-20*time.Minute)) // > DefaultTTL (10m) ⇒ owner gone
+		writeLease(t, ws, sealClock.Add(-20*time.Minute))
 		res, err := SealCycle(context.Background(), &recordingLedger{}, sealOpts(ev))
 		if err != nil {
 			t.Fatalf("stale lease must auto-seal (owner is dead): %v", err)

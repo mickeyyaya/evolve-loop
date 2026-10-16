@@ -941,3 +941,78 @@ The reasons that the comments of the orchestrator, phase advisor, phase binding,
 - **Cycle 1806 (wave 65, 2026-10-06) was a fleet lane lost to another process's fetch.** `gh pr update-branch` moved a train branch while the lane's `git fetch origin` was updating every remote-tracking ref in the shared store, so the fetch failed with `cannot lock ref 'refs/remotes/origin/train/wave64-boundary': is at … but expected …`, provisioning failed, the scout launch was refused for lack of a worktree, and the cycle sealed FAIL with a P0 failure-learning todo about the task. The narrowed, retried fetch and the lane deferral above are the fix ([incident](../../incidents/2026-10-06-cycle-1806-fetch-ref-lock.md)).
 - A width-3 batch (2026-07-13) emitted 76 stderr-only `spine not satisfied` fail-open WARNs with no counter, dossier field or threshold — an epidemic with no dashboard, and the WARN named only the phase being entered, not which predecessor's artifact was missing. `UnsatisfiedSpineAnchor` + `CycleResult.SpineFailOpens` (cycle-1166) made the signal countable and attributable before deciding whether the fix is artifact-retry, driver-bounce recovery, or an enforce flip.
 - The R8.5 spine-floor flip to `enforce` (2026-07-16) was validated by replaying 536 real `.evolve/runs` directories through `router.Digest` + `StateMachine.SpineSatisfiedUpTo`: zero would-block transitions on any cycle shape since ~cycle-480, after the scout/audit digest fallbacks landed; the only misses were pre-convention dirs (cycles 361-479). `TestSpineReplay_LocalHistory` (env-gated on `EVOLVE_SPINE_REPLAY_DIR`) is the re-runnable harness behind that evidence.
+
+## Core file group 5 rationale
+
+The reasons that the comments of the phase-I/O, ports, reset, resume, repair, retry and reviewer files carried. The code and the tests state the what.
+
+- **Phase-I/O stays byte-identical below its stage.**
+  - The build-plan envelope is served only at `EVOLVE_PHASE_IO>=advisory`. It also needs the planner enabled and a readable file.
+  - Every other case returns an empty body, and the build phase reads disk as before. A missing file gives an empty body, never an error.
+  - `PhaseInput` is assembled only at `>=enforce`, from one `router.Digest`; below it the zero value keeps dispatch identical to the pre-cutover loop. A digest failure skips the shadow comparison and, at enforce, still assembles the input with an empty upstream view.
+  - `NewPhaseInput` deep-copies the env map so a later loop iteration cannot mutate a sealed input. `PhaseInput` is excluded from JSON because its channels are unexported; the subprocess path keeps using `Context`.
+  - The shadow comparator re-derives expected values from the signal directly, not through `HandoffsFromSignals`, so a projection bug surfaces as a mismatch. It compares against the keys the phases really read (`challengeToken` camelCase, `carryover_summary`), so key drift surfaces. The shadow ledger append is best-effort and must never affect the cycle.
+- **Judge parsing.** `parseJudgeVerdict` takes the LAST balanced JSON object.
+  - A brace inside the rationale must not be miscounted.
+  - The echoed example in the prompt must not be taken as the answer.
+  - A judge error fails open to score -1.
+  - Phases are ordered deterministically, so the prompt prefix stays cache-friendly.
+- **Phase request fields.**
+  - `ProjectRoot` is the runtime-data root and `Worktree` the shipped-tree root; collapsing them lets a predicate run against the wrong tree. An empty `Worktree` is the degraded provisioning-failure mode.
+  - `WorktreeBaseSHA` is the host-owned cycle base: integrity checks diff against it, never a mutable manifest field. `WorktreeReadOnly` is derived from the orchestrator's write-permission predicate and fenced by the runner; a phase never sets it. `WorktreeVerified` never crosses the subprocess envelope.
+  - `ModelRoutingCLI/Tier` are set only in `auto` mode and applied as a soft overlay (promote to chain primary, keep the fallback chain). `BudgetScale` of 0 or 1 is unscaled; below 1 never shrinks.
+  - `PersonaProber`: only a KNOWN persona absence (an error wrapping `ErrAgentDocMissing`) is deterministic enough to exclude a phase from the menu.
+- **Ports.**
+  - `LedgerEntry.cycle` accepts an int or a legacy string. On-disk bytes are never rewritten, because that can cascade hash-chain breaks through every later entry.
+  - Ledger `Source` on `phase_skipped` entries is `router`, `psmas` or `content`. `Action` carries the self-heal verb (`extend`, `pause`) or the inbox verb (`claim`, `promote`). `WorktreeTreeSHA` binds ship's tree-drift check to the audited changes, not the auditor's unchanged base.
+  - `GuardDecision.Alarm` marks an integrity violation (an agent touching the control plane that grades it) and additionally emits a CRITICAL record to `.evolve/integrity-alarm.jsonl`.
+  - `BridgeRequest.ProjectRoot` zero disables sandbox confinement for the call; `RequireSandbox` fails the launch closed. `ChainAttempt` makes a chain-walking handle pass the request through instead of walking again. `SessionName` pins a tmux session, which the caller then owns for teardown. `SecondaryArtifacts` are existence-only waits; the artifact-timeout final poll completes without them and the phase gate reports the absence.
+  - One function derives the bridge PID file name from the stdout-log path. The bridge writer and the observer reader share it, so a rename moves both.
+- **Post-build repin.** It is never operator-authorized and fails open (a refusal warns and returns a zero result); the ship gate stays the backstop. An empty build commit is unverifiable, so a stripped binary cannot self-authorize a repin. The provenance function is a package seam so the decision stays git-free under test.
+- **Orphan pruning.**
+  - A superseded branch is kept before any PR check when a worktree has it checked out or a continuation binding names it.
+  - A delete runs only when `hasOpenPR` reports false.
+  - A refused delete is recorded and the walk continues.
+  - An error from listing, the registry, git or `hasOpenPR` aborts before a further delete.
+- **All-families quota exhaustion.**
+  - It is terminal only for two or more tries that all exited 85. The bridge alternates families, so an all-85 sequence means every family at every allowed tier is drained. A single try proves nothing.
+  - `cyclehealth.ClassifyOutcome` matches the abort-reason prefix to classify DEFERRED. The loop then stops resumable and does not burn the next cycle.
+- **Repair rounds.**
+  - The audit-repair and decline reason prefixes are single constants shared by the emitter and the consumer. A drifted literal silently disables the bound.
+  - The context keys are exported and single-sourced because the setter lives in core and the readers in `internal/phases/*`.
+  - Repair context derives only from persisted cycle state, so the live loop and crash-resume cannot diverge. `withContext` copies on write so the dispatch snapshot never inherits a round's brief. Audit and retro are not repair-seeded: audit re-reads its own artifacts, retro holds the dossier.
+  - Findings drop LOW (advisory at the ship gate) and rank through reportdoc, so the dashboard and the brief sort alike.
+  - A prompt archive never overwrites an existing one, because a counter rollback can erase the first attempt's evidence. A rename failure is reported, never fatal.
+- **Cycle reset (`SealCycle`).**
+  - The workspace is archived, never deleted, to a sibling `.reset-<UTCnano>` directory.
+  - The snapshot, manifest and deterministic retrospective are written INTO the workspace before the rename. The archive is then complete when it appears.
+  - The retrospective write hard-fails before the destructive rename, so the workspace stays intact for a clean retry. The lesson points at the archive, the durable location.
+  - A path escaping the evolve and project roots is refused before the rename.
+  - One timestamp covers the archive suffix, manifest, ledger entry and state.
+  - The liveness fence uses `runlease.OwnerLive` (fresh heartbeat AND live pid) when `PidAlive` is wired; a stale heartbeat is never live (pid reuse). Dry-run never blocks. `Force` over a live owner is recorded.
+  - An automated seal carries `autosealRole`, never `operator`, so it cannot move the ledger-verify epoch anchor.
+  - State changes run under the `<state.json>.lock` sidecar on the RESOLVED path, because a worktree's state.json links to canonical.
+  - ORDERING IS LOAD-BEARING: `failurelog.Record` runs BEFORE the seal's own read-change-write. The seal then stays final authority on `lastCycleNumber`, `currentBatch` and `lastUpdated`.
+  - The unlocked read and write primitives are used because the lock is already held. A second lock deadlocks.
+  - A missing state.json is soft-skipped. Removing cycle-state.json is the abandon commit point.
+- **Resume.**
+  - One timing owner spans abnormal and normal exits. Recreating `cycleRun` at either boundary appends the resumed segment twice.
+  - The owner context is reassigned to the live one, so the failure-learning dispatch sees real cancellation.
+  - The survey emission is unconditional (a resumed cycle dispatching nothing still has pre-crash outputs); the timings write keeps its emptiness guard.
+  - `checkpoint.gitHead == "unknown"` and an empty worktree path skip their validations. `git rev-parse HEAD` is read through `Capture` because callers depend on the raw, untrimmed output.
+  - Resume successor: a spine-valid phase uses the static kernel (byte-identical); an inserted phase uses `routing-plan.json`, else an archetype degrade that never skips the audit gate.
+  - The final verdict is recovered from host disposition, never agent prose; a checkpoint without the last floor's evidence stays WARN.
+  - A goal is never retargeted by a new caller goal; legacy fleet checkpoints use their lane pin.
+- **Retry.**
+  - Disposition actions are consts: a drifted literal is how the retro gate once looked for `failure-lesson*.yaml` while the persona wrote `inst-L*.yaml`.
+  - The envelope takes the policy as a parameter so the rule cannot read a different policy than the caller enforced. A deterministic floor candidate halts before any policy lookup. Absent or unrecognised evidence yields decline-only, which never grants a retry and never halts the batch. `Reason` is always populated.
+  - The adjudicator proposes; `clampAdjudication` binds it so it can only pick a more conservative legal action. A nil, unjustified or out-of-vocabulary proposal yields the default. A deep-tier dispatch is paid only when more than one action is legal.
+  - `retryOpts` is pinned by reflection (`retry_opts_parity_test.go`). The evaluate-batch set deliberately omits backfill (workspace writes under concurrency), ship recovery (it rewrites sequential cursor state) and quota exhaustion (no resumable partial-batch checkpoint). `retryPhaseRunner` reads only immutable handles and is safe to call concurrently. Hook order: backfill, then optional off-floor skip, then post-ship observer skip. A worktree is preserved from exit cleanup while a ship failure is unresolved.
+  - The build tier raise only raises, clamped by the real profile envelope.
+  - The inbox batch reader skips a malformed claim. `inboxmover` cannot replace it, because of an import cycle through the ledger adapter.
+- **Reviewers.**
+  - A `ContractVerifier` must never touch the global contract-gate breaker. A multi-rung repair then counts several blocks for one flaky deliverable and demotes the gate batch-wide. Only the ladder's final outcome goes through `Review`.
+  - `Reason` must be non-empty on a reject.
+  - `ChainReviewers` short-circuits on the first rejection and carries earlier demotion evidence.
+  - The wired-probe interfaces exist because core cannot import `internal/deliverable`.
+- **Tests that swap package hooks are serial.** In `quota_defer_retro_skip_test.go` and `quota_exhaustion_test.go`, the tests that assign `QuotaBoundaryCheckpointer` (or the sibling checkpoint hook) do not call `t.Parallel()`. The other tests in these files are parallel.

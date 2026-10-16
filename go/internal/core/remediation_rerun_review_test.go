@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// phaseReviewCounter counts Review calls per phase and approves everything.
 type phaseReviewCounter struct{ byPhase map[string]int }
 
 func (c *phaseReviewCounter) Review(_ context.Context, in ReviewInput) ReviewResult {
