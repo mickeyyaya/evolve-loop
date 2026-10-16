@@ -42,20 +42,13 @@ func TestAutoRespond_PlanModeDialogs(t *testing.T) {
 		wantRC                      int
 		paneBusy                    bool
 	}{
-		// --- live dialogs: respond ---
-		// Enter approves. An autonomous loop has no human to read the plan and the auditor grades the diff
-		// anyway, so approving beats a dead lane; a blocked agent cannot use an extended deadline.
 		{"claude plan approval (bypass launch)", "claude-tmux",
 			claudePlanApprovalBypassPane, "send:Enter", 1, false},
 		{"claude plan approval (plan-mode launch, different option 1)", "claude-tmux",
 			claudePlanApprovalPlanModePane, "send:Enter", 1, false},
-		// codex's picker footer carries "esc to interrupt", so the real pane reads busy.
 		{"codex plan question (pane reads busy in production)", "codex-tmux",
 			codexPlanQuestionPane, "send:Enter", 1, true},
 
-		// --- the bottom anchor: scrollback that scrolled up must NOT fire ---
-		// An answered or quoted dialog sits above later output and cannot match \z. One new line below the
-		// dialog must end the match, which is why each tail anchors on the dialog's own final line.
 		{"claude: answered dialog, ONE line of output below", "claude-tmux",
 			claudePlanApprovalBypassPane + "\n● Writing hello.go…", "noop", 0, false},
 		{"claude: answered dialog, two lines below", "claude-tmux",
@@ -65,12 +58,9 @@ func TestAutoRespond_PlanModeDialogs(t *testing.T) {
 		{"codex: answered picker, two lines below", "codex-tmux",
 			codexPlanQuestionPane + "\n• Ran go build ./...\n  └ ok", "noop", 0, true},
 
-		// --- prose and paraphrase must not fire ---
 		{"claude: prose quoting the approval sentence", "claude-tmux",
 			`The dialog reads "Claude has written up a plan and is ready to execute. Would you like to proceed?" and blocks.`,
 			"noop", 0, false},
-		// Deliberately not diff- or bullet-prefixed: stripAgentDiffLines would eat such a fixture,
-		// proving diff stripping instead of this rule.
 		{"claude: option-2 text on a plain line, no lead sentence", "claude-tmux",
 			"Here are the choices:\n   2. Yes, manually approve edits\n   3. Something else", "noop", 0, false},
 		{"codex: prose describing the question picker", "codex-tmux",
@@ -94,15 +84,13 @@ func TestAutoRespond_PlanModeDialogs(t *testing.T) {
 	}
 }
 
-// Feeds the rules' own tracked source material through as an agent's Read or cat renders it;
-// stripAgentDiffLines protects only a diff view. The bottom anchor is what makes this pass.
 func TestAutoRespond_PlanModeDoesNotMatchThisRepositorysOwnFiles(t *testing.T) {
 	t.Parallel()
 	files := []string{
-		"autorespond_planmode_test.go",                                      // this file: all three fixtures verbatim
-		"manifests/claude-tmux.json",                                        // the rule and its note
-		"manifests/codex-tmux.json",                                         // ditto
-		"../../../docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md", // the incident write-up
+		"autorespond_planmode_test.go",
+		"manifests/claude-tmux.json",
+		"manifests/codex-tmux.json",
+		"../../../docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md",
 	}
 	for _, f := range files {
 		body, err := os.ReadFile(f)
@@ -112,8 +100,6 @@ func TestAutoRespond_PlanModeDoesNotMatchThisRepositorysOwnFiles(t *testing.T) {
 		if !strings.Contains(string(body), "ready to execute") && !strings.Contains(string(body), "unanswered") {
 			t.Fatalf("%s no longer contains the dialog text — this guard has gone vacuous; re-point it", f)
 		}
-		// Scoped to the plan rules on purpose: the manifest file holds other rules' patterns as data,
-		// which trips them. That is a separate hazard this guard cannot fix.
 		for _, cli := range []string{"claude-tmux", "codex-tmux"} {
 			m, err := LoadManifest(cli)
 			if err != nil {
@@ -137,22 +123,19 @@ func TestAutoRespond_PlanModeDoesNotMatchThisRepositorysOwnFiles(t *testing.T) {
 	}
 }
 
-// codex's picker asks several questions, so the rule must stay multi-fire (once:true would hang on Q2).
-// The loop guard's budget bounds a form; the bottom anchor keeps a dismissed picker from spending it.
 func TestAutoRespond_PlanModeAnswersEveryLiveQuestion(t *testing.T) {
 	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)
 	}
-	counts := map[string]int{} // shared across ticks, as ar.counts is live
+	counts := map[string]int{}
 	for tick := 1; tick <= autoRespondLoopGuardLimit; tick++ {
 		action, rc := decideAutoRespond(codexPlanQuestionPane, m.InteractivePrompts, counts, true)
 		if action != "send:Enter" || rc != 1 {
 			t.Fatalf("tick %d: got (%q, %d), want (\"send:Enter\", 1)", tick, action, rc)
 		}
 	}
-	// Past the budget the responder abandons loudly (rc 86) rather than looping forever.
 	if _, rc := decideAutoRespond(codexPlanQuestionPane, m.InteractivePrompts, counts, true); rc != 86 {
 		t.Errorf("past the guard limit the responder must abandon loudly, got rc %d", rc)
 	}

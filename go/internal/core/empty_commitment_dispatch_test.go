@@ -30,15 +30,6 @@ func (r triageDecisionRunner) Run(_ context.Context, req PhaseRequest) (PhaseRes
 	return PhaseResponse{Phase: string(PhaseTriage), Verdict: r.verdict, ArtifactsDir: req.Workspace}, nil
 }
 
-// The signals are always derived by running the real router.Digest over a real
-// on-disk workspace, never a hand-built literal: TriageSignals.commitmentKnown
-// is unexported in package router, so only a real digest can express the
-// distinction between "committed nothing" and "no decision artifact", which is
-// the whole point of the gate.
-
-// digestTriageWorkspace materializes a cycle workspace whose triage decision
-// commits `committed` tasks and returns the production routing signals for it.
-// committed < 0 writes NO triage-decision.json — the commitment-UNKNOWN case.
 func writeTriageWorkspace(t *testing.T, committed int) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -256,7 +247,7 @@ func TestEnforceNext_EmptyTriageCommitmentIsALegalTermination(t *testing.T) {
 		current     Phase
 		staticNext  Phase
 		verdict     string
-		committed   int // <0 ⇒ no triage-decision.json (commitment unknown)
+		committed   int
 		shipPlanned bool
 		wantPhase   Phase
 		wantOK      bool

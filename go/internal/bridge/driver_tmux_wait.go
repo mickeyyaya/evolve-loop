@@ -10,11 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// replWaiter owns the completion wait state machine after prompt dispatch. Its
-// dependencies are fixed for one launch, which keeps the state transitions
-// testable without widening the package API.
-
-// artifactWaitInterval is the artifact-wait poll cadence.
 const artifactWaitInterval = 2 * time.Second
 
 type replWaiter struct {
@@ -26,7 +21,7 @@ type replWaiter struct {
 	phaseName      string
 	resolvedPrompt string
 	dispatchBase   dispatchBaseline
-	paste          pasteOutcome // what the prompt delivery learned — recorded beside the submit verdict
+	paste          pasteOutcome
 	responder      *autoResponder
 	recorder       *interaction.Recorder
 	cursor         *inbox.Cursor

@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// corpusLines returns the rendered body's list-item lines and reports whether
-// any line after the title introduces a top-level markdown construct.
 func corpusLines(body string) (items []string, injectedHeading string) {
 	for i, line := range strings.Split(body, "\n") {
 		switch {

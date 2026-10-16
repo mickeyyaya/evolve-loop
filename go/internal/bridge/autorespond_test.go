@@ -36,8 +36,6 @@ func TestDecideAutoRespond_IdleGatesEscalateWhileBusy(t *testing.T) {
 		t.Errorf("idle pane with real banner must escalate: got %q/%d", a, rc)
 	}
 
-	// An auto_respond prompt carries its own "esc to cancel", so it reads busy yet must still fire:
-	// the gate is escalate-only.
 	approvalPane := "Would you like to make the following edits?\n  1. Yes, proceed\n  2. Yes, and don't ask again\n  3. No\n\nPress enter to confirm or esc to cancel"
 	if !panestream.PaneBusy(approvalPane, panestream.Profiles["codex"]) {
 		t.Fatal("fixture invalid: the approval modal carries an esc-to-cancel affordance, must read busy")
@@ -53,7 +51,7 @@ func TestDecideAutoRespond(t *testing.T) {
 		{Name: "escA", Regex: "Please log in", Policy: "escalate"},
 		{Name: "autoB", Regex: `Continue\?`, ResponseKeys: "y,Enter", Policy: "auto_respond"},
 		{Name: "extC", Regex: "slow work", ResponseKeys: "60", Policy: "extend_timeout"},
-		{Name: "autoNoKeys", Regex: "weird-prompt", Policy: "auto_respond"}, // missing keys → escalate
+		{Name: "autoNoKeys", Regex: "weird-prompt", Policy: "auto_respond"},
 	}
 	cases := []struct {
 		name, pane, wantAction string
@@ -80,7 +78,6 @@ func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
 	prompts := []ManifestPrompt{
 		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
 	}
-	// The agent's editor shows a numbered diff of a fixture while the footer shows it Working.
 	agentEditPane := "" +
 		"   223 +\t// fixture: codex usage-limit banner\n" +
 		"   224 +\tpane := \"■ You've hit your usage limit. Upgrade to Pro\"\n" +
@@ -92,7 +89,6 @@ func TestDecideAutoRespond_AgentDiffContentNotChrome(t *testing.T) {
 	if a, rc := decideAutoRespond(realBanner, prompts, map[string]int{}, false); rc != 85 {
 		t.Fatalf("real rate-limit banner must escalate, got (%q,%d)", a, rc)
 	}
-	// Mixed pane: only the diff line is stripped, so the real banner still escalates.
 	mixedPane := "" +
 		"   224 +\tpane := \"■ You've hit your usage limit. Upgrade to Pro\"\n" +
 		"You've hit your usage limit. try again in 3 hours.\n"
@@ -106,7 +102,6 @@ func TestDecideAutoRespond_BareDiffLineNotChrome(t *testing.T) {
 	prompts := []ManifestPrompt{
 		{Name: "rate_limit", Regex: `(usage|rate)[ -]limit (reached|exceeded|hit)|hit your (usage|rate) limit|too many requests|quota exceeded`, Policy: "escalate"},
 	}
-	// The pane is idle, so the busy gate does not apply; only the bare-diff strip can save this.
 	bareAdd := "diff --git a/clihealth_test.go b/clihealth_test.go\n" +
 		"+\tpane := \"You've hit your usage limit. Upgrade to Pro\"\n"
 	if a, rc := decideAutoRespond(bareAdd, prompts, map[string]int{}, false); rc == 85 {
@@ -144,7 +139,7 @@ func TestDecideAutoRespond_LoopGuard(t *testing.T) {
 	counts := map[string]int{}
 	var a string
 	var rc int
-	for i := 0; i < 6; i++ { // 6th match: count 6 > 5 → loop guard
+	for i := 0; i < 6; i++ {
 		a, rc = decideAutoRespond("Please log in", prompts, counts, false)
 	}
 	if a != "loop_guard:stuck" || rc != 86 {
@@ -153,7 +148,6 @@ func TestDecideAutoRespond_LoopGuard(t *testing.T) {
 }
 
 func TestSendKeySequence(t *testing.T) {
-	// The multi-keystroke case is the load-bearing one: claude's multi-select needs three distinct presses.
 	t.Parallel()
 	cases := []struct {
 		name, csv string
@@ -169,7 +163,6 @@ func TestSendKeySequence(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := &fakeTmux{}
-			// no-op Sleep so the inter-key pacing doesn't slow the unit test.
 			deps := Deps{Tmux: rec, Sleep: func(time.Duration) {}}.withDefaults()
 			sendKeySequence(context.Background(), deps, "s", tc.csv)
 			if strings.Join(rec.sentSeq, ",") != strings.Join(tc.want, ",") {
@@ -180,7 +173,6 @@ func TestSendKeySequence(t *testing.T) {
 }
 
 func TestClaudeTmux_AutoRespond_EscalateWritesReport(t *testing.T) {
-	// The REPL boots, then shows an auth-recheck prompt the manifest escalates.
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "Please log in to continue"}}
@@ -194,7 +186,6 @@ func TestClaudeTmux_AutoRespond_EscalateWritesReport(t *testing.T) {
 }
 
 func TestClaudeTmux_AutoRespond_StuckPromptTripsLoopGuard(t *testing.T) {
-	// A model-deprecation prompt that never clears: the 6th match trips the loop guard.
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "this model is deprecated, Continue?"}}

@@ -19,10 +19,6 @@ func mkOptionalWave(ids ...string) []fleet.CycleSpec {
 	return specs
 }
 
-// recordingRunner is a fake WaveRunner. It records the scopes it was asked to run
-// and fails a cycle id either a fixed number of times before succeeding
-// (failTimes) or forever (failForever) — enough to exercise retry, retry-then-
-// succeed, and retry-exhausted-abort without coupling to call order.
 type recordingRunner struct {
 	mu          sync.Mutex
 	ranScopes   [][]string
@@ -68,7 +64,7 @@ func mkwave(ids ...string) []fleet.CycleSpec {
 
 func TestWaveRunner_MethodValueSatisfiesType(t *testing.T) {
 	r := &recordingRunner{}
-	var _ WaveRunner = r.run // compile-time: the injected runner type is real
+	var _ WaveRunner = r.run
 }
 
 func TestRunWaves_ResumeSkipsCompletedWaves(t *testing.T) {
@@ -149,12 +145,10 @@ func TestRunWaves_NoRetryStopsAtFirstFailedWave(t *testing.T) {
 func TestRunWaves_RetriesFailedSpecThenSucceeds(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "prog.json")
 	waves := [][]fleet.CycleSpec{mkwave("a", "b")}
-	// "b" fails its first attempt, succeeds on retry; "a" succeeds first try.
 	r := &recordingRunner{failTimes: map[string]int{"b": 1}}
 	if err := RunWaves(context.Background(), waves, r.run, RunOptions{ProgressPath: path, PlanSHA: "P", MaxRetries: 1}); err != nil {
 		t.Fatalf("RunWaves: want success after retry, got %v", err)
 	}
-	// Retry must be BATCHED to only the failed spec: 1st call runs [a b], retry runs [b].
 	if r.calls != 2 {
 		t.Fatalf("calls = %d, want 2 (wave + one batched retry of the failed spec)", r.calls)
 	}
@@ -170,7 +164,7 @@ func TestRunWaves_RetriesFailedSpecThenSucceeds(t *testing.T) {
 func TestRunWaves_StopsPromptlyOnCanceledContext(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "prog.json")
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // operator interrupt before the wave even settles
+	cancel()
 	waves := [][]fleet.CycleSpec{mkwave("a")}
 	r := &recordingRunner{failForever: map[string]bool{"a": true}}
 	err := RunWaves(ctx, waves, r.run, RunOptions{ProgressPath: path, PlanSHA: "P", MaxRetries: 3})
@@ -216,7 +210,7 @@ func TestRunWaves_OptionalPoisonSkippedAndContinues(t *testing.T) {
 
 func TestRunWaves_RequiredPoisonAbortsEvenWithOptionalPeer(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "prog.json")
-	w := append(mkwave("req"), mkOptionalWave("opt")...) // mixed wave, both fail
+	w := append(mkwave("req"), mkOptionalWave("opt")...)
 	r := &recordingRunner{failForever: map[string]bool{"req": true, "opt": true}}
 	if err := RunWaves(context.Background(), [][]fleet.CycleSpec{w}, r.run, RunOptions{ProgressPath: path, PlanSHA: "P", MaxRetries: 0}); err == nil {
 		t.Fatal("RunWaves: a required poison must abort even alongside an optional failure")
@@ -226,7 +220,7 @@ func TestRunWaves_RequiredPoisonAbortsEvenWithOptionalPeer(t *testing.T) {
 func TestRunWaves_CooldownWaitedBeforeRetry(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "prog.json")
 	waves := [][]fleet.CycleSpec{mkwave("a")}
-	r := &recordingRunner{failTimes: map[string]int{"a": 1}} // fail once, succeed on retry
+	r := &recordingRunner{failTimes: map[string]int{"a": 1}}
 	var slept []time.Duration
 	cool := 50 * time.Millisecond
 	err := RunWaves(context.Background(), waves, r.run, RunOptions{
@@ -258,10 +252,6 @@ func TestRunWaves_BeforeWaveCalledPerRunWave(t *testing.T) {
 	}
 }
 
-// F20 (2026-09-15): the pre-wave probes run inside BeforeWave; an interrupt
-// that lands there must abort BEFORE the wave is dispatched (the loop runner
-// printed "wave 2: 0/2 lanes ok" for a wave cancelled at spawn). The hook
-// takes the live context and its error aborts the run.
 func TestRunWaves_BeforeWaveErrorAbortsBeforeTheWave(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "prog.json")
 	waves := [][]fleet.CycleSpec{mkwave("a")}

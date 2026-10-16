@@ -13,16 +13,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 )
 
-// mutexSpyLocker is a WIRING spy, not a serialization proof: it deliberately
-// never asserts "no two holders at once", since its own mutex would make that
-// check tautological. The real index-serialization proof lives in
-// TestWriteCycleDossier_ConcurrentRealRepo_BothLand. `acquired` is atomic
-// (bumped before the mutex, including on the failErr path); `released` is
-// mutated only while the mutex is held.
 type mutexSpyLocker struct {
 	mu       sync.Mutex
-	acquired int32 // atomic — incremented before mu is taken
-	released int   // mu-guarded
+	acquired int32
+	released int
 	failErr  error
 }
 

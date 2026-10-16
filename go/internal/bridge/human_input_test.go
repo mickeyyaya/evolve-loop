@@ -46,18 +46,17 @@ func TestHumanPrimitives(t *testing.T) {
 	if len(tmux.sentKeys) == 0 {
 		t.Fatal("paste-with-review should send Enter")
 	}
-	// ReadFile error path (missing file → lines=1, floor review)
 	_, _ = pastePrompt(context.Background(), deps, "[t]", "s", "/no/such/file-xyz", true)
 
 	tmux2 := &fakeTmux{}
 	deps.Tmux = tmux2
-	humanSendKeysCSV(context.Background(), deps, "s", "y,,Enter") // empty token skipped + Enter
+	humanSendKeysCSV(context.Background(), deps, "s", "y,,Enter")
 	if !tmux2.sentContains("y") {
 		t.Fatalf("human send should deliver 'y'; sent=%v", tmux2.sentKeys)
 	}
 
-	humanReadingPause(deps, "a b")                       // <3 words → floor
-	humanReadingPause(deps, strings.Repeat("word ", 40)) // many words
+	humanReadingPause(deps, "a b")
+	humanReadingPause(deps, strings.Repeat("word ", 40))
 }
 
 func TestClaudeTmux_HumanInput_GateAndPath(t *testing.T) {
@@ -69,7 +68,6 @@ func TestClaudeTmux_HumanInput_GateAndPath(t *testing.T) {
 		t.Fatalf("human-input gate: code=%d se=%q", code, se)
 	}
 
-	// paneSeq never clears the deprecation prompt, tripping the loop guard to exercise the human send path.
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, "this model is deprecated, Continue?"}}
 	code2, se2 := runTmux(t, fx, tmux, map[string]string{"BRIDGE_HUMAN_SIMULATION": "1"}, "--allow-bypass", "--human-input")
 	if code2 != ExitRespondLoopGuard {

@@ -22,8 +22,6 @@ func TestModelFreshness_ClaudeDeclaresAlias(t *testing.T) {
 			t.Errorf("AliasIDs missing %q (got %v)", id, m.ModelFreshness.AliasIDs)
 		}
 	}
-	// Every alias id must be a model the tier map can actually emit — an
-	// alias the CLI never dispatches is a stale declaration.
 	tierModels := make(map[string]bool, len(m.ModelTierMap))
 	for _, model := range m.ModelTierMap {
 		tierModels[model] = true

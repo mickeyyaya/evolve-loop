@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
-// t.TempDir uses macOS's /var/folders and would miss the broad /tmp write-grant regression, so this uses /tmp directly.
 func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
 	t.Parallel()
 	probe := requireNativeSandbox(t)

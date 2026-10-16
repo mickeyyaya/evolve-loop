@@ -9,10 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// amplNewSkipOrchestrator builds the minimal *Orchestrator that
-// optionalInfraSkip/postShipObserverSkip read: cfg.Mandatory, catalog, and
-// shipFloor. Constructed entirely through phasespec's exported Merge so no
-// unexported catalog internals are assumed.
 func amplNewSkipOrchestrator(t *testing.T, mandatory, floor []string, specs []phasespec.PhaseSpec) *Orchestrator {
 	t.Helper()
 	cat, warnings := (phasespec.Catalog{}).Merge(specs)

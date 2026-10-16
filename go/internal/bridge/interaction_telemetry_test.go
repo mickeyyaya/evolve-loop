@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// readInteractionLedger parses <ws>/<phase>-interactions.ndjson.
 func readInteractionLedger(t *testing.T, ws, phase string) []interaction.Outcome {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(ws, phase+"-interactions.ndjson"))
@@ -33,8 +32,6 @@ func readInteractionLedger(t *testing.T, ws, phase string) []interaction.Outcome
 	return outs
 }
 
-// nudgeReactiveTmux simulates an agent that reacts to the nudge: when the nudge text (naming the artifact
-// path) is sent into the pane, the "agent" writes the artifact, so the nudge outcome resolves artifact_appeared.
 type nudgeReactiveTmux struct {
 	*fakeTmux
 	artifact string
@@ -74,8 +71,6 @@ func (n *nudgeCaptureFailureTmux) CapturePane(ctx context.Context, session strin
 	return n.fakeTmux.CapturePane(ctx, session, scrollback)
 }
 
-// runTelemetryLaunch drives a claude-tmux launch with --agent=build so the
-// ledger lands at build-interactions.ndjson.
 func runTelemetryLaunch(t *testing.T, fx launchFixture, tm TmuxController, lookup map[string]string) int {
 	t.Helper()
 	eng := NewEngine(Deps{
@@ -207,7 +202,6 @@ func TestRecorder_RecordsAtStageOff(t *testing.T) {
 	}
 }
 
-// autoRespondHarness builds a recording autoResponder over scripted panes.
 func autoRespondHarness(t *testing.T, panes []string, prompts []ManifestPrompt) (*autoResponder, *interaction.Recorder) {
 	t.Helper()
 	ws := t.TempDir()

@@ -16,9 +16,6 @@ func TestEngineLaunch_CtxCancelSignalKill_WrapsTransient(t *testing.T) {
 	prof := writeProfile(t, ws, "eng-test", "")
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Models exec.CommandContext's teardown: cancel the context (as the
-	// orchestrator's phase timeout does), then report the signal-death exit
-	// code -1.
 	runner := func(_ context.Context, name, dir string, args, env []string,
 		_ io.Reader, _, _ io.Writer) (int, error) {
 		cancel()
@@ -51,7 +48,7 @@ func TestEngineLaunch_StartFailure_MinusOne_StaysPlain(t *testing.T) {
 
 	runner := func(_ context.Context, name, dir string, args, env []string,
 		_ io.Reader, _, _ io.Writer) (int, error) {
-		return -1, nil // no ctx cancellation — a real start failure
+		return -1, nil
 	}
 	eng := NewEngine(Deps{Runner: runner, LookupEnv: mapLookup(nil)})
 

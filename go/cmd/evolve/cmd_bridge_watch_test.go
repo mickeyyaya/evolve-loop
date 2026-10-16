@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 )
 
-// lockedBuffer lets the test poll String() while the follow loop writes from
-// its own goroutine without a data race.
 type lockedBuffer struct {
 	mu sync.Mutex
 	b  bytes.Buffer
@@ -180,7 +178,6 @@ func TestRunBridgeWatchOnce_EmptyFeedNoOutput(t *testing.T) {
 
 func TestRunBridgeWatchOnce_ReadError(t *testing.T) {
 	t.Parallel()
-	// A directory at the feed path is a read error other than ErrNotExist.
 	ws := t.TempDir()
 	feedPath := channel.FeedPath(ws, "build")
 	if err := os.MkdirAll(feedPath, 0o755); err != nil {
@@ -194,7 +191,6 @@ func TestRunBridgeWatchOnce_ReadError(t *testing.T) {
 
 func TestRenderFeedLine_SeqIntType(t *testing.T) {
 	t.Parallel()
-	// JSON decodes numbers as float64; an int seq comes only from in-process callers.
 	e := map[string]any{"seq": 7, "kind": "ping"}
 	got := renderFeedLine(e)
 	if !strings.Contains(got, "seq=7") {
@@ -305,8 +301,6 @@ func TestRunBridgeWatchFollow_TailsNewLines(t *testing.T) {
 	ws := t.TempDir()
 	path := channel.FeedPath(ws, "scout")
 	os.WriteFile(path, []byte(`{"seq":1,"kind":"assistant_text","data":{"text":"first"}}`+"\n"), 0o644)
-	// The loop seeds its offset asynchronously and skips an earlier append, so
-	// the test re-appends each tick and waits on the rendered line.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	out := &lockedBuffer{}
@@ -373,10 +367,7 @@ func TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines(t *testing.T) {
 
 	ws := t.TempDir()
 	path := channel.FeedPath(ws, "scout")
-	// One byte makes the seeded offset non-zero, which forces a seek.
 	os.WriteFile(path, []byte("\n"), 0o644)
-	// The loop seeds its offset asynchronously and skips an earlier append, so
-	// the test re-appends each tick and waits on the rendered line.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	out := &lockedBuffer{}
@@ -413,8 +404,6 @@ func TestCmdBridgeWatch_FollowFlagParsed(t *testing.T) {
 	t.Cleanup(func() { watchFollowInterval = orig })
 
 	ws := t.TempDir()
-	// A SIGINT to this process is the only way to end the follow loop that
-	// cmdBridgeWatch wires to the signal context.
 	go func() {
 		time.Sleep(60 * time.Millisecond)
 		syscall.Kill(syscall.Getpid(), syscall.SIGINT) //nolint:errcheck

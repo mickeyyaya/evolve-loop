@@ -13,10 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
-// paneScriptTmux is a scriptable fake whose CapturePane returns whatever the
-// test's Sleep hook last set via setPane. Unlike fakeTmux.paneSeq (consumed in
-// order), every capture within a tick returns the SAME current frame, so a test
-// controls exactly what the per-tick channel delta extractor sees.
 type paneScriptTmux struct {
 	fakeTmux
 	mu   sync.Mutex
@@ -35,9 +31,6 @@ func (p *paneScriptTmux) CapturePane(_ context.Context, _ string, _ int) (string
 	return p.pane, nil
 }
 
-// Minimal claude-shaped rendered frames (BoundaryMarker "❯"). The thinking
-// frame has only the echoed prompt as stable content (the spinner trims as a
-// volatile tail row); the answer frame adds the ⏺ bullet above the input box.
 const (
 	paneThinkingFrame = "❯ explain tmux\n" +
 		"\n" +
@@ -67,7 +60,7 @@ func TestRunTmuxREPL_ChannelOff_NoLiveFiles(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
-	deps := covDeps() // LookupEnv = mapLookup(nil) → EVOLVE_CHANNEL unset
+	deps := covDeps()
 	tmux := &paneScriptTmux{pane: "❯"}
 	deps.Tmux = tmux
 
@@ -111,9 +104,9 @@ func TestRunTmuxREPL_ChannelOn_StreamsPaneDeltaToFile(t *testing.T) {
 		tick++
 		switch tick {
 		case 1:
-			tmux.setPane(paneThinkingFrame) // primes baseline
+			tmux.setPane(paneThinkingFrame)
 		case 2:
-			tmux.setPane(paneAnswerFrame) // answer becomes stable → emitted
+			tmux.setPane(paneAnswerFrame)
 		case 3:
 			_ = os.WriteFile(cfg.Artifact, []byte("done"), 0o644)
 		}
@@ -131,7 +124,6 @@ func TestRunTmuxREPL_ChannelOn_StreamsPaneDeltaToFile(t *testing.T) {
 	if !strings.Contains(string(body), "tmux is a terminal multiplexer") {
 		t.Errorf("pane.live missing streamed answer; got:\n%s", body)
 	}
-	// The volatile input box / footer must never leak as content.
 	if strings.Contains(string(body), "bypass permissions") {
 		t.Errorf("pane.live leaked volatile footer; got:\n%s", body)
 	}
@@ -162,16 +154,10 @@ func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 				Kind: inbox.KindCommand, Body: "answer me", CorrID: "cX", Source: "supervisor",
 			}, fixedTime)
 		case 2:
-			// Busy: a real claude thinking footer (PaneBusy keys on the
-			// interrupt affordance, not the ❯ marker which persists throughout).
 			tmux.setPane("❯ q\n\n✽ Inferring…\n\n❯\n  ⏵⏵ bypass permissions on · esc to interrupt")
 		case 3:
-			// Idle: answer present, no interrupt affordance → busy→idle transition.
 			tmux.setPane("❯ q\n\n⏺ done\n\n❯\n  ⏵⏵ bypass permissions on · ← for agents")
 		default:
-			// Drop the artifact only after both breadcrumbs are recorded, and
-			// write it once — a rewrite every tick would never let the
-			// stability window settle.
 			if _, err := os.Stat(cfg.Artifact); err != nil {
 				if b, _ := os.ReadFile(bcPath); strings.Contains(string(b), "idle_reached") {
 					_ = os.WriteFile(cfg.Artifact, []byte("done"), 0o644)
@@ -203,7 +189,6 @@ func TestRunTmuxREPL_ChannelOn_BreadcrumbsToFile(t *testing.T) {
 	if n := strings.Count(out, wantIdle); n != 1 {
 		t.Errorf("idle_reached emitted %d times, want exactly 1", n)
 	}
-	// Breadcrumbs must go to the file, not the driver's stderr log.
 	if strings.Contains(stderr.String(), "evolve_channel") {
 		t.Errorf("breadcrumb leaked to stderr:\n%s", stderr.String())
 	}
@@ -213,7 +198,7 @@ func TestRunTmuxREPL_ChannelOn_LiveFileOpenError_WARN(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
-	cfg.Agent = "missing/sub" // parent dir ws/missing does not exist → OpenFile fails
+	cfg.Agent = "missing/sub"
 	stderr := &bytes.Buffer{}
 	deps := covDeps()
 	deps.Stderr = stderr
@@ -249,7 +234,6 @@ func TestPaneProfileFor(t *testing.T) {
 	if p := paneProfileFor(tmuxLaunch{name: "agy-tmux", promptMarker: ">"}); p.Name != "agy" || !p.BoundaryExact {
 		t.Errorf("agy-tmux → %+v, want agy profile (BoundaryExact)", p)
 	}
-	// Unknown driver → fallback profile built from the launch's prompt marker.
 	if p := paneProfileFor(tmuxLaunch{name: "itest-tmux", promptMarker: "§"}); p.Name != "itest" || p.BoundaryMarker != "§" {
 		t.Errorf("itest-tmux → %+v, want fallback{itest, §}", p)
 	}

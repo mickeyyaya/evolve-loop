@@ -16,8 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// These tests exercise the real Make recipes and Go coverage tools. A percentage
-// alone is not a verdict: Go writes coverage even when a test assertion fails.
 func TestMakeCoverageGates_PropagateTestFailure(t *testing.T) {
 	t.Parallel()
 	for _, failing := range []bool{false, true} {
@@ -75,8 +73,6 @@ func TestMakeCoverageGates_RejectToolFailure(t *testing.T) {
 			root := makeFixture(t)
 			writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value() int { return 1 }\n")
 			writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 1 { t.Fatal(\"wrong value\") } }\n")
-			// Run the real tool first so the failure leaves plausible output/profile.
-			// The gate must honor the exit status instead of accepting that output.
 			wrapper := "#!/bin/sh\nif [ \"$1\" = \"" + stage + "\" ]; then go \"$@\"; echo intentional-tool-failure >&2; exit 23; fi\n" + makeGoBuildRedirect(t) + "exec go \"$@\"\n"
 			fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
 			out, err := runMakeFixture(t, root, "apicover-enforce")
@@ -367,7 +363,6 @@ func makeFixture(t *testing.T) string {
 
 func makeGoBuildRedirect(t *testing.T) string {
 	t.Helper()
-	// Build the actual apicover command, with its output still in the fixture.
 	module := filepath.Join(workflowRepoRoot(t), "go")
 	return "if [ \"$1\" = build ]; then exec go -C '" + strings.ReplaceAll(module, "'", "'\"'\"'") + "' \"$@\"; fi\n"
 }

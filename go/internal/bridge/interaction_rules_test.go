@@ -26,7 +26,6 @@ func TestLoadPromotedPrompts_EnforceOnly(t *testing.T) {
 	root := t.TempDir()
 	dir := interactionRulesDir(root)
 
-	// A sound, non-corpus enforce rule and a shadow rule.
 	enforceRe := "Accept the new workspace terms to continue"
 	shadowRe := "Press 9 to dismiss the upgrade banner"
 	if _, err := interaction.PromoteRule(dir, enforceRe, "1,Enter", "terms", healthyCorpus); err != nil {
@@ -35,7 +34,6 @@ func TestLoadPromotedPrompts_EnforceOnly(t *testing.T) {
 	if _, err := interaction.PromoteRule(dir, shadowRe, "9,Enter", "upgrade", healthyCorpus); err != nil {
 		t.Fatal(err)
 	}
-	// Operator promotes the first to enforce.
 	id := ""
 	for _, r := range interaction.LoadRules(dir, healthyCorpus) {
 		if r.Regex == enforceRe {
@@ -54,13 +52,11 @@ func TestLoadPromotedPrompts_EnforceOnly(t *testing.T) {
 	if prompts[0].Regex != enforceRe || prompts[0].Policy != "auto_respond" {
 		t.Errorf("promoted prompt shape wrong: %+v", prompts[0])
 	}
-	// Empty root → nothing, no panic.
 	if got := loadPromotedPrompts(""); got != nil {
 		t.Errorf("empty root must load nothing; got %+v", got)
 	}
 }
 
-// bumpRuleToEnforce flips a promoted rule's stage in place (operator action).
 func bumpRuleToEnforce(t *testing.T, path string) {
 	t.Helper()
 	data, err := os.ReadFile(path)

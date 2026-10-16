@@ -22,10 +22,6 @@ func TestCLIPreflight_CodexTmuxImplementsIt(t *testing.T) {
 }
 
 func TestCLIPreflight_OptOutByOmission(t *testing.T) {
-	// Drivers expected to NOT implement CLIPreflight today. If a driver
-	// later adopts CLIPreflight (e.g. agy keychain refresh), this list
-	// must be updated. The opt-out is the architectural design — no no-op
-	// stubs in every concrete driver. See driver.go's CLIPreflight godoc.
 	t.Parallel()
 	optOut := []string{"claude-p", "claude-tmux", "agy", "agy-tmux", "codex", "ollama", "ollama-tmux"}
 	for _, name := range optOut {
@@ -41,13 +37,6 @@ func TestCLIPreflight_OptOutByOmission(t *testing.T) {
 }
 
 func TestCLIPreflight_CodexPreflightReturnsHelperError(t *testing.T) {
-	// Drive codexTmuxDriver.Preflight directly with a config that the
-	// underlying helper (pretrustCodexProjects) accepts but writes to a
-	// real ~/.codex/config.toml — best-effort means even a write failure
-	// is a return value, not a panic. The test is intentionally loose:
-	// it just confirms Preflight returns without panic for a plausible
-	// config. Tighter end-to-end coverage is in codex_pretrust_test.go
-	// against the helper's own surface.
 	t.Parallel()
 	d, ok := LookupDriver("codex-tmux")
 	if !ok {
@@ -62,9 +51,7 @@ func TestCLIPreflight_CodexPreflightReturnsHelperError(t *testing.T) {
 		Worktree:  t.TempDir(),
 		Workspace: t.TempDir(),
 	}
-	deps := Deps{} // no I/O streams — the helper does not write to them
-	// We accept either a nil error (clean run) or a non-nil error (e.g.
-	// HOME unsetup) — the contract is "non-panicking, best-effort".
+	deps := Deps{}
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("codex-tmux Preflight panicked: %v (must be best-effort: return errors, never panic)", r)
@@ -98,14 +85,10 @@ func TestCodexTmuxPreflightDismissesUpdateNag(t *testing.T) {
 	}
 }
 
-// recordingDriver is a synthetic Driver used to pin the Engine's CLIPreflight
-// dispatch contract. It records the order of Preflight and Launch calls so
-// the tests can assert preflight-before-launch invariants and best-effort
-// error semantics. The driver returns ExitOK from Launch.
 type recordingDriver struct {
 	name        string
 	preflightFn func(ctx context.Context, cfg *Config, deps Deps) error
-	calls       []string // appended "preflight" or "launch" in invocation order
+	calls       []string
 }
 
 func (d *recordingDriver) Name() string { return d.name }
@@ -121,8 +104,6 @@ func (d *recordingDriver) Preflight(ctx context.Context, cfg *Config, deps Deps)
 	return nil
 }
 
-// nonPreflightDriver implements only Driver (not CLIPreflight) — used to pin
-// the opt-out path through the type assertion at launch.go.
 type nonPreflightDriver struct {
 	name  string
 	calls []string
@@ -134,29 +115,17 @@ func (d *nonPreflightDriver) Launch(ctx context.Context, cfg *Config, deps Deps)
 	return ExitOK, nil
 }
 
-// TestCLIPreflight_Compiletime is a compile-time assertion that the
-// recordingDriver test fake satisfies BOTH Driver and CLIPreflight — if
-// the interface drifts (e.g., signature change), this fails to build,
-// catching the breakage at compile time rather than as a runtime nil
-// assertion in another test.
 func TestCLIPreflight_Compiletime(t *testing.T) {
 	t.Parallel()
 	var _ Driver = (*recordingDriver)(nil)
 	var _ CLIPreflight = (*recordingDriver)(nil)
 	var _ Driver = (*nonPreflightDriver)(nil)
-	// nonPreflightDriver must NOT satisfy CLIPreflight — proving the
-	// opt-out by omission works at the type level.
 	var d Driver = (*nonPreflightDriver)(nil)
 	if _, isPF := d.(CLIPreflight); isPF {
 		t.Fatal("nonPreflightDriver must NOT satisfy CLIPreflight — opt-out by omission is the architectural design")
 	}
 }
 
-// TestCLIPreflight_RecordingFakePreflightOrder pins that the recording
-// fake's Preflight increments the calls slice BEFORE Launch is dispatched.
-// This is the core invariant the Engine relies on; tests below use it as a
-// building block, but it's worth a standalone smoke check so a refactor
-// of the fake itself doesn't silently invalidate downstream assertions.
 func TestCLIPreflight_RecordingFakePreflightOrder(t *testing.T) {
 	t.Parallel()
 	d := &recordingDriver{name: "fake-tmux"}
@@ -169,10 +138,6 @@ func TestCLIPreflight_RecordingFakePreflightOrder(t *testing.T) {
 	}
 }
 
-// TestCLIPreflight_ErrorPropagation pins that Preflight error VALUES reach
-// the caller unchanged via the interface — Engine.Launch logs them, but the
-// interface itself is a transparent pass-through. Sentinel-error patterns
-// (errors.Is) must work across the seam.
 func TestCLIPreflight_ErrorPropagation(t *testing.T) {
 	t.Parallel()
 	sentinel := errors.New("preflight-sentinel")
@@ -188,22 +153,14 @@ func TestCLIPreflight_ErrorPropagation(t *testing.T) {
 	}
 }
 
-// TestCLIPreflight_NilErrorPropagation pins the happy path — a Preflight
-// that completes without issue returns nil; the Engine's error-log branch
-// stays untaken. Pairs with TestCLIPreflight_ErrorPropagation.
 func TestCLIPreflight_NilErrorPropagation(t *testing.T) {
 	t.Parallel()
-	d := &recordingDriver{name: "fake-tmux"} // default preflightFn returns nil
+	d := &recordingDriver{name: "fake-tmux"}
 	if got := d.Preflight(context.Background(), &Config{}, Deps{}); got != nil {
 		t.Fatalf("Preflight with nil preflightFn must return nil; got %v", got)
 	}
 }
 
-// TestCLIPreflight_ContextPropagation pins that the Engine passes ctx
-// through to Preflight. The fake echoes ctx.Err() — a canceled ctx
-// arrives canceled, an alive ctx arrives alive. This is the property that
-// lets a Preflight observe orchestrator cancellation (e.g., per-phase
-// timeout) and bail early.
 func TestCLIPreflight_ContextPropagation(t *testing.T) {
 	t.Parallel()
 	var seen context.Context
@@ -215,7 +172,6 @@ func TestCLIPreflight_ContextPropagation(t *testing.T) {
 		},
 	}
 
-	// Live ctx → no error visible to Preflight.
 	live, cancelLive := context.WithCancel(context.Background())
 	defer cancelLive()
 	_ = d.Preflight(live, &Config{}, Deps{})
@@ -226,7 +182,6 @@ func TestCLIPreflight_ContextPropagation(t *testing.T) {
 		t.Fatalf("live ctx must show Err()=nil; got %v", seen.Err())
 	}
 
-	// Canceled ctx → Preflight observes ctx.Err() == context.Canceled.
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 	_ = d.Preflight(canceled, &Config{}, Deps{})
@@ -235,10 +190,6 @@ func TestCLIPreflight_ContextPropagation(t *testing.T) {
 	}
 }
 
-// TestCLIPreflight_ConfigAndDepsPassThrough pins that the *Config + Deps
-// pointers reach Preflight unchanged — the Engine's dispatch threads them
-// as-is. A driver-side Preflight that needs cfg.Worktree or deps.Stderr
-// must see what the caller passed.
 func TestCLIPreflight_ConfigAndDepsPassThrough(t *testing.T) {
 	t.Parallel()
 	var seenCfg *Config
@@ -267,12 +218,6 @@ func TestCLIPreflight_ConfigAndDepsPassThrough(t *testing.T) {
 	}
 }
 
-// TestCLIPreflight_OptOutDoesNotPanicOnTypeAssertion pins the Engine's
-// `if pf, ok := driver.(CLIPreflight); ok` short-circuit: a driver that
-// doesn't implement CLIPreflight must evaluate `ok=false`. The second
-// assertion uses an anonymous interface to triple-check the underlying type
-// genuinely lacks Preflight — catches accidental embedded promotion a
-// refactor might introduce.
 func TestCLIPreflight_OptOutDoesNotPanicOnTypeAssertion(t *testing.T) {
 	t.Parallel()
 	var d Driver = &nonPreflightDriver{name: "opt-out"}

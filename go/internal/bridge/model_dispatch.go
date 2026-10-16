@@ -16,8 +16,6 @@ const (
 	modelDispatchUnknown    = llmcalls.DispatchUnknown
 )
 
-// modelDispatch is the selector evidence observed at the actual process or
-// session boundary. It never contains argv, prompts, or environment values.
 type modelDispatch struct {
 	model        string
 	source       string
@@ -28,16 +26,12 @@ type modelDispatch struct {
 
 type modelSelectorKind uint8
 
-// Selector kinds are ordered by Codex precedence. A dedicated CLI model flag
-// overrides a generic config model even when the config token appears later.
 const (
 	modelSelectorNone modelSelectorKind = iota
 	modelSelectorConfig
 	modelSelectorDedicated
 )
 
-// modelSelector identifies one selector token in an argv vector and how to
-// rewrite that exact token without changing the surrounding arguments.
 type modelSelector struct {
 	model             string
 	argIndex          int
@@ -55,25 +49,14 @@ func defaultModelDispatch() modelDispatch {
 	return modelDispatch{source: modelDispatchCLIDefault}
 }
 
-// modelDispatchFromArgs applies the provider's selector precedence. args must
-// be the flag-only portion assembled by a driver; keeping prompts and artifact
-// paths out prevents their text from impersonating a model flag.
 func modelDispatchFromArgs(cli string, base modelDispatch, args []string) modelDispatch {
 	return scanModelDispatch(cli, base, args, false)
 }
 
-// modelDispatchFromExtraArgs accepts only an unambiguous sequence of selector
-// overrides. An unknown pass-through option may consume later text according
-// to provider-specific grammar, so retaining any inferred selector would risk
-// persisting an option value or prompt fragment as a model identity.
 func modelDispatchFromExtraArgs(cli string, base modelDispatch, args []string) modelDispatch {
 	return scanModelDispatch(cli, base, args, true)
 }
 
-// modelDispatchFromFinalizedFlags derives selector evidence from the exact
-// emitted flags after order-preserving deduplication. trusted must remain an
-// exact prefix; otherwise a malformed flag/value pair crossed the provenance
-// boundary and the selector is conservatively unknown.
 func modelDispatchFromFinalizedFlags(cli string, trusted, emitted []string) modelDispatch {
 	if len(trusted) > len(emitted) || !slices.Equal(trusted, emitted[:len(trusted)]) {
 		return modelDispatch{source: modelDispatchUnknown, uncertain: true}
@@ -110,11 +93,6 @@ func scanModelDispatch(cli string, base modelDispatch, args []string, rejectUnkn
 	return base
 }
 
-// effectiveCodexModelSelector returns the selector Codex resolves before `--`.
-// Dedicated -m/--model flags take precedence over generic config overrides,
-// regardless of their relative argv positions. Repeated config overrides are
-// ordered, while repeated dedicated flags are a provider argument conflict and
-// have no effective selector.
 func effectiveCodexModelSelector(args []string) (modelSelector, bool) {
 	var effective modelSelector
 	dedicatedFound := false
@@ -141,11 +119,6 @@ func effectiveCodexModelSelector(args []string) (modelSelector, bool) {
 	return effective, found
 }
 
-// modelSelectorAt recognizes every concrete selector spelling supported by the
-// named CLI. Codex config overrides are deliberately provider-specific: -c is
-// an unrelated flag on other CLIs. recognized also covers non-model Codex
-// config values so a strict raw scan consumes their value rather than treating
-// it as a separate option.
 func modelSelectorAt(cli string, args []string, index int) (selector modelSelector, consumed int, recognized bool) {
 	arg := args[index]
 	switch {
@@ -256,10 +229,6 @@ func modelDispatchForTmux(cli string, realization Realization, extras []string) 
 	return modelDispatchFromExtraArgs(cli, observation, extras)
 }
 
-// modelDispatchFromREPL recognizes selector commands at the boundary where a
-// seed line has actually been sent. Keeping this separate from launch argv
-// prevents a boot failure from claiming a model command that never reached the
-// session.
 func modelDispatchFromREPL(line string) (modelDispatch, bool) {
 	fields := strings.Fields(line)
 	if len(fields) < 2 || fields[0] != "/model" {

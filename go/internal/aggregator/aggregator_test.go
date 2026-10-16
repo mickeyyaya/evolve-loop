@@ -394,7 +394,6 @@ func TestAggregate_PlanReviewWeakLensReturnsRevise(t *testing.T) {
 	w2 := filepath.Join(dir, "b.md")
 	writeWorker(t, w1, "Score: 9\nVerdict: PROCEED\n")
 	writeWorker(t, w2, "Score: 4\nVerdict: REVISE\n")
-	// avg = 6.5 (>=5) but weak lens — should REVISE
 	rc := Aggregate(Inputs{Phase: "plan-review", Output: filepath.Join(dir, "o.md"), Workers: []string{w1, w2}, Now: fixedNow()}, os.Stderr)
 	if rc != ExitOK {
 		t.Errorf("rc=%d", rc)
@@ -449,7 +448,6 @@ func TestAggregate_CrossCLIBelowQuorumIsWarn(t *testing.T) {
 	writeWorker(t, w1, "Verdict: PASS\n")
 	writeWorker(t, w2, "Verdict: WARN\n")
 	writeWorker(t, w3, "Verdict: WARN\n")
-	// 1 PASS, no FAIL, quorum=2 — should WARN
 	rc := Aggregate(Inputs{Phase: "cross-cli-vote", Output: filepath.Join(dir, "o.md"), Workers: []string{w1, w2, w3}, Now: fixedNow()}, os.Stderr)
 	if rc != ExitOK {
 		t.Errorf("rc=%d, want 0 (WARN ships)", rc)
@@ -511,7 +509,5 @@ func fixedNow() func() time.Time {
 	}
 }
 
-// avoid import of fmt for tests
 func init() {
-	// no-op — keep package clean
 }

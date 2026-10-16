@@ -16,9 +16,6 @@ func repoRootForEffort(t *testing.T) string {
 	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..")
 }
 
-// claude-tmux declares effort as pass-through (flag, no values table), so
-// realizeScalar appends any string; its rows prove the mechanism is wired,
-// not that "max" is a valid claude effort level.
 func TestEffortTopRungs_RealizeOnCodexAndClaude(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

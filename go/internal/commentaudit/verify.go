@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// VerifyChanges checks each changed Go file for a comment-only edit and
-// returns one violation per file that fails.
 func VerifyChanges(files []string, before, after func(string) ([]byte, error)) ([]string, error) {
 	var violations []string
 	for _, f := range files {
@@ -45,8 +43,6 @@ func readOptional(read func(string) ([]byte, error), name string) ([]byte, error
 	return src, err
 }
 
-// readBoth reads both sides of one file, treating either side's absence as
-// nil; a genuine read error is wrapped with the file name.
 func readBoth(before, after func(string) ([]byte, error), name string) (b, a []byte, err error) {
 	b, bErr := readOptional(before, name)
 	a, aErr := readOptional(after, name)

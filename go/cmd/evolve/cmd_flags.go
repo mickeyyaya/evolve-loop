@@ -20,11 +20,8 @@ func runFlags(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: evolve flags <generate|check>")
 		return 10
 	}
-	// control-flags.md is a generated SOURCE doc, part of a cycle's committed
-	// deliverable — resolve it via sourceRoot() so an ACS suite run reads the
-	// worktree copy, not main's stale one.
-	project := sourceRoot()
-	docPath := filepath.Join(project, "docs", "architecture", "control-flags.md")
+	generatedDocRoot := sourceRoot()
+	docPath := filepath.Join(generatedDocRoot, "docs", "architecture", "control-flags.md")
 	switch args[0] {
 	case "generate":
 		return flagsRun(docPath, true, stdout, stderr)

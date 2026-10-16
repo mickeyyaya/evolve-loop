@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// modelCatalogDirFn resolves the model-catalog.json directory: policy's bridge CatalogDir, else the project's .evolve.
 var modelCatalogDirFn = func() string {
 	layout := paths.ResolveFromEnv()
 	pol, err := policy.Load(filepath.Join(layout.EvolveDir, "policy.json"))
@@ -23,12 +22,10 @@ var modelCatalogDirFn = func() string {
 	return layout.EvolveDir
 }
 
-// SetModelCatalogDirFn replaces the catalog directory resolver without touching the process environment.
 func SetModelCatalogDirFn(fn func() string) {
 	modelCatalogDirFn = fn
 }
 
-// overlayManifestCatalog merges live catalog tier models over m.ModelTierMap; a missing catalog never blocks a load.
 func overlayManifestCatalog(m Manifest) Manifest {
 	cat := loadCatalogCached()
 	if cat.Empty() {
@@ -37,8 +34,6 @@ func overlayManifestCatalog(m Manifest) Manifest {
 	return applyCatalogTierMap(m, cat)
 }
 
-// LoadManifest runs per dispatch, so the catalog is re-parsed only when its (dir, mtime) changes. A cycle-start
-// refresh rewrites the file, so freshness holds without a parse per load.
 var (
 	catalogMu  sync.Mutex
 	catalogDir string
@@ -53,7 +48,6 @@ func loadCatalogCached() modelcatalog.Catalog {
 	catalogMu.Lock()
 	defer catalogMu.Unlock()
 	if err != nil {
-		// Remember the dir so a later write to it is seen by the mtime check.
 		catalogDir, catalogMod, catalogVal = dir, time.Time{}, modelcatalog.Catalog{}
 		return catalogVal
 	}
@@ -65,8 +59,6 @@ func loadCatalogCached() modelcatalog.Catalog {
 	return cat
 }
 
-// applyCatalogTierMap merges each canonical tier's live model over m.ModelTierMap. With no live hit it returns m
-// unchanged, so dispatch stays byte-identical to the embedded manifest.
 func applyCatalogTierMap(m Manifest, cat modelcatalog.Catalog) Manifest {
 	base := policy.BaseCLI(m.CLI)
 	var merged map[string]string

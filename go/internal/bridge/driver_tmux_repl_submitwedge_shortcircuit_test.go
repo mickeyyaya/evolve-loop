@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-// permanentlyParkedPromptTmux models a prompt paste whose input line remains
-// visible despite every bounded re-send of Enter.
 type permanentlyParkedPromptTmux struct {
 	*fakeTmux
 	pasted bool

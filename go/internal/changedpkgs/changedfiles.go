@@ -8,14 +8,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// ChangedFile is a repo-relative path that differs between a base ref and the working tree; Added marks a path the base lacks.
 type ChangedFile struct {
 	Path  string
 	Added bool
 }
 
-// ChangedFilesChecked lists the files the working tree changes versus baseRef; ok is false when git could not answer.
-// It reads the working tree, never the index: a lane's output stays unstaged until the ship stages it.
 func ChangedFilesChecked(repoRoot, baseRef string) ([]ChangedFile, bool) {
 	if repoRoot == "" || baseRef == "" {
 		return nil, false
@@ -28,7 +25,6 @@ func ChangedFilesChecked(repoRoot, baseRef string) ([]ChangedFile, bool) {
 	}
 	var files []ChangedFile
 	for _, line := range strings.Split(out, "\n") {
-		// The last field is the path that exists now: "R100\told\tnew" names the rename's destination.
 		fields := strings.Split(strings.TrimRight(line, "\r"), "\t")
 		if len(fields) < 2 || strings.TrimSpace(fields[0]) == "" {
 			continue
@@ -48,7 +44,6 @@ func ChangedFilesChecked(repoRoot, baseRef string) ([]ChangedFile, bool) {
 	return files, true
 }
 
-// PackagesOf returns the sorted, deduped test patterns of the packages holding files, or nil when none is module Go source.
 func PackagesOf(files []ChangedFile) []string {
 	set := map[string]struct{}{}
 	for _, f := range files {

@@ -24,8 +24,6 @@ func (plainRunner) Run(context.Context, core.PhaseRequest) (core.PhaseResponse, 
 	return core.PhaseResponse{}, nil
 }
 
-// TestDecorator_ForwardsPersonaProber: wrapping must not hide the inner
-// runner's persona answer from the planner (token-waste #2).
 func TestDecorator_ForwardsPersonaProber(t *testing.T) {
 	missing := errors.New("load agent: " + core.ErrAgentDocMissing.Error())
 	wrapped := New(probingRunner{err: missing}, nil, swarm.ModeWriter, Config{})
@@ -45,9 +43,6 @@ type wiredRunner struct {
 
 func (w wiredRunner) SignalsWired() bool { return w.wired }
 
-// ADR-0103 unit 11 (test 43): a decorator must not narrow the wiring proof of
-// what it wraps — SignalsWired forwards to the inner runner, false for a
-// runner without the capability.
 func TestSwarmDecorator_ForwardsSignalsWired(t *testing.T) {
 	if !New(wiredRunner{wired: true}, nil, swarm.ModeWriter, Config{}).SignalsWired() {
 		t.Error("a wired inner runner reports wired through the Decorator")
@@ -86,9 +81,6 @@ func TestSwarmDecorator_ForwardsHostEffectsWired(t *testing.T) {
 	}
 }
 
-// Research F22: the verifier-wiring proof forwards through the Decorator the
-// same way SignalsWired does — wrapping never reports a wired runner unwired,
-// and never invents the capability for a runner without it.
 func TestSwarmDecorator_ForwardsContractVerifierWired(t *testing.T) {
 	if !New(contractWiredRunner{wired: true}, nil, swarm.ModeWriter, Config{}).ContractVerifierWired() {
 		t.Error("a wired inner runner reports wired through the Decorator")

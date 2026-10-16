@@ -8,11 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// remediationDenied are the judgment/floor phases that must NEVER be
-// remediable regardless of configuration: remediation is a re-earned verdict
-// from a DETERMINISTIC gate, and granting the builder a re-roll against an
-// LLM-judgment verdict (audit, adversarial-review, premise-challenge,
-// plan-review) or a control phase would be a gamed verdict, not a fix.
 var remediationDenied = map[Phase]bool{
 	PhaseAudit:                  true,
 	PhaseRetro:                  true,
@@ -22,11 +17,6 @@ var remediationDenied = map[Phase]bool{
 	Phase("plan-review"):        true,
 }
 
-// maybeRemediate runs between reviewAndGuard and recordAndBranch: on a FAIL
-// verdict from a remediable gate with rounds remaining, it re-dispatches the
-// builder with the gate report as directive, re-runs the gate, and replaces
-// dr.resp with the fresh verdict. Always returns loopNext — a failed
-// remediation leaves the original FAIL path untouched.
 func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, error) {
 	if dr.resp.Verdict != VerdictFAIL {
 		return loopNext, nil
@@ -56,25 +46,12 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	fmt.Fprintf(cr.o.errOut(), "[orchestrator] remediation: gate %s FAILed — dispatching builder fix round %d/%d (report: %s)\n",
 		next, round, wf.RemediationRounds, report)
 
-	// Record the original failing gate attempt through the phase-outcome
-	// chokepoint before anything else — the re-run gets its own window below,
-	// so the record honestly shows gate-FAIL, fix, gate-rerun.
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, "", cr.cs.PhaseStartedAt))
 
-	// Tree-diff guard parity with a normal dispatch: snapshot before the fix
-	// dispatch, recover + check after; a main-tree leak voids the round.
 	fixStarted := cr.o.now().UTC().Format("2006-01-02T15:04:05Z07:00")
 	breq := dr.phaseReq
-	// The gate's request is the template (same workspace/worktree/roots), but
-	// the whole-cycle model-routing clamp is PER-PHASE — the builder must run
-	// under its own profile, not the gate's (latent under routing=auto).
-	// Known limitation: breq.BuildPlan stays empty (it is only populated for a
-	// first-class build dispatch) — the remediation directive carries the gate
-	// report instead, which is the context that matters for a scoped fix.
 	breq.ModelRoutingCLI = ""
 	breq.ModelRoutingTier = ""
-	// The gate is read-only and fenced; the fix dispatch is a BUILD and must
-	// keep its writes (a fenced builder would have its fix silently undone).
 	breq.WorktreeReadOnly = false
 	breq.CorrectionDirective = fmt.Sprintf(
 		"REMEDIATION round %d: the deterministic gate %q FAILED after your build. "+
@@ -82,8 +59,6 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 			"typically missing tests for new code. Do not widen scope; do not touch unrelated "+
 			"files. The same gate re-runs immediately after you finish.", round, next, report)
 	fixGuard, fixBefore, bresp, berr := cr.snapshotThenRun(PhaseBuild, builder, breq)
-	// The fix dispatch burned tokens — record it whatever happens, under its
-	// own label so it never clobbers the build phase's own records.
 	fixAbort := ""
 	if berr != nil {
 		fixAbort = fmt.Sprintf("remediation fix dispatch: %v", berr)
@@ -117,9 +92,6 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		handoff.apply(&dr.phaseReq)
 	}
 
-	// Fresh timing window for the re-run: recordAndBranch later records the
-	// FINAL verdict against cs.PhaseStartedAt — without this reset the window
-	// would silently span the fix work recorded separately above.
 	cr.cs.PhaseStartedAt = cr.o.now().UTC().Format("2006-01-02T15:04:05Z07:00")
 	greq := dr.phaseReq
 	greq.CorrectionDirective = fmt.Sprintf("RE-VERIFY after remediation round %d: run your full check fresh against the current worktree.", round)
@@ -138,9 +110,6 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		fmt.Sprintf("%s: round %d -> %s", next, round, resp2.Verdict))
 	fmt.Fprintf(cr.o.errOut(), "[orchestrator] remediation: gate %s re-ran -> %s (round %d/%d)\n",
 		next, resp2.Verdict, round, wf.RemediationRounds)
-	// The re-run's deliverable meets the same reviewer the original did, so a
-	// re-run that omits a declared deliverable or fails a contract check is
-	// never recorded as reviewed.
 	if act, err := cr.reviewAndGuard(next, dr); act == loopAbort || err != nil {
 		return act, err
 	}
@@ -165,7 +134,6 @@ func (cr *cycleRun) observedRun(phase Phase, runner PhaseRunner, req PhaseReques
 	return resp, err
 }
 
-// remediableListed reports whether phase is in the configured remediable set.
 func remediableListed(list []string, p Phase) bool {
 	for _, s := range list {
 		if s == string(p) {

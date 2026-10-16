@@ -8,20 +8,12 @@ import (
 	"testing"
 )
 
-// infraTeardownUnionScanRoots are the directories the uniqueness guard must
-// cover: internal/core (the definition) plus every package that consumes the
-// sentinels. Paths are relative to internal/core, where the test runs.
 var infraTeardownUnionScanRoots = []string{
 	".",
 	"../bridge",
 	"../phases/runner",
 }
 
-// findInfraTeardownUnionSpellingsAcross scans several roots and namespaces each
-// hit by its root, so two same-named files in different packages stay
-// distinguishable. It reuses the AST walker verbatim — the shape is a UNIQUENESS
-// assertion over parsed expressions, not a source-grep, and widening the roots
-// must not degrade it to one.
 func findInfraTeardownUnionSpellingsAcross(roots ...string) ([]string, error) {
 	var all []string
 	for _, root := range roots {
@@ -40,8 +32,6 @@ func findInfraTeardownUnionSpellingsAcross(roots ...string) ([]string, error) {
 func TestInfraTeardownUnion_ScanCoversConsumerPackages(t *testing.T) {
 	t.Parallel()
 
-	// The roots must actually exist — a widening that silently names a
-	// nonexistent directory buys the same blindness it claims to remove.
 	for _, root := range infraTeardownUnionScanRoots {
 		if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
 			t.Fatalf("scan root %s is not a directory (%v) — the widened guard would silently see nothing there", root, err)
@@ -65,9 +55,6 @@ func TestInfraTeardownUnion_ScanCoversConsumerPackages(t *testing.T) {
 func TestInfraTeardownUnion_DetectsPlantedDuplicateOutsideCore(t *testing.T) {
 	t.Parallel()
 
-	// Anti-no-op. Widening the ROOT LIST without widening what the scanner
-	// actually sees would pass "roots include X" and fail this: a synthetic
-	// union planted in a package outside internal/core must be REPORTED.
 	planted := t.TempDir()
 	src := `package elsewhere
 

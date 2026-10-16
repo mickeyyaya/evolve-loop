@@ -28,7 +28,7 @@ func TestInjectEnvelope_CommandIdle_Pastes(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
-	tmux := &fakeTmux{paneSeq: []string{"❯"}} // marker present → agent idle
+	tmux := &fakeTmux{paneSeq: []string{"❯"}}
 	deps.Tmux = tmux
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
 
@@ -51,7 +51,7 @@ func TestInjectEnvelope_CommandMidTurn_Defers(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
-	tmux := &fakeTmux{paneSeq: []string{"thinking..."}} // marker absent → busy
+	tmux := &fakeTmux{paneSeq: []string{"thinking..."}}
 	deps.Tmux = tmux
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
 
@@ -71,7 +71,6 @@ func TestInjectEnvelope_Keystroke_RawSendNoEscNoGate(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
-	// pane is busy (no idle marker)
 	tmux := &fakeTmux{paneSeq: []string{"thinking..."}}
 	deps.Tmux = tmux
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
@@ -127,8 +126,6 @@ func TestInjectEnvelope_Keystroke_EmptyBodyIsNoop(t *testing.T) {
 
 	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindKeystroke, Body: ""})
 
-	// One SendKeys call recorded (kept for ledger uniformity), no scratch
-	// file, no Escape token. The SendKeys body is empty.
 	if len(tmux.sentSeq) != 1 || tmux.sentSeq[0] != "|false" {
 		t.Fatalf("empty keystroke should still record one SendKeys with empty body; sentSeq=%v", tmux.sentSeq)
 	}
@@ -137,34 +134,32 @@ func TestInjectEnvelope_Keystroke_EmptyBodyIsNoop(t *testing.T) {
 	}
 }
 
-// The fake tmux records "<keys>|<enter>", pinning both the body and the
-// no-Enter contract in one string.
 func TestInjectEnvelope_Keystroke_TmuxKeyNames(t *testing.T) {
 	t.Parallel()
 	keys := []string{
-		"Escape", // cancel a modal
-		"Enter",  // confirm a y/N prompt
-		"C-c",    // Ctrl-C
-		"C-d",    // Ctrl-D / EOF
-		"Up",     // navigate menu
+		"Escape",
+		"Enter",
+		"C-c",
+		"C-d",
+		"Up",
 		"Down",
 		"Left",
 		"Right",
 		"Tab",
-		"BSpace", // backspace
+		"BSpace",
 		"PgUp",
 		"PgDn",
 		"Home",
 		"End",
-		"F1",  // function key
-		"F12", // last function key
+		"F1",
+		"F12",
 	}
 	for _, k := range keys {
 		t.Run(k, func(t *testing.T) {
 			ws := t.TempDir()
 			cfg := injectCfg(ws)
 			deps := covDeps()
-			tmux := &fakeTmux{paneSeq: []string{"busy"}} // gate-bypass
+			tmux := &fakeTmux{paneSeq: []string{"busy"}}
 			deps.Tmux = tmux
 			lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
 
@@ -185,9 +180,9 @@ func TestInjectEnvelope_Keystroke_MultiToken(t *testing.T) {
 	}{
 		{"y Enter"},
 		{"Escape Enter"},
-		{"Up Up Down Down Left Right Left Right"}, // konami
-		{"C-x C-s"},     // emacs save
-		{"hello Enter"}, // literal + named
+		{"Up Up Down Down Left Right Left Right"},
+		{"C-x C-s"},
+		{"hello Enter"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.body, func(t *testing.T) {
@@ -208,17 +203,15 @@ func TestInjectEnvelope_Keystroke_MultiToken(t *testing.T) {
 	}
 }
 
-// Some CLIs prompt in non-ASCII (Japanese, Korean, Chinese localizations),
-// and a literal `--body=はい` must reach the REPL byte-for-byte.
 func TestInjectEnvelope_Keystroke_UnicodeBody(t *testing.T) {
 	t.Parallel()
 	cases := []string{
-		"はい",      // Japanese "yes"
-		"네",       // Korean "yes"
-		"是",       // Chinese "yes"
-		"oui",     // ASCII (sanity)
-		"é",       // composed accent
-		"🚀 Enter", // emoji + named key
+		"はい",
+		"네",
+		"是",
+		"oui",
+		"é",
+		"🚀 Enter",
 	}
 	for _, body := range cases {
 		t.Run(body, func(t *testing.T) {
@@ -244,7 +237,7 @@ func TestInjectEnvelope_Keystroke_DeferCountIgnored(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
-	tmux := &fakeTmux{paneSeq: []string{"busy"}} // idle-gate would block command/nudge
+	tmux := &fakeTmux{paneSeq: []string{"busy"}}
 	deps.Tmux = tmux
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
 
@@ -260,8 +253,6 @@ func TestInjectEnvelope_Keystroke_DeferCountIgnored(t *testing.T) {
 	}
 }
 
-// 4 KB is well above any realistic operator-scripted body but below macOS
-// ARG_MAX (256 KB) so the test stays portable.
 func TestInjectEnvelope_Keystroke_LongBody(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -310,8 +301,6 @@ func TestInjectEnvelope_Keystroke_SendKeysErrorSurfaced(t *testing.T) {
 	}
 }
 
-// errInjectingTmux is a fakeTmux that returns a configured error from
-// SendKeys, driving injectEnvelope's error branch.
 type errInjectingTmux struct {
 	sendKeysErr error
 }
@@ -333,7 +322,7 @@ func TestInjectEnvelope_Interrupt_EscBeforeBody(t *testing.T) {
 	ws := t.TempDir()
 	cfg := injectCfg(ws)
 	deps := covDeps()
-	tmux := &fakeTmux{paneSeq: []string{"thinking..."}} // busy, but interrupt ignores the gate
+	tmux := &fakeTmux{paneSeq: []string{"thinking..."}}
 	deps.Tmux = tmux
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
 
@@ -357,7 +346,6 @@ func TestInjectEnvelope_DeferBudgetExhausted_Drops(t *testing.T) {
 	deps.Tmux = tmux
 	lp := tmuxLaunch{name: "claude-tmux", session: "s", promptMarker: "❯"}
 
-	// Already at the max defer count.
 	injectEnvelope(context.Background(), cfg, deps, lp, inbox.Envelope{Kind: inbox.KindCommand, Body: "x", DeferCount: maxInjectDefer})
 
 	envs, _ := inbox.NewCursor(ws, "build").Drain()
@@ -366,16 +354,11 @@ func TestInjectEnvelope_DeferBudgetExhausted_Drops(t *testing.T) {
 	}
 }
 
-// --- loop wiring: cursor-at-EOF skips backlog; post-launch append injects ---
-
 func TestRunTmuxREPL_SkipsPreLaunchBacklog(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	artifact := filepath.Join(ws, "a")
-	// Pre-launch envelope: must be skipped (cursor seeks to EOF on entry).
-	// The artifact is NOT pre-present, so the drain DOES run on iter 1 — if
-	// cursor-at-EOF were broken, "stale" would be injected.
 	if err := inbox.Append(ws, "build", inbox.Envelope{Kind: inbox.KindCommand, Body: "stale"}, fixedTime); err != nil {
 		t.Fatal(err)
 	}
@@ -393,9 +376,6 @@ func TestRunTmuxREPL_SkipsPreLaunchBacklog(t *testing.T) {
 	}
 }
 
-// captureHookTmux returns the marker always and writes the artifact on its
-// 2nd CapturePane call (boot=1, first artifact-loop tick=2) so the wait loop
-// runs exactly one drain before exiting.
 type captureHookTmux struct {
 	fakeTmux
 	artifact string
@@ -404,9 +384,6 @@ type captureHookTmux struct {
 	wrote    bool
 }
 
-// CapturePane drops the artifact on the second capture and then leaves it
-// alone: rewriting it on every capture would keep bumping its mtime and the
-// completion stability window would never close.
 func (c *captureHookTmux) CapturePane(_ context.Context, _ string, _ int) (string, error) {
 	c.n++
 	if c.n >= 2 && !c.wrote {
@@ -424,9 +401,6 @@ func TestRunTmuxREPL_InjectsPostLaunchAppend(t *testing.T) {
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws, Worktree: ws, Agent: "build",
 		Artifact: artifact, StdoutLog: filepath.Join(ws, "o"), StderrLog: filepath.Join(ws, "e")}
 	deps := covDeps()
-	// Queue a live command on the first artifact-wait Sleep (the loop's
-	// distinctive 2s tick — boot/prompt sleeps are 1s) so the append lands
-	// AFTER the cursor seeks to EOF, exactly as an external sender would.
 	appended := false
 	deps.Sleep = func(d time.Duration) {
 		if d == 2*time.Second && !appended {
@@ -447,9 +421,6 @@ func TestRunTmuxREPL_InjectsPostLaunchAppend(t *testing.T) {
 	}
 }
 
-// pasteHookTmux is a fakeTmux variant: it reports idle (marker) always, and
-// the 2nd PasteBuffer (the injection; #1 is the prompt) writes the artifact
-// so the wait loop exits once the injected command has been delivered.
 type pasteHookTmux struct {
 	fakeTmux
 	artifact string
@@ -463,7 +434,7 @@ func (p *pasteHookTmux) CapturePane(_ context.Context, _ string, _ int) (string,
 
 func (p *pasteHookTmux) PasteBuffer(_ context.Context, _ string) error {
 	p.pasteN++
-	if p.pasteN == 2 { // injection paste done → finish the work
+	if p.pasteN == 2 {
 		_ = os.WriteFile(p.artifact, []byte("done"), 0o644)
 	}
 	return nil

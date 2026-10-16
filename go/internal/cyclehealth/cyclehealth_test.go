@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-// writeArtifacts seeds a workspace with the three required reports.
-// Body is 200-char filler so artifact_substance passes.
 func writeArtifacts(t *testing.T, ws string) {
 	t.Helper()
 	body := strings.Repeat("x", 200)
@@ -24,8 +22,6 @@ func writeArtifacts(t *testing.T, ws string) {
 	}
 }
 
-// writeLedger writes a minimal valid ledger.jsonl with the three
-// required role entries linked in a hash chain.
 func writeLedger(t *testing.T, ws string, cycle int) {
 	t.Helper()
 	entries := []ledgerEntry{
@@ -64,8 +60,6 @@ func freshWorkspace(t *testing.T, cycle int) string {
 	return ws
 }
 
-// TestCheck_HealthyCycle_NoAnomalies — a properly-formed cycle's
-// workspace produces zero anomalies and OverallFatal=false.
 func TestCheck_HealthyCycle_NoAnomalies(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
@@ -78,15 +72,12 @@ func TestCheck_HealthyCycle_NoAnomalies(t *testing.T) {
 	if len(r.Anomalies) != 0 {
 		t.Errorf("anomalies=%+v, want none", r.Anomalies)
 	}
-	// Confirm the report file was written.
 	disk := readReport(t, ws)
 	if disk.Cycle != 1 {
 		t.Errorf("report.Cycle=%d, want 1", disk.Cycle)
 	}
 }
 
-// TestCheck_MissingArtifact_Fatal — missing scout-report.md trips
-// workspace_artifacts + cascades to OverallFatal.
 func TestCheck_MissingArtifact_Fatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	if err := os.Remove(filepath.Join(ws, "scout-report.md")); err != nil {
@@ -107,8 +98,6 @@ func TestCheck_MissingArtifact_Fatal(t *testing.T) {
 	}
 }
 
-// TestCheck_ShortArtifact_Fatal — body under 100 chars trips
-// artifact_substance.
 func TestCheck_ShortArtifact_Fatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("short"), 0o644); err != nil {
@@ -126,11 +115,8 @@ func TestCheck_ShortArtifact_Fatal(t *testing.T) {
 	}
 }
 
-// TestCheck_MissingLedgerRole_Fatal — drop auditor from ledger →
-// ledger_completeness fires.
 func TestCheck_MissingLedgerRole_Fatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
-	// Rewrite ledger without auditor.
 	entries := []ledgerEntry{
 		{Cycle: 1, Role: "scout", Phase: "scout", Timestamp: 1000, EntryHash: "h1"},
 		{Cycle: 1, Role: "builder", Phase: "build", Timestamp: 1100, PrevHash: "h1", EntryHash: "h2"},
@@ -154,13 +140,11 @@ func TestCheck_MissingLedgerRole_Fatal(t *testing.T) {
 	}
 }
 
-// TestCheck_FutureTimestamp_Fatal — a ledger entry with a timestamp
-// > now+60 trips ledger_timestamps.
 func TestCheck_FutureTimestamp_Fatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	r, _ := Check(Options{
 		Cycle: 1, Workspace: ws,
-		NowFn: func() time.Time { return time.Unix(500, 0) }, // before all ledger entries
+		NowFn: func() time.Time { return time.Unix(500, 0) },
 	})
 	found := false
 	for _, a := range r.Anomalies {
@@ -173,8 +157,6 @@ func TestCheck_FutureTimestamp_Fatal(t *testing.T) {
 	}
 }
 
-// TestCheck_HashChainBroken_Fatal — corrupt prev_hash on builder entry
-// trips hash_chain.
 func TestCheck_HashChainBroken_Fatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	entries := []ledgerEntry{
@@ -201,12 +183,8 @@ func TestCheck_HashChainBroken_Fatal(t *testing.T) {
 	}
 }
 
-// TestCheck_ChecksumMismatch_Fatal — ledger SHA != file SHA →
-// artifact_checksums fires.
 func TestCheck_ChecksumMismatch_Fatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
-	// Write a ledger that claims a known SHA, then change the file to
-	// produce a different SHA.
 	body := strings.Repeat("x", 200)
 	h := sha256.Sum256([]byte(body))
 	sha := hex.EncodeToString(h[:])
@@ -234,8 +212,6 @@ func TestCheck_ChecksumMismatch_Fatal(t *testing.T) {
 	}
 }
 
-// TestCheck_ChallengeTokenReused_Fatal — same token across two roles
-// trips challenge_tokens.
 func TestCheck_ChallengeTokenReused_Fatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	entries := []ledgerEntry{
@@ -262,12 +238,11 @@ func TestCheck_ChallengeTokenReused_Fatal(t *testing.T) {
 	}
 }
 
-// TestCheck_VelocityGap_Warn — phases > 30 min apart warn (not fatal).
 func TestCheck_VelocityGap_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	entries := []ledgerEntry{
 		{Cycle: 1, Role: "scout", Phase: "scout", Timestamp: 1000, EntryHash: "h1"},
-		{Cycle: 1, Role: "builder", Phase: "build", Timestamp: 5000, PrevHash: "h1", EntryHash: "h2"}, // 4000s gap
+		{Cycle: 1, Role: "builder", Phase: "build", Timestamp: 5000, PrevHash: "h1", EntryHash: "h2"},
 		{Cycle: 1, Role: "auditor", Phase: "audit", Timestamp: 5500, PrevHash: "h2", EntryHash: "h3"},
 	}
 	var lines []string
@@ -289,8 +264,6 @@ func TestCheck_VelocityGap_Warn(t *testing.T) {
 	}
 }
 
-// TestCheck_CanaryFromOtherCycle_Warn — leftover canary-* file from a
-// different cycle trips canary_files (warn).
 func TestCheck_CanaryFromOtherCycle_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	if err := os.WriteFile(filepath.Join(ws, "canary-cycle-99"), []byte("x"), 0o644); err != nil {
@@ -308,8 +281,6 @@ func TestCheck_CanaryFromOtherCycle_Warn(t *testing.T) {
 	}
 }
 
-// TestCheck_DuplicateLedgerEntry_Fatal — two entries with the same
-// entry_hash trips duplicate_ledger.
 func TestCheck_DuplicateLedgerEntry_Fatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	entries := []ledgerEntry{
@@ -336,7 +307,6 @@ func TestCheck_DuplicateLedgerEntry_Fatal(t *testing.T) {
 	}
 }
 
-// TestCheck_MissingCycle_Error — required-field validation.
 func TestCheck_MissingCycle_Error(t *testing.T) {
 	_, err := Check(Options{Workspace: t.TempDir()})
 	if err == nil {
@@ -344,7 +314,6 @@ func TestCheck_MissingCycle_Error(t *testing.T) {
 	}
 }
 
-// TestCheck_MissingWorkspace_Error — required-field validation.
 func TestCheck_MissingWorkspace_Error(t *testing.T) {
 	_, err := Check(Options{Cycle: 1})
 	if err == nil {
@@ -352,8 +321,6 @@ func TestCheck_MissingWorkspace_Error(t *testing.T) {
 	}
 }
 
-// TestCheck_OverallFatal_TrueOnAnyFatal — confirm OverallFatal flips
-// on the first fatal anomaly.
 func TestCheck_OverallFatal_TrueOnAnyFatal(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	os.Remove(filepath.Join(ws, "audit-report.md"))
@@ -363,7 +330,6 @@ func TestCheck_OverallFatal_TrueOnAnyFatal(t *testing.T) {
 	}
 }
 
-// TestSignalNames_ReturnsThirteen guards against accidental signal removal.
 func TestSignalNames_ReturnsThirteen(t *testing.T) {
 	names := signalNames()
 	if len(names) != 13 {
@@ -382,11 +348,6 @@ func TestSignalNames_ReturnsThirteen(t *testing.T) {
 	}
 }
 
-// writeSelfHealLedger writes an otherwise-healthy 3-role ledger plus any
-// extra entries, so a self_heal_events test can be healthy in every other
-// signal. Extra entries carry no EntryHash/Token (so hash_chain,
-// duplicate_ledger, challenge_tokens skip them) and timestamps after the
-// auditor entry (so ledger_timestamps stays monotonic).
 func writeSelfHealLedger(t *testing.T, ws string, cycle int, extra ...ledgerEntry) {
 	t.Helper()
 	entries := []ledgerEntry{
@@ -405,7 +366,6 @@ func writeSelfHealLedger(t *testing.T, ws string, cycle int, extra ...ledgerEntr
 	}
 }
 
-// selfHealAnomalies returns just the self_heal_events anomalies from a report.
 func selfHealAnomalies(r Report) []Anomaly {
 	var out []Anomaly
 	for _, a := range r.Anomalies {
@@ -416,9 +376,6 @@ func selfHealAnomalies(r Report) []Anomaly {
 	return out
 }
 
-// TestCheck_SelfHealEvents_PhaseRetry_Warn — a kind=phase_retry ledger
-// entry for this cycle surfaces exactly one self_heal_events WARN anomaly
-// (never fatal — a recovered cycle must still ship), naming the retried phase.
 func TestCheck_SelfHealEvents_PhaseRetry_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writeSelfHealLedger(t, ws, 1, ledgerEntry{
@@ -443,8 +400,6 @@ func TestCheck_SelfHealEvents_PhaseRetry_Warn(t *testing.T) {
 	}
 }
 
-// TestCheck_SelfHealEvents_Backfill_Warn — a kind=backfill ledger entry
-// surfaces one self_heal_events WARN anomaly naming the backfilled phase.
 func TestCheck_SelfHealEvents_Backfill_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writeSelfHealLedger(t, ws, 1, ledgerEntry{
@@ -466,10 +421,6 @@ func TestCheck_SelfHealEvents_Backfill_Warn(t *testing.T) {
 	}
 }
 
-// TestCheck_SelfHealEvents_ContractCorrection_Warn — a kind=contract_correction
-// ledger entry (the orchestrator re-dispatched a phase to fix a deliverable
-// violation) surfaces one self_heal_events WARN naming the corrected phase. A
-// correction consumes an LLM call like phase_retry, so it must be visible.
 func TestCheck_SelfHealEvents_ContractCorrection_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writeSelfHealLedger(t, ws, 1, ledgerEntry{
@@ -494,11 +445,8 @@ func TestCheck_SelfHealEvents_ContractCorrection_Warn(t *testing.T) {
 	}
 }
 
-// TestCheck_SelfHealEvents_NoEvents_NoAnomaly — the anti-no-op guard: a
-// clean cycle (no phase_retry / backfill entries) emits ZERO self_heal_events
-// anomalies. A signal that always fired would FAIL this.
 func TestCheck_SelfHealEvents_NoEvents_NoAnomaly(t *testing.T) {
-	ws := freshWorkspace(t, 1) // base 3-role ledger only, no self-heal kinds
+	ws := freshWorkspace(t, 1)
 	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})
 	if err != nil {
 		t.Fatal(err)
@@ -508,8 +456,6 @@ func TestCheck_SelfHealEvents_NoEvents_NoAnomaly(t *testing.T) {
 	}
 }
 
-// TestCheck_SelfHealEvents_OnePerEvent — N recovery entries surface N
-// anomalies (one per event), not one collapsed summary.
 func TestCheck_SelfHealEvents_OnePerEvent(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writeSelfHealLedger(t, ws, 1,
@@ -526,9 +472,6 @@ func TestCheck_SelfHealEvents_OnePerEvent(t *testing.T) {
 	}
 }
 
-// TestCheck_SelfHealEvents_OtherCycle_Ignored — a phase_retry entry tagged
-// for a DIFFERENT cycle must not leak into this cycle's report (cross-cycle
-// isolation — the common signal-accumulation defect).
 func TestCheck_SelfHealEvents_OtherCycle_Ignored(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writeSelfHealLedger(t, ws, 1,
@@ -546,9 +489,8 @@ func TestCheck_SelfHealEvents_OtherCycle_Ignored(t *testing.T) {
 func TestCheck_PhaseLatency_SlowPhase_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 
-	// Write a slow phase entry to phase-timing.json
 	entries := []phaseTimingEntry{
-		{Phase: "build", DurationMS: 950000, Verdict: "PASS"}, // 950s (exceeds default 900s limit)
+		{Phase: "build", DurationMS: 950000, Verdict: "PASS"},
 	}
 	data, _ := json.Marshal(entries)
 	if err := os.WriteFile(filepath.Join(ws, "phase-timing.json"), data, 0o644); err != nil {
@@ -576,7 +518,6 @@ func TestCheck_PhaseLatency_SlowPhase_Warn(t *testing.T) {
 		t.Error("expected phase_latency warning anomaly, not found")
 	}
 
-	// Test with a custom policy ceiling.
 	r, err = Check(Options{Cycle: 1, Workspace: ws, PhaseLatencyCeilingS: 1000})
 	if err != nil {
 		t.Fatal(err)
@@ -590,7 +531,6 @@ func TestCheck_PhaseLatency_SlowPhase_Warn(t *testing.T) {
 
 func TestCheck_PhaseLatency_MissingFile_NoAnomaly(t *testing.T) {
 	ws := freshWorkspace(t, 1)
-	// phase-timing.json is missing by default
 	r, err := Check(Options{Cycle: 1, Workspace: ws})
 	if err != nil {
 		t.Fatal(err)
@@ -602,7 +542,6 @@ func TestCheck_PhaseLatency_MissingFile_NoAnomaly(t *testing.T) {
 	}
 }
 
-// TestSha256File_RoundTrip — direct unit test for the helper.
 func TestSha256File_RoundTrip(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "x")
 	os.WriteFile(p, []byte("hello"), 0o644)
@@ -616,14 +555,12 @@ func TestSha256File_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestSha256File_MissingFile_Error — error path.
 func TestSha256File_MissingFile_Error(t *testing.T) {
 	if _, err := sha256File("/no/such/file"); err == nil {
 		t.Error("want error for missing file")
 	}
 }
 
-// TestShortHash — direct helper.
 func TestShortHash(t *testing.T) {
 	if shortHash("abc") != "abc" {
 		t.Errorf("short input should pass through")
@@ -633,8 +570,6 @@ func TestShortHash(t *testing.T) {
 	}
 }
 
-// TestLoadLedger_FallsBackToParentDir — the ledger may live at the
-// workspace's parent (project-root case).
 func TestLoadLedger_FallsBackToParentDir(t *testing.T) {
 	parent := t.TempDir()
 	ws := filepath.Join(parent, "workspace")
@@ -642,7 +577,6 @@ func TestLoadLedger_FallsBackToParentDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeArtifacts(t, ws)
-	// Put ledger in the parent, not the workspace.
 	entries := []ledgerEntry{
 		{Cycle: 1, Role: "scout", Phase: "scout", Timestamp: 1000, EntryHash: "h1"},
 		{Cycle: 1, Role: "builder", Phase: "build", Timestamp: 1100, PrevHash: "h1", EntryHash: "h2"},
@@ -663,8 +597,6 @@ func TestLoadLedger_FallsBackToParentDir(t *testing.T) {
 	}
 }
 
-// TestLoadLedger_Missing_NoFile — when no ledger exists anywhere, the
-// completeness signal fires fatal.
 func TestLoadLedger_Missing_NoFile(t *testing.T) {
 	ws := t.TempDir()
 	writeArtifacts(t, ws)
@@ -680,10 +612,6 @@ func TestLoadLedger_Missing_NoFile(t *testing.T) {
 	}
 }
 
-// TestCheck_RunsThirteenSignals pins the signal roster to 13. This behavioral
-// test ties the count in the package comment to reality: SignalsRun must list
-// all current names, including dossier_commitment, and must NOT include the
-// removed cost_envelope signal.
 func TestCheck_RunsThirteenSignals(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	r, err := Check(Options{Cycle: 1, Workspace: ws, NowFn: func() time.Time { return time.Unix(2000, 0) }})

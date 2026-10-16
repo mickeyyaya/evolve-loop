@@ -1,8 +1,5 @@
 package core
 
-// The stderr-capturing tests below must not run in parallel: os.Stderr is
-// process-global, which is captureStderr's contract.
-
 import (
 	"context"
 	"errors"
@@ -21,8 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// spineRequest builds the spine-pin fixture once: audit failed at Cycle=1034,
-// the workspace and project root in dir.
 func spineRequest(dir string, err error) failureLearningRequest {
 	return failureLearningRequest{
 		CycleRequest: CycleRequest{ProjectRoot: dir},
@@ -38,9 +33,6 @@ func spineRequest(dir string, err error) failureLearningRequest {
 	}
 }
 
-// seedValidDisposition models a compliant retro agent: the real input
-// artifact, the canonical digest the assembler will derive, and a disposition
-// carrying that identity.
 func seedValidDisposition(t *testing.T, dir string) {
 	t.Helper()
 	writeJSON(t, dir, "audit-fail-reason.json", map[string]any{
@@ -57,7 +49,6 @@ func seedValidDisposition(t *testing.T, dir string) {
 	writeJSON(t, dir, "disposition.json", d)
 }
 
-// seqStorage logs the order of the two storage effects the spine performs.
 type seqStorage struct {
 	*fakeStorage
 	seq []string
@@ -73,7 +64,6 @@ func (s *seqStorage) WriteCycleState(ctx context.Context, cs CycleState) error {
 	return s.fakeStorage.WriteCycleState(ctx, cs)
 }
 
-// retroProbeRunner is a retro runner that inspects the workspace inside Run.
 type retroProbeRunner struct {
 	inRun   func(req PhaseRequest)
 	verdict string
@@ -256,7 +246,6 @@ func TestOptionalInfraSkip_RecordsTheInlineRetroBeforeTheSkipOutcome(t *testing.
 	}
 }
 
-// probeLedger observes each Append (the fake ledger with a hook).
 type probeLedger struct {
 	fakeLedger
 	onAppend func(LedgerEntry)
@@ -269,8 +258,6 @@ func (p *probeLedger) Append(ctx context.Context, e LedgerEntry) error {
 	return p.fakeLedger.Append(ctx, e)
 }
 
-// optionalPhaseOrchestrator is the missing-persona fixture: an optional
-// "amplify-tests" phase after build, dynamic-LLM routing with a fixed plan.
 func optionalPhaseOrchestrator(t *testing.T, st Storage, led Ledger, runners map[Phase]PhaseRunner, extra ...Option) *Orchestrator {
 	t.Helper()
 	cat, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "amplify-tests", Optional: true, After: "build"}})

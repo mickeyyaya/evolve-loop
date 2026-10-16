@@ -25,12 +25,6 @@ func TestVerifiedActiveMints(t *testing.T) {
 	write("bad-optional", `{"name":"bad-optional","optional":false}`)
 	write("bad-mismatch", `{"name":"other-name","optional":true}`)
 	write("bad-garbage", `{not json`)
-	// "bad-missing" has a registry entry but no file at all; "../bad-trav"
-	// is a forged path-traversal name that must be dropped BEFORE any
-	// filesystem access (path-segment safety).
-	// "bad-huge" and "bad-symlink" pin the read-bounding half: the spec read
-	// must be Lstat-gated to a small regular file, so a planted FIFO/symlink/
-	// giant file cannot hang or exhaust the guard.
 	write("bad-huge", `{"name":"bad-huge","optional":true,"pad":"`+strings.Repeat("x", 1<<20)+`"}`)
 	if err := os.MkdirAll(filepath.Join(root, ".evolve", "phases", "bad-symlink"), 0o755); err != nil {
 		t.Fatal(err)
@@ -55,8 +49,6 @@ func TestVerifiedActiveMints(t *testing.T) {
 	}
 }
 
-// Companion end-to-end pins live in treediff_crosslane_mint_test.go
-// (integration tag).
 func TestIsActiveMintPhasePath(t *testing.T) {
 	t.Parallel()
 
@@ -66,18 +58,18 @@ func TestIsActiveMintPhasePath(t *testing.T) {
 		want bool
 	}{
 		{".evolve/phases/gate-wiring-proof/phase.json", true},
-		{".evolve/phases/gate-wiring-proof", true},                    // bare dir entry for a registered mint
-		{".evolve/phases/gate-wiring-proof/nested/extra.json", false}, // a mint writes ONLY phase.json — payloads abort
-		{".evolve/phases/gate-wiring-proof/payload.sh", false},        // smuggled companion file aborts
-		{".evolve/phases/gate-wiring-proof/", false},                  // trailing-slash dir handled by the bare-dir rule, not mint
-		{".evolve/phases/evil/phase.json", false},                     // unregistered name
-		{".evolve/phases/gate-wiring-proof-evil/x.json", false},       // segment match, not prefix ("gate" registered too)
-		{".evolve/phases/", false},                                    // no name segment
-		{".evolve/phases", false},                                     // bare deliverable root
-		{".evolve/evals/gate-wiring-proof.md", false},                 // other deliverables unaffected
-		{".evolve/phasesx/gate-wiring-proof/phase.json", false},       // exact dir prefix only
-		{"go/internal/core/leak.go", false},                           // source never exempt
-		{"x/.evolve/phases/gate-wiring-proof/phase.json", false},      // top-level .evolve only
+		{".evolve/phases/gate-wiring-proof", true},
+		{".evolve/phases/gate-wiring-proof/nested/extra.json", false},
+		{".evolve/phases/gate-wiring-proof/payload.sh", false},
+		{".evolve/phases/gate-wiring-proof/", false},
+		{".evolve/phases/evil/phase.json", false},
+		{".evolve/phases/gate-wiring-proof-evil/x.json", false},
+		{".evolve/phases/", false},
+		{".evolve/phases", false},
+		{".evolve/evals/gate-wiring-proof.md", false},
+		{".evolve/phasesx/gate-wiring-proof/phase.json", false},
+		{"go/internal/core/leak.go", false},
+		{"x/.evolve/phases/gate-wiring-proof/phase.json", false},
 	}
 	for _, tc := range cases {
 		if got := isActiveMintPhasePath(mints, tc.path); got != tc.want {

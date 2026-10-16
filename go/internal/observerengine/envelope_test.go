@@ -1,11 +1,5 @@
 package observerengine
 
-// envelope_test.go — §6 tests 28-29 and the G1 fold: the pure envelope
-// builder replayed against the golden, the once-per-op append faults (marshal,
-// mkdir, open, write — the write through the unexported openAppend seam,
-// critic B1) and the INCIDENT retention point (after a successful open,
-// regardless of the write result — the :559-563 quirk).
-
 import (
 	"errors"
 	"io"
@@ -37,8 +31,6 @@ func goldenIncidentData() map[string]any {
 	return map[string]any{"idle_s": 601, "threshold_s": 600, "action": "extend", "action_reason": "deep-thinking phase; extend"}
 }
 
-// TestEnvelope_GoldenReplay — G1 through the leaf with Settings.PID bound to
-// the golden's <PID>. Kills M15 in the leaf.
 func TestEnvelope_GoldenReplay(t *testing.T) {
 	t.Parallel()
 	e := goldenEngine(t)
@@ -52,9 +44,6 @@ func TestEnvelope_GoldenReplay(t *testing.T) {
 	}
 }
 
-// TestEmit_IncidentAppendsAndIsRetained — the intent of the host's
-// TestEmit_AppendsToEventsFile (phaseobserver_test.go:245, moved): an INCIDENT
-// emit appends one parseable line and is retained; an INFO is not retained.
 func TestEmit_IncidentAppendsAndIsRetained(t *testing.T) {
 	t.Parallel()
 	e, rc, _ := newEngine(t, nil)
@@ -79,9 +68,6 @@ func (w *failingWriter) Write([]byte) (int, error) {
 }
 func (w *failingWriter) Close() error { w.closed++; return nil }
 
-// TestEmit_FaultsReportOncePerOp — each op reported exactly once across three
-// emits; retention follows a successful open only. Kills M27 (once-guard),
-// M43 (retention moved before the open), M44 (a swallowed write error).
 func TestEmit_FaultsReportOncePerOp(t *testing.T) {
 	t.Parallel()
 	t.Run("marshal", func(t *testing.T) {
@@ -113,7 +99,7 @@ func TestEmit_FaultsReportOncePerOp(t *testing.T) {
 	t.Run("open", func(t *testing.T) {
 		t.Parallel()
 		e, rc, _ := newEngine(t, nil)
-		if err := os.Mkdir(e.s.Paths.Events, 0o755); err != nil { // a DIRECTORY at the events path
+		if err := os.Mkdir(e.s.Paths.Events, 0o755); err != nil {
 			t.Fatal(err)
 		}
 		for i := 0; i < 3; i++ {

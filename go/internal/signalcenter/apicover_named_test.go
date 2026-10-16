@@ -1,9 +1,5 @@
 package signalcenter
 
-// apicover_named_test.go — names the exported symbols the behavior tests only
-// use anonymously (apicover counts identifiers, not uses), each with a real
-// assertion.
-
 import "testing"
 
 func TestAPI_ListenerOptionConflictAndFormatLineNamed(t *testing.T) {

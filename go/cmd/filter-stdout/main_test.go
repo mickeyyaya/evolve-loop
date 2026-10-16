@@ -1,13 +1,3 @@
-// go/cmd/filter-stdout/main_test.go
-// Package: package main (internal test, same package as main.go)
-//
-// These tests require Builder to refactor main.go to extract:
-//   func run(args []string) int
-// returning the intended exit code without calling os.Exit directly.
-// Until that function exists, this file will FAIL TO COMPILE → RED.
-//
-// Copy verbatim to go/cmd/filter-stdout/main_test.go (package main).
-
 package main
 
 import (
@@ -32,7 +22,6 @@ func TestRun_OneArg_ExitsWithCode2(t *testing.T) {
 
 func TestRun_HappyPath_WritesCleanFile(t *testing.T) {
 	ws := t.TempDir()
-	// Write a minimal stream-json log line (assistant text event)
 	rawContent := `{"type":"assistant","content":[{"type":"text","text":"Hello world"}]}` + "\n"
 	rawPath := filepath.Join(ws, "scout-stdout.log")
 	if err := os.WriteFile(rawPath, []byte(rawContent), 0o644); err != nil {

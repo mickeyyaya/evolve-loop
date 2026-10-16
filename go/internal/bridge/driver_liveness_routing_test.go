@@ -1,8 +1,5 @@
 package bridge
 
-// This file is package bridge, not bridge_test, because detectorFor is
-// unexported; calling it without exporting it requires being in-package.
-
 import (
 	"bytes"
 	"os"

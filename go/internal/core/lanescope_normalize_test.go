@@ -8,16 +8,11 @@ import (
 	"testing"
 )
 
-// pinGoalHash / misGoalHash are canonical 64-hex goal hashes differing by a
-// single digit, mirroring a real single-digit transcription flip.
 var (
 	pinGoalHash = strings.Repeat("a", 57) + "c05376e"
 	misGoalHash = strings.Repeat("a", 57) + "c05356e"
 )
 
-// writeScoutReportFixture writes <workspace>/scout-report.md whose Decision
-// Trace fenced-json block carries the given goal_hash. An empty goalHash writes
-// a trace with NO goal_hash key (the fail-open "report without the echo" case).
 func writeScoutReportFixture(t *testing.T, workspace, goalHash string) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -76,7 +71,7 @@ func TestNormalizeScoutGoalHash_NonCanonicalEchoRefused(t *testing.T) {
 
 	ws := t.TempDir()
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
-	writeScoutReportFixture(t, ws, "goal-1") // detected mismatch, but not 64-hex
+	writeScoutReportFixture(t, ws, "goal-1")
 	before := readScoutReport(t, ws)
 
 	normalizeScoutGoalHash(ws, io.Discard)
@@ -86,8 +81,6 @@ func TestNormalizeScoutGoalHash_NonCanonicalEchoRefused(t *testing.T) {
 	}
 }
 
-// Two distinct equal-length hex strings can't be substrings of each other,
-// so a canonical needle only ever replaces genuine echoes.
 func TestNormalizeScoutGoalHash_CorrectsEveryOccurrence(t *testing.T) {
 	t.Parallel()
 
@@ -118,7 +111,7 @@ func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 
 	t.Run("no pin leaves report untouched", func(t *testing.T) {
 		ws := t.TempDir()
-		writeScoutReportFixture(t, ws, misGoalHash) // no lane-scope.json
+		writeScoutReportFixture(t, ws, misGoalHash)
 		before := readScoutReport(t, ws)
 
 		normalizeScoutGoalHash(ws, io.Discard)
@@ -130,9 +123,9 @@ func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 
 	t.Run("no report is a safe no-op", func(t *testing.T) {
 		ws := t.TempDir()
-		writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash) // no scout-report.md
+		writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 
-		normalizeScoutGoalHash(ws, io.Discard) // must not panic / create a file
+		normalizeScoutGoalHash(ws, io.Discard)
 
 		if _, err := os.Stat(filepath.Join(ws, "scout-report.md")); !os.IsNotExist(err) {
 			t.Errorf("normalize fabricated a scout-report.md from a bare pin (err=%v)", err)
@@ -142,7 +135,7 @@ func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 	t.Run("report without a goal_hash echo is left untouched", func(t *testing.T) {
 		ws := t.TempDir()
 		writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
-		writeScoutReportFixture(t, ws, "") // trace present, goal_hash key absent
+		writeScoutReportFixture(t, ws, "")
 		before := readScoutReport(t, ws)
 
 		normalizeScoutGoalHash(ws, io.Discard)
@@ -165,9 +158,9 @@ func TestNormalizeScoutGoalHash_WriteFailureIsLoudNoOp(t *testing.T) {
 	if err := os.Chmod(reportPath, 0o444); err != nil {
 		t.Fatalf("chmod read-only: %v", err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(reportPath, 0o644) }) // let TempDir clean up
+	t.Cleanup(func() { _ = os.Chmod(reportPath, 0o644) })
 
-	normalizeScoutGoalHash(ws, io.Discard) // write fails → loud no-op, no panic
+	normalizeScoutGoalHash(ws, io.Discard)
 
 	_ = os.Chmod(reportPath, 0o644)
 	if after := readScoutReport(t, ws); after != before {

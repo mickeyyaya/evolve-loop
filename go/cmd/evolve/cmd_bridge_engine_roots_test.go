@@ -19,8 +19,6 @@ import (
 
 const bridgeImportPath = "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 
-// bridgeEngineRoots maps each file that builds a bridge Engine to its call count
-// and Signal Center wiring; a center-less root drops every bridge signal.
 var bridgeEngineRoots = map[string]struct {
 	calls  int
 	wiring string
@@ -33,8 +31,6 @@ var bridgeEngineRoots = map[string]struct {
 	"internal/subagent/bridgeadapter.go": {1, "center-bearing: the `evolve subagent run` root (ADR-0103 unit 16) — execAdapterDepsWith(env, signals) hands the Dispatcher's Center to the engine"},
 }
 
-// bridgeNewEngineCalls counts call expressions through the import alias, so a
-// comment or a same-named local never counts.
 func bridgeNewEngineCalls(t *testing.T, path string) int {
 	t.Helper()
 	fset := token.NewFileSet()

@@ -1,8 +1,5 @@
 package opscmd
 
-// doctor_plane_test.go — ADR-0080 S2 CLI surface: the plane report and the
-// exit-2 WARN when loop state lives in the primary (console) checkout.
-
 import (
 	"bytes"
 	"os"

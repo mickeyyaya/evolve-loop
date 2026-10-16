@@ -1,9 +1,5 @@
 package observerengine
 
-// report_test.go — §6 test 30 (with critic G4's three fault fixtures): G2
-// replayed through the leaf; a failed write is BOTH returned and reported as
-// OBSERVER_REPORT_WRITE_FAILED, with mkdir / write / rename each reachable.
-
 import (
 	"os"
 	"path/filepath"
@@ -35,19 +31,19 @@ func TestWriteReport_GoldenAndFailureReturnsAndReports(t *testing.T) {
 		name string
 		seed func(t *testing.T, s *Settings)
 	}{
-		{"mkdir", func(t *testing.T, s *Settings) { // a FILE where the workspace directory belongs
+		{"mkdir", func(t *testing.T, s *Settings) {
 			file := filepath.Join(t.TempDir(), "ws-is-a-file")
 			if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			s.Paths = PathsFor(filepath.Join(file, "nested"), "builder")
 		}},
-		{"write", func(t *testing.T, s *Settings) { // a DIRECTORY at <path>.tmp
+		{"write", func(t *testing.T, s *Settings) {
 			if err := os.Mkdir(s.Paths.Report+".tmp", 0o755); err != nil {
 				t.Fatal(err)
 			}
 		}},
-		{"rename", func(t *testing.T, s *Settings) { // a DIRECTORY at the target
+		{"rename", func(t *testing.T, s *Settings) {
 			if err := os.Mkdir(s.Paths.Report, 0o755); err != nil {
 				t.Fatal(err)
 			}

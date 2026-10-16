@@ -7,7 +7,7 @@ import (
 
 func TestFleetModeAcceptsScratchCwdWorktree(t *testing.T) {
 	t.Parallel()
-	scratch := t.TempDir() // the shape retro mints: a real, owned, writable dir
+	scratch := t.TempDir()
 	cfg := fixtureConfig(t)
 	cfg.Worktree = scratch
 	tm := &workdirRecordingTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: []string{"❯", "❯"}}}

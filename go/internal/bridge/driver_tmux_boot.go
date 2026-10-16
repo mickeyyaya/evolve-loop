@@ -13,8 +13,6 @@ import (
 
 const paneTmuxDetachLine = "unset TMUX TMUX_PANE"
 
-// bootTmuxREPL creates and boots a new session. Existing named sessions need no
-// boot work. The returned release keeps provider admission for the full launch.
 func bootTmuxREPL(
 	ctx context.Context,
 	cfg *Config,

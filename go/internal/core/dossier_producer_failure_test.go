@@ -13,8 +13,6 @@ import (
 
 const testFailFingerprint = "audit|gate-block|ab12cd34ef56"
 
-// writeFailureArtifacts drops production-shaped failure artifacts into ws —
-// the same schemas ensureFailureDigest and the coherence floor write.
 func writeFailureArtifacts(t *testing.T, ws string, reasons []string) {
 	t.Helper()
 	rb, err := json.Marshal(map[string]any{
@@ -42,8 +40,6 @@ func writeFailureArtifacts(t *testing.T, ws string, reasons []string) {
 	}
 }
 
-// readDossierPair reads cycle-N.{json,md} from root's knowledge base, returning
-// the raw JSON as a map (so absence of a key is assertable) plus the markdown.
 func readDossierPair(t *testing.T, root string, cycle int) (map[string]any, string) {
 	t.Helper()
 	base := filepath.Join(root, "knowledge-base", "cycles", fmt.Sprintf("cycle-%d", cycle))

@@ -1,16 +1,7 @@
-// Package flakererunscan is the native, in-process Go implementation of the
-// flake-rerun-scan phase. It replaces the former full-LLM boot (measured ~12
-// turns / ~5.5K output tokens on the balanced tier) with a deterministic rerun
-// loop — Rule 5: deterministic work belongs in code, not LLM cycles.
-//
-// The phase re-runs a candidate test N times, tallies the outcomes, and flags a
-// target Flaky iff it produced BOTH a pass and a failure across the reruns. It
-// emits the canonical PASS/WARN/FAIL verdict vocabulary the LLM variant
-// produced, so downstream gates that pattern-match the deliverable keep working.
+// Package flakererunscan reruns a test and flags it flaky when its outcomes disagree.
+// Its verdicts match the vocabulary that downstream gates pattern-match.
 package flakererunscan
 
-// Result is the tally of a rerun campaign: how many attempts ran, how many
-// passed, how many failed, and whether the outcomes were inconsistent (Flaky).
 type Result struct {
 	Runs     int
 	Passes   int
@@ -18,11 +9,6 @@ type Result struct {
 	Flaky    bool
 }
 
-// Rerun invokes attempt(i) for i in [0, runs) and tallies the outcomes into a
-// Result. attempt returns true for a pass, false for a failure. A target is
-// Flaky iff it recorded at least one pass AND at least one failure. Rerun is
-// deterministic: an identical attempt function yields a byte-identical Result,
-// so two campaigns over the same target diff to nothing.
 func Rerun(runs int, attempt func(i int) bool) Result {
 	var r Result
 	for i := 0; i < runs; i++ {
@@ -37,11 +23,6 @@ func Rerun(runs int, attempt func(i int) bool) Result {
 	return r
 }
 
-// Verdict maps a Result to the canonical phase verdict vocabulary:
-//   - "PASS"    — consistent success (ran at least once, no failures)
-//   - "WARN"    — flaky (mixed pass/fail across reruns)
-//   - "FAIL"    — consistent failure (ran at least once, no passes)
-//   - "SKIPPED" — no attempts ran (Runs == 0)
 func (r Result) Verdict() string {
 	switch {
 	case r.Runs == 0:

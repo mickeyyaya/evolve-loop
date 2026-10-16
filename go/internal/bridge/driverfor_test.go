@@ -9,7 +9,7 @@ func TestDriverFor_BareAndDriverNames(t *testing.T) {
 		want string
 	}{
 		{"claude", "claude-tmux"},
-		{"gemini", "claude-tmux"}, // gemini.sh's HYBRID mode delegated to claude
+		{"gemini", "claude-tmux"},
 		{"codex", "codex"},
 		{"agy", "agy"},
 		{"claude-tmux", "claude-tmux"},

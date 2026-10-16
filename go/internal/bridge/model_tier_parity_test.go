@@ -51,7 +51,7 @@ func tierChannelEffective(m Manifest) error {
 			return fmt.Errorf("Realize(tier=deep) did not seed REPL input with %q (REPLInput=%v)", deep, r.REPLInput)
 		}
 		return nil
-	default: // noop / absent
+	default:
 		if check, ok := positionalTmuxCLIs[m.CLI]; ok {
 			return check(m)
 		}
@@ -109,12 +109,9 @@ func TestAgyTierDeepLaunchCarriesModelToPane(t *testing.T) {
 		ProjectRoot: ws,
 		Agent:       "parity-probe",
 		AllowBypass: true,
-		BootOnly:    true, // boot-to-marker is enough: the launch line is sent before boot completes
+		BootOnly:    true,
 		Realization: RealizeFor("agy-tmux", LaunchIntent{ModelTier: "deep", Permission: "bypass"}),
 	}
-	// Boot loop consumes ~2 frames per iteration (wait-loop capture + the
-	// tickDuringBoot auto-responder capture); queue a healthy surplus of
-	// idle-marker frames plus the cleanup scrollback capture.
 	frames := make([]string, 12)
 	for i := range frames {
 		frames[i] = "? for shortcuts"

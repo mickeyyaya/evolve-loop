@@ -118,7 +118,6 @@ func TestReflectorCompaction_SyntheticBuriedNarrativeNegative(t *testing.T) {
 	}
 }
 
-// reflectorBodyHasCompactMarker must agree with StripOnDemandSections on what counts as the heading.
 func reflectorBodyHasCompactMarker(body string) bool {
 	for _, line := range strings.Split(body, "\n") {
 		trimmed := strings.TrimRight(line, "\r")

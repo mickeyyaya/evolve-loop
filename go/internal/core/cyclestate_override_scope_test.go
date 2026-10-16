@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// Every process a fleet lane spawns inherits its override, go test binaries included; a test's own
-// evolve dir must still resolve to its own file.
 func TestResolveCycleStatePath_AnOverrideOutsideTheEvolveDirIsNotItsFile(t *testing.T) {
 	live := filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1700", CycleStateFile)
 	t.Setenv(ipcenv.CycleStateFileKey, live)
@@ -20,8 +18,6 @@ func TestResolveCycleStatePath_AnOverrideOutsideTheEvolveDirIsNotItsFile(t *test
 	}
 }
 
-// Discovery stands down only for an override that governs this evolve dir: another tree's lane
-// override says nothing about where this tree's checkpoints are.
 func TestLoadResumeState_AnotherTreesLaneOverrideDoesNotStopDiscovery(t *testing.T) {
 	t.Setenv(ipcenv.CycleStateFileKey, filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1700", CycleStateFile))
 	tmp := t.TempDir()

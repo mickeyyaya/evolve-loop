@@ -137,8 +137,8 @@ func TestTddEngineerAdditionalAnchors(t *testing.T) {
 	stripped := StripOnDemandSections(body)
 
 	for _, anchor := range []string{
-		"## Operating Principles",            // contains "Do NOT implement production code"
-		"Mid-Trajectory Compaction Protocol", // contains "15-turn boundary"
+		"## Operating Principles",
+		"Mid-Trajectory Compaction Protocol",
 	} {
 		if !strings.Contains(stripped, anchor) {
 			t.Errorf("tdd-engineer structural anchor %q absent from stripped body — may have been accidentally moved below ## Reference Index", anchor)

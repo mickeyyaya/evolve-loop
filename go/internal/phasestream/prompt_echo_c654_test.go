@@ -11,9 +11,6 @@ func hasInfraFailure(envs []Envelope) bool {
 	return false
 }
 
-// Preserve both the API contract and cycle-654's infra-classifier-echo-veto
-// incident input (the cycle-641/642 reviewer-checklist regression). The direct
-// SetInjectedPrompt call also binds its exported identifier for apicover.
 func TestClassifier_SetInjectedPrompt(t *testing.T) {
 	for _, tc := range []struct{ name, prompt, trace string }{
 		{"api_contract", "Adversarial Reviewer checklist: TOCTOU / race windows; missing rate limits.", "trace-cover"},

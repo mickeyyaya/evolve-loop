@@ -1,17 +1,5 @@
 package modelcatalog
 
-// commit_test.go — the single-write-seam contract. Before Commit existed the
-// refresh write sequence was duplicated across two call sites and they had
-// DRIFTED: `evolve models refresh` (cmd_models.go) read the prior catalog and
-// merged operator-authored tier_fallbacks forward, while the cycle-start
-// auto-refresh (cmd_models_live.go) wrote the fresh catalog directly and
-// silently destroyed them. Those chains are the operator's only within-tier
-// escape hatch when a model walls, and the catalog file is gitignored — once
-// dropped there is nothing to restore them from.
-//
-// Commit makes that asymmetry structurally impossible rather than merely
-// fixed: there is one seam, so there is nothing to keep in sync.
-
 import (
 	"bytes"
 	"os"
@@ -20,7 +8,6 @@ import (
 	"time"
 )
 
-// seedCatalog writes a catalog carrying operator-authored fallback chains.
 func seedCatalog(t *testing.T, dir string) Catalog {
 	t.Helper()
 	prior := Catalog{
@@ -39,9 +26,6 @@ func seedCatalog(t *testing.T, dir string) Catalog {
 	return prior
 }
 
-// TestCommit_PreservesPriorTierFallbacks pins the behavior the auto-refresh
-// path was missing: a fresh catalog that carries no chains inherits the
-// operator's.
 func TestCommit_PreservesPriorTierFallbacks(t *testing.T) {
 	dir := t.TempDir()
 	seedCatalog(t, dir)
@@ -71,9 +55,6 @@ func TestCommit_PreservesPriorTierFallbacks(t *testing.T) {
 	}
 }
 
-// TestCommit_CorruptPriorIsWarnedNotFatal (negative): refresh IS the repair
-// path for a corrupt cache, so it must overwrite rather than refuse — but
-// never silently.
 func TestCommit_CorruptPriorIsWarnedNotFatal(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, FileName), []byte("{not json"), 0o644); err != nil {
@@ -97,8 +78,6 @@ func TestCommit_CorruptPriorIsWarnedNotFatal(t *testing.T) {
 	}
 }
 
-// TestCommit_NilWarnWritesWithoutPanicking pins the io.Discard default so a
-// caller with no logger cannot crash the refresh.
 func TestCommit_NilWarnWritesWithoutPanicking(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := Commit(dir, Catalog{FetchedAt: time.Now()}, nil); err != nil {
@@ -106,10 +85,6 @@ func TestCommit_NilWarnWritesWithoutPanicking(t *testing.T) {
 	}
 }
 
-// TestWrite_RetainsPreviousCatalogForRollback pins the restore path. The live
-// catalog is gitignored and partly hand-authored (entries no picker parser can
-// regenerate), so an atomic rename with no retained copy makes one bad refresh
-// unrecoverable.
 func TestWrite_RetainsPreviousCatalogForRollback(t *testing.T) {
 	dir := t.TempDir()
 	first := Catalog{FetchedAt: time.Now(), CLIs: map[string]CLIEntry{"claude": {TierModels: map[string]string{"deep": "opus"}, Source: SourceLive}}}
@@ -137,8 +112,6 @@ func TestWrite_RetainsPreviousCatalogForRollback(t *testing.T) {
 	}
 }
 
-// TestWrite_FirstWriteSucceedsWithNoPriorToRetain (negative): retention is
-// best-effort and must never block the write that matters.
 func TestWrite_FirstWriteSucceedsWithNoPriorToRetain(t *testing.T) {
 	dir := t.TempDir()
 	if err := Write(dir, Catalog{FetchedAt: time.Now()}); err != nil {
@@ -149,10 +122,6 @@ func TestWrite_FirstWriteSucceedsWithNoPriorToRetain(t *testing.T) {
 	}
 }
 
-// TestWrite_RetainedCopyIsNotWorldReadable pins that retention never WIDENS the
-// mode of the file it copies. os.CreateTemp yields 0600 and Rename preserves
-// it, so the live catalog is owner-only; a 0644 retained copy would publish a
-// catalog that may name internal model ids to every user on the host.
 func TestWrite_RetainedCopyIsNotWorldReadable(t *testing.T) {
 	dir := t.TempDir()
 	c := Catalog{FetchedAt: time.Now(), CLIs: map[string]CLIEntry{"claude": {TierModels: map[string]string{"deep": "opus"}, Source: SourceLive}}}
@@ -176,10 +145,6 @@ func TestWrite_RetainedCopyIsNotWorldReadable(t *testing.T) {
 	}
 }
 
-// TestWrite_RetainedCopyDoesNotFollowSymlink (negative / adversarial): a
-// pre-existing symlink at the retention path must be REPLACED, not written
-// through. A plain WriteFile follows the link and lets any pre-planted symlink
-// redirect every catalog write to an arbitrary file.
 func TestWrite_RetainedCopyDoesNotFollowSymlink(t *testing.T) {
 	dir := t.TempDir()
 	victim := filepath.Join(dir, "victim.txt")

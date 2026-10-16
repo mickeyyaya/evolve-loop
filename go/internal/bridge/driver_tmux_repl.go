@@ -12,52 +12,41 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// errWorktreeRequired refuses to fall back to the process cwd under a fleet
-// supervisor (EVOLVE_FLEET=1): that fallback would run the agent over
-// another run's worktree, or main.
 var errWorktreeRequired = errors.New("fleet mode: explicit worktree required (refusing process-cwd fallback)")
 
 const (
-	tmuxPromptMarkerDefault  = "❯" // claude REPL marker (codex ›, agy "? for shortcuts")
-	tmuxREPLBootTimeoutS     = 60  // boot-wait deadline (poll loop)
-	tmuxArtifactTimeoutS     = 300 // artifact-wait deadline (poll @ 2s)
+	tmuxPromptMarkerDefault  = "❯"
+	tmuxREPLBootTimeoutS     = 60
+	tmuxArtifactTimeoutS     = 300
 	transientRedispatchDelay = 15 * time.Second
 	tmuxPaneWidth            = 220
 	tmuxPaneHeight           = 80
-	tmuxArtifactScrollback   = 10000 // deep capture for final scrollback
+	tmuxArtifactScrollback   = 10000
 
-	// maxInjectDefer bounds how many times a mid-turn command is re-queued
-	// while the agent is busy, so a never-idle agent cannot loop forever.
-	maxInjectDefer = 10
-	// injectInterruptSettle is the pause after an ESC before injecting text.
+	maxInjectDefer        = 10
 	injectInterruptSettle = 500 * time.Millisecond
 )
 
-// tmuxKey is one keystroke group sent to the REPL (e.g. {"/exit", true, 2}
-// = send "/exit" + Enter, then sleep 2s). Used for the per-driver exit seq.
 type tmuxKey struct {
 	keys   string
 	enter  bool
 	pauseS int
 }
 
-// tmuxLaunch is the per-driver spec the shared engine runs. Everything
-// driver-specific that the state machine needs is captured here; the
-// driver computes it after its own preflight.
 type tmuxLaunch struct {
-	name            string // log prefix, e.g. "claude-tmux"
-	session         string // resolved tmux session name
-	named           bool   // resume-eligible: skip kill + skip exit seq
-	launchCmd       string // REPL launch command line
+	name            string
+	session         string
+	named           bool
+	launchCmd       string
 	modelDispatch   modelDispatch
-	promptMarker    string    // boot-ready marker to grep the pane for
-	inputLineMarker string    // live-input-line marker; empty when the family has none
-	bootScrollback  int       // capture-pane scrollback during boot (0=visible; 200 for alt-screen CLIs)
-	bootIntervalS   int       // seconds per boot poll iteration
-	tickDuringBoot  bool      // run the auto-respond engine during boot wait (codex/agy: trust prompts)
-	exitSeq         []tmuxKey // keystrokes to close the REPL cleanly
-	bootOnly        bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
-	guardDeadShell  bool      // true for real CLI drivers; false for shell-script REPL test harnesses
+	promptMarker    string
+	inputLineMarker string
+	bootScrollback  int
+	bootIntervalS   int
+	tickDuringBoot  bool
+	exitSeq         []tmuxKey
+	bootOnly        bool
+	guardDeadShell  bool
 	modelCheck      launchModelCheck
 }
 
@@ -72,9 +61,6 @@ func launchCmdLine(binary string, flags []string) string {
 	return binary + " " + strings.Join(quoted, " ")
 }
 
-// runTmuxREPL drives the shared interactive-REPL flow and returns a bridge
-// exit code. Preconditions (gate, cost guards, model/session resolution)
-// are the driver's responsibility before calling this.
 func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (int, error) {
 	prep, code, err := prepareTmuxREPL(ctx, cfg, deps, lp)
 	if code != ExitOK || err != nil {

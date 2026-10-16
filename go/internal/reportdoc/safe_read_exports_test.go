@@ -8,24 +8,20 @@ import (
 	"testing"
 )
 
-// TestValidReference_SingleSourcedStrictness names the exported validator that
-// is now the single home of the "is this relative path safe?" belief, shared
-// with explanationdocs (architecture review 2026-09-01: the two packages
-// previously judged the same string differently).
 func TestValidReference_SingleSourcedStrictness(t *testing.T) {
 	cases := []struct {
 		reference string
 		want      bool
 	}{
-		{"a/../../b", false}, // cleans to ../b — escapes the root
-		{"x:y", false},       // colon
-		{"b\x00d", false},    // NUL byte
+		{"a/../../b", false},
+		{"x:y", false},
+		{"b\x00d", false},
 		{"", false},
 		{".", false},
 		{"..", false},
 		{"../up", false},
 		{"/abs", false},
-		{"a\\b", false}, // backslash
+		{"a\\b", false},
 		{"ok/path.md", true},
 		{"docs/adr/0001.md", true},
 	}
@@ -36,10 +32,6 @@ func TestValidReference_SingleSourcedStrictness(t *testing.T) {
 	}
 }
 
-// TestOpenRegularNoFollow_RefusesFinalSymlink pins the exported O_NOFOLLOW
-// open helper: a final-component symlink must fail to open, a regular file
-// must succeed. One home for this helper — explanationdocs deletes its copy
-// and calls this one.
 func TestOpenRegularNoFollow_RefusesFinalSymlink(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "real.txt")

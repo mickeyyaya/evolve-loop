@@ -1,13 +1,3 @@
-// phaseboundary_test.go — cycle-234 task `phase-boundary-checkpoint` (RED).
-//
-// AC1: a new ReasonPhaseComplete constant joins the canonical reason set so
-// the orchestrator can write a checkpoint block at EVERY phase boundary
-// (campaign retro Invariant 3 — three failed `--resume` attempts in the
-// 215-231 campaign because checkpoints existed only at the quota wall).
-//
-// These tests are authored by the TDD-Engineer BEFORE the constant exists:
-// the compile error "undefined: ReasonPhaseComplete" is the intended RED
-// signal. Builder adds the constant + IsValid arm; do NOT modify the tests.
 package checkpoint
 
 import (
@@ -20,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestReasonPhaseComplete_IsValid pins the new reason's identity:
-// the canonical wire value is "phase-complete" and IsValid accepts it.
 func TestReasonPhaseComplete_IsValid(t *testing.T) {
 	if got := string(ReasonPhaseComplete); got != "phase-complete" {
 		t.Errorf("ReasonPhaseComplete = %q, want \"phase-complete\"", got)
@@ -31,9 +19,6 @@ func TestReasonPhaseComplete_IsValid(t *testing.T) {
 	}
 }
 
-// Negative (adversarial diversity): near-miss spellings must stay invalid —
-// an IsValid that just returns true would pass the positive test above but
-// fail here.
 func TestReason_NearMissSpellings_StayInvalid(t *testing.T) {
 	for _, bogus := range []Reason{"phase-completed", "phasecomplete", "phase_complete", ""} {
 		if bogus.IsValid() {
@@ -42,9 +27,6 @@ func TestReason_NearMissSpellings_StayInvalid(t *testing.T) {
 	}
 }
 
-// TestComposeChecked_AcceptsPhaseComplete: the validating constructor must
-// admit the new reason (it is the orchestrator's entry point for untrusted
-// reason origins) and carry it through to the composed block.
 func TestComposeChecked_AcceptsPhaseComplete(t *testing.T) {
 	cs := core.CycleState{
 		CycleID:         234,
@@ -66,13 +48,6 @@ func TestComposeChecked_AcceptsPhaseComplete(t *testing.T) {
 	}
 }
 
-// TestPhaseBoundaryCheckpointer_YieldsToEscalation pins the overwrite policy
-// (found landing cycle-234/236 work: the production wiring of the hook broke
-// TestRunLoop_QuotaPause_Rc5 because a routine phase-complete checkpoint
-// clobbered the seeded quota-likely block before detectQuotaPause read it).
-// phase-complete is the LOWEST-priority reason: the hook must never overwrite
-// an existing escalation checkpoint (quota-likely, batch-cap-near,
-// operator-requested, stall-inactivity) — those must survive until consumed.
 func TestPhaseBoundaryCheckpointer_YieldsToEscalation(t *testing.T) {
 	if core.PhaseBoundaryCheckpointer == nil {
 		t.Fatal("core.PhaseBoundaryCheckpointer not registered (init() wiring missing)")
@@ -91,8 +66,6 @@ func TestPhaseBoundaryCheckpointer_YieldsToEscalation(t *testing.T) {
 	}
 }
 
-// TestPhaseBoundaryCheckpointer_OverwritesRoutine: a phase-complete (or absent)
-// checkpoint IS refreshed — that is the breadcrumb behavior the feature exists for.
 func TestPhaseBoundaryCheckpointer_OverwritesRoutine(t *testing.T) {
 	if core.PhaseBoundaryCheckpointer == nil {
 		t.Fatal("core.PhaseBoundaryCheckpointer not registered")

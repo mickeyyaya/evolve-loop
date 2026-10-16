@@ -12910,3 +12910,120 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // also spend its round-2 budget on a structured re-prompt (double-spending the
 // correction cap for one block).
 ```
+
+## comment-zero core-2
+
+### `go/internal/core/cycle_closeout.go:32` — above `if derr := writeCycleDossier(cr.o.gitMutationLock, cr.dossierParams(cr.result.FinalVerdict)); derr != nil {`
+
+```text
+// ADR-0055: emit this completed cycle's closeout dossier; a fleet lane's goes
+// to the pending dir instead of the corpus (dossierDestination). Best-effort — the cycle
+// has already finalized, so a closeout-artifact write error must not fail it
+// (presence is enforced separately by `evolve dossier verify` against the
+// policy floor). Goal text comes from Context["goal"]; falls back to the goal
+// hash so the dossier's required Goal is never blank.
+```
+
+### `go/internal/core/cyclerun.go:98` — above `replanDepth       int`
+
+```text
+// post-scout re-plans run this cycle; capped by cfg.RePlanMaxDepth (check-before-increment). See ADR-0052.
+```
+
+### `go/internal/core/cyclerun.go:160` — above `persistFloorFailReasons(cs, failed, diags)`
+
+```text
+// Record the downgrade reasons FIRST: authoritative in CycleState (the
+// ADR-0072 coherence floor's ONLY source — orchestrator memory, so no
+// workspace writer can talk the floor out of halting) + the forensic
+// <phase>-fail-reason.json for retros (state.json truncates the defect
+// string). See persistFloorFailReasons / detectVerdictIncoherence.
+```
+
+### `go/internal/core/cyclerun.go:438` — above `if os.Getenv(ipcenv.FleetKey) != "" && cs.WorkspacePath != "" {`
+
+```text
+// Fleet cycle-state isolation (ADR-0049): this lane reads and writes its own per-run file. The
+// override applies only inside <project-root>/.evolve (paths.CycleStateFileFor), which
+// fleetLaneEvolveDirOK makes the lane's evolve dir; cleared on exit so a reused process never
+// carries it into a later cycle.
+```
+
+### `go/internal/core/cyclerun.go:510` — above `base, berr := resolveWorktreeBaseSHA(ctx, wtPath)`
+
+```text
+// NOT a bare `rev-parse HEAD`: a REUSED worktree's HEAD can be an
+// ADR-0076 salvage snapshot, and recording that as the base makes
+// normalizeWorktreeToBase soft-reset onto the preserved work itself
+// (see worktree_base.go). Ordinary HEADs are returned verbatim.
+```
+
+### `go/internal/core/cyclerun_chronicle_test.go:152` — above `ws := core.RunWorkspacePath(root, 1)`
+
+```text
+// Fresh state → allocateCycle mints cycle 1; pre-create the collision there.
+```
+
+### `go/internal/core/cyclerun_correction.go:190` — above `fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CONTRACT SALVAGE RETRY — %d consecutive contract blocks on cli=%s a…`
+
+```text
+// The two remedies are disjoint: this arm is reached only when
+// there is genuinely no other family to escalate to, so one
+// block's round-2 budget is never spent on both.
+```
+
+### `go/internal/core/cyclerun_dispatch.go:46` — above `resetFloorFailReason(&cr.cs, next)`
+
+```text
+// A (re-)dispatch supersedes any prior attempt's diagnosed-FAIL
+// explanation (ship-error recovery re-audits, debugger RERUN_PHASE):
+// stale reasons must never mark a later, differently-caused FAIL as
+// diagnosed to the ADR-0072 floor. Cleared BEFORE the pre-phase
+// cycle-state write below so the cleared state is also what persists.
+```
+
+### `go/internal/core/cyclerun_dispatch.go:52` — above `supersedePreviousAuditRound(&cr.cs)`
+
+```text
+// Same supersession rule for the round's verdict ARTIFACTS: a
+// re-dispatched audit must not replay the previous round's
+// pre-staged acs-verdict.json/audit-report.md through the
+// verdict-exists gate. First dispatch (round 0) retires nothing, so
+// an operator/CI pre-stage keeps its honor.
+```
+
+## comment-zero core-3
+
+### `go/internal/core/disposition_gate.go:55` — above `validRouting = map[string]bool{"inbox": true, "carryover": true, "console": true, "drop": true}`
+
+```text
+// "console" (not "escalate") is the operator-owned routing term — one
+// vocabulary with ADR-0074's route field and the plan-time gate.
+```
+
+### `go/internal/core/failure_decision.go:40` — above `func validDecisionAction(action string) bool {`
+
+```text
+// validDecisionAction reports whether action is in the ADR-0072 action vocabulary.
+```
+
+### `go/internal/core/failure_decision.go:50` — above `func validDecisionLevel(level string) bool {`
+
+```text
+// validDecisionLevel reports whether level is in the ADR-0072 level vocabulary.
+```
+
+### `go/internal/core/failure_hook.go:32` — above `func WithFailureAdviser(a FailureAdviser) Option {`
+
+```text
+// WithFailureAdviser injects the ADR-0044 LLM failure-advisor tail. Nil (the
+// default) keeps the hook inert regardless of stage.
+```
+
+### `go/internal/core/identity_carry_forward.go:19` — above `func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs CycleState, base0, projectRoot string) bo…`
+
+```text
+// identityCarryForward is ADR-0105 B3. After the rebind proved the pended change identical, it proves the
+// same on the trees, runs the composed-tree gates under the fence, records the carry and lets ship take the
+// audited verdict; any doubt returns false and the change is audited again.
+```

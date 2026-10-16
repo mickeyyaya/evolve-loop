@@ -9,32 +9,21 @@ import (
 	"time"
 )
 
-// submitVerifyStderrMarker is the loud-logging contract: each re-send attempt
-// must name itself on stderr so an operator reading a stalled cycle's log can
-// see the driver noticed and acted.
 const submitVerifyStderrMarker = "submit-verify"
 
-// maxSubmitVerifyResends bounds the re-send loop so it can never spin forever.
 const maxSubmitVerifyResends = 3
 
-// unsubmittedPane renders text parked at the input line, never submitted.
 func unsubmittedPane(text string) string {
 	return "● earlier scrollback\n\n" + tmuxPromptMarkerDefault + " " + text
 }
 
-// stickyInputTmux simulates a pane whose input line does NOT clear when keys
-// are sent with enter=true. `trigger` selects which send to sabotage: the
-// send whose keys contain `trigger` (the nudge names the artifact path; ""
-// means the prompt-paste Enter). When clearOnResend is set, a subsequent bare
-// Enter clears the input line, so the test can observe recovery rather than
-// an unbounded stall.
 type stickyInputTmux struct {
 	*fakeTmux
 	mu            sync.Mutex
-	trigger       string // substring identifying the send to sabotage
-	stuckText     string // what stays parked at the input line
+	trigger       string
+	stuckText     string
 	stuck         bool
-	stuckAtSeq    int // len(sentSeq) right after the sabotaged send
+	stuckAtSeq    int
 	clearOnResend bool
 }
 
@@ -56,9 +45,6 @@ func (s *stickyInputTmux) SendKeys(ctx context.Context, session, keys string, en
 	return err
 }
 
-// pasteStickyTmux sabotages the prompt-paste delivery instead: the paste
-// lands but the delivery Enter does not submit it, so the prompt text sits
-// at the input line.
 type pasteStickyTmux struct {
 	*fakeTmux
 	mu       sync.Mutex
@@ -78,8 +64,6 @@ func (p *pasteStickyTmux) PasteBuffer(ctx context.Context, session string) error
 
 func (p *pasteStickyTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {
 	p.mu.Lock()
-	// The first bare Enter AFTER the paste is the (failed) delivery Enter; a
-	// SECOND bare Enter is the re-send under test, and that one submits.
 	resend := p.stuck && p.pasted && keys == "" && enter && len(p.fakeTmux.sentSeq) > p.pasteSeq
 	if resend {
 		p.stuck = false
@@ -110,7 +94,6 @@ func (s *stickyInputTmux) CapturePane(ctx context.Context, session string, scrol
 	return out, err
 }
 
-// runSubmitVerify drives the production launch path with a custom controller.
 func runSubmitVerify(t *testing.T, fx launchFixture, tm TmuxController) (int, string) {
 	t.Helper()
 	eng := NewEngine(Deps{
@@ -125,8 +108,6 @@ func runSubmitVerify(t *testing.T, fx launchFixture, tm TmuxController) (int, st
 	return code, stderr.String()
 }
 
-// bareEnterIdxAfter returns the indices of bare-Enter sends ("" with enter) in
-// sentSeq at or after `from` — the driver's submit key.
 func bareEnterIdxAfter(seq []string, from int) []int {
 	var idx []int
 	for i := from; i < len(seq); i++ {
@@ -137,7 +118,6 @@ func bareEnterIdxAfter(seq []string, from int) []int {
 	return idx
 }
 
-// nudgeSeqIdx returns the index of the one-shot nudge send in sentSeq, or -1.
 func nudgeSeqIdx(seq []string, artifact string) int {
 	for i, e := range seq {
 		if strings.Contains(e, artifact) && strings.Contains(e, "complete the phase") {
@@ -177,8 +157,6 @@ func TestTmuxREPL_NudgeUnsubmitted_ResendsEnter(t *testing.T) {
 func TestTmuxREPL_NudgeSubmitted_NoResend(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// Plain fake: every capture is a clean prompt marker, so the nudge is
-	// submitted the moment it is sent.
 	tm := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	code, _ := runSubmitVerify(t, fx, tm)
 	if code != ExitArtifactTimeout {
@@ -200,7 +178,7 @@ func TestTmuxREPL_NudgeUnsubmitted_ResendBounded(t *testing.T) {
 	tm := &stickyInputTmux{
 		fakeTmux:      &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
 		trigger:       fx.artifact,
-		clearOnResend: false, // never clears — the pathological pane
+		clearOnResend: false,
 	}
 	code, _ := runSubmitVerify(t, fx, tm)
 	if code != ExitArtifactTimeout {
@@ -220,9 +198,6 @@ func TestTmuxREPL_NudgeUnsubmitted_ResendBounded(t *testing.T) {
 	}
 }
 
-// TestTmuxREPL_PromptPasteUnsubmitted_ResendsEnter generalizes the nudge fix
-// to the prompt-paste delivery site; no observed run shows an unsubmitted
-// prompt, so this pane state is stipulated, not replayed.
 func TestTmuxREPL_PromptPasteUnsubmitted_ResendsEnter(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")

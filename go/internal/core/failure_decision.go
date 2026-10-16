@@ -1,7 +1,5 @@
 package core
 
-// See ADR-0072.
-
 import (
 	"encoding/json"
 	"os"
@@ -10,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// failureDecision is the orchestrator's authored classification, matching the
-// schema the retrospective agent's instructions document.
 type failureDecision struct {
 	Category      string `json:"category"`
 	Level         string `json:"level"`
@@ -37,7 +33,6 @@ func readFailureDecision(workspace string) (*failureDecision, error) {
 	return &d, nil
 }
 
-// validDecisionAction reports whether action is in the ADR-0072 action vocabulary.
 func validDecisionAction(action string) bool {
 	switch action {
 	case policy.ActionHaltAndDiagnose, policy.ActionRetryWithFix, policy.ActionDeferOrQuarantine:
@@ -47,7 +42,6 @@ func validDecisionAction(action string) bool {
 	}
 }
 
-// validDecisionLevel reports whether level is in the ADR-0072 level vocabulary.
 func validDecisionLevel(level string) bool {
 	return level == policy.LevelSystem || level == policy.LevelTask
 }

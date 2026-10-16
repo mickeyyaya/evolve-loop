@@ -31,8 +31,6 @@ func appendLines(t *testing.T, path string, lines ...string) {
 	}
 }
 
-// appendRaw appends exactly s (no trailing newline added) — used to model a
-// streaming writer that has flushed only a partial line so far.
 func appendRaw(t *testing.T, path, s string) {
 	t.Helper()
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -45,7 +43,6 @@ func appendRaw(t *testing.T, path, s string) {
 	}
 }
 
-// failWriter always fails — used to verify sink-write errors propagate.
 type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, errors.New("sink full") }
@@ -62,7 +59,6 @@ func newTestNormalizer(dir string, sink *bytes.Buffer, clk *testClock) *Normaliz
 	})
 }
 
-// 1. Offset tracking: a second Poll sees only bytes appended since the first.
 func TestNormalizer_PollTailsOnlyNewBytes(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
@@ -95,7 +91,6 @@ func TestNormalizer_PollTailsOnlyNewBytes(t *testing.T) {
 	}
 }
 
-// 2. A burst of stream_event deltas in one poll coalesces to a single progress tick.
 func TestNormalizer_PollCoalescesStreamEvents(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
@@ -123,7 +118,6 @@ func TestNormalizer_PollCoalescesStreamEvents(t *testing.T) {
 	}
 }
 
-// 3. A stderr line carrying an infra marker becomes one infra_failure incident.
 func TestNormalizer_PollEmitsInfraFailureFromStderr(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
@@ -150,7 +144,6 @@ func TestNormalizer_PollEmitsInfraFailureFromStderr(t *testing.T) {
 	}
 }
 
-// 4. With no output, once the clock crosses StallS a single stall incident fires; it does not re-fire.
 func TestNormalizer_PollEmitsStallOnceAfterThreshold(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
@@ -182,7 +175,6 @@ func TestNormalizer_PollEmitsStallOnceAfterThreshold(t *testing.T) {
 	}
 }
 
-// 5. Every envelope written to the sink carries a gap-free monotonic seq across kinds.
 func TestNormalizer_SinkSeqMonotonicGapFree(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
@@ -219,7 +211,6 @@ func TestNormalizer_SinkSeqMonotonicGapFree(t *testing.T) {
 	}
 }
 
-// 6. Stall + Enforce + a pgid kills the process group via the injected seam.
 func TestNormalizer_StallEnforceKillsPgrp(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
@@ -253,14 +244,11 @@ func TestNormalizer_StallEnforceKillsPgrp(t *testing.T) {
 	if gotPGID != 4242 || gotSig != syscall.SIGTERM {
 		t.Fatalf("kill args: pgid=%d sig=%v want 4242/SIGTERM", gotPGID, gotSig)
 	}
-	// H2: the kill outcome must be surfaced on the stall envelope, not swallowed.
 	if len(got) != 1 || got[0].Data["kill_result"] != "ok" {
 		t.Fatalf("stall envelope should carry kill_result=ok, got %+v", got)
 	}
 }
 
-// H1: a partial (no-newline) line must not be consumed until it is completed;
-// the offset must not advance past it (else the line is split/corrupted).
 func TestNormalizer_PollHoldsPartialLineUntilComplete(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
@@ -268,7 +256,6 @@ func TestNormalizer_PollHoldsPartialLineUntilComplete(t *testing.T) {
 	n := newTestNormalizer(dir, &sink, clk)
 	stdout := filepath.Join(dir, "tdd-stdout.log")
 
-	// A genuinely partial JSON line (streaming writer mid-flush, no newline yet).
 	appendRaw(t, stdout, `{"type":"result","total_cost`)
 	got1, err := n.Poll()
 	if err != nil {
@@ -278,7 +265,6 @@ func TestNormalizer_PollHoldsPartialLineUntilComplete(t *testing.T) {
 		t.Fatalf("partial line must not be consumed yet, got %d envelopes", len(got1))
 	}
 
-	// Complete the line.
 	appendRaw(t, stdout, `_usd":0.5,"usage":{}}`+"\n")
 	got2, err := n.Poll()
 	if err != nil {
@@ -292,7 +278,6 @@ func TestNormalizer_PollHoldsPartialLineUntilComplete(t *testing.T) {
 	}
 }
 
-// M4: a shrunk file (truncation/rotation) resets the offset and re-reads.
 func TestNormalizer_PollHandlesRotation(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
@@ -305,7 +290,6 @@ func TestNormalizer_PollHandlesRotation(t *testing.T) {
 		t.Fatalf("poll1: err=%v len=%d", err, len(got1))
 	}
 
-	// Rotation: replace with a much shorter file (size drops below the offset).
 	if err := os.WriteFile(stdout, []byte(`{"type":"assistant","message":{"content":[{"type":"text","text":"x"}]}}`+"\n"), 0o644); err != nil {
 		t.Fatalf("rotate: %v", err)
 	}
@@ -321,8 +305,6 @@ func TestNormalizer_PollHandlesRotation(t *testing.T) {
 	}
 }
 
-// M5: a sink write failure propagates, and envelopes built before the failure
-// are still returned for the caller to inspect.
 func TestNormalizer_PollPropagatesSinkWriteError(t *testing.T) {
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}

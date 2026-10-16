@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// readEvents decodes every envelope in <ws>/<phase>-events.ndjson.
 func readEvents(t *testing.T, ws, phase string) []Envelope {
 	t.Helper()
 	f, err := os.Open(filepath.Join(ws, phase+"-events.ndjson"))
@@ -40,10 +39,6 @@ func writeRaw(t *testing.T, ws, name, body string) {
 	}
 }
 
-// TestProduce_WritesResultAndInfra is the core post-phase render: stdout
-// stream-json (with a result) plus a stderr infra marker normalize into one
-// <phase>-events.ndjson carrying both the billing-critical result and the
-// infra_failure event.
 func TestProduce_WritesResultAndInfra(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -83,15 +78,12 @@ func TestProduce_WritesResultAndInfra(t *testing.T) {
 	}
 }
 
-// TestProduce_UnterminatedFinalLine is the billing-safety guarantee that the
-// live Poll tail can NOT make: a finished log whose final result line has no
-// trailing newline must still be captured (Poll holds back partial lines).
 func TestProduce_UnterminatedFinalLine(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	writeRaw(t, ws, "scout-stdout.log",
 		`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`+"\n"+
-			`{"type":"result","total_cost_usd":0.25,"usage":{"input_tokens":10,"output_tokens":5}}`) // NO trailing newline
+			`{"type":"result","total_cost_usd":0.25,"usage":{"input_tokens":10,"output_tokens":5}}`)
 
 	if err := Produce(ProduceConfig{Workspace: ws, Phase: "scout", CLI: "claude-p", Cycle: 1}); err != nil {
 		t.Fatalf("Produce: %v", err)
@@ -110,8 +102,6 @@ func TestProduce_UnterminatedFinalLine(t *testing.T) {
 	}
 }
 
-// TestProduce_MissingStdout_NoOp: a phase that never produced a stdout log is
-// not an error (it simply contributes no events), and no events file appears.
 func TestProduce_MissingStdout_NoOp(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -123,8 +113,6 @@ func TestProduce_MissingStdout_NoOp(t *testing.T) {
 	}
 }
 
-// TestProduce_NoTempLeftBehind: the atomic temp file is not left in the
-// workspace (it would pollute the *-events.ndjson glob otherwise).
 func TestProduce_NoTempLeftBehind(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

@@ -25,7 +25,6 @@ func TestSuiteProjectRoot_NestedPlaneWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 	initRepo(t, console)
-	// The plane is itself a linked worktree of the console, as in the live hub.
 	plane := filepath.Join(base, "plane")
 	addWorktree(t, console, plane)
 	planeEvolve := filepath.Join(plane, ".evolve")
@@ -33,7 +32,6 @@ func TestSuiteProjectRoot_NestedPlaneWorktree(t *testing.T) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// An empty state file: presence alone must prove the plane.
 	if err := os.WriteFile(filepath.Join(runDir, "cycle-state.json"), []byte("{}"), 0o644); err != nil {
 		t.Fatal(err)
 	}

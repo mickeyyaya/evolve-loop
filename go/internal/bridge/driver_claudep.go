@@ -7,11 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// claudePArgs builds the `claude -p` argv from cfg and the prepared prompt; pure, extracted from Launch so
-// flag emission is testable without driving a real CLI. omittedModel is the model value that was
-// suppressed (empty when none was): an unresolved vocabulary token must not be sent as `--model`, since
-// this driver builds its own argv and the realizer's guard never sees it. An empty cfg.Model is "nothing
-// requested" rather than "a request we refused", so it emits no flag and reports no suppression.
 func claudePArgs(cfg *Config, prompt string) (args []string, omittedModel string) {
 	args = []string{"-p", prompt}
 	switch {
@@ -25,7 +20,6 @@ func claudePArgs(cfg *Config, prompt string) (args []string, omittedModel string
 		args = append(args, "--permission-mode", cfg.PermissionMode)
 	}
 	if cfg.StreamOutput {
-		// --verbose is required by claude when combining stream-json with -p.
 		args = append(args, "--output-format", "stream-json", "--include-partial-messages", "--verbose")
 	}
 	if len(cfg.AllowedTools) > 0 {
@@ -37,8 +31,6 @@ func claudePArgs(cfg *Config, prompt string) (args []string, omittedModel string
 	return args, omittedModel
 }
 
-// effectiveModelLabel reports the model the CLI will actually run under, for logging; a suppressed model
-// must never be logged as if it were dispatched, or a degraded tier would log as the requested one.
 func effectiveModelLabel(requested, omitted string) string {
 	if omitted != "" {
 		return ""
@@ -46,16 +38,11 @@ func effectiveModelLabel(requested, omitted string) string {
 	return requested
 }
 
-// claudePDriver is the headless `claude -p` driver; it forwards --permission-mode straight into the
-// claude argv, the only CLI that supports it.
 type claudePDriver struct{}
 
 func (claudePDriver) Name() string { return "claude-p" }
 
 func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
-	// Credential-isolation guard: refuse to run when an ambient auth path would override the CLI's
-	// configured one; the in-process inner CLI inherits it via driverEnv, so the leak is real — fail
-	// loudly so the operator confirms intent.
 	if v, ok := lookupEnv(deps, "ANTHROPIC_API_KEY"); ok && v != "" {
 		fmt.Fprintln(deps.Stderr, "[claude-p] credential-isolation guard: ANTHROPIC_API_KEY is set; refusing to run to avoid an ambiguous credential path")
 		fmt.Fprintln(deps.Stderr, "[claude-p] unset the variable, or use a different shell, then retry.")
@@ -90,8 +77,6 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	}
 	defer closeFn()
 
-	// Confines to the worktree when this is a source-writing phase and the host can wrap (sandbox-exec /
-	// bwrap); degrades unwrapped.
 	name, args, wrapped := wrapHeadlessInvocation(deps, cfg, resolveBinary(deps, "claude"), args)
 	if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
 		fmt.Fprintln(deps.Stderr, "[claude-p] safety gate: activated Build explanation contract requires OS sandbox confinement")
@@ -104,14 +89,10 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	selection = modelDispatchFromRealization("claude-p", selection, cfg.Realization)
 	selection = modelDispatchFromExtraArgs("claude-p", selection, cfg.ExtraFlags)
 	observeModelDispatch(deps, selection)
-	// Publishes the agent PID to a per-phase file so the auto-spawn observer's CPU liveness probe can tell
-	// a silently-thinking headless agent from a hung one (tmux drivers use the pane probe instead, so only
-	// the headless driver sets this); derived from StdoutLog so it matches the observer's path.
 	env := dispatchEnv(deps, cfg)
 	if pidFile := core.BridgePIDFile(cfg.StdoutLog); pidFile != "" {
 		env = append(env, bridgePidfileEnv+"="+pidFile)
 	}
-	// cfg.Worktree is "" for non-source-writing phases → inherits caller cwd.
 	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, env, nil, stdoutF, stderrF)
 	if err != nil {
 		return ExitMissingBinary, fmt.Errorf("[claude-p] %w", err)

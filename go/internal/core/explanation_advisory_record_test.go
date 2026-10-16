@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// See ADR-0102.
 func TestRecordPhaseOutcome_AnAdvisoryOnAPassRidesTheRecord(t *testing.T) {
 	t.Parallel()
 

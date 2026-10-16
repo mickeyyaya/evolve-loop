@@ -1,12 +1,5 @@
 package storage
 
-// CB.4 (concurrency campaign, run-scoped guard state): WriteCycleState
-// dual-writes the cycle state to <WorkspacePath>/run.json — the per-run
-// guard-read surface. The worktree provisioner symlinks the worktree's
-// .evolve/cycle-state.json at that run.json, so guards running inside a
-// cycle worktree decide on the run's OWN phase even when the host-global
-// cycle-state.json was last written by a different concurrent run.
-
 import (
 	"context"
 	"encoding/json"
@@ -50,11 +43,10 @@ func TestWriteCycleState_MirrorsRunJSON(t *testing.T) {
 func TestWriteCycleState_EmptyWorkspace_NoMirror(t *testing.T) {
 	dir := t.TempDir()
 	s := New(filepath.Join(dir, ".evolve"))
-	cs := core.CycleState{CycleID: 3, Phase: "scout"} // WorkspacePath unset
+	cs := core.CycleState{CycleID: 3, Phase: "scout"}
 	if err := s.WriteCycleState(context.Background(), cs); err != nil {
 		t.Fatalf("WriteCycleState: %v", err)
 	}
-	// No run.json may appear anywhere under the evolve dir.
 	err := filepath.Walk(dir, func(path string, _ os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -69,9 +61,6 @@ func TestWriteCycleState_EmptyWorkspace_NoMirror(t *testing.T) {
 	}
 }
 
-// The checkpoint block is resume state owned by the GLOBAL cycle-state.json
-// (spliced in by internal/checkpoint); guards never read it, and resume reads
-// the global file directly — so the per-run mirror stays a plain CycleState.
 func TestWriteCycleState_MirrorOmitsCheckpoint(t *testing.T) {
 	dir := t.TempDir()
 	evolveDir := filepath.Join(dir, ".evolve")
@@ -90,7 +79,6 @@ func TestWriteCycleState_MirrorOmitsCheckpoint(t *testing.T) {
 		t.Fatalf("WriteCycleState: %v", err)
 	}
 
-	// Global keeps the checkpoint block (existing contract).
 	globalRaw, err := os.ReadFile(filepath.Join(evolveDir, "cycle-state.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +91,6 @@ func TestWriteCycleState_MirrorOmitsCheckpoint(t *testing.T) {
 		t.Error("global cycle-state.json lost its checkpoint block")
 	}
 
-	// Mirror must not carry it.
 	runRaw, err := os.ReadFile(filepath.Join(ws, core.RunStateFile))
 	if err != nil {
 		t.Fatalf("run.json not mirrored: %v", err)
@@ -117,11 +104,8 @@ func TestWriteCycleState_MirrorOmitsCheckpoint(t *testing.T) {
 	}
 }
 
-// A failed mirror means guards inside the worktree would decide on a STALE
-// phase — that must surface as an error, not degrade silently.
 func TestWriteCycleState_MirrorFailureSurfaces(t *testing.T) {
 	dir := t.TempDir()
-	// Make the workspace path un-creatable: its parent is a regular file.
 	blocker := filepath.Join(dir, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)

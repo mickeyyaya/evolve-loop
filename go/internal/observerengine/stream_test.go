@@ -1,11 +1,5 @@
 package observerengine
 
-// stream_test.go — §6 test 18: the stream-json decoder. Eight tests MOVED from
-// the host (phaseobserver_test.go:94-154, coverage_test.go:162-207) with the
-// four loopHistory/rateLimitHist assertions rewritten to the counters they
-// imply (declared edited moves — D2 deleted the write-only accumulators), plus
-// the preserved content[0] quirk and the per-line clock read pinned.
-
 import (
 	"testing"
 	"time"
@@ -17,8 +11,6 @@ func streamEngine(t *testing.T) *Engine {
 	return e
 }
 
-// moved from phaseobserver_test.go:94 — loopHistory[0].tool == "Bash" rewritten
-// to toolCallCount/lastProgressTS. Kills M13a (the tool_use arm).
 func TestProcessLine_AssistantToolUse(t *testing.T) {
 	t.Parallel()
 	e := streamEngine(t)
@@ -31,8 +23,6 @@ func TestProcessLine_AssistantToolUse(t *testing.T) {
 	}
 }
 
-// moved from phaseobserver_test.go:112. Kills M13b (the tool_result arm) and
-// M13c (is_error not counted).
 func TestProcessLine_UserToolResultError(t *testing.T) {
 	t.Parallel()
 	e := streamEngine(t)
@@ -45,7 +35,6 @@ func TestProcessLine_UserToolResultError(t *testing.T) {
 	}
 }
 
-// moved from phaseobserver_test.go:122. Kills M13d (the result arm).
 func TestProcessLine_ResultEventAccumulatesCost(t *testing.T) {
 	t.Parallel()
 	e := streamEngine(t)
@@ -59,8 +48,6 @@ func TestProcessLine_ResultEventAccumulatesCost(t *testing.T) {
 	}
 }
 
-// moved from phaseobserver_test.go:134 — the rateLimitHist assertion rewritten
-// to the counter. Kills M13e (the rate_limit arm).
 func TestProcessLine_RateLimitEventTracked(t *testing.T) {
 	t.Parallel()
 	e := streamEngine(t)
@@ -73,7 +60,6 @@ func TestProcessLine_RateLimitEventTracked(t *testing.T) {
 	}
 }
 
-// moved from phaseobserver_test.go:146. Kills M13f (the malformed skip).
 func TestProcessLine_MalformedJSONSkipped(t *testing.T) {
 	t.Parallel()
 	e := streamEngine(t)
@@ -84,8 +70,6 @@ func TestProcessLine_MalformedJSONSkipped(t *testing.T) {
 	}
 }
 
-// moved from coverage_test.go:165 — len(loopHistory) == 0 rewritten to
-// toolCallCount == 0.
 func TestProcessLine_AssistantEmptyContent(t *testing.T) {
 	t.Parallel()
 	e := streamEngine(t)
@@ -98,9 +82,6 @@ func TestProcessLine_AssistantEmptyContent(t *testing.T) {
 	}
 }
 
-// rewritten from coverage_test.go:181 (ToolUseMissingNameDefaultsQuestion): the
-// "?" default fell with loopHistory (D2); what stays observable is that a
-// nameless tool_use still counts as a call and as progress.
 func TestProcessLine_NamelessToolUseStillCountsProgress(t *testing.T) {
 	t.Parallel()
 	e, _, _ := newEngine(t, func(_ *Settings, d *Deps) {
@@ -122,7 +103,6 @@ func TestProcessLine_NamelessToolUseStillCountsProgress(t *testing.T) {
 	}
 }
 
-// moved from coverage_test.go:196.
 func TestProcessLine_UserEmptyContent(t *testing.T) {
 	t.Parallel()
 	e := streamEngine(t)
@@ -135,14 +115,10 @@ func TestProcessLine_UserEmptyContent(t *testing.T) {
 	}
 }
 
-// TestProcessLine_OnlyTheFirstContentBlockCounts pins the preserved quirk:
-// only content[0] is inspected, so a text block followed by a tool_use counts
-// no progress (a possible false stuck_no_progress). Kills M14 (a range over
-// the content blocks).
 func TestProcessLine_OnlyTheFirstContentBlockCounts(t *testing.T) {
 	t.Parallel()
 	e, _, _ := newEngine(t, func(_ *Settings, d *Deps) { d.Now = fixedClock(fixtureAt.Add(time.Minute)) })
-	e.lastProgressTS = fixtureAt // construction read the shifted clock; pin the baseline
+	e.lastProgressTS = fixtureAt
 	e.processLine(`{"type":"assistant","message":{"content":[{"type":"text","text":"thinking"},{"type":"tool_use","name":"Edit","input":{}}]}}`)
 	e.processLine(`{"type":"user","message":{"content":[{"type":"text","text":"x"},{"type":"tool_result"}]}}`)
 	if e.toolCallCount != 0 || e.toolResultCnt != 0 {
@@ -156,10 +132,6 @@ func TestProcessLine_OnlyTheFirstContentBlockCounts(t *testing.T) {
 	}
 }
 
-// TestProcessLine_LastEventTSReadsTheClockPerLine pins the :469 clock site:
-// every VALID line reads the clock exactly once (lastEventTS is that read); a
-// malformed or empty line reads nothing. Load-bearing for the host's
-// count-stepping clocks (design §8).
 func TestProcessLine_LastEventTSReadsTheClockPerLine(t *testing.T) {
 	t.Parallel()
 	reads := 0
@@ -169,7 +141,7 @@ func TestProcessLine_LastEventTSReadsTheClockPerLine(t *testing.T) {
 			return fixtureAt.Add(time.Duration(reads) * time.Second)
 		}
 	})
-	reads = 0 // construction read consumed
+	reads = 0
 	e.processLine("garbage")
 	e.processLine("")
 	if reads != 0 {

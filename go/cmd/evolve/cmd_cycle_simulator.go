@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclesimulator"
 )
 
-// runCycleSimulator is the `evolve cycle-simulator <cycle> <workspace>` subcommand.
 func runCycleSimulator(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var pos []string
 	for _, a := range args {

@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-// The producer-side render and the validator are one contract: what
-// RenderNotApplicableDeclaration emits, parseDeclaration reads back as a
-// NOT_APPLICABLE declaration with the Reason and no Document, and
-// checkNotApplicable accepts without a failure.
 func TestRenderNotApplicableDeclaration_RoundTripsThroughTheValidator(t *testing.T) {
 	report := "# Build Report\n\n## Files Modified\n- none\n\n" + RenderNotApplicableDeclaration("the walk produces no Build diff")
 	decl, present, err := parseDeclaration(report)

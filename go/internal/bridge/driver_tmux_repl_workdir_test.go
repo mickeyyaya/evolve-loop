@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// workdirRecordingTmux records the workdir the driver passed at session birth.
 type workdirRecordingTmux struct {
 	*FakeTmuxController
 	bornIn string
@@ -87,8 +86,6 @@ func TestNewSessionBindsWorkdirAtBirth(t *testing.T) {
 	if tm.bornIn != cfg.Worktree {
 		t.Errorf("session born in %q, want %q — a workdirSessionStarter controller must receive the workdir at new-session time (`tmux new-session -c`), not only via the later cd keystroke", tm.bornIn, cfg.Worktree)
 	}
-	// Belt-and-suspenders: the cd keystroke must STILL be sent even when the
-	// session was born in the right directory.
 	cdSent := false
 	for _, ev := range tm.Events {
 		if ev == "send:cd "+cfg.Worktree+"|true" {
@@ -100,7 +97,6 @@ func TestNewSessionBindsWorkdirAtBirth(t *testing.T) {
 	}
 }
 
-// recipeWorkdirTmux gives the recipe-path fake the birth-bind capability.
 type recipeWorkdirTmux struct {
 	*fakeTmux
 	bornIn string

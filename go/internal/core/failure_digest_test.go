@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
-// writeAuditFailReason writes a workspace/audit-fail-reason.json fixture in
-// the coherence-floor schema.
 func writeAuditFailReason(t *testing.T, dir, phase string, reasons ...string) {
 	t.Helper()
 	body := map[string]any{"schema_version": 1, "phase": phase, "reasons": reasons}
@@ -170,7 +168,6 @@ func TestAssembler_WritesDigestArtifact(t *testing.T) {
 	}
 }
 
-// emptyCounter is a RecurrenceCounter that reports every fingerprint as unseen.
 type emptyCounter struct{}
 
 func (emptyCounter) Count(string) int { return 0 }

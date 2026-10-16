@@ -48,7 +48,6 @@ func TestCompute_ParsedHint_FutureToday(t *testing.T) {
 	if err := os.WriteFile(hintPath, []byte("resets 8:30pm"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	// 14:00 → 20:30 same day
 	r, err := Compute(dir, Options{
 		Now: func() time.Time { return refNow },
 	})
@@ -72,7 +71,6 @@ func TestCompute_ParsedHint_RollsToTomorrow(t *testing.T) {
 	if err := os.WriteFile(hintPath, []byte("5:20am"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	// 14:00 → next 05:20 is tomorrow
 	r, err := Compute(dir, Options{
 		Now: func() time.Time { return refNow },
 	})
@@ -186,9 +184,6 @@ func TestParseHint_InvalidMinutes(t *testing.T) {
 }
 
 func TestCompute_OperatorOverrideValidRFC3339(t *testing.T) {
-	// A well-formed RFC3339 override (colon in the zone offset) parses, so
-	// WakeAt is the parsed instant — not the synthesized now() of the
-	// unparseable branch.
 	override := "2026-05-23T20:00:00+00:00"
 	r, err := Compute("", Options{
 		ResetAt: override,
@@ -210,9 +205,6 @@ func TestCompute_OperatorOverrideValidRFC3339(t *testing.T) {
 }
 
 func TestCompute_DefaultClockUsedWhenNowNil(t *testing.T) {
-	// Now seam left nil → Compute falls back to time.Now(). Assert only the
-	// deterministic parts (source + that WakeAt is in the future window) to
-	// avoid coupling to the wall clock.
 	before := time.Now()
 	r, err := Compute("", Options{
 		DefaultHours: 1.0,
@@ -223,7 +215,6 @@ func TestCompute_DefaultClockUsedWhenNowNil(t *testing.T) {
 	if r.Source != "default" {
 		t.Errorf("Source=%q want default", r.Source)
 	}
-	// WakeAt = now()+1h; bound generously to stay deterministic under load.
 	if r.WakeAt.Before(before.Add(59*time.Minute)) || r.WakeAt.After(time.Now().Add(61*time.Minute)) {
 		t.Errorf("WakeAt=%v not ~1h after invocation", r.WakeAt)
 	}
@@ -232,8 +223,6 @@ func TestCompute_DefaultClockUsedWhenNowNil(t *testing.T) {
 func TestCompute_HintLongerThan32CharsTruncated(t *testing.T) {
 	dir := t.TempDir()
 	hintPath := filepath.Join(dir, "quota-reset-hint.txt")
-	// >32 chars; the parseable "8:30pm" sits within the first 32 bytes so the
-	// truncated head still parses. Padding pushes total length over the cap.
 	contents := "your limit resets 8:30pm----------------------------tail"
 	if len(contents) <= 32 {
 		t.Fatalf("test setup: contents must exceed 32 chars, got %d", len(contents))

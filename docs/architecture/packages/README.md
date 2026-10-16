@@ -116,3 +116,28 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/skillcheck` | renders every generated plugin surface from its single source (ADR-0040) | [internal-skillcheck.md](internal-skillcheck.md) |
 | `internal/subagent/subagentrun` | the `evolve subagent run` execution path | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
 | `internal/wtcheckpoint` | saves uncommitted worktree work as `refs/checkpoints` snapshots, and lists, restores, prunes and pushes them | [internal-wtcheckpoint.md](internal-wtcheckpoint.md) |
+| `internal/aggregator` | merges the artifacts of a fan-out phase into one canonical artifact by per-phase rules, with no model call | [internal-aggregator.md](internal-aggregator.md) |
+| `internal/binaryguard` | rejects large compiled executables from a change set before they reach a commit | [internal-binaryguard.md](internal-binaryguard.md) |
+| `internal/digest` | projects the role-scoped blocks out of an instruction document, never the full source | [internal-digest.md](internal-digest.md) |
+| `internal/gittest` | git-backed test fixtures: creation with background maintenance off, and teardown with retry | [internal-gittest.md](internal-gittest.md) |
+| `internal/phaseinventory` | builds the advisory index of every phase the pipeline can run | [internal-phaseinventory.md](internal-phaseinventory.md) |
+| `internal/repostate` | which files under a directory git actually tracks, for repo-wide scanners | [internal-repostate.md](internal-repostate.md) |
+| `internal/resolvellm` | resolves a phase role to its CLI and model tier from its profile | [internal-resolvellm.md](internal-resolvellm.md) |
+| `internal/soakreport` | the read-only soak evidence reporter for the phase-recovery enforce flip | [internal-soakreport.md](internal-soakreport.md) |
+| `internal/verifylock` | serializes the expensive go-test verification runs of one host | [internal-verifylock.md](internal-verifylock.md) |
+| `test/trustkernel` | black-box tests that pin the trust-kernel safety invariants | [test-trustkernel.md](test-trustkernel.md) |
+| `internal/projecthash` | computes the 8-char namespace that isolates one project's state, byte-exact with the bash pipeline | [internal-projecthash.md](internal-projecthash.md) |
+| `internal/deliverable/gatesignal` | reports each contract gate decision to the Signal Center under module `gate.contract` | [internal-deliverable-gatesignal.md](internal-deliverable-gatesignal.md) |
+| `internal/systemprompt` | resolves the launch-time system prompt for an agent, with the env and profile precedence chain | [internal-systemprompt.md](internal-systemprompt.md) |
+| `internal/quotastate` | parses a CLI's usage pane into a structured quota snapshot in its native units | [internal-quotastate.md](internal-quotastate.md) |
+| `internal/sizeratchet` | enforces the 50-line function limit across a Go module, with a shrink-only offender list | [internal-sizeratchet.md](internal-sizeratchet.md) |
+| `internal/phases/secretleakscan` | the native secret-leak-scan phase: a deterministic regex scan of the added lines of a diff | [internal-phases-secretleakscan.md](internal-phases-secretleakscan.md) |
+| `cmd/filter-stdout` | operator utility that writes a workspace's `<phase>-stdout.clean.txt` companion | [cmd-filter-stdout.md](cmd-filter-stdout.md) |
+| `internal/kerneltest` | a rename-proof fixture of the shipped phase registry for kernel tests | [internal-kerneltest.md](internal-kerneltest.md) |
+| `internal/bridge/keyspec` | classifies tmux key-spec tokens and flags likely typos without blocking a keystroke | [internal-bridge-keyspec.md](internal-bridge-keyspec.md) |
+| `internal/addedtests` | derives which test packages a tree adds and the build tags each must run under | [internal-addedtests.md](internal-addedtests.md) |
+| `internal/bedrock` | emits the byte-identical trust-boundary prefix of a subagent invocation, for prompt caching | [internal-bedrock.md](internal-bedrock.md) |
+| `internal/textutil` | byte-based string-shortening helpers for human-facing diagnostics | [internal-textutil.md](internal-textutil.md) |
+| `internal/textcap` | the two rune-cap text rules: trim and ` …[truncated]`, or the bare ellipsis | [internal-textcap.md](internal-textcap.md) |
+| `internal/phases/flakererunscan` | the native flake-rerun phase: reruns a test and flags it flaky when its outcomes disagree | [internal-phases-flakererunscan.md](internal-phases-flakererunscan.md) |
+| `internal/guardslog` | appends one timestamped guard-log line and returns the close error | [internal-guardslog.md](internal-guardslog.md) |

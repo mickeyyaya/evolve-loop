@@ -11,11 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
-// operationalSentinelRE is deliberately coarse: a false positive costs a relocation above the
-// strip marker, while a false negative strips a directive from every dispatched prompt.
 var operationalSentinelRE = regexp.MustCompile(`MANDATORY|STOP CRITERION|Completion Gates|force-FAIL|REQUIRED|POSTHOC|Verdict Rules|Constitutional audit`)
 
-// strippedPersonaBody returns (body, stripped body) as the runner's dispatch path derives them.
 func strippedPersonaBody(t *testing.T, root, name string) (string, string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(root, "agents", name))
@@ -51,7 +48,6 @@ func TestAuditorStripKeepsOperationalContract(t *testing.T) {
 }
 
 func TestPersonaStripKeepsOperationalSentinels(t *testing.T) {
-	// pendingCuration may only shrink; adding an entry needs a written justification.
 	pendingCuration := map[string]bool{}
 
 	root := repoRootForPairing(t)
@@ -63,7 +59,7 @@ func TestPersonaStripKeepsOperationalSentinels(t *testing.T) {
 	for _, rel := range tracked {
 		name := filepath.Base(rel)
 		if !strings.HasPrefix(name, "evolve-") || !strings.HasSuffix(name, ".md") ||
-			strings.HasSuffix(name, "-reference.md") { // reference docs are read on demand, never dispatched through the strip
+			strings.HasSuffix(name, "-reference.md") {
 			continue
 		}
 		personas++

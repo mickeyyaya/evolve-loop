@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// namedCaptureCfg binds an existing named session so EnsureSession attaches without a boot loop.
 func namedCaptureCfg(t *testing.T, name string) *Config {
 	t.Helper()
 	return &Config{

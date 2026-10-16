@@ -24,8 +24,6 @@ func TestReachabilitySubcommandRegistered(t *testing.T) {
 	}
 }
 
-// writeFixtureModule writes a real module with packages core and storage, so
-// the import graph comes from the toolchain rather than a hand-built literal.
 func writeFixtureModule(t *testing.T, storageImportsCore bool) (root, corePkg, storagePkg string) {
 	t.Helper()
 	root = t.TempDir()

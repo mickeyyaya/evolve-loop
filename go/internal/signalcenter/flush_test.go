@@ -1,9 +1,5 @@
 package signalcenter
 
-// flush_test.go — Flush (design §6.1, S2): an emitter that finds a drain in
-// progress returns before its event is delivered; a producer on an exit path
-// calls Flush to wait until the queue is empty and no drain is running.
-
 import (
 	"sync"
 	"testing"
@@ -25,9 +21,9 @@ func TestFlush_ReturnsOnlyAfterEveryQueuedEventIsDelivered(t *testing.T) {
 		delivered++
 		mu.Unlock()
 	})
-	go c.Emit(infoEvent("slow")) // this goroutine becomes the drainer and blocks inside the listener
+	go c.Emit(infoEvent("slow"))
 	<-entered
-	c.Emit(infoEvent("queued while draining")) // enqueues and returns
+	c.Emit(infoEvent("queued while draining"))
 	flushed := make(chan struct{})
 	go func() { c.Flush(); close(flushed) }()
 	select {

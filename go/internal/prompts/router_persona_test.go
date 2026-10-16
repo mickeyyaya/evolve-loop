@@ -20,15 +20,12 @@ func routerContent(t *testing.T) (raw []byte, body string) {
 	return raw, string(raw)
 }
 
-// routerProseBytes measures the body above the catalog heading minus the generated goal-recipes
-// table, which is a registry projection that grows with the catalog, not prose TSC governs.
 func routerProseBytes(t *testing.T, body string) int {
 	t.Helper()
 	const fmDelim = "---\n"
 	const catalogHeading = "## Phase Catalog — Core Values"
 	const genBegin = "<!-- GENERATED:goal-recipes BEGIN"
 	const genEnd = "<!-- GENERATED:goal-recipes END -->"
-	// Skip the opening "---\n" at position 0, find the closing "---\n".
 	closingFM := strings.Index(body[3:], fmDelim)
 	if closingFM < 0 {
 		t.Fatalf("could not find closing YAML frontmatter delimiter in evolve-router.md")
@@ -71,12 +68,11 @@ func TestRouterPersona_TSCMarkerPresent(t *testing.T) {
 	}
 }
 
-// Despite the name, this pins an anti-bloat ceiling on the prose region, not a reduction.
 func TestRouterPersona_ProseRegionByteReduction(t *testing.T) {
 	_, body := routerContent(t)
 	got := routerProseBytes(t, body)
-	const baselineBytes = 2349 // prose-only size at the re-baseline
-	const maxBytes = 3000      // room for real edits; still fails on a regrowth wave
+	const baselineBytes = 2349
+	const maxBytes = 3000
 	if got >= maxBytes {
 		t.Errorf("RED: prose region (excluding the generated recipe table) is %d bytes (want <%d, re-baseline=%d).\n"+
 			"Apply TSC to the prose sections (## Your job, ## Output contract, ## Goal-Type Recipes prose)\n"+
@@ -99,10 +95,10 @@ func TestRouterPersona_CatalogByteIdentical_Negative(t *testing.T) {
 func TestRouterPersona_DomainVocabPreserved(t *testing.T) {
 	_, body := routerContent(t)
 	for _, token := range []string{
-		"routing-plan.json",  // artifact path — must survive prose compression
-		"fast|balanced|deep", // tier enum in code span — must not be paraphrased
-		"writes_source",      // JSON field name in mint block example
-		"ClampPlanToFloor",   // Go function name — domain vocabulary
+		"routing-plan.json",
+		"fast|balanced|deep",
+		"writes_source",
+		"ClampPlanToFloor",
 	} {
 		if !strings.Contains(body, token) {
 			t.Errorf("Edge: domain vocab token %q absent from evolve-router.md after TSC.\n"+

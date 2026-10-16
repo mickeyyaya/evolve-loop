@@ -13,12 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
-// readInteractions returns the decoded ndjson ledger for phase in ws.
 func readInteractions(t *testing.T, ws, phase string) []interaction.Outcome {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(ws, phase+"-interactions.ndjson"))
 	if os.IsNotExist(err) {
-		return nil // no ledger yet is a legitimate "nothing recorded"
+		return nil
 	}
 	if err != nil {
 		t.Fatalf("interactions ledger unreadable (NOT the same as absent): %v", err)
@@ -92,11 +91,6 @@ func TestVerifySubmitted_ReportsOutcome(t *testing.T) {
 	})
 }
 
-// TestTmuxREPL_SubmitVerify_RecordReachesLedger drives the real production
-// entry point end to end, so a unit test of the outcome alone can't miss a
-// wiring gap. BOTH subtests matter: the recovered row proves the guard's win
-// is durable, and the clean row is the denominator — without it, an early
-// "don't spam the ledger" return would pass the recovered-row assertion alone.
 func TestTmuxREPL_SubmitVerify_RecordReachesLedger(t *testing.T) {
 	t.Parallel()
 	run := func(t *testing.T, tm TmuxController) []interaction.Outcome {

@@ -69,7 +69,6 @@ func materialSHA256(ctx context.Context, worktree string, paths []string) (strin
 	return pathStateSHA256(ctx, worktree, materialDomain, paths)
 }
 
-// statesOf keeps the states whose path is in paths, in their existing sorted order.
 func statesOf(states []pathState, paths []string) []pathState {
 	keep := stringSet(paths)
 	out := make([]pathState, 0, len(paths))
@@ -89,7 +88,6 @@ func pathStateSHA256(ctx context.Context, worktree, domain string, paths []strin
 	return foldPathStates(domain, states), nil
 }
 
-// pathState is one changed path's mode and content, read once so several digests can fold the same bytes.
 type pathState struct {
 	rel, mode, contentSHA string
 	contentBytes          int64
@@ -271,8 +269,6 @@ func requireLandedCommit(ctx context.Context, projectRoot, landedCommit string) 
 	return nil
 }
 
-// ArchiveUnpublishedContinuationRecords moves failed-build drafts out of the
-// immutable canonical cycle namespace while preserving them under docs/.
 func ArchiveUnpublishedContinuationRecords(ctx context.Context, worktree, baseSHA string) ([]string, error) {
 	paths, err := changedSince(ctx, worktree, baseSHA)
 	if err != nil {
@@ -549,10 +545,6 @@ func normalize(path string) string {
 	return path
 }
 
-// validRelative projects the single-sourced path-safety belief from reportdoc
-// (architecture review 2026-09-01: this package's local validator accepted
-// uncleaned traversal, colons, and NUL bytes that the citation validator
-// rejects — the same string was judged safe here and unsafe there).
 func validRelative(path string) bool {
 	return reportdoc.ValidReference(path)
 }

@@ -1,27 +1,4 @@
-// Package cyclehealth performs a 13-signal integrity check on a
-// completed cycle's workspace and writes the findings to
-// <workspace>/cycle-health.json. The orchestrator and Scout read the
-// file before the next phase; any ANOMALY in a non-WARN-only signal
-// halts the cycle so the integrity breach is investigated.
-//
-// The 12 signals (each emits zero or more anomalies):
-//
-//  1. ledger_completeness  — every required role appears in ledger.jsonl
-//  2. ledger_timestamps    — entries are monotonic, no future timestamps
-//  3. workspace_artifacts  — required reports exist (scout/build/audit)
-//  4. artifact_checksums   — SHA256 of every artifact matches its ledger entry
-//  5. challenge_tokens     — each subagent invocation has a unique token
-//  6. velocity             — wall-clock per phase within reasonable bounds
-//  7. substance            — artifact bodies non-trivial (> 100 chars)
-//  8. canary_files         — no orphan canary files left from previous cycles
-//  9. hash_chain           — ledger prev_hash chain unbroken
-//
-// 10. duplicate_ledger     — no two ledger entries with same SHA
-// 11. phase_latency        — per-phase execution time stays within policy
-// 12. self_heal_events     — anomalous self-heal retries / backfills in cycle
-// 13. dossier_commitment   — empty commitment never ran implementation phases
-//
-// v12.1 Phase 2A port. CLI: `evolve cycle-health <cycle-N> <workspace>`.
+// Package cyclehealth checks a completed cycle's workspace for integrity anomalies.
 package cyclehealth
 
 import (
@@ -38,33 +15,28 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Severity classifies a single anomaly's blocking force.
 type Severity string
 
 const (
-	SeverityWarn  Severity = "warn"  // advisory; loop continues
-	SeverityFatal Severity = "fatal" // HALT; investigate before next cycle
+	SeverityWarn  Severity = "warn"
+	SeverityFatal Severity = "fatal"
 )
 
-// Anomaly is a single integrity finding.
 type Anomaly struct {
 	Signal   string   `json:"signal"`
 	Severity Severity `json:"severity"`
 	Message  string   `json:"message"`
 }
 
-// Report is the on-disk JSON shape (the public contract for Scout and
-// the orchestrator). Healthy cycles emit an empty Anomalies slice.
 type Report struct {
 	Cycle        int       `json:"cycle"`
 	Workspace    string    `json:"workspace"`
 	GeneratedAt  time.Time `json:"generated_at"`
 	SignalsRun   []string  `json:"signals_run"`
 	Anomalies    []Anomaly `json:"anomalies"`
-	OverallFatal bool      `json:"overall_fatal"` // true when any anomaly has SeverityFatal
+	OverallFatal bool      `json:"overall_fatal"`
 }
 
-// Options configures Check. Cycle and Workspace are required.
 type Options struct {
 	Cycle                int
 	Workspace            string
@@ -72,9 +44,6 @@ type Options struct {
 	PhaseLatencyCeilingS int
 }
 
-// Check runs the 13 signals and writes cycle-health.json. Returns the
-// Report whether or not anomalies were found; the caller decides
-// whether to HALT based on Report.OverallFatal.
 func Check(opts Options) (Report, error) {
 	if opts.Cycle <= 0 {
 		return Report{}, fmt.Errorf("cyclehealth: Cycle must be > 0")
@@ -110,7 +79,6 @@ func Check(opts Options) (Report, error) {
 }
 
 func runSignals(opts Options) []Anomaly {
-	// Each signal appends zero or more Anomaly entries.
 	signals := []signalCheck{
 		checkWorkspaceArtifacts,
 		checkArtifactSubstance,
@@ -133,9 +101,6 @@ func runSignals(opts Options) []Anomaly {
 	return anomalies
 }
 
-// signalCheck is the per-signal contract. Each returns the anomalies
-// it found (possibly empty); never errors — file-not-found and
-// parse-failure are surfaced as anomalies, not Go errors.
 type signalCheck func(opts Options) []Anomaly
 
 func signalNames() []string {
@@ -185,12 +150,6 @@ func checkDossierCommitment(opts Options) []Anomaly {
 	return nil
 }
 
-// --- Signal implementations (kept small; each does one thing) ---
-
-// requiredArtifacts is the minimum file set a completed cycle must
-// produce. Missing files are fatal because downstream phases depend
-// on them. Sourced from the phasecontract registry (the same place the
-// agents are told to write) so this list cannot drift from the contracts.
 var requiredArtifacts = phasecontract.RequiredArtifacts()
 
 func checkWorkspaceArtifacts(opts Options) []Anomaly {
@@ -213,7 +172,7 @@ func checkArtifactSubstance(opts Options) []Anomaly {
 		p := filepath.Join(opts.Workspace, name)
 		b, err := os.ReadFile(p)
 		if err != nil {
-			continue // missing-artifact already covered by checkWorkspaceArtifacts
+			continue
 		}
 		if len(strings.TrimSpace(string(b))) < 100 {
 			out = append(out, Anomaly{
@@ -225,7 +184,6 @@ func checkArtifactSubstance(opts Options) []Anomaly {
 	return out
 }
 
-// ledgerEntry is the subset of ledger.jsonl fields cyclehealth inspects.
 type ledgerEntry struct {
 	Role      string  `json:"role"`
 	Phase     string  `json:"phase"`
@@ -240,15 +198,9 @@ type ledgerEntry struct {
 	Action    string  `json:"action,omitempty"`
 }
 
-// requiredRoles is the set of subagent roles whose ledger entries are
-// expected for a completed cycle. Missing roles are fatal. Single-sourced
-// from phasecontract — ledgerverify and redteamcheck read the same accessor.
 var requiredRoles = phasecontract.RequiredRoles()
 
 func loadLedger(workspace string) ([]ledgerEntry, error) {
-	// The ledger may live at <workspace>/ledger.jsonl or at the project
-	// root. Check the workspace-local path first (cycle-scoped tests
-	// keep their own ledger); fall back to a sibling path otherwise.
 	candidates := []string{
 		filepath.Join(workspace, "ledger.jsonl"),
 		filepath.Join(filepath.Dir(workspace), "ledger.jsonl"),
@@ -390,9 +342,6 @@ func checkArtifactChecksums(opts Options) []Anomaly {
 		if e.Cycle != opts.Cycle || e.SHA == "" {
 			continue
 		}
-		// SHA is the artifact's content hash; the ledger records it
-		// per phase. Re-hash to confirm the file wasn't mutated post-
-		// audit. Artifact name = <phase>-report.md by convention.
 		p := filepath.Join(opts.Workspace, e.Phase+"-report.md")
 		actual, err := sha256File(p)
 		if err != nil {
@@ -432,7 +381,7 @@ func checkChallengeTokens(opts Options) []Anomaly {
 	return out
 }
 
-const maxPhaseDurationSec = 1800 // 30 min — beyond this, phase likely stuck
+const maxPhaseDurationSec = 30 * 60
 
 func checkVelocity(opts Options) []Anomaly {
 	entries, err := loadLedger(opts.Workspace)
@@ -440,8 +389,6 @@ func checkVelocity(opts Options) []Anomaly {
 		return nil
 	}
 	var out []Anomaly
-	// Pair consecutive entries within the same cycle; warn when the
-	// gap between them exceeds maxPhaseDurationSec.
 	var prev *ledgerEntry
 	for i := range entries {
 		e := entries[i]
@@ -536,9 +483,6 @@ func checkSelfHealEvents(opts Options) []Anomaly {
 				Message:  fmt.Sprintf("%s event occurred in phase %s", e.Kind, e.Phase),
 			})
 		}
-		// stop_review/pause means the reviewer judged the phase stalled and paused
-		// it for investigation — an anomalous outcome worth flagging. extend is healthy
-		// (the reviewer saw progress) and must NOT emit an anomaly.
 		if e.Kind == "stop_review" && e.Action == "pause" {
 			phase := e.Phase
 			if phase == "" {
@@ -553,8 +497,6 @@ func checkSelfHealEvents(opts Options) []Anomaly {
 	}
 	return out
 }
-
-// --- Helpers ---
 
 func sha256File(path string) (string, error) {
 	b, err := os.ReadFile(path)

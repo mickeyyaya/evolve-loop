@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-// fixtureProject lays out a minimal project: a built-in registry with two
-// phases (one Control, which must still be inventoried — the inventory is a
-// catalog, not an advisor projection) and one user phase under .evolve/phases.
 func fixtureProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -128,7 +125,6 @@ func TestBuild_CategoryIndex(t *testing.T) {
 	if len(bugfix) != 1 || bugfix[0] != "reproduce-bug" {
 		t.Errorf("category_index[bugfix] = %v", bugfix)
 	}
-	// Built-ins without categories land in uncategorized — degrade, not crash.
 	uncat := inv.CategoryIndex["uncategorized"]
 	if len(uncat) != 2 {
 		t.Errorf("category_index[uncategorized] = %v, want scout+ship", uncat)
@@ -167,7 +163,7 @@ func TestBuild_CacheHitAndForce(t *testing.T) {
 
 func TestBuild_ExtraRootsAndProvenance(t *testing.T) {
 	root := fixtureProject(t)
-	pluginRoot := t.TempDir() // absolute, outside the project
+	pluginRoot := t.TempDir()
 	dir := filepath.Join(pluginRoot, "threat-model")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -194,7 +190,7 @@ func TestBuild_ExtraRootsAndProvenance(t *testing.T) {
 }
 
 func TestBuild_MissingRegistryFailOpen(t *testing.T) {
-	root := t.TempDir() // no registry, no phases
+	root := t.TempDir()
 	res, inv := buildAndLoad(t, Options{ProjectRoot: root, Force: true})
 	if res.PhaseCount != 0 || inv.PhaseCount != 0 {
 		t.Errorf("empty project must build an empty inventory; got %d", res.PhaseCount)

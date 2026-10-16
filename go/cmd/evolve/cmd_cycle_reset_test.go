@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// seedReset writes <root>/.evolve/{cycle-state.json,state.json,runs/cycle-N/...}.
 func seedReset(t *testing.T, root string, cycleID int) (evolveDir, workspace string) {
 	t.Helper()
 	evolveDir = filepath.Join(root, ".evolve")
@@ -37,8 +36,6 @@ func seedReset(t *testing.T, root string, cycleID int) (evolveDir, workspace str
 
 func TestRunCycleReset_LeaseFencing(t *testing.T) {
 	t.Parallel()
-	// The fence needs a fresh heartbeat and a live pid; this process's own pid is
-	// a guaranteed-live owner.
 	livePID := os.Getpid()
 
 	t.Run("fresh lease with a live owner refuses with owner message", func(t *testing.T) {

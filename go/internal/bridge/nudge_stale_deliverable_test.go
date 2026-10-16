@@ -35,8 +35,6 @@ func TestIdleNudgeFor_NamesAnUnrewrittenDeliverableAndBindsARecheck(t *testing.T
 		t.Errorf("an absent deliverable keeps the plain reminder, label and trigger: %+v", n)
 	}
 
-	// Rewritten since dispatch: the baseline no longer matches, so the plain
-	// reminder (not reached in practice — completion fires first).
 	later := time.Now().Add(time.Minute)
 	if err := os.Chtimes(report, later, later); err != nil {
 		t.Fatal(err)
@@ -78,8 +76,6 @@ func TestIdleNudgeFor_SeesALeftoverAtAFallbackLocation(t *testing.T) {
 	}
 }
 
-// appendOnNudgeTmux is an agent that does what the explaining nudge asks:
-// re-checks and appends an attestation line to the deliverable.
 type appendOnNudgeTmux struct {
 	*nudgeRecordingTmux
 	artifact string

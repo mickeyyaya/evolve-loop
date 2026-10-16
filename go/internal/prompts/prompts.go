@@ -12,12 +12,10 @@ import (
 	"strings"
 )
 
-// Loader resolves agent and skill names to parsed Prompts; a zero Loader finds nothing.
 type Loader struct {
 	fs fs.FS
 }
 
-// Prompt is the parsed form of an agent or skill .md file.
 type Prompt struct {
 	Name        string
 	Frontmatter map[string]any
@@ -25,10 +23,8 @@ type Prompt struct {
 	Raw         string
 }
 
-// NewFromFS returns a Loader backed by fsys; a nil fsys gives the zero Loader.
 func NewFromFS(fsys fs.FS) *Loader { return &Loader{fs: fsys} }
 
-// NewFromDir returns a Loader rooted at dir; an empty dir gives the zero Loader.
 func NewFromDir(dir string) *Loader {
 	if dir == "" {
 		return &Loader{}
@@ -36,7 +32,6 @@ func NewFromDir(dir string) *Loader {
 	return &Loader{fs: os.DirFS(dir)}
 }
 
-// NewForProject returns a Loader rooted at $EVOLVE_PROMPTS_DIR when set, else at projectRoot.
 func NewForProject(projectRoot string) *Loader {
 	if d := os.Getenv("EVOLVE_PROMPTS_DIR"); d != "" {
 		return NewFromDir(d)
@@ -44,17 +39,14 @@ func NewForProject(projectRoot string) *Loader {
 	return NewFromDir(projectRoot)
 }
 
-// Agent reads agents/<name>.md and parses its frontmatter.
 func (l *Loader) Agent(name string) (Prompt, error) {
 	return l.load(path.Join("agents", name+".md"), name)
 }
 
-// Skill reads skills/<name>/SKILL.md and parses its frontmatter.
 func (l *Loader) Skill(name string) (Prompt, error) {
 	return l.load(path.Join("skills", name, "SKILL.md"), name)
 }
 
-// Agents lists agent names (file names without .md), sorted.
 func (l *Loader) Agents() ([]string, error) {
 	if l.fs == nil {
 		return nil, nil
@@ -75,7 +67,6 @@ func (l *Loader) Agents() ([]string, error) {
 	return out, nil
 }
 
-// Skills lists the skill directories that contain a SKILL.md, sorted.
 func (l *Loader) Skills() ([]string, error) {
 	if l.fs == nil {
 		return nil, nil
@@ -98,13 +89,10 @@ func (l *Loader) Skills() ([]string, error) {
 	return out, nil
 }
 
-// ErrNoSource marks a read from a Loader with no filesystem: a wiring defect, not one missing doc.
 var ErrNoSource = errors.New("prompts: no source configured")
 
 func (l *Loader) load(p, name string) (Prompt, error) {
 	if l.fs == nil {
-		// Both sentinels: fs.ErrNotExist keeps the zero-Loader contract, and ErrNoSource
-		// keeps a misresolved prompts root from passing as one skippable missing persona.
 		return Prompt{}, fmt.Errorf("prompts: %w (%w)", fs.ErrNotExist, ErrNoSource)
 	}
 	raw, err := fs.ReadFile(l.fs, p)
@@ -123,7 +111,6 @@ func (l *Loader) load(p, name string) (Prompt, error) {
 	}, nil
 }
 
-// StripOnDemandSections drops everything from the first line that is a "## Reference Index" heading onward.
 func StripOnDemandSections(body string) string {
 	offset := 0
 	for _, line := range strings.SplitAfter(body, "\n") {
@@ -136,7 +123,6 @@ func StripOnDemandSections(body string) string {
 	return body
 }
 
-// ParseFrontmatter splits raw into its "---"-fenced frontmatter map and the body after the fence.
 func ParseFrontmatter(raw string) (map[string]any, string, error) {
 	if !strings.HasPrefix(raw, "---\n") && !strings.HasPrefix(raw, "---\r\n") {
 		return nil, raw, nil
@@ -177,7 +163,6 @@ func ParseFrontmatter(raw string) (map[string]any, string, error) {
 	return fm, body, nil
 }
 
-// parseValue returns an inline array as []string and any other value as an unquoted string.
 func parseValue(v string) any {
 	if v == "" {
 		return ""
@@ -207,7 +192,6 @@ func unquote(s string) string {
 	return s
 }
 
-// splitArray splits s on commas outside quotes, keeping the quotes; it has no escape handling.
 func splitArray(s string) []string {
 	out := []string{}
 	cur := strings.Builder{}

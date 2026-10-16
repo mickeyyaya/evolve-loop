@@ -10,7 +10,7 @@ import (
 func TestFakeTmuxController_PaneCommand_ReturnsScriptedAndRecords(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	f := &FakeTmuxController{PaneCmd: "node"} // a healthy claude REPL reports "node"
+	f := &FakeTmuxController{PaneCmd: "node"}
 
 	got, err := f.PaneCommand(ctx, "sess")
 	if err != nil {
@@ -27,7 +27,7 @@ func TestFakeTmuxController_PaneCommand_ReturnsScriptedAndRecords(t *testing.T) 
 func TestPaneCommander_SatisfiedAndExercised(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	var pc PaneCommander = &FakeTmuxController{PaneCmd: "zsh"} // a wedged shell reports "zsh"
+	var pc PaneCommander = &FakeTmuxController{PaneCmd: "zsh"}
 
 	got, err := pc.PaneCommand(ctx, "sess")
 	if err != nil {
@@ -61,7 +61,7 @@ func TestReport_BoundByBuildReport(t *testing.T) {
 	mkfile(t, filepath.Join(ws, "challenge-token.txt"), token+"\n")
 	mkfile(t, filepath.Join(ws, "stdout.log"), "hello stdout\n")
 
-	var rep Report // names the Report DTO
+	var rep Report
 	rep, err := BuildReport(ws, "artifact.md", now)
 	if err != nil {
 		t.Fatalf("BuildReport err = %v, want nil", err)
@@ -73,7 +73,7 @@ func TestReport_BoundByBuildReport(t *testing.T) {
 		t.Fatalf("Report.ScannedAt = %q, want the injected UTC time", rep.ScannedAt)
 	}
 
-	art := rep.Artifact // ArtifactRef from the producer
+	art := rep.Artifact
 	if !art.Exists || art.SizeBytes <= 0 {
 		t.Fatalf("ArtifactRef = %+v, want Exists with positive SizeBytes", art)
 	}
@@ -81,7 +81,7 @@ func TestReport_BoundByBuildReport(t *testing.T) {
 		t.Fatal("ArtifactRef.HasChallengeToken = false, want true (token is inside the artifact)")
 	}
 
-	var stdoutLog FileRef = rep.Logs.StdoutLog // FileRef from the producer's statRef
+	var stdoutLog FileRef = rep.Logs.StdoutLog
 	if !stdoutLog.Exists || stdoutLog.SizeBytes <= 0 {
 		t.Fatalf("FileRef(stdout.log) = %+v, want Exists with positive SizeBytes", stdoutLog)
 	}
@@ -105,7 +105,7 @@ func TestReport_TokenMismatchVerdict(t *testing.T) {
 	if rep.Verdict != "incomplete-token-mismatch" {
 		t.Fatalf("Report.Verdict = %q, want incomplete-token-mismatch", rep.Verdict)
 	}
-	var art ArtifactRef = rep.Artifact // names the ArtifactRef DTO
+	var art ArtifactRef = rep.Artifact
 	if !art.Exists || art.HasChallengeToken {
 		t.Fatalf("ArtifactRef = %+v, want Exists=true HasChallengeToken=false", art)
 	}
@@ -118,8 +118,8 @@ func TestDoctorReport_BoundByDoctor(t *testing.T) {
 
 	eng := doctorEngine(map[string]string{"HOME": home}, map[string]bool{"claude": true}, 0, nil)
 
-	var rep DoctorReport // names the DoctorReport DTO
-	rep, code := eng.Doctor(context.Background(), "claude-p", true /* deep */)
+	var rep DoctorReport
+	rep, code := eng.Doctor(context.Background(), "claude-p", true)
 	if code != ExitOK {
 		t.Fatalf("Doctor exit = %d, want ExitOK (ready)", code)
 	}
@@ -133,22 +133,22 @@ func TestDoctorReport_BoundByDoctor(t *testing.T) {
 		t.Fatalf("DoctorReport.Results length = %d, want 1 (filtered to claude-p)", len(rep.Results))
 	}
 
-	var res DoctorResult = rep.Results[0] // DoctorResult from the producer
+	var res DoctorResult = rep.Results[0]
 	if res.CLI != "claude-p" || res.Verdict != "ready" {
 		t.Fatalf("DoctorResult = {CLI:%q Verdict:%q}, want claude-p/ready", res.CLI, res.Verdict)
 	}
 
-	var bin BinaryInfo = res.Binary // BinaryInfo from the producer (LookPath + --version)
+	var bin BinaryInfo = res.Binary
 	if !bin.Present || bin.Path != "/usr/bin/claude" || bin.Version != "v1.2.3" {
 		t.Fatalf("BinaryInfo = %+v, want Present /usr/bin/claude v1.2.3", bin)
 	}
 
-	auth := res.Auth // AuthInfo from doctorAuth
+	auth := res.Auth
 	if !auth.Configured || auth.Source != "file:credentials.json" {
 		t.Fatalf("AuthInfo = %+v, want Configured via file:credentials.json", auth)
 	}
 
-	deep := res.DeepProbe // DeepProbe from doctorDeep (deep=true)
+	deep := res.DeepProbe
 	if !deep.Ran || !deep.Passed {
 		t.Fatalf("DeepProbe = %+v, want Ran && Passed", deep)
 	}
@@ -158,7 +158,7 @@ func TestAuthInfo_OllamaOptional(t *testing.T) {
 	t.Parallel()
 	eng := doctorEngine(map[string]string{"HOME": t.TempDir()}, nil, 0, nil)
 
-	var auth AuthInfo = eng.doctorAuth("ollama-tmux") // names the AuthInfo DTO
+	var auth AuthInfo = eng.doctorAuth("ollama-tmux")
 	if auth.Configured {
 		t.Fatalf("AuthInfo.Configured = true, want false for local-only ollama")
 	}

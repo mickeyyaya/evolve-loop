@@ -145,9 +145,6 @@ func runDossierVerify(_ []string, stdout, stderr io.Writer) int {
 	if r := os.Getenv("EVOLVE_PROJECT_ROOT"); r != "" {
 		root = r
 	}
-	// Enrolling "dossier-closeout" turns an absent or empty knowledge-base/cycles/
-	// into a FAIL; unenrolled, absence is a no-op success.
-	// See ADR-0055.
 	pol, perr := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
 	if perr != nil {
 		fmt.Fprintf(stderr, "dossier verify: load policy: %v\n", perr)

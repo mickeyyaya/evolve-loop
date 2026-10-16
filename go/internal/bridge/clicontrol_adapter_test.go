@@ -63,7 +63,7 @@ func TestController_Do_UnsupportedEvent(t *testing.T) {
 	t.Parallel()
 	c := &cliController{
 		resolve: func(cli string) (Manifest, error) {
-			return Manifest{CLI: cli, Binary: "x"}, nil // no controls block
+			return Manifest{CLI: cli, Binary: "x"}, nil
 		},
 		capture: func(context.Context, string, string, string) (string, error) {
 			t.Fatal("capture must not run for an unsupported event")
@@ -112,7 +112,6 @@ func TestCaptureControl_SendsGivenCommand(t *testing.T) {
 	if !strings.Contains(pane, "quota healthy") {
 		t.Errorf("pane=%q, want the captured response", pane)
 	}
-	// injectText writes the command body to <ws>/.bridge-inbox/<agent>-inject.txt before pasting.
 	body, rerr := os.ReadFile(filepath.Join(ws, ".bridge-inbox", "control-inject.txt"))
 	if rerr != nil {
 		t.Fatalf("read inject scratch: %v", rerr)

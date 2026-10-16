@@ -2,12 +2,6 @@ package core
 
 import "testing"
 
-// "shared.txt" is touched by BOTH the audited and composed change on
-// overlapping line ranges (the one intersecting file). "audonly.txt" is
-// audited-only; "cmponly.txt" is composed-only — neither intersects. Distinct
-// filenames let the assertions test membership by substring, robust to whether
-// the parser records "shared.txt" or "a/shared.txt".
-
 const auditedDiffSharedPlusAudOnly = `diff --git a/shared.txt b/shared.txt
 --- a/shared.txt
 +++ b/shared.txt
@@ -71,8 +65,6 @@ const malformedHunkDiff = `diff --git a/x.txt b/x.txt
  body line
 `
 
-// scopedMergeReviewSpy is a spy: it counts invocations and captures the hunks it
-// was handed, returning a caller-set outcome.
 type scopedMergeReviewSpy struct {
 	called  int
 	hunks   []MergeHunk
@@ -94,8 +86,6 @@ func containsAny(s string, subs ...string) bool {
 	return false
 }
 
-// stringContains is strings.Contains inlined to keep this leaf test's imports
-// minimal; the assertions only need substring membership.
 func stringContains(s, sub string) bool {
 	if len(sub) == 0 {
 		return true
@@ -165,8 +155,6 @@ func TestScopedReview_CompatibleComposesEntangledEscalates(t *testing.T) {
 	}
 }
 
-// The spy is armed to return entangled: if the core ever dispatched, the
-// result would be entangled and this test would catch it.
 func TestScopedReview_EmptyIntersectionNoDispatch(t *testing.T) {
 	t.Parallel()
 
@@ -214,14 +202,11 @@ func TestScopedReview_MalformedDiffFailsClosed(t *testing.T) {
 func TestLLMResolution_ReentersRung0Verification(t *testing.T) {
 	t.Parallel()
 
-	// compositionPatchID is core's own patch-id (git patch-id --stable); it is
-	// exactly what ResolutionMatchesAudited must recompute internally.
 	auditedPID, err := compositionPatchID([]byte(auditedDiffAudOnly))
 	if err != nil {
 		t.Fatalf("compositionPatchID(audited): %v", err)
 	}
 
-	// Matching resolution (same change) → trusted.
 	ok, err := ResolutionMatchesAudited(auditedPID, []byte(auditedDiffAudOnly))
 	if err != nil {
 		t.Fatalf("ResolutionMatchesAudited(match): %v", err)
@@ -230,8 +215,6 @@ func TestLLMResolution_ReentersRung0Verification(t *testing.T) {
 		t.Error("a resolution whose patch-id matches the audited change was rejected — rung-0 re-entry must accept a patch-id match")
 	}
 
-	// Different resolution (different patch-id) → NOT trusted, even though a
-	// reviewer might have claimed it resolves the conflict.
 	ok, err = ResolutionMatchesAudited(auditedPID, []byte(composedDiffCmpOnly))
 	if err != nil {
 		t.Fatalf("ResolutionMatchesAudited(mismatch): %v", err)
@@ -240,7 +223,6 @@ func TestLLMResolution_ReentersRung0Verification(t *testing.T) {
 		t.Error("a resolution with a different patch-id was trusted — an LLM resolution must be verified by recomputed patch-id, never trusted directly")
 	}
 
-	// Malformed resolution → fail-closed (error, never a silent trust).
 	ok, err = ResolutionMatchesAudited(auditedPID, []byte("not a diff at all"))
 	if err == nil {
 		t.Errorf("malformed resolution: want a fail-closed error, got ok=%v", ok)

@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestBackfillArtifactPath_AllPhases pins the phase→filename mapping
-// backfillArtifactPath must produce. "retro" and "build-planner" override the
-// default branch: the agents actually write retrospective-report.md and
-// build-plan.md, not retro-report.md / build-planner-report.md.
 func TestBackfillArtifactPath_AllPhases(t *testing.T) {
 	t.Parallel()
 	const ws = "/ws"

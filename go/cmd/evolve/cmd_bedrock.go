@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bedrock"
 )
 
-// runBedrock emits byte-identical output per role so the prompt cache can
-// reuse it.
 func runBedrock(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var role string
 	for _, a := range args {

@@ -9,8 +9,6 @@ import (
 )
 
 func TestReadMissingFileIsZeroNoError(t *testing.T) {
-	// First run: no cache file. Must yield a zero (always-stale) catalog, not
-	// an error, so the cycle-start hook treats it as "refresh needed".
 	c, err := Read(t.TempDir())
 	if err != nil {
 		t.Fatalf("Read missing file: unexpected error %v", err)

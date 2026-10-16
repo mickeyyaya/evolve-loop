@@ -1,41 +1,24 @@
 package clihealth
 
-// clihealth_boottimeout_reset_test.go — RED contract for the reset-boot-strike-
-// on-success feature (cycle-426 T2): ClearBootStrike removes the
-// BootTimeoutPattern bench entry for a given driver so consecutive-strike
-// counting restarts after a successful boot (any exit code != ExitREPLBootTimeout).
-//
-// All tests in this file are RED: ClearBootStrike does not yet exist on *Store.
-// They become GREEN when the Builder adds:
-//   func (s *Store) ClearBootStrike(driver string) error — removes the entry at
-//   key=driver only when the stored Reason == BootTimeoutPattern; no-op on absent
-//   driver or on entries with a different Reason.
-
 import (
 	"testing"
 	"time"
 )
 
-// TestBootStrikeResetOnSuccess: strike→ClearBootStrike→strike must NOT bench
-// the driver. The successful boot resets the consecutive counter to zero, so
-// the subsequent failure is treated as the first strike in a new sequence.
 func TestBootStrikeResetOnSuccess(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	s := NewStore(dir, func() time.Time { return time.Now() })
 	const driver = "codex-tmux"
 
-	// First strike (below threshold — not yet benched).
 	if _, err := s.RecordBootStrike(driver); err != nil {
 		t.Fatalf("RecordBootStrike (strike 1): %v", err)
 	}
 
-	// Successful boot: clear the consecutive counter.
 	if err := s.ClearBootStrike(driver); err != nil {
 		t.Fatalf("ClearBootStrike: %v", err)
 	}
 
-	// Second strike after clear: treated as strike 1 of a new sequence.
 	benched, err := s.RecordBootStrike(driver)
 	if err != nil {
 		t.Fatalf("RecordBootStrike (after clear): %v", err)
@@ -51,8 +34,6 @@ func TestBootStrikeResetOnSuccess(t *testing.T) {
 	}
 }
 
-// TestClearBootStrikeAbsentIsNoOp: calling ClearBootStrike on a driver that
-// has no bench entry must be a no-op (no error, store unchanged).
 func TestClearBootStrikeAbsentIsNoOp(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -66,17 +47,12 @@ func TestClearBootStrikeAbsentIsNoOp(t *testing.T) {
 	}
 }
 
-// TestClearBootStrikeReasonGuard: ClearBootStrike must NOT remove entries
-// whose Reason is not BootTimeoutPattern. A rate_limit entry stored under the
-// same key must survive a ClearBootStrike call (the rate-limit bench is not
-// reset by a successful REPL boot — it is a different classifier pattern).
 func TestClearBootStrikeReasonGuard(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	s := NewStore(dir, func() time.Time { return time.Now() })
 
 	now := time.Now()
-	// Bench a driver with rate_limit — NOT BootTimeoutPattern.
 	if err := s.Bench(Entry{
 		Family:       "codex-tmux",
 		Reason:       "rate_limit",
@@ -87,7 +63,6 @@ func TestClearBootStrikeReasonGuard(t *testing.T) {
 		t.Fatalf("Bench: %v", err)
 	}
 
-	// ClearBootStrike must leave the rate_limit entry intact.
 	if err := s.ClearBootStrike("codex-tmux"); err != nil {
 		t.Fatalf("ClearBootStrike: %v", err)
 	}
@@ -99,10 +74,6 @@ func TestClearBootStrikeReasonGuard(t *testing.T) {
 	}
 }
 
-// TestConsecutiveStrikesBenchWithoutReset: two consecutive RecordBootStrike
-// calls WITHOUT a ClearBootStrike between them must still bench the driver
-// (threshold behavior unchanged). Guards against an over-eager ClearBootStrike
-// that auto-resets after each record.
 func TestConsecutiveStrikesBenchWithoutReset(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

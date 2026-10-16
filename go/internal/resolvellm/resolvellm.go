@@ -1,13 +1,5 @@
 // Package resolvellm resolves a phase role to {cli, model_tier} from its
-// profile. Zero side effects.
-//
-// Step 9 (see docs/architecture/step9-llm-config-removal.md) removed the
-// .evolve/llm_config.json layer: profiles (+ policy pins, applied upstream)
-// own the CLI, and the live model-catalog overlay on the manifest ModelTierMap
-// (Step 10c) translates the tier to a concrete model downstream. What remains
-// here is the profile read:
-//
-//	profile cli + model_tier_default (default "balanced") → source="profile"
+// profile.
 package resolvellm
 
 import (
@@ -22,35 +14,21 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Result is the resolved dispatch info for a role: the CLI + the abstract model
-// tier. (Step 9 removed the exact-model path; the realizer's ModelTierMap —
-// catalog-overlaid in Step 10c — translates ModelTier to a concrete model.)
 type Result struct {
-	CLI string
-	// ModelTier is the canonical abstract tier ("fast" | "balanced" | "deep").
-	// Legacy values ("haiku" | "sonnet" | "opus") are accepted for one release
-	// via the realizer fallback ladder + parseManifest v1 shim; see ADR-0022.
+	CLI       string
 	ModelTier string
-	Source    string // always "profile" since Step 9
+	Source    string
 }
 
-// ErrProfileNotFound signals the role's profile was not found. Matches bash
-// exit code 1.
 var ErrProfileNotFound = errors.New("resolvellm: profile not found")
 
-// Options exposes seams for testing.
 type Options struct {
-	// PluginRoot maps to EVOLVE_PLUGIN_ROOT. Searched first for profile JSON.
-	PluginRoot string
-	// ProjectRoot maps to EVOLVE_PROJECT_ROOT. Searched second.
+	PluginRoot  string
 	ProjectRoot string
-	// GitRoot is the git rev-parse --show-toplevel result. Searched last.
-	GitRoot string
-	// Env stubs os.Getenv (defaults to os.Getenv).
-	Env func(string) string
+	GitRoot     string
+	Env         func(string) string
 }
 
-// Resolve runs the precedence chain for role and returns a Result.
 func Resolve(role string, opts Options) (Result, error) {
 	if strings.TrimSpace(role) == "" {
 		return Result{}, errors.New("resolvellm: role is required")
@@ -60,10 +38,6 @@ func Resolve(role string, opts Options) (Result, error) {
 		getEnv = os.Getenv
 	}
 
-	// Profile resolution (Step 9: llm_config.json removed). CLI + model tier come
-	// from the per-phase profile; the tier→concrete-model translation happens
-	// downstream via the live model-catalog overlay on the manifest ModelTierMap
-	// (Step 10c). See docs/architecture/step9-llm-config-removal.md.
 	profilePath, err := findProfile(role, opts, getEnv)
 	if err != nil {
 		return Result{}, ErrProfileNotFound
@@ -86,14 +60,10 @@ func Resolve(role string, opts Options) (Result, error) {
 	return Result{CLI: prof.CLI, ModelTier: tier, Source: "profile"}, nil
 }
 
-// JSON returns the single wire shape resolvellm now emits (cli + model_tier +
-// source). Manual formatting (not encoding/json) preserves key order.
 func (r Result) JSON() string {
 	return fmt.Sprintf(`{"cli":"%s","model_tier":"%s","source":"%s"}`, r.CLI, r.ModelTier, r.Source)
 }
 
-// findProfile mirrors resolve-llm.sh:_find_profile() — tries plugin root,
-// project root, then git root, returning the first existing profile path.
 func findProfile(role string, opts Options, getEnv func(string) string) (string, error) {
 	candidates := []string{}
 	if opts.PluginRoot != "" {

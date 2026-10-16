@@ -58,7 +58,6 @@ func TestWireOrchestratorDeps_SignalCenterWired(t *testing.T) {
 	}
 }
 
-// The one pinned nil root, internal/routingtest, is test machinery that takes a *testing.T.
 func TestNilSignalCenterRootsArePinned(t *testing.T) {
 	t.Parallel()
 	allowed := map[string]bool{
@@ -85,7 +84,6 @@ func TestNilSignalCenterRootsArePinned(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		// Counted per file, so an unwired call beside a wired one still fails.
 		calls := len(callRE.FindAll(src, -1))
 		if calls == 0 {
 			return nil
@@ -130,8 +128,6 @@ func TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn(t *testing
 	}
 }
 
-// countCallExprs counts calls of name, bare or as a selector, so comment and
-// string text never count.
 func countCallExprs(src []byte, name string) (int, error) {
 	f, err := parser.ParseFile(token.NewFileSet(), "", src, 0)
 	if err != nil {
@@ -158,14 +154,12 @@ func countCallExprs(src []byte, name string) (int, error) {
 	return n, nil
 }
 
-// captureConsole returns what the root's WARN-filtered console sink rendered.
 func captureConsole(fn func(console io.Writer)) string {
 	var buf bytes.Buffer
 	fn(&buf)
 	return buf.String()
 }
 
-// Only this binary links every producer module, so the real registry is checked here.
 func TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly(t *testing.T) {
 	t.Parallel()
 	if conflicts := signalcenter.RegistryConflicts(); len(conflicts) != 0 {
@@ -317,7 +311,7 @@ func TestWireSimulateOrchestrator_CarryoverWarningRenders(t *testing.T) {
 	d := wireSimulateOrchestrator(root, evolveDir, &console)
 	l := carryover.New(carryover.WithSignals(func() *signalcenter.Center { return d.Signals }))
 	ws := filepath.Join(root, "ws")
-	if err := os.MkdirAll(filepath.Join(ws, "carryover-todos.json"), 0o755); err != nil { // a directory at the path: a read fault, not absence
+	if err := os.MkdirAll(filepath.Join(ws, "carryover-todos.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	var state core.State
@@ -334,7 +328,7 @@ func TestWireSimulateOrchestrator_FailureLearningWarningRenders(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
-	if err := os.MkdirAll(filepath.Join(evolveDir, "policy.json"), 0o755); err != nil { // a directory at the path: a read fault, not absence
+	if err := os.MkdirAll(filepath.Join(evolveDir, "policy.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	var console bytes.Buffer
@@ -395,7 +389,6 @@ func TestConsoleSinkThresholdHasOneHome(t *testing.T) {
 	}
 }
 
-// Ship and retro are not BaseRunner-backed, so they carry no verdict engine.
 func TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -435,7 +428,7 @@ func TestWireSimulateOrchestrator_AuditLedgerWarningRenders(t *testing.T) {
 	evolveDir := filepath.Join(root, ".evolve")
 	ws := core.RunWorkspacePath(root, 1)
 	ancestorWS := core.RunWorkspacePath(root, 0)
-	if err := os.MkdirAll(filepath.Join(ws, defectledger.LedgerFile), 0o755); err != nil { // a directory at the path: a read fault, not absence
+	if err := os.MkdirAll(filepath.Join(ws, defectledger.LedgerFile), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(ancestorWS, 0o755); err != nil {
@@ -479,7 +472,6 @@ func TestAuditRoot_PassesTheSignalCenter(t *testing.T) {
 	}
 }
 
-// inlineHooks is a minimal runner.Hooks whose prompt ships as data, with no agent doc on disk.
 type inlineHooks struct{}
 
 func (inlineHooks) PhaseName() string                         { return "audit" }
@@ -494,7 +486,6 @@ func (inlineHooks) Classify(string, core.PhaseRequest, core.BridgeResponse) (str
 }
 func (inlineHooks) InlinePromptBody() (string, bool) { return "inline body", true }
 
-// writingBridge writes the contracted artifact and exits cleanly.
 type writingBridge struct{}
 
 func (writingBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -587,7 +578,7 @@ func TestAuditRootPassesTheCenter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	re := regexp.MustCompile(`(?s)audit\.NewDefaultWithStageCompactSpec\(.{0,240}?audit\.WithSignals\(`) // the option belongs to THIS call (gofmt wraps it onto the next line)
+	re := regexp.MustCompile(`(?s)audit\.NewDefaultWithStageCompactSpec\(.{0,240}?audit\.WithSignals\(`)
 	if n := len(re.FindAll(src, -1)); n != 1 {
 		t.Fatalf("the audit runner must be built with audit.WithSignals(…) exactly once in cmd_cycle.go, found %d", n)
 	}

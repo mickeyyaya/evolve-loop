@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// agyModelName is the shape agy accepts: a family name, then an effort parenthetical. agy's picker
-// shows the family alone, so a name captured from it is incomplete.
 var agyModelName = regexp.MustCompile(`^[A-Za-z0-9.\- ]+ \((Low|Medium|High|Thinking)\)$`)
 
 func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
@@ -24,7 +22,6 @@ func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
 			t.Errorf("agy tier %q model %q is not a name agy accepts — it needs the capability/effort parenthetical, e.g. %q. agy does NOT error on a bad name; it silently serves Gemini 3.5 Flash (Medium) for the whole session.",
 				tier, model, "Gemini 3.8 Flash (Low)")
 		}
-		// A transposed "Gemini Flash 3.7" passes the shape rule, so pin the word order.
 		if strings.Contains(model, "Flash") && !strings.Contains(model, "Flash (") {
 			t.Errorf("agy tier %q model %q puts the version AFTER \"Flash\"; agy spells it \"Gemini <version> Flash (<effort>)\"", tier, model)
 		}

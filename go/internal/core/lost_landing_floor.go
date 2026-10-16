@@ -9,9 +9,6 @@ import (
 
 func lostLandingVerdict() string { return VerdictWARN }
 
-// detectLostLanding reports a system-class signal when a cycle claims a
-// shipping verdict but its own ship phase produced no binding; nil means
-// there is nothing to report.
 func detectLostLanding(workspace, finalVerdict string) *SystemFailureSignal {
 	if workspace == "" || !IsShippingVerdict(finalVerdict) {
 		return nil
@@ -33,9 +30,6 @@ func detectLostLanding(workspace, finalVerdict string) *SystemFailureSignal {
 	}
 }
 
-// readShipError treats an absent or unreadable ship-error.json as "ship
-// never ran" — the conservative reading, since inventing a landing loss
-// from a missing file would fire on every pre-ship cycle.
 func readShipError(workspace string) (code, class, msg string, ok bool) {
 	b, err := os.ReadFile(filepath.Join(workspace, "ship-error.json"))
 	if err != nil {

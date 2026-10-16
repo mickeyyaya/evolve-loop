@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// TestMeasureCapability — measureCapability records Capable/CapabilityChecked
-// from an injected probe seam: applies→capable, EPERM→checked-but-incapable,
-// and !Available or nil-probe leave it unmeasured (checked=false).
 func TestMeasureCapability(t *testing.T) {
 	okProbe := func(ctx context.Context, bin string) error { return nil }
 	epermProbe := func(ctx context.Context, bin string) error { return errors.New("sandbox_apply: EPERM") }
@@ -39,9 +36,6 @@ func TestMeasureCapability(t *testing.T) {
 	}
 }
 
-// TestMeasureCapability_FailureReasonSurfaced — when the apply fails, the
-// diagnostic is preserved in Reason so the operator sees WHY inner confinement
-// was skipped (not a silent drop).
 func TestMeasureCapability_FailureReasonSurfaced(t *testing.T) {
 	probe := func(ctx context.Context, bin string) error {
 		return errors.New("sandbox_apply: Operation not permitted")
@@ -52,8 +46,6 @@ func TestMeasureCapability_FailureReasonSurfaced(t *testing.T) {
 	}
 }
 
-// TestShouldWrap_MeasuredCapability governs attempts to apply the full profile;
-// a session hint cannot overrule a successful measurement.
 func TestShouldWrap_MeasuredCapability(t *testing.T) {
 	base := func(os string) ProbeResult { return ProbeResult{OS: os, Available: true, BinaryPath: "/usr/bin/sb"} }
 	capable := func(pr ProbeResult) ProbeResult { pr.CapabilityChecked = true; pr.Capable = true; return pr }
@@ -65,17 +57,11 @@ func TestShouldWrap_MeasuredCapability(t *testing.T) {
 		probe    ProbeResult
 		wantWrap bool
 	}{
-		// NEW demotion: standalone + measured-incapable is the broken-standalone
-		// cell that today wraps → hangs the REPL boot (exit 80). Now → skip.
 		{"standalone darwin + measured incapable → skip", false, incapable(base("darwin")), false},
 		{"standalone linux + measured incapable → skip", false, incapable(base("linux")), false},
-		// standalone + measured-capable → wrap (confirmed-confined path).
 		{"standalone darwin + measured capable → wrap", false, capable(base("darwin")), true},
-		// A measured application succeeds despite a session hint.
 		{"nested darwin + measured capable → wrap", true, capable(base("darwin")), true},
 		{"nested linux + measured capable → wrap", true, capable(base("linux")), true},
-		// Backward-compat: unchecked capability (every caller before this slice)
-		// is unchanged — standalone + available → wrap.
 		{"standalone darwin + unchecked → wrap (unchanged)", false, base("darwin"), true},
 	}
 	for _, tt := range tests {

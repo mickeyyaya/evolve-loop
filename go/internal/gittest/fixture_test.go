@@ -17,8 +17,6 @@ import (
 	"time"
 )
 
-// recordingTB captures Errorf so a teardown failure can be asserted on without
-// failing the test that provokes it.
 type recordingTB struct {
 	testing.TB
 	mu   sync.Mutex
@@ -80,8 +78,6 @@ func forkExecGitError(errno syscall.Errno) error {
 	return &os.PathError{Op: "fork/exec", Path: "/usr/bin/git", Err: errno}
 }
 
-// lockedDir returns a directory RemoveAll cannot finish: a read-only
-// subdirectory holding a file. unlock makes it removable again.
 func lockedDir(t *testing.T) (dir string, unlock func()) {
 	t.Helper()
 	if os.Geteuid() == 0 {
@@ -121,7 +117,7 @@ func TestRemoveWithRetry_OutlastsATransientHold(t *testing.T) {
 
 func TestRemoveWithRetry_ExhaustionFailsWithPathAndDiagnostic(t *testing.T) {
 	dir, _ := lockedDir(t)
-	t.Setenv("PATH", t.TempDir()) // no lsof: the fallback must be stated
+	t.Setenv("PATH", t.TempDir())
 	rec := &recordingTB{TB: t}
 	removeWithRetry(rec, dir, 2)
 	if len(rec.errs) != 1 {

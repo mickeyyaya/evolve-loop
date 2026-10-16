@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// replWaitState is allocated per launch so state cannot leak between
-// concurrent REPLs.
 type replWaitState struct {
 	result replWaitResult
 
@@ -91,8 +89,6 @@ func newReplWaitState(w replWaiter) *replWaitState {
 	livenessCenter.RegisterLivenessHandler(paneLivenessHandler(w.deps.Signals, configIdentity(w.cfg)))
 	paneProfile := w.channel.profile
 	livenessProfile := paneProfile
-	// Exhaustion decides separately through its own gate; it must not
-	// override the liveness evidence handed to the reviewer.
 	livenessProfile.ExhaustedRegex = ""
 
 	fatalPaneStage := fatalPaneStageOf(w.deps)
@@ -103,18 +99,16 @@ func newReplWaitState(w replWaiter) *replWaitState {
 	}
 
 	return &replWaitState{
-		intervalS:       interval,
-		maxExtends:      maxExtends,
-		reviewer:        reviewer,
-		livenessCenter:  livenessCenter,
-		paneProfile:     paneProfile,
-		livenessProfile: livenessProfile,
-		paneWatch:       newPaneWatcher(w.cfg, w.launch, paneProfile, w.deps.Stderr, w.prefix),
-		fatalPaneStage:  fatalPaneStage,
-		fatalDetector:   fatalDetector,
-		detector:        newCompletionDetector(w.cfg.Completion, w.cfg, w.deps, w.launch, w.dispatchBase),
-		// Checkpoint-only gates live on this state so the fast-poll and
-		// checkpoint paths can't share a streak.
+		intervalS:            interval,
+		maxExtends:           maxExtends,
+		reviewer:             reviewer,
+		livenessCenter:       livenessCenter,
+		paneProfile:          paneProfile,
+		livenessProfile:      livenessProfile,
+		paneWatch:            newPaneWatcher(w.cfg, w.launch, paneProfile, w.deps.Stderr, w.prefix),
+		fatalPaneStage:       fatalPaneStage,
+		fatalDetector:        fatalDetector,
+		detector:             newCompletionDetector(w.cfg.Completion, w.cfg, w.deps, w.launch, w.dispatchBase),
 		checkpointExhaustion: newExhaustionGate(),
 		checkpointWall:       &checkpointWallState{},
 		checkpointFatal:      newFatalPaneGate(),

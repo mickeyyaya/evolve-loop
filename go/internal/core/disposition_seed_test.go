@@ -63,7 +63,6 @@ func TestSeedDispositionSkeleton_NeverClobbersAndNoOpCases(t *testing.T) {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Existing file (an agent or prior attempt wrote it): untouched.
 	existing := filepath.Join(ws, "defect-dispositions.json")
 	if err := os.WriteFile(existing, []byte(`{"dispositions":[{"id":"dx","status":"FIXED","evidence":"docs/x.md"}]}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -75,7 +74,6 @@ func TestSeedDispositionSkeleton_NeverClobbersAndNoOpCases(t *testing.T) {
 		t.Error("seed clobbered an existing dispositions file")
 	}
 
-	// No OPEN entries in the ancestor: no file minted.
 	root2 := t.TempDir()
 	ws2b := filepath.Join(root2, ".evolve", "runs", "cycle-1432")
 	if err := os.MkdirAll(ws2b, 0o755); err != nil {
@@ -87,7 +85,6 @@ func TestSeedDispositionSkeleton_NeverClobbersAndNoOpCases(t *testing.T) {
 		t.Error("seed minted a skeleton for an ancestor with no OPEN entries")
 	}
 
-	// Absent/unreadable ancestor ledger: silent no-op (the GATE blocks loudly).
 	root3 := t.TempDir()
 	ws3 := filepath.Join(root3, ".evolve", "runs", "cycle-1433")
 	if err := os.MkdirAll(ws3, 0o755); err != nil {

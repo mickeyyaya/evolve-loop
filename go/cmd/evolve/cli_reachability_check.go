@@ -23,8 +23,6 @@ func runReachability(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// runReachabilityCheckPin reports whether pinning a call to the referenced
-// symbol inside the pinning package would close an import cycle.
 func runReachabilityCheckPin(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve reachability check-pin", flag.ContinueOnError)
 	fs.SetOutput(stderr)

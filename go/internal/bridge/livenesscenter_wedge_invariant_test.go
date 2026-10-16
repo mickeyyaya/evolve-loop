@@ -66,8 +66,6 @@ func TestWedgeCorpus_EvidenceSurvivesEmptyCapture(t *testing.T) {
 	}
 }
 
-// Anti-gaming: the corpus above must exercise the production reviewer type, not a test double standing in
-// for it — a stubbed StopReviewer could satisfy any verdict table without the real Review() logic running.
 func TestWedgeCorpus_UsesRealDeterministicReviewer(t *testing.T) {
 	t.Parallel()
 	var r StopReviewer = newDeterministicReviewer(defaultArtifactMaxExtends)
@@ -80,9 +78,9 @@ func TestStopReview_RenderWedgeOverride(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{
-		tmuxPromptMarkerDefault, // boot
-		"⏺ working on it…",      // post-paste baseline (non-blank)
-		"",                      // every subsequent capture: blank (live session, render wedge)
+		tmuxPromptMarkerDefault,
+		"⏺ working on it…",
+		"",
 	}}}
 	rev := &scriptedReviewer{}
 	eng := newTestEngine(Deps{

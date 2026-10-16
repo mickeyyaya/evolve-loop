@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// scriptedRunner returns queued verdicts call-by-call (last repeats) and
-// records every CorrectionDirective it was dispatched with.
 type scriptedRunner struct {
 	name       Phase
 	verdicts   []string
@@ -42,8 +40,6 @@ func remediationHarness(t *testing.T, wf policy.WorkflowConfig, gate Phase, gate
 	return gr, build, res, err
 }
 
-// remediationDispatches counts builder calls that carried a REMEDIATION
-// directive (the spine's own build phase runs with an empty one).
 func remediationDispatches(build *scriptedRunner) []string {
 	var out []string
 	for _, d := range build.directives {
@@ -57,9 +53,6 @@ func remediationDispatches(build *scriptedRunner) []string {
 func TestRemediation_GateFailThenPassContinuesSpine(t *testing.T) {
 	t.Parallel()
 
-	// tdd stands in for a deterministic gate: spine-reachable with the fake
-	// runner map and NOT on the judgment deny-list (which the mechanism
-	// enforces regardless of configuration — pinned separately below).
 	wf := policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"tdd"}}
 	gate, build, res, err := remediationHarness(t, wf, PhaseTDD, []string{VerdictFAIL, VerdictPASS})
 	if err != nil {
@@ -69,11 +62,6 @@ func TestRemediation_GateFailThenPassContinuesSpine(t *testing.T) {
 	if len(rems) != 1 {
 		t.Fatalf("want exactly 1 remediation builder dispatch, got %d (directives: %q)", len(rems), build.directives)
 	}
-	// The report filename must come from the phasecontract registry, NOT the
-	// "<phase>-report.md" convention: the tdd gate's deliverable is
-	// test-report.md, so the convention pointed the remediation directive at a
-	// tdd-report.md that never exists — the builder was told to read a missing
-	// file. Asserting through ArtifactFilename keeps this honest under a rename.
 	wantReport := phasecontract.ArtifactFilename("tdd")
 	if wantReport == "tdd-report.md" {
 		t.Fatalf("registry regression: tdd's artifact is %q — this test's whole point is that the gate's "+
@@ -135,11 +123,6 @@ func TestRemediation_RoundCapIsHard(t *testing.T) {
 	if got := len(remediationDispatches(build)); got != 1 {
 		t.Fatalf("cap=1 must mean exactly 1 remediation dispatch, got %d", got)
 	}
-	// After the capped remediation fails, the cycle proceeds down the same
-	// legacy path as an unremediated FAIL (retro / fluent-vs-strict semantics
-	// own the final verdict, never remediation). The audit may re-run
-	// additional times via the legacy retry loop; the cap governs remediation
-	// dispatches only.
 	if gate.calls < 2 {
 		t.Fatalf("gate calls=%d, want >=2 (original + the one remediation re-run)", gate.calls)
 	}
@@ -155,10 +138,6 @@ func TestRemediation_ZeroConfigIsByteIdenticalLegacy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
 	}
-	// Byte-identical legacy = the DELTAS are zero: no remediation dispatches,
-	// no provenance. (The final verdict and audit retry count belong to the
-	// legacy fluent/strict path and are pinned by the existing orchestrator
-	// tests, not re-asserted here.)
 	if got := len(remediationDispatches(build)); got != 0 {
 		t.Fatalf("zero-value config must never remediate; got %d dispatches", got)
 	}
@@ -183,10 +162,6 @@ func TestRemediation_UnlistedPhaseUntouched(t *testing.T) {
 	}
 }
 
-// TestRemediation_JudgmentPhasesDeniedRegardlessOfConfig pins the deny-list:
-// configuring a judgment phase (audit) as remediable is REFUSED by the
-// mechanism itself — a builder re-roll against an LLM-judgment verdict would
-// be a gamed verdict, not a fix.
 func TestRemediation_JudgmentPhasesDeniedRegardlessOfConfig(t *testing.T) {
 	t.Parallel()
 
@@ -203,9 +178,6 @@ func TestRemediation_JudgmentPhasesDeniedRegardlessOfConfig(t *testing.T) {
 	}
 }
 
-// TestRemediation_RecordsFixDispatchInPhaseRecord pins that the remediation
-// fix dispatch appears in the phase record under its own label, never
-// clobbering the build phase's own records.
 func TestRemediation_RecordsFixDispatchInPhaseRecord(t *testing.T) {
 	t.Parallel()
 
@@ -225,8 +197,6 @@ func TestRemediation_RecordsFixDispatchInPhaseRecord(t *testing.T) {
 	}
 }
 
-// diagRunner returns a FAIL with error-severity diagnostics, the shape an
-// audit in-process override produces.
 type diagRunner struct{ name Phase }
 
 func (r *diagRunner) Name() string { return string(r.name) }
@@ -235,9 +205,6 @@ func (r *diagRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, er
 		Diagnostics: []Diagnostic{{Severity: "error", Message: "apicover -enforce flagged 1 line(s) — unnamed export"}}}, nil
 }
 
-// TestFailReasonsSurfaceInResult pins that a floor-override FAIL's
-// explanation reaches the result (summary + dossier surfaces), not just
-// workspace artifacts and orchestrator memory.
 func TestFailReasonsSurfaceInResult(t *testing.T) {
 	t.Parallel()
 
@@ -259,15 +226,6 @@ func TestFailReasonsSurfaceInResult(t *testing.T) {
 	}
 }
 
-// TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot is the core half
-// of the worktree fence: every dispatched request carries WorktreeReadOnly
-// derived from the one write-permission predicate (worktreePhase) —
-// read-only phases (scout, audit) true, the declared source writers (tdd,
-// build) false — and a remediation builder fix never inherits the fenced
-// gate's flag (a fenced builder would have its fix silently undone). Uses
-// scout as the remediable read-only gate so the inherited-flag path is
-// actually exercised.
-// See ADR-0097.
 func TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot(t *testing.T) {
 	t.Parallel()
 
@@ -299,15 +257,9 @@ func TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot(t *testing.T) {
 	}
 }
 
-// TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces — the other two
-// request builders derive the same flag: the crash-resume path and the
-// parallel-evaluate batch. A flag wired on the live loop alone would leave
-// these red.
 func TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces(t *testing.T) {
 	t.Parallel()
 
-	// Resume from audit: the resumed audit is fenced, the ship after it is a
-	// native phase (no worktree writes to fence — and it is not a source writer).
 	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictPASS})
 	root := t.TempDir()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 41, Phase: string(PhaseAudit), WorkspacePath: RunWorkspacePath(root, 41)}}
@@ -320,7 +272,6 @@ func TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces(t *testing.T) {
 		t.Errorf("a resumed audit must be dispatched fenced (resume.go request builder)")
 	}
 
-	// Evaluate batch: read-only evaluate phases are fenced through phaseRequestFor.
 	batchRunners := buildRunners(nil)
 	tester := &fakeRunner{name: "tester", verdict: VerdictPASS}
 	evaluator := &fakeRunner{name: "evaluator", verdict: VerdictPASS}

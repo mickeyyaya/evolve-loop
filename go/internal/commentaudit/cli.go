@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-// Git is the repository view verify needs; Show returns fs.ErrNotExist for a
-// path absent at base.
 type Git interface {
 	ChangedFiles(base string) ([]string, error)
 	Show(base, path string) ([]byte, error)
@@ -20,7 +18,6 @@ type Git interface {
 
 const usage = "usage: commentaudit rank [-n N] [dir] | commentaudit verify|check|comments -base <ref> [dir ...] | commentaudit history -base <ref> [-label L] [-out DIR] [dir ...] | commentaudit strip [dir ...]"
 
-// Main runs the CLI and returns its exit code: 0 ok, 1 violations, 2 usage.
 func Main(args []string, stdout, stderr io.Writer, git Git) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, usage)
@@ -70,8 +67,6 @@ func rank(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// diff is a change set: the Go files changed since base and how to read each
-// side of them.
 type diff struct {
 	files         []string
 	before, after func(string) ([]byte, error)
@@ -166,7 +161,6 @@ func listAdded(name string, r rule, what string, args []string, stdout, stderr i
 	return 0
 }
 
-// under reports whether path lies in one of dirs; no dirs means everywhere.
 func under(path string, dirs []string) bool {
 	if len(dirs) == 0 {
 		return true
@@ -180,8 +174,6 @@ func under(path string, dirs []string) bool {
 	return false
 }
 
-// scopeDirs turns each dir argument into a repo-root-relative path: relative
-// to the working directory when that exists, else relative to root.
 func scopeDirs(root string, dirs []string) ([]string, error) {
 	if len(dirs) == 0 {
 		return nil, nil

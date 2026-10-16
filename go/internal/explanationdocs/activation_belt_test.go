@@ -6,9 +6,6 @@ import (
 	"testing"
 )
 
-// TestCrossCheckActivation_Matrix names the belt's full decision table — the
-// audit-blinding case (zero version against an ACTIVE host) is the one that
-// motivated the extraction: before it, audit's gate silently no-oped.
 func TestCrossCheckActivation_Matrix(t *testing.T) {
 	f := newFixture(t)
 	f.activate(t)
@@ -38,7 +35,6 @@ func TestCrossCheckActivation_Matrix(t *testing.T) {
 		t.Fatal("stale base SHA must fail")
 	}
 
-	// No activation at all: legacy passes ONLY at version zero.
 	g := newFixture(t)
 	legacy := g.binding()
 	legacy.ContractVersion = 0
@@ -51,7 +47,6 @@ func TestCrossCheckActivation_Matrix(t *testing.T) {
 	}
 }
 
-// TestCycleFromRunWorkspace pins the moved (unexported) helper's derivation contract.
 func TestCycleFromRunWorkspaceDerivation(t *testing.T) {
 	root := t.TempDir()
 	if c, ok := cycleFromRunWorkspace(root, filepath.Join(root, ".evolve", "runs", "cycle-42")); !ok || c != 42 {

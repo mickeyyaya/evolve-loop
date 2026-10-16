@@ -15,16 +15,14 @@ import (
 )
 
 type tripwireCase struct {
-	cli        string // driver identity (req.CLI)
-	agent      string // req.Agent
-	code       int    // launch exit code
-	durSecs    int    // wall-clock duration of the launch (end - start)
-	covered    bool   // true => a workspace events log makes the resolve source=events_result
-	cycleInDir bool   // true => workspace lives under .evolve/runs/cycle-1005
+	cli        string
+	agent      string
+	code       int
+	durSecs    int
+	covered    bool
+	cycleInDir bool
 }
 
-// runTripwireCase reuses readLLMCalls from tokenfallback_red_test.go (same
-// package).
 func runTripwireCase(t *testing.T, c tripwireCase) (stderr, record string) {
 	t.Helper()
 	start := time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC)
@@ -38,18 +36,12 @@ func runTripwireCase(t *testing.T, c tripwireCase) (stderr, record string) {
 		}
 	}
 	if c.covered {
-		// A result envelope in <agent>-events.ndjson makes the driver-agnostic
-		// eventsResult tier fire, so the resolve is source=events_result
-		// (covered), not source=none, and the tripwire must stay silent.
 		envelope := `{"kind":"result","data":{"cost_usd":0.4,"tokens":{"in":900,"out":210,"cache_r":30,"cache_c":7}}}` + "\n"
 		if err := os.WriteFile(filepath.Join(ws, c.agent+"-events.ndjson"), []byte(envelope), 0o644); err != nil {
 			t.Fatalf("write events fixture: %v", err)
 		}
 	}
 
-	// See ADR-0101.
-	// errBuf holds what the root's WARN-filtered stderr sink renders for the
-	// engine's signals — the same one-line format the operator reads.
 	var errBuf bytes.Buffer
 	signals := signalcenter.New()
 	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(&errBuf), signalcenter.SeverityWarn))
@@ -57,7 +49,7 @@ func runTripwireCase(t *testing.T, c tripwireCase) (stderr, record string) {
 		Now:           func() time.Time { return end },
 		Stderr:        io.Discard,
 		Signals:       signals,
-		TokenResolver: tokenusage.DefaultResolver(t.TempDir()), // empty root: no transcript tier
+		TokenResolver: tokenusage.DefaultResolver(t.TempDir()),
 	})
 	req := core.BridgeRequest{
 		CLI:       c.cli,
@@ -66,8 +58,6 @@ func runTripwireCase(t *testing.T, c tripwireCase) (stderr, record string) {
 		Worktree:  "/repo/worktrees/cycle-1005",
 	}
 	if c.cycleInDir {
-		// The dispatch identity comes from the request: the cycle the
-		// workspace path names is the one the dispatcher stamped.
 		req.Cycle = 1005
 	}
 	var resp core.BridgeResponse
@@ -75,9 +65,6 @@ func runTripwireCase(t *testing.T, c tripwireCase) (stderr, record string) {
 	return errBuf.String(), readLLMCalls(t, ws)
 }
 
-// Keying on the TRIPWIRE marker is essential: the pre-existing generic
-// coverage WARN already contains the CLI and agent names, so a substring
-// check for those alone would false-green on it.
 func tripwireStderrLine(stderr string) (string, bool) {
 	for _, ln := range strings.Split(stderr, "\n") {
 		if strings.Contains(ln, "TRIPWIRE") {
@@ -143,8 +130,6 @@ func TestRecordTokenUsage_Tripwire_CoveredNonClaude_Silent(t *testing.T) {
 		cli: "agy", agent: "builder", code: 0, durSecs: 90, covered: true, cycleInDir: true,
 	})
 
-	// Guard the fixture: this case must actually be covered, else the negative
-	// would pass for the wrong reason (source=none rather than "measured").
 	if !strings.Contains(record, `"source":"events_result"`) {
 		t.Fatalf("fixture invalid: expected a covered (events_result) resolve, got record: %s", record)
 	}

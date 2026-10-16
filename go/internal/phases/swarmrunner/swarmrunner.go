@@ -1,24 +1,6 @@
-// Package swarmrunner is the orchestrator seam for the swarm harness (ADR-0032):
-// a Decorator that wraps any core.PhaseRunner and, when the swarm stage is
-// active and the planner produced a partitionable plan, dispatches the phase
-// across N parallel workers instead of running it as a single agent.
-//
-// It is the ONE piece that turns the (otherwise inert) swarm building blocks
-// into a live, orchestrator-managed multi-subagent phase. The orchestrator's
-// dispatch call site is unchanged — it still calls runner.Run; this Decorator
-// is wired in at the composition root (cmd/evolve/cmd_cycle.go) wrapping the
-// build (writer) and scout (reader) runners.
-//
-// Rollout via Config.Stage (sourced from policy.json "swarm.stage"):
-//   - off/shadow (default): delegate to the inner runner BYTE-FOR-BYTE. Zero risk.
-//   - advisory: Dispatch runs LIVE (proving the parallel path + guaranteed
-//     teardown) but the inner runner still produces the authoritative result;
-//     swarm outcome is attached to Signals for inspection.
-//   - enforce: the swarm result IS the phase output (writer: merge-train into the
-//     integration branch; reader: synthesized summary).
-//
-// Safety: any missing/invalid/non-partitionable plan, or a writer plan that
-// isn't provably disjoint, collapses to the inner single-writer runner (N=1).
+// Package swarmrunner is the orchestrator seam for the swarm harness: a decorator
+// that runs a phase across parallel workers when the swarm stage is active.
+// See docs/architecture/packages/internal-phases-swarmrunner.md.
 package swarmrunner
 
 import (
@@ -41,20 +23,12 @@ const (
 	stageEnforce
 )
 
-// Config holds the swarm dispatch configuration sourced from policy.SwarmConfig().
-// Both fields carry the same defaults as the removed env readers: Stage="shadow"
-// (maps to stageOff, the byte-identical delegate path) and PortBase=0
-// (swarm.DefaultPortBase sentinel).
 type Config struct {
-	Stage    string
-	PortBase int
-	// WorktreeBase is the resolved policy.json worktree.base ("" ⇒ default
-	// <root>/.evolve/worktrees), threaded to the worker provisioner. Replaces
-	// the former EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
+	Stage        string
+	PortBase     int
 	WorktreeBase string
 }
 
-// Decorator wraps a phase runner with swarm dispatch. Construct via New.
 type Decorator struct {
 	inner       core.PhaseRunner
 	bridge      core.Bridge
@@ -63,34 +37,25 @@ type Decorator struct {
 	cfg         Config
 }
 
-// New returns a Decorator wrapping inner for the given mode (writer phases like
-// build, reader phases like scout). bridge is adapted to a swarm.Launcher.
-// cfg carries the policy-resolved swarm stage and port base (see policy.SwarmConfig).
 func New(inner core.PhaseRunner, bridge core.Bridge, mode swarm.Mode, cfg Config) *Decorator {
 	return &Decorator{inner: inner, bridge: bridge, mode: mode, concurrency: 2, cfg: cfg}
 }
 
-// Name implements core.PhaseRunner (transparent — the orchestrator sees the
-// inner phase name).
 func (d *Decorator) Name() string { return d.inner.Name() }
 
-// Run implements core.PhaseRunner.
 func (d *Decorator) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 	st := parseSwarmStage(d.cfg.Stage)
 	if st == stageOff {
-		return d.inner.Run(ctx, req) // shadow/off → byte-identical delegate
+		return d.inner.Run(ctx, req)
 	}
 	plan, ok := loadPlan(req.Workspace)
 	if !ok {
-		return d.inner.Run(ctx, req) // no usable swarm-plan.json → N=1
+		return d.inner.Run(ctx, req)
 	}
-	plan.Mode = d.mode // the PHASE decides writer vs reader, not the planner
+	plan.Mode = d.mode
 	if v := swarm.Validate(plan); v.Collapse {
-		return d.inner.Run(ctx, req) // not partitionable / not disjoint → N=1
+		return d.inner.Run(ctx, req)
 	}
-	// Writer integration lacks an authoritative tree transfer and guard wiring.
-	// Refuse before any side effects instead of reporting an unshippable merge
-	// as a completed build. Reader swarm and the shadow delegate are supported.
 	if d.mode == swarm.ModeWriter {
 		err := fmt.Errorf("writer swarm is unsupported: integration worktree and acceptance authority are not wired; use swarm.stage=shadow or fleet lanes")
 		return core.PhaseResponse{Phase: d.Name(), Verdict: core.VerdictFAIL,
@@ -98,13 +63,6 @@ func (d *Decorator) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseR
 	}
 
 	if st == stageAdvisory {
-		// Advisory: the inner runner stays AUTHORITATIVE, so run it FIRST on the
-		// full caller ctx — the live dispatch (a side-experiment proving the
-		// parallel path + teardown) must never delay or deadline-starve inner
-		// (go-reviewer HIGH: a long dispatch on a tight orchestrator ctx would
-		// otherwise fail an inner run that shadow never fails). Dispatch then runs
-		// on a detached context so its own latency/cancellation can't corrupt the
-		// authoritative result; only its observations are annotated.
 		resp, err := d.inner.Run(ctx, req)
 		sr, derr := swarm.Dispatch(context.WithoutCancel(ctx), plan, swarm.DispatchRequest{
 			ProjectRoot: req.ProjectRoot, Cycle: req.Cycle, Workspace: req.Workspace,
@@ -113,18 +71,12 @@ func (d *Decorator) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseR
 		return resp, err
 	}
 
-	// Enforce: the swarm result IS the phase output.
 	sr, derr := swarm.Dispatch(ctx, plan, swarm.DispatchRequest{
 		ProjectRoot: req.ProjectRoot, Cycle: req.Cycle, Workspace: req.Workspace,
 	}, d.dispatchDeps(req))
-	return d.enforce(ctx, req, plan, sr, derr) // enforce: the swarm result is the output
+	return d.enforce(ctx, req, plan, sr, derr)
 }
 
-// dispatchDeps assembles the injected ports. Writers get a worktree provisioner;
-// readers do not (overlap is harmless, no isolation needed). linkGuardDeps is
-// nil here — wiring core's (unexported) guard-dep symlinker into advisory/enforce
-// writer worktrees is a documented follow-up; it only matters for the opt-in
-// live writer path, never for the default shadow delegate.
 func (d *Decorator) dispatchDeps(req core.PhaseRequest) swarm.Deps {
 	manifestPath := filepath.Join(req.Workspace, ".swarm", "sessions.json")
 	reg := swarm.NewSessionRegistry(manifestPath, req.Cycle, d.inner.Name(), os.Getpid())
@@ -136,14 +88,11 @@ func (d *Decorator) dispatchDeps(req core.PhaseRequest) swarm.Deps {
 	}
 	if d.mode == swarm.ModeWriter {
 		deps.Provisioner = swarm.NewGitWorkerProvisioner(nil, d.cfg.WorktreeBase)
-		deps.PortBase = d.cfg.PortBase // 0 → swarm.DefaultPortBase
+		deps.PortBase = d.cfg.PortBase
 	}
 	return deps
 }
 
-// enforce reduces the swarm to ONE authoritative PhaseResponse: writers run the
-// serialized merge-train into the integration branch; readers synthesize. Any
-// worker failure or merge failure → FAIL.
 func (d *Decorator) enforce(ctx context.Context, req core.PhaseRequest, plan swarm.SwarmPlan, sr swarm.SwarmResult, derr error) (core.PhaseResponse, error) {
 	resp := core.PhaseResponse{
 		Phase:   d.inner.Name(),
@@ -171,20 +120,12 @@ func (d *Decorator) enforce(ctx context.Context, req core.PhaseRequest, plan swa
 	}
 
 	if d.mode == swarm.ModeReader {
-		// Reader fan-in: fold each worker's report into ONE synthesized artifact at
-		// the phase's canonical report path (<phase>-report.md), so downstream
-		// phases read a single document instead of N reports scattered across
-		// worker workspaces. Readers do no git merge — overlap is harmless.
-		// sr.Workers is in plan order (results[i] = wr, one goroutine per index),
-		// so synthesis section order is deterministic across runs — do not sort.
 		order := make([]string, len(sr.Workers))
 		artifactByID := make(map[string]string, len(sr.Workers))
 		for i, w := range sr.Workers {
 			order[i] = w.WorkerID
 			body, rerr := os.ReadFile(w.ArtifactPath)
 			if rerr != nil {
-				// A worker that exited 0 should have written its report; surface the
-				// gap in the synthesis rather than silently dropping it (Rule 12).
 				artifactByID[w.WorkerID] = fmt.Sprintf("[no artifact at %s: %v]", w.ArtifactPath, rerr)
 				continue
 			}
@@ -201,7 +142,6 @@ func (d *Decorator) enforce(ctx context.Context, req core.PhaseRequest, plan swa
 	return resp, nil
 }
 
-// annotate records the swarm outcome on the response Signals bus (namespaced).
 func annotate(resp *core.PhaseResponse, plan swarm.SwarmPlan, sr swarm.SwarmResult, derr error, stageName string) {
 	if resp.Signals == nil {
 		resp.Signals = map[string]any{}
@@ -223,8 +163,6 @@ func branchByID(plan swarm.SwarmPlan) map[string]string {
 	return out
 }
 
-// parseSwarmStage parses a stage string (from policy.SwarmConfig().Stage).
-// Unknown/empty/off/shadow → stageOff (byte-identical delegate).
 func parseSwarmStage(s string) stage {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "advisory":
@@ -236,9 +174,6 @@ func parseSwarmStage(s string) stage {
 	}
 }
 
-// loadPlan reads swarm-plan.json (or swarm-plan.md with a fenced block) from the
-// workspace. Returns ok=false on any read/parse failure so the caller falls back
-// to N=1 — a swarm is never forced when the plan is unusable.
 func loadPlan(workspace string) (swarm.SwarmPlan, bool) {
 	for _, name := range []string{"swarm-plan.json", "swarm-plan.md"} {
 		data, err := os.ReadFile(filepath.Join(workspace, name))
@@ -252,12 +187,6 @@ func loadPlan(workspace string) (swarm.SwarmPlan, bool) {
 	return swarm.SwarmPlan{}, false
 }
 
-// bridgeLauncher adapts core.Bridge to swarm.Launcher (accept-interface-where-
-// used). It forwards the swarm-controlled SessionName so the dispatcher can
-// PRE-REGISTER a deterministic tmux session before launch (orphan-on-cancel
-// hardening) — core.BridgeResponse returns no session identity, but it no longer
-// needs to: the dispatcher already knows the name it pinned. The crash-safe
-// manifest sweep (`evolve swarm reap`) remains the backstop for a hard parent kill.
 type bridgeLauncher struct {
 	bridge core.Bridge
 	env    map[string]string
@@ -278,10 +207,6 @@ func (l bridgeLauncher) Launch(ctx context.Context, r swarm.LaunchRequest) (swar
 	return swarm.LaunchResult{ExitCode: resp.ExitCode, CostUSD: resp.CostUSD, Tokens: resp.Tokens}, nil
 }
 
-// mergeEnv overlays per-worker env over the shared phase env (overlay wins),
-// ALWAYS returning a fresh map. The shared phase-env (l.env) is owned by the
-// orchestrator and handed to every concurrent worker, so we never return it
-// aliased — the bridge is external code that may store or mutate what it's given.
 func mergeEnv(base, overlay map[string]string) map[string]string {
 	out := make(map[string]string, len(base)+len(overlay))
 	for k, v := range base {
@@ -293,11 +218,6 @@ func mergeEnv(base, overlay map[string]string) map[string]string {
 	return out
 }
 
-// PersonaAvailable forwards core.PersonaProber to the decorated runner: a
-// decorator must not narrow the capability of what it wraps, or the planner
-// would silently treat a wrapped optional phase as unprobeable (selectable →
-// dispatch → skip). A wrapped runner that is not a prober reports nil, the
-// same answer core gives an unprobeable runner.
 func (d *Decorator) PersonaAvailable() error {
 	if p, ok := d.inner.(core.PersonaProber); ok {
 		return p.PersonaAvailable()
@@ -305,11 +225,6 @@ func (d *Decorator) PersonaAvailable() error {
 	return nil
 }
 
-// SignalsWired forwards the verdict engine's root-wiring proof (ADR-0103 unit
-// 11) to the decorated runner: a decorator must not narrow the capability of
-// what it wraps, or the composition root's per-runner proof would read a
-// wrapped scout/build as unwired. A wrapped runner without the method
-// reports false.
 func (d *Decorator) SignalsWired() bool {
 	if w, ok := d.inner.(interface{ SignalsWired() bool }); ok {
 		return w.SignalsWired()
@@ -317,8 +232,6 @@ func (d *Decorator) SignalsWired() bool {
 	return false
 }
 
-// ContractVerifierWired forwards the verdict engine's verifier-wiring proof
-// (research F22) the same way SignalsWired does.
 func (d *Decorator) ContractVerifierWired() bool {
 	if w, ok := d.inner.(interface{ ContractVerifierWired() bool }); ok {
 		return w.ContractVerifierWired()
@@ -326,7 +239,6 @@ func (d *Decorator) ContractVerifierWired() bool {
 	return false
 }
 
-// HostEffectsWired forwards the wrapped runner's host-effects wiring proof.
 func (d *Decorator) HostEffectsWired() bool {
 	if w, ok := d.inner.(interface{ HostEffectsWired() bool }); ok {
 		return w.HostEffectsWired()

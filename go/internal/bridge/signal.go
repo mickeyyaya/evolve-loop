@@ -14,15 +14,11 @@ const (
 	CodeTelemetryAppendFailed signalcenter.Code = "BRIDGE_TELEMETRY_APPEND_FAILED"
 	CodeTelemetryTripwire     signalcenter.Code = "BRIDGE_TELEMETRY_TRIPWIRE"
 
-	// CodeBootStrikeClearFailed: the boot-strike store could not clear a
-	// driver's consecutive boot-timeout strike after a non-80 exit.
 	CodeBootStrikeClearFailed    signalcenter.Code = "BRIDGE_BOOT_STRIKE_CLEAR_FAILED"
 	CodeBootStrikeRecordFailed   signalcenter.Code = "BRIDGE_BOOT_STRIKE_RECORD_FAILED"
 	CodeLaunchErrorPersistFailed signalcenter.Code = "BRIDGE_LAUNCH_ERROR_PERSIST_FAILED"
 	CodeResultReadFailed         signalcenter.Code = "BRIDGE_RESULT_READ_FAILED"
 
-	// CodeFreshSessionRetry: a launch whose pane died with a session-recoverable
-	// cause gets one fresh session of the same CLI.
 	CodeFreshSessionRetry signalcenter.Code = "BRIDGE_FRESH_SESSION_RETRY"
 
 	CodeCompletedOnWorktreeEvidence signalcenter.Code = "BRIDGE_COMPLETED_ON_WORKTREE_EVIDENCE"

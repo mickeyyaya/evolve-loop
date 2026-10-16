@@ -13,13 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// deliveryFailureReasonToken mirrors interaction.ResultSubmitWedged, so the
-// timeout marker, the ndjson ledger, and any downstream classifier agree on
-// one word for a verified delivery failure.
 const deliveryFailureReasonToken = "submit_wedged"
 
-// parkedPromptTmux keeps the pasted prompt visible at the input line forever:
-// no number of bare Enters clears it (the paste landed, the submit never took).
 type parkedPromptTmux struct {
 	*fakeTmux
 	mu         sync.Mutex
@@ -75,8 +70,6 @@ func TestTmuxREPL_CleanSubmit_NeverClassifiesDeliveryFailure(t *testing.T) {
 func TestTmuxREPL_SilentPaneTimeout_NotClassifiedAsDeliveryFailure(t *testing.T) {
 	t.Parallel()
 	cfg := fixtureConfig(t)
-	// Input line clear after the paste (nothing follows the marker) => the
-	// submit verifies clean; the artifact simply never appears.
 	tm := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	deps := fixtureDeps(tm)
 	var stderr bytes.Buffer
@@ -114,7 +107,7 @@ func TestTmuxREPL_NudgeSubmitWedged_ClassifiedCauseSurvivesIntoMarker(t *testing
 	tm := &stickyInputTmux{
 		fakeTmux:      &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
 		trigger:       fx.artifact,
-		clearOnResend: false, // pathological pane: the input line never clears
+		clearOnResend: false,
 	}
 	code, stderr := runSubmitVerify(t, fx, tm)
 	if code != ExitArtifactTimeout {
@@ -203,8 +196,6 @@ func TestTmuxREPL_ParkedPaneWithDeliveredArtifact_CompletesOK(t *testing.T) {
 	}
 }
 
-// parkedButDeliveringTmux shows a forever-parked input line AND writes the
-// artifact when the prompt is pasted — the side-effect-answering REPL shape.
 type parkedButDeliveringTmux struct {
 	*FakeTmuxController
 	artifact   string
@@ -244,7 +235,7 @@ func TestTmuxREPL_ParkedPaneWithOnlyStaleArtifact_StillFastFails(t *testing.T) {
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ parked", "❯ parked", "❯ parked", "❯ parked", "❯ parked", "❯ parked"}}
 	tm := &parkedNeverDeliveringTmux{FakeTmuxController: base, parkedText: firstNonEmptyLine(string(promptBody))}
 	deps := fixtureDeps(tm)
-	deps.CaptureBaseline = captureArtifactBaseline // REAL capture: the stale file becomes the baseline
+	deps.CaptureBaseline = captureArtifactBaseline
 	var stderr bytes.Buffer
 	deps.Stderr = &stderr
 

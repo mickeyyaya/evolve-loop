@@ -20,14 +20,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// runGC implements `evolve gc [--dry-run]`.
 func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve gc", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, stale dispatch processes and orphan log tails, worktrees and branches, run dirs, logs of the log catalog, go build cache entries, empty claim dirs of stale cycles), mutating nothing")
-	// The back-quoted `dir` is the flag package's argument placeholder (it
-	// renders as "-project-root dir"); no other back-quotes here, or the first
-	// one would be consumed as the placeholder instead.
 	projectRoot := fs.String("project-root", "", "repository root `dir` the workspace (worktree/branch) sweep is aimed at; required: a non-dry run without it is refused, while --dry-run alone falls back to the current directory.\n\tNOTE the deliberate asymmetry: an explicit 'evolve gc' APPLIES the workspace sweep (an operator run is enforce),\n\twhile the in-loop hook's default mode stays 'shadow' (plan + publish only) — policy.json owns the loop's mode,\n\tthe operator owns their own invocation. Use --dry-run to preview.")
 	if err := fs.Parse(args); err != nil {
 		return 10
@@ -207,8 +203,6 @@ func (r gcRun) worktrees(opts gc.WorktreeOptions) bool {
 	for _, it := range manifest.Items {
 		switch it.Action {
 		case gc.WorktreeActionFlagDirty, gc.WorktreeActionFlagUnmerged:
-			// Never prefixed WOULD-: a flag is not a planned mutation in
-			// either mode — it is work this sweep is refusing to touch.
 			fmt.Fprintf(r.stdout, "  %s %s (%s)\n", strings.ToUpper(string(it.Action)), gcWorktreeItemLabel(it), it.Reason)
 		default:
 			fmt.Fprintf(r.stdout, "  WOULD-%s %s (%s)\n", strings.ToUpper(string(it.Action)), gcWorktreeItemLabel(it), it.Reason)
@@ -218,10 +212,6 @@ func (r gcRun) worktrees(opts gc.WorktreeOptions) bool {
 		return false
 	}
 	if err := gc.ApplyWorktrees(opts, manifest); err != nil {
-		// Partial application is NORMAL: ApplyWorktrees joins per-item
-		// refusals (a branch that became unmerged, a worktree that went dirty
-		// since planning). Report and continue — refusing to reap is the
-		// safe direction, so it is not a command failure.
 		fmt.Fprintf(r.stderr, "evolve gc: workspace sweep partial: %v\n", err)
 	}
 	fmt.Fprintf(r.stdout, "evolve gc: workspace sweep applied\n")
@@ -327,11 +317,6 @@ func gcGoCacheDir(ctx context.Context) (string, error) {
 
 func gcSize(b int64) string { return fmt.Sprintf("%.2f GB", float64(b)/1e9) }
 
-// resolveGCProjectRoot resolves --project-root for a workspace sweep: an
-// explicit value always passes through; an empty value on a mutating run is
-// refused (a sweep requires explicit aim, not whatever repo we happen to be
-// standing in), while --dry-run alone may fall back to cwd. ok=false means
-// the caller must return code immediately.
 func resolveGCProjectRoot(projectRoot string, dryRun bool, stderr io.Writer) (string, int, bool) {
 	if projectRoot != "" {
 		return projectRoot, 0, true
@@ -348,9 +333,6 @@ func resolveGCProjectRoot(projectRoot string, dryRun bool, stderr io.Writer) (st
 	return cwd, 0, true
 }
 
-// gcWorktreeItemLabel renders an item's identity: branch-only backlog entries
-// have no worktree dir, so naming the path unconditionally would print an
-// empty field for exactly the entries the branch sweep is about.
 func gcWorktreeItemLabel(it gc.WorktreeItem) string {
 	if it.Path == "" {
 		return "branch=" + it.Branch
@@ -361,8 +343,6 @@ func gcWorktreeItemLabel(it gc.WorktreeItem) string {
 	return "branch=" + it.Branch + " path=" + it.Path
 }
 
-// gcWorktreeCounts splits a manifest into mutating (planned) and flag-only
-// (never touched) items.
 func gcWorktreeCounts(m gc.WorktreeManifest) (planned, flagged int) {
 	for _, it := range m.Items {
 		switch it.Action {

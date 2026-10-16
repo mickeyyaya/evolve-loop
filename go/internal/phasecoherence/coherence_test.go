@@ -17,7 +17,6 @@ func personaMD(name string, fmLines ...string) string {
 	return b + "---\n\n# " + name + "\n"
 }
 
-// fixtures keys personas by file stem (evolve-<name>), placed under agents/, and profiles by name.
 func fixtures(personas map[string]string, profilesJSON map[string]string) (fstest.MapFS, fstest.MapFS) {
 	agents := fstest.MapFS{}
 	for name, body := range personas {
@@ -153,9 +152,7 @@ func TestCoherence_ProfileWithoutAllowedToolsSkipped(t *testing.T) {
 	}
 }
 
-func TestCoherence_UnpairedAndNonPersonaFilesSkipped(t *testing.T) {
-	// Despite the name, the unpaired persona WARNs; only a profile without a persona and
-	// the non-persona .md files stay silent.
+func TestCoherence_UnpairedPersonaWarnsWhileProfileOnlyAndNonPersonaFilesStaySilent(t *testing.T) {
 	agents, profs := fixtures(
 		map[string]string{
 			"evolve-orphan": personaMD("orphan", `tools: ["Read"]`),

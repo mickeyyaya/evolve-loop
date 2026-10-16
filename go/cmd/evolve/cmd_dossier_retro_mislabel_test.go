@@ -33,15 +33,6 @@ const (
 "skipped_phases":[{"phase":"memo","reason":"quota"}],"phases_run_verdict_not_adopted":[{"phase":"retro","verdict":"FAIL"}]}`
 )
 
-// buildMislabelCorpus lays down six records that together cover every
-// classification the audit must make, plus the two receipt sources:
-//
-//	10 legacy, retro skip, ledger receipt              → mislabeled
-//	11 legacy, retro skip, run-dir retrospective report → mislabeled
-//	12 legacy, retro skip, nothing survives             → uncorroborated
-//	13 VERSIONED, retro skip                            → not a candidate (trusted skip)
-//	14 legacy, memo skip + retro verdict-not-adopted    → not a candidate
-//	15 legacy, retro skip, receipt for the WRONG cycle  → uncorroborated
 func buildMislabelCorpus(t *testing.T, root string) map[string][]byte {
 	t.Helper()
 	files := map[string][]byte{}

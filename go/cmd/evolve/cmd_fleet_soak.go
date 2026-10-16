@@ -16,17 +16,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// soakLaunchFn is the DI seam for the fleet.LaunchFn used by the soak.
-// Nil in production (falls back to execCycleLaunch --simulate); tests assign a fake.
 var soakLaunchFn fleet.LaunchFn
 
-// soakKiller is the DI seam for the TmuxKiller used during post-soak reap.
-// Nil in production (uses swarm.ExecTmuxKill); tests assign a recording fake.
 var soakKiller swarm.TmuxKiller
 
-// runFleetSoak implements `evolve fleet soak --count N`. It spins N concurrent
-// launches (real or injected), then asserts the four ADR-0049 concurrency
-// invariants and renders a verdict table to stdout.
 func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve fleet soak", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -72,8 +65,6 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	inv2S, inv2E := soakCheckReap(evolveDir)
 
-	// Invariant 3 is structural, not checked at runtime: ReapRunSessions is
-	// registry-path-bound, so a reaper for run A cannot reach run B's sessions.
 	const inv3S = "PASS"
 	const inv3E = "structural: sessionreaper binds each sweep to one run's own registry path"
 
@@ -87,8 +78,6 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// soakCheckBranches verifies Invariant 1: N RunScopes on the "soak" lane with
-// cycle numbers 1…N produce pairwise-distinct CycleBranch values.
 func soakCheckBranches(count int) (status, evidence string) {
 	seen := make(map[string]bool, count)
 	for i := 0; i < count; i++ {
@@ -101,14 +90,11 @@ func soakCheckBranches(count int) (status, evidence string) {
 	return "FAIL", fmt.Sprintf("branch collision: %d unique out of %d", len(seen), count)
 }
 
-// soakCheckReap verifies Invariant 2: post-soak ReapOrphans finds 0 live runs
-// (all leases are stale) using the injected or production killer.
 func soakCheckReap(evolveDir string) (status, evidence string) {
 	killer := soakKiller
 	if killer == nil {
 		killer = swarm.ExecTmuxKill
 	}
-	// Same wedged-tmux bound as the loop-boot sweep.
 	ctx, cancel := context.WithTimeout(context.Background(), sessionreaper.DefaultReapTimeout)
 	defer cancel()
 	rep, err := sessionreaper.ReapOrphans(ctx, evolveDir, sessionreaper.Options{
@@ -125,8 +111,6 @@ func soakCheckReap(evolveDir string) (status, evidence string) {
 	return "PASS", fmt.Sprintf("0 live runs, %d orphaned runs reaped", len(rep.Orphaned))
 }
 
-// soakCheckToml verifies Invariant 4: the shared TOML file contains exactly N
-// [projects.*] section headers (one per concurrent run). Skipped if tomlPath is empty.
 func soakCheckToml(tomlPath string, count int) (status, evidence string) {
 	if tomlPath == "" {
 		return "PASS", "skipped (no --toml-path specified)"
@@ -147,7 +131,6 @@ func soakCheckToml(tomlPath string, count int) (status, evidence string) {
 	return "FAIL", fmt.Sprintf("want %d [projects.*] entries, got %d (torn write?)", count, n)
 }
 
-// renderSoakTable writes the 4-row invariant verdict table to w.
 func renderSoakTable(w io.Writer, inv1S, inv1E, inv2S, inv2E, inv3S, inv3E, inv4S, inv4E string) {
 	fmt.Fprintln(w, "# evolve fleet soak — concurrency invariant report")
 	fmt.Fprintln(w, "")

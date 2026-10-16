@@ -49,8 +49,6 @@ func TestBuiltinControlSpec(t *testing.T) {
 	}
 }
 
-// debuggerGateHarness leaves ActiveWorktree empty so normalizeBuildWorktree
-// no-ops during recordAndBranch's pre-gate steps.
 func debuggerGateHarness(t *testing.T, cat phasespec.Catalog) *cycleRun {
 	t.Helper()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithCatalog(cat))
@@ -97,11 +95,11 @@ func TestRecordAndBranch_DebuggerDegradesToSignalViaSeam(t *testing.T) {
 	}{
 		{action: "RESHIP", wantNext: PhaseShip},
 		{action: "RERUN_PHASE", rerunPhase: "audit", wantNext: PhaseAudit},
-		{action: "BLOCK", wantBreak: true}, // → end → loopBreak, no successor scheduled
+		{action: "BLOCK", wantBreak: true},
 	}
 	for _, c := range cases {
 		t.Run(c.action, func(t *testing.T) {
-			cr := debuggerGateHarness(t, phasespec.Catalog{}) // no entry → seam supplies signal
+			cr := debuggerGateHarness(t, phasespec.Catalog{})
 			sig := map[string]any{"debugger.action": c.action}
 			if c.rerunPhase != "" {
 				sig["debugger.rerun_phase"] = c.rerunPhase

@@ -1,10 +1,5 @@
 package phaseoutputs
 
-// signal_test.go — the survey's projection into the unified signal stream
-// (abnormal-events.jsonl). One line per cycle, and the abnormality decision
-// lives HERE, in the pure layer, so the loop adapter and any future emitter
-// cannot disagree about what counts as a problem.
-
 import (
 	"strings"
 	"testing"

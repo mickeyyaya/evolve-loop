@@ -37,8 +37,6 @@ func TestRenderCoveringTests_ReportsOmittedCount(t *testing.T) {
 		t.Fatalf("truncated corpus carries no visible note — a trimmed list is indistinguishable from a complete one")
 	}
 
-	// The reported count must be the REAL drop, not a placeholder: exactly
-	// len(many)-omitted of the paths may appear in the rendered corpus.
 	var present int
 	for _, p := range many {
 		if strings.Contains(out, "`"+p+"`") {
@@ -62,7 +60,6 @@ func TestWriteCoveringTests_WarnsLoudlyOnTruncation(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir fixture package: %v", err)
 	}
-	// ~400 paths of ~60 rendered bytes each comfortably exceeds the 16 KiB cap.
 	const fixtureFiles = 400
 	for i := 0; i < fixtureFiles; i++ {
 		name := "covering_amplification_fixture_" + strconv.Itoa(i) + "_test.go"
@@ -128,14 +125,6 @@ func TestWriteCoveringTests_SilentWhenNothingTruncated(t *testing.T) {
 	}
 }
 
-// gitInitCoveringFixture makes dir a git repository so changedWorktreePaths can
-// enumerate it. Only `git ls-files --others` is needed (every fixture file is
-// untracked), so no commit and no user identity are required — which keeps the
-// fixture independent of the host's git config.
-//
-// cmd.Dir is set rather than shelling bare `git`: a bare invocation resolves the
-// repo from the process cwd, which differs between the main tree, a cycle
-// worktree, and each fleet lane.
 func gitInitCoveringFixture(t *testing.T, dir string) {
 	t.Helper()
 	cmd := exec.Command("git", "init", "-q")

@@ -6,18 +6,6 @@ import (
 	"testing"
 )
 
-// Goldens captured from:
-//
-//	printf '%s' "$INPUT" | shasum -a 256 | head -c 8
-//
-// on macOS (the canonical preflight-environment.sh path; sha256sum on
-// Linux produces the same bytes for the same input).
-//
-// Source of the bash logic: scripts/dispatch/preflight-environment.sh:260-264
-//
-// These vectors guard against any silent encoding/length drift between
-// the bash and Go ports — multi-project worktree isolation depends on
-// byte-exact equivalence (see feedback_multi_project_isolation.md).
 func TestCompute_GoldenVectors(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -62,9 +50,6 @@ func TestCompute_Deterministic(t *testing.T) {
 	}
 }
 
-// TestCompute_MatchesBash spot-checks the live bash pipeline. Skipped
-// when shasum is unavailable (e.g. sparse CI image). This is the
-// safety net that catches any regression in either side.
 func TestCompute_MatchesBash(t *testing.T) {
 	if _, err := exec.LookPath("shasum"); err != nil {
 		t.Skip("shasum not available")
@@ -93,8 +78,6 @@ func TestCompute_MatchesBash(t *testing.T) {
 }
 
 func TestForProjectRoot_FallsBackOnEmpty(t *testing.T) {
-	// preflight-environment.sh:262-264 falls back to literal "default"
-	// when EVOLVE_PROJECT_ROOT is empty. The Go port must match.
 	if got := ForProjectRoot(""); got != "default" {
 		t.Errorf("ForProjectRoot('')=%q, want 'default'", got)
 	}

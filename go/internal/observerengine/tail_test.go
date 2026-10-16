@@ -1,11 +1,5 @@
 package observerengine
 
-// tail_test.go — §6 test 19: the stdout tail. Two tests MOVED from the host
-// (coverage_test.go:126/:141) plus the fault paths that were silent before
-// (D3): open, seek, non-ENOENT stat, scanner.Err — each reported ONCE per op
-// as OBSERVER_STDOUT_TAIL_FAILED; ENOENT stays silent; the partial-line loss
-// at :456 is characterized, not fixed (F4).
-
 import (
 	"net"
 	"os"
@@ -18,8 +12,6 @@ import (
 
 func tailFaults(rc *recordingCenter) []signalcenter.Event { return rc.byCode(CodeStdoutTailFailed) }
 
-// moved from coverage_test.go:126 — plus the ENOENT-is-silent pin. Kills M28
-// (ENOENT coded).
 func TestTail_StatMissReturnsPriorOffset(t *testing.T) {
 	t.Parallel()
 	e, rc, _ := newEngine(t, func(s *Settings, _ *Deps) { s.Paths.Stdout = filepath.Join(t.TempDir(), "does-not-exist.log") })
@@ -34,7 +26,6 @@ func TestTail_StatMissReturnsPriorOffset(t *testing.T) {
 	}
 }
 
-// moved from coverage_test.go:141.
 func TestTail_RotationResetsOffset(t *testing.T) {
 	t.Parallel()
 	e, _, ws := newEngine(t, nil)
@@ -49,9 +40,6 @@ func TestTail_RotationResetsOffset(t *testing.T) {
 	}
 }
 
-// TestTail_StatNotDirReportsOnce — a FILE where the log's parent directory
-// belongs: os.Stat fails with ENOTDIR (not ENOENT), reported once as op=stat;
-// the offset is kept. (Critic B2 — the stat arm's fixture.)
 func TestTail_StatNotDirReportsOnce(t *testing.T) {
 	t.Parallel()
 	file := filepath.Join(t.TempDir(), "not-a-dir")
@@ -71,14 +59,9 @@ func TestTail_StatNotDirReportsOnce(t *testing.T) {
 	}
 }
 
-// TestTail_OpenFailureReportsOnceAndKeepsOffset — a unix SOCKET at
-// Paths.Stdout: os.Stat succeeds (an inode), os.Open fails with ENXIO — a
-// deterministic, root-immune open fault (a directory opens fine on Unix and
-// fails only at read; chmod is banned). Three ticks → exactly one op=open
-// fault; the offset never moves. Kills M27 (the once-guard dropped).
 func TestTail_OpenFailureReportsOnceAndKeepsOffset(t *testing.T) {
 	t.Parallel()
-	short, err := os.MkdirTemp("", "u12") // socket paths are bounded (104 bytes on darwin); t.TempDir() is too long
+	short, err := os.MkdirTemp("", "u12")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +73,7 @@ func TestTail_OpenFailureReportsOnceAndKeepsOffset(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 	e, rc, _ := newEngine(t, func(s *Settings, _ *Deps) { s.Paths.Stdout = sock })
-	e.lastByteOff = 0 // a socket stats as size 0, so a positive offset would read as a rotation
+	e.lastByteOff = 0
 	for i := 0; i < 3; i++ {
 		if lines, off := e.tail(); lines != nil || off != 0 {
 			t.Errorf("tick %d: lines=%v off=%d", i, lines, off)
@@ -102,11 +85,6 @@ func TestTail_OpenFailureReportsOnceAndKeepsOffset(t *testing.T) {
 	}
 }
 
-// TestTail_SeekFailureReportsOnce — lastByteOff = -1 on a real file: the
-// rotation rule (size < -1 is false) does not reset a negative offset, so
-// Seek(-1, 0) fails with EINVAL, reported once as op=seek; deterministic, no
-// FIFO. Kills M29 (the offset returned instead of info.Size()) on the success
-// path below.
 func TestTail_SeekFailureReportsOnce(t *testing.T) {
 	t.Parallel()
 	e, rc, ws := newEngine(t, nil)
@@ -128,11 +106,6 @@ func TestTail_SeekFailureReportsOnce(t *testing.T) {
 	}
 }
 
-// TestTail_OversizedLineReportsScanAndAdvances — an 11 MiB unterminated line
-// exceeds the scanner's 10 MiB buffer: the read stops, op=scan is reported
-// once, and the returned offset is still the file size (the preserved offset
-// behaviour). NOT parallel: one 11 MiB allocation. Kills M30 (scanner.Err()
-// ignored).
 func TestTail_OversizedLineReportsScanAndAdvances(t *testing.T) {
 	e, rc, ws := newEngine(t, nil)
 	big := strings.Repeat("x", 11*1024*1024)
@@ -151,10 +124,6 @@ func TestTail_OversizedLineReportsScanAndAdvances(t *testing.T) {
 	}
 }
 
-// TestTail_UnterminatedLastLineIsLostAtThisOffset — characterization of the
-// :456 quirk (F4): an unterminated final line is returned as a token (and
-// skipped as malformed downstream) while the offset jumps to the size, so the
-// remainder written later is malformed too.
 func TestTail_UnterminatedLastLineIsLostAtThisOffset(t *testing.T) {
 	t.Parallel()
 	e, rc, ws := newEngine(t, nil)

@@ -96,8 +96,6 @@ func TestEnvInt(t *testing.T) {
 	}
 }
 
-// scriptedReviewer pauses once its verdict script is exhausted, so a test can
-// never spin forever waiting on an artifact that never lands.
 type scriptedReviewer struct {
 	verdicts []ReviewVerdict
 	events   []StopEvent
@@ -111,8 +109,6 @@ func (s *scriptedReviewer) Review(ev StopEvent) ReviewVerdict {
 	return ReviewVerdict{Action: ReviewPause, Reason: "script exhausted"}
 }
 
-// alwaysExtendReviewer never stops on its own — only an external signal
-// (context cancellation) can end a wait it governs.
 type alwaysExtendReviewer struct{}
 
 func (alwaysExtendReviewer) Review(StopEvent) ReviewVerdict {
@@ -126,12 +122,12 @@ func TestRunTmuxREPL_ContextCancelledBreaks(t *testing.T) {
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws,
 		Artifact: filepath.Join(ws, "a"), StdoutLog: filepath.Join(ws, "o"), StderrLog: filepath.Join(ws, "e")}
 	deps := covDeps()
-	deps.Tmux = &fakeTmux{paneSeq: []string{"❯"}} // boots immediately, artifact never appears
+	deps.Tmux = &fakeTmux{paneSeq: []string{"❯"}}
 	deps.Reviewer = alwaysExtendReviewer{}
 	lp := tmuxLaunch{name: "claude", session: "s", launchCmd: "x", promptMarker: "❯", bootIntervalS: 1}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // pre-cancelled: the first wait iteration must break
+	cancel()
 	code, _ := runTmuxREPL(ctx, cfg, deps, lp)
 	if code != ExitArtifactTimeout {
 		t.Fatalf("cancelled context should break the wait → ExitArtifactTimeout; got %d", code)
@@ -144,9 +140,6 @@ func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer
 	d.Tmux = tmux
 	d.Sleep = func(time.Duration) {}
 	if d.CaptureBaseline == nil {
-		// Harness default ONLY: pre-seeded artifacts stand in for mid-session
-		// writes. A stale-pre-dispatch scenario must inject the REAL capture
-		// explicitly (see the baseline wiring test).
 		d.CaptureBaseline = zeroBaselineCapture
 	}
 	d.Reviewer = rev
@@ -159,13 +152,12 @@ func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer
 func TestRunTmuxREPL_ReviewExtendThenPause(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
 		{Action: ReviewExtend, Reason: "working"},
 		{Action: ReviewExtend, Reason: "working"},
 		{Action: ReviewPause, Reason: "stalled"},
 	}}
-	// Tiny interval so each loop iteration crosses a review boundary.
 	code, stderr := runTmuxRev(t, fx, tmux, rev, Deps{ArtifactTimeoutS: 2}, "--allow-bypass")
 
 	if code != ExitArtifactTimeout {

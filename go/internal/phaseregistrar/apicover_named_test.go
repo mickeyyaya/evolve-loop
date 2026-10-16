@@ -2,10 +2,6 @@ package phaseregistrar
 
 import "testing"
 
-// TestResult_NamedType names the phaseregistrar.Result struct (Register returns
-// it but the bare type is never named in a test) and pins the two-field
-// contract: Spec is the normalized (forced-Optional) spec the caller splices
-// into the catalog, and Runner is a live core.PhaseRunner reporting the spec name.
 func TestResult_NamedType(t *testing.T) {
 	r := newRegistrar(t)
 	var got Result

@@ -8,16 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// TestValidateReviewedHandoff_ContractCore names the single home of the
-// review contract the audit and retro gates both delegate to (architecture
-// review 2026-09-01). Since 2026-09-13 (ADR-0102, operator decision) the
-// reviewer's REASONING is the gate and the section's SHAPE is advisory: the
-// status enum, the build-status echo, the required/not_applicable document
-// match and the path:line citations are reported as advisories on the phase
-// record, never as a blocking error. The reviewer's own NEEDS_CORRECTION is a
-// judgment, not a shape finding. The one loud error left is a host-side
-// defect — an unknown handoff status, a missing view — which no reviewer
-// wrote and which must not pass through both phase gates silently.
 func TestValidateReviewedHandoff_ContractCore(t *testing.T) {
 	required := &phaseio.ExplanationView{Status: "required", DocumentPath: "d.md", DocumentSHA256: "abc", MaterialPaths: []string{"go/app.go"}}
 	na := &phaseio.ExplanationView{Status: "not_applicable"}
@@ -30,7 +20,7 @@ func TestValidateReviewedHandoff_ContractCore(t *testing.T) {
 		fields       map[string]string
 		view         *phaseio.ExplanationView
 		wantStatus   string
-		wantAdvisory string // "" = a clean review
+		wantAdvisory string
 	}{
 		{name: "a fully cited VERIFIED review is clean", fields: full("VERIFIED"), view: required, wantStatus: "VERIFIED"},
 		{name: "NEEDS_CORRECTION is the reviewer's judgment, not a shape finding", fields: full("NEEDS_CORRECTION"), view: required, wantStatus: "NEEDS_CORRECTION"},
@@ -72,8 +62,6 @@ func TestValidateReviewedHandoff_HostDefectsStayLoud(t *testing.T) {
 	}
 }
 
-// Review collects findings in the order they were made; a fresh Review is
-// clean.
 func TestReview_AdvisoriesKeepTheirOrder(t *testing.T) {
 	var r Review
 	if r.Status != "" || len(r.Advisories) != 0 {
@@ -86,8 +74,6 @@ func TestReview_AdvisoriesKeepTheirOrder(t *testing.T) {
 	}
 }
 
-// AdvisoryPrefix is the one marker both phases stamp on a record; HostReason
-// renders the host's account of a lost handoff, or nothing.
 func TestAdvisoryPrefixAndHostReason_AreTheSharedVocabulary(t *testing.T) {
 	if !strings.HasPrefix(AdvisoryPrefix, "explanation documentation review (advisory, ADR-0102)") || !strings.HasSuffix(AdvisoryPrefix, ": ") {
 		t.Fatalf("the prefix is the documented grep key: %q", AdvisoryPrefix)

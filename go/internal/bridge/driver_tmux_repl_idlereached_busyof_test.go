@@ -8,10 +8,6 @@ import (
 	"testing"
 )
 
-// idleReachedBracketRegionSource extracts the correlation-span busy/idle
-// bracket from driver_tmux_channel.go, anchored on stable, unique surrounding
-// lines, so a future reflow can't silently narrow the scanned region without
-// also updating this test.
 func idleReachedBracketRegionSource(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -40,10 +36,6 @@ func idleReachedBracketRegionSource(t *testing.T) string {
 	return strings.Join(lines[start:end+1], "\n")
 }
 
-// TestRunTmuxREPL_NoDirectChromeParseAtIdleReachedBracket fails a fix that
-// keeps a direct panestream.PaneBusy( call alongside routing through the
-// center, so the idle_reached bracket cannot silently regress to a duplicate
-// direct busy read.
 func TestRunTmuxREPL_NoDirectChromeParseAtIdleReachedBracket(t *testing.T) {
 	t.Parallel()
 	region := idleReachedBracketRegionSource(t)

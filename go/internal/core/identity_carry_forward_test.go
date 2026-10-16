@@ -34,7 +34,6 @@ func allComposedGatesPass() map[string]ciparity.GateOutcome {
 	return out
 }
 
-// pendedIdenticalLane is a lane whose audited change is pended, byte for byte, on the new base after a clean rebase.
 func pendedIdenticalLane(t *testing.T) *carryHarness {
 	t.Helper()
 	fx := rebasedCommittedLane(t)

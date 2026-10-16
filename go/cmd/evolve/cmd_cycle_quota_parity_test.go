@@ -19,7 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// cycleRunQuotaRunner hits the capacity wall the way the bridge reports it.
 type cycleRunQuotaRunner struct{}
 
 func (cycleRunQuotaRunner) Name() string { return "audit" }
@@ -27,7 +26,6 @@ func (cycleRunQuotaRunner) Run(context.Context, core.PhaseRequest) (core.PhaseRe
 	return core.PhaseResponse{}, fmt.Errorf("bridge: launch exit=85: %w", core.ErrTransientBridgeFailure)
 }
 
-// scoutFailRunner is a plain, non-capacity phase failure.
 type scoutFailRunner struct{}
 
 func (scoutFailRunner) Name() string { return "scout" }
@@ -35,8 +33,6 @@ func (scoutFailRunner) Run(context.Context, core.PhaseRequest) (core.PhaseRespon
 	return core.PhaseResponse{}, errors.New("synthetic scout bridge death (cycle-level)")
 }
 
-// requireCycleRunUsesDepsSeam keeps this test from running the production
-// orchestrator (real bridge, real tmux) while the root is still unseamed.
 func requireCycleRunUsesDepsSeam(t *testing.T) {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -62,8 +58,6 @@ func requireCycleRunUsesDepsSeam(t *testing.T) {
 	}
 }
 
-// runCycleRunWith drives the cycle-run root over one seeded item with every
-// phase answered by runner (scout only, for a non-capacity failure).
 func runCycleRunWith(t *testing.T, runner core.PhaseRunner, onlyScout bool) (rc int, fake *fakeLedgerNoAppend, itemStillInInbox bool, stderr string) {
 	t.Helper()
 	requireCycleRunUsesDepsSeam(t)

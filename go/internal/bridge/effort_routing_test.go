@@ -11,10 +11,8 @@ var effortNoopCLIs = []string{"agy-tmux", "ollama-tmux"}
 
 func emitCount(r Realization) int { return len(r.LaunchFlags) + len(r.REPLInput) }
 
-// The positive arm (claude/codex) guards against a vacuous pass: an all-noop
-// wiring would fail here too.
 func TestEffortRealize_Matrix(t *testing.T) {
-	injectCatalogDir(t, t.TempDir()) // neutralize the live-catalog overlay (model_tier parity precedent)
+	injectCatalogDir(t, t.TempDir())
 
 	for _, cli := range effortSupportingCLIs {
 		t.Run("supported/"+cli, func(t *testing.T) {

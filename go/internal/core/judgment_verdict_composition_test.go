@@ -60,18 +60,10 @@ func TestJudgmentTeachingPhases_CoverEveryPhaseThatCanStateItsOwnVerdict(t *test
 		t.Skip("no phase.json files found — catalog layout moved?")
 	}
 	if declaring == 0 {
-		// Deliberately not an error: setting the key back to "" is a config
-		// rollback, and failing the build on it would turn a config action
-		// into a code change.
 		t.Log("no tracked phase declares classify.verdict_from_sentinel — the judgment-verdict wiring is currently inert (expected only if it was deliberately rolled back)")
 	}
 }
 
-// trackedPhaseDirsForTest returns the git-tracked phase dirs, or nil when
-// there is no usable git context (then the caller binds every dir, the
-// stricter fallback). It builds on repostate.TrackedFiles, the production
-// primitive, rather than a second hand-rolled "tracked" definition that once
-// drifted from it.
 func trackedPhaseDirsForTest(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	entries, err := os.ReadDir(filepath.Join(root, ".evolve", "phases"))

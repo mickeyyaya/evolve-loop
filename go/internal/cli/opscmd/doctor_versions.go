@@ -31,15 +31,18 @@ func defaultInstalledVersions() map[string]string {
 	return res
 }
 
+var npmLatestReleaseURLs = map[string]string{
+	"claude": "https://registry.npmjs.org/@anthropic-ai/claude-code/latest",
+	"codex":  "https://registry.npmjs.org/@openai/codex/latest",
+}
+
 func defaultLatestRelease(bin string) (string, error) {
-	client := &http.Client{Timeout: 3 * time.Second}
-	var url string
-	switch bin {
-	case "claude":
-		url = "https://registry.npmjs.org/@anthropic-ai/claude-code/latest"
-	case "codex":
-		url = "https://registry.npmjs.org/@openai/codex/latest"
-	default:
+	return latestRelease(&http.Client{Timeout: 3 * time.Second}, npmLatestReleaseURLs, bin)
+}
+
+func latestRelease(client *http.Client, urls map[string]string, bin string) (string, error) {
+	url, ok := urls[bin]
+	if !ok {
 		return "", fmt.Errorf("no release source configured for %s", bin)
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -50,7 +53,7 @@ func defaultLatestRelease(bin string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
@@ -193,25 +196,25 @@ func runDoctorVersions(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&asJSON, "json", false, "emit JSON payload")
 	fs.BoolVar(&checkLatest, "latest", false, "compare against latest releases")
 	if err := fs.Parse(cmdutil.ReorderArgs(args)); err != nil {
-		return 10
+		return exitUsage
 	}
 	if fs.NArg() > 0 {
 		fmt.Fprintf(stderr, "evolve doctor versions: unexpected arguments: %v\n", fs.Args())
-		return 10
+		return exitUsage
 	}
 
 	rows, anyLagging := collectDoctorVersionRows(checkLatest)
 	if asJSON {
 		if err := printDoctorVersionsJSON(stdout, rows); err != nil {
 			fmt.Fprintf(stderr, "evolve doctor versions: %v\n", err)
-			return 1
+			return exitFail
 		}
 	} else {
 		printDoctorVersionsText(stdout, rows, checkLatest)
 	}
 
 	if checkLatest && anyLagging {
-		return 1
+		return exitFail
 	}
-	return 0
+	return exitOK
 }

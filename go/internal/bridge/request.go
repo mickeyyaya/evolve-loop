@@ -6,10 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// ValidateRequest is the required-field gauntlet Launch runs first and the
-// production Adapter runs before every Launch: CLI, Profile, Workspace,
-// ArtifactPath in that order, each named by its exact "bridge: <Field>
-// required" string; nil when all four are set.
 func ValidateRequest(req core.BridgeRequest) error {
 	switch "" {
 	case req.CLI:

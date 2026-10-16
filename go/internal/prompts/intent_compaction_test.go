@@ -7,8 +7,7 @@ import (
 	"testing"
 )
 
-// Despite the name, the floor is 256 bytes: the Composition and Reference tail.
-func TestIntentCompaction_SavesAtLeast2200Bytes(t *testing.T) {
+func TestIntentCompaction_StripsTheCompositionAndReferenceTail(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))
 	if err != nil {
@@ -49,7 +48,6 @@ func TestIntentCompaction_OperationalAnchorsAboveMarker(t *testing.T) {
 	}
 }
 
-// Also pins the operational content that must survive stripping.
 func TestIntentCompaction_ReferenceContentAbsentAfterStrip_Negative(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-intent.md"))

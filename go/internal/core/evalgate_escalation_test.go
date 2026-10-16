@@ -6,11 +6,9 @@ import (
 	"testing"
 )
 
-// evalGateProbe models the evalgate reviewer's rejection shape: Blocks==0
-// (no contract-gate breaker), Remediation carried, identical reason per round.
 type evalGateProbe struct {
 	phase        string
-	compliantCLI string // "" = never complies (the live 0-for-N shape)
+	compliantCLI string
 	reasons      []string
 	remediation  string
 
@@ -49,9 +47,6 @@ func (p *evalGateProbe) Review(_ context.Context, in ReviewInput) ReviewResult {
 func runEvalGateCycle(t *testing.T, probe *evalGateProbe) *evalGateProbe {
 	t.Helper()
 	root := t.TempDir()
-	// A non-claude profile gives escalation a real target; with no profile the
-	// phase resolves to the universal claude family, and the salvage-retry arm
-	// fires instead (a different behavior, covered by its own tests).
 	writeCLIProfile(t, root, "builder", "codex-tmux", []string{"claude-tmux"})
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)

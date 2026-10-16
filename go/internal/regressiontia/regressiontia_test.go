@@ -1,46 +1,5 @@
 package regressiontia
 
-// regressiontia_test.go — RED contract for cycle-1260 Task 1
-// (`egps-regression-tia-shadow-wiring`, inbox item
-// .evolve/inbox/2026-07-30T09-00-00Z-egps-regression-tia-selection.json,
-// P1 weight 0.91, 3rd live instance).
-//
-// WHY THIS PACKAGE EXISTS (deviation from scout-report's target files, recorded
-// loudly per Core Rule 3). Scout targeted go/internal/acssuite/acssuite.go. That
-// path is PROTECTED CONTROL PLANE — guards.ProtectedSurfaceManifest carries
-// {Fragment: "/go/internal/acssuite/", Rationale: "the gate runner"} — so no
-// phase of any cycle may write it (the role guard denies and ALARMS; verified
-// live this phase). A cycle may not edit the gate that grades it.
-//
-// The boundary is not an obstacle to route around, it is a design constraint,
-// and honoring it yields the better architecture: the SHADOW stage changes
-// nothing about what the gate runs (that is the definition of shadow), so it
-// needs no code in the gate runner at all. It is pure observability, computed
-// beside the suite by the suite's own production CALLER — the audit phase's
-// generateACSVerdict (internal/phases/audit/audit.go:651). Only the future
-// `enforce` stage, which actually skips packages, must live inside acssuite,
-// and that change is human-gated `evolve ship --class manual` OUTSIDE a cycle
-// by construction. Scout's Task-1 acceptance intent is preserved verbatim:
-// off/absent is byte-identical, shadow logs would-skip counts, nothing is
-// skipped yet.
-//
-// The contract these tests freeze:
-//
-//	const ArtifactName = "acs-tia-shadow.json"
-//	type Decision struct{ Stage; ChangedPackages; Selected; WouldSkip; WouldSkipCount }
-//	func Select(patterns, scope []string, deps map[string][]string) (selected, wouldSkip []string)
-//	func ChangedScope(repoRoot string, changed []string) []string
-//	func Compute(stage, repoRoot, moduleDir string, changed []string) Decision
-//	func Emit(workspace string, d Decision) (string, error)
-//
-// Safety invariant carried from the inbox item — selection must never be able
-// to hide a regression class — so every fail-safe resolves toward RUNNING a
-// predicate: unknown scope ⇒ skip nothing, unknown deps ⇒ skip nothing,
-// unknown stage ⇒ off.
-//
-// RED today: package regressiontia does not exist, so this file fails to
-// COMPILE — a hard non-zero exit, never a silent pass.
-
 import (
 	"encoding/json"
 	"os"
@@ -50,9 +9,6 @@ import (
 	"testing"
 )
 
-// TestSelect_SkipsOnlyDisjointRegressionPackages pins the core semantics: a
-// regression sub-package is a skip candidate ONLY when its dependency set is
-// known and provably disjoint from the changed-package scope.
 func TestSelect_SkipsOnlyDisjointRegressionPackages(t *testing.T) {
 	patterns := []string{
 		"./acs/regression/routing",
@@ -73,8 +29,6 @@ func TestSelect_SkipsOnlyDisjointRegressionPackages(t *testing.T) {
 		t.Errorf("selected = %v, want [./acs/regression/routing]", selected)
 	}
 
-	// Partition invariant: selected ⊎ wouldSkip == patterns. Selection may
-	// reorder, never lose or duplicate a package.
 	union := append(append([]string{}, selected...), wouldSkip...)
 	sort.Strings(union)
 	all := append([]string{}, patterns...)
@@ -84,11 +38,6 @@ func TestSelect_SkipsOnlyDisjointRegressionPackages(t *testing.T) {
 	}
 }
 
-// TestSelect_FailSafes is the NEGATIVE axis and the anti-no-op guard: every
-// unknown must resolve toward RUNNING the predicate. An implementation that
-// eagerly marks packages skippable — the exact failure mode this item exists
-// to prevent — fails here, and so does a stub that returns everything as
-// would-skip.
 func TestSelect_FailSafes(t *testing.T) {
 	patterns := []string{"./acs/regression/routing", "./acs/regression/apicover"}
 	deps := map[string][]string{
@@ -107,7 +56,6 @@ func TestSelect_FailSafes(t *testing.T) {
 	})
 
 	t.Run("unknown deps skip nothing", func(t *testing.T) {
-		// No dependency data at all: impact is unresolvable for every package.
 		selected, wouldSkip := Select(patterns, []string{"./internal/bridge/..."}, map[string][]string{})
 		if len(wouldSkip) != 0 {
 			t.Errorf("wouldSkip = %v with no dependency data, want empty — a package whose deps could not be resolved must always run", wouldSkip)
@@ -125,14 +73,6 @@ func TestSelect_FailSafes(t *testing.T) {
 	})
 }
 
-// TestChangedScope_WidensByReverseDependency is the ImporterClosure wiring
-// proof and the cycle-1250 reproducer. A change confined to internal/router
-// must widen to internal/routingtest, which imports it (agent.go/bricks.go/
-// engine.go) and holds the keystone parity invariant. Forward-only scope marks
-// the routing regression package skippable and hides exactly the class that
-// kept main red for 5 commits. Run against the REAL repository import graph,
-// so it fails if ChangedScope forwards its input instead of calling
-// changedpkgs.ImporterClosure.
 func TestChangedScope_WidensByReverseDependency(t *testing.T) {
 	repoRoot := repoRootForTest(t)
 
@@ -146,8 +86,6 @@ func TestChangedScope_WidensByReverseDependency(t *testing.T) {
 	}
 }
 
-// TestChangedScope_DegenerateInputs pins the best-effort edges: never a panic,
-// never a lost input, never a widened everything from nothing.
 func TestChangedScope_DegenerateInputs(t *testing.T) {
 	if got := ChangedScope(repoRootForTest(t), nil); len(got) != 0 {
 		t.Errorf("ChangedScope(repoRoot, nil) = %v, want empty — no changed packages means no scope", got)
@@ -157,10 +95,6 @@ func TestChangedScope_DegenerateInputs(t *testing.T) {
 	}
 }
 
-// TestCompute_OffStageComputesNothing pins the production default. The
-// checked-in .evolve/policy.json carries no regression_tia block, so the
-// resolved stage is "off" and Compute must be inert — an empty Decision that
-// Emit is never asked to write.
 func TestCompute_OffStageComputesNothing(t *testing.T) {
 	mod := moduleWithRegressionDirs(t, "routing", "apicover")
 	for _, stage := range []string{"off", "", "bogus"} {
@@ -171,10 +105,6 @@ func TestCompute_OffStageComputesNothing(t *testing.T) {
 	}
 }
 
-// TestCompute_ShadowEnumeratesRegressionCorpus is the shadow-stage crux: with
-// an underivable changed set, every discovered regression sub-package is
-// SELECTED (nothing skippable), and the decision names the corpus it reasoned
-// about — the would-skip evidence this staged rollout exists to collect.
 func TestCompute_ShadowEnumeratesRegressionCorpus(t *testing.T) {
 	mod := moduleWithRegressionDirs(t, "apicover", "routing")
 
@@ -195,9 +125,6 @@ func TestCompute_ShadowEnumeratesRegressionCorpus(t *testing.T) {
 	}
 }
 
-// TestEmit_WritesArtifactAndRejectsEmptyWorkspace pins the artifact contract:
-// the decision lands at <workspace>/acs-tia-shadow.json as readable JSON, and
-// a missing workspace is a loud error, never a silent no-write.
 func TestEmit_WritesArtifactAndRejectsEmptyWorkspace(t *testing.T) {
 	ws := t.TempDir()
 	d := Decision{
@@ -232,9 +159,6 @@ func TestEmit_WritesArtifactAndRejectsEmptyWorkspace(t *testing.T) {
 	}
 }
 
-// moduleWithRegressionDirs builds a throwaway Go module dir holding the named
-// acs/regression/<sub> directories, so corpus enumeration is exercised against
-// a real filesystem without depending on the repo's live corpus.
 func moduleWithRegressionDirs(t *testing.T, subs ...string) string {
 	t.Helper()
 	mod := t.TempDir()
@@ -249,9 +173,6 @@ func moduleWithRegressionDirs(t *testing.T, subs ...string) string {
 	return mod
 }
 
-// repoRootForTest resolves the repository root from this test's own location
-// (go/internal/regressiontia → ../../..). Derived, not hardcoded, so it is
-// correct in the main tree and in every fleet worktree alike.
 func repoRootForTest(t *testing.T) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -270,10 +191,6 @@ func containsStr(xs []string, want string) bool {
 	return false
 }
 
-// TestChangedScope_SelectsTestOnlyImporters pins the 2026-09-14 widening at
-// this consumer: internal/routingeval's tests import internal/core (its build
-// deps do not), so a change confined to core selects routingeval's scope —
-// a build-deps-only closure left that regression class skippable.
 func TestChangedScope_SelectsTestOnlyImporters(t *testing.T) {
 	got := ChangedScope(repoRootForTest(t), []string{"./internal/core/..."})
 	for _, p := range got {

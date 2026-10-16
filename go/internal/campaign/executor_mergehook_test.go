@@ -9,11 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
-// The AfterWaveComplete hook is the merge-to-main gate's seam: it fires once per
-// newly-completed wave, AFTER progress is durably saved, so a promotion attempt
-// always runs against a checkpointed boundary. A nil hook is a no-op (legacy
-// behavior). Resumed (already-complete) waves must NOT re-fire it.
-
 func TestRunWaves_AfterWaveCompleteFiresPerCompletedWave(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "prog.json")
 	waves := [][]fleet.CycleSpec{mkwave("a"), mkwave("b", "c")}
@@ -24,7 +19,7 @@ func TestRunWaves_AfterWaveCompleteFiresPerCompletedWave(t *testing.T) {
 		ProgressPath: path, PlanSHA: "P",
 		AfterWaveComplete: func(w int, prog *CampaignProgress) {
 			firedWaves = append(firedWaves, w)
-			doneCounts = append(doneCounts, len(prog.CompletedWaves)) // hook sees durable progress
+			doneCounts = append(doneCounts, len(prog.CompletedWaves))
 		},
 	}
 	if err := RunWaves(context.Background(), waves, r.run, opts); err != nil {
@@ -63,7 +58,6 @@ func TestRunWaves_NilAfterWaveCompleteIsNoop(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "prog.json")
 	waves := [][]fleet.CycleSpec{mkwave("a")}
 	r := &recordingRunner{}
-	// No AfterWaveComplete set: must behave exactly like before (no panic, wave runs).
 	if err := RunWaves(context.Background(), waves, r.run, RunOptions{ProgressPath: path, PlanSHA: "P"}); err != nil {
 		t.Fatal(err)
 	}

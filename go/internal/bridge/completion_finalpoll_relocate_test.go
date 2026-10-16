@@ -8,10 +8,6 @@ import (
 	"testing"
 )
 
-// freezeSourceDir makes dir unwritable so os.Rename out of it fails while
-// os.ReadFile of its contents still succeeds — the copy+remove branch's
-// precondition, reproduced without a cross-device mount. Restored on cleanup so
-// t.TempDir's own teardown can still remove the tree.
 func freezeSourceDir(t *testing.T, dir string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
@@ -236,9 +232,6 @@ func TestRelocateFile_DoesNotWriteThroughAPredictableTempName(t *testing.T) {
 	}
 }
 
-// renameOnlyRelocate's production caller reaches it only indirectly, through
-// artifactDetector.poll's finality branch, so this test pins the mover's own
-// contract directly.
 func TestRenameOnlyRelocate_IsTheDetectorsFinalityMover(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

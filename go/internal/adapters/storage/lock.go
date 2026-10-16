@@ -12,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// lockHooks holds injectable seams for syscall.Flock + file close so
-// tests can drive the flock EWOULDBLOCK (held-externally) and arbitrary
-// flock-error branches without spawning a sibling process.
 type lockHooks struct {
 	flock  func(fd int, how int) error
 	closeF func(f *os.File) error
@@ -37,24 +34,10 @@ func withLockHooks(replacement lockHooks, fn func()) {
 	fn()
 }
 
-// AcquireLock takes the project-scoped .evolve/.lock via syscall.Flock
-// with LOCK_NB. Within the same process a sync.Mutex enforces the
-// exclusive invariant — Flock alone does not deduplicate same-process
-// callers on macOS / Linux.
-//
-// The returned release function flips both gates (mutex + flock) and
-// is safe to call exactly once. Calling it twice is a no-op.
 func (s *FilesystemStorage) AcquireLock(_ context.Context) (func() error, error) {
 	return s.pl.acquire()
 }
 
-// processLock combines a process-local "is held" flag with an OS-level
-// flock so concurrent goroutines (in this process) and concurrent
-// processes (sharing the file) both see exclusive ownership semantics.
-//
-// The mutex protects access to the held/file state — it is NOT held
-// for the lifetime of the lock (that would deadlock a second AcquireLock
-// caller that should instead get ErrLockHeld).
 type processLock struct {
 	path string
 	mu   sync.Mutex

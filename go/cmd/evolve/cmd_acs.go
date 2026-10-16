@@ -20,8 +20,6 @@ var (
 	evolveDirAbs        = filepath.Abs
 )
 
-// resolveACSSuiteRoot returns the cycle's active_worktree, or "" when the cycle
-// state is absent or malformed.
 func resolveACSSuiteRoot(evolveDir string, cycle int) string {
 	path := filepath.Join(evolveDir, "runs", fmt.Sprintf("cycle-%d", cycle), "cycle-state.json")
 	data, err := os.ReadFile(path)
@@ -37,9 +35,6 @@ func resolveACSSuiteRoot(evolveDir string, cycle int) string {
 	return state.ActiveWorktree
 }
 
-// suiteProjectRoot resolves the plane root that holds the cycle's runtime
-// state. Only the orchestrator-minted cycle-state.json proves a plane: `evolve
-// acs run` mints a bare runs/cycle-N directory under any cwd, worktrees included.
 func suiteProjectRoot(evolveDir string, cycle int, root string) string {
 	if abs, err := evolveDirAbs(evolveDir); err == nil {
 		state := filepath.Join(abs, "runs", fmt.Sprintf("cycle-%d", cycle), "cycle-state.json")
@@ -50,9 +45,6 @@ func suiteProjectRoot(evolveDir string, cycle int, root string) string {
 	return mainProjectRoot(root)
 }
 
-// mainProjectRoot follows a git worktree back to its main checkout, or returns
-// dir. It is wrong when the plane is itself a linked worktree, so it serves only
-// invocations with no plane evolve dir.
 func mainProjectRoot(dir string) string {
 	out, err := sysexec.Command(context.Background(), "git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir").Output()
 	if err != nil {
@@ -65,8 +57,6 @@ func mainProjectRoot(dir string) string {
 	return filepath.Dir(gitCommon)
 }
 
-// runACS implements `evolve acs run|suite`; both write the cycle's
-// acs-verdict.json.
 func runACS(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve acs: missing subcommand (try: run|suite)")

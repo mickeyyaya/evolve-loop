@@ -13,8 +13,6 @@ func (d agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 	if rc, handled := tmuxNonClaudePreflight(d.target, cfg, deps); handled {
 		return rc, nil
 	}
-	// No credential-isolation guard: GEMINI_API_KEY/GOOGLE_API_KEY are not
-	// on agy's auth path (per drivers/agy-tmux.sh).
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-agy-")
 
@@ -30,10 +28,6 @@ func (d agyTmuxDriver) launchModelCheck() (launchModelCheck, error) {
 }
 
 func agyTmuxLaunch(target string, cfg *Config, deps Deps, session string, named bool) tmuxLaunch {
-	// Launch flags come from the per-CLI Realization (ADR-0022): agy realizes
-	// permission=bypass → --dangerously-skip-permissions and model_tier →
-	// --model "<display name>"; launchCmdLine quotes the space/paren tokens.
-	// claude-keyed raw flags realize to nothing.
 	return tmuxLaunch{
 		name:            target,
 		session:         session,
@@ -42,9 +36,9 @@ func agyTmuxLaunch(target string, cfg *Config, deps Deps, session string, named 
 		modelDispatch:   modelDispatchForTmux(target, cfg.Realization, cfg.ExtraFlags),
 		promptMarker:    "? for shortcuts",
 		inputLineMarker: ">",
-		bootScrollback:  200, // alt-screen
+		bootScrollback:  200,
 		bootIntervalS:   2,
-		tickDuringBoot:  true, // agy shows a trust prompt during boot
+		tickDuringBoot:  true,
 		exitSeq:         []tmuxKey{{keys: "C-c", enter: false, pauseS: 1}, {keys: "C-c", enter: false, pauseS: 1}},
 		bootOnly:        cfg.BootOnly,
 		guardDeadShell:  true,

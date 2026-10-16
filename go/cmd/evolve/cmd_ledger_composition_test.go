@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// compAuditedDiff / compDriftedDiff are two valid unified diffs with DIFFERENT
-// patch-ids (the second changes the added line's content).
 const compAuditedDiff = `diff --git a/fixture.txt b/fixture.txt
 --- a/fixture.txt
 +++ b/fixture.txt
@@ -28,7 +26,6 @@ const compDriftedDiff = `diff --git a/fixture.txt b/fixture.txt
 +semantically different change
 `
 
-// compPatchID pipes a diff through `git patch-id --stable`.
 func compPatchID(t *testing.T, dir, diff string) string {
 	t.Helper()
 	cmd := exec.Command("git", "patch-id", "--stable")
@@ -45,10 +42,6 @@ func compPatchID(t *testing.T, dir, diff string) string {
 	return fields[0]
 }
 
-// compFixture writes a .evolve dir whose ledger holds one composition-verdict
-// entry over the two given diff artifacts, claiming claimedPatchID. Entries
-// omit prev_hash so the hash-chain walk is trivially intact and any verify
-// failure is attributable to the composition-verdict checker alone.
 func compFixture(t *testing.T, auditedDiff, composedDiff, claimedPatchID string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -96,12 +89,6 @@ func runLedgerVerifyRC(t *testing.T, evolveDir string) (int, string) {
 	return rc, stderr.String()
 }
 
-// Two forgeries:
-//
-//   - drifted-composed: composed.diff's patch-id differs from the claimed
-//     (audited) patch_id — a drift smuggled past the fast path.
-//   - forged-patch-id: both diffs agree with each other but the entry claims
-//     a fabricated patch_id — a hand-edited ledger line.
 func TestCompositionVerdict_KernelRecomputesPatchId(t *testing.T) {
 	t.Parallel()
 	auditedID := compPatchID(t, t.TempDir(), compAuditedDiff)
@@ -124,8 +111,6 @@ func TestCompositionVerdict_KernelRecomputesPatchId(t *testing.T) {
 	}
 }
 
-// Guards against over-rejection: the checker must validate composition-verdict
-// entries, not ban them.
 func TestCompositionVerdict_ValidEntryVerifies(t *testing.T) {
 	t.Parallel()
 	honestID := compPatchID(t, t.TempDir(), compAuditedDiff)

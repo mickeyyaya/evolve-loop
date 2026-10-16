@@ -6,8 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestIpcenv_ConstValues names all five exported keys in ipcenv for apicover
-// and verifies their string values match the IPC protocol.
 func TestIpcenv_ConstValues(t *testing.T) {
 	if ipcenv.FleetKey != "EVOLVE_FLEET" {
 		t.Errorf("FleetKey = %q, want %q", ipcenv.FleetKey, "EVOLVE_FLEET")

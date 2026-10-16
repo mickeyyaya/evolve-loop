@@ -17,21 +17,13 @@ import (
 	"strings"
 )
 
-// MaxLines is the largest function size, in lines, that needs no allowance.
 const MaxLines = 50
 
-// FuncSpan is one function declaration's key and size. Key is
-// "<slash dir>.<Name>" or "<slash dir>.<Receiver>.<Name>", the dir relative to
-// the walked root; Lines runs from the func keyword to the closing brace.
 type FuncSpan struct {
 	Key   string
 	Lines int
 }
 
-// Walk measures every function declaration with a body in the non-test .go
-// files under root, whatever their build constraints. Directories named vendor
-// or testdata, or starting with "." or "_", are skipped; a file that does not
-// parse is an error.
 func Walk(root string) ([]FuncSpan, error) {
 	fset := token.NewFileSet()
 	var spans []FuncSpan
@@ -85,8 +77,6 @@ func walkFile(fset *token.FileSet, root, path string) ([]FuncSpan, error) {
 	return spans, nil
 }
 
-// funcKey names a method by its receiver's base type so same-named methods on
-// different types keep separate allowances.
 func funcKey(dir string, fn *ast.FuncDecl) string {
 	if fn.Recv == nil || len(fn.Recv.List) == 0 {
 		return dir + "." + fn.Name.Name
@@ -110,8 +100,6 @@ func funcKey(dir string, fn *ast.FuncDecl) string {
 	}
 }
 
-// LoadOffenders reads a flat JSON object of key to allowance. Every allowance
-// must exceed MaxLines: a function within the limit needs no entry.
 func LoadOffenders(path string) (map[string]int, error) {
 	body, err := os.ReadFile(path)
 	if err != nil {
@@ -132,12 +120,6 @@ func LoadOffenders(path string) (map[string]int, error) {
 	return offenders, nil
 }
 
-// Check returns nil when every span fits the ratchet, else one error naming
-// every violating key. A key's size is its largest span, so same-named
-// declarations in build-tagged files share one allowance. An allowance is a
-// ceiling: the violations are an unlisted function past MaxLines and a listed
-// one past its allowance. A listed function under its allowance, within
-// MaxLines or gone is slack a boundary tighten removes, never a lane's failure.
 func Check(spans []FuncSpan, offenders map[string]int) error {
 	sizes := make(map[string]int, len(spans))
 	for _, s := range spans {

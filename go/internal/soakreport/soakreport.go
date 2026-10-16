@@ -1,14 +1,5 @@
 // Package soakreport is the R8.3 soak evidence reporter — the read-only
 // instrument the EVOLVE_PHASE_RECOVERY enforce flip (plan R8.5) is gated on.
-//
-// Every ADR-0044/0045 component already leaves DURABLE shadow records:
-// interaction ledgers carry C2 fatal_pane_shadow, I2 salvage-ladder, I3
-// kernel_answer, and I4 rule_shadow_fire outcomes; the phase observer's
-// events ndjson carries the C4/C3 INCIDENT envelopes with their
-// policy-decided action/action_reason. This package aggregates them per
-// batch and renders the per-component evidence table against the plan §6
-// bars. It never mutates anything — the sweep (cmd_loop) and the flip
-// (operator) act; the reporter only accounts.
 package soakreport
 
 import (
@@ -22,28 +13,24 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
 )
 
-// CycleRow is one cycle's R6 outcome classification.
 type CycleRow struct {
 	Cycle   int
 	Outcome string
 	Detail  string
 }
 
-// ComponentEvidence is one component's aggregated soak evidence.
 type ComponentEvidence struct {
-	Component string         // "C2", "C4/C3", "I2", "I3", "I4"
-	Bar       string         // the plan §6 evidence bar, verbatim
-	Counts    map[string]int // evidence counters (stable keys)
-	Notes     []string       // caveats the human reviewer must weigh
+	Component string
+	Bar       string
+	Counts    map[string]int
+	Notes     []string
 }
 
-// Report is the per-batch soak evidence bundle.
 type Report struct {
 	Cycles     []CycleRow
 	Components []ComponentEvidence
 }
 
-// bars is the plan §6 evidence-bar text, the single rendered source.
 var bars = map[string]string{
 	"C2":    "≥10 observations over ≥3 batches; 0 would-fires on phases that later PASSed; ≥1 true positive",
 	"C4/C3": "0 would-kill decisions on phases that completed within the next 2 intervals",
@@ -52,12 +39,8 @@ var bars = map[string]string{
 	"I4":    "promoted signatures ≥12 chars; 0 healthy-corpus hits (re-checked at flip)",
 }
 
-// componentOrder fixes the rendered section order (stable diffs across soaks).
 var componentOrder = []string{"C2", "C4/C3", "I2", "I3", "I4"}
 
-// Collect aggregates the durable soak evidence for the given cycles under
-// projectRoot. Missing files are absent evidence, never errors — the report
-// must render for any historical batch.
 func Collect(projectRoot string, cycles []int) Report {
 	r := Report{}
 	comp := map[string]*ComponentEvidence{}
@@ -92,7 +75,6 @@ func Collect(projectRoot string, cycles []int) Report {
 	return r
 }
 
-// collectInteractions folds one interaction ledger into the component set.
 func collectInteractions(path string, comp map[string]*ComponentEvidence) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -126,8 +108,6 @@ func collectInteractions(path string, comp map[string]*ComponentEvidence) {
 	}
 }
 
-// collectObserverIncidents folds one observer events ndjson — INCIDENT
-// severity only — into the C4/C3 evidence.
 func collectObserverIncidents(path string, c *ComponentEvidence) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -155,8 +135,6 @@ func collectObserverIncidents(path string, c *ComponentEvidence) {
 	}
 }
 
-// Render produces the markdown soak report: per-cycle outcomes, then one
-// section per component with its §6 bar and sorted evidence counters.
 func (r Report) Render() string {
 	var b strings.Builder
 	b.WriteString("# Soak evidence report (EVOLVE_PHASE_RECOVERY promotion program)\n\n")

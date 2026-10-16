@@ -5,23 +5,17 @@ import (
 	"sync"
 )
 
-// CodeDoc is one registered code with its one-line documentation.
 type CodeDoc struct {
 	Code Code
 	Doc  string
 }
 
-// Conflict records a registration the registry could not accept: a second
-// owner or a different doc for an already-registered code, a malformed code,
-// or a code whose prefix belongs to another module. Conflicts are recorded,
-// never panicked on (a duplicate code is a review defect, not an availability
-// event); TestRegistryConflicts_RealRegistryIsClean asserts the list is empty.
 type Conflict struct {
 	Code        Code
-	Module      Module // the registered owner (or the claimant, for a malformed code)
-	OtherModule Module // the conflicting claimant
-	Doc         string // the registered doc
-	OtherDoc    string // the conflicting doc, or the reason the registration was refused
+	Module      Module
+	OtherModule Module
+	Doc         string
+	OtherDoc    string
 }
 
 type registry struct {
@@ -49,8 +43,6 @@ func init() {
 	}
 }
 
-// RegisterCode registers c as owned by m with a one-line doc. A repeat with
-// the same owner and doc is a no-op; anything else is recorded as a Conflict.
 func RegisterCode(m Module, c Code, doc string) { codes.register(m, c, doc) }
 
 func (r *registry) register(m Module, c Code, doc string) {
@@ -78,7 +70,6 @@ func (r *registry) register(m Module, c Code, doc string) {
 	r.docs[c] = doc
 }
 
-// IsRegistered reports the owning module of c.
 func IsRegistered(c Code) (Module, bool) {
 	codes.mu.RLock()
 	defer codes.mu.RUnlock()
@@ -86,8 +77,6 @@ func IsRegistered(c Code) (Module, bool) {
 	return m, ok
 }
 
-// RegisteredCodes lists every registered code by owning module, sorted by
-// code — the source docs/architecture/signal-codes.md is generated from.
 func RegisteredCodes() map[Module][]CodeDoc {
 	codes.mu.RLock()
 	defer codes.mu.RUnlock()
@@ -101,7 +90,6 @@ func RegisteredCodes() map[Module][]CodeDoc {
 	return out
 }
 
-// RegistryConflicts returns a copy of every refused registration.
 func RegistryConflicts() []Conflict {
 	codes.mu.RLock()
 	defer codes.mu.RUnlock()

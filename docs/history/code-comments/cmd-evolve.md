@@ -6164,3 +6164,108 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // item with injected_by as agent-authored (ADR-0073 clamp-parity), so
 // a halt record can never be widened into lane work by annotation.
 ```
+
+## comment-zero s3
+
+### `go/cmd/evolve/cmd_branches_test.go:140` — above `func brKeptFixture(t *testing.T) string {`
+
+```text
+// brKeptFixture builds a remote-less repo whose cycle-1..cycle-4 are all
+// superseded by main: cycle-1 is checked out in a linked worktree, cycle-2 is
+// named by a continuation binding, and cycle-3 and cycle-4 are free to prune.
+```
+
+### `go/cmd/evolve/cmd_composition_wiring.go:1` — above `package main`
+
+```text
+// cmd_composition_wiring.go — the composition root's binding of the RUNG 0
+// trivial-rebase composition-verdict fast path (merge-concurrency-2026,
+// cycle-786/801 built the pieces, cycle-804 wires them).
+//
+// core cannot import internal/adapters/ledger (ledger already imports core —
+// an import cycle), so cmd/evolve — the only package that legally depends on
+// both — binds the three Option-injected closures to the real adapters, and
+// core stays adapter-agnostic. Every closure fails closed: a missing bound
+// audit, an unreadable ledger, a red gate, or a writer error makes
+// compositionCarryForward fall back to the pre-existing full re-audit path.
+// A bad binding can only keep the fast path dark (status quo), never widen
+// what ships.
+```
+
+### `go/cmd/evolve/cmd_composition_wiring.go:65` — above `var composedGateTargets = map[string]string{`
+
+```text
+// composedGateTargets maps each required composed-tree gate to the Makefile
+// target that runs it, so the fast path executes the SAME commands CI and the
+// cycle audit run (ADR-0069) — single-sourced through the Makefile, never a
+// second gate implementation that could drift. Keys stay in lock-step with
+// ciparity.RequiredComposedGates; an unmapped gate is left absent, which
+// MissingComposedGates counts as not-green (fail-closed).
+```
+
+### `go/cmd/evolve/cmd_composition_wiring.go:196` — above `func requireReusableAudit(entry auditledger.Entry) error {`
+
+```text
+// requireReusableAudit refuses to build a carry-forward snapshot from an audit
+// that did not pass. Cycle-1571 H2: the run-scoping added alongside this
+// function closed only half the hazard its own comment named — a FAILed audit
+// belonging to THIS run still bound, so RUNG 0 would run the full composed-tree
+// gate set and write a composition-verdict record certifying the carry-forward
+// of a REJECTION into a hash-chained ledger. Ship blocks the result downstream,
+// so the cost is a wasted gate pass and a dishonest provenance record.
+//
+// The verdict is read from the bound ARTIFACT, not the ledger entry: exit_code
+// is 1 for WARN and FAIL alike, and the binding recorder states plainly that
+// severity lives in the artifact. Deliberately no fallback to an older PASS —
+// if this run's newest audit says FAIL, carry-forward declines rather than
+// reaching behind it. Every failure path here fails CLOSED to a full re-audit.
+```
+
+### `go/cmd/evolve/cmd_fleet_soak.go:27` — above `func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {`
+
+```text
+// runFleetSoak implements `evolve fleet soak --count N`. It spins N concurrent
+// launches (real or injected), then asserts the four ADR-0049 concurrency
+// invariants and renders a verdict table to stdout.
+```
+
+### `go/cmd/evolve/cmd_gc_workspace_test.go:33` — above `projectRoot, _, _ := gcWorktreeEnv(t, "")`
+
+```text
+// repo + merged orphan branch cycle-777
+```
+
+### `go/cmd/evolve/cmd_inbox_consume_binding_test.go:122` — above `writeBinding(t, root, "refiled-item", 9)`
+
+```text
+// rebound AFTER the cycle-5 retirement
+```
+
+### `go/cmd/evolve/cmd_inbox_mover.go:11` — above `func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {`
+
+```text
+// runInboxMover is `evolve inbox-mover <subcmd> [args]`. Exit codes:
+//
+//	0  — success (or promote no-op for ship.sh compat)
+//	1  — not-found / bad args (claim only)
+//	2  — mv failed (claim only)
+//	3  — console-routed refusal (claim only; ADR-0074 — the item is
+//	     operator-owned and must not be drawn by a lane)
+```
+
+### `go/cmd/evolve/cmd_inbox_signals_test.go:50` — above `proc := filepath.Join(evolveDir, "inbox", "processing", "cycle-7")`
+
+```text
+// The committed item is already claimed under processing/cycle-7 (the
+// triage persona's claim) and a root twin of its basename provokes the
+// double-move when the drain releases it.
+```
+
+### `go/cmd/evolve/cmd_ledger.go:170` — above `func runLedgerRebaseline(args []string, stderr io.Writer) int {`
+
+```text
+// runLedgerRebaseline seals a densely damaged prefix in ONE operator call by
+// appending an in-band epoch seal (ADR-0081). Append-only: the damaged history
+// stays on disk, it is simply no longer chain-validated. The --note is the
+// operator gate — an unattributable bulk trust decision is refused.
+```

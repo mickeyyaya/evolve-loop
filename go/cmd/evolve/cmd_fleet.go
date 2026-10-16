@@ -22,9 +22,6 @@ var fleetLaunchFactory = execCycleLaunch
 
 var fleetExecutable = os.Executable
 
-// loadPlanSpecs parses an `evolve fleet --plan` backlog into up to `count`
-// disjoint-scoped cycle specs stamped with goalHash; the second return is the
-// deferred backlog for a later wave.
 func loadPlanSpecs(planJSON []byte, goalHash string, count int) ([]fleet.CycleSpec, []fleet.Todo, error) {
 	var todos []fleet.Todo
 	if err := json.Unmarshal(planJSON, &todos); err != nil {
@@ -123,8 +120,6 @@ func reportFleetResults(results []fleet.Result, stderr io.Writer) int {
 	return 0
 }
 
-// cycleRunArgs builds the `evolve cycle run` argv for one fleet cycle. Pure +
-// testable; --simulate threads the no-LLM -simulate flag through.
 func cycleRunArgs(goalHash, outputContract, goalText string, simulate bool, projectRoot string) []string {
 	args := []string{"cycle", "run", "--goal-hash", goalHash}
 	if outputContract != "" {
@@ -141,8 +136,6 @@ func cycleRunArgs(goalHash, outputContract, goalText string, simulate bool, proj
 	return args
 }
 
-// laneGoalHash prefers the spec's own GoalHash over the wave/campaign-level
-// fallback the launcher was built with.
 func laneGoalHash(specGoalHash, fallback string) string {
 	if specGoalHash != "" {
 		return specGoalHash
@@ -151,7 +144,7 @@ func laneGoalHash(specGoalHash, fallback string) string {
 }
 
 func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) fleet.LaunchFn {
-	var logMu sync.Mutex // serializes interleaved output across concurrent cycles
+	var logMu sync.Mutex
 	return func(ctx context.Context, spec fleet.CycleSpec) (int, error) {
 		prefix := "[" + cycleLogTag(spec) + "] "
 		ow := &prefixLineWriter{w: stdout, prefix: prefix, mu: &logMu}
@@ -161,8 +154,6 @@ func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalT
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = ow
 		cmd.Stderr = ew
-		// On ctx cancel/timeout, SIGTERM the child for a graceful exit; WaitDelay
-		// escalates to SIGKILL if it ignores the signal, so a wedged cycle is reaped.
 		cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 		cmd.WaitDelay = 10 * time.Second
 		if err := cmd.Run(); err != nil {

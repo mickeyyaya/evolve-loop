@@ -1,45 +1,76 @@
 package swarmrunner
 
 import (
+	"errors"
+	"os/exec"
+	"syscall"
 	"testing"
 )
 
-func TestGroupKiller_RefuseSafePGIDs(t *testing.T) {
-	cases := []struct {
-		pgid int
-		desc string
-	}{
-		{0, "pgid 0 = caller's own group"},
-		{1, "pgid 1 = init/launchd"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.desc, func(t *testing.T) {
-			if err := groupKiller(tc.pgid); err == nil {
-				t.Errorf("groupKiller(%d) must return error, got nil", tc.pgid)
-			}
-		})
+type sentSignal struct {
+	pid int
+	sig syscall.Signal
+}
+
+func recordingSender(sent *[]sentSignal) signalSender {
+	return func(pid int, sig syscall.Signal) error {
+		*sent = append(*sent, sentSignal{pid, sig})
+		return nil
 	}
 }
 
-func TestGroupKiller_NegativePGIDRefused(t *testing.T) {
-	// A negative pgid (e.g., -1) satisfies pgid<=1 so must also be refused.
-	if err := groupKiller(-1); err == nil {
-		t.Error("groupKiller(-1) must be refused")
+func TestKillGroup_RefusesCallerInitAndNegativeGroups(t *testing.T) {
+	t.Parallel()
+	for _, pgid := range []int{-1, 0, initProcessGroup} {
+		var sent []sentSignal
+		if err := killGroup(pgid, recordingSender(&sent)); err == nil {
+			t.Errorf("killGroup(%d) must be refused", pgid)
+		}
+		if len(sent) != 0 {
+			t.Errorf("killGroup(%d) sent %v; a refused group must never be signalled", pgid, sent)
+		}
 	}
 }
 
-func TestGroupKiller_ValidPGIDAttempts(t *testing.T) {
-	// pgid=2 passes the guard and reaches syscall.Kill; on a real system it
-	// will likely return EPERM (can't kill another process group) or ESRCH
-	// (no such group) — either way, the function was called, which is all
-	// coverage requires. We only assert the guard does NOT fire.
-	err := groupKiller(2)
-	// err may be non-nil (EPERM/ESRCH) — that is fine; the guard path was NOT taken.
-	_ = err
+func TestKillGroup_SignalsTheWholeGroupAboveInit(t *testing.T) {
+	t.Parallel()
+	var sent []sentSignal
+	if err := killGroup(initProcessGroup+1, recordingSender(&sent)); err != nil {
+		t.Fatalf("killGroup(%d): %v", initProcessGroup+1, err)
+	}
+	want := sentSignal{-(initProcessGroup + 1), syscall.SIGKILL}
+	if len(sent) != 1 || sent[0] != want {
+		t.Fatalf("sent = %v, want %v", sent, want)
+	}
 }
 
-// tmux teardown tests live in internal/swarm (ExecTmuxKill, seam-based — never
-// a real tmux exec). The predecessor here live-fired `tmux kill-session -t ''`
-// against the shared default socket, which tmux resolves to the CALLER'S OWN
-// session — running this suite from inside any tmux pane killed that session
-// (2026-06-11 killer-B). Do not reintroduce real-tmux calls in unit tests.
+func TestKillGroup_ReturnsTheSenderError(t *testing.T) {
+	t.Parallel()
+	failure := errors.New("no such process")
+	err := killGroup(initProcessGroup+1, func(int, syscall.Signal) error { return failure })
+	if !errors.Is(err, failure) {
+		t.Fatalf("err = %v, want %v", err, failure)
+	}
+}
+
+func TestGroupKiller_KillsAProcessGroupTheTestOwns(t *testing.T) {
+	t.Parallel()
+	child := exec.Command("sleep", "30")
+	child.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := child.Start(); err != nil {
+		t.Fatalf("start child: %v", err)
+	}
+	if err := groupKiller(child.Process.Pid); err != nil {
+		_ = child.Process.Kill()
+		t.Fatalf("groupKiller(own child group): %v", err)
+	}
+	err := child.Wait()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) {
+		t.Fatalf("child wait = %v, want an exit error", err)
+	}
+	status, ok := exit.Sys().(syscall.WaitStatus)
+	if !ok || status.Signal() != syscall.SIGKILL {
+		t.Fatalf("child status = %v, want killed by SIGKILL", exit.Sys())
+	}
+}

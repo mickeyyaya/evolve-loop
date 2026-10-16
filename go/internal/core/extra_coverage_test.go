@@ -17,16 +17,13 @@ func coverNow() time.Time { return time.Date(2026, 5, 27, 0, 0, 0, 0, time.UTC) 
 
 func TestEnforceNext(t *testing.T) {
 	t.Parallel()
-	// Catalog carries one optional user phase "extra-check" so the candidatePhase
-	// catalog-lookup branch (a router-proposed USER phase) is exercised, not just
-	// the built-in phaseFromRouter path.
 	userCat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "extra-check", Optional: true}})
 	o := &Orchestrator{
 		sm:      NewStateMachine(),
 		cfg:     config.RoutingConfig{Mandatory: []string{"scout", "build", "audit", "ship"}, Order: []string{"scout", "extra-check", "triage", "tdd", "build", "audit", "ship"}},
 		catalog: userCat,
 	}
-	sig := router.RoutingSignals{} // scout absent → build's spine gate fails
+	sig := router.RoutingSignals{}
 	cases := []struct {
 		name        string
 		next        string
@@ -36,15 +33,11 @@ func TestEnforceNext(t *testing.T) {
 	}{
 		{"empty-proposal", "", true, PhaseTriage, false},
 		{"equals-static", "triage", true, PhaseTriage, false},
-		{"illegal-edge", "ship", true, PhaseTriage, false}, // scout↛ship
-		{"spine-gated", "build", true, PhaseTriage, false}, // legal edge, scout artifact absent
-		{"accepted", "tdd", true, PhaseTDD, true},          // legal, needs 0 anchors
-		// Early-exit: advisor proposes end from scout. Allowed only for a no-ship
-		// cycle; a ship-intended cycle is declined (must satisfy the floor).
+		{"illegal-edge", "ship", true, PhaseTriage, false},
+		{"spine-gated", "build", true, PhaseTriage, false},
+		{"accepted", "tdd", true, PhaseTDD, true},
 		{"early-exit-noship", "end", false, PhaseEnd, true},
 		{"early-exit-blocked-when-ship", "end", true, PhaseTriage, false},
-		// User phase proposed by the advisor resolves via candidatePhase's catalog
-		// branch (forward-progress legal: scout→extra-check in cfg.Order).
 		{"user-phase-insert", "extra-check", true, Phase("extra-check"), true},
 	}
 	for _, tc := range cases {
@@ -96,7 +89,6 @@ func TestRecordRoutingDecision_HappyAndSkips(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws, "routing-decision-1.json")); err != nil {
 		t.Errorf("routing-decision artifact missing: %v", err)
 	}
-	// 1 routing_decision + 2 phase_skipped.
 	if len(led.entries) != 3 {
 		t.Fatalf("ledger entries = %d, want 3", len(led.entries))
 	}
@@ -112,7 +104,6 @@ func TestRecordRoutingDecision_ArtifactFailIsSwallowed(t *testing.T) {
 		ws   func(t *testing.T) string
 	}{
 		{
-			// workspace under a regular file → MkdirAll fails before WriteFile.
 			name: "mkdir-fail",
 			ws: func(t *testing.T) string {
 				t.Helper()
@@ -124,7 +115,6 @@ func TestRecordRoutingDecision_ArtifactFailIsSwallowed(t *testing.T) {
 			},
 		},
 		{
-			// artifact path is a directory → mkdir succeeds, WriteFile fails.
 			name: "write-fail",
 			ws: func(t *testing.T) string {
 				t.Helper()
@@ -158,7 +148,6 @@ func TestRecordRoutingDecision_ArtifactFailIsSwallowed(t *testing.T) {
 func TestRecordRoutingDecision_LedgerFailIsSwallowed(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{ledger: &fakeLedger{failOnAppend: true}, now: coverNow}
-	// Must not panic even though every Append errors.
 	o.recordRoutingDecision(context.Background(), 5, CycleState{WorkspacePath: t.TempDir()}, 1,
 		router.RouterDecision{NextPhase: "audit", SkipPhases: []string{"tester"}})
 }
@@ -195,7 +184,6 @@ func TestRecordPhasePlan_ArtifactFailIsSwallowed(t *testing.T) {
 		ws   func(t *testing.T) string
 	}{
 		{
-			// workspace under a regular file → MkdirAll fails before WriteFile.
 			name: "mkdir-fail",
 			ws: func(t *testing.T) string {
 				t.Helper()
@@ -207,7 +195,6 @@ func TestRecordPhasePlan_ArtifactFailIsSwallowed(t *testing.T) {
 			},
 		},
 		{
-			// artifact path is a directory → mkdir succeeds, WriteFile fails.
 			name: "write-fail",
 			ws: func(t *testing.T) string {
 				t.Helper()
@@ -248,7 +235,6 @@ func TestRecordPhasePlan_LedgerFailIsSwallowed(t *testing.T) {
 func TestArchivePollutedWorkspace_Branches(t *testing.T) {
 	t.Parallel()
 
-	// Non-directory workspace → returns nil (nothing to archive).
 	t.Run("not-a-dir", func(t *testing.T) {
 		t.Parallel()
 		f := filepath.Join(t.TempDir(), "ws-file")
@@ -260,7 +246,6 @@ func TestArchivePollutedWorkspace_Branches(t *testing.T) {
 		}
 	})
 
-	// Stat returns a non-IsNotExist error (path component is a file → ENOTDIR).
 	t.Run("stat-error", func(t *testing.T) {
 		t.Parallel()
 		blocker := filepath.Join(t.TempDir(), "blocker")
@@ -272,7 +257,6 @@ func TestArchivePollutedWorkspace_Branches(t *testing.T) {
 		}
 	})
 
-	// ReadDir error: a directory that exists but cannot be listed.
 	t.Run("readdir-error", func(t *testing.T) {
 		t.Parallel()
 		if os.Geteuid() == 0 {

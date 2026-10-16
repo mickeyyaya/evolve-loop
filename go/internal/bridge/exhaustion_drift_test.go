@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// exhaustedRegex is passed explicitly so the test stays decoupled from the
-// manifest's current wording.
 func TestWarnExhaustionRegexDrift(t *testing.T) {
 	t.Parallel()
 	const driftMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
@@ -86,8 +84,6 @@ func TestDriftProbeArmedPerCLI(t *testing.T) {
 			if exhausted == "" {
 				t.Fatalf("%s has no controls.usage.exhausted_regex — nothing to drift-guard", tc.cli)
 			}
-			// Guards against a vacuous positive case: if exhausted_regex already
-			// matched driftedPane there would be no gap left to detect.
 			if matchExhausted(exhausted, tc.driftedPane) {
 				t.Fatalf("%s exhausted_regex already matches %q — the drifted fixture no longer models a drift", tc.cli, tc.driftedPane)
 			}
@@ -118,8 +114,6 @@ const driftAlarmMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
 func TestTmuxREPL_DriftAlarm_AgentDiffContent_NoFalseAlarm(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// A unified-diff content line the agent is WRITING (quota-wall wording inside
-	// a test fixture), framed by prompt markers so the session reads as booted.
 	pane := "❯\n+\tfmt.Println(\"switch models with /model\")\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{pane}}}
 	code, stderr := runTmuxNudge(t, fx, tmux)
@@ -134,8 +128,6 @@ func TestTmuxREPL_DriftAlarm_AgentDiffContent_NoFalseAlarm(t *testing.T) {
 func TestTmuxREPL_DriftAlarm_PromptEchoContent_NoFalseAlarm(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// A prompt line that is wall-SHAPED to the broad probe. The pane echoes it
-	// verbatim, exactly as a CLI that re-renders its injected instructions does.
 	const echoed = "Do not treat \"switch models with /model\" as a real wall."
 	body := "Use your Write tool to create artifact containing:\n<!-- challenge-token: " + fx.token + " -->\n" + echoed + "\nPROTOTYPE OK\n"
 	if err := os.WriteFile(fx.promptFile, []byte(body), 0o644); err != nil {
@@ -152,14 +144,9 @@ func TestTmuxREPL_DriftAlarm_PromptEchoContent_NoFalseAlarm(t *testing.T) {
 	}
 }
 
-// A genuine drifted CLI-chrome wall is neither a diff line nor a prompt echo,
-// so it survives strippedForExhaustionScan and must still fire the alarm.
 func TestTmuxREPL_DriftAlarm_RealDriftedWallStillFires(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	// Plausible future wording: the shipped exhausted_regex misses "hit your
-	// <model> quota" (it keys on "reached/hit your usage|weekly limit"), while
-	// the broad probe sees "hit your" + "/usage-credits" — the drift signature.
 	pane := "❯\nYou've hit your Fable 5 quota. Run /usage-credits to continue.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{pane}}}
 	code, stderr := runTmuxNudge(t, fx, tmux)

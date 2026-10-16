@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// nonTestSourcesMatching lists the module's non-test Go files outside
-// internal/config whose source matches re; `\b` excludes phaseconfig.New(.
 func nonTestSourcesMatching(t *testing.T, re *regexp.Regexp) []string {
 	t.Helper()
 	moduleRoot := filepath.Join("..", "..")
@@ -67,10 +65,10 @@ func TestRoutingConfigLoader_ConstructionSitesArePinned(t *testing.T) {
 func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
 	t.Parallel()
 	want := map[string]bool{
-		"internal/cli/phasecmd/phase_verify.go": true, // the agent's self-check
-		"cmd/evolve/cmd_solution.go":            true, // hand-rendered, no Center (F7)
-		"internal/kerneltest/fixture.go":        true, // test machinery
-		"internal/dashboard/plan.go":            true, // the read-only board's registry read: no Center, registry warnings ride the snapshot's Warnings
+		"internal/cli/phasecmd/phase_verify.go": true,
+		"cmd/evolve/cmd_solution.go":            true,
+		"internal/kerneltest/fixture.go":        true,
+		"internal/dashboard/plan.go":            true,
 		"cmd/evolve/cmd_cycle_config.go":        true,
 	}
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bconfig\.Load\(`))
@@ -130,7 +128,6 @@ func TestCmdCycle_NoHandWrittenConfigWarnLineAndLaddersLiveInTheSeam(t *testing.
 	}
 }
 
-// Keyed fields: vet's composites check applies to imported struct literals.
 func TestPolicyStagesOf_ProjectsThePolicyAccessors(t *testing.T) {
 	t.Parallel()
 	pol := policy.Policy{
@@ -178,8 +175,6 @@ func TestWireOrchestratorDeps_ConfigWarningRendersAndIsDurable(t *testing.T) {
 	}
 }
 
-// --simulate resolves no RoutingConfig, so no CONFIG_* warning can originate
-// there; this proves the topology a future Loader on that root would inherit.
 func TestWireSimulateOrchestrator_CenterTopologyRendersConfigWarnings(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -188,7 +183,7 @@ func TestWireSimulateOrchestrator_CenterTopologyRendersConfigWarnings(t *testing
 		t.Fatal(err)
 	}
 	reg := config.RegistryPath(root)
-	if err := os.MkdirAll(reg, 0o755); err != nil { // a directory at the path: a read fault, not absence
+	if err := os.MkdirAll(reg, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	var console bytes.Buffer
@@ -225,7 +220,6 @@ func TestSolutionCmd_MalformedRegistryPrintsTheRegistryWarning(t *testing.T) {
 	}
 }
 
-// fakeBridgeStageSink records what the root forwards into the bridge adapter.
 type fakeBridgeStageSink struct {
 	phaseIO             config.Stage
 	recovery, fatalPane string
@@ -255,8 +249,6 @@ func TestWireBridgeStages_IsTheRootsOnlyStageForwarding(t *testing.T) {
 			t.Errorf("%s belongs to cmd/evolve/cmd_cycle_config.go alone, found in %v", re, hits)
 		}
 	}
-	// The cycle root must also call the forwarder: NewDefault's policy seeding
-	// would mask a dropped call while losing the Loader's validation.
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bwireBridgeStages\(`))
 	want := []string{"cmd/evolve/cmd_cycle.go", "cmd/evolve/cmd_cycle_config.go"}
 	if !reflect.DeepEqual(hits, want) {

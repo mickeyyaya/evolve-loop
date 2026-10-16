@@ -1,6 +1,3 @@
-// Tests for the scout phase. Drives the phase with a fake core.Bridge
-// that captures the BridgeRequest and writes a scripted scout-report.md
-// to the configured artifact path.
 package scout
 
 import (
@@ -117,7 +114,6 @@ func TestRun_HappyPath_PASSWithBacklog(t *testing.T) {
 }
 
 func TestRun_NoProposedTasks_FAIL(t *testing.T) {
-	// Report missing Proposed Tasks → cannot hand off → FAIL.
 	body := "# Scout Report\n\nNothing to do.\n"
 	fb := &fakeBridge{writeArtifact: body}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
@@ -133,7 +129,6 @@ func TestRun_NoProposedTasks_FAIL(t *testing.T) {
 }
 
 func TestRun_ConvergenceConfirmation_SKIPPED(t *testing.T) {
-	// "Convergence" + "nothing to do" → SKIPPED (cycle has nothing actionable).
 	body := "# Scout Report\nMode: convergence-confirmation. nothingToDoCount=2.\n## Proposed Tasks\n_none_ — converged.\n"
 	fb := &fakeBridge{writeArtifact: body}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
@@ -237,8 +232,6 @@ func TestName(t *testing.T) {
 	}
 }
 
-// --- v12.1 Capability 1: phaseflags wiring tests ---
-
 func writeScoutProfile(t *testing.T, contents string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -252,10 +245,6 @@ func writeScoutProfile(t *testing.T, contents string) string {
 	return root
 }
 
-// TestComposePrompt_InjectsGoalTextFromContext (cycle-108 bug #3): the
-// dispatcher routes --goal-text into Context["goal"]; Scout's prompt
-// must surface it so Scout treats the operator's goal as a constraint
-// when choosing between backlog work and the meta-goal.
 func TestComposePrompt_InjectsGoalTextFromContext(t *testing.T) {
 	h := hooks{}
 	req := core.PhaseRequest{
@@ -286,14 +275,6 @@ func TestComposePrompt_OmitsGoalLineWhenContextEmpty(t *testing.T) {
 	}
 }
 
-// TestComposePrompt_InjectsChallengeTokenFromRequest (cycle-135 lesson):
-// the auditor mandates `<!-- challenge-token: <value> -->` on line 2 of
-// every phase report. PR 5 centralized the contract in agent-templates.md;
-// PR 6 plumbs the actual token VALUE into scout's prompt via the
-// PhaseRequest.ChallengeToken field already on the struct (ports.go:148).
-// Without this fix, scout has to mint its own token or fall back to a
-// placeholder — cycle 135 audit C1: scout used `59576594e2e8d5c3` instead
-// of the actual `5b96ecb69a0c848f` from challenge-token.txt.
 func TestComposePrompt_InjectsChallengeTokenFromRequest(t *testing.T) {
 	h := hooks{}
 	req := core.PhaseRequest{
@@ -311,10 +292,6 @@ func TestComposePrompt_InjectsChallengeTokenFromRequest(t *testing.T) {
 	}
 }
 
-// TestComposePrompt_OmitsChallengeTokenLineWhenEmpty pins the symmetric
-// case: when the orchestrator hasn't minted a token yet, scout's prompt
-// stays clean (the agent will then read challenge-token.txt or FAIL
-// loudly per agent-templates.md PR 5 contract — no placeholder mint).
 func TestComposePrompt_OmitsChallengeTokenLineWhenEmpty(t *testing.T) {
 	h := hooks{}
 	req := core.PhaseRequest{Cycle: 1, GoalHash: "x", ProjectRoot: "/p", Workspace: "/w"}
@@ -324,10 +301,6 @@ func TestComposePrompt_OmitsChallengeTokenLineWhenEmpty(t *testing.T) {
 	}
 }
 
-// TestClassify_SelectedTasksHeading — cycle-192: the scout template's backlog
-// heading is "## Selected Tasks" with "### Task N:" subheadings; the classifier
-// must accept it (and the legacy "## Proposed Tasks" + list-item shape) or every
-// current scout report false-FAILs.
 func TestClassify_SelectedTasksHeading(t *testing.T) {
 	current := "# Scout Report\n\n## Selected Tasks\n\n### Task 1: `acs-fix` (HIGH, M)\nbody\n"
 	if got := classify(current, "balanced"); got != core.VerdictPASS {

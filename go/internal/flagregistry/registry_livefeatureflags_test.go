@@ -56,9 +56,6 @@ func TestLiveFeatureFlags_ExcludesCoreInfraAndNonActive(t *testing.T) {
 	}
 }
 
-// TestLiveFeatureFlags_EqualsActiveMinusCore pins the metric identity:
-//
-//	len(LiveFeatureFlags) == count(StatusActive) - count(core-infra)
 func TestLiveFeatureFlags_EqualsActiveMinusCore(t *testing.T) {
 	active, core := 0, 0
 	for _, f := range All {

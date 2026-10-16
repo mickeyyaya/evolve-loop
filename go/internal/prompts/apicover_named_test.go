@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// seedAgentDir writes agents/<name>.md under a temp root and returns the root.
 func seedAgentDir(t *testing.T, name, contents string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -33,7 +32,7 @@ Body content.
 
 func TestNewForProject_OverrideBranch(t *testing.T) {
 	overrideRoot := seedAgentDir(t, "evolve-scout", namedAgent)
-	emptyProject := t.TempDir() // no agents/ here — proves the override wins
+	emptyProject := t.TempDir()
 
 	t.Setenv("EVOLVE_PROMPTS_DIR", overrideRoot)
 	var l *Loader = NewForProject(emptyProject)

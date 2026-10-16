@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
 )
 
-// cliController is the production clicontrol.Controller; resolve and capture are test seams.
-// It holds no mutable state, so one instance is safe for the prober's concurrent fan-out.
 type cliController struct {
 	cfg     *Config
 	deps    Deps
@@ -16,11 +14,9 @@ type cliController struct {
 	capture func(ctx context.Context, cli, command, await string) (string, error)
 }
 
-// NewController builds the production clicontrol.Controller; each Do derives its family's config from the template cfg, so flags never bleed across CLIs.
 func NewController(cfg *Config, deps Deps) clicontrol.Controller {
 	c := &cliController{cfg: cfg, deps: deps.withDefaults(), resolve: LoadManifest}
 	c.capture = func(ctx context.Context, cli, command, _ string) (string, error) {
-		// The await is always the prompt marker today, which captureControl polls for.
 		return captureControl(ctx, c.perFamilyConfig(cli), c.deps, cli, command, helpCaptureSettleTicks)
 	}
 	return c
@@ -40,8 +36,6 @@ func (c *cliController) perFamilyConfig(cli string) *Config {
 	return &out
 }
 
-// Do runs one control event on the family's interactive driver. An unmapped event returns
-// clicontrol.ErrUnsupported without booting a REPL.
 func (c *cliController) Do(ctx context.Context, family string, ev clicontrol.Event) (clicontrol.Response, error) {
 	resp := clicontrol.Response{Family: family, Event: ev}
 	cli := family + "-tmux"

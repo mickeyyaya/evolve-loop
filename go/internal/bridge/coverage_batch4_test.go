@@ -12,7 +12,6 @@ import (
 )
 
 func TestDrivers_OpenLogsError(t *testing.T) {
-	// --stdout-log points at the workspace dir itself → os.Create fails.
 	t.Parallel()
 	for _, cli := range []string{"claude-p", "codex", "agy"} {
 		t.Run(cli, func(t *testing.T) {
@@ -20,7 +19,7 @@ func TestDrivers_OpenLogsError(t *testing.T) {
 			args := []string{
 				"--cli=" + cli, "--profile=" + fx.profile, "--model=auto",
 				"--prompt-file=" + fx.promptFile, "--workspace=" + fx.ws,
-				"--stdout-log=" + fx.ws, // a directory → Create fails
+				"--stdout-log=" + fx.ws,
 				"--stderr-log=" + fx.stderrLog, "--artifact=" + fx.artifact,
 			}
 			if code, _ := runLookup(t, &fakeRunner{}, args, nil); code != ExitBadFlags {
@@ -36,13 +35,11 @@ func TestEngineLaunch_ArgBranchesAndMissingArtifact(t *testing.T) {
 	prof := writeJSON(t, filepath.Join(ws, "p.json"), `{"name":"n","model":"haiku"}`)
 	art := filepath.Join(ws, "art.md")
 	wt := t.TempDir()
-	// fake runner does NOT write the artifact → success but empty Stdout.
 	fr := &fakeRunner{}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture}) // inert here (headless path); harness uniformity
+	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
 		Workspace: ws, ArtifactPath: art,
-		// Agent="" → default "agent"; Cycle>0 + Worktree exercise those argv branches.
 		Cycle: 5, Worktree: wt,
 	})
 	if err != nil {
@@ -56,13 +53,11 @@ func TestEngineLaunch_ArgBranchesAndMissingArtifact(t *testing.T) {
 	}
 }
 
-// The session name does not already exist, so this exercises the
-// CREATE-NAMED path; the session must be preserved on exit (no /exit).
 func TestRunTmuxREPL_NamedSessionCreate(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	writeJSON(t, fx.artifact, "done")
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots (new session)
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	code, se := runTmux(t, fx, tmux, nil, "--allow-bypass", "--session-name=brandnew")
 	if code != ExitOK {
 		t.Fatalf("named-create exit = %d, want ExitOK; se=%q", code, se)
@@ -76,7 +71,6 @@ func TestRunTmuxREPL_NamedSessionCreate(t *testing.T) {
 }
 
 func TestLoadProfile_ReadDirError(t *testing.T) {
-	// Passing a directory path → os.ReadFile returns a non-ENOENT error.
 	t.Parallel()
 	if _, err := LoadProfile(t.TempDir()); err == nil {
 		t.Fatal("reading a directory as a profile should error")

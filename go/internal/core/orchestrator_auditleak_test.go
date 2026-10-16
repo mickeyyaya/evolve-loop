@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	auditLeakBinV1  = "EVOLVE-BINARY-v1\n"    // committed go/evolve content
-	auditLeakNoteV1 = "operator note v1\n"    // committed docs/note.md content
-	auditLeakChurn  = "rebuilt-by-audit-v2\n" // what the audit phase writes
+	auditLeakBinV1  = "EVOLVE-BINARY-v1\n"
+	auditLeakNoteV1 = "operator note v1\n"
+	auditLeakChurn  = "rebuilt-by-audit-v2\n"
 )
 
 type auditLeakRunner struct {
@@ -64,7 +64,7 @@ func TestOrchestrator_AuditLeakRecover(t *testing.T) {
 	}
 	cases := []struct {
 		name      string
-		leakPaths []string // tracked main-tree files the audit runner overwrites
+		leakPaths []string
 		wantErr   bool
 	}{
 		{name: "clean_audit_no_leak"},
@@ -85,8 +85,6 @@ func TestOrchestrator_AuditLeakRecover(t *testing.T) {
 			}}
 			st := &fakeStorage{}
 			led := &fakeLedger{}
-			// A non-empty worktree path activates the tree-diff guard; gitDirtyPaths
-			// stays the production default so real git answers the snapshots.
 			o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}))
 
 			res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})

@@ -61,8 +61,6 @@ func TestArtifactReady_RelocatesFromWorkspaceSubdir(t *testing.T) {
 }
 
 func TestArtifactReady_RelocatesOverEmptyCanonical(t *testing.T) {
-	// The canonical file is an empty placeholder; the real content lives in
-	// the workspace/ subdir.
 	t.Parallel()
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
@@ -127,8 +125,6 @@ func TestArtifactReady_RelocationFailureSurfacesError(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("read-only directory permissions are not enforced for root")
 	}
-	// The workspace dir is read-only, so the relocation cannot write the
-	// canonical path.
 	ws := t.TempDir()
 	canonical := filepath.Join(ws, "scout-report.md")
 	subdir := filepath.Join(ws, "workspace", "scout-report.md")
@@ -141,7 +137,7 @@ func TestArtifactReady_RelocationFailureSurfacesError(t *testing.T) {
 	if err := os.Chmod(ws, 0o555); err != nil {
 		t.Fatalf("chmod ws read-only: %v", err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(ws, 0o755) }) // let t.TempDir clean up
+	t.Cleanup(func() { _ = os.Chmod(ws, 0o755) })
 
 	cfg := &Config{Workspace: ws, Artifact: canonical}
 	ready, _, err := artifactReady(cfg)
@@ -281,9 +277,6 @@ func TestRelocateFile_HappyPath(t *testing.T) {
 func TestListWorkspaceFiles_PrunesDepthIncludesArtifactPaths(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	// depth 0 (canonical) and depth 1 (non-canonical workspace/) are the two
-	// paths the diagnostic must always show; depth 2 is still listed; a file
-	// whose parent dir is at depth >= wsListMaxDepth must be pruned.
 	seed := map[string][]byte{
 		filepath.Join(ws, "scout-report.md"):                       []byte("a"),
 		filepath.Join(ws, "workspace", "scout-report.md"):          []byte("b"),
@@ -318,7 +311,7 @@ func TestListWorkspaceFiles_CapsEntries(t *testing.T) {
 		}
 	}
 	got := listWorkspaceFiles(ws)
-	if len(got) != wsListMaxEntries+1 { // capped entries + one truncation marker
+	if len(got) != wsListMaxEntries+1 {
 		t.Fatalf("expected %d lines (cap + marker), got %d", wsListMaxEntries+1, len(got))
 	}
 	if !strings.Contains(got[len(got)-1], "truncated") {
@@ -326,8 +319,6 @@ func TestListWorkspaceFiles_CapsEntries(t *testing.T) {
 	}
 }
 
-// assertNoTempArtifacts fails if any ".tmp" temp file from the atomic-write
-// path is left behind under root.
 func assertNoTempArtifacts(t *testing.T, root string) {
 	t.Helper()
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {

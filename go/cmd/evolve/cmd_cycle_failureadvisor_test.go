@@ -65,8 +65,6 @@ func TestFailureAdvisorOpts_ResolvesProfileCLI(t *testing.T) {
 
 func TestFailureAdvisorOpts_AbsentProfileFailsOpen(t *testing.T) {
 	empty := t.TempDir()
-	// Point every resolvellm fallback at the empty tree. failureAdvisorOpts pins
-	// GitRoot; the cwd fallback would otherwise read the real repo's profile.
 	t.Setenv("EVOLVE_PROJECT_ROOT", empty)
 	t.Setenv("EVOLVE_PLUGIN_ROOT", empty)
 	if got := len(failureAdvisorOpts(empty, profileRouter(t, empty, policy.Policy{}), io.Discard)); got != 0 {

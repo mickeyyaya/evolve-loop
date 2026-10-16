@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 )
 
-// sourceCycleFloor returns the highest cycle identity visible in root. Module
-// discovery is checked because an unreadable go/ path cannot safely be treated
-// as an empty ACS inventory.
 func sourceCycleFloor(root string) (int, error) {
 	moduleDir, err := codequality.ResolveModuleDir(root)
 	if err != nil {
@@ -18,9 +15,6 @@ func sourceCycleFloor(root string) (int, error) {
 	return acssuite.HighestCyclePackageNumber(moduleDir)
 }
 
-// verifyFreshCycleSource checks the provisioned source snapshot, after any
-// upstream fetch, for the exact identity allocated from the caller's checkout.
-// Resume bypasses newCycleRun and therefore does not apply this fresh-run gate.
 func verifyFreshCycleSource(root string, cycle int) error {
 	moduleDir, err := codequality.ResolveModuleDir(root)
 	if err != nil {

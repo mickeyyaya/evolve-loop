@@ -1,5 +1,4 @@
-// Package explanationdocs verifies and binds Builder-authored engineering
-// rationale documentation to one cycle's base-bound source diff.
+// Package explanationdocs verifies and binds a Build's explanation document to its diff.
 package explanationdocs
 
 import (
@@ -36,8 +35,6 @@ const (
 	materialReason        = "the base-bound Build diff contains material changes"
 )
 
-// CurrentContractVersion is the explanation-document contract activated for
-// newly started cycles. Readers retain explicit dispatch for older versions.
 const CurrentContractVersion = contractV1
 
 var fullCommitSHA = regexp.MustCompile(`^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$`)
@@ -54,8 +51,6 @@ type activation struct {
 	BaseSHA         string `json:"base_sha"`
 }
 
-// CycleBinding carries host-owned facts. Callers populate it from orchestrator
-// state, never from an agent-authored workspace artifact.
 type CycleBinding struct {
 	ProjectRoot     string
 	Worktree        string
@@ -72,9 +67,6 @@ type reportDeclaration struct {
 	Reason   string
 }
 
-// Activate records a fresh cycle run's contract in host-owned runtime state.
-// Reusing a non-durable local cycle number replaces an abandoned run marker;
-// resume paths must use RequireActivation instead.
 func Activate(binding CycleBinding) error {
 	if binding.ProjectRoot == "" || binding.Cycle <= 0 || !safeRunID.MatchString(binding.RunID) || binding.Workspace == "" || !supportedContract(binding.ContractVersion) {
 		return fmt.Errorf("project root, positive cycle, run ID, workspace, and a supported contract version are required")
@@ -101,8 +93,6 @@ func Activate(binding CycleBinding) error {
 			}
 			return nil
 		}
-		// Fresh-cycle activation is the host-authorized replacement boundary for
-		// an abandoned run that reused a non-durable local cycle number.
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("inspect activation marker: %w", err)
 	}
@@ -120,9 +110,6 @@ func Activate(binding CycleBinding) error {
 	return err
 }
 
-// RequireActivation verifies an existing marker without creating or replacing
-// it. Resume paths use this so corrupted checkpoint identity cannot rebind a
-// cycle by calling the fresh-cycle activation transition.
 func RequireActivation(binding CycleBinding) error {
 	_, active, err := resolveActivation(binding)
 	if err != nil {
@@ -134,9 +121,6 @@ func RequireActivation(binding CycleBinding) error {
 	return nil
 }
 
-// CheckBuild validates the cycle-owned explanation and writes the derived
-// workspace handoff on success. The host marker is the sole activation
-// authority; legacy cycles without one remain exempt.
 func CheckBuild(ctx context.Context, binding CycleBinding) []string {
 	return renderFailures(checkBuild(ctx, binding))
 }
@@ -191,8 +175,6 @@ func checkBuildV1(ctx context.Context, binding CycleBinding) ([]string, error) {
 	return checkRequired(ctx, binding, declaration, paths, material, diffSHA)
 }
 
-// Load reads the derived explanation handoff. Audit and Ship call Verify before
-// trusting its referenced document.
 func Load(workspace string) (*phaseio.ExplanationView, error) {
 	body, _, err := readRegularWithin(workspace, manifestFilename)
 	if err != nil {
@@ -205,9 +187,6 @@ func Load(workspace string) (*phaseio.ExplanationView, error) {
 	return &view, nil
 }
 
-// Verify re-checks the Build handoff against the host-owned base, current diff,
-// permanent document, and sealed result snapshot. active is false only for a
-// legacy cycle with no activated contract.
 func Verify(ctx context.Context, binding CycleBinding) (*phaseio.ExplanationView, bool, error) {
 	binding, active, err := resolveBuildActivation(binding)
 	if err != nil || !active {
@@ -216,9 +195,6 @@ func Verify(ctx context.Context, binding CycleBinding) (*phaseio.ExplanationView
 	return verifyResolved(ctx, binding, binding.Worktree)
 }
 
-// VerifyLanded re-checks a shipped snapshot against ProjectRoot after the
-// cycle worktree has been cleaned up. landedCommit must still be ProjectRoot's
-// exact HEAD; callers establish it from the host ship binding, not agent data.
 func VerifyLanded(ctx context.Context, binding CycleBinding, landedCommit string) (*phaseio.ExplanationView, bool, error) {
 	binding, active, err := resolveBuildActivation(binding)
 	if err != nil || !active {
@@ -473,17 +449,10 @@ func readBuildReport(workspace string) (string, error) {
 	return "", errors.New("build-report.md is missing")
 }
 
-// RenderNotApplicableDeclaration is the producer-side render of the one
-// declaration checkNotApplicable accepts: the Explanation Documentation
-// section with Status NOT_APPLICABLE, the given Reason, and no Document.
-// Every synthetic Build producer (the in-process fake runner, the e2e fake
-// CLI, the --simulate stub) emits it through here so the grammar has one
-// owner — the validator beside it.
 func RenderNotApplicableDeclaration(reason string) string {
 	return "## Explanation Documentation\n- Status: NOT_APPLICABLE\n- Reason: " + reason + "\n"
 }
 
-// declares holds when the Build report still declares exactly the sealed handoff.
 func declares(declaration reportDeclaration, view *phaseio.ExplanationView) bool {
 	if view.Status == statusRequired {
 		return declaration.Status == "REQUIRED" && declaration.Document == view.DocumentPath
@@ -507,18 +476,6 @@ func parseDeclaration(report string) (reportDeclaration, bool, error) {
 	}, true, nil
 }
 
-// nonMaterialExactPaths and nonMaterialPrefixes are the paths a Build diff may
-// touch without becoming "material" for the explanation contract.
-//
-// The .evolve entries cover runtime BOOKKEEPING only: the orchestrator
-// symlinks cycle-state.json into every worktree, and changedSince counts
-// untracked files — on a host without the production .gitignore's `.evolve/*`
-// rule that state read as a MATERIAL change, forcing a full REQUIRED
-// explanation for builds that changed no code (every e2e pipeline cycle hung
-// this way). Deliberately NARROW (review HIGH): a blanket .evolve/ exclusion
-// would launder TRACKED config — policy.json flips gates and fleet width,
-// profiles re-route phases — as non-material, exempting exactly the
-// consequential changes this contract exists to document.
 var nonMaterialExactPaths = []string{
 	".evolve/cycle-state.json",
 	".evolve/ledger.jsonl",
@@ -586,9 +543,6 @@ func cycleDocumentPath(cycle int, runID string) string {
 	return path
 }
 
-// DocumentPath returns the collision-resistant permanent path bound to one
-// cycle run. Run identity prevents a fresh clone's local cycle counter from
-// colliding with a document already published by another installation.
 func DocumentPath(cycle int, runID string) (string, error) {
 	if cycle <= 0 || !safeRunID.MatchString(runID) {
 		return "", fmt.Errorf("positive cycle and safe run ID are required for the explanation document path")

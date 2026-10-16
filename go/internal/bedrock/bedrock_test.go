@@ -125,10 +125,6 @@ func TestRoles(t *testing.T) {
 	}
 }
 
-// TestEmit_ParityWithBash verifies byte-identical output vs. the bash original
-// for every known role. This is the prompt-cache contract: any divergence
-// would silently invalidate cache reuse and inflate cost. Skipped when bash
-// is unavailable (e.g. some CI containers).
 func TestEmit_ParityWithBash(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("bash parity test skipped on windows")

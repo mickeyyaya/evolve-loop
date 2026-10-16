@@ -1,12 +1,5 @@
-// Package ciparity holds the pure helpers for the cycle audit's "CI-parity"
-// gate — the deterministic checks that run the EXACT whole-repo CI command set
-// (go vet ./..., -tags acs acs-durable, apicover -enforce) against a cycle's
-// worktree BEFORE ship, so a cycle can never ship green-locally / red-in-CI.
-//
-// This package is a LEAF: pure functions only, no subprocess, no I/O — the
-// audit phase (internal/phases/audit/ciparity.go) supplies the shell-out hooks
-// and calls these to decide scope and extract offenders. Keeping the logic here
-// makes it unit-testable without forking the go toolchain.
+// Package ciparity holds the pure helpers of the cycle audit's CI-parity gate:
+// the scope of the whole-repo checks, the offenders they name and the gate set.
 package ciparity
 
 import (
@@ -20,22 +13,6 @@ import (
 
 const RequiredWorkflow = "required.yml"
 
-// IntersectEnforced returns the enforced apicover package patterns that a cycle
-// actually touched — the intersection of the changed-package set with the
-// go/.apicover-enforce list. Only these need a scoped `apicover -enforce` run
-// (running it over the whole enforce list every cycle would be O(repo), not
-// O(change)).
-//
-//   - changed: package patterns from changedpkgs.ChangedPackages, of the form
-//     "./internal/foo/..." (trailing "/..." wildcard).
-//   - enforceBytes: the raw go/.apicover-enforce file — one "./internal/foo"
-//     pattern per line, plus "#" comments and blank lines.
-//
-// The trailing "/..." on changed entries is stripped before matching, since the
-// enforce list carries the bare package pattern ("./internal/foo"). The result
-// is in enforce-list form (feed straight to `go list`), deduped and sorted for
-// determinism. A nil/empty changed set (best-effort locator returned nothing)
-// yields nil — the caller then skips the scoped apicover run, fail-open.
 func IntersectEnforced(changed []string, enforceBytes []byte) []string {
 	if len(changed) == 0 {
 		return nil
@@ -64,26 +41,10 @@ func IntersectEnforced(changed []string, enforceBytes []byte) []string {
 	return out
 }
 
-// normalizePattern strips whitespace and a single trailing "/..." so a changed
-// entry ("./internal/foo/...") matches its enforce-list form ("./internal/foo").
 func normalizePattern(p string) string {
 	return strings.TrimSuffix(strings.TrimSpace(p), "/...")
 }
 
-// PackageDirHasProductionGoFiles reports whether the package directory behind
-// an enforce-list-form pattern ("./internal/foo", resolved against moduleDir)
-// holds at least one non-test .go file — an exported API surface the repo-wide
-// apicover gate could actually inspect. A TEST-ONLY package (the tdd phase's
-// RED-first mint) has zero exported production symbols, so the graduation
-// obligation is VACUOUS on it: CI's enforce step passes such packages with
-// "0 exported, 0 covered", while flagging them killed cycles 1223/1224/1228
-// with identical fingerprints and halted the 2026-08-02 batch. BOTH graduation
-// seams (build-entry abort, audit offender list) consult this ONE predicate so
-// a package cannot pass the build seam and then die at audit for the same
-// vacuous reason. A recursive pattern ("...") names no single directory, so it
-// reports true (stays flagged, never guessed about). Fail-open on an
-// unreadable dir — a package that cannot be proven obligation-bearing must not
-// fail a phase; the repo-wide CI gate stays the backstop.
 func PackageDirHasProductionGoFiles(moduleDir, pkg string) bool {
 	if strings.Contains(pkg, "...") {
 		return true
@@ -101,17 +62,6 @@ func PackageDirHasProductionGoFiles(moduleDir, pkg string) bool {
 	return false
 }
 
-// NewUngraduatedPackages returns the changed package patterns that live under
-// ./internal/ but are NOT yet listed in the go/.apicover-enforce file — exactly
-// the set IntersectEnforced silently drops (a package new this cycle cannot yet
-// be in the enforce list, so the touched∩enforced intersection excludes it and
-// the unnamed-export gate never inspects it — the recurring
-// warnship_apicover_ci_gap blind spot).
-//
-// Scope mirrors apicover's own: only ./internal/ packages are apicover-scoped,
-// so ./cmd/... entrypoints are never flagged. Normalizes the same way
-// IntersectEnforced does (strips a trailing "/..."), dedupes, and returns a
-// sorted slice (nil when nothing is ungraduated). Pure; no I/O.
 func NewUngraduatedPackages(changed []string, enforceBytes []byte) []string {
 	if len(changed) == 0 {
 		return nil
@@ -131,7 +81,7 @@ func NewUngraduatedPackages(changed []string, enforceBytes []byte) []string {
 	for _, c := range changed {
 		c = normalizePattern(c)
 		if c == "" || !strings.HasPrefix(c, "./internal/") {
-			continue // out of apicover's scope (e.g. ./cmd/...)
+			continue
 		}
 		if enforced[c] || seen[c] {
 			continue
@@ -143,25 +93,8 @@ func NewUngraduatedPackages(changed []string, enforceBytes []byte) []string {
 	return out
 }
 
-// CoverageTags is the SSOT build-tag set covering BOTH tiers the repo gates real
-// coverage behind: //go:build integration (real-FS/git/tmux) AND //go:build acs
-// (in-package acs suites in internal/core, internal/acssuite,
-// internal/phases/audit, internal/evalgate). Every scoped coverage-measuring
-// call site MUST build its `go test` args through CoverageTestArgs so it reads
-// the SAME (tagged) coverage number CI does. An untagged run under-reports a
-// tag-gated package's real coverage by up to 43 points (R1:
-// knowledge-base/research/test-coverage-audit-2026-07.md — internal/phases/ship
-// measured 47.0% plain vs 90.6% tagged), which would let a gate ship on a wrong
-// number; measuring the integration tier alone still under-counts the acs-gated
-// in-package suites. This is the same defect class ADR-0069 fixed once for
-// vet/apicover, now for the coverage dimension.
 const CoverageTags = "integration acs"
 
-// CoverageTestArgs returns tag-parity-correct `go test` args for a scoped
-// coverage-profile run: ["test", "-tags", CoverageTags, "-coverprofile="+
-// coverProfile, pkgs...]. The package list is preserved verbatim and in order
-// as trailing args so `go test` measures exactly the scoped set (dropping it
-// would silently fall back to the whole module). Pure; no I/O.
 func CoverageTestArgs(coverProfile string, pkgs []string) []string {
 	args := []string{"test", "-tags", CoverageTags, "-coverprofile=" + coverProfile}
 	return append(args, pkgs...)

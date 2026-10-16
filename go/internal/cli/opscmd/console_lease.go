@@ -1,12 +1,5 @@
 package opscmd
 
-// console_lease.go — ADR-0080 S4 writer: `evolve console-lease <path>...
-// [--ttl 30m] [--reason text] [--project-root P]` records a time-bounded,
-// exact-path operator lease in the git COMMON dir (the hub — outside every
-// worktree, so no lane phase can author or shadow it; review BLOCK).
-// `--clear` removes it. The reader (internal/core) adopts the lease once at
-// cycle start and treats absent/expired/malformed as an armed guard.
-
 import (
 	"encoding/json"
 	"flag"
@@ -20,16 +13,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
-// leaseFile mirrors internal/core's consoleLease shape (schema owned there;
-// duplicated as a wire struct to keep opscmd free of a core import).
 type leaseFile struct {
 	Paths     []string `json:"paths"`
 	ExpiresAt string   `json:"expires_at"`
 	Reason    string   `json:"reason,omitempty"`
 }
 
-// hubLeasePath resolves the hub-resident lease location for a project root —
-// the SAME resolution the core reader applies (plane.Classify → CommonGitDir).
 func hubLeasePath(projectRoot string) (string, error) {
 	info, err := plane.Classify(projectRoot)
 	if err != nil {
@@ -42,9 +31,6 @@ func hubLeasePath(projectRoot string) (string, error) {
 	return filepath.Join(common, plane.ConsoleLeaseFileName), nil
 }
 
-// normalizeLeasePaths cleans operator input into the exact repo-relative
-// slash form the guard's porcelain paths use (review MEDIUM: a `./` prefix or
-// absolute path silently waived nothing while claiming success).
 func normalizeLeasePaths(projectRoot string, raw []string) ([]string, error) {
 	out := make([]string, 0, len(raw))
 	for _, p := range raw {
@@ -71,11 +57,6 @@ func parseConsoleLeaseArgs(args []string, stderr io.Writer) (ttl time.Duration, 
 	fs.StringVar(&reason, "reason", "", "why the operator is touching the runtime tree")
 	fs.StringVar(&projectRoot, "project-root", ".", "runtime plane root the lease applies to")
 	fs.BoolVar(&clear, "clear", false, "remove the active lease")
-	// Interspersed parse: the documented form is paths-first (`console-lease
-	// <path>... --ttl 30m`), stdlib flag stops at the first positional, and
-	// cmdutil.ReorderArgs is bool-flag-only by contract (it scatters
-	// `--ttl 10m` style values into the positional list) — so collect
-	// positionals ourselves and re-parse the remainder.
 	rest := args
 	for {
 		if err := fs.Parse(rest); err != nil {
@@ -93,14 +74,14 @@ func parseConsoleLeaseArgs(args []string, stderr io.Writer) (ttl time.Duration, 
 func clearConsoleLease(leasePath string, rawPaths []string, stdout, stderr io.Writer) int {
 	if len(rawPaths) > 0 {
 		fmt.Fprintln(stderr, "evolve console-lease: --clear takes no paths (it removes the whole lease)")
-		return 10
+		return exitUsage
 	}
 	if err := os.Remove(leasePath); err != nil && !os.IsNotExist(err) {
 		fmt.Fprintf(stderr, "evolve console-lease: clear: %v\n", err)
-		return 1
+		return exitFail
 	}
 	fmt.Fprintln(stdout, "[console-lease] cleared — tree-diff guard fully armed")
-	return 0
+	return exitOK
 }
 
 var (
@@ -117,34 +98,33 @@ func writeConsoleLease(leasePath string, paths []string, reason string, ttl time
 	}, "", "  ")
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
-		return 1
+		return exitFail
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(leasePath), "console-lease-*.tmp")
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
-		return 1
+		return exitFail
 	}
 	if _, err := tmp.Write(b); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmp.Name())
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
-		return 1
+		return exitFail
 	}
 	if err := leaseCloseTemp(tmp); err != nil {
 		_ = os.Remove(tmp.Name())
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
-		return 1
+		return exitFail
 	}
 	if err := os.Rename(tmp.Name(), leasePath); err != nil {
 		_ = os.Remove(tmp.Name())
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
-		return 1
+		return exitFail
 	}
 	fmt.Fprintf(stdout, "[console-lease] %d path(s) leased until %s at %s — every waived leak still WARNs in the cycle log; adoption is at the NEXT cycle start\n", len(paths), expires.Format(time.RFC3339), leasePath)
-	return 0
+	return exitOK
 }
 
-// RunConsoleLease implements `evolve console-lease`.
 func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	ttl, reason, projectRoot, clear, rawPaths, code, done := parseConsoleLeaseArgs(args, stderr)
 	if done {
@@ -153,7 +133,7 @@ func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	leasePath, err := hubLeasePath(projectRoot)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
-		return 1
+		return exitFail
 	}
 	if clear {
 		return clearConsoleLease(leasePath, rawPaths, stdout, stderr)
@@ -161,11 +141,11 @@ func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	paths, err := normalizeLeasePaths(projectRoot, rawPaths)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
-		return 10
+		return exitUsage
 	}
 	if len(paths) == 0 {
 		fmt.Fprintln(stderr, "evolve console-lease: at least one exact repo-relative path is required (or --clear)")
-		return 10
+		return exitUsage
 	}
 	return writeConsoleLease(leasePath, paths, reason, ttl, stdout, stderr)
 }

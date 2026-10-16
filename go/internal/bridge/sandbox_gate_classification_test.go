@@ -1,7 +1,5 @@
 package bridge
 
-// Required confinement needs an applied wrapper; a nesting marker is not evidence.
-
 import (
 	"context"
 	"os"
@@ -75,14 +73,13 @@ func TestSandboxGate_NamedSessionCannotProveRequestedPolicy(t *testing.T) {
 	}
 }
 
-// The default tmux driver must enforce the same mandatory boundary as headless.
 func TestSandboxGate_TmuxDriverRejectsUnverifiedNestedConfinement(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	cfg := paneLiveCfg(t, ws)
 	cfg.RequireSandbox = true
 	deps := covDeps()
-	deps.Env = map[string]string{"CLAUDECODE": "1"} // nested session — outer sandbox confines
+	deps.Env = map[string]string{"CLAUDECODE": "1"}
 	tmux := &flakyPaneTmux{pane: "❯ hi\n\n❯\n"}
 	deps.Tmux = tmux
 	tick := 0

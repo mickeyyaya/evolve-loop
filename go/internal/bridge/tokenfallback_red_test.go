@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// tokenLaunchFixture returns a request whose workspace holds a
-// tdd-events.ndjson result envelope (in=900 out=210 cache_r=30 cache_c=7) —
-// the exact artifact shape a real tmux launch leaves behind — and an engine
-// wired with the REAL production resolver over an empty (transcript-less)
-// config root.
 func tokenLaunchFixture(t *testing.T, withEventsLog bool) (*Engine, core.BridgeRequest, time.Time) {
 	t.Helper()
 	ws := t.TempDir()
@@ -28,7 +23,7 @@ func tokenLaunchFixture(t *testing.T, withEventsLog bool) (*Engine, core.BridgeR
 	start := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
 	e := NewEngine(Deps{
 		Now:           func() time.Time { return start.Add(90 * time.Second) },
-		TokenResolver: tokenusage.DefaultResolver(t.TempDir()), // empty root: no transcript tier data
+		TokenResolver: tokenusage.DefaultResolver(t.TempDir()),
 	})
 	req := core.BridgeRequest{
 		CLI:          "claude-tmux",
@@ -40,7 +35,6 @@ func tokenLaunchFixture(t *testing.T, withEventsLog bool) (*Engine, core.BridgeR
 	return e, req, start
 }
 
-// readLLMCalls returns the raw contents of the workspace's llm-calls.ndjson.
 func readLLMCalls(t *testing.T, workspace string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(workspace, "llm-calls.ndjson"))

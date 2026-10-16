@@ -12,12 +12,12 @@ func covDeps() Deps {
 	return Deps{
 		Stderr:            io.Discard,
 		Stdout:            io.Discard,
-		LookupEnv:         mapLookup(nil), // no ambient creds → guards don't fire
+		LookupEnv:         mapLookup(nil),
 		NewChallengeToken: func() (string, error) { return "tok", nil },
 		Now:               time.Now,
 		Tmux:              &fakeTmux{},
 		Sleep:             func(time.Duration) {},
-		CaptureBaseline:   zeroBaselineCapture, // where reached: harness seeds model mid-session writes; inert for pre-dispatch error-path tests
+		CaptureBaseline:   zeroBaselineCapture,
 	}
 }
 
@@ -26,7 +26,7 @@ func TestHeadlessDrivers_PreparePromptError(t *testing.T) {
 	ws := t.TempDir()
 	cfg := &Config{
 		Model:      "haiku",
-		PromptFile: "/no/such/prompt-xyz.txt", // unreadable → preparePrompt errors
+		PromptFile: "/no/such/prompt-xyz.txt",
 		Workspace:  ws,
 		Artifact:   filepath.Join(ws, "a.md"),
 		StdoutLog:  filepath.Join(ws, "o.log"),
@@ -56,7 +56,6 @@ func TestRunTmuxREPL_PreparePromptError(t *testing.T) {
 }
 
 func TestEnsureDirs_EmptyFieldsSkipped(t *testing.T) {
-	// Workspace "" → the d=="" continue branch; Dir("")=="." is creatable.
 	t.Parallel()
 	if err := ensureDirs(&Config{}); err != nil {
 		t.Fatalf("ensureDirs(empty) err: %v", err)
@@ -68,8 +67,8 @@ func TestOpenDriverLogs_StderrCreateError(t *testing.T) {
 	ws := t.TempDir()
 	cfg := &Config{
 		Workspace: ws,
-		StdoutLog: filepath.Join(ws, "out.log"), // creatable
-		StderrLog: ws,                           // a directory → Create fails
+		StdoutLog: filepath.Join(ws, "out.log"),
+		StderrLog: ws,
 		Artifact:  filepath.Join(ws, "a.md"),
 	}
 	if _, _, _, err := openDriverLogs(cfg); err == nil {

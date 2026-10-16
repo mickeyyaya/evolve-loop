@@ -1,20 +1,5 @@
 package phasestream
 
-// RED wiring test for cycle-672 top_n task `echo-veto-wiring-completion`
-// (third cycle on this defect class: 654 landed the leaf helpers, 656's
-// wiring attempt was quota-killed, 672 completes the consumption wiring).
-//
-// TestClassifier_SetInjectedPrompt proves the echo veto works when called
-// directly — but grep shows ZERO production call sites: Produce() constructs
-// the Classifier (produce.go) and never threads the phase prompt in, so the
-// live emit path still classifies echoed prompt text as infra_failure
-// (cycle-656 retro D3: a 100%-echoed pane classified rate_limit).
-//
-// This test pins the WIRING: ProduceConfig must carry the injected prompt and
-// Produce must hand it to the Classifier before classifying. RED today:
-// ProduceConfig has no InjectedPrompt field — compile failure. DO NOT MODIFY;
-// Builder adds the field + the SetInjectedPrompt call to make it GREEN.
-
 import (
 	"bufio"
 	"encoding/json"
@@ -23,7 +8,6 @@ import (
 	"testing"
 )
 
-// readEventEnvelopes parses <ws>/<phase>-events.ndjson written by Produce.
 func readEventEnvelopes(t *testing.T, ws, phase string) []Envelope {
 	t.Helper()
 	f, err := os.Open(filepath.Join(ws, phase+"-events.ndjson"))
@@ -47,10 +31,6 @@ func readEventEnvelopes(t *testing.T, ws, phase string) []Envelope {
 	return envs
 }
 
-// TestC672_001_ProduceInjectedPromptEchoVeto — AC1 (mechanism wiring): Produce
-// over an on-disk workspace whose stderr log echoes a line of the injected
-// prompt must emit NO infra_failure for it; a genuine provider error frame in
-// an otherwise-identical workspace must still emit (negative/anti-no-op axis).
 func TestC672_001_ProduceInjectedPromptEchoVeto(t *testing.T) {
 	const prompt = "Adversarial Reviewer checklist: unbounded allocation or recursion; " +
 		"TOCTOU / race windows; missing rate limits. Report exploits only."
@@ -78,7 +58,7 @@ func TestC672_001_ProduceInjectedPromptEchoVeto(t *testing.T) {
 				Phase:          "review",
 				CLI:            "claude",
 				Cycle:          672,
-				InjectedPrompt: prompt, // RED: field does not exist yet
+				InjectedPrompt: prompt,
 			})
 			if err != nil {
 				t.Fatalf("Produce: %v", err)

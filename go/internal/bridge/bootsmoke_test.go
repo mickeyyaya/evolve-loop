@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-// bootSmokeDeps scripts fakeTmux with a no-op Sleep and an empty env, so the cost-leak guards see no ANTHROPIC_* keys.
 func bootSmokeDeps(tmux *fakeTmux) (Deps, *bytes.Buffer) {
 	var stderr bytes.Buffer
 	return Deps{
@@ -23,7 +22,7 @@ func bootSmokeDeps(tmux *fakeTmux) (Deps, *bytes.Buffer) {
 func TestBootSmokeTest_BootSuccess(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	tmux := &fakeTmux{paneSeq: []string{"❯"}} // ❯ marker on first capture
+	tmux := &fakeTmux{paneSeq: []string{"❯"}}
 	deps, _ := bootSmokeDeps(tmux)
 	rc, _ := BootSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, deps)
 	if rc != ExitOK {
@@ -87,7 +86,7 @@ func TestBootSmokeTest_SandboxPrefixApplied(t *testing.T) {
 
 func TestBootSmokeTest_NilCfg(t *testing.T) {
 	t.Parallel()
-	tmux := &fakeTmux{paneSeq: []string{"❯"}} // prompt marker present → boot succeeds
+	tmux := &fakeTmux{paneSeq: []string{"❯"}}
 	deps, _ := bootSmokeDeps(tmux)
 	rc, _ := BootSmokeTest(context.Background(), "claude-tmux", nil, deps)
 	if rc != ExitOK {

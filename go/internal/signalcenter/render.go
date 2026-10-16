@@ -6,14 +6,8 @@ import (
 	"strings"
 )
 
-// RenderCodes projects the code registry into markdown — one table per
-// module, modules and codes sorted — the GENERATED region of
-// docs/architecture/signal-codes.md (`evolve signals codes generate|check`).
-// One source (RegisterCode), one projection: a code cannot be documented
-// differently from how it is registered.
 func RenderCodes() string { return renderCodes(RegisteredCodes()) }
 
-// renderCodes is the pure projection of one registry snapshot.
 func renderCodes(all map[Module][]CodeDoc) string {
 	modules := make([]Module, 0, len(all))
 	for m := range all {

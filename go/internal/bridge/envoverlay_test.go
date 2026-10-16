@@ -47,7 +47,7 @@ func TestEnvInt_DepsEnvOverlay(t *testing.T) {
 func TestRunTmuxREPL_TimeoutFromDeps(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "stop now"}}}
 	eng := newTestEngine(Deps{
 		Tmux:             tmux,

@@ -1,12 +1,5 @@
 package quotareset_test
 
-// Black-box, environment-agnostic coverage of the quota-reset wake-time
-// parameters that replaced EVOLVE_QUOTA_RESET_AT / EVOLVE_QUOTA_RESET_HOURS.
-// Every behavior is driven ONLY through the public API quotareset.Compute and
-// the typed quotareset.Options — never via os.Getenv / t.Setenv. The clock and
-// the hint file are the only inputs, both supplied as parameters, so the suite
-// is fully deterministic and repeatable (F.I.R.S.T.).
-
 import (
 	"os"
 	"path/filepath"
@@ -16,15 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
-// refNow is a deterministic clock: 2026-06-20 14:00:00 UTC. Hint times before
-// 14:00 roll to tomorrow; times after stay today.
 func refNow() time.Time { return time.Date(2026, 6, 20, 14, 0, 0, 0, time.UTC) }
 
-// fixedClock returns refNow as an Options.Now seam.
 func fixedClock() func() time.Time { return func() time.Time { return refNow() } }
 
-// hintWorkspace writes $ws/quota-reset-hint.txt with body and returns ws.
-// An empty body produces a size-0 file (the "empty hint" edge case).
 func hintWorkspace(t *testing.T, body string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -34,8 +22,6 @@ func hintWorkspace(t *testing.T, body string) string {
 	return ws
 }
 
-// --- Source 1: opts.ResetAt (operator override) ------------------------------
-
 func TestCompute_Source1_ResetAt(t *testing.T) {
 	valid := "2026-06-21T09:00:00Z"
 	cases := []struct {
@@ -43,7 +29,7 @@ func TestCompute_Source1_ResetAt(t *testing.T) {
 		resetAt    string
 		wantSource string
 		wantISO    string
-		wantWake   time.Time // only asserted when wantSource == "operator-override"
+		wantWake   time.Time
 	}{
 		{"valid-rfc3339", valid, "operator-override", valid, time.Date(2026, 6, 21, 9, 0, 0, 0, time.UTC)},
 		{"unparseable-nonempty", "not-a-time", "operator-override", "not-a-time", refNow()},
@@ -53,7 +39,6 @@ func TestCompute_Source1_ResetAt(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r, err := quotareset.Compute("", quotareset.Options{ResetAt: tc.resetAt, Now: fixedClock()})
-			// Act/Assert
 			if err != nil {
 				t.Fatalf("Compute never errors on this path, got %v", err)
 			}
@@ -72,10 +57,8 @@ func TestCompute_Source1_ResetAt(t *testing.T) {
 	}
 }
 
-// --- Precedence across the three sources -------------------------------------
-
 func TestCompute_SourcePrecedence(t *testing.T) {
-	ws := hintWorkspace(t, "resets 8:30pm") // a parseable hint, present in all rows
+	ws := hintWorkspace(t, "resets 8:30pm")
 	override := "2026-06-21T09:00:00Z"
 	cases := []struct {
 		name       string
@@ -98,14 +81,12 @@ func TestCompute_SourcePrecedence(t *testing.T) {
 	}
 }
 
-// --- Source 2: hint-file parsing (exercised THROUGH Compute, public API) -----
-
 func TestCompute_Source2_HintParsing(t *testing.T) {
 	cases := []struct {
 		name       string
 		hint       string
 		wantSource string
-		wantDay    int // only checked when parsed
+		wantDay    int
 		wantHour   int
 		wantMin    int
 	}{
@@ -167,8 +148,6 @@ func TestCompute_Source3_DefaultHours(t *testing.T) {
 		})
 	}
 }
-
-// --- Result projection -------------------------------------------------------
 
 func TestResult_Format(t *testing.T) {
 	r := quotareset.Result{ISO: "2026-06-21T09:00:00Z", Source: "operator-override"}

@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
 )
 
-// runBridgeControl drives one abstract control event through the family's
-// manifest mapping and prints the captured pane.
 func runBridgeControl(args []string, stdout, stderr io.Writer) int {
 	var positional []string
 	ws := ""
@@ -54,8 +52,6 @@ func runBridgeControl(args []string, stdout, stderr io.Writer) int {
 	return emitControl(ctrl.Do, family, event, stdout, stderr)
 }
 
-// emitControl maps a control outcome to output and exit code: 0 ok, 3 an
-// unsupported pairing, 1 any other failure.
 func emitControl(
 	do func(context.Context, string, clicontrol.Event) (clicontrol.Response, error),
 	family, event string, stdout, stderr io.Writer,

@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// gitRec is a recording sysexec.RunFunc for core's white-box git tests; core
-// cannot import test/fixtures.FakeExec (import cycle), so this mirrors the
-// sysexec contract directly: a non-zero process exit returns (code, nil).
 type gitRec struct {
 	stdout, stderr string
 	exit           int
@@ -34,8 +31,6 @@ func (r *gitRec) run(_ context.Context, name, dir string, args, _ []string, _ io
 	return r.exit, nil
 }
 
-// useFakeGit is white-box (package core) so it can reach the unexported
-// gitRunner seam, swapping it for the recorder and restoring it on cleanup.
 func useFakeGit(t *testing.T, r *gitRec) {
 	t.Helper()
 	orig := gitRunner
@@ -44,7 +39,7 @@ func useFakeGit(t *testing.T, r *gitRec) {
 }
 
 func TestRecoverBuildLeak_UsesInjectedGit(t *testing.T) {
-	r := &gitRec{stdout: ""} // empty porcelain → no leaks → clean true
+	r := &gitRec{stdout: ""}
 	useFakeGit(t, r)
 
 	if ok := recoverBuildLeak(context.Background(), leakRecovery{projectRoot: "/proj", worktree: "/proj/.evolve/worktrees/cycle-1", baseline: map[string]bool{}, authority: sourceWriterAuthority}); !ok {

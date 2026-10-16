@@ -2,7 +2,6 @@ package flagregistry
 
 import "testing"
 
-// FlagCeiling is the one-way upper bound on len(All).
 const FlagCeiling = 26
 
 func TestRegistry_FlagCeiling(t *testing.T) {
@@ -12,7 +11,6 @@ func TestRegistry_FlagCeiling(t *testing.T) {
 	}
 }
 
-// LiveFeatureFlagCeiling is the one-way upper bound on len(LiveFeatureFlags()).
 const LiveFeatureFlagCeiling = 11
 
 func TestRegistry_LiveFeatureFlagCeiling(t *testing.T) {

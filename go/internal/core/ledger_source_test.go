@@ -73,7 +73,6 @@ func TestLedgerEntrySource_RoundTrip(t *testing.T) {
 		t.Errorf("round-tripped source = %q, want \"router\" (UnmarshalJSON must route the field)", got)
 	}
 
-	// omitempty negative: no source in → no "source" key out.
 	plain, err := json.Marshal(LedgerEntry{TS: "2026-06-06T00:00:00Z", Cycle: 230, Role: "scout", Kind: "phase_start"})
 	if err != nil {
 		t.Fatalf("marshal plain: %v", err)

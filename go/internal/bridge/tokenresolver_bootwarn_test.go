@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
-// stubResolver is a minimal non-nil TokenResolver for the wired case.
 func stubResolver(tokenusage.Window) (tokenusage.Result, error) {
 	return tokenusage.Result{}, nil
 }

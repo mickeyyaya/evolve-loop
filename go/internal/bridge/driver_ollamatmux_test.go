@@ -53,8 +53,6 @@ func TestOllamaTmux_RejectsWritePhase(t *testing.T) {
 	if !strings.Contains(stderr.String(), "cannot run worktree phase") {
 		t.Errorf("stderr missing the 'cannot run worktree phase' explanation: %q", stderr.String())
 	}
-	// Defensive: the error message names the phase + worktree so an operator
-	// auditing logs can find the misassigned phase quickly.
 	msg := err.Error()
 	if !strings.Contains(msg, "build") || !strings.Contains(msg, "/abs/wt/cycle-5") {
 		t.Errorf("error %q should name phase + worktree", msg)
@@ -62,8 +60,6 @@ func TestOllamaTmux_RejectsWritePhase(t *testing.T) {
 }
 
 func TestOllamaTmux_AcceptsReasoningPhase_RejectionDoesNotFire(t *testing.T) {
-	// A bogus binary forces tmuxNonClaudePreflight to short-circuit before
-	// launching real tmux, so only the rejection's ABSENCE is asserted here.
 	t.Parallel()
 	var stderr strings.Builder
 	deps := Deps{
@@ -93,15 +89,11 @@ func TestOllamaTmux_RealCLI_BootMarkerDetected(t *testing.T) {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		t.Skip("tmux not installed; skipping real-CLI ground-truth test")
 	}
-	// This only proves the binary is reachable; it does not invoke the driver
-	// against a real model (needs a pulled model and boot time, and flakes on
-	// shared hosts). The real-CLI flow runs under the real-tmux integration
-	// suite (EVOLVE_BRIDGE_INTEGRATION_LIVE=1).
 	d, ok := LookupDriver("ollama-tmux")
 	if !ok {
 		t.Fatal("ollama-tmux driver missing despite host having both binaries")
 	}
-	_ = d // touch to silence linter
+	_ = d
 }
 
 func TestOllamaTmux_LaunchCmdComposition(t *testing.T) {
@@ -206,7 +198,6 @@ func TestOllamaTmux_LaunchSignatureMatchesDriver(t *testing.T) {
 }
 
 func TestOllamaTmux_WorktreeFromPhaseRequest(t *testing.T) {
-	// PhaseRequest.Worktree is the non-bridge mirror of cfg.Worktree.
 	t.Parallel()
 	var pr core.PhaseRequest
 	pr.Worktree = "/abs/wt"
