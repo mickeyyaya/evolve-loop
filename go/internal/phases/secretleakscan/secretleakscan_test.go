@@ -45,10 +45,9 @@ func TestScanDiff_DetectsPlantedSecrets(t *testing.T) {
 }
 
 func TestScanDiff_IgnoresRemovedAndContextAndHeaderLines(t *testing.T) {
-	// A secret on a removed line, a context line, and the +++ header must all be ignored.
-	diff := "+++ b/AKIAIOSFODNN7EXAMPLE\n" + // header, even if it looks like a key
-		"-const old = \"AKIAIOSFODNN7EXAMPLE\"\n" + // removed
-		" const ctx = \"AKIAIOSFODNN7EXAMPLE\"\n" // context
+	diff := "+++ b/AKIAIOSFODNN7EXAMPLE\n" +
+		"-const old = \"AKIAIOSFODNN7EXAMPLE\"\n" +
+		" const ctx = \"AKIAIOSFODNN7EXAMPLE\"\n"
 	if f := ScanDiff(diff); len(f) != 0 {
 		t.Errorf("removed/context/header lines produced findings: %+v", f)
 	}

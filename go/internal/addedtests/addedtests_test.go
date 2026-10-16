@@ -21,11 +21,6 @@ func write(t *testing.T, root, rel, body string) {
 	}
 }
 
-// TestGroups_TagGatedAddedPackagesRunUnderTheirOwnTags — the cycle-1679 shape:
-// an added //go:build acs package must be grouped under acs (the default
-// context never sees it), an untagged added package stays in the default
-// group, a modified test is not a candidate, and a requires_tmux test is
-// excluded by name rather than silently dropped.
 func TestGroups_TagGatedAddedPackagesRunUnderTheirOwnTags(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "go/acs/cycle1676/predicates_test.go", "//go:build acs\n\npackage cycle1676\n")
@@ -57,8 +52,6 @@ func TestGroups_TagGatedAddedPackagesRunUnderTheirOwnTags(t *testing.T) {
 	}
 }
 
-// TestBuildTags names the tag resolver: default context, a single tag, and
-// the requires_tmux exclusion.
 func TestBuildTags(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "plain_test.go", "package x\n")
@@ -75,8 +68,6 @@ func TestBuildTags(t *testing.T) {
 	}
 }
 
-// TestGroup_NamesTheTagSetAndItsPackages names the Group type for apicover:
-// a group is one tag set and the packages that build under it.
 func TestGroup_NamesTheTagSetAndItsPackages(t *testing.T) {
 	g := addedtests.Group{Tags: []string{"acs"}, Packages: []string{"./acs/cycle1676"}}
 	if strings.Join(g.Tags, ",") != "acs" || len(g.Packages) != 1 {

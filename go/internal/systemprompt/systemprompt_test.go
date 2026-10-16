@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// systemprompt_test.go — precedence resolution for the launch-time
-// system-prompt/rules (facet B):
-//   EVOLVE_<AGENT>_SYSTEM_PROMPT > EVOLVE_SYSTEM_PROMPT
-//     > profile.system_prompt > read(profile.digest_file) > read(profile.system_prompt_file) > ""
-
 func writeProfile(t *testing.T, dir, agent, json string) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -76,7 +71,6 @@ func TestResolve_NothingSet(t *testing.T) {
 	if got := Resolve("build", dir, nil); got != "" {
 		t.Errorf("got %q, want empty", got)
 	}
-	// Missing profile is also empty, not an error.
 	if got := Resolve("nope", dir, nil); got != "" {
 		t.Errorf("missing profile: got %q, want empty", got)
 	}
@@ -116,13 +110,6 @@ func TestResolve_DigestFileUnsetLeavesChainUnchanged(t *testing.T) {
 }
 
 func TestResolve_ProcessEnvDoesNotOverrideProfile(t *testing.T) {
-	// After the envchain.ResolveNoOS migration, EVOLVE_SYSTEM_PROMPT in the
-	// process environment must NOT win over a profile-set system_prompt when
-	// reqEnv is nil. The 4-tier chain drops tier-2 (os.Getenv) for this key,
-	// becoming: reqEnv → profile → def.
-	//
-	// RED: current Resolve calls envchain.Resolve which includes os.Getenv tier
-	// → returns "from-process-env". Builder must switch to envchain.ResolveNoOS.
 	dir := t.TempDir()
 	writeProfile(t, dir, "build", `{"name":"build","system_prompt":"from-profile"}`)
 

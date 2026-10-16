@@ -126,3 +126,18 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/soakreport` | the read-only soak evidence reporter for the phase-recovery enforce flip | [internal-soakreport.md](internal-soakreport.md) |
 | `internal/verifylock` | serializes the expensive go-test verification runs of one host | [internal-verifylock.md](internal-verifylock.md) |
 | `test/trustkernel` | black-box tests that pin the trust-kernel safety invariants | [test-trustkernel.md](test-trustkernel.md) |
+| `internal/projecthash` | computes the 8-char namespace that isolates one project's state, byte-exact with the bash pipeline | [internal-projecthash.md](internal-projecthash.md) |
+| `internal/deliverable/gatesignal` | reports each contract gate decision to the Signal Center under module `gate.contract` | [internal-deliverable-gatesignal.md](internal-deliverable-gatesignal.md) |
+| `internal/systemprompt` | resolves the launch-time system prompt for an agent, with the env and profile precedence chain | [internal-systemprompt.md](internal-systemprompt.md) |
+| `internal/quotastate` | parses a CLI's usage pane into a structured quota snapshot in its native units | [internal-quotastate.md](internal-quotastate.md) |
+| `internal/sizeratchet` | enforces the 50-line function limit across a Go module, with a shrink-only offender list | [internal-sizeratchet.md](internal-sizeratchet.md) |
+| `internal/phases/secretleakscan` | the native secret-leak-scan phase: a deterministic regex scan of the added lines of a diff | [internal-phases-secretleakscan.md](internal-phases-secretleakscan.md) |
+| `cmd/filter-stdout` | operator utility that writes a workspace's `<phase>-stdout.clean.txt` companion | [cmd-filter-stdout.md](cmd-filter-stdout.md) |
+| `internal/kerneltest` | a rename-proof fixture of the shipped phase registry for kernel tests | [internal-kerneltest.md](internal-kerneltest.md) |
+| `internal/bridge/keyspec` | classifies tmux key-spec tokens and flags likely typos without blocking a keystroke | [internal-bridge-keyspec.md](internal-bridge-keyspec.md) |
+| `internal/addedtests` | derives which test packages a tree adds and the build tags each must run under | [internal-addedtests.md](internal-addedtests.md) |
+| `internal/bedrock` | emits the byte-identical trust-boundary prefix of a subagent invocation, for prompt caching | [internal-bedrock.md](internal-bedrock.md) |
+| `internal/textutil` | byte-based string-shortening helpers for human-facing diagnostics | [internal-textutil.md](internal-textutil.md) |
+| `internal/textcap` | the two rune-cap text rules: trim and ` …[truncated]`, or the bare ellipsis | [internal-textcap.md](internal-textcap.md) |
+| `internal/phases/flakererunscan` | the native flake-rerun phase: reruns a test and flags it flaky when its outcomes disagree | [internal-phases-flakererunscan.md](internal-phases-flakererunscan.md) |
+| `internal/guardslog` | appends one timestamped guard-log line and returns the close error | [internal-guardslog.md](internal-guardslog.md) |

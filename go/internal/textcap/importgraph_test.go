@@ -1,9 +1,5 @@
 package textcap
 
-// importgraph_test.go — textcap is a stdlib-only leaf (ADR-0103 unit 04 §2):
-// the two rune-cap rules must never grow a dependency, or the advisor and the
-// carryover lifecycle would inherit it (signalcenter/importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

@@ -1,11 +1,5 @@
-// Package addedtests is the ONE derivation of "which test packages does this
-// tree ADD, and under which build tags must each run" — the seed the ship's
-// repo-contract added-test backstop has used since #612, now shared with the
-// build floor so a red added test is found while the builder still owns the
-// tree. Cycle 1679 (2026-09-14): an added `//go:build acs` package was
-// invisible to the floor's default-context run (no GoFiles in that context)
-// and first executed by the ship gate, where its red cost repair rounds the
-// builder could not apply.
+// Package addedtests derives which test packages a tree adds and the build tags each must run under.
+// The ship gate and the build floor share this one derivation.
 package addedtests
 
 import (
@@ -20,19 +14,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 )
 
-// Group is one set of added test packages that run under the same build tags
-// (Tags empty = the default build context).
 type Group struct {
 	Tags     []string
 	Packages []string
 }
 
-// Groups collects the ADDED test files among files (repo-relative paths; only
-// go/**/_test.go count — a modified test's package is the importer backstop's
-// job) and groups their packages by the build tags each file declares, so a
-// tag-guarded reproducer runs under its own tags. Excluded lists the added
-// tests no tag selection can run on this host (requires_tmux, or a constraint
-// too wide to enumerate) — callers name them rather than silently skipping.
 func Groups(root string, files []changedpkgs.ChangedFile) (groups []Group, excluded []string, err error) {
 	packagesByTags := map[string]map[string]bool{}
 	tagsByKey := map[string][]string{}
@@ -73,10 +59,8 @@ func Groups(root string, files []changedpkgs.ChangedFile) (groups []Group, exclu
 	return groups, excluded, nil
 }
 
-// BuildTags reports the smallest tag selection under which the file at path
-// builds: (nil, true) when it builds in the default context; (_, false) when
-// no selection runs it here (requires_tmux, or more than 12 tags — the
-// exhaustive search's ceiling; upgrade to a constraint solver past it).
+const maxSearchTags = 12
+
 func BuildTags(path string) (tags []string, runnable bool, err error) {
 	dir, name := filepath.Dir(path), filepath.Base(path)
 	match, err := build.Default.MatchFile(dir, name)
@@ -89,7 +73,7 @@ func BuildTags(path string) (tags []string, runnable bool, err error) {
 	}
 	tagSet := map[string]bool{}
 	collectTags(expr, tagSet)
-	if tagSet["requires_tmux"] || len(tagSet) > 12 {
+	if tagSet["requires_tmux"] || len(tagSet) > maxSearchTags {
 		return nil, false, nil
 	}
 	all := make([]string, 0, len(tagSet))

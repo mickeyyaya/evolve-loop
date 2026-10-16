@@ -500,10 +500,12 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/adapters/sandbox` | 2 | [internal-adapters-sandbox.md](internal-adapters-sandbox.md) |
 | `internal/adapters/statemap` | 7 | [internal-adapters-statemap.md](internal-adapters-statemap.md) |
 | `internal/adapters/storage` | 7 | [internal-adapters-storage.md](internal-adapters-storage.md) |
+| `internal/addedtests` | 2 | [internal-addedtests.md](internal-addedtests.md) |
 | `internal/auditchain` | 6 | [internal-auditchain.md](internal-auditchain.md) |
 | `internal/binaryguard` | 1 | [internal-binaryguard.md](internal-binaryguard.md) |
 | `internal/bridge/channel` | 11 | [internal-bridge-channel.md](internal-bridge-channel.md) |
 | `internal/bridge/clicontrol` | 2 | [internal-bridge-clicontrol.md](internal-bridge-clicontrol.md) |
+| `internal/bridge/keyspec` | 1 | [internal-bridge-keyspec.md](internal-bridge-keyspec.md) |
 | `internal/bridge/panestream` | 44 | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge` | 433 | [internal-bridge.md](internal-bridge.md) |
 | `internal/campaign` | 4 | [internal-campaign.md](internal-campaign.md) |
@@ -525,6 +527,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/cycleoutcome` | 1 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/cyclestate` | 24 | [internal-cyclestate.md](internal-cyclestate.md) |
 | `internal/dashboard` | 8 | [internal-dashboard.md](internal-dashboard.md) |
+| `internal/deliverable/gatesignal` | 2 | [internal-deliverable-gatesignal.md](internal-deliverable-gatesignal.md) |
 | `internal/deliverable` | 116 | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/digest` | 3 | [internal-digest.md](internal-digest.md) |
 | `internal/dossier` | 38 | [internal-dossier.md](internal-dossier.md) |
@@ -575,6 +578,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/profiles` | 30 | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | 51 | [internal-prompts.md](internal-prompts.md) |
 | `internal/quotareset` | 1 | [internal-quotareset.md](internal-quotareset.md) |
+| `internal/quotastate` | 1 | [internal-quotastate.md](internal-quotastate.md) |
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/recovery` | 39 | [internal-recovery.md](internal-recovery.md) |
 | `internal/regressiontia` | 5 | [internal-regressiontia.md](internal-regressiontia.md) |
@@ -594,6 +598,8 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/subagent/subagentrun` | 6 | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
 | `internal/subagent` | 26 | [internal-subagent.md](internal-subagent.md) |
 | `internal/swarm` | 18 | [internal-swarm.md](internal-swarm.md) |
+| `internal/systemprompt` | 1 | [internal-systemprompt.md](internal-systemprompt.md) |
+| `internal/textcap` | 4 | [internal-textcap.md](internal-textcap.md) |
 | `internal/tokenusage` | 24 | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |
 | `internal/triagecap` | 69 | [internal-triagecap.md](internal-triagecap.md) |
