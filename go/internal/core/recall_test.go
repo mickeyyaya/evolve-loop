@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 )
 
-// fakeKB is a test double for research.KB capturing the query it received.
 type fakeKB struct {
 	lessons  []research.Lesson
 	err      error

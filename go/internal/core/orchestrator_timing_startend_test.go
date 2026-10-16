@@ -10,9 +10,6 @@ import (
 	"time"
 )
 
-// readTimings unmarshals <workspace>/phase-timing.json. Duplicated here
-// (rather than reused) because orchestrator_phaseoutcome_test.go's equivalent
-// sits behind a build tag this default-suite file cannot see.
 func readTimings(t *testing.T, workspace string) []map[string]any {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(workspace, "phase-timing.json"))
@@ -40,8 +37,6 @@ func timingEntry(t *testing.T, entries []map[string]any, phase string) map[strin
 	return found[0]
 }
 
-// advancingClock returns a monotonically increasing clock. Mutex-guarded so a
-// concurrent observer probe cannot race the dispatch under `go test -race`.
 func advancingClock(start time.Time, step time.Duration) func() time.Time {
 	var mu sync.Mutex
 	var n int64
@@ -151,7 +146,6 @@ func TestPhaseTiming_ArchetypeClassified(t *testing.T) {
 		t.Fatalf("RunCycle: %v", err)
 	}
 	entries := readTimings(t, cycleWorkspaceDir(root, res.Cycle))
-	// Spot-check one phase per archetype against the canonical taxonomy.
 	want := map[string]string{
 		"scout": "plan", "build": "build", "audit": "evaluate", "ship": "control",
 	}

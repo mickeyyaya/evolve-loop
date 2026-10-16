@@ -14,10 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// secondCallErrRunner PASSes every invocation except its 2nd one, which
-// fails with a plain (non-transient, non-integrity) error. In a 3-cycle
-// batch with one scout dispatch per cycle, that makes cycle 2 the failing
-// cycle while cycles 1 and 3 succeed.
 type secondCallErrRunner struct {
 	name  string
 	calls int
@@ -32,8 +28,6 @@ func (r *secondCallErrRunner) Run(context.Context, core.PhaseRequest) (core.Phas
 	return core.PhaseResponse{Verdict: core.VerdictPASS}, nil
 }
 
-// TestLoop_CycleLevelFailureContinues: loop with 3 cycles, the second fails
-// with ErrCycleLevelFailure, and the third cycle still runs.
 func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 	projectRoot := t.TempDir()
 	initLoopContractRepo(t, projectRoot)
@@ -66,15 +60,11 @@ func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 		"--cycles", "3",
 	}, nil, &stdout, &stderr)
 
-	// 1. Batch survives: rc=2 is the batch-fatal contract and must NOT fire
-	// for a cycle-level failure. (rc=0 or the recoverable-failure rc=3 are
-	// both acceptable "batch completed" codes.)
 	if rc == 2 {
 		t.Fatalf("rc=2 (batch-fatal) for a cycle-level failure — batch must continue; stderr=%q stdout=%q",
 			stderr.String(), stdout.String())
 	}
 
-	// 2. The loop ran to its cycle cap instead of stopping at the failure.
 	var lr struct {
 		StopReason string           `json:"stop_reason"`
 		Cycles     []map[string]any `json:"cycles"`
@@ -89,12 +79,10 @@ func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 		t.Errorf("cycles in batch output = %d, want 3 (cycle 2 failed, cycles 1+3 ran)", len(lr.Cycles))
 	}
 
-	// 3. The third cycle actually DISPATCHED (not just an empty result row).
 	if scout.calls != 3 {
 		t.Errorf("scout dispatches = %d, want 3 — the cycle after the failure never ran", scout.calls)
 	}
 
-	// 4. The failure is LOGGED (fail loudly), not swallowed.
 	if !strings.Contains(stderr.String(), "synthetic scout bridge death") {
 		t.Errorf("stderr does not mention the cycle failure cause; failures must be logged loudly\nstderr=%q", stderr.String())
 	}

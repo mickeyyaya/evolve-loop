@@ -13,11 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// applyEscalationBoundary applies every intent staged under
-// <evolveDir>/escalations at the iteration boundary, writing its report to
-// <evolveDir>/escalation-apply-report.json. Stage and escalation formula come
-// from policy.json's failure_disposition block (compiled defaults when absent),
-// so shadow-vs-enforce is config, not a flag.
 func applyEscalationBoundary(evolveDir string, cycle int, stderr io.Writer, signals *signalcenter.Center) {
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	if err != nil {
@@ -43,7 +38,7 @@ func applyEscalationBoundary(evolveDir string, cycle int, stderr io.Writer, sign
 		return
 	}
 	if len(res.Bumped)+len(res.Filed)+len(res.Planned)+len(res.Refused) == 0 {
-		return // nothing staged — stay quiet
+		return
 	}
 	for _, id := range res.Refused {
 		fmt.Fprintf(stderr, "[loop] WARN escalation boundary: refused %s: no priority_class\n", id)

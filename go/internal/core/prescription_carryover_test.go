@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-// writeDefectLedgerFixture writes a defect-ledger.json (the on-disk wire shape
-// emitDefectLedger produces: {"origin_cycle": N, "entries": [...]}) into dir.
 func writeDefectLedgerFixture(t *testing.T, dir, contents string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, "defect-ledger.json"), []byte(contents), 0o644); err != nil {
@@ -115,9 +113,9 @@ func TestMergeWorkspacePrescriptionCarryover_NonPrescriptionOpenEntryIsIgnored(t
 func TestMergeWorkspacePrescriptionCarryover_AbsentLedgerIsNoOp(t *testing.T) {
 	t.Parallel()
 
-	ws := t.TempDir() // no defect-ledger.json written
+	ws := t.TempDir()
 	state := &State{}
-	MergeWorkspacePrescriptionCarryover(state, ws, 1375, time.Now().UTC()) // must not panic
+	MergeWorkspacePrescriptionCarryover(state, ws, 1375, time.Now().UTC())
 	if len(state.CarryoverTodos) != 0 {
 		t.Fatalf("RED: absent ledger must be a no-op, got %+v", state.CarryoverTodos)
 	}
@@ -142,7 +140,7 @@ func TestMergeWorkspacePrescriptionCarryover_MalformedLedgerWarnsNotFails(t *tes
 	ws := t.TempDir()
 	writeDefectLedgerFixture(t, ws, `{ this is not valid json `)
 	state := &State{}
-	MergeWorkspacePrescriptionCarryover(state, ws, 1375, time.Now().UTC()) // must not panic
+	MergeWorkspacePrescriptionCarryover(state, ws, 1375, time.Now().UTC())
 	if len(state.CarryoverTodos) != 0 {
 		t.Fatalf("RED: malformed ledger produced %d todos, want 0", len(state.CarryoverTodos))
 	}

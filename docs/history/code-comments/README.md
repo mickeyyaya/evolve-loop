@@ -492,7 +492,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `acs/regression/pluginschema` | 1 | [acs-regression-pluginschema.md](acs-regression-pluginschema.md) |
 | `acs/regression/protectedsurface` | 2 | [acs-regression-protectedsurface.md](acs-regression-protectedsurface.md) |
 | `cmd/evolve-fake-cli` | 1 | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
-| `cmd/evolve` | 443 | [cmd-evolve.md](cmd-evolve.md) |
+| `cmd/evolve` | 447 | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/acssuite` | 27 | [internal-acssuite.md](internal-acssuite.md) |
 | `internal/adapters/bridge` | 32 | [internal-adapters-bridge.md](internal-adapters-bridge.md) |
 | `internal/adapters/ledger` | 27 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
@@ -521,7 +521,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/config` | 56 | [internal-config.md](internal-config.md) |
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | 19 | [internal-core-defectledger.md](internal-core-defectledger.md) |
-| `internal/core` | 926 | [internal-core.md](internal-core.md) |
+| `internal/core` | 943 | [internal-core.md](internal-core.md) |
 | `internal/cycleclassify` | 16 | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/cyclehealth` | 11 | [internal-cyclehealth.md](internal-cyclehealth.md) |
 | `internal/cycleoutcome` | 1 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |

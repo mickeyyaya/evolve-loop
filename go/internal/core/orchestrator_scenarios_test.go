@@ -1,10 +1,5 @@
 package core_test
 
-// Scenario catalog for dynamic phase-routing on the routingtest framework;
-// orchestrator_routing_test.go's 4 scenarios (StageOff-no-forensics,
-// shadow-tester, enforce-trivial, spine-warn) are intentionally not duplicated
-// here.
-
 import (
 	"testing"
 

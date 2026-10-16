@@ -61,7 +61,6 @@ func TestPhaseResponse_JSONShape(t *testing.T) {
 		},
 	}
 	raw, _ := json.Marshal(r)
-	// Spot-check key field names match what bash/audit artifacts use.
 	for _, want := range []string{
 		`"phase":"scout"`,
 		`"verdict":"PASS"`,

@@ -8,11 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestChainStartDecision_MinOneBatchOnDrainedInbox: at n==0 with nothing
-// pending and no brake, the chain must start — a drained inbox is a
-// continue condition ("we finished the work"), not a start condition
-// ("there was never any work"), and the pre-chain single-batch contract
-// must survive opting into chaining.
 func TestChainStartDecision_MinOneBatchOnDrainedInbox(t *testing.T) {
 	t.Parallel()
 	reason, stop := chainStartDecision(0, 20, 0, false)
@@ -22,10 +17,6 @@ func TestChainStartDecision_MinOneBatchOnDrainedInbox(t *testing.T) {
 	}
 }
 
-// TestChainStartDecision_BrakeStillWinsAtZeroBatches: the min-one-batch
-// allowance must not outrank the operator brake — `.evolve/loop-stop`
-// present at n==0 still means zero batches. An explicit operator instruction
-// is never overridden by a contract default.
 func TestChainStartDecision_BrakeStillWinsAtZeroBatches(t *testing.T) {
 	t.Parallel()
 	for _, pending := range []int{0, 5} {
@@ -37,10 +28,6 @@ func TestChainStartDecision_BrakeStillWinsAtZeroBatches(t *testing.T) {
 	}
 }
 
-// TestChainStartDecision_DrainedInboxStopsAfterFirstBatch: the allowance is
-// scoped to n==0 — once a batch has run, a drained inbox is still the clean
-// success exit. A blanket "never stop on empty" would pass the n==0 case and
-// fail here.
 func TestChainStartDecision_DrainedInboxStopsAfterFirstBatch(t *testing.T) {
 	t.Parallel()
 	for _, n := range []int{1, 2, 7} {
@@ -52,10 +39,6 @@ func TestChainStartDecision_DrainedInboxStopsAfterFirstBatch(t *testing.T) {
 	}
 }
 
-// TestChainStartDecision_ZeroCapNeverRunsABatch: the cap stays an exact
-// ceiling — a non-positive cap must not be widened by the min-one-batch
-// allowance (no cap+1), and the existing exact-cap behavior is unchanged for
-// positive caps.
 func TestChainStartDecision_ZeroCapNeverRunsABatch(t *testing.T) {
 	t.Parallel()
 	if reason, stop := chainStartDecision(0, 0, 0, false); !stop || reason != "chain_max_batches" {
@@ -67,9 +50,6 @@ func TestChainStartDecision_ZeroCapNeverRunsABatch(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_DrainedInboxRunsExactlyOneBatch: the operator-visible
-// contract is exactly one batch, rc=0, and the drained-inbox stop reason
-// recorded in the chain summary.
 func TestRunLoopChain_DrainedInboxRunsExactlyOneBatch(t *testing.T) {
 	cfg := chainTestEnv(t, 0, "")
 	seen := stubBatches(t, func(int, loopConfig) int { return 0 })
@@ -88,9 +68,6 @@ func TestRunLoopChain_DrainedInboxRunsExactlyOneBatch(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_PreEngagedBrakeRunsZeroBatchesOnDrainedInbox: a brake
-// file already on disk at launch means zero batches, even though the
-// min-one-batch allowance would otherwise fire.
 func TestRunLoopChain_PreEngagedBrakeRunsZeroBatchesOnDrainedInbox(t *testing.T) {
 	cfg := chainTestEnv(t, 0, "")
 	if err := os.WriteFile(filepath.Join(cfg.EvolveDir, chainBrakeFile), nil, 0o644); err != nil {

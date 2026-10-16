@@ -1,9 +1,5 @@
 package core
 
-// Kept tag-free: orchestrator_spinegate_test.go (untagged) references
-// insertedLeakRunner, so its definition cannot live in a //go:build
-// integration file.
-
 import "context"
 
 type insertedLeakRunner struct {

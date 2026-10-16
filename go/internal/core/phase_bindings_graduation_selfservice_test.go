@@ -19,13 +19,9 @@ func TestBuildGraduationCheck_MessageEmitsTheExactTwoEdits(t *testing.T) {
 		t.Fatal("premise broken: an ungraduated new package must still abort")
 	}
 	for _, want := range []string{
-		// Edit 1: the file to append to, and the verbatim line to append.
 		"go/.apicover-enforce",
 		"./internal/brandnew",
-		// Edit 2: the exact test file path to create, derived from the package.
 		"go/internal/brandnew/apicover_named_test.go",
-		// The obligation the test file must discharge — a bare empty file passes
-		// the enforce list and then fails the repo-wide unnamed-export gate.
 		"every exported symbol",
 	} {
 		if !strings.Contains(got, want) {

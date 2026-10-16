@@ -33,7 +33,6 @@ func TestNormalizeBuildGofmt_FormatsWorktreeGoModule(t *testing.T) {
 	}
 }
 
-// An empty worktree (provisioning failed) must be a safe no-op, never a panic.
 func TestNormalizeBuildGofmt_EmptyWorktreeIsNoOp(t *testing.T) {
 	t.Parallel()
 
@@ -55,8 +54,6 @@ func TestNormalizeBuildWorktree_GofmtsAfterNonBuildPhase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// next=audit is a NON-build phase; the soft-reset is skipped but gofmt must
-	// still run so test-amplification's output is clean before the audit gate.
 	(&Orchestrator{}).normalizeBuildWorktree(context.Background(), PhaseAudit, CycleState{ActiveWorktree: wt}, "")
 
 	got, err := os.ReadFile(fp)

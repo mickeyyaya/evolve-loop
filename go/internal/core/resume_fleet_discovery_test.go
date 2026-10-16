@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// fleetCheckpointState builds a realistic per-run state body in the exact
-// shape QuotaBoundaryCheckpointer writes.
 func fleetCheckpointState(cycle int, savedAt, phase, worktree string) map[string]any {
 	return map[string]any{
 		"cycle_id": cycle,
@@ -24,7 +22,7 @@ func fleetCheckpointState(cycle int, savedAt, phase, worktree string) map[string
 			"savedAt":         savedAt,
 			"resumeFromPhase": phase,
 			"worktreePath":    worktree,
-			"gitHead":         "unknown", // capture failed — validation skipped, as live
+			"gitHead":         "unknown",
 			"completedPhases": []string{"scout", "triage", "tdd", "build"},
 		},
 	}
@@ -89,7 +87,6 @@ func TestLoadResumeState_EnvOverrideDisablesDiscovery(t *testing.T) {
 	if err := os.MkdirAll(wt, 0o755); err != nil {
 		t.Fatalf("mkdir wt: %v", err)
 	}
-	// Sibling lane has a live checkpoint; our override points at a file with none.
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-951"), fleetCheckpointState(951, "2026-08-29T09:00:00Z", "audit", wt))
 	own := writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-950"), map[string]any{"cycle_id": 950})
 	t.Setenv("EVOLVE_CYCLE_STATE_FILE", own)
@@ -135,7 +132,6 @@ func TestActivateResumeStatePath_RoutesResolutionToTheDiscoveredFile(t *testing.
 	if err := os.MkdirAll(filepath.Dir(perRun), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// Ensure a clean slate for the env-mutating helper.
 	t.Setenv("EVOLVE_CYCLE_STATE_FILE", "")
 	if err := os.Unsetenv("EVOLVE_CYCLE_STATE_FILE"); err != nil {
 		t.Fatalf("unsetenv: %v", err)
@@ -165,7 +161,6 @@ func TestActivateResumeStatePath_NoOpWhenAlreadyResolved(t *testing.T) {
 		t.Errorf("env override set to %q for an already-resolved path — want no-op", got)
 	}
 	restore()
-	// Empty StatePath (older checkpoint shape) must also be a safe no-op.
 	restore2 := ActivateResumeStatePath(&ResumePoint{}, evolveDir)
 	restore2()
 }

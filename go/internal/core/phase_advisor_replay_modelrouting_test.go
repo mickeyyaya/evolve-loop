@@ -10,14 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// A recorded advisor plan response carrying a per-phase {cli,tier} proposal
-// drives the same chain a live model_routing=auto cycle runs end to end:
-// floor clamp, model-routing guardrail clamp, then the soft dispatch overlay.
 func TestReplayPlanFromResponse_ModelRoutingOverlayAppliesUnderAuto(t *testing.T) {
 	t.Parallel()
 	raw := `[{"phase":"build","run":true,"justification":"needs deep reasoning","cli":"codex","tier":"balanced"}]`
 	in := router.RouteInput{}
-	floor := []string{} // no ship-chain in this fixture; isolate the model-routing clamp
+	floor := []string{}
 
 	floored, _, err := ReplayPlanFromResponse(raw, in, floor)
 	if err != nil {
@@ -79,10 +76,6 @@ func TestReplayPlanFromResponse_LegacyResponseByteIdenticalDispatch(t *testing.T
 	}
 }
 
-// Renders the production persona-path prompt against a realistic RouteInput
-// fixture; must show the {cli,tier} schema and guardrail lines together, so a
-// regression dropping either turns this red independent of the narrower unit
-// tests in phase_advisor_tier_elicitation_test.go.
 func TestComposePlanPrompt_LiveShapeReplayCarriesTierSchemaAndGuardrails(t *testing.T) {
 	t.Parallel()
 	in := baseRouteInput()

@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
-// runLessons implements `evolve lessons recurrence`, which renders the
-// deterministic recurrence ledger (internal/recurrence). It is a pure reader —
-// no state mutation — so it is safe to run mid-batch.
 func runLessons(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "evolve lessons: usage: lessons recurrence [--project-root P] | backfill [--write] [--project-root P]")
@@ -94,10 +91,6 @@ func runLessonsRecurrence(stdout, stderr io.Writer) int {
 	return 0
 }
 
-// renderRecurrenceReport prints the ledger's patterns sorted by descending
-// count (via Ledger.Patterns), one row per pattern with its recurrence count
-// and fix-item status ("fix=<id>" when a linked open item is recorded, else
-// "fix=none"). Pure and I/O-injected so the CLI axis is unit-testable.
 func renderRecurrenceReport(w io.Writer, led *recurrence.Ledger) {
 	pats := led.Patterns()
 	if len(pats) == 0 {
@@ -107,7 +100,7 @@ func renderRecurrenceReport(w io.Writer, led *recurrence.Ledger) {
 	fmt.Fprintln(w, "COUNT  PATTERN  FIX")
 	for _, e := range pats {
 		if e.Generic {
-			continue // classification noise — de-noised out of the operator report
+			continue
 		}
 		fix := "none"
 		if e.FixItemID != "" {

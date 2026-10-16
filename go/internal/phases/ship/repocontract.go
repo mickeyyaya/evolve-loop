@@ -38,6 +38,9 @@ type packOutcome struct {
 	failures   []packFailure
 	failureLog string
 	err        error
+	pkgs       []pkgResult
+
+	droppedLines int
 }
 
 type packFailure struct{ Package, Test string }
@@ -84,6 +87,9 @@ func (o packOutcome) merged(next packOutcome) packOutcome {
 		failures:   append(append([]packFailure{}, o.failures...), next.failures...),
 		failureLog: o.failureLog + next.failureLog,
 		err:        errors.Join(o.err, next.err),
+		pkgs:       append(append([]pkgResult{}, o.pkgs...), next.pkgs...),
+
+		droppedLines: o.droppedLines + next.droppedLines,
 	}
 }
 
@@ -205,8 +211,18 @@ func runGoTestJSON(ctx context.Context, moduleDir string, log packLog, args []st
 	if err := cmd.Start(); err != nil {
 		return packOutcome{err: fmt.Errorf("go test start: %w", err)}
 	}
-	failed, failureLog := classifyPackEvents(stdout, out)
-	return packOutcome{failures: failed, failureLog: failureLog, err: cmd.Wait()}
+	var events io.Reader = stdout
+	var tap *pkgResultTap
+	if scanShadowFrom(ctx) != nil {
+		tap = newPkgResultTap(args)
+		events = io.TeeReader(stdout, tap)
+	}
+	failed, failureLog := classifyPackEvents(events, out)
+	outcome := packOutcome{failures: failed, failureLog: failureLog, err: cmd.Wait()}
+	if tap != nil {
+		outcome.pkgs, outcome.droppedLines = tap.results, tap.dropped
+	}
+	return outcome
 }
 
 func classifyPackEvents(r io.Reader, tee io.Writer) ([]packFailure, string) {
@@ -344,6 +360,9 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 		defer fmt.Fprintf(stderr, "[ship] repo-contract gate: full output: %s\n", scan.Name())
 		out = packLog{notes: io.MultiWriter(stderr, scan), raw: scan}
 	}
+	shadow := scanShadowFrom(ctx)
+	shadow.begin(ctx, root)
+	defer shadow.finish()
 	if err := runFixedPack(ctx, out, gate, root, baseRef, workspace); err != nil {
 		return err
 	}
@@ -418,6 +437,7 @@ type aloneRerun struct {
 
 func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, name string, retry bool, run func() packOutcome, alone *aloneRerun) error {
 	first := run()
+	scanShadowFrom(ctx).observe(first)
 	switch {
 	case first.green():
 		return nil
@@ -435,6 +455,7 @@ func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, na
 	}
 	fmt.Fprintf(out, "[ship] repo-contract %s exited nonzero with NO test-level failure (%v) — retrying once before classing it infra (cycle-1402/1403/1405 false-RED class)\n", name, first.err)
 	second := run()
+	scanShadowFrom(ctx).observe(second)
 	switch {
 	case second.green():
 		fmt.Fprintf(out, "[ship] repo-contract gate: retry GREEN — first failure was infra noise, ship proceeds\n")

@@ -30,7 +30,7 @@ func TestComparePhaseIOShadow_DivergenceDetected(t *testing.T) {
 	t.Parallel()
 
 	sig := router.RoutingSignals{Build: router.BuildSignals{Verdict: "PASS", SeverityMax: router.SevHigh, Present: true}}
-	h := phaseio.NewHandoffs(phaseio.HandoffsInit{}) // build absent → diverges from sig
+	h := phaseio.NewHandoffs(phaseio.HandoffsInit{})
 	ms := comparePhaseIOShadow(h, sig)
 	if len(ms) == 0 {
 		t.Fatal("divergent assembly should yield at least one mismatch")
@@ -54,7 +54,6 @@ func TestComparePhaseIOShadow_CoversAllProjectedFields(t *testing.T) {
 		Build:  router.BuildSignals{Verdict: "PASS", ACSGreen: 10, ACSTotal: 12, ACSThisCycle: 4, ACSRegression: 8, Present: true},
 		Audit:  router.AuditSignals{Verdict: "PASS", DefectsBySeverity: map[router.Severity]int{router.SevHigh: 2}, Present: true},
 	}
-	// An assembled view diverging in exactly the previously-uncompared fields.
 	h := phaseio.NewHandoffs(phaseio.HandoffsInit{
 		Triage: &phaseio.TriageView{CycleSize: "medium", PhaseSkip: []string{"retro"}},
 		Build:  &phaseio.BuildView{Verdict: "PASS", ACSGreen: 999, ACSTotal: 12, ACSThisCycle: 4, ACSRegression: 8},
@@ -229,20 +228,16 @@ func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
 	const real, wrong = "real-value", "wrong-value"
 	cases := []struct {
 		name      string
-		ctxKey    string                  // the legacy Context key the phase reads
-		field     string                  // the comparator field name
-		driftInit phaseio.CycleInputsInit // a CycleInputs whose getter is drifted to `wrong`
+		ctxKey    string
+		field     string
+		driftInit phaseio.CycleInputsInit
 	}{
 		{"goal", "goal", "cycle_inputs.goal", phaseio.CycleInputsInit{Goal: wrong}},
 		{"strategy", "strategy", "cycle_inputs.strategy", phaseio.CycleInputsInit{Strategy: wrong}},
 		{"commit_message", "commit_message", "cycle_inputs.commit_message", phaseio.CycleInputsInit{CommitMessage: wrong}},
 		{"fleet_scope", "fleet_scope", "cycle_inputs.fleet_scope", phaseio.CycleInputsInit{FleetScope: wrong}},
-		// challenge_token: the comparator field name is snake_case, the live
-		// Context key is camelCase challengeToken — the canonical key-drift trap.
 		{"challenge_token", "challengeToken", "cycle_inputs.challenge_token", phaseio.CycleInputsInit{ChallengeToken: wrong}},
 		{"previous_verdict", "previous_verdict", "cycle_inputs.previous_verdict", phaseio.CycleInputsInit{PreviousVerdict: wrong}},
-		// carryover: the comparator field name is carryover, the live Context key
-		// is carryover_summary (triage) — the same key-drift trap.
 		{"carryover", "carryover_summary", "cycle_inputs.carryover", phaseio.CycleInputsInit{Carryover: wrong}},
 	}
 	for _, tc := range cases {
@@ -309,8 +304,6 @@ func TestWritePhaseIOShadowFile_Parseable(t *testing.T) {
 	}
 }
 
-// overCapCtxValue is a valid-UTF-8 value strictly larger than the cap whose
-// first byte is `lead` so two values can differ INSIDE the retained prefix.
 func overCapCtxValue(lead byte) string {
 	return string(lead) + strings.Repeat("x", phaseio.MaxFieldBytes+64)
 }
@@ -334,7 +327,6 @@ func TestCompareCycleInputsShadow_CapAware_NoFalseMismatch(t *testing.T) {
 	if ms := compareCycleInputsShadow(assembleCycleInputs(ctx), nil, ctx); len(ms) != 0 {
 		t.Fatalf("over-cap legacy values assembled via assembleCycleInputs must not mismatch, got %+v", summarizePhaseIOMismatches(ms))
 	}
-	// Cap-equivalent: identical inside the cap, different only past it.
 	beyond := map[string]string{
 		"carryover_summary": overCapCtxValue('a') + "TAIL-ONLY-DIFFERENCE",
 		"previous_verdict":  overCapCtxValue('b') + "TAIL-ONLY-DIFFERENCE",

@@ -26,7 +26,6 @@ func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
 	}
 	writePipelineEscalation(evolveDir, root, 899, filepath.Join(root, ".evolve/runs/cycle-899"), sf, os.Stderr)
 
-	// 1) escalation dossier
 	escB, err := os.ReadFile(filepath.Join(evolveDir, "pipeline-escalation.json"))
 	if err != nil {
 		t.Fatalf("pipeline-escalation.json not written: %v", err)
@@ -42,7 +41,6 @@ func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
 		t.Errorf("escalation cycle = %v, want 899", esc["cycle"])
 	}
 
-	// 2) P0 pipeline-repair inbox item
 	itemB, err := os.ReadFile(filepath.Join(root, ".evolve/inbox/pipeline-defect-verdict-incoherence-cycle899.json"))
 	if err != nil {
 		t.Fatalf("pipeline-repair inbox item not filed: %v", err)
@@ -54,9 +52,6 @@ func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
 	if item["kind"] != inboxbatch.KindPipelineRepair {
 		t.Errorf("inbox kind = %v, want %s", item["kind"], inboxbatch.KindPipelineRepair)
 	}
-	// The halt record carries its producer, so the classifier's route:"lane"
-	// clamp keeps it console-owned however it is later annotated.
-	// See ADR-0074.
 	if item["injected_by"] != escalationInjectedBy {
 		t.Errorf("inbox injected_by = %v, want %q", item["injected_by"], escalationInjectedBy)
 	}
@@ -146,12 +141,6 @@ func TestWritePipelineEscalation_VerdictIncoherenceKeepsArtifactGuidance(t *test
 	}
 }
 
-// TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly: a
-// system-failure category the escalation renderer has never seen (neither
-// "pipeline-blocker" nor "verdict-incoherence") must still surface the
-// signal's own evidence verbatim, and must never invent the
-// verdict-incoherence root-cause narrative ("forged", "green") that only
-// applies to that one specific category.
 func TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -201,10 +190,6 @@ func TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly(t *testing.T
 	}
 }
 
-// TestWritePipelineEscalation_IdentityIncludesCycleNumber: the auto-filed
-// inbox item's id must be minted as pipeline-defect-<category>-cycle<N>,
-// never pipeline-defect-<category> alone — a category-only id is not a
-// unique record identity.
 func TestWritePipelineEscalation_IdentityIncludesCycleNumber(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -235,10 +220,6 @@ func TestWritePipelineEscalation_IdentityIncludesCycleNumber(t *testing.T) {
 	}
 }
 
-// TestWritePipelineEscalation_DistinctCyclesNeverCollideOnDisk is the
-// negative case for the same defect: two halts sharing a category must not
-// collapse onto one inbox file — both cycles' records must survive side by
-// side.
 func TestWritePipelineEscalation_DistinctCyclesNeverCollideOnDisk(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

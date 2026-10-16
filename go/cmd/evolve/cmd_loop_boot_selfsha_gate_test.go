@@ -16,10 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// bgWritePluginVersion writes <repo>/.claude-plugin/plugin.json:version=ver so
-// pluginVersion(repo) — the SAME resolver the ship gate uses — returns ver. This
-// is how a test pins "the current plugin version" deterministically without a
-// link-time stamp.
 func bgWritePluginVersion(t *testing.T, repo, ver string) {
 	t.Helper()
 	dir := filepath.Join(repo, ".claude-plugin")
@@ -29,8 +25,6 @@ func bgWritePluginVersion(t *testing.T, repo, ver string) {
 	brWriteJSON(t, filepath.Join(dir, "plugin.json"), map[string]any{"version": ver})
 }
 
-// bgSeedBinary writes an on-disk go/bin/evolve whose bytes hash to something
-// other than any pinned expected_ship_sha (callers pin a bogus string).
 func bgSeedBinary(t *testing.T, repo string, content string) {
 	t.Helper()
 	binPath := filepath.Join(repo, "go", "bin", "evolve")
@@ -42,9 +36,6 @@ func bgSeedBinary(t *testing.T, repo string, content string) {
 	}
 }
 
-// TestBootGate_HaltsOnWithinVersionSelfShaMismatch: a within-version ship-SHA
-// mismatch must halt boot pre-scout with the operator recipe, and must not
-// auto-repin — the pin is left untouched so the mismatch is not silently healed.
 func TestBootGate_HaltsOnWithinVersionSelfShaMismatch(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -55,16 +46,11 @@ func TestBootGate_HaltsOnWithinVersionSelfShaMismatch(t *testing.T) {
 	bgWritePluginVersion(t, repo, ver)
 	bgSeedBinary(t, repo, "\x7fELF-on-disk-binary-within-version")
 	const pin = "within-version-stale-or-tampered-sha"
-	// within-version: expected_ship_version == pluginVersion(repo), SHA differs.
 	brWriteJSON(t, filepath.Join(evolveDir, "state.json"), map[string]any{
 		"expected_ship_sha":     pin,
 		"expected_ship_version": ver,
 	})
 
-	// A provenance resolver that WOULD authorize a repin if consulted — proving
-	// the within-version halt path deliberately does NOT auto-repin even when the
-	// binary looks provenance-verified. If the halt path wrongly fell through to
-	// the repin, res.Healed would go true and this test would catch it.
 	prev := shipRepinProvenanceFn
 	defer func() { shipRepinProvenanceFn = prev }()
 	shipRepinProvenanceFn = func(string) (string, phaseintegrity.ProvenanceVerified) {
@@ -84,8 +70,6 @@ func TestBootGate_HaltsOnWithinVersionSelfShaMismatch(t *testing.T) {
 	if got := readExpectedShipSHA(t, evolveDir); got != pin {
 		t.Errorf("expected_ship_sha must be UNTOUCHED on a within-version halt; got %q want %q", got, pin)
 	}
-	// The message must carry the operator-unblock recipe verbatim so a human
-	// can act without hunting for it.
 	msg := stderr.String()
 	for _, want := range []string{"make -C go build", "evolve reset-sha -operator"} {
 		if !strings.Contains(msg, want) {
@@ -94,10 +78,6 @@ func TestBootGate_HaltsOnWithinVersionSelfShaMismatch(t *testing.T) {
 	}
 }
 
-// TestBootGate_AcrossVersionMismatchStillAutoRepins: an across-version
-// mismatch (a legitimate plugin/version bump) must stay on the existing boot
-// auto-repin path unchanged — it heals and re-pins the SHA, and must not trip
-// the within-version halt.
 func TestBootGate_AcrossVersionMismatchStillAutoRepins(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -106,13 +86,11 @@ func TestBootGate_AcrossVersionMismatchStillAutoRepins(t *testing.T) {
 	}
 	bgWritePluginVersion(t, repo, "9.9.9-test")
 	bgSeedBinary(t, repo, "\x7fELF-legitimately-rebuilt-new-version")
-	// across-version: the pinned version differs from the current plugin version.
 	brWriteJSON(t, filepath.Join(evolveDir, "state.json"), map[string]any{
 		"expected_ship_sha":     "stale-pin-from-the-old-version",
 		"expected_ship_version": "1.0.0-previous",
 	})
 
-	// Provenance VERIFIED (legit rebuild) — the existing repin path fires.
 	prev := shipRepinProvenanceFn
 	defer func() { shipRepinProvenanceFn = prev }()
 	shipRepinProvenanceFn = func(string) (string, phaseintegrity.ProvenanceVerified) {
@@ -129,7 +107,6 @@ func TestBootGate_AcrossVersionMismatchStillAutoRepins(t *testing.T) {
 	if !res.Healed {
 		t.Fatalf("an across-version mismatch with verified provenance must auto-repin (existing behavior unchanged); res=%+v stderr=%q", res, stderr.String())
 	}
-	// The pin now equals the on-disk binary sha: the existing repin actually fired.
 	newExpected := readExpectedShipSHA(t, evolveDir)
 	binPath := filepath.Join(repo, "go", "bin", "evolve")
 	mismatch, _, err := core.ShipSHAMismatch(binPath, newExpected)
@@ -141,9 +118,6 @@ func TestBootGate_AcrossVersionMismatchStillAutoRepins(t *testing.T) {
 	}
 }
 
-// TestBootGate_MatchingSHABootsIntoScout: when the on-disk binary's SHA
-// matches expected_ship_sha under the same plugin version, boot must take
-// zero self-SHA action and fall through to scout.
 func TestBootGate_MatchingSHABootsIntoScout(t *testing.T) {
 	t.Parallel()
 	repo := brInitRepo(t)
@@ -155,9 +129,8 @@ func TestBootGate_MatchingSHABootsIntoScout(t *testing.T) {
 	bgWritePluginVersion(t, repo, ver)
 	const binContent = "\x7fELF-healthy-matching-binary"
 	bgSeedBinary(t, repo, binContent)
-	// Pin expected_ship_sha to the ACTUAL on-disk sha — a healthy, matched tree.
 	binPath := filepath.Join(repo, "go", "bin", "evolve")
-	_, actual, err := core.ShipSHAMismatch(binPath, "") // "" != actual, returns the real sha
+	_, actual, err := core.ShipSHAMismatch(binPath, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,11 +151,6 @@ func TestBootGate_MatchingSHABootsIntoScout(t *testing.T) {
 	}
 }
 
-// TestRunLoop_HaltsPreScoutOnWithinVersionSelfShaMismatch: runLoop, given a
-// within-version mismatch, must halt during boot before the readiness gate —
-// no cycle, no scout, no LLM budget. The readiness-gate seam
-// (runLoopPreflightFn) must never be invoked; exit is 2 with a distinct
-// StopReason, and the operator recipe reaches stderr.
 func TestRunLoop_HaltsPreScoutOnWithinVersionSelfShaMismatch(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -203,9 +171,6 @@ func TestRunLoop_HaltsPreScoutOnWithinVersionSelfShaMismatch(t *testing.T) {
 		return orchDeps{Storage: &fixtures.FakeStorage{}, Ledger: newFakeLedger()}
 	}
 
-	// The readiness gate is the sentinel: if it is ever reached, boot did NOT
-	// halt pre-scout. It also force-halts as a backstop so no real cycle runs even
-	// if the contract regresses.
 	preflightCalled := false
 	prevPf := runLoopPreflightFn
 	defer func() { runLoopPreflightFn = prevPf }()

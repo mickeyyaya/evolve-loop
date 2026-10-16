@@ -14,9 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
 )
 
-// outcomeRunner PASSes its phase with a scripted cost/duration after running
-// an optional side effect, modeling a build that did real work but left the
-// main tree dirty in a way the tree-diff guard catches.
 type outcomeRunner struct {
 	name       string
 	verdict    string
@@ -39,8 +36,6 @@ func (r *outcomeRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse,
 	}, nil
 }
 
-// initOutcomeRepo creates a real git repo so the tree-diff guard runs its
-// production code path against actual git output rather than a stub.
 func initOutcomeRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -120,11 +115,6 @@ func phasesRunContains(phases []Phase, want Phase) bool {
 	return false
 }
 
-// Fixture note: the original fixture (a tracked .evolve/commit-prefix-scope.json
-// edit) is now RECOVERABLE by design (the deliverable allowlist relocates it;
-// pinned in buildleak_recover_test.go), so this test uses a STAGED RENAME of a
-// tracked file, which no recovery branch handles — the canonical
-// still-unrecoverable main-tree mutation.
 func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -136,7 +126,6 @@ func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 		name: string(PhaseBuild), verdict: VerdictPASS,
 		costUSD: 0.42, durationMS: 1234,
 		onRun: func() {
-			// porcelain 'R ' (staged rename) matches no recovery branch, so the guard re-check stays dirty.
 			cmd := exec.Command("git", "-C", root, "mv", ".evolve/commit-prefix-scope.json", ".evolve/commit-prefix-scope.renamed.json")
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Errorf("leak rename: %v\n%s", err, out)
@@ -145,7 +134,6 @@ func TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome(t *testing.T) {
 	}
 	st := &fakeStorage{}
 	led := &fakeLedger{}
-	// Non-empty worktree path arms the tree-diff guard for the guarded phases.
 	o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}))
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
@@ -187,11 +175,10 @@ func TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage(t *testing.T) {
 	t.Parallel()
 	maxAtt := 2
 	cases := []struct {
-		name string
-		// arrange mutates the harness; returns the phase whose record we check.
+		name         string
 		arrange      func(runners map[Phase]PhaseRunner, led *fakeLedger, opts *[]Option, env map[string]string) Phase
 		wantVerdict  string
-		wantAttempts int // 0 = don't check
+		wantAttempts int
 	}{
 		{
 			name: "bridge_error_exhausted",
@@ -215,7 +202,7 @@ func TestPhaseOutcome_AbortPaths_AlwaysRecordTimingAndUsage(t *testing.T) {
 			name: "review_gate_reject",
 			arrange: func(_ map[Phase]PhaseRunner, _ *fakeLedger, opts *[]Option, env map[string]string) Phase {
 				*opts = append(*opts, WithReviewer(stubReviewer{result: ReviewResult{Approve: false, Reason: "deliverable contract violated"}}))
-				env["EVOLVE_CONTRACT_CORRECTION_RETRIES"] = "0" // immediate abort, no correction re-dispatch
+				env["EVOLVE_CONTRACT_CORRECTION_RETRIES"] = "0"
 				return PhaseScout
 			},
 			wantVerdict:  VerdictPASS,
@@ -274,7 +261,7 @@ func TestPhaseOutcome_NeverInventsPass(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	runners := buildRunners(nil)
-	runners[PhaseScout] = &fakeRunner{name: "scout", verdict: "PASSING"} // non-canonical on purpose
+	runners[PhaseScout] = &fakeRunner{name: "scout", verdict: "PASSING"}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
@@ -305,7 +292,7 @@ func TestPhaseOutcome_SingleChokepoint_OneRecordPerDispatch(t *testing.T) {
 		t.Errorf("timing entries=%d, want one per phase run (%d): %v", len(entries), len(res.PhasesRun), res.PhasesRun)
 	}
 	for _, p := range res.PhasesRun {
-		e := timingEntryFor(t, entries, string(p)) // fails on duplicates
+		e := timingEntryFor(t, entries, string(p))
 		if reason, ok := e["abort_reason"]; ok {
 			t.Errorf("happy-path %s entry must NOT carry abort_reason (omitempty); got %v", p, reason)
 		}

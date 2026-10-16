@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// composeCorrection turns a deliverable-reject reason into the correction
-// directive injected into the phase re-dispatch (## Correction prompt block).
 func composeCorrection(round int, reason, remediation string) string {
 	head := "Your previous output for this phase was REJECTED by the deliverable contract check:\n\n" + reason
 	if remediation != "" {
@@ -78,5 +76,3 @@ func bridgeExitCode(err error) int {
 }
 
 const maxRecoveryDepth = 2
-
-// phaseTimingEntry records per-phase latency + outcome for phase-timing.json.

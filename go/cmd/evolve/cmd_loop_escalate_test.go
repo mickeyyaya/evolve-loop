@@ -12,13 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestRunLoop_EscalatesAtIterationBoundary is the wiring proof for the
-// failure-disposition-router boundary applier: it drives the real runLoop
-// (stubbed orchestrator deps) over a temp .evolve carrying one open inbox
-// item and one staged escalate intent, and asserts the loop applied the
-// escalation — weight bumped + apply report written. A commented-out call
-// site or a defined-but-uncalled applier fails this test, which a source
-// grep would not catch.
 func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -26,8 +19,6 @@ func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	if err := os.MkdirAll(inboxDir, 0o755); err != nil {
 		t.Fatalf("mkdir inbox: %v", err)
 	}
-	// dispatch off (skip the verify pipeline), escalation stage ENFORCE so the
-	// boundary mutates — proving the stage is config-injected, not a flag.
 	pol := `{"dispatch":{"policy":"off"},"workflow":{"auto_prune":false},` +
 		`"failure_disposition":{"stage":"enforce"}}`
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(pol), 0o644); err != nil {
@@ -67,8 +58,6 @@ func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	if _, err := os.Stat(reportPath); err != nil {
 		t.Fatalf("loop wrote no escalation apply report at %s — the iteration-boundary call site is unwired: %v", reportPath, err)
 	}
-	// The boundary's outcome is a loop.escalation WARN the stub root's
-	// console renders into this stderr.
 	if !strings.Contains(stderr.String(), "LOOP_ESCALATION_BOUNDARY") || strings.Contains(stderr.String(), "escalation boundary (cycle") {
 		t.Fatalf("the escalation boundary must be a rendered loop.escalation signal, not a hand-written line; stderr=%q", stderr.String())
 	}
@@ -82,7 +71,6 @@ func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	if err := json.Unmarshal(raw, &item); err != nil {
 		t.Fatalf("parse inbox item: %v", err)
 	}
-	// min(0.99, 0.80 + 0.03*(4-1)) = 0.89
 	if item.Weight <= 0.80 {
 		t.Fatalf("inbox weight = %v, want the escalated 0.89 — the boundary applier did not run at the iteration boundary", item.Weight)
 	}

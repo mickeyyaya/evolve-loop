@@ -12,8 +12,6 @@ func TestDecideAfterRetro_RetroPASSIsNotRecovery(t *testing.T) {
 
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	dir := t.TempDir()
-	// A plain task-level audit FAIL: deterministic floor silent, no agent floor
-	// claim, no disposition — so the ladder's terminal arm is the adapter.
 	writeAuditWithFailure(t, dir, "FAIL", "code-audit-fail", "H1 the auditor rejected this build")
 	cs := CycleState{CycleID: 1577, WorkspacePath: dir}
 
@@ -29,7 +27,6 @@ func TestDecideAfterRetro_RetroPASSStillFacesTheFloor(t *testing.T) {
 
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	dir := t.TempDir()
-	// infra-systemic produces a DETERMINISTIC floor candidate.
 	writeAuditWithFailure(t, dir, "FAIL", "infra-systemic", "all CLI families exhausted")
 	cs := CycleState{CycleID: 1001, WorkspacePath: dir}
 

@@ -12,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 )
 
-// AC-1 (positive): a provenance-VERIFIED ship-SHA mismatch — a legitimate
-// rebuild that changed the binary — is auto-repinned at boot, so the very next
-// boot/ship sees NO mismatch.
 func TestDefaultBootRecovery_AutoRepinsWhenProvenanceVerified(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -28,14 +25,9 @@ func TestDefaultBootRecovery_AutoRepinsWhenProvenanceVerified(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// expected_ship_sha is stale — a legitimate rebuild changed the binary.
 	brWriteJSON(t, filepath.Join(evolveDir, "state.json"),
 		map[string]any{"expected_ship_sha": "stale-pin-from-before-the-rebuild"})
 
-	// Provenance VERIFIED: the running binary's build-commit is an ancestor of
-	// HEAD (legit rebuild). Injected so the decision is git-free/deterministic —
-	// git is the only non-deterministic input, exactly why phaseintegrity injects
-	// ProvenanceVerified.
 	prev := shipRepinProvenanceFn
 	defer func() { shipRepinProvenanceFn = prev }()
 	shipRepinProvenanceFn = func(string) (string, phaseintegrity.ProvenanceVerified) {
@@ -49,8 +41,6 @@ func TestDefaultBootRecovery_AutoRepinsWhenProvenanceVerified(t *testing.T) {
 	if !res.Healed {
 		t.Fatalf("a provenance-verified SHA mismatch must auto-repin at boot; res=%+v stderr=%q", res, stderr.String())
 	}
-	// The cascade is ACTUALLY fixed: the pin now equals the on-disk binary sha, so
-	// core.ShipSHAMismatch reports no mismatch on the re-pinned state.
 	newExpected := readExpectedShipSHA(t, evolveDir)
 	if newExpected == "stale-pin-from-before-the-rebuild" || newExpected == "" {
 		t.Fatalf("expected_ship_sha was not re-pinned (still %q)", newExpected)
@@ -64,11 +54,6 @@ func TestDefaultBootRecovery_AutoRepinsWhenProvenanceVerified(t *testing.T) {
 	}
 }
 
-// AC-2 (negative / anti-tamper): a provenance-UNVERIFIED mismatch — the running
-// binary's build-commit is NOT an ancestor of HEAD (possible tampering) — must
-// NOT be auto-repinned. The mismatch stays flagged (the ship gate still blocks)
-// and the pin is left untouched. This is the strongest anti-no-op signal: a
-// "fix" that repins unconditionally would be a trust-kernel hole and fails here.
 func TestDefaultBootRecovery_DeclinesRepinWhenProvenanceUnverified(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
@@ -86,7 +71,6 @@ func TestDefaultBootRecovery_DeclinesRepinWhenProvenanceUnverified(t *testing.T)
 	brWriteJSON(t, filepath.Join(evolveDir, "state.json"),
 		map[string]any{"expected_ship_sha": pin})
 
-	// Provenance UNVERIFIED — the repin must be refused.
 	prev := shipRepinProvenanceFn
 	defer func() { shipRepinProvenanceFn = prev }()
 	shipRepinProvenanceFn = func(string) (string, phaseintegrity.ProvenanceVerified) {
@@ -108,18 +92,12 @@ func TestDefaultBootRecovery_DeclinesRepinWhenProvenanceUnverified(t *testing.T)
 	}
 }
 
-// AC-3 (edge): a project with NO expected_ship_sha yet (fresh / never pinned) is
-// a no-op — no mismatch, no heal — and boot recovery must NOT reach the
-// provenance/git path at all (short-circuit before any git subprocess). Asserted
-// via a spy on the provenance resolver: it is the exact seam that would shell out
-// to git, so "never called" proves "no git subprocess invoked".
 func TestDefaultBootRecovery_NoExpectedSHAIsNoOpAndSkipsProvenance(t *testing.T) {
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// state.json exists but carries NO expected_ship_sha (nothing pinned yet).
 	brWriteJSON(t, filepath.Join(evolveDir, "state.json"),
 		map[string]any{"lastCycleNumber": 3})
 

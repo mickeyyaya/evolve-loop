@@ -8,35 +8,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// OrphanVerdict is the per-branch outcome of a PruneSupersededOrphans walk.
 type OrphanVerdict struct {
-	// Ref is the branch's short name (e.g. "cycle-100").
-	Ref string
-	// Superseded is true when the branch is already landed on base (ancestor
-	// or patch-id functional duplicate).
-	Superseded bool
-	// Pruned is true only when the branch was both Superseded and safe to
-	// delete (hasOpenPR reported false), and the delete succeeded.
-	Pruned bool
-	// KeptCheckedOut, KeptBound and KeptDeleteFailed name why a superseded
-	// branch was kept; at most one is set. With none set, a kept superseded
-	// branch was kept behind an open PR.
+	Ref              string
+	Superseded       bool
+	Pruned           bool
 	KeptCheckedOut   bool
 	KeptBound        bool
 	KeptDeleteFailed bool
 }
 
-// PruneSupersededOrphans walks the local `cycle-*` branches in dir and, for
-// each, decides whether it is a superseded functional duplicate of base and
-// whether it may be pruned. A superseded branch checked out in any worktree
-// (KeptCheckedOut) or named by a continuation-registry binding under dir
-// (KeptBound) is kept before any PR check or delete. Otherwise it is deleted
-// (`git branch -D`) ONLY when hasOpenPR(ref) reports false — an open PR /
-// remote leaves it flagged-but-kept (verify_remote_pr_before_branch_delete).
-// A delete git refuses is reported on that ref (KeptDeleteFailed) and the walk
-// continues. Non-superseded (different-goal) branches are reported untouched.
-// An error from listing refs or worktrees, reading the registry, running git,
-// or from hasOpenPR aborts the walk before any further delete.
 func PruneSupersededOrphans(ctx context.Context, dir, base string, hasOpenPR func(ref string) (bool, error)) ([]OrphanVerdict, error) {
 	out, code, err := gitCapture(ctx, dir, "for-each-ref", "--format=%(refname:short)", "refs/heads/cycle-*")
 	if err != nil {

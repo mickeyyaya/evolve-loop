@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// remediationFixture builds the request writeDeterministicLearning needs plus a
-// project root whose .evolve/inbox can be inspected afterwards.
 func remediationFixture(t *testing.T) (*Orchestrator, failureLearningRequest, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -28,12 +26,11 @@ func remediationFixture(t *testing.T) (*Orchestrator, failureLearningRequest, st
 	return o, fl, root
 }
 
-// inboxFiles lists the .evolve/inbox entries the floor left behind.
 func inboxFiles(t *testing.T, root string) []string {
 	t.Helper()
 	ents, err := os.ReadDir(filepath.Join(root, ".evolve", "inbox"))
 	if err != nil {
-		return nil // no inbox at all is the "filed nothing" state
+		return nil
 	}
 	var names []string
 	for _, e := range ents {
@@ -49,7 +46,7 @@ func TestWriteDeterministicLearning_ClassedButDefectlessBlockFilesNothing(t *tes
 
 	o.writeDeterministicLearning(fl,
 		"audit phase exited 1 after 3 attempts",
-		&phasecontract.FailureBlock{Class: "deliverable-rejected"}, // classed, ZERO defects
+		&phasecontract.FailureBlock{Class: "deliverable-rejected"},
 	)
 
 	if files := inboxFiles(t, root); len(files) != 0 {

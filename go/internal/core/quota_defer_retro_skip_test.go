@@ -10,13 +10,6 @@ import (
 	"time"
 )
 
-// allFamiliesExhaustedRun drives a full RunCycle to all-families quota
-// exhaustion using the same harness as
-// TestRunCycle_AllFamilies85_CheckpointsAndDefers: scout returns exit=85 on
-// every attempt, so allFamiliesQuotaExhausted(attemptExits) is true and the
-// dispatch seam constructs the %w-wrapped ErrAllFamiliesExhausted and calls
-// cr.recordFailureLearning. Returns the storage fake and the runner map so
-// callers can assert on what the production chain did.
 func allFamiliesExhaustedRun(t *testing.T) (*fakeStorage, *fakeLedger, map[Phase]PhaseRunner, error) {
 	t.Helper()
 	prevHook := QuotaBoundaryCheckpointer
@@ -33,15 +26,12 @@ func allFamiliesExhaustedRun(t *testing.T) (*fakeStorage, *fakeLedger, map[Phase
 	if err == nil {
 		t.Fatal("RunCycle: want error, got nil")
 	}
-	// Precondition, not the assertion under test: if this trips, the harness
-	// is broken rather than the guard.
 	if !errors.Is(err, ErrAllFamiliesExhausted) {
 		t.Fatalf("err=%v, want errors.Is ErrAllFamiliesExhausted (harness precondition)", err)
 	}
 	return st, led, runners, err
 }
 
-// NOT t.Parallel: swaps the package-level QuotaBoundaryCheckpointer hook.
 func TestRunCycle_AllFamiliesExhausted_DoesNotDispatchRetro(t *testing.T) {
 	st, _, runners, _ := allFamiliesExhaustedRun(t)
 
@@ -134,8 +124,6 @@ func TestRunCycle_NonQuotaDispatchFailure_StillDispatchesRetroOnce(t *testing.T)
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	// exit=1 → errGenericExit, not transient and not quota: the loud-abort
-	// branch records failure learning.
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(1), failUntil: 99}
 	o := NewOrchestrator(st, led, runners)
 
@@ -155,11 +143,6 @@ func TestRunCycle_NonQuotaDispatchFailure_StillDispatchesRetroOnce(t *testing.T)
 	}
 }
 
-// The sentinel arrives %w-wrapped at least twice by the time it reaches
-// recordFailureLearning (dispatch wraps it, then wrapCycleLevelError wraps
-// that). A cheap `fl.Err == ErrAllFamiliesExhausted` identity check would pass
-// by accident and break the moment another wrapper is added, so this test
-// drives the chokepoint directly with a deliberately over-wrapped error.
 func TestRecordFailureLearning_MultiplyWrappedExhausted_SkipsRetro(t *testing.T) {
 	t.Parallel()
 

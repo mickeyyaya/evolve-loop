@@ -29,8 +29,6 @@ func amplCaptureStderr(t *testing.T, fn func()) string {
 
 func TestWriteBuildSelfCheckArtifact_MkdirAllFailure_WARNsAndDoesNotPanic(t *testing.T) {
 	tmp := t.TempDir()
-	// worktree itself is a REGULAR FILE, not a directory: MkdirAll(worktree/.evolve)
-	// must fail because a path component is not a directory (ENOTDIR).
 	blocked := filepath.Join(tmp, "blocked-worktree")
 	if err := os.WriteFile(blocked, []byte("not a directory"), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)

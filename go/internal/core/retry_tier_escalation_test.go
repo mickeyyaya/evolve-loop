@@ -25,7 +25,6 @@ func escalationRun(t *testing.T, root, scopeCSV string, reader func(string) int,
 func TestEscalatedBuildTier_RaisesAtThresholdEnvelopeless(t *testing.T) {
 	t.Parallel()
 
-	// No profiles on disk → universal envelope (Max=top) → deep passes.
 	cr := escalationRun(t, t.TempDir(), "item-a,item-b", func(id string) int {
 		return map[string]int{"item-a": 0, "item-b": 1}[id]
 	}, 1)
@@ -67,8 +66,6 @@ func TestEscalatedBuildTier_RaiseOnlyNeverLowers(t *testing.T) {
 func TestEscalatedBuildTier_EnvelopeMaxClampsThroughRealGuardrail(t *testing.T) {
 	t.Parallel()
 
-	// A build profile with envelope Max=balanced must pull the raise back to
-	// no-gain — via the REAL ClampPlanModelRouting, not a second clamp.
 	root := t.TempDir()
 	profDir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(profDir, 0o755); err != nil {

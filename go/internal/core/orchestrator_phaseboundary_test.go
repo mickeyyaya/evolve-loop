@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// seedCycleStateFile seeds a pre-existing cycle-state.json so the additive
-// checkpoint splice has a file to merge into and preserved fields can be checked.
 func seedCycleStateFile(t *testing.T, root string) string {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve")
@@ -62,9 +60,6 @@ func containsStr(ss []string, want string) bool {
 	return false
 }
 
-// checkpointProbeRunner runs as the TRIAGE phase and snapshots the on-disk
-// checkpoint block after scout completes but before anything later, pinning
-// "written at the phase BOUNDARY" (an end-of-cycle-only write can't satisfy this).
 type checkpointProbeRunner struct {
 	name      string
 	statePath string

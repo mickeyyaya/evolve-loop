@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// This test pins post-dispatch recording only: a pre-dispatch failure
-// (transition resolution, Build-context sealing, the cycle-state write, the
-// boundary checkpoint) legitimately returns bare, since no phase ran and
-// inventing an outcome for one would be a false record.
 func TestResumePostDispatchExits_RecordTheirOutcome(t *testing.T) {
 	t.Parallel()
 
@@ -19,9 +15,6 @@ func TestResumePostDispatchExits_RecordTheirOutcome(t *testing.T) {
 	}
 	src := string(body)
 
-	// Each entry names a post-dispatch terminal exit and the text that proves
-	// it records before returning, pinned so a future edit cannot quietly
-	// drop one back to a bare return.
 	for _, pin := range []struct{ what, evidence string }{
 		{"the non-canonical-verdict exit", `phaseOutcomeFrom(next, resp, attempts, ferr.Error(), cs.PhaseStartedAt)`},
 		{"the deliverable-review exit", `phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt)`},
@@ -32,11 +25,6 @@ func TestResumePostDispatchExits_RecordTheirOutcome(t *testing.T) {
 		}
 	}
 
-	// The post-Build refresh exit needs a positional check, not a substring:
-	// its record uses phaseErr.Error(), the same spelling as the
-	// dispatch-error exit above it, so a substring pin would pass on that
-	// sibling's call and never catch a regression here. Assert the record
-	// sits between this exit's own wrapper and its return instead.
 	wrapper := strings.Index(src, `"resume refresh Build explanation after %s: %w"`)
 	if wrapper < 0 {
 		t.Fatal("the post-Build refresh exit no longer exists in the form this pin tracks — re-derive the pin rather than deleting it")
@@ -47,8 +35,6 @@ func TestResumePostDispatchExits_RecordTheirOutcome(t *testing.T) {
 		t.Error("the post-Build explanation refresh exit returns without recording a phase outcome — an unrecorded terminal exit classifies the cycle FAILED_UNEXPLAINED and pages an operator with no diagnosable reason")
 	}
 
-	// The bounded-loop escape records through the shared primitive rather than
-	// a second implementation, so fresh and resume cannot drift apart again.
 	if !strings.Contains(src, "timingOwner.recordChokepointEscape(") {
 		t.Error("resume's iteration-limit exit no longer routes through recordChokepointEscape — the fresh path's C1 escape guard (the cycle-492 fix) is not mirrored here")
 	}

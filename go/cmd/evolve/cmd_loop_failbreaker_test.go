@@ -26,18 +26,12 @@ func TestConsecutiveFailBreaker(t *testing.T) {
 		wantStreak int
 		wantStop   bool
 	}{
-		// Default max=1: any FAIL stops immediately (byte-identical to the
-		// pre-flag unconditional break).
 		{"default max=1 stops on first fail", true, 0, 1, 1, true},
-		// max=3: first two fails continue, third stops.
 		{"max=3 first fail continues", true, 0, 3, 1, false},
 		{"max=3 second fail continues", true, 1, 3, 2, false},
 		{"max=3 third fail stops", true, 2, 3, 3, true},
-		// A non-FAIL cycle resets the streak — two fails then a pass then a
-		// fail must NOT stop at max=3 (the pass broke the run).
 		{"pass resets streak", false, 2, 3, 0, false},
 		{"fail after reset is streak 1", true, 0, 3, 1, false},
-		// Streak already at/over max keeps stopping (defensive).
 		{"streak past max stays stopped", true, 5, 3, 6, true},
 	}
 	for _, tc := range tests {
@@ -89,12 +83,6 @@ func countFailedApproaches(t *testing.T, statePath string) int {
 	return len(st.FailedApproaches)
 }
 
-// TestRecordAbsorbedFail is the regression pin for the continue-on-fail BLOCK
-// finding: an absorbed verdict-FAIL must be written to
-// state.json:failedApproaches. The orchestrator does NOT record the
-// clean-completion FAIL path (only err!=nil cycle-level failures), and the
-// stop-path recordLoopFatal is skipped when continuing — so without this the
-// next cycle's scout would see no record of the failure.
 func TestRecordAbsorbedFail(t *testing.T) {
 	t.Parallel()
 	projectRoot := t.TempDir()
@@ -119,22 +107,14 @@ func TestRecordAbsorbedFail(t *testing.T) {
 	}
 }
 
-// TestRecordAbsorbedFail_MissingStateIsSoftWarn pins that a missing state.json
-// does not panic or hard-fail — the loop must keep running past an absorbed
-// FAIL even when pre-flight never created state.json.
 func TestRecordAbsorbedFail_MissingStateIsSoftWarn(t *testing.T) {
 	t.Parallel()
 	projectRoot := t.TempDir()
 	cfg := loopConfig{ProjectRoot: projectRoot, EvolveDir: filepath.Join(projectRoot, ".evolve")}
 	var stderr bytes.Buffer
-	recordAbsorbedFail(cfg, 1, &stderr) // no state.json on disk — must not panic
+	recordAbsorbedFail(cfg, 1, &stderr)
 }
 
-// failingOrch is a loopCycleRunner that returns a fixed FinalVerdict with an
-// incrementing cycle number — the seam that lets the call-site wiring of the
-// consecutive-fail breaker be exercised end-to-end (the real *core.Orchestrator
-// cannot be scripted to emit FinalVerdict=FAIL without a faithful phase
-// machine). Injected via loopOrchOverride.
 type failingOrch struct {
 	noSignals
 	verdict string
@@ -185,11 +165,6 @@ func runFailLoop(t *testing.T, maxConsecutive string) (int, string) {
 	return rc, stderr.String()
 }
 
-// TestRunLoop_ContinueOnFail_CallSite is the end-to-end regression pin for the
-// continue-on-fail WIRING (not just the pure helpers): with the default max=1
-// the batch stops on the first FAIL; with max=3 it absorbs FAILs and keeps
-// running, emitting the "continuing" line. Guards against a future loop edit
-// silently dropping the breaker/record call.
 func TestRunLoop_ContinueOnFail_CallSite(t *testing.T) {
 	t.Run("default max=1 stops on first FAIL", func(t *testing.T) {
 		_, stderr := runFailLoop(t, "1")

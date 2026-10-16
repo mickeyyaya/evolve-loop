@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// makeOverflowCards builds n cards that force the overflow path when n > maxEnrichedCatalogCards.
-// All cards are Optional with metadata so they sort into the withMeta bucket.
 func makeOverflowCards(n int) []router.PhaseCard {
 	cards := make([]router.PhaseCard, n)
 	for i := range cards {
@@ -65,7 +63,6 @@ func TestWriteCatalog_PointerLinePresent(t *testing.T) {
 
 func TestWriteCatalog_PointerLineRequired_Negative(t *testing.T) {
 	t.Parallel()
-	// Minimal overflow: exactly 1 card beyond the cap.
 	cards := makeOverflowCards(maxEnrichedCatalogCards + 1)
 	var b strings.Builder
 	writeCatalog(&b, cards)
@@ -78,8 +75,6 @@ func TestWriteCatalog_PointerLineRequired_Negative(t *testing.T) {
 			"Even minimal overflow must use a pointer, not an enumeration.", overflowName)
 	}
 
-	// A builder who removes the enumeration but adds no pointer would produce
-	// output no longer than the no-overflow case; catch that here.
 	noOverflowCards := makeOverflowCards(maxEnrichedCatalogCards)
 	var noB strings.Builder
 	writeCatalog(&noB, noOverflowCards)
@@ -93,7 +88,6 @@ func TestWriteCatalog_PointerLineRequired_Negative(t *testing.T) {
 
 func TestWriteCatalog_NoOverflow_NoPointer(t *testing.T) {
 	t.Parallel()
-	// Exactly at the cap — none overflow.
 	cards := makeOverflowCards(maxEnrichedCatalogCards)
 	var b strings.Builder
 	writeCatalog(&b, cards)

@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-// resumeTeardownHarness stages an interrupted cycle the way a real crash
-// leaves one: cycle state persisted, ActiveWorktree naming the tree the
-// builder was working in, with resume inheriting that path from the
-// checkpoint rather than calling worktree.Create.
 func resumeTeardownHarness(t *testing.T, verdicts map[Phase]string, opts ...Option) (*fakeStorage, *fakeWorktree, *Orchestrator, string) {
 	t.Helper()
 	projectRoot := t.TempDir()
@@ -80,8 +76,6 @@ func TestRunCycleFromPhase_PreservesAFailedCycleWorktree(t *testing.T) {
 func TestRunCycleFromPhase_PreservesAnAbnormallyExitedWorktree(t *testing.T) {
 	t.Parallel()
 
-	// Cap the dispatch loop below what the spine needs to reach PhaseEnd, so
-	// the run exits via the iteration bound with completed=false.
 	st, wt, o, projectRoot := resumeTeardownHarness(t, nil, WithMaxPhaseIterations(2))
 
 	if _, err := o.RunCycleFromPhase(context.Background(),
@@ -106,8 +100,6 @@ func TestGitWorktreeCleanup_RefusesTheProjectRoot(t *testing.T) {
 	if err := os.WriteFile(sentinel, []byte("live tree\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// A symlinked alias of the root (macOS t.TempDir already lives under
-	// /var → /private/var; this makes the aliasing explicit on every OS).
 	alias := filepath.Join(t.TempDir(), "alias")
 	if err := os.Symlink(root, alias); err != nil {
 		t.Fatal(err)
@@ -139,7 +131,6 @@ func TestRunCycleFromPhase_ProjectRootCheckpointSurvivesTeardown(t *testing.T) {
 		state:      State{LastCycleNumber: 9},
 		cycleState: CycleState{CycleID: 9, WorkspacePath: ws, ActiveWorktree: projectRoot},
 	}
-	// No WithWorktreeProvisioner: the default is the real gitWorktree.
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
 
 	if _, err := o.RunCycleFromPhase(context.Background(),

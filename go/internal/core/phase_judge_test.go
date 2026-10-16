@@ -40,7 +40,6 @@ func TestRouteQualityJudge_ScoresPlanAgainstGoal(t *testing.T) {
 	}{
 		{"clean json", `{"score":0.8,"rationale":"covers the bug path","missing_phases":[]}`, 0.8},
 		{"fenced + prose", "Here is my grade:\n```json\n{\"score\":0.5,\"rationale\":\"ok\",\"missing_phases\":[\"bug-reproduction\"]}\n```\nDone.", 0.5},
-		// Inclusive boundaries must be ACCEPTED (a future `>`→`>=` slip is caught here).
 		{"boundary lower 0.0", `{"score":0,"rationale":"worst plan but valid"}`, 0},
 		{"boundary upper 1.0", `{"score":1,"rationale":"perfect"}`, 1},
 	}

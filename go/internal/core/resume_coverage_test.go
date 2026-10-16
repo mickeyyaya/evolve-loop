@@ -99,7 +99,7 @@ func TestRunCycleFromPhase_RejectsCheckpointIdentityMismatch(t *testing.T) {
 
 func TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted(t *testing.T) {
 	t.Parallel()
-	const inserted = Phase("mutation-gate") // registered at runtime, not spine-valid
+	const inserted = Phase("mutation-gate")
 	if inserted.IsValid() {
 		t.Fatalf("test premise broken: %q must NOT be a spine-valid phase", inserted)
 	}
@@ -141,7 +141,6 @@ func TestRunCycleFromPhase_MissingRunner(t *testing.T) {
 		state:      State{LastCycleNumber: 5},
 		cycleState: CycleState{CycleID: 5, WorkspacePath: "/tmp/ws"},
 	}
-	// Only register PhaseRetro; resume requests PhaseBuild → missing.
 	runners := map[Phase]PhaseRunner{
 		PhaseRetro: &fakeRunner{name: string(PhaseRetro)},
 	}
@@ -286,8 +285,6 @@ func TestLoadResumeState_InvalidJSON(t *testing.T) {
 	}
 }
 
-// mustBuildOrchestrator constructs a default orchestrator with all-PASS
-// runners for tests that don't need precise control.
 func mustBuildOrchestrator(t *testing.T) *Orchestrator {
 	t.Helper()
 	st := &fakeStorage{

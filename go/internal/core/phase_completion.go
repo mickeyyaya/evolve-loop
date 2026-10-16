@@ -6,9 +6,6 @@ import (
 	"os"
 )
 
-// phaseCompletionRecord is the shared completion boundary for fresh and
-// resumed phase execution. Dispatch and branch selection remain path-specific;
-// durable completion, floor learning, and timing use one implementation.
 type phaseCompletionRecord struct {
 	orchestrator *Orchestrator
 	ctx          context.Context

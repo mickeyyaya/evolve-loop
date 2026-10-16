@@ -11,9 +11,6 @@ import (
 
 const insertedResumePhase = Phase("bug-reproduction")
 
-// writeRoutingPlan writes a whole-cycle plan to <workspace>/routing-plan.json
-// in the same on-disk shape parsePhasePlan reads: a bare JSON array of
-// {"phase","run"} entries.
 func writeRoutingPlan(t *testing.T, workspace string, entries []map[string]any) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -28,10 +25,6 @@ func writeRoutingPlan(t *testing.T, workspace string, entries []map[string]any) 
 	}
 }
 
-// fullRunnerSet is buildRunners plus the two spine runners it omits
-// (PhaseSwarmPlan, PhaseDebugger) so that whichever static successor a degrade
-// path selects always has a registered runner — isolating the transition-kernel
-// behavior under test from an incidental missing-runner abort.
 func fullRunnerSet() map[Phase]PhaseRunner {
 	runners := buildRunners(nil)
 	runners[PhaseSwarmPlan] = &fakeRunner{name: string(PhaseSwarmPlan)}
@@ -80,7 +73,7 @@ func TestRunCycleFromPhase_MissingPlanDegradesNotInvalidPhase(t *testing.T) {
 	if insertedResumePhase.IsValid() {
 		t.Fatalf("test premise broken: %q must NOT be a spine-valid phase", insertedResumePhase)
 	}
-	ws := t.TempDir() // deliberately no routing-plan.json written here
+	ws := t.TempDir()
 
 	st := &fakeStorage{
 		state:      State{LastCycleNumber: 635},

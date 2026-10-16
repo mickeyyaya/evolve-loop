@@ -37,11 +37,6 @@ func TestRunCycleFromPhase_NormalizesBuildWorktree(t *testing.T) {
 		},
 	}
 	led := &fakeLedger{}
-	// A resumed cycle that completes normally prunes its worktree at exit
-	// (cycle_worktree_teardown.go); the fake provisioner records that disposal
-	// instead of performing it, so this test can still read the worktree's git
-	// state after the call returns. What the teardown itself does is pinned by
-	// resume_worktree_teardown_test.go, not here.
 	o := NewOrchestrator(st, led, buildRunners(nil), WithWorktreeProvisioner(&fakeWorktree{path: wt}))
 	if _, err := o.RunCycleFromPhase(context.Background(), CycleRequest{
 		ProjectRoot: repo,
@@ -60,9 +55,6 @@ func TestRunCycleFromPhase_NormalizesBuildWorktree(t *testing.T) {
 	}
 }
 
-// Resuming from AUDIT replays no build phase, so the worktree must stay
-// untouched: the operator's manual recovery may have left a deliberate
-// committed state.
 func TestRunCycleFromPhase_NoNormalizeWhenResumingPastBuild(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-10")
@@ -78,8 +70,6 @@ func TestRunCycleFromPhase_NoNormalizeWhenResumingPastBuild(t *testing.T) {
 			WorktreeBaseSHA: base,
 		},
 	}
-	// See the sibling test: the exit teardown is recorded, not performed, so
-	// this test can still read the worktree it is asserting about.
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(&fakeWorktree{path: wt}))
 	if _, err := o.RunCycleFromPhase(context.Background(), CycleRequest{
 		ProjectRoot: repo,
@@ -95,7 +85,6 @@ func TestRunCycleFromPhase_NoNormalizeWhenResumingPastBuild(t *testing.T) {
 func TestNormalizeWorktreeToBase_SkipsNonAncestorBase(t *testing.T) {
 	t.Parallel()
 	dir, base := newRepoWithBaseCommit(t)
-	// Side branch from base — sideSHA is NOT an ancestor of the main line.
 	gitInRepo(t, dir, "checkout", "-q", "-b", "side")
 	side := addCommit(t, dir, "side.go", "side commit")
 	gitInRepo(t, dir, "checkout", "-q", "-")
@@ -133,7 +122,7 @@ func TestRunCycle_PersistsWorktreeBaseSHA(t *testing.T) {
 	repo, _ := initBindingRepo(t, "cycle-11")
 	wt, base := newRepoWithBaseCommit(t)
 
-	st := &fakeStorage{state: State{LastCycleNumber: 10}} // cycle 11
+	st := &fakeStorage{state: State{LastCycleNumber: 10}}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil),
 		WithWorktreeProvisioner(&fakeWorktree{path: wt}))
 	if _, err := o.RunCycle(context.Background(), CycleRequest{

@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// cycleWorkspaceDir mirrors RunCycle's WorkspacePath formula
-// (orchestrator.go: "%s/.evolve/runs/cycle-%d").
 func cycleWorkspaceDir(root string, cycle int) string {
 	return filepath.Join(root, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
 }
@@ -73,7 +71,6 @@ func TestPhaseTimingJSON_RetryEmitsLedgerEntry(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	// One artifact-timeout then success → exactly one retry of scout.
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 1}
 	o := NewOrchestrator(st, led, runners)
 
@@ -105,7 +102,6 @@ func TestFailureDiag_WrittenOnPhaseAbort(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	// Times out on every attempt → aborts after phaseMaxAttempts.
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 99}
 	o := NewOrchestrator(st, led, runners)
 
@@ -292,7 +288,6 @@ func TestOrchestrator_Backfill_TDDArtifactPath(t *testing.T) {
 	}
 
 	workspace := cycleWorkspaceDir(root, res.Cycle)
-	// Must write to test-report.md, not tdd-report.md
 	testReportPath := filepath.Join(workspace, "test-report.md")
 	if _, err := os.Stat(testReportPath); err != nil {
 		t.Errorf("expected test-report.md to be written for tdd backfill: %v", err)
@@ -309,9 +304,7 @@ func TestPhaseTimingJSON_AttemptCount(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	// Scout fails once then succeeds → exactly 2 attempts.
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 1}
-	// Build passes on first attempt → exactly 1 attempt.
 	runners[PhaseBuild] = &fakeRunner{name: "build"}
 	o := NewOrchestrator(st, led, runners)
 

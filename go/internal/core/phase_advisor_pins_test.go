@@ -24,9 +24,6 @@ func (r *refusingBridge) Launch(_ context.Context, _ BridgeRequest) (BridgeRespo
 	return BridgeResponse{}, nil
 }
 
-// readAdvisorArtifact reads a capture artifact, failing the test if it is
-// absent — the capture is the behavior under test, so a missing file is a
-// real failure, not a skip.
 func readAdvisorArtifact(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -36,9 +33,6 @@ func readAdvisorArtifact(t *testing.T, path string) string {
 	return string(b)
 }
 
-// goldenGitRepo builds the fixed five-touch history the recon golden was
-// captured over: a.go twice (a hotspot), b_test.go, c.py and docs/README.md
-// once each.
 func goldenGitRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -93,7 +87,6 @@ func assertGolden(t *testing.T, name, got string) {
 	}
 }
 
-// jsonUnmarshalGolden reads a templated launch golden back into v.
 func jsonUnmarshalGolden(t *testing.T, name, ws, root, wt string, v any) error {
 	t.Helper()
 	raw := strings.NewReplacer("{{WT}}", wt, "{{WS}}", ws, "{{ROOT}}", root).Replace(readAdvisorGolden(t, name))
@@ -161,8 +154,6 @@ func TestPhaseAdvisor_ErrorTextsAreTheOrchestratorsStderrText(t *testing.T) {
 	}
 }
 
-// The capture lands before the parse, so an unparseable response is still
-// forensically debuggable.
 func TestAdvisorLaunch_CapturesEvenWhenTheResponseIsUnparseable(t *testing.T) {
 	t.Parallel()
 
@@ -179,8 +170,6 @@ func TestAdvisorLaunch_CapturesEvenWhenTheResponseIsUnparseable(t *testing.T) {
 	readAdvisorArtifact(t, filepath.Join(ws, "advisor-span-plan.json"))
 }
 
-// Covers the persona-composed plan prompt with the recon off, on (through a
-// real git history), and for the re-plan artifact.
 func TestComposePlanPrompt_MatchesGolden(t *testing.T) {
 	t.Parallel()
 

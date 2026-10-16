@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// diagnosticFailRunner returns FAIL with the phase's own diagnostics — the
-// shape Classify produces for an admission rejection.
 type diagnosticFailRunner struct {
 	name  string
 	diags []Diagnostic
@@ -65,19 +63,11 @@ func TestRunCycle_TriageOwnFailReasonReachesTheSealAndTheRecord(t *testing.T) {
 	if len(triage.Diagnostics) != 2 || triage.Diagnostics[1].Message != protectedSurfaceRejection {
 		t.Errorf("the durable record must carry the phase's own diagnostics, got %+v", triage.Diagnostics)
 	}
-	// Writer/reader parity: the batch-report classifier reads the SAME record the
-	// chokepoint wrote (through phasetiming.Entry, not a hand-typed mirror), so a
-	// schema drift cannot silently revert the detail to verdict-only.
 	if outcome, detail := cyclehealth.ClassifyOutcome(storage.cycleState.WorkspacePath); outcome != cyclehealth.OutcomeFailedExplained || !strings.Contains(detail, "names protected surface") {
 		t.Errorf("cyclehealth must name the reason from the record core wrote: %s %q", outcome, detail)
 	}
 }
 
-// The C1 chokepoint is the ONE producer: phaseOutcomeFrom relays the phase's
-// diagnostics, recordPhaseOutcome writes them to the record and emits ONE
-// phase.outcome; the root's WARN-filtered stderr sink renders a reasoned FAIL
-// in one line — the chokepoint itself prints nothing. A PASS carrying
-// warnings is recorded (the durable trail) and stays off stderr.
 func TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail(t *testing.T) {
 	t.Parallel()
 

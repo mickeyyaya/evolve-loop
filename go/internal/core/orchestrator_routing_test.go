@@ -13,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// seedWorkspace writes a handoff artifact into the cycle workspace for
-// router.Digest to read; callers must pass DisableWorkspaceGuard so the
-// pre-seeded files survive into the run.
 func seedWorkspace(t *testing.T, projectRoot string, cycle int, files map[string]string) string {
 	t.Helper()
 	ws := filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
@@ -67,8 +64,6 @@ func contains(xs []string, want string) bool {
 	return false
 }
 
-// shadowCfg is a deterministic StaticPreset config with the tester trigger
-// (build.acs_red > 0) the plan's minimal slice exercises.
 func shadowCfg(stage config.Stage) config.RoutingConfig {
 	return config.RoutingConfig{
 		Stage:         stage,
@@ -102,14 +97,10 @@ func TestOrchestrator_Enforce_RunsUserPhaseBetweenBuildAndAudit(t *testing.T) {
 	runners[Phase("security-scan")] = scanRunner
 
 	cycle := 1
-	// acs_red=0 so the built-in tester trigger stays quiet; a generic signal
-	// (build.cves>0) fires the user phase instead, isolating the new path.
 	seedWorkspace(t, projectRoot, cycle, map[string]string{
 		"handoff-build.json": `{"verdict":"PASS","acs_result":{"green":5,"red":0},"signals":{"cves":1}}`,
 	})
 
-	// Merge returns (Catalog, warnings), no error; guard explicitly so a future
-	// Merge regression fails here, not as a confusing "runner calls = 0" later.
 	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{
 		{Name: "security-scan", Optional: true, After: "build"},
 	})
@@ -146,8 +137,6 @@ func TestOrchestrator_Enforce_RunsUserPhaseBetweenBuildAndAudit(t *testing.T) {
 	}
 }
 
-// capturingPlanner records the RouteInput handed to the advisor; returning a
-// nil plan is fine since the orchestrator then degrades to the static spine.
 type capturingPlanner struct {
 	got   router.RouteInput
 	calls int
@@ -164,8 +153,8 @@ func TestOrchestrator_ThreadsGoalTextToPlanner(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	cfg := shadowCfg(config.StageAdvisory) // advisory ⇒ the planner is consulted
-	cfg.Mode = config.ModeDynamicLLM       // DynamicLLM ⇒ the LLM planner gate opens
+	cfg := shadowCfg(config.StageAdvisory)
+	cfg.Mode = config.ModeDynamicLLM
 	cp := &capturingPlanner{}
 	o := NewOrchestrator(st, led, runners, WithRouting(cfg, router.StaticPreset{}), WithPlanner(cp))
 
@@ -174,7 +163,7 @@ func TestOrchestrator_ThreadsGoalTextToPlanner(t *testing.T) {
 		ProjectRoot:           t.TempDir(),
 		GoalHash:              "g",
 		DisableWorkspaceGuard: true,
-		Context:               map[string]string{"goal": goal}, // the goal-text key (not "strategy" = mode)
+		Context:               map[string]string{"goal": goal},
 	})
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -233,8 +222,6 @@ func TestOrchestrator_StageOff_EmitsNoRoutingLedgerEntries(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	// Explicit WithRouting at StageOff confirms the Off branch short-circuits
-	// even with a non-default Mode configured.
 	cfg := shadowCfg(config.StageOff)
 	o := NewOrchestrator(st, led, runners, WithRouting(cfg, router.StaticPreset{}))
 
@@ -268,9 +255,8 @@ func TestOrchestrator_Shadow_LogsTesterInsert_StaticPathUnchanged(t *testing.T) 
 
 	o := NewOrchestrator(st, led, runners, WithRouting(shadowCfg(config.StageShadow), router.StaticPreset{}))
 	res, err := o.RunCycle(context.Background(), CycleRequest{
-		ProjectRoot: projectRoot,
-		GoalHash:    "g",
-		// Keep the pre-seeded handoff-build.json from being archived.
+		ProjectRoot:           projectRoot,
+		GoalHash:              "g",
 		DisableWorkspaceGuard: true,
 	})
 	if err != nil {
@@ -315,8 +301,6 @@ func TestOrchestrator_Enforce_TrivialCycle_SkipsOptionalMiddle(t *testing.T) {
 
 	cycle := 1
 	seedWorkspace(t, projectRoot, cycle, map[string]string{
-		// A trivial cycle leaves tdd's conditional pin (cycle_size != trivial)
-		// unsatisfied, so tdd is skippable this cycle.
 		"handoff-scout.json": `{"cycle_size_estimate":"trivial"}`,
 	})
 
@@ -346,8 +330,6 @@ func TestOrchestrator_Enforce_TrivialCycle_SkipsOptionalMiddle(t *testing.T) {
 	}
 }
 
-// Only handoff-scout is seeded, so both the build→audit and audit→ship
-// transitions should warn (their predecessor handoffs are absent).
 func TestOrchestrator_Enforce_SpineUnsatisfied_WarnsButProceeds(t *testing.T) {
 	t.Parallel()
 	projectRoot := t.TempDir()
@@ -357,7 +339,7 @@ func TestOrchestrator_Enforce_SpineUnsatisfied_WarnsButProceeds(t *testing.T) {
 
 	cycle := 1
 	ws := seedWorkspace(t, projectRoot, cycle, map[string]string{
-		"handoff-scout.json": `{"cycle_size_estimate":"medium"}`, // non-trivial ⇒ full spine runs
+		"handoff-scout.json": `{"cycle_size_estimate":"medium"}`,
 	})
 
 	o := NewOrchestrator(st, led, runners, WithRouting(shadowCfg(config.StageEnforce), router.StaticPreset{}))

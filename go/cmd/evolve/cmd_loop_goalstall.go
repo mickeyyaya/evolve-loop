@@ -15,26 +15,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// goalStallWeightFloor mirrors policy.GoalStallWeight's floor; guarded at both
-// layers so neither a bad config nor a bad caller can under-weight a stalled
-// goal.
 const goalStallWeightFloor = 0.9
 
 const goalStallItemIDPrefix = "goal-stall-"
 
-// nonprogressItemIDPrefix stays distinct from goalStallItemIDPrefix so a
-// non-progress escalation cannot overwrite the empty-only goal-stall todo for
-// the same goal.
 const nonprogressItemIDPrefix = "nonprogress-"
 
-// stallKind is per-breaker data; the two breakers share all other machinery so
-// the difference stays data, not a duplicate
-// (feedback_never_duplicate_centralize_via_design_patterns).
 type stallKind struct {
 	idPrefix string
-	// outcomes names the counted class in the title/description/event; reporting
-	// a FAIL/EMPTY streak as empty-only would send the scout after the wrong
-	// evidence, so each kind states its own.
 	outcomes string
 	source   string
 	marker   string
@@ -56,9 +44,6 @@ var (
 )
 
 func nonShippingOutcome(finalVerdict string) bool {
-	// A WARN-verdict cycle that shipped inline still counts as non-progress
-	// here, since CycleResult carries no HEAD-moved field; that can file one
-	// spurious diagnostic todo but never halts.
 	return !core.IsShippingVerdict(finalVerdict)
 }
 
@@ -94,8 +79,6 @@ func (t *goalStallTracker) observe(nonShipping bool, reason string, threshold in
 	return nil
 }
 
-// goalStallItem's JSON matches the canonical inbox-item schema, plus the
-// human-facing fields a scout reads.
 type goalStallItem struct {
 	ID            string  `json:"id"`
 	Title         string  `json:"title"`
@@ -170,16 +153,12 @@ func shortGoalHash(goalHash string) string {
 	return goalHash[:8]
 }
 
-// goalStallConfig groups both breakers' policy-sourced knobs so the loop's
-// single load site cannot pick up one threshold and miss the other.
 type goalStallConfig struct {
-	threshold            int // empty/blocked-only ceiling
-	nonprogressThreshold int // union (any non-shipping outcome) ceiling
+	threshold            int
+	nonprogressThreshold int
 	weight               float64
 }
 
-// loadGoalStallConfig falls back to the compiled defaults on any policy.json
-// read error (feedback_phase_settings_from_config_not_code).
 func loadGoalStallConfig(evolveDir string) goalStallConfig {
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	if err != nil {
@@ -192,8 +171,6 @@ func loadGoalStallConfig(evolveDir string) goalStallConfig {
 	}
 }
 
-// handleGoalStall never fails the loop: escalation errors are logged, not
-// fatal (never_stop_queue_inject_inbox).
 func handleGoalStall(kind stallKind, evolveDir, goalHash, workspace string, cycle int, esc *goalStallEscalation, threshold int, weight float64, stderr io.Writer) {
 	item := buildGoalStallItem(kind, goalHash, esc, weight, cycle, time.Now().UTC().Format(time.RFC3339))
 	if path, err := item.writeTo(evolveDir); err != nil {

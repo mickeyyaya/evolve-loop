@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// resumeFinalVerdict recovers host disposition, never an agent report's prose.
-// An old checkpoint without the last completed floor's evidence stays WARN
-// until another authoritative phase runs; missing evidence cannot imply PASS.
 func (o *Orchestrator) resumeFinalVerdict(cs CycleState) string {
 	if IsVerdict(cs.FinalVerdict) {
 		return cs.FinalVerdict
@@ -34,5 +31,5 @@ func (o *Orchestrator) resumeFinalVerdict(cs CycleState) string {
 		fmt.Fprintf(os.Stderr, "[resume] WARN cycle %d: legacy checkpoint has no host verdict for completed %s; retaining WARN until an authoritative phase runs\n", cs.CycleID, phase)
 		return VerdictWARN
 	}
-	return VerdictPASS // no authoritative phase has completed yet
+	return VerdictPASS
 }

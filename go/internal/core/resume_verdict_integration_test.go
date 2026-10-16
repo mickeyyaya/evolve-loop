@@ -31,8 +31,6 @@ func TestResumeVerdict_PostAuditCloseoutPreservesHostDisposition(t *testing.T) {
 			o, st, req, rp := resumedLifecycleFixture(t)
 			rp.Phase = string(PhaseRetro)
 			st.cycleState.CompletedPhases = append(st.cycleState.CompletedPhases, "audit")
-			// Decode the additive checkpoint field to keep the RED test runnable
-			// against legacy code that does not yet retain it.
 			if err := json.Unmarshal([]byte(`{"final_verdict":"`+tc.persisted+`"}`), &st.cycleState); err != nil {
 				t.Fatal(err)
 			}

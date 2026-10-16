@@ -7,11 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// resolveResumeNext computes the successor of a just-completed phase on the
-// resume path: a spine-valid current phase uses the exact static kernel
-// (o.sm.Next), so resume stays byte-identical for the common case. An
-// inserted (invalid) phase resolves via the run's own routing-plan.json,
-// falling back to an archetype degrade when that plan is absent.
 func (o *Orchestrator) resolveResumeNext(cs CycleState, current Phase, verdict string) (Phase, error) {
 	if current.IsValid() {
 		return o.sm.Next(current, verdict)
@@ -22,11 +17,6 @@ func (o *Orchestrator) resolveResumeNext(cs CycleState, current Phase, verdict s
 	return o.degradeInsertedSuccessor(current), nil
 }
 
-// nextFromRoutingPlan returns the phase that follows current in
-// <workspace>/routing-plan.json's run:true order, PhaseEnd when current is
-// the plan's last entry, and ok=false when the plan is missing/unparseable
-// or current is absent from it. It reuses parsePhasePlan so the wire format
-// stays single-sourced.
 func nextFromRoutingPlan(workspace string, current Phase) (Phase, bool) {
 	if workspace == "" {
 		return "", false
@@ -52,15 +42,11 @@ func nextFromRoutingPlan(workspace string, current Phase) (Phase, bool) {
 		}
 	}
 	if found {
-		// current is in the plan but nothing runs after it — the plan is complete.
 		return PhaseEnd, true
 	}
 	return "", false
 }
 
-// degradeInsertedSuccessor is the archetype fallback when no routing-plan.json
-// is available: it routes an inserted phase to the static spine phase its
-// composition archetype flows into, never skipping the audit gate.
 func (o *Orchestrator) degradeInsertedSuccessor(current Phase) Phase {
 	switch o.phaseArchetype(string(current)) {
 	case string(phasespec.RolePlan):
