@@ -9,39 +9,17 @@ import (
 	"time"
 )
 
-// ProduceConfig configures a post-phase one-shot events render. The raw log
-// paths are derived from Workspace+Phase (<phase>-stdout.log /
-// <phase>-stderr.log), matching the bridge's naming and logfilter.Process.
 type ProduceConfig struct {
-	Workspace string
-	Phase     string // file stem + envelope agent/phase
-	CLI       string
-	Cycle     int
-	// InjectedPrompt is the phase's composed prompt text. When set, the
-	// Classifier suppresses infra-marker lines that are a verbatim echo of it
-	// (cycle-641/642 lesson; wired cycle-672). Empty = no suppression.
+	Workspace      string
+	Phase          string
+	CLI            string
+	Cycle          int
 	InjectedPrompt string
-	Now            func() time.Time // defaults to time.Now
+	Now            func() time.Time
 }
 
-// produceScanBufBytes caps a raw log line; a result envelope can embed a
-// large payload. Generous, matching cyclecost's reader.
-const produceScanBufBytes = 1 << 24 // 16MB
+const produceScanBufBytes = 1 << 24
 
-// Produce reads a finished phase's complete raw <phase>-stdout.log (and
-// optional <phase>-stderr.log) and writes the unified <phase>-events.ndjson
-// through the same Classifier the live Normalizer uses (ADR-0020). This is the
-// post-phase path for the synchronous-bridge runner, where the whole log
-// exists at once.
-//
-// Unlike the live Poll tail — which deliberately holds back an unterminated
-// final line to avoid splitting a still-being-written record — Produce reads
-// each log in full, so the billing-critical trailing `result` event is never
-// dropped. The write is atomic (temp + rename) so the post-cycle readers
-// (cyclecost, cycleclassify) never observe a half-written events file, and the
-// temp never pollutes their *-events.ndjson glob.
-//
-// A missing stdout log is a no-op (returns nil): the phase produced no output.
 func Produce(cfg ProduceConfig) error {
 	now := cfg.Now
 	if now == nil {
@@ -80,7 +58,6 @@ func Produce(cfg ProduceConfig) error {
 		envs = append(envs, stderrEnvs...)
 	}
 
-	// Coalesced liveness tick for any stream_event burst (parity with Poll).
 	if env, ok := clf.FlushProgress(); ok {
 		envs = append(envs, env)
 	}
@@ -88,8 +65,6 @@ func Produce(cfg ProduceConfig) error {
 	return writeEventsFile(cfg.Workspace, cfg.Phase, envs)
 }
 
-// classifyLines reads logPath in full and runs each line (including a final
-// unterminated one) through classify, accumulating the emitted envelopes.
 func classifyLines(logPath string, classify func([]byte) []Envelope) ([]Envelope, error) {
 	f, err := os.Open(logPath)
 	if err != nil {
@@ -109,10 +84,6 @@ func classifyLines(logPath string, classify func([]byte) []Envelope) ([]Envelope
 	return out, nil
 }
 
-// writeEventsFile atomically writes the envelope stream to
-// <workspace>/<phase>-events.ndjson via a temp file + rename. The temp name is
-// dot-prefixed so a crash mid-write cannot leave a file matching the consumers'
-// *-events.ndjson glob.
 func writeEventsFile(workspace, phase string, envs []Envelope) error {
 	tmp, err := os.CreateTemp(workspace, "."+phase+"-events.ndjson.tmp.*")
 	if err != nil {

@@ -1,10 +1,5 @@
 package signalcenter
 
-// sinks_test.go — the two default listeners and the filter (ADR-0101 decision 6;
-// design §6.8–6.9, §9). The NDJSON sink is the durable record (everything, one line
-// per event, one open handle per cycle); the stderr sink is the ONE module-tagged
-// log line; Filter is how the root keeps INFO out of the console.
-
 import (
 	"bufio"
 	"bytes"
@@ -86,7 +81,7 @@ func TestNDJSONSink_ResolverEmptyKeepsCountAndReportsOnce(t *testing.T) {
 		}
 		return filepath.Join(root, "signals.ndjson")
 	}))
-	c.Emit(infoEvent("process-level 1")) // cycle 0 → no file yet
+	c.Emit(infoEvent("process-level 1"))
 	c.Emit(infoEvent("process-level 2"))
 	if _, err := os.Stat(filepath.Join(root, "signals.ndjson")); !os.IsNotExist(err) {
 		t.Fatal("no file may be written while the resolver returns \"\"")
@@ -172,11 +167,6 @@ func TestFilter_PassesAtOrAboveTheThreshold(t *testing.T) {
 	}
 }
 
-// ConsoleSink is the console half of every composition root — the orchestrator
-// roots (newRootSignalCenter) and the `evolve phase-observer` subprocess
-// (ADR-0103 unit 12 review fold) — so the WARN threshold has ONE home: INFO
-// never renders (the contract's "log only" tier), WARN and INCIDENT render in
-// the one line format. Kills a threshold raised to INCIDENT and a dropped Filter.
 func TestConsoleSink_RendersWarnAndAboveInTheOneLineFormat(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
@@ -196,9 +186,6 @@ func TestConsoleSink_RendersWarnAndAboveInTheOneLineFormat(t *testing.T) {
 	}
 }
 
-// A resumed cycle appends to the same signals.ndjson from a NEW process: fresh
-// pid, fresh seq, same file (O_APPEND). Both orders stay reconstructible by
-// pid+seq — the durable record never needs a lock across processes (design §6.8).
 func TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "signals.ndjson")
@@ -231,10 +218,6 @@ func TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile(t *testing.T) {
 	}
 }
 
-// A Listener is a plain func: it can run outside a drain (a direct call, or a
-// sink subscribed to a second Center). The drop report must be emitted with
-// the sink's own lock released, or the synchronous drain that follows
-// re-enters write and self-deadlocks (architecture review, S1).
 func TestNDJSONSink_DropReportIsEmittedOutsideTheSinkLock(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "signals.ndjson")

@@ -1,17 +1,3 @@
-// outcome_test.go — R6 (concurrency-factory plan): the cycle-outcome SLO
-// classifier, computed from the ADR-0044 C1 records every terminal path
-// already writes (phase-timing.json + <phase>-usage.json sidecars +
-// interaction-summary.json). This is the measurement instrument for the
-// R8 shadow→enforce soak: SHIPPED / SALVAGED / FAILED_EXPLAINED are the
-// only acceptable cycle endings; FAILED_UNEXPLAINED must be 0 and alarmed.
-//
-// Precedence (first match wins): SHIPPED (ship verdict PASS) → SALVAGED
-// (no ship, but a correction-ladder salvage produced the artifact) →
-// FAILED_EXPLAINED (an abort_reason was recorded — the C1 chokepoint
-// guarantees abort paths record one) → FAILED_EXPLAINED (a phase recorded
-// verdict FAIL with no abort — the audit-FAIL completion terminal,
-// cycle-306) → FAILED_UNEXPLAINED (phases ran, nothing explains the
-// ending — the bucket that pages someone).
 package cyclehealth
 
 import (
@@ -45,9 +31,9 @@ func TestClassifyOutcome(t *testing.T) {
 	cases := []struct {
 		name    string
 		timing  []timingFixture
-		rollup  map[string]any // interaction-summary.json; nil = absent
+		rollup  map[string]any
 		want    Outcome
-		wantSub string // substring expected in the detail
+		wantSub string
 	}{
 		{
 			name: "shipped",
@@ -57,7 +43,6 @@ func TestClassifyOutcome(t *testing.T) {
 			want: OutcomeShipped,
 		},
 		{
-			// cycle-283 shape: build ran, audit FAILed, abort recorded.
 			name: "failed_explained_via_abort_reason",
 			timing: []timingFixture{
 				{Phase: "build", Verdict: "PASS"},
@@ -67,8 +52,6 @@ func TestClassifyOutcome(t *testing.T) {
 			wantSub: "coverage floors",
 		},
 		{
-			// no ship, no abort — but the correction ladder salvaged the
-			// deliverable (rung=salvage, artifact_appeared).
 			name:   "salvaged",
 			timing: []timingFixture{{Phase: "build", Verdict: "PASS"}},
 			rollup: map[string]any{
@@ -79,12 +62,6 @@ func TestClassifyOutcome(t *testing.T) {
 			want: OutcomeSalvaged,
 		},
 		{
-			// cycle-306 shape (soak #3, 2026-06-13): the audit-FAIL → retro →
-			// normal-completion terminal records the FAIL verdict but NO
-			// abort_reason — it is a completion, not an abort, so the C1
-			// chokepoint never fires. A recorded FAIL verdict IS the
-			// explanation; this must not page anyone as UNEXPLAINED
-			// (auto-filed defect auto-unexplained-outcome-cycle-306).
 			name: "failed_explained_via_fail_verdict_without_abort",
 			timing: []timingFixture{
 				{Phase: "build", Verdict: "PASS"},
@@ -95,10 +72,6 @@ func TestClassifyOutcome(t *testing.T) {
 			wantSub: "audit",
 		},
 		{
-			// Ordering invariant: an explicit abort_reason ANYWHERE in the
-			// timing log outranks a prior FAIL verdict — the abort is the
-			// more specific cause and must win even when an earlier phase
-			// failed first. Pins the loop order in ClassifyOutcome.
 			name: "abort_reason_beats_prior_fail_verdict",
 			timing: []timingFixture{
 				{Phase: "mutation-gate", Verdict: "FAIL"},
@@ -108,14 +81,11 @@ func TestClassifyOutcome(t *testing.T) {
 			wantSub: "observer killed",
 		},
 		{
-			// The alarm bucket: phases ran, nothing explains the ending.
 			name:   "failed_unexplained",
 			timing: []timingFixture{{Phase: "build", Verdict: "PASS"}},
 			want:   OutcomeFailedUnexplained,
 		},
 		{
-			// Precedence: a ship PASS outranks a recorded abort earlier in
-			// the cycle (a repaired ship is still SHIPPED).
 			name: "ship_pass_outranks_earlier_abort",
 			timing: []timingFixture{
 				{Phase: "build", Verdict: "FAIL", AbortReason: "first attempt died"},
@@ -125,8 +95,6 @@ func TestClassifyOutcome(t *testing.T) {
 			want: OutcomeShipped,
 		},
 		{
-			// Empty/no records means initialization failed before any phase
-			// timing could be written. This is explained, not an alarm.
 			name:    "empty_workspace",
 			timing:  nil,
 			want:    OutcomeFailedExplained,

@@ -1,17 +1,5 @@
 package signalcenter
 
-// center_test.go — the Center's delivery contract (ADR-0101 decision 3; design §6).
-//
-// Delivery model: Emit assigns the sequence number and enqueues under the emit
-// lock; the first emitter that finds no drain in progress drains the queue in
-// seq order, delivering each event to a snapshot of the listeners, outside the
-// lock. A listener that emits (re-entrancy) enqueues and returns; its event is
-// delivered by the active drainer right after the current fan-out, before the
-// outer Emit returns. A concurrent emitter that finds a drain in progress
-// enqueues and returns; the active drainer delivers its event in seq order
-// before the drainer's own Emit returns. Every listener therefore observes the
-// same total order, and `seq` proves it in the durable record.
-
 import (
 	"strings"
 	"sync"
@@ -112,7 +100,7 @@ func TestEmit_ReentrantListenerIsQueuedNotDeadlocked(t *testing.T) {
 	c.Subscribe(func(e Event) {
 		order = append(order, e.Reason)
 		if e.Reason == "outer" {
-			c.Emit(infoEvent("nested")) // re-entrant: must not deadlock, must be delivered after the outer
+			c.Emit(infoEvent("nested"))
 		}
 	})
 	done := make(chan struct{})
@@ -164,7 +152,7 @@ func TestSubscribe_UnsubscribeIsIdempotentAndSafeDuringEmit(t *testing.T) {
 	var a, b int
 	unsubA := c.Subscribe(func(Event) { a++ })
 	var unsubB func()
-	unsubB = c.Subscribe(func(Event) { b++; unsubB() }) // unsubscribes itself mid-fan-out
+	unsubB = c.Subscribe(func(Event) { b++; unsubB() })
 	c.Emit(infoEvent("one"))
 	c.Emit(infoEvent("two"))
 	if a != 2 || b != 1 {

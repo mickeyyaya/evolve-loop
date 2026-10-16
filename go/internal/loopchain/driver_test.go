@@ -18,8 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// --- 38. the pure decisions ---
-
 func TestStartDecision_Table(t *testing.T) {
 	cases := []struct {
 		n, max, pending int
@@ -75,8 +73,6 @@ func TestStopReasons_AreTheSevenWireStrings(t *testing.T) {
 		t.Error("seven stop reasons")
 	}
 }
-
-// --- 39. the inbox count, the brake, the config ---
 
 func TestInboxPendingCount_SkipsDirsNonJSONAndNamesInvalidFiles(t *testing.T) {
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
@@ -141,8 +137,6 @@ func TestLoadChainConfig_DefaultsOnError(t *testing.T) {
 	}
 }
 
-// --- 40. the last refresh entry ---
-
 func TestLastRefreshLogEntry_MostRecentMissingEmptyUnparseable(t *testing.T) {
 	dir := t.TempDir()
 	logPath := filepath.Join(dir, LogFile)
@@ -161,7 +155,7 @@ func TestLastRefreshLogEntry_MostRecentMissingEmptyUnparseable(t *testing.T) {
 		buf.Write(line)
 		buf.WriteString("\n")
 	}
-	buf.WriteString("\n") // a trailing blank line is skipped
+	buf.WriteString("\n")
 	if err := os.WriteFile(logPath, buf.Bytes(), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -175,8 +169,6 @@ func TestLastRefreshLogEntry_MostRecentMissingEmptyUnparseable(t *testing.T) {
 		t.Errorf("an unparseable last line is (nil, nil) — Q-C4: (%v, %v)", got, err)
 	}
 }
-
-// --- 48. the fleet-lane check ---
 
 func liveRun(t *testing.T, evolveDir, name string, pid int) {
 	t.Helper()
@@ -201,9 +193,6 @@ func TestFleetLaneActive_ExcludesOwnPIDLease(t *testing.T) {
 	if active, err := FleetLaneActive(evolveDir); err != nil || active {
 		t.Errorf("our own fresh lease is not a sibling: %v %v", active, err)
 	}
-	// A sibling is a DIFFERENT LIVE process: os.Getpid()+1 only happened to
-	// be alive; since liveness is the owner's (2026-09-15) the fixture holds a
-	// real child for the duration.
 	sibling := exec.Command("sleep", "30")
 	if err := sibling.Start(); err != nil {
 		t.Fatalf("spawn a live sibling: %v", err)
@@ -213,9 +202,6 @@ func TestFleetLaneActive_ExcludesOwnPIDLease(t *testing.T) {
 	if active, err := FleetLaneActive(evolveDir); err != nil || !active {
 		t.Errorf("a foreign LIVE pid is a sibling: %v %v", active, err)
 	}
-	// Live without a lease at all (the current-workspace liveness source) is
-	// deliberately NOT excluded — but only a fresh lease or the current
-	// workspace makes a dir Live; a bare run dir is dead.
 	bare := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(bare, "runs", "cycle-dead"), 0o755); err != nil {
 		t.Fatal(err)
@@ -235,9 +221,6 @@ func TestFleetLaneActive_ExcludesOwnPIDLease(t *testing.T) {
 	}
 }
 
-// --- 50-54. the Driver ---
-
-// chainFixture scripts a Driver over a temp project with `items` pending.
 type chainFixture struct {
 	root, evolveDir string
 	stderr          bytes.Buffer
@@ -277,9 +260,6 @@ func (f *chainFixture) run(cap int) Result {
 	return NewDriver(Roots{ProjectRoot: f.root, EvolveDir: f.evolveDir}, policy.ChainConfig{Enabled: true, MaxBatches: cap}, f.deps, &f.stderr, WithSignals(f.sig.accessor())).Run()
 }
 
-// resultJSON renders the Result exactly as the host prints it (MarshalIndent
-// + newline): the Result IS the chain's stdout wire schema, so the fold-0
-// goldens (captured through runLoopChain) replay here with no view struct.
 func resultJSON(t *testing.T, r Result) string {
 	t.Helper()
 	buf, err := json.MarshalIndent(r, "", "  ")
@@ -289,17 +269,9 @@ func resultJSON(t *testing.T, r Result) string {
 	return string(buf) + "\n"
 }
 
-// --- review fold R1: the chain summary schema has ONE home ---
-
-// TestResult_IsTheChainSummaryWireSchema pins the stdout contract on the leaf
-// type itself: the five wire keys in order, `boundary_refresh` omitted when
-// nil, the exit code never on the wire, and ChainMode stamped by Run — a field
-// added or a tag renamed here changes the host's stdout, and this test.
 func TestResult_IsTheChainSummaryWireSchema(t *testing.T) {
 	full := Result{ChainMode: true, MaxBatches: 5, Batches: []BatchRecord{{Batch: 1, RC: 0, FleetCount: 1, InboxPending: 3}}, StopReason: StopBoundaryRefreshReexec, Exit: 7,
 		BoundaryRefresh: &RefreshLogEntry{Batch: 2, AuthorizedClass: AuthorizedClassBoundaryRefresh, Timestamp: "t", OldSHA: "a", NewSHA: "b"}}
-	// keys lists the top-level keys in wire order (each spelled once in the
-	// document, so byte offset is order).
 	keys := func(r Result) []string {
 		raw, err := json.Marshal(r)
 		if err != nil {
@@ -500,11 +472,6 @@ func (f *chainFixture) refresherNull() *Refresher {
 	return NewRefresher(Roots{ProjectRoot: f.root, EvolveDir: f.evolveDir}, RefreshDeps{}, &f.stderr, WithSignals(func() *signalcenter.Center { return nil }))
 }
 
-// --- review fold R4: one producer per console sentence ---
-
-// TestDriver_StopLineHasOneProducer pins the unit's own rule (§4
-// Fold-the-twin): the "[chain] stopping after …" sentence the brake and the
-// start decision share is spelled ONCE in the Driver.
 func TestDriver_StopLineHasOneProducer(t *testing.T) {
 	src, err := os.ReadFile("driver.go")
 	if err != nil {
@@ -516,13 +483,6 @@ func TestDriver_StopLineHasOneProducer(t *testing.T) {
 	}
 }
 
-// A sealed lane's lease outlives its process: the writer stops heartbeating
-// at exit but the file stays "fresh" for a full TTL (cycle 1679 sealed at
-// 17:03Z; the boundary refresh at 17:03 read its 17:02 heartbeat as an active
-// sibling and refused to rebuild — LOOP_BOUNDARY_REFRESH_SKIPPED step=lane_active
-// with no lane running, twice on 2026-09-15). Liveness is the OWNER, not the
-// timestamp: a fresh lease whose owner pid is gone is not a sibling; a lease
-// with no owner pid stays a sibling (nothing to probe — refuse conservatively).
 func TestFleetLaneActive_DeadOwnerIsNotASibling(t *testing.T) {
 	evolveDir := t.TempDir()
 	cmd := exec.Command("true")

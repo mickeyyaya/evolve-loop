@@ -1,25 +1,10 @@
 package clihealth
 
-// clihealth_amplify_cycle426_test.go — adversarial amplification for cycle-426
-// ClearBootStrike lifecycle (T2).  Tests target lifecycle corners the Build
-// tests do not probe:
-//
-//  1. Double-clear idempotency — clearing an already-cleared entry.
-//  2. Full re-accumulation after clear — bench→clear→re-bench lifecycle.
-//  3. Multi-driver isolation — ClearBootStrike(A) must not affect driver B.
-
 import (
 	"testing"
 	"time"
 )
 
-// TestAmplify_C426_DoubleClearIsIdempotent: after setting a boot-bench and
-// clearing it, a second ClearBootStrike on the now-absent entry must be a
-// no-op (no error, Active() stays empty).
-//
-// Distinct from TestClearBootStrikeAbsentIsNoOp which tests a key that was
-// NEVER set; here the key was SET then CLEARED, and the second call must not
-// fail or corrupt the store.
 func TestAmplify_C426_DoubleClearIsIdempotent(t *testing.T) {
 	t.Parallel()
 	s := NewStore(t.TempDir(), nil)
@@ -41,7 +26,6 @@ func TestAmplify_C426_DoubleClearIsIdempotent(t *testing.T) {
 		t.Fatalf("Active() = %v after first clear; want empty", active)
 	}
 
-	// Second clear on the now-absent entry — must be a no-op, not an error.
 	if err := s.ClearBootStrike(driver); err != nil {
 		t.Errorf("ClearBootStrike (second, already absent): unexpected error: %v", err)
 	}
@@ -50,18 +34,11 @@ func TestAmplify_C426_DoubleClearIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestAmplify_C426_FullReaccumulationAfterClear: reach threshold (benched) →
-// clear (reset) → re-accumulate threshold strikes → benched again.
-//
-// Guards against an implementation where ClearBootStrike zeroes an in-memory
-// counter but leaves the on-disk entry, causing the second round to count from
-// a residual state and bench on fewer than threshold consecutive failures.
 func TestAmplify_C426_FullReaccumulationAfterClear(t *testing.T) {
 	t.Parallel()
 	s := NewStore(t.TempDir(), nil)
 	const driver = "claude-tmux"
 
-	// Round 1: accumulate to threshold.
 	for i := 0; i < DefaultBootBenchThreshold; i++ {
 		if _, err := s.RecordBootStrike(driver); err != nil {
 			t.Fatalf("round1 RecordBootStrike call %d: %v", i+1, err)
@@ -78,7 +55,6 @@ func TestAmplify_C426_FullReaccumulationAfterClear(t *testing.T) {
 		t.Fatal("driver still active after ClearBootStrike; round2 precondition broken")
 	}
 
-	// Round 2: strikes below threshold must NOT bench.
 	for i := 0; i < DefaultBootBenchThreshold-1; i++ {
 		benched, err := s.RecordBootStrike(driver)
 		if err != nil {
@@ -92,7 +68,6 @@ func TestAmplify_C426_FullReaccumulationAfterClear(t *testing.T) {
 		t.Error("Active() contains driver before round2 threshold is reached")
 	}
 
-	// Final strike reaches threshold again → must bench.
 	benched, err := s.RecordBootStrike(driver)
 	if err != nil {
 		t.Fatalf("round2 threshold strike: %v", err)
@@ -105,11 +80,6 @@ func TestAmplify_C426_FullReaccumulationAfterClear(t *testing.T) {
 	}
 }
 
-// TestAmplify_C426_ClearOnlyTargetDriver: with two drivers both having active
-// boot benches, ClearBootStrike(A) must NOT affect driver B's bench entry.
-//
-// Guards against an implementation that clears all BootTimeoutPattern entries
-// or iterates the full map instead of keying on the requested driver only.
 func TestAmplify_C426_ClearOnlyTargetDriver(t *testing.T) {
 	t.Parallel()
 	s := NewStore(t.TempDir(), nil)

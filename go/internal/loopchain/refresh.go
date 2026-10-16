@@ -11,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// RefreshDeps are the Refresher's collaborators — every process seam the
-// boundary refresh touches, explicit at construction. Rebuild (`make -C go
-// build`) and ReExec (syscall.Exec) have no leaf default: the host owns the
-// two process adapters. Flush drains the host's Signal Center before the
-// terminal exec (a successful exec never returns, so nothing after it runs).
-// A nil dep is a programming error and panics at first use.
 type RefreshDeps struct {
 	RunningCommit func() string
 	Ahead         func(projectRoot, runningCommit string) (bool, error)
@@ -30,12 +24,6 @@ type RefreshDeps struct {
 	ReExec        func(argv0 string, argv, envv []string) error
 }
 
-// Refresher is the boundary binary refresh (cycle 1314): a chained or
-// multi-wave loop that runs for many boundaries could keep executing a
-// running binary that fell behind HEAD while fixes landed on main. It is
-// called only BETWEEN batches (the loop body is single-threaded per
-// boundary, so no lock is needed); every degrade returns refreshed=false and
-// the CURRENT binary keeps running the loop — it never halts.
 type Refresher struct {
 	roots  Roots
 	deps   RefreshDeps
@@ -43,26 +31,18 @@ type Refresher struct {
 	opts   options
 }
 
-// NewRefresher builds the refresher over its roots, deps and the warn writer
-// the two kept report lines print to.
 func NewRefresher(roots Roots, deps RefreshDeps, warn io.Writer, opts ...Option) *Refresher {
 	return &Refresher{roots: roots, deps: deps, stderr: warn, opts: newOptions(opts)}
 }
 
-// SignalsWired reports whether the refresher currently reaches a Center.
 func (r *Refresher) SignalsWired() bool { return r.opts.center() != nil }
 
-// skip is the Result Object of a degrade branch: the step that refused, the
-// sentence the branch has always printed, and the cause.
 type skip struct {
 	step   string
 	reason string
 	err    error
 }
 
-// Refresh runs guards → rebuildAndRepin → armAndExec for boundary `batch`,
-// degrading every refusal, a cancelled ctx included, to one
-// LOOP_BOUNDARY_REFRESH_SKIPPED and refreshed=false.
 func (r *Refresher) Refresh(ctx context.Context, batch int) (refreshed bool) {
 	commit, ahead, s := r.guards(ctx)
 	if s != nil {
@@ -82,8 +62,6 @@ func (r *Refresher) Refresh(ctx context.Context, batch int) (refreshed bool) {
 	return true
 }
 
-// guards refuses before any rebuild on an ahead-check error, a live or
-// unverifiable sibling lane, the loop breaker, or a pending interrupt.
 func (r *Refresher) guards(ctx context.Context) (commit string, ahead bool, s *skip) {
 	commit = r.deps.RunningCommit()
 	ahead, err := r.deps.Ahead(r.roots.ProjectRoot, commit)
@@ -104,8 +82,6 @@ func (r *Refresher) guards(ctx context.Context) (commit string, ahead bool, s *s
 	return commit, true, interrupted(ctx)
 }
 
-// rebuildAndRepin rebuilds, re-checks the interrupt, and resolves the re-exec
-// target before the provenance-gated re-pin and its audit entry.
 func (r *Refresher) rebuildAndRepin(ctx context.Context, batch int) (target string, res phaseintegrity.RepinResult, s *skip) {
 	if err := r.deps.Rebuild(r.roots.ProjectRoot); err != nil {
 		return "", res, &skip{"rebuild", fmt.Sprintf("rebuild failed (%v) — skipping refresh, continuing on the current binary", err), err}
@@ -129,8 +105,6 @@ func (r *Refresher) rebuildAndRepin(ctx context.Context, batch int) (target stri
 	return target, res, nil
 }
 
-// armAndExec re-checks the interrupt, then arms the breaker and flushes the
-// Center before the exec, because a successful exec never returns.
 func (r *Refresher) armAndExec(ctx context.Context, batch int, commit, target string, res phaseintegrity.RepinResult) *skip {
 	if s := interrupted(ctx); s != nil {
 		return s
@@ -157,8 +131,6 @@ func interrupted(ctx context.Context) *skip {
 	return nil
 }
 
-// skipped reports a degrade branch as ONE loop.warning WARN and returns
-// refreshed=false.
 func (r *Refresher) skipped(batch int, commit string, s *skip) bool {
 	fields := map[string]string{"batch": strconv.Itoa(batch), "step": s.step}
 	if commit != "" {
@@ -171,7 +143,6 @@ func (r *Refresher) skipped(batch int, commit string, s *skip) bool {
 	return false
 }
 
-// warn is the refresher's producer: a loop.warning WARN under module loop.
 func (r *Refresher) warn(origin string, code signalcenter.Code, reason string, fields map[string]string) {
 	emit(r.opts.center(), origin, signalcenter.KindLoopWarning, signalcenter.SeverityWarn, code, reason, fields)
 }

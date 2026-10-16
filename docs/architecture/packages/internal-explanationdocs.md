@@ -1,0 +1,34 @@
+# internal/explanationdocs
+
+## Purpose
+
+`internal/explanationdocs` verifies and binds the Builder-authored engineering rationale document to one cycle's base-bound source diff. It owns the host-side handoff. The handoff covers the Build contract, its sealed result snapshot, the host activation marker, the rebase rules and the review contract. The host owns every fact here. Callers take those facts from orchestrator state, never from an agent-authored workspace artifact.
+
+## Design
+
+- A cycle's host marker (`Activate`, `RequireActivation`) records the contract version that the cycle runs under. `CrossCheckActivation` is the one activation belt. Both the ship and audit gates consult it.
+- The Build contract moves through sealed states. `SealBuild` binds the final worktree and base. `SealResult` preserves the reviewed handoff outside the mutable phase workspace. `RefreshResult` advances the snapshot after a non-material post-Build change. `Verify` re-checks the handoff against the base, the current diff, the permanent document and the sealed snapshot. `VerifyLanded` re-checks a shipped snapshot after the worktree is gone.
+- `RebaseBuild`, `RebaseBuildAndPersist` and `RecoverRebaseSplit` handle a moved base. `RebindIdenticalRebase` moves an approved contract to a new base without a new Build. It does so only when the change is provably byte-identical there (ADR-0105).
+- `ValidateReviewedHandoff` is the phase-agnostic core of a review section. It is the single home of the contract. Audit and retro each apply their own phase policy to its result.
+- `DocumentPath` is collision-resistant per run. A fresh clone's local cycle counter therefore cannot collide with a document that another installation published.
+
+## Invariants
+
+- A zero `ContractVersion` means either "legacy cycle" or "a caller dropped the field". Only the host marker tells the two apart. With an active host, any mismatch is an error, including a zero version. With no active host, `(false, nil)` is returned only for a zero typed version. A non-zero typed version with no matching host activation is stale or foreign, so it is an error. The marker cycle is derived from the run workspace path when one exists, because the host provisions that workspace.
+- Field-by-field comparison names the divergence. The realistic live trigger is a continuation base advance that moves the base off the sealed marker. An error path returns `active=false`, because non-error results are undefined when an error occurs.
+- `sameWorkspacePath` is the one workspace-equality rule. Before it was shared, the belt and the resolver compared paths differently (cleaned against raw). A trailing separator passed one check and failed the other.
+- The host marker is the write-ahead authority in a rebase. The marker is written before the matching checkpoint. A persistence failure never rolls the marker back, because the checkpoint may already have committed before a secondary mirror failed.
+- `RecoverRebaseSplit` covers the one crash window where the marker names the new base but the checkpoint still names the old one. The approved old-base snapshot is the journal witness. The caller must restart at Build.
+- `ErrRebindIncomplete` marks an error that came after the rebind began writing. That write may have left a split. Any other error came before a write, so the caller may fall back.
+- A rebound handoff was proven, not re-authored, so the host never re-seals it. An unchanged tree needs nothing. Any change needs the Builder again.
+- `RefreshResult` refuses changes to material scope or to Builder-owned documentation. It blesses only non-material files, such as generated tests.
+- The `.evolve` entries in the non-material list are narrow on purpose. The orchestrator symlinks `cycle-state.json` into every worktree. On a host without the production `.gitignore` rule, that untracked file counted as a material change. Every end-to-end cycle then demanded a full explanation. A blanket `.evolve/` exclusion will also hide tracked configuration: `policy.json` flips gates and fleet width, and profiles re-route phases.
+- A path is validated by the same rules as the citation validator in `reportdoc`. Before that, this package accepted uncleaned traversal, colons and NUL bytes, which the other validator rejected.
+- A plain path component is capped at 250 bytes (`maxPlainComponentBytes`). The cap sits below the 255-byte name limit, so a truncating filesystem cannot fold two long names into one.
+- Peer paths compare case-folded for the lineage proof. Any path that a filesystem may resolve to a differently spelled file counts as touching. Examples are APFS normalization, trailing dots and spaces, 8.3 short names and stream suffixes. Byte equality proves nothing for such a path. A peer change to `.gitattributes` or `.gitignore` changes how git reads content, so it always counts as touching.
+- A missing review view or an unknown handoff status is a host defect. It must fail loudly rather than pass both phase gates silently.
+- The review's reasoning is the gate, and the section's shape is advisory (ADR-0102). Shape findings go on the phase record with `AdvisoryPrefix`, and they never change a verdict.
+
+## Findings
+
+- The ship and audit gates each restated the review contract before `ValidateReviewedHandoff` existed, and nothing bound the copies. The architecture review of 2026-09-01 found that gap.

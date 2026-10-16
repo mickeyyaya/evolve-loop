@@ -27,8 +27,6 @@ var (
 
 const commit = "cafebabe1234deadbeef"
 
-// project builds a temp root with .evolve/state.json pinned to STALE_PIN and
-// a rebuilt go/bin/evolve; returns root, evolveDir and sha256(binary).
 func project(t *testing.T) (root, evolveDir, binSHA string) {
 	t.Helper()
 	root = t.TempDir()
@@ -70,15 +68,10 @@ func golden(t *testing.T, name string) string {
 func template(s, root, evolveDir string) string {
 	s = strings.ReplaceAll(s, evolveDir, "{EVOLVE_DIR}")
 	s = strings.ReplaceAll(s, root, "{ROOT}")
-	// The os.ReadDir fault is a *fs.PathError whose Op is Go-version- and
-	// OS-dependent (`open` darwin/Go 1.27, `fdopendir` darwin/Go 1.23,
-	// `readdirent` linux — PR #599 CI); the goldens keep `open`. Same
-	// canonicalization as cmd/evolve's u13Template.
 	s = readDirOp.ReplaceAllString(s, "open $1: not a directory")
 	return rfc3339.ReplaceAllString(s, "{TS}")
 }
 
-// signals is a recording Center with a WARN-filtered console.
 type signals struct {
 	center  *signalcenter.Center
 	events  *[]signalcenter.Event
@@ -112,8 +105,6 @@ func (s *signals) only(t *testing.T, code signalcenter.Code) signalcenter.Event 
 	return (*s.events)[0]
 }
 
-// refreshFixture scripts every seam: the running commit, a stale ahead
-// check, an idle plane, a recorded rebuild/exec, a verifying provenance.
 type refreshFixture struct {
 	root, evolveDir string
 	deps            RefreshDeps
@@ -170,15 +161,11 @@ func refreshSection(t *testing.T, name string) string {
 	return ""
 }
 
-// oldSentence is the golden's [chain] line for a section minus its prefix —
-// the reason every replaced line keeps.
 func oldSentence(t *testing.T, section string, line int) string {
 	t.Helper()
 	lines := strings.Split(strings.TrimSuffix(refreshSection(t, section), "\n"), "\n")
 	return strings.TrimPrefix(lines[line], "[chain] boundary-refresh: ")
 }
-
-// --- 37. codes ---
 
 func TestCodes_AreRegisteredUnderLoopWithDocs(t *testing.T) {
 	for _, c := range []signalcenter.Code{CodeBoundaryRefreshSkipped, CodeBoundaryRefreshAuditFailed, CodeChainInboxItemInvalid, CodeChainQuotaDefer, CodeChainInboxUnreadable, CodeChainBatchError} {
@@ -192,8 +179,6 @@ func TestCodes_AreRegisteredUnderLoopWithDocs(t *testing.T) {
 		}
 	}
 }
-
-// --- 41. every degrade branch is ONE coded WARN naming its step ---
 
 func TestRefresh_EveryDegradeBranchIsOneCodedWarnNamingItsStep(t *testing.T) {
 	cases := []struct {
@@ -239,8 +224,6 @@ func TestRefresh_EveryDegradeBranchIsOneCodedWarnNamingItsStep(t *testing.T) {
 			return nil
 		}, "flush"},
 		{"arm_failed", "arm", 1, func(f *refreshFixture) []Option {
-			// A directory at the marker path: unreadable (so not "already
-			// attempted") and unwritable (so the arm fails).
 			if err := os.Mkdir(filepath.Join(f.evolveDir, AttemptFile), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -270,7 +253,6 @@ func TestRefresh_EveryDegradeBranchIsOneCodedWarnNamingItsStep(t *testing.T) {
 			if console := template(f.sig.console.String(), f.root, f.evolveDir); !strings.Contains(console, "LOOP_BOUNDARY_REFRESH_SKIPPED") || !strings.Contains(console, want) {
 				t.Errorf("the console renders the WARN with the old sentence: %q", f.sig.console.String())
 			}
-			// The kept lines (before the fault) stay verbatim on stderr.
 			kept := strings.Split(strings.TrimSuffix(refreshSection(t, c.section), "\n"), "\n")[:c.line]
 			if got := template(f.stderr.String(), f.root, f.evolveDir); strings.TrimSuffix(got, "\n") != strings.Join(kept, "\n") {
 				t.Errorf("stderr keeps the report lines that print before the fault:\n got %q\nwant %q", got, strings.Join(kept, "\n"))
@@ -282,8 +264,6 @@ func TestRefresh_EveryDegradeBranchIsOneCodedWarnNamingItsStep(t *testing.T) {
 	}
 }
 
-// --- 42. the healthy and the empty-commit paths are silent ---
-
 func TestRefresh_NotAheadAndEmptyCommitAreSilent(t *testing.T) {
 	f := newRefreshFixture(t)
 	f.deps.Ahead = func(string, string) (bool, error) { f.order = append(f.order, "ahead"); return false, nil }
@@ -292,13 +272,11 @@ func TestRefresh_NotAheadAndEmptyCommitAreSilent(t *testing.T) {
 	}
 	f = newRefreshFixture(t)
 	f.deps.RunningCommit = func() string { return "" }
-	f.deps.Ahead = GitAhead // the real check: an empty commit is a quiet no-op, no git subprocess
+	f.deps.Ahead = GitAhead
 	if f.refresher().Refresh(context.Background(), 1) || len(*f.sig.events) != 0 || f.stderr.Len() != 0 {
 		t.Errorf("an empty commit is a silent no-op: %v %q", f.sig.codes(), f.stderr.String())
 	}
 }
-
-// --- 43. the success path: log, arm, flush, exec — in that order ---
 
 func TestRefresh_SuccessLogsArmsFlushesThenExecs(t *testing.T) {
 	f := newRefreshFixture(t)
@@ -348,8 +326,6 @@ func TestRefresh_SuccessLogsArmsFlushesThenExecs(t *testing.T) {
 	}
 }
 
-// --- 44. the audit failure is its own code and the exec still happens ---
-
 func TestRefresh_AuditWriteFailureIsItsOwnCodeAndTheExecStillHappens(t *testing.T) {
 	f := newRefreshFixture(t)
 	if err := os.Mkdir(filepath.Join(f.evolveDir, "log-dir"), 0o755); err != nil {
@@ -367,8 +343,6 @@ func TestRefresh_AuditWriteFailureIsItsOwnCodeAndTheExecStillHappens(t *testing.
 		t.Errorf("the exec still happens: %v", f.order)
 	}
 }
-
-// --- 45. the breaker ---
 
 func TestRefresh_BreakerRefusesTheSameCommitTwice(t *testing.T) {
 	f := newRefreshFixture(t)
@@ -388,7 +362,6 @@ func TestRefresh_BreakerRefusesTheSameCommitTwice(t *testing.T) {
 	if ev := f.sig.only(t, CodeBoundaryRefreshSkipped); ev.Fields["step"] != "breaker" || !strings.Contains(ev.Reason, "(see .evolve/"+AttemptFile+")") {
 		t.Errorf("step=breaker naming the marker: %+v", ev)
 	}
-	// A different commit re-arms; an absent or corrupt marker proceeds.
 	f.deps.RunningCommit = func() string { return "0ddba11beef0" }
 	f.deps.Provenance = func(string) (string, phaseintegrity.ProvenanceVerified) {
 		return "0ddba11beef0", func(string) bool { return true }
@@ -423,8 +396,6 @@ func TestRefresh_BreakerRefusesTheSameCommitTwice(t *testing.T) {
 	}
 }
 
-// --- 46-49. the git and disk defaults ---
-
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -443,8 +414,6 @@ func git(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// repo builds a one-commit repo; commitAt adds one more commit on the
-// current branch and returns its SHA.
 func repo(t *testing.T) (dir, commitA string) {
 	t.Helper()
 	dir = t.TempDir()
@@ -480,7 +449,6 @@ func TestGitAhead_ResolvesTheShortStampBeforeComparingAndRejectsNonAncestors(t *
 	if _, err := GitAhead(t.TempDir(), "deadbeef"); err == nil || !strings.Contains(err.Error(), "resolve running commit") {
 		t.Errorf("a non-repo errors at the resolve step: %v", err)
 	}
-	// A commit that exists but is not an ancestor of HEAD.
 	git(t, dir, "checkout", "-q", "-b", "side")
 	side := commitAt(t, dir, "s")
 	git(t, dir, "checkout", "-q", "main")
@@ -488,7 +456,6 @@ func TestGitAhead_ResolvesTheShortStampBeforeComparingAndRejectsNonAncestors(t *
 	if _, err := GitAhead(dir, side); err == nil || !strings.Contains(err.Error(), "not a verifiable ancestor") {
 		t.Errorf("a non-ancestor is refused: %v", err)
 	}
-	// HEAD unresolvable while the commit resolves: the resolve-HEAD branch.
 	if err := os.WriteFile(filepath.Join(dir, ".git", "HEAD"), []byte("ref: refs/heads/nonexistent\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

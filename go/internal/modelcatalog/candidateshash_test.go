@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-// TestBuildFromSnapshots_CarriesCandidatesHash: the snapshot's CandidatesHash
-// flows into the built entry verbatim — BuildFromSnapshots stays a pure
-// wholesale rebuild with no special case, and an absent hash stays absent
-// (omitempty) so every pre-existing catalog degrades safely to classifying
-// once.
 func TestBuildFromSnapshots_CarriesCandidatesHash(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 8, 5, 0, 0, 0, 0, time.UTC)

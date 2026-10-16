@@ -16,14 +16,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// ErrRebindIncomplete marks an error after the rebind started writing. It may leave a split that
-// RecoverRebaseSplit recognises; any other error was raised before a write, so the caller may fall back.
 var ErrRebindIncomplete = errors.New("identity-preserving rebind incomplete")
 
-// RebindIdenticalRebase moves an approved Build contract to newBaseSHA without a new Build when the host
-// proves the change it explains is byte-identical on that base (ADR-0105). It returns (false, nil) and
-// writes nothing when the change is not provably identical, and (true, nil) once the result snapshot,
-// the commit point, is written.
 func RebindIdenticalRebase(ctx context.Context, binding CycleBinding, newBaseSHA string, persist func() error) (bool, error) {
 	if persist == nil {
 		return false, errors.New("rebind requires a checkpoint persist step: the snapshot moves, so the cycle state must move with it")
@@ -45,7 +39,6 @@ func RebindIdenticalRebase(ctx context.Context, binding CycleBinding, newBaseSHA
 	return true, nil
 }
 
-// proveIdenticalRebase is read-only. It returns the rebound snapshot only when every identity check holds.
 func proveIdenticalRebase(ctx context.Context, binding CycleBinding, newBaseSHA string) (*resultSnapshot, bool, error) {
 	if err := validateBaseCommit(ctx, binding.Worktree, newBaseSHA); err != nil {
 		return nil, false, err
@@ -68,7 +61,6 @@ func proveIdenticalRebase(ctx context.Context, binding CycleBinding, newBaseSHA 
 	if ok, err := isAncestor(ctx, binding.Worktree, binding.BaseSHA, newBaseSHA); err != nil || !ok {
 		return nil, false, err
 	}
-	// One read of the changed paths backs both the proof and the digest the rebind binds.
 	states, err := readPathStates(ctx, binding.Worktree, changed)
 	if err != nil {
 		return nil, false, err
@@ -123,8 +115,6 @@ func applyRebind(binding CycleBinding, next *resultSnapshot, persist func() erro
 	return atomicwrite.JSON(resultSnapshotPath(binding.ProjectRoot, binding.Cycle), next)
 }
 
-// authoredBase is the base the Builder's document names: the authored base a rebind recorded, else the
-// view's own base.
 func authoredBase(view *phaseio.ExplanationView) string {
 	if view.AuthoredBaseSHA != "" {
 		return view.AuthoredBaseSHA
@@ -132,9 +122,6 @@ func authoredBase(view *phaseio.ExplanationView) string {
 	return view.BaseSHA
 }
 
-// lineageHolds proves base descends from authored and that nothing landed between them touches the
-// change: no peer path equals a changed path even case-folded, and no peer delta alters how git reads
-// content (.gitattributes, .gitignore).
 func lineageHolds(ctx context.Context, worktree, authored, base string, changed []string) (bool, error) {
 	if authored == base {
 		return false, nil
@@ -152,10 +139,6 @@ func lineageHolds(ctx context.Context, worktree, authored, base string, changed 
 	return !peerTouchesLane(splitNUL(out), changed), nil
 }
 
-// peerTouchesLane reports whether a peer path may name a lane file or changes how git reads content.
-// Plain paths compare case-folded, for case-insensitive filesystems. Any other path counts as touching:
-// some filesystem resolves it to a differently spelled file (APFS normalization, NTFS/exFAT/SMB trailing
-// dots and spaces, 8.3 short names, stream suffixes), so equality of its bytes proves nothing.
 func peerTouchesLane(peer, lane []string) bool {
 	folded := make(map[string]bool, len(lane))
 	for _, p := range lane {
@@ -187,8 +170,6 @@ func IsPlainPath(p string) bool {
 	return true
 }
 
-// maxPlainComponentBytes stays below the 255-byte name limit, so a truncating filesystem cannot fold two
-// long names into one.
 const maxPlainComponentBytes = 250
 
 func isAncestor(ctx context.Context, worktree, ancestor, descendant string) (bool, error) {

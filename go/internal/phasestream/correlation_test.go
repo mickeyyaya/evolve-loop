@@ -30,8 +30,6 @@ func TestCorrelation_DuplicateIdleIgnored(t *testing.T) {
 	}
 }
 
-// TestCorrelation_UnknownChannelIgnored exercises the default branch of the
-// switch — a valid JSON breadcrumb with an unrecognised evolve_channel value.
 func TestCorrelation_UnknownChannelIgnored(t *testing.T) {
 	c := newCorrelator()
 	if got := c.observe([]byte(`{"evolve_channel":"bogus","corr_id":"c1"}`), 7); got != nil {
@@ -39,8 +37,6 @@ func TestCorrelation_UnknownChannelIgnored(t *testing.T) {
 	}
 }
 
-// TestCorrelation_MissingCorrIDIgnored covers the branch where JSON is valid
-// but corr_id is absent (empty string after unmarshal).
 func TestCorrelation_MissingCorrIDIgnored(t *testing.T) {
 	c := newCorrelator()
 	if got := c.observe([]byte(`{"evolve_channel":"inject_applied"}`), 2); got != nil {
@@ -48,8 +44,6 @@ func TestCorrelation_MissingCorrIDIgnored(t *testing.T) {
 	}
 }
 
-// TestCorrelation_OrphanIdleIgnored covers idle_reached with no preceding
-// inject_applied for that corr_id (out-of-order / orphaned).
 func TestCorrelation_OrphanIdleIgnored(t *testing.T) {
 	c := newCorrelator()
 	if got := c.observe([]byte(`{"evolve_channel":"idle_reached","corr_id":"never-opened"}`), 4); got != nil {

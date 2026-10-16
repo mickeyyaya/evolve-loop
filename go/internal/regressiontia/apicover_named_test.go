@@ -1,16 +1,5 @@
 package regressiontia
 
-// apicover_named_test.go — the ADR-0069 repo-wide apicover gate's second half.
-// Enrolling ./internal/regressiontia in go/.apicover-enforce is not enough:
-// every exported symbol must be NAMED here in an assertion that EXECUTES it,
-// or the enrolled-but-unnamed shape fails the gate.
-//
-// These are not restatements of regressiontia_test.go's contract tests. Each
-// one exercises a path that contract file leaves cold — the enforce stage, real
-// dependency resolution against this repository's own regression corpus, the
-// scope-driven partition, and the marshalling round trip through Emit's real
-// filesystem write.
-
 import (
 	"encoding/json"
 	"os"
@@ -20,19 +9,12 @@ import (
 	"testing"
 )
 
-// TestArtifactName_IsTheWorkspaceEvidenceFile names ArtifactName and asserts the
-// value the audit phase and every operator reading a cycle workspace agree on.
 func TestArtifactName_IsTheWorkspaceEvidenceFile(t *testing.T) {
 	if ArtifactName != "acs-tia-shadow.json" {
 		t.Errorf("ArtifactName = %q, want \"acs-tia-shadow.json\" — the audit phase and its reachability test key off this exact name", ArtifactName)
 	}
 }
 
-// TestCompute_EnforceStageIsAlsoArmed names Compute on the one stage the
-// contract tests do not reach. "enforce" is in the closed policy vocabulary, so
-// it must compute (and therefore leave evidence) rather than fall into the
-// dormant default and silently produce nothing on the very stage an operator
-// promoted to.
 func TestCompute_EnforceStageIsAlsoArmed(t *testing.T) {
 	mod := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(mod, "acs", "regression", "routing"), 0o755); err != nil {
@@ -49,12 +31,6 @@ func TestCompute_EnforceStageIsAlsoArmed(t *testing.T) {
 	}
 }
 
-// TestListCorpusDeps_ResolvesTheRealCorpus proves dependency resolution
-// actually EXECUTES against this repository: `go list -tags acs -test` over
-// acs/regression/... The `-test` half is load-bearing and was found the hard
-// way — a regression predicate package holds only _test.go files, so its plain
-// .Deps is empty and a listing without -test reports the whole corpus as
-// depending on nothing.
 func TestListCorpusDeps_ResolvesTheRealCorpus(t *testing.T) {
 	moduleDir := repoModuleDir(t)
 	const pkg = "./acs/regression/apicover"
@@ -72,14 +48,6 @@ func TestListCorpusDeps_ResolvesTheRealCorpus(t *testing.T) {
 	}
 }
 
-// TestResolveDeps_DropsPredicatesThatReachOutsideTheImportGraph is the
-// CORRECTNESS crux of this whole mechanism, and it is a real defect this build
-// hit, not a hypothetical. go/acs/regression/apicover fails a cycle for adding
-// an unenrolled internal package — by READING go/.apicover-enforce and shelling
-// out to `go list`, importing none of the code it grades. Its static dependency
-// set is disjoint from nearly every diff, so an import-graph selector marks it
-// skippable on exactly the change it exists to catch. It must never be
-// derivable, and therefore never a skip candidate.
 func TestResolveDeps_DropsPredicatesThatReachOutsideTheImportGraph(t *testing.T) {
 	moduleDir := repoModuleDir(t)
 	const pkg = "./acs/regression/apicover"
@@ -89,16 +57,9 @@ func TestResolveDeps_DropsPredicatesThatReachOutsideTheImportGraph(t *testing.T)
 	}
 }
 
-// TestCompute_NeverSkipsAnEscapeHatchPredicate is the same invariant at the
-// production seam, through Compute against the REAL corpus with a real changed
-// scope: whatever selection concludes, a file-reading/subprocess predicate
-// stays in Selected, and the partition never loses a package.
 func TestCompute_NeverSkipsAnEscapeHatchPredicate(t *testing.T) {
 	moduleDir := repoModuleDir(t)
 
-	// Empty repoRoot keeps ImporterClosure's `go list` out of this test: the
-	// scope is supplied verbatim, so what is under test is selection, not
-	// closure (TestChangedScope_ covers that).
 	d := Compute("shadow", "", moduleDir, []string{"./internal/apicover/..."})
 
 	if len(d.Selected)+len(d.WouldSkip) == 0 {
@@ -124,10 +85,6 @@ func repoModuleDir(t *testing.T) string {
 	return filepath.Join(repoRoot, "go")
 }
 
-// TestSelect_ParentScopeEntryStillIntersects names Select on the prefix axis:
-// a scope naming a parent directory ("./internal/...") must still hold every
-// package beneath it, or a coarse scope would read as disjoint and mark
-// everything skippable.
 func TestSelect_ParentScopeEntryStillIntersects(t *testing.T) {
 	patterns := []string{"./acs/regression/routing"}
 	deps := map[string][]string{"./acs/regression/routing": {"./internal/router/..."}}
@@ -142,8 +99,6 @@ func TestSelect_ParentScopeEntryStillIntersects(t *testing.T) {
 	}
 }
 
-// TestChangedScope_DropsNoInputUnderClosure names ChangedScope and pins the
-// never-narrow invariant against a pattern with no importers at all.
 func TestChangedScope_DropsNoInputUnderClosure(t *testing.T) {
 	in := []string{"./internal/nosuchpackage/..."}
 	if got := ChangedScope("", in); !reflect.DeepEqual(got, in) {
@@ -151,9 +106,6 @@ func TestChangedScope_DropsNoInputUnderClosure(t *testing.T) {
 	}
 }
 
-// TestEmit_RoundTripsEveryDecisionField names Emit and Decision (every field)
-// and proves the JSON tags round-trip. A field that marshals but does not
-// unmarshal reads to an operator as absent evidence.
 func TestEmit_RoundTripsEveryDecisionField(t *testing.T) {
 	d := Decision{
 		Stage:           "enforce",
@@ -183,9 +135,6 @@ func TestEmit_RoundTripsEveryDecisionField(t *testing.T) {
 	}
 }
 
-// TestEmit_ReportsAnUnwritableWorkspace pins the loud half of Emit's contract:
-// the audit caller chooses to swallow this error, which is only defensible
-// because Emit actually RETURNS one.
 func TestEmit_ReportsAnUnwritableWorkspace(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "does", "not", "exist")
 	if _, err := Emit(missing, Decision{Stage: "shadow"}); err == nil {

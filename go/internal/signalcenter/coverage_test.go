@@ -1,10 +1,5 @@
 package signalcenter
 
-// coverage_test.go — the branches the behavior tests do not reach by
-// themselves: option clamps, a listener removed by another during delivery,
-// and the durable sink's failure paths (through the package-internal opener
-// seam, so no real filesystem fault is needed).
-
 import (
 	"errors"
 	"io"

@@ -10,23 +10,6 @@ import (
 	"time"
 )
 
-// cyclehealth_cycle188_test.go — RED contracts for cycle-188.
-//
-// Task 1 (stop-review-ledger-trail) READ side: checkSelfHealEvents must treat
-// a kind=stop_review ledger entry with action=pause as a WARN anomaly (a phase
-// the reviewer paused for investigation), while action=extend is healthy and
-// emits nothing.
-//
-// Task 2 (per-phase-latency-ceiling) was superseded by the policy-backed global
-// ceiling. These tests now pin the explicit Options input and default fallback.
-
-// --- Task 1 helpers ---------------------------------------------------------
-
-// writeStopReviewLedger seeds a valid 3-role ledger plus one stop_review entry
-// carrying an `action` field. The action lives in raw JSON — the ledgerEntry
-// struct does not model it yet — so this test compiles BEFORE the Builder adds
-// the field, giving a clean assertion-RED (not a compile error) on the
-// currently-missing stop_review handling in checkSelfHealEvents.
 func writeStopReviewLedger(t *testing.T, ws string, cycle int, action string) {
 	t.Helper()
 	base := []ledgerEntry{
@@ -47,9 +30,6 @@ func writeStopReviewLedger(t *testing.T, ws string, cycle int, action string) {
 	}
 }
 
-// TestCheck_SelfHealEvents_StopReviewPause_Warn — AC4: a stop_review/pause
-// ledger entry surfaces exactly one self_heal_events WARN (never fatal — a
-// paused-then-recovered cycle must still report), naming the paused phase.
 func TestCheck_SelfHealEvents_StopReviewPause_Warn(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writeStopReviewLedger(t, ws, 1, "pause")
@@ -72,11 +52,6 @@ func TestCheck_SelfHealEvents_StopReviewPause_Warn(t *testing.T) {
 	}
 }
 
-// TestCheck_SelfHealEvents_StopReviewExtend_NoAnomaly — AC4 anti-no-op: a
-// stop_review/extend entry is a HEALTHY decision (the reviewer judged the agent
-// still working) and must emit ZERO self_heal_events anomalies. An
-// implementation that warned on every stop_review regardless of action fails
-// this.
 func TestCheck_SelfHealEvents_StopReviewExtend_NoAnomaly(t *testing.T) {
 	ws := freshWorkspace(t, 1)
 	writeStopReviewLedger(t, ws, 1, "extend")
@@ -88,8 +63,6 @@ func TestCheck_SelfHealEvents_StopReviewExtend_NoAnomaly(t *testing.T) {
 		t.Errorf("stop_review/extend is healthy and must emit 0 anomalies, got %d; %+v", len(got), got)
 	}
 }
-
-// --- Task 2 helpers ---------------------------------------------------------
 
 func writePhaseTiming(t *testing.T, ws string, entries []phaseTimingEntry) {
 	t.Helper()

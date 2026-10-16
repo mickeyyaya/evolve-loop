@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// TestStore_BenchWallFirstStrike: a wall on a fresh family records strike 1 and a
-// future bench window.
 func TestStore_BenchWallFirstStrike(t *testing.T) {
 	s := NewStore(t.TempDir(), fixedNow(time.Unix(0, 0)))
 	e, err := s.BenchWall("codex", "rate_limit", "wall text")
@@ -22,10 +20,6 @@ func TestStore_BenchWallFirstStrike(t *testing.T) {
 	}
 }
 
-// TestStore_BenchWallAccumulatesStrikesUnderConcurrency: concurrent walls on the
-// SAME family (the fleet case — N cycles hit the same quota wall at once) must
-// accumulate every strike. An unlocked read-modify-write loses increments, which
-// under-escalates the cooldown. Run with -race.
 func TestStore_BenchWallAccumulatesStrikesUnderConcurrency(t *testing.T) {
 	s := NewStore(t.TempDir(), fixedNow(time.Unix(0, 0)))
 	const n = 20
@@ -44,8 +38,6 @@ func TestStore_BenchWallAccumulatesStrikesUnderConcurrency(t *testing.T) {
 	}
 }
 
-// TestStore_ClearUnderConcurrencyNoPanic: Clear and BenchWall on different
-// families racing must not corrupt the file or panic.
 func TestStore_ClearConcurrentWithBench(t *testing.T) {
 	s := NewStore(t.TempDir(), fixedNow(time.Unix(0, 0)))
 	if _, err := s.BenchWall("agy", "rate_limit", ""); err != nil {

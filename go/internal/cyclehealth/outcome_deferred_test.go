@@ -13,8 +13,6 @@ func writeTiming(t *testing.T, dir, body string) {
 	}
 }
 
-// Cycle-656: an all-families quota abort must classify DEFERRED, never as a
-// failed cycle — and must not disturb the existing FAILED_EXPLAINED arm.
 func TestClassifyOutcome_Deferred(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

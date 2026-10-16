@@ -7,11 +7,6 @@ import (
 	"time"
 )
 
-// TestShadowRoundTrip: WriteShadow persists to ShadowFileName and ReadShadow
-// loads it back; the LIVE catalog file is never touched (dispatch reads only
-// FileName, so a shadow deploy is byte-identical to off at dispatch), and no
-// .prev rollback copy is rotated (retention protects the hand-authored live
-// catalog; the shadow file is disposable pipeline output).
 func TestShadowRoundTrip(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -42,9 +37,6 @@ func TestShadowRoundTrip(t *testing.T) {
 	}
 }
 
-// TestReadShadow_MissingIsZero: a missing shadow file yields a zero catalog
-// (stale by definition) with no error — first shadow run refreshes
-// transparently, mirroring Read's contract for the live file.
 func TestReadShadow_MissingIsZero(t *testing.T) {
 	t.Parallel()
 	got, err := ReadShadow(t.TempDir())

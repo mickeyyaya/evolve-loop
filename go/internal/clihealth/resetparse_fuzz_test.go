@@ -1,16 +1,5 @@
 package clihealth
 
-// Fuzz harness for ParseResetHint (inbox fuzz-parser-surfaces, slice 1). Seeded
-// from the TestParseResetHintTable goldens (cycle-283/cycle-314 wall shapes) so
-// the corpus starts from real provider wording, then explores mutations for
-// crashers the curated table can't anticipate. `now` is held fixed (fuzz
-// corpora can't carry a time.Time) so every invariant check is deterministic.
-//
-// Invariants asserted on every input (never just "no panic"):
-//   - ok=false must return the zero time.Time (no half-parsed leakage).
-//   - ok=true must return a time strictly after now (no negative "duration
-//     until reset") and no more than 24h after now (the capHint ceiling).
-
 import (
 	"testing"
 	"time"

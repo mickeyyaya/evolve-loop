@@ -1,9 +1,5 @@
 package signalcenter
 
-// importgraph_test.go — the package is a leaf (design §6): standard library plus
-// internal/log, nothing else under internal/, so core, bridge and cmd can all
-// depend on it without an import cycle.
-
 import (
 	"go/parser"
 	"go/token"

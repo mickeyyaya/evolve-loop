@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-// Catalogs are constructed by unmarshaling JSON — the same ingestion path
-// .evolve/model-catalog.json takes — so these tests compile before the
-// TierFallbacks field exists and fail (RED) on behavior, not syntax. Do not
-// rewrite them as struct literals; the JSON path is part of the contract
-// (unknown keys are silently dropped by encoding/json, which is the exact
-// defect being fixed).
 func mustCatalog(t *testing.T, raw string) Catalog {
 	t.Helper()
 	var c Catalog

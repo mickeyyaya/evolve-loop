@@ -1,10 +1,5 @@
 package observerengine
 
-// observerengine_test.go — the leaf's fixtures and the construction, layout,
-// reporter and registry tests (ADR-0103 unit 12 §6 tests 16-17, 33-35).
-// Every test uses t.TempDir() only, a fixed or stepped clock, fake ports and
-// a recording Center: no syscall, no inbox, no tmux, no ticker.
-
 import (
 	"encoding/json"
 	"fmt"
@@ -28,9 +23,6 @@ var fixtureAt = time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
 
 func fixedClock(at time.Time) func() time.Time { return func() time.Time { return at } }
 
-// settingsFixture is the ONE complete Settings every leaf test starts from:
-// every threshold set (the engine defaults nothing — the host's withDefaults
-// and policy's ObserverConfig are the belief owners).
 func settingsFixture(ws string) Settings {
 	return Settings{
 		Cycle: 7, Phase: "build", Agent: "builder", Scope: ScopePhase, PID: fixturePID,
@@ -40,7 +32,6 @@ func settingsFixture(ws string) Settings {
 	}
 }
 
-// depsFixture wires every port to a no-op fake and a fixed clock.
 func depsFixture() Deps {
 	return Deps{
 		Now:   fixedClock(fixtureAt),
@@ -49,7 +40,6 @@ func depsFixture() Deps {
 	}
 }
 
-// recordingCenter captures every event a real Center delivers.
 type recordingCenter struct {
 	c      *signalcenter.Center
 	mu     sync.Mutex
@@ -86,8 +76,6 @@ func (r *recordingCenter) byCode(code signalcenter.Code) []signalcenter.Event {
 	return out
 }
 
-// newEngine builds an engine over a temp workspace, a recording Center and the
-// fixtures, after letting the test mutate Settings/Deps.
 func newEngine(t *testing.T, mutate func(s *Settings, d *Deps)) (*Engine, *recordingCenter, string) {
 	t.Helper()
 	ws := t.TempDir()
@@ -137,11 +125,6 @@ var threeLines = []string{
 	`{"type":"result","total_cost_usd":0.5,"usage":{"cache_read_input_tokens":10,"cache_creation_input_tokens":2}}`,
 }
 
-// --- 16: the layout projection ---------------------------------------------
-
-// TestPathsFor_ProjectsTheThreeSuffixes is the consumer pin for the one
-// spelling of the per-agent layout (the host and the live adapter project it;
-// the two glob readers are follow-up F3). Kills M23 (a suffix misspelt).
 func TestPathsFor_ProjectsTheThreeSuffixes(t *testing.T) {
 	t.Parallel()
 	got := PathsFor("/ws", "builder")
@@ -157,12 +140,6 @@ func TestPathsFor_ProjectsTheThreeSuffixes(t *testing.T) {
 	}
 }
 
-// --- 17: construction and the start event -----------------------------------
-
-// TestNew_StartEmitsObserverStartedAndSetsTheClocks — fixed clock, PID 4242:
-// the observer_started line is byte-exact; traceID, startedAt and the two
-// liveness clocks are set from the ONE construction read. Kills M24 (a dropped
-// start field), M25 (the trace format), M26 (a zero clock).
 func TestNew_StartEmitsObserverStartedAndSetsTheClocks(t *testing.T) {
 	t.Parallel()
 	e, rc, ws := newEngine(t, nil)
@@ -189,13 +166,6 @@ func TestNew_StartEmitsObserverStartedAndSetsTheClocks(t *testing.T) {
 	}
 }
 
-// --- 33: the reporter ---------------------------------------------------------
-
-// TestReporter_NullObjectAndSeverityTable — a nil accessor and an accessor
-// returning nil never panic and report Wired false; wired, one event per call
-// with the severity from the table (INCIDENT only for the stall kill) and the
-// origin/cycle/phase as passed; an unregistered code degrades to WARN and the
-// Center's own drift stamp. Kills M37 (WARN↔INCIDENT), M49 (a nil deref).
 func TestReporter_NullObjectAndSeverityTable(t *testing.T) {
 	t.Parallel()
 	var nilRep *Reporter
@@ -203,7 +173,7 @@ func TestReporter_NullObjectAndSeverityTable(t *testing.T) {
 		if r.Wired() {
 			t.Errorf("reporter %d must not be wired", i)
 		}
-		r.Report("Engine.Tick", 1, "build", CodeKillFailed, "no center", nil) // must not panic
+		r.Report("Engine.Tick", 1, "build", CodeKillFailed, "no center", nil)
 	}
 	rc := newRecordingCenter()
 	r := NewReporter(rc.accessor())
@@ -228,10 +198,6 @@ func TestReporter_NullObjectAndSeverityTable(t *testing.T) {
 	}
 }
 
-// --- 34/35: the severity table and the registry -------------------------------
-
-// leafCodeConsts scans the leaf's non-test sources for every `Code*` const
-// declared with the signalcenter.Code type.
 func leafCodeConsts(t *testing.T) []signalcenter.Code {
 	t.Helper()
 	entries, err := os.ReadDir(".")
@@ -268,10 +234,6 @@ func leafCodeConsts(t *testing.T) []signalcenter.Code {
 	return out
 }
 
-// TestSeverityTable_CompleteAndRegistered — every Code* const has a severityOf
-// row, is registered under ModuleObserver, BelongsTo the module, and carries
-// the §5 severity (INCIDENT for the kill, WARN otherwise). Kills M50 (a code
-// without a row), M51 (a mis-prefixed code).
 func TestSeverityTable_CompleteAndRegistered(t *testing.T) {
 	t.Parallel()
 	codes := leafCodeConsts(t)
@@ -302,8 +264,6 @@ func TestSeverityTable_CompleteAndRegistered(t *testing.T) {
 	}
 }
 
-// TestCodes_RegisteredOnceUnderModuleObserver — the registry lists exactly the
-// eight, each with a non-empty doc. Kills M52 (a RegisterCode removed).
 func TestCodes_RegisteredOnceUnderModuleObserver(t *testing.T) {
 	t.Parallel()
 	docs := signalcenter.RegisteredCodes()[signalcenter.ModuleObserver]
@@ -318,8 +278,6 @@ func TestCodes_RegisteredOnceUnderModuleObserver(t *testing.T) {
 	}
 }
 
-// TestWithSignals_ReadsTheCenterLive — the accessor is read at every use, so a
-// Center installed after construction is reached. Kills M-snapshot.
 func TestWithSignals_ReadsTheCenterLive(t *testing.T) {
 	t.Parallel()
 	var live *signalcenter.Center

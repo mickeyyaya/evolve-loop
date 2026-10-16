@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// TestConfinementSatisfied names the three-cell Specification both the bridge
-// gate (sandboxRequiredButUnavailable) and preflight's host-capabilities check
-// project from — extracted 2026-09-01 after the two sites diverged in the
-// nested cell (preflight HALTed a launch the gate would have run) and the
-// opt-out cell (the reverse).
 func TestConfinementSatisfied(t *testing.T) {
 	cases := []struct {
 		name         string

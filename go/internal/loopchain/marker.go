@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 )
 
-// BatchRecord is one chained batch's boundary observation. FleetCount is
-// recorded per batch because fleet width is a hard operator commitment: a
-// chain that silently narrows lanes from batch N to N+1 looks healthy in
-// every other signal.
 type BatchRecord struct {
 	Batch        int `json:"batch"`
 	RC           int `json:"rc"`
@@ -22,9 +18,6 @@ type BatchRecord struct {
 	InboxPending int `json:"inbox_pending"`
 }
 
-// RefreshLogEntry is one JSONL line of the boundary-refresh audit trail —
-// the additive record that tells an automatic boundary re-pin apart from a
-// manual `evolve reset-sha`.
 type RefreshLogEntry struct {
 	Batch           int    `json:"batch"`
 	AuthorizedClass string `json:"authorized_class"`
@@ -33,8 +26,6 @@ type RefreshLogEntry struct {
 	NewSHA          string `json:"new_sha,omitempty"`
 }
 
-// attempt is the breaker marker: the build commit a refresh re-execed away
-// from, plus the wave boundary's handoff (pid, waves_done) until it is taken.
 type attempt struct {
 	RunningCommit string `json:"running_commit"`
 	Batch         int    `json:"batch"`
@@ -43,10 +34,6 @@ type attempt struct {
 	WavesDone     int    `json:"waves_done,omitempty"`
 }
 
-// alreadyAttempted reports whether a refresh was already performed for
-// runningCommit. An absent/unreadable/corrupt marker means "no prior attempt"
-// — the breaker must never be the thing that stops a legitimate first
-// refresh.
 func (r *Refresher) alreadyAttempted(runningCommit string) bool {
 	if runningCommit == "" {
 		return false
@@ -62,7 +49,6 @@ func (r *Refresher) alreadyAttempted(runningCommit string) bool {
 	return rec.RunningCommit == runningCommit
 }
 
-// recordAttempt arms the breaker for runningCommit and records any handoff.
 func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
 	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339), PID: r.opts.handoff.PID, WavesDone: r.opts.handoff.WavesDone})
 	if err == nil {
@@ -101,8 +87,6 @@ func (a attempt) handsOffTo(c Claim) bool {
 	return err == nil && a.PID != 0 && a.PID == c.PID && a.RunningCommit != c.Commit && c.At.Sub(armed) <= handoffMaxAge
 }
 
-// appendLog appends one audit record. Best-effort: a failure here must not
-// itself halt the chain (the pin already moved).
 func (r *Refresher) appendLog(batch int, res phaseintegrity.RepinResult) error {
 	entry := RefreshLogEntry{
 		Batch:           batch,
@@ -115,14 +99,13 @@ func (r *Refresher) appendLog(batch int, res phaseintegrity.RepinResult) error {
 	if err != nil {
 		return fmt.Errorf("open boundary-refresh log: %w", err)
 	}
-	err = json.NewEncoder(f).Encode(entry) // json.Marshal's bytes plus the newline
+	err = json.NewEncoder(f).Encode(entry)
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
 	return wrapLogWrite(err)
 }
 
-// wrapLogWrite names a failed audit append; nil passes through.
 func wrapLogWrite(err error) error {
 	if err != nil {
 		return fmt.Errorf("write boundary-refresh log: %w", err)
@@ -132,11 +115,6 @@ func wrapLogWrite(err error) error {
 
 func (r *Refresher) logPath() string { return filepath.Join(r.roots.EvolveDir, r.opts.logFile) }
 
-// LastRefreshLogEntry reads the audit trail at logPath and returns the LAST
-// (most-recently-appended) entry. Best-effort, nil-when-clean: a missing
-// file, an empty file, or a read/parse error all resolve to (nil, nil) —
-// surfacing a refresh event into the summary must never itself become a new
-// failure mode for an already-successful boundary refresh (Q-C4).
 func LastRefreshLogEntry(logPath string) (*RefreshLogEntry, error) {
 	raw, err := os.ReadFile(logPath)
 	if err != nil {

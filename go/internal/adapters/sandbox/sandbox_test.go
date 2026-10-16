@@ -1,7 +1,3 @@
-// Package sandbox ports OS-level sandboxing from claude.sh:
-// generate_macos_sandbox_profile (SBPL for sandbox-exec) and the
-// equivalent bwrap argv generator. The generators are pure functions
-// so they run on any host; Exec dispatches by runtime.GOOS.
 package sandbox
 
 import (
@@ -15,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
-// canonicalConfig — minimal Config matching the production scout
-// profile shape.
 func canonicalConfig() Config {
 	return Config{
 		RepoRoot:     "/repo",
@@ -28,9 +22,6 @@ func canonicalConfig() Config {
 	}
 }
 
-// TestGenerateSBPL_HeaderAndBaseline — every SBPL output must start
-// with the version directive and import system.sb. This is the macOS
-// kernel contract; missing either renders the profile unusable.
 func TestGenerateSBPL_HeaderAndBaseline(t *testing.T) {
 	out := GenerateSBPL(canonicalConfig())
 	mustContain(t, out,
@@ -42,9 +33,6 @@ func TestGenerateSBPL_HeaderAndBaseline(t *testing.T) {
 	)
 }
 
-// TestGenerateSBPL_RepoReadAlwaysAllowed — repo subpath is always
-// readable (claude needs to read the codebase regardless of
-// read_only_repo).
 func TestGenerateSBPL_RepoReadAlwaysAllowed(t *testing.T) {
 	out := GenerateSBPL(canonicalConfig())
 	if !strings.Contains(out, `(allow file-read* (subpath "/repo"))`) {
@@ -52,9 +40,6 @@ func TestGenerateSBPL_RepoReadAlwaysAllowed(t *testing.T) {
 	}
 }
 
-// TestGenerateSBPL_HomeDirReadAndKnownWrites — HOME is readable + the
-// canonical tmux CLI state dirs are writable. Without these, cloud CLIs block
-// at startup trying to update auth/config/cache files before the REPL prompt.
 func TestGenerateSBPL_HomeDirReadAndKnownWrites(t *testing.T) {
 	out := GenerateSBPL(canonicalConfig())
 	mustContain(t, out,
@@ -67,10 +52,6 @@ func TestGenerateSBPL_HomeDirReadAndKnownWrites(t *testing.T) {
 	)
 }
 
-// TestGenerateSBPL_TmpReadWriteBoth — both /tmp and /var/folders need
-// read+write. claude.sh:477 explains this is load-bearing for bash
-// tool output files. Missing the read rule was the root cause of
-// cycles 8121-8128 build failures.
 func TestGenerateSBPL_TmpReadWriteBoth(t *testing.T) {
 	out := GenerateSBPL(canonicalConfig())
 	mustContain(t, out,
@@ -81,10 +62,6 @@ func TestGenerateSBPL_TmpReadWriteBoth(t *testing.T) {
 	)
 }
 
-// TestGenerateSBPL_ReadOnlyRepo_AddsDenyBeforeWriteAllows — when
-// ReadOnlyRepo=true, an explicit (deny file-write* (subpath repo))
-// must appear, and it must come BEFORE the per-write-path allows so
-// the later rules can re-permit the cycle-specific subdirs.
 func TestGenerateSBPL_ReadOnlyRepo_AddsDenyBeforeWriteAllows(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.ReadOnlyRepo = true
@@ -103,8 +80,6 @@ func TestGenerateSBPL_ReadOnlyRepo_AddsDenyBeforeWriteAllows(t *testing.T) {
 	}
 }
 
-// TestGenerateSBPL_WritePathsAddedAsSubpath — each entry of
-// WritePaths becomes an `(allow file-write* (subpath "X"))` rule.
 func TestGenerateSBPL_WritePathsAddedAsSubpath(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.WritePaths = []string{"/repo/a", "/repo/b/c"}
@@ -115,11 +90,6 @@ func TestGenerateSBPL_WritePathsAddedAsSubpath(t *testing.T) {
 	)
 }
 
-// TestGenerateSBPL_WritePathsAreLiteral pins the adapter's contract: every
-// WritePath is emitted verbatim. Glob resolution is the bridge's job
-// (resolveSandboxWriteGrants widens a glob to its glob-free ancestor before
-// the hand-off), so the SBPL and bwrap generators never each interpret a
-// glob their own way.
 func TestGenerateSBPL_WritePathsAreLiteral(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.WritePaths = []string{"/repo/.evolve/runs"}
@@ -129,8 +99,6 @@ func TestGenerateSBPL_WritePathsAreLiteral(t *testing.T) {
 	}
 }
 
-// TestGenerateSBPL_DenyPaths — kernel-enforced mirror of
-// disallowed_tools file patterns. claude.sh:540+ deny loop.
 func TestGenerateSBPL_DenyPaths(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.DenyPaths = []string{"/repo/.git", "/repo/.evolve/state.json"}
@@ -141,8 +109,6 @@ func TestGenerateSBPL_DenyPaths(t *testing.T) {
 	)
 }
 
-// TestGenerateSBPL_AllowNetwork — when true, no network deny is
-// emitted; when false, an explicit deny appears.
 func TestGenerateSBPL_AllowNetwork(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.AllowNetwork = true
@@ -155,15 +121,10 @@ func TestGenerateSBPL_AllowNetwork(t *testing.T) {
 	}
 }
 
-// TestGenerateBwrapArgv_BaseRules — bwrap argv must include the
-// essential bind-mounts: /usr ro, /lib ro, /bin ro, /etc ro, repo
-// (ro/rw depending on ReadOnlyRepo), $HOME (ro for read-only Claude
-// config), and an unprivileged user namespace.
 func TestGenerateBwrapArgv_BaseRules(t *testing.T) {
 	cfg := canonicalConfig()
 	innerArgv := []string{"claude", "-p", "go"}
 	args := GenerateBwrapArgv(cfg, innerArgv)
-	// First arg is the bwrap binary's expected first flag block.
 	mustContainArg(t, args, "--ro-bind", "/usr", "/usr")
 	mustContainArg(t, args, "--ro-bind", "/bin", "/bin")
 	mustContainArg(t, args, "--ro-bind", "/etc", "/etc")
@@ -172,15 +133,11 @@ func TestGenerateBwrapArgv_BaseRules(t *testing.T) {
 	mustContainArg(t, args, "--tmpfs", "/tmp")
 	mustContainArg(t, args, "--unshare-user")
 	mustContainArg(t, args, "--unshare-pid")
-	// Inner argv must be present at the tail.
 	if !endsWithArgv(args, innerArgv) {
 		t.Errorf("inner argv missing at tail: %v", args)
 	}
 }
 
-// TestGenerateBwrapArgv_HomeStateDirsTryBoundRW — Linux bridge launches need
-// the same CLI HOME state writes as macOS, but some CLI dirs may not exist on a
-// given host, so these must be try-binds rather than mandatory binds.
 func TestGenerateBwrapArgv_HomeStateDirsTryBoundRW(t *testing.T) {
 	args := GenerateBwrapArgv(canonicalConfig(), []string{"codex"})
 	mustContainArg(t, args, "--bind-try", "/Users/test/.claude", "/Users/test/.claude")
@@ -188,8 +145,6 @@ func TestGenerateBwrapArgv_HomeStateDirsTryBoundRW(t *testing.T) {
 	mustContainArg(t, args, "--bind-try", "/Users/test/.gemini", "/Users/test/.gemini")
 }
 
-// TestGenerateBwrapArgv_RepoBind — bind-mount the repo dir, read-write
-// by default and read-only when ReadOnlyRepo=true.
 func TestGenerateBwrapArgv_RepoBind(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.ReadOnlyRepo = false
@@ -201,8 +156,6 @@ func TestGenerateBwrapArgv_RepoBind(t *testing.T) {
 	mustContainArg(t, args, "--ro-bind", "/repo", "/repo")
 }
 
-// TestGenerateBwrapArgv_WritePathsRebound — when ReadOnlyRepo=true,
-// each WritePaths entry needs an explicit --bind to re-grant write.
 func TestGenerateBwrapArgv_WritePathsRebound(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.ReadOnlyRepo = true
@@ -211,8 +164,6 @@ func TestGenerateBwrapArgv_WritePathsRebound(t *testing.T) {
 	mustContainArg(t, args, "--bind", "/repo/.evolve/runs", "/repo/.evolve/runs")
 }
 
-// TestGenerateBwrapArgv_NetworkOff — when AllowNetwork=false, bwrap
-// must --unshare-net (deny networking via namespace isolation).
 func TestGenerateBwrapArgv_NetworkOff(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.AllowNetwork = false
@@ -220,10 +171,6 @@ func TestGenerateBwrapArgv_NetworkOff(t *testing.T) {
 	mustContainArg(t, args, "--unshare-net")
 }
 
-// TestProbe_DetectsAvailableSandboxer — on macOS we expect
-// sandbox-exec available; on Linux we expect bwrap (or none if not
-// installed). The test asserts the probe doesn't error and returns
-// reasonable info for the current host.
 func TestProbe_DetectsAvailableSandboxer(t *testing.T) {
 	pr := Probe()
 	if pr.OS == "" {
@@ -232,15 +179,11 @@ func TestProbe_DetectsAvailableSandboxer(t *testing.T) {
 	if pr.OS != runtime.GOOS {
 		t.Errorf("Probe.OS=%q, want runtime.GOOS=%q", pr.OS, runtime.GOOS)
 	}
-	// Available bool reflects sandbox-exec or bwrap presence; on
-	// dev macOS sandbox-exec is always present.
 	if runtime.GOOS == "darwin" && !pr.Available {
 		t.Errorf("on macOS, Probe.Available should be true (sandbox-exec at /usr/bin/sandbox-exec)")
 	}
 }
 
-// TestProbe_BinaryPathPopulated — when Available, BinaryPath must be
-// non-empty so the caller can log it.
 func TestProbe_BinaryPathPopulated(t *testing.T) {
 	pr := Probe()
 	if pr.Available && pr.BinaryPath == "" {
@@ -248,7 +191,6 @@ func TestProbe_BinaryPathPopulated(t *testing.T) {
 	}
 }
 
-// TestProbeFor_LinuxWithBwrap — probe linux branch with mocked LookPath.
 func TestProbeFor_LinuxWithBwrap(t *testing.T) {
 	look := func(name string) (string, error) {
 		if name == "bwrap" {
@@ -262,7 +204,6 @@ func TestProbeFor_LinuxWithBwrap(t *testing.T) {
 	}
 }
 
-// TestProbeFor_LinuxNoBwrap — probe linux branch when bwrap missing.
 func TestProbeFor_LinuxNoBwrap(t *testing.T) {
 	look := func(name string) (string, error) { return "", fakeNotFound(name) }
 	pr := probeFor("linux", look)
@@ -274,7 +215,6 @@ func TestProbeFor_LinuxNoBwrap(t *testing.T) {
 	}
 }
 
-// TestProbeFor_DarwinNoSandboxExec — degraded macOS.
 func TestProbeFor_DarwinNoSandboxExec(t *testing.T) {
 	look := func(string) (string, error) { return "", fakeNotFound("missing") }
 	pr := probeFor("darwin", look)
@@ -283,7 +223,6 @@ func TestProbeFor_DarwinNoSandboxExec(t *testing.T) {
 	}
 }
 
-// TestProbeFor_UnsupportedOS — windows/freebsd/etc. yield no impl.
 func TestProbeFor_UnsupportedOS(t *testing.T) {
 	pr := probeFor("windows", func(string) (string, error) { return "", nil })
 	if pr.Available {
@@ -294,8 +233,6 @@ func TestProbeFor_UnsupportedOS(t *testing.T) {
 	}
 }
 
-// TestGenerateSBPL_EmptyHomeDirSkipsHomeRules — when HomeDir is unset
-// (no operator HOME context), the HOME-keyed rules are skipped entirely.
 func TestGenerateSBPL_EmptyHomeDirSkipsHomeRules(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.HomeDir = ""
@@ -305,19 +242,15 @@ func TestGenerateSBPL_EmptyHomeDirSkipsHomeRules(t *testing.T) {
 	}
 }
 
-// TestGenerateSBPL_EmptyWritePathSkipped — entries that are "" must be
-// silently dropped (defensive against caller bugs).
 func TestGenerateSBPL_EmptyWritePathSkipped(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.WritePaths = []string{"", "/repo/.evolve/runs", ""}
 	out := GenerateSBPL(cfg)
-	// Empty rule would render as `(allow file-write* (subpath ""))` — verify absent.
 	if strings.Contains(out, `(subpath "")`) {
 		t.Errorf("empty write path leaked into SBPL: %s", excerpt(out, "subpath \"\""))
 	}
 }
 
-// TestGenerateSBPL_EmptyDenyPathSkipped — same defense for deny paths.
 func TestGenerateSBPL_EmptyDenyPathSkipped(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.DenyPaths = []string{"", "/repo/.git"}
@@ -330,15 +263,11 @@ func TestGenerateSBPL_EmptyDenyPathSkipped(t *testing.T) {
 	}
 }
 
-// TestGenerateBwrapArgv_EmptyHomeAndRepo — defensive: empty paths
-// don't emit malformed bind args.
 func TestGenerateBwrapArgv_EmptyHomeAndRepo(t *testing.T) {
 	cfg := Config{AllowNetwork: true}
 	args := GenerateBwrapArgv(cfg, []string{"true"})
-	// No --bind with empty src/dst pairs.
 	for i, a := range args {
 		if a == "--bind" || a == "--ro-bind" {
-			// Next two args must be non-empty.
 			if i+2 >= len(args) || args[i+1] == "" || args[i+2] == "" {
 				t.Errorf("bind/ro-bind with empty path at idx=%d: %v", i, args)
 			}
@@ -346,7 +275,6 @@ func TestGenerateBwrapArgv_EmptyHomeAndRepo(t *testing.T) {
 	}
 }
 
-// TestGenerateBwrapArgv_GlobInWritePathWidens — same parity as SBPL.
 func TestGenerateBwrapArgv_GlobInWritePathWidens(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.WritePaths = []string{"/repo/.evolve/runs/cycle-*"}
@@ -354,9 +282,6 @@ func TestGenerateBwrapArgv_GlobInWritePathWidens(t *testing.T) {
 	mustContainArg(t, args, "--bind", "/repo/.evolve/runs", "/repo/.evolve/runs")
 }
 
-// TestNewAndExec_Unwrapped — when sandbox binary is absent (or OS
-// unsupported), Exec falls back to plain exec and logs a NOTE.
-// Uses /usr/bin/true (universal POSIX no-op).
 func TestNewAndExec_Unwrapped(t *testing.T) {
 	s := &Sandbox{
 		probe: ProbeResult{OS: "unsupported", Available: false, Reason: "test stub"},
@@ -372,7 +297,6 @@ func TestNewAndExec_Unwrapped(t *testing.T) {
 	}
 }
 
-// TestExec_EmptyArgvFails — explicit error contract.
 func TestExec_EmptyArgvFails(t *testing.T) {
 	s := New(canonicalConfig())
 	err := s.Exec(context.Background(), nil, nil, nil, nil)
@@ -381,8 +305,6 @@ func TestExec_EmptyArgvFails(t *testing.T) {
 	}
 }
 
-// TestNew_BindsProbeAtConstruction — calling New once must capture the
-// probe result; subsequent calls return the same Sandbox config.
 func TestNew_BindsProbeAtConstruction(t *testing.T) {
 	cfg := canonicalConfig()
 	s := New(cfg)
@@ -397,9 +319,6 @@ func TestNew_BindsProbeAtConstruction(t *testing.T) {
 	}
 }
 
-// TestExec_DarwinSandboxExec — on darwin with sandbox-exec available,
-// Exec actually wraps the inner command. /usr/bin/true returns 0 with
-// no file I/O, so even a minimal SBPL grants enough.
 func TestExec_DarwinSandboxExec(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("darwin-only")
@@ -413,8 +332,6 @@ func TestExec_DarwinSandboxExec(t *testing.T) {
 	}
 }
 
-// TestExec_LinuxBwrap — on linux with bwrap available; skipped on
-// darwin. The shape is symmetric with the darwin test.
 func TestExec_LinuxBwrap(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("linux-only")
@@ -430,14 +347,10 @@ func TestExec_LinuxBwrap(t *testing.T) {
 	}
 }
 
-// fakeNotFound — minimal os.ErrNotExist-shaped error used by mocked
-// LookPath callbacks.
 type fakeNotFoundErr struct{ name string }
 
 func (e fakeNotFoundErr) Error() string { return "not found: " + e.name }
 func fakeNotFound(name string) error    { return fakeNotFoundErr{name} }
-
-// Helpers ------------------------------------------------------------
 
 func mustContain(t *testing.T, haystack string, needles ...string) {
 	t.Helper()

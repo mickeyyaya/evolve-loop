@@ -1,9 +1,5 @@
 package observerengine
 
-// respond_test.go — §6 tests 24-26: the pure decision (ADR-0044's
-// record-reflects-reality rule as a table) and the act order
-// enrich → emit → signal → kill, with the kill error surfaced.
-
 import (
 	"os"
 	"strings"
@@ -14,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// TestDecide_Table — nil policy → legacy_enforce (kill iff Enforce && PGID);
-// a policy's verdict outranks Enforce; kill_retry without a pgid records the
-// skip and never kills. Pure, no I/O. Kills M6, M6b, M36 (the policy verdict
-// ignored).
 func TestDecide_Table(t *testing.T) {
 	t.Parallel()
 	rows := []struct {
@@ -48,9 +40,6 @@ func TestDecide_Table(t *testing.T) {
 	}
 }
 
-// TestRespond_NilPolicyEnvelopeUnenriched — the intent of the host's
-// stallpolicy_test.go:156 in the leaf: the legacy branch emits the INCIDENT
-// with NO action keys, signals the kill and kills once.
 func TestRespond_NilPolicyEnvelopeUnenriched(t *testing.T) {
 	t.Parallel()
 	kills := 0
@@ -81,10 +70,6 @@ func TestRespond_NilPolicyEnvelopeUnenriched(t *testing.T) {
 	}
 }
 
-// TestRespond_PolicyEnrichesThenEmitsThenSignalsThenKills — the Kill closure
-// finds the INCIDENT already on disk and the kill signal already in the
-// Center. Kills M9 (kill before emit), M37 (WARN on the kill code), M38 (a
-// missing field).
 func TestRespond_PolicyEnrichesThenEmitsThenSignalsThenKills(t *testing.T) {
 	t.Parallel()
 	var onDiskAtKill, signalledAtKill bool
@@ -126,9 +111,6 @@ func TestRespond_PolicyEnrichesThenEmitsThenSignalsThenKills(t *testing.T) {
 	}
 }
 
-// TestRespond_KillErrorIsAWarnSignal — Kill returning EPERM reports
-// OBSERVER_KILL_FAILED with the errno text; the INCIDENT still stands; a
-// nil-returning Kill reports no such code. Kills M39 (`_ =` kept).
 func TestRespond_KillErrorIsAWarnSignal(t *testing.T) {
 	t.Parallel()
 	e, rc, _ := newEngine(t, func(s *Settings, d *Deps) {

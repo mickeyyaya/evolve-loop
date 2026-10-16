@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-// TestBuildFromSnapshots_AllCanonicalTiersKeptNonCanonicalDropped names the
-// modelcatalog.CanonicalTiers var and pins the real filter (refresh.go:49):
-// every tier in CanonicalTiers survives into the catalog and a tier outside it
-// is dropped. Iterating CanonicalTiers in the assertion ties the test to the
-// set itself, so the filter and the set cannot silently drift apart.
 func TestBuildFromSnapshots_AllCanonicalTiersKeptNonCanonicalDropped(t *testing.T) {
 	const nonCanonical = "ultra"
 	tm := map[string]string{nonCanonical: "m-ultra"}

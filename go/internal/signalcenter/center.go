@@ -10,16 +10,10 @@ import (
 	"time"
 )
 
-// Listener receives every event the Center delivers. Listeners observe; they
-// never decide (ADR-0101 decision 5). A listener may call Emit (re-entrancy is
-// queued, never a deadlock). A listener that panics is unsubscribed and the
-// panic is reported to the others as a signalcenter.listener_panicked INCIDENT.
 type Listener func(Event)
 
-// Option configures a Center at construction.
 type Option func(*Center)
 
-// WithClock injects the clock that stamps TS (tests pin it).
 func WithClock(now func() time.Time) Option {
 	return func(c *Center) {
 		if now != nil {
@@ -28,7 +22,6 @@ func WithClock(now func() time.Time) Option {
 	}
 }
 
-// WithRecentLimit bounds the in-memory window Recent returns (minimum 1).
 func WithRecentLimit(n int) Option {
 	return func(c *Center) {
 		if n < 1 {
@@ -38,8 +31,6 @@ func WithRecentLimit(n int) Option {
 	}
 }
 
-// WithPID stamps every event with the emitting process id, so a resumed
-// cycle's second process stays distinguishable in the durable record.
 func WithPID(pid int) Option { return func(c *Center) { c.pid = pid } }
 
 type listenerEntry struct {
@@ -48,23 +39,11 @@ type listenerEntry struct {
 	fn   Listener
 }
 
-// listenerName is the function the runtime spells for l — e.g.
-// "core.(*Orchestrator).observeSignal-fm" or "signalcenter.(*Center).NDJSONSink.func1"
-// — so a listener_panicked INCIDENT names what was dropped, not a counter.
 func listenerName(l Listener) string {
 	name := runtime.FuncForPC(reflect.ValueOf(l).Pointer()).Name()
 	return name[strings.LastIndex(name, "/")+1:]
 }
 
-// Center is the process-scoped fan-out (design §6). Delivery model: Emit
-// normalizes, stamps the sequence number and enqueues under c.mu; the first
-// emitter that finds no drain in progress drains the queue in seq order,
-// delivering each event to a snapshot of the listeners outside the lock. An
-// emitter that finds a drain in progress — a re-entrant listener, or a
-// concurrent goroutine — enqueues and returns; the active drainer delivers its
-// event in order before the drainer's own Emit returns. Every listener thus
-// observes the same total order, and Seq proves it in the durable record.
-// A nil *Center is a Null Object: every method is safe and does nothing.
 type Center struct {
 	mu          sync.Mutex
 	listeners   []listenerEntry
@@ -72,16 +51,17 @@ type Center struct {
 	seq         uint64
 	queue       []Event
 	draining    bool
-	idle        *sync.Cond // signalled when a drain ends; Flush waits on it
+	idle        *sync.Cond
 	recent      []Event
 	recentLimit int
 	now         func() time.Time
 	pid         int
 }
 
-// New constructs a Center with the wall clock, no pid and a 256-event window.
+const defaultRecentLimit = 256
+
 func New(opts ...Option) *Center {
-	c := &Center{now: time.Now, recentLimit: 256}
+	c := &Center{now: time.Now, recentLimit: defaultRecentLimit}
 	c.idle = sync.NewCond(&c.mu)
 	for _, opt := range opts {
 		opt(c)
@@ -89,7 +69,6 @@ func New(opts ...Option) *Center {
 	return c
 }
 
-// Subscribe registers l and returns its idempotent unsubscribe.
 func (c *Center) Subscribe(l Listener) func() {
 	if c == nil || l == nil {
 		return func() {}
@@ -125,8 +104,6 @@ func (c *Center) subscribed(id uint64) bool {
 	return false
 }
 
-// Emit normalizes e, stamps it and delivers it to every listener in seq order.
-// It never drops (see Normalize) and never blocks a listener on itself.
 func (c *Center) Emit(e Event) {
 	if c == nil {
 		return
@@ -143,12 +120,9 @@ func (c *Center) Emit(e Event) {
 		return
 	}
 	c.draining = true
-	c.drain() // releases c.mu
+	c.drain()
 }
 
-// drain delivers queued events in order; called with c.mu held, returns with
-// it released. Listeners run outside the lock so they may subscribe,
-// unsubscribe or emit.
 func (c *Center) drain() {
 	for len(c.queue) > 0 {
 		next := c.queue[0]
@@ -163,11 +137,6 @@ func (c *Center) drain() {
 	c.mu.Unlock()
 }
 
-// Flush blocks until the queue is empty and no drain is in progress — the
-// seam for producers on exit paths (design §6.1): an Emit that finds a drain
-// in progress returns before its event is delivered. Nil-safe; returns at
-// once when idle. Never call it from inside a listener: the drain that runs
-// the listener is the one Flush would wait for.
 func (c *Center) Flush() {
 	if c == nil {
 		return
@@ -187,8 +156,6 @@ func (c *Center) deliver(e Event, listeners []listenerEntry) {
 	}
 }
 
-// call invokes one listener with panic isolation: a panicking listener is
-// unsubscribed and the panic is reported to the others.
 func (c *Center) call(e Event, l listenerEntry) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -212,8 +179,6 @@ func (c *Center) pushRecent(e Event) {
 	}
 }
 
-// Recent returns a copy of the bounded window, newest last (nil for a nil
-// Center) — the cross-cycle view; the durable record is the NDJSON sink.
 func (c *Center) Recent() []Event {
 	if c == nil {
 		return nil

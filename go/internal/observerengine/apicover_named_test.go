@@ -1,14 +1,5 @@
 package observerengine
 
-// apicover_named_test.go — every export of the leaf named AND exercised by the
-// package's own tests (the 100 % API gate counts package-local tests only):
-// Paths/PathsFor + the three suffixes + the two scopes (TestPathsFor_…),
-// Settings/Deps/Engine/Option/New/WithSignals/SignalsWired (the fixtures,
-// TestWithSignals_…), Start/Stop/StopNone/StopEOFGrace/Tick/Shutdown/
-// WriteReport (the tick, sequence and report tests), Reporter/NewReporter/
-// Wired/Report (TestReporter_…), the eight codes (the registry test). This
-// file pins the exported SET positionally so a new export must be named here.
-
 import "testing"
 
 func TestAPICover_EveryExportIsNamed(t *testing.T) {
