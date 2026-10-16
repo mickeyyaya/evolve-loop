@@ -368,10 +368,11 @@ If you find a gaming pattern that the framework did not catch, please file an is
 
 ## Version
 
-**Current (v22.28)** — the full release history is in [CHANGELOG.md](CHANGELOG.md). To cut a release, use `evolve release X.Y.Z`.
+**Current (v22.29)** — the full release history is in [CHANGELOG.md](CHANGELOG.md). To cut a release, use `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
+| v22.29 | Oct 16 | See the [22.29.0] section of CHANGELOG.md. |
 | v22.28 | Oct 12 | See the [22.28.0] section of CHANGELOG.md. |
 | v22.27 | Oct 8 | The `cli_routing` table runs agy first. This release adds the code-review phase, the convergence policy (both shadow), the computed inbox rank, `evolve checkpoint` and `evolve cli update`. |
 | v22.26 | Sep 30 | `evolve gc` removes what finished cycles leave. The build handoff floor runs the repo-contract pack. This release also adds `evolve loop-stop`, `evolve inbox route-console` and the `NO_WORK` result. |
