@@ -7,7 +7,7 @@
 >   personas/skills/scripts. (`docs/research/` itself now holds the merged
 >   research tree — see the 2026-08-05 section below.)
 > - **Archived references** (42 files, in `docs/private/research/`) — for
->   contributor reference; explicitly excluded from agent context via the
+>   contributor reference; explicitly excluded from agent context through the
 >   trust kernel (deny_subpaths + Layer-B filter). See
 >   [docs/architecture/private-context-policy.md](architecture/private-context-policy.md)
 >   for the convention.
@@ -41,7 +41,7 @@ These load into agent runtime context. Cited by the listed runtime artifact.
 ## Archived Research (in `docs/private/research/`)
 
 Restored verbatim from commit `35b31c4^` (cycle 13's parent). Cycle 13
-correctly deleted these from runtime context per Liu et al. 2023 "Lost in
+correctly deleted these from runtime context per Liu and others (2023) "Lost in
 the Middle"; v9.1.x re-introduced them as developer-only reference under
 `docs/private/`. Agents never see these during cycles. Contributors
 read them directly.
@@ -148,7 +148,7 @@ blind-judged on three scenarios (2026-09-28), is
 [research/coding-craft-2026/architecture-reviewer-comparison.md](research/coding-craft-2026/architecture-reviewer-comparison.md).
 
 Plus 12 single-file notes from knowledge-base/research (lessons-and-resolutions,
-verdict-classifier drift, flag-reduction design, token histories, et al.) — see
+verdict-classifier drift, flag-reduction design, token histories, and others) — see
 `docs/research/`.
 
 **The engineering chronicle** — workstream-level narratives (problem /
@@ -168,39 +168,39 @@ approaches / decision / results / retro) — lives at
 
 | Document | What it records |
 |---|---|
-| [research/cli-coverage-inventory-2026-09-30.md](research/cli-coverage-inventory-2026-09-30.md) | Which of 147 core functions the published `evolve` CLI runs today (64 fully, 36 partly, 47 not at all), with file:line evidence per row, and the 50 CLI requests it produced (PR #750). |
-| [reports/inbox-review-2026-09-30.md](reports/inbox-review-2026-09-30.md) | Why the loop's queue planned 0 batches from 183 items, the per-item verdicts of a six-agent re-verification against main, and the drain that reopened it to 29 batches (PRs #745, #747). |
+| [research/cli-coverage-inventory-2026-09-30.md](research/cli-coverage-inventory-2026-09-30.md) | The CLI runs 64 functions fully, 36 partly, and 47 not at all. It records evidence and 50 CLI requests (PR #750). |
+| [reports/inbox-review-2026-09-30.md](reports/inbox-review-2026-09-30.md) | The queue planned 0 batches from 183 items. It shows the verdicts against main and reopening to 29 batches (PRs #745, #747). |
 | [reports/comment-round-12-findings-2026-09-30.md](reports/comment-round-12-findings-2026-09-30.md) | The 43 findings of comment reduction round 12 (PR #749), including two `scopedelta` security holes, and the inbox item that carries each. |
-| [reports/comment-strip-clean-code-review-2026-09-30.md](reports/comment-strip-clean-code-review-2026-09-30.md) | A Clean Code review of 64 stripped production files: none read fully without their comments, two thirds of what was removed carried intent, invariants or design, and the defects the comments were covering for. |
+| [reports/comment-strip-clean-code-review-2026-09-30.md](reports/comment-strip-clean-code-review-2026-09-30.md) | A Clean Code review of 64 stripped production files. Two thirds of removed comments carried intent, invariants, or design. |
 | [incidents/2026-09-30-a-lane-ship-grew-a-function-past-the-size-ratchet.md](incidents/2026-09-30-a-lane-ship-grew-a-function-past-the-size-ratchet.md) | Cycle 1779's lane ship turned main red through a whole-tree test its change scope never selected; the class fix (PR #751). |
 | [architecture/adr/0110-whole-tree-tests-run-before-main.md](architecture/adr/0110-whole-tree-tests-run-before-main.md) | Decision: every test that reads the whole tree runs before main, and an AST detector keeps the scanner pack complete. |
-| [architecture/adr/0111-code-carries-no-comments.md](architecture/adr/0111-code-carries-no-comments.md) | Decision: code carries no comments; what they said moves to code, tests, design notes and the history archive; the commit gate refuses an added comment (PRs #746, #749, #753). |
-| [architecture/adr/0114-the-acs-verdict-is-always-written-and-complete.md](architecture/adr/0114-the-acs-verdict-is-always-written-and-complete.md) | Decision: every ACS run writes a complete verdict; a scope that could not run is a named `egps/` harness red carrying its cause, the lane budget is one shared deadline, and predicates run in the suite's own scrubbed environment. |
-| [architecture/adr/0115-commit-gate-keeps-history-and-records-waivers.md](architecture/adr/0115-commit-gate-keeps-history-and-records-waivers.md) | Decision: the commit gate refuses a removed history comment its change does not record, records a review waiver as a `Review-waived` trailer, and keeps review for pure-docs changes; `docs/` is not code for the added-comment rule. |
-| [architecture/adr/0116-inbox-curation-verbs.md](architecture/adr/0116-inbox-curation-verbs.md) | Decision: inbox items are curated through `evolve inbox show/list/edit/withdraw/verify`; each item field has one owner (authored, curated, or verb-owned), an edit is judged on the fields it writes, a withdrawal undoes a filing, a premise re-verification is a lifecycle stamp. |
-| [architecture/adr/0117-pre-handoff-probes-run-the-build-floor.md](architecture/adr/0117-pre-handoff-probes-run-the-build-floor.md) | Decision: `evolve selfcheck build` and `evolve phase verify build` run the build handoff floor itself, one named check list with the cycle's own inputs, after three cycles (1763, 1764, 1788) failed on a floor check a probe had reported green. |
+| [architecture/adr/0111-code-carries-no-comments.md](architecture/adr/0111-code-carries-no-comments.md) | Decision: code carries no comments. Comments move to code, tests, notes, and the history archive. The commit gate refuses added comments (PRs #746, #749, #753). |
+| [architecture/adr/0114-the-acs-verdict-is-always-written-and-complete.md](architecture/adr/0114-the-acs-verdict-is-always-written-and-complete.md) | Decision: every ACS run writes a complete verdict. Unrun scopes become egps/ harness reds. The lane budget is one shared deadline. |
+| [architecture/adr/0115-commit-gate-keeps-history-and-records-waivers.md](architecture/adr/0115-commit-gate-keeps-history-and-records-waivers.md) | Decision: the commit gate refuses unrecorded comment removals. It records a review waiver as a Review-waived trailer. The directory docs/ is exempt from the rule. |
+| [architecture/adr/0116-inbox-curation-verbs.md](architecture/adr/0116-inbox-curation-verbs.md) | Decision: curate inbox items through evolve inbox verbs. Each field has one owner. An edit evaluates written fields, and withdrawal undoes a filing. |
+| [architecture/adr/0117-pre-handoff-probes-run-the-build-floor.md](architecture/adr/0117-pre-handoff-probes-run-the-build-floor.md) | Decision: evolve selfcheck build and evolve phase verify build run the build floor itself. This check list uses the cycle inputs directly. |
 
 ## 2026-10-07 — convergence policy (ADR-0126)
 
 | Document | What it records |
 |---|---|
-| [research/review-convergence-limited-rounds-2026-10.md](research/review-convergence-limited-rounds-2026-10.md) | Research: the best policy to converge review feedback within limited rounds. Two rounds capture 76–95% of the gain; stop on marginal gain and keep the best (VRR-Stop); LLM reviewers vary across runs, so verify rather than re-hunt (OpenCodeReview); more revisions do not converge without reduced uncertainty (33,596 agent PRs); Google's "better, not perfect"; effort before model, for reasoning failures only. Mapped to refinements CR1–CR8. |
+| [research/review-convergence-limited-rounds-2026-10.md](research/review-convergence-limited-rounds-2026-10.md) | Research: policies to converge review feedback in limited rounds. Two rounds capture most gains. Stop on marginal gain and keep the best round. |
 | [incidents/2026-10-07-l2-seven-review-rounds.md](incidents/2026-10-07-l2-seven-review-rounds.md) | The example issue: the L2 routing lane needed seven review fix rounds on the deepest Claude model. Four causes: a review added a capability, a heuristic over an unbounded input, delta checks that hunted instead of verifying, and nothing changing between rounds. |
 | [architecture/convergence-policy.md](architecture/convergence-policy.md) | Design: one pure `convergence.Decide` for every repeat-until-accepted loop. A three-rung ladder: change the feedback, then the strategy, then the scope. Stop on marginal gain, land the best round, and never run a fourth. Output first, with deferrals filed as follow-ups. Headroom is read from the manifests. |
-| [plans/convergence-policy-2026-10.md](plans/convergence-policy-2026-10.md) | Plan: strategies A–C, decisions V-D1 to V-D11 and CQ1 (the operator: top = Opus 5.5 at xhigh effort), components V0–V9 plus V3b (console first), and the L2 replay as the acceptance test (it lands at round 3 through rung 2). |
-| [architecture/adr/0126-every-iterative-loop-converges-or-escalates.md](architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) | Decision: every iterative loop converges or escalates (feedback, then strategy, then scope), lands the best round, and never runs a fourth; capability findings below CRITICAL never block; judges verify after `J_0`; CRITICAL is never deferred. |
+| [plans/convergence-policy-2026-10.md](plans/convergence-policy-2026-10.md) | Plan: strategies A to C, decisions V-D1 to V-D11, and components V0 to V9. The L2 replay serves as the acceptance test. |
+| [architecture/adr/0126-every-iterative-loop-converges-or-escalates.md](architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) | Decision: iterative loops converge or escalate, keep the best round, and never run a fourth round. Non-critical findings do not block. |
 
 ## 2026-10-07 — the code-review loop and the audit evaluation contract
 
 | Document | What it records |
 |---|---|
-| [research/audit-evaluation-contract-prior-art-2026-10.md](research/audit-evaluation-contract-prior-art-2026-10.md) | How current AI software factories (Anthropic, OpenAI, StrongDM, Stripe, Augment) and 2026 evaluator research (SpecBench, ImpossibleRubrics, PROCTOR, Agentic Rubrics, self-preference bias) handle publishing an evaluator's standard to the agents it judges. The verdict is "contract before code, criteria public, instruments private, evidence as certificates, facts over the judge", mapped to refinements AR1–AR9. |
+| [research/audit-evaluation-contract-prior-art-2026-10.md](research/audit-evaluation-contract-prior-art-2026-10.md) | Research: how AI software factories publish evaluation standards. The rule is contract before code with public criteria and private instruments. |
 | [architecture/review-loop-and-quality-index.md](architecture/review-loop-and-quality-index.md) | Design: the independent `code-review` loop between build and audit, and the ten-dimension quality index the review and the audit share (ADR-0124). |
 | [plans/code-review-phase-2026-10.md](plans/code-review-phase-2026-10.md) | Plan: the code-review phase's strategies (S1–S3), operator decisions, components and landings. |
 | [architecture/adr/0124-code-review-phase.md](architecture/adr/0124-code-review-phase.md) | Decision: an independent code-review loop sits between build and audit, and the audit qualifies its result on one shared quality index. |
-| [architecture/audit-evaluation-contract.md](architecture/audit-evaluation-contract.md) | Design: the audit's published standard (dimensions plus `G-…` gate criteria with verifiers and certificates), the `audit-plan` phase that writes each cycle's expectations before build, delivery as capped digests, and the final audit held to its plan with a kernel cross-check (ADR-0125). |
-| [plans/audit-evaluation-contract-2026-10.md](plans/audit-evaluation-contract-2026-10.md) | Plan: approaches A–C, decisions E-D0 to E-D9 (E-D1–E-D4 by the operator), refinements AR1–AR9, components E0–E7 (E0 its own docs landing, E1–E6 inside the code-review plan's landing 2, E7 at its flip). |
-| [architecture/adr/0125-audit-publishes-its-evaluation-contract.md](architecture/adr/0125-audit-publishes-its-evaluation-contract.md) | Decision: the audit publishes its standard and, before build, this cycle's expectations; its verdicts are keyed to published criteria; criteria are public and probe instances private. |
+| [architecture/audit-evaluation-contract.md](architecture/audit-evaluation-contract.md) | Design: the audit published standard and gate criteria. The audit-plan phase writes expectations before build. The kernel cross-checks the plan. |
+| [plans/audit-evaluation-contract-2026-10.md](plans/audit-evaluation-contract-2026-10.md) | Plan: approaches A to C, decisions E-D0 to E-D9, and components E0 to E7. Components land in stages across two reviews. |
+| [architecture/adr/0125-audit-publishes-its-evaluation-contract.md](architecture/adr/0125-audit-publishes-its-evaluation-contract.md) | Decision: the audit publishes its standard and expectations before build. Verdicts link to public criteria with private probes. |
 
 ## 2026-10-08 — logging and process hygiene
 
@@ -242,7 +242,7 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/attempt-postmortem-2026-10.md](research/attempt-postmortem-2026-10.md) | Research: the cycle 1853 chain, the records that the repository writes today, and how agent harnesses carry failure context into a retry. It covers Reflexion, SWE-agent, OpenHands, Claude Code, Aider, LangGraph and same-input retry. Findings F1.1 to F3.10, refinements R1 to R9. |
 | [plans/attempt-postmortem-2026-10.md](plans/attempt-postmortem-2026-10.md) | Plan: four candidate designs with scores, decisions D1 to D18, components P1 to P5, the wiring lane W1 and the repeat guard G1 (R3). |
-| [architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md](architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md) | Decision: each abnormal end of a phase dispatch leaves a postmortem record, and the next dispatch or a resume gets a bridge-stated section with a do-not-repeat rule. |
+| [architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md](architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md) | Decision: abnormal dispatch ends leave postmortem records. The next dispatch receives a bridge section with do-not-repeat rules. |
 
 ## 2026-10-11 — a gate that refuses a changed function below 100%
 
@@ -275,6 +275,7 @@ approaches / decision / results / retro) — lives at
 | [plans/model-capability-practice-2026-10.md](plans/model-capability-practice-2026-10.md) | Plan: four approaches for less scaffolding and four for the practice watch, each with scores, a winner and what it takes from the others. Decisions D1 to D11 and components M0 to M5. |
 | [architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md](architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md) | Decision: a deterministic watch files a research item when a source changes. Prompt trims are measured, one persona at a time. |
 | [research/practice-gemini-prompting-guide-2026-10.md](research/practice-gemini-prompting-guide-2026-10.md) | Research: the Gemini prompting guide change (Gemini 4 Argon, the end of custom `temperature`, `top_p` and `top_k`) read as data. The loop sends none of these parameters, and no persona changes before the M2 baseline. |
+| [research/practice-agy-cli-changelog-2026-10.md](research/practice-agy-cli-changelog-2026-10.md) | Research: the agy changelog updates for versions 1.3.4 through 1.4.0 read as data. No persona changes before the M2 baseline. |
 
 ## 2026-10-13 — fleet landing at scale: 200 concurrent lanes (ADR-0134)
 

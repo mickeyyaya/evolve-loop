@@ -35,6 +35,7 @@ This setting stops invisible editor hangs.
 Version 1.4.0 adds terminal status reporting over OSC 7501.
 The release adds `--strict` and `--json` flags to `agy plugin validate`.
 The tool records final task output when background commands stop.
+The release adds the `alt+m` shortcut for queued messages.
 
 ## 3. Core persona evaluation under ADR-0133
 
