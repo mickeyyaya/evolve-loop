@@ -142,3 +142,17 @@ func TestCoverfixCollectSpanWarnsAndKeepsEventsBeforeAnOversizedLine(t *testing.
 		t.Errorf("scan failure not surfaced, stderr = %q", out)
 	}
 }
+
+func TestCoverfixTailLinesAtTheEndOfTheFeedReturnsNothingAndKeepsTheOffset(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "feed.ndjson")
+	body := []byte("one\ntwo\n")
+	if err := os.WriteFile(path, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	end := int64(len(body))
+	lines, off := tailLines(path, end)
+	if lines != nil || off != end {
+		t.Fatalf("tailLines at end = (%v, %d), want (nil, %d)", lines, off, end)
+	}
+}
