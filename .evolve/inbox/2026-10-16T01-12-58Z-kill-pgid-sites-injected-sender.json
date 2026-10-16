@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Every non-test syscall.Kill(-x, ...) site in go/ goes through a guard that refuses pgid <= 1, and a test per site fails when that guard is removed",
+    "Tests of phaseobserver, phasewatchdog, phasestream and cmd_swarm reach the kill only through an injected sender; no test passes a pgid it did not create to a real syscall.Kill"
+  ],
+  "created_at": "2026-10-16T01:12:56Z",
+  "files": [
+    "go/cmd/evolve/cmd_swarm.go",
+    "go/internal/phasewatchdog/phasewatchdog.go",
+    "go/internal/phaseobserver/phaseobserver.go",
+    "go/internal/phasestream/normalizer.go"
+  ],
+  "fix": "Move the pgid<=1 refusal of swarmrunner.killGroup (go/internal/phases/swarmrunner/kill_unix.go, the pattern source) into one shared helper and use it as the default KillPgrp in phaseobserver, phasewatchdog and phasestream and in cmd_swarm's KillGroup. Add a guard test that scans non-test go/ files for syscall.Kill(-...) outside that helper, with an allowlist for cliupdate/grouprunner_unix.go and phases/ship/repocontract_cmd_unix.go.",
+  "id": "kill-pgid-sites-injected-sender",
+  "kind": "hardening",
+  "priority_class": "correctness",
+  "source": "console incident 2026-10-15 (kill(-1, SIGKILL) killed every user process twice), fixed for swarmrunner in #890",
+  "summary": "A mutation check of swarmrunner.groupKiller's pgid guard reached syscall.Kill(-1, SIGKILL) and killed every process of the user, twice; #890 fixed that site. Non-test sites that send to a negative pid: go/cmd/evolve/cmd_swarm.go:135 (inline pgid<=1 guard), go/internal/phaseobserver/phaseobserver.go:81,151, go/internal/phasewatchdog/phasewatchdog.go:319 and go/internal/phasestream/normalizer.go:41. The last three have an injectable KillPgrp but their default sender has no pgid guard, so a mutated or zero pgid reaches Kill(-1, SIGKILL) or Kill(0, ...). cliupdate/grouprunner_unix.go:22 and phases/ship/repocontract_cmd_unix.go:12 use -cmd.Process.Pid on a started process and are out of scope.",
+  "title": "The default senders of the remaining Kill(-pgid) sites need the pgid guard of #890",
+  "weight": 0.6
+}

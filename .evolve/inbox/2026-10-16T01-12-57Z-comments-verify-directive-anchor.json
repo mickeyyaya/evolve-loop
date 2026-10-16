@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Shortening a package doc that sits below a //go:build line passes `evolve comments verify` as comment-only (red first, on a fixture pair taken from acs/cycle14)",
+    "A real change to the build directive is still reported"
+  ],
+  "created_at": "2026-10-16T01:12:56Z",
+  "files": [
+    "go/internal/commentaudit/equivalence.go",
+    "go/acs/cycle14/predicates_test.go"
+  ],
+  "fix": "Reproduce the false report with a before/after fixture pair from acs/cycle14, find which field of anchoredDirectives differs (nextToken, blank or paragraph), and make that field independent of the text and length of an unrelated doc comment. Keep the check that a moved or edited directive is still reported.",
+  "id": "comments-verify-directive-anchor",
+  "kind": "bug",
+  "priority_class": "maintainability",
+  "source": "comment-zero lane K1, 2026-10-16",
+  "summary": "In go/acs/cycle14/predicates_test.go the file starts with `//go:build acs`, then a blank line, then a package doc. Editing that doc makes `evolve comments verify` report \"directive changed\" (Equivalent -> anchoredDirectives in go/internal/commentaudit/equivalence.go). The lane had to leave acs/cycle14 untouched. The cause is not yet pinned: scanDirectives anchors on nextToken (code tokens only), trailing, blankBefore and paragraph, and none should move with the doc text. Reproduce with a before/after pair first.",
+  "title": "comments verify reports a directive change when the package doc below a build directive is edited",
+  "weight": 0.3
+}
