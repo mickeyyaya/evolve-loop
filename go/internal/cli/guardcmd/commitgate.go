@@ -1,21 +1,5 @@
 package guardcmd
 
-// cmd_commitgate.go — `evolve commit-gate run` — the native port of
-// commit-gate/commit-gate-runner.sh (bash->Go migration Wave B1).
-//
-// Detects the languages of the changed files, validates the --reviewers
-// precondition (simplify + one review capability, waived for a proven comment
-// removal), runs lint + targeted tests,
-// and on a full pass writes .commit-gate/attestation.json bound to
-// sha256(`git diff HEAD`) — the attestation `evolve ship --class manual`
-// verifies. Exit codes mirror the bash runner verbatim: 0 pass, 1 fail/precond,
-// 2 git/SHA fatal, 3 tool missing, 10 bad args.
-//
-// ADDITIVE: the bash runner stays in place until B2 confirms differential parity
-// and deletes it. Registry wiring (not edited here per task scope):
-//
-//	{Name: "commit-gate", Summary: "Pre-commit quality gate (lint + targeted tests + attestation)", Run: runCommitGate},
-
 import (
 	"context"
 	"flag"

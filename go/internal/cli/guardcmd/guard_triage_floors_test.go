@@ -8,21 +8,6 @@ import (
 	"testing"
 )
 
-// cmd_guard_triage_floors_test.go — ADR-0046 Layer 1 (cycle 305): the
-// agent-runnable `evolve guard triage-floors <workspace>` self-check. It reads
-// the workspace's triage-report.md + triage-decision.json companion, reports
-// committed/deferred declaration-vs-prose divergence, and exits non-zero when
-// they disagree so the triage persona can repair its artifact before the
-// correction ladder fires (ADR-0045 gate-admission rule).
-//
-// RED: `triage-floors` is not a recognized subcommand, so runGuard falls through
-// to buildGuard, which errors → exit 10 for every case below. Each pin asserts
-// the BUILT behavior (exit 0 clean / non-zero divergence / informative --help),
-// so all are RED until Builder adds the subcommand branch before stdin parsing.
-
-// triageFloorsFixture lays out a self-contained project root so the guard can
-// source its package vocabulary from go/internal regardless of cwd, with the
-// workspace at <root>/.evolve/runs/cycle-305. Returns the workspace path.
 func triageFloorsFixture(t *testing.T, report, companion string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -48,9 +33,6 @@ func triageFloorsFixture(t *testing.T, report, companion string) string {
 	return ws
 }
 
-// cleanReport commits core (top_n) and defers bridge (## deferred); the clean
-// companion declares exactly that, so both committed and deferred declarations
-// agree with prose → no divergence.
 const cleanReport = `## top_n (commit to THIS cycle)
 - coverage-core: push internal/core coverage to ≥98% — priority=H
 
@@ -70,7 +52,6 @@ func TestGuardTriageFloors_CleanWorkspaceExitsZero(t *testing.T) {
 }
 
 func TestGuardTriageFloors_DivergenceExitsNonZero(t *testing.T) {
-	// Companion declares deferred core, but prose defers bridge → divergence.
 	ws := triageFloorsFixture(t, cleanReport,
 		`{"cycle":305,"committed_floors":["core"],"deferred_floors":["core"]}`)
 	var stdout, stderr bytes.Buffer

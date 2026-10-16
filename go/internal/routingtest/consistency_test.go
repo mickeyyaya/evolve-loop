@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// presentRoles lists the completed-phase names a fixture's handoffs represent,
-// so Digest gates them present.
 func presentRoles(f SignalSpec) []string {
 	var roles []string
 	if f.scoutPresent() {
@@ -26,10 +24,6 @@ func presentRoles(f SignalSpec) []string {
 	return roles
 }
 
-// TestSignalSpec_DualRenderingAgree is the framework's keystone self-test: the
-// pure rendering (Signals) MUST equal what Digest extracts from the orchestrator
-// rendering (HandoffFiles). This guarantees PureKernel and FullOrchestrator
-// scenarios see equivalent signals from one fixture.
 func TestSignalSpec_DualRenderingAgree(t *testing.T) {
 	fixtures := []SignalSpec{
 		{CycleSize: "trivial"},
@@ -39,12 +33,12 @@ func TestSignalSpec_DualRenderingAgree(t *testing.T) {
 		{SeverityMax: "HIGH", FilesTouched: 4, BuildVerdict: "WARN"},
 		{AuditVerdict: "PASS", AuditConf: 0.9},
 		{CycleSize: "small", ACSRed: 1, SeverityMax: "CRITICAL", FilesTouched: 2, AuditVerdict: "FAIL", AuditRedCount: 3},
-		{ScoutBacklog: 7},                    // backlog-only scout fixture
-		{DiffLOC: 540, BuildVerdict: "PASS"}, // diff_loc-only build fixture
-		{CycleSize: "large", ScoutBacklog: 12, ScoutCarryover: 3, DiffLOC: 800, FilesTouched: 6, BuildVerdict: "PASS"}, // both new fields + neighbors
-		{ArtifactBytes: 4096}, // artifact_bytes-only scout fixture
+		{ScoutBacklog: 7},
+		{DiffLOC: 540, BuildVerdict: "PASS"},
+		{CycleSize: "large", ScoutBacklog: 12, ScoutCarryover: 3, DiffLOC: 800, FilesTouched: 6, BuildVerdict: "PASS"},
+		{ArtifactBytes: 4096},
 		{CycleSize: "medium", ScoutBacklog: 9, ScoutCarryover: 2, ArtifactBytes: 1 << 20},
-		{}, // empty fixture → all roles absent
+		{},
 	}
 	for i, f := range fixtures {
 		want := f.Signals()
@@ -59,12 +53,6 @@ func TestSignalSpec_DualRenderingAgree(t *testing.T) {
 	}
 }
 
-// TestSignalSpec_WrappedDualRenderingAgree extends the keystone self-test to the
-// ADR-0050 Phase-3 envelope: the SAME fixtures, rendered as payload-wrapped
-// handoffs, must Digest to the SAME RoutingSignals as the pure rendering. This
-// is the broad golden-equivalence proof (every routing fixture, not just the
-// hand-picked ones in router/digest_payload_test.go) that the wrapped envelope
-// is behavior-equivalent to the flat one.
 func TestSignalSpec_WrappedDualRenderingAgree(t *testing.T) {
 	fixtures := []SignalSpec{
 		{CycleSize: "trivial"},
@@ -79,7 +67,7 @@ func TestSignalSpec_WrappedDualRenderingAgree(t *testing.T) {
 		{CycleSize: "large", ScoutBacklog: 12, ScoutCarryover: 3, DiffLOC: 800, FilesTouched: 6, BuildVerdict: "PASS"},
 		{ArtifactBytes: 4096},
 		{CycleSize: "medium", ScoutBacklog: 9, ScoutCarryover: 2, ArtifactBytes: 1 << 20},
-		{}, // empty fixture → all roles absent
+		{},
 	}
 	for i, f := range fixtures {
 		want := f.Signals()
@@ -94,9 +82,6 @@ func TestSignalSpec_WrappedDualRenderingAgree(t *testing.T) {
 	}
 }
 
-// TestSignalSpec_ArtifactBytesReachesBothRenderings guards the keystone against
-// a vacuous pass: parity also holds when both renderings drop the field, so the
-// fixture's value must itself survive the pure rendering and the Digest read.
 func TestSignalSpec_ArtifactBytesReachesBothRenderings(t *testing.T) {
 	const want = 4096
 	f := SignalSpec{ArtifactBytes: want}
@@ -114,8 +99,6 @@ func TestSignalSpec_ArtifactBytesReachesBothRenderings(t *testing.T) {
 	}
 }
 
-// TestMatrix_CrossProductCount verifies Matrix yields exactly product(dims)
-// uniquely-named specs.
 func TestMatrix_CrossProductCount(t *testing.T) {
 	specs := Matrix([]Brick{Pure()},
 		Dim("size", V("trivial", TrivialCycle()), V("medium", MediumCycle())),

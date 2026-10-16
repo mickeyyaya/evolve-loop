@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-// TestListRegistryEntries covers the read the operator surface (`evolve
-// continuation list`) is built on: every binding, and an absent registry as an
-// empty map rather than an error — no registry is the normal state of a healthy
-// project, and an error there would make the command useless exactly when it is
-// most often run.
 func TestListRegistryEntries(t *testing.T) {
 	t.Run("absent registry is empty, not an error", func(t *testing.T) {
 		got, err := ListRegistryEntries(t.TempDir())
@@ -49,11 +44,6 @@ func TestListRegistryEntries(t *testing.T) {
 	})
 }
 
-// TestRedactHostPaths pins the M1 fix (audit cycle-1507): released pointers ride
-// the ship commit into TRACKED .evolve/inbox items on a public remote, so the
-// absolute host paths must collapse to "~" — while the refs salvage actually
-// resumes from (snapshot, base, branch) stay byte-identical, since redacting
-// those would turn a privacy fix into a data-loss bug.
 func TestRedactHostPaths(t *testing.T) {
 	home, err := os.UserHomeDir()
 	if err != nil || strings.TrimSpace(home) == "" {

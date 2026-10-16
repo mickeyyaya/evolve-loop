@@ -142,3 +142,5 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/textcap` | the two rune-cap text rules: trim and ` …[truncated]`, or the bare ellipsis | [internal-textcap.md](internal-textcap.md) |
 | `internal/phases/flakererunscan` | the native flake-rerun phase: reruns a test and flags it flaky when its outcomes disagree | [internal-phases-flakererunscan.md](internal-phases-flakererunscan.md) |
 | `internal/guardslog` | appends one timestamped guard-log line and returns the close error | [internal-guardslog.md](internal-guardslog.md) |
+| `internal/continuation` | the continuation binding: the one schema, the per-cycle manifest, the scope-keyed registry and the release authority gate (ADR-0076) | [internal-continuation.md](internal-continuation.md) |
+| `internal/routingtest` | the composable scenario framework for the dynamic phase-routing kernel: specs, bricks, matrices and kernel-floor invariants | [internal-routingtest.md](internal-routingtest.md) |

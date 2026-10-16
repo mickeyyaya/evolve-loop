@@ -512,6 +512,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/changedpkgs` | 13 | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/checkpoint` | 14 | [internal-checkpoint.md](internal-checkpoint.md) |
 | `internal/ciparity` | 10 | [internal-ciparity.md](internal-ciparity.md) |
+| `internal/cli/guardcmd` | 9 | [internal-cli-guardcmd.md](internal-cli-guardcmd.md) |
 | `internal/cli/opscmd` | 7 | [internal-cli-opscmd.md](internal-cli-opscmd.md) |
 | `internal/cli/phasecmd` | 32 | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
 | `internal/clihealth` | 14 | [internal-clihealth.md](internal-clihealth.md) |
@@ -519,6 +520,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/commitgate` | 3 | [internal-commitgate.md](internal-commitgate.md) |
 | `internal/committedset` | 1 | [internal-committedset.md](internal-committedset.md) |
 | `internal/config` | 56 | [internal-config.md](internal-config.md) |
+| `internal/continuation` | 11 | [internal-continuation.md](internal-continuation.md) |
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | 19 | [internal-core-defectledger.md](internal-core-defectledger.md) |
 | `internal/core` | 943 | [internal-core.md](internal-core.md) |
@@ -590,9 +592,11 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/resolvellm` | 1 | [internal-resolvellm.md](internal-resolvellm.md) |
 | `internal/rollback` | 3 | [internal-rollback.md](internal-rollback.md) |
 | `internal/router` | 93 | [internal-router.md](internal-router.md) |
+| `internal/routingtest` | 13 | [internal-routingtest.md](internal-routingtest.md) |
 | `internal/scopedelta` | 3 | [internal-scopedelta.md](internal-scopedelta.md) |
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
 | `internal/shiperr` | 13 | [internal-shiperr.md](internal-shiperr.md) |
+| `internal/shipmanifest` | 12 | [internal-shipmanifest.md](internal-shipmanifest.md) |
 | `internal/signalcenter` | 13 | [internal-signalcenter.md](internal-signalcenter.md) |
 | `internal/skillcheck` | 5 | [internal-skillcheck.md](internal-skillcheck.md) |
 | `internal/soakreport` | 1 | [internal-soakreport.md](internal-soakreport.md) |

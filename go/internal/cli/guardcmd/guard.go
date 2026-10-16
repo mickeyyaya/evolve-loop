@@ -19,11 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// guardLogTag maps the Go guard subcommand name to the audit-trail tag
-// used in .evolve/guards.log by the bash counterparts. Preserves the
-// log format byte-equivalent across the v11.4.0 bash→Go cutover so
-// operators / parity audits / external tooling that grep guards.log
-// see the same lines.
 var guardLogTag = map[string]string{
 	"ship":      "ship-gate",
 	"phase":     "phase-gate-pre",
@@ -32,9 +27,6 @@ var guardLogTag = map[string]string{
 	"chain":     "chain",
 }
 
-// appendGuardsLog writes one line to the given logPath mirroring the
-// bash `echo "[ts] [<tag>] <line>" >> guards.log` pattern. Best-effort:
-// failures are silent so hook latency isn't impacted by audit-log I/O.
 func appendGuardsLog(logPath, guardName string, allow bool, reason string) {
 	tag, ok := guardLogTag[guardName]
 	if !ok {
@@ -61,12 +53,6 @@ func appendGuardsLog(logPath, guardName string, allow bool, reason string) {
 	_, _ = f.Write([]byte(line))
 }
 
-// appendIntegrityAlarm writes a CRITICAL integrity-violation record to
-// .evolve/integrity-alarm.jsonl when a guard denies a control-plane modification
-// (GuardDecision.Alarm). Unlike the routine guards.log DENY line, this is a
-// dedicated, loud, append-only alarm channel the observer + audit surface to fail
-// the cycle: a phase agent tried to edit the gate/metric/guard/contract that
-// grades it. Best-effort: failures are silent so hook latency isn't impacted.
 func appendIntegrityAlarm(alarmPath, guardName string, in core.GuardInput, reason string) {
 	if err := os.MkdirAll(filepath.Dir(alarmPath), 0o755); err != nil {
 		return
@@ -93,9 +79,6 @@ func appendIntegrityAlarm(alarmPath, guardName string, in core.GuardInput, reaso
 	_, _ = f.Write(append(buf, '\n'))
 }
 
-// runGuard implements `evolve guard <name>` — reads tool_input JSON from
-// stdin, dispatches to the named guard, and exits 0 on Allow or 2 on Deny.
-// Mirrors the bash hook contract (scripts/guards/*.sh).
 func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve guard", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -111,12 +94,6 @@ func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 10
 	}
 	name := fs.Arg(0)
-	// Read-only enumeration subcommand, distinct from the kernel-hook
-	// guards (ship/phase/role/…). Doesn't take stdin, doesn't emit
-	// allow/deny — just lists pending audit failures so an operator can
-	// triage them (issue surfaced by cycle-107 retro: "16 non-expired
-	// code-audit-fail entries (within 30d retention)" with no way to see
-	// which entries).
 	if name == "list-audit-fails" {
 		return runListAuditFails(fs.Args()[1:], evolveDir, stdout, stderr)
 	}
@@ -189,20 +166,10 @@ func readGuardInput(r io.Reader) (core.GuardInput, error) {
 	return in, nil
 }
 
-// runListAuditFails enumerates the non-expired code-audit-fail entries
-// from .evolve/state.json:failedApproaches[]. Flag surface:
-//
-//	--json   emit JSON array instead of the human table
-//
-// Exit code 0 even when zero entries match (an empty list is a valid
-// answer, not an error).
 func runListAuditFails(args []string, evolveDir string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve guard list-audit-fails", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var asJSON bool
-	// Re-accept --evolve-dir here so it works whether the operator puts
-	// it before or after the subcommand name. Default to the parent
-	// runGuard's already-resolved value.
 	fs.StringVar(&evolveDir, "evolve-dir", evolveDir, "path to .evolve/ state directory")
 	fs.BoolVar(&asJSON, "json", false, "emit JSON array instead of human-readable table")
 	if err := fs.Parse(args); err != nil {
@@ -224,9 +191,6 @@ func runListAuditFails(args []string, evolveDir string, stdout, stderr io.Writer
 		return 1
 	}
 
-	// Convert state.FailedAt ([]core.FailedRecord) → []failureadapter.Entry
-	// so we can reuse the canonical retention filter. Field names match
-	// byte-for-byte across the two structs (both mirror state.json).
 	entries := make([]failureadapter.Entry, 0, len(st.FailedAt))
 	for _, r := range st.FailedAt {
 		entries = append(entries, failureadapter.Entry{

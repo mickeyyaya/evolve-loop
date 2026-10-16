@@ -22,7 +22,6 @@ func TestCmd_PostEditValidate_Help(t *testing.T) {
 func TestCmd_PostEditValidate_NoPayload(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	var stdout, stderr bytes.Buffer
-	// Empty stdin — should succeed (skip).
 	rc := RunPostEditValidate(nil, bytes.NewReader(nil), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)
@@ -31,7 +30,6 @@ func TestCmd_PostEditValidate_NoPayload(t *testing.T) {
 
 func TestCmd_PostEditValidate_UnknownFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	// Even unknown flags exit 0 — PostToolUse can't block.
 	rc := RunPostEditValidate([]string{"--bogus"}, bytes.NewReader(nil), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0", rc)

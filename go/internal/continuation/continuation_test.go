@@ -45,11 +45,6 @@ func TestReadManifest_CorruptIsLoud(t *testing.T) {
 	}
 }
 
-// TestManifestName_IsTheFileTheManifestRoundTripsThrough — ADR-0103 unit 09
-// review fold (F5): the manifest's file name is exported so its three outside
-// consumers (the audit teardown hold, the citation self-cite denylist and the
-// ledger's prompt-degrade path field) name the SAME file WriteManifest
-// publishes and ReadManifest loads — a rename here fails to compile there.
 func TestManifestName_IsTheFileTheManifestRoundTripsThrough(t *testing.T) {
 	ws := t.TempDir()
 	if err := WriteManifest(ws, Continuation{Cycle: 1285}); err != nil {

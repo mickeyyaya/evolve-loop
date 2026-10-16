@@ -1,10 +1,28 @@
 # internal/cli/guardcmd
 
-> This page is filled incrementally by handler. It now covers `evolve eval` (`eval.go`). Operator commands, flags and exit codes: [runtime-reference.md](../../operations/runtime-reference.md). The checks `evolve eval` runs: [internal-evalqualitycheck.md](internal-evalqualitycheck.md). The pipeline gates that run the same checks without the CLI: [internal-evalgate.md](internal-evalgate.md). This package is protected control-plane surface (`guards.IsProtectedSurface`, [ADR-0064](../adr/0064-pipeline-integrity-boundary.md)), so a loop lane may not edit it; changes land from the console.
+> This page is filled incrementally by handler. It covers `evolve eval` (`eval.go`) and the other handlers. Operator commands, flags and exit codes: [runtime-reference.md](../../operations/runtime-reference.md). The checks `evolve eval` runs: [internal-evalqualitycheck.md](internal-evalqualitycheck.md). The pipeline gates that run the same checks without the CLI: [internal-evalgate.md](internal-evalgate.md). This package is protected control-plane surface (`guards.IsProtectedSurface`, [ADR-0064](../adr/0064-pipeline-integrity-boundary.md)), so a loop lane may not edit it; changes land from the console.
 
 ## Purpose
 
 `internal/cli/guardcmd` holds the `evolve` CLI handlers for the trust-kernel guard and pre-commit-gate subcommands: `guard`, `commit-gate`, `commit-prefix-gate`, `eval`, `preflight-environment` and `postedit-validate`. Each exported `Run*` function has the standard subcommand signature and is wired into the dispatcher table in `cmd/evolve/registry.go`. The handlers parse their own flags and delegate the work to the `internal/*` gate packages.
+
+## Other handlers
+
+- **`evolve guard <name>`** reads `tool_input` JSON from stdin and dispatches to the named guard. It exits 0 on Allow and 2 on Deny, the contract of the bash hooks.
+- **`list-audit-fails` is a read-only enumeration.** It sits beside the kernel-hook guards, takes no stdin and emits no allow or deny. It lists the non-expired code-audit-fail entries of `.evolve/state.json:failedApproaches[]`, as a table or as a JSON array under `--json`. An empty list exits 0.
+- **`list-audit-fails` re-accepts `--evolve-dir`.** The flag works before or after the subcommand name, and defaults to the value that `runGuard` resolved. The handler converts the failed records of the state to `failureadapter.Entry` to reuse the canonical retention filter. The field names match, because both structs mirror `state.json`.
+- **`triage-floors <workspace>`** is the self-check that an agent can run on a triage declaration against its prose (ADR-0046 layer 1). It is parsed before stdin.
+- **The guard log is best-effort and byte-compatible.** `guardLogTag` maps the name of a guard to the audit-trail tag that the bash guards wrote to `.evolve/guards.log`. An unknown name is its own tag. `appendGuardsLog` writes `[ts] [<tag>] ALLOW` or `[ts] [<tag>] DENY: <reason>` and swallows its failures. Hook latency is on the critical path, and the log is secondary.
+- **The log lines must not change.** External tooling and the parity audit grep `guards.log`. They must see the same lines from the bash hook and from Go. `TestAppendGuardsLog_*` pins them.
+- **The integrity alarm is a separate channel.** When a guard denies a control-plane change (`GuardDecision.Alarm`), `appendIntegrityAlarm` appends a CRITICAL record to `.evolve/integrity-alarm.jsonl`. A phase agent tried to edit the gate, metric, guard or contract that grades it. The observer and the audit show the record and fail the cycle. The append is best-effort, for the same latency reason.
+- **The alarm has two pins.** `TestRunGuard_RoleControlPlaneEdit_DeniesAndAlarms` pins the deny and the record. `TestRunGuard_RoleNormalSourceEdit_NoAlarm` pins that a normal worktree edit raises none.
+- **Every hook name in the settings is a name that the binary builds.** The hooks run `evolve guard <name>`. A name that `buildGuard` does not know turns each matching tool call into a hook error. The hook-wiring test pins this.
+- **`evolve commit-gate run`** finds the languages of the changed files and checks the `--reviewers` precondition. The precondition is simplify plus one review capability, waived for a proven comment removal. On a full pass it writes `.commit-gate/attestation.json`, bound to `sha256(git diff HEAD)`. `evolve ship --class manual` verifies that attestation.
+- **The `commit-gate` exit codes** are listed here. 0 is pass. 1 is fail or precondition. 2 is a git or SHA fatal error. 3 is a missing tool. 10 is bad arguments.
+- **`evolve commit-prefix-gate --msg <msg>`** exits 0 when the prefix matches the scope or is unknown. It exits 2 for a scope violation, 3 for bad arguments and 4 for a missing or malformed manifest.
+- **`evolve postedit-validate`** reads a PostToolUse payload from stdin and runs the validator for the extension. It always exits 0, because PostToolUse cannot block. A warning goes to stderr, where Claude Code shows it to the model as a reminder. A parse error is only a warning.
+- **`evolve preflight-environment`** makes a relative `$EVOLVE_PROJECT_ROOT` absolute against the working directory (`envOrCwd`).
+- **The package holds no business logic.** It came out of `cmd/evolve`, a package main with 77 handlers. The handlers are now importable and testable, and the composition root is smaller. `cmd` is a fan-in-0 sink, so the extraction adds no import-cycle risk.
 
 ## `evolve eval`
 
@@ -12,6 +30,7 @@
 
 - **`quality-check [-predicates <path>] <eval.md>`** grades one eval with `evalqualitycheck.Check` (Level-0 tautology detection). With `-predicates`, naming a `predicates_test.go` file or a `go/acs/cycle<N>` directory, it also runs the two advisory predicate lints over those sources: the flaky-shape lint (`flaky[...]` lines) and the unsatisfiable-predicate lint (`unsatisfiable[...]` lines).
 - **Flags before or after the positional.** `parseInterspersed` collects positionals one at a time and re-parses the rest, because the standard `flag` package stops at the first positional and silently dropped `-predicates` in the documented `quality-check <eval.md> -predicates <dir>` order.
+- **An unknown flag after a positional is an error.** `parseInterspersed` exits 10 for it. Before, the flag was absorbed as an extra positional and ignored. The only caller in the repository passes one positional. Each loop pass shrinks the remaining arguments, so the loop ends.
 - **Keyed on the flag's presence.** The lints run whenever `-predicates` is given, even with an empty value (an unset shell variable), so the empty path reaches the lints and is reported as the error it is instead of skipping them silently.
 - **One predicate-lint table, one path (Strategy).** `predicateLints()` lists each predicate lint by its receipt name and a strategy that runs it and phrases its findings; `predicateLint.advise` is the one path that reports them, so the receipt, the skip and the severity cannot drift between lints, and a third lint is a table row. Findings use a `flaky[...]` or `unsatisfiable[...]` prefix, deliberately not the `L<n>` prefix the tautology classifier uses, so an advisory note is never read as a claim that the eval is a weak tautology.
 - **One receipt per lint, on every run.** Each lint's findings print one line each, then `[eval quality-check] <lint>: linted N file(s) under <path> — M advisory finding(s) (stage=advisory: raises PASS→WARN, never HALT)`, so "linted 0 file(s)" never reads as a clean tree.

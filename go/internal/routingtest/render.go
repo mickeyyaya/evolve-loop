@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// scoutPresent etc. decide which roles the fixture "produced". A role is present
-// when any of its fields is set; this keeps the dual renderings (Signals /
-// HandoffFiles) in lock-step.
 func (s SignalSpec) scoutPresent() bool {
 	return s.CycleSize != "" || s.ScoutItemCount > 0 || s.ScoutCarryover > 0 || s.ScoutBacklog > 0 || s.ArtifactBytes > 0 || s.GoalType != "" || s.DeliverableKind != ""
 }
@@ -23,7 +20,6 @@ func (s SignalSpec) auditPresent() bool {
 	return s.AuditVerdict != "" || s.AuditConf > 0 || s.AuditRedCount > 0
 }
 
-// Signals renders the fixture as the pure router.RoutingSignals digest.
 func (s SignalSpec) Signals() router.RoutingSignals {
 	var sig router.RoutingSignals
 	if s.scoutPresent() {
@@ -65,8 +61,6 @@ func (s SignalSpec) Signals() router.RoutingSignals {
 	return sig
 }
 
-// HandoffFiles renders the fixture as on-disk handoff JSON, matching the shapes
-// router.Digest extracts. Only present roles emit a file (mirrors fail-open).
 func (s SignalSpec) HandoffFiles() map[string]string {
 	out := map[string]string{}
 	if s.scoutPresent() {
@@ -87,8 +81,6 @@ func (s SignalSpec) HandoffFiles() map[string]string {
 		if s.DiffLOC > 0 {
 			m["diff_loc"] = s.DiffLOC
 		}
-		// One thrust carries SeverityMax + FilesTouched (digest takes max severity
-		// and len(union(files))).
 		if s.SeverityMax != "" || s.FilesTouched > 0 {
 			files := make([]string, 0, s.FilesTouched)
 			for i := 0; i < s.FilesTouched; i++ {
@@ -128,19 +120,12 @@ func (s SignalSpec) scoutHandoff() map[string]interface{} {
 	if s.DeliverableKind != "" {
 		m["deliverable_kind"] = s.DeliverableKind
 	}
-	// Digest counts keys "item<digit>..." for ItemCount.
 	for i := 1; i <= s.ScoutItemCount; i++ {
 		m[fmt.Sprintf("item%d_scope", i)] = "x"
 	}
 	return m
 }
 
-// WrappedHandoffFiles renders the fixture as the canonical ADR-0050 Phase-3
-// payload-wrapped envelope (schema_version 2): each flat handoff JSON from
-// HandoffFiles becomes the `payload` of an outer wrapper. router.Digest must
-// yield identical RoutingSignals from these as from the flat HandoffFiles — the
-// wrapped/flat equivalence invariant that lets the unified envelope replace the
-// flat one without changing any routing decision.
 func (s SignalSpec) WrappedHandoffFiles() map[string]string {
 	flat := s.HandoffFiles()
 	out := make(map[string]string, len(flat))
