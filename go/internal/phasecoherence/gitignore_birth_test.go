@@ -17,7 +17,6 @@ func TestTrackedCorpusDirsAllowNewBirths(t *testing.T) {
 		".evolve/instincts/lessons/": "only the .keep marker ships by design",
 		".evolve/inbox-parked/":      "grandfathered manual park; no active writer; parked content must not auto-ship",
 	}
-	// The .evolve root ships an explicit per-file whitelist, so a new root file must stay ignored.
 	rootExempt := ".evolve"
 
 	out, err := exec.Command("git", "-C", root, "ls-files", "--", ".evolve/").Output()
@@ -25,7 +24,7 @@ func TestTrackedCorpusDirsAllowNewBirths(t *testing.T) {
 		t.Fatalf("git ls-files: %v", err)
 	}
 	type pair struct{ dir, ext string }
-	seen := map[pair]string{} // one tracked exemplar per pair
+	seen := map[pair]string{}
 	for _, f := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		if f == "" {
 			continue
@@ -60,8 +59,6 @@ func TestTrackedCorpusDirsAllowNewBirths(t *testing.T) {
 	sort.Slice(pairs, func(i, j int) bool {
 		return pairs[i].dir+pairs[i].ext < pairs[j].dir+pairs[j].ext
 	})
-	// One batched check-ignore: rc=0 lists the ignored subset, rc=1 means none is ignored.
-	// Probe names are ASCII, so git prints no C-quoted lines.
 	type probes struct{ sameDir, siblingDir string }
 	probeFor := make(map[pair]probes, len(pairs))
 	var all []string

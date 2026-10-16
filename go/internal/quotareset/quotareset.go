@@ -20,7 +20,6 @@ type Result struct {
 	Source string
 }
 
-// Options exposes seams for testing.
 type Options struct {
 	Now          func() time.Time
 	ResetAt      string
@@ -87,10 +86,7 @@ func resultAt(t time.Time, source string) Result {
 	return Result{WakeAt: t, ISO: isoFormat(t), Source: source}
 }
 
-// parseHint extracts a "HH:MM(am|pm)" time and returns the next
-// occurrence (today if still future, else tomorrow).
 func parseHint(hint string, nowT time.Time) (time.Time, bool) {
-	// Strip whitespace
 	hint = strings.Map(func(r rune) rune {
 		if r == ' ' || r == '\t' || r == '\r' || r == '\n' {
 			return -1
@@ -130,13 +126,10 @@ func parseHint(hint string, nowT time.Time) (time.Time, bool) {
 	return candidate, true
 }
 
-// isoFormat returns the canonical ISO 8601 string with local-TZ offset
-// matching the bash output format "%Y-%m-%dT%H:%M:%S%z".
 func isoFormat(t time.Time) string {
 	return t.Format("2006-01-02T15:04:05-0700")
 }
 
-// Format returns the 2-line stdout shape produced by the bash script.
 func (r Result) Format() string {
 	return fmt.Sprintf("%s\nsource=%s\n", r.ISO, r.Source)
 }

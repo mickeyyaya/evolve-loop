@@ -2,8 +2,6 @@ package flagregistry
 
 import "testing"
 
-// TestDeadFlagsSweep_Gone lives in this package rather than behind an acs
-// build tag, so it runs in normal CI as a permanent regression guard.
 func TestDeadFlagsSweep_Gone(t *testing.T) {
 	removed := []string{
 		"EVOLVE_ANCHOR_EXTRACT",

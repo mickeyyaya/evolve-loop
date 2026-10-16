@@ -61,7 +61,7 @@ func TestRouterCompaction_NoDuplicatePhaseNames(t *testing.T) {
 		if !strings.HasPrefix(trimmed, "| `") || !strings.Contains(trimmed, "` |") {
 			continue
 		}
-		inner := trimmed[3:] // skip "| `"
+		inner := trimmed[3:]
 		end := strings.Index(inner, "`")
 		if end < 0 {
 			continue

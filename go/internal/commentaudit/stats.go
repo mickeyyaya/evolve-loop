@@ -13,8 +13,6 @@ import (
 	"strings"
 )
 
-// FileStats counts non-blank lines: Code lines, whole-line Comment lines, and
-// the comment lines that carry project history (Narrative).
 type FileStats struct {
 	Code, Comment, Narrative int
 }
@@ -31,7 +29,6 @@ var (
 	adrPointer    = regexp.MustCompile(`^//\s*See ADR-\d{4}(, ADR-\d{4})*\.?$`)
 )
 
-// goReferenceDate is the layout Go formats dates with, not a date in history.
 const goReferenceDate = "2006-01-02"
 
 func isNarrative(line string) bool {
@@ -59,7 +56,6 @@ func isOutsideProjectCode(file string) bool {
 	return slices.ContainsFunc(strings.Split(path.Dir(filepath.ToSlash(file)), "/"), isSkippedDir)
 }
 
-// Stats counts the lines of one Go source file.
 func Stats(src []byte) FileStats {
 	var s FileStats
 	forEachLine(src, func(line string, isComment bool) {
@@ -76,8 +72,6 @@ func Stats(src []byte) FileStats {
 	return s
 }
 
-// AddedNarrative returns the whole-line narrative comments in after that
-// before does not already hold; a moved line is not added.
 func AddedNarrative(before, after []byte) []string {
 	return subtract(commentLines(after, isNarrative), commentLines(before, isNarrative))
 }
@@ -134,7 +128,6 @@ func commentLines(src []byte, keep func(string) bool) []string {
 	return found
 }
 
-// A file whose package clause does not parse has no package doc to spare.
 func packageDoc(src []byte) []string {
 	file, err := parser.ParseFile(token.NewFileSet(), "", src, parser.PackageClauseOnly|parser.ParseComments)
 	if err != nil || file.Doc == nil {
@@ -183,14 +176,12 @@ func wholeLineCommentLines(src []byte) map[int]bool {
 	}
 }
 
-// PackageStats sums the Go files of one directory.
 type PackageStats struct {
 	Dir   string
 	Files int
 	Stats FileStats
 }
 
-// Rank returns every directory holding Go files, most narrative first.
 func Rank(fsys fs.FS) ([]PackageStats, error) {
 	byDir := map[string]*PackageStats{}
 	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {

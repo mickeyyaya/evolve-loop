@@ -5,13 +5,6 @@ import (
 	"testing"
 )
 
-// TestAPICoverNamedExports names and EXERCISES the one exported symbol of
-// this package (ADR-0069 new-package graduation): ProjectDigest, through
-// the same happy-path/negative-path/error-path shape its real consumer
-// (go/internal/systemprompt.Resolve, via a pre-generated digest file) relies
-// on — a role's tagged content survives, another role's content is
-// excluded, an unmatched role yields empty (not full source), and a
-// malformed marker is a hard error.
 func TestAPICoverNamedExports(t *testing.T) {
 	source := []byte("<!-- digest:role=scout -->\nScout content.\n<!-- /digest -->\n" +
 		"<!-- digest:role=build -->\nBuild content.\n<!-- /digest -->\n")

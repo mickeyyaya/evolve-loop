@@ -11,7 +11,6 @@ import (
 	"testing"
 )
 
-// writeSource writes only a package clause and imports: the deriver parses imports, never compiles.
 func writeSource(t *testing.T, root, relPath, pkgName string, imports ...string) {
 	t.Helper()
 	var b strings.Builder
@@ -32,8 +31,6 @@ func writeSource(t *testing.T, root, relPath, pkgName string, imports ...string)
 	}
 }
 
-// importerFixture: bar imports foo, zed imports foo only from its test, qux imports bar (transitive),
-// lone imports nothing, and decoy imports another module's internal/foo.
 func importerFixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

@@ -13,11 +13,10 @@ func TestNoRuntimeArtifactsTracked(t *testing.T) {
 	t.Parallel()
 	root := repoRootForPairing(t)
 
-	// Every rule names its production writer: a rule nobody can trace is one nobody can safely delete.
 	rules := []struct {
 		re   *regexp.Regexp
 		why  string
-		rule string // the .gitignore line governing new births of this class
+		rule string
 	}{
 		{
 			re:   regexp.MustCompile(`\.log$`),
@@ -50,7 +49,6 @@ func TestNoRuntimeArtifactsTracked(t *testing.T) {
 			rule: ".bridge-inbox/",
 		},
 		{
-			// The leading slash matches only a nested .evolve/; the root corpus ships by design.
 			re:   regexp.MustCompile(`/\.evolve/`),
 			why:  "nested .evolve/ runtime state created in a phase's cwd",
 			rule: "*/**/.evolve/",
@@ -63,7 +61,6 @@ func TestNoRuntimeArtifactsTracked(t *testing.T) {
 
 	out, err := exec.Command("git", "-C", root, "ls-files").Output()
 	if err != nil {
-		// ExitError.Error() is only "exit status N"; git's reason is on stderr.
 		var ee *exec.ExitError
 		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
 			t.Fatalf("git ls-files: %v: %s", err, ee.Stderr)

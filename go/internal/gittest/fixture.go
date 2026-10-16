@@ -1,11 +1,5 @@
 // Package gittest owns git-backed test fixtures: their creation and their
-// teardown. Every repo it builds persists a config that keeps git's automatic
-// maintenance out of the background (from git 2.47 a commit or fetch otherwise
-// detaches a `git maintenance run --auto` child that keeps writing in
-// .git/objects after the command returned), so production code that runs a raw
-// git inside a fixture inherits the same guarantee. Teardown retries a bounded
-// number of times and, if the tree still cannot be removed, fails the test
-// naming the processes that hold it.
+// teardown.
 package gittest
 
 import (
@@ -26,8 +20,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// teardownAttempts bounds the removal retry; with a doubling backoff from
-// teardownBackoff it waits about 1.3s in total before failing the test.
 const (
 	teardownAttempts = 8
 	teardownBackoff  = 10 * time.Millisecond
@@ -42,23 +34,16 @@ func MaintenanceConfig() [][2]string {
 	return slices.Clone(maintenanceConfig)
 }
 
-// quietConfig is written into every fixture repo's own config. maintenance.auto
-// stops the detached maintenance child (gc.auto=0 alone does not); gc.auto=0
-// covers gits older than 2.47, whose commit runs `gc --auto` directly. The
-// identity makes commits work on a runner with no global identity.
 var quietConfig = slices.Concat(maintenanceConfig, [][2]string{
 	{"user.name", "gittest"},
 	{"user.email", "gittest@example.com"},
 })
 
-// Repo is a git repository owned by one test and removed when that test ends.
 type Repo struct {
-	// Dir is the absolute work-tree root (the repository itself for a bare repo).
 	Dir string
 	tb  testing.TB
 }
 
-// Fixture returns an initialized, committable work tree on branch main.
 func Fixture(tb testing.TB) *Repo {
 	tb.Helper()
 	r := newRepo(tb)
@@ -72,7 +57,6 @@ func (r *Repo) initWorkTree() {
 	r.quiet()
 }
 
-// Bare returns an initialized bare repository whose default branch is main.
 func Bare(tb testing.TB) *Repo {
 	tb.Helper()
 	r := newRepo(tb)
@@ -81,7 +65,6 @@ func Bare(tb testing.TB) *Repo {
 	return r
 }
 
-// Clone returns a clone of src whose own config carries the fixture settings.
 func Clone(tb testing.TB, src string) *Repo {
 	tb.Helper()
 	r := newRepo(tb)
@@ -103,8 +86,6 @@ func ConfigEnv(extra ...[2]string) []string {
 	return env
 }
 
-// Git runs git in Dir and returns its trimmed combined output; a failing git
-// fails the test with the arguments, the directory and git's output.
 func (r *Repo) Git(args ...string) string {
 	r.tb.Helper()
 	out, err := CaptureWithEBADFRetry(func() ([]byte, error) {
@@ -140,9 +121,6 @@ func IsEBADFLike(err error) bool {
 	return errors.Is(err, syscall.EBADF) || errors.Is(err, io.ErrClosedPipe)
 }
 
-// newRepo makes an empty directory under tb.TempDir() and registers its
-// retried removal. tb.Cleanup runs LIFO, so the retry runs before TempDir's
-// own single RemoveAll, which then finds nothing left to race.
 func newRepo(tb testing.TB) *Repo {
 	tb.Helper()
 	dir := filepath.Join(tb.TempDir(), "repo")
@@ -160,9 +138,6 @@ func (r *Repo) quiet() {
 	}
 }
 
-// removeWithRetry removes dir, retrying with a doubling backoff so a git child
-// that outlives its test body can finish; on exhaustion it fails tb with the
-// path and the processes holding it.
 func removeWithRetry(tb testing.TB, dir string, attempts int) {
 	tb.Helper()
 	var err error
@@ -179,14 +154,11 @@ func removeWithRetry(tb testing.TB, dir string, attempts int) {
 	tb.Errorf("gittest: fixture %s not removed after %d attempts: %v\n%s", dir, attempts, err, holders(dir))
 }
 
-// holders reports the processes with a file or cwd under dir, looking lsof up
-// on PATH at failure time.
 func holders(dir string) string {
 	lsof, err := exec.LookPath("lsof")
 	if err != nil {
 		return "holding process: diagnostic unavailable (lsof not on PATH)"
 	}
-	// lsof exits 1 even when it prints holders: judge its output, not its status.
 	out, err := sysexec.Command(context.Background(), lsof, "+D", dir).Output()
 	var exitErr *exec.ExitError
 	if err != nil && !errors.As(err, &exitErr) {
@@ -199,7 +171,6 @@ func holders(dir string) string {
 	return "holding processes: " + strings.Join(procs, ", ")
 }
 
-// parseLsof turns lsof's table into distinct "COMMAND (PID n)" entries.
 func parseLsof(out string) []string {
 	var procs []string
 	seen := map[string]bool{}

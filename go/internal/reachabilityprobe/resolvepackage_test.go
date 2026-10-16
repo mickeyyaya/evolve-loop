@@ -2,7 +2,6 @@ package reachabilityprobe
 
 import "testing"
 
-// storage appears twice, at different depths, so resolvePackage must pick the nearer one.
 const (
 	resolveModule    = "example.com/fixture"
 	corePkg          = resolveModule + "/internal/core"
@@ -14,7 +13,6 @@ const (
 	outsideModulePkg = "third.party/elsewhere/storage"
 )
 
-// Edges do not affect resolvePackage; the storage -> core edge only mirrors the real cycle.
 func resolveGraph() ImportGraph {
 	return ImportGraph{
 		corePkg:         nil,
@@ -94,8 +92,6 @@ func TestResolvePackage_BaseNameFallback(t *testing.T) {
 func TestResolvePackage_DeterministicLexicalTieBreak(t *testing.T) {
 	graph := resolveGraph()
 
-	// Both shared candidates tie on prefix with pinning; repeating the call exercises
-	// Go's randomized map iteration order.
 	const pinning = resolveModule + "/internal/consumer"
 	for i := 0; i < 50; i++ {
 		got, ok := resolvePackage(graph, "shared", pinning, nil)

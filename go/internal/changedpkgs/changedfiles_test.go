@@ -8,11 +8,11 @@ import (
 
 func TestChangedFilesChecked_WorkingTreeNotIndex(t *testing.T) {
 	root := newRepoWithBaseline(t)
-	writeFile(t, root, "go/internal/base/base.go", "package base\n\nconst Changed = true\n") // unstaged
-	writeFile(t, root, "go/internal/base/staged_test.go", "package base\n")                  // index-added
+	writeFile(t, root, "go/internal/base/base.go", "package base\n\nconst Changed = true\n")
+	writeFile(t, root, "go/internal/base/staged_test.go", "package base\n")
 	gitCmd(t, root, "add", "go/internal/base/staged_test.go")
-	writeFile(t, root, "go/internal/newpkg/new.go", "package newpkg\n") // untracked
-	writeFile(t, root, "docs/note.md", "not go\n")                      // untracked, not Go
+	writeFile(t, root, "go/internal/newpkg/new.go", "package newpkg\n")
+	writeFile(t, root, "docs/note.md", "not go\n")
 
 	files, ok := ChangedFilesChecked(root, "HEAD")
 	if !ok {

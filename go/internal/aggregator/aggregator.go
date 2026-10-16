@@ -1,16 +1,5 @@
-// Package aggregator ports legacy/scripts/dispatch/aggregator.sh.
-//
-// Pure-shell merge of fan-out worker artifacts. Merges N worker artifacts
-// into a single canonical phase artifact according to per-phase rules.
-// NO LLM CALL — this script cannot be coerced by a malicious worker into
-// accepting forged output.
-//
-// Per-phase merge rules:
-//   - scout / research / discover     → concat with "## Worker:" headers
-//   - audit                            → ALL-PASS verdict; any FAIL fails the aggregate
-//   - learn / retrospective / retro    → union of "## Lesson:" sections, deduped
-//   - plan-review                      → multi-lens score+verdict aggregation
-//   - audit-consensus / cross-cli-vote → MAJORITY-PASS with FAIL-VETO
+// Package aggregator merges fan-out worker artifacts into one canonical phase artifact.
+// The merge is deterministic: no model call, so a worker cannot forge the output.
 package aggregator
 
 import (
@@ -25,18 +14,12 @@ import (
 	"time"
 )
 
-// Exit codes (matches aggregator.sh):
-//
-//	0 — merge succeeded (audit PASS/WARN, plan-review PROCEED/REVISE, etc.)
-//	1 — audit FAIL, plan-review ABORT, or cross-cli FAIL
-//	2 — usage error / input file missing / unknown phase
 const (
 	ExitOK         = 0
 	ExitVerdictBad = 1
 	ExitUsageErr   = 2
 )
 
-// MergeMode is the per-phase merge strategy.
 type MergeMode int
 
 const (
@@ -48,7 +31,6 @@ const (
 	ModeCrossCLIVote
 )
 
-// ResolveMode maps a phase name to its merge mode. Unknown phases return ModeUnknown.
 func ResolveMode(phase string) MergeMode {
 	switch phase {
 	case "scout", "research", "discover":
@@ -65,7 +47,6 @@ func ResolveMode(phase string) MergeMode {
 	return ModeUnknown
 }
 
-// Inputs collects the arguments to Aggregate.
 type Inputs struct {
 	Phase    string
 	Output   string
@@ -74,9 +55,6 @@ type Inputs struct {
 	Now      func() time.Time
 }
 
-// Aggregate merges the worker artifacts into the output path according to the
-// phase's merge mode. Returns the exit code (0/1/2). stderr receives
-// [aggregator] error lines.
 func Aggregate(in Inputs, stderr io.Writer) int {
 	logf := func(format string, args ...any) {
 		fmt.Fprintf(stderr, "[aggregator] "+format+"\n", args...)
@@ -172,8 +150,6 @@ func defaultReadFile(path string) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
-// ── concat (scout / research / discover) ──────────────────────────────────
-
 func writeConcat(out, phase string, workers []string, now string, readFile func(string) ([]byte, error)) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Aggregated %s Report\n\n", phase)
@@ -184,12 +160,8 @@ func writeConcat(out, phase string, workers []string, now string, readFile func(
 	return os.WriteFile(out, []byte(b.String()), 0o644)
 }
 
-// ── verdict (audit) ────────────────────────────────────────────────────────
-
 var verdictLineRe = regexp.MustCompile(`(?i)^\s*verdict:\s*(\S+)`)
 
-// extractVerdict reads the first "Verdict: <token>" line from the file and
-// returns the uppercase first word. Returns "" if no verdict line.
 func extractVerdict(path string) string {
 	return strings.ToUpper(scanFirstCapture(path, verdictLineRe))
 }
@@ -218,7 +190,6 @@ func writeVerdict(out string, workers []string, now string, readFile func(string
 		v := extractVerdict(w)
 		switch v {
 		case "PASS":
-			// ok
 		case "FAIL":
 			anyFail = true
 			allPass = false
@@ -252,12 +223,8 @@ func writeVerdict(out string, workers []string, now string, readFile func(string
 	return ExitOK, nil
 }
 
-// ── lessons (learn / retrospective / retro) ────────────────────────────────
-
 var lessonHeadingRe = regexp.MustCompile(`(?i)^## Lesson:`)
 
-// writeLessons concats all workers, then iterates lines, capturing each
-// "## Lesson: <title>" block and emitting only once per title.
 func writeLessons(out string, workers []string, now string, readFile func(string) ([]byte, error)) error {
 	var combined strings.Builder
 	for _, w := range workers {
@@ -308,8 +275,6 @@ func writeLessons(out string, workers []string, now string, readFile func(string
 	b.WriteString(dedup.String())
 	return os.WriteFile(out, []byte(b.String()), 0o644)
 }
-
-// ── plan-review ────────────────────────────────────────────────────────────
 
 var scoreLineRe = regexp.MustCompile(`(?i)^\s*score:\s*([0-9]*\.?[0-9]+)`)
 
@@ -367,8 +332,6 @@ func writePlanReview(out string, workers []string, now string, readFile func(str
 	}
 	return ExitOK, nil
 }
-
-// ── cross-cli-vote / audit-consensus ───────────────────────────────────────
 
 func writeCrossCLIVote(out string, workers []string, now string, readFile func(string) ([]byte, error)) (int, error) {
 	perCLI, passCount, total, anyFail := tallyCrossCLIVotes(workers)

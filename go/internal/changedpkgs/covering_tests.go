@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gopkgpattern"
 )
 
-// CoveringTests returns the sorted repo-relative _test.go paths under pkgPatterns; nil for any unusable input, "./..." included.
 func CoveringTests(repoRoot string, pkgPatterns []string) []string {
 	if strings.TrimSpace(repoRoot) == "" || len(pkgPatterns) == 0 {
 		return nil
@@ -23,7 +22,6 @@ func CoveringTests(repoRoot string, pkgPatterns []string) []string {
 			continue
 		}
 		dir := filepath.Join(moduleDir, filepath.FromSlash(rel))
-		// An unreadable subtree contributes no files; the corpus fails open.
 		_ = filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
 			if err != nil || info == nil || info.IsDir() || !strings.HasSuffix(info.Name(), "_test.go") {
 				return nil
@@ -47,7 +45,6 @@ func CoveringTests(repoRoot string, pkgPatterns []string) []string {
 	return out
 }
 
-// patternDir maps the recursive and bare forms of a pattern to one module-relative dir; false for "./..." or an escape.
 func patternDir(pat string) (string, bool) {
 	p := strings.TrimSpace(pat)
 	if p == "" || p == gopkgpattern.WholeModule || !strings.HasPrefix(p, "./") {

@@ -18,8 +18,6 @@ func writeLedger(t *testing.T, root, lines string) {
 	}
 }
 
-// hermeticEnv points the ledger lookup at an empty temp root: CheckProvenance resolves the
-// ledger from the environment, so the real .evolve/ledger.jsonl would otherwise leak in.
 func hermeticEnv(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()

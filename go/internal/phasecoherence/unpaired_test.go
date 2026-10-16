@@ -51,7 +51,6 @@ func TestCoherence_ReferencePersonaIsDocumentation(t *testing.T) {
 	}
 }
 
-// repoRootForPairing returns the repo root four directories above this file; every real-tree test uses it.
 func repoRootForPairing(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -65,8 +64,6 @@ func repoRootForPairing(t *testing.T) string {
 	return root
 }
 
-// trackedProfiles returns the git-tracked profile names. An untracked profile is a runtime
-// mint that never reaches main, so the profile-to-persona check must not bind it.
 func trackedProfiles(root string) (map[string]bool, error) {
 	return repostate.TrackedSet(root, ".evolve/profiles", ".json")
 }
@@ -78,7 +75,6 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 		"operator":      "human-operator playbook, never machine-dispatched",
 		"swarm-planner": "swarm is EVOLVE_SWARM_STAGE=shadow; MUST be paired before swarm promotion (plan task CF.2)",
 	}
-	// Untracked runtime mints need no entry here: trackedProfiles excludes them structurally.
 	profileOnly := map[string]string{
 		"evaluator":   "persona projected from skills/evaluator",
 		"inspirer":    "persona projected from skills/inspirer",
@@ -98,7 +94,7 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 		}
 		name := strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-")
 		if strings.HasSuffix(name, "-reference") {
-			continue // documentation by convention
+			continue
 		}
 		if why, ok := personaOnly[name]; ok {
 			t.Logf("allowlisted persona-only %q: %s", name, why)
@@ -115,12 +111,9 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 	}
 	tracked, terr := trackedProfiles(root)
 	if terr == nil && len(tracked) == 0 {
-		// A pathspec that matches nothing exits 0, so an empty set on the real tree means a
-		// misresolved root or sparse checkout; accepting it would unbind the whole gate.
 		terr = fmt.Errorf("empty tracked-profile set at %s — pathspec matched nothing", root)
 	}
 	if terr != nil {
-		// Without git context, bind every on-disk profile: the stricter direction.
 		t.Logf("trackedProfiles: %v — binding all on-disk profiles", terr)
 		tracked = nil
 	}

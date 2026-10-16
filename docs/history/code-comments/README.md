@@ -498,6 +498,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/adapters/ledger` | 27 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/adapters/observer` | 30 | [internal-adapters-observer.md](internal-adapters-observer.md) |
 | `internal/auditchain` | 6 | [internal-auditchain.md](internal-auditchain.md) |
+| `internal/binaryguard` | 1 | [internal-binaryguard.md](internal-binaryguard.md) |
 | `internal/bridge/panestream` | 44 | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge` | 424 | [internal-bridge.md](internal-bridge.md) |
 | `internal/changedpkgs` | 13 | [internal-changedpkgs.md](internal-changedpkgs.md) |
@@ -516,6 +517,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/cyclestate` | 24 | [internal-cyclestate.md](internal-cyclestate.md) |
 | `internal/dashboard` | 8 | [internal-dashboard.md](internal-dashboard.md) |
 | `internal/deliverable` | 116 | [internal-deliverable.md](internal-deliverable.md) |
+| `internal/digest` | 3 | [internal-digest.md](internal-digest.md) |
 | `internal/dossier` | 38 | [internal-dossier.md](internal-dossier.md) |
 | `internal/evalgate` | 31 | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/evalqualitycheck` | 15 | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
@@ -530,6 +532,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/inboxmover/lifecycle` | 24 | [internal-inboxmover-lifecycle.md](internal-inboxmover-lifecycle.md) |
 | `internal/inboxmover` | 81 | [internal-inboxmover.md](internal-inboxmover.md) |
 | `internal/interaction` | 19 | [internal-interaction.md](internal-interaction.md) |
+| `internal/ipcenv` | 1 | [internal-ipcenv.md](internal-ipcenv.md) |
 | `internal/llmcalls` | 1 | [internal-llmcalls.md](internal-llmcalls.md) |
 | `internal/llmroute` | 23 | [internal-llmroute.md](internal-llmroute.md) |
 | `internal/loopchain` | 1 | [internal-loopchain.md](internal-loopchain.md) |
@@ -538,6 +541,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/modelquery` | 10 | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/phasecoherence` | 25 | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/phasecontract` | 62 | [internal-phasecontract.md](internal-phasecontract.md) |
+| `internal/phaseinventory` | 1 | [internal-phaseinventory.md](internal-phaseinventory.md) |
 | `internal/phaseobserver` | 15 | [internal-phaseobserver.md](internal-phaseobserver.md) |
 | `internal/phases/audit/ciparitygate` | 18 | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
 | `internal/phases/audit` | 170 | [internal-phases-audit.md](internal-phases-audit.md) |
@@ -551,19 +555,24 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phasespec` | 60 | [internal-phasespec.md](internal-phasespec.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
 | `internal/profiles` | 30 | [internal-profiles.md](internal-profiles.md) |
-| `internal/prompts` | 50 | [internal-prompts.md](internal-prompts.md) |
+| `internal/prompts` | 51 | [internal-prompts.md](internal-prompts.md) |
+| `internal/quotareset` | 1 | [internal-quotareset.md](internal-quotareset.md) |
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/recovery` | 39 | [internal-recovery.md](internal-recovery.md) |
 | `internal/releasepipeline` | 25 | [internal-releasepipeline.md](internal-releasepipeline.md) |
 | `internal/releasepreflight` | 14 | [internal-releasepreflight.md](internal-releasepreflight.md) |
+| `internal/repostate` | 1 | [internal-repostate.md](internal-repostate.md) |
+| `internal/resolvellm` | 1 | [internal-resolvellm.md](internal-resolvellm.md) |
 | `internal/rollback` | 3 | [internal-rollback.md](internal-rollback.md) |
 | `internal/router` | 93 | [internal-router.md](internal-router.md) |
 | `internal/scopedelta` | 3 | [internal-scopedelta.md](internal-scopedelta.md) |
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
 | `internal/skillcheck` | 5 | [internal-skillcheck.md](internal-skillcheck.md) |
+| `internal/soakreport` | 1 | [internal-soakreport.md](internal-soakreport.md) |
 | `internal/subagent/subagentrun` | 6 | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
 | `internal/subagent` | 26 | [internal-subagent.md](internal-subagent.md) |
 | `internal/swarm` | 18 | [internal-swarm.md](internal-swarm.md) |
 | `internal/tokenusage` | 24 | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |
 | `internal/triagecap` | 69 | [internal-triagecap.md](internal-triagecap.md) |
+| `internal/verifylock` | 2 | [internal-verifylock.md](internal-verifylock.md) |

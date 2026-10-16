@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestScrub_DropsEveryEvolveKeyAndKeepsTheToolchain names ipcenv.Scrub for
-// apicover and pins its contract: every EVOLVE_-namespaced entry is dropped,
-// everything else survives in order, and only the KEY is inspected (a value
-// that merely mentions the namespace is not a leak).
 func TestScrub_DropsEveryEvolveKeyAndKeepsTheToolchain(t *testing.T) {
 	in := []string{
 		"PATH=/usr/bin",
@@ -32,9 +28,6 @@ func TestScrub_DropsEveryEvolveKeyAndKeepsTheToolchain(t *testing.T) {
 	}
 }
 
-// TestScrub_CoversEveryIPCKey pins the namespace rule Scrub relies on: every
-// key this package exports lives under EVOLVE_, so a key added tomorrow is
-// scrubbed the day it is added without a second list to maintain.
 func TestScrub_CoversEveryIPCKey(t *testing.T) {
 	keys := []string{ipcenv.FleetKey, ipcenv.FleetScopeKey, ipcenv.FleetWidthKey, ipcenv.WorktreeRootKey, ipcenv.CycleStateFileKey}
 	for _, k := range keys {

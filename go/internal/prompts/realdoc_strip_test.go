@@ -21,8 +21,6 @@ func TestRealDocOnDemandStrip(t *testing.T) {
 	root := repoRoot(t)
 	agentsDir := filepath.Join(root, "agents")
 
-	// The floors only prove each marker section exists; what may be stripped is
-	// governed by phasecoherence/persona_strip_operational_test.go.
 	mustStrip := []struct {
 		name    string
 		minSave int

@@ -12,43 +12,32 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// InvariantStatus is one invariant's outcome: ok, violated, or indeterminate.
 type InvariantStatus string
 
 const (
-	// InvariantOK means the invariant was evaluated and holds.
-	InvariantOK InvariantStatus = "ok"
-	// InvariantViolated means the invariant was evaluated and does NOT hold.
-	InvariantViolated InvariantStatus = "violated"
-	// InvariantIndeterminate means the artifacts were absent, malformed or silent: never a match, never a violation.
+	InvariantOK            InvariantStatus = "ok"
+	InvariantViolated      InvariantStatus = "violated"
 	InvariantIndeterminate InvariantStatus = "indeterminate"
 )
 
 const (
-	// InvariantVerdictAgreement names the embedded-sentinel vs standalone-verdict check.
 	InvariantVerdictAgreement = "verdict-agreement"
-	// InvariantTestCounts names the claimed-counts vs independent-recount check.
-	InvariantTestCounts = "test-count-agreement"
-	// InvariantReferencedPaths names the cited-evidence-path existence check.
-	InvariantReferencedPaths = "referenced-paths-exist"
-	// InvariantPhaseOrder names the provenance / phase-order check.
-	InvariantPhaseOrder = "provenance-phase-order"
+	InvariantTestCounts       = "test-count-agreement"
+	InvariantReferencedPaths  = "referenced-paths-exist"
+	InvariantPhaseOrder       = "provenance-phase-order"
 )
 
-// Invariant is one weak verifier's finding; a non-ok status always carries Evidence.
 type Invariant struct {
 	Name     string          `json:"name"`
 	Status   InvariantStatus `json:"status"`
 	Evidence string          `json:"evidence"`
 }
 
-// InvariantReport is the per-cycle aggregate: the four invariants in declared order, always advisory.
 type InvariantReport struct {
 	Advisory   bool        `json:"advisory"`
 	Invariants []Invariant `json:"invariants"`
 }
 
-// Violations returns only the violated invariants, in report order; indeterminates never appear.
 func (r InvariantReport) Violations() []Invariant {
 	var out []Invariant
 	for _, inv := range r.Invariants {
@@ -59,7 +48,6 @@ func (r InvariantReport) Violations() []Invariant {
 	return out
 }
 
-// CheckCrossArtifactInvariants evaluates the four invariants over a cycle workspace, resolving cited paths under it and then the lane worktree.
 func CheckCrossArtifactInvariants(workspace, worktree string) InvariantReport {
 	sentinel, sentinelOK := readAuditSentinel(workspace)
 	acs, acsOK := readACSArtifact(workspace)
@@ -82,8 +70,6 @@ func readAuditSentinel(workspace string) (phasecontract.VerdictSentinel, bool) {
 	return phasecontract.ParseVerdictSentinelFull(string(b))
 }
 
-// acsArtifact is decoded locally: importing internal/acssuite would pull gitexec,
-// sysexec, changedpkgs and verifylock into this package.
 type acsArtifact struct {
 	PredicateSuite struct {
 		Total int `json:"total"`
@@ -192,8 +178,6 @@ func checkReferencedPaths(s phasecontract.VerdictSentinel, sentinelOK bool, work
 	return ok(InvariantReferencedPaths, fmt.Sprintf("all %d cited evidence path(s) resolve under the cycle workspace or the lane worktree", len(cited)))
 }
 
-// resolvesUnder checks containment before the stat: filepath.Join cleans "../"
-// segments, so an escaping citation could otherwise resolve to a real file outside root.
 func resolvesUnder(root, rel string) bool {
 	if strings.TrimSpace(root) == "" {
 		return false
@@ -213,7 +197,6 @@ type timedPhase struct {
 	ended   time.Time
 }
 
-// checkPhaseOrder compares only the first build and first audit, so re-dispatched build/audit rounds stay ok.
 func checkPhaseOrder(workspace string) Invariant {
 	entries, err := phasetiming.Read(workspace)
 	if err != nil {
@@ -225,7 +208,7 @@ func checkPhaseOrder(workspace string) Invariant {
 	var chain []timedPhase
 	for i, e := range entries {
 		if e.StartedAt == "" || e.EndedAt == "" {
-			continue // timestamps are optional in the wire shape; an untimed entry orders nothing
+			continue
 		}
 		started, serr := time.Parse(time.RFC3339, e.StartedAt)
 		ended, eerr := time.Parse(time.RFC3339, e.EndedAt)

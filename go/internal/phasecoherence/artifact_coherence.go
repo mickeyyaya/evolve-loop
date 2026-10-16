@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// CheckArtifactNames reports each persona whose first output-format .md token disagrees with
-// its profile's output_artifact; it errors only on configuration or I/O failure.
 func CheckArtifactNames(opts Options) ([]Violation, error) {
 	var violations []Violation
 	err := walkPersonas(opts, personaVisitor{

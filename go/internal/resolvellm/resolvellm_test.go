@@ -47,7 +47,7 @@ func TestResolve_ProfileDefaultsTierToBalanced(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	writeJSON(t, filepath.Join(dir, ".evolve", "profiles", "scout.json"), map[string]any{
-		"cli": "claude", // no model_tier_default — sentinel kicks in
+		"cli": "claude",
 	})
 	r, err := Resolve("scout", Options{ProjectRoot: dir})
 	if err != nil {
@@ -72,8 +72,6 @@ func TestResolve_ProfileMissingCLI_IsError(t *testing.T) {
 func TestResolve_ProfilePathIsDirectory_ReadError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	// A directory where the profile file should be → findProfile's Stat sees it
-	// exist, then os.ReadFile fails → the read-error branch (not ErrProfileNotFound).
 	if err := os.MkdirAll(filepath.Join(dir, ".evolve", "profiles", "scout.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -155,14 +153,9 @@ func TestResolve_EnvDrivenRoots(t *testing.T) {
 	}
 }
 
-// TestResolve_IgnoresLLMConfig is the Step-9 behavior-change proof: a
-// .evolve/llm_config.json present on disk is now IGNORED — resolution comes
-// solely from the profile. (Before Step 9 the llm_config phase entry would have
-// won.) See docs/architecture/step9-llm-config-removal.md.
 func TestResolve_IgnoresLLMConfig(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	// An llm_config that, pre-Step-9, would have forced cli=codex/model=gpt-5.5.
 	writeJSON(t, filepath.Join(dir, ".evolve", "llm_config.json"), map[string]any{
 		"phases":    map[string]any{"scout": map[string]any{"cli": "codex", "model": "gpt-5.5"}},
 		"_fallback": map[string]any{"cli": "gemini", "model_tier": "deep"},

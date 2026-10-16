@@ -11,12 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// Violation is one drift finding from Check, CheckArtifactNames or CheckProvenance.
 type Violation struct {
-	Persona  string // base name without the evolve- prefix, e.g. "builder"; empty for provenance findings
-	Kind     string // "unpaired" | "disallowed" | "undeclared" | "mismatch" | "missing-provenance" | "provenance-mismatch"
+	Persona  string
+	Kind     string
 	Severity string
-	Message  string // persona drift uses the eval vocabulary: contradiction|mismatch|disallowed|undeclared
+	Message  string
 }
 
 const (
@@ -24,15 +23,12 @@ const (
 	SeverityError = "ERROR"
 )
 
-// Options names the persona and profile roots a check reads.
 type Options struct {
-	AgentsFS   fs.FS             // root CONTAINING agents/ (prompts.Loader layout)
-	ProfilesFS fs.FS             // profiles dir root: <name>.json at top level (profiles.Loader layout)
-	Overrides  map[string]string // persona name → OS file path substituting agents/evolve-<name>.md
+	AgentsFS   fs.FS
+	ProfilesFS fs.FS
+	Overrides  map[string]string
 }
 
-// Check reports each evolve-<name>.md persona that lacks a profile or whose tools disagree
-// with the profile's allowed_tools; it errors only on configuration or I/O failure.
 func Check(opts Options) ([]Violation, error) {
 	var violations []Violation
 	err := walkPersonas(opts, personaVisitor{
@@ -139,8 +135,6 @@ func unpairedViolations(opts Options, name string) []Violation {
 	}}
 }
 
-// dispatchNone reports whether the persona opts out of profile pairing with `dispatch: none`.
-// An unreadable or unparsable persona returns false, so the unpaired WARN still fires.
 func dispatchNone(opts Options, name string) bool {
 	raw, err := personaContents(opts, name)
 	if err != nil {
@@ -154,7 +148,6 @@ func dispatchNone(opts Options, name string) bool {
 	return ok && strings.TrimSpace(v) == "none"
 }
 
-// personaContents reads agents/evolve-<name>.md, honoring Overrides.
 func personaContents(opts Options, name string) (string, error) {
 	if overridePath, ok := opts.Overrides[name]; ok {
 		b, err := os.ReadFile(overridePath)

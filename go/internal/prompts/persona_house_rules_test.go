@@ -9,10 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// The builder writes the code, and the TDD engineer encodes the same duties one phase earlier.
 var houseRulePersonas = []string{"evolve-builder.md", "evolve-tdd-engineer.md"}
 
-// alwaysOnBody returns the persona body an agent receives: frontmatter removed, on-demand tail stripped.
 func alwaysOnBody(t *testing.T, path string) string {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -31,11 +29,11 @@ func TestPersonaHouseRules_ApicoverGraduation(t *testing.T) {
 	for _, name := range houseRulePersonas {
 		body := strings.ToLower(alwaysOnBody(t, filepath.Join(root, "agents", name)))
 		for _, want := range []string{
-			"go/.apicover-enforce",   // the file to edit
-			"./internal/",            // the pattern-line shape appended to it
-			"apicover_named_test.go", // the second edit
-			"every exported symbol",  // what that test must discharge
-			"repo-wide",              // ADR-0069: which of the TWO apicover gates
+			"go/.apicover-enforce",
+			"./internal/",
+			"apicover_named_test.go",
+			"every exported symbol",
+			"repo-wide",
 		} {
 			if !strings.Contains(body, want) {
 				t.Errorf("%s (always-on body) must carry the apicover graduation requirement token %q", name, want)
@@ -49,9 +47,9 @@ func TestPersonaHouseRules_CallerProof(t *testing.T) {
 	for _, name := range houseRulePersonas {
 		body := strings.ToLower(alwaysOnBody(t, filepath.Join(root, "agents", name)))
 		for _, want := range []string{
-			"production caller", // must be NAMED
-			"reach",             // the seam must be proven REACHED from it
-			"dead code",         // a test-only caller is dead code
+			"production caller",
+			"reach",
+			"dead code",
 		} {
 			if !strings.Contains(body, want) {
 				t.Errorf("%s (always-on body) must carry the caller-proof requirement token %q", name, want)

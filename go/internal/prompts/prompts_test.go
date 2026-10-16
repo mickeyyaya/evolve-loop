@@ -11,7 +11,6 @@ import (
 	"testing/fstest"
 )
 
-// sampleAgent mirrors the frontmatter shapes of the real agents/evolve-scout.md.
 const sampleAgent = `---
 name: evolve-scout
 description: Discovery and planning agent for the Evolve Loop. Scans codebase.
@@ -43,7 +42,7 @@ func fixtureFS() fstest.MapFS {
 		"agents/evolve-builder.md":     &fstest.MapFile{Data: []byte("---\nname: evolve-builder\ndescription: builder\n---\nBody.")},
 		"skills/loop/SKILL.md":         &fstest.MapFile{Data: []byte(sampleSkill)},
 		"skills/santa-loop/SKILL.md":   &fstest.MapFile{Data: []byte("---\nname: santa-loop\ndescription: santa\n---\nBody.")},
-		"skills/empty/notSkillFile.md": &fstest.MapFile{Data: []byte("ignored")}, // must not appear in Skills()
+		"skills/empty/notSkillFile.md": &fstest.MapFile{Data: []byte("ignored")},
 	}
 }
 
@@ -273,7 +272,7 @@ func TestZeroLoader_AgentsAndSkills(t *testing.T) {
 func TestAgents_SkipsDirsAndNonMD(t *testing.T) {
 	fsys := fstest.MapFS{
 		"agents/foo.md":      &fstest.MapFile{Data: []byte("---\nname: foo\n---\nb")},
-		"agents/subdir/x.md": &fstest.MapFile{Data: []byte("ignored")}, // creates subdir entry
+		"agents/subdir/x.md": &fstest.MapFile{Data: []byte("ignored")},
 		"agents/.DS_Store":   &fstest.MapFile{Data: []byte("junk")},
 		"agents/notes.txt":   &fstest.MapFile{Data: []byte("not md")},
 	}
@@ -361,7 +360,7 @@ func TestParseFrontmatter_CRLFLines(t *testing.T) {
 }
 
 func TestSmoke_RealAgentFiles(t *testing.T) {
-	root := "../../../" // go/internal/prompts → repo root
+	root := "../../../"
 	if _, err := os.Stat(filepath.Join(root, "agents")); err != nil {
 		t.Skipf("repo agents/ not reachable from test dir: %v", err)
 	}
@@ -373,8 +372,6 @@ func TestSmoke_RealAgentFiles(t *testing.T) {
 	if len(agents) == 0 {
 		t.Fatal("expected at least one real agent file")
 	}
-	// Subagent dispatch keys on the frontmatter `name:`; *-reference.md, AGENTS.md and
-	// agent-templates.md are supplementary docs that carry none.
 	skipNoFM := func(n string) bool {
 		return contains(n, "-reference") || contains(n, "AGENTS") || contains(n, "agent-templates")
 	}

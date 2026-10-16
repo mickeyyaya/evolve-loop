@@ -9,28 +9,20 @@ import (
 	"strings"
 )
 
-// Status is a flag's lifecycle state.
 type Status string
 
 const (
-	// StatusActive is read in production and operator-facing; do not remove it without a deprecation window.
-	StatusActive Status = "active"
-	// StatusDeprecated is still honored, often via a bridge to its replacement, but emits a WARN; scheduled for removal.
+	StatusActive     Status = "active"
 	StatusDeprecated Status = "deprecated"
-	// StatusDead has no reader on any surface; safe to delete its mentions.
-	StatusDead Status = "dead"
-	// StatusInternal is read by production code but set by the runner itself (subprocess injection or plumbing), not an operator dial.
-	StatusInternal Status = "internal"
-	// StatusTestSeam is read only by _test.go files; never set in production.
-	StatusTestSeam Status = "test-seam"
+	StatusDead       Status = "dead"
+	StatusInternal   Status = "internal"
+	StatusTestSeam   Status = "test-seam"
 )
 
-// Flag is one registry row; Kind and Default are optional metadata, and
-// Cluster mirrors the control-flags.md section the flag is documented under.
 type Flag struct {
 	Name       string
 	Status     Status
-	Kind       string // bool | int | string | enum | path | usd ("" = unspecified)
+	Kind       string
 	Default    string
 	Cluster    string
 	Doc        string
@@ -38,17 +30,10 @@ type Flag struct {
 	RemoveIn   string
 }
 
-// ClusterCoreInfra marks flags that are process configuration, not operator
-// feature dials; LiveFeatureFlags excludes them.
 const ClusterCoreInfra = "Core Infrastructure (never consolidate)"
 
-// IsCoreInfra reports whether f is an irreducible core-infrastructure flag
-// (process configuration, not a feature dial).
 func IsCoreInfra(f Flag) bool { return f.Cluster == ClusterCoreInfra }
 
-// LiveFeatureFlags returns the operator-facing feature flags still read in
-// production: StatusActive minus core-infrastructure. This is the SSOT metric
-// the flag-reduction campaign drives toward zero (the no_feature_flags goal).
 func LiveFeatureFlags() []Flag {
 	out := make([]Flag, 0, len(All))
 	for _, f := range All {
@@ -59,7 +44,6 @@ func LiveFeatureFlags() []Flag {
 	return out
 }
 
-// Lookup returns the registry row for name.
 func Lookup(name string) (Flag, bool) {
 	i := sort.Search(len(All), func(i int) bool { return All[i].Name >= name })
 	if i < len(All) && All[i].Name == name {
@@ -68,8 +52,6 @@ func Lookup(name string) (Flag, bool) {
 	return Flag{}, false
 }
 
-// RenderIndex renders the full registry as the markdown table projected
-// into control-flags.md's generated marker region.
 func RenderIndex() string {
 	var b strings.Builder
 	b.WriteString("Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit the registry, then run `evolve flags generate`; do not edit this table by hand.\n\n")

@@ -31,9 +31,6 @@ func assertPersistsMaintenanceConfig(t *testing.T, dir string) {
 	}
 }
 
-// TestFixture_CommitsWithNoAmbientIdentity names Fixture, Repo, Repo.Dir and
-// Repo.Git: with an empty global config a fixture still commits, and its own
-// config keeps auto-maintenance off for any git run inside it.
 func TestFixture_CommitsWithNoAmbientIdentity(t *testing.T) {
 	empty := filepath.Join(t.TempDir(), "gitconfig")
 	if err := os.WriteFile(empty, nil, 0o644); err != nil {
@@ -56,9 +53,6 @@ func TestFixture_CommitsWithNoAmbientIdentity(t *testing.T) {
 	assertPersistsMaintenanceConfig(t, r.Dir)
 }
 
-// TestBareAndClone_CarryTheFixtureConfig names Bare and Clone: a clone of a
-// bare origin tracks its main and persists the fixture config itself, since
-// production fetches in it never pass through Repo.Git.
 func TestBareAndClone_CarryTheFixtureConfig(t *testing.T) {
 	origin := Bare(t)
 	if got := origin.Git("rev-parse", "--is-bare-repository"); got != "true" {

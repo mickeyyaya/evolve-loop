@@ -1,10 +1,3 @@
-// soakreport_test.go — R8.3: the read-only soak evidence reporter, the
-// instrument the EVOLVE_PHASE_RECOVERY enforce flip (R8.5) is gated on.
-// It aggregates the DURABLE shadow records each component already writes —
-// interaction ledgers (C2 fatal_pane_shadow, I2 salvage, I3 kernel_answer,
-// I4 rule_shadow_fire) and observer INCIDENT envelopes (C4/C3 actions) —
-// plus the R6 outcome classification per cycle, and renders them against
-// the plan §6 evidence bars.
 package soakreport
 
 import (
@@ -95,8 +88,6 @@ func TestCollect_EmptyWorkspacesDegradeToNotes(t *testing.T) {
 	if len(r.Cycles) != 1 || r.Cycles[0].Outcome != "FAILED_EXPLAINED" {
 		t.Fatalf("missing workspace must classify as initialization failure: %+v", r.Cycles)
 	}
-	// Every component still appears (with zero counts) — the report's shape
-	// is stable so soak comparisons never diff against absent sections.
 	if len(r.Components) != 5 {
 		t.Errorf("components = %d, want the stable 5 (C2, C4/C3, I2, I3, I4)", len(r.Components))
 	}
@@ -111,10 +102,10 @@ func TestRender_TableCarriesBarsAndCounts(t *testing.T) {
 	})
 	out := Collect(root, []int{3}).Render()
 	for _, want := range []string{
-		"cycle-3", "SHIPPED", // per-cycle outcome row
-		"C2", "≥10 observations", // component + its plan §6 bar
-		"would_fast_fail", "1", // the evidence count
-		"I4", "I3", "I2", "C4/C3", // stable sections
+		"cycle-3", "SHIPPED",
+		"C2", "≥10 observations",
+		"would_fast_fail", "1",
+		"I4", "I3", "I2", "C4/C3",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered report missing %q:\n%s", want, out)
@@ -122,11 +113,6 @@ func TestRender_TableCarriesBarsAndCounts(t *testing.T) {
 	}
 }
 
-// TestReport_RenderFromConstructedRows builds a Report directly (rather than
-// via Collect) to pin Render's contract on fully-controlled input: the
-// per-cycle CycleRow table line, an evidence count, and the per-component NOTE
-// rendering — the last is a branch the Collect-driven tests above never reach
-// (a readable-but-empty workspace records no note).
 func TestReport_RenderFromConstructedRows(t *testing.T) {
 	t.Parallel()
 	rep := Report{
@@ -146,7 +132,7 @@ func TestReport_RenderFromConstructedRows(t *testing.T) {
 		"| cycle-41 | SHIPPED | clean |",
 		"| cycle-42 | FAILED_EXPLAINED | audit FAIL |",
 		"| would_fast_fail | 3 |",
-		"> NOTE: cycle-42 workspace unreadable", // the Notes branch
+		"> NOTE: cycle-42 workspace unreadable",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Render() missing %q:\n%s", want, out)
@@ -154,12 +140,9 @@ func TestReport_RenderFromConstructedRows(t *testing.T) {
 	}
 }
 
-// TestAppendOnce_DedupesNotes pins appendOnce's de-duplication: a note already
-// present is not re-appended (so repeated unreadable-workspace cycles do not
-// stutter the report), while a new note is.
 func TestAppendOnce_DedupesNotes(t *testing.T) {
 	t.Parallel()
-	got := appendOnce([]string{"a", "b"}, "b") // duplicate → unchanged
+	got := appendOnce([]string{"a", "b"}, "b")
 	if len(got) != 2 {
 		t.Errorf("appendOnce kept a duplicate: %v", got)
 	}
