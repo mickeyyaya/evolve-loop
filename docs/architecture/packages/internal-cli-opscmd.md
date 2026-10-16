@@ -19,5 +19,5 @@
 - An unknown or non-tmux driver is a usage error, and it touches no tmux. Pinned by `TestDoctorBoot_UnknownDriver` and `TestDoctorBoot_Usage`.
 - The JSON output of the boot probe keeps its documented fields. Pinned by `TestDoctorBoot_JSONShape`.
 - The lease lands in the common directory, its paths are normalized, value flags survive the paths-first form, and `--clear` removes only the lease. Pinned by `console_lease_test.go`.
-- The plane report warns with exit 2 when loop state lives in the console checkout. Pinned by `doctor_plane_test.go`.
+- The plane report warns with exit 2 when loop state lives in the console checkout. In a hub it reports the broken worktree links of the store records only (exit 1). Under `--repair` it repairs them (exit 0, or exit 2 on git error). Pinned by `doctor_plane_test.go`.
 - Every exported handler answers its usage text without side effects. Pinned by `apicover_smoke_test.go`.

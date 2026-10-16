@@ -211,8 +211,7 @@ It never deletes.
 - Fresh worktree: run `make -C go build` before any `evolve` command.
 - Bare-store notes: the store carries the standard refspec
   (`+refs/heads/*:refs/remotes/origin/*`). If you move the hub directory,
-  run `git --git-dir=.repo.git worktree repair <worktree paths>` to fix the
-  bidirectional links.
+  run `evolve doctor plane --repair` to fix the bidirectional links.
 
 ## Checkpoints (`refs/checkpoints/`)
 
