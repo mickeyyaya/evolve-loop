@@ -4,9 +4,12 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -16,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -46,6 +50,11 @@ Subcommands:
                 ( --cli=NAME [--pane-file=PATH | --workspace=DIR] )
   control       Drive one abstract control event (usage|status|clean_ctx|…)
                 ( bridge control <family> <event> --workspace=DIR )
+  add-rule  Append an unchecked prompt rule to a CLI manifest
+            ( bridge add-rule --cli=NAME --regex=R [--response=KEYS] ... )
+  promote-rule  Write a shadow auto-respond rule after a healthy-pane corpus check
+                ( bridge promote-rule --regex=R --response-keys=K --corpus=FILE
+                  [--note=T] [--dir=DIR] [--project-root=DIR] )
   version   Print the bridge/evolve version
   help      Print this help
 
@@ -126,50 +135,10 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 0
 
 	case "add-rule":
-		var cli, regex, keys, policy, name, note string
-		for _, a := range rest {
-			switch {
-			case strings.HasPrefix(a, "--cli="):
-				cli = strings.TrimPrefix(a, "--cli=")
-			case strings.HasPrefix(a, "--regex="):
-				regex = strings.TrimPrefix(a, "--regex=")
-			case strings.HasPrefix(a, "--response="):
-				keys = strings.TrimPrefix(a, "--response=")
-			case strings.HasPrefix(a, "--policy="):
-				policy = strings.TrimPrefix(a, "--policy=")
-			case strings.HasPrefix(a, "--name="):
-				name = strings.TrimPrefix(a, "--name=")
-			case strings.HasPrefix(a, "--note="):
-				note = strings.TrimPrefix(a, "--note=")
-			case a == "--help" || a == "-h":
-				fmt.Fprintln(stdout, "Usage: evolve bridge add-rule --cli=NAME --regex=R [--response=KEYS] [--policy=auto_respond|escalate] [--name=N] [--note=...]")
-				return 0
-			}
-		}
-		if cli == "" || regex == "" {
-			fmt.Fprintln(stderr, "evolve bridge add-rule: --cli and --regex are required")
-			return 10
-		}
-		if policy == "" {
-			if keys != "" {
-				policy = "auto_respond"
-			} else {
-				policy = "escalate"
-			}
-		}
-		if name == "" {
-			name = fmt.Sprintf("%s_rule_%d", strings.ReplaceAll(cli, "-", "_"), time.Now().Unix())
-		}
-		if note == "" {
-			note = "Added by evolve bridge add-rule"
-		}
-		path, err := bridge.AddRule(cli, bridge.ManifestPrompt{Name: name, Regex: regex, ResponseKeys: keys, Policy: policy, Note: note})
-		if err != nil {
-			fmt.Fprintf(stderr, "evolve bridge add-rule: %v\n", err)
-			return 10
-		}
-		fmt.Fprintf(stdout, "appended rule %q to %s\n", name, path)
-		return 0
+		return runBridgeAddRule(rest, stdout, stderr)
+
+	case "promote-rule":
+		return runBridgePromoteRule(rest, stdout, stderr)
 
 	case "send":
 		ws, agent, kind, source := "", "", "command", "cli"
@@ -292,6 +261,104 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve bridge: unknown subcommand %q\n\n%s", sub, bridgeUsage)
 		return 10
 	}
+}
+
+func runBridgeAddRule(rest []string, stdout, stderr io.Writer) int {
+	var cli, regex, keys, policy, name, note string
+	for _, a := range rest {
+		switch {
+		case strings.HasPrefix(a, "--cli="):
+			cli = strings.TrimPrefix(a, "--cli=")
+		case strings.HasPrefix(a, "--regex="):
+			regex = strings.TrimPrefix(a, "--regex=")
+		case strings.HasPrefix(a, "--response="):
+			keys = strings.TrimPrefix(a, "--response=")
+		case strings.HasPrefix(a, "--policy="):
+			policy = strings.TrimPrefix(a, "--policy=")
+		case strings.HasPrefix(a, "--name="):
+			name = strings.TrimPrefix(a, "--name=")
+		case strings.HasPrefix(a, "--note="):
+			note = strings.TrimPrefix(a, "--note=")
+		case a == "--help" || a == "-h":
+			fmt.Fprintln(stdout, "Usage: evolve bridge add-rule --cli=NAME --regex=R [--response=KEYS] [--policy=auto_respond|escalate] [--name=N] [--note=...]")
+			return 0
+		}
+	}
+	if cli == "" || regex == "" {
+		fmt.Fprintln(stderr, "evolve bridge add-rule: --cli and --regex are required")
+		return 10
+	}
+	if policy == "" {
+		if keys != "" {
+			policy = "auto_respond"
+		} else {
+			policy = "escalate"
+		}
+	}
+	if name == "" {
+		name = fmt.Sprintf("%s_rule_%d", strings.ReplaceAll(cli, "-", "_"), time.Now().Unix())
+	}
+	if note == "" {
+		note = "Added by evolve bridge add-rule"
+	}
+	path, err := bridge.AddRule(cli, bridge.ManifestPrompt{Name: name, Regex: regex, ResponseKeys: keys, Policy: policy, Note: note})
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve bridge add-rule: %v\n", err)
+		return 10
+	}
+	fmt.Fprintf(stdout, "appended rule %q to %s\n", name, path)
+	return 0
+}
+
+const bridgePromoteRuleUsage = "Usage: evolve bridge promote-rule --regex=R --response-keys=K --corpus=FILE [--note=T] [--dir=DIR] [--project-root=DIR]"
+
+func runBridgePromoteRule(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("bridge promote-rule", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	regex := fs.String("regex", "", "pattern of the stalled prompt")
+	keys := fs.String("response-keys", "", "CSV of keys the rule sends")
+	corpusPath := fs.String("corpus", "", "healthy-pane corpus file the pattern must not match")
+	note := fs.String("note", "Promoted by evolve bridge promote-rule", "why the rule exists")
+	dir := fs.String("dir", "", "rule registry directory")
+	root := fs.String("project-root", envOrCwd("EVOLVE_PROJECT_ROOT"), "project whose registry receives the rule")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Fprintln(stdout, bridgePromoteRuleUsage)
+			return 0
+		}
+		return 10
+	}
+	if fs.NArg() != 0 || *regex == "" || *keys == "" || *corpusPath == "" {
+		fmt.Fprintf(stderr, "evolve bridge promote-rule: --regex, --response-keys and --corpus are required, with no positional argument\n%s\n", bridgePromoteRuleUsage)
+		return 10
+	}
+	if err := interaction.ValidateRule(*regex, *keys, nil); err != nil {
+		fmt.Fprintf(stderr, "evolve bridge promote-rule: %v\n", err)
+		return 10
+	}
+	raw, err := os.ReadFile(*corpusPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve bridge promote-rule: read corpus: %v\n", err)
+		return 10
+	}
+	rulesDir := cmp.Or(*dir, filepath.Join(*root, ".evolve", "instincts", "interaction-rules"))
+	id, err := interaction.PromoteRule(rulesDir, *regex, *keys, *note, corpusLines(string(raw)))
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve bridge promote-rule: refused: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "promoted rule %s at stage %s to %s\n", id, interaction.RuleStageShadow, filepath.Join(rulesDir, id+".yaml"))
+	return 0
+}
+
+func corpusLines(raw string) []string {
+	var lines []string
+	for _, ln := range strings.Split(raw, "\n") {
+		if t := strings.TrimSpace(ln); t != "" && !strings.HasPrefix(t, "#") {
+			lines = append(lines, t)
+		}
+	}
+	return lines
 }
 
 // emitProbeJSON writes the {os, results:[{cli,tier}]} shape the adapter parses.

@@ -144,3 +144,94 @@ func TestRunBridge_Billing(t *testing.T) {
 		}
 	}
 }
+
+func TestRunBridgePromoteRule(t *testing.T) {
+	t.Parallel()
+	const regex = `Press any key to continue\.\.\.`
+	corpusFile := func(t *testing.T, lines ...string) string {
+		t.Helper()
+		p := filepath.Join(t.TempDir(), "corpus.txt")
+		if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	cases := []struct {
+		name     string
+		args     func(corpus string) []string
+		corpus   []string
+		wantCode int
+		wantRule bool
+		wantErr  string
+	}{
+		{"clean corpus writes a shadow rule", func(c string) []string {
+			return []string{"--regex=" + regex, "--response-keys=Enter", "--corpus=" + c}
+		}, []string{"Reading main.go"}, 0, true, ""},
+		{"commented corpus line does not refuse", func(c string) []string {
+			return []string{"--regex=" + regex, "--response-keys=Enter", "--corpus=" + c}
+		}, []string{"# Press any key to continue...", "", "Reading main.go"}, 0, true, ""},
+		{"matching corpus line refuses", func(c string) []string {
+			return []string{"--regex=" + regex, "--response-keys=Enter", "--corpus=" + c}
+		}, []string{"Press any key to continue..."}, 1, false, "Press any key to continue..."},
+		{"empty response keys", func(c string) []string {
+			return []string{"--regex=" + regex, "--response-keys=,", "--corpus=" + c}
+		}, []string{"x"}, 10, false, "no response keys"},
+		{"uncompilable regex", func(c string) []string {
+			return []string{"--regex=(unbalanced paren", "--response-keys=Enter", "--corpus=" + c}
+		}, []string{"x"}, 10, false, "does not compile"},
+		{"missing corpus file", func(string) []string {
+			return []string{"--regex=" + regex, "--response-keys=Enter", "--corpus=/nonexistent/corpus.txt"}
+		}, nil, 10, false, "read corpus"},
+		{"positional argument", func(c string) []string {
+			return []string{"--regex=" + regex, "--response-keys=Enter", "--corpus=" + c, "stray"}
+		}, []string{"x"}, 10, false, "no positional argument"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			args := append([]string{"promote-rule", "--dir=" + dir}, tc.args(corpusFile(t, tc.corpus...))...)
+			var out, errb bytes.Buffer
+			if code := runBridge(args, nil, &out, &errb); code != tc.wantCode {
+				t.Fatalf("exit=%d, want %d; stdout=%q stderr=%q", code, tc.wantCode, out.String(), errb.String())
+			}
+			files, err := filepath.Glob(filepath.Join(dir, "*.yaml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := len(files) == 1; got != tc.wantRule || len(files) > 1 {
+				t.Fatalf("rule files=%v, want one written=%v", files, tc.wantRule)
+			}
+			if tc.wantRule && !strings.Contains(out.String(), files[0]) {
+				t.Errorf("stdout %q does not name %s", out.String(), files[0])
+			}
+			if !strings.Contains(errb.String(), tc.wantErr) {
+				t.Errorf("stderr %q does not contain %q", errb.String(), tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestRunBridgePromoteRuleHelpAndDefaultDir(t *testing.T) {
+	t.Parallel()
+	var out, errb bytes.Buffer
+	if code := runBridge([]string{"promote-rule", "--help"}, nil, &out, &errb); code != 0 || !strings.Contains(out.String(), bridgePromoteRuleUsage) {
+		t.Fatalf("--help exit=%d stdout=%q", code, out.String())
+	}
+	root := t.TempDir()
+	corpus := filepath.Join(t.TempDir(), "corpus.txt")
+	if err := os.WriteFile(corpus, []byte("Reading main.go\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	args := []string{"promote-rule", "--regex=Press any key to continue", "--response-keys=Enter", "--corpus=" + corpus, "--project-root=" + root}
+	if code := runBridge(args, nil, &out, &errb); code != 0 {
+		t.Fatalf("exit=%d stderr=%q", code, errb.String())
+	}
+	files, err := filepath.Glob(filepath.Join(root, ".evolve", "instincts", "interaction-rules", "*.yaml"))
+	if err != nil || len(files) != 1 {
+		t.Fatalf("default registry files=%v, want 1", files)
+	}
+	if got := corpusLines("  # note\n\n a \nb"); strings.Join(got, "|") != "a|b" {
+		t.Errorf("corpusLines=%q, want [a b]", got)
+	}
+}
