@@ -7,10 +7,6 @@ import (
 	"testing"
 )
 
-// TestAmplifyGCNoPolicyFileDefaultsToShadow: no policy.json on disk at all →
-// gcPol.Mode="" → resolves to "shadow", so the run-dir manifest is published
-// (shadow never mutates). Explicit gc.mode=off remains pinned by TestGCOff
-// and TestRunGCHook_ExplicitOffSkipsWorktreeSweep.
 func TestAmplifyGCNoPolicyFileDefaultsToShadow(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
@@ -21,23 +17,15 @@ func TestAmplifyGCNoPolicyFileDefaultsToShadow(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(workspace, "gc-shadow-manifest.json")); err != nil {
 		t.Fatalf("absent policy.json must default to shadow and publish the manifest, stat err=%v", err)
 	}
-	// ProjectRoot is unset: the worktree sweep must refuse rather than aim git
-	// at the process cwd, so no workspace manifest is published.
 	if _, err := os.Stat(filepath.Join(workspace, "workspace-gc-manifest.json")); !os.IsNotExist(err) {
 		t.Fatalf("unset ProjectRoot must skip the worktree sweep, stat err=%v", err)
 	}
 }
 
-// TestAmplifyGCShadowContinuesAfterPolicyLoadError verifies that when
-// policy.json is unreadable, runGCHook logs a WARN and continues on the
-// zero-value policy: an unreadable policy yields mode="" which resolves to
-// "shadow", the safe default — shadow only plans and publishes, it never
-// mutates the tree, which the run-dir assertions below pin directly.
 func TestAmplifyGCShadowContinuesAfterPolicyLoadError(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
 	workspace := t.TempDir()
-	// policy.json is a directory — unreadable, triggers WARN.
 	if err := os.Mkdir(filepath.Join(evolveDir, "policy.json"), 0o755); err != nil {
 		t.Fatalf("create unreadable policy placeholder: %v", err)
 	}
@@ -48,8 +36,6 @@ func TestAmplifyGCShadowContinuesAfterPolicyLoadError(t *testing.T) {
 	if !strings.Contains(strings.ToLower(stderr.String()), "policy") {
 		t.Fatalf("policy load failure should be logged, stderr=%q", stderr.String())
 	}
-	// Mode resolves to "shadow" when policy is unreadable: the plan is
-	// published, and nothing is mutated (shadow has no apply step).
 	if _, err := os.Stat(filepath.Join(workspace, "gc-shadow-manifest.json")); err != nil {
 		t.Fatalf("unreadable policy → shadow; manifest must still be published, stat err=%v", err)
 	}
@@ -61,7 +47,6 @@ func TestAmplifyGCShadowContinuesAfterPolicyLoadError(t *testing.T) {
 func TestAmplifyGCEnforceReturnsWhenManifestPathCannotBeWritten(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
-	// Write a policy.json with mode=enforce so the hook proceeds to the write step.
 	pol := `{"gc":{"mode":"enforce"}}`
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(pol), 0o644); err != nil {
 		t.Fatalf("write policy.json: %v", err)

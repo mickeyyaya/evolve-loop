@@ -6269,3 +6269,45 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // stays on disk, it is simply no longer chain-validated. The --note is the
 // operator gate — an unattributable bulk trust decision is refused.
 ```
+
+## comment-zero cmd/evolve group 2
+
+### `go/cmd/evolve/cmd_loop_chain.go:190` — above `func runLoopChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer) int {`
+
+```text
+// runLoopChain drives runLoopBatch until a boundary condition stops it. The
+// chain builds its own batch-level Signal Center (the ONE sink topology;
+// cycle-0 events land in <evolveDir>/signals.ndjson) and flushes it at exit —
+// the refresh flushes it again before every re-exec. The Driver's Result IS
+// the summary JSON, printed to stdout after the per-batch loopResult
+// documents.
+```
+
+### `go/cmd/evolve/cmd_loop_cyclelevel_test.go:17` — above `type secondCallErrRunner struct {`
+
+```text
+// secondCallErrRunner PASSes every invocation except its 2nd one, which
+// fails with a plain (non-transient, non-integrity) error. In a 3-cycle
+// batch with one scout dispatch per cycle, that makes cycle 2 the failing
+// cycle while cycles 1 and 3 succeed.
+```
+
+### `go/cmd/evolve/cmd_loop_escalation.go:17` — above `type pipelineEscalation struct {`
+
+```text
+// pipelineEscalation is the diagnostic dossier written on an ADR-0072
+// system-failure halt. It is the operator's (and the resumed loop's) starting
+// point for the pipeline diagnosis the halt demands.
+```
+
+### `go/cmd/evolve/cmd_loop_escalation.go:41` — above `func writePipelineEscalation(evolveDir, projectRoot string, cycle int, workspace string, sf *cyclestate.SystemFailureSig…`
+
+```text
+// writePipelineEscalation records the ADR-0072 halt: it writes
+// .evolve/pipeline-escalation.json (the diagnostic dossier) and auto-files a P0
+// pipeline-repair inbox item. The inbox write honors never_stop_queue — the
+// QUEUE is still injected even though the loop halts, so on resume the pipeline
+// fix is the first thing worked. Both writes are best-effort + LOUD on error
+// (a halt that also fails to leave a breadcrumb must not do so silently).
+// The returned record names what it wrote, for the halt INCIDENT.
+```

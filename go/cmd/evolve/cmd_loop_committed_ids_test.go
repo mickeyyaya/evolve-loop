@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome"
 )
 
-// writeTriageDecision drops a triage-decision.json into a fake cycle workspace
-// and returns the workspace dir.
 func writeTriageDecision(t *testing.T, body string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -19,9 +17,6 @@ func writeTriageDecision(t *testing.T, body string) string {
 	return ws
 }
 
-// TestFailedCycleCommittedIDs_ReadsTopNAndSkipShipped: the committed set is
-// the top_n ∪ skip_shipped union, deduped and order-preserving, so a FAIL
-// bumps exactly the ids triage committed to.
 func TestFailedCycleCommittedIDs_ReadsTopNAndSkipShipped(t *testing.T) {
 	t.Parallel()
 	ws := writeTriageDecision(t, `{
@@ -48,10 +43,6 @@ func TestFailedCycleCommittedIDs_ReadsTopNAndSkipShipped(t *testing.T) {
 	}
 }
 
-// TestFailedCycleCommittedIDs_ExcludesDeferredAndDropped: an id triage
-// explicitly did not commit to must never enter the committed set — it
-// accrues no failure_count and cannot be walked toward the ceiling by a
-// failure it had no part in.
 func TestFailedCycleCommittedIDs_ExcludesDeferredAndDropped(t *testing.T) {
 	t.Parallel()
 	ws := writeTriageDecision(t, `{
@@ -67,11 +58,6 @@ func TestFailedCycleCommittedIDs_ExcludesDeferredAndDropped(t *testing.T) {
 	}
 }
 
-// TestFailedCycleCommittedIDs_AbsentOrCorruptDecisionIsNil: a missing or
-// unparseable decision yields nil, which the drain reads as "no committed
-// set known" and falls back to the legacy whole-dir behavior. A panic or a
-// bogus non-nil set here would corrupt the failure ledger of a cycle that
-// crashed before triage even wrote its verdict.
 func TestFailedCycleCommittedIDs_AbsentOrCorruptDecisionIsNil(t *testing.T) {
 	t.Parallel()
 	if got := cycleoutcome.CommittedIDsFor(t.TempDir()); got != nil {

@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// seedLoopStateFile writes a minimal on-disk state.json (the file
-// failurelog.Record appends to — distinct from the FakeStorage state).
 func seedLoopStateFile(t *testing.T, evolveDir string) string {
 	t.Helper()
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -45,9 +43,6 @@ func readFailedApproaches(t *testing.T, statePath string) []map[string]any {
 	return out
 }
 
-// TestLoopFatal_CircuitBreaker_AppendsBatchLevelFailedApproach forces the
-// dispatcher-deadlock fatal (same harness as TestRunLoop_CircuitBreakerTrips)
-// and asserts the batch LEARNS from it.
 func TestLoopFatal_CircuitBreaker_AppendsBatchLevelFailedApproach(t *testing.T) {
 
 	projectRoot := t.TempDir()
@@ -87,8 +82,6 @@ func TestLoopFatal_CircuitBreaker_AppendsBatchLevelFailedApproach(t *testing.T) 
 	}
 }
 
-// TestLoopMaxCycles_NoFalseFailureLearning: clean exits (max_cycles) must
-// NOT write failure learning — the floor fires only on abnormal exits.
 func TestLoopMaxCycles_NoFalseFailureLearning(t *testing.T) {
 
 	projectRoot := t.TempDir()
@@ -119,16 +112,13 @@ func TestLoopMaxCycles_NoFalseFailureLearning(t *testing.T) {
 	}
 }
 
-// TestLoopFatal_MissingStateJSON_DoesNotBlockExit: the floor is
-// best-effort — recording into a missing state.json must not panic or
-// change the exit code (the WARN is the only trace).
 func TestLoopFatal_MissingStateJSON_DoesNotBlockExit(t *testing.T) {
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
-	} // NOTE: no state.json seeded
+	}
 	writeDispatchPolicyFull(t, evolveDir, "off", 3)
 	defer installStubDeps(t, &stuckStorage{}, newFakeLedger())()
 	if err := os.MkdirAll(cycleWorkspace(projectRoot, 1), 0o755); err != nil {

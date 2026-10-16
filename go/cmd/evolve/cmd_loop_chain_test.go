@@ -14,8 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// chainTestEnv seeds a temp project with an inbox holding `items` pending
-// todos and an optional policy.json body.
 func chainTestEnv(t *testing.T, items int, policyJSON string) loopConfig {
 	t.Helper()
 	projectRoot := t.TempDir()
@@ -24,7 +22,6 @@ func chainTestEnv(t *testing.T, items int, policyJSON string) loopConfig {
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
 		t.Fatalf("seed inbox: %v", err)
 	}
-	// A lifecycle subdirectory and a non-json file must NOT count as pending.
 	if err := os.MkdirAll(filepath.Join(inbox, "processed"), 0o755); err != nil {
 		t.Fatalf("seed processed dir: %v", err)
 	}
@@ -45,8 +42,6 @@ func chainTestEnv(t *testing.T, items int, policyJSON string) loopConfig {
 	return loopConfig{ProjectRoot: projectRoot, EvolveDir: evolveDir, GoalHash: "deadbeef", MaxCycles: 1, ChainMode: true}
 }
 
-// stubBatches installs a scripted batch runner and returns a pointer to the
-// slice of configs it was called with (one entry per batch).
 func stubBatches(t *testing.T, fn func(batch int, cfg loopConfig) int) *[]loopConfig {
 	t.Helper()
 	seen := &[]loopConfig{}
@@ -59,8 +54,6 @@ func stubBatches(t *testing.T, fn func(batch int, cfg loopConfig) int) *[]loopCo
 	return seen
 }
 
-// consumeOneInboxItem deletes one pending inbox todo — the fake batch's stand-in
-// for a cycle that consumed a task.
 func consumeOneInboxItem(t *testing.T, cfg loopConfig) {
 	t.Helper()
 	ents, err := os.ReadDir(filepath.Join(cfg.EvolveDir, "inbox"))
@@ -89,9 +82,6 @@ func runChain(t *testing.T, cfg loopConfig, cc policy.ChainConfig) (int, chainRe
 	return rc, res, stderr.String()
 }
 
-// TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit: two pending
-// todos, one consumed per batch — the chain must start a second batch with
-// no external invocation and then exit clean (rc=0) once the inbox is empty.
 func TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit(t *testing.T) {
 	cfg := chainTestEnv(t, 2, "")
 	seen := stubBatches(t, func(_ int, c loopConfig) int {
@@ -115,11 +105,6 @@ func TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching: rc=5 is the
-// batch's quota-pause contract (derived from core.allFamiliesQuotaExhausted).
-// The chain must not start another batch into the drained families: it
-// stops, propagates rc=5, and points at the intact checkpoint — even though
-// the inbox still holds work it would otherwise chain on.
 func TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching(t *testing.T) {
 	cfg := chainTestEnv(t, 3, "")
 	seen := stubBatches(t, func(int, loopConfig) int { return 5 })
@@ -143,12 +128,9 @@ func TestRunLoopChain_QuotaExhaustionDefersInsteadOfRelaunching(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_MaxBatchesCapHalts: with a never-draining inbox, the
-// runaway backstop is the only thing that stops the chain — it must halt at
-// exactly the cap, not one batch either side of it.
 func TestRunLoopChain_MaxBatchesCapHalts(t *testing.T) {
 	cfg := chainTestEnv(t, 5, "")
-	seen := stubBatches(t, func(int, loopConfig) int { return 0 }) // consumes nothing
+	seen := stubBatches(t, func(int, loopConfig) int { return 0 })
 
 	rc, res, _ := runChain(t, cfg, policy.ChainConfig{Enabled: true, MaxBatches: 3})
 
@@ -160,9 +142,6 @@ func TestRunLoopChain_MaxBatchesCapHalts(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_LoopStopFileBrakeHalts: `.evolve/loop-stop` dropped while
-// the first batch runs must halt the chain at the next boundary even though
-// the inbox still has work and the cap is far away.
 func TestRunLoopChain_LoopStopFileBrakeHalts(t *testing.T) {
 	cfg := chainTestEnv(t, 5, "")
 	seen := stubBatches(t, func(batch int, c loopConfig) int {
@@ -184,10 +163,6 @@ func TestRunLoopChain_LoopStopFileBrakeHalts(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_FleetWidthPreservedAcrossBatches: fleet width is a hard
-// operator commitment; a chain that re-derives per-batch settings can
-// silently narrow it. Every batch must receive the identical config, and the
-// recorded lane count must be stable across batches.
 func TestRunLoopChain_FleetWidthPreservedAcrossBatches(t *testing.T) {
 	cfg := chainTestEnv(t, 3, `{"fleet":{"count":3}}`)
 	seen := stubBatches(t, func(_ int, c loopConfig) int {
@@ -212,10 +187,6 @@ func TestRunLoopChain_FleetWidthPreservedAcrossBatches(t *testing.T) {
 	}
 }
 
-// TestRunLoopChain_BatchErrorStopsChain: a fatal batch outcome (preflight
-// failure, unfinished cycle, a system-failure halt) must stop the chain and
-// propagate the code, while an rc=3 batch (completed with absorbed failures)
-// must not halt the queue.
 func TestRunLoopChain_BatchErrorStopsChain(t *testing.T) {
 	t.Run("rc=2 halts and propagates", func(t *testing.T) {
 		cfg := chainTestEnv(t, 5, "")
@@ -238,9 +209,6 @@ func TestRunLoopChain_BatchErrorStopsChain(t *testing.T) {
 	})
 }
 
-// TestChainStartDecision pins the pre-batch precedence: the brake outranks a
-// drained inbox and the cap, so an operator instruction is never masked by a
-// coincidentally-empty inbox.
 func TestChainStartDecision(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -271,8 +239,6 @@ func TestChainStartDecision(t *testing.T) {
 	}
 }
 
-// TestChainContinueDecision pins the rc→chain-move mapping, including the
-// never-stop-the-queue semantics of rc=3.
 func TestChainContinueDecision(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -301,10 +267,6 @@ func TestChainContinueDecision(t *testing.T) {
 	}
 }
 
-// TestInboxPendingCount pins that only unclaimed top-level todos count, and
-// that a missing inbox is zero rather than an error. Well-formed fixtures
-// must produce no skips — shape validation must not start rejecting real
-// items.
 func TestInboxPendingCount(t *testing.T) {
 	t.Parallel()
 	cfg := chainTestEnv(t, 4, "")
@@ -318,9 +280,6 @@ func TestInboxPendingCount(t *testing.T) {
 	}
 }
 
-// TestParseLoopArgs_UntilInboxEmpty pins the CLI opt-in: the parameter sets
-// chain mode and its absence leaves it off (chaining is never a silent
-// default).
 func TestParseLoopArgs_UntilInboxEmpty(t *testing.T) {
 	t.Parallel()
 	cfg, rc := parseLoopArgs([]string{"--goal-text", "g", "--until-inbox-empty"}, os.Stderr)

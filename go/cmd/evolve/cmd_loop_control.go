@@ -24,37 +24,22 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// wireOrchestratorDepsFn is the test seam for runLoop: a stub can substitute
-// a fake orchestrator and in-memory storage/ledger so the pipeline is
-// exercised without spawning real LLM subagents.
 var wireOrchestratorDepsFn = wireOrchestratorDeps
 
-// disableWorkspaceGuardForTest is a test seam: package-level test harnesses
-// that pre-seed cycle workspaces set this to true so the orchestrator does
-// not archive the pre-seeded files before phases run. Production code
-// always leaves this false.
 var disableWorkspaceGuardForTest bool
 
-// dispatchPolicy enumerates the dispatch verification policy values.
 type dispatchPolicy int
 
 const (
-	dispatchPolicyVerify dispatchPolicy = iota // default — verify + continue on recoverable, STOP on breach
-	dispatchPolicyOff                          // skip ledger pipeline verification entirely
-	dispatchPolicyStop                         // verify + STOP on any failure (legacy fail-fast)
+	dispatchPolicyVerify dispatchPolicy = iota
+	dispatchPolicyOff
+	dispatchPolicyStop
 )
 
 const defaultCircuitBreakerThreshold = 5
 
-// orphanGCTimeout bounds the crash-recovery session sweep so a wedged tmux
-// socket (corrupted server, not the common "no server" case) can never hang
-// the loop. Hoisted to sessionreaper.DefaultReapTimeout so the boot preflight
-// and soak checks share the same bound.
 const orphanGCTimeout = sessionreaper.DefaultReapTimeout
 
-// resolveDispatchPolicy maps a policy string (from DispatchConfig.Policy) to
-// the corresponding dispatch policy. Unknown values default to
-// dispatchPolicyVerify with a WARN logged to stderr.
 func resolveDispatchPolicy(policyVal string, stderr io.Writer) dispatchPolicy {
 	if policyVal != "" {
 		switch policyVal {
@@ -72,9 +57,6 @@ func resolveDispatchPolicy(policyVal string, stderr io.Writer) dispatchPolicy {
 	return dispatchPolicyVerify
 }
 
-// resolveCircuitBreakerThreshold maps a RepeatThreshold from DispatchConfig to
-// the breaker value. Values <= 0 fall back to the default — preventing an
-// accidentally-zero config from instantly tripping the breaker.
 func resolveCircuitBreakerThreshold(threshold int) int {
 	if threshold <= 0 {
 		return defaultCircuitBreakerThreshold
@@ -82,8 +64,6 @@ func resolveCircuitBreakerThreshold(threshold int) int {
 	return threshold
 }
 
-// loadDispatchConfig loads .evolve/policy.json and returns the dispatch config
-// with defaults resolved. Absent or malformed policy ⇒ built-in defaults.
 func loadDispatchConfig(evolveDir string) policy.DispatchConfig {
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	if err != nil {
@@ -92,8 +72,6 @@ func loadDispatchConfig(evolveDir string) policy.DispatchConfig {
 	return pol.DispatchConfig()
 }
 
-// loadWorkflowConfig loads .evolve/policy.json and returns workflow defaults.
-// Absent or malformed policy falls back to built-in defaults.
 func loadWorkflowConfig(evolveDir string) policy.WorkflowConfig {
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	if err != nil {
@@ -102,8 +80,6 @@ func loadWorkflowConfig(evolveDir string) policy.WorkflowConfig {
 	return pol.WorkflowConfig()
 }
 
-// loadClassifyConfig loads .evolve/policy.json and returns classifier defaults.
-// Absent or malformed policy falls back to built-in defaults (HangClassifier=false).
 func loadClassifyConfig(evolveDir string) policy.ClassifyPolicy {
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	if err != nil {
@@ -112,14 +88,6 @@ func loadClassifyConfig(evolveDir string) policy.ClassifyPolicy {
 	return pol.ClassifyConfig()
 }
 
-// recordAbsorbedFail persists a continue-on-fail-absorbed verdict-FAIL cycle
-// to state.json:failedApproaches. The clean-completion FAIL path (audit
-// FAIL → retro → end, err==nil) is NOT recorded by the orchestrator — only
-// err!=nil cycle-level failures are — and recordLoopFatal runs only on the
-// STOP path the breaker is skipping, so without this the next cycle's scout
-// would see no record of the failure. A missing state.json is a soft WARN
-// (matching the recoverable-failure path). Best-effort: a record failure
-// must not change the loop's continue decision.
 func recordAbsorbedFail(cfg loopConfig, ranCycle int, stderr io.Writer) {
 	workspace := cycleWorkspace(cfg.ProjectRoot, ranCycle)
 	cls := cycleclassify.Classify(workspace)
@@ -137,31 +105,14 @@ func recordAbsorbedFail(cfg loopConfig, ranCycle int, stderr io.Writer) {
 	}
 }
 
-// loopCycleRunner is the slice of *core.Orchestrator the batch loop drives —
-// narrowed to an interface so a scripted fake can exercise the loop's
-// post-cycle wiring (the consecutive-fail breaker, recordAbsorbedFail) which
-// only fires on FinalVerdict=FAIL, a state the real orchestrator cannot reach
-// without a full phase machine.
 type loopCycleRunner interface {
 	RunCycle(context.Context, core.CycleRequest) (core.CycleResult, error)
 	RunCycleFromPhase(context.Context, core.CycleRequest, *core.ResumePoint) (core.CycleResult, error)
-	// SignalSummary is the runner's per-cycle view of the Signal Center, read
-	// by the batch report through this seam, so a scripted runner is
-	// reported exactly like the real orchestrator.
 	SignalSummary() signalcenter.Summary
 }
 
-// loopOrchOverride is a test-only seam: when non-nil, runLoop drives this
-// instead of the wired *core.Orchestrator. nil in production.
 var loopOrchOverride loopCycleRunner
 
-// consecutiveFailBreaker advances the consecutive-verdict-FAIL streak and
-// reports whether the batch must stop. A non-FAIL cycle resets the streak to
-// zero (a PASS/SHIPPED breaks the run); a FAIL increments it and stops once
-// the streak reaches max. WorkflowConfig guarantees max is always ≥1, so
-// max==1 stops on the first FAIL — byte-identical to the
-// pre-flag unconditional break. Pure for testability, mirroring
-// updateBreaker (the same-cycle dispatcher breaker).
 func consecutiveFailBreaker(failed bool, streak, max int) (newStreak int, stop bool) {
 	if !failed {
 		return 0, false
@@ -170,8 +121,6 @@ func consecutiveFailBreaker(failed bool, streak, max int) (newStreak int, stop b
 	return streak, streak >= max
 }
 
-// readLastCycleNumber returns state.LastCycleNumber, or 0 on any error
-// (missing state.json is fine — first cycle starts at 1).
 func readLastCycleNumber(ctx context.Context, st core.Storage) (int, error) {
 	state, err := st.ReadState(ctx)
 	if err != nil {
@@ -180,19 +129,6 @@ func readLastCycleNumber(ctx context.Context, st core.Storage) (int, error) {
 	return state.LastCycleNumber, nil
 }
 
-// readBatchWindowFloor returns the cycle number the blocker breaker's batch
-// window starts above: max(LastCycleNumber, LastAllocatedCycleNumber).
-//
-// LastCycleNumber tracks cycles completed — an aborted cycle exits through
-// abnormalEpilogue, which writes its failure digest but returns before
-// finalizeCycle, so the counter never advances past it. LastAllocatedCycleNumber
-// tracks cycles dispatched and advances at mint time, so anchoring the window
-// on it too keeps an aborted cycle's digest from re-tripping the breaker on
-// every relaunch.
-//
-// max, not a bare swap: allocateCycle falls back to LastCycleNumber+1 when
-// storage is not a StateUpdater, so a legacy state can carry a zero lease —
-// anchoring on it alone would zero the window and re-collect all of runs/.
 func readBatchWindowFloor(ctx context.Context, st core.Storage) (int, error) {
 	state, err := st.ReadState(ctx)
 	if err != nil {
@@ -201,24 +137,10 @@ func readBatchWindowFloor(ctx context.Context, st core.Storage) (int, error) {
 	return state.HighestCycleNumber(), nil
 }
 
-// unfinishedCycle reports whether cycle-state describes a cycle that started
-// but never completed — its id is ahead of lastCycleNumber. A clean cycle
-// advances lastCycleNumber to its own id on completion (orchestrator), so a
-// finished cycle has cs.CycleID == lastCycleNumber and is NOT flagged; a fresh
-// tree has cs.CycleID == 0. Only a genuinely stuck cycle (id > last) trips it.
 func unfinishedCycle(cs core.CycleState, lastCycleNumber int) bool {
 	return cs.CycleID != 0 && cs.CycleID > lastCycleNumber
 }
 
-// reconcileStaleCycleState is the iteration-top coherence sentinel: a canonical
-// record claiming a live phase for a dead cycle the batch already passed is
-// WARNed and reconciled with abnormalEpilogue's state floor (Phase="aborted",
-// ActiveAgent cleared, identity kept). A fleet lane SIGKILLed by cmd_fleet.go's
-// WaitDelay escalation dies before that floor runs, and once its id is <=
-// lastCycleNumber unfinishedCycle (the once-per-batch boot guard) cannot see
-// it. Everything it cannot prove stale is left untouched: the resumable
-// unfinishedCycle shape, a record whose lease owner is live, a completed
-// phase, and any record or lease it could not read (surfaced, never clobbered).
 func reconcileStaleCycleState(ctx context.Context, st core.Storage, projectRoot string, now time.Time, stderr io.Writer) {
 	if st == nil {
 		return
@@ -237,7 +159,7 @@ func reconcileStaleCycleState(ctx context.Context, st core.Storage, projectRoot 
 		return
 	}
 	if unfinishedCycle(cs, last) {
-		return // resumable — owned by `evolve loop --resume` / `evolve cycle reset`
+		return
 	}
 	owner, dead, err := cycleOwnerDead(cs, projectRoot, now)
 	if err != nil {
@@ -258,11 +180,6 @@ func reconcileStaleCycleState(ctx context.Context, st core.Storage, projectRoot 
 		stalePhase, cs.CycleID, owner, last)
 }
 
-// claimsLivePhase reports whether the record asserts an in-flight phase: not a
-// fresh tree, not terminal, and not a phase the cycle already completed (both
-// completion paths — phaseCompletionRecord.persist and completeRetro — append
-// the phase to CompletedPhases while leaving Phase on it, so a cleanly
-// finished cycle's record is history, not residue).
 func claimsLivePhase(cs core.CycleState) bool {
 	switch cs.Phase {
 	case "", "aborted", string(core.PhaseEnd):
@@ -271,10 +188,6 @@ func claimsLivePhase(cs core.CycleState) bool {
 	return cs.CycleID != 0 && !slices.Contains(cs.CompletedPhases, cs.Phase)
 }
 
-// cycleOwnerDead reads the cycle's run lease and reports whether its owner is
-// provably gone (no lease, or runlease.OwnerLive false — a SIGKILLed lane has a
-// fresh heartbeat but a dead pid). owner describes the evidence for the WARN.
-// An unreadable lease is an error: liveness unknown means never reconcile.
 func cycleOwnerDead(cs core.CycleState, projectRoot string, now time.Time) (owner string, dead bool, err error) {
 	runDir := cs.WorkspacePath
 	if runDir == "" {
@@ -298,17 +211,10 @@ func cycleOwnerDead(cs core.CycleState, projectRoot string, now time.Time) (owne
 	return fmt.Sprintf("run lease owner pid %d not running", lease.OwnerPID), true, nil
 }
 
-// cycleWorkspace returns .evolve/runs/cycle-<N>/ for verify/classify.
 func cycleWorkspace(projectRoot string, cycle int) string {
 	return filepath.Join(projectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
 }
 
-// reapCycleSessions kills any tmux sessions the cycle's launches registered
-// in its per-run registry (never by glob — see swarm.ReapRunSessions). Fired
-// after EVERY cycle attempt: a clean cycle's
-// sessions were already killed by per-launch cleanup (re-kill is a no-op);
-// an aborted cycle's leaked sessions are exactly what the looppreflight
-// stale-session check used to find a batch too late.
 func reapCycleSessions(projectRoot string, cycle int, stderr io.Writer) {
 	if cycle <= 0 {
 		return
@@ -319,21 +225,9 @@ func reapCycleSessions(projectRoot string, cycle int, stderr io.Writer) {
 		fmt.Fprintf(stderr, "[loop] session registry reap cycle=%d: killed=%d skipped=%d errors=%d\n",
 			cycle, rep.Killed, rep.Skipped, rep.Errors)
 	}
-	// Belt-and-suspenders: a liveness sweep also reaps any orphan whose creator
-	// PID is dead — sessions a crashed phase left behind that never made it into
-	// (or were lost from) the registry. Safe under concurrency: live runs' PIDs
-	// are alive, so their sessions are skipped.
 	gcOrphanSessions(fmt.Sprintf("cycle=%d", cycle), stderr)
 }
 
-// gcOrphanSessions runs the crash-recovery liveness GC (swarm.ExecReapOrphans):
-// it reaps evolve-namespace tmux sessions whose creator PID is dead — corpses a
-// crashed or SIGKILL'd run left on the shared bridge server. It complements the
-// per-run registry reap, which is structurally blind to a crashed run's (and any
-// other run's) sessions; a SIGKILL'd loop never runs its teardown, so without
-// this the next loop inherits the corpses until the server starves the machine.
-// Liveness-scoped, so a LIVE concurrent run is never touched. Quiet on a clean
-// sweep; logs only when it killed or errored.
 func gcOrphanSessions(label string, stderr io.Writer) {
 	ctx, cancel := context.WithTimeout(context.Background(), orphanGCTimeout)
 	defer cancel()
@@ -342,10 +236,6 @@ func gcOrphanSessions(label string, stderr io.Writer) {
 		fmt.Fprintf(stderr, "[loop] orphan-session GC (%s): killed=%d skipped(live=%d foreign=%d no-pid=%d) errors=%d\n",
 			label, len(rep.Killed), rep.SkippedLive, rep.SkippedForeign, rep.SkippedUnparseable, len(rep.Errors))
 	}
-	// Also reap whole per-run tmux sockets (evolve-bridge-p<pid>) left by a
-	// crashed loop — a different socket than ours, which the per-session sweep
-	// above (it lists only THIS run's socket) can't see. Liveness-scoped: a live
-	// loop's socket is never killed.
 	srep := swarm.ExecReapOrphanSockets(ctx)
 	if len(srep.Killed) > 0 || len(srep.Errors) > 0 {
 		fmt.Fprintf(stderr, "[loop] orphan-socket GC (%s): killed=%d dead per-run socket(s) skipped-live=%d errors=%d\n",
@@ -353,11 +243,6 @@ func gcOrphanSessions(label string, stderr io.Writer) {
 	}
 }
 
-// updateBreaker is the pure step function of the same-cycle circuit
-// breaker. Returns the new (prev, streak, tripped) tuple given the
-// current ran_cycle. Extracted from runLoop so the algorithm is
-// unit-testable without gaming the orchestrator's LastCycleNumber
-// bookkeeping.
 func updateBreaker(prev, streak, ranCycle, threshold int) (newPrev, newStreak int, tripped bool) {
 	if ranCycle == prev {
 		streak++
@@ -421,13 +306,6 @@ func quotaPauseLine(qp quotaPause, now time.Time) string {
 	return head + " auto-resume=off: " + cmp.Or(qp.OperatorAction, "the auto-resume budget is spent or the wake time is unreadable; run `evolve loop --resume` by hand")
 }
 
-// detectQuotaPause reads <evolveDir>/cycle-state.json and returns a
-// populated quotaPause when checkpoint.enabled==true AND
-// checkpoint.reason=="quota-likely".
-//
-// Returns (zero, false) on any failure path (missing file, malformed
-// JSON, wrong reason, or checkpoint disabled) — quota-pause is an
-// opt-in signal, not an error condition.
 func loadActiveQuotaLikelyCheckpoint(evolveDir string) (blob, checkpoint map[string]any, ok bool) {
 	path := core.ResolveCycleStatePath(evolveDir)
 	raw, err := os.ReadFile(path)
@@ -487,9 +365,6 @@ func detectQuotaPause(evolveDir string) (quotaPause, bool) {
 	return quotaPauseFromCheckpoint(blob, cp), true
 }
 
-// dirExists is a tiny helper for the best-effort emit path. Returns
-// true only when the path resolves to an existing directory; broken
-// symlinks or files of the same name return false.
 func dirExists(path string) bool {
 	info, err := os.Stat(path)
 	if err != nil {

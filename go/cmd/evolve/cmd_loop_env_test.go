@@ -4,9 +4,6 @@ import (
 	"testing"
 )
 
-// TestBuildCycleEnv_PropagatesRequireIntent is the regression test ensuring
-// EVOLVE_REQUIRE_INTENT=1 in the operator shell lands in CycleRequest.Env so
-// the orchestrator's intent gate evaluates true.
 func TestBuildCycleEnv_PropagatesRequireIntent(t *testing.T) {
 	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
@@ -21,8 +18,6 @@ func TestBuildCycleEnv_PropagatesRequireIntent(t *testing.T) {
 	}
 }
 
-// TestBuildCycleEnv_PropagatesSandboxFallback covers the second
-// documented STRICT-MODE flag that was also silently dropped.
 func TestBuildCycleEnv_PropagatesSandboxFallback(t *testing.T) {
 	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
@@ -33,9 +28,6 @@ func TestBuildCycleEnv_PropagatesSandboxFallback(t *testing.T) {
 	}
 }
 
-// TestBuildCycleEnv_SkipsNonEvolvePrefix ensures only the documented
-// operator surface (EVOLVE_*) makes it through — other env vars stay
-// out of the cycle env to avoid surprising subagents.
 func TestBuildCycleEnv_SkipsNonEvolvePrefix(t *testing.T) {
 	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
@@ -54,9 +46,6 @@ func TestBuildCycleEnv_SkipsNonEvolvePrefix(t *testing.T) {
 	}
 }
 
-// TestBuildCycleEnv_StrategyNotWrittenByDispatcher asserts that
-// EVOLVE_STRATEGY is NOT written to the env map by the dispatcher.
-// Strategy flows via Context["strategy"] — not via the cycle env.
 func TestBuildCycleEnv_StrategyNotWrittenByDispatcher(t *testing.T) {
 	t.Parallel()
 	cfg := loopConfig{Strategy: "harden"}
@@ -66,12 +55,6 @@ func TestBuildCycleEnv_StrategyNotWrittenByDispatcher(t *testing.T) {
 	}
 }
 
-// TestBuildCycleEnv_DispatcherFlagsPropagate covers the explicitly-set
-// dispatcher IPC flags (Resume) — present iff bool set.
-// ConsensusAudit is no longer written to the cycle env; it is configured
-// via policy.json workflow.consensus_audit_enabled instead.
-// EVOLVE_RESET is no longer written: cfg.Reset is consumed at cmd_loop.go
-// before buildCycleEnv is called.
 func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
 	t.Parallel()
 	t.Run("resume set", func(t *testing.T) {
@@ -93,14 +76,12 @@ func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
 	})
 }
 
-// TestBuildCycleEnv_MalformedEnvIgnored guards against panics on env
-// lines without '=' (rare but possible from low-level callers).
 func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {
 	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
-		"EVOLVE_NO_EQUALS", // no '='
-		"=EVOLVE_NAMELESS", // empty name
+		"EVOLVE_NO_EQUALS",
+		"=EVOLVE_NAMELESS",
 		"EVOLVE_REQUIRE_INTENT=1",
 	}
 	got := buildCycleEnv(cfg, osEnv)
@@ -109,10 +90,6 @@ func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {
 	}
 }
 
-// TestBuildCycleContext_PropagatesGoalText is the regression test ensuring
-// --goal-text's value lands in CycleRequest.Context["goal"] so the Intent
-// persona can structure intent.md around the operator's actual goal rather
-// than inferring from leftover workspace artifacts.
 func TestBuildCycleContext_PropagatesGoalText(t *testing.T) {
 	t.Parallel()
 	cfg := loopConfig{
@@ -130,20 +107,13 @@ func TestBuildCycleContext_PropagatesGoalText(t *testing.T) {
 
 func TestBuildCycleContext_EmptyGoalTextOmitsKey(t *testing.T) {
 	t.Parallel()
-	// When --goal-text was not passed (operator used --goal-hash or
-	// resume), the "goal" key must NOT appear in Context — phases
-	// check for empty and skip the prompt-line, but defensive: keep
-	// the map minimal.
-	cfg := loopConfig{Strategy: "balanced"} // no GoalText
+	cfg := loopConfig{Strategy: "balanced"}
 	got := buildCycleContext(cfg)
 	if _, present := got["goal"]; present {
 		t.Errorf("empty GoalText must not add 'goal' key; got %v", got)
 	}
 }
 
-// TestBuildCycleEnv_BroadDocumentedFlagsSurface spot-checks several
-// documented EVOLVE_* flags from CLAUDE.md (intent, sandbox, triage,
-// build-planner) to lock in the propagation contract.
 func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
 	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}

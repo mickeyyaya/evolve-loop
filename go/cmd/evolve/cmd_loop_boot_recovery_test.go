@@ -18,8 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// --- git fixture helpers (br* prefix avoids collision with other main tests) ---
-
 func brInitRepo(t *testing.T) string {
 	t.Helper()
 	return gittest.FromTemplate(t, "cmd-evolve-boot-recovery-repo", func(r *gittest.Repo) error {
@@ -53,9 +51,6 @@ func brPorcelain(t *testing.T, dir string) string {
 	return string(out)
 }
 
-// AC (integration, headline / live-repro): defaultBootRecovery must ACTUALLY
-// quarantine leaked tracked-source dirt so the tree is clean — proving
-// QuarantineDirtyTree is invoked by the orchestrator, not merely defined.
 func TestDefaultBootRecovery_QuarantinesDirtyTree(t *testing.T) {
 	t.Parallel()
 	repo := brInitRepo(t)
@@ -63,7 +58,6 @@ func TestDefaultBootRecovery_QuarantinesDirtyTree(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// A committed source file, then a leaked uncommitted edit.
 	src := filepath.Join(repo, "go", "internal", "leak.go")
 	if err := os.MkdirAll(filepath.Dir(src), 0o755); err != nil {
 		t.Fatal(err)
@@ -89,9 +83,6 @@ func TestDefaultBootRecovery_QuarantinesDirtyTree(t *testing.T) {
 	}
 }
 
-// AC (edge, ship-SHA): with go/bin/evolve on disk and a MISMATCHING
-// expected_ship_sha in state.json, defaultBootRecovery must flag the mismatch —
-// proving ShipSHAMismatch is invoked from the orchestrator.
 func TestDefaultBootRecovery_DetectsShipSHAMismatch(t *testing.T) {
 	t.Parallel()
 	repo := brInitRepo(t)
@@ -106,7 +97,6 @@ func TestDefaultBootRecovery_DetectsShipSHAMismatch(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// expected_ship_sha deliberately does NOT match the on-disk binary.
 	brWriteJSON(t, filepath.Join(evolveDir, "state.json"),
 		map[string]any{"expected_ship_sha": "0000not-the-real-sha0000"})
 
@@ -119,10 +109,6 @@ func TestDefaultBootRecovery_DetectsShipSHAMismatch(t *testing.T) {
 	}
 }
 
-// AC (edge, autoseal): a stranded cycle-state marker whose owner PID is dead
-// must be auto-sealed at boot — proving AutosealStaleMarker is invoked. Uses a
-// real dead PID (999999) so the orchestrator's REAL liveness probe drives the
-// decision (no injection needed).
 func TestDefaultBootRecovery_AutosealsDeadOwnerMarker(t *testing.T) {
 	t.Parallel()
 	repo := brInitRepo(t)
@@ -143,7 +129,6 @@ func TestDefaultBootRecovery_AutosealsDeadOwnerMarker(t *testing.T) {
 	brWriteJSON(t, filepath.Join(evolveDir, "state.json"), map[string]any{
 		"lastCycleNumber": 490,
 	})
-	// A run lease owned by a dead pid — the stranded marker's owner.
 	if err := runlease.Write(workspace, runlease.Lease{RunID: "run-491", OwnerPID: 999999}, time.Now().UTC()); err != nil {
 		t.Fatalf("seed lease: %v", err)
 	}
@@ -160,8 +145,6 @@ func TestDefaultBootRecovery_AutosealsDeadOwnerMarker(t *testing.T) {
 	}
 }
 
-// AC (negative): a fully clean state — clean tree, no stranded marker, no ship
-// binary / expected_ship_sha — triggers ZERO recovery actions and never panics.
 func TestDefaultBootRecovery_CleanStateNoOp(t *testing.T) {
 	t.Parallel()
 	repo := brInitRepo(t)
@@ -182,10 +165,6 @@ func TestDefaultBootRecovery_CleanStateNoOp(t *testing.T) {
 	}
 }
 
-// AC (anti-dead-code): runLoop must INVOKE bootRecoverFn during its boot path,
-// BEFORE the readiness gate halts. A spy seam records the call; forcing the
-// preflight gate to halt isolates the boot path (no cycle runs) — a recovery
-// function defined but never called by runLoop fails HERE.
 func TestRunLoop_InvokesBootRecoveryBeforeGate(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")

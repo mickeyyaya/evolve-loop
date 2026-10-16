@@ -492,7 +492,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `acs/regression/pluginschema` | 1 | [acs-regression-pluginschema.md](acs-regression-pluginschema.md) |
 | `acs/regression/protectedsurface` | 2 | [acs-regression-protectedsurface.md](acs-regression-protectedsurface.md) |
 | `cmd/evolve-fake-cli` | 1 | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
-| `cmd/evolve` | 443 | [cmd-evolve.md](cmd-evolve.md) |
+| `cmd/evolve` | 447 | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/acssuite` | 27 | [internal-acssuite.md](internal-acssuite.md) |
 | `internal/adapters/bridge` | 32 | [internal-adapters-bridge.md](internal-adapters-bridge.md) |
 | `internal/adapters/ledger` | 27 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |

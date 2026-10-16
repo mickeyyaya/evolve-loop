@@ -13,22 +13,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// gcHookCall is one observed gcHookFn invocation. markerPresent /
-// cycleHadRun are sampled AT CALL TIME, which is what makes this an ordering
-// assertion rather than a mere "was it called" check:
-//   - markerPresent==false  ⇒ finalizeCompletedCycle already ran (it deletes
-//     the on-disk cycle-state.json marker).
-//   - cycleHadRun==true     ⇒ the batch's cycle(s) already executed, so this is
-//     the batch-END call and not the batch-START one.
 type gcHookCall struct {
 	workspace     string
 	markerPresent bool
 	cycleHadRun   bool
 }
 
-// batchEndOrch is the scripted cycle runner for the clean-exit test: it flips
-// the shared cycleHadRun flag the spy samples, then reports a clean PASS so the
-// batch reaches its max-cycles exit.
 type batchEndOrch struct {
 	noSignals
 	ran *bool
@@ -43,8 +33,6 @@ func (o *batchEndOrch) RunCycleFromPhase(ctx context.Context, req core.CycleRequ
 	return o.RunCycle(ctx, req)
 }
 
-// installGCHookSpy replaces the gcHookFn seam with a recorder. Returns the
-// (growing) call log and the flag the scripted orchestrator flips.
 func installGCHookSpy(t *testing.T, evolveDir string) (calls *[]gcHookCall, cycleRan *bool) {
 	t.Helper()
 	calls = &[]gcHookCall{}
@@ -62,15 +50,10 @@ func installGCHookSpy(t *testing.T, evolveDir string) (calls *[]gcHookCall, cycl
 	return calls, cycleRan
 }
 
-// TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd is the crux: the sweep
-// must run at batch end, after the final cycle and after finalize. The
-// fixture writes a real cycle-state.json marker that is present at batch
-// start, so a start-only hook records only markerPresent==true/
-// cycleHadRun==false invocations and fails here.
 func TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
-	writeLoopFinalizeFixture(t, evolveDir, 5, 5) // completed cycle, no live owner
+	writeLoopFinalizeFixture(t, evolveDir, 5, 5)
 
 	calls, cycleRan := installGCHookSpy(t, evolveDir)
 
@@ -112,10 +95,6 @@ func TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd(t *testing.T) {
 	}
 }
 
-// TestRunLoopBatch_SignalExitSkipsBatchEndGCHook is the NEGATIVE half: an
-// interrupted batch is resumable, so no batch-end sweep may fire. A blanket
-// "always sweep on the way out" implementation passes the test above and fails
-// here — which is exactly the no-op-resistance this pair is for.
 func TestRunLoopBatch_SignalExitSkipsBatchEndGCHook(t *testing.T) {
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
@@ -153,9 +132,6 @@ func TestRunLoopBatch_SignalExitSkipsBatchEndGCHook(t *testing.T) {
 	}
 }
 
-// signalMarkingOrch is cancelOnRunOrch plus the cycleHadRun flag the spy
-// samples: it marks that a cycle entered, cancels the loop context (simulating
-// SIGINT landing mid-cycle), and returns ctx.Err().
 type signalMarkingOrch struct {
 	noSignals
 	cancel context.CancelFunc

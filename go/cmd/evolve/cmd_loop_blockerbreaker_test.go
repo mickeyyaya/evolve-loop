@@ -57,8 +57,6 @@ func TestBlockerBreakerHalt_HistoricDigestsExcluded(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
-	// Same two guard-aborts, but the batch starts AFTER them — a fixed
-	// historic blocker must never halt a fresh healthy run.
 	writeDigestFixture(t, evolveDir, 11, "build|guard-abort|aaa", "guard-abort")
 	writeDigestFixture(t, evolveDir, 12, "audit|guard-abort|bbb", "guard-abort")
 
@@ -67,11 +65,6 @@ func TestBlockerBreakerHalt_HistoricDigestsExcluded(t *testing.T) {
 	}
 }
 
-// TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt is the explicit
-// wiring-proof fixture: the actual loop-boot call site (blockerBreakerHalt),
-// replaying three identical-fingerprint digests on disk, must not halt once
-// the ack ledger carries a matching record, and must still halt (unchanged
-// behavior) when the ledger is absent.
 func TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt(t *testing.T) {
 	t.Parallel()
 	fp := "ship|unknown|76d0f4fca190"

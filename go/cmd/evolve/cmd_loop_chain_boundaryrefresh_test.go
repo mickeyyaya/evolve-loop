@@ -17,8 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// --- git fixture helpers (brf* prefix avoids collision with other main tests) ---
-
 func brfGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -56,7 +54,6 @@ func brfInitRepo(t *testing.T) (dir, commitA string) {
 	return repo.Dir, repo.Git("rev-parse", "HEAD")
 }
 
-// brfAdvance commits one more file on top and returns the new HEAD.
 func brfAdvance(t *testing.T, dir string) string {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644); err != nil {
@@ -78,8 +75,6 @@ func brfWriteJSON(t *testing.T, path string, v any) {
 	}
 }
 
-// TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead: HEAD has
-// moved past the running binary's build commit.
 func TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead(t *testing.T) {
 	t.Parallel()
 	dir, commitA := brfInitRepo(t)
@@ -93,8 +88,6 @@ func TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead(t *testing.T) 
 	}
 }
 
-// TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead: the running
-// binary is the tip — nothing to refresh.
 func TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead(t *testing.T) {
 	t.Parallel()
 	dir, commitA := brfInitRepo(t)
@@ -107,9 +100,6 @@ func TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead(t *testing.T) {
 	}
 }
 
-// TestDefaultChainBoundaryAhead_EmptyRunningCommitIsNoOp: an unstamped dev
-// binary (empty build commit) has nothing verifiable to compare — must be a
-// quiet no-op, not an error.
 func TestDefaultChainBoundaryAhead_EmptyRunningCommitIsNoOp(t *testing.T) {
 	t.Parallel()
 	dir, _ := brfInitRepo(t)
@@ -122,9 +112,6 @@ func TestDefaultChainBoundaryAhead_EmptyRunningCommitIsNoOp(t *testing.T) {
 	}
 }
 
-// TestDefaultChainBoundaryAhead_GitFailureDegradesToSkip: a git failure (not
-// a repo at all) must return an error the caller treats as "skip this
-// boundary" — never panic, never claim ahead=true on bad data.
 func TestDefaultChainBoundaryAhead_GitFailureDegradesToSkip(t *testing.T) {
 	t.Parallel()
 	notARepo := t.TempDir()
@@ -134,9 +121,6 @@ func TestDefaultChainBoundaryAhead_GitFailureDegradesToSkip(t *testing.T) {
 	}
 }
 
-// TestMaybeRefreshChainBoundary_NoLagIsNoOpFree: no lag detected means the
-// whole rebuild/repin/re-exec sequence is a provably free no-op — none of
-// the seams fire.
 func TestMaybeRefreshChainBoundary_NoLagIsNoOpFree(t *testing.T) {
 	restore := brfStubSeams(t, false, nil, nil)
 	defer restore()
@@ -163,9 +147,6 @@ func TestMaybeRefreshChainBoundary_NoLagIsNoOpFree(t *testing.T) {
 	}
 }
 
-// TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger: lag
-// detected means rebuild, repin (ledgered under a distinguishable
-// "boundary-refresh" class), and re-exec, in that order.
 func TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -203,7 +184,6 @@ func TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger(t *tes
 		t.Error("re-exec must be invoked with a non-empty argv (the original chain invocation)")
 	}
 
-	// The state.json pin moved (RepinShipSHA's own write path).
 	raw, err := os.ReadFile(filepath.Join(evolveDir, "state.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -212,9 +192,6 @@ func TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger(t *tes
 		t.Errorf("expected_ship_sha must be re-pinned on a successful boundary refresh: %s", raw)
 	}
 
-	// A distinguishable boundary-refresh record, separate from state.json's
-	// own two-value Authorized enum, so a ledger read can tell this apart
-	// from a manual `evolve reset-sha`.
 	logRaw, err := os.ReadFile(filepath.Join(evolveDir, chainBoundaryRefreshLogFile))
 	if err != nil {
 		t.Fatalf("boundary-refresh must be ledgered (missing %s): %v", chainBoundaryRefreshLogFile, err)
@@ -227,10 +204,6 @@ func TestMaybeRefreshChainBoundary_LagTriggersRebuildRepinReExecAndLedger(t *tes
 	}
 }
 
-// TestMaybeRefreshChainBoundary_RebuildFailureDegradesToNoRefresh: a rebuild
-// failure must degrade to refreshed=false — repin and re-exec are never
-// reached, and the chain keeps running the current (un-rebuilt) binary
-// rather than halting.
 func TestMaybeRefreshChainBoundary_RebuildFailureDegradesToNoRefresh(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -267,9 +240,6 @@ func TestMaybeRefreshChainBoundary_RebuildFailureDegradesToNoRefresh(t *testing.
 	}
 }
 
-// TestMaybeRefreshChainBoundary_AheadCheckErrorDegradesToNoRefresh: an
-// ahead-check error (git/network failure) must degrade to refreshed=false
-// without ever touching rebuild/repin/re-exec.
 func TestMaybeRefreshChainBoundary_AheadCheckErrorDegradesToNoRefresh(t *testing.T) {
 	restore := brfStubSeams(t, false, errors.New("git fetch: network unreachable"), nil)
 	defer restore()
@@ -295,9 +265,6 @@ func TestMaybeRefreshChainBoundary_AheadCheckErrorDegradesToNoRefresh(t *testing
 	}
 }
 
-// brfStubSeams installs a chainBoundaryAheadFn stub returning (ahead, err) for
-// every call, and returns a restore func. aheadErr/unused params reserved for
-// future callers that need per-call variation; nil means constant per-call.
 func brfStubSeams(t *testing.T, ahead bool, aheadErr error, _ any) func() {
 	t.Helper()
 	prev := chainBoundaryAheadFn
@@ -305,21 +272,12 @@ func brfStubSeams(t *testing.T, ahead bool, aheadErr error, _ any) func() {
 	return func() { chainBoundaryAheadFn = prev }
 }
 
-// TestRunLoopChain_BoundaryRefreshCheckedBeforeEveryBatchNeverMidBatch: over
-// a 3-batch chain, the ahead-check must fire exactly once per boundary,
-// strictly before that boundary's runLoopBatchFn call — proving the refresh
-// can never interleave with (or interrupt) an in-flight batch, which is
-// single-threaded by construction at this call site.
 func TestRunLoopChain_BoundaryRefreshCheckedBeforeEveryBatchNeverMidBatch(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Seed >=3 pending inbox items so chain_inbox_empty never fires before
-	// the 3rd boundary's [ahead-check, batch] pair is recorded — an empty
-	// inbox would stop the chain after the first batch, making the calls>=3
-	// branch in the runLoopBatchFn stub below unreachable.
 	inboxDir := filepath.Join(evolveDir, "inbox")
 	if err := os.MkdirAll(inboxDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -334,7 +292,7 @@ func TestRunLoopChain_BoundaryRefreshCheckedBeforeEveryBatchNeverMidBatch(t *tes
 	defer func() { chainBoundaryAheadFn = prevAhead }()
 	chainBoundaryAheadFn = func(string, string) (bool, error) {
 		order = append(order, "ahead-check")
-		return false, nil // never trigger a real refresh — isolates the ORDERING assertion
+		return false, nil
 	}
 
 	prevBatch := runLoopBatchFn
@@ -344,7 +302,7 @@ func TestRunLoopChain_BoundaryRefreshCheckedBeforeEveryBatchNeverMidBatch(t *tes
 		calls++
 		order = append(order, "batch")
 		if calls >= 3 {
-			return 5 // quota defer — stop the chain
+			return 5
 		}
 		return 0
 	}
@@ -363,10 +321,6 @@ func TestRunLoopChain_BoundaryRefreshCheckedBeforeEveryBatchNeverMidBatch(t *tes
 	}
 }
 
-// TestRunLoopChain_BoundaryRefreshStopsChainBeforeThatBoundarysBatch: when
-// the ahead-check trips at a given boundary, the chain stops (re-exec is
-// terminal in production) before that boundary's runLoopBatchFn runs, and
-// the stop reason names the refresh.
 func TestRunLoopChain_BoundaryRefreshStopsChainBeforeThatBoundarysBatch(t *testing.T) {
 	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
 
@@ -382,7 +336,7 @@ func TestRunLoopChain_BoundaryRefreshStopsChainBeforeThatBoundarysBatch(t *testi
 	defer func() { chainBoundaryAheadFn = prevAhead }()
 	chainBoundaryAheadFn = func(string, string) (bool, error) {
 		callN++
-		return callN == 2, nil // trip on the SECOND boundary only
+		return callN == 2, nil
 	}
 	prevRebuild, prevReExec := chainRebuildFn, chainReExecFn
 	defer func() { chainRebuildFn, chainReExecFn = prevRebuild, prevReExec }()

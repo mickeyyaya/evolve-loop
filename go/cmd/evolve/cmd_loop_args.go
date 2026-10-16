@@ -142,15 +142,6 @@ func resolveGoal(stderr io.Writer, goalHash, goalText, posGoal string, resume, d
 	return hash, text, 0
 }
 
-// parseLoopArgs parses `evolve loop` arguments. Returns the resolved config
-// plus rc (0 = success, 10 = bad args; errors printed to stderr).
-//
-// Argument precedence:
-//
-//	--goal-hash takes priority over --goal-text (--goal-text computes hash)
-//	--goal-text takes priority over positional [GOAL...]
-//	--cycles / --max-cycles take priority over positional [CYCLES]
-//	--strategy takes priority over positional [STRATEGY]
 func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs := flag.NewFlagSet("evolve loop", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -301,8 +292,6 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 	}
 }
 
-// parsePositional's order is fixed: CYCLES, then STRATEGY, then GOAL —
-// changing it would silently reparse existing operator invocations differently.
 func parsePositional(args []string) (cycles int, strategy string, goal string) {
 	i := 0
 	if i < len(args) {
@@ -364,8 +353,6 @@ func buildCycleEnv(cfg loopConfig, osEnv []string) map[string]string {
 	return out
 }
 
-// phaseEnvAgentKey mirrors envchain.PhaseEnvKey's normalization (upper-case,
-// dash to underscore), so EVOLVE_<AGENT>_CLI/_MODEL match the runner's lookup.
 func phaseEnvAgentKey(agent string) string {
 	b := make([]byte, 0, len(agent))
 	for i := 0; i < len(agent); i++ {
