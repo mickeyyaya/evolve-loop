@@ -61,6 +61,14 @@
 - **The disk-space floor is policy, not a literal.** `disk-space` halts below `policy.json` `preflight.min_free_gib` (default 1 GiB; `Options.MinFreeBytes` 0 takes it) and names `evolve gc`; `host-capabilities` still warns below its 500 MiB literal (`checks.go` is a protected control-plane path). `CheckDiskSpace` is exported so the wave boundary (`cmd/evolve` `diskSpaceHalt`) runs the same check. `statfs` block sizes of zero or less are rejected, so an unchecked cast cannot wrap into a huge "ample disk" value.
 - **The disk-free probe has one implementation.** `DiskFreeBytes` exports the same probe, including its stub for platforms without `statfs`, so `evolve gc` can report the disk it released without a second `statfs` wrapper (`TestDiskFreeBytes_MeasuresTheFilesystemHoldingThePath`).
 - **External contracts on the source.** `go/acs/cycle2` requires `checks.go` to call `ReapOrphans` and not to contain the text `stale bridge tmux session(s)`. `checks.go` and `drivers.go` are on the integrity surface (`internal/guards/integrity_surface.go`), because they hold the pre-spend required-sandbox halt and the sandbox-enabled profile discovery behind it.
+- **Small reasons in the checks.**
+  - The boot check uses a negative exit code for a failed workspace setup (`exitWorkspaceSetupFailed`). So a `MkdirTemp` failure never collides with a bridge exit code, and the check does not report it as `ExitBadFlags`. An unknown exit code carries its number, so distinct codes stay distinguishable.
+  - The disk probe converts `Bsize` with a `<= 0` guard. On linux `Bsize` is an `int64`, and a wrapped cast reads as ample disk. On a platform without support, the host check skips the warning.
+  - The version-drift check saves the current inventory on a best-effort basis: a failed save costs only the comparison of the next batch. A version probe that hangs drops its binary from the inventory and does not stall the start of the batch.
+  - The canary removes its sentinel on a best-effort basis, because POSIX unlinks the file whatever `Close` returns. Only a permission error counts as a denied write. Another setup failure stays unverified.
+  - `PrettyJSON` cannot fail for these field types. A failure is surfaced and is never returned as an empty payload.
+  - A hung `brew` goes to the warn-on-ambiguity path (`pinnedListerTimeout`). A tmux that does not answer must abandon the kill and not hang the boot of the loop. A headless launch does not run the updater, so only `*-tmux` drivers are checked.
+  - `withEvidenceWarnings` turns a Pass into a Warn and keeps a Halt as a Halt.
 
 ## Findings
 

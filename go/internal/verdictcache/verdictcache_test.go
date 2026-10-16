@@ -10,7 +10,6 @@ import (
 
 func fixedNow() time.Time { return time.Date(2026, 6, 13, 12, 0, 0, 0, time.UTC) }
 
-// TestPutThenLookup_RoundTrips: a put verdict is found by its tree SHA.
 func TestPutThenLookup_RoundTrips(t *testing.T) {
 	root := t.TempDir()
 	s := NewStore(root, fixedNow)
@@ -30,7 +29,6 @@ func TestPutThenLookup_RoundTrips(t *testing.T) {
 	}
 }
 
-// TestLookup_Miss: an unknown tree SHA misses.
 func TestLookup_Miss(t *testing.T) {
 	s := NewStore(t.TempDir(), fixedNow)
 	if _, ok := s.Lookup("nope"); ok {
@@ -38,9 +36,6 @@ func TestLookup_Miss(t *testing.T) {
 	}
 }
 
-// TestPut_EmptyTreeSHA_NoOp: a verdict with no content key cannot be cached
-// (content-addressed by definition) — Put is a no-op, never an error, and the
-// entry is not retrievable under the empty key.
 func TestPut_EmptyTreeSHA_NoOp(t *testing.T) {
 	root := t.TempDir()
 	s := NewStore(root, fixedNow)
@@ -52,8 +47,6 @@ func TestPut_EmptyTreeSHA_NoOp(t *testing.T) {
 	}
 }
 
-// TestPut_Persists: a put survives a fresh Store over the same root (atomic
-// file write), and the on-disk file is the documented path.
 func TestPut_Persists(t *testing.T) {
 	root := t.TempDir()
 	if err := NewStore(root, fixedNow).Put(Entry{TreeSHA: "t1", Cycle: 7, Verdict: "WARN"}); err != nil {
@@ -68,9 +61,6 @@ func TestPut_Persists(t *testing.T) {
 	}
 }
 
-// TestLoad_CorruptFile_DegradesToEmpty: a corrupt cache file degrades to an
-// empty store (advisory, self-invalidating — a miss only costs a full run,
-// never correctness; same contract as clihealth).
 func TestLoad_CorruptFile_DegradesToEmpty(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -83,7 +73,6 @@ func TestLoad_CorruptFile_DegradesToEmpty(t *testing.T) {
 	if _, ok := s.Lookup("anything"); ok {
 		t.Error("corrupt file must degrade to empty (no hit)")
 	}
-	// And a Put over a corrupt file recovers (starts fresh).
 	if err := s.Put(Entry{TreeSHA: "recovered", Cycle: 1, Verdict: "PASS"}); err != nil {
 		t.Fatalf("Put over corrupt file: %v", err)
 	}

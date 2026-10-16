@@ -1,13 +1,5 @@
 package outcome
 
-// recorder_test.go — unit 01 (ADR-0103, design decomposition/01-outcome-recorder.md):
-// the C1 recording chokepoint as its own small unit. Every terminal phase
-// disposition is recorded exactly once — into the cycle result, the
-// phase-timing log and the <phase>-usage.json sidecar — with EndedAt, the
-// archetype and the context fill stamped here, the orchestrator's emission
-// hook called at the same point as before, and the unit's own failure modes
-// raised as outcome.warning signals under module outcome.
-
 import (
 	"encoding/json"
 	"math"
@@ -167,7 +159,7 @@ func TestRecorder_WritePhaseTimings_RenameFailureSignals(t *testing.T) {
 	c, got := recordingSignals()
 	r, _ := newTestRecorder(c)
 	ws := t.TempDir()
-	if err := os.MkdirAll(phasetiming.Path(ws), 0o755); err != nil { // a directory where the file must land: the rename fails
+	if err := os.MkdirAll(phasetiming.Path(ws), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	out := r.WritePhaseTimings(ws, []phasetiming.Entry{{Phase: "scout"}})
@@ -182,7 +174,7 @@ func TestRecorder_WritePhaseTimings_RenameFailureSignals(t *testing.T) {
 func TestRecorder_WritePhaseTimings_TempWriteFailureSignals(t *testing.T) {
 	c, got := recordingSignals()
 	r, _ := newTestRecorder(c)
-	ws := filepath.Join(t.TempDir(), "missing-dir") // no workspace dir: the temp write fails
+	ws := filepath.Join(t.TempDir(), "missing-dir")
 	r.WritePhaseTimings(ws, []phasetiming.Entry{{Phase: "scout"}})
 	if len(*got) != 1 || (*got)[0].Code != CodeTimingWriteFailed || !strings.Contains((*got)[0].Reason, "write") {
 		t.Fatalf("a failed temp write is a WARN naming the step: %+v", *got)
@@ -234,7 +226,7 @@ func TestWithSignals_NilIsTheNullObject(t *testing.T) {
 	}
 	result := &cyclestate.CycleResult{Cycle: 1}
 	var timings []phasetiming.Entry
-	r.Record(result, &timings, "", scoutOutcome()) // the skip path with no Center must not panic
+	r.Record(result, &timings, "", scoutOutcome())
 	if len(timings) != 1 {
 		t.Fatalf("the record still happens through the Null Object: %+v", timings)
 	}
@@ -248,10 +240,6 @@ func TestOutcomeCodes_AreRegisteredWithDocs(t *testing.T) {
 	}
 }
 
-// The sidecar's bytes are the pre-extraction rendering: indent-2 JSON in this
-// field order, empty stamps omitted, tokens always present (a struct is never
-// omitted by omitempty) — the dossier producer and `evolve cycle timing` read
-// this file.
 func TestRecorder_Record_WritesTheUsageSidecarByteIdentical(t *testing.T) {
 	c, _ := recordingSignals()
 	r, _ := newTestRecorder(c)
@@ -275,7 +263,6 @@ func TestRecorder_Record_WritesTheUsageSidecarByteIdentical(t *testing.T) {
 	}
 }
 
-// A canonical tier yields a real fill; the timing entry carries it.
 func TestRecorder_Record_StampsTheContextFillForACanonicalTier(t *testing.T) {
 	c, _ := recordingSignals()
 	r, _ := newTestRecorder(c)
@@ -293,8 +280,6 @@ func TestRecorder_Record_StampsTheContextFillForACanonicalTier(t *testing.T) {
 	}
 }
 
-// A non-finite float is the one way a plain struct fails to encode; the
-// failure is a signal and the sidecar is not truncated to nothing.
 func TestRecorder_Record_MarshalFailureIsAWarnSignalAndWritesNothing(t *testing.T) {
 	c, got := recordingSignals()
 	r, _ := newTestRecorder(c)
@@ -338,9 +323,6 @@ func TestRecorder_WritePhaseTimings_MarshalFailureSignalsAndLeavesTheLogUntouche
 	}
 }
 
-// The Center is read through the accessor at every use, so a Center that
-// arrives after construction (the orchestrator's WithSignalCenter option
-// applied late, as tests do) receives the unit's signals.
 func TestWithSignals_ReadsTheCenterLive(t *testing.T) {
 	var late *signalcenter.Center
 	r := NewRecorder(fixedNow, archetypeOf, func(int, recovery.PhaseOutcome) {}, WithSignals(func() *signalcenter.Center { return late }))

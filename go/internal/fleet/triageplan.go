@@ -5,16 +5,14 @@ import (
 	"fmt"
 )
 
-// triageDecision is the subset of triage-decision.json (schema owned by triagecap.ReadDeclaredFloors) read here.
 type triageDecision struct {
 	CommittedFloors []string `json:"committed_floors"`
 	TopN            []struct {
 		ID    string   `json:"id"`
-		Files []string `json:"files"` // declared footprint; absent keeps the card an id-only island
+		Files []string `json:"files"`
 	} `json:"top_n"`
 }
 
-// PlanFromTriage partitions a wave's triage-decision.json into up to count disjoint specs plus the refused ids.
 func PlanFromTriage(decisionJSON []byte, cardPackages []string, count int, routed RoutedFn) ([]CycleSpec, []string, error) {
 	todos, refused, err := TodosFromTriage(decisionJSON, cardPackages, routed)
 	if err != nil {
@@ -24,11 +22,8 @@ func PlanFromTriage(decisionJSON []byte, cardPackages []string, count int, route
 	return specs, refused, nil
 }
 
-// RoutedFn reports whether an id is console-routed and why; a nil RoutedFn refuses nothing.
-// See ADR-0074.
 type RoutedFn func(id string) (routed bool, reason string)
 
-// TodosFromTriage parses triage-decision.json (committed_floors, else cardPackages, else top_n) into deduplicated todos.
 func TodosFromTriage(decisionJSON []byte, cardPackages []string, routed RoutedFn) (todos []Todo, refused []string, err error) {
 	var decision triageDecision
 	if len(decisionJSON) > 0 {

@@ -1,12 +1,5 @@
-// Package flock provides the tiny blocking cross-process file lock shared
-// by the adapters that serialize short read-modify-write critical sections
-// (ledger.Append CA.1, storage.UpdateState CA.3). BLOCKING by design —
-// unlike the storage project lock (LOCK_NB → ErrLockHeld), these writers
-// must serialize, never refuse; every critical section is one read + one
-// write, so waits are bounded in practice.
-//
-// flock(2) locks are per open-file-description, so two opens in the SAME
-// process also contend — Lock serializes goroutines and processes alike.
+// Package flock provides the blocking and non-blocking cross-process file locks of the adapters.
+// See docs/architecture/packages/internal-adapters-flock.md.
 package flock
 
 import (
@@ -17,24 +10,12 @@ import (
 	"syscall"
 )
 
-// flockFn is the syscall seam so tests can drive flock-error branches
-// without a second process.
 var flockFn = syscall.Flock
 
-// ShipLockPath is the single source of truth for the shared git-mutation
-// advisory-lock file: <projectRoot>/.evolve/ship.lock. Every writer that
-// mutates the shared main-repo .git/index — the ship integrator's
-// add/commit/merge/push cluster AND the cycle-dossier closeout commit — MUST
-// Lock this exact path so their sections are mutually exclusive on the one
-// shared index. A second string literal of this path anywhere silently
-// reopens the .git/index.lock race, so both call sites resolve it here.
 func ShipLockPath(projectRoot string) string {
 	return filepath.Join(projectRoot, ".evolve", "ship.lock")
 }
 
-// Lock blocks until the exclusive lock on path is held. The returned
-// release unlocks and closes; call it exactly once (idempotence is the
-// caller's concern — defer it).
 func Lock(path string) (release func(), err error) {
 	f, err := openLockFile(path)
 	if err != nil {
@@ -64,8 +45,6 @@ func LockShared(path string) (release func(), err error) {
 
 func lockFile(f *os.File, path string, how int) (release func(), err error) {
 	err = flockFn(int(f.Fd()), how)
-	// KeepAlive: f must outlive the raw-fd syscall — without it the GC may
-	// finalize (close) f between Fd() and the flock completing.
 	runtime.KeepAlive(f)
 	if err != nil {
 		_ = f.Close()

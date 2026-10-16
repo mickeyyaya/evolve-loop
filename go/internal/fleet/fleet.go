@@ -14,18 +14,14 @@ import (
 
 var errNoLaunch = errors.New("fleet: no LaunchFn configured")
 
-// CycleSpec describes one cycle the supervisor will launch.
 type CycleSpec struct {
-	GoalHash string   // --goal-hash for `evolve cycle run`
-	Scope    []string // todo IDs this cycle owns; mirrored in Env[ipcenv.FleetScopeKey]
-	// OutputContract is the cycle's done-definition, passed as --goal; empty keeps the goal-hash goal.
+	GoalHash       string
+	Scope          []string
 	OutputContract string
-	Env            map[string]string // base env overlay; EVOLVE_FLEET is forced on
-	// Optional marks a cycle whose exhausted failure is quarantined instead of aborting the campaign.
-	Optional bool
+	Env            map[string]string
+	Optional       bool
 }
 
-// Result is one launched cycle's outcome (input order).
 type Result struct {
 	Index    int
 	ExitCode int
@@ -53,17 +49,14 @@ func (r Result) Status() LaneStatus {
 	}
 }
 
-// LaunchFn launches one cycle to completion and returns its process exit code.
 type LaunchFn func(ctx context.Context, spec CycleSpec) (exitCode int, err error)
 
-// Supervisor launches a fleet of concurrent cycles.
 type Supervisor struct {
 	Launch       LaunchFn
-	Concurrency  int           // max concurrent cycles; <=0 → all at once
-	CycleTimeout time.Duration // per-launch deadline that reaps a wedged child; 0 = none
+	Concurrency  int
+	CycleTimeout time.Duration
 }
 
-// Validate reports a nil LaunchFn before any launch is scheduled.
 func (s *Supervisor) Validate() error {
 	if s.Launch == nil {
 		return errNoLaunch
@@ -71,7 +64,6 @@ func (s *Supervisor) Validate() error {
 	return nil
 }
 
-// Run launches every spec in fleet mode, bounded by Concurrency, and returns results in input order.
 func (s *Supervisor) Run(ctx context.Context, specs []CycleSpec) []Result {
 	results := make([]Result, len(specs))
 	if len(specs) == 0 {
@@ -104,7 +96,6 @@ func (s *Supervisor) Run(ctx context.Context, specs []CycleSpec) []Result {
 }
 
 func (s *Supervisor) launchOne(ctx context.Context, i int, spec CycleSpec, width int) Result {
-	// Copy so the caller's map is never mutated; core.shipRecoveryBudget scales with the width.
 	env := make(map[string]string, len(spec.Env)+2)
 	for k, v := range spec.Env {
 		env[k] = v

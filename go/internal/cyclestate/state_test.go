@@ -30,7 +30,6 @@ func TestState_RoundTrip(t *testing.T) {
 	if !reflect.DeepEqual(in, out) {
 		t.Errorf("round-trip mismatch:\n in=%+v\nout=%+v", in, out)
 	}
-	// DeepEqual cannot see a tag rename; only the wire names can.
 	for _, want := range []string{
 		`"lastCycleNumber"`, `"failedApproaches"`, `"carryoverTodos"`, `"currentBatch"`,
 		`"cycleAccruedCostUSD"`, `"retrospected"`, `"first_seen_cycle"`, `"floors"`,

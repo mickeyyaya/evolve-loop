@@ -15,50 +15,33 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Source identifies how a Result's usage was obtained.
 type Source string
 
 const (
-	// SourceNone means no source observed the launch; Usage is zero.
-	SourceNone Source = "none"
-	// SourceTranscript means usage was recovered from an attributed Claude Code transcript.
+	SourceNone       Source = "none"
 	SourceTranscript Source = "transcript"
 )
 
-// Window identifies the launch whose token usage is recovered, and carries each tier's input.
 type Window struct {
-	// Worktree is the exact-cwd fallback key, used only when ArtifactPath is empty.
-	Worktree string
-	// ArtifactPath is the primary attribution key, stamped into the launch's first user message.
-	ArtifactPath  string
-	EventsLogPath string
-	// Scrollback is the captured pane content, not a pane id.
-	Scrollback string
-	// Driver is the launch's CLI identity, such as "claude-tmux" or "codex"; empty means claude.
+	Worktree       string
+	ArtifactPath   string
+	EventsLogPath  string
+	Scrollback     string
 	Driver         string
 	TokenLineRegex string
-	// Start and End bound, inclusively, the assistant turns that count.
-	Start time.Time
-	End   time.Time
+	Start          time.Time
+	End            time.Time
 }
 
-// Result is a launch's recovered usage, the Source that produced it, and the derived fill reading.
 type Result struct {
-	// Usage is the launch's total spend, summed across its turns.
-	Usage  cyclestate.TokenUsage
-	Source Source
-	// Warn names the driver when no source observed the launch, so unmeasured never reads as free.
-	Warn string
-	// FillPct is the percent of the driver's effective window in use, or FillPctUnmeasured.
-	FillPct float64
-	// PeakPromptTokens is the fullest single turn's prompt side: 0 when the tier reports no
-	// turns, negative when turns were expected but none fell inside the Window.
+	Usage            cyclestate.TokenUsage
+	Source           Source
+	Warn             string
+	FillPct          float64
 	PeakPromptTokens int
-	// PeakUsage holds the counters of that same fullest turn.
-	PeakUsage cyclestate.TokenUsage
+	PeakUsage        cyclestate.TokenUsage
 }
 
-// transcriptLine is the subset of a Claude Code transcript JSONL record the scanner reads.
 type transcriptLine struct {
 	Type      string `json:"type"`
 	Cwd       string `json:"cwd"`
@@ -71,7 +54,6 @@ type transcriptLine struct {
 			CacheRead  int `json:"cache_read_input_tokens"`
 			CacheWrite int `json:"cache_creation_input_tokens"`
 		} `json:"usage"`
-		// Content is a bare string or an array of text blocks, kept raw for contentText.
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
 }
@@ -90,14 +72,12 @@ func predatesWindow(d os.DirEntry, w Window) bool {
 	return info.ModTime().Before(w.Start.Add(-transcriptMtimeSlack))
 }
 
-// ScanConfigRoot sums the usage of the transcripts under root/projects attributed to w; finding none is SourceNone, not an error.
 func ScanConfigRoot(root string, w Window) (Result, error) {
 	projects := filepath.Join(root, "projects")
 	if _, err := os.Stat(projects); err != nil {
 		return Result{Source: SourceNone}, nil
 	}
 
-	// Streamed deltas repeat a message id and are cumulative, so only the last one per id counts.
 	perMsg := map[string]cyclestate.TokenUsage{}
 	matched := false
 	warn := ""
@@ -127,8 +107,6 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	if !matched {
 		return Result{Source: SourceNone}, nil
 	}
-	// The sum is what the launch cost; the peak turn is how full its window got.
-	// perMsg has no reliable turn order, so the peak stands in for the last turn.
 	var total cyclestate.TokenUsage
 	peak := promptTokensUnmeasured
 	var peakUsage cyclestate.TokenUsage
@@ -163,7 +141,6 @@ func recordAssistantUsage(perMsg map[string]cyclestate.TokenUsage, lines []trans
 	}
 }
 
-// readLines skips unparseable lines; it returns nil for a file it cannot open and the scanner's error when a line overruns the buffer.
 func readLines(path string) ([]transcriptLine, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -184,19 +161,14 @@ func readLines(path string) ([]transcriptLine, error) {
 	return out, sc.Err()
 }
 
-// artifactMarker is the label both subagent prompt assemblers stamp before the deliverable path.
 const artifactMarker = "Artifact path: "
 
-// artifactAnchors are every label a prompt puts before its deliverable path; anchor+path keeps a prompt that only
-// cites another launch's artifact from being billed to it. A dropped form silently degrades its launches to scrollback.
 var artifactAnchors = []string{
 	artifactMarker,
 	phasecontract.FooterMarker + " ",
 	"<artifact-path>",
 }
 
-// attributes matches the anchored ArtifactPath when set, else an exact cwd; cwd is lossy across the exec boundary.
-// See ADR-0071.
 func attributes(lines []transcriptLine, w Window) bool {
 	if w.ArtifactPath != "" {
 		text := firstUserText(lines)
@@ -225,7 +197,6 @@ func firstUserText(lines []transcriptLine) string {
 	return ""
 }
 
-// contentText decodes both content forms; real transcripts carry the phase prompt as a bare string.
 func contentText(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
@@ -247,7 +218,6 @@ func contentText(raw json.RawMessage) string {
 	return ""
 }
 
-// withinWindow admits a turn with no parseable timestamp, since its transcript is already attributed.
 func withinWindow(ts string, w Window) bool {
 	if ts == "" {
 		return true

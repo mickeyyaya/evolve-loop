@@ -447,3 +447,16 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // another section and never counts, and a malformed "## Decision Trace" is out
 // of scope by construction — this reads the Selected Tasks body only.
 ```
+
+## comment-zero d11
+
+### `go/internal/evalgate/slugs.go:65` — above `var slugLineRE = regexp.MustCompile('(?m)^[*\-]\s*\*\*Slug:\*\*\s*' + "'" + '?([a-z0-9][a-z0-9-]*)')`
+
+```text
+// slugLineRE matches a "- **Slug:** <kebab>" bullet (bullet * or -). The slug may
+// be backticked, the form real reports also emit. That widening is a deliberate
+// capability increase: measured 2026-09-15, it changes the SelectedSlugs union on
+// 6 of 84 cycle-16xx reports, and 2 become newly blockable at Gate A because their
+// eval is absent: cycle-1664 (settle-wait-stability-shortcircuit) and cycle-1669
+// (verdict-tool-call-claudep). TestSlugLineWideningIsNotBlockingNeutral pins it.
+```

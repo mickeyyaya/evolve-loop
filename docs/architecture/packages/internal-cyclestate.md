@@ -33,6 +33,20 @@
 - **Refusal dispositions.** A code that names an item charges that item's `failure_count`. `TRIAGE_PROTECTED_SURFACE` also routes its subject to the operator on the first hit; since ADR-0106 R1 the code normally travels as a warning on a PASS while the host moves the card out of `top_n`, and this disposition governs only the fail-closed FAIL. `TRIAGE_COMMITMENT_INVALID` is stamped on I/O faults reading the triage decision, so it never charges the queue. An unknown or empty code charges nobody. Pinned by `TestRefusalDisposition_TableBesideTheVocabulary`.
 - **`ClassificationMidExecutionFail` stays outside failurelog's taxonomy.** `NormalizeLegacy` maps it to the unknown class, so records carrying it age out on the one-day `LegacyEffectiveTTL`. That was an operator decision ([03b](../decomposition/03b-failure-learning-engine.md)). Pinned by `TestClassificationMidExecutionFail_IsOutsideTheTaxonomy` (`internal/failurelog`) and `TestRecurrence_DenylistNamesTheEnginesDefaultClass` (`internal/recurrence`).
 - **`CarryoverTodo.CyclesUnpicked` is dead.** It is written as 0 and never incremented. Per-task failure memory is the inbox item's `failure_count`. It stays for wire compatibility, and no new reads should be added ([queue audit](../../operations/queue-audit-2026-08-27.md)).
+- **Field reasons that the types cannot say.**
+  - `CycleResult.Remediations` records fix-forward rounds as `<gate>: round N -> <verdict>`. It is provenance only, because the verdict of the re-run is the one recorded.
+  - `CycleResult.TerminationReason` is a host-owned terminal disposition that phase artifacts cannot rebuild safely. Empty means the ordinary closeout path.
+  - `RetroDecision` has the format `<action>: <reason>` and is set only when retro ran.
+  - `Diagnostic.Code` is stamped by the deterministic gate of a phase and is empty on an agent diagnostic. `Subject` names the item that the code concerns, such as a `top_n` card id.
+  - `State` is a subset view of `.evolve/state.json`, and the `WriteState` of the orchestrator drops every key that the type does not model. `StateRevision` counts one for each `UpdateState` read-write cycle, so a gap or a repeat exposes a writer that bypassed the lock. `LastAllocatedCycleNumber` is the highest number ever minted. `LastCycleNumber` is the highest completed number. `UpdateState` bumps the first before a run starts, so a crashed run burns its number.
+  - `TriageThroughput` is the rolling window of coverage floors passed per recent PASS cycle. It bounds the floor commitments of triage, and `internal/triagecap` owns its operations.
+  - `CarryoverTodo.ExpiresAt` (RFC3339) is inherited from the `FailedRecord` that it came from, so the prune at loop start ages the todo out. Empty means that it is never pruned automatically.
+  - `CycleState.RunID` is the ULID that `RunCycle` mints. Every ledger entry of the run carries it.
+  - `GoalHash` and `GoalText` carry the original request across quota pauses. A legacy checkpoint lacks them, and resume then resolves conservatively. `ExplanationDocumentationVersion` is the Build explanation contract version that the cycle activated. Zero grandfathers a legacy checkpoint.
+  - `PreCycleHEAD` keeps the closeout baseline across a pause after Ship. A new capture on resume loses the completed ship.
+  - `AuditRepairActive` is true only inside a granted repair round. The monotonic `AuditRepairAttempts` cannot gate the repair brief without leaking it into later re-entries. `AuditDispatches` counts dispatches and not completions, and it is bumped before the pre-phase checkpoint write, so a resume retires an interrupted round.
+  - `FinalVerdict` is the floor-gated disposition at the last completed phase. A resume after the audit keeps it and does not default to PASS.
+- **Test fixtures.** `TestPhaseConstants` lists the constants in a slice. A map keyed by the constant compares each value with itself. The round-trip tests compare wire names, because `DeepEqual` cannot see a tag rename.
 
 ## Findings
 

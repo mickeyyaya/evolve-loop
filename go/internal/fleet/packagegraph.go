@@ -10,10 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// modulePrefix limits conflicts to module-internal imports, so a shared stdlib import never conflicts.
 const modulePrefix = "github.com/mickeyyaya/evolve-loop/go/"
 
-// TransitivePackageSet returns the module-internal packages reachable from the packages holding files (module-root-relative).
 func TransitivePackageSet(files []string, repoRoot string) (map[string]bool, error) {
 	dirs := map[string]bool{}
 	for _, f := range files {
@@ -39,14 +37,12 @@ func TransitivePackageSet(files []string, repoRoot string) (map[string]bool, err
 	return set, nil
 }
 
-// globalZoneFiles can affect every package's build regardless of the import graph.
 var globalZoneFiles = []string{
 	"go.mod",
 	"go.sum",
 	".evolve/policy.json",
 }
 
-// IsGlobalZone reports whether file (any leading "./") is a global-zone file.
 func IsGlobalZone(file string) bool {
 	clean := filepath.Clean(file)
 	for _, gz := range globalZoneFiles {
@@ -57,21 +53,19 @@ func IsGlobalZone(file string) bool {
 	return false
 }
 
-// GlobalZoneFiles returns a copy of the fixed global-zone file list.
 func GlobalZoneFiles() []string {
 	out := make([]string, len(globalZoneFiles))
 	copy(out, globalZoneFiles)
 	return out
 }
 
-// PartitionGraph is [Partition] over transitive package sets, treating global-zone files as conflicting with every bucket.
 func PartitionGraph(todos []Todo, n int, repoRoot string) (buckets [][]Todo, deferred []Todo, err error) {
 	if n < 1 {
 		n = 1
 	}
 	buckets = make([][]Todo, n)
-	owner := map[string]int{} // module-internal package path -> owning bucket
-	gzBucket := -1            // bucket holding the global-zone todo(s); -1 = none yet
+	owner := map[string]int{}
+	gzBucket := -1
 
 	for _, td := range todos {
 		gzFiles, pkgFiles := splitGlobalZone(td.Files)
@@ -124,7 +118,6 @@ func resolveOwningBuckets(pkgs map[string]bool, owner map[string]int, buckets []
 	return owning
 }
 
-// splitGlobalZone separates global-zone files, which have no package to resolve, from package-graph files.
 func splitGlobalZone(files []string) (gzFiles, pkgFiles []string) {
 	for _, f := range files {
 		if IsGlobalZone(f) {

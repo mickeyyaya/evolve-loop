@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// freezeOptions returns goodPipelineOptions with a codex-tmux profile and scripted freeze seams.
 func freezeOptions(t *testing.T, evidence map[string]string, pinned []string, pinErr error) Options {
 	t.Helper()
 	opts := goodPipelineOptions(t)
@@ -126,7 +125,6 @@ func TestRun_VersionFreeze_Idempotent(t *testing.T) {
 	}
 }
 
-// agy has no registry entry; claude or codex would read this host's real updater state.
 func TestDefaultSelfUpdateEvidence_Unregistered(t *testing.T) {
 	ok, evidence, err := defaultSelfUpdateEvidence("agy")
 	if err != nil {
@@ -226,7 +224,6 @@ func TestRun_VersionFreeze_ClaudeNoSettings_Passes(t *testing.T) {
 }
 
 func TestDefaultSelfUpdateEvidence_Codex(t *testing.T) {
-	// Smoke: result depends on whether ~/.codex/version.json exists on this host.
 	_, _, err := defaultSelfUpdateEvidence("codex")
 	if err != nil {
 		t.Logf("defaultSelfUpdateEvidence(codex): %v (expected only if home dir unresolvable)", err)
@@ -234,7 +231,6 @@ func TestDefaultSelfUpdateEvidence_Codex(t *testing.T) {
 }
 
 func TestDefaultPinnedLister_Smoke(t *testing.T) {
-	// brew may be absent, so only a panic fails this.
 	_, _ = defaultPinnedLister()
 }
 

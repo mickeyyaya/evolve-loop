@@ -5,21 +5,15 @@ import (
 	"strings"
 )
 
-// Edge binds items A and B (slice indices); Reason renders into Batch.Reasons.
 type Edge struct {
 	A, B   int
 	Reason string
 }
 
-// Rule is one grouping signal; Classify unions the edges of every rule it is given.
 type Rule interface {
-	// Edges returns every pairing this signal justifies over items.
 	Edges(items []Item) []Edge
 }
 
-// DefaultRules returns the bounded structural rules: campaign and file area. ConnectsRule is opt-in.
-// root_cause is never a rule: its values are unique per-defect prose, so exact matching yields zero edges
-// (.evolve/state.json failedApproaches[54]).
 func DefaultRules() []Rule {
 	return []Rule{campaignRule{}, fileAreaRule{}}
 }
@@ -36,22 +30,18 @@ func (campaignRule) Edges(items []Item) []Edge {
 	var edges []Edge
 	for c, idx := range byCampaign {
 		for k := 1; k < len(idx); k++ {
-			// A spanning chain suffices: union-find needs connectivity, not the clique.
 			edges = append(edges, Edge{A: idx[k-1], B: idx[k], Reason: "campaign " + c})
 		}
 	}
 	return edges
 }
 
-// fileAreaRule binds items whose files share a package area (see fileArea).
 type fileAreaRule struct{}
 
 const areaDepth = 3
 
-// hubAreaMaxItems is the ceiling: an area more items share than this is a hub and carries no signal.
 const hubAreaMaxItems = 5
 
-// minAreaDepth is the floor: a single top-level directory is a bag of unrelated files, not a unit of work.
 const minAreaDepth = 2
 
 func (fileAreaRule) Edges(items []Item) []Edge {
@@ -79,10 +69,8 @@ func (fileAreaRule) Edges(items []Item) []Edge {
 	return edges
 }
 
-// fileArea returns f's directory capped at areaDepth segments, or "" when it is shallower than minAreaDepth.
 func fileArea(f string) string {
 	dir := path.Dir(f)
-	// A trailing "/" names a directory, which path.Dir would climb out of.
 	if strings.HasSuffix(f, "/") {
 		dir = strings.TrimSuffix(f, "/")
 	}
@@ -99,10 +87,8 @@ func fileArea(f string) string {
 	return strings.Join(seg, "/")
 }
 
-// ConnectsRule binds items through connects_to entries that begin with a known id; it is opt-in via Config.Rules.
 type ConnectsRule struct{}
 
-// Edges returns one edge per resolvable connects_to reference.
 func (ConnectsRule) Edges(items []Item) []Edge {
 	index := indexByID(items)
 	var edges []Edge
@@ -126,7 +112,6 @@ func indexByID(items []Item) map[string]int {
 	return index
 }
 
-// resolveRef matches an exact id first, then the first token of the prose form "id (why)".
 func resolveRef(ref string, index map[string]int) (int, bool) {
 	ref = strings.TrimSpace(ref)
 	if j, ok := index[ref]; ok {

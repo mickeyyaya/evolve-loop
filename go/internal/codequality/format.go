@@ -12,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// ModuleDir resolves the Go module directory under root: the conventional
-// `<root>/go` submodule when it exists, else root itself. Formatting callers
-// retain the historical root fallback on inspection errors. Safety decisions
-// use ResolveModuleDir so those errors remain visible.
 func ModuleDir(root string) string {
 	if root == "" {
 		return ""
@@ -26,10 +22,6 @@ func ModuleDir(root string) string {
 	return root
 }
 
-// ResolveModuleDir resolves a nested Go module only when go/go.mod exists and
-// preserves filesystem errors. Callers that use the result for a safety
-// decision must use this checked form: a support-only go/ directory is not a
-// module, and an unreadable path cannot be treated as absent.
 func ResolveModuleDir(root string) (string, error) {
 	if root == "" {
 		return "", nil
@@ -61,15 +53,6 @@ func isDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// FormatGoFiles applies `gofmt -w -s` to dir, rewriting every .go file that is
-// not already gofmt-s-clean (the same simplification CI and the audit gate
-// require, via the shared gofmt binary). It returns the parseable files it ran
-// gofmt over (those that were not already clean); the audit gofmt gate verifies
-// the result, so the return value is for reporting, not a clean guarantee. An
-// empty result means the tree was already clean. A missing gofmt binary is an
-// error — the normalizer cannot run. An unparseable file is left untouched for
-// the audit gate to reject: gofmt -w cannot fix code that does not parse, and
-// such code must never ship.
 func FormatGoFiles(dir string) ([]string, error) {
 	dirty, err := UnformattedGoFiles(dir)
 	if err != nil {
@@ -78,7 +61,7 @@ func FormatGoFiles(dir string) ([]string, error) {
 	var fixable []string
 	for _, f := range dirty {
 		if strings.HasPrefix(f, "gofmt parse error:") {
-			continue // gofmt -w cannot fix unparseable files; leave for the gate
+			continue
 		}
 		fixable = append(fixable, f)
 	}
@@ -90,8 +73,6 @@ func FormatGoFiles(dir string) ([]string, error) {
 		if !errors.As(werr, &exitErr) {
 			return nil, fmt.Errorf("gofmt -w -s %s: %w", dir, werr)
 		}
-		// gofmt RAN but a file failed to parse; the parseable files were still
-		// rewritten. The unparseable file is left for the audit gate to reject.
 	}
 	return fixable, nil
 }

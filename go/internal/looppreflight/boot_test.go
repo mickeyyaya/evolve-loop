@@ -12,7 +12,7 @@ import (
 )
 
 func TestRun_BridgeBoot_Skipped_Warns(t *testing.T) {
-	opts := goodPipelineOptions(t) // SkipBoot: true
+	opts := goodPipelineOptions(t)
 	r, err := Run(opts)
 	if err != nil {
 		t.Fatalf("Run: %v", err)

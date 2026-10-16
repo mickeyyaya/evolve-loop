@@ -18,23 +18,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/panewatch"
 )
 
-// Default observer timings; policy.ObserverPolicy supplies the live values.
 const (
-	// DefaultPollS is the interval between progress checks.
-	DefaultPollS = 5 * time.Second
-	// DefaultStallS is how long a phase may show no progress before Watch emits stall_no_output.
-	// See ADR-0030.
+	DefaultPollS  = 5 * time.Second
 	DefaultStallS = 600 * time.Second
-	// DefaultNudgeS is the soft-stall nudge threshold. The auto-spawn path sends
-	// no nudges yet; the constant waits for the engine fold.
-	// See ADR-0023.
 	DefaultNudgeS = 300 * time.Second
 
-	// observerEventsSuffix is excluded from the activity scan so the observer's
-	// own writes never reset the stall clock.
 	observerEventsSuffix = observerengine.EventsSuffix
 
-	// activityScanMaxFiles bounds the per-poll workspace walk against a pathological tree.
 	activityScanMaxFiles = 500
 )
 
@@ -45,11 +35,10 @@ const (
 	sourceStdout         = "stdout"
 )
 
-// Event is one observer emission, NDJSON-serialized.
 type Event struct {
 	TS       string `json:"ts"`
-	Type     string `json:"type"`     // started | stall_no_output | stall_probe_active | stopped
-	Severity string `json:"severity"` // info | incident
+	Type     string `json:"type"`
+	Severity string `json:"severity"`
 	Cycle    int    `json:"cycle"`
 	Phase    string `json:"phase"`
 	Agent    string `json:"agent"`
@@ -59,40 +48,31 @@ type Event struct {
 	Busy     bool   `json:"busy,omitempty"`
 }
 
-// Config pins the observer's runtime parameters.
 type Config struct {
-	StallS    time.Duration
-	PollS     time.Duration
-	Cycle     int
-	Phase     string
-	Agent     string
-	StdoutLog string
-	// WorkspaceDir, when set, makes a fresh file write anywhere under it count as
-	// progress; a tmux driver's output reaches the stdout log only at exit.
+	StallS       time.Duration
+	PollS        time.Duration
+	Cycle        int
+	Phase        string
+	Agent        string
+	StdoutLog    string
 	WorkspaceDir string
 
-	// LivenessProbe, when set, is consulted only at the stall threshold; true
-	// resets the stall clock and emits stall_probe_active instead of stall_no_output.
 	LivenessProbe func() bool
 
-	// OnEvent, when set, receives every event synchronously after the sink write
-	// and outside the sink lock. It must not block.
 	OnEvent func(Event)
 
 	PaneWatch func() (panewatch.Snapshot, bool, error)
 }
 
-// Observer watches one phase's stdout log and workspace and emits events when rules fire.
 type Observer struct {
-	cfg     Config
-	sink    io.Writer
-	quit    chan struct{}
-	once    sync.Once
-	encMu   sync.Mutex // serializes sink writes
-	nowFunc func() time.Time
+	cfg         Config
+	sink        io.Writer
+	quit        chan struct{}
+	once        sync.Once
+	sinkWriteMu sync.Mutex
+	nowFunc     func() time.Time
 }
 
-// New constructs an Observer; a zero StallS or PollS takes the package default.
 func New(cfg Config, sink io.Writer) *Observer {
 	if cfg.StallS == 0 {
 		cfg.StallS = DefaultStallS
@@ -108,8 +88,6 @@ func New(cfg Config, sink io.Writer) *Observer {
 	}
 }
 
-// Watch blocks until ctx is canceled or Stop is called. It returns ctx.Err()
-// on cancellation and nil on Stop; a stall emits stall_no_output but never ends the watch.
 func (o *Observer) Watch(ctx context.Context) error {
 	o.emit("started", "info", "observer attached")
 	st := watchState{lastGrowth: o.nowFunc(), lastSize: o.statSize(), lastActivity: o.newestActivity()}
@@ -217,8 +195,6 @@ func (o *Observer) outputStallReason() string {
 	return fmt.Sprintf("no stdout growth and no workspace file activity for %s", o.cfg.StallS)
 }
 
-// newestActivity returns the newest file mtime under WorkspaceDir, excluding
-// the observer's own events file. The zero Time means no signal.
 func (o *Observer) newestActivity() time.Time {
 	if o.cfg.WorkspaceDir == "" {
 		return time.Time{}
@@ -227,12 +203,11 @@ func (o *Observer) newestActivity() time.Time {
 	seen := 0
 	_ = filepath.Walk(o.cfg.WorkspaceDir, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // an unreadable entry is skipped, never fatal
+			return nil
 		}
 		if info.IsDir() {
 			return nil
 		}
-		// Skipped before the cap is charged: the observer's own sink is not work.
 		if strings.HasSuffix(info.Name(), observerEventsSuffix) {
 			return nil
 		}
@@ -248,13 +223,11 @@ func (o *Observer) newestActivity() time.Time {
 	return newest
 }
 
-// Stop signals the Watch goroutine to exit. Idempotent.
 func (o *Observer) Stop() error {
 	o.once.Do(func() { close(o.quit) })
 	return nil
 }
 
-// statSize returns the stdout log size, or 0 when it is unset or unreadable.
 func (o *Observer) statSize() int64 {
 	if o.cfg.StdoutLog == "" {
 		return 0
@@ -273,12 +246,11 @@ func (o *Observer) emit(eventType, severity, reason string) {
 func (o *Observer) emitEvent(e Event) {
 	e.TS = o.nowFunc().UTC().Format(time.RFC3339Nano)
 	e.Cycle, e.Phase, e.Agent = o.cfg.Cycle, o.cfg.Phase, o.cfg.Agent
-	o.encMu.Lock()
+	o.sinkWriteMu.Lock()
 	if b, err := json.Marshal(e); err == nil {
 		_, _ = o.sink.Write(append(b, '\n'))
 	}
-	o.encMu.Unlock()
-	// Outside the lock, so a slow subscriber cannot hold up other emits.
+	o.sinkWriteMu.Unlock()
 	if o.cfg.OnEvent != nil {
 		o.cfg.OnEvent(e)
 	}

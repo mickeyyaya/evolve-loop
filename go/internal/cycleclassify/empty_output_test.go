@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// emptyOutputWS seeds an unclassifiable orchestrator-report.md so Classify reaches the final passes.
 func emptyOutputWS(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -89,7 +88,6 @@ func TestClassify_EmptyStdoutButEventsTruncated_StaysBreach(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(ws, "build-stdout.log"), []byte(""), 0o644); err != nil {
 		t.Fatalf("write stdout: %v", err)
 	}
-	// The line must exceed the 1024-byte initial scanner buffer as well as the shrunk cap.
 	if err := os.WriteFile(filepath.Join(ws, "build-events.ndjson"),
 		[]byte(`{"kind":"tool_use","data":{"text":"`+strings.Repeat("x", 2000)+`"}}`+"\n"), 0o644); err != nil {
 		t.Fatalf("write events: %v", err)

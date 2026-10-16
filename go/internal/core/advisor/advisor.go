@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The six WARN codes of the routing/plan decision, registered with their reasons below.
 const (
 	CodeLaunchFailed        signalcenter.Code = "ADVISOR_LAUNCH_FAILED"
 	CodeResponseUnparseable signalcenter.Code = "ADVISOR_RESPONSE_UNPARSEABLE"
@@ -22,8 +21,6 @@ const (
 	CodeCaptureWriteFailed  signalcenter.Code = "ADVISOR_CAPTURE_WRITE_FAILED"
 )
 
-// The fields.step, fields.cause and fields.op vocabularies. The emit sites and the
-// registered reasons both build from these, so the stream and signal-codes.md cannot drift.
 const (
 	stepPreflight = "preflight"
 	stepDispatch  = "dispatch"
@@ -48,21 +45,18 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleAdvisor, CodeCaptureWriteFailed, "a redacted capture artifact (advisor-prompt-, advisor-response- or advisor-span-<kind>) could not be persisted (fields.artifact = prompt / response / span; fields.op = "+opMarshal+" / "+opWrite+" — marshal is dormant, a Span always marshals); the decision still returns and the remaining artifacts are still attempted; the ledger binds nothing for an absent capture; fields.step="+stepCapture+", path, decision, contract")
 }
 
-// Identity selects which LLM brain answers, shared by the phase and failure advisors (core.AgentIdentity).
 type Identity struct {
-	CLI        string // resolved from profile and env by the composition root
-	Model      string // a tier (fast/balanced/deep/top) or a raw family model
-	Profile    string // empty ⇒ derived from RouteInput.ProjectRoot
-	Persona    string // persona body (agents/evolve-*.md); empty ⇒ the legacy inline framing
-	AgentLabel string // the bridge "Agent" role tag (router / failure-advisor)
+	CLI        string
+	Model      string
+	Profile    string
+	Persona    string
+	AgentLabel string
 }
 
-// Launcher is the leaf-owned dispatch port that core adapts its Bridge to.
 type Launcher interface {
 	Launch(ctx context.Context, req LaunchRequest) (LaunchResponse, error)
 }
 
-// LaunchRequest is the fourteen bridge-request fields the launch sets; its json keys match the bridge's.
 type LaunchRequest struct {
 	CLI          string            `json:"cli"`
 	Profile      string            `json:"profile"`
@@ -80,7 +74,6 @@ type LaunchRequest struct {
 	Env          map[string]string `json:"env,omitempty"`
 }
 
-// LaunchResponse is the four bridge-response fields the advisor reads.
 type LaunchResponse struct {
 	ExitCode   int
 	Stdout     string
@@ -88,19 +81,14 @@ type LaunchResponse struct {
 	Tokens     cyclestate.TokenUsage
 }
 
-// ArtifactWriter persists one capture artifact; nil disables the capture.
 type ArtifactWriter func(path string, data []byte) error
 
-// RecentFiles lists the files recent commits touched under projectRoot; core injects its git reader.
 type RecentFiles func(projectRoot string) ([]string, error)
 
-// DepthCheck is the recursion-depth guard: true for the dispatch env refuses the launch.
 type DepthCheck func(env map[string]string) bool
 
-// OverlayResolver names the skill overlays for one attempted CLI.
 type OverlayResolver func(cli string) []string
 
-// Advisor owns the routing and plan decisions.
 type Advisor struct {
 	launcher      Launcher
 	identity      Identity
@@ -112,10 +100,8 @@ type Advisor struct {
 	route         llmroute.Plan
 }
 
-// Option configures an Advisor at construction.
 type Option func(*Advisor)
 
-// New builds an Advisor; a nil launcher fails every launch with "nil bridge", the fail-safe the orchestrator degrades on.
 func New(launcher Launcher, identity Identity, capture ArtifactWriter, opts ...Option) *Advisor {
 	a := &Advisor{
 		launcher:      launcher,
@@ -133,7 +119,6 @@ func WithRoute(walk llmroute.Plan) Option {
 	return func(a *Advisor) { a.route = walk }
 }
 
-// WithRecentFiles replaces the recon's recent-files reader.
 func WithRecentFiles(read RecentFiles) Option {
 	return func(a *Advisor) {
 		if read != nil {
@@ -142,12 +127,10 @@ func WithRecentFiles(read RecentFiles) Option {
 	}
 }
 
-// WithDepthCheck installs the recursion-depth guard.
 func WithDepthCheck(check DepthCheck) Option {
 	return func(a *Advisor) { a.checkDepth = check }
 }
 
-// WithOverlayResolver replaces the per-attempt skill-overlay resolver.
 func WithOverlayResolver(resolve OverlayResolver) Option {
 	return func(a *Advisor) {
 		if resolve != nil {
@@ -156,12 +139,10 @@ func WithOverlayResolver(resolve OverlayResolver) Option {
 	}
 }
 
-// WithSignals installs the Signal Center accessor, read at every use; a nil accessor or Center reports nothing.
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(a *Advisor) { a.signals = c }
 }
 
-// SignalsWired reports whether the advisor currently reaches a Center.
 func (a *Advisor) SignalsWired() bool { return a.center() != nil }
 
 func (a *Advisor) center() *signalcenter.Center {
@@ -180,7 +161,6 @@ func (a *Advisor) warn(in router.RouteInput, d decision, code signalcenter.Code,
 	})
 }
 
-// Propose implements router.Proposer: the per-transition advice on the next phase and optional inserts.
 func (a *Advisor) Propose(in router.RouteInput) (*router.Proposal, error) {
 	resp, err := a.launch(in, decisionProposal, buildRoutingPrompt(in))
 	if err != nil {
@@ -194,18 +174,14 @@ func (a *Advisor) Propose(in router.RouteInput) (*router.Proposal, error) {
 	return prop, nil
 }
 
-// Plan implements router.Planner: the advisory upfront whole-cycle run/skip plan.
-// See ADR-0024.
 func (a *Advisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 	return a.plan(in, decisionPlan)
 }
 
-// RePlan is the advisory whole-cycle re-plan once scout's handoff has populated in.Signals.
 func (a *Advisor) RePlan(in router.RouteInput) (*router.PhasePlan, error) {
 	return a.plan(in, decisionRePlan)
 }
 
-// plan composes the prompt before the launch guards run, so a recon fault reports ahead of a preflight refusal.
 func (a *Advisor) plan(in router.RouteInput, d decision) (*router.PhasePlan, error) {
 	resp, err := a.launch(in, d, a.composePlanPrompt(in, d, d.artifactFile()))
 	if err != nil {

@@ -18,12 +18,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// unverifiedReport mirrors the host harness's malformed report; it is long enough that the
-// 160-byte forensic tail is a real suffix.
 const unverifiedReport = "# audit\n(partial — no verdict sentinel, no challenge token)\n" +
 	"## Findings\n- one\n- two\n- three\n- four\n- five\n- six\n- seven\n- eight\n- nine\n- ten\n- eleven\n- twelve\n- thirteen\n- fourteen\n- fifteen\n- sixteen\n- seventeen\n- eighteen\n- nineteen\n- twenty\n"
 
-// seedStale writes a pre-dispatch leftover with an old mtime and returns its snapshot.
 func seedStale(t *testing.T, path, body string) Snapshot {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
@@ -53,7 +50,7 @@ func eventsWith(events []signalcenter.Event, code signalcenter.Code) []signalcen
 func TestReconcileTeardown_ArmOrderIsStaleOKOptionalACSFloorForensic(t *testing.T) {
 	t.Run("stale leftover refuses BOTH doors", func(t *testing.T) {
 		h := newHarness(t, probe{okFrom: 1})
-		h.writeACSFloor(t, "PASS") // the floor WOULD rescue this report if it were consulted
+		h.writeACSFloor(t, "PASS")
 		d := h.dispatch("audit", timeoutErr())
 		d.PreDispatch, d.HadPreDispatch = seedStale(t, d.ArtifactPath, reportWithToken), true
 		r, early, err := h.e.reconcile(context.Background(), d)
@@ -81,7 +78,7 @@ func TestReconcileTeardown_ArmOrderIsStaleOKOptionalACSFloorForensic(t *testing.
 		h := newHarness(t, probe{okFrom: 1})
 		d := h.dispatch("audit", timeoutErr())
 		d.PreDispatch, d.HadPreDispatch = seedStale(t, d.ArtifactPath, reportPASS), true
-		h.writeReport(t, "audit", reportPASS) // the agent rewrote it during the session
+		h.writeReport(t, "audit", reportPASS)
 		r, early, err := h.e.reconcile(context.Background(), d)
 		if early != nil || err != nil || !r.reconciled || r.acsFloorRescued {
 			t.Fatalf("a rewritten deliverable reconciles via Verify: %+v %+v %v", r, early, err)
@@ -303,7 +300,6 @@ func TestRescueViaACSFloor_RescuesOnlyAudit_PassPass_TokenEchoed_LateReadOnce(t 
 		if early != nil || err != nil || !r.acsFloorRescued || r.verified.ArtifactPath != d.ArtifactPath || r.verified.Content != reportWithToken {
 			t.Fatalf("the late read adopts path + bytes: %+v %+v %v", r, early, err)
 		}
-		// A directory at the path makes any second read visible.
 		if err := os.Remove(d.ArtifactPath); err != nil {
 			t.Fatal(err)
 		}
@@ -376,7 +372,7 @@ func TestReconcileTeardown_LeftoverRepairedByTheProbeIsStillRefused(t *testing.T
 	d.PreDispatch, d.HadPreDispatch = seedStale(t, d.ArtifactPath, fenced), true
 	repairing := func(_ Identity, phase string, roots phasecontract.Roots) (deliverable.Result, error) {
 		repaired := "# audit\n\n## Verdict\n**PASS**\n\n<!-- evolve-verdict: {\"verdict\": \"PASS\"} -->\n"
-		if err := os.WriteFile(d.ArtifactPath, []byte(repaired), 0o644); err != nil { // the gate's salvage persists
+		if err := os.WriteFile(d.ArtifactPath, []byte(repaired), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		return deliverable.Result{OK: true, Phase: phase, ArtifactPath: d.ArtifactPath, Content: repaired}, nil

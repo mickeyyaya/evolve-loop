@@ -14,8 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
-// makeMarketplace creates a fake marketplace directory at the given version.
-// Mirrors the bash test helper `make_marketplace`.
 func makeMarketplace(t *testing.T, version string) string {
 	t.Helper()
 	d := t.TempDir()
@@ -30,8 +28,6 @@ func makeMarketplace(t *testing.T, version string) string {
 	return d
 }
 
-// stubClock returns a (now, advance) pair. advance(dur) moves the clock
-// forward by dur, so deadline math is deterministic.
 func stubClock(start time.Time) (now func() time.Time, advance func(time.Duration)) {
 	var t atomic.Int64
 	t.Store(start.UnixNano())
@@ -43,7 +39,6 @@ func stubClock(start time.Time) (now func() time.Time, advance func(time.Duratio
 		}
 }
 
-// === Test 1: marketplace already at target → match on first poll ============
 func TestRun_MatchOnFirstPoll(t *testing.T) {
 	m := makeMarketplace(t, "1.2.3")
 	now, _ := stubClock(time.Now())
@@ -87,7 +82,6 @@ func TestRun_MatchOnFirstPoll(t *testing.T) {
 	}
 }
 
-// === Test 2: marketplace catches up after N polls ===========================
 func TestRun_MatchAfterDelay(t *testing.T) {
 	m := makeMarketplace(t, "0.9.0")
 	now, advance := stubClock(time.Now())
@@ -100,9 +94,7 @@ func TestRun_MatchAfterDelay(t *testing.T) {
 		MaxWait:        10 * time.Second,
 		PollInterval:   1 * time.Second,
 		Now:            now,
-		// Sleep advances our stub clock so we cross the poll interval.
-		Sleep: func(d time.Duration) { advance(d) },
-		// On the 3rd pull, bump the marketplace version.
+		Sleep:          func(d time.Duration) { advance(d) },
 		Pull: func(dir string) error {
 			pullCalls++
 			if pullCalls == 3 {
@@ -130,7 +122,6 @@ func TestRun_MatchAfterDelay(t *testing.T) {
 	}
 }
 
-// === Test 3: STALE-VERSION REGRESSION — never matches → ErrTimeout =========
 func TestRun_StaleVersionTimeout(t *testing.T) {
 	m := makeMarketplace(t, "0.9.0")
 	now, advance := stubClock(time.Now())
@@ -143,7 +134,7 @@ func TestRun_StaleVersionTimeout(t *testing.T) {
 		PollInterval:   1 * time.Second,
 		Now:            now,
 		Sleep:          func(d time.Duration) { advance(d) },
-		Pull:           func(string) error { return nil }, // never updates
+		Pull:           func(string) error { return nil },
 		ReleaseSh:      func(_, _ string) error { releaseCalls++; return nil },
 	})
 	if !errors.Is(err, ErrTimeout) {
@@ -160,7 +151,6 @@ func TestRun_StaleVersionTimeout(t *testing.T) {
 	}
 }
 
-// === Test 4: missing marketplace dir → ErrRuntime ===========================
 func TestRun_MissingMarketplaceDir(t *testing.T) {
 	now, _ := stubClock(time.Now())
 	_, err := Run(Options{
@@ -179,7 +169,6 @@ func TestRun_MissingMarketplaceDir(t *testing.T) {
 	}
 }
 
-// === Test 5: CACHE-REFRESH ORDERING — release.sh runs after match ===========
 func TestRun_ReleaseShCalledAfterConvergence(t *testing.T) {
 	m := makeMarketplace(t, "1.2.3")
 	now, _ := stubClock(time.Now())
@@ -209,13 +198,11 @@ func TestRun_ReleaseShCalledAfterConvergence(t *testing.T) {
 	}
 }
 
-// === Test 6: missing plugin.json → ErrRuntime ===============================
 func TestRun_MissingPluginJSON(t *testing.T) {
 	d := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(d, ".claude-plugin"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// No plugin.json file at all.
 	now, _ := stubClock(time.Now())
 	_, err := Run(Options{
 		Target:         "1.0.0",
@@ -230,7 +217,6 @@ func TestRun_MissingPluginJSON(t *testing.T) {
 	}
 }
 
-// === Test 7: --dry-run: no polling, no release.sh ===========================
 func TestRun_DryRun(t *testing.T) {
 	m := makeMarketplace(t, "0.9.0")
 	releaseCalls := 0
@@ -267,9 +253,6 @@ func TestRun_DryRun(t *testing.T) {
 	}
 }
 
-// === Test 8 (impl): invalid semver target → ErrRuntime ======================
-// (Test 8 in bash exercises arg parsing; that lives in the cmd layer. Here
-// we cover Run's own semver guard.)
 func TestRun_InvalidSemver(t *testing.T) {
 	now, _ := stubClock(time.Now())
 	_, err := Run(Options{
@@ -284,7 +267,6 @@ func TestRun_InvalidSemver(t *testing.T) {
 	}
 }
 
-// === Test 9: release.sh failure → ErrRuntime, FAIL message ==================
 func TestRun_ReleaseShFailure(t *testing.T) {
 	m := makeMarketplace(t, "1.2.3")
 	now, _ := stubClock(time.Now())
@@ -309,7 +291,6 @@ func TestRun_ReleaseShFailure(t *testing.T) {
 	}
 }
 
-// === Test 10: zero MaxWait → ErrRuntime =====================================
 func TestRun_ZeroMaxWait(t *testing.T) {
 	_, err := Run(Options{
 		Target:         "1.0.0",
@@ -334,7 +315,6 @@ func TestRun_ZeroPollInterval(t *testing.T) {
 	}
 }
 
-// === IsSemver unit table ====================================================
 func TestIsSemver(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -357,7 +337,6 @@ func TestIsSemver(t *testing.T) {
 	}
 }
 
-// === parseVersionField ======================================================
 func TestParseVersionField(t *testing.T) {
 	cases := []struct {
 		name string
@@ -380,7 +359,6 @@ func TestParseVersionField(t *testing.T) {
 	}
 }
 
-// === ReadMarketplaceVersion =================================================
 func TestReadMarketplaceVersion(t *testing.T) {
 	d := makeMarketplace(t, "5.5.5")
 	v, err := ReadMarketplaceVersion(d)
@@ -400,7 +378,6 @@ func TestReadMarketplaceVersion_MissingFile(t *testing.T) {
 	}
 }
 
-// === DefaultPull: non-git dir is no-op =====================================
 func TestDefaultPull_NonGitDir(t *testing.T) {
 	d := t.TempDir()
 	if err := DefaultPull(d); err != nil {
@@ -408,10 +385,6 @@ func TestDefaultPull_NonGitDir(t *testing.T) {
 	}
 }
 
-// === DefaultPull: .git directory present — git cmds run, errors swallowed ===
-// Exercises the git-checkout branch: when .git is a directory the function
-// runs git fetch + git reset; since d is not a real repo both fail, but
-// DefaultPull swallows every error and returns nil (mirrors bash behaviour).
 func TestDefaultPull_GitDirPresent_ExecutesGit_ErrorsSwallowed(t *testing.T) {
 	d := t.TempDir()
 	if err := os.Mkdir(filepath.Join(d, ".git"), 0o755); err != nil {
@@ -422,13 +395,6 @@ func TestDefaultPull_GitDirPresent_ExecutesGit_ErrorsSwallowed(t *testing.T) {
 	}
 }
 
-// === DefaultReleaseSh tests ==================================================
-
-// TestDefaultReleaseSh_AlwaysNil: DefaultReleaseSh is a Go-native no-op in v12+
-// (ADR-0062/T1.7) — it returns nil regardless of repo contents and never shells
-// out. The former Script{Absent,ExitsNonZero,ExitsOK} tests asserted the deleted
-// bash path and were removed; the no-shell-out guarantee is additionally proven
-// by TestDefaultReleaseSh_IgnoresLegacyScript (releasesh_noexec_test.go).
 func TestDefaultReleaseSh_AlwaysNil(t *testing.T) {
 	if err := DefaultReleaseSh(t.TempDir(), "1.2.3"); err != nil {
 		t.Errorf("DefaultReleaseSh = %v, want nil (Go no-op)", err)

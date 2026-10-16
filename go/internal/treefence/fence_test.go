@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// initRepo makes a repo with one commit, an ignore rule, and a pending
-// (uncommitted) builder change — the shape of a cycle worktree at audit time.
 func initRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -63,9 +61,6 @@ func TestRestore_UndoesEveryKindOfWriteAndLeavesIgnoredAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Take: %v", err)
 	}
-	// The auditor's mutation probes (cycles 1603-1605): rewrite a material
-	// file in place, revert a builder edit, drop a probe test into the package,
-	// delete a builder-added file, chmod a file, and build a binary (ignored).
 	write(t, dir, "src/mat.go", "package src // MUTATED by a probe\n")
 	write(t, dir, "src/keep.go", "package src // reverted to something else\n")
 	write(t, dir, "src/zz_probe_test.go", "package src // auditor probe\n")
@@ -103,7 +98,6 @@ func TestRestore_UndoesEveryKindOfWriteAndLeavesIgnoredAlone(t *testing.T) {
 	if got := read(t, dir, "bin/tool"); got != "binary\n" {
 		t.Error("ignored paths are outside the fence and must be left alone")
 	}
-	// Idempotent: a second restore over the restored tree changes nothing.
 	again, err := snap.Restore(ctx)
 	if err != nil || len(again.Restored) != 0 {
 		t.Fatalf("second Restore = %v, %v; want no-op", again.Restored, err)
@@ -149,9 +143,6 @@ func TestTake_DoesNotTouchTheRealIndex(t *testing.T) {
 	}
 }
 
-// TestRestore_UndoesTypeChangesInBothDirections — a tracked file turned into
-// a directory, and a tracked directory turned into a file: whichever order git
-// lists the two sides in, the removal runs first and the restore completes.
 func TestRestore_UndoesTypeChangesInBothDirections(t *testing.T) {
 	t.Parallel()
 	dir := initRepo(t)
@@ -160,14 +151,11 @@ func TestRestore_UndoesTypeChangesInBothDirections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// file → directory
 	if err := os.Remove(filepath.Join(dir, "src/keep.go")); err != nil {
 		t.Fatal(err)
 	}
 	write(t, dir, "src/keep.go/nested.go", "package nested\n")
-	// directory → file
 	if err := os.RemoveAll(filepath.Join(dir, "src")); err == nil {
-		// keep src; instead turn a fresh tracked dir into a file
 	}
 	res, err := snap.Restore(ctx)
 	if err != nil {
@@ -179,7 +167,6 @@ func TestRestore_UndoesTypeChangesInBothDirections(t *testing.T) {
 	if got := read(t, dir, "src/mat.go"); got != "package src // builder change\n" {
 		t.Fatalf("sibling lost during the type-change restore: %q", got)
 	}
-	// directory → file, on a tracked directory of its own
 	dir2 := initRepo(t)
 	snap2, err := Take(ctx, dir2)
 	if err != nil {
@@ -200,7 +187,6 @@ func TestRestore_UndoesTypeChangesInBothDirections(t *testing.T) {
 	}
 }
 
-// TestRestore_PrunesDirectoriesThePhaseCreated — no empty-directory litter.
 func TestRestore_PrunesDirectoriesThePhaseCreated(t *testing.T) {
 	t.Parallel()
 	dir := initRepo(t)
@@ -224,15 +210,12 @@ func TestRestore_PrunesDirectoriesThePhaseCreated(t *testing.T) {
 	}
 }
 
-// TestFenceEnd_DistinguishesInertTakeErrFromGenuineEmptyRestore: both an
-// inert fence and a clean restore report an empty Kept; TakeErr and Verified
-// tell them apart.
 func TestFenceEnd_DistinguishesInertTakeErrFromGenuineEmptyRestore(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("inert fence (Take failed) sets TakeErr and never verifies", func(t *testing.T) {
 		t.Parallel()
-		f := Begin(ctx, t.TempDir(), true) // not a repository: Take must fail
+		f := Begin(ctx, t.TempDir(), true)
 		out := f.End(ctx)
 		if out.TakeErr == nil {
 			t.Fatal("TakeErr = nil, want non-nil for an inert fence (Take failed against a non-repository)")
@@ -248,7 +231,7 @@ func TestFenceEnd_DistinguishesInertTakeErrFromGenuineEmptyRestore(t *testing.T)
 	t.Run("genuine restore that verifies and keeps nothing has no TakeErr", func(t *testing.T) {
 		t.Parallel()
 		dir := initRepo(t)
-		f := Begin(ctx, dir, true) // no writable paths: nothing may be kept
+		f := Begin(ctx, dir, true)
 		out := f.End(ctx)
 		if out.TakeErr != nil {
 			t.Fatalf("TakeErr = %v, want nil: Take succeeded against a real repository", out.TakeErr)
@@ -297,10 +280,8 @@ func TestFenceEnd_KeepsASameSizeRewriteInTheRealIndexsTimestampTick(t *testing.T
 	}
 }
 
-// TestTake_IgnoresAmbientGitEnvironment — GIT_DIR/GIT_WORK_TREE from the
-// parent process must never redirect the fence to another repository.
 func TestTake_IgnoresAmbientGitEnvironment(t *testing.T) {
-	dir := initRepo(t) // before the ambient vars: the fixture's own git must not be redirected
+	dir := initRepo(t)
 	t.Setenv("GIT_DIR", filepath.Join(t.TempDir(), "nowhere"))
 	t.Setenv("GIT_WORK_TREE", t.TempDir())
 	snap, err := Take(context.Background(), dir)

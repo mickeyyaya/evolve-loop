@@ -96,7 +96,6 @@ func TestTranscriptScan_ConcurrentSessionsSameDir_OnlyContentVerifiedCounted(t *
 	bodyA := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"uA","content":[{"type":"text","text":"Artifact path: .evolve/runs/cycle-997/launch-token-abc123"}]}}
 {"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:02Z","message":{"id":"mA","usage":{"input_tokens":40,"output_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
 `
-	// Session B shares the cwd and session directory but not the launch's artifact path.
 	bodyB := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"uB","content":[{"type":"text","text":"unrelated swarm reader task"}]}}
 {"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:03Z","message":{"id":"mB","usage":{"input_tokens":9000,"output_tokens":9000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
 `

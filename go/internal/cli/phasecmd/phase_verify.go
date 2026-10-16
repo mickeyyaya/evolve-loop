@@ -19,9 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/reachabilityprobe"
 )
 
-// runPhaseVerify is the agent's deliverable self-check; it shares the host gate's verifier.
-// Exit: 0 well-formed, 1 confirmed violation, 2 infra ambiguity (callers fail open), 10 usage error.
-// See ADR-0034.
 func (c phaseCommand) runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	phaseArg, flags := splitPhaseArg(args)
 	if phaseArg == "" {
@@ -46,7 +43,6 @@ func (c phaseCommand) runPhaseVerify(args []string, stdout, stderr io.Writer) in
 		return 10
 	}
 
-	// Default from the resolver's root so deliverables, cycle state and inbox resolve against one project.
 	if *evolveDir == "" {
 		*evolveDir = filepath.Join(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
 	}
@@ -72,7 +68,6 @@ func (c phaseCommand) verifyBuild(flagged phasecontract.Roots, stderr io.Writer)
 }
 
 func splitPhaseArg(args []string) (phaseArg string, flags []string) {
-	// Take the phase positional first, then flag-parse the rest, so both --flag value and --flag=value work.
 	for _, a := range args {
 		if phaseArg == "" && !strings.HasPrefix(a, "-") {
 			phaseArg = a
@@ -84,8 +79,6 @@ func splitPhaseArg(args []string) (phaseArg string, flags []string) {
 }
 
 func withCycleState(roots phasecontract.Roots, contract phasecontract.Contract, stderr io.Writer) phasecontract.Roots {
-	// The gate judges explanation sections and declared effects from the cycle state, so the self-check
-	// must too. Without it the section check is skipped, and an effect cannot be judged: verify exits 2.
 	needsSections, needsEffects := len(contract.ExplanationSections) > 0, len(contract.Effects) > 0
 	if !needsSections && !needsEffects {
 		return roots
@@ -120,9 +113,6 @@ func reportVerifyResult(phase string, res deliverable.Result, asJSON bool, stdou
 	return 1
 }
 
-// verifyDeliverable adds the architecture docs floor for build and the frozen-pin gate for tdd, each only
-// with --worktree: the worktree is the one place the diff and the import graph exist.
-// See ADR-0077.
 func verifyDeliverable(phase string, roots phasecontract.Roots, resolver phasecontract.Resolver) (deliverable.Result, error) {
 	stage := phaseVerifyPhaseIO()
 	if phase == "build" && roots.Worktree != "" {
@@ -136,11 +126,8 @@ func verifyDeliverable(phase string, roots phasecontract.Roots, resolver phaseco
 	return withFrozenPinViolations(res, roots.Worktree), nil
 }
 
-// codeUnreachableFrozenPin is the stable violation code of the tdd reachability gate.
 const codeUnreachableFrozenPin = "unreachable_frozen_pin"
 
-// withFrozenPinViolations fails a tdd verdict whose frozen tests pin a call that could only build by
-// closing an import cycle. Infra ambiguity fails open; only a compiler-provable cycle turns it red.
 func withFrozenPinViolations(res deliverable.Result, worktree string) deliverable.Result {
 	frozen, err := reachabilityprobe.FrozenTestFiles(res.ArtifactPath)
 	if err != nil || len(frozen) == 0 {
@@ -160,16 +147,11 @@ func withFrozenPinViolations(res deliverable.Result, worktree string) deliverabl
 	return res
 }
 
-// phaseVerifyPhaseIO resolves the PhaseIO stage exactly as the host gate does; an unreadable
-// registry falls back to env and code defaults.
-// See ADR-0050.
 func phaseVerifyPhaseIO() config.Stage {
 	cfg, _ := config.Load(config.RegistryPath(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")), cmdutil.FilterEvolveEnv(os.Environ()))
 	return cfg.PhaseIO
 }
 
-// phaseVerifyResolver resolves contracts from the merged phase catalog the host gate uses; a load
-// failure falls back to built-ins, so built-in phases always verify.
 func phaseVerifyResolver() phasecontract.Resolver {
 	project := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	cat, _, _, err := mergedCatalog(project)

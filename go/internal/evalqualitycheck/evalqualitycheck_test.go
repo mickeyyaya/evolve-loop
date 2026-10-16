@@ -198,7 +198,7 @@ func TestCheck_ContentParityAndPlainGit_PASS(t *testing.T) {
 		"git rev-parse HEAD",
 		"git log -p dir/../file",
 		"git log --follow -- docs/../README.md",
-		"git log ..HEAD", // left-open range: a known gap of commitPresenceRE
+		"git log ..HEAD",
 	}
 	for _, c := range cases {
 		path := writeEval(t, "```bash\n"+c+"\n```\n")

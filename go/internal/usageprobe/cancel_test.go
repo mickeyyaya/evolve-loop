@@ -10,19 +10,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// 2026-09-15 wave-4 boundary: the loop ignored SIGINT ×2 and SIGTERM for
-// over a minute while `[loop] usage-probe: checking …` ran — the probe was
-// handed context.Background() and its WaitGroup waited on a bridge session
-// that does not return on cancel. The loop's interrupt must win: a cancelled
-// context skips the probe entirely, and a cancel that lands mid-probe returns
-// promptly even when a probe ignores it, naming what was abandoned.
 func TestProber_Run_ReturnsPromptlyOnCancelEvenWhenAProbeIgnoresIt(t *testing.T) {
 	block := make(chan struct{})
 	defer close(block)
 	var log bytes.Buffer
 	p := &Prober{
 		Families: []string{"codex"},
-		Probe:    func(context.Context, string) (string, error) { <-block; return "", nil }, // ignores ctx, like a stuck pane
+		Probe:    func(context.Context, string) (string, error) { <-block; return "", nil },
 		Classify: bridge.ClassifyExhausted,
 		Store:    newStore(t),
 		Log:      &log,
@@ -65,7 +59,7 @@ func TestProber_Run_AbandonmentCountsOnlyProbesStillRunning(t *testing.T) {
 		Families: []string{"claude", "codex"},
 		Probe: func(_ context.Context, family string) (string, error) {
 			if family == "codex" {
-				<-block // stuck pane
+				<-block
 			}
 			return "healthy", nil
 		},

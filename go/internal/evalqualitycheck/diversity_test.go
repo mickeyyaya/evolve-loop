@@ -109,14 +109,14 @@ func TestCheckDiversity_NegativeCasePrecision(t *testing.T) {
 		cmd         string
 		wantNegated bool
 	}{
-		{`grep -q "failure pattern analysis" docs/x.md`, false}, // English word, not a negative test
-		{`grep -q "should not fail" docs/x.md`, false},          // still a doc-grep target
-		{`grep -q "result != expected" out.txt`, false},         // != inside a grep string is NOT a negative test
+		{`grep -q "failure pattern analysis" docs/x.md`, false},
+		{`grep -q "should not fail" docs/x.md`, false},
+		{`grep -q "result != expected" out.txt`, false},
 		{`grep -q "!= mismatch" out.txt`, false},
 		{`! grep -q "removed" src/f.txt`, true},
 		{`test "$x" -ne 0`, true},
 		{`assert_fail "rejects bad input" cmd`, true},
-		{`run cmd; [ "$?" != 0 ]`, true}, // != inside a test bracket IS a negative assertion
+		{`run cmd; [ "$?" != 0 ]`, true},
 		{`go test ./...`, false},
 	}
 	for _, tc := range cases {
@@ -147,7 +147,7 @@ func TestCheckDiversity_SkipsMetaAndCommandlessFiles(t *testing.T) {
 		"_canary.md":    fence(`echo "canary"`),
 		"prose-only.md": "# Eval\nNo commands here, just text.\n",
 		"real.md":       fence(`! grep -q "x" f.txt`),
-		"noteval.txt":   fence(`grep -q "x" f.txt`), // non-.md ignored
+		"noteval.txt":   fence(`grep -q "x" f.txt`),
 	})
 	res, err := CheckDiversity(DiversityOptions{EvalDir: dir})
 	if err != nil {

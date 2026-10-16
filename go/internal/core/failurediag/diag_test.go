@@ -1,9 +1,5 @@
 package failurediag
 
-// diag_test.go — unit 02: the failure-diag sidecar writer. The diagnosis is
-// pure over the injected clock and predicate (the mutant seam); Write owns the
-// only side effects (one file, at most one signal). RED first.
-
 import (
 	"encoding/json"
 	"errors"
@@ -156,7 +152,7 @@ func TestWithSignals_NilIsTheNullObject(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(SidecarPath(ws, "retro"), "occupied"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	w.Write(ws, "retro", 1562, wedgedErr(), 2) // the rename-failure path with no Center must not panic
+	w.Write(ws, "retro", 1562, wedgedErr(), 2)
 	if _, err := os.Stat(SidecarPath(ws, "retro") + ".tmp"); err != nil {
 		t.Fatal("the file was still staged through the Null Object")
 	}
@@ -196,8 +192,6 @@ func TestSidecarPath_IsThePhaseFailureDiagFile(t *testing.T) {
 	}
 }
 
-// The gate is required: a nil predicate panics at first use — never "nothing
-// is a timeout" (the doc comment's contract, pinned).
 func TestNewWriter_NilGatePanicsAtFirstUse(t *testing.T) {
 	defer func() {
 		if recover() == nil {

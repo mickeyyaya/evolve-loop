@@ -1,12 +1,5 @@
 package solutioncheck
 
-// solutioncheck_test.go — ADR-0099 slice 2 RED contract. A `document` cycle's
-// deliverable is solutions/<slug>/ with ≥N candidate options, a recommendation
-// and an assumptions-and-evidence file; this package is the ONE deterministic,
-// LLM-free engine that judges its shape (the build floor, the `evolve solution
-// check` CLI and the audit gate line all project it). Judgment (rubric quality)
-// stays in audit — never here.
-
 import (
 	"os"
 	"path/filepath"
@@ -72,7 +65,7 @@ func TestCheck_Failures(t *testing.T) {
 	cases := []struct {
 		name   string
 		mutate func(m map[string]string)
-		want   string // substring of a failure reason
+		want   string
 	}{
 		{"one option only", func(m map[string]string) { delete(m, "options/2-adaptive-bitrate.md") }, "options"},
 		{"recommendation missing", func(m map[string]string) { delete(m, "recommendation.md") }, "recommendation.md"},
@@ -112,8 +105,6 @@ func TestCheck_MissingSolutionDirIsOneLoudFailure(t *testing.T) {
 	}
 }
 
-// TestFailure_String names the type's renderer (apicover) and pins the
-// "path: reason" shape the build floor and the CLI print.
 func TestFailure_String(t *testing.T) {
 	f := Failure{Path: "solutions/x/recommendation.md", Reason: "missing"}
 	if got := f.String(); got != "solutions/x/recommendation.md: missing" {
@@ -121,8 +112,6 @@ func TestFailure_String(t *testing.T) {
 	}
 }
 
-// TestDescribe: the contract prose the Task Contract renders is generated from
-// the spec (one renderer, never hand-typed); a zero spec renders nothing.
 func TestDescribe(t *testing.T) {
 	got := Describe(spec())
 	for _, want := range []string{"solutions/<slug>/", "at least 2 candidate", "recommendation.md (sections: Options Compared, Recommendation)", "assumptions-and-evidence.md", "placeholders forbidden: TBD, TODO, lorem ipsum", "evolve solution check solutions/<slug>"} {
@@ -135,8 +124,6 @@ func TestDescribe(t *testing.T) {
 	}
 }
 
-// TestCheck_HeadingInsideFenceDoesNotCount: the words of a required section
-// pasted inside a code fence or an indented block are not structure.
 func TestCheck_HeadingInsideFenceDoesNotCount(t *testing.T) {
 	tree := t.TempDir()
 	files := goodSolution()
@@ -148,9 +135,6 @@ func TestCheck_HeadingInsideFenceDoesNotCount(t *testing.T) {
 	}
 }
 
-// TestCheck_SlugIsConfinedToTheIdVocabulary: a slug carrying a path segment,
-// `..`, or characters outside the task-id vocabulary never reaches the
-// filesystem — one loud failure at the engine, for every caller.
 func TestCheck_SlugIsConfinedToTheIdVocabulary(t *testing.T) {
 	tree := t.TempDir()
 	writeSolution(t, tree, "netflix-margin", goodSolution())
@@ -162,8 +146,6 @@ func TestCheck_SlugIsConfinedToTheIdVocabulary(t *testing.T) {
 	}
 }
 
-// TestCheck_MismatchedFenceMarkerStaysOpen: a `~~~` line or a shorter run does
-// not close a backtick fence, so a heading after it is still fence content.
 func TestCheck_MismatchedFenceMarkerStaysOpen(t *testing.T) {
 	tree := t.TempDir()
 	files := goodSolution()
@@ -174,8 +156,6 @@ func TestCheck_MismatchedFenceMarkerStaysOpen(t *testing.T) {
 	}
 }
 
-// TestDescribe_PartialSections: a required file with no declared sections
-// renders bare — no dangling "(sections: )".
 func TestDescribe_PartialSections(t *testing.T) {
 	s := spec()
 	delete(s.RequiredSections, "assumptions-and-evidence.md")

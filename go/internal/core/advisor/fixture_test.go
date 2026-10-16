@@ -16,10 +16,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// goldenWorkspace needs no templating: the composer only renders it and never touches the disk.
 const goldenWorkspace = "/ws/cycle-42"
 
-// goldenPersona is a stub: the real agents/evolve-router.md would break the goldens on every persona edit.
 const goldenPersona = "# evolve-router\nYou are the ROUTER persona stub (PERSONA_MARKER_42)."
 
 func richRouteInput() router.RouteInput {
@@ -68,14 +66,13 @@ func richRouteInput() router.RouteInput {
 	}
 }
 
-// richCarryoverTodos spans every priority spelling plus malformed ones, with cycling FirstSeenCycle to exercise ties.
 func richCarryoverTodos() []router.CarryoverTodo {
 	priorities := []string{"P0", "P1", "H", "HIGH", "P2", "P3", "M", "MED", "MEDIUM", "L", "LOW", "", "blocking", " p1 ", "p0", "P2", "P1", "P0", "LOW", "P3", "H", "P0", "M"}
 	todos := make([]router.CarryoverTodo, 0, len(priorities))
 	for i, p := range priorities {
 		action := fmt.Sprintf("carryover action %02d", i)
 		if i == 4 {
-			action = strings.Repeat("é", 700) // 700 runes, capped at 600 in the prompt
+			action = strings.Repeat("é", 700)
 		}
 		todos = append(todos, router.CarryoverTodo{
 			ID:             fmt.Sprintf("cycle-%d-todo-%02d", 40-(i%5), i),
@@ -88,7 +85,6 @@ func richCarryoverTodos() []router.CarryoverTodo {
 	return todos
 }
 
-// richCatalog interleaves the three enrichment buckets so the stable partition shows in the golden.
 func richCatalog() []router.PhaseCard {
 	return []router.PhaseCard{
 		{Name: "scout", Role: "plan"},
@@ -107,7 +103,6 @@ func richCatalog() []router.PhaseCard {
 	}
 }
 
-// launchRouteInput carries a secret-shaped goal so the capture golden covers redaction.
 func launchRouteInput(ws, root, wt string) router.RouteInput {
 	return router.RouteInput{
 		Current:        "build",
@@ -140,7 +135,6 @@ type scriptedResp struct {
 	err  error
 }
 
-// fakeLauncher replies from seq in order, repeating its last entry once exhausted, else with the canned stdout.
 type fakeLauncher struct {
 	stdout     string
 	err        error
@@ -181,12 +175,10 @@ func (r refusingLauncher) Launch(context.Context, LaunchRequest) (LaunchResponse
 	return LaunchResponse{}, nil
 }
 
-// defaultIdentity mirrors core's NewPhaseAdvisor default.
 func defaultIdentity() Identity {
 	return Identity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"}
 }
 
-// observed builds an advisor whose Center records every event.
 func observed(t *testing.T, l Launcher, id Identity, opts ...Option) (*Advisor, *[]signalcenter.Event) {
 	t.Helper()
 	c := signalcenter.New()
@@ -196,7 +188,6 @@ func observed(t *testing.T, l Launcher, id Identity, opts ...Option) (*Advisor, 
 	return New(l, id, plainWriter, opts...), got
 }
 
-// plainWriter stands in for core's atomic capture writer.
 func plainWriter(path string, data []byte) error { return os.WriteFile(path, data, 0o644) }
 
 func eventsWithCode(got []signalcenter.Event, code signalcenter.Code) []signalcenter.Event {
@@ -209,7 +200,6 @@ func eventsWithCode(got []signalcenter.Event, code signalcenter.Code) []signalce
 	return out
 }
 
-// tempInput uses a temp workspace so a wired Center sees no capture-write faults.
 func tempInput(t *testing.T) router.RouteInput {
 	t.Helper()
 	in := baseRouteInput()

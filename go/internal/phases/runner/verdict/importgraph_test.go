@@ -54,7 +54,6 @@ func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
 	}
 }
 
-// A source scan, because a stray write to the process streams is invisible to every other test.
 func TestNoStderrNoEnv_InTheLeaf(t *testing.T) {
 	for _, name := range nonTestSources(t) {
 		src, err := os.ReadFile(filepath.Join(".", name))

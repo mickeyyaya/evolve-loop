@@ -20,7 +20,6 @@ func writeReport(t *testing.T, body string) string {
 	return ws
 }
 
-// seedEvents writes the envelopes the real phasestream.Classifier emits for raw stdout and stderr lines, as the live normalizer does.
 func seedEvents(t *testing.T, ws, name string, stdoutLines, stderrLines []string) {
 	t.Helper()
 	clf := phasestream.NewClassifier(
@@ -286,7 +285,6 @@ func TestClassify_SortedEventsScan(t *testing.T) {
 }
 
 func TestClassify_Pass0_StructuredClassBeatsRegex(t *testing.T) {
-	// Prose alone would regex-classify audit-fail.
 	ws := writeReport(t, "# Cycle Report\nVerdict: FAIL\n")
 	line := phasecontract.RenderVerdictSentinelWithFailure("tdd", "FAIL",
 		&phasecontract.FailureBlock{Class: "code-build-fail", Defects: []string{"red suite"}})

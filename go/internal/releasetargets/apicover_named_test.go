@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// TestTarget_String names the Target type and its String method, pinning the
-// canonical "<os>_<arch>" rendering used in verifier error rows.
 func TestTarget_String(t *testing.T) {
 	got := Target{OS: "linux", Arch: "arm64"}.String()
 	if got != "linux_arm64" {
@@ -14,17 +12,13 @@ func TestTarget_String(t *testing.T) {
 	}
 }
 
-// TestConfig_AssetNameErrors names the Config type literally and exercises
-// AssetName's error branches: a missing name template, a missing format, a
-// malformed template (parse error), and a template referencing a field the
-// target struct does not expose (render error).
 func TestConfig_AssetNameErrors(t *testing.T) {
 	tg := Target{OS: "darwin", Arch: "arm64"}
 
 	cases := []struct {
 		name string
 		cfg  Config
-		want string // substring expected in the error
+		want string
 	}{
 		{"no template", Config{ArchiveFormat: "tar.gz"}, "name_template"},
 		{"no format", Config{ArchiveNameTemplate: "evolve_{{ .Os }}_{{ .Arch }}"}, "formats"},
@@ -42,8 +36,6 @@ func TestConfig_AssetNameErrors(t *testing.T) {
 	}
 }
 
-// TestParseConfig_MalformedTargetNoUnderscore covers splitTarget's rejection of
-// a target with no os/arch separator.
 func TestParseConfig_MalformedTargetNoUnderscore(t *testing.T) {
 	p := writeGoreleaser(t, `
 version: 2

@@ -24,7 +24,7 @@ func TestSandboxNestedFallbackCanary(t *testing.T) {
 		stage     config.Stage
 		nested    bool
 		noSandbox bool
-		blocked   bool // true: the outer environment denied the write
+		blocked   bool
 		wantLevel CheckLevel
 	}{
 		{"off → no canary, pass", config.StageOff, true, false, false, LevelPass},

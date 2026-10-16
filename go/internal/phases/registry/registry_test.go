@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// fakeRunner implements core.PhaseRunner with deterministic behavior
-// for registry-level tests. The runner doesn't do real dispatch; the
-// registry only cares that a Factory returns a valid PhaseRunner.
 type fakeRunner struct{ name string }
 
 func (f *fakeRunner) Name() string { return f.name }
@@ -24,7 +21,6 @@ func factory(name string) Factory {
 	return func(req core.PhaseRequest) core.PhaseRunner { return &fakeRunner{name: name} }
 }
 
-// TestRegister_RoundTrip — register then look up.
 func TestRegister_RoundTrip(t *testing.T) {
 	ResetForTesting()
 	Register("alpha", factory("alpha"))
@@ -38,8 +34,6 @@ func TestRegister_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestRegister_DuplicatePanic — registering twice panics so init-time
-// conflicts surface at startup.
 func TestRegister_DuplicatePanic(t *testing.T) {
 	ResetForTesting()
 	Register("dup", factory("dup"))
@@ -56,7 +50,6 @@ func TestRegister_DuplicatePanic(t *testing.T) {
 	Register("dup", factory("dup-again"))
 }
 
-// TestRegister_EmptyNamePanics — defense against silent registration.
 func TestRegister_EmptyNamePanics(t *testing.T) {
 	ResetForTesting()
 	defer func() {
@@ -67,8 +60,6 @@ func TestRegister_EmptyNamePanics(t *testing.T) {
 	Register("", factory("x"))
 }
 
-// TestRegister_NilFactoryPanics — defense against nil-factory lookups
-// later producing nil derefs.
 func TestRegister_NilFactoryPanics(t *testing.T) {
 	ResetForTesting()
 	defer func() {
@@ -79,7 +70,6 @@ func TestRegister_NilFactoryPanics(t *testing.T) {
 	Register("nilf", nil)
 }
 
-// TestFor_MissingReturnsFalse — unknown name → (nil, false).
 func TestFor_MissingReturnsFalse(t *testing.T) {
 	ResetForTesting()
 	f, ok := For("nope")
@@ -91,8 +81,6 @@ func TestFor_MissingReturnsFalse(t *testing.T) {
 	}
 }
 
-// TestNames_Sorted — caller-visible API guarantee that Names() is
-// stable across runs (sorted) so docs-contract tests can golden-compare.
 func TestNames_Sorted(t *testing.T) {
 	ResetForTesting()
 	Register("zeta", factory("zeta"))
@@ -114,7 +102,6 @@ func TestNames_Sorted(t *testing.T) {
 	}
 }
 
-// TestNames_Empty — fresh registry returns an empty (non-nil) slice.
 func TestNames_Empty(t *testing.T) {
 	ResetForTesting()
 	got := Names()
@@ -126,8 +113,6 @@ func TestNames_Empty(t *testing.T) {
 	}
 }
 
-// TestConcurrentLookupsAreSafe — RWMutex correctness under -race.
-// Registers a few factories then runs N parallel lookups.
 func TestConcurrentLookupsAreSafe(t *testing.T) {
 	ResetForTesting()
 	Register("a", factory("a"))
@@ -151,8 +136,6 @@ func TestConcurrentLookupsAreSafe(t *testing.T) {
 	wg.Wait()
 }
 
-// TestResetForTesting_Clears — confirm tests can rebuild the registry
-// from scratch.
 func TestResetForTesting_Clears(t *testing.T) {
 	ResetForTesting()
 	Register("temp", factory("temp"))

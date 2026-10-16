@@ -1,7 +1,3 @@
-// Tests for the intent phase. Drives the phase with a fake core.Bridge
-// that captures the BridgeRequest and either writes a scripted artifact
-// to disk or returns an error. The prompts loader is backed by fstest.MapFS
-// so no disk fixtures are needed.
 package intent
 
 import (
@@ -21,10 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// fakeBridge captures the most recent Launch call and produces a
-// scripted response. If WriteArtifact is non-empty, fakeBridge writes
-// it to req.ArtifactPath before returning (mirroring real bridge
-// behavior — the adapter reads the file back into BridgeResponse.Stdout).
 type fakeBridge struct {
 	resp          core.BridgeResponse
 	err           error
@@ -42,7 +34,6 @@ func (f *fakeBridge) Launch(ctx context.Context, req core.BridgeRequest) (core.B
 		if err := os.WriteFile(req.ArtifactPath, []byte(f.writeArtifact), 0o644); err != nil {
 			return core.BridgeResponse{}, err
 		}
-		// Mimic adapter behavior: stdout carries the artifact body.
 		f.resp.Stdout = f.writeArtifact
 	}
 	return f.resp, f.err
@@ -52,7 +43,6 @@ func (f *fakeBridge) Probe(ctx context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// fakePromptsFS builds a Loader that resolves agents/evolve-intent.md.
 func fakePromptsFS(body string) *prompts.Loader {
 	mapFS := fstest.MapFS{
 		"agents/evolve-intent.md": &fstest.MapFile{
@@ -111,7 +101,6 @@ Body here.
 	if resp.ArtifactsDir != ws {
 		t.Errorf("ArtifactsDir=%q, want %q", resp.ArtifactsDir, ws)
 	}
-	// Inspect captured BridgeRequest for plumbed inputs.
 	if fb.gotReq.Cycle != 42 {
 		t.Errorf("BridgeRequest.Cycle=%d, want 42", fb.gotReq.Cycle)
 	}
@@ -194,11 +183,6 @@ func TestRun_EmptyArtifact_IntentSettleLadderKeepsProductionBounds(t *testing.T)
 	rec.AssertProductionLadder(t)
 }
 
-// Pins the line-anchored matching semantics adopted with the
-// EvaluateClassify migration: a "goal:" token occurring only mid-line is
-// NOT a section. The pre-migration phasecontract path used
-// strings.Contains and would have passed this artifact; the tightening
-// is intentional (intent artifacts are YAML-style, tokens begin lines).
 func TestRun_MidLineGoalToken_FAIL_LineAnchored(t *testing.T) {
 	ws := t.TempDir()
 	fb := &fakeBridge{writeArtifact: "The main goal: ship it. Also acceptance_checks: are described inline."}
@@ -278,7 +262,6 @@ func TestRun_MissingPrompts_ReturnsError(t *testing.T) {
 }
 
 func TestRun_AgentLoadFails_ReturnsError(t *testing.T) {
-	// Loader without the agents/evolve-intent.md file.
 	emptyLoader := prompts.NewFromFS(fstest.MapFS{})
 	fb := &fakeBridge{}
 	phase := New(Config{Bridge: fb, Prompts: emptyLoader})
@@ -319,8 +302,6 @@ func TestName(t *testing.T) {
 	}
 }
 
-// --- v12.1 Capability 1: phaseflags wiring tests ---
-
 func writeIntentProfile(t *testing.T, contents string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -334,12 +315,6 @@ func writeIntentProfile(t *testing.T, contents string) string {
 	return root
 }
 
-// TestComposePrompt_InjectsGoalTextFromContext is the regression test
-// for cycle-108 bug #3. When the operator passed --goal-text "foo",
-// the dispatcher routes it through Context["goal"]; the intent
-// persona's prompt MUST surface it in the Cycle Context block so the
-// persona structures intent.md around the real goal rather than
-// inferring from workspace leftovers.
 func TestComposePrompt_InjectsGoalTextFromContext(t *testing.T) {
 	h := hooks{}
 	req := core.PhaseRequest{
@@ -362,7 +337,6 @@ func TestComposePrompt_OmitsGoalLineWhenContextEmpty(t *testing.T) {
 	if strings.Contains(got, "- goal:") {
 		t.Errorf("no goal in Context should omit the line; got: %q", got)
 	}
-	// Other context still emitted (cycle, goal_hash, project_root, workspace, mode).
 	if !strings.Contains(got, "- cycle: 1") {
 		t.Errorf("cycle line missing: %q", got)
 	}

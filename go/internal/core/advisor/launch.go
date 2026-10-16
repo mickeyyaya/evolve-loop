@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// launch captures before the caller parses, so an unparseable response is still recorded and replayable.
 func (a *Advisor) launch(in router.RouteInput, d decision, prompt string) (LaunchResponse, error) {
 	if err := a.preflight(in, d); err != nil {
 		a.warn(in, d, CodeLaunchFailed, err.Error(), map[string]string{"step": stepPreflight})
@@ -27,7 +26,6 @@ func (a *Advisor) launch(in router.RouteInput, d decision, prompt string) (Launc
 	return resp, nil
 }
 
-// preflight's depth check is defense in depth; the primary recursion guard is the mint denylist.
 func (a *Advisor) preflight(in router.RouteInput, d decision) error {
 	if a.launcher == nil {
 		return fmt.Errorf("%s: nil bridge", d.errPfx())
@@ -79,7 +77,6 @@ func (a *Advisor) launchOnce(in router.RouteInput, d decision, cli, profile, pro
 	return a.launcher.Launch(context.Background(), a.launchRequestFor(in, d, cli, profile, prompt))
 }
 
-// launchRequestFor falls back to the workspace as the worktree: the tmux driver refuses an empty one under EVOLVE_FLEET.
 func (a *Advisor) launchRequestFor(in router.RouteInput, d decision, cli, profile, prompt string) LaunchRequest {
 	worktree := in.ActiveWorktree
 	if worktree == "" {
@@ -103,8 +100,6 @@ func (a *Advisor) launchRequestFor(in router.RouteInput, d decision, cli, profil
 	}
 }
 
-// resolveOverlays passes the tier-shaped Model as both Model and Tier. The default uses the zero
-// policy, so the operator's policy.json overlays do not govern the advisor's own dispatch.
 func (a *Advisor) resolveOverlays(cli string) []string {
 	if a.overlays != nil {
 		return a.overlays(cli)

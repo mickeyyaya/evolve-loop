@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// specScopeUnion collects every Env-scoped todo id and fails the test on an id owned by two specs.
 func specScopeUnion(t *testing.T, specs []CycleSpec) map[string]bool {
 	t.Helper()
 	union := map[string]bool{}

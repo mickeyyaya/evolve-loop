@@ -1,17 +1,5 @@
-// Package ciwatch closes the feedback edge from GitHub Actions back into the
-// loop (cycle-748, push-ci-watch-remote-parity). The go.yml matrix runs
-// ubuntu+macos while every local gate runs macOS-only, so ubuntu-only
-// failures are structurally invisible to local gates: main stayed red from
-// 2026-07-06 11:50 through 20:16+ across 8 pushes with the loop shipping on
-// top. Watch polls the CI run for a pushed SHA until it completes (or times
-// out), records the verdict as a workspace artifact the dossier ingests
-// (dossier.CIWatchVerdictFile), and on a red conclusion auto-files a critical
-// fix-forward inbox item naming the failing job/test with a bounded log
-// excerpt. A green run files nothing.
-//
-// All knobs (enabled, timeout, poll interval) come from the policy.json
-// ci_watch block (policy.CIWatchConfig) — zero env flags. Tests inject a fake
-// Fetcher; production uses NewGHFetcher (gh CLI, existing gh auth).
+// Package ciwatch watches the CI run of a pushed commit and files a fix-forward item when it is red.
+// See docs/architecture/packages/internal-ciwatch.md.
 package ciwatch
 
 import (
@@ -28,32 +16,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// StatusCompleted is the terminal RunStatus.Status value; every other status
-// means the run is still queued or in progress and Watch keeps polling.
 const StatusCompleted = "completed"
 
-// ConclusionSuccess is the one green RunStatus.Conclusion value; anything
-// else on a completed run files the critical fix-forward inbox item.
 const ConclusionSuccess = "success"
 
-// maxLogExcerpt bounds the failing-log excerpt carried into the inbox item so
-// a huge CI log can never bloat the inbox (the item must stay a pointer plus
-// evidence, not a log archive).
 const maxLogExcerpt = 4000
 
 var marshalIndent = json.MarshalIndent
 
-// RunStatus is one observation of the CI run for a pushed SHA.
 type RunStatus struct {
-	// Status is the run lifecycle state ("queued", "in_progress", "completed").
-	Status string
-	// Conclusion is set once Status is completed ("success", "failure", ...).
-	Conclusion string
-	// RunURL links the observed workflow run.
-	RunURL string
-	// FailingTest is the best-effort failing job/test name on a red run.
-	FailingTest string
-	// LogExcerpt is a bounded excerpt of the failing job's log.
+	Status       string
+	Conclusion   string
+	RunURL       string
+	FailingTest  string
 	LogExcerpt   string
 	FailingJobs  []string
 	RunID        int64
@@ -63,40 +38,23 @@ type RunStatus struct {
 	FailingTests []FailingTest
 }
 
-// Fetcher returns the current CI run status for a pushed SHA. Tests inject
-// fakes; production uses NewGHFetcher.
 type Fetcher func(ctx context.Context, sha string) (RunStatus, error)
 
-// Options drives one Watch invocation.
 type Options struct {
-	// SHA is the pushed commit to watch. Required.
-	SHA string
-	// Cycle is the cycle number recorded in the escalation item (0 = unknown).
+	SHA          string
 	Cycle        int
 	InboxDir     string
 	NoEscalation bool
-	// WorkspaceDir, when non-empty, receives the verdict artifact
-	// (dossier.CIWatchVerdictFile) for dossier ingestion.
 	WorkspaceDir string
-	// Fetch observes the run state. Required.
-	Fetch Fetcher
-	// Timeout and Poll come from the policy.json ci_watch block
-	// (policy.CIWatchConfig); zero values fall back to the same compiled
-	// defaults (900s / 30s).
-	Timeout time.Duration
-	Poll    time.Duration
-	// Now and Sleep are test seams; nil = real clock.
-	Now   func() time.Time
-	Sleep func(time.Duration)
+	Fetch        Fetcher
+	Timeout      time.Duration
+	Poll         time.Duration
+	Now          func() time.Time
+	Sleep        func(time.Duration)
 }
 
-// ErrWatchTimeout reports that the CI run did not complete within Timeout.
 var ErrWatchTimeout = errors.New("ciwatch: timed out waiting for CI run to complete")
 
-// Watch polls opts.Fetch until the run for opts.SHA completes or Timeout
-// elapses, then records the verdict. On a non-success conclusion it files a
-// critical fix-forward inbox item naming the failing test; a green run files
-// nothing. The returned record is what the dossier ingests.
 func Watch(ctx context.Context, opts Options) (dossier.CIWatchRecord, error) {
 	var rec dossier.CIWatchRecord
 	if strings.TrimSpace(opts.SHA) == "" {
@@ -179,8 +137,6 @@ func pollUntilComplete(ctx context.Context, opts Options) (RunStatus, error) {
 	}
 }
 
-// writeVerdict records the CI verdict artifact atomically (tmp + rename) so a
-// concurrent dossier build never reads a torn file.
 func writeVerdict(dir string, rec dossier.CIWatchRecord) error {
 	body, err := json.MarshalIndent(rec, "", "  ")
 	if err != nil {
@@ -197,8 +153,6 @@ func writeVerdict(dir string, rec dossier.CIWatchRecord) error {
 	return nil
 }
 
-// escalationItem is the critical fix-forward inbox item filed on a red run.
-// The shape mirrors the hand-filed .evolve/inbox items triage already reads.
 type escalationItem struct {
 	ID            string  `json:"id"`
 	CreatedAt     string  `json:"created_at"`
@@ -212,8 +166,6 @@ type escalationItem struct {
 	Source        string  `json:"source"`
 }
 
-// fileEscalation writes the critical fix-forward inbox item for a red run,
-// naming the failing job/test and carrying a bounded log excerpt.
 func fileEscalation(opts Options, st RunStatus, now time.Time) error {
 	short := opts.SHA
 	if len(short) > 12 {

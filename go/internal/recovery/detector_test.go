@@ -2,7 +2,6 @@ package recovery
 
 import "testing"
 
-// The pane fixtures are verbatim captures of real fatal panes; keep them unedited.
 const (
 	paneClaudeModelError = `user@host evolve-loop % claude --model auto --dangerously-skip-permissions
 ⏺ There's an issue with the selected model (auto). It may not exist or you may not have access to it. Run /model to pick a different model.`

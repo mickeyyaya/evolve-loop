@@ -29,7 +29,7 @@ func refusalEntries(code string) []phasetiming.Entry {
 }
 
 func TestClassify_CodedRefusalOnTheLastOutcome_IsPhaseRefusal(t *testing.T) {
-	ws := t.TempDir() // no orchestrator-report.md: the abnormal path writes none
+	ws := t.TempDir()
 	writePhaseTiming(t, ws, refusalEntries(cyclestate.DiagCodeTriageProtectedSurface))
 	r := Classify(ws)
 	if r.Class != ClassPhaseRefusal || r.Marker != cyclestate.DiagCodeTriageProtectedSurface || r.Source != phasetiming.FileName {
@@ -65,7 +65,6 @@ func TestClassify_CodedRefusalOutranksTheRegexPasses(t *testing.T) {
 func TestClassify_SentinelClassStillOutranksTheRefusal(t *testing.T) {
 	ws := t.TempDir()
 	writePhaseTiming(t, ws, refusalEntries(cyclestate.DiagCodeTriageProtectedSurface))
-	// The sentinel comes from triage, the phase the cycle stopped on.
 	sentinel := "# triage\n<!-- evolve-verdict: {\"phase\":\"triage\",\"verdict\":\"FAIL\",\"failure\":{\"class\":\"infrastructure\"}} -->\n"
 	if err := os.WriteFile(filepath.Join(ws, "triage-report.md"), []byte(sentinel), 0o644); err != nil {
 		t.Fatal(err)

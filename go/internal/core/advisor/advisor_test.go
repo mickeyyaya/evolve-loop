@@ -144,7 +144,7 @@ func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) 
 	}
 	in := tempInput(t)
 	in.Cfg.ReconDigest = true
-	if err := os.Mkdir(filepath.Join(in.Workspace, "advisor-prompt-plan.txt"), 0o755); err != nil { // the plan capture's write fails
+	if err := os.Mkdir(filepath.Join(in.Workspace, "advisor-prompt-plan.txt"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	persona := Identity{CLI: "claude-tmux", Model: "deep", Persona: "PERSONA", AgentLabel: "router"}
@@ -157,12 +157,12 @@ func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) 
 		opts []Option
 		call func(*Advisor)
 	}{
-		{nil, nil, plan}, // preflight
-		{&fakeLauncher{err: errors.New("boom")}, nil, plan},                                                        // dispatch
-		{&fakeLauncher{stdout: "no decision"}, nil, propose},                                                       // parse / no_json
-		{&fakeLauncher{stdout: `{"next_phase": }`}, nil, propose},                                                  // parse / invalid_json
-		{&fakeLauncher{stdout: "[]"}, nil, plan},                                                                   // parse / empty (+ the capture write fault)
-		{&fakeLauncher{stdout: `[{"phase":"router","run":true,"mint":{"prompt":"x"}}]`}, []Option{gitFault}, plan}, // compose, capture, mint
+		{nil, nil, plan},
+		{&fakeLauncher{err: errors.New("boom")}, nil, plan},
+		{&fakeLauncher{stdout: "no decision"}, nil, propose},
+		{&fakeLauncher{stdout: `{"next_phase": }`}, nil, propose},
+		{&fakeLauncher{stdout: "[]"}, nil, plan},
+		{&fakeLauncher{stdout: `[{"phase":"router","run":true,"mint":{"prompt":"x"}}]`}, []Option{gitFault}, plan},
 	} {
 		a, got := observed(t, run.l, persona, run.opts...)
 		run.call(a)
@@ -184,7 +184,6 @@ func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) 
 	}
 }
 
-// Positional literals on purpose: a new field breaks the build here, so the core adapter is revisited.
 func TestRequestShapes_HaveExactlyTheDeclaredFields(t *testing.T) {
 	req := LaunchRequest{"claude-tmux", "/p.json", "deep", []string{"fable"}, "prompt", "/ws", "/wt", "/root", "/ws/routing-plan.json", "artifact", "router", "router", 7, map[string]string{"k": "v"}}
 	resp := LaunchResponse{0, "out", 12, cyclestate.TokenUsage{Input: 1}}

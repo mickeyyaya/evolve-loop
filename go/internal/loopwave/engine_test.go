@@ -18,7 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// harness mirrors the root sink topology: every event is recorded, and WARN+ also renders on console.
 type harness struct {
 	root, evolveDir string
 	stderr, console *bytes.Buffer
@@ -292,7 +291,6 @@ func TestForceOneLane_CapsAtOneLaneUngatedAndSilent(t *testing.T) {
 func TestDispatchAndForceOneLane_ShareOneBody(t *testing.T) {
 	h := newHarness(t)
 	l1, l2 := &recorder{}, &recorder{}
-	// One card, so the one-lane cap cannot make the repair's specs differ from the fan-out's.
 	one := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"top_n":[{"id":"a","files":["a.go"]}]}`), nil, nil
 	}

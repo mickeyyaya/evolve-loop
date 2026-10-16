@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 )
 
-// A fresh escalation report naming a credential wall benches the family and the log names the operator's
-// fix, so the next dispatch in the wave routes around the family instead of into the login prompt.
 func TestBenchOnEscalation_ACredentialWallBenchesAndNamesTheOperator(t *testing.T) {
 	root, ws := t.TempDir(), t.TempDir()
 	now := func() time.Time { return time.Date(2026, 9, 26, 22, 40, 0, 0, time.UTC) }

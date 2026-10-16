@@ -16,7 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// syncSink is a mutex-guarded bytes.Buffer: the watcher goroutine writes while the test reads.
 type syncSink struct {
 	mu  sync.Mutex
 	buf bytes.Buffer
@@ -136,7 +135,6 @@ func TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	// The assertion is the race detector: no race and no panic.
 }
 
 func fastObserverPolicy() policy.ObserverPolicy {
@@ -144,7 +142,6 @@ func fastObserverPolicy() policy.ObserverPolicy {
 	return policy.ObserverPolicy{StallS: &stallS, PollS: &pollS}
 }
 
-// The workspace is a regular file, so the events path's parent is not a directory.
 func TestCoreAdapter_Start_DegradesToNoopWhenEventsFileUnopenable(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -152,7 +149,7 @@ func TestCoreAdapter_Start_DegradesToNoopWhenEventsFileUnopenable(t *testing.T) 
 	if err := os.WriteFile(wsFile, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	a := &CoreAdapter{} // nil Sink: Start opens the events file
+	a := &CoreAdapter{}
 	cancel := a.Start(context.Background(), "tdd", core.PhaseRequest{Workspace: wsFile, Cycle: 1})
 	if cancel == nil {
 		t.Fatal("expected non-nil (no-op) cancel when events file cannot be opened")
@@ -181,5 +178,4 @@ func decodeEvents(t *testing.T, body []byte) []Event {
 	return out
 }
 
-// Keeps the otherwise unreferenced helper from failing the unused lint.
 var _ = decodeEvents

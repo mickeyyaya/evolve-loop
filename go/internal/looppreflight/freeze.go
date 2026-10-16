@@ -13,11 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// pinnedListerTimeout sends a hung brew to the Warn-on-ambiguity path instead of stalling batch start.
 const pinnedListerTimeout = 5 * time.Second
 
-// defaultSelfUpdateEvidence is the known-updater registry, keyed by the updater-state file
-// under the default home dir. A failed home lookup is ambiguity (error), not absence.
 func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
 	if risky, evidence, declared := manifestFreezeEvidence(bin); declared {
 		return risky, evidence, nil
@@ -42,8 +39,6 @@ func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
 	if _, err := os.Stat(p); err != nil {
 		return false, "", nil
 	}
-	// autoUpdates:false freezes claude at the source: the only freeze where claude is
-	// not brew-installed, so without it the halt would be permanent there.
 	if bin == "claude" {
 		raw, err := os.ReadFile(p)
 		if err != nil {
@@ -62,7 +57,6 @@ func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
 	return true, p + " present (" + label + ")", nil
 }
 
-// defaultPinnedLister lists brew-pinned formulae; the caller treats an error as ambiguity.
 func defaultPinnedLister() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), pinnedListerTimeout)
 	defer cancel()
@@ -79,12 +73,9 @@ func defaultPinnedLister() ([]string, error) {
 	return pins, nil
 }
 
-// checkCLIVersionFreeze is the Specification risky(bin) ∧ tmuxDriven(bin) ⇒ pinned(bin); ambiguity only warns.
-// See ADR-0044.
 func checkCLIVersionFreeze(o resolved) CheckResult {
 	const name = "cli-version-freeze"
 
-	// Only *-tmux drivers: a headless launch does not run the updater.
 	seen := map[string]struct{}{}
 	var bins []string
 	for _, d := range o.drivers() {
@@ -168,7 +159,6 @@ func checkCLIVersionFreeze(o resolved) CheckResult {
 	}, evidenceErrs)
 }
 
-// withEvidenceWarnings appends unverifiable-evidence errors: a Pass demotes to Warn, and a Halt stays a Halt.
 func withEvidenceWarnings(res CheckResult, errs []string) CheckResult {
 	if len(errs) == 0 {
 		return res

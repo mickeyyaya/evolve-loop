@@ -10,11 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// White-box, fast-tier coverage of the gitexec-backed cores behind ReadGitLog
-// and VerifyRef. The raw exec.Command form could only be exercised against a
-// real repo (git_integration_test.go); these pin the exact git invocation and
-// the parse/error semantics via fixtures.FakeExec.
-
 func TestReadGitLogWith_ParsesCommits(t *testing.T) {
 	t.Parallel()
 	const sep = "\x1f"
@@ -45,7 +40,7 @@ func TestReadGitLogWith_ParsesCommits(t *testing.T) {
 
 func TestReadGitLogWith_EmptyRange_ReturnsErrNoCommits(t *testing.T) {
 	t.Parallel()
-	fake := &fixtures.FakeExec{} // empty stdout, exit 0
+	fake := &fixtures.FakeExec{}
 	_, err := ReadGitLogWith(context.Background(), gitexec.Git{Exec: fake.Run}, "HEAD", "HEAD")
 	if !errors.Is(err, ErrNoCommits) {
 		t.Errorf("err = %v, want ErrNoCommits", err)
@@ -65,7 +60,7 @@ func TestReadGitLogWith_GitError_Wrapped(t *testing.T) {
 
 func TestVerifyRefWith_ValidRef_OK(t *testing.T) {
 	t.Parallel()
-	fake := &fixtures.FakeExec{} // rev-parse succeeds (zero value)
+	fake := &fixtures.FakeExec{}
 	if err := VerifyRefWith(context.Background(), gitexec.Git{Dir: "/repo", Exec: fake.Run}, "v0.1.0"); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

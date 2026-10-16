@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// cycle1570ReportShape states its slug as prose ("Task slug:") rather than as a
-// bullet, so it parses to no slug.
 const cycle1570ReportShape = "# Scout Report\n\n## Selected Tasks\n\n" +
 	"### Task 1: Config gate default policy authority\n" +
 	"Task slug: config-gate-default-policy-authority\n" +
@@ -185,8 +183,6 @@ func TestMaterializationGate_ParseMissAdvisoryIsNonBlocking(t *testing.T) {
 	})
 }
 
-// scoutWorkspaceWithReport writes body as the scout report and returns a project
-// root holding no eval.
 func scoutWorkspaceWithReport(t *testing.T, body string) (projectRoot, workspace string) {
 	t.Helper()
 	projectRoot, workspace = t.TempDir(), t.TempDir()
@@ -196,8 +192,6 @@ func scoutWorkspaceWithReport(t *testing.T, body string) (projectRoot, workspace
 	return projectRoot, workspace
 }
 
-// captureParseMissLog captures stderr around fn; NewReviewer's logger resolves
-// os.Stderr at call time.
 func captureParseMissLog(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
@@ -222,8 +216,6 @@ func captureParseMissLog(t *testing.T, fn func()) string {
 	return out
 }
 
-// Both shapes carry their slug only as a backticked bullet, and a Decision Trace in the
-// "selected_tasks" array form that decisionTraceSelected does not read.
 const cycle1664ReportShape = "# Scout Report — Cycle 1664\n\n" +
 	"## Selected Tasks\n\n" +
 	"### Task 1: settle-wait stability short-circuit\n" +
@@ -247,7 +239,6 @@ const cycle1669ReportShape = "# Scout Report — Cycle 1669\n\n" +
 	"  \"deferred\": [\"extend-structured-verdict-to-codex-agy\"]\n" +
 	"}\n```\n"
 
-// preWideningSlugLineRE is slugLineRE without the backtick widening, the counterfactual arm.
 var preWideningSlugLineRE = regexp.MustCompile(`(?m)^[*\-]\s*\*\*Slug:\*\*\s*([a-z0-9][a-z0-9-]*)`)
 
 var slugBulletRE = regexp.MustCompile(`(?m)^- \*\*Slug:\*\*.*\n`)

@@ -11,9 +11,6 @@ import (
 
 const epsilon = 1e-9
 
-// TestFillRatio is the table-driven sweep over the derivation: which fields
-// count, the boundary rows the acceptance criteria name, and the invalid-window
-// rejection.
 func TestFillRatio(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -22,8 +19,6 @@ func TestFillRatio(t *testing.T) {
 		want   float64
 	}{
 		{
-			// Asymmetric on purpose: an Input+Output-only sum yields 0.1875 and a
-			// CacheWrite-blind sum yields 0.4375, so either mistake fails here.
 			name:   "every token kind counts",
 			tokens: cyclestate.TokenUsage{Input: 1000, Output: 500, CacheRead: 2000, CacheWrite: 500},
 			window: 8000,
@@ -38,8 +33,6 @@ func TestFillRatio(t *testing.T) {
 			want:   HotThreshold,
 		},
 		{
-			// Unclamped: telemetry that saturates at 1.0 cannot tell a phase that
-			// just fit from one that overran by half.
 			name:   "over window is not clamped",
 			tokens: cyclestate.TokenUsage{Input: 1000, Output: 500},
 			window: 1000,
@@ -60,11 +53,6 @@ func TestFillRatio(t *testing.T) {
 	}
 }
 
-// TestFillRatio_InvalidWindow is the negative axis: a window we cannot identify
-// (0, as WindowSizeForTier reports for an unknown tier) or an outright negative
-// one must be REJECTED with ErrInvalidWindow. A silent divide-by-zero (+Inf /
-// NaN), a panic, or a fabricated 0-with-nil-error are all failures — a fill
-// number nobody can source is worse than no number.
 func TestFillRatio_InvalidWindow(t *testing.T) {
 	tokens := cyclestate.TokenUsage{Input: 100, Output: 100}
 
@@ -79,8 +67,6 @@ func TestFillRatio_InvalidWindow(t *testing.T) {
 	}
 }
 
-// TestIsHot pins the classification boundary against the exported threshold so
-// the constant and its consumers cannot drift apart.
 func TestIsHot(t *testing.T) {
 	if HotThreshold <= 0 || HotThreshold > 1 {
 		t.Fatalf("HotThreshold = %v, want a usable fraction in (0, 1]", HotThreshold)
@@ -102,9 +88,6 @@ func TestIsHot(t *testing.T) {
 	}
 }
 
-// TestWindowSizeForTier drives the stub over the REAL canonical tier vocabulary
-// so the map cannot silently cover a hand-copied subset that drifts from
-// modelcatalog, and pins unknown -> 0 (reported as unknown, never defaulted).
 func TestWindowSizeForTier(t *testing.T) {
 	for _, tier := range modelcatalog.CanonicalTiers {
 		got := WindowSizeForTier(tier)

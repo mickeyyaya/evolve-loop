@@ -41,7 +41,7 @@ func TestCloseSinkAfterWait_ReturnValueTrueOnDone(t *testing.T) {
 }
 
 func TestCloseSinkAfterWait_ReturnValueFalseOnTimeout(t *testing.T) {
-	done := make(chan struct{}) // never closed
+	done := make(chan struct{})
 	fc := &amplFakeCloser{}
 	got := closeSinkAfterWait(done, 5*time.Millisecond, fc)
 	if got {
@@ -71,7 +71,7 @@ func TestCloseSinkAfterWait_CloserErrorDoesNotPanic(t *testing.T) {
 }
 
 func TestCloseSinkAfterWait_NilDoneChannelAlwaysTimesOut(t *testing.T) {
-	var done chan struct{} // nil: never ready, so only the timeout arm can fire
+	var done chan struct{}
 	fc := &amplFakeCloser{}
 	got := closeSinkAfterWait(done, 10*time.Millisecond, fc)
 	if got {

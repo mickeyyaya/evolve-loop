@@ -24,7 +24,7 @@ func TestQualityGate_WiredIntoReviewer(t *testing.T) {
 func TestNewReviewer_TautologyEvalBlocksAtEnforce(t *testing.T) {
 	ws, root := t.TempDir(), t.TempDir()
 	writeScoutReport(t, ws, "taut")
-	writeEval(t, root, "taut", ":") // no-op tautology → LevelHalt
+	writeEval(t, root, "taut", ":")
 
 	r := NewReviewer(config.StageEnforce)
 	res := r.Review(context.Background(), core.ReviewInput{Phase: "tdd", Workspace: ws, ProjectRoot: root})

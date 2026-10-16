@@ -8,53 +8,43 @@ import (
 	"strings"
 )
 
-// DiversityLevel classifies a suite of evals for adversarial diversity.
 type DiversityLevel int
 
-// Diversity levels in rising severity.
 const (
-	DiversityPass DiversityLevel = 0 // diverse enough (or nothing to assess)
-	DiversityWarn DiversityLevel = 1 // weak diversity; advisory
-	DiversityHalt DiversityLevel = 2 // a cohesive suite with zero negative cases
+	DiversityPass DiversityLevel = 0
+	DiversityWarn DiversityLevel = 1
+	DiversityHalt DiversityLevel = 2
 )
 
-// maxCohesiveSuiteSize is the largest suite treated as one authoring unit; a larger
-// directory is an accumulated archive, so a zero-negative result there only WARNs.
 const maxCohesiveSuiteSize = 12
 
-// DiversityOptions configures CheckDiversity. EvalDir is required.
 type DiversityOptions struct {
 	EvalDir string
-	Slug    string // optional: only consider files whose name contains this substring
+	Slug    string
 }
 
-// EvalDiversity is the per-file diversity fingerprint.
 type EvalDiversity struct {
 	Path        string
-	HasNegative bool // ≥1 command asserting a rejection / non-zero exit
-	HasEdge     bool // ≥1 command exercising empty/boundary/malformed input
+	HasNegative bool
+	HasEdge     bool
 }
 
-// DiversityResult is the suite-level verdict + per-file breakdown.
 type DiversityResult struct {
 	EvalDir           string
-	EvalCount         int // files with ≥1 parsed command
-	NegativeCaseCount int // files with ≥1 negative case
-	EdgeCaseCount     int // files with ≥1 edge/OOD case
-	PositiveOnlyCount int // files with neither negative nor edge cases
+	EvalCount         int
+	NegativeCaseCount int
+	EdgeCaseCount     int
+	PositiveOnlyCount int
 	Level             DiversityLevel
 	Reasons           []string
 	Files             []EvalDiversity
 }
 
 var (
-	// Precision over recall: only shell negation constructs count, never English words like "fail",
-	// and `!=` counts only inside a test bracket.
 	negativeCaseRE = regexp.MustCompile(`(^|\s)!\s|\bexit\s+1\b|-ne\s+0|\[[^]]*!=[^]]*\]|\b(assert|expect|should|must)[_-]?(fail|error|reject|not)\b`)
 	edgeCaseRE     = regexp.MustCompile(`\binvalid\b|\bmissing\b|\bcorrupt(ed)?\b|\bmalformed\b|\boverflow\b|\bboundary\b|\bempty\b|""|''`)
 )
 
-// CheckDiversity scores the .md evals in opts.EvalDir for adversarial diversity; a suite with no commands passes.
 func CheckDiversity(opts DiversityOptions) (DiversityResult, error) {
 	if opts.EvalDir == "" {
 		return DiversityResult{}, fmt.Errorf("evalqualitycheck: EvalDir required")
@@ -71,7 +61,7 @@ func CheckDiversity(opts DiversityOptions) (DiversityResult, error) {
 			continue
 		}
 		if strings.HasPrefix(name, "_") {
-			continue // meta / canary / example evals are not authoring units
+			continue
 		}
 		if opts.Slug != "" && !strings.Contains(name, opts.Slug) {
 			continue
@@ -125,7 +115,6 @@ func fingerprintEval(path string) (EvalDiversity, bool, error) {
 	return ed, true, nil
 }
 
-// scoreDiversity gates on negative cases only; edge-case detection is keyword-based and too noisy to gate.
 func scoreDiversity(d DiversityResult) (DiversityLevel, []string) {
 	switch {
 	case d.EvalCount == 0:

@@ -86,7 +86,6 @@ func TestClassify_NoTypePrefixGoesToOther(t *testing.T) {
 }
 
 func TestClassify_MultiWordType(t *testing.T) {
-	// "feat-extra" doesn't match the regex (hyphen breaks [A-Za-z]+).
 	var b Buckets
 	Classify("feat-extra: thing", &b)
 	if len(b.Other) != 1 || b.Other[0] != "feat-extra: thing" {
@@ -176,7 +175,6 @@ func TestHasEntry(t *testing.T) {
 }
 
 func TestHasEntry_MidLineNotMatched(t *testing.T) {
-	// `## [11.6.6]` must be at line start.
 	body := "comment ## [11.6.6] referenced"
 	if HasEntry(body, "11.6.6") {
 		t.Errorf("mid-line should not match")
@@ -255,7 +253,6 @@ func TestWriteEntry_Idempotent(t *testing.T) {
 	if wrote || !skipped {
 		t.Errorf("wrote=%v skipped=%v, want false/true", wrote, skipped)
 	}
-	// Original content unchanged.
 	body, _ := os.ReadFile(cl)
 	if string(body) != seed {
 		t.Errorf("body mutated: %s", body)
@@ -282,10 +279,6 @@ func TestWriteEntry_PrependPreservesHeader(t *testing.T) {
 	}
 }
 
-// TestWriteEntry_FreshCreateError pins that when the CHANGELOG does not exist
-// (fresh-create path) but the parent directory is not writable, WriteEntry
-// returns the wrapped "create fresh" error and reports (false,false,err) —
-// it must not claim a write happened. Reproduced with a 0555 directory.
 func TestWriteEntry_FreshCreateError(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root bypasses directory write permission")
@@ -295,7 +288,7 @@ func TestWriteEntry_FreshCreateError(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
-	cl := filepath.Join(dir, "CHANGELOG.md") // does not exist → fresh path
+	cl := filepath.Join(dir, "CHANGELOG.md")
 
 	wrote, skipped, err := WriteEntry(cl, "1.0.0", "## [1.0.0]\n")
 	if err == nil || !strings.Contains(err.Error(), "create fresh") {
@@ -306,11 +299,6 @@ func TestWriteEntry_FreshCreateError(t *testing.T) {
 	}
 }
 
-// TestWriteEntry_WriteTmpError pins that when the CHANGELOG exists (so the
-// non-fresh prepend path runs) but the tmp sibling cannot be written because
-// the directory is read-only, WriteEntry surfaces the wrapped "write tmp"
-// error and reports no write. Reproduced by seeding the file, then chmod'ing
-// the directory to 0555.
 func TestWriteEntry_WriteTmpError(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root bypasses directory write permission")
@@ -323,7 +311,7 @@ func TestWriteEntry_WriteTmpError(t *testing.T) {
 	if err := os.WriteFile(cl, []byte("# Changelog\n\n## [0.9.0]\n\nold\n\n---\n\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(dir, 0o555); err != nil { // block tmp creation
+	if err := os.Chmod(dir, 0o555); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
@@ -373,17 +361,13 @@ func TestBucketsEmpty(t *testing.T) {
 	}
 }
 
-// TestRenderEntry_DedupsIdenticalBulletsWithinBucket is the regression test for
-// the verbatim-duplicated `(#406)` bullet shipped in CHANGELOG.md [22.13.1]: a
-// merge made one commit reachable by two paths, so ClassifyAll produced the same
-// rendered item twice inside one bucket.
 func TestRenderEntry_DedupsIdenticalBulletsWithinBucket(t *testing.T) {
 	const dup = "un-track runtime-minted profile stubs (#406)"
 	b := ClassifyAll([]Commit{
 		{SHA: "a", Subject: "fix: " + dup},
 		{SHA: "b", Subject: "fix: " + dup},
 		{SHA: "c", Subject: "fix: something else (#407)"},
-		{SHA: "d", Subject: "feat: " + dup}, // same text, different bucket
+		{SHA: "d", Subject: "feat: " + dup},
 	})
 	got := RenderEntry("22.13.1", "v22.13.0", "HEAD", time.Date(2026, 8, 4, 0, 0, 0, 0, time.UTC), b)
 

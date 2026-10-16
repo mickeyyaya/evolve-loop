@@ -14,10 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// versionCaptureTimeout drops a hung binary from the inventory instead of stalling batch start.
 var versionCaptureTimeout = 5 * time.Second
 
-// execVersion runs "<bin> --version"; tests replace it.
 var execVersion = func(bin string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), versionCaptureTimeout)
 	defer cancel()
@@ -30,7 +28,6 @@ var execVersion = func(bin string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// versionTokenRE matches the first M.N or M.N.P token, as in "codex-cli 0.139.0".
 var versionTokenRE = regexp.MustCompile(`\d+\.\d+(?:\.\d+)?`)
 
 func CLIVersion(bin string) (string, error) {
@@ -45,7 +42,6 @@ func CLIVersion(bin string) (string, error) {
 	return token, nil
 }
 
-// captureVersionInventory omits bins whose probe fails or prints no version token.
 func captureVersionInventory(bins []string) map[string]string {
 	inv := make(map[string]string, len(bins))
 	for _, b := range bins {
@@ -56,7 +52,6 @@ func captureVersionInventory(bins []string) map[string]string {
 	return inv
 }
 
-// loadVersionCache returns nil, nil when the file is absent, as on a first batch.
 func loadVersionCache(path string) (map[string]string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// writeRubricLines projects the routing config the kernel walks, so a threshold cannot disagree between the walk
-// and the prompt. A conditional rule says when a phase is pinned, so its op is negated to say when it may be skipped.
 func writeRubricLines(b *strings.Builder, cfg config.RoutingConfig) {
 	seen := make(map[string]struct{}, len(cfg.Triggers)+len(cfg.Conditional))
 	for p := range cfg.Conditional {
@@ -25,8 +23,6 @@ func writeRubricLines(b *strings.Builder, cfg config.RoutingConfig) {
 	sort.Strings(names)
 	for _, p := range names {
 		if rule, ok := cfg.Conditional[p]; ok {
-			// One exemption line per clause: the rule pins only while EVERY
-			// clause holds, so the negation of any single clause is a release.
 			for _, c := range rule.Clauses() {
 				if op, ok := negateOp(c.Op); ok {
 					fmt.Fprintf(b, "- %s %s %s → skip %s (conditional-mandatory exemption)\n", c.Field, op, c.Value, p)
@@ -72,7 +68,6 @@ func opSymbol(op string) string {
 	return op
 }
 
-// negateOp also accepts word-form ops so an in-process caller cannot lose an exemption line; unknown ops yield none.
 func negateOp(op string) (string, bool) {
 	switch op {
 	case "==", "eq":

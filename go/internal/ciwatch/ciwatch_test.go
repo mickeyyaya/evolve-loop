@@ -15,13 +15,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
-// fakeClock lets a test drive the poll loop without real sleeping.
 type fakeClock struct{ now time.Time }
 
 func (c *fakeClock) Now() time.Time        { return c.now }
 func (c *fakeClock) Sleep(d time.Duration) { c.now = c.now.Add(d) }
 
-// watchOpts returns Options wired to temp dirs and the fake clock.
 func watchOpts(t *testing.T, fetch Fetcher) (Options, string, string) {
 	t.Helper()
 	inbox := t.TempDir()
@@ -53,10 +51,6 @@ func inboxFiles(t *testing.T, dir string) []string {
 	return names
 }
 
-// TestCIWatch_FailedRunFilesCriticalInboxItem pins AC1 of
-// push-ci-watch-remote-parity: a push whose CI run FAILS yields a critical
-// fix-forward inbox item naming the failing test (bounded log excerpt),
-// through a faked gh-runner seam — no live gh call.
 func TestCIWatch_FailedRunFilesCriticalInboxItem(t *testing.T) {
 	calls := 0
 	fetch := func(_ context.Context, sha string) (RunStatus, error) {
@@ -72,7 +66,7 @@ func TestCIWatch_FailedRunFilesCriticalInboxItem(t *testing.T) {
 			Conclusion:  "failure",
 			RunURL:      "https://github.com/mickeyyaya/evolve-loop/actions/runs/42",
 			FailingTest: "TestOrchestrator_TriageLeakRecover",
-			LogExcerpt:  strings.Repeat("x", 10000), // must be bounded in the item
+			LogExcerpt:  strings.Repeat("x", 10000),
 		}, nil
 	}
 	opts, inbox, workspace := watchOpts(t, fetch)
@@ -123,7 +117,6 @@ func TestCIWatch_FailedRunFilesCriticalInboxItem(t *testing.T) {
 		t.Errorf("evidence = %q, want the run URL", item.Evidence)
 	}
 
-	// The verdict artifact for dossier ingestion is recorded too.
 	vb, err := os.ReadFile(filepath.Join(workspace, dossier.CIWatchVerdictFile))
 	if err != nil {
 		t.Fatalf("verdict artifact missing: %v", err)
@@ -137,10 +130,6 @@ func TestCIWatch_FailedRunFilesCriticalInboxItem(t *testing.T) {
 	}
 }
 
-// TestCIWatch_GreenRunFilesNoInboxItem pins AC1's negative half (the
-// anti-no-op signal): a GREEN CI run files NO inbox item — a stub that
-// unconditionally escalates fails here. The verdict artifact is still
-// recorded (dossier evidence is unconditional).
 func TestCIWatch_GreenRunFilesNoInboxItem(t *testing.T) {
 	fetch := func(_ context.Context, _ string) (RunStatus, error) {
 		return RunStatus{
@@ -166,9 +155,6 @@ func TestCIWatch_GreenRunFilesNoInboxItem(t *testing.T) {
 	}
 }
 
-// TestWatch_TimesOutWhenRunNeverCompletes pins the timeout bound: a run stuck
-// in_progress past the policy timeout returns ErrWatchTimeout and files
-// nothing (no fabricated verdict).
 func TestWatch_TimesOutWhenRunNeverCompletes(t *testing.T) {
 	fetch := func(_ context.Context, _ string) (RunStatus, error) {
 		return RunStatus{Status: "in_progress"}, nil
@@ -189,9 +175,6 @@ func TestWatch_TimesOutWhenRunNeverCompletes(t *testing.T) {
 	}
 }
 
-// TestNewGHFetcher_ParsesRunListAndFailedLog exercises the production gh
-// fetcher through the execCapture seam (no live gh): run-list JSON parsing,
-// queued-when-empty, and failing-test extraction from --log-failed.
 func TestNewGHFetcher_ParsesRunListAndFailedLog(t *testing.T) {
 	orig := execCapture
 	t.Cleanup(func() { execCapture = orig })

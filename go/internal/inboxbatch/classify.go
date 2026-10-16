@@ -7,22 +7,17 @@ import (
 	"strings"
 )
 
-// DefaultMaxItems caps a batch when Config.MaxItems is unset.
 const DefaultMaxItems = 4
 
-// Config parameterizes Classify; the zero value uses the compiled defaults.
 type Config struct {
-	// MaxItems <= 0 means DefaultMaxItems.
 	MaxItems int
-	// Rules nil means DefaultRules().
-	Rules []Rule
-	Order func([]Item) []Item
+	Rules    []Rule
+	Order    func([]Item) []Item
 }
 
 type Batch struct {
-	Items   []Item
-	Reasons []string
-	// DependsOnPrev marks a later chunk of a split cluster: run the previous batch first.
+	Items         []Item
+	Reasons       []string
 	DependsOnPrev bool
 }
 
@@ -137,7 +132,6 @@ func rankOrder(member, position []int) []int {
 	return ordered
 }
 
-// sortedRuleEdges collects every rule's edges in one canonical (A, B, Reason) order.
 func sortedRuleEdges(rules []Rule, items []Item) []Edge {
 	var edges []Edge
 	for _, r := range rules {
@@ -155,7 +149,6 @@ func sortedRuleEdges(rules []Rule, items []Item) []Edge {
 	return edges
 }
 
-// maxRenderedReasons caps the binding signals shown per batch line.
 const maxRenderedReasons = 3
 
 func RenderMarkdown(batches []Batch, label func(Item) string) string {

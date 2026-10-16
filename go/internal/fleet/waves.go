@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// PlanWaves levels todos by depends_on into waves of file-disjoint specs, merging file-sharing todos into one spec.
 func PlanWaves(todos []Todo) ([][]CycleSpec, error) {
 	ids := make([]string, len(todos))
 	byID := make(map[string]Todo, len(todos))
@@ -51,7 +50,6 @@ func PlanWaves(todos []Todo) ([][]CycleSpec, error) {
 	return waves, nil
 }
 
-// combinedContract keeps a lone todo's contract verbatim and labels each non-empty one "[id] " in a merged group.
 func combinedContract(group []Todo) string {
 	if len(group) == 1 {
 		return strings.TrimSpace(group[0].OutputContract)
@@ -65,7 +63,6 @@ func combinedContract(group []Todo) string {
 	return strings.Join(parts, "\n")
 }
 
-// groupByFiles union-finds todos that transitively share a file; groups follow their earliest member.
 func groupByFiles(todos []Todo) [][]Todo {
 	parent := make([]int, len(todos))
 	for i := range parent {
@@ -73,7 +70,7 @@ func groupByFiles(todos []Todo) [][]Todo {
 	}
 	find := func(x int) int {
 		for parent[x] != x {
-			parent[x] = parent[parent[x]] // path-halving
+			parent[x] = parent[parent[x]]
 			x = parent[x]
 		}
 		return x
@@ -83,13 +80,13 @@ func groupByFiles(todos []Todo) [][]Todo {
 		if ra == rb {
 			return
 		}
-		if ra < rb { // root = smallest member index → deterministic
+		if ra < rb {
 			parent[rb] = ra
 		} else {
 			parent[ra] = rb
 		}
 	}
-	fileOwner := map[string]int{} // normalized file -> first todo index claiming it
+	fileOwner := map[string]int{}
 	for i, td := range todos {
 		for f := range normalizeFiles(td.Files) {
 			if j, ok := fileOwner[f]; ok {

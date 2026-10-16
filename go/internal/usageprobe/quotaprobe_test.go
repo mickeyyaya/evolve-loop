@@ -1,12 +1,5 @@
 package usageprobe
 
-// quotaprobe_test.go — ProbeQuota is the MEASUREMENT sibling of the boolean
-// Prober: it captures each family's /usage pane through the same injected probe
-// seam and PARSES it into a quotastate.QuotaState (instead of discarding the
-// numbers after a capped/not classification). Fail-open: a family whose probe is
-// unsupported (ollama) or errors is omitted — never a fabricated state. The
-// budget allocator consumes the returned slice.
-
 import (
 	"context"
 	"errors"
@@ -18,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
-// a minimal REAL-shaped claude /usage pane: one numeric window is enough for
-// Parse to return Source=probed (bucket fidelity is quotastate's own test).
 const claudeUsagePane = "" +
 	"   Current session\n" +
 	"   █████████████▌                                     27% used\n" +
@@ -52,10 +43,6 @@ func TestProbeQuota_OneScreenReportsEveryFamilyItsWindowsTarget(t *testing.T) {
 	}
 }
 
-// TestProbeQuota_ParsesHealthyOmitsFailed pins the two core contracts: a family
-// whose probe succeeds is parsed to a probed QuotaState; a family whose probe is
-// unsupported OR errors is OMITTED (fail-open, no fabricated entry). Naming
-// ProbeQuota by identifier also satisfies apicover -enforce for this package.
 func TestProbeQuota_ParsesHealthyOmitsFailed(t *testing.T) {
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	probe := func(_ context.Context, family string) (string, error) {
@@ -67,14 +54,12 @@ func TestProbeQuota_ParsesHealthyOmitsFailed(t *testing.T) {
 		case "codex":
 			return "", errors.New("bridge timeout")
 		case "garble":
-			return "some banner text with no usage numbers at all\n", nil // responds, unparseable
+			return "some banner text with no usage numbers at all\n", nil
 		default:
 			return "", nil
 		}
 	}
 
-	// claude parses (kept); codex errors, ollama is unsupported, garble responds
-	// but yields no numbers (Source=unknown) — all three omitted.
 	got := ProbeQuota(context.Background(), []string{"claude", "codex", "ollama", "garble"}, QuotaReader{Probe: probe, Read: readSession, Now: now})
 
 	if len(got) != 1 {
@@ -91,10 +76,6 @@ func TestProbeQuota_ParsesHealthyOmitsFailed(t *testing.T) {
 	}
 }
 
-// TestProbeQuota_ConcurrentFailOpen exercises the concurrent fan-out with a mix
-// of healthy/errored families under -race: the goroutines append to a shared
-// slice, so the race detector guards the accumulation, and a panicking-free
-// error path proves fail-open. Every "healthy-<n>" family must survive.
 func TestProbeQuota_ConcurrentFailOpen(t *testing.T) {
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	families := []string{}
@@ -120,8 +101,6 @@ func TestProbeQuota_ConcurrentFailOpen(t *testing.T) {
 	}
 }
 
-// TestProbeQuota_EmptyFamilies returns an empty slice (never nil-deref) for no
-// families — the shadow-safe caller passes nil when budgeting is off.
 func TestProbeQuota_EmptyFamilies(t *testing.T) {
 	if got := ProbeQuota(context.Background(), nil, QuotaReader{Probe: func(context.Context, string) (string, error) {
 		return "", nil

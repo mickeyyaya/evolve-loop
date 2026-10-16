@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// createFixtureProject writes a minimal registry so the collision check against built-ins is exercised.
 func createFixtureProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -34,7 +33,6 @@ const validCreateSpec = `{
   "classify": { "require_sections": ["Threats", "Mitigations"], "verdict_on_pass": "PASS" }
 }`
 
-// createEnvelope decodes the wire contract independently of createEnvelopeOut.
 type createEnvelope struct {
 	OK               bool     `json:"ok"`
 	Phase            string   `json:"phase"`
@@ -277,7 +275,6 @@ func TestPhasesCreate_RejectsRootOutsideProjectAndRoots(t *testing.T) {
 
 func TestPhasesCreate_RollbackPreservesPreexistingDir(t *testing.T) {
 	root := createFixtureProject(t)
-	// A same-named directory without phase.json is invisible to the collision check.
 	dir := filepath.Join(root, ".evolve", "phases", "threat-model")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -286,7 +283,6 @@ func TestPhasesCreate_RollbackPreservesPreexistingDir(t *testing.T) {
 	if err := os.WriteFile(keep, []byte("operator notes"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// agents/ as a file makes the persona write fail after phase.json is written.
 	if err := os.WriteFile(filepath.Join(root, "agents"), []byte("not a dir"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +324,6 @@ func TestPhasesCreate_VerifyRoundtrip(t *testing.T) {
 		t.Fatalf("create envelope not OK: %+v", env)
 	}
 
-	// Exit 1, not 10: a missing-artifact violation proves the created phase resolved.
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-1")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)

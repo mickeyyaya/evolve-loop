@@ -11,15 +11,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/textcap"
 )
 
-// MaxGoalTextRunes bounds the goal text rendered into the advisor prompt.
 const MaxGoalTextRunes = 4000
 
 const maxLaneScopeRunes = 4000
 
-// TruncateGoal trims s and caps it at MaxGoalTextRunes with a truncation marker.
 func TruncateGoal(s string) string { return textcap.TruncateRunes(s, MaxGoalTextRunes) }
 
-// WriteRoutingContext writes the deterministic decision context both the routing and the plan prompts share.
 func WriteRoutingContext(b *strings.Builder, in router.RouteInput) {
 	writeCycleHeader(b, in)
 	writeGoal(b, in)
@@ -38,7 +35,6 @@ func writeCycleHeader(b *strings.Builder, in router.RouteInput) {
 	fmt.Fprintf(b, "- max_optional_insertions: %d\n\n", in.Cfg.MaxInsertions)
 }
 
-// writeGoal renders ahead of the per-cycle signals: the goal is stable across a run, so the prompt prefix stays cacheable.
 func writeGoal(b *strings.Builder, in router.RouteInput) {
 	if g := TruncateGoal(in.GoalText); g != "" {
 		fmt.Fprintf(b, "## Goal\n%s\n\n", g)
@@ -68,7 +64,6 @@ func writeLaneItem(b *strings.Builder, item router.LaneItem) {
 	}
 }
 
-// writeCLIHealth lets the advisor plan around a benched family instead of discovering it one phase at a time.
 func writeCLIHealth(b *strings.Builder, in router.RouteInput) {
 	if len(in.BenchedCLIs) == 0 {
 		return
@@ -104,7 +99,7 @@ func writeOptionalPhases(b *strings.Builder, in router.RouteInput) {
 	names := make([]string, 0, len(in.Cfg.Triggers))
 	for name := range in.Cfg.Triggers {
 		if slices.Contains(in.UnavailablePhases, name) {
-			continue // a phase without a persona doc is not selectable
+			continue
 		}
 		names = append(names, name)
 	}
@@ -114,7 +109,6 @@ func writeOptionalPhases(b *strings.Builder, in router.RouteInput) {
 	}
 }
 
-// writeUnavailablePhases says why the persona-less phases are missing, so the advisor never proposes them from memory.
 func writeUnavailablePhases(b *strings.Builder, in router.RouteInput) {
 	if len(in.UnavailablePhases) == 0 {
 		return
@@ -125,14 +119,12 @@ func writeUnavailablePhases(b *strings.Builder, in router.RouteInput) {
 	}
 }
 
-// writeRubric hardcodes only the FORBIDDEN line: it is a kernel invariant, not phase data.
 func writeRubric(b *strings.Builder, in router.RouteInput) {
 	b.WriteString("\n## Decision rubric (justify each optional phase by an objective signal)\n")
 	writeRubricLines(b, in.Cfg)
 	b.WriteString("FORBIDDEN: never propose reaching ship without audit. Any justification for skipping audit is rejected by the kernel.\n")
 }
 
-// writeRecallMemory renders the last failure's reason and its matching lessons, which the orchestrator pre-computes.
 func writeRecallMemory(b *strings.Builder, in router.RouteInput) {
 	if in.LastReason == "" && len(in.Lessons) == 0 {
 		return

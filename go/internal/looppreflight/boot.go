@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-// checkBridgeBoot boots each *-tmux driver's REPL in turn and halts if any misses its
-// prompt marker; SkipBoot warns instead. Sandbox needs a profile request and a capable host.
 func checkBridgeBoot(o resolved, usageEvidence func(driver string) string) CheckResult {
 	if o.skipBoot {
 		return CheckResult{
@@ -103,8 +101,6 @@ func attemptsNote(driver string, out BootOutcome) string {
 	return ""
 }
 
-// newDefaultBootTester mirrors `evolve doctor boot`: it boots in a throwaway workspace,
-// plus a throwaway worktree and the build agent on the sandbox path.
 func newDefaultBootTester(projectRoot string, stderr io.Writer) func(context.Context, string, bool) BootOutcome {
 	return func(ctx context.Context, driver string, sandbox bool) BootOutcome {
 		ws, err := os.MkdirTemp("", "evolve-looppreflight-*")
@@ -126,8 +122,6 @@ func newDefaultBootTester(projectRoot string, stderr io.Writer) func(context.Con
 	}
 }
 
-// exitWorkspaceSetupFailed is negative so it never collides with a bridge exit code
-// and a MkdirTemp failure is not misreported as ExitBadFlags.
 const exitWorkspaceSetupFailed = -1
 
 func bootRCName(rc int) string {
@@ -143,7 +137,6 @@ func bootRCName(rc int) string {
 	case exitWorkspaceSetupFailed:
 		return "workspace setup failed (os.MkdirTemp)"
 	default:
-		// Carry the number so distinct unknown codes stay distinguishable.
 		return fmt.Sprintf("boot failure (exit=%d)", rc)
 	}
 }

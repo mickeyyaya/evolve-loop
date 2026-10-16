@@ -8,25 +8,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TaskFreshness is one task id re-resolved at dispatch time.
 type TaskFreshness struct {
 	Fresh  bool
 	Reason string
 }
 
-// FreshnessProbeFn re-resolves one task id against current inbox and dependency state.
 type FreshnessProbeFn func(taskID string) TaskFreshness
 
-// RefillFn returns the next pending backlog spec whose ids are not in exclude; ok=false leaves the slot empty.
 type RefillFn func(exclude map[string]bool) (CycleSpec, bool)
 
-// FreshnessSkip records one id skipped at dispatch, with its reason.
 type FreshnessSkip struct {
 	TaskID string
 	Reason string
 }
 
-// FreshenSpecs drops stale scope ids, refills slots that lost their whole scope, and WARNs once per skip.
 func FreshenSpecs(specs []CycleSpec, probe FreshnessProbeFn, refill RefillFn, warn io.Writer) (kept []CycleSpec, skipped []FreshnessSkip) {
 	exclude := make(map[string]bool)
 	for _, s := range specs {
@@ -44,7 +39,6 @@ func FreshenSpecs(specs []CycleSpec, probe FreshnessProbeFn, refill RefillFn, wa
 		}
 		kept = append(kept, live)
 	}
-	// Refill candidates are probed too: the backlog can hold stale entries just like the plan.
 	for freedSlots > 0 {
 		cand, ok := refill(exclude)
 		if !ok {
@@ -84,8 +78,6 @@ func filterScope(s CycleSpec, probe FreshnessProbeFn, warn io.Writer) (CycleSpec
 		stale[sk.TaskID] = true
 	}
 	s.Scope = live
-	// The lane pins lane-scope.json from Env[FleetScopeKey], not Scope; rebuild it on a copy
-	// because the input map is shared with the caller.
 	if _, ok := s.Env[ipcenv.FleetScopeKey]; ok {
 		env := make(map[string]string, len(s.Env))
 		for k, v := range s.Env {
@@ -98,8 +90,6 @@ func filterScope(s CycleSpec, probe FreshnessProbeFn, warn io.Writer) (CycleSpec
 	return s, skips
 }
 
-// dropStaleContractLines removes pruned ids' objectives from a combinedContract; an unlabeled
-// continuation line shares the fate of the "[id] " label above it.
 func dropStaleContractLines(contract string, stale map[string]bool) string {
 	if contract == "" || len(stale) == 0 {
 		return contract
@@ -129,7 +119,6 @@ func contractLineID(line string) (string, bool) {
 	return line[1:end], true
 }
 
-// ClassifyEmptyScopeBuild returns SKIPPED for an honest empty-scope build after the gate, else originalVerdict.
 func ClassifyEmptyScopeBuild(freshnessGateRan, reportsNoInScopeWork bool, originalVerdict string) string {
 	if freshnessGateRan && reportsNoInScopeWork {
 		return "SKIPPED"

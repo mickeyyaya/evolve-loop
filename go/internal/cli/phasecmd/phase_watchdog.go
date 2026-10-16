@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasewatchdog"
 )
 
-// RunPhaseWatchdog implements `evolve phase-watchdog <workspace> <pgid> <cycle> <cycle-state>`.
 func RunPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var pos []string
 	for _, a := range args {
@@ -44,7 +43,6 @@ func RunPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 	return phasewatchdog.Run(cfg, stderr)
 }
 
-// watchdogEnvConfig resolves watchdog settings from .evolve/policy.json.
 func watchdogEnvConfig(stderr io.Writer) phasewatchdog.Config {
 	pol, path, err := loadPolicy()
 	if err != nil {

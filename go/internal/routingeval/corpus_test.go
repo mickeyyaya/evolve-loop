@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// WS4-S1 (ADR-0052): the corpus loads + validates. A malformed case file is a
-// LOUD error, never a skipped case.
 func TestGoldenRoutingCorpus_LoadsAndValidates(t *testing.T) {
 	t.Parallel()
 	cases, err := LoadCorpus("testdata")
@@ -21,12 +19,9 @@ func TestGoldenRoutingCorpus_LoadsAndValidates(t *testing.T) {
 	if len(cases) < 6 {
 		t.Fatalf("want >=6 seed cases, got %d", len(cases))
 	}
-	// Name-sorted for deterministic subtest order.
 	if !sort.SliceIsSorted(cases, func(i, j int) bool { return cases[i].Name < cases[j].Name }) {
 		t.Error("LoadCorpus must return name-sorted cases")
 	}
-	// Name the Case type directly (public-API coverage) and assert the realized
-	// fields are populated.
 	var first Case = cases[0]
 	if first.Name == "" || first.RawResponse == "" {
 		t.Errorf("first realized Case is malformed: %+v", first)
@@ -38,14 +33,11 @@ func TestGoldenRoutingCorpus_LoadsAndValidates(t *testing.T) {
 		if c.RawResponse == "" {
 			t.Errorf("case %q: empty raw response", c.Name)
 		}
-		// A positive case must assert something (run-set or forbidden); a
-		// negative case must declare the parse error. Never a no-op case.
 		if !c.ExpectParseError && len(c.ExpectRunSet) == 0 && len(c.ForbiddenPhases) == 0 {
 			t.Errorf("case %q asserts nothing — a no-op corpus case locks nothing", c.Name)
 		}
 	}
 
-	// Malformed loader inputs must be loud errors.
 	t.Run("bad json is loud", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
@@ -63,7 +55,7 @@ func TestGoldenRoutingCorpus_LoadsAndValidates(t *testing.T) {
 		cd := filepath.Join(dir, "typo")
 		mustMkdir(t, cd)
 		mustWrite(t, filepath.Join(cd, "response.txt"), "[]")
-		mustWrite(t, filepath.Join(cd, "case.json"), `{"expect_runset":["x"]}`) // typo'd key
+		mustWrite(t, filepath.Join(cd, "case.json"), `{"expect_runset":["x"]}`)
 		if _, err := LoadCorpus(dir); err == nil {
 			t.Error("a typo'd expectation key must be a loud error (DisallowUnknownFields)")
 		}
@@ -86,11 +78,6 @@ func TestGoldenRoutingCorpus_LoadsAndValidates(t *testing.T) {
 	})
 }
 
-// WS4-S2 (ADR-0052): replay each captured response through the REAL parse +
-// integrity-floor clamp (core.ReplayPlanFromResponse — the WS3-S5 entry point)
-// and assert the run-set, the clamps that fire, the phases that must never run,
-// and the universal ship⇒audit safety invariant. This locks the parse + floor:
-// a regression that weakened either would change a run-set and break a case.
 func TestGoldenCorpus_ReplayProducesExpectedRunSet(t *testing.T) {
 	t.Parallel()
 	cases, err := LoadCorpus("testdata")
@@ -129,8 +116,6 @@ func TestGoldenCorpus_ReplayProducesExpectedRunSet(t *testing.T) {
 					t.Errorf("forbidden phase %q must NOT run; plan = %+v", forbidden, plan.Entries)
 				}
 			}
-			// Universal safety invariant (intent, not characterization): a plan
-			// that reaches ship MUST run audit — the floor's whole purpose.
 			if phaseRuns(plan, "ship") && !phaseRuns(plan, "audit") {
 				t.Errorf("ship without audit survived the clamp — floor violated; plan = %+v", plan.Entries)
 			}

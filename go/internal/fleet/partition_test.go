@@ -200,7 +200,6 @@ func assertGraphConnectedNotSplit(t *testing.T, buckets [][]Todo, deferred []Tod
 }
 
 func TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets(t *testing.T) {
-	// Disjoint files, but package fleet imports ipcenv, so the package graph connects them.
 	todos := []Todo{
 		{ID: "a", Files: []string{"internal/fleet/partition.go"}},
 		{ID: "b", Files: []string{"internal/ipcenv/ipcenv.go"}},

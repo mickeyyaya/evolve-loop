@@ -19,7 +19,6 @@ func profileCLIs(p profiles.Profile) []string {
 	return out
 }
 
-// sandboxWanted reports whether any loadable profile enables sandboxing, i.e. a write phase needs it.
 func sandboxWanted(list func() ([]string, error), get func(string) (profiles.Profile, error)) bool {
 	names, _ := list()
 	for _, n := range names {
@@ -34,7 +33,6 @@ func sandboxWanted(list func() ([]string, error), get func(string) (profiles.Pro
 	return false
 }
 
-// driverBinary maps a driver to its executable, the segment before the first dash (claude-tmux → claude).
 func driverBinary(driver string) string {
 	if i := strings.IndexByte(driver, '-'); i > 0 {
 		return driver[:i]

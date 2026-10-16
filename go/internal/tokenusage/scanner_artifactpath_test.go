@@ -8,8 +8,8 @@ import (
 )
 
 func TestTranscriptScan_AttributesByArtifactPath_WhenCwdMispropagated(t *testing.T) {
-	repoRoot := "/repo"                                  // the mis-propagated Window.Worktree
-	transcriptCwd := "/repo/.evolve/worktrees/cycle-867" // where the CLI actually ran
+	repoRoot := "/repo"
+	transcriptCwd := "/repo/.evolve/worktrees/cycle-867"
 	artifact := ".evolve/runs/cycle-867/build-report.md"
 
 	root := t.TempDir()
@@ -47,7 +47,7 @@ func TestTranscriptScan_ArtifactPathNotInMessage_NotAttributed(t *testing.T) {
 	writeTranscript(t, sessionDir, "sess1.jsonl", body)
 
 	w := Window{
-		Worktree:     "/repo/.evolve/worktrees/cycle-42", // matches the transcript cwd, yet must not attribute
+		Worktree:     "/repo/.evolve/worktrees/cycle-42",
 		ArtifactPath: ".evolve/runs/cycle-42/build-report.md",
 		Start:        mustParse(t, launchWindowStart),
 		End:          mustParse(t, launchWindowEnd),
@@ -71,7 +71,6 @@ func TestTranscriptScan_AttributesByArtifactPath_StringContent(t *testing.T) {
 `
 	writeTranscript(t, sessionDir, "sess1.jsonl", body)
 
-	// Worktree is arbitrary here: ArtifactPath alone decides attribution.
 	w := Window{
 		Worktree:     "/repo",
 		ArtifactPath: artifact,

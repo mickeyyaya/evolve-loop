@@ -58,6 +58,10 @@ The phase advisor is the LLM brain behind `router.Proposer` (per-transition advi
 - **`LaunchRequest`'s json keys match the bridge's**, so the launch goldens replay through it, and the tests build it positionally so a new field breaks the build and the core adapter is revisited. `TestLaunchRequest_GoldenPerDecision`, `TestRequestShapes_HaveExactlyTheDeclaredFields`.
 - **Leaf-ness.** `importgraph_test.go` rejects any undeclared internal import, any third-party import, and the spellings `os.Stderr` and `advisor.New(` anywhere in non-test source, comments included. Core's `TestPhaseAdvisor_OneConstructionSite` pins `advisor.New(` to `core/phase_advisor.go`.
 - **Clean-code limits** are a test (`limits_test.go`): functions under 50 lines, counting comments inside the body; nesting at most 4; files under 800 lines.
+- **Closed decision enum.** `decision` has three values: the first plan (the zero value), the per-transition proposal and the re-plan. The enum is closed, so the `<kind>` token in the capture file names (`advisor-{prompt,response,span}-<kind>.*`) cannot be built from outside the package. `decisionForArtifact` maps every name but the re-plan artifact to Plan, because the test facade passes arbitrary names. The completion of every decision is `artifact`. Each prompt tells the model to write its artifact, so the scrollback holds only the echoed example of the prompt.
+- **Test choices that stay.** The tier lists in the parse test are literal on purpose. A catalog change then turns the test red. It cannot change silently what the advisor can propose.
+
+  The `LaunchRequest` literal in the adapter test is positional on purpose. A new field breaks the build there, and then the core adapter gets a review. The golden persona is a stub, because the real `agents/evolve-router.md` breaks the goldens on every persona edit.
 
 ## Findings
 

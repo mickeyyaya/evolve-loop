@@ -16,7 +16,6 @@ type drained struct {
 	src, dest, base, taskID string
 }
 
-// Release drains processing/cycle-<cycle>/ to the inbox root; a non-nil Policy bumps failures and parks at the ceiling.
 func (m *Mover) Release(cycle int, reason string, q *Policy) (RecoverResult, error) {
 	if reason == "" {
 		reason = "cycle-release"
@@ -27,7 +26,7 @@ func (m *Mover) Release(cycle int, reason string, q *Policy) (RecoverResult, err
 		return res, err
 	}
 	stamp := m.readStamp(cycle)
-	files, _ := jsonEntries(cycleDir) // an unreadable dir is an empty release (preserved)
+	files, _ := jsonEntries(cycleDir)
 	sort.Slice(files, func(i, j int) bool { return files[i].Name() < files[j].Name() })
 	for _, f := range files {
 		d := drained{src: filepath.Join(cycleDir, f.Name()), dest: filepath.Join(m.inboxDir, f.Name()), base: f.Name()}
@@ -62,7 +61,6 @@ func (m *Mover) openCycleDir(cycle int) (string, bool, error) {
 	return cycleDir, true, nil
 }
 
-// readStamp reads the cycle's continuation manifest so the drain stamps each item in the same pass.
 func (m *Mover) readStamp(cycle int) *continuation.Continuation {
 	if m.runWorkspace == nil {
 		return nil
@@ -81,8 +79,6 @@ func (m *Mover) readStamp(cycle int) *continuation.Continuation {
 	return &c
 }
 
-// parkAtCeiling bumps a committed item's failure_count and parks it in quarantine/ at the ceiling.
-// Every fault falls open to a plain release and is reported: the item WILL be re-picked.
 func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (bool, string) {
 	if q == nil || q.SystemLevel || q.Routed || (q.Committed != nil && !q.Committed[d.taskID]) {
 		return false, ""
@@ -115,7 +111,6 @@ func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (b
 	return true, pr.DestPath
 }
 
-// releaseOne moves one item to the inbox root, never over a root twin, and reports whether it moved.
 func (m *Mover) releaseOne(d drained, reason string, cycle int, stamp *continuation.Continuation) bool {
 	if _, statErr := os.Stat(d.dest); statErr == nil {
 		m.warn(fault{code: CodeReleaseDoubleMove, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",

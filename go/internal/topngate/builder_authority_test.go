@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// repoRoot assumes the test runs in <root>/go/internal/topngate.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	wd, err := os.Getwd()

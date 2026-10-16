@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// projectWithRegistryTriage copies the checked-in triage entry, so the fixture cannot drift from the real declaration.
 func projectWithRegistryTriage(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "architecture", "phase-registry.json"))

@@ -51,8 +51,6 @@ func TestRunPool_BackfillsReplacementWhileSiblingLaneStillRunning(t *testing.T) 
 		t.Fatalf("initial fill dispatched %v, want exactly {A,B}", seen)
 	}
 
-	// Let B finish only after observing both initial callbacks: callback entry
-	// order is scheduler-dependent even when the pool dispatches A before B.
 	releaseB()
 	select {
 	case id := <-dispatched:
@@ -252,7 +250,6 @@ func TestRunPool_BackfillPrefersHighestPriorityDisjointCandidate(t *testing.T) {
 		t.Fatal("timed out waiting for A's initial dispatch")
 	}
 
-	// Target=1 frees one slot at a time, so low and high compete for it and the order is deterministic.
 	close(holdA)
 
 	firstOfPair := ""
@@ -277,7 +274,6 @@ func TestRunPool_BackfillPrefersHighestPriorityDisjointCandidate(t *testing.T) {
 	}
 }
 
-// scopeID reads a pool spec's todo id; poolSpec always scopes exactly one todo.
 func scopeID(spec CycleSpec) string {
 	if len(spec.Scope) == 0 {
 		return ""

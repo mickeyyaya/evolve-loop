@@ -6,22 +6,16 @@ const RouteLaneValue = "lane"
 
 const loadWarningCode = "INBOX_LOAD_WARNING"
 
-// consoleRoutePrefix marks operator-owned route values (console-manual, console-salvage, ...).
 const consoleRoutePrefix = "console"
 
-// pipelineKindPrefix marks pipeline-integrity work, which the operator owns even with no files[].
 const pipelineKindPrefix = "pipeline-"
 
-// KindPipelineRepair is the kind the loop's halt escalation autofiles; the halt writer shares this symbol.
 const KindPipelineRepair = pipelineKindPrefix + "repair"
 
 func IsConsoleRoute(route string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(route)), consoleRoutePrefix)
 }
 
-// ConsoleRouted reports whether the item is operator-owned and why; a nil isProtected disables only surface rules.
-// route:"lane" relaxes a heuristic derivation for operator-authored items only.
-// See ADR-0074.
 func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 	route := strings.ToLower(strings.TrimSpace(it.Route))
 	if IsConsoleRoute(route) {
@@ -48,9 +42,7 @@ func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 	return true, reason
 }
 
-// surfaceDerivation is one item's protected-surface judgment.
 type surfaceDerivation struct {
-	// binding marks a declared protected file, which triage's breaker and the ship tripwire refuse whatever the route.
 	routed, binding bool
 	reason          string
 }
@@ -63,8 +55,6 @@ func pipelineKindDerivation(it Item) (bool, string) {
 	return true, "kind:" + kind + " (pipeline-integrity work is console-owned)"
 }
 
-// protectedDerivation binds on a declared protected file; a protected declared directory, or with no
-// declared surface a protected file the text names, routes without binding.
 func protectedDerivation(it Item, isProtected func(string) bool) surfaceDerivation {
 	if isProtected == nil {
 		return surfaceDerivation{}
@@ -80,9 +70,8 @@ func protectedDerivation(it Item, isProtected func(string) bool) surfaceDerivati
 		}
 	}
 	if scope.routed || it.DeclaredSurface() {
-		return scope // a declared surface wins; mentions are context
+		return scope
 	}
-	// A mention never binds: the text may only cite the file.
 	for _, p := range it.mentions {
 		if isProtected(p) {
 			return surfaceDerivation{routed: true, reason: "mentions protected path: " + p + " (no declared files[]: the surface is derived from the item's own text)"}
@@ -91,7 +80,6 @@ func protectedDerivation(it Item, isProtected func(string) bool) surfaceDerivati
 	return surfaceDerivation{}
 }
 
-// PartitionConsole splits items in input order, with one reason per routed item so no exclusion is silent.
 func PartitionConsole(items []Item, isProtected func(string) bool) (laneRoutable, console []Item, reasons []string) {
 	for _, it := range items {
 		routed, reason := ConsoleRouted(it, isProtected)
@@ -105,8 +93,6 @@ func PartitionConsole(items []Item, isProtected func(string) bool) (laneRoutable
 	return laneRoutable, console, reasons
 }
 
-// RoutedResolver loads dir once and classifies by id; unknown ids and a failed load resolve dispatchable.
-// Build one per wave so inbox changes are seen; failing open keeps a broken backlog from stopping the queue.
 func RoutedResolver(dir string, isProtected func(string) bool) func(id string) (bool, string) {
 	scan, _ := ScanDir(dir)
 	idx := indexByID(scan.Items)

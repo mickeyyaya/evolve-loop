@@ -208,7 +208,6 @@ func TestMover_ReleaseFromQuarantine_Guards(t *testing.T) {
 	if body, _ := os.ReadFile(filepath.Join(inbox, "q.json")); !strings.Contains(string(body), "q-root") {
 		t.Error("the root twin is never clobbered")
 	}
-	// A read-only root fails the rename after the counter reset, a preserved quirk.
 	if err := os.Remove(filepath.Join(inbox, "q.json")); err != nil {
 		t.Fatal(err)
 	}

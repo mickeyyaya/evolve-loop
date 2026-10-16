@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// buildChain threads prevCombined through Compute to produce a valid,
-// link-consistent chain from per-phase sources.
 func buildChain(t *testing.T, phases []string, srcs []fakeSource) []Digest {
 	t.Helper()
 	if len(phases) != len(srcs) {
@@ -25,7 +23,6 @@ func buildChain(t *testing.T, phases []string, srcs []fakeSource) []Digest {
 	return chain
 }
 
-// allOK is a provenance oracle that trusts every (non-empty) commit.
 func allOK(commit string) bool { return commit != "" }
 
 func TestVerify_EmptyChain_ReturnsSentinel(t *testing.T) {
@@ -48,8 +45,6 @@ func TestVerify_SingleBinary_Pass(t *testing.T) {
 }
 
 func TestVerify_ResumedUnderRebuild_VerifiedProvenance_Pass(t *testing.T) {
-	// scout/build ran under binA (commit cA); resumed: audit ran under binB
-	// (commit cB); ship runs under binB. Both commits are ancestors of HEAD.
 	chain := buildChain(t,
 		[]string{"scout", "build", "audit"},
 		[]fakeSource{
@@ -63,11 +58,10 @@ func TestVerify_ResumedUnderRebuild_VerifiedProvenance_Pass(t *testing.T) {
 }
 
 func TestVerify_DifferentBinary_NoProvenance_Tamper(t *testing.T) {
-	// A phase ran under binA with NO build-commit (unstamped) — unverifiable.
 	chain := buildChain(t,
 		[]string{"scout", "build"},
 		[]fakeSource{
-			{bin: "binA", commit: "", prof: "p1"}, // unstamped
+			{bin: "binA", commit: "", prof: "p1"},
 			{bin: "binB", commit: "cB", prof: "p2"},
 		})
 	err := Verify(chain, "binB", "cB", allOK)
@@ -84,7 +78,6 @@ func TestVerify_RunningBinaryUnverified_Tamper(t *testing.T) {
 			{bin: "binA", commit: "cA", prof: "p1"},
 			{bin: "binA", commit: "cA", prof: "p2"},
 		})
-	// running binary differs and its own commit is unverifiable.
 	err := Verify(chain, "binEVIL", "", allOK)
 	var te *TamperError
 	if !errors.As(err, &te) {
@@ -99,7 +92,6 @@ func TestVerify_NonAncestorCommit_Tamper(t *testing.T) {
 			{bin: "binA", commit: "cEVIL", prof: "p1"},
 			{bin: "binB", commit: "cB", prof: "p2"},
 		})
-	// oracle rejects cEVIL (not an ancestor of HEAD).
 	prov := func(c string) bool { return c == "cB" }
 	err := Verify(chain, "binB", "cB", prov)
 	var te *TamperError
@@ -115,7 +107,7 @@ func TestVerify_BrokenChainLink_Tamper(t *testing.T) {
 			{bin: "binA", commit: "cA", prof: "p1"},
 			{bin: "binA", commit: "cA", prof: "p2"},
 		})
-	chain[1].PrevCombined = "tampered-link" // break the back-pointer
+	chain[1].PrevCombined = "tampered-link"
 	err := Verify(chain, "binA", "cA", allOK)
 	var te *TamperError
 	if !errors.As(err, &te) {
@@ -124,9 +116,6 @@ func TestVerify_BrokenChainLink_Tamper(t *testing.T) {
 }
 
 func TestVerify_EmptyRunningSHA_Tamper(t *testing.T) {
-	// A chain of empty-sha records + an empty running sha must NOT slip through
-	// the single-binary fast-path: an unestablished binary identity is a tamper
-	// posture, not a clean pass.
 	chain := buildChain(t, []string{"scout"}, []fakeSource{{bin: "", commit: "", prof: "p"}})
 	err := Verify(chain, "", "", allOK)
 	var te *TamperError
@@ -136,9 +125,6 @@ func TestVerify_EmptyRunningSHA_Tamper(t *testing.T) {
 }
 
 func TestVerify_BackPointerMismatch_Tamper(t *testing.T) {
-	// Isolate the back-pointer link check: chain[1] is computed with a
-	// self-consistent but WRONG prevCombined, so combine(chain[1])==Combined
-	// (the recompute check passes) yet PrevCombined != chain[0].Combined.
 	src := fakeSource{bin: "binA", commit: "cA", prof: "p"}
 	d0, _ := Compute("scout", "run", "ts", "", src)
 	d1, _ := Compute("build", "run", "ts", "wrong-but-self-consistent-prev", src)
@@ -160,7 +146,7 @@ func TestVerify_CombinedMismatch_Tamper(t *testing.T) {
 			{bin: "binA", commit: "cA", prof: "p1"},
 			{bin: "binA", commit: "cA", prof: "p2"},
 		})
-	chain[0].BinarySHA = "swapped" // mutate a field without recomputing Combined
+	chain[0].BinarySHA = "swapped"
 	err := Verify(chain, "binA", "cA", allOK)
 	var te *TamperError
 	if !errors.As(err, &te) {

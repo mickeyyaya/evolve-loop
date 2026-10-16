@@ -7,10 +7,8 @@ import (
 	"testing"
 )
 
-// conservativeWindowCeiling is the smallest advertised maximum in the table (codex 400K; agy advertises 1M).
 const conservativeWindowCeiling = 400_000
 
-// Production launches the tmux variants, so each family is checked under both identities.
 var measuredNonClaudeFamilies = []struct {
 	family  string
 	variant string
@@ -41,11 +39,11 @@ func TestFillTelemetry_EffectiveWindowMeasuredNonClaudeFamilies(t *testing.T) {
 
 func TestFillTelemetry_EffectiveWindowUnsupportedFamiliesStayUnmeasured(t *testing.T) {
 	unmeasured := []string{
-		"ollama", // the served model owns the window, not the CLI
+		"ollama",
 		"ollama-tmux",
 		"no-such-cli-family",
-		"codexx", // adjacent name — must NOT inherit the codex window
-		"agyx",   // adjacent name — must NOT inherit the agy window
+		"codexx",
+		"agyx",
 		"   ",
 		"-",
 	}

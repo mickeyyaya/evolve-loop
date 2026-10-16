@@ -7,14 +7,12 @@ import (
 	"testing"
 )
 
-// echoedReviewerLine is a verbatim adversarial-review prompt line that the normalizer keyword-matches as rate_limit.
 const echoedReviewerLine = "unbounded allocation or recursion; TOCTOU / race windows; missing rate limits."
 
 func passSentinel(phase string) string {
 	return "<!-- evolve-verdict: {\"phase\":\"" + phase + "\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n"
 }
 
-// infraEventLine hand-writes the envelope shape phasestream.infraEnvelope emits.
 func infraEventLine(marker, excerpt string) string {
 	return "{\"schema_version\":\"1\",\"seq\":56,\"source\":{\"producer\":\"normalizer\",\"phase\":\"adversarial-review\"}," +
 		"\"kind\":\"infra_failure\",\"severity\":\"INCIDENT\",\"data\":{\"marker\":\"" + marker +

@@ -49,7 +49,6 @@ func TestDefaultSpinePhases_FallbackAndMembership(t *testing.T) {
 	}
 }
 
-// MarshalJSON is called by name, not via json.Marshal, so apicover counts it as named.
 func TestCheckResultMarshalJSON_LevelAsString(t *testing.T) {
 	c := CheckResult{Name: "bridge-boot", Level: LevelHalt, Message: "1 driver failed"}
 	b, err := c.MarshalJSON()

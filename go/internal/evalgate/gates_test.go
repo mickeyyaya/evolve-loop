@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// writeScoutReport writes a scout-report.md selecting the given slugs (prose form).
 func writeScoutReport(t *testing.T, workspace string, slugs ...string) {
 	t.Helper()
 	var b strings.Builder
@@ -30,7 +29,6 @@ func writeEval(t *testing.T, projectRoot, slug, bashBody string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir evals: %v", err)
 	}
-	// The [code] bullet is what Gate A requires; the bash fence is the legacy grader form.
 	body := "# Eval " + slug + "\n\n- [code] `" + bashBody + "`\n\n```bash\n" + bashBody + "\n```\n"
 	if err := os.WriteFile(filepath.Join(dir, slug+".md"), []byte(body), 0o644); err != nil {
 		t.Fatalf("write eval: %v", err)
@@ -75,7 +73,7 @@ func TestMaterializationGate(t *testing.T) {
 	t.Run("eval in cycle worktree is invisible → block", func(t *testing.T) {
 		ws, root, wt := t.TempDir(), t.TempDir(), t.TempDir()
 		writeScoutReport(t, ws, "a")
-		writeEval(t, wt, "a", "go test ./...") // mirrors an agent cwd inside .evolve/worktrees/cycle-*
+		writeEval(t, wt, "a", "go test ./...")
 		reason, block := materializationGate{}.check(core.ReviewInput{Phase: "scout", Workspace: ws, ProjectRoot: root})
 		if !block || !strings.Contains(reason, "a") {
 			t.Errorf("worktree-local eval must not satisfy Gate A; got reason=%q block=%v", reason, block)
@@ -112,7 +110,7 @@ func TestQualityGate(t *testing.T) {
 	t.Run("tautology eval → certain block", func(t *testing.T) {
 		ws, root := t.TempDir(), t.TempDir()
 		writeScoutReport(t, ws, "taut")
-		writeEval(t, root, "taut", ":") // no-op tautology → LevelHalt
+		writeEval(t, root, "taut", ":")
 		reason, block := qualityGate{}.check(core.ReviewInput{Phase: "tdd", Workspace: ws, ProjectRoot: root})
 		if !block || !strings.Contains(reason, "taut") {
 			t.Errorf("tautology must block + name slug; got reason=%q block=%v", reason, block)

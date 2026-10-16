@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
 )
 
-// TestEvaluateDecisionTable pins the full decision surface: the crux WARN, the
-// documented PASS, and every SKIP axis (stage off, unlabeled, empty diff).
 func TestEvaluateDecisionTable(t *testing.T) {
 	cases := []struct {
 		name string
@@ -80,8 +78,6 @@ func TestEvaluateDecisionTable(t *testing.T) {
 	}
 }
 
-// TestEvaluateWarnReasonNamesTheRule keeps the warning actionable: it must say
-// what is missing and cite the policy clause, not just fire.
 func TestEvaluateWarnReasonNamesTheRule(t *testing.T) {
 	v := docsfloor.Evaluate(
 		docsfloor.Config{Stage: "enforce"},
@@ -97,9 +93,6 @@ func TestEvaluateWarnReasonNamesTheRule(t *testing.T) {
 	}
 }
 
-// TestLabelArchitecture covers both axes of the label: every declared surface
-// labels, and an ordinary leaf-package change does not (otherwise the floor
-// would warn on every build and become noise).
 func TestLabelArchitecture(t *testing.T) {
 	labeled := []string{
 		"go/internal/core/orchestrator.go",
@@ -126,15 +119,11 @@ func TestLabelArchitecture(t *testing.T) {
 	if docsfloor.LabelArchitecture(nil) {
 		t.Error("LabelArchitecture(nil) = true, want false")
 	}
-	// A mixed set is labeled by its single architecture member.
 	if !docsfloor.LabelArchitecture(append(append([]string{}, unlabeled...), "./go/internal/core/cyclerun.go")) {
 		t.Error("mixed change set containing an architecture surface was not labeled")
 	}
 }
 
-// TestVerdictIsAValue guards the gate's shape: Verdict is a plain value type
-// callers can construct and compare, so a caller can assert against an expected
-// verdict rather than reaching into the package.
 func TestVerdictIsAValue(t *testing.T) {
 	want := docsfloor.Verdict{Status: docsfloor.StatusSkip, Reason: "docs floor stage is off"}
 	got := docsfloor.Evaluate(docsfloor.Config{Stage: "off"}, docsfloor.Input{ArchitectureLabeled: true})
@@ -143,16 +132,12 @@ func TestVerdictIsAValue(t *testing.T) {
 	}
 }
 
-// TestIsArchitectureClass covers the blocking-grade classifier's three
-// divergences from LabelArchitecture — test-file exclusion, the new-package
-// namesake proxy, and phase specs — plus the fail-open default that keeps
-// ordinary cycles untouched.
 func TestIsArchitectureClass(t *testing.T) {
 	class := [][]string{
 		{"go/internal/policy/policy.go", "go/internal/policy/policy_test.go"},
 		{"go/internal/config/config.go"},
-		{"go/internal/docsfloor/docsfloor.go"}, // new package via its namesake file
-		{"go/internal/fleet/prefixqueue.go"},   // trust-kernel surface
+		{"go/internal/docsfloor/docsfloor.go"},
+		{"go/internal/fleet/prefixqueue.go"},
 		{"go/internal/phases/ship/landprefixes.go"},
 		{"phases/specs/docs-floor.json"},
 	}
@@ -163,9 +148,9 @@ func TestIsArchitectureClass(t *testing.T) {
 	}
 	open := [][]string{
 		nil,
-		{"go/internal/policy/policy_test.go"}, // test-only: documents nothing
+		{"go/internal/policy/policy_test.go"},
 		{"go/internal/deliverable/reviewer_test.go"},
-		{"go/internal/dossier/build.go"}, // leaf package, not its namesake
+		{"go/internal/dossier/build.go"},
 		{"go/internal/gc/discover.go"},
 		{"docs/operations/release-notes/index.md"},
 		{".evolve/runs/cycle-1144/build-report.md"},
@@ -177,9 +162,6 @@ func TestIsArchitectureClass(t *testing.T) {
 	}
 }
 
-// TestHasDocsDelta pins what satisfies the floor: the architecture docs tree
-// (DocsRoots[0]) or the operator runtime reference (DocsRoots[1]) — and nothing
-// else, so an incidental doc edit elsewhere cannot buy off an ADR.
 func TestHasDocsDelta(t *testing.T) {
 	if len(docsfloor.DocsRoots) != 2 {
 		t.Fatalf("DocsRoots = %v, want the architecture tree + runtime reference", docsfloor.DocsRoots)

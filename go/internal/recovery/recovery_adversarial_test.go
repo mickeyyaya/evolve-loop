@@ -48,7 +48,6 @@ func TestNewChainStallPolicy_ZeroAndNegativeDefaultToSix(t *testing.T) {
 	t.Parallel()
 	for _, input := range []int{0, -1, -100} {
 		p := NewChainStallPolicy(input)
-		// IdleS/ThresholdS is the attempt count: 5 is within the default budget of 6, 6 is not.
 		a5, _ := p.Decide(StallEvent{Kind: "stuck_no_output", IdleS: 5, ThresholdS: 1})
 		if a5 != StallExtend {
 			t.Errorf("NewChainStallPolicy(%d) at 5 extends must extend (defaulted to 6); got %s", input, a5)
@@ -169,6 +168,5 @@ func TestPromoteAdvice_ValidHappyPath(t *testing.T) {
 	}
 }
 
-// Keeps the errors import referenced.
 var _ = PromoteAdvice
 var _ = errors.New

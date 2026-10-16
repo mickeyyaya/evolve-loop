@@ -40,7 +40,6 @@ func TestPhaseIsValid_Unknown(t *testing.T) {
 }
 
 func TestVerdictConstants(t *testing.T) {
-	// A slice, not a map keyed by the constant: such a map compares each value with itself.
 	cases := []struct {
 		got  string
 		want string

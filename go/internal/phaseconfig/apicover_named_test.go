@@ -2,10 +2,6 @@ package phaseconfig
 
 import "testing"
 
-// TestPhaseConfig_LoadDecomposition names the phaseconfig.PhaseConfig type (Load
-// returns it but it is never named in a test) and pins the decomposition
-// contract: one loaded config exposes an agreeing PhaseSpec view, profile name,
-// in-band prompt, and swarm-worker count.
 func TestPhaseConfig_LoadDecomposition(t *testing.T) {
 	got, err := Load(writeCfg(t, sample))
 	if err != nil {

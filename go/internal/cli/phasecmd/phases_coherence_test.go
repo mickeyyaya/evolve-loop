@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// newCoherenceProject also blanks the env overrides that would redirect directory resolution.
 func newCoherenceProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -60,7 +59,6 @@ func TestRunPhases_ProvenanceWarnsByDefault(t *testing.T) {
 		t.Fatalf("rc = %d, want 0 (default mode is advisory); stderr=%s", rc, errb.String())
 	}
 	combined := out.String() + errb.String()
-	// An eval greps `missing.*generated_from`, so both words are part of the output contract.
 	if !strings.Contains(combined, "missing") || !strings.Contains(combined, "generated_from") {
 		t.Errorf("validate output must match missing.*generated_from, got:\n%s", combined)
 	}
@@ -168,7 +166,6 @@ func TestRunPhases_CheckCoherenceStrictExitsTwoOnDrift(t *testing.T) {
 }
 
 func TestRunPhases_CheckCoherencePersonaOverride(t *testing.T) {
-	// The on-disk pair is clean; only the override adds a contradicting tool.
 	root := newCoherenceProject(t)
 	writeCoherencePersona(t, root, "widget", `tools: ["Read"]`)
 	writeCoherenceProfile(t, root, "widget",

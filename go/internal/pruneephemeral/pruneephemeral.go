@@ -1,21 +1,5 @@
-// Package pruneephemeral ports legacy/scripts/observability/prune-ephemeral.sh.
-//
-// TTL retention for phase-tracker ephemeral data. Idempotent. Safe to run
-// repeatedly. Safe to run while a cycle is in progress (recently-modified
-// files are protected by the mtime filter).
-//
-// Retention policy (defaults; env-overridable):
-//
-//	.evolve/runs/cycle-*/.ephemeral/   → 7 days  (EVOLVE_TRACKER_TTL_DAYS)
-//	.evolve/dispatch-logs/batch-*.log  → 30 days (EVOLVE_DISPATCH_LOG_TTL_DAYS)
-//	.evolve/runs/cycle-*/*.md          → never pruned
-//	.evolve/runs/cycle-*/*.json        → never pruned
-//	.evolve/ledger.jsonl               → never pruned (append-only, tamper-evident)
-//
-// Exit codes (mapped by cmd layer):
-//
-//	0  — success (whether anything was pruned or not)
-//	10 — bad arguments
+// Package pruneephemeral applies TTL retention to the ephemeral data of the phase tracker.
+// See docs/architecture/packages/internal-pruneephemeral.md.
 package pruneephemeral
 
 import (
@@ -27,13 +11,12 @@ import (
 	"time"
 )
 
-// Options drives a Run() invocation.
 type Options struct {
-	ProjectRoot     string        // required
-	RunsDir         string        // optional override; defaults to <ProjectRoot>/.evolve/runs
-	DispatchLogsDir string        // optional override; defaults to <ProjectRoot>/.evolve/dispatch-logs
-	TrackerTTL      time.Duration // default 7d
-	DispatchLogTTL  time.Duration // default 30d
+	ProjectRoot     string
+	RunsDir         string
+	DispatchLogsDir string
+	TrackerTTL      time.Duration
+	DispatchLogTTL  time.Duration
 	DryRun          bool
 	Quiet           bool
 	Stderr          io.Writer
@@ -41,15 +24,13 @@ type Options struct {
 	Now func() time.Time
 }
 
-// Result summarizes how many entries were pruned (or would be in dry-run).
 type Result struct {
 	EphemeralPruned int
 	LogFilesPruned  int
-	EphemeralPaths  []string // populated in dry-run for auditing
+	EphemeralPaths  []string
 	LogPaths        []string
 }
 
-// Run executes the prune pipeline.
 func Run(opts Options) (Result, error) {
 	res := Result{EphemeralPaths: []string{}, LogPaths: []string{}}
 

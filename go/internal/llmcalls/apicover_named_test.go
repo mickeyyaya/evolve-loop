@@ -1,9 +1,5 @@
 package llmcalls
 
-// apicover_named_test.go names and exercises the exported telemetry vocabulary
-// and result types that callers consume as data. The broader behavioral suites
-// cover the storage and aggregation paths in depth.
-
 import (
 	"path/filepath"
 	"reflect"

@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// reservedNames are the control-plane identities a minted phase may never assume:
-// a minted router would let a brain schedule a brain.
-// See ADR-0052.
 var reservedNames = map[string]struct{}{
 	"router":                 {},
 	"evolve-router":          {},
@@ -21,7 +18,6 @@ var reservedNames = map[string]struct{}{
 	"evolve-failure-advisor": {},
 }
 
-// ReservedMintReason returns why name, trimmed and case-folded, may not be minted, or "" when it may.
 func ReservedMintReason(name string) string {
 	if _, ok := reservedNames[strings.ToLower(strings.TrimSpace(name))]; ok {
 		return fmt.Sprintf("recursion guard: a minted phase may not assume the control-plane router/advisor identity %q", name)
@@ -29,7 +25,6 @@ func ReservedMintReason(name string) string {
 	return ""
 }
 
-// MintConfigsFrom builds a PhaseConfig per minted entry, whatever its Run flag, and returns reserved-name drops as data.
 func MintConfigsFrom(entries []router.PhasePlanEntry) ([]phaseconfig.PhaseConfig, []RejectedMint) {
 	var out []phaseconfig.PhaseConfig
 	var rejected []RejectedMint

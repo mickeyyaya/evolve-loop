@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// checkSandboxNestedFallback samples one out-of-allowlist write in a nested session: off skips,
-// shadow warns, enforce halts. A denied write never waives the launch-time gate.
 func checkSandboxNestedFallback(o resolved) CheckResult {
 	const name = "sandbox-nested-fallback"
 	if o.nestedFallbackStage == config.StageOff {
@@ -30,15 +28,12 @@ func checkSandboxNestedFallback(o resolved) CheckResult {
 	return CheckResult{Name: name, Level: LevelWarn, Message: "nested fallback UNVERIFIED (shadow)", Detail: detail}
 }
 
-// defaultSandboxCanary writes a sentinel in the project's parent, outside the inner sandbox's
-// allow-list. Only a permission error returns true; any other setup failure stays unverified.
 func defaultSandboxCanary(projectRoot string) func() bool {
 	return func() bool {
 		f, err := os.CreateTemp(filepath.Dir(projectRoot), ".evolve-sandbox-canary-*")
 		if err != nil {
 			return os.IsPermission(err)
 		}
-		// Best-effort: POSIX unlinks the sentinel whatever Close returns.
 		name := f.Name()
 		_ = f.Close()
 		_ = os.Remove(name)

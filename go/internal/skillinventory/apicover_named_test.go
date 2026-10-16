@@ -5,18 +5,12 @@ import (
 	"time"
 )
 
-// TestDefaultTTL_Value names DefaultTTL and pins it to one hour — the cache
-// cadence the package doc promises. It is the freshness window Build uses when
-// Options.TTL is left zero. Mirrors the sibling phaseinventory graduation.
 func TestDefaultTTL_Value(t *testing.T) {
 	if DefaultTTL != time.Hour {
 		t.Errorf("DefaultTTL = %v, want 1h", DefaultTTL)
 	}
 }
 
-// TestResult_PopulatedByBuild names the Result type and pins that a forced
-// (non-cache-hit) Build returns the written path, CacheHit=false, and the
-// scanned skill count — Result is Build's structured outcome.
 func TestResult_PopulatedByBuild(t *testing.T) {
 	root := t.TempDir()
 	writeSkill(t, root, "alpha", `name: alpha
@@ -39,10 +33,6 @@ categories: [testing]`)
 	}
 }
 
-// TestSkillEntry_FullEquality names the SkillEntry type and pins its shape: the
-// scanned alpha skill must equal a fully-specified SkillEntry literal (name,
-// project-relative SKILL.md path, parsed description, ordered categories) — the
-// per-skill summary line Scout consumes from the inventory.
 func TestSkillEntry_FullEquality(t *testing.T) {
 	root := t.TempDir()
 	writeSkill(t, root, "alpha", `name: alpha

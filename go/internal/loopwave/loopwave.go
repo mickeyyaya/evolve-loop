@@ -16,7 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The loop.wave signal codes this package registers and emits.
 const (
 	CodeMinWidthRepair     signalcenter.Code = "LOOP_MIN_WIDTH_REPAIR"
 	CodeWaveDispatchFailed signalcenter.Code = "LOOP_WAVE_DISPATCH_FAILED"
@@ -31,14 +30,11 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeWaveAllLanesStale, "every planned lane of the wave was stale at the last-moment freshness gate (consumed, or a declared dep still unmet) and the backlog refill found nothing, so the wave launched nothing — a shorter wave, never a doomed lane; the per-lane skips are fleet's own freshness-gate lines; fields.planned, skipped")
 }
 
-// Roots carries the project root and the evolve dir, which --evolve-dir can move.
-// Set both or neither: an empty half would resolve CWD-relative.
 type Roots struct {
 	ProjectRoot string
 	EvolveDir   string
 }
 
-// RootsOf derives both roots from projectRoot; an empty projectRoot yields the zero Roots.
 func RootsOf(projectRoot string) Roots {
 	if projectRoot == "" {
 		return Roots{}
@@ -46,10 +42,8 @@ func RootsOf(projectRoot string) Roots {
 	return Roots{ProjectRoot: projectRoot, EvolveDir: paths.EvolveDirOf(projectRoot)}
 }
 
-// ShrinkFn is the quota-bench shrink's shape (fleet.QuotaAwareCount).
 type ShrinkFn func(count int, benched map[string]string, minLanes int, warn io.Writer) int
 
-// Ports are the engine's required collaborators; a nil port panics at first use.
 type Ports struct {
 	LastCycle func(ctx context.Context) (int, error)
 	Workspace func(cycle int) string
@@ -57,7 +51,6 @@ type Ports struct {
 	Shrink    ShrinkFn
 }
 
-// Engine is the wave engine; build it with New.
 type Engine struct {
 	roots   Roots
 	ports   Ports
@@ -66,10 +59,8 @@ type Engine struct {
 	goal    string
 }
 
-// Option configures an Engine at construction.
 type Option func(*Engine)
 
-// New builds an Engine; warn receives the report lines that are not signals.
 func New(roots Roots, ports Ports, warn io.Writer, opts ...Option) *Engine {
 	e := &Engine{roots: roots, ports: ports, stderr: warn}
 	for _, opt := range opts {
@@ -78,8 +69,6 @@ func New(roots Roots, ports Ports, warn io.Writer, opts ...Option) *Engine {
 	return e
 }
 
-// WithSignals installs the Signal Center accessor. It is read at every use
-// because the batch Center is built per batch; a nil accessor or Center emits nothing.
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(e *Engine) { e.signals = c }
 }
@@ -88,7 +77,6 @@ func WithGoal(hash string) Option {
 	return func(e *Engine) { e.goal = hash }
 }
 
-// SignalsWired reports whether the engine currently reaches a Center.
 func (e *Engine) SignalsWired() bool { return e.center() != nil }
 
 func (e *Engine) center() *signalcenter.Center {
@@ -102,8 +90,6 @@ func (e *Engine) warn(origin string, wave int, code signalcenter.Code, reason st
 	EmitWave(e.center(), wave, origin, code, reason, fields)
 }
 
-// EmitWave emits a batch-level loop.wave event, INFO without a code and WARN
-// with one, stamping the wave on a copy of the caller's fields.
 func EmitWave(c *signalcenter.Center, wave int, origin string, code signalcenter.Code, reason string, fields map[string]string) {
 	stamped := make(map[string]string, len(fields)+1)
 	maps.Copy(stamped, fields)
@@ -118,13 +104,10 @@ func EmitWave(c *signalcenter.Center, wave int, origin string, code signalcenter
 	c.Emit(e)
 }
 
-// ShouldRunWave reports whether a batch iteration dispatches a wave instead of
-// the sequential path. Pool scheduling is excluded so one iteration never fires both gates.
 func ShouldRunWave(fc policy.FleetConfig) bool {
 	return fc.Count > 1 && fc.PlanSource == "triage" && fc.Scheduling != "pool"
 }
 
-// LoadFleetConfig loads the batch-start fleet block; an absent or malformed policy yields the defaults.
 func LoadFleetConfig(evolveDir string) policy.FleetConfig {
 	pol, err := policy.Load(paths.PolicyPath(evolveDir))
 	if err != nil {
@@ -133,8 +116,6 @@ func LoadFleetConfig(evolveDir string) policy.FleetConfig {
 	return pol.FleetConfig()
 }
 
-// ReloadFleetConfig re-resolves the fleet block at a wave boundary. Unlike
-// LoadFleetConfig, an unreadable policy holds prev, the operator's standing width.
 func ReloadFleetConfig(evolveDir string, prev policy.FleetConfig, warn io.Writer) policy.FleetConfig {
 	pol, err := policy.Load(paths.PolicyPath(evolveDir))
 	if err != nil {

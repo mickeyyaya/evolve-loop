@@ -14,14 +14,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// lifecycleItem plants an inbox todo in the directory inboxmover resolves to state.
 func lifecycleItem(t *testing.T, evolveDir, state, id string, deps ...string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "inbox")
 	switch state {
 	case inboxmover.StatePending:
 	case inboxmover.StateProcessing, inboxmover.StateProcessed, inboxmover.StateRejected:
-		dir = filepath.Join(dir, state, "cycle-9") // the promoter nests these by cycle (lifecycle.promoteDestPath)
+		dir = filepath.Join(dir, state, "cycle-9")
 	default:
 		dir = filepath.Join(dir, state)
 	}

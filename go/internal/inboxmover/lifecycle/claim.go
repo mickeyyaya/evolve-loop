@@ -10,13 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// ClaimResult describes what happened.
 type ClaimResult struct {
 	SrcPath  string
 	DestPath string
 }
 
-// Claim moves taskID's item from the inbox root into processing/cycle-<cycle>/; an absent id is ErrNotFound.
 func (m *Mover) Claim(taskID, cycle string) (ClaimResult, error) {
 	res := ClaimResult{}
 	if taskID == "" || cycle == "" {
@@ -75,8 +73,6 @@ func (m *Mover) claimInto(taskID, src, cycle string, cycleNum int) (ClaimResult,
 	return res, nil
 }
 
-// consoleRoutedReason returns why the item is operator-owned, or "" when it is dispatchable.
-// An unreadable or malformed item fails open so routing never bricks claiming; LoadDir reports it.
 func consoleRoutedReason(path string, isProtected func(string) bool) string {
 	raw, err := os.ReadFile(path)
 	if err != nil {

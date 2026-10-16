@@ -13,33 +13,26 @@ import (
 
 const RepairWidth = 1
 
-// Launcher launches one wave's lane specs and returns their results; *fleet.Supervisor satisfies it.
 type Launcher interface {
 	Run(ctx context.Context, specs []fleet.CycleSpec) []fleet.Result
 }
 
-// PlanFn produces one wave's triage-decision.json bytes and the committed cards'
-// target packages, the fan-out's fallback when floors are absent.
 type PlanFn func(ctx context.Context, wave int) (decisionJSON []byte, cardPackages []string, err error)
 
-// Step names the dispatch step that failed.
 type Step string
 
-// The three dispatch steps, in order.
 const (
 	StepPreflight Step = "preflight"
 	StepPlan      Step = "plan"
 	StepAdapt     Step = "adapt"
 )
 
-// StepError is a dispatch failure tagged with the step that failed.
 type StepError struct {
 	Wave int
 	Step Step
 	Err  error
 }
 
-// Error renders "wave N: <step label>: <cause>".
 func (e *StepError) Error() string {
 	switch e.Step {
 	case StepPreflight:
@@ -51,10 +44,8 @@ func (e *StepError) Error() string {
 	}
 }
 
-// Unwrap returns the step's cause.
 func (e *StepError) Unwrap() error { return e.Err }
 
-// DispatchRequest carries one wave's collaborators; Config.Count gates Dispatch and caps the fan-out.
 type DispatchRequest struct {
 	Config    policy.FleetConfig
 	Wave      int
@@ -64,15 +55,12 @@ type DispatchRequest struct {
 	Routed    fleet.RoutedFn
 }
 
-// Outcome reports whether lanes launched, and the launched specs and their results.
 type Outcome struct {
 	Ran     bool
 	Specs   []fleet.CycleSpec
 	Results []fleet.Result
 }
 
-// dispatch is the one body Dispatch and ForceOneLane share. It never emits,
-// because each caller owns its own signal.
 func dispatch(ctx context.Context, req DispatchRequest, count int) (Outcome, error) {
 	if err := req.Preflight(); err != nil {
 		return Outcome{}, &StepError{Wave: req.Wave, Step: StepPreflight, Err: err}
@@ -81,7 +69,6 @@ func dispatch(ctx context.Context, req DispatchRequest, count int) (Outcome, err
 	if err != nil {
 		return Outcome{}, &StepError{Wave: req.Wave, Step: StepPlan, Err: err}
 	}
-	// The routed resolver logs each refusal as it fires, so the refusal slice is unused.
 	specs, _, err := fleet.PlanFromTriage(decisionJSON, cardPackages, count, req.Routed)
 	if err != nil {
 		return Outcome{}, &StepError{Wave: req.Wave, Step: StepAdapt, Err: err}
@@ -96,8 +83,6 @@ func dispatch(ctx context.Context, req DispatchRequest, count int) (Outcome, err
 	return Outcome{Ran: true, Specs: specs, Results: results}, nil
 }
 
-// Dispatch runs the wave path when ShouldRunWave allows it, else returns Outcome{}
-// untouched; a step failure also emits one LOOP_WAVE_DISPATCH_FAILED.
 func (e *Engine) Dispatch(ctx context.Context, req DispatchRequest) (Outcome, error) {
 	if !ShouldRunWave(req.Config) {
 		return Outcome{}, nil
@@ -110,14 +95,10 @@ func (e *Engine) Dispatch(ctx context.Context, req DispatchRequest) (Outcome, er
 	return out, err
 }
 
-// ForceOneLane dispatches at most one lane without the ShouldRunWave gate. It
-// emits nothing, because RepairMinWidth reports.
 func (e *Engine) ForceOneLane(ctx context.Context, req DispatchRequest) (Outcome, error) {
 	return dispatch(ctx, req, RepairWidth)
 }
 
-// RepairMinWidth dispatches one isolated lane when the operator asked for a
-// fleet (fleetCfg.Count > 1) but the wave launched none, and reports whether it did.
 func (e *Engine) RepairMinWidth(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, req DispatchRequest) (handled bool) {
 	width := map[string]string{"desired": strconv.Itoa(fleetCfg.Count), "realized": strconv.Itoa(waveCfg.Count)}
 	if fleetCfg.Count <= 1 {
@@ -146,7 +127,6 @@ func (e *Engine) RepairMinWidth(ctx context.Context, fleetCfg, waveCfg policy.Fl
 	}
 }
 
-// stepFields projects a dispatch error onto the signal's path, step and error fields.
 func stepFields(err error, path string) map[string]string {
 	fields := map[string]string{"path": path, "error": err.Error()}
 	var se *StepError
@@ -156,9 +136,6 @@ func stepFields(err error, path string) map[string]string {
 	return fields
 }
 
-// RoutedResolver is the plan-time routing gate; a refusal is a plain WARN line
-// because the pool scheduler calls it with no Center.
-// See ADR-0074.
 func (e *Engine) RoutedResolver() fleet.RoutedFn {
 	base := e.routedBase()
 	return func(id string) (bool, string) {
@@ -170,14 +147,10 @@ func (e *Engine) RoutedResolver() fleet.RoutedFn {
 	}
 }
 
-// routedBase is the routing authority the gate and pruneRouted share. Each reads
-// the inbox fresh, and the gate backstops an inbox write that lands between the two reads.
 func (e *Engine) routedBase() fleet.RoutedFn {
 	return inboxbatch.RoutedResolver(e.lifecycle().InboxDir, e.ports.Protected)
 }
 
-// Preflight refuses a wave while the main checkout has uncommitted control-plane
-// edits: waves ship from the main tree, where such edits kill audit-passed lanes.
 func Preflight(projectRoot string) func() error {
 	return func() error { return fleet.PreflightControlPlane(projectRoot) }
 }

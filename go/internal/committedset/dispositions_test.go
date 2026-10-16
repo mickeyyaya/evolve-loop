@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// TestDispositions_OnlyAnsweringBucketsAnswer pins which of triage's
-// non-commitment buckets ANSWER for an id (F30, cycle 1682): a lane scoped to
-// one item whose triage dropped it with a reason did its job, and must end as
-// planned no-work rather than a claim failure. Deferral is deliberately NOT an
-// answer — cycle 1623's triage narrated a claim failure as a deferral
-// (empty_commitment_claimable_test.go), so a deferred id stays claimable work.
 func TestDispositions_OnlyAnsweringBucketsAnswer(t *testing.T) {
 	ws := t.TempDir()
 	write(t, ws, DecisionFile, map[string]any{
@@ -41,11 +35,6 @@ func TestDispositions_OnlyAnsweringBucketsAnswer(t *testing.T) {
 	}
 }
 
-// TestDispositions_TheMostSevereBucketWinsAndNothingIsFabricated: an id named
-// in two buckets is reported once, by its most severe bucket — a drop's
-// "already-shipped" reason never masks a fraudulent-commit escalation (F30
-// architecture review m1) — and an absent or malformed decision answers for
-// nothing: this package never fabricates.
 func TestDispositions_TheMostSevereBucketWinsAndNothingIsFabricated(t *testing.T) {
 	ws := t.TempDir()
 	write(t, ws, DecisionFile, map[string]any{
@@ -68,9 +57,6 @@ func TestDispositions_TheMostSevereBucketWinsAndNothingIsFabricated(t *testing.T
 	}
 }
 
-// TestDispositionsFrom_ReadsTheDecisionBody is the body-level reader other
-// packages project from (inboxmover already holds decision bodies): the same
-// answers as the workspace reader, and a malformed body answers for nothing.
 func TestDispositionsFrom_ReadsTheDecisionBody(t *testing.T) {
 	got := DispositionsFrom([]byte(`{"dropped":[{"id":"x","reason":"superseded"}],"deferred":[{"id":"y"}]}`))
 	if len(got) != 1 || got[0] != (Disposition{ID: "x", Bucket: "dropped", Reason: "superseded"}) {

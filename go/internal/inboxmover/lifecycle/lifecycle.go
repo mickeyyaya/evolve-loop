@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Codes of the inbox.warning conditions the mover reports; init registers each with its doc.
 const (
 	CodeClaimNotFound                  signalcenter.Code = "INBOX_CLAIM_NOT_FOUND"
 	CodeClaimRefused                   signalcenter.Code = "INBOX_CLAIM_REFUSED"
@@ -49,17 +48,13 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeRouteNotFound, "the FAIL closeout could not find the item it was told to route (fields.task_id, inbox_dir, step=locate) — or found it held by another cycle's claim (fields.held_by_cycle) — the refusal is NOT recorded on it and it WILL be re-picked; neither processing/cycle-*/ nor the inbox root holds the id")
 }
 
-// LegacyPrefix opens every console line the mover and its host print.
 const LegacyPrefix = "[inbox-mover] "
 
-// Sentinel errors: the cmd layer maps them to exit codes through errors.Is.
 var (
-	ErrNotFound = errors.New("inboxmover: task not found")
-	ErrMvFailed = errors.New("inboxmover: mv failed")
-	ErrBadArgs  = errors.New("inboxmover: bad arguments")
-	ErrBadState = errors.New("inboxmover: invalid new_state")
-	// ErrConsoleRouted refuses a lane claim of an operator-owned item.
-	// See ADR-0074.
+	ErrNotFound        = errors.New("inboxmover: task not found")
+	ErrMvFailed        = errors.New("inboxmover: mv failed")
+	ErrBadArgs         = errors.New("inboxmover: bad arguments")
+	ErrBadState        = errors.New("inboxmover: invalid new_state")
 	ErrConsoleRouted   = errors.New("inboxmover: item is console-routed (operator-owned) — refusing lane claim")
 	ErrNotWithdrawable = errors.New("inboxmover: refusing to withdraw the item")
 )
@@ -71,12 +66,10 @@ var validStates = map[string]bool{
 	"quarantine": true,
 }
 
-// LedgerAppender appends a lifecycle record to the chained ledger; *ledger.FileLedger satisfies it.
 type LedgerAppender interface {
 	AppendLifecycle(ctx context.Context, r ledger.LifecycleRecord) error
 }
 
-// Mover moves the items of one inbox dir between lifecycle states.
 type Mover struct {
 	inboxDir     string
 	ledger       LedgerAppender
@@ -94,10 +87,8 @@ type Mover struct {
 	priorityClasses []string
 }
 
-// Option configures a Mover at construction.
 type Option func(*Mover)
 
-// New builds a Mover over inboxDir; a nil appender records nothing and says nothing.
 func New(inboxDir string, appender LedgerAppender, opts ...Option) *Mover {
 	m := &Mover{
 		inboxDir:    inboxDir,
@@ -118,7 +109,6 @@ func New(inboxDir string, appender LedgerAppender, opts ...Option) *Mover {
 	return m
 }
 
-// WithStderr sets the writer for the console lines; nil keeps io.Discard.
 func WithStderr(w io.Writer) Option {
 	return func(m *Mover) {
 		if w != nil {
@@ -127,7 +117,6 @@ func WithStderr(w io.Writer) Option {
 	}
 }
 
-// WithNow installs the clock the ledger TS is stamped from; nil keeps time.Now.
 func WithNow(fn func() time.Time) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -136,7 +125,6 @@ func WithNow(fn func() time.Time) Option {
 	}
 }
 
-// WithActiveCycle sets RecoverOrphans' active-cycle reader; nil keeps a failing one, so every dir recovers.
 func WithActiveCycle(fn func() (string, error)) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -145,7 +133,6 @@ func WithActiveCycle(fn func() (string, error)) Option {
 	}
 }
 
-// WithLanded sets the landing probe for a processed promotion with a sha; nil treats every sha as landed.
 func WithLanded(fn func(sha string) (bool, error)) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -154,7 +141,6 @@ func WithLanded(fn func(sha string) (bool, error)) Option {
 	}
 }
 
-// WithProtectedPath sets the claim floor's protected-path predicate; nil keeps the installed one.
 func WithProtectedPath(fn func(path string) bool) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -163,7 +149,6 @@ func WithProtectedPath(fn func(path string) bool) Option {
 	}
 }
 
-// WithRetire sets the hook Promote fires between its console line and its ledger line; nil keeps the no-op.
 func WithRetire(fn func(itemPath, taskID, reason string)) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -172,7 +157,6 @@ func WithRetire(fn func(itemPath, taskID, reason string)) Option {
 	}
 }
 
-// WithRunWorkspace sets where the drain reads a cycle's continuation manifest; nil keeps the installed one.
 func WithRunWorkspace(fn func(cycle int) string) Option {
 	return func(m *Mover) {
 		if fn != nil {
@@ -197,12 +181,10 @@ func WithBinding(fn func(taskID string) (bool, error)) Option {
 	}
 }
 
-// WithSignals sets the Signal Center accessor, read at every use; no Center selects the console fallback.
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(m *Mover) { m.signals = c }
 }
 
-// SignalsWired reports whether the Mover currently reaches a Center.
 func (m *Mover) SignalsWired() bool { return m.center() != nil }
 
 func (m *Mover) center() *signalcenter.Center {
@@ -212,7 +194,6 @@ func (m *Mover) center() *signalcenter.Center {
 	return m.signals()
 }
 
-// fault is one warning; legacy is the severity token the console fallback prints before reason.
 type fault struct {
 	code   signalcenter.Code
 	origin string
@@ -222,7 +203,6 @@ type fault struct {
 	fields map[string]string
 }
 
-// warn emits f to the wired Center, or prints it as a console line when none is wired.
 func (m *Mover) warn(f fault) {
 	if c := m.center(); c != nil {
 		c.Emit(signalcenter.Event{
@@ -234,7 +214,6 @@ func (m *Mover) warn(f fault) {
 	m.linef("%s%s", f.legacy, f.reason)
 }
 
-// linef prints a console line; the INFO, usage and ledger-append lines print whether or not a Center is wired.
 func (m *Mover) linef(format string, args ...any) {
 	fmt.Fprintf(m.stderr, LegacyPrefix+format+"\n", args...)
 }

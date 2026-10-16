@@ -10,15 +10,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// RouteConsoleValue is the route RouteConsole writes and the claim floor refuses.
 const RouteConsoleValue = "console-manual"
 
-// RouteResult describes what happened: the rewritten item's path.
 type RouteResult struct {
 	Path string
 }
 
-// RouteConsole marks taskID's item route:console-manual where it lies, so no later lane claims it.
 func (m *Mover) RouteConsole(taskID, reason string, cycle int) (RouteResult, error) {
 	res := RouteResult{}
 	if taskID == "" {
@@ -32,7 +29,6 @@ func (m *Mover) RouteConsole(taskID, reason string, cycle int) (RouteResult, err
 			fields: map[string]string{"task_id": taskID, "inbox_dir": m.inboxDir, "step": "locate"}})
 		return res, fmt.Errorf("%w: %s", ErrNotFound, taskID)
 	}
-	// Another cycle's claim belongs to a live lane; a mis-copied id must never rewrite it.
 	if loc.Cycle != 0 && loc.Cycle != cycle {
 		m.warn(fault{code: CodeRouteNotFound, origin: "Mover.RouteConsole", cycle: cycle, legacy: "WARN: ",
 			reason: fmt.Sprintf("route-console: task '%s' is held by cycle %d's claim, not cycle %d's — not routed", taskID, loc.Cycle, cycle),
@@ -101,6 +97,6 @@ func (m *Mover) admitToLanes(taskID, path string, body []byte) error {
 }
 
 func jsonString(s string) json.RawMessage {
-	b, _ := json.Marshal(s) // a string never fails to marshal
+	b, _ := json.Marshal(s)
 	return b
 }

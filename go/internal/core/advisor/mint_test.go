@@ -12,7 +12,7 @@ func TestMintConfigsFrom_RejectsAdvisorRoleMint(t *testing.T) {
 	entries := []router.PhasePlanEntry{
 		{Phase: "router", Run: true, Mint: &router.MintSpec{Prompt: "be a router"}},
 		{Phase: "evolve-router", Run: true, Mint: &router.MintSpec{Prompt: "x"}},
-		{Phase: "Failure-Advisor", Run: true, Mint: &router.MintSpec{Prompt: "x"}}, // case-insensitive
+		{Phase: "Failure-Advisor", Run: true, Mint: &router.MintSpec{Prompt: "x"}},
 		{Phase: "new-helper", Run: true, Mint: &router.MintSpec{Prompt: "legit"}},
 		{Phase: "plain", Run: true},
 	}
