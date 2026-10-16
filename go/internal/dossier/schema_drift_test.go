@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// schemaObjects maps each schema object (the empty key is the root) to its Go
-// type. Every schema definition must be registered here.
 var schemaObjects = map[string]reflect.Type{
 	"":                    reflect.TypeOf(Dossier{}),
 	"PhaseRecord":         reflect.TypeOf(PhaseRecord{}),
@@ -56,8 +54,6 @@ type wireField struct {
 	omitempty bool
 }
 
-// wireFields returns the fields t marshals, flattening untagged embedded
-// structs the way encoding/json promotes them.
 func wireFields(t reflect.Type) []wireField {
 	var out []wireField
 	for i := 0; i < t.NumField(); i++ {
@@ -74,14 +70,14 @@ func wireFields(t reflect.Type) []wireField {
 			}
 		}
 		if f.PkgPath != "" {
-			continue // unexported: never on the wire
+			continue
 		}
 		if tag == "-" {
-			continue // deliberately not persisted (in-memory-only carriers)
+			continue
 		}
 		name, opts, _ := strings.Cut(tag, ",")
 		if name == "" {
-			name = f.Name // Go's default when no tag is given
+			name = f.Name
 		}
 		out = append(out, wireField{
 			name:      name,
@@ -112,7 +108,6 @@ func defNameFor(t reflect.Type) string {
 	return ""
 }
 
-// wantShape describes how the schema must spell a Go type.
 func wantShape(t reflect.Type) (string, func(schemaProp) bool) {
 	if def := defNameFor(t); def != "" {
 		ref := "#/definitions/" + def
@@ -136,7 +131,7 @@ func wantShape(t reflect.Type) (string, func(schemaProp) bool) {
 	default:
 		k, ok := jsonKind(t)
 		if !ok {
-			return "", nil // not modelled; name check still applies
+			return "", nil
 		}
 		return "type " + k, func(p schemaProp) bool { return p.Type == k }
 	}
@@ -164,7 +159,6 @@ func jsonKind(t reflect.Type) (string, bool) {
 
 func repoRootFromTest(t *testing.T) string {
 	t.Helper()
-	// This file lives at <root>/go/internal/dossier/.
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatalf("resolve repo root: %v", err)
@@ -208,7 +202,7 @@ func TestSchema_NoDrift(t *testing.T) {
 		if name == "" {
 			obj = doc.schemaObject
 		} else if !ok {
-			continue // already reported above
+			continue
 		}
 		label := name
 		if label == "" {
@@ -236,7 +230,7 @@ func TestSchema_NoDrift(t *testing.T) {
 		for _, f := range fields {
 			p, ok := obj.Properties[f.name]
 			if !ok {
-				continue // already reported by the inventory check
+				continue
 			}
 			desc, pred := wantShape(f.typ)
 			if pred == nil {
@@ -251,7 +245,7 @@ func TestSchema_NoDrift(t *testing.T) {
 		for _, req := range obj.Required {
 			f, ok := byName[req]
 			if !ok {
-				continue // inventory check reports it
+				continue
 			}
 			if f.omitempty {
 				t.Errorf("%s: schema requires %q but the Go field is omitempty — valid dossiers that omit it would be rejected", label, req)
@@ -275,7 +269,6 @@ func describe(p schemaProp) string {
 	}
 }
 
-// missing returns the elements of a that are not in b.
 func missing(a, b []string) []string {
 	in := make(map[string]bool, len(b))
 	for _, s := range b {
@@ -303,8 +296,6 @@ func TestSchema_NoDrift_CatchesTheMutationsThatMatter(t *testing.T) {
 	})
 
 	t.Run("json:- is not wire surface", func(t *testing.T) {
-		// This is what keeps in-memory-only carriers such as
-		// deliverable.Result.Content out of the schema.
 		type withSkipped struct {
 			Cycle   int    `json:"cycle"`
 			Ignored string `json:"-"`
@@ -322,16 +313,12 @@ func TestSchema_NoDrift_CatchesTheMutationsThatMatter(t *testing.T) {
 			inner
 			B string `json:"b"`
 		}
-		// encoding/json promotes a's key to the parent object; a check that
-		// emitted "inner" would demand a property that never appears.
 		if got := names(wireFields(reflect.TypeOf(outer{}))); !reflect.DeepEqual(got, []string{"a", "b"}) {
 			t.Errorf("embedded struct not flattened the way encoding/json promotes it: %v", got)
 		}
 	})
 
 	t.Run("a swapped $ref is caught", func(t *testing.T) {
-		// Every name still matches, but the two definitions carry disjoint
-		// required keys, so every real dossier would be rejected.
 		_, pred := wantShape(reflect.TypeOf([]cyclestate.SkippedPhase{}))
 		if pred == nil {
 			t.Fatal("no shape predicate for []cyclestate.SkippedPhase")
@@ -362,7 +349,6 @@ func TestSchema_NoDrift_CatchesTheMutationsThatMatter(t *testing.T) {
 	})
 
 	t.Run("requiring an omitempty field is caught", func(t *testing.T) {
-		// commit_sha is omitempty, so requiring it rejects a cycle that did not ship.
 		var found bool
 		for _, f := range wireFields(reflect.TypeOf(Dossier{})) {
 			if f.name == "commit_sha" {

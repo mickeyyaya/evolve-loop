@@ -6,15 +6,11 @@ import (
 	"strings"
 )
 
-// ProtectedSurfaceEntry is one manifest row: a lower-case, slash-normalized path fragment and why it is control plane.
 type ProtectedSurfaceEntry struct {
-	Fragment  string // "/dir/" for a directory subtree, "/dir/file.ext" for a single file
+	Fragment  string
 	Rationale string
 }
 
-// ProtectedSurfaceManifest is the single source of truth for the pipeline control plane no autonomous cycle may modify.
-// It is compiled rather than config, so a cycle cannot write the knob that disarms it.
-// See ADR-0064.
 var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/acs/regression/", Rationale: "standing deterministic gates"},
 	{Fragment: "/go/internal/acssuite/", Rationale: "the gate runner"},
@@ -35,7 +31,6 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/.claude/settings.json", Rationale: "PreToolUse hook wiring (repo + global ~/.claude)"},
 	{Fragment: "/.evolve/policy.json", Rationale: "gate-default overrides (eval/contract/swarm gates)"},
 
-	// A directory entry when every file in it is control plane; file entries inside ordinary cycle territory.
 	{Fragment: "/go/internal/commitgate/", Rationale: "the pre-commit quality gate (attestation writer the manual-ship reader trusts)"},
 	{Fragment: "/go/internal/commentaudit/", Rationale: "the comment rules the commit gate trusts: the comment-only proof behind its review waiver, the added-comment and removed-history refusals, the history archive's append-only check, and the build comment floor (ADR-0115)"},
 	{Fragment: "/go/internal/phaseintegrity/", Rationale: "the per-phase integrity chain's DigestSource (ADR-0065)"},
@@ -52,12 +47,9 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/bridge/driver_tmux_submitverify_guard_test.go", Rationale: "submit-verify's own keep-guard: pins that every real tmux driver declares an input-line marker (a family that omits it goes inert) and that a failed verification stays loud — a cycle editing this could re-open the cycles 1505/1510/1517 unsubmitted-prompt stall unobserved"},
 	{Fragment: "/go/internal/sysexec/command_guard_test.go", Rationale: "the K10 process guard: it fails on any production exec.Command or exec.CommandContext call outside sysexec.Command, so every process the pipeline starts has a Cancel and a WaitDelay; a cycle that quietly widened it could start processes that outlive their cancel"},
 	{Fragment: "/go/test/structure/nopoll_guard_test.go", Rationale: "the no-poll guard of the event channels (ADR-0127): it fails on any time.Sleep, time.Tick, time.NewTicker, time.After or time.NewTimer in the directories of its list (internal/events today), so every wait arms a kernel watch and a one-shot deadline; a cycle that quietly widened it could bring back the poll loops that the channels replace"},
-	// A cycle that could edit the disposition gate could route its own failure classification.
 	{Fragment: "/go/internal/core/disposition_gate.go", Rationale: "ADR-0074 disposition-contract gate (retro's verdict-on-the-verdict verifier + digest cross-check)"},
 	{Fragment: "/go/internal/core/disposition_gate_test.go", Rationale: "the disposition gate's own regression pins"},
 
-	// The Build explanation trust boundary: a cycle that could edit these could approve its own
-	// explanation or downgrade the active contract.
 	{Fragment: "/go/internal/explanationdocs/", Rationale: "Build explanation contract, host snapshots, and deterministic verifier"},
 	{Fragment: "/go/internal/reportdoc/", Rationale: "strict visible-Markdown parser shared by explanation review gates"},
 	{Fragment: "/go/internal/core/build_explanation_handoff.go", Rationale: "orchestrator activation and post-review sealing lifecycle"},
@@ -171,15 +163,11 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/router/code_review_pin_test.go", Rationale: "pins the registry's conditional_mandatory[code-review] rule; the registry file itself stays editable for routing work (ADR-0124)"},
 }
 
-// IsProtectedSurface reports whether path is on the control plane. path may be absolute or
-// repo-relative: a fragment matches anywhere in it, so the boundary holds in any worktree.
 func IsProtectedSurface(path string) bool {
 	p, ok := normalizeSurfacePath(path)
 	if !ok {
 		return false
 	}
-	// The appended slash lets a slashless directory name ("go/internal/bridge") match its fragment.
-	// It changes no other match, because it can only complete a fragment that ends in a slash.
 	pd := p + "/"
 	for _, e := range ProtectedSurfaceManifest {
 		if strings.Contains(pd, e.Fragment) {
@@ -189,9 +177,6 @@ func IsProtectedSurface(path string) bool {
 	return false
 }
 
-// IsProtectedScope reports whether path is, or as a directory spelling contains, protected surface.
-// Routing and triage's breaker compose it with the build sandbox (lanerouting); the ship tripwire
-// and role guard keep IsProtectedSurface. Membership implies scope.
 func IsProtectedScope(path string) bool {
 	if IsProtectedSurface(path) {
 		return true
@@ -210,9 +195,6 @@ func IsProtectedScope(path string) bool {
 	return false
 }
 
-// normalizeSurfacePath is the one spelling both projections match: the clean path, so .. cannot step
-// around a fragment, keeping a directory's trailing slash. The leading slash lets a repo-relative path
-// match its fragment; case-folding covers case-insensitive filesystems.
 func normalizeSurfacePath(raw string) (string, bool) {
 	if raw == "" {
 		return "", false
@@ -225,8 +207,6 @@ func normalizeSurfacePath(raw string) (string, bool) {
 	return strings.ToLower(p), true
 }
 
-// directorySpelling reports whether p is spelled as a directory (a trailing slash, or a last segment with
-// no dot after its first character, so ".evolve" counts) and returns it with one trailing slash.
 func directorySpelling(p string) (string, bool) {
 	if strings.HasSuffix(p, "/") {
 		return p, true
@@ -238,8 +218,6 @@ func directorySpelling(p string) (string, bool) {
 	return p + "/", true
 }
 
-// fragmentInside reports whether fragment lies under dir wherever dir is rooted: some suffix of dir that
-// starts at a slash prefixes the fragment. The bare root "/" is excluded, since every fragment starts with it.
 func fragmentInside(dir, fragment string) bool {
 	for i := 0; i < len(dir)-1; i++ {
 		if dir[i] == '/' && strings.HasPrefix(fragment, dir[i:]) {

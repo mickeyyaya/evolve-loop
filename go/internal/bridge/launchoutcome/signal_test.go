@@ -1,8 +1,5 @@
 package launchoutcome
 
-// signal_test.go — the BRIDGE_EXIT_* projection, Outcome.Signal (design §6
-// tests 29-30).
-
 import (
 	"strings"
 	"testing"
@@ -60,7 +57,6 @@ func TestOutcomeSignal_IsTheTableColumnAndFollowsTheNamingRule(t *testing.T) {
 	}
 }
 
-// Test 30 — 81 is ONE code regardless of the marker's sub-cause.
 func TestOutcomeSignal_81_IsOneCodeRegardlessOfSubCause(t *testing.T) {
 	for _, stderr := range []string{"", "[bridge] artifact-timeout: cause=submit_wedged phase=x\n", "[bridge] artifact-timeout: cause=incomplete\n"} {
 		if out := Classify(ExitArtifactTimeout, nil, stderr); out.Signal != CodeExitArtifactTimeout || out.ExitCode != ExitArtifactTimeout {

@@ -29,13 +29,10 @@ func TestReconcileConsumedBindings(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// stray: consumed, no live copy, no newer-binding evidence → released
 	write("stray.json", `{"id":"stray"}`)
 	bind("stray", 4)
-	// recency: consumed before its binding was renewed → kept
 	write("refiled.json", `{"id":"refiled","consumed":{"cycle":5}}`)
 	bind("refiled", 9)
-	// live copy in the pending root → kept
 	write("relive.json", `{"id":"relive"}`)
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "inbox", "relive.json"), []byte(`{"id":"relive"}`), 0o644); err != nil {
 		t.Fatal(err)

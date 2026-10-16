@@ -112,7 +112,6 @@ func commandTexts(cmd string) string {
 	return strings.Join(texts, "\n")
 }
 
-// The command is not a native ship, so only the heredoc rule can allow it.
 func TestShip_Decide_VerbInHeredocBody(t *testing.T) {
 	s := NewShip(false)
 	body := `cat > notes.md <<'EOF'

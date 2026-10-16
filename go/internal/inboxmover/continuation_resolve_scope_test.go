@@ -25,7 +25,6 @@ func writeClaim(t *testing.T, root string, cycle int, id string, stamped bool, f
 		}
 	}
 	b, _ := json.MarshalIndent(item, "", "  ")
-	// The filename is the id, so a test controls which claim the sorted walk meets first.
 	if err := os.WriteFile(filepath.Join(dir, id+".json"), b, 0o644); err != nil {
 		t.Fatalf("write claim: %v", err)
 	}
@@ -45,8 +44,8 @@ func itoa(i int) string {
 
 func TestResolveContinuationForScope_DoesNotAdoptAPeerLanesClaim(t *testing.T) {
 	root := t.TempDir()
-	writeClaim(t, root, 1536, "pipeline-defect-infra-systemic", false, 0)      // this lane's own — no stamp
-	writeClaim(t, root, 1536, "pipeline-replay-contract-boundary", true, 1532) // a PEER lane's — stamped
+	writeClaim(t, root, 1536, "pipeline-defect-infra-systemic", false, 0)
+	writeClaim(t, root, 1536, "pipeline-replay-contract-boundary", true, 1532)
 
 	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1536, []string{"pipeline-defect-infra-systemic"})
 
@@ -95,7 +94,6 @@ func TestResolveContinuationForScope_MatchesAnyDeclaredScopeID(t *testing.T) {
 	}
 }
 
-// The peer's claim sorts first, so the lane's own binding is reachable only if the skip continues the walk.
 func TestResolveContinuationForScope_ContinuesPastAPeerClaimToItsOwn(t *testing.T) {
 	root := t.TempDir()
 	writeClaim(t, root, 1600, "aaa-peer-lane-task", true, 1500)
@@ -117,7 +115,6 @@ func TestResolveContinuationForScope_ClaimWithEmptySnapshotIsNotABinding(t *test
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// A stamp with an empty snapshot_sha (a half-written stamp), which writeClaim cannot express.
 	body := []byte(`{"id":"this-lane-task","continuation":{"cycle":1590,"snapshot_sha":"","branch":"cycle-1590"}}`)
 	if err := os.WriteFile(filepath.Join(dir, "this-lane-task.json"), body, 0o644); err != nil {
 		t.Fatalf("write: %v", err)

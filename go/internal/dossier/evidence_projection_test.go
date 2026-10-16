@@ -28,7 +28,7 @@ func baseOpts(ws string) BuildOpts {
 }
 
 func TestBuild_LivePhaseTimingsAreAuthoritative(t *testing.T) {
-	ws := t.TempDir() // deliberately EMPTY: no phase-timing.json on disk
+	ws := t.TempDir()
 	opts := baseOpts(ws)
 	opts.PhaseTimings = []phasetiming.Entry{
 		{Phase: "scout", Verdict: "PASS", DurationMS: 1000},

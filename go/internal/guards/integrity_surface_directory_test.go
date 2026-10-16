@@ -7,12 +7,12 @@ import (
 
 func TestIsProtectedScope_DirectorySpellingCoversTheSurfaceInside(t *testing.T) {
 	inScope := []string{
-		"go/internal/core/",             // holds orchestrator.go, cyclerun.go, …
-		"go/internal/phases/runner/",    // holds runner.go, dispatch.go, verdict/
-		"go/internal/phases/",           // a parent of protected phase files
-		"/wt/go/internal/phases/runner", // no trailing slash, no extension: a directory spelling
-		"Go/Internal/Core/",             // case-insensitive, like files
-		"go/",                           // the whole tree contains the surface
+		"go/internal/core/",
+		"go/internal/phases/runner/",
+		"go/internal/phases/",
+		"/wt/go/internal/phases/runner",
+		"Go/Internal/Core/",
+		"go/",
 	}
 	for _, p := range inScope {
 		if !IsProtectedScope(p) {
@@ -20,13 +20,13 @@ func TestIsProtectedScope_DirectorySpellingCoversTheSurfaceInside(t *testing.T) 
 		}
 	}
 	outOfScope := []string{
-		"go/internal/inboxbatch/",      // no protected file inside
-		"docs/architecture/",           // docs are not control plane
-		"go/internal/core/observer.go", // a FILE keeps membership: not a fragment
-		"go/Makefile",                  // extension-less, read as a directory: nothing protected inside
-		"phases/runner",                // a partial path: no fragment starts there
-		"shadow/enforce",               // prose with a slash
-		"/",                            // the root alone never matches every fragment
+		"go/internal/inboxbatch/",
+		"docs/architecture/",
+		"go/internal/core/observer.go",
+		"go/Makefile",
+		"phases/runner",
+		"shadow/enforce",
+		"/",
 	}
 	for _, p := range outOfScope {
 		if IsProtectedScope(p) {
@@ -37,8 +37,8 @@ func TestIsProtectedScope_DirectorySpellingCoversTheSurfaceInside(t *testing.T) 
 
 func TestIsProtectedSurface_MembershipStaysMembership(t *testing.T) {
 	members := []string{
-		"go/internal/bridge", // names the protected /go/internal/bridge/ directory
-		"github.com/mickeyyaya/evolve-loop/go/internal/bridge", // an import path names it too
+		"go/internal/bridge",
+		"github.com/mickeyyaya/evolve-loop/go/internal/bridge",
 		"go/internal/bridge/driver_codex.go",
 		"go/internal/core/orchestrator.go",
 	}
@@ -48,10 +48,10 @@ func TestIsProtectedSurface_MembershipStaysMembership(t *testing.T) {
 		}
 	}
 	notMembers := []string{
-		"go/internal/core/",          // CONTAINS protected files; membership says no — scope's job
-		"go/internal/phases/runner/", // same
-		"go/cmd/evolve",              // contains cmd_cycle_config.go — not itself a member
-		"go/internal/bridgex",        // a sibling name, not the directory
+		"go/internal/core/",
+		"go/internal/phases/runner/",
+		"go/cmd/evolve",
+		"go/internal/bridgex",
 	}
 	for _, p := range notMembers {
 		if IsProtectedSurface(p) {

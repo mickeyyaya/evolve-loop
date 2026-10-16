@@ -9,8 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// auditArtifactName derives the audit report filename from the phasecontract
-// registry; a re-typed literal would go stale when the registry renames it.
 func auditArtifactName() string {
 	if c, ok := phasecontract.For("audit"); ok && c.ArtifactName != "" {
 		return c.ArtifactName
@@ -18,8 +16,6 @@ func auditArtifactName() string {
 	return "the audit report"
 }
 
-// timingRecords projects live timings, else the workspace phase-timing.json,
-// into per-phase records and the roll-up. ok is false when neither has entries.
 func timingRecords(workspace string, live []phasetiming.Entry) ([]PhaseRecord, *phasetiming.Summary, bool) {
 	entries := live
 	if len(entries) == 0 {
@@ -47,8 +43,6 @@ func timingRecords(workspace string, live []phasetiming.Entry) ([]PhaseRecord, *
 	return records, &summary, true
 }
 
-// normalizeVerdict maps an unknown or blank timing verdict to WARN, so Validate
-// cannot reject a record over a legacy or hand-edited log entry.
 func normalizeVerdict(v string) string {
 	switch v {
 	case VerdictPass, VerdictWarn, VerdictFail:
@@ -58,27 +52,18 @@ func normalizeVerdict(v string) string {
 	}
 }
 
-// BuildOpts configures a Build call.
 type BuildOpts struct {
-	WorkspacePath string
-	Goal          string
-	RunID         string
-	// FinalVerdict is the cycle's real outcome. Empty means PASS; FAIL makes
-	// Build synthesize a defect and carryover that point at the audit artifacts.
+	WorkspacePath      string
+	Goal               string
+	RunID              string
 	FinalVerdict       string
 	SystemFailure      *cyclestate.SystemFailureSignal
 	SkippedPhases      []cyclestate.SkippedPhase
 	VerdictsNotAdopted []cyclestate.VerdictNotAdopted
 	SpineFailOpens     []cyclestate.SpineFailOpen
-	// PhaseTimings is the caller's composed timing set. It is passed in because
-	// the on-disk log lands after the dossier on the normal path; empty falls
-	// back to reading the workspace log.
-	PhaseTimings []phasetiming.Entry
+	PhaseTimings       []phasetiming.Entry
 }
 
-// Build assembles the dossier for cycle from opts and the workspace artifacts.
-// With no per-phase evidence it records one evidence-unavailable WARN phase
-// rather than invent a phase verdict.
 func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 	if err := validateBuildInputs(cycle, opts); err != nil {
 		return nil, err
@@ -112,8 +97,6 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 	if rec, ok := ciWatchRecord(opts.WorkspacePath); ok {
 		d.CIWatch = rec
 	}
-	// Validate requires a FAIL to carry a defect and a carryover. These point at
-	// the audit artifacts rather than invent specifics.
 	if verdict == VerdictFail {
 		recordAuditFailure(d, cycle, opts.WorkspacePath)
 	}
@@ -150,8 +133,6 @@ func recordAuditFailure(d *Dossier, cycle int, workspace string) {
 	}
 }
 
-// resolveBuildVerdict defaults an empty verdict to PASS and rejects anything
-// outside PASS|WARN|FAIL rather than silently defaulting it.
 func resolveBuildVerdict(v string) (string, error) {
 	switch v {
 	case "":
@@ -163,8 +144,6 @@ func resolveBuildVerdict(v string) (string, error) {
 	}
 }
 
-// evidenceUnavailablePhase marks a record with no per-phase evidence. WARN
-// stays inside the validated vocabulary; the cycle's FinalVerdict is untouched.
 func evidenceUnavailablePhase() PhaseRecord {
 	return PhaseRecord{
 		Name:    "evidence-unavailable",

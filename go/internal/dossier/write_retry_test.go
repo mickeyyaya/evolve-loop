@@ -8,11 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// fakeGitRun is a scripted sysexec.RunFunc for commitPairGit's retry tests.
 type fakeGitRun struct {
-	calls      []string // recorded subcommands, in call order ("add", "diff", "commit")
-	failCommit int      // number of leading "commit" calls that must fail before succeeding
-	commitErr  string   // stderr text for a failing commit; defaults to an index.lock message
+	calls      []string
+	failCommit int
+	commitErr  string
 }
 
 func (f *fakeGitRun) run(_ context.Context, _, _ string, args, _ []string, _ io.Reader, _, stderr io.Writer) (int, error) {
@@ -23,7 +22,7 @@ func (f *fakeGitRun) run(_ context.Context, _, _ string, args, _ []string, _ io.
 	f.calls = append(f.calls, sub)
 	switch sub {
 	case "diff":
-		return 1, nil // non-zero == differences ARE staged, so commitPairGit must proceed to commit
+		return 1, nil
 	case "commit":
 		if f.failCommit > 0 {
 			f.failCommit--
@@ -37,7 +36,7 @@ func (f *fakeGitRun) run(_ context.Context, _, _ string, args, _ []string, _ io.
 			return 128, nil
 		}
 		return 0, nil
-	default: // "add"
+	default:
 		return 0, nil
 	}
 }
@@ -53,7 +52,7 @@ func (f *fakeGitRun) commitCalls() int {
 }
 
 func TestCommitPairGit_RetriesTransientLockFailure(t *testing.T) {
-	f := &fakeGitRun{failCommit: 2} // 2 transient failures, 3rd attempt succeeds
+	f := &fakeGitRun{failCommit: 2}
 	g := gitexec.Git{Dir: t.TempDir(), Exec: f.run}
 
 	if err := commitPairGit(g, "cycle-99"); err != nil {
@@ -65,7 +64,7 @@ func TestCommitPairGit_RetriesTransientLockFailure(t *testing.T) {
 }
 
 func TestCommitPairGit_UnrecoverableAfterBoundedRetries(t *testing.T) {
-	f := &fakeGitRun{failCommit: 1000} // never succeeds within any reasonable bound
+	f := &fakeGitRun{failCommit: 1000}
 	g := gitexec.Git{Dir: t.TempDir(), Exec: f.run}
 
 	err := commitPairGit(g, "cycle-100")

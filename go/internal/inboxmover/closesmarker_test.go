@@ -37,7 +37,6 @@ func TestClosesInboxIDs(t *testing.T) {
 			body: "Closes-Inbox: b-item, a-item\nCloses-Inbox: a-item\nCloses-Inbox: b-item, c-item\n",
 			want: []string{"b-item", "a-item", "c-item"},
 		},
-		// Negative half: none of these may consume anything.
 		{
 			name: "prose mention mid-sentence is not a marker",
 			body: "This landing Closes-Inbox: nothing-really, per the convention.\n",

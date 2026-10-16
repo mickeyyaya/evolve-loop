@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// findRepoRoot walks up from the test cwd to the dir holding the real manifest.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -30,29 +29,19 @@ func findRepoRoot(t *testing.T) string {
 	return ""
 }
 
-// globBaseDir returns the literal directory a glob pattern is anchored to (the
-// path up to the last "/" before the first wildcard), or "" for a top-level
-// wildcard (e.g. "**/*.md") that anchors to nothing checkable.
 func globBaseDir(pattern string) string {
 	star := strings.IndexAny(pattern, "*?[")
 	if star < 0 {
-		return pattern // literal path (e.g. a root-level file)
+		return pattern
 	}
 	literal := pattern[:star]
 	slash := strings.LastIndex(literal, "/")
 	if slash < 0 {
-		return "" // top-level wildcard — nothing to anchor on
+		return ""
 	}
 	return literal[:slash]
 }
 
-// TestManifestRequiredPaths_ResolveToRealTree guards against the dead-path
-// regression the 2026-06-22 doc↔impl audit found (T1.2): after the script→Go
-// migration deleted legacy/scripts/ and root acs/, every required_paths glob in
-// .evolve/commit-prefix-scope.json still pointed there, so feat(guards) /
-// feat(routing) / feat(audit) / feat(posthoc) / feat(token-opt) commits could
-// NEVER satisfy Rule 1 ("≥1 diff path must match") — they became un-shippable
-// without --bypass-prefix-gate. Every glob's anchor dir must exist in the tree.
 func TestManifestRequiredPaths_ResolveToRealTree(t *testing.T) {
 	root := findRepoRoot(t)
 	m := loadManifest(t, root)
@@ -80,8 +69,6 @@ func loadManifest(t *testing.T, root string) PrefixManifest {
 	return manifest
 }
 
-// missingManifestAnchors reports patterns whose literal anchor is unavailable.
-// Callers choose whether availability means present on disk or tracked by Git.
 func missingManifestAnchors(m PrefixManifest, anchorExists func(string) bool) map[string][]string {
 	missing := map[string][]string{}
 	for prefix, rule := range m.Prefixes {
@@ -89,7 +76,7 @@ func missingManifestAnchors(m PrefixManifest, anchorExists func(string) bool) ma
 		for _, pattern := range paths {
 			anchor := globBaseDir(pattern)
 			if anchor == "" {
-				continue // top-level wildcard — not anchorable
+				continue
 			}
 			if !anchorExists(anchor) {
 				missing[prefix] = append(missing[prefix], pattern)
@@ -142,17 +129,11 @@ func TestTrackedAnchorExistsResolvesSymlinkTarget(t *testing.T) {
 	}
 }
 
-// TestManifestRequiredPaths_RejectsMissingRequiredAnchor is the negative
-// canary for missingManifestAnchors: an entry whose anchor is genuinely absent
-// MUST still be flagged. Without this, a future refactor of the anchor check
-// (e.g. one that silently skips unresolvable paths) could make both real-tree
-// and clean-checkout variants vacuously green.
 func TestManifestRequiredPaths_RejectsMissingRequiredAnchor(t *testing.T) {
 	tmp := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(tmp, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Only "go/evolve" exists; "go/bin" is deliberately absent.
 	if err := os.WriteFile(filepath.Join(tmp, "go", "evolve"), []byte("stub"), 0o644); err != nil {
 		t.Fatal(err)
 	}

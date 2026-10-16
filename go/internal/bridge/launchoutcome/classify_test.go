@@ -1,10 +1,5 @@
 package launchoutcome
 
-// classify_test.go — the classifier replays the host golden captured on the
-// pre-extraction code and pins each row of the exit table (design §6 tests
-// 11-19). The golden is package bridge's testdata/launch-outcome.golden.json
-// (a cross-package read, declared: the oracle has ONE home).
-
 import (
 	"context"
 	"encoding/json"
@@ -26,8 +21,6 @@ type goldenRow struct {
 	CauseCode string `json:"cause_code"`
 }
 
-// goldenStderr mirrors package bridge's launchStderrFixtures by key — the
-// bytes the fixture driver printed when the golden was captured.
 var goldenStderr = map[string]string{
 	"empty": "",
 	"first-bridge-line": "[bridge] launch: missing required (flag or env): --profile\n" +
@@ -64,8 +57,6 @@ func ctxErrOf(state string) error {
 	return nil
 }
 
-// Test 11 — every golden row: the error string, the sentinel and the ledger
-// cause code through Classify / CauseCode.
 func TestClassify_ReplaysTheHostGolden(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "testdata", "launch-outcome.golden.json"))
 	if err != nil {
@@ -97,7 +88,6 @@ func TestClassify_ReplaysTheHostGolden(t *testing.T) {
 	}
 }
 
-// Test 12 — success is the zero outcome, whatever stderr says.
 func TestClassify_ExitOK_IsTheZeroOutcome(t *testing.T) {
 	if out := Classify(ExitOK, nil, "[bridge] anything\n"); out != (Outcome{}) {
 		t.Fatalf("Classify(0) = %+v, want the zero Outcome", out)
@@ -140,7 +130,6 @@ func assertClassRow(t *testing.T, row exitClass) {
 	assertRegisteredBridgeCode(t, row.signal)
 }
 
-// Test 14 — 81 wraps ErrArtifactTimeout and is NOT transient.
 func TestClassify_81_WrapsErrArtifactTimeout_NotTransient(t *testing.T) {
 	out := Classify(ExitArtifactTimeout, nil, "")
 	if !errors.Is(out.Err, core.ErrArtifactTimeout) || errors.Is(out.Err, core.ErrTransientBridgeFailure) || out.Transient {
@@ -166,9 +155,6 @@ func TestClassify_TransientSet_IsExactly80_85_86_124(t *testing.T) {
 	}
 }
 
-// Test 16 — the signal death is transient only under a cancelled context;
-// the ledger cause stays driver_error and the signal BRIDGE_EXIT_SIGNAL_DEATH
-// either way; a cancelled context alone makes no other exit transient.
 func TestClassify_SignalDeath_TransientOnlyWhenCtxCancelled(t *testing.T) {
 	cancelled := Classify(ExitSignalDeath, context.Canceled, "")
 	if !cancelled.Transient || !cancelled.CtxCancelled || !errors.Is(cancelled.Err, core.ErrTransientBridgeFailure) || cancelled.CauseCode != "driver_error" {
@@ -187,7 +173,6 @@ func TestClassify_SignalDeath_TransientOnlyWhenCtxCancelled(t *testing.T) {
 	}
 }
 
-// Test 17 — an unknown non-zero exit is the driver_error class.
 func TestClassify_UnknownExit_IsDriverError(t *testing.T) {
 	out := Classify(42, nil, "")
 	if out.CauseCode != "driver_error" || out.Signal != CodeExitDriverError || classOf(42).name != "driver_error" || out.Err.Error() != "bridge: launch exit=42" {
@@ -195,8 +180,6 @@ func TestClassify_UnknownExit_IsDriverError(t *testing.T) {
 	}
 }
 
-// Test 18 — on 81 the marker summary beats the first [bridge] line, and its
-// typed cause becomes the cause code.
 func TestClassify_81_PrefersTheMarkerSummaryOverTheFirstBridgeLine(t *testing.T) {
 	out := Classify(ExitArtifactTimeout, nil, goldenStderr["marker-submit-wedged"])
 	if !strings.HasPrefix(out.Err.Error(), "bridge: launch exit=81: artifact-timeout: cause=submit_wedged ") || strings.Contains(out.Err.Error(), "EVOLVE_SANDBOX") {
@@ -207,7 +190,6 @@ func TestClassify_81_PrefersTheMarkerSummaryOverTheFirstBridgeLine(t *testing.T)
 	}
 }
 
-// Test 19 — every other exit keeps the first [bridge] line as its cause.
 func TestClassify_Non81_CauseIsTheFirstDiagnosticLine(t *testing.T) {
 	out := Classify(ExitBadFlags, nil, goldenStderr["marker-submit-wedged"])
 	if out.Err.Error() != "bridge: launch exit=10: [bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied" || out.CauseCode != "bad_flags" {

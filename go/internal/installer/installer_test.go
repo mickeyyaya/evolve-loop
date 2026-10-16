@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// writeFile is a test helper that writes content under root/rel, creating
-// parent dirs.
 func writeFile(t *testing.T, root, rel, content string) {
 	t.Helper()
 	path := filepath.Join(root, rel)
@@ -21,13 +19,6 @@ func writeFile(t *testing.T, root, rel, content string) {
 	}
 }
 
-// fakePluginLayout builds a minimal but fully-valid evolve-loop source tree
-// under a fresh temp dir, satisfying every CI-mode Validate check: a plugin.json
-// with all required fields (agents+skills as arrays), a marketplace.json with a
-// non-empty plugins array, the core agents (with name: + description:
-// frontmatter), a *-reference.md agent that is correctly skipped, the loop skill
-// files, and the reference docs. Extra agent/skill so the glob counts exceed the
-// core minimums.
 func fakePluginLayout(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -38,17 +29,12 @@ func fakePluginLayout(t *testing.T) string {
 	for _, a := range coreAgents {
 		writeFile(t, root, "agents/"+a+".md", "---\nname: "+a+"\ndescription: d\n---\nbody\n")
 	}
-	// An extra evolve-* agent so the glob count is core+2 (with the reference).
 	writeFile(t, root, "agents/evolve-retrospective.md", "---\nname: evolve-retrospective\ndescription: d\n---\n")
-	// A *-reference.md agent: intentionally has NO frontmatter and must be
-	// SKIPPED by the frontmatter check (but still counts in the glob).
 	writeFile(t, root, "agents/evolve-scout-reference.md", "# Scout Reference\nno frontmatter\n")
-	// A non-evolve agent that must NOT be globbed.
 	writeFile(t, root, "agents/other-agent.md", "---\nname: other\n---\n")
 	for _, s := range loopSkillFiles {
 		writeFile(t, root, "skills/loop/"+s, "# "+s+"\n")
 	}
-	// An extra skill file so the skill glob is len(loopSkillFiles)+1.
 	writeFile(t, root, "skills/loop/extra.md", "# extra\n")
 	for _, d := range referenceDocs {
 		writeFile(t, root, d, "# ref\n")
@@ -56,9 +42,6 @@ func fakePluginLayout(t *testing.T) string {
 	return root
 }
 
-// fakeAgentGlobCount is how many agents/evolve-*.md fakePluginLayout writes:
-// the core agents, plus evolve-retrospective.md, plus evolve-scout-reference.md
-// (other-agent.md is not evolve-* so it is excluded from the glob).
 var fakeAgentGlobCount = len(coreAgents) + 2
 
 func TestValidate_AcceptsWellFormedLayout(t *testing.T) {
@@ -91,21 +74,16 @@ func TestValidate_AcceptsWellFormedLayout(t *testing.T) {
 			t.Errorf("validate output missing %q\n%s", want, s)
 		}
 	}
-	// The *-reference.md agent must be SKIPPED, not failed.
 	if strings.Contains(s, "evolve-scout-reference.md missing") {
 		t.Errorf("*-reference.md agent should be skipped, not flagged:\n%s", s)
 	}
 }
 
 func TestValidate_FlagsMissingManifestAndAgents(t *testing.T) {
-	root := t.TempDir() // empty: nothing exists
+	root := t.TempDir()
 	var out bytes.Buffer
 	res := Validate(root, &out)
 
-	// Missing-manifest short-circuits the field check, and an empty agents/ dir
-	// globs to zero agents (so no per-agent failure). Hard failures:
-	//   1 plugin.json + 1 marketplace.json + len(loopSkillFiles) skills +
-	//   len(referenceDocs) reference docs.
 	wantErrors := 1 + 1 + len(loopSkillFiles) + len(referenceDocs)
 	if res.Errors != wantErrors {
 		t.Fatalf("Errors = %d, want %d; output:\n%s", res.Errors, wantErrors, out.String())
@@ -125,7 +103,6 @@ func TestValidate_FlagsMissingManifestAndAgents(t *testing.T) {
 
 func TestValidate_FlagsAgentMissingFrontmatter(t *testing.T) {
 	root := fakePluginLayout(t)
-	// Overwrite one core agent without the leading --- fence.
 	writeFile(t, root, "agents/evolve-auditor.md", "no frontmatter here\n")
 	var out bytes.Buffer
 	res := Validate(root, &out)
@@ -140,7 +117,6 @@ func TestValidate_FlagsAgentMissingFrontmatter(t *testing.T) {
 
 func TestValidate_FlagsAgentMissingDescriptionField(t *testing.T) {
 	root := fakePluginLayout(t)
-	// A fenced agent whose frontmatter has name: but not description:.
 	writeFile(t, root, "agents/evolve-scout.md", "---\nname: evolve-scout\n---\nbody\n")
 	var out bytes.Buffer
 	res := Validate(root, &out)
@@ -155,7 +131,6 @@ func TestValidate_FlagsAgentMissingDescriptionField(t *testing.T) {
 
 func TestValidate_FlagsMissingPluginField(t *testing.T) {
 	root := fakePluginLayout(t)
-	// Drop the description field from an otherwise-valid manifest.
 	writeFile(t, root, ".claude-plugin/plugin.json",
 		`{"name":"evo","version":"6.0.0","agents":[],"skills":[]}`)
 	var out bytes.Buffer
@@ -171,7 +146,6 @@ func TestValidate_FlagsMissingPluginField(t *testing.T) {
 
 func TestValidate_FlagsNonArrayAgentsAndSkills(t *testing.T) {
 	root := fakePluginLayout(t)
-	// agents and skills present but the wrong JSON type (objects, not arrays).
 	writeFile(t, root, ".claude-plugin/plugin.json",
 		`{"name":"n","version":"v","description":"d","agents":{},"skills":"x"}`)
 	var out bytes.Buffer
@@ -239,7 +213,6 @@ func TestValidate_FlagsInvalidJSONAsWarn(t *testing.T) {
 	var out bytes.Buffer
 	res := Validate(root, &out)
 
-	// Invalid JSON is a WARN (matches bash `|| echo "WARN..."`), not a hard error.
 	if res.Errors != 0 {
 		t.Fatalf("Errors = %d, want 0 (bad JSON is WARN-only)", res.Errors)
 	}
@@ -291,9 +264,6 @@ func TestInstall_CopiesAgentsAndSkills(t *testing.T) {
 		t.Errorf("copied Skills = %d, want %d", res.Skills, len(loopSkillFiles)+1)
 	}
 
-	// Same filesystem effects the bash produced: agents land in .claude/agents,
-	// skills land in .claude/skills/loop, content preserved, non-evolve agent
-	// NOT copied.
 	scout := filepath.Join(home, ".claude", "agents", "evolve-scout.md")
 	if b, err := os.ReadFile(scout); err != nil {
 		t.Fatalf("evolve-scout.md not installed: %v", err)
@@ -315,7 +285,6 @@ func TestInstall_CopiesAgentsAndSkills(t *testing.T) {
 func TestInstall_OverwriteLogsOverwriting(t *testing.T) {
 	src := fakePluginLayout(t)
 	home := t.TempDir()
-	// Pre-place a stale evolve-scout.md so the second install path is exercised.
 	writeFile(t, home, ".claude/agents/evolve-scout.md", "stale\n")
 
 	var out bytes.Buffer
@@ -325,7 +294,6 @@ func TestInstall_OverwriteLogsOverwriting(t *testing.T) {
 	if !strings.Contains(out.String(), "Overwriting: evolve-scout.md") {
 		t.Errorf("expected Overwriting log for pre-existing agent, got:\n%s", out.String())
 	}
-	// Content must be the source's, not the stale one.
 	b, _ := os.ReadFile(filepath.Join(home, ".claude", "agents", "evolve-scout.md"))
 	if strings.Contains(string(b), "stale") {
 		t.Error("overwrite did not replace stale content")
@@ -338,7 +306,6 @@ func TestUninstall_RemovesAgentsAndSkillDir(t *testing.T) {
 	if _, err := Install(src, home, &bytes.Buffer{}); err != nil {
 		t.Fatalf("setup Install: %v", err)
 	}
-	// A user agent that is NOT evolve-* must survive uninstall.
 	writeFile(t, home, ".claude/agents/my-agent.md", "keep me\n")
 
 	var out bytes.Buffer
@@ -397,7 +364,6 @@ func TestUninstallDryRun_ListsButDeletesNothing(t *testing.T) {
 	if !res.SkillDirExisted {
 		t.Error("SkillDirExisted = false, want true")
 	}
-	// Nothing actually deleted.
 	if _, err := os.Stat(filepath.Join(home, ".claude", "agents", "evolve-scout.md")); err != nil {
 		t.Error("dry-run deleted an agent")
 	}
@@ -438,8 +404,6 @@ func TestPluginAlreadyInstalled(t *testing.T) {
 	}
 }
 
-// TestExportedResultTypes names every exported result type via composite
-// literals so the apicover gate sees them referenced in-package.
 func TestExportedResultTypes(t *testing.T) {
 	if (ValidateResult{Agents: 1, Skills: 2, Errors: 0}).Agents != 1 {
 		t.Fatal("ValidateResult field access broken")
@@ -456,8 +420,6 @@ func TestExportedResultTypes(t *testing.T) {
 	if !strings.Contains(UsageLine, "[cycles] [strategy] [goal]") {
 		t.Errorf("UsageLine drifted from the 3-arg form: %q", UsageLine)
 	}
-	// Post-rename (2026-06-24): the installer prints the live /evo:loop command,
-	// never the dead /evolve-loop one. Locks the user-facing display string.
 	if !strings.Contains(UsageLine, "/evo:loop") {
 		t.Errorf("UsageLine must use the /evo:loop command form, got: %q", UsageLine)
 	}

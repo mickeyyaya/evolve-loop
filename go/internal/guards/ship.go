@@ -8,21 +8,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Ship denies ship-class Bash commands (git commit, git push, gh release) that bypass `evolve ship`.
 type Ship struct {
 	bypass bool
 }
 
-// NewShip returns a Ship guard; bypass allows every call.
 func NewShip(bypass bool) *Ship { return &Ship{bypass: bypass} }
 
-// Name reports "ship".
 func (s *Ship) Name() string { return "ship" }
 
 var shipVerbRe = regexp.MustCompile(`\b(git[ \t]+commit|git[ \t]+push|gh[ \t]+release[ \t]+(create|edit))\b`)
 
-// Decide denies a command line in which any simple command is ship-class without itself being `evolve ship`.
-// Each command is judged on its own, so an `evolve ship` elsewhere on the line allows nothing else.
 func (s *Ship) Decide(_ context.Context, in core.GuardInput) core.GuardDecision {
 	if s.bypass || in.ToolName != "Bash" {
 		return core.GuardDecision{Allow: true}
@@ -38,8 +33,6 @@ func (s *Ship) Decide(_ context.Context, in core.GuardInput) core.GuardDecision 
 	return core.GuardDecision{Allow: true}
 }
 
-// isShipClass reports whether a command commits, pushes or publishes a release, whether spelled in its
-// text or reached through git's global options, as in `git -C dir push`.
 func isShipClass(c shellCommand) bool {
 	if shipVerbRe.MatchString(c.text) {
 		return true
@@ -55,7 +48,6 @@ func isShipClass(c shellCommand) bool {
 	return false
 }
 
-// isNativeShip reports whether the words run `evolve ship`, after any leading VAR=value assignments.
 func isNativeShip(words []string) bool {
 	for len(words) > 0 && shellAssignmentRe.MatchString(words[0]) {
 		words = words[1:]

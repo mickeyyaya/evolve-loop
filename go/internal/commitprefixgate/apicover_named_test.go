@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-// TestResult_NamesManifestAndRuleOnScopeMatch drives a scope-match through Run
-// and names the Result, PrefixManifest, and PrefixRule types via the real
-// consumer (the GetDiffPaths seam avoids a git subprocess). It pins that a
-// matching prefix yields Allowed/scope-matched, the parsed manifest carries the
-// declared prefix, and the matched rule carries its required paths.
 func TestResult_NamesManifestAndRuleOnScopeMatch(t *testing.T) {
 	repo := t.TempDir()
 	manifest := `{"prefixes":{"docs":{"required_paths":["docs/**"]}}}`
@@ -58,8 +53,6 @@ func TestResult_NamesManifestAndRuleOnScopeMatch(t *testing.T) {
 	}
 }
 
-// TestPrefixRule_AnyPathBypassesScope pins the any_path escape hatch: a rule
-// with AnyPath allows any changed path with reason "any-path".
 func TestPrefixRule_AnyPathBypassesScope(t *testing.T) {
 	repo := t.TempDir()
 	manifest := `{"prefixes":{"chore":{"any_path":true}}}`
@@ -89,8 +82,6 @@ func TestPrefixRule_AnyPathBypassesScope(t *testing.T) {
 	}
 }
 
-// TestPrefixRule_RequiredPathsViolationIsScopeError pins that a changed path
-// outside the rule's required_paths is rejected as ErrScopeViolation.
 func TestPrefixRule_RequiredPathsViolationIsScopeError(t *testing.T) {
 	repo := t.TempDir()
 	manifest := `{"prefixes":{"feat":{"required_paths":["go/**"]}}}`

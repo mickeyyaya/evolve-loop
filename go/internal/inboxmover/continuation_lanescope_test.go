@@ -59,7 +59,6 @@ func TestResolveContinuationForScope_FallsBackToLaneScopeRegistry(t *testing.T) 
 	}
 }
 
-// The claim uses the lane's own id: a claim outside the lane scope is a peer's and is skipped.
 func TestResolveContinuationForScope_ClaimWinsOverRegistry(t *testing.T) {
 	root := t.TempDir()
 	seedRegistry(t, root, "scope-a", "6666666666666666666666666666666666666666", 1078)

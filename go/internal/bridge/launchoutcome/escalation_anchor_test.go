@@ -2,8 +2,6 @@ package launchoutcome
 
 import "testing"
 
-// The markers are matched at the start of a stderr line, where only the host writes; text quoted further along
-// a line never classifies an exit.
 func TestClassify_EscalationMarkersAreAnchoredToTheLineStart(t *testing.T) {
 	for name, stderr := range map[string]string{
 		"a quoted escalation line": "pane: [auto-respond] escalation report written (pattern=rate_limit reason=escalate)\n",

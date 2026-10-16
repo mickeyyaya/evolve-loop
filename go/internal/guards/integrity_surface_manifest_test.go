@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// preRefactorFragments is the original perimeter; each must stay in the manifest byte-for-byte.
 var preRefactorFragments = []string{
 	"/go/acs/regression/",
 	"/go/internal/acssuite/",
@@ -55,7 +54,6 @@ func TestProtectedSurfaceManifest_EveryEntryDenies(t *testing.T) {
 				t.Errorf("fragment %q has no Rationale; every manifest entry must document "+
 					"why its surface grades/gates a cycle", e.Fragment)
 			}
-			// A directory entry is sampled with a file under it.
 			sample := e.Fragment
 			if strings.HasSuffix(sample, "/") {
 				sample += "x.go"
@@ -76,7 +74,6 @@ func TestProtectedSurfaceManifest_EveryEntryDenies(t *testing.T) {
 
 func TestProtectedSurfaceManifest_NonProtectedPathsStillAllow(t *testing.T) {
 	allowed := []string{
-		// Neighbors of protected files in core, phases/ship, go/acs and flagregistry stay writable.
 		"/wt/go/internal/core/observer.go",
 		"/wt/go/internal/phases/ship/output.go",
 		"/wt/go/acs/cycle21/predicates_test.go",

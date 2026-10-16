@@ -6,7 +6,7 @@ func TestIsProtectedSurface(t *testing.T) {
 	protected := []string{
 		"/Users/x/.evolve/worktrees/cycle-21/go/acs/regression/flagreaders/readers_test.go",
 		"/repo/go/acs/regression/flagprogress/progress_test.go",
-		"go/internal/guards/role.go", // repo-relative form
+		"go/internal/guards/role.go",
 		"/repo/go/internal/acssuite/acssuite.go",
 		"/wt/go/internal/flagregistry/registry_table.go",
 		"/wt/go/internal/flagregistry/registry_ceiling_test.go",
@@ -14,9 +14,9 @@ func TestIsProtectedSurface(t *testing.T) {
 		"/wt/skills/audit/SKILL.md",
 		"/wt/skills/adversarial-testing/SKILL.md",
 		"/wt/.claude/settings.json",
-		"/Users/runner/.claude/settings.json", // global hook wiring, under an always-safe dir
+		"/Users/runner/.claude/settings.json",
 		"/wt/.evolve/policy.json",
-		"/wt/Go/ACS/Regression/evil_test.go", // case-insensitive filesystems: Go/ACS is go/acs
+		"/wt/Go/ACS/Regression/evil_test.go",
 		"/wt/go/internal/core/orchestrator.go",
 		"/wt/go/internal/core/cyclerun.go",
 		"/wt/go/internal/core/cyclerun_dispatch.go",
@@ -35,10 +35,10 @@ func TestIsProtectedSurface(t *testing.T) {
 
 	allowed := []string{
 		"/wt/go/internal/core/observer.go",
-		"/wt/go/acs/cycle21/predicates_test.go", // a cycle writes its own predicates
+		"/wt/go/acs/cycle21/predicates_test.go",
 		"/wt/go/internal/flagregistry/registry.go",
 		"/wt/go/internal/flagregistry/lookup.go",
-		"/wt/skills/loop/SKILL.md", // a skill that grades nothing
+		"/wt/skills/loop/SKILL.md",
 		"/wt/README.md",
 		"",
 	}

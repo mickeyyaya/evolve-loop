@@ -107,7 +107,7 @@ func TestBuild_MalformedDigestStillCarriesReasons(t *testing.T) {
 
 func TestBuild_FailureReasonsTruncatedAndCapped(t *testing.T) {
 	ws := t.TempDir()
-	reasons := []string{"  ", ""} // blanks are dropped, not carried
+	reasons := []string{"  ", ""}
 	for i := 0; i < 7; i++ {
 		reasons = append(reasons, string(rune('a'+i))+strings.Repeat("x", 300))
 	}
@@ -162,7 +162,7 @@ func TestRenderMarkdown_FailureSection(t *testing.T) {
 
 func TestFailureReasons_MultibyteTruncationStaysValidUTF8(t *testing.T) {
 	ws := t.TempDir()
-	long := strings.Repeat("é", 300) // 600 bytes; the cut lands mid-rune
+	long := strings.Repeat("é", 300)
 	writeReasonArtifact(t, ws, []string{long})
 	got := failureReasons(ws)
 	if len(got) != 1 {

@@ -151,3 +151,8 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/consensusdispatch` | the cross-CLI consensus audit: filters the voters, writes the worker commands, fans out and aggregates by vote | [internal-consensusdispatch.md](internal-consensusdispatch.md) |
 | `internal/fleetbudget` | the pure allocator that sizes a wave of fleet lanes from measured quota and pace, and the shadow join of quota with token burn | [internal-fleetbudget.md](internal-fleetbudget.md) |
 | `internal/apicover` | measures the public-API coverage of a package: the exported symbols that no test names, and the named symbols that never run | [internal-apicover.md](internal-apicover.md) |
+| `internal/failureadapter` | the pure decision kernel that turns recorded failures into a proceed, retry or block action | [internal-failureadapter.md](internal-failureadapter.md) |
+| `internal/commitprefixgate` | refuses a commit whose conventional prefix does not match the diff scope the manifest declares | [internal-commitprefixgate.md](internal-commitprefixgate.md) |
+| `internal/bridge/launchoutcome` | what one bridge launch exit means: the exit table, the cause line and the outcome projections | [internal-bridge-launchoutcome.md](internal-bridge-launchoutcome.md) |
+| `internal/installer` | copies and removes the evolve-loop agents and loop skill under `~/.claude`, and validates the plugin layout in CI | [internal-installer.md](internal-installer.md) |
+| `internal/core/failurelearning` | the deterministic half of learning from a failed phase: the recorder, the floor and the recurrence closure | [internal-core-failurelearning.md](internal-core-failurelearning.md) |

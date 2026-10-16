@@ -81,7 +81,6 @@ func TestReleaseCycleProcessing_NoManifestNoStamp(t *testing.T) {
 }
 
 func TestQuarantinePromotion_ShedsContinuationStamp(t *testing.T) {
-	// failure_count 2 against ceiling 3: the drain's bump reaches the ceiling and quarantines.
 	opts, cycle, _ := stampFixture(t, true, 2)
 	if _, err := failDrain(opts, cycle, 3, false); err != nil {
 		t.Fatalf("release: %v", err)

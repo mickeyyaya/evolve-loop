@@ -1,11 +1,5 @@
 package launchoutcome
 
-// importgraph_test.go — the package is a leaf under bridge (ADR-0103 unit 10
-// §2): stdlib plus internal/core (the request type and the two port
-// sentinels) and internal/signalcenter, never internal/bridge itself (the
-// compiler is the cycle guard; this is the leaf-ness declaration —
-// core/failurelearning/importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

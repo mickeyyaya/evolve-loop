@@ -132,7 +132,7 @@ func TestFindScopeItemFile(t *testing.T) {
 func TestResolveContinuationForScopeRecency(t *testing.T) {
 	tests := []struct {
 		name         string
-		retiredDir   []string // path segments under the inbox for the retired copy
+		retiredDir   []string
 		bindingCycle int
 		wantResolved bool
 	}{

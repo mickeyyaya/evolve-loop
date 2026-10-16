@@ -21,7 +21,6 @@ func TestFindFileByTaskID_SkipsUnreadableAndMalformed(t *testing.T) {
 		t.Skip("root bypasses file permissions")
 	}
 	dir := t.TempDir()
-	// Names chosen so ReadDir (sorted) visits unreadable → malformed → good.
 	unreadable := filepath.Join(dir, "a-unreadable.json")
 	if err := os.WriteFile(unreadable, []byte(`{"id":"x"}`), 0o000); err != nil {
 		t.Fatal(err)
@@ -59,7 +58,6 @@ func TestClaim_MkdirDestFails(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	dropInboxFile(t, repo, "task-1.json", "task-1")
-	// Occupy processing/ with a file so the cycle dir cannot be created.
 	if err := os.WriteFile(filepath.Join(repo, ".evolve", "inbox", "processing"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +71,6 @@ func TestClaim_RenameFails(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	dropInboxFile(t, repo, "task-1.json", "task-1")
-	// Pre-create the destination path as a non-empty directory → rename fails.
 	destDir := filepath.Join(repo, ".evolve", "inbox", "processing", "cycle-5", "task-1.json")
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -91,7 +88,6 @@ func TestPromote_MkdirFailsLoudly(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
-	// Occupy processed/ with a file so processed/cycle-0 cannot be created.
 	if err := os.WriteFile(filepath.Join(repo, ".evolve", "inbox", "processed"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +111,6 @@ func TestPromote_RenameFailsNoOp(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "5", "task-1.json", "task-1")
-	// retry dest = inbox/retry/task-1.json; pre-create as non-empty dir.
 	dest := filepath.Join(repo, ".evolve", "inbox", "retry", "task-1.json")
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		t.Fatal(err)
@@ -136,7 +131,6 @@ func TestRecoverOrphans_RenameFails(t *testing.T) {
 	t.Parallel()
 	repo := makeRepo(t)
 	dropProcessingFile(t, repo, "3", "task-1.json", "task-1")
-	// dest = inbox/task-1.json; pre-create as a non-empty dir → rename fails.
 	dest := filepath.Join(repo, ".evolve", "inbox", "task-1.json")
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		t.Fatal(err)
@@ -146,7 +140,7 @@ func TestRecoverOrphans_RenameFails(t *testing.T) {
 	}
 	res, err := RecoverOrphans(Options{
 		ProjectRoot:   repo,
-		ActiveCycleFn: func() (string, error) { return "99", nil }, // the fixture's cycle is not active
+		ActiveCycleFn: func() (string, error) { return "99", nil },
 	})
 	if err != nil {
 		t.Fatalf("recover should not error, got %v", err)

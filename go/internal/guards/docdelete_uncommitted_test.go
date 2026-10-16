@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// activeCycle is the storage a lane's guard reads: only the cycle identity matters to docdelete.
 type activeCycle struct {
 	core.Storage
 	cs core.CycleState
@@ -19,7 +18,6 @@ type activeCycle struct {
 
 func (a activeCycle) ReadCycleState(context.Context) (core.CycleState, error) { return a.cs, nil }
 
-// cycle 2 of run "draft" owns docs/explain/builds/cycle-2-draft.md (explanationdocs.DocumentPath).
 var draftCycle = activeCycle{cs: core.CycleState{CycleID: 2, RunID: "draft"}}
 
 const ownDraft = "docs/explain/builds/cycle-2-draft.md"
@@ -56,8 +54,6 @@ func writeFile(t *testing.T, dir, rel, body string) {
 	}
 }
 
-// laneWithADraft is a lane worktree whose HEAD holds committed documentation, plus the active cycle's
-// explanation draft, written by a Build and never committed.
 func laneWithADraft(t *testing.T) string {
 	t.Helper()
 	dir := gitRepo(t, map[string]string{

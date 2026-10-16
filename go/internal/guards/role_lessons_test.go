@@ -24,7 +24,6 @@ func lessonsRole(t *testing.T, phase string) (*Role, string) {
 
 func TestRole_RetroMayWriteLessonsCorpus(t *testing.T) {
 	r, _ := lessonsRole(t, "retro")
-	// Not a t.TempDir() path: on Linux that sits under /tmp and would ride the always-safe allowance.
 	d := r.Decide(context.Background(), lessonsGuardInput("/repo/.evolve/instincts/lessons/cycle-7-lesson.yaml"))
 	if !d.Allow {
 		t.Fatalf("retro must be allowed to write the lessons corpus, got deny: %s", d.Reason)

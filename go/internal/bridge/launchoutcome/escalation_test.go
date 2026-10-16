@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// Exit 85 is one exit class (the numeric table is frozen), so the auto-responder's escalation pattern rides
-// the cause, as the 81 sub-causes do: a quota wall and a rejected model are counted and routed as what they
-// are, and only a prompt nobody recognised stays unknown_prompt.
 func TestClassify_EscalationPatternRidesTheCause(t *testing.T) {
 	const killed = "[codex-tmux] session killed: evolve-bridge-codex-r01M3ENTP-c1707-build-pid89680-n9-1790425116\n"
 	for _, tc := range []struct {
@@ -62,7 +59,6 @@ func TestClassify_EscalationPatternRidesTheCause(t *testing.T) {
 	}
 }
 
-// Other exits never borrow the escalation rule, even with an escalation line in their stderr.
 func TestClassify_EscalationPatternIsScopedToExit85(t *testing.T) {
 	stderr := "[auto-respond] escalation report written (pattern=rate_limit reason=escalate)\n"
 

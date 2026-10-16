@@ -1,22 +1,11 @@
 package launchoutcome
 
-// cause_test.go — the cause-line miners and the artifact-timeout vocabulary
-// (design §6 tests 20, 22-26, 28). Tests 20, 23, 24, 25 and 26 moved verbatim
-// from package bridge (launch_error_repro_test.go:87-127,
-// artifact_timeout_diag_test.go:152-197, engine_attempt_telemetry_test.go:591-603
-// — the last with the spelling modelAttemptCause( → CauseCode().
-
 import (
 	"strings"
 	"testing"
 	"unicode/utf8"
 )
 
-// TestFirstDiagnosticLine_PrefersCausalLine — cycle-286 field evidence: a
-// driver-timeout stderr starts with chatter ("[claude-tmux] NOTE: …") and
-// ends with the causal line; the gauntlet failures put the cause first
-// ("[bridge] …"). The picker must prefer a [bridge]-prefixed line, else the
-// LAST non-empty line — never leading chatter.
 func TestFirstDiagnosticLine_PrefersCausalLine(t *testing.T) {
 	tests := []struct {
 		name, stderr, want string
@@ -59,8 +48,6 @@ func TestFirstDiagnosticLine_PrefersCausalLine(t *testing.T) {
 	}
 }
 
-// Test 22 — the cause line is capped at 300 RUNES (never a byte split) and
-// marked with "…"; 300 runes pass unchanged; a [bridge] line is bounded too.
 func TestFirstDiagnosticLine_BoundsAt300Runes_RuneSafe(t *testing.T) {
 	over := strings.Repeat("界", 301)
 	got := firstDiagnosticLine("chatter\n" + over + "\n")
@@ -77,10 +64,6 @@ func TestFirstDiagnosticLine_BoundsAt300Runes_RuneSafe(t *testing.T) {
 	}
 }
 
-// TestArtifactTimeoutSummary_WinsOverEarlierBridgeChatter: the extractor must be
-// marker-driven, not position-driven. A sandbox WARN (`[bridge] WARN: …`) is
-// emitted BEFORE the artifact wait on real launches, so a first-`[bridge]`-line
-// heuristic would report the sandbox note as the timeout's cause.
 func TestArtifactTimeoutSummary_WinsOverEarlierBridgeChatter(t *testing.T) {
 	stderr := strings.Join([]string{
 		"[bridge] WARN: EVOLVE_SANDBOX=on but inner sandbox not applied",
@@ -126,7 +109,6 @@ func TestArtifactTimeoutSummaryHasDedicatedRuneBudget(t *testing.T) {
 	if !strings.HasSuffix(got, "…") {
 		t.Fatalf("bounded exit-81 summary has no truncation marker: %q", got)
 	}
-	// 1023 runes kept + the marker: exactly the cap, never one under.
 	if n := len([]rune(got)); n != 1024 || !strings.HasPrefix(got, string([]rune(overBudget)[:1023])) {
 		t.Fatalf("bounded summary keeps 1023 runes then …: %d runes", n)
 	}

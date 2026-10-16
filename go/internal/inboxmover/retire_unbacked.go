@@ -6,8 +6,6 @@ import (
 	"strconv"
 )
 
-// RetireUnbacked retires each id no inbox item backs (its dispatch state is unknown) into state's cycle
-// dir and leaves every other id alone; it returns the retired ids and the joined write faults.
 func RetireUnbacked(opts Options, cycle int, state, reason, commitSHA string, ids []string) ([]string, error) {
 	opts.resolveOpts()
 	mover := opts.mover()

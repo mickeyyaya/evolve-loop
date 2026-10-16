@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// cycleStateOnly serves one cycle state and nothing else, so a fixture workspace needs no directory
-// and can sit outside every always-safe dir on every OS.
 type cycleStateOnly struct {
 	core.Storage
 	cs core.CycleState

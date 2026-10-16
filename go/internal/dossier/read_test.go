@@ -34,12 +34,10 @@ func writeCorpusDossier(t *testing.T, root string, cycle int, events []cyclestat
 
 func TestReadCommitted_WindowedAscendingAndFaultTolerant(t *testing.T) {
 	root := t.TempDir()
-	writeCorpusDossier(t, root, 9, nil)  // before the window
-	writeCorpusDossier(t, root, 11, nil) // in window
+	writeCorpusDossier(t, root, 9, nil)
+	writeCorpusDossier(t, root, 11, nil)
 	writeCorpusDossier(t, root, 10, []cyclestate.SpineFailOpen{{Phase: "ship", MissingArtifact: "build"}})
 	dir := filepath.Join(root, "knowledge-base", "cycles")
-	// Junk the reader must skip rather than fail on: unparseable JSON, a non-dossier
-	// filename, and the .md half of a pair.
 	if err := os.WriteFile(filepath.Join(dir, "cycle-12.json"), []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
