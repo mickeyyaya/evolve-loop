@@ -120,3 +120,59 @@ Consequence: persona scaffolding reductions wait for milestone M2 baseline metri
 
 - This review covers only the snapshot diff from `https://platform.claude.com/docs/en/release-notes/overview`.
 - The `claude` CLI binary manages its own upstream HTTP headers and fast mode behavior internally.
+
+## 7. Update for snapshot 2026-10-15T23:06:21Z
+
+The source `https://platform.claude.com/docs/en/release-notes/overview` changed after snapshot `2026-10-15T23:06:21Z`.
+The loop reads the upstream text as untrusted data.
+The update adds default rate limit details for Claude models:
+
+- Claude Opus 5.5 has a default fast mode rate limit in the Start, Build and Scale usage tiers.
+- Fast mode for Claude Opus 5 and Claude Opus 4.8 remains in research preview. Requests must send the beta header.
+
+The loop dispatches models through CLI binaries, not raw HTTP Messages API calls.
+Therefore, the rate limit updates require no loop code change.
+
+### ADR-0133 persona review for snapshot 2026-10-15T23:06:21Z
+
+Under ADR-0133, the loop watches CLI practice and trims prompt scaffolding.
+Decision D7 states that a prompt diet trims one persona at a time.
+Decision D8 requires 10-cycle before-and-after baseline measurements under milestone M2 before any persona diet change.
+The M2 baseline is not established yet.
+Therefore, no persona file changes in this cycle.
+
+#### evolve-scout
+The `evolve-scout` persona requires no change in this cycle.
+The scout phase finds tasks and writes specifications.
+Rate limit tiers in the cloud platform do not alter scout prompt instructions.
+The `evolve-scout` persona does not change.
+
+#### evolve-triage
+The `evolve-triage` persona requires no change in this cycle.
+Triage selects tasks based on deterministic policy rules.
+Upstream model release notes do not alter triage routing rules or task priorities.
+The `evolve-triage` persona does not change.
+
+#### evolve-tdd-engineer
+The `evolve-tdd-engineer` persona requires no change in this cycle.
+The TDD phase writes red tests and predicate suites.
+Model rate limits do not alter test contracts or predicate assertions.
+The `evolve-tdd-engineer` persona does not change.
+
+#### evolve-builder
+The `evolve-builder` persona requires no change in this cycle.
+Builder is the designated diet candidate under milestone M3.
+Decision D8 requires a 10-cycle baseline under milestone M2 before any prompt diet edit.
+Because the M2 baseline is not complete, the `evolve-builder` persona does not change in this cycle.
+
+#### evolve-auditor
+The `evolve-auditor` persona requires no change in this cycle.
+The auditor evaluates deterministic test exit codes and binary verdicts.
+Platform rate limits do not change auditor gates or report structures.
+The `evolve-auditor` persona does not change.
+
+#### evolve-retrospective
+The `evolve-retrospective` persona requires no change in this cycle.
+The retrospective phase extracts lessons and updates instincts off the critical path.
+Platform release notes do not affect retrospective steps.
+The `evolve-retrospective` persona does not change.
