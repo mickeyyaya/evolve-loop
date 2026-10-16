@@ -7,39 +7,24 @@ import (
 	"time"
 )
 
-// defaultAwaitIntervalS is the poll cadence when a step's await sets none. 2s
-// matches the parent driver's artifact-wait tick.
 const defaultAwaitIntervalS = 2
 
-// SessionDriver is the minimal tmux surface the engine drives. It is a strict
-// subset of the bridge's capabilities, declared HERE (consumer-owned port) so
-// the recipe package depends on nothing from bridge. The production
-// implementation is a thin adapter in the bridge package.
 type SessionDriver interface {
-	// EnsureSession launches-or-attaches the target REPL session.
 	EnsureSession(ctx context.Context) error
-	// Capture returns the current pane contents.
 	Capture(ctx context.Context) (string, error)
-	// SendCommand pastes body then presses Enter (slash-command idiom).
 	SendCommand(ctx context.Context, body string) error
-	// SendKeys sends body as raw tmux key tokens, no trailing Enter.
 	SendKeys(ctx context.Context, tokens string) error
-	// AutoRespond runs one auto-responder tick (dismissing any modal that
-	// appeared between steps) and reports whether it escalated/abandoned.
 	AutoRespond(ctx context.Context) (escalated bool, err error)
 }
 
-// Clock is the sleep seam — a no-op in tests so the poll loop runs instantly.
 type Clock interface {
 	Sleep(d time.Duration)
 }
 
-// Engine executes recipes against a SessionDriver. Construct it with the
-// resolved prompt marker (from the CLI's manifest) so AwaitPromptMarker works.
 type Engine struct {
 	Driver       SessionDriver
 	Clock        Clock
-	Log          io.Writer // diagnostics; nil discards
+	Log          io.Writer
 	PromptMarker string
 }
 
@@ -49,9 +34,6 @@ func (e *Engine) logf(format string, a ...any) {
 	}
 }
 
-// Run executes r for cli with params. The Template Method skeleton: resolve
-// steps → merge params → ensure session → run each step → done. It always
-// returns a Result describing how far it got, alongside any error.
 func (e *Engine) Run(ctx context.Context, r Recipe, cli string, params Params) (Result, error) {
 	res := Result{Recipe: r.Name, CLI: cli, Status: StatusFailed}
 
@@ -78,9 +60,6 @@ func (e *Engine) Run(ctx context.Context, r Recipe, cli string, params Params) (
 	return res, nil
 }
 
-// runStep sends one step's body then polls until its await condition is
-// satisfied, fails, or times out — running the auto-responder each tick so
-// modals that pop between steps are still handled (never bypassed).
 func (e *Engine) runStep(ctx context.Context, step Step, params Params, idx int) (StepResult, error) {
 	name := step.Name
 	if name == "" {
@@ -94,7 +73,7 @@ func (e *Engine) runStep(ctx context.Context, step Step, params Params, idx int)
 	}
 	ca, err := step.Await.compile()
 	if err != nil {
-		return sr, err // defensive: load-time validate() already checked this
+		return sr, err
 	}
 
 	if err := e.send(ctx, step.Send.Kind, body); err != nil {
@@ -107,9 +86,6 @@ func (e *Engine) runStep(ctx context.Context, step Step, params Params, idx int)
 		interval = defaultAwaitIntervalS
 	}
 	if interval > step.Await.TimeoutS {
-		// Guarantee at least one pane check within the budget — otherwise a
-		// recipe with interval_s > timeout_s would sleep past the deadline and
-		// never call Capture.
 		interval = step.Await.TimeoutS
 	}
 
@@ -157,8 +133,6 @@ func (e *Engine) runStep(ctx context.Context, step Step, params Params, idx int)
 	return sr, nil
 }
 
-// send dispatches a step body to the correct INJECT transport. An empty/
-// unknown kind defaults to command (the safe slash-command idiom).
 func (e *Engine) send(ctx context.Context, kind SendKind, body string) error {
 	if kind == KindKeys {
 		if err := e.Driver.SendKeys(ctx, body); err != nil {

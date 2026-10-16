@@ -8,25 +8,22 @@ import (
 	"time"
 )
 
-// noClock is the no-op sleep seam so poll loops run instantly.
 type noClock struct{}
 
 func (noClock) Sleep(time.Duration) {}
 
-// fakeDriver is a scriptable SessionDriver. paneSeq is consumed in order by
-// Capture (last value repeats). The *Err / *At fields drive failure branches.
 type fakeDriver struct {
 	ensureErr error
 
 	paneSeq []string
 	paneIdx int
 
-	commands   []string // bodies sent via SendCommand
-	keys       []string // bodies sent via SendKeys
-	sendErr    error    // returned by Send* calls
-	captureErr error    // returned by Capture calls
+	commands   []string
+	keys       []string
+	sendErr    error
+	captureErr error
 
-	autoEscalateAt int // 1-based tick at which AutoRespond returns escalated=true; 0=never
+	autoEscalateAt int
 	autoErr        error
 	autoCalls      int
 }
@@ -111,8 +108,6 @@ func TestEngineRun_HappyMultiStep(t *testing.T) {
 }
 
 func TestEngineRun_IntervalClampedToTimeout(t *testing.T) {
-	// interval_s (5) > timeout_s (3): interval must clamp so at least one
-	// Capture happens within the budget rather than oversleeping past it.
 	r := Recipe{Name: "x", Steps: []Step{
 		cmdStep("go", "/go", Await{Kind: AwaitAnyOf, Substrs: []string{"done"}, TimeoutS: 3, IntervalS: 5}),
 	}}
@@ -124,7 +119,7 @@ func TestEngineRun_IntervalClampedToTimeout(t *testing.T) {
 	if got.Status != StatusComplete {
 		t.Fatalf("result=%+v", got)
 	}
-	if d.paneIdx == 0 && len(d.paneSeq) > 1 { // sanity: Capture was invoked
+	if d.paneIdx == 0 && len(d.paneSeq) > 1 {
 		t.Error("expected at least one Capture within the clamped interval")
 	}
 }
@@ -159,7 +154,6 @@ func TestEngineRun_StepTimeoutContinue(t *testing.T) {
 }
 
 func TestEngineRun_MidStepModalThenSatisfied(t *testing.T) {
-	// AutoRespond fires (dismisses a modal) on tick 1; await satisfied tick 2.
 	r := Recipe{Name: "x", Steps: []Step{
 		cmdStep("go", "/go", Await{Kind: AwaitAnyOf, Substrs: []string{"done"}, TimeoutS: 10, IntervalS: 1}),
 	}}
@@ -278,7 +272,6 @@ func TestEngineRun_SendError(t *testing.T) {
 }
 
 func TestEngineRun_UnresolvedParamAtStep(t *testing.T) {
-	// Param declared optional+unset, body references it → substitute errors at step time.
 	r := Recipe{Name: "x", Params: []ParamDecl{{Name: "p"}}, Steps: []Step{cmdStep("a", "/a {{p}}", Await{Kind: AwaitPromptMarker, TimeoutS: 4})}}
 	d := &fakeDriver{}
 	_, err := newEngine(d).Run(context.Background(), r, "claude-tmux", nil)
@@ -291,7 +284,7 @@ func TestEngineRun_UnresolvedParamAtStep(t *testing.T) {
 }
 
 func TestEngine_LogfNilSafe(t *testing.T) {
-	e := &Engine{} // Log nil
+	e := &Engine{}
 	e.logf("ignored %d", 1)
 }
 
@@ -327,8 +320,6 @@ func TestEngineRun_CaptureError(t *testing.T) {
 }
 
 func TestEngineRun_DefensiveBadAwaitCompile(t *testing.T) {
-	// A Recipe constructed in-memory (bypassing loader validate) with an
-	// uncompilable await regex must fail at the runStep compile guard, not panic.
 	r := Recipe{Name: "x", Steps: []Step{
 		cmdStep("go", "/go", Await{Kind: AwaitRegex, Regex: "([", TimeoutS: 4}),
 	}}

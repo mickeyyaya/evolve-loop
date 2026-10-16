@@ -1,9 +1,5 @@
 package apicover
 
-// diffscope_test.go — cycle-1048 pins: enforcement is diff-scoped. A lane owns
-// the hygiene of files it touched; pre-existing debt in untouched files WARNs
-// and never fails the run. Nil ChangedFilesByDir = classic behavior (CI).
-
 import (
 	"context"
 	"os"
@@ -12,8 +8,6 @@ import (
 	"testing"
 )
 
-// fixture: package with two exported funcs in separate files; a cover profile
-// giving both 0%; both named in a test file (⇒ both false-green).
 func writeDiffScopeFixture(t *testing.T) (dir, coverPath string) {
 	t.Helper()
 	dir = t.TempDir()

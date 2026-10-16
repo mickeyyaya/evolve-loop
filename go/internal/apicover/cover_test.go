@@ -28,7 +28,6 @@ func TestParseCoverFunc_ParsesFuncLineAndSkipsTotal(t *testing.T) {
 }
 
 func TestParseCoverFunc_HandlesSpacesInPath(t *testing.T) {
-	// Developer machines often have spaces in the module path (e.g. /Users/Dan Lee).
 	in := "/Users/Dan Lee/proj/foo.go:7:\tFn\t50.0%\n"
 	entries, err := ParseCoverFunc(strings.NewReader(in))
 	if err != nil {

@@ -6,11 +6,6 @@ import (
 	"testing"
 )
 
-// TestSummarizeCycle_StructShape names Summary and PhaseCost explicitly and
-// pins the frozen aggregate shape: SummarizeCycle must return a Summary whose
-// Cycle echoes the arg, whose Phases hold one PhaseCost per *-events.ndjson
-// (alphabetically sorted), and whose Total sums every field. The whole-struct
-// equality locks the field set the downstream JSON consumers depend on.
 func TestSummarizeCycle_StructShape(t *testing.T) {
 	ws := filepath.Join(t.TempDir(), "cycle-7")
 	writeLog(t, ws, "auditor-events.ndjson", resultEnvelope(0.10, 100, 20, 3, 4))

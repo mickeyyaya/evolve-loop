@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 )
 
-// TestRun_WorkspaceMkdirFails covers Run's workspace-create error branch: the
-// workspace path lives under a regular file, so MkdirAll fails after the input
-// validation passes.
 func TestRun_WorkspaceMkdirFails(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -27,7 +24,7 @@ func TestRun_WorkspaceMkdirFails(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	rc := Run(Inputs{
 		Cycle:         "1",
-		WorkspacePath: filepath.Join(blocker, "ws"), // under a file → mkdir fails
+		WorkspacePath: filepath.Join(blocker, "ws"),
 		ProfilePath:   prof,
 		PromptFile:    prompt,
 	}, &stdout, &stderr)
@@ -36,12 +33,6 @@ func TestRun_WorkspaceMkdirFails(t *testing.T) {
 	}
 }
 
-// TestRun_QuorumReducedThenNoDrivers covers the quorum-reduction WARN block
-// (eligible < declared quorum) followed by the post-build "workers ready < 2"
-// branch. Post-bridge cutover a worker is ready only if its CLI projects onto a
-// REGISTERED bridge driver, so this uses two driverless voter names:
-// require_min_tier=none admits both regardless of tier, quorum=5 forces the
-// reduction WARN, then BuildCommandsTSV skips both (no driver) → zero ready workers.
 func TestRun_QuorumReducedThenNoDrivers(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -50,14 +41,14 @@ func TestRun_QuorumReducedThenNoDrivers(t *testing.T) {
 	writeProfile(t, prof, map[string]any{
 		"enabled":          true,
 		"cli_voters":       []string{"no-driver-a", "no-driver-b"},
-		"quorum":           5, // > eligible(2) → reduction WARN
+		"quorum":           5,
 		"require_min_tier": "none",
 	})
 	writeFile(t, prompt, "audit")
 	var stdout, stderr bytes.Buffer
 	rc := Run(Inputs{
 		Cycle: "1", WorkspacePath: dir, ProfilePath: prof, PromptFile: prompt,
-		AdaptersDir: filepath.Join(dir, "empty-adapters"), // no capability manifests → unknown tier
+		AdaptersDir: filepath.Join(dir, "empty-adapters"),
 		DispatchDir: filepath.Join(dir, "fake-dispatch"),
 	}, &stdout, &stderr)
 	if rc != ExitRuntimeErr {
@@ -71,15 +62,9 @@ func TestRun_QuorumReducedThenNoDrivers(t *testing.T) {
 	}
 }
 
-// TestFilterEligible_MissingManifestExcludedUnderHybrid pins the deliberate
-// post-migration behavior (see filterEligible doc): a voter whose
-// <cli>.capabilities.json is absent resolves to "unknown" via the default
-// tierFor (capability.QualityTier) and is EXCLUDED when require_min_tier is
-// hybrid or above. The old shell path's "checker script absent → include all"
-// global bail-out is intentionally gone (the checker is compiled in now).
 func TestFilterEligible_MissingManifestExcludedUnderHybrid(t *testing.T) {
 	t.Parallel()
-	emptyAdapters := t.TempDir() // no *.capabilities.json manifests
+	emptyAdapters := t.TempDir()
 	tierFor := func(cli string) (string, error) {
 		return capability.QualityTier(emptyAdapters, cli, nil)
 	}
@@ -96,9 +81,7 @@ func TestFilterEligible_MissingManifestExcludedUnderHybrid(t *testing.T) {
 	}
 }
 
-// TestResolveEvolveBin_EnvOverride covers the EVOLVE_GO_BIN branch.
 func TestResolveEvolveBin_EnvOverride(t *testing.T) {
-	// Serial (no t.Parallel): t.Setenv mutates process-global EVOLVE_GO_BIN/PATH.
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	writeExec(t, bin, "#!/bin/sh\nexit 0\n")
@@ -108,12 +91,8 @@ func TestResolveEvolveBin_EnvOverride(t *testing.T) {
 	}
 }
 
-// TestResolveEvolveBin_EnvNonExecutableFallsThrough covers the env-set but
-// non-executable case (Stat ok, mode&0111==0 → skip) followed by the walk.
 func TestResolveEvolveBin_WalkFindsGoBin(t *testing.T) {
-	// Serial (no t.Parallel): t.Setenv mutates process-global EVOLVE_GO_BIN/PATH.
 	dir := t.TempDir()
-	// Non-executable env target → env branch skipped.
 	notExec := filepath.Join(dir, "not-exec")
 	if err := os.WriteFile(notExec, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -126,10 +105,7 @@ func TestResolveEvolveBin_WalkFindsGoBin(t *testing.T) {
 	}
 }
 
-// TestResolveEvolveBin_NotFound covers the exhausted-walk → "" path. PATH is
-// cleared so LookPath cannot find a real `evolve`.
 func TestResolveEvolveBin_NotFound(t *testing.T) {
-	// Serial (no t.Parallel): t.Setenv mutates process-global EVOLVE_GO_BIN/PATH.
 	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 	if got := resolveEvolveBin(t.TempDir()); got != "" {
@@ -137,10 +113,7 @@ func TestResolveEvolveBin_NotFound(t *testing.T) {
 	}
 }
 
-// TestResolveNativeDispatch_Native covers the native-binary path: a resolvable
-// EVOLVE_GO_BIN yields `<bin> <subcmd> <args...>` with no error.
 func TestResolveNativeDispatch_Native(t *testing.T) {
-	// Serial (no t.Parallel): t.Setenv mutates process-global EVOLVE_GO_BIN/PATH.
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	writeExec(t, bin, "#!/bin/sh\nexit 0\n")
@@ -160,12 +133,7 @@ func TestResolveNativeDispatch_Native(t *testing.T) {
 	}
 }
 
-// TestResolveNativeDispatch_RequiresNativeBin covers the v12 contract: with no
-// native binary resolvable, dispatch errors — the legacy bash fallback
-// (<dir>/<subcmd>.sh) was removed with legacy/scripts/dispatch/ (ADR-0062/T1.7),
-// so there is nothing to fall back to.
 func TestResolveNativeDispatch_RequiresNativeBin(t *testing.T) {
-	// Serial (no t.Parallel): t.Setenv mutates process-global EVOLVE_GO_BIN/PATH.
 	t.Setenv("EVOLVE_GO_BIN", "")
 	t.Setenv("PATH", "")
 	if _, err := resolveNativeDispatch(t.TempDir(), "aggregator", []string{"out.md"}); err == nil {
@@ -173,7 +141,6 @@ func TestResolveNativeDispatch_RequiresNativeBin(t *testing.T) {
 	}
 }
 
-// TestExitCodeFromErr_NilState covers the nil-ProcessState branch.
 func TestExitCodeFromErr_NilState(t *testing.T) {
 	t.Parallel()
 	if got := exitCodeFromErr(nil); got != 1 {

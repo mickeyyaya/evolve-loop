@@ -144,3 +144,10 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/guardslog` | appends one timestamped guard-log line and returns the close error | [internal-guardslog.md](internal-guardslog.md) |
 | `internal/continuation` | the continuation binding: the one schema, the per-cycle manifest, the scope-keyed registry and the release authority gate (ADR-0076) | [internal-continuation.md](internal-continuation.md) |
 | `internal/routingtest` | the composable scenario framework for the dynamic phase-routing kernel: specs, bricks, matrices and kernel-floor invariants | [internal-routingtest.md](internal-routingtest.md) |
+| `internal/phasetiming` | the per-phase latency record in `phase-timing.json` and its cycle roll-up | [internal-phasetiming.md](internal-phasetiming.md) |
+| `internal/bridge/recipe` | scripted multi-step slash-command sequences that run through the tmux REPL of an LLM CLI | [internal-bridge-recipe.md](internal-bridge-recipe.md) |
+| `internal/shipwindow` | the lease that serializes the audit-binding-to-push window across concurrent lanes | [internal-shipwindow.md](internal-shipwindow.md) |
+| `internal/cyclecost` | per-phase and per-cycle cost and token totals from the phase event streams and the usage sidecars | [internal-cyclecost.md](internal-cyclecost.md) |
+| `internal/consensusdispatch` | the cross-CLI consensus audit: filters the voters, writes the worker commands, fans out and aggregates by vote | [internal-consensusdispatch.md](internal-consensusdispatch.md) |
+| `internal/fleetbudget` | the pure allocator that sizes a wave of fleet lanes from measured quota and pace, and the shadow join of quota with token burn | [internal-fleetbudget.md](internal-fleetbudget.md) |
+| `internal/apicover` | measures the public-API coverage of a package: the exported symbols that no test names, and the named symbols that never run | [internal-apicover.md](internal-apicover.md) |

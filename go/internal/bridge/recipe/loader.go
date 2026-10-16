@@ -14,17 +14,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// recipes/*.json are the embedded recipe definitions, making the engine
-// self-contained. The operator override directory (recipeDir) is consulted
-// first so a project can ship or tweak recipes without a rebuild — the exact
-// precedence LoadManifest uses for manifests.
-//
 //go:embed recipes/*.json
 var embeddedRecipes embed.FS
 
-// recipeSource is the test-swappable embedded source. The embed.FS satisfies
-// it in production; tests inject a fake to drive ReadFile/ReadDir error
-// branches the always-valid embedded set cannot reach.
 type recipeSource interface {
 	ReadFile(name string) ([]byte, error)
 	ReadDir(name string) ([]fs.DirEntry, error)
@@ -43,14 +35,10 @@ var recipeDirFn = func() string {
 	return filepath.Join(layout.EvolveDir, "bridge-recipes")
 }
 
-// recipeDir is the writable override directory consulted before the embedded
-// set.
 func recipeDir() string {
 	return recipeDirFn()
 }
 
-// LoadRecipe reads, parses, and validates the recipe named name (no .json
-// suffix). Override directory wins over the embedded set.
 func LoadRecipe(name string) (Recipe, error) {
 	if name == "" {
 		return Recipe{}, fmt.Errorf("recipe: empty name")
@@ -65,7 +53,6 @@ func LoadRecipe(name string) (Recipe, error) {
 	return parseRecipe(name, data)
 }
 
-// RecipeNames returns the sorted set of embedded recipe names.
 func RecipeNames() []string {
 	entries, err := recipeFS.ReadDir("recipes")
 	if err != nil {
@@ -81,7 +68,6 @@ func RecipeNames() []string {
 	return out
 }
 
-// parseRecipe unmarshals + validates recipe bytes.
 func parseRecipe(name string, data []byte) (Recipe, error) {
 	var r Recipe
 	if err := json.Unmarshal(data, &r); err != nil {
@@ -96,9 +82,6 @@ func parseRecipe(name string, data []byte) (Recipe, error) {
 	return r, nil
 }
 
-// validate rejects malformed recipes at load time: a recipe must declare at
-// least one step arm, and every step must have a non-empty body, a valid send
-// kind, a positive timeout, and an await that compiles.
 func (r Recipe) validate() error {
 	if len(r.Steps) == 0 && len(r.PerCLI) == 0 {
 		return fmt.Errorf("%w: recipe %s has no steps", ErrInvalidRecipe, r.Name)

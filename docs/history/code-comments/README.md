@@ -501,6 +501,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/adapters/statemap` | 7 | [internal-adapters-statemap.md](internal-adapters-statemap.md) |
 | `internal/adapters/storage` | 7 | [internal-adapters-storage.md](internal-adapters-storage.md) |
 | `internal/addedtests` | 2 | [internal-addedtests.md](internal-addedtests.md) |
+| `internal/apicover` | 3 | [internal-apicover.md](internal-apicover.md) |
 | `internal/auditchain` | 6 | [internal-auditchain.md](internal-auditchain.md) |
 | `internal/binaryguard` | 1 | [internal-binaryguard.md](internal-binaryguard.md) |
 | `internal/bridge/channel` | 11 | [internal-bridge-channel.md](internal-bridge-channel.md) |
@@ -520,11 +521,13 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/commitgate` | 3 | [internal-commitgate.md](internal-commitgate.md) |
 | `internal/committedset` | 1 | [internal-committedset.md](internal-committedset.md) |
 | `internal/config` | 56 | [internal-config.md](internal-config.md) |
+| `internal/consensusdispatch` | 3 | [internal-consensusdispatch.md](internal-consensusdispatch.md) |
 | `internal/continuation` | 11 | [internal-continuation.md](internal-continuation.md) |
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | 19 | [internal-core-defectledger.md](internal-core-defectledger.md) |
 | `internal/core` | 943 | [internal-core.md](internal-core.md) |
 | `internal/cycleclassify` | 16 | [internal-cycleclassify.md](internal-cycleclassify.md) |
+| `internal/cyclecost` | 6 | [internal-cyclecost.md](internal-cyclecost.md) |
 | `internal/cyclehealth` | 11 | [internal-cyclehealth.md](internal-cyclehealth.md) |
 | `internal/cycleoutcome` | 25 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/cyclestate` | 24 | [internal-cyclestate.md](internal-cyclestate.md) |
@@ -540,6 +543,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/failurelog` | 9 | [internal-failurelog.md](internal-failurelog.md) |
 | `internal/flagregistry` | 7 | [internal-flagregistry.md](internal-flagregistry.md) |
 | `internal/fleet` | 30 | [internal-fleet.md](internal-fleet.md) |
+| `internal/fleetbudget` | 2 | [internal-fleetbudget.md](internal-fleetbudget.md) |
 | `internal/gc` | 10 | [internal-gc.md](internal-gc.md) |
 | `internal/gitexec` | 15 | [internal-gitexec.md](internal-gitexec.md) |
 | `internal/guards` | 33 | [internal-guards.md](internal-guards.md) |
@@ -576,6 +580,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phases/triage` | 26 | [internal-phases-triage.md](internal-phases-triage.md) |
 | `internal/phasespec` | 60 | [internal-phasespec.md](internal-phasespec.md) |
 | `internal/phasestream` | 20 | [internal-phasestream.md](internal-phasestream.md) |
+| `internal/phasetiming` | 9 | [internal-phasetiming.md](internal-phasetiming.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
 | `internal/profiles` | 30 | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | 51 | [internal-prompts.md](internal-prompts.md) |
@@ -597,6 +602,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
 | `internal/shiperr` | 13 | [internal-shiperr.md](internal-shiperr.md) |
 | `internal/shipmanifest` | 12 | [internal-shipmanifest.md](internal-shipmanifest.md) |
+| `internal/shipwindow` | 2 | [internal-shipwindow.md](internal-shipwindow.md) |
 | `internal/signalcenter` | 13 | [internal-signalcenter.md](internal-signalcenter.md) |
 | `internal/skillcheck` | 5 | [internal-skillcheck.md](internal-skillcheck.md) |
 | `internal/soakreport` | 1 | [internal-soakreport.md](internal-soakreport.md) |

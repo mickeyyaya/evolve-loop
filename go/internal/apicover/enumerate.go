@@ -12,10 +12,8 @@ import (
 	"strings"
 )
 
-// SymbolKind classifies an exported declaration.
 type SymbolKind int
 
-// Symbol kinds.
 const (
 	KindFunc SymbolKind = iota
 	KindMethod
@@ -41,8 +39,6 @@ func (k SymbolKind) String() string {
 	}
 }
 
-// Symbol is one exported declaration discovered by Enumerate. Methods are keyed
-// "ReceiverType.Method"; everything else is keyed by its bare exported name.
 type Symbol struct {
 	Pkg          string
 	Name         string
@@ -54,12 +50,6 @@ type Symbol struct {
 	IgnoreReason string
 }
 
-// Enumerate returns the exported symbols of the package rooted at dir, skipping
-// _test.go files and any file excluded by the default build context (i.e.
-// integration/e2e/acs-tagged or platform-mismatched files). Reusing
-// build.Default.MatchFile means the measured surface matches exactly what an
-// untagged `go test` compiles. ctx is checked at each file boundary so the
-// audit gate's deadline bounds the walk (apicover-inprocess-ctx-timeout).
 func Enumerate(ctx context.Context, dir string) ([]Symbol, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -80,7 +70,7 @@ func Enumerate(ctx context.Context, dir string) ([]Symbol, error) {
 			return nil, err
 		}
 		if !match {
-			continue // integration/e2e/acs-tagged or platform-mismatched
+			continue
 		}
 		path := filepath.Join(dir, name)
 		f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
@@ -96,8 +86,6 @@ func Enumerate(ctx context.Context, dir string) ([]Symbol, error) {
 	return syms, nil
 }
 
-// exportedSymbols walks one parsed file and returns its exported declarations.
-// An //apicover:ignore directive with an empty reason is a hard error.
 func exportedSymbols(fset *token.FileSet, f *ast.File, file string) ([]Symbol, error) {
 	pkg := f.Name.Name
 	var out []Symbol
@@ -105,9 +93,6 @@ func exportedSymbols(fset *token.FileSet, f *ast.File, file string) ([]Symbol, e
 	add := func(name string, kind SymbolKind, pos token.Pos, doc *ast.CommentGroup) {
 		ignored, reason, err := parseIgnore(doc)
 		if err != nil {
-			// A malformed directive still signals intent-to-ignore: bucket it as
-			// ignored so it never surfaces as a spurious UNCOVERED line. Enumerate
-			// also returns firstErr, so callers can fail hard if they choose.
 			ignored = true
 			if firstErr == nil {
 				firstErr = fmt.Errorf("%s:%d %s: %w", file, fset.Position(pos).Line, name, err)
@@ -145,7 +130,7 @@ func addFuncDecl(d *ast.FuncDecl, add symbolAdder) {
 	if d.Recv != nil {
 		recv := recvTypeName(d.Recv)
 		if recv == "" || !ast.IsExported(recv) {
-			return // method on an unexported type is not public API
+			return
 		}
 		add(recv+"."+d.Name.Name, KindMethod, d.Pos(), d.Doc)
 		return
@@ -176,8 +161,6 @@ func addGenDecl(d *ast.GenDecl, add symbolAdder) {
 	}
 }
 
-// recvTypeName extracts the receiver's bare type name, unwrapping pointer and
-// generic-instantiation receivers (*T, T[P], *T[P]).
 func recvTypeName(recv *ast.FieldList) string {
 	if recv == nil || len(recv.List) == 0 {
 		return ""
@@ -189,11 +172,11 @@ func recvTypeName(recv *ast.FieldList) string {
 	switch t := expr.(type) {
 	case *ast.Ident:
 		return t.Name
-	case *ast.IndexExpr: // generic receiver: T[P]
+	case *ast.IndexExpr:
 		if id, ok := t.X.(*ast.Ident); ok {
 			return id.Name
 		}
-	case *ast.IndexListExpr: // generic receiver: T[P, Q]
+	case *ast.IndexListExpr:
 		if id, ok := t.X.(*ast.Ident); ok {
 			return id.Name
 		}

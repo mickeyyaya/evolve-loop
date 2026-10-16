@@ -1,46 +1,5 @@
 package shipwindow
 
-// shipwindow_test.go — RED test contract for the ship-window lease
-// (cycle-778, inbox id ship-window-lease, weight 0.97, operator-boosted).
-//
-// PROBLEM (evolve tokens report, cycles 767-774): audit ran ~10x for 8 cycles.
-// The extras are AUDIT_BINDING_HEAD_MOVED re-audits: a sibling lane lands on
-// main between this lane's audit-binding snapshot (core/phase_bindings.go
-// recordAuditBinding: `git rev-parse HEAD`) and its ship push, so ship's
-// verifyAuditBinding sees a moved HEAD and forces a deep-tier re-audit.
-// width-scaled-binding-retry makes lanes SURVIVE that race; this lease makes
-// them AVOID it by serializing ONLY the binding-snapshot→push critical section.
-//
-// CONTRACT the Builder implements in this package (tests are the spec;
-// do NOT modify them — implement production code until they pass):
-//
-//	// PathIn returns the lease file path: <evolveDir>/ship-window.lock.
-//	func PathIn(evolveDir string) string
-//
-//	// DefaultTTL is the stale-break ceiling for a held lease. The window is
-//	// binding-snapshot→push (~5-10 min observed), NOT the whole audit; pick
-//	// a ceiling comfortably above that (runlease.DefaultTTL is the pattern).
-//	const/var DefaultTTL time.Duration
-//
-//	type Options struct {
-//	    TTL      time.Duration      // 0 ⇒ DefaultTTL
-//	    Now      func() time.Time   // nil ⇒ time.Now (test seam, runlease-style)
-//	    Alive    func(pid int) bool // nil ⇒ real pid probe; holder-death oracle
-//	    Poll     time.Duration      // waiter poll interval; 0 ⇒ sane default
-//	    OwnerPID int                // 0 ⇒ os.Getpid()
-//	}
-//
-//	// Acquire blocks until the caller holds the ship-window lease for
-//	// evolveDir, or ctx is done (then returns ctx's error). A held lease is
-//	// respected only while LIVE (runlease semantics: heartbeat Fresh within
-//	// TTL AND holder pid alive); a stale lease (TTL expired OR holder dead)
-//	// is broken and acquisition proceeds. Waiters acquire in FIFO order of
-//	// their Acquire calls (starvation fairness).
-//	func Acquire(ctx context.Context, evolveDir string, opts Options) (*Lease, error)
-//
-//	// Release frees the lease so the next queued waiter proceeds.
-//	func (l *Lease) Release() error
-
 import (
 	"context"
 	"os"
@@ -50,24 +9,15 @@ import (
 	"time"
 )
 
-// TestShipWindowLease_SiblingWaitsInsteadOfReaudit is the headline AC: two
-// lanes race the audit→ship critical section against one simulated main HEAD.
-// With the lease serializing binding-snapshot→push, the section is mutually
-// exclusive, so NO lane ever observes HEAD moving between its snapshot and its
-// push (zero AUDIT_BINDING_HEAD_MOVED) — and both lanes still ship.
-//
-// Anti-no-op teeth: a stub Acquire that returns immediately would let both
-// lanes into the section simultaneously — the deliberate 25ms work window
-// makes the overlap counter and/or the headMoved counter fire.
 func TestShipWindowLease_SiblingWaitsInsteadOfReaudit(t *testing.T) {
 	dir := t.TempDir()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var mainHead int64  // simulated main HEAD (each push advances it)
-	var inSection int64 // lanes concurrently inside binding-snapshot→push
-	var overlaps int64  // mutual-exclusion violations
-	var headMoved int64 // AUDIT_BINDING_HEAD_MOVED analogue
+	var mainHead int64
+	var inSection int64
+	var overlaps int64
+	var headMoved int64
 
 	var wg sync.WaitGroup
 	for lane := 0; lane < 2; lane++ {
@@ -82,12 +32,12 @@ func TestShipWindowLease_SiblingWaitsInsteadOfReaudit(t *testing.T) {
 			if atomic.AddInt64(&inSection, 1) > 1 {
 				atomic.AddInt64(&overlaps, 1)
 			}
-			snapshot := atomic.LoadInt64(&mainHead) // the audit-binding snapshot
-			time.Sleep(25 * time.Millisecond)       // audit-bound work window
+			snapshot := atomic.LoadInt64(&mainHead)
+			time.Sleep(25 * time.Millisecond)
 			if atomic.LoadInt64(&mainHead) != snapshot {
-				atomic.AddInt64(&headMoved, 1) // would be a deep-tier re-audit
+				atomic.AddInt64(&headMoved, 1)
 			}
-			atomic.AddInt64(&mainHead, 1) // the push
+			atomic.AddInt64(&mainHead, 1)
 			atomic.AddInt64(&inSection, -1)
 			if err := l.Release(); err != nil {
 				t.Errorf("lane %d: Release: %v", lane, err)
@@ -107,10 +57,6 @@ func TestShipWindowLease_SiblingWaitsInsteadOfReaudit(t *testing.T) {
 	}
 }
 
-// TestShipWindowLease_HeldLeaseBlocksSibling is the NEGATIVE predicate (the
-// strongest anti-no-op signal): while a fresh, live-holder lease is held, a
-// sibling's Acquire must NOT succeed — it blocks until its context expires and
-// returns that context's error.
 func TestShipWindowLease_HeldLeaseBlocksSibling(t *testing.T) {
 	dir := t.TempDir()
 
@@ -136,23 +82,14 @@ func TestShipWindowLease_HeldLeaseBlocksSibling(t *testing.T) {
 	}
 }
 
-// TestShipWindowLease_HolderDeathRecovered: the lease is the sole liveness
-// oracle (run-lease pattern). Two independent stale-break paths, each of which
-// must unblock a waiter WITHOUT operator intervention:
-//
-//   - dead holder: pid probe says the holder is gone ⇒ break immediately,
-//     even though the heartbeat is still within TTL (the post-crash window);
-//   - TTL expiry: heartbeat aged past TTL ⇒ break even if the pid still
-//     exists (live-but-hung holder must not wedge every sibling ship).
 func TestShipWindowLease_HolderDeathRecovered(t *testing.T) {
 	t0 := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
 
 	t.Run("dead holder broken before TTL", func(t *testing.T) {
 		dir := t.TempDir()
-		// Holder acquires at t0 and "crashes" (never releases).
 		_, err := Acquire(context.Background(), dir, Options{
 			Now:      func() time.Time { return t0 },
-			OwnerPID: 4194000, // arbitrary; the waiter's Alive oracle declares it dead
+			OwnerPID: 4194000,
 		})
 		if err != nil {
 			t.Fatalf("holder Acquire: %v", err)
@@ -161,8 +98,8 @@ func TestShipWindowLease_HolderDeathRecovered(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		l, err := Acquire(ctx, dir, Options{
-			Now:   func() time.Time { return t0.Add(time.Second) }, // heartbeat still Fresh
-			Alive: func(int) bool { return false },                 // …but the holder is dead
+			Now:   func() time.Time { return t0.Add(time.Second) },
+			Alive: func(int) bool { return false },
 			Poll:  2 * time.Millisecond,
 		})
 		if err != nil {
@@ -186,8 +123,8 @@ func TestShipWindowLease_HolderDeathRecovered(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		l, err := Acquire(ctx, dir, Options{
-			Now:   func() time.Time { return t0.Add(DefaultTTL + time.Second) }, // aged past TTL
-			Alive: func(int) bool { return true },                               // pid "alive" (hung holder)
+			Now:   func() time.Time { return t0.Add(DefaultTTL + time.Second) },
+			Alive: func(int) bool { return true },
 			Poll:  2 * time.Millisecond,
 		})
 		if err != nil {
@@ -199,10 +136,6 @@ func TestShipWindowLease_HolderDeathRecovered(t *testing.T) {
 	})
 }
 
-// TestShipWindowLease_FIFOFairness: waiters acquire in the order their Acquire
-// calls started — a lane queued first cannot be starved by later arrivals.
-// Waiter starts are staggered well beyond the poll interval so arrival order
-// is unambiguous.
 func TestShipWindowLease_FIFOFairness(t *testing.T) {
 	dir := t.TempDir()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -232,7 +165,6 @@ func TestShipWindowLease_FIFOFairness(t *testing.T) {
 				t.Errorf("waiter %d: Release: %v", id, err)
 			}
 		}(i)
-		// Stagger: waiter i is enqueued (many poll cycles deep) before i+1 starts.
 		time.Sleep(150 * time.Millisecond)
 	}
 
@@ -248,8 +180,6 @@ func TestShipWindowLease_FIFOFairness(t *testing.T) {
 	}
 }
 
-// TestShipWindowLease_PathIn pins the on-disk contract: the lease lives at
-// <evolveDir>/ship-window.lock (the path the operator greps and gc sweeps).
 func TestShipWindowLease_PathIn(t *testing.T) {
 	got := PathIn("/some/root/.evolve")
 	want := "/some/root/.evolve/ship-window.lock"

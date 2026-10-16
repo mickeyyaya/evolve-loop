@@ -1,17 +1,10 @@
 package phasetiming
 
-// apicover_named_test.go — ADR-0050 Phase 5 public-API coverage: name and
-// exercise every exported phasetiming symbol by identifier (apicover counts
-// field access as "uses", not "names"). Each test asserts a REAL contract.
-
 import (
 	"strings"
 	"testing"
 )
 
-// TestParallelProjection_Named names the ParallelProjection type by identifier
-// (apicover counts field access as "uses", not "names") and pins the shadow
-// projection contract: 2 evaluate phases at concurrency 2 yield a real saving.
 func TestParallelProjection_Named(t *testing.T) {
 	t.Parallel()
 	var p ParallelProjection = ProjectParallelSaving([]Entry{
@@ -23,9 +16,6 @@ func TestParallelProjection_Named(t *testing.T) {
 	}
 }
 
-// TestSummary_RollupNamed names the Summary type and Rollup, pinning the roll-up
-// contract that the latency evidence turns on: total = sum of durations, longest
-// = max, retried = dispatches past attempt 1.
 func TestSummary_RollupNamed(t *testing.T) {
 	t.Parallel()
 	var s Summary = Rollup([]Entry{
@@ -41,14 +31,11 @@ func TestSummary_RollupNamed(t *testing.T) {
 	if s.RetriedCount != 1 {
 		t.Errorf("Summary.RetriedCount=%d, want 1", s.RetriedCount)
 	}
-	// ArchetypePercent on an empty Summary must not divide by zero.
 	if p := (Summary{}).ArchetypePercent("build"); p != 0 {
 		t.Errorf("empty Summary ArchetypePercent=%.1f, want 0", p)
 	}
 }
 
-// TestPath_FileNameNamed names Path + FileName: the timing-log path is the
-// workspace joined with the canonical file name.
 func TestPath_FileNameNamed(t *testing.T) {
 	t.Parallel()
 	if got := Path("/ws"); !strings.HasSuffix(got, FileName) {
@@ -56,8 +43,6 @@ func TestPath_FileNameNamed(t *testing.T) {
 	}
 }
 
-// TestHumanMS_Named names HumanMS: millisecond durations render compactly, and
-// sub-second values round to "0s" (the deliberate second-resolution choice).
 func TestHumanMS_Named(t *testing.T) {
 	t.Parallel()
 	if got := HumanMS(60_000); got != "1m0s" {

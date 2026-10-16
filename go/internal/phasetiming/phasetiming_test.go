@@ -45,14 +45,11 @@ func TestReadAndRollup(t *testing.T) {
 	if s.ByArchetype["build"] != 700_000 || s.ByArchetype["evaluate"] != 300_000 {
 		t.Errorf("ByArchetype=%v, want build=700000 evaluate=300000", s.ByArchetype)
 	}
-	// build is 700000/1402000 ≈ 49.9%
 	if p := s.ArchetypePercent("build"); p < 49 || p > 51 {
 		t.Errorf("build percent=%.1f, want ~49.9", p)
 	}
 }
 
-// Legacy logs written before the archetype field existed must still sum (under
-// the "unknown" bucket) rather than be dropped from the total.
 func TestRollup_LegacyEntriesBucketUnknown(t *testing.T) {
 	t.Parallel()
 	s := Rollup([]Entry{{Phase: "scout", DurationMS: 100, AttemptCount: 1}})
@@ -72,22 +69,16 @@ func TestRead_MissingFileIsNotExist(t *testing.T) {
 	}
 }
 
-// ProjectParallelSaving is the shadow evidence for PR2: it projects how much
-// wall-clock the independent post-build evaluate phases (archetype "evaluate",
-// excluding the audit brancher) would save if run concurrently. Pure projection
-// from recorded durations — no execution change.
 func TestProjectParallelSaving(t *testing.T) {
 	t.Parallel()
 	entries := []Entry{
-		{Phase: "scout", DurationMS: 400_000, Archetype: "plan"},  // not evaluate — excluded
-		{Phase: "build", DurationMS: 700_000, Archetype: "build"}, // not evaluate — excluded
+		{Phase: "scout", DurationMS: 400_000, Archetype: "plan"},
+		{Phase: "build", DurationMS: 700_000, Archetype: "build"},
 		{Phase: "coverage-gate", DurationMS: 240_000, Archetype: "evaluate"},
 		{Phase: "behavior-compare", DurationMS: 120_000, Archetype: "evaluate"},
 		{Phase: "adversarial-review", DurationMS: 300_000, Archetype: "evaluate"},
-		{Phase: "audit", DurationMS: 290_000, Archetype: "evaluate"}, // the brancher — excluded
+		{Phase: "audit", DurationMS: 290_000, Archetype: "evaluate"},
 	}
-	// Group = the 3 non-audit evaluate phases: 240+120+300 = 660s sequential.
-	// At concurrency 2, makespan lower bound = max(maxDur 300, ceil(660/2)=330) = 330s.
 	p := ProjectParallelSaving(entries, 2)
 	if p.Concurrency != 2 {
 		t.Errorf("Concurrency=%d, want 2", p.Concurrency)
@@ -106,7 +97,6 @@ func TestProjectParallelSaving(t *testing.T) {
 	}
 }
 
-// Concurrency >= group size ⇒ makespan = the single longest phase.
 func TestProjectParallelSaving_UnboundedConcurrency(t *testing.T) {
 	t.Parallel()
 	entries := []Entry{
@@ -118,15 +108,14 @@ func TestProjectParallelSaving_UnboundedConcurrency(t *testing.T) {
 	if p.ProjectedParallelMS != 500 {
 		t.Errorf("ProjectedParallelMS=%d, want 500 (the longest phase)", p.ProjectedParallelMS)
 	}
-	if p.SavingMS != 300 { // 800 sequential - 500 makespan
+	if p.SavingMS != 300 {
 		t.Errorf("SavingMS=%d, want 300", p.SavingMS)
 	}
 }
 
-// Degenerate cases: <2 parallelizable phases, or concurrency<=1, ⇒ zero saving.
 func TestProjectParallelSaving_NoParallelism(t *testing.T) {
 	t.Parallel()
-	one := []Entry{{Phase: "audit", DurationMS: 300, Archetype: "evaluate"}} // only audit
+	one := []Entry{{Phase: "audit", DurationMS: 300, Archetype: "evaluate"}}
 	if p := ProjectParallelSaving(one, 4); p.SavingMS != 0 || len(p.GroupPhases) != 0 {
 		t.Errorf("single audit phase: want zero saving / empty group, got %+v", p)
 	}

@@ -28,9 +28,6 @@ func TestUncovered_FlagsReferencedButZeroCoverageFunc(t *testing.T) {
 }
 
 func TestClassify_MethodMatchedByBareName(t *testing.T) {
-	// A test referencing obj.Method() yields the bare selector "Method" (no
-	// receiver type), but the symbol is keyed "T.Method". The cover map is
-	// joined on file:line in main, so it is keyed by the full symbol name.
 	syms := []Symbol{{Name: "T.Method", Kind: KindMethod}}
 	named := map[string]bool{"Method": true}
 	cover := map[string]float64{"T.Method": 50.0}

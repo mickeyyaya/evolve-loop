@@ -6,10 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// TestSummary_TokenRollupAndCacheHitRatio — S6, token-telemetry. Rollup must
-// aggregate per-entry token usage into cycle totals + per-archetype buckets,
-// compute the cache-hit ratio cache_read/(input+cache_read), and attribute
-// FAIL-verdict entries' tokens as wasted.
 func TestSummary_TokenRollupAndCacheHitRatio(t *testing.T) {
 	entries := []Entry{
 		{Phase: "scout", Archetype: "generative", Verdict: "PASS",
@@ -34,14 +30,11 @@ func TestSummary_TokenRollupAndCacheHitRatio(t *testing.T) {
 	if s.WastedTokens != wantWaste {
 		t.Fatalf("WastedTokens = %+v, want %+v", s.WastedTokens, wantWaste)
 	}
-	// cache_read/(input+cache_read) = 500/(1000+500) = 0.3333...
 	if got := s.CacheHitRatio; got < 0.3333 || got > 0.3334 {
 		t.Fatalf("CacheHitRatio = %v, want ~0.3333", got)
 	}
 }
 
-// TestSummary_TokenRollupZeroInput covers the zero-token edge case: no input at
-// all must yield a 0 cache-hit ratio, never a divide-by-zero.
 func TestSummary_TokenRollupZeroInput(t *testing.T) {
 	s := Rollup([]Entry{{Phase: "scout", Verdict: "PASS"}})
 	if s.CacheHitRatio != 0 {

@@ -5,12 +5,6 @@ import (
 	"testing"
 )
 
-// TestProfile_FullStructFromParse binds the named Profile type to ParseProfile's
-// result and asserts full-struct equality against the expected parse. This pins
-// the field-by-field mapping from the JSON consensus block (and the
-// model_tier_default top-level key) onto the Profile struct, including the two
-// fields that get a default (ModelTierDefault, RequireMinTier) when omitted —
-// here both are supplied so the compare is exact across all five fields.
 func TestProfile_FullStructFromParse(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -26,7 +20,7 @@ func TestProfile_FullStructFromParse(t *testing.T) {
 		t.Fatalf("ParseProfile: %v", err)
 	}
 	want := Profile{
-		ModelTierDefault: "sonnet", // from writeProfile's top-level model_tier_default
+		ModelTierDefault: "sonnet",
 		Enabled:          true,
 		CLIVoters:        []string{"claude", "gemini", "codex"},
 		Quorum:           2,
