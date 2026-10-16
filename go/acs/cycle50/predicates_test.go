@@ -148,7 +148,7 @@ func TestC50B_006_ReleasePipelineOptions_HasStrictPassField(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
 	f := filepath.Join(root, "go", "internal", "releasepipeline", "releasepipeline.go")
-	if !acsassert.FileContains(t, f, "StrictPass bool") {
+	if !acsassert.FileMatchesRegex(t, f, `StrictPass\s+bool`) {
 		t.Errorf("RED: releasepipeline.go Options struct does not contain 'StrictPass bool'.\n"+
 			"Builder must add StrictPass bool to releasepipeline.Options and wire it through:\n"+
 			"  releasepipeline.Options.StrictPass → runPreflightLib 5th arg → releasepreflight.Options.StrictPass\n"+
