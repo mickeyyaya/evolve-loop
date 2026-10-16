@@ -1,11 +1,5 @@
 package core
 
-// Fixtures (initRetryRepo, failingAddRunner) and the sleep no-op init() are
-// shared with worktree_retry_test.go — PR #401's file, which must stay green
-// and unmodified: "existing tests staying green" is part of this task's
-// acceptance criteria, so the consolidation may not break core's
-// worktreeAddAttempts / worktreeAddRetrySleep identifiers.
-
 import (
 	"os"
 	"strings"

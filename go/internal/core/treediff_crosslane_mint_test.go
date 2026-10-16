@@ -13,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 )
 
-// writeMintSpec persists a phase spec JSON at root/.evolve/phases/<name>/phase.json
-// exactly as the registrar's persist step would (normalized form: optional user
-// spec). body overrides the default valid spec when non-empty.
 func writeMintSpec(t *testing.T, root, name, body string) {
 	t.Helper()
 	if body == "" {
@@ -30,10 +27,6 @@ func writeMintSpec(t *testing.T, root, name, body string) {
 	}
 }
 
-// runScoutLeakCycle runs a cycle where scout leaks leakPath into the main
-// tree and returns RunCycle's error, sharing the NewOrchestrator + RunCycle
-// scaffolding every composed guard test below needs. Callers set up the
-// registry/spec fixtures beforehand and assert on the returned error.
 func runScoutLeakCycle(t *testing.T, root, leakPath string) error {
 	t.Helper()
 	dirty := &fakeGitDirty{baseline: []string{}, afterLeak: []string{leakPath}}
@@ -51,8 +44,6 @@ func TestGuardExemptsConcurrentLaneMintedPhaseConfig(t *testing.T) {
 
 	root := t.TempDir()
 	const mintLeak = ".evolve/phases/xlane-mint/phase.json"
-	// The concurrent lane's registrar registered the mint before its files
-	// became visible (Register appends to the registry before persisting).
 	if err := mintregistry.Append(mintregistry.Path(root), "xlane-mint", time.Now()); err != nil {
 		t.Fatalf("registry append: %v", err)
 	}
@@ -61,8 +52,6 @@ func TestGuardExemptsConcurrentLaneMintedPhaseConfig(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "tree-diff") {
 		t.Errorf("guard must not abort on a concurrent lane's registered mint; got: %v", err)
 	}
-	// Non-vacuous (mirrors TestGuardIgnoresScoutEvalMaterialization): the
-	// cycle must ADVANCE PAST scout's guard to a phase with no runner.
 	if err == nil || !strings.Contains(err.Error(), "no runner") {
 		t.Fatalf("expected the cycle to advance past scout's guard to a no-runner phase; got: %v", err)
 	}
@@ -73,7 +62,6 @@ func TestGuardStillAbortsUnregisteredPhaseConfigLeak(t *testing.T) {
 
 	root := t.TempDir()
 	const leak = ".evolve/phases/evil/phase.json"
-	// Deliberately NO registry entry for "evil".
 	err := runScoutLeakCycle(t, root, leak)
 	if err == nil {
 		t.Fatal("expected tree-diff abort for unregistered phase-config leak; got nil error")
@@ -92,7 +80,7 @@ func TestGuardAbortsForgedRegistryEntryWithUnclampedSpec(t *testing.T) {
 	const leak = ".evolve/phases/xlane-mint/phase.json"
 	cases := []struct {
 		label string
-		body  string // on-disk phase.json content; "-" = write no file at all
+		body  string
 	}{
 		{"missing-spec-file", "-"},
 		{"garbage-json", "{not json"},
@@ -175,7 +163,3 @@ func TestGuardStillAbortsExpiredMintPhaseConfigLeak(t *testing.T) {
 		t.Fatalf("expected tree-diff abort for expired mint; got: %v", err)
 	}
 }
-
-// TestIsActiveMintPhasePath (classifier scope pinning) lives untagged in
-// mint_exemption_test.go so it runs in both the default and integration
-// test modes.

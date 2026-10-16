@@ -24,15 +24,6 @@ func TestWorktreePhase(t *testing.T) {
 	}
 }
 
-// chdirTempNonGit chdirs the process into a fresh non-git temp dir for the
-// duration of the test and restores the prior cwd on cleanup. The core
-// package tests run sequentially (no t.Parallel), so the process-global cwd
-// swap is safe. It serves two purposes for the relative-base guard tests:
-//   - cwd is NOT inside a git repo, so an un-guarded (RED) build's
-//     `git -C "." worktree add` fails cleanly instead of polluting the live
-//     evolve-loop repo with a stray cycle-N branch/worktree.
-//   - any relative base dir an un-guarded MkdirAll creates lands under this
-//     temp dir, which t.TempDir() auto-removes — RED stays side-effect-free.
 func chdirTempNonGit(t *testing.T) string {
 	t.Helper()
 	orig, err := os.Getwd()
@@ -65,7 +56,6 @@ func TestGitWorktree_RelativeBaseRefused(t *testing.T) {
 
 func TestGitWorktree_RelativeProjectRootRefused(t *testing.T) {
 	chdirTempNonGit(t)
-	// No base override → base() falls back to <root>/.evolve/worktrees.
 	g := gitWorktree{}
 	wt, err := g.Create(".", 1)
 	if err == nil {
@@ -79,7 +69,6 @@ func TestGitWorktree_RelativeProjectRootRefused(t *testing.T) {
 	}
 }
 
-// fakeWorktree records Create/Cleanup calls and returns a scripted path/err.
 type fakeWorktree struct {
 	createdCycles []int
 	cleaned       []string
@@ -103,7 +92,7 @@ func (f *fakeWorktree) Cleanup(_, worktree string) error {
 func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
 	t.Parallel()
 
-	st := &fakeStorage{state: State{LastCycleNumber: 9}} // cycle 10
+	st := &fakeStorage{state: State{LastCycleNumber: 9}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
 	wt := &fakeWorktree{path: "/tmp/wt/cycle-10"}

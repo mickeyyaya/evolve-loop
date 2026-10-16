@@ -528,7 +528,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | 19 | [internal-core-defectledger.md](internal-core-defectledger.md) |
 | `internal/core/failurelearning` | 14 | [internal-core-failurelearning.md](internal-core-failurelearning.md) |
-| `internal/core` | 943 | [internal-core.md](internal-core.md) |
+| `internal/core` | 948 | [internal-core.md](internal-core.md) |
 | `internal/cycleclassify` | 16 | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/cyclecost` | 6 | [internal-cyclecost.md](internal-cyclecost.md) |
 | `internal/cyclehealth` | 11 | [internal-cyclehealth.md](internal-cyclehealth.md) |

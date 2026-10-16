@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
-// rebasedCommittedLane is a lane whose ship commit carried no consumption, replayed onto the new base.
 func rebasedCommittedLane(t *testing.T) *shippedLane {
 	t.Helper()
 	fx := newCommittedLane(t, "lane.txt", addLaneFile, addPeerFile)

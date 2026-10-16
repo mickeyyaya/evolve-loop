@@ -8,19 +8,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// ValidateSafetyInvariants is the phase-agnostic load-time trust anchor. The
-// legality graph and gates live in config, so the floor's non-gameability
-// cannot rest on a hardcoded graph literal; this validator HARD-checks that
-// the transition graph + config preserve the ship floor, quantified over the
-// graph and config ROLES (mandatory anchors, verdict branches) — never
-// phase-name literals — so an operator may rename any phase without
-// weakening the floor. Returns human-readable violations; empty == safe.
-// See ADR-0060.
 func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat phasespec.Catalog) []string {
 	var violations []string
 
-	// Branch targets must be known, legal successors: config selects among legal edges, never invents one.
-	// See ADR-0058.
 	for _, name := range cat.Names() {
 		spec, _ := cat.Get(name)
 		from := phaseFromRouter(name)
@@ -42,7 +32,6 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// A config spine must join known phases by legal edges: Next walks it without re-checking CanTransition.
 	for _, n := range cfg.SpineOrder {
 		if phaseFromRouter(n) == "" {
 			violations = append(violations, fmt.Sprintf("spine_order phase %q resolves to no known phase", n))
@@ -57,7 +46,6 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// legalGraphFrom silently drops an unknown name, so an unresolvable legal_successors entry is reported here.
 	for from, tos := range cfg.LegalSuccessors {
 		if phaseFromRouter(from) == "" {
 			violations = append(violations, fmt.Sprintf("legal_successors phase %q resolves to no known phase", from))
@@ -69,7 +57,6 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// A mandatory phase's verdict gate may accept only shippable verdicts.
 	for _, name := range cfg.Mandatory {
 		spec, ok := cat.Get(name)
 		if !ok || spec.Gate == nil {
@@ -82,14 +69,11 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Some mandatory phase must gate on a shippable verdict, judged only when the catalog describes a mandatory phase.
-	// See ADR-0060.
 	evals := mandatoryEvaluators(cfg, cat)
 	if catalogDescribesAnyMandatory(cfg, cat) && len(evals) == 0 {
 		violations = append(violations, "no mandatory phase gates on a shippable verdict (PASS/WARN) — the ship floor has no mandatory evaluator; ship could proceed without a verdict gate")
 	}
 
-	// Every mandatory anchor must be reachable from start; a stranded anchor is a silent floor hole.
 	if sm != nil {
 		start := sm.sourceNode()
 		if start == "" {
@@ -103,8 +87,6 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 				}
 			}
 
-			// Every start→ship path must traverse a floor evaluator: ship stays unreachable with the evaluator set removed.
-			// See ADR-0060.
 			if len(evals) > 0 && len(anchors) > 0 {
 				sink := anchors[len(anchors)-1]
 				if sm.reachableAvoiding(start, evals)[sink] {
@@ -117,10 +99,6 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 	return violations
 }
 
-// catalogDescribesAnyMandatory reports whether the catalog has an entry for at
-// least one mandatory phase — i.e. the catalog is authoritative over the floor.
-// It gates the floor-evaluator check so synthetic/empty test catalogs (which do
-// not describe the registry's gates) are not falsely flagged.
 func catalogDescribesAnyMandatory(cfg config.RoutingConfig, cat phasespec.Catalog) bool {
 	for _, name := range cfg.Mandatory {
 		if _, ok := cat.Get(name); ok {
@@ -130,13 +108,6 @@ func catalogDescribesAnyMandatory(cfg config.RoutingConfig, cat phasespec.Catalo
 	return false
 }
 
-// mandatoryEvaluators returns the SET of mandatory phases (as graph nodes) that
-// carry an artifact gate constraining the verdict to a NON-EMPTY shippable set
-// (⊆ {PASS, WARN}). These are the floor's evaluators — the phases whose verdict
-// ship structurally depends on. Phase-agnostic: it inspects roles via the gate,
-// never a phase name, so a renamed evaluator still satisfies the floor. The set
-// keys are graph nodes (via phaseFromRouter) so the dominance walk can delete
-// them directly.
 func mandatoryEvaluators(cfg config.RoutingConfig, cat phasespec.Catalog) map[Phase]bool {
 	evals := map[Phase]bool{}
 	for _, name := range cfg.Mandatory {
@@ -158,10 +129,6 @@ func mandatoryEvaluators(cfg config.RoutingConfig, cat phasespec.Catalog) map[Ph
 	return evals
 }
 
-// reachableFrom returns the set of phases reachable from start via legal
-// transitions. Pure graph analysis (no phase-name literals) over the
-// config-driven graph. The visited set makes it safe on the cyclic
-// transition graph (ship→ship, audit→ship).
 func (sm *StateMachine) reachableFrom(start Phase) map[Phase]bool {
 	reach := map[Phase]bool{}
 	var walk func(p Phase)
@@ -178,16 +145,6 @@ func (sm *StateMachine) reachableFrom(start Phase) map[Phase]bool {
 	return reach
 }
 
-// reachableAvoiding returns the phases reachable from start via legal transitions
-// WITHOUT entering any node in avoid (the avoided nodes are treated as deleted
-// from the graph). It is the dominance primitive: if the ship sink is reachable
-// while avoiding the whole evaluator set, the evaluator does not dominate ship.
-// Mirrors reachableFrom; the visited set keeps it safe on the cyclic graph.
-//
-// If start itself is in avoid the result is empty — correct, not a missed bypass:
-// every path leaves from start, so a start that is an evaluator is on every path
-// and trivially dominates the sink (no violation). Seeding start unconditionally
-// would instead FALSELY flag a direct start→sink edge, so the early return stands.
 func (sm *StateMachine) reachableAvoiding(start Phase, avoid map[Phase]bool) map[Phase]bool {
 	reach := map[Phase]bool{}
 	var walk func(p Phase)
@@ -204,10 +161,6 @@ func (sm *StateMachine) reachableAvoiding(start Phase, avoid map[Phase]bool) map
 	return reach
 }
 
-// sourceNode returns the graph's start node — a node that is never a transition
-// TARGET (in-degree 0). Identified structurally so a renamed start phase is
-// still found. When several candidates exist the lowest-sorted is returned for
-// determinism; "" means none (a structural violation the caller reports).
 func (sm *StateMachine) sourceNode() Phase {
 	hasIncoming := map[Phase]bool{}
 	for _, tos := range sm.allowed {

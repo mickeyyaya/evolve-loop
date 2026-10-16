@@ -10,8 +10,8 @@ import (
 
 type inPlaceRepo struct {
 	root        string
-	unformatted string // go/seed.go's exact bytes, gofmt would rewrite them
-	edit        string // README.md's exact bytes, an uncommitted edit
+	unformatted string
+	edit        string
 }
 
 func newInPlaceRepo(t *testing.T) inPlaceRepo {
@@ -35,8 +35,6 @@ func newInPlaceRepo(t *testing.T) inPlaceRepo {
 	return r
 }
 
-// fingerprint is what a mutator could change: file bytes, porcelain status
-// (index included), commit count.
 func (r inPlaceRepo) fingerprint(t *testing.T) string {
 	t.Helper()
 	seed, _ := os.ReadFile(filepath.Join(r.root, "go", "seed.go"))
@@ -60,7 +58,7 @@ func TestWorktreeMutators_RefuseTheProjectRoot(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct {
 		name string
-		run  func(t *testing.T, r inPlaceRepo) string // returns what the helper reported
+		run  func(t *testing.T, r inPlaceRepo) string
 	}{
 		{"normalizeBuildWorktree (gofmt -w, reset --soft, projection regen)", func(t *testing.T, r inPlaceRepo) string {
 			var sink injectedStderr
@@ -109,9 +107,6 @@ func TestWorktreeMutators_RefuseTheProjectRoot(t *testing.T) {
 	}
 }
 
-// The audit binding degrades, on an in-place root, to an empty worktree tree
-// SHA (ship then falls back to the auditor's value) — a behavioural contract
-// with ship, pinned here rather than only through the e2e porcelain compare.
 func TestRecordAuditBinding_InPlaceRootDegradesToNoTreeSHA(t *testing.T) {
 	t.Parallel()
 

@@ -16,11 +16,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
-// errWriteBoom is the forced compositionVerdictWriter failure used by
-// TestRecoverFromShipError_CleanRebase_WriterFailureFallsBackToFullAudit.
 var errWriteBoom = errors.New("ledger write boom")
 
-// writeFileT writes content to path, creating parent dirs as needed.
 func writeFileT(path, content string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -28,18 +25,11 @@ func writeFileT(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
-// fixedWorktree is a core.WorktreeProvisioner fake that always hands back
-// the same pre-built repo dir, so recoverFromShipError's real
-// `git rebase main` runs against a repo this suite fully controls.
 type fixedWorktree struct{ dir string }
 
 func (f fixedWorktree) Create(string, int) (string, error) { return f.dir, nil }
 func (f fixedWorktree) Cleanup(string, string) error       { return nil }
 
-// countingRunner is a PhaseRunner that always PASSes and counts its calls —
-// used here as the audit runner so tests can assert whether a composition
-// carry-forward actually SKIPPED re-audit (calls stay 0) or fell back to the
-// pre-existing full-audit route (calls become 1).
 type countingRunner struct {
 	name  string
 	calls int
@@ -88,8 +78,6 @@ func (r *countingRunner) Run(_ context.Context, req core.PhaseRequest) (core.Pha
 	return core.PhaseResponse{Phase: r.name, Verdict: core.VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// greenComposedGateResults returns an all-PASS result for every gate
-// ciparity.RequiredComposedGates requires.
 func greenComposedGateResults() map[string]ciparity.GateOutcome {
 	out := map[string]ciparity.GateOutcome{}
 	for _, g := range ciparity.RequiredComposedGates {
@@ -98,7 +86,6 @@ func greenComposedGateResults() map[string]ciparity.GateOutcome {
 	return out
 }
 
-// runGitT runs git in dir, failing the test on a non-zero exit.
 func runGitT(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -110,12 +97,6 @@ func runGitT(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-// initCleanRebaseRepoT builds a temp git repo where branch `cycle` and
-// `main` diverge on DIFFERENT files, so rebasing `cycle` onto `main`
-// replays cleanly (no conflict) — the precondition for the composition
-// carry-forward fast path. Leaves `cycle` checked out at the pre-rebase tip
-// and returns the dir plus the pre-rebase diff of cycle's own commit
-// against the OLD main (what an audit bound before a peer moved main).
 func initCleanRebaseRepoT(t *testing.T) (dir string, preRebaseDiff []byte) {
 	t.Helper()
 	dir = t.TempDir()
@@ -139,15 +120,13 @@ func initCleanRebaseRepoT(t *testing.T) (dir string, preRebaseDiff []byte) {
 	runGitT(t, dir, "commit", "-m", "lane change")
 	preRebaseDiff = []byte(runGitT(t, dir, "diff", "main...HEAD"))
 	runGitT(t, dir, "checkout", "main")
-	write("peer.txt", "peer change\n") // disjoint file → clean replay
+	write("peer.txt", "peer change\n")
 	runGitT(t, dir, "add", "-A")
 	runGitT(t, dir, "commit", "-m", "peer change")
 	runGitT(t, dir, "checkout", "cycle")
 	return dir, preRebaseDiff
 }
 
-// compositionCycleFixture bundles the ship/audit stubs and Orchestrator
-// wired for one composition-carry-forward scenario.
 type compositionCycleFixture struct {
 	ship    *shipErrorStub
 	audit   *countingRunner
@@ -156,9 +135,6 @@ type compositionCycleFixture struct {
 	o       *core.Orchestrator
 }
 
-// newCompositionFixture wires an Orchestrator whose ship runner fails once
-// with CodeGitFleetRebaseNeeded (then PASSes) against repoDir, with the
-// three composition seams set from snap/gates/write.
 func newCompositionFixture(
 	repoDir string,
 	snap func(context.Context, string, string) (core.CompositionAuditSnapshot, error),
@@ -247,7 +223,7 @@ func TestRecoverFromShipError_CleanRebase_PatchIdDriftFallsBackToFullAudit(t *te
 				LaneAuditRef: "audit-artifact-sha",
 				AuditedBase:  "old-main-sha",
 				Diff:         []byte("this is not the real diff"),
-				PatchID:      "0000000000000000000000000000000000dead", // deliberately wrong
+				PatchID:      "0000000000000000000000000000000000dead",
 			}, nil
 		},
 		func(context.Context, string) map[string]ciparity.GateOutcome { return greenComposedGateResults() },
@@ -263,8 +239,6 @@ func TestRecoverFromShipError_CleanRebase_PatchIdDriftFallsBackToFullAudit(t *te
 	if fx.ship.calls != 2 {
 		t.Fatalf("ship calls = %d, want 2 (fail once → full re-audit → reship, unchanged pre-existing path)", fx.ship.calls)
 	}
-	// Baseline is 1 initial + 1 recovery re-audit = 2 total for one fallback
-	// (see TestOrchestrator_RecoveryDepthBudget).
 	if fx.audit.calls != 2 {
 		t.Fatalf("audit calls = %d, want 2 — patch-id drift must fall back to the existing full re-audit (1 initial + 1 recovery)", fx.audit.calls)
 	}
@@ -293,7 +267,7 @@ func TestRecoverFromShipError_CleanRebase_MissingComposedGateFallsBackToFullAudi
 		},
 		func(context.Context, string) map[string]ciparity.GateOutcome {
 			red := greenComposedGateResults()
-			red["apicover"] = ciparity.GateOutcome{Status: "fail"} // one required gate is red
+			red["apicover"] = ciparity.GateOutcome{Status: "fail"}
 			return red
 		},
 		func(ledgerPath string, in core.CompositionVerdictInput) error {
@@ -305,7 +279,6 @@ func TestRecoverFromShipError_CleanRebase_MissingComposedGateFallsBackToFullAudi
 	if err := runCompositionCycle(t, fx.o); err != nil {
 		t.Fatalf("a rejected composition attempt must still recover via the pre-existing full-audit path, got: %v", err)
 	}
-	// Baseline is 1 initial + 1 recovery re-audit = 2 total.
 	if fx.audit.calls != 2 {
 		t.Fatalf("audit calls = %d, want 2 — a red required composed gate must fall back to full re-audit (1 initial + 1 recovery)", fx.audit.calls)
 	}
@@ -340,7 +313,6 @@ func TestRecoverFromShipError_CleanRebase_WriterFailureFallsBackToFullAudit(t *t
 	if err := runCompositionCycle(t, fx.o); err != nil {
 		t.Fatalf("a writer failure must fail closed into the existing full-audit recovery, not abort, got: %v", err)
 	}
-	// Baseline is 1 initial + 1 recovery re-audit = 2 total.
 	if fx.audit.calls != 2 {
 		t.Fatalf("audit calls = %d, want 2 — a writer failure must fall back to full re-audit (1 initial + 1 recovery)", fx.audit.calls)
 	}

@@ -163,9 +163,6 @@ func (o *Orchestrator) reportIdentityProofSkipped(cycle int, cs CycleState, reas
 	})
 }
 
-// gitFn runs a git subcommand in dir and returns (stdout, exitCode, err); it
-// matches gitCapture so production wiring passes gitCapture directly while tests
-// inject a fake — the Humble Object seam for rebaseWithDerivedRegen.
 type gitFn = func(ctx context.Context, dir string, args ...string) (string, int, error)
 
 func gitStdout(ctx context.Context, git gitFn, dir string, args ...string) (string, error) {
@@ -240,8 +237,6 @@ func goInputsFor(ctx context.Context, worktree string) derived.GoInputDirs {
 	return dirs
 }
 
-// maxRebaseContinueSteps bounds the replay loop so a pathological rebase can never
-// spin forever (each cycle branch has only a handful of commits).
 const maxRebaseContinueSteps = 100
 
 func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string) (ok bool, conflicts []string) {

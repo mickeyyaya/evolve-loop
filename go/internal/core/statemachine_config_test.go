@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// specForCatalog adapts a test catalog to the StateMachine.specFor accessor,
-// canonicalizing the name exactly as the orchestrator's specFor does.
 func specForCatalog(cat phasespec.Catalog) func(Phase) (phasespec.PhaseSpec, bool) {
 	return func(p Phase) (phasespec.PhaseSpec, bool) { return cat.Get(canonicalCatalogName(p)) }
 }
@@ -22,9 +20,6 @@ func mustCatalog(t *testing.T, specs ...phasespec.PhaseSpec) phasespec.Catalog {
 	return cat
 }
 
-// TestNext_AuditVerdictBranchFromSpec's catalog inverts the targets vs the
-// literal table (PASS→retro, FAIL→ship) so the assertion can only pass if the
-// spec is actually consulted, not the hardcoded PhaseAudit case.
 func TestNext_AuditVerdictBranchFromSpec(t *testing.T) {
 	t.Parallel()
 	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "retrospective", OnFail: "ship"})
@@ -45,9 +40,6 @@ func TestNext_AuditVerdictBranchFromSpec(t *testing.T) {
 	}
 }
 
-// TestNext_AuditDegradesToLiteralWhenCatalogUnset is the degrade
-// characterization: a bare StateMachine (no WithCatalog) keeps the exact
-// literal audit branch.
 func TestNext_AuditDegradesToLiteralWhenCatalogUnset(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()
@@ -66,9 +58,6 @@ func TestNext_AuditDegradesToLiteralWhenCatalogUnset(t *testing.T) {
 	}
 }
 
-// TestWiredStateMachine_ReproducesAuditOracle proves the shipped config shape
-// (audit on_pass:ship / on_fail:retrospective) reproduces the frozen oracle's
-// audit cells byte-identically when the catalog is wired.
 func TestWiredStateMachine_ReproducesAuditOracle(t *testing.T) {
 	t.Parallel()
 	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})

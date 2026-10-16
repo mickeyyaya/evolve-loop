@@ -1,7 +1,5 @@
 package core
 
-// These observe the retry announcement through the package's existing
-// captureStderr helper (phase_bindings_selfcheck_failloud_test.go).
 import (
 	"strings"
 	"testing"

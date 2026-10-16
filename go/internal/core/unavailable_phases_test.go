@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// probeRunner is a fakeRunner that also answers the persona availability
-// question — the shape every dispatchable phase runner has.
 type probeRunner struct {
 	*fakeRunner
 	persona error
@@ -29,9 +27,6 @@ func TestAdvisorPlanInput_ListsPhasesWithMissingPersona(t *testing.T) {
 	runners[Phase("amplify-tests")] = &probeRunner{fakeRunner: &fakeRunner{name: "amplify-tests"},
 		persona: fmt.Errorf("amplify-tests: load agent: %w", ErrAgentDocMissing)}
 	runners[Phase("coverage-gate")] = &probeRunner{fakeRunner: &fakeRunner{name: "coverage-gate"}}
-	// Guard rails: a NON-optional catalog phase and a catalog-Optional phase the
-	// operator configured mandatory both have a missing persona — neither may
-	// be excluded; their absence stays a loud dispatch failure.
 	runners[PhaseBuild] = &probeRunner{fakeRunner: &fakeRunner{name: "build"},
 		persona: fmt.Errorf("build: load agent: %w", ErrAgentDocMissing)}
 	runners[Phase("mutation-gate")] = &probeRunner{fakeRunner: &fakeRunner{name: "mutation-gate"},
@@ -48,7 +43,7 @@ func TestAdvisorPlanInput_ListsPhasesWithMissingPersona(t *testing.T) {
 	cfg := shadowCfg(config.StageAdvisory)
 	cfg.Mandatory = append(cfg.Mandatory, "mutation-gate")
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners, WithCatalog(cat), WithRouting(cfg, router.StaticPreset{}))
-	var _ PersonaProber = runners[PhaseBuild].(*probeRunner) // the interface the planner asks through
+	var _ PersonaProber = runners[PhaseBuild].(*probeRunner)
 	in := o.advisorPlanInput(context.Background(), "scout", router.RoutingSignals{}, CycleRequest{ProjectRoot: t.TempDir()}, State{}, CycleState{}, 1, nil, nil)
 	if want := []string{"amplify-tests"}; !reflect.DeepEqual(in.UnavailablePhases, want) {
 		t.Fatalf("UnavailablePhases = %v, want %v (optional + missing only; build is non-optional and mutation-gate is configured-mandatory — both stay loud)", in.UnavailablePhases, want)

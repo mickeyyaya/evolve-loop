@@ -57,9 +57,6 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, verdict string, si
 	return cand, true
 }
 
-// planRunsShip reports whether the advisor's clamped plan schedules the ship
-// phase. A nil plan (static spine, no advisor) is treated as ship-intended so
-// early-exit is never taken without an explicit advisor decision.
 func planRunsShip(plan *router.PhasePlan) bool {
 	if plan == nil {
 		return true
@@ -72,9 +69,6 @@ func planRunsShip(plan *router.PhasePlan) bool {
 	return false
 }
 
-// candidatePhase resolves a router-proposed phase string to a runnable Phase:
-// a built-in (via phaseFromRouter) OR a user phase present in the catalog. An
-// unknown string yields "" so enforceNext declines it.
 func (o *Orchestrator) candidatePhase(s string) Phase {
 	if p := phaseFromRouter(s); p != "" {
 		return p
@@ -85,12 +79,6 @@ func (o *Orchestrator) candidatePhase(s string) Phase {
 	return ""
 }
 
-// transitionLegal is the kernel legality gate for a proposed edge. Built-in
-// phases use the hardcoded state-machine graph. A user phase (optional,
-// catalog-defined) is legal iff it makes forward progress in the configured
-// order (cfg.Order) — the router only proposes the next runnable optional, and
-// SpineSatisfiedUpTo independently guards the mandatory anchors, so an optional
-// insertion between anchors cannot skip the spine or reach ship illegitimately.
 func (o *Orchestrator) transitionLegal(from, cand Phase) bool {
 	if decisionOnlyEdge(from, cand) {
 		return false
@@ -98,8 +86,6 @@ func (o *Orchestrator) transitionLegal(from, cand Phase) bool {
 	if from.IsValid() && cand.IsValid() {
 		return o.sm.CanTransition(from, cand)
 	}
-	// A user-phase candidate must be optional (the floor). Leapfrogging a
-	// mandatory anchor is independently blocked by SpineSatisfiedUpTo in the caller.
 	if !cand.IsValid() {
 		spec, ok := o.catalog.Get(string(cand))
 		if !ok || !spec.Optional {
@@ -110,14 +96,6 @@ func (o *Orchestrator) transitionLegal(from, cand Phase) bool {
 	return ci >= 0 && fi >= 0 && ci > fi
 }
 
-// registerMintedPhases registers each advisor-minted phase from the clamped
-// plan, making it BOTH dispatchable (runners map) and routable (catalog +
-// cfg.Order, the same live-read path build-time user phases take). The
-// trust-kernel clamp (envelope/allowed-CLIs) is enforced inside the injected
-// registrar — a rejected config is a loud skip, never a registered dead phase,
-// and a name that collides with a built-in is never clobbered. Best-effort: a
-// nil plan, nil registrar, or empty MintPhases is a no-op (byte-identical
-// legacy behavior).
 func (o *Orchestrator) registerMintedPhases(plan *router.PhasePlan) {
 	if plan == nil || o.registrar == nil || len(plan.MintPhases) == 0 {
 		return
@@ -128,20 +106,11 @@ func (o *Orchestrator) registerMintedPhases(plan *router.PhasePlan) {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q rejected (skipping): %v\n", cfg.Name, err)
 			continue
 		}
-		// The runner-collision check intentionally gates ALL THREE splices
-		// below: a name already in runners (built-in or earlier mint) is left
-		// wholly untouched — never half-registered into catalog/routing only.
 		p := Phase(spec.Name)
 		if _, exists := o.runners[p]; exists {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q clashes with an existing runner — keeping existing\n", spec.Name)
 			continue
 		}
-		// Splice into the three live-read structures: runners (dispatch lookup),
-		// catalog (candidatePhase/transitionLegal recognition), and cfg routing
-		// (Order forward-progress + triggers/enable). Catalog.Merge keeps the
-		// built-in on a name clash, so the splice cannot displace a built-in.
-		// ApplyUserRouting extends o.cfg.Order in place; the mid-cycle RouteInput
-		// copies built below inherit that extended order intentionally.
 		merged, warns := o.catalog.Merge([]phasespec.PhaseSpec{spec})
 		for _, w := range warns {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q: %s\n", spec.Name, w)
@@ -157,11 +126,6 @@ func (o *Orchestrator) registerMintedPhases(plan *router.PhasePlan) {
 	}
 }
 
-// nextInOrder returns the phase immediately following p in the configured
-// order, or PhaseEnd when p is last/absent. Used to resume the normal sequence
-// after a user phase runs. Assumes cfg.Order is the complete registry order
-// (applyRegistry appends every registry phase), so a built-in successor is
-// always present when a registry is loaded.
 func (o *Orchestrator) nextInOrder(p Phase) Phase {
 	i := orderIndex(o.cfg.Order, string(p))
 	if i < 0 || i+1 >= len(o.cfg.Order) {
@@ -170,7 +134,6 @@ func (o *Orchestrator) nextInOrder(p Phase) Phase {
 	return Phase(o.cfg.Order[i+1])
 }
 
-// orderIndex returns the position of phase in order, or -1 if absent.
 func orderIndex(order []string, phase string) int {
 	for i, p := range order {
 		if p == phase {
@@ -180,10 +143,6 @@ func orderIndex(order []string, phase string) int {
 	return -1
 }
 
-// worktreePhase reports whether next WRITES SOURCE — the write axis the
-// role-gate, tree-diff guard, and build-commit normalize key off. Built-in
-// tdd/build always do; a user phase does iff its spec sets writes_source.
-// Method form (vs the free WorktreePhase) so it consults the injected catalog.
 func (o *Orchestrator) worktreePhase(p Phase) bool {
 	if WorktreePhase(p) {
 		return true
@@ -194,11 +153,6 @@ func (o *Orchestrator) worktreePhase(p Phase) bool {
 	return false
 }
 
-// worktreeReadOnly is the complement of worktreePhase for the dispatch
-// request: a phase without write permission gets its worktree fenced by the
-// runner (PhaseRequest.WorktreeReadOnly). One predicate, both readings —
-// the role-gate/tree-diff axis and the fence cannot disagree about who may
-// write.
 func (o *Orchestrator) worktreeReadOnly(p Phase) bool { return !o.worktreePhase(p) }
 
 func (o *Orchestrator) withWorktreeFence(req PhaseRequest, next Phase, cs CycleState) PhaseRequest {
@@ -207,27 +161,15 @@ func (o *Orchestrator) withWorktreeFence(req PhaseRequest, next Phase, cs CycleS
 	return req
 }
 
-// leakRecoverablePhase reports whether next is eligible for main-tree leak
-// recovery: the union of the fixed active-worktree set (LeakRecoverablePhase)
-// with worktreePhase.
 func (o *Orchestrator) leakRecoverablePhase(p Phase) bool {
 	return LeakRecoverablePhase(p) || o.worktreePhase(p)
 }
 
-// phaseFromRouter denormalizes a router phase string back to a core.Phase.
-// The router speaks canonical "retrospective"/"end"; core uses "retro"/
-// PhaseEnd. An unknown string yields "" so enforceNext declines it.
-//
-// The core↔registry vocabulary skew this bridges is a DECIDED permanent
-// boundary. Do NOT "unify" PhaseRetro's wire string — "retro" is the
-// trust-kernel serialized identity in state.json/ledger (pinned by
-// cyclestate.TestPhaseConstants), so the converter stays; the rename does not.
-// See ADR-0060.
 func phaseFromRouter(s string) Phase {
 	switch s {
 	case "retrospective":
 		return PhaseRetro
-	case router.PhaseEnd: // "end" — same string as core.PhaseEnd
+	case router.PhaseEnd:
 		return PhaseEnd
 	}
 	p := Phase(s)
@@ -237,28 +179,10 @@ func phaseFromRouter(s string) Phase {
 	return p
 }
 
-// canonicalCatalogName maps a core.Phase to its catalog/registry key, bridging
-// the core↔router vocabulary skew (PhaseRetro stringifies to "retro" but the
-// registry names the phase "retrospective"). It is the inverse of
-// phaseFromRouter's alias cases — used by specFor so a descriptor lookup cannot
-// silently miss on the skew and fall through to a wrong edge. The skew is a
-// decided permanent boundary.
-// See ADR-0058, ADR-0060.
 func canonicalCatalogName(p Phase) string {
-	// ONE rule, owned by phasecontract: the registry key for a core phase
-	// name. Keeping a second copy here is how an alias added to one side
-	// silently ungated a phase on the other.
-	// See ADR-0100.
 	return phasecontract.RegistryKey(string(p))
 }
 
-// recallForPlan builds the recall-memory context for the advisor's plan: the
-// short reason of the most recent failure and the prior lessons that match it.
-// It is the orchestrator's I/O (a KB lookup), kept out of the pure advisor so the
-// advisor only renders. Returns ("", nil) when no KB is wired or there is no
-// failure history — the legacy no-recall behavior. An empty lesson result is the
-// novel-failure signal (nothing in the corpus matches yet), surfaced as the
-// reason-without-lessons case.
 func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord, goal ...string) (lastReason string, lessons []string) {
 	if o.kb == nil {
 		return "", nil
@@ -276,7 +200,6 @@ func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord
 		Keywords:    strings.Fields(query),
 	})
 	if err != nil {
-		// Recall is best-effort: a KB read error must never block planning.
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN KB recall lookup failed (continuing without lessons): %v\n", err)
 		return latest.Summary, nil
 	}
@@ -287,10 +210,6 @@ func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord
 	return latest.Summary, digests
 }
 
-// resolvedShipFloor returns the integrity floor to clamp the advisor's plan to:
-// the user-configured floor when set, else the router's safe structural
-// default ({tdd,build,audit}). The router self-seals the non-removable evaluator
-// either way, so this never returns a floor that could reach ship without audit.
 func (o *Orchestrator) resolvedShipFloor() []string {
 	if len(o.shipFloor) > 0 {
 		return o.shipFloor
@@ -298,12 +217,6 @@ func (o *Orchestrator) resolvedShipFloor() []string {
 	return router.DefaultShipFloor()
 }
 
-// phaseCardsFromCatalog projects the composable phases (Plan/Build/Evaluate
-// archetypes) of the catalog into advisor-facing PhaseCards, so the advisor can
-// SELECT a pre-defined phase instead of minting a new one (prefer reuse — DRY
-// at the agent level). Control-archetype phases (ship/retro/memo/debugger)
-// are kernel-managed, not advisor-composed, so they are omitted. Order follows
-// the catalog's registry order for a deterministic, prompt-cache-friendly result.
 func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
 	var cards []router.PhaseCard
 	for _, spec := range cat.All() {
@@ -311,10 +224,6 @@ func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
 		if role == phasespec.RoleControl {
 			continue
 		}
-		// A phase may decline its SELECT slot (phasespec.CatalogOnDemand) while
-		// staying installed and dispatchable. It is still named in the prompt's
-		// on-demand index (onDemandCatalogNames), so declining costs
-		// discoverability of METADATA, never of existence.
 		if spec.IsOnDemand() {
 			continue
 		}
@@ -351,9 +260,6 @@ func carryoverTodosForAdvisor(todos []CarryoverTodo) []router.CarryoverTodo {
 	return out
 }
 
-// entriesFromRecords converts FailedRecord values into failureadapter.Entry.
-// Inlined here (rather than exposed from failureadapter) to avoid a
-// circular import between core and failureadapter.
 func entriesFromRecords(records []FailedRecord) []failureadapter.Entry {
 	out := make([]failureadapter.Entry, len(records))
 	for i, r := range records {
@@ -376,21 +282,10 @@ func entriesFromRecords(records []FailedRecord) []failureadapter.Entry {
 	return out
 }
 
-// backfillArtifactPath returns the absolute path to the backfilled artifact
-// file. The filename comes from phasecontract.ArtifactFilename — the SSOT the
-// agent's own deliverable contract is projected from, including the
-// "<phase>-report.md" fallback for unregistered/NoArtifact phases — instead of
-// a switch literal that had to be kept in sync with backfill.phaseHeaders by
-// hand.
 func backfillArtifactPath(workspacePath, phase string) string {
 	return filepath.Join(workspacePath, phasecontract.ArtifactFilename(phase))
 }
 
-// onDemandCatalogNames lists the phases that declined a SELECT slot, in catalog
-// order. Rendered as ONE line beneath the menu: the point of declining is to
-// stop excess cards crowding out the enriched slots, so re-listing them as
-// cards would undo the fix. Control phases are absent here for the same reason they
-// are absent from the menu — they are kernel-managed, never advisor-composed.
 func onDemandCatalogNames(cat phasespec.Catalog) []string {
 	var out []string
 	for _, spec := range cat.All() {

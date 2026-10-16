@@ -23,8 +23,6 @@ func gitInRepo(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// newRepoWithBaseCommit creates a temp git repo with one base commit and returns
-// (repoDir, baseSHA).
 func newRepoWithBaseCommit(t *testing.T) (string, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -42,7 +40,6 @@ func newRepoWithBaseCommit(t *testing.T) (string, string) {
 func TestNormalizeWorktreeToBase_UncommitsBuilderCommit(t *testing.T) {
 	t.Parallel()
 	dir, base := newRepoWithBaseCommit(t)
-	// Simulate the builder: write a feature file + commit it [worktree-build].
 	if err := os.WriteFile(filepath.Join(dir, "feature.go"), []byte("package x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +66,7 @@ func TestNormalizeWorktreeToBase_NoopWhenUncommitted(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "pending.go"), []byte("package x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	gitInRepo(t, dir, "add", "-A") // staged but NOT committed
+	gitInRepo(t, dir, "add", "-A")
 
 	normalizeWorktreeToBase(context.Background(), dir, base, io.Discard)
 

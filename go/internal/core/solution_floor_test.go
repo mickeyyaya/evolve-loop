@@ -27,9 +27,6 @@ func writeWS(t *testing.T, ws, name, body string) {
 	}
 }
 
-// documentWorkspace declares a document cycle bound to one task the way the
-// live pipeline does: triage's report header (authoritative kind) + its
-// decision's top_n.
 func documentWorkspace(t *testing.T, kind string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -46,7 +43,7 @@ func TestSolutionFloorChecks(t *testing.T) {
 	ctx := context.Background()
 
 	ws := documentWorkspace(t, "document")
-	wt := t.TempDir() // builder delivered nothing
+	wt := t.TempDir()
 	fails := fn(ctx, ReviewInput{Phase: string(PhaseBuild), Workspace: ws, Worktree: wt})
 	if len(fails) == 0 || !strings.Contains(strings.Join(fails, "\n"), "solutions/netflix-margin") {
 		t.Fatalf("document cycle with no deliverable must be rejected naming the slug; got %v", fails)

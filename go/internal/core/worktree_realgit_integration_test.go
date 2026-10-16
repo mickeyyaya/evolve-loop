@@ -133,7 +133,6 @@ func TestGitWorktree_Cleanup_UnmergedBranchSurvives(t *testing.T) {
 	}
 	branch := runscope.New(runscope.LaneFromRoot(root), "", 42).CycleBranch()
 
-	// Diverge: commit inside the worktree, never merged back to root's HEAD.
 	if err := os.WriteFile(filepath.Join(wt, "unshipped.txt"), []byte("wip"), 0o644); err != nil {
 		t.Fatal(err)
 	}

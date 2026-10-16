@@ -167,9 +167,6 @@ func releasedAContinuation(ctx context.Context, worktree, consumedPath string, g
 	return len(item.Released) > 0, nil
 }
 
-// pendRebasedChange soft-resets the carrier onto the commit it sits on, so the change is pending again: the
-// shape Audit binds and ship commits. After a clean replay that is the new base; after an aborted one it is
-// the audited base, which restores the audited shape.
 func pendRebasedChange(ctx context.Context, worktree string, git gitFn) error {
 	onto, err := forkPoint(ctx, git, worktree)
 	if err != nil {

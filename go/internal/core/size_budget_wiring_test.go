@@ -62,17 +62,12 @@ func TestBuildBudgetScale_AbsentReportIsUnscaled(t *testing.T) {
 	if got := cr.buildBudgetScale(); got != 1.0 {
 		t.Errorf("no report → 1.0, got %v", got)
 	}
-	// Triage not completed yet: size unknown → unscaled (dispatch before triage
-	// must never scale).
 	cr2 := sizeBudgetRun(t, "cycle_size_estimate: large\n", nil)
 	if got := cr2.buildBudgetScale(); got != 1.0 {
 		t.Errorf("triage not completed → 1.0, got %v", got)
 	}
 }
 
-// reportWriterRunner wraps a phase's fakeRunner to write an artifact into the
-// LIVE workspace during the cycle — how a real triage phase delivers its
-// report, so the composed proof exercises the true artifact path.
 type reportWriterRunner struct {
 	*fakeRunner
 	fileName string

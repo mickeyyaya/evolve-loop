@@ -1,8 +1,5 @@
 package core
 
-// These run against a REAL git repo, because the whole seam is a git ancestry
-// question and a faked runner would prove only that the fake agrees with itself.
-
 import (
 	"context"
 	"io"
@@ -15,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// gitRepoWithCommits initialises a repo and returns a helper that commits an
-// empty commit with the given subject, returning its SHA. Empty commits are
-// enough: the guard reads subjects and ancestry, never trees.
 func gitRepoWithCommits(t *testing.T) (dir string, commit func(subject string, body ...string) string) {
 	t.Helper()
 	dir = t.TempDir()

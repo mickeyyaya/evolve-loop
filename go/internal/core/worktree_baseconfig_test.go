@@ -13,7 +13,6 @@ func TestGitWorktree_BaseFromConfigNotEnv(t *testing.T) {
 		t.Errorf("base() with override = %q, want /cfg/base (env must be ignored)", got)
 	}
 
-	// No override ⇒ built-in default, env still ignored.
 	wantDefault := filepath.Join("/proj", ".evolve", "worktrees")
 	if got := (gitWorktree{}).base("/proj"); got != wantDefault {
 		t.Errorf("default base() = %q, want %q", got, wantDefault)

@@ -9,7 +9,6 @@ type (
 	ShipErrorCode  = shiperr.ShipErrorCode
 )
 
-// ShipClassTransient and its siblings are the ship-error severity vocabulary.
 const (
 	ShipClassTransient    = shiperr.ShipClassTransient
 	ShipClassPrecondition = shiperr.ShipClassPrecondition
@@ -17,7 +16,6 @@ const (
 	ShipClassConfig       = shiperr.ShipClassConfig
 )
 
-// StageVerifyExplanation and its siblings are the ship stages.
 const (
 	StageVerifyExplanation = shiperr.StageVerifyExplanation
 	StageVerifySelfSHA     = shiperr.StageVerifySelfSHA
@@ -27,8 +25,6 @@ const (
 	StageArgs              = shiperr.StageArgs
 )
 
-// CodeExplanationDocumentation and its siblings are the precise failure
-// identities, grouped by stage.
 const (
 	CodeExplanationDocumentation = shiperr.CodeExplanationDocumentation
 
@@ -84,10 +80,8 @@ const (
 	CodeUnknown = shiperr.CodeUnknown
 )
 
-// NewShipError re-exports shiperr.NewShipError.
 func NewShipError(code ShipErrorCode, class ShipErrorClass, stage ShipStage, message string, debugKV ...string) *ShipError {
 	return shiperr.NewShipError(code, class, stage, message, debugKV...)
 }
 
-// AsShipError re-exports shiperr.AsShipError.
 func AsShipError(err error) (*ShipError, bool) { return shiperr.AsShipError(err) }

@@ -13172,3 +13172,49 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // through the mandatory-explanation wrapper and chain nesting. Introspection
 // for composition-root wiring tests (mirrors ThroughputRecorderWired).
 ```
+
+## comment-zero core-6
+
+### `go/internal/core/system_failure.go:97` — above `func (o *Orchestrator) detectVerdictIncoherence(ctx context.Context, cs CycleState, finalVerdict string) (sig *SystemFai…`
+
+```text
+// detectVerdictIncoherence is the ADR-0072 Go floor for the verdict-incoherence
+// category: the deterministic, non-negotiable check that catches a pipeline
+// forging a verdict. It reads the cycle's own on-disk phase artifacts and, if
+// the recorded verdict is FAIL/WARN while both are green, returns a
+// system-failure signal; it fires regardless of orchestrator judgment or
+// strict_audit. The other floor category, infra-systemic, is enforced
+// elsewhere (the resumable quota-pause path) — not this function.
+```
+
+### `go/internal/core/transition_oracle_test.go:48` — above `var legalityGolden = map[Phase][]Phase{`
+
+```text
+// legalityGolden freezes the legality graph: legalityGolden[from] is the exact
+// set of `to` phases for which CanTransition(from,to) is true at HEAD. This
+// graph is a config-INDEPENDENT trust anchor (ADR-0058 §1) and must never drift.
+```
+
+### `go/internal/core/worktree_collision_integration_test.go:44` — above `sharedBase := t.TempDir()`
+
+```text
+// Force a SHARED worktree base for BOTH roots — the strongest form of the bug:
+// without the lane, both runs target the same dir (<shared>/cycle-1) AND the
+// same global branch (cycle-1), exercising both collision axes at once.
+```
+
+### `go/internal/core/worktree_retry_consolidate_test.go:3` — above `import (`
+
+```text
+// Fixtures (initRetryRepo, failingAddRunner) and the sleep no-op init() are
+// shared with worktree_retry_test.go — PR #401's file, which must stay green
+// and unmodified: "existing tests staying green" is part of this task's
+// acceptance criteria, so the consolidation may not break core's
+// worktreeAddAttempts / worktreeAddRetrySleep identifiers.
+```
+
+### `go/internal/core/worktree_test.go:106` — above `st := &fakeStorage{state: State{LastCycleNumber: 9}}`
+
+```text
+// cycle 10
+```

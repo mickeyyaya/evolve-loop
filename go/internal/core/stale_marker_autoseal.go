@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// markerShouldAutoseal decides whether a stranded marker must be auto-sealed.
 func markerShouldAutoseal(ownerPID int, hasPID bool, alive func(int) bool) bool {
 	if !hasPID {
 		return true
@@ -18,11 +17,6 @@ func markerShouldAutoseal(ownerPID int, hasPID bool, alive func(int) bool) bool 
 	return !alive(ownerPID)
 }
 
-// AutosealStaleMarker seals the in-progress cycle described by
-// <EvolveDir>/cycle-state.json when its owner PID is dead, clearing the
-// role-gate block so the next dispatch/inbox write proceeds. Returns
-// sealed=false with a nil error when the live owner must be left alone, and
-// ErrNothingToReset when there is no marker to seal.
 func AutosealStaleMarker(ctx context.Context, ledger ledgerAppender, opts SealOptions, alive func(int) bool) (SealResult, bool, error) {
 	csPath := ResolveCycleStatePath(opts.EvolveDir)
 	raw, err := os.ReadFile(csPath)
@@ -40,8 +34,6 @@ func AutosealStaleMarker(ctx context.Context, ledger ledgerAppender, opts SealOp
 		return SealResult{}, false, ErrNothingToReset
 	}
 
-	// Without a lease naming the owner we cannot prove it dead, so we defer to
-	// the operator's unfinished-cycle guard rather than tear the cycle down.
 	workspace := strFromAny(cs["workspace_path"])
 	if workspace == "" {
 		return SealResult{}, false, nil

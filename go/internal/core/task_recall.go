@@ -9,11 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 )
 
-// CtxKeyRecallMemory carries bounded, evidence-only lesson digests to phase prompts.
 const CtxKeyRecallMemory = "recalled_lessons"
 
-// seedTaskRecall retrieves from the existing durable corpus on BOTH dispatch
-// paths. It deliberately does not persist a second mutable memory summary.
 func (o *Orchestrator) seedTaskRecall(ctx context.Context, base map[string]string, next Phase, cs CycleState, projectRoot string) map[string]string {
 	if o.kb == nil || (next != PhaseScout && !taskContractPhase(next)) {
 		return base
@@ -31,8 +28,6 @@ func (o *Orchestrator) seedTaskRecall(ctx context.Context, base map[string]strin
 		fmt.Fprintf(&b, "Memory unavailable: %v", err)
 	} else {
 		for _, lesson := range found {
-			// Reuse the existing rune-safe prompt bound; provenance stays visible
-			// even when an unusually long lesson needs shortening.
 			fmt.Fprintf(&b, "%s [source: %s]\n", truncateRunes(lesson.Digest(), maxGoalTextChars), lesson.Path)
 		}
 	}

@@ -8,13 +8,6 @@ import (
 	"testing"
 )
 
-// Uses the package gitRunner seam (git_seam_test.go / worktree_branchdelete_test.go
-// style) — package core cannot import test/fixtures.FakeExec (import cycle).
-
-// laneBaseFake scripts per-subcommand git responses: an origin-probe answer, a
-// scriptable fetch outcome, and success for everything else. It records every
-// call in order so the tests can assert on SEQUENCE (fetch strictly before
-// worktree add), which a single-response recorder cannot express.
 type laneBaseFake struct {
 	calls     []gitCall
 	hasOrigin bool
@@ -28,8 +21,6 @@ func (f *laneBaseFake) run(_ context.Context, name, dir string, args, _ []string
 		return 0, nil
 	}
 	switch args[0] {
-	// Origin probe — accept any of the reasonable plumbing forms so the test
-	// pins the BEHAVIOUR (does a remote exist?) and not one implementation.
 	case "remote", "config", "ls-remote":
 		if f.hasOrigin {
 			if outw != nil {
@@ -37,7 +28,7 @@ func (f *laneBaseFake) run(_ context.Context, name, dir string, args, _ []string
 			}
 			return 0, nil
 		}
-		return 1, nil // no origin configured
+		return 1, nil
 	case "fetch":
 		if f.fetchErr != nil {
 			return -1, f.fetchErr
@@ -57,8 +48,6 @@ func useLaneBaseFake(t *testing.T, f *laneBaseFake) {
 	t.Cleanup(func() { gitRunner = orig })
 }
 
-// findCall returns the index of the first recorded call whose args start with
-// the given prefix, or -1.
 func (f *laneBaseFake) findCall(prefix ...string) int {
 	for i, c := range f.calls {
 		if len(c.args) < len(prefix) {
@@ -78,8 +67,6 @@ func (f *laneBaseFake) findCall(prefix ...string) int {
 	return -1
 }
 
-// laneBaseProvisioner returns a gitWorktree whose base is an absolute temp dir
-// (Create refuses a relative base) plus a temp projectRoot.
 func laneBaseProvisioner(t *testing.T) (gitWorktree, string) {
 	t.Helper()
 	return gitWorktree{baseOverride: filepath.Join(t.TempDir(), "worktrees")}, t.TempDir()
@@ -179,9 +166,6 @@ func TestGitWorktree_Create_ReuseSkipsFetch(t *testing.T) {
 	useLaneBaseFake(t, f)
 	g, root := laneBaseProvisioner(t)
 
-	// First call provisions; the fake git does not create the directory, but
-	// linkGuardDeps does (go/bin + .evolve under the worktree), which is enough
-	// for the os.Stat + rev-parse reuse probe to succeed on the second call.
 	first, err := g.Create(root, 1196)
 	if err != nil {
 		t.Fatalf("Create (provision): %v", err)
