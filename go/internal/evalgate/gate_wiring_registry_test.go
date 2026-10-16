@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// pinnedGateWirings maps each gate in NewReviewer's slice to the test that pins it there.
 var pinnedGateWirings = map[string]string{
 	"predicate-quality":             "TestQualityGate_WiredIntoReviewer",
 	"floor-binding":                 "TestFloorBindingGate_WiredIntoReviewer",

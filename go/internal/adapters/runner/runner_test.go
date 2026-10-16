@@ -1,6 +1,3 @@
-// Package runner provides the in-process and subprocess PhaseRunner
-// adapters. The orchestrator never knows which is in play — that's
-// the Approach C independence guarantee from plan §2.
 package runner
 
 import (
@@ -14,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// fakePhase implements core.PhaseRunner — used as the in-process default.
 type fakePhase struct {
 	name   string
 	gotReq core.PhaseRequest
@@ -30,7 +26,6 @@ func (f *fakePhase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseR
 	return f.resp, f.err
 }
 
-// scriptedCmd is the CmdRunner-shaped stub for SubprocessRunner tests.
 type scriptedCmd struct {
 	stdout   string
 	stderr   string
@@ -53,8 +48,6 @@ func (s *scriptedCmd) runner() CmdRunner {
 	}
 }
 
-// TestSubprocess_HappyPath — exit 0, valid response JSON on stdout,
-// adapter parses + returns the typed response.
 func TestSubprocess_HappyPath(t *testing.T) {
 	resp := core.PhaseResponse{
 		Phase: "scout", Verdict: "PASS", CostUSD: 0.5,
@@ -77,15 +70,11 @@ func TestSubprocess_HappyPath(t *testing.T) {
 	if got.CostUSD != 0.5 {
 		t.Errorf("CostUSD=%g", got.CostUSD)
 	}
-	// Argv: binary name only (no extra flags).
 	if len(sc.gotArgs) == 0 || sc.gotArgs[0] != "/bin/phase-scout" {
 		t.Errorf("argv=%v, want first=/bin/phase-scout", sc.gotArgs)
 	}
 }
 
-// TestSubprocess_RequestSentAsStdinJSON — the PhaseRequest is
-// JSON-serialized to the subprocess stdin so external phase binaries
-// can be written in any language.
 func TestSubprocess_RequestSentAsStdinJSON(t *testing.T) {
 	resp := core.PhaseResponse{Verdict: "PASS"}
 	jsonOut, _ := json.Marshal(resp)
@@ -103,8 +92,6 @@ func TestSubprocess_RequestSentAsStdinJSON(t *testing.T) {
 	}
 }
 
-// TestSubprocess_NonZeroExit_Errors — exit ≠ 0 must surface as an
-// error including the captured stderr for diagnostics.
 func TestSubprocess_NonZeroExit_Errors(t *testing.T) {
 	sc := &scriptedCmd{exitCode: 1, stderr: "subagent panic", stdout: ""}
 	r := NewSubprocess("scout", "/x", sc.runner())
@@ -117,8 +104,6 @@ func TestSubprocess_NonZeroExit_Errors(t *testing.T) {
 	}
 }
 
-// TestSubprocess_MalformedJSON_Errors — stdout that isn't valid
-// PhaseResponse JSON must surface, not silently zero-value.
 func TestSubprocess_MalformedJSON_Errors(t *testing.T) {
 	sc := &scriptedCmd{exitCode: 0, stdout: "not json at all"}
 	r := NewSubprocess("scout", "/x", sc.runner())
@@ -128,9 +113,6 @@ func TestSubprocess_MalformedJSON_Errors(t *testing.T) {
 	}
 }
 
-// TestSubprocess_RunnerError_Propagated — CmdRunner returning a
-// non-nil error (e.g., binary missing) must wrap into the adapter's
-// error.
 func TestSubprocess_RunnerError_Propagated(t *testing.T) {
 	sc := &scriptedCmd{err: errors.New("exec: file not found")}
 	r := NewSubprocess("scout", "/no/such/bin", sc.runner())
@@ -140,8 +122,6 @@ func TestSubprocess_RunnerError_Propagated(t *testing.T) {
 	}
 }
 
-// TestSubprocess_Name — Name() returns the phase name configured at
-// construction.
 func TestSubprocess_Name(t *testing.T) {
 	r := NewSubprocess("triage", "/x", (&scriptedCmd{}).runner())
 	if r.Name() != "triage" {
@@ -149,8 +129,6 @@ func TestSubprocess_Name(t *testing.T) {
 	}
 }
 
-// TestPerPhase_EnvUnset_ReturnsInProc — when EVOLVE_PHASE_<NAME>_BIN
-// is unset, PerPhase returns the in-process PhaseRunner verbatim.
 func TestPerPhase_EnvUnset_ReturnsInProc(t *testing.T) {
 	t.Setenv("EVOLVE_PHASE_SCOUT_BIN", "")
 	inproc := &fakePhase{name: "scout", resp: core.PhaseResponse{Verdict: "PASS"}}
@@ -158,15 +136,12 @@ func TestPerPhase_EnvUnset_ReturnsInProc(t *testing.T) {
 	if got != inproc {
 		t.Errorf("PerPhase returned different runner; want identity-equal to inproc")
 	}
-	// Sanity: a Run() must reach the fake.
 	_, _ = got.Run(context.Background(), core.PhaseRequest{Cycle: 1})
 	if inproc.runs != 1 {
 		t.Errorf("inProc.runs=%d, want 1", inproc.runs)
 	}
 }
 
-// TestPerPhase_EnvSet_ReturnsSubprocess — when EVOLVE_PHASE_<NAME>_BIN
-// is set, PerPhase returns a SubprocessRunner that forks that binary.
 func TestPerPhase_EnvSet_ReturnsSubprocess(t *testing.T) {
 	t.Setenv("EVOLVE_PHASE_SCOUT_BIN", "/usr/local/bin/phase-scout")
 	resp := core.PhaseResponse{Phase: "scout", Verdict: "PASS"}
@@ -185,15 +160,11 @@ func TestPerPhase_EnvSet_ReturnsSubprocess(t *testing.T) {
 	if out.Verdict != "PASS" {
 		t.Errorf("Verdict=%q, want PASS", out.Verdict)
 	}
-	// inproc must NOT have been called.
 	if inproc.runs != 0 {
 		t.Errorf("inproc.runs=%d, want 0 (subprocess took over)", inproc.runs)
 	}
 }
 
-// TestPerPhase_NormalizesPhaseName — env-var lookup uppercases the
-// phase name to match the CLAUDE.md convention EVOLVE_PHASE_<NAME>_BIN
-// where <NAME> is uppercase.
 func TestPerPhase_NormalizesPhaseName(t *testing.T) {
 	t.Setenv("EVOLVE_PHASE_BUILD_BIN", "/x")
 	inproc := &fakePhase{name: "build"}
@@ -203,23 +174,17 @@ func TestPerPhase_NormalizesPhaseName(t *testing.T) {
 	}
 }
 
-// TestNewSubprocess_NilRunnerUsesExec — production wiring path.
-// Can't easily test exec without a binary, but verify the constructor
-// doesn't panic.
 func TestNewSubprocess_NilRunnerUsesExec(t *testing.T) {
 	r := NewSubprocess("scout", "/x", nil)
 	if r == nil {
 		t.Fatal("NewSubprocess returned nil")
 	}
-	// Try Run — will fail because /x doesn't exist, but it shouldn't panic.
 	_, err := r.Run(context.Background(), core.PhaseRequest{})
 	if err == nil {
 		t.Error("expected error from missing binary")
 	}
 }
 
-// TestSubprocess_LongStderrTruncated — error message must be bounded.
-// 400-char tail is what fits comfortably in operator logs.
 func TestSubprocess_LongStderrTruncated(t *testing.T) {
 	big := strings.Repeat("E", 1000)
 	sc := &scriptedCmd{exitCode: 1, stderr: big}
@@ -236,9 +201,7 @@ func TestSubprocess_LongStderrTruncated(t *testing.T) {
 	}
 }
 
-// TestExecRunner_ExitsWithCode — drives execRunner's ExitError branch.
 func TestExecRunner_ExitsWithCode(t *testing.T) {
-	// /usr/bin/false: exits 1 with no output, POSIX universal.
 	code, err := execRunner(context.Background(), "/usr/bin/false", nil, nil, io.Discard, io.Discard)
 	if err != nil {
 		t.Errorf("execRunner /usr/bin/false: err=%v, want nil", err)
@@ -248,7 +211,6 @@ func TestExecRunner_ExitsWithCode(t *testing.T) {
 	}
 }
 
-// TestExecRunner_BinaryMissing — non-existent binary → err non-nil.
 func TestExecRunner_BinaryMissing(t *testing.T) {
 	_, err := execRunner(context.Background(), "/no/such/binary/zzz", nil, nil, io.Discard, io.Discard)
 	if err == nil {
@@ -256,8 +218,6 @@ func TestExecRunner_BinaryMissing(t *testing.T) {
 	}
 }
 
-// TestExecRunner_Success — drive the (return 0, nil) happy-path
-// branch with /usr/bin/true (POSIX universal exit-0 no-op).
 func TestExecRunner_Success(t *testing.T) {
 	code, err := execRunner(context.Background(), "/usr/bin/true", nil, nil, io.Discard, io.Discard)
 	if err != nil {
@@ -268,7 +228,6 @@ func TestExecRunner_Success(t *testing.T) {
 	}
 }
 
-// TestSubprocess_ContextCancel — canceled ctx propagates.
 func TestSubprocess_ContextCancel(t *testing.T) {
 	runner := func(ctx context.Context, name string, args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		return 0, ctx.Err()

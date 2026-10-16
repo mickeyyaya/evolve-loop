@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-// SelectedSlugs returns the sorted, distinct kebab-case slugs a scout report
-// selects; nil means the report claims none.
 func SelectedSlugs(report string) []string {
 	set := map[string]struct{}{}
 	for _, s := range decisionTraceSelected(report) {
@@ -62,19 +60,10 @@ func decisionTraceSelected(report string) []string {
 
 var nextH2RE = regexp.MustCompile(`(?m)^## `)
 
-// slugLineRE matches a "- **Slug:** <kebab>" bullet (bullet * or -). The slug may
-// be backticked, the form real reports also emit. That widening is a deliberate
-// capability increase: measured 2026-09-15, it changes the SelectedSlugs union on
-// 6 of 84 cycle-16xx reports, and 2 become newly blockable at Gate A because their
-// eval is absent: cycle-1664 (settle-wait-stability-shortcircuit) and cycle-1669
-// (verdict-tool-call-claudep). TestSlugLineWideningIsNotBlockingNeutral pins it.
 var slugLineRE = regexp.MustCompile(`(?m)^[*\-]\s*\*\*Slug:\*\*\s*` + "`" + `?([a-z0-9][a-z0-9-]*)`)
 
-// htmlCommentRE lets a "<!-- none selected -->" placeholder read as an empty section.
 var htmlCommentRE = regexp.MustCompile(`(?s)<!--.*?-->`)
 
-// selectedTasksBody is the one "## Selected Tasks" bound that the parse and the
-// parse-miss signal share, so a miss is judged over exactly the span parsed.
 func selectedTasksBody(report string) (string, bool) {
 	const heading = "## Selected Tasks"
 	start := strings.Index(report, heading)
@@ -104,8 +93,6 @@ func selectedTaskSlugs(report string) []string {
 	return slugBullets(body)
 }
 
-// SelectedTasksParseMiss reports a "## Selected Tasks" section that has content
-// but yields no slug: format drift, not convergence.
 func SelectedTasksParseMiss(report string) bool {
 	body, ok := selectedTasksBody(report)
 	if !ok {
@@ -123,13 +110,11 @@ func fencedAfterHeading(report, heading string) (string, bool) {
 		return "", false
 	}
 	rest := report[hi+len(heading):]
-	// Anchored at a line start so an inline triple-backtick span in prose is not a fence.
 	open := strings.Index(rest, "\n```")
 	if open < 0 {
 		return "", false
 	}
 	after := rest[open+len("\n```"):]
-	// Skip the opening fence's language tag.
 	if nl := strings.IndexByte(after, '\n'); nl >= 0 {
 		after = after[nl+1:]
 	} else {

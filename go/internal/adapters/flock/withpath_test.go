@@ -9,11 +9,6 @@ import (
 	"testing"
 )
 
-// TestWithPathLock_SerializesConcurrentRMW proves the sidecar path-lock
-// serializes read-modify-write closures across goroutines: N closures each read
-// an int from a data file, increment it, and write it back. Without mutual
-// exclusion the final value is < N (lost updates); WithPathLock must yield
-// exactly N. The lock is taken on "<data>.lock", never the data file itself.
 func TestWithPathLock_SerializesConcurrentRMW(t *testing.T) {
 	dir := t.TempDir()
 	data := filepath.Join(dir, "counter")
@@ -27,7 +22,7 @@ func TestWithPathLock_SerializesConcurrentRMW(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			<-start // release all goroutines at once to maximise contention
+			<-start
 			if err := WithPathLock(data, func() error {
 				raw, err := os.ReadFile(data)
 				if err != nil {
@@ -67,9 +62,6 @@ func TestWithPathLock_ReturnsPathLockError(t *testing.T) {
 	}
 }
 
-// TestPathLock_LocksSidecarNotData verifies PathLock locks "<path>.lock" and
-// leaves the data file untouched — the lock must never open/truncate the file
-// the atomic writers rename-replace.
 func TestPathLock_LocksSidecarNotData(t *testing.T) {
 	dir := t.TempDir()
 	data := filepath.Join(dir, "state.json")

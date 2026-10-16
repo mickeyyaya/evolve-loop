@@ -10,10 +10,6 @@ import (
 	"time"
 )
 
-// makeRepo sets up a fake .evolve/runs/cycle-N/.ephemeral + .evolve/dispatch-logs/
-// layout with controllable mtimes for the .ephemeral dirs and log files.
-//
-// Returns the repo root.
 func makeRepo(t *testing.T, cycles []cycleSpec, logs []logSpec) string {
 	t.Helper()
 	d := t.TempDir()
@@ -23,7 +19,6 @@ func makeRepo(t *testing.T, cycles []cycleSpec, logs []logSpec) string {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", dir, err)
 		}
-		// Drop a file inside so the dir is non-empty.
 		if err := os.WriteFile(filepath.Join(dir, "data.json"), []byte("{}"), 0o644); err != nil {
 			t.Fatalf("write: %v", err)
 		}
@@ -61,11 +56,10 @@ type logSpec struct {
 	modTime time.Time
 }
 
-// === Test 1: stale ephemerals get pruned; fresh ones survive ===============
 func TestRun_PrunesOldEphemerals(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
-	stale := now.Add(-10 * 24 * time.Hour) // 10 days old
-	fresh := now.Add(-2 * 24 * time.Hour)  // 2 days old
+	stale := now.Add(-10 * 24 * time.Hour)
+	fresh := now.Add(-2 * 24 * time.Hour)
 
 	repo := makeRepo(t,
 		[]cycleSpec{
@@ -85,7 +79,6 @@ func TestRun_PrunesOldEphemerals(t *testing.T) {
 	if res.EphemeralPruned != 2 {
 		t.Errorf("EphemeralPruned = %d, want 2", res.EphemeralPruned)
 	}
-	// cycle-1 + cycle-3 should be gone; cycle-2 should remain.
 	for _, name := range []string{"cycle-1", "cycle-3"} {
 		path := filepath.Join(repo, ".evolve", "runs", name, ".ephemeral")
 		if _, err := os.Stat(path); err == nil {
@@ -98,11 +91,10 @@ func TestRun_PrunesOldEphemerals(t *testing.T) {
 	}
 }
 
-// === Dry-run never removes anything ========================================
 func TestRun_DryRun(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	stale := now.Add(-10 * 24 * time.Hour)
-	staleLog := now.Add(-45 * 24 * time.Hour) // exceed 30d log TTL
+	staleLog := now.Add(-45 * 24 * time.Hour)
 	repo := makeRepo(t,
 		[]cycleSpec{{"cycle-1", stale}},
 		[]logSpec{{"batch-old.log", staleLog}},
@@ -119,7 +111,6 @@ func TestRun_DryRun(t *testing.T) {
 		t.Errorf("dry-run counts = (eph=%d log=%d), want (1,1)",
 			res.EphemeralPruned, res.LogFilesPruned)
 	}
-	// Both should still exist on disk.
 	if _, err := os.Stat(filepath.Join(repo, ".evolve", "runs", "cycle-1", ".ephemeral")); err != nil {
 		t.Errorf("dry-run removed ephemeral dir: %v", err)
 	}
@@ -131,16 +122,15 @@ func TestRun_DryRun(t *testing.T) {
 	}
 }
 
-// === Old batch logs get pruned ============================================
 func TestRun_PrunesOldLogs(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
-	stale := now.Add(-45 * 24 * time.Hour) // 45 days
-	fresh := now.Add(-10 * 24 * time.Hour) // 10 days
+	stale := now.Add(-45 * 24 * time.Hour)
+	fresh := now.Add(-10 * 24 * time.Hour)
 
 	repo := makeRepo(t, nil, []logSpec{
 		{"batch-old.log", stale},
 		{"batch-recent.log", fresh},
-		{"unrelated.txt", stale}, // wrong prefix; must NOT prune
+		{"unrelated.txt", stale},
 	})
 	res, err := Run(Options{
 		ProjectRoot: repo,
@@ -163,10 +153,9 @@ func TestRun_PrunesOldLogs(t *testing.T) {
 	}
 }
 
-// === Quiet mode suppresses output unless something was pruned =============
 func TestRun_QuietNoOp(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
-	repo := makeRepo(t, nil, nil) // nothing to prune
+	repo := makeRepo(t, nil, nil)
 	var buf bytes.Buffer
 	_, err := Run(Options{
 		ProjectRoot: repo,
@@ -201,12 +190,10 @@ func TestRun_QuietWithActivity(t *testing.T) {
 	}
 }
 
-// === Custom TTLs honored ===================================================
 func TestRun_CustomTTLs(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	twoDaysAgo := now.Add(-2 * 24 * time.Hour)
 	repo := makeRepo(t, []cycleSpec{{"cycle-1", twoDaysAgo}}, nil)
-	// TTL = 1 day — 2-day-old dir is stale.
 	res, err := Run(Options{
 		ProjectRoot: repo,
 		TrackerTTL:  1 * 24 * time.Hour,
@@ -220,9 +207,8 @@ func TestRun_CustomTTLs(t *testing.T) {
 	}
 }
 
-// === Missing dirs are no-ops (don't error) =================================
 func TestRun_MissingRunsDir(t *testing.T) {
-	repo := t.TempDir() // no .evolve/runs/ at all
+	repo := t.TempDir()
 	res, err := Run(Options{
 		ProjectRoot: repo,
 		Now:         func() time.Time { return time.Now() },
@@ -235,7 +221,6 @@ func TestRun_MissingRunsDir(t *testing.T) {
 	}
 }
 
-// === Empty ProjectRoot → error ============================================
 func TestRun_EmptyProjectRoot(t *testing.T) {
 	_, err := Run(Options{})
 	if err == nil {
@@ -246,7 +231,6 @@ func TestRun_EmptyProjectRoot(t *testing.T) {
 	}
 }
 
-// === Override dirs honored ================================================
 func TestRun_OverrideDirs(t *testing.T) {
 	d := t.TempDir()
 	customRuns := filepath.Join(d, "custom-runs")
@@ -274,14 +258,10 @@ func TestRun_OverrideDirs(t *testing.T) {
 	}
 }
 
-// === Non-dir entries under runs/ are skipped ===============================
-// A stray FILE sitting directly in .evolve/runs/ (not a cycle dir) must be
-// ignored by the cycle walk, exercising the !cycleEntry.IsDir() continue.
 func TestRun_NonDirEntryInRunsSkipped(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	stale := now.Add(-10 * 24 * time.Hour)
 	repo := makeRepo(t, []cycleSpec{{"cycle-1", stale}}, nil)
-	// Drop a loose stale FILE alongside the cycle dir.
 	stray := filepath.Join(repo, ".evolve", "runs", "stray.txt")
 	if err := os.WriteFile(stray, []byte("x"), 0o644); err != nil {
 		t.Fatalf("write stray: %v", err)
@@ -293,7 +273,6 @@ func TestRun_NonDirEntryInRunsSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	// Only the real cycle's .ephemeral counts; the stray file is untouched.
 	if res.EphemeralPruned != 1 {
 		t.Errorf("EphemeralPruned = %d, want 1 (stray file ignored)", res.EphemeralPruned)
 	}
@@ -302,13 +281,10 @@ func TestRun_NonDirEntryInRunsSkipped(t *testing.T) {
 	}
 }
 
-// === Cycle dir without an .ephemeral subdir is skipped =====================
-// Exercises the os.Stat(ephemeralDir) err-or-not-dir continue.
 func TestRun_CycleWithoutEphemeralSkipped(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	stale := now.Add(-10 * 24 * time.Hour)
 	repo := makeRepo(t, []cycleSpec{{"cycle-1", stale}}, nil)
-	// cycle-2 exists but has NO .ephemeral child (just a plain file).
 	bare := filepath.Join(repo, ".evolve", "runs", "cycle-2")
 	if err := os.MkdirAll(bare, 0o755); err != nil {
 		t.Fatalf("mkdir bare: %v", err)
@@ -325,13 +301,10 @@ func TestRun_CycleWithoutEphemeralSkipped(t *testing.T) {
 	}
 }
 
-// === A subdir among the dispatch logs is skipped ===========================
-// Exercises the e.IsDir() continue in the log walk.
 func TestRun_DispatchLogSubdirSkipped(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	stale := now.Add(-45 * 24 * time.Hour)
 	repo := makeRepo(t, nil, []logSpec{{"batch-old.log", stale}})
-	// A directory named like a batch log must be skipped (only regular files prune).
 	subdir := filepath.Join(repo, ".evolve", "dispatch-logs", "batch-dir.log")
 	if err := os.MkdirAll(subdir, 0o755); err != nil {
 		t.Fatalf("mkdir subdir: %v", err)
@@ -351,9 +324,6 @@ func TestRun_DispatchLogSubdirSkipped(t *testing.T) {
 	}
 }
 
-// === RemoveAll failure surfaces as a skipped prune (count not incremented) ==
-// A read-only parent cycle dir makes os.RemoveAll(ephemeralDir) fail; the WARN
-// branch must `continue` WITHOUT incrementing EphemeralPruned.
 func TestRun_EphemeralRemovalFailureNotCounted(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root bypasses directory write permissions")
@@ -362,7 +332,6 @@ func TestRun_EphemeralRemovalFailureNotCounted(t *testing.T) {
 	stale := now.Add(-10 * 24 * time.Hour)
 	repo := makeRepo(t, []cycleSpec{{"cycle-1", stale}}, nil)
 	cycleDir := filepath.Join(repo, ".evolve", "runs", "cycle-1")
-	// Read-only parent → cannot unlink the .ephemeral child.
 	if err := os.Chmod(cycleDir, 0o555); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
@@ -381,8 +350,6 @@ func TestRun_EphemeralRemovalFailureNotCounted(t *testing.T) {
 	}
 }
 
-// === Log-file removal failure surfaces as a skipped prune ===================
-// Read-only dispatch-logs dir makes os.Remove fail; WARN branch must continue.
 func TestRun_LogRemovalFailureNotCounted(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root bypasses directory write permissions")
@@ -409,9 +376,6 @@ func TestRun_LogRemovalFailureNotCounted(t *testing.T) {
 	}
 }
 
-// === A dangling batch-*.log symlink is skipped (os.Stat fails) =============
-// The entry passes the prefix/suffix filter and is not a dir, but os.Stat
-// (which follows the link) errors → the prune-walk must `continue`.
 func TestRun_DanglingLogSymlinkSkipped(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	stale := now.Add(-45 * 24 * time.Hour)
@@ -424,22 +388,15 @@ func TestRun_DanglingLogSymlinkSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	// Only the real stale log prunes; the dangling link is skipped, not counted.
 	if res.LogFilesPruned != 1 {
 		t.Errorf("LogFilesPruned = %d, want 1 (dangling symlink skipped)", res.LogFilesPruned)
 	}
 }
 
-// === nil Now defaults to the real wall clock ===============================
-// Covers the `now == nil → now = time.Now` default. We assert behavior by
-// planting a dir whose mtime is far enough in the past that the real clock,
-// whatever it reads, treats it as stale — pinning that the default clock IS
-// consulted (a missing default would nil-panic).
 func TestRun_NilNowUsesWallClock(t *testing.T) {
-	// 100 days before the actual current time → definitely past the 7d TTL.
 	stale := time.Now().Add(-100 * 24 * time.Hour)
 	repo := makeRepo(t, []cycleSpec{{"cycle-1", stale}}, nil)
-	res, err := Run(Options{ProjectRoot: repo}) // Now left nil
+	res, err := Run(Options{ProjectRoot: repo})
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -448,7 +405,6 @@ func TestRun_NilNowUsesWallClock(t *testing.T) {
 	}
 }
 
-// === Fresh dirs survive (mtime within TTL) =================================
 func TestRun_FreshEphemeralSurvives(t *testing.T) {
 	now := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	repo := makeRepo(t, []cycleSpec{{"cycle-1", now.Add(-1 * time.Hour)}}, nil)

@@ -52,7 +52,6 @@ func TestCheck_TemplateExampleRoundTripsThroughScanner(t *testing.T) {
 	if j := strings.Index(section[len(anchor):], "<!-- ANCHOR:"); j >= 0 {
 		section = section[:len(anchor)+j]
 	}
-	// The template wraps its example in a ````markdown fence; an authored eval carries the bullets at top level.
 	fence := "````markdown"
 	fi := strings.Index(section, fence)
 	if fi < 0 {

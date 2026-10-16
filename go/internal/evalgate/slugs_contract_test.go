@@ -11,11 +11,11 @@ import (
 func TestSlugParserContract(t *testing.T) {
 	union := scoutProducerUnion(t)
 	for _, tok := range []string{
-		"## Selected Tasks", // selectedTaskSlugs section heading
-		"**Slug:**",         // slugLineRE bullet
-		"## Decision Trace", // decisionTraceSelected fenced-block heading
-		"finalDecision",     // decision-trace JSON field
-		"selected",          // the finalDecision value the parser matches
+		"## Selected Tasks",
+		"**Slug:**",
+		"## Decision Trace",
+		"finalDecision",
+		"selected",
 	} {
 		if !strings.Contains(union, tok) {
 			t.Errorf("scout producer templates no longer declare %q — SelectedSlugs (Gate A's block input) "+
@@ -24,8 +24,6 @@ func TestSlugParserContract(t *testing.T) {
 	}
 }
 
-// scoutProducerUnion reads agents/evolve-scout*.md relative to this file, so it
-// does not depend on the working directory.
 func scoutProducerUnion(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)

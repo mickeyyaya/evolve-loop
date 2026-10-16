@@ -12,16 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliadmit"
 )
 
-// setAmpXDG isolates slot files to a per-test temp dir so amplification tests
-// cannot collide with each other or with real slot files.
 func setAmpXDG(t *testing.T) {
 	t.Helper()
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
 }
 
-// TestAcquireAmplify_DistinctCLIsNoInterference asserts that two goroutines
-// each acquiring a DISTINCT CLI name (both at max=1) do not block each other.
-// Slot files are keyed by CLI name; no cross-name interference is the invariant.
 func TestAcquireAmplify_DistinctCLIsNoInterference(t *testing.T) {
 	setAmpXDG(t)
 
@@ -52,8 +47,6 @@ func TestAcquireAmplify_DistinctCLIsNoInterference(t *testing.T) {
 	}
 }
 
-// TestAcquireAmplify_BurstNAtMaxN asserts that N concurrent callers with max=N
-// all succeed immediately — none should block or be denied.
 func TestAcquireAmplify_BurstNAtMaxN(t *testing.T) {
 	setAmpXDG(t)
 
@@ -72,7 +65,7 @@ func TestAcquireAmplify_BurstNAtMaxN(t *testing.T) {
 				atomic.AddInt64(&failures, 1)
 				return
 			}
-			releases[i] = rel // wg.Done() happens-before wg.Wait(), no data race
+			releases[i] = rel
 		}()
 	}
 	wg.Wait()
@@ -87,9 +80,6 @@ func TestAcquireAmplify_BurstNAtMaxN(t *testing.T) {
 	}
 }
 
-// TestAcquireAmplify_DoubleRelease asserts that calling release() twice is safe:
-// the second call must not panic, and a subsequent Acquire on the same slot must
-// still succeed (proving the slot file is not permanently corrupted).
 func TestAcquireAmplify_DoubleRelease(t *testing.T) {
 	setAmpXDG(t)
 
@@ -97,9 +87,8 @@ func TestAcquireAmplify_DoubleRelease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Acquire: %v", err)
 	}
-	rel() // nominal release
+	rel()
 
-	// Second release must not panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -109,7 +98,6 @@ func TestAcquireAmplify_DoubleRelease(t *testing.T) {
 		rel()
 	}()
 
-	// Slot must be free for a subsequent caller.
 	rel2, err := cliadmit.Acquire(context.Background(), "amp-double-rel", 1, cliadmit.DefaultTTL)
 	if err != nil {
 		t.Errorf("Acquire after double-release must succeed: %v", err)
@@ -118,20 +106,15 @@ func TestAcquireAmplify_DoubleRelease(t *testing.T) {
 	rel2()
 }
 
-// TestAcquireAmplify_PreCancelledContextBlocked asserts that Acquire returns an
-// error immediately when the context is already cancelled AND all slots are full.
-// The implementation must not hang in the backoff loop with a dead context.
 func TestAcquireAmplify_PreCancelledContextBlocked(t *testing.T) {
 	setAmpXDG(t)
 
-	// Hold the only slot so the second Acquire must enter the backoff path.
 	holder, err := cliadmit.Acquire(context.Background(), "amp-precancel", 1, cliadmit.DefaultTTL)
 	if err != nil {
 		t.Fatalf("setup Acquire: %v", err)
 	}
 	defer holder()
 
-	// Cancel the context BEFORE calling Acquire (so it arrives dead at the backoff loop).
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -146,20 +129,15 @@ func TestAcquireAmplify_PreCancelledContextBlocked(t *testing.T) {
 
 	select {
 	case <-done:
-		// good — returned promptly without hanging
 	case <-time.After(2 * time.Second):
 		t.Error("Acquire with pre-cancelled context blocked >2s (must detect dead ctx and return)")
 	}
 }
 
-// TestAcquireAmplify_CorruptedSlotFile asserts that Acquire self-heals when the
-// slot file contains malformed JSON and still admits the caller (readHolders
-// self-healing path noted in the build-report).
 func TestAcquireAmplify_CorruptedSlotFile(t *testing.T) {
 	xdgDir := t.TempDir()
 	t.Setenv("XDG_RUNTIME_DIR", xdgDir)
 
-	// Pre-populate the expected slot file with invalid JSON.
 	slotDir := filepath.Join(xdgDir, "evolve")
 	if err := os.MkdirAll(slotDir, 0o700); err != nil {
 		t.Fatalf("mkdir evolve: %v", err)
@@ -176,8 +154,6 @@ func TestAcquireAmplify_CorruptedSlotFile(t *testing.T) {
 	rel()
 }
 
-// TestAcquireAmplify_MaxTwoThirdBlocking asserts the blocking path with max=2:
-// first two callers admit immediately; the third blocks until one slot is freed.
 func TestAcquireAmplify_MaxTwoThirdBlocking(t *testing.T) {
 	setAmpXDG(t)
 
@@ -203,7 +179,6 @@ func TestAcquireAmplify_MaxTwoThirdBlocking(t *testing.T) {
 		thirdCh <- acqResult{rel, err}
 	}()
 
-	// Allow the third goroutine time to enter the backoff loop.
 	time.Sleep(100 * time.Millisecond)
 
 	select {
@@ -215,10 +190,8 @@ func TestAcquireAmplify_MaxTwoThirdBlocking(t *testing.T) {
 			}
 		}
 	default:
-		// expected: third goroutine is still blocking
 	}
 
-	// Free one slot — the third caller must unblock and succeed.
 	rel1()
 
 	select {

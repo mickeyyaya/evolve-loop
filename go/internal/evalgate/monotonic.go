@@ -6,15 +6,10 @@ import (
 	"strings"
 )
 
-// monotonicClass is the inbox class whose progress accumulates across cycles.
 const monotonicClass = "task-contract-design"
 
-// binaryAbsoluteTargetRe matches a criterion stating where a count must end up
-// ("to <=25", "to at most 25") rather than how far it must move.
 var binaryAbsoluteTargetRe = regexp.MustCompile(`(?i)\bto\s+(?:<=|≤|=<|at most|no more than|fewer than|less than|under|below)\s*\d+`)
 
-// LintMonotonicBinaryTarget returns one finding per absolute-count criterion on
-// a monotonic-class task.
 func LintMonotonicBinaryTarget(class string, criteria []string) []string {
 	if !isMonotonicClass(class) {
 		return nil

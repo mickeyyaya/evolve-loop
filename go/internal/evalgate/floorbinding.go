@@ -38,8 +38,6 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 	}
 	companionPath := filepath.Join(in.Workspace, triagecap.TriageDecisionName())
 	deferred := triagecap.DeferredFloorPackagesDecl(string(artifact), companionPath, targets)
-	// Committed wins over deferred; a declared deferral yields only to a declared commitment.
-	// See ADR-0046.
 	_, deferredDeclared, deferredErr := triagecap.ReadDeferredFloors(companionPath)
 	_, committedDeclared, committedErr := triagecap.ReadDeclaredFloors(companionPath)
 	if err := cmp.Or(deferredErr, committedErr); err != nil {
@@ -53,7 +51,6 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 			for _, pkg := range committed {
 				committedSet[pkg] = true
 			}
-			// [:0:0] makes appends allocate, so a callee-shared backing array is never overwritten.
 			kept := deferred[:0:0]
 			for _, pkg := range deferred {
 				if !committedSet[pkg] {
@@ -73,8 +70,6 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 
 var cycleDirRE = regexp.MustCompile(`^cycle-(\d+)$`)
 
-// cycleNumFromWorkspace parses N from a workspace basename of exactly
-// "cycle-<N>", returning 0 for anything else.
 func cycleNumFromWorkspace(workspace string) int {
 	m := cycleDirRE.FindStringSubmatch(filepath.Base(workspace))
 	if m == nil {
@@ -87,14 +82,10 @@ func cycleNumFromWorkspace(workspace string) int {
 	return n
 }
 
-// pkgPathLitRE matches a package-path literal such as "./internal/core/". A
-// segment never starts with a dot, so "..." and hidden directories never match.
 var pkgPathLitRE = regexp.MustCompile(`^\.?/?(?:internal|cmd|go)(?:/[A-Za-z0-9_][A-Za-z0-9_.-]*)+/?$`)
 
 var floorNameRE = regexp.MustCompile(`(?i)coverage|floor`)
 
-// floorPredicateTargets returns the sorted, distinct package basenames that
-// coverage or floor Test functions name; nil when the file cannot be read or parsed.
 func floorPredicateTargets(predPath string) []string {
 	src, err := os.ReadFile(predPath)
 	if err != nil {
@@ -107,7 +98,6 @@ func floorPredicateTargets(predPath string) []string {
 	seen := map[string]bool{}
 	for _, decl := range f.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		// Only Test functions are predicates; a helper's literals could false-block a healthy cycle.
 		if !ok || fn.Body == nil || !strings.HasPrefix(fn.Name.Name, "Test") || !floorNameRE.MatchString(fn.Name.Name) {
 			continue
 		}

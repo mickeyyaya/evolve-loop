@@ -66,7 +66,7 @@ func TestCheckDiversity_BindsDiversityStructs(t *testing.T) {
 	}
 	negFiles := 0
 	for _, f := range res.Files {
-		var _ EvalDiversity = f // bind the per-file struct type
+		var _ EvalDiversity = f
 		if f.HasNegative {
 			negFiles++
 		}

@@ -16,32 +16,23 @@ import (
 
 const maxRecordBytes = 1 << 20
 
-// Scanner needs room for the newline delimiter in addition to the largest
-// record Append accepts.
 const maxScanBytes = maxRecordBytes + 1
 
-// ReadResult retains valid records while making degraded input visible.
 type ReadResult struct {
 	Records []Record
 	Skipped int
 }
 
-// ImportResult describes a canonical ledger import.
 type ImportResult struct {
 	Imported   int
 	Duplicates int
 	Skipped    int
 }
 
-// Path returns the canonical ledger location in a workspace.
 func Path(workspace string) string { return filepath.Join(workspace, Filename) }
 
-// AppendWorkspace appends one complete JSON record to a workspace ledger.
 func AppendWorkspace(workspace string, rec Record) error { return Append(Path(workspace), rec) }
 
-// Append serializes writers across goroutines and processes and performs one
-// append write. A torn previous tail is separated first so it cannot consume
-// the new JSON object.
 func Append(path string, rec Record) error {
 	line, err := json.Marshal(rec)
 	if err != nil {
@@ -92,8 +83,6 @@ func separatorFor(f *os.File) ([]byte, error) {
 	return []byte{'\n'}, nil
 }
 
-// Read decodes valid bounded records and skips malformed lines. An oversized
-// line returns the valid prefix plus a contextual scanner error.
 func Read(path string) (ReadResult, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -121,12 +110,8 @@ func Read(path string) (ReadResult, error) {
 	return out, nil
 }
 
-// ReadWorkspace reads the canonical ledger in workspace.
 func ReadWorkspace(workspace string) (ReadResult, error) { return Read(Path(workspace)) }
 
-// Import copies valid source records through the same serialized append path.
-// call_id is the primary identity; legacy records use their exact trimmed JSON
-// bytes. Repeating salvage is therefore idempotent without rewriting history.
 func Import(destination, source string) (ImportResult, error) {
 	var result ImportResult
 	err := flock.WithPathLock(destination, func() error {
@@ -203,7 +188,4 @@ func recordIdentity(line []byte) (string, bool) {
 	return "legacy:" + hex.EncodeToString(digest[:]), true
 }
 
-// validRecord is the minimum historical contract: every real ledger row names
-// the phase it belongs to. This rejects JSON null, empty objects, and unrelated
-// envelopes without imposing new-schema requirements on legacy data.
 func validRecord(rec Record) bool { return rec.Phase != "" }

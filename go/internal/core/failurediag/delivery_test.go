@@ -1,9 +1,5 @@
 package failurediag
 
-// delivery_test.go — unit 02 (ADR-0103, design decomposition/02-failure-diagnostics.md):
-// the delivery-failure classifier, pinned in the unit with an injected
-// timeout predicate (the unit never imports core's sentinel). RED first.
-
 import (
 	"errors"
 	"fmt"
@@ -12,8 +8,6 @@ import (
 	"testing"
 )
 
-// errTimeout stands in for core.ErrArtifactTimeout: the unit only ever sees
-// the predicate, never the sentinel.
 var errTimeout = errors.New("core: bridge artifact timeout")
 
 func isTimeout(err error) bool { return errors.Is(err, errTimeout) }

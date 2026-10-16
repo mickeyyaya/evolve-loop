@@ -9,23 +9,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// ShouldQuarantine reports whether a task-level failure count reached a positive ceiling.
-// See ADR-0072.
 func ShouldQuarantine(failureCount, ceiling int, systemLevelFailure bool) bool {
 	return ceiling > 0 && !systemLevelFailure && failureCount >= ceiling
 }
 
-// Policy holds a failure drain's quarantine inputs; a nil *Policy is a plain release.
 type Policy struct {
 	Ceiling     int
-	SystemLevel bool            // a system-level failure: nothing bumps or parks
-	Committed   map[string]bool // the ids that accrue failures; nil means every drained item
-	// Routed means the closeout already routed the refused item: nothing bumps or parks,
-	// and the failure is not mislabelled system-level.
-	Routed bool
+	SystemLevel bool
+	Committed   map[string]bool
+	Routed      bool
 }
 
-// ReleaseFromQuarantine moves a quarantined item back to the inbox root with its failure_count reset to 0.
 func (m *Mover) ReleaseFromQuarantine(taskID string) (PromoteResult, error) {
 	res := PromoteResult{}
 	if taskID == "" {

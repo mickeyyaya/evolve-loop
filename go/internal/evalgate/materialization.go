@@ -11,8 +11,6 @@ import (
 
 var scoutReportName = phasecontract.ArtifactName(string(core.PhaseScout))
 
-// materializationGate (Gate A) requires every slug scout selected to have an
-// eval file carrying a [code] grader, before later phases spend tokens.
 type materializationGate struct{}
 
 func (materializationGate) name() string                { return "evals-materialized" }
@@ -29,8 +27,6 @@ func (g materializationGate) check(in core.ReviewInput) (string, bool) {
 		parts = append(parts, "scout materialized evals without a [code] grader for selected slug(s): "+strings.Join(ungraded, ", ")+
 			" — an eval that only asserts existence caps nothing, and the lane's own durability test refuses it at the ship gate (cycle 1679)")
 	}
-	// Latched before the advisory is appended, so a parse-miss can neither block
-	// nor mask a real missing eval.
 	block := len(parts) > 0
 	if adv := g.parseMissAdvisory(in); adv != "" {
 		parts = append(parts, adv)
@@ -41,14 +37,11 @@ func (g materializationGate) check(in core.ReviewInput) (string, bool) {
 	return strings.Join(parts, "; "), block
 }
 
-// parseMissAdvisory returns a non-blocking note when the "## Selected Tasks"
-// section has content but yielded no slug, which fail-open would otherwise hide.
 func (materializationGate) parseMissAdvisory(in core.ReviewInput) string {
 	report, ok := readScoutReport(in.Workspace)
 	if !ok || !SelectedTasksParseMiss(report) {
 		return ""
 	}
-	// A non-empty union here came from the Decision Trace alone, and Gate A did check those slugs.
 	scope := "Gate A therefore checked NOTHING this cycle: a selected task with no eval file " +
 		"would pass here and surface at audit instead (cycle-1570)"
 	if traced := SelectedSlugs(report); len(traced) > 0 {
@@ -62,8 +55,6 @@ func (materializationGate) parseMissAdvisory(in core.ReviewInput) string {
 		"or as a \"## Decision Trace\" entry with finalDecision \"selected\""
 }
 
-// ungradedSlugs returns the selected slugs whose eval exists but has no [code]
-// grader. Only the scout may write evals, so a graderless one must fail here.
 func (materializationGate) ungradedSlugs(in core.ReviewInput) []string {
 	report, ok := readScoutReport(in.Workspace)
 	if !ok {
@@ -83,8 +74,6 @@ func (materializationGate) ungradedSlugs(in core.ReviewInput) []string {
 	return out
 }
 
-// missingSlugs returns the selected slugs with no eval file. check and
-// remediation both use it, so they never disagree about which files to create.
 func (materializationGate) missingSlugs(in core.ReviewInput) []string {
 	report, ok := readScoutReport(in.Workspace)
 	if !ok {

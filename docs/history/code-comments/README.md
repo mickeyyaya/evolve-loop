@@ -519,6 +519,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/changeloggen` | 2 | [internal-changeloggen.md](internal-changeloggen.md) |
 | `internal/checkpoint` | 14 | [internal-checkpoint.md](internal-checkpoint.md) |
 | `internal/ciparity` | 10 | [internal-ciparity.md](internal-ciparity.md) |
+| `internal/ciwatch` | 1 | [internal-ciwatch.md](internal-ciwatch.md) |
 | `internal/cli/guardcmd` | 9 | [internal-cli-guardcmd.md](internal-cli-guardcmd.md) |
 | `internal/cli/opscmd` | 7 | [internal-cli-opscmd.md](internal-cli-opscmd.md) |
 | `internal/cli/phasecmd` | 32 | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
@@ -534,7 +535,9 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/carryover` | 11 | [internal-core-carryover.md](internal-core-carryover.md) |
 | `internal/core/defectledger` | 19 | [internal-core-defectledger.md](internal-core-defectledger.md) |
+| `internal/core/failurediag` | 3 | [internal-core-failurediag.md](internal-core-failurediag.md) |
 | `internal/core/failurelearning` | 14 | [internal-core-failurelearning.md](internal-core-failurelearning.md) |
+| `internal/core/outcome` | 4 | [internal-core-outcome.md](internal-core-outcome.md) |
 | `internal/core` | 948 | [internal-core.md](internal-core.md) |
 | `internal/cycleclassify` | 16 | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/cyclecost` | 6 | [internal-cyclecost.md](internal-cyclecost.md) |
@@ -549,7 +552,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/dispatchevents` | 1 | [internal-dispatchevents.md](internal-dispatchevents.md) |
 | `internal/docsfloor` | 5 | [internal-docsfloor.md](internal-docsfloor.md) |
 | `internal/dossier` | 38 | [internal-dossier.md](internal-dossier.md) |
-| `internal/evalgate` | 31 | [internal-evalgate.md](internal-evalgate.md) |
+| `internal/evalgate` | 32 | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/evalqualitycheck` | 15 | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
 | `internal/explanationdocs` | 9 | [internal-explanationdocs.md](internal-explanationdocs.md) |
 | `internal/faillearn` | 19 | [internal-faillearn.md](internal-faillearn.md) |
@@ -581,6 +584,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/observerengine` | 10 | [internal-observerengine.md](internal-observerengine.md) |
 | `internal/panetrust` | 7 | [internal-panetrust.md](internal-panetrust.md) |
 | `internal/paths` | 4 | [internal-paths.md](internal-paths.md) |
+| `internal/phaseblock` | 1 | [internal-phaseblock.md](internal-phaseblock.md) |
 | `internal/phasecoherence` | 25 | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/phasecontract` | 67 | [internal-phasecontract.md](internal-phasecontract.md) |
 | `internal/phaseintegrity` | 5 | [internal-phaseintegrity.md](internal-phaseintegrity.md) |
@@ -612,6 +616,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/preflight` | 4 | [internal-preflight.md](internal-preflight.md) |
 | `internal/profiles` | 30 | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | 51 | [internal-prompts.md](internal-prompts.md) |
+| `internal/pruneephemeral` | 2 | [internal-pruneephemeral.md](internal-pruneephemeral.md) |
 | `internal/quotareset` | 1 | [internal-quotareset.md](internal-quotareset.md) |
 | `internal/quotastate` | 1 | [internal-quotastate.md](internal-quotastate.md) |
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
@@ -619,6 +624,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/recurrence` | 12 | [internal-recurrence.md](internal-recurrence.md) |
 | `internal/reflection` | 1 | [internal-reflection.md](internal-reflection.md) |
 | `internal/regressiontia` | 5 | [internal-regressiontia.md](internal-regressiontia.md) |
+| `internal/releaseconsistency` | 1 | [internal-releaseconsistency.md](internal-releaseconsistency.md) |
 | `internal/releasepipeline` | 25 | [internal-releasepipeline.md](internal-releasepipeline.md) |
 | `internal/releasepreflight` | 14 | [internal-releasepreflight.md](internal-releasepreflight.md) |
 | `internal/reportdoc` | 20 | [internal-reportdoc.md](internal-reportdoc.md) |
@@ -631,6 +637,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/routingtest` | 13 | [internal-routingtest.md](internal-routingtest.md) |
 | `internal/runlease` | 1 | [internal-runlease.md](internal-runlease.md) |
 | `internal/scopedelta` | 3 | [internal-scopedelta.md](internal-scopedelta.md) |
+| `internal/sessionrecord` | 3 | [internal-sessionrecord.md](internal-sessionrecord.md) |
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
 | `internal/shiperr` | 13 | [internal-shiperr.md](internal-shiperr.md) |
 | `internal/shipmanifest` | 12 | [internal-shipmanifest.md](internal-shipmanifest.md) |

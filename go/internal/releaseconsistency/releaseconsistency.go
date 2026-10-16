@@ -1,26 +1,5 @@
 // Package releaseconsistency ports the version-consistency-check half of
 // legacy/scripts/utility/release.sh.
-//
-// Verifies all version markers are consistent with the target version:
-//
-//	.claude-plugin/plugin.json        json "version" field
-//	.claude-plugin/marketplace.json   json "version" field
-//	.codex-plugin/plugin.json         json "version" field (generated mirror; skipped if absent)
-//	skills/loop/SKILL.md       `# Evolve Loop vX.Y` heading
-//	README.md                          `Current (vX.Y)` cell
-//	CHANGELOG.md                       contains `[<target>]` entry
-//	README.md history                  contains `v<major.minor>` row
-//
-// The plugin-cache-refresh half of release.sh (~100 lines of marketplace
-// pull + python registry update) is intentionally NOT ported — it's
-// environment-specific and removed entirely in v12.0.0 when legacy/
-// vanishes. The cache refresh is also covered by `evolve marketplace-poll`
-// for the in-pipeline flow.
-//
-// Exit codes (cmd layer maps from ErrInconsistent):
-//
-//	0 = all markers consistent with target
-//	1 = at least one inconsistency (ErrInconsistent)
 package releaseconsistency
 
 import (
@@ -33,30 +12,26 @@ import (
 	"strings"
 )
 
-// ErrInconsistent is returned when one or more markers don't match.
 var ErrInconsistent = errors.New("releaseconsistency: marker(s) inconsistent")
 
-// Options drives a Check() invocation.
 type Options struct {
 	ProjectRoot string
-	Target      string // optional; if empty, derived from plugin.json
+	Target      string
 	Stderr      io.Writer
 }
 
-// Result captures per-check outcomes.
 type Result struct {
 	Target     string
 	MajorMinor string
-	Canonical  string // version from plugin.json
+	Canonical  string
 	Checks     []Check
 	Errors     int
 }
 
-// Check is one marker's verification outcome.
 type Check struct {
 	File        string
 	Description string
-	Status      string // "OK" | "MISSING" | "NO_MATCH" | "MISMATCH"
+	Status      string
 	Found       string
 	Expected    string
 }
@@ -65,7 +40,6 @@ var jsonVersionRE = regexp.MustCompile(`"version"[[:space:]]*:[[:space:]]*"([^"]
 var skillHeadingRE = regexp.MustCompile(`^# Evolve Loop v([0-9]+\.[0-9]+)`)
 var readmeCurrentRE = regexp.MustCompile(`Current \(v([0-9]+\.[0-9]+)\)`)
 
-// majorMinor extracts "X.Y" from "X.Y.Z".
 func majorMinor(v string) string {
 	parts := strings.SplitN(v, ".", 3)
 	if len(parts) < 2 {
@@ -74,7 +48,6 @@ func majorMinor(v string) string {
 	return parts[0] + "." + parts[1]
 }
 
-// extractJSONVersion reads <file>'s first "version" field.
 func extractJSONVersion(path string) (string, error) {
 	body, err := os.ReadFile(path)
 	if err != nil {
@@ -87,7 +60,6 @@ func extractJSONVersion(path string) (string, error) {
 	return m[1], nil
 }
 
-// Run executes every marker verification and reports per-check outcomes.
 func Run(opts Options) (Result, error) {
 	res := Result{}
 	if opts.ProjectRoot == "" {
@@ -175,10 +147,11 @@ func buildChecks(opts Options, target, majorMinor string) []checkSpec {
 	}
 }
 
+const contentMarkerStart = 5
+
 func runChecks(logw io.Writer, checks []checkSpec) ([]Check, int) {
 	var results []Check
 	errs := 0
-	contentMarkerStart := 5 // version markers 0-4 (plugin, marketplace, codex, SKILL, README); 5 = CHANGELOG, 6 = README history
 	for i, c := range checks {
 		if i == contentMarkerStart {
 			fmt.Fprintln(logw, "")
@@ -203,13 +176,6 @@ func runChecks(logw io.Writer, checks []checkSpec) ([]Check, int) {
 	return results, errs
 }
 
-// --- Per-check helpers -----------------------------------------------------
-
-// checkJSONVersionIfPresent is like checkJSONVersion but returns OK with
-// "absent (skipped)" when the file does not exist. Used for generated mirrors
-// (e.g. .codex-plugin/plugin.json) that may not be present in every checkout
-// but MUST match target when they are — a release that forgot to bump the
-// Codex surface fails here (rollback) instead of shipping drift.
 func checkJSONVersionIfPresent(repoRoot, relPath, desc, target string) Check {
 	if _, err := os.Stat(filepath.Join(repoRoot, relPath)); errors.Is(err, os.ErrNotExist) {
 		return Check{File: relPath, Description: desc, Status: "OK", Found: "absent (skipped)"}

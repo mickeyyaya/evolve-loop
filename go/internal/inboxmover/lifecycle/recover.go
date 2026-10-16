@@ -9,13 +9,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// RecoverResult counts the items a drain or recovery moved and lists their new paths.
 type RecoverResult struct {
 	Recovered int
 	Paths     []string
 }
 
-// RecoverOrphans moves the claims of every inactive cycle back to the inbox root, overwriting a root twin.
 func (m *Mover) RecoverOrphans() (RecoverResult, error) {
 	res := RecoverResult{Paths: []string{}}
 	procDir := inboxbatch.ProcessingDir(m.inboxDir)
@@ -42,10 +40,9 @@ func (m *Mover) RecoverOrphans() (RecoverResult, error) {
 	return res, nil
 }
 
-// recoverDir has no double-move guard on purpose: the clobbering rename is a pinned, preserved quirk.
 func (m *Mover) recoverDir(dir string, cycle int) (int, []string) {
 	cycleNum := strconv.Itoa(cycle)
-	files, _ := jsonEntries(dir) // an unreadable dir recovers nothing (preserved)
+	files, _ := jsonEntries(dir)
 	n, paths := 0, []string(nil)
 	for _, f := range files {
 		base := f.Name()

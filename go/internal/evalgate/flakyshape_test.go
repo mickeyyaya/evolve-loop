@@ -24,7 +24,6 @@ func writeCyclePredicates(t *testing.T, worktree string, cycle int, src string) 
 	}
 }
 
-// cycleWorkspace names the dir "cycle-<N>", the only shape cycleNumFromWorkspace accepts.
 func cycleWorkspace(t *testing.T, cycle int) string {
 	t.Helper()
 	ws := filepath.Join(t.TempDir(), "cycle-"+strconv.Itoa(cycle))

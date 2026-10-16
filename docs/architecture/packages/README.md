@@ -198,3 +198,16 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/phases/intent` | the goal-capture phase: delta mode, the deterministic goal-hash skip and the verdict mapping | [internal-phases-intent.md](internal-phases-intent.md) |
 | `internal/phases/debugger` | the ship-recovery diagnosis phase: the decision file, the recovery signals and the safe BLOCK default | [internal-phases-debugger.md](internal-phases-debugger.md) |
 | `internal/changeloggen` | renders conventional-commit subjects into a Keep-a-Changelog entry and prepends it idempotently | [internal-changeloggen.md](internal-changeloggen.md) |
+| `internal/phaseblock` | the content-addressed, chained digest of each pipeline phase | [internal-phaseblock.md](internal-phaseblock.md) |
+| `internal/phaseconfig` | the unified phase descriptor: spec, dispatch config and swarm worker count | [internal-phaseconfig.md](internal-phaseconfig.md) |
+| `internal/core/outcome` | the recording chokepoint for every terminal phase disposition | [internal-core-outcome.md](internal-core-outcome.md) |
+| `internal/cliadmit` | cross-process admission control for shared LLM CLIs | [internal-cliadmit.md](internal-cliadmit.md) |
+| `internal/ciwatch` | the CI watch that files a fix-forward item for a red run | [internal-ciwatch.md](internal-ciwatch.md) |
+| `internal/llmcalls` | the model-try ledger and its performance index | [internal-llmcalls.md](internal-llmcalls.md) |
+| `internal/core/failurediag` | the phase failure sidecar and the delivery-failure classifier | [internal-core-failurediag.md](internal-core-failurediag.md) |
+| `internal/releaseconsistency` | the version-marker consistency check of a release | [internal-releaseconsistency.md](internal-releaseconsistency.md) |
+| `internal/adapters/flock` | the blocking and non-blocking file-lock primitives | [internal-adapters-flock.md](internal-adapters-flock.md) |
+| `internal/adapters/runner` | the in-process and subprocess phase runner adapters | [internal-adapters-runner.md](internal-adapters-runner.md) |
+| `internal/sysexec` | the single seam for running external commands | [internal-sysexec.md](internal-sysexec.md) |
+| `internal/sessionrecord` | the per-run tmux session registry schema | [internal-sessionrecord.md](internal-sessionrecord.md) |
+| `internal/pruneephemeral` | TTL retention for phase-tracker ephemeral data | [internal-pruneephemeral.md](internal-pruneephemeral.md) |

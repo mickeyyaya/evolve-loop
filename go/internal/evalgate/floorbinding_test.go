@@ -234,7 +234,6 @@ const deferredCoreProse = `## top_n (commit to THIS cycle)
 - coverage-core: push internal/core coverage to ≥98% — defer_reason=too large
 `
 
-// writeFixtureCompanion omits the deferred_floors field when deferredFloors is nil.
 func writeFixtureCompanion(t *testing.T, in core.ReviewInput, deferredFloors []string) {
 	t.Helper()
 	var body string
@@ -305,13 +304,11 @@ func TestFloorBinding_DeclaredDivergenceMessage(t *testing.T) {
 	}
 	known := []string{"core", "bridge"}
 
-	// Prose defers bridge; declaration defers core → divergence.
 	diverge := "## top_n\n- x: y\n\n## deferred\n- coverage-bridge: bridge coverage ≥98%\n"
 	if msg := triagecap.DeferredFloorDivergence(diverge, companion, known); msg == "" {
 		t.Error("prose/declaration divergence must yield a non-empty corrective message")
 	}
 
-	// Prose defers core; declaration defers core → agreement, silent.
 	agree := "## top_n\n- x: y\n\n## deferred\n- coverage-core: core coverage ≥98%\n"
 	if msg := triagecap.DeferredFloorDivergence(agree, companion, known); msg != "" {
 		t.Errorf("matching prose/declaration must be silent, got %q", msg)

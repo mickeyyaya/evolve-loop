@@ -13,36 +13,30 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gopkgpattern"
 )
 
-// Flakiness-taxonomy classes (Luo et al., FSE'14) carried on each finding.
 const (
-	FlakyClassAsyncWait    = "async-wait"    // 45% of flaky tests (Luo FSE'14)
-	FlakyClassConcurrency  = "concurrency"   // 20% (Luo FSE'14)
-	FlakyClassResourceLeak = "resource-leak" // Luo FSE'14 resource-leak class
-	FlakyClassEnvironment  = "environment"   // house extension: PID/cwd/host assumptions
+	FlakyClassAsyncWait    = "async-wait"
+	FlakyClassConcurrency  = "concurrency"
+	FlakyClassResourceLeak = "resource-leak"
+	FlakyClassEnvironment  = "environment"
 )
 
-// FlakyFinding is one flaky-shaped pattern found in a predicate source.
 type FlakyFinding struct {
 	Func   string
-	File   string // source file basename
-	Class  string // FlakyClass* taxonomy annotation
-	Reason string // human-readable detail including the offending token
+	File   string
+	Class  string
+	Reason string
 }
 
-// FlakyLintReport carries the files LintFlakyPredicates parsed with its findings, so zero files never reads as clean.
 type FlakyLintReport struct {
-	Path     string         // the path as requested (file or dir)
-	Files    []string       // basenames of the .go files actually parsed, in order
-	Findings []FlakyFinding // one per (function, class, reason), deduped
+	Path     string
+	Files    []string
+	Findings []FlakyFinding
 }
 
-// Linted is the receipt count of parsed .go files; callers print it unconditionally.
 func (r FlakyLintReport) Linted() int { return len(r.Files) }
 
-// flakyPIDCeiling: a literal PID below it in a liveness check is a stale artifact of the authoring session.
 const flakyPIDCeiling = 100000
 
-// flakySlowSuites take 40s+ under contention even as a single named package.
 var flakySlowSuites = map[string]bool{
 	"internal/core": true,
 	"cmd/evolve":    true,
@@ -54,14 +48,12 @@ var flakyLoadGenBins = map[string]bool{
 	"stress-ng": true,
 }
 
-// Unix* methods are absent on purpose: time.Now().UnixNano() is the unique-name idiom, not a deadline.
 var flakyDeadlineMethods = map[string]bool{
 	"Add": true, "Before": true, "After": true, "Sub": true,
 }
 
 var procPIDPathRE = regexp.MustCompile(`^/proc/(\d+)(/|$)`)
 
-// LintFlakyPredicates lints a predicate .go file or cycle package dir; a dir with no .go files is an error, not a clean result.
 func LintFlakyPredicates(path string) (FlakyLintReport, error) {
 	report := FlakyLintReport{Path: path}
 	paths, err := predicateSourcePaths(path)
@@ -92,7 +84,6 @@ func LintFlakyPredicates(path string) (FlakyLintReport, error) {
 	return report, nil
 }
 
-// flakyPackageFuncs indexes plain functions for the one-level helper hop; methods would need receiver resolution.
 func flakyPackageFuncs(files []*ast.File) map[string]*ast.FuncDecl {
 	out := map[string]*ast.FuncDecl{}
 	for _, file := range files {
@@ -105,7 +96,6 @@ func flakyPackageFuncs(files []*ast.File) map[string]*ast.FuncDecl {
 	return out
 }
 
-// flakyStringConsts collects package-level string const/var values so const-indirected patterns resolve at the use site.
 func flakyStringConsts(files []*ast.File) map[string]string {
 	out := map[string]string{}
 	for _, file := range files {
@@ -137,7 +127,6 @@ func flakyStringConsts(files []*ast.File) map[string]string {
 func lintFuncFlaky(fn *ast.FuncDecl, file string, consts map[string]string, helpers map[string]*ast.FuncDecl) []FlakyFinding {
 	anchored := dirAnchoredVars(fn.Body)
 	assigned := execAssignNames(fn.Body)
-	// The argv-position index keeps a pattern handed to go build, go vet or rg from reading as a test suite.
 	index := indexExecPatterns(fn, consts, helpers)
 	var out []FlakyFinding
 	seen := map[string]bool{}
@@ -179,8 +168,6 @@ func lintFuncFlaky(fn *ast.FuncDecl, file string, consts map[string]string, help
 	return out
 }
 
-// narrowed suppresses only the known-slow finding: a recursive sweep still builds and
-// loads every package beneath it, so -run does not bound its cost.
 func lintPkgPatternString(s string, narrowed bool, add func(class, reason string)) {
 	if !gopkgpattern.IsPackagePattern(s) {
 		return
@@ -260,8 +247,6 @@ func exprPkgName(call *ast.CallExpr) string {
 	return "liveness call"
 }
 
-// lintExecCall applies the subprocess rules to one exec call; single-pattern
-// suite-scope findings come from the argv-position-aware literal scan instead.
 func lintExecCall(call *ast.CallExpr, consts map[string]string, anchored map[string]bool, assigned map[*ast.CallExpr]string, add func(class, reason string)) {
 	argv, hasCtx, ok := execArgv(call, consts)
 	if !ok || len(argv) == 0 {
@@ -273,7 +258,6 @@ func lintExecCall(call *ast.CallExpr, consts map[string]string, anchored map[str
 			lintGoTestArgs(argv[2:], add)
 		}
 	case "git":
-		// -C may sit inside append([]string{"-C", dir}, args...), so scan the raw arg ASTs.
 		if !argsContainStringLit(call.Args, "-C", consts) {
 			if name := assigned[call]; name == "" || !anchored[name] {
 				add(FlakyClassEnvironment,
@@ -304,7 +288,6 @@ func addLoadGenFinding(what string, add func(class, reason string)) {
 		"unreaped load-generation: %s spawned with no context bound to its lifetime — use exec.CommandContext (plus WaitDelay for grandchildren) so the load dies with the predicate; orphaned generators burned 8 cores for 9h across batches 18-21", what))
 }
 
-// lintGoTestArgs flags only multi-package invocations; single patterns go through the literal scan.
 func lintGoTestArgs(args []string, add func(class, reason string)) {
 	n := 0
 	for _, a := range args {
@@ -318,8 +301,6 @@ func lintGoTestArgs(args []string, add func(class, reason string)) {
 	}
 }
 
-// lintShellScript applies the go-test rules per segment because a script string has
-// spaces and so never reaches the literal scan as a package pattern.
 func lintShellScript(script string, hasCtx bool, add func(class, reason string)) {
 	if !hasCtx && (strings.Contains(script, "while true") || strings.Contains(script, "while :")) {
 		add(FlakyClassResourceLeak,

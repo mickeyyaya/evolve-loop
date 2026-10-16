@@ -30,9 +30,6 @@ func TestTryLockSecondSameProcessAcquireReportsHeld(t *testing.T) {
 	}
 	defer release()
 
-	// A second acquire of the same path from THIS process must refuse — flock
-	// alone does not dedup same-process callers cross-platform, so the held-set
-	// must make this deterministic on macOS and Linux alike.
 	release2, held2, err2 := TryLock(path)
 	if err2 != nil {
 		t.Fatalf("second TryLock errored: %v", err2)
@@ -96,7 +93,6 @@ func TestTryLockOtherFlockErrorSurfaces(t *testing.T) {
 }
 
 func TestTryLockOpenErrorSurfaces(t *testing.T) {
-	// A directory path cannot be opened O_RDWR → real error, not held.
 	_, held, err := TryLock(t.TempDir())
 	if err == nil {
 		t.Fatal("TryLock on a directory path must fail opening the lock file")
@@ -107,8 +103,6 @@ func TestTryLockOpenErrorSurfaces(t *testing.T) {
 }
 
 func TestTryLockReleaseClearsSameProcessHold(t *testing.T) {
-	// Belt-and-suspenders: ensure release removes the held-set entry even when
-	// the OS flock is stubbed out (so the in-process gate is what we exercise).
 	old := flockFn
 	t.Cleanup(func() { flockFn = old })
 	flockFn = func(_ int, _ int) error { return nil }
