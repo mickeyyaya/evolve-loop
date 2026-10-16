@@ -18,7 +18,7 @@
 ## Invariants
 
 - **A forged host artifact is restored.** Proof of read (`challenge-token.txt`), the lane pin, a planted verdict, a removed file. Pinned by `TestGuard_RestoresProofOfReadTheAgentForged`, `TestGuard_RemovesAVerdictTheAgentPlanted`, `TestGuard_RestoresTheLanePinTheAgentRemoved`.
-- **A swap is undone, in both directions.** A fenced file turned into a link or a directory, a planted link, an allowed path turned into a link. Pinned by `TestGuard_UndoesAFencedFileSwappedForALinkOrDirectory` and `TestGuard_UndoesAnAllowedPathSwappedForALink`. A link present at `Begin` is removed if its type changes but is not recreated: no target was captured. The code keeps a one-line note on `Guard`.
+- **A swap is undone, in both directions.** A fenced file turned into a link or a directory, a planted link, an allowed path turned into a link. Pinned by `TestGuard_UndoesAFencedFileSwappedForALinkOrDirectory` and `TestGuard_UndoesAnAllowedPathSwappedForALink`. A link present at `Begin` is removed if its type changes but is not recreated: no target was captured.
 - **The change is restored.** Pinned by `TestGuard_RestoresTheChangesWorktree`.
 - **An in-grant repair is kept.** Pinned by `TestGuard_KeepsTheDeliverableTheAgentWasAskedToRepair`.
 - **Tolerances have boundaries.** Pinned by `TestGuard_UnfencedPathsHaveABoundary` and `TestGuard_ToleratesTheDispatchesGeneratedArtifactsByStemAndReportsThem`.
