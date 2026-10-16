@@ -58,14 +58,14 @@ func clihealthList(store *clihealth.Store, asJSON bool, stdout io.Writer) int {
 	for _, e := range active {
 		entries = append(entries, e)
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Family < entries[j].Family })
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Key() < entries[j].Key() })
 	if asJSON {
 		body, _ := json.Marshal(entries)
 		fmt.Fprintln(stdout, string(body))
 		return 0
 	}
 	for _, e := range entries {
-		fmt.Fprintf(stdout, "%s\t%s\tuntil %s\n", e.Family, e.Reason, e.BenchedUntil.Format(time.RFC3339))
+		fmt.Fprintf(stdout, "%s\t%s\tuntil %s\n", e.Key(), e.Reason, e.BenchedUntil.Format(time.RFC3339))
 	}
 	return 0
 }

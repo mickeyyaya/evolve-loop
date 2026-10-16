@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
@@ -14,6 +15,7 @@ import (
 
 type Entry struct {
 	Family         string    `json:"family"`
+	Scope          string    `json:"scope,omitempty"`
 	Reason         string    `json:"reason"`
 	BenchedAt      time.Time `json:"benched_at"`
 	BenchedUntil   time.Time `json:"benched_until"`
@@ -76,7 +78,11 @@ func CooldownForStrikes(strikes int) time.Duration {
 func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) Entry {
 	strikes := prev.Strikes + 1
 	until, parsed := time.Time{}, false
-	if pattern != CredentialPattern {
+	switch pattern {
+	case CredentialPattern:
+	case ExhaustedPattern:
+		until, parsed = parseHints(clockedHints, paneText, now)
+	default:
 		until, parsed = ParseResetHint(paneText, now)
 	}
 	if !parsed {
@@ -87,6 +93,21 @@ func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) 
 		Evidence: truncateRunes(evidenceLine(paneText), 160), Strikes: strikes,
 		OperatorAction: OperatorAction(family, pattern),
 	}
+}
+
+func (e Entry) Key() string {
+	if e.Scope == "" {
+		return e.Family
+	}
+	return e.Family + "@" + e.Scope
+}
+
+func ModelGroup(model string) string {
+	model = strings.TrimSpace(model)
+	if i := strings.LastIndex(model, " ("); i > 0 && strings.HasSuffix(model, ")") {
+		return strings.TrimSpace(model[:i])
+	}
+	return model
 }
 
 func firstLine(s string) string {
@@ -144,8 +165,15 @@ func (s *Store) Load() (map[string]Entry, error) {
 }
 
 func (s *Store) BenchWall(family, pattern, paneText string) (Entry, error) {
-	return s.benchComposed(family, func(prev Entry, now time.Time) Entry {
-		return NewBenchEntry(prev, family, pattern, paneText, now)
+	return s.BenchScopedWall(family, "", pattern, paneText)
+}
+
+func (s *Store) BenchScopedWall(family, scope, pattern, paneText string) (Entry, error) {
+	key := Entry{Family: family, Scope: scope}.Key()
+	return s.benchComposed(key, func(prev Entry, now time.Time) Entry {
+		entry := NewBenchEntry(prev, family, pattern, paneText, now)
+		entry.Scope = scope
+		return entry
 	})
 }
 
@@ -165,12 +193,12 @@ func (s *Store) BenchWallUntil(family string, w Wall) (Entry, error) {
 	})
 }
 
-func (s *Store) benchComposed(family string, compose func(prev Entry, now time.Time) Entry) (Entry, error) {
+func (s *Store) benchComposed(key string, compose func(prev Entry, now time.Time) Entry) (Entry, error) {
 	var entry Entry
 	err := s.withLock(func() error {
 		benches, _ := s.Load()
-		entry = compose(benches[family], s.now())
-		benches[family] = entry
+		entry = compose(benches[key], s.now())
+		benches[key] = entry
 		return s.write(benches)
 	})
 	return entry, err
@@ -179,7 +207,7 @@ func (s *Store) benchComposed(family string, compose func(prev Entry, now time.T
 func (s *Store) Bench(e Entry) error {
 	return s.withLock(func() error {
 		benches, _ := s.Load()
-		benches[e.Family] = e
+		benches[e.Key()] = e
 		return s.write(benches)
 	})
 }

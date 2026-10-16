@@ -6,7 +6,8 @@
 
 ## Design
 
-- `Entry` is one benched family. `Store` reads and writes the file.
+- `Entry` is one benched family, or one model group of a family when `Scope` is set. `Entry.Key` is the store key: the family, or `family@scope`. `Store` reads and writes the file.
+- `ModelGroup` strips the effort variant from a model name, so `Gemini 4 Argon (High)` and `Gemini 4 Argon (Medium)` share the group `Gemini 4 Argon`. `BenchScopedWall` benches one group; `BenchWall` benches the family.
 - `NewBenchEntry` composes the record after a classified wall. The strike count continues from the previous record. The bench lasts until the pane's reset hint, when one parses, or else the strike-scaled cooldown. The wall line is kept as evidence.
 - The runner's bench writer and the loop canary both compose entries through `NewBenchEntry`. The strike, cooldown and evidence logic therefore cannot drift between them.
 - `BenchWall` is the one read-previous, compose, write sequence. `Bench`, `Clear` and `RecordBootStrike` are the other writers.
@@ -21,7 +22,9 @@
 - Cooldown: `DefaultCooldown` is 30 minutes. It doubles per strike beyond the first and caps at `MaxCooldown`, 4 hours. Strikes of one or less get the default.
 - A login wall (`CredentialPattern`) ignores any reset hint. A stale wall in the same scrollback can otherwise set a time. The family stays benched until a canary probe succeeds after the login. `Active` keeps a credential wall until a probe clears it, because time says nothing about the login.
 - An exhausted wall (`ExhaustedPattern`) arrives as `exhausted` from agy and as `rate_limit` from codex. Both must be benched.
-- agy's wall text (`Resets in 6h12m56s`) is deliberately not parsed as a reset hint. Doubling per re-bench gives a long bench only after the wall repeats. agy served successful dispatches inside its own claimed window.
+- agy's compact reset (`Resets in 148h8m53s`) is a reset hint for every pattern except `ExhaustedPattern`. The hint is capped at 24 hours. Cycle 1911 added it together with model-group scopes, so a long hint benches one model group, not all of agy.
+- An `ExhaustedPattern` wall still ignores the compact hint. Doubling per re-bench gives a long bench only after the wall repeats. agy served successful dispatches inside its own claimed window.
+- A legacy file without `scope` reads as family-wide entries. A scoped entry and a family-wide entry of one family coexist under different keys.
 - Boot timeouts are keyed by driver, not family, because a REPL boot failure is driver-specific. `RecordBootStrike` benches a driver only at `DefaultBootBenchThreshold` consecutive strikes. Below that, the strike count is kept with `BenchedUntil` set to now, so the driver stays retryable.
 - `ClearBootStrike` runs on any other exit, because strike, success, strike must not bench. It removes only an entry whose reason is the boot-timeout pattern, so it cannot clear a rate-limit bench under the same name.
 - `truncateRunes` truncates on rune boundaries. Wall text carries multi-byte glyphs, and a byte slice can split one.

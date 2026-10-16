@@ -2,13 +2,18 @@ package clihealth
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
 
 func ParseResetHint(pane string, now time.Time) (time.Time, bool) {
-	for _, hint := range resetHints {
+	return parseHints(resetHints, pane, now)
+}
+
+func parseHints(hints []resetHint, pane string, now time.Time) (time.Time, bool) {
+	for _, hint := range hints {
 		if at, ok := hint.parse(pane, now); ok {
 			return capHint(at, now), true
 		}
@@ -24,16 +29,21 @@ var (
 	datedHintRe    = regexp.MustCompile(`(?i)try again at\s+([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4}),?\s+(\d{1,2}):(\d{2})\s*(AM|PM)`)
 	clockHintRe    = regexp.MustCompile(`(?i)(?:try again at|resets)\s+(\d{1,2}):(\d{2})\s*(AM|PM)(?:[ \t]*\(([^)]+)\))?`)
 	relativeHintRe = regexp.MustCompile(`(?i)try again in\s+(?:(\d+)\s*hours?)?\s*(?:(\d+)\s*min(?:ute)?s?)?`)
+	compactHintRe  = regexp.MustCompile(`(?i)resets in\s+((?:\d+[hms])+)\b`)
 )
 
-var resetHints = []struct {
+type resetHint struct {
 	re    *regexp.Regexp
 	parse func(string, time.Time) (time.Time, bool)
-}{
+}
+
+var clockedHints = []resetHint{
 	{datedHintRe, parseDatedHint},
 	{clockHintRe, parseClockHint},
 	{relativeHintRe, parseRelativeHint},
 }
+
+var resetHints = append(slices.Clip(clockedHints), resetHint{compactHintRe, parseCompactHint})
 
 func evidenceLine(pane string) string {
 	for _, ln := range strings.Split(pane, "\n") {
@@ -134,6 +144,18 @@ func parseRelativeHint(pane string, now time.Time) (time.Time, bool) {
 		d += time.Duration(mins) * time.Minute
 	}
 	if d <= 0 {
+		return time.Time{}, false
+	}
+	return now.Add(d).Add(resetMargin), true
+}
+
+func parseCompactHint(pane string, now time.Time) (time.Time, bool) {
+	m := compactHintRe.FindStringSubmatch(pane)
+	if m == nil {
+		return time.Time{}, false
+	}
+	d, err := time.ParseDuration(m[1])
+	if err != nil || d <= 0 {
 		return time.Time{}, false
 	}
 	return now.Add(d).Add(resetMargin), true

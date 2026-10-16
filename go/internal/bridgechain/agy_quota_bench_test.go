@@ -24,3 +24,31 @@ func TestBenchOnEscalation_AgyQuotaWallBenchesTheAgyFamily(t *testing.T) {
 		t.Fatal("agy's quota_exhausted wall left the family unbenched; every later dispatch pays a dead round-trip")
 	}
 }
+
+func TestBenchOnEscalation_AgyWallScopeFollowsTheDispatchedTier(t *testing.T) {
+	now := func() time.Time { return time.Date(2026, 10, 17, 2, 17, 0, 0, time.UTC) }
+	cases := []struct {
+		cli, tier, wantKey string
+	}{
+		{"agy-tmux", "deep", "agy@Gemini 4 Argon"},
+		{"agy-tmux", "top", "agy@Gemini 4 Argon"},
+		{"agy-tmux", "balanced", "agy@Gemini 3.8 Flash"},
+		{"agy-tmux", "", "agy"},
+		{"agy-tmux", "sonnet", "agy"},
+		{"claude-tmux", "deep", "claude"},
+		{"agy-claude-tmux", "deep", "agy-claude"},
+	}
+	for _, tc := range cases {
+		root, ws := t.TempDir(), t.TempDir()
+		b, _ := json.Marshal(map[string]any{"captured_at": now(), "cli": tc.cli, "pattern_name": "quota_exhausted",
+			"pane_tail": "Individual quota reached for this model. Resets in 3h."})
+		if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: tc.cli, Tier: tc.tier, DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
+		active := clihealth.NewStore(root, now).Active()
+		if _, ok := active[tc.wantKey]; !ok || len(active) != 1 {
+			t.Errorf("%s wall at tier %q: benches = %v, want the single key %q", tc.cli, tc.tier, active, tc.wantKey)
+		}
+	}
+}

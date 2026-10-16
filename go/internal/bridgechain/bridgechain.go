@@ -13,6 +13,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -31,6 +32,7 @@ type Escalation struct {
 	ProjectRoot   string
 	Workspace     string
 	CLI           string
+	Tier          string
 	DispatchStart time.Time
 	Env           map[string]string
 }
@@ -99,7 +101,7 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		keeper.Observe(cli+"@"+tier, last, lastErr)
 		attempts = append(attempts, fmt.Sprintf("%s@%s=%d", cli, tier, last.ExitCode))
 		if last.ExitCode == exitQuota && w.bench != nil {
-			w.bench(Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: cli, DispatchStart: start, Env: req.Env})
+			w.bench(Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: cli, Tier: tier, DispatchStart: start, Env: req.Env})
 		}
 		return last.ExitCode, lastErr
 	}, func(from, to string) {
@@ -138,10 +140,11 @@ func ApplyCLIHealthBench(projectRoot, phase string, plan llmroute.Plan, env map[
 	bootDrivers := make(map[string]time.Time, len(active))
 	familyBenched := make(map[string]time.Time, len(active))
 	for key, e := range active {
-		if e.Reason == clihealth.BootTimeoutPattern {
+		switch {
+		case e.Reason == clihealth.BootTimeoutPattern:
 			bootDrivers[key] = e.BenchedAt
-		} else {
-			familyBenched[key] = e.BenchedAt
+		case e.Scope == "" || scopeCoversSeat(e, plan):
+			benchFamily(familyBenched, e)
 		}
 	}
 	out := llmroute.ApplyDriverBench(plan, bootDrivers)
@@ -159,6 +162,48 @@ func ApplyCLIHealthBench(projectRoot, phase string, plan llmroute.Plan, env map[
 			phase, benchedSummary(active))
 	}
 	return out
+}
+
+func benchFamily(benched map[string]time.Time, e clihealth.Entry) {
+	if prev, ok := benched[e.Family]; !ok || e.BenchedAt.Before(prev) {
+		benched[e.Family] = e.BenchedAt
+	}
+}
+
+func scopeCoversSeat(e clihealth.Entry, plan llmroute.Plan) bool {
+	tier := plan.Model
+	if len(plan.Tiers) > 0 {
+		tier = plan.Tiers[0]
+	}
+	for _, cli := range plan.Candidates {
+		if llmroute.Family(cli) != e.Family {
+			continue
+		}
+		if clihealth.ModelGroup(seatModel(cli, tier)) == e.Scope {
+			return true
+		}
+	}
+	return false
+}
+
+func seatModel(cli, tier string) string {
+	if m, err := bridge.LoadManifest(cli); err == nil && m.ModelTierMap[tier] != "" {
+		return m.ModelTierMap[tier]
+	}
+	return tier
+}
+
+var perModelQuotaFamilies = map[string]bool{"agy": true}
+
+func wallScope(cli, tier string) string {
+	if !perModelQuotaFamilies[llmroute.Family(cli)] {
+		return ""
+	}
+	m, err := bridge.LoadManifest(cli)
+	if err != nil {
+		return ""
+	}
+	return clihealth.ModelGroup(m.ModelTierMap[tier])
 }
 
 func allBenched(candidates []string, benched map[string]time.Time) bool {
@@ -204,24 +249,24 @@ func BenchOnEscalation(e Escalation, now func() time.Time, logf Logf) {
 	if !clihealth.Benchable(rep.Pattern) || rep.CLI != e.CLI || rep.CapturedAt.Before(e.DispatchStart) {
 		return
 	}
-	family := llmroute.Family(e.CLI)
+	target := clihealth.Entry{Family: llmroute.Family(e.CLI), Scope: wallScope(e.CLI, e.Tier)}
 	store := clihealth.NewStore(e.ProjectRoot, now)
-	if benchedFor(store, family, rep.CapturedAt) {
-		logf("cli-health: family %s is already benched for this wall; not benched again\n", family)
+	if benchedFor(store, target.Key(), rep.CapturedAt) {
+		logf("cli-health: family %s is already benched for this wall; not benched again\n", target.Key())
 		return
 	}
-	entry, err := store.BenchWall(family, rep.Pattern, rep.PaneTail)
+	entry, err := store.BenchScopedWall(target.Family, target.Scope, rep.Pattern, rep.PaneTail)
 	if err != nil {
 		logf("WARN cli-health bench write failed: %v\n", err)
 		return
 	}
 	logf("cli-health: benched family %s until %s (pattern=%s strikes=%d)%s\n",
-		family, entry.BenchedUntil.Format(time.RFC3339), rep.Pattern, entry.Strikes, operatorSuffix(entry))
+		entry.Key(), entry.BenchedUntil.Format(time.RFC3339), rep.Pattern, entry.Strikes, operatorSuffix(entry))
 }
 
-func benchedFor(store *clihealth.Store, family string, wallSeen time.Time) bool {
+func benchedFor(store *clihealth.Store, key string, wallSeen time.Time) bool {
 	benches, _ := store.Load()
-	prev, ok := benches[family]
+	prev, ok := benches[key]
 	return ok && !prev.BenchedAt.Before(wallSeen)
 }
 
