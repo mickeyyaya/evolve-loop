@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// Launcher builds one wave's production launcher: a fleet.Supervisor over launch,
-// wrapped in the freshness gate so the wave and the min-width repair share one gate.
 func (e *Engine) Launcher(wave, concurrency int, launch fleet.LaunchFn) Launcher {
 	return gatedLauncher{
 		inner:  &fleet.Supervisor{Concurrency: concurrency, Launch: launch},
@@ -26,8 +24,6 @@ func (e *Engine) Launcher(wave, concurrency int, launch fleet.LaunchFn) Launcher
 	}
 }
 
-// gatedLauncher runs the freshness gate at the last moment before launch,
-// because the plan was made earlier and may be stale.
 type gatedLauncher struct {
 	inner  Launcher
 	probe  fleet.FreshnessProbeFn
@@ -37,8 +33,6 @@ type gatedLauncher struct {
 	e      *Engine
 }
 
-// Run launches the specs that stay fresh. When none do, it launches nothing and
-// emits one LOOP_WAVE_ALL_LANES_STALE: a shorter wave, never a doomed lane.
 func (l gatedLauncher) Run(ctx context.Context, specs []fleet.CycleSpec) []fleet.Result {
 	kept, skipped := fleet.FreshenSpecs(specs, l.probe, l.refill, l.warn)
 	if len(kept) == 0 {

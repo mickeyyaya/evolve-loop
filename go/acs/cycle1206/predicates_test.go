@@ -104,15 +104,15 @@ func TestC1206_002_RootCauseFieldBindsNothingEndToEnd(t *testing.T) {
 }
 
 // acs-predicate: config-check — this criterion is inherently a
-func TestC1206_003_RejectionRationaleRecordedAtDecisionSite(t *testing.T) {
-	rules := filepath.Join(acsassert.RepoRoot(t), "go", "internal", "inboxbatch", "rules.go")
+func TestC1206_003_RejectionRationaleRecordedInPackageNotes(t *testing.T) {
+	notes := filepath.Join(acsassert.RepoRoot(t), "docs", "architecture", "packages", "internal-inboxbatch.md")
 
 	for _, needle := range []string{"root_cause", "failedApproaches[54]"} {
-		if !acsassert.FileContains(t, rules, needle) {
-			t.Errorf("C1206-003: %s does not mention %q — the root_cause rejection rationale is not recorded at the decision site (DefaultRules doc comment), so the task can resurface without its evidence", rules, needle)
+		if !acsassert.FileContains(t, notes, needle) {
+			t.Errorf("C1206-003: %s does not mention %q — the root_cause rejection rationale is not recorded in the package design notes, so the task can resurface without its evidence", notes, needle)
 		}
 	}
-	if !acsassert.FileContainsAny(rules, "zero edges", "no edges") {
-		t.Errorf("C1206-003: %s records no measured outcome for root_cause binding — the rationale must state that exact-match binding emits zero edges on the real backlog (20/20 unique prose values, cycle-1206 measurement)", rules)
+	if !acsassert.FileContainsAny(notes, "zero edges", "no edges") {
+		t.Errorf("C1206-003: %s records no measured outcome for root_cause binding — the rationale must state that exact-match binding emits zero edges on the real backlog (20/20 unique prose values, cycle-1206 measurement)", notes)
 	}
 }

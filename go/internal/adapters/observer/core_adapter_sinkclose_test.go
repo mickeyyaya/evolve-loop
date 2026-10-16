@@ -27,7 +27,7 @@ func (c *countingCloser) Count() int {
 func TestCoreAdapter_SinkClosedOnNormalDone(t *testing.T) {
 	t.Parallel()
 	done := make(chan struct{})
-	close(done) // the watcher has already exited
+	close(done)
 	closer := &countingCloser{}
 
 	start := time.Now()
@@ -44,7 +44,7 @@ func TestCoreAdapter_SinkClosedOnNormalDone(t *testing.T) {
 
 func TestCoreAdapter_NoSinkCloseRaceOnTimeout(t *testing.T) {
 	t.Parallel()
-	done := make(chan struct{}) // never closed: a wedged watcher
+	done := make(chan struct{})
 	closer := &countingCloser{}
 
 	timeout := 30 * time.Millisecond

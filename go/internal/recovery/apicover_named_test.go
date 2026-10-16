@@ -1,7 +1,5 @@
 package recovery
 
-// These tests declare exported types explicitly (var x T): apicover counts naming a
-// type, not using its fields.
 import "testing"
 
 func TestDecision_IntegrityEscalateFullStruct(t *testing.T) {
@@ -17,8 +15,6 @@ func TestDecision_IntegrityEscalateFullStruct(t *testing.T) {
 	}
 }
 
-// PhaseOutcome's only producer lives in core, which recovery cannot import, so
-// the type itself is the contract under test.
 func TestPhaseOutcome_AbortPreservesVerdictAndSpend(t *testing.T) {
 	t.Parallel()
 	happy := PhaseOutcome{Phase: "build", Verdict: "PASS", CostUSD: 0.42, DurationMS: 1500, BootMS: 30, AttemptCount: 2}

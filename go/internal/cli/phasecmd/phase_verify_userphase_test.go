@@ -11,7 +11,6 @@ import (
 
 func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 	project := t.TempDir()
-	// Minimal registry so mergedCatalog's built-in Load succeeds.
 	reg := filepath.Join(project, "docs", "architecture")
 	if err := os.MkdirAll(reg, 0o755); err != nil {
 		t.Fatal(err)
@@ -38,7 +37,6 @@ func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// At the enforce default a verdict-declaring deliverable needs the machine-readable sentinel.
 	deliverable := "## Findings\n- ok\n" + phasecontract.RenderVerdictSentinel("widget-check", "PASS") + "\n"
 	if err := os.WriteFile(filepath.Join(ws, "widget-check-report.md"), []byte(deliverable), 0o644); err != nil {
 		t.Fatal(err)

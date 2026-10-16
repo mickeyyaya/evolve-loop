@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// runPhaseLint implements `evolve phase lint <name>`. It is fail-open by contract:
-// every finding is a warning and only a missing name exits non-zero.
-// See ADR-0035.
 func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || strings.TrimSpace(args[0]) == "" {
 		fmt.Fprintln(stderr, "usage: evolve phase lint <name>")

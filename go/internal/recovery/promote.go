@@ -12,28 +12,22 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
-// promotedConfidence sits below LLM-authored lessons (>=0.9) and matches faillearn's deterministic artifacts.
 const promotedConfidence = "0.5"
 
-// minPromotedSubstrLen keeps short substrings, which match healthy output, out of the kill path.
 const minPromotedSubstrLen = 12
 
-// FailureAdvice is the advisor's unvalidated verdict on a CauseUnknown state; PromoteAdvice validates it.
 type FailureAdvice struct {
 	Cause         string `json:"cause"`
 	PaneSubstr    string `json:"pane_substr"`
 	Justification string `json:"justification"`
 }
 
-// validCauses is the promotion vocabulary; CauseUnknown is absent because promoting it is noise.
 var validCauses = map[TerminalCause]struct{}{
 	CauseModelInvalid:   {},
 	CauseCLISelfUpdated: {},
 	CauseDeadShell:      {},
 }
 
-// Promote appends sig after the seeds, so it can never shadow one; nil-receiver safe.
-// Not concurrency-safe: never call it on a detector another goroutine is using.
 func (d *FatalPaneDetector) Promote(sig FatalSignature) {
 	if d == nil || sig.Substr == "" {
 		return
@@ -41,13 +35,11 @@ func (d *FatalPaneDetector) Promote(sig FatalSignature) {
 	d.sigs = append(d.sigs, sig)
 }
 
-// promotionID is a content hash, so re-promoting a substring targets the same file.
 func promotionID(substr string) string {
 	sum := sha256.Sum256([]byte(substr))
 	return "sig-" + hex.EncodeToString(sum[:6])
 }
 
-// PromoteSignature writes sig under dir as <id>.yaml unless that file exists, and returns the id.
 func PromoteSignature(dir string, sig FatalSignature) (string, error) {
 	if sig.Substr == "" {
 		return "", fmt.Errorf("recovery: empty signature substring")
@@ -55,7 +47,7 @@ func PromoteSignature(dir string, sig FatalSignature) (string, error) {
 	id := promotionID(sig.Substr)
 	path := filepath.Join(dir, id+".yaml")
 	if _, err := os.Stat(path); err == nil {
-		return id, nil // an existing, possibly operator-edited file wins
+		return id, nil
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
@@ -66,15 +58,12 @@ func PromoteSignature(dir string, sig FatalSignature) (string, error) {
 	fmt.Fprintf(&b, "cause: %s\n", sig.Cause)
 	fmt.Fprintf(&b, "confidence: %s\n", promotedConfidence)
 	fmt.Fprintf(&b, "note: %s\n", strconv.Quote(sig.Note))
-	// atomicwrite gives each writer a unique temp, so concurrent promotions of
-	// one path cannot tear it. See ADR-0049.
 	if err := atomicwrite.Bytes(path, []byte(b.String())); err != nil {
 		return "", err
 	}
 	return id, nil
 }
 
-// loadPromotedSignatures is best-effort: a missing dir or corrupt file must never block boot.
 func loadPromotedSignatures(dir string) []FatalSignature {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -96,7 +85,6 @@ func loadPromotedSignatures(dir string) []FatalSignature {
 	return sigs
 }
 
-// parsePromotion reads the fixed-key format PromoteSignature writes.
 func parsePromotion(data string) (FatalSignature, bool) {
 	var sig FatalSignature
 	for _, line := range strings.Split(data, "\n") {
@@ -126,7 +114,6 @@ func parsePromotion(data string) (FatalSignature, bool) {
 	return sig, true
 }
 
-// SeedDetectorWithPromotions returns the seeds plus every promotion replayed from dir.
 func SeedDetectorWithPromotions(dir string) *FatalPaneDetector {
 	d := SeedDetector()
 	for _, sig := range loadPromotedSignatures(dir) {
@@ -135,7 +122,6 @@ func SeedDetectorWithPromotions(dir string) *FatalPaneDetector {
 	return d
 }
 
-// PromoteAdvice validates advice, then promotes it in memory and under dir; invalid advice is an error.
 func PromoteAdvice(d *FatalPaneDetector, dir string, advice FailureAdvice) error {
 	cause := TerminalCause(advice.Cause)
 	if _, ok := validCauses[cause]; !ok {
@@ -144,8 +130,6 @@ func PromoteAdvice(d *FatalPaneDetector, dir string, advice FailureAdvice) error
 	if len(advice.PaneSubstr) < minPromotedSubstrLen {
 		return fmt.Errorf("recovery: advice substring %q too short to promote safely (min %d chars — short substrings are false-positive bombs)", advice.PaneSubstr, minPromotedSubstrLen)
 	}
-	// The advisor reads a neutralized digest but Detect matches raw panes, so a
-	// neutralization artifact could never fire. See ADR-0045.
 	for _, artifact := range []string{"[REDACTED]", "[untrusted]", "'''"} {
 		if strings.Contains(advice.PaneSubstr, artifact) {
 			return fmt.Errorf("recovery: pane_substr %q contains neutralization artifact %q — quoted from the digest view, not the raw pane; promotion rejected", advice.PaneSubstr, artifact)

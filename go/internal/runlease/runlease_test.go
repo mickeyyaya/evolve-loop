@@ -88,18 +88,9 @@ func TestFresh_UnparsableTimestampNeverFresh(t *testing.T) {
 	}
 }
 
-// TestOwnerLive_* — cycle-554 workspace-hygiene-s1 RED contract. Today
-// liveness is freshness-only (10min lease TTL), so a crashed owner with a
-// still-fresh heartbeat (the common 2-6min post-crash window) reads as "live"
-// and blocks SealCycle/the loop guard, forcing `evolve cycle reset --force` at
-// every batch boundary (plan docs/plans/workspace-hygiene-2026-07.md §S1).
-// OwnerLive adds a pid-liveness probe on top of Fresh: dead pid + fresh
-// heartbeat ⇒ not live (the fix); live pid + fresh heartbeat ⇒ still live (the
-// invariant the fence exists for, unchanged).
-
 func TestOwnerLive_DeadPidFreshHeartbeatNotLive(t *testing.T) {
 	l := Lease{OwnerPID: 4242, HeartbeatAt: t0.UTC().Format(time.RFC3339Nano)}
-	alive := func(pid int) bool { return false } // owner process is gone
+	alive := func(pid int) bool { return false }
 	if OwnerLive(l, t0, 0, alive) {
 		t.Error("fresh heartbeat with a dead owner pid must NOT be live")
 	}
@@ -121,8 +112,6 @@ func TestOwnerLive_StaleAliveOwnerNotLive(t *testing.T) {
 	}
 }
 
-// TestOwnerLive_NilAlive — EDGE/back-compat: a caller that passes no probe
-// keeps the old freshness-only behavior; no probe call, no panic.
 func TestOwnerLive_NilAlive(t *testing.T) {
 	l := Lease{OwnerPID: 4242, HeartbeatAt: t0.UTC().Format(time.RFC3339Nano)}
 	if !OwnerLive(l, t0, 0, nil) {
@@ -133,9 +122,6 @@ func TestOwnerLive_NilAlive(t *testing.T) {
 	}
 }
 
-// TestOwnerLive_Pid0 — EDGE/back-compat: leases written before pid tracking
-// existed (or by a caller that never sets OwnerPID) must resolve via Fresh
-// alone; the probe must not even be consulted.
 func TestOwnerLive_Pid0(t *testing.T) {
 	l := Lease{OwnerPID: 0, HeartbeatAt: t0.UTC().Format(time.RFC3339Nano)}
 	called := false
@@ -255,12 +241,6 @@ func TestWrite_RenameSeamErrorRemovesTemp(t *testing.T) {
 	}
 }
 
-// TestWriter_PerInstanceSeamsAreIsolated is the acceptance for moving the write
-// seams off package globals (concurrency-hygiene): two writers with DIFFERENT
-// injected seams operate independently. The old package-var form (one shared
-// createTempFn/renameFn) structurally could not hold two live seams at once — so
-// this proves the seams are per-instance, which is what lets the seam tests
-// above run t.Parallel() without racing shared state.
 func TestWriter_PerInstanceSeamsAreIsolated(t *testing.T) {
 	t.Parallel()
 	var aCreated, bRenamed bool

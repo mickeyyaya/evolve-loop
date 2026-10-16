@@ -46,7 +46,6 @@ func TestConsoleRouted_AnnotatedFileEntryFirstToken(t *testing.T) {
 	}
 }
 
-// The override wins only over a directory-scope derivation; a declared protected file still routes.
 func TestConsoleRouted_ExplicitLaneOverrideWins(t *testing.T) {
 	it := Item{ID: "x", Route: "lane", Files: []string{"go/internal/guards/"}}
 	if routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/")); routed {

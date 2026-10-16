@@ -44,8 +44,6 @@ func TestSeedDetector_RemainingShellContinuationVariants(t *testing.T) {
 			t.Errorf("RED (R3.3): %q not classified dead_shell (ok=%v cause=%v) — the cycle-274/277 transcript variants must all be seeded", pane, ok, cause)
 		}
 	}
-	// A line-leading token in prose is an accepted limit that the process check
-	// covers; pin the form that must not match: the token mid-line.
 	if cause, sub, ok := det.Detect("the zsh dquote> prompt indicates an unclosed string in your script"); ok {
 		t.Errorf("mid-line prose classified as %v via %q — seed must anchor on a line boundary", cause, sub)
 	}

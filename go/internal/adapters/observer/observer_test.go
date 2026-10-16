@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-// assertWatchActivityResetsStallTimer runs Watch on a virtual clock and writes
-// the activity after the first idle sample. The next poll crosses the original
-// deadline, so only a stall-timer reset prevents stall_no_output; no writer
-// goroutine races the -race scheduler.
 func assertWatchActivityResetsStallTimer(t *testing.T, cfg Config, activity func() error) {
 	t.Helper()
 	const stall = 200 * time.Millisecond
@@ -40,11 +36,11 @@ func assertWatchActivityResetsStallTimer(t *testing.T, cfg Config, activity func
 	observer := New(cfg, &sink)
 	observer.nowFunc = func() time.Time {
 		if !started {
-			return base // timestamp for the initial started event
+			return base
 		}
 		if !baselineSet {
 			baselineSet = true
-			return base // initial lastGrowth
+			return base
 		}
 		clockChecks++
 		switch clockChecks {
@@ -94,7 +90,6 @@ func TestWatch_StallEmitsIncident(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "scout-stdout.log")
-	// No growth after this write.
 	if err := os.WriteFile(logFile, []byte("initial"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +148,6 @@ func TestWatch_LivenessProbeSuppressesFalseStall(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()
 	logFile := filepath.Join(tmp, "tdd-stdout.log")
-	// A flat log and no workspace: the window of one long silent turn.
 	if err := os.WriteFile(logFile, []byte("start"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -273,8 +267,6 @@ func TestWatch_WorkspaceConfiguredButIdle_StillStalls(t *testing.T) {
 	}
 }
 
-// awaitEvent waits for an event of eventType on ch. The timeout is a generous
-// safety bound, not a tuned window, so a slow -race runner cannot flake it.
 func awaitEvent(t *testing.T, ch <-chan Event, eventType string, timeout time.Duration) bool {
 	t.Helper()
 	deadline := time.NewTimer(timeout)
@@ -306,7 +298,6 @@ func TestWatch_ObserverEventsFileDoesNotMaskStall(t *testing.T) {
 		StallS: 40 * time.Millisecond, PollS: 5 * time.Millisecond,
 		Cycle: 3, Phase: "build", Agent: "build",
 		StdoutLog: logFile, WorkspaceDir: tmp,
-		// Non-blocking, as OnEvent requires.
 		OnEvent: func(e Event) {
 			select {
 			case events <- e:
@@ -315,7 +306,6 @@ func TestWatch_ObserverEventsFileDoesNotMaskStall(t *testing.T) {
 		},
 	}, &sink)
 
-	// Keep the observer's own events file growing throughout.
 	stopWriter := make(chan struct{})
 	writerDone := make(chan struct{})
 	go func() {
@@ -397,7 +387,6 @@ func TestWatch_ContextCancelReturnsErr(t *testing.T) {
 	}
 }
 
-// The only assertion is that Watch does not panic on a missing log.
 func TestWatch_MissingLogFile(t *testing.T) {
 	t.Parallel()
 	o := New(Config{
@@ -478,7 +467,6 @@ func TestNewestActivity_ReportsNewestFileMtime(t *testing.T) {
 	if err := os.Chtimes(newer, newTime, newTime); err != nil {
 		t.Fatal(err)
 	}
-	// The newest file on disk, but it is the observer's own sink.
 	events := filepath.Join(ws, "build"+observerEventsSuffix)
 	if err := os.WriteFile(events, []byte("{}\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -505,7 +493,6 @@ func TestNewestActivity_SkipsUnreadableEntries(t *testing.T) {
 	if err := os.Chtimes(good, goodTime, goodTime); err != nil {
 		t.Fatal(err)
 	}
-	// An unreadable subdir makes Walk report an error for its children.
 	bad := filepath.Join(ws, "noread")
 	if err := os.MkdirAll(filepath.Join(bad, "child"), 0o755); err != nil {
 		t.Fatal(err)
@@ -513,7 +500,7 @@ func TestNewestActivity_SkipsUnreadableEntries(t *testing.T) {
 	if err := os.Chmod(bad, 0o000); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(bad, 0o755) }) // so t.TempDir cleanup can remove it
+	t.Cleanup(func() { _ = os.Chmod(bad, 0o755) })
 
 	o := New(Config{WorkspaceDir: ws}, &bytes.Buffer{})
 	got := o.newestActivity()
@@ -555,7 +542,6 @@ func parseEvents(t *testing.T, b []byte) []Event {
 	return out
 }
 
-// syncBuffer is a mutex-guarded bytes.Buffer: the watcher goroutine writes while the test reads.
 type syncBuffer struct {
 	mu  sync.Mutex
 	buf bytes.Buffer

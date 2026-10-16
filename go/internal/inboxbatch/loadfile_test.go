@@ -12,7 +12,7 @@ func TestLoadFile_ParsesAcceptanceAndSanitises(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "task-a.json")
 	long := strings.Repeat("x", maxAcceptanceLen+50)
-	control := "\\" + "u0001" // the JSON escape for U+0001 (raw control bytes are invalid JSON)
+	control := "\\" + "u0001"
 	body := `{"title":"T","acceptance":["first criterion","bad` + control + `char","` + long + `"]}`
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 		t.Fatal(err)

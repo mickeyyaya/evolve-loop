@@ -496,7 +496,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/acssuite` | 27 | [internal-acssuite.md](internal-acssuite.md) |
 | `internal/adapters/bridge` | 32 | [internal-adapters-bridge.md](internal-adapters-bridge.md) |
 | `internal/adapters/ledger` | 28 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
-| `internal/adapters/observer` | 30 | [internal-adapters-observer.md](internal-adapters-observer.md) |
+| `internal/adapters/observer` | 31 | [internal-adapters-observer.md](internal-adapters-observer.md) |
 | `internal/adapters/sandbox` | 2 | [internal-adapters-sandbox.md](internal-adapters-sandbox.md) |
 | `internal/adapters/statemap` | 7 | [internal-adapters-statemap.md](internal-adapters-statemap.md) |
 | `internal/adapters/storage` | 7 | [internal-adapters-storage.md](internal-adapters-storage.md) |
@@ -516,6 +516,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/campaign` | 4 | [internal-campaign.md](internal-campaign.md) |
 | `internal/capability` | 1 | [internal-capability.md](internal-capability.md) |
 | `internal/changedpkgs` | 13 | [internal-changedpkgs.md](internal-changedpkgs.md) |
+| `internal/changeloggen` | 2 | [internal-changeloggen.md](internal-changeloggen.md) |
 | `internal/checkpoint` | 14 | [internal-checkpoint.md](internal-checkpoint.md) |
 | `internal/ciparity` | 10 | [internal-ciparity.md](internal-ciparity.md) |
 | `internal/cli/guardcmd` | 9 | [internal-cli-guardcmd.md](internal-cli-guardcmd.md) |
@@ -591,6 +592,8 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phases/audit/ciparitygate` | 18 | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
 | `internal/phases/audit` | 170 | [internal-phases-audit.md](internal-phases-audit.md) |
 | `internal/phases/build` | 13 | [internal-phases-build.md](internal-phases-build.md) |
+| `internal/phases/debugger` | 3 | [internal-phases-debugger.md](internal-phases-debugger.md) |
+| `internal/phases/intent` | 6 | [internal-phases-intent.md](internal-phases-intent.md) |
 | `internal/phases/retro` | 25 | [internal-phases-retro.md](internal-phases-retro.md) |
 | `internal/phases/runner/verdict` | 22 | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/phases/runner` | 78 | [internal-phases-runner.md](internal-phases-runner.md) |
@@ -612,7 +615,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/quotareset` | 1 | [internal-quotareset.md](internal-quotareset.md) |
 | `internal/quotastate` | 1 | [internal-quotastate.md](internal-quotastate.md) |
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
-| `internal/recovery` | 39 | [internal-recovery.md](internal-recovery.md) |
+| `internal/recovery` | 42 | [internal-recovery.md](internal-recovery.md) |
 | `internal/recurrence` | 12 | [internal-recurrence.md](internal-recurrence.md) |
 | `internal/reflection` | 1 | [internal-reflection.md](internal-reflection.md) |
 | `internal/regressiontia` | 5 | [internal-regressiontia.md](internal-regressiontia.md) |
@@ -626,6 +629,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/rollback` | 3 | [internal-rollback.md](internal-rollback.md) |
 | `internal/router` | 93 | [internal-router.md](internal-router.md) |
 | `internal/routingtest` | 13 | [internal-routingtest.md](internal-routingtest.md) |
+| `internal/runlease` | 1 | [internal-runlease.md](internal-runlease.md) |
 | `internal/scopedelta` | 3 | [internal-scopedelta.md](internal-scopedelta.md) |
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
 | `internal/shiperr` | 13 | [internal-shiperr.md](internal-shiperr.md) |
@@ -643,6 +647,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |
 | `internal/treefence` | 3 | [internal-treefence.md](internal-treefence.md) |
 | `internal/triagecap` | 69 | [internal-triagecap.md](internal-triagecap.md) |
+| `internal/usageprobe` | 2 | [internal-usageprobe.md](internal-usageprobe.md) |
 | `internal/verdictcache` | 6 | [internal-verdictcache.md](internal-verdictcache.md) |
 | `internal/verifylock` | 2 | [internal-verifylock.md](internal-verifylock.md) |
 | `pkg/acsassert` | 5 | [pkg-acsassert.md](pkg-acsassert.md) |

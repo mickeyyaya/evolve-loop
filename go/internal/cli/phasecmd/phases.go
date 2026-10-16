@@ -16,7 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// RunPhases implements `evolve phases`; it exits 0 ok, 1 I/O error, 2 validation failure, 10 usage error.
 func RunPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve phases", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -153,7 +152,6 @@ func phasesList(project string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// phasesValidate prints per-phase verdicts on stdout (machine-readable) and discovery warnings on stderr.
 func phasesValidate(project, profileDir string, args []string, stdout, stderr io.Writer) int {
 	strictProvenance, args := splitStrictProvenance(args)
 	if profileDir == "" {

@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 
-	// Blank imports register every built-in phase through its package init().
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/debugger"
@@ -70,7 +69,6 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	resp, err := runner.Run(context.Background(), req)
 	if err != nil {
-		// Emit the partial response anyway so the parent can read its diagnostics.
 		buf, _ := json.MarshalIndent(resp, "", "  ")
 		fmt.Fprintln(stdout, string(buf))
 		fmt.Fprintf(stderr, "evolve phase: %s: %v\n", name, err)

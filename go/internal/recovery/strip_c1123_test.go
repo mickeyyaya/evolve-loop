@@ -6,9 +6,7 @@ import (
 )
 
 const (
-	// c1123ModelSeed is an English-sentence seed, the shape an agent quotes.
-	c1123ModelSeed = "There's an issue with the selected model"
-	// c1123AnchoredSeed is newline-anchored, which a delete-based strip would break.
+	c1123ModelSeed    = "There's an issue with the selected model"
 	c1123AnchoredSeed = "\nquote>"
 )
 
@@ -26,7 +24,6 @@ func TestC1123_StripAgentContentBlanksAgentDiffLines(t *testing.T) {
 	if _, _, ok := SeedDetector().Detect(got); ok {
 		t.Errorf("Detect fires on a pane whose only signature came from agent diff content\nstripped:\n%s", got)
 	}
-	// Line count is the observable for blank-in-place.
 	if want, have := strings.Count(pane, "\n"), strings.Count(got, "\n"); have != want {
 		t.Errorf("line count changed: %d newlines, want %d — lines were DELETED, not blanked; every survivor below the strip lost its position and the newline-anchored seeds stop matching (D1)", have, want)
 	}

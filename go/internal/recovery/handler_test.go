@@ -73,7 +73,6 @@ func TestChainStallPolicy_AdaptsToObserverVocabulary(t *testing.T) {
 	if a != StallExtend || reason == "" {
 		t.Fatalf("within-budget stall must extend with a reason; got %s %q", a, reason)
 	}
-	// IdleS/ThresholdS is the attempt count: 10 is past the budget of 6.
 	a, _ = p.Decide(StallEvent{Kind: "stuck_no_output", IdleS: 6000, ThresholdS: 600})
 	if a != StallEscalate {
 		t.Fatalf("budget-exhausted unknown stall must escalate from the observer; got %s", a)

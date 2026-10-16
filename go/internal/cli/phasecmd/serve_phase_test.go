@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
-// envelopeStdin frames req the way phaseproto.SubprocessRunner writes it.
 func envelopeStdin(t *testing.T, req core.PhaseRequest) []byte {
 	t.Helper()
 	env, err := phaseproto.EncodeRequest("corr-test", req)

@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// decode goes through json.Unmarshal, as every production reader does, so mentions are derived.
 func decode(t *testing.T, record string) inboxbatch.Item {
 	t.Helper()
 	var it inboxbatch.Item
@@ -63,7 +62,6 @@ func TestConsoleRouted_UndeclaredSurfaceIsTheFilesTheTextNames(t *testing.T) {
 	if ok, reason := routed(t, `{"id":"y","kind":"bug","fix":"tighten go/internal/inboxbatch/item.go and docs/architecture/x.md"}`); ok {
 		t.Errorf("unprotected file mentions routed console: %q", reason)
 	}
-	// JSON may escape the slash as "\/".
 	if ok, _ := routed(t, `{"id":"z","kind":"bug","fix":"see go\/internal\/bridge\/autorespond.go"}`); !ok {
 		t.Error(`an escaped "\/" path must still be read as a mention`)
 	}

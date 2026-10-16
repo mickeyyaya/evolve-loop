@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// PlanFn returns the wave's plan source: the prior cycle's triage decision, else an
-// inbox seed. It prunes the decision before widening it, so the widen refills the freed slots.
 func (e *Engine) PlanFn(count int) PlanFn {
 	return func(ctx context.Context, wave int) ([]byte, []string, error) {
 		e.releaseStaleClaims(wave)
@@ -32,8 +30,6 @@ func (e *Engine) PlanFn(count int) PlanFn {
 	}
 }
 
-// SeedWavePlanFromInbox builds a triage decision from the inbox backlog. count is
-// clamped to at least 2, and fewer than 2 file-disjoint lanes is an error.
 func SeedWavePlanFromInbox(evolveDir string, count int, protected func(string) bool) ([]byte, error) {
 	if count < 2 {
 		count = 2
@@ -45,13 +41,11 @@ func SeedWavePlanFromInbox(evolveDir string, count int, protected func(string) b
 	return json.Marshal(map[string]any{"top_n": cards(menus)})
 }
 
-// card is one top_n entry as the decision file spells it.
 type card struct {
 	ID    string   `json:"id"`
 	Files []string `json:"files"`
 }
 
-// decision is the triage-decision wire shape the prunes and the widen read.
 type decision struct {
 	CommittedFloors []string `json:"committed_floors"`
 	TopN            []card   `json:"top_n"`
@@ -73,7 +67,6 @@ func cardOf(id string, files []string) map[string]any {
 	return c
 }
 
-// cards flattens lane menus into top_n cards, keeping files so the fan-out re-derives the same lanes.
 func cards(menus [][]triagecap.FleetCandidate) []map[string]any {
 	var topN []map[string]any
 	for _, menu := range menus {
@@ -104,8 +97,6 @@ func (e *Engine) pruneUndispatchable(data []byte) []byte {
 	})
 }
 
-// pruneRouted drops top_n ids the plan-time gate would now refuse. Kept, such an
-// id holds a lane slot the widen never refills, and the gate refuses it after the lanes are cut.
 func (e *Engine) pruneRouted(data []byte) []byte {
 	routed := e.routedBase()
 	return e.pruneTopN(data, func(id string) (string, bool) {
@@ -114,8 +105,6 @@ func (e *Engine) pruneRouted(data []byte) []byte {
 	})
 }
 
-// pruneTopN drops each non-empty top_n id that dead reports, with one WARN line
-// per id. A decision with committed_floors passes through, because the fan-out then ignores top_n.
 func (e *Engine) pruneTopN(data []byte, dead func(id string) (line string, drop bool)) []byte {
 	d, ok := parseDecision(data)
 	if !ok || len(d.CommittedFloors) > 0 || len(d.TopN) == 0 {
@@ -137,7 +126,6 @@ func (e *Engine) pruneTopN(data []byte, dead func(id string) (line string, drop 
 	return remarshalFull(data, kept)
 }
 
-// remarshalFull rewrites top_n and keeps every other key of the decision.
 func remarshalFull(data []byte, topN []map[string]any) []byte {
 	var full map[string]any
 	if err := json.Unmarshal(data, &full); err != nil {
@@ -147,13 +135,10 @@ func remarshalFull(data []byte, topN []map[string]any) []byte {
 	return marshalOr(data, full)
 }
 
-// remarshalTopN emits {"top_n": …} only, dropping every other key.
 func remarshalTopN(data []byte, topN []map[string]any) []byte {
 	return marshalOr(data, map[string]any{"top_n": topN})
 }
 
-// marshalOr falls back to the original bytes on a marshal failure: widening and
-// pruning are optimizations, never a correctness dependency.
 func marshalOr(data []byte, v any) []byte {
 	out, err := json.Marshal(v)
 	if err != nil {

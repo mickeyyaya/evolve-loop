@@ -16,47 +16,35 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
-// Item is one .evolve/inbox/*.json record; absent fields zero-value rather than error.
 type Item struct {
-	ID     string  `json:"id"`
-	Title  string  `json:"title"`
-	Weight float64 `json:"weight"`
-	Kind   string  `json:"kind"`
-	// Class is the declared archetype that IsOperatorState keys on.
-	Class         string   `json:"class"`
-	Priority      string   `json:"priority"`
-	PriorityClass string   `json:"priority_class"`
-	Campaign      string   `json:"campaign"`
-	Files         []string `json:"files"`
-	ConnectsTo    []string `json:"connects_to"`
-	Deps          []string `json:"deps"`
-	// Route "console-*" makes the item operator-owned; "lane" overrides a heuristic derivation; empty derives.
-	Route string `json:"route"`
-	// InjectedBy is autofile provenance; a non-empty value clamps the route:"lane" override.
-	InjectedBy string `json:"injected_by"`
-	// Continuation binds a failed cycle's preserved work; machine-consumed, never rendered.
-	Continuation *continuation.Continuation `json:"continuation,omitempty"`
-	// Acceptance is the single source of the Task Contract block's criteria.
-	Acceptance []string `json:"acceptance,omitempty"`
-	// DeliverableKind is "code" (default) or "document".
-	DeliverableKind string `json:"deliverable_kind,omitempty"`
-	// CreatedAt is the filing timestamp as authored: RFC3339 or a bare date.
-	CreatedAt string `json:"created_at,omitempty"`
-	// Path is the file name inside the inbox dir, for display only.
-	Path           string `json:"-"`
-	IDFromFileName bool   `json:"-"`
-	// mentions are the files the record's own text names, derived at decode.
-	mentions []string
+	ID              string                     `json:"id"`
+	Title           string                     `json:"title"`
+	Weight          float64                    `json:"weight"`
+	Kind            string                     `json:"kind"`
+	Class           string                     `json:"class"`
+	Priority        string                     `json:"priority"`
+	PriorityClass   string                     `json:"priority_class"`
+	Campaign        string                     `json:"campaign"`
+	Files           []string                   `json:"files"`
+	ConnectsTo      []string                   `json:"connects_to"`
+	Deps            []string                   `json:"deps"`
+	Route           string                     `json:"route"`
+	InjectedBy      string                     `json:"injected_by"`
+	Continuation    *continuation.Continuation `json:"continuation,omitempty"`
+	Acceptance      []string                   `json:"acceptance,omitempty"`
+	DeliverableKind string                     `json:"deliverable_kind,omitempty"`
+	CreatedAt       string                     `json:"created_at,omitempty"`
+	Path            string                     `json:"-"`
+	IDFromFileName  bool                       `json:"-"`
+	mentions        []string
 }
 
 type ItemKey struct{ ID, Path string }
 
 func (it Item) Key() ItemKey { return ItemKey{ID: it.ID, Path: it.Path} }
 
-// UnmarshalJSON decodes a record and derives the files its author-written fields name.
-// Deriving at decode gives every reader (wave seed, claim floor, LoadFile) the same surface.
 func (it *Item) UnmarshalJSON(raw []byte) error {
-	type record Item // drops this method, so decoding does not recurse
+	type record Item
 	var r record
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return err
@@ -69,23 +57,18 @@ func (it *Item) UnmarshalJSON(raw []byte) error {
 	return nil
 }
 
-// DeclaredSurface reports whether any files[] token is path-shaped; placeholders and bare file names declare nothing.
 func (it Item) DeclaredSurface() bool {
 	return len(declaredTokens(it.Files)) > 0
 }
 
-// DeclaredPaths returns the item's declared fix surface: its path-shaped files[] tokens.
 func (it Item) DeclaredPaths() []string {
 	return declaredTokens(it.Files)
 }
 
-// filedAtLayouts are the created_at shapes authors write, most specific first.
 var filedAtLayouts = []string{time.RFC3339, "2006-01-02"}
 
 const FilenameStampLayout = "2006-01-02T15-04-05Z"
 
-// FiledAt is when the item was filed: its created_at, else its file name's timestamp prefix.
-// It is zero when neither parses; premise drift measures from it, so a date is never guessed.
 func (it Item) FiledAt() time.Time {
 	created := strings.TrimSpace(it.CreatedAt)
 	for _, layout := range filedAtLayouts {
@@ -101,7 +84,6 @@ func (it Item) FiledAt() time.Time {
 	return time.Time{}
 }
 
-// declaredTokens is the path-shaped files[] tokens: the declared surface the console classifier judges.
 func declaredTokens(files []string) []string {
 	var out []string
 	for _, tok := range surfaceTokens(files) {
@@ -112,7 +94,6 @@ func declaredTokens(files []string) []string {
 	return out
 }
 
-// surfaceTokens splits files[] entries into bare tokens ("a.go b.go", "(a.go)", "a.go;", "a.go:178").
 func surfaceTokens(files []string) []string {
 	var out []string
 	for _, f := range files {
@@ -126,14 +107,10 @@ func surfaceTokens(files []string) []string {
 	return out
 }
 
-// lineLocatorRE matches a trailing citation locator (":178", ":189,205,221", ":10-20", "#L10-L20"),
-// which is not part of the path; a date-shaped suffix strips too.
 var lineLocatorRE = regexp.MustCompile(`(?::\d+(?:[-,:]\d+)*|#L\d+(?:-L?\d+)?)$`)
 
-// repoPathRE matches a whole token of slash-joined path segments, or one segment with a trailing slash ("go/").
 var repoPathRE = regexp.MustCompile(`^[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)*/$|^[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+$`)
 
-// isPathShaped accepts "go/", "docs/x.md" and "skills/audit" but not "N/A", "w/o", "TBD" or a bare "role.go".
 func isPathShaped(tok string) bool {
 	if !repoPathRE.MatchString(tok) {
 		return false
@@ -156,10 +133,8 @@ func skipMention(k string) bool {
 	return surfaceAndProvenanceFields[k] || RoleOf(k).IsStamp()
 }
 
-// maxMentions bounds the walk so a runaway record cannot make routing costly.
 const maxMentions = 64
 
-// mentionedFiles returns the distinct file paths the fields name, in walk order; directory mentions are context.
 func mentionedFiles(doc map[string]any) []string {
 	var out []string
 	seen := map[string]bool{}
@@ -189,7 +164,6 @@ func mentionedFiles(doc map[string]any) []string {
 	return out
 }
 
-// isFileSpelling reports whether p's last segment has an extension after its first character ("runner.go", not ".evolve").
 func isFileSpelling(p string) bool {
 	last := p[strings.LastIndex(p, "/")+1:]
 	return len(last) > 1 && strings.Contains(last[1:], ".")
@@ -204,7 +178,6 @@ func sortedKeys(m map[string]any) []string {
 	return keys
 }
 
-// LoadDir loads every *.json in dir sorted by ID; a missing dir is empty and a malformed file is a warning.
 func LoadDir(dir string) (items []Item, warnings []string, err error) {
 	scan, err := ScanDir(dir)
 	if err != nil {
@@ -216,13 +189,10 @@ func LoadDir(dir string) (items []Item, warnings []string, err error) {
 	return scan.Items, warnings, nil
 }
 
-// maxFieldLen fits every legitimate id yet stops a runaway field flooding the prompt.
 const maxFieldLen = 160
 
-// maxAcceptanceLen fits a real criterion yet stops an item smuggling in a page of instructions.
 const maxAcceptanceLen = 600
 
-// LoadFile loads one record with LoadDir's id fallback and sanitization; warnings are non-fatal.
 func LoadFile(path string) (Item, []string, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -308,8 +278,6 @@ func SanitizedFields(it Item) []string {
 	return sanitizeItem(&probe).changed
 }
 
-// StripControl replaces control characters (C0 and DEL) with spaces.
-// A newline in agent-authored text entering a prompt would forge a new context line.
 func StripControl(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {

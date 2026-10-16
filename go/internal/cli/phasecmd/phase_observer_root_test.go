@@ -65,8 +65,6 @@ func TestParseObserverArgs_TableVerbatim(t *testing.T) {
 	}
 }
 
-// A directory at the report path forces OBSERVER_REPORT_WRITE_FAILED. SIGUSR1 to this process is
-// safe once observer_started is on disk, because the handler is armed before Run.
 func TestRunPhaseObserver_RendersObserverCodesOnStderr(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	ws := t.TempDir()
@@ -110,7 +108,6 @@ func TestRunPhaseObserver_RendersObserverCodesOnStderr(t *testing.T) {
 	}
 }
 
-// A source pin: the stderr-only Center delivers synchronously, so a missing Flush is not observable at runtime.
 func TestRunPhaseObserver_FlushesItsCenterOnReturn(t *testing.T) {
 	t.Parallel()
 	src, err := os.ReadFile("phase_observer.go")

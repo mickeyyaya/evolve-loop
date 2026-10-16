@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// ADR-0050 §3.10 Slice 2: debugger reads the ship-failure envelope from the typed
-// ErrorContext at enforce (req.Input.Active()) and the legacy ship_error_* Context
-// keys below it.
-
 func TestDebugger_ComposePrompt_TypedEqualsMap(t *testing.T) {
 	ctx := map[string]string{
 		"ship_error_code":  "E_PUSH_NONFF",
@@ -34,8 +30,6 @@ func TestDebugger_ComposePrompt_TypedEqualsMap(t *testing.T) {
 	}
 }
 
-// At enforce the typed channel is consulted (no Context): a partial envelope renders
-// only its present fields, matching the legacy "only render what is present".
 func TestDebugger_ComposePrompt_EnforceReadsTypedPartial(t *testing.T) {
 	req := core.PhaseRequest{
 		Input: phaseio.NewPhaseInput(phaseio.PhaseInputInit{
@@ -55,11 +49,9 @@ func TestDebugger_ComposePrompt_EnforceReadsTypedPartial(t *testing.T) {
 	}
 }
 
-// An active envelope with NO upstream error renders an empty Ship Failure Envelope —
-// byte-identical to a dispatch with no ship_error_* Context keys.
 func TestDebugger_ComposePrompt_EnforceNoError_NoLines(t *testing.T) {
 	req := core.PhaseRequest{Input: phaseio.NewPhaseInput(phaseio.PhaseInputInit{Phase: "debugger"})}
-	mapReq := core.PhaseRequest{} // no ship_error_* keys
+	mapReq := core.PhaseRequest{}
 	got := hooks{}.ComposePrompt("BODY", req)
 	want := hooks{}.ComposePrompt("BODY", mapReq)
 	if got != want {

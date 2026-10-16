@@ -191,3 +191,10 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/docsfloor` | the docs floor: an architecture-labeled change must touch documentation (ADR-0077) | [internal-docsfloor.md](internal-docsfloor.md) |
 | `internal/phases/tdd` | the RED test-writer phase: its verdict mapping, prompt composition and artifact name | [internal-phases-tdd.md](internal-phases-tdd.md) |
 | `internal/bridgechain` | the bridge decorator that walks the CLI and tier fallback chain for every launcher | [internal-bridgechain.md](internal-bridgechain.md) |
+| `internal/releasetargets` | parses .goreleaser.yml, the release build matrix, into the target list and asset names the release-verify-binaries gate checks | [internal-releasetargets.md](internal-releasetargets.md) |
+| `internal/skillinventory` | builds the cached skill inventory by category that Scout reads as routing hints | [internal-skillinventory.md](internal-skillinventory.md) |
+| `pkg/naminguard` | the config-driven guard against dead naming tokens that a rename leaves behind; public API | [pkg-naminguard.md](pkg-naminguard.md) |
+| `internal/runlease` | the per-run .lease heartbeat file shared by the retention engine and the fleet scheduler: freshness, owner liveness, write ordering | [internal-runlease.md](internal-runlease.md) |
+| `internal/phases/intent` | the goal-capture phase: delta mode, the deterministic goal-hash skip and the verdict mapping | [internal-phases-intent.md](internal-phases-intent.md) |
+| `internal/phases/debugger` | the ship-recovery diagnosis phase: the decision file, the recovery signals and the safe BLOCK default | [internal-phases-debugger.md](internal-phases-debugger.md) |
+| `internal/changeloggen` | renders conventional-commit subjects into a Keep-a-Changelog entry and prepends it idempotently | [internal-changeloggen.md](internal-changeloggen.md) |
