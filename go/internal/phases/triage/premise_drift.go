@@ -14,18 +14,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Bounded like the carry-forward sweep: git work here must never stall
-// prompt composition.
 const (
-	premiseDriftMaxItems   = 5               // a lane's scope (one item, or a small menu); the cap guards a runaway scope
-	premiseDriftMaxCommits = 5               // declared-path commits listed per item (newest first)
-	premiseDriftMaxOther   = 3               // id-naming and package-only commits listed per item
-	premiseDriftTextLen    = 100             // runes kept of each id, subject and path list
-	premiseDriftTimeout    = 5 * time.Second // one deadline for the whole section
+	premiseDriftMaxItems   = 5
+	premiseDriftMaxCommits = 5
+	premiseDriftMaxOther   = 3
+	premiseDriftTextLen    = 100
+	premiseDriftTimeout    = 5 * time.Second
 )
 
-// premiseDriftUnavailable is the visible line for an item whose evidence could
-// not be gathered — silence would read as "no drift".
 const premiseDriftUnavailable = "drift unavailable (git failed or timed out)\n"
 
 func premiseDriftSection(ctx context.Context, projectRoot, scope string) string {
@@ -180,7 +176,7 @@ func repoPaths(declared []string) (inRepo, outside []string) {
 			continue
 		}
 		if strings.HasSuffix(p, "/") {
-			c += "/" // keep the directory marker packageDirs reads
+			c += "/"
 		}
 		inRepo = append(inRepo, c)
 	}
@@ -212,7 +208,7 @@ func vanishedAtHEAD(ctx context.Context, root string, declared []string) (gone [
 	head := sysexec.Command(ctx, "git", "rev-parse", "--quiet", "--verify", "HEAD^{tree}")
 	head.Dir = root
 	if head.Run() != nil {
-		return nil, false // no HEAD tree to judge against: unavailable, never "everything vanished"
+		return nil, false
 	}
 	for _, p := range declared {
 		cmd := sysexec.Command(ctx, "git", "cat-file", "-e", "HEAD:"+strings.TrimSuffix(p, "/"))

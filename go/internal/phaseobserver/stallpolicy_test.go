@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// scriptedStallPolicy returns a fixed action for every stall and records the events it was asked about.
 type scriptedStallPolicy struct {
 	mu     sync.Mutex
 	action recovery.StallAction
@@ -27,7 +26,6 @@ func (p *scriptedStallPolicy) Decide(ev recovery.StallEvent) (recovery.StallActi
 	return p.action, p.reason
 }
 
-// stallHarness runs the observer over an empty stdout with a clock that jumps past StallS; it returns kills and events.
 func stallHarness(t *testing.T, enforce bool, policy *scriptedStallPolicy) (int, string) {
 	t.Helper()
 	ws := tempWorkspace(t)
@@ -77,7 +75,7 @@ func stallHarness(t *testing.T, enforce bool, policy *scriptedStallPolicy) (int,
 func TestRun_StallPolicyExtend_NoKill(t *testing.T) {
 	t.Parallel()
 	pol := &scriptedStallPolicy{action: recovery.StallExtend, reason: "deep-thinking phase; extend"}
-	kills, events := stallHarness(t, true /* enforce */, pol)
+	kills, events := stallHarness(t, true, pol)
 	if kills != 0 {
 		t.Errorf("policy=extend must suppress the kill even with Enforce=true; got %d kill(s)", kills)
 	}
@@ -100,7 +98,7 @@ func TestRun_StallPolicyExtend_NoKill(t *testing.T) {
 func TestRun_StallPolicyKillRetry_SendsSIGTERM(t *testing.T) {
 	t.Parallel()
 	pol := &scriptedStallPolicy{action: recovery.StallKillRetry, reason: "dead pane; fresh dispatch"}
-	kills, events := stallHarness(t, false /* enforce */, pol)
+	kills, events := stallHarness(t, false, pol)
 	if kills == 0 {
 		t.Error("policy=kill_retry must SIGTERM the pgid even without Enforce")
 	}

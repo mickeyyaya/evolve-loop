@@ -164,7 +164,6 @@ func TestNewDefault_ReturnsUsableAdapter(t *testing.T) {
 	}
 }
 
-// runOnce launches against a fake engine and returns the prompt the engine received.
 func runOnce(t *testing.T, agent, prompt string, env map[string]string) string {
 	return runOnceWithPolicy(t, agent, prompt, env, "")
 }
@@ -198,7 +197,6 @@ func TestLaunch_NoPolicyPrefix_WhenEscalateExplicit(t *testing.T) {
 	if strings.Contains(body, "Subagent Interactive Policy") {
 		t.Errorf("escalate policy must not inject a block; got first 120 chars: %q", truncate(body, 120))
 	}
-	// The contract block is still injected under escalate, so only the body's presence is asserted.
 	if !strings.Contains(body, "builder body") {
 		t.Errorf("original body missing under escalate; got %q", truncate(body, 120))
 	}

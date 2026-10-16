@@ -7,21 +7,14 @@ import (
 	"testing"
 )
 
-// Table-driven coverage for formatVersion — the pure formatter that Get()
-// composes with ldflag-injected vars + runtime/debug.BuildInfo fallback.
-//
-// Three injection sources, in order of precedence:
-//  1. ldflag values (release / make build).
-//  2. runtime/debug.BuildInfo VCS revision (go install).
-//  3. The literal "dev" / "unknown" (go run / go test).
 func TestFormatVersion(t *testing.T) {
 	cases := []struct {
 		name        string
 		ver         string
 		commit      string
 		builtAt     string
-		wantContain []string // substrings that MUST appear
-		wantRegex   string   // optional anchored regex
+		wantContain []string
+		wantRegex   string
 	}{
 		{
 			name:        "release_full",
@@ -53,8 +46,7 @@ func TestFormatVersion(t *testing.T) {
 			commit:      "0123456789abcdef0123456789abcdef01234567",
 			builtAt:     "",
 			wantContain: []string{"0123456789ab"},
-			// Must NOT contain the 13th char
-			wantRegex: `^evolve v9\.9\.9 \(0123456789ab\)$`,
+			wantRegex:   `^evolve v9\.9\.9 \(0123456789ab\)$`,
 		},
 		{
 			name:        "short_sha_kept_as_is",
@@ -84,10 +76,6 @@ func TestFormatVersion(t *testing.T) {
 	}
 }
 
-// Get() in the absence of ldflag injection (i.e. under `go test`) should
-// return a non-empty string. We don't pin the exact value because BuildInfo
-// behaviour differs between `go test` and `go install` invocation paths,
-// but it must follow the documented shape and never panic.
 func TestGetReturnsShapedString(t *testing.T) {
 	s := Get()
 	if s == "" {
@@ -101,8 +89,6 @@ func TestGetReturnsShapedString(t *testing.T) {
 	}
 }
 
-// Drive the ldflag-injection branch of Get() by mutating the package
-// vars (lowercase so accessible within the package test).
 func TestGet_HonorsLdflagInjectedValues(t *testing.T) {
 	saveV, saveC, saveB := version, commit, builtAt
 	t.Cleanup(func() { version, commit, builtAt = saveV, saveC, saveB })
@@ -117,8 +103,6 @@ func TestGet_HonorsLdflagInjectedValues(t *testing.T) {
 	}
 }
 
-// Drive the BuildInfo fallback branch by clearing ldflag vars; under
-// `go test` BuildInfo.Main.Version is "(devel)".
 func TestGet_BuildInfoFallback(t *testing.T) {
 	saveV, saveC, saveB := version, commit, builtAt
 	t.Cleanup(func() { version, commit, builtAt = saveV, saveC, saveB })
@@ -127,14 +111,11 @@ func TestGet_BuildInfoFallback(t *testing.T) {
 	commit = ""
 	builtAt = ""
 	got := Get()
-	// Just assert the BuildInfo path produced something shaped sensibly.
 	if got == "" || !strings.HasPrefix(got, "evolve ") {
 		t.Errorf("BuildInfo fallback got %q", got)
 	}
 }
 
-// composeVersion exhaustive cases — drives every BuildInfo branch
-// with injected synthetic payloads.
 func TestComposeVersion_BuildInfoBranches(t *testing.T) {
 	mkBI := func(mainVer, rev, vcsTime string) func() (*debug.BuildInfo, bool) {
 		return func() (*debug.BuildInfo, bool) {
@@ -218,9 +199,6 @@ func TestShortSHA(t *testing.T) {
 	}
 }
 
-// composeCommit resolves the raw build-commit (short sha) used for provenance
-// (ADR-0065): ldflag-injected `commit` wins; else BuildInfo vcs.revision; else
-// "". Truncated/trimmed via shortSHA. Drives every branch deterministically.
 func TestComposeCommit(t *testing.T) {
 	mustNotRead := func() (*debug.BuildInfo, bool) {
 		t.Helper()
@@ -257,9 +235,6 @@ func TestComposeCommit(t *testing.T) {
 	}
 }
 
-// Commit() under `go test` must never panic and must honor the shortSHA
-// contract (<=12 chars). Exact value is environment-dependent (VCS info may
-// or may not be embedded), so we don't pin it.
 func TestCommit_ShortShapeNeverPanics(t *testing.T) {
 	got := Commit()
 	if len(got) > 12 {
@@ -267,7 +242,6 @@ func TestCommit_ShortShapeNeverPanics(t *testing.T) {
 	}
 }
 
-// Drive Commit()'s ldflag branch by mutating the package var.
 func TestCommit_HonorsLdflagInjectedCommit(t *testing.T) {
 	saveC := commit
 	t.Cleanup(func() { commit = saveC })

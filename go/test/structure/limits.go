@@ -18,10 +18,6 @@ const (
 	maxFileLines = 800
 )
 
-// CheckLimits checks the non-test Go files directly in dir, regardless of build
-// constraints. Functions must have fewer than 50 lines and at most four nested
-// control statements; files must have fewer than 800 newline bytes. Function doc
-// comments are excluded, while comments inside a function count toward its size.
 func CheckLimits(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

@@ -1,11 +1,5 @@
-// Package doctor implements `evolve doctor probe <tool>` — the Go
-// port of scripts/utility/probe-tool.sh.
-//
-// /insights documented the "Claude declares a tool unavailable based
-// on a single check" failure pattern. The probe walks PATH first via
-// exec.LookPath, then explicit fallback locations (Homebrew Intel +
-// Apple-silicon, ~/.local/bin, ~/bin, /usr/bin), and surfaces the
-// full checked-list so the operator sees the diagnostic trail.
+// Package doctor implements `evolve doctor probe <tool>` — the Go port of
+// scripts/utility/probe-tool.sh.
 package doctor
 
 import (
@@ -16,16 +10,14 @@ import (
 	"path/filepath"
 )
 
-// Result is the structured payload Probe returns and EmitJSON serializes.
 type Result struct {
 	Tool    string   `json:"tool"`
 	Found   bool     `json:"found"`
-	Path    string   `json:"-"`                // serialized via custom JSON to allow null
-	Method  string   `json:"method,omitempty"` // "path" (LookPath) | "fallback" (explicit dirs)
+	Path    string   `json:"-"`
+	Method  string   `json:"method,omitempty"`
 	Checked []string `json:"checked"`
 }
 
-// resultJSON is the wire shape so Path serializes as null when empty.
 type resultJSON struct {
 	Tool    string   `json:"tool"`
 	Found   bool     `json:"found"`
@@ -43,8 +35,6 @@ func (r Result) toWire() resultJSON {
 	return out
 }
 
-// probeHooks holds injectable seams so unit tests can drive
-// PATH-miss + fallback-hit + home-error branches deterministically.
 type probeHooks struct {
 	lookPath   func(name string) (string, error)
 	homeDir    func() (string, error)
@@ -77,9 +67,6 @@ func withHooks(replacement probeHooks, fn func()) {
 	fn()
 }
 
-// defaultCandidates returns the explicit fallback paths probe-tool.sh
-// walks after a PATH miss. Order matches the bash script verbatim:
-// /usr/local/bin → /opt/homebrew/bin → ~/.local/bin → ~/bin → /usr/bin.
 func defaultCandidates(tool, home string) []string {
 	out := []string{
 		filepath.Join("/usr/local/bin", tool),
@@ -93,10 +80,6 @@ func defaultCandidates(tool, home string) []string {
 	return out
 }
 
-// Probe locates a CLI tool by walking PATH, then explicit fallback
-// directories. Returns a populated Result; the error channel is
-// reserved for unexpected I/O failures and is currently never set —
-// missing-tool is communicated via Found=false.
 func Probe(tool string) (Result, error) {
 	r := Result{Tool: tool}
 	if path, err := hooks.lookPath(tool); err == nil && path != "" {
@@ -126,10 +109,6 @@ func Probe(tool string) (Result, error) {
 	return r, nil
 }
 
-// isExecutable returns true if path is a file and any of its mode-bits
-// include the executable flag. On Windows the check degrades to "is
-// a regular file" since the executable bit isn't carried in NTFS ACLs
-// the same way.
 func isExecutable(path string) bool {
 	st, err := os.Stat(path)
 	if err != nil {
@@ -142,8 +121,6 @@ func isExecutable(path string) bool {
 	return mode.Perm()&0o111 != 0
 }
 
-// EmitJSON serializes a Result to the bash-contract wire shape:
-// {tool, found, path, method, checked:[...]}. Path is null when empty.
 func EmitJSON(r Result) ([]byte, error) {
 	buf, err := hooks.marshal(r.toWire())
 	if err != nil {

@@ -5,11 +5,8 @@ import (
 	"strings"
 )
 
-// idSlugRE rejects non-slug ids: promotion moves an id out of the inbox, so an id parsed from prose must never
-// pass.
 var idSlugRE = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
-// A files= field ends at the next ", key=" field, so its value may itself contain commas.
 var (
 	filesFieldRE        = regexp.MustCompile(`\bfiles\s*[=:]\s*`)
 	nextMetadataFieldRE = regexp.MustCompile(`,\s*[A-Za-z_][A-Za-z0-9_]*=`)
@@ -17,24 +14,17 @@ var (
 	commentRE           = regexp.MustCompile(`(?s)<!--.*?-->`)
 )
 
-// Item is one "- {id}: {rest}" card with a slug id.
 type Item struct {
 	ID, Rest string
 }
 
-// Section is one bucket of the report as written.
 type Section struct {
-	Items []Item
-	// Rejected are bullets without a slug id and a colon.
+	Items    []Item
 	Rejected []string
-	// Prose are non-blank lines that are neither bullets nor a "(none …)" line.
-	Prose []string
-	// None reports a "(none …)" line, which states an empty bucket.
-	None bool
+	Prose    []string
+	None     bool
 }
 
-// SectionBody returns the text under the "## <heading>" line, up to the next heading. The heading may carry
-// trailing words ("## top_n (commit to THIS cycle)").
 func SectionBody(report, heading string) (string, bool) {
 	prefix := "## " + heading
 	lines := strings.SplitAfter(report, "\n")
@@ -71,7 +61,6 @@ func isWordByte(c byte) bool {
 	return c == '_' || c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
-// ParseSection reads a bucket's lines. HTML comments are not content.
 func ParseSection(body string) Section {
 	var s Section
 	for _, raw := range strings.Split(commentRE.ReplaceAllString(body, ""), "\n") {
@@ -106,7 +95,6 @@ func splitID(text string) (id, rest string, ok bool) {
 	return id, strings.TrimSpace(text[i+1:]), true
 }
 
-// ActionOf is the text before the em-dash metadata separator ("{action} — priority=…").
 func ActionOf(rest string) string {
 	if i := strings.Index(rest, "—"); i >= 0 {
 		return strings.TrimSpace(rest[:i])
@@ -114,7 +102,6 @@ func ActionOf(rest string) string {
 	return strings.TrimSpace(rest)
 }
 
-// ReasonOf is the value of a dropped card's reason= field.
 func ReasonOf(rest string) string {
 	if m := dropReasonRE.FindStringSubmatch(rest); m != nil {
 		return strings.TrimSpace(m[1])
@@ -122,8 +109,6 @@ func ReasonOf(rest string) string {
 	return ""
 }
 
-// SplitDeclaredFiles returns every files= field's tokens and the card with those fields removed. A field spans
-// to the next ", key=" or end of line, because agents separate paths with spaces and commas too.
 func SplitDeclaredFiles(rest string) (tokens []string, stripped string) {
 	var kept strings.Builder
 	remaining := rest
@@ -153,7 +138,6 @@ func isFilesSeparator(r rune) bool {
 	return r == ';' || r == ',' || r == ' ' || r == '\t'
 }
 
-// FilesOf keeps only usable repo-relative paths, since the planner matches exactly.
 func FilesOf(rest string) []string {
 	tokens, _ := SplitDeclaredFiles(rest)
 	var files []string
@@ -169,8 +153,6 @@ func FilesOf(rest string) []string {
 	return files
 }
 
-// DeclaredFilePath trims agent punctuation and rejects placeholders, globs, absolute or ".." paths, and bare
-// names.
 func DeclaredFilePath(tok string) (string, bool) {
 	p := strings.Trim(tok, "[]()\"'`,;:. \t")
 	if p == "" || strings.ContainsAny(p, "{}*?<>") {

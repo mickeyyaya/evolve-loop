@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
-// steppedClock returns t0 for the first hold calls and t0+jump afterwards.
 func steppedClock(t0 time.Time, hold int, jump time.Duration) func() time.Time {
 	var mu sync.Mutex
 	calls := 0
@@ -29,7 +28,6 @@ func steppedClock(t0 time.Time, hold int, jump time.Duration) func() time.Time {
 	}
 }
 
-// killRecorder counts KillPgrp calls; the mutex guards Run's goroutine against the test's.
 type killRecorder struct {
 	mu    sync.Mutex
 	calls int

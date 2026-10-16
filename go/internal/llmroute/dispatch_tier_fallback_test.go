@@ -16,7 +16,6 @@ func tierTestPlan() Plan {
 }
 
 func TestTieredDispatchResult_NamedShape(t *testing.T) {
-	// The explicit type names TieredDispatchResult for apicover's identifier scan.
 	var res TieredDispatchResult = DispatchTiered(tierTestPlan(), func(cli, tier string) (int, error) {
 		return 85, errors.New("quota")
 	}, nil)
@@ -98,7 +97,6 @@ func TestDispatchTiered_TerminalOnlyAfterLowestTierExhausted(t *testing.T) {
 }
 
 func TestDispatchTiered_NonQuotaExitsNeverStepTier(t *testing.T) {
-	// mixed: codex exits 85 and claude 81, so not every attempt at the tier exited 85.
 	for _, mixed := range []bool{false, true} {
 		var attempts []string
 		stepDowns := 0
@@ -142,7 +140,7 @@ func TestDispatchTiered_EmptyTiersDegradesToSingleTierModel(t *testing.T) {
 	res := DispatchTiered(plan, func(cli, tier string) (int, error) {
 		attempts = append(attempts, cli+"@"+tier)
 		return 85, errors.New("quota exhausted")
-	}, nil) // nil onStepDown must not panic
+	}, nil)
 	if res.Err == nil {
 		t.Errorf("expected terminal error, got success")
 	}

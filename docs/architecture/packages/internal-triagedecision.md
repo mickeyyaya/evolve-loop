@@ -17,6 +17,8 @@
 
 ## Invariants
 
+- **A `files=` field spans to the next `, key=` or the end of the line**, because agents separate paths with spaces and commas too. `SplitDeclaredFiles` returns every field's tokens and the card with those fields removed. `DeclaredFilePath` rejects placeholders, globs, absolute and `..` paths and bare names. The planner matches paths exactly.
+- **The derived decision omits floor declarations and skipped items on purpose.** Consumers treat each absence as safe and fall back to their own readers. `supersededIDs` lists each id once, because ship retires them by id alone.
 - **An absent optional bucket commits more, never less.** Treating a missing `deferred` as `[]` claims every committed item; treating a missing `top_n` as `[]` would claim nothing, so `top_n` is required in strict mode. Pinned by `TestDerive_TreatsAnAbsentOptionalBucketAsEmpty` and the `no top_n section` case of `TestDerive_DeclinesAnIncompleteOrUnreadableReport`.
 - **An empty optional bucket states no cards; an empty `top_n` still declines.** A heading with nothing under it is what an agent writes when it has nothing to say, so `deferred`, `dropped` and `superseded` left empty read as `[]` in strict mode; `top_n` left empty is a missing commitment and the report is declined (ADR-0106 H1b). Pinned by `TestDerive_ReadsAnEmptyOptionalBucketAsNoCards` and the "an empty top_n section" case of `TestDerive_DeclinesAnIncompleteOrUnreadableReport`.
 - **A pinned item is never dropped.** Pinned by `TestDerive_DeclinesWhenAPinnedItemIsNotCommitted`.

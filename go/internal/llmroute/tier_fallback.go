@@ -6,13 +6,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// exitQuotaExhausted is the only exit that steps a tier down; the other triggers are CLI problems, not tier availability.
 const exitQuotaExhausted = 85
 
-// universalTierFloorMin mirrors the router's universalTierFloor Min.
 const universalTierFloorMin = "balanced"
 
-// TierChain steps down from resolved one rank at a time to envelopeMin (default "balanced"); an exact model id stays alone.
 func TierChain(resolved, envelopeMin string) []string {
 	chain := []string{resolved}
 	rank := policy.TierRank(resolved)
@@ -29,16 +26,14 @@ func TierChain(resolved, envelopeMin string) []string {
 	return chain
 }
 
-// TieredDispatchResult is the outcome of walking a Plan's tier×CLI grid.
 type TieredDispatchResult struct {
-	CLI      string   // the CLI that produced the terminal result
-	Tier     string   // the tier the terminal result ran at
-	Attempts []string // every launch as "cli@tier", in order
-	Err      error    // nil on success; the terminal attempt's error otherwise
+	CLI      string
+	Tier     string
+	Attempts []string
+	Err      error
 	Walled   bool
 }
 
-// DispatchTiered runs Dispatch per tier, stepping down (via optional onStepDown) only when every attempt exited 85.
 func DispatchTiered(plan Plan, launch func(cli, tier string) (exitCode int, err error), onStepDown func(from, to string)) TieredDispatchResult {
 	if len(plan.Candidates) == 0 {
 		return TieredDispatchResult{Err: errors.New("llmroute: DispatchTiered called with no candidates")}

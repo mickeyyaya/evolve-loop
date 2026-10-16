@@ -23,8 +23,6 @@ func TestPhase_Identity(t *testing.T) {
 	}
 }
 
-// ShouldSkip must skip by default (shadow): no EVOLVE_SWARM_PLANNER → opt-in
-// phase is skipped, and the cycle proceeds to build unchanged.
 func TestPhase_ShouldSkip_DefaultShadow(t *testing.T) {
 	p := New(Config{})
 	skip, verdict, next, _ := p.ShouldSkip(core.PhaseRequest{Env: map[string]string{}})
@@ -53,8 +51,6 @@ func TestPhase_Classify(t *testing.T) {
 	}
 }
 
-// TestBaseRunner verifies that BaseRunner returns a non-nil runner.BaseRunner,
-// confirming the factory wiring is correct.
 func TestBaseRunner(t *testing.T) {
 	p := New(Config{})
 	br := p.BaseRunner()
@@ -63,7 +59,6 @@ func TestBaseRunner(t *testing.T) {
 	}
 }
 
-// TestComposePrompt verifies that ComposePrompt injects the cycle context.
 func TestComposePrompt(t *testing.T) {
 	p := New(Config{})
 	req := core.PhaseRequest{Cycle: 42, GoalHash: "abc123", ProjectRoot: "/proj", Workspace: "/ws"}

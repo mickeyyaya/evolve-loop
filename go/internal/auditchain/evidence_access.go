@@ -51,7 +51,7 @@ func RequiredEvidence(phase string) []string {
 	for a := range set {
 		out = append(out, a)
 	}
-	sort.Strings(out) // deterministic: this list goes into a dispatch record
+	sort.Strings(out)
 	return out
 }
 

@@ -1,16 +1,5 @@
-// Package treediff is Workstream B's post-phase main-tree diff guard.
-//
-// The bridge's OS sandbox confines source-writing phases to their worktree at
-// runtime, but the trust-kernel design wants belt-and-suspenders. Each git
-// worktree is a separate working directory: `git diff --name-only HEAD` run
-// in the main repo root only shows changes to the main tree, NOT to any
-// worktree. So after a source-writing phase runs, comparing the main-tree
-// dirty set before-and-after isolates exactly the leaks the sandbox is
-// supposed to prevent — any newly-dirty *main-tree* path = a write that
-// escaped the worktree (Issue 2 / cycle-119 cross-CLI trust bypass).
-//
-// This package is pure logic: it takes a git-exec seam as a function value so
-// the orchestrator can inject test fakes. No package globals.
+// Package treediff is the post-phase guard that flags main-tree writes that escaped the worktree.
+// See docs/architecture/packages/internal-guards-treediff.md.
 package treediff
 
 import (
@@ -18,24 +7,19 @@ import (
 	"fmt"
 )
 
-// GitDirtyFn returns the set of dirty tracked paths in repoRoot (the output of
-// `git diff --name-only HEAD`, one path per line). The orchestrator passes its
-// production impl; tests pass a fake.
 type GitDirtyFn func(ctx context.Context, repoRoot string) ([]string, error)
 
-// Guard captures the pre-phase snapshot + the seam to query after.
 type Guard struct {
 	gitDirty GitDirtyFn
 }
 
-// New constructs a Guard bound to a git-exec seam.
 func New(gitDirty GitDirtyFn) *Guard {
 	return &Guard{gitDirty: gitDirty}
 }
 
 func (g *Guard) Snapshot(ctx context.Context, repoRoot string) ([]string, error) {
 	if g == nil || g.gitDirty == nil {
-		return nil, nil // no seam → no-op
+		return nil, nil
 	}
 	return g.gitDirty(ctx, repoRoot)
 }
@@ -45,12 +29,8 @@ type CheckResult struct {
 	SnapshotMissed bool
 }
 
-// OK reports whether the check found no leaks (and the snapshot worked).
 func (r CheckResult) OK() bool { return len(r.Leaked) == 0 && !r.SnapshotMissed }
 
-// Error formats the leak set for the orchestrator's "abort cycle" path.
-// Returns nil when there are no leaks. The format names the phase, worktree,
-// and every leaked path so the operator can audit the bypass at a glance.
 func (r CheckResult) Error(phase, worktree string) error {
 	if r.OK() {
 		return nil
@@ -62,15 +42,9 @@ func (r CheckResult) Error(phase, worktree string) error {
 		phase, worktree, r.Leaked)
 }
 
-// Check is the post-phase comparison. `before` is the snapshot the orchestrator
-// captured before the runner ran; `repoRoot` is the same root used at snapshot.
-// Returns the leak set + a SnapshotMissed flag the caller uses to decide
-// abort-vs-warn. Errors from the git seam degrade to SnapshotMissed (the guard
-// is belt-and-suspenders to the sandbox — it must never be the cause of a
-// false abort).
 func (g *Guard) Check(ctx context.Context, repoRoot string, before []string) CheckResult {
 	if g == nil || g.gitDirty == nil {
-		return CheckResult{} // OK by default when guard is disabled
+		return CheckResult{}
 	}
 	after, err := g.gitDirty(ctx, repoRoot)
 	if err != nil {

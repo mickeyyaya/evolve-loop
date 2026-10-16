@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// An unfenced path is that path, or a directory and what is below it; a name that merely begins the same is a
-// planted file and is fenced.
 func TestGuard_UnfencedPathsHaveABoundary(t *testing.T) {
 	ws := workspace(t)
 	signals := filepath.Join(ws, "signals.ndjson")
@@ -38,8 +36,6 @@ func TestGuard_UnfencedPathsHaveABoundary(t *testing.T) {
 	}
 }
 
-// The dispatch creates artifacts with generated names (its sandbox profile dir, its own logs); they survive by
-// stem and are reported, never silently tolerated.
 func TestGuard_ToleratesTheDispatchesGeneratedArtifactsByStemAndReportsThem(t *testing.T) {
 	ws := workspace(t)
 	write(t, filepath.Join(ws, "sbprofile-1", "sandbox.sb"), "(version 1)\n")
@@ -64,7 +60,6 @@ func TestGuard_ToleratesTheDispatchesGeneratedArtifactsByStemAndReportsThem(t *t
 	}
 }
 
-// An allowed path may be written, not turned into a link: every later reader would follow it.
 func TestGuard_UndoesAnAllowedPathSwappedForALink(t *testing.T) {
 	ws := workspace(t)
 	report := filepath.Join(ws, "build-report.md")
@@ -101,7 +96,6 @@ func TestBegin_RefusesADirectoryAsAnAllowedPath(t *testing.T) {
 	}
 }
 
-// A link at an allowed path could already point outside every fence; the guard refuses to start over it.
 func TestBegin_RefusesALinkAsAnAllowedPath(t *testing.T) {
 	ws := workspace(t)
 	link := filepath.Join(ws, "build-report.md")

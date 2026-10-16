@@ -63,7 +63,6 @@ func TestCheckLimits_PreservesDirectoryScope(t *testing.T) {
 	if err := CheckLimits(dir); err != nil {
 		t.Fatalf("excluded files affected current-directory check: %v", err)
 	}
-	// The existing scanner checks source regardless of filename build selection.
 	if err := os.WriteFile(filepath.Join(dir, "source_windows.go"), []byte("invalid Go"), 0o644); err != nil {
 		t.Fatal(err)
 	}

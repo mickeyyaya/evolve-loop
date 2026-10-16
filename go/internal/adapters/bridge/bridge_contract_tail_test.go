@@ -41,11 +41,9 @@ func TestLaunch_AppendsDeliverableContractTailBlock(t *testing.T) {
 			t.Errorf("tail block must restate required section %q verbatim; got:\n%s", s.Canonical, tail)
 		}
 	}
-	// The tail is the copy the agent follows, so audit's exemplar there must carry the failure block.
 	if !c.RequireFailureContext {
 		t.Fatal("test premise: the audit contract must declare RequireFailureContext")
 	}
-	// Asserted on the rendered shape: an export whose only caller is a test would be a dead seam.
 	for _, want := range []string{
 		`"phase":"audit"`, `"schema_version":2`, `"failure"`, `"class"`, `"defects"`, `"evidence_paths"`,
 	} {
@@ -56,7 +54,6 @@ func TestLaunch_AppendsDeliverableContractTailBlock(t *testing.T) {
 	if !strings.Contains(tail, "MUST carry the failure block") {
 		t.Errorf("tail must say the failure block is mandatory for FAIL/WARN; got:\n%s", tail)
 	}
-	// Count only after the body: the prefix block quotes the footer marker as a cross-reference.
 	after := got[strings.Index(got, "PERSONA-BODY"):]
 	if n := strings.Count(after, phasecontract.FooterMarker); n != 1 {
 		t.Errorf("the tail must declare the path exactly once, got %d occurrences", n)

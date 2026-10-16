@@ -10,16 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
-// E2E tier example (//go:build e2e → excluded from default; run via
-// `make test-e2e`). It builds the REAL evolve binary and runs a subcommand
-// against it — the smallest honest end-to-end: does the artifact we ship
-// actually start and respond? Heavier full-cycle e2e lives in cmd/evolve's
-// e2e_*_test.go (also e2e-tagged).
-//
-// Pattern to copy when adding an e2e test:
-//  1. skip if the toolchain needed to build isn't present.
-//  2. build the binary into t.TempDir().
-//  3. exec it and assert on real stdout/exit.
 func TestE2E_VersionSubcommandRuns(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH; skipping e2e build")
@@ -35,10 +25,6 @@ func TestE2E_VersionSubcommandRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run `evolve version`: %v\n%s", err, out)
 	}
-	// Assert the binary self-identifies (output starts with the program name),
-	// not just that it printed any non-empty bytes. The version/commit values
-	// themselves vary with ldflags (a plain `go build` yields "evolve (devel)
-	// (unknown)"), so we pin the stable token, not the version string.
 	got := strings.TrimSpace(string(out))
 	if !strings.HasPrefix(got, "evolve") {
 		t.Fatalf("`evolve version` output not self-identifying: %q", got)

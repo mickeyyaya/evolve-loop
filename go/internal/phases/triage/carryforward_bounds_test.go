@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-// boundsRunGit runs a git subcommand in dir, failing loudly on error —
-// fixture setup is not the behavior under test.
 func boundsRunGit(t *testing.T, dir string, env []string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -39,9 +37,6 @@ func TestCarryforwardCandidatesSection_NewestCommittedFirst(t *testing.T) {
 	boundsRunGit(t, dir, nil, "add", "base.txt")
 	boundsRunGit(t, dir, nil, "commit", "-q", "-m", "base")
 
-	// cycle-alpha sorts first alphabetically but is committed older;
-	// cycle-zulu sorts last but is committed newer, so refname order and
-	// committerdate order disagree.
 	mkBranch := func(name, file string, ts string) {
 		boundsRunGit(t, dir, nil, "checkout", "-q", "-b", name, "main")
 		if err := os.WriteFile(filepath.Join(dir, file), []byte("x\n"), 0o644); err != nil {
@@ -129,7 +124,7 @@ func TestCarryforwardCandidatesSection_RespectsExpiredContext(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel()
-	time.Sleep(time.Millisecond) // guarantee the deadline has elapsed
+	time.Sleep(time.Millisecond)
 	section := CarryforwardCandidatesSection(ctx, dir, "main")
 	if section != "" {
 		t.Errorf("expired context must fail-open to \"\", got:\n%s", section)

@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// report1707 is cycle 1707's triage-report.md, whose decision file the phase never wrote.
 const report1707 = `<!-- challenge-token: 2bb098b9e2c61eb0 -->
 <!-- ANCHOR:triage_decision -->
 # Triage Decision — Cycle 1707
@@ -31,8 +30,6 @@ phase_skip: []
 Fleet scope pins this lane to the single item.
 `
 
-// personaReport follows the persona's template: metadata tails, a files= footprint, a superseded section with
-// its template comment.
 const personaReport = `# Triage Decision — Cycle 9
 
 cycle_size_estimate: small
@@ -134,8 +131,6 @@ func TestDerive_NeverInventsWhatTheReportDoesNotState(t *testing.T) {
 	}
 }
 
-// An absent deferred, dropped or superseded section commits more, never less, so it is empty; the commitment
-// itself must be stated.
 func TestDerive_TreatsAnAbsentOptionalBucketAsEmpty(t *testing.T) {
 	report := "# Triage\n\nphase_skip: []\n\n## top_n\n" + topN1707 + "\n"
 
@@ -148,8 +143,6 @@ func TestDerive_TreatsAnAbsentOptionalBucketAsEmpty(t *testing.T) {
 	}
 }
 
-// A decision document is the phase's judgment: the host derives it only when every present bucket is stated
-// as cards, and the commitment is stated at all.
 func TestDerive_DeclinesAnIncompleteOrUnreadableReport(t *testing.T) {
 	replace := func(old, new string) string { return strings.Replace(report1707, old, new, 1) }
 	noneDeferred := "(none — this cycle is scoped solely to the assigned fleet task)"
@@ -196,8 +189,6 @@ func TestDerive_AcceptsAnExplicitlyEmptyCommitment(t *testing.T) {
 	}
 }
 
-// The lane pin is the lane's assignment; a derived commitment that drops a pinned item would let the host
-// skip work the lane was given.
 func TestDerive_DeclinesWhenAPinnedItemIsNotCommitted(t *testing.T) {
 	_, err := Derive([]byte(report1707), 1707, []string{"lineage-datestamp-normalization", "second-pinned-item"})
 
@@ -206,7 +197,6 @@ func TestDerive_DeclinesWhenAPinnedItemIsNotCommitted(t *testing.T) {
 	}
 }
 
-// Project is ship's lenient reading: a missing or unreadable section is empty, and it never declines.
 func TestProject_NeverDeclines(t *testing.T) {
 	for name, report := range map[string]string{
 		"only a commitment": "# Triage\n\n## top_n\n- only-item: do it — files=go/a.go\n",
@@ -243,8 +233,6 @@ func TestProject_ReadsTheCardsItCan(t *testing.T) {
 	}
 }
 
-// An optional bucket left empty states no cards: cycle 1713's triage wrote `## superseded` with nothing
-// under it, the strict reader declined, and the gate rejected a decision the report already carried.
 func TestDerive_ReadsAnEmptyOptionalBucketAsNoCards(t *testing.T) {
 	noneDeferred := "(none — this cycle is scoped solely to the assigned fleet task)"
 	for name, report := range map[string]string{

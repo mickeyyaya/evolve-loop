@@ -1,7 +1,5 @@
-// Package auditledger is the one reader of auditor rows in .evolve/ledger.jsonl.
-// It owns the row schema, the row identity (kind=agent_subprocess, role=auditor)
-// and the run-scope rule; each consumer maps its errors onto its own vocabulary.
-// It is a leaf: it must not import a consumer or internal/core.
+// Package auditledger is the one reader of auditor rows in
+// .evolve/ledger.jsonl.
 package auditledger
 
 import (
@@ -12,10 +10,8 @@ import (
 	"strings"
 )
 
-// ErrNoAuditorForRun reports a ledger that holds no auditor row bindable to the requested run.
 var ErrNoAuditorForRun = errors.New("no Auditor ledger entry")
 
-// Entry is an auditor row of the ledger.
 type Entry struct {
 	TS              string `json:"ts"`
 	Role            string `json:"role"`
@@ -30,7 +26,6 @@ type Entry struct {
 	WorktreeBaseSHA string `json:"worktree_base_sha"`
 }
 
-// AuditorRows returns every auditor row of the ledger, newest first; a read failure wraps the os error.
 func AuditorRows(ledgerPath string) ([]Entry, error) {
 	raw, err := os.ReadFile(ledgerPath)
 	if err != nil {
@@ -44,7 +39,6 @@ func AuditorRows(ledgerPath string) ([]Entry, error) {
 			continue
 		}
 		var e Entry
-		// An unparseable line is not an auditor row: alien lines must not break a reader.
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
 			continue
 		}
@@ -55,8 +49,6 @@ func AuditorRows(ledgerPath string) ([]Entry, error) {
 	return rows, nil
 }
 
-// BindRun returns the first of rows (newest first) stamped with runID, or the first row when runID is empty.
-// A miss wraps ErrNoAuditorForRun and names the newest refused row.
 func BindRun(rows []Entry, runID string) (Entry, error) {
 	if runID == "" {
 		if len(rows) > 0 {
@@ -64,7 +56,6 @@ func BindRun(rows []Entry, runID string) (Entry, error) {
 		}
 		return Entry{}, fmt.Errorf("%w found", ErrNoAuditorForRun)
 	}
-	// An unstamped row never binds a run: the ledger is shared by every fleet lane.
 	for _, e := range rows {
 		if e.RunID == runID {
 			return e, nil
@@ -81,7 +72,6 @@ func BindRun(rows []Entry, runID string) (Entry, error) {
 		ErrNoAuditorForRun, runID, foreign, rows[0].GitHEAD)
 }
 
-// LatestAuditorEntry returns the newest auditor row of runID's run, or of any run when runID is empty.
 func LatestAuditorEntry(ledgerPath, runID string) (Entry, error) {
 	rows, err := AuditorRows(ledgerPath)
 	if err != nil {
@@ -97,8 +87,6 @@ func (e Entry) AuditedBase() string {
 	return e.GitHEAD
 }
 
-// IsAuditorRow reports whether e is an auditor row that binds a ship: the audit agent's own subprocess
-// row, not a phase marker.
 func IsAuditorRow(e Entry) bool {
 	return e.Kind == "agent_subprocess" && e.Role == "auditor"
 }

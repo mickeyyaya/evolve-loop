@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestGuard_DetectsLeakAcrossSnapshotAndCheck names the treediff.Guard type (New
-// returns *Guard but the type is never named in a test) and pins the leak-
-// detection contract end-to-end: a path dirty AFTER the phase but not BEFORE is
-// reported as a leak (CheckResult.OK()==false, path in Leaked).
 func TestGuard_DetectsLeakAcrossSnapshotAndCheck(t *testing.T) {
 	var g *Guard = New(fakeGit([]string{}, []string{"docs/leaked.md"}, nil))
 

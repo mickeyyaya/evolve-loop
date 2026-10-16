@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// scopeFromStartedEvent runs the observer to shutdown and returns the scope its observer_started envelope recorded.
 func scopeFromStartedEvent(t *testing.T, configured Scope) string {
 	t.Helper()
 	ws := tempWorkspace(t)
@@ -70,7 +69,6 @@ func TestScope_EmptyDefaultsToPhase(t *testing.T) {
 
 func TestDefaultProcessAlive_LiveVsDead(t *testing.T) {
 	t.Parallel()
-	// The probe signals -pgid, so the live fixture must be a process-group id, not a pid.
 	livePgid, err := syscall.Getpgid(os.Getpid())
 	if err != nil {
 		t.Fatalf("Getpgid(self): %v", err)
@@ -78,7 +76,6 @@ func TestDefaultProcessAlive_LiveVsDead(t *testing.T) {
 	if !DefaultProcessAlive(livePgid) {
 		t.Errorf("DefaultProcessAlive(%d) = false for the test's own live process group; want true", livePgid)
 	}
-	// A pgid above the kernel's pid_max cannot name a live group.
 	const bogusPgid = 0x7FFFFFFF
 	if DefaultProcessAlive(bogusPgid) {
 		t.Errorf("DefaultProcessAlive(%d) = true for a non-existent process group; want false", bogusPgid)

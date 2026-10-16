@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// See ADR-0104. Only git-tracked profiles bind; untracked runtime-minted stubs
-// are skipped unless there is no tracked set, in which case every file binds.
 func TestEveryAgentProfileHasAFallbackChain(t *testing.T) {
 	dir := profiles.RealProfilesDir(t)
 	tracked := profiles.TrackedRealProfileNames(t)
@@ -43,7 +41,7 @@ func TestEveryAgentProfileHasAFallbackChain(t *testing.T) {
 			t.Fatalf("%s: %v", e.Name(), err)
 		}
 		if p.CLI == "" {
-			continue // not an agent, e.g. tool-policy.json
+			continue
 		}
 		checked++
 		if len(p.CLIFallback) == 0 {

@@ -25,7 +25,7 @@
 
 - **`skillEntryName` rejects `.`, `..` and embedded separators,** so `./skills/..` cannot resolve to `<root>/SKILL.md` and pass falsely (`TestManifestProblems_DotDotSkillEntryRejected`, `TestSkillEntryName`).
 - **The live tree is in sync.** `TestCheck_CleanRepoNoDrift` and `TestManifestProblems_CleanRepoNoProblems` are the in-process equivalents of CI's `evolve skills check`; a skill added to disk but not registered, or a hand edit inside a generated region (`TestCheck_DetectsMutatedRegion`), turns them red.
-- **Multi-line descriptions round-trip through `yamlQuote`.** No test pins this yet (a one-line why stays on `yamlQuote`).
+- **Multi-line descriptions round-trip through `yamlQuote`.** No test pins this yet; the reason is the stub frontmatter quoting bullet under Design.
 
 ## Findings
 

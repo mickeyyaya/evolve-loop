@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// moduleRoot walks up from the working directory (the package directory under
-// go test) to the directory holding go.mod, so a copy of the module scans itself.
 func moduleRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -27,8 +25,6 @@ func moduleRoot(t *testing.T) string {
 	}
 }
 
-// TestRatchet_NoNewRawGitFixtures is the ratchet: every raw git init site in
-// the module's bound test files must be listed in baseline.json, exactly.
 func TestRatchet_NoNewRawGitFixtures(t *testing.T) {
 	note, err := Scan(moduleRoot(t))
 	if note != "" {

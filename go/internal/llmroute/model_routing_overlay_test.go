@@ -71,7 +71,6 @@ func TestApplySoftOverlay_TierChainHonorsPhaseEnvelopeFloor(t *testing.T) {
 		}
 	}
 
-	// Control: without a profile the universal balanced floor applies.
 	uni := ApplySoftOverlay(in, Overlay{Tier: "top"}, nil)
 	sawBalanced := false
 	for _, tr := range uni.Tiers {
