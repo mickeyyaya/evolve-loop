@@ -18,7 +18,7 @@ func (l OllamaLister) List(ctx context.Context, _ string) ([]string, error) {
 	metadataOnlyListArgs := []string{"list"}
 	out, err := run(ctx, "ollama", metadataOnlyListArgs, "")
 	if err != nil {
-		return nil, fmt.Errorf("ollama list: %w", err)
+		return nil, fmt.Errorf("ollama list: %w: %s", err, truncate(out, 200))
 	}
 	return parseOllamaList(out), nil
 }

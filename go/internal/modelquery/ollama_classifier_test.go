@@ -3,8 +3,8 @@ package modelquery
 import (
 	"context"
 	"errors"
-	"os"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -74,13 +74,17 @@ func TestOllamaListerReachesNoModel(t *testing.T) {
 	}
 }
 
-func TestOllamaListMetadataExceptionDocumented(t *testing.T) {
-	src, err := os.ReadFile("ollama.go")
-	if err != nil {
-		t.Fatalf("read ollama.go: %v", err)
+func TestOllamaLister_FailureCarriesTheCommandOutput(t *testing.T) {
+	s := &stubRunner{out: "Error: could not connect to ollama app, is it running?\n", err: errors.New("exit status 1")}
+	ids, err := (OllamaLister{Run: s.run}).List(context.Background(), "ollama")
+	if err == nil {
+		t.Fatal("want an error from a failed ollama list")
 	}
-	if !strings.Contains(string(src), "metadataOnlyListArgs") {
-		t.Error("ollama.go must name its list arguments metadataOnlyListArgs: the name is what marks the call as the metadata-only, non-model-reaching C1 exception (TestOllamaListerReachesNoModel pins the behaviour)")
+	if !strings.Contains(err.Error(), "could not connect to ollama app") {
+		t.Errorf("err = %v, want the command output that says why ollama list failed", err)
+	}
+	if ids != nil {
+		t.Errorf("ids must be nil on error, got %v", ids)
 	}
 }
 
@@ -183,7 +187,12 @@ func TestErrNoLister_Error(t *testing.T) {
 
 func TestOllamaLister_NilRunDefaultsToExecRunner(t *testing.T) {
 	t.Parallel()
-	ids, err := (OllamaLister{}).List(context.Background(), "ollama")
+	ctx := context.Background()
+	direct, directErr := defaultRunner(ctx, "ollama", []string{"list"}, "")
+	ids, err := (OllamaLister{}).List(ctx, "ollama")
+	if (err != nil) != (directErr != nil) {
+		t.Fatalf("lister err = %v, direct ollama list err = %v: a nil Run must run ollama through the exec runner", err, directErr)
+	}
 	if err != nil {
 		if !strings.Contains(err.Error(), "ollama list") {
 			t.Errorf("want wrapped 'ollama list' error, got %v", err)
@@ -191,6 +200,10 @@ func TestOllamaLister_NilRunDefaultsToExecRunner(t *testing.T) {
 		if ids != nil {
 			t.Errorf("ids must be nil on error, got %v", ids)
 		}
+		return
+	}
+	if want := parseOllamaList(direct); !slices.Equal(ids, want) {
+		t.Errorf("ids = %v, want the listed models %v", ids, want)
 	}
 }
 

@@ -161,3 +161,17 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // happens to look right by luck. RED today: RefreshDeps has no
 // AllowedFamilies field (compile failure).
 ```
+
+## decision-surface pin hashes code (cycle 1882)
+
+### `go/internal/modelquery/lineage.go:14` — above `var dateRun = regexp.MustCompile('\b(?:19|20)\d{2}(?:-\d{2}(?:-\d{2})?)?\b')`
+
+```text
+// dateRun matches a calendar-year-anchored date-shaped run (YYYY[-MM[-DD]]),
+// e.g. "2024-08-06" or "2024" in "gpt-4o-2024-08-06". Anchored on a 4-digit
+// year starting with "19" or "20" so it cannot fire on capability-bearing
+// digits like ":8b", ":70b", "32b", or a short dotted version like "4.6" /
+// "2.5" — none of those contain a 19xx/20xx-shaped run. Stripped in
+// LineageKey in ADDITION to the existing versionToken strip so same-line
+// dated snapshots (gpt-4o-2024-08-06 / gpt-4o-2024-11-20) share a key.
+```

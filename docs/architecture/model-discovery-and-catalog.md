@@ -10,7 +10,7 @@ Routing decisions need the **models a CLI can actually serve right now**, not a 
 
 1. **Keep the static manifest, update by hand** — rejected: the exact drift problem being fixed; every model launch requires a code change.
 2. **Per-provider HTTP APIs** (`/v1/models` etc.) — rejected: not uniform across codex/agy/claude/ollama; needs per-provider auth handling; bypasses what the *CLI* is actually configured to serve (subscription tier, local config).
-3. **Ask each CLI itself** (chosen) — `ollama list` for the non-interactive case; drive the interactive `/model` picker through the tmux recipe engine (ADR-0031) for codex/agy/claude and parse the rendered pane. The CLI's own picker is ground truth for "what can this CLI dispatch right now".
+3. **Ask each CLI itself** (chosen) — `ollama list` for the non-interactive case; drive the interactive `/model` picker through the tmux recipe engine (ADR-0031) for codex and claude and parse the rendered pane. The CLI's own picker is ground truth for "what can this CLI dispatch right now".
 4. **Hardcoded tier classification** (regex on model names) — rejected for the judgment step: tier-ness ("fast" vs "deep") is qualitative and changes per release; per AGENTS.md Rule 5 this is LLM work. A one-shot LLM classification with strict validation was chosen instead.
 
 ## Chosen solution
