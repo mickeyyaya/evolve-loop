@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// Span is the OTel-GenAI decision span persisted per call as advisor-span-<kind>.json (core.AdvisorSpan).
 type Span struct {
 	Model       string                `json:"gen_ai.request.model"`
 	System      string                `json:"gen_ai.system"`
@@ -23,8 +22,6 @@ type Span struct {
 	Tokens      cyclestate.TokenUsage `json:"tokens"`
 }
 
-// capture is fail-open: a capture fault is reported and never fails the decision.
-// Only the persisted copy is redacted; the live prompt is untouched.
 func (a *Advisor) capture(in router.RouteInput, d decision, prompt string, resp LaunchResponse) {
 	if a.writeArtifact == nil {
 		return
@@ -56,7 +53,6 @@ func (a *Advisor) persist(in router.RouteInput, d decision, artifact, path strin
 	}
 }
 
-// sha256OfString must equal the ledger's bindArtifactSHA of the same persisted bytes.
 func sha256OfString(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])

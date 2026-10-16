@@ -10,13 +10,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// reconcileCommand is named in the halt so the stop comes with a next step.
 const reconcileCommand = "evolve sync-main"
 
-// baseDivergenceTimeout bounds the whole probe, fetch included, so a wedged remote cannot hang boot.
 const baseDivergenceTimeout = 60 * time.Second
 
-// baseState is the probe verdict; Skipped means there is nothing to compare, and Reason says why.
 type baseState struct {
 	Skipped bool
 	Reason  string
@@ -25,14 +22,10 @@ type baseState struct {
 	Behind  int
 }
 
-// baseDivergenceProbe is a test seam, so the fast tier never shells out to git.
 var baseDivergenceProbe = defaultBaseDivergenceProbe
 
-// newGit is a test seam for scripted git replies.
 var newGit = gitexec.Default
 
-// defaultBaseDivergenceProbe compares HEAD with the freshly fetched origin branch;
-// an error means the comparison is unverified.
 func defaultBaseDivergenceProbe(ctx context.Context, projectRoot string) (baseState, error) {
 	g := newGit(projectRoot)
 
@@ -54,7 +47,6 @@ func defaultBaseDivergenceProbe(ctx context.Context, projectRoot string) (baseSt
 		return baseState{Skipped: true, Reason: "no `origin` remote"}, nil
 	}
 
-	// Compare against the FETCH_HEAD this fetch writes: a local origin/<base> ref may itself be stale.
 	if err := g.Run(ctx, "fetch", "origin", branch); err != nil {
 		return baseState{}, fmt.Errorf("fetch origin %s: %w", branch, err)
 	}
@@ -78,7 +70,6 @@ func hasRemoteOrigin(remotes string) bool {
 	return false
 }
 
-// parseLeftRightCount parses the "<left>\t<right>" output of `rev-list --left-right --count HEAD...FETCH_HEAD`.
 func parseLeftRightCount(out string) (ahead, behind int, err error) {
 	fields := strings.Fields(out)
 	if len(fields) != 2 {
@@ -93,8 +84,6 @@ func parseLeftRightCount(out string) (ahead, behind int, err error) {
 	return ahead, behind, nil
 }
 
-// checkBaseDivergence halts when the base is behind origin; ahead-only passes, an unverifiable comparison warns.
-// See ADR-0081.
 func checkBaseDivergence(o resolved) CheckResult {
 	const name = "base-divergence"
 

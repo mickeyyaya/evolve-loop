@@ -31,7 +31,6 @@ func buildRoutingPrompt(in router.RouteInput) string {
 	return b.String()
 }
 
-// isFailureTransition is the post-retro recovery decision or the audit-FAIL learning choice.
 func isFailureTransition(in router.RouteInput) bool {
 	switch strings.ToLower(strings.TrimSpace(in.Current)) {
 	case "retrospective", "retro":
@@ -42,7 +41,6 @@ func isFailureTransition(in router.RouteInput) bool {
 	return false
 }
 
-// writeFailureVocabulary states the floor so the model does not spend tokens proposing what the kernel will clamp.
 func writeFailureVocabulary(b *strings.Builder) {
 	b.WriteString("\n## Failure-path vocabulary (this is a failure transition)\n")
 	b.WriteString("- recovery_action: \"retry\" re-enters tdd to fix forward; \"end\" stops the cycle (e.g. budget nearly exhausted, systemic cause).\n")
@@ -52,7 +50,6 @@ func writeFailureVocabulary(b *strings.Builder) {
 	b.WriteString("- The failure-adapter's BLOCK verdicts are non-overridable: a blocked cycle ends no matter what you propose (the attempt is recorded as a clamp).\n")
 }
 
-// buildPlanPrompt is the legacy inline framing ComposePlanPrompt falls back to without a persona.
 func buildPlanPrompt(in router.RouteInput) string {
 	var b strings.Builder
 	b.WriteString("You are the evolve-loop PHASE ADVISOR. The model proposes; the kernel disposes.\n")
@@ -69,7 +66,6 @@ func buildPlanPrompt(in router.RouteInput) string {
 	return b.String()
 }
 
-// writePlanResponseSchema is shared by both plan-prompt paths so their response contracts cannot diverge.
 func writePlanResponseSchema(b *strings.Builder) {
 	b.WriteString("\n## Optionally MINT a new phase\n")
 	b.WriteString("If an objective signal calls for work no existing phase covers, you MAY add an entry for a brand-new phase ")
@@ -95,8 +91,6 @@ func writePlanResponseSchema(b *strings.Builder) {
 	b.WriteString("\n")
 }
 
-// ComposePlanPrompt builds the whole-cycle plan prompt: the persona body, then the per-cycle context, then the
-// instruction to write artifactFile under the workspace.
 func (a *Advisor) ComposePlanPrompt(in router.RouteInput, artifactFile string) string {
 	return a.composePlanPrompt(in, decisionForArtifact(artifactFile), artifactFile)
 }
@@ -114,12 +108,10 @@ func (a *Advisor) composePlanPrompt(in router.RouteInput, d decision, artifactFi
 	}
 	WriteCatalogWithOnDemand(&b, in.Catalog, in.OnDemandPhases)
 	writePlanResponseSchema(&b)
-	// Absolute: a relative path lands in the REPL's cwd, which the bridge does not watch.
 	fmt.Fprintf(&b, "\nNow write your whole-cycle plan as a strict JSON array to %s (no prose, no fence).\n", filepath.Join(in.Workspace, artifactFile))
 	return b.String()
 }
 
-// gatherRecon fails open: a reader fault is reported and yields no file facts, while the goal and backlog facts survive.
 func (a *Advisor) gatherRecon(in router.RouteInput, d decision) router.ReconDigest {
 	var files []string
 	if in.ProjectRoot != "" {

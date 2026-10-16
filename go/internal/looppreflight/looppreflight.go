@@ -24,19 +24,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// CheckLevel is a check's severity, ordered so the worst of a set is the maximum.
 type CheckLevel int
 
 const (
-	// LevelPass means the check found nothing wrong.
 	LevelPass CheckLevel = iota
-	// LevelWarn is a degraded but runnable condition; it never blocks.
 	LevelWarn
-	// LevelHalt is a readiness gap; the batch must not start.
 	LevelHalt
 )
 
-// String returns the stable lowercase token used in JSON and the summary.
 func (l CheckLevel) String() string {
 	switch l {
 	case LevelPass:
@@ -50,7 +45,6 @@ func (l CheckLevel) String() string {
 	}
 }
 
-// CheckResult is one check's outcome: a one-line Message and a multi-line Detail.
 type CheckResult struct {
 	Name    string
 	Level   CheckLevel
@@ -58,34 +52,30 @@ type CheckResult struct {
 	Detail  string
 }
 
-// Result is the accumulated outcome of a Run; OverallLevel is the maximum check level.
 type Result struct {
 	Checks       []CheckResult
 	ChecksPassed int
 	ChecksTotal  int
 	OverallLevel CheckLevel
 	GeneratedAt  string
-	CLIVersions  map[string]string // CLI binary → version token
+	CLIVersions  map[string]string
 }
 
-// Halted reports whether any check halted (the batch must not start).
 func (r Result) Halted() bool { return r.OverallLevel == LevelHalt }
 
-// DefaultSpinePhases are the phases every cycle dispatches; each needs a factory and a contract.
 var DefaultSpinePhases = []string{"build", "scout", "tdd", "audit", "intent", "triage"}
 
-// Options drives a Run; every nil seam defaults to the real implementation.
 type Options struct {
-	ProjectRoot string // required
-	ProfileDir  string // read only by the default profile seams
-	EvolveDir   string // default ProjectRoot/.evolve
+	ProjectRoot string
+	ProfileDir  string
+	EvolveDir   string
 	Stderr      io.Writer
 	Now         func() time.Time
 
-	SkipBoot   bool          // run the cheap checks but skip the real bridge boot
-	BootBudget time.Duration // per-driver boot deadline; default DefaultBootBudget
+	SkipBoot   bool
+	BootBudget time.Duration
 
-	SpinePhases   []string // nil or empty → DefaultSpinePhases
+	SpinePhases   []string
 	FactoryKnown  func(name string) bool
 	ContractKnown func(name string) bool
 	ProfileLister func() ([]string, error)
@@ -94,31 +84,24 @@ type Options struct {
 
 	ProbeCLI      func(bin string) (doctor.Result, error)
 	HostProbe     func() preflight.Profile
-	SandboxMode   func() string // the EVOLVE_SANDBOX value
+	SandboxMode   func() string
 	DirWritable   func(dir string) bool
-	DiskFreeBytes func(path string) (uint64, error) // an error makes the disk-space check warn
-	MinFreeBytes  uint64                            // 0 → the policy preflight.min_free_gib default
-	OrphanKill    swarm.TmuxKiller                  // used by the boot orphan sweep
+	DiskFreeBytes func(path string) (uint64, error)
+	MinFreeBytes  uint64
+	OrphanKill    swarm.TmuxKiller
 
-	// NestedFallbackStage is the sandbox.nested_fallback stage; the zero value (StageOff) disables the canary.
 	NestedFallbackStage config.Stage
-	// SandboxCanaryProbe reports true when the outer environment denied an out-of-allowlist write.
-	SandboxCanaryProbe func() bool
+	SandboxCanaryProbe  func() bool
 
 	BootTester func(ctx context.Context, driver string, sandbox bool) BootOutcome
 
-	// SelfUpdateEvidence reports whether bin self-updates on launch; an error means unverifiable (Warn).
 	SelfUpdateEvidence func(bin string) (bool, string, error)
-	// PinnedLister lists version-frozen package names; an error is ambiguity (Warn).
-	PinnedLister func() ([]string, error)
+	PinnedLister       func() ([]string, error)
 
-	// CLIHealthActive lists the CLI families with an active bench.
 	CLIHealthActive func() []clihealth.Entry
 
-	// VersionInventory returns the current CLI binary → version map.
 	VersionInventory func() map[string]string
 
-	// PhaseRoutingWarnings returns the user-phase specs phasespec dropped while merging the catalog.
 	PhaseRoutingWarnings func() []string
 
 	Routing func() (Routing, error)
@@ -126,7 +109,6 @@ type Options struct {
 	UsageEvidence func(driver string) string
 }
 
-// resolved is Options with every seam and default filled in.
 type resolved struct {
 	projectRoot string
 	profileDir  string
@@ -165,7 +147,6 @@ type resolved struct {
 	routing *routingOnce
 }
 
-// DefaultBootBudget is the per-driver REPL boot deadline, matching `evolve doctor boot`.
 const DefaultBootBudget = 90 * time.Second
 
 func resolve(opts Options) (resolved, error) {
@@ -321,7 +302,6 @@ func memoizeVersionInventory(o *resolved) {
 	}
 }
 
-// Run executes every check; a failed check halts in the Result, and err reports only harness faults.
 func Run(opts Options) (Result, error) {
 	o, err := resolve(opts)
 	if err != nil {

@@ -63,7 +63,6 @@ func TestRootsFor_CarriesCycleAndEvolveDirOnlyWithAProjectRoot(t *testing.T) {
 	if got := rootsFor(d); got.EvolveDir != "" {
 		t.Errorf("no project root ⇒ no EvolveDir, got %q", got.EvolveDir)
 	}
-	// A value comparison cannot tell paths.EvolveDirOf from an inline join; only a source scan can.
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)

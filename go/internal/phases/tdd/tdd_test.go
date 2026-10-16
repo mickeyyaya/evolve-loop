@@ -1,6 +1,3 @@
-// Tests for the tdd phase. The RED phase agent writes failing tests
-// before Builder runs. Artifact = test-report.md (the contract) +
-// the RED test files in the worktree.
 package tdd
 
 import (
@@ -106,7 +103,6 @@ Add rate limiter to /login
 
 func TestRun_NoAcceptance_FAIL(t *testing.T) {
 	body := "# Team Context\n\n## Goal\nx\n\n## RED Tests\n- a_test.go\n"
-	// Missing "## Acceptance" → contract incomplete → FAIL.
 	fb := &fakeBridge{writeArtifact: body}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
@@ -119,7 +115,6 @@ func TestRun_NoAcceptance_FAIL(t *testing.T) {
 
 func TestRun_NoREDTests_FAIL(t *testing.T) {
 	body := "# Team Context\n\n## Goal\nx\n\n## Acceptance\n- y\n"
-	// Missing "## RED Tests" → contract incomplete → FAIL.
 	fb := &fakeBridge{writeArtifact: body}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
@@ -198,11 +193,6 @@ func TestName(t *testing.T) {
 	}
 }
 
-// TestClassify_HeadingVariants — cycle-192: the TDD report's acceptance and
-// RED-tests headings drifted ("## RED Run Output"/"## Test Files Written",
-// "## AC-Materialization"/"## Coverage Map"); the classifier must accept the
-// current variants (and the legacy "## Acceptance"/"## RED Tests") or every
-// current TDD report false-FAILs.
 func TestClassify_HeadingVariants(t *testing.T) {
 	current := "# TDD Report\n\n## Test Files Written\n- x_test.go\n\n## RED Run Output\nfail\n\n## Coverage Map\n..\n"
 	if got := classify(current); got != core.VerdictPASS {
@@ -219,8 +209,6 @@ func TestClassify_HeadingVariants(t *testing.T) {
 		t.Errorf("acceptance present but no RED section: classify=%q, want FAIL", got)
 	}
 }
-
-// --- v12.1 Capability 1: phaseflags wiring tests ---
 
 func writeTddProfile(t *testing.T, contents string) string {
 	t.Helper()

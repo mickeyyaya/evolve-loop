@@ -1,23 +1,5 @@
 // Package treefence is a content fence around a read-only phase's worktree.
-//
-// A phase that is not a declared source writer (registry writes_source=false:
-// audit, adversarial-review, retrospective, …) must hand downstream the exact
-// tree it was given. The agents behind those phases have a shell, and cycles
-// 1603, 1604 and 1605 each failed the deterministic build-explanation gate
-// because the auditor's mutation probes rewrote the builder's material files
-// in place (`cp /tmp/digest.go.bak …`, "wrote reverted tdd.go", probe tests
-// dropped into the material packages) — the sealed diff digest no longer
-// matched the tree, and no LLM round could repair a defect the auditor itself
-// had introduced. See docs/incidents/2026-09-03-auditor-mutates-the-worktree.md.
-//
-// Take records the worktree as a git tree object — tracked changes and
-// untracked files, .gitignore respected — through a throwaway index, so the
-// real index is never touched. Restore diffs a fresh tree against it and
-// undoes every difference: added paths are removed, modified/deleted/retyped
-// paths are written back from the snapshot with their mode, and the
-// directories the phase created around its files are pruned. Ignored paths
-// (build outputs, the worktree's own .evolve/ scratch) are outside the fence
-// by construction — the same set the explanation digest ignores.
+// See docs/architecture/packages/internal-treefence.md.
 package treefence
 
 import (
@@ -37,10 +19,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Snapshot is the content state of a worktree at Take time.
 type Snapshot struct {
 	Worktree string
-	// Tree is the git tree object id the working tree hashed to.
 	Tree     string
 	mode     snapshotMode
 	writable map[string]bool
@@ -64,16 +44,11 @@ func TakeStaged(ctx context.Context, worktree string, pathspec []string) (Snapsh
 	return Snapshot{Worktree: worktree, Tree: tree, mode: declaredFiles}, nil
 }
 
-// Result reports what Restore had to undo.
 type Result struct {
-	// Restored lists the worktree-relative paths written back or removed,
-	// sorted. Empty means the phase left the tree byte-identical.
 	Restored []string
 	Kept     []string
 }
 
-// Take snapshots the worktree. An empty path or a non-repository is an error,
-// never a silent no-op — the caller decides how loudly to fail open.
 func Take(ctx context.Context, worktree string) (Snapshot, error) {
 	if strings.TrimSpace(worktree) == "" {
 		return Snapshot{}, fmt.Errorf("treefence: worktree path required")
@@ -85,10 +60,6 @@ func Take(ctx context.Context, worktree string) (Snapshot, error) {
 	return Snapshot{Worktree: worktree, Tree: tree}, nil
 }
 
-// Restore puts the worktree back to the snapshot's content and reports the
-// paths it touched. A tree that still matches is a no-op. Every entry is
-// attempted even when one fails; the failures are joined and returned so the
-// caller reports each by name.
 func (s Snapshot) Restore(ctx context.Context) (Result, error) {
 	if s.mode != allFiles {
 		return Result{}, errNotRestorable
@@ -107,9 +78,6 @@ func (s Snapshot) Restore(ctx context.Context) (Result, error) {
 	added, keptAdded := s.partition(added)
 	changed, keptChanged := s.partition(changed)
 	var errs []error
-	// Removals first: a path the phase turned from a file into a directory
-	// (or the reverse) has to be cleared before its other form is written
-	// back, whatever order git listed the two entries in.
 	for _, rel := range added {
 		if err := removeAdded(s.Worktree, rel); err != nil {
 			errs = append(errs, err)
@@ -169,9 +137,6 @@ func (s Snapshot) verify(ctx context.Context) error {
 	return nil
 }
 
-// diff lists the paths the phase added (to remove) and the paths it modified,
-// deleted or retyped (to write back), from `diff-tree -z`; a malformed listing
-// is an error, never a silently shortened one.
 func (s Snapshot) diff(ctx context.Context, after string) (added, changed []string, err error) {
 	out, err := git(ctx, s.Worktree, nil, "diff-tree", "-r", "-z", "--no-renames", "--name-status", s.Tree, after)
 	if err != nil {
@@ -199,9 +164,6 @@ func (s Snapshot) diff(ctx context.Context, after string) (added, changed []stri
 	return added, changed, nil
 }
 
-// removeAdded deletes a path the phase created and prunes the directories it
-// created around it. A path that is already gone — or whose parent was
-// meanwhile restored to a file — is nothing to do.
 func removeAdded(worktree, rel string) error {
 	abs := filepath.Join(worktree, filepath.FromSlash(rel))
 	if _, err := os.Lstat(abs); err != nil {
@@ -217,8 +179,6 @@ func removeAdded(worktree, rel string) error {
 	return nil
 }
 
-// pruneEmptyParents removes now-empty directories from dir up to (not
-// including) root; a non-empty directory stops the walk.
 func pruneEmptyParents(root, dir string) {
 	root, dir = filepath.Clean(root), filepath.Clean(dir)
 	for dir != root && strings.HasPrefix(dir, root+string(filepath.Separator)) {
@@ -229,9 +189,6 @@ func pruneEmptyParents(root, dir string) {
 	}
 }
 
-// writeTree hashes the working tree — tracked changes plus untracked files,
-// ignore rules respected — into a tree object via a throwaway index seeded
-// from the real one (so only changed paths are re-hashed).
 func writeTree(ctx context.Context, worktree string) (string, error) {
 	return indexCopyTree(ctx, worktree, allFiles, nil)
 }
@@ -257,13 +214,11 @@ func addArgs(mode snapshotMode, declared []string) [][]string {
 	}
 }
 
-// writeFromTree restores one path's content and mode from the snapshot tree.
 func writeFromTree(ctx context.Context, worktree, tree, rel, abs string) error {
 	entry, err := git(ctx, worktree, nil, "ls-tree", "-z", tree, "--", rel)
 	if err != nil {
 		return err
 	}
-	// "<mode> <type> <object>\t<path>\0"
 	head, _, ok := strings.Cut(strings.TrimSuffix(entry, "\x00"), "\t")
 	meta := strings.Fields(head)
 	if !ok || len(meta) != 3 {
@@ -325,17 +280,11 @@ func git(ctx context.Context, dir string, env []string, args ...string) (string,
 	return stdout.String(), nil
 }
 
-// Fence is the two-step form every dispatcher uses: Begin before the agent
-// runs, End after it returns. Both dispatch surfaces that call the bridge —
-// the shared phase runner and the retro phase's own runner — hold one so the
-// mechanism cannot be wired on one and forgotten on the other.
 type Fence struct {
 	snap    *Snapshot
 	takeErr error
 }
 
-// Begin takes the fence for a read-only dispatch. A source writer (readOnly
-// false) or a dispatch without a worktree gets an inert fence.
 func Begin(ctx context.Context, worktree string, readOnly bool, writable ...string) *Fence {
 	if !readOnly || worktree == "" {
 		return &Fence{}
@@ -359,24 +308,14 @@ func writableSet(paths []string) map[string]bool {
 	return set
 }
 
-// Outcome is what End did, rendered by Diagnostics for the phase response.
 type Outcome struct {
-	// Verified means an actual snapshot was restored successfully. An inert
-	// fence or a failed snapshot/restore cannot authenticate the worktree.
-	Verified bool
-	// Restored lists the paths written back or removed (also on a partial
-	// failure — the caller reports both halves).
-	Restored []string
-	Kept     []string
-	// TakeErr is set when the fence was wanted but could not be taken; the
-	// phase ran unfenced.
-	TakeErr error
-	// RestoreErr is set when one or more entries could not be put back.
+	Verified   bool
+	Restored   []string
+	Kept       []string
+	TakeErr    error
 	RestoreErr error
 }
 
-// End restores the worktree and reports. An inert fence yields an empty
-// Outcome.
 func (f *Fence) End(ctx context.Context) Outcome {
 	if f == nil {
 		return Outcome{}
@@ -389,20 +328,13 @@ func (f *Fence) End(ctx context.Context) Outcome {
 	}
 	res, err := f.snap.Restore(ctx)
 	if err == nil {
-		// Restoration can reveal additions hidden by the phase's temporary
-		// .gitignore changes. Authenticate the final tree, not just write success.
 		err = f.snap.verify(ctx)
 	}
 	return Outcome{Verified: err == nil, Restored: res.Restored, Kept: res.Kept, RestoreErr: err}
 }
 
-// listMax bounds the restored-path list carried on a diagnostic.
 const listMax = 12
 
-// Diagnostics renders the outcome for the phase response: nothing for a clean
-// phase; a warning naming the restored paths for a writing one; a warning
-// naming the failure when the fence could not do its job. Never an error
-// severity — the fence reports, the gates decide.
 func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 	if o.TakeErr != nil {
 		return []cyclestate.Diagnostic{{Severity: "warning", Message: fmt.Sprintf(
@@ -431,8 +363,6 @@ func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 	return out
 }
 
-// TakeErr reports why the fence could not be taken (nil for an inert or a
-// live fence), so a dispatcher can log it the moment the phase starts.
 func (f *Fence) TakeErr() error {
 	if f == nil {
 		return nil

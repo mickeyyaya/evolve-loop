@@ -511,6 +511,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/bridge/launchoutcome` | 6 | [internal-bridge-launchoutcome.md](internal-bridge-launchoutcome.md) |
 | `internal/bridge/panestream` | 44 | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge` | 434 | [internal-bridge.md](internal-bridge.md) |
+| `internal/bridgechain` | 2 | [internal-bridgechain.md](internal-bridgechain.md) |
 | `internal/budgethistory` | 2 | [internal-budgethistory.md](internal-budgethistory.md) |
 | `internal/campaign` | 4 | [internal-campaign.md](internal-campaign.md) |
 | `internal/capability` | 1 | [internal-capability.md](internal-capability.md) |
@@ -524,7 +525,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/coherence` | 16 | [internal-coherence.md](internal-coherence.md) |
 | `internal/commitgate` | 3 | [internal-commitgate.md](internal-commitgate.md) |
 | `internal/commitprefixgate` | 2 | [internal-commitprefixgate.md](internal-commitprefixgate.md) |
-| `internal/committedset` | 1 | [internal-committedset.md](internal-committedset.md) |
+| `internal/committedset` | 6 | [internal-committedset.md](internal-committedset.md) |
 | `internal/config` | 56 | [internal-config.md](internal-config.md) |
 | `internal/consensusdispatch` | 3 | [internal-consensusdispatch.md](internal-consensusdispatch.md) |
 | `internal/contextfillcorrelate` | 3 | [internal-contextfillcorrelate.md](internal-contextfillcorrelate.md) |
@@ -545,6 +546,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/deliverable` | 116 | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/digest` | 3 | [internal-digest.md](internal-digest.md) |
 | `internal/dispatchevents` | 1 | [internal-dispatchevents.md](internal-dispatchevents.md) |
+| `internal/docsfloor` | 5 | [internal-docsfloor.md](internal-docsfloor.md) |
 | `internal/dossier` | 38 | [internal-dossier.md](internal-dossier.md) |
 | `internal/evalgate` | 31 | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/evalqualitycheck` | 15 | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
@@ -572,6 +574,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/loopchain` | 12 | [internal-loopchain.md](internal-loopchain.md) |
 | `internal/looppreflight` | 28 | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/loopwave` | 15 | [internal-loopwave.md](internal-loopwave.md) |
+| `internal/marketplacepoll` | 3 | [internal-marketplacepoll.md](internal-marketplacepoll.md) |
 | `internal/modelcatalog` | 2 | [internal-modelcatalog.md](internal-modelcatalog.md) |
 | `internal/modelquery` | 11 | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/observerengine` | 10 | [internal-observerengine.md](internal-observerengine.md) |
@@ -596,6 +599,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phases/ship` | 271 | [internal-phases-ship.md](internal-phases-ship.md) |
 | `internal/phases/specrunner` | 15 | [internal-phases-specrunner.md](internal-phases-specrunner.md) |
 | `internal/phases/swarmrunner` | 9 | [internal-phases-swarmrunner.md](internal-phases-swarmrunner.md) |
+| `internal/phases/tdd` | 9 | [internal-phases-tdd.md](internal-phases-tdd.md) |
 | `internal/phases/triage` | 26 | [internal-phases-triage.md](internal-phases-triage.md) |
 | `internal/phasespec` | 61 | [internal-phasespec.md](internal-phasespec.md) |
 | `internal/phasestream` | 20 | [internal-phasestream.md](internal-phasestream.md) |
@@ -637,7 +641,9 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/textcap` | 4 | [internal-textcap.md](internal-textcap.md) |
 | `internal/tokenusage` | 24 | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |
+| `internal/treefence` | 3 | [internal-treefence.md](internal-treefence.md) |
 | `internal/triagecap` | 69 | [internal-triagecap.md](internal-triagecap.md) |
+| `internal/verdictcache` | 6 | [internal-verdictcache.md](internal-verdictcache.md) |
 | `internal/verifylock` | 2 | [internal-verifylock.md](internal-verifylock.md) |
 | `pkg/acsassert` | 5 | [pkg-acsassert.md](pkg-acsassert.md) |
 | `pkg/phaseproto` | 1 | [pkg-phaseproto.md](pkg-phaseproto.md) |

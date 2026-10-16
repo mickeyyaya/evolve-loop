@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// initPreflightRepo tracks skills/audit/SKILL.md so git lists an untracked sibling per file, not as its directory.
 func initPreflightRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

@@ -8,18 +8,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/textcap"
 )
 
-// MaxEnrichedCatalogCards bounds how many catalog cards render with full metadata.
 const MaxEnrichedCatalogCards = 12
 
 const maxCardHintRunes = 140
 
-// WriteCatalog renders the SELECT menu of pre-defined phases with no on-demand index.
 func WriteCatalog(b *strings.Builder, cards []router.PhaseCard) {
 	WriteCatalogWithOnDemand(b, cards, nil)
 }
 
-// WriteCatalogWithOnDemand renders the SELECT menu, then names the on-demand phases in one line.
-// The index hides a declined phase without removing it: a phase absent from the prompt cannot be selected.
 func WriteCatalogWithOnDemand(b *strings.Builder, cards []router.PhaseCard, onDemand []string) {
 	if len(cards) == 0 {
 		return
@@ -46,7 +42,6 @@ func WriteCatalogWithOnDemand(b *strings.Builder, cards []router.PhaseCard, onDe
 
 }
 
-// partitionCards puts spine cards last: they run via the mandatory config however they render.
 func partitionCards(cards []router.PhaseCard) []router.PhaseCard {
 	var withMeta, opt, rest []router.PhaseCard
 	for _, c := range cards {
@@ -80,7 +75,6 @@ func writeCard(b *strings.Builder, c router.PhaseCard) {
 		fmt.Fprintf(b, " — when: %s", hint)
 	}
 	b.WriteString("\n")
-	// The phase's own guardrails give an advisor proposing {cli,tier} the legal bounds.
 	if len(c.AllowedCLIs) > 0 {
 		fmt.Fprintf(b, "  allowed_clis: %s\n", strings.Join(c.AllowedCLIs, ", "))
 	}

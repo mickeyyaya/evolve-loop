@@ -115,7 +115,6 @@ func TestParsePhasePlan_SanitizesTiersAndReportsRejectedMintsAsData(t *testing.T
 	})
 }
 
-// The literal tier lists are deliberate: a catalog change turns this red instead of silently changing what the advisor may propose.
 func TestSanitizeTier_KeepsExactlyTheFourCanonicalTiers(t *testing.T) {
 	for _, good := range []string{"fast", "balanced", "deep", "top"} {
 		if SanitizeTier(good) != good {

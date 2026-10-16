@@ -44,6 +44,13 @@
 - **Starvation weight floor 0.9, enforced twice.** `policy.FleetConfig` and `BuildStarvationItem`/`Validate` both clamp or reject, so neither a bad config nor a bad caller can under-weight the todo. A quota-shrunk wave is never starvation (`TestStarvation_QuotaShrunkWaveNeverStarves`).
 - **The min-lanes floor holds capacity through a bench**, and a floor above `count` clamps down to `count` (`TestQuotaAwareCount_MinLanesFloorHoldsCapacity`, `TestQuotaAwareCount_MinLanesClampedToCount`).
 - **Routing gate coverage.** `committed_floors` ids pass through the same gate as cards, so the precedence source is not a bypass (`TestTodosFromTriage_RefusesRoutedCommittedFloor`). Unknown ids are dispatchable by the resolver's contract, because scout-originated work has no inbox item.
+- **Reasons that sit on single fields.** `Todo.Priority` orders pool backfill (higher first) and never affects dependency order. `Optional` marks a best-effort todo. An exhausted failure of it is quarantined and does not abort the wave.
+
+  `CycleSpec.OutputContract` is passed as `--goal`, and empty keeps the goal-hash goal. `EVOLVE_FLEET` is forced on in `Env`. The lane pins `lane-scope.json` from `Env[FleetScopeKey]`, not from `Scope`.
+
+  So `FreshenSpecs` rebuilds that value on a copy, because the caller shares the input map. A todo whose triage card has no `files` stays an id-only island.
+- **The pool claims before it launches.** `RunPool` claims the files of a lane and counts the lane before its goroutine starts. Correctness comes from that order. The rendezvous and `Gosched` calls are hints and do not order the launch callbacks. The test lets one lane finish only after both start callbacks, because the callback order depends on the scheduler.
+- **A bridge between lanes is a collision.** A todo that spans two buckets bridges two concurrent lanes on the shared tree, so `Partition` defers it. The package graph also connects files of different lanes through `ipcenv`. `TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets` pins this.
 
 ## Findings
 

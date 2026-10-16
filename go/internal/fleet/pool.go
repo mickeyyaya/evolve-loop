@@ -8,19 +8,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// PoolConfig sets the width a rolling pool holds; a positive Concurrency may only lower it below Target.
 type PoolConfig struct {
 	Target      int
 	Concurrency int
 }
 
-// PoolTransition is the live-lane count the caller formats as "lanes live: N/target".
 type PoolTransition struct {
 	Live   int
 	Target int
 }
 
-// RunPool keeps up to cfg.Target file-disjoint lanes running, backfilling as each exits; Result.Index indexes backlog.
 func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchFn, onTransition func(PoolTransition)) []Result {
 	if launch == nil {
 		return noLaunchResults(len(backlog))
@@ -39,7 +36,7 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 	for i := range backlog {
 		pending[i] = true
 	}
-	claimed := map[string]bool{} // normalized file → held by a running lane
+	claimed := map[string]bool{}
 	running := 0
 	completions := make(chan int, len(backlog))
 
@@ -63,8 +60,6 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 		}
 		running++
 		emit()
-		// Correctness comes from claiming files and counting the lane before its goroutine
-		// starts; the rendezvous and Gosched are hints and do not order launch callbacks.
 		started := make(chan struct{})
 		go func() {
 			started <- struct{}{}
@@ -108,7 +103,6 @@ func noLaunchResults(n int) []Result {
 	return results
 }
 
-// selectDisjoint returns the highest-Priority disjoint pending todo (lowest index on ties), or -1.
 func selectDisjoint(backlog []Todo, pending map[int]bool, disjoint func(int) bool) int {
 	best := -1
 	for i := range backlog {
@@ -122,7 +116,6 @@ func selectDisjoint(backlog []Todo, pending map[int]bool, disjoint func(int) boo
 	return best
 }
 
-// poolSpec builds the same scoped fleet-mode spec a wave launch gets, so a pool lane is equally isolated.
 func poolSpec(td Todo, width int) CycleSpec {
 	env := map[string]string{
 		ipcenv.FleetScopeKey: td.ID,

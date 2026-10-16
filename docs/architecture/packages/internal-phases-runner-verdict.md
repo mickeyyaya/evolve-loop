@@ -42,6 +42,9 @@
 - **`forensicSnapshot` discards the read error.** A directory renders `size=N tail=""`, and the rendered bytes are pinned by a golden (`TestForensicSnapshot_AbsentSizeTailAndDirectory`). The code keeps a one-line why.
 - **`Dispatch` is built positionally in the leaf's test,** so a new field breaks that literal at compile time and the host's `dispatchOf` projection is revisited instead of silently zeroing (`TestDispatch_HasExactlyTheDeclaredFields`).
 - **Signals are a Null Object.** A nil accessor, or one returning nil, never changes a verdict (`TestWithSignals_NilIsTheNullObject`, `TestWithSignals_ReadsTheCenterLive`).
+- **The settle ladder is a liveness bound.** Its ceiling (about 3 s) lets a deliverable that is still flushing to disk finish. It is not the mechanism of verdict correctness. `settle` checks the context before and after each sleep, because the injected sleep cannot be interrupted. A probe error (no contract, or an I/O fault) returns at once, because waiting cannot fix it.
+- **Seams and tests.** The probe is required and every other seam is an `Option`. `rootsFor` is the one translation from a dispatch to contract roots, and a source scan pins that no inline join replaces `paths.EvolveDirOf`. A value comparison cannot tell them apart. A second source scan pins that nothing writes to the process streams (`importgraph_test.go`). The replay scenarios mirror the table of the host row for row.
+- **Warn fields.** The engine drops empty field values so each code stays under the field cap of the Center. A nil Center ignores the event.
 
 ## Findings
 

@@ -17,9 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// scripted answers each (cli@model) with a scripted exit code; anything not
-// scripted answers 0. A non-zero exit comes with an error, as the real bridge's
-// does — DispatchTiered advances only on err != nil AND a trigger exit.
 type scripted struct {
 	exits     map[string]int
 	exhausted map[string]bool
@@ -56,11 +53,6 @@ func fixedPlan(clis, tiers []string) bridgechain.PlanResolver {
 	}
 }
 
-// TestWalking_ArtifactTimeoutAdvancesToTheNextCLI reproduces lanes 1676/1677
-// (2026-09-14): the retro launched the bridge itself, codex exited 81 after the
-// artifact window, and the cycle sealed with no disposition. Through the walk
-// the next CLI in the chain runs, every attempt is marked, and the fallback is
-// one log line — the runner's own contract, now the bridge handle's.
 func TestWalking_ArtifactTimeoutAdvancesToTheNextCLI(t *testing.T) {
 	inner := &scripted{exits: map[string]int{"codex-tmux": 81}}
 	var logs []string
@@ -83,10 +75,6 @@ func TestWalking_ArtifactTimeoutAdvancesToTheNextCLI(t *testing.T) {
 	}
 }
 
-// TestWalking_ChainAttemptPassesThrough pins the no-double-walk rule: the
-// runner (and the advisor) walk their own chains and mark each attempt; the
-// decorator hands a marked request straight to the inner bridge without
-// resolving a plan.
 func TestWalking_ChainAttemptPassesThrough(t *testing.T) {
 	inner := &scripted{exits: map[string]int{"codex-tmux": 81}}
 	resolved := 0
@@ -100,8 +88,6 @@ func TestWalking_ChainAttemptPassesThrough(t *testing.T) {
 	}
 }
 
-// TestWalking_RealFailureStopsTheWalk — a model's legitimate FAIL (a non-trigger
-// exit) never routes to another CLI: the classifier must see it.
 func TestWalking_RealFailureStopsTheWalk(t *testing.T) {
 	inner := &scripted{exits: map[string]int{"codex-tmux": 1}}
 	w := bridgechain.New(inner, fixedPlan([]string{"codex-tmux", "claude-tmux"}, nil))
@@ -111,9 +97,6 @@ func TestWalking_RealFailureStopsTheWalk(t *testing.T) {
 	}
 }
 
-// TestWalking_QuotaAtEveryCLIStepsDownATierAndBenchesEachWall — when every CLI
-// at a tier exits 85 the walk steps down a tier (WS-876), and each 85 reaches
-// the bench recorder with the CLI that hit the wall.
 func TestWalking_QuotaAtEveryCLIStepsDownATierAndBenchesEachWall(t *testing.T) {
 	inner := &scripted{exits: map[string]int{"codex-tmux@deep": 85, "claude-tmux@deep": 85}}
 	var benched, logs []string
@@ -136,8 +119,6 @@ func TestWalking_QuotaAtEveryCLIStepsDownATierAndBenchesEachWall(t *testing.T) {
 	}
 }
 
-// TestWalking_NoPlanLaunchesTheCallersOwnChoiceOnce — a resolver with nothing
-// to say degrades to exactly the launch the caller asked for.
 func TestWalking_NoPlanLaunchesTheCallersOwnChoiceOnce(t *testing.T) {
 	inner := &scripted{exits: map[string]int{"claude-p": 81}}
 	w := bridgechain.New(inner, func(core.BridgeRequest) (llmroute.Plan, error) { return llmroute.Plan{}, nil })
@@ -163,11 +144,6 @@ func writeProfile(t *testing.T, dir, name string, v map[string]any) {
 
 func findAll(string) (string, error) { return "/usr/bin/true", nil }
 
-// TestDefaultPlanResolver_ProfileChainRunsBehindTheCallersPrimary — the plan
-// for a launch is the agent profile's chain (llmroute.Resolve: primary,
-// cli_fallback, tier chain, triggers) with the caller's own CLI kept as the
-// primary when it differs, so wrapping never changes which CLI runs FIRST —
-// only what happens when it fails.
 func TestDefaultPlanResolver_ProfileChainRunsBehindTheCallersPrimary(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "profiles")
@@ -187,15 +163,12 @@ func TestDefaultPlanResolver_ProfileChainRunsBehindTheCallersPrimary(t *testing.
 	}
 }
 
-// TestCLIHealthEnabled names the projection the runner and the decorator share.
 func TestCLIHealthEnabled(t *testing.T) {
 	if !bridgechain.CLIHealthEnabled(map[string]string{}) || bridgechain.CLIHealthEnabled(map[string]string{"EVOLVE_CLI_HEALTH": "0"}) {
 		t.Fatal("EVOLVE_CLI_HEALTH defaults on and 0 disables")
 	}
 }
 
-// TestApplyCLIHealthBench_DemotesABenchedFamily — an active family bench moves
-// that family behind the healthy candidates (the runner's contract, shared).
 func TestApplyCLIHealthBench_DemotesABenchedFamily(t *testing.T) {
 	root := t.TempDir()
 	now := func() time.Time { return time.Date(2026, 9, 14, 21, 0, 0, 0, time.UTC) }
@@ -213,9 +186,6 @@ func TestApplyCLIHealthBench_DemotesABenchedFamily(t *testing.T) {
 	}
 }
 
-// TestBenchOnEscalation_BenchesTheFamilyAFreshReportNames — the runner's
-// staleness guard, shared: the report must name the CLI that just exited 85 and
-// be captured at/after this dispatch's start; a leftover report never benches.
 func TestBenchOnEscalation_BenchesTheFamilyAFreshReportNames(t *testing.T) {
 	root, ws := t.TempDir(), t.TempDir()
 	now := func() time.Time { return time.Date(2026, 9, 14, 21, 0, 0, 0, time.UTC) }
@@ -225,7 +195,7 @@ func TestBenchOnEscalation_BenchesTheFamilyAFreshReportNames(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	report(now().Add(-time.Hour)) // stale: captured before this dispatch started
+	report(now().Add(-time.Hour))
 	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "codex-tmux", DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
 	if active := clihealth.NewStore(root, now).Active(); len(active) != 0 {
 		t.Fatalf("a stale report must not bench: %v", active)
@@ -239,9 +209,6 @@ func TestBenchOnEscalation_BenchesTheFamilyAFreshReportNames(t *testing.T) {
 	}
 }
 
-// TestExports_AreNamed names every exported type of the package for apicover:
-// the handle is a core.Bridge, and the three function types are what the
-// composition root passes in.
 func TestExports_AreNamed(t *testing.T) {
 	var _ core.Bridge = (*bridgechain.Walking)(nil)
 	var resolve bridgechain.PlanResolver = fixedPlan(nil, nil)
@@ -261,13 +228,6 @@ type centerBearing struct {
 func (c *centerBearing) Signals() *signalcenter.Center { return c.center }
 func (c *centerBearing) SignalsWired() bool            { return c.center != nil }
 
-// TestWalking_ForwardsTheInnerSignalCenter — the runner's verdict engine
-// reaches the production Center by asserting Signals() on the bridge handle it
-// was built with (phases/runner verdict_engine.go); the swarm decorator and
-// the orchestrator ask SignalsWired(). A handle that hid them would silently
-// disconnect every runner from the stream — the cmd/evolve wiring pin
-// (TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner) is what
-// caught it on the first wrap.
 func TestWalking_ForwardsTheInnerSignalCenter(t *testing.T) {
 	center := signalcenter.New()
 	w := bridgechain.New(&centerBearing{center: center}, nil)

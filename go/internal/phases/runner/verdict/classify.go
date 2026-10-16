@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 )
 
-// verdictSource is what selectVerdictBytes chose, with the ladder's re-probe count.
 type verdictSource struct {
 	artifact   string
 	violations []deliverable.Violation
@@ -17,8 +16,6 @@ type verdictSource struct {
 	attempts   int
 }
 
-// classify is the judge's second step. Diagnostics append in a pinned order:
-// Classify's own, the fence's, the violations, then the reconcile trail.
 func (e *Engine) classify(ctx context.Context, d Dispatch, r reconciliation, classify Classify) core.PhaseResponse {
 	src := e.selectVerdictBytes(ctx, d, r)
 	e.writeCleanStdout(d)
@@ -38,10 +35,6 @@ func (e *Engine) classify(ctx context.Context, d Dispatch, r reconciliation, cla
 	return resp
 }
 
-// selectVerdictBytes applies the verdict-source rule: a contracted phase is judged on its deliverable,
-// never the pane, whose scrollback can echo the contract's example sentinels. A probe error means no
-// contract, so the pane stays the source; unverified bytes still reach Classify and the ship guard.
-// See ADR-0072.
 func (e *Engine) selectVerdictBytes(ctx context.Context, d Dispatch, r reconciliation) verdictSource {
 	pane := d.Bridge.Stdout
 	if r.reconciled {
@@ -58,8 +51,6 @@ func (e *Engine) selectVerdictBytes(ctx context.Context, d Dispatch, r reconcili
 	return src
 }
 
-// writeCleanStdout is best-effort: a failure never blocks the phase, because the raw log stays the
-// forensic source. The companion's filename belongs to the writer and is never spelled here.
 func (e *Engine) writeCleanStdout(d Dispatch) {
 	if e.stdoutFilter == nil {
 		return
@@ -70,8 +61,6 @@ func (e *Engine) writeCleanStdout(d Dispatch) {
 	}
 }
 
-// applyShipGuard turns a clean-ship claim (PASS or a non-canonical verdict) into FAIL when the
-// deliverable failed its contract. WARN passes through: whether WARN ships is the orchestrator's policy.
 func applyShipGuard(verdict string, unverified bool) string {
 	if !unverified {
 		return verdict
@@ -83,7 +72,6 @@ func applyShipGuard(verdict string, unverified bool) string {
 	return core.VerdictFAIL
 }
 
-// violationDiagnostics surfaces the contract codes behind a rejected deliverable.
 func violationDiagnostics(vs []deliverable.Violation) []core.Diagnostic {
 	var out []core.Diagnostic
 	for _, v := range vs {
@@ -92,8 +80,6 @@ func violationDiagnostics(vs []deliverable.Violation) []core.Diagnostic {
 	return out
 }
 
-// reconcileTrail marks a teardown the deliverable overrode; the agent's own verdict stands, so a
-// reconciled FAIL routes as a real FAIL. A floor rescue lists what it overrode, never a silent bypass.
 func (e *Engine) reconcileTrail(resp *core.PhaseResponse, d Dispatch, r reconciliation, verdict string) {
 	resp.Reconciled = true
 	via := "verify"
@@ -112,8 +98,6 @@ func (e *Engine) reconcileTrail(resp *core.PhaseResponse, d Dispatch, r reconcil
 	})
 }
 
-// unverifiedSignal is fault-only: it fires when an unverified deliverable ends in FAIL, never on a
-// WARN or SKIPPED pass-through.
 func (e *Engine) unverifiedSignal(d Dispatch, before, after string, src verdictSource) {
 	if after != core.VerdictFAIL {
 		return

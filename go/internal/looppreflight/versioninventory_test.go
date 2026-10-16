@@ -11,7 +11,6 @@ import (
 
 const cliVersionsFile = "cli-versions.json"
 
-// writeCLIVersions writes the prior batch's record that the drift check compares against.
 func writeCLIVersions(t *testing.T, evolveDir string, versions map[string]string) {
 	t.Helper()
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

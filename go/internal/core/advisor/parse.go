@@ -11,10 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// parseFailure carries fields.cause out of the parsers, which stay Center-free because resume,
-// replay and the routing-eval corpus call them and must emit nothing.
 type parseFailure struct {
-	cause string // no_json | invalid_json | empty
+	cause string
 	err   error
 }
 
@@ -32,7 +30,6 @@ func (a *Advisor) warnUnparseable(in router.RouteInput, d decision, err error, r
 	})
 }
 
-// ParseProposal decodes the last balanced JSON object in the response; an absent, malformed or empty proposal is an error.
 func ParseProposal(stdout string) (*router.Proposal, error) {
 	start, end, ok := LastBalancedSpan(stdout, '{', '}')
 	if !ok {
@@ -49,19 +46,16 @@ func ParseProposal(stdout string) (*router.Proposal, error) {
 	return &prop, nil
 }
 
-// RejectedMint is one plan entry the recursion guard dropped, with the reason.
 type RejectedMint struct {
 	Phase  string
 	Reason string
 }
 
-// ParsedPlan is the parsed plan and the mints the recursion guard rejected.
 type ParsedPlan struct {
 	Plan          *router.PhasePlan
 	RejectedMints []RejectedMint
 }
 
-// ParsePhasePlan decodes the last balanced JSON array in the response; an absent, malformed or empty plan is an error.
 func ParsePhasePlan(stdout string) (ParsedPlan, error) {
 	start, end, ok := LastBalancedSpan(stdout, '[', ']')
 	if !ok {
@@ -81,8 +75,6 @@ func ParsePhasePlan(stdout string) (ParsedPlan, error) {
 	return ParsedPlan{Plan: &router.PhasePlan{Entries: entries, MintPhases: mints}, RejectedMints: rejected}, nil
 }
 
-// SanitizeTier keeps only a canonical tier and drops any alias or model name, untranslated;
-// the downstream clamp trusts this instead of re-validating.
 func SanitizeTier(tier string) string {
 	if slices.Contains(modelcatalog.CanonicalTiers, tier) {
 		return tier
@@ -90,7 +82,6 @@ func SanitizeTier(tier string) string {
 	return ""
 }
 
-// ReplayPlanFromResponse reparses a captured response through the live parse and floor clamp, returning the clamps that fired.
 func ReplayPlanFromResponse(raw string, in router.RouteInput, floor []string) (*router.PhasePlan, []router.Clamp, error) {
 	parsed, err := ParsePhasePlan(raw)
 	if err != nil {
@@ -100,8 +91,6 @@ func ReplayPlanFromResponse(raw string, in router.RouteInput, floor []string) (*
 	return clamped, clamps, nil
 }
 
-// LastBalancedSpan returns the inclusive bounds of the last top-level open/close span in s, ignoring delimiters
-// inside JSON strings. The last span wins because a reply follows any echoed example.
 func LastBalancedSpan(s string, open, close byte) (start, end int, ok bool) {
 	depth, spanStart := 0, -1
 	inStr, esc := false, false

@@ -8,22 +8,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// starvationWeightFloor mirrors policy.FleetConfig's clamp, so neither a bad config nor a bad caller under-weights the todo.
 const starvationWeightFloor = 0.9
 
-// starvationItemID is independent of the cycle, so a re-fire overwrites the single open todo.
 const starvationItemID = "fleet-work-supply-starvation"
 
-// WaveObservation is one wave's realized-vs-sized lane count.
 type WaveObservation struct {
-	SizedLanes    int // the wave's width after the quota-aware shrink; the width Starved compares against
-	RealizedLanes int // lanes that actually dispatched work this wave
+	SizedLanes    int
+	RealizedLanes int
 	// minimal: DesiredLanes/QuotaShrunk only keep go/acs/cycle544's superseded observations compiling; an unset SizedLanes falls back to them.
 	DesiredLanes int
 	QuotaShrunk  bool
 }
 
-// Starved reports fewer lanes realized than the wave was sized for; a quota shrink explains only the lanes it removed.
 func (o WaveObservation) Starved() bool {
 	return o.RealizedLanes < o.sizedWidth()
 }
@@ -35,15 +31,12 @@ func (o WaveObservation) sizedWidth() int {
 	return o.DesiredLanes
 }
 
-// StarvationTracker counts consecutive starved waves; hold one across waves so the streak spans them.
 type StarvationTracker struct {
 	streak int
 }
 
-// Streak returns the current consecutive-starved-wave count.
 func (t *StarvationTracker) Streak() int { return t.streak }
 
-// Observe reports whether o is the k-th consecutive starved wave (k<1 means 1); a fire or a recovered wave resets the streak.
 func (t *StarvationTracker) Observe(o WaveObservation, k int) bool {
 	if k < 1 {
 		k = 1
@@ -60,7 +53,6 @@ func (t *StarvationTracker) Observe(o WaveObservation, k int) bool {
 	return false
 }
 
-// StarvationItem is the self-filed inbox todo; its JSON is a superset of what triagecap.ReadInboxBacklog reads.
 type StarvationItem struct {
 	ID            string   `json:"id"`
 	Title         string   `json:"title"`
@@ -73,7 +65,6 @@ type StarvationItem struct {
 	CreatedAt     string   `json:"created_at"`
 }
 
-// BuildStarvationItem builds the inbox todo for k consecutive starved waves, clamping weight up to 0.9.
 func BuildStarvationItem(o WaveObservation, k int, weight float64, cycle int, nowRFC3339 string) StarvationItem {
 	if weight < starvationWeightFloor {
 		weight = starvationWeightFloor
@@ -97,7 +88,6 @@ func BuildStarvationItem(o WaveObservation, k int, weight float64, cycle int, no
 	}
 }
 
-// Validate rejects an item below the weight floor or missing a required field.
 func (it StarvationItem) Validate() error {
 	if it.Weight < starvationWeightFloor {
 		return fmt.Errorf("fleet: starvation item weight %v below floor %v", it.Weight, starvationWeightFloor)
@@ -113,7 +103,6 @@ func (it StarvationItem) Validate() error {
 	return nil
 }
 
-// WriteTo validates then atomically writes the item to <evolveDir>/inbox/<id>.json, returning the path.
 func (it StarvationItem) WriteTo(evolveDir string) (string, error) {
 	if err := it.Validate(); err != nil {
 		return "", err

@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// checkPhaseRoutingWarnings surfaces user-phase specs phasespec dropped during catalog merge.
-// Never a halt: the built-in spine is intact, so a broken phase.json must not block the batch.
 func checkPhaseRoutingWarnings(o resolved) CheckResult {
 	const name = "phase-routing-warnings"
 	warns := o.phaseRoutingWarnings()
@@ -22,7 +20,6 @@ func checkPhaseRoutingWarnings(o resolved) CheckResult {
 	}
 }
 
-// defaultPhaseRoutingWarnings fails open on a catalog-load error, so the gate never blocks a batch by itself.
 func defaultPhaseRoutingWarnings(projectRoot string) func() []string {
 	return func() []string {
 		_, _, warns, err := phasespec.MergedCatalog(projectRoot)

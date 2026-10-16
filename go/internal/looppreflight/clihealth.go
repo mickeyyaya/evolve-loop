@@ -8,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 )
 
-// checkCLIHealth warns at batch start that benched CLI families will run fallback-first.
-// Never a halt: the fallback chain exists so a benched family does not block the batch.
 func checkCLIHealth(o resolved) CheckResult {
 	const name = "cli-health"
 	active := o.cliHealthActive()

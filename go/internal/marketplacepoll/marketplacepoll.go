@@ -1,21 +1,5 @@
-// Package marketplacepoll ports legacy/scripts/release/marketplace-poll.sh.
-//
-// Post-publish marketplace propagation verifier (v8.13.2). Polls the local
-// marketplace checkout — the path Claude Code reads at session startup —
-// until the plugin.json there matches the target version, OR until the
-// deadline. On success, re-invokes release.sh to refresh installed_plugins.json
-// (the **cache-refresh ordering bug fix**: poll first, then refresh, so the
-// refresh check runs only when version-match is already true).
-//
-// Exit codes (mirrored by the cmd-layer wrapper):
-//
-//	0 — marketplace converged + release.sh refresh succeeded
-//	1 — timeout: polled until MaxWait without matching version
-//	2 — runtime error (missing dir, malformed plugin.json, release.sh failed)
-//
-// Testing seams: callers may inject Now/Sleep/Pull/ReleaseSh to bypass real
-// time, real git operations, and real shell invocations. Defaults preserve
-// the bash script's external behavior.
+// Package marketplacepoll polls the local marketplace checkout until its plugin version matches the release target.
+// See docs/architecture/packages/internal-marketplacepoll.md.
 package marketplacepoll
 
 import (
@@ -32,58 +16,38 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Sentinel errors. The cmd layer maps these to bash exit codes.
 var (
-	// ErrTimeout is returned when MaxWait elapses without convergence.
-	// Maps to exit code 1.
 	ErrTimeout = errors.New("marketplacepoll: timeout waiting for marketplace convergence")
-	// ErrRuntime wraps runtime failures (missing dir, missing plugin.json,
-	// invalid semver target, release.sh failure). Maps to exit code 2.
 	ErrRuntime = errors.New("marketplacepoll: runtime error")
 )
 
-// Options drives a Run() invocation. Zero values for seam fields cause the
-// real implementations to be used; tests override them.
 type Options struct {
-	Target         string        // required; semver X.Y.Z
-	MarketplaceDir string        // required
-	MaxWait        time.Duration // required; > 0
-	PollInterval   time.Duration // required; > 0
+	Target         string
+	MarketplaceDir string
+	MaxWait        time.Duration
+	PollInterval   time.Duration
 	DryRun         bool
-	RepoRoot       string // for default ReleaseSh; used only if ReleaseSh nil
+	RepoRoot       string
 	Stderr         io.Writer
 
-	// Seams; nil = use the real implementations.
 	Now       func() time.Time
 	Sleep     func(time.Duration)
 	Pull      func(dir string) error
 	ReleaseSh func(repoRoot, target string) error
 }
 
-// Result captures what happened during a Run() call. Always populated even
-// on error, so callers can log diagnostics.
 type Result struct {
 	Converged      bool
 	Attempts       int
 	Elapsed        time.Duration
 	FinalVersion   string
-	ReleaseShRunOK bool // true iff release.sh was called and exited 0
+	ReleaseShRunOK bool
 }
 
-// pluginJSONPath returns the canonical plugin.json location under a
-// marketplace directory.
 func pluginJSONPath(marketDir string) string {
 	return filepath.Join(marketDir, ".claude-plugin", "plugin.json")
 }
 
-// ReadMarketplaceVersion reads the plugin.json at dir/.claude-plugin/plugin.json
-// and returns the "version" string. Mirrors the bash sed pipeline:
-//
-//	sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1
-//
-// Returns ("", error) if the file is missing or unreadable.
-// Returns ("", nil) if the file exists but no version field matches (rare —
-// in practice the bash script also returns empty here).
 func ReadMarketplaceVersion(dir string) (string, error) {
 	path := pluginJSONPath(dir)
 	body, err := os.ReadFile(path)
@@ -103,42 +67,20 @@ func parseVersionField(s string) string {
 	return m[1]
 }
 
-// DefaultPull is the production Pull implementation: git fetch origin main
-// + git reset --hard origin/main, silently no-op'd if dir is not a git
-// checkout (matches bash).
 func DefaultPull(dir string) error {
 	gitDir := filepath.Join(dir, ".git")
 	if info, err := os.Stat(gitDir); err != nil || !info.IsDir() {
-		return nil // not a git checkout — silent no-op
+		return nil
 	}
-	// Both errors are intentionally swallowed: the bash script does the
-	// same. Convergence is detected by the version check, not by git
-	// exit codes.
 	_ = sysexec.Command(context.Background(), "git", "-C", dir, "fetch", "origin", "main", "--quiet").Run()
 	_ = sysexec.Command(context.Background(), "git", "-C", dir, "reset", "--hard", "origin/main", "--quiet").Run()
 	return nil
 }
 
-// DefaultReleaseSh is a Go-native no-op. It formerly shelled out to
-// legacy/scripts/utility/release.sh for a cache-refresh side-effect (marketplace
-// pull + installed_plugins.json registry update). That script was removed in the
-// v12 script→Go migration; the cache-refresh side-effect is obsolete and release
-// consistency is covered by go/internal/releaseconsistency. The injectable
-// Options.ReleaseSh seam remains for callers that want a real check (ADR-0062/
-// T1.7 — no bash shell-out remains; a stray legacy release.sh is NOT executed).
 func DefaultReleaseSh(repoRoot, target string) error {
 	return nil
 }
 
-// Run executes the poll loop. Returns Result + error mapped to the bash
-// exit-code scheme:
-//
-//	nil               → exit 0
-//	ErrTimeout        → exit 1
-//	ErrRuntime (wrap) → exit 2
-//
-// Caller must ensure Target/MarketplaceDir/MaxWait/PollInterval are set;
-// validation of those happens here and surfaces as ErrRuntime.
 func Run(opts Options) (Result, error) {
 	res := Result{}
 	if err := validateMarketplacePollOptions(opts); err != nil {

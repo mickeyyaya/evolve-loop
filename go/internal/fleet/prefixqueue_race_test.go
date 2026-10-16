@@ -19,7 +19,6 @@ func TestPrefixQueue_ConcurrentEnqueue_NoLostWork(t *testing.T) {
 				Tier:  TierMaybe,
 				Files: []string{fmt.Sprintf("go/internal/f%d/f.go", i)},
 			})
-			// Interleave AIMD control writes to race the window field too.
 			if i%2 == 0 {
 				q.OnGreen()
 			} else {
@@ -30,7 +29,6 @@ func TestPrefixQueue_ConcurrentEnqueue_NoLostWork(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Disjoint files keep every lane in one group, so ComposePrefixes yields one prefix per lane.
 	if got := len(q.ComposePrefixes()); got != n {
 		t.Fatalf("%d lanes survived %d concurrent Enqueues — lost appends under contention", got, n)
 	}

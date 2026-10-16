@@ -2,11 +2,6 @@ package verdictcache
 
 import "testing"
 
-// TestProbeEligible_FreshBaseGuard names verdictcache.ProbeEligible and pins the
-// shared fresh-base guard both production call sites (the ADR-0048 shadow probe
-// and the audit-binding Put) route through: only a candidate that carries a
-// content identity distinct from a RESOLVED base is cache-eligible, while an
-// unresolvable base leaves the candidate eligible (frozen pre-guard behaviour).
 func TestProbeEligible_FreshBaseGuard(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -27,10 +22,6 @@ func TestProbeEligible_FreshBaseGuard(t *testing.T) {
 	}
 }
 
-// TestStore_PutLookupRoundTrip names the verdictcache.Store type (NewStore
-// returns *Store but the bare type is never named in a test) and pins the core
-// contract: a Put'd verdict is retrievable by its tree SHA, and Put on an empty
-// TreeSHA is a no-op (verdictcache.go:90) that stores nothing.
 func TestStore_PutLookupRoundTrip(t *testing.T) {
 	var s *Store = NewStore(t.TempDir(), fixedNow)
 	want := Entry{TreeSHA: "deadbeef", Cycle: 5, Verdict: "PASS", ArtifactSHA256: "h", ArtifactPath: "audit-report.md"}
@@ -45,7 +36,6 @@ func TestStore_PutLookupRoundTrip(t *testing.T) {
 		t.Errorf("round-trip mismatch: %+v", got)
 	}
 
-	// Put with an empty TreeSHA is a documented no-op: nothing becomes findable.
 	if err := s.Put(Entry{Verdict: "PASS"}); err != nil {
 		t.Fatalf("Put(empty TreeSHA): %v", err)
 	}

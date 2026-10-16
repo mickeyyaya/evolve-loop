@@ -5,61 +5,48 @@ import (
 	"sync"
 )
 
-// RiskTier ranks how safely a lane may be composed with others in one prefix.
 type RiskTier int
 
 const (
-	// TierRollup lanes are the safest — freely composable rollup material.
 	TierRollup RiskTier = iota
-	// TierMaybe lanes are normal composable lanes.
 	TierMaybe
-	// TierIffy lanes touch core / cross-cutting surface and get a solo slot.
 	TierIffy
 )
 
-// LaneCandidate is a PASS lane awaiting landing; Files are repo-relative and detect overlap-zone conflicts.
 type LaneCandidate struct {
 	ID    string
 	Tier  RiskTier
 	Files []string
 }
 
-// PrefixQueue is the single-writer landing composer: a FIFO of PASS lanes plus the AIMD window.
-// See ADR-0078.
 type PrefixQueue struct {
-	// mu guards lanes and window: drivers enqueue and report outcomes from several goroutines.
 	mu     sync.Mutex
 	lanes  []LaneCandidate
 	window int
 }
 
-// NewPrefixQueue returns an empty queue with the AIMD window at its start value of 3.
 func NewPrefixQueue() *PrefixQueue {
 	return &PrefixQueue{window: 3}
 }
 
-// Enqueue appends a PASS lane candidate to the FIFO.
 func (q *PrefixQueue) Enqueue(c LaneCandidate) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.lanes = append(q.lanes, c)
 }
 
-// Window returns the current AIMD speculation window.
 func (q *PrefixQueue) Window() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.window
 }
 
-// OnGreen records a green landing: additive increase (+1).
 func (q *PrefixQueue) OnGreen() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.window++
 }
 
-// OnRed records a red landing: multiplicative decrease (halve), floored at 1.
 func (q *PrefixQueue) OnRed() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -70,8 +57,6 @@ func (q *PrefixQueue) OnRed() {
 	}
 }
 
-// groups splits the FIFO into composable groups; a TierIffy or overlapping lane starts a new one.
-// The caller must hold q.mu.
 func (q *PrefixQueue) groups() [][]LaneCandidate {
 	var result [][]LaneCandidate
 	var cur []LaneCandidate
@@ -110,7 +95,6 @@ func (q *PrefixQueue) groups() [][]LaneCandidate {
 	return result
 }
 
-// ComposePrefixes returns each group's cumulative lane-ID prefixes, in queue order.
 func (q *PrefixQueue) ComposePrefixes() [][]string {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -126,7 +110,6 @@ func (q *PrefixQueue) ComposePrefixes() [][]string {
 	return prefixes
 }
 
-// ResolveCulprit lands lanes by positional NNFI, ejecting each lane that turns a known-good set red.
 func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed, ejected []string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -142,8 +125,6 @@ func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed
 			}
 		}
 	}
-	// Green groups can still form a red union, so verify(landed) is restored by trimming
-	// from the tail; the ejected lane is positional, not necessarily the culprit.
 	for len(landed) > 0 && !verify(landed) {
 		last := len(landed) - 1
 		ejected = append(ejected, landed[last])
@@ -152,22 +133,17 @@ func (q *PrefixQueue) ResolveCulprit(verify func(laneIDs []string) bool) (landed
 	return landed, ejected
 }
 
-// LandingMode is the fleet.landing policy vocabulary for how PASS lanes reach main.
 type LandingMode string
 
 const (
-	// LandingPerLane lands each lane independently (the compiled default).
-	LandingPerLane LandingMode = "per-lane"
-	// LandingPrefixQueue lands lanes through the single-writer prefix composer.
+	LandingPerLane     LandingMode = "per-lane"
 	LandingPrefixQueue LandingMode = "prefix-queue"
 )
 
-// DefaultLandingMode is the compiled default landing mode: per-lane.
 func DefaultLandingMode() LandingMode {
 	return LandingPerLane
 }
 
-// ParseLandingMode validates s against the landing-mode vocabulary, rejecting unknown and empty values.
 func ParseLandingMode(s string) (LandingMode, error) {
 	switch LandingMode(s) {
 	case LandingPerLane, LandingPrefixQueue:

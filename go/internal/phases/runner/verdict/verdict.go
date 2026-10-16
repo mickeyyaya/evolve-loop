@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The engine's Signal Center codes, one per WARN decision it reports.
 const (
 	CodeTeardownFail          signalcenter.Code = "RUNNER_TEARDOWN_FAIL"
 	CodeOptionalPhaseDegraded signalcenter.Code = "RUNNER_OPTIONAL_PHASE_DEGRADED"
@@ -30,21 +29,16 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeStdoutFilterFailed, "the clean-stdout companion of the phase's raw log (the logfilter writer's <phase>-stdout.clean.txt) could not be written; the phase continues and the raw log stays the forensic source; fields.workspace (the phase is the event's own)")
 }
 
-// The settle ladder's bounds: a liveness ceiling (about 3 s) for a deliverable
-// still flushing to disk, never the verdict-correctness mechanism.
 const (
 	SettleRetries  = 15
 	SettleInterval = 200 * time.Millisecond
 )
 
-// Verify is the host's deliverable probe; Classify is the phase's verdict hook, bound per call.
 type (
 	Verify   func(id Identity, phase string, roots phasecontract.Roots) (deliverable.Result, error)
 	Classify func(artifact string) (verdict string, diags []core.Diagnostic, nextPhase string)
 )
 
-// Dispatch is the engine's one input: the request fields it reads, the
-// pre-dispatch snapshot and the bridge outcome, which is read even when BridgeErr is set.
 type Dispatch struct {
 	Cycle                           int
 	RunID                           string
@@ -64,7 +58,6 @@ type Dispatch struct {
 	FenceDiagnostics                []core.Diagnostic
 }
 
-// Engine judges one dispatch outcome. The probe is required; every other seam is an Option.
 type Engine struct {
 	verify       Verify
 	sleep        func(time.Duration)
@@ -73,10 +66,8 @@ type Engine struct {
 	signals      func() *signalcenter.Center
 }
 
-// Option configures an Engine at construction.
 type Option func(*Engine)
 
-// New builds the engine over its required probe; a nil probe panics at first use.
 func New(verify Verify, opts ...Option) *Engine {
 	e := &Engine{verify: verify, sleep: time.Sleep}
 	for _, opt := range opts {
@@ -85,27 +76,22 @@ func New(verify Verify, opts ...Option) *Engine {
 	return e
 }
 
-// WithSleep installs the settle ladder's sleep; the default is time.Sleep.
 func WithSleep(fn func(time.Duration)) Option {
 	return func(e *Engine) { e.sleep = fn }
 }
 
-// WithStdoutFilter installs the clean-stdout companion writer; nil writes no companion.
 func WithStdoutFilter(fn func(workspace, phase string) error) Option {
 	return func(e *Engine) { e.stdoutFilter = fn }
 }
 
-// WithOptional marks the phase optional: a teardown with no trustworthy deliverable degrades to WARN.
 func WithOptional(optional bool) Option {
 	return func(e *Engine) { e.optional = optional }
 }
 
-// WithSignals installs the Signal Center accessor, read at every use; nil is the Null Object.
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(e *Engine) { e.signals = c }
 }
 
-// SignalsWired reports whether the engine currently reaches a Center.
 func (e *Engine) SignalsWired() bool { return e.center() != nil }
 
 func (e *Engine) center() *signalcenter.Center {
@@ -115,8 +101,6 @@ func (e *Engine) center() *signalcenter.Center {
 	return e.signals()
 }
 
-// warn is the engine's one producer. Empty field values are dropped so every
-// code stays under the Center's field cap; a nil Center ignores the event.
 func (e *Engine) warn(origin string, d Dispatch, code signalcenter.Code, reason string, fields map[string]string) {
 	for k, v := range fields {
 		if v == "" {
@@ -129,8 +113,6 @@ func (e *Engine) warn(origin string, d Dispatch, code signalcenter.Code, reason 
 	})
 }
 
-// Judge reconciles the bridge outcome against the deliverable, then classifies.
-// A FAIL arm also returns the bridge error wrapped, so errors.Is still finds the infra sentinel.
 func (e *Engine) Judge(ctx context.Context, d Dispatch, classify Classify) (core.PhaseResponse, error) {
 	r, early, err := e.reconcile(ctx, d)
 	if early != nil {
@@ -139,7 +121,6 @@ func (e *Engine) Judge(ctx context.Context, d Dispatch, classify Classify) (core
 	return e.classify(ctx, d, r, classify), nil
 }
 
-// Identity names the dispatch to the verifier, so its salvage reports carry the right cycle and run.
 type Identity struct {
 	Cycle int
 	RunID string

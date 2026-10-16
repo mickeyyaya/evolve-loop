@@ -38,8 +38,8 @@ func TestDiagCodes_TriageRefusalVocabulary(t *testing.T) {
 func TestErrorCodes_ProjectsErrorSeverityCodesOnce(t *testing.T) {
 	diags := []Diagnostic{
 		{Severity: SeverityError, Message: "a", Code: DiagCodeTriageProtectedSurface},
-		{Severity: SeverityWarning, Message: "b", Code: DiagCodeTriageTopNEmpty}, // a trail, not a reason
-		{Severity: SeverityError, Message: "c"},                                  // uncoded
+		{Severity: SeverityWarning, Message: "b", Code: DiagCodeTriageTopNEmpty},
+		{Severity: SeverityError, Message: "c"},
 		{Severity: SeverityError, Message: "d", Code: DiagCodeTriageProtectedSurface},
 		{Severity: SeverityError, Message: "e", Code: DiagCodeTriageCommitmentInvalid},
 	}
@@ -63,7 +63,7 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		{"", false, false},
 		{"SOMETHING_NEW", false, false},
 	}
-	var _ Disposition = RefusalDisposition(DiagCodeTriageProtectedSurface) // names Disposition for apicover
+	var _ Disposition = RefusalDisposition(DiagCodeTriageProtectedSurface)
 	for _, c := range cases {
 		d := RefusalDisposition(c.code)
 		if d.TaskLevel != c.task || d.RouteConsole != c.route {

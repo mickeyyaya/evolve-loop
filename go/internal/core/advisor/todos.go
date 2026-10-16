@@ -9,13 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/textcap"
 )
 
-// MaxCarryoverTodosInPrompt caps how many carryover todos render into the prompt.
 const MaxCarryoverTodosInPrompt = 20
 
-// maxCarryoverTodoActionRunes also bounds oversized entries already on disk, which creation-time caps cannot shrink.
 const maxCarryoverTodoActionRunes = 600
 
-// carryoverPriorityRank ranks an unknown priority 0, so it sorts last without being dropped.
 func carryoverPriorityRank(p string) int {
 	switch strings.ToUpper(strings.TrimSpace(p)) {
 	case "P0":
@@ -33,13 +30,11 @@ func carryoverPriorityRank(p string) int {
 	}
 }
 
-// WriteCarryoverTodos renders the carryover todos, highest priority and most recent first, capped in count and length.
 func WriteCarryoverTodos(b *strings.Builder, todos []router.CarryoverTodo) {
 	if len(todos) == 0 {
 		return
 	}
 	b.WriteString("\n## Carryover todos from previous cycles (consider when selecting phases)\n")
-	// A stable sort of a copy: ties keep on-disk order and the caller's slice is untouched.
 	ordered := append([]router.CarryoverTodo(nil), todos...)
 	sort.SliceStable(ordered, func(i, j int) bool {
 		ri, rj := carryoverPriorityRank(ordered[i].Priority), carryoverPriorityRank(ordered[j].Priority)
