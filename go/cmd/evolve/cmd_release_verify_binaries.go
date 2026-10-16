@@ -14,23 +14,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/releasetargets"
 )
 
-// binVerify is one row of the binary-asset verification matrix: an expected
-// asset name and whether it was found on the release, with a human Detail.
 type binVerify struct {
 	Asset  string
 	OK     bool
 	Detail string
 }
 
-// releaseAssetLister returns the asset names attached to the GitHub release for
-// tag in owner/repo. Injected so the orchestration is unit-testable; an error
-// (e.g. release not found) means no binaries were published — a hard failure.
 type releaseAssetLister func(owner, repo, tag string) ([]string, error)
 
-// verifyReleaseBinaries checks that every expected asset — one archive per
-// goreleaser target plus the checksums file — is present on the release. It
-// never returns early: every missing asset is reported so the operator sees the
-// complete picture, not just the first gap.
 func verifyReleaseBinaries(cfg releasetargets.Config, tag string, list releaseAssetLister) ([]binVerify, error) {
 	assets, err := list(cfg.RepoOwner, cfg.RepoName, tag)
 	if err != nil {
@@ -54,7 +45,6 @@ func verifyReleaseBinaries(cfg releasetargets.Config, tag string, list releaseAs
 	return rows, nil
 }
 
-// assetRow builds one row from whether the named asset was found.
 func assetRow(name string, ok bool) binVerify {
 	if ok {
 		return binVerify{Asset: name, OK: true, Detail: "present in release"}
@@ -62,10 +52,6 @@ func assetRow(name string, ok bool) binVerify {
 	return binVerify{Asset: name, OK: false, Detail: "MISSING from release"}
 }
 
-// defaultReleaseAssetLister lists a release's assets via the GitHub REST API.
-// It uses GITHUB_TOKEN when set (CI / private rate limits) but works
-// unauthenticated for the public repo. A 404 is surfaced as "release not found"
-// so a tag that published nothing fails the gate loudly.
 func defaultReleaseAssetLister(owner, repo, tag string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -81,8 +67,6 @@ func defaultReleaseAssetLister(owner, repo, tag string) ([]string, error) {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 
-	// Explicit client-level timeout as a backstop in addition to the request
-	// context — a release gate must never hang on a stalled connection.
 	client := &http.Client{Timeout: 35 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -113,9 +97,6 @@ func defaultReleaseAssetLister(owner, repo, tag string) ([]string, error) {
 	return names, nil
 }
 
-// runReleaseVerifyBinaries is the `evolve release-verify-binaries <tag>` handler:
-// it parses the release matrix from .goreleaser.yml, lists the GitHub release's
-// assets, prints a table, and exits non-zero if any expected asset is missing.
 func runReleaseVerifyBinaries(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 || args[0] == "" {
 		fmt.Fprintln(stderr, "usage: evolve release-verify-binaries <tag>")
@@ -138,10 +119,6 @@ func runReleaseVerifyBinaries(args []string, _ io.Reader, stdout, stderr io.Writ
 	return reportBinaryVerification(cfg, tag, defaultReleaseAssetLister, stdout, stderr)
 }
 
-// reportBinaryVerification runs the matrix with the given lister, prints the
-// result table, and returns the process exit code (0 = all assets present).
-// Split from the handler so the success/partial-failure/lister-error paths are
-// unit-testable with a stubbed lister, no filesystem or network.
 func reportBinaryVerification(cfg releasetargets.Config, tag string, list releaseAssetLister, stdout, stderr io.Writer) int {
 	rows, err := verifyReleaseBinaries(cfg, tag, list)
 	if err != nil {

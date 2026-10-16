@@ -11,7 +11,7 @@ func TestParseLoopArgs_GoalSources(t *testing.T) {
 	cases := []struct {
 		name     string
 		args     []string
-		wantHash string // empty = rc != 0
+		wantHash string
 		wantRC   int
 	}{
 		{
@@ -23,9 +23,7 @@ func TestParseLoopArgs_GoalSources(t *testing.T) {
 		{
 			"goal_text_computed",
 			[]string{"--goal-text", "Fix the BUG"},
-			// goalhash.Compute normalizes to "fix the bug" then SHA256
-			// = same as "fix the bug" plain
-			"a09f5d75a09f1ec5d518dbab47a4b3676ad7e6dad7e7a3c7e8c9b6c7e8c9b6c7", // placeholder; real value asserted via prefix
+			"a09f5d75a09f1ec5d518dbab47a4b3676ad7e6dad7e7a3c7e8c9b6c7e8c9b6c7",
 			0,
 		},
 		{
@@ -84,7 +82,7 @@ func TestParseLoopArgs_PositionalCyclesStrategy(t *testing.T) {
 		args         []string
 		wantCycles   int
 		wantStrategy string
-		wantGoalSub  string // substring of resolved GoalText
+		wantGoalSub  string
 	}{
 		{
 			"cycles_strategy_goal",

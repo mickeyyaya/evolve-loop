@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// scriptedGit is a fake gitFn. respond is keyed off the call's args; every call
-// is recorded so assertions can verify which git verbs ran.
 type scriptedGit struct {
 	calls   [][]string
 	respond func(args []string) (string, int, error)
@@ -25,8 +23,6 @@ func (s *scriptedGit) capture(_ context.Context, _ string, args ...string) (stri
 	return s.respond(args)
 }
 
-// ran reports whether any recorded call's args, joined by spaces, contains the
-// joined want tokens (a loose contains-match good enough for verb assertions).
 func (s *scriptedGit) ran(want ...string) bool {
 	needle := strings.Join(want, " ")
 	for _, c := range s.calls {
@@ -41,8 +37,6 @@ func joined(args []string) string { return strings.Join(args, " ") }
 
 const cflags = "docs/architecture/control-flags.md"
 
-// recordingRegen returns a regenFn that records the paths it was asked to
-// regenerate, optionally failing.
 func recordingRegen(failOn string) (func(context.Context, string, string) error, *[]string) {
 	var got []string
 	fn := func(_ context.Context, _ string, p string) error {
@@ -82,7 +76,7 @@ func TestRebaseWithDerivedRegen_AllDerivedConflict_Resolves(t *testing.T) {
 		j := joined(args)
 		switch {
 		case j == "rebase main":
-			return "", 1, nil // conflict
+			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			return cflags + "\x00", 0, nil
 		case strings.HasPrefix(j, "ls-files "):
@@ -90,7 +84,7 @@ func TestRebaseWithDerivedRegen_AllDerivedConflict_Resolves(t *testing.T) {
 		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
-			return "", 0, nil // continue completes the rebase
+			return "", 0, nil
 		}
 		t.Fatalf("unexpected git call %q", j)
 		return "", 0, nil
@@ -154,7 +148,6 @@ func TestRebaseWithDerivedRegen_MixedConflict_Aborts(t *testing.T) {
 		case j == "rebase main":
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			// one derived + one real conflict in the same step
 			return cflags + "\x00go/internal/core/orchestrator.go\x00", 0, nil
 		case strings.Contains(j, "rebase --abort"):
 			return "", 0, nil
@@ -191,9 +184,9 @@ func TestRebaseWithDerivedRegen_MultiCommitDerivedConflicts_Resolves(t *testing.
 		case strings.Contains(j, "rebase --continue"):
 			continues++
 			if continues == 1 {
-				return "", 1, nil // a SECOND replayed commit also conflicts on the doc
+				return "", 1, nil
 			}
-			return "", 0, nil // resolved on the second continue
+			return "", 0, nil
 		}
 		t.Fatalf("unexpected git call %q", j)
 		return "", 0, nil
@@ -245,7 +238,7 @@ func TestRebaseWithDerivedRegen_InfraFailureNoUnmerged_Aborts(t *testing.T) {
 		case j == "rebase main":
 			return "fatal: something broke", 128, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			return "", 0, nil // no unmerged paths → not a conflict
+			return "", 0, nil
 		case strings.Contains(j, "rebase --abort"):
 			return "", 0, nil
 		}
@@ -274,8 +267,6 @@ func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			diffCalls++
-			// pre-loop + first loop step see the conflict; after the (empty) continue
-			// the commit has no unmerged paths.
 			if diffCalls <= 2 {
 				return cflags + "\x00", 0, nil
 			}
@@ -285,9 +276,9 @@ func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
 		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
-			return "nothing to commit", 1, nil // commit became empty after resolution
+			return "nothing to commit", 1, nil
 		case strings.Contains(j, "rebase --skip"):
-			return "", 0, nil // skip finishes the rebase
+			return "", 0, nil
 		}
 		t.Fatalf("unexpected git call %q", j)
 		return "", 0, nil
@@ -312,13 +303,13 @@ func TestRebaseWithDerivedRegen_ContinueNeverConverges_AbortsAtBound(t *testing.
 		case j == "rebase main":
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			return cflags + "\x00", 0, nil // perpetual derived conflict
+			return cflags + "\x00", 0, nil
 		case strings.HasPrefix(j, "ls-files "):
 			return cflags + "\x00", 0, nil
 		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
-			return "", 1, nil // never converges
+			return "", 1, nil
 		case strings.Contains(j, "rebase --abort"):
 			return "", 0, nil
 		}
@@ -401,7 +392,7 @@ func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
 		case strings.HasPrefix(j, "ls-files "):
 			return cflags + "\x00", 0, nil
 		case strings.HasPrefix(j, "add -A -- "):
-			return "", 1, nil // staging the regenerated file fails
+			return "", 1, nil
 		case strings.Contains(j, "rebase --abort"):
 			return "", 0, nil
 		}
@@ -430,10 +421,6 @@ func TestRebaseCycleBranchOntoMain_EmptyWorktree(t *testing.T) {
 	}
 }
 
-// TestRebaseCycleBranchOntoMain_RealGit_NonDerivedConflict drives the production
-// wiring against a real temp repo where the conflict is a NON-derived file, so the
-// production regenerator (go run) is never invoked. Covers the delegation in
-// rebaseCycleBranchOntoMain end-to-end against real git.
 func TestRebaseCycleBranchOntoMain_RealGit_NonDerivedConflict(t *testing.T) {
 	t.Parallel()
 
@@ -448,11 +435,6 @@ func TestRebaseCycleBranchOntoMain_RealGit_NonDerivedConflict(t *testing.T) {
 	}
 }
 
-// TestRebaseWithDerivedRegen_RealGit_DerivedConflict validates the ACTUAL git
-// command sequence (rebase main → diff --diff-filter=U → add → -c core.editor=true
-// rebase --continue) against real git, with a fake regenerator standing in for
-// `flags generate` (so the test needs no go module). This is the real-git proof
-// the fakes cannot give.
 func TestRebaseWithDerivedRegen_RealGit_DerivedConflict(t *testing.T) {
 	t.Parallel()
 
@@ -474,8 +456,6 @@ func TestRebaseWithDerivedRegen_RealGit_DerivedConflict(t *testing.T) {
 	}
 }
 
-// initConflictRepo builds a temp git repo where branch `cycle` and `main` diverge
-// on relFile, so rebasing `cycle` onto `main` conflicts. Leaves `cycle` checked out.
 func initConflictRepo(t *testing.T, relFile string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -527,10 +507,10 @@ func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			diffCalls++
-			if diffCalls <= 2 { // pre-loop + first step see the conflict
+			if diffCalls <= 2 {
 				return cflags + "\x00", 0, nil
 			}
-			return "", 0, nil // emptied after resolution
+			return "", 0, nil
 		case strings.HasPrefix(j, "ls-files "):
 			return cflags + "\x00", 0, nil
 		case strings.HasPrefix(j, "add -A -- "):
@@ -540,9 +520,9 @@ func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
 		case strings.Contains(j, "rebase --skip"):
 			skips++
 			if skips == 1 {
-				return "transient", 1, nil // first skip fails → loop continues
+				return "transient", 1, nil
 			}
-			return "", 0, nil // second skip finishes the rebase
+			return "", 0, nil
 		}
 		t.Fatalf("unexpected git call %q", j)
 		return "", 0, nil
@@ -570,11 +550,11 @@ func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			diffN++
 			switch diffN {
-			case 1, 2: // pre-loop + first step: conflict on the doc
+			case 1, 2:
 				return cflags + "\x00", 0, nil
-			case 3: // the resolution emptied the commit → triggers --skip
+			case 3:
 				return "", 0, nil
-			default: // the skip landed on a NEW commit that also conflicts on the doc
+			default:
 				return cflags + "\x00", 0, nil
 			}
 		case strings.HasPrefix(j, "ls-files "):
@@ -584,12 +564,12 @@ func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T
 		case strings.Contains(j, "rebase --continue"):
 			contN++
 			if contN == 1 {
-				return "nothing to commit", 1, nil // commit emptied by resolution
+				return "nothing to commit", 1, nil
 			}
-			return "", 0, nil // resolves the new conflict → done
+			return "", 0, nil
 		case strings.Contains(j, "rebase --skip"):
 			skipN++
-			return "transient", 1, nil // skip fails → loop re-checks, finds a new conflict
+			return "transient", 1, nil
 		}
 		t.Fatalf("unexpected git call %q", j)
 		return "", 0, nil
@@ -617,7 +597,6 @@ func TestRegenerateDerivedArtifact_RunFails_Errors(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(wt, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// worktree/go has no module → `go run ./cmd/evolve` fails → error surfaced.
 	if err := regenerateDerivedArtifact(context.Background(), wt, "flag-index"); err == nil {
 		t.Fatal("want an error when `go run` fails in a worktree with no module")
 	}
@@ -699,8 +678,6 @@ func TestRegenStaleProjections_StageFails_Skips(t *testing.T) {
 	}
 }
 
-// initTempRepo creates an empty temp git repo on branch main with a test identity
-// and returns its dir plus a git runner that fails the test on any non-zero git.
 func initTempRepo(t *testing.T) (string, func(...string)) {
 	t.Helper()
 	dir := t.TempDir()
@@ -765,13 +742,12 @@ func TestNormalizeDerivedProjections_EmptyWorktree_NoOp(t *testing.T) {
 	t.Parallel()
 
 	o := &Orchestrator{}
-	o.normalizeDerivedProjections(context.Background(), "") // guard: must not panic
+	o.normalizeDerivedProjections(context.Background(), "")
 }
 
 func TestNormalizeDerivedProjections_CleanWorktree_NoRegen(t *testing.T) {
 	t.Parallel()
 
-	// A clean repo (no changed paths) → no stale projection → no `go run`, no error.
 	dir, git := initTempRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -779,7 +755,7 @@ func TestNormalizeDerivedProjections_CleanWorktree_NoRegen(t *testing.T) {
 	git("add", "-A")
 	git("commit", "-m", "base")
 	o := &Orchestrator{}
-	o.normalizeDerivedProjections(context.Background(), dir) // clean tree → no-op, no panic
+	o.normalizeDerivedProjections(context.Background(), dir)
 }
 
 func TestChangedWorktreePaths_RealGit(t *testing.T) {
@@ -791,8 +767,6 @@ func TestChangedWorktreePaths_RealGit(t *testing.T) {
 	}
 	git("add", "-A")
 	git("commit", "-m", "base")
-	// A tracked edit AND an untracked new file must both be reported: a cycle
-	// ADDING a registry file must still regen.
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("changed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -809,7 +783,6 @@ func TestChangedWorktreePaths_RealGit(t *testing.T) {
 	if !want["f.txt"] || !want["new.txt"] {
 		t.Fatalf("changedWorktreePaths must report tracked AND untracked changes, got %v", got)
 	}
-	// A clean tree yields no paths.
 	git("checkout", "--", "f.txt")
 	_ = os.Remove(filepath.Join(dir, "new.txt"))
 	if g := changedWorktreePaths(context.Background(), dir); len(g) != 0 {
@@ -817,8 +790,6 @@ func TestChangedWorktreePaths_RealGit(t *testing.T) {
 	}
 }
 
-// repoRootForTest walks up from the test's working directory (go/internal/core)
-// to the repo root (the dir containing go/ and docs/).
 func repoRootForTest(t *testing.T) string {
 	t.Helper()
 	wd, err := os.Getwd()

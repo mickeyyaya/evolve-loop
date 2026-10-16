@@ -58,8 +58,6 @@ func runSolution(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	return 1
 }
 
-// parseInterspersedArgs parses flags that may follow positional args
-// (`check <dir> --project-root X`), returning the positionals.
 func parseInterspersedArgs(fs *flag.FlagSet, args []string) ([]string, bool) {
 	var pos []string
 	for len(args) > 0 {

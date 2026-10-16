@@ -125,8 +125,6 @@ func mergeOrigin(git func(...string) (string, error), branch string, stderr io.W
 	return 1
 }
 
-// Matches gc.discover's minimal cycle_id/workspace schema rather than
-// depending on the heavier core loader.
 func liveLeaseWorkspace(root string) string {
 	b, err := os.ReadFile(filepath.Join(root, ".evolve", "cycle-state.json"))
 	if err != nil {

@@ -18,11 +18,6 @@ func quarantineDir(projectRoot string, cycle int) string {
 	return filepath.Join(projectRoot, ".evolve", "quarantine", fmt.Sprintf("cycle-%d", cycle))
 }
 
-// ensureCleanWorktree asserts the reused worktree wt is clean at HEAD. Dirty
-// paths (tracked-modified AND untracked, file-granular via porcelain -uall)
-// are moved under quarantineDir preserving their relative layout, then the
-// worktree is `git reset --hard HEAD`. Returns the quarantined destination
-// paths. A clean worktree is a no-op (no quarantine dir created).
 func ensureCleanWorktree(ctx context.Context, wt, projectRoot string, cycle int) ([]string, error) {
 	dirty := porcelainDirtySet(ctx, wt)
 	if len(dirty) == 0 {
@@ -39,8 +34,6 @@ func ensureCleanWorktree(ctx context.Context, wt, projectRoot string, cycle int)
 	for _, p := range paths {
 		src := filepath.Join(wt, p)
 		if _, err := os.Lstat(src); err != nil {
-			// Deleted-tracked path or the old side of a rename: nothing on disk
-			// to preserve; the reset below restores it from HEAD.
 			continue
 		}
 		dst := uniqueQuarantinePath(filepath.Join(qdir, p))
@@ -53,8 +46,6 @@ func ensureCleanWorktree(ctx context.Context, wt, projectRoot string, cycle int)
 		moved = append(moved, dst)
 		fmt.Fprintf(os.Stderr, "[worktree] WARN dirty reuse (cycle %d): quarantined %s -> %s\n", cycle, p, dst)
 	}
-	// Restore tracked content (modified/staged/deleted) to HEAD. The dirty
-	// content itself is already preserved above, so this destroys nothing.
 	if out, code, err := gitCapture(ctx, wt, "reset", "--hard", "HEAD"); err != nil || code != 0 {
 		return moved, fmt.Errorf("worktree clean-provision: git reset --hard HEAD in %s (rc=%d): %v: %s", wt, code, err, out)
 	}
@@ -62,9 +53,6 @@ func ensureCleanWorktree(ctx context.Context, wt, projectRoot string, cycle int)
 	return moved, nil
 }
 
-// uniqueQuarantinePath suffixes .1, .2, … when a prior attempt at the same
-// cycle already quarantined a file of the same name — earlier salvage is never
-// overwritten.
 func uniqueQuarantinePath(p string) string {
 	if _, err := os.Lstat(p); err != nil {
 		return p

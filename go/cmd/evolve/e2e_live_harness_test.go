@@ -1,6 +1,5 @@
 //go:build e2e
 
-// See docs/testing/live-e2e-plan.md.
 package main
 
 import (
@@ -16,8 +15,6 @@ import (
 	"time"
 )
 
-// liveGate skips the test unless the named env var is "1". The single switch
-// that keeps live (spending) tests dormant in default/CI runs.
 func liveGate(t *testing.T, env string) {
 	t.Helper()
 	if testing.Short() {
@@ -28,18 +25,13 @@ func liveGate(t *testing.T, env string) {
 	}
 }
 
-// liveCLI describes one real CLI target: its driver name, the binary to probe,
-// its cheapest model tier, and its model-vendor family (for cross-family soak).
 type liveCLI struct {
-	Driver    string // bridge --cli identifier (claude-p, codex, agy, ollama-tmux, *-tmux)
-	Binary    string // executable to probe on PATH
-	CheapTier string // cheapest model tier for this CLI (fast/haiku/…)
-	Family    string // anthropic | openai | google | local
+	Driver    string
+	Binary    string
+	CheapTier string
+	Family    string
 }
 
-// liveHeadlessCLIs / liveTmuxCLIs are the matrix domains. ollama is tmux-only
-// (no headless driver), and is FREE — the canary that proves the live path at
-// zero spend.
 var liveHeadlessCLIs = []liveCLI{
 	{Driver: "claude-p", Binary: "claude", CheapTier: "fast", Family: "anthropic"},
 	{Driver: "codex", Binary: "codex", CheapTier: "fast", Family: "openai"},
@@ -53,9 +45,6 @@ var liveTmuxCLIs = []liveCLI{
 	{Driver: "ollama-tmux", Binary: "ollama", CheapTier: "fast", Family: "local"},
 }
 
-// liveCLIAvailable reports whether a live run of cli can even be attempted.
-// Binary-on-PATH is necessary; auth is assumed once the operator opted in via
-// the tier gate — a real auth check would itself cost a call.
 func liveCLIAvailable(cli liveCLI) (bool, string) {
 	if _, err := exec.LookPath(cli.Binary); err != nil {
 		return false, fmt.Sprintf("%s binary not on PATH", cli.Binary)
@@ -63,26 +52,15 @@ func liveCLIAvailable(cli liveCLI) (bool, string) {
 	return true, ""
 }
 
-// transientMarkers are substrings that mark a provider/infrastructure hiccup
-// (retryable) rather than a broken contract (hard fail). Conservative on
-// purpose: when in doubt the failure is treated as a real contract break.
 var transientMarkers = []string{
 	"429", "rate limit", "rate-limit", "ratelimit", "too many requests",
 	"overloaded", "RESOURCE_EXHAUSTED", "quota", "service unavailable", "503", "502",
 	"connection reset", "connection refused", "i/o timeout", "timed out", "timeout",
 	"EOF", "temporarily unavailable", "network",
 	"exit=81", "exit=124", "ExitArtifactTimeout", "ExitREPLBootTimeout", "bridge artifact timeout",
-	// Subscription usage/quota exhaustion: the CLI booted and authenticated, but
-	// the account is capped until a reset date — a provider limit, not a broken
-	// contract. These are quota-specific substrings unlikely in model-generated
-	// output. We deliberately exclude the generic "try again at" tail: that
-	// ordinary English phrase could mask a real contract break, and the
-	// quota-specific markers here already catch the codex/claude/agy caps.
 	"usage limit", "upgrade to plus", "limit will reset", "plan limit",
 }
 
-// isTransientFailure classifies combined cycle output. Transient → retry then
-// quarantine-skip; otherwise the failure is a contract break → hard fail.
 func isTransientFailure(out string) bool {
 	low := strings.ToLower(out)
 	for _, m := range transientMarkers {
@@ -93,10 +71,6 @@ func isTransientFailure(out string) bool {
 	return false
 }
 
-// isTransient folds the error text into the classified output. A timeout from
-// runWithTimeout carries its signal in err (not stdout), so classifying stdout
-// alone would mis-grade a nested-CLI hang as a contract break. Callers that have
-// both out and err should use this; classify the union.
 func isTransient(out string, err error) bool {
 	s := out
 	if err != nil {
@@ -108,7 +82,7 @@ func isTransient(out string, err error) bool {
 var (
 	liveBudgetMu     sync.Mutex
 	liveSpentUSD     float64
-	liveBudgetCapUSD = -1.0 // <0 = uncapped (parsed lazily)
+	liveBudgetCapUSD = -1.0
 	liveBudgetOnce   sync.Once
 )
 
@@ -123,8 +97,6 @@ func liveBudgetCap() float64 {
 	return liveBudgetCapUSD
 }
 
-// liveBudgetRemaining reports whether more spend is allowed and how much room
-// is left. Uncapped ⇒ always (true, +inf-ish).
 func liveBudgetRemaining() (bool, float64) {
 	cap := liveBudgetCap()
 	if cap < 0 {
@@ -182,30 +154,27 @@ func captureLiveFailure(t *testing.T, projRoot, label string) string {
 	return dst
 }
 
-// liveCycleCfg configures one live `evolve cycle run` attempt.
 type liveCycleCfg struct {
 	EvolveBin string
 	RepoRoot  string
-	Driver    string // EVOLVE_CLI for every phase
-	Tier      string // model_tier_default written into profiles
+	Driver    string
+	Tier      string
 	GoalHash  string
-	Goal      string   // human-readable goal text (--goal); threaded to Scout + advisor. Optional.
-	ExtraEnv  []string // e.g. EVOLVE_<AGENT>_CLI for cross-family
+	Goal      string
+	ExtraEnv  []string
 	Timeout   time.Duration
 }
 
-// liveResult is the observable outcome of a live cycle.
 type liveResult struct {
 	Entries            []ledgerEntry
 	Shipped            bool
 	Cost               float64
 	Out                string
 	Err                error
-	ProjRoot           string // the temp project (alive until the test ends) for artifact capture
-	TransientExhausted bool   // transient retries exhausted → caller should Skip
+	ProjRoot           string
+	TransientExhausted bool
 }
 
-// requireTmuxForLive skips when tmux is absent — the *-tmux live drivers need it.
 func requireTmuxForLive(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("tmux"); err != nil {
@@ -213,10 +182,6 @@ func requireTmuxForLive(t *testing.T) {
 	}
 }
 
-// runLiveCycle runs one live cycle with bounded retry on transient failures.
-// Contract failures return immediately (caller hard-fails); transient failures
-// retry with exponential backoff up to EVOLVE_E2E_LIVE_RETRIES (default 2),
-// then return with TransientExhausted=true so the caller quarantine-skips.
 func runLiveCycle(t *testing.T, cfg liveCycleCfg) liveResult {
 	t.Helper()
 	if ok, _ := liveBudgetRemaining(); !ok {
@@ -236,18 +201,17 @@ func runLiveCycle(t *testing.T, cfg liveCycleCfg) liveResult {
 			return res
 		}
 		if !isTransientFailure(res.Out) {
-			return res // contract failure — surface to caller immediately
+			return res
 		}
 		t.Logf("[live-retry] %s attempt %d/%d hit a transient failure; backing off", cfg.GoalHash, attempt, maxAttempts)
 		if attempt < maxAttempts {
-			time.Sleep(time.Duration(attempt*attempt*5) * time.Second) // 5s, 20s, …
+			time.Sleep(time.Duration(attempt*attempt*5) * time.Second)
 		}
 	}
 	res.TransientExhausted = true
 	return res
 }
 
-// runLiveCycleOnce performs a single live cycle attempt (no retry).
 func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 	t.Helper()
 	projRoot := setupTempProject(t, cfg.RepoRoot)
@@ -257,14 +221,8 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 	env := append(os.Environ(),
 		"EVOLVE_CLI="+cfg.Driver,
 		"EVOLVE_PROMPTS_DIR="+cfg.RepoRoot,
-		// A live cycle runs the native shipper; Shipped (below) is observed, not
-		// asserted.
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
-		// Redirect codex/agy preflight writes away from the operator's real home.
 		"EVOLVE_CODEX_CONFIG_PATH="+filepath.Join(fakeHome, ".codex", "config.toml"),
-		// NOTE: do NOT override HOME — the real CLIs need their auth/credentials,
-		// which live in the operator's real ~/. (Offline tests redirect HOME; live
-		// must not.)
 	)
 	env = append(env, cfg.ExtraEnv...)
 
@@ -281,10 +239,6 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 	cmd.Dir = projRoot
 
 	out, err := runWithTimeout(cmd, cfg.Timeout)
-	// The classifier matches against Out, but the real provider message lands in
-	// the per-phase *-stderr.log artifact, not this subprocess's stdout. Fold
-	// those artifacts in so a quota/provider failure classifies transient
-	// instead of mis-grading as a contract break.
 	out += "\n" + phaseStderrTail(projRoot)
 	entries := readLedgerSafe(projRoot)
 	return liveResult{
@@ -297,10 +251,6 @@ func runLiveCycleOnce(t *testing.T, cfg liveCycleCfg) liveResult {
 	}
 }
 
-// phaseStderrTail concatenates every per-phase *-stderr.log under .evolve/runs/
-// so the flake classifier sees the real CLI/provider error text (which the
-// orchestrator captures to artifacts, not to its own stdout). Best-effort: a
-// missing runs dir or unreadable file contributes nothing.
 func phaseStderrTail(projRoot string) string {
 	runs := filepath.Join(projRoot, ".evolve", "runs")
 	var b strings.Builder
@@ -317,8 +267,6 @@ func phaseStderrTail(projRoot string) string {
 	return b.String()
 }
 
-// readLedgerSafe is readLedger without t.Fatal — a live attempt may legitimately
-// leave no ledger (early provider failure), which the caller classifies.
 func readLedgerSafe(projRoot string) []ledgerEntry {
 	path := filepath.Join(projRoot, ".evolve", "ledger.jsonl")
 	b, err := os.ReadFile(path)
@@ -339,10 +287,6 @@ func readLedgerSafe(projRoot string) []ledgerEntry {
 	return out
 }
 
-// liveBridgeLaunch runs ONE `evolve bridge launch` with a trivial "write PONG"
-// prompt at the given concrete model — the cheapest possible real-CLI call.
-// Returns the artifact byte size (-1 if not written), combined output, and err.
-// Shared by the T0 smoke and T2 model-tier matrix.
 func liveBridgeLaunch(t *testing.T, evolveBin, driver, model string, timeout time.Duration) (int64, string, error) {
 	t.Helper()
 	dir := t.TempDir()
@@ -380,16 +324,9 @@ func liveBridgeLaunch(t *testing.T, evolveBin, driver, model string, timeout tim
 	return size, out, err
 }
 
-// writeLiveProfiles rewrites the phase profiles with model_tier_default=tier so
-// the live cycle uses each CLI's cheapest model. cli is left at "claude" in the
-// file (EVOLVE_CLI overrides it per phase), but allowed_clis=["all"] keeps the
-// floor from rejecting whatever driver the env selects.
 func writeLiveProfiles(t *testing.T, projRoot, driver, tier string) {
 	t.Helper()
 	profilesDir := filepath.Join(projRoot, ".evolve", "profiles")
-	// "router" (the advisor brain) is included so a dynamic_routing=advisory cycle
-	// has a profile for the advisor's bridge launch; its model tier is normally
-	// overridden to deep via EVOLVE_ROUTER_MODEL.
 	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective", "router"} {
 		body := fmt.Sprintf(
 			`{"name":%q,"role":%q,"cli":%q,"allowed_clis":["all"],"model_tier_default":%q,"model_tier_envelope":{"min":"fast","default":%q,"max":"deep"},"allowed_tools":["Read","Write","Bash"]}`,

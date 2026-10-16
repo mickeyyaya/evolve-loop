@@ -70,8 +70,6 @@ func TestProductionWavePlanFn_SeedsFromInboxWhenNoPriorDecision(t *testing.T) {
 	writeInboxItem(t, inbox, "a.json", "alpha", 0.90)
 	writeInboxItem(t, inbox, "b.json", "beta", 0.80)
 
-	// erroringReadStorage makes readLastCycleNumber return an error → "no prior
-	// cycle" → the planFn must seed from the inbox, not fall back to sequential.
 	plan := productionWavePlanFn(loopConfig{ProjectRoot: dir, EvolveDir: dir}, &erroringReadStorage{}, 2, io.Discard)
 	data, cards, err := plan(context.Background(), 0)
 	if err != nil {

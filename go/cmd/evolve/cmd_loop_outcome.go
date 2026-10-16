@@ -24,32 +24,18 @@ import (
 )
 
 type loopResult struct {
-	StopReason          string             `json:"stop_reason"`
-	Cycles              []core.CycleResult `json:"cycles"`
-	TotalCost           float64            `json:"total_cost_usd"`
-	Resumed             bool               `json:"resumed,omitempty"`
-	RecoverableFailures int                `json:"recoverable_failures,omitempty"`
-	// ContinuedFailures counts verdict-FAIL cycles the batch absorbed and
-	// continued past (>1 only under a raised consecutive-fails ceiling); like
-	// RecoverableFailures it drives the rc=3 "completed but with failures" exit.
-	ContinuedFailures int `json:"continued_failures,omitempty"`
-	// SpineFailOpens is the batch roll-up of spine-gate fail-opens: the total,
-	// the per-phase breakdown, and the cycles that breached the WARN threshold.
-	// Absent on a clean batch.
-	SpineFailOpens *dossier.SpineFailOpenRollup `json:"spine_fail_opens,omitempty"`
-	// CycleOutcomes is the per-cycle SLO classification (SHIPPED / SALVAGED /
-	// FAILED_EXPLAINED / FAILED_UNEXPLAINED) computed from the C1 records at
-	// emit time.
-	CycleOutcomes []cycleOutcomeEntry `json:"cycle_outcomes,omitempty"`
-	// classifyRoot, when set, makes emit() populate CycleOutcomes from
-	// <root>/.evolve/runs/cycle-N.
-	classifyRoot    string
-	batchFirstCycle int
-	// BoundaryRefresh mirrors chainResult.BoundaryRefresh for the non-chain
-	// wave/fleet boundary path: nil-when-clean, populated only when this
-	// batch's stop is "loop_boundary_refresh_reexec".
-	BoundaryRefresh *chainBoundaryRefreshLogEntry `json:"boundary_refresh,omitempty"`
-	CLIUpdateHalt   []cliupdate.Result            `json:"cli_update_halt,omitempty"`
+	StopReason          string                       `json:"stop_reason"`
+	Cycles              []core.CycleResult           `json:"cycles"`
+	TotalCost           float64                      `json:"total_cost_usd"`
+	Resumed             bool                         `json:"resumed,omitempty"`
+	RecoverableFailures int                          `json:"recoverable_failures,omitempty"`
+	ContinuedFailures   int                          `json:"continued_failures,omitempty"`
+	SpineFailOpens      *dossier.SpineFailOpenRollup `json:"spine_fail_opens,omitempty"`
+	CycleOutcomes       []cycleOutcomeEntry          `json:"cycle_outcomes,omitempty"`
+	classifyRoot        string
+	batchFirstCycle     int
+	BoundaryRefresh     *chainBoundaryRefreshLogEntry `json:"boundary_refresh,omitempty"`
+	CLIUpdateHalt       []cliupdate.Result            `json:"cli_update_halt,omitempty"`
 }
 
 type cycleOutcomeEntry struct {
@@ -58,16 +44,7 @@ type cycleOutcomeEntry struct {
 	Detail  string `json:"detail,omitempty"`
 }
 
-// emit writes lr to w as the canonical pretty-JSON dispatcher output. If a
-// future field breaks MarshalIndent, it emits a structured error envelope
-// instead of a silent empty line, since dispatchers and `evolve loop`
-// consumers grep stop_reason.
 func (lr *loopResult) emit(w io.Writer) {
-	// Classify every cycle's ending from its C1 records at the single output
-	// chokepoint every exit path funnels through. A FAILED_UNEXPLAINED
-	// additionally self-files an inbox defect: that bucket means a terminal
-	// path escaped the chokepoint, which is itself a defect. Best-effort:
-	// classification must never break the dispatcher contract.
 	if lr.classifyRoot != "" && len(lr.Cycles) > 0 && lr.CycleOutcomes == nil {
 		for _, c := range lr.Cycles {
 			oc, detail := cyclehealth.ClassifyOutcome(cycleWorkspace(lr.classifyRoot, c.Cycle))
@@ -78,10 +55,6 @@ func (lr *loopResult) emit(w io.Writer) {
 		}
 		sweepRulePromotions(os.Stderr, lr.classifyRoot, lr.Cycles)
 	}
-	// Deliberately outside the classifyRoot block above, which is gated on
-	// len(lr.Cycles) > 0: a fleet batch runs every cycle in a lane subprocess
-	// and appends nothing to lr.Cycles, yet those are precisely the batches
-	// whose fail-opens need counting.
 	if lr.classifyRoot != "" {
 		publishPendingDossiers(lr.classifyRoot, os.Stderr)
 	}
@@ -121,9 +94,6 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 	}
 
 	runRunDirGC(cfg, workspace, mode, gcPol, stderr)
-	// Deliberately independent of the run-dir sweep: either half failing (bad
-	// plan, unwritable workspace, non-git ProjectRoot) must never silently
-	// disable the other. Both are best-effort batch-end hygiene.
 	runWorktreeGC(cfg, workspace, mode, gcPol, stderr)
 	runDevWorktreeGC(cfg, workspace, gcPol, stderr)
 }
@@ -157,9 +127,6 @@ func runRunDirGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr
 
 func runWorktreeGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr io.Writer) {
 	if cfg.ProjectRoot == "" {
-		// Never infer the repo from the process cwd: an unset ProjectRoot with
-		// mode=enforce would aim `git branch -d` at whatever repo the binary
-		// happens to run inside. Refuse loudly instead.
 		fmt.Fprintf(stderr, "[gc] WARN: worktree sweep skipped: ProjectRoot is unset\n")
 		return
 	}
@@ -178,8 +145,6 @@ func runWorktreeGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stde
 		return
 	}
 	if err := gc.ApplyWorktrees(opts, manifest); err != nil {
-		// Partial application is normal (errors.Join over per-item refusals):
-		// report and continue — the manifest is the evidence of record.
 		fmt.Fprintf(stderr, "[gc] WARN: worktree enforce apply: %v\n", err)
 	}
 	fmt.Fprintf(stderr, "[gc] worktree enforce: applied %d items\n", len(manifest.Items))
@@ -219,9 +184,6 @@ func planRunDirGC(evolveDir string, pol gc.Policy, discoverFailed func(error)) (
 	return gc.Plan(gc.Options{EvolveDir: evolveDir, Runs: runs, Policy: pol})
 }
 
-// worktreeGCOptions is the single construction site shared by the in-loop
-// hook and the operator command (`evolve gc`, cmd_gc.go), so both sweeps aim
-// at the same worktree base and carry the same policy.
 func worktreeGCOptions(projectRoot, evolveDir string, pol gc.WorktreesPolicy, log io.Writer) gc.WorktreeOptions {
 	return gc.WorktreeOptions{
 		ProjectRoot:  projectRoot,
@@ -284,19 +246,8 @@ func gcActionCounts(manifest gc.Manifest) (archive, del int) {
 	return archive, del
 }
 
-// spineFailOpenWarnThreshold is a compiled constant, not a policy knob: a
-// policy knob here would let a noisy batch turn its own alarm off. A cycle's
-// spine legitimately degrades once or twice under a driver bounce; four times
-// is a pattern.
 const spineFailOpenWarnThreshold = 3
 
-// spineFailOpenRollup unions committed dossiers for cycles >= firstCycle (a
-// fleet lane's CycleResult never returns to this process, so its dossier is
-// the only record) with the in-memory CycleResults for any cycle with no
-// dossier yet on disk; the dossier wins on overlap since it was written from
-// that same CycleResult. firstCycle <= 0 skips the corpus read entirely,
-// rather than report all-time history as this batch's. Returns nil for a
-// clean batch so the summary omits the field entirely.
 func spineFailOpenRollup(cycles []core.CycleResult, projectRoot string, firstCycle int, warn io.Writer) *dossier.SpineFailOpenRollup {
 	var ds []*dossier.Dossier
 	if projectRoot != "" && firstCycle > 0 {
@@ -325,10 +276,6 @@ func spineFailOpenRollup(cycles []core.CycleResult, projectRoot string, firstCyc
 	return &rollup
 }
 
-// sweepRulePromotions flips a shadow rule to enforce only after
-// minShadowFires clean fires with zero anomalies; bridge.EnforceMeasuredRule
-// re-validates against a fresh corpus before flipping. Best-effort: a missing
-// dir/ledger is just absent evidence.
 func sweepRulePromotions(stderr io.Writer, projectRoot string, cycles []core.CycleResult) {
 	const minShadowFires = 5
 	fires := map[string]int{}
@@ -380,9 +327,6 @@ func sweepRulePromotions(stderr io.Writer, projectRoot string, cycles []core.Cyc
 	}
 }
 
-// fileUnexplainedOutcomeDefect signals that a terminal path escaped without
-// recording its outcome, which is itself a defect. Idempotent per cycle
-// (fixed filename); best-effort.
 var unexplainedOutcomeMarshal = json.MarshalIndent
 
 func fileUnexplainedOutcomeDefect(projectRoot string, cycle int, detail string) {
@@ -410,19 +354,11 @@ func fileUnexplainedOutcomeDefect(projectRoot string, cycle int, detail string) 
 	_ = os.WriteFile(path, body, 0o644)
 }
 
-// emitFatal is emit for abnormal exits: it records loop-fatal failure
-// learning first, then emits. Plain emit stays in use for success exits and
-// for paths that already recorded their failure (quota-pause empty-output) or
-// structurally cannot (state_unwritable: the record write is what failed;
-// unfinished-cycle guard: learning is captured downstream by the forced
-// reset/resume).
 func (lr *loopResult) emitFatal(w, stderr io.Writer, cfg loopConfig, cycle int) {
 	recordLoopFatal(stderr, cfg, cycle, lr.StopReason)
 	lr.emit(w)
 }
 
-// cycle may be 0 when unknown: Record's lastCycleNumber advance is monotonic,
-// so a zero cycle cannot regress the counter.
 func recordLoopFatal(stderr io.Writer, cfg loopConfig, cycle int, stopReason string) {
 	now := time.Now().UTC()
 	stop := "stop_reason=" + stopReason

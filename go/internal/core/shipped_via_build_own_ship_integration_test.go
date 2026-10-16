@@ -10,7 +10,7 @@ import (
 func TestResumeLifecycle_ShipPassPersistsTheShipLatch(t *testing.T) {
 	t.Parallel()
 
-	o, st, req, rp := resumedLifecycleFixture(t) // resumes at audit → ship PASSes in the resumed session
+	o, st, req, rp := resumedLifecycleFixture(t)
 	if _, err := o.RunCycleFromPhase(context.Background(), req, rp); err != nil {
 		t.Fatalf("RunCycleFromPhase: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestResumeLifecycle_PostShipSkippedVerdictReadsTheCheckpointLatch(t *testin
 			o, st, req, rp := resumedLifecycleFixture(t)
 			rp.Phase = string(PhaseRetro)
 			st.cycleState.CompletedPhases = append(st.cycleState.CompletedPhases, "audit", "ship")
-			st.cycleState.FinalVerdict = VerdictSKIPPED // a post-ship floor phase's SKIPPED, persisted before the pause
+			st.cycleState.FinalVerdict = VerdictSKIPPED
 			st.cycleState.Shipped = tc.shipped
 			result, err := o.RunCycleFromPhase(context.Background(), req, rp)
 			if err != nil {

@@ -589,3 +589,145 @@ This section holds the durable reasons that the comments of file group 2 carried
 - `buildCycleEnv` forwards every `EVOLVE_*` variable and nothing else. `EVOLVE_STRATEGY` travels in `Context["strategy"]`. `EVOLVE_RESET` and the consensus-audit flag are not in the cycle environment: `cfg.Reset` is consumed before `buildCycleEnv`, and consensus audit is `workflow.consensus_audit_enabled` in `policy.json`. `buildCycleContext` sets `Context["goal"]` only when `--goal-text` was given.
 - The gc hook runs at batch end, after `finalizeCompletedCycle`, and never after a signal exit (the cycle stays resumable). An absent `gc.mode` resolves to shadow, and only an explicit `off` disables the hook. Shadow plans and publishes but never mutates. A policy load error warns and continues as shadow. A run named by the in-flight `cycle-state.json` is live and never a delete target. The worktree sweep refuses when `ProjectRoot` is unset, so git is never aimed at the process cwd.
 - `TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport` plants a throwaway package with an uncovered export, to reproduce an apicover gate parity defect for new exports. The test removes it in cleanup, and it must never be committed.
+## cmd/evolve file group 3 rationale
+
+The comment-zero strip of file group 3 covers `cmd_loop_*` through `e2e_live_harness_test.go`: 113 files in the group, of which 96 carried comments. It removed narration, doc comments and history. The invariants below were comments. They live here now.
+
+### Loop batch outcome and hygiene
+
+Files: `cmd_loop_outcome.go`, `cmd_loop.go`, `cmd_loop_prebatch.go`, `cmd_loop_preflight.go`, `cmd_loop_window.go`.
+
+- `emit` is the single output chokepoint. Every exit path goes through it. It classifies each cycle's ending from its C1 records there.
+- A `FAILED_UNEXPLAINED` classification files an inbox defect. That bucket means a terminal path escaped the chokepoint.
+- Classification is best-effort. It must never break the dispatcher contract. If `MarshalIndent` fails, `emit` writes a structured error envelope. Dispatchers grep `stop_reason`, so a silent empty line is wrong.
+- The spine fail-open roll-up sits outside the `classifyRoot` block. That block is gated on `len(lr.Cycles) > 0`. A fleet batch runs every cycle in a lane subprocess and appends nothing to `lr.Cycles`. Those batches are the ones whose fail-opens need counting.
+- `spineFailOpenWarnThreshold` is a compiled constant, not a policy knob. A knob lets a noisy batch switch off its own alarm.
+- The roll-up unions committed dossiers for cycles at or after `firstCycle` with the in-memory results. The dossier wins on overlap. A `firstCycle` of 0 or less skips the corpus read. All-time history is then never reported as this batch's.
+- The run-dir sweep and the worktree sweep are independent. If one half fails, the other still runs. Causes are a bad plan, an unwritable workspace or a non-git `ProjectRoot`. Both are best-effort batch-end hygiene.
+- The worktree sweep never infers the repository from the process cwd. With `ProjectRoot` unset and `mode=enforce`, `git branch -d` can aim at any repository. The sweep refuses instead.
+- A partial application is reported and the batch continues. `errors.Join` collects the per-item refusals. The manifest is the evidence of record.
+- `worktreeGCOptions` is the one construction site for the in-loop hook and `evolve gc`. Both sweeps then aim at the same worktree base with the same policy.
+- `emitFatal` records the loop-fatal failure learning before it emits. Plain `emit` stays for success exits. It also stays for paths that already recorded their failure (quota-pause empty output) or cannot (`state_unwritable`). The unfinished-cycle guard also uses plain `emit`, because the forced reset or resume captures its learning.
+- A cycle number of 0 cannot regress the counter. The `lastCycleNumber` advance in `Record` is monotonic.
+- A stale binary must not run recovery logic. The refresh therefore runs first. A successful refresh re-execs and never returns.
+- The pre-batch worktree drain handles worktrees that a prior crashed batch left finalized. The end sweep handles this batch's own worktrees.
+- The preflight canary is dormant by default. An absent or malformed policy resolves the fallback dial to `off`. The canary runs or halts only after an operator opts in.
+- A harness fault halts loudly as a synthetic halt. A misconfigured gate must not pass a doomed batch.
+- The gate's write file name has a PID suffix. Concurrent loop starts then cannot collide on a stale `.tmp`. A write failure logs a WARN. It never changes the gate decision.
+- `prepareIteration` refreshes every batch-wide input at the only safe boundary. That is after the previous window drained and before the next dispatch.
+- The coherence check runs on every iteration, sequential and fleet. A SIGKILLed lane leaves live-phase residue. The once-per-batch unfinished-cycle guard cannot see it. The check runs before the breaker, so a halted batch still leaves a coherent record.
+- An interrupt during the probes must not dispatch a wave. The spawn cancels that wave.
+- `cmd_loop.go` imports `checkpoint` for its `init()`. That registers the phase-boundary checkpointer. Without it, checkpointing silently does nothing.
+- `MaxCyclesExplicit` is true only when the operator set a count. When false, an enforced cycle-budget policy raises the ceiling to the safety cap.
+- A loop launched into the primary checkout shares its tree with the operator console. A classification failure is then non-fatal. The tripwire stays dark.
+- The crashed-run tmux reaper runs before any cycle. A SIGKILLed loop never ran its teardown, so the per-run registry reaper cannot see its sessions. The reaper is liveness-scoped. It never touches a live concurrent run.
+- Chaining is never entered implicitly. `loopOrchOverride` narrows the orchestrator to `loopCycleRunner`. A test can then script a `FinalVerdict=FAIL` run. A nil override runs production unchanged.
+- `loopBatchRuntime.close` runs `closeSocket` before `stopSignal`. `runSocketTeardownTimeout` bounds exit-time cleanup when tmux is wedged.
+- `completedTriageNoWork` binds the shortened ledger floor to the result that the orchestrator returned. The caller revalidates the artifact. The artifact alone cannot grant the exemption.
+
+### Wave and pool dispatch
+
+Files: `cmd_loop_wave.go`, `cmd_loop_pool.go`, `cmd_loop_wavesync.go`.
+
+- `shouldRunPool` and `shouldRunWave` are mutually exclusive. A default or `wave` fleet never enters the pool. A `pool` fleet never enters the wave barrier. Wiring the pool therefore cannot double-dispatch or regress the wave path.
+- `dispatchPoolIteration` reports `ran=false` with no side effects when the pool is gated off. It does the same for an empty pool. That avoids spending a `--max-cycles` iteration on nothing.
+- The pool reuses the wave path's plan source, preflight guard and isolated launch seam. Both schedulers read identical committed work. The pool has no Center, so its refusal and prune WARNs stay lines.
+- The wave engine cache is unsynchronized. A batch runs on one goroutine, so `wave()` is never called concurrently. A caller that parallelizes iteration prep must build the engine eagerly.
+- The preflight guard checks the MAIN checkout. The pool shares it.
+- `dispatchIteration`, `minWidthRepair`, `productionWaveLauncher` and `reloadFleetConfigAtWaveBoundary` are by-name facades over the engine. Their production callers are `cmd_loop_batch.go`, `cmd_loop_window.go`, `cmd_loop_pool.go` and `cli_wave_budget.go`.
+- The wave-boundary sync of `main` halts on a DIVERGED relation. It does not skip. `gitexec.RelationToRemote` is the one main-relation resolver, and `laneStartRef` also reads it. If the sync continued, the two consumers can disagree about the safety of main to lane from.
+- `--ff-only` can refuse when local tracked changes are overwritten. That is a normal runtime state (rebuilt-binary churn). Name it as such. Never call it divergence, because the "next ship reconciles" remedy belongs to the stowaway class.
+- `waveSyncTimeout` bounds the fetch. A wedged network delays one wave and never hangs the boundary.
+- `mainCIRedForSHA` returns an unavailable API as an error, for the caller's loud fail-open path. Only a completed failing conclusion is evidence of RED.
+
+### Models catalog
+
+Files: `cmd_models.go`, `cmd_models_live.go`.
+
+- Flags go straight to `Parse`, never through `reorderArgs`. That function ignores value flags. It moves the value of `--evolve-dir` to the end and leaves the flag to swallow the next one. These subcommands take no positionals.
+- `Commit` is the one catalog write seam. It carries operator-authored `tier_fallbacks` forward, because the refresh rebuilds the catalog wholesale. It keeps the outgoing catalog for rollback. It returns what actually landed, with chains merged.
+- Report the value that `Commit` returns, not the pre-commit `cat`. The cycle-start auto-refresh uses the same call. Do not re-inline `Read`, `MergeFallbacks` and `Write`.
+- The live catalog is the `Prior`. Its `candidates_hash` lets an unchanged offering reuse the stored tier map with zero classifier calls. A read failure only means no reuse.
+- `list --json` on an empty cache emits an explicit signal before the JSON branch. It never emits a zero-value `{"clis":null}`.
+- `runStagedCatalogRefresh` stages: `off`, and anything unresolved, does nothing. `shadow` gates the TTL on the SHADOW catalog. Gating on the live file either never runs or drives the expensive probe every cycle.
+- `shadow` refreshes with the shadow catalog as `Prior`, because the reuse fingerprints were written there. It emits per-tier lines for each changed tier against the live catalog. It writes only the shadow file.
+- `enforce` gates on the live catalog and calls `Commit`. A corrupt cache counts as stale, and the refresh overwrites it. The corruption is still surfaced.
+- The probe works in a throwaway scratch dir, never the repository. The router profile sandbox is `read_only_repo`. An `ArtifactPath` under the project root is denied (artifact-timeout per CLI at cycle start) or litters an untracked file in main. The profile path stays anchored to `projectRoot`.
+- Diagnostics under the scratch workspace are salvaged to `<evolveDir>/models-probe` before teardown. Deleting them destroys the one artifact that explains a failed probe.
+- Salvage is allowlist-shaped. Escalation reports get a UTC stamp and are never clobbered. Launch-error files are copied verbatim. `llm-calls.ndjson` is appended to the durable ledger. Artifacts, prompts and pane logs stay disposable.
+- Salvage is best-effort. It must never fail the refresh. The `tag` separates destinations when `evolve setup latest` salvages per family in parallel. An empty tag keeps the historical names.
+- `freshnessFromManifests` is the composition-root translation of a bridge-declared fact into a plain value. `modelquery` never imports `bridge`. The per-CLI difference is manifest data, not a Go conditional.
+
+### Release verification
+
+Files: `cmd_release_verify_binaries.go`, `cmd_release_verify_clis.go`.
+
+- Both verifiers never return early. They report every missing asset or failing row, so the operator sees the full picture.
+- A release lookup error (a 404) means that no binaries were published. It is a hard failure.
+- The HTTP client has an explicit timeout in addition to the request context. A release gate must never hang on a stalled connection. `GITHUB_TOKEN` is used when set. The public repository also works unauthenticated.
+- The Claude install is verified in a throwaway home. The matrix never touches the operator's real `~/.claude`.
+- `coreSubcommands` are the ones that the installed skills shell out to. If the release binary stops answering any of them, the skills break silently. This gate catches that regression.
+
+### Other commands
+
+- `plan-and-execute`: `runPassWithEnv` saves and restores the previous env values, so concurrent invocations do not collide. Pass A runs with permission mode `plan`. Pass B runs with `acceptEdits`.
+- `plan-and-execute` exit codes: 0 both passes succeeded, 1 pass A failed, 2 pass B failed, 10 bad args, 11 plan artifact missing after pass A.
+- `prune-ephemeral` exits 0 on success, also when it pruned nothing. It exits 10 on bad arguments. This mirrors the retired shell script.
+- `resetsha` uses an absolute root, as `runShipCmd` and the audit and commit-gate paths do. The `IsAbs` guard in `RepinShipSHA` is the terminal check.
+- `routing` replay always uses the default ship floor. A per-cycle policy-floor override is not persisted. The run-set comparison therefore stays floor-anchored.
+- `setup` takes no positional arguments, so flags parse directly (see the `reorderArgs` finding above). It reads the onboarding marker directly. That bypasses the lossy round-trip of `core.State`. A bad project-root path is surfaced and never falls back to a relative path.
+- `ship`: `finalize()` classifies the error into `ExitCode`. An integrity error gives `ExitIntegrity`. Any other error gives `ExitFailure`. Early-validation errors bypass it and leave `ExitCode==ExitOK`.
+- `skills publish` adds the provenance header to the entry `SKILL.md` only. The runtime reads companions and `reference/` overlays verbatim, and a header corrupts their yaml or markdown.
+- `skills publish` excludes write and orchestration skills from ollama. Plain `run` has no agentic tool use. This mirrors `driver_ollamatmux.go`.
+- `sanitizeModelfileSystem` downgrades the `"""` fence. Ollama defines no escape.
+- Staging dirs under `.evolve/publish/` are wholly owned projections. A full rewrite from scratch is safe. The stale-model record of ollama is read from the staging manifest before the rewrite destroys it.
+- A missing stale plugin makes uninstall fail. That is expected and is not an error.
+- `swarm reap` signals only the pgid and session pairs that the manifest recorded. It never uses a broad pkill.
+- Refusing group 0 and 1 in `KillGroup` is defense in depth. It protects the caller's own group or session. `ExecSessionKiller` already gates `pgid>1`.
+- `worktree create` uses the lane-namespaced `runscope` path, as `core.gitWorktree` does. Concurrent worktrees then never collide.
+- The shared `gitexec` retry surfaces the exit code and stderr of git. An operator can tell lane contention from a real fault. A non-repository fails at once, because `Retryable` is the classifier that core and swarm use.
+- `--project-root` is absolutized. The recorded worktree path and base dir are then independent of the cwd.
+- `docs_contract_test.go` keeps a baseline of `EVOLVE_*` variables that existed before the contract test landed. Each must be documented in `runtime-reference.md` or removed.
+- The contract test scans `CLAUDE.md` and `runtime-reference.md`. The text is joined with a newline, so no phantom token forms across the file boundary. Drift is logged softly. `EVOLVE_DOCS_CONTRACT_STRICT=1` makes it a hard failure.
+
+### Test invariants that were comments
+
+- **`smInitRepoWithRemote` writes a `.gitignore` with `.evolve/`.** Cycle state and lease files under `.evolve/` must never make the tree dirty. Otherwise the sync-main precondition check refuses the fixture repo.
+- Swarm reap tests are SAFETY-critical. The production killer of `runSwarmReap` sends a real `syscall.Kill(-pgid, SIGKILL)` for `PGID>1`. It runs a real `tmux kill-session` for a non-empty `TmuxSession`.
+- Fixtures use `PGID=0` and an empty `TmuxSession`, so the gates skip those calls. The `reap-orphans` tests also pass `--dry-run`. A test of this surface must never put a real pid or tmux session in a fixture.
+- Live e2e harnesses never override `HOME`. The real CLIs need their auth and credentials there. Offline fake-CLI harnesses do redirect it. Pre-trust writes of codex and agy are redirected away from the operator's real home.
+- Real-tmux matrix tests are not parallel. Boot timing is flaky under concurrent server load. Live cycles are not parallel either. They can rate-limit each other on one provider, and cost attribution gets unclear.
+- The live gate is the single switch that keeps spending tests dormant in default and CI runs.
+- The transient classifier is conservative on purpose. When in doubt, a failure is a real contract break. It excludes the generic phrase "try again at", because that phrase can mask a break.
+- The classifier reads the diagnostics of the bridge (`out`), never the free-text stdout of the model. Otherwise a marker phrase in a justification hides a real break.
+- A headless sandbox that cannot write (codex read-only) is an environment constraint. It quarantine-skips.
+- The advisor matrix parse tests pin the bracket-depth scan. A naive `LastIndexByte(']')` mis-slices trailing prose that holds a stray `]`. The first balanced span is used. Under artifact completion, the array comes before any trailing note.
+- `runWithTimeout` kills the child, then drains the goroutine. `CombinedOutput` still blocks on the pipes of the child. Without the wait, the goroutine outlives `t.TempDir` teardown and can read a deleted dir. A short grace bounds the drain, so a wedged child cannot hang the test.
+- `syncBuffer` is mutex-guarded. The exec goroutine writes while the poll loop reads. The ledger poll interval is coarse, because the ledger is appended once per phase.
+- E2E fixtures commit a root `.gitignore`, set `catalog.auto_refresh:false`, name stub profiles by agent, and seed the committed predicate input before the first commit. The reasons are in the Findings section above.
+- Wait bounds are ceilings, not targets. `poolTestSyncTimeout` is 10s. Under `-race` and coverage on a loaded CI runner, a 2s bound failed on a slow start. Callback entry order in the pool depends on the scheduler, so a test awaits both lanes before it releases the second.
+- The nonprogress test sets `nonprogress_threshold=3` against the compiled default 5. The filed streak then proves that `policy.json` is read. The FAIL breaker (`max_consecutive_fails=2`) and the empty-only breaker (`goal_stall.threshold=3`) cannot fire on its interleaved stream.
+- `phaseEnvAgentKey` in the per-phase test must mirror the normalization of `envchain.PhaseEnvKey`. Otherwise the `EVOLVE_<AGENT>_CLI` lookup of the runner misses.
+- PID 999999 is a real, dead pid for the reset-guard tests. The production `pidAlive` probe decides with no injection. The orphan-socket dead pid is above the `pid_max` of every OS. Live-owner fixtures use the test process pid, or its parent for the socket test, because the loop teardown removes its own per-run socket.
+## cmd/evolve file group 4 rationale
+
+This section holds the durable reasons that the strip removed from the group 4 files.
+
+- **`liveTierModels` is a function, not a package variable.** The codex row loads a manifest. Init-time I/O, or its panic, must not fire before `liveGate` can SKIP. agy pins all three tiers to one model in its manifest.
+- **`liveTierModels` omits ollama.** The host model varies. Use `EVOLVE_E2E_LIVE_MODEL_OLLAMA` and the T0 case for it. `cheapModelFor` honours `EVOLVE_E2E_LIVE_MODEL_<BASECLI>`, so a host with other pulled models tunes without code changes.
+- **`codexTierModels` is a projection of the family manifest, never a copy.** It reads the tier table through the headless manifest. `codex.json` points at `codex-tmux.json` with `model_tier_map_from`, the single source every codex reader uses. A load failure panics. A silent nil launches every case without `-m`.
+- **`pipelineCycle` never fails the test on a non-zero cycle exit.** It returns the run error with the ledger entries. Callers assert on ledger-observable routing with `ledgerHasRole`. The `strictPolicyMarker` bullet above describes the harness sentinel.
+- **The pipeline-paths tests set `EVOLVE_SANDBOX=off` on purpose.** They exercise pipeline semantics with fake CLIs. CI runners cannot promise a working sandbox wrap (Ubuntu images have no bwrap). `TestSandboxGate_*` in `internal/bridge` pins the gate's own classification. The probe-cycle bullet above explains the 300s cycle bound.
+- **Soak pairs (`crossFamilyPairs`) are `{builderDriver, auditorDriver}` on different families.** Both must be available, or the pair skips. Every phase defaults to the builder's CLI. The per-agent override then pins the auditor. The order is `EVOLVE_<AGENT>_CLI`, then `EVOLVE_CLI`, then the profile.
+- **The echo test phase sits behind a build tag, not an env-var gate.** The tag keeps it out of the production binary's symbol table. `echoPhaseRunner` reflects the request's `Cycle` into `ArtifactsDir`. The subprocess test fails if the wire dropped the request. `buildEvolveBinaryWithTestPhases` skips when `go` is not on PATH (hermetic CI sandboxes).
+- **`TestMain` disables the workspace-pollution guard.** This package's tests pre-seed workspace files that the guard archives away. It also points `TMUX_TMPDIR` at a private short dir. The loop's orphan-socket sweep then never reaps the host's tmux sockets. A short base keeps socket paths under the AF_UNIX length limit.
+- **`resolveModelTier` uses `bridge.LoadManifest`, not `modelcatalog.Catalog.Lookup`.** See Findings. `TestWireOrchestrator_ModelCatalogLookupWired` asserts against the real composition root. An AST scan cannot tell `WithModelCatalogLookup(resolver)` from `WithModelCatalogLookup(nil)`. Nil is the dead-gate state.
+- **Dispatcher notes.** `phaseRoots` is the cmd-local alias for `phasespec.Roots` (ADR-0038). `subcommand.Summary` is not rendered today. It stays on the struct so tooling can derive a short listing. The `commands` table is the single source of truth for routing, and it keeps the usage order of `main.go`.
+- **Dispatcher lookup.** `lookupCommand` scans linearly. The table has about 40 entries and lookups happen once at startup. `dispatch` is split from `main` so tests drive it without `os.Exit`.
+- **The routing-order real-tree test pins the incident phase by name.** A red-first Evaluate deliverable is coherent only PRE-build. If a registry or catalog reshuffle brings back the post-build slot, the test fails with that phase's name on it. The generic anchor rule alone cannot name it. The config load there uses the tolerant posture of `cmd_cycle`, with an empty env and no operator overrides.
+- **Loop signal producers (`signal_loop.go`).** `loopHaltRule` carries what only the caller of `haltOnSystemFailure` knows: the rule code and its fields. The chokepoint merges them into the one INCIDENT it emits. `systemFailureRule` is the generic rule for a halt that the cycle itself signalled (a forged verdict, a phase-infra floor). `emitLoopHalt` emits an INCIDENT, and the batch stops.
+- **Other loop signal producers.** `emitLoopWave` is the coordinator's spelling of `loopwave.EmitWave` (INFO without a code, WARN with one). `emitLoopEscalation` emits a WARN that names the stage and what the boundary staged. `formatSignalReport` is a report line, not a signal. The loop reports and never gates.
+- **Profile policy guards (`tmux_default_profiles_test.go`).** Every `.evolve/profiles/*.json` pins a `-tmux` cli or leaves it empty, and llmroute then falls back to `claude-tmux`. Headless drivers (claude-p, codex, agy) are opt-in with `EVOLVE_CLI`, `EVOLVE_<AGENT>_CLI` or a `.evolve/policy.json` pin. They are never a profile default. The test makes such a change a conscious, reviewed act.
+- **Source-writing profiles keep `sandbox.allow_network` true.** The build and tdd phases run under the OS sandbox, which confines the LLM CLI itself. With false, the CLI boots network-denied and never reaches the model API. sandbox-exec and bwrap cannot express per-host egress.
+- **Why the model endpoint stays reachable.** The model endpoint cannot be proxied without breaking subscription billing. The boundary for these phases is filesystem confinement plus kernel hooks. The test pins the value because a flip to false once shipped silently for lack of a JSON tag.
+- **The live advisor spike (`-tags spike`) is not in normal CI.** It calls the PhaseAdvisor's `Plan()` with the real bridge on opus. It answers if the LLM advisor produces a routing plan, or errors, or degrades. It never fails. It reports what happened.

@@ -12,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// ============================================================================
-// Deprecated cost flags are accepted no-ops
-// ============================================================================
-
 func TestParseLoopArgs_BudgetAliasAccepted(t *testing.T) {
 	t.Parallel()
 	for _, flag := range []string{"--budget-usd", "--budget"} {
@@ -33,10 +29,6 @@ func TestParseLoopArgs_BudgetAliasAccepted(t *testing.T) {
 		})
 	}
 }
-
-// ============================================================================
-// Deprecation WARN
-// ============================================================================
 
 func TestParseLoopArgs_NegativeBudgetAccepted(t *testing.T) {
 	t.Parallel()
@@ -73,10 +65,6 @@ func TestParseLoopArgs_ExplicitCyclesNoWarn(t *testing.T) {
 		t.Fatalf("--cycles flag should not trigger deprecation WARN; stderr=%q", stderr.String())
 	}
 }
-
-// ============================================================================
-// QUOTA-PAUSE detection
-// ============================================================================
 
 func TestDetectQuotaPause_HappyPath(t *testing.T) {
 	t.Parallel()
@@ -143,8 +131,6 @@ func TestDetectQuotaPause_NotFlagged(t *testing.T) {
 
 func TestDetectQuotaPause_FallbackFields(t *testing.T) {
 	t.Parallel()
-	// Cycle from top-level "cycle" (not cycle_id), default Source
-	// when quotaResetSource missing.
 	dir := t.TempDir()
 	cs := map[string]any{
 		"cycle": float64(4),
@@ -182,10 +168,6 @@ func TestRunLoop_QuotaPause_Rc5(t *testing.T) {
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
-	// Pre-seed the quota-likely cycle-state. detectQuotaPause runs
-	// AFTER each cycle's RunCycle, so the cycle-state must be present
-	// at that point. Since our stub orchestrator doesn't write
-	// cycle-state.json, we seed it before runLoop starts.
 	cs := map[string]any{
 		"cycle_id": float64(1),
 		"checkpoint": map[string]any{
@@ -215,10 +197,6 @@ func TestRunLoop_QuotaPause_Rc5(t *testing.T) {
 	}
 }
 
-// ============================================================================
-// --reset Go-side pruning
-// ============================================================================
-
 func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 
 	projectRoot := t.TempDir()
@@ -227,8 +205,6 @@ func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	writeDispatchPolicy(t, evolveDir, "off")
-	// Seed state.json with one entry per class — 3 should be pruned by
-	// --reset, 1 (code-audit-fail) should remain.
 	state := map[string]any{
 		"failedApproaches": []any{
 			map[string]any{"cycle": float64(1), "classification": "infrastructure-systemic"},
@@ -267,10 +243,6 @@ func TestRunLoop_ResetPrunesAtStart(t *testing.T) {
 	}
 }
 
-// ============================================================================
-// Deprecated cost env-vars are inert
-// ============================================================================
-
 func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 
 	projectRoot := t.TempDir()
@@ -280,7 +252,6 @@ func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 	storage := &fixtures.FakeStorage{}
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
-	// $2.50 exceeds the --batch-cap-usd of 1.0; the cap must not fire (it is inert).
 	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 2.50)
 
 	var stdout, stderr bytes.Buffer
@@ -302,8 +273,4 @@ func TestRunLoop_DeprecatedCostEnvVarsInert(t *testing.T) {
 	}
 }
 
-// ============================================================================
-// Helper: writeStdoutLog from cmd_loop_m5_test.go is shared — declared there
-// ============================================================================
-// (compile-time guard so this file's helpers don't clash)
 var _ = fmt.Sprintf("placeholder")

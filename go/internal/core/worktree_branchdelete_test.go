@@ -6,13 +6,6 @@ import (
 	"testing"
 )
 
-// Uses the gitCall/useFakeGit-style seam from git_seam_test.go (package core
-// cannot import test/fixtures.FakeExec — that would be an import cycle).
-
-// branchDeleteFake scripts distinct responses per git subcommand (worktree
-// remove vs branch -d), which the single-response gitRec (git_seam_test.go)
-// cannot do — this test needs the worktree remove to succeed while branch -d
-// fails (the unmerged case).
 type branchDeleteFake struct {
 	calls           []gitCall
 	branchDeleteRC  int
@@ -30,7 +23,7 @@ func (f *branchDeleteFake) run(_ context.Context, name, dir string, args, _ []st
 		}
 		return f.branchDeleteRC, nil
 	}
-	return 0, nil // worktree remove always succeeds in these tests
+	return 0, nil
 }
 
 func useBranchDeleteFake(t *testing.T, f *branchDeleteFake) {
@@ -41,7 +34,7 @@ func useBranchDeleteFake(t *testing.T, f *branchDeleteFake) {
 }
 
 func TestCleanup_DeletesMergedCycleBranch(t *testing.T) {
-	f := &branchDeleteFake{branchDeleteRC: 0} // merged → -d succeeds
+	f := &branchDeleteFake{branchDeleteRC: 0}
 	useBranchDeleteFake(t, f)
 
 	const projectRoot = "/proj"
@@ -72,7 +65,7 @@ func TestCleanup_DeletesMergedCycleBranch(t *testing.T) {
 }
 
 func TestCleanup_UnmergedBranchSurvives_WarnsOnly(t *testing.T) {
-	f := &branchDeleteFake{branchDeleteRC: 1} // unmerged → -d refuses
+	f := &branchDeleteFake{branchDeleteRC: 1}
 	useBranchDeleteFake(t, f)
 
 	if err := (gitWorktree{}).Cleanup("/proj", "/base/cycle-unmerged-3"); err != nil {

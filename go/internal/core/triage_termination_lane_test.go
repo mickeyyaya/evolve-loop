@@ -9,16 +9,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-const laneScopedItem = "claimable-lane-item" // writeClaimableInbox's first item
+const laneScopedItem = "claimable-lane-item"
 
-// runLaneCycle runs one composed cycle for a lane scoped to laneScopedItem over
-// an inbox holding it plus one more claimable item (another lane's work).
 func runLaneCycle(t *testing.T, decision string, prepare func(t *testing.T, root string)) (CycleResult, map[Phase]PhaseRunner) {
 	t.Helper()
 	return runLaneCycleWith(t, triageDecisionRunner{verdict: VerdictPASS, decision: decision}, prepare)
 }
 
-// runLaneCycleWith is runLaneCycle with the triage runner supplied.
 func runLaneCycleWith(t *testing.T, triage PhaseRunner, prepare func(t *testing.T, root string)) (CycleResult, map[Phase]PhaseRunner) {
 	t.Helper()
 	root := writeClaimableInbox(t, 2)
@@ -51,8 +48,6 @@ func TestRunCycle_LaneThatAnswersForItsScopeEndsPlannedNoWork(t *testing.T) {
 		{name: "skip_shipped with its sha", decision: `{"top_n":[],"skip_shipped":[{"task_id":"claimable-lane-item","git_sha":"abc123"}]}`},
 		{name: "escalated to the console", decision: `{"top_n":[],"escalate_block":[{"task_id":"claimable-lane-item","reason":"console-routed"}]}`},
 		{
-			// Consumed by an earlier ship before this lane's triage ended:
-			// nothing in the lane's scope is claimable, whatever else is queued.
 			name:     "the scoped item is no longer pending",
 			decision: `{"top_n":[]}`,
 			prepare: func(t *testing.T, root string) {
@@ -94,11 +89,6 @@ func TestRunCycle_LaneThatLeavesItsScopeUnansweredStaysClaimFailed(t *testing.T)
 	}
 }
 
-// decidingClaimTriageRunner performs triage's own claim through the REAL
-// inboxmover.Claim (the persona's Step 0a.4 — RealInboxForTest, as
-// claimingTriageRunner does in continuation_adopt_test.go) and then writes its
-// decision: the scoped item leaves the inbox root for processing/cycle-<N>/,
-// as it does live.
 type decidingClaimTriageRunner struct {
 	triageDecisionRunner
 	root, taskID string

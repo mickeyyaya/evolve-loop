@@ -28,7 +28,6 @@ const publishProvenanceSentinel = "EVOLVE-PUBLISH:projection"
 
 const publishPluginName = "evo"
 
-// Exec seams — overridable in tests so no real agy/ollama binaries run.
 var (
 	publishLookPath = exec.LookPath
 	publishRunCmd   = func(stdout, stderr io.Writer, dir, name string, args ...string) error {
@@ -40,8 +39,6 @@ var (
 	}
 )
 
-// Write/orchestration skills are excluded — ollama's plain `run` has no
-// agentic tool use, mirroring driver_ollamatmux.go's write-phase rejection.
 var ollamaCompatible = map[string]bool{
 	"scout":                  true,
 	"plan-review":            true,
@@ -62,7 +59,7 @@ var ollamaCompatible = map[string]bool{
 }
 
 type publishConfig struct {
-	Targets    []string // subset of {codex, agy, ollama}
+	Targets    []string
 	DryRun     bool
 	Install    bool
 	Check      bool
@@ -73,10 +70,10 @@ type publishConfig struct {
 
 type canonicalSkill struct {
 	Name        string
-	Raw         string // full SKILL.md contents
-	Body        string // markdown after frontmatter
+	Raw         string
+	Body        string
 	Description string
-	ArgHint     string // frontmatter argument-hint (for the command-stub projection)
+	ArgHint     string
 }
 
 func parsePublishFlags(args []string, stderr io.Writer) (publishConfig, bool) {
@@ -137,8 +134,6 @@ func parsePublishFlags(args []string, stderr io.Writer) (publishConfig, bool) {
 		fmt.Fprintln(stderr, "note: --check takes precedence over --dry-run (check never writes)")
 	}
 	if cfg.OllamaBase == "" {
-		// Mirrors driver_ollamatmux.go's model default; no ollama profile in
-		// .evolve/profiles/ names one.
 		cfg.OllamaBase = "llama3.1:8b"
 	}
 	if cfg.CodexHome == "" {
@@ -211,8 +206,6 @@ func renderTarget(project, target string, skills []canonicalSkill, cfg publishCo
 }
 
 func applyTarget(project, target, staging string, files map[string][]byte, skills []canonicalSkill, cfg publishConfig, stdout, stderr io.Writer) error {
-	// Ollama's stale-model record lives in the staging manifest; read it
-	// before the rewrite below destroys it.
 	var oldModels []string
 	if target == "ollama" {
 		oldModels = readOllamaManifest(staging)
@@ -282,7 +275,7 @@ func renderAgy(project string, skills []canonicalSkill) (map[string][]byte, erro
 	manifest, _ := json.MarshalIndent(struct {
 		Name     string   `json:"name"`
 		Commands []string `json:"commands"`
-	}{Name: publishPluginName, Commands: []string{"./commands/"}}, "", "  ") // const input — cannot fail
+	}{Name: publishPluginName, Commands: []string{"./commands/"}}, "", "  ")
 	files := map[string][]byte{
 		filepath.Join(publishPluginName, "plugin.json"): append(manifest, '\n'),
 	}
@@ -295,9 +288,6 @@ func renderAgy(project string, skills []canonicalSkill) (map[string][]byte, erro
 	return files, nil
 }
 
-// Only the entry SKILL.md gets the provenance header — companions and
-// reference/ overlays are read by the runtime verbatim, so a header would
-// corrupt their yaml/markdown.
 func stageAgySkillTree(project string, s canonicalSkill, files map[string][]byte) error {
 	skillDir := filepath.Join(project, "skills", s.Name)
 	return filepath.WalkDir(skillDir, func(path string, d fs.DirEntry, err error) error {
@@ -404,14 +394,10 @@ func injectProvenance(raw, header string) string {
 	return header + "\n" + raw
 }
 
-// sanitizeModelfileSystem keeps a skill body from terminating the SYSTEM
-// """ block early. Ollama defines no escape, so the fence is downgraded.
 func sanitizeModelfileSystem(s string) string {
 	return strings.ReplaceAll(s, `"""`, "'''")
 }
 
-// Staging dirs are wholly owned projections under .evolve/publish/, so a
-// full rewrite from scratch is safe and leaves no stale files.
 func writeStaging(root string, files map[string][]byte) error {
 	if err := os.RemoveAll(root); err != nil {
 		return fmt.Errorf("clear staging %s: %w", root, err)
@@ -513,7 +499,6 @@ func installAgy(project, staging string, cfg publishConfig, stdout, stderr io.Wr
 	}
 	fmt.Fprintf(stdout, "[skills] agy: installed plugin %s\n", publishPluginName)
 	if cfg.Prune {
-		// A missing stale plugin makes uninstall fail — expected, not an error.
 		if err := publishRunCmd(io.Discard, io.Discard, project, "agy", "plugin", "uninstall", agyStalePluginName); err != nil {
 			fmt.Fprintf(stdout, "[skills] agy: no stale %s plugin to prune\n", agyStalePluginName)
 		} else {

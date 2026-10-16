@@ -21,24 +21,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerverify"
 )
 
-// minimalProfileJSON produces a one-shot profile satisfying the bridge's
-// validate step, so drive-bridge-directly tests don't depend on the
-// profiles.Loader / subagent.Runner stack.
 func minimalProfileJSON(artifact string) []byte {
 	p := map[string]any{
 		"name":               "scout",
 		"role":               "scout",
 		"cli":                "claude-p",
 		"model_tier_default": "haiku",
-		// Write is needed to produce the artifact; Bash kept as a
-		// commonly-allowed companion. permission_mode=acceptEdits
-		// avoids the interactive write-confirmation prompt that would
-		// otherwise hang the headless `claude -p` invocation.
-		"allowed_tools":     []string{"Bash", "Write", "Edit"},
-		"output_artifact":   artifact,
-		"max_turns":         3,
-		"parallel_eligible": false,
-		"permission_mode":   "acceptEdits",
+		"allowed_tools":      []string{"Bash", "Write", "Edit"},
+		"output_artifact":    artifact,
+		"max_turns":          3,
+		"parallel_eligible":  false,
+		"permission_mode":    "acceptEdits",
 	}
 	b, _ := json.MarshalIndent(p, "", "  ")
 	return b
@@ -68,8 +61,6 @@ func TestE2E_M4PipelineAgainstLiveLedger(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 
-	// The prompt has no leading `--`, working around a claude-CLI bug where a
-	// prompt value starting with `--` confuses the flag parser.
 	br := bridge.New()
 	ld := ledger.New(evolveDir)
 
@@ -162,7 +153,6 @@ Verdict: FAIL
 		t.Fatalf("write report: %v", err)
 	}
 	class := cycleclassify.Classify(runsDir)
-	// Either is acceptable: which of Verdict/build-fail wins depends on scan order.
 	if class.Class != cycleclassify.ClassAuditFail && class.Class != cycleclassify.ClassBuildFail {
 		t.Fatalf("classify: got %s want audit-fail or build-fail (marker=%q)", class.Class, class.Marker)
 	}
@@ -198,8 +188,5 @@ func TestE2E_M4LedgerEntryShapeMatch(t *testing.T) {
 	if os.Getenv("EVOLVE_E2E_LIVE_LLM") != "1" {
 		t.Skip("EVOLVE_E2E_LIVE_LLM!=1")
 	}
-	// Always skips, to avoid paying twice when run alongside
-	// TestE2E_M4PipelineAgainstLiveLedger; kept as a named entrypoint so
-	// `go test -run TestE2E_M4LedgerEntryShapeMatch` is a selective canary hook.
 	t.Skip("covered by TestE2E_M4PipelineAgainstLiveLedger — kept as named entrypoint for selective runs")
 }

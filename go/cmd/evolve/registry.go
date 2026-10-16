@@ -10,23 +10,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// subcommand is one row in the dispatcher table.
 type subcommand struct {
-	// Name is the canonical command name as the user types it.
-	Name string
-	// Aliases are alternate spellings that route to the same Run.
+	Name    string
 	Aliases []string
-	// Summary is a one-line description, not currently rendered, but
-	// kept on the struct so future tooling can derive a short listing.
 	Summary string
-	// Run is the handler with the standard signature used by every
-	// existing cmd_*.go file in this package.
-	Run func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
+	Run     func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 }
 
-// commands is the canonical dispatcher table, single source of truth for
-// routing. Its order matches main.go's usage listing so a reader scanning
-// both stays oriented.
 var commands = []subcommand{
 	{Name: "version", Aliases: []string{"--version", "-v"}, Summary: "Print build version", Run: runVersion},
 	{Name: "help", Aliases: []string{"--help", "-h"}, Summary: "Show usage", Run: runHelp},
@@ -135,8 +125,6 @@ var commands = []subcommand{
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }
 
-// lookupCommand returns the subcommand matching name or any alias. A linear
-// scan is fine: the table has ~40 entries and lookups happen once at startup.
 func lookupCommand(name string) *subcommand {
 	for i := range commands {
 		if commands[i].Name == name {

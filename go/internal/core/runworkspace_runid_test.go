@@ -9,7 +9,6 @@ import (
 func TestRunIDFromWorkspace_ReadsRunJSON(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	// Shape copied from a real run.json file.
 	mustWriteRunState(t, ws, `{"cycle_id":1519,"phase":"aborted","run_id":"01M09657TDN6Q1VMJK1XKYR376"}`)
 
 	if got := RunIDFromWorkspace(ws); got != "01M09657TDN6Q1VMJK1XKYR376" {
@@ -38,9 +37,6 @@ func TestRunIDFromWorkspace_UnresolvableIsEmpty(t *testing.T) {
 	}
 }
 
-// TestRunIDFromWorkspace_EmptyWorkspace: a caller with no workspace at all
-// (standalone `evolve subagent run` outside a cycle) must not panic or read a
-// stray ./run.json from the process cwd.
 func TestRunIDFromWorkspace_EmptyWorkspace(t *testing.T) {
 	t.Parallel()
 	if got := RunIDFromWorkspace(""); got != "" {

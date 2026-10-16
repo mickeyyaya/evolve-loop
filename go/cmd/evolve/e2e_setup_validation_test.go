@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// writeSetupFixture lays out a temp evolve-dir with the given per-role profiles
-// and an optional policy.json (empty → no file), and returns the evolve-dir path.
 func writeSetupFixture(t *testing.T, profiles map[string]string, policyJSON string) string {
 	t.Helper()
 	evolveDir := t.TempDir()
@@ -32,7 +30,6 @@ func writeSetupFixture(t *testing.T, profiles map[string]string, policyJSON stri
 	return evolveDir
 }
 
-// detectReport is the subset of the digest these tests assert on.
 type detectReport struct {
 	CLIs   []map[string]any `json:"clis"`
 	Phases []struct {
@@ -45,7 +42,6 @@ type detectReport struct {
 	PolicyError string `json:"policy_error"`
 }
 
-// runDetectJSON invokes `evolve setup detect --json` in-process and parses it.
 func runDetectJSON(t *testing.T, evolveDir string) detectReport {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
@@ -75,7 +71,7 @@ func TestSetupDetect_PinEnvelopeViolation(t *testing.T) {
 		map[string]string{
 			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["all"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
 		},
-		`{"pins":{"builder":{"cli":"claude","model":"haiku"}}}`, // haiku (rank 1) < min balanced (rank 2)
+		`{"pins":{"builder":{"cli":"claude","model":"haiku"}}}`,
 	)
 	_, _, _, viol := phase(runDetectJSON(t, evolveDir), "builder")
 	if viol == "" || !bytes.Contains([]byte(viol), []byte("envelope")) {
@@ -89,7 +85,7 @@ func TestSetupDetect_PinAllowedCLIsViolation(t *testing.T) {
 		map[string]string{
 			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
 		},
-		`{"pins":{"builder":{"cli":"codex","model":"sonnet"}}}`, // codex ∉ {claude,agy}
+		`{"pins":{"builder":{"cli":"codex","model":"sonnet"}}}`,
 	)
 	_, _, _, viol := phase(runDetectJSON(t, evolveDir), "builder")
 	if viol == "" || !bytes.Contains([]byte(viol), []byte("allowed_clis")) {
@@ -103,7 +99,7 @@ func TestSetupDetect_PinValidNoViolation(t *testing.T) {
 		map[string]string{
 			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
 		},
-		`{"pins":{"builder":{"cli":"claude","model":"opus"}}}`, // claude ∈ allowed, opus ∈ balanced..deep
+		`{"pins":{"builder":{"cli":"claude","model":"opus"}}}`,
 	)
 	src, cli, tier, viol := phase(runDetectJSON(t, evolveDir), "builder")
 	if src != "policy-pin" || cli != "claude" || tier != "opus" {

@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// fakeWaveLauncher records every Run call's specs (input order = wave order)
-// so tests can assert lane count / scope disjointness AND prove the golden
-// no-block path never invokes it — the same fake-launcher pattern
-// cmd_fleet.go's production execCycleLaunch is swapped out for.
 type fakeWaveLauncher struct {
 	calls [][]fleet.CycleSpec
 }
@@ -126,7 +122,7 @@ func TestDispatchIteration_MalformedTriagePlanFallsBackSequential(t *testing.T) 
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
-		return []byte(`{"committed_floors":[`), nil, nil // truncated JSON
+		return []byte(`{"committed_floors":[`), nil, nil
 	}
 	ran, _, _, err := dispatchIteration(context.Background(), fc, passingPreflight, planFn, launcher, nil, 0)
 	if err == nil {

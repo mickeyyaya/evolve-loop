@@ -26,9 +26,6 @@ func gitrun(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// syncFixture builds a bare origin plus a runtime clone using real git repos,
-// not mocks, because the failure modes under test (non-FF divergence, a
-// missing remote, a detached branch) are git's own.
 func syncFixture(t *testing.T) (origin, runtime string) {
 	t.Helper()
 	installCheckRunsGH(t, `{"total_count":1,"check_runs":[{"name":"build+test","status":"completed","conclusion":"success"}]}`, false)
@@ -46,8 +43,6 @@ func syncFixture(t *testing.T) (origin, runtime string) {
 	return origin, runtime
 }
 
-// originAdvance lands a new commit on origin main via a scratch clone (the
-// console-plane landing path).
 func originAdvance(t *testing.T, origin string) {
 	t.Helper()
 	c := filepath.Join(t.TempDir(), "console")
@@ -176,7 +171,6 @@ func TestSyncMainAtWaveBoundary_AlreadyCurrentIsQuietNoop(t *testing.T) {
 
 func TestSyncMainAtWaveBoundary_LocalAheadSkipsLoudly(t *testing.T) {
 	origin, runtime := syncFixture(t)
-	// Local commit not on origin (unpushed dossier shape) + origin also moves.
 	if err := os.WriteFile(filepath.Join(runtime, "local.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -223,8 +217,6 @@ func TestSyncMainAtWaveBoundary_NoRemoteSkipsWithoutError(t *testing.T) {
 func TestSyncMainAtWaveBoundary_DirtyTrackedFileWarnsBlockedNotDiverged(t *testing.T) {
 	origin, runtime := syncFixture(t)
 	originAdvance(t, origin)
-	// A local file at the path origin's new commit ADDS: git refuses the FF
-	// with the would-be-overwritten error — the binary-churn shape.
 	if err := os.WriteFile(filepath.Join(runtime, "g.txt"), []byte("local dirt"), 0o644); err != nil {
 		t.Fatal(err)
 	}

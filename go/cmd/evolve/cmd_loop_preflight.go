@@ -15,14 +15,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// runLoopPreflightFn is the test seam for the pre-batch readiness gate; tests
-// override it to force a halt/pass without a real environment probe.
 var runLoopPreflightFn = defaultLoopPreflight
 
 func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Options {
 	layout := paths.ResolveFromEnv()
-	// Absent or malformed policy resolves the fallback dial to off, the dormant
-	// default: the canary never runs nor halts unless an operator opts in.
 	pol, _ := policy.Load(filepath.Join(cfg.ProjectRoot, ".evolve", "policy.json"))
 	return looppreflight.Options{
 		ProjectRoot:         cfg.ProjectRoot,
@@ -40,8 +36,6 @@ func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Option
 func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result {
 	res, err := looppreflight.Run(loopPreflightOptions(cfg, stderr))
 	if err != nil {
-		// A harness fault fails loud as a synthetic halt rather than silently
-		// letting a misconfigured gate pass a doomed batch through.
 		return looppreflight.Result{
 			Checks: []looppreflight.CheckResult{{
 				Name: "preflight", Level: looppreflight.LevelHalt,
@@ -65,7 +59,6 @@ func loopPreflightHalts(cfg loopConfig, stderr io.Writer) bool {
 	return res.Halted()
 }
 
-// A write failure WARNs but never changes the gate decision.
 func persistLoopPreflight(evolveDir string, r looppreflight.Result, stderr io.Writer) {
 	if evolveDir == "" {
 		return
@@ -75,7 +68,6 @@ func persistLoopPreflight(evolveDir string, r looppreflight.Result, stderr io.Wr
 		fmt.Fprintf(stderr, "[loop] WARN: could not create %s: %v\n", evolveDir, err)
 		return
 	}
-	// PID-suffixed to avoid a stale-.tmp collision between concurrent loop starts.
 	tmp := fmt.Sprintf("%s.tmp.%d", target, os.Getpid())
 	if err := os.WriteFile(tmp, append(r.PrettyJSON(), '\n'), 0o644); err != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: could not write %s: %v\n", target, err)

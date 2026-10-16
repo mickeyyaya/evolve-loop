@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// seedFailedCycleInbox writes one inbox item and the cycle workspace's
-// triage-decision.json committing it, and returns (evolveDir, workspace).
 func seedFailedCycleInbox(t *testing.T, root, id string, cycle int) (string, string) {
 	t.Helper()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -101,8 +99,6 @@ func TestLoopApplyCycleFailureOutcome_WarnsInTheLoopsVoiceOnAFailedWalk(t *testi
 	t.Parallel()
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
-	// An inbox root that is a file, not a directory: the walk cannot move
-	// the committed item and reports it.
 	inbox := filepath.Join(evolveDir, "inbox")
 	if err := os.RemoveAll(inbox); err != nil {
 		t.Fatal(err)

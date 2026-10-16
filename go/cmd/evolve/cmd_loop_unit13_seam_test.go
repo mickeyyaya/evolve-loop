@@ -25,8 +25,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// loopProducerOrigins collects every origin literal handed to the three loop
-// producers in file, keyed by the producer's name.
 func loopProducerOrigins(t *testing.T, fset *token.FileSet, file string) []string {
 	t.Helper()
 	f, err := parser.ParseFile(fset, file, nil, 0)
@@ -55,8 +53,6 @@ func loopProducerOrigins(t *testing.T, fset *token.FileSet, file string) []strin
 	return origins
 }
 
-// declaredFuncs lists the package's non-test FuncDecls as "name" or
-// "Type.method".
 func declaredFuncs(t *testing.T, fset *token.FileSet) map[string]bool {
 	t.Helper()
 	entries, err := os.ReadDir(".")
@@ -106,9 +102,6 @@ func TestLoopSignalOrigins_NameDeclaredFunctions(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioningU13 lists the module's non-test Go files outside
-// the two unit-13 leaves and the one allowed site whose source contains
-// needle (the carryover_lifecycle_test.go idiom, moduleRoot = go/).
 func nonTestSourcesMentioningU13(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
@@ -287,7 +280,7 @@ func TestCmdLoopWave_ACSTokensHoldByCode(t *testing.T) {
 	}
 	coded := false
 	for _, line := range strings.Split(string(src), "\n") {
-		code, _, _ := strings.Cut(strings.TrimSpace(line), "//") // the code part, never a trailing comment
+		code, _, _ := strings.Cut(strings.TrimSpace(line), "//")
 		if strings.Contains(code, "fleet.QuotaAwareCount") {
 			coded = true
 		}
@@ -408,9 +401,9 @@ func TestWiredChain_FlushesTheChainCenterBeforeEveryBatch(t *testing.T) {
 	event := func(reason string) signalcenter.Event {
 		return signalcenter.Event{Module: signalcenter.ModuleLoop, Origin: "test", Kind: signalcenter.KindLoopWarning, Severity: signalcenter.SeverityInfo, Reason: reason}
 	}
-	go c.Emit(event("slow")) // this goroutine becomes the drainer and blocks inside the listener
+	go c.Emit(event("slow"))
 	<-entered
-	c.Emit(event("queued behind the held drain")) // enqueues and returns
+	c.Emit(event("queued behind the held drain"))
 	batchReached, done := make(chan struct{}), make(chan struct{})
 	prev := runLoopBatchFn
 	t.Cleanup(func() { runLoopBatchFn = prev })

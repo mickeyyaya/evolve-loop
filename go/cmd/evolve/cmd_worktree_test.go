@@ -10,10 +10,6 @@ import (
 	"time"
 )
 
-// worktree create now provisions through the shared bounded retry, whose
-// backoff is a real time.Sleep in production; without this no-op, a fixture
-// that makes `worktree add` fail permanently would pay the full retry ladder.
-// Tests that count sleeps install their own recorder and restore this default.
 func init() { worktreeAddRetry.Sleep = func(time.Duration) {} }
 
 func requireGit(t *testing.T) {
@@ -23,8 +19,6 @@ func requireGit(t *testing.T) {
 	}
 }
 
-// initRepo creates a git repo at dir with one commit on HEAD (worktree add
-// needs a real commit to detach onto).
 func initRepo(t *testing.T, dir string) {
 	t.Helper()
 	run := func(args ...string) {
@@ -65,7 +59,6 @@ func TestRunWorktreeCreate_Success(t *testing.T) {
 	if info, err := os.Stat(wt); err != nil || !info.IsDir() {
 		t.Fatalf("worktree dir %q was not created: %v", wt, err)
 	}
-	// git itself must agree the worktree exists.
 	out, err := exec.Command("git", "-C", root, "worktree", "list").CombinedOutput()
 	if err != nil {
 		t.Fatalf("git worktree list: %v\n%s", err, out)
@@ -91,7 +84,7 @@ func TestRunWorktreeCreate_MissingCycle_Errors(t *testing.T) {
 func TestRunWorktreeCreate_NotAGitRepo_ExitOne(t *testing.T) {
 	t.Parallel()
 	requireGit(t)
-	root := t.TempDir() // no `git init` — not a repo
+	root := t.TempDir()
 	base := filepath.Join(root, ".evolve", "worktrees")
 
 	var stdout, stderr strings.Builder
@@ -165,7 +158,6 @@ func TestRunWorktreeCleanup_PruneAll_ExitZero(t *testing.T) {
 	initRepo(t, root)
 
 	var stdout, stderr strings.Builder
-	// cycle=0 (default) → prune-all path, not a targeted removal.
 	code := runWorktreeCleanup([]string{"--project-root", root}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runWorktreeCleanup (prune) exit=%d stderr=%s", code, stderr.String())

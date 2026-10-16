@@ -109,8 +109,6 @@ func TestBuildCycleEnv_FlagOverridesInheritedEnv(t *testing.T) {
 
 func TestPhaseEnvAgentKey(t *testing.T) {
 	t.Parallel()
-	// phaseEnvAgentKey must mirror envchain.PhaseEnvKey's normalization, or the
-	// runner's EVOLVE_<AGENT>_CLI lookup misses.
 	cases := []struct {
 		in, want string
 	}{

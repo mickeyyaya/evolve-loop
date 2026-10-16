@@ -45,10 +45,6 @@ func TestResolveModelTier_RejectsUnresolvablePairings(t *testing.T) {
 	}
 }
 
-// TestWireOrchestrator_ModelCatalogLookupWired asserts against the real
-// composition root rather than by source inspection: an AST scan cannot
-// tell WithModelCatalogLookup(resolver) from WithModelCatalogLookup(nil),
-// and nil is precisely the dead-gate state.
 func TestWireOrchestrator_ModelCatalogLookupWired(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

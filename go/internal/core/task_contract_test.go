@@ -139,10 +139,6 @@ func TestListACSPredicates_InventoriesTheCyclePackage(t *testing.T) {
 	}
 }
 
-// TestDispatch_TaskContractReachesTDDBuildAndAudit is the core half of the
-// wiring proof; the phase half — each ComposePrompt rendering the key under
-// "## Task Contract" — is pinned in
-// phases/{tdd,build,audit}/task_contract_prompt_test.go.
 func TestDispatch_TaskContractReachesTDDBuildAndAudit(t *testing.T) {
 	t.Parallel()
 
@@ -423,20 +419,14 @@ func TestContractTaskIDs_WhitespacePaddedIDsAreNotPhantomMembers(t *testing.T) {
 	}
 }
 
-// contractParityFixture is one on-disk binding plus the dispatch context the
-// Task Contract is composed from. want is the committed set committedset
-// projects for the binding, in order; the context never changes it.
 type contractParityFixture struct {
 	name     string
-	pin      string // lane-scope.json body; "" = absent
-	decision string // triage-decision.json body; "" = absent
+	pin      string
+	decision string
 	ctx      map[string]string
 	want     []string
 }
 
-// contractParityFixtures is the shared table: the Task Contract's refs, the
-// block seedTaskContract renders and ContractTaskIDs must name the same ids for
-// every row.
 var contractParityFixtures = []contractParityFixture{
 	{name: "pin", pin: `{"todo_ids":["alpha","beta"]}`, ctx: map[string]string{"fleet_scope": "alpha,beta"}, want: []string{"alpha", "beta"}},
 	{name: "pin_wins_over_decision_and_deferral_subtracts", pin: `{"todo_ids":["renamed-work","gamma"]}`, decision: `{"top_n":[{"id":"alpha"}],"deferred":[{"id":"gamma"}]}`, ctx: map[string]string{"fleet_scope": "renamed-work,gamma"}, want: []string{"renamed-work"}},
@@ -479,8 +469,6 @@ func refIDs(refs []taskItemRef) []string {
 	return ids
 }
 
-// blockIDs returns the ids of the "### <id> — " headers of a rendered Task
-// Contract block, in order.
 func blockIDs(block string) []string {
 	var ids []string
 	for _, line := range strings.Split(block, "\n") {
@@ -579,10 +567,6 @@ func TestTaskItemRefs_ScopePathsResolvePathsNeverMembership(t *testing.T) {
 	}
 }
 
-// TestSeedTaskContract_RendersIdenticallyForPinDecisionAndDeferral pins the
-// complete block, byte for byte, for the three production binding shapes.
-// A disclosed pair and the resolver point at different records for alpha so
-// the render also proves which one placed it.
 func TestSeedTaskContract_RendersIdenticallyForPinDecisionAndDeferral(t *testing.T) {
 	t.Parallel()
 

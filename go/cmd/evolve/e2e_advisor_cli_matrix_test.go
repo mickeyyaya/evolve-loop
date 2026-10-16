@@ -13,37 +13,24 @@ import (
 	"time"
 )
 
-// advisorPlanEntry is the minimal shape of a routing-plan.json entry. Kept local
-// (not internal/router.PhasePlanEntry) so the live assertion stays a structural
-// contract check decoupled from the kernel types. The "mint" block is
-// deliberately omitted: the matrix asserts a valid plan was written, not that a
-// phase was minted (mint coverage lives in the kernel unit tests).
 type advisorPlanEntry struct {
 	Phase         string `json:"phase"`
 	Run           bool   `json:"run"`
 	Justification string `json:"justification"`
 }
 
-// stripFrontmatter removes a leading YAML frontmatter block (--- … ---) from a
-// persona markdown body so only the prose instructions reach the prompt. Only a
-// genuine block (opening "---" on its own line) is stripped; a decorative
-// thematic break that merely starts with dashes is left intact.
 func stripFrontmatter(md string) string {
 	s := strings.TrimLeft(md, "\n ")
 	if !strings.HasPrefix(s, "---\n") {
 		return md
 	}
-	rest := s[strings.IndexByte(s, '\n')+1:] // drop the opening "---" line
+	rest := s[strings.IndexByte(s, '\n')+1:]
 	if i := strings.Index(rest, "\n---"); i >= 0 {
 		return strings.TrimLeft(rest[i+len("\n---"):], "-\n ")
 	}
 	return md
 }
 
-// parseRoutingPlanArray tolerantly decodes a routing-plan.json artifact into its
-// phase entries. Under the artifact-completion contract the file is normally
-// clean JSON, but a CLI may wrap it in a ```json fence or add stray prose, so we
-// strip a fence and fall back to the FIRST balanced [ … ] span before failing.
 func parseRoutingPlanArray(raw []byte) ([]advisorPlanEntry, error) {
 	body := strings.TrimSpace(string(raw))
 	if after, ok := strings.CutPrefix(body, "```json"); ok {
@@ -67,13 +54,6 @@ func parseRoutingPlanArray(raw []byte) ([]advisorPlanEntry, error) {
 	return entries, nil
 }
 
-// firstBalancedArray returns the first top-level [ … ] span in s, depth-tracking
-// brackets while skipping string-literal contents (with escapes) so a ']' inside
-// a justification value — or in trailing prose after the array — is not
-// miscounted (the bug a naive LastIndexByte(']') would introduce). ok=false when
-// no balanced array exists. Mirrors the kernel's lastBalancedSpan but returns the
-// FIRST span: under artifact completion the file is the agent's direct write, so
-// the array comes before any trailing note.
 func firstBalancedArray(s string) (string, bool) {
 	depth, start := 0, -1
 	inStr, esc := false, false
@@ -110,9 +90,6 @@ func firstBalancedArray(s string) (string, bool) {
 	return "", false
 }
 
-// advisorModelFor resolves the DEEP / high-level model the advisor runs on per
-// CLI, overridable via EVOLVE_E2E_ADVISOR_MODEL_<BASE> (e.g.
-// EVOLVE_E2E_ADVISOR_MODEL_CLAUDE=sonnet).
 func advisorModelFor(driver string) string {
 	base := strings.TrimSuffix(strings.TrimSuffix(driver, "-tmux"), "-p")
 	if v := os.Getenv("EVOLVE_E2E_ADVISOR_MODEL_" + strings.ToUpper(base)); v != "" {
@@ -122,9 +99,9 @@ func advisorModelFor(driver string) string {
 	case "claude":
 		return "opus"
 	case "codex":
-		return codexTierModels()["deep"] // projection of the family manifest, never a copy
+		return codexTierModels()["deep"]
 	case "agy":
-		return "gemini-3.5-flash" // agy's manifest pins all tiers to one model
+		return "gemini-3.5-flash"
 	case "ollama":
 		return "llama3.1:8b"
 	default:
@@ -132,12 +109,6 @@ func advisorModelFor(driver string) string {
 	}
 }
 
-// launchAdvisor fires ONE live `evolve bridge launch` carrying the evolve-router
-// persona + a representative cycle digest, with artifact=routing-plan.json. It
-// returns the plan bytes from the artifact when written, else falls back to
-// captured stdout for a model that prints instead of writing. A synthetic
-// permissive profile (allowed_clis:["all"]) keeps the floor from rejecting
-// whatever driver the matrix selects.
 func launchAdvisor(t *testing.T, evolveBin, repoRoot, driver, model string, timeout time.Duration) ([]byte, string, error) {
 	t.Helper()
 	dir := t.TempDir()
@@ -145,11 +116,6 @@ func launchAdvisor(t *testing.T, evolveBin, repoRoot, driver, model string, time
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// codex refuses to run outside a trusted/git directory; the production advisor
-	// runs inside a git worktree, so git-init the temp dir to match (a harmless
-	// no-op for the other drivers). Log failure rather than discard it, so a broken
-	// harness precondition (no git / unwritable fs) is not mistaken for codex being
-	// merely "env-unavailable".
 	if err := exec.Command("git", "init", "-q", dir).Run(); err != nil {
 		t.Logf("git init %s failed (codex needs a trusted/git dir): %v", dir, err)
 	}
@@ -192,9 +158,6 @@ func launchAdvisor(t *testing.T, evolveBin, repoRoot, driver, model string, time
 	cmd.Env = env
 	cmd.Dir = dir
 	out, runErr := runWithTimeout(cmd, timeout)
-	// Fold the captured stderr log into out so the transient classifier sees the
-	// real provider message (quota/rate-limit), which the bridge writes to the
-	// log file rather than the subprocess stdout (cf. phaseStderrTail).
 	if b, rerr := os.ReadFile(stderrLog); rerr == nil && len(b) > 0 {
 		out += "\n" + string(b)
 	}
@@ -207,11 +170,6 @@ func launchAdvisor(t *testing.T, evolveBin, repoRoot, driver, model string, time
 	return raw, out, runErr
 }
 
-// TestParseRoutingPlanArray is a pure-function test (no live gate) that runs
-// under `go test -tags e2e` without spending quota. It pins parseRoutingPlanArray's
-// tolerance — clean JSON, code fences, and (the regression the review caught)
-// trailing prose that contains a stray ']' which a naive LastIndexByte would
-// mis-slice.
 func TestParseRoutingPlanArray(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -252,8 +210,6 @@ func TestParseRoutingPlanArray(t *testing.T) {
 	}
 }
 
-// TestStripFrontmatter pins that a genuine YAML block is removed while a body
-// without frontmatter is returned unchanged.
 func TestStripFrontmatter(t *testing.T) {
 	t.Parallel()
 	got := stripFrontmatter("---\nname: x\nmodel: tier-3\n---\n\n# Body\ntext")
@@ -266,25 +222,12 @@ func TestStripFrontmatter(t *testing.T) {
 	}
 }
 
-// advisorEnvUnavailableMarkers flag a CLI that is present but cannot run the
-// advisor on THIS host for environmental reasons — distinct from a broken advisor
-// contract: a driver with no tool use (ollama can't write the artifact), or a
-// first-run interactive trust prompt the headless/auto-responder can't clear
-// (an un-onboarded codex). These quarantine-SKIP like a transient so the matrix
-// stays a meaningful gate on the CLIs that are actually usable here, rather than
-// red-failing on host setup. (Account/model caps like "<deep model> not on a ChatGPT
-// account" surface via the trust-loop or transient path.)
 var advisorEnvUnavailableMarkers = []string{
 	"no tool use",
 	"not inside a trusted directory",
 	"auto-respond loop guard",
 	"loop_guard",
 	"trust_prompt",
-	// codex headless sandboxes the workspace read-only with approvals disabled, so
-	// it cannot write the artifact — the codex family's writer path is codex-tmux
-	// (which passes). A writer-incapable headless sandbox is an env constraint here.
-	// "read-only sandbox" is the stderr-side phrase (reliably in `out`); the others
-	// are the model's stdout apology, kept for the pre-parse no-artifact branches.
 	"read-only sandbox",
 	"mounted read-only",
 	"approvals are disabled",
@@ -300,12 +243,6 @@ func advisorEnvUnavailable(out string) bool {
 	return false
 }
 
-// TestE2ELiveAdvisorActivation is the ACTIVATION proof: it runs one real,
-// isolated cycle with EVOLVE_DYNAMIC_ROUTING=advisory and the advisor on
-// claude-p@opus (headless — claude-tmux@opus exceeds the REPL ceiling), then
-// asserts the orchestrator actually consulted the planner and disposed its
-// plan. EVOLVE_MANDATORY_PHASES=scout keeps the cycle tiny; the planner runs
-// at cycle start regardless.
 func TestE2ELiveAdvisorActivation(t *testing.T) {
 	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
 	if ok, why := liveCLIAvailable(liveCLI{Driver: "claude-p", Binary: "claude"}); !ok {
@@ -318,13 +255,13 @@ func TestE2ELiveAdvisorActivation(t *testing.T) {
 		EvolveBin: evolveBin,
 		RepoRoot:  repoRoot,
 		Driver:    "claude-p",
-		Tier:      "fast", // incidental phases stay cheap; the advisor is opus via env
+		Tier:      "fast",
 		GoalHash:  "advisor-activation-proof",
 		ExtraEnv: []string{
-			"EVOLVE_DYNAMIC_ROUTING=advisory", // Stage=Advisory ⇒ the advisor drives
-			"EVOLVE_ROUTER_CLI=claude-p",      // headless opus completes fast
-			"EVOLVE_ROUTER_MODEL=opus",        // advisor at its deep production tier
-			"EVOLVE_MANDATORY_PHASES=scout",   // keep the cycle tiny; planner runs regardless
+			"EVOLVE_DYNAMIC_ROUTING=advisory",
+			"EVOLVE_ROUTER_CLI=claude-p",
+			"EVOLVE_ROUTER_MODEL=opus",
+			"EVOLVE_MANDATORY_PHASES=scout",
 		},
 		Timeout: envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute),
 	})
@@ -332,7 +269,6 @@ func TestE2ELiveAdvisorActivation(t *testing.T) {
 		t.Skipf("activation transient (quarantined):\n%s", lastN(res.Out, 600))
 	}
 
-	// Proof 1: the orchestrator consulted the planner and recorded it (kind=phase_plan).
 	hasPhasePlan := false
 	for _, e := range res.Entries {
 		if e.Kind == "phase_plan" {
@@ -347,7 +283,6 @@ func TestE2ELiveAdvisorActivation(t *testing.T) {
 		t.Fatalf("ACTIVATION FAILED: no phase_plan ledger entry — the planner was not consulted at dynamic_routing=advisory\n%s", lastN(res.Out, 1200))
 	}
 
-	// Proof 2: the advisor's raw plan artifact was written and parses.
 	raw := readFirstFileNamed(res.ProjRoot, "routing-plan.json")
 	if len(raw) == 0 {
 		t.Fatalf("phase_plan present but no routing-plan.json artifact found under %s", res.ProjRoot)
@@ -359,9 +294,6 @@ func TestE2ELiveAdvisorActivation(t *testing.T) {
 	t.Logf("[advisor-activation] dynamic_routing=advisory: phase_plan ledger entry present + %d-entry routing-plan.json written — the advisor drove the cycle", len(entries))
 }
 
-// readFirstFileNamed returns the contents of the first file named `name` found
-// under root (depth-first), or nil if none. Used to locate the advisor's
-// routing-plan.json without computing the cycle number.
 func readFirstFileNamed(root, name string) []byte {
 	var found []byte
 	_ = filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
@@ -371,7 +303,7 @@ func readFirstFileNamed(root, name string) []byte {
 		if filepath.Base(p) == name {
 			if b, rerr := os.ReadFile(p); rerr == nil {
 				found = b
-				return filepath.SkipAll // stop traversal — file in hand
+				return filepath.SkipAll
 			}
 		}
 		return nil
@@ -379,11 +311,6 @@ func readFirstFileNamed(root, name string) []byte {
 	return found
 }
 
-// TestE2ELiveAdvisorSelectsDesignPhase: with the advisor goal-aware (GoalText
-// threaded), an explicitly architectural goal should make the brain select
-// (or mint) the non-spine architecture-design phase — genuine AI-driven
-// composition, not the rubber-stamped spine. Tolerant: transient/
-// env-unavailable → skip.
 func TestE2ELiveAdvisorSelectsDesignPhase(t *testing.T) {
 	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
 	if ok, why := liveCLIAvailable(liveCLI{Driver: "claude-p", Binary: "claude"}); !ok {
@@ -443,8 +370,6 @@ func TestE2ELiveAdvisorCLIMatrix(t *testing.T) {
 	liveGate(t, "EVOLVE_E2E_LIVE_ADVISOR")
 	repoRoot := mustRepoRoot(t)
 	evolveBin := buildBinary(t, t.TempDir(), "evolve", "./cmd/evolve", repoRoot)
-	// Deep models (opus / the codex family's deep model) reason longer than the cheap-tier smoke calls,
-	// so the default ceiling is generous; override with EVOLVE_E2E_LIVE_TIMEOUT_S.
 	timeout := envDurationSeconds("EVOLVE_E2E_LIVE_TIMEOUT_S", 10*time.Minute)
 
 	all := append(append([]liveCLI{}, liveHeadlessCLIs...), liveTmuxCLIs...)
@@ -476,12 +401,6 @@ func TestE2ELiveAdvisorCLIMatrix(t *testing.T) {
 			}
 			entries, perr := parseRoutingPlanArray(raw)
 			if perr != nil {
-				// A driver that ran but reported an environmental write/approval block
-				// (e.g. codex headless read-only sandbox) prints an apology, not a plan
-				// — quarantine-skip rather than treating it as an advisor contract break.
-				// Classify on `out` (the bridge/CLI's own diagnostics) only, NOT on raw:
-				// raw is the model's free-text stdout, which could coincidentally contain
-				// a marker phrase in a justification and mask a real contract break.
 				if advisorEnvUnavailable(out) {
 					t.Skipf("%s advisor skipped (env-unavailable; could not write a plan):\n%s", cli.Driver, lastN(out, 600))
 				}

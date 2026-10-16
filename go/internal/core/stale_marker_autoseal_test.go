@@ -13,7 +13,7 @@ import (
 func TestMarkerShouldAutoseal_DeadOwner(t *testing.T) {
 	t.Parallel()
 
-	if !markerShouldAutoseal(999999, true /*hasPID*/, func(int) bool { return false /*dead*/ }) {
+	if !markerShouldAutoseal(999999, true, func(int) bool { return false }) {
 		t.Error("a marker whose owner PID is dead must be auto-sealed")
 	}
 }
@@ -31,7 +31,7 @@ func TestMarkerShouldAutoseal_LiveOwnerUntouched(t *testing.T) {
 func TestMarkerShouldAutoseal_MissingPidFailsSafe(t *testing.T) {
 	t.Parallel()
 
-	if !markerShouldAutoseal(0, false /*hasPID*/, func(int) bool { return true /*would-be-alive, must be ignored*/ }) {
+	if !markerShouldAutoseal(0, false, func(int) bool { return true }) {
 		t.Error("a marker that cannot assert liveness (missing/zero pid) must fail SAFE toward auto-seal")
 	}
 }
@@ -41,9 +41,6 @@ func TestAutosealStaleMarker_DeadOwnerSealsViaSealCycleAndClearsBlock(t *testing
 
 	evolveDir := t.TempDir()
 	workspace := sealFixture(t, evolveDir, 491)
-	// A lease that would read as FRESH (heartbeat == opts.Now) yet whose owner
-	// pid is dead — proves liveness is pid-based, not merely heartbeat-age based,
-	// and that AutosealStaleMarker forces the seal over a "fresh" lease.
 	frozen := time.Date(2026, 5, 27, 8, 0, 0, 0, time.UTC)
 	if err := runlease.Write(workspace, runlease.Lease{RunID: "run-491", OwnerPID: 999999}, frozen); err != nil {
 		t.Fatalf("seed lease: %v", err)

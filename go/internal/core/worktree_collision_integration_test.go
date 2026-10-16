@@ -37,13 +37,9 @@ func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	git(mainRoot, "add", ".")
 	git(mainRoot, "commit", "-q", "-m", "init")
 
-	// A SECOND worktree of the same repo — the sibling work stream.
 	sibling := filepath.Join(t.TempDir(), "sibling")
 	git(mainRoot, "worktree", "add", "-q", "-b", "stream-sibling", sibling, "HEAD")
 
-	// Force a SHARED worktree base for BOTH roots — the strongest form of the bug:
-	// without the lane, both runs target the same dir (<shared>/cycle-1) AND the
-	// same global branch (cycle-1), exercising both collision axes at once.
 	sharedBase := t.TempDir()
 	g := gitWorktree{baseOverride: sharedBase}
 	wtMain, err := g.Create(mainRoot, 1)
@@ -58,7 +54,6 @@ func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	}
 	defer func() { _ = g.Cleanup(sibling, wtSibling) }()
 
-	// Distinct directory paths even under one shared base (the dir-collision axis).
 	if wtMain == wtSibling {
 		t.Fatalf("sibling worktree dirs collide under a shared base: both %q", wtMain)
 	}

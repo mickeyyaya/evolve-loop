@@ -34,7 +34,6 @@ func TestGitWorktree_GuardStateIsRunScoped(t *testing.T) {
 	git("add", ".")
 	git("commit", "-q", "-m", "init")
 
-	// The host-global cycle-state.json belongs to a DIFFERENT concurrent run.
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -43,7 +42,6 @@ func TestGitWorktree_GuardStateIsRunScoped(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(evolveDir, "cycle-state.json"), []byte(global), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// This run's own state, as the WriteCycleState mirror would persist it.
 	runWS := RunWorkspacePath(root, 77)
 	if err := os.MkdirAll(runWS, 0o755); err != nil {
 		t.Fatal(err)
@@ -60,8 +58,6 @@ func TestGitWorktree_GuardStateIsRunScoped(t *testing.T) {
 	}
 	defer func() { _ = g.Cleanup(root, wt) }()
 
-	// Symlink pin: the worktree's guard-visible cycle-state resolves to the
-	// run's own run.json.
 	link := filepath.Join(wt, ".evolve", "cycle-state.json")
 	target, err := os.Readlink(link)
 	if err != nil {
@@ -71,8 +67,6 @@ func TestGitWorktree_GuardStateIsRunScoped(t *testing.T) {
 		t.Errorf("cycle-state.json symlink target = %q, want per-run %q", target, want)
 	}
 
-	// Behavioral pin: reading through the worktree path yields the run's OWN
-	// phase, not the concurrent run's.
 	raw, err := os.ReadFile(link)
 	if err != nil {
 		t.Fatalf("read through worktree cycle-state link: %v", err)
@@ -85,7 +79,6 @@ func TestGitWorktree_GuardStateIsRunScoped(t *testing.T) {
 		t.Errorf("worktree guard state = cycle %d phase %q; want own run (cycle 77 phase \"build\") — global state leaked in", cs.CycleID, cs.Phase)
 	}
 
-	// state.json and ledger.jsonl stay host-global.
 	for _, f := range []string{"state.json", "ledger.jsonl"} {
 		got, err := os.Readlink(filepath.Join(wt, ".evolve", f))
 		if err != nil {

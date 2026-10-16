@@ -9,9 +9,6 @@ import (
 	"time"
 )
 
-// cheapModelFor returns the concrete cheapest model string for a CLI's bridge
-// launch. Overridable per-CLI via EVOLVE_E2E_LIVE_MODEL_<BASECLI> so a host with
-// different pulled/available models can tune without code changes.
 func cheapModelFor(driver string) string {
 	base := strings.TrimSuffix(strings.TrimSuffix(driver, "-tmux"), "-p")
 	if v := os.Getenv("EVOLVE_E2E_LIVE_MODEL_" + strings.ToUpper(base)); v != "" {
@@ -21,7 +18,7 @@ func cheapModelFor(driver string) string {
 	case "claude":
 		return "haiku"
 	case "codex":
-		return codexTierModels()["fast"] // projection of the family manifest, never a copy
+		return codexTierModels()["fast"]
 	case "agy":
 		return "gemini-3.5-flash"
 	case "ollama":
@@ -37,8 +34,6 @@ func TestE2ELiveSmoke(t *testing.T) {
 	repoRoot := mustRepoRoot(t)
 	evolveBin := buildBinary(t, t.TempDir(), "evolve", "./cmd/evolve", repoRoot)
 
-	// ollama first: it's the free canary. tmux smoke is redundant with the
-	// headless call here; the full tmux path is T1.
 	targets := append([]liveCLI{
 		{Driver: "ollama-tmux", Binary: "ollama", CheapTier: "fast", Family: "local"},
 	}, liveHeadlessCLIs...)

@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
-// putBaseRepo initializes a repo with one committed file and the .gitignore
-// the provisioner would plant (so worktreeContentSHA never sees .evolve dirt).
 func putBaseRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -31,8 +29,6 @@ func putBaseRepo(t *testing.T) string {
 	return root
 }
 
-// putBaseClone clones src at its current tip into a fresh dir — the lane
-// "worktree" frozen at the base commit.
 func putBaseClone(t *testing.T, src string) string {
 	t.Helper()
 	dst := filepath.Join(t.TempDir(), "wt")
@@ -40,7 +36,6 @@ func putBaseClone(t *testing.T, src string) string {
 	return dst
 }
 
-// putBaseAdvance lands a sibling commit on the repo's main line.
 func putBaseAdvance(t *testing.T, root string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(root, "sibling.txt"), []byte("sibling ship"), 0o644); err != nil {
@@ -50,8 +45,6 @@ func putBaseAdvance(t *testing.T, root string) {
 	gitOut(t, root, "commit", "-q", "-m", "sibling ship")
 }
 
-// putBaseWorkspace mints a workspace holding the audit artifact the recorder
-// reads fatally.
 func putBaseWorkspace(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -136,7 +129,7 @@ func TestAuditBindingPut_NoBaseIdentityFailsClosed(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	o.now = now
 
-	cs := CycleState{WorkspacePath: ws, ActiveWorktree: worktree} // WorktreeBaseSHA absent
+	cs := CycleState{WorkspacePath: ws, ActiveWorktree: worktree}
 	o.emitPhaseBindings(ctx, 9, projectRoot, cs, PhaseAudit, VerdictPASS)
 
 	sha := worktreeContentSHA(ctx, "", worktree, ws)

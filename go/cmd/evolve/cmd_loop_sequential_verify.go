@@ -63,9 +63,6 @@ func (b *loopBatchCoordinator) verifySequentialCycle(cycle sequentialCycle, stat
 	return b.recordRecoverableVerification(cycle, classification)
 }
 
-// completedTriageNoWork binds the shortened ledger floor to the result returned
-// by the orchestrator. The artifact is revalidated by the caller, but cannot
-// grant this exemption by itself.
 func completedTriageNoWork(cycle sequentialCycle) bool {
 	return core.IsTriageNoWorkResult(cycle.result)
 }

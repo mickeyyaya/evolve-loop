@@ -15,8 +15,6 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
-	// Seed state.json as a regular file with classifications that
-	// would normally be pruned by --reset.
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -30,9 +28,6 @@ func TestRunLoop_ResetErrorLogged(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	writeDispatchPolicy(t, evolveDir, "off")
-	// Make evolveDir read-only so the tmp+mv atomic write fails.
-	// We need state.json itself to be readable but the directory to
-	// reject new files — chmod 555 on the dir.
 	if err := os.Chmod(evolveDir, 0o555); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
@@ -69,8 +64,6 @@ func TestRunLoop_BudgetFlagsDoNotStop(t *testing.T) {
 	ledger := newFakeLedger()
 	defer installStubDeps(t, storage, ledger)()
 
-	// Cycle cost $1.50 exceeds both the (deprecated) budget ($0.50) and batch
-	// cap ($1.00). Neither gates anymore — the loop runs its one cycle and exits 0.
 	writeStdoutLog(t, cycleWorkspace(projectRoot, 1), "scout", 1.50)
 
 	var stdout, stderr bytes.Buffer

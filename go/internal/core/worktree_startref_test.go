@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// startRefFixture builds a bare origin with one commit on main and a runtime
-// clone checked out on main, returning (seed, runtime).
 func startRefFixture(t *testing.T) (*gittest.Repo, *gittest.Repo) {
 	t.Helper()
 	origin := gittest.Bare(t)

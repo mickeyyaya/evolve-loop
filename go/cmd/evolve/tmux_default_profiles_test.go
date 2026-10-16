@@ -1,9 +1,3 @@
-// tmux_default_profiles_test.go — guard test enforcing the tmux-LLM-default
-// policy. Asserts that every .evolve/profiles/*.json pins a "-tmux" cli OR
-// leaves cli empty (llmroute falls back to "claude-tmux" — still tmux).
-// Fails the build when a profile pins a headless driver as its default,
-// making such a change a conscious, reviewed act.
-
 package main
 
 import (
@@ -14,12 +8,6 @@ import (
 	"testing"
 )
 
-// TestProfilesDefaultToTmux asserts the tmux-LLM-default policy for every
-// phase profile. Headless drivers (claude-p, codex, agy) are opt-in only —
-// selectable via EVOLVE_CLI / EVOLVE_<AGENT>_CLI / a .evolve/policy.json pin
-// — and must never be a profile default.
-//
-// findRepoRoot is shared with docs_contract_test.go (same package).
 func TestProfilesDefaultToTmux(t *testing.T) {
 	t.Parallel()
 	dir := filepath.Join(findRepoRoot(t), ".evolve", "profiles")
@@ -49,20 +37,10 @@ func TestProfilesDefaultToTmux(t *testing.T) {
 	}
 }
 
-// TestSourceWritingProfilesAllowNetwork guards the allow_network invariant for
-// the built-in source-writing phases. Those phases run under the OS sandbox
-// (worktree assigned), and the sandbox confines the LLM CLI itself — so
-// sandbox.allow_network MUST be true or the sandboxed CLI boots network-denied
-// and can never reach the model API. Network-denial is not an available control
-// for a model-reaching phase (per-host egress isn't expressible in sandbox-exec/
-// bwrap, and the model endpoint can't be proxied without breaking subscription
-// billing); the boundary for these phases is filesystem confinement + kernel
-// hooks. This pins the value so a future flip back to false (the latent bug that
-// shipped silently for lack of a JSON tag) fails the build.
 func TestSourceWritingProfilesAllowNetwork(t *testing.T) {
 	t.Parallel()
 	dir := filepath.Join(findRepoRoot(t), ".evolve", "profiles")
-	for _, name := range []string{"builder", "tdd-engineer"} { // built-in worktree phases (build, tdd)
+	for _, name := range []string{"builder", "tdd-engineer"} {
 		b, err := os.ReadFile(filepath.Join(dir, name+".json"))
 		if err != nil {
 			t.Fatalf("read %s.json: %v", name, err)

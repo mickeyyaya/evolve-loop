@@ -47,8 +47,6 @@ func writeFileForPublishTest(t *testing.T, path, content string) {
 	}
 }
 
-// stubPublishExec replaces the exec seams for the test's lifetime, recording
-// every invocation. haveBinaries controls LookPath success.
 type execCall struct {
 	Name string
 	Args []string
@@ -77,7 +75,7 @@ func TestRewriteFrontmatterName(t *testing.T) {
 	cases := []struct {
 		label   string
 		raw     string
-		want    string // "" → expect error
+		want    string
 		newName string
 	}{
 		{
@@ -225,7 +223,7 @@ func TestPublishCodex_InstallIsIdempotentAndNameMatchesDir(t *testing.T) {
 	}
 
 	for rel, content := range first {
-		dir := filepath.Dir(rel) // evolve-<name>
+		dir := filepath.Dir(rel)
 		fm, _, err := prompts.ParseFrontmatter(content)
 		if err != nil {
 			t.Fatalf("%s: unparseable: %v", rel, err)
@@ -259,13 +257,10 @@ func TestPublishCodex_PrunesOnlySentinelMarked(t *testing.T) {
 	})
 	codexHome := t.TempDir()
 	skillsDir := filepath.Join(codexHome, "skills")
-	// Stale projection (carries sentinel) → must be pruned.
 	writeFileForPublishTest(t, filepath.Join(skillsDir, "evolve-gone", "SKILL.md"),
 		"---\nname: evolve-gone\n---\n<!-- "+publishProvenanceSentinel+" -->\nold\n")
-	// User-authored skill with evolve- prefix but NO sentinel → preserved.
 	writeFileForPublishTest(t, filepath.Join(skillsDir, "evolve-mine", "SKILL.md"),
 		"---\nname: evolve-mine\n---\nhand-written\n")
-	// Unrelated skill → untouched.
 	writeFileForPublishTest(t, filepath.Join(skillsDir, "other-tool", "SKILL.md"),
 		"---\nname: other-tool\n---\nx\n")
 
@@ -408,7 +403,6 @@ func TestPublish_CrossCLISurfaces(t *testing.T) {
 	}
 	pub := filepath.Join(project, ".evolve", "publish")
 
-	// codex: skills ARE the native surface — evolve-prefixed skill, no commands/.
 	if _, err := os.Stat(filepath.Join(pub, "codex", "evolve-scout", "SKILL.md")); err != nil {
 		t.Errorf("codex skill projection missing: %v", err)
 	}
@@ -416,7 +410,6 @@ func TestPublish_CrossCLISurfaces(t *testing.T) {
 		t.Errorf("codex must NOT get a commands/ layer (skills load natively)")
 	}
 
-	// agy: Claude-Code-shaped plugin host — skill AND command stub present.
 	if _, err := os.Stat(filepath.Join(pub, "agy", "evo", "skills", "scout", "SKILL.md")); err != nil {
 		t.Errorf("agy skill missing: %v", err)
 	}
@@ -424,7 +417,6 @@ func TestPublish_CrossCLISurfaces(t *testing.T) {
 		t.Errorf("agy command stub missing: %v", err)
 	}
 
-	// ollama: model only — no slash-command concept.
 	if _, err := os.Stat(filepath.Join(pub, "ollama", "evolve-scout", "Modelfile")); err != nil {
 		t.Errorf("ollama Modelfile missing: %v", err)
 	}
@@ -594,7 +586,6 @@ func TestPublishOllama_BaseOverrideAndTripleQuoteSanitized(t *testing.T) {
 	if !strings.Contains(s, "FROM qwen3:4b") {
 		t.Errorf("--ollama-base override not honored:\n%s", s)
 	}
-	// The only """ occurrences must be the SYSTEM delimiters (exactly 2).
 	if n := strings.Count(s, `"""`); n != 2 {
 		t.Errorf("body triple-quote not sanitized: %d fences found:\n%s", n, s)
 	}
@@ -605,7 +596,6 @@ func TestPublishOllama_InstallCreatesAndPrunesStaleModels(t *testing.T) {
 	project := publishTestProject(t, map[string]string{
 		"scout": publishSkillDoc("scout", "scout skill", "Scout things."),
 	})
-	// Pre-existing manifest from an earlier publish that included evolve-audit.
 	writeFileForPublishTest(t, filepath.Join(project, ".evolve", "publish", "ollama", "manifest.json"),
 		`{"models": ["evolve-audit", "evolve-scout"]}`)
 

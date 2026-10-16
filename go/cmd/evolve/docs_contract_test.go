@@ -10,20 +10,12 @@ import (
 	"testing"
 )
 
-// envVarRE captures EVOLVE_<NAME> identifiers across Go source files.
 var envVarRE = regexp.MustCompile(`EVOLVE_[A-Z][A-Z0-9_]*`)
 
-// allowedUndocumented lists env vars that intentionally don't appear
-// in the scanned docs (CLAUDE.md / runtime-reference.md). Add a
-// rationale comment when expanding this list — these become technical
-// debt otherwise.
 var allowedUndocumented = map[string]bool{
-	"EVOLVE_TEST_COST_THRESHOLD":    true,
-	"EVOLVE_TEST_COST_GUARD_STRICT": true,
-	"EVOLVE_TESTING":                true,
-	// Per-phase env-var FAMILIES — documented as a pattern, not per-phase.
-	// The base pattern (e.g., EVOLVE_<PHASE>_PERMISSION_MODE) IS in
-	// runtime-reference.md.
+	"EVOLVE_TEST_COST_THRESHOLD":           true,
+	"EVOLVE_TEST_COST_GUARD_STRICT":        true,
+	"EVOLVE_TESTING":                       true,
 	"EVOLVE_BUILD_MODEL":                   true,
 	"EVOLVE_SCOUT_MODEL":                   true,
 	"EVOLVE_INTENT_MODEL":                  true,
@@ -41,45 +33,37 @@ var allowedUndocumented = map[string]bool{
 	"EVOLVE_TDD_ENGINEER_MODEL":            true,
 	"EVOLVE_TDD_ENGINEER_PERMISSION_MODE":  true,
 	"EVOLVE_PLAN_REVIEWER_PERMISSION_MODE": true,
-	"EVOLVE_SKIP_CYCLE_HEALTH":             true, // documented as inline operator escape in cyclehealth doc comment
+	"EVOLVE_SKIP_CYCLE_HEALTH":             true,
 
-	// Baseline: env vars that existed before this contract test landed. Each
-	// should eventually be either (a) documented in runtime-reference.md OR
-	// (b) removed from code. Tracked as technical debt; the contract test
-	// still catches NEW additions.
-	"EVOLVE_HANG_CLASSIFIER":           true, // legacy dispatcher classifier override
-	"EVOLVE_LEDGER_OVERRIDE":           true, // ledger adapter test override
-	"EVOLVE_PHASE_":                    true, // regex anchor leak — not a real var
-	"EVOLVE_PHASE_BUILD_BIN":           true, // per-phase subprocess override pattern
-	"EVOLVE_PLUGIN_ROOT":               true, // dispatcher root resolve
-	"EVOLVE_PROFILES_DIR_OVERRIDE":     true, // profile loader override
-	"EVOLVE_PROJECT_ROOT":              true, // dispatcher root resolve
-	"EVOLVE_PROMPTS_DIR":               true, // prompts.NewForProject dev override (used)
-	"EVOLVE_QUOTA_RESET_AT":            true, // quotareset
-	"EVOLVE_QUOTA_RESET_HOURS":         true, // quotareset
-	"EVOLVE_RELEASE_REQUIRE_PREFLIGHT": true, // releasepipeline flag
-	"EVOLVE_RELEASE_STRICT_PASS":       true, // releasepreflight strict mode
-	"EVOLVE_RESUME":                    true, // cmd_loop resume signal
-	"EVOLVE_RESUME_ALLOW_HEAD_MOVED":   true, // checkpoint flag
-	"EVOLVE_RESUME_MODE":               true, // checkpoint flag
-	"EVOLVE_SHIP_SCRIPT":               true, // legacy ship.sh override
-	"EVOLVE_TRACKER_TTL_DAYS":          true, // tracker telemetry TTL
-	"EVOLVE_USE_PHASE_REGISTRY":        true, // v12.1 internal toggle
+	"EVOLVE_HANG_CLASSIFIER":           true,
+	"EVOLVE_LEDGER_OVERRIDE":           true,
+	"EVOLVE_PHASE_":                    true,
+	"EVOLVE_PHASE_BUILD_BIN":           true,
+	"EVOLVE_PLUGIN_ROOT":               true,
+	"EVOLVE_PROFILES_DIR_OVERRIDE":     true,
+	"EVOLVE_PROJECT_ROOT":              true,
+	"EVOLVE_PROMPTS_DIR":               true,
+	"EVOLVE_QUOTA_RESET_AT":            true,
+	"EVOLVE_QUOTA_RESET_HOURS":         true,
+	"EVOLVE_RELEASE_REQUIRE_PREFLIGHT": true,
+	"EVOLVE_RELEASE_STRICT_PASS":       true,
+	"EVOLVE_RESUME":                    true,
+	"EVOLVE_RESUME_ALLOW_HEAD_MOVED":   true,
+	"EVOLVE_RESUME_MODE":               true,
+	"EVOLVE_SHIP_SCRIPT":               true,
+	"EVOLVE_TRACKER_TTL_DAYS":          true,
+	"EVOLVE_USE_PHASE_REGISTRY":        true,
 }
 
 func TestEnvVars_DocumentedInCLAUDEmd(t *testing.T) {
 	t.Parallel()
 	repoRoot := findRepoRoot(t)
-	// CLAUDE.md keeps a digest and runtime-reference.md the full table; scan
-	// both so a row in either file satisfies the contract.
 	var claudeBody string
 	for _, rel := range []string{"CLAUDE.md", filepath.Join("docs", "operations", "runtime-reference.md")} {
 		body, err := os.ReadFile(filepath.Join(repoRoot, rel))
 		if err != nil {
 			t.Fatalf("read %s: %v", rel, err)
 		}
-		// "\n" separator: prevent a phantom EVOLVE_* token forming
-		// across the file boundary.
 		claudeBody += string(body) + "\n"
 	}
 
@@ -97,10 +81,6 @@ func TestEnvVars_DocumentedInCLAUDEmd(t *testing.T) {
 	if len(missing) == 0 {
 		return
 	}
-	// Soft contract: log the drift so it's visible in CI but don't
-	// fail the build. EVOLVE_DOCS_CONTRACT_STRICT=1 flips to hard
-	// failure for the future tightening pass once the backlog is paid
-	// down (or the allowedUndocumented map fully covers it).
 	msg := fmt.Sprintf("docs-contract: %d EVOLVE_* env vars used in code but not in CLAUDE.md or docs/operations/runtime-reference.md:\n  %s\n\n"+
 		"Either add rows to the runtime-reference.md 'Current behavior' table OR add entries to allowedUndocumented "+
 		"in docs_contract_test.go (with a one-line rationale comment per entry).",
@@ -112,9 +92,6 @@ func TestEnvVars_DocumentedInCLAUDEmd(t *testing.T) {
 	}
 }
 
-// findRepoRoot walks up from cwd until it finds CLAUDE.md, returning
-// the directory that contains it. Tests run from go/cmd/evolve so the
-// root is two levels up; this works regardless of layout changes.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
 	cwd, err := os.Getwd()
@@ -146,8 +123,6 @@ func collectEnvVarsFromCode(t *testing.T, goRoot string) map[string]bool {
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		// Skip the acs/ adversarial-cycle scaffolds — they reference
-		// historical env vars per cycle that may not all be live.
 		if strings.Contains(path, "/acs/") || strings.Contains(path, "/archive/") {
 			return nil
 		}

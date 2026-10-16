@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// corePhaseRoles are the phases that prove the real CLI drove the pipeline.
-// (intent is gated off; ship/retro depend on the synthetic task's verdict.)
 var corePhaseRoles = []string{"scout", "build", "audit"}
 
 func TestE2ELiveCycleHeadless(t *testing.T) {
@@ -65,8 +63,6 @@ func runLiveCycleTier1(t *testing.T, repoRoot, evolveBin string, cli liveCLI, ti
 		}
 	}
 	if reachedCore {
-		// Integration proven. Final verdict (ship vs block) depends on the
-		// synthetic task and is not a CLI-integration concern — just report it.
 		return
 	}
 	if isTransient(res.Out, res.Err) {

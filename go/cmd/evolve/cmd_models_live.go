@@ -25,9 +25,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
-// shouldRefreshCatalog is the pure cycle-start gate: refresh only when enabled
-// AND the cached catalog is older than the TTL (so the live /model drive runs
-// at most once per day, not every cycle). Reads autoRefresh from policy.CatalogConfig().
 func shouldRefreshCatalog(cat modelcatalog.Catalog, now time.Time, autoRefresh bool) bool {
 	if !autoRefresh {
 		return false
@@ -35,12 +32,6 @@ func shouldRefreshCatalog(cat modelcatalog.Catalog, now time.Time, autoRefresh b
 	return cat.IsStale(now, modelcatalog.DefaultTTL)
 }
 
-// makeCatalogRefresher returns the closure core.WithCatalogRefresher invokes
-// at cycle start. stage is the resolved policy.CatalogConfig().RefreshStage:
-// "off" is a no-op, "shadow" runs the full live pipeline but writes only the
-// shadow catalog (dispatch byte-identical to off), "enforce" commits the live
-// catalog. TTL-gated per stage and best-effort; a failure propagates to the
-// orchestrator which only WARNs.
 func makeCatalogRefresher(projectRoot, evolveDir, stage string) func(context.Context) error {
 	return func(ctx context.Context) error {
 		return runStagedCatalogRefresh(ctx, evolveDir, stage, func(ctx context.Context, prior modelcatalog.Catalog) (modelcatalog.Catalog, error) {
@@ -57,26 +48,12 @@ func makeCatalogRefresher(projectRoot, evolveDir, stage string) func(context.Con
 	}
 }
 
-// runStagedCatalogRefresh is the stage-aware refresh spine, separated from
-// makeCatalogRefresher so every stage behavior is testable with a fake
-// pipeline (no live CLI drive, no setup.Detect):
-//
-//   - off (and anything unresolved — policy already fail-safes unknowns): no-op.
-//   - shadow: TTL-gate on the SHADOW catalog (gating on the live file would
-//     either never run or drive the expensive live probe every cycle), refresh
-//     with the shadow catalog as Prior (that is where the reuse fingerprints
-//     this stage wrote live), emit per-tier would-change lines against the
-//     live catalog, and write ONLY the shadow file.
-//   - enforce: TTL-gate on the live catalog and Commit (the one write seam —
-//     carries operator tier_fallbacks, rotates .prev).
 func runStagedCatalogRefresh(ctx context.Context, evolveDir, stage string, refresh func(context.Context, modelcatalog.Catalog) (modelcatalog.Catalog, error), now func() time.Time, log io.Writer) error {
 	if stage != "shadow" && stage != "enforce" {
 		return nil
 	}
 	live, rerr := modelcatalog.Read(evolveDir)
 	if rerr != nil {
-		// Corrupt cache: treat as stale (refresh overwrites it) but surface
-		// the corruption rather than papering over it silently.
 		fmt.Fprintf(log, "[models] WARN unreadable catalog (will refresh): %v\n", rerr)
 	}
 	gate := live
@@ -100,15 +77,10 @@ func runStagedCatalogRefresh(ctx context.Context, evolveDir, stage string, refre
 		}
 		return modelcatalog.WriteShadow(evolveDir, fresh)
 	}
-	// Same seam as `evolve models refresh`.
 	_, cerr := modelcatalog.Commit(evolveDir, fresh, log)
 	return cerr
 }
 
-// shadowDiffLines renders the per-CLI per-tier differences between the live
-// catalog and a shadow refresh result — the soak evidence that earns (or
-// blocks) the flip to enforce. Deterministic order: sorted CLI names ×
-// CanonicalTiers. An absent side renders as "(none)".
 func shadowDiffLines(live, next modelcatalog.Catalog) []string {
 	names := make(map[string]bool, len(live.CLIs)+len(next.CLIs))
 	for cli := range live.CLIs {
@@ -141,9 +113,6 @@ func shadowDiffLines(live, next modelcatalog.Catalog) []string {
 	return lines
 }
 
-// bridgeModelCapturer adapts bridge.CaptureModelPicker to
-// modelquery.ModelCapturer. It translates a base CLI name (codex|agy|claude)
-// to the tmux driver the bridge launches (codex-tmux, …).
 type bridgeModelCapturer struct {
 	workspace string
 }
@@ -159,13 +128,6 @@ func (c bridgeModelCapturer) CaptureModelPicker(ctx context.Context, cli string)
 	return bridge.CaptureModelPicker(ctx, cfg, bridge.Deps{}, driver)
 }
 
-// bridgePromptDispatcher adapts bridge.Engine.Launch to
-// modelquery.PromptDispatcher: the tier-classification prompt is dispatched
-// through the same sandboxed, liveness-probed, cli_fallback-aware bridge
-// every phase uses, instead of a raw exec. It
-// translates a base CLI name (codex|agy|claude) to the headless driver the
-// bridge launches (driver_codex.go/driver_agy.go/driver_claudep.go), mirroring
-// bridgeModelCapturer's cli->driver translation for the tmux pickers.
 type bridgePromptDispatcher struct {
 	workspace   string
 	projectRoot string
@@ -219,15 +181,6 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		return modelcatalog.Catalog{}, fmt.Errorf("no ready CLIs to query (run: evolve setup detect)")
 	}
 
-	// The probe (tmux picker capture + one-shot classifier) works in a
-	// throwaway scratch dir, never the repo: the router profile's sandbox
-	// declares read_only_repo, so an ArtifactPath under the project root is
-	// either denied (artifact-timeout per CLI at cycle start) or litters an
-	// untracked file in main. The profile path stays anchored to projectRoot.
-	// Diagnostics the bridge writes under the workspace (escalation reports,
-	// launch errors, the llm-calls token ledger) are salvaged to a durable
-	// home BEFORE teardown — deleting them with the scratch dir would silently
-	// destroy the one artifact that explains a failed probe.
 	scratch, err := os.MkdirTemp("", "evolve-models-probe-*")
 	if err != nil {
 		return modelcatalog.Catalog{}, fmt.Errorf("liveRefresh: scratch workspace: %w", err)
@@ -319,25 +272,6 @@ func classifierFamilies(router *cliroute.Router) ([]string, error) {
 	return families, nil
 }
 
-// salvageProbeDiagnostics copies the diagnostic side-effects the bridge wrote
-// under the scratch probe workspace into evolveDir/models-probe before the
-// scratch dir is deleted:
-//
-//   - escalation-report.json → escalation-report-<UTC stamp>.json (each event
-//     kept, never clobbered) + a WARN naming the salvaged path
-//   - *-launch-error.txt → copied verbatim + WARN
-//   - llm-calls.ndjson → APPENDED to the durable ledger, so the
-//     token-telemetry trail keeps every classifier call the probe made
-//
-// Deliberately allowlist-shaped: artifacts/prompts/pane logs are probe
-// plumbing and stay disposable. Best-effort throughout — salvage must never
-// fail the refresh — and fully quiet when a clean probe left nothing behind.
-// tag disambiguates destinations when multiple probes salvage concurrently
-// into the shared durable home (`evolve setup latest` runs one salvage per
-// family in parallel): a second-granularity stamp alone can still collide,
-// and the un-stamped launch-error name collides outright since every
-// family's capturer is Agent "models". Empty tag keeps the historical names
-// (single-probe callers).
 func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Time, log io.Writer) {
 	entries, err := os.ReadDir(scratch)
 	if err != nil {
@@ -400,12 +334,6 @@ func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Tim
 	}
 }
 
-// freshnessFromManifests maps each ready CLI's manifest model_freshness block
-// to a modelquery.FreshnessPolicy. This is the composition-root translation
-// of a bridge-declared CLI fact into a plain value — modelquery never imports
-// bridge, and the per-CLI difference lives in manifest DATA, not a Go
-// conditional. A CLI with no manifest (ollama) or no block gets no entry ⇒
-// zero policy (newest concrete version wins).
 func freshnessFromManifests(clis []string) map[string]modelquery.FreshnessPolicy {
 	out := make(map[string]modelquery.FreshnessPolicy, len(clis))
 	for _, cli := range clis {

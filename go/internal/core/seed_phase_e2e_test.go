@@ -9,22 +9,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// seedRepoRoot walks up from this test file to the repo root (the dir
-// containing .evolve/phases), following the usercatalog_research_test.go
-// precedent of proving config-only claims against the REAL repo files.
 func seedRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("cannot locate test file")
 	}
-	// .../go/internal/core/seed_phase_e2e_test.go → up 4 to repo root.
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 }
 
-// The original seed phase was named reproduce-bug; the two-tier naming rule
-// renamed it bug-reproduction, which is why this test looks for the latter.
-// See ADR-0038.
 func TestSeedPhase_BugReproductionReachesAdvisorCatalog(t *testing.T) {
 	t.Parallel()
 	root := seedRepoRoot(t)

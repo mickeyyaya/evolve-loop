@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// seedNoWorkLane writes a lane scoped to one inbox item whose triage dropped
-// it with a reason, and returns the .evolve dir.
 func seedNoWorkLane(t *testing.T, root string, cycle int) string {
 	t.Helper()
 	evolveDir := filepath.Join(root, ".evolve")

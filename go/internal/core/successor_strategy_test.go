@@ -61,10 +61,6 @@ func TestSuccessorStrategy(t *testing.T) {
 	}
 }
 
-// retroGateHarness builds a minimal cycleRun positioned at the completed retro
-// phase, with the supplied catalog. recordAndBranch's pre-gate steps are all
-// fake-safe for retro: ledger/storage are fakes, ActiveWorktree is empty (so
-// normalizeBuildWorktree no-ops), and there is no retro phase-binding case.
 func retroGateHarness(t *testing.T, cat phasespec.Catalog) *cycleRun {
 	t.Helper()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithCatalog(cat))
@@ -113,9 +109,6 @@ func TestRecordAndBranch_RetroDegradesToHistoryWhenUnconfigured(t *testing.T) {
 	}
 }
 
-// resumeFromRetro builds a fake-backed orchestrator (optionally with a
-// catalog) and resumes a cycle starting at retro, exercising resume.go's
-// history-branch gate — the lockstep twin of recordAndBranch.
 func resumeFromRetro(t *testing.T, opts ...Option) (CycleResult, error) {
 	t.Helper()
 	st := &fakeStorage{
@@ -138,9 +131,6 @@ func TestResume_RetroDegradesToHistoryWhenUnconfigured(t *testing.T) {
 	}
 }
 
-// TestResume_RetroGateIsStrategyKeyed tolerates a downstream transition error
-// after the history branch is skipped; the contract under test is only that
-// the branch did not fire.
 func TestResume_RetroGateIsStrategyKeyed(t *testing.T) {
 	t.Parallel()
 	res, _ := resumeFromRetro(t, WithCatalog(mustCatalog(t,

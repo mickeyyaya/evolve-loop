@@ -124,10 +124,6 @@ func runSwarmReap(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	killer := swarm.ExecSessionKiller{
-		// Kills only the pgid/session pairs this manifest recorded, never a
-		// broad pkill; refusing group 0/1 here is defense in depth against
-		// signaling the caller's own group or session (ExecSessionKiller
-		// already gates pgid>1 before calling KillGroup).
 		KillGroup: func(pgid int) error {
 			if pgid <= 1 {
 				return fmt.Errorf("refusing to kill process group %d", pgid)

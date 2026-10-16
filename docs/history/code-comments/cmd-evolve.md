@@ -6311,3 +6311,78 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // (a halt that also fails to leave a breadcrumb must not do so silently).
 // The returned record names what it wrote, for the halt INCIDENT.
 ```
+
+## comment-zero cmd-evolve-3
+
+### `go/cmd/evolve/cmd_loop_resume_quota_test.go:59` — above `ledger := newFakeLedger()`
+
+```text
+// satisfies rootLedger; see ADR-0101.
+```
+
+### `go/cmd/evolve/cmd_loop_wave.go:73` — above `func consoleRoutedResolver(cfg loopConfig, stderr io.Writer) fleet.RoutedFn {`
+
+```text
+// consoleRoutedResolver is the ADR-0074 plan-time gate's resolver (the pool
+// scheduler reaches it with no Center, so its refusal WARN stays a line).
+```
+
+### `go/cmd/evolve/cmd_loop_wave.go:115` — above `func productionWaveLauncher(fc policy.FleetConfig, binPath, projectRoot, goalHash, goalText string, stdout, stderr io.Wr…`
+
+```text
+// productionWaveLauncher is the by-name facade of Engine.Launcher: a
+// Supervisor over execCycleLaunch inside the freshness gate (wave 0: no
+// caller carries a wave; the refill dir is <projectRoot>/.evolve as always).
+```
+
+### `go/cmd/evolve/cmd_routing_test.go:65` — above `pr := t.TempDir()`
+
+```text
+// no .evolve/runs/cycle-9 at all
+```
+
+### `go/cmd/evolve/cmd_selfcheck_protected_integration_test.go:48` — above `ws := t.TempDir()`
+
+```text
+// A placeholder token in the build report proves the deterministic engine
+// is composed too — a pointer pin alone cannot (architecture review F37 M2).
+```
+
+### `go/cmd/evolve/cmd_tokens_test.go:140` — above `writeTokensTimingFixture(t, root, "5", []phasetiming.Entry{`
+
+```text
+// Cycle 5 is discovered via its phase-timing log; duration 90000 / exit 0
+// deliberately carry no stray "5" digit so the cycle-number assertion is real.
+```
+
+### `go/cmd/evolve/e2e_advisor_cli_matrix_test.go:321` — above `Tier:      "fast",`
+
+```text
+// incidental phases stay cheap; the advisor is opus via env
+```
+
+### `go/cmd/evolve/e2e_cycle_cli_matrix_test.go:228` — above `func setupTempProject(t *testing.T, repoRoot string) string {`
+
+```text
+// setupTempProject builds an isolated project root in t.TempDir() with
+// everything the cycle path needs:
+//   - git init + initial commit (so ship's git commit has a parent)
+//   - .evolve/profiles/{intent,scout,triage,tdd,build,audit,retro}.json
+//     (stubs — bridge profile loader only requires `name`)
+//   - .evolve/state.json bootstrapped to cycle 0
+//   - committed durable Go predicate input for native Audit
+//
+// The in-process Go bridge resolves paths from the request (no
+// tools/agent-bridge tree is symlinked).
+```
+
+## comment-zero cmd-evolve-4
+
+### `go/cmd/evolve/routing_order_realtree_test.go:57` — above `if bi, fi, bu := idx("bug-reproduction"), idx("fault-localization"), idx("build"); bi >= 0 && fi >= 0 && bu >= 0 {`
+
+```text
+// The incident phase specifically: a red-first Evaluate deliverable is only
+// coherent PRE-build. Pin it by name so a future registry/catalog reshuffle
+// that reintroduces the post-build slot fails here with the incident's name
+// on it, not just the generic anchor rule above.
+```

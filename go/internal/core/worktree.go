@@ -13,14 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
-// WorktreeProvisioner creates and removes the per-cycle worktree. Injected via
-// WithWorktreeProvisioner; the default is gitWorktree (real `git worktree`).
 type WorktreeProvisioner interface {
-	// Create provisions (or reuses) the cycle's worktree and returns its
-	// absolute path. Idempotent: an existing worktree for the cycle is reused.
 	Create(projectRoot string, cycle int) (string, error)
-	// Cleanup removes the worktree. Best-effort; a missing worktree is not an
-	// error. Empty worktree path is a no-op.
 	Cleanup(projectRoot, worktree string) error
 }
 
@@ -71,8 +65,6 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	return wt, nil
 }
 
-// worktreeAddRetrySleep is the inter-attempt backoff clock — a seam so the
-// package tests count sleeps instead of paying them.
 var worktreeAddRetrySleep = time.Sleep
 
 func worktreeAddRetry(branch string) gitexec.WorktreeAddRetry {
@@ -94,7 +86,7 @@ func laneStartRef(ctx context.Context, projectRoot string) (string, error) {
 	git := gitexec.Git{Dir: projectRoot, Exec: gitRunner}
 	url, _, code, err := git.Capture(ctx, "config", "--get", "remote.origin.url")
 	if err != nil || code != 0 || strings.TrimSpace(url) == "" {
-		return "HEAD", nil // remoteless repo — documented fallback
+		return "HEAD", nil
 	}
 	branch := originDefaultBranch(ctx, git)
 	if _, stderr, code, err := git.FetchOriginBranch(ctx, laneBaseFetchRetry(branch), branch); err != nil || code != 0 {
@@ -116,7 +108,7 @@ func laneBaseFetchRetry(branch string) gitexec.FetchRetry {
 func integrationHead(ctx context.Context, git gitexec.Git, remote string) (string, error) {
 	branch, _, bcode, berr := git.Capture(ctx, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if berr != nil || bcode != 0 || "origin/"+strings.TrimSpace(branch) != remote {
-		return remote, nil // detached / feature checkout — the remote tip is the base
+		return remote, nil
 	}
 	rel, err := git.RelationToRemote(ctx, remote)
 	if err != nil {
@@ -129,14 +121,11 @@ func integrationHead(ctx context.Context, git gitexec.Git, remote string) (strin
 		return rel.Local, nil
 	case gitexec.RelationDiverged:
 		return "", fmt.Errorf("lane base: %s", rel)
-	default: // current or behind — the boundary fast-forwards a behind main
+	default:
 		return remote, nil
 	}
 }
 
-// originDefaultBranch falls back to "main" when refs/remotes/origin/HEAD is
-// absent; a wrong guess fails loudly on the unknown ref at worktree add rather
-// than silently basing on the stale local tip.
 func originDefaultBranch(ctx context.Context, git gitexec.Git) string {
 	out, _, code, err := git.Capture(ctx, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
 	if err != nil || code != 0 {
@@ -148,9 +137,6 @@ func originDefaultBranch(ctx context.Context, git gitexec.Git) string {
 	return "main"
 }
 
-// CreateFrom provisions the cycle worktree seeded from startRef instead of
-// HEAD; an existing directory at this cycle number is always a stale
-// collision and is recreated, never reused.
 func (g gitWorktree) CreateFrom(projectRoot string, cycle int, startRef string) (string, error) {
 	base := g.base(projectRoot)
 	if !filepath.IsAbs(base) {
@@ -226,16 +212,10 @@ func deleteCycleBranch(projectRoot, worktree string) {
 	}
 }
 
-// WorktreePhase reports whether a phase writes source into the cycle
-// worktree: only tdd and build do; every other phase writes only its
-// artifact into the absolute workspace path.
 func WorktreePhase(p Phase) bool {
 	return p == PhaseTDD || p == PhaseBuild
 }
 
-// LeakRecoverablePhase reports whether a phase runs with an active cycle
-// worktree and is therefore eligible for leak recovery, a distinct axis from
-// WorktreePhase's write permission.
 func LeakRecoverablePhase(p Phase) bool {
 	switch p {
 	case PhaseTriage, PhaseAudit, PhaseScout, PhaseTDD, PhaseBuild, Phase("bug-reproduction"):

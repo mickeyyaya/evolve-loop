@@ -8,23 +8,14 @@ import (
 	"time"
 )
 
-// liveTierModels maps each CLI to the concrete model per abstract tier. A
-// function, not a package var: the codex row loads a manifest, and init-time
-// I/O (or its panic) must not fire before liveGate's SKIP. agy
-// pins all tiers to one model (per its manifest); ollama is omitted (host model
-// varies — exercise it via EVOLVE_E2E_LIVE_MODEL_OLLAMA + T0).
 func liveTierModels() map[string]map[string]string {
 	return map[string]map[string]string{
 		"claude-p": {"fast": "haiku", "balanced": "sonnet", "deep": "opus"},
-		"codex":    codexTierModels(), // a projection of the family manifest, never a copy
+		"codex":    codexTierModels(),
 		"agy":      {"fast": "gemini-3.5-flash", "balanced": "gemini-3.5-flash", "deep": "gemini-3.5-flash"},
 	}
 }
 
-// codexTierModels reads the codex family tier table through the headless
-// manifest (codex.json points at codex-tmux.json via model_tier_map_from — the
-// single source every codex reader resolves through). A load failure panics — loud, never a silent nil that
-// would launch every case without -m.
 func codexTierModels() map[string]string {
 	m, err := bridge.LoadManifest("codex")
 	if err != nil {
@@ -48,7 +39,7 @@ func TestE2ELiveModelTierMatrix(t *testing.T) {
 			if ok, why := liveCLIAvailable(cli); !ok {
 				t.Skip(why)
 			}
-			seen := map[string]bool{} // skip duplicate models (agy maps all tiers to one)
+			seen := map[string]bool{}
 			for _, tier := range []string{"fast", "balanced", "deep"} {
 				model := tiers[tier]
 				if model == "" || seen[model] {

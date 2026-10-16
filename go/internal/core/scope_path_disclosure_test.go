@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// ctxProbe records the Context each dispatched phase received.
 type ctxProbe struct {
 	phase string
 	ctxs  []map[string]string
@@ -45,7 +44,7 @@ func TestScopePaths_ResolvedPathsReachThePhaseContext(t *testing.T) {
 		if taskID == "pipeline-defect-pipeline-blocker" {
 			return "/abs/inbox/2026-08-22T15-02-52Z-pipeline-defect-pipeline-blocker.json"
 		}
-		return "" // not inbox-backed (carryover ids) — no entry, fail-open
+		return ""
 	}
 	p := runScopedCycle(t, resolver, map[string]string{
 		"EVOLVE_FLEET_SCOPE": "pipeline-defect-pipeline-blocker,some-carryover-id",

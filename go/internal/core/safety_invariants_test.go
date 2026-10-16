@@ -35,14 +35,10 @@ func TestValidateSafetyInvariants_UnknownBranchTarget(t *testing.T) {
 	}
 }
 
-// PhaseSwarmPlan is a structural kernel phase that is valid but off any
-// start→ship path — the rename-stable unreachable sentinel.
 func TestValidateSafetyInvariants_StrandedMandatoryAnchor(t *testing.T) {
 	t.Parallel()
 	ref := kerneltest.Load(t)
 	cfg := ref.Config
-	// Mark the unreachable sentinel mandatory AND order-present so it becomes an
-	// anchor (mandatoryAnchorsFor intersects Order ∩ Mandatory).
 	cfg.Order = append([]string{string(PhaseSwarmPlan)}, cfg.Order...)
 	cfg.Mandatory = append([]string{string(PhaseSwarmPlan)}, cfg.Mandatory...)
 	if !containsSubstr(ValidateSafetyInvariants(NewStateMachine(), cfg, ref.Catalog), "unreachable") {
@@ -112,8 +108,6 @@ func TestValidateSafetyInvariants_UnknownLegalSuccessor(t *testing.T) {
 	}
 }
 
-// Sibling to TestValidateSafetyInvariants_UnknownLegalSuccessor above, which
-// exercises the key (from) side; this one exercises the successor (to) side.
 func TestValidateSafetyInvariants_UnknownLegalSuccessorTarget(t *testing.T) {
 	t.Parallel()
 	ref := kerneltest.Load(t)
@@ -125,8 +119,6 @@ func TestValidateSafetyInvariants_UnknownLegalSuccessorTarget(t *testing.T) {
 	}
 }
 
-// The synthetic 2-cycle is injected via WithLegalGraph; the Phase constants
-// here are arbitrary bare-graph vocabulary, not flow identity.
 func TestValidateSafetyInvariants_NoStartNodeRejected(t *testing.T) {
 	t.Parallel()
 	ref := kerneltest.Load(t)
@@ -139,11 +131,6 @@ func TestValidateSafetyInvariants_NoStartNodeRejected(t *testing.T) {
 	}
 }
 
-// A legal_successors edge that lets a path reach the ship sink WITHOUT
-// traversing the floor evaluator (here: the first anchor jumps straight to
-// ship, bypassing the audit-class evaluator) is rejected at load. Evaluator
-// and ship sink are identified by ROLE (mandatory shippable-verdict phase /
-// last mandatory anchor), never by name — a rename does not weaken the check.
 func TestValidateSafetyInvariants_EvaluatorBypassRejected(t *testing.T) {
 	t.Parallel()
 	ref := kerneltest.Load(t)
@@ -156,12 +143,6 @@ func TestValidateSafetyInvariants_EvaluatorBypassRejected(t *testing.T) {
 	}
 }
 
-// When two evaluators each gate a DISJOINT path to ship, every start→ship
-// path still crosses AN evaluator, so the floor holds and the config is safe.
-// The dominance check must delete the evaluator SET as a whole — deleting
-// only one evaluator would leave the other's path open and false-positive.
-// This locks the collective-dominance semantic against a future
-// one-at-a-time regression. The Phase constants are bare-graph vocabulary.
 func TestValidateSafetyInvariants_TwoEvaluatorsCollectiveDominance(t *testing.T) {
 	t.Parallel()
 	shippable := &phasespec.ArtifactGate{RequiresPresent: true, VerdictIn: []string{VerdictPASS, VerdictWARN}}
@@ -174,7 +155,6 @@ func TestValidateSafetyInvariants_TwoEvaluatorsCollectiveDominance(t *testing.T)
 		Order:     []string{string(PhaseIntent), string(PhaseTriage), string(PhaseAudit), string(PhaseShip)},
 		Mandatory: []string{string(PhaseTriage), string(PhaseAudit), string(PhaseShip)},
 	}
-	// Two disjoint evaluator paths to ship: intent→triage→ship and intent→audit→ship.
 	sm := NewStateMachine().WithLegalGraph(map[Phase]map[Phase]bool{
 		PhaseIntent: {PhaseTriage: true, PhaseAudit: true},
 		PhaseTriage: {PhaseShip: true},

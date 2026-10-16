@@ -11,9 +11,6 @@ import (
 
 const cycleTerminationTriageClaimFailed = cyclestate.CycleTerminationTriageClaimFailed
 
-// triageTermination is the host's terminal decision after Triage. Phase
-// artifacts supply evidence through router.Digest; the host combines that
-// evidence with the canonical phase verdict and prior floor completion.
 type triageTermination struct {
 	stop   bool
 	reason string
@@ -101,8 +98,6 @@ func phasesEndAtTriageWithoutImplementation(phases []Phase) bool {
 	return true
 }
 
-// IsTriageNoWorkResult reports whether a completed result carries the host's
-// planned no-work disposition and proves that no implementation phase ran.
 func IsTriageNoWorkResult(result CycleResult) bool {
 	return result.FinalVerdict == CycleOutcomeSkippedUnknown &&
 		result.TerminationReason == CycleTerminationTriageNoWork &&

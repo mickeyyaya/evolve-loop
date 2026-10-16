@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// --- git fixture helpers (sm* prefix avoids collision with other main tests) ---
-
 func smGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -29,8 +27,6 @@ func smGit(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-// smGitAllowFail runs git without failing the test — some fixture steps
-// (e.g. a merge expected to conflict) legitimately exit non-zero.
 func smGitAllowFail(t *testing.T, dir string, args ...string) (string, error) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -59,15 +55,10 @@ func smInitRepo(t *testing.T, dir string) {
 	smGit(t, dir, "config", "commit.gpgsign", "false")
 }
 
-// smInitRepoWithRemote creates a local repo with one committed file
-// ("base.txt"), a bare "origin" remote, and pushes main so both sides start
-// identical. Returns (repoDir, bareRemoteDir).
 func smInitRepoWithRemote(t *testing.T) (string, string) {
 	t.Helper()
 	repo := t.TempDir()
 	smInitRepo(t, repo)
-	// .evolve/ (cycle-state.json, lease files) must never make the tree
-	// "dirty" in the eyes of sync-main's precondition check.
 	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -83,24 +74,14 @@ func smInitRepoWithRemote(t *testing.T) (string, string) {
 	smGit(t, t.TempDir(), "init", "-q", "--bare", bare)
 	smGit(t, repo, "remote", "add", "origin", bare)
 	smGit(t, repo, "push", "-q", "origin", "main")
-	// `init --bare` leaves the bare's HEAD at the host default branch name
-	// (master on unconfigured CI runners); a clone of it then checks out an
-	// UNBORN branch named by the CLONER's own default, so smRemoteCommit's
-	// `push origin main` dies with "src refspec main does not match any".
-	// Pin the bare's HEAD so clones are hermetic regardless of git defaults.
 	smGit(t, bare, "symbolic-ref", "HEAD", "refs/heads/main")
 	return repo, bare
 }
 
-// smRemoteCommit clones bare fresh, commits a new file, and pushes to
-// origin/main — simulating a teammate's landed commit the local repo hasn't
-// fetched yet.
 func smRemoteCommit(t *testing.T, bare, filename, content string) {
 	t.Helper()
 	clone := t.TempDir()
 	smGit(t, t.TempDir(), "clone", "-q", bare, clone)
-	// Hermetic identity: does not rely on the host's global git config — a
-	// runner without user.email would fail the commit.
 	smGit(t, clone, "config", "user.email", "ci@example.com")
 	smGit(t, clone, "config", "user.name", "ci")
 	if err := os.WriteFile(filepath.Join(clone, filename), []byte(content), 0o644); err != nil {

@@ -16,7 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The leaf's port vocabulary under the names the test doubles implement.
 type (
 	waveLauncher = loopwave.Launcher
 	wavePlanFn   = loopwave.PlanFn
@@ -33,9 +32,6 @@ func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals
 	return loopwave.New(roots, ports, warn, loopwave.WithSignals(signals), loopwave.WithGoal(cfg.GoalHash))
 }
 
-// The cache is unsynchronized: a batch runs on one goroutine, so wave() is
-// never called concurrently — a caller that parallelizes iteration prep must
-// build the engine eagerly instead.
 func (b *loopBatchCoordinator) wave() *loopwave.Engine {
 	if b.waveEngine == nil {
 		b.waveEngine = b.wiredWave()
@@ -53,31 +49,20 @@ func nullWaveEngine(roots loopwave.Roots, warn io.Writer) *loopwave.Engine {
 	return newWaveEngine(loopConfig{ProjectRoot: roots.ProjectRoot, EvolveDir: roots.EvolveDir}, nil, warn, nilSignals)
 }
 
-// --- production facades: spellings kept for cmd_loop_batch.go, cmd_loop_window.go, cmd_loop_pool.go, cli_wave_budget.go ---
-
 func shouldRunWave(fc policy.FleetConfig) bool { return loopwave.ShouldRunWave(fc) }
 
-// loadFleetConfig is the batch-start loader (defaults on any error).
 func loadFleetConfig(evolveDir string) policy.FleetConfig { return loopwave.LoadFleetConfig(evolveDir) }
 
-// productionWavePreflight is the S3 dirty-control-plane guard against the
-// MAIN checkout (the pool shares it).
 func productionWavePreflight(projectRoot string) func() error { return loopwave.Preflight(projectRoot) }
 
-// productionWavePlanFn is the wave's plan source (the pool reuses it through
-// productionPoolPlanFn — a Null Center there, so its prune line stays a line).
 func productionWavePlanFn(cfg loopConfig, storage core.Storage, count int, stderr io.Writer) wavePlanFn {
 	return newWaveEngine(cfg, storage, stderr, nilSignals).PlanFn(count)
 }
 
-// consoleRoutedResolver is the ADR-0074 plan-time gate's resolver (the pool
-// scheduler reaches it with no Center, so its refusal WARN stays a line).
 func consoleRoutedResolver(cfg loopConfig, stderr io.Writer) fleet.RoutedFn {
 	return newWaveEngine(cfg, nil, stderr, nilSignals).RoutedResolver()
 }
 
-// quotaAwareWaveConfig sizes fc for this wave: the bench shrink, then the
-// budget block (cli_wave_budget.go's budgetAwareWaveConfig wraps it).
 func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Writer, states []quotastate.QuotaState, tp budgethistory.Throughput, now time.Time) (policy.FleetConfig, time.Duration) {
 	return nullWaveEngine(loopwave.RootsOf(projectRoot), warn).Size(fc, states, tp, now)
 }
@@ -90,10 +75,6 @@ func widenNarrowDecision(data []byte, evolveDir string, count int) []byte {
 	return loopwave.WidenNarrowDecision(data, evolveDir, count, laneForbidden(filepath.Dir(evolveDir), os.Stderr))
 }
 
-// --- test/ACS-only facades: no production call site reaches these; the coordinator drives the engine directly ---
-
-// dispatchIteration is the by-name facade of Engine.Dispatch over a Null
-// Center (its WARN is the coordinator's to render).
 func dispatchIteration(ctx context.Context, fc policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, routed fleet.RoutedFn, waveIndex int) (ran bool, specs []fleet.CycleSpec, results []fleet.Result, err error) {
 	out, err := nullWaveEngine(loopwave.Roots{}, io.Discard).Dispatch(ctx, loopwave.DispatchRequest{Config: fc, Wave: waveIndex, Preflight: preflight, Plan: planFn, Launcher: launcher, Routed: routed})
 	return out.Ran, out.Specs, out.Results, err
@@ -104,24 +85,15 @@ func forceOneLaneDispatch(ctx context.Context, preflight func() error, planFn wa
 	return out.Ran, out.Specs, out.Results, err
 }
 
-// minWidthRepair is the by-name facade of Engine.RepairMinWidth over the
-// caller's Center (the minwidth suites pass the production sink topology);
-// rootless like the zero Roots — the request carries every collaborator.
 func minWidthRepair(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, preflight func() error, planFn wavePlanFn, launcher waveLauncher, routed fleet.RoutedFn, waveIndex int, stderr io.Writer, signals *signalcenter.Center) (handled bool) {
 	e := newWaveEngine(loopConfig{}, nil, stderr, func() *signalcenter.Center { return signals })
 	return e.RepairMinWidth(ctx, fleetCfg, waveCfg, loopwave.DispatchRequest{Config: waveCfg, Wave: waveIndex, Preflight: preflight, Plan: planFn, Launcher: launcher, Routed: routed})
 }
 
-// productionWaveLauncher is the by-name facade of Engine.Launcher: a
-// Supervisor over execCycleLaunch inside the freshness gate (wave 0: no
-// caller carries a wave; the refill dir is <projectRoot>/.evolve as always).
 func productionWaveLauncher(fc policy.FleetConfig, binPath, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) waveLauncher {
 	return nullWaveEngine(loopwave.RootsOf(projectRoot), stderr).Launcher(0, fc.Concurrency, execCycleLaunch(binPath, false, projectRoot, goalHash, goalText, stdout, stderr))
 }
 
-// reloadFleetConfigAtWaveBoundary is the by-name facade of
-// loopwave.ReloadFleetConfig (its hold WARN renders on warn verbatim) — a
-// package function like loadFleetConfig's, so no engine is built here.
 func reloadFleetConfigAtWaveBoundary(evolveDir string, prev policy.FleetConfig, warn io.Writer) policy.FleetConfig {
 	return loopwave.ReloadFleetConfig(evolveDir, prev, warn)
 }

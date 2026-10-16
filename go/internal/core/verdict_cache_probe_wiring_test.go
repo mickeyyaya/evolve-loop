@@ -41,7 +41,6 @@ func TestVerdictCacheProbeEligibilityWiring(t *testing.T) {
 				t.Fatalf("fixture invalid: dirty=%t but candidate==base is %t", tt.dirty, candidate == base)
 			}
 
-			// The oracle: the shared predicate decides probe eligibility.
 			wantEligible := verdictcache.ProbeEligible(base, candidate)
 
 			now := func() time.Time { return time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC) }

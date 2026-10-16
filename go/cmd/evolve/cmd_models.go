@@ -15,14 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
-// runModels implements `evolve models <subcommand>` — the live tier→model
-// catalog cached at .evolve/model-catalog.json. Subcommands:
-//
-//	refresh [--evolve-dir P] [--project-root P] [--json]   re-query CLIs, rewrite the cache
-//	list        [--evolve-dir P] [--project-root P] [--json]   print the cached catalog + staleness
-//	performance [--evolve-dir P] [--project-root P] [--json]   aggregate model-attempt latency + I/O
-//
-// Exit codes: 0 OK, 1 runtime error, 10 bad args.
 func runModels(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve models: missing subcommand (refresh|list|performance)")
@@ -41,20 +33,12 @@ func runModels(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// modelsOpts holds the parsed flags + resolved roots shared by both
-// subcommands. `list` reads only EvolveDir/AsJSON; `refresh` also uses Source
-// and the roots.
 type modelsOpts struct {
 	EvolveDir, Project, Plugin, Adapters string
 	AsJSON                               bool
-	// Source selects the refresh strategy: "live" queries each CLI's /model
-	// (authoritative) with per-CLI detect fallback; "detect" uses only the
-	// manifest-derived map (fast, no REPL driving). Ignored by `list`.
-	Source string
+	Source                               string
 }
 
-// parseModelsFlags parses the shared flags and resolves the .evolve directory
-// the same way `evolve setup` does.
 func parseModelsFlags(name string, args []string, stderr io.Writer) (modelsOpts, bool) {
 	fs := flag.NewFlagSet("evolve models "+name, flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -64,11 +48,6 @@ func parseModelsFlags(name string, args []string, stderr io.Writer) (modelsOpts,
 	fs.StringVar(&o.Source, "source", "live", "refresh source: live (query /model) | detect (manifest map)")
 	fs.StringVar(&evolveDirFlag, "evolve-dir", "", "path to .evolve/ (default <project>/.evolve)")
 	fs.StringVar(&projectRootFlag, "project-root", "", "project root (default $EVOLVE_PROJECT_ROOT or cwd)")
-	// NOTE: pass args straight to Parse — do NOT route through reorderArgs.
-	// reorderArgs is value-flag-unaware: it moves a value-taking flag's value
-	// ("--evolve-dir /tmp" → "/tmp") to the end as a positional, leaving
-	// "--evolve-dir" to swallow the next flag. These subcommands take no
-	// positionals, so native flag parsing is both correct and sufficient.
 	if err := fs.Parse(args); err != nil {
 		return modelsOpts{}, false
 	}
@@ -92,9 +71,6 @@ func runModelsRefresh(args []string, stdout, stderr io.Writer) int {
 	if o.Source == "detect" {
 		return commitAndReport(o, detectRefresh(rep), "setup detect", stdout, stderr)
 	}
-	// The live catalog is the prior: its candidates_hash lets an
-	// unchanged offering reuse the stored tier map with zero
-	// classifier calls. A read failure just means no reuse.
 	prior, _ := modelcatalog.Read(o.EvolveDir)
 	cat, err := liveRefresh(ctx, rep, o.Project, o.EvolveDir, prior, stderr)
 	if err != nil {
@@ -131,12 +107,6 @@ func countLiveAndFallback(cat modelcatalog.Catalog) (live, fallback int) {
 }
 
 func commitAndReport(o modelsOpts, cat modelcatalog.Catalog, srcLbl string, stdout, stderr io.Writer) int {
-	// Commit is the one write seam: it carries operator-authored tier_fallbacks
-	// forward (the refresh rebuilds the catalog wholesale) and retains the
-	// outgoing catalog for rollback. The cycle-start auto-refresh goes through
-	// the same call — do not re-inline Read/MergeFallbacks/Write here. Its
-	// return value is what actually LANDED, chains merged in; reporting `cat`
-	// below would show the operator a catalog missing those chains.
 	cat, err := modelcatalog.Commit(o.EvolveDir, cat, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve models refresh: %v\n", err)
@@ -150,9 +120,6 @@ func commitAndReport(o modelsOpts, cat modelcatalog.Catalog, srcLbl string, stdo
 	return 0
 }
 
-// detectRefresh builds a catalog from setup.Detect's manifest-derived tier
-// models (Source defaults to "detect" in BuildFromSnapshots — informational,
-// not dispatch-authoritative).
 func detectRefresh(rep setup.DetectReport) modelcatalog.Catalog {
 	snaps := make([]modelcatalog.CLISnapshot, 0, len(rep.CLIs))
 	for _, c := range rep.CLIs {
@@ -173,8 +140,6 @@ func runModelsList(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve models list: %v\n", err)
 		return 1
 	}
-	// Empty-cache guard BEFORE the JSON branch so `list --json` on a fresh
-	// repo emits an explicit signal rather than a zero-value {"clis":null}.
 	if cat.Empty() {
 		if o.AsJSON {
 			fmt.Fprintln(stdout, `{"clis":{},"note":"empty — run: evolve models refresh"}`)
@@ -212,7 +177,6 @@ func printCatalogHuman(w io.Writer, cat modelcatalog.Catalog) {
 		fmt.Fprintf(w, "  %-8s fast=%-16s balanced=%-16s deep=%s\n",
 			cli, dash(tm["fast"]), dash(tm["balanced"]), dash(tm["deep"]))
 		fmt.Fprintf(w, "  %-8s source: %s\n", "", sourceLabel(e))
-		// An operator can only notice a CLI's offering moved if this prints it.
 		if len(e.Efforts) > 0 {
 			fmt.Fprintf(w, "  %-8s efforts: %s\n", "", strings.Join(e.Efforts, ", "))
 		}
@@ -233,8 +197,6 @@ func dash(s string) string {
 	return s
 }
 
-// sortedCLIs returns the catalog's CLI keys in stable order for deterministic
-// human output (map iteration order is randomized).
 func sortedCLIs(cat modelcatalog.Catalog) []string {
 	out := make([]string, 0, len(cat.CLIs))
 	for k := range cat.CLIs {

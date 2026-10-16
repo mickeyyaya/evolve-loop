@@ -1,7 +1,5 @@
 //go:build evolve_test_phases
 
-// A build tag, not an env-var gate, keeps this test-only phase entirely out
-// of the production binary's symbol table.
 package main
 
 import (
@@ -18,8 +16,6 @@ func init() {
 	})
 }
 
-// echoPhaseRunner reflects the request's Cycle into ArtifactsDir so
-// the test can assert round-trip integrity through the wire.
 type echoPhaseRunner struct{}
 
 func (e *echoPhaseRunner) Name() string { return "echo" }

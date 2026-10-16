@@ -2,15 +2,11 @@ package core
 
 import "testing"
 
-// oracleCell is one frozen Next() outcome: the successor phase and the exact
-// error string ("" means nil error).
 type oracleCell struct {
 	next    Phase
 	errText string
 }
 
-// nextGoldenLinear freezes the Next() successor for every phase whose successor
-// is verdict-INDEPENDENT (the linear spine + the recovery/terminal sentinels).
 var nextGoldenLinear = map[Phase]oracleCell{
 	PhaseStart:        {PhaseScout, ""},
 	PhaseIntent:       {PhaseScout, ""},
@@ -20,14 +16,12 @@ var nextGoldenLinear = map[Phase]oracleCell{
 	PhaseBuildPlanner: {PhaseBuild, ""},
 	PhaseBuild:        {PhaseAudit, ""},
 	PhaseShip:         {PhaseEnd, ""},
-	PhaseRetro:        {PhaseEnd, ""}, // sentinel; orchestrator overrides via decideAfterRetro
-	PhaseDebugger:     {PhaseEnd, ""}, // sentinel; orchestrator overrides via decideAfterDebugger
+	PhaseRetro:        {PhaseEnd, ""},
+	PhaseDebugger:     {PhaseEnd, ""},
 	PhaseSwarmPlan:    {"", "core: invalid phase transition: no successor for swarm-plan"},
 	PhaseEnd:          {"", "core: invalid phase transition: end is terminal"},
 }
 
-// nextGoldenAudit freezes audit's verdict-DEPENDENT successors — the only real
-// verdict branch in the kernel today.
 var nextGoldenAudit = map[string]oracleCell{
 	VerdictPASS: {PhaseShip, ""},
 	VerdictWARN: {PhaseShip, ""},
@@ -36,18 +30,13 @@ var nextGoldenAudit = map[string]oracleCell{
 	"garbage":   {"", `core: invalid phase transition: audit verdict "garbage"`},
 }
 
-// oracleVerdicts is the verdict cross-product the oracle sweeps for every phase.
 var oracleVerdicts = []string{"", VerdictPASS, VerdictWARN, VerdictFAIL, "garbage"}
 
-// allOraclePhases is every VALID phase the legality matrix sweeps.
 var allOraclePhases = []Phase{
 	PhaseStart, PhaseIntent, PhaseScout, PhaseTriage, PhaseTDD, PhaseBuildPlanner,
 	PhaseSwarmPlan, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseDebugger, PhaseEnd,
 }
 
-// legalityGolden freezes the legality graph: legalityGolden[from] is the exact
-// set of `to` phases for which CanTransition(from,to) is true at HEAD. This
-// graph is a config-INDEPENDENT trust anchor (ADR-0058 §1) and must never drift.
 var legalityGolden = map[Phase][]Phase{
 	PhaseStart:        {PhaseIntent, PhaseScout},
 	PhaseIntent:       {PhaseScout},
@@ -88,7 +77,6 @@ func TestTransitionKernelOracle_Next(t *testing.T) {
 	for v, want := range nextGoldenAudit {
 		assertNextCell(t, PhaseAudit, v, want)
 	}
-	// An invalid phase is ErrPhaseInvalid, verdict-independent.
 	for _, v := range oracleVerdicts {
 		assertNextCell(t, Phase("bogus"), v, oracleCell{"", "core: invalid phase: bogus"})
 	}

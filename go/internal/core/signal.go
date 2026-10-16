@@ -9,14 +9,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The orchestrator module's codes — registered with their docs so
-// signalcenter.RegisteredCodes() documents them.
 const (
-	CodePhaseVerdictFail signalcenter.Code = "ORCHESTRATOR_PHASE_VERDICT_FAIL"
-	CodePhaseVerdictWarn signalcenter.Code = "ORCHESTRATOR_PHASE_VERDICT_WARN"
-	CodePhaseAborted     signalcenter.Code = "ORCHESTRATOR_PHASE_ABORTED"
-	// CodeAuditRepairDeclined / CodeAuditRepairGranted: decideAfterAuditFail's
-	// verdict on an audit FAIL.
+	CodePhaseVerdictFail    signalcenter.Code = "ORCHESTRATOR_PHASE_VERDICT_FAIL"
+	CodePhaseVerdictWarn    signalcenter.Code = "ORCHESTRATOR_PHASE_VERDICT_WARN"
+	CodePhaseAborted        signalcenter.Code = "ORCHESTRATOR_PHASE_ABORTED"
 	CodeAuditRepairDeclined signalcenter.Code = "ORCHESTRATOR_AUDIT_REPAIR_DECLINED"
 	CodeAuditRepairGranted  signalcenter.Code = "ORCHESTRATOR_AUDIT_REPAIR_GRANTED"
 
@@ -32,10 +28,6 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodePhaseAborted, "the cycle aborted after this phase's outcome (review reject, guard, persistence); the abort reason is in fields.abort_reason")
 }
 
-// WithSignalCenter registers the orchestrator as a listener of c. A nil c is
-// the Null Object for tests and the two pinned secondary roots; the production
-// composition root always passes a Center (cmd_cycle.go), and
-// TestWireOrchestratorDeps_SignalCenterWired proves it.
 func WithSignalCenter(c *signalcenter.Center) Option {
 	return func(o *Orchestrator) {
 		if c == nil {
@@ -47,12 +39,8 @@ func WithSignalCenter(c *signalcenter.Center) Option {
 	}
 }
 
-// SignalCenterWired reports whether a Center was injected — the composition
-// root's wiring proof.
 func (o *Orchestrator) SignalCenterWired() bool { return o.signals != nil }
 
-// SignalSummary is the CURRENT cycle's view: signals by severity and kind and
-// the last INCIDENT.
 func (o *Orchestrator) SignalSummary() signalcenter.Summary {
 	o.signalMu.Lock()
 	defer o.signalMu.Unlock()
@@ -62,16 +50,12 @@ func (o *Orchestrator) SignalSummary() signalcenter.Summary {
 	return o.signalSummary.Snapshot()
 }
 
-// observeSignal is the listener: O(1), never emits, never decides.
 func (o *Orchestrator) observeSignal(e signalcenter.Event) {
 	o.signalMu.Lock()
 	defer o.signalMu.Unlock()
 	o.signalSummary.Observe(e)
 }
 
-// emitPhaseOutcome is the Signal Center's phase-outcome producer: one
-// phase.outcome (or phase.aborted) per terminal disposition, on both dispatch
-// roots. A nil Center is a no-op.
 func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
 	e := signalcenter.Event{
 		Cycle: cycle, RunID: o.signalRunID(), Phase: out.Phase, Attempt: out.AttemptCount,
@@ -98,33 +82,25 @@ func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
 	o.signals.Emit(e)
 }
 
-// CodeGateCorrection is the correction ladder's code: one gate.corrected INFO
-// per rung the orchestrator runs after a gate rejection.
-// See ADR-0101.
 const CodeGateCorrection signalcenter.Code = "ORCHESTRATOR_GATE_CORRECTION"
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeGateCorrection, "the correction ladder ran a rung after a gate rejection — fields name the correction ordinal, the budget (max), the rung, the CLI re-dispatched on and whether that CLI was escalated; the reason is the rejection being corrected")
 }
 
-// gateCorrection is one rung of the ladder as the stream sees it (a parameter
-// object: six of these become the event's fields, and two adjacent bools at
-// a call site would otherwise swap silently).
 type gateCorrection struct {
-	origin       string // the ladder naming itself: the fresh root's or the resume root's
+	origin       string
 	cycle        int
 	phase        Phase
-	correction   int // the ordinal of this correction (1-based)
-	max          int // the correction budget
+	correction   int
+	max          int
 	rung         string
-	cli          string // the CLI re-dispatched on, after any escalation
+	cli          string
 	escalated    bool
 	salvageRetry bool
-	reason       string // the rejection being corrected
+	reason       string
 }
 
-// emitGateCorrection is the ladder's producer on both dispatch roots; the
-// correction ordinal has one home, fields.correction. A nil Center is a no-op.
 func (o *Orchestrator) emitGateCorrection(gc gateCorrection) {
 	o.signals.Emit(signalcenter.Event{
 		Cycle: gc.cycle, RunID: o.signalRunID(), Phase: string(gc.phase),

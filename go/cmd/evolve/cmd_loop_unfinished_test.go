@@ -24,8 +24,6 @@ func TestRunLoop_UnfinishedCycle_FreshLeaseHaltsWithLiveOwnerMsg(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"dispatch":{"policy":"off"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Uses this test process's own pid so runlease.OwnerLive sees a genuinely
-	// live owner, not just a fresh heartbeat.
 	livePID := os.Getpid()
 	if err := runlease.Write(ws, runlease.Lease{RunID: "01RUN", OwnerPID: livePID}, time.Now()); err != nil {
 		t.Fatalf("write lease: %v", err)
