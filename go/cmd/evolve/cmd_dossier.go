@@ -9,13 +9,14 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "evolve dossier: usage: dossier verify | retro-mislabel [--project-root P] [--json] | publish [--dry-run] [--project-root P]")
+		fmt.Fprintln(stderr, "evolve dossier: usage: dossier verify | retro-mislabel [--project-root P] [--json] | publish [--dry-run] [--project-root P] | sweep [--dry-run] [--project-root P]")
 		return 10
 	}
 	switch args[0] {
@@ -25,8 +26,10 @@ func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runDossierRetroMislabel(args[1:], stdout, stderr)
 	case "publish":
 		return runDossierPublish(args[1:], stdout, stderr)
+	case "sweep":
+		return runDossierSweep(args[1:], stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "evolve dossier: unknown subcommand %q (want: verify | retro-mislabel | publish)\n", args[0])
+		fmt.Fprintf(stderr, "evolve dossier: unknown subcommand %q (want: verify | retro-mislabel | publish | sweep)\n", args[0])
 		return 10
 	}
 }
@@ -75,6 +78,67 @@ func runDossierPublish(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	return publishDossierPairs(projectRoot, stdout, stderr)
+}
+
+func runDossierSweep(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve dossier sweep", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	root := fs.String("project-root", ".", "the plane whose uncommitted knowledge-base/cycles pairs are recommitted")
+	dryRun := fs.Bool("dry-run", false, "list what would be recommitted; change nothing")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "dossier sweep: unexpected arguments %q\n", fs.Args())
+		return 10
+	}
+	projectRoot := paths.AbsoluteRoot("the project root", *root, nil)
+	g := gitexec.Default(projectRoot)
+	plan, err := dossier.PlanOrphans(g)
+	if err != nil {
+		fmt.Fprintf(stderr, "dossier sweep: %v\n", err)
+		return 2
+	}
+	if len(plan.Half) > 0 {
+		fmt.Fprintf(stdout, "dossier sweep: half pairs %v stay uncommitted (a .md without its .json, or the reverse)\n", plan.Half)
+	}
+	if len(plan.Complete) == 0 {
+		fmt.Fprintln(stdout, "dossier sweep: nothing to recommit")
+		return 0
+	}
+	lock := tryDossierPublishLock
+	if *dryRun {
+		lock = probeDossierPublishLock
+	}
+	release, hold, err := holdDossierPublish(projectRoot, lock)
+	if err != nil {
+		fmt.Fprintf(stderr, "dossier sweep: %v\n", err)
+		return 2
+	}
+	if hold != "" {
+		fmt.Fprintf(stderr, "dossier sweep: held: %s; orphan cycles %v stay uncommitted\n", hold, plan.Complete)
+		return 1
+	}
+	defer release()
+	if *dryRun {
+		fmt.Fprintf(stdout, "dossier sweep: dry run: would recommit cycles %v\n", plan.Complete)
+		return 0
+	}
+	return sweepDossierPairs(g, stdout, stderr)
+}
+
+func sweepDossierPairs(g gitexec.Git, stdout, stderr io.Writer) int {
+	res, err := dossier.SweepOrphans(g, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "dossier sweep: %v\n", err)
+		return 2
+	}
+	fmt.Fprintf(stdout, "dossier sweep: recommitted cycles %v\n", res.Recommitted)
+	if len(res.Failed) > 0 {
+		fmt.Fprintf(stderr, "dossier sweep: %d pairs failed to commit and stay uncommitted\n", len(res.Failed))
+		return 2
+	}
+	return 0
 }
 
 func publishDossierPairs(projectRoot string, stdout, stderr io.Writer) int {

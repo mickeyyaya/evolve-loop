@@ -24,32 +24,51 @@ type SweepResult struct {
 	Failed      map[int]error
 }
 
-func SweepOrphans(g gitexec.Git, logw io.Writer) (SweepResult, error) {
-	res := SweepResult{Failed: map[int]error{}}
+type OrphanPlan struct {
+	Complete []int
+	Half     []int
+}
 
-	dirty, err := g.DirtyPaths(context.Background())
+func PlanOrphans(g gitexec.Git) (OrphanPlan, error) {
+	plan, _, err := planOrphans(g)
+	return plan, err
+}
+
+func planOrphans(g gitexec.Git) (OrphanPlan, map[int]*orphanPairPaths, error) {
+	var plan OrphanPlan
+	ctx := context.Background()
+	dirty, err := g.DirtyPaths(ctx)
 	if err != nil {
-		return res, fmt.Errorf("dossier: sweep: enumerate tree: %w", err)
+		return plan, nil, fmt.Errorf("dossier: sweep: enumerate tree: %w", err)
 	}
-
 	pairs := groupOrphanPairs(dirty)
-
 	cycles := make([]int, 0, len(pairs))
 	for n := range pairs {
 		cycles = append(cycles, n)
 	}
 	sort.Ints(cycles)
-
-	ctx := context.Background()
 	for _, n := range cycles {
 		pp := pairs[n]
-		if anyTracked(ctx, g, pp.json, pp.md) {
-			continue
+		switch {
+		case anyTracked(ctx, g, pp.json, pp.md):
+		case pp.json == "" || pp.md == "":
+			plan.Half = append(plan.Half, n)
+		default:
+			plan.Complete = append(plan.Complete, n)
 		}
-		if pp.json == "" || pp.md == "" {
-			res.Skipped = append(res.Skipped, n)
-			continue
-		}
+	}
+	return plan, pairs, nil
+}
+
+func SweepOrphans(g gitexec.Git, logw io.Writer) (SweepResult, error) {
+	res := SweepResult{Failed: map[int]error{}}
+	plan, pairs, err := planOrphans(g)
+	if err != nil {
+		return res, err
+	}
+	res.Skipped = plan.Half
+	for _, n := range plan.Complete {
+		pp := pairs[n]
 		base := strings.TrimSuffix(pp.json, ".json")
 		if err := commitPairGit(g, base); err != nil {
 			res.Failed[n] = err

@@ -141,3 +141,43 @@ func TestSweepOrphans_LogsFailedPairByDirectory(t *testing.T) {
 		t.Errorf("log = %q, want %q", log.String(), want)
 	}
 }
+
+func TestPlanOrphans_SplitsCompleteFromHalfPairsAndCommitsNothing(t *testing.T) {
+	dir := t.TempDir()
+	initSweepRepo(t, dir)
+	for _, n := range []int{2, 1} {
+		writePairFile(t, dir, fmt.Sprintf("knowledge-base/cycles/cycle-%d.json", n), "{}")
+		writePairFile(t, dir, fmt.Sprintf("knowledge-base/cycles/cycle-%d.md", n), "# md")
+	}
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-5.md", "# md")
+	g := gitexec.Default(dir)
+	dirtyBefore, err := g.DirtyPaths(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plan, err := PlanOrphans(g)
+
+	if err != nil {
+		t.Fatalf("PlanOrphans: %v", err)
+	}
+	if want := (OrphanPlan{Complete: []int{1, 2}, Half: []int{5}}); !reflect.DeepEqual(plan, want) {
+		t.Errorf("plan = %+v, want %+v", plan, want)
+	}
+	if dirtyAfter, _ := g.DirtyPaths(context.Background()); !reflect.DeepEqual(dirtyAfter, dirtyBefore) {
+		t.Errorf("planning changed the tree: %v -> %v", dirtyBefore, dirtyAfter)
+	}
+}
+
+func TestPlanOrphans_WrapsEnumerateFailure(t *testing.T) {
+	boom := errors.New("exec boom")
+	failing := func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
+		return 0, boom
+	}
+
+	_, err := PlanOrphans(gitexec.Git{Dir: t.TempDir(), Exec: failing})
+
+	if !errors.Is(err, boom) {
+		t.Fatalf("PlanOrphans error = %v, want it to wrap %v", err, boom)
+	}
+}
