@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// Forbidden returns the routing predicate: true for protected surface, or for a path the
-// named source-writing profile's enforced sandbox denies, since a lane could never write either.
 func Forbidden(projectRoot, writerProfile string) (func(string) bool, error) {
 	if projectRoot == "" {
 		return nil, errors.New("lanerouting: empty project root")

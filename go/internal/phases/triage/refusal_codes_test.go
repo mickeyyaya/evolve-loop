@@ -61,7 +61,6 @@ func TestTriageClassify_EmptyTopNRefusalCarriesItsCode(t *testing.T) {
 
 func TestTriageClassify_CommitmentInvalidRefusalCarriesItsCode(t *testing.T) {
 	ws := t.TempDir()
-	// A directory where triage-decision.json belongs: the read faults (not absence).
 	if err := os.MkdirAll(filepath.Join(ws, "triage-decision.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}

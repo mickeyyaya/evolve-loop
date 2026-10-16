@@ -16,7 +16,6 @@ func git(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// worktree is a repository with one committed source file, as a build leaves the change's worktree.
 func worktree(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -29,8 +28,6 @@ func worktree(t *testing.T) string {
 	return dir
 }
 
-// workspace is a run directory as a phase leaves it: its report, the host's proof-of-read token, the lane
-// pin and a host log.
 func workspace(t *testing.T) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -60,7 +57,6 @@ func read(t *testing.T, path string) string {
 	return string(b)
 }
 
-// run begins a guard over scope, lets act play the agent, and ends it.
 func run(t *testing.T, scope Scope, act func()) Outcome {
 	t.Helper()
 	g, err := Begin(context.Background(), scope)
@@ -164,7 +160,6 @@ func TestGuard_RestoresTheChangesWorktree(t *testing.T) {
 	}
 }
 
-// Without its kernel evidence the rung must not run at all.
 func TestBegin_FailsClosed(t *testing.T) {
 	for name, scope := range map[string]Scope{
 		"no workspace":                     {},
@@ -177,7 +172,6 @@ func TestBegin_FailsClosed(t *testing.T) {
 	}
 }
 
-// A path the guard could not put back is an error the caller must treat as a failed rung.
 func TestGuard_ReportsAFileItCouldNotPutBack(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory permissions")
@@ -200,8 +194,6 @@ func TestGuard_ReportsAFileItCouldNotPutBack(t *testing.T) {
 	}
 }
 
-// A fenced file swapped for a link, a directory or a device is no longer the file: every later reader would
-// follow the swap, so the swap is undone and reported like any other change.
 func TestGuard_UndoesAFencedFileSwappedForALinkOrDirectory(t *testing.T) {
 	ws := workspace(t)
 	token := filepath.Join(ws, "challenge-token.txt")

@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// family reduces a driver name to its CLI family. It mirrors policy.BaseCLI
-// because importing internal/policy here would create an import cycle.
 func family(cli string) string {
 	if i := strings.IndexByte(cli, '-'); i > 0 {
 		return cli[:i]
@@ -14,8 +12,6 @@ func family(cli string) string {
 	return cli
 }
 
-// It compares against the live builder's family, not a literal, so a builder
-// flip cannot make the floor contradict itself.
 func TestClaudeFamilyFloor(t *testing.T) {
 	loader, names := RealTreeProfiles(t)
 	builder, err := loader.Get("builder")

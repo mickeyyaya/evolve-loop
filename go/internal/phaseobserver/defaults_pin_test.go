@@ -25,7 +25,6 @@ func TestWithDefaults_MatchPolicyCompiledDefaults(t *testing.T) {
 	calls := 0
 	rc := phaseobserver.Run(phaseobserver.Config{
 		Workspace: ws, Cycle: 1, Phase: "build", Agent: "builder",
-		// The clock jumps 400 s, past policy's NudgeS 300, so a defaulted-on nudge would show.
 		Now: func() time.Time {
 			mu.Lock()
 			defer mu.Unlock()

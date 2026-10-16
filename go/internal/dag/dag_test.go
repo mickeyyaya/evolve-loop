@@ -16,7 +16,7 @@ func TestLevels(t *testing.T) {
 			name:  "independent nodes form one concurrent wave",
 			nodes: []string{"c", "a", "b"},
 			deps:  nil,
-			want:  [][]string{{"a", "b", "c"}}, // sorted within the level
+			want:  [][]string{{"a", "b", "c"}},
 		},
 		{
 			name:  "linear chain is one node per wave",

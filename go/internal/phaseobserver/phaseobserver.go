@@ -15,23 +15,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Exit codes Run returns.
 const (
 	ExitOK          = 0
 	ExitInvalidArgs = 10
 )
 
-// Scope is "phase" (the default) or "cycle"; any other value runs no stall rule.
 type Scope string
 
-// Scope values, spelled as the engine spells them.
 const (
 	ScopePhase Scope = observerengine.ScopePhase
 	ScopeCycle Scope = observerengine.ScopeCycle
 )
 
-// Config wires the observer.
-// CycleState and LoopN through ThrottleN are read by nothing; they keep the literal shape callers build.
 type Config struct {
 	Workspace    string
 	SubagentPGID int
@@ -44,8 +39,8 @@ type Config struct {
 
 	PollS          int
 	StallS         int
-	NudgeS         int    // soft-stall nudge threshold; 0 disables the nudge
-	NudgeBody      string // text appended to the agent inbox on soft stall
+	NudgeS         int
+	NudgeBody      string
 	LoopN          int
 	LoopWindowS    int
 	ErrorRate      float64
@@ -54,34 +49,24 @@ type Config struct {
 	EOFGraceS      int
 	HeartbeatEvery int
 
-	// MaxNoProgressS fires stuck_no_progress when no tool_use or tool_result arrives for this long;
-	// StallS resets on any line, so it misses a babbling agent. 0 disables it.
 	MaxNoProgressS int
 
-	// StallPolicy decides each stall INCIDENT's action and records it in the envelope; its
-	// verdict outranks Enforce. nil keeps the Enforce kill and an unenriched envelope.
 	StallPolicy recovery.StallPolicy
 
-	// ProcessAlive probes the agent's process group; a dead group fires one process_dead
-	// INCIDENT. nil disables the probe, so fixture Configs with fake pgids never read as dead.
 	ProcessAlive func(pgid int) bool
 
-	// Signals is the late-bound Signal Center accessor for the engine's own faults; nil is silent.
 	Signals func() *signalcenter.Center
 
 	Now         func() time.Time
 	KillPgrp    func(pgid int, sig syscall.Signal) error
-	ShutdownSig <-chan struct{} // SIGUSR1-equivalent
-	StopAfterMS int             // testing: force shutdown after this many ms
+	ShutdownSig <-chan struct{}
+	StopAfterMS int
 }
 
-// DefaultProcessAlive is the production liveness probe: signal 0 to the process group.
-// EPERM also reads as dead, which is safe only while observer and agent share a UID.
 func DefaultProcessAlive(pgid int) bool {
 	return syscall.Kill(-pgid, 0) == nil
 }
 
-// stopChan returns nil for a nil timer: a nil channel's select arm never fires and allocates nothing.
 func stopChan(stopTimer *time.Timer) <-chan time.Time {
 	if stopTimer != nil {
 		return stopTimer.C
@@ -89,8 +74,6 @@ func stopChan(stopTimer *time.Timer) <-chan time.Time {
 	return nil
 }
 
-// Run drives the observer until shutdown and returns ExitOK or ExitInvalidArgs.
-// The engine it builds is never shared: this goroutine is its only caller, so it needs no locking.
 func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 	logf := func(format string, args ...any) {
 		fmt.Fprintf(stderr, "[phase-observer] "+format+"\n", args...)
@@ -117,13 +100,10 @@ func Run(cfg Config, stdoutPath string, stderr io.Writer) int {
 	eng := wiredEngine(cfg, paths)
 	eng.Start()
 	pollLoop(cfg, eng)
-	// The engine already reports a failed write as OBSERVER_REPORT_WRITE_FAILED; the report never changes the exit code.
 	_ = eng.WriteReport()
 	return ExitOK
 }
 
-// withDefaults applies the host's defaults; PollS and StallS must equal policy's compiled ObserverConfig.
-// ProcessAlive gets no default: nil keeps the probe off.
 func withDefaults(cfg Config) Config {
 	if cfg.PollS == 0 {
 		cfg.PollS = 5
@@ -154,7 +134,6 @@ func withDefaults(cfg Config) Config {
 	return cfg
 }
 
-// wiredEngine is the module's only construction of the engine; its nudge port appends to the agent's bridge inbox.
 func wiredEngine(cfg Config, paths observerengine.Paths) *observerengine.Engine {
 	return observerengine.New(settingsOf(cfg, paths), observerengine.Deps{
 		Now:          cfg.Now,
@@ -171,7 +150,6 @@ func wiredEngine(cfg Config, paths observerengine.Paths) *observerengine.Engine 
 	}, observerengine.WithSignals(cfg.Signals))
 }
 
-// settingsOf projects Config onto the engine's Settings and binds the observer's own pid.
 func settingsOf(cfg Config, paths observerengine.Paths) observerengine.Settings {
 	return observerengine.Settings{
 		Cycle: cfg.Cycle, Phase: cfg.Phase, Agent: cfg.Agent, Scope: string(cfg.Scope),
@@ -182,7 +160,6 @@ func settingsOf(cfg Config, paths observerengine.Paths) observerengine.Settings 
 	}
 }
 
-// pollLoop owns the real ticker, the optional stop timer and the shutdown signal; each arm names its reason.
 func pollLoop(cfg Config, eng *observerengine.Engine) {
 	tickerInterval := time.Duration(cfg.PollS) * time.Second
 	if cfg.StopAfterMS > 0 {

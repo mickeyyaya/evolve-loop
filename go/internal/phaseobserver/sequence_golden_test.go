@@ -23,7 +23,6 @@ func readGolden(t *testing.T, name string) string {
 	return string(b)
 }
 
-// sequenceEntry is the shape the golden records per envelope.
 type sequenceEntry struct {
 	Type     string   `json:"type"`
 	Severity string   `json:"severity"`
@@ -37,8 +36,6 @@ type sequenceGolden struct {
 	Report map[string]any  `json:"report"`
 }
 
-// scenarioClock returns t0 for calls 1-9, t0+400 s for 10-14 and t0+700 s after, calling onClose at call closeAt.
-// The scenario makes exactly 20 reads; one more or fewer shifts the shutdown and every ts after it.
 func scenarioClock(t0 time.Time, closeAt int, onClose func()) func() time.Time {
 	var mu sync.Mutex
 	calls := 0
@@ -67,7 +64,6 @@ var scenarioLines = []string{
 	`{"type":"rate_limit_event","reason":"quota"}`,
 }
 
-// sequenceOf projects the events file and the report into the golden shape.
 func sequenceOf(t *testing.T, ws string) sequenceGolden {
 	t.Helper()
 	var g sequenceGolden
@@ -91,7 +87,7 @@ func sequenceOf(t *testing.T, ws string) sequenceGolden {
 	if err := json.Unmarshal(raw, &report); err != nil {
 		t.Fatal(err)
 	}
-	delete(report, "incidents") // observerengine's report golden pins these; this one keeps the counters
+	delete(report, "incidents")
 	delete(report, "trace_id")
 	g.Report = report
 	return g
@@ -118,7 +114,7 @@ func TestGolden_IdleScenarioSequence(t *testing.T) {
 		StallPolicy: &scriptedStallPolicy{action: recovery.StallExtend, reason: "deep-thinking phase; extend"},
 		Now:         scenarioClock(goldenAt, 18, func() { once.Do(func() { close(shutdown) }) }),
 		ShutdownSig: shutdown,
-		StopAfterMS: 2000, // ticks every 500 ms; the clock closes shutdown inside tick 3, well before the timer
+		StopAfterMS: 2000,
 	}, filepath.Join(ws, "builder-stdout.log"), os.Stderr)
 	if rc != ExitOK {
 		t.Fatalf("rc=%d", rc)

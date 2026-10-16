@@ -26,7 +26,7 @@
 
 ## Invariants
 
-- `Conclude` treats a missing required link as FAIL, never WARN, so omitting a link never lands in a gentler bucket than an honest incoherent answer. `TestConclude_AnIncompleteChainCannotConclude` pins only "not PASS", so the code keeps a one-line why until a test pins FAIL.
+- `Conclude` treats a missing required link as FAIL, never WARN, so omitting a link never lands in a gentler bucket than an honest incoherent answer. `TestConclude_AnIncompleteChainCannotConclude` pins only "not PASS", so this note holds the reason until a test pins FAIL.
 - Unverifiable entails WARN, never PASS. Pinned by `TestConclude_UnverifiableCannotSupportPASS`.
 - The paradox diagnosis requires the contradiction. Pinned by `TestDiagnose_ParadoxRequiresTheContradiction`.
 - Citations must span more than one artifact. Pinned by `TestValidate_ChainMustCiteMoreThanOneStage`.
@@ -34,7 +34,7 @@
 - Render then parse is the identity, and a separator inside a finding survives. Pinned by `TestRenderChainBlock_RoundTrips` and `TestChainBlock_FindingMayContainTheSeparator`.
 - Table-shaped rows parse, and the last block wins over an echoed example. Pinned by `TestParseChainBlock_HandlesTheShapesAnLLMActuallyEmits`.
 - A conditional artifact's absence is never a withholding and never downgrades a link; a link whose required sources are absent is still downgraded. Pinned by `TestMissingEvidence_NamesWhatTheJudgeWasNotGiven` and `TestConcludeWithEvidence_ALinkWithASurvivingSourceIsNotDowngraded`.
-- `RequiredEvidence` is sorted, since it lands in a dispatch record. No test pins the order, so the code keeps a one-line why.
+- `RequiredEvidence` is sorted, since it lands in a dispatch record. No test pins the order, so this note holds the reason.
 - `Agrees` measures the pure chain verdict, so an entitlement gap never masquerades as auditor disagreement, and an absent chain never records as agreement. Pinned by `TestShadow_RecordsTheThreeStatesARolloutProduces`.
 
 ## Findings

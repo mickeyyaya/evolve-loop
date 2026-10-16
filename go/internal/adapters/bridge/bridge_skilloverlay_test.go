@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// writeSkillDir writes skills/<name>/SKILL.md under a fresh root and returns the root, not the skill dir.
 func writeSkillDir(t *testing.T, name, body string) string {
 	t.Helper()
 	root := t.TempDir()

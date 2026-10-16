@@ -227,3 +227,31 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/skilloverlay` | turns policy-resolved skill overlays into a prompt prefix | [internal-skilloverlay.md](internal-skilloverlay.md) |
 | `internal/goalhash` | hashes a loop goal string, byte for byte as the legacy bash pipeline did | [internal-goalhash.md](internal-goalhash.md) |
 | `examples/secure-orchestrator` | a reference program with four defenses against agent reward hacking | [examples-secure-orchestrator.md](examples-secure-orchestrator.md) |
+| `cmd/evolve/cmdutil` | the small helpers shared by the `evolve` subcommand handlers: help gate, root resolution, argument reorder, env filter and prompts loader | [cmd-evolve-cmdutil.md](cmd-evolve-cmdutil.md) |
+| `pkg/version` | the build-stamped binary identity: version string and build commit | [pkg-version.md](pkg-version.md) |
+| `internal/phases/buildplanner` | the optional build-planner phase that moves the Builder's design step into its own session | [internal-phases-buildplanner.md](internal-phases-buildplanner.md) |
+| `internal/guards/treediff` | the post-phase main-tree diff guard: flags a write that escaped the worktree | [internal-guards-treediff.md](internal-guards-treediff.md) |
+| `internal/rawgitratchet` | the ratchet that keeps new raw git fixtures out of the module's tests | [internal-rawgitratchet.md](internal-rawgitratchet.md) |
+| `internal/sessionreaper` | removes tmux sessions orphaned by runs whose lease is stale, found only through each run's session registry | [internal-sessionreaper.md](internal-sessionreaper.md) |
+| `internal/gcpolicy` | the zero-dependency leaf for the `gc` block of policy.json: the retention engine's configuration vocabulary | [internal-gcpolicy.md](internal-gcpolicy.md) |
+| `internal/doctor` | `evolve doctor probe`: finds a CLI tool on PATH and fallback locations and shows the trail | [internal-doctor.md](internal-doctor.md) |
+| `internal/failuregrade` | the graduated-enforcement classifier: grades a failure to abort, correct, quarantine or repair | [internal-failuregrade.md](internal-failuregrade.md) |
+| `internal/phases/swarmplan` | the optional swarm-plan phase: an LLM planner that splits a task into worker assignments | [internal-phases-swarmplan.md](internal-phases-swarmplan.md) |
+| `internal/mintregistry` | the per-project record of advisor-minted phase names that lets the tree-diff guard exempt a sanctioned mint | [internal-mintregistry.md](internal-mintregistry.md) |
+| `internal/directives` | the runtime operator-directives cascade: global and per-loop layers re-read each cycle and injected into phase prompts | [internal-directives.md](internal-directives.md) |
+| `internal/bridge/capabilities` | the per-CLI capability catalog and its drift check against a live `/help` | [internal-bridge-capabilities.md](internal-bridge-capabilities.md) |
+| `internal/detectcli` | detects which AI coding CLI drives the session, and owns the CLI-name alias table | [internal-detectcli.md](internal-detectcli.md) |
+| `internal/cyclebudget` | the pure decision of when a loop batch stops: completion-driven, bounded by a safety cap | [internal-cyclebudget.md](internal-cyclebudget.md) |
+| `internal/semvercheck` | the one strict `X.Y.Z` version check | [internal-semvercheck.md](internal-semvercheck.md) |
+| `internal/detectnested` | detects a nested Claude Code parent from its environment beacons | [internal-detectnested.md](internal-detectnested.md) |
+| `internal/dag` | deterministic dependency leveling shared by the wave planner and the merge train | [internal-dag.md](internal-dag.md) |
+| `internal/phaseorder` | the pipeline phase order from the registry, with a hardcoded fallback | [internal-phaseorder.md](internal-phaseorder.md) |
+| `internal/selfsha` | the sha256 of a file or of the running executable | [internal-selfsha.md](internal-selfsha.md) |
+| `internal/auditledger` | the one reader of auditor rows in `.evolve/ledger.jsonl` | [internal-auditledger.md](internal-auditledger.md) |
+| `internal/auditcalibration` | a calibration report of auditor narratives against ship-gate outcomes | [internal-auditcalibration.md](internal-auditcalibration.md) |
+| `internal/paralleltest` | the parallel-by-default guard of the package test trees | [internal-paralleltest.md](internal-paralleltest.md) |
+| `test/structure` | source-structure checks shared between package tests | [test-structure.md](test-structure.md) |
+| `test/e2e` | the end-to-end test tier | [test-e2e.md](test-e2e.md) |
+| `test/component` | the component test tier | [test-component.md](test-component.md) |
+| `test/integration` | the integration test tier | [test-integration.md](test-integration.md) |
+| `cmd/apicover` | the standalone binary over `internal/apicover` | [cmd-apicover.md](cmd-apicover.md) |

@@ -72,7 +72,6 @@ func TestRun_WritesShutdownReport(t *testing.T) {
 		close(done)
 	}()
 
-	// An already-closed shutdown fires on the first select, so <-done is the only barrier needed.
 	close(shutdown)
 	<-done
 
@@ -101,7 +100,6 @@ func TestRun_StallDetectionFires(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		callIdx++
-		// Construction and observer_started read startTime; every later read is past StallS.
 		if callIdx <= 2 {
 			return startTime
 		}
@@ -189,7 +187,6 @@ func TestRun_TailsStdoutLog(t *testing.T) {
 `), 0o644)
 
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
-	// With StopAfterMS set, Run ticks every StopAfterMS/4, so it tails the log before the timer ends it.
 	rc := Run(Config{
 		Workspace: ws, Cycle: 1, Phase: "build", Agent: "builder",
 		PollS: 1, StallS: 9999, EOFGraceS: 9999,

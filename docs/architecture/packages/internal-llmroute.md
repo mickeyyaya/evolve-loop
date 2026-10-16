@@ -41,6 +41,7 @@
 
 ## Invariants
 
+- **A pinned model never steps down a tier.** A pin skips the env, profile and default chain and the `"auto"` expansion, and its `Tiers` hold the pinned model alone.
 - **A non-trigger exit stops the walk.** A legitimate FAIL is never rerouted to another CLI, where it would pass for a CLI hiccup. Pinned by `TestDispatch_StopsOnNonTriggerExit`, `TestDispatch_NonTriggerBoundaryCodesNeverReroute` and `TestDispatchTiered_LegitimateFailStopsImmediately`.
 - **An empty chain fails loudly.** `Dispatch` and `DispatchTiered` return an error for zero candidates, because a caller that checks only `Err` would read nil as a successful dispatch to no CLI. `buildCandidates` always returns at least the primary, so the guard is defensive. Pinned by `TestDispatch_EmptyCandidatesNeverCallsLaunchOrClaimsSuccess` and the `all-noise-fallback-collapses-to-primary` case.
 - **Exhaustion returns the last error**, so the caller can degrade to its own backstop: the advisor's static spine, or the runner's FAIL classification. `TestDispatch_AllCandidatesFailReturnsLastError`.

@@ -9,10 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// Names DispatchResult for apicover, whose naming check scans identifiers and misses inferred types.
 var _ DispatchResult
 
-// scriptedLaunch replays seq by call order, repeating the last entry, and records each cli launched.
 type scriptedLaunch struct {
 	seq   []scriptedAttempt
 	calls []string
@@ -53,7 +51,6 @@ func TestDispatch_SuccessOnFirstCandidate(t *testing.T) {
 	}
 }
 
-// Per-code trigger coverage lives here: the end-to-end TestE2ECLIFallbackChain costs about ten minutes per code.
 func TestDispatch_FallsBackOnTriggerExit(t *testing.T) {
 	if len(defaultFallbackOnExit) == 0 {
 		t.Fatal("defaultFallbackOnExit is empty — the trigger contract would be vacuous")
@@ -128,7 +125,7 @@ func TestDispatch_AllCandidatesFailReturnsLastError(t *testing.T) {
 
 func TestChainFor_PrimaryPlusDedupedFallback(t *testing.T) {
 	prof := &profiles.Profile{
-		CLI:               "agy-tmux", // the swapped-away primary, excluded from the chain
+		CLI:               "agy-tmux",
 		CLIFallback:       []string{"claude-tmux", "agy-tmux"},
 		CLIFallbackOnExit: []int{81},
 	}

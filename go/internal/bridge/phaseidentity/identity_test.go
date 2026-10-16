@@ -14,8 +14,6 @@ var facts1707 = Facts{
 	Artifact:   "/plane/.evolve/runs/cycle-1707/test-report.md",
 }
 
-// The wording is the component: an agent that inspects its environment must find every one of its own
-// traces named here, so the block is pinned byte for byte.
 func TestBlock_StatesEveryTraceTheAgentCanFind(t *testing.T) {
 	want := Heading + "\n\n" +
 		"- You are the `tdd` phase agent of cycle 1707.\n" +

@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
-// RealProfilesDir is the repo's live .evolve/profiles, the package's one resolver
-// for it. Go's test cache does not track reads outside the module, so run
-// go test -count=1 after a profile edit.
 func RealProfilesDir(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -23,7 +20,6 @@ func RealProfilesDir(t *testing.T) string {
 	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".evolve", "profiles")
 }
 
-// TrackedRealProfileNames returns the git-tracked profile names; nil means bind every profile.
 func TrackedRealProfileNames(t *testing.T) map[string]bool {
 	t.Helper()
 	root := filepath.Join(RealProfilesDir(t), "..", "..")
@@ -38,14 +34,11 @@ func TrackedRealProfileNames(t *testing.T) map[string]bool {
 	return set
 }
 
-// RealTreeProfiles returns a Loader over the live .evolve/profiles and its git-tracked names.
-// Real-tree scans go through it because the runtime mints untracked stubs no CI checkout has.
 func RealTreeProfiles(t *testing.T) (*Loader, []string) {
 	t.Helper()
 	return treeProfiles(t, filepath.Join(RealProfilesDir(t), "..", ".."))
 }
 
-// treeProfiles is RealTreeProfiles for an arbitrary repo root.
 func treeProfiles(t *testing.T, root string) (*Loader, []string) {
 	t.Helper()
 	l := NewFromDir(filepath.Join(root, ".evolve", "profiles"))
@@ -77,7 +70,6 @@ func TestRealTreeProfiles_ExcludesUntrackedDecoy(t *testing.T) {
 	if tracked == nil {
 		t.Skip("no usable git context — filter disabled (bind-all fallback), nothing to prove")
 	}
-	// Phase sandboxes deny writes to the live .evolve/profiles, so the decoy goes in a mirror.
 	root := mirrorTrackedProfiles(t, filepath.Join(RealProfilesDir(t), "..", ".."), tracked)
 	const decoy = "zz-decoy-mint-profiles-funnel"
 	payload := `{"name":"` + decoy + `","role":"decoy","cli":"claude","model_tier_default":"fast"}`
@@ -97,7 +89,6 @@ func TestRealTreeProfiles_ExcludesUntrackedDecoy(t *testing.T) {
 	}
 }
 
-// mirrorTrackedProfiles copies the tracked profiles into a fresh committed git repo and returns its root.
 func mirrorTrackedProfiles(t *testing.T, real string, tracked map[string]bool) string {
 	t.Helper()
 	root := t.TempDir()

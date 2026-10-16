@@ -292,3 +292,11 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // the assigned task IDs so concurrent cycles work disjoint files (ADR-0049 E).
 // Absent when not scoped (legacy single-cycle behavior unchanged).
 ```
+
+## comment-zero d13
+
+### `go/internal/phases/triage/premise_drift_test.go:68` — above `"fix: restore audit authority (ReadVerdict)",`
+
+```text
+// #535's shape, by SUBJECT (review M4)
+```

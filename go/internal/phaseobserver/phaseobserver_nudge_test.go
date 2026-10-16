@@ -25,7 +25,7 @@ func TestRun_SoftStallNudge_AppendsOnceBelowKillThreshold(t *testing.T) {
 		if callIdx <= 2 {
 			return startTime
 		}
-		return startTime.Add(400 * time.Second) // > NudgeS(300), < StallS(600)
+		return startTime.Add(400 * time.Second)
 	}
 	killCalls := 0
 	rc := Run(Config{

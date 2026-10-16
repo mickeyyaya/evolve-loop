@@ -2,9 +2,6 @@ package capabilities
 
 import "testing"
 
-// TestKeyBinding_FieldsNamed names the KeyBinding DTO and pins its two-field
-// shape (Keys + Action) — the wire record the capability catalog stores for a
-// CLI's interrupt/submit keys. Field renames would fail to compile here.
 func TestKeyBinding_FieldsNamed(t *testing.T) {
 	kb := KeyBinding{Keys: "ctrl+c", Action: "interrupt"}
 	if kb.Keys != "ctrl+c" || kb.Action != "interrupt" {
@@ -12,8 +9,6 @@ func TestKeyBinding_FieldsNamed(t *testing.T) {
 	}
 }
 
-// TestHeadless_FieldsNamed names the Headless DTO and pins its Entrypoint +
-// Available shape (the headless-mode descriptor for a CLI).
 func TestHeadless_FieldsNamed(t *testing.T) {
 	h := Headless{Entrypoint: "claude -p", Available: []string{"-p", "--print"}}
 	if h.Entrypoint != "claude -p" {
@@ -24,10 +19,6 @@ func TestHeadless_FieldsNamed(t *testing.T) {
 	}
 }
 
-// TestDrift_TypeNamedAndCleanContract names the Drift type and pins its Clean()
-// contract: a Drift with matching catalog/live counts and no diff lists is
-// Clean; one with InCatalogNotLive entries is not. This is the drift-detection
-// invariant the capability check reports on.
 func TestDrift_TypeNamedAndCleanContract(t *testing.T) {
 	clean := Drift{CLI: "claude-tmux", CatalogCount: 2, LiveCount: 2}
 	if !clean.Clean() {

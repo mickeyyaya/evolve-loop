@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// The git binary and init subcommand are assembled at run time so this
-// package's own tests hold no raw-init shape for the ratchet to list.
 var (
 	gitLit  = strconv.Quote("gi" + "t")
 	initLit = strconv.Quote("in" + "it")
@@ -30,8 +28,6 @@ func writeFiles(t *testing.T, root string, files map[string]string) {
 	}
 }
 
-// noGitAbove keeps git discovery from climbing out of dir, so dir reads as a
-// module outside any work tree.
 func noGitAbove(t *testing.T, dir string) {
 	t.Helper()
 	real, err := filepath.EvalSymlinks(dir)
@@ -43,9 +39,6 @@ func noGitAbove(t *testing.T, dir string) {
 
 const passTest = "package p\n\nimport \"testing\"\n\nfunc TestP(t *testing.T) {}\n"
 
-// TestBoundTestFiles_BindsTrackedOnly names BoundTestFiles: in a work tree a
-// staged test file is bound, while an untracked one, a non-test file and one
-// under testdata or a dot directory are not (ADR-0084 I1).
 func TestBoundTestFiles_BindsTrackedOnly(t *testing.T) {
 	r := gittest.Fixture(t)
 	writeFiles(t, r.Dir, map[string]string{
@@ -68,9 +61,6 @@ func TestBoundTestFiles_BindsTrackedOnly(t *testing.T) {
 	}
 }
 
-// TestBoundTestFiles_OutsideGitBindsEveryFile: when git cannot list the tracked
-// set the scan binds every on-disk test file and says so, and an empty binding
-// set is an error rather than a silent pass.
 func TestBoundTestFiles_OutsideGitBindsEveryFile(t *testing.T) {
 	root := t.TempDir()
 	noGitAbove(t, root)
@@ -93,9 +83,6 @@ func TestBoundTestFiles_OutsideGitBindsEveryFile(t *testing.T) {
 	}
 }
 
-// TestSites_CountsEachShapeOutsideTheOwner names Sites and OwnerDir: the
-// literal, helper-wrapped (sibling file) and table-driven shapes are counted
-// per site; near-misses, the owner package and missing files are not.
 func TestSites_CountsEachShapeOutsideTheOwner(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -130,8 +117,6 @@ func TestSites_CountsEachShapeOutsideTheOwner(t *testing.T) {
 	}
 }
 
-// TestSites_UnparsableFileFails keeps a scan error loud: a bound file the
-// scanner cannot parse fails the ratchet rather than dropping out of it.
 func TestSites_UnparsableFileFails(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{"x/broken_test.go": "package x\nfunc {"})
@@ -140,7 +125,6 @@ func TestSites_UnparsableFileFails(t *testing.T) {
 	}
 }
 
-// TestLoadBaseline_ReadsCountsAndRejectsBadLists names LoadBaseline.
 func TestLoadBaseline_ReadsCountsAndRejectsBadLists(t *testing.T) {
 	dir := t.TempDir()
 	cases := []struct {
@@ -174,8 +158,6 @@ func TestLoadBaseline_ReadsCountsAndRejectsBadLists(t *testing.T) {
 	}
 }
 
-// TestCheck_ListOnlyShrinks names Check: an exact match passes; an unlisted
-// file, a grown count, a shrunk count and a migrated file each fail by name.
 func TestCheck_ListOnlyShrinks(t *testing.T) {
 	baseline := map[string]int{"a_test.go": 2, "b_test.go": 1}
 	if err := Check(map[string]int{"a_test.go": 2, "b_test.go": 1}, baseline); err != nil {

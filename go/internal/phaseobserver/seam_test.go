@@ -26,7 +26,6 @@ func TestObserverEngine_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioning lists the module's non-test Go files, other than allowed, whose source contains needle.
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))

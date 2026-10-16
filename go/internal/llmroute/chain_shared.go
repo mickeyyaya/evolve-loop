@@ -8,12 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// DefaultTriggers returns a copy of the trigger set a profile without cli_fallback_on_exit gets.
 func DefaultTriggers() []int {
 	return append([]int(nil), defaultFallbackOnExit...)
 }
 
-// AllowedDiscovered keeps discovered CLIs whose family allowed_clis permits; nil, empty or "all" permits every family.
 func AllowedDiscovered(discovered []string, prof *profiles.Profile) []string {
 	if prof == nil || len(prof.AllowedCLIs) == 0 {
 		return discovered
@@ -35,7 +33,6 @@ func AllowedDiscovered(discovered []string, prof *profiles.Profile) []string {
 	return out
 }
 
-// ExcludeFamilies drops discovered drivers whose family is banned (workflow.universal_fallback_exclude).
 func ExcludeFamilies(discovered, families []string) []string {
 	if len(families) == 0 {
 		return discovered
@@ -53,7 +50,6 @@ func ExcludeFamilies(discovered, families []string) []string {
 	return out
 }
 
-// KnownDriver reports whether name is a registered bridge driver (cliBinaryFor).
 func KnownDriver(name string) bool {
 	_, ok := cliBinaryFor[name]
 	return ok

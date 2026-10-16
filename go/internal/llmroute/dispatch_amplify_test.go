@@ -49,7 +49,6 @@ func TestDispatch_AllDefaultTriggerCodesAdvanceChain(t *testing.T) {
 }
 
 func TestDispatch_NonTriggerBoundaryCodesNeverReroute(t *testing.T) {
-	// Neighbors of each default trigger, plus two common genuine-failure codes.
 	for _, code := range []int{79, 82, 84, 86, 123, 126, 128, 1, 2} {
 		code := code
 		t.Run(fmt.Sprintf("exit=%d", code), func(t *testing.T) {

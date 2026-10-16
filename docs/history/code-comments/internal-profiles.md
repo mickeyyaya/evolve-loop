@@ -469,3 +469,26 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // EffortOverrides maps a resolved model tier to the effort level used at
 // that tier, so a tier escalation carries its effort. See ADR-0096.
 ```
+
+## comment-zero d13
+
+### `go/internal/profiles/fallback_chain_test.go:14` — above `func TestEveryAgentProfileHasAFallbackChain(t *testing.T) {`
+
+```text
+// See ADR-0104. Only git-tracked profiles bind; untracked runtime-minted stubs
+// are skipped unless there is no tracked set, in which case every file binds.
+```
+
+### `go/internal/profiles/profiles.go:25` — above `CLIFallbackOnExit  []int              'json:"cli_fallback_on_exit,omitempty"'`
+
+```text
+// CLIFallbackOnExit lists the bridge exit codes that trigger fallback; empty
+// means llmroute's default. Any other failure never reroutes. See ADR-0029.
+```
+
+### `go/internal/profiles/profiles.go:49` — above `DigestFile string 'json:"digest_file,omitempty"'`
+
+```text
+// DigestFile names a pre-generated role-scoped digest, resolved like
+// SystemPromptFile and preferred over it when the file exists. See ADR-0023.
+```

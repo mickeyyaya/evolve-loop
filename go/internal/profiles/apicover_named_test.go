@@ -7,7 +7,6 @@ import (
 )
 
 func TestLoader_TypedBindingAndGet(t *testing.T) {
-	// The explicit *Loader binding names the type for apicover's named-in-test check.
 	var l *Loader = NewFromFS(fixtureFS())
 	p, err := l.Get("scout")
 	if err != nil {

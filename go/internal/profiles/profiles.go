@@ -12,18 +12,13 @@ import (
 	"strings"
 )
 
-// Profile mirrors the .evolve/profiles/<name>.json schema.
 type Profile struct {
-	Name            string   `json:"name"`
-	Role            string   `json:"role"`
-	CLI             string   `json:"cli"`
-	AllowedCLIs     []string `json:"allowed_clis,omitempty"`
-	CrossFamilyWith string   `json:"cross_family_with,omitempty"`
-	// CLIFallback lists registered driver names tried in order when CLI exits
-	// with a CLIFallbackOnExit code.
-	CLIFallback []string `json:"cli_fallback,omitempty"`
-	// CLIFallbackOnExit lists the bridge exit codes that trigger fallback; empty
-	// means llmroute's default. Any other failure never reroutes. See ADR-0029.
+	Name               string             `json:"name"`
+	Role               string             `json:"role"`
+	CLI                string             `json:"cli"`
+	AllowedCLIs        []string           `json:"allowed_clis,omitempty"`
+	CrossFamilyWith    string             `json:"cross_family_with,omitempty"`
+	CLIFallback        []string           `json:"cli_fallback,omitempty"`
 	CLIFallbackOnExit  []int              `json:"cli_fallback_on_exit,omitempty"`
 	ModelTierDefault   string             `json:"model_tier_default"`
 	ModelTierEnvelope  *ModelTierEnvelope `json:"model_tier_envelope,omitempty"`
@@ -42,26 +37,18 @@ type Profile struct {
 	StopCriterion      string             `json:"stop_criterion,omitempty"`
 	TurnBudgetHint     int                `json:"turn_budget_hint,omitempty"`
 	GeneratedFrom      string             `json:"generated_from,omitempty"`
-	// SystemPrompt holds per-agent rules prepended to the prompt at launch; it
-	// wins over SystemPromptFile, which resolves relative to the profile dir.
-	SystemPrompt     string `json:"system_prompt,omitempty"`
-	SystemPromptFile string `json:"system_prompt_file,omitempty"`
-	// DigestFile names a pre-generated role-scoped digest, resolved like
-	// SystemPromptFile and preferred over it when the file exists. See ADR-0023.
-	DigestFile string `json:"digest_file,omitempty"`
-	// Raw holds the file's original bytes, $include_policy sentinels unexpanded,
-	// for keys the struct does not model; the typed tool lists are expanded.
-	Raw json.RawMessage `json:"-"`
+	SystemPrompt       string             `json:"system_prompt,omitempty"`
+	SystemPromptFile   string             `json:"system_prompt_file,omitempty"`
+	DigestFile         string             `json:"digest_file,omitempty"`
+	Raw                json.RawMessage    `json:"-"`
 }
 
-// ModelTierEnvelope bounds a profile's model tier escalation.
 type ModelTierEnvelope struct {
 	Min     string `json:"min,omitempty"`
 	Default string `json:"default,omitempty"`
 	Max     string `json:"max,omitempty"`
 }
 
-// SandboxConfig is the typed shape of profile.sandbox.
 type SandboxConfig struct {
 	Enabled          bool     `json:"enabled,omitempty"`
 	ReadOnlyRepo     bool     `json:"read_only_repo,omitempty"`
@@ -71,15 +58,12 @@ type SandboxConfig struct {
 	AllowNetwork     bool     `json:"allow_network,omitempty"`
 }
 
-// Loader resolves profile names to Profiles; a zero Loader's Get returns fs.ErrNotExist.
 type Loader struct {
 	fs fs.FS
 }
 
-// NewFromFS returns a Loader over fsys; a nil fsys gives the zero Loader.
 func NewFromFS(fsys fs.FS) *Loader { return &Loader{fs: fsys} }
 
-// NewFromDir returns a Loader rooted at dir; an empty dir gives the zero Loader.
 func NewFromDir(dir string) *Loader {
 	if dir == "" {
 		return &Loader{}
@@ -87,7 +71,6 @@ func NewFromDir(dir string) *Loader {
 	return &Loader{fs: os.DirFS(dir)}
 }
 
-// Get loads <name>.json, expanding $include_policy sentinels in its tool lists.
 func (l *Loader) Get(name string) (Profile, error) {
 	if l.fs == nil {
 		return Profile{}, fmt.Errorf("profiles: %w (no source configured)", fs.ErrNotExist)
@@ -121,8 +104,6 @@ func (l *Loader) Get(name string) (Profile, error) {
 const policyFile = "tool-policy.json"
 const policyPrefix = "$include_policy:"
 
-// expandPolicies replaces each $include_policy:<name> entry with that policy's
-// tools, dropping duplicates; without a sentinel it never reads the policy file.
 func (l *Loader) expandPolicies(tools []string) ([]string, error) {
 	hasSentinel := false
 	for _, t := range tools {
@@ -171,7 +152,6 @@ func (l *Loader) expandPolicies(tools []string) ([]string, error) {
 	return result, nil
 }
 
-// List returns the sorted basenames of the JSON files that carry a non-empty "name".
 func (l *Loader) List() ([]string, error) {
 	if l.fs == nil {
 		return nil, nil

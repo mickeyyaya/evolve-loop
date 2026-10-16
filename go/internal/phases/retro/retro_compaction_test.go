@@ -10,8 +10,6 @@ import (
 )
 
 // acs-predicate: config-check (inherent Config-struct field presence; no behavioral probe possible
-// before the field exists — B1 registry-class fix mandates this structural assertion).
-// RED: field absent → reflect FieldByName("CompactPrompts").IsValid() == false → t.Fatal.
 func TestRetroPhase_ConfigHasCompactPrompts(t *testing.T) {
 	ct := reflect.TypeOf(Config{})
 	f, ok := ct.FieldByName("CompactPrompts")

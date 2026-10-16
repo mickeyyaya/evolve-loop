@@ -32,8 +32,6 @@ type exclusion struct {
 	detail string
 }
 
-// Generate reads dossiersDir and runsDir and returns a deterministic Markdown
-// calibration report. The sample is the set of canonical cycle-N run dirs.
 func Generate(dossiersDir, runsDir string) ([]byte, error) {
 	if err := requireDir("dossiers directory", dossiersDir); err != nil {
 		return nil, err

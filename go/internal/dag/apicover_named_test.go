@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// TestLevelsAndFlatten_NamePublicAPI pins the package's two exported functions
-// together: dependency levels flatten back into deterministic execution order.
 func TestLevelsAndFlatten_NamePublicAPI(t *testing.T) {
 	levels, err := Levels(
 		[]string{"build", "study", "ship"},

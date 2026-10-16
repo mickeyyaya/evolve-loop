@@ -47,7 +47,6 @@ func TestLoadCatalog_AllEmbedded(t *testing.T) {
 }
 
 func TestLoadCatalog_ExtensionKinds(t *testing.T) {
-	// The research-grounded facts the catalog must encode.
 	claude, _ := LoadCatalog("claude-tmux")
 	if claude.Extension.Kind != "plugin_marketplace" || len(claude.Extension.InstallFlow) != 3 {
 		t.Errorf("claude extension=%+v", claude.Extension)

@@ -80,8 +80,6 @@ func TestActiveNamesCorruptFailsSafeEmpty(t *testing.T) {
 	}
 }
 
-// TestAppendSameNameReplacesEntry: a re-mint refreshes the one entry instead
-// of growing the file unboundedly.
 func TestAppendSameNameReplacesEntry(t *testing.T) {
 	path := Path(t.TempDir())
 	now := time.Now()
@@ -107,8 +105,6 @@ func TestAppendSameNameReplacesEntry(t *testing.T) {
 	}
 }
 
-// TestAppendPrunesExpiredEntries: appends garbage-collect entries past TTL so
-// the registry cannot grow without bound across batches.
 func TestAppendPrunesExpiredEntries(t *testing.T) {
 	path := Path(t.TempDir())
 	now := time.Now()
@@ -160,12 +156,9 @@ func TestQuarantineCorrupt_RenamesAndSelfHeals(t *testing.T) {
 
 func TestQuarantineCorrupt_HealthyAndMissingUntouched(t *testing.T) {
 	path := Path(t.TempDir())
-	// Missing file: nothing to do.
 	if q, err := QuarantineCorrupt(path); err != nil || q {
 		t.Errorf("missing registry must be a no-op; got %v, %v", q, err)
 	}
-	// Healthy file: must not be quarantined (a concurrent Append may have
-	// just repaired it between the caller's failed read and this call).
 	if err := Append(path, "fine-mint", time.Now()); err != nil {
 		t.Fatal(err)
 	}
@@ -178,8 +171,6 @@ func TestQuarantineCorrupt_HealthyAndMissingUntouched(t *testing.T) {
 	}
 }
 
-// TestAppendConcurrentNamesAllSurvive: concurrent lanes' appends serialize
-// under the flock — no lost updates.
 func TestAppendConcurrentNamesAllSurvive(t *testing.T) {
 	path := Path(t.TempDir())
 	now := time.Now()

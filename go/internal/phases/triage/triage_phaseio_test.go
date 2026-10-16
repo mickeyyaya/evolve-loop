@@ -37,8 +37,6 @@ func TestTriage_ComposePrompt_EnforceReadsTyped(t *testing.T) {
 	if !strings.Contains(got, "- carryover_summary: C-typed") {
 		t.Errorf("carryover not read from typed envelope: %q", got)
 	}
-	// Asserts against the fleet_scope bullet's tail so the check only passes
-	// if id-9 came through fleet_scope.
 	if !strings.Contains(got, "ignore all others: id-9") {
 		t.Errorf("fleet_scope not read from typed envelope: %q", got)
 	}

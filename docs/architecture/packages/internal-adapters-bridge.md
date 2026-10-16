@@ -23,6 +23,8 @@
 - **One validation rule.** `validate` delegates to `gobridge.ValidateRequest`, so the adapter and the engine reject the same request with the same error string. `internal/bridge/launch_outcome_seam_test.go` pins that `ValidateRequest(req)` appears only in this file and `engine.go`.
 - **`SetModelCatalogDirFn`** forwards to a package global in `internal/bridge`. It is process-wide, not per Adapter.
 - **External pins on `bridge.go`.** It is listed in the integrity-surface manifest (`internal/guards/integrity_surface_manifest_test.go`). `cmd/evolve/cmd_bridge_engine_roots_test.go` counts its three `bridge.NewEngine` calls. `go/acs/cycle25` requires `req.InteractivePolicy` in the file.
+- **The policy blocks stay constant and under about 200 tokens**, so the cached prompt prefix stays stable. An unknown policy value gets the default block, so a typo cannot break the loop's autonomy; `escalate` adds none. Under `escalate` the contract block is still injected.
+- **The engine polls `artifactPath`, so the prompt must name it.** When no contract resolves, only the footer is added: the full tail's `evolve phase verify <agent>` self-check always exits 10 for an unregistered phase. Off and shadow keep the prompt byte-identical, because the sentinel pass of the classifier is not stage-gated ([ADR-0050](../adr/0050-modularization-and-unified-phase-io.md)). The prefix block quotes the footer marker as a cross-reference, so tests count the marker only after the body.
 
 ## Invariants
 

@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// babbleStream returns n assistant-text lines with no tool use, in the stream-json shape claude -p emits.
 func babbleStream(n int) []string {
 	lines := make([]string, 0, n)
 	for i := 0; i < n; i++ {
@@ -35,7 +34,6 @@ func TestRun_MaxNoProgress_BabbleAgent_Fires(t *testing.T) {
 	mu := &sync.Mutex{}
 	startTime := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
 	callIdx := 0
-	// Reads after the sixth jump 700 s: past MaxNoProgressS, while StallS 9999 keeps the idle rule quiet.
 	nowFn := func() time.Time {
 		mu.Lock()
 		defer mu.Unlock()
@@ -98,8 +96,6 @@ func TestRun_MaxNoProgress_ToolUsingAgent_DoesNotFire(t *testing.T) {
 	mu := &sync.Mutex{}
 	startTime := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
 	callIdx := 0
-	// The clock never leaves the MaxNoProgressS window, so this guards false positives only;
-	// the babble test is the one that proves which events count as progress.
 	nowFn := func() time.Time {
 		mu.Lock()
 		defer mu.Unlock()

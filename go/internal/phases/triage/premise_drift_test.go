@@ -12,9 +12,6 @@ import (
 
 const staleItemFile = "2026-08-16T19-30-00Z-warn-gap.json"
 
-// premiseRepo lays out commits around the item's filing date: one before
-// filing, one on its own declared file after filing, and one elsewhere in
-// the same package after filing.
 func premiseRepo(t *testing.T, item string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -35,8 +32,6 @@ func premiseRepo(t *testing.T, item string) string {
 	return dir
 }
 
-// commitAt commits body to file with the given message at committer date ts
-// (author date authorTS, or ts when empty).
 func commitAt(t *testing.T, dir, file, body, msg, ts, authorTS string) {
 	t.Helper()
 	p := filepath.Join(dir, file)
@@ -63,9 +58,9 @@ func TestPremiseDriftSection_PutsTheDriftSinceFilingInFrontOfTriage(t *testing.T
 		"- premise_drift: evidence to re-verify, not a verdict",
 		"warn-gap (filed 2026-08-16)",
 		"1 commit(s) since filing touched its declared paths:",
-		"fix(ship): single-source committed-inbox-id resolution", // on its own file, after filing
+		"fix(ship): single-source committed-inbox-id resolution",
 		"1 more commit(s) since filing touched only its packages (go/internal/ship/):",
-		"fix: restore audit authority (ReadVerdict)", // #535's shape, by SUBJECT (review M4)
+		"fix: restore audit authority (ReadVerdict)",
 		"not at HEAD: go/internal/ship/gone.go",
 	} {
 		if !strings.Contains(section, want) {

@@ -1,11 +1,5 @@
 package cmdutil
 
-// filterenv_promptsloader_test.go — RED contract for cycle-549's
-// cli-command-layer-test-coverage task (see cmd_worktree_test.go's package
-// doc in cmd/evolve for the full task/lane background). FilterEvolveEnv and
-// NewPromptsLoader had ZERO direct test coverage (0.0% per `go tool
-// cover -func`).
-
 import (
 	"os"
 	"path/filepath"
@@ -31,8 +25,6 @@ func TestFilterEvolveEnv(t *testing.T) {
 		},
 		{"no_matches", []string{"PATH=/usr/bin", "HOME=/root"}, map[string]string{}},
 		{"empty_environ", nil, map[string]string{}},
-		// Negative/edge: malformed entries (no '=', or an empty key) are skipped,
-		// not panicked on or admitted with a garbage key.
 		{"no_equals_skipped", []string{"EVOLVE_BROKEN"}, map[string]string{}},
 		{"empty_key_skipped", []string{"=noKey"}, map[string]string{}},
 		{"value_with_embedded_equals", []string{"EVOLVE_X=a=b=c"}, map[string]string{"EVOLVE_X": "a=b=c"}},
@@ -48,7 +40,6 @@ func TestFilterEvolveEnv(t *testing.T) {
 	}
 }
 
-// writeAgent creates <dir>/agents/<name>.md with minimal valid frontmatter.
 func writeAgent(t *testing.T, dir, name string) {
 	t.Helper()
 	agentsDir := filepath.Join(dir, "agents")
@@ -77,8 +68,8 @@ func TestNewPromptsLoader_RootsAtProjectRoot_WhenEnvUnset(t *testing.T) {
 }
 
 func TestNewPromptsLoader_HonorsEnvOverride(t *testing.T) {
-	root := t.TempDir()     // has NO agents/ dir — must not be used
-	override := t.TempDir() // has the real agents/ dir
+	root := t.TempDir()
+	override := t.TempDir()
 	writeAgent(t, override, "evolve-override")
 	t.Setenv("EVOLVE_PROMPTS_DIR", override)
 
@@ -86,8 +77,6 @@ func TestNewPromptsLoader_HonorsEnvOverride(t *testing.T) {
 	if _, err := l.Agent("evolve-override"); err != nil {
 		t.Fatalf("Agent(evolve-override) via EVOLVE_PROMPTS_DIR override: %v", err)
 	}
-	// Negative: an agent that only exists under the (ignored) project root
-	// must NOT be found once the override is set.
 	writeAgent(t, root, "evolve-project-only")
 	if _, err := l.Agent("evolve-project-only"); err == nil {
 		t.Error("Agent(evolve-project-only) unexpectedly found — NewPromptsLoader must prefer EVOLVE_PROMPTS_DIR over projectRoot")

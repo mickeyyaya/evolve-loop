@@ -1,7 +1,4 @@
-// Package triage implements the cycle-scope task-selection phase. The phase
-// boilerplate lives in internal/phases/runner; this file only encodes
-// triage-specific variation points. See
-// docs/architecture/packages/internal-phases-triage.md.
+// Package triage implements the cycle-scope task-selection phase.
 package triage
 
 import (
@@ -36,14 +33,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// topNHeadingRE locates the selection-section heading (phasecontract.Triage,
-// single source).
 var topNHeadingRE = regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(phasecontract.Triage.Sections[0].Canonical) + `\b`)
 
-// listItemRE matches a single non-empty Markdown list item line.
 var listItemRE = regexp.MustCompile(`(?m)^[-*]\s+\S`)
 
-// nextHeadingRE finds the next "## " section heading.
 var nextHeadingRE = regexp.MustCompile(`(?m)^## `)
 
 type hooks struct{ forbidden func(string) bool }
@@ -53,8 +46,6 @@ func (hooks) AgentPromptName() string                     { return "evolve-triag
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "triage-report.md" }
 func (hooks) DefaultModel() string                        { return "auto" }
 
-// ShouldSkip delegates to the central PhasePolicy (config.Load reads
-// EVOLVE_TRIAGE_DISABLE) rather than reading the env flag here.
 func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
 	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTriage)) {
 		return false, "", "", nil
@@ -102,9 +93,6 @@ const carryforwardCandidatesTimeout = 8 * time.Second
 
 const carryforwardCandidatesMaxBranches = 40
 
-// CarryforwardCandidatesSection renders the deterministic carry-forward
-// candidate list for the triage prompt: local cycle-* branches under dir
-// landable onto base, fail-open to "" on any error or when none qualify.
 func CarryforwardCandidatesSection(ctx context.Context, dir, base string) string {
 	if dir == "" || base == "" {
 		return ""
@@ -282,8 +270,6 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	return core.VerdictPASS, append(diags, unifiedDiags...), string(core.PhaseTDD)
 }
 
-// topNSectionBody returns the ## top_n section body, or ok=false when the
-// heading is absent. trimmed must already be whitespace-trimmed.
 func topNSectionBody(trimmed string) (body string, ok bool) {
 	loc := topNHeadingRE.FindStringIndex(trimmed)
 	if loc == nil {
@@ -296,33 +282,20 @@ func topNSectionBody(trimmed string) (body string, ok bool) {
 	return body, true
 }
 
-// topNItemIDRE captures the id token of a "- id: description ..." top_n list
-// item — the shape triage-report.md's real output uses.
 var topNItemIDRE = regexp.MustCompile(`(?m)^[-*]\s+([^:\n]+):`)
 
 var filesFieldRE = regexp.MustCompile(`files=(?:\{([^}]*)\}|([^,\n]*))`)
 
-// Config holds the dependencies for constructing a triage Phase.
 type Config struct {
-	Bridge  core.Bridge
-	Prompts *prompts.Loader
-	// ContractVerifier is the deliverables gate's verifier accessor for the
-	// verdict engine (runner.Options.ContractVerifier); nil uses the
-	// catalog-aware default.
+	Bridge           core.Bridge
+	Prompts          *prompts.Loader
 	ContractVerifier func() runner.ContractVerifier
 	HostEffects      func() core.HostEffects
 	NowFn            func() time.Time
-	// PhaseIO threads the EVOLVE_PHASE_IO stage into the reconcile rung; the
-	// zero value (StageOff) is byte-identical.
-	// See ADR-0050.
-	PhaseIO config.Stage
-	// CompactPrompts strips the on-demand reference tail from the disk-loaded
-	// agent doc before dispatch; it flows from workflow.compact_prompts
-	// (policy.json), never a literal here.
-	CompactPrompts bool
-	// LaneForbidden marks the declared paths no lane can change; nil judges protected surface only.
-	LaneForbidden func(string) bool
-	SleepFn       func(time.Duration)
+	PhaseIO          config.Stage
+	CompactPrompts   bool
+	LaneForbidden    func(string) bool
+	SleepFn          func(time.Duration)
 }
 
 func boundItems(workspace string) []string {
@@ -332,12 +305,8 @@ func boundItems(workspace string) []string {
 
 func hooksFor(c Config) hooks { return hooks{forbidden: c.LaneForbidden} }
 
-// Phase is the triage cycle-scope task-selection phase, a runner.BaseRunner
-// specialized with the triage-specific hooks.
 type Phase struct{ *runner.BaseRunner }
 
-// New constructs a triage Phase from c, wiring the triage hooks, bridge,
-// prompts, clock, and PhaseIO stage into a runner.BaseRunner.
 func New(c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{

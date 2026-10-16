@@ -47,10 +47,6 @@ func TestRunning(t *testing.T) {
 	}
 }
 
-// Of is a read-only hasher with no shared state, so concurrent calls against
-// the same file must return the same digest with no race (the per-phase
-// integrity capture hashes the running binary from each phase's goroutine).
-// Run with -race to prove it.
 func TestOf_ConcurrentSafe(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -83,7 +79,6 @@ func TestOf_ConcurrentSafe(t *testing.T) {
 
 func TestOf_DirectoryReadError(t *testing.T) {
 	dir := t.TempDir()
-	// Open on a directory succeeds on Unix, but reading it should fail.
 	_, err := Of(dir)
 	if err == nil {
 		t.Fatal("expected an error when hashing a directory")

@@ -1,14 +1,5 @@
-// Package rawgitratchet keeps new raw git fixtures out of the module's tests.
-// A test outside internal/gittest that builds its own git repository fails the
-// ratchet unless its file is listed in baseline.json, and a listed file's
-// count of init sites may only shrink until its entry disappears. The fixture
-// home is internal/gittest, whose repos keep git's detached maintenance child
-// from racing t.TempDir() removal.
-//
-// The scan binds the module's git-tracked test files, index-staged included,
-// so an untracked file never reds it (ADR-0084 I1). When git cannot answer —
-// the module is not in a work tree — every on-disk test file is bound instead:
-// the strict direction, never bind-none.
+// Package rawgitratchet keeps new raw git fixtures out of the module's
+// tests.
 package rawgitratchet
 
 import (
@@ -29,15 +20,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
-// OwnerDir is the module-relative directory whose tests may build git
-// repositories: the sanctioned fixture package and everything under it.
 const OwnerDir = "internal/gittest"
 
-// BoundTestFiles returns the sorted, module-relative slash paths of the
-// _test.go files under root that the ratchet binds: the git-tracked ones, or
-// every on-disk one when git cannot list them, in which case note says why.
-// Directories named vendor or testdata, or starting with "." or "_", are
-// never bound; an empty binding set is an error.
 func BoundTestFiles(root string) (files []string, note string, err error) {
 	tracked, gitErr := repostate.TrackedTree(root, ".")
 	if gitErr == nil {
@@ -105,13 +89,6 @@ func onDiskTestFiles(root string) ([]string, error) {
 	return files, nil
 }
 
-// Sites counts the raw git init sites in files (module-relative slash paths
-// under root) outside OwnerDir, keyed by file; files without a site are
-// absent. A site is an "init" string literal passed to a call or listed in a
-// composite literal, in a file whose directory holds a bound test file with a
-// "git" string literal — so a helper in a sibling file that spawns git counts
-// as much as an inline exec.Command. A listed file missing from disk is
-// skipped; one that does not parse is an error.
 func Sites(root string, files []string) (map[string]int, error) {
 	inits := map[string]int{}
 	gitDirs := map[string]bool{}
@@ -177,8 +154,6 @@ func isString(lit *ast.BasicLit, want string) bool {
 	return err == nil && s == want
 }
 
-// LoadBaseline reads the list of existing call sites: a flat JSON object of
-// module-relative test file to its allowed init-site count, each at least 1.
 func LoadBaseline(p string) (map[string]int, error) {
 	body, err := os.ReadFile(p)
 	if err != nil {
@@ -199,10 +174,6 @@ func LoadBaseline(p string) (map[string]int, error) {
 	return baseline, nil
 }
 
-// Check returns nil when sites matches baseline exactly, else one error
-// naming every file that differs: an unlisted file with a site, a listed file
-// with more sites than allowed, or fewer (lower or remove its entry, so a
-// migration frees no slot).
 func Check(sites, baseline map[string]int) error {
 	var problems []string
 	for file, n := range sites {
