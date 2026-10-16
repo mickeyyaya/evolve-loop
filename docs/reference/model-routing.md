@@ -12,8 +12,8 @@ Each profile in `.evolve/profiles/` names a default tier and an envelope (`model
 |---|---|---|---|---|
 | `fast` | haiku | Gemini 3.8 Flash (Low) | Claude Sonnet 5.5 (Low) | gpt-5.6-luna |
 | `balanced` | sonnet | Gemini 3.8 Flash (High) | Claude Sonnet 5.5 (Medium) | gpt-5.6-terra |
-| `deep` | opus | Gemini 3.1 Pro (High) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
-| `top` | opus | Gemini 3.1 Pro (High) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
+| `deep` | opus | Gemini 4 Argon (Medium) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
+| `top` | opus | Gemini 4 Argon (High) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
 
 In Claude Code 2.1.293, the `haiku` alias of the `fast` tier resolves to Haiku 5.5 (checked on 2026-10-08). agy has no Haiku model, so the `fast` tier of `agy-claude-tmux` is Claude Sonnet 5.5 (Low).
 
@@ -52,7 +52,7 @@ On `agy-claude-tmux`, the effort selects the variant suffix of the model name, b
 Since v22.27.0, one table in `.evolve/policy.json` (`cli_routing`) decides which CLI runs each dispatch ([ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md)). The table of this repository has these rules:
 
 - A phase below the deep tier runs agy first, at the `balanced` tier (see the table above). Then it runs agy-owned Claude (`agy-claude`), then Claude Code. `evolve cli-routing explain <agent>` prints the chain and the model at the tier of the agent.
-- A phase at the deep or the top tier runs agy-owned Claude first, then Claude Code.
+- A phase at the deep or the top tier runs agy-owned Claude first, then agy's Gemini 4 Argon, then Claude Code. Gemini 4 Argon is the successor of Gemini 3.1 Pro, which agy no longer lists. The operator added it on 2026-10-16, so a benched agy Claude group falls to agy's own quota before Claude Code.
 - The Claude-family floor agents (the auditor, the adversarial review, the tdd engineer, the code reviewer and the spec verifiers) run Claude Code only.
 - Codex runs only under `--bypass-policy`.
 
