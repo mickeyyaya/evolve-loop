@@ -1,5 +1,5 @@
 ---
-description: "Use when the user asks whether a release is ready, or to gate/verify release criteria before publishing. A thin readiness-gate that runs the existing read-only verifiers (evolve release-preflight, evolve release-consistency), adds the CI-green-on-main and no-WIP-commit checks they don't cover, then delegates execution to /evo:publish. Does NOT reimplement the release pipeline."
+description: "Use when the user asks whether a release is ready, or to gate/verify release criteria before publishing. A thin readiness-gate that runs the existing read-only verifiers (evolve release-preflight --require-ci, evolve release-consistency), then delegates execution to /evo:publish. Does NOT reimplement the release pipeline."
 argument-hint: "<target-version> [--dry-run]"
 ---
 

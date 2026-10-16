@@ -43,6 +43,7 @@ type Options struct {
 	LedgerPath     string
 
 	AllowRedCI bool
+	RequireCI  bool
 
 	Now              func() time.Time
 	GitClean         func(repoRoot string) (bool, error)
@@ -52,6 +53,7 @@ type Options struct {
 	SimulationRunner func(repoRoot string) error
 	CIConclusion     func(repoRoot string) (CIRunStatus, error)
 	HeadSHA          func(repoRoot string) (string, error)
+	WIPCommits       func(repoRoot string) ([]string, error)
 }
 
 type CIRunStatus struct {
@@ -231,6 +233,31 @@ func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 	return CIRunStatus{Conclusion: runs[0].Conclusion, RunURL: runs[0].URL}, nil
 }
 
+var wipSubjectRE = regexp.MustCompile(`^(WIP|fixup!|squash!|amend!)`)
+
+func defaultWIPCommits(repoRoot string) ([]string, error) {
+	logRange := "HEAD"
+	if tag, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "describe", "--tags", "--abbrev=0").Output(); err == nil {
+		logRange = strings.TrimSpace(string(tag)) + "..HEAD"
+	}
+	out, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "log", "--format=%h %s", logRange).Output()
+	if err != nil {
+		return nil, fmt.Errorf("git log %s: %w", logRange, err)
+	}
+	return wipCommitLines(string(out)), nil
+}
+
+func wipCommitLines(gitLog string) []string {
+	var wip []string
+	for _, line := range strings.Split(gitLog, "\n") {
+		_, subject, ok := strings.Cut(line, " ")
+		if ok && wipSubjectRE.MatchString(subject) {
+			wip = append(wip, line)
+		}
+	}
+	return wip
+}
+
 func Run(opts Options) (Result, error) {
 	o, err := resolve(opts)
 	if err != nil {
@@ -243,6 +270,9 @@ func Run(opts Options) (Result, error) {
 			return p.res, err
 		}
 		p.res.StepsPassed++
+	}
+	if err := p.gateNoWIPCommits(); err != nil {
+		return p.res, err
 	}
 	if err := p.gateReleaseCommitCI(); err != nil {
 		return p.res, err

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
@@ -20,6 +21,7 @@ type resolved struct {
 	skipTests  bool
 	strictPass bool
 	allowRedCI bool
+	requireCI  bool
 
 	now              func() time.Time
 	gitClean         func(string) (bool, error)
@@ -29,6 +31,7 @@ type resolved struct {
 	simulationRunner func(string) error
 	ciConclusion     func(string) (CIRunStatus, error)
 	headSHA          func(string) (string, error)
+	wipCommits       func(string) ([]string, error)
 }
 
 func resolve(opts Options) (resolved, error) {
@@ -44,6 +47,7 @@ func resolve(opts Options) (resolved, error) {
 		skipTests:        opts.SkipTests,
 		strictPass:       opts.StrictPass,
 		allowRedCI:       opts.AllowRedCI,
+		requireCI:        opts.RequireCI,
 		now:              opts.Now,
 		gitClean:         opts.GitClean,
 		currentBranch:    opts.CurrentBranch,
@@ -52,6 +56,7 @@ func resolve(opts Options) (resolved, error) {
 		simulationRunner: opts.SimulationRunner,
 		ciConclusion:     opts.CIConclusion,
 		headSHA:          opts.HeadSHA,
+		wipCommits:       opts.WIPCommits,
 	}
 	r.applyDefaults()
 	return r, nil
@@ -87,6 +92,9 @@ func (r *resolved) applyDefaults() {
 	}
 	if r.headSHA == nil {
 		r.headSHA = defaultHeadSHA
+	}
+	if r.wipCommits == nil {
+		r.wipCommits = defaultWIPCommits
 	}
 }
 
@@ -247,6 +255,24 @@ func (p *preflightRun) stepGateSuites() error {
 	return nil
 }
 
+func (p *preflightRun) gateNoWIPCommits() error {
+	p.logf("no WIP commits since the last tag?")
+	if p.o.dryRun {
+		p.logf("DRY-RUN: would scan commit subjects since the last tag for WIP, fixup!, squash! and amend!")
+		return nil
+	}
+	wip, err := p.o.wipCommits(p.o.repoRoot)
+	if err != nil {
+		return fmt.Errorf("%w: WIP-commit scan error: %v", ErrCheckFailed, err)
+	}
+	if len(wip) > 0 {
+		return fmt.Errorf("%w: %d WIP commit(s) since the last tag — squash or reword them first:\n  %s",
+			ErrCheckFailed, len(wip), strings.Join(wip, "\n  "))
+	}
+	p.logf("OK: no WIP commits since the last tag")
+	return nil
+}
+
 func (p *preflightRun) gateReleaseCommitCI() error {
 	p.logf("release-commit CI conclusion green?")
 	if p.o.dryRun {
@@ -259,6 +285,9 @@ func (p *preflightRun) gateReleaseCommitCI() error {
 	}
 	p.res.CIConclusion = ci.Conclusion
 	switch {
+	case ci.Conclusion == ciConclusionUnavailable && p.o.requireCI:
+		return fmt.Errorf("%w: release-commit CI conclusion unavailable (no run visible / gh unavailable) and --require-ci is set",
+			ErrCheckFailed)
 	case ci.Conclusion == ciConclusionUnavailable:
 		p.logf("advisory: remote CI conclusion unavailable (no run visible / gh unavailable) — /publish's CI-green check remains authoritative")
 	case ci.Conclusion == "success":

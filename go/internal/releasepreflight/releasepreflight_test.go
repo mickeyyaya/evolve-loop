@@ -44,6 +44,7 @@ func stubOpts(repo, target string) Options {
 		GitClean:       func(string) (bool, error) { return true, nil },
 		CurrentBranch:  func(string) (string, error) { return "main", nil },
 		GateTestRunner: func(string, string) error { return nil },
+		WIPCommits:     func(string) ([]string, error) { return nil, nil },
 	}
 }
 

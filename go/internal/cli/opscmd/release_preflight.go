@@ -10,11 +10,13 @@ import (
 )
 
 func printReleasePreflightUsage(stdout io.Writer) {
-	fmt.Fprintln(stdout, "Usage: evolve release-preflight <target-version> [--dry-run] [--skip-tests] [--strict-pass] [--allow-red-ci]")
+	fmt.Fprintln(stdout, "Usage: evolve release-preflight <target-version> [--dry-run] [--skip-tests] [--strict-pass] [--allow-red-ci] [--require-ci]")
 	fmt.Fprintln(stdout, "5-step gate: clean tree | branch attached | semver bump | recent audit PASS | gate-tests green.")
+	fmt.Fprintln(stdout, "Plus the no-WIP gate: no commit subject since the last tag may start with WIP, fixup!, squash! or amend!.")
 	fmt.Fprintln(stdout, "Plus the release-commit CI hard-gate: the remote go CI run for HEAD must be conclusion=success.")
 	fmt.Fprintln(stdout, "  --strict-pass   reject WARN verdicts (treat WARN as FAIL)")
 	fmt.Fprintln(stdout, "  --allow-red-ci  explicit override: proceed on a non-green release-commit CI (logged loudly)")
+	fmt.Fprintln(stdout, "  --require-ci    fail when no remote CI verdict is visible (advisory without the flag)")
 }
 
 type releasePreflightFlags struct {
@@ -23,6 +25,7 @@ type releasePreflightFlags struct {
 	skipTests  bool
 	strictPass bool
 	allowRedCI bool
+	requireCI  bool
 }
 
 func parseReleasePreflightArgs(args []string, stdout, stderr io.Writer) (f releasePreflightFlags, code int, done bool) {
@@ -39,6 +42,8 @@ func parseReleasePreflightArgs(args []string, stdout, stderr io.Writer) (f relea
 			f.strictPass = true
 		case a == "--allow-red-ci":
 			f.allowRedCI = true
+		case a == "--require-ci":
+			f.requireCI = true
 		case len(a) >= 2 && a[:2] == "--":
 			fmt.Fprintf(stderr, "[preflight] unknown flag: %s\n", a)
 			return f, 10, true
@@ -75,6 +80,7 @@ func RunReleasePreflight(args []string, _ io.Reader, stdout, stderr io.Writer) i
 		SkipTests:  f.skipTests,
 		StrictPass: f.strictPass,
 		AllowRedCI: f.allowRedCI,
+		RequireCI:  f.requireCI,
 		Stderr:     stderr,
 	}
 	_, err := releasePreflightRun(opts)

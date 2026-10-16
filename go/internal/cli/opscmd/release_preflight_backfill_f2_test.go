@@ -33,12 +33,12 @@ func TestRunReleasePreflight_MapsEachRunOutcomeToExitCodeAndMessageF2(t *testing
 			t.Setenv("EVOLVE_PROJECT_ROOT", "/the/root")
 			var out, errb bytes.Buffer
 
-			rc := RunReleasePreflight([]string{"1.2.3", "--dry-run", "--skip-tests", "--strict-pass", "--allow-red-ci"}, nil, &out, &errb)
+			rc := RunReleasePreflight([]string{"1.2.3", "--dry-run", "--skip-tests", "--strict-pass", "--allow-red-ci", "--require-ci"}, nil, &out, &errb)
 
 			if rc != tc.wantRC || (tc.wantStderr == "") != (errb.Len() == 0) || !strings.Contains(errb.String(), tc.wantStderr) {
 				t.Errorf("rc=%d stderr=%q, want %d containing %q", rc, errb.String(), tc.wantRC, tc.wantStderr)
 			}
-			if got.Target != "1.2.3" || got.RepoRoot != "/the/root" || !got.DryRun || !got.SkipTests || !got.StrictPass || !got.AllowRedCI || got.Stderr != &errb {
+			if got.Target != "1.2.3" || got.RepoRoot != "/the/root" || !got.DryRun || !got.SkipTests || !got.StrictPass || !got.AllowRedCI || !got.RequireCI || got.Stderr != &errb {
 				t.Errorf("options = %+v, want every flag, the target and the project root forwarded", got)
 			}
 		})

@@ -553,7 +553,7 @@ approval-request flow, and the codesign alternative — see
 
 Pipeline lifecycle: the one home of the release lifecycle is [publishing-releases.md](../guides/publishing-releases.md). In short, `evolve release` runs these steps:
 
-1. pre-flight (`evolve release-preflight`), with the check of the `required.yml` run of `HEAD`;
+1. pre-flight (`evolve release-preflight`), with the `required.yml` run of `HEAD` and the no-WIP gate (see below);
 2. the changelog (`evolve changelog-gen`, conventional commits);
 3. the version bump (`evolve version-bump`);
 4. the rebuild of `go/evolve`;
@@ -563,6 +563,8 @@ Pipeline lifecycle: the one home of the release lifecycle is [publishing-release
 8. the release verify.
 
 If a step after the push fails, `evolve rollback` reverts the release.
+
+The no-WIP gate fails the pre-flight when a commit subject since the last tag starts with `WIP`, `fixup!`, `squash!` or `amend!`. An unavailable CI verdict is advisory. `--require-ci` makes it fail.
 
 **Demote-on-failure net (#394, landed 2026-07-31; proven live at v22.13.0):** the local ship pipeline
 publishes the tag's GitHub release listing BEFORE the remote workflow's suite runs. When that suite fails,

@@ -37,6 +37,7 @@ func poisonedOpts(t *testing.T, failAt string) (Options, *seamCounters) {
 			}
 			return "main", nil
 		},
+		WIPCommits: func(string) ([]string, error) { return nil, nil },
 		HeadSHA: func(string) (string, error) {
 			c.headSHA++
 			return "deadbeef", nil
