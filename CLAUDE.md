@@ -103,7 +103,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - The resolution is policy pin > live catalog > manifest baseline. The manifest `codex-tmux.json` is the ONE tier table of the family.
 - Since 2026-10-07 the `cli_routing` table decides every dispatch:
   - Every non-deep, non-top phase runs agy first (Gemini 3.8 Flash High at balanced). No tracked profile defaults to fast, and no tracked profile lets an envelope fall to fast.
-  - Deep and top seats run agy-owned Claude first (`agy-claude-tmux`, Claude Opus 5.5). Then they run agy's Gemini 4 Argon, then Claude Code (since 2026-10-16). `agy-claude-tmux` waits up to 10 s for a claude-family footer label before the prompt. If no label shows, it exits 87. Exit 87 is a walk trigger, so the seat falls through. The usage query that follows can bench an exhausted Claude group, and preflight only warns on it.
+  - Deep and top seats run agy-owned Claude first (`agy-claude-tmux`, Claude Opus 5.5), then Claude Code. agy's Gemini 4 Argon is out of the chain until inbox `agy-model-429-benches-whole-family` lands: one Argon quota wall benches all of agy. `agy-claude-tmux` waits up to 10 s for a claude-family footer label before the prompt. If no label shows, it exits 87. Exit 87 is a walk trigger, so the seat falls through. The usage query that follows can bench an exhausted Claude group, and preflight only warns on it.
   - The claudeFamilyFloor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only.
   - codex is reachable only under `--bypass-policy`.
   - `evolve cli-routing explain <agent>` prints the chain of any agent.
