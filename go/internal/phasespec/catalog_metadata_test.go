@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// metadataAllowlist is the shrink-only backlog of optional phases still lacking SELECT metadata.
 var metadataAllowlist = map[string]bool{
 	"accessibility-audit": true, "account-reconcile": true, "adversarial-review": true,
 	"api-contract-design": true, "architecture-design": true, "authz-gap-scan": true,

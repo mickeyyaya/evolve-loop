@@ -526,6 +526,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/consensusdispatch` | 3 | [internal-consensusdispatch.md](internal-consensusdispatch.md) |
 | `internal/continuation` | 11 | [internal-continuation.md](internal-continuation.md) |
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
+| `internal/core/carryover` | 11 | [internal-core-carryover.md](internal-core-carryover.md) |
 | `internal/core/defectledger` | 19 | [internal-core-defectledger.md](internal-core-defectledger.md) |
 | `internal/core/failurelearning` | 14 | [internal-core-failurelearning.md](internal-core-failurelearning.md) |
 | `internal/core` | 948 | [internal-core.md](internal-core.md) |
@@ -533,6 +534,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/cyclecost` | 6 | [internal-cyclecost.md](internal-cyclecost.md) |
 | `internal/cyclehealth` | 11 | [internal-cyclehealth.md](internal-cyclehealth.md) |
 | `internal/cycleoutcome` | 25 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
+| `internal/cyclesimulator` | 2 | [internal-cyclesimulator.md](internal-cyclesimulator.md) |
 | `internal/cyclestate` | 24 | [internal-cyclestate.md](internal-cyclestate.md) |
 | `internal/dashboard` | 8 | [internal-dashboard.md](internal-dashboard.md) |
 | `internal/deliverable/gatesignal` | 2 | [internal-deliverable-gatesignal.md](internal-deliverable-gatesignal.md) |
@@ -545,6 +547,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/faillearn` | 19 | [internal-faillearn.md](internal-faillearn.md) |
 | `internal/failureadapter` | 9 | [internal-failureadapter.md](internal-failureadapter.md) |
 | `internal/failurelog` | 9 | [internal-failurelog.md](internal-failurelog.md) |
+| `internal/fanoutdispatch` | 4 | [internal-fanoutdispatch.md](internal-fanoutdispatch.md) |
 | `internal/flagregistry` | 7 | [internal-flagregistry.md](internal-flagregistry.md) |
 | `internal/fleet` | 30 | [internal-fleet.md](internal-fleet.md) |
 | `internal/fleetbudget` | 2 | [internal-fleetbudget.md](internal-fleetbudget.md) |
@@ -557,6 +560,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/installer` | 2 | [internal-installer.md](internal-installer.md) |
 | `internal/interaction` | 19 | [internal-interaction.md](internal-interaction.md) |
 | `internal/ipcenv` | 1 | [internal-ipcenv.md](internal-ipcenv.md) |
+| `internal/ledgerverify` | 4 | [internal-ledgerverify.md](internal-ledgerverify.md) |
 | `internal/llmcalls` | 1 | [internal-llmcalls.md](internal-llmcalls.md) |
 | `internal/llmroute` | 23 | [internal-llmroute.md](internal-llmroute.md) |
 | `internal/loopchain` | 12 | [internal-loopchain.md](internal-loopchain.md) |
@@ -577,6 +581,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phaseregistrar` | 10 | [internal-phaseregistrar.md](internal-phaseregistrar.md) |
 | `internal/phases/audit/ciparitygate` | 18 | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
 | `internal/phases/audit` | 170 | [internal-phases-audit.md](internal-phases-audit.md) |
+| `internal/phases/build` | 13 | [internal-phases-build.md](internal-phases-build.md) |
 | `internal/phases/retro` | 25 | [internal-phases-retro.md](internal-phases-retro.md) |
 | `internal/phases/runner/verdict` | 22 | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/phases/runner` | 78 | [internal-phases-runner.md](internal-phases-runner.md) |
@@ -586,7 +591,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phases/specrunner` | 15 | [internal-phases-specrunner.md](internal-phases-specrunner.md) |
 | `internal/phases/swarmrunner` | 9 | [internal-phases-swarmrunner.md](internal-phases-swarmrunner.md) |
 | `internal/phases/triage` | 26 | [internal-phases-triage.md](internal-phases-triage.md) |
-| `internal/phasespec` | 60 | [internal-phasespec.md](internal-phasespec.md) |
+| `internal/phasespec` | 61 | [internal-phasespec.md](internal-phasespec.md) |
 | `internal/phasestream` | 20 | [internal-phasestream.md](internal-phasestream.md) |
 | `internal/phasetiming` | 9 | [internal-phasetiming.md](internal-phasetiming.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
@@ -603,6 +608,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/releasepreflight` | 14 | [internal-releasepreflight.md](internal-releasepreflight.md) |
 | `internal/reportdoc` | 20 | [internal-reportdoc.md](internal-reportdoc.md) |
 | `internal/repostate` | 1 | [internal-repostate.md](internal-repostate.md) |
+| `internal/research` | 3 | [internal-research.md](internal-research.md) |
 | `internal/resolvellm` | 1 | [internal-resolvellm.md](internal-resolvellm.md) |
 | `internal/rollback` | 3 | [internal-rollback.md](internal-rollback.md) |
 | `internal/router` | 93 | [internal-router.md](internal-router.md) |
@@ -625,3 +631,4 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/triagecap` | 69 | [internal-triagecap.md](internal-triagecap.md) |
 | `internal/verifylock` | 2 | [internal-verifylock.md](internal-verifylock.md) |
 | `pkg/acsassert` | 5 | [pkg-acsassert.md](pkg-acsassert.md) |
+| `pkg/phaseproto` | 1 | [pkg-phaseproto.md](pkg-phaseproto.md) |

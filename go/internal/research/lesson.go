@@ -1,9 +1,5 @@
-// Package research is the programmatic knowledge-base port: it gives the
-// orchestrator and advisor a typed, deterministic way to query the lessons
-// corpus (.evolve/instincts/lessons/*.yaml) when interpreting a failure — the
-// "recall memory" tier of the three-tier memory model. KB search was previously
-// shell-only (scripts/research/kb-search.sh, agent-invoked); this package makes
-// it a first-class Go capability with no LLM in the loop (ranking is pure code).
+// Package research is the typed, deterministic query port over the lessons corpus.
+// See docs/architecture/packages/internal-research.md.
 package research
 
 import (
@@ -14,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
 )
 
-// Lesson is the typed view of one entry in a .evolve/instincts/lessons/*.yaml
-// file (schema: skills/loop/lesson-template.yaml). The flattened
-// failureContext fields are the ones relevant to taxonomy-shaped lookup.
 type Lesson struct {
 	ID               string
 	Pattern          string
@@ -26,14 +19,12 @@ type Lesson struct {
 	Type             string
 	Category         string
 	PreventiveAction string
-	FailedStep       string // failureContext.failedStep — matches Query.Source
-	ErrorCategory    string // failureContext.errorCategory
-	AuditVerdict     string // failureContext.auditVerdict
-	Path             string // source file (forensic; not part of equality)
+	FailedStep       string
+	ErrorCategory    string
+	AuditVerdict     string
+	Path             string
 }
 
-// Digest renders a one-line summary for the advisor's recall-memory prompt
-// section. Deterministic and compact.
 func (l Lesson) Digest() string {
 	action := l.PreventiveAction
 	if action == "" {
@@ -42,8 +33,6 @@ func (l Lesson) Digest() string {
 	return l.ID + " (" + l.Pattern + "): " + firstSentence(action)
 }
 
-// lessonYAML mirrors the on-disk schema for unmarshalling. Each file is a YAML
-// list of these (one root cause per entry).
 type lessonYAML struct {
 	ID               string  `yaml:"id"`
 	Pattern          string  `yaml:"pattern"`
@@ -60,9 +49,6 @@ type lessonYAML struct {
 	} `yaml:"failureContext"`
 }
 
-// parseLessonFile reads one YAML file and returns its lessons. A malformed file
-// yields an error (the caller decides whether to skip or fail) — never a silent
-// empty result, so corpus rot surfaces.
 func parseLessonFile(path string) ([]Lesson, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -92,8 +78,6 @@ func parseLessonFile(path string) ([]Lesson, error) {
 	return out, nil
 }
 
-// firstSentence trims a body to its first sentence (or the whole thing if short)
-// so digests stay one line.
 func firstSentence(s string) string {
 	s = strings.TrimSpace(s)
 	if i := strings.IndexAny(s, ".\n"); i > 0 {
@@ -102,9 +86,6 @@ func firstSentence(s string) string {
 	return s
 }
 
-// listLessonFiles returns every *.yaml under root (non-recursive walk of the
-// lessons dir; lessons are flat by convention). Missing root ⇒ empty, not error
-// (an absent corpus is normal, not a failure).
 func listLessonFiles(root string) []string {
 	entries, err := os.ReadDir(root)
 	if err != nil {

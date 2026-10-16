@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// Add a phase here when its persona starts writing source.
-// See ADR-0097.
 func TestUserSpecs_SourceWritersDeclareWritesSource(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {

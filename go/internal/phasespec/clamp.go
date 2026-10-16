@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// ClampDiscoveredSpecs forces discovered specs optional and keeps writes_source only if sandboxedProfile verifies it; nil fails closed.
 func ClampDiscoveredSpecs(specs []PhaseSpec, sandboxedProfile func(profileName string) bool) ([]PhaseSpec, []string) {
 	var warnings []string
 	out := make([]PhaseSpec, len(specs))
@@ -17,7 +16,6 @@ func ClampDiscoveredSpecs(specs []PhaseSpec, sandboxedProfile func(profileName s
 			s.Optional = true
 		}
 		if s.WritesSource {
-			// The runner resolves the dispatch profile by this same name.
 			profile := strings.TrimPrefix(s.AgentName(), "evolve-")
 			if sandboxedProfile == nil || !sandboxedProfile(profile) {
 				warnings = append(warnings, fmt.Sprintf("user phase %s claims writes_source:true but its dispatch profile %q is not a sandbox-enabled registrar-minted profile — writes_source STRIPPED (worktree-write eligibility denied; ADR-0073 on-disk-spec trust gap)", s.Name, profile))
@@ -29,7 +27,6 @@ func ClampDiscoveredSpecs(specs []PhaseSpec, sandboxedProfile func(profileName s
 	return out, warnings
 }
 
-// SandboxedProfilePredicate reports whether <profilesDir>/<name>.json is a sandbox-enabled, repo-writable profile.
 func SandboxedProfilePredicate(profilesDir string) func(name string) bool {
 	loader := profiles.NewFromDir(profilesDir)
 	return func(name string) bool {
@@ -37,7 +34,6 @@ func SandboxedProfilePredicate(profilesDir string) func(name string) bool {
 		if err != nil {
 			return false
 		}
-		// Mirrors the registrar's writer clamp: a read-only sandbox grants eligibility without write capability.
 		return p.Sandbox != nil && p.Sandbox.Enabled && !p.Sandbox.ReadOnlyRepo
 	}
 }

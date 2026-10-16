@@ -161,3 +161,11 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/bridge/launchoutcome` | what one bridge launch exit means: the exit table, the cause line and the outcome projections | [internal-bridge-launchoutcome.md](internal-bridge-launchoutcome.md) |
 | `internal/installer` | copies and removes the evolve-loop agents and loop skill under `~/.claude`, and validates the plugin layout in CI | [internal-installer.md](internal-installer.md) |
 | `internal/core/failurelearning` | the deterministic half of learning from a failed phase: the recorder, the floor and the recurrence closure | [internal-core-failurelearning.md](internal-core-failurelearning.md) |
+| `internal/core/carryover` | the lifecycle of the `carryoverTodos[]` array in `state.json`: mint admission, closeout merges, retirement and persist | [internal-core-carryover.md](internal-core-carryover.md) |
+| `internal/phases/build` | the GREEN code-writer phase: its prompt blocks and its verdict classification | [internal-phases-build.md](internal-phases-build.md) |
+| `internal/fanoutdispatch` | runs the commands of a TSV file as bounded parallel workers and merges their exit codes | [internal-fanoutdispatch.md](internal-fanoutdispatch.md) |
+| `internal/cyclesimulator` | walks every phase of a cycle with no LLM call and appends simulated ledger entries | [internal-cyclesimulator.md](internal-cyclesimulator.md) |
+| `pkg/phaseproto` | the public wire protocol between the orchestrator and out-of-process phase agents | [pkg-phaseproto.md](pkg-phaseproto.md) |
+| `internal/research` | the typed, deterministic query port over the lessons corpus | [internal-research.md](internal-research.md) |
+| `internal/logfilter` | writes the human-readable clean companion of a raw phase stdout log | [internal-logfilter.md](internal-logfilter.md) |
+| `internal/ledgerverify` | asserts from the ledger that a cycle ran its required roles end to end | [internal-ledgerverify.md](internal-ledgerverify.md) |

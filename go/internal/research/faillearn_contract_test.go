@@ -1,13 +1,5 @@
 package research
 
-// SCHEMA-PARITY GUARD (do not "clean up" the faillearn import): this
-// white-box test is the producer/consumer contract between
-// faillearn.RenderLessonYAML (deterministic fallback lesson writer) and
-// parseLessonFile (the only corpus reader). It exists so the two
-// packages can stay decoupled — faillearn a leaf, research the reader —
-// without the twin-schema silent-divergence risk. If either side
-// changes shape, this test fails first.
-
 import (
 	"os"
 	"path/filepath"
@@ -18,10 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 )
 
-// If this count drifts, a field was added to research.lessonYAML that
-// faillearn.RenderLessonYAML may not be writing (or vice versa): update
-// faillearn's twin schema struct AND the assertions below together.
-const expectedLessonSchemaFields = 9 // 8 scalar fields + failureContext
+const expectedLessonSchemaFields = 9
 
 func TestLessonSchema_FieldCountPinsFaillearnParity(t *testing.T) {
 	if n := reflect.TypeOf(lessonYAML{}).NumField(); n != expectedLessonSchemaFields {
@@ -30,8 +19,6 @@ func TestLessonSchema_FieldCountPinsFaillearnParity(t *testing.T) {
 }
 
 func TestParseLessonFile_RoundTripsFaillearnRender(t *testing.T) {
-	// Fixture intentionally mirrors faillearn_test.go:fixtureEvent —
-	// keep the two in sync (cross-package test helpers can't be shared).
 	ev := faillearn.FailureEvent{
 		Cycle:          243,
 		FailedPhase:    "retrospective",
@@ -60,7 +47,6 @@ func TestParseLessonFile_RoundTripsFaillearnRender(t *testing.T) {
 	}
 
 	l := lessons[0]
-	// All 11 corpus fields must survive the round trip.
 	if l.ID != id {
 		t.Errorf("ID = %q, want %q", l.ID, id)
 	}

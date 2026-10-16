@@ -24,7 +24,6 @@ func TestArtifactGate_JSONRoundTrip(t *testing.T) {
 		t.Errorf("gate round-trip lost data: %+v", rt.Gate)
 	}
 
-	// Matching `"gate":` with the colon keeps the distinct "gates" key from matching.
 	bare, _ := json.Marshal(PhaseSpec{Name: "scout"})
 	if strings.Contains(string(bare), `"gate":`) {
 		t.Errorf("unset gate must be omitted:\n%s", bare)

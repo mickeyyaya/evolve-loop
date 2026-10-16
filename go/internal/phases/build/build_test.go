@@ -1,5 +1,3 @@
-// Tests for the build phase. Verifies the "## Files Modified" verdict
-// trigger and cost telemetry passthrough.
 package build
 
 import (
@@ -110,10 +108,6 @@ func TestRun_NoFilesModified_FAIL(t *testing.T) {
 	}
 }
 
-// TestClassifyArtifact_HeadingVariants — cycle-192: the builder template's
-// changed-files heading drifted to "## Changes"; the classifier must accept it
-// (and the legacy/template variants) or a valid build report false-FAILs and
-// trips the auditor cross-check, blocking ship.
 func TestClassifyArtifact_HeadingVariants(t *testing.T) {
 	for _, h := range []string{"## Changes", "## Files Changed", "## Files Modified"} {
 		body := "# Build Report\n\n" + h + "\n- foo.go\n"
@@ -166,11 +160,6 @@ func TestRun_BridgeError_FAIL(t *testing.T) {
 	}
 }
 
-// --- v12.1 Capability 1: plan-mode + extra-flags wiring tests ---
-
-// writeProfile materializes a build profile JSON under
-// <projectRoot>/.evolve/profiles/build.json so resolveExtraFlags can
-// read it via the real loader. Returns the projectRoot.
 func writeProfile(t *testing.T, contents string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -184,9 +173,6 @@ func writeProfile(t *testing.T, contents string) string {
 	return root
 }
 
-// TestRun_NoProfile_EmptyExtraFlags — missing profile is non-fatal;
-// ExtraFlags stays nil/empty. Regression guard against breaking the
-// build phase on fresh projects with no .evolve/profiles/.
 func TestRun_NoProfile_EmptyExtraFlags(t *testing.T) {
 	body := "# Build Report\n## Files Modified\n- a.go\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -202,8 +188,6 @@ func TestRun_NoProfile_EmptyExtraFlags(t *testing.T) {
 	}
 }
 
-// TestRun_NoProfile_EnvAloneStillWires — even without a profile, the
-// env override produces a --permission-mode flag.
 func TestRun_NoProfile_EnvAloneStillWires(t *testing.T) {
 	body := "# Build Report\n## Files Modified\n- a.go\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -219,11 +203,6 @@ func TestRun_NoProfile_EnvAloneStillWires(t *testing.T) {
 		t.Errorf("env-only permission mode not propagated; got %q", fb.gotReq.PermissionMode)
 	}
 }
-
-// Direct unit tests for the resolver moved to
-// internal/phaseflags/phaseflags_test.go when the helper was extracted
-// in v12.1.0 second slice. The phase-runner-level integration tests
-// above (TestRun_*) still exercise the resolver end-to-end through Run.
 
 func TestRun_MissingBridge_ReturnsError(t *testing.T) {
 	phase := New(Config{Prompts: fakePromptsFS("body")})

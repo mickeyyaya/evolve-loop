@@ -9,11 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// Test 47 (ADR-0103 unit 09) — the consumer pin of the ledger's vocabulary:
-// PrescriptionPrefix projects the leaf's; MergePrescriptions over a ledger the
-// leaf wrote keeps exactly the OPEN + prefixed rows, skips a FIXED
-// prescription and an ordinary defect, and STILL tolerates a padded " OPEN"
-// (preserved quirk Q3 — the lifecycle's TrimSpace compare).
 func TestCarryover_ProjectsTheLedgerVocabulary(t *testing.T) {
 	if PrescriptionPrefix != defectledger.PrescriptionPrefix {
 		t.Fatalf("PrescriptionPrefix = %q, the leaf spells %q", PrescriptionPrefix, defectledger.PrescriptionPrefix)

@@ -24,7 +24,6 @@ func TestTwoTierNaming_MultiWordAccepted(t *testing.T) {
 	}
 }
 
-// "scanner-" passes nameRE (a trailing hyphen is allowed), so only twoTierNameRE catches it.
 func TestTwoTierNaming_MalformedRejected(t *testing.T) {
 	malformed := []string{"scanner-", "scan--go"}
 	for _, name := range malformed {

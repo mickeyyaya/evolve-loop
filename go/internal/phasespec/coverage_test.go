@@ -50,7 +50,7 @@ func TestCatalog_Merge_DuplicateUserPhase(t *testing.T) {
 }
 
 func TestCatalog_UserPhases(t *testing.T) {
-	builtin, err := Load(writeRegistry(t, fullRegistry)) // scout, security-scan (built-in)
+	builtin, err := Load(writeRegistry(t, fullRegistry))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

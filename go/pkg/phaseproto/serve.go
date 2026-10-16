@@ -11,20 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Handler is the subprocess-side function that processes one request
-// and emits a response. Returned *WireError values are surfaced
-// verbatim; other errors are wrapped as CodeHandlerError.
 type Handler func(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error)
 
-// ServeStdio is the symmetric server-side helper for subprocess agents
-// written in Go. It reads exactly one request envelope from `in`,
-// invokes `h`, and writes one response (or error) envelope to `out`,
-// followed by a newline.
-//
-// The contract is intentionally one-shot: each child process handles
-// one envelope and exits. This matches the SubprocessRunner.Run
-// behaviour (one process per Run) so neither side needs to manage
-// long-lived stream state.
 func ServeStdio(in io.Reader, out io.Writer, h Handler) error {
 	br := bufio.NewReader(in)
 	line, err := br.ReadBytes('\n')

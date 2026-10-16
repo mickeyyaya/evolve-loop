@@ -7,18 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Phase 4 task #19: structural perf benchmarks. NO LLM calls. Measures
-// the in-process wire-protocol overhead a real cycle would incur once
-// per phase boundary.
-//
-// Targets per parent plan §6 item 8: "hot-path performance, Go median
-// ≤ bash median × 0.6". These benchmarks establish the Go side of the
-// comparison; the bash side is measured separately via
-// `time bash scripts/dispatch/cycle-simulator.sh` (see
-// scripts/parity-audit.sh).
-//
-// Run: go test -bench=. -benchmem -run=^$ ./pkg/phaseproto/
-
 func benchRequest() core.PhaseRequest {
 	return core.PhaseRequest{
 		Cycle:       12345,

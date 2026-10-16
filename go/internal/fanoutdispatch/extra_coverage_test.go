@@ -8,14 +8,11 @@ import (
 	"testing"
 )
 
-// TestRun_MkdirResultsDirFails covers the MkdirAll(resultsDir) error branch:
-// the results dir's parent is a regular file, so the dir cannot be created.
 func TestRun_MkdirResultsDirFails(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	cmds := filepath.Join(dir, "cmds.tsv")
 	writeFile(t, cmds, "a\techo hi\n")
-	// "blocker" is a file; results dir would need to live underneath it.
 	blocker := filepath.Join(dir, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -30,8 +27,6 @@ func TestRun_MkdirResultsDirFails(t *testing.T) {
 	}
 }
 
-// TestRun_ReadCommandsError covers Run's read-commands error branch: the
-// commands file passes Stat but is unreadable, so the open inside fails.
 func TestRun_ReadCommandsError(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -51,8 +46,6 @@ func TestRun_ReadCommandsError(t *testing.T) {
 	}
 }
 
-// TestRun_WriteResultsError covers the write-results error branch: the results
-// path is a directory, so the final WriteFile fails after workers complete.
 func TestRun_WriteResultsError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -65,7 +58,7 @@ func TestRun_WriteResultsError(t *testing.T) {
 	var b bytes.Buffer
 	rc := Run(Config{
 		CommandsFile: cmds,
-		ResultsFile:  resultsDir, // a directory → WriteFile fails
+		ResultsFile:  resultsDir,
 		Concurrency:  1, TimeoutSecs: 10,
 	}, &b)
 	if rc != ExitSetupErr {
@@ -73,10 +66,6 @@ func TestRun_WriteResultsError(t *testing.T) {
 	}
 }
 
-// TestRun_ConsensusCancelTerminatesSurvivors covers the consensus-cancel
-// polling goroutine and runWorker's context.Canceled → 143 branch: two workers
-// vote FAIL quickly, a third sleeps; once K=2 FAILs are observed the survivor
-// is SIGTERM'd.
 func TestRun_ConsensusCancelTerminatesSurvivors(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -90,17 +79,16 @@ func TestRun_ConsensusCancelTerminatesSurvivors(t *testing.T) {
 	rc := Run(Config{
 		CommandsFile:      cmds,
 		ResultsFile:       results,
-		Concurrency:       3, // all start immediately
+		Concurrency:       3,
 		TimeoutSecs:       60,
 		CancelOnConsensus: true,
 		ConsensusK:        2,
-		ConsensusPollSecs: 2, // margin over fast FAIL-voters' write latency on loaded CI
+		ConsensusPollSecs: 2,
 	}, &b)
 	if rc != ExitWorkerFail {
 		t.Fatalf("rc=%d, want %d (log=%s)", rc, ExitWorkerFail, b.String())
 	}
 	body, _ := os.ReadFile(results)
-	// survivor was SIGTERM'd via canceled context → exit code 143.
 	if !strings.Contains(string(body), "survivor\t143\t") {
 		t.Errorf("survivor should be canceled (143), got: %s", body)
 	}
@@ -109,9 +97,6 @@ func TestRun_ConsensusCancelTerminatesSurvivors(t *testing.T) {
 	}
 }
 
-// TestRun_ConsensusPollExitsWhenAllDone covers the poller's all-done exit:
-// consensus is enabled but K is unreachable, so the poll loop exits because
-// every worker finished rather than because consensus was reached.
 func TestRun_ConsensusPollExitsWhenAllDone(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -125,7 +110,7 @@ func TestRun_ConsensusPollExitsWhenAllDone(t *testing.T) {
 		Concurrency:       2,
 		TimeoutSecs:       10,
 		CancelOnConsensus: true,
-		ConsensusK:        99, // never reached
+		ConsensusK:        99,
 		ConsensusPollSecs: 1,
 	}, &b)
 	if rc != ExitOK {
@@ -133,7 +118,6 @@ func TestRun_ConsensusPollExitsWhenAllDone(t *testing.T) {
 	}
 }
 
-// TestReadCommands_OpenError covers ReadCommands' open-error branch.
 func TestReadCommands_OpenError(t *testing.T) {
 	t.Parallel()
 	if _, err := ReadCommands(filepath.Join(t.TempDir(), "nope.tsv")); err == nil {
@@ -141,13 +125,10 @@ func TestReadCommands_OpenError(t *testing.T) {
 	}
 }
 
-// TestReadCommands_ScannerError covers the scanner.Err() branch: a single line
-// larger than the 10 MB scanner buffer triggers bufio.ErrTooLong.
 func TestReadCommands_ScannerError(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	p := filepath.Join(dir, "huge.tsv")
-	// 11 MB with no newline — exceeds the 10 MB max token size.
 	huge := bytes.Repeat([]byte("x"), 11*1024*1024)
 	if err := os.WriteFile(p, huge, 0o644); err != nil {
 		t.Fatal(err)
@@ -157,20 +138,11 @@ func TestReadCommands_ScannerError(t *testing.T) {
 	}
 }
 
-// TestRun_MissingMetaWritesSentinelRow covers the merge-loop branch that
-// emits a "<name>\t-1\t0" sentinel and flags anyFail when a worker's .meta
-// file is absent at merge time (the SIGTERM'd-worker case). Reproduced
-// deterministically: a worker name containing a path separator routes its
-// .meta write into a nonexistent subdirectory, so os.WriteFile fails silently
-// and the merge sees no meta — exactly the missing-meta condition — while the
-// echo command itself still runs.
 func TestRun_MissingMetaWritesSentinelRow(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	cmds := filepath.Join(dir, "cmds.tsv")
 	results := filepath.Join(dir, "r.tsv")
-	// "sub/w" → meta path <resultsDir>/sub/w.meta; <resultsDir>/sub does not
-	// exist, so the meta write fails and the merge falls to the sentinel.
 	writeFile(t, cmds, "sub/w\techo ok\n")
 	var b bytes.Buffer
 	rc := Run(Config{
@@ -179,7 +151,6 @@ func TestRun_MissingMetaWritesSentinelRow(t *testing.T) {
 		Concurrency:  1,
 		TimeoutSecs:  10,
 	}, &b)
-	// Missing meta forces anyFail → ExitWorkerFail even though echo exited 0.
 	if rc != ExitWorkerFail {
 		t.Fatalf("rc=%d, want %d (log=%s)", rc, ExitWorkerFail, b.String())
 	}
@@ -189,22 +160,14 @@ func TestRun_MissingMetaWritesSentinelRow(t *testing.T) {
 	}
 }
 
-// TestCheckFailConsensus_GlobError covers checkFailConsensus's Glob-error
-// branch: when resultsDir contains an unbalanced "[" the joined glob pattern
-// is malformed (filepath.ErrBadPattern) and the function must return false
-// (no consensus) rather than panic or miscount.
 func TestCheckFailConsensus_GlobError(t *testing.T) {
 	t.Parallel()
-	// "ws[" makes the joined pattern "ws[/*.out" — an unterminated character
-	// class → filepath.ErrBadPattern from Glob.
 	badDir := filepath.Join(t.TempDir(), "ws[")
 	if checkFailConsensus(badDir, 1) {
 		t.Error("malformed glob pattern must yield no consensus (false)")
 	}
 }
 
-// TestCheckFailConsensus_UnreadableOutFile covers the per-file Open-error
-// continue: a glob-matched .out file that cannot be opened is skipped.
 func TestCheckFailConsensus_UnreadableOutFile(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -218,7 +181,6 @@ func TestCheckFailConsensus_UnreadableOutFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(bad, 0o644) })
-	// good.out counts (1 FAIL); bad.out is skipped on open error.
 	if checkFailConsensus(dir, 2) {
 		t.Error("unreadable .out should be skipped, so k=2 is unmet")
 	}

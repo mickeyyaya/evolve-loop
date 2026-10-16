@@ -6,12 +6,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// ApplyUserRouting splices valid user specs into cfg so the router can propose them; builtin enables the optional-built-in exemption (Catalog{} for none).
 func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Catalog) []string {
 	var warnings []string
 	var pending []PhaseSpec
 	for _, s := range specs {
-		// The safety floor is enforced at this wiring seam, so an invalid spec never becomes a routing candidate.
 		if v := ValidateUserSpecWithCatalog(s, builtin); len(v) > 0 {
 			warnings = append(warnings, "phase "+s.Name+" not routed (invalid): "+strings.Join(v, "; "))
 			continue
@@ -28,19 +26,16 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 		cfg.PhaseEnable[s.Name] = config.EnableContent
 		pending = append(pending, s)
 	}
-	// Placement is a fixpoint: discovery sorts alphabetically, so an anchor may be a later
-	// batch-mate. Passes repeat while any spec is placed.
 	for len(pending) > 0 {
 		var deferred []PhaseSpec
 		for _, s := range pending {
-			// A name already in the order never defers or warns: nothing will move.
 			if indexOfStr(cfg.Order, s.Name) < 0 && s.After != "" && indexOfStr(cfg.Order, s.After) < 0 {
 				deferred = append(deferred, s)
 				continue
 			}
 			cfg.Order = spliceAfter(cfg.Order, s.Name, s.After)
 		}
-		if len(deferred) == len(pending) { // no anchor resolved this pass
+		if len(deferred) == len(pending) {
 			stuck := map[string]bool{}
 			for _, s := range deferred {
 				stuck[s.Name] = true
@@ -48,7 +43,6 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 			var held []PhaseSpec
 			placed := false
 			for _, s := range deferred {
-				// Held, not force-placed, so it still lands after its stuck anchor.
 				if stuck[s.After] {
 					held = append(held, s)
 					continue
@@ -57,9 +51,7 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 				cfg.Order = spliceAfter(cfg.Order, s.Name, "")
 				placed = true
 			}
-			if !placed { // anchor deadlock (cycle, possibly with tails)
-				// Force-place one anchor target and re-loop, so its dependents follow it in
-				// declared order and only the broken link warns.
+			if !placed {
 				isAnchor := map[string]bool{}
 				for _, s := range held {
 					isAnchor[s.After] = true
@@ -85,7 +77,6 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 	return warnings
 }
 
-// spliceAfter inserts name after anchor, else before "audit", else at the end; a name already present is a no-op.
 func spliceAfter(order []string, name, anchor string) []string {
 	if indexOfStr(order, name) >= 0 {
 		return order

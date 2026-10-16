@@ -18,7 +18,6 @@ func TestRepoPhaseCatalog_NoInertFailIfSignal(t *testing.T) {
 
 func TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown(t *testing.T) {
 	t.Parallel()
-	// Copies specrunner's stage words: specrunner imports phasespec, so importing them back would cycle.
 	known := map[string]bool{"": true, "shadow": true, "enforce": true}
 	eachTrackedPhaseClassify(t, func(path string, c *ClassifyRules) {
 		if c != nil && !known[c.VerdictFromSentinel] {
@@ -27,7 +26,6 @@ func TestRepoPhaseCatalog_VerdictFromSentinelStageIsKnown(t *testing.T) {
 	})
 }
 
-// eachTrackedPhaseClassify calls fn with each git-tracked phase.json's classify rules, skipping when the catalog is absent.
 func eachTrackedPhaseClassify(t *testing.T, fn func(path string, c *ClassifyRules)) {
 	t.Helper()
 	root := filepath.Join("..", "..", "..")

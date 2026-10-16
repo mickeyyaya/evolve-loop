@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// seedProject writes a project with one built-in registry phase and one user phase overlay.
 func seedProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()

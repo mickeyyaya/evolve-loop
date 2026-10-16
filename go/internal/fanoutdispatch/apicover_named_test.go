@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// TestReadCommands_ParsesNameAndCommandFields pins the Command struct's parsing
-// contract: ReadCommands splits each TSV row at the FIRST tab into
-// Command.Name and Command.Command (the remainder, tabs preserved). Names the
-// Command type and reads both exported fields — the existing suite only checks
-// the slice length, never the field mapping.
 func TestReadCommands_ParsesNameAndCommandFields(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -22,7 +17,7 @@ func TestReadCommands_ParsesNameAndCommandFields(t *testing.T) {
 	}
 	want := []Command{
 		{Name: "alpha", Command: "echo hi"},
-		{Name: "beta", Command: "sh -c 'a\tb'"}, // split at FIRST tab only; later tabs stay in Command
+		{Name: "beta", Command: "sh -c 'a\tb'"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("len(got)=%d, want %d: %+v", len(got), len(want), got)

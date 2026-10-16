@@ -11,7 +11,6 @@ const defaultRoot = ".evolve/phases"
 
 const registryRelPath = "docs/architecture/phase-registry.json"
 
-// RootsWithPolicy splits cfg.PhaseRoots on ":" (default .evolve/phases), joining relative entries to projectRoot.
 func RootsWithPolicy(projectRoot string, cfg policy.PathsConfig) []string {
 	raw := cfg.PhaseRoots
 	if strings.TrimSpace(raw) == "" {
@@ -31,7 +30,6 @@ func RootsWithPolicy(projectRoot string, cfg policy.PathsConfig) []string {
 	return out
 }
 
-// Roots returns the discovery roots configured in the project's .evolve/policy.json.
 func Roots(projectRoot string) []string {
 	roots, _ := RootsWithWarnings(projectRoot)
 	return roots
@@ -46,7 +44,6 @@ func RootsWithWarnings(projectRoot string) ([]string, []string) {
 	return roots, nil
 }
 
-// MergedCatalog is every consumer's one loader: registry plus clamped overlays; sources maps each user phase to its root.
 func MergedCatalog(projectRoot string) (Catalog, map[string]string, []string, error) {
 	builtin, err := Load(filepath.Join(projectRoot, filepath.FromSlash(registryRelPath)))
 	if err != nil {
@@ -55,7 +52,6 @@ func MergedCatalog(projectRoot string) (Catalog, map[string]string, []string, er
 	roots, warns := RootsWithWarnings(projectRoot)
 	user, sources, discWarns := DiscoverUserSpecsFromRoots(roots)
 	warns = append(warns, discWarns...)
-	// Every admission seam clamps, so listing and lint report the writes_source that dispatch enforces.
 	user, clampWarns := ClampDiscoveredSpecs(user,
 		SandboxedProfilePredicate(filepath.Join(projectRoot, ".evolve", "profiles")))
 	warns = append(warns, clampWarns...)
