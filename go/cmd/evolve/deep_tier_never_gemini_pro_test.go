@@ -86,11 +86,11 @@ func TestDeepAndTopProfiles_NoChainEntryResolvesTheirTierToAGeminiProModel(t *te
 		}
 		checked++
 		if hits := geminiProEntries(t, slices.Concat([]string{p.CLI}, p.CLIFallback), p.ModelTierDefault); len(hits) > 0 {
-			t.Errorf("%s's own chain runs %v at %s: deep and top work runs a Claude model, agy-owned first, and never Gemini Pro (operator rule, 2026-10-06)", name, hits, p.ModelTierDefault)
+			t.Errorf("%s's own chain runs %v at %s: deep and top work never runs a Gemini Pro model (operator rule 2026-10-06; Gemini 4 Argon allowed since 2026-10-16)", name, hits, p.ModelTierDefault)
 		}
 		chain := permittedChain(t, r, cliroute.Request{Agent: name, Phase: cliroutetest.PhaseOf(name), ProjectRoot: t.TempDir()}, p.ModelTierDefault)
 		if hits := geminiProEntries(t, chain, p.ModelTierDefault); len(hits) > 0 {
-			t.Errorf("%s resolves to %v at %s, which reaches %v: the cli_routing tiers.%s ceiling must keep Gemini Pro off deep and top work", name, chain, p.ModelTierDefault, hits, p.ModelTierDefault)
+			t.Errorf("%s resolves to %v at %s, which reaches %v: the cli_routing tiers.%s ceiling must keep Gemini Pro models off deep and top work (Gemini 4 Argon is allowed)", name, chain, p.ModelTierDefault, hits, p.ModelTierDefault)
 		}
 	}
 	if checked == 0 {

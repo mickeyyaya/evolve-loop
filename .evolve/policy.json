@@ -51,10 +51,12 @@
     "tiers": {
       "deep": [
         "agy-claude",
+        "agy",
         "claude"
       ],
       "top": [
         "agy-claude",
+        "agy",
         "claude"
       ]
     }

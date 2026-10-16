@@ -37,11 +37,11 @@ func TestAgyTierModelsPinnedToVerifiedNames(t *testing.T) {
 	for tier, want := range map[string]string{
 		"fast":     "Gemini 3.8 Flash (Low)",
 		"balanced": "Gemini 3.8 Flash (High)",
-		"deep":     "Gemini 3.1 Pro (High)",
-		"top":      "Gemini 3.1 Pro (High)",
+		"deep":     "Gemini 4 Argon (Medium)",
+		"top":      "Gemini 4 Argon (High)",
 	} {
 		if got := m.ModelTierMap[tier]; got != want {
-			t.Errorf("agy tier %q = %q, want %q (each name launched live and shown verbatim in agy's banner: Pro on agy 1.1.22, 3.8 Flash on agy 1.2.17, 2026-10-05)", tier, got, want)
+			t.Errorf("agy tier %q = %q, want %q (each name launched live and shown verbatim in agy's footer: 3.8 Flash on agy 1.2.17, 2026-10-05; 4 Argon Medium and High on agy 1.4.0, 2026-10-16)", tier, got, want)
 		}
 	}
 }
