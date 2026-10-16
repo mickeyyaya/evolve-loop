@@ -79,50 +79,20 @@ func TestWriteTree_WriteTreeCommandFailureIsReturned(t *testing.T) {
 
 	snap, err := Take(context.Background(), dir)
 
-	if err == nil || !strings.Contains(err.Error(), "git write-tree") || snap.Tree != "" {
+	if err == nil || !strings.Contains(err.Error(), "[write-tree]") || snap.Tree != "" {
 		t.Fatalf("snap=%+v err=%v", snap, err)
 	}
 }
 
-func TestWriteTreeMode_UnusableTempDirIsReported(t *testing.T) {
+func TestIndexCopyTree_UnusableTempDirIsReported(t *testing.T) {
 	dir := initRepo(t)
 	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "absent"))
 
-	tree, err := writeTreeMode(context.Background(), dir, allFiles, nil)
+	tree, err := indexCopyTree(context.Background(), dir, allFiles, nil)
 
-	if err == nil || !strings.Contains(err.Error(), "treefence: temp index") || tree != "" {
+	if err == nil || !strings.Contains(err.Error(), "treefence: snapshot tree: gitexec: scratch index") || tree != "" {
 		t.Fatalf("tree=%q err=%v", tree, err)
 	}
-}
-
-func TestCopyIndex_FailureStages(t *testing.T) {
-	t.Run("source is a directory so reading fails", func(t *testing.T) {
-		if err := copyIndex(t.TempDir(), filepath.Join(t.TempDir(), "dst")); err == nil {
-			t.Fatal("want a read error")
-		}
-	})
-	t.Run("destination directory missing", func(t *testing.T) {
-		src := filepath.Join(t.TempDir(), "index")
-		if err := os.WriteFile(src, []byte("DIRC"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := copyIndex(src, filepath.Join(t.TempDir(), "no", "dst")); err == nil {
-			t.Fatal("want a write error")
-		}
-	})
-	t.Run("copy preserves bytes", func(t *testing.T) {
-		src := filepath.Join(t.TempDir(), "index")
-		dst := filepath.Join(t.TempDir(), "copy")
-		if err := os.WriteFile(src, []byte("DIRC-bytes"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := copyIndex(src, dst); err != nil {
-			t.Fatal(err)
-		}
-		if got, _ := os.ReadFile(dst); string(got) != "DIRC-bytes" {
-			t.Fatalf("copy = %q", got)
-		}
-	})
 }
 
 func TestRestore_EntriesThatCannotBeUndoneAreReportedByNameWhileTheRestIsStillRestored(t *testing.T) {

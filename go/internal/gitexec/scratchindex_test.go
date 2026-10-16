@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
@@ -94,5 +95,12 @@ func TestTreeOfIndexCopy_FailsLoudlyOnAFailingAdd(t *testing.T) {
 	}
 	if _, err := gitexec.Default(t.TempDir()).TreeOfIndexCopy(context.Background()); err == nil {
 		t.Error("a directory outside any repository returned a tree")
+	}
+}
+
+func TestAmbientGitVars_ListsEveryVariableThatRedirectsGitAwayFromItsDir(t *testing.T) {
+	want := []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"}
+	if !slices.Equal(gitexec.AmbientGitVars, want) {
+		t.Fatalf("AmbientGitVars = %v, want %v", gitexec.AmbientGitVars, want)
 	}
 }

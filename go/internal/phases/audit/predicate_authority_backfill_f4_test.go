@@ -32,11 +32,11 @@ func TestPredicateTreeFor_EachCaptureFailureNamesItsStage(t *testing.T) {
 			t.Fatalf("tree=%q err=%v", tree, err)
 		}
 	})
-	t.Run("a repository with no index cannot seed the ship tree", func(t *testing.T) {
+	t.Run("a repository with no index is refused at the predicate tree", func(t *testing.T) {
 		t.Parallel()
 		root := gittest.Fixture(t).Dir
 		tree, err := predicateTreeFor(requestF4(root, t.TempDir()))
-		if err == nil || !strings.Contains(err.Error(), "capture predicate ship tree") || tree != "" {
+		if err == nil || !strings.Contains(err.Error(), "capture predicate tree: treefence: snapshot tree: gitexec: copy index") || tree != "" {
 			t.Fatalf("tree=%q err=%v", tree, err)
 		}
 	})

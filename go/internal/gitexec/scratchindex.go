@@ -12,7 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-var ambientGitVars = []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"}
+var AmbientGitVars = []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"}
 
 func Isolated(dir string) Git {
 	return Git{Dir: dir, Exec: isolate(sysexec.DefaultRunner)}
@@ -30,7 +30,7 @@ func isolate(run sysexec.RunFunc, extra ...string) sysexec.RunFunc {
 func withoutAmbientGit(environ []string) []string {
 	kept := make([]string, 0, len(environ))
 	for _, kv := range environ {
-		if key, _, _ := strings.Cut(kv, "="); !slices.Contains(ambientGitVars, key) {
+		if key, _, _ := strings.Cut(kv, "="); !slices.Contains(AmbientGitVars, key) {
 			kept = append(kept, kv)
 		}
 	}

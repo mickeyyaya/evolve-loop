@@ -241,7 +241,7 @@ func gitShimForcingTreefenceWriteTreeFailure(t *testing.T) string {
 
 // gitShimFailingTreefenceWriteTreeWhen returns a directory holding a `git` that
 // fails a write-tree against treefence's throwaway index (GIT_INDEX_FILE under
-// a "treefence-index-*" temp dir) with stderr "fatal: <cause>" whenever the
+// a "gitexec-index-*" temp dir) with stderr "fatal: <cause>" whenever the
 // shell test guard holds in git's working directory, and runs the real git for
 // everything else.
 func gitShimFailingTreefenceWriteTreeWhen(t *testing.T, guard, cause string) string {
@@ -253,7 +253,7 @@ func gitShimFailingTreefenceWriteTreeWhen(t *testing.T, guard, cause string) str
 	dir := t.TempDir()
 	script := "#!/bin/sh\n" +
 		"case \"$GIT_INDEX_FILE\" in\n" +
-		"  */treefence-index-*)\n" +
+		"  */gitexec-index-*)\n" +
 		"    if [ \"$1\" = \"write-tree\" ] && " + guard + "; then\n" +
 		"      echo 'fatal: " + cause + "' >&2\n" +
 		"      exit 128\n" +

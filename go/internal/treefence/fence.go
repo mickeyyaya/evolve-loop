@@ -27,11 +27,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -55,7 +57,7 @@ func TakeStaged(ctx context.Context, worktree string, pathspec []string) (Snapsh
 	if strings.TrimSpace(worktree) == "" {
 		return Snapshot{}, fmt.Errorf("treefence: worktree path required")
 	}
-	tree, err := writeTreeMode(ctx, worktree, declaredFiles, pathspec)
+	tree, err := indexCopyTree(ctx, worktree, declaredFiles, pathspec)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -231,55 +233,17 @@ func pruneEmptyParents(root, dir string) {
 // ignore rules respected — into a tree object via a throwaway index seeded
 // from the real one (so only changed paths are re-hashed).
 func writeTree(ctx context.Context, worktree string) (string, error) {
-	return writeTreeMode(ctx, worktree, allFiles, nil)
+	return indexCopyTree(ctx, worktree, allFiles, nil)
 }
 
 var errNotRestorable = errors.New("treefence: only a full snapshot restores a worktree")
 
-func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode, declared []string) (string, error) {
-	tmp, err := os.MkdirTemp("", "treefence-index-*")
+func indexCopyTree(ctx context.Context, worktree string, mode snapshotMode, declared []string) (string, error) {
+	tree, err := gitexec.Isolated(worktree).TreeOfIndexCopy(ctx, addArgs(mode, declared)...)
 	if err != nil {
-		return "", fmt.Errorf("treefence: temp index: %w", err)
+		return "", fmt.Errorf("treefence: snapshot tree: %w", err)
 	}
-	defer func() { _ = os.RemoveAll(tmp) }()
-	index := filepath.Join(tmp, "index")
-	real, indexErr := git(ctx, worktree, nil, "rev-parse", "--git-path", "index")
-	if indexErr == nil {
-		realPath := strings.TrimSpace(real)
-		if !filepath.IsAbs(realPath) {
-			realPath = filepath.Join(worktree, realPath)
-		}
-		indexErr = copyIndex(realPath, index)
-	}
-	if mode != allFiles && indexErr != nil {
-		return "", fmt.Errorf("treefence: this snapshot requires a complete real-index seed: %w", indexErr)
-	}
-	env := []string{"GIT_INDEX_FILE=" + index}
-	for _, add := range addArgs(mode, declared) {
-		if _, err := git(ctx, worktree, env, add...); err != nil {
-			return "", err
-		}
-	}
-	out, err := git(ctx, worktree, env, "write-tree")
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(out), nil
-}
-
-func copyIndex(src, dst string) error {
-	info, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(dst, data, 0o644); err != nil {
-		return err
-	}
-	return os.Chtimes(dst, info.ModTime(), info.ModTime())
+	return tree, nil
 }
 
 func addArgs(mode snapshotMode, declared []string) [][]string {
@@ -337,15 +301,11 @@ func writeFromTree(ctx context.Context, worktree, tree, rel, abs string) error {
 	return os.Rename(tmp, abs)
 }
 
-// ambientGitVars would redirect git away from the worktree the fence was
-// given; the fence never trusts the parent process's environment for them.
-var ambientGitVars = map[string]bool{"GIT_DIR": true, "GIT_WORK_TREE": true, "GIT_INDEX_FILE": true, "GIT_COMMON_DIR": true}
-
 func gitEnv(extra []string) []string {
 	base := os.Environ()
 	env := make([]string, 0, len(base)+len(extra))
 	for _, kv := range base {
-		if k, _, _ := strings.Cut(kv, "="); ambientGitVars[k] {
+		if k, _, _ := strings.Cut(kv, "="); slices.Contains(gitexec.AmbientGitVars, k) {
 			continue
 		}
 		env = append(env, kv)
