@@ -158,9 +158,6 @@ func markerExtentOf(text string) (markerExtent, bool) {
 	return markerLine, false
 }
 
-// Directives returns the comments tools or conventions act on: toolchain and
-// linter directives, generated headers, deprecation notes, example output,
-// apicover ignores, ACS waivers and minimal: markers.
 func Directives(src []byte) []string {
 	var found []string
 	for _, d := range scanDirectives(src) {
@@ -169,15 +166,13 @@ func Directives(src []byte) []string {
 	return found
 }
 
-// placedDirective is a directive and its place in the code's token stream,
-// which a comment-only edit cannot move.
 type placedDirective struct {
 	text        string
 	line        int
-	nextToken   int  // index of the next code token; -1 at end of file
-	trailing    bool // code precedes it on its own line
-	blankBefore bool // a blank line detaches a leading directive from its code
-	paragraph   bool // a Deprecated: note opens a doc paragraph, as tools require
+	nextToken   int
+	trailing    bool
+	blankBefore bool
+	paragraph   bool
 }
 
 func anchoredDirectives(src []byte) []string {
@@ -229,8 +224,6 @@ func scanDirectives(src []byte) []placedDirective {
 	return found
 }
 
-// opensParagraph reports whether the comment at line starts its group or
-// follows an empty `//` line.
 func opensParagraph(lines []string, line int) bool {
 	if line < 2 {
 		return true

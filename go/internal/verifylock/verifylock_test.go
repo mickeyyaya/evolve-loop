@@ -1,12 +1,5 @@
 package verifylock
 
-// verifylock_test.go — ADR-0080 P1: expensive go-test verification runs
-// (EGPS suite execution, build-floor coverage) are HOST-wide single-flight.
-// Batch-16 halt ground truth: TouchedPackagesStayGreen red-lined three lanes
-// (1166/1167/1169) while the same suite is GREEN in the preserved worktree —
-// two lanes + EGPS oversubscribing one host turned a 43s suite into false
-// reds. Verification correctness outranks wave throughput.
-
 import (
 	"context"
 	"os"
@@ -67,7 +60,7 @@ func TestAcquire_ReleaseIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 	release()
-	release() // second call must be a safe no-op
+	release()
 	release2, err := AcquireAt(context.Background(), lockPath, nil)
 	if err != nil {
 		t.Fatalf("lock not reacquirable after release: %v", err)
@@ -75,9 +68,6 @@ func TestAcquire_ReleaseIsIdempotent(t *testing.T) {
 	release2()
 }
 
-// TestAcquire_ResolvesTheHubLockPath drives the production entry point: for
-// a primary checkout the lock lands inside .git (the hub), shared by every
-// worktree of the repo — the property that makes single-flight HOST-wide.
 func TestAcquire_ResolvesTheHubLockPath(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {

@@ -9,7 +9,6 @@ import (
 
 const aliasFixtureModule = "example.com/fixture"
 
-// Worktree-relative and slash-separated, as a tdd handoff writes them.
 const (
 	aliasCyclicFrozenTest      = "go/internal/core/frozen_alias_cyclic_test.go"
 	aliasReachableFrozenTest   = "go/internal/core/frozen_alias_reachable_test.go"
@@ -30,8 +29,6 @@ func writeAliasFixtureFile(t *testing.T, root, rel, body string) {
 	}
 }
 
-// aliasFixtureWorktree builds a listable module where storage imports core, so pinning it in core
-// closes a cycle, and leafutil imports nothing; the pins differ only in how the identifier is bound.
 func aliasFixtureWorktree(t *testing.T) string {
 	t.Helper()
 	wt := t.TempDir()
@@ -72,7 +69,6 @@ func aliasFixtureWorktree(t *testing.T) string {
 			"\tassertFileContains(t, \"go/internal/core/state.go\", \"zz.Whatever(\")\n"+
 			"}\n")
 
-	// The blank import binds storage, so resolving "_" would report a false cycle.
 	writeAliasFixtureFile(t, wt, aliasBlankImportFrozenTest,
 		"package core\n\nimport (\n\t\"testing\"\n\n"+
 			"\t_ \""+aliasFixtureModule+"/internal/storage\"\n)\n\n"+

@@ -116,3 +116,13 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/skillcheck` | renders every generated plugin surface from its single source (ADR-0040) | [internal-skillcheck.md](internal-skillcheck.md) |
 | `internal/subagent/subagentrun` | the `evolve subagent run` execution path | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
 | `internal/wtcheckpoint` | saves uncommitted worktree work as `refs/checkpoints` snapshots, and lists, restores, prunes and pushes them | [internal-wtcheckpoint.md](internal-wtcheckpoint.md) |
+| `internal/aggregator` | merges the artifacts of a fan-out phase into one canonical artifact by per-phase rules, with no model call | [internal-aggregator.md](internal-aggregator.md) |
+| `internal/binaryguard` | rejects large compiled executables from a change set before they reach a commit | [internal-binaryguard.md](internal-binaryguard.md) |
+| `internal/digest` | projects the role-scoped blocks out of an instruction document, never the full source | [internal-digest.md](internal-digest.md) |
+| `internal/gittest` | git-backed test fixtures: creation with background maintenance off, and teardown with retry | [internal-gittest.md](internal-gittest.md) |
+| `internal/phaseinventory` | builds the advisory index of every phase the pipeline can run | [internal-phaseinventory.md](internal-phaseinventory.md) |
+| `internal/repostate` | which files under a directory git actually tracks, for repo-wide scanners | [internal-repostate.md](internal-repostate.md) |
+| `internal/resolvellm` | resolves a phase role to its CLI and model tier from its profile | [internal-resolvellm.md](internal-resolvellm.md) |
+| `internal/soakreport` | the read-only soak evidence reporter for the phase-recovery enforce flip | [internal-soakreport.md](internal-soakreport.md) |
+| `internal/verifylock` | serializes the expensive go-test verification runs of one host | [internal-verifylock.md](internal-verifylock.md) |
+| `test/trustkernel` | black-box tests that pin the trust-kernel safety invariants | [test-trustkernel.md](test-trustkernel.md) |

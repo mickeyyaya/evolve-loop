@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// TestProjectDigest is the projector's own package-level regression suite
-// (scout-report.md cycle 1391, Task 1, verifiableBy). The full behavioral
-// pins for each acceptance criterion live in
-// go/acs/cycle1391/predicates_test.go; this file covers the same contract
-// at the package level plus one additional case (multi-role membership).
 func TestProjectDigest(t *testing.T) {
 	t.Run("extracts only the tagged role's content", func(t *testing.T) {
 		source := []byte("Untagged intro.\n" +

@@ -37,9 +37,9 @@ func TestTrackedSet_BindsTrackedExcludesUntrackedAndNested(t *testing.T) {
 	root, git := fixtureRepo(t)
 	write(t, root, ".evolve/profiles/auditor.json")
 	git("add", ".evolve/profiles/auditor.json")
-	write(t, root, ".evolve/profiles/minted-stub.json") // untracked
+	write(t, root, ".evolve/profiles/minted-stub.json")
 	write(t, root, ".evolve/profiles/archive/scout.json")
-	git("add", ".evolve/profiles/archive/scout.json") // nested tracked
+	git("add", ".evolve/profiles/archive/scout.json")
 
 	set, err := TrackedSet(root, ".evolve/profiles", ".json")
 	if err != nil {
@@ -81,7 +81,7 @@ func TestTrackedFiles_NonRepoErrorCarriesGitStderr(t *testing.T) {
 
 func TestTrackedSet_EmptyDirIsSuccessWithEmptySet(t *testing.T) {
 	root, _ := fixtureRepo(t)
-	write(t, root, ".evolve/profiles/only-minted.json") // untracked
+	write(t, root, ".evolve/profiles/only-minted.json")
 	set, err := TrackedSet(root, ".evolve/profiles", ".json")
 	if err != nil {
 		t.Fatal(err)

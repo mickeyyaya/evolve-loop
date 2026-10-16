@@ -30,8 +30,8 @@
 ## Invariants
 
 - **The recorded verdict is never trusted alone.** The whole check compares it with the artifacts the phases wrote.
-- **An absent verdict cannot prove forgery.** When the audit or ACS verdict is missing or not PASS, the result is coherent, because a false halt costs the whole batch. The code keeps a one-line why. Pinned by the `audit PASS but ACS artifact absent` case of `TestCheckVerdictCoherence`.
-- **An audit that never ran is a genuine incomplete, not forgery.** The code keeps a one-line why. Pinned by the `audit did not run` case of `TestCheckVerdictCoherence`.
+- **An absent verdict cannot prove forgery.** When the audit or ACS verdict is missing or not PASS, the result is coherent, because a false halt costs the whole batch. Pinned by the `audit PASS but ACS artifact absent` case of `TestCheckVerdictCoherence`.
+- **An audit that never ran is a genuine incomplete, not forgery.** Pinned by the `audit did not run` case of `TestCheckVerdictCoherence`.
 - **An explained negative is never forgery.** `SubstantiveError` covers a substantive (non-teardown) bridge error and a diagnosed runner-side gate downgrade, which is persisted as error-severity reasons. Pinned by the `substantive (non-infra) error` case of `TestCheckVerdictCoherence`.
 - **`Incoherent` and `Reconciled` are mutually exclusive.** `DeliverableValid` only downgrades a would-be halt. It never turns a case that is already coherent into a reconcile. Pinned by `TestCheckVerdictCoherence_Reconcile`.
 - **The anti-laundering boundary.** A malformed report that only carries a PASS sentinel has `DeliverableValid` false and stays `Incoherent`, so a forgery is never laundered into a PASS. Pinned by `TestCheckVerdictCoherence_ForgedStillHalts`.
@@ -42,7 +42,7 @@
 - **The report is deterministic.** It holds exactly the four invariants in the declared order, and two evaluations of an unchanged workspace are identical. The report must be diffable across cycles, because that diff is the only way the advisory's false-positive rate becomes measurable. Pinned by `TestCrossArtifactInvariants_ReportShapeIsDeterministic`.
 - **A non-ok status always carries evidence.** A finding nobody can act on is not a finding. Every cross-artifact test asserts it through `xaWantStatus`.
 - **The stack is advisory.** `InvariantReport.Advisory` is always true and no invariant blocks a cycle. Graduating an invariant to blocking is a separate decision that needs a measured false-positive rate near zero. The no-blocking half is pinned at the seam by `internal/core/crossartifact_invariants_wiring_test.go`.
-- **Containment is checked before the stat.** `filepath.Join` cleans `../` segments, so an escaping citation could otherwise land on a real file outside both roots and read as resolved. A path the lane did not write is not evidence the lane produced. The code keeps a one-line why. Pinned by `TestCrossArtifactInvariants_EscapingReferencedPathIsViolatedNotResolved`.
+- **Containment is checked before the stat.** `filepath.Join` cleans `../` segments. Without the check, an escaping citation can land on a real file outside both roots and read as resolved. A path the lane did not write is not evidence that the lane produced it. Pinned by `TestCrossArtifactInvariants_EscapingReferencedPathIsViolatedNotResolved`.
 - **Only the lane's own tree counts as evidence.** Cited paths resolve under the workspace, then the lane worktree, never the project root. The unit half is pinned by `TestCrossArtifactInvariants_ReferencedPathsResolveUnderWorkspaceThenWorktree`. That the caller passes the lane worktree is pinned in `internal/core/crossartifact_invariants_wiring_test.go`.
 
 ## Findings

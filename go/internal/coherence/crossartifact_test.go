@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// xaWriteAudit marshals the sentinel with encoding/json, never hand-spelled, so
-// the fixture is the shape phasecontract actually parses.
 func xaWriteAudit(t *testing.T, dir, verdict string, evidencePaths []string) {
 	t.Helper()
 	payload := map[string]any{"phase": "audit", "verdict": verdict, "schema_version": 1}
@@ -39,8 +37,6 @@ func xaWriteRaw(t *testing.T, dir, name, body string) {
 	}
 }
 
-// xaACS takes the claimed total and counts explicitly so a test can make the
-// claim disagree with its own results.
 func xaACS(t *testing.T, verdict string, total, green, red, skip int, results []string) string {
 	t.Helper()
 	rows := make([]map[string]any, 0, len(results))
@@ -191,7 +187,6 @@ func TestCrossArtifactInvariants_ProseVerdictCannotSatisfyTheSentinelInvariant(t
 
 func TestCrossArtifactInvariants_TestCountDisagreementNamesClaimedAndCounted(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
-	// claims 3 green / 0 red over a 3-entry suite; the results say 2 green, 1 red.
 	xaWriteRaw(t, ws, "acs-verdict.json", xaACS(t, "PASS", 3, 3, 0, 0, []string{"green", "green", "red"}))
 
 	got := xaWantStatus(t, CheckCrossArtifactInvariants(ws, wt), InvariantTestCounts, InvariantViolated)
@@ -228,7 +223,7 @@ func TestCrossArtifactInvariants_MissingReferencedPathIsViolatedAndNamed(t *test
 
 func TestCrossArtifactInvariants_ReferencedPathsResolveUnderWorkspaceThenWorktree(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
-	decoy := t.TempDir() // an unrelated root the aggregate is never handed
+	decoy := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(decoy, "docs"), 0o755); err != nil {
 		t.Fatalf("mkdir decoy: %v", err)
 	}
@@ -372,8 +367,8 @@ func TestCrossArtifactInvariants_MalformedArtifactsAreIndeterminateNotOK(t *test
 
 func TestCrossArtifactInvariants_ViolationsReturnsOnlyTheViolated(t *testing.T) {
 	ws, wt := xaCoherentWorkspace(t)
-	xaWriteAudit(t, ws, "FAIL", nil)                                          // verdict-agreement → violated
-	if err := os.Remove(filepath.Join(ws, "phase-timing.json")); err != nil { // phase-order → indeterminate
+	xaWriteAudit(t, ws, "FAIL", nil)
+	if err := os.Remove(filepath.Join(ws, "phase-timing.json")); err != nil {
 		t.Fatalf("remove phase-timing.json: %v", err)
 	}
 

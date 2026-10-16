@@ -26,7 +26,6 @@ func TestImporterClosure_RouterRoutingtest(t *testing.T) {
 	}
 }
 
-// gitexec cannot reach router, but its tests import test/fixtures, whose deps do; a transitive test-import walk would include it.
 func TestImporterClosure_ExcludesNonImporters(t *testing.T) {
 	got := ImporterClosure(repoRootForTest(t), []string{"./internal/router/..."})
 
@@ -38,7 +37,6 @@ func TestImporterClosure_ExcludesNonImporters(t *testing.T) {
 	}
 }
 
-// acssuite reaches gitexec only through changedpkgs.
 func TestImporterClosure_Transitive(t *testing.T) {
 	got := ImporterClosure(repoRootForTest(t), []string{"./internal/gitexec/..."})
 
@@ -108,7 +106,6 @@ func TestImporterClosure_SortedDedupedAndModuleRoot(t *testing.T) {
 	}
 }
 
-// routingeval's tests import core; its build deps do not.
 func TestImporterClosure_TestOnlyImporter(t *testing.T) {
 	got := ImporterClosure(repoRootForTest(t), []string{"./internal/core/..."})
 	if !contains(got, "./internal/routingeval/...") {
@@ -116,7 +113,6 @@ func TestImporterClosure_TestOnlyImporter(t *testing.T) {
 	}
 }
 
-// go/acs/cycle8 holds only `//go:build acs` files.
 func TestImporterClosureChecked_TestableExcludesTagOnlyDirs(t *testing.T) {
 	c, ok := ImporterClosureChecked(repoRootForTest(t), []string{"./acs/cycle8/...", "./internal/gitexec/..."})
 	if !ok {

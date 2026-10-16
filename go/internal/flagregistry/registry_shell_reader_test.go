@@ -2,15 +2,12 @@ package flagregistry
 
 import "testing"
 
-// TestFlagRegistry_MigratedShellReadFlagsAreDeprecated asserts these flags are
-// absent from the registry, despite the name: they progressed from deprecated
-// to fully removed.
-func TestFlagRegistry_MigratedShellReadFlagsAreDeprecated(t *testing.T) {
+func TestFlagRegistry_MigratedShellReadFlagsAreAbsent(t *testing.T) {
 	retired := []string{
-		"EVOLVE_INNER_SANDBOX",          // superseded by EVOLVE_SANDBOX
-		"EVOLVE_FORCE_INNER_SANDBOX",    // deprecation bridge — both ends gone
-		"EVOLVE_PROFILE_WORKTREE_AWARE", // superseded by BridgeRequest.Worktree
-		"EVOLVE_REINVOKE_CMD",           // superseded by manifest interactive_prompts
+		"EVOLVE_INNER_SANDBOX",
+		"EVOLVE_FORCE_INNER_SANDBOX",
+		"EVOLVE_PROFILE_WORKTREE_AWARE",
+		"EVOLVE_REINVOKE_CMD",
 	}
 	for _, name := range retired {
 		if _, ok := Lookup(name); ok {

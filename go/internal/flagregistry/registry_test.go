@@ -10,9 +10,6 @@ func TestAll_NonEmptyAndWellFormed(t *testing.T) {
 	if len(All) == 0 {
 		t.Fatal("registry is empty")
 	}
-	// A real flag name never ends in '_' and never has '__' — those shapes
-	// are grep artifacts (bash interpolations like EVOLVE_${PHASE}_MODEL and
-	// doc wildcard prefixes like "EVOLVE_BUILDER_*").
 	nameRE := regexp.MustCompile(`^EVOLVE(_[A-Z0-9]+)+$`)
 	seen := map[string]bool{}
 	for _, f := range All {
@@ -84,8 +81,6 @@ func TestRenderIndex_StableAndComplete(t *testing.T) {
 	}
 }
 
-// TestRenderDoc_FoldsAndEscapes crafts a Flag hitting every renderDoc branch,
-// since the table-wide test above only exercises real registry rows.
 func TestRenderDoc_FoldsAndEscapes(t *testing.T) {
 	got := renderDoc(Flag{
 		Name:       "EVOLVE_EXAMPLE",

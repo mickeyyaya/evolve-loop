@@ -31,7 +31,7 @@ func TestTrackedProfiles_MintedStubIsRuntimeStateNotRepoConfig(t *testing.T) {
 	writeProfile("auditor")
 	git("add", ".evolve/profiles/auditor.json")
 	writeProfile("defect-disposition-ledger")
-	writeProfile("any-future-mint") // arbitrary name: the exclusion is structural, not name-based
+	writeProfile("any-future-mint")
 
 	tracked, err := trackedProfiles(root)
 	if err != nil {
@@ -77,8 +77,6 @@ func TestTrackedProfiles_RealTreePlantedDecoyNotBound(t *testing.T) {
 	}
 }
 
-// mirrorTrackedProfiles commits the live tracked profiles into a temp repo so decoys are planted
-// there: a phase sandbox denies writes under .evolve/profiles, and tests must not touch tracked config.
 func mirrorTrackedProfiles(t *testing.T, real string, tracked map[string]bool) string {
 	t.Helper()
 	root := t.TempDir()

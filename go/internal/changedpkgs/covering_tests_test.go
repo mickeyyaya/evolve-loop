@@ -31,7 +31,7 @@ func TestCoveringTests_DerivesTestFilesForChangedPackagesOnly(t *testing.T) {
 		"go/internal/foo/foo_test.go",
 		"go/internal/foo/extra_test.go",
 		"go/internal/foo/sub/sub_test.go",
-		"go/internal/bar/bar_test.go", // untouched package — must NOT appear
+		"go/internal/bar/bar_test.go",
 	)
 
 	got := CoveringTests(root, []string{"./internal/foo/..."})

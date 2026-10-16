@@ -645,3 +645,11 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // mention of "## Reference Index" must NOT trigger a strip (the anti-naive-
 // substring guard; a bare strings.Index impl fails the "inline mention" case).
 ```
+
+## comment-zero K1
+
+### `go/internal/prompts/persona_house_rules_test.go:38` — above `"repo-wide",`
+
+```text
+// ADR-0069: which of the TWO apicover gates
+```

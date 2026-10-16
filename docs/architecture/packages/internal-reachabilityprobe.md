@@ -18,13 +18,21 @@
 - **Resolution order in `resolvePackage`:** an exact import path, then a base-name match, then an import alias from the frozen test file.
   - Among base-name matches, the candidate sharing the longest prefix with the pinning package wins (its nearest neighbour in the module), and a tie breaks lexically.
   - Aliases come from the frozen test file's own import block. That is the only place such a binding can live: if the pinned production file imported the referenced package, the module would already be cyclic and `go list` would produce no graph. `go list -deps` ignores `_test.go` imports, so the module still lists cleanly.
-  - Only aliased imports are collected. An unaliased import is already found by base-name matching. `_` and `.` bind no usable identifier and are never resolved. A test file that does not parse contributes no aliases.
+  - Only aliased imports are collected. An unaliased import is already found by base-name matching. `_` and `.` bind no usable identifier and are never resolved. A resolved blank import reports a false cycle. Pinned by the `blank_import_binds_no_identifier` case of `TestCheckFrozenPins_AliasUnresolvableFailsOpen`. A test file that does not parse contributes no aliases.
 
 ## Invariants
 
-- **Fail open on anything unprovable.** An unreadable deliverable is an error. An unreadable frozen file, a file outside any module, a `go list` failure, an unresolvable identifier, or a pinning package absent from the graph all yield no violation. Only a compiler-provable cycle is reported, because a false HALT here taxes every cycle. Pinned by `TestCheckFrozenPins_AliasUnresolvableFailsOpen`, `TestResolvePackage_BaseNameFallback/no_candidate_fails_open` and `TestCheckCallSite/pinning_package_absent_from_graph`.
+- **Fail open on anything unprovable.** An unreadable deliverable is an error. These cases yield no violation:
+  - an unreadable frozen file (it proves nothing);
+  - a file outside any module;
+  - a `go list` failure;
+  - an unresolvable identifier;
+  - a pinning package absent from the graph.
+  Only a compiler-provable cycle is reported, because a false HALT here taxes every cycle. Pinned by `TestCheckFrozenPins_AliasUnresolvableFailsOpen`, `TestResolvePackage_BaseNameFallback/no_candidate_fails_open` and `TestCheckCallSite/pinning_package_absent_from_graph`.
 - **A self-pin is a violation.** When the referenced and pinning packages are the same, `findImportChain` returns a one-element chain, so `CheckCallSite` reports it. Pinned by `TestCheckCallSite/self_referential_pin`.
-- **An alias never displaces a real match.** The identifier compiles in the pinned production file's scope, not the test file's, so an alias in the test file is a hint about intent, not a binding. Consulted first, one alias line in an agent-authored test file could rebind `storage` to a harmless package and hide a real cycle, and an alias to a package outside the graph could block resolution altogether. Consulted last, an alias can only add reach, for identifiers such as `st` that match no base name. An alias to a package absent from the graph resolves nothing. Pinned by `TestResolvePackage_AliasNeverSuppressesBaseNameMatch`; the code keeps a one-line why.
+- **An alias never displaces a real match.** The identifier compiles in the pinned production file's scope, not the test file's. So an alias in the test file is a hint about intent, not a binding. Pinned by `TestResolvePackage_AliasNeverSuppressesBaseNameMatch`.
+  - Consulted first, one alias line in an agent-authored test file can rebind `storage` to a harmless package and hide a real cycle. An alias to a package outside the graph can block resolution altogether.
+  - Consulted last, an alias can only add reach, for identifiers such as `st` that match no base name. An alias to a package absent from the graph resolves nothing.
 - **The verdict is deterministic.** Go randomizes map iteration, so the lexical tie-break between equally scored candidates keeps the gate from blaming a different package on each run. Pinned by `TestResolvePackage_DeterministicLexicalTieBreak`.
 - **Base-name matching is exact.** `stor` never matches `storage`. Pinned by `TestResolvePackage_BaseNameFallback/partial_base_name_is_not_a_match_fails_open`.
 

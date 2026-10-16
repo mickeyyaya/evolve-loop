@@ -10,26 +10,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// importerClosureTimeout bounds `go list` on a cold module cache; past it the input set is returned rather than hang a predicate.
 const importerClosureTimeout = 120 * time.Second
 
 const moduleRootPattern = "./..."
 
-// Closure is one reverse-dependency walk over the module's import graph.
 type Closure struct {
-	// Patterns is the sorted union of the inputs and every package whose build or test binary transitively links one.
 	Patterns []string
-	// Testable is the subset of Patterns that `go test` can run without tags; a tag-only or removed dir is left out.
 	Testable []string
 }
 
-// ImporterClosure returns pkgs widened by every module package that transitively imports one; any failure returns pkgs unchanged.
 func ImporterClosure(repoRoot string, pkgs []string) []string {
 	c, _ := ImporterClosureChecked(repoRoot, pkgs)
 	return c.Patterns
 }
 
-// ImporterClosureChecked is ImporterClosure plus Testable; ok is false when the module could not be listed.
 func ImporterClosureChecked(repoRoot string, pkgs []string) (Closure, bool) {
 	if len(pkgs) == 0 {
 		return Closure{}, true
@@ -40,12 +34,12 @@ func ImporterClosureChecked(repoRoot string, pkgs []string) (Closure, bool) {
 	}
 	for _, p := range in {
 		if p == moduleRootPattern {
-			return Closure{Patterns: in, Testable: in}, true // already selects every package
+			return Closure{Patterns: in, Testable: in}, true
 		}
 	}
 	targets := targetPrefixes(in)
 	if len(targets) == 0 {
-		return Closure{Patterns: in}, true // no parseable pattern to trace importers of
+		return Closure{Patterns: in}, true
 	}
 	moduleDir := filepath.Join(repoRoot, "go")
 	modPath, ok := modulePathOf(moduleDir)
@@ -79,18 +73,15 @@ func ImporterClosureChecked(repoRoot string, pkgs []string) (Closure, bool) {
 	return Closure{Patterns: patterns, Testable: testableUnder(patterns, listing, modPath)}, true
 }
 
-// listedPkg is what one `go list` line says about a module package.
 type listedPkg struct {
-	path        string
-	deps        []string // transitive build dependencies (.Deps)
-	testImports []string // direct imports of its _test.go files (.TestImports + .XTestImports)
-	testable    bool     // has Go files in the default build context
+	path           string
+	transitiveDeps []string
+	testImports    []string
+	testable       bool
 }
 
-// links reports whether pkg's transitive build deps or its tests' direct imports name a package hit accepts.
-// A test import counts one hop: following its deps would pull every user of a shared fixture into every closure.
 func (p listedPkg) links(hit func(string) bool) bool {
-	for _, d := range p.deps {
+	for _, d := range p.transitiveDeps {
 		if hit(d) {
 			return true
 		}
@@ -103,7 +94,6 @@ func (p listedPkg) links(hit func(string) bool) bool {
 	return false
 }
 
-// listModule runs one `go list -e` over the module; -e keeps one unloadable package from failing the whole listing.
 func listModule(ctx context.Context, moduleDir string) (map[string]listedPkg, error) {
 	out, err := sysexec.Output(ctx, sysexec.DefaultRunner, moduleDir, "go", "list", "-e", "-f",
 		`{{.ImportPath}}|{{join .Deps " "}}|{{join .TestImports " "}} {{join .XTestImports " "}}|{{len .GoFiles}} {{len .TestGoFiles}} {{len .XTestGoFiles}}`,
@@ -113,21 +103,26 @@ func listModule(ctx context.Context, moduleDir string) (map[string]listedPkg, er
 	}
 	listing := map[string]listedPkg{}
 	for _, line := range strings.Split(out, "\n") {
-		parts := strings.Split(line, "|")
-		if len(parts) != 4 || strings.TrimSpace(parts[0]) == "" {
-			continue
-		}
-		listing[parts[0]] = listedPkg{
-			path:        parts[0],
-			deps:        strings.Fields(parts[1]),
-			testImports: strings.Fields(parts[2]),
-			testable:    strings.TrimSpace(parts[3]) != "0 0 0",
+		if pkg, ok := parseListedPkg(line); ok {
+			listing[pkg.path] = pkg
 		}
 	}
 	return listing, nil
 }
 
-// testableUnder keeps the patterns under which a listed package has default-context Go files, in input order.
+func parseListedPkg(line string) (listedPkg, bool) {
+	parts := strings.Split(line, "|")
+	if len(parts) != 4 || strings.TrimSpace(parts[0]) == "" {
+		return listedPkg{}, false
+	}
+	return listedPkg{
+		path:           parts[0],
+		transitiveDeps: strings.Fields(parts[1]),
+		testImports:    strings.Fields(parts[2]),
+		testable:       strings.TrimSpace(parts[3]) != "0 0 0",
+	}, true
+}
+
 func testableUnder(patterns []string, listing map[string]listedPkg, modPath string) []string {
 	var out []string
 	for _, pat := range patterns {
@@ -149,7 +144,6 @@ func testableUnder(patterns []string, listing map[string]listedPkg, modPath stri
 	return out
 }
 
-// targetPrefixes converts "./dir/..." patterns into module-relative dirs; an unparseable one adds no closure but stays in the output.
 func targetPrefixes(pkgs []string) []string {
 	var out []string
 	for _, p := range pkgs {
@@ -162,12 +156,10 @@ func targetPrefixes(pkgs []string) []string {
 	return out
 }
 
-// matchesAny reports whether importPath (a full module import path) lies inside
-// any of the module-relative target dirs.
 func matchesAny(importPath string, targets []string, modPath string) bool {
 	rel := strings.TrimPrefix(importPath, modPath+"/")
 	if rel == importPath {
-		return false // outside the module (stdlib or an external dep)
+		return false
 	}
 	for _, t := range targets {
 		if rel == t || strings.HasPrefix(rel, t+"/") {
@@ -177,7 +169,6 @@ func matchesAny(importPath string, targets []string, modPath string) bool {
 	return false
 }
 
-// patternFor maps a module import path back to its go test pattern.
 func patternFor(importPath, modPath string) string {
 	rel := strings.TrimPrefix(importPath, modPath+"/")
 	if rel == importPath || rel == "" {
@@ -186,7 +177,6 @@ func patternFor(importPath, modPath string) string {
 	return "./" + rel + "/..."
 }
 
-// sortedDedup returns a sorted, deduped copy of pkgs, so the fallbacks share the real result's shape.
 func sortedDedup(pkgs []string) []string {
 	set := map[string]struct{}{}
 	for _, p := range pkgs {

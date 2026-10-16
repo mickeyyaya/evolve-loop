@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// machO64 is the reversed-byte-order Mach-O 64 magic — the exact signature of the
-// 18MB go/acs/cycle536/evolve binary this guard exists to keep out.
 var machO64 = []byte{0xcf, 0xfa, 0xed, 0xfe}
 
 func writeFile(t *testing.T, dir, name string, head []byte, size int) string {
@@ -21,16 +19,13 @@ func writeFile(t *testing.T, dir, name string, head []byte, size int) string {
 	return path
 }
 
-// TestScan_RejectsSyntheticLargeExecutable is the acceptance-criteria regression:
-// a synthetic large executable (magic bytes + padding over threshold) must be
-// flagged, and a large non-executable and a small executable must NOT be.
 func TestScan_RejectsSyntheticLargeExecutable(t *testing.T) {
 	dir := t.TempDir()
 	const threshold = int64(1024)
 
-	writeFile(t, dir, "evolve", machO64, int(threshold)+512)           // large + magic -> offender
-	writeFile(t, dir, "fixture.json", []byte("{"), int(threshold)+512) // large, no magic -> ok
-	writeFile(t, dir, "tiny", machO64, 16)                             // magic but under threshold -> ok
+	writeFile(t, dir, "evolve", machO64, int(threshold)+512)
+	writeFile(t, dir, "fixture.json", []byte("{"), int(threshold)+512)
+	writeFile(t, dir, "tiny", machO64, 16)
 
 	offenders, err := Scan(dir, []string{"evolve", "fixture.json", "tiny"}, threshold)
 	if err != nil {
@@ -47,8 +42,6 @@ func TestScan_RejectsSyntheticLargeExecutable(t *testing.T) {
 	}
 }
 
-// TestScan_SkipsMissingFiles: a deleted change-set entry is not an offender and
-// must not error (deletions legitimately appear in `git diff --name-only`).
 func TestScan_SkipsMissingFiles(t *testing.T) {
 	offenders, err := Scan(t.TempDir(), []string{"gone.bin"}, DefaultThresholdBytes)
 	if err != nil {
@@ -78,10 +71,6 @@ func TestHasExecutableMagic(t *testing.T) {
 	}
 }
 
-// TestOffender_RecordsPathAndSize names the exported Offender type directly
-// (ADR-0069 apicover naming gate: every exported symbol needs a test that
-// references it by name) and pins its two fields as the caller-facing contract
-// commitgate relies on when it logs a rejected artifact.
 func TestOffender_RecordsPathAndSize(t *testing.T) {
 	off := Offender{Path: "go/acs/cycle536/evolve", Size: 18467058}
 	if off.Path != "go/acs/cycle536/evolve" {

@@ -7,7 +7,6 @@ import (
 )
 
 func TestCoherence_ResultShape(t *testing.T) {
-	// The explicit Coherence type names the result type for apicover.
 	var got Coherence = CheckVerdictCoherence(VerdictInputs{Recorded: "FAIL", Audit: "PASS", ACS: "PASS", AuditRan: true})
 	if !got.Incoherent || got.Category != "verdict-incoherence" || got.Evidence == "" {
 		t.Errorf("Coherence = %+v; want incoherent verdict-incoherence with evidence", got)

@@ -20,8 +20,6 @@ func countLines(t *testing.T, path string) int {
 	return strings.Count(string(data), "\n")
 }
 
-// Despite the name, this is the standing combined line budget of the three personas;
-// core.personaBudgetFailures runs this package in-lane when a persona doc changes.
 func TestPersonaStopCriterionDedupe_CombinedLineCountReduced(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	total := 0
@@ -56,15 +54,11 @@ func TestPersonaStopCriterionDedupe_NoGateOrBannedPatternTextLost(t *testing.T) 
 	all := combined.String()
 
 	required := []string{
-		// scout gates
 		"system-health-complete", "inbox-audit-complete", "backlog-complete",
 		"build-plan-written", "research-cache-section", "evals-materialized",
-		// builder gates
 		"worktree-verified", "implementation-complete", "self-verify-passed",
 		"report-written", "turn-budget-respected",
-		// auditor gates
 		"predicates-run", "verdict-decided",
-		// banned post-report phrases, without the ellipsis so "…" and "..." both match
 		"Let me also check", "Let me verify one more thing", "I should also check",
 	}
 	for _, want := range required {

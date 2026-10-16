@@ -62,8 +62,7 @@ func TestIntentOnDemandSectionsNotDeleted_Amplified(t *testing.T) {
 	}
 }
 
-// Despite the name, the floor is 64 bytes: the marker section itself.
-func TestTriageCompaction_ByteSavings4200_Amplified(t *testing.T) {
+func TestTriageCompaction_MarkerSectionExists_Amplified(t *testing.T) {
 	root := repoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "agents", "evolve-triage.md"))
 	if err != nil {

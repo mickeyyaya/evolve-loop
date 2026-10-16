@@ -1,8 +1,5 @@
 package flagregistry
 
-// All is the complete EVOLVE_* flag registry, sorted by Name. It is the SSOT
-// projected into control-flags.md; Lookup binary-searches it, so it must stay
-// sorted (TestAll_SortedByName enforces this).
 var All = []Flag{
 	{Name: "EVOLVE_ADAPTERS_DIR_OVERRIDE", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},
 	{Name: "EVOLVE_CLI", Status: StatusInternal, Doc: "Undocumented production reader (inventory 2026-06-11); classify when touched."},

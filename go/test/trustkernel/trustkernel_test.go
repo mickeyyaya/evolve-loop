@@ -15,10 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// repoRoot resolves the enclosing git checkout's top level so on-disk fixtures
-// (.evolve/profiles) can be located regardless of the test's working directory.
-// Skips (not fails) outside a git checkout — keeps the tier portable.
-func repoRoot(t *testing.T) string {
+func repoRootOrSkip(t *testing.T) string {
 	t.Helper()
 	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
@@ -27,15 +24,6 @@ func repoRoot(t *testing.T) string {
 	return strings.TrimSpace(string(out))
 }
 
-// === EGPS ship gate ========================================================
-// Invariant: a cycle is ship-eligible only when the EGPS predicate suite has
-// zero RED predicates. Pins acssuite.Run's verdict computation — the same
-// red_count the ship phase's checkEGPSGate refuses to ship on.
-// Knowledge: knowledge/architecture/trust-kernel-and-egps.md
-
-// writeGoPredFixture writes a minimal Go ACS predicate module under <root>/go so
-// acssuite.Run's Go lane discovers one predicate for `cycle` (passing or RED) via
-// real `go test -tags acs` execution — the integration the ship gate depends on.
 func writeGoPredFixture(t *testing.T, root string, cycle int, pass bool) {
 	t.Helper()
 	pkg := "cycle" + strconv.Itoa(cycle)
@@ -74,7 +62,7 @@ func TestShipGate_ShipEligibleOnlyWhenRedCountZero(t *testing.T) {
 
 func TestShipGate_BlocksWhenRedCountNonZero(t *testing.T) {
 	root := t.TempDir()
-	writeGoPredFixture(t, root, 1, false) // RED predicate
+	writeGoPredFixture(t, root, 1, false)
 
 	v, err := acssuite.Run(acssuite.Options{Root: root, Cycle: 1})
 	if err != nil {
@@ -90,12 +78,6 @@ func TestShipGate_BlocksWhenRedCountNonZero(t *testing.T) {
 		t.Error("ShipEligible = true with a RED predicate; ship must be blocked")
 	}
 }
-
-// === Routing integrity floor ===============================================
-// Invariant: reach(ship) ⇒ build ∧ audit ∧ (tdd, unless trivial). Pins
-// router.ClampPlanToFloor — the non-configurable floor that survives any
-// routing Strategy and cannot be weakened by the mandatory-phase set.
-// Knowledge: knowledge/architecture/routing-and-advisor.md
 
 func tddPinCfg() config.RoutingConfig {
 	return config.RoutingConfig{Conditional: map[string]config.CondRule{
@@ -117,7 +99,6 @@ func TestRoutingFloor_ShipRequiresBuildAndAudit(t *testing.T) {
 		Cfg:     tddPinCfg(),
 		Signals: router.RoutingSignals{Scout: router.ScoutSignals{CycleSizeEstimate: "medium", Present: true}},
 	}
-	// Adversarial plan: jump straight to ship, skipping the whole chain.
 	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true},
 		{Phase: "ship", Run: true},
@@ -138,7 +119,6 @@ func TestRoutingFloor_NoShipCycleIsUnconstrained(t *testing.T) {
 		Cfg:     tddPinCfg(),
 		Signals: router.RoutingSignals{Scout: router.ScoutSignals{CycleSizeEstimate: "medium", Present: true}},
 	}
-	// A scout-only investigation cycle: the implication's antecedent is false.
 	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true},
 		{Phase: "build", Run: false},
@@ -168,23 +148,14 @@ func TestRoutingFloor_TrivialCycleExemptsTDDNotBuildAudit(t *testing.T) {
 	}
 }
 
-// === Phase-transition legality =============================================
-// Invariant: ship is reachable only after audit (the canonical spine), and ship
-// hands off only to end / recovery phases — never back up the spine arbitrarily.
-// Pins core.StateMachine's transition table.
-// Knowledge: knowledge/architecture/phase-pipeline.md
-
 func TestStateMachine_ShipFollowsAuditOnlyViaShippableVerdict(t *testing.T) {
 	sm := core.NewStateMachine()
-	// audit → ship is a legal edge...
 	if !sm.CanTransition(core.PhaseAudit, core.PhaseShip) {
 		t.Error("audit → ship must be a legal transition")
 	}
-	// ...but scout → ship must NOT be (cannot bypass build/audit on the graph).
 	if sm.CanTransition(core.PhaseScout, core.PhaseShip) {
 		t.Error("scout → ship must be illegal (no bypass of build/audit)")
 	}
-	// build → ship is illegal: audit sits between them.
 	if sm.CanTransition(core.PhaseBuild, core.PhaseShip) {
 		t.Error("build → ship must be illegal (audit must run first)")
 	}
@@ -210,14 +181,8 @@ func TestStateMachine_AuditVerdictRoutesShipOrRetro(t *testing.T) {
 	}
 }
 
-// === Profile validity ======================================================
-// Invariant: every phase profile on disk is well-formed JSON declaring the
-// minimum routing fields (name + cli). Pins the real .evolve/profiles/*.json
-// the dispatcher reads before launching any subagent.
-// Knowledge: knowledge/architecture/cli-matrix-and-drivers.md
-
 func TestProfile_AllPhaseProfilesValid(t *testing.T) {
-	profilesDir := filepath.Join(repoRoot(t), ".evolve", "profiles")
+	profilesDir := filepath.Join(repoRootOrSkip(t), ".evolve", "profiles")
 	entries, err := filepath.Glob(filepath.Join(profilesDir, "*.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -239,9 +204,8 @@ func TestProfile_AllPhaseProfilesValid(t *testing.T) {
 			t.Errorf("%s: invalid JSON: %v", filepath.Base(path), err)
 			continue
 		}
-		// Non-profile JSON files (e.g. tool-policy.json) have no name field.
-		// Skip them — this test validates agent profiles, not policy config.
-		if p.Name == "" {
+		isPolicyConfigNotProfile := p.Name == ""
+		if isPolicyConfigNotProfile {
 			continue
 		}
 		if p.CLI == "" {

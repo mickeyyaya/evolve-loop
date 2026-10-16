@@ -8,13 +8,6 @@ import (
 	"testing"
 )
 
-// TestTrackedSet_BindsTrackedFilesThroughRealGit binds the package's two
-// exported functions to their real behavior end-to-end: TrackedFiles is the
-// underlying enumerator and TrackedSet its basename projection — one fixture
-// repo proves both carry git's actual index state (a staged file appears in
-// each; an on-disk-only file appears in neither), rather than the names
-// merely existing. Graduates internal/repostate to the public-API DoD
-// (go/.apicover-enforce).
 func TestTrackedSet_BindsTrackedFilesThroughRealGit(t *testing.T) {
 	root := t.TempDir()
 	run := func(args ...string) {
@@ -53,9 +46,6 @@ func TestTrackedSet_BindsTrackedFilesThroughRealGit(t *testing.T) {
 	}
 }
 
-// TestTrackedTree_BindsNestedTrackedFiles names TrackedTree: it lists tracked
-// and staged files at every depth under relDir and never an untracked one —
-// the recursive binding set TrackedFiles narrows to direct children.
 func TestTrackedTree_BindsNestedTrackedFiles(t *testing.T) {
 	root, git := fixtureRepo(t)
 	write(t, root, "go/a_test.go")

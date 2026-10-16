@@ -111,7 +111,6 @@ func TestAlwaysOnPhaseDocsHaveCompactMarker_InlineMentionRejected(t *testing.T) 
 	}
 }
 
-// bodyHasCompactMarker must agree with StripOnDemandSections on what counts as the heading.
 func bodyHasCompactMarker(body string) bool {
 	for _, line := range strings.Split(body, "\n") {
 		trimmed := strings.TrimRight(line, "\r")

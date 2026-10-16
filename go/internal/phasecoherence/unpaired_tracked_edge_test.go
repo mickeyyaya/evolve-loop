@@ -48,7 +48,7 @@ func TestTrackedProfiles_ErrorCarriesGitStderr(t *testing.T) {
 
 func TestTrackedProfiles_RepoWithNoTrackedProfilesReturnsEmptySetNilError(t *testing.T) {
 	root, _ := initProfileRepo(t)
-	writeProfileAt(t, root, ".evolve/profiles/minted-only.json") // never added
+	writeProfileAt(t, root, ".evolve/profiles/minted-only.json")
 
 	set, err := trackedProfiles(root)
 	if err != nil {
@@ -77,7 +77,7 @@ func TestTrackedProfiles_NestedTrackedProfileDoesNotAliasTopLevelStub(t *testing
 	root, git := initProfileRepo(t)
 	writeProfileAt(t, root, ".evolve/profiles/archive/auditor.json")
 	git("add", ".evolve/profiles/archive/auditor.json")
-	writeProfileAt(t, root, ".evolve/profiles/auditor.json") // untracked top-level stub
+	writeProfileAt(t, root, ".evolve/profiles/auditor.json")
 
 	set, err := trackedProfiles(root)
 	if err != nil {
