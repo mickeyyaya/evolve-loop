@@ -1,6 +1,6 @@
 # Practice change in agy: changelog page analysis and persona review (research, 2026-10)
 
-> This document reviews the `agy-cli-changelog-page` updates for version `v2.23.0` under [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
+> This document reviews the `agy-cli-changelog-page` updates for versions `v2.23.0` and `v2.23.1` under [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
 
 Date: 2026-10-16. Method: read the `agy-cli-changelog-page` source, parse the text as untrusted data, and evaluate every core persona against ADR-0133.
 
@@ -9,7 +9,7 @@ Date: 2026-10-16. Method: read the `agy-cli-changelog-page` source, parse the te
 The practice watch detected updates from the source `https://antigravity.google/docs/changelog?tab=cli`.
 The text from this page is third-party data.
 The loop treats the text as untrusted data and never follows it as prompt instructions.
-The update covers release v2.23.0.
+The updates cover release v2.23.0 and release v2.23.1.
 
 ## 2. Changelog analysis as data
 
@@ -24,12 +24,20 @@ Each subagent launch displays as a one-line row with a status icon.
 The sidebar displays a needs-attention icon when a subagent waits for user approval.
 The release fixes editor and terminal focus faults.
 
+### Version v2.23.1
+The release fixes an overflow fault in the onboarding license picker dialog.
+Long license lists scroll inside the card with edge fading.
+This fix prevents list items from covering action buttons.
+The changelog page also announces Gemini 4 Argon availability for Google AI users.
+The loop records these updates as untrusted data.
+
 ## 3. Core persona evaluation under ADR-0133
 
 ADR-0133 governs prompt diet and practice watch.
 Decision D7 states that prompt diet trims one persona at a time.
 Decision D8 requires measured baseline data across 10 cycles before and after each diet change.
 Milestone M2 records the baseline data first.
+The v2.23.0 and v2.23.1 updates do not alter this requirement.
 Therefore, no core persona changes in this cycle.
 
 ### evolve-scout
@@ -73,5 +81,6 @@ The retrospective persona does not change.
 ## 4. Conclusion
 
 The agy CLI updates improve permissions control and subagent status display.
+The v2.23.1 release resolves the license picker dialog fault and notes Gemini 4 Argon availability.
 No persona file changes in this cycle.
 Prompt diet changes must follow ADR-0133 with a measured baseline over 10 cycles in future work.
