@@ -442,9 +442,15 @@ func TestSeal_RealLedgerCopy(t *testing.T) {
 	}
 	dir := t.TempDir()
 	for _, f := range []string{"ledger.jsonl", "ledger.tip"} {
-		raw, err := os.ReadFile(filepath.Join(src, f))
+		path := filepath.Join(src, f)
+		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Skipf("cannot copy real %s: %v", f, err)
+		}
+		if f == "ledger.jsonl" {
+			if lines := len(splitLines(raw)); lines <= 100 {
+				t.Skipf("real %s has only %d lines (want > 100 for seal test)", path, lines)
+			}
 		}
 		if err := os.WriteFile(filepath.Join(dir, f), raw, 0o644); err != nil {
 			t.Fatal(err)
