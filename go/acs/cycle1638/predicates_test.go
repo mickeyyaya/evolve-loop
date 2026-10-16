@@ -457,9 +457,37 @@ func baseSHA(t *testing.T, body string) string {
 	return ""
 }
 
+func shippedRecordCommit(t *testing.T, root string) string {
+	t.Helper()
+	rel := shippingCycleRecord(t, root)
+	pending, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "status", "--porcelain", "--", rel)
+	if err != nil || code != 0 {
+		t.Fatalf("git status -- %s: exit=%d err=%v stderr=%s", rel, code, err, stderr)
+	}
+	if strings.TrimSpace(pending) != "" {
+		return ""
+	}
+	shallow, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "rev-parse", "--is-shallow-repository")
+	if err != nil || code != 0 || strings.TrimSpace(shallow) != "false" {
+		t.Fatalf("cannot locate the commit that added %s: the repository is shallow or unreadable (exit=%d err=%v out=%q stderr=%s)", rel, code, err, shallow, stderr)
+	}
+	sha, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "log", "-1", "--diff-filter=A", "--format=%H", "--", rel)
+	if err != nil || code != 0 || strings.TrimSpace(sha) == "" {
+		t.Fatalf("git log -- %s: exit=%d err=%v stderr=%s", rel, code, err, stderr)
+	}
+	return strings.TrimSpace(sha)
+}
+
 func changedSinceBase(t *testing.T, root, base string) []string {
 	t.Helper()
-	out, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "diff", "--name-only", base)
+	args := []string{"-C", root, "diff", "--name-only", base}
+	if end := shippedRecordCommit(t, root); end != "" {
+		if _, stderr, code, _ := acsassert.SubprocessOutput("git", "-C", root, "merge-base", "--is-ancestor", base, end); code != 0 {
+			t.Fatalf("base SHA %s is not an ancestor of the commit %s that added the explanation -- the record was not shipped on top of its base: %s", base, end, stderr)
+		}
+		args = append(args, end)
+	}
+	out, stderr, code, err := acsassert.SubprocessOutput("git", args...)
 	if err != nil || code != 0 {
 		t.Fatalf("git diff --name-only %s: exit=%d err=%v stderr=%s", base, code, err, stderr)
 	}

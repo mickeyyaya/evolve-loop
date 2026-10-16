@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -428,16 +429,14 @@ var recordedAddedTests = []string{
 
 func TestC1679_007_EveryAddedGoTestPackageIsGreenBeforeShip(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	added := addedGoTestFiles(t, root)
-	if len(added) == 0 {
-		for _, rel := range recordedAddedTests {
-			if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
-				t.Fatalf("RED (audit M1): the live added-test seed is empty (merged tree) and the recorded added file %s is missing (%v) — the lane's own tag-guarded package is gone", rel, err)
-			}
+	for _, rel := range recordedAddedTests {
+		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
+			t.Fatalf("RED (audit M1): the recorded added file %s is missing (%v) — the lane's own tag-guarded package is gone", rel, err)
 		}
-		added = recordedAddedTests
-		t.Logf("live added-test seed empty (the lane's commit is on main) — verifying the recorded added set %v", added)
 	}
+	added := append(addedGoTestFiles(t, root), recordedAddedTests...)
+	sort.Strings(added)
+	added = slices.Compact(added)
 
 	pkgsByTagKey := map[string]map[string]bool{}
 	tagsByKey := map[string][]string{}

@@ -177,7 +177,6 @@
   "internal/phases/scout.mergeDigests": 57,
   "internal/phases/ship.classifyPackEvents": 56,
   "internal/phases/ship.committedInboxIDs": 73,
-  "internal/phases/ship.consumeCommittedItems": 76,
   "internal/phases/ship.detectColliders": 74,
   "internal/phases/ship.itemConsumer.stage": 93,
   "internal/phases/ship.promoteInbox": 150,
