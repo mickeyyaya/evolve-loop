@@ -13,11 +13,13 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
@@ -32,6 +34,14 @@ type gcDevHubEnv struct {
 
 func newGCDevHub(t *testing.T, policyJSON string) gcDevHubEnv {
 	t.Helper()
+	origHost := gcInjectedProcessHost
+	t.Cleanup(func() { gcInjectedProcessHost = origHost })
+	gcInjectedProcessHost = &gcProcessHost{
+		list:   func(context.Context) ([]proctree.Process, error) { return nil, nil },
+		signal: func(int, syscall.Signal) error { return nil },
+		sleep:  func(time.Duration) {},
+		alive:  func(int) bool { return false },
+	}
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
 	t.Setenv("GOCACHE", t.TempDir())
 	src := gittest.Fixture(t)

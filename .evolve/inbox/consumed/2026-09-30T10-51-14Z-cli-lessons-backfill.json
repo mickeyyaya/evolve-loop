@@ -4,6 +4,11 @@
     "--write produces a ledger that `lessons recurrence` renders with the same counts",
     "Skipped malformed files are listed"
   ],
+  "consumed": {
+    "at": "2026-10-16T03:34:50Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-09-30T10:51:14Z",
   "files": [
     "go/cmd/evolve/cmd_lessons.go",
