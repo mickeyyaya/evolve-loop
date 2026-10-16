@@ -205,6 +205,14 @@ func explicitSteTargets(root string, paths []string, mode steMode) ([]steTarget,
 		if err != nil {
 			return nil, err
 		}
+		if _, statErr := os.Stat(abs); statErr != nil && !filepath.IsAbs(p) && root != "" {
+			candidate := filepath.Join(root, p)
+			if _, cErr := os.Stat(candidate); cErr == nil {
+				if cAbs, aErr := steAbs(candidate); aErr == nil {
+					abs = cAbs
+				}
+			}
+		}
 		info, err := os.Stat(abs)
 		if err != nil || !info.IsDir() {
 			out = append(out, steTarget{abs: abs, display: steDisplay(root, abs)})

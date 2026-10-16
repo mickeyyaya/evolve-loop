@@ -509,6 +509,27 @@ func TestExplicitSteTargets_AnUnresolvablePathIsAnError(t *testing.T) {
 	}
 }
 
+func TestExplicitSteTargets_FallsBackToProjectRootWhenNotInCwd(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	rel := filepath.Join("docs", "target.md")
+	target := filepath.Join(root, rel)
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("text"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := explicitSteTargets(root, []string{filepath.ToSlash(rel)}, steDocsMode)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].abs != target || got[0].display != "docs/target.md" {
+		t.Fatalf("explicitSteTargets = %+v, want abs %q and display docs/target.md", got, target)
+	}
+}
+
 func TestSteDisplay_IsRootRelativeOnlyInsideTheRoot(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
