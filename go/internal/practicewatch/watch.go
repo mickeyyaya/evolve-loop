@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -116,6 +117,14 @@ func (o Options) watchSource(ctx context.Context, src Source) Result {
 	text := Normalize(src.Kind, got.text)
 	sum := sha256.Sum256([]byte(text))
 	next := snapshot{Hash: hex.EncodeToString(sum[:]), FetchedAt: o.Now().UTC().Format(time.RFC3339), ETag: got.etag, Excerpt: capText(text, excerptLimit)}
+	settled := o.settle(res, src, prev, found, next)
+	if got.truncated {
+		return settled.markTruncated()
+	}
+	return settled
+}
+
+func (o Options) settle(res Result, src Source, prev snapshot, found bool, next snapshot) Result {
 	switch {
 	case !found:
 		return o.record(res, src, next)
@@ -123,6 +132,14 @@ func (o Options) watchSource(ctx context.Context, src Source) Result {
 		return res.with(StatusUnchanged, "")
 	}
 	return o.fileChange(res, src, prev, next)
+}
+
+func (r Result) markTruncated() Result {
+	note := fmt.Sprintf("the body was truncated at the %d MiB limit", bodyLimit>>20)
+	if r.Detail == "" {
+		return r.with(r.Status, note)
+	}
+	return r.with(r.Status, r.Detail+"; "+note)
 }
 
 func (r Result) with(status Status, detail string) Result {
@@ -153,7 +170,11 @@ func (o Options) fileChange(res Result, src Source, prev, next snapshot) Result 
 		return res.with(StatusWouldFile, "")
 	}
 	raw, id := practiceItem(src, next.Hash, prev, addedLines(prev.Excerpt, next.Excerpt, addedLinesLimit), o.Now())
-	if idFiled(inboxDir, id) {
+	filed, err := idFiled(inboxDir, id)
+	if err != nil {
+		return res.with(StatusError, err.Error())
+	}
+	if filed {
 		return o.advance(res, src, next, "the item id "+id+" is already filed (a consumed item of the same minute): the snapshot advanced")
 	}
 	if err := os.MkdirAll(inboxDir, 0o755); err != nil {

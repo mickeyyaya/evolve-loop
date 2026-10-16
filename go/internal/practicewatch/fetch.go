@@ -20,6 +20,7 @@ type fetched struct {
 	text        string
 	etag        string
 	notModified bool
+	truncated   bool
 	skip        string
 }
 
@@ -52,11 +53,15 @@ func (o Options) fetchHTTP(ctx context.Context, src Source, etag string) (fetche
 	case resp.StatusCode < 200 || resp.StatusCode > 299:
 		return fetched{}, fmt.Errorf("fetch %s: HTTP %d", u.Redacted(), resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, bodyLimit))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, bodyLimit+1))
 	if err != nil {
 		return fetched{}, fmt.Errorf("read %s: %w", u.Redacted(), err)
 	}
-	return fetched{text: string(body), etag: resp.Header.Get("ETag")}, nil
+	truncated := len(body) > bodyLimit
+	if truncated {
+		body = body[:bodyLimit]
+	}
+	return fetched{text: string(body), etag: resp.Header.Get("ETag"), truncated: truncated}, nil
 }
 
 func (o Options) fetchCommand(ctx context.Context, src Source) (fetched, error) {
@@ -73,7 +78,7 @@ func (o Options) fetchCommand(ctx context.Context, src Source) (fetched, error) 
 	case code != 0:
 		return fetched{}, fmt.Errorf("run %q: exit %d: %s", src.Locator, code, capText(strings.TrimSpace(stderr), stderrDetail))
 	}
-	return fetched{text: stdout}, nil
+	return fetched{text: stdout, truncated: capped.cut}, nil
 }
 
 const maxRedirects = 5
@@ -93,11 +98,13 @@ func guardRedirect(req *http.Request, via []*http.Request) error {
 type cappedWriter struct {
 	w    io.Writer
 	left int
+	cut  bool
 }
 
 func (c *cappedWriter) Write(p []byte) (int, error) {
 	keep := min(len(p), c.left)
 	c.left -= keep
+	c.cut = c.cut || keep < len(p)
 	if _, err := c.w.Write(p[:keep]); err != nil {
 		return 0, err
 	}

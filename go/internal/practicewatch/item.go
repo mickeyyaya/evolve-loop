@@ -2,6 +2,7 @@ package practicewatch
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -25,7 +26,7 @@ var terminalEscape = regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b
 func sanitizeUntrusted(text string) string {
 	text = terminalEscape.ReplaceAllString(text, "")
 	return strings.Map(func(r rune) rune {
-		if r == '\n' || r == '\t' || !unicode.IsControl(r) {
+		if r == '\n' || r == '\t' || !unicode.IsControl(r) && !unicode.Is(unicode.Cf, r) {
 			return r
 		}
 		return -1
@@ -106,13 +107,21 @@ func inboxDirOf(root string, override string) string {
 	return filepath.Join(root, ".evolve", "inbox")
 }
 
-func idFiled(inboxDir, id string) bool {
+func idFiled(inboxDir, id string) (bool, error) {
 	found := false
-	_ = filepath.WalkDir(inboxDir, func(path string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && strings.HasSuffix(d.Name(), "-"+id+".json") {
+	err := filepath.WalkDir(inboxDir, func(path string, d fs.DirEntry, err error) error {
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return nil
+		case err != nil:
+			return err
+		case !d.IsDir() && strings.HasSuffix(d.Name(), "-"+id+".json"):
 			found = true
 		}
 		return nil
 	})
-	return found
+	if err != nil {
+		return false, fmt.Errorf("look for the item %s in the inbox %s: %w", id, inboxDir, err)
+	}
+	return found, nil
 }
