@@ -3,22 +3,16 @@
 package main
 
 import (
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestRunWorktreeCreateDev_AShowRefFaultIsAnIOErrorNotAFreeBranch(t *testing.T) {
 	runtime, _ := devHubFixture(t)
-	realGit, err := exec.LookPath("git")
-	if err != nil {
-		t.Skip("git not on PATH")
-	}
-	bfStub(t, "git", `for a in "$@"; do
-  if [ "$a" = show-ref ]; then echo "fatal: bad object" >&2; exit 128; fi
-done
-exec '`+realGit+`' "$@"`)
+	gittest.InstallFault(t, gittest.GitFault{Verb: "show-ref", Code: 128, Stderr: "fatal: bad object"})
 
 	out, code := e3DevCreate(t, runtime, "t1", "b1")
 
@@ -26,7 +20,7 @@ exec '`+realGit+`' "$@"`)
 		t.Fatalf("code %d out %q", code, out)
 	}
 	store := filepath.Join(filepath.Dir(runtime), ".repo.git")
-	if strings.Contains(out, "already exists") || exec.Command(realGit, "-C", store, "show-ref", "--verify", "--quiet", "refs/heads/b1").Run() == nil {
+	if strings.Contains(out, "already exists") || gittest.BranchExists(t, store, "b1") {
 		t.Errorf("a show-ref fault was read as an answer: %q", out)
 	}
 }

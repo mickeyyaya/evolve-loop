@@ -12,31 +12,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-type e3GitFault struct {
-	pattern string
-	skip    int
-	code    int
-	out     string
-}
-
-func e3FaultyGit(t *testing.T, f e3GitFault) {
-	t.Helper()
-	realGit, err := exec.LookPath("git")
-	if err != nil {
-		t.Skip("git not on PATH")
-	}
-	counter := filepath.Join(t.TempDir(), "count")
-	body := fmt.Sprintf(`all=" $* "
-case "$all" in
-*'%s'*)
-  n=$(cat '%s' 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > '%s'
-  if [ "$n" -gt %d ]; then printf '%%s' '%s'; [ %d -ne 0 ] && echo "fatal: e3 injected" >&2; exit %d; fi ;;
-esac
-exec '%s' "$@"`, f.pattern, counter, counter, f.skip, f.out, f.code, f.code, realGit)
-	bfStub(t, "git", body)
-}
+const e3Injected = "gittest: injected fault on git "
 
 func e3CleanTree(t *testing.T) (landedHub, string) {
 	t.Helper()
@@ -62,26 +42,26 @@ func TestWorktreeDevCleanup_EveryGitFaultFailsTheTreeAndKeepsIt(t *testing.T) {
 	cases := []struct {
 		name  string
 		tree  func(t *testing.T) (landedHub, string)
-		fault e3GitFault
+		fault gittest.GitFault
 		want  string
 	}{
-		{"worktree list", e3CleanTree, e3GitFault{pattern: " worktree list ", code: 128}, "e3 injected"},
-		{"admin dir lookup", e3CleanTree, e3GitFault{pattern: " --absolute-git-dir ", code: 128}, "e3 injected"},
-		{"unreadable admin dir", e3CleanTree, e3GitFault{pattern: " --absolute-git-dir ", out: notDir + "/admin"}, "quiet check: "},
-		{"symbolic-ref", e3CleanTree, e3GitFault{pattern: " symbolic-ref ", code: 128}, "git symbolic-ref rc=128"},
-		{"head", e3CleanTree, e3GitFault{pattern: " rev-parse HEAD ", code: 128}, "e3 injected"},
-		{"status", e3CleanTree, e3GitFault{pattern: " status ", code: 128}, "git status -z rc=128"},
-		{"ancestry", e3CleanTree, e3GitFault{pattern: " merge-base --is-ancestor ", code: 128}, "git merge-base --is-ancestor rc=128"},
-		{"merge-base of a dirty tree", e3DirtyLandedTree, e3GitFault{pattern: " merge-base ", code: 128}, "e3 injected"},
-		{"binary diff of a dirty tree", e3DirtyLandedTree, e3GitFault{pattern: " diff --binary ", code: 128}, "e3 injected"},
-		{"raw diff of a dirty tree", e3DirtyLandedTree, e3GitFault{pattern: " diff --raw ", code: 128}, "e3 injected"},
-		{"recheck before removal", e3DirtyLandedTree, e3GitFault{pattern: " diff --binary ", skip: 1, code: 128}, "e3 injected"},
-		{"worktree remove", e3CleanTree, e3GitFault{pattern: " worktree remove ", code: 128}, "git worktree remove rc=128"},
+		{"worktree list", e3CleanTree, gittest.GitFault{Verb: "worktree", Args: []string{"list"}, Code: 128}, e3Injected},
+		{"admin dir lookup", e3CleanTree, gittest.GitFault{Verb: "rev-parse", Args: []string{"--absolute-git-dir"}, Code: 128}, e3Injected},
+		{"unreadable admin dir", e3CleanTree, gittest.GitFault{Verb: "rev-parse", Args: []string{"--absolute-git-dir"}, Stdout: notDir + "/admin"}, "quiet check: "},
+		{"symbolic-ref", e3CleanTree, gittest.GitFault{Verb: "symbolic-ref", Code: 128}, "git symbolic-ref rc=128"},
+		{"head", e3CleanTree, gittest.GitFault{Verb: "rev-parse", Args: []string{"HEAD"}, Code: 128}, e3Injected},
+		{"status", e3CleanTree, gittest.GitFault{Verb: "status", Code: 128}, "git status -z rc=128"},
+		{"ancestry", e3CleanTree, gittest.GitFault{Verb: "merge-base", Args: []string{"--is-ancestor"}, Code: 128}, "git merge-base --is-ancestor rc=128"},
+		{"merge-base of a dirty tree", e3DirtyLandedTree, gittest.GitFault{Verb: "merge-base", Code: 128}, e3Injected},
+		{"binary diff of a dirty tree", e3DirtyLandedTree, gittest.GitFault{Verb: "diff", Args: []string{"--binary"}, Code: 128}, e3Injected},
+		{"raw diff of a dirty tree", e3DirtyLandedTree, gittest.GitFault{Verb: "diff", Args: []string{"--raw"}, Code: 128}, e3Injected},
+		{"recheck before removal", e3DirtyLandedTree, gittest.GitFault{Verb: "diff", Args: []string{"--binary"}, Skip: 1, Code: 128}, e3Injected},
+		{"worktree remove", e3CleanTree, gittest.GitFault{Verb: "worktree", Args: []string{"remove"}, Code: 128}, "git worktree remove rc=128"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			h, dir := tc.tree(t)
-			e3FaultyGit(t, tc.fault)
+			gittest.InstallFault(t, tc.fault)
 
 			out, code := cleanupOne(t, h, "t1", devCleanupOptions{})
 
@@ -97,7 +77,7 @@ func TestWorktreeDevCleanup_EveryGitFaultFailsTheTreeAndKeepsIt(t *testing.T) {
 
 func TestWorktreeDevCleanup_ABranchDeleteFaultAfterRemovalIsReported(t *testing.T) {
 	h, dir := e3CleanTree(t)
-	e3FaultyGit(t, e3GitFault{pattern: " update-ref ", code: 128})
+	gittest.InstallFault(t, gittest.GitFault{Verb: "update-ref", Code: 128})
 
 	out, code := cleanupOne(t, h, "t1", devCleanupOptions{})
 
@@ -107,7 +87,7 @@ func TestWorktreeDevCleanup_ABranchDeleteFaultAfterRemovalIsReported(t *testing.
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Errorf("the tree should be gone before the branch delete: %v", err)
 	}
-	if !brBranchExists(t, h.store, "b1") {
+	if !gittest.BranchExists(t, h.store, "b1") {
 		t.Error("branch b1 is gone although its delete failed")
 	}
 }
@@ -227,7 +207,7 @@ func TestWorktreeDevCleanupAll_FaultsAndStrayEntries(t *testing.T) {
 	})
 	t.Run("a failing tree fails the run", func(t *testing.T) {
 		h, dir := e3CleanTree(t)
-		e3FaultyGit(t, e3GitFault{pattern: " symbolic-ref ", code: 128})
+		gittest.InstallFault(t, gittest.GitFault{Verb: "symbolic-ref", Code: 128})
 		out, code := cleanupAll(t, h, devCleanupOptions{now: futureNow()})
 		if code != devFailed || !strings.Contains(out, "failed dev/t1: git symbolic-ref rc=128") || !strings.Contains(out, ": 0 removed, 0 kept, 1 failed") {
 			t.Fatalf("code %d out %q", code, out)
@@ -239,7 +219,7 @@ func TestWorktreeDevCleanupAll_FaultsAndStrayEntries(t *testing.T) {
 	t.Run("an unreadable dirty path fails the quiet check", func(t *testing.T) {
 		h, dir := e3CleanTree(t)
 		writeDevFile(t, dir, "blk", "a file, not a dir\n")
-		e3FaultyGit(t, e3GitFault{pattern: " status ", out: "?? blk/x"})
+		gittest.InstallFault(t, gittest.GitFault{Verb: "status", Stdout: "?? blk/x"})
 		out, code := cleanupAll(t, h, devCleanupOptions{now: futureNow()})
 		if code != devFailed || !strings.Contains(out, "failed dev/t1: quiet check: ") {
 			t.Fatalf("code %d out %q", code, out)

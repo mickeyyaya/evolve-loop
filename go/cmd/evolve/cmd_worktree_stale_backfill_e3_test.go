@@ -100,7 +100,7 @@ func TestWorktreeCleanupStale_KeepReasonsForAMissingDirAndABranchBinding(t *test
 	if !brLine(out, staleLeaf(2)+" ", "kept: named by continuation binding scope-b") {
 		t.Errorf("branch-bound lane not kept:\n%s", out)
 	}
-	if !brBranchExists(t, r.Dir, staleLeaf(1)) || !brBranchExists(t, r.Dir, staleLeaf(2)) {
+	if !gittest.BranchExists(t, r.Dir, staleLeaf(1)) || !gittest.BranchExists(t, r.Dir, staleLeaf(2)) {
 		t.Error("a kept lane lost its branch")
 	}
 }
@@ -134,7 +134,7 @@ func TestWorktreeCleanupStale_AnUnmergedBranchIsLeftInPlace(t *testing.T) {
 	if _, err := os.Stat(lane); !os.IsNotExist(err) {
 		t.Errorf("lane dir survived: %v", err)
 	}
-	if !brBranchExists(t, r.Dir, staleLeaf(1)) {
+	if !gittest.BranchExists(t, r.Dir, staleLeaf(1)) {
 		t.Error("an unmerged branch was deleted")
 	}
 }
@@ -167,7 +167,7 @@ func TestRemoveStaleLane_ALaneWithoutABranchReportsNone(t *testing.T) {
 	if failed || out.String() != staleLeaf(6)+" removed path="+l.path+" branch=none\n" {
 		t.Fatalf("failed=%v stdout %q stderr %q", failed, out.String(), errb.String())
 	}
-	if !brBranchExists(t, r.Dir, staleLeaf(6)) {
+	if !gittest.BranchExists(t, r.Dir, staleLeaf(6)) {
 		t.Error("a lane with no recorded branch must not delete one")
 	}
 }
