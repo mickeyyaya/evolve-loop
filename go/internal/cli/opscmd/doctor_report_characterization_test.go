@@ -47,13 +47,13 @@ func TestDoctorCharacterization_LiveReport(t *testing.T) {
 			"[doctor] live: \"claude-tmux\" is not a known *-tmux driver\n"},
 		{"walled json", true, bridge.ExitUnknownPrompt, "rate_limit", pane, 1,
 			"{\n  \"driver\": \"claude-tmux\",\n  \"exit_code\": 85,\n  \"healthy\": false,\n  \"pattern\": \"rate_limit\"\n}\n",
-			"[doctor] LIVE WALLED: claude-tmux rc=85 pattern=rate_limit\n[doctor] final pane:\n" + paneLines(15, 20) + "\n"},
+			"[doctor] LIVE WALLED: claude-tmux rc=85 pattern=rate_limit\n[doctor] final pane:\n" + paneLines(15, 20) + "\n[doctor] failing stage: delivery\n"},
 		{"failed", false, bridge.ExitArtifactTimeout, "", pane, 1, "",
-			"[doctor] LIVE FAILED: claude-tmux rc=81\n[doctor] final pane:\n" + paneLines(9, 20) + "\n"},
+			"[doctor] LIVE FAILED: claude-tmux rc=81\n[doctor] final pane:\n" + paneLines(9, 20) + "\n[doctor] failing stage: artifact\n"},
 		{"failed empty pane", false, bridge.ExitArtifactTimeout, "", "", 1, "",
-			"[doctor] LIVE FAILED: claude-tmux rc=81\n"},
+			"[doctor] LIVE FAILED: claude-tmux rc=81\n[doctor] failing stage: artifact\n"},
 		{"wrong model", false, bridge.ExitModelMismatch, "", pane, 1, "",
-			"[doctor] LIVE WRONG MODEL: claude-tmux rc=87 — the REPL booted a model outside the target's model family, or showed no readable model label, so the prompt was never sent\n[doctor] final pane:\n" + paneLines(15, 20) + "\n"},
+			"[doctor] LIVE WRONG MODEL: claude-tmux rc=87 — the REPL booted a model outside the target's model family, or showed no readable model label, so the prompt was never sent\n[doctor] final pane:\n" + paneLines(15, 20) + "\n[doctor] failing stage: REPL prompt\n"},
 	}
 	for _, tc := range cases {
 		var out, errb bytes.Buffer

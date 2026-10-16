@@ -329,8 +329,8 @@ func TestWaveNext_FailedStepRecordsNothingAndKeepsTheNotes(t *testing.T) {
 		t.Fatalf("rc = %d, want the failed step's 7", rc)
 	}
 	e := decodeWaveEnvelope(t, h.stdout.Bytes())
-	if len(e.Steps) != 3 || e.Steps[2].OK || e.Steps[2].Detail != "rc=7" || !strings.Contains(e.Steps[2].Name, "sync-main") {
-		t.Errorf("steps = %+v, want 3 with sync-main failed rc=7", e.Steps)
+	if len(e.Steps) != 3 || e.Steps[2].OK || e.Steps[2].Detail != "rc=7\nfake sync-main failed rc=7" || !strings.Contains(e.Steps[2].Name, "sync-main") {
+		t.Errorf("steps = %+v, want 3 with sync-main failed rc=7 and its stderr tail", e.Steps)
 	}
 	records, _ := p.store().Records()
 	notes, _ := p.store().Notes()

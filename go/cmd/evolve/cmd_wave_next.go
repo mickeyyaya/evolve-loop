@@ -82,13 +82,21 @@ type waveStepRecorder struct {
 }
 
 func (r *waveStepRecorder) dispatch(verb string, args []string, stdout, stderr io.Writer) int {
-	rc := r.next(verb, args, stdout, stderr)
+	rc, tail := dispatchKeepingStderrTail(r.next, verb, args, stdout, stderr)
 	name := boundaryStep{verb: verb, args: args}.String()
 	if i := len(r.results); i < len(r.steps) {
 		name = r.steps[i].String()
 	}
-	r.results = append(r.results, waveStepResult{Name: name, Verb: verb, OK: rc == 0, Detail: fmt.Sprintf("rc=%d", rc)})
+	r.results = append(r.results, waveStepResult{Name: name, Verb: verb, OK: rc == 0, Detail: waveStepDetail(rc, tail)})
 	return rc
+}
+
+func waveStepDetail(rc int, tail []string) string {
+	detail := fmt.Sprintf("rc=%d", rc)
+	if rc == 0 || len(tail) == 0 {
+		return detail
+	}
+	return detail + "\n" + strings.Join(tail, "\n")
 }
 
 func runWaveNext(env waveEnv, args []string, stdout, stderr io.Writer) int {

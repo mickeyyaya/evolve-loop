@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -67,6 +68,27 @@ func printUsage(stderr io.Writer, usage *usageprobe.Evidence) {
 	}
 }
 
+var trustDialogTail = regexp.MustCompile(`(?i)\btrust (the files in |the contents of )?this (folder|project|directory)\b`)
+
+func liveFailingStage(rc int, scrollback string) string {
+	switch {
+	case rc == bridge.ExitMissingBinary, rc == bridge.ExitSafetyGate, rc == bridge.ExitCostLeak:
+		return "launch"
+	case trustDialogTail.MatchString(bridge.ScrollbackTail(scrollback, 12)):
+		return "trust prompt"
+	case rc == bridge.ExitREPLBootTimeout, rc == bridge.ExitModelMismatch:
+		return "REPL prompt"
+	case rc == bridge.ExitArtifactTimeout, rc == bridge.ExitRequireFullUnmet:
+		return "artifact"
+	default:
+		return "delivery"
+	}
+}
+
+func printFailingStage(stderr io.Writer, rc int, scrollback string) {
+	fmt.Fprintf(stderr, "[doctor] failing stage: %s\n", liveFailingStage(rc, scrollback))
+}
+
 type liveProbeTarget struct {
 	driver string
 	model  string
@@ -114,6 +136,7 @@ func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
 		printUsage(stderr, usage)
+		printFailingStage(stderr, rc, scrollback)
 		return exitFail
 	case pattern != "":
 		fmt.Fprintf(stderr, "[doctor] LIVE WALLED: %s rc=%d pattern=%s\n", target, rc, pattern)
@@ -121,6 +144,7 @@ func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
 		printUsage(stderr, usage)
+		printFailingStage(stderr, rc, scrollback)
 		return exitFail
 	default:
 		fmt.Fprintf(stderr, "[doctor] LIVE FAILED: %s rc=%d\n", target, rc)
@@ -128,6 +152,7 @@ func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
 		printUsage(stderr, usage)
+		printFailingStage(stderr, rc, scrollback)
 		return exitFail
 	}
 }

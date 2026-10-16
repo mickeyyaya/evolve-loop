@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -178,15 +179,75 @@ func runBoundarySteps(dispatch boundaryDispatch, steps []boundaryStep, stdout, s
 	released := false
 	for i, s := range steps {
 		fmt.Fprintf(stdout, "boundary: step %d/%d: %s\n", i+1, len(steps), s)
-		if rc := dispatch(s.verb, s.args, stdout, stderr); rc != 0 {
+		if rc, tail := dispatchKeepingStderrTail(dispatch, s.verb, s.args, stdout, stderr); rc != 0 {
 			brake := "the loop-stop brake stays engaged"
 			if released {
 				brake = "the brake was already released"
 			}
 			fmt.Fprintf(stderr, "%sstep %d/%d (%s) failed rc=%d; stopped there, %s\n", boundaryPrefix, i+1, len(steps), s, rc, brake)
+			writeStderrTail(stderr, tail)
 			return rc
 		}
 		released = released || slices.Contains(s.args, "--release")
 	}
 	return 0
+}
+
+const (
+	stepStderrTailLines   = 40
+	stepStderrLineMaxSize = 4096
+)
+
+type stderrTail struct {
+	lines   []string
+	partial []byte
+}
+
+func (t *stderrTail) Write(p []byte) (int, error) {
+	rest := append(t.partial, p...)
+	for {
+		i := bytes.IndexByte(rest, '\n')
+		if i < 0 {
+			break
+		}
+		t.keep(string(clipStderrLine(rest[:i])))
+		rest = rest[i+1:]
+	}
+	t.partial = bytes.Clone(clipStderrLine(rest))
+	return len(p), nil
+}
+
+func (t *stderrTail) keep(line string) {
+	t.lines = append(t.lines, line)
+	if over := len(t.lines) - stepStderrTailLines; over > 0 {
+		t.lines = slices.Clone(t.lines[over:])
+	}
+}
+
+func (t *stderrTail) Lines() []string {
+	lines := slices.Clone(t.lines)
+	if len(t.partial) > 0 {
+		lines = append(lines, string(t.partial))
+	}
+	return lines[max(0, len(lines)-stepStderrTailLines):]
+}
+
+func clipStderrLine(line []byte) []byte {
+	return line[max(0, len(line)-stepStderrLineMaxSize):]
+}
+
+func dispatchKeepingStderrTail(dispatch boundaryDispatch, verb string, args []string, stdout, stderr io.Writer) (int, []string) {
+	tail := &stderrTail{}
+	rc := dispatch(verb, args, stdout, io.MultiWriter(stderr, tail))
+	return rc, tail.Lines()
+}
+
+func writeStderrTail(w io.Writer, tail []string) {
+	if len(tail) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "%sstderr tail of the failed step (last %d lines):\n", boundaryPrefix, len(tail))
+	for _, line := range tail {
+		fmt.Fprintf(w, "  | %s\n", line)
+	}
 }
