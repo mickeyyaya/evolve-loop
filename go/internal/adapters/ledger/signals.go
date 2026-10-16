@@ -7,14 +7,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// CodeLedgerAppendFailed names a ledger append that returned an error.
 const CodeLedgerAppendFailed signalcenter.Code = "LEDGER_APPEND_FAILED"
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLedger, CodeLedgerAppendFailed, "the ledger could not append an entry (lock, chain or I/O failure); the reason is the error, fields name the entry")
 }
 
-// WithSignals installs the Signal Center as the append observer; a nil Center installs nothing.
 func WithSignals(signals *signalcenter.Center) Option {
 	return func(l *FileLedger) {
 		if signals == nil {
@@ -24,10 +22,8 @@ func WithSignals(signals *signalcenter.Center) Option {
 	}
 }
 
-// SignalsWired reports whether the Signal Center observes this ledger, the root's wiring proof.
 func (l *FileLedger) SignalsWired() bool { return l.onAppend != nil }
 
-// appendedEvent projects one appended entry, or its failure, onto a Signal Center event.
 func appendedEvent(e core.LedgerEntry, err error) signalcenter.Event {
 	fields := map[string]string{"role": e.Role, "kind": e.Kind, "exit_code": strconv.Itoa(e.ExitCode)}
 	if e.ArtifactPath != "" {

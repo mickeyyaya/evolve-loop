@@ -9,16 +9,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// RebaselineKind is the Kind of Rebaseline's in-band seal; it carries resetSealKindPrefix and marks a bulk seal.
 const RebaselineKind = resetSealKindPrefix + "rebaseline"
 
-// Rebaseline appends one operator seal at the physical tail only when a dry run of the sealed chain deep-verifies;
-// a refusal writes nothing. It refuses without a note or entries.
 func (l *FileLedger) Rebaseline(ctx context.Context, note string) error {
 	if strings.TrimSpace(note) == "" {
 		return fmt.Errorf("ledger rebaseline: an operator note is required — sealing a damaged prefix is a trust decision and must carry its justification")
 	}
-	// Minting a sealed genesis where no chain exists would fabricate an audit record, not repair one.
 	segs, live, err := l.readChain()
 	if err != nil {
 		return fmt.Errorf("ledger rebaseline: %w", err)
@@ -33,8 +29,6 @@ func (l *FileLedger) Rebaseline(ctx context.Context, note string) error {
 	if err != nil {
 		return fmt.Errorf("ledger rebaseline: %w", err)
 	}
-	// Chain from the physical last line: foreign raw appends sit past the tip, and sealChainsFromPrev
-	// checks the physical predecessor. The tip then moves to the seal so later appends chain from it.
 	entry := core.LedgerEntry{
 		TS:       time.Now().UTC().Format(time.RFC3339),
 		Role:     operatorRole,

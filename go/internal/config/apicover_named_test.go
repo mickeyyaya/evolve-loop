@@ -29,7 +29,6 @@ func TestLoad_BindsRoutingTypes(t *testing.T) {
 		t.Fatalf("write registry: %v", err)
 	}
 
-	// Explicit declarations name RoutingConfig and Warning for apicover.
 	var cfg RoutingConfig
 	var warnings []Warning
 	cfg, warnings = Load(regPath, map[string]string{})

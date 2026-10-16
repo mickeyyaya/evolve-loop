@@ -8,7 +8,6 @@ import (
 )
 
 func TestSessionRegistry_ConcurrentRegister_NoRaceNoLostUpdate(t *testing.T) {
-	// In-memory mode isolates the slice race the mutex guards from per-call manifest I/O.
 	r := NewSessionRegistry("", 7, "build", 1234)
 
 	const n, k = 8, 40
@@ -18,7 +17,7 @@ func TestSessionRegistry_ConcurrentRegister_NoRaceNoLostUpdate(t *testing.T) {
 			t.Errorf("register %s: %v", id, err)
 			return
 		}
-		_ = r.Snapshot() // read contention against the concurrent writers
+		_ = r.Snapshot()
 		if i > 0 {
 			if err := r.MarkReaped(fmt.Sprintf("w-%d-%d", g, i-1)); err != nil {
 				t.Errorf("mark-reaped: %v", err)

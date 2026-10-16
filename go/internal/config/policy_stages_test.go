@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// sentinelStages differs from everything the positional fixture resolves to, so a dropped
-// assignment is observable.
 func sentinelStages() RoutingConfig {
 	cfg := defaults()
 	cfg.ContractGate, cfg.EvalGate, cfg.TriageCapGate, cfg.TopNGate, cfg.ReviewGate = StageAdvisory, StageAdvisory, StageAdvisory, StageAdvisory, StageAdvisory

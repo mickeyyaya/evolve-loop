@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// blockedRegistry's manifest parent is a regular file, so every persist fails for real, with no mock.
 func blockedRegistry(t *testing.T) *SessionRegistry {
 	t.Helper()
 	blocker := filepath.Join(t.TempDir(), "not-a-dir")
@@ -39,7 +38,6 @@ func TestReap_MarkReapedFailure_SurfacedInErrors(t *testing.T) {
 	if err := reg.Register(handle("w0")); err != nil {
 		t.Fatalf("setup register (should succeed): %v", err)
 	}
-	// Replace the manifest's parent dir with a file so the next persist fails.
 	if err := os.RemoveAll(filepath.Join(dir, "sub")); err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +80,6 @@ func TestMarkReaped_PersistFailure_RollsBackStatus(t *testing.T) {
 	if err := reg.Register(handle("w0")); err != nil {
 		t.Fatalf("setup register (should succeed): %v", err)
 	}
-	// Replace the manifest's parent dir with a file so the next persist fails.
 	if err := os.RemoveAll(filepath.Join(dir, "sub")); err != nil {
 		t.Fatal(err)
 	}
@@ -101,10 +98,9 @@ func TestMarkReaped_PersistFailure_RollsBackStatus(t *testing.T) {
 func TestRegister_ReplacePersistFailure_RollsBackToOriginal(t *testing.T) {
 	dir := t.TempDir()
 	reg := NewSessionRegistry(filepath.Join(dir, "sub", "s.json"), 1, "build", os.Getpid())
-	if err := reg.Register(handle("w0")); err != nil { // original Branch: cycle-1-w0
+	if err := reg.Register(handle("w0")); err != nil {
 		t.Fatalf("setup register (should succeed): %v", err)
 	}
-	// Replace the manifest's parent dir with a file so the next persist fails.
 	if err := os.RemoveAll(filepath.Join(dir, "sub")); err != nil {
 		t.Fatal(err)
 	}

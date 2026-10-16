@@ -37,7 +37,6 @@ func TestPolicyStages_KeysMatchPolicyJSONTags(t *testing.T) {
 	}
 	for _, d := range dials {
 		wantKey := jsonTag(t, policyType, d.section) + "." + jsonTag(t, d.block, d.blockField)
-		// Every stage word is valid except the one under test, so exactly one warning fires.
 		ps := config.PolicyStages{ContractGate: "off", EvalGate: "off", TriageCapGate: "off", TopNGate: "off", ReviewGate: "off", PhaseRecovery: "off", SpineFloor: "off", FatalPane: "off", RouterReplan: "off", ParallelEvaluate: "off"}
 		reflect.ValueOf(&ps).Elem().FieldByName(d.stagesField).SetString("typo")
 		_, ws := config.New().ApplyPolicyStages(config.RoutingConfig{}, ps)

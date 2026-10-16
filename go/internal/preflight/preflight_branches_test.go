@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-// TestProbe_DefaultSeams pins the nil-option fallbacks in Probe: with only a
-// ProjectRoot supplied, Env→os.Getenv, Now→time.Now, LookPath→exec.LookPath,
-// OSType→runtime.GOOS, and IsNested→the $CLAUDECODE heuristic all engage. The
-// profile must still be well-formed (schema 3, a probed timestamp, a real
-// host OS). Not parallel: it reads ambient process env via the default seams.
 func TestProbe_DefaultSeams(t *testing.T) {
 	root := t.TempDir()
 	p := Probe(Options{ProjectRoot: root})
@@ -23,7 +18,6 @@ func TestProbe_DefaultSeams(t *testing.T) {
 	}
 	switch p.Host.OS {
 	case "darwin", "linux", "other":
-		// one of the runtime.GOOS-mapped values
 	default:
 		t.Errorf("default OSType mapping produced unexpected host OS %q", p.Host.OS)
 	}
@@ -32,9 +26,6 @@ func TestProbe_DefaultSeams(t *testing.T) {
 	}
 }
 
-// TestProbe_DefaultProjectRootFromGetwd pins the ProjectRoot=="" branch:
-// Probe falls back to os.Getwd, so the state dir is anchored under the cwd.
-// Not parallel (mutates cwd via Chdir, restored on cleanup).
 func TestProbe_DefaultProjectRootFromGetwd(t *testing.T) {
 	dir := t.TempDir()
 	orig, err := os.Getwd()
@@ -52,7 +43,6 @@ func TestProbe_DefaultProjectRootFromGetwd(t *testing.T) {
 		Now:      fixedNow(),
 		IsNested: func() bool { return false },
 	})
-	// macOS resolves /var → /private/var etc; compare resolved paths.
 	wantPrefix, _ := filepath.EvalSymlinks(dir)
 	gotDir, _ := filepath.EvalSymlinks(p.Filesystem.StateDir)
 	if !strings.HasPrefix(gotDir, wantPrefix) {
@@ -60,9 +50,6 @@ func TestProbe_DefaultProjectRootFromGetwd(t *testing.T) {
 	}
 }
 
-// TestProbe_DefaultIsNested_FromClaudecodeEnv pins the default IsNested
-// heuristic (no IsNested override): CLAUDECODE set without a "host" type marks
-// the run nested, and the CLAUDECODE pointer is populated on the profile.
 func TestProbe_DefaultIsNested_FromClaudecodeEnv(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -72,7 +59,6 @@ func TestProbe_DefaultIsNested_FromClaudecodeEnv(t *testing.T) {
 		Env:         stubEnv(map[string]string{"HOME": root, "CLAUDECODE": "1"}),
 		LookPath:    stubLookPath(map[string]string{"sandbox-exec": "/usr/bin/sandbox-exec"}),
 		Now:         fixedNow(),
-		// IsNested omitted → exercises the $CLAUDECODE heuristic.
 	})
 	if !p.ClaudeCode.Nested {
 		t.Error("CLAUDECODE=1 (non-host) should be detected as nested via the default heuristic")
@@ -85,9 +71,6 @@ func TestProbe_DefaultIsNested_FromClaudecodeEnv(t *testing.T) {
 	}
 }
 
-// TestProbe_DefaultIsNested_HostTypeNotNested pins the "host" carve-out of the
-// default heuristic: CLAUDECODE set but CLAUDECODE_TYPE contains "host" is NOT
-// nested (a host-side Claude Code session, not an inner nested one).
 func TestProbe_DefaultIsNested_HostTypeNotNested(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -105,13 +88,9 @@ func TestProbe_DefaultIsNested_HostTypeNotNested(t *testing.T) {
 	}
 }
 
-// TestSelectWorktreeBase_OverrideNotWritableFallsThrough pins the branch where
-// the worktree.base override is set but unwritable: the override is ignored and
-// the standalone in-project base is chosen instead.
 func TestSelectWorktreeBase_OverrideNotWritableFallsThrough(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// Point the override at a regular file → probeWritable fails for it.
 	blocker := filepath.Join(root, "blocker-file")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatalf("write blocker: %v", err)
@@ -133,17 +112,14 @@ func TestSelectWorktreeBase_OverrideNotWritableFallsThrough(t *testing.T) {
 	}
 }
 
-// TestSelectWorktreeBase_CacheDirWhenNestedNoTmpdir pins worktree-base step 4:
-// nested (so the in-project preference is skipped) with no TMPDIR but a
-// writable cache dir selects the cache dir.
 func TestSelectWorktreeBase_CacheDirWhenNestedNoTmpdir(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	home := t.TempDir() // writable HOME → Library/Caches under it is creatable
+	home := t.TempDir()
 	p := Probe(Options{
 		ProjectRoot: root,
 		OSType:      "darwin",
-		Env:         stubEnv(map[string]string{"HOME": home}), // no TMPDIR
+		Env:         stubEnv(map[string]string{"HOME": home}),
 		LookPath:    stubLookPath(map[string]string{"sandbox-exec": "/usr/bin/sandbox-exec"}),
 		Now:         fixedNow(),
 		IsNested:    func() bool { return true },
@@ -157,16 +133,13 @@ func TestSelectWorktreeBase_CacheDirWhenNestedNoTmpdir(t *testing.T) {
 	}
 }
 
-// TestSelectWorktreeBase_LastResortInProjectWhenNested pins step 5: nested with
-// neither TMPDIR nor a writable cache dir (HOME unset → cacheDirPath returns "")
-// falls back to the in-project worktrees dir with the degraded-isolation reason.
 func TestSelectWorktreeBase_LastResortInProjectWhenNested(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	p := Probe(Options{
 		ProjectRoot: root,
 		OSType:      "darwin",
-		Env:         stubEnv(map[string]string{}), // no HOME, no TMPDIR
+		Env:         stubEnv(map[string]string{}),
 		LookPath:    stubLookPath(map[string]string{"sandbox-exec": "/usr/bin/sandbox-exec"}),
 		Now:         fixedNow(),
 		IsNested:    func() bool { return true },
@@ -180,8 +153,6 @@ func TestSelectWorktreeBase_LastResortInProjectWhenNested(t *testing.T) {
 	}
 }
 
-// TestProfile_PrettyJSON pins PrettyJSON: it produces 2-space-indented JSON
-// that round-trips and carries the schema version.
 func TestProfile_PrettyJSON(t *testing.T) {
 	t.Parallel()
 	p := Probe(Options{
@@ -198,13 +169,8 @@ func TestProfile_PrettyJSON(t *testing.T) {
 	}
 }
 
-// TestProfile_Summary_NoWorktreeBaseShowsNone pins the Summary <NONE> branch:
-// when no writable worktree base was found, the summary renders worktree_base
-// as <NONE> rather than an empty string.
 func TestProfile_Summary_NoWorktreeBaseShowsNone(t *testing.T) {
 	t.Parallel()
-	// Force WorktreeBase="" by making the project root a regular file (every
-	// writability probe fails), mirroring TestProbe_NoWritableWorktreeBase.
 	f, err := os.CreateTemp("", "preflight-none-*")
 	if err != nil {
 		t.Fatalf("temp: %v", err)
@@ -227,9 +193,6 @@ func TestProfile_Summary_NoWorktreeBaseShowsNone(t *testing.T) {
 	}
 }
 
-// TestProfile_WriteToFile_MkdirError pins the WriteToFile MkdirAll-error leg:
-// when the parent path is a regular file, the .evolve dir can't be created and
-// the error surfaces.
 func TestProfile_WriteToFile_MkdirError(t *testing.T) {
 	t.Parallel()
 	f, err := os.CreateTemp("", "preflight-write-*")
@@ -239,16 +202,11 @@ func TestProfile_WriteToFile_MkdirError(t *testing.T) {
 	defer os.Remove(f.Name())
 	f.Close()
 	p := Profile{SchemaVersion: 3}
-	// projectRoot is a regular file → filepath.Dir(target)=<file>/.evolve →
-	// MkdirAll fails with ENOTDIR.
 	if err := p.WriteToFile(f.Name()); err == nil {
 		t.Fatal("expected a mkdir error when the project root is a regular file")
 	}
 }
 
-// TestProfile_WriteToFile_RenameError pins the WriteToFile rename-error leg:
-// when the destination environment.json already exists as a directory, the
-// atomic rename of the temp over it fails.
 func TestProfile_WriteToFile_RenameError(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

@@ -22,7 +22,6 @@ func TestParseModelRouting_ZeroValueStatic(t *testing.T) {
 }
 
 func TestParseModelRouting_EscapeHatchStaticOff(t *testing.T) {
-	// "off" is not a model_routing word; it falls back to static.
 	for _, value := range []string{"static", "off"} {
 		dir := t.TempDir()
 		regPath := filepath.Join(dir, "phase-registry.json")
@@ -37,7 +36,6 @@ func TestParseModelRouting_EscapeHatchStaticOff(t *testing.T) {
 	}
 }
 
-// Despite "Policy" in its name, this reads the checked-in phase registry, the only source of model_routing.
 func TestCheckedInPolicyDefaultsModelRoutingAuto(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	regPath := filepath.Join(root, "docs", "architecture", "phase-registry.json")

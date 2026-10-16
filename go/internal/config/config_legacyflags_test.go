@@ -2,7 +2,6 @@ package config
 
 import "testing"
 
-// Despite its name, this pins the compiled phase-enable defaults; the legacy env flags are gone.
 func TestLoad_LegacyPhaseFlags(t *testing.T) {
 	cases := []struct {
 		name  string

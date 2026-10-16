@@ -5,16 +5,10 @@ import (
 	"testing"
 )
 
-// envMap returns a lookupEnv closure backed by a map. Empty values are
-// treated as unset (matching os.Getenv semantics — both unset and empty
-// return "").
 func envMap(m map[string]string) func(string) string {
 	return func(k string) string { return m[k] }
 }
 
-// TestResolve_DefaultLayout covers the no-override path: every field is
-// derived from cwd. This is the common case in CI and developer shells
-// where no EVOLVE_* env vars are set.
 func TestResolve_DefaultLayout(t *testing.T) {
 	cwd := "/tmp/proj"
 	got := Resolve(envMap(nil), cwd)
@@ -35,8 +29,6 @@ func TestResolve_DefaultLayout(t *testing.T) {
 	}
 }
 
-// TestResolve_ProjectRootOverride: EVOLVE_PROJECT_ROOT wins over cwd.
-// PluginRoot still defaults to ProjectRoot.
 func TestResolve_ProjectRootOverride(t *testing.T) {
 	got := Resolve(envMap(map[string]string{
 		"EVOLVE_PROJECT_ROOT": "/work/repo",
@@ -56,9 +48,6 @@ func TestResolve_ProjectRootOverride(t *testing.T) {
 	}
 }
 
-// TestResolve_SplitPluginRoot: when plugin install path differs from
-// project, EVOLVE_PLUGIN_ROOT controls profiles/adapters/capability
-// surfaces but state/ledger/llm_config stay under ProjectRoot.
 func TestResolve_SplitPluginRoot(t *testing.T) {
 	got := Resolve(envMap(map[string]string{
 		"EVOLVE_PROJECT_ROOT": "/work/repo",
@@ -88,8 +77,6 @@ func TestResolve_SplitPluginRoot(t *testing.T) {
 	}
 }
 
-// TestResolve_DirOverrides covers each override env var individually so
-// regressions point at the failing variable.
 func TestResolve_DirOverrides(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -134,10 +121,6 @@ func TestResolve_DirOverrides(t *testing.T) {
 	}
 }
 
-// TestResolve_CapabilityDirAlwaysPluginRoot: per cmd_subagent.go:283-286
-// comment, CapabilityDir mirrors REAL_ADAPTERS_DIR and is NEVER honored
-// by EVOLVE_ADAPTERS_DIR_OVERRIDE. This is load-bearing for capability
-// manifest correctness during testing.
 func TestResolve_CapabilityDirAlwaysPluginRoot(t *testing.T) {
 	got := Resolve(envMap(map[string]string{
 		"EVOLVE_PROJECT_ROOT":          "/repo",
@@ -153,9 +136,6 @@ func TestResolve_CapabilityDirAlwaysPluginRoot(t *testing.T) {
 	}
 }
 
-// TestResolve_EmptyEnvAndCwd: when both env and cwd are empty, fields
-// fall back to relative `.evolve/...` paths. Degenerate case — callers
-// should always pass a non-empty cwd, but the function must not crash.
 func TestResolve_EmptyEnvAndCwd(t *testing.T) {
 	got := Resolve(envMap(nil), "")
 
@@ -170,8 +150,6 @@ func TestResolve_EmptyEnvAndCwd(t *testing.T) {
 	}
 }
 
-// TestResolve_NilLookupPanicsNot: nil lookup is treated as empty env.
-// Defensive — but documented behavior.
 func TestResolve_NilLookupPanicsNot(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -184,9 +162,6 @@ func TestResolve_NilLookupPanicsNot(t *testing.T) {
 	}
 }
 
-// TestResolveFromEnv_IntegratesWithOsGetenv smoke-checks the
-// convenience entry point so call sites that want default behavior
-// don't have to repeat the closure.
 func TestResolveFromEnv_IntegratesWithOsGetenv(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", "/from/env")
 	t.Setenv("EVOLVE_PLUGIN_ROOT", "/plugin/env")

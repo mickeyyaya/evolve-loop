@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// chainLines is a valid 4-line chained ledger (genesis + 3) with each line's SHA.
 func chainLines() (lines []string, sha []string) {
 	g := `{"ts":"2026-05-01T00:00:00Z","cycle":1,"role":"orchestrator","kind":"phase","exit_code":0,"entry_seq":0,"prev_hash":"` + ZeroSeed + `"}`
 	a := fmt.Sprintf(`{"ts":"2026-05-01T00:01:00Z","cycle":1,"role":"scout","kind":"phase","exit_code":0,"entry_seq":1,"prev_hash":"%s"}`, sha256Of(g))
@@ -46,7 +45,6 @@ func TestWalkChain_Anchor_SkipsPreEpochDamage(t *testing.T) {
 	lines, sha := chainLines()
 	damaged := append([]string(nil), lines...)
 	damaged[1] = `{"ts":"2026-05-01T00:01:00Z","cycle":999,"role":"scout","kind":"phase","exit_code":0,"entry_seq":1,"prev_hash":"` + ZeroSeed + `"}`
-	// Anchor at line 2 (b): intact, the first line after the damage.
 	if _, lastSha, _, err := walkChain(bytesLines(damaged), sha[2], compositionEvidenceIndex{}); err != nil {
 		t.Fatalf("anchored walk past pre-epoch damage must pass: %v", err)
 	} else if lastSha != sha[3] {
@@ -56,7 +54,6 @@ func TestWalkChain_Anchor_SkipsPreEpochDamage(t *testing.T) {
 
 func TestWalkChain_Anchor_PostAnchorBreakStillCaught(t *testing.T) {
 	lines, sha := chainLines()
-	// Anchor at line 1 (a); damage line 2 (b) → line 3 (c)'s prev mismatches.
 	damaged := append([]string(nil), lines...)
 	damaged[2] = `{"ts":"2026-05-01T00:02:00Z","cycle":999,"role":"builder","kind":"phase","exit_code":0,"entry_seq":2,"prev_hash":"` + sha256Of(lines[1]) + `"}`
 	if _, _, _, err := walkChain(bytesLines(damaged), sha[1], compositionEvidenceIndex{}); err == nil {
@@ -85,7 +82,6 @@ func TestAnchor_FindsSealedSegmentLine(t *testing.T) {
 	if err := l.Seal(context.Background(), 3); err != nil {
 		t.Fatalf("Seal: %v", err)
 	}
-	// seq 2 is now in a sealed segment, absent from the live tail.
 	if err := l.Anchor(context.Background(), 2, "sealed-line epoch"); err != nil {
 		t.Fatalf("Anchor must find a sealed-segment line, got: %v", err)
 	}

@@ -17,7 +17,6 @@ func TestRebaseline_ForeignUnchainedTailLine_SealsAndVerifies(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// A foreign raw line past the tip: no prev_hash, no entry_seq, tip not moved.
 	f, err := os.OpenFile(l.ledgerPath, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)

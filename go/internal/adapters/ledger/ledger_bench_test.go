@@ -41,7 +41,6 @@ func BenchmarkAppendSerial(b *testing.B) {
 	}
 }
 
-// 100 entries: a realistic cycle writes 30-80.
 func BenchmarkVerify(b *testing.B) {
 	dir := b.TempDir()
 	evolveDir := filepath.Join(dir, ".evolve")

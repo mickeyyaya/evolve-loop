@@ -13,30 +13,24 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// orphanNamespaces bounds the GC: a user's own session on the same socket is foreign and never killed.
 var orphanNamespaces = []string{"evolve-bridge-", "evolve-recipe-"}
 
-// pidTokenRE requires the leading dash so a substring like "rapid7" never matches.
 var pidTokenRE = regexp.MustCompile(`-pid(\d+)(?:-|$)`)
 
 var testSessionRE = regexp.MustCompile(`^evolve-bridge-it-[A-Za-z0-9._]+-(\d+)$`)
 
-// SessionLister returns every session name on the bridge tmux server.
 type SessionLister func(ctx context.Context) ([]string, error)
 
-// PidLiveness reports whether a PID is alive.
 type PidLiveness func(pid int) bool
 
-// OrphanReapReport summarizes one liveness sweep, with skips split by reason.
 type OrphanReapReport struct {
 	Killed             []string
-	SkippedLive        int // creator PID alive: a concurrent run
-	SkippedForeign     int // empty, or outside the evolve namespace
-	SkippedUnparseable int // no -pid<N> token, so liveness is unknown
+	SkippedLive        int
+	SkippedForeign     int
+	SkippedUnparseable int
 	Errors             []string
 }
 
-// SessionPID extracts the creator PID from a session name, refusing PID 0, which a signaller reads as its own group.
 func SessionPID(session string) (pid int, ok bool) {
 	m := pidTokenRE.FindStringSubmatch(session)
 	if m == nil {
@@ -58,7 +52,6 @@ func inEvolveNamespace(session string) bool {
 	return false
 }
 
-// ReapOrphanSessions kills every evolve-namespace session whose creator PID is dead; a list error kills nothing.
 func ReapOrphanSessions(ctx context.Context, list SessionLister, alive PidLiveness, kill TmuxKiller) OrphanReapReport {
 	var rep OrphanReapReport
 	sessions, err := list(ctx)
@@ -89,12 +82,10 @@ func ReapOrphanSessions(ctx context.Context, list SessionLister, alive PidLivene
 	return rep
 }
 
-// tmuxListRun is a test seam, so the unit suite never shells out to tmux.
 var tmuxListRun = func(ctx context.Context, args ...string) ([]byte, error) {
 	return sysexec.Command(ctx, "tmux", args...).Output()
 }
 
-// ExecListBridgeSessions is the production SessionLister; a stopped server with no output is an empty list, not an error.
 func ExecListBridgeSessions(ctx context.Context) ([]string, error) {
 	out, err := tmuxListRun(ctx, bridge.TmuxSocketArgs("list-sessions", "-F", "#{session_name}")...)
 	trimmed := strings.TrimSpace(string(out))
@@ -113,7 +104,6 @@ func ExecListBridgeSessions(ctx context.Context) ([]string, error) {
 	return names, nil
 }
 
-// ExecReapOrphans runs ReapOrphanSessions with the production lister, liveness probe and killer.
 func ExecReapOrphans(ctx context.Context) OrphanReapReport {
 	return ReapOrphanSessions(ctx, ExecListBridgeSessions, ExecPidAlive, ExecTmuxKill)
 }
@@ -128,7 +118,6 @@ type OrphanSocketReport struct {
 
 type SocketLister func() ([]string, error)
 
-// ServerKiller kills the tmux server on one socket.
 type ServerKiller func(ctx context.Context, socket string) error
 
 func ReapOrphanSockets(ctx context.Context, list SocketLister, alive PidLiveness, killServer ServerKiller) OrphanSocketReport {
@@ -160,7 +149,6 @@ func ReapOrphanSockets(ctx context.Context, list SocketLister, alive PidLiveness
 	return rep
 }
 
-// socketGlob is a test seam over the tmux socket directory.
 var socketGlob = func() ([]string, error) {
 	matches, err := filepath.Glob(filepath.Join(bridge.TmuxSocketDir(), "evolve-bridge-[pt]*"))
 	if err != nil {
@@ -173,10 +161,8 @@ var socketGlob = func() ([]string, error) {
 	return names, nil
 }
 
-// ExecListBridgeSockets is the production SocketLister.
 func ExecListBridgeSockets() ([]string, error) { return socketGlob() }
 
-// ExecKillServer is the production ServerKiller: it refuses an empty socket name, kills the server, and removes its socket file; a missing server or file counts as success.
 func ExecKillServer(ctx context.Context, socket string) error {
 	if socket == "" {
 		return fmt.Errorf("refusing kill-server with an empty socket name")
@@ -188,7 +174,6 @@ func ExecKillServer(ctx context.Context, socket string) error {
 	return nil
 }
 
-// ExecReapOrphanSockets runs ReapOrphanSockets with the production socket lister, liveness probe and server killer.
 func ExecReapOrphanSockets(ctx context.Context) OrphanSocketReport {
 	return ReapOrphanSockets(ctx, ExecListBridgeSockets, ExecPidAlive, ExecKillServer)
 }

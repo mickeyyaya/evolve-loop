@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// fakeT records assertion failures so we can test helpers as if they
-// were running inside a real *testing.T without actually failing the
-// outer test.
 type fakeT struct {
 	errs []string
 }
@@ -23,12 +20,9 @@ func (f *fakeT) Errorf(format string, args ...any) {
 func (f *fakeT) Helper() {}
 
 func sprintf(f string, args ...any) string {
-	// Minimal: prefer the format itself for assertions where args
-	// may be path strings or ints — tests inspect errs[i] anyway.
 	return f
 }
 
-// FileExists ----------------------------------------------------------
 func TestFileExists_Present(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
@@ -52,7 +46,6 @@ func TestFileExists_Missing(t *testing.T) {
 	}
 }
 
-// FileContains -------------------------------------------------------
 func TestFileContains_Hit(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
@@ -83,8 +76,6 @@ func TestFileContains_MissingFile(t *testing.T) {
 	}
 }
 
-// FileNotContains — the correct ABSENCE primitive (cycle-352: authors inverted
-// FileContains, which Errorf's "missing" on the absent/correct state) ----------
 func TestFileNotContains_Absent(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
@@ -121,7 +112,6 @@ func TestFileNotContains_MissingFile(t *testing.T) {
 	}
 }
 
-// FileMatchesRegex ---------------------------------------------------
 func TestFileMatchesRegex_Hit(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
@@ -155,7 +145,6 @@ func TestFileMatchesRegex_InvalidRegex(t *testing.T) {
 	}
 }
 
-// JSONFieldEquals ----------------------------------------------------
 func TestJSONFieldEquals_Scalar(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "s.json")
@@ -205,7 +194,6 @@ func TestJSONFieldEquals_InvalidJSON(t *testing.T) {
 	}
 }
 
-// SubprocessOutput ---------------------------------------------------
 func TestSubprocessOutput_Stdout(t *testing.T) {
 	stdout, _, code, err := SubprocessOutput("echo", "hello")
 	if err != nil {
@@ -235,11 +223,9 @@ func TestSubprocessOutput_MissingBinary(t *testing.T) {
 		t.Fatal("expected error for missing binary")
 	}
 	if !errors.Is(err, ErrSubprocessNotFound) && err == nil {
-		// Sentinel mismatch acceptable; just demand a non-nil error.
 	}
 }
 
-// AllOf ---------------------------------------------------------------
 func TestAllOf_All(t *testing.T) {
 	ft := &fakeT{}
 	got := AllOf(ft,
@@ -256,7 +242,7 @@ func TestAllOf_ShortCircuit(t *testing.T) {
 	calls := 0
 	got := AllOf(ft,
 		func(_ TB) bool { calls++; return false },
-		func(_ TB) bool { calls++; return true }, // must not run
+		func(_ TB) bool { calls++; return true },
 	)
 	if got {
 		t.Errorf("AllOf with first false returned true")
@@ -281,16 +267,10 @@ func TestJSONFieldEquals_MissingFile(t *testing.T) {
 }
 
 func TestJSONFieldEquals_EmptyDotPath(t *testing.T) {
-	// Empty dotPath returns whole doc; comparing to a map of any won't
-	// equal via ==, so this should mismatch with non-nil want.
 	dir := t.TempDir()
 	p := filepath.Join(dir, "s.json")
 	_ = os.WriteFile(p, []byte(`{"a":1}`), 0o644)
 	ft := &fakeT{}
-	// Comparing the whole map via Go == will panic on map — guard?
-	// Actually a map is not == comparable in Go. The helper must not
-	// panic on this; instead it should report false via the != check.
-	// To avoid a comparison panic at runtime, the impl must handle it.
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("panicked on empty dotPath: %v", r)
@@ -328,23 +308,18 @@ func TestSetupTempProject_StructureCreated(t *testing.T) {
 	}
 }
 
-// RepoRoot ------------------------------------------------------------
 func TestRepoRoot_InsideGitRepo(t *testing.T) {
-	// We're executing inside the evolve-loop git repo; expect a non-empty
-	// path that the current file lives under.
 	root := RepoRoot(t)
 	if root == "" {
 		t.Fatalf("RepoRoot returned empty path")
 	}
 	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
-		// The repo's go.mod lives at go/go.mod, so check that instead.
 		if _, err2 := os.Stat(filepath.Join(root, "go", "go.mod")); err2 != nil {
 			t.Errorf("RepoRoot=%q has neither go.mod nor go/go.mod", root)
 		}
 	}
 }
 
-// FileContainsAny -----------------------------------------------------
 func TestFileContainsAny_Hit(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
@@ -369,7 +344,6 @@ func TestFileContainsAny_MissingFile(t *testing.T) {
 	}
 }
 
-// CountOccurrencesAny -------------------------------------------------
 func TestCountOccurrencesAny_LineCount(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
@@ -382,7 +356,6 @@ func TestCountOccurrencesAny_LineCount(t *testing.T) {
 }
 
 func TestCountOccurrencesAny_OneVariantPerLine(t *testing.T) {
-	// A line matching two variants should count only once.
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
 	_ = os.WriteFile(p, []byte("alpha and beta together\n"), 0o644)
@@ -398,7 +371,6 @@ func TestCountOccurrencesAny_MissingFile(t *testing.T) {
 	}
 }
 
-// LineContainsAll -----------------------------------------------------
 func TestLineContainsAll_Hit(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
@@ -423,14 +395,6 @@ func TestLineContainsAll_MissingFile(t *testing.T) {
 	}
 }
 
-// TestCountInGoFunc — function-scoped occurrence counting. Kills the ACS
-// count-rot class: file-wide counts (CountOccurrencesAny == N) break when a
-// LATER cycle legitimately adds an occurrence elsewhere in the file
-// (cycle-296's IsAbs predicate rotted exactly this way within one day,
-// refreshed 1→2 in 0c210b52). Scoping the assertion to the function whose
-// body carries the invariant ("addWorktree contains NO IsAbs guard") makes
-// it immune to unrelated growth — and a missing/renamed function is a LOUD
-// error, never a silent 0.
 func TestCountInGoFunc(t *testing.T) {
 	dir := t.TempDir()
 	src := `package p
@@ -457,24 +421,17 @@ func clean(s string) string { return s }
 	if n, err := CountInGoFunc(path, "clean", "filepath.IsAbs"); err != nil || n != 0 {
 		t.Errorf("CountInGoFunc(clean) = %d, %v; want 0, nil", n, err)
 	}
-	// Missing function must be a LOUD error (silent 0 would let a renamed
-	// function evade a ==0 predicate forever).
 	if _, err := CountInGoFunc(path, "renamedAway", "filepath.IsAbs"); err == nil {
 		t.Error("CountInGoFunc(missing func) = nil error, want error")
 	}
-	// Missing file must error too.
 	if _, err := CountInGoFunc(filepath.Join(dir, "nope.go"), "keeper", "x"); err == nil {
 		t.Error("CountInGoFunc(missing file) = nil error, want error")
 	}
-	// Variants are OR'd per line, like CountOccurrencesAny.
 	if n, err := CountInGoFunc(path, "keeper", "IsAbs(s) { // one", "// two"); err != nil || n != 2 {
 		t.Errorf("CountInGoFunc(keeper, variants) = %d, %v; want 2, nil", n, err)
 	}
 }
 
-// TestCountInGoFunc_MethodReceiver — the only real-world call site
-// (cycle-296's addWorktree predicate) targets a METHOD; FuncDecl.Name is the
-// bare method name, receiver ignored.
 func TestCountInGoFunc_MethodReceiver(t *testing.T) {
 	dir := t.TempDir()
 	src := `package p
@@ -492,7 +449,6 @@ func (r myT) method(s string) bool { return len(s) > 0 }
 	}
 }
 
-// fmtT records fully formatted failure messages (fakeT keeps only formats).
 type fmtT struct{ msgs []string }
 
 func (f *fmtT) Errorf(format string, args ...any) {
@@ -546,13 +502,6 @@ func TestCountInGoFunc_MissingFileHintsAtRelocation(t *testing.T) {
 	}
 }
 
-// FileContainsAnyChecked / CountOccurrencesAnyChecked / LineContainsAllChecked
-// are the message-carrying siblings of the value-only readers above.
-// acsassert-silent-readers-cannot-name-a-moved-file: a moved predicate path
-// used to come back as a bare false/0 indistinguishable from "file present,
-// content absent" — these (value, error) forms name the path and the moved
-// hint on a not-exist read, exactly like CountInGoFunc, while an existing
-// path that merely lacks the content still returns a nil error.
 func TestFileContainsAnyChecked_MissingFileHintsAtRelocation(t *testing.T) {
 	dir := t.TempDir()
 	gone := filepath.Join(dir, "cmd_gone.go")

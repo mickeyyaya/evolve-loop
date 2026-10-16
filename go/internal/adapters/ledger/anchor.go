@@ -13,20 +13,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// ErrAmbiguousAnchorSeq means several distinct lines carry the requested entry_seq, so the operator must name one.
 var ErrAmbiguousAnchorSeq = errors.New("ambiguous entry_seq: carried by more than one distinct line")
 
-// resetSealKindPrefix marks an in-band epoch anchor, an operator seal the chain itself carries. It and
-// ledger-anchor.json resolve through one helper, and the later of the two wins.
-// See ADR-0081.
 const resetSealKindPrefix = "reset-seal-"
 
-// operatorRole is the only Role whose in-band seal moves the anchor. Role is self-declared, so the unattended
-// autoseal path writes "operator-autoseal": a dead owner PID must not mint a trust anchor.
 const operatorRole = "operator"
 
-// isOperatorSeal reports whether e is an in-band operator seal. The marker may sit in Kind or in
-// CycleLabel, where core.SealCycle writes it; Role is the authority check.
 func isOperatorSeal(e core.LedgerEntry) bool {
 	if e.Role != operatorRole {
 		return false
@@ -35,33 +27,24 @@ func isOperatorSeal(e core.LedgerEntry) bool {
 		strings.HasPrefix(e.CycleLabel, resetSealKindPrefix)
 }
 
-// sealChainsFromPrev is the seal trust guard: a seal moves the anchor only when it chains from its own
-// predecessor, or one forged operator line would silence the whole prefix behind it.
 func sealChainsFromPrev(hasPrev bool, e core.LedgerEntry, prevLineSHA string) bool {
 	if !hasPrev {
 		return false
 	}
 	if prevLineSHA == "" {
-		return e.PrevHash == ZeroSeed // the seal is itself the genesis line
+		return e.PrevHash == ZeroSeed
 	}
 	return e.PrevHash == prevLineSHA
 }
 
-// VerifiedScope names the history a successful verification validated; the zero value means full-strict.
 type VerifiedScope struct {
-	// AnchorLineSHA is the epoch-anchor line strict validation resumed from; "" means from genesis.
-	AnchorLineSHA string
-	// AnchorSeq is that line's own entry_seq; meaningless when AnchorLineSHA is "".
+	AnchorLineSHA     string
 	AnchorSeq         int
 	FromSealedSegment bool
 }
 
-// effectiveAnchorSHA resolves the later of the ledger-anchor.json line and any self-valid operator seal
-// after it, with that line's own entry_seq: the sidecar's anchor_seq goes stale once a seal moves past it.
-// A sidecar SHA no line carries is returned unchanged so walkChain fails loudly instead of relaxing.
 func effectiveAnchorSHA(lines [][]byte, fileAnchorSHA string) (anchorSHA string, anchorSeq int) {
 	anchorSHA = fileAnchorSHA
-	// Seals before the sidecar anchor sit in the untrusted prefix, so only later ones may move it.
 	reached := fileAnchorSHA == ""
 	prevLineSHA := ""
 	for _, line := range lines {
@@ -73,7 +56,6 @@ func effectiveAnchorSHA(lines [][]byte, fileAnchorSHA string) (anchorSHA string,
 				anchorSeq = e.EntrySeq
 			}
 		case !reached:
-			// still inside the untrusted prefix
 		default:
 			if hasPrev, e, err := decodeLedgerLine(line); err == nil &&
 				isOperatorSeal(e) && sealChainsFromPrev(hasPrev, e, prevLineSHA) {
@@ -85,7 +67,6 @@ func effectiveAnchorSHA(lines [][]byte, fileAnchorSHA string) (anchorSHA string,
 	return anchorSHA, anchorSeq
 }
 
-// ledgerAnchor is the on-disk shape of <evolveDir>/ledger-anchor.json.
 type ledgerAnchor struct {
 	AnchorSeq     int    `json:"anchor_seq"`
 	AnchorLineSHA string `json:"anchor_line_sha256"`
@@ -99,8 +80,6 @@ var (
 	anchorClose      = func(f *os.File) error { return f.Close() }
 )
 
-// loadAnchorSHA returns the recorded anchor line SHA, or "" when none is set or the file is unreadable.
-// "" means full-strict verification, so a garbled anchor never relaxes the walk.
 func (l *FileLedger) loadAnchorSHA() string {
 	raw, err := os.ReadFile(l.anchorPath)
 	if err != nil {
@@ -113,8 +92,6 @@ func (l *FileLedger) loadAnchorSHA() string {
 	return a.AnchorLineSHA
 }
 
-// resolveAnchorLine picks the one line SHA an anchor may bind: seq must name exactly one distinct line
-// (by SHA, so byte-identical duplicates count once), and a named wantSHA must itself carry seq.
 func resolveAnchorLine(lines [][]byte, seq int, wantSHA string) (string, error) {
 	seqOf := map[string]int{}
 	var candidates []string
@@ -153,14 +130,11 @@ func resolveAnchorLine(lines [][]byte, seq int, wantSHA string) (string, error) 
 	}
 }
 
-// Anchor records an epoch anchor bound to the current SHA of the one line whose entry_seq is seq.
 func (l *FileLedger) Anchor(ctx context.Context, seq int, note string) error {
 	return l.AnchorLine(ctx, seq, "", note)
 }
 
-// AnchorLine is Anchor with an explicit line SHA that picks one of several siblings; errors leave no anchor file.
 func (l *FileLedger) AnchorLine(_ context.Context, seq int, lineSHA, note string) error {
-	// Search sealed segments too: damage old enough to anchor past is usually sealed.
 	lines, err := l.gatherAllLines()
 	if err != nil {
 		return fmt.Errorf("ledger anchor: %w", err)
@@ -179,7 +153,6 @@ func (l *FileLedger) AnchorLine(_ context.Context, seq int, lineSHA, note string
 	if err != nil {
 		return fmt.Errorf("ledger anchor: marshal: %w", err)
 	}
-	// A unique temp name keeps concurrent anchors apart and rename is atomic; failures remove the temp.
 	f, err := anchorCreateTemp(filepath.Dir(l.anchorPath), "ledger-anchor.*.tmp")
 	if err != nil {
 		return fmt.Errorf("ledger anchor: create temp: %w", err)

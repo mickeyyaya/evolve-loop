@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-// TestAbsoluteRoot encodes Workstream A: a single shared helper that resolves a
-// (possibly relative) project root to an absolute path. Cycle 119/120 proved a
-// relative root silently breaks path-crossing contracts (the agent's worktree
-// cwd vs the in-process bridge's main cwd), and the fix in commit 80f4206 lived
-// only in cmd_loop.go. This helper is the reusable, tested version applied at
-// every entrypoint.
 func TestAbsoluteRoot(t *testing.T) {
 	abs := func(p string) string { a, _ := filepath.Abs(p); return a }
 	cases := []struct {
@@ -40,9 +34,6 @@ func TestAbsoluteRoot(t *testing.T) {
 	}
 }
 
-// TestAbsoluteRoot_WarnsAndReturnsInputOnError covers the fail-loud branch: when
-// filepath.Abs fails (os.Getwd failure — cwd deleted/unmounted), the helper must
-// WARN and return the original (never silently continue with a broken state).
 func TestAbsoluteRoot_WarnsAndReturnsInputOnError(t *testing.T) {
 	orig := absFn
 	defer func() { absFn = orig }()

@@ -2,7 +2,6 @@ package config
 
 import "github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 
-// The config module's registered signal codes.
 const (
 	CodeUnknownValue       signalcenter.Code = "CONFIG_UNKNOWN_VALUE"
 	CodeWeakSpine          signalcenter.Code = "CONFIG_WEAK_SPINE"
@@ -12,7 +11,6 @@ const (
 	CodeRegistryMalformed  signalcenter.Code = "CONFIG_REGISTRY_MALFORMED"
 )
 
-// The legacy Warning.Code vocabulary that in-package pins and `evolve solution` read.
 const (
 	codeUnknownValue       = "unknown-value"
 	codeWeakSpine          = "weak-spine"
@@ -22,8 +20,6 @@ const (
 	codeRegistryMalformed  = "registry-malformed"
 )
 
-// signalCodes maps each Warning.Code to its signal code. A missing entry would reach the Center
-// empty and be stamped SIGNALCENTER_MISSING_CODE.
 var signalCodes = map[string]signalcenter.Code{
 	codeUnknownValue:       CodeUnknownValue,
 	codeWeakSpine:          CodeWeakSpine,
@@ -42,7 +38,6 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleConfig, CodeRegistryMalformed, "docs/architecture/phase-registry.json was read but is not valid JSON (a trailing comma is the classic); the same compiled-baseline degrade as CONFIG_REGISTRY_UNREADABLE — no triage, no registry order — with the decoder's error in the reason; fields.step=registry, path, err")
 }
 
-// warn is the one appender. It copies fields so the range stamper never touches the producer's map.
 func warn(ws *[]Warning, code, msg string, fields map[string]string) {
 	own := make(map[string]string, len(fields)+4)
 	for k, v := range fields {
@@ -51,7 +46,6 @@ func warn(ws *[]Warning, code, msg string, fields map[string]string) {
 	*ws = append(*ws, Warning{Code: code, Message: msg, Fields: own})
 }
 
-// stamp sets each key/value pair of kv on every Warning in the range.
 func stamp(ws []Warning, kv ...string) {
 	for i := range ws {
 		for j := 0; j+1 < len(kv); j += 2 {
@@ -60,8 +54,6 @@ func stamp(ws []Warning, kv ...string) {
 	}
 }
 
-// emit sends each Warning as a config.warning WARN. The event's Cycle stays zero because the
-// loader runs before any cycle number exists. A nil Center is the Null Object.
 func (l *Loader) emit(origin string, ws []Warning) {
 	for _, w := range ws {
 		l.center().Emit(signalcenter.Event{
@@ -78,7 +70,6 @@ func (l *Loader) center() *signalcenter.Center {
 	return l.signals()
 }
 
-// IsRegistryFault reports whether w questions the registry itself: unreadable, malformed, or a weak spine.
 func IsRegistryFault(w Warning) bool {
 	switch w.Code {
 	case codeRegistryUnreadable, codeRegistryMalformed, codeWeakSpine:

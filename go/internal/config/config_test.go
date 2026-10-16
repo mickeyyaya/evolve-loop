@@ -89,7 +89,7 @@ func TestLoad_EnvOverridesRegistryAndDefault(t *testing.T) {
 		"EVOLVE_DYNAMIC_ROUTING":         "enforce",
 		"EVOLVE_ROUTING_MODE":            "static",
 		"EVOLVE_MAX_OPTIONAL_INSERTIONS": "2",
-		"EVOLVE_MANDATORY_PHASES":        "scout,build", // drops audit+ship
+		"EVOLVE_MANDATORY_PHASES":        "scout,build",
 	})
 
 	if cfg.Stage != StageEnforce {
@@ -187,7 +187,7 @@ func TestParseCondRule(t *testing.T) {
 	}{
 		{"cycle_size!=trivial", "cycle_size", "!=", "trivial"},
 		{"cycle_size==large", "cycle_size", "==", "large"},
-		{"verdict != PASS", "verdict", "!=", "PASS"}, // tolerate spaces
+		{"verdict != PASS", "verdict", "!=", "PASS"},
 	}
 	for _, tc := range cases {
 		got, err := parseCondRule(tc.in)

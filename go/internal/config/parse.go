@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// GateStage parses the off/shadow/enforce trichotomy of the gate and recovery dials; anything else is StageOff, false.
 func GateStage(v string) (Stage, bool) {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
@@ -18,7 +17,6 @@ func GateStage(v string) (Stage, bool) {
 	return StageOff, false
 }
 
-// RouterStage parses the full off/shadow/advisory/enforce ladder; anything else is StageOff, false.
 func RouterStage(v string) (Stage, bool) {
 	switch strings.TrimSpace(v) {
 	case "0", "off":
@@ -33,8 +31,6 @@ func RouterStage(v string) (Stage, bool) {
 	return StageOff, false
 }
 
-// parseStage and the parsers below resolve an unknown value to the fail-safe side with a
-// warning: a typo must never silently enable a kill path or a staged rollout.
 func parseStage(v, varName string, ws *[]Warning) Stage {
 	s, ok := RouterStage(v)
 	if !ok {
@@ -53,7 +49,6 @@ func parseEvidenceStage(v, varName string, ws *[]Warning) Stage {
 	return s
 }
 
-// parseMode's message names the registry key even for the env dial, whose stamp rewrites only fields.key.
 func parseMode(v string, ws *[]Warning) Mode {
 	switch strings.TrimSpace(v) {
 	case "llm", "dynamic", "dynamic-llm":

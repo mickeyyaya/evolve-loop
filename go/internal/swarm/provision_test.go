@@ -276,7 +276,6 @@ func TestAddWorktree_StaleStubRemoved(t *testing.T) {
 	base := filepath.Join(root, ".evolve", "worktrees")
 	ctx := context.Background()
 
-	// The stub sits at the exact path CreateWorker targets, so the teardown path really runs.
 	stub := filepath.Join(base, workerBranchFor(root, 7, "w0"))
 	if err := os.MkdirAll(stub, 0o755); err != nil {
 		t.Fatal(err)

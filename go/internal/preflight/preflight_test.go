@@ -91,11 +91,6 @@ func TestProbe_DarwinNested(t *testing.T) {
 
 func TestProbe_InnerSandboxReason_HonestWhenDisabled(t *testing.T) {
 	t.Parallel()
-	// Guard for the audit MEDIUM (cycle-990613): whenever InnerSandbox is false,
-	// InnerSandboxReason must NOT be the "standalone … defense-in-depth" default —
-	// it must explain WHY the inner sandbox was disabled. Pins the reason switch's
-	// exhaustiveness (incl. the catch-all) so the host profile can't misreport
-	// across every reachable disabled path.
 	const standaloneDefault = "standalone shell with working sandbox: defense-in-depth enabled"
 	root := t.TempDir()
 	cases := []struct {
@@ -177,23 +172,18 @@ func TestProbe_UnsupportedOS(t *testing.T) {
 
 func TestProbe_NoWritableWorktreeBase(t *testing.T) {
 	t.Parallel()
-	// Use a path that doesn't exist and the user can't create.
-	// We can't easily simulate this on a normal filesystem; instead use a
-	// path that resolves to a regular file (mkdir fails).
 	tmpfile, _ := os.CreateTemp("", "evolve-block-*")
 	defer os.Remove(tmpfile.Name())
 	tmpfile.Close()
 
-	// Pass the file's path as project root — mkdir for .evolve will fail.
-	root := tmpfile.Name() // a regular file, not a directory
+	root := tmpfile.Name()
 	p := Probe(Options{
 		ProjectRoot: root,
 		OSType:      "darwin",
-		// HOME is also a file → cache dir mkdir fails too
-		Env:      stubEnv(map[string]string{"HOME": root, "TMPDIR": tmpfile.Name()}),
-		LookPath: stubLookPath(nil),
-		Now:      fixedNow(),
-		IsNested: func() bool { return false },
+		Env:         stubEnv(map[string]string{"HOME": root, "TMPDIR": tmpfile.Name()}),
+		LookPath:    stubLookPath(nil),
+		Now:         fixedNow(),
+		IsNested:    func() bool { return false },
 	})
 	if p.AutoConfig.WorktreeBase != "" {
 		t.Errorf("with no writable target, worktree_base should be empty, got %q", p.AutoConfig.WorktreeBase)
@@ -269,7 +259,6 @@ func TestProbeWritable(t *testing.T) {
 	if probeWritable("") {
 		t.Error("empty path should be unwritable")
 	}
-	// A path that's a regular file (not a dir) should fail
 	file, _ := os.CreateTemp("", "probe-block-*")
 	defer os.Remove(file.Name())
 	file.Close()
@@ -295,7 +284,6 @@ func TestProfile_JSONMarshaling(t *testing.T) {
 	if !strings.Contains(string(b), `"schema_version":3`) {
 		t.Errorf("missing schema_version: %s", b)
 	}
-	// nil pointer fields should serialize as null
 	if !strings.Contains(string(b), `"claude":null`) {
 		t.Errorf("expected claude:null when not on PATH: %s", b)
 	}

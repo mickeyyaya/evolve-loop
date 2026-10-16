@@ -17,7 +17,6 @@ func stressEntry(kind string, i int) core.LedgerEntry {
 	return core.LedgerEntry{TS: fmt.Sprintf("2026-06-11T00:00:%02dZ", i%60), Cycle: 9000 + i, Role: "stress", Kind: kind}
 }
 
-// Not a test: the child-process body the cross-process stress tests spawn.
 func TestHelperLedgerAppender(t *testing.T) {
 	dir := os.Getenv(stressDirEnv)
 	if dir == "" {

@@ -282,3 +282,11 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // env var, which is removed. An absolute override wins; a relative override is
 // refused; an empty override falls back to <root>/.evolve/worktrees.
 ```
+
+## comment-zero d5
+
+### `go/internal/swarm/session_accounting_test.go:104` — above `if err := reg.Register(handle("w0")); err != nil {`
+
+```text
+// original Branch: cycle-1-w0
+```

@@ -408,3 +408,11 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // verification commands must not disagree about what was verified (#373, the
 // wired-into-one-path-only defect).
 ```
+
+## comment-zero d5
+
+### `go/internal/adapters/ledger/composition.go:28` — above `const IdenticalRebaseMethod = "identical-rebase"`
+
+```text
+// IdenticalRebaseMethod is the ADR-0105 B3 method: a byte-identical rebase carrying the verdict of the audited tree it names.
+```

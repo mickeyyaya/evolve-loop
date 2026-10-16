@@ -50,7 +50,6 @@ func TestVerify_SoftBoundary_FirstV837_WrongPrev(t *testing.T) {
 	}
 
 	pre1 := `{"ts":"x","cycle":1,"role":"orchestrator","kind":"phase","exit_code":0,"entry_seq":0}`
-	// A zero seed with a nonzero seq: neither a genesis nor chained from pre1.
 	bad := fmt.Sprintf(`{"ts":"y","cycle":2,"role":"builder","kind":"phase","exit_code":0,"entry_seq":1,"prev_hash":"%s"}`, ZeroSeed)
 	badSha := sha256Of(bad)
 
@@ -81,7 +80,6 @@ func TestVerify_SoftBoundary_AllPreV837(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(evolveDir, "ledger.jsonl"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// No tip file: an unchained ledger needs none.
 
 	l := New(evolveDir)
 	if err := l.Verify(context.Background()); err != nil {

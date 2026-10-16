@@ -495,7 +495,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `cmd/evolve` | 456 | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/acssuite` | 27 | [internal-acssuite.md](internal-acssuite.md) |
 | `internal/adapters/bridge` | 32 | [internal-adapters-bridge.md](internal-adapters-bridge.md) |
-| `internal/adapters/ledger` | 27 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
+| `internal/adapters/ledger` | 28 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/adapters/observer` | 30 | [internal-adapters-observer.md](internal-adapters-observer.md) |
 | `internal/adapters/sandbox` | 2 | [internal-adapters-sandbox.md](internal-adapters-sandbox.md) |
 | `internal/adapters/statemap` | 7 | [internal-adapters-statemap.md](internal-adapters-statemap.md) |
@@ -565,8 +565,11 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/modelcatalog` | 2 | [internal-modelcatalog.md](internal-modelcatalog.md) |
 | `internal/modelquery` | 11 | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/observerengine` | 10 | [internal-observerengine.md](internal-observerengine.md) |
+| `internal/panetrust` | 7 | [internal-panetrust.md](internal-panetrust.md) |
+| `internal/paths` | 4 | [internal-paths.md](internal-paths.md) |
 | `internal/phasecoherence` | 25 | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/phasecontract` | 62 | [internal-phasecontract.md](internal-phasecontract.md) |
+| `internal/phaseintegrity` | 5 | [internal-phaseintegrity.md](internal-phaseintegrity.md) |
 | `internal/phaseinventory` | 1 | [internal-phaseinventory.md](internal-phaseinventory.md) |
 | `internal/phaseio` | 9 | [internal-phaseio.md](internal-phaseio.md) |
 | `internal/phaseobserver` | 15 | [internal-phaseobserver.md](internal-phaseobserver.md) |
@@ -587,6 +590,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phasestream` | 20 | [internal-phasestream.md](internal-phasestream.md) |
 | `internal/phasetiming` | 9 | [internal-phasetiming.md](internal-phasetiming.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
+| `internal/preflight` | 4 | [internal-preflight.md](internal-preflight.md) |
 | `internal/profiles` | 30 | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | 51 | [internal-prompts.md](internal-prompts.md) |
 | `internal/quotareset` | 1 | [internal-quotareset.md](internal-quotareset.md) |
@@ -613,10 +617,11 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/soakreport` | 1 | [internal-soakreport.md](internal-soakreport.md) |
 | `internal/subagent/subagentrun` | 6 | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
 | `internal/subagent` | 26 | [internal-subagent.md](internal-subagent.md) |
-| `internal/swarm` | 18 | [internal-swarm.md](internal-swarm.md) |
+| `internal/swarm` | 19 | [internal-swarm.md](internal-swarm.md) |
 | `internal/systemprompt` | 1 | [internal-systemprompt.md](internal-systemprompt.md) |
 | `internal/textcap` | 4 | [internal-textcap.md](internal-textcap.md) |
 | `internal/tokenusage` | 24 | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |
 | `internal/triagecap` | 69 | [internal-triagecap.md](internal-triagecap.md) |
 | `internal/verifylock` | 2 | [internal-verifylock.md](internal-verifylock.md) |
+| `pkg/acsassert` | 5 | [pkg-acsassert.md](pkg-acsassert.md) |
