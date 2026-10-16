@@ -14,22 +14,28 @@ The updates cover three releases: 2.1.299, 2.1.300, and 2.1.301.
 ## 2. Changelog analysis as data
 
 ### Version 2.1.299
-Version 2.1.299 adds the environment variable `CLAUDE_CODE_DISABLE_FILE_MENTIONS` to stop automatic file expansions.
+Version 2.1.299 adds `CLAUDE_CODE_DISABLE_FILE_MENTIONS` to stop automatic file expansions.
 The release adds idle context compaction when a session stays inactive past a token threshold.
 The release exposes skill metadata and paths to prompt hooks.
 The release adds media support in `$.prompt.media` and adds `$.session.identity()`.
 
 ### Version 2.1.300
-Version 2.1.300 adds `virtualText` support and adds the `prompt.change` hook.
-The release fixes background command polling and sleep handling in subshells.
+Version 2.1.300 adds `virtualText` support and adds the `prompt.change` mod hook.
+The release fixes background command output file checks and sleep waits while the command runs.
 The release resolves worktree base commits accurately in bare git repositories.
 The release adds semantic-convention attributes for GenAI metrics.
+The release fixes compaction summary retention on session resumes.
 
 ### Version 2.1.301
-Version 2.1.301 fixes tool result reporting so that `Grep` and `Glob` do not return empty text on error.
-The release fixes workflow steps after reading harness status notes.
+Version 2.1.301 adds `CLAUDE_CODE_RETRY_WATCHDOG_MAX_USAGE_LIMIT_WAIT_MS` to stop long waits at usage limits.
+The release adds OpenTelemetry tracing guidance to the `claude-api` skill.
 The release adds `classifier_verdict` and `permission_mode` fields to OpenTelemetry events.
-The release improves tracing guidance for agent spans.
+The release stops worktree removal after `WorktreeCreate` when unpushed commits exist.
+The release retries the previous model when the newest `fable` alias is absent.
+
+The CLI shows a clear error when a full disk blocks login refresh.
+The `Grep` and `Glob` tools report an error when the search program fails.
+The release fixes workflow agents that skip steps after harness notes.
 
 ## 3. Core persona evaluation under ADR-0133
 
