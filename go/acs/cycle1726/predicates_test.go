@@ -172,8 +172,8 @@ func TestC1726_006_CheckedInListCoversEveryLiveOffenderAtOrAboveItsSize(t *testi
 		}
 	}
 	for _, key := range []string{
-		"internal/phases/ship.consumeCommittedItems", "internal/phases/ship.itemConsumer.stage",
-		"internal/phases/ship.stageExplicitPaths", "internal/bridge.codexDriver.Launch", "internal/bridge.claudePDriver.Launch",
+		"internal/phases/ship.runPersonaLint", "internal/phases/ship.itemConsumer.stage",
+		"internal/bridge.codexDriver.Launch", "internal/bridge.claudePDriver.Launch",
 	} {
 		if _, ok := listed[key]; !ok || census[key] <= 50 {
 			t.Errorf("known offender %s must be listed and measured as a live offender (listed %v, census %d lines)", key, ok, census[key])
@@ -212,14 +212,14 @@ func TestC1726_007_CIRatchetTestFailsOnARealModuleRegression(t *testing.T) {
 			"(exit %d):\n%s", probeFunc, probe, code, tail(out))
 	}
 	writeProbe(50)
-	growConsumeCommittedItems(t, copyRoot)
+	growRunPersonaLint(t, copyRoot)
 	out, code := runGo(t, copyRoot, ciTestArgs()...)
-	if code == 0 || !strings.Contains(out, "consumeCommittedItems") {
-		t.Errorf("the CI ratchet test did not fail naming consumeCommittedItems after it grew one line past "+
+	if code == 0 || !strings.Contains(out, "runPersonaLint") {
+		t.Errorf("the CI ratchet test did not fail naming runPersonaLint after it grew one line past "+
 			"its allowance (exit %d):\n%s", code, tail(out))
 	}
 	if strings.Contains(out, probeFunc) {
-		t.Errorf("the CI ratchet test blamed the 50-line probe for the consumeCommittedItems growth:\n%s", tail(out))
+		t.Errorf("the CI ratchet test blamed the 50-line probe for the runPersonaLint growth:\n%s", tail(out))
 	}
 }
 
@@ -527,24 +527,24 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, body, 0o644)
 }
 
-func growConsumeCommittedItems(t *testing.T, copyRoot string) {
+func growRunPersonaLint(t *testing.T, copyRoot string) {
 	t.Helper()
-	path := filepath.Join(copyRoot, "internal", "phases", "ship", "consume.go")
+	path := filepath.Join(copyRoot, "internal", "phases", "ship", "commitgate.go")
 	src, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	const anchor = "\nfunc consumeCommittedItems("
+	const anchor = "\nfunc runPersonaLint("
 	start := bytes.Index(src, []byte(anchor))
 	if start < 0 {
-		t.Fatalf("%q not found in the copied consume.go", anchor)
+		t.Fatalf("%q not found in the copied commitgate.go", anchor)
 	}
 	eol := bytes.IndexByte(src[start+1:], '\n')
 	if eol < 0 {
-		t.Fatalf("consumeCommittedItems header has no line end")
+		t.Fatalf("runPersonaLint header has no line end")
 	}
 	cut := start + 1 + eol + 1
-	grown := append(append(append([]byte{}, src[:cut]...), "\t// one planted line of growth\n"...), src[cut:]...)
+	grown := append(append(append([]byte{}, src[:cut]...), "\t_ = 0\n"...), src[cut:]...)
 	if err := os.WriteFile(path, grown, 0o644); err != nil {
 		t.Fatal(err)
 	}

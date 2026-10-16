@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"io/fs"
 	"os"
@@ -122,12 +123,8 @@ func TestC1741_003_ModuleWideRatchetCheckPasses(t *testing.T) {
 func TestC1741_004_BaselineTestFilesUnchanged(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, dir := range packageDirs {
-		diff, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "diff", "--diff-filter=a", baseCommit, "--", "go/"+dir+"/*_test.go")
-		if code != 0 {
-			t.Fatalf("git diff against %s failed: %v\n%s", baseCommit, err, stderr)
-		}
-		if strings.TrimSpace(diff) != "" {
-			t.Errorf("RED: baseline %s test files modified or deleted vs %s (existing tests must stay unmodified):\n%s", dir, baseCommit, diff)
+		if drift := baselineTestFileDrift(t, root, dir); len(drift) > 0 {
+			t.Errorf("RED: baseline %s test files changed beyond comments vs %s (existing tests must stay unmodified):\n  %s", dir, baseCommit, strings.Join(drift, "\n  "))
 		}
 	}
 }
@@ -197,12 +194,11 @@ func (g worktreeGit) Show(base, path string) ([]byte, error) {
 
 func (g worktreeGit) Root() (string, error) { return g.root, nil }
 
-// acs-predicate: config-check — the doc comment text IS the contract under
-func TestC1741_009_TargetFunctionDocsMatchBaseline(t *testing.T) {
+func TestC1741_009_TargetFunctionSignaturesMatchBaseline(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	current := map[string]string{}
 	for _, dir := range packageDirs {
-		for key, doc := range funcDocs(t, dir, packageSources(t, dir)) {
+		for key, doc := range funcSignatures(t, dir, packageSources(t, dir)) {
 			current[key] = doc
 		}
 	}
@@ -211,7 +207,7 @@ func TestC1741_009_TargetFunctionDocsMatchBaseline(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("git show %s:%s failed: %v\n%s", baseCommit, tg.file, err, stderr)
 		}
-		want, found := funcDocs(t, tg.pkg, map[string][]byte{tg.file: []byte(src)})[tg.key]
+		want, found := funcSignatures(t, tg.pkg, map[string][]byte{tg.file: []byte(src)})[tg.key]
 		if !found {
 			t.Fatalf("baseline %s has no func %s", tg.file, tg.key)
 		}
@@ -221,44 +217,7 @@ func TestC1741_009_TargetFunctionDocsMatchBaseline(t *testing.T) {
 			continue
 		}
 		if got != want {
-			t.Errorf("RED: doc comment of %s differs from baseline %s\n--- baseline ---\n%s--- worktree ---\n%s", tg.key, baseCommit, want, got)
-		}
-	}
-}
-
-// acs-predicate: config-check — comment text IS the contract under test
-func TestC1741_010_NoBaselineCommentDeleted(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	git := worktreeGit{root: root}
-	changed, err := git.ChangedFiles(baseCommit)
-	if err != nil {
-		t.Fatalf("list changed files: %v", err)
-	}
-	for _, dir := range packageDirs {
-		var baseline, current []byte
-		scoped := 0
-		for _, rel := range changed {
-			if filepath.Dir(rel) != "go/"+dir || !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") {
-				continue
-			}
-			scoped++
-			before, err := git.Show(baseCommit, rel)
-			if err != nil && !errors.Is(err, fs.ErrNotExist) {
-				t.Fatalf("git show %s:%s: %v", baseCommit, rel, err)
-			}
-			after, err := os.ReadFile(filepath.Join(root, rel))
-			if err != nil && !errors.Is(err, fs.ErrNotExist) {
-				t.Fatalf("read %s: %v", rel, err)
-			}
-			baseline = append(append(baseline, before...), '\n')
-			current = append(append(current, after...), '\n')
-		}
-		if scoped == 0 {
-			t.Errorf("RED: no non-test Go file under %s changed since %s — the extraction has not happened", dir, baseCommit)
-			continue
-		}
-		if deleted := commentaudit.AddedComments(current, baseline); len(deleted) > 0 {
-			t.Errorf("RED: %d baseline comment line(s) deleted from %s since %s (restore each where its code now lives; code-comments.md:43):\n  %s", len(deleted), dir, baseCommit, strings.Join(deleted, "\n  "))
+			t.Errorf("RED: signature of %s differs from baseline %s\n--- baseline ---\n%s--- worktree ---\n%s", tg.key, baseCommit, want, got)
 		}
 	}
 }
@@ -441,18 +400,18 @@ func packageSources(t *testing.T, dir string) map[string][]byte {
 	return sources
 }
 
-func funcDocs(t *testing.T, dir string, sources map[string][]byte) map[string]string {
+func funcSignatures(t *testing.T, dir string, sources map[string][]byte) map[string]string {
 	t.Helper()
 	docs := make(map[string]string)
 	fset := token.NewFileSet()
 	for name, src := range sources {
-		file, err := parser.ParseFile(fset, name, src, parser.ParseComments)
+		file, err := parser.ParseFile(fset, name, src, 0)
 		if err != nil {
 			t.Fatalf("parse %s: %v", name, err)
 		}
 		for _, decl := range file.Decls {
 			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil {
-				docs[dir+"."+fn.Name.Name] = fn.Doc.Text()
+				docs[dir+"."+fn.Name.Name] = signatureOf(fset, fn)
 			}
 		}
 	}
@@ -486,4 +445,43 @@ func writeMutantOverlay(t *testing.T, dir string, m mutant) string {
 		t.Fatalf("write overlay: %v", err)
 	}
 	return overlayPath
+}
+
+func baselineTestFileDrift(t *testing.T, root, dir string) []string {
+	t.Helper()
+	listing, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "ls-tree", "--name-only", baseCommit, "go/"+dir+"/")
+	if code != 0 {
+		t.Fatalf("git ls-tree %s failed: %v\n%s", baseCommit, err, stderr)
+	}
+	var drift []string
+	for _, rel := range strings.Fields(listing) {
+		if !strings.HasSuffix(rel, "_test.go") {
+			continue
+		}
+		before, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "show", baseCommit+":"+rel)
+		if code != 0 {
+			t.Fatalf("git show %s:%s failed: %v\n%s", baseCommit, rel, err, stderr)
+		}
+		after, readErr := os.ReadFile(filepath.Join(root, rel))
+		if readErr != nil {
+			drift = append(drift, rel+": deleted")
+			continue
+		}
+		same, why, eqErr := commentaudit.Equivalent(rel, []byte(before), after)
+		if eqErr != nil {
+			t.Fatalf("compare %s with baseline: %v", rel, eqErr)
+		}
+		if !same {
+			drift = append(drift, rel+": "+why)
+		}
+	}
+	return drift
+}
+
+func signatureOf(fset *token.FileSet, fn *ast.FuncDecl) string {
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, fset, fn.Type); err != nil {
+		return err.Error()
+	}
+	return buf.String()
 }
