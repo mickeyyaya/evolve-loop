@@ -1,0 +1,191 @@
+{
+  "schema_version": 2,
+  "cycle": 1897,
+  "run_id": "01M52DJB0P9W39K714V0V6JJPB",
+  "goal": "Wave 108.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 107 facts (run 20261016T122949Z): 2 of 2 cycles shipped.\n- Cycle 1895: final verdict PASS. It shipped.\n- Cycle 1896: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 108:\n- Release gate for v22.29.0: 4 of 6 consecutive cycle ships so far. Prefer low-risk, well-scoped tasks; avoid protected-surface and kernel changes until the cut.\n\nEarlier waves:\n- Wave 104 (run 20261016T075236Z): 2 of 2 cycles shipped.\n- Wave 105 (run 20261016T094110Z): 2 of 2 cycles shipped.\n- Wave 106 (run 20261016T112047Z): 2 of 2 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "63407e94801daf20cb2c8dc64e22454848256837",
+  "tree_sha": "c3bd979a5e490ee1bacc1fcf8d353c7450a7abab",
+  "tasks": [
+    "practice-claude-prompting-guide-d69a3e68-202610141610"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 368251,
+      "started_at": "2026-10-16T13:14:35Z",
+      "ended_at": "2026-10-16T13:20:44Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 152651,
+      "started_at": "2026-10-16T13:21:11Z",
+      "ended_at": "2026-10-16T13:23:45Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 60132,
+      "started_at": "2026-10-16T13:23:45Z",
+      "ended_at": "2026-10-16T13:24:46Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 4200,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 390546,
+      "started_at": "2026-10-16T13:24:46Z",
+      "ended_at": "2026-10-16T13:31:40Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "prompt-regression-eval",
+      "verdict": "PASS",
+      "duration_ms": 46550,
+      "started_at": "2026-10-16T13:31:59Z",
+      "ended_at": "2026-10-16T13:32:46Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 103496,
+      "started_at": "2026-10-16T13:32:46Z",
+      "ended_at": "2026-10-16T13:35:38Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 8300,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 22872,
+      "started_at": "2026-10-16T13:35:58Z",
+      "ended_at": "2026-10-16T13:43:01Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 29946,
+      "started_at": "2026-10-16T13:43:02Z",
+      "ended_at": "2026-10-16T13:43:32Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 1174444,
+    "phase_count": 8,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 390546,
+    "by_archetype_ms": {
+      "build": 390546,
+      "control": 52818,
+      "evaluate": 150046,
+      "plan": 581034
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 12500,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 0,
+        "output": 8300,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 0,
+        "output": 4200,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  }
+}
