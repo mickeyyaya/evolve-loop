@@ -11,11 +11,12 @@ metadata:
 
 ## TLDR
 
-**Synopsis:** All markdown files must follow this schema: a YAML frontmatter block and a TLDR section (synopsis + key points + non-goals). They also need a TOC for files over 100 lines, tables over prose lists, and imperative voice in headings.
+**Synopsis:** Skill and agent files start with a YAML frontmatter block and a TLDR section. A document under `docs/` starts with links to its design set and a status line. All files use a TOC over 100 lines, tables for data and imperative headings.
 
 **Key points:**
-- Frontmatter is mandatory. The `name`, `description` and `metadata.type` fields are required.
-- Every file requires a TLDR section, with the sub-structure synopsis + key points + non-goals.
+- Skill and agent files require frontmatter, with the `name`, `description` and `metadata.type` fields.
+- Skill and agent files require a TLDR section, with the sub-structure synopsis + key points + non-goals.
+- A document under `docs/` has no frontmatter and no TLDR. It starts with links to its design set and a status line.
 - A file of more than 100 lines requires a TOC.
 - Tables are preferred over prose lists for structured data.
 - Use the imperative voice in H2 headings (for example, "Run the linter", not "Running the linter").
@@ -40,7 +41,7 @@ metadata:
 
 ## Frontmatter Block
 
-Every markdown file must start with a YAML frontmatter block:
+A skill file or an agent file must start with a YAML frontmatter block, because the CLIs read it to load the file. A new document under `docs/` has no frontmatter ([ADR-0132](../architecture/adr/0132-documents-are-written-through-one-skill.md)).
 
 ```yaml
 ---
@@ -71,7 +72,7 @@ Optional fields:
 
 ## TLDR Section
 
-Put it immediately after the blockquote header (if present) or after the frontmatter. Every file requires it.
+A skill file or an agent file requires a TLDR. Put it immediately after the blockquote header (if present) or after the frontmatter. A new document under `docs/` has no TLDR. It starts with links to its design set and a status line.
 
 ```markdown
 ## TLDR
@@ -168,6 +169,25 @@ For actual hyperlinks, use standard markdown: `[text](path/to/file.md)`.
 ---
 
 ## Full Template
+
+Use this template for a document under `docs/`:
+
+```markdown
+# <Title>
+
+> Design set: [research](<path>) · [plan](<path>) · [decision](<path>) · [spec](<path>)
+> Status: <draft | accepted | superseded> (<YYYY-MM-DD>)
+
+## Table of Contents    ← omit if file < 100 lines
+
+1. [Section](#section)
+
+## Section
+
+<content>
+```
+
+Use this template for a skill file or an agent file:
 
 ```markdown
 ---
