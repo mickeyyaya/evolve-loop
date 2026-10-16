@@ -157,7 +157,8 @@ nonzero       = "1" | … | "9" ;
   - `phase:<p>` selects each roster entry with the phase `p`, also a planned phase with no dispatch yet.
   - `dispatch:<id>` selects one dispatch.
   - `*` selects every agent of the cycle.
-- **A past entry.** `role:`, `phase:` and `*` skip a `past` roster entry. Only an exact `dispatch:` address selects it. Thus a retried phase gets one copy, in its new dispatch.
+- **A past entry.** `role:`, `phase:` and `*` skip a `past` roster entry. Only an exact `dispatch:` address selects it.
+- **A retry gets a planned-phase message again (at least once).** A message to `phase:<p>` while `p` is planned stays addressed to the phase. Each dispatch of `p` reads it, so a retry of the phase gets it again (§10).
 - **The sender is never its own recipient.** `*` skips the sender. An address that selects only the sender is an unknown recipient.
 - **Refusals.** These are syntax errors: an empty address, an unknown selector, an empty value and an upper-case name. A cycle of 0, a cycle with a lead zero and white space are syntax errors too.
 - **The JSON form** of an address is its text form.
@@ -198,7 +199,7 @@ token caveats = "cycle=" N, "dispatch=" ID, "expires=" UNIX, "agent=" A, "phase=
 - A phase has at most one entry that is not `past`.
 - A `planned` entry becomes `live` in place when its dispatch boots. It keeps its queue.
 - A `live` entry becomes `past` when its dispatch ends. A retry of the phase adds a new `planned` or `live` entry.
-- At the seal, the service moves the queue of each `past` entry to the dead letters.
+- At the seal, the service moves the queue of each `past` entry and each `planned` entry to the dead letters. A `planned` entry at the seal is a phase that did not run (§10).
 
 **The principal** is `{cycle, dispatch, agent, phase, role}`, as the roster states it. The broker stamps it as `from`. A `from` that the sender wrote is ignored.
 
@@ -274,8 +275,8 @@ A read and an ack also hold the lock across their store call. Thus a slow store 
 3. Keep only the records addressed to the reader: its dispatch, or its phase when the record names a planned phase.
 4. Drop a second copy of an id (the seen set).
 5. Move an expired message to the dead letters, once for each recipient, with a `msg.dead` event.
-6. Report each gap that the store reports (§7) in the mailbox, with a `msg.dead` event that has the reason `gap`. A gap is never silent.
-7. Return the messages and the next cursor. The messages up to that next cursor leave the queue of the reader. A cursor that the caller gives never empties the queue.
+6. Report each gap that the store reports (§7) in the mailbox of each read. A gap is never silent. The first report of a gap emits one `msg.dead` event with the reason `gap`. A later read of the same gap emits no second event.
+7. Return the messages and the next cursor. The messages up to that next cursor leave the queue of the reader. Thus a read from the head returns no messages and clears the queue.
 
 A negative cursor is `ErrCursor`, and the store is not called.
 
@@ -377,7 +378,8 @@ Config gives each limit (§14). The broker checks them in the core.
 - **The idempotency key** is the `id`. A retry of a send with the same `id` gives the same receipt. A read drops a second copy of an `id`.
 - **The cursor** is the position of the reader in `msg.<cycle>`. Each recipient has its own cursor.
 - **Request and reply.** A request carries a `correlation_id` and an `expires_at` (research F7.3, F7.4).
-- **Dead letters.** An expired message goes to `msg.dead` once for each recipient. At the seal, a message to a phase that did not run goes there too (component M7).
+- **Dead letters.** An expired message goes to `msg.dead` once for each recipient. At the seal, a message to a phase that did not run goes there too. The seal moves the queue of each `planned` entry (§4, component M7).
+- **A retry reads a planned-phase message again.** A message to a phase while it is planned reaches each dispatch of that phase, so a retry gets a second copy (§3).
 - **No exactly-once delivery.** A consumer that must be exact keeps its own set of ids.
 
 ### 11. The command surface
@@ -474,7 +476,7 @@ The threat is a confused or injected agent, not a hostile local user (research �
 | T9 | A token leaks to another process of the same uid | the second check by location; the expiry; the key only in memory | §4 |
 | T10 | Agents collude through free text | the audit log of every send and refusal; typed kinds; caps | §12, §9 |
 | T11 | A retry with the same id changes the content | the content digest; `ErrIDConflict` | §6 |
-| T12 | A reader skips its queue with a large cursor | a cursor past the head is refused; the queue moves only to the cursor that a read returns | §6 |
+| T12 | A reader skips its queue with a large cursor | a cursor past the head is refused; a read or an ack at the head clears the queue. A reader loses only its own messages | §6 |
 | T13 | A past or planned dispatch acts | only a `live` roster entry can send, read or ack; the token must agree with the roster | §4 |
 | T14 | An agent reads the mailbox of another dispatch | read confinement in the sandbox (M6); an unsandboxed phase stays a limit | §13 |
 | T15 | An agent changes an archive in `runs/` | the retro reads the protected store; the ledger holds the archive hash | §7 |

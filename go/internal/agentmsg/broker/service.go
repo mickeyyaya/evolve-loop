@@ -231,7 +231,12 @@ func (s *Service) read(ctx context.Context, c identity.Credential, from int64, n
 	}
 	box := Mailbox{Next: batch.Next, Gaps: batch.Gaps}
 	for _, g := range batch.Gaps {
-		n.add(Event{Kind: EventDead, Cycle: s.cfg.Cycle, ID: fmt.Sprintf("gap.%d.%d", g.From, g.To), Reason: ReasonGap})
+		id := fmt.Sprintf("gap.%d.%d", g.From, g.To)
+		if s.state.dead[id] {
+			continue
+		}
+		s.state.dead[id] = true
+		n.add(Event{Kind: EventDead, Cycle: s.cfg.Cycle, ID: id, Reason: ReasonGap})
 	}
 	seen := map[string]bool{}
 	for _, r := range batch.Records {

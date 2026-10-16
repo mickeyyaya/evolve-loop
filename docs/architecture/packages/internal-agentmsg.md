@@ -31,7 +31,7 @@ Nothing outside `internal/agentmsg` imports it yet. Components M2 to M7 add the 
 - **Events after the lock.** A call collects its events (`notices`) and notifies them after it releases the lock, so a notifier can call the service again. The roster call is outside the lock too.
 - **The identity comes from the roster.** `authenticate` checks the token and the cycle, then finds the roster entry of the dispatch. The entry must be `live` and equal to the principal of the token, or the call is unauthenticated.
 - **Roster states.** `Member` adds a `MemberState` to a principal. `selects` skips a `past` entry for `role:`, `phase:` and `*`. Only `dispatch:` selects it.
-- **Gaps and acks.** `Batch.Gaps` carries the gaps of a store, and `Read` reports each one with a `msg.dead` event. `Ack` moves the queue of a reader to a cursor inside the log.
+- **Gaps and acks.** `Batch.Gaps` carries the gaps of a store. `Read` puts each gap in every mailbox, and emits one `msg.dead` event for each distinct gap. `Ack` moves the queue of a reader to a cursor inside the log.
 - **The store contract.** `Append` returns the cursor `c`. A later `Read(from)` with `from` at or below `c` holds the record, and its `Next` is above `c`. A read and an ack hold the lock across the store call, so a slow store blocks the sends.
 - **Config checks.** `Config.check` reads an ordered list, so the first absent field is the same in each run.
 - **The ledger** (`broker/ledger.go`) holds the state of the limits in memory:

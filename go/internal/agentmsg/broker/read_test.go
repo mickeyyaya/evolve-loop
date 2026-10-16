@@ -3,6 +3,7 @@ package broker_test
 import (
 	"context"
 	"crypto/rand"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -217,4 +218,84 @@ func TestNew_RefusesAnIncompleteConfig(t *testing.T) {
 	if _, err := broker.New(valid()); err != nil {
 		t.Fatalf("New(valid config) error = %v, want nil", err)
 	}
+}
+
+func TestAck_CrossQueueIndependence(t *testing.T) {
+	ctx := context.Background()
+	handledByBuild := map[string]func(t *testing.T, h *harness, head int64){
+		"an ack to the head": func(t *testing.T, h *harness, head int64) {
+			if err := h.svc.Ack(ctx, h.credential(build), head); err != nil {
+				t.Fatalf("Ack error = %v", err)
+			}
+		},
+		"a read from the start": func(_ *testing.T, h *harness, _ int64) { h.read(build, 0) },
+		"a read from the head":  func(_ *testing.T, h *harness, head int64) { h.read(build, head) },
+	}
+	for name, act := range handledByBuild {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t, limits(func(l *broker.Limits) { l.RecipientQueue = 1 }))
+			h.mustSend(scout, msg(envelope.KindNote, "for build", "phase:build"))
+			h.mustSend(scout, msg(envelope.KindNote, "for tdd", "phase:tdd"))
+			h.mustSend(scout, msg(envelope.KindNote, "for audit", "phase:audit"))
+			act(t, h, h.read(scout, 0).Next)
+			for _, other := range []string{"phase:tdd", "phase:audit"} {
+				_, err := h.send(scout, msg(envelope.KindNote, "more for "+other, other))
+				isErr(t, err, broker.ErrQueueFull)
+			}
+			if got := bodies(h.read(tdd, 0)); len(got) != 1 || got[0] != "for tdd" {
+				t.Fatalf("tdd mailbox after %s by build = %v, want [for tdd]", name, got)
+			}
+			h.mustSend(scout, msg(envelope.KindNote, "build has room again", "phase:build"))
+		})
+	}
+}
+
+func TestRead_GapEventsAreDeduplicatedOnReRead(t *testing.T) {
+	h := newHarness(t)
+	h.mustSend(scout, msg(envelope.KindNote, "x", "phase:build"))
+	first := broker.Gap{From: 7, To: 19, Reason: "retention"}
+	h.store.gaps = []broker.Gap{first}
+	for i := 0; i < 3; i++ {
+		if box := h.read(build, 0); len(box.Gaps) != 1 || box.Gaps[0] != first {
+			t.Fatalf("read %d Mailbox.Gaps = %+v, want [%+v] on every read", i, box.Gaps, first)
+		}
+	}
+	later := broker.Gap{From: 20, To: 25, Reason: "retention"}
+	h.store.gaps = []broker.Gap{first, later}
+	if box := h.read(build, 0); len(box.Gaps) != 2 {
+		t.Fatalf("Mailbox.Gaps = %+v, want both gaps", box.Gaps)
+	}
+	var ids []string
+	for _, e := range h.events.of(broker.EventDead) {
+		if e.Reason == broker.ReasonGap {
+			ids = append(ids, e.ID)
+		}
+	}
+	if want := []string{"gap.7.19", "gap.20.25"}; !slices.Equal(ids, want) {
+		t.Fatalf("gap dead events = %v, want %v: one event for each distinct gap", ids, want)
+	}
+}
+
+func TestRead_AMessageToAPlannedPhaseReachesARetryAgain(t *testing.T) {
+	h := newHarness(t)
+	h.mustSend(scout, msg(envelope.KindNote, "for audit", "phase:audit"))
+	h.roster.members = append(h.roster.members, live(auditor))
+	if got := bodies(h.read(auditor, 0)); len(got) != 1 {
+		t.Fatalf("first audit dispatch mailbox = %v, want the message", got)
+	}
+	retry := identity.Principal{Cycle: cycle, Dispatch: "r/1850/audit/p15n1", Agent: "auditor", Phase: "audit", Role: "audit"}
+	h.roster.members = []broker.Member{live(scout), live(tdd), live(build), planned(audit), past(auditor), live(retry)}
+	if got := bodies(h.read(retry, 0)); len(got) != 1 || got[0] != "for audit" {
+		t.Fatalf("retry audit dispatch mailbox = %v, want the message again (at-least-once)", got)
+	}
+}
+
+func TestRead_FromTheHeadClearsTheQueueWithoutMessages(t *testing.T) {
+	h := newHarness(t, limits(func(l *broker.Limits) { l.RecipientQueue = 1 }))
+	h.mustSend(scout, msg(envelope.KindNote, "never returned", "phase:build"))
+	head := h.read(scout, 0).Next
+	if got := bodies(h.read(build, head)); len(got) != 0 {
+		t.Fatalf("Read(from the head %d) = %v, want no messages", head, got)
+	}
+	h.mustSend(scout, msg(envelope.KindNote, "room after the head read", "phase:build"))
 }
