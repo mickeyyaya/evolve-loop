@@ -1,9 +1,5 @@
 //go:build spike
 
-// Live diagnostic spike (not in normal CI; run with -tags spike). Calls the
-// PhaseAdvisor's Plan() directly with the REAL bridge on opus, to answer:
-// does the LLM advisor actually produce a routing plan, or does it error/degrade?
-// Run: go test ./cmd/evolve/ -tags spike -run TestSpikeAdvisorLive -v -timeout 300s
 package main
 
 import (
@@ -22,7 +18,7 @@ import (
 
 func TestSpikeAdvisorLive(t *testing.T) {
 	t.Parallel()
-	root, err := filepath.Abs("../../..") // repo root: go/cmd/evolve → cmd → go → repo
+	root, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,5 +77,4 @@ func TestSpikeAdvisorLive(t *testing.T) {
 	} else {
 		t.Logf("SPIKE: NO routing-plan.json (%v)", rerr)
 	}
-	// This test never fails — it is a diagnostic that reports what happened.
 }

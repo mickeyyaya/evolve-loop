@@ -1,4 +1,3 @@
-// Package main is the evolve CLI entrypoint.
 package main
 
 import (
@@ -203,8 +202,6 @@ v12.1 utilities + composition:
                                 [--json] [--out PATH] )
 `
 
-// dispatch is the top-level subcommand router, extracted so tests can
-// drive it without invoking os.Exit. It returns the process exit code.
 func dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprint(stderr, usage)

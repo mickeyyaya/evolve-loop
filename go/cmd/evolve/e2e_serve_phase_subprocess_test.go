@@ -13,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
-// buildEvolveBinaryWithTestPhases compiles the evolve binary into a
-// temp dir with the evolve_test_phases build tag. Skips if `go` is not
-// on PATH (e.g. some hermetic CI sandboxes).
 func buildEvolveBinaryWithTestPhases(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("go"); err != nil {
@@ -63,8 +60,6 @@ func TestServePhase_SubprocessRunnerRoundTrip(t *testing.T) {
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict=%q want PASS", resp.Verdict)
 	}
-	// Round-trip integrity: the echo phase encodes Cycle into
-	// ArtifactsDir. If the wire ate the request, this fails.
 	want := "cycle-42"
 	if resp.ArtifactsDir != want {
 		t.Errorf("ArtifactsDir=%q want %q — request lost on wire", resp.ArtifactsDir, want)

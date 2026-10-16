@@ -6375,3 +6375,14 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // The in-process Go bridge resolves paths from the request (no
 // tools/agent-bridge tree is symlinked).
 ```
+
+## comment-zero cmd-evolve-4
+
+### `go/cmd/evolve/routing_order_realtree_test.go:57` — above `if bi, fi, bu := idx("bug-reproduction"), idx("fault-localization"), idx("build"); bi >= 0 && fi >= 0 && bu >= 0 {`
+
+```text
+// The incident phase specifically: a red-first Evaluate deliverable is only
+// coherent PRE-build. Pin it by name so a future registry/catalog reshuffle
+// that reintroduces the post-build slot fails here with the incident's name
+// on it, not just the generic anchor rule above.
+```

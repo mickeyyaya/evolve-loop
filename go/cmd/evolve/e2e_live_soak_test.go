@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-// crossFamilyPairs are builder/auditor combos on different families. Each entry
-// is {builderDriver, auditorDriver}; both must be available or the pair skips.
 var crossFamilyPairs = [][2]liveCLI{
 	{{Driver: "claude-tmux", Binary: "claude", Family: "anthropic"}, {Driver: "codex-tmux", Binary: "codex", Family: "openai"}},
 	{{Driver: "agy-tmux", Binary: "agy", Family: "google"}, {Driver: "codex-tmux", Binary: "codex", Family: "openai"}},
@@ -34,8 +32,6 @@ func TestE2ELiveCrossFamilySoak(t *testing.T) {
 			if ok, why := liveCLIAvailable(auditor); !ok {
 				t.Skip("auditor " + why)
 			}
-			// Default every phase to the builder's CLI, then pin the auditor via the
-			// per-agent override (EVOLVE_<AGENT>_CLI beats EVOLVE_CLI beats profile).
 			res := runLiveCycle(t, liveCycleCfg{
 				EvolveBin: evolveBin,
 				RepoRoot:  repoRoot,

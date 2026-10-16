@@ -19,8 +19,6 @@ func TestReleaseVerifyBinaries_RealConfigAllPresent(t *testing.T) {
 		t.Fatalf("parse real .goreleaser.yml: %v", err)
 	}
 
-	// A lister that returns exactly the assets the SSOT implies — the "happy"
-	// published release — must produce an all-OK matrix.
 	list := func(owner, repo, tag string) ([]string, error) {
 		names := []string{cfg.ChecksumsName}
 		for _, tg := range cfg.Targets {
@@ -47,8 +45,6 @@ func TestReleaseVerifyBinaries_RealConfigAllPresent(t *testing.T) {
 	}
 }
 
-// TestReleaseVerifyBinaries_BinaryDispatch runs with no tag arg so it stays
-// network-free.
 func TestReleaseVerifyBinaries_BinaryDispatch(t *testing.T) {
 	t.Parallel()
 	if testing.Short() {

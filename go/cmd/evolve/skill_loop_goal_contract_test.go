@@ -7,11 +7,8 @@ import (
 	"testing"
 )
 
-// skillLoopRelPath is the /evo:loop skill definition under contract.
 const skillLoopRelPath = "skills/loop/SKILL.md"
 
-// readSkillLoopLines returns SKILL.md split into lines, failing when the doc
-// is unreadable (its absence is a contract failure, not a skip).
 func readSkillLoopLines(t *testing.T) []string {
 	t.Helper()
 	path := filepath.Join(findRepoRoot(t), skillLoopRelPath)
