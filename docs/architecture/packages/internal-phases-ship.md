@@ -161,6 +161,7 @@ These rules held in comments before the comment-zero change. Tests pin the ones 
 - Shadow is the default and never blocks. Enforce fails closed on any path that no phase report declared. It uses `core.CodeManifestGate`, so the ledger and the debugger can tell a manifest block from a real `git add` failure.
 - The mode comes from `policy.json` `gates.manifest_gate`. It never comes from a code literal.
 - `shipmanifest` also extracts bare root-level filenames. A legitimate root-file change is then not a false block under enforce.
+- `scanshadow.go`, `scanshadow_tree.go` and `scanshadow_tap.go` are the scan shadow (landing plan S5, [ADR-0134](../adr/0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md)). `Phase.scanShadowFor` builds it from `gates.scan_cache_gate` (default `shadow`) and `runRepoContractGate` puts it in the context. `runRepoContractGateAt` calls `begin` before the first run and `finish` on every exit. `runClassifiedPackRetrying` calls `observe` with each run outcome. `runGoTestJSON` fills `packOutcome.pkgs` from a read-only tap on the event stream. The scan runs every package as before.
 - The changed set is the porcelain dirt plus the commits already on the cycle branch. `detectColliders` binds the same inputs. A run with no readable reports skips the gate.
 
 ### Repo-contract gate
@@ -181,6 +182,25 @@ These rules held in comments before the comment-zero change. Tests pin the ones 
 - Discovery of the seed files retries once after `discoveryRetryPause`. A concurrent lane's `index.lock` is the known transient. A second failure is `CodeRepoContractInfra` and never a silent green.
 - `importerBackstopTimeout` bounds the run so the ship phase ends. A timeout exits with no test-level failure and classes as infra. `importerBackstopRetryMaxTargets` caps the pack size that is worth a second full run.
 - `repoContractGateRoot` fails closed with `CodeWorktreeResolve` for an unresolvable typed worktree. The gate then never tests the project root in the lane's place and reports a false green.
+
+### Scan shadow
+
+- The shadow changes no verdict, no exit code and no order. It adds a tap on the event stream, three calls in the gate and records in the store. A test pins the notes, the order and the error text against a run with the shadow off (`TestScanShadow_ChangesNoVerdict`).
+- The shadow is read-only toward the lane. It lists files with `git ls-files`, reads them, and runs `go env -json`. It stages nothing and does not touch the index or the inbox (`TestScanShadow_IsReadOnlyTowardTheLane`).
+- `begin` takes one snapshot before the first run. It hashes every file that git lists, tracked or not and not ignored, as the files are on disk. The result is the whole-tree id. A test that writes into the tree during the scan cannot change the key of its own record.
+- Every key is a whole-tree key today. No producer of test logs exists, so `keyOf` gives an unknown log to `testkey.Compute`. A hit thus needs an identical tree. A producer of logs must come before the hit rate can reach the plan's exit of 500 hits.
+- A package result is a hit when the store holds a green record for its key and the package passed. It is an escape when the package failed. An escape emits `CodeScanShadowEscape` (WARN, with the package, the key, the tags and the flags). A hit that passed counts only in the summary.
+- The key holds the tags and the flags of the run. A by-name run (`-run`) and a whole-package run of one package are thus two keys.
+- `settled` keeps one lookup for each key in one scan. A retry of the same run is not a hit on the record that the scan wrote a moment before.
+- `finish` emits one INFO summary for each scan. Its fields count `packages`, `hits`, `escapes`, `recorded`, `unkeyed` and `store_errors`, and name `hit_packages` and any `degraded` cause. The count of summaries is the count of scans for the S5 exit.
+- A fault degrades to no hit. A failed listing or `go env` sets `degraded` and every package is `unkeyed`. A failed store write is a `store_errors` count. Nothing fails the scan.
+- A panic never reaches the gate. `begin`, `observe`, `finish` and each package in `settle` run under `guard`. `guard` recovers, adds the cause to `degraded` and emits one `CodeScanShadowFault` WARN for each scan.
+- The tree hash has a budget. `begin` runs under a deadline (`scan_cache_budget_seconds`, default 60). `fileID` streams each file through `ctxReader`, so a cancelled context stops the hash within one read. A total over `scan_cache_max_mb` (default 2048) is `errTreeTooLarge`. Either bound degrades the scan, and the reason is in the summary.
+- The tap exists only for a shadowed scan. `runGoTestJSON` makes no tap when the context holds no shadow. A line of more than 1 MiB with no newline is dropped and counted in `dropped_lines`.
+- The store grows with each scan, so `evolve gc` trims it (`gc.testcache_ttl_days`, `gc.testcache_max_mb`). The ship path never trims.
+- A retried package is settled once by key. A first-run failure that a green alone re-run clears still raises an escape. S6 must discount it (plan Q7).
+- The alone re-run is not observed. A hit that failed in the first run is an escape even when the alone re-run clears it.
+- The test environment is not in the key. No list of child-process variables exists yet, so `ChildVars` is empty.
 
 ### Inbox consumption and post-ship
 

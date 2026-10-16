@@ -1,5 +1,10 @@
 package policy
 
+import (
+	"path/filepath"
+	"time"
+)
+
 // defaultObservationMaskWindow is the empirical optimum (M=10) from the
 // observation-masking study, arXiv 2508.21433.
 const defaultObservationMaskWindow = 10
@@ -70,6 +75,10 @@ type GatesPolicy struct {
 	// RepoContractGate runs the repo-wide guard suites at ship time; it defaults to
 	// "enforce" because those suites fail on main's next run anyway (false-positive rate near zero).
 	RepoContractGate string `json:"repo_contract_gate,omitempty"`
+
+	ScanCacheGate          string `json:"scan_cache_gate,omitempty"`
+	ScanCacheMaxMB         int    `json:"scan_cache_max_mb,omitempty"`
+	ScanCacheBudgetSeconds int    `json:"scan_cache_budget_seconds,omitempty"`
 }
 
 // GatesConfig is the resolved gate configuration with defaults applied.
@@ -82,6 +91,10 @@ type GatesConfig struct {
 	TopNGate         string
 	ManifestGate     string
 	RepoContractGate string
+	ScanCacheGate    string
+
+	ScanCacheMaxMB         int
+	ScanCacheBudgetSeconds int
 }
 
 // GatesConfig returns persistent gate stages with built-in defaults resolved.
@@ -95,6 +108,10 @@ func (p Policy) GatesConfig() GatesConfig {
 		TopNGate:         "enforce",
 		ManifestGate:     "shadow",
 		RepoContractGate: "enforce",
+		ScanCacheGate:    "shadow",
+
+		ScanCacheMaxMB:         defaultScanCacheMaxMB,
+		ScanCacheBudgetSeconds: defaultScanCacheBudgetSeconds,
 	}
 	if p.Gates == nil {
 		return c
@@ -123,5 +140,38 @@ func (p Policy) GatesConfig() GatesConfig {
 	if p.Gates.RepoContractGate != "" {
 		c.RepoContractGate = p.Gates.RepoContractGate
 	}
+	c.applyScanCache(p.Gates)
 	return c
+}
+
+func (c *GatesConfig) applyScanCache(g *GatesPolicy) {
+	if g.ScanCacheGate != "" {
+		c.ScanCacheGate = g.ScanCacheGate
+	}
+	if g.ScanCacheMaxMB > 0 {
+		c.ScanCacheMaxMB = g.ScanCacheMaxMB
+	}
+	if g.ScanCacheBudgetSeconds > 0 {
+		c.ScanCacheBudgetSeconds = g.ScanCacheBudgetSeconds
+	}
+}
+
+const (
+	defaultScanCacheMaxMB         = 2048
+	defaultScanCacheBudgetSeconds = 60
+)
+
+type ScanCacheConfig struct {
+	Gate     string
+	MaxBytes int64
+	Budget   time.Duration
+}
+
+func ScanCacheFor(projectRoot string) ScanCacheConfig {
+	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		pol = Policy{}
+	}
+	g := pol.GatesConfig()
+	return ScanCacheConfig{Gate: g.ScanCacheGate, MaxBytes: int64(g.ScanCacheMaxMB) << 20, Budget: time.Duration(g.ScanCacheBudgetSeconds) * time.Second}
 }

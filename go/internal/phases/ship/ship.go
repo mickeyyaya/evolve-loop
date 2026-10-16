@@ -135,6 +135,7 @@ func (p *Phase) runRepoContractGate(ctx context.Context, req core.PhaseRequest, 
 	if err != nil {
 		return fmt.Errorf("ship repo-contract gate: %w", err)
 	}
+	ctx = withScanShadow(ctx, p.scanShadowFor(req))
 	if err := runRepoContractGateAt(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr, backstopFlakeSignal(p.signals, req.Cycle)); err != nil {
 		return fmt.Errorf("ship repo-contract gate: %w", err)
 	}

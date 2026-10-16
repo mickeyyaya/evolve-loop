@@ -6,7 +6,7 @@
 
 `internal/testverdict` stores the green results of package test runs, by the content key of `internal/testkey`. A later scan asks the store if a run with the same inputs was green. A hit lets the scan skip the run.
 
-The store root is a parameter of `NewStore`. The caller chooses it (for example `.evolve/landing/testcache/`). Nothing in production calls the package yet. Component S5 wires it.
+The store root is a parameter of `NewStore`. The caller chooses it (for example `.evolve/landing/testcache/`). Component S5 wires it in shadow (`internal/phases/ship/scanshadow.go`): the ship scan reads and writes the store under `<project>/.evolve/landing/testcache/`. Nothing skips a run on a hit.
 
 The existing `internal/verdictcache` stays as it is. It caches audit verdicts by tree id, which is another domain.
 
@@ -34,6 +34,15 @@ A hit must never hide a red. Three rules enforce it:
 2. `Lookup` re-checks the outcome of every file that it reads. A damaged or edited file is a miss, so a torn write costs one run and gives no false hit.
 3. `Lookup` needs an equal `File` key and equal variable values. A key that the encoding of `internal/testkey` did not produce cannot match.
 4. `Put` and `Lookup` check that the key and the log agree. A key from a stale log cannot hide a variable or an outside read.
+
+## Retention
+
+`Trim(root, now, maxAge, maxBytes, remove)` is the retention of the store. It is a function, and it takes the remover as a parameter. `evolve gc` passes a no-op remover for `--dry-run`, so the preview counts the same plan.
+
+- The plan removes each file older than `maxAge`. It then removes the oldest files until the rest fits `maxBytes`.
+- It removes the key directories that become empty.
+- A failed removal is a report line, not a count.
+- `GC` is the older age-only method and has no production caller.
 
 ## Known limits
 

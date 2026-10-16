@@ -6,7 +6,7 @@
 
 `internal/testkey` computes the content key of one package test run. Two runs with an equal key must give an equal result. A later scan can then skip a run when a green result of the same key exists in `internal/testverdict`.
 
-`Compute` is a pure function. It takes its inputs as values. It reads no file, starts no process and holds no global state. Nothing in production calls the package yet. Component S5 wires it.
+`Compute` is a pure function. It takes its inputs as values. It reads no file, starts no process and holds no global state. Component S5 wires it in shadow (`internal/phases/ship/scanshadow.go`). It gives every run an unknown test log, so each key is a whole-tree key until a producer of test logs exists.
 
 ## Design
 
@@ -62,7 +62,8 @@ The key is the first half of that rule. It must hold every input that can change
 - **The log must be the log of the run.** The names of the variables come from the log. After each run, the caller computes the key again with the log of that run and stores the result under that key. `Key.Consistent` checks the pair.
 
   `testverdict` refuses a record, and ignores a stored record, when the key and the log disagree. A log from an older run, or from another lane, cannot find an entry that its own reads do not support. The store enforces this invariant. A stale log is not harmless.
-- **Test imports.** `overlap.LoadModule` does not list test imports. Component S5 must add them (`TestImports` of `go list`) before it calls `Compute`.
+- **Test imports.** `overlap.LoadModule` does not list test imports. A caller that gives a known log must add them (`TestImports` of `go list`) before it calls `Compute`. Component S5 gives an unknown log, so it gives a module map of one package and needs no test imports.
+- **Absent build variables.** `go env -json` omits the variables of other platforms. On `darwin/arm64` it has no `GOAMD64`, and `Compute` refuses a build environment with a gap. The caller must give an empty value for each absent name. Component S5 does this in `goEnv`.
 - **The data-edge catalog.** The catalog home (`internal/testimpact`, component Q5) does not exist yet. `Compute` takes the roots as `Input.DataRoots`, so Q5 needs no change in this package.
 - **Hidden inputs.** The test log does not see these inputs:
   - an `os.Environ()` dump;

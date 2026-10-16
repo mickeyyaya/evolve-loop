@@ -313,6 +313,8 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_MANUAL_NOT_TTY` | verify-class: a manual ship needs an interactive confirmation (or the auto-confirm environment) |
 | `SHIP_REPO_CONTRACT_GATE` | atomic-ship: a repo-contract guard suite is RED in the lane worktree; pushing would red main |
 | `SHIP_REPO_CONTRACT_INFRA` | atomic-ship: the repo-contract scanner toolchain died twice without a test-level failure (re-dispatchable) |
+| `SHIP_SCAN_SHADOW_ESCAPE` | the scan shadow found a stored green result for the content key of a package, and that package then failed in the real run; the content key misses an input of the test, and the scan cache cannot be enforced until the miss is closed |
+| `SHIP_SCAN_SHADOW_FAULT` | the scan shadow panicked and recovered; the ship scan and its verdict were not affected, and the shadow records for this scan are incomplete |
 | `SHIP_SELF_SHA_IO` | verify-self-sha: the SHA pin could not be read or written |
 | `SHIP_SELF_SHA_TAMPERED` | verify-self-sha: the ship binary's SHA does not match the pinned one (tamper or unpinned rebuild) |
 | `SHIP_STATE_IO` | state file I/O failure |
