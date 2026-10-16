@@ -38,6 +38,10 @@ The version is pinned in `GOVULNCHECK_VERSION` in `go/Makefile`. The target runs
 
 On 2026-10-13, `main` had no findings with Go 1.27.2 and govulncheck v1.9.0. The job is therefore a required gate. A new disclosure turns the gate red on `main`. Fix it with a dependency bump or a toolchain bump.
 
+### Emergency allowlist escape
+
+When an unfixable vulnerability blocks the pipeline, record an entry in `go/vulncheck-allowlist.json`. The `make vulncheck` recipe pipes `govulncheck -json` output through `go/cmd/vulnfilter`. Each allowlist entry must specify the vulnerability `id`, an `expires` date, and a non-empty `reason` explaining the mitigation. Any unlisted finding, expired entry, or entry without a reason fails the build.
+
 ## What this convention does not do
 
 - It does not limit the standard library.

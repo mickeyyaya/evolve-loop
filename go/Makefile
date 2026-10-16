@@ -198,7 +198,9 @@ lint: ## go vet + format diff (read-only)
 	if [ -n "$$diff_out" ]; then echo "$$diff_out"; echo "FAIL: gofmt diff above" >&2; exit 1; fi
 
 vulncheck: ## govulncheck over the whole module at the pinned version (no go.mod require); fails on any reachable vulnerability
-	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) $(PKG)
+	@mkdir -p $(BIN_DIR); \
+	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -json $(PKG) > $(BIN_DIR)/vulncheck.json || { status=$$?; echo "vulncheck: govulncheck failed (exit $$status)" >&2; exit $$status; }; \
+	$(GO) run ./cmd/vulnfilter -allowlist vulncheck-allowlist.json < $(BIN_DIR)/vulncheck.json
 
 tidy: ## Normalize go.mod / go.sum
 	$(GO) mod tidy

@@ -259,7 +259,7 @@ func TestGoWorkflow_GatesTheSuiteOnAPinnedGovulncheckFromTheMakeTarget(t *testin
 	if !regexp.MustCompile(`(?m)^GOVULNCHECK_VERSION := v\d+\.\d+\.\d+$`).MatchString(text) {
 		t.Error("Makefile must pin GOVULNCHECK_VERSION to an exact release")
 	}
-	if !strings.Contains(text, "govulncheck@$(GOVULNCHECK_VERSION) $(PKG)") {
+	if !strings.Contains(text, "govulncheck@$(GOVULNCHECK_VERSION) -json $(PKG)") {
 		t.Error("the vulncheck recipe must run the pinned govulncheck over every package")
 	}
 }
