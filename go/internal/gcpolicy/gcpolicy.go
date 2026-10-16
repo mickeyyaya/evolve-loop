@@ -29,11 +29,15 @@ type Policy struct {
 	LogsTTLDays int `json:"logs_ttl_days,omitempty"`
 	// TrackerTTLDays prunes <run-dir>/.ephemeral subtrees of KEPT runs.
 	// Default 7 (mirrors pruneephemeral).
-	TrackerTTLDays  int        `json:"tracker_ttl_days,omitempty"`
-	GoCacheTTLHours int        `json:"go_cache_ttl_hours,omitempty"`
-	GoCacheMaxGB    int        `json:"go_cache_max_gb,omitempty"`
-	TempTTLHours    int        `json:"temp_ttl_hours,omitempty"`
-	Logs            LogsPolicy `json:"logs,omitempty"`
+	TrackerTTLDays  int `json:"tracker_ttl_days,omitempty"`
+	GoCacheTTLHours int `json:"go_cache_ttl_hours,omitempty"`
+	GoCacheMaxGB    int `json:"go_cache_max_gb,omitempty"`
+	TempTTLHours    int `json:"temp_ttl_hours,omitempty"`
+
+	TestCacheTTLDays int `json:"testcache_ttl_days,omitempty"`
+	TestCacheMaxMB   int `json:"testcache_max_mb,omitempty"`
+
+	Logs LogsPolicy `json:"logs,omitempty"`
 	// Worktrees is the retention grace for the worktree+branch backlog sweep
 	// (S4); consumed by PlanWorktrees. Zero value = no KeepRecent/MinAge grace.
 	Worktrees    WorktreesPolicy    `json:"worktrees,omitempty"`
@@ -97,6 +101,25 @@ func (p Policy) GoCacheMaxBytes() int64 {
 		return defaultGoCacheMaxGB * bytesPerGB
 	}
 	return int64(p.GoCacheMaxGB) * bytesPerGB
+}
+
+const (
+	defaultTestCacheTTLDays = 14
+	defaultTestCacheMaxMB   = 256
+)
+
+func (p Policy) TestCacheTTL() time.Duration {
+	if p.TestCacheTTLDays <= 0 {
+		return defaultTestCacheTTLDays * 24 * time.Hour
+	}
+	return time.Duration(p.TestCacheTTLDays) * 24 * time.Hour
+}
+
+func (p Policy) TestCacheMaxBytes() int64 {
+	if p.TestCacheMaxMB <= 0 {
+		return defaultTestCacheMaxMB * bytesPerMB
+	}
+	return int64(p.TestCacheMaxMB) * bytesPerMB
 }
 
 const (

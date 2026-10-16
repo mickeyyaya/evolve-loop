@@ -1,6 +1,9 @@
 # Plan: fleet landings stay fast from 2 to 200 concurrent lanes
 
-- **Status:** proposed, 2026-10-13. S0 (these documents) is in review in the docs lane `cl-merge-scale`. No code has changed.
+- **Status:** proposed, 2026-10-13. S0 (these documents) is in review in the docs lane `cl-merge-scale`.
+  - S3 and S4 are merged and unwired (#889).
+  - **S5 is built (2026-10-16), in shadow.** The ship scan keys each package result and reads and writes the verdict store. It signals each hit and each escape, and one summary for each scan. The dial is `gates.scan_cache_gate` (default `shadow`).
+  - Limit of S5: the scan has no producer of test logs yet. Every key is a whole-tree key, so a hit needs an identical tree. The S5 exit of 500 hits needs that producer first (see §12, Q6).
 - **Decision:** [ADR-0134](../architecture/adr/0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md) (Proposed). It amends [ADR-0128](../architecture/adr/0128-landing-queue-tiered-reverification.md).
 - **Research:** [fleet-landing-at-scale-2026-10.md](../research/fleet-landing-at-scale-2026-10.md) (findings F2.1 to F3.5 and P4.1 to P8.4, refinements R1 to R12).
 - **Design that this plan extends:** [fleet-landing-queue.md](../architecture/fleet-landing-queue.md), the spec of record of the landing queue. Its plan: [concurrent-cycle-landing-2026-10.md](concurrent-cycle-landing-2026-10.md).
@@ -408,3 +411,7 @@ It runs each policy (today, A, B, C, E and W) at N = 2, 20 and 200, for 24 simul
 - **Q3.** Does a shared cache across hosts pay for its trust model? Content keys allow it, but a shared store needs a writer identity.
 - **Q4.** The operator decides the weights of §4.6. Other weights can change the order of A and C, but not the gate on B and D.
 - **Q5.** A catalog of production reads, with its own guard test, can replace the whole-tree key for outside reads. It also covers the reads of child processes that the test log cannot see.
+- **Q6.** Which component produces the test log of each package run? `go test -count=1` does not write `-test.testlogfile`, and one path for many packages makes the binaries overwrite it. S5 gives an unknown log, so every key is a whole-tree key. A log producer, for example a per-package run with a private log path, must come before S6.
+- **Q7.** Does a package timeout count as an escape? S5 counts any failed package whose key hit. A timeout on a loaded host then raises an escape that is a load fault, and the S5 exit needs zero escapes.
+  - A retried package is a second case. S5 settles each key once for each scan. A first-run failure that a green alone re-run clears thus raises an escape that is flake noise.
+  - S6 must discount the escapes of retried packages before it uses the escape count as a gate.

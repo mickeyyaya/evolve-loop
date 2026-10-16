@@ -198,3 +198,36 @@ func TestDevSweepBudgetSeconds_DecodesFromItsPolicyKey(t *testing.T) {
 		t.Errorf("SweepBudget() = %s, want 2m0s", got)
 	}
 }
+
+func TestTestCacheBounds_UnsetOrNonPositiveTakeTheCompiledDefaults(t *testing.T) {
+	cases := []struct {
+		name    string
+		days    int
+		mb      int
+		wantTTL time.Duration
+		wantMax int64
+	}{
+		{"unset", 0, 0, 14 * 24 * time.Hour, 256 * 1024 * 1024},
+		{"negative", -1, -1, 14 * 24 * time.Hour, 256 * 1024 * 1024},
+		{"explicit", 3, 8, 3 * 24 * time.Hour, 8 * 1024 * 1024},
+	}
+	for _, c := range cases {
+		p := gcpolicy.Policy{TestCacheTTLDays: c.days, TestCacheMaxMB: c.mb}
+		if got := p.TestCacheTTL(); got != c.wantTTL {
+			t.Errorf("%s: TestCacheTTL() = %v, want %v", c.name, got, c.wantTTL)
+		}
+		if got := p.TestCacheMaxBytes(); got != c.wantMax {
+			t.Errorf("%s: TestCacheMaxBytes() = %d, want %d", c.name, got, c.wantMax)
+		}
+	}
+}
+
+func TestTestCacheBounds_DecodeFromTheirPolicyKeys(t *testing.T) {
+	var p gcpolicy.Policy
+	if err := json.Unmarshal([]byte(`{"testcache_ttl_days":5,"testcache_max_mb":64}`), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if p.TestCacheTTLDays != 5 || p.TestCacheMaxMB != 64 {
+		t.Errorf("decoded %+v", p)
+	}
+}

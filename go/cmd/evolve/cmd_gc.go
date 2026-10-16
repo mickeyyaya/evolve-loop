@@ -161,6 +161,7 @@ func (r gcRun) project(projectRoot string) int {
 		func(s gcRun) bool { return s.runDirs(evolveDir, gcPol) },
 		func(s gcRun) bool { return s.goCache(gcPol) },
 		func(s gcRun) bool { return s.pipelineTemp(gcPol.TempTTLHours) },
+		func(s gcRun) bool { return s.testCache(evolveDir, gcPol) },
 		func(s gcRun) bool { return s.claimDirs(projectRoot) },
 	}
 	failed := false
