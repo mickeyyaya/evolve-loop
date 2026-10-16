@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// optionalSkipHarness builds an advisory-routing orchestrator: spine runners
-// all green, one catalog-Optional phase scheduled after build whose runner
-// behavior the caller controls.
 func optionalSkipHarness(t *testing.T, optRunner PhaseRunner) (*Orchestrator, *fakeRunner, *fakeRunner) {
 	t.Helper()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}

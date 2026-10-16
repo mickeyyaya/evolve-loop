@@ -46,7 +46,6 @@ func TestTDDLeakRecover(t *testing.T) {
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 
-	// Real gitWorktree provisioner (not fakeWorktree) so recovery runs against an actual git worktree.
 	o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(gitWorktree{}))
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})

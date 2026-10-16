@@ -339,6 +339,174 @@ The reasons that the comments of the decision, disposition, dossier, failure-lea
 - **ADR pointers moved here:**
   - ADR-0039 (audit-declared envelope), ADR-0044 (failure advisor and recorder), ADR-0045, ADR-0048 (shadow stage), ADR-0052 (agent identity), ADR-0072 (failure decision and dossier).
 
+## Core file group 4 rationale
+
+The reasons that the comments of the orchestrator, phase advisor, phase binding, self-check and graduation files carried. The code and the tests state the what.
+
+- **Orchestrator wiring.**
+  - `PhaseBoundaryCheckpointer` and `QuotaBoundaryCheckpointer` are package-level hooks set by the checkpoint package, because core cannot import it without a cycle.
+  - `specFor` canonicalizes the phase name before the lookup, so the core and router spellings of one phase cannot miss each other.
+    - The registry is the single source of truth and wins over `builtinControlSpec`.
+    - `builtinControlSpec` only supplies the debugger's signal-driven successor for a phase with no registry entry.
+  - `successorStrategy` degrades to `literalSuccessorStrategy` on a catalog miss. Config selects among branches the state machine already deems legal and never invents one.
+  - A `PhaseMinter` must return a spec with `Optional=true`. A minted phase can never satisfy or displace the build, audit and ship floor.
+  - `CycleRequest.Env` and `Context` are copied, so a mutation after `RunCycle` starts never reaches an in-flight or completed run.
+  - `legacyExplanationTestStorage` is package-private on purpose. Only core's same-package legacy fake may opt out of the fresh-cycle explanation contract.
+    - `explanationContractVersion` has no exported option, so production callers cannot downgrade the mandatory contract.
+  - `gitHEAD` is not evidence that this cycle shipped, because a fleet sibling can move HEAD too. The outcome label reads the ship latch, and a HEAD read error counts as "no movement".
+  - `gitDirtyPaths` feeds the tree-diff guard, which snapshots it before and after each source-writing phase to catch a leak that escaped the sandbox.
+  - `safetyViolations` is computed once at construction over the wired state machine, config and catalog. A non-empty result makes `RunCycle` and `RunCycleFromPhase` fail closed with `ErrUnsafeConfig` before any phase runs, so an unsafe registry edit can never run a phase.
+  - `shipFloor` can only relax build and tdd. The router self-seals the non-removable evaluator regardless.
+  - `signalMu` is the first production mutex in core. The Signal Center holds no lock while delivering, `observeSignal` never emits, and no orchestrator path holds `signalMu` across an `Emit`.
+  - `currentRunID` is read atomically by the construction-time stamping ledger on every append, so goroutine-spawning observers read the run identity race-free. An empty value means no run is in flight and entries are not stamped.
+  - `WithWorktreeBase` and `WithWorktreeProvisioner` both set `o.worktree`. Production uses only the base override and tests use only the fake.
+  - `CatalogPublisherWired` exists because without a publisher a mid-cycle mint never reaches the live contract resolver.
+  - `HasRunner` is the composition root's read seam, because a phase the router nominates without a runner is silently skipped by the missing-runner escape hatch.
+- **Nil wiring defaults.** Each optional collaborator has a defined meaning when unset.
+  - A nil `planner` gives no advisor plan, so the kernel floor falls back to the never-skip spine. The planner is consulted once at cycle start, only at `Stage>=Advisory`, and its output is always clamped to the integrity floor.
+  - A nil `reviewer` is `noopReviewer`: every non-error, non-SKIPPED verdict is a success. When a reviewer returns `Approve=false`, the cycle aborts with its reason.
+  - A nil `observer` is `noopObserver`. `Start` is called once before each `runner.Run` and the returned cancel runs once after.
+  - A nil `contractVerifier` gives the salvage rung zero budget, so the correction ladder degrades to redispatch only.
+  - A nil `failureAdviser` leaves the hook inert. It is consulted only at `cfg.PhaseRecovery == StageEnforce`, and only for unclassified artifact-timeout panes.
+  - A nil `directivesProvider` means no directives. The provider is fail-open: it returns a possibly empty set and never an error.
+  - The composition-verdict fast path (RUNG 0) never fires unless all three composition seams are set. A nil `scopedMergeReviewer` leaves RUNG 2 dark.
+  - A nil `catalogRefresh` skips the refresh, and a refresh error only WARNs and never blocks the cycle.
+  - A nil `modelCatalogLookup` skips the resolvability gate, while guardrail validation still runs.
+  - A nil `retryAdjudicator` is a supported production state: policy alone is enough authority to grant a retry.
+  - A nil `failureCountFor` disables retry tier escalation, and a nil `continuationFor` means continuations never adopt.
+  - An empty `catalog` means only built-in phases exist. A nil `registrar` ignores `MintPhases`.
+- **Ordering in `NewOrchestrator` and `RunCycle`.**
+  - The outcome recorder reads the clock and the catalog live, because tests swap `o.now` after construction and mints change the catalog mid-cycle.
+  - The failure-learning engine is built after `o.carry`, because it mints through the one wired carryover lifecycle.
+  - The state machine receives its config-driven verdict-branch resolution only after the options settle the catalog. An empty catalog or spine order degrades to the literal table.
+  - The run-id stamping decorator wraps the ledger exactly once, at construction.
+  - `newCycleRun` returns a cleanup closure that `RunCycle` defers in its own frame, so the exit actions fire at cycle exit in LIFO order.
+  - `cycleRun` is the one addressable home for the dispatch loop's state. Late mutations by sub-methods stay visible to the exit defers and the next iteration.
+  - The exit defers keep these rules.
+    - The worktree preserve decision reads `cr.preserveWorktree` and `cr.cycleCompletedNormally` at defer-execution time.
+    - No exit path leaves the ship-window lease held, because siblings will wait out the full TTL.
+    - No exit path leaves a started cycle without its evidence trail.
+    - A graceful interrupt resumes the phase that was active. That defer runs before the abnormal epilogue marks the cycle aborted.
+  - The fresh-cycle marker is persisted before the first phase. A crash before Build then cannot turn a new cycle into a legacy exemption from the explanation contract.
+  - Phase timings are written in a deferred call that also runs when `RunCycle` returns an error, so partial timing data survives for inspection. Interaction outcomes are recorded on abort paths too.
+  - The content-addressed audit-reuse probe is shadow only. It runs before the loop, against a preserved or re-dispatched worktree. A fresh worktree skips the lookup to prevent fresh-base collisions.
+  - The loop is labeled `OuterLoop`. The extracted sub-methods signal termination with `loopBreak`, and a bare `break` inside the switch ladder exits the switch and not the loop.
+  - Triage continuation adoption may replace both worktree and review base, so the final context is sealed once before the first Build dispatch. Adoption is keyed to the actual claim, since triage claims items into `processing/cycle-N` mid-cycle.
+  - The post-scout re-plan fires once, after scout's handoff is recorded and before the next `selectNext`. A re-plan thus cannot widen the run set or bypass the spine gate.
+  - A deterministic gate that FAILed gets one bounded builder fix and a same-gate re-run. Nothing downstream is bypassed, and the same gate must pass with the audit and ship floors unchanged.
+  - Exhausting the iteration budget records an explicit abort naming the stalled phase, so the escape is diagnosable and not `FAILED_UNEXPLAINED`. It runs before `finalizeCycle`, so the recorded FAIL preserves the worktree for salvage.
+- **Phase advisor.**
+  - All advisor output is advisory.
+    - The pure `router.Route()` clamp re-validates it against the kernel floor (mandatory spine, TDD pin, ship needs a real audit).
+    - A hallucinated or malformed proposal thus cannot weaken the ship guarantee.
+    - Any failure returns an error and the caller degrades to the deterministic static path.
+  - `brain` is built once under a `sync.Once`. A bare nil-check is a read-check-write race for a `PhaseAdvisor` built as a literal and first used concurrently.
+    - A nil bridge stays nil, so the legacy "nil bridge" fail-safe survives.
+  - `wiredAdvisor` is the one construction site of the leaf (`TestPhaseAdvisor_OneConstructionSite`).
+    - `bridgeRequestOf` is the one projection of the leaf's request onto the bridge request.
+    - `ChainAttempt` marks each launch as one step of the advisor's own chain walk. A chain-walking bridge handle passes it through and does not walk it again.
+  - `WithAdvisorSignals` is construction-time DI. The composition root builds the Signal Center before the advisor in the same function.
+  - An empty `WithPersona` falls back to the legacy inline framing as a fail-safe.
+    - The CLI and model fallback is deep (opus), because composing a cycle and inventing phases is deep-reasoning work.
+    - The composition root normally overrides both from the router profile.
+  - `writeArtifactAtomically` writes through a temp file and a rename. A capture artifact is thus either absent or complete.
+    - The ledger's disk-read SHA equals the span's in-memory SHA.
+    - It is single-writer per workspace and kind per cycle, so the fixed `.tmp` suffix cannot collide.
+  - `benchedCLIsForRouting` sorts by family for a deterministic, prompt-prefix-cache-friendly prompt. CLI health is advice and never a planning prerequisite, so an unreadable store yields an empty list.
+  - The recon is advisory and fails open.
+    - `recentChangeCommits` bounds the git-log window.
+    - `reconGitTimeout` bounds the git subprocess, so a hung repo cannot stall plan composition.
+    - Duplicate paths are kept, because frequency is the churn signal.
+    - The git I/O lives in core and is injected into the leaf.
+  - The `Deprecated` test facades (`composePlanPrompt`, `sanitizeAdvisorTier`, `writeCatalog`, `mintConfigsFrom` and the rest) stay because ACS-named tests and the protected guard tests call them. Production goes through `Plan` and `RePlan`.
+- **Provenance bindings.**
+  - FAIL is bound. Without a binding, ship's lookup has nothing for the run and the FAIL verdict is invisible to the gate built to enforce it.
+    - SKIPPED stays excluded, since no audit ran and there is no artifact to bind.
+  - The phase-agnostic binding for user and inserted phases is dormant until `EVOLVE_PHASE_IO=enforce`. The default loop thus emits exactly the audit and build bindings it always did.
+  - `phaseRole` maps audit to `auditor` and build to `builder`, the strings ship's audit binding (`findLatestAudit`) and the `rt-001-ledger-role-completeness` red-team predicate require. It is total over all phases and pinned by `TestPhaseRole`.
+  - `bindingInputs` carries the project root, workspace and worktree explicitly. The typed phase output holds the wire result and not the paths the git probes need.
+    - `worktreeBase` is the correct operand for the verdict-cache fresh-base guard.
+    - The project root HEAD at audit time can diverge under fleet concurrency.
+  - `recordPhaseBinding` delegates audit and build to their specialized recorders unchanged, so their ledger bytes stay identical.
+    - The bodies are genuinely asymmetric. Only audit computes a worktree-tree SHA, reads its artifact fatally, derives the exit code from the verdict and projects into the verdict cache.
+    - The collapse is thus at the dispatch and role-naming layer and not a merged body.
+  - `recordAuditBinding` writes the entry that ship's audit binding requires. `tree_state_sha` is the sha256 of `git diff HEAD`, byte-identical to ship's `computeTreeStateSHA`. `git diff HEAD` exits 1 when differences exist, which is not an error, and only an exit above 1 is fatal. The recorder is best-effort: a failure WARNs, and ship then fails loudly on the missing binding and never ships unbound.
+  - The binding tree is the tree ship will commit from the builder-declared index, not the auditor's own `HEAD^{tree}`, which can never equal it. Nothing is committed (`write-tree` only).
+  - `worktreeContentSHA` is the single source of three values: the audit binding's `WorktreeTreeSHA`, the composition entries' `TreeStateSHA` and the ADR-0048 verdict-cache key. Every recorded, looked-up and verified value is thus computed identically.
+    - It returns an empty string when the worktree or workspace is empty or git fails.
+    - Callers degrade: ship falls back to the auditor's value and the cache does not record or match.
+    - An in-place worktree is the operator's tree, and a cycle never stages its index.
+  - `recordBuildBinding` exists because the orchestrator's per-phase entry has role `build`, the phase name, and not `builder`, the agent name.
+    - A cycle that goes through formal audit will otherwise false-FAIL provenance with "no role:builder entry".
+    - The binding mirrors the audit one and WARNs loudly without blocking the cycle.
+  - `recordGenericBinding` is reached only at `EVOLVE_PHASE_IO=enforce`, gated by `emitPhaseBindings`.
+- **Build worktree normalization.**
+  - `normalizeWorktreeToBase` soft-resets to the cycle base so a committing builder's work becomes pending again. The builder commits for crash safety, but the auditor and the audit binding inspect the pending diff, which a commit empties. It never aborts the cycle and is a no-op when HEAD already equals the base.
+  - A persisted base on the resume path can be stale after the operator rebased the worktree onto a moved main.
+    - A soft reset to a non-ancestor repoints the branch and stages the whole delta between histories as a spurious diff.
+    - It is thus skipped, and the manual recovery's "as-is" state stands.
+  - `normalizeBuildWorktree` is shared by `RunCycle` and `RunCycleFromPhase`. The soft reset runs only after Build. The gofmt normalization runs after every worktree phase, because tdd, build and test-amplification all author Go that the audit gofmt gate scans.
+  - An in-place worktree is the operator's tree: no soft reset, no `gofmt -w` and no projection regen.
+  - The derived-projection regen is build-only and gated on the flag registry (the single source of truth) actually changing, so non-flag cycles pay no `go run` cost.
+  - The covering-test corpus for test-amplification is derived after every worktree phase.
+    - A resume past build never sees `PhaseBuild` complete in this process.
+    - The phase then silently degrades to an unscoped whole-repo search.
+    - The derivation is a no-op once the corpus exists.
+  - The selfcheck runs after the regen so the tested tree matches what audit binds. When the build-floor reviewer is enforced, the same selfcheck already ran at the review seam, so the duplicate `go test` pass is skipped.
+  - `changedWorktreePaths` covers tracked changes against HEAD and untracked new files. A cycle that adds a file under a projection's source prefix is thus not missed.
+    - It splits on newlines and not `strings.Fields`, so a path with spaces stays one entry.
+    - A path that is not a git repo yields no paths and no error.
+  - `ChangedWorktreePaths` is a projection for `evolve phase verify build`, so the gate and the self-check judge the same diff. A second derivation in `internal/cli/phasecmd` can let them drift (ADR-0034).
+  - `normalizeBuildGofmt` applies `gofmt -w -s` before the audit gofmt gate. Formatting is deterministic work and must not depend on the LLM builder remembering it.
+    - It is scoped to the same module dir the audit gate scans (`codequality.ModuleDir`), so the two cannot disagree.
+    - The worktree is cut from CI-clean main, so only this cycle's files can be dirty.
+    - A gofmt failure WARNs and never aborts.
+- **Build self-check.**
+  - The self-check is best-effort and never aborts the cycle. It clears any prior `.evolve/build-selfcheck.json` first.
+    - The toolchain gate (`go/acs/regression/buildselfcheck`) reads that artifact at audit and hard-fails on it.
+    - Without the clear, a retry that fixes the build can see the previous run's failures and loop forever.
+    - The clear sits above the early return for a cycle with no changed Go packages.
+  - `realGoUnitTest` runs unit tests only, with no integration tag.
+    - It scrubs the subprocess env with `ipcenv.Scrub`, so the campaign's runtime flags do not flip env-sensitive tests. An inherited `EVOLVE_FLEET=1` can flip `internal/bridge`'s fleet-mode worktree guard.
+    - A bounded timeout keeps a wedged test from hanging the build phase.
+  - A changed path whose package directory no longer exists means the diff deleted the package, so nothing is left to test. This is checked on the filesystem and not by output text, so a present package keeps its real verdict.
+  - `goTestExcludedByBuildTags` separates a package whose files are all excluded by build tags from a real failure.
+    - Every cycle materializes a `//go:build`-gated acceptance package (`acs/cycleN`). An untagged `go test` of one prints "build constraints exclude all Go files".
+    - Flagging it will WARN every cycle and bury real signal.
+    - The `imports ` guard keeps the check narrow. When a transitive dependency is the excluded one, `go test` prints an `imports <dep>:` chain and the tested package genuinely failed.
+    - That case is still reported, as are compile errors and assertion failures.
+  - A tag-gated package is invisible to the default context, so the tagged runner runs an added package under the tags its files declare.
+  - `removeBuildSelfCheckArtifact` treats a missing file, the common case, as no error. A write error on the artifact is non-fatal because the WARN already surfaced it.
+- **Graduation check.**
+  - `buildGraduationCheck` flags a changed `go/internal/<pkg>` package that is new this cycle and absent from `go/.apicover-enforce`.
+    - A modified pre-existing package is the enforce ratchet's concern.
+    - A deleted or renamed-away package is not new. Flagging it makes graduation hygiene un-shippable.
+    - It fails open when the worktree is empty or the enforce file is unreadable, and for a package it cannot prove new. Audit stays the backstop.
+  - A test-only package has no exported production symbol, so the repo-wide apicover gate cannot fire on it. `packageHasProductionGoFiles` delegates to the shared predicate `ciparity.PackageDirHasProductionGoFiles`, so the two seams cannot disagree. The vacuous-obligation skip is announced, so a test-only mint that lands unenrolled shows in the cycle log and not at audit.
+  - The abort reason lands on the recorded phase outcome (`AbortReason`), unlike the WARN-only unit-test self-check.
+- **Test-suite constraints.**
+  - `TestMain` zeroes the retry-backoff sleep for the whole suite, saving about 250 seconds of wall clock across the full-cycle retry tests. Only two sequential backoff tests mutate it afterward, and the Go runner drains sequential tests before launching parallel ones, so it stays race-safe.
+  - The orchestrator test fakes stay local and do not move to `go/test/fixtures`. These white-box tests exercise unexported internals, and `fixtures` imports core, which creates an import cycle.
+  - `insertedLeakRunner` lives in the untagged `orchestrator_testfakes_test.go`. The untagged spine-gate test references it, and a definition behind `//go:build integration` does not compile there.
+  - `captureStderr` redirects the process-global `os.Stderr`, so callers must not be parallel.
+  - Real-repo fixtures follow production.
+    - The repo's `.gitignore` ignores `.evolve/*`. The orchestrator's own workspace writes never show in `git status`, so the clean-tree assertion trips only on the leak under test.
+    - The git identity lives in the repo and not in the helper's env. `RunCycle`'s own git children (the dossier-closeout commit) do not inherit it, and CI runners have no ambient identity.
+  - `initInsertedLeakRepo` commits one source file first, so the leaked path is a new untracked file, the shape the guard's untracked-only baseline must catch. The leak write uses `Fatalf` and not `Errorf`, because a half-executed write must abort at once or the test reports a spurious guard RED.
+  - The real-worktree provisioner's cleanup is a no-op on purpose. A shipped cycle's worktree must survive for the post-run `git diff HEAD`, and `t.TempDir` handles teardown. The runner executes synchronously on the test goroutine inside `RunCycle`, so a plain bool is race-free there.
+  - Binding-cache pins stage a tracked modification and not an untracked file.
+    - `worktreeContentSHA` stages with `git add -u`, so an untracked file keeps the base identity.
+    - That lets the FAIL-verdict pin pass vacuously through the fresh-base guard.
+    - The WARN-verdict positive control exists so that a red control marks the FAIL pin's no-cache assertion as untrustworthy.
+  - The staging-scope pins require that residue (an unrelated untracked file) never changes a worktree's identity. `ProbeEligible` reads that identity to decide if a verdict can be cached or reused.
+    - A declared new file must be retained.
+    - A tracked edit that was never staged must be captured.
+    - Otherwise the cheapest fixes (bind the base tree, stage nothing) look correct.
+  - The phase-input tests rely on `reflect.DeepEqual` against a zero literal, because `PhaseInput` seals channels behind unexported fields. That is valid because `assemblePhaseIO` returns before any `NewPhaseInput` call below enforce.
+  - The tier-elicitation tests read the shipped `agents/evolve-router.md` persona through `runtime.Caller`, so the path is cwd-independent and points at the worktree copy. The floor of two existing-phase examples is the anti-delete guard: deleting the persona's example, leaving only the Go-appended one, must not green the golden.
+  - A failing Planner under `RunCycle` emits no orchestrator code naming the plan, because the advisor reports its own fault. The verbatim `[orchestrator] WARN phase advisor Plan failed` line still prints.
+  - An unregistered signal code is rewritten to `SIGNALCENTER_UNREGISTERED_CODE` with the raw spelling under `fields.raw_code`.
+
 ## Invariants
 
 - **A cycle number is never reused.** The lease is minted before any run artifact exists, and a crashed run burns its number, because a burned number may have orphaned artifacts and reuse would mix two runs' state. Pinned by `TestAllocateCycleNumber_ConcurrentAllocatorsDistinct` and `TestAllocateCycleNumber_CrashBurnsNumber`.

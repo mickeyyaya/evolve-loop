@@ -59,8 +59,6 @@ func (r *leakInjector) Run(_ context.Context, req PhaseRequest) (PhaseResponse, 
 	return PhaseResponse{Phase: string(r.name), Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// fakeGitDirty fakes the guard's git query without a real repo: baseline on
-// the first call (snapshot), afterLeak on every call after (check).
 type fakeGitDirty struct {
 	callCount int
 	baseline  []string
@@ -100,7 +98,7 @@ func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
 	cases := []struct {
 		name      string
 		leakPhase Phase
-		leakPath  string // path that appears as untracked after the phase
+		leakPath  string
 	}{
 		{
 			name:      "untracked_source_file_after_scout",
@@ -146,8 +144,6 @@ func TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase(t *testing.T) {
 	t.Parallel()
 
 	breakerPath := ".evolve/contract-gate-breaker.json"
-	// dirtyFn flips only after the phase runs, so the leak attributes to the
-	// worktree phase rather than fakeGitDirty's fixed first-call flip.
 	leakPhaseRan := false
 	dirtyFn := func(_ context.Context, _ string) ([]string, error) {
 		if leakPhaseRan {
@@ -155,8 +151,6 @@ func TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase(t *testing.T) {
 		}
 		return nil, nil
 	}
-	// tdd stands in for a worktree phase; build sits behind build-planner,
-	// which this harness doesn't register.
 	runners := minimalRunners(PhaseTDD, &leakInjector{
 		name:  PhaseTDD,
 		onRun: func(PhaseRequest) { leakPhaseRan = true },
@@ -346,8 +340,6 @@ func TestGuardRecoversCatalogWritesSourcePhaseLeak(t *testing.T) {
 			t.Errorf("scout leak write: %v", err)
 		}
 	}}
-	// A catalog-declared source-writer (not the hardcoded WorktreePhase literal
-	// set) so o.worktreePhase(scout) is true only via catalog consultation.
 	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "scout", WritesSource: true}})
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
 		WithWorktreeProvisioner(gitWorktree{}),

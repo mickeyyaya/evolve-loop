@@ -13027,3 +13027,30 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // same on the trees, runs the composed-tree gates under the fence, records the carry and lets ship take the
 // audited verdict; any doubt returns false and the change is audited again.
 ```
+
+## comment-zero core-4
+
+### `go/internal/core/phase_advisor.go:294` — above `func mintConfigsFrom(entries []router.PhasePlanEntry) []phaseconfig.PhaseConfig {`
+
+```text
+// mintConfigsFrom reconstructs the minted phase configs, the recursion
+// guard's drops discarded.
+//
+// Deprecated: test facade — the protected phase_advisor_guard_test.go and the
+// ADR-0052 seams guard name it.
+```
+
+### `go/internal/core/phase_bindings.go:186` — above `func worktreeContentSHA(ctx context.Context, projectRoot, worktree, workspace string) string {`
+
+```text
+// worktreeContentSHA stages tracked worktree changes in the real index, then
+// returns the tree Ship will commit (shipmanifest.TakeShipTree): the index,
+// every tracked edit, and the paths the cycle's reports declare, untracked or
+// not. Undeclared untracked files are not adopted. It is the SINGLE source for
+// the audit binding's WorktreeTreeSHA (recordAuditBinding), the composition
+// entries' TreeStateSHA and the ADR-0048 Slice B verdict-cache key, and it is
+// the tree the audit seals, so every value recorded, looked up and verified
+// is computed identically. Best-effort: returns "" when the worktree or the
+// workspace is empty or git fails (callers degrade — ship falls back to the
+// auditor comment; the cache simply does not record/match).
+```

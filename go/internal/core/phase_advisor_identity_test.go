@@ -2,21 +2,14 @@ package core
 
 import "testing"
 
-// TestAdvisorDispatch_DefaultsAndOverrides asserts the AgentIdentity value
-// object directly — TestPhaseAdvisor_DispatchWiringFlowsToBridge already
-// covers the field→bridge flow — so the single-source identity both
-// control-plane advisors share is locked against drift.
 func TestAdvisorDispatch_DefaultsAndOverrides(t *testing.T) {
 	t.Parallel()
 
-	// Profile/Persona empty (derived per-call / legacy framing).
 	def := NewPhaseAdvisor(&fakeBridge{}).identity
 	if want := (AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"}); def != want {
 		t.Fatalf("default PhaseAdvisor identity = %+v, want %+v", def, want)
 	}
 
-	// Options populate the SAME identity value object; AgentLabel is identity,
-	// not a per-call param, so it stays "router" regardless of overrides.
 	got := NewPhaseAdvisor(&fakeBridge{},
 		WithProposerCLI("codex-tmux"),
 		WithProposerModel("gpt-5.5"),

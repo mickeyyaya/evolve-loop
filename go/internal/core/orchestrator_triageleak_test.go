@@ -25,9 +25,6 @@ func (r *triageLeakRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespon
 	return PhaseResponse{Phase: r.name, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// initLeakRecoverRepo creates a minimal real git repo (one committed file) so
-// the orchestrator's default gitDirtyPaths exercises its production code path
-// against real git, exactly like initAuditLeakRepo.
 func initLeakRecoverRepo(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -44,18 +41,10 @@ func initLeakRecoverRepo(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("init\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Mirror production: the real repo's .gitignore ignores .evolve/* (runtime
-	// state — runs/, leases, usage.json), so the orchestrator's own per-cycle
-	// workspace writes never appear in `git status`. Without it the final
-	// clean-tree assertion would trip on runtime residue, not the leak under test.
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	git("init", "-q")
-	// Identity must live IN the repo, not in the helper's env: RunCycle's own
-	// git children (the dossier-closeout commit) don't inherit these env vars,
-	// and CI's ubuntu runners have no ambient identity git can auto-detect, so
-	// the commit fails there.
 	git("config", "user.name", "t")
 	git("config", "user.email", "t@t")
 	git("add", ".")

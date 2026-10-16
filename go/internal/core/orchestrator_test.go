@@ -14,8 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// These fakes stay local rather than moving to go/test/fixtures: this white-box `package core` test exercises unexported internals (recordAuditBinding, runGit, …), and fixtures imports core, so importing it here would cycle.
-
 type fakeStorage struct {
 	state                      State
 	cycleState                 CycleState
@@ -28,7 +26,7 @@ type fakeStorage struct {
 	failOnWriteCS              bool
 	failOnReadState            bool
 	failOnWriteState           bool
-	writeCSFailAt              int // 0 = never; N = N-th write
+	writeCSFailAt              int
 	writeCSCalls               int
 	enforceExplanationContract bool
 }
@@ -63,7 +61,6 @@ func (f *fakeStorage) WriteCycleState(_ context.Context, cs CycleState) error {
 		return errors.New("write CS forced fail at N")
 	}
 	f.cycleState = cs
-	// Deep enough copy for the slice — the orchestrator may keep mutating.
 	csCopy := cs
 	csCopy.CompletedPhases = append([]string(nil), cs.CompletedPhases...)
 	f.cycleStateLog = append(f.cycleStateLog, csCopy)
@@ -124,11 +121,10 @@ func (it *sliceLedgerIterator) Next() (LedgerEntry, bool, error) {
 func (it *sliceLedgerIterator) Close() error { return nil }
 
 type fakeRunner struct {
-	name     string
-	calls    int
-	requests []PhaseRequest
-	verdict  string
-	// failErr, when set, is returned for the first failUntil calls; nil never fails.
+	name      string
+	calls     int
+	requests  []PhaseRequest
+	verdict   string
 	failErr   error
 	failUntil int
 }
@@ -421,7 +417,6 @@ func TestOrchestrator_MissingRunnerErrors(t *testing.T) {
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 	runners := map[Phase]PhaseRunner{
-		// missing scout
 		PhaseTriage: &fakeRunner{name: "triage"},
 	}
 	o := NewOrchestrator(st, led, runners)
@@ -476,7 +471,6 @@ func TestOrchestrator_InitialWriteCycleStateError(t *testing.T) {
 func TestOrchestrator_WriteCycleStateMidPhaseError(t *testing.T) {
 	t.Parallel()
 
-	// Init=1, pre-scout=2 → fails before scout's run.
 	st := &fakeStorage{writeCSFailAt: 2}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -489,7 +483,6 @@ func TestOrchestrator_WriteCycleStateMidPhaseError(t *testing.T) {
 func TestOrchestrator_WriteCycleStatePostPhaseError(t *testing.T) {
 	t.Parallel()
 
-	// Init=1, pre-scout=2, post-scout=3 → fail at 3.
 	st := &fakeStorage{writeCSFailAt: 3}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, buildRunners(nil))
@@ -749,7 +742,7 @@ func TestOrchestrator_RetroPASS_DoesNotRouteToShip(t *testing.T) {
 	}}
 	led := &fakeLedger{}
 	runners := buildRunners(map[Phase]string{
-		PhaseAudit: VerdictFAIL, // force audit→retro path
+		PhaseAudit: VerdictFAIL,
 		PhaseRetro: VerdictPASS,
 	})
 	o := NewOrchestrator(st, led, runners)
@@ -871,7 +864,6 @@ func TestOrchestrator_PhaseArtifactTimeout_RetriesAndRecovers(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
 	runners := buildRunners(nil)
-	// wrapTimeout() wraps ErrArtifactTimeout so errors.Is matches (mirrors engine.go).
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTimeout(), failUntil: 1}
 	o := NewOrchestrator(st, led, runners)
 
