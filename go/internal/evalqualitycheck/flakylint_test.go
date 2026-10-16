@@ -16,7 +16,6 @@ func writePredicateDir(t *testing.T, src string) string {
 	return dir
 }
 
-// lintDir asserts the file receipt on every fixture, so a lint that parsed nothing never looks clean.
 func lintDir(t *testing.T, src string) []FlakyFinding {
 	t.Helper()
 	var report FlakyLintReport
@@ -618,7 +617,6 @@ func TestLintFlaky_AcsassertSubprocessOutputIsAnExecConstructor(t *testing.T) {
 	}
 }
 
-// helperHopSrc mirrors the idiom in go/acs/cycle1034: the pattern in a const, the -run in a shared helper.
 const helperHopSrc = `//go:build acs
 
 package cycle9999

@@ -9,7 +9,6 @@ import (
 func TestPromoteSignature_ConcurrentSameSubstr_NoTornWriteOrLostError(t *testing.T) {
 	const iters = 300
 	const writers = 16
-	// A padded note spans several write() calls, widening the race window.
 	substr := "novel fatal pane requiring promotion 0xCAFE — concurrent classification"
 	note := "justification: " + strings.Repeat("x", 1024)
 

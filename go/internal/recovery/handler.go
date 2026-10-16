@@ -2,35 +2,24 @@ package recovery
 
 import "fmt"
 
-// Action is the recovery chain's verdict.
 type Action string
 
 const (
-	// ActionExtend keeps waiting; the agent is plausibly still working.
-	ActionExtend Action = "extend"
-	// ActionKillRetry terminates and re-dispatches fresh; the runner's fallback chain picks the CLI.
+	ActionExtend    Action = "extend"
 	ActionKillRetry Action = "kill_retry"
-	// ActionEscalate surfaces to the operator and takes no automatic action.
-	ActionEscalate Action = "escalate"
-	// ActionAdvise hands the evidence to the LLM failure-advisor and promotes its verdict via PromoteAdvice.
-	ActionAdvise Action = "advise"
+	ActionEscalate  Action = "escalate"
+	ActionAdvise    Action = "advise"
 )
 
-// RecoverInput is the evidence one terminal state presents to the chain.
 type RecoverInput struct {
-	// Kind is "fatal_pane", "process_dead", "stuck_no_output" or "stuck_no_progress".
-	Kind  string
-	Cause TerminalCause
-	// Busy reports whether the pane visibly shows the agent mid-turn.
-	Busy bool
-	// Attempts and MaxAttempts are the caller's stall extension budget.
+	Kind        string
+	Cause       TerminalCause
+	Busy        bool
 	Attempts    int
 	MaxAttempts int
-	// Integrity marks an integrity-adjacent state, which is never auto-recovered.
-	Integrity bool
+	Integrity   bool
 }
 
-// Decision is the chain's verdict, the handler that claimed the input, and a justification.
 type Decision struct {
 	Action  Action
 	Handler string
@@ -42,7 +31,6 @@ type chainHandler struct {
 	match func(in RecoverInput) (Decision, bool)
 }
 
-// chain is ordered: each handler outranks every handler below it. See ADR-0044.
 var chain = []chainHandler{
 	{
 		name: "integrity-escalate",
@@ -54,7 +42,6 @@ var chain = []chainHandler{
 		},
 	},
 	{
-		// Above busy-extend: a dead process can render busy-looking chrome forever.
 		name: "process-dead-kill",
 		match: func(in RecoverInput) (Decision, bool) {
 			if in.Kind == "process_dead" {
@@ -98,7 +85,6 @@ var chain = []chainHandler{
 	},
 }
 
-// Recover returns the first claiming handler's decision, stamped with its name.
 func Recover(in RecoverInput) Decision {
 	for _, h := range chain {
 		if d, matched := h.match(in); matched {
@@ -106,7 +92,6 @@ func Recover(in RecoverInput) Decision {
 			return d
 		}
 	}
-	// Unreachable: the last handler always claims.
 	return Decision{Action: ActionEscalate, Handler: "unreachable", Reason: "chain fell through"}
 }
 
@@ -114,7 +99,6 @@ type chainStallPolicy struct {
 	maxExtends int
 }
 
-// NewChainStallPolicy builds the chain-backed StallPolicy; maxExtends <= 0 means 6.
 func NewChainStallPolicy(maxExtends int) StallPolicy {
 	if maxExtends <= 0 {
 		maxExtends = 6
@@ -122,7 +106,6 @@ func NewChainStallPolicy(maxExtends int) StallPolicy {
 	return chainStallPolicy{maxExtends: maxExtends}
 }
 
-// Decide counts elapsed idle thresholds as attempts, because the observer calls it every tick.
 func (p chainStallPolicy) Decide(ev StallEvent) (StallAction, string) {
 	attempts := 0
 	if ev.ThresholdS > 0 {
@@ -139,7 +122,7 @@ func (p chainStallPolicy) Decide(ev StallEvent) (StallAction, string) {
 		return StallExtend, d.Reason
 	case ActionKillRetry:
 		return StallKillRetry, d.Reason
-	default: // advise degrades to escalate: the observer cannot dispatch an advisor
+	default:
 		return StallEscalate, d.Reason
 	}
 }

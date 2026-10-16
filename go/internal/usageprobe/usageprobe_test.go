@@ -17,8 +17,6 @@ func newStore(t *testing.T) *clihealth.Store {
 	return clihealth.NewStore(t.TempDir(), nil)
 }
 
-// recordingProbe captures which families were probed (concurrency-safe) and
-// returns a scripted pane per family.
 type recordingProbe struct {
 	mu     sync.Mutex
 	called []string
@@ -46,15 +44,13 @@ func (r *recordingProbe) probedFamilies() []string {
 	return out
 }
 
-// TestProber_BenchesCappedFamily: a family whose usage pane classifies as
-// exhausted is benched into the store so the dispatcher's pre-skip demotes it.
 func TestProber_BenchesCappedFamily(t *testing.T) {
 	st := newStore(t)
 	rp := &recordingProbe{pane: map[string]string{"codex": "5h limit: 0% left (resets 14:39)"}}
 	p := &Prober{
 		Families: []string{"codex"},
 		Probe:    rp.probe,
-		Classify: func(_, pane string) bool { return pane != "" }, // capped
+		Classify: func(_, pane string) bool { return pane != "" },
 		Store:    st,
 		Log:      io.Discard,
 	}
@@ -64,15 +60,13 @@ func TestProber_BenchesCappedFamily(t *testing.T) {
 	}
 }
 
-// TestProber_HealthyFamilyNotBenched: a healthy usage pane leaves the store
-// empty (no false bench — worse than the status quo).
 func TestProber_HealthyFamilyNotBenched(t *testing.T) {
 	st := newStore(t)
 	rp := &recordingProbe{pane: map[string]string{"claude": "Usage: 12% of weekly limit (resets in 3 days)"}}
 	p := &Prober{
 		Families: []string{"claude"},
 		Probe:    rp.probe,
-		Classify: func(_, _ string) bool { return false }, // healthy
+		Classify: func(_, _ string) bool { return false },
 		Store:    st,
 		Log:      io.Discard,
 	}
@@ -82,8 +76,6 @@ func TestProber_HealthyFamilyNotBenched(t *testing.T) {
 	}
 }
 
-// TestProber_SkipsAlreadyBenched: a family with an ACTIVE bench is not re-probed
-// (it is already pre-skipped; re-probing would re-boot a capped REPL).
 func TestProber_SkipsAlreadyBenched(t *testing.T) {
 	st := newStore(t)
 	if _, err := st.BenchWall("codex", "rate_limit", "try again in 2 hours"); err != nil {
@@ -103,8 +95,6 @@ func TestProber_SkipsAlreadyBenched(t *testing.T) {
 	}
 }
 
-// TestProber_UnsupportedFamilySkipped: ErrUnsupported is a silent no-op (ollama
-// has no usage command), never a bench and never an error.
 func TestProber_UnsupportedFamilySkipped(t *testing.T) {
 	st := newStore(t)
 	rp := &recordingProbe{
@@ -114,7 +104,7 @@ func TestProber_UnsupportedFamilySkipped(t *testing.T) {
 	p := &Prober{
 		Families: []string{"ollama"},
 		Probe:    rp.probe,
-		Classify: func(_, _ string) bool { return true }, // would bench if reached
+		Classify: func(_, _ string) bool { return true },
 		Store:    st,
 		Log:      io.Discard,
 	}
@@ -124,8 +114,6 @@ func TestProber_UnsupportedFamilySkipped(t *testing.T) {
 	}
 }
 
-// TestProber_ProbeErrorFailOpen: a transport error neither benches nor panics —
-// the probe is advisory, never allowed to break a cycle.
 func TestProber_ProbeErrorFailOpen(t *testing.T) {
 	st := newStore(t)
 	rp := &recordingProbe{err: map[string]error{"agy": fmt.Errorf("boot timeout")}}
@@ -142,9 +130,6 @@ func TestProber_ProbeErrorFailOpen(t *testing.T) {
 	}
 }
 
-// TestProber_ConcurrentBenchesRaceSafe: all families probed in parallel and all
-// capped ones benched — the flock-protected store accumulates every write. Run
-// under -race to prove thread + process safety of the fan-out.
 func TestProber_ConcurrentBenchesRaceSafe(t *testing.T) {
 	st := newStore(t)
 	fams := []string{"a", "b", "c", "d", "e", "f", "g", "h"}

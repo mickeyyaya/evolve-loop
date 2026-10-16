@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// writeDecision stages a debug-decision.json under dir. An empty body
-// means "write no file" so the missing-file path can be exercised.
 func writeDecision(t *testing.T, dir, body string) {
 	t.Helper()
 	if body == "" {
@@ -25,18 +23,14 @@ func writeDecision(t *testing.T, dir, body string) {
 	}
 }
 
-// TestClassify is the load-bearing behavioral test: it pins the
-// action→verdict→signals mapping and, critically, the SAFE-DEFAULT
-// (BLOCK/FAIL) on any parse failure or unknown action. Never RESHIP on
-// a malformed file.
 func TestClassify(t *testing.T) {
 	cases := []struct {
 		name          string
-		body          string // "" = no file
+		body          string
 		wantVerdict   string
-		wantAction    string // expected Signals["debugger.action"]; "" = key absent
-		wantRerun     string // expected Signals["debugger.rerun_phase"]; "" = key absent
-		wantRootCause string // expected Signals["debugger.root_cause"]; "" = not asserted
+		wantAction    string
+		wantRerun     string
+		wantRootCause string
 	}{
 		{
 			name:          "reship maps to PASS with ship next",
@@ -118,12 +112,9 @@ func TestClassify(t *testing.T) {
 	}
 }
 
-// TestClassifyNeverReshipOnParseFailure is an explicit safety pin: a
-// parse failure must NEVER yield a RESHIP signal, even partially. This
-// is the integrity-critical invariant of the phase.
 func TestClassifyNeverReshipOnParseFailure(t *testing.T) {
 	dir := t.TempDir()
-	writeDecision(t, dir, `{"action":"RESHIP"`) // truncated JSON
+	writeDecision(t, dir, `{"action":"RESHIP"`)
 
 	verdict, signals, _ := Classify(dir)
 	if verdict != core.VerdictFAIL {

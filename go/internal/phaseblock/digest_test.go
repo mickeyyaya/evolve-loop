@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// fakeSource is a deterministic DigestSource for unit tests — no IO.
 type fakeSource struct {
 	bin, commit, prof, report, tree string
 	binErr, profErr                 error
@@ -17,10 +16,6 @@ func (f fakeSource) ProfileSHA() (string, error) { return f.prof, f.profErr }
 func (f fakeSource) ReportSHA() (string, error)  { return f.report, nil }
 func (f fakeSource) TreeSHA() (string, error)    { return f.tree, nil }
 
-// Compute is the pure content-addressed digest. Combined must be a stable
-// function of the integrity-relevant fields ONLY (phase, binary, commit,
-// profile, report, tree, prevCombined) — never of run metadata (runID,
-// completedAt) — so regenerating a phase with identical content is idempotent.
 func TestCompute_DeterministicOverRunMetadata(t *testing.T) {
 	src := fakeSource{bin: "binA", commit: "c0ffeecafe12", prof: "profX", report: "rep1", tree: "tree1"}
 	d1, err := Compute("build", "run-1", "2026-06-25T00:00:00Z", "prev0", src)
@@ -55,7 +50,7 @@ func TestCompute_PrevCombinedChains(t *testing.T) {
 }
 
 func TestCompute_OmitsAbsentReportAndTree(t *testing.T) {
-	src := fakeSource{bin: "binA", commit: "c", prof: "p"} // no report, no tree
+	src := fakeSource{bin: "binA", commit: "c", prof: "p"}
 	d, err := Compute("intent", "run", "t", "", src)
 	if err != nil {
 		t.Fatal(err)

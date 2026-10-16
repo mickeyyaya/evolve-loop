@@ -27,7 +27,7 @@ func TestProcessCPUProbe_AdvancingCPUIsAlive(t *testing.T) {
 		}
 		s := samples[i]
 		i++
-		return "  " + s + "\n", nil // ps pads its output
+		return "  " + s + "\n", nil
 	}
 	probe := newProcessCPUProbe(pidFile, run)
 

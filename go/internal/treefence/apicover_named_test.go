@@ -6,17 +6,11 @@ import (
 	"testing"
 )
 
-// TestAPICoverNamedExports names and EXERCISES every exported symbol of this
-// package (ADR-0069 new-package graduation) through the shapes its consumers
-// — the phase runner's and the retro phase's worktree fence — rely on: the
-// one-shot Take/Restore pair, and the Begin/End lifecycle with its Outcome
-// rendered as diagnostics.
 func TestAPICoverNamedExports(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	dir := initRepo(t)
 
-	// Take + Snapshot.Restore → Result.
 	snap, err := Take(ctx, dir)
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +25,6 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Fatalf("unexpected shapes: %+v %+v", snap, res)
 	}
 
-	// Begin/End lifecycle: inert for a source writer, live for a read-only phase.
 	var inert *Fence = Begin(ctx, dir, false)
 	if inert.TakeErr() != nil || len(inert.End(ctx).Diagnostics("build")) != 0 {
 		t.Fatal("a source writer's fence must be inert")
@@ -48,7 +41,6 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Fatalf("outcome=%+v diags=%+v", out, diags)
 	}
 
-	// An untakeable fence reports itself and never errors the phase.
 	broken := Begin(ctx, t.TempDir(), true)
 	if broken.TakeErr() == nil {
 		t.Fatal("a non-repository must be an untakeable fence")
@@ -63,7 +55,6 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Fatal("a nil fence is inert")
 	}
 
-	// TakeStaged + Snapshot.Differing: an untracked file is beyond the staged base.
 	staged := initRepo(t)
 	base, err := TakeStaged(ctx, staged, nil)
 	if err != nil {

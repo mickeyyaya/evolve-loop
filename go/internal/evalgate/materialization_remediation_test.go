@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// scoutWorkspaceSelecting names slugs as backticked bullets and in the Decision
-// Trace, and writes no eval file.
 func scoutWorkspaceSelecting(t *testing.T, slugs ...string) (projectRoot, workspace string) {
 	t.Helper()
 	projectRoot, workspace = t.TempDir(), t.TempDir()

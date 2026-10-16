@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 )
 
-// docsFloorBuildReport is well-formed, so only the docs floor can turn a case red.
 const docsFloorBuildReport = "## Changes\n- go/internal/policy/policy.go\nVerdict: PASS\n"
 
 func docsFloorGit(t *testing.T, dir string, args ...string) {
@@ -22,7 +21,6 @@ func docsFloorGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// newDocsFloorWorktree commits a base, then adds changed as untracked files, as a build worktree looks at verify time.
 func newDocsFloorWorktree(t *testing.T, changed ...string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -146,7 +144,6 @@ func TestPhaseVerify_NonBuildPhase_UnaffectedByDocsFloor(t *testing.T) {
 	wt := newDocsFloorWorktree(t, "go/internal/policy/policy.go")
 	ws := t.TempDir()
 
-	// The empty workspace fails tdd on well-formedness; the point is which code surfaces.
 	code, _, errb := runVerify(t, "tdd", "--workspace="+ws, "--worktree="+wt)
 	if code != 1 {
 		t.Fatalf("exit=%d want 1 (missing tdd artifact); stderr=%s", code, errb)

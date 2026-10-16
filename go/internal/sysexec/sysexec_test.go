@@ -10,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// DefaultRunner is exercised against real, ubiquitous shell commands — it is
-// the one production wrapper that genuinely must fork to be meaningful. The
-// forks are trivial (sh -c) so the test stays in the fast tier.
-
 func TestDefaultRunner_ExitZero_NoError(t *testing.T) {
 	code, err := sysexec.DefaultRunner(context.Background(), "sh", "", []string{"-c", "exit 0"}, nil, nil, nil, nil)
 	if err != nil {
@@ -24,8 +20,6 @@ func TestDefaultRunner_ExitZero_NoError(t *testing.T) {
 	}
 }
 
-// The load-bearing contract: a non-zero exit is (code, nil), NOT an error.
-// Callers branch on exit codes (git diff --quiet rc=1 == "differences").
 func TestDefaultRunner_NonZeroExit_IsCodeNotError(t *testing.T) {
 	code, err := sysexec.DefaultRunner(context.Background(), "sh", "", []string{"-c", "exit 3"}, nil, nil, nil, nil)
 	if err != nil {
@@ -36,7 +30,6 @@ func TestDefaultRunner_NonZeroExit_IsCodeNotError(t *testing.T) {
 	}
 }
 
-// An unrecoverable failure (binary not found) is err != nil with exitCode -1.
 func TestDefaultRunner_BinaryNotFound_IsUnrecoverableError(t *testing.T) {
 	code, err := sysexec.DefaultRunner(context.Background(), "evolve-no-such-binary-xyz", "", nil, nil, nil, nil, nil)
 	if err == nil {
@@ -91,7 +84,7 @@ func TestDefaultRunner_PipesStdin(t *testing.T) {
 
 func TestDefaultRunner_ContextCancelled_ReturnsError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // cancel before run
+	cancel()
 	code, err := sysexec.DefaultRunner(ctx, "sh", "", []string{"-c", "sleep 5"}, nil, nil, nil, nil)
 	if err == nil {
 		t.Fatal("err = nil, want context-cancellation error")
@@ -100,9 +93,6 @@ func TestDefaultRunner_ContextCancelled_ReturnsError(t *testing.T) {
 		t.Fatalf("exitCode = %d, want -1", code)
 	}
 }
-
-// --- Convenience helpers (driven via a tiny inline RunFunc stub so the helper
-// logic is tested without forking and without depending on fixtures). ---
 
 func stubRun(stdout, stderr string, code int, err error) sysexec.RunFunc {
 	return func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, so, se io.Writer) (int, error) {
@@ -151,17 +141,11 @@ func TestCombinedOutput_InterleavesStdoutStderr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
-	// Both streams land in one buffer (order is stub-dependent: stdout then stderr).
 	if !strings.Contains(got, "out") || !strings.Contains(got, "err") {
 		t.Fatalf("CombinedOutput = %q, want it to contain both out and err", got)
 	}
 }
 
-// Proof (under -race) that CombinedOutput is race-free on the REAL DefaultRunner
-// path despite passing one buffer as both stdout and stderr: os/exec reuses a
-// single pipe + goroutine for a shared writer, so the two streams never write
-// concurrently. A real fork is intentional here — it is the only way to exercise
-// the os/exec sharing behavior the helper relies on.
 func TestCombinedOutput_RealRunner_NoRace(t *testing.T) {
 	got, err := sysexec.CombinedOutput(context.Background(), sysexec.DefaultRunner, "", "sh", "",
 		"-c", "printf out; printf err 1>&2")

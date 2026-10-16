@@ -106,7 +106,6 @@ func TestMover_RouteConsole_RewriteFault_ReportsAndFails(t *testing.T) {
 	writeItem(t, path, `{"id":"poison"}`)
 	rc := newRecordingCenter()
 	m := New(inbox, nil, WithSignals(rc.accessor()))
-	// Make the atomic rewrite's temp file un-creatable: the inbox dir is read-only.
 	if err := os.Chmod(inbox, 0o555); err != nil {
 		t.Fatal(err)
 	}

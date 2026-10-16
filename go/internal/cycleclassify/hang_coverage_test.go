@@ -29,7 +29,7 @@ func TestGitLogFn_ErrorPath(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH")
 	}
-	dir := t.TempDir() // NOT a git repo
+	dir := t.TempDir()
 	prevWD, _ := os.Getwd()
 	defer os.Chdir(prevWD)
 	_ = os.Chdir(dir)
@@ -59,7 +59,6 @@ func TestGitLogFn_ProductionPath(t *testing.T) {
 	run("add", ".")
 	run("commit", "-m", "cycle 42 — shipped scout-only")
 
-	// gitLogFn runs git in the process working directory.
 	prevWD, _ := os.Getwd()
 	defer os.Chdir(prevWD)
 	_ = os.Chdir(dir)

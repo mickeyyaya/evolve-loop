@@ -8,23 +8,21 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// PromoteOpts gathers the optional flag-bearing arguments.
 type PromoteOpts struct {
-	Cycle     string // empty → "0"
-	CommitSHA string // empty → no SHA prefix
+	Cycle     string
+	CommitSHA string
 }
 
-// PromoteResult describes what happened.
 type PromoteResult struct {
 	SrcPath  string
 	DestPath string
-	NoOp     bool // nothing moved: the id was not found or the rename failed
+	NoOp     bool
 }
 
 type promotion struct {
 	taskID  string
 	src     string
-	srcRel  string // "processing" for a claim, "inbox" for a root item (the ledger From quirk)
+	srcRel  string
 	base    string
 	state   string
 	destDir string
@@ -32,7 +30,6 @@ type promotion struct {
 	opts    PromoteOpts
 }
 
-// Promote moves taskID's item to processed, rejected, retry or quarantine; an absent item is a NoOp success.
 func (m *Mover) Promote(taskID, newState string, p PromoteOpts) (PromoteResult, error) {
 	res := PromoteResult{}
 	if err := m.validatePromote(taskID, newState); err != nil {
@@ -44,7 +41,7 @@ func (m *Mover) Promote(taskID, newState string, p PromoteOpts) (PromoteResult, 
 			reason: fmt.Sprintf("promote: task '%s' not found in processing/ or inbox/ — already moved?", taskID),
 			fields: map[string]string{"task_id": taskID, "state": newState, "step": "locate"}})
 		res.NoOp = true
-		return res, nil // a missing item never blocks the ship
+		return res, nil
 	}
 	newState, reroutedUnlanded := m.landingGate(taskID, newState, p)
 	pr := promotion{taskID: taskID, src: src, srcRel: srcRel, base: filepath.Base(src), state: newState, opts: p}
@@ -58,7 +55,6 @@ func (m *Mover) Promote(taskID, newState string, p PromoteOpts) (PromoteResult, 
 	res.DestPath = pr.dest
 	m.linef("promoted: %s → %s/", pr.base, newState)
 	reason := "ship-promote-" + newState
-	// The override precedes the retire hook so the preserved pointer and the ledger line carry one reason.
 	if reroutedUnlanded {
 		reason = "ship-promote-retry-unlanded-sha"
 	}
@@ -75,7 +71,6 @@ func (m *Mover) Promote(taskID, newState string, p PromoteOpts) (PromoteResult, 
 	return res, nil
 }
 
-// validatePromote's bad-state line omits quarantine on purpose: a pinned, preserved quirk.
 func (m *Mover) validatePromote(taskID, newState string) error {
 	if taskID == "" || newState == "" {
 		m.linef("ERROR: usage: promote <task_id> <new_state> [<cycle>] [--commit-sha <sha>]")
@@ -98,14 +93,13 @@ func (m *Mover) locateSource(taskID string) (src, srcRel string) {
 	return src, srcRel
 }
 
-// landingGate reroutes a processed promotion to retry/ when its ship sha has not landed on main.
 func (m *Mover) landingGate(taskID, newState string, p PromoteOpts) (string, bool) {
 	if newState != "processed" || p.CommitSHA == "" {
 		return newState, false
 	}
 	landed, err := m.landed(p.CommitSHA)
 	if err != nil {
-		landed = true // fail-open: never block a promotion on a gate error
+		landed = true
 		m.warn(fault{code: CodeLandedCheckFailed, origin: "Mover.Promote", cycle: cycleOf(p.Cycle), legacy: "WARN: ",
 			reason: fmt.Sprintf("promote: landed check for '%s' failed (%v) — treating %s as landed (fail-open)", taskID, err, p.CommitSHA),
 			fields: map[string]string{"task_id": taskID, "sha": p.CommitSHA, "err": err.Error(), "step": "landing"}})
@@ -119,8 +113,6 @@ func (m *Mover) landingGate(taskID, newState string, p PromoteOpts) (string, boo
 	return "retry", true
 }
 
-// deliver moves the item into its destination. A mkdir failure is ErrMvFailed with the item in
-// place; a rename failure stays the (NoOp=true, nil) success that callers depend on.
 func (m *Mover) deliver(pr promotion) (noop bool, err error) {
 	warnEntry := ledgerEntry{Action: "promote-warn", TaskID: pr.taskID, From: ".evolve/inbox/" + pr.srcRel + "/" + pr.base,
 		To: pr.dest, Cycle: intPtr(pr.opts.Cycle), GitSHA: strPtr(pr.opts.CommitSHA)}
@@ -146,7 +138,6 @@ func (m *Mover) deliver(pr promotion) (noop bool, err error) {
 	return false, nil
 }
 
-// promoteDestPath returns the destination dir and path; quarantine is flat because it is terminal.
 func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, string) {
 	switch newState {
 	case "processed":

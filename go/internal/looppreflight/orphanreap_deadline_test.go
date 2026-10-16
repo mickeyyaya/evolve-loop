@@ -14,7 +14,6 @@ import (
 func TestPreflight_OrphanReapIsDeadlineBounded(t *testing.T) {
 	opts := goodPipelineOptions(t)
 
-	// A lease-less run with a registered session forces the sweep to call the killer.
 	runDir := filepath.Join(opts.EvolveDir, "runs", "stale")
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)

@@ -68,7 +68,6 @@ func TestRun_PhaseRoutingWarnings_DoesNotHalt(t *testing.T) {
 	}
 }
 
-// An optional overlay named after the non-optional built-in "audit" is dropped with a clash warning.
 func TestRun_PhaseRoutingWarnings_DefaultUsesRealMergedCatalog(t *testing.T) {
 	root := t.TempDir()
 	registryDir := filepath.Join(root, "docs", "architecture")

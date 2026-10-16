@@ -1,13 +1,3 @@
-// gopkgpattern_test.go graduates internal/gopkgpattern into .apicover-enforce:
-// every export — ModulePrefix, WholeModule, IsPackagePattern, IsRecursive, Key —
-// is named and exercised across the shapes both production callers depend on
-// (internal/acssuite run-time scope-lint, internal/evalqualitycheck
-// authoring-time flaky-shape lint).
-//
-// The table is deliberately adversarial about the FALSE-POSITIVE direction: in
-// both callers a wrong "yes" is the expensive answer (it demotes a real gate at
-// run time, and prints a false claim to a predicate author at authoring time),
-// so prose, file paths, URLs and bare words all get explicit rows.
 package gopkgpattern
 
 import "testing"
@@ -79,9 +69,6 @@ func TestKey(t *testing.T) {
 	}
 }
 
-// TestKeyAgreesAcrossSpellings is the property both callers actually rely on:
-// three spellings of one package must compare equal, or a touched-set match at
-// run time and a known-slow match at authoring time silently disagree.
 func TestKeyAgreesAcrossSpellings(t *testing.T) {
 	spellings := []string{"./internal/core", "./internal/core/...", ModulePrefix + "internal/core"}
 	first := Key(spellings[0])
@@ -95,10 +82,6 @@ func TestKeyAgreesAcrossSpellings(t *testing.T) {
 	}
 }
 
-// TestRecursivePatternsAreAlsoPackagePatterns pins the invariant the callers'
-// switch statements assume: IsRecursive is a REFINEMENT of IsPackagePattern, so a
-// recursive shape can never slip through a caller that filters on the latter
-// first.
 func TestRecursivePatternsAreAlsoPackagePatterns(t *testing.T) {
 	for _, s := range []string{WholeModule, "./internal/bridge/...", ModulePrefix + "internal/core/..."} {
 		if IsRecursive(s) && !IsPackagePattern(s) {

@@ -114,7 +114,7 @@ func TestUnchangedSince_FailsOpenOnErrorAndNonRegular(t *testing.T) {
 	if !unchangedSince(path, snap) {
 		t.Error("same size and mtime ⇒ unchanged")
 	}
-	if err := os.WriteFile(path, []byte("BODY"), 0o644); err != nil { // same size, new mtime
+	if err := os.WriteFile(path, []byte("BODY"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if unchangedSince(path, snap) {

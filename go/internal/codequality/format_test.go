@@ -9,8 +9,6 @@ import (
 const dirtyGo = "package sample\n\nfunc Sample() int {\n\tx :=  1\n\treturn x\n}\n"
 const cleanGo = "package sample\n\nfunc Sample() int {\n\tx := 1\n\treturn x\n}\n"
 
-// FormatGoFiles must rewrite a gofmt-dirty file to clean and report it as fixed,
-// so a builder's formatting lapse never reaches the audit gofmt gate (I9).
 func TestFormatGoFiles_ReformatsDirtyFile(t *testing.T) {
 	dir := t.TempDir()
 	fp := filepath.Join(dir, "sample.go")
@@ -49,8 +47,6 @@ func TestFormatGoFiles_ReformatsDirtyFile(t *testing.T) {
 	}
 }
 
-// A clean dir is a no-op: nothing reformatted, no error — so the post-build step
-// is byte-identical for a well-behaved builder.
 func TestFormatGoFiles_NoOpOnCleanDir(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "sample.go"), []byte(cleanGo), 0o644); err != nil {
@@ -65,11 +61,7 @@ func TestFormatGoFiles_NoOpOnCleanDir(t *testing.T) {
 	}
 }
 
-// ModuleDir resolves the go/ submodule when present and falls back to root —
-// the single source the audit gate and the post-build normalizer both consume.
 func TestModuleDir_PrefersGoSubdir(t *testing.T) {
-	// Empty root is the load-bearing guard: "" must stay "" so FormatGoFiles
-	// never hands gofmt an empty dir arg (which would scan the cwd).
 	if got := ModuleDir(""); got != "" {
 		t.Fatalf("empty root: want %q, got %q", "", got)
 	}

@@ -37,7 +37,6 @@ func (r *recordingCenter) codes() []signalcenter.Code {
 	return out
 }
 
-// recordingAppender captures lifecycle records; fail makes every append err.
 type recordingAppender struct {
 	records []ledger.LifecycleRecord
 	fail    error
@@ -89,7 +88,6 @@ func procPath(inbox string, cycle int, name string) string {
 
 func tmpPathOf(path string) string { return path + ".tmp." + strconv.Itoa(os.Getpid()) }
 
-// faultLines keeps the WARN and ERROR lines of stderr; INFO lines print whether or not a Center is wired.
 func faultLines(stderr string) []string {
 	var out []string
 	for _, line := range strings.Split(stderr, "\n") {
@@ -162,7 +160,6 @@ func TestNew_NilOptionNeverClobbersAnInstalledSeam(t *testing.T) {
 	}
 }
 
-// warnRow provokes one fault class and names what the two links must produce.
 type warnRow struct {
 	name       string
 	arrange    func(t *testing.T, inbox string) []Option
@@ -329,7 +326,6 @@ func TestMover_Warn_TwoLinks(t *testing.T) {
 	}
 }
 
-// codeSteps is the code → fields.step table every registration doc must name.
 var codeSteps = map[signalcenter.Code][]string{
 	CodeClaimNotFound:                  {"locate"},
 	CodeClaimRefused:                   {"route"},

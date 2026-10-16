@@ -23,9 +23,6 @@ func TestImport_ConcurrentProcessesDeduplicateDestination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The malformed prefix lengthens the source scan so independently scheduled
-	// helpers exercise destination-lock contention. Correctness relies on the
-	// flock transaction, not on a particular process reaching the scan first.
 	sourceBody := strings.Repeat("not-json\n", 40_000) + string(valid) + "\n"
 	if err := os.WriteFile(source, []byte(sourceBody), 0o644); err != nil {
 		t.Fatal(err)

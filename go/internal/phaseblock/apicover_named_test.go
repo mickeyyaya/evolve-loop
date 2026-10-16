@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// TestNamePublicAPI references every exported symbol of phaseblock so the
-// apicover public-API gate sees the package surface covered. The other test
-// files exercise behavior; this one pins the API shape.
 func TestNamePublicAPI(t *testing.T) {
 	var (
 		_ DigestSource = fakeSource{}

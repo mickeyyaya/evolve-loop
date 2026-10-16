@@ -30,7 +30,7 @@ func TestGitLogMatchesCycle_Match_ReturnsTrue(t *testing.T) {
 
 func TestGitLogMatchesCycle_NoCommit_ReturnsFalse(t *testing.T) {
 	t.Parallel()
-	fake := &fixtures.FakeExec{} // zero value => empty stdout, exit 0
+	fake := &fixtures.FakeExec{}
 	if gitLogMatchesCycle(context.Background(), gitexec.Git{Exec: fake.Run}, "7") {
 		t.Errorf("gitLogMatchesCycle = true, want false (no matching commit)")
 	}

@@ -12,36 +12,30 @@ import (
 	"strings"
 )
 
-// Level classifies an individual command's rigor.
 type Level int
 
-// Levels in rising severity; Check reports the worst one.
 const (
-	LevelPass Level = 0 // genuinely inspects the workspace
-	LevelWarn Level = 1 // weak signal; advisory
-	LevelHalt Level = 2 // no-op tautology; rewrite required
+	LevelPass Level = 0
+	LevelWarn Level = 1
+	LevelHalt Level = 2
 )
 
-// Result is the overall verdict + per-command breakdown.
 type Result struct {
 	Path     string
-	Overall  Level            // worst classification across commands
-	Commands []ClassifiedLine // one per parsed command, or one diagnostic entry when none parse
+	Overall  Level
+	Commands []ClassifiedLine
 }
 
-// ClassifiedLine is a single command and its classification.
 type ClassifiedLine struct {
 	Line   string
 	Level  Level
 	Reason string
 }
 
-// Options configures Check. Path is required.
 type Options struct {
 	Path string
 }
 
-// Check classifies every ```bash-fence and `[code]`-bullet command in the eval at opts.Path.
 func Check(opts Options) (Result, error) {
 	if opts.Path == "" {
 		return Result{}, fmt.Errorf("evalqualitycheck: Path required")
@@ -67,14 +61,12 @@ func Check(opts Options) (Result, error) {
 	}
 	if len(cmds) == 0 {
 		if scoreCapGraded {
-			// The ACS suite grades score_cap evals, so zero bash commands is their designed shape.
 			res.Commands = append(res.Commands, ClassifiedLine{
 				Line: "(score_cap-graded eval)", Level: LevelPass,
 				Reason: "no bash graders by design; scoring is consumed by the ACS suite",
 			})
 			return res, nil
 		}
-		// Zero parsed commands means the gate verified nothing, so it must never read as PASS.
 		res.Overall = LevelWarn
 		res.Commands = append(res.Commands, ClassifiedLine{
 			Line: "(no commands parsed)", Level: LevelWarn,
@@ -84,13 +76,10 @@ func Check(opts Options) (Result, error) {
 	return res, nil
 }
 
-// codeBulletRE matches the scout template's `[code]` grader bullet; the greedy
-// capture lets the command itself contain backticks.
 var codeBulletRE = regexp.MustCompile("^-\\s*`\\[code\\]`\\s*`(.+)`\\s*$")
 
 var scoreCapRE = regexp.MustCompile(`(?m)^\s*score_cap\s*:`)
 
-// scanBashCommands is the one eval parser Check and CheckDiversity share, so both read evals identically.
 func scanBashCommands(r io.Reader) ([]string, error) {
 	var cmds []string
 	inFence := false
@@ -108,7 +97,6 @@ func scanBashCommands(r io.Reader) ([]string, error) {
 			continue
 		}
 		if !inFence {
-			// Grader bullets count only at top level: a fenced one is illustration or a planted decoy.
 			if m := codeBulletRE.FindStringSubmatch(trimmed); m != nil {
 				cmds = append(cmds, strings.TrimSpace(m[1]))
 			}
@@ -132,10 +120,7 @@ var (
 	tautologyExactRE = regexp.MustCompile(`^(:|true|exit\s+0|/bin/true)\s*$`)
 	tautologyBrackRE = regexp.MustCompile(`^\[\s+(true|1\s+-eq\s+1|"a"\s+=\s+"a")\s+\]\s*$`)
 	echoOnlyRE       = regexp.MustCompile(`^echo\b`)
-	// RE2 has no backreferences, so any two adjacent quoted args count as a grep against an inlined literal.
-	grepLiteralRE = regexp.MustCompile(`^grep\s+(-[a-zA-Z]+\s+)*["'][^"']+["']\s+["'][^"']+["']\s*$`)
-	// A git log/rev-list range asserts commit presence, which is structurally false once
-	// worktree-normalize soft-resets builder commits to base before audit.
+	grepLiteralRE    = regexp.MustCompile(`^grep\s+(-[a-zA-Z]+\s+)*["'][^"']+["']\s+["'][^"']+["']\s*$`)
 	commitPresenceRE = regexp.MustCompile(`\bgit\s+(log|rev-list)\b[^|&;]*[a-zA-Z0-9_~^@]\.{2,3}([a-zA-Z0-9_~^@]|\s|$)`)
 )
 

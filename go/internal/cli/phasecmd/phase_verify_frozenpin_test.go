@@ -18,8 +18,6 @@ func frozenPinWrite(t *testing.T, root, rel, body string) {
 	}
 }
 
-// frozenPinWorktree builds a real module in which storage imports core, so pinning storage.UpdateStateMap
-// in a core file closes a cycle, while leafutil imports nothing, so pinning leafutil.Helper does not.
 func frozenPinWorktree(t *testing.T) string {
 	t.Helper()
 	wt := t.TempDir()
@@ -51,7 +49,6 @@ const (
 	frozenPinReachableTest = "go/internal/core/frozen_reachable_test.go"
 )
 
-// frozenPinWorkspace writes a well-formed tdd report, so only the reachability gate can turn a case red.
 func frozenPinWorkspace(t *testing.T, doNotModifyTests bool, frozen string) string {
 	t.Helper()
 	ws := t.TempDir()

@@ -99,7 +99,6 @@ func TestHasRemoteOrigin(t *testing.T) {
 	}
 }
 
-// scriptGit fakes git: replies are keyed by subcommand, and a subcommand in failing exits 1.
 func scriptGit(t *testing.T, replies map[string]string, failing map[string]bool) {
 	t.Helper()
 	orig := newGit
@@ -121,7 +120,6 @@ func scriptGit(t *testing.T, replies map[string]string, failing map[string]bool)
 	t.Cleanup(func() { newGit = orig })
 }
 
-// healthyReplies is a scripted repo on main, with origin, in sync.
 func healthyReplies() map[string]string {
 	return map[string]string{
 		"rev-parse": "main",
@@ -229,7 +227,6 @@ func TestDefaultProbe_BranchResolveFailureErrors(t *testing.T) {
 	newGit = func(dir string) gitexec.Git {
 		return gitexec.Git{Dir: dir, Exec: func(_ context.Context, _, _ string, args, _ []string,
 			_ io.Reader, stdout, stderr io.Writer) (int, error) {
-			// The work-tree rev-parse succeeds; the --abbrev-ref HEAD one fails.
 			if len(args) > 0 && args[0] == "rev-parse" {
 				calls++
 				if calls == 1 {

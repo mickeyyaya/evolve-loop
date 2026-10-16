@@ -7,10 +7,8 @@ import (
 	"path/filepath"
 )
 
-// unbackedStates are the retirement states an id without an inbox item may take.
 var unbackedStates = map[string]bool{"processed": true, "rejected": true}
 
-// unbackedRecord is the retirement record of an id no inbox item backs.
 type unbackedRecord struct {
 	ID       string `json:"id"`
 	Unbacked bool   `json:"unbacked"`
@@ -19,9 +17,6 @@ type unbackedRecord struct {
 	GitSHA   string `json:"git_sha,omitempty"`
 }
 
-// RetireUnbacked writes taskID's retirement record under newState's cycle dir, so every reader of the
-// retirement states sees an id no inbox item backs as done; a record already there is left as it is.
-// Unlike the failure-count bump this is an idempotent create, not a read-modify-write, so it takes no lock.
 func (m *Mover) RetireUnbacked(taskID, newState string, p PromoteOpts, reason string) (string, error) {
 	if taskID == "" || taskID == "." || taskID == ".." || filepath.Base(taskID) != taskID {
 		return "", fmt.Errorf("%w: retire-unbacked needs a plain task id, got %q", ErrBadArgs, taskID)
@@ -45,7 +40,6 @@ func (m *Mover) RetireUnbacked(taskID, newState string, p PromoteOpts, reason st
 	return dest, nil
 }
 
-// writeRecord lands body at dest through a pid-suffixed temp file, so no reader sees a partial record.
 func writeRecord(dest string, body []byte) error {
 	tmp := fmt.Sprintf("%s.tmp.%d", dest, os.Getpid())
 	if err := os.WriteFile(tmp, body, 0o644); err != nil {

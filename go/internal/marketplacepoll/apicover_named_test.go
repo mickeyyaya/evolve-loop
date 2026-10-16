@@ -6,14 +6,9 @@ import (
 	"time"
 )
 
-// TestResult_NamedType names the marketplacepoll.Result struct (Run returns it
-// by value but the bare type is never named in a test) and pins its exact field
-// contract on a clean first-poll convergence: Converged, one Attempt, zero
-// Elapsed (stub clock never advances), the matched FinalVersion, release.sh ran.
-// Result is all-scalar (comparable), so the whole value is asserted at once.
 func TestResult_NamedType(t *testing.T) {
 	m := makeMarketplace(t, "1.2.3")
-	now, _ := stubClock(time.Now()) // never advanced → Elapsed == 0
+	now, _ := stubClock(time.Now())
 	var buf bytes.Buffer
 
 	got, err := Run(Options{

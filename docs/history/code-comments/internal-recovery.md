@@ -571,3 +571,25 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // fast-fail goes silent. The second half proves the protect-list is what saves
 // it — not some incidental property of the input.
 ```
+
+## comment-zero d10
+
+### `go/internal/recovery/handler.go:45` — above `var chain = []chainHandler{`
+
+```text
+// chain is ordered: each handler outranks every handler below it. See ADR-0044.
+```
+
+### `go/internal/recovery/promote.go:69` — above `if err := atomicwrite.Bytes(path, []byte(b.String())); err != nil {`
+
+```text
+// atomicwrite gives each writer a unique temp, so concurrent promotions of
+// one path cannot tear it. See ADR-0049.
+```
+
+### `go/internal/recovery/promote.go:147` — above `for _, artifact := range []string{"[REDACTED]", "[untrusted]", "'''"} {`
+
+```text
+// The advisor reads a neutralized digest but Detect matches raw panes, so a
+// neutralization artifact could never fire. See ADR-0045.
+```

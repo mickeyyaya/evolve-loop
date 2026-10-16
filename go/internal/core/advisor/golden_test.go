@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// goldenRecentFiles is what `git log --name-only` printed for the recon golden's history; duplicates count churn.
 func goldenRecentFiles(string) ([]string, error) {
 	return []string{"a.go", "c.py", "docs/README.md", "a.go", "b_test.go"}, nil
 }

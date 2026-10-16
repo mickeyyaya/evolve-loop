@@ -56,7 +56,6 @@ func captureStderr(t *testing.T, fn func()) string {
 	return string(b)
 }
 
-// The workspace path is a regular file, so opening the events sink fails.
 func TestCoreAdapter_SinkOpenFailureIsASignalAndTheAdapterIsWired(t *testing.T) {
 	wsFile := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(wsFile, []byte("x"), 0o644); err != nil {
@@ -91,14 +90,14 @@ func TestCoreAdapter_SinkOpenFailureIsASignalAndTheAdapterIsWired(t *testing.T) 
 	if unwired.SignalsWired() {
 		t.Error("no accessor → unwired")
 	}
-	unwired.Start(context.Background(), "tdd", core.PhaseRequest{Workspace: wsFile, Cycle: 3})() // must not panic
+	unwired.Start(context.Background(), "tdd", core.PhaseRequest{Workspace: wsFile, Cycle: 3})()
 }
 
 func TestCoreAdapter_WatcherLeakIsASignal(t *testing.T) {
 	rc := newRecordingCenter()
 	a := &CoreAdapter{Signals: func() *signalcenter.Center { return rc.c }}
 	var wg sync.WaitGroup
-	wg.Add(1) // the watcher never exits
+	wg.Add(1)
 	closer := &countingCloser{}
 	obs := New(Config{StallS: time.Hour, PollS: time.Hour}, io.Discard)
 	cancels := 0

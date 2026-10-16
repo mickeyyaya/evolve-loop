@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalqualitycheck"
 )
 
-// qualityGate (Gate B) blocks a selected slug whose eval predicate is a definite
-// tautology; a weak predicate is advisory only.
 type qualityGate struct{}
 
 func (qualityGate) name() string                { return "predicate-quality" }

@@ -8,11 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// ADR-0050 §3.10 Slice 2: intent reads the goal from the typed envelope at enforce
-// (req.Input.Active()) and from the legacy Context["goal"] below it.
-
-// Typed envelope and legacy map carrying the same goal render the identical prompt
-// — the byte-identity proof for the migrated read.
 func TestIntent_ComposePrompt_TypedGoalEqualsMap(t *testing.T) {
 	const goal = "ship a typed phase envelope"
 	mapReq := core.PhaseRequest{Context: map[string]string{"goal": goal}}
@@ -33,9 +28,6 @@ func TestIntent_ComposePrompt_TypedGoalEqualsMap(t *testing.T) {
 	}
 }
 
-// At enforce the typed source must actually be consulted: with NO Context["goal"]
-// but a populated envelope, the goal still renders (would fail if the gate read the
-// map).
 func TestIntent_ComposePrompt_EnforceReadsTypedNotMap(t *testing.T) {
 	const goal = "from the envelope only"
 	req := core.PhaseRequest{

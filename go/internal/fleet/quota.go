@@ -6,7 +6,6 @@ import (
 	"sort"
 )
 
-// QuotaAwareCount shrinks count by one lane per benched family (family → bench reason), down to minLanes clamped to [1, count].
 func QuotaAwareCount(count int, benched map[string]string, minLanes int, warn io.Writer) int {
 	if len(benched) == 0 {
 		return count
@@ -22,7 +21,7 @@ func QuotaAwareCount(count int, benched map[string]string, minLanes int, warn io
 	for fam := range benched {
 		families = append(families, fam)
 	}
-	sort.Strings(families) // deterministic WARN order
+	sort.Strings(families)
 	effective := count
 	for _, fam := range families {
 		next := effective - 1

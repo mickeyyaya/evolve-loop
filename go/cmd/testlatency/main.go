@@ -1,10 +1,5 @@
-// Command testlatency turns a `go test -json` event stream into a Markdown
-// latency report: per-package wall time, the longest-path test in each
-// package, the globally slowest tests, and counts over configurable
-// thresholds. It reads the stream on stdin and writes Markdown to stdout, so
-// it composes with the Makefile:
-//
-//	go test -json ./... | go run ./cmd/testlatency -title "Fast suite" > report.md
+// Command testlatency turns a go test -json event stream on stdin into a Markdown latency report on stdout.
+// See docs/architecture/packages/cmd-testlatency.md.
 package main
 
 import (

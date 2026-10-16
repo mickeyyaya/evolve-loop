@@ -13,11 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionreaper"
 )
 
-// Below minFreeDiskBytes, per-cycle worktrees and scrollback logs risk ENOSPC mid-cycle.
 const minFreeDiskBytes uint64 = 500 << 20
 
-// checkPipelineStructure halts on a spine phase without a factory or contract, an
-// unloadable profile, or a profile CLI with no known driver, listing every gap.
 func checkPipelineStructure(o resolved) CheckResult {
 	const name = "pipeline-structure"
 	var gaps []string
@@ -63,7 +60,6 @@ func checkPipelineStructure(o resolved) CheckResult {
 	}
 }
 
-// checkLLMCLIStatus halts when a CLI binary the profiles use is missing; each binary is probed once.
 func checkLLMCLIStatus(o resolved) CheckResult {
 	const name = "llm-cli-status"
 	seen := map[string]struct{}{}
@@ -104,8 +100,6 @@ func checkLLMCLIStatus(o resolved) CheckResult {
 	}
 }
 
-// checkHostCapabilities halts on missing tmux, an unwritable .evolve or runs dir, or a
-// required sandbox the host lacks; low disk and a failed orphan reap only warn.
 func checkHostCapabilities(o resolved) CheckResult {
 	const name = "host-capabilities"
 	var halts, warns []string
@@ -137,7 +131,6 @@ func checkHostCapabilities(o resolved) CheckResult {
 			free>>20, minFreeDiskBytes>>20, o.evolveDir))
 	}
 
-	// A wedged tmux must abandon the kill, not hang loop boot.
 	reapCtx, cancel := context.WithTimeout(context.Background(), sessionreaper.DefaultReapTimeout)
 	defer cancel()
 	if _, err := sessionreaper.ReapOrphans(reapCtx, o.evolveDir, sessionreaper.Options{
@@ -171,8 +164,6 @@ func checkHostCapabilities(o resolved) CheckResult {
 	}
 }
 
-// checkCLIVersionDrift warns when a CLI's version differs from .evolve/cli-versions.json,
-// then saves the current inventory there; a first batch only records the baseline.
 func checkCLIVersionDrift(o resolved) CheckResult {
 	const name = "cli-version-drift"
 
@@ -185,7 +176,6 @@ func checkCLIVersionDrift(o resolved) CheckResult {
 	prev, _ := loadVersionCache(cachePath)
 	changes := classifyVersionChanges(o.evolveDir, prev, current)
 
-	// Best-effort: a failed save only costs the next batch its comparison.
 	_ = saveVersionCache(cachePath, current)
 
 	if res, changed := changes.result(name); changed {
@@ -205,8 +195,6 @@ func checkCLIVersionDrift(o resolved) CheckResult {
 	}
 }
 
-// sandboxUnavailableIssue applies bridge dispatch's fail-closed decision: a nested session
-// proves nothing, and only the EVOLVE_SANDBOX=off opt-out permits an unconfined launch.
 func sandboxUnavailableIssue(host preflight.Profile, mode string) (halt, warn string) {
 	ok, optOut, reason := sandbox.ConfinementSatisfied(host.ClaudeCode.Nested, mode)
 	switch {

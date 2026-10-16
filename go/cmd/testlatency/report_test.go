@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// A minimal hand-written test2json stream: two packages, a package-level
-// summary each, a subtest that must be excluded, and a skip.
 const sample = `
 {"Action":"run","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow"}
 {"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow","Elapsed":12.5}
@@ -28,7 +26,6 @@ func TestParse_AggregatesAndExcludesSubtests(t *testing.T) {
 	if len(rep.Packages) != 2 {
 		t.Fatalf("got %d packages, want 2", len(rep.Packages))
 	}
-	// Packages sorted by wall time desc → bridge first.
 	bridge := rep.Packages[0]
 	if !strings.HasSuffix(bridge.Pkg, "/bridge") {
 		t.Fatalf("slowest package = %s, want bridge", bridge.Pkg)
@@ -36,22 +33,17 @@ func TestParse_AggregatesAndExcludesSubtests(t *testing.T) {
 	if bridge.Wall != 12.7 {
 		t.Errorf("bridge wall = %.2f, want 12.7", bridge.Wall)
 	}
-	// TestSlow + TestFast counted; the "/sub" subtest excluded.
 	if bridge.NumTests != 2 {
 		t.Errorf("bridge NumTests = %d, want 2 (subtest excluded)", bridge.NumTests)
 	}
 	if bridge.SlowestTest != "TestSlow" || bridge.SlowestSecs != 12.5 {
 		t.Errorf("bridge slowest = %s/%.2f, want TestSlow/12.50", bridge.SlowestTest, bridge.SlowestSecs)
 	}
-	// Serial sum is top-level only: 12.5 + 0.1.
 	if bridge.SerialSum < 12.59 || bridge.SerialSum > 12.61 {
 		t.Errorf("bridge SerialSum = %.2f, want ~12.6", bridge.SerialSum)
 	}
 }
 
-// TestParse_FlagsIncompletePackage proves a package that starts but emits no
-// terminal pass/fail/skip summary (truncated stream / panic / timeout) is
-// recorded as Incomplete and surfaced in the Markdown, not silently dropped.
 func TestParse_FlagsIncompletePackage(t *testing.T) {
 	stream := `
 {"Action":"run","Package":"x/crashy","Test":"TestBoom"}
@@ -81,9 +73,6 @@ func TestMarkdown_FlagsSlowPackagesAndTests(t *testing.T) {
 	if !strings.Contains(md, "internal/bridge") {
 		t.Error("report should flag the slow bridge package")
 	}
-	// budget (0.4s wall) is under the 5s package threshold; its package-table
-	// row "| internal/budget | 0.40 |" must be absent (it may still appear in
-	// the per-test table, which is fine).
 	if strings.Contains(md, "internal/budget | 0.40") {
 		t.Error("budget (0.4s) is under the 5s package threshold; should not be flagged as a slow package")
 	}
@@ -95,20 +84,14 @@ func TestMarkdown_FlagsSlowPackagesAndTests(t *testing.T) {
 	}
 }
 
-// A line that begins with '{' but is not valid JSON must be tolerated and
-// skipped (test2json streams can interleave malformed/truncated fragments),
-// while the surrounding valid events are still aggregated.
 func TestParse_ToleratesMalformedJSONLine(t *testing.T) {
-	// Arrange: a valid event, a '{'-prefixed but broken line, another valid event.
 	const stream = `
 {"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestA","Elapsed":0.2}
 {"Action":"pass","Package": not-valid-json
 {"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Elapsed":0.5}
 `
-	// Act
 	rep, err := Parse(strings.NewReader(stream))
 
-	// Assert: parse succeeds; the broken line is dropped, the two valid events kept.
 	if err != nil {
 		t.Fatalf("Parse should tolerate a malformed line, got err: %v", err)
 	}
@@ -123,8 +106,6 @@ func TestParse_ToleratesMalformedJSONLine(t *testing.T) {
 	}
 }
 
-// failingReader yields one line of valid data, then a non-EOF read error,
-// so Parse exercises the sc.Err() failure path deterministically (no I/O).
 type failingReader struct {
 	data []byte
 	done bool
@@ -141,17 +122,11 @@ func (r *failingReader) Read(p []byte) (int, error) {
 
 var errReadBoom = errors.New("boom")
 
-// Parse must surface a stream read error rather than silently returning a
-// partial report — the scanner error path is the only place a malformed pipe
-// can be reported to the caller.
 func TestParse_ScannerError_Propagates(t *testing.T) {
-	// Arrange: a reader that returns data then fails.
 	r := &failingReader{data: []byte(`{"Action":"pass","Package":"p","Elapsed":1}` + "\n")}
 
-	// Act
 	rep, err := Parse(r)
 
-	// Assert
 	if err == nil {
 		t.Fatalf("Parse should propagate the scanner read error, got nil (rep=%+v)", rep)
 	}
@@ -163,11 +138,7 @@ func TestParse_ScannerError_Propagates(t *testing.T) {
 	}
 }
 
-// When no package exceeds the wall-time threshold, the slow-packages table
-// must render the explicit "_(none)_" placeholder row rather than an empty
-// table body — that placeholder is the signal a reader scans for.
 func TestMarkdown_NoSlowPackages_RendersNonePlaceholder(t *testing.T) {
-	// Arrange: a fast suite (budget package only, 0.4s wall < 5s threshold).
 	const fastOnly = `
 {"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestTiny","Elapsed":0.01}
 {"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Elapsed":0.4}
@@ -177,10 +148,8 @@ func TestMarkdown_NoSlowPackages_RendersNonePlaceholder(t *testing.T) {
 		t.Fatalf("Parse: %v", err)
 	}
 
-	// Act
 	md := rep.Markdown(MarkdownOptions{Title: "T", Top: 10, ThresholdPkg: 5.0, ThresholdTst: 1.0})
 
-	// Assert
 	if !strings.Contains(md, "| _(none)_ | | | | | |") {
 		t.Errorf("expected the no-slow-packages placeholder row; got:\n%s", md)
 	}
@@ -189,20 +158,14 @@ func TestMarkdown_NoSlowPackages_RendersNonePlaceholder(t *testing.T) {
 	}
 }
 
-// The slowest-tests table must honour the Top cap: with Top=1 and two tests,
-// only the single slowest row is rendered.
 func TestMarkdown_TopCap_TruncatesSlowestTable(t *testing.T) {
-	// Arrange
 	rep, err := Parse(strings.NewReader(sample))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
 
-	// Act: Top=1 forces the i >= o.Top break after the first (slowest) row.
 	md := rep.Markdown(MarkdownOptions{Title: "T", Top: 1, ThresholdPkg: 5.0, ThresholdTst: 1.0})
 
-	// Assert: the slowest test (TestSlow) is present, the next-slowest (TestFast)
-	// is truncated out of the per-test table.
 	if !strings.Contains(md, "| TestSlow | internal/bridge | 12.50 |") {
 		t.Errorf("slowest test row TestSlow missing; got:\n%s", md)
 	}

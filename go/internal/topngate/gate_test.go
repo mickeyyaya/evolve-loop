@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// writeTriageReport also writes the matching triage-decision.json, which core.ContractTaskIDs reads.
 func writeTriageReport(t *testing.T, workspace string, topN ...string) {
 	t.Helper()
 	writeTriageDecision(t, workspace, topN, nil)
@@ -241,8 +240,6 @@ type scoutTask struct {
 	targetFiles []string
 }
 
-// writeScoutReportTasks follows each backticked path with prose, as real scout
-// reports do, so the parser must ignore the annotations.
 func writeScoutReportTasks(t *testing.T, workspace string, tasks ...scoutTask) {
 	t.Helper()
 	var b strings.Builder
@@ -362,8 +359,6 @@ func TestTDDScopeGate_FileScopeBinding(t *testing.T) {
 	})
 
 	t.Run("scope is read per-slug, never borrowed from a sibling task", func(t *testing.T) {
-		// The decoy declares exactly the tree TDD authored into, so a parser
-		// that reads any task's targetFiles line would stay silent.
 		ws := t.TempDir()
 		writeTriageReport(t, ws, "committed-slug")
 		writeScoutReportTasks(t, ws,

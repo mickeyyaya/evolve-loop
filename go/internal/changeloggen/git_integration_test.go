@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// initGitRepo materializes a temp git repo with a known commit history
-// for ReadGitLog + VerifyRef coverage. Uses a hermetic env so the test
-// doesn't pick up the user's git config / signing keys.
 func initGitRepo(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -32,7 +29,6 @@ func initGitRepo(t *testing.T) string {
 		}
 	}
 	mustRun("init", "-q", "-b", "main")
-	// Seed two commits + tag the first.
 	if err := os.WriteFile(filepath.Join(tmp, "a.txt"), []byte("a"), 0o644); err != nil {
 		t.Fatalf("seed a: %v", err)
 	}
@@ -61,7 +57,6 @@ func TestReadGitLog_RealRepo(t *testing.T) {
 	if len(commits) != 2 {
 		t.Fatalf("expected 2 commits since v0.1.0, got %d: %+v", len(commits), commits)
 	}
-	// Most recent commit first (git log default).
 	if !strings.HasPrefix(commits[0].Subject, "chore:") {
 		t.Errorf("first commit subject=%q", commits[0].Subject)
 	}
@@ -77,7 +72,6 @@ func TestReadGitLog_RealRepo(t *testing.T) {
 
 func TestReadGitLog_NoCommitsInRange(t *testing.T) {
 	repo := initGitRepo(t)
-	// HEAD..HEAD should be empty.
 	_, err := ReadGitLog(repo, "HEAD", "HEAD")
 	if !errors.Is(err, ErrNoCommits) {
 		t.Errorf("expected ErrNoCommits, got %v", err)

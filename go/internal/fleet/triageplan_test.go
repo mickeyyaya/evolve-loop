@@ -99,7 +99,6 @@ func TestPlanFromTriage_EmptyInputsNeverOverSchedule(t *testing.T) {
 }
 
 func TestPlanFromTriage_ProductionFixtureTopNOnlyFallback(t *testing.T) {
-	// A real triage-decision.json shape: top_n cards only, no committed_floors, and nil cardPackages.
 	decisionJSON := []byte(`{
 		"cycle": 464,
 		"top_n": [

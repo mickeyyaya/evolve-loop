@@ -77,8 +77,6 @@ func TestChannelSourcePaths_Headless(t *testing.T) {
 	}
 }
 
-// Process env is never read at all; TestCoreAdapter_HasNoStderrLinesAndNoEnvReads
-// pins that. This test covers the request-scoped key and its hyphen mapping.
 func TestChannelSourcePaths_PerAgentKeyIgnoresProcessEnv(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()

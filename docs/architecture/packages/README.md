@@ -184,3 +184,46 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/retrofile` | lifts the preventive actions of a retro report into weighted inbox todos | [internal-retrofile.md](internal-retrofile.md) |
 | `internal/log` | JSONL sidecar events, slog channels, the operator console and the safe rendering of untrusted diagnostic fields | [internal-log.md](internal-log.md) |
 | `internal/phasewatchdog` | kills the process group of a phase that shows no file activity for longer than a threshold | [internal-phasewatchdog.md](internal-phasewatchdog.md) |
+| `internal/committedset` | the one answer to which tasks a cycle committed to, read from the lane pin and triage's decision, and which ids triage answered for | [internal-committedset.md](internal-committedset.md) |
+| `internal/treefence` | a content fence around the worktree of a read-only phase: it takes a tree snapshot and restores every change the phase made | [internal-treefence.md](internal-treefence.md) |
+| `internal/verdictcache` | the content-addressed store that binds a reusable audit verdict to the tree SHA it judged (ADR-0048) | [internal-verdictcache.md](internal-verdictcache.md) |
+| `internal/marketplacepoll` | polls the local marketplace checkout until its plugin version matches the release target | [internal-marketplacepoll.md](internal-marketplacepoll.md) |
+| `internal/docsfloor` | the docs floor: an architecture-labeled change must touch documentation (ADR-0077) | [internal-docsfloor.md](internal-docsfloor.md) |
+| `internal/phases/tdd` | the RED test-writer phase: its verdict mapping, prompt composition and artifact name | [internal-phases-tdd.md](internal-phases-tdd.md) |
+| `internal/bridgechain` | the bridge decorator that walks the CLI and tier fallback chain for every launcher | [internal-bridgechain.md](internal-bridgechain.md) |
+| `internal/releasetargets` | parses .goreleaser.yml, the release build matrix, into the target list and asset names the release-verify-binaries gate checks | [internal-releasetargets.md](internal-releasetargets.md) |
+| `internal/skillinventory` | builds the cached skill inventory by category that Scout reads as routing hints | [internal-skillinventory.md](internal-skillinventory.md) |
+| `pkg/naminguard` | the config-driven guard against dead naming tokens that a rename leaves behind; public API | [pkg-naminguard.md](pkg-naminguard.md) |
+| `internal/runlease` | the per-run .lease heartbeat file shared by the retention engine and the fleet scheduler: freshness, owner liveness, write ordering | [internal-runlease.md](internal-runlease.md) |
+| `internal/phases/intent` | the goal-capture phase: delta mode, the deterministic goal-hash skip and the verdict mapping | [internal-phases-intent.md](internal-phases-intent.md) |
+| `internal/phases/debugger` | the ship-recovery diagnosis phase: the decision file, the recovery signals and the safe BLOCK default | [internal-phases-debugger.md](internal-phases-debugger.md) |
+| `internal/changeloggen` | renders conventional-commit subjects into a Keep-a-Changelog entry and prepends it idempotently | [internal-changeloggen.md](internal-changeloggen.md) |
+| `internal/phaseblock` | the content-addressed, chained digest of each pipeline phase | [internal-phaseblock.md](internal-phaseblock.md) |
+| `internal/phaseconfig` | the unified phase descriptor: spec, dispatch config and swarm worker count | [internal-phaseconfig.md](internal-phaseconfig.md) |
+| `internal/core/outcome` | the recording chokepoint for every terminal phase disposition | [internal-core-outcome.md](internal-core-outcome.md) |
+| `internal/cliadmit` | cross-process admission control for shared LLM CLIs | [internal-cliadmit.md](internal-cliadmit.md) |
+| `internal/ciwatch` | the CI watch that files a fix-forward item for a red run | [internal-ciwatch.md](internal-ciwatch.md) |
+| `internal/llmcalls` | the model-try ledger and its performance index | [internal-llmcalls.md](internal-llmcalls.md) |
+| `internal/core/failurediag` | the phase failure sidecar and the delivery-failure classifier | [internal-core-failurediag.md](internal-core-failurediag.md) |
+| `internal/releaseconsistency` | the version-marker consistency check of a release | [internal-releaseconsistency.md](internal-releaseconsistency.md) |
+| `internal/adapters/flock` | the blocking and non-blocking file-lock primitives | [internal-adapters-flock.md](internal-adapters-flock.md) |
+| `internal/adapters/runner` | the in-process and subprocess phase runner adapters | [internal-adapters-runner.md](internal-adapters-runner.md) |
+| `internal/sysexec` | the single seam for running external commands | [internal-sysexec.md](internal-sysexec.md) |
+| `internal/sessionrecord` | the per-run tmux session registry schema | [internal-sessionrecord.md](internal-sessionrecord.md) |
+| `internal/pruneephemeral` | TTL retention for phase-tracker ephemeral data | [internal-pruneephemeral.md](internal-pruneephemeral.md) |
+| `internal/dispositionrouter` | routes a classified failure to the operator console or the lane queue, and stages the intents | [internal-dispositionrouter.md](internal-dispositionrouter.md) |
+| `internal/gopkgpattern` | the shared rule that recognizes and normalizes `go test` package patterns in Go source | [internal-gopkgpattern.md](internal-gopkgpattern.md) |
+| `internal/phases/registry` | the Factory Method that maps a phase name to its runner factory | [internal-phases-registry.md](internal-phases-registry.md) |
+| `internal/treestate` | computes the tree-state SHA, the sha256 of `git diff HEAD`, that binds an audit to a tree | [internal-treestate.md](internal-treestate.md) |
+| `cmd/testlatency` | turns a `go test -json` stream into a Markdown latency report | [cmd-testlatency.md](cmd-testlatency.md) |
+| `internal/codequality` | runs the deterministic gofmt gates that mirror the CI format step | [internal-codequality.md](internal-codequality.md) |
+| `internal/plane` | tells the console checkout from a linked runtime worktree | [internal-plane.md](internal-plane.md) |
+| `internal/contextfill` | derives how full the context window of a phase got from its token counts | [internal-contextfill.md](internal-contextfill.md) |
+| `internal/solutioncheck` | the deterministic judge of the deliverable shape of a document cycle | [internal-solutioncheck.md](internal-solutioncheck.md) |
+| `internal/redteamcheck` | the standing anti-gaming ledger-integrity checks | [internal-redteamcheck.md](internal-redteamcheck.md) |
+| `internal/core/evidence` | the commit-as-evidence trailer that proves a phase delivered | [internal-core-evidence.md](internal-core-evidence.md) |
+| `internal/routingeval` | the golden corpus that replays advisor responses through the routing floor | [internal-routingeval.md](internal-routingeval.md) |
+| `internal/backfill` | rebuilds a missing phase artifact from the clean stdout of the phase | [internal-backfill.md](internal-backfill.md) |
+| `internal/skilloverlay` | turns policy-resolved skill overlays into a prompt prefix | [internal-skilloverlay.md](internal-skilloverlay.md) |
+| `internal/goalhash` | hashes a loop goal string, byte for byte as the legacy bash pipeline did | [internal-goalhash.md](internal-goalhash.md) |
+| `examples/secure-orchestrator` | a reference program with four defenses against agent reward hacking | [examples-secure-orchestrator.md](examples-secure-orchestrator.md) |

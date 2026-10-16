@@ -5,20 +5,6 @@ import (
 	"testing"
 )
 
-// TDD RED (cycle-806, task sweep-tombstone-attribution).
-//
-// ReadAllResolving and ReapedSuffix do not yet exist → this file fails to
-// compile until Builder adds the tombstone-aware resolver. Contract: after
-// ReapOrphans tombstones a fully-reaped registry (rename <path> →
-// <path>+ReapedSuffix, sessionreaper.go:92-95), a caller must STILL be able to
-// attribute the killed sessions to their owning run. Attribution is preserved
-// in the `.reaped` tombstone, not lost — but the live-path ReadAll can no
-// longer discover it. ReadAllResolving closes that gap by unioning the live
-// registry with its tombstone, deduped by session id.
-
-// AC1.1 — a session recorded then tombstoned (live path renamed to .reaped)
-// must still resolve. Behavioral: exercises the resolver against a real
-// on-disk tombstone produced the way ReapOrphans produces it.
 func TestReadAllResolving_ReadsTombstoneAfterReap(t *testing.T) {
 	dir := t.TempDir()
 	path := PathIn(dir)
@@ -26,7 +12,6 @@ func TestReadAllResolving_ReadsTombstoneAfterReap(t *testing.T) {
 	if err := Append(path, rec); err != nil {
 		t.Fatal(err)
 	}
-	// Simulate the reaper's tombstone: the live registry no longer exists.
 	if err := os.Rename(path, path+ReapedSuffix); err != nil {
 		t.Fatal(err)
 	}
@@ -42,12 +27,9 @@ func TestReadAllResolving_ReadsTombstoneAfterReap(t *testing.T) {
 	}
 }
 
-// AC1.2 (negative / no-fabrication) — a run with NEITHER a live registry NOR a
-// tombstone must resolve to zero records and no error. A resolver that ever
-// fabricates attribution is worse than one that loses it.
 func TestReadAllResolving_MissingBothIsZeroNoFabrication(t *testing.T) {
 	dir := t.TempDir()
-	recs, err := ReadAllResolving(PathIn(dir)) // neither <path> nor <path>.reaped exists
+	recs, err := ReadAllResolving(PathIn(dir))
 	if err != nil {
 		t.Fatalf("ReadAllResolving on empty dir: %v", err)
 	}
@@ -56,9 +38,6 @@ func TestReadAllResolving_MissingBothIsZeroNoFabrication(t *testing.T) {
 	}
 }
 
-// AC1.3 (edge) — the same session present in BOTH the live registry and the
-// tombstone (a run relaunched after a reap re-creates the registry) must NOT be
-// double-counted: the union deduplicates by session id.
 func TestReadAllResolving_LiveAndTombstoneNoDoubleCount(t *testing.T) {
 	dir := t.TempDir()
 	path := PathIn(dir)

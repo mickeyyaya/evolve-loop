@@ -12,13 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-// Location is where an item lives; Cycle is 0 at the inbox root, else the cycle whose claim holds it.
 type Location struct {
 	Path  string
 	Cycle int
 }
 
-// Locate finds an id's file, a processing claim before the inbox root; a missing id or inbox is ErrNotFound.
 func Locate(inboxDir, id string) (Location, error) {
 	for _, dir := range inboxbatch.ProcessingCycleDirs(inboxDir) {
 		if path, ferr := FindFileByTaskID(dir, id); ferr == nil {
@@ -37,7 +35,6 @@ func Locate(inboxDir, id string) (Location, error) {
 	}
 }
 
-// FindFileByTaskID finds the file in dir whose JSON id is taskID (filenames carry timestamps); no match is ErrNotFound.
 func FindFileByTaskID(dir, taskID string) (string, error) {
 	entries, err := jsonEntries(dir)
 	if err != nil {
@@ -83,7 +80,6 @@ func jsonEntries(dir string) ([]os.DirEntry, error) {
 	return out, nil
 }
 
-// readID reads a file's JSON id; ok is false only when the file cannot be read or parsed.
 func readID(path string) (string, bool) {
 	body, err := os.ReadFile(path)
 	if err != nil {
@@ -105,7 +101,6 @@ func readTaskIDOrUnknown(path string) string {
 	return "unknown"
 }
 
-// ReadFailureCount returns taskID's failure_count from the inbox root or a processing claim; ok is false when absent.
 func (m *Mover) ReadFailureCount(taskID string) (int, bool) {
 	dirs := append([]string{m.inboxDir}, inboxbatch.ProcessingCycleDirs(m.inboxDir)...)
 	for _, d := range dirs {
@@ -134,23 +129,20 @@ func readFailureCountAt(path string) (int, bool) {
 	return doc.FailureCount, true
 }
 
-// BumpFailureCount atomically increments an item's failure_count, records reason and returns the new count.
 func BumpFailureCount(path, reason string) (int, error) {
 	return bumpWith(path, reason, nil)
 }
 
-// bumpWith sheds the continuation stamp in the same write once shedAt(count) holds:
-// quarantine is terminal, so a revived item starts fresh.
 func bumpWith(path, reason string, shedAt func(count int) bool) (int, error) {
 	count := 0
 	err := UpdateItemJSON(path, func(item map[string]json.RawMessage) {
 		if raw, ok := item[inboxbatch.FailureCountField]; ok {
-			_ = json.Unmarshal(raw, &count) // a non-numeric counter reads as 0 (tolerant)
+			_ = json.Unmarshal(raw, &count)
 		}
 		count++
 		item[inboxbatch.FailureCountField] = json.RawMessage(strconv.Itoa(count))
 		if reason != "" {
-			rb, _ := json.Marshal(reason) // a string never fails to marshal
+			rb, _ := json.Marshal(reason)
 			item[inboxbatch.LastFailureReasonField] = rb
 		}
 		if shedAt != nil && shedAt(count) {
@@ -163,7 +155,6 @@ func bumpWith(path, reason string, shedAt func(count int) bool) (int, error) {
 	return count, nil
 }
 
-// UpdateItemJSON atomically rewrites an item with mutate applied to its top-level fields; mutate must not retain the map.
 func UpdateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {
 	return updateAdmittedItemJSON(path, admitEvery, mutate)
 }

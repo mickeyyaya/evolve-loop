@@ -17,8 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// createEnvelopeOut is the stable stdout JSON contract of `phases create`.
-// See ADR-0038.
 type createEnvelopeOut struct {
 	OK               bool     `json:"ok"`
 	Phase            string   `json:"phase,omitempty"`
@@ -33,8 +31,6 @@ type createEnvelopeOut struct {
 	Hint             string   `json:"hint,omitempty"`
 }
 
-// mintSpec is an advisor mint promoted by --mint. Its JSON matches router.MintSpec plus Name,
-// which a runtime mint carries on its plan entry instead.
 type mintSpec struct {
 	Name         string `json:"name"`
 	Prompt       string `json:"prompt"`
@@ -43,7 +39,6 @@ type mintSpec struct {
 	WritesSource bool   `json:"writes_source,omitempty"`
 }
 
-// phasesCreate implements `evolve phases create`; it exits 0 created, 1 I/O error, 2 validation or collision, 10 usage.
 func phasesCreate(project string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	flags, code := parseCreateFlags(args, stderr)
 	if code != 0 {
@@ -108,7 +103,7 @@ func parseCreateFlags(args []string, stderr io.Writer) (createFlags, int) {
 		return createFlags{}, 10
 	}
 
-	if (*specArg == "") == (*mintArg == "") { // exactly one of --spec/--mint
+	if (*specArg == "") == (*mintArg == "") {
 		fmt.Fprintln(stderr, "usage: evolve phases create --spec <file|-> [--persona <file|->] | --mint <file|->")
 		return createFlags{}, 10
 	}
@@ -120,8 +115,6 @@ func parseCreateFlags(args []string, stderr io.Writer) (createFlags, int) {
 }
 
 func checkPersonaPath(project, personaPath, agentName string, hasPersonaBody bool) (refusal, warning string) {
-	// The spec is untrusted LLM input: the persona path must stay inside agents/ and never
-	// overwrite another phase's persona.
 	if agentsDir := filepath.Join(project, "agents") + string(filepath.Separator); !strings.HasPrefix(personaPath, agentsDir) {
 		return fmt.Sprintf("agent %q resolves outside agents/ — refusing", agentName), ""
 	}
@@ -136,8 +129,6 @@ func checkPersonaPath(project, personaPath, agentName string, hasPersonaBody boo
 }
 
 func writePhaseFiles(targetRoot string, spec phasespec.PhaseSpec, personaPath, personaBody string, stderr io.Writer) (phasePath string, code int) {
-	// Write phase.json, then the persona, rolling back on a persona failure. Check-then-write is not
-	// atomic across concurrent invocations, which is accepted for a single-operator CLI.
 	specJSON, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		fmt.Fprintf(stderr, "marshal spec: %v\n", err)
@@ -153,7 +144,6 @@ func writePhaseFiles(targetRoot string, spec phasespec.PhaseSpec, personaPath, p
 	}
 	if personaBody != "" {
 		if err := atomicwrite.Bytes(personaPath, []byte(personaBody)); err != nil {
-			// Remove only what this invocation created: a pre-existing directory may hold operator files.
 			if dirCreatedByUs {
 				_ = os.RemoveAll(phaseDir)
 			} else {
@@ -167,7 +157,6 @@ func writePhaseFiles(targetRoot string, spec phasespec.PhaseSpec, personaPath, p
 }
 
 func rebuildInventory(project string, roots, warnings []string) (bool, []string) {
-	// Make the phase visible to the next cycle immediately.
 	invRes, invErr := phaseinventory.Build(phaseinventory.Options{
 		ProjectRoot: project, Roots: roots, NowFn: time.Now, Force: true,
 	})
@@ -197,7 +186,6 @@ func createdEnvelope(project string, spec phasespec.PhaseSpec, phasePath string,
 
 const createHint = "fix errors and re-run: evolve phases create --spec -"
 
-// loadCreateInputs returns parse failures as envelope errors and I/O failures as an exit code.
 func loadCreateInputs(specArg, personaArg, mintArg string, stdin io.Reader, stderr io.Writer) (spec phasespec.PhaseSpec, personaBody string, errs []string, code int) {
 	if mintArg != "" {
 		raw, err := readArg(mintArg, stdin)
@@ -242,8 +230,6 @@ func loadCreateInputs(specArg, personaArg, mintArg string, stdin io.Reader, stde
 	return spec, personaBody, nil, 0
 }
 
-// findCollision names an existing built-in or user phase called name. An unreadable registry
-// fails open: the user roots are still checked.
 func findCollision(project string, roots []string, name string) string {
 	registryPath := config.RegistryPath(project)
 	if builtin, err := phasespec.Load(registryPath); err == nil {
@@ -258,7 +244,6 @@ func findCollision(project string, roots []string, name string) string {
 	return ""
 }
 
-// softLintWarnings holds the soft checks shared by `phase lint` and `phases create`.
 func softLintWarnings(s phasespec.PhaseSpec) []string {
 	var warnings []string
 	if s.RoleOrDefault() == phasespec.RoleEvaluate {
@@ -275,8 +260,6 @@ func softLintWarnings(s phasespec.PhaseSpec) []string {
 	return warnings
 }
 
-// resolveTargetRoot accepts --root only as a configured root or a path inside the project, so create
-// never writes, or rolls back with RemoveAll, outside what the pipeline reads. Empty means the first root.
 func resolveTargetRoot(arg, project string, roots []string) (string, bool) {
 	if arg == "" {
 		return roots[0], true
@@ -300,7 +283,6 @@ func resolveTargetRoot(arg, project string, roots []string) (string, bool) {
 func emitEnvelope(stdout io.Writer, env createEnvelopeOut, code int) int {
 	raw, err := json.MarshalIndent(env, "", "  ")
 	if err != nil {
-		// The fallback must still be valid JSON: the envelope is a machine contract.
 		msg, _ := json.Marshal("internal: envelope marshal: " + err.Error())
 		fmt.Fprintf(stdout, `{"ok":false,"errors":[%s]}`+"\n", msg)
 		return 1
@@ -309,7 +291,6 @@ func emitEnvelope(stdout io.Writer, env createEnvelopeOut, code int) int {
 	return code
 }
 
-// readArg reads a file path, or stdin when the arg is "-".
 func readArg(arg string, stdin io.Reader) ([]byte, error) {
 	if arg == "-" {
 		if stdin == nil {
@@ -330,7 +311,6 @@ func stdinCount(args ...string) int {
 	return n
 }
 
-// firstLine returns the first non-empty line of s, trimmed.
 func firstLine(s string) string {
 	for _, line := range strings.Split(s, "\n") {
 		if line = strings.TrimSpace(line); line != "" {
@@ -340,7 +320,6 @@ func firstLine(s string) string {
 	return ""
 }
 
-// relTo renders path project-relative when possible (for stable envelopes).
 func relTo(project, path string) string {
 	if rel, err := filepath.Rel(project, path); err == nil && !strings.HasPrefix(rel, "..") {
 		return filepath.ToSlash(rel)

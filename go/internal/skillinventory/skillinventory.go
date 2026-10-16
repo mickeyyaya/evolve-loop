@@ -1,18 +1,6 @@
-// Package skillinventory builds .evolve/skill-inventory.json — a cache
-// of all available skills indexed by category. Scout uses the
-// categoryIndex subset matching project language/framework/task-types
-// as routing hints (`skillCategories`).
-//
-// Cache semantics: the output file's mtime determines freshness. When
-// it's younger than TTL, Build is a no-op (returns the cached path).
-// Operators force a rebuild via --force or by deleting the file.
-//
-// Skill discovery: walks <project_root>/skills/*/SKILL.md and parses
-// the YAML frontmatter for `categories: [...]` and `name: ...` fields.
-// Skills without frontmatter are listed under category "uncategorized"
-// so they're still discoverable.
-//
-// v12.1 Phase 2A port. CLI: `evolve skill-inventory build [--ttl 1h]`.
+// Package skillinventory builds .evolve/skill-inventory.json — a cache of
+// all available skills indexed by category.
+// See docs/architecture/packages/internal-skillinventory.md.
 package skillinventory
 
 import (
@@ -27,21 +15,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// DefaultTTL is the cache freshness window. 1h matches the bash
-// script's behavior so operators see no change in cadence.
 const DefaultTTL = time.Hour
 
-// Inventory is the on-disk JSON shape. Stable; the schema is the
-// public contract for Scout's skillCategories input.
 type Inventory struct {
 	GeneratedAt   time.Time           `json:"generated_at"`
 	ProjectRoot   string              `json:"project_root"`
 	SkillCount    int                 `json:"skill_count"`
 	Skills        []SkillEntry        `json:"skills"`
-	CategoryIndex map[string][]string `json:"category_index"` // category → []skill name
+	CategoryIndex map[string][]string `json:"category_index"`
 }
 
-// SkillEntry is a single skill's summary line.
 type SkillEntry struct {
 	Name        string   `json:"name"`
 	Path        string   `json:"path"`
@@ -49,9 +32,6 @@ type SkillEntry struct {
 	Categories  []string `json:"categories,omitempty"`
 }
 
-// Options configures Build. ProjectRoot is required. TTL defaults to
-// DefaultTTL. NowFn is the time source (override for deterministic
-// tests). Force forces a rebuild regardless of cache freshness.
 type Options struct {
 	ProjectRoot string
 	TTL         time.Duration
@@ -59,15 +39,12 @@ type Options struct {
 	Force       bool
 }
 
-// Result captures the outcome of a Build call.
 type Result struct {
 	OutputPath string
-	CacheHit   bool // true when the cache was fresh enough to skip rebuild
+	CacheHit   bool
 	SkillCount int
 }
 
-// Build produces the inventory at <project_root>/.evolve/skill-inventory.json.
-// Returns Result describing what was written (or that the cache was reused).
 func Build(opts Options) (Result, error) {
 	if opts.ProjectRoot == "" {
 		return Result{}, fmt.Errorf("skillinventory: ProjectRoot required")
@@ -98,19 +75,16 @@ func Build(opts Options) (Result, error) {
 		return Result{}, fmt.Errorf("skillinventory: scan: %w", err)
 	}
 
-	// atomicwrite.JSON creates the parent dir, writes 0644, and renames atomically.
 	if err := atomicwrite.JSON(outPath, inv); err != nil {
 		return Result{}, fmt.Errorf("skillinventory: write: %w", err)
 	}
 	return Result{OutputPath: outPath, SkillCount: inv.SkillCount}, nil
 }
 
-// scan walks the skills directory and assembles the Inventory.
 func scan(projectRoot string, now time.Time) (Inventory, error) {
 	loader := prompts.NewFromDir(projectRoot)
 	names, err := loader.Skills()
 	if err != nil {
-		// No skills dir is not fatal — emit an empty inventory.
 		if os.IsNotExist(err) {
 			return Inventory{
 				GeneratedAt:   now,
@@ -148,7 +122,6 @@ func scan(projectRoot string, now time.Time) (Inventory, error) {
 		inv.Skills = append(inv.Skills, entry)
 	}
 	inv.SkillCount = len(inv.Skills)
-	// Stable ordering for deterministic diffs.
 	sort.Slice(inv.Skills, func(i, j int) bool { return inv.Skills[i].Name < inv.Skills[j].Name })
 	for _, list := range inv.CategoryIndex {
 		sort.Strings(list)
@@ -156,14 +129,6 @@ func scan(projectRoot string, now time.Time) (Inventory, error) {
 	return inv, nil
 }
 
-// extractCategories parses frontmatter for category hints. Handles
-// every shape the prompts.ParseFrontmatter helper can emit:
-//   - `categories: [a, b]` → []string (the common path)
-//   - `categories: "a, b"`  → string (comma-split fallback)
-//   - `categories: [a, b]` parsed as []any (defensive — third-party loaders)
-//
-// Empty values and unsupported types degrade to nil so the caller
-// maps the skill to "uncategorized" rather than crashing.
 func extractCategories(fm map[string]any) []string {
 	v, ok := fm["categories"]
 	if !ok {

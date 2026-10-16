@@ -27,11 +27,6 @@ func ids(in ...string) []map[string]string {
 	return out
 }
 
-// TestCommitted_Precedence pins the one answer every consumer projects from.
-// The shapes are the ones real cycles leave on disk: runtime cycle-1621 had a
-// lane pin naming two members while triage's top_n named one, and 17 of the
-// last 20 runtime cycles carried a pin — so a top_n-only reader under-reports
-// on the dominant shape.
 func TestCommitted_Precedence(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -80,9 +75,6 @@ func TestCommitted_Precedence(t *testing.T) {
 	}
 }
 
-// TestCommitted_MalformedIsUnknownNotEmpty: a corrupt artifact must never be
-// read as "committed to nothing" — that would let a parse failure masquerade
-// as a finding.
 func TestCommitted_MalformedIsUnknownNotEmpty(t *testing.T) {
 	ws := t.TempDir()
 	for _, name := range []string{LanePinFile, DecisionFile} {
@@ -95,8 +87,6 @@ func TestCommitted_MalformedIsUnknownNotEmpty(t *testing.T) {
 	}
 }
 
-// TestLanePinAndDecision_BlankIDsDropped keeps a malformed entry from becoming
-// a phantom member.
 func TestLanePinAndDecision_BlankIDsDropped(t *testing.T) {
 	ws := t.TempDir()
 	write(t, ws, LanePinFile, map[string]any{"todo_ids": []string{"alpha", "  ", ""}})
@@ -117,11 +107,6 @@ func TestLanePinAndDecision_BlankIDsDropped(t *testing.T) {
 	}
 }
 
-// TestLanePinDoc_IsTheOneWireShape names the pin's declaration directly. It is
-// the single home for those tags — core aliases this type rather than
-// redeclaring it, which is what cycleoutcome's
-// TestLaneScopeProjection_SingleWireShapeDeclaration enforces — so the fields
-// must round-trip exactly as the lane provisioner writes them.
 func TestLanePinDoc_IsTheOneWireShape(t *testing.T) {
 	ws := t.TempDir()
 	want := LanePinDoc{TodoIDs: []string{"alpha", "beta"}, GoalHash: "abc123"}
@@ -138,7 +123,6 @@ func TestLanePinDoc_IsTheOneWireShape(t *testing.T) {
 	if strings.Join(got.TodoIDs, ",") != "alpha,beta" || got.GoalHash != "abc123" {
 		t.Fatalf("round-trip = %+v, want %+v", got, want)
 	}
-	// And the projection reads that same shape.
 	if ids := LanePin(ws); strings.Join(ids, ",") != "alpha,beta" {
 		t.Errorf("LanePin = %v, want the pinned ids", ids)
 	}

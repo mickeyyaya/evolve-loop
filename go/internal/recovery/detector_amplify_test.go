@@ -64,7 +64,6 @@ func TestShellSpill_NewlinePrefixBoundary(t *testing.T) {
 	}
 }
 
-// Despite the name, this pins that matching is case-sensitive.
 func TestShellSpill_CaseInsensitiveBoundary(t *testing.T) {
 	t.Parallel()
 	d := SeedDetector()

@@ -38,10 +38,10 @@ func assertWaveFileDisjoint(t *testing.T, wave []CycleSpec, byID map[string]Todo
 func TestPlanWaves_WaveLevelFileDisjoint(t *testing.T) {
 	todos := []Todo{
 		{ID: "a", Files: []string{"f1.go"}},
-		{ID: "b", Files: []string{"f1.go", "f2.go"}}, // bridges a and c transitively
+		{ID: "b", Files: []string{"f1.go", "f2.go"}},
 		{ID: "c", Files: []string{"f2.go"}},
 		{ID: "d", Files: []string{"f3.go"}},
-		{ID: "e", Files: []string{"f1.go"}, DependsOn: []string{"a"}}, // later wave reuses f1 — allowed
+		{ID: "e", Files: []string{"f1.go"}, DependsOn: []string{"a"}},
 	}
 	byID := map[string]Todo{}
 	for _, td := range todos {

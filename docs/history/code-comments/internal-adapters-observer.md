@@ -364,3 +364,11 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // advancing) reports alive. The first sighting also reports alive (grace
 // window); an unchanged pane afterward reports not-alive (possibly hung).
 ```
+
+## comment-zero d10
+
+### `go/internal/adapters/observer/observer.go:52` — above `Severity string 'json:"severity"'`
+
+```text
+// info | incident
+```

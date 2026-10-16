@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// wantDefaultRuleTypes pins order, which is presentation-only, so a substitution fails as loudly as an addition.
 var wantDefaultRuleTypes = []string{
 	"inboxbatch.campaignRule",
 	"inboxbatch.fileAreaRule",
@@ -29,7 +28,6 @@ func TestDefaultRules_DoesNotBindOnRootCauseProse(t *testing.T) {
 		}
 	}
 
-	// Item has no root_cause field, so Title stands in as the free-form prose; no case shares anything else.
 	const prose = "verdict incoherence under contention: the tier reported RED because SubstantiveError was never populated"
 
 	for _, tc := range []struct {
@@ -87,7 +85,6 @@ func TestDefaultRules_DoesNotBindOnRootCauseProse(t *testing.T) {
 	}
 }
 
-// ruleTypeName strips a leading "*" so a pointer-receiver rule still matches the composition list.
 func ruleTypeName(r Rule) string {
 	return strings.TrimPrefix(fmt.Sprintf("%T", r), "*")
 }

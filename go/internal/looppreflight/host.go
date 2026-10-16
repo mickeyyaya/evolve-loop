@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 )
 
-// defaultDirWritable mirrors preflight's unexported mkdir, touch, remove probe; any failure means not writable.
 func defaultDirWritable(dir string) bool {
 	if dir == "" {
 		return false

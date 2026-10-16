@@ -6,9 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// Performance is one comparable model/outcome group. Token volumes include
-// every valid observed count; the output rate uses only complete measurements
-// with a positive attempt duration.
 type Performance struct {
 	CLI               string `json:"cli"`
 	Model             string `json:"model"`
@@ -51,9 +48,6 @@ type performanceAccumulator struct {
 	throughputOutput     int
 }
 
-// Aggregate builds a deterministic performance index without persisting a
-// second copy of the ledger. Legacy selector labels stay in RequestedModel and
-// are never treated as verified concrete identity.
 func Aggregate(records []Record) []Performance {
 	groups := make(map[performanceKey]*performanceAccumulator)
 	for _, rec := range records {

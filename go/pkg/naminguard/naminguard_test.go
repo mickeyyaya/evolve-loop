@@ -10,11 +10,8 @@ import (
 	"testing"
 )
 
-// Forbidden tokens are assembled at runtime so this committed test file never
-// contains a literal forbidden token — otherwise the legacynames gate (and Scan
-// itself) would flag the test that exercises them.
-func deadSlug() string   { return "evolve" + "loop" }                   // the dead repo slug
-func deadHandle() string { return "evolve-loop" + "@" + "evolve-loop" } // the dead plugin handle
+func deadSlug() string   { return "evolve" + "loop" }
+func deadHandle() string { return "evolve-loop" + "@" + "evolve-loop" }
 
 func testManifest() *Manifest {
 	return &Manifest{
@@ -85,8 +82,6 @@ func TestParseGrepOutput(t *testing.T) {
 	}
 }
 
-// --- integration: real git work tree ---------------------------------------
-
 func initRepo(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -128,8 +123,8 @@ func TestScan_FindsTrackedHonorsExclude(t *testing.T) {
 	tok := deadSlug()
 	writeTracked(t, dir, "README.md", "slug "+tok+"\nline 2 "+tok+"\n")
 	writeTracked(t, dir, "other.md", "slug "+tok+"\n")
-	writeTracked(t, dir, "sub/testdata/fixture.txt", "ignored "+tok+"\n") // excluded
-	writeTracked(t, dir, "clean.md", "all good evolve-loop\n")            // canonical, not forbidden
+	writeTracked(t, dir, "sub/testdata/fixture.txt", "ignored "+tok+"\n")
+	writeTracked(t, dir, "clean.md", "all good evolve-loop\n")
 
 	vs, err := Scan(dir, testManifest())
 	if err != nil {
@@ -153,7 +148,7 @@ func TestFix_RewritesAndReportsChanged(t *testing.T) {
 	dir := initRepo(t)
 	tok := deadSlug()
 	writeTracked(t, dir, "README.md", "slug "+tok+" here\n")
-	writeTracked(t, dir, "sub/testdata/f.txt", tok+"\n") // excluded -> untouched
+	writeTracked(t, dir, "sub/testdata/f.txt", tok+"\n")
 
 	m := testManifest()
 	changed, err := Fix(dir, m)
@@ -206,8 +201,6 @@ func TestFix_PreservesExecutableMode(t *testing.T) {
 	}
 }
 
-// deadCmdNS assembles the boundary-anchored dead-command-namespace regex so the
-// literal dead-command token never appears in this committed source.
 func deadCmdNS() string { return "(^|[^A-Za-z0-9._/-])" + "/evolve-loop" + ":" }
 
 func TestApplyRegex_BoundaryAnchored(t *testing.T) {
@@ -223,7 +216,6 @@ func TestApplyRegex_BoundaryAnchored(t *testing.T) {
 	if want := "run /evo:loop here"; got != want {
 		t.Errorf("apply(command) = %q, want %q", got, want)
 	}
-	// A repo-ref URL (owner/repo:branch) must be left alone (boundary char is alnum).
 	url := "github.com/mickeyyaya/" + "evolve-loop" + ":main"
 	if out, _ := f.apply(url); out != url {
 		t.Errorf("apply rewrote a non-command ref: %q -> %q", url, out)
@@ -257,17 +249,14 @@ func TestViolation_String(t *testing.T) {
 }
 
 func TestValidate_InvalidForbidden(t *testing.T) {
-	// empty token
 	m1 := &Manifest{Forbidden: []Forbidden{{Token: "", Replacement: "bar"}}}
 	if err := m1.Validate(); err == nil || !strings.Contains(err.Error(), "has empty token") {
 		t.Errorf("expected empty token error, got %v", err)
 	}
-	// invalid match type
 	m2 := &Manifest{Forbidden: []Forbidden{{Token: "foo", Replacement: "bar", Match: "invalid"}}}
 	if err := m2.Validate(); err == nil || !strings.Contains(err.Error(), "want \"fixed\" or \"regex\"") {
 		t.Errorf("expected invalid match type error, got %v", err)
 	}
-	// invalid regex
 	m3 := &Manifest{Forbidden: []Forbidden{{Token: "[invalid", Replacement: "bar", Match: "regex"}}}
 	if err := m3.Validate(); err == nil || !strings.Contains(err.Error(), "regex") {
 		t.Errorf("expected invalid regex error, got %v", err)
@@ -275,12 +264,10 @@ func TestValidate_InvalidForbidden(t *testing.T) {
 }
 
 func TestParseGrepOutput_Errors(t *testing.T) {
-	// line number missing second colon
 	_, err := parseGrepOutput("file:123", "tok")
 	if err == nil || !strings.Contains(err.Error(), "unparseable grep line") {
 		t.Errorf("expected unparseable error, got %v", err)
 	}
-	// line number not an integer
 	_, err = parseGrepOutput("file:notanint:text", "tok")
 	if err == nil || !strings.Contains(err.Error(), "bad line number") {
 		t.Errorf("expected bad line number error, got %v", err)
@@ -288,13 +275,11 @@ func TestParseGrepOutput_Errors(t *testing.T) {
 }
 
 func TestWriteFilePreservingMode_Errors(t *testing.T) {
-	// Non-existent file (Stat error)
 	err := writeFilePreservingMode("/nonexistent/file/path", []byte("data"))
 	if err == nil {
 		t.Fatal("expected error for non-existent file")
 	}
 
-	// Sibling directory that exists but is read-only (CreateTemp error)
 	dir := t.TempDir()
 	subDir := filepath.Join(dir, "readonly")
 	if err := os.Mkdir(subDir, 0755); err != nil {
@@ -304,12 +289,10 @@ func TestWriteFilePreservingMode_Errors(t *testing.T) {
 	if err := os.WriteFile(file, []byte("original"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	// Make directory read-only (read/execute but no write)
 	if err := os.Chmod(subDir, 0555); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		// Restore permissions to clean up
 		_ = os.Chmod(subDir, 0755)
 	}()
 
@@ -325,7 +308,6 @@ func TestScanAndFix_MockGrepErrors(t *testing.T) {
 
 	m := testManifest()
 
-	// Test gitGrep returning error
 	gitGrep = func(root string, args ...string) (string, int, error) {
 		return "", -1, fmt.Errorf("simulated grep error")
 	}
@@ -336,7 +318,6 @@ func TestScanAndFix_MockGrepErrors(t *testing.T) {
 		t.Fatal("expected Fix error")
 	}
 
-	// Test gitGrep returning bad exit code (e.g. 128)
 	gitGrep = func(root string, args ...string) (string, int, error) {
 		return "some stdout", 128, nil
 	}
@@ -347,7 +328,6 @@ func TestScanAndFix_MockGrepErrors(t *testing.T) {
 		t.Fatal("expected Fix error for exit 128")
 	}
 
-	// Test gitGrep returning a file that doesn't exist to trigger os.ReadFile error in Fix
 	gitGrep = func(root string, args ...string) (string, int, error) {
 		if strings.Contains(strings.Join(args, " "), "-l") {
 			return "does-not-exist.txt\n", 0, nil
@@ -358,7 +338,6 @@ func TestScanAndFix_MockGrepErrors(t *testing.T) {
 		t.Fatal("expected Fix error for missing file")
 	}
 
-	// Test parseGrepOutput returning error inside Scan
 	gitGrep = func(root string, args ...string) (string, int, error) {
 		return "garbage-no-colons\n", 0, nil
 	}
@@ -366,7 +345,6 @@ func TestScanAndFix_MockGrepErrors(t *testing.T) {
 		t.Fatal("expected Scan error when parseGrepOutput fails")
 	}
 
-	// Test f.apply returning error inside Fix (invalid regex pattern)
 	invalidRegexpManifest := &Manifest{
 		Forbidden: []Forbidden{
 			{Token: "[invalid", Replacement: "bar", Match: "regex"},
@@ -386,7 +364,6 @@ func TestScanAndFix_MockGrepErrors(t *testing.T) {
 		t.Fatal("expected Fix error when regex compile fails")
 	}
 
-	// Test nb == string(b) continue path
 	noopManifest := &Manifest{
 		Forbidden: []Forbidden{
 			{Token: "non-existent-token", Replacement: "bar"},
@@ -400,7 +377,6 @@ func TestScanAndFix_MockGrepErrors(t *testing.T) {
 		t.Errorf("expected no files to be changed, got %v", changedList)
 	}
 
-	// Test Fix failing during writeFilePreservingMode (write error) and empty relation check
 	mWriteFail := &Manifest{
 		Forbidden: []Forbidden{
 			{Token: "content", Replacement: "bar"},
@@ -416,12 +392,10 @@ func TestScanAndFix_MockGrepErrors(t *testing.T) {
 	}
 	gitGrep = func(root string, args ...string) (string, int, error) {
 		if strings.Contains(strings.Join(args, " "), "-l") {
-			// trailing empty line after split covers rel == "" continue path!
 			return filepath.Base(writeFailFile) + "\n\n", 0, nil
 		}
 		return "", 1, nil
 	}
-	// Make directory read-only so CreateTemp inside writeFilePreservingMode fails
 	if err := os.Chmod(writeFailDir, 0555); err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +419,6 @@ func TestLoad_InvalidJSON(t *testing.T) {
 
 func TestLoad_InvalidManifest(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "invalid_manifest.json")
-	// JSON is valid, but forbidden list is empty
 	if err := os.WriteFile(p, []byte(`{"forbidden": []}`), 0644); err != nil {
 		t.Fatal(err)
 	}

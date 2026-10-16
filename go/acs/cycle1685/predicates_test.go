@@ -182,7 +182,7 @@ func TestC1685_007_GateABlockingContractPreserved(t *testing.T) {
 	})
 }
 
-func TestC1685_008_NewExportIsNamedAndDocumented(t *testing.T) {
+func TestC1685_008_NewExportIsNamedAndDeclared(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	if !acsassert.FileContains(t, filepath.Join(root, "go", ".apicover-enforce"), "./internal/evalgate") {
 		t.Fatalf("internal/evalgate is no longer enrolled in go/.apicover-enforce — the premise of this predicate is gone; if enrollment was deliberately dropped, say so in build-report.md")
@@ -194,17 +194,13 @@ func TestC1685_008_NewExportIsNamedAndDocumented(t *testing.T) {
 	if !names["SelectedTasksParseMiss"] {
 		t.Errorf("no _test.go in internal/evalgate names SelectedTasksParseMiss — an enrolled package's export that no test names is an apicover false-green and hard-fails `make apicover-enforce`")
 	}
-	doc, impl := regexp.MustCompile(`(?m)^// SelectedTasksParseMiss\b`), regexp.MustCompile(`(?m)^func SelectedTasksParseMiss\(`)
-	var hasDoc, hasImpl bool
+	impl := regexp.MustCompile(`(?m)^func SelectedTasksParseMiss\(`)
+	var hasImpl bool
 	for _, src := range packageSources(t, evalgatePkgDir(root)) {
-		hasDoc = hasDoc || doc.MatchString(src)
 		hasImpl = hasImpl || impl.MatchString(src)
 	}
 	if !hasImpl {
 		t.Errorf("SelectedTasksParseMiss is not declared as a package-level func in internal/evalgate")
-	}
-	if !hasDoc {
-		t.Errorf("SelectedTasksParseMiss carries no godoc comment opening with its own name — apicover's Phase-5 Definition of Done requires godoc on every export")
 	}
 }
 
@@ -668,61 +664,35 @@ func statesFraction(doc string, num, den int, mustMention ...string) (string, bo
 	return "", false
 }
 
-func precedingComment(src, decl string) string {
-	i := strings.Index(src, decl)
-	if i < 0 {
-		return ""
-	}
-	lines := strings.Split(src[:i], "\n")
-	var block []string
-	for j := len(lines) - 1; j >= 0; j-- {
-		l := strings.TrimSpace(lines[j])
-		if l == "" && len(block) == 0 {
-			continue
-		}
-		if !strings.HasPrefix(l, "//") {
-			break
-		}
-		block = append([]string{l}, block...)
-	}
-	return strings.Join(block, "\n")
-}
-
 // acs-predicate: config-check
 func TestC1685_015_SlugsGoStatesTheMeasuredBlockingEffect(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	path := filepath.Join(evalgatePkgDir(root), "slugs.go")
+	path := filepath.Join(root, "docs", "architecture", "packages", "internal-evalgate.md")
 	body, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
-	src := string(body)
+	notes := string(body)
 
-	assertNoFalsifiedClaim(t, "go/internal/evalgate/slugs.go", src)
+	assertNoFalsifiedClaim(t, "docs/architecture/packages/internal-evalgate.md", notes)
 
-	claim := precedingComment(src, "var slugLineRE = ")
-	if strings.TrimSpace(claim) == "" {
-		t.Fatalf("slugLineRE carries no doc comment at all — the widening must still explain itself, now with the measured effect.\n%s", correctedClaimGuidance)
-	}
-	if _, ok := statesFraction(claim, measuredUnionDeltaReports, measuredReportCorpus, "union"); !ok {
-		t.Errorf("slugLineRE's comment does not state how many reports the widening actually changes the union for "+
-			"(want %d of %d, in a sentence that says \"union\").\nIt is the sentence that made the false claim, so it is where the measured one belongs.\ncomment:\n%s\n\n%s",
-			measuredUnionDeltaReports, measuredReportCorpus, claim, correctedClaimGuidance)
+	claim, ok := statesFraction(notes, measuredUnionDeltaReports, measuredReportCorpus, "union")
+	if !ok {
+		t.Fatalf("the evalgate notes do not state how many reports the widening actually changes the union for "+
+			"(want %d of %d, in a paragraph that says \"union\").\n%s",
+			measuredUnionDeltaReports, measuredReportCorpus, correctedClaimGuidance)
 	}
 	if !regexp.MustCompile(`(?i)\b`+strconv.Itoa(measuredNewlyBlockable)+`\b[^.]{0,160}block`).MatchString(claim) &&
 		!regexp.MustCompile(`(?i)block[^.]{0,160}\b`+strconv.Itoa(measuredNewlyBlockable)+`\b`).MatchString(claim) {
-		t.Errorf("slugLineRE's comment does not state that %d of those reports become newly BLOCKABLE.\n"+
-			"\"the union changes\" alone understates it: the union changing is harmless, the new block is the consequence H1 is about.\ncomment:\n%s\n\n%s",
-			measuredNewlyBlockable, claim, correctedClaimGuidance)
+		t.Errorf("the notes do not state that %d of those reports become newly BLOCKABLE.\n%s", measuredNewlyBlockable, claim)
 	}
 	for cycle, slug := range measuredNewlyBlockableEvidence {
 		if !strings.Contains(claim, cycle) && !strings.Contains(claim, slug) {
-			t.Errorf("slugLineRE's comment names neither %s nor its slug %q — the two newly blockable reports ARE the falsifying evidence, and an unnamed count is another claim to be trusted rather than re-derived.\n%s",
-				cycle, slug, correctedClaimGuidance)
+			t.Errorf("the notes name neither %s nor its slug %q.\n%s", cycle, slug, correctedClaimGuidance)
 		}
 	}
 	if !isoDateRE.MatchString(claim) {
-		t.Errorf("slugLineRE's comment carries no YYYY-MM-DD measurement date for the corrected figures (the file already uses this convention):\n%s", claim)
+		t.Errorf("the notes carry no YYYY-MM-DD measurement date for the corrected figures:\n%s", claim)
 	}
 }
 

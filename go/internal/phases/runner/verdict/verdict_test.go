@@ -15,13 +15,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The fixed bridge response the host goldens were captured with.
 var bridgeResp = core.BridgeResponse{ExitCode: 81, CostUSD: 1.5, Tokens: core.TokenUsage{Input: 42}, BootMS: 7}
 
 const (
-	reportPASS     = "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
-	challengeToken = "chal-tok-verdict-0001"
-	// reportWithToken echoes challengeToken, which the ACS floor requires.
+	reportPASS      = "# audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\"} -->\n"
+	challengeToken  = "chal-tok-verdict-0001"
 	reportWithToken = "<!-- challenge-token: " + challengeToken + " -->\n# Audit Report\n**Verdict:** PASS\n" +
 		"<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n"
 )
@@ -38,17 +36,14 @@ type counts struct {
 	verify, sleep int
 }
 
-// probe scripts the deliverable probe: OK from the okFrom-th call (0 = never), else the given
-// codes; err, when set, wins on every call.
 type probe struct {
 	okFrom int
 	codes  []string
 	err    error
-	empty  bool // return no bytes (an infra read fault) instead of the file's
+	empty  bool
 	n      *counts
 }
 
-// verifiedFrom stamps the path and the bytes as deliverable.Verify does.
 func verifiedFrom(res deliverable.Result, phase string, roots phasecontract.Roots) deliverable.Result {
 	path := filepath.Join(roots.Workspace, phase+"-report.md")
 	data, err := os.ReadFile(path)
@@ -78,7 +73,6 @@ func (p probe) fn() Verify {
 	}
 }
 
-// harness is one engine over a recording Center with counted seams.
 type harness struct {
 	e      *Engine
 	n      *counts
@@ -110,7 +104,6 @@ func (h *harness) writeReport(t *testing.T, phase, body string) {
 	}
 }
 
-// writeACSFloor stages the deterministic-truth artifacts the floor reads.
 func (h *harness) writeACSFloor(t *testing.T, acsVerdict string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(h.ws, "challenge-token.txt"), []byte(challengeToken+"\n"), 0o644); err != nil {
@@ -153,7 +146,6 @@ func TestRunnerCodes_AreRegisteredWithDocsUnderModuleRunner(t *testing.T) {
 	}
 }
 
-// Positional on purpose: a new field breaks this literal, so the host's dispatchOf is revisited.
 func TestDispatch_HasExactlyTheDeclaredFields(t *testing.T) {
 	d := Dispatch{7, "run", "audit", "ws", "wt", "root", 2, "ws/audit-report.md", Snapshot{}, false, bridgeResp, nil, 200, "opus", "profile", nil}
 	if d.Cycle != 7 || d.ModelSource != "profile" || d.ExplanationDocumentationVersion != 2 {

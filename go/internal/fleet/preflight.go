@@ -9,9 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// PreflightControlPlane refuses a wave while repoRoot has uncommitted protected-surface changes or cannot be checked.
 func PreflightControlPlane(repoRoot string) error {
-	// --untracked-files=all names a new protected file inside a new directory individually.
 	cmd := sysexec.Command(context.Background(), "git", "status", "--porcelain", "--untracked-files=all")
 	cmd.Dir = repoRoot
 	out, err := cmd.CombinedOutput()
@@ -21,11 +19,9 @@ func PreflightControlPlane(repoRoot string) error {
 	}
 	var dirty []string
 	for _, line := range strings.Split(string(out), "\n") {
-		// Porcelain v1: two status characters, a space, then the path.
 		if len(line) < 4 {
 			continue
 		}
-		// A rename reads `R  old -> new`; both sides are uncommitted churn.
 		for _, p := range strings.Split(line[3:], " -> ") {
 			p = strings.Trim(strings.TrimSpace(p), `"`)
 			if p != "" && guards.IsProtectedSurface(p) {

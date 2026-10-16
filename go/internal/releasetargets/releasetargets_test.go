@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// writeGoreleaser writes a goreleaser config to a temp file and returns its path.
 func writeGoreleaser(t *testing.T, body string) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), ".goreleaser.yml")
@@ -63,12 +62,6 @@ checksum:
 	}
 }
 
-// TestParseConfig_UniversalBinary: a goreleaser universal_binaries block makes
-// the release publish ONE macOS artifact fingerprint (a lipo'd darwin fat
-// binary). goreleaser renders its archive with .Arch="all", so the published
-// asset is evolve_darwin_all.tar.gz — the parser must surface it as a target so
-// release-verify-binaries requires it present (one-binary S2: one macOS
-// fingerprint per version).
 func TestParseConfig_UniversalBinary(t *testing.T) {
 	p := writeGoreleaser(t, `
 version: 2
@@ -105,8 +98,6 @@ checksum:
 	if !have["evolve_darwin_all.tar.gz"] {
 		t.Errorf("universal_binaries block must surface evolve_darwin_all.tar.gz; got %v", have)
 	}
-	// The per-arch archives remain (replace:false), so both fingerprints ship
-	// until the S4/S5 cutover — the gate must still require them too.
 	for _, core := range []string{"evolve_darwin_amd64.tar.gz", "evolve_darwin_arm64.tar.gz"} {
 		if !have[core] {
 			t.Errorf("per-arch archive %q must remain with replace:false; got %v", core, have)
@@ -114,10 +105,6 @@ checksum:
 	}
 }
 
-// TestParseConfig_UniversalBinary_Replace: with replace:true, goreleaser drops
-// the per-arch darwin archives and publishes ONLY the universal — the parser
-// must mirror that (require darwin_all, NOT darwin_amd64/arm64) or the gate would
-// red-fail every release demanding assets goreleaser no longer builds.
 func TestParseConfig_UniversalBinary_Replace(t *testing.T) {
 	p := writeGoreleaser(t, `
 version: 2
@@ -158,9 +145,6 @@ checksum: { name_template: 'checksums.txt' }
 	}
 }
 
-// TestParseConfig_NoUniversalBinary_NoAllTarget: without a universal_binaries
-// block, no synthetic darwin_all target is invented (guards against flagging a
-// missing universal asset on releases that don't build one).
 func TestParseConfig_NoUniversalBinary_NoAllTarget(t *testing.T) {
 	p := writeGoreleaser(t, `
 version: 2
@@ -204,8 +188,6 @@ release:
 }
 
 func TestTargetSplit_FirstUnderscore(t *testing.T) {
-	// ppc64le / riscv64 contain no underscore in the arch; split must be on the
-	// FIRST underscore so os=linux, arch=ppc64le (not os=linux, arch=ppc64).
 	p := writeGoreleaser(t, `
 version: 2
 builds:
@@ -225,9 +207,6 @@ checksum: { name_template: 'checksums.txt' }
 }
 
 func TestParseConfig_DefaultsChecksumsName(t *testing.T) {
-	// goreleaser defaults checksum.name_template to "checksums.txt" when the
-	// field is omitted, so the published asset IS checksums.txt — the parser must
-	// default to it too or the gate spuriously reports the checksums row missing.
 	p := writeGoreleaser(t, `
 version: 2
 builds:
@@ -264,11 +243,6 @@ func TestParseConfig_Errors(t *testing.T) {
 	})
 }
 
-// TestParseConfig_RealRepo verifies the parser works against the checked-in
-// .goreleaser.yml — the actual SSOT — and that the core targets every other
-// projection (Makefile dist, install.sh) also builds are present. It does NOT
-// freeze the exact count (targets may be added intentionally); it guards that
-// the SSOT stays parseable and the baseline matrix never silently shrinks.
 func TestParseConfig_RealRepo(t *testing.T) {
 	root := repoRootForTest(t)
 	cfg, err := ParseConfig(filepath.Join(root, ".goreleaser.yml"))
@@ -291,9 +265,6 @@ func TestParseConfig_RealRepo(t *testing.T) {
 		"evolve_darwin_arm64.tar.gz",
 		"evolve_linux_amd64.tar.gz",
 		"evolve_linux_arm64.tar.gz",
-		// one-binary S2: the universal macOS artifact is a committed campaign
-		// requirement — the single macOS fingerprint. Guard against accidental
-		// removal of the universal_binaries block from the real config.
 		"evolve_darwin_all.tar.gz",
 	} {
 		if !have[core] {
@@ -302,8 +273,6 @@ func TestParseConfig_RealRepo(t *testing.T) {
 	}
 }
 
-// repoRootForTest walks up from the test's working dir to the module root
-// (the dir containing .goreleaser.yml).
 func repoRootForTest(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()

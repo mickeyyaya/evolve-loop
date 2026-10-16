@@ -89,7 +89,6 @@ func TestPhaseVerify_MissingPhaseArg(t *testing.T) {
 }
 
 func TestPhaseVerify_Advisor_EvolveDirDefault(t *testing.T) {
-	// Orchestrator deliverable lives in --evolve-dir.
 	ev := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ev, "cycle-state.json"),
 		[]byte(`{"cycle_id":1,"phase":"tdd"}`), 0o644); err != nil {
@@ -130,7 +129,7 @@ func TestPhaseVerify_FailureContextPhaseIO_RespectsStage(t *testing.T) {
 	failNoBlock := "## Changes\n- x\n" + phasecontract.RenderVerdictSentinel("build", "FAIL") + "\n"
 
 	t.Run("explicit-off-dormant", func(t *testing.T) {
-		t.Setenv("EVOLVE_PHASE_IO", "off") // enforce is the default, so off must be explicit
+		t.Setenv("EVOLVE_PHASE_IO", "off")
 		ws := t.TempDir()
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(failNoBlock), 0o644); err != nil {
 			t.Fatal(err)
@@ -142,7 +141,6 @@ func TestPhaseVerify_FailureContextPhaseIO_RespectsStage(t *testing.T) {
 	})
 
 	t.Run("default-enforce-blocks", func(t *testing.T) {
-		// No t.Setenv: enforce is the default.
 		ws := t.TempDir()
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(failNoBlock), 0o644); err != nil {
 			t.Fatal(err)

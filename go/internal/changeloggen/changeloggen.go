@@ -1,12 +1,6 @@
-// Package changeloggen ports legacy/scripts/release/changelog-gen.sh.
-//
-// Pure-function conventional-commits parser: takes a list of commit subjects
-// (typically from `git log <from>..<to>`) and renders a Keep-a-Changelog
-// style `## [<version>] - <date>` block grouped into Added/Fixed/Changed/
-// Documentation/Other buckets.
-//
-// Idempotency: if a CHANGELOG.md already has a `## [<version>]` heading for
-// the target version, the prepend is a no-op (manual curation preserved).
+// Package changeloggen renders conventional-commit subjects into a
+// Keep-a-Changelog entry and prepends it to CHANGELOG.md, skipping a version
+// that has a heading. See docs/architecture/packages/internal-changeloggen.md.
 package changeloggen
 
 import (
@@ -23,13 +17,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
-// Commit is one commit subject line passed to Classify.
 type Commit struct {
 	SHA     string
-	Subject string // first line of commit message
+	Subject string
 }
 
-// Buckets is the grouped output of Classify.
 type Buckets struct {
 	Added   []string
 	Fixed   []string
@@ -38,26 +30,12 @@ type Buckets struct {
 	Other   []string
 }
 
-// Empty reports whether all buckets are empty.
 func (b Buckets) Empty() bool {
 	return len(b.Added)+len(b.Fixed)+len(b.Changed)+len(b.Docs)+len(b.Other) == 0
 }
 
-// typeScopeRE matches "<type>(<scope>): <rest>". Bash uses two separate
-// sed patterns; we merge into one with named capture for readability.
 var typeScopeRE = regexp.MustCompile(`^([A-Za-z]+)(?:\(([^)]+)\))?:[ \t]*(.*)$`)
 
-// Classify buckets a single commit subject into the right Keep-a-Changelog
-// section. Mirrors the bash classify() function at changelog-gen.sh:116.
-//
-// Recognized types (case-insensitive):
-//   - feat | feature                            → Added
-//   - fix | bugfix                              → Fixed
-//   - refactor | perf | performance | stability | techdebt → Changed
-//   - docs | documentation | doc                → Docs
-//   - chore | ci | test | build | style | revert | meta | release → skipped
-//   - any other typed prefix                    → Other (with "(<type>)" tag)
-//   - no recognized prefix                      → Other (raw subject)
 func Classify(subject string, into *Buckets) {
 	m := typeScopeRE.FindStringSubmatch(subject)
 	if m == nil {
@@ -76,13 +54,11 @@ func Classify(subject string, into *Buckets) {
 	case "docs", "documentation", "doc":
 		into.Docs = append(into.Docs, rest)
 	case "chore", "ci", "test", "build", "style", "revert", "meta", "release":
-		// skipped by convention
 	default:
 		into.Other = append(into.Other, fmt.Sprintf("(%s) %s", typeName, rest))
 	}
 }
 
-// ClassifyAll runs Classify over every commit, returning grouped buckets.
 func ClassifyAll(commits []Commit) Buckets {
 	var b Buckets
 	for _, c := range commits {
@@ -91,9 +67,6 @@ func ClassifyAll(commits []Commit) Buckets {
 	return b
 }
 
-// RenderEntry produces the `## [<version>] - <date>\n\n...\n---\n\n` block.
-// fromRef + toRef appear in the generator-byline; date is taken from now.
-// Mirrors bash render section at changelog-gen.sh:152-174.
 func RenderEntry(version, fromRef, toRef string, now time.Time, b Buckets) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "## [%s] - %s\n\n", version, now.Format("2006-01-02"))
@@ -110,11 +83,6 @@ func RenderEntry(version, fromRef, toRef string, now time.Time, b Buckets) strin
 	return sb.String()
 }
 
-// appendBucket renders one `### <heading>` section. Identical items collapse to
-// a single bullet, keeping first-occurrence order: a merge can make one commit
-// reachable by two paths, which rendered the same bullet twice (CHANGELOG.md
-// [22.13.1], both ending `(#406)`). Dedup is per-bucket, so the same text
-// legitimately classified into two sections still renders once in each.
 func appendBucket(sb *strings.Builder, heading string, items []string) {
 	if len(items) == 0 {
 		return
@@ -131,28 +99,19 @@ func appendBucket(sb *strings.Builder, heading string, items []string) {
 	sb.WriteString("\n")
 }
 
-// HasEntry reports whether the CHANGELOG body already contains a
-// `## [<version>]` heading. Used for the idempotency skip.
 func HasEntry(body, version string) bool {
 	pattern := regexp.MustCompile(fmt.Sprintf(`(?m)^## \[%s\]`, regexp.QuoteMeta(version)))
 	return pattern.MatchString(body)
 }
 
-// PrependEntry inserts entry into body AFTER the file header (everything up
-// to the first `## [` line) and BEFORE the existing first version block.
-// When there is no version block at all, entry is appended. Mirrors bash
-// lines 200-215.
 func PrependEntry(body, entry string) string {
 	loc := firstVersionBlock(body)
 	if loc < 0 {
-		// No version blocks: append.
 		return body + entry
 	}
 	return body[:loc] + entry + body[loc:]
 }
 
-// firstVersionBlock returns the byte offset of the first `## [` line in
-// body, or -1 if none. Matches bash's `grep -nE '^## \[' | head -1`.
 func firstVersionBlock(body string) int {
 	pos := 0
 	for {
@@ -161,7 +120,6 @@ func firstVersionBlock(body string) int {
 			return -1
 		}
 		abs := pos + idx
-		// Must be at line start.
 		if abs == 0 || body[abs-1] == '\n' {
 			return abs
 		}
@@ -169,12 +127,8 @@ func firstVersionBlock(body string) int {
 	}
 }
 
-// DefaultFreshContent is what we write when CHANGELOG.md doesn't exist.
 const DefaultFreshContent = "# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n"
 
-// WriteEntry writes (or no-ops idempotent) the entry to the CHANGELOG at
-// changelogPath. Returns (didWrite, skippedIdempotent, err). Mirrors bash
-// main flow at changelog-gen.sh:177-216.
 func WriteEntry(changelogPath, version, entry string) (bool, bool, error) {
 	body, err := os.ReadFile(changelogPath)
 	if err != nil {
@@ -202,20 +156,12 @@ func WriteEntry(changelogPath, version, entry string) (bool, bool, error) {
 	return true, false, nil
 }
 
-// ErrNoCommits is returned by ReadGitLog when the commit range is empty.
 var ErrNoCommits = errors.New("changeloggen: no commits in range")
 
-// ReadGitLog runs `git log --pretty=format:%H<SEP>%s <from>..<to>` in
-// repoRoot and parses the output into Commits. Returns ErrNoCommits when the
-// range is empty (caller can decide to write a placeholder entry or skip).
 func ReadGitLog(repoRoot, fromRef, toRef string) ([]Commit, error) {
 	return ReadGitLogWith(context.Background(), gitexec.Default(repoRoot), fromRef, toRef)
 }
 
-// ReadGitLogWith is the gitexec-backed core behind ReadGitLog; the public
-// wrapper injects gitexec.Default(repoRoot). Exposed (and ctx-first) so the git
-// invocation is unit-testable via fixtures.FakeExec rather than only against a
-// real repo.
 func ReadGitLogWith(ctx context.Context, g gitexec.Git, fromRef, toRef string) ([]Commit, error) {
 	const sep = "\x1f"
 	out, err := g.Output(ctx, "log", "--pretty=format:%H"+sep+"%s", fromRef+".."+toRef)
@@ -237,13 +183,10 @@ func ReadGitLogWith(ctx context.Context, g gitexec.Git, fromRef, toRef string) (
 	return commits, nil
 }
 
-// VerifyRef reports whether the given git ref resolves inside repoRoot.
 func VerifyRef(repoRoot, ref string) error {
 	return VerifyRefWith(context.Background(), gitexec.Default(repoRoot), ref)
 }
 
-// VerifyRefWith is the gitexec-backed core behind VerifyRef; the public wrapper
-// injects gitexec.Default(repoRoot).
 func VerifyRefWith(ctx context.Context, g gitexec.Git, ref string) error {
 	if err := g.Run(ctx, "rev-parse", "--verify", ref); err != nil {
 		return fmt.Errorf("changeloggen: ref does not exist: %s", ref)
@@ -251,10 +194,8 @@ func VerifyRefWith(ctx context.Context, g gitexec.Git, ref string) error {
 	return nil
 }
 
-// IsSemver reports whether s matches X.Y.Z (no leading "v").
 func IsSemver(s string) bool { return semvercheck.IsSemver(s) }
 
-// ResolveChangelogPath returns <repoRoot>/CHANGELOG.md.
 func ResolveChangelogPath(repoRoot string) string {
 	return filepath.Join(repoRoot, "CHANGELOG.md")
 }

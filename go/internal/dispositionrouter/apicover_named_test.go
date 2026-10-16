@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 )
 
-// TestExportedVocabularyNamed pins the exported constants the behavioural tests
-// reference only indirectly, so apicover sees every export asserted.
 func TestExportedVocabularyNamed(t *testing.T) {
 	t.Parallel()
 	if dispositionrouter.RecurrenceConsoleFloor != 3 {

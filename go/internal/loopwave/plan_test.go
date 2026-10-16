@@ -18,7 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// These fixtures match cmd/evolve's cmd_loop_wave_budget_test.go so the shared golden replays.
 func tightQuota(now time.Time) []quotastate.QuotaState {
 	return []quotastate.QuotaState{{
 		Family:     "claude",
@@ -170,7 +169,7 @@ func TestPlanFn_ConsoleRoutedPriorIDsArePrunedBeforeWidening(t *testing.T) {
 
 func TestPlanFn_AbsentDecisionSeedsFromInbox(t *testing.T) {
 	h := newHarness(t)
-	h.ports.LastCycle = func(context.Context) (int, error) { return 5, nil } // no workspace on disk
+	h.ports.LastCycle = func(context.Context) (int, error) { return 5, nil }
 	e := New(Roots{ProjectRoot: h.root, EvolveDir: h.evolveDir}, h.ports, h.stderr)
 	lifecycleItem(t, h.evolveDir, inboxmover.StatePending, "one")
 	lifecycleItem(t, h.evolveDir, inboxmover.StatePending, "two")
@@ -268,7 +267,6 @@ func TestWidenNarrow_PrunedDisarmsBothShortcutsAndRemarshalsTopNOnly(t *testing.
 	if got := string(WidenNarrowDecision(stale, evolveDir, 2, nil)); strings.Contains(got, "gone") || !strings.Contains(got, "beta") {
 		t.Errorf("the consumed id is dropped and the lane refilled: %s", got)
 	}
-	// Three committed, one consumed: still fleet-width after the prune.
 	wideStale := []byte(`{"top_n":[{"id":"alpha","files":["a.go"]},{"id":"beta","files":["b.go"]},{"id":"gone","files":["z.go"]}]}`)
 	if got := string(WidenNarrowDecision(wideStale, evolveDir, 2, nil)); strings.Contains(got, "gone") {
 		t.Errorf("a fleet-width decision carrying a consumed id is rewritten, never returned verbatim: %s", got)
@@ -280,8 +278,6 @@ func TestWidenNarrow_PrunedDisarmsBothShortcutsAndRemarshalsTopNOnly(t *testing.
 	if got := string(WidenNarrowDecision([]byte(`{"top_n":[{"id":""}]}`), evolveDir, 2, nil)); !strings.Contains(got, "alpha") {
 		t.Errorf("an empty id is not a committed lane: %s", got)
 	}
-	// gamma declares a path because the predicate judges path-shaped files[], and
-	// outweighs beta so its exclusion is observable.
 	writeJSON(t, filepath.Join(evolveDir, "inbox", "gamma.json"), map[string]any{"id": "gamma", "weight": 0.95, "files": []string{"pkg/c.go"}})
 	protected := func(p string) bool { return p == "pkg/c.go" }
 	if got := string(WidenNarrowDecision(narrow, evolveDir, 2, protected)); strings.Contains(got, "gamma") || !strings.Contains(got, "beta") {

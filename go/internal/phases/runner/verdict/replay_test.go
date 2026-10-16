@@ -35,7 +35,6 @@ func staleBody(phase string) string {
 	return "# " + phase + "\n<!-- evolve-verdict: {\"phase\":\"" + phase + "\",\"verdict\":\"PASS\"} -->\n"
 }
 
-// replayScenarios mirrors the host's verdictScenarios table row for row.
 func replayScenarios() []replayScenario {
 	missing := []string{deliverable.CodeMissingArtifact}
 	unverified := []string{deliverable.CodeMissingChallengeToken, deliverable.CodeBadVerdict}
@@ -52,14 +51,12 @@ func replayScenarios() []replayScenario {
 		{name: "clean_contracted_ok", phase: "audit", file: reportPASS, stdout: panePASS, probe: probe{okFrom: 1}, verdict: core.VerdictPASS, nextPhase: "ship", diags: []core.Diagnostic{{Severity: "warning", Message: "classify note"}}},
 		{name: "clean_contracted_unverified", phase: "audit", file: unverifiedReport, stdout: panePASS, probe: probe{codes: unverified}, verdict: core.VerdictPASS, nextPhase: "ship"},
 		{name: "clean_uncontracted_pane", phase: "widget-scan", stdout: panePASS, probe: probe{err: errors.New("no deliverable contract for phase widget-scan")}, verdict: core.VerdictPASS, nextPhase: "audit"},
-		// the probe-only rows (no response golden)
 		{name: "timeout_settles_on_third", phase: "audit", bridgeErr: timeoutErr(), file: reportPASS, probe: probe{okFrom: 3, codes: missing}, verdict: core.VerdictPASS},
 		{name: "clean_settles_on_third", phase: "audit", file: reportPASS, stdout: panePASS, probe: probe{okFrom: 3, codes: missing}, verdict: core.VerdictPASS},
 		{name: "clean_never_settles", phase: "audit", file: unverifiedReport, stdout: panePASS, probe: probe{codes: []string{deliverable.CodeBadVerdict}}, verdict: core.VerdictFAIL},
 	}
 }
 
-// replay orders a row as the host's Run does: pre-dispatch snapshot, agent write, then Judge.
 func replay(t *testing.T, ctx context.Context, sc replayScenario) (*harness, core.PhaseResponse, error) {
 	t.Helper()
 	h := newHarness(t, sc.probe, WithOptional(sc.optional))
@@ -94,7 +91,7 @@ func TestJudge_ReplaysTheHostGoldens(t *testing.T) {
 			}
 			golden, gerr := os.ReadFile(filepath.Join("testdata", "response_"+sc.name+".golden.json"))
 			if gerr != nil {
-				return // a probe-only row
+				return
 			}
 			raw, merr := json.Marshal(resp)
 			if merr != nil {

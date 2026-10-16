@@ -9,9 +9,7 @@ func TestConsoleRouted_LaneOverrideCannotRelaxAProtectedFile(t *testing.T) {
 	for _, rec := range []string{
 		`{"id":"cyclerun-seat-helper","kind":"techdebt","route":"lane","files":["go/internal/core/resume.go","go/internal/core/cyclerun.go"]}`,
 		`{"id":"bwrap-bind-requires-existing-write-dir","kind":"bug","route":"lane","files":["go/internal/adapters/sandbox/sandbox.go","go/internal/adapters/sandbox/sandbox_test.go"]}`,
-		// the kind derivation fires first; the file still binds
 		`{"id":"k","kind":"pipeline-repair","route":"lane","files":["go/internal/core/cyclerun.go"]}`,
-		// a relaxable directory hit beside a binding file hit: the file binds
 		`{"id":"e","kind":"feature","route":"lane","files":["go/internal/core/","go/internal/core/cyclerun.go"]}`,
 	} {
 		if ok, reason := routed(t, rec); !ok || !strings.Contains(reason, "route:lane cannot relax") || !strings.Contains(reason, ".go") {

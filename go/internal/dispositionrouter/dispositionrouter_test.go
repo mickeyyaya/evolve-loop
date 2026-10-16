@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 )
 
-// TestDecide_FloorsForceConsole pins both deterministic floors and their
-// boundary: guard-abort at any recurrence, and recurrence >= 3 for any class.
 func TestDecide_FloorsForceConsole(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -45,12 +43,9 @@ func TestDecide_FloorsForceConsole(t *testing.T) {
 	}
 }
 
-// TestStageIntent_AppendsJSONLAndCreatesDir pins the staging contract: the dir
-// is created on first use, each call appends exactly one parseable line, and
-// the returned path is PendingActionsPath.
 func TestStageIntent_AppendsJSONLAndCreatesDir(t *testing.T) {
 	t.Parallel()
-	escDir := filepath.Join(t.TempDir(), "escalations") // deliberately absent
+	escDir := filepath.Join(t.TempDir(), "escalations")
 	in := dispositionrouter.Intent{
 		Cycle: 7, Pattern: "pattern:x", ItemID: "id-x",
 		Action: dispositionrouter.ActionEscalate, Route: dispositionrouter.RouteQueue,
@@ -87,9 +82,6 @@ func TestStageIntent_AppendsJSONLAndCreatesDir(t *testing.T) {
 	}
 }
 
-// TestLoadIntents_MissingFileIsNotAnError pins the empty-staging case and the
-// happy path in one place: nothing staged must no-op, and staged records must
-// come back in append order.
 func TestLoadIntents_MissingFileIsNotAnError(t *testing.T) {
 	t.Parallel()
 	escDir := filepath.Join(t.TempDir(), "escalations")
@@ -111,8 +103,6 @@ func TestLoadIntents_MissingFileIsNotAnError(t *testing.T) {
 	}
 }
 
-// TestLoadIntents_MalformedLineErrors pins that garbage is surfaced, never
-// silently treated as "nothing staged".
 func TestLoadIntents_MalformedLineErrors(t *testing.T) {
 	t.Parallel()
 	escDir := t.TempDir()
@@ -125,8 +115,6 @@ func TestLoadIntents_MalformedLineErrors(t *testing.T) {
 	}
 }
 
-// TestStageIntent_UnwritableDirErrors pins that a staging failure is surfaced,
-// never swallowed — a silently dropped intent is a lost escalation.
 func TestStageIntent_UnwritableDirErrors(t *testing.T) {
 	t.Parallel()
 	blocked := filepath.Join(t.TempDir(), "not-a-dir")
@@ -138,8 +126,6 @@ func TestStageIntent_UnwritableDirErrors(t *testing.T) {
 	}
 }
 
-// TestLoadIntents_UnreadablePathErrors pins the read-error branch (a directory
-// where the staging file should be) as a surfaced failure.
 func TestLoadIntents_UnreadablePathErrors(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

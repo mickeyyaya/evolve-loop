@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-// TestDefaultReleaseSh_IgnoresLegacyScript guards the T1.7 fix: DefaultReleaseSh
-// is a Go no-op and must NEVER execute a legacy bash release.sh. The script was
-// removed in v12 (script→Go migration); the cache-refresh side-effect is
-// obsolete and release consistency is covered by internal/releaseconsistency.
-// Even a stray executable legacy/scripts/utility/release.sh that exits 1 must be
-// ignored (return nil), proving no bash shell-out remains.
 func TestDefaultReleaseSh_IgnoresLegacyScript(t *testing.T) {
 	repo := t.TempDir()
 	dir := filepath.Join(repo, "legacy", "scripts", "utility")

@@ -47,9 +47,6 @@ func TestReadAllMissingFileIsEmpty(t *testing.T) {
 	}
 }
 
-// TestReadAllSkipsMalformedLines: a crash can half-write a line; the reaper
-// must still reap the well-formed remainder rather than abandoning the whole
-// registry (which would leak every session of the run).
 func TestReadAllSkipsMalformedLines(t *testing.T) {
 	t.Parallel()
 	path := PathIn(t.TempDir())

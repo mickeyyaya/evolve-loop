@@ -30,8 +30,6 @@ func TestTrailer_Build_OmitsEmptyAndZeroCycle(t *testing.T) {
 }
 
 func TestParse_OnlyTrailingBlock(t *testing.T) {
-	// A body line with a colon ("Note: ...") that is NOT in the trailing block
-	// must not be parsed as a trailer; only the contiguous trailing run counts.
 	msg := "fix: thing\n\nNote: this mentions Evolve-Phase: build in prose\n\n" +
 		Trailer{Phase: "scout", Challenge: "real"}.Build()
 	got := Parse(msg)
@@ -47,10 +45,6 @@ func TestParse_NoTrailerYieldsZero(t *testing.T) {
 }
 
 func TestParse_BlankLineTerminatesTrailer(t *testing.T) {
-	// Contract (git-trailer spec): a blank line terminates the trailing run, so
-	// a trailer block split by a blank line only parses the contiguous TAIL.
-	// Build() never emits such a block; this pins the boundary so PR3's emitter
-	// honors it. Here the tail after the blank lacks Evolve-Phase → Phase == "".
 	msg := "subject\n\nEvolve-Phase: scout\n\nChallenge-Token: tok\n"
 	got := Parse(msg)
 	if got.Phase != "" {
@@ -62,9 +56,6 @@ func TestParse_BlankLineTerminatesTrailer(t *testing.T) {
 }
 
 func TestParse_ProseKeyLineFlushAgainstTrailerIsAbsorbed(t *testing.T) {
-	// Known limitation of the contiguous-run heuristic: a prose line with valid
-	// key grammar ("Added: ...") flush against the trailer is absorbed into the
-	// block. Harmless — unknown keys are ignored, so Phase/Challenge still parse.
 	msg := "subject\n\nAdded: a feature\nEvolve-Phase: scout\nChallenge-Token: tok\n"
 	got := Parse(msg)
 	if got.Phase != "scout" || got.Challenge != "tok" {
@@ -92,7 +83,6 @@ func TestTrailer_Verify_FailClosed(t *testing.T) {
 			}
 		})
 	}
-	// A zero-token commit can never be verified even if phase matches.
 	if (Trailer{Phase: "build"}).Verify("build", "tok") {
 		t.Error("a commit with no Challenge-Token must never verify")
 	}

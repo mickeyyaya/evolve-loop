@@ -14,8 +14,8 @@ type ledgerEntry struct {
 	TaskID string
 	From   string
 	To     string
-	Cycle  *int    // nil when no active cycle
-	GitSHA *string // nil when unknown
+	Cycle  *int
+	GitSHA *string
 	Reason string
 }
 
@@ -26,8 +26,6 @@ func foldLifecycleMessage(from, to, reason string) string {
 	return from + " → " + to + ": " + reason
 }
 
-// ledgerLine appends e best-effort: a failed append never undoes the move, and it prints
-// a WARN line because an appender need not report its own failure.
 func (m *Mover) ledgerLine(e ledgerEntry) {
 	if m.ledger == nil {
 		return
@@ -59,7 +57,6 @@ func (m *Mover) appendRecord(e ledgerEntry) error {
 	})
 }
 
-// intPtr parses s's leading digits (Sscanf, so "12x" is 12); empty or non-numeric is nil.
 func intPtr(s string) *int {
 	if s == "" {
 		return nil
@@ -71,7 +68,6 @@ func intPtr(s string) *int {
 	return &v
 }
 
-// cycleOf projects a cycle string onto an event's Cycle: intPtr's value, or 0.
 func cycleOf(s string) int {
 	if p := intPtr(s); p != nil {
 		return *p
@@ -79,7 +75,6 @@ func cycleOf(s string) int {
 	return 0
 }
 
-// strPtr returns a *string, or nil if empty.
 func strPtr(s string) *string {
 	if s == "" {
 		return nil

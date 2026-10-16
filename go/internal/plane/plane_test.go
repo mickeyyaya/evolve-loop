@@ -1,13 +1,5 @@
 package plane
 
-// plane_test.go — ADR-0080 S2: the loop must KNOW which worktree plane it
-// occupies. Batch-15 lost four lanes to operator activity in the shared
-// primary checkout (1149-1152); the classification below is what lets the
-// loop boot-WARN when launched from the primary and lets `evolve doctor
-// plane` report the layout. Filesystem-only on purpose: .git is a directory
-// in the primary checkout and a `gitdir:` pointer FILE in a linked worktree —
-// no git subprocess, hermetic under t.TempDir.
-
 import (
 	"os"
 	"path/filepath"
@@ -93,9 +85,6 @@ func TestClassify_NotARepoErrors(t *testing.T) {
 	}
 }
 
-// TestBootLine_WarnsOnlyOnPrimary pins the operator-facing contract: the boot
-// line for a linked worktree is informational; for the PRIMARY checkout it
-// carries the ADR-0080 warning that operator activity here kills lanes.
 func TestBootLine_WarnsOnlyOnPrimary(t *testing.T) {
 	primary := Info{IsLinkedWorktree: false, Branch: "main"}
 	linked := Info{IsLinkedWorktree: true, Branch: "main"}
@@ -116,9 +105,6 @@ func containsAll(s string, subs ...string) bool {
 	return true
 }
 
-// TestClassify_RelativeGitdirPointerResolvesAgainstRoot (review MEDIUM): git
-// >=2.48 relative pointers must resolve against the checkout, or Branch
-// blanks and the S3 sync becomes a silent permanent no-op.
 func TestClassify_RelativeGitdirPointerResolvesAgainstRoot(t *testing.T) {
 	root := t.TempDir()
 	gitdir := filepath.Join(root, "hub", "worktrees", "rt")
@@ -140,9 +126,6 @@ func TestClassify_RelativeGitdirPointerResolvesAgainstRoot(t *testing.T) {
 	}
 }
 
-// TestClassify_ForeignDotGitFileErrors (review MEDIUM): a non-gitdir .git
-// file must ERROR — silently classifying it as a linked worktree turns the
-// PRIMARY-checkout tripwire dark in the direction that matters.
 func TestClassify_ForeignDotGitFileErrors(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, ".git"), []byte("not a pointer\n"), 0o644); err != nil {
@@ -153,9 +136,6 @@ func TestClassify_ForeignDotGitFileErrors(t *testing.T) {
 	}
 }
 
-// TestCommonGitDir_WalksCommondir: the hub resolution the console lease
-// depends on — linked worktrees resolve through their commondir file;
-// primaries are their own hub.
 func TestCommonGitDir_WalksCommondir(t *testing.T) {
 	root, gitdir := linkedFixture(t, "main")
 	if err := os.WriteFile(filepath.Join(gitdir, "commondir"), []byte("../..\n"), 0o644); err != nil {
@@ -187,10 +167,6 @@ func TestCommonGitDir_WalksCommondir(t *testing.T) {
 	}
 }
 
-// TestConsoleLeaseFileName_IsTheSingleSharedName freezes the const's VALUE
-// (renaming it orphans every existing hub lease). It does not prove call
-// sites reference the const — that is the compiler's job once both packages
-// import it.
 func TestConsoleLeaseFileName_IsTheSingleSharedName(t *testing.T) {
 	if ConsoleLeaseFileName != "evolve-console-lease.json" {
 		t.Fatalf("ConsoleLeaseFileName = %q — renaming it orphans existing hub leases; coordinate reader+writer+docs", ConsoleLeaseFileName)

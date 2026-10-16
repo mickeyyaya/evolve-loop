@@ -16,12 +16,12 @@ func TestObserver_EventsFileMatchesGolden(t *testing.T) {
 	t0 := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
 	o := New(Config{
 		StallS: time.Hour, PollS: 5 * time.Millisecond, Cycle: 7, Phase: "build", Agent: "build",
-		StdoutLog:     filepath.Join(t.TempDir(), "build-stdout.log"), // never created: no growth
+		StdoutLog:     filepath.Join(t.TempDir(), "build-stdout.log"),
 		LivenessProbe: func() bool { return false },
 	}, sink)
 	var mu sync.Mutex
 	calls := 0
-	o.nowFunc = func() time.Time { // started (1), lastGrowth (2) at t0; the threshold read and every emit after at +2h
+	o.nowFunc = func() time.Time {
 		mu.Lock()
 		defer mu.Unlock()
 		calls++
