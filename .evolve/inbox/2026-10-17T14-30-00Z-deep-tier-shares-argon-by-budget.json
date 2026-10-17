@@ -1,0 +1,27 @@
+{
+  "created_at": "2026-10-17T14:30:00Z",
+  "kind": "improvement",
+  "priority_class": "capacity",
+  "weight": 0.8,
+  "campaign": "tier-policy",
+  "source": "console, 2026-10-17: `evolve clihealth usage agy` after wave 122; the operator approved a true share",
+  "id": "deep-tier-shares-argon-by-budget",
+  "title": "The deep tier puts Argon first, so it spends all of Argon's weekly allowance in about four waves; share deep seats between Argon and Claude by budget",
+  "summary": "Since #924 (2026-10-17) `cli_routing.tiers.deep` is [agy, agy-claude, claude], and the agy deep seat runs Gemini 4 Argon (Medium). The operator asked to share the Opus deep phase with Argon. A first-in-chain rule is not a share: every deep dispatch went to Argon until its group was exhausted. On 2026-10-17 at 22:15 (Asia/Taipei) `evolve clihealth usage agy` showed Gemini 4 Argon week 100% (reset in 153h 55m) and CLAUDE AND GPT MODELS week 100% (reset in 61h 56m), with GEMINI MODELS week at 42%. So every deep seat now falls through to Claude Code, which is at 67% of its week. Argon gives no deep capacity for about 6 days, and Claude carries the whole deep load.",
+  "fix": "Make the deep tier share seats by budget, not by order. Research first, with a live web search: weighted and budget-paced routing (for example, token-bucket pacing, smooth weighted round-robin, and spend pacing as used in ad delivery). Write a design through skills/docs-write that compares at least 3 approaches, for example a fixed share per tier in cli_routing, a pace computed from each group's weekly used percent and its reset time, and a share that the advisor sets per phase. The router stays deterministic: the share is data in .evolve/policy.json cli_routing (written by `evolve cli-routing set`), and the pace input is the usage the bridge already reads (`evolve clihealth usage`). Keep the existing walk: an exhausted or benched target still falls through. No feature flag: the share is the routing table's own data.",
+  "acceptance": [
+    "A design set (research, plan, ADR, spec) under docs/ compares at least 3 approaches and cites live sources; ste-lint --strict reports 0 findings.",
+    "With Argon at 0% used and 7 days to reset, a deep-tier walk over 100 simulated dispatches sends Argon about the configured share, not 100 (a unit test with an injected usage reader).",
+    "When the Argon group is paced to its budget, the next deep dispatch goes to the next healthy family in the chain, and `evolve cli-routing explain <agent>` prints the share and the pace.",
+    "An exhausted Argon group still benches only the Argon target (the cycle 1911 behavior is unchanged)."
+  ],
+  "files": [
+    "go/internal/cliroute/family_chains.go",
+    "go/internal/cliroute/resolve.go",
+    "go/internal/cliroute/table.go",
+    ".evolve/policy.json"
+  ],
+  "connects_to": [
+    "tier-policy-and-bridge-factory"
+  ]
+}
