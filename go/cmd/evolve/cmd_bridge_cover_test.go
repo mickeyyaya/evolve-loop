@@ -45,7 +45,7 @@ func TestRunBridgeControl_ResolvesTheFamilyBeforeAnySession(t *testing.T) {
 		want   int
 		text   string
 	}{
-		{"nosuchfamily", 1, "clicontrol: resolve nosuchfamily-tmux"},
+		{"nosuchfamily", 1, `no interactive driver for family "nosuchfamily"`},
 		{"claude", 3, `claude does not support event "teleport"`},
 	}
 	for _, tc := range cases {

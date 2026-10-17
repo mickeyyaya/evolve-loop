@@ -201,7 +201,7 @@ func TestCLIUpdate_IsTheCLICommandGroup(t *testing.T) {
 func TestManifestUpdateFamilies_ReadsEachFamilysUpdateArgvFromItsManifest(t *testing.T) {
 	t.Parallel()
 	var log bytes.Buffer
-	got := manifestUpdateFamilies([]string{"claude", "codex", "agy"}, bridge.LoadManifest, &log)
+	got := manifestUpdateFamilies([]string{"claude", "codex", "agy"}, bridge.DefaultDriverSet(), &log)
 
 	want := []cliupdate.Family{
 		{Name: "claude", UpdateArgv: []string{"claude", "update"}},
@@ -223,7 +223,7 @@ func TestManifestUpdateFamilies_AnUnloadableManifestWarnsAndSkipsTheFamily(t *te
 		return bridge.Manifest{UpdateArgv: []string{"claude", "update"}}, nil
 	}
 
-	got := manifestUpdateFamilies([]string{"claude", "agy"}, load, &log)
+	got := manifestUpdateFamilies([]string{"claude", "agy"}, bridge.NewDriverSet(bridge.ManifestNames(), load), &log)
 
 	if len(got) != 1 || got[0].Name != "claude" || !strings.Contains(log.String(), "agy") || !strings.Contains(log.String(), "invalid JSON") {
 		t.Errorf("want claude only and a WARN naming agy: %+v %q", got, log.String())

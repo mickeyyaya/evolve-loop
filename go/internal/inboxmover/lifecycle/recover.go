@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -43,12 +44,17 @@ func (m *Mover) RecoverOrphans() (RecoverResult, error) {
 func (m *Mover) recoverDir(dir string, cycle int) (int, []string) {
 	cycleNum := strconv.Itoa(cycle)
 	files, _ := jsonEntries(dir)
+	consumed := inboxbatch.ConsumedRecords(m.inboxDir)
 	n, paths := 0, []string(nil)
 	for _, f := range files {
 		base := f.Name()
 		src := filepath.Join(dir, base)
 		dest := filepath.Join(m.inboxDir, base)
 		taskID := readTaskIDOrUnknown(src)
+		if rec, retired := inboxbatch.CopyOf(consumed[taskID], readCreatedAt(src), base); retired {
+			m.linef("recover-orphans: skipping %s (id %s already %s) — left in processing/cycle-%s/ for the operator", base, taskID, rec.Describe(), cycleNum)
+			continue
+		}
 		if err := os.Rename(src, dest); err != nil {
 			m.warn(fault{code: CodeReleaseMoveFailed, origin: "Mover.RecoverOrphans", cycle: cycle, legacy: "WARN: ",
 				reason: fmt.Sprintf("recover-orphans: mv failed for %s (leaving in processing/): %v", base, err),
@@ -68,4 +74,18 @@ func (m *Mover) recoverDir(dir string, cycle int) (int, []string) {
 		paths = append(paths, dest)
 	}
 	return n, paths
+}
+
+func readCreatedAt(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var doc struct {
+		CreatedAt string `json:"created_at"`
+	}
+	if json.Unmarshal(raw, &doc) != nil {
+		return ""
+	}
+	return doc.CreatedAt
 }

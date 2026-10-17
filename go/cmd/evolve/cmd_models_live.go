@@ -115,17 +115,22 @@ func shadowDiffLines(live, next modelcatalog.Catalog) []string {
 
 type bridgeModelCapturer struct {
 	workspace string
+	deps      bridge.Deps
 }
 
 func (c bridgeModelCapturer) CaptureModelPicker(ctx context.Context, cli string) (string, error) {
-	driver := cli + "-tmux"
+	r, err := bridge.Resolve(driverSet, cli)
+	if err != nil {
+		return "", err
+	}
+	driver := r.Driver
 	cfg := &bridge.Config{
 		CLI:         driver,
 		Workspace:   c.workspace,
 		Agent:       "models",
 		Realization: bridge.RealizeFor(driver, bridge.LaunchIntent{}),
 	}
-	return bridge.CaptureModelPicker(ctx, cfg, bridge.Deps{}, driver)
+	return bridge.CaptureModelPicker(ctx, cfg, c.deps, driver)
 }
 
 type bridgePromptDispatcher struct {
@@ -337,12 +342,12 @@ func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Tim
 func freshnessFromManifests(clis []string) map[string]modelquery.FreshnessPolicy {
 	out := make(map[string]modelquery.FreshnessPolicy, len(clis))
 	for _, cli := range clis {
-		m, err := bridge.LoadManifest(cli + "-tmux")
+		r, err := bridge.Resolve(driverSet, cli)
 		if err != nil {
 			continue
 		}
-		if m.ModelFreshness.Prefer == "alias" {
-			out[cli] = modelquery.FreshnessPolicy{PreferAlias: true, AliasIDs: m.ModelFreshness.AliasIDs}
+		if r.Manifest.ModelFreshness.Prefer == "alias" {
+			out[cli] = modelquery.FreshnessPolicy{PreferAlias: true, AliasIDs: r.Manifest.ModelFreshness.AliasIDs}
 		}
 	}
 	return out

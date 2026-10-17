@@ -1,7 +1,10 @@
 # Agent bridge factory: one function resolves every LLM CLI, and the manifest holds its facts
 
 > Decision: [ADR-0137](adr/0137-one-bridge-factory-resolves-every-llm-cli-and-the-manifest-holds-its-facts.md). Plan: [bridge-factory-2026-10](../plans/bridge-factory-2026-10.md). Research: [bridge-factory-2026-10](../research/bridge-factory-2026-10.md).
-> Status: proposed (2026-10-17). This file is the spec of record for how every caller reaches an LLM CLI. The dispatch rules stay in [agent-bridge-dispatch-contract](agent-bridge-dispatch-contract.md).
+>
+> Status: accepted (2026-10-17). Component F1 is built (2026-10-17): `bridge.Resolve` and `bridge.DriverSet` exist.
+>
+> This file is the spec of record for how every caller reaches an LLM CLI. The dispatch rules stay in [agent-bridge-dispatch-contract](agent-bridge-dispatch-contract.md).
 
 The operator said on 2026-10-17: "every query and action should go through agent bridge abstract layer for maximizing common layer as the factory model described in design pattern."
 
@@ -63,7 +66,17 @@ This registry is a Service Locator (B7, P6.2). Any code can call it, it hides a 
 
 ### Solution
 
-Add one function, **planned** as `bridge.Resolve(set DriverSet, family string) (Resolved, error)` (D1). `Resolved` holds the driver name, the manifest and the controller. `Resolve` reads only the manifest set. It replaces the 19 hand-built names and the two maps (R1).
+Add one function, `bridge.Resolve(set DriverSet, family string) (Resolved, error)` (D1, built by F1 in `go/internal/bridge/resolve.go`). `Resolved` holds the driver name and the manifest. `Resolve` reads only the manifest set. It replaced the 19 hand-built names (R1).
+
+F1 made three choices that the plan did not fix:
+
+| Choice | Reason |
+|---|---|
+| `Resolved` has no controller field. `ControllerFactory.For` takes the driver name from the set, and `cliController.Do` calls `Resolve`. | A controller needs a workspace and an agent name. A family does not give them. |
+| `llmroute` keeps its own family table (`interactiveDriverFor`). A bridge test keeps it equal to `Resolve`. | `bridge` imports `llmroute`, so `llmroute` cannot call `Resolve`. The tier plan also bans a `bridge` import in `cliroute`, which calls `llmroute.DefaultDriverForFamily`. |
+| `bareDriverMap` and `DriverFor` stay. | `DriverFor("ollama")` returns `ollama` today (B9). A change of that result changes dispatch, which is a non-goal of F1. |
+
+An unknown family gives `*UnknownFamilyError`, never a guessed name. Each moved site keeps its old reaction to a missing manifest: it skips the family, returns an error or returns no value.
 
 The factory starts as a Simple Factory with three products. It grows into an Abstract Factory when it also returns the model lister (F3) and the version reader (F4) of the family (P6.1). A wider factory interface costs a change for each new product (P6.5). So the factory grows one product at a time.
 
@@ -92,13 +105,15 @@ The manifest set is global state. The manifests are embedded files (`go/internal
 
 ### Gap
 
-`Resolve` needs the list of known drivers and their manifests. If `Resolve` reads the global registry, it inherits the Service Locator problem (plan §10). The research names no type for the set. The shape of `DriverSet` is **planned**, and plan F1 defines it.
+`Resolve` needs the list of known drivers and their manifests. If `Resolve` reads the global registry, it inherits the Service Locator problem (plan §10). The research names no type for the set, so F1 defined it.
 
 ### Solution
 
-`main` builds a `DriverSet` from the manifest set and passes it to every consumer (D1). The global registry only feeds this default set. A test builds a small `DriverSet` with fake manifests and passes it in.
+`NewDriverSet(names, load)` keys each name that ends in `-tmux` by its family. `load` reads the manifest at each `Resolve`, so an override file still applies. `DefaultDriverSet()` uses `ManifestNames()` and `LoadManifest`. The set does not read the `init()` registry.
 
-F1 writes the red test first: every manifest resolves, `agy-claude` and `ollama` included (plan §7). That test closes the defect of B9.
+`cmd/evolve` builds the default set once, in `driver_set.go`. A bridge function without a set parameter, such as `UsageWindows`, uses `DefaultDriverSet()`. A test builds a small `DriverSet` with a fake loader and passes it in.
+
+F1 wrote the red test first: every manifest resolves, `agy-claude` and `ollama` included (`TestResolve_EveryInteractiveManifestResolvesFromItsFamily`). A family name gives the right driver for every family. `DriverFor` keeps its old result (B9), as the table in §2 says.
 
 ## 4. Capabilities
 
@@ -210,8 +225,8 @@ This case follows one command from the shell to the window values. The path is t
 1. `evolve clihealth usage agy` calls `clihealthUsage` (`go/cmd/evolve/cmd_clihealth_usage.go:43`). The family list is `[agy]`. Without an argument, the list is `bridge.InteractiveFamilies()`.
 2. `productionUsagePanes` makes a temporary workspace and calls `bridge.NewControllerFactory(projectRoot, ws, "clihealth-usage", bridge.Deps{})` (`cmd_clihealth_usage.go:34-41`).
 3. `bridgeUsageProbe` wraps `usageevidence.UsagePane(factory)` (`go/cmd/evolve/cli_usage_probe.go:60-62`). That function calls `factory.For(family).Do(ctx, family, clicontrol.EventUsage)` (`go/internal/usageevidence/production.go:56-61`).
-4. `ControllerFactory.For` builds a `Config` with `CLI: family + "-tmux"` (`controllerfactory.go:23-31`) and returns `NewController` (`clicontrol_adapter.go:17`). This is the hand-built name that F1 replaces.
-5. `cliController.Do` loads the manifest `agy-tmux` and reads `m.Control("usage")` (`clicontrol_adapter.go:39-47`). If the manifest has no such control, `Do` returns `ErrUnsupported`, and the command prints "its manifest maps no usage command" (`cmd_clihealth_usage.go:72-73`).
+4. `ControllerFactory.For` builds a `Config` with the driver name of the family from `DefaultDriverSet()` and returns `NewController` (`clicontrol_adapter.go:17`). Before F1, this step built the name by hand.
+5. `cliController.Do` calls `Resolve`, which loads the manifest `agy-tmux`. `Do` then reads `Control("usage")` (`clicontrol_adapter.go:38-47`). If the manifest has no such control, `Do` returns `ErrUnsupported`, and the command prints "its manifest maps no usage command" (`cmd_clihealth_usage.go:72-73`).
 6. `Do` calls `captureControl` with `spec.Send`, which is `/usage` (`clicontrol_adapter.go:50`). `captureControl` starts a session, sends the command and polls the pane up to 8 times. It stops early when the pane contains the prompt marker. It then kills the session (`go/internal/bridge/recipe_adapter.go:161-189`).
 7. `readUsage` passes the pane to `bridge.UsageWindows(family, pane, now)` (`cmd_clihealth_usage.go:77`). That function loads the manifest, takes `controls.usage.windows` and calls `quotastate.ReadWindows` (`usage_window_reader.go:10-20`).
 8. `ReadWindows` reads the pane line by line. A group title sets the scope. A label opens a window. A value and a reset line fill it (`quotastate/windows.go:176-190`).
@@ -258,8 +273,9 @@ Each step that removes a bypass adds a guard test that bans the shape it removes
 
 | Rule | Guard test | State |
 |---|---|---|
-| No `+"-tmux"` outside `Resolve` | A scan of non-test Go files for the concatenation (F1) | planned |
-| Every manifest resolves, `agy-claude` and `ollama` included | A test that resolves every manifest (F1) | planned |
+| No `+"-tmux"` outside `Resolve` | `TestDriverNames_AreBuiltOnlyByResolve`, with the fixture test `TestTmuxNameBuilds_FindsEachBannedShape` (F1) | built |
+| Every manifest resolves, `agy-claude` and `ollama` included | `TestResolve_EveryInteractiveManifestResolvesFromItsFamily` (F1) | built |
+| The family table of `llmroute` equals `Resolve` | `TestResolve_AgreesWithTheRoutingTableForEveryFamily` (F1) | built |
 | No LLM argv literal in `bridge/doctor.go` | A scan of `doctor.go` (F2) | planned |
 | The agy probe argv carries the manifest's `fast` model | A test of the probe argv (F2) | planned |
 | No `sysexec` of an LLM binary outside the bridge | An AST scan with an allow rule for the `bridge` package and its tmux layer (F3) | planned |
@@ -278,7 +294,8 @@ Each step that removes a bypass adds a guard test that bans the shape it removes
 - A parse spec in the manifest reads a screen, and a screen can change. Each spec needs a fixture of the real screen, and a fixture cannot prove that a new CLI release keeps the format (ADR-0137, Consequences).
 - If a CLI needs logic that data cannot express, its driver keeps that logic in Go inside the bridge. The rule still holds, because the code stays in the bridge (ADR-0137).
 - A guard test finds the shapes that it names. It does not find a new way to run a CLI.
-- The research does not define the fields of `DriverSet`, `Resolved`, `Probe`, `ModelLister`, `Version`, `controls.models`, `controls.effort` or `controls.model.parse`. Plan components F1 to F5 define them.
+- The research does not define the fields of `Probe`, `ModelLister`, `Version`, `controls.models`, `controls.effort` or `controls.model.parse`. Plan components F2 to F5 define them.
+- The F1 guard finds the three shapes that it names. A name built from a constant, such as `x + tmuxSuffix`, passes it.
 - The Go 1.27 migration of the drivers and a new tmux layer are out of scope (plan §4).
 
 ## Related documents

@@ -303,8 +303,10 @@ func TestDispatchAndForceOneLane_ShareOneBody(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(string(src), "fleet.PlanFromTriage("); n != 1 {
-		t.Errorf("exactly ONE fleet.PlanFromTriage( call in the package (the fold), got %d", n)
+	for _, call := range []string{"fleet.TodosFromTriage(", "fleet.PlanCycles("} {
+		if n := strings.Count(string(src), call); n != 1 {
+			t.Errorf("exactly ONE %s call in the package (the fold), got %d", call, n)
+		}
 	}
 	entries, _ := os.ReadDir(".")
 	for _, e := range entries {
@@ -312,8 +314,10 @@ func TestDispatchAndForceOneLane_ShareOneBody(t *testing.T) {
 			continue
 		}
 		other, _ := os.ReadFile(e.Name())
-		if strings.Contains(string(other), "fleet.PlanFromTriage(") {
-			t.Errorf("%s re-introduces a second PlanFromTriage call", e.Name())
+		for _, call := range []string{"fleet.PlanFromTriage(", "fleet.TodosFromTriage(", "fleet.PlanCycles("} {
+			if strings.Contains(string(other), call) {
+				t.Errorf("%s re-introduces a second %s call", e.Name(), call)
+			}
 		}
 	}
 }
@@ -395,19 +399,19 @@ func TestTally_CountsErrOrNonZeroExitAsFailed(t *testing.T) {
 
 func TestLoadFleetConfig_DefaultsOnAnyError(t *testing.T) {
 	dir := t.TempDir()
-	if got := LoadFleetConfig(dir); got.Count != 1 || got.PlanSource != "triage" {
+	if got := LoadFleetConfig(dir, io.Discard, nil); got.Count != 1 || got.PlanSource != "triage" {
 		t.Errorf("absent policy defaults: %+v", got)
 	}
 	if err := os.WriteFile(paths.PolicyPath(dir), []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := LoadFleetConfig(dir); got.Count != 1 {
+	if got := LoadFleetConfig(dir, io.Discard, nil); got.Count != 1 {
 		t.Errorf("malformed policy defaults to Count 1 (never holds): %+v", got)
 	}
 	if err := os.WriteFile(paths.PolicyPath(dir), []byte(`{"fleet":{"count":4,"min_lanes":2}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := LoadFleetConfig(dir); got.Count != 4 || got.MinLanes != 2 {
+	if got := LoadFleetConfig(dir, io.Discard, nil); got.Count != 4 || got.MinLanes != 2 {
 		t.Errorf("a fleet block resolves: %+v", got)
 	}
 }
@@ -539,5 +543,44 @@ func TestEngine_NullObjectAndSignalsWired(t *testing.T) {
 	c = signalcenter.New()
 	if !e.SignalsWired() {
 		t.Error("wired after")
+	}
+}
+
+func TestLoadFleetConfig_AnInvalidPolicyIsLoudAndRunsSequential(t *testing.T) {
+	h := newHarness(t)
+	if err := os.WriteFile(paths.PolicyPath(h.evolveDir), []byte(`{"fleet":{"count":4,"orchestrator":{"scan_kk":3}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var warn bytes.Buffer
+	got := LoadFleetConfig(h.evolveDir, &warn, h.center)
+	if got.Count != 1 {
+		t.Errorf("Count = %d, want 1 (sequential until the policy is fixed)", got.Count)
+	}
+	out := warn.String()
+	if !strings.HasPrefix(out, "[loop] WARN: fleet: .evolve/policy.json is not valid (") || !strings.Contains(out, "scan_kk") ||
+		!strings.HasSuffix(out, "); the loop runs sequential until it is fixed\n") {
+		t.Errorf("warn = %q, want the verbatim WARN naming the bad key", out)
+	}
+	ev := h.only(t, CodeFleetPolicyInvalid)
+	if ev.Fields["path"] != paths.PolicyPath(h.evolveDir) || !strings.Contains(ev.Reason, "scan_kk") {
+		t.Errorf("event = %+v, want the path and the load error", ev)
+	}
+	if m, ok := signalcenter.IsRegistered(CodeFleetPolicyInvalid); !ok || m != signalcenter.ModuleLoop || CodeFleetPolicyInvalid != "LOOP_FLEET_POLICY_INVALID" {
+		t.Errorf("LOOP_FLEET_POLICY_INVALID must be registered under loop (got %q, %v)", m, ok)
+	}
+}
+
+func TestLoadFleetConfig_AValidOrAbsentPolicyWarnsNothing(t *testing.T) {
+	h := newHarness(t)
+	var warn bytes.Buffer
+	LoadFleetConfig(h.evolveDir, &warn, h.center)
+	if err := os.WriteFile(paths.PolicyPath(h.evolveDir), []byte(`{"fleet":{"count":3}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := LoadFleetConfig(h.evolveDir, &warn, h.center); got.Count != 3 {
+		t.Errorf("Count = %d, want 3", got.Count)
+	}
+	if warn.Len() != 0 || len(*h.events) != 0 {
+		t.Errorf("warn = %q, events = %v, want none", warn.String(), h.codes())
 	}
 }

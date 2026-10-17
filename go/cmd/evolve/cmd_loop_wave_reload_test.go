@@ -24,7 +24,7 @@ func writeFleetPolicy(t *testing.T, dir, fleetJSON string) string {
 func TestFleetDispatch_ReloadsMinLanesAtWaveBoundary(t *testing.T) {
 	t.Parallel()
 	dir := writeFleetPolicy(t, t.TempDir(), `{"count":10,"min_lanes":3,"plan_source":"triage"}`)
-	prev := loadFleetConfig(dir)
+	prev := loadFleetConfig(dir, io.Discard, nil)
 	if prev.Count != 10 || prev.MinLanes != 3 {
 		t.Fatalf("fixture sanity: batch-start snapshot = count=%d min_lanes=%d, want 10/3", prev.Count, prev.MinLanes)
 	}
@@ -50,7 +50,7 @@ func TestFleetDispatch_ReloadsMinLanesAtWaveBoundary(t *testing.T) {
 func TestFleetDispatch_ReloadsCountAtWaveBoundary(t *testing.T) {
 	t.Parallel()
 	dir := writeFleetPolicy(t, t.TempDir(), `{"count":3,"min_lanes":2,"plan_source":"triage"}`)
-	prev := loadFleetConfig(dir)
+	prev := loadFleetConfig(dir, io.Discard, nil)
 	if prev.Count != 3 {
 		t.Fatalf("fixture sanity: batch-start count = %d, want 3", prev.Count)
 	}
@@ -86,7 +86,7 @@ func TestFleetDispatch_ReloadsCountAtWaveBoundary(t *testing.T) {
 func TestFleetDispatch_UnchangedPolicyByteIdenticalDispatch(t *testing.T) {
 	t.Parallel()
 	dir := writeFleetPolicy(t, t.TempDir(), `{"count":3,"min_lanes":2,"plan_source":"triage"}`)
-	prev := loadFleetConfig(dir)
+	prev := loadFleetConfig(dir, io.Discard, nil)
 
 	var warn bytes.Buffer
 	got := reloadFleetConfigAtWaveBoundary(dir, prev, &warn)
@@ -101,7 +101,7 @@ func TestFleetDispatch_UnchangedPolicyByteIdenticalDispatch(t *testing.T) {
 func TestFleetDispatch_MalformedPolicyAtWaveBoundaryHoldsWidth(t *testing.T) {
 	t.Parallel()
 	dir := writeFleetPolicy(t, t.TempDir(), `{"count":3,"min_lanes":2,"plan_source":"triage"}`)
-	prev := loadFleetConfig(dir)
+	prev := loadFleetConfig(dir, io.Discard, nil)
 
 	if err := os.WriteFile(filepath.Join(dir, "policy.json"), []byte("{not json"), 0o644); err != nil {
 		t.Fatalf("corrupt policy.json: %v", err)

@@ -39,7 +39,11 @@ func familyEvidence(explain usageevidence.Explain) func(ctx context.Context, fam
 		return nil
 	}
 	return func(ctx context.Context, family string) usageprobe.Evidence {
-		return explain(ctx, family+"-tmux", time.Now())
+		r, err := bridge.Resolve(driverSet, family)
+		if err != nil {
+			return usageprobe.Evidence{Family: family, Verdict: usageprobe.VerdictUnavailable, Detail: err.Error()}
+		}
+		return explain(ctx, r.Driver, time.Now())
 	}
 }
 
@@ -77,7 +81,11 @@ func usageResetFrom(explain usageevidence.Explain) func(families []string, now t
 	return func(families []string, now time.Time) (time.Time, bool) {
 		var first time.Time
 		for _, family := range families {
-			back, ok := familyBackAt(explain(context.Background(), family+"-tmux", now))
+			r, err := bridge.Resolve(driverSet, family)
+			if err != nil {
+				continue
+			}
+			back, ok := familyBackAt(explain(context.Background(), r.Driver, now))
 			if ok && (first.IsZero() || back.Before(first)) {
 				first = back
 			}

@@ -21,8 +21,9 @@ func NewControllerFactory(projectRoot, baseWorkspace, agent string, deps Deps) *
 }
 
 func (f *ControllerFactory) For(family string) clicontrol.Controller {
+	resolved, _ := Resolve(DefaultDriverSet(), family)
 	cfg := &Config{
-		CLI:         family + "-tmux",
+		CLI:         resolved.Driver,
 		ProjectRoot: f.projectRoot,
 		Workspace:   filepath.Join(f.baseWorkspace, family),
 		Agent:       f.agent,

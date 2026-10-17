@@ -126,7 +126,7 @@ func bootTmuxREPL(
 }
 
 func primePaneShell(ctx context.Context, deps Deps, cfg *Config, session, workingDir string) error {
-	_ = deps.Tmux.SendKeys(ctx, session, "cd "+workingDir, true)
+	_ = deps.Tmux.SendKeys(ctx, session, "cd "+shellQuotePOSIX(workingDir), true)
 	if cfg.ProjectRoot != "" {
 		_ = deps.Tmux.SendKeys(ctx, session, "export EVOLVE_PROJECT_ROOT="+shellQuotePOSIX(cfg.ProjectRoot), true)
 	}
