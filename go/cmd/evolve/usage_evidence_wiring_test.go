@@ -124,3 +124,25 @@ func TestWireOrchestratorDeps_TheObserverAndTheBridgeShareOneUsageEvidence(t *te
 		t.Errorf("a disabled observer yields no option")
 	}
 }
+
+func TestLoopPreflightOptions_WiresTheReleaseLagReaderAndPolicyDials(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	evolve := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolve, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pol := `{"preflight":{"release_lag_threshold":7,"release_check_ttl_hours":3}}`
+	if err := os.WriteFile(filepath.Join(evolve, "policy.json"), []byte(pol), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := loopPreflightOptions(loopConfig{ProjectRoot: root, EvolveDir: evolve}, io.Discard)
+
+	if opts.LatestRelease == nil {
+		t.Fatal("the production release reader must be wired")
+	}
+	if opts.ReleaseLag.Threshold != 7 || opts.ReleaseLag.CacheTTL != 3*time.Hour {
+		t.Fatalf("ReleaseLag = %+v, want policy dials 7 and 3h", opts.ReleaseLag)
+	}
+}

@@ -355,11 +355,36 @@ No step compares all pairs of lanes. The cost thus grows linearly with N, not wi
 |---|---|---|---|
 | Disjoint Go cells | about 139 lanes | the import graph: at most 139 packages with no edge between any two (ADR-0134 research F2.16) | work outside `go/`, which has no cell. Smaller hub packages. |
 | The serial landing | about 6 lanes | one landing takes about 5 minutes (ADR-0134 research §2.1). The median lane takes 31 minutes (F2.13). Little's law gives 31 / 5 ≈ 6 lanes before landings queue (synthesis). | ADR-0134: content-keyed verification and group commit |
-| Host CPU | an estimate of 8–12 lanes on one host | this host has 14 CPUs. Each lane's build floor and audit run `go test` over the module. | lanes on more hosts, a later plan |
+| Host CPU | 4 lanes without a budget (F12.1). An estimate of 8–12 lanes with the lane CPU budget. | this host has 14 CPUs. Each lane's build floor and audit run `go test` over the module. | the lane CPU budget (below). Lanes on more hosts, a later plan. |
 | Host memory | above the CPU limit | one agy phase uses about 350 MB, and one Claude Code phase about 1.5 GB, on a 64 GB host (2026-10-17, `ps`) | none needed before the CPU limit |
 | Quota | changes each hour | the benches of §5 | more families in each chain |
 
 The first limit that binds is the serial landing, at about 6 lanes. A width of 4 is inside it. A width above 6 needs ADR-0134's group commit. The orchestrator then raises its window through §10, and the conflict rate shows if the cells hold.
+
+### The lane CPU budget
+
+Each `go test` that a lane runs gets one share of the host CPUs. The share is `procs = max(1, host CPUs / fleet width)`. The lane gives the share to the child three times: `-p procs`, `-parallel procs` and `GOMAXPROCS=procs` in the child environment.
+
+**F12.1** Wave 122 (2026-10-17) was the first wave with 4 lanes. Cycle 1931's ship floor ran `go test -json -count=1 -timeout 20m ./internal/core` at 634% CPU (`ps`, 21:02). The load average was 15–18 on the 14 CPUs of the host.
+*Implication:* one lane floor alone can fill the host, so the host CPU limit of the table above binds at width 4, not at 8–12.
+
+**F12.2** On the same day, the same load caused two Claude REPL boot timeouts (exit 80). They were the build of cycle 1928 and the `doctor live` run of the boundary (inbox `boot-timeout-reported-as-all-families-exhausted`).
+*Implication:* an oversubscribed host fails the phases of all lanes, not only the slow lane.
+
+**F12.3** `go test` sets `-p` and `GOMAXPROCS` to the host CPU count when the caller does not set them. Before this budget, only the integration tier of `ciparitygate` passed `-p`, with a fixed value of 4. At width 4 it thus asked for 16 packages.
+
+The formula divides the CPUs among the lanes. The floor of 1 keeps a lane alive on a host with fewer CPUs than lanes. A worked example: 14 CPUs at width 4 gives `procs` 3, so the 4 lanes ask for 12 CPUs.
+
+`GOMAXPROCS` is necessary because the two flags do not bound the CPU use:
+
+- `-p` bounds the number of packages that build and run at the same time. `-parallel` bounds the number of parallel tests in one test binary. The two multiply: a budget of 3 can still run about 9 test goroutines.
+- Only `GOMAXPROCS` bounds the threads that run Go code. It bounds the compiler, the linker and the CPU use inside each test binary.
+
+The width is `EVOLVE_FLEET_WIDTH` (`ipcenv.FleetWidthKey`). Each fleet launch path sets it to the effective width after the shrink ([internal-fleet](packages/internal-fleet.md)). The lane process reads it from its own environment, because each lane is a separate process. A console run has no width, so the budget changes nothing, and the integration tier keeps its 4.
+
+The package `internal/lanebudget` ([its note](packages/internal-lanebudget.md)) owns the formula, and each site that builds a `go test` argv goes through it. `TestEveryGoTestArgvGoesThroughTheLaneBudget` fails on a new site that does not. `releasepreflight` is exempt: it runs only on the console, before a release.
+
+The budget does not make a lane faster. It makes the lanes share the host, so the load stays below the CPU count. The live check is the load average during the test floors of a wave at width 4 (`uptime` and `evolve wave status`).
 
 ## 13. Config keys, signals and commands
 

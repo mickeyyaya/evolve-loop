@@ -17,26 +17,41 @@ class: the next hook diverges the same way.
 **Design** (`go/internal/core/retry_opts.go`). `retryOpts` is a Strategy value
 enumerating every recovery hook a retry loop may run:
 
-| hook | meaning | main | batch |
-|---|---|---|---|
-| `backfill` | reconstruct the artifact from `stdout.clean.txt` after an `ErrArtifactTimeout` exhaustion | ✅ | ✖ (writes the workspace; the batch runs concurrently) |
-| `optionalInfraSkip` | optional, off-floor phase with an infra-shaped exhaustion degrades to WARN | ✅ | ✅ |
-| `postShipObserverSkip` | best-effort post-ship Control observer's failure degrades to WARN | ✅ | ✅ |
-| `shipRecovery` | route a structured `ShipError` to the advisor's recovery chain | ✅ | ✖ (rewrites the loop cursor; an evaluate batch never contains ship) |
+| hook | meaning | main | resume | batch |
+|---|---|---|---|---|
+| `backfill` | reconstruct the artifact from `stdout.clean.txt` after an `ErrArtifactTimeout` exhaustion | ✅ | ✖ | ✖ (writes the workspace; the batch runs concurrently) |
+| `optionalInfraSkip` | optional, off-floor phase with an infra-shaped exhaustion degrades to WARN | ✅ | ✅ | ✅ |
+| `postShipObserverSkip` | best-effort post-ship Control observer's failure degrades to WARN | ✅ | ✅ | ✅ |
+| `shipRecovery` | route a structured `ShipError` to the advisor's recovery chain | ✅ | ✖ | ✖ (rewrites the loop cursor; an evaluate batch never contains ship) |
 
 A `nil` field means "this path does not run that hook" — divergence declared and
 inspectable, rather than implicit and discoverable only by diffing two loops.
-`mainDispatchRetryOpts()` is the REFERENCE set (every hook wired);
-`evaluateBatchRetryOpts()` is the batch subset. `retryPhaseRunner` is the shared
-retry core; `dispatchRunnerWithRetry` is now a one-line delegation to it, so the
-batch path cannot keep a second hand-maintained loop. The sequential loop keeps
-its own control flow (it owns aborts, ledger writes and the cursor) but consults
-its hooks *through the registry*, so both paths read from one enumeration.
+`mainDispatchRetryOpts()` is the REFERENCE set. It wires every hook.
+`evaluateBatchRetryOpts()` is the batch subset.
 
-**Guard.** `retry_opts_parity_test.go` reflects over `retryOpts` and asserts the
-field set equals the canonical hook list. A hook added to the dispatch loop
-without a field here fails the table — the parity gap is now structural, not
-vigilance-dependent.
+`resumeDispatchRetryOpts()` starts from the reference set and clears only
+`backfill` and `shipRecovery`. A hook added to the reference set therefore
+reaches the resume loop without a second edit.
+The resume loop reads the ship latch from its checkpoint (`CycleState.Shipped`).
+A best-effort observer that fails after Ship on a resumed cycle therefore
+degrades to WARN, as it does on a fresh cycle.
+
+`retryPhaseRunner` is the shared retry core.
+`dispatchRunnerWithRetry` is a one-line delegation to it.
+The batch path therefore cannot keep a second hand-maintained loop.
+
+The sequential loop keeps its own control flow. It owns aborts, ledger writes
+and the cursor. It consults its hooks *through the registry*, so both paths
+read from one enumeration.
+
+**Guard.** `retry_opts_parity_test.go` reflects over `retryOpts`.
+It asserts that the field set equals the canonical hook list.
+A hook added to the dispatch loop without a field here fails the table.
+The parity gap is structural and does not depend on vigilance.
+
+`TestResumeDispatchRetryOpts_MatchesMainDispatchExceptDocumentedDivergence`
+asserts that the resume set equals the reference set minus the two declared
+omissions. A hook wired on one path only fails the test.
 
 ## 2. `IsInfraTeardownError` — the union predicate spelled once
 

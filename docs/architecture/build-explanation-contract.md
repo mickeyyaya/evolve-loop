@@ -73,24 +73,31 @@ material path still needs its own exact entry, so one broad glob can never stand
 in for the per-path explanations the contract requires (2026-09-30, after cycles
 1765 and 1768 each lost a correction round to a directory or glob citation).
 
-An entry is a Markdown list item, not a physical line. Its explanation may wrap
-onto continuation lines (unindented, or indented fewer than four spaces: the
-shared section reader hides a line indented four or more, or by a tab, as code)
-or continue in sub-bullets (a sub-bullet is its own entry, checked like any
-other, when its first span names a diff path or is shaped like one, holding a
-`/`; one that opens with a backticked identifier such as `runGateSet`
-continues the item). One item may name several paths that share its explanation
-(``- `a`, `b` — why``, also joined by `and` or `&`), but a span joins the group
-only when it covers a diff path, so a backticked identifier
-(``- `a.go`, `checkAll` — splits…``), or a path outside the diff in that
-position, stays part of the first path's explanation: the host neither cites
-nor checks it, and judging such a claim is the auditor's. The next `- ` bullet at the same or a lesser
-indent, or unindented text after a blank line, ends the item, so a short
-explanation never borrows the next block's text. Every path an item names still
-passes the diff check and the `minExplanationBytes` floor (2026-09-30, after
-cycles 1707, 1730, 1735, 1737, 1760, 1762, 1765 and 1772 each lost a correction
-round to a wrapped or grouped bullet whose explanation the line-by-line reader
-never saw).
+An entry is a Markdown list item, not a physical line.
+Its explanation can wrap onto continuation lines.
+A continuation line can be unindented or indented.
+A line that is indented by four spaces or a tab is a continuation when it directly follows item text.
+After a blank line it is code, and the section reader hides it.
+
+The explanation can also continue in sub-bullets.
+A sub-bullet is its own entry.
+The host checks it like any other entry when its first span names a diff path.
+It also checks it when the span has the shape of a path, which holds a `/`.
+A sub-bullet that opens with a backticked identifier such as `runGateSet` continues the item.
+
+One item can name several paths that share its explanation (``- `a`, `b` — why``, also joined by `and` or `&`).
+A span joins the group only when it covers a diff path.
+A backticked identifier (``- `a.go`, `checkAll` — splits…``) stays part of the first path's explanation.
+A path outside the diff in that position does the same.
+
+The host neither cites nor checks such a span, and judging the claim is the work of the auditor.
+The next `- ` bullet at the same or a lesser indent ends the item.
+Unindented text after a blank line also ends the item.
+Thus a short explanation never borrows the text of the next block.
+
+Every path that an item names still passes the diff check and the `minExplanationBytes` floor.
+Cycles 1707, 1730, 1735, 1737, 1760, 1762, 1765 and 1772 each lost a correction round (2026-09-30).
+The cause was a wrapped or grouped bullet whose explanation the line-by-line reader never saw.
 
 The host classifies documentation, knowledge-base files, eval definitions, ACS
 predicates, testdata, unambiguous test files and the inbox lifecycle records under

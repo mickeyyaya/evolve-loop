@@ -158,6 +158,8 @@ type Orchestrator struct {
 	learn   *failurelearning.Engine
 	gitHEAD func() (string, error)
 
+	resumeDispatch func(cr *cycleRun, next Phase, req PhaseRequest, hooks retryOpts) (map[string]bool, PhaseResponse, int, error)
+
 	gitMutationLock gitMutationLocker
 
 	dossierDestination DossierDestination
@@ -447,6 +449,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		sm:                         NewStateMachine(),
 		now:                        time.Now,
 		gitHEAD:                    defaultGitHEAD,
+		resumeDispatch:             (*cycleRun).snapshotThenDispatch,
 		gitMutationLock:            defaultGitMutationLock,
 		gitDirtyPaths:              defaultGitDirtyPaths,
 		worktree:                   gitWorktree{},

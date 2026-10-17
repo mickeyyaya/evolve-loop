@@ -140,6 +140,7 @@ var treeReadingSelections = []TestSelection{
 		"TestPipelineCode_StartsEveryProcessThroughCommand",
 	}},
 	{Package: "./test/structure", Tests: []string{
+		"TestEveryGoTestArgvGoesThroughTheLaneBudget",
 		"TestEveryThirdPartyImportHasExactlyOneHome",
 		"TestNoPollTimerInTheEventChannelSources",
 		"TestNoTestRunsARawBareClone",

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -312,5 +313,115 @@ func TestObservedRun_TheObserverWatchesTheWholeRun(t *testing.T) {
 
 	if runner.cancelsAtRun != 0 || obs.cancelCalls.Load() != 1 || len(obs.starts) != 1 || obs.starts[0] != string(PhaseBuild) {
 		t.Fatalf("observer: starts=%v cancels during run=%d after=%d, want one %s watch spanning the run, cancelled once after it", obs.starts, runner.cancelsAtRun, obs.cancelCalls.Load(), PhaseBuild)
+	}
+}
+
+func TestRemediation_FixDirectiveAsksForTheRoundsNumberedCorrectionRecord(t *testing.T) {
+	t.Parallel()
+
+	wf := policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"tdd"}}
+	gate, build, _, err := remediationHarness(t, wf, PhaseTDD, []string{VerdictFAIL, VerdictPASS})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	rems := remediationDispatches(build)
+	if len(rems) != 1 {
+		t.Fatalf("want 1 remediation dispatch, got %d", len(rems))
+	}
+	if want := correctionRecord(1); !strings.HasSuffix(rems[0], want) {
+		t.Errorf("remediation directive must end with the numbered correction record %q\n  got: %s", want, rems[0])
+	}
+	heading := "## Correction 1"
+	if !correctionHeadingRE.MatchString(heading) || !strings.Contains(rems[0], "`"+heading+"`") {
+		t.Errorf("the requested heading must be one the build floor parses as a correction section: %q", rems[0])
+	}
+	reverify := gate.directives[len(gate.directives)-1]
+	if want := "RE-VERIFY after remediation round 1: run your full check fresh against the current worktree."; reverify != want {
+		t.Errorf("the read-only gate re-verify directive must stay unchanged, got %q", reverify)
+	}
+}
+
+func TestRemediation_RequestedRecordRoundTripsThroughThePlaceholderCheck(t *testing.T) {
+	t.Parallel()
+
+	body := "# Build Report\n\nresult: ok\n\n## Correction 1\nRemoved the `CMD_EVOLVE_PLACEHOLDER` slot flagged at build-report.md:62.\n"
+	if got := placeholderFailuresFor(t, body); len(got) != 0 {
+		t.Fatalf("a record in the requested format must parse as a correction section; got %v", got)
+	}
+}
+
+type remediationErrRunner struct {
+	name  Phase
+	calls int
+	errAt int
+	err   error
+}
+
+func (r *remediationErrRunner) Name() string { return string(r.name) }
+func (r *remediationErrRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	r.calls++
+	if r.calls == r.errAt {
+		return PhaseResponse{}, r.err
+	}
+	verdict := VerdictFAIL
+	if r.calls > 1 {
+		verdict = VerdictPASS
+	}
+	return PhaseResponse{Phase: r.name.String(), Verdict: verdict, ArtifactsDir: req.Workspace}, nil
+}
+
+func remediationWithErrRunner(t *testing.T, gateErrAt, buildErrAt int, buildVerdicts []string) CycleResult {
+	t.Helper()
+	runners := buildRunners(nil)
+	runners[PhaseTDD] = &remediationErrRunner{name: PhaseTDD, errAt: gateErrAt, err: errors.New("gate boom")}
+	if buildErrAt > 0 {
+		runners[PhaseBuild] = &remediationErrRunner{name: PhaseBuild, errAt: buildErrAt, err: errors.New("builder boom")}
+	} else {
+		runners[PhaseBuild] = &scriptedRunner{name: PhaseBuild, verdicts: buildVerdicts}
+	}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
+		WithWorkflowConfig(policy.WorkflowConfig{RemediationRounds: 1, RemediablePhases: []string{"tdd"}}))
+	res, _ := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
+	return res
+}
+
+func TestRemediation_BuilderDispatchErrorLeavesTheGateFailStanding(t *testing.T) {
+	t.Parallel()
+
+	res := remediationWithErrRunner(t, 0, 1, nil)
+	if len(res.Remediations) == 0 || !strings.Contains(res.Remediations[0], "builder-failed") {
+		t.Fatalf("a builder dispatch error must be recorded as builder-failed; got %v", res.Remediations)
+	}
+}
+
+func TestRemediation_BuilderFailVerdictLeavesTheGateFailStanding(t *testing.T) {
+	t.Parallel()
+
+	res := remediationWithErrRunner(t, 0, 0, []string{VerdictFAIL})
+	if len(res.Remediations) == 0 || !strings.Contains(res.Remediations[0], "builder-failed") {
+		t.Fatalf("a builder FAIL verdict must be recorded as builder-failed; got %v", res.Remediations)
+	}
+}
+
+func TestRemediation_GateReRunDispatchErrorLeavesTheOriginalFailStanding(t *testing.T) {
+	t.Parallel()
+
+	res := remediationWithErrRunner(t, 2, 0, []string{VerdictPASS})
+	if len(res.Remediations) == 0 || !strings.Contains(res.Remediations[0], "re-run dispatch-failed") {
+		t.Fatalf("a failed gate re-run must be recorded as dispatch-failed; got %v", res.Remediations)
+	}
+}
+
+func TestSnapshotThenRun_ASnapshotFailureNeverDispatchesTheRunner(t *testing.T) {
+	t.Parallel()
+
+	reader := &scriptedDirtyReader{err: errors.New("status unreadable")}
+	cr := snapshotCycleRun(t, checkoutRoot(t), reader)
+	runner := &scriptedRunner{name: PhaseBuild, verdicts: []string{VerdictPASS}}
+
+	_, _, _, err := cr.snapshotThenRun(PhaseBuild, runner, PhaseRequest{})
+
+	if err == nil || runner.calls != 0 {
+		t.Fatalf("a failed pre-phase snapshot must stop the dispatch: err=%v calls=%d", err, runner.calls)
 	}
 }

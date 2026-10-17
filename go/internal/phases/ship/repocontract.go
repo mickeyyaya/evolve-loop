@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -135,7 +136,7 @@ func repoContractTestArgs(packages, tags []string) []string {
 	if len(tags) > 0 {
 		args = append(args, "-tags", strings.Join(tags, ","))
 	}
-	return append(args, packages...)
+	return lanebudget.Args(append(args, packages...))
 }
 
 func packagesOf(failures []packFailure) []string {
@@ -200,7 +201,7 @@ func runGoTestJSON(ctx context.Context, moduleDir string, log packLog, args []st
 	out := &lockedWriter{w: log.raw}
 	cmd := sysexec.Command(ctx, "go", args...)
 	cmd.Dir = moduleDir
-	cmd.Env = ipcenv.Scrub(os.Environ())
+	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
 	cancelKillsTheProcessGroup(cmd)
 	cmd.WaitDelay = packWaitDelay
 	stdout, err := stdoutPipe(cmd)

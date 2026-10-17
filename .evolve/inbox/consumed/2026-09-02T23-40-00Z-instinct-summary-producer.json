@@ -25,7 +25,13 @@
     "lesson_to_action_gap (memory)",
     "repair-brief-carries-auditor-findings (R2)"
   ],
-  "notes": "Filed 2026-09-02 (proposal R7).",
+  "notes": "Producer, selector and injection landed 2026-09-09 as recalled_lessons (09d32a190, task_recall.go, filekb.go). This change adds the dossier record.",
   "priority_class": "feature",
-  "priority_rationale": "inbox review 2026-09-27: Closes the write-only learning loop (the memory's 'lesson_to_action_gap'). Until then the personas point agents at a variable that never exists."
+  "priority_rationale": "inbox review 2026-09-27: Closes the write-only learning loop (the memory's 'lesson_to_action_gap'). Until then the personas point agents at a variable that never exists.",
+  "consumed": {
+    "at": "2026-10-17T18:04:38Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Producer, selector and injection already shipped in 09d32a190 (seedTaskRecall, FileKB keyword selector; supersedes the file-overlap fixture); dossier record of injected lesson ids and persona prose alignment added by this change (feat/instinct-summary-producer)."
+  }
 }

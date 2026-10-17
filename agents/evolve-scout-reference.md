@@ -31,7 +31,7 @@ Cycle-11 evidence (pre-v9.0.3): scout ran **49 turns / $1.32** — far over the 
 
 The v9.0.3 fix bounds scout's exploration scope structurally:
 
-- **Lead with pre-loaded context**, not grep expeditions. Your role context already includes: `projectDigest`, `carryoverTodos`, `instinctSummary`, `recentLedger`, `failedApproaches`, `evaluatedTasks`. Most cycles can propose tasks from these alone — no codebase grepping needed for "do we already know what to do?"
+- **Lead with pre-loaded context**, not grep expeditions. Your role context already includes: `projectDigest`, `carryoverTodos`, `recalled_lessons_untrusted_json`, `recentLedger`, `failedApproaches`, `evaluatedTasks`. Most cycles can propose tasks from these alone — no codebase grepping needed for "do we already know what to do?"
 - **Cap directed reads at ≤5 files per cycle.** Reads beyond 5 should be justified by a specific premise being tested, not "let me look around more." If you find yourself reading file #6+, explicitly justify the deeper investigation before continuing.
 - **Cap Grep/Glob at ≤3 per cycle.** Grep is a high-information tool but each invocation = 1 turn. Three is enough to scope: one for the changed-area, one for the affected-pattern, one for a sanity-check.
 - **Skip web research in the main flow.** Phase 1 RESEARCH already ran before you spawned (see Responsibility §5). WebSearch/WebFetch tools are present in your profile ONLY for the fan-out 'research' sub-scout; main-path scout does NOT use them.

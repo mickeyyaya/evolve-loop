@@ -116,3 +116,11 @@ func TestDoctorVersions_RejectsUnknownFlag(t *testing.T) {
 		t.Fatalf("exit=%d, want 10 on a bad flag", code)
 	}
 }
+
+func TestDoctorVersions_LatestWithNoReleaseReaderPrintsUnavailable(t *testing.T) {
+	stubVersions(t, map[string]string{"claude": "2.1.3"}, nil)
+	code, out, _ := runVersions("--latest")
+	if code != 0 || !strings.Contains(out, "unavailable") {
+		t.Fatalf("exit=%d out=%q, want exit 0 and unavailable", code, out)
+	}
+}

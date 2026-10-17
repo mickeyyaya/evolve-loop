@@ -16,5 +16,11 @@
     "The contract's 'indented fewer than four spaces' limit is removed in the same change"
   ],
   "created_at": "2026-09-30T01:16:00Z",
-  "source": "console, 2026-09-30 architecture review of the Changed Areas list-item fix (HIGH-4)"
+  "source": "console, 2026-09-30 architecture review of the Changed Areas list-item fix (HIGH-4)",
+  "consumed": {
+    "at": "2026-10-17T14:34:57Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "visibleLinesIdx keeps an indented line that directly follows paragraph or list-item text as continuation text (CommonMark 4.4); indented code after a blank line, heading, thematic break or fence stays hidden. Pinned in reportdoc and explanationdocs tests; contract limit removed."
+  }
 }

@@ -765,3 +765,5 @@
 ./internal/treewalk
 # kbgraph - the read-only graph projection over cycle dossiers and inbox items (slice 1).
 ./internal/kbgraph
+# lanebudget — the lane CPU budget of each go test a lane runs (wave-orchestrator plan O9).
+./internal/lanebudget

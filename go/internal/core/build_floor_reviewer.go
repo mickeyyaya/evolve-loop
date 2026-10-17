@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
@@ -282,7 +283,7 @@ func coverTestArgs(profile string, pkgs, tags []string) []string {
 	if len(tags) > 0 {
 		args = append(args, "-tags", strings.Join(tags, ","))
 	}
-	return append(append(args, "-coverprofile", profile), pkgs...)
+	return lanebudget.Args(append(append(args, "-coverprofile", profile), pkgs...))
 }
 
 func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path, output string, status int) {
@@ -318,7 +319,7 @@ func scopedCoverProfile(ctx context.Context, moduleDir string, pkgs, tags []stri
 	profile = filepath.Join(tmpDir, "cover.out")
 	cmd := sysexec.Command(ctx, "go", coverTestArgs(profile, pkgs, tags)...)
 	cmd.Dir = moduleDir
-	cmd.Env = ipcenv.Scrub(os.Environ())
+	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return profile, string(out), coverStatusTestsFailed
 	}

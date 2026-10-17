@@ -57,7 +57,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		"REMEDIATION round %d: the deterministic gate %q FAILED after your build. "+
 			"Read its report at %s and fix EXACTLY the enumerated defects in the worktree — "+
 			"typically missing tests for new code. Do not widen scope; do not touch unrelated "+
-			"files. The same gate re-runs immediately after you finish.", round, next, report)
+			"files. The same gate re-runs immediately after you finish.", round, next, report) + correctionRecord(round)
 	fixGuard, fixBefore, bresp, berr := cr.snapshotThenRun(PhaseBuild, builder, breq)
 	fixAbort := ""
 	if berr != nil {

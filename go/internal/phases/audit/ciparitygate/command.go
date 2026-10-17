@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -14,25 +15,25 @@ func (g *Gates) GoVet(req Request) ([]string, error) {
 	if _, run, err := g.scope(gateGoVet, req); err != nil || !run {
 		return nil, err
 	}
-	return g.runGate(gateGoVet, req, "go vet ./...", g.timeouts.GoVet, "go", "vet", "./...")
+	return g.runGate(gateGoVet, req, "go vet ./...", g.timeouts.GoVet, g.run, "go", "vet", "./...")
 }
 
 func (g *Gates) ACSDurable(req Request) ([]string, error) {
 	if _, run, err := g.scope(gateACSDurable, req); err != nil || !run {
 		return nil, err
 	}
-	return g.runGate(gateACSDurable, req, "acs-durable (-tags acs)", g.timeouts.ACSDurable,
+	return g.runGate(gateACSDurable, req, "acs-durable (-tags acs)", g.timeouts.ACSDurable, lanebudget.Runner(g.run),
 		"go", "test", "-count=1", "-tags", "acs", "./acs/regression/...")
 }
 
-func (g *Gates) runGate(at gateOrigin, req Request, label string, timeout time.Duration, name string, args ...string) ([]string, error) {
+func (g *Gates) runGate(at gateOrigin, req Request, label string, timeout time.Duration, run sysexec.RunFunc, name string, args ...string) ([]string, error) {
 	dir := moduleDir(req.root())
 	if dir == "" {
 		return nil, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	out, errOut, code, err := sysexec.Capture(ctx, g.run, dir, name, args...)
+	out, errOut, code, err := sysexec.Capture(ctx, run, dir, name, args...)
 	if err != nil {
 		wrapped := fmt.Errorf("%s gate could not run: %w", label, err)
 		g.stepFailed(at, req, stepExec, wrapped.Error(), err, "cmd", name+" "+strings.Join(args, " "))

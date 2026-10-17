@@ -109,6 +109,9 @@ type Options struct {
 	UsageEvidence func(driver string) string
 
 	MCPConfig MCPConfigPort
+
+	LatestRelease func(bin string) (string, error)
+	ReleaseLag    ReleaseLagConfig
 }
 
 type resolved struct {
@@ -147,6 +150,9 @@ type resolved struct {
 	phaseRoutingWarnings func() []string
 
 	mcpConfig MCPConfigPort
+
+	latestRelease func(string) (string, error)
+	releaseLag    ReleaseLagConfig
 
 	routing *routingOnce
 }
@@ -190,6 +196,8 @@ func resolve(opts Options) (resolved, error) {
 
 		phaseRoutingWarnings: opts.PhaseRoutingWarnings,
 		mcpConfig:            defaultMCPConfigPort(opts.MCPConfig),
+		latestRelease:        opts.LatestRelease,
+		releaseLag:           defaultReleaseLagConfig(opts.ReleaseLag),
 		routing:              onceRouting(opts.Routing),
 	}
 	if o.stderr == nil {
@@ -325,6 +333,7 @@ func Run(opts Options) (Result, error) {
 		checkSandboxNestedFallback(o),
 		checkPhaseRoutingWarnings(o),
 		checkMCPConfig(o),
+		checkReleaseLag(o),
 		checkOverlayTierSelectors(o),
 		checkCLIRouting(o),
 	}
