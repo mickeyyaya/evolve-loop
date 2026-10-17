@@ -26,6 +26,7 @@ type ApplyOptions struct {
 	Shadow          bool
 	Policy          EscalationPolicy
 	Now             time.Time
+	Reweight        func(id string, weight float64) error
 }
 
 type ApplyResult struct {
@@ -86,8 +87,8 @@ func applyIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResul
 		return autofileIntent(opts, in, res)
 
 	case dispositionrouter.ActionEscalate:
-		path, weight, state := findItem(opts.InboxDir, id)
-		if state != itemOpen {
+		weight, state := findItem(opts.InboxDir, id)
+		if state != itemOpen || opts.Reweight == nil {
 			res.Skipped = append(res.Skipped, id)
 			return false, nil
 		}
@@ -96,8 +97,8 @@ func applyIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResul
 			res.Skipped = append(res.Skipped, id)
 			return true, nil
 		}
-		if err := setItemWeight(path, target); err != nil {
-			return false, err
+		if err := opts.Reweight(id, target); err != nil {
+			return false, fmt.Errorf("recurrence: reweight %s to %v: %w", id, target, err)
 		}
 		res.Bumped = append(res.Bumped, id)
 		return true, nil
@@ -141,7 +142,7 @@ const (
 	itemClaimed
 )
 
-func findItem(inboxDir, id string) (path string, weight float64, state itemState) {
+func findItem(inboxDir, id string) (weight float64, state itemState) {
 	_ = filepath.Walk(inboxDir, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || filepath.Ext(p) != ".json" || state != itemAbsent {
 			return nil //nolint:nilerr // an absent tree is a legitimate "not found"
@@ -157,7 +158,7 @@ func findItem(inboxDir, id string) (path string, weight float64, state itemState
 		if json.Unmarshal(raw, &it) != nil || it.ID != id {
 			return nil
 		}
-		path, weight = p, it.Weight
+		weight = it.Weight
 		rel, relErr := filepath.Rel(inboxDir, p)
 		if relErr == nil && strings.HasPrefix(rel, "processing"+string(filepath.Separator)) {
 			state = itemClaimed
@@ -166,20 +167,7 @@ func findItem(inboxDir, id string) (path string, weight float64, state itemState
 		state = itemOpen
 		return nil
 	})
-	return path, weight, state
-}
-
-func setItemWeight(path string, weight float64) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("recurrence: read inbox item %s: %w", path, err)
-	}
-	var item map[string]any
-	if err := json.Unmarshal(raw, &item); err != nil {
-		return fmt.Errorf("recurrence: parse inbox item %s: %w", path, err)
-	}
-	item["weight"] = weight
-	return atomicwrite.JSON(path, item)
+	return weight, state
 }
 
 func intentID(in dispositionrouter.Intent) string {

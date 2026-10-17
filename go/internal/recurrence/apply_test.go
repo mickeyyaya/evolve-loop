@@ -2,11 +2,13 @@ package recurrence_test
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
@@ -48,6 +50,13 @@ func opts(root string, cycle int, shadow bool) recurrence.ApplyOptions {
 		Shadow:          shadow,
 		Policy:          recurrence.DefaultEscalationPolicy(),
 		Now:             time.Date(2026, 7, 23, 0, 0, 0, 0, time.UTC),
+		Reweight:        fakeItemWriter(filepath.Join(root, "inbox")),
+	}
+}
+
+func fakeItemWriter(inboxDir string) func(id string, weight float64) error {
+	return func(id string, weight float64) error {
+		return atomicwrite.JSON(filepath.Join(inboxDir, id+".json"), map[string]any{"id": id, "weight": weight})
 	}
 }
 
@@ -296,5 +305,41 @@ func TestApplyBoundary_CorruptInboxItemSurfaces(t *testing.T) {
 	res, err := recurrence.ApplyBoundary(opts(root, 1062, false))
 	if err == nil && len(res.Bumped) != 0 {
 		t.Fatalf("a corrupt inbox item was bumped: %+v", res)
+	}
+}
+
+func TestApplyBoundary_ReweightGoesOnlyThroughTheSeam(t *testing.T) {
+	t.Parallel()
+	refusal := errors.New("curator refused")
+	cases := []struct {
+		name       string
+		seam       func(id string, weight float64) error
+		wantErr    error
+		wantBumped bool
+	}{
+		{name: "nil seam skips the item", seam: nil},
+		{name: "refusing seam surfaces its error", seam: func(string, float64) error { return refusal }, wantErr: refusal},
+		{name: "accepting seam bumps", seam: func(string, float64) error { return nil }, wantBumped: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			path := seedItem(t, filepath.Join(root, "inbox"), "reweighted", 0.50)
+			stage(t, root, dispositionrouter.ActionEscalate, "reweighted", "pattern:r", 4, 0.50)
+			o := opts(root, 1932, false)
+			o.Reweight = tc.seam
+
+			res, err := recurrence.ApplyBoundary(o)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("ApplyBoundary error = %v, want %v", err, tc.wantErr)
+			}
+			if got := len(res.Bumped) == 1; got != tc.wantBumped {
+				t.Fatalf("Bumped = %v, want bumped=%v", res.Bumped, tc.wantBumped)
+			}
+			if got := readWeight(t, path); got != 0.50 {
+				t.Fatalf("recurrence wrote the item itself: weight = %v, want 0.50", got)
+			}
+		})
 	}
 }
