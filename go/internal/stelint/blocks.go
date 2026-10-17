@@ -15,6 +15,7 @@ type blockSplitter struct {
 	inQuote      bool
 	quoteDecided bool
 	quoteExempt  bool
+	quoteSkip    bool
 }
 
 func splitBlocks(lines []string, isStandard bool) blockSplitter {
@@ -39,8 +40,15 @@ func (b *blockSplitter) line(n int, text string) {
 		b.quoteLine(n, trimmed)
 		return
 	}
-	b.inQuote = false
+	b.endQuote()
 	b.body(n, text, trimmed)
+}
+
+func (b *blockSplitter) endQuote() {
+	if b.quoteSkip {
+		b.fence, b.inComment = "", false
+	}
+	b.inQuote, b.quoteSkip = false, false
 }
 
 func (b *blockSplitter) quoteLine(n int, trimmed string) {
@@ -75,7 +83,7 @@ func (b *blockSplitter) body(n int, text, trimmed string) {
 	case strings.HasPrefix(trimmed, "|"):
 		b.flush()
 		b.tableRow(n, trimmed)
-	case b.cur != nil && isRuleLine(trimmed, "=-"):
+	case b.cur != nil && !b.cur.isItem && isRuleLine(trimmed, "=-"):
 		b.cur.kind = headingParagraph
 		b.flush()
 	case isRuleLine(trimmed, "-*_"):
@@ -116,8 +124,10 @@ func (b *blockSplitter) opensSkip(n int, trimmed string) bool {
 		b.inRegion = true
 	case fence != "":
 		b.fence = fence
+		b.quoteSkip = b.inQuote
 	case strings.HasPrefix(trimmed, "<!--"):
 		b.inComment = !strings.Contains(trimmed[len("<!--"):], "-->")
+		b.quoteSkip = b.inQuote
 	case isHTMLBlockStart(trimmed):
 		b.inHTML = true
 	default:

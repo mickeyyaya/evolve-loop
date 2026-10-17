@@ -3,6 +3,8 @@
 > Status: living doc for the agent-bridge hardening program (plan: `sleepy-wandering-salamander`).
 > Covers the invariants that make every subagent/phase-agent dispatch go through the one bridge
 > process, safely and at scale. B1–B6 are complete; invariants I1–I10 below.
+>
+> Design for how every caller reaches a CLI (query, probe and dispatch): [agent-bridge-factory.md](agent-bridge-factory.md).
 
 ## Request
 

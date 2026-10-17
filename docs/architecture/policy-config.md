@@ -153,12 +153,12 @@ The block configures `internal/convergence`, the one rule every repeat-until-acc
 
 ## Documentation floors (`docs_floor`)
 
-The block sets the stages of the two documentation floors of the build handoff. Both floors only WARN. The loader decodes the block strictly. An unknown key, or a `stage` or `ste_stage` word that is not `off`, `shadow` or `enforce`, fails the load of the whole file. Thus a typo key in `docs_floor` stops every consumer of the policy, not only the two floors.
+The block sets the stages of the two documentation floors of the build handoff. Both floors only WARN. The loader decodes the block strictly. An unknown key, or a `stage` or `ste_stage` word that is not `0`, `off`, `shadow` or `enforce`, fails the load of the whole file. Thus a typo key in `docs_floor` stops every consumer of the policy, not only the two floors.
 
 | Key | Meaning | Default |
 |---|---|---|
-| `stage` | the documentation floor for an architecture change without a document ([ADR-0077](adr/0077-docs-floor-for-architecture-changes.md)). `off` turns it off. `shadow` and `enforce` turn it on. | `enforce` |
-| `ste_stage` | the STE lint of the changed documents ([internal-stelint](packages/internal-stelint.md), `evolve docs ste-lint`). `off` prints nothing. `shadow` and `enforce` print the `[ste-lint] WARN:` line. | `shadow` |
+| `stage` | the documentation floor for an architecture change without a document ([ADR-0077](adr/0077-docs-floor-for-architecture-changes.md)). `off` or `0` turns it off. `shadow` and `enforce` turn it on. | `enforce` |
+| `ste_stage` | the STE lint of the changed documents ([internal-stelint](packages/internal-stelint.md), `evolve docs ste-lint`). `off` or `0` prints nothing. `shadow` and `enforce` print the `[ste-lint] WARN:` line. | `shadow` |
 
 ## Changed-function coverage (`cover_changed`)
 

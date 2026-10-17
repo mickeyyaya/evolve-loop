@@ -25,15 +25,18 @@ func runRuleCases(t *testing.T, cases map[string]ruleCase) {
 
 func TestCheck_RuleLinesAndSetextUnderlines(t *testing.T) {
 	runRuleCases(t, map[string]ruleCase{
-		"a star rule ends a paragraph":                 {words(13) + "\n***\n" + sentence(13) + "\n", nil},
-		"an underscore rule ends a paragraph":          {words(13) + "\n___\n" + sentence(13) + "\n", nil},
-		"a spaced star rule ends a paragraph":          {words(13) + "\n* * *\n" + sentence(13) + "\n", nil},
-		"a rule with no paragraph before is skipped":   {"***\n" + sentence(25) + "\n", nil},
-		"three dashes make the text a heading":         {words(30) + "\n---\n" + sentence(13) + "\n", nil},
-		"three equals signs make the text a heading":   {words(30) + "\n===\n" + sentence(13) + "\n", nil},
-		"two dashes are text in the paragraph":         {words(13) + "\n--\n" + sentence(13) + "\n", []string{"1 STE-SENTENCE"}},
-		"two stars are text in the paragraph":          {words(13) + "\n**\n" + sentence(13) + "\n", []string{"1 STE-SENTENCE"}},
-		"a lone pair of stars does not end a sentence": {words(13) + " ** " + sentence(13) + "\n", []string{"1 STE-SENTENCE"}},
+		"a star rule ends a paragraph":                  {words(13) + "\n***\n" + sentence(13) + "\n", nil},
+		"an underscore rule ends a paragraph":           {words(13) + "\n___\n" + sentence(13) + "\n", nil},
+		"a spaced star rule ends a paragraph":           {words(13) + "\n* * *\n" + sentence(13) + "\n", nil},
+		"a rule with no paragraph before is skipped":    {"***\n" + sentence(25) + "\n", nil},
+		"three dashes make the text a heading":          {words(30) + "\n---\n" + sentence(13) + "\n", nil},
+		"three equals signs make the text a heading":    {words(30) + "\n===\n" + sentence(13) + "\n", nil},
+		"three dashes after a bullet item are a rule":   {"- " + sentence(30) + "\n---\n", []string{"1 STE-SENTENCE"}},
+		"three dashes after a numbered step are a rule": {"1. " + sentence(21) + "\n---\n", []string{"1 STE-SENTENCE"}},
+		"three dashes after a checkbox item are a rule": {"- [ ] " + sentence(26) + "\n---\n" + sentence(13) + "\n", []string{"1 STE-SENTENCE"}},
+		"two dashes are text in the paragraph":          {words(13) + "\n--\n" + sentence(13) + "\n", []string{"1 STE-SENTENCE"}},
+		"two stars are text in the paragraph":           {words(13) + "\n**\n" + sentence(13) + "\n", []string{"1 STE-SENTENCE"}},
+		"a lone pair of stars does not end a sentence":  {words(13) + " ** " + sentence(13) + "\n", []string{"1 STE-SENTENCE"}},
 	})
 }
 

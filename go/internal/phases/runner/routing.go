@@ -127,7 +127,7 @@ func (b *BaseRunner) logDecision(req core.PhaseRequest, prep phasePreparation, d
 	for _, line := range d.Trace {
 		log.Diag().Infof("[runner] phase=%s routing: %s\n", prep.phase, line)
 	}
-	plan := d.Plan
+	plan := dispatchedPlan(prep.phase, d)
 	if len(plan.Candidates) > 1 {
 		log.Diag().Infof("[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s fallback=%v triggers=%v\n",
 			prep.phase, prep.profileName, plan.Candidates[0], plan.PrimarySource, prep.profilePath, plan.Candidates[1:], plan.Triggers)
@@ -135,4 +135,23 @@ func (b *BaseRunner) logDecision(req core.PhaseRequest, prep phasePreparation, d
 	}
 	log.Diag().Infof("[runner] phase=%s agent=%s cli=%s (source=%s) profile=%s\n",
 		prep.phase, prep.profileName, plan.Candidates[0], plan.PrimarySource, prep.profilePath)
+}
+
+func dispatchedPlan(phase string, d cliroute.Decision) llmroute.Plan {
+	walk, err := d.Walk()
+	if err != nil {
+		log.Diag().Infof("[runner] phase=%s routing walk refused: %v\n", phase, err)
+		return d.Plan
+	}
+	tier := policy.TierName(policy.TierRank(d.Plan.Model))
+	if tier == "" {
+		tier = d.Plan.Model
+	}
+	for _, cli := range d.Plan.Candidates {
+		if !d.Plan.Permits(cli, d.Plan.Model) {
+			log.Diag().Infof("[runner] phase=%s skipped %s: tier %s ceiling permits %v\n", phase, cli, tier, d.Plan.TierCeiling[tier])
+		}
+	}
+	walk.PrimarySource = d.Plan.PrimarySource
+	return walk
 }
