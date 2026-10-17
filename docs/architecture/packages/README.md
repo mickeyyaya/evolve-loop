@@ -223,6 +223,8 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/treestate` | computes the tree-state SHA, the sha256 of `git diff HEAD`, that binds an audit to a tree | [internal-treestate.md](internal-treestate.md) |
 | `cmd/testlatency` | turns a `go test -json` stream into a Markdown latency report | [cmd-testlatency.md](cmd-testlatency.md) |
 | `cmd/e2elist` | prints the anchored `go test -run` pattern of the tests that only the e2e build tag compiles | [cmd-e2elist.md](cmd-e2elist.md) |
+| `cmd/testrusage` | `go test -exec` wrapper that appends one resource record per test binary | [cmd-testrusage.md](cmd-testrusage.md) |
+| `cmd/hostsampler` | samples host CPU, memory, load and disk each second into NDJSON | [cmd-hostsampler.md](cmd-hostsampler.md) |
 | `internal/codequality` | runs the deterministic gofmt gates that mirror the CI format step | [internal-codequality.md](internal-codequality.md) |
 | `internal/plane` | tells the console checkout from a linked runtime worktree | [internal-plane.md](internal-plane.md) |
 | `internal/contextfill` | derives how full the context window of a phase got from its token counts | [internal-contextfill.md](internal-contextfill.md) |

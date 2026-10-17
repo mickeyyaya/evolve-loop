@@ -795,3 +795,6 @@
 ./internal/handoff/request
 # retryladder - the deterministic failure classifier of the retry ladder (ADR-0142, plan L1).
 ./internal/retryladder
+# CI telemetry commands (C0b): no exported API beyond Record/Sample/Counters, all named by tests.
+./cmd/testrusage
+./cmd/hostsampler
