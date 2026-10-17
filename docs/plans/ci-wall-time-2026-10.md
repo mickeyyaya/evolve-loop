@@ -207,6 +207,7 @@ Each level keeps the indexes that explain its time. The last column says which d
 | D11 | One runner sampler per Go job writes CPU, run queue, memory, swap and disk wait each second, and stops when the job ends. | F3.15, P4.8 |
 | D12 | `evolve ci telemetry` joins L1–L5 for one run from its artifacts and the GitHub API, and writes the §4a indexes. With `--history N`, it gives trends, the flaky list, and the P50 and P95 of `cicd.pipeline.run.duration`, `step.wall` and `pkg.wall`, because a mean hides the tail. | F3.11, P4.6, P4.8 |
 | D13 | The index names follow the OpenTelemetry CI/CD conventions where they exist. The `ci.*` names are local, because OpenTelemetry has no equivalent. No collector or backend is added now. | P4.6 |
+| D14 | The `bridge` self-match guard scans each line window once. It cuts each pane from the file body through a line-start index. It checks a rule only on a pane that holds a literal of the rule's regex. A rule with no safe literal keeps the full check. | F3.16, F3.19 |
 
 ## 6. Components
 
@@ -216,9 +217,10 @@ Each level keeps the indexes that explain its time. The last column says which d
 | C0b | D10 rusage wrapper and D11 runner sampler, both uploaded with the C0 artifacts | a wrapper test: a child allocates 64 MB and spawns one subprocess. The record shows peak RSS ≥ 64 MB and system CPU > 0. The exit code passes through. A sampler test: a 2 s run writes at least one record per second, and the file closes when the job ends. | Sonnet |
 | C1 | D3 `ci-critical-path` report, as `evolve ci telemetry` (D12). Its red-test fixture also holds a rusage record and a sampler record, so the join is proven | a fixture of jobs, steps and test JSON gives the expected L5→L1 path | Sonnet |
 | C2 | D4–D6 matrix scope, plus the darwin-set script | a script test: a package with a `_darwin.go` file is in the set, and a plain package is not | Sonnet, workflow review by the console |
-| C3 | D7 skills-drift build sharing | a test counts generator builds per run: one per distinct tree | Sonnet |
+| C3 | D7 skills-drift build sharing. **In progress (2026-10-17).** | a test counts generator builds per run: one per distinct tree | Sonnet |
 | C4 | D8 `cmd/evolve` serial chain | the AST parallel guard shows the moved tests as parallel | Sonnet |
 | C5 | D9 `bridge` injected clock | each dwell test passes with the fake clock in under 1 s | Sonnet |
+| C5b | D14 the `bridge` self-match guard scans each line window once. **In progress (2026-10-17).** | a fixture file holds a planted pane for each rule. The fast guard and the old exhaustive guard give the same verdict for every rule | Sonnet |
 
 ## 6a. Components after the first instrumented run (C6 to C14)
 
@@ -299,7 +301,7 @@ In approach A, the `-run` pattern is anchored (`^(…)$`), so a plain test with 
 
 1. **C0, then C0b, then C1.** Measure before you change: time first, then resources, then the joined report. The history is also the input for any sharding later.
 2. **C2.** This is the largest wall-time cut, and it is a workflow-only change.
-3. **C3, then C4 and C5.** These are ordered by CPU-seconds freed (F3.5, F3.6).
+3. **C3, then C5b, then C4 and C5.** These are ordered by CPU-seconds freed (F3.5, F3.6, F3.16). In run 39027224638, `phases/audit` used 31.9% of the test CPU (C3) and `bridge` used 17.5% (C5b and C5).
 4. **Re-measure with C1.** Start design B if the wall is still above 8 min, as the estimate for A and C predicts. Open design D as its own plan with ADR-0134 S6.
 
 Each component is one PR, merged at a wave boundary. Each one follows the usual review chain and floor.

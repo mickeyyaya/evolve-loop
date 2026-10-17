@@ -26,6 +26,7 @@
 - [9. How to read the report: a worked example](#9-how-to-read-the-report-a-worked-example)
 - [10. Guards](#10-guards)
 - [11. Limits](#11-limits)
+- [12. The long-pole fixes: C3 and C5b](#12-the-long-pole-fixes-c3-and-c5b)
 - [13. The measurement fixes: C12 and C13](#13-the-measurement-fixes-c12-and-c13)
 
 ## 1. Goals
@@ -292,9 +293,112 @@ A second example shows the resource view. In a local run on 14 CPUs, `phases/shi
 - **The flaky list needs history.** One run cannot mark a test as flaky. The list needs `--history` and the same tree hash in two runs.
 - **No dashboard.** The report writes to the job summary and to JSON. A dashboard or an OpenTelemetry export is outside the scope of this spec.
 
+## 12. The long-pole fixes: C3 and C5b
+
+The telemetry named two test families that use half of the test CPU (research F3.16, F3.17). This section records the design of each fix. Both fixes change test code only. Each test keeps its assertions, and the guarantee of each test stays the same.
+
+### C3: one generator build for each distinct source tree
+
+#### Issue
+
+Nine `TestSkillsDriftGate_*` tests used 508 s of CPU on CI, 31.9% of all test CPU (F3.16). Each test copies the module into a new repository. The gate then runs `go run ./cmd/evolve skills check` in the copy (F3.18). The Go build cache keys a package on its directory, so each copy compiles all of `evolve` again.
+
+#### Gap
+
+The tests use only four distinct generator trees. They are the base tree with an extra file, the renderer edit, the renderer edit with the report edit, and the parser edit. Yet they build the binary about 14 times, one time for each `go run`.
+
+#### Solution
+
+A test-only runner, `sharedGeneratorBuilds` (`go/internal/phases/audit/generator_builds_test.go`), wraps the package seam `runCmd`. `TestMain` installs it once, before any test starts, so no parallel test writes the seam. It works in these steps:
+
+1. It passes each call through unchanged, except `go run ./cmd/evolve <args>`.
+2. For that call, it hashes the `go/` directory of the tree: each regular file's path, content and size, in SHA-256.
+3. It looks up the hash in a `sync.Map`. The first caller for a hash runs `go build -trimpath -o <dir>/<hash>/evolve ./cmd/evolve` in the tree. A `sync.Once` for each hash makes each later caller wait for that build.
+4. It runs the built binary in the same directory, with the same arguments, environment and writers.
+5. It gives the same result as `go run`. A non-zero exit becomes exit 1 with `exit status N` on stderr. A compile error becomes exit 1 with the compiler output on stderr.
+
+The builds run one at a time. `-trimpath` removes the directory from the cache key, so each build reuses the packages that the build before it compiled. Only the edited package, its importers and the link run again. `TestMain` removes the build directory after the tests.
+
+The tree copy is also shared. `committedSkillsRepo` builds the committed base repository once for each file set, through `gittest.FromTemplate` (#873). Each test gets its own copy of that template, so a test can edit its copy. The template holds the build inputs only: the copy skips `_test.go` files and `testdata` directories, which `go build` never reads.
+
+**Why the key is the content hash.** A test that edits the generator source gets a different hash, so it gets its own build. Two tests with the same content share one build, whatever their paths. The plan named this risk: a shared build must not hide a difference between trees (plan §9).
+
+**Rejected options.**
+
+| Option | Why it is rejected |
+|---|---|
+| A key on the test name | Two tests with the same tree build twice, and a test that edits its tree after the first run gets the old binary. |
+| `go run -trimpath` in production | It changes the production gate for a test cost. The gate must run what the lane ships. |
+| A smaller binary for the skills check | It changes what the gate runs. The tests then prove a different program. |
+| Builds in parallel | Two cold builds compile the same packages at the same time, and neither reuses the other's cache. |
+
+**The red test.** `TestGeneratorBuilds_OneBuildPerDistinctTree` (`go/internal/phases/audit/generator_builds_count_test.go`) runs four calls over three directories with two distinct contents. It expects two builds. An edit to equal a built tree adds no build, and an edit to new content adds one. `TestGeneratorBuilds_ARunMatchesGoRunByteForByte` compares the exit code, stdout and stderr with a real `go run`. `TestGeneratorBuilds_BuildOneAtATimeSoEachBuildReusesTheLastOnesCache` proves that no two builds overlap.
+
+**Measured result.** Local runs on the 14-CPU host while a wave ran, 2026-10-17, `/usr/bin/time -l go test -count=1 -p 2 -tags integration -json ./internal/phases/audit/`. The cold run used a new `GOCACHE` that held only the compiled test binary, so each generator build started without a `-trimpath` cache.
+
+| Run | Wall | CPU (user + system) | Slowest `TestSkillsDriftGate_*` test |
+|---|--:|--:|--:|
+| Before | 86.8 s | 562.8 s (172.3 + 390.5) | 77.5 s |
+| After, cold cache | 41.6 s | 159.8 s (79.8 + 79.9) | 35.8 s |
+| After, warm cache | 32.0 s | 107.4 s (20.7 + 86.7) | 25.3 s |
+
+**Limits.** The runner does not prove that `go run` itself works in a lane. The unit test `TestWorktreeSkillsDrift_RunsTheWorktreeGeneratorCheck` still pins the exact `go run` invocation of the gate. A signal that kills the generator becomes `exit status -1`, where `go run` prints the signal name. No current test sends a signal.
+
+### C5b: the self-match guard scans each line window once
+
+#### Issue
+
+`TestAutoRespond_CodexUpdateMenuRulesDoNotMatchThisRepositorysOwnFiles` took 134.7 s on CI (F3.17). For each line of each file, the guard joined up to 64 lines and called `decideAutoRespond` with every rule. Each call compiles each rule's regex (F3.19).
+
+#### Gap
+
+A rule can fire only on a pane that holds the literal text that its regex requires. Most lines of `CHANGELOG.md` and of the docs hold none of those literals, but the guard checked every pane.
+
+#### Solution
+
+`firesAtPaneBottoms` (`go/internal/bridge/selfmatch_guard_test.go`) keeps the guarantee: no rule fires on any pane whose bottom line is any line of these files. It works in these steps:
+
+1. It indexes the start offset of each line once. A pane is then a substring of the file body, byte for byte the same text as the old join.
+2. For each rule, `requiredLiterals` parses the regex with `regexp/syntax` and finds a set of literals. Each match of the regex contains at least one of them.
+3. It moves the bottom line down the file. For each rule, it records the last line that holds a literal of the rule.
+4. It calls `decideAutoRespond` only with the rules that have such a line inside the 64-line pane.
+
+**Why the prefilter is safe.** `decideAutoRespond` removes whole lines (`stripAgentDiffLines`) and keeps the last lines (`lastLines`). Thus each line of the text that a rule reads is a line of the pane. A literal without a newline must then lie inside one line of the pane. The literal rules are strict:
+
+- A concatenation takes the literal set of one part, the one whose shortest literal is the longest.
+- An alternation takes the union of its branches, and it has no set if one branch has none.
+- A repeat with a minimum of zero gives no set. A case-folded literal (`(?i)`) and a literal with a newline give no set.
+- An invalid regex and an empty regex give no set.
+- A rule with no set gets the full check on each pane.
+
+The verdict of a checked pane is the same as before, because a rule that the filter skips cannot match.
+
+**Rejected options.**
+
+| Option | Why it is rejected |
+|---|---|
+| A regex cache in `promptMatches` | It changes production code for a test cost. The prefilter removes most calls, so the cache gains little. |
+| Check only every 64th line | A pane whose bottom line is between two checked lines can fire, and the guard does not see it. |
+| A smaller file list | It removes the files that an agent can print, which are the files that the guard exists to check. |
+
+**Measured result.** Local runs on the same host, 2026-10-17, `-tags integration`:
+
+| Test | Before | After |
+|---|--:|--:|
+| `TestAutoRespond_CodexUpdateMenuRulesDoNotMatchThisRepositorysOwnFiles` | 5.28 s | 0.27 s |
+| the same test with `-race` | 14.18 s | 1.08 s |
+| `TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles` with `-race` | 1.62 s | 0.73 s |
+| the whole `bridge` package (wall, CPU) | 69.5 s, 97.7 s | 57.4 s, 74.8 s |
+
+The new equivalence test adds 0.81 s (1.88 s with `-race`).
+
+**The equivalence test.** `TestSelfMatchGuard_ThePrefilterGivesTheExhaustiveVerdictForEveryRule` (`go/internal/bridge/selfmatch_guard_prefilter_test.go`) keeps the old exhaustive guard as the reference. Its fixture holds a planted pane for each rule, prose lines with the literals, and a quiet stretch of more than 64 lines. For each rule alone and for all rules together, the fast guard and the reference must give the same list of firing lines. Each valid rule must fire at least once, so the test cannot pass on a fixture that fires nothing.
+
+A mutant that shrinks the pane window to 3 lines fails this test. `TestSelfMatchGuard_RequiredLiteralsAreOnlyWhatEveryMatchContains` pins the literal rules.
+
 ## 13. The measurement fixes: C12 and C13
 
-> Plan: [§6a, C12 and C13](../plans/ci-wall-time-2026-10.md#6a-components-after-the-first-instrumented-run-c6-to-c14). Research: [F3.23 and F3.34](../research/ci-wall-time-2026-10.md#31-the-first-instrumented-run-c0b). Section 12 is reserved for C3 and C5b (PR #935).
+> Plan: [§6a, C12 and C13](../plans/ci-wall-time-2026-10.md#6a-components-after-the-first-instrumented-run-c6-to-c14). Research: [F3.23 and F3.34](../research/ci-wall-time-2026-10.md#31-the-first-instrumented-run-c0b). Section 12 holds C3 and C5b (PR #935).
 
 ### C12: the limit of a package comes from its own time window
 
