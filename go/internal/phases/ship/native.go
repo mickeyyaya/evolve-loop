@@ -297,7 +297,7 @@ func checkPostPushIdempotency(ctx context.Context, opts *Options) (string, bool,
 	bindingCommitSHA := stateString(bindingMap, "commit_sha")
 	committedTree := stateString(bindingMap, "tree_sha_committed")
 	auditTree := stateString(bindingMap, "audit_bound_tree_sha")
-	if !hasCycle || bindingCycle != cid || bindingCommitSHA == "" || committedTree == "" || auditTree == "" || auditTree != committedTree {
+	if !hasCycle || bindingCycle != cid || bindingCommitSHA == "" || committedTree == "" || auditTree == "" {
 		return "", false, nil
 	}
 	head, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
@@ -314,6 +314,9 @@ func checkPostPushIdempotency(ctx context.Context, opts *Options) (string, bool,
 	}
 	headTree = strings.TrimSpace(headTree)
 	if headTree == "" || headTree != committedTree {
+		return "", false, nil
+	}
+	if ok, _ := auditBindingSatisfied(ctx, resumedAuditView(opts, auditTree), "", committedTree); !ok {
 		return "", false, nil
 	}
 	return head, true, nil

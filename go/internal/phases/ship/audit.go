@@ -164,6 +164,21 @@ func bindResumedAudit(opts *Options, entry *auditEntry) {
 	opts.internalAuditArtifactSHA = entry.ArtifactSHA256
 }
 
+func boundAuditView(opts *Options, tree, artifactSHA string) *Options {
+	view := *opts
+	view.internalAuditBoundTreeSHA = tree
+	view.internalAuditArtifactSHA = artifactSHA
+	return &view
+}
+
+func resumedAuditView(opts *Options, auditTree string) *Options {
+	entry, err := findLatestAudit(filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl"), opts.RunID)
+	if err != nil || entry.WorktreeTreeSHA != auditTree {
+		return boundAuditView(opts, auditTree, "")
+	}
+	return boundAuditView(opts, auditTree, entry.ArtifactSHA256)
+}
+
 func findLatestAudit(ledgerPath, runID string) (*auditEntry, error) {
 	entry, err := auditledger.LatestAuditorEntry(ledgerPath, runID)
 	switch {
@@ -261,9 +276,9 @@ func verifyPostPushPredicateEvidence(ctx context.Context, opts *Options, res *Ru
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(landedTree) != entry.WorktreeTreeSHA {
+	if ok, detail := auditBindingSatisfied(ctx, boundAuditView(opts, entry.WorktreeTreeSHA, entry.ArtifactSHA256), "", strings.TrimSpace(landedTree)); !ok {
 		return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
-			"landed commit differs from the host predicate execution tree; re-run Audit")
+			"landed commit differs from the host predicate execution tree; re-run Audit"+detail)
 	}
 
 	return verifyPredicateReceipt(opts, entry, string(body), res)
