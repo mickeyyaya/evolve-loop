@@ -1,0 +1,1 @@
+✗ no graph found at /idx/graft — run `trail build` first

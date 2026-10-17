@@ -1,7 +1,7 @@
 # Code index CLI: `evolve code` gives every phase agent a read-only code graph
 
 > Research: [code-index-cli-2026-10](../research/code-index-cli-2026-10.md). Plan: [code-index-cli-2026-10](../plans/code-index-cli-2026-10.md). Decision: [ADR-0138](adr/0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md).
-> Status: proposed (2026-10-17). No code exists yet. Every name in this file that has no code is marked "planned".
+> Status: K1 is built (2026-10-17): the `evolve code` verb, the `codeindex` layer, the trail adapter and the policy block `code_index`. The components K2 to K5 are planned. A name in this file that has no code is marked "planned".
 >
 > This file is the spec of record for the `evolve code` verb. The research holds the evidence, the plan holds the scored designs and the order of work, and the ADR holds the decision.
 
@@ -13,9 +13,9 @@ On 2026-10-17 the operator asked that the loop agents use trail-code, "separated
 |---|---|
 | code index | A graph of the symbols and the calls of this repository. trail-code builds it with tree-sitter (C1, C7). |
 | trail-code | The outside tool that builds and queries the index. Its binary is `dev/.tools/trail/node_modules/.bin/trail` (C6). |
-| index worktree | A git worktree at `dev/code-index` (planned). It holds the checkout that the index describes. |
-| `Backend` | The Go interface (planned) that the `evolve code` commands call. It has one method for each command. |
-| adapter | The one package (planned) that runs the trail-code binary. It implements `Backend`. |
+| index worktree | A git worktree at `dev/code-index` (the default of `code_index.index_dir`). It holds the checkout that the index describes. The operator makes it today, and K2 (planned) refreshes it. |
+| `Backend` | The Go interface `codeindex.Backend` (`go/internal/codeindex`) that the `evolve code` commands call. It has one method for each command. |
+| adapter | The one package, `go/internal/adapters/codeindex/trail`, that runs the trail-code binary. It implements `Backend`. |
 | boundary | The step between two waves where the loop merges and refreshes. `evolve wave next` runs it (`go/cmd/evolve/cmd_wave_next.go:102`). |
 | phase agent | The LLM CLI process of one phase: scout, builder, debugger and others. Each has a shell tool (C5). |
 | usage log | The file `/tmp/evolve-code-calls.ndjson` (planned). Each call appends one line. |
@@ -56,7 +56,7 @@ An MCP tool lives in the tool list of one CLI. A shell command is the one surfac
 
 ### Solution
 
-`evolve code` (planned) has four commands. Each command is read-only (D1).
+`evolve code` has four commands. Each command is read-only (D1). The code is `go/cmd/evolve/cmd_code.go`.
 
 | Command | Question it answers | Backend call (trail-code) |
 |---|---|---|
@@ -65,15 +65,32 @@ An MCP tool lives in the tool list of one CLI. A shell command is the one surfac
 | `evolve code find <query>` | Which symbols match a question in plain words? | `trail ask` |
 | `evolve code map [dir]` | What is the structure of this directory? | `trail map` |
 
-The output is plain text. Each fact is on its own line. Each line that names a hit ends with the `file:line` of the hit, so the agent can open the file at that line.
+The output is plain text. Each hit is one line of three fields that a tab separates: `file:line`, the symbol and a short text. A hit that has no line, such as a directory of `map`, shows the `file` alone. A tab or a newline inside a field becomes a space. The agent opens the file at the line.
+
+`find` joins its words, so `evolve code find catalog refresh` and `evolve code find "catalog refresh"` are the same query. Every command takes `--project-root P` (default: `$EVOLVE_PROJECT_ROOT`, then the nearest directory at or above the working directory that holds `.git`).
 
 | Exit code | Meaning | Output |
 |---|---|---|
 | 0 | The query found at least one hit. | the hit lines on stdout |
 | 1 | The query ran and found nothing. | one line on stderr that names the query |
-| 2 | The index or the backend is absent. | one line on stderr that says what is absent and how to build it |
+| 2 | The index or the backend is absent. | one line on stderr that says what is absent, with the path of the binary and of the index, and a pointer to section 4 |
+| 3 | No backend in the list serves the command. | one line on stderr: `no backend serves <command>` |
+| 4 | Any other failure: a refused policy, a root that is no hub, an unknown backend name or a failed backend. | one line on stderr |
+| 10 | A usage error: a missing or extra argument, a wrong flag or a wrong direction. | the reason and the usage line on stderr |
 
-The exit code 2 is the case of a host with no Node or no index worktree. The command stops with a clear message and does not guess (plan section 9). No command writes to the repository, to the index or to the cycle worktree.
+The `map [dir]` command lists the directory clusters of the index. With a `dir`, it keeps the clusters at or below that directory. The other commands read the index, whatever the `dir`.
+
+### The policy block
+
+The wiring reads the block `code_index` of `.evolve/policy.json`. The decode is strict, like the other blocks. A relative path resolves against the hub root. The hub root is the parent of the bare store (`docs/operations/workspace-layout.md`). A path that is absolute needs no hub.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `backends` | `["trail"]` | the ordered list of backend names. It is a capability route: the first backend that serves a query answers it. There is no failover when that backend is absent. |
+| `index_dir` | `dev/code-index` | the index worktree |
+| `trail_bin` | `dev/.tools/trail/node_modules/.bin/trail` | the trail-code binary |
+
+The exit code 2 is the case of a host with no Node, no binary or no index worktree. The command stops with a clear message and does not guess (plan section 9). No command writes to the repository, to the index or to the cycle worktree.
 
 ## 2. The Backend interface
 
@@ -87,21 +104,21 @@ trail-code parses with tree-sitter and does not type-check. It misses a call thr
 
 ### Solution
 
-The commands call a `Backend` interface (planned, D2). This is the Strategy pattern: the commands do not know which engine answers. The method names below are planned.
+The commands call the `codeindex.Backend` interface (D2, `go/internal/codeindex`). This is the Strategy pattern: the commands do not know which engine answers. Notes: [internal-codeindex](packages/internal-codeindex.md).
 
-| Planned method | Serves | Returns |
+| Method | Serves | Returns |
 |---|---|---|
-| `Callers(ctx, symbol, direction)` | `evolve code callers` | a list of hits (symbol, `file`, `line`) |
-| `API(ctx, file)` | `evolve code api` | a list of signature lines |
-| `Find(ctx, query)` | `evolve code find` | a list of hits |
-| `Map(ctx, dir)` | `evolve code map` | a list of lines |
+| `Callers(ctx, symbol, direction)` | `evolve code callers` | a list of `Hit` (`File`, `Line`, `Symbol`, `Text`) |
+| `API(ctx, file)` | `evolve code api` | a list of `Hit`, one for each definition, with its signature as `Text` |
+| `Find(ctx, query)` | `evolve code find` | a list of `Hit` |
+| `Map(ctx, dir)` | `evolve code map` | a list of `Hit`, one for each directory, with `Line` 0 |
 
-Each method returns `(hits, error)`. The typed error `ErrNotFound` (planned) means exit 1, and the typed error `ErrAbsent` (planned) means exit 2. The command code maps the two errors to the exit codes of section 1.
+Besides the four methods, a `Backend` has `Name()` and `Capabilities()`. Each method returns `([]Hit, error)`. The typed error `ErrNotFound` means exit 1, `ErrAbsent` means exit 2 and `ErrUnsupported` means exit 3. The command code maps the three errors to the exit codes of section 1.
 
 | Backend | State | Reason |
 |---|---|---|
-| trail-code adapter | first, planned (K1) | C1, C6: fast, and it has a CLI |
-| fake backend | planned (K1), for tests | G5: the same command tests run on any backend |
+| trail-code adapter | first, built (K1): `go/internal/adapters/codeindex/trail` | C1, C6: fast, and it has a CLI |
+| fake backend | built (K1), for tests: `codeindextest.Fake` | G5: the same command tests run on any backend |
 | `gopls` | later | P3.5: type-checked, but its CLI is experimental and its start-up cost is not measured (C8) |
 | native Go index | later | the most work, and it adds a library to `go.mod` |
 
@@ -110,11 +127,13 @@ Each method returns `(hits, error)`. The typed error `ErrNotFound` (planned) mea
 On 2026-10-17 the operator asked: "build the cli layer as abstract layer which can be adapted to different indexing fast code search algorithm for llm". So a new algorithm must plug in as data and one new package, with no change to the commands. Four rules make that true:
 
 1. **One result type.** Every backend returns the same `Hit`: `file`, `line`, `symbol` and a short `text`. A command prints hits in one format, whatever the backend.
-2. **Declared capabilities.** Each backend says which of the four queries it serves (`Capabilities()`, planned). A call graph serves `callers`. A text or embedding search serves `find` only. A command that no backend serves exits 3 with the message "no backend serves `<command>`".
-3. **A backend set, chosen by config.** `main` builds a `Backends` set from the policy key `code_index.backends` (planned), an ordered list such as `["trail"]`. For each query, the first backend in the list that serves it answers. This is the Chain of Responsibility pattern over the Strategy interface. There is no `init()` registry: the set is built and injected, as ADR-0137 asks for the bridge.
-4. **One conformance suite.** A shared test suite (planned) runs the same cases on every backend. A new backend is done when it passes the suite.
+2. **Declared capabilities.** Each backend says which of the four queries it serves (`Capabilities()`). A call graph serves `callers`. A text or embedding search serves `find` only. A command that no backend serves exits 3 with the message "no backend serves `<command>`".
+3. **A backend set, chosen by config.** `main` builds a `Backends` set from the policy key `code_index.backends`, an ordered list such as `["trail"]`. `codeindex.New` builds it from a map of factory functions and fails on an unknown name. For each query, the first backend in the list that serves it answers. This is the Chain of Responsibility pattern over the Strategy interface. There is no `init()` registry: the set is built and injected, as ADR-0137 asks for the bridge.
 
-   The cases are a known caller, a known file API, a query with no answer (`ErrNotFound`) and an absent index (`ErrAbsent`).
+   The list is a capability route and not a failover chain. When the chosen backend is absent, the command exits 2 and does not ask the next backend. An absent backend is an operator fix. A silent switch to another backend hides the fault and changes the answer.
+4. **One conformance suite.** The shared suite `codeindextest.Run` runs the same cases on every backend. A new backend is done when it passes the suite. It runs on the fake and on the trail adapter.
+
+   The cases are a known caller, a known file API, a query with no answer (`ErrNotFound`) and an absent index (`ErrAbsent`). A query that the backend does not serve must give `ErrUnsupported`.
 
 | Example backend | Algorithm | Serves | Cost to add |
 |---|---|---|---|
@@ -139,14 +158,14 @@ A phase agent must not receive an instruction from a tool. A line such as "tell 
 
 ### Solution
 
-One package (planned, D3) runs the binary. No other package runs it. The adapter does four things:
+One package, `go/internal/adapters/codeindex/trail` (D3), runs the binary. Notes: [internal-adapters-codeindex-trail](packages/internal-adapters-codeindex-trail.md). No other package runs it. The adapter does four things:
 
 1. It runs `dev/.tools/trail/node_modules/.bin/trail` (the path today) with `DO_NOT_TRACK=1` and with the refresh off. The refresh is off through the environment variable `GRAFT_NO_REFRESH=1`, not through a flag.
-2. It points the binary at the index worktree `dev/code-index`, never at the cycle worktree. K1 names how `evolve code` finds `dev/code-index` from the hub root. The adapter passes that root to trail as the explicit `[dir]` argument. The reason: the default of trail is the nearest ancestor with a `graft/` index.
+2. It points the binary at the index worktree `dev/code-index`, never at the cycle worktree. `evolve code` resolves the path `code_index.index_dir` against the hub root (section 1). The adapter passes that path to trail as the explicit `[dir]` argument. The reason: the default of trail is the nearest ancestor with a `graft/` index.
 3. It maps each `Backend` method to one trail-code verb, as the table in section 1 shows.
 4. It removes each output line that tells the agent what to do or say (D4). The "[trail] tokens saved ... tell the user" header is the known case (C6).
 
-The strip is a filter in the adapter. A test (K1) feeds the fake binary output with a "tokens saved" line and expects the command output without it. If trail-code adds a new instruction line in a later version, the filter must learn it. The adapter keeps the match rules in one list so that a new rule is one row.
+The strip is a filter in the adapter (`strip.go`). A test feeds the captured binary output, with its "tokens saved" header, and expects hits without it. Only parsed fields leave the adapter, so a line that the parser does not know cannot reach an agent. The filter is a second control. If trail-code adds a new instruction line in a later version, the filter must learn it. The adapter keeps the match rules in one list so that a new rule is one row.
 
 ## 4. The index lifecycle
 
@@ -186,7 +205,7 @@ The command only reads. The index worktree is read through the file system. The 
 
 If the log write fails, the command prints the answer and goes on. A log failure must not block a query. The command does print one line on stderr when the write fails, so the failure is not silent. This rule is planned (K3).
 
-The index worktree at `dev/code-index` is a path that the sandbox must allow for read. The read grant covers `dev/code-index` when `HomeDir` is set (`go/internal/adapters/sandbox/sandbox.go:175-176`; on Linux `go/internal/adapters/sandbox/sandbox.go:249-251`). K1 adds a test that runs `evolve code map` under the generated profile.
+The index worktree at `dev/code-index` is a path that the sandbox must allow for read. The read grant covers `dev/code-index` when `HomeDir` is set (`go/internal/adapters/sandbox/sandbox.go:175-176`; on Linux `go/internal/adapters/sandbox/sandbox.go:249-251`). No test runs `evolve code map` under the generated profile yet. K1 did not build it, because it needs the macOS sandbox tool. It stays open.
 
 ## 6. The usage log
 
@@ -263,17 +282,17 @@ The solid arrows are the query path. The agent calls the command. The command ca
 4. The command prints one line for each caller. The real caller is `makeCatalogRefresher`, in `go/cmd/evolve/cmd_models_live.go:35-49`. That function returns a closure that calls `runStagedCatalogRefresh` at line 37 and passes it a `liveRefresh` function.
 5. The command exits 0 and appends one record to the usage log.
 
-The query uses the index of the 6,004 files, 51,347 symbols and 134,377 edges (C1). It takes about 0.1 s, against a `grep` that returns every text match and needs a read of each file. The exact output text is planned: K1 fixes it in a golden test.
+The query uses the index of the 6,004 files, 51,347 symbols and 134,377 edges (C1). It takes about 0.1 s, against a `grep` that returns every text match and needs a read of each file. The output text is the three-field line of section 1. Tests in `go/cmd/evolve/cmd_code_test.go` pin it.
 
 ## Guards
 
 | Rule | Guard test | State |
 |---|---|---|
-| D3: one package runs the trail-code binary | a structure test fails if another package imports `os/exec` with the trail path, in the style of `go/test/structure/thirdparty_test.go`; the convention gets one row | planned (K1) |
-| D4: the output has no instruction line | a fake backend returns a "tokens saved" line, and `evolve code callers` prints the answer without it | planned (K1) |
-| D5: the command is read-only, so a cycle worktree stays clean | a test runs each command in a temporary git repository and expects an empty `git status` | planned (K1) |
+| D3: one package runs the trail-code binary | `TestOnlyTheTrailAdapterRunsTheTrailBinary` in `go/test/structure/binary_test.go` fails if another package both runs a process and names the trail binary path. `TestTheCodeIndexAbstractionRunsNoProcessAndNamesNoBackend` keeps `internal/codeindex` free of both. The convention has one row | built (K1) |
+| D4: the output has no instruction line | `TestTrailBackend_NoOutputLineThatInstructsTheAgentReachesAnyHit` and `TestCodeVerb_ThePhaseAgentDoesNotSeeAnInstructionLineOfTheBackendOutput` feed a "tokens saved" header and expect the answer without it | built (K1) |
+| D5: the command is read-only, so a cycle worktree stays clean | `TestCodeVerb_EveryVerbLeavesTheCheckedOutTreeClean` runs the four verbs in a temporary git repository and expects an empty `git status` | built (K1) |
 | D6: one record for each call | a test runs one command and counts one new line, with the command and the phase | planned (K3) |
-| G5: any backend passes the command tests | the command tests run on the fake backend and on trail-code | planned (K1) |
+| G5: any backend passes the same tests | `codeindextest.Run` runs on the fake and on the trail adapter (`TestTrailBackend_PassesTheConformanceSuite`); the command tests run on the fake. The strip and the real process run through the trail adapter | built (K1) |
 
 ## Limits
 
@@ -284,4 +303,5 @@ The query uses the index of the 6,004 files, 51,347 symbols and 134,377 edges (C
 - The name of the environment variable for the phase is open (section 6).
 - The gain in tokens is not proven. Independent tests find that a graph helps most on structural questions, not on tokens (P3.3). G3 measures it for this repository.
 - A path from the cycle worktree maps to the index worktree at main, so a file that the cycle edited shows its old API.
+- A relative `code_index` path needs a worktree of the hub store. A checkout outside the hub gets exit 4, and an absolute path in the policy avoids the need. K1 did not test a phase worktree of the runtime plane. It stays open.
 - The spec does not remove the MCP registrations. K5 does that after one wave with the CLI live (D8).
