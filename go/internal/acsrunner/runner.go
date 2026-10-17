@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -153,7 +154,7 @@ type runCommander func(ctx context.Context, args ...string) (stdout io.ReadClose
 
 var execCommand runCommander = func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
 	cmd := sysexec.Command(ctx, args[0], args[1:]...)
-	cmd.Env = ipcenv.Scrub(os.Environ())
+	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -173,7 +174,7 @@ func withCommander(c runCommander, fn func()) {
 }
 
 func Run(ctx context.Context, cycle int, pkg string) (Verdict, error) {
-	stdout, wait, err := execCommand(ctx, "go", "test", "-json", "-count=1", pkg)
+	stdout, wait, err := execCommand(ctx, append([]string{"go"}, lanebudget.Args([]string{"test", "-json", "-count=1", pkg})...)...)
 	if err != nil {
 		return Verdict{}, fmt.Errorf("acsrunner: %w", err)
 	}

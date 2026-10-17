@@ -46,7 +46,7 @@
 - A package may be env-exclusive only when the serialized retake cannot make red-twice trustworthy and CI provides no backstop; every backstop carries `envExclusiveNoCIMarker` ("NOT covered by CI"), the one home of that phrase. Pinned by `TestEnvExclusive_EntriesDeclareNoCIBackstop`; `TestIntegrationTierScope_CoversCoreCmdShip_Cycle1594` keeps `internal/core`, `cmd/evolve` and `internal/phases/ship` in the lane tier.
 - `hasOffenderMarker` has no fallback. Pinned by `TestOffenderLines_MarkersFallbackAndCap`.
 - The apicover prologue reads the enforce list before the derivability check, and its underivable arm is one `GATE_FAILED{cause=underivable}` with no `CHANGESET_UNDERIVABLE`. Pinned by `TestApicoverEnforce_InputsOrderAndSeverity`.
-- The package stays a leaf, importing stdlib plus eight declared internal packages (`TestImportGraph_LeafImportsOnlyTheDeclaredPackages`), within the clean-code limits (`TestLimits_FunctionsFilesAndNestingStayWithinTheBar`). `apicover_named_test.go` names every export, because the apicover completeness predicate and `apicover -enforce` count package-local tests only.
+- The package stays a leaf, importing stdlib plus nine declared internal packages. The ninth is `lanebudget`, itself a leaf, which gives each `go test` gate the lane CPU budget ([internal-lanebudget](internal-lanebudget.md)) (`TestImportGraph_LeafImportsOnlyTheDeclaredPackages`), within the clean-code limits (`TestLimits_FunctionsFilesAndNestingStayWithinTheBar`). `apicover_named_test.go` names every export, because the apicover completeness predicate and `apicover -enforce` count package-local tests only.
 
 ## Findings
 

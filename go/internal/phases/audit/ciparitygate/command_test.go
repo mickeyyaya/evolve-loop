@@ -111,7 +111,7 @@ func TestRunGate_ExitCodeMappingAndNoModule(t *testing.T) {
 			t.Errorf("no module %+v: (%v,%v) called=%v", r, off, err, called)
 		}
 	}
-	if _, err := g.runGate(gateGoVet, Request{1, t.TempDir(), "", ""}, "x", time.Second, "go", "vet"); err != nil || called {
+	if _, err := g.runGate(gateGoVet, Request{1, t.TempDir(), "", ""}, "x", time.Second, g.run, "go", "vet"); err != nil || called {
 		t.Error("runGate itself guards the module dir")
 	}
 }

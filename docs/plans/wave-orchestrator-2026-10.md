@@ -184,6 +184,7 @@ Scores are 1 (worst) to 5 (best).
 | O6 | D4, D10, D11, D12: the orchestrator loop over the event channels, and the supply census | `TestOrchestrator_WakesOnlyOnEvents`, `TestOrchestrator_ShipLandedFreesTheCells`, `TestSupply_RecordsTheCauseOfEachRefusal` | console (protected: loop) |
 | O7 | D14: width, utilization and the conflict rate in `evolve wave status`. **Built 2026-10-17:** `internal/wavemeasure`, spec §11, with the baseline of §8. | `TestWaveStatus_ReportsTheConflictRate` | lane |
 | O8 | D13: the adaptive window above width 4. **Deferred:** it has no effect at width 4. It starts when `fleet.count` goes above 6, together with the ADR-0134 group commit (spec §12). | `TestWindow_GrowsOnACleanLandingAndHalvesOnAConflict` | lane, later |
+| O9 | The lane CPU budget of spec §12: each `go test` of a lane gets `-p`, `-parallel` and `GOMAXPROCS` of `max(1, host CPUs / width)`, from one package `internal/lanebudget`. A structure test refuses a `go test` argv that does not go through it. | `TestProcs_DividesTheHostAmongTheLanes`, `TestEveryGoTestArgvGoesThroughTheLaneBudget` | console (protected: ship, core floors, acssuite, commitgate) |
 
 Each component adds its spec section and its package note. Each new package is at 100% coverage in `.cover-strict` and listed in `.apicover-enforce`.
 

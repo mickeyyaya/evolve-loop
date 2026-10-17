@@ -8,14 +8,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const tierParallelism = 4
 
+func tierProcs() int {
+	if procs := lanebudget.Current(); procs > 0 {
+		return procs
+	}
+	return tierParallelism
+}
+
 func tierArgs(pkgs []string) []string {
-	p := strconv.Itoa(tierParallelism)
+	p := strconv.Itoa(tierProcs())
 	return append([]string{"test", "-race", "-count=1", "-p", p, "-parallel", p, "-tags", "integration"}, pkgs...)
 }
 
@@ -47,7 +55,7 @@ func (g *Gates) IntegrationTier(req Request) ([]string, error) {
 		return nil, nil
 	}
 	args := tierArgs(pkgs)
-	scrubbed := scrubbedRun(g.run)
+	scrubbed := scrubbedRun(lanebudget.Runner(g.run))
 	first := runAttempt(ctx, scrubbed, dir, args)
 	if first.err != nil {
 		wrapped := fmt.Errorf("integration-tier gate could not run: %w", first.err)

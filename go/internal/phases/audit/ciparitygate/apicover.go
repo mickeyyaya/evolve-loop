@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -91,7 +92,7 @@ func (g *Gates) coverageProfile(ctx context.Context, req Request, dir string, to
 	covPath := filepath.Join(binDir, "ciparity-cover.txt")
 	scratch = append(scratch, covPath)
 	testArgs := ciparity.CoverageTestArgs(covPath, touched)
-	run := scrubbedRun(g.run)
+	run := scrubbedRun(lanebudget.Runner(g.run))
 	if _, err := sysexec.Output(ctx, run, dir, "go", testArgs...); err != nil {
 		return fail(stepCoverRun, fmt.Errorf("apicover gate: scoped coverage run: %w", err), "go "+strings.Join(testArgs, " "))
 	}
