@@ -107,8 +107,8 @@ func TestC1920_005_PriorSuiteRequiresVertexAIInSection(t *testing.T) {
 		t.Fatalf("RED: %s has no TestC1915_002", priorSuite)
 	}
 	body := src[at:]
-	if end := strings.Index(body, "\nfunc "[1:]); end > 0 {
-		body = body[:end+1]
+	if end := strings.Index(body[1:], "\nfunc "); end >= 0 {
+		body = body[:end+2]
 	}
 	if !strings.Contains(body, `"Vertex AI"`) {
 		t.Errorf("RED: TestC1915_002 item list does not require %q", "Vertex AI")
