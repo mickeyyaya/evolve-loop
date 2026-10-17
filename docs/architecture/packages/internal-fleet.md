@@ -9,6 +9,9 @@
 **Status (2026-10-09):** `PrefixQueue` has no production caller, and `PartitionGraph` is not wired into dispatch. [ADR-0128](../adr/0128-landing-queue-tiered-reverification.md) replaces the composer with a durable landing queue, and it wires `PartitionGraph` with a narrower rule.
 
 **Proposed (2026-10-17):** the [wave orchestrator](../wave-orchestrator.md) ([ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md)) runs `RunPool` as the scheduler and `PartitionGraph` as admission by cell. O1 of that plan is built: see the "Quota shrink" bullet.
+**Proposed (2026-10-17):** the [wave orchestrator](../wave-orchestrator.md) ([ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md)) runs `RunPool` as the scheduler and admission by cell. It also corrects the quota shrink: `Engine.Size` passes every active bench today, not the intersection that the "Quota shrink" bullet names (research F2.3).
+
+**Built (2026-10-17, shadow):** admission by cell is [`internal/admission`](internal-admission.md) (plan O3), not `PartitionGraph`. `PartitionGraph` buckets todos and calls `go list -deps` once for each directory. Admission needs more: a decision for each todo against the lanes in flight, a hub cell and the reach rule of spec §6. `PartitionGraph` thus still has no production caller. `IsGlobalZone` is the one global-zone list that admission reuses.
 
 ## Design
 

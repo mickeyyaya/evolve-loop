@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -462,7 +463,7 @@ func TestPrepareIteration_WiredBeforeEveryIteration(t *testing.T) {
 				CycleState: staleSeed(t, root),
 			}
 			b, console := iscsCoordinator(root, evolveDir, st)
-			fc := loadFleetConfig(evolveDir)
+			fc := loadFleetConfig(evolveDir, io.Discard, nil)
 			if !fleet.enabled(fc) {
 				t.Fatalf("fixture error: %s does not select the fleet path: %+v", fleet.policy, fc)
 			}

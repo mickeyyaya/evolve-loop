@@ -11,7 +11,7 @@
 > - **Slot:** a place for one lane. The width is the number of slots.
 > - **Todo:** one unit of work that a lane takes, from the inbox or from a triage decision.
 > - **Supply:** the todos that a lane can take now: lane-routable, with their `deps` met, and not claimed.
-> - **Cell:** a module package with its module-internal dependencies, as `PartitionGraph` computes it. The unit of admission.
+> - **Cell:** a module package that a todo edits. `internal/admission` computes it from `go list -deps`. The unit of admission.
 > - **Hub cell:** one cell that holds the hub packages. Its capacity is 1.
 > - **Admissible:** a todo whose cells overlap no cell of a lane in flight.
 > - **Lease:** the record that a lane is alive. It holds the last heartbeat and the deadline.
@@ -52,7 +52,7 @@ The order of the goals is the order of the work. Supply first: an empty supply m
 
 ## 2. Architecture
 
-The orchestrator replaces the fire-and-wait wave on the loop's fleet path. It is deterministic Go in the loop process, and it runs no LLM (ADR-0139 decision 1). It reuses built parts: `fleet.RunPool`, `fleet.PartitionGraph`, `fleet.FreshenSpecs`, `clihealth`, `inboxrank` and the event reader of ADR-0127.
+The orchestrator replaces the fire-and-wait wave on the loop's fleet path. It is deterministic Go in the loop process, and it runs no LLM (ADR-0139 decision 1). It reuses built parts: `fleet.RunPool`, `internal/admission`, `fleet.FreshenSpecs`, `clihealth`, `inboxrank` and the event reader of ADR-0127.
 
 ```mermaid
 flowchart LR
@@ -89,7 +89,7 @@ The orchestrator owns four kinds of state. All of it lives in memory, and the ru
 This example uses real packages of this repository. `fleet.count` is 4, and `agy-claude` is benched, as on 2026-10-17 (F2.2).
 
 1. **Sizing.** `agy-claude` has `claude` after it in each chain that the wave uses. The bench costs no slot, so the window is 4 (§5).
-2. **Supply.** After the routing remedy of the plan (O2a), the census finds 6 admissible todos. Their cells, from `PartitionGraph`:
+2. **Supply.** After the routing remedy of the plan (O2a), the census finds 6 admissible todos. Their cells, from `internal/admission`:
 
 | Todo | Files | Cells |
 |---|---|---|
@@ -184,17 +184,35 @@ The live partition is file-disjoint (F2.8). File-based parallel agents gain noth
 
 ### Solution
 
-The admission step is ADR-0134 S14, built inside the orchestrator.
+**Built (shadow), 2026-10-17:** [`internal/admission`](packages/internal-admission.md) (plan O3). The admission step is ADR-0134 S14, built for the orchestrator. In the `shadow` stage, the loop runs it after the file partition of each wave. It records each todo that it holds back, and it changes no lane. Until O4 runs the lanes, the stage `enforce` also only records.
 
-1. **Cells of a todo.** `PartitionGraph` maps each Go file to its module-internal packages, from `go list -deps`. A file outside `go/` maps to no cell. A todo with no files takes the cell of the package that its text names. With no package, it takes the hub cell (ADR-0139 decision 8).
-2. **The hub cell.** The packages with the most importers form one cell with a capacity of 1. On 2026-10-13 these were `sysexec` (147 importers), `log` (125), `atomicwrite` (124) and `signalcenter` (120) (ADR-0134 research F2.16). A todo that touches a hub package holds the whole hub cell. The global-zone files `go.mod`, `go.sum` and `.evolve/policy.json` also map to the hub cell.
-3. **The test.** A todo is admissible when no cell of it is in the cell table. Admission puts each of its cells in the table, with the lane id.
-4. **The release.** `ship.landed`, a lane failure or a lane stop removes the cells of that lane from the table (§9).
-5. **Rank order.** The step takes the todos in `inboxrank` order. It stops at the first `scan_k` admissible todos (§12). A todo that waits keeps its rank. It does not lose its place to a later todo of lower rank when its cell frees.
+1. **The edited packages.** `E(t)` is the set of module-internal packages that todo `t` edits: the packages of its Go files. Another path under `go/` maps to its nearest enclosing package. A file outside `go/` maps to no package.
+   - Known limit: a todo with only files outside `go/` (docs, scripts) maps to no cell. So does a todo with non-Go files that no package encloses. Such a todo conflicts with nothing, and admission admits it at once. Only the landing proof of ADR-0128 finds a clash between such todos.
+2. **The reach.** `D(p)` is the set of module-internal transitive imports of package `p`, from `go list -deps`. It excludes the hub packages. `D(E)` is the union of `D(p)` for each `p` in `E`.
+3. **The conflict rule.** Two todos `t1` and `t2` conflict when one of these holds:
+   - `E(t1)` and `E(t2)` meet;
+   - `E(t1)` meets `D(E(t2))`;
+   - `E(t2)` meets `D(E(t1))`;
+   - both hold the hub cell.
+4. **The hub cell.** A todo that edits a hub package holds the hub cell. The hub cell has a capacity of 1, so two such todos conflict. An import of a hub never conflicts, because `D` excludes the hubs. The global-zone files `go.mod`, `go.sum` and `.evolve/policy.json` (`fleet.IsGlobalZone`) also map to the hub cell, and so does `go/Makefile`.
+   - The module-root files `go/go.mod`, `go/go.sum` and `go/Makefile` sit in no package. The hub cell is thus the only cell that holds them.
+5. **A todo with no files.** It takes the packages of the `go/internal/<pkg>` paths in its inbox title or summary. When its text names no known package, it takes the hub cell (ADR-0139 decision 8, plan D7). A todo whose only file is its own id (the placeholder of `fleet.TodosFromTriage`) has no files.
+6. **The hub set.** A hub is a package that at least `fleet.orchestrator.hub_min_importers` module packages import, directly or transitively. On 2026-10-17 the counts were `sysexec` 151, `log` 127, `atomicwrite` 126, `signalcenter` 122, then `ipcenv` 116. The default 120 gives these four hubs. The transitive count reproduces ADR-0134 research F2.16. The direct count does not.
+7. **The test.** A todo is admissible when it conflicts with no lane in flight and with no todo admitted before it. `Admit` records the cells of each decision and the lane or todo that blocks it.
+8. **The release.** `ship.landed`, a lane failure or a lane stop removes the lane from the in-flight list (§9).
+9. **Rank order.** The step takes the todos in `inboxrank` order. It stops after `scan_k` admitted todos (§12). A todo that waits keeps its rank. It does not lose its place to a later todo of lower rank when its cell frees.
 
-The cell table is the shared view of all lanes in flight that the console has by hand today (F2.15). `evolve wave status` prints it.
+The cell table is the shared view of all lanes in flight that the console has by hand today (F2.15). `evolve wave status` prints it (plan O7).
 
-The cells come from the tree at the run's base. A lane that adds an import adds an edge that the table does not hold. The landing proof of ADR-0128 finds that edge at landing. This is the reason why admission lowers the conflict rate but does not replace the landing proof.
+The cells come from the tree at the run's base. A lane that adds an import adds an edge that the table does not hold. The landing proof of ADR-0128 finds that edge at landing. Admission thus lowers the conflict rate, but it does not replace the landing proof.
+
+**The shadow never delays a launch.** The shadow observation, including the `go list`, runs in its own goroutine while the lanes launch. A panic in it is recovered and logged as one WARN, and the launch is not told. The loop joins the observation after the launch returns. Its line and events thus appear once the lanes are done. The launched specs never change.
+
+**The shadow record.** For each wave, the loop log gets one line: `[loop] wave N: admission shadow (stage S): admission launches A lane(s), the file partition launches F; W todo(s) wait for a cell`. A is the admitted count, capped at the wave count. Each todo that waits gets one `LOOP_ORCH_ADMIT_WAIT` event with `todo`, `rank`, `cells`, `blocked_by`, `blocked_by_lane` and `stage`. The wave run record under `.evolve/waves/` belongs to `evolve wave next`, not to the inner waves of the loop, so it gets no field yet.
+
+**The first measure (2026-10-17, width 4).** The ready list is empty, so both widths are 0. Each of the last 10 triage decisions holds 1 todo, so both widths are 1. The 9 todos of those decisions as one wave give 4 and 4.
+
+In 30 windows of 8 pending items, admission gives 58 lanes against 120. The cause: 120 of the 244 pending items edit `cmd/evolve` or `internal/core`, which import most of the module. The S14 exit takes 3 live runs ([internal-admission.md](packages/internal-admission.md) §Findings).
 
 ## 7. The rolling pool
 
@@ -340,7 +358,7 @@ This section gives the cost of each step as a function of the lane count N and t
 | Step | Cost for each call | Calls | Reason |
 |---|---|---|---|
 | Census (§4) | O(I) for I inbox items | one for each plan | one pass over the ranked inbox |
-| Cells of a todo (§6) | one `go list -deps` for each directory, cached for the run | one for each new directory | `PartitionGraph` calls it once for each directory |
+| Cells of a todo (§6) | one `go list -deps ./...` for the module, 0.8 s for 303 packages | one for each plan | `LoadModuleGraph` loads the whole graph once |
 | Admission test (§6) | O(c) map lookups for c cells of a todo | at most `scan_k` todos for each free slot | the scan stops at the first `scan_k` admissible todos (P3.12) |
 | Release (§9) | O(c) | one for each lane end | |
 | Event handling (§9) | O(1) for each event | one for each event | the channels push. No poll tick. |
@@ -390,7 +408,7 @@ The budget does not make a lane faster. It makes the lanes share the host, so th
 
 ### Config keys
 
-All keys are under `.evolve/policy.json` `fleet`, strict-decoded by `policy.FleetConfig()`.
+All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig()`. The `orchestrator` block is strict-decoded: an unknown key, an unknown `stage` or a negative number refuses the policy. Built on 2026-10-17: `stage`, `scan_k` and `hub_min_importers`.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
@@ -398,6 +416,7 @@ All keys are under `.evolve/policy.json` `fleet`, strict-decoded by `policy.Flee
 | `min_lanes` | int | 2 | the smallest window after sizing |
 | `orchestrator.stage` | `shadow` \| `enforce` | `shadow` | §14 |
 | `orchestrator.scan_k` | int | 32 | the admissible todos that admission scans for each free slot |
+| `orchestrator.hub_min_importers` | int | 120 | the importer count (direct or transitive) that makes a package a hub (§6) |
 | `orchestrator.deadline_floor_minutes` | int | 60 | the floor of the lane deadline |
 | `orchestrator.stall_minutes` | int | 20 | the heartbeat gap that reports a stall |
 | `orchestrator.run_max_lanes` | int | `4 × count` | the lanes that one run launches before its boundary |
@@ -413,6 +432,7 @@ All keys are under `.evolve/policy.json` `fleet`, strict-decoded by `policy.Flee
 | `orchestrator.supply` | `loop` | after each census |
 | `LOOP_ORCH_SUPPLY_SHORT` | `loop` | the admissible count is below the window |
 | `LOOP_ORCH_ADMIT_WAIT` | `loop` | a todo waits for a cell. Once for each todo. |
+| `LOOP_FLEET_POLICY_INVALID` | `loop` | `.evolve/policy.json` does not load at batch start (for example a misspelt `fleet.orchestrator` key), so the loop runs sequential until it is fixed |
 | `LOOP_ORCH_LANE_STALLED` | `errors` | §8 |
 | `LOOP_ORCH_LANE_DEADLINE` | `errors` | §8 |
 | `LOOP_ORCH_FAMILY_PAUSED` | `loop` | §9: a family with no fallback stops taking new lanes |
@@ -443,8 +463,9 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 |---|---|---|
 | The orchestrator runs no LLM. | a structure test: the orchestrator package imports no bridge and no driver package | proposed (O6) |
 | The orchestrator never polls. | the AST guard of ADR-0127 bans `time.Sleep`, `time.Tick` and `time.NewTicker` in the orchestrator package | proposed (O6) |
-| Two lanes in flight never hold one cell. | `TestAdmit_ATodoInABusyCellWaits` and a property test over random todos | proposed (O3) |
-| The hub cell admits one lane. | `TestAdmit_TheGlobalCellAdmitsOne` | proposed (O3) |
+| Two lanes in flight never hold one cell. | `TestAdmit_ATodoInABusyCellWaits` and `TestAdmit_TwoAdmittedTodosNeverConflict` | built (O3) |
+| The hub cell admits one lane. | `TestAdmit_TheGlobalCellAdmitsOne` | built (O3) |
+| The shadow changes no lane. | `TestAdmit_ShadowRecordsTheWaitAndChangesNothing` | built (O3) |
 | A stop is never a broad kill. | the stop takes the injected process-group stop of the launch, and a test pins that no name match is used | proposed (O5) |
 | The census never routes an item. | `TestSupply_RecordsTheCauseOfEachRefusal` checks that the inbox files do not change | proposed (O6) |
 | A split keeps every protected file in the console part. | `TestInboxSplit_TheConsolePartKeepsEveryProtectedFile` | proposed (O2c) |
@@ -454,6 +475,7 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 
 - **Landing.** The orchestrator does not land. ADR-0128 and ADR-0134 own the queue, the tiers and the group commit. Above about 6 lanes, the width needs their group commit (§12).
 - **Edges added in a lane.** Cells come from the tree at the run's base. An import that a lane adds is found at landing, not at admission (§6).
+- **Todos outside `go/`.** A todo whose files are all outside `go/`, or that has unmapped non-Go files, maps to no cell. It conflicts with nothing, so admission cannot hold it back (§6).
 - **Accuracy of the cells.** The package graph of `go list -deps` misses runtime coupling: shared files under `.evolve/`, shared test data and generated outputs. The landing proof of ADR-0128 covers these (fleet-landing-queue §7).
 - **Supply.** The census measures the supply and proposes splits. It does not create work from a goal. A goal-split planner phase is plan design D, which is deferred (plan Q3).
 - **Hosts.** One host runs all lanes. The CPU limit of 8–12 lanes is an estimate. The soak at N = 16 measures it.

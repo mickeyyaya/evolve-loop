@@ -61,7 +61,9 @@ type Outcome struct {
 	Results []fleet.Result
 }
 
-func dispatch(ctx context.Context, req DispatchRequest, count int) (Outcome, error) {
+type planObserver func(wave, count int, cfg policy.OrchestratorConfig, todos []fleet.Todo, specs []fleet.CycleSpec) func()
+
+func dispatch(ctx context.Context, req DispatchRequest, count int, observe planObserver) (Outcome, error) {
 	if err := req.Preflight(); err != nil {
 		return Outcome{}, &StepError{Wave: req.Wave, Step: StepPreflight, Err: err}
 	}
@@ -69,14 +71,20 @@ func dispatch(ctx context.Context, req DispatchRequest, count int) (Outcome, err
 	if err != nil {
 		return Outcome{}, &StepError{Wave: req.Wave, Step: StepPlan, Err: err}
 	}
-	specs, _, err := fleet.PlanFromTriage(decisionJSON, cardPackages, count, req.Routed)
+	todos, _, err := fleet.TodosFromTriage(decisionJSON, cardPackages, req.Routed)
 	if err != nil {
 		return Outcome{}, &StepError{Wave: req.Wave, Step: StepAdapt, Err: err}
 	}
+	specs, _ := fleet.PlanCycles(todos, count)
 	if len(specs) == 0 {
 		return Outcome{}, nil
 	}
+	join := func() {}
+	if observe != nil {
+		join = observe(req.Wave, count, req.Config.Orchestrator, todos, specs)
+	}
 	results := req.Launcher.Run(ctx, specs)
+	join()
 	if len(results) == 0 {
 		return Outcome{}, nil
 	}
@@ -87,7 +95,7 @@ func (e *Engine) Dispatch(ctx context.Context, req DispatchRequest) (Outcome, er
 	if !ShouldRunWave(req.Config) {
 		return Outcome{}, nil
 	}
-	out, err := dispatch(ctx, req, req.Config.Count)
+	out, err := dispatch(ctx, req, req.Config.Count, e.shadowAdmission)
 	if err != nil {
 		e.warn("Engine.Dispatch", req.Wave, CodeWaveDispatchFailed,
 			fmt.Sprintf("wave %d dispatch failed, falling back to sequential: %v", req.Wave, err), stepFields(err, "wave"))
@@ -96,7 +104,7 @@ func (e *Engine) Dispatch(ctx context.Context, req DispatchRequest) (Outcome, er
 }
 
 func (e *Engine) ForceOneLane(ctx context.Context, req DispatchRequest) (Outcome, error) {
-	return dispatch(ctx, req, RepairWidth)
+	return dispatch(ctx, req, RepairWidth, nil)
 }
 
 func (e *Engine) RepairMinWidth(ctx context.Context, fleetCfg, waveCfg policy.FleetConfig, req DispatchRequest) (handled bool) {

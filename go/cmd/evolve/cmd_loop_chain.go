@@ -139,7 +139,7 @@ func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, 
 		},
 		Refresh:     func(batch int) bool { return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch) },
 		LastRefresh: func() (*chainBoundaryRefreshLogEntry, error) { return lastChainBoundaryRefreshLogEntry(cfg.EvolveDir) },
-		FleetWidth:  func() int { return loadFleetConfig(cfg.EvolveDir).Count },
+		FleetWidth:  func() int { return loadFleetConfig(cfg.EvolveDir, stderr, signals).Count },
 		QuotaPause: func() (loopchain.QuotaPause, bool) {
 			qp, ok := detectQuotaPause(cfg.EvolveDir)
 			return loopchain.QuotaPause{Cycle: qp.Cycle, WakeAt: qp.WakeAt, Source: qp.Source}, ok

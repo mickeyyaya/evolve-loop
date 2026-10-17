@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 type (
@@ -22,7 +23,7 @@ type (
 	wavePlanFn   = loopwave.PlanFn
 )
 
-func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals func() *signalcenter.Center) *loopwave.Engine {
+func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals func() *signalcenter.Center, opts ...loopwave.Option) *loopwave.Engine {
 	roots := loopwave.Roots{ProjectRoot: cfg.ProjectRoot, EvolveDir: cfg.EvolveDir}
 	ports := loopwave.Ports{
 		LastCycle: func(ctx context.Context) (int, error) { return readLastCycleNumber(ctx, storage) },
@@ -31,7 +32,7 @@ func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals
 		Shrink:    fleet.QuotaAwareCount,
 		Chains:    cliroute.FamilyChains,
 	}
-	return loopwave.New(roots, ports, warn, loopwave.WithSignals(signals), loopwave.WithGoal(cfg.GoalHash))
+	return loopwave.New(roots, ports, warn, append([]loopwave.Option{loopwave.WithSignals(signals), loopwave.WithGoal(cfg.GoalHash)}, opts...)...)
 }
 
 func (b *loopBatchCoordinator) wave() *loopwave.Engine {
@@ -42,7 +43,8 @@ func (b *loopBatchCoordinator) wave() *loopwave.Engine {
 }
 
 func (b *loopBatchCoordinator) wiredWave() *loopwave.Engine {
-	return newWaveEngine(b.cfg, b.deps.Storage, b.stderr, func() *signalcenter.Center { return b.deps.Signals })
+	return newWaveEngine(b.cfg, b.deps.Storage, b.stderr, func() *signalcenter.Center { return b.deps.Signals },
+		loopwave.WithAdmission(admissionShadow(b.ctx, filepath.Join(b.cfg.ProjectRoot, "go"), sysexec.DefaultRunner)))
 }
 
 func nilSignals() *signalcenter.Center { return nil }
@@ -53,7 +55,9 @@ func nullWaveEngine(roots loopwave.Roots, warn io.Writer) *loopwave.Engine {
 
 func shouldRunWave(fc policy.FleetConfig) bool { return loopwave.ShouldRunWave(fc) }
 
-func loadFleetConfig(evolveDir string) policy.FleetConfig { return loopwave.LoadFleetConfig(evolveDir) }
+func loadFleetConfig(evolveDir string, warn io.Writer, signals *signalcenter.Center) policy.FleetConfig {
+	return loopwave.LoadFleetConfig(evolveDir, warn, signals)
+}
 
 func productionWavePreflight(projectRoot string) func() error { return loopwave.Preflight(projectRoot) }
 
