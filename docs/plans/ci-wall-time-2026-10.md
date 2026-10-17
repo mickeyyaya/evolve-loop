@@ -1,7 +1,7 @@
 # Plan: CI wall time falls from about 24 to about 9 minutes, and every run keeps the data that shows why
 
-- **Status:** proposed, 2026-10-17.
-- **Research:** [ci-wall-time-2026-10](../research/ci-wall-time-2026-10.md). **Earlier campaign:** [test-system-efficiency-2026-10](test-system-efficiency-2026-10.md). **Decision:** an ADR follows when the operator accepts this plan.
+- **Status:** accepted, 2026-10-17 (the operator approved it with "Ok").
+- **Research:** [ci-wall-time-2026-10](../research/ci-wall-time-2026-10.md). **Earlier campaign:** [test-system-efficiency-2026-10](test-system-efficiency-2026-10.md). **Decision:** [ADR-0135](../architecture/adr/0135-ci-measures-itself-before-it-changes-its-shape.md). **Design:** [ci-telemetry-and-critical-path](../architecture/ci-telemetry-and-critical-path.md).
 
 ## Table of contents
 

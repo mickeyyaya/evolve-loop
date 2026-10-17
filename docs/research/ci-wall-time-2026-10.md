@@ -1,6 +1,6 @@
 # CI wall time: where the 21–25 minutes go, measured from the test up (research, 2026-10)
 
-> The plan that uses this research: [ci-wall-time-2026-10](../plans/ci-wall-time-2026-10.md). Earlier work on the same suite: [test-system-efficiency-2026-10](test-system-efficiency-2026-10.md) and its [plan](../plans/test-system-efficiency-2026-10.md).
+> The plan that uses this research: [ci-wall-time-2026-10](../plans/ci-wall-time-2026-10.md). The design: [ci-telemetry-and-critical-path](../architecture/ci-telemetry-and-critical-path.md). The decision record: [ADR-0135](../architecture/adr/0135-ci-measures-itself-before-it-changes-its-shape.md). Earlier work on the same suite: [test-system-efficiency-2026-10](test-system-efficiency-2026-10.md) and its [plan](../plans/test-system-efficiency-2026-10.md).
 
 Date: 2026-10-17. Method:
 
