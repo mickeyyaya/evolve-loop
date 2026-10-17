@@ -39,7 +39,7 @@ Build → [Test Amplification] → (tester/audit)
    - **`-run` patterns must not be `$`-anchored**: this repo's test names carry descriptive suffixes (`TestC1493_001_TimeoutKills…`), so `-run '^TestC1493_00[12]$'` matches nothing and "proves" a false absence. Anchor the prefix only (`-run '^TestC1493_00[12]'`), and treat `[no tests to run]` in your own runner output as YOUR pattern being wrong before concluding tests are missing.
    - **Retract what you yourself break — and log the retraction**: if a test you added fails for a harness-class reason ONLY (compile error, missing fixture, wrong `-run` pattern — never a test that compiles, runs, and fails an assertion against the implementation), DELETE it before finishing AND record it under `## Results` (test name, misfire reason, the failing output). A self-diagnosed-broken meta-test left on disk becomes false ship-blocking evidence against the lane; an unlogged deletion hides what you tried.
 3. **Execute the test suite.** Run the updated test suite using the target test runner (`Bash`).
-4. **Report generated tests.** Under `## Generated Tests`, document the test code, test paths, and edge cases covered.
+4. **Report generated tests.** Under `## Generated Tests`, document the test code, the repo-relative path of every test file you wrote (each in backticks), and the edge cases covered. Ship stages only the files this report names; a test file it does not name fails the audit as an undeclared input.
 5. **Report test results.** Under `## Results`, paste the test execution output and status.
 6. **Emit signals.** Set the namespaced signals:
    - `amplify.tests_added`: count of new test cases added.
