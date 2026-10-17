@@ -309,6 +309,7 @@ approaches / decision / results / retro) — lives at
 | [plans/code-index-cli-2026-10.md](plans/code-index-cli-2026-10.md) | Plan: four designs with weighted scores. The winner is `evolve code` over a swappable backend, with trail-code first. Decisions D1 to D8 and components K1 to K5 with red tests. |
 | [architecture/adr/0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md](architecture/adr/0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md) | Decision (Proposed): phase agents query the code index through four read-only `evolve code` commands, not MCP. A `Backend` interface keeps a type-checked backend open. |
 | [architecture/code-index-cli.md](architecture/code-index-cli.md) | Spec: the commands and their exit codes, the `Backend` interface, the trail-code adapter, the index lifecycle, the sandbox, the usage log and the prompt text. It has a worked example and the guards. |
+| [conventions/cli-only-no-mcp.md](conventions/cli-only-no-mcp.md) | Convention: no phase, lane or project config uses MCP. Each outside service is reached through a CLI. It names the three guards: the launch flag test, the structure test and the preflight warning. |
 
 ## 2026-10-17 — wave orchestrator: at least four lanes, few conflicts, a large fleet (ADR-0139)
 
