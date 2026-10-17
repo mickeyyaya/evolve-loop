@@ -30,6 +30,18 @@ func TestProtectedTopNCards_NamesEveryOffendingCard(t *testing.T) {
 	}
 }
 
+func TestProtectedTopNCards_TheRoutingPredicateRefusesAProtectedFileNotItsDirectory(t *testing.T) {
+	t.Parallel()
+	body := "- core-dir: a core change — priority=M, files={go/internal/core/}, source=inbox\n" +
+		"- core-floor: edit the build floor — priority=H, files={go/internal/core/build_handoff_floor.go}, source=inbox\n"
+
+	cards := protectedTopNCards(body, guards.IsProtectedScope)
+
+	if len(cards) != 1 || cards[0].ID != "core-floor" || cards[0].Path != "go/internal/core/build_handoff_floor.go" {
+		t.Fatalf("cards = %+v; want only the card that names the protected core file", cards)
+	}
+}
+
 func writeDecision(t *testing.T, ws, body string) string {
 	t.Helper()
 	path := filepath.Join(ws, "triage-decision.json")

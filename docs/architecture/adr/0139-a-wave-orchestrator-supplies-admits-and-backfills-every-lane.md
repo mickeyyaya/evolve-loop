@@ -29,7 +29,7 @@ Each cause has a built part that can fix it: `RunPool`, `PartitionGraph`, the ev
 2. A bench costs a lane only for a family with no fallback in the chains of the wave.
 3. `fleet.count` is 4, and `fleet.min_lanes` stays 2.
 4. Before each plan, a supply census counts the admissible items and records each refusal with its cause.
-5. A directory routes to the console only when it lies inside a protected fragment.
+5. A directory routes to the console only when it lies inside a protected fragment. (Built: O2b, 2026-10-17.)
 6. Dispatch admits a todo only when no lane in flight holds an overlapping package cell.
 7. The hub cell admits one lane.
 8. A todo with no files takes its named package cell, or else the hub cell.

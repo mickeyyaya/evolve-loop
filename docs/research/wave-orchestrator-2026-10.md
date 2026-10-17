@@ -264,7 +264,7 @@ AgenticFlict found 27.67% over 107,000 simulated merges ([arXiv 2604.03551](http
 ## 5. Refinements to adopt
 
 - **R1** (F2.6, F2.7, F2.17, F2.24): a supply step runs before each plan. It counts the lane-routable items and reports the cause when the supply is below the width.
-- **R1a** (F2.19, F2.21, F2.22): the console does S-A and S-B once, and the code does S-C. Together they free about 30–35 items.
+- **R1a** (F2.19, F2.21, F2.22): the console does S-A and S-B once, and the code does S-C. The estimate was 30–35 items. The measured total is 11 (2026-10-17). S-A and S-B (O2a, #921) moved 3 of 35 candidates, and S-C (O2b) freed 8.
 - **R1b** (F2.17, F2.20): the supply step proposes a split of each mixed item (S-D) when the supply is below twice the width. The console approves each split, because a split decides which part is a grader.
 - **R2** (F2.2, F2.3): the shrink counts a bench only for a family that is the last in some chain the wave uses.
 - **R3** (F2.9, F2.10, P3.9, P3.17): dispatch admits a todo by its package cell, through `PartitionGraph`, with the hub cell at capacity 1. This is ADR-0134 S14.
