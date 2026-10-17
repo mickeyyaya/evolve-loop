@@ -13,13 +13,13 @@
 | ❌ none | No regression test pins this mode. |
 | ⛔ untestable | Depends on external infra/CLI behavior (vendor rate limit, interactive modal) a unit test cannot reproduce; mitigate by design + docs, not a unit test. |
 
-## Summary (recounted 2026-10-07 from the coverage map below)
+## Summary (recounted 2026-10-17 from the coverage map below)
 
 | | Count |
 |---|---|
-| Incidents mapped | 55 |
-| Distinct failure modes (coverage-map rows) | 89 |
-| ✅ covered (a test would fail if the bug returned) | 74 |
+| Incidents mapped | 57 |
+| Distinct failure modes (coverage-map rows) | 94 |
+| ✅ covered (a test would fail if the bug returned) | 79 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 10 |
 | ❌ none (no regression test) | 5 |
 | ⛔ untestable (external infra / live CLI) | 0 |
@@ -30,7 +30,7 @@ once however many rows it has; a record that documents several named incidents
 counts each name. Recounted on 2026-10-06 when the carry incident's four rows
 were added: by this rule the map held 48 incidents before them (the earlier
 summary said 49) and 49 with them. Recounted on 2026-10-07 when the cycle-1825
-carry incident's two rows were added beside cycle 1811's five: 51 incidents, 78 rows; the cycle-1822 explanation-refresh rows make 52 incidents and 80 rows, and the L2 review-rounds incident (a process incident, ❌ until ADR-0126's replay test) makes 53 incidents and 81 rows. The cycle-1828 gate-class incident adds three rows, all covered: 54 incidents, 84 rows and 69 covered. The cycle-1830 incident adds 1 incident and 5 covered rows: 55 incidents, 89 rows and 74 covered. Untestable modes are
+carry incident's two rows were added beside cycle 1811's five: 51 incidents, 78 rows; the cycle-1822 explanation-refresh rows make 52 incidents and 80 rows, and the L2 review-rounds incident (a process incident, ❌ until ADR-0126's replay test) makes 53 incidents and 81 rows. The cycle-1828 gate-class incident adds three rows, all covered: 54 incidents, 84 rows and 69 covered. The cycle-1830 incident adds 1 incident and 5 covered rows: 55 incidents, 89 rows and 74 covered. The cycle-1853 secondary-defects record adds 1 incident and 4 covered rows, and the cycle-1637/1691 rebase-chase record adds 1 incident and 1 covered row: 57 incidents, 94 rows and 79 covered. Untestable modes are
 kept in the "Untestable-by-unit" section below rather than as ⛔ map rows.
 
 **Historical baseline.** The 2026-05-29 13-agent parallel sweep counted 14
@@ -136,6 +136,7 @@ not the coverage map, which is the hand-maintained per-incident record.
 | 2026-10-09 — cycle 1853 | a walk with a lost-pane rung and a walled rung became a quota pause, although the lost rung had no evidence of exhaustion | `bridgechain/wall_keeper.go`, `usageevidence/usageevidence.go`, `core/ports.go` (`BridgeResponse.UsageExhausted`) | ✅ | `bridgechain/wall_keeper_test.go::TestWallKeeper_AStallWithNoExhaustionEvidenceBeforeTheWallIsNotAQuotaPause` + `::TestWalking_TheCycle1853WalkWithAnUnprovenPaneLossSurfacesThePaneLoss`, `phases/runner/runner_fallback_test.go::TestRun_TheCycle1853WalkIsAQuotaPauseOnlyWithExhaustionEvidenceForThePaneLoss`, `usageevidence/usageevidence_test.go::TestBridge_OnlyAnExhaustedUsageVerdictMarksTheAttemptAsProvenExhausted` |
 | 2026-10-09 — cycle 1853 | a pause with no reset evidence woke at a built-in 5.4167 h default | `quotareset/quotareset.go`, `checkpoint/checkpoint.go` | ✅ | `quotareset/unknown_reset_test.go::TestCompute_AnUnknownResetIsNowAndSaysUnknownNeverAFarFutureDefault` + `::TestCompute_ABenchedFamilysResetIsTheEvidenceBeforeAnyConfiguredDefault`, `checkpoint/quota_wakeat_test.go::TestQuotaBoundaryCheckpointer_TheEarliestActiveBenchSetsTheWakeAt` |
 | 2026-10-09 — cycle 1853 | the stall triage's usage query had no worktree, so the fleet guard refused it | `bridge/clicontrol_adapter.go` | ✅ | `bridge/controllerfactory_test.go::TestControllerFactory_AFleetModeUsageQueryRunsInAnOwnedScratchDirAndReadsTheFakeCLIScreen` |
+| [2026-09-30 — cycles 1637 and 1691: a clean fleet rebase returned to Build and chased peer commits](2026-09-30-cycle-1637-1691-rebase-chase.md) | `recoverFromShipError` invalidated the build explanation and routed to Build on every `GIT_FLEET_REBASE_NEEDED` before trying the carry-forward ladder, so cycle 1637 ran five rebuild/re-audit rounds across 21 phases as peers kept moving `main` and sealed FAIL, and cycle 1691 paid a full rebuild + re-audit on a disjoint rebase | `core/ship_recovery.go` (`recoverFromShipError`, `routeRebasedExplanation`, `rebindPendingChange`), `core/identity_carry_forward.go` (`identityCarryForward`), `explanationdocs/contract_state.go` (`RebindIdenticalRebase`) | ✅ | `core/carry_chase_replay_test.go::TestCycle1637Replay_ShipsOnFirstRecovery` + `::TestCycle1637Replay_ByteDivergentRebaseDeclinesCarry` |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
