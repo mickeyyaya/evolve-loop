@@ -69,9 +69,9 @@ func TestMarkdownCharacterization_Golden(t *testing.T) {
 		"- Fully-serial upper bound (Σ test elapsed): **6.5s**\n\n" +
 		"> ⚠ **3 package(s) had no terminal summary** (truncated stream / panic / timeout) — their wall time is missing and they are NOT counted above: x/a, x/b, x/c\n\n" +
 		"## Slow packages (> 5.0s wall) — optimization targets\n\n" +
-		"| Package | Wall (s) | Tests | Σserial (s) | Slowest test | Slowest (s) |\n" +
-		"|---|--:|--:|--:|---|--:|\n" +
-		"| example.com/m/p1 | 6.25 | 3 | 6.00 | TestTieA | 2.50 |\n\n" +
+		"| Package | Wall (s) | Tests | Σall tests (s) | Serial Σ (s) | Parallel max (s) | Floor (s) | Dominant | Slowest test | Slowest (s) |\n" +
+		"|---|--:|--:|--:|--:|--:|--:|---|---|--:|\n" +
+		"| example.com/m/p1 | 6.25 | 3 | 6.00 | 6.00 | 0.00 | 6.00 | serial | TestTieA | 2.50 |\n\n" +
 		"## Slowest 2 tests\n\n" +
 		"| Test | Package | Elapsed (s) |\n|---|---|--:|\n" +
 		"| TestTieA | example.com/m/p1 | 2.50 |\n" +

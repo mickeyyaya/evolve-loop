@@ -39,8 +39,8 @@ func TestParse_AggregatesAndExcludesSubtests(t *testing.T) {
 	if bridge.SlowestTest != "TestSlow" || bridge.SlowestSecs != 12.5 {
 		t.Errorf("bridge slowest = %s/%.2f, want TestSlow/12.50", bridge.SlowestTest, bridge.SlowestSecs)
 	}
-	if bridge.SerialSum < 12.59 || bridge.SerialSum > 12.61 {
-		t.Errorf("bridge SerialSum = %.2f, want ~12.6", bridge.SerialSum)
+	if bridge.AllTestsSum < 12.59 || bridge.AllTestsSum > 12.61 {
+		t.Errorf("bridge AllTestsSum = %.2f, want ~12.6", bridge.AllTestsSum)
 	}
 }
 

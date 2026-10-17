@@ -124,8 +124,18 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 	status=$${status:-1}; if [ "$$status" -ne 0 ]; then rm -f coverage.partial.txt; exit "$$status"; fi; \
 	mv coverage.partial.txt coverage.txt
 
-test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in
-	$(GO) test -count=1 -timeout 45m -tags "e2e evolve_test_phases" ./cmd/... ./test/e2e/...
+E2E_JSON ?=
+E2E_TEST = $(GO) test -count=1 -timeout 45m -tags "e2e evolve_test_phases"
+E2E_PKGS = ./cmd/... ./test/e2e/...
+
+test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in; E2E_JSON=<file> also writes the go test -json stream while the console keeps the plain text
+ifneq ($(strip $(E2E_JSON)),)
+	@$(GO) build -o $(BIN_DIR)/testlatency ./cmd/testlatency || exit $$?; \
+	status=$$( { { $(E2E_TEST) -json $(E2E_PKGS); echo $$? >&3; } | tee "$(E2E_JSON)" | $(BIN_DIR)/testlatency -render >&2; } 3>&1 ); \
+	exit $${status:-1}
+else
+	$(E2E_TEST) $(E2E_PKGS)
+endif
 
 test-acs-durable: ## Durable ACS regression tier (//go:build acs); artifact-free predicates, mirrors the ci.yml acs-durable gate
 	$(GO) test -count=1 -tags acs ./acs/regression/...
