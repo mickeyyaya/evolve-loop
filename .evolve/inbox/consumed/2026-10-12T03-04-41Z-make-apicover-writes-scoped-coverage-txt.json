@@ -4,10 +4,9 @@
     "A test runs make apicover, then cover-strict and cover-changed, and the gates refuse or ignore the scoped profile"
   ],
   "consumed": {
-    "at": "2026-10-12T03:57:44Z",
-    "via": "console-manual",
-    "cycle": "console",
-    "resolution": "Fixed in PR #861 (plan T2): make apicover writes coverage.apicover.txt; TestMakeApicover_NeverFeedsTheCoverageGates proves no gate reads it."
+    "at": "2026-10-17T18:00:18Z",
+    "cycle": "",
+    "via": "ship"
   },
   "created_at": "2026-10-12T14:00:00Z",
   "files": [

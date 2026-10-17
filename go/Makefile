@@ -168,8 +168,8 @@ apicover: ## Public-API coverage report (warning-only; APICOVER_PKGS=... to scop
 	@mkdir -p $(BIN_DIR)
 	@$(GO) build -o $(BIN_DIR)/apicover ./cmd/apicover
 	@$(GO) test -count=1 -coverprofile=coverage.apicover.txt $(APICOVER_PKGS) >/dev/null
-	@$(GO) tool cover -func=coverage.apicover.txt > coverage.func.txt
-	@$(BIN_DIR)/apicover -cover coverage.func.txt $$($(GO) list -f '{{.Dir}}' $(APICOVER_PKGS))
+	@$(GO) tool cover -func=coverage.apicover.txt > coverage.apicover.func.txt
+	@$(BIN_DIR)/apicover -cover coverage.apicover.func.txt $$($(GO) list -f '{{.Dir}}' $(APICOVER_PKGS))
 
 cover-strict: ## Per-package line-coverage hard-fail over go/.cover-strict (ADR-0101 §11: `<pkg> <min%>` per line), read from the coverage.txt of test-integration; runs no test
 	$(GO) run ./cmd/evolve cover strict --root .
@@ -200,14 +200,14 @@ apicover-check: ## Enforce public API coverage from the successful integration r
 	@pkgs="$${APICOVER_PKGS}"; \
 	if [ -z "$$pkgs" ]; then pkgs=$$(sed '/^[[:space:]]*\#/d; /^[[:space:]]*$$/d' .apicover-enforce) || exit $$?; fi; \
 	if [ -z "$$pkgs" ]; then echo "apicover-enforce: no enforced packages — skipping"; exit 0; fi; \
-	$(GO) tool cover -func=$(COVER_PROFILE) > coverage.func.txt || exit $$?; \
+	$(GO) tool cover -func=$(COVER_PROFILE) > coverage.apicover.func.txt || exit $$?; \
 	$(GO) list -e -f '{{if .Dir}}{{.Dir}}{{else}}MISSING_PACKAGE{{end}}' $$pkgs > $(BIN_DIR)/apicover-dirs.txt || exit $$?; \
 	set --; while IFS= read -r dir; do \
 		test -d "$$dir" || { echo "apicover-check: missing package directory: $$dir" >&2; exit 1; }; \
 		set -- "$$@" "$$dir"; \
 	done < $(BIN_DIR)/apicover-dirs.txt; \
 	test "$$#" -gt 0 || { echo "apicover-check: no package directories" >&2; exit 1; }; \
-	$(BIN_DIR)/apicover -enforce -cover coverage.func.txt "$$@"
+	$(BIN_DIR)/apicover -enforce -cover coverage.apicover.func.txt "$$@"
 
 lint: ## go vet + format diff (read-only)
 	$(GO) vet $(PKG)
@@ -224,4 +224,4 @@ tidy: ## Normalize go.mod / go.sum
 	$(GO) mod verify
 
 clean: dist-clean ## Remove build outputs (incl. cross-compile artifacts)
-	rm -rf $(BIN_DIR) coverage.txt coverage.partial.txt coverage.apicover.txt coverage.html coverage.func.txt
+	rm -rf $(BIN_DIR) coverage.txt coverage.partial.txt coverage.apicover.txt coverage.apicover.func.txt coverage.html coverage.func.txt
