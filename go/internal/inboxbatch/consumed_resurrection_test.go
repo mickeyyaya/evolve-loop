@@ -198,3 +198,15 @@ func TestCopyOf_MatchesOnCreatedAtElseOnFileName(t *testing.T) {
 		}
 	}
 }
+
+func TestConsumedRecord_DescribeNamesWhenHowAndWhichRecord(t *testing.T) {
+	t.Parallel()
+	rec := ConsumedRecord{ID: "rolled", At: "2026-10-08T18:49:03Z", Via: "ship", File: "2026-09-30T11-07-44Z-rolled.json"}
+
+	got := rec.Describe()
+
+	want := "consumed at 2026-10-08T18:49:03Z via ship, record 2026-09-30T11-07-44Z-rolled.json"
+	if got != want {
+		t.Fatalf("Describe() = %q, want %q", got, want)
+	}
+}
