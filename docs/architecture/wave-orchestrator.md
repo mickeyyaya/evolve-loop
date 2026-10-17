@@ -142,6 +142,10 @@ When the admissible count is below the window, the census publishes `LOOP_ORCH_S
 
 The census never routes an item itself. ADR-0074 keeps the routing authority, and the four guards of F2.23 keep the protected files safe.
 
+**The directory rule (built, O2b, 2026-10-17).** A declared directory routes to the console only when it lies inside a protected fragment (ADR-0139 decision 5). `guards.IsProtectedScope` now gives the same answer as `guards.IsProtectedSurface` (`go/internal/guards/integrity_surface.go:180`). Thus `files: ["go/internal/core/"]` is lane work, and `go/internal/bridge/sub/` stays console work.
+
+A protected file spelling stays binding (`go/internal/inboxbatch/consoleroute.go:31-33`). Triage's breaker uses the same predicate, so it refuses a card that names a protected file and accepts the directory. On this tree, `evolve inbox rank --list ready` showed 1 item before the change and 9 after it.
+
 ## 5. Sizing
 
 ### Issue

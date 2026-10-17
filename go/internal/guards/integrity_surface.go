@@ -178,21 +178,7 @@ func IsProtectedSurface(path string) bool {
 }
 
 func IsProtectedScope(path string) bool {
-	if IsProtectedSurface(path) {
-		return true
-	}
-	p, ok := normalizeSurfacePath(path)
-	if !ok {
-		return false
-	}
-	if dir, isDir := directorySpelling(p); isDir {
-		for _, e := range ProtectedSurfaceManifest {
-			if fragmentInside(dir, e.Fragment) {
-				return true
-			}
-		}
-	}
-	return false
+	return IsProtectedSurface(path)
 }
 
 func normalizeSurfacePath(raw string) (string, bool) {
@@ -205,24 +191,4 @@ func normalizeSurfacePath(raw string) (string, bool) {
 		p += "/"
 	}
 	return strings.ToLower(p), true
-}
-
-func directorySpelling(p string) (string, bool) {
-	if strings.HasSuffix(p, "/") {
-		return p, true
-	}
-	last := p[strings.LastIndex(p, "/")+1:]
-	if last == "" || strings.Contains(last[1:], ".") {
-		return "", false
-	}
-	return p + "/", true
-}
-
-func fragmentInside(dir, fragment string) bool {
-	for i := 0; i < len(dir)-1; i++ {
-		if dir[i] == '/' && strings.HasPrefix(fragment, dir[i:]) {
-			return true
-		}
-	}
-	return false
 }
