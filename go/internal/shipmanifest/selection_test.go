@@ -156,8 +156,8 @@ func TestSelect_NothingSelectedAsksNoIgnoreProbe(t *testing.T) {
 	}
 }
 
-func TestReportFiles_AreTheBuildAndTDDReports(t *testing.T) {
-	if got := ReportFiles(); !slices.Equal(got, []string{"build-report.md", "test-report.md"}) {
+func TestReportFiles_AreTheBuildTDDAndAmplificationReports(t *testing.T) {
+	if got := ReportFiles(); !slices.Equal(got, []string{"build-report.md", "test-report.md", "test-amplification-report.md"}) {
 		t.Fatalf("ReportFiles = %v", got)
 	}
 }
@@ -221,5 +221,37 @@ func TestWithoutIgnored_DecodesQuotedProbeOutput(t *testing.T) {
 				t.Fatalf("kept %q (%v), want %q: an ignored path left in fails the add, an unignored one dropped under-stages the ship", kept, err, tc.want)
 			}
 		})
+	}
+}
+
+func TestSelect_AnAmplificationTestDeclaredOnlyInItsReportJoinsTheShipTree(t *testing.T) {
+	root := gitRepo(t)
+	writeUnder(t, root, "go/internal/policy/coverchanged.go", "package policy\n")
+	writeUnder(t, root, "go/internal/policy/coverchanged_config_amplify_test.go", "package policy\n")
+	ws := t.TempDir()
+	writeUnder(t, ws, "build-report.md", "Changed `go/internal/policy/coverchanged.go`.\n")
+	writeUnder(t, ws, "test-amplification-report.md", "File: `go/internal/policy/coverchanged_config_amplify_test.go`\n")
+	sel, err := Select(GitIn(context.Background(), root), root, ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"go/internal/policy/coverchanged.go", "go/internal/policy/coverchanged_config_amplify_test.go"}
+	if !slices.Equal(sel.Paths, want) {
+		t.Fatalf("selected %v, want %v", sel.Paths, want)
+	}
+}
+
+func TestSelect_AStrayFileNoReportNamesStaysOutOfTheShipTree(t *testing.T) {
+	root := gitRepo(t)
+	writeUnder(t, root, "go/internal/policy/coverchanged_config_amplify_test.go", "package policy\n")
+	writeUnder(t, root, "go/internal/policy/stray_test.go", "package policy\n")
+	ws := t.TempDir()
+	writeUnder(t, ws, "test-amplification-report.md", "File: `go/internal/policy/coverchanged_config_amplify_test.go`\n")
+	sel, err := Select(GitIn(context.Background(), root), root, ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"go/internal/policy/coverchanged_config_amplify_test.go"}; !slices.Equal(sel.Paths, want) {
+		t.Fatalf("selected %v, want only %v", sel.Paths, want)
 	}
 }

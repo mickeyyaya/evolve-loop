@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestNewDefault_HostPredicateExecutionBindsCompleteEvidence(t *testing.T) {
@@ -119,5 +120,37 @@ func TestBeginPredicateEvidence_UnstagedInputsRefuseAudit(t *testing.T) {
 	}
 	if string(before) != string(after) {
 		t.Fatal("audit adopted undeclared input into the real index")
+	}
+}
+
+func TestBeginPredicateEvidence_AmplificationTestDeclaredInItsReportIsNotUndeclared(t *testing.T) {
+	t.Parallel()
+	for _, declared := range []bool{true, false} {
+		root := gittest.Fixture(t).Dir
+		if err := os.WriteFile(filepath.Join(root, "source.go"), []byte("package source\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if out, err := exec.Command("git", "-C", root, "add", "source.go").CombinedOutput(); err != nil {
+			t.Fatalf("git add: %v %s", err, out)
+		}
+		if err := os.WriteFile(filepath.Join(root, "source_amplify_test.go"), []byte("package source\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ws := t.TempDir()
+		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("Added `source.go`.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if declared {
+			if err := os.WriteFile(filepath.Join(ws, "test-amplification-report.md"), []byte("File: `source_amplify_test.go`\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		_, err := beginPredicateEvidence(core.PhaseRequest{Cycle: 1, RunID: "run-1", AuditRound: 1, Worktree: root, Workspace: ws})
+		if declared && err != nil {
+			t.Fatalf("an amplification test its report declares joins the ship tree: %v", err)
+		}
+		if !declared && (err == nil || !strings.Contains(err.Error(), "source_amplify_test.go")) {
+			t.Fatalf("an undeclared amplification test must still refuse the audit: %v", err)
+		}
 	}
 }
