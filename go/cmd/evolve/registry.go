@@ -50,6 +50,8 @@ var commands = []subcommand{
 	{Name: "carryover", Summary: "Apply a reviewed keep/drop/cluster decisions file to state.json:carryoverTodos via the sanctioned locked RMW path (carryover apply-decisions)", Run: runCarryover},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
 	{Name: "checkpoint", Summary: "Protect uncommitted worktree work as refs/checkpoints snapshots, never touching the branch, index or tree: checkpoint save [--worktree DIR | --all] [--label T] [--push] | list [--worktree DIR] | restore <ref> --into DIR | prune [--landed] (each takes --json and --project-root P)", Run: runCheckpoint},
+	{Name: "treewalk", Summary: "Guard the test tiers against leaked files and empty directories: treewalk snapshot --root DIR --out FILE | treewalk check --root DIR --baseline FILE (exit 1 names each new path)", Run: runTreewalk},
+	{Name: "kb", Summary: "Query the read-only knowledge-base graph over cycle dossiers and inbox items: kb graph neighbors <node-id> [--hops N] | kb graph recurrences <fingerprint> (each takes --json and --project-root P)", Run: runKB},
 	{Name: "gc", Summary: "Release what finished cycles left behind: tmux sessions/sockets, orphan processes, worktrees, run dirs, go build cache (gc --project-root <dir> [--dry-run])", Run: runGC},
 	{Name: "failures", Summary: "Inspect and clear state.json:failedApproaches: failures list [--class C] [--json] | failures reset [--fingerprint F] | failures prune [--dry-run] (prune also drops expired carryoverTodos; reset and a real prune require --project-root)", Run: runFailures},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
@@ -122,7 +124,7 @@ var commands = []subcommand{
 	{Name: "practice", Summary: "CLI practice watch: watch [--dry-run] [--json] [--project-root P] reads each configured practice source (changelogs, prompting guides), compares it with its last snapshot and files one inbox research item per changed source (exit 1 on a bad policy, 10 on usage)", Run: runPracticeCommand},
 	{Name: "ratchet", Summary: "Function-size + raw-git-fixture ratchets over a module: check [size|rawgit] [--root DIR]", Run: runRatchet},
 	{Name: "cover", Summary: "Coverage gate over a change: changed --base <ref> [--profile <path>] [--json] [--root DIR] refuses every changed function below 100%; strict [--profile <path>] [--floors <path>] [--json] [--root DIR] refuses every package of go/.cover-strict below its floor", Run: runCover},
-	{Name: "code", Summary: "Read-only code index for phase agents: callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir] [--project-root P]; one hit per line as file:line, symbol, text; exit 1 no result, 2 index absent, 3 unsupported, 10 usage", Run: runCodeCommand},
+	{Name: "code", Summary: "Read-only code index for phase agents: callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir] [--project-root P]; one hit per line as file:line, symbol, text; exit 1 no result, 2 index absent, 3 unsupported, 10 usage; each call appends one record to the cycle workspace in a phase, else to the user cache (a write failure never changes the exit code); code usage [--since D] [--json] counts the calls by phase and command", Run: runCodeCommand},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }
 

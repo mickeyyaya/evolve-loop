@@ -12,6 +12,7 @@
 - [4a. The telemetry index catalog](#4a-the-telemetry-index-catalog)
 - [5. Decisions](#5-decisions)
 - [6. Components](#6-components)
+- [6a. Components after the first instrumented run (C6 to C14)](#6a-components-after-the-first-instrumented-run-c6-to-c14)
 - [7. Order](#7-order)
 - [8. Verification](#8-verification)
 - [9. Risks](#9-risks)
@@ -219,6 +220,81 @@ Each level keeps the indexes that explain its time. The last column says which d
 | C4 | D8 `cmd/evolve` serial chain | the AST parallel guard shows the moved tests as parallel | Sonnet |
 | C5 | D9 `bridge` injected clock | each dwell test passes with the fake clock in under 1 s | Sonnet |
 
+## 6a. Components after the first instrumented run (C6 to C14)
+
+On 2026-10-17 the operator asked: "Continue investigating the performance, latency, resource usage for ci pipeline and test cases". The C0b run 39031338517 gave the data (research F3.20 to F3.35). This section adds nine components, ranked by the wall time that they save on the critical path, then by CPU-seconds. PR #935 owns D14 and C5b, so the new ids start at D15 and C6.
+
+**Terms.** A *slot-second* is one second of one `-p` slot. A test binary holds its slot while it sleeps, so a sleep costs slot-seconds but no CPU. *Wall* is the time that a person waits.
+
+*Worked example (F3.26):* `GORACE` sleeps 1 s at the exit of each of 301 race binaries. That is 301 slot-seconds. macOS has 3 slots, so the sleep can add up to 301 / 3 ≈ 100 s to its test step.
+
+### The ranked components
+
+The savings are synthesis from the research ids in the last column. "mac" is the macOS 1.23 job, and "u23" is the ubuntu 1.23 job.
+
+| Rank | Id | Component | Measured target | Expected saving: wall | Expected saving: CPU-s | Red test first | Guarantee kept | Research |
+|--:|---|---|---|---|---|---|---|---|
+| 1 | C6 | D15: the e2e step runs only the `e2e`-tagged tests | mac e2e step 118–176 s; 188.9 of 247 test-seconds repeat the integration step | mac −110 s (176 → about 65 s), on the critical path before and after C2; u23 −15 to −25 s | mac about 150; u23 about 30 | a `ciparity` test: the `make -n test-e2e` command selects each test of an `e2e`-tagged file, and no test of a plain file | every `e2e`-tagged test runs on every OS. Every other `cmd/*` test still runs under `-race` in the integration step | F3.27 |
+| 2 | C7 | D16: `GORACE=atexit_sleep_ms=0` for each `-race` test run | 301 binaries × 1.0 s on each Go job; no race binary below 1.008 s | mac up to −100 s before C2, about −6 s after C2. u23 up to −75 s of slot time; its CPU is saturated, so less wall | 0; the local floor of each lane saves about 300 slot-seconds | a `ciparity` test: a race test binary with one empty test, run with the Makefile's environment, exits in under 0.5 s | the detector checks every access before the exit. Only a race in the last second after `main` returns can escape | F3.26, P4.9 |
+| 3 | C8 | D17: the deliverable read grace is a value that tests set | `deliverable` 40 s (mac 59 s) at CPU/wall 0.08; `phases/runner` 29 s (mac 32 s), with two tests of 8.2 s | u23 about −55 package-seconds; mac about −70; off the critical path today, on it after C2 for `phases/runner` users | about 0 | the two `ArtifactTimeout` tests pass in under 1 s; a missing-file read under the test value returns in under 50 ms | production keeps 500 ms. `grace_test` keeps one real-window test | F3.25 |
+| 4 | C9 | D18: one parse of the tree per test binary, one package of ASTs in memory at a time | `repocontract` 1,222 MB peak RSS and 2 full parses of 4,441 files; `cmd/evolve` ratchet and inbox scans | u23 about −20 to −30 package-seconds; mac about −40 | about 25 | a parse counter seam: each file parses once per binary. A heap test: `repocontract` scan peak heap < 400 MB | the scanners give the same findings: a golden run of the old and the new scanner on the real tree | F3.25, F3.28 |
+| 5 | C10 | D19: the `bridge` tick-loop tests reach their state in fewer ticks | `TransientDwell` Σ 102 s on main (167 s in the PR #935 run); the three pane-loss tests 600–1,200 ticks each, 20–27 s | u23 about −60 to −120 test-seconds in `bridge`, the second CPU hog; mac about −100 | about 60–100 | each test asserts its tick count through the fake sleep, and passes in under 2 s | each test asserts the same state changes. One test keeps the production thresholds (300 s and 1,200 s) | F3.25 |
+| 6 | C11 | D20: vet and gofmt run once per GOOS, not once per job | vet + fmt 37–59 s on mac and 38–51 s on u27 | mac −45 s on the critical path; u27 −10 s (gofmt only) | about 100 (assumption) | a workflow test: only ubuntu 1.23 runs gofmt; ubuntu runs `GOOS=darwin go vet ./...`; mac runs no vet | the darwin files are still type-checked and vetted. Go 1.27 keeps its own vet for new analyzers | F3.30 |
+| 7 | C12 | D21: the C1 report fixes B1 to B4 | the `limit` field is wrong for 303 u27 packages (B1) and 184 mac packages (B2) | 0; it makes the next decisions correct | 0 | fixture tests with the C0b numbers. A package window at 60% busy is not `cpu-saturation`. A 1 s binary with 0.011 s of CPU is `wait`. mac has 3 CPUs. `core` at 4× its floor is `contention` | the report never changes a run. Its JSON keeps every current field | F3.34 |
+| 8 | C13 | D22: the macOS sampler records CPU busy; a spawn counter counts the `git` and `go` children of each package | mac has no CPU samples; mac system CPU is 6.3× ubuntu | 0; it decides C14 and the `-p` question on macOS | about 1 per job | a sampler test on darwin: each record has `cpu_busy_pct` in 0–100. A shim test: one `git` call under package P adds one count to P | the sampler and the shim never change a test result or its exit code | F3.23, F3.35 |
+| 9 | C14 | D23: fewer `git` processes in the macOS-heavy tests, only if C2 keeps them on macOS | `core` 362 s with 310 s system CPU; `gc`, `explanationdocs`, `inboxstamps` at 7–11× ubuntu | up to −250 s on mac if C2 does not land; about 0 if it does, because these packages leave the macOS job | up to 400 | C13's counter shows fewer spawns per scenario, with the same assertions | each scenario still runs the real `git` path once per distinct shape | F3.22, F3.33 |
+
+**Two corrections to earlier components.**
+- **C5** assumes that the `bridge` dwell tests wait in real time (F3.8). The code shows a simulated loop with a fake sleep (F3.25), so an injected clock cannot shorten it. C10 replaces C5 for those tests.
+- **C4** must move seams and env writes into injected values. Seam swaps and env writes cause 171 s of the 238 s macOS serial chain of `cmd/evolve` (F3.29).
+
+**Combined effect (synthesis).** Before C2, C6 + C7 + C11 can cut the macOS job by about 4–4.5 min: 110 + up to 100 + 45 s. The run is then about 20 min on a slow day. After C2, C6 and C11 still apply to macOS, because macOS keeps the e2e tier. The ubuntu step loses CPU-seconds through C8, C9 and C10. On a saturated runner, those seconds become wall time.
+
+### C6: four approaches, scored
+
+The problem (F3.27): `go test -tags "e2e evolve_test_phases" ./cmd/... ./test/e2e/...` builds each `cmd/*` package with the e2e tag and then runs all of its tests. Only 28 top-level tests in `cmd/evolve` need the tag.
+
+- **A. A `-run` list from the tagged files.** A small Go command lists the `Test` functions in each file whose build line names `e2e`. `make test-e2e` passes them as one `-run` pattern per package. *Advantage:* no test moves, and a new e2e test joins the list by its build tag. *Limit:* a plain test with the name of an e2e test also runs, which costs only time.
+- **B. Move the e2e tests to their own package.** For example, `cmd/evolve/e2e` holds them, and the e2e step runs only that package. *Advantage:* the tag selects the package, so no list is needed. *Limit:* the tests use the internals of package `main`, so most of them must change.
+- **C. Run the e2e tests in the integration step.** Add `e2e` to the integration tags and remove the e2e step. *Advantage:* one compile and one run. *Limit:* the e2e tests then run under `-race` and `-cover`, which the e2e tier does not want (`go.yml` "e2e tier (no race …)"). The integration step on macOS also grows.
+- **D. Keep the double run.** *Advantage:* the non-e2e tests also pass without `-race` and with the `evolve_test_phases` tag. *Limit:* about 110 s on the critical path for one weak signal.
+
+Rejected without a score: a `//go:build !e2e` line on every plain test file. It touches about 1,000 files, and a new file without the line joins the e2e run again.
+
+| Criterion (weight) | A. `-run` list | B. own package | C. merge into integration | D. keep |
+|---|:-:|:-:|:-:|:-:|
+| Wall time saved (×3) | 5 (−110 s mac) | 5 (−110 s mac) | 3 (the e2e tests move into a longer step) | 1 |
+| Keeps all evidence, G3 (×3) | 4 (loses the no-race repeat) | 4 (the same) | 3 (no no-race e2e run) | 5 |
+| Effort and risk (×2) | 4 (one small command, one Makefile line) | 1 (moves 28 tests out of `main`) | 3 (timeouts and race cost of the e2e tests) | 5 |
+| Runner cost, G4 (×2) | 5 | 5 | 4 | 1 |
+| Helps local runs and the loop (×1) | 4 (`make test-e2e` is faster) | 4 | 2 | 1 |
+| **Weighted total (out of 55)** | **49** | **43** | **34** | **31** |
+
+In approach A, the `-run` pattern is anchored (`^(…)$`), so a plain test with the same name never matches. The C6 change also updates `internal/ciparity/makefile_integration_test.go`, which pins the e2e target.
+
+**Winner: A.** It saves the most for the least change, and its selection follows the build tag, so it cannot drift from the code. **Each alternative keeps a role.** B is the clean end state if the e2e tests are later rewritten against a public seam. C is the fallback if a future e2e test needs `-race`. D's no-race signal can come back as a weekly scheduled run if a defect ever appears only without `-race`.
+
+### Decisions D15 to D23
+
+| Id | Decision | Research id |
+|---|---|---|
+| D15 | `make test-e2e` runs only the tests of `e2e`-tagged files, through a `-run` list that a command builds from the build tags (C6, approach A). | F3.27 |
+| D16 | Each `-race` test recipe sets `GORACE=atexit_sleep_ms=0`, in CI and in the loop's floor. | F3.26, P4.9 |
+| D17 | `deliverable` reads its grace window from a value that tests can set. Production keeps 500 ms. | F3.25 |
+| D18 | The whole-tree scanners share one parse per test binary, and they release the ASTs of each package after its scan. | F3.25, F3.28 |
+| D19 | The `bridge` tick-loop tests set test-scoped thresholds, so each reaches its state in at most about 10 ticks. One test keeps the production thresholds. | F3.25 |
+| D20 | gofmt runs on ubuntu 1.23 only. vet runs on ubuntu 1.23 for both `GOOS=linux` and `GOOS=darwin`, and on ubuntu 1.27. macOS runs no vet. | F3.30 |
+| D21 | The C1 report decides `cpu-saturation` over the package's own time window. It skips the system-CPU rule below 0.5 s of CPU. It reads the CPU count per runner type. It adds the limit `contention` when the wall is more than 2× the floor. | F3.34 |
+| D22 | The darwin sampler reads CPU busy from one `iostat -w 1` child. The rusage wrapper exports `TESTRUSAGE_PKG`, and a `git`/`go` shim on `PATH` counts the spawns of each package. | F3.23, F3.35 |
+| D23 | C14 starts only if C2 keeps `core` or the other `git`-heavy packages on macOS, and only with C13's spawn counts. | F3.22, F3.33 |
+
+### Order of the new components
+
+1. **C12 and C13 first.** They measure, and they cost little. The rule of §7 applies: measure before you change.
+2. **C7, then C6, then C11.** C7 is one line. C6 and C11 save macOS wall now, and they still save it after C2.
+3. **C8, C10, C9.** They cut ubuntu CPU-seconds and package walls. Each re-measures with C1.
+4. **C14 only under D23.**
+
 ## 7. Order
 
 1. **C0, then C0b, then C1.** Measure before you change: time first, then resources, then the joined report. The history is also the input for any sharding later.
@@ -255,3 +331,5 @@ Each component is one PR, merged at a wave boundary. Each one follows the usual 
 - **Q1:** keep a weekly full macOS run, or a nightly one? Proposed: weekly, on main.
 - **Q2:** does Go 1.27 need the e2e tier, or only the unit and integration suite? Proposed: the suite only.
 - **Q3:** do the five `sandbox-exec`-only packages in F3.10 need macOS? Some name the binary only in a string. Proposed: keep them in the set until a test proves otherwise.
+- **Q4:** does `fetch-depth: 0` need the full history in all three Go jobs? Checkout takes 21–45 s per job (F3.30). Proposed: measure a blobless clone (`filter: blob:none`) before a change.
+- **Q5:** does the macOS runner gain from `-p 2` or `-p 4`? C13 must record its CPU first (F3.23).

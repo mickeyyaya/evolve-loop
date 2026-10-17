@@ -19,7 +19,7 @@ func TestTmuxBoot_DetachesThePaneShellFromTheRunServerBeforeTheLaunch(t *testing
 		case k == "unset TMUX TMUX_PANE":
 			unsetAt = i
 			unsets++
-		case strings.Contains(k, "claude --model"):
+		case strings.Contains(k, "claude --strict-mcp-config --model"):
 			launchAt = i
 		}
 	}

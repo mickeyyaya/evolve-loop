@@ -107,6 +107,8 @@ type Options struct {
 	Routing func() (Routing, error)
 
 	UsageEvidence func(driver string) string
+
+	MCPConfig MCPConfigPort
 }
 
 type resolved struct {
@@ -143,6 +145,8 @@ type resolved struct {
 	versionInventory func() map[string]string
 
 	phaseRoutingWarnings func() []string
+
+	mcpConfig MCPConfigPort
 
 	routing *routingOnce
 }
@@ -185,6 +189,7 @@ func resolve(opts Options) (resolved, error) {
 		versionInventory: opts.VersionInventory,
 
 		phaseRoutingWarnings: opts.PhaseRoutingWarnings,
+		mcpConfig:            defaultMCPConfigPort(opts.MCPConfig),
 		routing:              onceRouting(opts.Routing),
 	}
 	if o.stderr == nil {
@@ -319,6 +324,7 @@ func Run(opts Options) (Result, error) {
 		checkBridgeBoot(o, opts.UsageEvidence),
 		checkSandboxNestedFallback(o),
 		checkPhaseRoutingWarnings(o),
+		checkMCPConfig(o),
 		checkOverlayTierSelectors(o),
 		checkCLIRouting(o),
 	}

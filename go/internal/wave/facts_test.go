@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
@@ -53,9 +54,10 @@ func TestReadCycles_JoinsStateSignalsLandingAndDossiers(t *testing.T) {
 
 	got, warnings := wave.ReadCycles(p.root, 4, 9)
 
+	signalled := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 	want := []wave.Cycle{
-		{ID: 5, Phase: "build", QuotaPauses: 2},
-		{ID: 6, Phase: "retrospective", Verdict: "PASS", Shipped: true},
+		{ID: 5, Phase: "build", QuotaPauses: 2, StartedAt: signalled},
+		{ID: 6, Phase: "retrospective", Verdict: "PASS", Shipped: true, StartedAt: signalled, EndedAt: signalled},
 		{ID: 7, Verdict: "FAIL"},
 		{ID: 8},
 		{ID: 9, Verdict: "PASS", Shipped: true},

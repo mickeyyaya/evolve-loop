@@ -4,6 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
 func TestResolve_DefaultDriverKnownAsksTheBridgeRegistry(t *testing.T) {
@@ -41,5 +44,33 @@ func TestResolve_DefaultHostProbeHonorsTheProjectPolicyWorktreeBase(t *testing.T
 	}
 	if p.AutoConfig.WorktreeBase != base {
 		t.Errorf("WorktreeBase = %q (%s), want the policy override %q", p.AutoConfig.WorktreeBase, p.AutoConfig.WorktreeBaseReason, base)
+	}
+}
+
+func TestResolve_DefaultFactoryKnownAsksThePhaseRegistry(t *testing.T) {
+	t.Cleanup(registry.SnapshotForTest())
+	registry.Register("preflight-probe-phase", func(core.PhaseRequest) core.PhaseRunner { return nil })
+	o, err := resolve(Options{ProjectRoot: t.TempDir()})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	for name, want := range map[string]bool{"preflight-probe-phase": true, "": false, "no-such-phase": false} {
+		if got := o.factoryKnown(name); got != want {
+			t.Errorf("factoryKnown(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+func TestResolve_DefaultContractKnownAsksThePhaseContractTable(t *testing.T) {
+	o, err := resolve(Options{ProjectRoot: t.TempDir()})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	for name, want := range map[string]bool{"build": true, "audit": true, "": false, "no-such-phase": false} {
+		if got := o.contractKnown(name); got != want {
+			t.Errorf("contractKnown(%q) = %v, want %v", name, got, want)
+		}
 	}
 }
