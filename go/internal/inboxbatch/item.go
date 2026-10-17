@@ -19,6 +19,7 @@ import (
 type Item struct {
 	ID              string                     `json:"id"`
 	Title           string                     `json:"title"`
+	Summary         json.RawMessage            `json:"summary,omitempty"`
 	Weight          float64                    `json:"weight"`
 	Kind            string                     `json:"kind"`
 	Class           string                     `json:"class"`

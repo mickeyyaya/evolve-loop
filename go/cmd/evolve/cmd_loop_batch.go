@@ -52,7 +52,7 @@ func (b *loopBatchCoordinator) run() int {
 		fmt.Fprintf(stderr, "[loop] no --cycles: advisor-decided, completion-driven (stops when the backlog drains), safety cap=%d\n", effectiveMax)
 	}
 
-	fleetCfg := loadFleetConfig(cfg.EvolveDir)
+	fleetCfg := loadFleetConfig(cfg.EvolveDir, stderr, b.deps.Signals)
 	for _, w := range fleetCfg.Warnings {
 		fmt.Fprintf(stderr, "[loop] WARN: fleet: %s\n", w)
 	}

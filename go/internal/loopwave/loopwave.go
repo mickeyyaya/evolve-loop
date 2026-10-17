@@ -21,12 +21,16 @@ const (
 	CodeWaveDispatchFailed signalcenter.Code = "LOOP_WAVE_DISPATCH_FAILED"
 	CodeWaveEmptyPlan      signalcenter.Code = "LOOP_WAVE_EMPTY_PLAN"
 	CodeWaveAllLanesStale  signalcenter.Code = "LOOP_WAVE_ALL_LANES_STALE"
+	CodeOrchAdmitWait      signalcenter.Code = "LOOP_ORCH_ADMIT_WAIT"
+	CodeFleetPolicyInvalid signalcenter.Code = "LOOP_FLEET_POLICY_INVALID"
 )
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeMinWidthRepair, "the fleet shrank below its committed width and one isolated lane was dispatched instead (min-width repair)")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeWaveDispatchFailed, "a wave (fields.path=wave) or the min-width repair (path=repair) could not dispatch: the control-plane preflight refused (step=preflight — uncommitted control-plane edits in the main checkout), the triage plan could not be produced (step=plan — no prior triage decision and the inbox seed found fewer than 2 file-disjoint lanes, or the last-cycle read failed) or the plan could not be adapted into disjoint lanes (step=adapt); the batch falls back to the sequential path, the only unisolated execution mode; fields.error is the step's own error")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeWaveEmptyPlan, "the wave planned zero lanes and the batch falls back to sequential: cause=empty_triage_plan — fleet.count <= 1 so the one-lane repair guard is not met (the operator wanted one lane; fires whatever the dispatcher's own reason was); cause=empty_backlog — the guard was met but the one-lane repair found no disjoint candidate; fields.desired = fleet.count, realized = the wave-sized count")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeOrchAdmitWait, "the admission shadow (fleet.orchestrator.stage, ADR-0139 O3) found a planned todo whose package cell overlaps the cell of a todo ranked before it, so admission by cell holds it back; in shadow the event only records the hold and no lane changes; fields.todo, rank, cells, blocked_by, blocked_by_lane (the partition lane of the blocker, or none), stage")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeFleetPolicyInvalid, "the loop could not load .evolve/policy.json at batch start (unreadable, malformed, or a key the strict schema rejects such as a misspelt fleet.orchestrator field), so the fleet config fell back to its defaults and the loop runs sequential (count 1) until the file is fixed; the reason carries the load error; fields.path")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeWaveAllLanesStale, "every planned lane of the wave was stale at the last-moment freshness gate (consumed, or a declared dep still unmet) and the backlog refill found nothing, so the wave launched nothing — a shorter wave, never a doomed lane; the per-lane skips are fleet's own freshness-gate lines; fields.planned, skipped")
 }
 
@@ -52,11 +56,12 @@ type Ports struct {
 }
 
 type Engine struct {
-	roots   Roots
-	ports   Ports
-	stderr  io.Writer
-	signals func() *signalcenter.Center
-	goal    string
+	roots     Roots
+	ports     Ports
+	stderr    io.Writer
+	signals   func() *signalcenter.Center
+	goal      string
+	admission AdmissionFn
 }
 
 type Option func(*Engine)
@@ -108,9 +113,17 @@ func ShouldRunWave(fc policy.FleetConfig) bool {
 	return fc.Count > 1 && fc.PlanSource == "triage" && fc.Scheduling != "pool"
 }
 
-func LoadFleetConfig(evolveDir string) policy.FleetConfig {
-	pol, err := policy.Load(paths.PolicyPath(evolveDir))
+func LoadFleetConfig(evolveDir string, warn io.Writer, c *signalcenter.Center) policy.FleetConfig {
+	path := paths.PolicyPath(evolveDir)
+	pol, err := policy.Load(path)
 	if err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: fleet: .evolve/policy.json is not valid (%v); the loop runs sequential until it is fixed\n", err)
+		c.Emit(signalcenter.Event{
+			Module: signalcenter.ModuleLoop, Origin: "loopwave.LoadFleetConfig", Kind: signalcenter.KindLoopWarning,
+			Severity: signalcenter.SeverityWarn, Code: CodeFleetPolicyInvalid,
+			Reason: fmt.Sprintf("fleet: %s is not valid (%v); the loop runs sequential until it is fixed", path, err),
+			Fields: map[string]string{"path": path},
+		})
 		return policy.Policy{}.FleetConfig()
 	}
 	return pol.FleetConfig()
