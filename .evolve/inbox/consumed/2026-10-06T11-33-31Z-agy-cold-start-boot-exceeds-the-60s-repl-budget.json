@@ -22,5 +22,11 @@
   "root_cause": "The REPL boot wait is one fixed budget for every launch. It does not tell a cold first launch from a warm one, and the probes that run first (the boundary updater's doctor live, the preflight bridge-boot) have no retry. So a slow cold start becomes a false 'unsubscribed' skip or a preflight halt.",
   "summary": "Seen twice. In wave 62, preflight halted when agy's first boot never drew its REPL, and a live doctor boot passed a minute later. At the wave 67 boundary (2026-10-06), the boundary CLI updater's doctor-live probe of agy-tmux (the first agy launch since wave 66 ended) failed with rc=80 'REPL prompt never appeared after 60s', and the updater skipped agy as unsubscribed. Preflight's agy-claude-tmux boot 80 s later and its agy-tmux boot (same default model) both booted. So the first agy launch of a wave pays a cold-start cost (likely auth refresh or the model list fetch) that can exceed the fixed 60 s boot wait, while warm launches boot in a few seconds.",
   "title": "agy's first launch after an idle period can take longer than the 60 s REPL boot budget, so the first probe of a wave fails while the next launch boots",
-  "weight": 0.6
+  "weight": 0.6,
+  "consumed": {
+    "at": "2026-10-17T14:25:22Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DONE. 4ee64111f (v22.27.0) agy cold-start retry; manifest probe_boot_retries:1 in bridge/manifests/agy-tmux.json, bridge/manifest.go:67, probe_boot_retry.go:14; docs/incidents/agy-cold-start-boot-timeout-2026-10-06.md"
+  }
 }

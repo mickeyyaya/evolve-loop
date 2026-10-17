@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "The fresh-session retry carries a record",
+    "A bad record is skipped with a WARN",
+    "collect refuses an existing record unless forced"
+  ],
+  "created_at": "2026-10-10T00:11:03Z",
+  "files": [
+    "go/internal/bridge/engine.go",
+    "go/internal/attemptpostmortem/record.go",
+    "go/cmd/evolve/cmd_postmortem.go",
+    "go/internal/core/ports.go"
+  ],
+  "fix": "Fix (1) and (5) first. They change what a retry sees.",
+  "id": "attempt-postmortem-followups",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "W1 Go and architecture reviews, 2026-10-10",
+  "summary": "Non-blocking items from the W1 reviews, 2026-10-10: (1) Engine.freshSessionRetry (bridge/engine.go:487) replays the same prompt with no record. Write a record before the retry, or let the runner chain own the retry. (2) BridgeResponse has no DispatchID, so the record renders dispatch unknown. (3) evolve postmortem collect --attempt K silently overwrites an existing record. (4) NextNumber then Write can race for two dispatches of one phase name. (5) One invalid record makes ReadAll drop the whole section. Skip the bad record. (6) retro.go:159 and swarmrunner.go:271 call Launch outside dispatchPhaseAttempts, so they get no postmortem.",
+  "title": "Attempt postmortem follow-ups after the W1 wiring (ADR-0130)",
+  "weight": 0.4,
+  "consumed": {
+    "at": "2026-10-17T14:25:52Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DONE. PR #847 (31a55cfe3) + 14cc8411f: fresh_session_test.go, record.go:213 ReadAll returns BadRecord list, cmd_postmortem.go --force flag"
+  }
+}

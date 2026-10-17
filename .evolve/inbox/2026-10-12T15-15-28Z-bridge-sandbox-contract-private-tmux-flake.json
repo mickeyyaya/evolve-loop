@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "TestAgentSandboxContract/start_a_private_tmux_server_(-L)_and_run_a_window_on_its_own_pty passes 50 times under a loaded host (make test-integration running beside it)",
+    "The test waits for its private tmux server to be ready (a readiness probe, no sleep) before it runs the window, or it reports the real cause when the server never starts"
+  ],
+  "created_at": "2026-10-12T15:30:00Z",
+  "files": [
+    "go/internal/bridge/sandbox_contract_integration_test.go"
+  ],
+  "fix": "Find why the private server is gone when the window command runs (start race, a sandbox profile that denies the socket dir under load, or the server exiting with no session) and make the test wait for readiness on its own socket.",
+  "id": "bridge-sandbox-contract-private-tmux-flake",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "source": "make test-integration under load, 2026-10-12 (T12 lane floor and the gc step-deadline floor)",
+  "summary": "TestAgentSandboxContract fails under host load with: contract: allow; the profile refused it: exit status 1: \"no server running on /private/tmp/sbc-agent.../own/tmux-501/mine\". It failed in two separate floor runs on 2026-10-12 and passed on each rerun and alone. A floor that fails on it blocks lanes for a rerun.",
+  "title": "TestAgentSandboxContract: the private tmux server is not running when the window starts (load flake, seen twice)",
+  "weight": 0.5
+}

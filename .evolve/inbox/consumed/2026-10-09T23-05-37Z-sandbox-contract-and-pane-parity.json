@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "The contract table runs under real sandbox-exec",
+    "Pane parity fails on an environment-only red",
+    "CI runs the tmux tests on macOS with no skip"
+  ],
+  "created_at": "2026-10-09T23:05:37Z",
+  "files": [
+    "go/internal/adapters/sandbox",
+    "go/internal/bridge",
+    ".github/workflows/go.yml"
+  ],
+  "fix": "Build (a), (b) and (c) in one console lane after R1 (#838).",
+  "id": "sandbox-contract-and-pane-parity",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "operator, 2026-10-09",
+  "summary": "Operator request (2026-10-09): test inside the real sandbox, not a simulation. (a) One table-driven real sandbox-exec contract: each agent action with its expected allow or deny, plus every incident command as a permanent row, with a spec doc. (b) A pane-parity harness: run the tmux-dependent test packages through the real bridge boot path (pane, profile and pane env) and compare the result with the host run. A test that passes on the host and fails in the pane fails the gate. Also check the env contract (no TMUX or TMUX_PANE). (c) .github/workflows/go.yml runs make test-integration on macos-latest but installs no tmux, so the real-tmux and sandbox tests probably skip in CI. Install tmux and make that skip a CI failure.",
+  "title": "Sandbox capability contract and pane-parity tests, with CI that really runs tmux",
+  "weight": 0.7,
+  "consumed": {
+    "at": "2026-10-17T14:25:52Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DONE. PR #844 merge a874d6166 / d95bedd19: sandbox contract, pane-parity gate (bridge/pane_parity_integration_test.go), CI macos in .github/workflows/go.yml"
+  }
+}

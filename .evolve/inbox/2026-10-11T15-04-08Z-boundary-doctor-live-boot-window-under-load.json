@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A boundary under host load does not fail on a single slow REPL boot",
+    "A real boot failure still fails loudly with evidence"
+  ],
+  "created_at": "2026-10-11T15:04:07Z",
+  "files": [
+    "go/cmd/evolve/cmd_doctor_live.go",
+    "go/internal/bridge/driver_tmux_boot.go"
+  ],
+  "fix": "Make the boot window of the live check adaptive or config-driven (policy), and give the boundary one recovery rung: retry the live check once after a load-aware wait before it fails the boundary. Record the load and the boot time in the failure.",
+  "id": "boundary-doctor-live-boot-window-under-load",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "wave 90 launch, 2026-10-11",
+  "summary": "On 2026-10-11, evolve wave next failed two times at step 7 (evolve doctor live claude-tmux): REPL prompt never appeared after 60s, rc=80, after the auto-respond trust keys. The same check passed alone four times, also right after evolve gc. The failures came right after the make build step while 4 lanes ran test suites (load average up to 29). The third wave next passed. A fixed 60 s boot window turns host load into a boundary failure.",
+  "title": "The wave boundary fails its live claude check under host load (60 s REPL window)",
+  "weight": 0.4
+}
