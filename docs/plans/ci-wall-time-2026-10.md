@@ -222,6 +222,8 @@ Each level keeps the indexes that explain its time. The last column says which d
 | C5 | D9 `bridge` injected clock | each dwell test passes with the fake clock in under 1 s | Sonnet |
 | C5b | D14 the `bridge` self-match guard scans each line window once. **In progress (2026-10-17).** | a fixture file holds a planted pane for each rule. The fast guard and the old exhaustive guard give the same verdict for every rule | Sonnet |
 
+C0b status: built. `cmd/testrusage` and `cmd/hostsampler` are in `go/.cover-strict` and `go/.apicover-enforce` at 100%. `go.yml` runs both on the Go job and uploads `test-rusage.ndjson` and `runner-samples.ndjson` with the C0 artifacts.
+
 ## 6a. Components after the first instrumented run (C6 to C14)
 
 On 2026-10-17 the operator asked: "Continue investigating the performance, latency, resource usage for ci pipeline and test cases". The C0b run 39031338517 gave the data (research F3.20 to F3.35). This section adds nine components, ranked by the wall time that they save on the critical path, then by CPU-seconds. PR #935 owns D14 and C5b, so the new ids start at D15 and C6.
