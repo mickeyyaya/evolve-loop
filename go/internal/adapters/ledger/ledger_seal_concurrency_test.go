@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"testing"
 )
@@ -125,4 +126,47 @@ func TestAnchor_ConcurrentWithSeal_NoCorruptAnchor(t *testing.T) {
 		}
 	}
 	t.Errorf("ledger-anchor.json binds SHA %s to a line absent from the final chain — anchor corrupted by a concurrent seal", anchorSHA)
+}
+
+func TestSeal_TwoConcurrentSealsNeverAnchorTheSameSegment(t *testing.T) {
+	ctx := context.Background()
+	l, dir := seedLedger(t, 40)
+	other := New(dir)
+
+	var wg sync.WaitGroup
+	for _, led := range []*FileLedger{l, other} {
+		wg.Add(1)
+		go func(led *FileLedger) {
+			defer wg.Done()
+			if err := led.Seal(ctx, 5); err != nil {
+				t.Errorf("concurrent Seal: %v", err)
+			}
+		}(led)
+	}
+	wg.Wait()
+
+	segs, err := segmentFiles(filepath.Join(dir, segmentsDirName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := map[string]string{}
+	for _, seg := range segs {
+		lines, _, err := readSegment(seg)
+		if err != nil {
+			t.Fatalf("read %s: %v", seg, err)
+		}
+		for _, line := range lines {
+			sha := sha256Hex(line)
+			if prior, dup := owner[sha]; dup {
+				t.Fatalf("line %s sealed into both %s and %s", sha, prior, seg)
+			}
+			owner[sha] = seg
+		}
+	}
+	if err := l.Verify(ctx); err != nil {
+		t.Errorf("Verify after two concurrent seals: %v", err)
+	}
+	if err := l.VerifyDeep(ctx); err != nil {
+		t.Errorf("VerifyDeep after two concurrent seals: %v", err)
+	}
 }
