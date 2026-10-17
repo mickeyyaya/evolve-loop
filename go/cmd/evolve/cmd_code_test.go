@@ -352,6 +352,26 @@ func TestBuildCodeBackends_AnUnknownBackendNameFailsLoudly(t *testing.T) {
 	}
 }
 
+func TestBuildCodeBackends_GotypesServesCallersFromTheIndexBesideTheIndexDirAndTrailServesFind(t *testing.T) {
+	t.Parallel()
+	root := codePolicyRoot(t, map[string]string{"backends": `["gotypes", "trail"]`})
+	rec := &runRecord{}
+
+	set, err := buildCodeBackends(root, rec.run, nil)
+	if err != nil {
+		t.Fatalf("buildCodeBackends: %v", err)
+	}
+	_, callersErr := set.Search(context.Background(), codeindex.Request{Query: codeindex.QueryCallers, Arg: "a", Direction: codeindex.DirectionIn})
+	_, _ = set.Search(context.Background(), codeindex.Request{Query: codeindex.QueryFind, Arg: "x"})
+
+	if !errors.Is(callersErr, codeindex.ErrAbsent) || !strings.Contains(callersErr.Error(), "/abs/index-gotypes/index.gob") {
+		t.Errorf("callers err = %v, want ErrAbsent naming the gotypes index", callersErr)
+	}
+	if rec.name != "/abs/trail" {
+		t.Errorf("find ran %q, want the trail binary", rec.name)
+	}
+}
+
 func TestBuildCodeBackends_ABadPolicyFileFailsLoudly(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

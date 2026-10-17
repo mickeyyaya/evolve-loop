@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/codeindex/gotypes"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/codeindex/trail"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -244,6 +245,9 @@ func loadCodeIndexLocation(projectRoot string) (codeIndexLocation, error) {
 
 func newCodeBackends(loc codeIndexLocation, run sysexec.RunFunc, env []string) (codeindex.Backends, error) {
 	factories := map[string]codeindex.Factory{
+		"gotypes": func() (codeindex.Backend, error) {
+			return gotypes.New(gotypes.IndexPath(indexDir)), nil
+		},
 		"trail": func() (codeindex.Backend, error) {
 			return trail.New(trail.Config{Bin: loc.trailBin, IndexDir: loc.indexDir, Env: env, Run: run}), nil
 		},

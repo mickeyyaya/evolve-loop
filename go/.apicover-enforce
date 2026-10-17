@@ -778,3 +778,5 @@
 # orchestrator — the rolling pool under the orchestrator and the lane lease (ADR-0139 O4, O5): admission by cell for each free slot, one deadline timer over a heap, and the stop through the launch context only.
 ./internal/orchestrator
 ./internal/acspathscan
+# gotypes — the type-checked Go index behind codeindex.Backend for callers and api, standard library only (ADR-0140, plan G1).
+./internal/adapters/codeindex/gotypes
