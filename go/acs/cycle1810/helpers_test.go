@@ -213,7 +213,7 @@ func newHub(t *testing.T) hubFixture {
 	seed.Git("push", "-q", "origin", "main")
 	root := t.TempDir()
 	store := filepath.Join(root, ".repo.git")
-	seed.Git("clone", "-q", "--bare", origin.Dir, store)
+	seed.CloneBare(origin.Dir, store)
 	for _, kv := range append(gittest.MaintenanceConfig(), [2]string{"user.name", "u"}, [2]string{"user.email", "u@example.com"}) {
 		gitIn(t, store, "config", kv[0], kv[1])
 	}
