@@ -149,8 +149,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		if next != PhaseBuild {
 			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)
 		}
-		retryHooks := retryOpts{quotaExhausted: allFamiliesQuotaExhausted, optionalInfraSkip: o.optionalInfraSkip}
-		phaseBaseline, resp, attempts, err := dispatch.snapshotThenDispatch(next, phaseReq, retryHooks)
+		phaseBaseline, resp, attempts, err := o.resumeDispatch(dispatch, next, phaseReq, dispatch.resumeDispatchRetryOpts())
 		pauseOnQuotaWall := func() {
 			dispatch.result, dispatch.phaseTimings = result, phaseTimings
 			err = dispatch.pauseForQuota(next, resp, attempts, err)

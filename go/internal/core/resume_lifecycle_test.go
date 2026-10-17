@@ -8,6 +8,7 @@ import (
 	"errors"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"os"
 	"path/filepath"
@@ -403,5 +404,64 @@ func TestResumeLifecycle_PausedAllocatedCycleUsesHostLeaseIdentity(t *testing.T)
 	}
 	if got.Cycle != 7 || st.state.LastCycleNumber != 7 || st.state.LastAllocatedCycleNumber != 7 {
 		t.Fatalf("resume changed allocated identity: %+v %+v", got, st.state)
+	}
+}
+
+func TestResumeLifecycle_PostShipObserverFailureDegradesLikeFreshPath(t *testing.T) {
+	t.Parallel()
+
+	o, st, req, rp := resumedLifecycleFixture(t)
+	cat, warnings := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "memo", Optional: true, After: "ship"}})
+	if len(warnings) > 0 {
+		t.Fatalf("catalog merge: %v", warnings)
+	}
+	WithCatalog(cat)(o)
+	o.retryConfig.PhaseMaxAttempts = 1
+	o.runners[Phase("memo")] = &fakeRunner{name: "memo", failErr: errors.New("memo tier/envelope policy error"), failUntil: 99}
+	st.cycleState.CompletedPhases = []string{"scout", "triage", "build", "audit", "ship"}
+	st.cycleState.Shipped = true
+	rp.Phase = "memo"
+
+	got, err := o.RunCycleFromPhase(context.Background(), req, rp)
+	if err != nil {
+		t.Fatalf("a shipped resume must degrade a failed best-effort observer, got abort: %v (result %+v)", err, got)
+	}
+	if got.FinalVerdict == VerdictFAIL {
+		t.Fatalf("shipped resume FinalVerdict = FAIL after observer skip: %+v", got)
+	}
+}
+
+func TestResumeLifecycle_NonCanonicalVerdictFromDispatchAbortsAndRecords(t *testing.T) {
+	t.Parallel()
+
+	o, _, req, rp := resumedLifecycleFixture(t)
+	o.resumeDispatch = func(_ *cycleRun, next Phase, _ PhaseRequest, _ retryOpts) (map[string]bool, PhaseResponse, int, error) {
+		return nil, PhaseResponse{Phase: string(next), Verdict: "BOGUS"}, 1, nil
+	}
+
+	got, err := o.RunCycleFromPhase(context.Background(), req, rp)
+	if err == nil || !strings.Contains(err.Error(), `phase audit returned non-canonical verdict "BOGUS"`) {
+		t.Fatalf("a resumed phase returning a non-canonical verdict with a nil error must abort with the guard message: result=%+v err=%v", got, err)
+	}
+	if got.FinalVerdict != VerdictFAIL {
+		t.Errorf("FinalVerdict = %q, want %q", got.FinalVerdict, VerdictFAIL)
+	}
+	if len(got.PhasesRun) == 0 || got.PhasesRun[len(got.PhasesRun)-1] != PhaseAudit {
+		t.Errorf("the guard must record the audit phase outcome before returning, PhasesRun = %v", got.PhasesRun)
+	}
+}
+
+func TestResumeLifecycle_NonCanonicalVerdictAborts(t *testing.T) {
+	t.Parallel()
+
+	o, _, req, rp := resumedLifecycleFixture(t)
+	o.runners[PhaseAudit] = &fakeRunner{name: "audit", verdict: "BOGUS"}
+
+	got, err := o.RunCycleFromPhase(context.Background(), req, rp)
+	if err == nil || !strings.Contains(err.Error(), "non-canonical verdict") {
+		t.Fatalf("a resumed phase returning a non-canonical verdict must abort: result=%+v err=%v", got, err)
+	}
+	if got.FinalVerdict != VerdictFAIL {
+		t.Errorf("FinalVerdict = %q, want %q", got.FinalVerdict, VerdictFAIL)
 	}
 }
