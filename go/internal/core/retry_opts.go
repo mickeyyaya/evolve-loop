@@ -138,3 +138,10 @@ func (cr *cycleRun) recordPhaseSkip(phase Phase, cause error, kind, msg string) 
 	return PhaseResponse{Phase: string(phase), Verdict: VerdictSKIPPED,
 		ArtifactsDir: cr.cs.WorkspacePath, Diagnostics: []Diagnostic{{Severity: "warn", Message: msg}}}
 }
+
+func (cr *cycleRun) resumeDispatchRetryOpts() retryOpts {
+	opts := cr.mainDispatchRetryOpts()
+	opts.backfill = nil
+	opts.shipRecovery = nil
+	return opts
+}

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"reflect"
 	"sort"
 	"testing"
@@ -131,5 +132,45 @@ func TestDispatchRunnerWithRetry_DelegatesToTheSharedRetryCore(t *testing.T) {
 	if wAttempts != cAttempts {
 		t.Errorf("attempts = wrapper %d / shared-core %d — dispatchRunnerWithRetry must DELEGATE "+
 			"to retryPhaseRunner, not keep a second hand-maintained loop", wAttempts, cAttempts)
+	}
+}
+
+var resumeDivergentRetryHooks = map[string]bool{
+	"backfill":     true,
+	"shipRecovery": true,
+}
+
+func TestResumeDispatchRetryOpts_MatchesMainDispatchExceptDocumentedDivergence(t *testing.T) {
+	t.Parallel()
+
+	cr := retryOptsCycleRun(t)
+	main := enabledRetryHooks(t, cr.mainDispatchRetryOpts())
+	resume := enabledRetryHooks(t, cr.resumeDispatchRetryOpts())
+
+	for _, hook := range canonicalRetryHooks {
+		want := main[hook] && !resumeDivergentRetryHooks[hook]
+		if resume[hook] != want {
+			t.Errorf("resume hook %q enabled=%v, want %v — a hook wired on the fresh path must be "+
+				"wired on resume too unless it is listed in resumeDivergentRetryHooks", hook, resume[hook], want)
+		}
+	}
+}
+
+func TestResumeDispatchRetryOpts_PostShipObserverSkipFollowsTheCheckpointLatch(t *testing.T) {
+	t.Parallel()
+
+	runner := &alwaysFailRunner{name: "memo", err: errors.New("memo tier/envelope policy error")}
+	o := retryParityOrchestrator(t, runner, "memo", phasespec.PhaseSpec{Optional: true, After: "ship"})
+
+	shipped := retryParityCycleRun(o, t)
+	shipped.cs.Shipped = true
+	resp, _, err := shipped.retryPhaseRunner(Phase("memo"), PhaseRequest{}, shipped.resumeDispatchRetryOpts())
+	if err != nil || resp.Verdict != VerdictSKIPPED {
+		t.Fatalf("shipped resume: verdict=%q err=%v, want SKIPPED and nil error", resp.Verdict, err)
+	}
+
+	unshipped := retryParityCycleRun(o, t)
+	if _, _, err := unshipped.retryPhaseRunner(Phase("memo"), PhaseRequest{}, unshipped.resumeDispatchRetryOpts()); err == nil {
+		t.Fatal("an unshipped resume must keep a memo failure fatal")
 	}
 }

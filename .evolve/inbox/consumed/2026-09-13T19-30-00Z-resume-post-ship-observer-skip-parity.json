@@ -17,5 +17,11 @@
   ],
   "created_at": "2026-09-13T19:30:00Z",
   "priority_class": "stability",
-  "priority_rationale": "inbox review 2026-09-27: A resumed cycle that has already shipped aborts abnormally on a best-effort memo failure. It is latent but more reachable now that capacity walls pause and resume, and the fix is one hook plus a parity test."
+  "priority_rationale": "inbox review 2026-09-27: A resumed cycle that has already shipped aborts abnormally on a best-effort memo failure. It is latent but more reachable now that capacity walls pause and resume, and the fix is one hook plus a parity test.",
+  "consumed": {
+    "at": "2026-10-17T18:46:42Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Resume loop now builds its retry hooks from the reference set via resumeDispatchRetryOpts (minus backfill and shipRecovery), so postShipObserverSkip degrades a post-ship observer failure on resume; parity unit test plus integration resume test."
+  }
 }
