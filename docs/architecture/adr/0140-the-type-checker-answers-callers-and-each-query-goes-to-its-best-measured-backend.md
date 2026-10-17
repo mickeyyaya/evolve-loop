@@ -1,6 +1,6 @@
 # ADR-0140: The type checker answers callers, and each query goes to its best measured backend
 
-- **Status:** Proposed (2026-10-17).
+- **Status:** Accepted (2026-10-17, the operator approved the design).
 - **Plan:** [code-index-backends-2026-10](../../plans/code-index-backends-2026-10.md). **Research:** [code-index-backends-2026-10](../../research/code-index-backends-2026-10.md). **Design:** [code-index-cli](../code-index-cli.md), section "Backends and the benchmark".
 - **Relates to:**
   - [ADR-0138](0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md): this ADR fills the backend set that ADR-0138 decisions 2 and 3 opened. It reverses one rejected option of ADR-0138, the native Go index, because F2.13 removes the reason ("it adds a library to `go.mod`").

@@ -1,6 +1,6 @@
 # Plan: the type checker answers `callers`, and `evolve code bench` picks the backend of each query by measure
 
-- **Status:** proposed, 2026-10-17.
+- **Status:** accepted, 2026-10-17 (the operator approved it).
 - **Research:** [code-index-backends-2026-10](../research/code-index-backends-2026-10.md). **Design:** [code-index-cli](../architecture/code-index-cli.md), section "Backends and the benchmark". **Decision:** [ADR-0140](../architecture/adr/0140-the-type-checker-answers-callers-and-each-query-goes-to-its-best-measured-backend.md).
 - **Extends:** [code-index-cli-2026-10](code-index-cli-2026-10.md) (components K1 to K5). This plan does not change K1 to K5.
 - **Decision numbers:** D1 to D11 of this plan are decisions 1 to 11 of ADR-0140, with the same numbers.
