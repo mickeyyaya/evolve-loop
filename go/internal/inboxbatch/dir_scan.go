@@ -42,9 +42,26 @@ func ScanDir(dir string) (DirScan, error) {
 			scan = scan.withFile(dir, e.Name())
 		}
 	}
+	scan = scan.withoutResurrected(ConsumedRecords(dir))
 	sort.SliceStable(scan.Items, func(i, j int) bool { return scan.Items[i].ID < scan.Items[j].ID })
 	scan.Warnings = append(scan.Warnings, duplicateIDWarnings(scan.Items)...)
 	return scan, nil
+}
+
+func (s DirScan) withoutResurrected(consumed map[string][]ConsumedRecord) DirScan {
+	if len(consumed) == 0 {
+		return s
+	}
+	var kept []Item
+	for _, it := range s.Items {
+		if rec, ok := CopyOf(consumed[it.ID], it.CreatedAt, it.Path); ok {
+			s.Warnings = append(s.Warnings, resurrectedWarning(it.Path, rec))
+			continue
+		}
+		kept = append(kept, it)
+	}
+	s.Items = kept
+	return s
 }
 
 func (s DirScan) withFile(dir, name string) DirScan {

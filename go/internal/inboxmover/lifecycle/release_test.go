@@ -363,3 +363,44 @@ func TestShouldQuarantine_PureDecision(t *testing.T) {
 		t.Error("ceiling > 0 && !systemLevel && count >= ceiling")
 	}
 }
+
+func TestMover_RecoverOrphans_SkipsOnlyACopyOfARetiredItem(t *testing.T) {
+	inbox := newInbox(t)
+	writeItem(t, procPath(inbox, 3, "a.json"), `{"id":"done","created_at":"T1"}`)
+	writeItem(t, procPath(inbox, 3, "b.json"), `{"id":"done","created_at":"T2"}`)
+	writeItem(t, procPath(inbox, 3, "c.json"), `{"id":"live"}`)
+	writeItem(t, filepath.Join(inbox, "consumed", "done.json"), `{"id":"done","created_at":"T1","consumed":{"at":"2026-10-08T18:49:03Z","via":"ship"}}`)
+	var stderr strings.Builder
+	m := New(inbox, nil, WithStderr(&stderr), WithActiveCycle(func() (string, error) { return "99", nil }))
+	res, err := m.RecoverOrphans()
+	if err != nil || res.Recovered != 2 {
+		t.Fatalf("res = %+v, err = %v", res, err)
+	}
+	if _, err := os.Stat(procPath(inbox, 3, "a.json")); err != nil {
+		t.Errorf("the exact copy stays in processing/ for the operator: %v", err)
+	}
+	for _, name := range []string{"b.json", "c.json"} {
+		if _, err := os.Stat(filepath.Join(inbox, name)); err != nil {
+			t.Errorf("%s is a new occurrence and recovers: %v", name, err)
+		}
+	}
+	for _, frag := range []string{"a.json", "done", "2026-10-08T18:49:03Z", "ship", "done.json"} {
+		if !strings.Contains(stderr.String(), frag) {
+			t.Errorf("stderr lacks %q: %s", frag, stderr.String())
+		}
+	}
+}
+
+func TestReadCreatedAt_IsEmptyForAnUnreadableOrMalformedClaim(t *testing.T) {
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.json")
+	writeItem(t, bad, `{not json`)
+	if err := os.Symlink(filepath.Join(dir, "missing"), filepath.Join(dir, "dangling.json")); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{bad, filepath.Join(dir, "dangling.json")} {
+		if got := readCreatedAt(p); got != "" {
+			t.Errorf("readCreatedAt(%s) = %q", p, got)
+		}
+	}
+}
