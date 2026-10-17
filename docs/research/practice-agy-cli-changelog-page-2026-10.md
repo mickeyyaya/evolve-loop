@@ -1,6 +1,6 @@
 # Practice change in agy: changelog page analysis and persona review (research, 2026-10)
 
-> This document reviews the `agy-cli-changelog-page` updates for versions `v2.23.0`, `v2.23.1`, and `v2.24.0` under [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
+> This document reviews the `agy-cli-changelog-page` updates for versions `v1.4.0`, `v2.23.0`, `v2.23.1`, and `v2.24.0` under [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
 
 Date: 2026-10-17. Method: read the `agy-cli-changelog-page` source, parse the text as untrusted data, and evaluate every core persona against ADR-0133.
 
@@ -9,9 +9,16 @@ Date: 2026-10-17. Method: read the `agy-cli-changelog-page` source, parse the te
 The practice watch detected updates from the source `https://antigravity.google/docs/changelog?tab=cli`.
 The text from this page is third-party data.
 The loop treats the text as untrusted data and never follows it as prompt instructions.
-The updates cover release v2.23.0, release v2.23.1, and release v2.24.0.
+The updates cover release v1.4.0, release v2.23.0, release v2.23.1, and release v2.24.0.
 
 ## 2. Changelog analysis as data
+
+### Version v1.4.0
+The practice watch detected the `v1.4.0` release label in the `agy-cli-changelog-page` source.
+The upstream page includes the label in the version list only.
+The page provides no release notes and no changelog entries for this version.
+The loop treats the version list item as untrusted data.
+This entry introduces no prompt features or tool modifications.
 
 ### Version v2.23.0
 The release adds a Permissions picker to the message box.
@@ -48,7 +55,7 @@ Decision D7 states that prompt diet trims one persona at a time.
 Decision D8 requires measured baseline data across 10 cycles before and after each diet change.
 
 Milestone M2 records the baseline data first.
-The v2.23.0, v2.23.1, and v2.24.0 updates do not alter this requirement.
+The v1.4.0, v2.23.0, v2.23.1, and v2.24.0 updates do not alter this requirement.
 Therefore, no core persona changes in this cycle.
 
 ### evolve-scout
@@ -56,21 +63,27 @@ The `evolve-scout` persona requires no change in this cycle.
 The scout phase finds tasks and writes specifications.
 The CLI host manages permissions presets and subagent row status natively.
 The scout prompt needs no added rules for these CLI features.
+
 The v2.24.0 side panel and model selection features do not alter scout tasks.
+The v1.4.0 label in the version list provides no release text for scout.
 The scout persona does not change.
 
 ### evolve-triage
 The `evolve-triage` persona requires no change in this cycle.
 Triage selects tasks based on deterministic policy rules.
 CLI updates do not change triage routing rules or task priority.
+
 The v2.24.0 conversation organization and model picker options do not affect policy triage.
+The v1.4.0 label provides no routing rules or task priority updates.
 The triage persona does not change.
 
 ### evolve-tdd-engineer
 The `evolve-tdd-engineer` persona requires no change in this cycle.
 The TDD phase writes red tests and predicate suites.
 CLI updates do not change test authoring contracts or assertion requirements.
+
 The v2.24.0 compaction and media fixes do not alter predicate generation.
+The v1.4.0 label includes no test contract changes or new requirements.
 The tdd engineer persona does not change.
 
 ### evolve-builder
@@ -78,21 +91,27 @@ The `evolve-builder` persona requires no change in this cycle.
 Builder is the designated first diet candidate under milestone M3.
 Under ADR-0133, diet changes require measured baseline data across 10 cycles under milestone M2 first.
 Prompt changes must wait for milestone M2 baseline data.
+
 The v2.24.0 release introduces features that the CLI runtime handles without prompt additions.
+The v1.4.0 label contains no release notes and needs no prompt changes.
 Therefore, the builder persona does not change in this cycle.
 
 ### evolve-auditor
 The `evolve-auditor` persona requires no change in this cycle.
 The auditor evaluates deterministic test exit codes and binary verdicts.
 CLI updates do not change auditor gates or report structures.
+
 The v2.24.0 permission dialog adjustments and model list updates do not alter audit criteria.
+The v1.4.0 label adds no gates and does not alter audit criteria.
 The auditor persona does not change.
 
 ### evolve-retrospective
 The `evolve-retrospective` persona requires no change in this cycle.
 The retrospective phase extracts lessons and updates instincts off the critical path.
 CLI updates do not affect retrospective steps.
+
 The v2.24.0 release features do not change retrospective analysis or lesson extraction.
+The v1.4.0 label does not affect retrospective analysis or lesson extraction.
 The retrospective persona does not change.
 
 ## 4. Conclusion
@@ -100,5 +119,6 @@ The retrospective persona does not change.
 The agy CLI updates improve permissions control and subagent status display.
 The v2.23.1 release resolves the license picker dialog fault and notes Gemini 4 Argon availability.
 The v2.24.0 release adds side panel controls, conversation compaction, and model selection.
+The v1.4.0 label adds no release notes to the changelog page.
 No persona file changes in this cycle.
 Prompt diet changes must follow ADR-0133 with a measured baseline over 10 cycles in future work.
