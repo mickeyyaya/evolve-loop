@@ -769,3 +769,7 @@
 ./internal/lanebudget
 # admission — admission by package cell, with the hub cell at capacity 1 (ADR-0139 O3, ADR-0134 S14): the conflict rule, the module graph and the hub set.
 ./internal/admission
+
+# CI telemetry commands (C0b): no exported API beyond Record/Sample/Counters, all named by tests.
+./cmd/testrusage
+./cmd/hostsampler

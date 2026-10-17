@@ -113,10 +113,14 @@ test-component: ## Component tier: several internal packages wired against temp 
 
 TEST_TIMEOUT ?= 20m
 TEST_JSON ?=
-INTEGRATION_TEST = $(GO) test -race -count=1 -timeout $(TEST_TIMEOUT) -tags integration -coverprofile=coverage.partial.txt
+TEST_RUSAGE ?=
+RUSAGE_EXEC = $(if $(strip $(TEST_RUSAGE)),-exec $(abspath $(BIN_DIR))/testrusage,)
+BUILD_RUSAGE = if [ -n "$(TEST_RUSAGE)" ]; then $(GO) build -o $(BIN_DIR)/testrusage ./cmd/testrusage || exit $$?; fi
+INTEGRATION_TEST = $(GO) test $(RUSAGE_EXEC) -race -count=1 -timeout $(TEST_TIMEOUT) -tags integration -coverprofile=coverage.partial.txt
 
-test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run; TEST_TIMEOUT=20m bounds each package; TEST_JSON=<file> also writes the go test -json stream while the console keeps the plain text
+test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run; TEST_TIMEOUT=20m bounds each package; TEST_JSON=<file> also writes the go test -json stream while the console keeps the plain text; TEST_RUSAGE=1 runs every test binary through bin/testrusage (appends to TESTRUSAGE_OUT)
 	@rm -f coverage.txt coverage.partial.txt; \
+	$(BUILD_RUSAGE); \
 	pkgs=$$($(GO) list -tags integration ./...) || exit $$?; \
 	pkgs=$$(printf '%s\n' "$$pkgs" | grep -v '/acs/') || exit $$?; \
 	if [ -n "$(TEST_JSON)" ]; then \
@@ -129,10 +133,11 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 	mv coverage.partial.txt coverage.txt
 
 E2E_JSON ?=
-E2E_TEST = $(GO) test -count=1 -timeout 45m -tags "e2e evolve_test_phases"
+E2E_TEST = $(GO) test $(RUSAGE_EXEC) -count=1 -timeout 45m -tags "e2e evolve_test_phases"
 E2E_PKGS = ./cmd/... ./test/e2e/...
 
-test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in; E2E_JSON=<file> also writes the go test -json stream while the console keeps the plain text
+test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in; E2E_JSON=<file> also writes the go test -json stream while the console keeps the plain text; TEST_RUSAGE=1 runs every test binary through bin/testrusage (appends to TESTRUSAGE_OUT)
+	@$(BUILD_RUSAGE)
 ifneq ($(strip $(E2E_JSON)),)
 	@$(GO) build -o $(BIN_DIR)/testlatency ./cmd/testlatency || exit $$?; \
 	status=$$( { { $(E2E_TEST) -json $(E2E_PKGS); echo $$? >&3; } | tee "$(E2E_JSON)" | $(BIN_DIR)/testlatency -render >&2; } 3>&1 ); \

@@ -69,3 +69,5 @@
 ./internal/wavemeasure 100
 ./internal/lanebudget 100
 ./internal/admission 100
+./cmd/testrusage 100
+./cmd/hostsampler 100
