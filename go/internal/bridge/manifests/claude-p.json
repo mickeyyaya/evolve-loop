@@ -11,7 +11,7 @@
   },
   "prompt_marker": null,
   "default_model": "haiku",
-  "default_args": [],
+  "default_args": ["--strict-mcp-config"],
   "params": {
     "effort": {
       "channel": "flag",

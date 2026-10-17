@@ -27,7 +27,7 @@ func TestLeakRecoverablePhase_ExcludesPhasesWithoutAnActiveWorktree(t *testing.T
 func TestWorktreePhase_UnchangedByRecoveryDecoupling(t *testing.T) {
 	t.Parallel()
 
-	mustBeTrue := []Phase{PhaseTDD, PhaseBuild}
+	mustBeTrue := []Phase{PhaseTDD, PhaseBuild, Phase("test-amplification")}
 	for _, p := range mustBeTrue {
 		if !WorktreePhase(p) {
 			t.Errorf("WorktreePhase(%q) = false, want true", p)
@@ -37,7 +37,7 @@ func TestWorktreePhase_UnchangedByRecoveryDecoupling(t *testing.T) {
 		PhaseShip, PhaseRetro, PhaseEnd, PhaseStart, PhaseIntent}
 	for _, p := range mustBeFalse {
 		if WorktreePhase(p) {
-			t.Errorf("WorktreePhase(%q) = true, want false (role-gate write-allowance must stay tdd/build only)", p)
+			t.Errorf("WorktreePhase(%q) = true, want false (role-gate write-allowance must stay the source-writing phases only)", p)
 		}
 	}
 }

@@ -23,7 +23,8 @@
   "prompt_marker": "❯",
   "transient_regex": "(?i)(api error:\\s*5\\d{2}\\b|server-side issue,? usually temporary)",
   "default_model": "haiku",
-  "default_args": [],
+  "default_args": ["--strict-mcp-config"],
+  "mcp_config_files": [".mcp.json"],
   "default_env": {
     "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false"
   },

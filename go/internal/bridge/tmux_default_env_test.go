@@ -36,7 +36,7 @@ func TestTmuxBoot_ExportsTheManifestEnvBeforeTheLaunch(t *testing.T) {
 		case k == promptSuggestionExport:
 			exportAt = i
 			exports++
-		case strings.Contains(k, "claude --model"):
+		case strings.Contains(k, "claude --strict-mcp-config --model"):
 			launchAt = i
 		}
 	}
