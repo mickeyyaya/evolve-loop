@@ -757,5 +757,7 @@
 ./internal/codeindex
 # codeindextest — the fake backend and the conformance suite that every codeindex backend passes.
 ./internal/codeindex/codeindextest
+# usagelog - the append-only record of each evolve code call and its summary by phase (plan K3, D6).
+./internal/codeindex/usagelog
 # trail — the one adapter that runs the trail-code binary behind codeindex.Backend (plan K1, D3, D4).
 ./internal/adapters/codeindex/trail
