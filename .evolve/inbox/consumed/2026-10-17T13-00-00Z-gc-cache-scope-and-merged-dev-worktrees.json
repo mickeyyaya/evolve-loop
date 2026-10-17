@@ -1,0 +1,46 @@
+{
+  "acceptance": [
+    "`evolve gc --only cache --project-root P` trims the cache and touches no worktree, branch, session or process (a test with fakes); `--only nonsense` is refused with a usage error.",
+    "A fixture dev worktree whose branch is landed in origin/main, with a clean tree and no open PR, is archived on the next gc; a dirty one, an open-PR one, and one with a commit beyond main are each kept."
+  ],
+  "consumed": {
+    "at": "2026-10-17T19:32:08Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "continuation": {
+    "base_sha": "7cce1ae6cf82d4331ae6ef08803fbcf1693dac22",
+    "branch": "cycle-cd3ae73e-1935",
+    "cycle": 1935,
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1935/audit-fail-reason.json",
+    "snapshot_sha": "dbeaa469447f93d0240db90f9f40c8dcc3555380",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1935"
+  },
+  "created_at": "2026-10-17T13:00:00Z",
+  "files": [
+    "go/cmd/evolve/cmd_gc.go",
+    "go/internal/gc/devworktrees.go",
+    "go/internal/gc/gocache.go",
+    "go/internal/policy"
+  ],
+  "fix": "(1) Add a scope to evolve gc, `evolve gc --only cache`, that runs only the go build cache trim and the pipeline temp sweep (it removes only temp artifacts under the OS temp dir unused for more than 24h, never a worktree, branch, session or process). The scope is safe mid-wave. An unknown --only value is refused. The console runs it when free disk falls under the policy key gc.cache_trim_free_gb (a new strict-decoded key). (2) In the dev worktree archive, skip the 14-day gateIdle rule when the existing git check landed() is true (merge-base --is-ancestor against origin/main, or branchLandedBySquash), the tree is clean, and no open PR exists (the existing openPRs lookup). This needs no new gh merged-PR check, and a branch with commits beyond its merged PR reads as not landed, so it is kept.",
+  "id": "gc-cache-scope-and-merged-dev-worktrees",
+  "kind": "feature",
+  "priority_class": "stability",
+  "released_continuations": [
+    {
+      "base_sha": "7cce1ae6cf82d4331ae6ef08803fbcf1693dac22",
+      "branch": "cycle-cd3ae73e-1935",
+      "cycle": 1935,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1935/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-10-17T19:32:08Z",
+      "snapshot_sha": "dbeaa469447f93d0240db90f9f40c8dcc3555380",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1935"
+    }
+  ],
+  "source": "console, 2026-10-17: the operator asked 'Has gc continue to work when the task is completed?'",
+  "summary": "Two gaps, measured on 2026-10-17. (1) The go build cache was trimmed to 21.95 GB at the wave 122 boundary and was 66 GB one hour later, because console lanes built with -race and integration tags; disk free fell from 194 GB to 108 GB. evolve gc has no scope flag, and an explicit run also applies the workspace sweep, so it is not safe while lanes are live; the only trim is at the next boundary. (2) The dev worktree archive kept 245 worktrees ('active within the 14-day limit'), and 95 of the console's dev/cl-* worktrees had a MERGED pull request and a clean tree. The console removed 94 of them by hand (13 GB).",
+  "title": "evolve gc cannot trim only the build cache mid-wave, and it keeps merged, clean dev worktrees for 14 days",
+  "weight": 0.7
+}

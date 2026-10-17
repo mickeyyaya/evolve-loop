@@ -222,3 +222,20 @@ func TestTestCacheBounds_DecodeFromTheirPolicyKeys(t *testing.T) {
 		t.Errorf("decoded %+v", p)
 	}
 }
+
+func TestCacheTrimFreeBytes_AnUnsetOrNonPositiveFloorIsOff(t *testing.T) {
+	cases := []struct {
+		name string
+		gb   int
+		want uint64
+	}{
+		{"unset", 0, 0},
+		{"negative", -3, 0},
+		{"explicit", 50, 50e9},
+	}
+	for _, c := range cases {
+		if got := (gcpolicy.Policy{CacheTrimFreeGB: c.gb}).CacheTrimFreeBytes(); got != c.want {
+			t.Errorf("%s: CacheTrimFreeBytes() with cache_trim_free_gb=%d = %d, want %d", c.name, c.gb, got, c.want)
+		}
+	}
+}

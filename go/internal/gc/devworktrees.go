@@ -90,17 +90,19 @@ func (o DevOptions) save(ctx context.Context, w wtcheckpoint.Worktree) (wtcheckp
 }
 
 type devSweep struct {
-	o         DevOptions
-	hub       wtcheckpoint.Hub
-	store     gitexec.Git
-	procs     []Process
-	now       time.Time
-	limit     time.Duration
-	notes     []string
-	prs       map[string][]time.Time
-	prsErr    error
-	prsLoaded bool
-	strictPR  bool
+	o          DevOptions
+	hub        wtcheckpoint.Hub
+	store      gitexec.Git
+	procs      []Process
+	now        time.Time
+	limit      time.Duration
+	notes      []string
+	prs        map[string][]time.Time
+	prsErr     error
+	prsLoaded  bool
+	prsSkipped bool
+	strictPR   bool
+	early      map[string]bool
 }
 
 func newDevSweep(ctx context.Context, o DevOptions) (*devSweep, string, error) {
@@ -227,10 +229,25 @@ func (s *devSweep) gateBranch(_ context.Context, it *DevItem) (string, error) {
 	return "", nil
 }
 
-func (s *devSweep) gateIdle(_ context.Context, it *DevItem) (string, error) {
-	if time.Duration(it.IdleDays*24*float64(time.Hour)) < s.limit {
-		return fmt.Sprintf("active within the %d-day limit", int(s.limit.Hours()/24)), nil
+func (s *devSweep) gateIdle(ctx context.Context, it *DevItem) (string, error) {
+	if time.Duration(it.IdleDays*24*float64(time.Hour)) >= s.limit {
+		return "", nil
 	}
+	reason := fmt.Sprintf("active within the %d-day limit", int(s.limit.Hours()/24))
+	early, err := s.landedEarly(ctx, it)
+	if err != nil && ctx.Err() != nil {
+		return "", err
+	}
+	if err != nil {
+		return reason + " (landed check: " + err.Error() + ")", nil
+	}
+	if !early {
+		return reason, nil
+	}
+	if s.early == nil {
+		s.early = map[string]bool{}
+	}
+	s.early[it.Path] = true
 	return "", nil
 }
 
@@ -257,6 +274,7 @@ func (s *devSweep) openPRs(ctx context.Context) (map[string][]time.Time, error) 
 		return nil, s.prsErr
 	}
 	if s.o.OpenPRs == nil {
+		s.prsSkipped = true
 		s.notes = append(s.notes, "no pull request lookup is configured: the open pull request check was skipped")
 		return nil, nil
 	}
@@ -266,6 +284,7 @@ func (s *devSweep) openPRs(ctx context.Context) (map[string][]time.Time, error) 
 		return nil, s.prsErr
 	}
 	if errors.Is(err, ErrPRLookupUnavailable) {
+		s.prsSkipped = true
 		s.notes = append(s.notes, "gh is unavailable: the open pull request check was skipped")
 		return nil, nil
 	}
@@ -291,12 +310,15 @@ func (s *devSweep) finish(ctx context.Context, tree gitexec.Git, it DevItem) Dev
 		return it
 	}
 	it.Action = DevActionArchive
-	it.Reason = archiveReason(it, landed, s.limit)
+	it.Reason = archiveReason(it, landed, s.limit, s.early[it.Path])
 	return it
 }
 
-func archiveReason(it DevItem, landed string, limit time.Duration) string {
+func archiveReason(it DevItem, landed string, limit time.Duration, early bool) string {
 	reason := fmt.Sprintf("idle %.1f days (limit %d); branch %s %s and stays", it.IdleDays, int(limit.Hours()/24), it.Branch, landed)
+	if early {
+		reason = fmt.Sprintf("landed early: branch %s %s, the tree is clean and no pull request is open (idle %.1f days, limit %d skipped)", it.Branch, landed, it.IdleDays, int(limit.Hours()/24))
+	}
 	if it.Dirty {
 		reason += "; uncommitted work is saved as a checkpoint first"
 	}
@@ -309,7 +331,7 @@ func (s *devSweep) landed(ctx context.Context, it DevItem) (string, error) {
 	case err != nil || code > 1:
 		return "", fmt.Errorf("git merge-base --is-ancestor exit %d err=%v: %s", code, err, strings.TrimSpace(stderr))
 	case code == 0:
-		return "is in main", nil
+		return landedInMain, nil
 	}
 	res, err := branchLandedBySquash(ctx, s.store, plane.OriginMainRef, it.Branch)
 	switch {
@@ -318,7 +340,7 @@ func (s *devSweep) landed(ctx context.Context, it DevItem) (string, error) {
 	case res.NoNet:
 		return fmt.Sprintf("has no net changes against main (%d commit(s) not in main)", res.Ahead), nil
 	case res.Landed:
-		return "is in main", nil
+		return landedInMain, nil
 	}
 	return "is not in main", nil
 }

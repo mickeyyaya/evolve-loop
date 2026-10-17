@@ -13,6 +13,7 @@ type Policy struct {
 	TrackerTTLDays  int        `json:"tracker_ttl_days,omitempty"`
 	GoCacheTTLHours int        `json:"go_cache_ttl_hours,omitempty"`
 	GoCacheMaxGB    int        `json:"go_cache_max_gb,omitempty"`
+	CacheTrimFreeGB int        `json:"cache_trim_free_gb,omitempty"`
 	TempTTLHours    int        `json:"temp_ttl_hours,omitempty"`
 
 	TestCacheTTLDays int `json:"testcache_ttl_days,omitempty"`
@@ -62,6 +63,13 @@ func (p Policy) GoCacheMaxBytes() int64 {
 		return defaultGoCacheMaxGB * bytesPerGB
 	}
 	return int64(p.GoCacheMaxGB) * bytesPerGB
+}
+
+func (p Policy) CacheTrimFreeBytes() uint64 {
+	if p.CacheTrimFreeGB <= 0 {
+		return 0
+	}
+	return uint64(p.CacheTrimFreeGB) * uint64(bytesPerGB)
 }
 
 const (
