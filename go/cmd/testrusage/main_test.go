@@ -309,7 +309,8 @@ func TestRun_WaitFailureWithoutProcessState_ReportsAndExits1(t *testing.T) {
 	t.Cleanup(func() { waitCmd = old })
 	waitCmd = func(c *exec.Cmd) error {
 		_ = c.Process.Kill()
-		_, _ = c.Process.Wait()
+		_ = (*exec.Cmd).Wait(c)
+		c.ProcessState = nil
 		return errors.New("wait boom")
 	}
 	t.Setenv(helperEnv, "sleep")
