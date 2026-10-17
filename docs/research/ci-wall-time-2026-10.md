@@ -115,6 +115,46 @@ The high count of involuntary context switches suggests scheduler contention, wh
 **F3.15** Package rusage cannot see contention between packages, or a runner that waits on disk. Only a sampler of the whole runner can show utilization and saturation (the USE view). It reads CPU busy, run-queue length, memory, swap and disk wait.
 *Implication:* the telemetry needs two layers: per-package resource accounting, and one runner sampler per job.
 
+**F3.16** The first CI run with the C0b rusage wrapper measures the CPU of each test binary. Run 39027224638, ubuntu, Go 1.27, `-race -cover -tags integration`, 2026-10-17. The method: the wrapper writes one NDJSON record per test binary (`test-rusage.ndjson`), and CPU is user plus system time. The total test CPU is 1,591 s over 300 packages.
+
+| Package | CPU (user + system) | Share of the test CPU | Wall | Peak RSS |
+|---|--:|--:|--:|--:|
+| `phases/audit` | 508 s | 31.9% | 212 s | 291 MB |
+| `bridge` | 278 s | 17.5% | 191 s | 321 MB |
+| `cmd/evolve` | 159 s | 10.0% | 162 s | 869 MB |
+| `core` | 112 s | 7.0% | 70 s | 504 MB |
+| `phases/ship` | 100 s | 6.3% | 95 s | 336 MB |
+| `ciparity` | 64 s | 4.0% | 38 s | 285 MB |
+
+*Implication:* two packages use half of the test CPU. On a 4-vCPU runner, their CPU slows every package that runs beside them.
+
+**F3.17** The `-json` stream of the same run (`test-integration.json`) names the tests inside those two packages:
+
+| Test | Package | Elapsed |
+|---|---|--:|
+| `TestSkillsDriftGate_ImportedPackageChangeIsGradedByTheWorktreeGenerator` | `phases/audit` | 136.8 s |
+| `TestAutoRespond_CodexUpdateMenuRulesDoNotMatchThisRepositorysOwnFiles` | `bridge` | 134.7 s |
+| `TestSkillsDriftGate_CommittedGeneratorChangeIsGradedByTheWorktreeWithOrWithoutABase` | `phases/audit` | 86.6 s |
+| `TestSkillsDriftGate_GeneratorChangeWithRegeneratedStubsPasses` | `phases/audit` | 83.9 s |
+| `TestSkillsDriftGate_BaseGeneratorChangeWithoutRegenerationFails` | `phases/audit` | 77.4 s |
+| `TestSkillsDriftGate_GeneratorChangeThatAgreesWithTheHostIsSilent` | `phases/audit` | 69.6 s |
+| `TestSkillsDriftGate_GeneratorChangeWithoutRegenerationFails` | `phases/audit` | 69.3 s |
+| `TestSkillsDriftGate_Cycle1840ReplayPasses` | `phases/audit` | 65.1 s |
+| `TestSkillsDriftGate_ReworkedReportProtocolStillFails` | `phases/audit` | 62.6 s |
+| `TestSkillsDriftGate_Cycle1841ReplayBaseNewerThanTheHostPasses` | `phases/audit` | 57.8 s |
+
+*Implication:* ten tests in two families hold most of the CPU of the two packages. Each family needs one fix.
+
+**F3.18** Each `TestSkillsDriftGate_*` test copies the module source into a new git repository and commits it. The source is `go/vendor`, `go/cmd`, `go/internal` and `go/pkg`: 5,615 files, about 36 MB (`committedSkillsRepo` in `go/internal/phases/audit/audit_skillsdrift_worktree_integration_test.go`). Then the gate runs `go run ./cmd/evolve skills check` in that copy (`go/internal/phases/audit/skillsdrift.go:42-47`). Some tests also run `skills generate` first. The Go build cache keys a package on its directory unless `-trimpath` is set. Thus each copy compiles every package of `evolve` again.
+
+Locally the package used 563 s of CPU (172 s user, 390 s system) over 87 s of wall. The command was `/usr/bin/time -l go test -count=1 -p 2 -tags integration -json ./internal/phases/audit/` (14 CPUs, 2026-10-17).
+*Implication:* the tests build the same binary about 14 times from 4 distinct source trees. One build per distinct tree, with a cache that a copy can reuse, removes most of that work.
+
+**F3.19** `requireNoRuleFiresAtAnyPaneBottom` (`go/internal/bridge/selfmatch_guard_test.go`) checks each line of each file as the bottom line of a 64-line pane. For each line it joins up to 64 lines and calls `decideAutoRespond` with every rule. `decideAutoRespond` compiles the regex of each rule on each call (`go/internal/bridge/autorespond.go:115`). `CHANGELOG.md` alone has 13,035 lines (1.28 MB).
+
+Locally with `-race` the codex guard took 14.2 s, against 134.7 s on CI (F3.17).
+*Implication:* the cost is lines × rules regex compilations and joins. A rule can fire only on a pane that holds a literal of its regex, so most panes need no check.
+
 ### 3.1 The first instrumented run (C0b)
 
 On 2026-10-17 the operator asked: "Continue investigating the performance, latency, resource usage for ci pipeline and test cases". An earlier request, "Identify which test starves the CPU and improve the test for parallel running", gave PR #935 (C3 and C5b). F3.20 to F3.35 answer the new request. PR #935 adds F3.16 to F3.19, R10, D14 and C5b; this section does not reuse those ids.
@@ -414,6 +454,7 @@ The duration history also mixes red and green runs, while `cicd.pipeline.run.dur
 - **R7** (F3.13, F3.14, P4.7): a `go test -exec` wrapper records rusage per test binary: wall, user and system CPU, peak RSS, block I/O and context switches.
 - **R8** (F3.15, P4.8): one runner sampler per Go job records CPU busy, run-queue length, memory, swap and disk wait every second.
 - **R9** (P4.6, P4.8): one CI index set, named after the OpenTelemetry CI/CD conventions, is computed per run and kept as history.
+- **R10** (F3.16, F3.19): the `bridge` self-match guard checks a pane only when the pane holds a literal that the rule needs. It cuts the pane from the file body without a join.
 - **R11** (F3.27): the e2e step runs only the tests that the integration step cannot run: the `e2e`-tagged tests.
 - **R12** (F3.26, P4.9): every `-race` test run sets `GORACE=atexit_sleep_ms=0`.
 - **R13** (F3.25): the 500 ms deliverable grace is a value that a test can set, so a test of a missing file does not sleep.

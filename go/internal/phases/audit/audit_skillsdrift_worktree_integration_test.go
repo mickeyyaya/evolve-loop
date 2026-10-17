@@ -5,7 +5,9 @@ package audit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -49,19 +51,44 @@ func generatorLaneRepo(t *testing.T) *gittest.Repo {
 func committedSkillsRepo(t *testing.T, files, dirs []string) *gittest.Repo {
 	t.Helper()
 	repoRoot := skillsDriftRepoRoot(t)
-	repo := gittest.Fixture(t)
-	for _, rel := range files {
-		skillsDriftCopyFile(t, filepath.Join(repoRoot, rel), filepath.Join(repo.Dir, rel))
+	name := "skills-drift-base:" + strings.Join(append(append([]string(nil), files...), dirs...), "|")
+	return gittest.FromTemplate(t, name, func(repo *gittest.Repo) error {
+		for _, rel := range files {
+			skillsDriftCopyFile(t, filepath.Join(repoRoot, rel), filepath.Join(repo.Dir, rel))
+		}
+		for _, dir := range dirs {
+			skillsDriftCopyBuildInputs(t, filepath.Join(repoRoot, dir), filepath.Join(repo.Dir, dir))
+		}
+		if drift, err := skillcheck.Check(repo.Dir); err != nil || len(drift) != 0 {
+			return fmt.Errorf("the base copy must be clean before the lane edits it: drift=%v err=%v", drift, err)
+		}
+		repo.Git("add", "-A")
+		repo.Git("commit", "-qm", "base")
+		return nil
+	})
+}
+
+func skillsDriftCopyBuildInputs(t *testing.T, src, dst string) {
+	t.Helper()
+	err := filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case d.IsDir() && d.Name() == "testdata":
+			return filepath.SkipDir
+		case d.IsDir() || strings.HasSuffix(d.Name(), "_test.go"):
+			return nil
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		skillsDriftCopyFile(t, p, filepath.Join(dst, rel))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("copy the build inputs of %s: %v", src, err)
 	}
-	for _, dir := range dirs {
-		skillsDriftCopyTree(t, filepath.Join(repoRoot, dir), filepath.Join(repo.Dir, dir))
-	}
-	if drift, err := skillcheck.Check(repo.Dir); err != nil || len(drift) != 0 {
-		t.Fatalf("the base copy must be clean before the lane edits it: drift=%v err=%v", drift, err)
-	}
-	repo.Git("add", "-A")
-	repo.Git("commit", "-qm", "base")
-	return repo
 }
 
 func generatorLaneWorktree(t *testing.T) string {
@@ -91,7 +118,7 @@ func regenerateWithWorktreeGenerator(t *testing.T, root string) {
 	t.Helper()
 	inv := core.WorktreeEvolveInvocation(root, "skills", "generate")
 	var out strings.Builder
-	code, err := sysexec.DefaultRunner(context.Background(), "go", inv.Dir, inv.Args, inv.Env, nil, &out, &out)
+	code, err := sharedGeneratorBuilds.runner(sysexec.DefaultRunner)(context.Background(), "go", inv.Dir, inv.Args, inv.Env, nil, &out, &out)
 	if err != nil || code != 0 {
 		t.Fatalf("worktree skills generate: exit %d, err %v\n%s", code, err, out.String())
 	}

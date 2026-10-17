@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
@@ -13,5 +14,13 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "TestMain: %v\n", err)
 		os.Exit(1)
 	}
-	os.Exit(m.Run())
+	runCmd = sharedGeneratorBuilds.runner(runCmd)
+	code := m.Run()
+	if err := sharedGeneratorBuilds.remove(); err != nil {
+		fmt.Fprintln(os.Stderr, "audit tests: remove generator builds:", err)
+	}
+	if err := gittest.RemoveTemplates(); err != nil {
+		fmt.Fprintln(os.Stderr, "audit tests: remove git templates:", err)
+	}
+	os.Exit(code)
 }
