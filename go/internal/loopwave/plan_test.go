@@ -53,7 +53,7 @@ func TestSize_NilBudgetByteIdentical(t *testing.T) {
 	h := newHarness(t)
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1}
-	got, pace := h.e.Size(fc, tightQuota(now), fastPace(), now)
+	got, pace := h.e.Size(fc, nil, tightQuota(now), fastPace(), now)
 	if got.Count != 3 || pace != 0 || h.stderr.String() != stderrSection(t, "size_nil_budget") || len(*h.events) != 0 {
 		t.Errorf("no budget: no resize, no pace, no line, no event: %+v %v %q", got, pace, h.stderr.String())
 	}
@@ -63,7 +63,7 @@ func TestSize_ShadowLogsAndHolds(t *testing.T) {
 	h := newHarness(t)
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1, Budget: &policy.FleetBudgetConfig{Stage: "shadow", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
-	got, pace := h.e.Size(fc, tightQuota(now), tokenFastPace(1110), now)
+	got, pace := h.e.Size(fc, nil, tightQuota(now), tokenFastPace(1110), now)
 	if got.Count != 3 || pace != 0 || fc.Count != 3 {
 		t.Errorf("shadow holds the count and never paces; the caller's fc is a copy: %+v %v %+v", got, pace, fc)
 	}
@@ -76,14 +76,14 @@ func TestSize_EnforceResizesAndPaces(t *testing.T) {
 	h := newHarness(t)
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1, Budget: &policy.FleetBudgetConfig{Stage: "enforce", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
-	got, _ := h.e.Size(fc, tightQuota(now), fastPace(), now)
+	got, _ := h.e.Size(fc, nil, tightQuota(now), fastPace(), now)
 	if got.Count != 1 || fc.Count != 3 || h.stderr.String() != stderrSection(t, "size_enforce") {
 		t.Errorf("enforce applies the plan: %+v %+v %q", got, fc, h.stderr.String())
 	}
 	fc = policy.FleetConfig{Count: 4, Concurrency: 4, MinLanes: 2, Budget: &policy.FleetBudgetConfig{Stage: "enforce", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
 	states := tightQuota(now)
 	states[0].Buckets[0].UsedFraction = 0.8
-	got, pace := h.e.Size(fc, states, budgethistory.Throughput{SampleCount: 5, MedianCycleDurationMS: 360000, CyclesPerHour: 2}, now)
+	got, pace := h.e.Size(fc, nil, states, budgethistory.Throughput{SampleCount: 5, MedianCycleDurationMS: 360000, CyclesPerHour: 2}, now)
 	if got.Count != 2 || pace <= 0 {
 		t.Errorf("the floor forces two lanes and paces: %+v %v", got, pace)
 	}
@@ -102,11 +102,11 @@ func TestSize_BenchedFamiliesReadFromTheStore(t *testing.T) {
 		return count - 1
 	}
 	e := New(Roots{ProjectRoot: h.root, EvolveDir: h.evolveDir}, h.ports, h.stderr)
-	got, _ := e.Size(policy.FleetConfig{Count: 3, MinLanes: 2}, nil, budgethistory.Throughput{}, time.Now())
+	got, _ := e.Size(policy.FleetConfig{Count: 3, MinLanes: 2}, nil, nil, budgethistory.Throughput{}, time.Now())
 	if got.Count != 2 || seenCount != 3 || seenMin != 2 || seen["codex"] != "rate_limit" || len(seen) != 1 {
 		t.Errorf("the shrink port sees the bench map and the floor: %+v %v %d %d", got, seen, seenCount, seenMin)
 	}
-	got, _ = h.e.Size(policy.FleetConfig{Count: 3, MinLanes: 1}, nil, budgethistory.Throughput{}, time.Now())
+	got, _ = h.e.Size(policy.FleetConfig{Count: 3, MinLanes: 1}, nil, nil, budgethistory.Throughput{}, time.Now())
 	if got.Count != 2 || !strings.Contains(h.stderr.String(), `[loop] WARN: fleet: quota bench on CLI family "codex" (rate_limit): wave count 3 -> 2 (min 1)`) {
 		t.Errorf("fleet.QuotaAwareCount shrinks and warns: %+v %q", got, h.stderr.String())
 	}
