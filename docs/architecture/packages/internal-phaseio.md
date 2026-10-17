@@ -13,6 +13,7 @@
 - **Absent versus zero.** Each handoff accessor returns `ok=false` when the phase is absent. So a phase can tell "no audit yet" from "audit reported zero". `Degraded` lists the anchor handoffs that failed to read for a reason other than absence. A non-empty list means that an absent signal may be a read miss, so routing must fail open.
 - **Bounded free text.** `CapField` cuts the carryover and previous-verdict text to `MaxFieldBytes` on a rune boundary. It appends `TruncationMarker`, so a reader can see that text was dropped. A silent cut is not an acceptable cap. The capped value is idempotent, so the shadow comparator can cap a legacy value and compare it with the typed one.
 - **Digest budget.** `UpstreamDigest` renders the sealed handoffs for prompt context. It JSON-quotes untrusted strings, reserves space for the separators, and shares the rest of the budget across sections. One long section cannot evict the sections after it.
+- **Per-edge digest.** `EdgeUpstreams` is the one table of the upstream phases whose handoffs flow into each `ComposePrompt` phase. `DigestFor` renders only those typed sections and the `<upstream>.*` generic keys, under the same budget. An undeclared or empty edge renders nothing. Audit has an empty edge, so the auditor does not read the builder's self-report. The table lives here and not in `phasespec.IO`, because built-in phases have no tracked phase file.
 - **Verdict vocabulary.** `Verdict` is the typed outcome, matching the EGPS gate strings. `IsValid` is case- and whitespace-sensitive, so a typo is refused. A `FailureBlock` is data, not prose, and the output carries no raw telemetry: tokens, cost and duration stay on the wire response.
 
 ## Invariants
@@ -22,4 +23,5 @@
 - An absent handoff is distinguishable from a zero one. Pinned by `TestHandoffs_AuditAccessor_AbsentReturnsFalse`.
 - The zero envelope is safe to read. Pinned by `TestPhaseInput_ZeroValue_Safe` and `TestHandoffs_ZeroValue_Empty`.
 - `Active` is a positive marker, not a whole-struct zero comparison. Pinned by `active_test.go`.
+- A digest carries only the sections that the edge of its phase declares. Pinned by `TestDigestFor_DebuggerSeesTriageAndBuildOnly` and `TestDigestFor_EmptyEdgesRenderNothing` in `edges_test.go`.
 - A bounded field keeps a rune-aligned prefix and a visible marker, and its bound holds. Pinned by the `CapField` tests in `cycleinputs_test.go`.

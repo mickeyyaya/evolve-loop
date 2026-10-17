@@ -208,7 +208,7 @@ type CoverChangedPolicy struct {
 }
 
 func (p Policy) CoverChangedConfig() CoverChangedPolicy {
-	c := CoverChangedPolicy{Stage: "shadow"}
+	c := CoverChangedPolicy{Stage: "enforce"}
 	if p.CoverChanged != nil && p.CoverChanged.Stage != "" {
 		c.Stage = p.CoverChanged.Stage
 	}

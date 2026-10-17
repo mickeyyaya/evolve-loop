@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "go test -count=1 -tags integration -coverprofile of ./internal/core reports 100.0% of statements",
+    "./internal/core 100 is listed in go/.cover-strict"
+  ],
+  "connects_to": [
+    "core-package-coverage-to-100"
+  ],
+  "created_at": "2026-10-18T06:00:00Z",
+  "files": [
+    "go/internal/core",
+    "go/.cover-strict"
+  ],
+  "fix": "Continue in function-group batches with behavior tests for each uncovered branch, as cycle 1938 did for phase_bindings*.go and ship_recovery_budget.go (TestCoreCoverageBatch_*). Register ./internal/core at 100 in go/.cover-strict after the last batch.",
+  "id": "core-package-coverage-remaining-batches",
+  "kind": "test-gap",
+  "priority_class": "maintainability",
+  "source": "cycle 1938 build (remainder of core-package-coverage-to-100)",
+  "summary": "The 2026-10-18 measure of internal/core with -tags integration was 96.8%, with 110 functions below 100.0%. Cycle 1938 closed six of them. The other functions and the .cover-strict registration remain. The encode-error branch of writeBuildSelfCheckArtifact (go/internal/core/phase_bindings_selfcheck.go) is unreachable; that file is protected control-plane surface (ADR-0064), so its removal is console work.",
+  "title": "Close the remaining internal/core coverage batches and register the package at 100 in .cover-strict",
+  "weight": 0.4
+}

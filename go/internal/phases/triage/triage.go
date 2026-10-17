@@ -66,6 +66,9 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if scope := runner.LaneScope(req); scope != "" {
 		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; select ONLY tasks whose id is in this assigned set, ignore all others: %s\n", scope)
 	}
+	if req.Input.Active() {
+		b.WriteString(runner.UpstreamDigestBlock(req.Input.Upstream().DigestFor(string(core.PhaseTriage))))
+	}
 	if ro := req.Context["recent_outcomes"]; ro != "" {
 		fmt.Fprintf(&b, "- recent_outcomes: %s\n", ro)
 	}

@@ -156,8 +156,10 @@ func (r handoffReplay) selfcheck() (int, string) {
 }
 
 const (
-	replayLint     = "go/internal/evalqualitycheck/unsatisfiable.go"
-	replayLintBody = "package evalqualitycheck\n\nfunc Unsatisfiable(src string) bool { return src == \"\" }\n"
+	replayLint         = "go/internal/evalqualitycheck/unsatisfiable.go"
+	replayLintBody     = "package evalqualitycheck\n\nfunc Unsatisfiable(src string) bool { return src == \"\" }\n"
+	replayLintTest     = "go/internal/evalqualitycheck/unsatisfiable_test.go"
+	replayLintTestBody = "package evalqualitycheck\n\nimport \"testing\"\n\nfunc TestUnsatisfiable(t *testing.T) {\n\tif !Unsatisfiable(\"\") || Unsatisfiable(\"x\") {\n\t\tt.Fatal(\"Unsatisfiable\")\n\t}\n}\n"
 )
 
 func TestPhaseVerifyBuild_Replay1788_ReportWithoutTheExplanationSectionFailsWithTheFloorsMessage(t *testing.T) {
@@ -216,8 +218,12 @@ func TestBuildHandoffProbes_Replay1763_MaterialPathWithoutAChangedAreasBulletFai
 func TestBuildHandoffProbes_AnExplainedBuildIsGreenOnBothProbes(t *testing.T) {
 	r := newHandoffReplay(t, 1788, nil)
 	r.commitBuild(t, map[string]string{
-		replayLint:        replayLintBody,
-		r.documentPath(t): r.explanation("- `" + replayLint + "` — the AST lint that flags a positive assertion used to prove absence."),
+		replayLint:     replayLintBody,
+		replayLintTest: replayLintTestBody,
+		r.documentPath(t): r.explanation(
+			"- `"+replayLint+"` — the AST lint that flags a positive assertion used to prove absence.",
+			"- `"+replayLintTest+"` — covers both outcomes of the lint, so the cover-changed floor passes.",
+		),
 	})
 	r.writeWorkspace(t, "build-report.md", r.reportWithSection(t))
 	if code, out := r.phaseVerify(); code != 0 {

@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 func TestTaggedTestArgs_RunAnAddedPackageUnderShipsBackstopBudget(t *testing.T) {
-	t.Parallel()
+	t.Setenv(ipcenv.FleetWidthKey, "")
 
 	got := taggedTestArgs("./acs/cycle1763", []string{"acs"})
 
@@ -19,7 +20,7 @@ func TestTaggedTestArgs_RunAnAddedPackageUnderShipsBackstopBudget(t *testing.T) 
 }
 
 func TestUnitTestArgs_RunAChangedPackageUnderTheSharedBudget(t *testing.T) {
-	t.Parallel()
+	t.Setenv(ipcenv.FleetWidthKey, "")
 
 	got := unitTestArgs("./cmd/evolve")
 
@@ -30,7 +31,7 @@ func TestUnitTestArgs_RunAChangedPackageUnderTheSharedBudget(t *testing.T) {
 }
 
 func TestCoverTestArgs_RunTheCoveragePassUnderTheSharedBudget(t *testing.T) {
-	t.Parallel()
+	t.Setenv(ipcenv.FleetWidthKey, "")
 
 	got := coverTestArgs("/tmp/cover.out", []string{"./cmd/evolve", "./internal/core"}, nil)
 

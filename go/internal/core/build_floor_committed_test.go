@@ -71,8 +71,8 @@ func TestDefaultBuildFloorChecks_SeesCommittedBuilderWork(t *testing.T) {
 	fails = DefaultBuildFloorChecks(context.Background(), ReviewInput{
 		Phase: string(PhaseBuild), Worktree: wt, WorktreeBaseSHA: base,
 	})
-	if len(fails) != 1 || !strings.Contains(fails[0], "Unnamed") {
-		t.Fatalf("floor must catch the unnamed export in an enforced changed package; got %v", fails)
+	if len(fails) != 2 || !strings.Contains(fails[0], "bad.Unnamed") || !strings.Contains(fails[1], "apicover naming floor") || !strings.Contains(fails[1], "Unnamed") {
+		t.Fatalf("floor must refuse the unnamed export twice: uncovered under the enforce cover-changed default, and unnamed in an enforced changed package; got %v", fails)
 	}
 	write("go/bad/extra_test.go", "package bad\n\nimport \"testing\"\n\nfunc TestUnnamed(t *testing.T) {\n\tif Unnamed() != 1 {\n\t\tt.Fatal()\n\t}\n}\n")
 	run("add", "-A")

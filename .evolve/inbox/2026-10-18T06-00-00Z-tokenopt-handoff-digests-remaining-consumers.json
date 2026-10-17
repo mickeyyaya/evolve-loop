@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The intent, build-planner, swarm-plan and debugger ComposePrompt hooks each render one '## Upstream Handoff Digest' block equal to phaseio Handoffs.DigestFor(<phase>), only when req.Input.Active().",
+    "Each of the four hooks has a test that proves the block carries only the upstream sections that phaseio.EdgeUpstreams declares for it, and that an inactive PhaseInput renders no block."
+  ],
+  "connects_to": [
+    "tokenopt-handoff-digests-per-edge-remainder"
+  ],
+  "created_at": "2026-10-18T06:00:00Z",
+  "files": [
+    "go/internal/phases/",
+    "go/internal/phaseio/digest.go"
+  ],
+  "fix": "Cycle 1938 declared every ComposePrompt edge in phaseio (EdgeUpstreams) and wired the triage and build consumers through runner.UpstreamDigestBlock. Wire the four remaining consumers the same way. Audit keeps an empty edge.",
+  "id": "tokenopt-handoff-digests-remaining-consumers",
+  "kind": "feature",
+  "priority_class": "performance",
+  "source": "cycle 1938 build (remainder of tokenopt-handoff-digests-per-edge-remainder)",
+  "summary": "Cycle 1938 made the artifact flow of each ComposePrompt edge explicit config and moved the triage and build prompts to their bounded per-edge digest. The intent, build-planner, swarm-plan and debugger prompts still do not consume their declared digest.",
+  "title": "Wire the per-edge handoff digest into the intent, build-planner, swarm-plan and debugger prompts",
+  "weight": 0.5
+}

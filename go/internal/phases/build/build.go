@@ -45,6 +45,9 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if scope := runner.LaneScope(req); scope != "" {
 		fmt.Fprintf(&b, "- fleet_scope: this cycle is one fleet lane; bind ONLY to tasks whose id is in this assigned set, ignore all others: %s\n", scope)
 	}
+	if req.Input.Active() {
+		b.WriteString(runner.UpstreamDigestBlock(req.Input.Upstream().DigestFor(string(core.PhaseBuild))))
+	}
 	if req.BuildPlan != "" {
 		fmt.Fprintf(&b, "\n\n## Build Plan\n%s", req.BuildPlan)
 	}

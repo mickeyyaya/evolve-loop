@@ -101,7 +101,7 @@ func TestCoverChangedFailures_UncoveredFunction(t *testing.T) {
 	})
 	var shadow []string
 	shadowErr := captureStderr(t, func() {
-		shadow = coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{}`), repo, base), paths)
+		shadow = coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"shadow"}}`), repo, base), paths)
 	})
 
 	joined := strings.Join(enforce, "\n")

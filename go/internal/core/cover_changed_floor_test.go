@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 func coverGapLines() []string {
@@ -65,7 +66,7 @@ func TestCoverChangedPackages_KeepsOnlyLivePackagesOutsideTestdata(t *testing.T)
 }
 
 func TestCoverTestArgs_AddTheTagsOfTheCoverageRunOnlyWhenGiven(t *testing.T) {
-	t.Parallel()
+	t.Setenv(ipcenv.FleetWidthKey, "")
 
 	got := coverTestArgs("/tmp/cover.out", []string{"./p"}, []string{"integration", "acs"})
 
@@ -134,9 +135,10 @@ func TestCoverChangedFailures_EnforceRefusesTheChangedFunctionOfTheBuild(t *test
 func TestCoverChangedFailures_AFailingTestRefusesAtEnforceAndOnlyWarnsAtShadow(t *testing.T) {
 	repo, base := coverChangedRepo(t)
 	stubCoverChangedProfiler(t, coverChangedProfile, "--- FAIL: TestF\nFAIL\tp", coverStatusTestsFailed)
+	stubSelfCheckRunner(t, "ok\tp", true)
 
 	enforce := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"enforce"}}`), repo, base), []string{"go/p/a.go"})
-	shadow := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{}`), repo, base), []string{"go/p/a.go"})
+	shadow := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"shadow"}}`), repo, base), []string{"go/p/a.go"})
 
 	if len(enforce) != 1 || !strings.Contains(enforce[0], "--- FAIL: TestF") || !strings.Contains(enforce[0], "-tags integration") {
 		t.Errorf("enforce = %v, want one refusal carrying the test failure", enforce)
@@ -155,7 +157,7 @@ func TestCoverChangedFailures_ShadowOffAndEveryPlumbingFaultLeaveTheHandoffAlone
 		status  int
 		calls   int
 	}{
-		"shadow only warns":                 {`{}`, []string{"go/p/a.go"}, coverChangedProfile, coverStatusOK, 1},
+		"shadow only warns":                 {`{"cover_changed":{"stage":"shadow"}}`, []string{"go/p/a.go"}, coverChangedProfile, coverStatusOK, 1},
 		"off never measures":                {`{"cover_changed":{"stage":"off"}}`, []string{"go/p/a.go"}, coverChangedProfile, coverStatusOK, 0},
 		"a docs-only change never measures": {`{"cover_changed":{"stage":"enforce"}}`, []string{"docs/a.md"}, coverChangedProfile, coverStatusOK, 0},
 		"a plumbing fault warns":            {`{"cover_changed":{"stage":"enforce"}}`, []string{"go/p/a.go"}, "", coverStatusPlumbingError, 1},
@@ -183,8 +185,8 @@ func TestFloorStage_AnUnknownWordTurnsTheCheckOffAndNamesIt(t *testing.T) {
 			t.Errorf("stage %q = %s, want %s", word, got, want)
 		}
 	}
-	if got := coverChangedStage("", io.Discard); got != config.StageShadow {
-		t.Errorf("no project root = %s, want the compiled shadow", got)
+	if got := coverChangedStage("", io.Discard); got != config.StageEnforce {
+		t.Errorf("no project root = %s, want the compiled enforce", got)
 	}
 	var commentSink, coverSink injectedStderr
 	commentFloorStage(floorRoot(t, `{"comment_floor":{"stage":"bogus"}}`), &commentSink)
@@ -195,5 +197,20 @@ func TestFloorStage_AnUnknownWordTurnsTheCheckOffAndNamesIt(t *testing.T) {
 	}
 	if !strings.Contains(cover, `cover_changed.stage "bogus" is not off, shadow or enforce; the cover-changed check is off`) {
 		t.Errorf("cover-changed warning = %q", cover)
+	}
+}
+
+func TestCoverChangedFailures_LeavesAFailureTheUnitRunAlsoRefusesToTheChangedPackageFloor(t *testing.T) {
+	repo, base := coverChangedRepo(t)
+	stubCoverChangedProfiler(t, coverChangedProfile, "--- FAIL: TestF\nFAIL\tp", coverStatusTestsFailed)
+	ran := stubSelfCheckRunner(t, "--- FAIL: TestF\nFAIL\tp", false)
+
+	failures := coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"enforce"}}`), repo, base), []string{"go/p/a.go"})
+
+	if failures != nil {
+		t.Errorf("failures = %v, want none: the changed-package floor already refuses the failing unit run", failures)
+	}
+	if !slices.Equal(*ran, []string{"./p"}) {
+		t.Errorf("unit run packages = %v, want [./p]", *ran)
 	}
 }

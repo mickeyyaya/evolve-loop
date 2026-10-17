@@ -42,7 +42,7 @@ func TestCoverChangedFailures_StrictRunner(t *testing.T) {
 		wantWarning bool
 	}{
 		"enforce refuses a strict package below its floor": {`{"cover_changed":{"stage":"enforce"}}`, []coverstrict.Result{below}, true, false},
-		"shadow only warns":     {`{}`, []coverstrict.Result{below}, false, true},
+		"shadow only warns":     {`{"cover_changed":{"stage":"shadow"}}`, []coverstrict.Result{below}, false, true},
 		"a met floor is silent": {`{"cover_changed":{"stage":"enforce"}}`, []coverstrict.Result{met}, false, false},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -99,7 +99,7 @@ func TestCoverChangedFailures_StrictRunnerDefaultMeasuresOnlyTheChangedStrictPac
 	})
 	var shadow []string
 	shadowErr := captureStderr(t, func() {
-		shadow = coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{}`), repo, base), []string{"go/p/a.go"})
+		shadow = coverChangedFailures(context.Background(), floorInput(t, floorRoot(t, `{"cover_changed":{"stage":"shadow"}}`), repo, base), []string{"go/p/a.go"})
 	})
 
 	named := "cover strict: p: 75.0% < 100.0% FAIL"

@@ -166,7 +166,7 @@ The block sets the stage of the changed-function coverage check of the build han
 
 | Key | Meaning | Default |
 |---|---|---|
-| `stage` | `off` skips the check. `shadow` prints the `[build-floor] WARN cover-changed (shadow)` line. `enforce` rejects the handoff. | `shadow` |
+| `stage` | `off` skips the check. `shadow` prints the `[build-floor] WARN cover-changed (shadow)` line. `enforce` rejects the handoff. | `enforce` |
 
 ## Context-fill telemetry (`context_fill`)
 

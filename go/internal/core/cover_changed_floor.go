@@ -22,6 +22,8 @@ import (
 
 var coverChangedProfiler = scopedCoverProfile
 
+const coverChangedTestsFailedHeadline = "the tests of the changed packages fail under -tags integration, so no changed function is proven"
+
 var coverStrictRunner = changedStrictResults
 
 func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) []string {
@@ -40,13 +42,21 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 	}
 	switch status {
 	case coverStatusTestsFailed:
-		return coverChangedReport(coverChangedResult(stage, "the tests of the changed packages fail under -tags integration, so no changed function is proven", []string{floorFailureDiagnostic(out)}))
+		if unitRunRefuses(ctx, in, moduleDir, pkgs) {
+			return nil
+		}
+		return coverChangedReport(coverChangedResult(stage, coverChangedTestsFailedHeadline, []string{floorFailureDiagnostic(out)}))
 	case coverStatusPlumbingError:
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not make a coverage profile (%s); `make -C go cover-changed` and CI still judge coverage\n", out)
 		return nil
 	}
 	failures := coverChangedFunctionFailures(ctx, in, stage, moduleDir, profile)
 	return append(failures, coverStrictFailures(stage, moduleDir, profile, pkgs)...)
+}
+
+func unitRunRefuses(ctx context.Context, in ReviewInput, moduleDir string, pkgs []string) bool {
+	visible := buildTagVisiblePackages(ctx, moduleDir, pkgs, in.errOut())
+	return len(runBuildSelfCheck(ctx, moduleDir, visible, buildSelfCheckRunner)) > 0
 }
 
 func coverChangedFunctionFailures(ctx context.Context, in ReviewInput, stage config.Stage, moduleDir, profile string) []string {
