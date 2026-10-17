@@ -213,7 +213,7 @@ func deleteCycleBranch(projectRoot, worktree string) {
 }
 
 func WorktreePhase(p Phase) bool {
-	return p == PhaseTDD || p == PhaseBuild
+	return p == PhaseTDD || p == PhaseBuild || p == Phase("test-amplification")
 }
 
 func LeakRecoverablePhase(p Phase) bool {

@@ -72,7 +72,7 @@ func newDoctorPlaneHubFixture(t *testing.T) (seed *gittest.Repo, hubRoot string)
 	}
 	hubRoot = filepath.Join(base, "hub")
 	store := filepath.Join(hubRoot, ".repo.git")
-	seed.Git("clone", "-q", "--bare", seed.Dir, store)
+	seed.CloneBare(seed.Dir, store)
 	storeGit := "--git-dir=" + store
 	seed.Git(storeGit, "config", "gc.auto", "0")
 	seed.Git(storeGit, "config", "maintenance.auto", "false")

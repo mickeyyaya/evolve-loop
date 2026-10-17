@@ -1,0 +1,104 @@
+package wave
+
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"path/filepath"
+	"strconv"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
+)
+
+const (
+	WidthFromSignal = "signal"
+	WidthFromPolicy = "policy"
+)
+
+var landingConflicts = map[signalcenter.Code]bool{
+	shiperr.SignalCode(shiperr.CodeGitFleetRebaseNeeded):   true,
+	shiperr.SignalCode(shiperr.CodeGitFleetRebaseConflict): true,
+	shiperr.SignalCode(shiperr.CodeAuditBindingHeadMoved):  true,
+}
+
+func ReadLoopSignals(root string) ([]signalcenter.Event, []string) {
+	path := filepath.Join(paths.EvolveDirOf(root), signalcenter.StreamFileName)
+	chunk, err := signalcenter.ReadStream(path, 0)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, []string{err.Error()}
+	}
+	if chunk.Skipped > 0 {
+		return chunk.Events, []string{fmt.Sprintf("skipped %d malformed signal line(s) in %s", chunk.Skipped, path)}
+	}
+	return chunk.Events, nil
+}
+
+func MeasureFacts(rec Record, next *Record, cycles []Cycle, loop []signalcenter.Event, policyWidth int) (wavemeasure.Facts, string) {
+	f := wavemeasure.Facts{Start: rec.StartedAt, End: runEnd(rec, next), WidthSized: policyWidth}
+	for _, c := range cycles {
+		f.Lanes = append(f.Lanes, wavemeasure.Lane{Start: c.StartedAt, End: c.EndedAt, Landed: c.Shipped, Conflict: c.Conflict})
+	}
+	return applyLoopSignals(f, loop)
+}
+
+func applyLoopSignals(f wavemeasure.Facts, events []signalcenter.Event) (wavemeasure.Facts, string) {
+	source := WidthFromPolicy
+	for _, e := range events {
+		at := eventTime(e)
+		if at.Before(f.Start) || (!f.End.IsZero() && at.After(f.End)) {
+			continue
+		}
+		switch {
+		case e.Code == wavemeasure.CodeAdmitWait:
+			f.AdmissionWaits++
+		case e.Kind == signalcenter.KindLoopWave:
+			if w, err := strconv.Atoi(e.Fields[wavemeasure.FieldWidthSized]); err == nil {
+				f.WidthSized, source = w, WidthFromSignal
+			}
+		}
+	}
+	return f, source
+}
+
+func runEnd(rec Record, next *Record) time.Time {
+	switch {
+	case rec.EndedAt != nil:
+		return *rec.EndedAt
+	case next != nil:
+		return next.StartedAt
+	default:
+		return time.Time{}
+	}
+}
+
+func eventTime(e signalcenter.Event) time.Time {
+	at, _ := time.Parse(time.RFC3339Nano, e.TS)
+	return at
+}
+
+func phaseSpan(start, end time.Time, phases []dossier.PhaseRecord) (time.Time, time.Time) {
+	for _, p := range phases {
+		if at, err := time.Parse(time.RFC3339Nano, p.StartedAt); err == nil {
+			start = earliest(start, at)
+		}
+		if at, err := time.Parse(time.RFC3339Nano, p.EndedAt); err == nil && at.After(end) {
+			end = at
+		}
+	}
+	return start, end
+}
+
+func earliest(a, b time.Time) time.Time {
+	if a.IsZero() || (!b.IsZero() && b.Before(a)) {
+		return b
+	}
+	return a
+}

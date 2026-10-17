@@ -384,7 +384,7 @@ func newHub(t *testing.T) *hub {
 	if err := os.MkdirAll(h.dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, h.dir, "clone", "-q", "--bare", origin.Dir, h.store)
+	seed.CloneBare(origin.Dir, h.store)
 	for _, kv := range [][2]string{
 		{"remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"},
 		{"user.name", "acs"}, {"user.email", "acs@evolve.local"}, {"commit.gpgsign", "false"},

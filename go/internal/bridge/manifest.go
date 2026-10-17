@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -71,6 +72,7 @@ type Manifest struct {
 	DefaultModel            string                   `json:"default_model"`
 	DefaultArgs             []string                 `json:"default_args"`
 	DefaultEnv              map[string]string        `json:"default_env,omitempty"`
+	MCPConfigFiles          []string                 `json:"mcp_config_files,omitempty"`
 	InteractivePrompts      []ManifestPrompt         `json:"interactive_prompts"`
 	TransientRegex          string                   `json:"transient_regex,omitempty"`
 	BusyLineRegex           string                   `json:"busy_line_regex,omitempty"`
@@ -169,6 +171,9 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 			return Manifest{}, fmt.Errorf("bridge:manifest: default_env value for %q (cli=%s) carries a control byte; it is typed into a pane", key, cli)
 		}
 	}
+	if err := validateMCPConfigFiles(cli, m.MCPConfigFiles); err != nil {
+		return Manifest{}, err
+	}
 	if err := validatePaneVocabulary(cli, m); err != nil {
 		return Manifest{}, err
 	}
@@ -186,6 +191,15 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 		}
 	}
 	return m, nil
+}
+
+func validateMCPConfigFiles(cli string, entries []string) error {
+	for _, entry := range entries {
+		if strings.HasPrefix(entry, "/") && !strings.HasPrefix(entry, "~/") || slices.Contains(strings.Split(entry, "/"), "..") {
+			return fmt.Errorf("bridge:manifest: mcp_config_files entry %q for cli=%s must be relative or start with ~/ and carry no .. segment", entry, cli)
+		}
+	}
+	return nil
 }
 
 var credentialEnvKeys = map[string]bool{"ANTHROPIC_API_KEY": true, "ANTHROPIC_BASE_URL": true, "OPENAI_API_KEY": true}

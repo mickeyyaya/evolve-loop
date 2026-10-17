@@ -52,6 +52,10 @@ Commands:
               the branch, index or tree; restore it into a new or clean worktree
               ( checkpoint save [--worktree DIR | --all] [--label T] [--push] |
                 list [--worktree DIR] | restore <ref> --into DIR | prune [--landed] )
+  treewalk   Fail when a test run leaves a new file or empty directory in the tree
+              ( treewalk snapshot --root DIR --out FILE | treewalk check --root DIR --baseline FILE )
+  kb         Read-only graph over cycle dossiers and inbox items
+              ( kb graph neighbors <node-id> [--hops N] | kb graph recurrences <fingerprint> )
   land       Land a patch or a salvaged cycle uncommitted on a dev worktree at origin/main
               ( land --branch B (--patch F | --salvage <leaf>) [--project-root P] )
   gc         Release what finished cycles left behind: tmux sessions/sockets,
@@ -197,10 +201,12 @@ v12.1 utilities + composition:
                               [--root DIR] )
   code                      Read-only code index for phase agents: who calls
                               a symbol, the API of a file, a search in plain
-                              words, a map of the directories
+                              words, a map of the directories; each call is
+                              logged, and code usage counts the calls by phase
                               ( code callers <symbol> [--direction in|out]
                               | code api <file> | code find <query>
-                              | code map [dir] [--project-root P] )
+                              | code map [dir] [--project-root P]
+                              | code usage [--since D] [--json] )
   context-fill              Context-window fill telemetry; correlates each
                               cycle's peak per-phase fill ratio against its
                               dossier final verdict (read-only)

@@ -163,3 +163,28 @@ func TestCaptureWithEBADFRetry_RetriesOnlyAnEBADFLikeErrorAndOnlyOnce(t *testing
 		})
 	}
 }
+
+func TestCloneBare_CarriesTheFixtureIdentityAndMaintenanceConfig(t *testing.T) {
+	seed := Fixture(t)
+	seed.Git("commit", "--allow-empty", "-q", "-m", "base")
+	dst := filepath.Join(t.TempDir(), "store.git")
+
+	store := seed.CloneBare(seed.Dir, dst)
+
+	if store.Dir != dst {
+		t.Errorf("CloneBare Dir = %q, want %q", store.Dir, dst)
+	}
+	if got := store.Git("rev-parse", "--is-bare-repository"); got != "true" {
+		t.Errorf("--is-bare-repository = %q, want true", got)
+	}
+	if got, want := store.Git("rev-parse", "main"), seed.Git("rev-parse", "HEAD"); got != want {
+		t.Errorf("store main = %s, want the seed HEAD %s", got, want)
+	}
+	assertPersistsMaintenanceConfig(t, dst)
+	if got := rawConfig(t, dst, "user.name"); got != "gittest" {
+		t.Errorf("user.name = %q, want gittest", got)
+	}
+	if got := rawConfig(t, dst, "user.email"); got != "gittest@example.com" {
+		t.Errorf("user.email = %q, want gittest@example.com", got)
+	}
+}
