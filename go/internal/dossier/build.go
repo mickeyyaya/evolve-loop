@@ -97,6 +97,7 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 	if rec, ok := ciWatchRecord(opts.WorkspacePath); ok {
 		d.CIWatch = rec
 	}
+	d.RecalledLessons = readRecalledLessons(opts.WorkspacePath)
 	if verdict == VerdictFail {
 		recordAuditFailure(d, cycle, opts.WorkspacePath)
 	}

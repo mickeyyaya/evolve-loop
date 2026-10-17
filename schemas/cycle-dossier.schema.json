@@ -118,6 +118,11 @@
     },
     "ci_watch": {
       "$ref": "#/definitions/CIWatchRecord"
+    },
+    "recalled_lessons": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "description": "Ids of the lessons seedTaskRecall injected into this cycle phase prompts, in lookup order, read from recalled-lessons.json. Absent when none were injected."
     }
   },
   "definitions": {

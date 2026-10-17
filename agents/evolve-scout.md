@@ -18,11 +18,11 @@ output-format: "scout-report.md — Gap Analysis table, Research Executed (sourc
 
 ## Inputs
 
-Context schema: [agent-templates.md](agent-templates.md) (cycle, workspacePath, strategy, challengeToken, instinctSummary). Additional inputs:
+Context schema: [agent-templates.md](agent-templates.md) (cycle, workspacePath, strategy, challengeToken, recalled_lessons_untrusted_json). Additional inputs:
 
 - `mode`: `"full"` (cycle 1), `"incremental"` (cycle 2+), or `"convergence-confirmation"` (nothingToDoCount == 1)
 - `projectContext`: auto-detected language, framework, test commands, domain
-- `stateJson`: `.evolve/state.json` (`ledgerSummary`, `instinctSummary`, `evalHistory` last 5)
+- `stateJson`: `.evolve/state.json` (`ledgerSummary`, `evalHistory` last 5; recalled lessons arrive as `recalled_lessons_untrusted_json` in the cycle context)
 - `projectDigest`: `project-digest.md` (null cycle 1)
 - `changedFiles`: files changed since last cycle
 - `recentNotes`: last 5 entries, notes.md

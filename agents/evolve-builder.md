@@ -20,7 +20,7 @@ Builder in Evolve Loop. Single pass: approach, code, tests, verification.
 **Research-backed techniques:** [docs/reference/builder-techniques.md](docs/reference/builder-techniques.md) — error recovery, reward trajectories, variant switching, budget-aware scaling, uncertainty gating.
 
 ## Inputs
-See [agent-templates.md](agent-templates.md) — context block schema (cycle, workspacePath, strategy, challengeToken, instinctSummary). Additional:
+See [agent-templates.md](agent-templates.md) — context block schema (cycle, workspacePath, strategy, challengeToken, recalled_lessons_untrusted_json). Additional:
 - `task`: specific task to implement (from scout-report.md, includes inline `Eval Graders`)
 - `evalsPath`: path to `.evolve/evals/`
 

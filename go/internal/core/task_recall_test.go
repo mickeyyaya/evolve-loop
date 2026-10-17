@@ -4,9 +4,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
@@ -45,5 +47,64 @@ func TestTaskRecall_ReplacesStaleMemoryWithoutMutatingCaller(t *testing.T) {
 				t.Fatalf("caller context was mutated: %v", base)
 			}
 		})
+	}
+}
+
+func TestTaskRecall_RecordsInjectedLessonIDsForTheDossier(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		lessons []research.Lesson
+		want    []string
+	}{
+		{name: "empty store records nothing"},
+		{name: "ids in lookup order", lessons: []research.Lesson{{ID: "L-a", Pattern: "p"}, {ID: "L-b", Pattern: "q"}}, want: []string{"L-a", "L-b"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ws := t.TempDir()
+			o := &Orchestrator{kb: &fakeKB{lessons: tc.lessons}}
+			o.seedTaskRecall(context.Background(), map[string]string{"goal": "x"}, PhaseBuild, CycleState{WorkspacePath: ws}, t.TempDir())
+			d, err := dossier.Build(3, dossier.BuildOpts{WorkspacePath: ws, Goal: "g", FinalVerdict: dossier.VerdictPass})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(d.RecalledLessons, tc.want) {
+				t.Fatalf("dossier RecalledLessons = %v, want %v", d.RecalledLessons, tc.want)
+			}
+		})
+	}
+}
+
+func TestTaskRecall_UnwritableRecordWarnsAndStillInjects(t *testing.T) {
+	t.Parallel()
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var warn strings.Builder
+	o := &Orchestrator{kb: &fakeKB{lessons: []research.Lesson{{ID: "L-a", Pattern: "p"}}}, stderr: &warn}
+	got := o.seedTaskRecall(context.Background(), map[string]string{"goal": "x"}, PhaseBuild, CycleState{WorkspacePath: blocker}, t.TempDir())
+	if !strings.Contains(got[CtxKeyRecallMemory], "L-a") {
+		t.Fatalf("recall not injected: %v", got)
+	}
+	if !strings.Contains(warn.String(), "recalled-lessons record") {
+		t.Fatalf("no warning on stderr: %q", warn.String())
+	}
+}
+
+func TestTaskRecall_QueryIncludesSelectedItemTitle(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	writeWSFile(t, ws, LaneScopeFile, `{"todo_ids":["a"]}`)
+	item := filepath.Join(t.TempDir(), "a.json")
+	if err := os.WriteFile(item, []byte(`{"id":"a","title":"zebra crossing","acceptance":["quokka"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	kb := &fakeKB{}
+	o := &Orchestrator{kb: kb}
+	o.seedTaskRecall(context.Background(), map[string]string{"goal": "g", "fleet_scope_paths": "a=" + item}, PhaseBuild, CycleState{WorkspacePath: ws}, t.TempDir())
+	if got := strings.Join(kb.gotQuery.Keywords, " "); !strings.Contains(got, "zebra") || !strings.Contains(got, "quokka") {
+		t.Fatalf("query keywords = %q, want the item title and acceptance", got)
 	}
 }
