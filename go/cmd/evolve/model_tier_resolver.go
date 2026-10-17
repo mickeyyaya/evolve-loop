@@ -6,10 +6,10 @@ import (
 )
 
 func resolveModelTier(cli, tier string) (string, bool) {
-	m, err := bridge.LoadManifest(policy.BaseCLI(cli) + "-tmux")
+	r, err := bridge.Resolve(driverSet, policy.BaseCLI(cli))
 	if err != nil {
 		return "", false
 	}
-	model := m.ModelTierMap[tier]
+	model := r.Manifest.ModelTierMap[tier]
 	return model, model != ""
 }

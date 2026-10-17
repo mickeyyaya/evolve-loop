@@ -140,7 +140,7 @@ func printCLIUpdateReport(rep cliupdate.Report, asJSON bool, stdout io.Writer) {
 func productionCLIUpdateWiring(projectRoot string, log io.Writer) cliUpdateWiring {
 	live := liveCheck(func(ctx context.Context) liveProbe { return defaultLiveProbe(ctx, projectRoot, log) })
 	return cliUpdateWiring{
-		families: manifestUpdateFamilies(bridge.InteractiveFamilies(), bridge.LoadManifest, log),
+		families: manifestUpdateFamilies(bridge.InteractiveFamilies(), driverSet, log),
 		seams: cliupdate.Seams{
 			Eligible: cliupdate.Unwalled(credentialWall(clihealth.NewStore(projectRoot, nil))),
 			Probe:    live,
@@ -153,15 +153,15 @@ func productionCLIUpdateWiring(projectRoot string, log io.Writer) cliUpdateWirin
 	}
 }
 
-func manifestUpdateFamilies(installed []string, load func(string) (bridge.Manifest, error), log io.Writer) []cliupdate.Family {
+func manifestUpdateFamilies(installed []string, set bridge.DriverSet, log io.Writer) []cliupdate.Family {
 	out := make([]cliupdate.Family, 0, len(installed))
 	for _, family := range installed {
-		m, err := load(family + "-tmux")
+		r, err := bridge.Resolve(set, family)
 		if err != nil {
 			fmt.Fprintf(log, "[cli-update] WARN: %s is not updated: its manifest did not load: %v\n", family, err)
 			continue
 		}
-		out = append(out, cliupdate.Family{Name: family, UpdateArgv: m.UpdateArgv, AutoUpdateOffEnv: m.AutoUpdateOffEnv})
+		out = append(out, cliupdate.Family{Name: family, UpdateArgv: r.Manifest.UpdateArgv, AutoUpdateOffEnv: r.Manifest.AutoUpdateOffEnv})
 	}
 	return out
 }
@@ -178,9 +178,13 @@ func credentialWall(store *clihealth.Store) func(family string) (string, bool) {
 
 func liveCheck(newProbe func(context.Context) liveProbe) func(ctx context.Context, family string) error {
 	return func(ctx context.Context, family string) error {
-		driver := family + "-tmux"
-		rc, pattern, scrollback := newProbe(ctx)(driver)
-		return liveCheckErr(driver, liveProbeResult{rc: rc, pattern: pattern, scrollback: scrollback})
+		probe := newProbe(ctx)
+		r, err := bridge.Resolve(driverSet, family)
+		if err != nil {
+			return fmt.Errorf("doctor live: %w", err)
+		}
+		rc, pattern, scrollback := probe(r.Driver)
+		return liveCheckErr(r.Driver, liveProbeResult{rc: rc, pattern: pattern, scrollback: scrollback})
 	}
 }
 

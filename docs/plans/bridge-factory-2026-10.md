@@ -122,12 +122,20 @@ Scores are 1 (worst) to 5 (best).
 
 | Id | Component | Red test first | Guard it adds |
 |---|---|---|---|
-| F1 | D1: `bridge.Resolve` over a `DriverSet` built in `main`, and the 19 concatenation sites move to it, the 6 inside the bridge included | every manifest resolves, `agy-claude` and `ollama` included | no `+"-tmux"` outside `Resolve` |
+| F1 | D1: `bridge.Resolve` over a `DriverSet` built in `main`, and the 19 concatenation sites move to it, the 6 inside the bridge included. **Built 2026-10-17** ([spec §2](../architecture/agent-bridge-factory.md#2-the-factory)) | every manifest resolves, `agy-claude` and `ollama` included | no `+"-tmux"` outside `Resolve` |
 | F2 | D4: the deep probe through the driver, by a `Probe` capability on an optional interface, as `CLIPreflight` does today. This delivers tier-policy Q4 for the probe. Q4's own test checks the dispatch launch | the agy probe argv has the manifest's `fast` model | no LLM argv literal in `doctor.go` |
 | F3 | D2 and D3: a bridge adapter reads `controls.models` and implements the `Lister` interface that `modelquery` already defines. `modelquery` does not import `bridge`. agy first, then ollama | a fixture of the real `agy models` output gives the model list | no `sysexec` of an LLM binary outside the bridge |
 | F4 | D5: one `bridge.Version` | both callers get the same version from one fake runner | one `--version` call site |
 | F5 | D3: the effort list becomes a bridge capture of `--help` with its parse spec in the manifest. The picker parse also becomes manifest data. The CLI-name branches of B11 move with them | fixtures of the agy and claude screens | no `pickerParsers` map keyed on a CLI name |
 | F6 | D7: `liveRefresh` and its adapters move out of package `main` into `internal/modelrefresh`. `LaunchArgs` splits by duty | the moved code keeps its tests green | no function over 50 lines in `bridge/launch.go` |
+
+**F1 result (2026-10-17).** The guard scan found the 19 sites of B8 and no other name build:
+
+- 17 sites call `bridge.Resolve`: 10 in `cmd/evolve`, 6 in `internal/bridge` and 1 in `internal/looppreflight`.
+- The 2 sites in `internal/llmroute` read a family table. `llmroute` cannot import `bridge`, because `bridge` imports `llmroute`. `TestResolve_AgreesWithTheRoutingTableForEveryFamily` keeps the table equal to `Resolve`.
+- 3 more strings hold `-tmux` as prose, not as a name build: two messages in `looppreflight/freeze.go` and one in `cmd/evolve/cmd_loop_cliupdate.go`. The guard does not ban them.
+
+**Open item for F2: remove `DriverFor` and `bareDriverMap`.** F1 keeps both beside the `DriverSet`, so the map from family to driver still exists twice. They stay because B9 is not yet closed: `DriverFor("ollama")` returns `ollama`, and F1 must not change that result. F2 removes both, moves each caller to `bridge.Resolve`, and decides the `ollama` result in the same change.
 
 **The order is F1, F2, F3, F4, F5, F6.**
 

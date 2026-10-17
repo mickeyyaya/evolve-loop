@@ -3,11 +3,11 @@ package bridge
 import "regexp"
 
 func ClassifyExhausted(family, pane string) bool {
-	m, err := LoadManifest(family + "-tmux")
+	r, err := Resolve(DefaultDriverSet(), family)
 	if err != nil {
 		return false
 	}
-	return matchExhausted(manifestExhaustedPattern(m), pane)
+	return matchExhausted(manifestExhaustedPattern(r.Manifest), pane)
 }
 
 func manifestExhaustedPattern(m Manifest) string {

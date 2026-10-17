@@ -10,12 +10,12 @@ func universalFallbackTail(results []gobridge.DoctorResult) []string {
 	var tail []string
 	for _, r := range results {
 		bin := llmroute.Binary(r.CLI)
-		driver := bin + "-tmux"
-		if seen[bin] || !r.Binary.Present || r.Verdict == "blocked" || !gobridge.HasToolUse(driver) {
+		resolved, err := gobridge.Resolve(driverSet, bin)
+		if err != nil || seen[bin] || !r.Binary.Present || r.Verdict == "blocked" || !gobridge.HasToolUse(resolved.Driver) {
 			continue
 		}
 		seen[bin] = true
-		tail = append(tail, driver)
+		tail = append(tail, resolved.Driver)
 	}
 	return tail
 }

@@ -91,6 +91,7 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/bridge", Tests: []string{
 		"TestCompletionContractVocabulary_EveryRequestNamesItsContractByTheTypedConstant",
 		"TestCompletionContractVocabulary_SpelledOnce",
+		"TestDriverNames_AreBuiltOnlyByResolve",
 		"TestLaunchOutcome_OneClassificationSite",
 	}},
 	{Package: "./internal/changedpkgs", Tests: []string{

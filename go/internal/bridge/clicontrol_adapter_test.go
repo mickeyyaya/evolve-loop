@@ -120,3 +120,20 @@ func TestCaptureControl_SendsGivenCommand(t *testing.T) {
 		t.Errorf("injected body=%q, want /usage", string(body))
 	}
 }
+
+func TestController_Do_ACaptureFailureNamesTheFamilyAndTheEvent(t *testing.T) {
+	t.Parallel()
+	cause := errors.New("pane gone")
+	c := &cliController{
+		resolve: func(cli string) (Manifest, error) {
+			return Manifest{CLI: cli, Binary: "x", Controls: map[string]ControlSpec{"usage": {Send: "/usage"}}}, nil
+		},
+		capture: func(context.Context, string, string, string) (string, error) { return "", cause },
+	}
+
+	_, err := c.Do(context.Background(), "agy", clicontrol.EventUsage)
+
+	if !errors.Is(err, cause) || !strings.Contains(err.Error(), "agy usage") {
+		t.Fatalf("err=%v, want the capture error wrapped with the family and the event", err)
+	}
+}

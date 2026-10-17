@@ -5,9 +5,9 @@ func ProcessEnv(bin string) []string {
 }
 
 func familyEnv(bin string) map[string]string {
-	m, err := LoadManifest(bin + "-tmux")
+	r, err := Resolve(DefaultDriverSet(), bin)
 	if err != nil {
 		return nil
 	}
-	return m.DefaultEnv
+	return r.Manifest.DefaultEnv
 }

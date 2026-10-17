@@ -39,8 +39,12 @@ func runCLIHealthCanary(ctx context.Context, projectRoot string, env map[string]
 	}
 	store := clihealth.NewStore(projectRoot, nil)
 	for family := range store.Expired() {
-		driver := family + "-tmux"
-		rc, pattern, scrollback := probe(driver)
+		resolved, err := bridge.Resolve(driverSet, family)
+		if err != nil {
+			fmt.Fprintf(stderr, "[loop] cli-health canary: %v — bench untouched\n", err)
+			continue
+		}
+		rc, pattern, scrollback := probe(resolved.Driver)
 		if ctx.Err() != nil {
 			fmt.Fprintf(stderr, "[loop] cli-health canary: cancelled (%v) during the %s probe — bench untouched\n", ctx.Err(), family)
 			return
