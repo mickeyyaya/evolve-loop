@@ -40,6 +40,7 @@ On 2026-10-17 the operator asked that the loop agents use trail-code, "separated
 - [6. The usage log](#6-the-usage-log)
 - [7. The prompt text](#7-the-prompt-text)
 - [8. The flow and a worked example](#8-the-flow-and-a-worked-example)
+- [9. Backends and the benchmark](#9-backends-and-the-benchmark)
 - [Separation from the loop](#separation-from-the-loop)
 - [Guards](#guards)
 - [Limits](#limits)
@@ -283,6 +284,92 @@ The solid arrows are the query path. The agent calls the command. The command ca
 5. The command exits 0 and appends one record to the usage log.
 
 The query uses the index of the 6,004 files, 51,347 symbols and 134,377 edges (C1). It takes about 0.1 s, against a `grep` that returns every text match and needs a read of each file. The output text is the three-field line of section 1. Tests in `go/cmd/evolve/cmd_code_test.go` pin it.
+
+## 9. Backends and the benchmark
+
+> [ADR-0140](adr/0140-the-type-checker-answers-callers-and-each-query-goes-to-its-best-measured-backend.md) · plan: [code-index-backends-2026-10](../plans/code-index-backends-2026-10.md) · research: [code-index-backends-2026-10](../research/code-index-backends-2026-10.md).
+> Status: planned (2026-10-17). No name in this section has code yet, except `Backends`, `Capabilities` and `codeindextest.Run` of section 2. "Decision N" in this section is decision N of ADR-0140, which is also D N of the plan.
+
+### Issue
+
+On 2026-10-17 the operator asked if graphify looks up code better than trail-code, through the CLI that we built. We measured both against the Go type checker, on 40 symbols and 10 files (research F2.15). trail-code gives `callers` a precision of 0.11 and a recall of 0.32. It matches a name without its case or its type (F2.9), and misses calls through a package name (F2.10). graphify gives `callers` 0.93 and 0.75, but only after a second call with the right file for 18 of 40 names. It needs a unique name (F2.7), and takes about 3.5 s for each call (F2.6).
+
+### Gap
+
+Section 2 gives a capability route, but only one backend fills it, and nothing measures which backend is best for which query. A tree-sitter graph cannot fix the name problem: it has no types. On the same day the operator forbade MCP: "Forbid any mcp use, we only use cli to commute with other services". So the gopls, codegraph and Serena servers are not options (research section 4).
+
+### Solution
+
+Three parts: a type-checked backend, a benchmark against the type checker, and a route that the benchmark fills.
+
+**The backends and the four queries.** Each backend is a CLI or an `evolve` verb (decision 9).
+
+| Query | `gotypes` (planned, G1) | `trail` (built, K1) | graphify CLI (bench-only run, no adapter) |
+|---|---|---|---|
+| `callers --direction in` | the static call sites of the symbol, from the index | `trail callers` | the `<--` edges of relation `calls` in `graphify explain <name> --all` |
+| `callers --direction out` | the calls in the body of the symbol | `trail callers --direction out` | the `-->` edges of relation `calls` in the same output |
+| `api <file>` | the top-level declarations of the file, with constants and variables | `trail skeleton` | the `-->` edges of relation `contains` in `graphify explain <file> --all` |
+| `find <query>` | not served (`ErrUnsupported`) | `trail ask` | `graphify query <words>`, the `NODE` lines |
+| `map [dir]` | not served (`ErrUnsupported`) | `trail map` | not scored |
+
+**The `gotypes` backend.** It lives in `go/internal/adapters/codeindex/gotypes`, because its build runs `go list`. It uses the standard library only (`go/parser`, `go/types`). At the boundary, it type-checks the module with its test variants and keeps the 85,694 static call edges to module functions (F2.20).
+
+- **The index file.** One gob file, `dev/code-index-gotypes/index.gob`, beside the index worktree and outside every git tree, so no ignore rule is needed. It holds the edges keyed by the bare name, by `Type.Method` and by the package-qualified name. On this repository it is 19 MB.
+- **The refresh order.** The K2 refresh runs `git checkout --detach origin/main` and the incremental `trail build` in the index worktree. Then the `gotypes` step type-checks the same checkout and writes the index, in about 5 s (F2.13). A failed step keeps the last good index and prints a warning.
+- **The cost of a query.** The query loads the index and prints the three-field lines of section 1. The prototype took 0.044–0.047 s at p50, and `evolve` starts in 0.019 s. So a call costs about 0.07 s, an estimate from two measured parts (F2.20).
+
+**Names.** A package-qualified name, such as `router.Digest` or `loopwave.Launcher.Run`, gives an exact answer (decision 4). The prototype scored 1.00 and 1.00 with qualified names, and 0.44 and 1.00 with bare names. A bare name merges the homonyms of every package. So for a bare name with several definitions, each hit's `Text` starts with the qualified name of its definition. The agent can then drop the hits of the other definitions.
+
+**Kinds.** Each `gotypes` hit names its kind in its `Text`: `static`, `interface` or `func-value` (decision 5). A call through an interface counts for the interface method, not for the concrete method (F2.14). A concrete method with no static caller gets one line for each interface that it implements, from `go/types.Implements`. For example: "implements `Bridge.Launch`: 5 calls through it" for `fakeBridge.Launch` (F2.22). So the answer is not empty with no reason.
+
+**graphify.** graphify is not in the route and has no adapter (decision 11). The bench runs its CLI from outside, with a clean environment, `GRAPHIFY_QUERY_LOG_DISABLE=1` and `GRAPHIFY_NO_AUTO_REFRESH=1` (F2.2). graphify refreshes only inside a bench run, never at the boundary (decision 10), because its refresh takes about 66–130 s (F2.17). If a bench run shows graphify best for a query type, a new plan adds an adapter with the rules of research R4.
+
+**The capability route.** The default of `code_index.backends` becomes `["gotypes", "trail"]` (G4). `Backends.For` picks the first backend that serves the query (`go/internal/codeindex/backends.go:27-34`), so the route works with no code change:
+
+```mermaid
+flowchart LR
+    Q[evolve code query] --> R{first backend that serves it}
+    R -->|callers, api| G[gotypes: type-checked index]
+    R -->|find, map| T[trail: tree-sitter graph]
+    B[evolve code bench] -.->|table in the pull request| P[code_index.backends]
+    P --> R
+```
+
+The boundary refreshes only the indexes that the route names (decision 10). A change to the route carries a bench table (decision 8). What latency an agent accepts for a better answer is open (plan Q5), so the bench reports latency beside accuracy and does not combine them.
+
+**The benchmark and its truth.** `evolve code bench` (planned, G3) repeats the measurement of research section 1 for any set of backends.
+
+1. It type-checks the index worktree with its test variants, as the `gotypes` build does. That is the truth.
+2. It checks the truth with grep on 10 symbols, as research F2.19 did. A truth site that grep cannot find fails the run.
+3. It samples symbols by a hash of their position, so no person picks them. It always adds the symbols of `codeindextest.StandardProbes()`.
+4. It runs each query through `Backends.Search` for each backend, 3 times.
+5. It prints the precision, recall, p50, p95, median bytes and failures of each backend and query, with the load average.
+
+A caller is the pair of its file and its enclosing function, so two call sites in one function count once. `map` has no type-checked truth and is "not scored". The truth is the static call graph: a call through reflection or in a package-level initializer is not in it (F2.14).
+
+**Worked example.** `evolve code callers Digest` today returns the callers of the lower-case `digest` in `go/internal/acssuite/evidence.go` (F2.9). The truth has 62 call sites of `router.Digest` (`go/internal/router/digest.go:17`). With the route `["gotypes", "trail"]`, `Backends.For(QueryCallers)` picks `gotypes`.
+
+- `evolve code callers router.Digest` returns those 62 sites, each with the kind `static`.
+- `evolve code callers Digest` also returns the calls of the methods `Digest` of other types, and each hit names its definition.
+- A `find catalog refresh` still goes to trail-code.
+
+### Guards for the backends
+
+| Rule | Guard test | State |
+|---|---|---|
+| decision 1: `gotypes` serves `callers` and `api` only | `codeindextest.Run` on a fixture module. `find` and `map` give `ErrUnsupported` | planned (G1) |
+| decision 4: a qualified name gives only its own callers | the fixture has two functions of the same bare name in two packages | planned (G1) |
+| decision 5: each hit names its kind, and a concrete method gets its "implements" line | the fixture has one interface call and one function-value call | planned (G1) |
+| decision 7: the bench scores exactly and checks its truth | a fake backend with two false positives and one false negative gives the exact precision and recall. A truth that misses a real call fails the grep check | planned (G3) |
+| decision 8: a route change carries a bench table | review of the pull request; no automatic guard | planned (G4) |
+| decision 10: the boundary refreshes only route members | `wave next --dry-run` lists no graphify step | planned (G2) |
+
+### Limits of the backends
+
+- `gotypes` is Go only. trail-code still answers for the other languages.
+- The static answer does not give the concrete target of an interface call. A CHA or VTA mode is an open question (plan Q4).
+- The independent check covered 10 functions and no interface methods (F2.19).
+- The bench measures `callers`, `api` and `find` against the type checker. It cannot score `map`, and it cannot prove that an agent gets a better result. The K3 usage log and the A/B of the plan, section 8, measure that.
 
 ## Guards
 
