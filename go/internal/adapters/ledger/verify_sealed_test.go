@@ -1,10 +1,14 @@
 package ledger
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 func ledgerLines(t *testing.T, dir string) [][]byte {
@@ -92,5 +96,32 @@ func TestVerify_ASealThatCrashedBeforeTruncationVerifiesFromThePreviousSegment(t
 	}
 	if err := l.VerifyDeep(ctx); err == nil {
 		t.Fatal("VerifyDeep must still report the untruncated segment as residue")
+	}
+}
+
+func TestVerify_ATamperedLiveLineOnASealedLedgerFails(t *testing.T) {
+	ctx := context.Background()
+	l, dir := seedLedger(t, 12)
+	if err := l.Seal(ctx, 4); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Verify(ctx); err != nil {
+		t.Fatalf("Verify before tampering: %v", err)
+	}
+	path := filepath.Join(dir, "ledger.jsonl")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tampered := bytes.Replace(raw, []byte(`"entry-9"`), []byte(`"entry-X"`), 1)
+	if bytes.Equal(tampered, raw) {
+		t.Fatal("fixture drift: entry-9 is not in the live tail")
+	}
+	if err := os.WriteFile(path, tampered, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := l.Verify(ctx); !errors.Is(err, core.ErrLedgerChainBroken) {
+		t.Errorf("Verify of a sealed ledger with a tampered live line: err=%v, want ErrLedgerChainBroken", err)
 	}
 }

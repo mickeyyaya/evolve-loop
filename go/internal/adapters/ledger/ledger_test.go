@@ -22,8 +22,6 @@ func newLedger(t *testing.T) (*FileLedger, string) {
 	return New(evolveDir), evolveDir
 }
 
-const zero64 = "0000000000000000000000000000000000000000000000000000000000000000"
-
 func TestAppend_FirstEntry(t *testing.T) {
 	l, dir := newLedger(t)
 	e := core.LedgerEntry{Role: "scout", Cycle: 1, Kind: "phase"}
@@ -32,7 +30,7 @@ func TestAppend_FirstEntry(t *testing.T) {
 	}
 
 	raw, _ := os.ReadFile(filepath.Join(dir, "ledger.jsonl"))
-	if !strings.Contains(string(raw), `"prev_hash":"`+zero64+`"`) {
+	if !strings.Contains(string(raw), `"prev_hash":"`+ZeroSeed+`"`) {
 		t.Errorf("first entry prev_hash not zero-init: %s", raw)
 	}
 	if !strings.Contains(string(raw), `"entry_seq":0`) {
@@ -364,7 +362,7 @@ func TestSplitTip_StripsTrailingNewline(t *testing.T) {
 	}
 }
 
-func TestVerify_DuplicatePrevHash(t *testing.T) {
+func TestVerify_ALineAppendedBehindTheTipIsATipMismatch(t *testing.T) {
 	l, dir := newLedger(t)
 	_ = l.Append(context.Background(), core.LedgerEntry{Role: "a", Cycle: 1})
 	_ = l.Append(context.Background(), core.LedgerEntry{Role: "b", Cycle: 1})
@@ -377,6 +375,6 @@ func TestVerify_DuplicatePrevHash(t *testing.T) {
 	_ = os.WriteFile(path, []byte(combined), 0o644)
 
 	if err := l.Verify(context.Background()); !errors.Is(err, core.ErrLedgerChainBroken) {
-		t.Errorf("Verify duplicate prev_hash: err=%v, want ErrLedgerChainBroken", err)
+		t.Errorf("Verify line appended behind the tip: err=%v, want ErrLedgerChainBroken", err)
 	}
 }
