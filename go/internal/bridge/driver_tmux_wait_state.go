@@ -32,6 +32,7 @@ type replWaitState struct {
 	nudgeEvent              *interaction.Event
 	nudgeAt                 time.Time
 	detectorErrorLogged     bool
+	inboxDrainWarned        bool
 	terminalDetectorErrored bool
 	paneLost                bool
 	paneLossTicks           int
