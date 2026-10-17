@@ -37,6 +37,7 @@ func inboxVerbs() []inboxVerb {
 		{"withdraw", "withdraw <id> <reason>", withoutStdin(runInboxWithdraw)},
 		{"claims", "claims [--json] [--project-root P]", withoutStdin(runInboxClaims)},
 		{"release", "release <id> <reason> [--keep root|claim] [--json] | release --stale <reason> [--json] [--project-root P]", withoutStdin(runInboxRelease)},
+		{"split", "split <id> [--lane-after-console] [--json] [--project-root P]", withoutStdin(runInboxSplit)},
 		{"route-console", "route-console <id> <reason> <cycle>", withoutStdin(runInboxRouteConsole)},
 		{"route-lane", "route-lane <id> <reason>", withoutStdin(runInboxRouteLane)},
 		{"consume", "consume <item-path> [--resolution <text>] [--cycle <n>|console]", withoutStdin(runInboxConsume)},

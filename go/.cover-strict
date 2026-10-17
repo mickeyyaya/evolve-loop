@@ -26,6 +26,7 @@
 ./internal/cliupdate 100
 ./internal/inboxrank 100
 ./internal/inboxrank/rankinputs 100
+./internal/inboxsplit 100
 ./internal/codereview 100
 ./internal/qualityindex 100
 ./internal/events/channel 100

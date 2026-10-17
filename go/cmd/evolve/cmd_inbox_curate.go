@@ -20,7 +20,11 @@ func curationOptions(stderr io.Writer) inboxmover.Options {
 }
 
 func refusedMidWave(verb string, stderr io.Writer) bool {
-	runsDir := filepath.Join(paths.EvolveDirOf(envOrCwd("EVOLVE_PROJECT_ROOT")), "runs")
+	return refusedMidWaveAt(envOrCwd("EVOLVE_PROJECT_ROOT"), verb, stderr)
+}
+
+func refusedMidWaveAt(root, verb string, stderr io.Writer) bool {
+	runsDir := filepath.Join(paths.EvolveDirOf(root), "runs")
 	live := runlease.LiveRuns(runsDir, time.Now())
 	if len(live) == 0 {
 		return false
