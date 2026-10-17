@@ -197,10 +197,12 @@ v12.1 utilities + composition:
                               [--root DIR] )
   code                      Read-only code index for phase agents: who calls
                               a symbol, the API of a file, a search in plain
-                              words, a map of the directories
+                              words, a map of the directories; each call is
+                              logged, and code usage counts the calls by phase
                               ( code callers <symbol> [--direction in|out]
                               | code api <file> | code find <query>
-                              | code map [dir] [--project-root P] )
+                              | code map [dir] [--project-root P]
+                              | code usage [--since D] [--json] )
   context-fill              Context-window fill telemetry; correlates each
                               cycle's peak per-phase fill ratio against its
                               dossier final verdict (read-only)

@@ -1,7 +1,7 @@
 # Code index CLI: `evolve code` gives every phase agent a read-only code graph
 
 > Research: [code-index-cli-2026-10](../research/code-index-cli-2026-10.md). Plan: [code-index-cli-2026-10](../plans/code-index-cli-2026-10.md). Decision: [ADR-0138](adr/0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md).
-> Status: K1 is built (2026-10-17): the `evolve code` verb, the `codeindex` layer, the trail adapter and the policy block `code_index`. The components K2 to K5 are planned. A name in this file that has no code is marked "planned".
+> Status: K1 and K3 are built (2026-10-17): the `evolve code` verb, the `codeindex` layer, the trail adapter, the policy block `code_index` and the usage log. The components K2, K4a, K4b and K5 are planned. A name in this file that has no code is marked "planned".
 >
 > This file is the spec of record for the `evolve code` verb. The research holds the evidence, the plan holds the scored designs and the order of work, and the ADR holds the decision.
 
@@ -18,7 +18,7 @@ On 2026-10-17 the operator asked that the loop agents use trail-code, "separated
 | adapter | The one package, `go/internal/adapters/codeindex/trail`, that runs the trail-code binary. It implements `Backend`. |
 | boundary | The step between two waves where the loop merges and refreshes. `evolve wave next` runs it (`go/cmd/evolve/cmd_wave_next.go:102`). |
 | phase agent | The LLM CLI process of one phase: scout, builder, debugger and others. Each has a shell tool (C5). |
-| usage log | The file `/tmp/evolve-code-calls.ndjson` (planned). Each call appends one line. |
+| usage log | The file `code-calls.ndjson` (built, K3). A call inside a phase writes the cycle workspace copy. A call outside a phase writes the per-user cache copy. |
 
 ## Goals
 
@@ -201,9 +201,11 @@ The index tool must read a worktree that is not the phase worktree. The usage lo
 
 ### Solution
 
-The command only reads. The index worktree is read through the file system. The one write is the usage log under `/tmp`. The macOS sandbox profile grants read and write on `/tmp`, `/private/tmp`, `/var/folders` and `/private/var/folders` (`go/internal/adapters/sandbox/sandbox.go:178-181`). The bridge also passes `/tmp` as a write path on its wrap (`go/internal/bridge/sandbox_wrap.go:158`). The command needs no new grant.
+The command only reads. The index worktree is read through the file system. The one write is the usage log (section 6 gives the path rule).
 
-If the log write fails, the command prints the answer and goes on. A log failure must not block a query. The command does print one line on stderr when the write fails, so the failure is not silent. This rule is planned (K3).
+Inside a phase, the log is in the cycle workspace (`.evolve/runs/cycle-N/code-calls.ndjson`), which the phase can write under both sandboxes. The log is not in `/tmp`, because the Linux phase sandbox mounts a private `tmpfs` on `/tmp` (`go/internal/adapters/sandbox/sandbox.go:245`, `--tmpfs /tmp`). A record in `/tmp` is lost when the phase ends. The command needs no new grant.
+
+If the log write fails, the command prints the answer and goes on. A log failure must not block a query. The command does print one line on stderr when the write fails, so the failure is not silent. Built (K3): `TestCodeVerbLogged_AWriteFailureKeepsTheExitCodeAndTheOutput`.
 
 The index worktree at `dev/code-index` is a path that the sandbox must allow for read. The read grant covers `dev/code-index` when `HomeDir` is set (`go/internal/adapters/sandbox/sandbox.go:175-176`; on Linux `go/internal/adapters/sandbox/sandbox.go:249-251`). No test runs `evolve code map` under the generated profile yet. K1 did not build it, because it needs the macOS sandbox tool. It stays open.
 
@@ -219,16 +221,39 @@ G2 and G3 need numbers by phase. The backend cannot give them, because the backe
 
 ### Solution
 
-Each call appends one record (D6) to `/tmp/evolve-code-calls.ndjson` (planned, K3). One record is one JSON object on one line.
+Each call appends one record (D6) to the usage log (built, K3). One record is one JSON object on one line. The command writes the whole line with one `write` call on a file that it opens with `O_APPEND`. A reader never sees a part of a line. Two calls at the same time never mix their lines.
 
 | Field | Value |
 |---|---|
 | `ts` | the time of the call, in UTC |
 | `command` | `callers`, `api`, `find` or `map` |
-| `phase` | the phase name, read from the environment of the process if present, else empty |
+| `arg_len` | the length of the argument, in bytes. The log never holds the argument, because it can hold code. |
+| `exit` | the exit code of the call |
+| `hits` | the number of result lines |
+| `duration_ms` | the run time of the call, in milliseconds |
+| `phase` | the phase name, from the agent part of `EVOLVE_DISPATCH_ID`, else empty |
+| `cycle` | the cycle number, from `EVOLVE_DISPATCH_ID`, else 0 |
+| `cli` | the CLI family, from `EVOLVE_CLI` if present, else empty |
 | `cwd` | the working directory of the call |
 
-The name of the environment variable that carries the phase is not fixed. The loop passes many `EVOLVE_PHASE_*` variables, and K3 must find the variable that names the phase (open item, see Limits).
+The bridge sets `EVOLVE_DISPATCH_ID` (form `run/cycle/agent/pPIDnNONCE`) in the environment of each phase agent, so every shell command of the agent carries it. No `EVOLVE_PHASE` variable exists. A call outside a phase has an empty `phase`. The command logs a call that has a known verb, also when it fails.
+
+The command writes no record for an unknown verb.
+
+The path of the log follows the identity of the process:
+
+| Place of the call | Log file | Rotation |
+|---|---|---|
+| Inside a phase (`EVOLVE_DISPATCH_ID` is set) | `<project root>/.evolve/runs/cycle-N/code-calls.ndjson`, where N is the cycle in the tag | none. The existing gc removes the file with the run directory of the cycle. |
+| Outside a phase | `<user cache dir>/evolve/code-calls.ndjson` (`os.UserCacheDir`) | When the file is larger than 5 MB (`MaxUserBytes`), the next write renames it to `code-calls.ndjson.1` and starts a new file. One old file is kept. |
+
+The command creates the per-user directory with mode 0700 and the file with mode 0600. No other user can read the log. The command adds no environment variable: the path uses only `EVOLVE_DISPATCH_ID` and the project root.
+
+A failed write prints one line on stderr (`evolve code: usage log: ...`) and changes neither the exit code nor the output.
+
+`evolve code usage [--since D] [--json]` reads the per-user file, its `.1` file and every `<project root>/.evolve/runs/cycle-*/code-calls.ndjson`, and counts the calls by phase and command. D is a Go duration such as `24h`. The table has the columns PHASE, COMMAND, CALLS, HITS and FAILURES (a failure is a call with a nonzero exit). An empty phase shows as `(none)`. `--json` prints a list of `{phase, command, calls, hits, failures}`. A missing log gives an empty result.
+
+A line that does not parse is skipped, and one stderr line gives the count. The code is `go/internal/codeindex/usagelog` and `go/cmd/evolve/cmd_code_usage.go`.
 
 How the plan reads the log:
 
@@ -268,7 +293,7 @@ flowchart LR
     B -->|Backend interface| C[trail-code adapter]
     C -->|DO_NOT_TRACK=1, refresh off| D[trail binary]
     D --> E[(index at dev/code-index)]
-    B -.->|one record per call| F[/tmp/evolve-code-calls.ndjson/]
+    B -.->|one record per call| F[code-calls.ndjson: cycle workspace or user cache/]
     G[boundary: wave next] -->|checkout --detach origin/main, trail build| E
 ```
 
@@ -291,7 +316,7 @@ The query uses the index of the 6,004 files, 51,347 symbols and 134,377 edges (C
 | D3: one package runs the trail-code binary | `TestOnlyTheTrailAdapterRunsTheTrailBinary` in `go/test/structure/binary_test.go` fails if another package both runs a process and names the trail binary path. `TestTheCodeIndexAbstractionRunsNoProcessAndNamesNoBackend` keeps `internal/codeindex` free of both. The convention has one row | built (K1) |
 | D4: the output has no instruction line | `TestTrailBackend_NoOutputLineThatInstructsTheAgentReachesAnyHit` and `TestCodeVerb_ThePhaseAgentDoesNotSeeAnInstructionLineOfTheBackendOutput` feed a "tokens saved" header and expect the answer without it | built (K1) |
 | D5: the command is read-only, so a cycle worktree stays clean | `TestCodeVerb_EveryVerbLeavesTheCheckedOutTreeClean` runs the four verbs in a temporary git repository and expects an empty `git status` | built (K1) |
-| D6: one record for each call | a test runs one command and counts one new line, with the command and the phase | planned (K3) |
+| D6: one record for each call | `TestCodeVerbLogged_ACallWritesOneRecordWithItsCommandAndPhase` runs one command and reads one new record with the command and the phase. `TestAppend_ConcurrentCallsGiveWholeLines` pins whole lines. `TestCodeUsage_AggregatesCallsByPhaseAndCommand` pins the summary | built (K3) |
 | G5: any backend passes the same tests | `codeindextest.Run` runs on the fake and on the trail adapter (`TestTrailBackend_PassesTheConformanceSuite`); the command tests run on the fake. The strip and the real process run through the trail adapter | built (K1) |
 
 ## Limits

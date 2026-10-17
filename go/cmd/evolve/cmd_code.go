@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -23,7 +24,7 @@ import (
 )
 
 const (
-	codeUsage = "usage: evolve code callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir]  [--project-root P]"
+	codeUsage = "usage: evolve code callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir]  [--project-root P] | usage [--since D] [--json]"
 
 	codeExitNotFound    = 1
 	codeExitAbsent      = 2
@@ -41,33 +42,49 @@ type codeInvocation struct {
 	projectRoot string
 }
 
+var codeUsageCacheDir = os.UserCacheDir
+
 func runCodeCommand(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == codeUsageVerbName {
+		return codeUsageVerb(args[1:], stdout, stderr, codeUsageCacheDir, codeProjectRoot(""))
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	return codeVerb(ctx, args, stdout, stderr, func(root string) (codeindex.Backends, error) {
+	sink := codeUsageSink{env: os.Getenv, cacheDir: codeUsageCacheDir, rootOf: func() string { return codeProjectRoot("") }}
+	return codeVerbLogged(ctx, args, stdout, stderr, func(root string) (codeindex.Backends, error) {
 		return buildCodeBackends(root, sysexec.DefaultRunner, os.Environ())
-	})
+	}, sink)
 }
 
-func codeVerb(ctx context.Context, args []string, stdout, stderr io.Writer, build codeBackendsBuilder) int {
+func codeVerb(ctx context.Context, args []string, stdout, stderr io.Writer, build codeBackendsBuilder) (int, codeCall) {
 	inv, err := parseCodeArgs(args, stderr)
+	call := codeCall{verb: codeVerbName(args), root: inv.projectRoot}
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve code: %v\n%s\n", err, codeUsage)
-		return codeExitUsage
+		return codeExitUsage, call
 	}
+	call.argLen = len(inv.request.Arg)
 	backends, err := build(inv.projectRoot)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve code: %v\n", err)
-		return codeExitFailed
+		return codeExitFailed, call
 	}
 	ctx, cancel := context.WithTimeout(ctx, codeQueryTimeout)
 	defer cancel()
 	hits, err := backends.Search(ctx, inv.request)
 	if err != nil {
-		return reportCodeError(inv.request, err, stderr)
+		return reportCodeError(inv.request, err, stderr), call
 	}
+	call.hits = len(hits)
 	printCodeHits(hits, stdout)
-	return 0
+	return 0, call
+}
+
+func codeVerbName(args []string) string {
+	if len(args) > 0 && slices.Contains(codeindex.Queries(), codeindex.Query(args[0])) {
+		return args[0]
+	}
+	return ""
 }
 
 func reportCodeError(req codeindex.Request, err error, stderr io.Writer) int {

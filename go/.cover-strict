@@ -64,4 +64,5 @@
 ./internal/testverdict 100
 ./internal/codeindex 100
 ./internal/codeindex/codeindextest 100
+./internal/codeindex/usagelog 100
 ./internal/adapters/codeindex/trail 100
