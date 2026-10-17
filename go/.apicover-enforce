@@ -769,3 +769,5 @@
 ./internal/lanebudget
 # admission — admission by package cell, with the hub cell at capacity 1 (ADR-0139 O3, ADR-0134 S14): the conflict rule, the module graph and the hub set.
 ./internal/admission
+# gotypes — the type-checked Go index behind codeindex.Backend for callers and api, standard library only (ADR-0140, plan G1).
+./internal/adapters/codeindex/gotypes

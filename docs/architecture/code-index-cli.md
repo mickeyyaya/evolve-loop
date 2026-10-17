@@ -328,7 +328,7 @@ The query uses the index of the 6,004 files, 51,347 symbols and 134,377 edges (C
 ## 9. Backends and the benchmark
 
 > [ADR-0140](adr/0140-the-type-checker-answers-callers-and-each-query-goes-to-its-best-measured-backend.md) · plan: [code-index-backends-2026-10](../plans/code-index-backends-2026-10.md) · research: [code-index-backends-2026-10](../research/code-index-backends-2026-10.md).
-> Status: planned (2026-10-17). No name in this section has code yet, except `Backends`, `Capabilities` and `codeindextest.Run` of section 2. "Decision N" in this section is decision N of ADR-0140, which is also D N of the plan.
+> Status: G1 built (2026-10-17): the `gotypes` backend, in [internal-adapters-codeindex-gotypes](packages/internal-adapters-codeindex-gotypes.md). G2 to G5 are planned. "Decision N" in this section is decision N of ADR-0140, which is also D N of the plan.
 
 ### Issue
 
@@ -344,7 +344,7 @@ Three parts: a type-checked backend, a benchmark against the type checker, and a
 
 **The backends and the four queries.** Each backend is a CLI or an `evolve` verb (decision 9).
 
-| Query | `gotypes` (planned, G1) | `trail` (built, K1) | graphify CLI (bench-only run, no adapter) |
+| Query | `gotypes` (built, G1) | `trail` (built, K1) | graphify CLI (bench-only run, no adapter) |
 |---|---|---|---|
 | `callers --direction in` | the static call sites of the symbol, from the index | `trail callers` | the `<--` edges of relation `calls` in `graphify explain <name> --all` |
 | `callers --direction out` | the calls in the body of the symbol | `trail callers --direction out` | the `-->` edges of relation `calls` in the same output |
@@ -354,13 +354,17 @@ Three parts: a type-checked backend, a benchmark against the type checker, and a
 
 **The `gotypes` backend.** It lives in `go/internal/adapters/codeindex/gotypes`, because its build runs `go list`. It uses the standard library only (`go/parser`, `go/types`). At the boundary, it type-checks the module with its test variants and keeps the 85,694 static call edges to module functions (F2.20).
 
-- **The index file.** One gob file, `dev/code-index-gotypes/index.gob`, beside the index worktree and outside every git tree, so no ignore rule is needed. It holds the edges keyed by the bare name, by `Type.Method` and by the package-qualified name. On this repository it is 19 MB.
+- **The index file.** One gob file, `dev/code-index-gotypes/index.gob`, beside the index worktree and outside every git tree, so no ignore rule is needed. `gotypes.IndexPath` gives this path from `code_index.index_dir`. The file holds the definitions, the module call edges, the declarations and the interface links. A definition answers to its bare name, to `Type.Method` and to its package-qualified name. On this repository it is 5.4 MB (G1, 2026-10-17), and the prototype file of F2.20 was 19 MB.
 - **The refresh order.** The K2 refresh runs `git checkout --detach origin/main` and the incremental `trail build` in the index worktree. Then the `gotypes` step type-checks the same checkout and writes the index, in about 5 s (F2.13). A failed step keeps the last good index and prints a warning.
-- **The cost of a query.** The query loads the index and prints the three-field lines of section 1. The prototype took 0.044–0.047 s at p50, and `evolve` starts in 0.019 s. So a call costs about 0.07 s, an estimate from two measured parts (F2.20).
+- **The cost of a query.** The query loads the index and prints the three-field lines of section 1. The prototype took 0.044–0.047 s at p50, and `evolve` starts in 0.019 s (F2.20). The G1 backend, measured as one run of `evolve code callers`, took 0.031–0.037 s at p50 for 5 symbols on 2026-10-17. Its `Build` took 3.7–8.2 s, with a peak memory of 434–461 MB.
 
 **Names.** A package-qualified name, such as `router.Digest` or `loopwave.Launcher.Run`, gives an exact answer (decision 4). The prototype scored 1.00 and 1.00 with qualified names, and 0.44 and 1.00 with bare names. A bare name merges the homonyms of every package. So for a bare name with several definitions, each hit's `Text` starts with the qualified name of its definition. The agent can then drop the hits of the other definitions.
 
+G1 starts the `Text` of every hit with the qualified name of its definition, so one rule covers both forms.
+
 **Kinds.** Each `gotypes` hit names its kind in its `Text`: `static`, `interface` or `func-value` (decision 5). A call through an interface counts for the interface method, not for the concrete method (F2.14). A concrete method with no static caller gets one line for each interface that it implements, from `go/types.Implements`. For example: "implements `Bridge.Launch`: 5 calls through it" for `fakeBridge.Launch` (F2.22). So the answer is not empty with no reason.
+
+G1 prints that line as `audit.fakeBridge.Launch implements core.Bridge.Launch: 6 call(s) through it`, on 2026-10-17. G1 counts 6 calls, and F2.22 counted 5. The sixth site, `go/internal/core/apicover_ports_test.go:58`, dates from 2026-06-17 (`git log -S`). The truth missed it: the site is in the test variant `core [core.test]`, so `types.Implements` saw a second `Bridge` type. The right number is 6 ([internal-adapters-codeindex-gotypes](packages/internal-adapters-codeindex-gotypes.md), section "Measurement").
 
 **graphify.** graphify is not in the route and has no adapter (decision 11). The bench runs its CLI from outside, with a clean environment, `GRAPHIFY_QUERY_LOG_DISABLE=1` and `GRAPHIFY_NO_AUTO_REFRESH=1` (F2.2). graphify refreshes only inside a bench run, never at the boundary (decision 10), because its refresh takes about 66–130 s (F2.17). If a bench run shows graphify best for a query type, a new plan adds an adapter with the rules of research R4.
 
@@ -397,9 +401,9 @@ A caller is the pair of its file and its enclosing function, so two call sites i
 
 | Rule | Guard test | State |
 |---|---|---|
-| decision 1: `gotypes` serves `callers` and `api` only | `codeindextest.Run` on a fixture module. `find` and `map` give `ErrUnsupported` | planned (G1) |
-| decision 4: a qualified name gives only its own callers | the fixture has two functions of the same bare name in two packages | planned (G1) |
-| decision 5: each hit names its kind, and a concrete method gets its "implements" line | the fixture has one interface call and one function-value call | planned (G1) |
+| decision 1: `gotypes` serves `callers` and `api` only | `TestGotypesBackend_PassesTheConformanceSuite` runs `codeindextest.Run` on a fixture module. `find` and `map` give `ErrUnsupported` | built (G1) |
+| decision 4: a qualified name gives only its own callers | `TestGotypesBackend_AQualifiedNameGivesOnlyTheCallersOfItsOwnDefinition` and `TestGotypesBackend_ABareNameWithTwoDefinitionsNamesTheDefinitionOfEachHit`: the fixture has two functions of the same bare name in two packages | built (G1) |
+| decision 5: each hit names its kind, and a concrete method gets its "implements" line | `TestGotypesBackend_EachHitNamesItsKind` and `TestGotypesBackend_AConcreteMethodReachedOnlyThroughAnInterfaceGetsItsImplementsLine`: the fixture has interface calls and one function-value call | built (G1) |
 | decision 7: the bench scores exactly and checks its truth | a fake backend with two false positives and one false negative gives the exact precision and recall. A truth that misses a real call fails the grep check | planned (G3) |
 | decision 8: a route change carries a bench table | review of the pull request; no automatic guard | planned (G4) |
 | decision 10: the boundary refreshes only route members | `wave next --dry-run` lists no graphify step | planned (G2) |
@@ -407,6 +411,9 @@ A caller is the pair of its file and its enclosing function, so two call sites i
 ### Limits of the backends
 
 - `gotypes` is Go only. trail-code still answers for the other languages.
+- `gotypes` has the files of the host platform only. `CGO_ENABLED=0` leaves out the cgo files, and the files of another `GOOS` or `GOARCH` are not in the index.
+- `gotypes` counts calls only. A method value or a function reference that is not a call is not counted. A call in a package-level initializer has the caller `<package>.<init>`.
+- A broken package gives a warning and a partial index, not a failed build.
 - The static answer does not give the concrete target of an interface call. A CHA or VTA mode is an open question (plan Q4).
 - The independent check covered 10 functions and no interface methods (F2.19).
 - The bench measures `callers`, `api` and `find` against the type checker. It cannot score `map`, and it cannot prove that an agent gets a better result. The K3 usage log and the A/B of the plan, section 8, measure that.
