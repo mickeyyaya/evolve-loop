@@ -71,3 +71,4 @@
 ./internal/lanebudget 100
 ./internal/admission 100
 ./internal/orchestrator 100
+./internal/acspathscan 100

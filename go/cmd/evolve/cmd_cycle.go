@@ -25,6 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
@@ -255,6 +256,8 @@ func releaseDeferredLaneClaims(projectRoot string, cycle int, stderr io.Writer, 
 	return err
 }
 
+var protectedMembership = guards.IsProtectedSurface
+
 func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) (applied string, err error) {
 	switch {
 	case result.FinalVerdict == cyclestate.VerdictFAIL:
@@ -282,9 +285,9 @@ func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr i
 	if cycle == 0 {
 		return nil
 	}
-	_, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
-		projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr,
-	).WithLedger(lifecycle).WithSignals(signals))
+	in := cycleoutcome.FailureInputsFor(projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr)
+	in.Protected = protectedMembership
+	_, err := cycleoutcome.ApplyFailure(in.WithLedger(lifecycle).WithSignals(signals))
 	return err
 }
 
@@ -491,6 +494,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
 	opts = append(opts, core.WithHostEffects(hostEffects))
 	opts = append(opts, core.WithLaneMenu(laneMenuOf(forbidden)))
+	opts = append(opts, core.WithProtectedSurface(protectedMembership))
 	opts = append(opts, core.WithSignalCenter(signals))
 
 	return orchDeps{

@@ -29,6 +29,13 @@ func (cr *cycleRun) completeCycle() error {
 }
 
 func (cr *cycleRun) recordPlannedNoWorkOutcome() {
+	if cr.result.TerminationReason == CycleTerminationTddProtectedRoute && cr.current == PhaseTDD {
+		cr.result.FinalVerdict = VerdictFAIL
+		cr.o.recordHostEnding(&cr.phaseTimings, phaseOutcomeFrom(PhaseTDD,
+			PhaseResponse{Phase: string(PhaseTDD), Verdict: VerdictFAIL, Diagnostics: cr.protectedRouteDiags},
+			0, CycleTerminationTddProtectedRoute, ""))
+		return
+	}
 	if cr.result.TerminationReason == cycleTerminationTriageClaimFailed &&
 		cr.current == PhaseTriage &&
 		!cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases) &&
