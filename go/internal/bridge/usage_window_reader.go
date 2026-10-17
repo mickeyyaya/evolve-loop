@@ -8,11 +8,11 @@ import (
 )
 
 func UsageWindows(family, pane string, now time.Time) []quotastate.UsageWindow {
-	m, err := LoadManifest(family + "-tmux")
+	r, err := Resolve(DefaultDriverSet(), family)
 	if err != nil {
 		return nil
 	}
-	spec := m.usageWindowSpec()
+	spec := r.Manifest.usageWindowSpec()
 	if spec == nil {
 		return nil
 	}

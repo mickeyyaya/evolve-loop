@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliupdate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
@@ -64,8 +65,9 @@ func TestProductionCLIUpdateWiring_ProbesAndSmokesThroughTheLiveDoctor(t *testin
 
 	for name, check := range map[string]func(context.Context, string) error{"probe": w.seams.Probe, "smoke": w.seams.Smoke} {
 		err := check(context.Background(), "nosuchfamily")
-		if err == nil || err.Error() != `doctor live nosuchfamily-tmux rc=10 pattern=""` {
-			t.Errorf("%s(nosuchfamily) = %v, want the bad-flags refusal of an unknown driver", name, err)
+		var unknown *bridge.UnknownFamilyError
+		if !errors.As(err, &unknown) || unknown.Family != "nosuchfamily" {
+			t.Errorf("%s(nosuchfamily) = %v, want the typed refusal of an unknown family before any session", name, err)
 		}
 	}
 	if w.now == nil || w.seams.Version == nil || w.seams.Run == nil || w.seams.Eligible == nil {

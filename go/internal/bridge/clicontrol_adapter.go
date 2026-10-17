@@ -38,12 +38,12 @@ func (c *cliController) perFamilyConfig(cli string) *Config {
 
 func (c *cliController) Do(ctx context.Context, family string, ev clicontrol.Event) (clicontrol.Response, error) {
 	resp := clicontrol.Response{Family: family, Event: ev}
-	cli := family + "-tmux"
-	m, err := c.resolve(cli)
+	r, err := Resolve(DefaultDriverSet().WithLoader(c.resolve), family)
 	if err != nil {
-		return resp, fmt.Errorf("clicontrol: resolve %s: %w", cli, err)
+		return resp, fmt.Errorf("clicontrol: %w", err)
 	}
-	spec, ok := m.Control(string(ev))
+	cli := r.Driver
+	spec, ok := r.Manifest.Control(string(ev))
 	if !ok {
 		return resp, fmt.Errorf("%w: family=%s event=%s", clicontrol.ErrUnsupported, family, ev)
 	}

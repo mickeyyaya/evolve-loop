@@ -113,9 +113,17 @@ func resolveModel(agent, phase, defaultModel string, env map[string]string, prof
 	return model
 }
 
+var interactiveDriverFor = map[string]string{
+	"claude":     "claude-tmux",
+	"codex":      "codex-tmux",
+	"agy":        "agy-tmux",
+	"agy-claude": "agy-claude-tmux",
+	"ollama":     "ollama-tmux",
+}
+
 func defaultDriverForFamily(cli string) string {
-	if _, ok := cliBinaryFor[cli+"-tmux"]; ok {
-		return cli + "-tmux"
+	if driver, ok := interactiveDriverFor[cli]; ok {
+		return driver
 	}
 	return cli
 }

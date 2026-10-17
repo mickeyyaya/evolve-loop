@@ -41,7 +41,12 @@ func runBridgeControl(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve bridge control: --workspace is required (the REPL scratch dir)")
 		return 10
 	}
-	cli := family + "-tmux"
+	resolved, err := bridge.Resolve(driverSet, family)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve bridge control: %v\n", err)
+		return 1
+	}
+	cli := resolved.Driver
 	efforts := commandEfforts(stderr)
 	intent := bridgeCommandIntent(cli, bypassIf(allowBypass), efforts)
 	cfg := &bridge.Config{

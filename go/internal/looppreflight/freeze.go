@@ -174,11 +174,11 @@ func withEvidenceWarnings(res CheckResult, errs []string) CheckResult {
 }
 
 var manifestAutoUpdateOff = func(bin string) (env string, set bool) {
-	m, err := bridge.LoadManifest(bin + "-tmux")
-	if err != nil || m.AutoUpdateOffEnv == "" {
+	r, err := bridge.Resolve(bridge.DefaultDriverSet(), bin)
+	if err != nil || r.Manifest.AutoUpdateOffEnv == "" {
 		return "", false
 	}
-	return m.AutoUpdateOffEnv, m.DefaultEnv[m.AutoUpdateOffEnv] != ""
+	return r.Manifest.AutoUpdateOffEnv, r.Manifest.DefaultEnv[r.Manifest.AutoUpdateOffEnv] != ""
 }
 
 func manifestFreezeEvidence(bin string) (risky bool, evidence string, declared bool) {
