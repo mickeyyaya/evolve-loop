@@ -10,8 +10,11 @@ Each library in `go/go.mod` has exactly one package that imports it. That packag
 |---|---|---|
 | `gopkg.in/yaml.v3` | `go/internal/adapters/yamlcodec` (`Marshal`, `Unmarshal`) | Test files |
 | `pgregory.net/rapid` | none | Test files only |
+| the trail-code binary (`.bin/trail`, an outside Node program, not a `go.mod` library) | `go/internal/adapters/codeindex/trail` | Nowhere. The path comes from the policy key `code_index.trail_bin`. |
 
 Example: `internal/faillearn` calls `yamlcodec.Marshal`. It does not import `gopkg.in/yaml.v3`.
+
+An outside binary follows the same rule. The trail-code binary is the first case ([code-index-cli](../architecture/code-index-cli.md), decision D3). Only its adapter runs it, through an injected `sysexec.RunFunc`.
 
 When you add a library to `go.mod`, add a row to `thirdPartyHomes` in `go/test/structure/thirdparty_test.go`. The test fails until you do.
 
@@ -51,4 +54,5 @@ When an unfixable vulnerability blocks the pipeline, record an entry in `go/vuln
 ## Regression guard
 
 - `TestEveryThirdPartyImportHasExactlyOneHome` in `go/test/structure/thirdparty_test.go` parses the imports of each non-vendor `.go` file. It fails on a direct `gopkg.in/yaml.v3` import in a non-test file, on `pgregory.net/rapid` in a non-test file, and on a `go.mod` library without a row.
+- `TestOnlyTheTrailAdapterRunsTheTrailBinary` in `go/test/structure/binary_test.go` fails when a non-test file outside the trail adapter both imports `os/exec` or `internal/sysexec` and holds a string literal with `.bin/trail`.
 - `TestGoWorkflow_GatesTheSuiteOnAPinnedGovulncheckFromTheMakeTarget` in `go/internal/ciparity/workflows_test.go` pins the CI job and the exact version.

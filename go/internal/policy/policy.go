@@ -32,6 +32,7 @@ type Policy struct {
 	Boot               *BootPolicy               `json:"boot,omitempty"`
 	CIWatch            *CIWatchPolicy            `json:"ci_watch,omitempty"`
 	PracticeWatch      *PracticeWatchPolicy      `json:"practice_watch,omitempty"`
+	CodeIndex          *CodeIndexPolicy          `json:"code_index,omitempty"`
 	PR                 *PRPolicy                 `json:"pr,omitempty"`
 	Bridge             *BridgePolicy             `json:"bridge,omitempty"`
 	QuotaReset         *QuotaResetConfig         `json:"quota_reset,omitempty"`

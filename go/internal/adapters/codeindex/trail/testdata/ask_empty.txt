@@ -1,0 +1,5 @@
+trail ask — "qqqzzzxxx"  (empty)
+
+no matching nodes — try different words, or `trail build` if the code map is empty — scopes here: landing/ · go/
+
+[trail] no hits — don't re-ask with new wording; switch tool: `trail grep "<literal>"` for every occurrence · `trail skeleton <file>` for a file's full API · `trail callers <symbol>` for who-uses.
