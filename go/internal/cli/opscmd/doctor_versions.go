@@ -2,14 +2,10 @@ package opscmd
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"net/http"
 	"sort"
-	"strings"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
@@ -17,7 +13,7 @@ import (
 
 var (
 	doctorInstalledVersions = defaultInstalledVersions
-	doctorLatestRelease     = defaultLatestRelease
+	doctorLatestRelease     = looppreflight.DefaultLatestRelease
 )
 
 func defaultInstalledVersions() map[string]string {
@@ -29,90 +25,6 @@ func defaultInstalledVersions() map[string]string {
 		}
 	}
 	return res
-}
-
-var npmLatestReleaseURLs = map[string]string{
-	"claude": "https://registry.npmjs.org/@anthropic-ai/claude-code/latest",
-	"codex":  "https://registry.npmjs.org/@openai/codex/latest",
-}
-
-func defaultLatestRelease(bin string) (string, error) {
-	return latestRelease(&http.Client{Timeout: 3 * time.Second}, npmLatestReleaseURLs, bin)
-}
-
-func latestRelease(client *http.Client, urls map[string]string, bin string) (string, error) {
-	url, ok := urls[bin]
-	if !ok {
-		return "", fmt.Errorf("no release source configured for %s", bin)
-	}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-	var payload struct {
-		Version string `json:"version"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return "", err
-	}
-	if payload.Version == "" {
-		return "", errors.New("empty version in release payload")
-	}
-	return payload.Version, nil
-}
-
-func parseVersionParts(v string) []int {
-	v = strings.TrimPrefix(v, "v")
-	tokens := strings.Split(v, ".")
-	parts := make([]int, 0, len(tokens))
-	for _, tok := range tokens {
-		var n int
-		for i := 0; i < len(tok); i++ {
-			if tok[i] >= '0' && tok[i] <= '9' {
-				n = n*10 + int(tok[i]-'0')
-			} else {
-				break
-			}
-		}
-		parts = append(parts, n)
-	}
-	return parts
-}
-
-func isLagging(installed, latest string) bool {
-	if latest == "" || latest == "unavailable" {
-		return false
-	}
-	inst := parseVersionParts(installed)
-	lat := parseVersionParts(latest)
-	maxLen := len(inst)
-	if len(lat) > maxLen {
-		maxLen = len(lat)
-	}
-	for i := 0; i < maxLen; i++ {
-		var pInst, pLat int
-		if i < len(inst) {
-			pInst = inst[i]
-		}
-		if i < len(lat) {
-			pLat = lat[i]
-		}
-		if pLat > pInst {
-			return true
-		}
-		if pLat < pInst {
-			return false
-		}
-	}
-	return false
 }
 
 type doctorVersionRow struct {
@@ -164,7 +76,7 @@ func resolveLatestAndLag(cli, inst string) (string, bool) {
 	if err != nil {
 		return "unavailable", false
 	}
-	return l, isLagging(inst, l)
+	return l, looppreflight.IsLagging(inst, l)
 }
 
 func printDoctorVersionsText(w io.Writer, rows []doctorVersionRow, checkLatest bool) {

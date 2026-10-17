@@ -1,4 +1,4 @@
-package opscmd
+package looppreflight
 
 import (
 	"net/http"
@@ -17,16 +17,16 @@ func releaseServer(t *testing.T, status int, body string) map[string]string {
 	return map[string]string{"claude": srv.URL}
 }
 
-func TestLatestRelease_ReadsTheVersionFromTheRegistry(t *testing.T) {
+func TestLatestReleaseFromRegistry_ReadsTheVersionFromTheRegistry(t *testing.T) {
 	t.Parallel()
 	urls := releaseServer(t, http.StatusOK, `{"version":"2.1.0"}`)
-	got, err := latestRelease(http.DefaultClient, urls, "claude")
+	got, err := latestReleaseFrom(http.DefaultClient, urls, "claude")
 	if err != nil || got != "2.1.0" {
 		t.Fatalf("latestRelease = %q, %v; want 2.1.0", got, err)
 	}
 }
 
-func TestLatestRelease_RefusesWhatTheRegistryCannotAnswer(t *testing.T) {
+func TestLatestReleaseFromRegistry_RefusesWhatTheRegistryCannotAnswer(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name   string
@@ -41,7 +41,7 @@ func TestLatestRelease_RefusesWhatTheRegistryCannotAnswer(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := latestRelease(http.DefaultClient, releaseServer(t, tc.status, tc.body), "claude")
+			_, err := latestReleaseFrom(http.DefaultClient, releaseServer(t, tc.status, tc.body), "claude")
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v, want it to contain %q", err, tc.want)
 			}
@@ -49,26 +49,26 @@ func TestLatestRelease_RefusesWhatTheRegistryCannotAnswer(t *testing.T) {
 	}
 }
 
-func TestLatestRelease_ReportsAnUnreachableRegistry(t *testing.T) {
+func TestLatestReleaseFromRegistry_ReportsAnUnreachableRegistry(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.NotFoundHandler())
 	url := srv.URL
 	srv.Close()
-	if _, err := latestRelease(http.DefaultClient, map[string]string{"claude": url}, "claude"); err == nil {
+	if _, err := latestReleaseFrom(http.DefaultClient, map[string]string{"claude": url}, "claude"); err == nil {
 		t.Fatal("a closed registry must be reported")
 	}
 }
 
-func TestLatestRelease_ReportsAMalformedSourceURL(t *testing.T) {
+func TestLatestReleaseFromRegistry_ReportsAMalformedSourceURL(t *testing.T) {
 	t.Parallel()
-	if _, err := latestRelease(http.DefaultClient, map[string]string{"claude": "http://bad host"}, "claude"); err == nil {
+	if _, err := latestReleaseFrom(http.DefaultClient, map[string]string{"claude": "http://bad host"}, "claude"); err == nil {
 		t.Fatal("a malformed source URL must be reported")
 	}
 }
 
 func TestDefaultLatestRelease_RefusesABinaryWithNoReleaseSource(t *testing.T) {
 	t.Parallel()
-	_, err := defaultLatestRelease("gemini")
+	_, err := DefaultLatestRelease("gemini")
 	if err == nil || !strings.Contains(err.Error(), "no release source configured for gemini") {
 		t.Fatalf("err = %v, want the no-source refusal", err)
 	}
