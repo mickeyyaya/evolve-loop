@@ -761,3 +761,7 @@
 ./internal/codeindex/usagelog
 # trail — the one adapter that runs the trail-code binary behind codeindex.Backend (plan K1, D3, D4).
 ./internal/adapters/codeindex/trail
+# treewalk - the before/after walk that fails a test run for any file or empty directory it leaves behind.
+./internal/treewalk
+# kbgraph - the read-only graph projection over cycle dossiers and inbox items (slice 1).
+./internal/kbgraph
