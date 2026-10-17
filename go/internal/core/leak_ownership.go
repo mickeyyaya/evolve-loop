@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ const (
 	itemOwner ownerKind = iota + 1
 	cycleOwner
 	mintRegistryOwner
+	dossierOwner
 )
 
 type ownerKey struct {
@@ -43,6 +45,8 @@ func (k ownerKey) String() string {
 		return "item " + k.item
 	case cycleOwner:
 		return "cycle " + strconv.Itoa(k.cycle)
+	case dossierOwner:
+		return "the dossier of cycle " + strconv.Itoa(k.cycle)
 	}
 	return "the mint registry"
 }
@@ -55,7 +59,7 @@ type mainTreeOwnership struct {
 
 type ownerRule func(o mainTreeOwnership, p string) (ownerKey, bool)
 
-var ownerRules = []ownerRule{evalOwner, predicatePackageOwner, changeRecordOwner, mintOwner}
+var ownerRules = []ownerRule{evalOwner, predicatePackageOwner, changeRecordOwner, mintOwner, dossierFileOwner}
 
 func laneOwnership(cs CycleState, mints map[string]bool) mainTreeOwnership {
 	return mainTreeOwnership{cycle: cs.CycleID, items: laneItems(cs.WorkspacePath), mints: mints}
@@ -110,7 +114,7 @@ func (o mainTreeOwnership) holds(key ownerKey) bool {
 	switch key.kind {
 	case itemOwner:
 		return o.items == nil || o.items[key.item]
-	case cycleOwner:
+	case cycleOwner, dossierOwner:
 		return o.cycle <= 0 || o.cycle == key.cycle
 	}
 	return false
@@ -164,6 +168,17 @@ func mintOwner(o mainTreeOwnership, p string) (ownerKey, bool) {
 	return ownerKey{kind: mintRegistryOwner}, isActiveMintPhasePath(o.mints, p)
 }
 
+var dossierFile = regexp.MustCompile(`^knowledge-base/cycles/cycle-(\d+)\.(json|md)$`)
+
+func dossierFileOwner(_ mainTreeOwnership, p string) (ownerKey, bool) {
+	m := dossierFile.FindStringSubmatch(p)
+	if m == nil {
+		return ownerKey{}, false
+	}
+	n, err := strconv.Atoi(m[1])
+	return ownerKey{kind: dossierOwner, cycle: n}, err == nil
+}
+
 type liveSiblings struct {
 	projectRoot string
 	runs        map[string]bool
@@ -194,8 +209,15 @@ func (s liveSiblings) holds(key ownerKey) bool {
 		return s.items[key.item]
 	case cycleOwner:
 		return s.runs[filepath.Clean(RunWorkspacePath(s.projectRoot, key.cycle))]
+	case dossierOwner:
+		return s.runs[filepath.Clean(RunWorkspacePath(s.projectRoot, key.cycle))] || s.cycleExists(key.cycle)
 	}
 	return key.kind == mintRegistryOwner
+}
+
+func (s liveSiblings) cycleExists(cycle int) bool {
+	info, err := os.Stat(RunWorkspacePath(s.projectRoot, cycle))
+	return err == nil && info.IsDir()
 }
 
 func (o mainTreeOwnership) heldBySibling(p string, siblings liveSiblings) bool {

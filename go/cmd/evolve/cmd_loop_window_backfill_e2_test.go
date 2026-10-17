@@ -265,3 +265,30 @@ func TestLoopBatchRun_ASystemFailureLaneReturnsItsHaltCode(t *testing.T) {
 		t.Fatalf("a halted batch dispatched another pool:\n%s", stderr)
 	}
 }
+
+func TestDispatchPool_AtEnforceTheOrchestratorRunsTheLanesAndPublishesEachTransition(t *testing.T) {
+	t.Parallel()
+	f := newE2WindowFixture(t, e2TwoItems)
+	bin := fakeCycleBinary(t, "exit 0\n")
+	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave",
+		Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8}}
+
+	d, done := f.b.dispatchPool(0, fc, bin)
+	f.b.deps.Signals.Flush()
+
+	if !done || d.flow != batchNextIteration {
+		t.Fatalf("done=%v decision=%+v console:\n%s", done, d, f.console.String())
+	}
+	if !strings.Contains(f.console.String(), "[loop] pool 0: 2/2 lanes ok (orchestrator, target=2)") {
+		t.Fatalf("console:\n%s", f.console.String())
+	}
+	raw, err := os.ReadFile(filepath.Join(f.evolveDir, "signals.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, code := range []string{"LOOP_ORCH_LANE_LAUNCHED", "LOOP_ORCH_LANE_EXITED", "LOOP_ORCH_POOL_IDLE"} {
+		if !strings.Contains(string(raw), `"code":"`+code+`"`) {
+			t.Errorf("signals lack %s:\n%s", code, raw)
+		}
+	}
+}

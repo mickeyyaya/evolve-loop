@@ -113,7 +113,11 @@ func EmitWave(c *signalcenter.Center, wave int, origin string, code signalcenter
 }
 
 func ShouldRunWave(fc policy.FleetConfig) bool {
-	return fc.Count > 1 && fc.PlanSource == "triage" && fc.Scheduling != "pool"
+	return fc.Count > 1 && fc.PlanSource == "triage" && !ShouldRunPool(fc)
+}
+
+func ShouldRunPool(fc policy.FleetConfig) bool {
+	return fc.Count > 1 && fc.PlanSource == "triage" && (fc.Scheduling == "pool" || fc.Orchestrator.Stage == "enforce")
 }
 
 func LoadFleetConfig(evolveDir string, warn io.Writer, c *signalcenter.Center) policy.FleetConfig {

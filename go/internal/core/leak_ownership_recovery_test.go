@@ -5,6 +5,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -425,4 +426,38 @@ func TestRecoverPhaseLeak_SkipsAPhaseWithNoPrePhaseSnapshot(t *testing.T) {
 	}
 	requireTreeFile(t, repo, "operator-notes.md", "dirty before the phase, unknown to recovery\n")
 	requireAbsent(t, wt, "operator-notes.md")
+}
+
+func TestRecoverBeforeReview_AShippedCyclesDossierStaysInTheMainTreeAndIsNoLeak(t *testing.T) {
+	t.Parallel()
+	repo, lane, _ := twoLanesOnOneMainTree(t)
+	cr, dr := lane.phaseStart(t, repo, 1811, PhaseBuild)
+	const shipped = "knowledge-base/cycles/cycle-1700.json"
+	if err := os.MkdirAll(RunWorkspacePath(repo, 1700), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTreeFile(t, repo, shipped, "{\"cycle\":1700}\n")
+
+	if err := cr.recoverBeforeReview(PhaseBuild, dr); err != nil {
+		t.Fatalf("recovery must leave a finished cycle's dossier to that cycle, not fail the phase: %v", err)
+	}
+	requireTreeFile(t, repo, shipped, "{\"cycle\":1700}\n")
+	requireAbsent(t, lane.worktree, shipped)
+	res := dr.treeGuard.Check(cr.ctx, repo, dr.beforeDirty)
+	if real, _ := filterRealLeaks(res.Leaked, cr.leakExemptions(), io.Discard); len(real) != 0 {
+		t.Fatalf("real leaks = %v, want none: the dossier belongs to cycle 1700", real)
+	}
+}
+
+func TestRecoverBeforeReview_ThisCyclesOwnDossierInTheMainTreeIsStillALeak(t *testing.T) {
+	t.Parallel()
+	repo, lane, _ := twoLanesOnOneMainTree(t)
+	cr, dr := lane.phaseStart(t, repo, 1811, PhaseTDD)
+	const own = "knowledge-base/cycles/cycle-1811.md"
+	writeTreeFile(t, repo, own, "# cycle 1811\n")
+
+	res := dr.treeGuard.Check(cr.ctx, repo, dr.beforeDirty)
+	if real, _ := filterRealLeaks(res.Leaked, cr.leakExemptions(), io.Discard); !slices.Contains(real, own) {
+		t.Fatalf("real leaks = %v, want %s: a phase of cycle 1811 must not write its dossier into the main tree", real, own)
+	}
 }

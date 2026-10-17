@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -33,8 +34,8 @@ func TestShouldRunPool_GateTable(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := shouldRunPool(tc.fc); got != tc.want {
-				t.Errorf("shouldRunPool(%+v) = %v, want %v", tc.fc, got, tc.want)
+			if got := loopwave.ShouldRunPool(tc.fc); got != tc.want {
+				t.Errorf("loopwave.ShouldRunPool(%+v) = %v, want %v", tc.fc, got, tc.want)
 			}
 		})
 	}
@@ -50,7 +51,7 @@ func TestShouldRunWaveAndPool_MutuallyExclusive(t *testing.T) {
 		{Count: 1, PlanSource: "triage", Scheduling: "pool"},
 	}
 	for _, fc := range configs {
-		if shouldRunWave(fc) && shouldRunPool(fc) {
+		if shouldRunWave(fc) && loopwave.ShouldRunPool(fc) {
 			t.Errorf("both gates fired for %+v — wave and pool dispatch must be mutually exclusive (double-dispatch)", fc)
 		}
 	}
@@ -59,8 +60,8 @@ func TestShouldRunWaveAndPool_MutuallyExclusive(t *testing.T) {
 		t.Errorf("shouldRunWave(%+v) = true, want false — a pool-scheduled fleet must NOT take the wave barrier", poolFC)
 	}
 	waveFC := policy.FleetConfig{Count: 2, PlanSource: "triage", Scheduling: "wave"}
-	if shouldRunPool(waveFC) {
-		t.Errorf("shouldRunPool(%+v) = true, want false — a wave-scheduled fleet must NOT take the pool", waveFC)
+	if loopwave.ShouldRunPool(waveFC) {
+		t.Errorf("loopwave.ShouldRunPool(%+v) = true, want false — a wave-scheduled fleet must NOT take the pool", waveFC)
 	}
 	defaultFC := policy.FleetConfig{Count: 2, PlanSource: "triage", Scheduling: ""}
 	if !shouldRunWave(defaultFC) {

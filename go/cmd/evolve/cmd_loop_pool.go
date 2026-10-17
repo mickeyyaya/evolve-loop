@@ -7,17 +7,26 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 type poolPlanFn func(ctx context.Context, waveIndex int) ([]fleet.Todo, error)
 
-func shouldRunPool(fc policy.FleetConfig) bool {
-	return fc.Count > 1 && fc.PlanSource == "triage" && fc.Scheduling == "pool"
+type poolRunFn func(ctx context.Context, backlog []fleet.Todo) []fleet.Result
+
+func rollingPool(fc policy.FleetConfig, launch fleet.LaunchFn) poolRunFn {
+	return func(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
+		return fleet.RunPool(ctx, fleet.PoolConfig{Target: fc.Count, Concurrency: fc.Concurrency}, backlog, launch, nil)
+	}
 }
 
 func dispatchPoolIteration(ctx context.Context, fc policy.FleetConfig, preflight func() error, planFn poolPlanFn, launch fleet.LaunchFn, waveIndex int) (ran bool, backlog []fleet.Todo, results []fleet.Result, err error) {
-	if !shouldRunPool(fc) {
+	return planAndRunPool(ctx, fc, preflight, planFn, rollingPool(fc, launch), waveIndex)
+}
+
+func planAndRunPool(ctx context.Context, fc policy.FleetConfig, preflight func() error, planFn poolPlanFn, run poolRunFn, waveIndex int) (ran bool, backlog []fleet.Todo, results []fleet.Result, err error) {
+	if !loopwave.ShouldRunPool(fc) {
 		return false, nil, nil, nil
 	}
 	if err := preflight(); err != nil {
@@ -30,8 +39,7 @@ func dispatchPoolIteration(ctx context.Context, fc policy.FleetConfig, preflight
 	if len(backlog) == 0 {
 		return false, nil, nil, nil
 	}
-	results = fleet.RunPool(ctx, fleet.PoolConfig{Target: fc.Count, Concurrency: fc.Concurrency}, backlog, launch, nil)
-	return true, backlog, results, nil
+	return true, backlog, run(ctx, backlog), nil
 }
 
 func productionPoolPlanFn(cfg loopConfig, storage core.Storage, count int, stderr io.Writer) poolPlanFn {
