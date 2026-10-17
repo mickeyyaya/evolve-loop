@@ -50,6 +50,7 @@
     },
     "tiers": {
       "deep": [
+        "agy",
         "agy-claude",
         "claude"
       ],
