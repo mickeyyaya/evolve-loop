@@ -198,6 +198,9 @@ func clearWaveNotes(store wave.Store, stdout, stderr io.Writer) int {
 func dispatchWaveVerb(run sysexec.RunFunc) boundaryDispatch {
 	handlers := map[string]func([]string, io.Reader, io.Writer, io.Writer) int{
 		"checkpoint": runCheckpoint, "reset-sha": runResetSHA, "doctor": opscmd.RunDoctor,
+		waveCodeRefreshVerb: func(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+			return runWaveCodeRefresh(run, waveCodeRefreshTimeout, os.Environ(), args, stdout, stderr)
+		},
 		waveBuildVerb: func(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			return runWaveBuild(run, args, stdout, stderr)
 		},

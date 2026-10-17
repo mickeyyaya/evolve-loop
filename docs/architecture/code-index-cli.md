@@ -1,7 +1,7 @@
 # Code index CLI: `evolve code` gives every phase agent a read-only code graph
 
 > Research: [code-index-cli-2026-10](../research/code-index-cli-2026-10.md). Plan: [code-index-cli-2026-10](../plans/code-index-cli-2026-10.md). Decision: [ADR-0138](adr/0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md).
-> Status: K1 and K3 are built (2026-10-17): the `evolve code` verb, the `codeindex` layer, the trail adapter, the policy block `code_index` and the usage log. The components K2, K4a, K4b and K5 are planned. A name in this file that has no code is marked "planned".
+> Status: K1, K2 and K3 are built (2026-10-17), and K4a, K4b and K5 are planned. A name with no code is marked "planned".
 >
 > This file is the spec of record for the `evolve code` verb. The research holds the evidence, the plan holds the scored designs and the order of work, and the ADR holds the decision.
 
@@ -13,7 +13,7 @@ On 2026-10-17 the operator asked that the loop agents use trail-code, "separated
 |---|---|
 | code index | A graph of the symbols and the calls of this repository. trail-code builds it with tree-sitter (C1, C7). |
 | trail-code | The outside tool that builds and queries the index. Its binary is `dev/.tools/trail/node_modules/.bin/trail` (C6). |
-| index worktree | A git worktree at `dev/code-index` (the default of `code_index.index_dir`). It holds the checkout that the index describes. The operator makes it today, and K2 (planned) refreshes it. |
+| index worktree | A git worktree at `dev/code-index` (the default of `code_index.index_dir`). It holds the checkout that the index describes. The operator makes it. The boundary refreshes it (K2, built). |
 | `Backend` | The Go interface `codeindex.Backend` (`go/internal/codeindex`) that the `evolve code` commands call. It has one method for each command. |
 | adapter | The one package, `go/internal/adapters/codeindex/trail`, that runs the trail-code binary. It implements `Backend`. |
 | boundary | The step between two waves where the loop merges and refreshes. `evolve wave next` runs it (`go/cmd/evolve/cmd_wave_next.go:102`). |
@@ -186,7 +186,22 @@ The index worktree is separate from every cycle worktree. The boundary refreshes
 2. The boundary runs an incremental `trail build`. It reads only the changed files and takes about 2 s (C1).
 3. A phase reads the index. A query takes about 0.1 s (C1).
 
-The refresh is a step of `evolve wave next` (planned, K2), beside the other boundary steps. `wave next --dry-run` lists it.
+The refresh is a step of `evolve wave next` (built, K2), beside the other boundary steps. `wave next --dry-run` lists it as "refresh the code index".
+
+K2 is built as follows:
+
+1. The step is the verb `code-refresh`. It runs after the merges, the build and the `doctor live` checks, and before `loop-stop --release`. A lane therefore starts on a fresh index.
+2. The step reads `code_index.index_dir` and resolves it against the hub root, as `evolve code` does.
+3. The step cleans `index_dir` and resolves its symbolic links. It then refuses `index_dir` in four cases. The first case is the project root. The second is a path inside the project root. The third is a path under `<project root>/.evolve/worktrees`. The fourth is the runtime plane root of the hub, or a path inside it.
+4. A refusal is a WARN, and no `git` or trail command runs.
+5. The step runs `git rev-parse --show-toplevel` with `index_dir` as the working directory. The output must equal the cleaned `index_dir`. If not, `index_dir` is a plain directory inside another repository. The step then prints a WARN. It runs no `git fetch` and no `git checkout`.
+6. The step runs `git fetch --quiet origin` and then `git checkout --quiet --detach origin/main`. Both commands run with the index worktree as the working directory. No command names the project root, so the step does not write the main tree.
+7. If local changes in the index worktree conflict, the checkout fails. The step then prints a WARN. It does not run `reset` and does not run trail. The operator cleans the index worktree.
+8. The whole step has a deadline of 5 minutes. When the deadline ends, `sysexec` sends SIGTERM to the child process. After `WaitDelay` (5 s), it kills the child process. The step then prints a WARN and exits 0.
+9. The step calls `Backends.Refresh`. It runs `Refresh` on each backend that implements the small interface `codeindex.Refresher`. A backend that cannot refresh stays valid and is skipped. The trail adapter runs `trail build -- <index_dir>`. This is the incremental rebuild.
+10. A failure prints `evolve wave: WARN: code index not refreshed: <reason>` to stderr. The step exits 0 and the boundary goes on.
+11. A WARN has one of these causes: a policy error, a path outside a hub, or a refused `index_dir`.
+12. A WARN can also come from a failed `git` command, a deadline, or a failed rebuild.
 
 Why the index at `main` is right for a cycle: a cycle starts from `main`, so the index matches the base of the cycle. The index does not show the edits that the builder made in this cycle. The prompt tells the agent this (section 7). The agent reads a file before it changes it, and the file on disk is always current.
 
@@ -403,8 +418,12 @@ A caller is the pair of its file and its enclosing function, so two call sites i
 | D3: one package runs the trail-code binary | `TestOnlyTheTrailAdapterRunsTheTrailBinary` in `go/test/structure/binary_test.go` fails if another package both runs a process and names the trail binary path. `TestTheCodeIndexAbstractionRunsNoProcessAndNamesNoBackend` keeps `internal/codeindex` free of both. The convention has one row | built (K1) |
 | D4: the output has no instruction line | `TestTrailBackend_NoOutputLineThatInstructsTheAgentReachesAnyHit` and `TestCodeVerb_ThePhaseAgentDoesNotSeeAnInstructionLineOfTheBackendOutput` feed a "tokens saved" header and expect the answer without it | built (K1) |
 | D5: the command is read-only, so a cycle worktree stays clean | `TestCodeVerb_EveryVerbLeavesTheCheckedOutTreeClean` runs the four verbs in a temporary git repository and expects an empty `git status` | built (K1) |
+| D5: the refresh writes only the index worktree and never halts the boundary | `TestWaveCodeRefresh_NeverNamesTheProjectRootTreeInAnyCommand` records every command and its working directory and expects no path under the project root. `TestWaveCodeRefresh_AFailureIsAWarningAndTheStepStillSucceeds` and `TestWaveCodeRefresh_AFailedRefreshDoesNotStopTheBoundarySteps` expect a WARN and a next step that runs. `TestWaveNext_DryRunListsTheRefreshStepBeforeTheLaunch` expects the step in the dry run. `TestTrailBackend_RefreshRunsTheIncrementalBuildWithTheIndexDirAfterTheSeparator` pins the argv | built (K2) |
+| D5a: the refresh refuses an unsafe `index_dir` | `TestWaveCodeRefresh_AnIndexDirInsideTheProjectIsAWarningAndRunsNothing`, `TestWaveCodeRefresh_AnIndexDirThroughASymlinkIntoTheRootIsRefused` and `TestWaveCodeRefresh_AnIndexDirInTheRuntimePlaneIsAWarningAndRunsNothing` expect a WARN and zero runner calls | built (K2) |
+| D5b: the refresh touches only a real, own worktree | `TestWaveCodeRefresh_AnIndexDirThatIsNotItsOwnWorktreeIsAWarningWithNoFetchOrCheckout` expects only the `rev-parse` call. `TestWaveCodeRefresh_ADirtyIndexWorktreeWarnsAndNeverReachesTheRebuild` expects no trail call after a failed checkout | built (K2) |
+| D5c: a hung command ends at the deadline | `TestWaveCodeRefresh_AHungGitCallEndsAtTheDeadlineWithAWarning` expects a return before the test limit and a deadline WARN | built (K2) |
 | D6: one record for each call | `TestCodeVerbLogged_ACallWritesOneRecordWithItsCommandAndPhase` runs one command and reads one new record with the command and the phase. `TestAppend_ConcurrentCallsGiveWholeLines` pins whole lines. `TestCodeUsage_AggregatesCallsByPhaseAndCommand` pins the summary | built (K3) |
-| G5: any backend passes the same tests | `codeindextest.Run` runs on the fake and on the trail adapter (`TestTrailBackend_PassesTheConformanceSuite`); the command tests run on the fake. The strip and the real process run through the trail adapter | built (K1) |
+| G5: any backend passes the same tests | `codeindextest.Run` runs on the fake and on the trail adapter (`TestTrailBackend_PassesTheConformanceSuite`); the command tests run on the fake. A backend that implements `Refresher` also gets two checks. A refresh of a present index succeeds. A refresh of an absent index is `ErrAbsent`. The strip and the real process run through the trail adapter | built (K1) |
 
 ## Limits
 

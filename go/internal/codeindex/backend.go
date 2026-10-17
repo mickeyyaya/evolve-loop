@@ -55,3 +55,7 @@ func Dispatch(ctx context.Context, b Backend, req Request) ([]Hit, error) {
 	}
 	return nil, unsupported(req.Query)
 }
+
+type Refresher interface {
+	Refresh(ctx context.Context) error
+}

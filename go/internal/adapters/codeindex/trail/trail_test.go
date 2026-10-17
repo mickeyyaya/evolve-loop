@@ -22,6 +22,11 @@ func TestTrailBackend_PassesTheConformanceSuite(t *testing.T) {
 	})
 }
 
+func TestTrailBackend_IsARefresher(t *testing.T) {
+	t.Parallel()
+	var _ codeindex.Refresher = newBackend(replying(t, &callLog{}, fixtureReplies(t)))
+}
+
 func TestTrailBackend_NamesItselfAndServesAllFourQueries(t *testing.T) {
 	t.Parallel()
 	b := newBackend(replying(t, &callLog{}, fixtureReplies(t)))
@@ -401,5 +406,59 @@ func TestTrailBackend_TheTrackingKeysAppearOnceAndWinOverTheInheritedEnvironment
 	}
 	if count["DO_NOT_TRACK"] != 1 || count["GRAFT_NO_REFRESH"] != 1 || !hasEnv(env, "DO_NOT_TRACK=1") || !hasEnv(env, "GRAFT_NO_REFRESH=1") || !hasEnv(env, "PATH=/usr/bin") {
 		t.Errorf("env = %v", env)
+	}
+}
+
+func TestTrailBackend_RefreshRunsTheIncrementalBuildWithTheIndexDirAfterTheSeparator(t *testing.T) {
+	t.Parallel()
+	log := &callLog{}
+	b := newBackend(replying(t, log, func([]string) reply { return reply{} }))
+
+	err := b.Refresh(context.Background())
+
+	c := log.only(t)
+	if err != nil || c.name != testBin || joined(c.args) != "build -- "+testIndexDir {
+		t.Errorf("err=%v name=%q args=%q, want %q build -- %s", err, c.name, joined(c.args), testBin, testIndexDir)
+	}
+	for _, want := range []string{"DO_NOT_TRACK=1", "GRAFT_NO_REFRESH=1", "PATH=/usr/bin"} {
+		if !hasEnv(c.env, want) {
+			t.Errorf("env = %v, want it to hold %q", c.env, want)
+		}
+	}
+}
+
+func TestTrailBackend_RefreshNeverPassesTheForceRebuildOrDeepFlags(t *testing.T) {
+	t.Parallel()
+	log := &callLog{}
+	b := newBackend(replying(t, log, func([]string) reply { return reply{} }))
+
+	_ = b.Refresh(context.Background())
+
+	for _, arg := range log.only(t).args {
+		if arg == "--no-reuse" || arg == "--deep" {
+			t.Errorf("args = %v, want an incremental build", log.only(t).args)
+		}
+	}
+}
+
+func TestTrailBackend_RefreshMapsFailuresToTheSameErrorsAsQueries(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		answer  reply
+		want    error
+		wantMsg string
+	}{
+		"no node":    {reply{stderr: "env: node: No such file or directory\n", exit: 127}, codeindex.ErrAbsent, ""},
+		"no binary":  {reply{err: fs.ErrNotExist}, codeindex.ErrAbsent, ""},
+		"exit code":  {reply{stderr: "boom\n", exit: 3}, nil, "trail: exit 3: boom"},
+		"run failed": {reply{err: errors.New("spawn")}, nil, "trail: run " + testBin},
+	} {
+		b := newBackend(replying(t, &callLog{}, func([]string) reply { return tc.answer }))
+
+		err := b.Refresh(context.Background())
+
+		if err == nil || (tc.want != nil && !errors.Is(err, tc.want)) || !strings.Contains(err.Error(), tc.wantMsg) {
+			t.Errorf("%s: err = %v, want %v / %q", name, err, tc.want, tc.wantMsg)
+		}
 	}
 }
