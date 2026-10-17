@@ -1,0 +1,23 @@
+{
+  "created_at": "2026-10-17T03:40:00Z",
+  "kind": "feature",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "weight": 1.0,
+  "campaign": "wave-orchestrator",
+  "deps": ["wave-orchestrator-design-set"],
+  "source": "operator, 2026-10-17 ('ultrathink to investigate console routing issue'); research wave-orchestrator-2026-10 F2.17-F2.24",
+  "id": "restore-lane-routable-supply",
+  "title": "Restore the lane-routable inbox supply that fell from 41 items to 1 in one month",
+  "summary": "On 2026-10-17, evolve inbox rank --list ready shows 0 of 230 items. By reason: 90 protected fix surface, 80 pipeline kind, 59 explicit console route. The lane-routable count fell from 41 (2026-09-15) to 1 (2026-10-17) while the inbox stayed near 230, so lanes used the lane-safe work and the console backlog did not drain. 36 pipeline-kind items and 36 explicit-route items have no binding protected file. IsProtectedScope routes a directory that only contains a protected fragment (integrity_surface.go:222).",
+  "fix": "Plan wave-orchestrator-2026-10 O2a and O2b. O2a (data only, console): re-route the 15-18 pipeline-kind items that are ordinary code fixes with `evolve inbox route-lane`, keep the ship-carry and persona items with the console, sweep the 6-10 ownership-only explicit routes, and add the cited protected paths to the files of the 7 dispatchability-audit items. O2b (code, protected guards): route a directory spelling to the console only when it lies inside a fragment. Keep the four guards of research F2.23 unchanged. The design must hold at a large fleet: the supply census and split proposals of O2c keep the supply up after this one-time repair.",
+  "acceptance": [
+    "`evolve inbox rank --list ready` shows at least 20 items after O2a.",
+    "`TestIsProtectedScope_ADirectoryThatOnlyContainsAFragmentIsNotProtected` passes, and the ship tripwire tests are unchanged.",
+    "No item that names a protected file spelling becomes lane-routable."
+  ],
+  "files": [
+    "go/internal/guards/integrity_surface.go",
+    "go/internal/inboxbatch/consoleroute.go"
+  ]
+}

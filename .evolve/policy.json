@@ -111,7 +111,9 @@
     "age_halflife_days": 30,
     "unblocks_cap": 3,
     "recurrence_cap": 5,
-    "active_campaigns": [],
+    "active_campaigns": [
+      "wave-orchestrator"
+    ],
     "preempt_margin": 0.05
   },
   "parallel_evaluate": {

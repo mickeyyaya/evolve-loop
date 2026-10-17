@@ -751,3 +751,9 @@
 ./internal/paralleltest
 ./internal/testkey
 ./internal/testverdict
+# codeindex — the backend-neutral layer of the evolve code verb (plan K1): Hit, Backend, Capabilities, the Backends chain and its factory builder.
+./internal/codeindex
+# codeindextest — the fake backend and the conformance suite that every codeindex backend passes.
+./internal/codeindex/codeindextest
+# trail — the one adapter that runs the trail-code binary behind codeindex.Backend (plan K1, D3, D4).
+./internal/adapters/codeindex/trail
