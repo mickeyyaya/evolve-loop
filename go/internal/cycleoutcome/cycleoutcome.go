@@ -28,6 +28,7 @@ type FailureInputs struct {
 	RefusalDetail  string
 	RefusalSubject string
 	Reason         string
+	Protected      func(string) bool
 	Stderr         io.Writer
 	Ledger         inboxmover.LedgerAppender
 	Signals        *signalcenter.Center
@@ -58,14 +59,7 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		Stderr:      stderr,
 		Signals:     in.Signals,
 	}
-	routed := false
-	if cyclestate.RefusalDisposition(in.Refusal).RouteConsole && in.RefusalSubject != "" {
-		if !containsID(committed, in.RefusalSubject) {
-			fmt.Fprintf(stderr, "[cycleoutcome] WARN: route-console skipped: refused subject %q is not in the committed set %v — task-level bump instead\n", in.RefusalSubject, committed)
-		} else if _, rerr := inboxmover.RouteConsole(opts, in.RefusalSubject, in.RefusalDetail, in.Cycle); rerr == nil {
-			routed = true
-		}
-	}
+	routed := routeRefusal(opts, in, committed, stderr)
 	res, err := inboxmover.ApplyCycleOutcome(opts, inboxmover.CycleOutcome{
 		Cycle:        in.Cycle,
 		Passed:       false,
@@ -79,6 +73,33 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		return res, fmt.Errorf("apply cycle %d failure outcome: %w", in.Cycle, err)
 	}
 	return res, nil
+}
+
+func routeRefusal(opts inboxmover.Options, in FailureInputs, committed []string, stderr io.Writer) bool {
+	if !cyclestate.RefusalDisposition(in.Refusal).RouteConsole || in.RefusalSubject == "" {
+		return false
+	}
+	if !containsID(committed, in.RefusalSubject) {
+		fmt.Fprintf(stderr, "[cycleoutcome] WARN: route-console skipped: refused subject %q is not in the committed set %v — task-level bump instead\n", in.RefusalSubject, committed)
+		return false
+	}
+	detail, files := in.RefusalDetail, []string(nil)
+	if in.Refusal == cyclestate.DiagCodeProtectedPredicateRoute {
+		proven, why := proveProtectedRoute(in, committed)
+		if why != "" {
+			fmt.Fprintf(stderr, "[cycleoutcome] WARN: protected-predicate route not proven (%s) — task-level bump instead, the claim is released\n", why)
+			return false
+		}
+		detail, files = core.ProtectedRouteMessage(proven), protectedPaths(proven)
+	}
+	if len(files) > 0 {
+		if ferr := addItemFiles(opts.ProjectRoot, in.RefusalSubject, files); ferr != nil {
+			fmt.Fprintf(stderr, "[cycleoutcome] WARN: the item %q could not gain its protected files (%v) — task-level bump instead\n", in.RefusalSubject, ferr)
+			return false
+		}
+	}
+	_, err := inboxmover.RouteConsole(opts, in.RefusalSubject, detail, in.Cycle)
+	return err == nil
 }
 
 func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stderr io.Writer) FailureInputs {

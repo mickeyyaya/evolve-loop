@@ -67,3 +67,4 @@
 ./internal/codeindex/usagelog 100
 ./internal/adapters/codeindex/trail 100
 ./internal/wavemeasure 100
+./internal/acspathscan 100

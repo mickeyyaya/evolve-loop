@@ -27,6 +27,7 @@ func TestDiagCodes_TriageRefusalVocabulary(t *testing.T) {
 		DiagCodeTriageTopNEmpty:         "TRIAGE_TOPN_EMPTY",
 		DiagCodeTriageCommitmentInvalid: "TRIAGE_COMMITMENT_INVALID",
 		DiagCodeTriageScopeUnanswered:   "TRIAGE_SCOPE_UNANSWERED",
+		DiagCodeProtectedPredicateRoute: "PROTECTED_PREDICATE_ROUTE",
 	}
 	for got, spelled := range want {
 		if got != spelled {
@@ -57,6 +58,7 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		task, route bool
 	}{
 		{DiagCodeTriageProtectedSurface, true, true},
+		{DiagCodeProtectedPredicateRoute, true, true},
 		{DiagCodeTriageTopNEmpty, true, false},
 		{DiagCodeTriageCommitmentInvalid, false, false},
 		{DiagCodeTriageScopeUnanswered, true, false},

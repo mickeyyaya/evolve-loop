@@ -45,6 +45,11 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 		}
 	}
 
+	if cr.current == PhaseTDD && cr.routeProtectedPredicates() {
+		cr.result.TerminationReason = CycleTerminationTddProtectedRoute
+		return PhaseEnd, loopBreak, nil
+	}
+
 	if cr.o.cfg.Stage != config.StageOff {
 		cr.routingSeq++
 		signals, _ := router.Digest(cr.cs.WorkspacePath, cr.cs.CompletedPhases)
