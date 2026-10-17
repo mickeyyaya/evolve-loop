@@ -52,11 +52,9 @@ func TestCoverChangedPackages_KeepsOnlyLivePackagesOutsideTestdata(t *testing.T)
 	t.Parallel()
 
 	module := t.TempDir()
-	for _, dir := range []string{"internal/x", "internal/x/testdata/y", "cmd/z"} {
-		if err := os.MkdirAll(filepath.Join(module, dir), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
+	writeFile(t, filepath.Join(module, "internal", "x", "a.go"), "package x\n")
+	writeFile(t, filepath.Join(module, "internal", "x", "testdata", "y", "y.go"), "package y\n")
+	writeFile(t, filepath.Join(module, "cmd", "z", "main.go"), "package main\n")
 	paths := []string{"go/internal/x/a.go", "go/internal/x/a_test.go", "go/internal/x/testdata/y/y.go", "go/internal/gone/g.go", "go/cmd/z/main.go", "docs/x.md"}
 
 	got := coverChangedPackages(module, paths)
