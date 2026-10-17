@@ -767,3 +767,5 @@
 ./internal/kbgraph
 # lanebudget — the lane CPU budget of each go test a lane runs (wave-orchestrator plan O9).
 ./internal/lanebudget
+# admission — admission by package cell, with the hub cell at capacity 1 (ADR-0139 O3, ADR-0134 S14): the conflict rule, the module graph and the hub set.
+./internal/admission

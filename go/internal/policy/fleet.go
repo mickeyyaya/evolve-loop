@@ -112,15 +112,16 @@ func (p Policy) SwarmConfig() SwarmConfig {
 }
 
 type FleetPolicy struct {
-	Count            int                `json:"count,omitempty"`
-	Concurrency      int                `json:"concurrency,omitempty"`
-	MinLanes         int                `json:"min_lanes,omitempty"`
-	PlanSource       string             `json:"plan_source,omitempty"`
-	Scheduling       string             `json:"scheduling,omitempty"`
-	Landing          string             `json:"landing,omitempty"`
-	Budget           *FleetBudgetPolicy `json:"budget,omitempty"`
-	StarvationK      int                `json:"starvation_k,omitempty"`
-	StarvationWeight float64            `json:"starvation_weight,omitempty"`
+	Count            int                      `json:"count,omitempty"`
+	Concurrency      int                      `json:"concurrency,omitempty"`
+	MinLanes         int                      `json:"min_lanes,omitempty"`
+	PlanSource       string                   `json:"plan_source,omitempty"`
+	Scheduling       string                   `json:"scheduling,omitempty"`
+	Landing          string                   `json:"landing,omitempty"`
+	Budget           *FleetBudgetPolicy       `json:"budget,omitempty"`
+	StarvationK      int                      `json:"starvation_k,omitempty"`
+	StarvationWeight float64                  `json:"starvation_weight,omitempty"`
+	Orchestrator     *FleetOrchestratorPolicy `json:"orchestrator,omitempty"`
 }
 
 type FleetBudgetPolicy struct {
@@ -149,6 +150,7 @@ type FleetConfig struct {
 	Budget           *FleetBudgetConfig
 	StarvationK      int
 	StarvationWeight float64
+	Orchestrator     OrchestratorConfig
 	Warnings         []string
 }
 
@@ -159,10 +161,11 @@ const (
 
 func (p Policy) FleetConfig() FleetConfig {
 	c := FleetConfig{Count: 1, Concurrency: 1, MinLanes: 1, PlanSource: "triage",
-		Scheduling: "wave", Landing: "per-lane", StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight}
+		Scheduling: "wave", Landing: "per-lane", StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight, Orchestrator: orchestratorConfig(nil)}
 	if p.Fleet == nil {
 		return c
 	}
+	c.Orchestrator = orchestratorConfig(p.Fleet.Orchestrator)
 	if p.Fleet.Count > 0 {
 		c.Count = p.Fleet.Count
 	}

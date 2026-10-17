@@ -68,3 +68,4 @@
 ./internal/adapters/codeindex/trail 100
 ./internal/wavemeasure 100
 ./internal/lanebudget 100
+./internal/admission 100

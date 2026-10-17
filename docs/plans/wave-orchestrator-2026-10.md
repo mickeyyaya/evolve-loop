@@ -178,7 +178,7 @@ Scores are 1 (worst) to 5 (best).
 | O2a | D5 S-A and S-B: the console re-routes 15–18 pipeline-kind items and sweeps 6–10 stale routes, with `evolve inbox route-lane`. The 7 under-declared items name their protected paths. | `evolve inbox rank --list ready` shows at least 20 items | console (data only) |
 | O2b | D5 S-C: `IsProtectedScope` routes a directory spelling only when it lies inside a fragment | `TestIsProtectedScope_ADirectoryThatOnlyContainsAFragmentIsNotProtected` | console (protected: guards) |
 | O2c | D5a: the split proposal of the supply step, and `evolve inbox split` for the console | `TestSupply_ProposesASplitOfAMixedItemWhenTheSupplyIsLow`, `TestInboxSplit_TheConsolePartKeepsEveryProtectedFile` | console (protected: inbox lifecycle) |
-| O3 | D6, D7: admission by cell, through `PartitionGraph`. O3 is ADR-0134 S14, built here. The ADR-0134 plan keeps S14 only as a pointer to O3, so one lane builds it. | `TestAdmit_ATodoInABusyCellWaits`, `TestAdmit_TheGlobalCellAdmitsOne`, `TestAdmit_ATodoWithNoFilesTakesItsPackageCell` | lane |
+| O3 | D6, D7: admission by cell. **Built (shadow), 2026-10-17:** [`internal/admission`](../architecture/packages/internal-admission.md), with the conflict rule of spec §6. O3 is ADR-0134 S14, built here. The ADR-0134 plan keeps S14 only as a pointer to O3, so one lane builds it. | `TestAdmit_ATodoInABusyCellWaits`, `TestAdmit_TheGlobalCellAdmitsOne`, `TestAdmit_ATodoWithNoFilesTakesItsPackageCell` | lane |
 | O4 | D8: the rolling pool is the scheduler under the orchestrator. Its transitions go to the `loop` channel. | `TestOrchestrator_AFreeSlotTakesTheNextAdmissibleTodoAtOnce` | lane |
 | O5 | D9: the lane lease, the heartbeat and the deadline | `TestLease_ALanePastItsDeadlineStopsAndReleasesItsItem` | lane |
 | O6 | D4, D10, D11, D12: the orchestrator loop over the event channels, and the supply census | `TestOrchestrator_WakesOnlyOnEvents`, `TestOrchestrator_ShipLandedFreesTheCells`, `TestSupply_RecordsTheCauseOfEachRefusal` | console (protected: loop) |
@@ -240,5 +240,5 @@ The inbox holds one item for each group of components, in the campaign `wave-orc
 ## 10. Open questions
 
 - **Q1:** what is the deadline? We propose the 95th percentile of lane time over the last 50 cycles, with a floor of 60 minutes. O5 measures it in shadow.
-- **Q2:** how many hub packages go into the hub cell? ADR-0134 names `sysexec`, `log`, `atomicwrite` and `signalcenter`. O3 in shadow measures the in-degree of each package and proposes the list.
+- **Q2 (resolved, 2026-10-17):** how many hub packages go into the hub cell? Four: `sysexec` (151 importers), `log` (127), `atomicwrite` (126) and `signalcenter` (122). O3 measured the transitive importer count of each of the 303 module packages. The next package is `ipcenv` with 116, and the median is 5. The default `fleet.orchestrator.hub_min_importers` is 120. The measure is in [internal-admission.md](../architecture/packages/internal-admission.md) §Findings.
 - **Q3:** does a goal-split planner phase (design D) become a second supply source? We propose not until O2 is live and measured.
