@@ -1,6 +1,8 @@
 package policy
 
 import (
+	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -10,14 +12,12 @@ func TestCodeIndexConfig_AbsentBlockResolvesTheCompiledDefaults(t *testing.T) {
 
 	cfg, err := loadCIWatchPolicy(t, `{}`).CodeIndexConfig()
 
+	want := CodeIndexSettings{Backends: []string{"trail"}, IndexDir: "dev/code-index", TrailBin: "dev/.tools/trail/node_modules/.bin/trail"}
 	if err != nil {
 		t.Fatalf("CodeIndexConfig: %v", err)
 	}
-	if len(cfg.Backends) != 1 || cfg.Backends[0] != "trail" {
-		t.Errorf("Backends = %v, want [trail]", cfg.Backends)
-	}
-	if cfg.IndexDir != "dev/code-index" || cfg.TrailBin != "dev/.tools/trail/node_modules/.bin/trail" {
-		t.Errorf("IndexDir = %q, TrailBin = %q, want the hub-relative defaults", cfg.IndexDir, cfg.TrailBin)
+	if !reflect.DeepEqual(cfg, want) {
+		t.Errorf("cfg = %+v, want the hub-relative defaults %+v", cfg, want)
 	}
 }
 
@@ -72,5 +72,19 @@ func TestCodeIndexPolicy_DecodesStrictly(t *testing.T) {
 
 	if err == nil || !strings.Contains(err.Error(), "code_index") {
 		t.Errorf("Parse err = %v, want a code_index refusal", err)
+	}
+}
+
+func TestCodeIndexPolicy_UnmarshalJSONKeepsEachKnownKey(t *testing.T) {
+	t.Parallel()
+	var block CodeIndexPolicy
+
+	err := json.Unmarshal([]byte(`{"backends":["trail"],"index_dir":"/srv/idx","trail_bin":"/opt/trail"}`), &block)
+
+	if err != nil {
+		t.Fatalf("UnmarshalJSON: %v", err)
+	}
+	if !reflect.DeepEqual(block.Backends, []string{"trail"}) || block.IndexDir == nil || *block.IndexDir != "/srv/idx" || block.TrailBin == nil || *block.TrailBin != "/opt/trail" {
+		t.Errorf("block = %+v", block)
 	}
 }
