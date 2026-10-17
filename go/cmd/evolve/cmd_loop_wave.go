@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
@@ -28,6 +29,7 @@ func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals
 		Workspace: func(cycle int) string { return cycleWorkspace(cfg.ProjectRoot, cycle) },
 		Protected: laneForbidden(cfg.ProjectRoot, warn),
 		Shrink:    fleet.QuotaAwareCount,
+		Chains:    cliroute.FamilyChains,
 	}
 	return loopwave.New(roots, ports, warn, loopwave.WithSignals(signals), loopwave.WithGoal(cfg.GoalHash))
 }
@@ -64,7 +66,8 @@ func consoleRoutedResolver(cfg loopConfig, stderr io.Writer) fleet.RoutedFn {
 }
 
 func quotaAwareWaveConfig(fc policy.FleetConfig, projectRoot string, warn io.Writer, states []quotastate.QuotaState, tp budgethistory.Throughput, now time.Time) (policy.FleetConfig, time.Duration) {
-	return nullWaveEngine(loopwave.RootsOf(projectRoot), warn).Size(fc, states, tp, now)
+	routing := loopwave.LoadRouting(loopwave.RootsOf(projectRoot).EvolveDir, warn)
+	return nullWaveEngine(loopwave.RootsOf(projectRoot), warn).Size(fc, routing, states, tp, now)
 }
 
 func seedWavePlanFromInbox(evolveDir string, count int) ([]byte, error) {

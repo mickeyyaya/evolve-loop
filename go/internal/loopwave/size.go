@@ -6,13 +6,15 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleetbudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
-func (e *Engine) Size(fc policy.FleetConfig, states []quotastate.QuotaState, tp budgethistory.Throughput, now time.Time) (policy.FleetConfig, time.Duration) {
-	fc.Count = e.ports.Shrink(fc.Count, e.benchedFamilies(), fc.MinLanes, e.stderr)
+func (e *Engine) Size(fc policy.FleetConfig, routing *policy.CLIRouting, states []quotastate.QuotaState, tp budgethistory.Throughput, now time.Time) (policy.FleetConfig, time.Duration) {
+	costed := fleet.ChainAwareBenches(e.benchedFamilies(), e.laneChains(routing), e.stderr)
+	fc.Count = e.ports.Shrink(fc.Count, costed, fc.MinLanes, e.stderr)
 	if fc.Budget == nil {
 		return fc, 0
 	}
@@ -46,4 +48,11 @@ func (e *Engine) benchedFamilies() map[string]string {
 		benched[fam] = entry.Reason
 	}
 	return benched
+}
+
+func (e *Engine) laneChains(routing *policy.CLIRouting) [][]string {
+	if e.ports.Chains == nil {
+		return nil
+	}
+	return e.ports.Chains(routing)
 }
