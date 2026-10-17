@@ -62,11 +62,8 @@ func newGCDevHub(t *testing.T, policyJSON string) gcDevHubEnv {
 		r.Git("add", "-A")
 		r.Git("commit", "-q", "-m", "base")
 		bare := filepath.Join(r.Dir, "store.git")
-		r.Git("clone", "-q", "--bare", ".", bare)
+		r.CloneBare(".", bare)
 		r.Git("-C", bare, "update-ref", "refs/remotes/origin/main", "main")
-		for _, kv := range gittest.MaintenanceConfig() {
-			r.Git("-C", bare, "config", kv[0], kv[1])
-		}
 		return nil
 	})
 	root := filepath.Dir(tpl.Dir)
