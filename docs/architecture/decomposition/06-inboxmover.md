@@ -362,18 +362,47 @@ Risks:
 - **Concurrency**: the leaf adds no goroutines or locks. Fleet safety rests on `os.Rename` atomicity and the `FileLedger` flock. `RecordRootTaskFailure` and its `.bump.lock` were deleted under 06-F2 in cycle 1864.
 - **A shared scratchpad is not private**: during the build a parallel unit overwrote this unit's mutant-runner script in the session scratchpad (its argument shape shifted, every run became a no-op and reported "SURVIVED" without applying anything); the runs were redone with a uniquely named script and every mutant re-applied — a process note for the next parallel unit.
 
-Follow-ups, in order:
+Follow-ups, in order. The `file:line` anchors cite the unit-06 tree of 2026-09-14.
 - 06-F1: thread root Center into 12 Center-less roots.
+  - Do it root by root. Add a `Signals` field on `ship.Options` and wire it at `cmd_ship.go:88-99` for `postship.go:169`.
+  - Give each operator inbox command its own `newRootSignalCenter`.
+  - For the triage sandbox, first verify that `<run>/signals.ndjson` is writable under the `sandbox.write_subpaths` of the triage profile.
+  - Only then give `evolve inbox-mover` a Center. A denied write surfaces as `signalcenter.sink_dropped`.
+  - Each wired root shrinks the allow-list of test 55.
+  - With S4b, the `ledger.New(` inventory at `cmd_cycle_ledger_roots_test.go:30` goes from 1 to 0.
 - 06-F2: retired in cycle 1864 (`RecordRootTaskFailure` deleted).
+  - Cycle 1864 deleted `RecordRootTaskFailure`, its `verifylock` import, root_failure_test.go and the host apicover row.
+  - `lifecycle.Mover.Promote` is now the sole quarantine writer.
 - 06-F3: LANDED by review fold 2.
+  - `shaLandedOnMain` now returns its error.
+  - Measured: hub worktrees share `main`, so the roots of this operator print no new line.
 - 06-F4: home run workspace and cycle state in `internal/paths`.
+  - Home `.evolve/runs/cycle-N` and `.evolve/cycle-state.json` in `internal/paths`.
+  - Pin the consumers on `core.RunWorkspacePath` and `cyclestate.State.CycleID`.
 - 06-F5: continuation trio as unit 06b under `inbox` tag.
+  - Move the continuation trio and the five raw `[inbox]` lines as unit 06b, under the same `inbox` tag.
+  - Delete the host `logf` renderer. It already consumes `lifecycle.LegacyPrefix` since review fold 3.
+  - Fold the third id reader, `continuation_retire.go:179 itemIDAt`.
 - 06-F6: F8 `LifecycleRecord` inversion.
+  - Invert `LifecycleRecord` so that core can import the leaf.
+  - The composition-root seams at orchestrator.go:429/:443 then retire.
 - 06-F7: move `ApplyCycleOutcome` and `ClaimLaneScope` into leaf.
+  - Move them as `(*Mover).ApplyOutcome` and `ClaimScope` once the leaf is proven.
+  - D3 then becomes compile-enforced, and the WARN at `outcome.go:151` folds.
 - 06-F8: vocabulary fix under test 15.
+  - Fix the stale `processed|rejected|retry` text at the usage line and at `cmd_inbox_mover.go:104`.
+  - Turn test 15 red first. The text omits `quarantine`, which `validStates` accepts (Q2).
+  - Today the text lives at `internal/inboxmover/lifecycle/promote.go:80`.
 - 06-F9: add `rejected` and `quarantine` to `lifecycleDirs`.
+  - The list was at `dashboard/queue.go:15`. Today it is at `internal/dashboard/queue.go:14`.
 - 06-F10: reconcile two definitions of landed at ship.
+  - Ship's `isLanded` at `postship.go:313-325` checks HEAD, then `origin/<branch>`.
+  - The mover's `shaLandedOnMain` hard-codes `main` (Q11). Reconcile the two at ship.
 - 06-F11: `ClaimLaneScope` pre-filters ids through `Locate`.
+  - Skip each id that is already under `processing/`.
+  - The FAIL closeout then stops reporting `INBOX_CLAIM_NOT_FOUND` for expected state.
+  - The change is two stderr lines per id, in its own commit, under test 50 turned red.
+  - The 2026-09-14 addendum below landed this skip at `go/internal/inboxmover/outcome.go:103`.
 
 Mutants (each a one-line edit; the named test goes red; hand-applied and recorded by name in §10). Equivalents recorded, not padded: `"-1"` → `"0"` in RecoverOrphans (test 3 — `cycle-0` is never a claim dir); the tail's Promote-vs-facade choice for the inner quarantine park (D4 — same bytes); a `step` value hard-coded on a code with one step (test 21).
 
