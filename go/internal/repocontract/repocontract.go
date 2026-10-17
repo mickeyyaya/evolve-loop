@@ -142,6 +142,7 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./test/structure", Tests: []string{
 		"TestEveryThirdPartyImportHasExactlyOneHome",
 		"TestNoPollTimerInTheEventChannelSources",
+		"TestNoTestRunsARawBareClone",
 		"TestNoTrackedFileRegistersAnMCPServer",
 		"TestOnlyTheTrailAdapterRunsTheTrailBinary",
 		"TestTheCodeIndexAbstractionRunsNoProcessAndNamesNoBackend",

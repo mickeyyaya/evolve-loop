@@ -30,7 +30,7 @@ func newCheckpointHub(t *testing.T) checkpointHub {
 		r.Git("add", "-A")
 		r.Git("commit", "-q", "-m", "base")
 		storeDir := filepath.Join(r.Dir, "store.git")
-		r.Git("clone", "-q", "--bare", ".", storeDir)
+		r.CloneBare(".", storeDir)
 		r.Git("-C", storeDir, "remote", "remove", "origin")
 		r.Git("-C", storeDir, "update-ref", "refs/remotes/origin/main", "main")
 		return os.RemoveAll(filepath.Join(r.Dir, ".git"))
