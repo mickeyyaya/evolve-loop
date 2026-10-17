@@ -88,7 +88,12 @@ func carryForwardRemedy(artifact string) string {
 func (w replWaiter) deliverArtifactNudge(state *replWaitState, elapsed int) checkpointDispositionResult {
 	nudge := idleNudgeFor(w.cfg, w.dispatchBase)
 	nudgeMsg := nudge.msg
-	_ = w.deps.Tmux.SendKeys(w.ctx, w.launch.session, nudgeMsg, true)
+	if sendErr := w.deps.Tmux.SendKeys(w.ctx, w.launch.session, nudgeMsg, true); sendErr != nil {
+		fmt.Fprintf(w.deps.Stderr, "%s WARN: %s; the nudge send failed, so it is NOT verified and the wait stops: %v\n", w.prefix, nudge.label, sendErr)
+		recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "nudge", submitVerifyOutcome{Result: interaction.ResultNotVerified}, pasteOutcome{})
+		state.lastVerdict.Reason = fmt.Sprintf("nudge send failed: %v", sendErr)
+		return checkpointStopWaiting
+	}
 	fmt.Fprintf(w.deps.Stderr, "%s %s; sent one-shot nudge: %s\n", w.prefix, nudge.label, nudgeMsg)
 	w.deps.Sleep(submitVerifySettle)
 	nudgePane, captureErr := w.deps.Tmux.CapturePane(w.ctx, w.launch.session, w.launch.bootScrollback)
