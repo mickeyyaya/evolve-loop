@@ -58,7 +58,7 @@
       "exhausted_regex": "(?i)(usage limit reached|quota (exceeded|reached)|\\b0%\\s*(left|remaining))",
       "drift_probe_regex": "(?i)(limit reached|usage limit|weekly limit|(?:reached|hit) your|\\b0%\\s*(left|remaining)|out of (usage|credits|tokens)|rate.?limit|too many requests|quota (exceeded|reached)|upgrade to (a paid plan|continue))",
       "windows": {
-        "section_regex": "^\\s*(?P<scope>[A-Z][A-Z0-9 &/-]*MODELS)\\s*$",
+        "section_regex": "^\\s*(?P<scope>[A-Z][A-Z0-9 &/-]*(?:MODELS|ARGON))\\s*$",
         "models_regex": "Models within this group:\\s*(?P<models>.+?)\\s*$",
         "labels": [
           {
@@ -68,6 +68,11 @@
           {
             "regex": "^\\s*Five Hour Limit Remaining\\s*$",
             "kind": "5h"
+          },
+          {
+            "regex": "^\\s*Gemini 4 Argon Weekly Limit\\s*$",
+            "kind": "week",
+            "scope": "Gemini 4 Argon"
           }
         ],
         "value_regex": "(?P<pct>\\d{1,3}(?:\\.\\d+)?)%",
@@ -80,6 +85,10 @@
           },
           "CLAUDE AND GPT MODELS": {
             "family": "agy-claude"
+          },
+          "Gemini 4 Argon": {
+            "family": "agy",
+            "per_model": true
           }
         }
       }

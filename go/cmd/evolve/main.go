@@ -195,6 +195,12 @@ v12.1 utilities + composition:
                               [--json] [--root DIR] | cover strict
                               [--profile <path>] [--floors <path>] [--json]
                               [--root DIR] )
+  code                      Read-only code index for phase agents: who calls
+                              a symbol, the API of a file, a search in plain
+                              words, a map of the directories
+                              ( code callers <symbol> [--direction in|out]
+                              | code api <file> | code find <query>
+                              | code map [dir] [--project-root P] )
   context-fill              Context-window fill telemetry; correlates each
                               cycle's peak per-phase fill ratio against its
                               dossier final verdict (read-only)
