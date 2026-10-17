@@ -17,13 +17,24 @@ type event struct {
 }
 
 type pkgStat struct {
-	Pkg         string
-	Wall        float64
-	SerialSum   float64
-	NumTests    int
-	SlowestTest string
-	SlowestSecs float64
-	Status      string
+	Pkg             string
+	Wall            float64
+	AllTestsSum     float64
+	SerialOnlySum   float64
+	ParallelLongest float64
+	NumTests        int
+	SlowestTest     string
+	SlowestSecs     float64
+	Status          string
+}
+
+func (p pkgStat) Floor() float64 { return p.SerialOnlySum + p.ParallelLongest }
+
+func (p pkgStat) Dominant() string {
+	if p.ParallelLongest > p.SerialOnlySum {
+		return "parallel"
+	}
+	return "serial"
 }
 
 type testStat struct {
@@ -39,7 +50,7 @@ type Report struct {
 }
 
 func Parse(r io.Reader) (*Report, error) {
-	agg := &aggregator{pkgs: map[string]*pkgStat{}}
+	agg := &aggregator{pkgs: map[string]*pkgStat{}, paused: map[string]bool{}}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(nil, 16*1024*1024)
 	for sc.Scan() {
@@ -60,8 +71,9 @@ func Parse(r io.Reader) (*Report, error) {
 }
 
 type aggregator struct {
-	pkgs  map[string]*pkgStat
-	tests []testStat
+	pkgs   map[string]*pkgStat
+	tests  []testStat
+	paused map[string]bool
 }
 
 func (agg *aggregator) get(name string) *pkgStat {
@@ -79,6 +91,10 @@ func (agg *aggregator) observe(e event) {
 		if e.Package != "" {
 			agg.get(e.Package)
 		}
+	case "pause":
+		if e.Test != "" && !strings.Contains(e.Test, "/") {
+			agg.paused[e.Package+"\x00"+e.Test] = true
+		}
 	case "pass", "fail", "skip":
 		if e.Test == "" {
 			p := agg.get(e.Package)
@@ -91,7 +107,15 @@ func (agg *aggregator) observe(e event) {
 		}
 		p := agg.get(e.Package)
 		p.NumTests++
-		p.SerialSum += e.Elapsed
+		p.AllTestsSum += e.Elapsed
+		key := e.Package + "\x00" + e.Test
+		wasPaused := agg.paused[key]
+		delete(agg.paused, key)
+		if wasPaused {
+			p.ParallelLongest = max(p.ParallelLongest, e.Elapsed)
+		} else {
+			p.SerialOnlySum += e.Elapsed
+		}
 		if e.Elapsed > p.SlowestSecs {
 			p.SlowestSecs = e.Elapsed
 			p.SlowestTest = e.Test
@@ -139,7 +163,7 @@ func (rep *Report) writeOverview(b *strings.Builder, o MarkdownOptions) {
 	totalTests := 0
 	for _, p := range rep.Packages {
 		aggWall += p.Wall
-		aggSerial += p.SerialSum
+		aggSerial += p.AllTestsSum
 		totalTests += p.NumTests
 	}
 
@@ -187,18 +211,18 @@ func (rep *Report) writeOverBudget(b *strings.Builder, o MarkdownOptions) {
 func (rep *Report) writeSlowPackages(b *strings.Builder, o MarkdownOptions) {
 	fmt.Fprintf(b, "## Slow packages (> %.1fs wall) — optimization targets\n\n", o.ThresholdPkg)
 	flagged := 0
-	b.WriteString("| Package | Wall (s) | Tests | Σserial (s) | Slowest test | Slowest (s) |\n")
-	b.WriteString("|---|--:|--:|--:|---|--:|\n")
+	b.WriteString("| Package | Wall (s) | Tests | Σall tests (s) | Serial Σ (s) | Parallel max (s) | Floor (s) | Dominant | Slowest test | Slowest (s) |\n")
+	b.WriteString("|---|--:|--:|--:|--:|--:|--:|---|---|--:|\n")
 	for _, p := range rep.Packages {
 		if p.Wall <= o.ThresholdPkg {
 			continue
 		}
 		flagged++
-		fmt.Fprintf(b, "| %s | %.2f | %d | %.2f | %s | %.2f |\n",
-			shortPkg(p.Pkg), p.Wall, p.NumTests, p.SerialSum, p.SlowestTest, p.SlowestSecs)
+		fmt.Fprintf(b, "| %s | %.2f | %d | %.2f | %.2f | %.2f | %.2f | %s | %s | %.2f |\n",
+			shortPkg(p.Pkg), p.Wall, p.NumTests, p.AllTestsSum, p.SerialOnlySum, p.ParallelLongest, p.Floor(), p.Dominant(), p.SlowestTest, p.SlowestSecs)
 	}
 	if flagged == 0 {
-		b.WriteString("| _(none)_ | | | | | |\n")
+		b.WriteString("| _(none)_ | | | | | | | | | |\n")
 	}
 	b.WriteString("\n")
 }
