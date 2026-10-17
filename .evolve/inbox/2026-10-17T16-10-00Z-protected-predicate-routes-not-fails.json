@@ -1,0 +1,25 @@
+{
+  "created_at": "2026-10-17T16:10:00Z",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "weight": 0.85,
+  "campaign": "wave-orchestrator",
+  "source": "console, wave 123 (2026-10-17): cycle 1933 sealed FAIL on a deadlock that a route would have avoided",
+  "id": "protected-predicate-routes-not-fails",
+  "title": "A cycle whose own ACS predicate needs a protected-surface edit seals FAIL; it must end as planned no-work and route the item to the console",
+  "summary": "Cycle 1933 claimed audit-eval-existence-path-convention, whose declared files were go/internal/phases/audit/ and go/acs/, so the inbox rank listed it as lane-ready. Its tdd phase then wrote ACS predicate 004 (go/acs/cycle1933/predicates_test.go:57), which asserts a line in agents/evolve-auditor.md. That file is a protected surface (go/internal/guards/integrity_surface.go:142), so the builder could not satisfy the predicate. The build report says 'deadlock: ACS predicate 004 requires an edit to the ADR-0064 protected path agents/evolve-auditor.md'. After 2 corrections the review gate rejected the build and the cycle sealed FAIL. The wave goal says a card on a protected surface is a route, not a verdict, but that rule only acts on the declared files at claim time. Nothing acts when the protected surface shows up later, in the tdd predicates or the build's own deadlock report. The console routed this one item by hand (PR #944), but the class stays open for every item whose declared files omit a protected file.",
+  "fix": "Detect a protected-surface need after claim and convert it to a route. Candidate points: (1) when tdd writes predicates, resolve each path a predicate reads or asserts and refuse a predicate that targets IsProtectedSurface, ending the cycle as planned no-work with route console; (2) when the build reports a deadlock on a protected path, classify the cycle as routed (not FAIL) and write route console, routed_reason and the protected file into the inbox item. Prefer one rule in one place that both points use. A routed cycle is neutral for the ship streak, not a FAIL. Keep the anti-gaming boundary: a lane must not be able to call a real failure a route, so the protected path must be proven by IsProtectedSurface on a path the predicate or the deadlock names.",
+  "acceptance": [
+    "A replay of cycle 1933 (a tdd predicate that asserts a line in agents/evolve-auditor.md) ends as planned no-work, not FAIL, and the inbox item gains route console with the protected file in files (red-first test).",
+    "A deadlock report that names a path for which IsProtectedSurface is false still seals FAIL (negative test).",
+    "The routed cycle does not count as a FAIL in wave status and does not reset the release streak."
+  ],
+  "files": [
+    "go/internal/core/",
+    "go/internal/phases/tdd/",
+    "go/internal/guards/integrity_surface.go",
+    ".evolve/wave-goal.md"
+  ],
+  "route": "console",
+  "routed_reason": "The fix changes how the kernel classifies a cycle outcome and reads the protected-surface manifest; both are console surfaces."
+}

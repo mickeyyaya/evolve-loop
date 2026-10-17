@@ -6,8 +6,9 @@
   "weight": 0.52,
   "campaign": "continuation-defect-ledger",
   "files": [
-    "go/internal/phases/audit/",
-    "go/acs/"
+    "agents/evolve-auditor.md",
+    "go/acs/",
+    "go/internal/phases/audit/"
   ],
   "connects_to": [],
   "deps": [],
@@ -20,5 +21,9 @@
     "cd go && go test ./internal/phases/audit/... N/N PASS, no regression."
   ],
   "priority_class": "hygiene",
-  "priority_rationale": "inbox review 2026-09-27: No FAIL since the scout gate landed; the remaining cost is recurring LOW audit noise from slug and path drift."
+  "priority_rationale": "inbox review 2026-09-27: No FAIL since the scout gate landed; the remaining cost is recurring LOW audit noise from slug and path drift.",
+  "route": "console",
+  "routed_at": "2026-10-17T15:38:22Z",
+  "routed_cycle": "1933",
+  "routed_reason": "Cycle 1933 deadlocked: its own ACS predicate 004 needs an edit to agents/evolve-auditor.md, a protected surface (go/internal/guards/integrity_surface.go:142) that a lane may not edit. The declared files named only go/internal/phases/audit/ and go/acs/, so the rank listed it as lane-ready."
 }

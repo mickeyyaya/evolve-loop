@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "An agent of cycle N cannot write in .evolve/runs/cycle-M",
+    "The contract gap row is a deny row",
+    "Every phase still writes its own run artifacts"
+  ],
+  "created_at": "2026-10-11T14:47:55Z",
+  "files": [
+    "go/internal/bridge/sandbox_wrap.go",
+    ".evolve/profiles"
+  ],
+  "fix": "Resolve the grant to the dispatch own cycle directory only: a {cycle} template in the profile, or the resolver substitutes the running cycle. Then flip the gap row to deny. Check every phase that writes into its own run dir.",
+  "id": "sandbox-cross-cycle-run-dir-write",
+  "kind": "pipeline-repair",
+  "priority_class": "security",
+  "source": "sandbox contract lane (cl-sbx-contract), 2026-10-11",
+  "summary": "Found by the sandbox contract lane, 2026-10-11. About 90 agent profiles declare .evolve/runs/cycle-* in sandbox.write_subpaths. resolveSandboxWriteGrants widens that path to .evolve/runs, so an agent can write in any cycle run directory (cycle isolation is broken). The agent-messaging design (ADR-0129 D3, the outbox identity by location) depends on this isolation. The contract test has a gap row that asserts the write is allowed today and that flips when the gap closes.",
+  "title": "A sandboxed agent can write in another cycle run directory",
+  "weight": 0.8
+}

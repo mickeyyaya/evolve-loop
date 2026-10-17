@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A boot failure with a dead session after a wall is a system fault",
+    "A plain non-start stays neutral"
+  ],
+  "created_at": "2026-10-09T23:05:37Z",
+  "files": [
+    "go/internal/bridgechain/wall_keeper.go"
+  ],
+  "fix": "Keep exit 80 non-neutral when has-session fails or the bench store shows repeated boot-timeout strikes. Add tests for both cases.",
+  "id": "boot-timeout-after-wall-not-quota",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "pane-loss delta review, PR #840, 2026-10-09",
+  "summary": "Under the #840 rule, exit 80 is neutral. If one rung exits 85 and a later rung exits 80 because the infrastructure failed (the tmux server was killed during the boot, or the shell died after the paste), the walk reports a quota pause, not a system fault.",
+  "title": "An infrastructure boot failure after a quota wall is reported as a quota pause",
+  "weight": 0.4,
+  "consumed": {
+    "at": "2026-10-17T14:25:52Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DONE. b725689d5 (2026-10-11) wall_keeper.go neverStartedWork(res) keeps exit 80 non-neutral when BootLossCause(res.CauseCode).Lost(); wall_keeper_test.go +56 lines"
+  }
+}

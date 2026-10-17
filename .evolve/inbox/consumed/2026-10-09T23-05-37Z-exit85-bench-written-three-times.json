@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "One wall records one strike",
+    "One named constant for exit 85"
+  ],
+  "created_at": "2026-10-09T23:05:37Z",
+  "files": [
+    "go/internal/usageevidence/usageevidence.go",
+    "go/internal/bridgechain/bridgechain.go",
+    "go/internal/phases/runner/dispatch.go"
+  ],
+  "fix": "Write the bench in one place and name one shared constant for the quota wall. Add a test that one wall records one strike.",
+  "id": "exit85-bench-written-three-times",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "pane-loss reviews, PR #840, 2026-10-09",
+  "summary": "The bench on exit 85 is written in three places: usageevidence.go:125, bridgechain.go:138 and runner dispatch.go:62. One wall can therefore count more than once. There is also a second issue: bridgechain.exitQuota=85 duplicates launchoutcome.ExitUnknownPrompt=85, which has another meaning.",
+  "title": "One quota wall can record two or three bench strikes",
+  "weight": 0.4,
+  "consumed": {
+    "at": "2026-10-17T14:25:52Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DUPLICATE. same fix as exit85 escalation-bench-own-decorator (187): bench at usageevidence.go:128, runner dispatch.go:60, bridgechain walker still three sites"
+  }
+}

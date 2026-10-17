@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The run socket lives in a directory that no agent can write",
+    "Linux refuses or denies the run socket",
+    "Recipe sessions unset TMUX"
+  ],
+  "created_at": "2026-10-09T23:05:37Z",
+  "files": [
+    "go/internal/bridge/tmux.go",
+    "go/internal/adapters/sandbox/sandbox.go",
+    "go/internal/bridge/recipe_adapter.go"
+  ],
+  "fix": "Do (b) as the structural fix, add a bwrap rule or refusal for (a), give recipe sessions the unset for (c), and record (d) from the gate wave.",
+  "id": "tmux-isolation-linux-and-structural",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "cycle-1853 reviews, PR #836, 2026-10-09",
+  "summary": "Follow-ups from cycle 1853 (#836): (a) Linux bwrap has no run-socket deny when TMUX_TMPDIR is outside /tmp; (b) the bridge can put the run socket with -S in a directory that no agent profile can write, which removes the move/link attack class; (c) recipe sessions (newRecipeDriver) get neither the TMUX unset nor the sandbox; (d) the first live wave after #836 must show that claude and agy stop their own subprocesses under (allow signal (target same-sandbox)).",
+  "title": "Tmux isolation: Linux has no run-socket deny, and the run socket sits in a directory that agents can write",
+  "weight": 0.5
+}

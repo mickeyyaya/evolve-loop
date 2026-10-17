@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "internal/explanationdocs gitio.go treats exec.ErrWaitDelay from a git command that exited 0 as success, the same rule as sysexec.DefaultRunner and gittest",
+    "A test makes a git child keep its output pipe open after exit 0 (or a fake runner returns ErrWaitDelay with a 0 exit) and the read succeeds"
+  ],
+  "created_at": "2026-10-12T19:00:00Z",
+  "files": [
+    "go/internal/explanationdocs/gitio.go"
+  ],
+  "fix": "Accept errors.Is(err, exec.ErrWaitDelay) when cmd.ProcessState.Success(); prefer routing the call through sysexec so one rule holds. Red test first.",
+  "id": "explanationdocs-git-waitdelay",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "source": "T11-ship lane, 2026-10-12",
+  "summary": "MEDIUM: explanationdocs/gitio.go:255 runs git directly and treats exec.ErrWaitDelay as an error. When a forked child inherits the output pipe, a git command that exited 0 can still return ErrWaitDelay; the ship gate then reports 'base SHA is not a commit'. sysexec.DefaultRunner and (since T11-ship) gittest already accept ErrWaitDelay after a successful exit.",
+  "title": "explanationdocs git reads fail on ErrWaitDelay after a successful exit",
+  "weight": 0.5
+}

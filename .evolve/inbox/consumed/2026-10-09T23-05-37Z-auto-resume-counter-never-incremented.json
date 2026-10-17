@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The counter increments on each auto-resume",
+    "The resume at the cap is refused with an operator action"
+  ],
+  "created_at": "2026-10-09T23:05:37Z",
+  "files": [
+    "go/internal/checkpoint/checkpoint.go",
+    "go/internal/core/resume.go",
+    "go/cmd/evolve/cmd_loop_control.go"
+  ],
+  "fix": "Increment the counter in the resume path. Refuse with an operator action at the cap. Add a test that the fourth resume is refused.",
+  "id": "auto-resume-counter-never-incremented",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "pane-loss reviews, PR #840, 2026-10-09",
+  "summary": "checkpoint stores AutoResumeAttempts and AutoResumeMaxAttempts, and resumeDelay refuses a pause at its cap. But no code increments the counter, so the cap never applies when the reset time is known. An unknown reset is no longer auto-resumed (#840).",
+  "title": "autoResumeAttempts is never incremented, so a known-reset quota pause auto-resumes with no cap",
+  "weight": 0.5,
+  "consumed": {
+    "at": "2026-10-17T14:25:52Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DONE. b725689d5 'the auto-resume cap counts'; go/internal/checkpoint/autoresume.go:42 increments, :39 refuses at cap with operator action; cmd_loop_resume.go:88 recordResume wired"
+  }
+}

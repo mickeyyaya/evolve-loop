@@ -15,5 +15,11 @@
     "The census reads the same lane menu the planner reads (inboxmover.PartitionLaneMenu)."
   ],
   "source": "inbox review 2026-09-27 (design doc §7.7 W6)",
-  "priority_rationale": "inbox review 2026-09-27: an empty or short wave says nothing about why the backlog is not lane material; the wave-20 diagnosis took a throwaway program"
+  "priority_rationale": "inbox review 2026-09-27: an empty or short wave says nothing about why the backlog is not lane material; the wave-20 diagnosis took a throwaway program",
+  "consumed": {
+    "at": "2026-10-17T14:25:22Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DUPLICATE. same W6/O6 supply census as triage-commits-disjoint-tasks-for-every-lane (ADR-0139 D4); no census code on HEAD"
+  }
 }

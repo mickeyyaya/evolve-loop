@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "make apicover (warning-only) never leaves a scoped profile under the name coverage.txt that the coverage gates read",
+    "A test runs make apicover, then cover-strict and cover-changed, and the gates refuse or ignore the scoped profile"
+  ],
+  "consumed": {
+    "at": "2026-10-12T03:57:44Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Fixed in PR #861 (plan T2): make apicover writes coverage.apicover.txt; TestMakeApicover_NeverFeedsTheCoverageGates proves no gate reads it."
+  },
+  "created_at": "2026-10-12T14:00:00Z",
+  "files": [
+    "go/Makefile"
+  ],
+  "fix": "Write the warning-only apicover report profile to its own name (for example coverage.apicover-report.txt), as apicover-enforce already does with coverage.apicover.txt.",
+  "id": "make-apicover-writes-scoped-coverage-txt",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "source": "test-system lane T2, 2026-10-12",
+  "summary": "LOW: make apicover writes coverage.txt from a scoped run. After T2 every coverage gate reads coverage.txt as the one profile of a green test-integration run, so a scoped profile under that name can feed partial numbers to a gate (freshness still passes).",
+  "title": "make apicover writes a scoped profile under the gate's name coverage.txt",
+  "weight": 0.3
+}

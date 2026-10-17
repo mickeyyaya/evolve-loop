@@ -17,5 +17,11 @@
   "source": "console lane cl-lq-q12 (ADR-0128 Q12), 2026-10-09: the open question of the interim fix",
   "summary": "Q12 makes a continuation lane reach the identity proof: after a clean rebase the recovery pends ship's replayed commit, and the rebind does not count ship's inbox consumption. The lane then goes to Audit, not Ship. The B3 carry compares the trees byte for byte (treedelta.Identical), and the pended tree holds the consumption pair that the audited tree does not. Ship's B4 check (carryExplains, reProveCarry) also re-proves the bytes, and treeDriftExplainedByConsumption needs the re-ship's own consumed paths, which are empty because the item is already consumed. A carry record written by core would be refused at ship (INTEGRITY_TREE_DRIFT, as in cycle 1825). So the interim fix stops at Audit, and each continuation lane still pays one Audit (about 5 min) after a clean rebase. Research F2.3 assumed the lane ships with no LLM phase. The landing queue (Q14) removes the class; this item is only worth it if enforce is weeks away.",
   "title": "A continuation lane with a byte-identical rebase still re-audits: ship's carry check does not accept a consumption already in the change",
-  "weight": 0.5
+  "weight": 0.5,
+  "consumed": {
+    "at": "2026-10-17T14:25:22Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DONE. 706961f3a (Q12, ADR-0128) + d4dd2b0d9: carryExplains/treeDriftExplainedByConsumption in phases/ship/carry.go:62-65 accept drift = sanctioned consumption; explanationdocs.withoutShipConsumption in rebind.go"
+  }
 }

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "An operator stop writes no record that names a command that finished OK",
+    "An agy record names its real source"
+  ],
+  "created_at": "2026-10-10T00:42:53Z",
+  "files": [
+    "go/internal/phases/runner/postmortem.go",
+    "go/internal/attemptpostmortem/collect.go",
+    "go/internal/tokenusage/locate.go"
+  ],
+  "fix": "Do (1) and (2) together with the bridge pane capture for each dispatch (plan Q8).",
+  "id": "attempt-postmortem-delta-followups",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "W1 delta review, 2026-10-10",
+  "summary": "W1 delta review, 2026-10-10. (1) MEDIUM: exit -1 under a cancelled context (operator stop, deliverable door) writes a record whose end_window suspect can be a command that finished OK. Pass ctx.Err() into endedInTheAgentSession and exclude it unless it is a phase timeout (runner/postmortem.go:56). (2) MEDIUM: an agy record says command_source pane_tail but read no pane. Add a none source, or copy the scrollback for each dispatch (attemptpostmortem/collect.go:30-36). (3) LOW: Input.ScrollbackPath and readPane are dead in production. (4) LOW: document exit 124 as an end that gives a record. (5) LOW: when the fresh-session retry fails twice, the transcript window covers two sessions. (6) LOW: ClaudeConfigRoot ignores CLAUDE_CONFIG_DIR.",
+  "title": "Attempt postmortem: exit -1 under a cancelled context, thin agy records, dead scrollback input",
+  "weight": 0.3
+}

@@ -12,5 +12,11 @@
   "weight": 0.5,
   "priority_class": "hygiene",
   "priority_rationale": "inbox review 2026-09-27: A gradual refactor backlog now down to five files, with no failure mode.",
-  "review_status": "inbox review 2026-09-27: PARTIAL. Of the 20 files over 800 lines, 15 are resolved (ADR-0103 decomposition and the comment campaign). Five non-test files remain over 800 lines: core/orchestrator.go 961, phases/ship/gitops.go 952, core/cyclerun.go 891, acssuite/acssuite.go 866 and cmd/evolve/cmd_cycle.go 833. None exceeds the 2000-line hard trigger."
+  "review_status": "inbox review 2026-09-27: PARTIAL. Of the 20 files over 800 lines, 15 are resolved (ADR-0103 decomposition and the comment campaign). Five non-test files remain over 800 lines: core/orchestrator.go 961, phases/ship/gitops.go 952, core/cyclerun.go 891, acssuite/acssuite.go 866 and cmd/evolve/cmd_cycle.go 833. None exceeds the 2000-line hard trigger.",
+  "consumed": {
+    "at": "2026-10-17T14:25:22Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DONE. largest non-test Go file is 682 lines (explanationdocs.go; wc -l census today): zero files >=800 vs 20 at filing"
+  }
 }

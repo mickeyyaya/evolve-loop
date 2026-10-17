@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A read of another pane tty is denied under real sandbox-exec",
+    "The agent still reads its own pane and ptys"
+  ],
+  "created_at": "2026-10-09T23:05:37Z",
+  "files": [
+    "go/internal/adapters/sandbox/sandbox.go"
+  ],
+  "fix": "Remove the tty devices from the /dev read grant. Keep the pane's own tty and the agent's own ptys (pty extension). Add a real sandbox-exec deny test.",
+  "id": "sandbox-dev-read-other-tty",
+  "kind": "pipeline-repair",
+  "priority_class": "security",
+  "source": "R1 lane, PR #838, 2026-10-09",
+  "summary": "The base SBPL grants file-read* on all of /dev, so a sandboxed agent can open another pane's tty for read. The R1 lane measured OTHER-READ-OK. It can possibly read keystrokes. TIOCSTI is not granted. Linux bwrap devpts was not checked.",
+  "title": "The agent sandbox can read another pane's tty",
+  "weight": 0.6
+}
