@@ -116,3 +116,26 @@ func TestParseManifest_RefusesABrokenUsageWindowSpec(t *testing.T) {
 		t.Errorf("a well-formed window spec was refused: %v", err)
 	}
 }
+
+func TestUsageWindows_Agy140ScreenReadsEveryGroupIncludingModelScopedArgon(t *testing.T) {
+	t.Parallel()
+	type row struct {
+		Scope, Kind, Family, Model string
+		Used                       float64
+		Reset                      time.Duration
+		Exhausted                  bool
+	}
+	var got []row
+	for _, w := range UsageWindows("agy", usagePane(t, "agy_usage_1.4.0.txt"), usageNow) {
+		got = append(got, row{w.Scope, w.Kind, w.Family, w.Model, w.PercentUsed, w.ResetsAt.Sub(usageNow), w.Exhausted})
+	}
+	want := []row{
+		{"GEMINI MODELS", "week", "agy", "", 8.10, 165*time.Hour + 21*time.Minute, false},
+		{"GEMINI MODELS", "5h", "agy", "", 26.34, 2*time.Hour + 21*time.Minute, false},
+		{"CLAUDE AND GPT MODELS", "week", "agy-claude", "", 100, 75*time.Hour + 32*time.Minute, true},
+		{"Gemini 4 Argon", "week", "agy", "Gemini 4 Argon", 1.38, 167*time.Hour + 31*time.Minute, false},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("windows = %+v\nwant      %+v", got, want)
+	}
+}
