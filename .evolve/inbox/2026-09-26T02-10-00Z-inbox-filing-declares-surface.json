@@ -25,5 +25,8 @@
     "Replay: the three items hand-typed on 2026-09-26 (resume-does-not-refresh-a-stale-worktree-base, carryover-queue-unbounded-by-design, acs-verdict-filename-literal-sweep) are reported as undeclared on their pre-curation records."
   ],
   "priority_class": "performance",
-  "priority_rationale": "inbox review 2026-09-27: Undeclared items still cost a lane scout and triage (1714, wave 16), though R1 removed the FAIL."
+  "priority_rationale": "inbox review 2026-09-27: Undeclared items still cost a lane scout and triage (1714, wave 16), though R1 removed the FAIL.",
+  "route": "lane",
+  "routed_reason": "ordinary code fix with no protected file and no grader, gate, floor, carry or persona logic; console review 2026-10-17 (ADR-0139 plan O2a)",
+  "routed_at": "2026-10-17T07:05:26Z"
 }
