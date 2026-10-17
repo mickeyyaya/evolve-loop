@@ -1,6 +1,6 @@
 # Plan: each model tier has one purpose, one chain across separate quota pools, and Gemini 4 Argon (Medium) for agy at deep and top
 
-- **Status:** proposed, 2026-10-17.
+- **Status:** accepted, 2026-10-17 (the operator approved it).
 - **Research:** [model-tier-policy-2026-10](../research/model-tier-policy-2026-10.md). **Decision:** [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md). **Spec of record:** [model-routing](../reference/model-routing.md), section "The tier policy". **Earlier work:** [cli-routing-table-2026-10](cli-routing-table-2026-10.md) and [ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md). **Bridge rule:** every component that queries a CLI follows [bridge-factory-2026-10](bridge-factory-2026-10.md); its §8 names the layer of each component.
 
 ## Table of contents

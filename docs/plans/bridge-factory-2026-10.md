@@ -1,6 +1,6 @@
 # Plan: every query and action on an LLM CLI goes through one bridge factory and the manifest data
 
-- **Status:** proposed, 2026-10-17.
+- **Status:** accepted, 2026-10-17 (the operator approved it).
 - **Research:** [bridge-factory-2026-10](../research/bridge-factory-2026-10.md). **Design:** [agent-bridge-factory](../architecture/agent-bridge-factory.md).
 - **Decision:** [ADR-0137](../architecture/adr/0137-one-bridge-factory-resolves-every-llm-cli-and-the-manifest-holds-its-facts.md). **Related plan:** [model-tier-policy-2026-10](model-tier-policy-2026-10.md), whose components Q1–Q5 depend on this plan. **Existing design:** [agent-bridge-dispatch-contract](../architecture/agent-bridge-dispatch-contract.md).
 

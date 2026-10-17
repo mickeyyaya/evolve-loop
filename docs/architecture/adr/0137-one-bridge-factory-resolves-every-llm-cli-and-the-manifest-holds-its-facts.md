@@ -1,6 +1,6 @@
 # ADR-0137: One bridge factory resolves every LLM CLI, and the manifest holds its facts
 
-- **Status:** Proposed (2026-10-17).
+- **Status:** Accepted (2026-10-17, the operator approved the design set).
 - **Plan:** [bridge-factory-2026-10](../../plans/bridge-factory-2026-10.md). **Research:** [bridge-factory-2026-10](../../research/bridge-factory-2026-10.md). **Design:** [agent-bridge-factory](../agent-bridge-factory.md).
 - **Relates to:**
   - [agent-bridge-dispatch-contract](../agent-bridge-dispatch-contract.md): the dispatch invariants. This ADR extends the one-bridge rule from dispatch to every query.

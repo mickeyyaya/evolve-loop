@@ -62,3 +62,6 @@
 ./internal/phases/runner/runnertest 100
 ./internal/testkey 100
 ./internal/testverdict 100
+./internal/codeindex 100
+./internal/codeindex/codeindextest 100
+./internal/adapters/codeindex/trail 100

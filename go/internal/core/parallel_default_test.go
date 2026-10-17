@@ -27,6 +27,7 @@ const (
 	swapsChallengeTokenRead         = "test swaps package variable challengeTokenRead"
 	swapsCoverChangedProfiler       = "test swaps package variable coverChangedProfiler"
 	swapsCoverLockWait              = "test swaps package variable coverLockWait"
+	swapsCoverStrictRunner          = "test swaps package variable coverStrictRunner"
 	swapsCoveringTestsDeriver       = "test swaps package variable coveringTestsDeriver"
 	swapsFailureDecide              = "test swaps package variable failureDecide"
 	swapsFailureDigestMarshal       = "test swaps package variable failureDigestMarshal"
@@ -84,6 +85,11 @@ var serialRequiredTests = map[string]string{
 	"core.TestCoverChangedFailures_AFailingTestRefusesAtEnforceAndOnlyWarnsAtShadow":                swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_EnforceRefusesTheChangedFunctionOfTheBuild":                      swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_ShadowOffAndEveryPlumbingFaultLeaveTheHandoffAlone":              swapsCoverChangedProfiler,
+	"core.TestCoverChangedFailures_ExcludesACSTagOnlyPackageFromProfiler":                           swapsCoverChangedProfiler,
+	"core.TestCoverChangedFailures_StrictRunner":                                                    swapsCoverStrictRunner,
+	"core.TestCoverChangedFailures_StrictRunnerDefaultMeasuresOnlyTheChangedStrictPackages":         swapsCoverChangedProfiler,
+	"core.TestCoverChangedFailures_UncoveredFunction":                                               swapsStderr,
+	"core.TestCoverStrictFailures_ARunnerErrorWarnsAndLeavesTheHandoffAlone":                        swapsCoverStrictRunner,
 	"core.TestScopedCoverFunc_BehindAHeldLockWaitsOnlyItsBoundThenRunsUnserialized":                 swapsCoverLockWait,
 	"core.TestCoveringTests_AvailableToTestAmplificationWithoutFreshBuild":                          swapsCoveringTestsDeriver,
 	"core.TestDecideAfterRetro_ABlockingDecisionEndsTheCycleNamingTheAction":                        swapsFailureDecide,

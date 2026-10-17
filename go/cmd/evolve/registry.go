@@ -122,6 +122,7 @@ var commands = []subcommand{
 	{Name: "practice", Summary: "CLI practice watch: watch [--dry-run] [--json] [--project-root P] reads each configured practice source (changelogs, prompting guides), compares it with its last snapshot and files one inbox research item per changed source (exit 1 on a bad policy, 10 on usage)", Run: runPracticeCommand},
 	{Name: "ratchet", Summary: "Function-size + raw-git-fixture ratchets over a module: check [size|rawgit] [--root DIR]", Run: runRatchet},
 	{Name: "cover", Summary: "Coverage gate over a change: changed --base <ref> [--profile <path>] [--json] [--root DIR] refuses every changed function below 100%; strict [--profile <path>] [--floors <path>] [--json] [--root DIR] refuses every package of go/.cover-strict below its floor", Run: runCover},
+	{Name: "code", Summary: "Read-only code index for phase agents: callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir] [--project-root P]; one hit per line as file:line, symbol, text; exit 1 no result, 2 index absent, 3 unsupported, 10 usage", Run: runCodeCommand},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }
 

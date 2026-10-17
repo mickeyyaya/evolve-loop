@@ -6,6 +6,8 @@
 
 `covchanged` finds each Go function that a change touches and measures it against a coverage profile. It refuses each changed function below 100% statement coverage. The verb `evolve cover changed`, the target `make cover-changed`, the CI step in `.github/workflows/go.yml` and the loop build floor (`go/internal/core/cover_changed_floor.go`) call the same `Workspace.Check`.
 
+The build floor profiles only the changed packages that build a file under `DefaultTags`. Thus a `go/acs/cycleN` package (tag `acs` only) cannot fail the profile run with `[setup failed]`. The floor also measures each changed package that `go/.cover-strict` lists against its floor (`coverStrictRunner` over `coverstrict.Measure`, cycle 1916).
+
 ## Design
 
 - **A pure core with ports.** `ParseDiff`, `ParseProfile`, `Measure` and `Judge` do no IO. `Measure` gets the changed lines, the profile, a file reader and a `go/build` context in `Sources`. `Workspace.Check` is the one adapter: it runs git through a `sysexec.RunFunc` and reads files from the module directory.

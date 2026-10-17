@@ -44,11 +44,14 @@ func RootsOf(projectRoot string) Roots {
 
 type ShrinkFn func(count int, benched map[string]string, minLanes int, warn io.Writer) int
 
+type ChainsFn func(block *policy.CLIRouting) [][]string
+
 type Ports struct {
 	LastCycle func(ctx context.Context) (int, error)
 	Workspace func(cycle int) string
 	Protected func(path string) bool
 	Shrink    ShrinkFn
+	Chains    ChainsFn
 }
 
 type Engine struct {
@@ -114,6 +117,15 @@ func LoadFleetConfig(evolveDir string) policy.FleetConfig {
 		return policy.Policy{}.FleetConfig()
 	}
 	return pol.FleetConfig()
+}
+
+func LoadRouting(evolveDir string, warn io.Writer) *policy.CLIRouting {
+	pol, err := policy.Load(paths.PolicyPath(evolveDir))
+	if err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: fleet: the routing chains are unknown (%v): every bench costs a lane\n", err)
+		return nil
+	}
+	return pol.CLIRouting
 }
 
 func ReloadFleetConfig(evolveDir string, prev policy.FleetConfig, warn io.Writer) policy.FleetConfig {
