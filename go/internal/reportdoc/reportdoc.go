@@ -375,6 +375,7 @@ func visibleLinesIdx(markdown string) (out []string, rawIdx []int) {
 	rawIdx = make([]int, 0, len(lines))
 	var active fence
 	inComment := false
+	inParagraph := false
 	for i, raw := range lines {
 		if active.length > 0 {
 			if closesFence(raw, active) {
@@ -383,13 +384,15 @@ func visibleLinesIdx(markdown string) (out []string, rawIdx []int) {
 			continue
 		}
 		line := stripHTMLComments(raw, &inComment)
-		if isIndentedCode(line) {
+		if isIndentedCode(line) && !inParagraph {
 			continue
 		}
 		if opened, ok := opensFence(line); ok {
 			active = opened
+			inParagraph = false
 			continue
 		}
+		inParagraph = isParagraphText(line)
 		out = append(out, line)
 		rawIdx = append(rawIdx, i)
 	}
@@ -422,6 +425,14 @@ func stripHTMLComments(line string, inComment *bool) string {
 
 func isIndentedCode(line string) bool {
 	return strings.HasPrefix(line, "\t") || strings.HasPrefix(line, "    ")
+}
+
+func isParagraphText(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || trimmed[0] == '#' {
+		return false
+	}
+	return strings.Trim(trimmed, "-=*_ ") != ""
 }
 
 func opensFence(line string) (fence, bool) {
