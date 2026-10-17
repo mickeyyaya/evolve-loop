@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-10-17T04:30:00Z",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "weight": 0.8,
+  "source": "console, boundary of wave 116 to 117 (2026-10-17): `evolve pr merge 916 917 --update-branch --wait 25m` printed '#916 updated with main' and then '#916 refused: base moved during the wait: 62a2dfea98f3 is behind main by 4', while gh showed the new head f0a666e7",
+  "id": "pr-merge-update-branch-reads-stale-head",
+  "title": "evolve pr merge --update-branch waits on the old head and refuses every behind PR on its first pass",
+  "summary": "upToDate runs `gh pr update-branch` and then re-reads the PR at once (go/cmd/evolve/cmd_pr.go:345-349). GitHub has not moved headRefOid yet, so the view returns the old head. awaitGreen then checks the old head, which is green, and behindBy finds the old head behind main, so mergeOne refuses (cmd_pr.go:322-326). A behind PR thus never merges on the first pass, and each merge of a boundary train makes the next PR behind, so a train of N PRs needs N manual reruns.",
+  "fix": "After update-branch, wait until the PR head differs from the head before the update (bounded by the --wait deadline), then await green on the new head. Add a fake gh that returns the old head on the first view after update-branch.",
+  "acceptance": [
+    "A test with a fake gh whose first view after update-branch returns the old head: mergeOne waits for the new head, awaits green on it, and merges.",
+    "A train `evolve pr merge A B --update-branch` where A's merge makes B behind merges both in one run."
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_pr.go",
+    "go/cmd/evolve/cmd_pr_test.go"
+  ]
+}
