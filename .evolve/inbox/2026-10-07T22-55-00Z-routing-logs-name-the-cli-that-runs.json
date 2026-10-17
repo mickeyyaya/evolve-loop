@@ -16,5 +16,8 @@
   "files": [
     "go/internal/phases/runner/routing.go",
     "go/internal/bridgechain/bridgechain.go"
-  ]
+  ],
+  "route": "lane",
+  "routed_reason": "ordinary code fix with no protected file and no grader, gate, floor, carry or persona logic; console review 2026-10-17 (ADR-0139 plan O2a)",
+  "routed_at": "2026-10-17T07:05:26Z"
 }
