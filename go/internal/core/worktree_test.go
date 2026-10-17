@@ -12,12 +12,12 @@ import (
 func TestWorktreePhase(t *testing.T) {
 	t.Parallel()
 
-	for _, p := range []Phase{PhaseTDD, PhaseBuild} {
+	for _, p := range []Phase{PhaseTDD, PhaseBuild, Phase("test-amplification")} {
 		if !WorktreePhase(p) {
 			t.Errorf("%s should be a worktree (source-writing) phase", p)
 		}
 	}
-	for _, p := range []Phase{PhaseIntent, PhaseScout, PhaseTriage, PhaseBuildPlanner, PhaseAudit, PhaseShip, PhaseRetro, PhaseStart, PhaseEnd} {
+	for _, p := range []Phase{PhaseIntent, PhaseScout, PhaseTriage, PhaseBuildPlanner, PhaseAudit, PhaseShip, PhaseRetro, PhaseStart, PhaseEnd, Phase(""), Phase("unknown-phase")} {
 		if WorktreePhase(p) {
 			t.Errorf("%s should NOT be a worktree phase (writes only to workspace)", p)
 		}

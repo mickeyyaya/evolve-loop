@@ -101,8 +101,12 @@ $(DIST_CHECKSUMS): $(DIST_TARGETS) $(DIST_UNIVERSAL)
 dist-clean: ## Remove cross-compiled artifacts
 	rm -rf $(DIST_DIR)
 
-test: ## FAST layer: co-located unit/functional/component tests, race on (excludes acs/, integration, e2e)
-	$(GO) test -race -count=1 -cover $(FAST_PKGS)
+test: ## FAST layer: co-located unit/functional/component tests, race on (excludes acs/, integration, e2e); a treewalk guard fails the run on any file or empty directory the tests leave in go/
+	@base=$$(mktemp) || exit 1; \
+	$(GO) run ./cmd/evolve treewalk snapshot --root . --out "$$base" || exit 1; \
+	$(GO) test -race -count=1 -cover $(FAST_PKGS); status=$$?; \
+	$(GO) run ./cmd/evolve treewalk check --root . --baseline "$$base" || status=1; \
+	rm -f "$$base"; exit $$status
 
 test-component: ## Component tier: several internal packages wired against temp FS (no subprocess)
 	$(GO) test -race -count=1 ./test/component/...

@@ -217,7 +217,7 @@ func TestBootTmuxREPL_ExportsTheDispatchTagOfThisLaunch(t *testing.T) {
 	if len(ids) != 1 || !strings.Contains(ids[0], "/p"+strconv.Itoa(os.Getpid())+"n") {
 		t.Fatalf("exported ids = %v from %q, want one id with this bridge's pid", ids, tmux.sentKeys)
 	}
-	launchAt := slices.IndexFunc(tmux.sentKeys, func(k string) bool { return strings.Contains(k, "claude --model") })
+	launchAt := slices.IndexFunc(tmux.sentKeys, func(k string) bool { return strings.Contains(k, "claude --strict-mcp-config --model") })
 	exportAt := slices.IndexFunc(tmux.sentKeys, func(k string) bool { return dispatchIDRE.MatchString(k) })
 	if exportAt < 0 || launchAt < exportAt {
 		t.Errorf("export at %d, launch at %d: the tag must be in the shell before the CLI starts", exportAt, launchAt)

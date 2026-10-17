@@ -23,6 +23,7 @@
 | [accuracy-self-correction.md](private/research/archived-2026-05-19/accuracy-self-correction.md) | CoT verification and anti-conformity checks |
 | [performance-profiling.md](private/research/archived-2026-05-19/performance-profiling.md) | Token attribution and cost baselines |
 | [eval-grader-best-practices.md](eval-grader-best-practices.md) | Eval grader precision and mutation resistance |
+| [conventions/cli-only-no-mcp.md](conventions/cli-only-no-mcp.md) | The rule: outside services are reached through a CLI, never MCP |
 
 ## Architecture
 

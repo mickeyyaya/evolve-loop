@@ -22,7 +22,7 @@ func TestTmuxBoot_ExportsProjectRootIntoThePaneShell(t *testing.T) {
 			if !strings.Contains(k, root) {
 				t.Fatalf("export names %q, want the launch's project root %q", k, root)
 			}
-		case strings.Contains(k, "claude --model"):
+		case strings.Contains(k, "claude --strict-mcp-config --model"):
 			launchAt = i
 		}
 	}

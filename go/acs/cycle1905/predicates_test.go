@@ -50,7 +50,7 @@ func newHub(t *testing.T) hubFixture {
 	seed.Git("add", "README.md")
 	seed.Git("commit", "-q", "-m", "seed")
 	hub := hubFixture{git: seed, root: filepath.Join(canonicalTempDir(t), "hub")}
-	seed.Git("clone", "-q", "--bare", seed.Dir, hub.store())
+	seed.CloneBare(seed.Dir, hub.store())
 	storeGit := "--git-dir=" + hub.store()
 	seed.Git(storeGit, "config", "gc.auto", "0")
 	seed.Git(storeGit, "config", "maintenance.auto", "false")

@@ -26,6 +26,7 @@
 - [9. How to read the report: a worked example](#9-how-to-read-the-report-a-worked-example)
 - [10. Guards](#10-guards)
 - [11. Limits](#11-limits)
+- [13. The measurement fixes: C12 and C13](#13-the-measurement-fixes-c12-and-c13)
 
 ## 1. Goals
 
@@ -290,3 +291,53 @@ A second example shows the resource view. In a local run on 14 CPUs, `phases/shi
 - **A process that a test does not wait for is not counted.** For example, a daemon that a test starts and does not stop has no rusage in the record (research P4.7).
 - **The flaky list needs history.** One run cannot mark a test as flaky. The list needs `--history` and the same tree hash in two runs.
 - **No dashboard.** The report writes to the job summary and to JSON. A dashboard or an OpenTelemetry export is outside the scope of this spec.
+
+## 13. The measurement fixes: C12 and C13
+
+> Plan: [§6a, C12 and C13](../plans/ci-wall-time-2026-10.md#6a-components-after-the-first-instrumented-run-c6-to-c14). Research: [F3.23 and F3.34](../research/ci-wall-time-2026-10.md#31-the-first-instrumented-run-c0b). Section 12 is reserved for C3 and C5b (PR #935).
+
+### C12: the limit of a package comes from its own time window
+
+#### Issue
+
+The first instrumented run (39031338517) gave wrong `limit` values (research F3.34). All 303 packages of the ubuntu 1.27 job got `cpu-saturation`. 184 macOS packages got `subprocesses-and-syscalls`, but most of them only sleep for 1 s at the exit of the race detector.
+
+#### Gap
+
+The rules of section 8 read the runner over the whole step, not over the time of the package. Rule 3 has no lower bound, so 0.011 s of CPU can set a limit. The CPU count is a constant 4, but the macOS runner has 3. No rule sees a package whose wall is far above its floor.
+
+#### Solution
+
+The report applies these rules in this order. The list replaces the rule list of section 8.
+
+1. **Window.** The window of a package is the time from its first to its last event in the `-json` stream. The report reads the sampler records in that window only.
+2. **Memory, then saturation.** Rules 1 and 2 of section 8 apply over the window. The CPU count comes from the runner type: 4 for ubuntu and 3 for macOS.
+3. **Too small to judge.** If user plus system CPU is below 0.5 s, the limit is `wait`. Under `-race`, such a binary mostly sleeps at its exit (research F3.26).
+4. **Contention.** If the wall is more than 2× the floor (serial sum + longest parallel test), the limit is `contention`. The package waits for the CPUs that other packages use.
+5. **The other rules.** Rules 3 to 5 of section 8 apply as before.
+
+*Worked example (C0b run):* `internal/core` on macOS has a wall of 362 s and a floor of 92 s, so rule 4 gives `contention`. `cmd/commentaudit` on ubuntu 1.23 has 1.016 s of wall and 0.011 s of CPU, so rule 3 gives `wait`.
+
+### C13: the macOS sampler records CPU, and a counter records the spawns
+
+#### Issue
+
+macOS is the critical path, but its sampler writes only memory and swap (research F3.23). macOS also uses 6.3× the system CPU of ubuntu, and nothing names the processes that cause it (F3.22).
+
+#### Gap
+
+Section 6 names `host_statistics` as the macOS CPU source. That call needs cgo, so the built sampler has no CPU on darwin. rusage counts the CPU of all descendants together, so it cannot count the processes that a package starts.
+
+#### Solution
+
+- **CPU on macOS.** The sampler starts one `iostat -w 1` child at the start. It reads the `us`, `sy` and `id` columns of each line, and it writes `cpu_busy_pct` = 100 − `id`. If the child stops, the sampler writes records without CPU, as today. macOS still has no run queue.
+- **The package of a process.** The rusage wrapper sets `TESTRUSAGE_PKG=<package>` in the environment of each test binary. Every child inherits it.
+- **The spawn counter.** In the CI test step only, a directory on the front of `PATH` holds a `git` shim and a `go` shim. Each shim appends one line (`TESTRUSAGE_PKG`, the tool, the first argument) to `spawns.ndjson`, then runs the real tool with the same arguments. The exit code and the output pass through.
+- **The report.** `evolve ci telemetry` adds `pkg.spawns.git` and `pkg.spawns.go` to each package.
+
+| Rule | Guard |
+|---|---|
+| The shim never changes a result. | A test: the shim passes stdin, stdout, stderr and the exit code of the real tool through. |
+| A test that sets its own `PATH` still works. | The shim is on the front of `PATH`, and it finds the real tool through the rest of `PATH`. |
+| The counter costs little. | One append of one line per spawn. The C0b run has about 10–15 `git` spawns per `core` scenario (F3.22). |
+

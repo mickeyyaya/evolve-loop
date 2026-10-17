@@ -1,0 +1,287 @@
+{
+  "schema_version": 2,
+  "cycle": 1932,
+  "run_id": "01M54VQV1CJGD92JH2HKD45HZV",
+  "goal": "Wave 122.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 121 facts (run 20261017T093651Z): 2 of 3 cycles shipped.\n- Cycle 1926: final verdict PASS. It shipped.\n- Cycle 1927: final verdict PASS. It shipped.\n- Cycle 1928: no final verdict. Last phase: build. It did not ship. Quota pauses: 1.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 118 (run 20261017T053340Z): 1 of 1 cycles shipped.\n- Wave 119 (run 20261017T061052Z): 1 of 1 cycles shipped.\n- Wave 120 (run 20261017T073249Z): 1 of 1 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "56be5c0aa4fc43dd98c9f658a0eb4c8131fa9a61",
+  "tree_sha": "cb915f5a3c3dd3de9d19b422ff3d13930e7aabc7",
+  "tasks": [
+    "recurrence-reweight-bypasses-the-item-writer"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 651739,
+      "started_at": "2026-10-17T12:00:52Z",
+      "ended_at": "2026-10-17T12:11:45Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 111688,
+      "started_at": "2026-10-17T12:12:12Z",
+      "ended_at": "2026-10-17T12:18:28Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 483299,
+      "started_at": "2026-10-17T12:18:28Z",
+      "ended_at": "2026-10-17T12:26:35Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 531616,
+      "started_at": "2026-10-17T12:26:35Z",
+      "ended_at": "2026-10-17T12:35:28Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 274165,
+      "started_at": "2026-10-17T12:35:28Z",
+      "ended_at": "2026-10-17T12:40:03Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 17200,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 105594,
+      "started_at": "2026-10-17T12:40:03Z",
+      "ended_at": "2026-10-17T13:20:17Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 152584,
+      "started_at": "2026-10-17T13:20:43Z",
+      "ended_at": "2026-10-17T13:34:17Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 10900,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 246876,
+      "started_at": "2026-10-17T13:34:46Z",
+      "ended_at": "2026-10-17T13:38:55Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 23900,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1060415,
+      "started_at": "2026-10-17T13:38:55Z",
+      "ended_at": "2026-10-17T14:04:47Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 16700,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 364347,
+      "started_at": "2026-10-17T14:05:07Z",
+      "ended_at": "2026-10-17T14:14:47Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 8300,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 180648,
+      "started_at": "2026-10-17T14:15:11Z",
+      "ended_at": "2026-10-17T14:18:15Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 174434,
+      "started_at": "2026-10-17T14:18:15Z",
+      "ended_at": "2026-10-17T14:24:08Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 105307,
+      "started_at": "2026-10-17T14:24:28Z",
+      "ended_at": "2026-10-17T14:29:39Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 8500,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 212564,
+      "started_at": "2026-10-17T14:30:00Z",
+      "ended_at": "2026-10-17T14:33:35Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 4655276,
+    "phase_count": 14,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1060415,
+    "by_archetype_ms": {
+      "build": 1340443,
+      "control": 393212,
+      "evaluate": 1153854,
+      "plan": 1767767
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 85500,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 16700,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 0,
+        "output": 27700,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 0,
+        "output": 41100,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 10900,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  }
+}

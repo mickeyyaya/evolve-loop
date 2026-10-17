@@ -38,4 +38,4 @@ A backend is done when it passes `Run`. The trail adapter runs the suite with a 
 
 ## Wiring
 
-`go/cmd/evolve/cmd_code.go` builds the `Backends` set from the policy block `code_index` (`internal/policy`, `CodeIndexConfig`) and maps the errors to exit codes.
+`go/cmd/evolve/cmd_code.go` builds the `Backends` set from the policy block `code_index` (`internal/policy`, `CodeIndexConfig`) and maps the errors to exit codes. It appends one record to the usage log for each call through [`internal/codeindex/usagelog`](internal-codeindex-usagelog.md).

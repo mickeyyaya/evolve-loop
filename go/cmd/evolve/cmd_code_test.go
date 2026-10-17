@@ -28,7 +28,7 @@ func standardFake() codeindex.Backend {
 func runCode(t *testing.T, build codeBackendsBuilder, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	rc := codeVerb(context.Background(), args, &stdout, &stderr, build)
+	rc, _ := codeVerb(context.Background(), args, &stdout, &stderr, build)
 	return rc, stdout.String(), stderr.String()
 }
 

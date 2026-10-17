@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
+	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
 )
 
 type waveSummary struct {
@@ -15,17 +16,19 @@ type waveSummary struct {
 }
 
 type waveStatusReport struct {
-	Wave          int          `json:"wave"`
-	RunID         string       `json:"run_id"`
-	PID           int          `json:"pid"`
-	PIDAlive      bool         `json:"pid_alive"`
-	LoopLive      bool         `json:"loop_live"`
-	Outcome       string       `json:"outcome"`
-	Cycles        []wave.Cycle `json:"cycles"`
-	CyclesOmitted int          `json:"cycles_omitted,omitempty"`
-	LastWave      *waveSummary `json:"last_wave,omitempty"`
-	NotesQueued   int          `json:"notes_queued"`
-	Warnings      []string     `json:"warnings,omitempty"`
+	Wave          int                  `json:"wave"`
+	RunID         string               `json:"run_id"`
+	PID           int                  `json:"pid"`
+	PIDAlive      bool                 `json:"pid_alive"`
+	LoopLive      bool                 `json:"loop_live"`
+	Outcome       string               `json:"outcome"`
+	Cycles        []wave.Cycle         `json:"cycles"`
+	CyclesOmitted int                  `json:"cycles_omitted,omitempty"`
+	LastWave      *waveSummary         `json:"last_wave,omitempty"`
+	NotesQueued   int                  `json:"notes_queued"`
+	Measures      wavemeasure.Measures `json:"measures"`
+	Runs          []waveRunMeasures    `json:"runs"`
+	Warnings      []string             `json:"warnings,omitempty"`
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
@@ -74,7 +77,7 @@ func runWaveStatus(env waveEnv, args []string, stdout, stderr io.Writer) int {
 }
 
 func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) waveStatusReport {
-	report := waveStatusReport{Cycles: []wave.Cycle{}, LoopLive: len(waveLiveRuns(plane.evolveDir, env.now())) > 0}
+	report := waveStatusReport{Cycles: []wave.Cycle{}, Runs: []waveRunMeasures{}, LoopLive: len(waveLiveRuns(plane.evolveDir, env.now())) > 0}
 	if notes, err := plane.store.Notes(); err == nil {
 		report.NotesQueued = len(notes)
 	}
@@ -86,6 +89,9 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	report.Wave, report.RunID, report.PID, report.Warnings = cur.Number, cur.RunID, cur.PID, warnings
 	report.PIDAlive = waveOwnsPID(env, cur)
 	report.Outcome = wave.Facts{Cycles: cycles}.Outcome()
+	runs, measureWarnings := measureWaveRuns(plane, records, cycles, report.PIDAlive || report.LoopLive, env.now())
+	report.Runs, report.Measures = runs, runs[len(runs)-1].Measures
+	report.Warnings = append(report.Warnings, measureWarnings...)
 	if over := len(cycles) - waveStatusMaxCycles; over > 0 {
 		cycles, report.CyclesOmitted = cycles[over:], over
 	}
@@ -101,6 +107,7 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 	fmt.Fprintf(w, "wave:    %d run %s\n", r.Wave, r.RunID)
 	fmt.Fprintf(w, "loop:    live=%t pid=%d alive=%t\n", r.LoopLive, r.PID, r.PIDAlive)
 	fmt.Fprintf(w, "outcome: %s\n", r.Outcome)
+	writeWaveMeasuresText(w, r.Measures)
 	if r.CyclesOmitted > 0 {
 		fmt.Fprintf(w, "  (%d older cycle(s) not shown)\n", r.CyclesOmitted)
 	}

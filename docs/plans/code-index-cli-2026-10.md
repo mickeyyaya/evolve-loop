@@ -108,7 +108,7 @@ C and D score 3 for G2, because the per-call latency of `gopls` and the build ti
 | D3 | One adapter package runs the trail-code binary. No other package runs it. It extends the rule of [third-party-dependencies](../conventions/third-party-dependencies.md) from `go.mod` libraries to outside binaries. | C8 |
 | D4 | The layer removes each line of backend output that tells the agent what to do or say. | C6, R2 |
 | D5 | The layer reads the index worktree only. It never refreshes the index inside a phase. The boundary refreshes it. | G4 |
-| D6 | Each call appends one record to a usage log under `/tmp`: time, command, phase and working directory. | C3, R5 |
+| D6 | Each call appends one record to a usage log: time, command, phase and working directory. | C3, R5 |
 | D7 | The scout, builder and debugger prompts name the commands and say when each one helps. | P3.4, R4 |
 | D8 | The trail-code MCP registrations go after one wave with the CLI live. | C3, R6 |
 
@@ -118,10 +118,10 @@ C and D score 3 for G2, because the per-call latency of `gopls` and the build ti
 |---|---|---|
 | K1 | D1–D4: `evolve code` and the trail-code adapter, with a fake backend for tests | a fake backend returns a "tokens saved" line, and `evolve code callers` prints the answer without it |
 | K2 | D5: the index location and the boundary refresh, as a step of `wave next`. The refresh writes only the separate index worktree, never the main tree. A failed refresh is a warning, never a halt. | `wave next --dry-run` lists the refresh step |
-| K3 | D6: the usage log | a call writes one record with its command and phase |
+| K3 | D6: the usage log. Built 2026-10-17: `internal/codeindex/usagelog` and `evolve code usage`. The record also holds the argument length (never the argument), the exit code, the hit count, the duration, the cycle and the CLI family. | a call writes one record with its command and phase |
 | K4a | D7: the persona text in `agents/evolve-scout.md`, `agents/evolve-builder.md` and `agents/evolve-debugger.md` | a Go test reads each persona, finds the four commands, and checks that each instruction line has 20 words or fewer |
 | K4b | D7: the gate for K4a | the prompt-regression eval passes, and the G3 waves before and after show no loss |
-| K5 | D8: the removal of the MCP registrations, and a doc note | `claude mcp list` and `agy mcp list` show no `trail` |
+| K5 | D8: the removal of the MCP registrations, and a doc note. **Done on 2026-10-17.** The console removed the trail MCP server from the Claude Code user scope and from the agy `mcp_config.json`, with no repo change. The doc note is [cli-only-no-mcp](../conventions/cli-only-no-mcp.md). | `claude mcp list` and `agy mcp list` show no `trail` |
 
 ## 7. Order
 

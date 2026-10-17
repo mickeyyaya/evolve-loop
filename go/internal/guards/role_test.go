@@ -312,3 +312,53 @@ func TestRoleGuard_RelativeWorkspacePath(t *testing.T) {
 		t.Error("write outside workspace must deny")
 	}
 }
+
+func TestRole_WorktreeWriteDecisionMatchesAcrossSourceWritingPhases(t *testing.T) {
+	cases := []struct {
+		phase string
+		want  bool
+	}{
+		{"tdd", true},
+		{"build", true},
+		{"test-amplification", true},
+		{"scout", false},
+		{"audit", false},
+		{"", false},
+		{"unknown-phase", false},
+	}
+	for _, c := range cases {
+		t.Run("phase="+c.phase, func(t *testing.T) {
+			worktree := "/work/wt/cycle-52"
+			s, _ := setupStorageWithCS(t, core.CycleState{
+				CycleID:        52,
+				Phase:          c.phase,
+				ActiveWorktree: worktree,
+				WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-52"),
+			})
+			dec := NewRole(s, false).Decide(context.Background(), core.GuardInput{
+				ToolName:  "Write",
+				ToolInput: map[string]any{"file_path": filepath.Join(worktree, "go/internal/foo/new_amplify_test.go")},
+			})
+			if dec.Allow != c.want {
+				t.Errorf("phase=%q worktree write Allow=%v, want %v (reason: %s)", c.phase, dec.Allow, c.want, dec.Reason)
+			}
+		})
+	}
+}
+
+func TestRole_TestAmplificationStillCannotWriteAProtectedSurfaceInTheWorktree(t *testing.T) {
+	worktree := "/work/wt/cycle-53"
+	s, _ := setupStorageWithCS(t, core.CycleState{
+		CycleID:        53,
+		Phase:          "test-amplification",
+		ActiveWorktree: worktree,
+		WorkspacePath:  filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-53"),
+	})
+	dec := NewRole(s, false).Decide(context.Background(), core.GuardInput{
+		ToolName:  "Write",
+		ToolInput: map[string]any{"file_path": filepath.Join(worktree, "go/internal/guards/role.go")},
+	})
+	if dec.Allow {
+		t.Fatalf("test-amplification wrote the protected guard source in its worktree; want deny (reason: %s)", dec.Reason)
+	}
+}

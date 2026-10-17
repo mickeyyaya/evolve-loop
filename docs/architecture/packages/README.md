@@ -69,6 +69,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/panewatch` | publishes each tmux phase pane's liveness snapshot for observers and operators | [internal-panewatch.md](internal-panewatch.md) |
 | `internal/phaseobserver` | watches one running phase for stalls and dead processes | [internal-phaseobserver.md](internal-phaseobserver.md) |
 | `internal/loopwave` | plans, gates and launches each fleet wave | [internal-loopwave.md](internal-loopwave.md) |
+| `internal/wavemeasure` | computes the width, the utilization and the conflict rate of one wave run from its lane intervals and landings | [internal-wavemeasure.md](internal-wavemeasure.md) |
 | `internal/dossier` | writes, commits and reads the per-cycle dossier record | [internal-dossier.md](internal-dossier.md) |
 | `internal/gc` | decides which resources finished cycles left behind are garbage, and releases them | [internal-gc.md](internal-gc.md) |
 | `internal/lanerouting` | the one routing predicate: protected surface or a path the build profile's sandbox denies | [internal-lanerouting.md](internal-lanerouting.md) |

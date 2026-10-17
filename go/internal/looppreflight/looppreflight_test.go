@@ -52,6 +52,7 @@ func goodPipelineOptions(t *testing.T) Options {
 		PhaseRoutingWarnings: func() []string { return nil },
 		OrphanKill:           func(context.Context, string) error { return nil },
 		VersionInventory:     versionInv,
+		MCPConfig:            mcpPort(nil),
 	}
 }
 
