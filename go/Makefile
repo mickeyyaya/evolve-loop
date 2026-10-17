@@ -44,7 +44,7 @@ export GIT_CONFIG_KEY_1   := gc.auto
 export GIT_CONFIG_VALUE_1 := 0
 
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
-        test-latency cover apicover lint tidy clean help dist dist-clean \
+        test-latency test-budget cover apicover lint tidy clean help dist dist-clean \
         cover-strict cover-changed apicover-enforce apicover-check \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64 \
         dist-darwin-universal dist-checksums
@@ -147,6 +147,9 @@ test-all: test-integration ## All runtime tiers, preserving no-race E2E and its 
 test-latency: ## Render the fast-suite latency report to test/latency-report.md
 	@$(GO) test -json $(FAST_PKGS) | $(GO) run ./cmd/testlatency -title "Fast suite latency" > test/latency-report.md
 	@echo "Latency report: test/latency-report.md"
+
+test-budget: ## Check fast-suite package wall times against addedtests.PackageWallBudget
+	@$(GO) test -json $(FAST_PKGS) | $(GO) run ./cmd/testlatency -package-budget
 
 cover: test-integration ## Coverage report; hard package floors are enforced separately by cover-strict
 	@$(GO) tool cover -func=coverage.txt | tee coverage.func.txt

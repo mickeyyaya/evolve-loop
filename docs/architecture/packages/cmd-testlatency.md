@@ -17,6 +17,7 @@
 - **Large lines.** The scanner buffer grows lazily to 16 MiB, because some `Output` lines are large.
 - **Report sections.** Optimization targets (packages over the wall threshold) with the columns Package, Wall, Tests, Σall tests, Serial Σ, Parallel max, Floor, Dominant, Slowest test and Slowest.
 - **Table columns.** The Σall tests column sums every top-level test. The Serial Σ column sums only the tests without `pause`.
+- **Package budget.** `--budget` leads the report with the packages over a wall time. `--fail-over-budget` then exits 1. `-package-budget` sets both from `addedtests.PackageWallBudget`. `make test-budget` runs it on the fast suite.
 - **Other sections.** The report also has the slowest tests (capped by `Top`). A count of tests over the per-test threshold is the regression watch. `shortPkg` trims the module prefix.
 
 ## Invariants
@@ -26,5 +27,6 @@
 - **A read error is surfaced.** `Parse` returns a stream read error. It never returns a silently partial report. The scanner error path is the only place a malformed pipe can be reported.
 - **An empty slow table has a placeholder.** When no package exceeds the threshold, the table shows the `_(none)_` row. Readers scan for that row.
 - **`Top` caps the slowest-tests table.**
+- **`-package-budget` fails over the named budget.** It exits 1 when a package wall time exceeds `addedtests.PackageWallBudget`, and 0 at or under it. `TestRun_PackageBudgetFlagUsesNamedWallBudgetAndFailsOverIt` pins this.
 
 Design: [ci-telemetry-and-critical-path §4](../ci-telemetry-and-critical-path.md#4-level-1-and-level-2-the-test-stream). Plan: component C0 of [ci-wall-time-2026-10](../../plans/ci-wall-time-2026-10.md).

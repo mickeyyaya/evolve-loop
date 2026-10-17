@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 )
 
 var exitProcess = os.Exit
@@ -24,6 +27,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	thrTest := fs.Float64("threshold-test", 1.0, "flag tests whose elapsed exceeds this (seconds)")
 	budget := fs.Duration("budget", 0, "lead the report with the packages whose wall time exceeds this (for example 180s)")
 	failOver := fs.Bool("fail-over-budget", false, "exit 1 when a package is over --budget")
+	pkgBudget := fs.Bool("package-budget", false, "apply addedtests.PackageWallBudget and exit 1 when a package exceeds it")
 	render := fs.Bool("render", false, "write the Output field of each event to stdout (the plain go test text) and exit 0")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -31,6 +35,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if *render {
 		renderOutput(stdin, stdout, stderr)
 		return 0
+	}
+	if *pkgBudget {
+		d, err := time.ParseDuration(addedtests.PackageWallBudget)
+		if err != nil {
+			fmt.Fprintf(stderr, "testlatency: addedtests.PackageWallBudget: %v\n", err)
+			return 2
+		}
+		*budget = d
+		*failOver = true
 	}
 	if *failOver && *budget <= 0 {
 		fmt.Fprintln(stderr, "testlatency: --fail-over-budget needs --budget")

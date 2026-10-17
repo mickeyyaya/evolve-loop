@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -49,32 +50,43 @@ func smFilteredEnv() []string {
 
 func smInitRepo(t *testing.T, dir string) {
 	t.Helper()
-	smGit(t, dir, "init", "-q")
-	smGit(t, dir, "config", "user.email", "ci@example.com")
-	smGit(t, dir, "config", "user.name", "ci")
-	smGit(t, dir, "config", "commit.gpgsign", "false")
+	tpl := gittest.FromTemplate(t, "cmd-evolve-sminit", func(r *gittest.Repo) error {
+		r.Git("init", "-q")
+		r.Git("config", "user.email", "ci@example.com")
+		r.Git("config", "user.name", "ci")
+		r.Git("config", "commit.gpgsign", "false")
+		return nil
+	})
+	if err := os.CopyFS(dir, os.DirFS(tpl.Dir)); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func smInitRepoWithRemote(t *testing.T) (string, string) {
 	t.Helper()
-	repo := t.TempDir()
-	smInitRepo(t, repo)
-	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(repo, "base.txt"), []byte("line1\nline2\nline3\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	smGit(t, repo, "add", "-A")
-	smGit(t, repo, "commit", "-q", "-m", "base")
-	smGit(t, repo, "branch", "-M", "main")
-
-	bare := t.TempDir()
-	bare = filepath.Join(bare, "origin.git")
-	smGit(t, t.TempDir(), "init", "-q", "--bare", bare)
-	smGit(t, repo, "remote", "add", "origin", bare)
-	smGit(t, repo, "push", "-q", "origin", "main")
-	smGit(t, bare, "symbolic-ref", "HEAD", "refs/heads/main")
+	tpl := gittest.FromTemplate(t, "cmd-evolve-smremote", func(r *gittest.Repo) error {
+		r.Git("init", "-q")
+		r.Git("config", "user.email", "ci@example.com")
+		r.Git("config", "user.name", "ci")
+		r.Git("config", "commit.gpgsign", "false")
+		r.Write(".gitignore", ".evolve/\n")
+		r.Write("base.txt", "line1\nline2\nline3\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		r.Git("branch", "-M", "main")
+		bare := filepath.Join(r.Dir, "origin.git")
+		r.Git("clone", "-q", "--bare", ".", bare)
+		r.Git("-C", bare, "symbolic-ref", "HEAD", "refs/heads/main")
+		repo := filepath.Join(r.Dir, "repo")
+		r.Git("clone", "-q", bare, repo)
+		r.Git("-C", repo, "config", "user.email", "ci@example.com")
+		r.Git("-C", repo, "config", "user.name", "ci")
+		r.Git("-C", repo, "config", "commit.gpgsign", "false")
+		return os.RemoveAll(filepath.Join(r.Dir, ".git"))
+	})
+	bare := filepath.Join(tpl.Dir, "origin.git")
+	repo := filepath.Join(tpl.Dir, "repo")
+	setGitRemoteOriginURL(t, filepath.Join(repo, ".git", "config"), bare)
 	return repo, bare
 }
 

@@ -231,12 +231,16 @@ func reapCycleSessions(projectRoot string, cycle int, stderr io.Writer) {
 func gcOrphanSessions(label string, stderr io.Writer) {
 	ctx, cancel := context.WithTimeout(context.Background(), orphanGCTimeout)
 	defer cancel()
-	rep := swarm.ExecReapOrphans(ctx)
+	reapers := gcReapers{sessions: swarm.ExecReapOrphans, sockets: swarm.ExecReapOrphanSockets}
+	if gcInjectedReapers != nil {
+		reapers = *gcInjectedReapers
+	}
+	rep := reapers.sessions(ctx)
 	if len(rep.Killed) > 0 || len(rep.Errors) > 0 {
 		fmt.Fprintf(stderr, "[loop] orphan-session GC (%s): killed=%d skipped(live=%d foreign=%d no-pid=%d) errors=%d\n",
 			label, len(rep.Killed), rep.SkippedLive, rep.SkippedForeign, rep.SkippedUnparseable, len(rep.Errors))
 	}
-	srep := swarm.ExecReapOrphanSockets(ctx)
+	srep := reapers.sockets(ctx)
 	if len(srep.Killed) > 0 || len(srep.Errors) > 0 {
 		fmt.Fprintf(stderr, "[loop] orphan-socket GC (%s): killed=%d dead per-run socket(s) skipped-live=%d errors=%d\n",
 			label, len(srep.Killed), srep.SkippedLive, len(srep.Errors))

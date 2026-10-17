@@ -10,12 +10,16 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -59,19 +63,61 @@ func (n noopRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseRes
 	return core.PhaseResponse{Verdict: core.VerdictPASS}, nil
 }
 
+type inPlaceStubWorktree struct{}
+
+func (inPlaceStubWorktree) Create(projectRoot string, _ int) (string, error) {
+	return projectRoot, nil
+}
+
+func (inPlaceStubWorktree) Cleanup(string, string) error { return nil }
+
 func initLoopContractRepo(t *testing.T, projectRoot string) {
 	t.Helper()
+	prevReapers := gcInjectedReapers
+	gcInjectedReapers = &gcReapers{
+		sessions: func(context.Context) swarm.OrphanReapReport { return swarm.OrphanReapReport{} },
+		sockets:  swarm.ExecReapOrphanSockets,
+	}
+	prevGCHook := gcHookFn
+	if reflect.ValueOf(gcHookFn).Pointer() == reflect.ValueOf(runGCHook).Pointer() {
+		gcHookFn = func(cfg loopConfig, workspace string, stderr io.Writer) {
+			runRunDirGC(cfg, workspace, "shadow", gc.Policy{}, stderr)
+		}
+	}
+	t.Cleanup(func() {
+		gcInjectedReapers = prevReapers
+		gcHookFn = prevGCHook
+	})
 	if _, err := os.Stat(filepath.Join(projectRoot, ".git")); err == nil {
 		return
 	}
-	if err := os.WriteFile(filepath.Join(projectRoot, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
+	tpl := gittest.FromTemplate(t, "cmd-evolve-loop-contract-repo", func(r *gittest.Repo) error {
+		r.Write(".gitignore", ".evolve/\ngo/bin/\n")
+		r.Write("f.txt", "x")
+		r.Git("add", ".")
+		r.Git("commit", "-m", "seed")
+		return nil
+	})
+	_ = os.Remove(filepath.Join(projectRoot, ".gitignore"))
+	_ = os.Remove(filepath.Join(projectRoot, "f.txt"))
+	if err := os.CopyFS(projectRoot, os.DirFS(tpl.Dir)); err != nil {
 		t.Fatal(err)
 	}
-	initRepo(t, projectRoot)
 }
 
 func installStubDeps(t *testing.T, storage core.Storage, ledger rootLedger) func() {
 	t.Helper()
+	prevReapers := gcInjectedReapers
+	gcInjectedReapers = &gcReapers{
+		sessions: func(context.Context) swarm.OrphanReapReport { return swarm.OrphanReapReport{} },
+		sockets:  swarm.ExecReapOrphanSockets,
+	}
+	prevGCHook := gcHookFn
+	if reflect.ValueOf(gcHookFn).Pointer() == reflect.ValueOf(runGCHook).Pointer() {
+		gcHookFn = func(cfg loopConfig, workspace string, stderr io.Writer) {
+			runRunDirGC(cfg, workspace, "shadow", gc.Policy{}, stderr)
+		}
+	}
 	prev := wireOrchestratorDepsFn
 	wireOrchestratorDepsFn = func(projectRoot, evolveDir string, console io.Writer, run routingRun) orchDeps {
 		initLoopContractRepo(t, projectRoot)
@@ -90,10 +136,14 @@ func installStubDeps(t *testing.T, storage core.Storage, ledger rootLedger) func
 			Signals:      newRootSignalCenter(projectRoot, evolveDir, console),
 			Storage:      storage,
 			Ledger:       ledger,
-			Orchestrator: core.NewOrchestrator(storage, ledger, runners),
+			Orchestrator: core.NewOrchestrator(storage, ledger, runners, core.WithWorktreeProvisioner(inPlaceStubWorktree{})),
 		}
 	}
-	return func() { wireOrchestratorDepsFn = prev }
+	return func() {
+		wireOrchestratorDepsFn = prev
+		gcInjectedReapers = prevReapers
+		gcHookFn = prevGCHook
+	}
 }
 
 func TestResolveDispatchPolicy(t *testing.T) {

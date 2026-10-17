@@ -398,7 +398,7 @@ func TestRunLoop_VerifyIterError(t *testing.T) {
 			core.PhaseShip:         noopRunner{name: "ship"},
 			core.PhaseRetro:        noopRunner{name: "retro"},
 		}
-		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners)}
+		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithWorktreeProvisioner(inPlaceStubWorktree{}))}
 	}
 	if err := os.MkdirAll(cycleWorkspace(projectRoot, 1), 0o755); err != nil {
 		t.Fatalf("mkdir ws: %v", err)
@@ -464,7 +464,7 @@ func TestRunLoop_FailVerdictBreaks(t *testing.T) {
 			core.PhaseShip:         failVerdictRunner{name: "ship"},
 			core.PhaseRetro:        failVerdictRunner{name: "retro"},
 		}
-		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners)}
+		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithWorktreeProvisioner(inPlaceStubWorktree{}))}
 	}
 
 	var stdout, stderr bytes.Buffer

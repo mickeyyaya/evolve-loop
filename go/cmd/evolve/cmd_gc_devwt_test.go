@@ -17,9 +17,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
@@ -34,8 +36,16 @@ type gcDevHubEnv struct {
 
 func newGCDevHub(t *testing.T, policyJSON string) gcDevHubEnv {
 	t.Helper()
+	origReapers := gcInjectedReapers
 	origHost := gcInjectedProcessHost
-	t.Cleanup(func() { gcInjectedProcessHost = origHost })
+	t.Cleanup(func() {
+		gcInjectedReapers = origReapers
+		gcInjectedProcessHost = origHost
+	})
+	gcInjectedReapers = &gcReapers{
+		sessions: func(context.Context) swarm.OrphanReapReport { return swarm.OrphanReapReport{} },
+		sockets:  func(context.Context) swarm.OrphanSocketReport { return swarm.OrphanSocketReport{} },
+	}
 	gcInjectedProcessHost = &gcProcessHost{
 		list:   func(context.Context) ([]proctree.Process, error) { return nil, nil },
 		signal: func(int, syscall.Signal) error { return nil },
@@ -44,16 +54,33 @@ func newGCDevHub(t *testing.T, policyJSON string) gcDevHubEnv {
 	}
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
 	t.Setenv("GOCACHE", t.TempDir())
-	src := gittest.Fixture(t)
-	if err := os.WriteFile(filepath.Join(src.Dir, "base.txt"), []byte("base\n"), 0o644); err != nil {
+	binDir := t.TempDir()
+	fakeclitest.Install(t, filepath.Join(binDir, "lsof"), "#!/bin/sh\nprintf 'p1\\nR0\\nn/\\n'\n")
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	tpl := gittest.FromTemplate(t, "cmd-evolve-gc-devhub-store", func(r *gittest.Repo) error {
+		r.Write("base.txt", "base\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		bare := filepath.Join(r.Dir, "store.git")
+		r.Git("clone", "-q", "--bare", ".", bare)
+		r.Git("-C", bare, "update-ref", "refs/remotes/origin/main", "main")
+		for _, kv := range gittest.MaintenanceConfig() {
+			r.Git("-C", bare, "config", kv[0], kv[1])
+		}
+		return nil
+	})
+	root := filepath.Dir(tpl.Dir)
+	storeDir := filepath.Join(root, "repo.git")
+	if err := os.Rename(filepath.Join(tpl.Dir, "store.git"), storeDir); err != nil {
 		t.Fatal(err)
 	}
-	src.Git("add", "-A")
-	src.Git("commit", "-q", "-m", "base")
-	store := gittest.Bare(t)
-	src.Git("push", "-q", store.Dir, "main")
-	store.Git("update-ref", "refs/remotes/origin/main", "main")
-	root := filepath.Dir(store.Dir)
+	if err := os.RemoveAll(tpl.Dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(storeDir, tpl.Dir); err != nil {
+		t.Fatal(err)
+	}
+	store := tpl
 	runtime := filepath.Join(root, "runtime")
 	store.Git("worktree", "add", "-q", "--detach", runtime, "main")
 	evolve := filepath.Join(runtime, ".evolve")

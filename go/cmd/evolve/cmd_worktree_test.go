@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func init() { worktreeAddRetry.Sleep = func(time.Duration) {} }
@@ -21,23 +23,17 @@ func requireGit(t *testing.T) {
 
 func initRepo(t *testing.T, dir string) {
 	t.Helper()
-	run := func(args ...string) {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example",
-			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example",
-		)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
+	tpl := gittest.FromTemplate(t, "cmd-evolve-init-repo", func(r *gittest.Repo) error {
+		r.Git("init", "-q", "-b", "main")
+		r.Write("f.txt", "x")
+		r.Git("add", ".")
+		r.Git("commit", "-m", "init")
+		return nil
+	})
+	_ = os.Remove(filepath.Join(dir, "f.txt"))
+	if err := os.CopyFS(dir, os.DirFS(tpl.Dir)); err != nil {
+		t.Fatalf("copy template repo: %v", err)
 	}
-	run("init", "-b", "main")
-	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x"), 0o644); err != nil {
-		t.Fatalf("write f.txt: %v", err)
-	}
-	run("add", ".")
-	run("commit", "-m", "init")
 }
 
 func TestRunWorktreeCreate_Success(t *testing.T) {

@@ -16,7 +16,8 @@ import (
 
 func spawnOrphanIn(t *testing.T, dir string) int {
 	t.Helper()
-	if _, err := exec.LookPath("lsof"); err != nil {
+	realLsof, err := lookPathOutsideTempDir("lsof")
+	if err != nil {
 		t.Skip("lsof is not installed")
 	}
 	out, err := exec.Command("sh", "-c", "cd '"+dir+"' || exit 1; sleep 120 >/dev/null 2>&1 & echo $!").Output()
@@ -28,6 +29,12 @@ func spawnOrphanIn(t *testing.T, dir string) int {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = syscall.Kill(pid, syscall.SIGKILL) })
+	shimDir := t.TempDir()
+	shim := "#!/bin/sh\nexec '" + realLsof + "' -a -p " + strconv.Itoa(pid) + " \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(shimDir, "lsof"), []byte(shim), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		ppid, err := exec.Command("ps", "-o", "ppid=", "-p", strconv.Itoa(pid)).Output()
@@ -39,6 +46,19 @@ func spawnOrphanIn(t *testing.T, dir string) int {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+func lookPathOutsideTempDir(name string) (string, error) {
+	tmp := os.TempDir()
+	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		if dir == "" || strings.HasPrefix(dir, tmp) {
+			continue
+		}
+		if p, err := exec.LookPath(filepath.Join(dir, name)); err == nil {
+			return p, nil
+		}
+	}
+	return "", exec.ErrNotFound
 }
 
 func gcClosedOutCycleTree(t *testing.T, projectRoot string, cycle int) string {

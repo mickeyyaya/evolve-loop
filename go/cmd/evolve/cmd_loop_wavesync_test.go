@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -29,17 +30,20 @@ func gitrun(t *testing.T, dir string, args ...string) string {
 func syncFixture(t *testing.T) (origin, runtime string) {
 	t.Helper()
 	installCheckRunsGH(t, `{"total_count":1,"check_runs":[{"name":"build+test","status":"completed","conclusion":"success"}]}`, false)
-	seed := t.TempDir()
-	gitrun(t, seed, "init", "-q", "-b", "main")
-	if err := os.WriteFile(filepath.Join(seed, "f.txt"), []byte("v1"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	gitrun(t, seed, "add", "f.txt")
-	gitrun(t, seed, "commit", "-q", "-m", "c1")
-	origin = filepath.Join(t.TempDir(), "origin.git")
-	gitrun(t, seed, "clone", "-q", "--bare", ".", origin)
-	runtime = filepath.Join(t.TempDir(), "runtime")
-	gitrun(t, filepath.Dir(runtime), "clone", "-q", origin, runtime)
+	tpl := gittest.FromTemplate(t, "cmd-evolve-wavesync", func(r *gittest.Repo) error {
+		r.Git("init", "-q", "-b", "main")
+		r.Write("f.txt", "v1")
+		r.Git("add", "f.txt")
+		r.Git("commit", "-q", "-m", "c1")
+		orig := filepath.Join(r.Dir, "origin.git")
+		r.Git("clone", "-q", "--bare", ".", orig)
+		rt := filepath.Join(r.Dir, "runtime")
+		r.Git("clone", "-q", orig, rt)
+		return os.RemoveAll(filepath.Join(r.Dir, ".git"))
+	})
+	origin = filepath.Join(tpl.Dir, "origin.git")
+	runtime = filepath.Join(tpl.Dir, "runtime")
+	setGitRemoteOriginURL(t, filepath.Join(runtime, ".git", "config"), origin)
 	return origin, runtime
 }
 

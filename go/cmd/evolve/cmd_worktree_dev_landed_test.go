@@ -34,9 +34,11 @@ type landedHub struct {
 
 func newLandedHub(t *testing.T) landedHub {
 	t.Helper()
-	runtime, seed := devHubFixture(t)
-	brCommit(t, seed.Dir, "big.txt", bigFile(nil), "big file")
-	seed.Git("push", "-q", "origin", "main")
+	runtime, seed := devHubFixtureFromTemplate(t, "cmd-evolve-landedhub", func(r *gittest.Repo) {
+		r.Write("big.txt", bigFile(nil))
+		r.Git("add", "big.txt")
+		r.Git("commit", "-q", "-m", "big file")
+	})
 	return landedHub{runtime: runtime, store: filepath.Join(filepath.Dir(runtime), ".repo.git"), seed: seed}
 }
 

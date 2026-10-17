@@ -105,6 +105,18 @@ func TestRun_FailOverBudgetNeedsABudget(t *testing.T) {
 	}
 }
 
+func TestRun_PackageBudgetFlagUsesNamedWallBudgetAndFailsOverIt(t *testing.T) {
+	code, out, _ := runLatency(t, budgetStream, "-package-budget")
+	if code != 1 || !strings.Contains(out, "| x/over | 200.50 |") {
+		t.Fatalf("exit %d, want 1 with over-budget table:\n%s", code, out)
+	}
+	okStream := `{"Action":"pass","Package":"x/ok","Elapsed":1}` + "\n"
+	code, out, _ = runLatency(t, okStream, "-package-budget")
+	if code != 0 || !strings.Contains(out, "All packages are within the budget.") {
+		t.Fatalf("exit %d, want 0 within budget:\n%s", code, out)
+	}
+}
+
 func TestRun_RejectsABadFlag(t *testing.T) {
 	if code, _, _ := runLatency(t, "", "--budget", "soon"); code != 2 {
 		t.Fatalf("exit %d, want 2", code)

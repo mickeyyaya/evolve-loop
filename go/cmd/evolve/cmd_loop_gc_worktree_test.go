@@ -2,14 +2,21 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 const workspaceGCManifestName = "workspace-gc-manifest.json"
@@ -36,15 +43,34 @@ func gcWorktreeEnv(t *testing.T, mode string) (projectRoot, evolveDir, workspace
 	t.Helper()
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
 	t.Setenv("GOCACHE", t.TempDir())
-	projectRoot = t.TempDir()
-	workspace = t.TempDir()
-	gcGit(t, projectRoot, "init", "-b", "main")
-	if err := os.WriteFile(filepath.Join(projectRoot, "seed.txt"), []byte("seed\n"), 0o644); err != nil {
-		t.Fatal(err)
+	prevReapers := gcInjectedReapers
+	gcInjectedReapers = &gcReapers{
+		sessions: func(context.Context) swarm.OrphanReapReport { return swarm.OrphanReapReport{} },
+		sockets:  func(context.Context) swarm.OrphanSocketReport { return swarm.OrphanSocketReport{} },
 	}
-	gcGit(t, projectRoot, "add", "seed.txt")
-	gcGit(t, projectRoot, "commit", "-m", "seed")
-	gcGit(t, projectRoot, "branch", gcOrphanBranch)
+	prevHost := gcInjectedProcessHost
+	gcInjectedProcessHost = &gcProcessHost{
+		list:   func(context.Context) ([]proctree.Process, error) { return nil, nil },
+		signal: func(int, syscall.Signal) error { return nil },
+		sleep:  func(time.Duration) {},
+		alive:  func(int) bool { return false },
+	}
+	t.Cleanup(func() {
+		gcInjectedReapers = prevReapers
+		gcInjectedProcessHost = prevHost
+	})
+	binDir := t.TempDir()
+	fakeclitest.Install(t, filepath.Join(binDir, "lsof"), "#!/bin/sh\nprintf 'p1\\nR0\\nn/\\n'\n")
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	projectRoot = gittest.FromTemplate(t, "cmd-evolve-gc-worktree", func(r *gittest.Repo) error {
+		r.Git("init", "-q", "-b", "main")
+		r.Write("seed.txt", "seed\n")
+		r.Git("add", "seed.txt")
+		r.Git("commit", "-m", "seed")
+		r.Git("branch", gcOrphanBranch)
+		return nil
+	}).Dir
+	workspace = t.TempDir()
 
 	evolveDir = filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(filepath.Join(evolveDir, "runs"), 0o755); err != nil {

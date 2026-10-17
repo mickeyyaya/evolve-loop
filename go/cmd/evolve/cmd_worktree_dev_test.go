@@ -12,22 +12,64 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-func devHubFixture(t *testing.T) (runtime string, seed *gittest.Repo) {
+func setGitRemoteOriginURL(t *testing.T, configPath, url string) {
 	t.Helper()
-	origin := gittest.Bare(t)
-	seed = gittest.Fixture(t)
-	seed.Git("commit", "-q", "--allow-empty", "-m", "base")
-	seed.Git("remote", "add", "origin", origin.Dir)
-	seed.Git("push", "-q", "origin", "main")
-	hub := t.TempDir()
-	store := filepath.Join(hub, ".repo.git")
-	seed.Git("clone", "-q", "--bare", origin.Dir, store)
-	for _, kv := range append(gittest.MaintenanceConfig(), [2]string{"user.name", "u"}, [2]string{"user.email", "u@example.com"}) {
-		brGit(t, store, "config", kv[0], kv[1])
+	raw, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
 	}
+	lines := strings.Split(string(raw), "\n")
+	for i, l := range lines {
+		if strings.HasPrefix(strings.TrimSpace(l), "url = ") {
+			lines[i] = "\turl = " + url
+		}
+	}
+	if err := os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func devHubFixtureFromTemplate(t *testing.T, name string, extra func(r *gittest.Repo)) (runtime string, seed *gittest.Repo) {
+	t.Helper()
+	seed = gittest.FromTemplate(t, name, func(r *gittest.Repo) error {
+		r.Git("commit", "-q", "--allow-empty", "-m", "base")
+		orig := filepath.Join(r.Dir, "_origin.git")
+		r.Git("clone", "-q", "--bare", ".", orig)
+		r.Git("remote", "add", "origin", orig)
+		if extra != nil {
+			extra(r)
+			r.Git("push", "-q", "origin", "main")
+		}
+		store := filepath.Join(r.Dir, "_store.git")
+		r.Git("clone", "-q", "--bare", orig, store)
+		for _, kv := range append(gittest.MaintenanceConfig(), [2]string{"user.name", "u"}, [2]string{"user.email", "u@example.com"}) {
+			r.Git("-C", store, "config", kv[0], kv[1])
+		}
+		return nil
+	})
+	base := t.TempDir()
+	originDir := filepath.Join(base, "origin.git")
+	if err := os.Rename(filepath.Join(seed.Dir, "_origin.git"), originDir); err != nil {
+		t.Fatal(err)
+	}
+	hub := filepath.Join(base, "hub")
+	if err := os.MkdirAll(hub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store := filepath.Join(hub, ".repo.git")
+	if err := os.Rename(filepath.Join(seed.Dir, "_store.git"), store); err != nil {
+		t.Fatal(err)
+	}
+	setGitRemoteOriginURL(t, filepath.Join(seed.Dir, ".git", "config"), originDir)
+	setGitRemoteOriginURL(t, filepath.Join(store, "config"), originDir)
 	runtime = filepath.Join(hub, "runtime")
 	brGit(t, store, "worktree", "add", "-q", runtime, "main")
 	return runtime, seed
+}
+
+func devHubFixture(t *testing.T) (runtime string, seed *gittest.Repo) {
+	t.Helper()
+	return devHubFixtureFromTemplate(t, "cmd-evolve-devhub", nil)
 }
 
 func runDev(t *testing.T, args ...string) (string, int) {

@@ -31,18 +31,25 @@ func brCommit(t *testing.T, dir, name, content, msg string) {
 
 func brFixture(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	brGit(t, dir, "init", "-q", "-b", "main")
-	brGit(t, dir, "config", "user.email", "acs@evolve.local")
-	brGit(t, dir, "config", "user.name", "acs")
-	brGit(t, dir, "config", "commit.gpgsign", "false")
-	brCommit(t, dir, "base.txt", "line1\n", "base commit")
-	brGit(t, dir, "branch", "cycle-100")
-	brGit(t, dir, "checkout", "-q", "-b", "cycle-200")
-	brCommit(t, dir, "feature.txt", "new work\n", "cycle-200 unique commit")
-	brGit(t, dir, "checkout", "-q", "main")
-	brCommit(t, dir, "base.txt", "line1\nline2\n", "advance main")
-	return dir
+	return gittest.FromTemplate(t, "cmd-evolve-brfixture", func(r *gittest.Repo) error {
+		r.Git("init", "-q", "-b", "main")
+		r.Git("config", "user.email", "acs@evolve.local")
+		r.Git("config", "user.name", "acs")
+		r.Git("config", "commit.gpgsign", "false")
+		r.Write("base.txt", "line1\n")
+		r.Git("add", "base.txt")
+		r.Git("commit", "-q", "-m", "base commit")
+		r.Git("branch", "cycle-100")
+		r.Git("checkout", "-q", "-b", "cycle-200")
+		r.Write("feature.txt", "new work\n")
+		r.Git("add", "feature.txt")
+		r.Git("commit", "-q", "-m", "cycle-200 unique commit")
+		r.Git("checkout", "-q", "main")
+		r.Write("base.txt", "line1\nline2\n")
+		r.Git("add", "base.txt")
+		r.Git("commit", "-q", "-m", "advance main")
+		return nil
+	}).Dir
 }
 
 func brBranchExists(t *testing.T, dir, name string) bool {

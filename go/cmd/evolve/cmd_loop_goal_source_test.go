@@ -41,7 +41,7 @@ func installNoopLaunchDeps(t *testing.T) {
 			core.PhaseShip:         noopRunner{name: "ship"},
 			core.PhaseRetro:        noopRunner{name: "retro"},
 		}
-		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners)}
+		return orchDeps{Storage: st, Ledger: ld, Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithWorktreeProvisioner(inPlaceStubWorktree{}))}
 	}
 }
 

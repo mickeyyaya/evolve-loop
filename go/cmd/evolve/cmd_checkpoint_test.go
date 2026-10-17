@@ -23,14 +23,21 @@ type checkpointHub struct {
 
 func newCheckpointHub(t *testing.T) checkpointHub {
 	t.Helper()
-	src := gittest.Fixture(t)
-	writeCheckpointFile(t, src.Dir, "a.txt", "a\n")
-	src.Git("add", "-A")
-	src.Git("commit", "-q", "-m", "base")
-	store := gittest.Bare(t)
-	src.Git("push", "-q", store.Dir, "main")
-	store.Git("update-ref", "refs/remotes/origin/main", "main")
-	return checkpointHub{t: t, store: store, root: filepath.Dir(store.Dir)}
+	tpl := gittest.FromTemplate(t, "checkpoint-hub", func(r *gittest.Repo) error {
+		if err := os.WriteFile(filepath.Join(r.Dir, "a.txt"), []byte("a\n"), 0o644); err != nil {
+			return err
+		}
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		storeDir := filepath.Join(r.Dir, "store.git")
+		r.Git("clone", "-q", "--bare", ".", storeDir)
+		r.Git("-C", storeDir, "remote", "remove", "origin")
+		r.Git("-C", storeDir, "update-ref", "refs/remotes/origin/main", "main")
+		return os.RemoveAll(filepath.Join(r.Dir, ".git"))
+	})
+	root := tpl.Dir
+	tpl.Dir = filepath.Join(root, "store.git")
+	return checkpointHub{t: t, store: tpl, root: root}
 }
 
 func (h checkpointHub) worktree(rel, branch string) string {
