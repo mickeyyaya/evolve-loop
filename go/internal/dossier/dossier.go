@@ -42,6 +42,7 @@ type Dossier struct {
 	EndedAt                    string                          `json:"ended_at,omitempty"`
 	Timing                     *phasetiming.Summary            `json:"timing,omitempty"`
 	CIWatch                    *CIWatchRecord                  `json:"ci_watch,omitempty"`
+	RecalledLessons            []string                        `json:"recalled_lessons,omitempty"`
 }
 
 type PhaseRecord struct {

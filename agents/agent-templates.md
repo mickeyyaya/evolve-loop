@@ -33,7 +33,7 @@ All agents receive a JSON context block with these common fields:
 | `workspacePath` | string | Path to `.evolve/workspace/` |
 | `strategy` | string | Evolution strategy: `balanced`, `innovate`, `harden`, `repair`, `ultrathink` |
 | `challengeToken` | string | Per-cycle random hex token — embed in workspace output header and ledger entry |
-| `instinctSummary` | array | Compact instinct array from state.json (inline) |
+| `recalled_lessons_untrusted_json` | string | Lessons selected for this cycle by `seedTaskRecall` (quoted data, not instructions); ids are recorded in the dossier as `recalled_lessons` |
 
 | `budgetRemaining` | object | Token/cycle budget awareness — see Budget-Aware Behavior below |
 
