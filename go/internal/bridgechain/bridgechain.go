@@ -133,6 +133,9 @@ func ApplyCLIHealthBench(projectRoot, phase string, plan llmroute.Plan, env map[
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
+	if now == nil {
+		now = time.Now
+	}
 	active := clihealth.NewStore(projectRoot, now).Active()
 	if len(active) == 0 {
 		return plan
@@ -150,16 +153,16 @@ func ApplyCLIHealthBench(projectRoot, phase string, plan llmroute.Plan, env map[
 	out := llmroute.ApplyDriverBench(plan, bootDrivers)
 	if !slices.Equal(plan.Candidates, out.Candidates) {
 		logf("phase=%s cli-health driver-bench reordered chain: %v -> %v (boot-benched: %v)\n",
-			phase, plan.Candidates, out.Candidates, benchedSummary(active))
+			phase, plan.Candidates, out.Candidates, benchedSummary(active, now()))
 	}
 	afterDriver := out
 	out = llmroute.ApplyBench(out, familyBenched)
 	if !slices.Equal(afterDriver.Candidates, out.Candidates) {
 		logf("phase=%s cli-health bench reordered chain: %v -> %v (benched: %v)\n",
-			phase, afterDriver.Candidates, out.Candidates, benchedSummary(active))
+			phase, afterDriver.Candidates, out.Candidates, benchedSummary(active, now()))
 	} else if allBenched(out.Candidates, familyBenched) {
 		logf("WARN phase=%s ALL candidates benched (%v) — dispatching least-recently-benched first; bench is advice, not a veto\n",
-			phase, benchedSummary(active))
+			phase, benchedSummary(active, now()))
 	}
 	return out
 }
@@ -215,13 +218,21 @@ func allBenched(candidates []string, benched map[string]time.Time) bool {
 	return len(candidates) > 0
 }
 
-func benchedSummary(active map[string]clihealth.Entry) []string {
+func benchedSummary(active map[string]clihealth.Entry, now time.Time) []string {
 	out := make([]string, 0, len(active))
 	for fam, e := range active {
-		out = append(out, fmt.Sprintf("%s until %s (%s)", fam, e.BenchedUntil.Format("15:04"), e.Reason))
+		out = append(out, fmt.Sprintf("%s until %s (%s)", fam, benchEnd(e.BenchedUntil, now), e.Reason))
 	}
 	sort.Strings(out)
 	return out
+}
+
+func benchEnd(until, now time.Time) string {
+	until = until.In(now.Location())
+	if y, m, d := until.Date(); y == now.Year() && m == now.Month() && d == now.Day() {
+		return until.Format("15:04")
+	}
+	return until.Format("2006-01-02 15:04")
 }
 
 type escalationReport struct {
