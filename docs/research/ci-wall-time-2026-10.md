@@ -94,6 +94,25 @@ Compile and link of the five packages takes 11 s with a warm cache. The serial a
 **F3.12** The earlier campaign moved several packages to parallel-by-default and shared fixtures ([test-system-efficiency-2026-10](test-system-efficiency-2026-10.md)). Locally, `cmd/evolve` went from 686 to 211 s and `core` from 215 to 142 s. `bridge` went from 182 to 56 s and `audit` from 185 to 113 s. The CI numbers in F3.4 are higher, because CI runners have 3–4 CPUs, not 14.
 *Implication:* parallel-by-default did not reach the remaining poles: tests that must stay serial, one heavy cluster, and real waits.
 
+**F3.13** Time alone hides where a package spends its time. A `go test -exec` wrapper read the OS resource accounting (rusage) of each test binary and its waited-for descendants. Local run on a 14-CPU laptop, `-tags integration`, 2026-10-17:
+
+| Package | Wall | User CPU | System CPU | Peak RSS | Involuntary context switches |
+|---|--:|--:|--:|--:|--:|
+| `phases/audit` | 106 s | 163 s | 417 s | 325 MB | 2.1 M |
+| `phases/ship` | 87 s | 88 s | 293 s | 97 MB | 1.35 M |
+| `gitexec` | 2.7 s | 0.9 s | 1.2 s | 13 MB | 13.5 k |
+
+The prototype is a 40-line Go program. `go test -exec <wrapper>` starts one wrapper process per test binary, so the numbers are per package.
+*Implication:* the two slowest packages spend 2.5–3.3 times more CPU in the kernel than in user code. The cost is process creation and filesystem calls (`git` and `go` subprocesses).
+
+The high count of involuntary context switches suggests scheduler contention, which package rusage cannot prove (F3.15). It is not memory. A fix that cuts subprocesses helps more than a faster CPU.
+
+**F3.14** macOS reports 0 for block reads and writes (`inblock`, `oublock`) in this run, while Linux fills them. macOS reports peak RSS in bytes and Linux in kilobytes.
+*Implication:* the wrapper must scale peak RSS per OS, and block I/O is trustworthy only on the ubuntu jobs.
+
+**F3.15** Package rusage cannot see contention between packages, or a runner that waits on disk. Only a sampler of the whole runner can show utilization and saturation (the USE view). It reads CPU busy, run-queue length, memory, swap and disk wait.
+*Implication:* the telemetry needs two layers: per-package resource accounting, and one runner sampler per job.
+
 ## 4. Current practice
 
 **P4.1** gotestsum's `tool ci-matrix` reads past `go test -json` timings and writes a GitHub Actions matrix that balances packages across jobs ([gotestsum](https://github.com/gotestyourself/gotestsum)). Its `tool slowest` finds slow tests from the same stream.
@@ -106,6 +125,12 @@ Compile and link of the five packages takes 11 s with a warm cache. The serial a
 
 **P4.5** Test impact analysis skips tests whose inputs did not change. Safe use keys on every input. It falls back to a full run when the dependency data is incomplete, and it keeps a scheduled full run ([QASkills](https://qaskills.sh/blog/ci-test-impact-caching-strategy), [Symflower](https://symflower.com/en/company/blog/2024/test-impact-analysis/), [Datadog](https://docs.datadoghq.com/ko/getting_started/test_impact_analysis/)). Go's own test cache keys on file mtimes, so it misses on CI ([golang/go #58571](https://golang.org/issue/58571)).
 
+**P4.6** OpenTelemetry defines CI/CD semantic conventions. `cicd.pipeline.run.duration` is a histogram in seconds, grouped by pipeline name, state and result. `cicd.pipeline.run.errors` counts the errors of a run. Both are in development status ([OTel CI/CD metrics](https://opentelemetry.io/docs/specs/semconv/cicd/cicd-metrics/), [Go `cicdconv`](https://godocs.io/go.opentelemetry.io/otel/semconv/v1.38.0/cicdconv)).
+
+**P4.7** `getrusage(RUSAGE_CHILDREN)` counts only children that were waited for, and it includes their waited-for descendants. Peak RSS is a running maximum, so one wrapper process per binary keeps the numbers separate ([LKML getrusage maxrss](https://lkml.iu.edu/hypermail/linux/kernel/0901.0/01452.html), [LTP getrusage03](https://lists.linux.it/pipermail/ltp/2021-June/023230.html)).
+
+**P4.8** CI observability guides name more indexes than duration. They are queue time (the wait for a runner), cache restore and save time, and the success rate per stage. They also name the failure rate per test, which marks a flaky test, and CPU and memory per runner ([Splunk](https://www.splunk.com/en_us/blog/learn/monitoring-ci-cd?p=83), [Tinybird](https://www.tinybird.co/blog/data-driven-ci-pipeline-monitoring-with-pytest), [Metabase](https://www.metabase.com/dashboards/ci-pipeline-health), [DEV](https://dev.to/_6638a39c349d7e9c85ee20/cicd-observability-build-metrics-test-analytics-deployment-tracking-and-dora-metrics-3b5b)).
+
 ## 5. Adopt or reject
 
 | Practice | Decision | Reason |
@@ -115,6 +140,9 @@ Compile and link of the five packages takes 11 s with a warm cache. The serial a
 | Run macOS only where the OS matters (P4.3) | Adopt | F3.1 and F3.10: macOS is the critical path, and 290 of 303 packages do not depend on the OS. |
 | Drop `-race` on macOS (P4.4) | Reject as the main lever | F3.9: about 20% saved. Scope saves more. |
 | A larger macOS runner (P4.3) | Reject for now | It costs money every run, and F3.10 removes most of the macOS work for free. |
+| Per-package rusage through `go test -exec` (P4.7) | Adopt | F3.13: it shows system-CPU and contention, which time alone hides. |
+| A runner sampler for utilization and saturation (P4.8) | Adopt | F3.15: rusage cannot see contention between packages. |
+| OpenTelemetry CI/CD names (P4.6) | Adopt for names only | One vocabulary for later export. No collector is needed now. |
 | Test impact analysis (P4.5) | Adopt later | It is the largest per-PR win, but it needs content keys for non-Go inputs. ADR-0134's `testkey` is the base. |
 
 ## 6. Refinements to adopt
@@ -125,3 +153,6 @@ Compile and link of the five packages takes 11 s with a warm cache. The serial a
 - **R4** (F3.7): split `cmd/evolve`'s serial tests across processes, or move them to injected environments so that they can run in parallel.
 - **R5** (F3.8): give the `bridge` dwell tests an injected clock.
 - **R6** (F3.4, P4.2): after R3–R5, balance the ubuntu suite across shards from the R1 history.
+- **R7** (F3.13, F3.14, P4.7): a `go test -exec` wrapper records rusage per test binary: wall, user and system CPU, peak RSS, block I/O and context switches.
+- **R8** (F3.15, P4.8): one runner sampler per Go job records CPU busy, run-queue length, memory, swap and disk wait every second.
+- **R9** (P4.6, P4.8): one CI index set, named after the OpenTelemetry CI/CD conventions, is computed per run and kept as history.
