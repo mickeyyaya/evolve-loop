@@ -49,7 +49,7 @@ On `agy-claude-tmux`, the effort selects the variant suffix of the model name, b
 
 ## The tier policy
 
-This section is the spec of record for what each tier is for and in which order its chain walks. The plan is [model-tier-policy-2026-10](../plans/model-tier-policy-2026-10.md), and the decision is [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md).
+This section is the spec of record for what each tier is for and in which order its chain walks. The research is [model-tier-policy-2026-10](../research/model-tier-policy-2026-10.md), the plan is [model-tier-policy-2026-10](../plans/model-tier-policy-2026-10.md), and the decision is [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md).
 
 **Why a policy.** A provider counts its quota in pools. On 2026-10-17, agy's Gemini 4 Argon pool was empty for 148 h, while its Gemini 3.8 Flash pool still answered. A chain that knows the pools moves to the next pool when one is empty.
 

@@ -1,7 +1,7 @@
 # Plan: each model tier has one purpose, one chain across separate quota pools, and Gemini 4 Argon (Medium) for agy at deep and top
 
 - **Status:** proposed, 2026-10-17.
-- **Decision:** [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md). **Spec of record:** [model-routing](../reference/model-routing.md), section "The tier policy". **Earlier work:** [cli-routing-table-2026-10](cli-routing-table-2026-10.md) and [ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md).
+- **Research:** [model-tier-policy-2026-10](../research/model-tier-policy-2026-10.md). **Decision:** [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md). **Spec of record:** [model-routing](../reference/model-routing.md), section "The tier policy". **Earlier work:** [cli-routing-table-2026-10](cli-routing-table-2026-10.md) and [ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md). **Bridge rule:** every component that queries a CLI follows [bridge-factory-2026-10](bridge-factory-2026-10.md); its §8 names the layer of each component.
 
 ## Table of contents
 
@@ -36,20 +36,22 @@ Earlier the same day the operator asked to use agy's tokens: "Make sure we lever
 
 ## 3. Facts
 
-| Id | Fact | Source |
+| Id | Fact | Source (research id) |
 |---|---|---|
-| T1 | On main, 67 tracked phase profiles default to `balanced`, 26 to `deep`, and none to `fast` or `top`. The runtime plane adds 8 minted profiles, for 72 and 29 in all. | `.evolve/profiles/*.json` on main and on the runtime plane, 2026-10-17 |
-| T2 | The advisor raised the build of 8 out of 17 recent cycles to `deep`. Those builds then ran on Claude Code. | `phase-plan.json` of cycles 1879–1914 |
-| T2b | 11 of 18 build dispatches in cycles 1879–1896 ran on Claude Code. 7 ran on agy. | the `cli` field of `build-events.ndjson`, 2026-10-17 |
-| T3 | agy counts quota in separate pools. On 2026-10-17, Gemini 4 Argon was exhausted for 148 h, while Gemini 3.8 Flash still answered. agy's Claude and GPT group was at 100% of its week. | `agy -p` probes and `evolve clihealth`, 2026-10-17 |
-| T4 | One Argon wall benched the whole agy family, Flash included, for 30 min. Wave 111 then ran every phase on Claude Code. | `.evolve/cli-health.json`; inbox `agy-model-429-benches-whole-family` |
-| T5 | Because of T4, PR #910 took `agy` out of `tiers.deep` and `tiers.top` again. | `.evolve/policy.json` on main |
-| T6 | agy has no effort flag. Its effort is part of the model name: `Gemini 4 Argon (Medium)`. agy-claude also takes its effort as a name suffix. Claude Code takes `--effort`. | `docs/reference/model-routing.md` "Effort for each tier" |
-| T7 | The live catalog picks the model of each tier through a classifier, and it overrides the manifest. On 2026-10-17 it picked `Gemini 4 Argon (High)` for agy `top`. | `go/internal/modelquery/query.go:87-117`, `.evolve/model-catalog.json` |
-| T8 | No setting can fix the model of one tier for one family. A `pins` key beside the routing table refuses every launch, and a pin names a phase, not a tier. | `go/internal/policy/core.go:104-139`, CLAUDE.md "Routing" |
-| T9 | A build on Gemini 4 Argon (cycle 1899) and builds on Gemini 3.8 Flash (cycles 1900, 1902) passed the Claude audit and shipped. | wave 109 and 110 records |
-| T10 | Claude Code was at 52% of its weekly quota on 2026-10-17. The floor seats need it every cycle. | `/usage`, 2026-10-17 |
-| T11 | The operator directive of 2026-10-08 is to start every effort at medium, and to raise it only on a measured gain. | `docs/reference/model-routing.md` |
+| T1 | On main, 67 tracked phase profiles default to `balanced`, 26 to `deep`, and none to `fast` or `top`. The runtime plane adds 8 minted profiles, for 72 and 29 in all. | [research T1](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T2 | The advisor raised the build of 8 out of 17 recent cycles to `deep`. Those builds then ran on Claude Code. | [research T2](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T2b | 11 of 18 build dispatches in cycles 1879–1896 ran on Claude Code. 7 ran on agy. | [research T2b](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T3 | agy counts quota in separate pools. On 2026-10-17, Gemini 4 Argon was exhausted for 148 h, while Gemini 3.8 Flash still answered. agy's Claude and GPT group was at 100% of its week. | [research T3](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T4 | One Argon wall benched the whole agy family, Flash included, for 30 min. Wave 111 then ran every phase on Claude Code. | [research T4](../research/model-tier-policy-2026-10.md#2-local-evidence); inbox `agy-model-429-benches-whole-family` |
+| T5 | Because of T4, PR #910 took `agy` out of `tiers.deep` and `tiers.top` again. | [research T5](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T6 | agy has no effort flag. Its effort is part of the model name: `Gemini 4 Argon (Medium)`. agy-claude also takes its effort as a name suffix. Claude Code takes `--effort`. | [research T6](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T7 | The live catalog picks the model of each tier through a classifier, and it overrides the manifest. On 2026-10-17 it picked `Gemini 4 Argon (High)` for agy `top`. | [research T7](../research/model-tier-policy-2026-10.md#2-local-evidence); `.evolve/model-catalog.json` |
+| T8 | No setting can fix the model of one tier for one family. A `pins` key beside the routing table refuses every launch, and a pin names a phase, not a tier. | [research T8](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T9 | A build on Gemini 4 Argon (cycle 1899) and builds on Gemini 3.8 Flash (cycles 1900, 1902) passed the Claude audit and shipped. | [research T9](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T10 | Claude Code was at 52% of its weekly quota on 2026-10-17. The floor seats need it every cycle. | [research T10](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T11 | The operator directive of 2026-10-08 is to start every effort at medium, and to raise it only on a measured gain. | [research T11](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T12 | Both Argon variants boot. A launch with `--model "Gemini 4 Argon (Medium)"` showed the footer `Gemini 4 Argon · medium`. agy runs its default model on an invalid name, so this check is necessary. | [research T12](../research/model-tier-policy-2026-10.md#2-local-evidence) |
+| T13 | The shadow catalog first listed Gemini 4 Argon on 2026-10-15T23:07Z. The live catalog still named Gemini 3.1 Pro on 2026-10-16, because `catalog.refresh_stage` is `shadow`. | [research T13](../research/model-tier-policy-2026-10.md#2-local-evidence) |
 
 ## 4. Goals and non-goals
 
@@ -160,6 +162,8 @@ Two more facts came from the same screen:
 
 - **U1:** Argon had quota again. The wall of T3 was over when this screen was read.
 - **U2:** agy's saved default model, "Gemini 3.5 Flash (Medium)", no longer exists. agy then used "Gemini 4 Argon (Medium)" with only a warning. So each agy launch without a model, such as a probe, uses quota from the Argon pool.
+
+The research file holds the screen and these facts. The screen and its quotes are P3.1 and P3.2. U1 is the last implication of the screen, and U2 is P3.3. The reader findings are P3.4. All are in [research §3](../research/model-tier-policy-2026-10.md#3-what-agy-says-about-its-quota).
 
 ### Gap
 
