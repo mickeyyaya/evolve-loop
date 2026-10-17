@@ -58,7 +58,7 @@ func TestCB1_WriteAxisUnchanged(t *testing.T) {
 			t.Errorf("worktreePhase(%s)=%v, want %v — CB.1 must not move the write axis", p, got, want)
 		}
 		if got, want := WorktreePhase(p), writeCapable[p]; got != want {
-			t.Errorf("WorktreePhase(%s)=%v, want %v — role-gate key must be untouched", p, got, want)
+			t.Errorf("WorktreePhase(%s)=%v, want %v — role-gate key of the spine phases must be untouched", p, got, want)
 		}
 	}
 }
