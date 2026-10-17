@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-10-17T09:30:00Z",
+  "kind": "bug",
+  "priority_class": "debuggability",
+  "weight": 0.7,
+  "source": "console, 2026-10-17: the operator asked why agy Gemini usage is low; the llm-calls ledger of cycles 1910-1925 could not show the agy token share",
+  "id": "agy-calls-record-no-tokens",
+  "title": "Every agy dispatch records zero tokens, so the agy share of the token load cannot be measured",
+  "summary": "In cycles 1910-1925, all 25 agy-tmux rows of llm-calls.ndjson have tokens.output 0, while claude-tmux rows carry counts (scrollback_peak). agy-tmux.json:170 declares token_line_regex for the line \"▸ Thought for X, N tokens\", which attempt_telemetry.go:157 feeds to TokenLinePeakCollector. The agy 1.4 pane no longer prints that line: cycle 1925 scout final pane line 348 reads \"○ Thought for 5m 40s (Examined the cmd/evolve test suite ...)\", with a different marker and no token count. So the pattern never matches, and no other collector applies.",
+  "fix": "Find where agy 1.4 exposes tokens, through the bridge only (never raw agy -p): a footer or status line, its session or transcript files under the agy home, or the per-model /usage window delta before and after a call. Add that source as the agy-tmux token collector, or a manifest pattern if a pane line carries a count. If agy exposes no per-call count, record the /usage delta per call and mark the row usage_status estimated.",
+  "acceptance": [
+    "A real agy 1.4 pane capture taken through the bridge is a fixture. The current token_line_regex gives 0 on it, and the new source gives a non-zero output count.",
+    "After one live wave, the agy-tmux rows of llm-calls.ndjson carry non-zero tokens.output, or an estimated status from the /usage delta."
+  ],
+  "files": [
+    "go/internal/bridge/attempt_telemetry.go",
+    "go/internal/bridge/manifests/agy-tmux.json"
+  ]
+}
