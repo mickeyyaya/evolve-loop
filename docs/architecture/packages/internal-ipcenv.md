@@ -17,6 +17,7 @@
   - The orchestrator scales the ship-recovery budget of a contention-class error (`shipRecoveryBudget`: the larger of 2 and width plus 1). The width is the number of siblings that race for main.
   - `core.fleetWidthFromEnv` reads it from `CycleRequest.Env`, never from `os.Getenv`. So fleet siblings cannot leak their width into each other.
   - An absent, garbage or non-positive value means solo (1).
+  - `lanebudget.Current` reads it from `os.Getenv`, because the budget belongs to the process that runs the `go test`. Each lane is a separate process, so it reads its own width ([internal-lanebudget.md](internal-lanebudget.md)).
 - **`CycleStateFileKey`** (`EVOLVE_CYCLE_STATE_FILE`) names the own per-run cycle-state file of a fleet lane (`runs/cycle-N/cycle-state.json`). So two concurrent lanes never share `<evolveDir>/cycle-state.json`. It applies only to the evolve directory that holds it (`paths.CycleStateFileFor`).
 - **`TmuxSocketKey`** (`EVOLVE_TMUX_SOCKET`) is the per-run bridge tmux socket the loop exports to its bridge subprocesses. `bridge.TmuxSocketEnv` is defined as this constant, so the key has one spelling. It keeps its `flagregistry` row (status internal, "IPC channel, not an operator dial") for now; the row predates the constant moving here.
 

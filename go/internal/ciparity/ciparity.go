@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 )
 
 const RequiredWorkflow = "required.yml"
@@ -97,5 +99,5 @@ const CoverageTags = "integration acs"
 
 func CoverageTestArgs(coverProfile string, pkgs []string) []string {
 	args := []string{"test", "-tags", CoverageTags, "-coverprofile=" + coverProfile}
-	return append(args, pkgs...)
+	return lanebudget.Args(append(args, pkgs...))
 }

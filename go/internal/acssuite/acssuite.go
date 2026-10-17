@@ -21,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
@@ -251,9 +252,9 @@ func hasGoACSTree(moduleDir string) bool {
 }
 
 func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []string) (string, error) {
-	cmd := sysexec.Command(ctx, "go", "test", "-json", "-tags", "acs", "-count=1", pkgPattern)
+	cmd := sysexec.Command(ctx, "go", lanebudget.Args([]string{"test", "-json", "-tags", "acs", "-count=1", pkgPattern})...)
 	cmd.Dir = moduleDir
-	cmd.Env = env
+	cmd.Env = lanebudget.Env(env)
 	cmd.WaitDelay = 30 * time.Second
 	out, err := cmd.CombinedOutput()
 	return string(out), err

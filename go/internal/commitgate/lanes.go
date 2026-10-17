@@ -10,11 +10,18 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 )
 
 var nodeExts = []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 
 const defaultLintBudget = 10 * time.Minute
+
+func (o Options) budgeted() Options {
+	o.Runner = lanebudget.Runner(o.Runner)
+	return o
+}
 
 func lookPathDefault(tool string) (string, error) { return exec.LookPath(tool) }
 
@@ -105,7 +112,7 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 			}
 			glc = true
 		}
-		if out, ok := o.runCmd(ctx, mod, "go", append([]string{"test"}, pkgs...)...); !ok {
+		if out, ok := o.budgeted().runCmd(ctx, mod, "go", append([]string{"test"}, pkgs...)...); !ok {
 			res.log("go test failed in %s\n%s", mod, out)
 			return ExitFail
 		}

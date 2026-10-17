@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -77,17 +78,17 @@ func runBuildSelfCheck(ctx context.Context, moduleDir string, pkgs []string, run
 }
 
 func unitTestArgs(pkg string) []string {
-	return []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, pkg}
+	return lanebudget.Args([]string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, pkg})
 }
 
 func taggedTestArgs(pkg string, tags []string) []string {
-	return []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", strings.Join(tags, ","), pkg}
+	return lanebudget.Args([]string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", strings.Join(tags, ","), pkg})
 }
 
 func realGoUnitTestTagged(ctx context.Context, moduleDir, pkg string, tags []string) (output string, passed bool) {
 	cmd := sysexec.Command(ctx, "go", taggedTestArgs(pkg, tags)...)
 	cmd.Dir = moduleDir
-	cmd.Env = ipcenv.Scrub(os.Environ())
+	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
 	out, err := cmd.CombinedOutput()
 	return string(out), err == nil
 }
@@ -98,7 +99,7 @@ func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, 
 	}
 	cmd := sysexec.Command(ctx, "go", unitTestArgs(pkg)...)
 	cmd.Dir = moduleDir
-	cmd.Env = ipcenv.Scrub(os.Environ())
+	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
 	out, err := cmd.CombinedOutput()
 	s := string(out)
 	return s, err == nil || goTestExcludedByBuildTags(s)
