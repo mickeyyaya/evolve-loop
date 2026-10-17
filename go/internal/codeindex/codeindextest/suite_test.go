@@ -2,6 +2,7 @@ package codeindextest_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -181,5 +182,72 @@ func TestRun_AMissingProbeIsReportedPerQuery(t *testing.T) {
 
 	if !strings.Contains(rec.all(), "no probe for query find") || !strings.Contains(rec.all(), "no probe for query map") {
 		t.Errorf("problems = %s", rec.all())
+	}
+}
+
+type refreshable struct {
+	codeindex.Backend
+	err error
+}
+
+func (r refreshable) Refresh(context.Context) error { return r.err }
+
+func refreshHarness(healthy, absent error) codeindextest.Harness {
+	caps := codeindex.AllCapabilities()
+	h := fakeHarness(caps)
+	h.New = func() codeindex.Backend {
+		return refreshable{Backend: codeindextest.NewFake("fake", caps, codeindextest.StandardIndex()), err: healthy}
+	}
+	h.NewAbsent = func() codeindex.Backend {
+		return refreshable{Backend: codeindextest.NewAbsentFake("fake", caps), err: absent}
+	}
+	return h
+}
+
+func TestRun_ARefreshableBackendThatRefreshesAndReportsAbsentPasses(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+
+	codeindextest.Run(rec, refreshHarness(nil, fmt.Errorf("%w: gone", codeindex.ErrAbsent)))
+
+	if rec.all() != "" {
+		t.Errorf("problems:\n%s", rec.all())
+	}
+}
+
+func TestRun_ARefreshableBackendWhoseHealthyRefreshFailsIsReported(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+
+	codeindextest.Run(rec, refreshHarness(errors.New("boom"), fmt.Errorf("%w: gone", codeindex.ErrAbsent)))
+
+	if !strings.Contains(rec.all(), "refresh of a present index must succeed") {
+		t.Errorf("problems:\n%s", rec.all())
+	}
+}
+
+func TestRun_ARefreshableBackendThatDoesNotReportAbsentIsReported(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+
+	codeindextest.Run(rec, refreshHarness(nil, nil))
+
+	if !strings.Contains(rec.all(), "refresh of an absent index must be ErrAbsent") {
+		t.Errorf("problems:\n%s", rec.all())
+	}
+}
+
+func TestRun_ABackendThatCannotRefreshNeedsNoRefreshProbe(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	h := fakeHarness(codeindex.AllCapabilities())
+	h.New = func() codeindex.Backend {
+		return struct{ codeindex.Backend }{codeindextest.NewFake("fake", codeindex.AllCapabilities(), codeindextest.StandardIndex())}
+	}
+
+	codeindextest.Run(rec, h)
+
+	if rec.all() != "" {
+		t.Errorf("problems:\n%s", rec.all())
 	}
 }

@@ -88,3 +88,8 @@ func underPrefix(hits []codeindex.Hit, prefix string) []codeindex.Hit {
 	}
 	return kept
 }
+
+func (b Backend) Refresh(ctx context.Context) error {
+	_, err := b.execute(ctx, []string{"build", "--", b.cfg.IndexDir})
+	return err
+}

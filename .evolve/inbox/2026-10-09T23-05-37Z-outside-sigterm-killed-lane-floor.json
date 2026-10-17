@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The sender is named",
+    "A sweep test proves that it never stops a foreign make or go test"
+  ],
+  "created_at": "2026-10-09T23:05:37Z",
+  "files": [
+    "go/internal/gc/dispatch_processes.go",
+    "go/internal/bridge/dispatch_reap.go"
+  ],
+  "fix": "Find the sender (gc process sweep or dispatch reap selection keys). Make sure that a sweep never selects a process outside its own dispatch id.",
+  "id": "outside-sigterm-killed-lane-floor",
+  "kind": "pipeline-repair",
+  "priority_class": "debuggability",
+  "source": "tmux-isolation lane floor, 2026-10-09",
+  "summary": "At 11:46 on 2026-10-09 the tmux-isolation lane's test-e2e and test-acs-durable targets stopped with \"make: *** Terminated: 15\". The lane did not send the signal. It was likely a process sweep from another session (dispatch reap or evolve gc).",
+  "title": "An unknown outside SIGTERM killed a lane's floor targets",
+  "weight": 0.4
+}

@@ -2,6 +2,7 @@ package codeindex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -86,4 +87,21 @@ func knownNames(factories map[string]Factory) string {
 	}
 	sort.Strings(names)
 	return strings.Join(names, ", ")
+}
+
+func (b Backends) Refresh(ctx context.Context) ([]string, error) {
+	var refreshed []string
+	var failures []error
+	for _, backend := range b.ordered {
+		refresher, ok := backend.(Refresher)
+		if !ok {
+			continue
+		}
+		if err := refresher.Refresh(ctx); err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", backend.Name(), err))
+			continue
+		}
+		refreshed = append(refreshed, backend.Name())
+	}
+	return refreshed, errors.Join(failures...)
 }

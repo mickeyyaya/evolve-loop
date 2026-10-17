@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "TestChannel_EndToEnd no longer depends on the stdout and stderr appends of tick 2 landing in one poll of the Normalizer",
+    "The test passes 200 times with -race -count=200 under a loaded host (or with a fake ticker that forces the worst interleaving)",
+    "A mutation that lets response_complete close the span before the assistant text is visible fails the test"
+  ],
+  "created_at": "2026-10-12T11:40:00Z",
+  "files": [
+    "go/internal/bridge/channel/e2e_test.go"
+  ],
+  "fix": "Drive the Normalizer with an injected tick (or wait for the feed to carry the assistant_text envelope before appending idle_reached), so the span always contains the assistant text; no sleeps.",
+  "id": "channel-e2e-tick2-race",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "source": "PR #874 CI (run 38241358938, ubuntu-latest Go 1.27), 2026-10-12",
+  "summary": "TestChannel_EndToEnd failed in CI with answer text \"\" after 0.01 s on a change that does not touch internal/bridge/channel. Tick 2 appends the assistant text to stdout and idle_reached to stderr; one poll can read stdout before the first append and stderr after the second, so response_complete closes the span before the assistant text exists. The test passes 5/5 locally.",
+  "title": "TestChannel_EndToEnd races on tick 2: the span can close before the assistant text lands",
+  "weight": 0.5
+}

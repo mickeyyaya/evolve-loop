@@ -56,3 +56,10 @@ func (f Fake) answer(req codeindex.Request) ([]codeindex.Hit, error) {
 		return hits, nil
 	}
 }
+
+func (f Fake) Refresh(context.Context) error {
+	if f.absent {
+		return fmt.Errorf("%w: %s", codeindex.ErrAbsent, f.name)
+	}
+	return nil
+}

@@ -283,3 +283,66 @@ func TestDispatch_PassesAnAbsentIndexThroughAsErrAbsent(t *testing.T) {
 		t.Errorf("err = %v, want ErrAbsent", err)
 	}
 }
+
+type refreshing struct {
+	codeindex.Backend
+	name string
+	err  error
+	ran  *[]string
+}
+
+func (r refreshing) Name() string { return r.name }
+
+func (r refreshing) Refresh(context.Context) error {
+	*r.ran = append(*r.ran, r.name)
+	return r.err
+}
+
+func TestBackends_RefreshRunsEachBackendThatCanRefreshAndSkipsTheRest(t *testing.T) {
+	t.Parallel()
+	var _ codeindex.Refresher = refreshing{}
+	var ran []string
+	plain := codeindextest.NewFake("plain", codeindex.AllCapabilities(), nil)
+	set := codeindex.NewBackends(
+		refreshing{Backend: plain, name: "first", ran: &ran},
+		struct{ codeindex.Backend }{plain},
+		refreshing{Backend: plain, name: "second", ran: &ran},
+	)
+
+	refreshed, err := set.Refresh(context.Background())
+
+	if err != nil || strings.Join(refreshed, ",") != "first,second" || strings.Join(ran, ",") != "first,second" {
+		t.Errorf("refreshed=%v ran=%v err=%v, want first,second and no error", refreshed, ran, err)
+	}
+}
+
+func TestBackends_RefreshKeepsGoingAfterAFailureAndNamesTheFailedBackend(t *testing.T) {
+	t.Parallel()
+	var ran []string
+	plain := codeindextest.NewFake("plain", codeindex.AllCapabilities(), nil)
+	boom := errors.New("boom")
+	set := codeindex.NewBackends(
+		refreshing{Backend: plain, name: "first", err: boom, ran: &ran},
+		refreshing{Backend: plain, name: "second", ran: &ran},
+	)
+
+	refreshed, err := set.Refresh(context.Background())
+
+	if !errors.Is(err, boom) || !strings.Contains(err.Error(), "first") {
+		t.Errorf("err = %v, want it to wrap boom and name first", err)
+	}
+	if strings.Join(refreshed, ",") != "second" || strings.Join(ran, ",") != "first,second" {
+		t.Errorf("refreshed=%v ran=%v, want second refreshed and both run", refreshed, ran)
+	}
+}
+
+func TestBackends_RefreshWithNoRefreshableBackendIsANoOp(t *testing.T) {
+	t.Parallel()
+	set := codeindex.NewBackends(struct{ codeindex.Backend }{codeindextest.NewFake("plain", codeindex.AllCapabilities(), nil)})
+
+	refreshed, err := set.Refresh(context.Background())
+
+	if err != nil || len(refreshed) != 0 {
+		t.Errorf("refreshed=%v err=%v, want none and no error", refreshed, err)
+	}
+}

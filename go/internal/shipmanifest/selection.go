@@ -10,6 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
+const amplificationPhase = "test-amplification"
+
 type GitRead func(args ...string) (string, error)
 
 type Selection struct {
@@ -24,6 +26,7 @@ func ReportFiles() []string {
 	return []string{
 		phasecontract.ArtifactName(string(cyclestate.PhaseBuild)),
 		phasecontract.ArtifactName(string(cyclestate.PhaseTDD)),
+		phasecontract.ArtifactFilename(amplificationPhase),
 	}
 }
 

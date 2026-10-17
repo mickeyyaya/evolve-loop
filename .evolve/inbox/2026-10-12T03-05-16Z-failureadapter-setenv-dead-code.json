@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Either failureadapter.Decision.SetEnv is removed together with the extraEnv loops that read it (cyclerun_record.go and resume_execution.go), or a production path that sets it is named and tested",
+    "No test reaches the loops only through a seam that production never takes"
+  ],
+  "created_at": "2026-10-12T14:20:00Z",
+  "files": [
+    "go/internal/failureadapter/failureadapter.go",
+    "go/internal/core/cyclerun_record.go",
+    "go/internal/core/resume_execution.go"
+  ],
+  "fix": "Confirm with a code search that no non-test code assigns Decision.SetEnv (env injection retired in cycle 10). Then remove the field and the two loops in one refactor commit, and drop the failureDecide-only coverage tests for them.",
+  "id": "failureadapter-setenv-dead-code",
+  "kind": "refactor",
+  "priority_class": "hygiene",
+  "source": "coverage backfill E4, 2026-10-12",
+  "summary": "LOW: failureadapter.Decision.SetEnv is declared but never assigned outside tests, so the extraEnv loops in cyclerun_record.go (~160) and resume_execution.go (~256) never run in production. Backfill E4 covered them only through the failureDecide seam.",
+  "title": "failureadapter.Decision.SetEnv is dead; the extraEnv loops that read it never run",
+  "weight": 0.2
+}

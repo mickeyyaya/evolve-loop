@@ -45,12 +45,12 @@ func reconcileManifest(ctx context.Context, opts *Options, res *RunResult, workt
 	sort.Strings(changed)
 	extras := shipmanifest.OutOfManifest(changed, manifest)
 	if len(extras) == 0 {
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] manifest-gate: OK — all %d bound path(s) covered by the declared build/TDD manifest", len(changed)))
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] manifest-gate: OK — all %d bound path(s) covered by the declared phase-report manifest (build, tdd, test-amplification)", len(changed)))
 		return nil
 	}
 	if manifestGateEnforced(opts.ManifestGate) {
 		return shipErr(core.CodeManifestGate, core.ShipClassPrecondition, core.StageAtomicShip,
-			fmt.Sprintf("ship: manifest-gate (enforce): refusing to commit %d path(s) no build/TDD report declared (likely a cross-lane untracked leak): %s", len(extras), strings.Join(extras, ", ")),
+			fmt.Sprintf("ship: manifest-gate (enforce): refusing to commit %d path(s) no phase report (build, tdd, test-amplification) declared (likely a cross-lane untracked leak): %s", len(extras), strings.Join(extras, ", ")),
 			"out_of_manifest", strings.Join(extras, ","))
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] manifest-gate: %d out-of-manifest path(s) about to be bound (SHADOW — would block under enforce): %s", len(extras), strings.Join(extras, ", ")))

@@ -19,5 +19,11 @@
     "docs/research/wave-orchestrator-2026-10.md",
     "docs/plans/wave-orchestrator-2026-10.md",
     "docs/architecture/wave-orchestrator.md"
-  ]
+  ],
+  "consumed": {
+    "at": "2026-10-17T14:25:22Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "Inbox reconciliation 2026-10-17: DONE. PR #919 (e343fb593, ff505a707): docs/architecture/adr/0139-*.md, docs/architecture/wave-orchestrator.md, docs/plans/wave-orchestrator-2026-10.md, docs/research/wave-orchestrator-2026-10.md all on HEAD; ste-lint 0-findings not re-run"
+  }
 }

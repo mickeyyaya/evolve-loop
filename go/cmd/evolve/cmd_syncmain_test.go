@@ -75,7 +75,7 @@ func smInitRepoWithRemote(t *testing.T) (string, string) {
 		r.Git("commit", "-q", "-m", "base")
 		r.Git("branch", "-M", "main")
 		bare := filepath.Join(r.Dir, "origin.git")
-		r.Git("clone", "-q", "--bare", ".", bare)
+		r.CloneBare(".", bare)
 		r.Git("-C", bare, "symbolic-ref", "HEAD", "refs/heads/main")
 		repo := filepath.Join(r.Dir, "repo")
 		r.Git("clone", "-q", bare, repo)

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A cycle cannot ship a changed function below 100% statement coverage: the ship path (or the build handoff floor) runs the same cover-changed check CI runs, against the same base, in enforce",
+    "A test proves a cycle whose diff adds an uncovered branch is refused before it lands, with the refused function named",
+    "After rollout, CI on console PRs no longer reports cover-changed refusals for functions that only main changed"
+  ],
+  "created_at": "2026-10-13T13:45:00Z",
+  "files": [
+    "go/internal/phases/ship/repocontract.go",
+    "go/internal/core",
+    "go/Makefile"
+  ],
+  "fix": "Run cover changed on the cycle's diff in the build floor or the ship gate (the build floor already has a shadow cover-changed WARN: promote it to enforce with a recovery rung), using the coverage the floor already collects.",
+  "id": "cycle-ship-enforces-cover-changed",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "source": "console PRs #883 and #887 red on 2026-10-13",
+  "summary": "Loop cycles 1869/1870 (be9bfd824, 71f5e6529) shipped changes to internal/cyclestate/read.go (ReadLastCycleNumber 90.9%, ReadState 88.9%) and internal/redteamcheck (NoBatchCycleJump 75.0%) below the 100% that CI's cover-changed gate requires. The build floor only WARNs in shadow (`[build-floor] WARN cover-changed (shadow)`). Every console PR whose diff spans those commits then fails CI on functions it never touched until it is rebased.",
+  "title": "Cycles ship functions below 100% coverage; the cover-changed check is shadow-only in the loop",
+  "weight": 0.6
+}
