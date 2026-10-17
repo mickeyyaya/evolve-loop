@@ -1,7 +1,7 @@
 # Code index CLI: `evolve code` gives every phase agent a read-only code graph
 
 > Research: [code-index-cli-2026-10](../research/code-index-cli-2026-10.md). Plan: [code-index-cli-2026-10](../plans/code-index-cli-2026-10.md). Decision: [ADR-0138](adr/0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md).
-> Status: K1, K2 and K3 are built (2026-10-17): the `evolve code` verb, the `codeindex` layer, the trail adapter, the policy block `code_index`, the boundary refresh and the usage log. The components K4a, K4b and K5 are planned. A name in this file that has no code is marked "planned".
+> Status: K1, K2 and K3 are built (2026-10-17), and K4a, K4b and K5 are planned. A name with no code is marked "planned".
 >
 > This file is the spec of record for the `evolve code` verb. The research holds the evidence, the plan holds the scored designs and the order of work, and the ADR holds the decision.
 
