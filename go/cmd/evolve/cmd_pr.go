@@ -346,7 +346,24 @@ func (m prMerger) upToDate(ctx context.Context, n string, pr prView) (prView, er
 		return pr, err
 	}
 	fmt.Fprintf(m.stderr, "%s#%s updated with %s\n", prMergePrefix, n, pr.BaseRefName)
-	return m.view(ctx, n)
+	return m.awaitNewHead(ctx, n, pr.HeadRefOid)
+}
+
+func (m prMerger) awaitNewHead(ctx context.Context, n, oldHead string) (prView, error) {
+	deadline := m.now().Add(m.wait)
+	for {
+		pr, err := m.view(ctx, n)
+		if err != nil {
+			return pr, err
+		}
+		if pr.HeadRefOid != "" && pr.HeadRefOid != oldHead {
+			return pr, nil
+		}
+		if m.now().Add(m.poll).After(deadline) {
+			return pr, refusef("head is still %s after update-branch", shortSHA(oldHead))
+		}
+		m.sleep(m.poll)
+	}
 }
 
 func (m prMerger) awaitGreen(ctx context.Context, n, head string) error {
