@@ -139,6 +139,7 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 		return batchDecision{flow: batchProceed}
 	}
 	waveConfig, pace := budgetAwareWaveConfig(b.ctx, fleetConfig, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.deps.Storage, b.stderr)
+	recordWaveSized(b.deps.Signals, iteration, fleetConfig.Count, waveConfig.Count)
 	out, err := b.wave().Dispatch(b.ctx, b.waveRequest(iteration, waveConfig, waveBinary))
 	switch {
 	case err != nil:
