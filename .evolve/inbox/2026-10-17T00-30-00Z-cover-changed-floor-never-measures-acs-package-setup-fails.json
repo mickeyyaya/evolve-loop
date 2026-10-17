@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Through the coverChangedProfiler seam, a go/internal/core unit test gives the floor a change set with a go/acs/cycleN package (acs tag only) and a production package. The pkgs passed to the fake profiler exclude the acs package and include the production package, and no `[setup failed]` warning appears.",
+    "A fixture diff that adds a function with no covering test (the shape of cycle 1909's markTruncated) makes the floor report that function as a refusal (enforce) or a warning (shadow).",
+    "Through an injected strict-runner seam, a changed package listed in go/.cover-strict whose coverage is below its declared percentage produces a floor failure under enforce and a warning under shadow, at the cover_changed stage."
+  ],
+  "created_at": "2026-10-17T00:30:00Z",
+  "files": [
+    "go/internal/core/cover_changed_floor.go",
+    "go/internal/covchanged",
+    "go/internal/coverstrict",
+    "go/internal/policy/budgets_recovery.go"
+  ],
+  "fix": "(1) Build the cover-changed profile only from packages that compile under covchanged.DefaultTags. Reuse the build-constraint logic of covchanged's buildsFor (go/build ImportDir with BuildTags = DefaultTags, skipping *build.NoGoError) in coverChangedPackages, not a hard-coded go/acs prefix. Then no tag-only package can fail the single `go test` that scopedCoverProfile runs for the whole set. (2) Add the go/.cover-strict check for the changed strict packages to the build floor beside cover-changed, behind a seam. (3) After a shadow soak with the setup failures gone, move cover_changed.stage from shadow to enforce. Do not flip first: under enforce, each cycle's own acs package makes coverChangedFailures return the setup failure as a hard failure.",
+  "id": "cover-changed-floor-never-measures-acs-package-setup-fails",
+  "kind": "bug",
+  "priority_class": "pipeline",
+  "source": "console, main CI red 2026-10-17 (cover-strict practicewatch 96.6%)",
+  "summary": "Main CI went red on 2026-10-17 at f4a9005a7, cycle 1909, and stayed red for 5 commits. `make cover-strict` failed because internal/practicewatch fell to 96.6%; the new function markTruncated was at 0%. The loop's build floor did not catch it, for two reasons. Its cover-changed check runs in shadow, the compiled default. It also can never measure: every cycle adds go/acs/cycleN, which builds only under the acs tag. Profiling the changed packages under -tags integration then fails with `build constraints exclude all Go files ... [setup failed]`, and the floor warns `no changed function is proven`. Runtime loop logs from 2026-10-1x (.evolve/logs/*/loop.log) carry 69 such warnings. The floor also has no cover-strict step, so CI is the first hard coverage gate.",
+  "title": "The build floor's cover-changed never measures (each cycle's acs package fails setup), and the floor has no cover-strict, so cycles ship CI-red coverage",
+  "weight": 0.7
+}
