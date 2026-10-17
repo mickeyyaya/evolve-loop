@@ -759,3 +759,5 @@
 ./internal/adapters/codeindex/trail
 # admission — admission by package cell, with the hub cell at capacity 1 (ADR-0139 O3, ADR-0134 S14): the conflict rule, the module graph and the hub set.
 ./internal/admission
+# orchestrator — the rolling pool under the orchestrator and the lane lease (ADR-0139 O4, O5): admission by cell for each free slot, one deadline timer over a heap, and the stop through the launch context only.
+./internal/orchestrator

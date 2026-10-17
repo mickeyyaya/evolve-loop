@@ -41,7 +41,30 @@ The `[loop] practice-watch:` lines show the result. A `WARN` line does not stop 
 
 The item has class `hygiene`, so it ranks low. Read it at the next boundary. Then decide which prompt or persona to change under [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
 
-## 4. Other cases
+## 4. The orchestrator stage
+
+The policy key `fleet.orchestrator.stage` sets how the loop runs its lanes ([wave-orchestrator §7, §8](../architecture/wave-orchestrator.md#7-the-rolling-pool)). The default is `shadow`.
+
+| What the console sees | `shadow` | `enforce` |
+|---|---|---|
+| How the lanes run | the barrier wave: all lanes start, and the wave ends when the last lane ends | the rolling pool: a free slot takes the next admissible todo at once |
+| Which todo takes a slot | the file partition | admission by package cell; `LOOP_ORCH_LANE_BACKFILLED` names it |
+| The end line | `[loop] wave N: X/Y lanes ok` | `[loop] pool N: X/Y lanes ok (orchestrator, target=W)` |
+| When a run ends | when the wave ends | when the supply is empty and no lane runs, at the operator stop, or after `run_max_lanes` launches (default 4 × `fleet.count`) |
+| A lane past its deadline | `LOOP_ORCH_LANE_DEADLINE`, action `recorded`. The lane runs on. | the loop stops the lane, reaps its dispatches, releases its inbox claim and gives the todo one more try. A second stop routes the todo to the console with the reason `deadline twice`. |
+| A lane with no live signal (cycle event, pane-watch, events or stdout file) for `stall_minutes` (default 30) | `LOOP_ORCH_LANE_STALLED` once. The lane runs on. | the same |
+
+At `enforce`:
+
+- Merge at the boundary as before. The run is one boundary-to-boundary unit, and the boundary work runs after the run.
+- `evolve loop-stop --wait` stops new launches. The lanes in flight finish, and then the loop stops at the boundary.
+- A todo with route `console-manual` and the reason `deadline twice` needs the console. Read its last two cycles before you route it back to a lane.
+- Remove `fleet.scheduling: pool`. The orchestrator always runs the pool, and the loop gives a WARN for the key.
+- `LOOP_ORCH_LANE_RECOVERY_FAILED` means that a claim release or a park failed. Release or route the named todo by hand.
+
+At `shadow`, count the `LOOP_ORCH_LANE_LATE_EXIT` events with `status` `ok`. Each one is a lane that passed after its deadline. A deadline stop at `enforce` stops such a lane. The exit to `enforce` needs none over 3 runs ([wave-orchestrator §14](../architecture/wave-orchestrator.md#14-stages)).
+
+## 5. Other cases
 
 | Case | Verb |
 |---|---|

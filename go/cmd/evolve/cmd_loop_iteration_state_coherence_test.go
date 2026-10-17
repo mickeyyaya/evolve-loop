@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
@@ -451,7 +452,7 @@ func TestPrepareIteration_WiredBeforeEveryIteration(t *testing.T) {
 		enabled func(policy.FleetConfig) bool
 	}{
 		{"fleet_wave_config", `{"fleet":{"count":3,"scheduling":"wave"}}`, shouldRunWave},
-		{"fleet_pool_config", `{"fleet":{"count":3,"scheduling":"pool"}}`, shouldRunPool},
+		{"fleet_pool_config", `{"fleet":{"count":3,"scheduling":"pool"}}`, loopwave.ShouldRunPool},
 	} {
 		t.Run(fleet.name, func(t *testing.T) {
 			root, evolveDir := iscsProject(t)

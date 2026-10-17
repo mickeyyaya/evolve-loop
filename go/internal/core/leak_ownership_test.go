@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -43,6 +44,10 @@ func TestMainTreeOwnership_ForeignOwnerNamesEveryOwnerKeyedClass(t *testing.T) {
 		{"a record of this cycle number is this cycle's", "docs/explain/builds/cycle-1811-01m48p8jhdj97bg0evcbbetkyr.md", false, ""},
 		{"registered mint", ".evolve/phases/xlane-mint/phase.json", true, "mint"},
 		{"unregistered phase config", ".evolve/phases/novel/phase.json", false, ""},
+		{"own dossier", "knowledge-base/cycles/cycle-1811.json", false, ""},
+		{"another cycle's dossier", "knowledge-base/cycles/cycle-1812.md", true, "dossier of cycle 1812"},
+		{"a dossier-like name with a suffix is not cycle-keyed", "knowledge-base/cycles/cycle-1812-notes.md", false, ""},
+		{"a nested dossier path is not cycle-keyed", "knowledge-base/cycles/old/cycle-1812.md", false, ""},
 		{"source file", "go/internal/router/router.go", false, ""},
 	}
 	owner := laneOneEightOneOne()
@@ -167,6 +172,9 @@ func TestMainTreeOwnership_HeldBySiblingNeedsALiveHolder(t *testing.T) {
 		"go/acs/cycle1700/predicates_test.go":                          false,
 		"docs/explain/builds/cycle-1812-01m48p8jhdj97bg0evcbbetkyr.md": true,
 		"docs/explain/builds/cycle-1700-01m48p8jhdj97bg0evcbbetkyr.md": false,
+		"knowledge-base/cycles/cycle-1700.json":                        false,
+		"knowledge-base/cycles/cycle-1812.md":                          true,
+		"knowledge-base/cycles/cycle-1811.json":                        false,
 		".evolve/phases/xlane-mint/phase.json":                         true,
 		"go/internal/router/router.go":                                 false,
 	}
@@ -270,5 +278,30 @@ func TestCycleRun_RecoveryBaselineNeedsASnapshotOfACheckout(t *testing.T) {
 	noCheckout := &cycleRun{checkout: &checkoutDecision{decided: true, checkout: false}}
 	if got := noCheckout.recoveryBaselineFor(guard, []string{"operator-notes.md"}); got != nil {
 		t.Errorf("a root with no git checkout has no main tree to recover: baseline = %v, want nil", got)
+	}
+}
+
+func TestFilterRealLeaks_AnotherCyclesDossierIsNotThisLanesLeakButItsOwnIs(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for _, cycle := range []int{1812, 1700} {
+		if err := os.MkdirAll(RunWorkspacePath(root, cycle), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exempt := laneOneEightOneOne().exemptions(root, RunWorkspacePath(root, 1811), nil)
+	leaked := []string{
+		"knowledge-base/cycles/cycle-1812.json",
+		"knowledge-base/cycles/cycle-1812.md",
+		"knowledge-base/cycles/cycle-1700.json",
+		"knowledge-base/cycles/cycle-9999.json",
+		"knowledge-base/cycles/cycle-1811.json",
+		"knowledge-base/cycles/notes.md",
+		"go/internal/router/router.go",
+	}
+	real, waived := filterRealLeaks(leaked, exempt, io.Discard)
+	want := []string{"knowledge-base/cycles/cycle-9999.json", "knowledge-base/cycles/cycle-1811.json", "knowledge-base/cycles/notes.md", "go/internal/router/router.go"}
+	if !reflect.DeepEqual(real, want) || waived != 0 {
+		t.Errorf("real leaks = %v (waived %d), want %v: a dossier of a real other cycle (live or with a run directory) belongs to that cycle; a cycle that does not exist and this cycle's own file stay leaks", real, waived, want)
 	}
 }
