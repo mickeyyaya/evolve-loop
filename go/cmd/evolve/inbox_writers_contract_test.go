@@ -75,6 +75,24 @@ func TestInboxWriters_EveryAutofiledItemCarriesAKnownClass(t *testing.T) {
 	})
 }
 
+func TestInboxWriters_EveryAutofiledItemDeclaresSurface(t *testing.T) {
+	t.Parallel()
+	consoleFilers := []string{"ADR-0072 halt writer", "recurrence boundary applier, retro autofile"}
+	for _, name := range consoleFilers {
+		at := slices.IndexFunc(autofilers, func(w autofiler) bool { return w.name == name })
+		if at < 0 {
+			t.Fatalf("console filer %q is not in the autofilers table", name)
+		}
+		t.Run(name, func(t *testing.T) {
+			item := autofilers[at].build(t)
+			pipelineKind := strings.HasPrefix(strings.ToLower(strings.TrimSpace(item.Kind)), "pipeline-")
+			if !pipelineKind && !item.DeclaredSurface() {
+				t.Errorf("filed item %q declares no surface: kind %q is not pipeline-* and files %q has no path-shaped token", item.ID, item.Kind, item.Files)
+			}
+		})
+	}
+}
+
 func enrollmentProblems(sites []string) []string {
 	var problems []string
 	enrolled := map[string]bool{}

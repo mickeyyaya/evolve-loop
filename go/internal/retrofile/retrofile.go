@@ -85,6 +85,9 @@ func FileActions(inboxDir string, cycle int, actions []PreventiveAction, default
 			"injected_at":      now.UTC().Format(time.RFC3339),
 			"injected_by":      "retro-preventive-actions-autofiler",
 		}
+		if !(inboxbatch.Item{Files: a.Files}).HasDeclaredSurface() {
+			item["kind"] = inboxbatch.KindPipelineRepair
+		}
 		body, err := json.MarshalIndent(item, "", "  ")
 		if err != nil {
 			return written, fmt.Errorf("retrofile: encode item %s: %w", a.ID, err)

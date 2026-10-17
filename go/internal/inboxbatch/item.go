@@ -37,6 +37,7 @@ type Item struct {
 	Path            string                     `json:"-"`
 	IDFromFileName  bool                       `json:"-"`
 	mentions        []string
+	basenames       []string
 }
 
 type ItemKey struct{ ID, Path string }
@@ -52,13 +53,27 @@ func (it *Item) UnmarshalJSON(raw []byte) error {
 	*it = Item(r)
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err == nil {
-		it.mentions = mentionedFiles(doc)
+		it.mentions, it.basenames = mentionedFiles(doc)
 	}
 	return nil
 }
 
 func (it Item) DeclaredSurface() bool {
 	return len(declaredTokens(it.Files)) > 0
+}
+
+func (it Item) HasDeclaredSurface() bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(it.Kind)), pipelineKindPrefix) || it.DeclaredSurface()
+}
+
+func (it Item) ProtectedBasenames(isProtectedBasename func(string) bool) []string {
+	var out []string
+	for _, b := range it.basenames {
+		if isProtectedBasename != nil && isProtectedBasename(b) {
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 func (it Item) DeclaredPaths() []string {
@@ -125,6 +140,8 @@ func isPathShaped(tok string) bool {
 
 var pathInProseRE = regexp.MustCompile(`[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+/?`)
 
+var basenameInProseRE = regexp.MustCompile(`[A-Za-z0-9_@-]+(?:\.[A-Za-z0-9_-]+)+`)
+
 var surfaceAndProvenanceFields = map[string]bool{
 	"files": true, "injected_by": true,
 }
@@ -135,17 +152,23 @@ func skipMention(k string) bool {
 
 const maxMentions = 64
 
-func mentionedFiles(doc map[string]any) []string {
-	var out []string
+func mentionedFiles(doc map[string]any) (paths, basenames []string) {
 	seen := map[string]bool{}
+	seenBase := map[string]bool{}
 	var walk func(v any)
 	walk = func(v any) {
 		switch x := v.(type) {
 		case string:
 			for _, p := range pathInProseRE.FindAllString(x, -1) {
-				if len(out) < maxMentions && !seen[p] && isFileSpelling(p) {
+				if len(paths) < maxMentions && !seen[p] && isFileSpelling(p) {
 					seen[p] = true
-					out = append(out, p)
+					paths = append(paths, p)
+				}
+			}
+			for _, b := range basenameInProseRE.FindAllString(x, -1) {
+				if len(basenames) < maxMentions && !seenBase[b] && isFileSpelling(b) {
+					seenBase[b] = true
+					basenames = append(basenames, b)
 				}
 			}
 		case []any:
@@ -161,7 +184,8 @@ func mentionedFiles(doc map[string]any) []string {
 		}
 	}
 	walk(doc)
-	return out
+	sort.Strings(basenames)
+	return paths, basenames
 }
 
 func isFileSpelling(p string) bool {

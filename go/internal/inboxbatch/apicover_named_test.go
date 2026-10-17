@@ -68,3 +68,23 @@ func TestUnifiedCommitment_RejectsMixedCampaignMembership(t *testing.T) {
 		t.Fatal("UnifiedCommitment.Validate accepted mixed unscoped and campaign-scoped members")
 	}
 }
+
+func TestItem_HasDeclaredSurfaceAndProtectedBasenames(t *testing.T) {
+	var undeclared Item
+	if err := undeclared.UnmarshalJSON([]byte(`{"id":"u","kind":"bug","title":"disposition_gate.go and plain_helper.go."} `)); err != nil {
+		t.Fatalf("UnmarshalJSON: %v", err)
+	}
+	if undeclared.HasDeclaredSurface() {
+		t.Fatal("undeclared bug item reported HasDeclaredSurface() = true")
+	}
+	if !(Item{ID: "p", Kind: KindPipelineRepair}).HasDeclaredSurface() {
+		t.Fatal("pipeline-repair item reported HasDeclaredSurface() = false")
+	}
+	if !(Item{ID: "f", Files: []string{"go/internal/inboxbatch/item.go"}}).HasDeclaredSurface() {
+		t.Fatal("file-declared item reported HasDeclaredSurface() = false")
+	}
+	got := undeclared.ProtectedBasenames(func(name string) bool { return name == "disposition_gate.go" })
+	if len(got) != 1 || got[0] != "disposition_gate.go" {
+		t.Fatalf("ProtectedBasenames = %v, want [disposition_gate.go]", got)
+	}
+}

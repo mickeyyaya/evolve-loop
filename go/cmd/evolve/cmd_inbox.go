@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
 type inboxVerb struct {
@@ -25,6 +27,7 @@ func inboxVerbs() []inboxVerb {
 	}
 	return []inboxVerb{
 		{"batches", "batches [--json] [--max N]", withoutStdin(runInboxBatches)},
+		{"lint", "lint [--json]", withoutStdin(runInboxLint)},
 		{"list", "list [--status " + strings.Join(menuStatusNames[:], "|") + "] [--kind K] [--route R] [--json]", withoutStdin(runInboxList)},
 		{"show", "show <id> [--json]", withoutStdin(runInboxShow)},
 		{"rank", "rank [--list " + strings.Join(rankListNames, "|") + "] [--top N] [--explain <id>] [--json]", withoutStdin(runInboxRank)},
@@ -195,4 +198,84 @@ func excludedItems(items []inboxbatch.Item, reasons []string) []excludedItem {
 		out[i] = excludedItem{Item: it, Reason: strings.TrimPrefix(reasons[i], it.ID+": ")}
 	}
 	return out
+}
+
+type inboxLintEntry struct {
+	ID                 string   `json:"id"`
+	ProtectedBasenames []string `json:"protected_basenames"`
+}
+
+type inboxLintDoc struct {
+	Undeclared []inboxLintEntry `json:"undeclared"`
+}
+
+func runInboxLint(args []string, stdout, stderr io.Writer) int {
+	asJSON := false
+	for _, arg := range args {
+		if arg == "--json" {
+			asJSON = true
+			continue
+		}
+		fmt.Fprintf(stderr, "inbox lint: unknown arg %q\n", arg)
+		return 10
+	}
+	inbox, err := loadPendingInbox("lint", stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "inbox lint: %v\n", err)
+		return 1
+	}
+	root := filepath.Dir(filepath.Dir(inbox.opts.InboxDir))
+	isProtectedBase := protectedBasenameJudge(root, inbox.isProtected, stderr)
+	var undeclared []inboxLintEntry
+	for _, it := range inbox.items {
+		if routed, _ := inboxbatch.ConsoleRouted(it, inbox.isProtected); routed || it.HasDeclaredSurface() {
+			continue
+		}
+		undeclared = append(undeclared, inboxLintEntry{
+			ID:                 it.ID,
+			ProtectedBasenames: it.ProtectedBasenames(isProtectedBase),
+		})
+	}
+	if asJSON {
+		enc := json.NewEncoder(stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(inboxLintDoc{Undeclared: undeclared}); err != nil {
+			fmt.Fprintf(stderr, "inbox lint: encode: %v\n", err)
+			return 1
+		}
+	} else {
+		for _, e := range undeclared {
+			if len(e.ProtectedBasenames) > 0 {
+				fmt.Fprintf(stdout, "%s: undeclared surface (cites protected basename: %s)\n", e.ID, strings.Join(e.ProtectedBasenames, ", "))
+			} else {
+				fmt.Fprintf(stdout, "%s: undeclared surface\n", e.ID)
+			}
+		}
+	}
+	if len(undeclared) > 0 {
+		return 1
+	}
+	return 0
+}
+
+func protectedBasenameJudge(root string, isProtected func(string) bool, stderr io.Writer) func(string) bool {
+	protected := map[string]bool{}
+	if isProtected != nil {
+		for _, e := range guards.ProtectedSurfaceManifest {
+			rel := strings.TrimPrefix(e.Fragment, "/")
+			if !strings.HasSuffix(rel, "/") && isProtected(rel) {
+				protected[filepath.Base(rel)] = true
+			}
+		}
+		tracked, err := repostate.TrackedTree(root, ".")
+		if err != nil {
+			fmt.Fprintf(stderr, "inbox lint: tracked files unreadable, judging basenames by the protected-surface manifest only: %v\n", err)
+		}
+		for _, rel := range tracked {
+			if isProtected(filepath.ToSlash(rel)) {
+				protected[filepath.Base(rel)] = true
+			}
+		}
+	}
+	return func(name string) bool { return protected[name] }
 }
