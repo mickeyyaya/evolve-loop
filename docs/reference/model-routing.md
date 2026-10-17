@@ -53,6 +53,8 @@ This section is the spec of record for what each tier is for and in which order 
 
 **Why a policy.** A provider counts its quota in pools. On 2026-10-17, agy's Gemini 4 Argon pool was empty for 148 h, while its Gemini 3.8 Flash pool still answered. A chain that knows the pools moves to the next pool when one is empty.
 
+**The pools.** agy's `/usage` screen names its pools (agy 1.4.0, 2026-10-17): `GEMINI MODELS` (Flash and Pro), `CLAUDE AND GPT MODELS` (Opus, Sonnet and GPT-OSS) and `GEMINI 4 ARGON` (Argon only). Each pool has its own limits. The plan's §6a says how the bridge reads them.
+
 **The chain rule.** A chain walks from the pool with the most headroom to Claude Code. No chain puts two models of one quota pool next to each other. Claude Code goes last, because the floor seats can run nowhere else.
 
 | Tier | Use it when the phase… | Target chain | Model on each family |

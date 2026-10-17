@@ -11,6 +11,8 @@
 - [4. Goals and non-goals](#4-goals-and-non-goals)
 - [5. The tier policy](#5-the-tier-policy)
 - [6. How to hold Argon at Medium: three mechanisms](#6-how-to-hold-argon-at-medium-three-mechanisms)
+- [6a. Quota pools come from agy's own /usage screen](#6a-quota-pools-come-from-agys-own-usage-screen)
+- [6b. /model and /usage together](#6b-model-and-usage-together-what-is-new-and-how-much-of-it-we-can-use)
 - [7. Decisions](#7-decisions)
 - [8. Components and order](#8-components-and-order)
 - [9. Verification](#9-verification)
@@ -21,7 +23,7 @@
 
 On 2026-10-17 the operator asked: "let's also include the gemini top / deep model as Gemini 4 Argon with medium effort. I would let you design the optimized policy for different usage (deep, fast, balance, etc...)".
 
-Earlier the same day the operator asked to use agy's tokens: "Make sure we leverage token usage from agy". The operator also gave a standing rule: "whenever you planned to write the code, make sure we can always map to the doc that explains why and what and how".
+Earlier the same day the operator asked to use agy's tokens: "Make sure we leverage token usage from agy". Later the operator added: "Agy gemini 4 argon has its own quota, use the /usage to learn from the different LLM limitations and separated quotas through agent bridge". The operator also gave a standing rule: "whenever you planned to write the code, make sure we can always map to the doc that explains why and what and how".
 
 ## 2. Terms
 
@@ -140,6 +142,89 @@ Scores are 1 (worst) to 5 (best).
 
 **The winner is M2, with M1 as its offline default.** M2 is the only mechanism that gives the operator's model today with no side effect. M1 stays as the default when no catalog exists. M3 has the best long-term shape, and it becomes a follow-up after a per-family effort override exists.
 
+## 6a. Quota pools come from agy's own /usage screen
+
+### Issue
+
+The policy of §5 needs to know the quota pools. Until now this plan inferred them from failures (T3). agy's own `/usage` screen names the pools directly. agy 1.4.0 showed this screen on 2026-10-17:
+
+| Pool (agy group) | Models in the pool | Weekly left | 5-hour left |
+|---|---|---|---|
+| `GEMINI MODELS` | Gemini Flash, Gemini Pro | 91.90%, refreshes in 165 h | 73.66%, refreshes in 2 h 21 m |
+| `CLAUDE AND GPT MODELS` | Claude Opus, Claude Sonnet, GPT-OSS | 0.00%, refreshes in 75 h | disabled while the weekly limit is hit |
+| `GEMINI 4 ARGON` | Gemini 4 Argon only | 98.62%, refreshes in 167 h | none shown |
+
+The screen also says: "For paid Pro plans, Argon quota is separate." It says that agy charges quota "proportionally to the cost of the tokens", so a cheaper model lasts longer.
+
+Two more facts came from the same screen:
+
+- **U1:** Argon had quota again. The wall of T3 was over when this screen was read.
+- **U2:** agy's saved default model, "Gemini 3.5 Flash (Medium)", no longer exists. agy then used "Gemini 4 Argon (Medium)" with only a warning. So each agy launch without a model, such as a probe, uses quota from the Argon pool.
+
+### Gap
+
+The bridge already reads `/usage` (`controls.usage.windows` in `go/internal/bridge/manifests/agy-tmux.json`). But the reader was made for the agy 1.3.0 screen, and three of its assumptions are now false:
+
+| Reader assumption | The agy 1.4.0 screen | Result |
+|---|---|---|
+| A group title ends in `MODELS` (`section_regex`) | The third group title is `GEMINI 4 ARGON` | The Argon pool is not read. |
+| A window label is `Weekly Limit Remaining` | The Argon label is `Gemini 4 Argon Weekly Limit` | The Argon percentage is not read. |
+| Each group maps to one routing family (`scopes`) | `GEMINI MODELS` and `GEMINI 4 ARGON` are two pools of the one family `agy` | The `scopes` map has no `GEMINI 4 ARGON` entry. A scope with `per_model: true` already makes a window name its model (`go/internal/quotastate/windows.go:41-44`). But no scope sets it, and the bench does not use it yet (T4). |
+
+After the `CLAUDE AND GPT MODELS` group, the reader keeps that group's scope for the lines that follow (`windows.go:175-190`). So it can read the Argon percentage into the Claude window.
+
+On 2026-10-17, `evolve clihealth usage agy` reported "no usage window read" for agy. The cause is not known yet. The reader can also miss the screen if the `/usage` panel hides the prompt marker that the reader waits for.
+
+### Solution
+
+The quota pool becomes the unit of the bench and of the chain order, and the bridge learns the pools from `/usage`. Components Q1–Q4 in §8 do this.
+
+1. **Read every group.** The reader takes any group title, not only `…MODELS`, and any label with "Weekly Limit" or "Five Hour Limit". A fixture of the 1.4.0 screen above pins the reader.
+2. **Map a group to a pool, not to a family.** The reader already has the tool: a scope with `per_model: true`. The manifest adds a `GEMINI 4 ARGON` scope with family `agy` and `per_model: true`.
+3. **Bench a pool.** A quota wall benches the pool of the model that hit it. A dispatch to another pool of the same family still runs. This is the fix of inbox `agy-model-429-benches-whole-family`.
+4. **Order by headroom.** The chain rule of §5 uses the remaining percent from `/usage`. Inside one tier, the router tries the family with the most weekly headroom first. It chooses only among the families that the table allows. The choice of a model inside a family stays with the catalog. The floor seats keep Claude Code only.
+5. **Give agy a valid default model.** Each agy launch passes `--model`. A launch without a tier gets the `fast` model of the agy manifest, not agy's saved default. Thus a probe uses quota from the Flash pool, not the Argon pool.
+
+**Why the screen and not the 429 text.** The 429 text names one model and one reset, and only after the wall. The screen gives every pool, its headroom and its reset before the wall. A router can avoid a wall with the screen. With the 429 text it can only react to one.
+
+## 6b. /model and /usage together: what is new, and how much of it we can use
+
+### Issue
+
+The operator asked: "/model and /usage should be used together to learn the latest model published and how much quota can be leveraged." Today each screen feeds its own system, and no view joins them.
+
+- `/model` feeds the model catalog (`evolve models refresh`). It learns the models and maps them to tiers. Its refresh runs in shadow (`catalog.refresh_stage`), so the live catalog keeps its old models until an operator refreshes it. The shadow catalog first listed Gemini 4 Argon in its fetch of 2026-10-15T23:07Z. The live catalog still named Gemini 3.1 Pro on 2026-10-16.
+- `/usage` feeds the quota windows (`evolve clihealth usage`). It learns the headroom of each pool, but it does not know which tier each pool serves.
+
+### Gap
+
+A new model is useful only if its pool has quota. A pool with quota is useful only if the tiers use its models. With two separate views, an operator must join them by hand. The router cannot join them at all.
+
+### Solution
+
+One joined view, `evolve models capacity`, reads the catalog and the usage windows of every family. It writes one row for each pool:
+
+| Column | Source | Example on 2026-10-17 |
+|---|---|---|
+| family and pool | `/usage` group | `agy` · `GEMINI 4 ARGON` |
+| models in the pool | `/usage` "Models within this group", or the pool name | Gemini 4 Argon |
+| tiers that use the pool | catalog tier map (`/model`) | `deep`, `top` |
+| new since the last live catalog | the shadow catalog against the live catalog | yes: the shadow catalog first listed Argon on 2026-10-15T23:07Z, and no live tier used it |
+| weekly and 5-hour headroom | `/usage` windows | 98.62%, no 5-hour window |
+| reset | `/usage` "Refreshes in" | 167 h |
+
+The view gives three signals. The boundary runs it, and each signal goes to the wave notes:
+
+1. **New model, no tier.** The shadow catalog has a model that no live tier uses. The operator then decides on a refresh or a pin (§6).
+2. **Tier on an empty pool.** A live tier maps to a model whose pool has less than `capacity.empty_below_pct` weekly headroom (start value: 5). The router then skips it (Q2, Q3), and the note says why.
+3. **Unused headroom.** A pool has more than `capacity.idle_above_pct` weekly headroom (start value: 50). No live tier used it in the last wave. The operator then reviews the chain order, as for Argon on 2026-10-17.
+
+Both values are start values in `.evolve/policy.json`, not in code. Tune them from the wave-note telemetry (P5).
+
+**Why join them at the boundary.** Each screen needs a pane and a few seconds. The boundary already refreshes the catalog in shadow and probes the CLIs, so one more read there costs little. A read in each dispatch adds that time to every phase.
+
+**Where it plugs in.** Q5 adds one read-only step to `evolve wave next`, after the catalog shadow refresh and before the wave goal is written. The step appends the three signals to the wave notes. It never fails the wave, and it changes no cycle state.
+
 ## 7. Decisions
 
 | Id | Decision | Facts |
@@ -152,6 +237,9 @@ Scores are 1 (worst) to 5 (best).
 | D6 | The advisor raises a build to `deep` only for the four risk classes of §5. | T2 |
 | D7 | `fast` stays unused until a measurement shows no quality loss. | T1 |
 | D8 | A pin that names a model that the CLI does not offer makes `Refresh` return an error. The catalog does not fall back to the detect map. | M2 weakness |
+| D9 | The quota pool from `/usage` is the unit of the bench and of the chain order. | §6a |
+| D10 | Every agy launch passes `--model`. A launch without a tier gets the `fast` model of the agy manifest (today `Gemini 3.8 Flash (Low)`). | U2 |
+| D11 | One joined view, `evolve models capacity`, reads `/model` (the catalog) and `/usage` (the windows). A read-only step of `wave next` runs it and writes three signals to the wave notes. Its thresholds are policy keys. | §6b |
 
 ## 8. Components and order
 
@@ -159,14 +247,21 @@ Scores are 1 (worst) to 5 (best).
 |---|---|---|---|
 | P1 | D4: the manifest maps agy `top` to `Gemini 4 Argon (Medium)`, and the pin test follows | `TestAgyTierModelsPinnedToVerifiedNames` expects Medium at `top` | — |
 | P2 | D3 and D8: a `catalog.tier_pins` field in the strict policy schema, a `TierPins` field on `RefreshDeps`, and the pin step in `liveTiers` | Red tests: a refresh with a pin returns the pinned model. A pin to an absent model makes `Refresh` return an error. A pin applies when the prior is reusable. A changed pin changes the fingerprint. | — |
-| P3 | the per-model bench fix | the tests of inbox `agy-model-429-benches-whole-family` | — |
-| P4 | D2 and D5: `agy` returns to `tiers.deep` and `tiers.top` | `evolve cli-routing explain debugger` shows `agy-claude → agy → claude` | P2, P3 |
+| Q1 | the `/usage` reader reads every agy 1.4.0 group and label, and finds why `clihealth usage agy` read no window | a fixture of the 1.4.0 screen gives three pools with 91.90, 0.00 and 98.62 | — |
+| Q2 | D9: a `GEMINI 4 ARGON` scope with `per_model: true`, and a bench that honours a model-scoped window. This is the fix of inbox `agy-model-429-benches-whole-family` | an Argon wall benches the Argon pool, and a Flash dispatch still runs; the tests of that inbox item | Q1 |
+| Q3 | D9: `cliroute.Router.Resolve` orders the families inside one tier by weekly headroom, from an injected usage-window source. The floor seats keep Claude Code only. This amends ADR-0119, whose `Resolve` never re-reads | with `agy-claude` at 0% and `agy` at 98%, a `deep` chain starts with `agy` | Q2, P4 |
+| Q4 | D10: a valid model for every agy launch, also for the `agy -p` doctor probe and for a launch whose tier token does not resolve | each such launch argv carries the manifest's `fast` model | — |
+| Q5 | D11: `evolve models capacity` joins the catalog and the usage windows, one row for each pool, with the three signals. It adds the subcommand to the `evolve models` usage line, the `capacity.empty_below_pct` and `capacity.idle_above_pct` policy keys, and a read-only step in `wave next` | a fixture catalog with a new shadow model and a fixture `/usage` screen give the three signals. `wave next --dry-run` lists the step | Q1 |
+| P4 | D2 and D5: `agy` returns to `tiers.deep` and `tiers.top` | `evolve cli-routing explain debugger` shows `agy-claude → agy → claude` | P2, Q2 |
 | P5 | D6: the advisor rule for `deep` builds | the advisor test: a build with no risk class stays `balanced` | the CI plan's C1, for the measure |
 
-The order is P1, P2, P3, P4, P5.
+The order is P1, P2, Q4, Q1, Q5, Q2, P4, Q3, P5.
 1. P1 and P2 are safe now. `agy` is out of the `deep` and `top` chains (T5), so they change no dispatch.
-2. P3 must come before P4, or one Argon wall benches all of agy again (T4).
-3. P5 waits for the telemetry, so its effect has a measure.
+2. Q4 stops the hidden spend of the Argon pool (U2), so it comes early.
+3. Q1 and Q2 (the pool bench) must come before P4, or one Argon wall benches all of agy again (T4).
+4. Q5 comes right after Q1, because it needs the reader. It gives the operator the joined view before the router acts on it.
+5. Q3 comes after P4, because it orders a chain that holds `agy`.
+6. P5 waits for the telemetry, so its effect has a measure.
 
 ## 9. Verification
 

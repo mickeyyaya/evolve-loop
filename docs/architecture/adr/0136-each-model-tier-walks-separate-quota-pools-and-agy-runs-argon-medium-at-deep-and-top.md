@@ -3,12 +3,13 @@
 - **Status:** Proposed (2026-10-17).
 - **Plan:** [model-tier-policy-2026-10](../../plans/model-tier-policy-2026-10.md). **Spec of record:** [model-routing](../../reference/model-routing.md), section "The tier policy".
 - **Relates to:**
-  - [ADR-0119](0119-one-routing-table-one-resolver.md): one routing table decides every dispatch. This ADR sets the order inside that table.
+  - [ADR-0119](0119-one-routing-table-one-resolver.md): one routing table decides every dispatch. This ADR sets the order inside that table. Decision 12 amends ADR-0119: `Resolve` then reads an injected usage-window source on each call.
 - **Evidence:**
   - T3: agy counts quota in separate pools. Argon was empty for 148 h while Flash still answered.
   - T4: one Argon wall benched all of agy, and a whole wave ran on Claude Code.
   - T7, T8: the live catalog picked Argon (High) for `top`, and no setting can fix one tier of one family.
   - T10: the floor seats need Claude Code quota in every cycle.
+  - §6a: agy's `/usage` screen names three pools. Argon has its own pool, and the bridge reader cannot see it.
 
 ## Context
 
@@ -28,6 +29,10 @@ Two technical facts shape the mechanism. agy carries its effort in the model nam
 8. A pin to a model that the CLI does not offer makes the refresh fail.
 9. `agy` returns to the `deep` and `top` chains only after the per-model bench fix.
 10. The advisor raises a build to `deep` only for four named risk classes.
+11. The quota pool, read from agy's `/usage` screen, is the unit of the bench.
+12. Inside one tier, the router tries the family with the most headroom first.
+13. Every agy launch passes `--model`, so a probe uses the Flash pool.
+14. Each boundary joins `/model` and `/usage` into one view of models, tiers and headroom.
 
 ## Consequences
 
@@ -45,6 +50,8 @@ Two technical facts shape the mechanism. agy carries its effort in the model nam
 **What changes this decision:**
 - If the audit pass rate of Argon `deep` work falls below the `balanced` baseline, Argon moves after Claude Code in the chain.
 - If agy merges its pools, the chain rule needs a new check.
+
+The choice of a model inside a family stays with the catalog (decisions 5 and 6). The headroom order of decision 12 chooses between families only.
 
 ## Rejected
 
