@@ -1,0 +1,23 @@
+{
+  "created_at": "2026-10-17T03:40:00Z",
+  "kind": "feature",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "weight": 1.0,
+  "campaign": "wave-orchestrator",
+  "source": "operator, 2026-10-17 ('Document and research first and make sure it can scale to large fleet number in parallel'; 'prioritize them with high prioritization')",
+  "id": "wave-orchestrator-design-set",
+  "title": "Design set for a wave orchestrator that scales to a large parallel fleet",
+  "summary": "The five wave-orchestrator items need one design before code. An audit on 2026-10-17 found: no wave-level supervisor (fleet.Supervisor is fire-and-wait, no CycleTimeout on the wave path), width bound by plan supply (the wave seed is the previous triage with top_n=1, widened only by inbox cards with files), PartitionGraph and PrefixQueue unwired, quota read once before the wave, and RunPool behind a non-default setting with a nil onTransition hook.",
+  "fix": "Write docs/research/wave-orchestrator-2026-10.md (live online research on fleet scheduling, partitioning and merge queues), docs/plans/wave-orchestrator-2026-10.md with at least three approaches scored, an ADR and docs/architecture/wave-orchestrator.md, all through the docs-write skill. The design must state how it scales from 4 lanes to a large fleet (N far above 4): admission, partitioning, oversight cost per lane, quota and landing order.",
+  "acceptance": [
+    "The four files exist and `evolve docs ste-lint --strict --changed origin/main --added` reports 0 findings.",
+    "The plan scores at least three approaches and names the winner and the strengths of each alternative.",
+    "The spec gives the cost of each orchestrator step as a function of the lane count N, and names the limit of N with its cause."
+  ],
+  "files": [
+    "docs/research/wave-orchestrator-2026-10.md",
+    "docs/plans/wave-orchestrator-2026-10.md",
+    "docs/architecture/wave-orchestrator.md"
+  ]
+}
