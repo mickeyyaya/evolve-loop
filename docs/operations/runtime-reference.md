@@ -271,6 +271,22 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 > - **Registry lifecycle invariants the above shares with the runtime** (cycle-1515): (1) an item LEAVING the pending pool releases its binding in the same operation — `Promote` to processed/rejected/retry/quarantine (`inboxmover.releaseContinuationOnRetire`) and ship-time consumption (`internal/phases/ship/consume.go`); (2) the read-side belt in `ResolveContinuationForScope` refuses a binding whose scope names no live pending item, but only on RECENT retirement evidence — a retired copy from an EARLIER cycle than the binding means the item was re-filed and rebound after that retirement, so the binding is adopted, not released (an unstamped quarantine copy is still evidence; that is the ordinary shape). Every release preserves before it deletes.
 > - `evolve setup detect [--json]` — onboarding digest (read-only): per-CLI binary/auth-mode/capability-tier/verdict + per-phase current routing + envelope/cross-family/allowed_clis constraints, with `.evolve/policy.json` pins overlaid (`source=policy-pin`) and any floor breach reported as `pin_violation` (a malformed policy → top-level `policy_error`). Backs the in-session `/setup` skill. (Step 9b removed the `evolve setup validate` subcommand + the `llm_config.json` it clamped; the same envelope + allowed_clis clamp now lives in `policy.ValidatePin`, surfaced inline by `detect` and hard-enforced at dispatch.) See [docs/architecture/setup-onboarding.md](../architecture/setup-onboarding.md) + ADR-0051.
 
+> **Split a mixed inbox item (2026-10-18).** `evolve inbox split <id> [--lane-after-console] [--json] [--project-root P]` splits one pending item that names protected files and files that are not protected ([wave orchestrator §4](../architecture/wave-orchestrator.md)). The command files two items, `<id>-console` and `<id>-lane`, and retires the original.
+>
+> - The console part keeps every protected file, the acceptance, and the `route` when the route is a console route.
+> - The lane part holds the files that are not protected. It gets one generated acceptance criterion and the `deps` of the original. With `--lane-after-console`, its `deps` also name the console part.
+> - Both parts carry `split_from: <id>`. The command routes the lane part with the same check as `evolve inbox route-lane`.
+> - The original moves to `inbox/consumed/` with its fields unchanged. Its `consumed.resolution` names both parts. No evidence is deleted.
+> - The command refuses (exit `1`, nothing left filed) an item that is not pending in the inbox root. It also refuses an item that declares no file, only protected files, or only files that are not protected.
+> - The command refuses an item whose `fix`, `acceptance`, `summary` or `description` names a protected path.
+> - The command refuses an item with a stamp that a lifecycle verb wrote. It refuses an item that a pending item names in `deps`. It refuses an item whose lane part the route check refuses.
+> - The command refuses every run while a loop lane is live.
+> - A second run on the same id is refused, because the original is no longer pending.
+> - When the lane route is refused, the command withdraws both parts, so the inbox stays as it was.
+> - Exit `0` split. Exit `1` refused. Exit `2` the inbox or the policy cannot be read or written. Exit `2` also means that both parts are filed but the original is not retired: retire it with `evolve inbox consume`. Exit `10` usage.
+> - `--json` prints `{"original","console","lane"}`.
+
+
 > **Interaction-rule commands (they write):**
 >
 > - `evolve bridge add-rule --cli=NAME --regex=R [--response=KEYS] [--policy=auto_respond|escalate] [--name=N] [--note=T]` appends a prompt rule to the manifest of one CLI. It does no safety check. Exit 10 when `--cli` or `--regex` is absent.

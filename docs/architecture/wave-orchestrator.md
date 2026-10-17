@@ -140,6 +140,8 @@ When the admissible count is below the window, the census publishes `LOOP_ORCH_S
 - The **console part** keeps every protected file, the route and the acceptance that a grader judges.
 - The **lane part** keeps the files that are not protected. It has `deps` on the console part when it needs the console part first.
 
+**State: Built (O2c, 2026-10-18).** `evolve inbox split <id>` and the pure package `internal/inboxsplit` exist. The census that calls `inboxsplit.Proposals` is part of O6 and is not built yet. Until then, the command computes the proposal from the pending item when the console runs it. The split refuses an item whose text names a protected path. Package note: [internal-inboxsplit.md](packages/internal-inboxsplit.md).
+
 The census never routes an item itself. ADR-0074 keeps the routing authority, and the four guards of F2.23 keep the protected files safe.
 
 **The directory rule (built, O2b, 2026-10-17).** A declared directory routes to the console only when it lies inside a protected fragment (ADR-0139 decision 5). `guards.IsProtectedScope` now gives the same answer as `guards.IsProtectedSurface` (`go/internal/guards/integrity_surface.go:180`). Thus `files: ["go/internal/core/"]` is lane work, and `go/internal/bridge/sub/` stays console work.
@@ -446,7 +448,7 @@ Each code goes into the Signal Center registry.
 |---|---|
 | `evolve wave status [--json]` | adds the measures of §11 and the cell table |
 | `evolve wave supply [--json]` | runs the census (§4) read-only and prints its classes and its split proposals |
-| `evolve inbox split <id>` | the console accepts a split proposal (§4) |
+| `evolve inbox split <id> [--lane-after-console] [--json] [--project-root P]` | the console accepts a split proposal (§4). Built (O2c). |
 
 ## 14. Stages
 
@@ -468,7 +470,7 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 | The shadow changes no lane. | `TestAdmit_ShadowRecordsTheWaitAndChangesNothing` | built (O3) |
 | A stop is never a broad kill. | the stop takes the injected process-group stop of the launch, and a test pins that no name match is used | proposed (O5) |
 | The census never routes an item. | `TestSupply_RecordsTheCauseOfEachRefusal` checks that the inbox files do not change | proposed (O6) |
-| A split keeps every protected file in the console part. | `TestInboxSplit_TheConsolePartKeepsEveryProtectedFile` | proposed (O2c) |
+| A split keeps every protected file in the console part. | `TestInboxSplit_TheConsolePartKeepsEveryProtectedFile` | built (O2c) |
 | A bench with a fallback keeps its slot. | `TestQuotaAwareCount_ABenchWithAFallbackKeepsTheLane` | proposed (O1) |
 
 ## Limits
