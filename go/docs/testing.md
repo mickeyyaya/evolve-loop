@@ -339,9 +339,13 @@ schema-filter enforcement) are tracked in `PORTING-LEDGER.md` and map to
 - `make test-integration` — all non-ACS runtime packages with integration,
   race detection, uncached execution and coverage. This includes commit-gate,
   component, fixtures, public-package and trustkernel tests.
-- `make test-e2e` — existing no-race, uncached E2E tier with
-  `e2e evolve_test_phases` and its 45-minute timeout. Live cases retain their
+- `make test-e2e` — no-race, uncached E2E tier with `e2e evolve_test_phases`
+  and its 45-minute timeout. It runs only the tests of files that the `e2e` tag
+  adds. `cmd/e2elist` builds the anchored `-run` pattern from the build tags, so
+  a new e2e file joins the run without a list to edit. Live cases retain their
   individual explicit opt-ins and skip behavior.
+- Every `-race` recipe sets `GORACE=atexit_sleep_ms=0`, which removes the
+  1 s exit sleep of each race binary. The detector still reports each race.
 - `make cover-changed`, `make apicover-check` and `make cover-strict` — hard
   gates over the one profile of the `make test-integration` step. They run no
   test; the separate 85% function diagnostics remain advisory.
