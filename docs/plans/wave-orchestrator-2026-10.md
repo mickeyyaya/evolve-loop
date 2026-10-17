@@ -173,7 +173,7 @@ Scores are 1 (worst) to 5 (best).
 | O4 | D8: the rolling pool is the scheduler under the orchestrator. Its transitions go to the `loop` channel. | `TestOrchestrator_AFreeSlotTakesTheNextAdmissibleTodoAtOnce` | lane |
 | O5 | D9: the lane lease, the heartbeat and the deadline | `TestLease_ALanePastItsDeadlineStopsAndReleasesItsItem` | lane |
 | O6 | D4, D10, D11, D12: the orchestrator loop over the event channels, and the supply census | `TestOrchestrator_WakesOnlyOnEvents`, `TestOrchestrator_ShipLandedFreesTheCells`, `TestSupply_RecordsTheCauseOfEachRefusal` | console (protected: loop) |
-| O7 | D14: width, utilization and the conflict rate in `evolve wave status` | `TestWaveStatus_ReportsTheConflictRate` | lane |
+| O7 | D14: width, utilization and the conflict rate in `evolve wave status`. **Built 2026-10-17:** `internal/wavemeasure`, spec §11, with the baseline of §8. | `TestWaveStatus_ReportsTheConflictRate` | lane |
 | O8 | D13: the adaptive window above width 4. **Deferred:** it has no effect at width 4. It starts when `fleet.count` goes above 6, together with the ADR-0134 group commit (spec §12). | `TestWindow_GrowsOnACleanLandingAndHalvesOnAConflict` | lane, later |
 
 Each component adds its spec section and its package note. Each new package is at 100% coverage in `.cover-strict` and listed in `.apicover-enforce`.
@@ -208,9 +208,9 @@ The inbox holds one item for each group of components, in the campaign `wave-orc
 
 | Goal | Measure | Before | Target |
 |---|---|---|---|
-| G1 | the median realized width over 3 runs, from `evolve wave status --json` | 1–2 (F2.2, F2.4) | ≥ 4 when the supply is ≥ 4 |
-| G2 | landed pairs that needed a rebase or a re-audit, over all landed pairs | not measured. The census found 46 recoveries in 14 days (F2.11) | ≤ 5% |
-| G3 | the busy lane time over the lane slots times the run time | 0.66 at 4 lanes (simulated, F2.13) | ≥ 0.85 at 4 lanes |
+| G1 | the median realized width over 3 runs, from `evolve wave status --json` | 1–2 (F2.2, F2.4). O7 measured 1 for waves 118–120 (spec §11). | ≥ 4 when the supply is ≥ 4 |
+| G2 | landed pairs that needed a rebase or a re-audit, over all landed pairs | The census found 46 recoveries in 14 days (F2.11). O7 measured 0 of 1 landed lanes for each of waves 118–120 (spec §11). | ≤ 5% |
+| G3 | the busy lane time over the lane slots times the run time | 0.66 at 4 lanes (simulated, F2.13). O7 measured 0.32–0.33 at a policy width of 3 for waves 118–120 (spec §11). | ≥ 0.85 at 4 lanes |
 | G4 | the share of stalls and deadlines that the orchestrator acts on before the console does | 0 (F2.15) | 100% |
 | G5 | the spec states the cost of each step as a function of N, and a soak with the simulated driver at N = 16 runs | none | stated, and the soak passes |
 | G6 | each plan records its supply count and the cause of each refusal | none | every plan |

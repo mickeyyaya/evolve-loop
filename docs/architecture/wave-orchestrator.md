@@ -294,19 +294,38 @@ The window never stops a lane in flight. A smaller window only delays the next a
 
 ## 11. Measures
 
-`evolve wave status --json` reports these values for each run. The run record keeps them.
+**State: Built (O7, 2026-10-17).** `evolve wave status --json` reports these values for the current run (`measures`) and for each of the last 3 runs (`runs`, the oldest first). The pure package `internal/wavemeasure` computes them from facts that already exist. The command computes them each time it runs. It writes no record and starts no timer. Package note: [internal-wavemeasure.md](packages/internal-wavemeasure.md).
 
-| Measure | Definition |
-|---|---|
-| `width_sized` | the window after sizing |
-| `width_realized` | the median of the lanes in flight over the run time |
-| `utilization` | the busy lane time over `width_sized` times the run time |
-| `supply` | the class counts of the last census (§4) |
-| `admission_waits` | the todos that waited for a cell, and the median wait |
-| `conflict_rate` | landed lanes that needed a rebase or a re-audit, over all landed lanes |
-| `deadline_stops` | the lanes that the lease stopped |
+| Measure | Definition | Source |
+|---|---|---|
+| `width_sized` | the width after the quota shrink and the budget | the last `loop.wave` record with `fields.width_sized` in the run, else `fleet.count` (`width_source`: `signal` or `policy`) |
+| `width_realized` | the time-weighted median of the lanes in flight over the run time. Idle time counts as width 0. | the lane intervals |
+| `utilization` | the busy lane time over `width_sized` times the run time | the lane intervals |
+| `conflict_rate` | the landed lanes that needed a rebase or a re-audit at landing, over all landed lanes (`conflicts`, `landed`) | `recoverFromShipError` calls `recordShipError` before it recovers. A lane that rebased and then landed thus still holds the event: a `ship.error` with `SHIP_GIT_FLEET_REBASE_NEEDED`, `SHIP_GIT_FLEET_REBASE_CONFLICT` or `SHIP_AUDIT_BINDING_HEAD_MOVED` in the lane's stream |
+| `admission_waits` | the todos that waited for a cell. It is 0 until O3 registers its code. | the count of `LOOP_ORCH_ADMIT_WAIT` in the run |
+| `deadline_stops` | the lanes that the lease stopped | not built: it arrives with O5, which emits `LOOP_ORCH_LANE_DEADLINE` |
+| `supply` | the class counts of the last census (§4) | not built: O6 adds it |
+
+The facts:
+
+- **The run window.** It starts at the `started_at` of the wave record. It ends at `ended_at`, else at the next record's `started_at`. A current run whose loop is not live ends at the mtime of its loop log. `wave next` uses the same rule to close a wave.
+- **The one exception to "reads state and signals".** `wave status` reads the mtime of the loop log for the run end. It reads the metadata only, never the text. A live run ends at the clock.
+- **A lane interval.** It is the span of the cycle's signals: from the first event to `cycle.sealed`. The phase times of the cycle dossier widen it. A lane with no seal and no dossier is in flight, and it ends at the end of the run window.
+- **The sized width.** The loop writes one INFO `loop.wave` record at each sizing, with `fields.width_sized` and `fields.desired`, to `.evolve/signals.ndjson`. Before O7, no record held the sized width. The loop log has the line `wave count X -> Y`, but `wave status` reads state and signals, never the text log. A run from before O7 thus shows `width_source: policy`.
 
 The conflict rate is the main measure of G2 (P3.3, P3.8). No outside source gives a good predictor of conflicts, so the loop measures its own rate.
+
+### The baseline before O4
+
+Measured on 2026-10-17 on the runtime plane, read-only, with the O7 binary (`evolve wave status --json --project-root <runtime>`):
+
+| Wave | Cycles | `width_sized` (source) | `width_realized` | `utilization` | `conflicts` / `landed` |
+|---|---|---|---|---|---|
+| 118 | 1923 | 3 (policy) | 1 | 0.32 | 0 / 1 |
+| 119 | 1924 | 3 (policy) | 1 | 0.32 | 0 / 1 |
+| 120 | 1925 | 3 (policy) | 1 | 0.33 | 0 / 1 |
+
+The loop log of each of the three runs has `wave count 3 -> 2`, because `agy-claude` was benched. With the sized width 2, the utilization is 0.48 to 0.49. Each run fell back to one sequential cycle (`LOOP_WAVE_DISPATCH_FAILED`: fewer than 2 file-disjoint todos). Thus the realized width is 1, and no lane landed on a moved `main`.
 
 ## 12. Scale
 

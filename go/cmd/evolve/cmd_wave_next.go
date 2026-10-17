@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
@@ -325,10 +326,21 @@ func closeLastWave(env waveEnv, plan *wavePlan) error {
 		return nil
 	}
 	closed := *plan.last
-	ended := env.now()
-	if info, err := os.Stat(closed.LogPath); err == nil && closed.LogPath != "" {
-		ended = info.ModTime().UTC()
+	ended, ok := waveLogEnded(closed)
+	if !ok {
+		ended = env.now()
 	}
 	closed.EndedAt, closed.Outcome = &ended, plan.facts.Outcome()
 	return plan.plane.store.Save(closed)
+}
+
+func waveLogEnded(r wave.Record) (time.Time, bool) {
+	if r.LogPath == "" {
+		return time.Time{}, false
+	}
+	info, err := os.Stat(r.LogPath)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return info.ModTime().UTC(), true
 }

@@ -65,3 +65,4 @@
 ./internal/codeindex 100
 ./internal/codeindex/codeindextest 100
 ./internal/adapters/codeindex/trail 100
+./internal/wavemeasure 100
