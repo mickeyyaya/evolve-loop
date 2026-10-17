@@ -105,6 +105,26 @@ Each method returns `(hits, error)`. The typed error `ErrNotFound` (planned) mea
 | `gopls` | later | P3.5: type-checked, but its CLI is experimental and its start-up cost is not measured (C8) |
 | native Go index | later | the most work, and it adds a library to `go.mod` |
 
+### Adapt the layer to any search algorithm
+
+On 2026-10-17 the operator asked: "build the cli layer as abstract layer which can be adapted to different indexing fast code search algorithm for llm". So a new algorithm must plug in as data and one new package, with no change to the commands. Four rules make that true:
+
+1. **One result type.** Every backend returns the same `Hit`: `file`, `line`, `symbol` and a short `text`. A command prints hits in one format, whatever the backend.
+2. **Declared capabilities.** Each backend says which of the four queries it serves (`Capabilities()`, planned). A call graph serves `callers`. A text or embedding search serves `find` only. A command that no backend serves exits 3 with the message "no backend serves `<command>`".
+3. **A backend set, chosen by config.** `main` builds a `Backends` set from the policy key `code_index.backends` (planned), an ordered list such as `["trail"]`. For each query, the first backend in the list that serves it answers. This is the Chain of Responsibility pattern over the Strategy interface. There is no `init()` registry: the set is built and injected, as ADR-0137 asks for the bridge.
+4. **One conformance suite.** A shared test suite (planned) runs the same cases on every backend. A new backend is done when it passes the suite.
+
+   The cases are a known caller, a known file API, a query with no answer (`ErrNotFound`) and an absent index (`ErrAbsent`).
+
+| Example backend | Algorithm | Serves | Cost to add |
+|---|---|---|---|
+| `trail` | tree-sitter graph, pre-built | `callers`, `api`, `find`, `map` | K1 |
+| `gopls` | type-checked call hierarchy | `callers`, `api`, `find` | one adapter package |
+| `native` | Go analysis call graph, built at the boundary | `callers`, `api` | one package and one `go.mod` library |
+| `grep` | text search over the index worktree | `find` | one small package, and a safe last entry in the list |
+
+**Why a chain and not one backend.** No single algorithm is the best at every query. A type-checked graph is exact for `callers`, and a text or embedding search is better for `find` when the agent knows only some words. With a chain, the operator puts the best backend for each query first, and a cheap one last.
+
 The decision to change the backend belongs to the usage log. If the agents call the commands but the answers fail for injected functions, a type-checked backend replaces trail-code (ADR-0138, "What changes this decision").
 
 ## 3. The trail-code adapter

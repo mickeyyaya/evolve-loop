@@ -104,7 +104,7 @@ C and D score 3 for G2, because the per-call latency of `gopls` and the build ti
 | Id | Decision | Research id |
 |---|---|---|
 | D1 | `evolve code` has four read-only commands: `callers`, `api`, `find` and `map`. | C6, R1 |
-| D2 | `evolve code` calls a `Backend` interface. trail-code is its first implementation. | C7, R3 |
+| D2 | `evolve code` calls a `Backend` interface. trail-code is its first implementation. Each backend declares the queries it serves, and an ordered set from the policy key `code_index.backends` picks the first backend that serves each query. A shared conformance suite runs on every backend. | C7, R3 |
 | D3 | One adapter package runs the trail-code binary. No other package runs it. It extends the rule of [third-party-dependencies](../conventions/third-party-dependencies.md) from `go.mod` libraries to outside binaries. | C8 |
 | D4 | The layer removes each line of backend output that tells the agent what to do or say. | C6, R2 |
 | D5 | The layer reads the index worktree only. It never refreshes the index inside a phase. The boundary refreshes it. | G4 |

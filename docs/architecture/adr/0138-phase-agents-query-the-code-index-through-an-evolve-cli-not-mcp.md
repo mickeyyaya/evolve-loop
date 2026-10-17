@@ -20,13 +20,15 @@ A shell command reaches every agent of every CLI. It is also an `evolve` verb, a
 
 1. `evolve code` gives four read-only commands: `callers`, `api`, `find` and `map`.
 2. `evolve code` calls a `Backend` interface, and trail-code is its first backend.
-3. One adapter package runs the trail-code binary.
-4. The layer removes each instruction to the agent from the backend output.
-5. The layer reads the index worktree only, and the boundary refreshes it.
-6. Each call appends one record to a usage log.
-7. The scout, builder and debugger prompts name the commands and say when each one helps. The persona edit is a loop change. It is justified because without it the agents made 0 calls (C3, P3.4).
-8. A failed index refresh at the boundary is a warning, never a halt.
-9. The MCP registrations go after one wave with the CLI live.
+3. Each backend declares the queries it serves. An ordered set from the policy picks a backend for each query.
+4. Every backend passes one shared conformance suite.
+5. One adapter package runs the trail-code binary.
+6. The layer removes each instruction to the agent from the backend output.
+7. The layer reads the index worktree only, and the boundary refreshes it.
+8. Each call appends one record to a usage log.
+9. The scout, builder and debugger prompts name the commands and say when each one helps. The persona edit is a loop change. It is justified because without it the agents made 0 calls (C3, P3.4).
+10. A failed index refresh at the boundary is a warning, never a halt.
+11. The MCP registrations go after one wave with the CLI live.
 
 ## Consequences
 
