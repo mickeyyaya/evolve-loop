@@ -29,7 +29,7 @@ func recordWaveSized(signals *signalcenter.Center, n, desired, sized int) {
 
 func measureWaveRuns(plane wavePlaneDirs, records []wave.Record, current []wave.Cycle, live bool, now time.Time) ([]waveRunMeasures, []string) {
 	loop, warnings := wave.ReadLoopSignals(plane.root)
-	policyWidth := loadFleetConfig(plane.evolveDir).Count
+	policyWidth := loadFleetConfig(plane.evolveDir, io.Discard, nilSignals()).Count
 	runs := []waveRunMeasures{}
 	for i := max(0, len(records)-waveMeasuredRuns); i < len(records); i++ {
 		rec, next, cycles := records[i], (*wave.Record)(nil), current
