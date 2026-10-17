@@ -70,6 +70,7 @@ Shortcut `Cmd+Shift+M` or `Ctrl+Shift+M` maximizes the side panel over the conve
 The automations model selector offers `Flash Lite`, `Flash`, or `Pro`.
 The project view adds `Auto Pin` to pin conversations when the user sends a message.
 Users can sign in with `Application Default Credentials` to access `Claude Opus 5.5` and `Claude Sonnet 5.5`.
+The model picker shows `Vertex AI` models when the project has access.
 The release fixes `WebM` media capture errors.
 
 ## 3. Core persona evaluation under ADR-0133

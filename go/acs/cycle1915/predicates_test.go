@@ -79,6 +79,7 @@ func TestC1915_002_DocExplainsV2_24_0AsData(t *testing.T) {
 		"Application Default Credentials",
 		"Claude Opus 5.5",
 		"WebM",
+		"Vertex AI",
 	} {
 		if !strings.Contains(section, item) {
 			t.Errorf("RED: the v2.24.0 section does not explain changelog item %q", item)
