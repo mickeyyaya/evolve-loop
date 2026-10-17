@@ -278,7 +278,7 @@ approaches / decision / results / retro) — lives at
 | [research/practice-claude-prompting-guide-2026-10.md](research/practice-claude-prompting-guide-2026-10.md) | Research: the Claude prompting guide updates (XML structure, effort levels, and medication dosing blocks) read as data. No persona changes before the M2 baseline. |
 | [research/practice-gemini-prompting-guide-2026-10.md](research/practice-gemini-prompting-guide-2026-10.md) | Research: the Gemini prompting guide change (Gemini 4 Argon, the end of custom `temperature`, `top_p` and `top_k`) read as data. The loop sends none of these parameters, and no persona changes before the M2 baseline. |
 | [research/practice-agy-cli-changelog-2026-10.md](research/practice-agy-cli-changelog-2026-10.md) | Research: the agy changelog updates for versions 1.3.4 through 1.4.0 read as data. No persona changes before the M2 baseline. |
-| [research/practice-agy-cli-changelog-page-2026-10.md](research/practice-agy-cli-changelog-page-2026-10.md) | Research: the agy changelog page updates for versions v2.23.0 and v2.23.1 read as data. No persona changes before the M2 baseline. |
+| [research/practice-agy-cli-changelog-page-2026-10.md](research/practice-agy-cli-changelog-page-2026-10.md) | Research: the agy changelog page updates for versions v2.23.0, v2.23.1, and v2.24.0 read as data. No persona changes before the M2 baseline. |
 | [research/practice-claude-model-release-notes-2026-10.md](research/practice-claude-model-release-notes-2026-10.md) | Research: the Claude model release notes updates for Opus 5.5 fast mode rate limits and research preview status read as data. No persona changes before the M2 baseline. |
 
 ## 2026-10-13 — fleet landing at scale: 200 concurrent lanes (ADR-0134)
