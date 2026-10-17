@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/acspathscan"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -214,5 +215,23 @@ func TestRunCycle_AScanFaultIsLoudButTheFindingsStillCount(t *testing.T) {
 	result, _, _, _ := runTDDPredicateCycleWT(t, predicateWritingTDD{body: joinedPersonaPredicate, extraFile: "package cycle10\nfunc ("}, protectsAuditorPersona, oneCardDecision, laneEnv)
 	if !routed(result) {
 		t.Errorf("a broken sibling file must not hide a proven need: %+v", result)
+	}
+}
+
+func TestProtectedRouteMessage_NamesEachPathItsTestAndItsFile(t *testing.T) {
+	t.Parallel()
+	got := ProtectedRouteMessage([]acspathscan.Need{
+		{Path: "agents/evolve-auditor.md", Test: "TestC1933_004", File: "predicates_test.go"},
+		{Path: "go/internal/guards/role.go", Test: "TestC1933_005", File: "more_test.go"},
+	})
+
+	for _, want := range []string{
+		"agents/evolve-auditor.md (read by TestC1933_004 in predicates_test.go)",
+		"go/internal/guards/role.go (read by TestC1933_005 in more_test.go)",
+		"a lane cannot edit it, so the item is console work",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ProtectedRouteMessage = %q, want it to contain %q", got, want)
+		}
 	}
 }

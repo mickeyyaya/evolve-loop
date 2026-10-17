@@ -31,3 +31,11 @@ func TestReadProtectedRoute_RoundTripsWhatWriteProtectedRouteStoresAndRejectsThe
 		t.Error("malformed JSON is not a route")
 	}
 }
+
+func TestProtectedPredicatesDir_IsTheRunDirFolderTheCloseoutRescans(t *testing.T) {
+	t.Parallel()
+	const want = "tdd-protected-predicates"
+	if ProtectedPredicatesDir != want {
+		t.Fatalf("ProtectedPredicatesDir = %q, want %q: the host copy and the closeout re-scan must agree on it", ProtectedPredicatesDir, want)
+	}
+}
