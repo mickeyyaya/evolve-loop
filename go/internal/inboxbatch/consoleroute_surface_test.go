@@ -23,16 +23,13 @@ func routed(t *testing.T, record string) (bool, string) {
 	return inboxbatch.ConsoleRouted(decode(t, record), guards.IsProtectedScope)
 }
 
-func TestConsoleRouted_ReplaysTheEighteenRefusals(t *testing.T) {
+func TestConsoleRouted_ReplaysTheFourteenRefusalsThatNameAProtectedFile(t *testing.T) {
 	cases := []struct {
 		name, record, wantReason string
 	}{
 		{"verdict-sentinel (9 refusals): kind",
 			`{"id":"verdict-sentinel-as-tool-call","kind":"pipeline-integrity","summary":"verdict rides go/internal/bridge/streamjson_verdict.go"}`,
 			"kind:pipeline-integrity"},
-		{"tokenopt (4 refusals): a declared directory holding protected files",
-			`{"id":"tokenopt-handoff-digests-per-edge-remainder","kind":"feature","files":["go/internal/core/","go/internal/phases/runner/","go/internal/phases/"]}`,
-			"protected fix surface: go/internal/core/"},
 		{"settle-wait (3 refusals): no files[], the text names runner.go",
 			`{"id":"nonconforming-deliverable-settle-wait-latency","kind":"perf","files":[],"fix":"bound the settle wait in go/internal/phases/runner/runner.go"}`,
 			"mentions protected path: go/internal/phases/runner/runner.go"},
@@ -129,10 +126,20 @@ func TestConsoleRouted_AnnotationWordsAreNotSurface(t *testing.T) {
 	if ok, reason := routed(t, `{"id":"n","kind":"bug","files":["go/internal/triagecap/topn_width.go (go test)"]}`); ok {
 		t.Errorf("an annotation word routed console: %q", reason)
 	}
-	for _, files := range []string{`["skills/audit"]`, `["go/"]`} {
-		if ok, reason := routed(t, `{"id":"s","kind":"bug","files":`+files+`}`); !ok || !strings.HasPrefix(reason, "protected fix surface: ") {
-			t.Errorf("files=%s: ConsoleRouted = %v %q, want console (the directory holds protected surface)", files, ok, reason)
+	if ok, reason := routed(t, `{"id":"s","kind":"bug","files":["skills/audit"]}`); !ok || !strings.HasPrefix(reason, "protected fix surface: ") {
+		t.Errorf("ConsoleRouted = %v %q, want console (the directory is a protected fragment)", ok, reason)
+	}
+}
+
+func TestConsoleRouted_ADirectoryThatOnlyContainsProtectedFilesIsLaneWork(t *testing.T) {
+	for _, files := range []string{`["go/internal/core/"]`, `["go/"]`, `["go/internal/core/","go/internal/phases/runner/","go/internal/phases/"]`} {
+		if ok, reason := routed(t, `{"id":"d","kind":"feature","files":`+files+`}`); ok {
+			t.Errorf("files=%s: ConsoleRouted = true %q, want lane (no declared path lies inside a fragment)", files, reason)
 		}
+	}
+	ok, reason := routed(t, `{"id":"f","kind":"feature","files":["go/internal/core/","go/internal/core/build_handoff_floor.go"]}`)
+	if !ok || reason != "protected fix surface: go/internal/core/build_handoff_floor.go" {
+		t.Errorf("ConsoleRouted = %v %q, want console naming the protected core file", ok, reason)
 	}
 }
 

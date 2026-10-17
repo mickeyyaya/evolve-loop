@@ -5,18 +5,19 @@ import (
 	"testing"
 )
 
-func TestIsProtectedScope_DirectorySpellingCoversTheSurfaceInside(t *testing.T) {
-	inScope := []string{
+func TestIsProtectedScope_ADirectoryThatOnlyContainsAFragmentIsNotProtected(t *testing.T) {
+	containsOnly := []string{
 		"go/internal/core/",
 		"go/internal/phases/runner/",
 		"go/internal/phases/",
 		"/wt/go/internal/phases/runner",
 		"Go/Internal/Core/",
 		"go/",
+		"go/internal/core/../../internal/",
 	}
-	for _, p := range inScope {
-		if !IsProtectedScope(p) {
-			t.Errorf("IsProtectedScope(%q) = false, want true (the directory contains protected surface)", p)
+	for _, p := range containsOnly {
+		if IsProtectedScope(p) {
+			t.Errorf("IsProtectedScope(%q) = true, want false (the directory only contains protected surface)", p)
 		}
 	}
 	outOfScope := []string{
@@ -27,10 +28,43 @@ func TestIsProtectedScope_DirectorySpellingCoversTheSurfaceInside(t *testing.T) 
 		"phases/runner",
 		"shadow/enforce",
 		"/",
+		"",
+		".",
+		"go",
 	}
 	for _, p := range outOfScope {
 		if IsProtectedScope(p) {
 			t.Errorf("IsProtectedScope(%q) = true, want false (must not over-block)", p)
+		}
+	}
+}
+
+func TestIsProtectedScope_ADirectoryInsideAFragmentIsProtected(t *testing.T) {
+	inside := []string{
+		"go/internal/bridge/sub/",
+		"go/internal/bridge/",
+		"go/internal/bridge",
+		"/wt/go/internal/phases/runner/verdict/settle",
+		"Skills/Audit/references/",
+		"go/internal/core/../bridge/sub/",
+	}
+	for _, p := range inside {
+		if !IsProtectedScope(p) {
+			t.Errorf("IsProtectedScope(%q) = false, want true (the directory lies inside a protected fragment)", p)
+		}
+	}
+}
+
+func TestIsProtectedScope_AProtectedFileSpellingIsProtected(t *testing.T) {
+	files := []string{
+		"go/internal/core/build_handoff_floor.go",
+		"go/internal/phases/runner/runner.go",
+		"/wt/go/internal/guards/role.go",
+		"skills/audit/SKILL.md",
+	}
+	for _, p := range files {
+		if !IsProtectedScope(p) {
+			t.Errorf("IsProtectedScope(%q) = false, want true (a protected file stays protected)", p)
 		}
 	}
 }

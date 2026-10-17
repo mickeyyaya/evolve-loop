@@ -139,6 +139,15 @@ Scores are 1 (worst) to 5 (best).
 
 **What changes our mind.** O3 runs in shadow first. If admission by cell costs more than 10% of the width at N = 4, the non-hub cells fall back to files. If O2a and O2b free fewer than 8 items, D moves ahead of O6. The research counts 30–35 (R1a).
 
+**The measured outcome of O2a and O2b (2026-10-17).**
+
+1. O2a (#921) moved 3 of 35 candidates to the lanes.
+2. A strict second review kept the other 32 with the console. Each one changes gate, routing-authority, ledger, phase-config or loop-control logic.
+3. O2b freed 8 items. On the O2b tree, `evolve inbox rank --list ready` showed 1 item before the change and 9 after it.
+4. The 3 items of O2a and the 8 items of O2b are different items. Together, O2a and O2b freed 11 items.
+5. The research estimate of 30–35 was too high. The S-A and S-B estimates counted items that a strict review keeps with the console.
+6. The rule of §4 moves design D ahead of O6 only when O2a and O2b free fewer than 8 items. They freed 11, so D stays after O6 in §7.
+
 ## 5. Decisions
 
 | Id | Decision | Because | Rejected options and why |
@@ -184,7 +193,7 @@ The order is O0, O1, O2a, O2b, O3, O7, O4, O5, O6, O2c, O8.
 
 1. O0 comes first: the operator asked for the design before the code.
 2. O1 gives back the lost lane at once, with the smallest change.
-3. O2a and O2b restore the supply. Without supply, no other component fills a slot. O2a is data only, so it can land at the next boundary.
+3. O2a and O2b restore the supply. Without supply, no other component fills a slot. O2a is data only, so it can land at the next boundary. Together they freed 11 items, not 30–35 (§4, the measured outcome).
 4. O3 keeps the extra lanes apart before the pool makes them run longer together.
 5. O7 adds the measures, so O4 to O8 each have a before and an after.
 6. O4 and O5 change how lanes run. The lease comes with the pool, so a backfilled slot has a deadline.
