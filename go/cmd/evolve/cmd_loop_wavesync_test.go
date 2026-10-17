@@ -36,7 +36,7 @@ func syncFixture(t *testing.T) (origin, runtime string) {
 		r.Git("add", "f.txt")
 		r.Git("commit", "-q", "-m", "c1")
 		orig := filepath.Join(r.Dir, "origin.git")
-		r.Git("clone", "-q", "--bare", ".", orig)
+		r.CloneBare(".", orig)
 		rt := filepath.Join(r.Dir, "runtime")
 		r.Git("clone", "-q", orig, rt)
 		return os.RemoveAll(filepath.Join(r.Dir, ".git"))

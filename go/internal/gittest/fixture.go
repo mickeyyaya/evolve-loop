@@ -76,6 +76,16 @@ func Clone(tb testing.TB, src string) *Repo {
 	return r
 }
 
+func (r *Repo) CloneBare(src, dst string) *Repo {
+	r.tb.Helper()
+	args := []string{"clone", "-q", "--bare"}
+	for _, kv := range quietConfig {
+		args = append(args, "-c", kv[0]+"="+kv[1])
+	}
+	r.Git(append(args, src, dst)...)
+	return &Repo{Dir: dst, tb: r.tb}
+}
+
 func ConfigEnv(extra ...[2]string) []string {
 	pairs := slices.Concat(maintenanceConfig, extra)
 	env := []string{"GIT_CONFIG_COUNT=" + strconv.Itoa(len(pairs))}
