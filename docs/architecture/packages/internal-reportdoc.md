@@ -20,6 +20,9 @@
 ## Invariants
 
 - Examples inside fences, indented blocks and HTML comments never raise a finding or declare a verdict. Pinned by `TestFindings_IgnoresFencedIndentedAndCommentedExamples` and `TestSection_UsesOnlyVisibleUniqueHeadings`.
+- An indented line that directly follows paragraph or list-item text is a continuation of that text.
+  CommonMark section 4.4 requires this: an indented code block cannot interrupt a paragraph.
+  After a blank line, a heading, a thematic break, a fence or another indented code line, it stays hidden as code. Pinned by `TestVisibleLines_IndentedLineIsCodeOnlyWhenItCannotContinueAParagraph` and `TestValidateDocument_FourSpaceChangedAreasContinuationPassesTheWholeDocument`.
 - A duplicated visible heading is a finding, and `HasSection` still reports it present. Pinned by `TestSection_RejectsDuplicateVisibleHeading`.
 - Absence is never laxer than thinness. Pinned by `TestReasonedReview_AbsenceIsNeverLaxerThanThinness` and `TestReasonedReview_GarbledBoilerplateWithoutEvidenceFailsTheFloor`.
 - A prose line without a colon is not a verdict, and the verdict grammar matches the audit gate's fallback. Pinned by `TestVerdict_MatchesTheAuditGatesProseFallback`.

@@ -265,3 +265,24 @@ func TestValidateDocument_WrappedAndGroupedChangedAreasPassTheWholeDocument(t *t
 		t.Errorf("failures = %v, want none: wrapped and grouped bullets reach the item reader through the real section extraction", got)
 	}
 }
+
+func TestValidateDocument_FourSpaceChangedAreasContinuationPassesTheWholeDocument(t *testing.T) {
+	base := strings.Repeat("a", 40)
+	body := "# Build Explanation — Cycle 42\n\n" +
+		"## Build Binding\n- Cycle: 42\n- Base SHA: " + base + "\n\n" +
+		"## Summary\nSplits checkAll into named steps under the size limit.\n\n" +
+		"## Rationale\nNamed steps keep each function under the limit without changing behavior.\n\n" +
+		"## Changed Areas\n" +
+		"- `go/internal/phasecoherence/coherence.go` —\n" +
+		"    migrates `checkAll` into named steps under the 50-line limit.\n" +
+		"- `go/acs/cycle1768/helpers_test.go`,\n" +
+		"    `go/acs/cycle1768/predicates_test.go` — the cycle's predicates for the shrink.\n\n" +
+		"## Design Decisions\nEach step keeps the original order of checks.\n\n" +
+		"## Verification\nThe package tests and the cycle predicates pass unchanged.\n\n" +
+		"## Compatibility\nNo exported behavior changes.\n\n" +
+		"## Limitations\nOnly the one function is split.\n"
+
+	if got := validateDocument(body, 42, base, coverChanged, coverMaterial); len(got) != 0 {
+		t.Errorf("failures = %v, want none: a four-space continuation is paragraph text, not indented code", got)
+	}
+}
