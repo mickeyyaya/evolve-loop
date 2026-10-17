@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
@@ -27,11 +28,14 @@ var (
 )
 
 type Cycle struct {
-	ID          int    `json:"id"`
-	Phase       string `json:"phase,omitempty"`
-	Verdict     string `json:"verdict,omitempty"`
-	Shipped     bool   `json:"shipped"`
-	QuotaPauses int    `json:"quota_pauses"`
+	ID          int       `json:"id"`
+	Phase       string    `json:"phase,omitempty"`
+	Verdict     string    `json:"verdict,omitempty"`
+	Shipped     bool      `json:"shipped"`
+	QuotaPauses int       `json:"quota_pauses"`
+	Conflict    bool      `json:"conflict,omitempty"`
+	StartedAt   time.Time `json:"-"`
+	EndedAt     time.Time `json:"-"`
 }
 
 type cycleWindow struct{ floor, ceiling int }
@@ -108,6 +112,7 @@ func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossi
 			c.Verdict = d.FinalVerdict
 		}
 		c.Shipped = c.Shipped || d.CommitSHA != ""
+		c.StartedAt, c.EndedAt = phaseSpan(c.StartedAt, c.EndedAt, d.Phases)
 	}
 	return c, warnings
 }
@@ -150,11 +155,14 @@ func applySignals(c *Cycle, path string) []string {
 		return []string{fmt.Sprintf("cycle-%d: %v", c.ID, err)}
 	}
 	for _, e := range chunk.Events {
+		c.StartedAt = earliest(c.StartedAt, eventTime(e))
 		switch e.Kind {
 		case signalcenter.KindCycleSealed:
-			c.Verdict = e.Fields[sealedVerdictField]
+			c.Verdict, c.EndedAt = e.Fields[sealedVerdictField], eventTime(e)
 		case signalcenter.KindQuotaPaused:
 			c.QuotaPauses++
+		case signalcenter.KindShipError:
+			c.Conflict = c.Conflict || landingConflicts[e.Code]
 		}
 	}
 	if chunk.Skipped > 0 {

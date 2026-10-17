@@ -34,14 +34,14 @@ func devHubFixtureFromTemplate(t *testing.T, name string, extra func(r *gittest.
 	seed = gittest.FromTemplate(t, name, func(r *gittest.Repo) error {
 		r.Git("commit", "-q", "--allow-empty", "-m", "base")
 		orig := filepath.Join(r.Dir, "_origin.git")
-		r.Git("clone", "-q", "--bare", ".", orig)
+		r.CloneBare(".", orig)
 		r.Git("remote", "add", "origin", orig)
 		if extra != nil {
 			extra(r)
 			r.Git("push", "-q", "origin", "main")
 		}
 		store := filepath.Join(r.Dir, "_store.git")
-		r.Git("clone", "-q", "--bare", orig, store)
+		r.CloneBare(orig, store)
 		for _, kv := range append(gittest.MaintenanceConfig(), [2]string{"user.name", "u"}, [2]string{"user.email", "u@example.com"}) {
 			r.Git("-C", store, "config", kv[0], kv[1])
 		}

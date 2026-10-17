@@ -13,10 +13,12 @@ import (
 var processImports = []string{"os/exec", "github.com/mickeyyaya/evolve-loop/go/internal/sysexec"}
 
 func ExecImporters(root string, dirs ...string) ([]string, error) {
-	return filesWhere(root, dirs, func(file *ast.File) bool {
-		return slices.ContainsFunc(file.Imports, func(imp *ast.ImportSpec) bool {
-			return slices.Contains(processImports, strings.Trim(imp.Path.Value, "\"`"))
-		})
+	return filesWhere(root, dirs, runsAProcess)
+}
+
+func runsAProcess(file *ast.File) bool {
+	return slices.ContainsFunc(file.Imports, func(imp *ast.ImportSpec) bool {
+		return slices.Contains(processImports, strings.Trim(imp.Path.Value, "\"`"))
 	})
 }
 
@@ -43,11 +45,19 @@ func filesWhere(root string, dirs []string, keep func(*ast.File) bool) ([]string
 }
 
 func hasLiteralWith(file *ast.File, want string) bool {
+	return hasLiteral(file, func(value string) bool { return strings.Contains(value, want) })
+}
+
+func hasLiteralEqual(file *ast.File, want string) bool {
+	return hasLiteral(file, func(value string) bool { return value == want })
+}
+
+func hasLiteral(file *ast.File, match func(string) bool) bool {
 	found := false
 	ast.Inspect(file, func(n ast.Node) bool {
 		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
 			value, err := strconv.Unquote(lit.Value)
-			found = found || (err == nil && strings.Contains(value, want))
+			found = found || (err == nil && match(value))
 		}
 		return !found
 	})

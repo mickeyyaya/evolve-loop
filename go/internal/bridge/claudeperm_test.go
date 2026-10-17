@@ -8,12 +8,12 @@ import (
 func TestRealizeFor_ClaudeTmux_AllPermissionModes(t *testing.T) {
 	t.Parallel()
 	cases := map[string][]string{
-		"bypass":      {"--dangerously-skip-permissions"},
-		"plan":        {"--permission-mode", "plan"},
-		"acceptEdits": {"--permission-mode", "acceptEdits"},
-		"default":     {"--permission-mode", "default"},
-		"dontAsk":     {"--permission-mode", "dontAsk"},
-		"auto":        {"--permission-mode", "auto"},
+		"bypass":      {"--strict-mcp-config", "--dangerously-skip-permissions"},
+		"plan":        {"--strict-mcp-config", "--permission-mode", "plan"},
+		"acceptEdits": {"--strict-mcp-config", "--permission-mode", "acceptEdits"},
+		"default":     {"--strict-mcp-config", "--permission-mode", "default"},
+		"dontAsk":     {"--strict-mcp-config", "--permission-mode", "dontAsk"},
+		"auto":        {"--strict-mcp-config", "--permission-mode", "auto"},
 	}
 	for mode, want := range cases {
 		t.Run(mode, func(t *testing.T) {

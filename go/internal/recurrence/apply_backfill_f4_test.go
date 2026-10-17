@@ -2,6 +2,7 @@ package recurrence
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,19 +32,14 @@ func optionsF4(inbox string) ApplyOptions {
 func TestApplyIntent_EscalationThatCannotBeWrittenIsAnErrorAndRecordsNoBump(t *testing.T) {
 	inbox := filepath.Join(t.TempDir(), "inbox")
 	path := openItemF4(t, inbox, "flaky", 0.1)
-	if err := os.Chmod(inbox, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(inbox, 0o755) })
-	if f, err := os.CreateTemp(inbox, "probe"); err == nil {
-		f.Close()
-		t.Skip("directory permissions are not enforced for this user")
-	}
+	writeFault := errors.New("item write failed")
+	opts := optionsF4(inbox)
+	opts.Reweight = func(string, float64) error { return writeFault }
 	var res ApplyResult
 
-	consumed, err := applyIntent(optionsF4(inbox), dispositionrouter.Intent{Action: dispositionrouter.ActionEscalate, ItemID: "flaky", Recurrence: 9, Weight: 1.0}, &res)
+	consumed, err := applyIntent(opts, dispositionrouter.Intent{Action: dispositionrouter.ActionEscalate, ItemID: "flaky", Recurrence: 9, Weight: 1.0}, &res)
 
-	if err == nil || consumed {
+	if !errors.Is(err, writeFault) || consumed {
 		t.Fatalf("consumed=%v err=%v", consumed, err)
 	}
 	if len(res.Bumped) != 0 {

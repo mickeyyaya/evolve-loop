@@ -45,7 +45,19 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "TestMain: set TMUX_TMPDIR: %v\n", err)
 		os.Exit(1)
 	}
+	usageDir, err := os.MkdirTemp("", "evcodeusage")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: isolate the code usage log: %v\n", err)
+		if rmErr := os.RemoveAll(tmuxTmp); rmErr != nil {
+			fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", tmuxTmp, rmErr)
+		}
+		os.Exit(1)
+	}
+	codeUsageCacheDir = func() (string, error) { return usageDir, nil }
 	code := m.Run()
+	if err := os.RemoveAll(usageDir); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", usageDir, err)
+	}
 	if err := builtBinaries.Close(); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove the built binaries: %v\n", err)
 	}

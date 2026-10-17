@@ -1,0 +1,33 @@
+{
+  "created_at": "2026-10-17T13:10:00Z",
+  "kind": "bug",
+  "priority_class": "stability",
+  "weight": 0.9,
+  "campaign": "wave-orchestrator",
+  "source": "console, wave 122 (2026-10-17): 4 lanes at once for the first time; load average 15-18 on the 14-CPU host",
+  "id": "lane-test-floors-oversubscribe-the-host",
+  "title": "Each lane's go test floor runs at full host parallelism, so 4 lanes ask for about 56 CPU-bound processes on 14 cores and Claude REPLs time out",
+  "summary": "In wave 122 (4 lanes), cycle 1931's ship floor ran `go test -json -count=1 -timeout 20m ./internal/core` at 634% CPU (ps, 2026-10-17 21:02), and the load average was 15-18 on 14 CPUs. go test defaults -p and GOMAXPROCS to the host CPU count, so each lane alone can fill the host. Only ciparitygate passes -p (go/internal/phases/audit/ciparitygate/tier.go:19). The ship repo-contract pack (go/internal/phases/ship/repocontract.go, repocontract_importers.go), the ACS suite (go/internal/acssuite, go/internal/acsrunner) and the task contract runner (go/internal/core/task_contract.go) run uncapped. The same oversubscription caused two Claude REPL boot timeouts (exit 80) earlier on 2026-10-17: cycle 1928's build and the boundary's doctor live (see inbox boot-timeout-reported-as-all-families-exhausted). This is the host limit of the wave-orchestrator spec section 12, reached at width 4. A review found more uncapped sites: core/build_floor_reviewer.go:281 (the added-tests floor) and :319 (cover-changed), core/phase_bindings_selfcheck.go:80 and :84, ciparitygate/apicover.go:95, ciparitygate/command.go:25 (the acs regression run), ciparity/ciparity.go:99 (the coverage run), commitgate/lanes.go:108, task_contract.go:202 (go test -list still compiles), and gotooltest/cache.go:42 (to check). ciparitygate/tier.go uses a fixed tierParallelism of 4, so at width 4 it still asks for 16 packages.",
+  "fix": "Give every go test that a lane runs one CPU budget: procs = max(1, host CPUs / fleet width), from one helper (a lanebudget function the orchestrator owns), applied as both `-p procs` and `GOMAXPROCS=procs` in the child env, and `-parallel procs`. Route the ship repo-contract pack, the ACS suite, the task contract runner, the build-floor scanners and ciparitygate through that helper, so no lane call site builds its own go test argv. The fleet width comes from the live sizing (fleet.count after the shrink); console runs outside a lane keep the default. Add the budget to the wave-orchestrator spec section 12. -p and -parallel multiply (a budget of 3 can still run about 9 test goroutines), so GOMAXPROCS in the child env is required: it is the only bound on the compiler, the linker and CPU use inside a test binary. Keep the floor at 1. releasepreflight/releasepreflight.go:193 runs on the console side and is exempt by name in the structure test.",
+  "acceptance": [
+    "A structure test fails when a non-test file under go/internal builds a `go test` argv without the lane budget helper.",
+    "With host CPUs 14 and width 4, the helper gives -p 3, -parallel 3 and GOMAXPROCS=3 to each lane's go test (a unit test with an injected CPU count).",
+    "A live wave at width 4 keeps the load average under the host CPU count during the test floors (measured with uptime and `evolve wave status` measures).",
+    "When the width is unset (a console run), the helper adds none of -p, -parallel or GOMAXPROCS."
+  ],
+  "files": [
+    "go/internal/phases/ship/repocontract.go",
+    "go/internal/phases/ship/repocontract_importers.go",
+    "go/internal/acssuite/acssuite.go",
+    "go/internal/acsrunner/runner.go",
+    "go/internal/core/task_contract.go",
+    "go/internal/phases/audit/ciparitygate/tier.go",
+    "go/internal/core/build_floor_reviewer.go",
+    "go/internal/core/phase_bindings_selfcheck.go",
+    "go/internal/phases/audit/ciparitygate/apicover.go",
+    "go/internal/phases/audit/ciparitygate/command.go",
+    "go/internal/ciparity/ciparity.go",
+    "go/internal/commitgate/lanes.go",
+    "go/internal/gotooltest/cache.go"
+  ]
+}
