@@ -8,6 +8,8 @@
 
 **Status (2026-10-09):** `PrefixQueue` has no production caller, and `PartitionGraph` is not wired into dispatch. [ADR-0128](../adr/0128-landing-queue-tiered-reverification.md) replaces the composer with a durable landing queue, and it wires `PartitionGraph` with a narrower rule.
 
+**Proposed (2026-10-17):** the [wave orchestrator](../wave-orchestrator.md) ([ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md)) runs `RunPool` as the scheduler and `PartitionGraph` as admission by cell. It also corrects the quota shrink: `Engine.Size` passes every active bench today, not the intersection that the "Quota shrink" bullet names (research F2.3).
+
 ## Design
 
 - **Fleet mode is an env contract.** Every launch path forces `EVOLVE_FLEET=1` (`ipcenv.FleetKey`) on a copy of the spec env and advertises the effective width in `ipcenv.FleetWidthKey`, which `core.shipRecoveryBudget` uses to scale contention-class ship retries. Under fleet mode the orchestrator skips the whole-cycle project lock. Per-resource flocks (`state.json`, the ledger chain, `.evolve/ship.lock`) serialize the shared writes, and each cycle's own worktree, `run.json` reads and run-scoped audit binding keep it isolated (ADR-0049 S2–S6).
