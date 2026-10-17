@@ -121,7 +121,7 @@ func TestClaudeTmux_ClaudeCmd_PermissionModePlan(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil)
-	if !tmux.sentContains("claude --model haiku --permission-mode plan") {
+	if !tmux.sentContains("claude --strict-mcp-config --model haiku --permission-mode plan") {
 		t.Fatalf("claude_cmd should use --permission-mode plan; sentKeys=%v", tmux.sentKeys)
 	}
 	if tmux.sentContains("--dangerously-skip-permissions") {

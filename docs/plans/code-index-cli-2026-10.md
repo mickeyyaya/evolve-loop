@@ -121,7 +121,7 @@ C and D score 3 for G2, because the per-call latency of `gopls` and the build ti
 | K3 | D6: the usage log | a call writes one record with its command and phase |
 | K4a | D7: the persona text in `agents/evolve-scout.md`, `agents/evolve-builder.md` and `agents/evolve-debugger.md` | a Go test reads each persona, finds the four commands, and checks that each instruction line has 20 words or fewer |
 | K4b | D7: the gate for K4a | the prompt-regression eval passes, and the G3 waves before and after show no loss |
-| K5 | D8: the removal of the MCP registrations, and a doc note | `claude mcp list` and `agy mcp list` show no `trail` |
+| K5 | D8: the removal of the MCP registrations, and a doc note. **Done on 2026-10-17.** The console removed the trail MCP server from the Claude Code user scope and from the agy `mcp_config.json`, with no repo change. The doc note is [cli-only-no-mcp](../conventions/cli-only-no-mcp.md). | `claude mcp list` and `agy mcp list` show no `trail` |
 
 ## 7. Order
 
