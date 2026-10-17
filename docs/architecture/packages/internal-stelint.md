@@ -19,8 +19,8 @@
 
 - **One home for the word list.** `ParseWordTable` reads the table under the heading "House list of words to replace" in `docs/conventions/ste100-writing.md`. The Go code has no copy of the list. A standard without the table, or with a row that has no replacement, is an error.
 - **Blocks first.** `Check` splits a document into paragraphs. A paragraph is a block of text lines between blank lines. A list item is a paragraph, and each table cell is a paragraph.
-- **Three kinds of paragraph.** A numbered list item has the limit of 20 words. The standard calls it a numbered item: a step, or a rule or a decision that other text cites by its number. Other prose has the limit of 25 words. A heading (ATX or setext) is checked against the house list only, with no length rule.
-- **Blockquotes.** A blockquote is prose. The splitter removes the `>` marks and reads the text as usual. If the first text of a blockquote starts with a quotation mark, the blockquote is a quoted passage, and the lint does not read it.
+- **Three kinds of paragraph.** A numbered list item has the limit of 20 words. The standard calls it a numbered item: a step, or a rule or a decision that other text cites by its number. Other prose has the limit of 25 words. A heading (ATX or setext) is checked against the house list only, with no length rule. Only a prose paragraph becomes a setext heading. A `---` line after a list item is a rule, so the item keeps its length rule.
+- **Blockquotes.** A blockquote is prose. The splitter removes the `>` marks and reads the text as usual. If the first text of a blockquote starts with a quotation mark, the blockquote is a quoted passage, and the lint does not read it. The end of a blockquote closes a fence or an HTML comment that the blockquote opened. Thus an unclosed fence in a blockquote does not hide the text after it.
 - **What the lint does not read.** It does not read YAML frontmatter, fenced code, HTML comments, HTML blocks or table separator rows. An HTML block starts with a block tag (`details`, `div`, `table` and the others in `blockTags`). An inline tag (`a`, `b`, `code`, `span` and the others in `inlineTags`) at the start of a line does not start a block.
 - **The standard's own word table.** In `docs/conventions/ste100-writing.md` only, the lint does not read the table under the house-list heading. `LintFile` sets `Options.IsStandard` from the path.
 - **A scanner removes the markup.** A code span is one technical word. A link keeps its text and loses its URL: the link text counts for length, but `STE-WORD` does not match it. An autolink and a bare URL are one technical word each. An inline HTML tag is removed.
@@ -61,7 +61,7 @@ The floor reads the standard from the cycle worktree, and only when a document i
 | the three rules and their limits (25, 20 and 6 pass; 26, 21 and 7 fail) | `TestCheck_SentenceLengthIsTwentyFiveWordsInText`, `TestCheck_ANumberedStepHasTwentyWords`, `TestCheck_ParagraphHasSixSentences`, `TestCheck_HouseWords` |
 | the limits agree with the standard | `TestTheLimitsMatchTheStandard` |
 | sentence splitting | `TestCheck_SentenceSplitting`, `TestCheck_ACodeSpanIsOneWord`, `TestCheck_AQuotationIsOneWord` |
-| headings, blockquotes and each exemption | `TestCheck_AHeadingIsCheckedForWordsOnly`, `TestCheck_ABlockquoteIsProse`, `TestCheck_Exemptions`, `TestCheck_LinkTextCountsAndTheURLDoesNot`, `TestCheck_OnlyTheStandardExemptsItsOwnWordTable`, `TestLintFile_ExemptsTheWordTableOnlyInTheStandard`, `TestCheck_GeneratedText` |
+| headings, blockquotes and each exemption | `TestCheck_AHeadingIsCheckedForWordsOnly`, `TestCheck_ABlockquoteIsProse`, `TestCheck_AnEmptyFirstBlockquoteLineDoesNotDecideTheQuotation`, `TestCheck_EachBlockquoteDecidesItsOwnQuotation`, `TestCheck_ABlockquoteEndClosesItsFenceAndComment`, `TestCheck_RuleLinesAndSetextUnderlines`, `TestCheck_Exemptions`, `TestCheck_LinkTextCountsAndTheURLDoesNot`, `TestCheck_OnlyTheStandardExemptsItsOwnWordTable`, `TestLintFile_ExemptsTheWordTableOnlyInTheStandard`, `TestCheck_GeneratedText` |
 | the word table | `TestParseWordTable_*` (one reads the real standard) and `TestLoadStandard_*` |
 | Go extraction: each call form, constants, concatenations, a variable argument | `TestCheckGo_*` |
 | the scopes and the file reader | `TestInDocsScope_*`, `TestInGoScope_*`, `TestLintFile_*` |
@@ -71,5 +71,6 @@ The floor reads the standard from the cycle worktree, and only when a document i
 
 ## History
 
+- **2026-10-17:** the review follow-ups of cycle 1927. The end of a blockquote closes its fence and its HTML comment. A `---` line after a list item is a rule, not a setext underline. Named tests kill three mutants of the quotation rules.
 - **2026-10-08:** fix round 1 after the J_0 review. A quotation is one word, and the lint checks link text and headings for words only. A blockquote is prose. The word-table exemption is for the standard only, and an inline tag does not start an HTML block. The `--go` mode knows injected streams, and three abbreviations join the house list.
 - **2026-10-07:** the first version: batch S0 of the STE plan, and the `--go` mode of batch S10.
