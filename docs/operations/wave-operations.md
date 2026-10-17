@@ -35,6 +35,12 @@ Run the plane's own binary, `<plane>/go/bin/evolve`. The build step rebuilds tha
 | 10 | `error: "usage: …"` | A bad argument. | Fix the arguments. |
 | other | `failed_step`, `error` | A step failed with this exit code. The wave is not recorded, and the notes stay. | Fix the cause, then run step 2 again. A failure before the brake release leaves the brake on, which is the safe state. |
 
+### The code index step
+
+`wave next` has one step, "refresh the code index", after the build and the `doctor live` checks and before the loop launch. It moves the index worktree (`code_index.index_dir`, `dev/code-index` by default) to `origin/main` and runs the incremental `trail build`. Lanes then start on a fresh index. The step writes only the index worktree.
+
+A failed refresh prints `evolve wave: WARN: code index not refreshed: <reason>` on stderr. It never stops the wave. The agents then use `grep`, as they do when no index exists. To repair the index, fix the cause in the message and run `evolve wave next` again at the next boundary.
+
 ### What the loop reads at the boundary
 
 After the loop runs `evolve cli update`, it runs the practice watch. The watch reads the changelogs and guides of Claude Code and agy. It files one inbox research item for each source that changed.

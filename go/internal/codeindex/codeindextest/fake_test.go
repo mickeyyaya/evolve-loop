@@ -72,3 +72,16 @@ func TestFake_ReportsItsNameAndCapabilities(t *testing.T) {
 		t.Errorf("Name = %q, Capabilities = %+v", fake.Name(), fake.Capabilities())
 	}
 }
+
+func TestFake_RefreshSucceedsWhenPresentAndIsAbsentWhenAbsent(t *testing.T) {
+	t.Parallel()
+	var present codeindex.Refresher = codeindextest.NewFake("fake", codeindex.AllCapabilities(), nil)
+	var absent codeindex.Refresher = codeindextest.NewAbsentFake("fake", codeindex.AllCapabilities())
+
+	if err := present.Refresh(context.Background()); err != nil {
+		t.Errorf("present Refresh = %v, want nil", err)
+	}
+	if err := absent.Refresh(context.Background()); !errors.Is(err, codeindex.ErrAbsent) {
+		t.Errorf("absent Refresh = %v, want ErrAbsent", err)
+	}
+}

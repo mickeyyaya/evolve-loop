@@ -117,7 +117,7 @@ C and D score 3 for G2, because the per-call latency of `gopls` and the build ti
 | Id | Component | Red test first |
 |---|---|---|
 | K1 | D1–D4: `evolve code` and the trail-code adapter, with a fake backend for tests | a fake backend returns a "tokens saved" line, and `evolve code callers` prints the answer without it |
-| K2 | D5: the index location and the boundary refresh, as a step of `wave next`. The refresh writes only the separate index worktree, never the main tree. A failed refresh is a warning, never a halt. | `wave next --dry-run` lists the refresh step |
+| K2 | D5: the index location and the boundary refresh, as a step of `wave next`. The refresh writes only the separate index worktree, never the main tree. A failed refresh is a warning, never a halt. Built 2026-10-17: the step is the verb `code-refresh`, after the merges and the build and before the loop launch. The optional interface `codeindex.Refresher` keeps backends that cannot refresh valid. The spec is [code-index-cli.md](../architecture/code-index-cli.md), section 4. | `wave next --dry-run` lists the refresh step |
 | K3 | D6: the usage log. Built 2026-10-17: `internal/codeindex/usagelog` and `evolve code usage`. The record also holds the argument length (never the argument), the exit code, the hit count, the duration, the cycle and the CLI family. | a call writes one record with its command and phase |
 | K4a | D7: the persona text in `agents/evolve-scout.md`, `agents/evolve-builder.md` and `agents/evolve-debugger.md` | a Go test reads each persona, finds the four commands, and checks that each instruction line has 20 words or fewer |
 | K4b | D7: the gate for K4a | the prompt-regression eval passes, and the G3 waves before and after show no loss |

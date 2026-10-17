@@ -39,6 +39,24 @@ func Run(t Reporter, h Harness) {
 			t.Errorf("%s %s: %s", backend.Name(), q, problem)
 		}
 	}
+	for _, problem := range h.refreshProblems(backend) {
+		t.Errorf("%s refresh: %s", backend.Name(), problem)
+	}
+}
+
+func (h Harness) refreshProblems(backend codeindex.Backend) []string {
+	refresher, ok := backend.(codeindex.Refresher)
+	if !ok {
+		return nil
+	}
+	var problems []string
+	if err := refresher.Refresh(context.Background()); err != nil {
+		problems = append(problems, fmt.Sprintf("refresh of a present index must succeed: got %v", err))
+	}
+	if absent, ok := h.NewAbsent().(codeindex.Refresher); !ok || !errors.Is(absent.Refresh(context.Background()), codeindex.ErrAbsent) {
+		problems = append(problems, "refresh of an absent index must be ErrAbsent")
+	}
+	return problems
 }
 
 func (h Harness) probeFor(q codeindex.Query) (Probe, bool) {

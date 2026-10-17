@@ -214,24 +214,41 @@ func checkoutRoot(dir string) string {
 }
 
 func buildCodeBackends(projectRoot string, run sysexec.RunFunc, env []string) (codeindex.Backends, error) {
-	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	loc, err := loadCodeIndexLocation(projectRoot)
 	if err != nil {
 		return codeindex.Backends{}, err
+	}
+	return newCodeBackends(loc, run, env)
+}
+
+type codeIndexLocation struct {
+	backends           []string
+	indexDir, trailBin string
+}
+
+func loadCodeIndexLocation(projectRoot string) (codeIndexLocation, error) {
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		return codeIndexLocation{}, err
 	}
 	cfg, err := pol.CodeIndexConfig()
 	if err != nil {
-		return codeindex.Backends{}, err
+		return codeIndexLocation{}, err
 	}
 	indexDir, trailBin, err := resolveCodeIndexPaths(projectRoot, cfg)
 	if err != nil {
-		return codeindex.Backends{}, err
+		return codeIndexLocation{}, err
 	}
+	return codeIndexLocation{backends: cfg.Backends, indexDir: indexDir, trailBin: trailBin}, nil
+}
+
+func newCodeBackends(loc codeIndexLocation, run sysexec.RunFunc, env []string) (codeindex.Backends, error) {
 	factories := map[string]codeindex.Factory{
 		"trail": func() (codeindex.Backend, error) {
-			return trail.New(trail.Config{Bin: trailBin, IndexDir: indexDir, Env: env, Run: run}), nil
+			return trail.New(trail.Config{Bin: loc.trailBin, IndexDir: loc.indexDir, Env: env, Run: run}), nil
 		},
 	}
-	return codeindex.New(cfg.Backends, factories)
+	return codeindex.New(loc.backends, factories)
 }
 
 func resolveCodeIndexPaths(projectRoot string, cfg policy.CodeIndexSettings) (indexDir, trailBin string, err error) {
