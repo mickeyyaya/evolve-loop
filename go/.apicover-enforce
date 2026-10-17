@@ -765,3 +765,4 @@
 ./internal/treewalk
 # kbgraph - the read-only graph projection over cycle dossiers and inbox items (slice 1).
 ./internal/kbgraph
+./internal/acspathscan

@@ -66,6 +66,16 @@ func TestCycleTerminationTriageNoWork(t *testing.T) {
 	}
 }
 
+func TestCycleTerminationTddProtectedRoute_IsTheReasonWaveStatusAndCycleHealthShow(t *testing.T) {
+	const want = "tdd-protected-predicate-route"
+	if CycleTerminationTddProtectedRoute != want {
+		t.Errorf("CycleTerminationTddProtectedRoute = %q, want %q", CycleTerminationTddProtectedRoute, want)
+	}
+	if CycleTerminationTddProtectedRoute == CycleTerminationTriageNoWork {
+		t.Error("the protected route must not share the triage no-work reason, or wave status cannot tell a routed FAIL from a planned no-work")
+	}
+}
+
 func TestCycleTerminationLaneWorktreeDeferred(t *testing.T) {
 	const want = "lane-worktree-deferred"
 	if CycleTerminationLaneWorktreeDeferred != want {

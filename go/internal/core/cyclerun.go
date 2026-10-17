@@ -42,6 +42,8 @@ type cycleRun struct {
 	o   *Orchestrator
 	ctx context.Context
 
+	protectedRouteDiags []Diagnostic
+
 	req            CycleRequest
 	cycle          int
 	consoleLeased  map[string]bool

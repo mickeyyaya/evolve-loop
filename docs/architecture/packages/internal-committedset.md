@@ -8,6 +8,7 @@
 
 ## Design
 
+- **The protected-route artifact.** `tdd-protected-route.json` holds the cycle and the item. `tdd-protected-predicates/` holds the kept predicate files. The artifact names no path: the closeout scans the kept files again. `WriteProtectedRoute` and `ReadProtectedRoute` are the one reader and writer.
 - **One reader, not four.** Four independent readers disagreed on live cycles. The readers were `core.ContractTaskIDs` (lane pin, else decision `top_n`, minus deferred) and `core.BoundTaskIDs` (`top_n` only). `inboxmover.CommittedIDs` read `top_n` plus `skip_shipped`. The cycle dossier read `top_n` only, for a short time. A record that reports a commitment it did not read is worse than a record that reports none.
 - **The lane pin is the dominant shape.** On runtime cycle 1621 the lane pin named two members while `top_n` named one. 17 of the last 20 runtime cycles carried a pin. A reader of `top_n` only under-reports the commitment on the usual shape. The tests use the shapes that real cycles leave on disk.
 - **A leaf with stdlib imports only.** `internal/core` owns the orchestrator, and `internal/dossier` cannot import `core`. A leaf lets every consumer project from it. The package parses. The only policy it owns is the precedence in `Committed` and the rule for what counts as triage answering for an id (`DispositionsFrom`).

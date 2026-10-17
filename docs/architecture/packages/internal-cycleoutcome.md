@@ -4,7 +4,9 @@
 
 ## Purpose
 
-`internal/cycleoutcome` is the importable closeout seam for a cycle that did not ship. `ApplyFailure` walks the committed ids of a failed cycle through the inbox failure lifecycle. It claims an id if the lane never did, bumps `failure_count`, and quarantines at the ceiling. Uncommitted menu ids release untouched. `ApplyNoWork` is the sibling for a lane whose triage answered for its scoped item without committing it. `FailureInputsFor`, `IsTaskLevelFailure`, `IsTaskLevelResult`, `CommittedIDsFor` and `LaneScopeIDs` give the callers one definition of the rules that the closeouts share.
+`internal/cycleoutcome` is the importable closeout seam for a cycle that did not ship. `ApplyFailure` walks the committed ids of a failed cycle through the inbox failure lifecycle. It claims an id if the lane never did, bumps `failure_count`, and quarantines at the ceiling. Uncommitted menu ids release untouched. `ApplyNoWork` is the sibling for a lane whose triage answered for its scoped item without committing it. 
+
+`ApplyFailure` also routes the item of a cycle that stopped on a tdd predicate that reads a protected file. `FailureInputsFor`, `IsTaskLevelFailure`, `IsTaskLevelResult`, `CommittedIDsFor` and `LaneScopeIDs` give the callers one definition of the rules that the closeouts share.
 
 ## Design
 
@@ -25,6 +27,100 @@
 - **Scope edges of no-work.** A cycle without a lane pin has no scope to hand over and releases nothing. A sequential no-work end keeps its historical lifecycle. An answered id outside the scope is never touched. An item that already routed to the console keeps its original evidence. An item that left the inbox is gone, not a route failure.
 - **Faults never change the exit code.** Route and release faults are on the stream. They return joined, for the caller to WARN. A lifecycle hiccup never changes the exit code of a cycle.
 - **The seams belong to the root.** `Ledger` is the chained-append seam for the lifecycle lines, the observed ledger of the root. If it is nil, the inbox mover falls back to its own unobserved file ledger over the same file. `Signals` is the Signal Center of the root for the `inbox.warning` events of the mover. If it is nil, the mover prints the legacy `[inbox-mover]` line. `WithLedger` and `WithSignals` return a copy and leave the receiver untouched.
+
+## Protected predicate route (tdd)
+
+> Request: the console inbox item `protected-predicate-routes-not-fails`. "A cycle whose own ACS predicate needs a protected-surface edit seals FAIL; it must end as planned no-work and route the item to the console."
+
+### Terms used throughout
+
+- **Protected need**: a path that `guards.IsProtectedSurface` accepts and that a tdd predicate reads.
+- **Route**: the console-manual stamp of an inbox item (`route`, `routed_reason`, `routed_cycle`, `routed_at`).
+- **Route code**: the diagnostic code `PROTECTED_PREDICATE_ROUTE`. The termination reason is `tdd-protected-predicate-route`.
+
+### Problem
+
+Cycle 1933 claimed `audit-eval-existence-path-convention`. The declared files were `go/internal/phases/audit/` and `go/acs/`.
+
+**F1.1** The tdd phase wrote predicate `TestC1933_004_auditor_eval_existence_rule_names_path_and_rejects_acs`. It reads `agents/evolve-auditor.md` (`go/acs/cycle1933/predicates_test.go:57` in the worktree of the cycle).
+*Implication:* the declared files of the item did not show the need. The need appeared only when tdd wrote the predicate.
+
+**F1.2** `agents/evolve-auditor.md` is a protected surface (`go/internal/guards/integrity_surface.go:142`). The build floor restores any edit to it (`go/internal/core/build_floor_reviewer.go:47`).
+*Implication:* the builder can satisfy the predicate or the floor, but not both. Cycle 1933 spent five build panes and two corrections, then sealed FAIL.
+
+**F1.3** The routing rule acts on two inputs only: the declared files at claim time (`inboxbatch.ConsoleRouted`) and the `files` of a triage card (`go/internal/phases/triage/protected_route.go:19`). Neither input sees a predicate.
+
+**F1.4** A phase refusal already has a route. `RefusalDisposition` (`go/internal/cyclestate/result.go:94`) names the codes that route the item. `ApplyFailure` routes the subject in place, then drains the claims with no failure bump.
+
+**F1.5** The counters read the verdict. `cycleRunExitCode` returns 2 for `FAIL` (`go/cmd/evolve/cmd_loop_systemfailure_halt.go:14`). The ship streak counts a cycle as shipped, or not (`go/internal/dashboard/history.go:156`). A `SKIPPED_UNKNOWN` cycle exits 0. No counter sees a route.
+
+### Approaches
+
+| Id | Approach | Input that it trusts | Outcome of the cycle | Verdict |
+|---|---|---|---|---|
+| A | Check the predicates when tdd ends. Stop the cycle, route the item, record a FAIL. | The predicate source, parsed by the host. | FAIL with the route code | Chosen |
+| B | Classify the build deadlock as a route. | `build-report.md` prose, which the builder writes. | Any | Rejected: a builder can relabel any FAIL as a deadlock. |
+| C | Scan the likely surface of the item at claim time. | The title, summary and declared files of the item. | Any | Rejected: cycle 1933 declared two clean directories, so a guess misses it. |
+| D | Extend the triage card check to read predicates. | The card line. | Any | Rejected: triage runs before tdd, so no predicate exists yet. |
+| E | Approach A, but record planned no-work (a neutral outcome). | The predicate source. | `SKIPPED_UNKNOWN`, exit 0 | Rejected: the adversarial review found the escape hatch. |
+
+**D1** Choose approach A. It is the first point where the predicate exists. The host parses that source and proves the path. It stops before the build pays for the deadlock.
+
+**D2** Record the cycle as a FAIL. Route the item, and keep the cycle outcome apart from the route.
+
+Approach E failed the adversarial review. A tdd agent can add one `filepath.Join(root, "agents", "evolve-auditor.md")` read, even in dead code. An expected FAIL then becomes a neutral cycle. Repeated neutral cycles never trip the fail breaker or the zero-ship halt. With D2, the gamed route gains nothing: the cycle still counts as a FAIL. The item still stops returning to deadlock lanes.
+
+Approach E also reversed acceptance line 3 of the inbox item ("the routed cycle does not count as a FAIL"). This design reverses that line on purpose, for the reason above.
+
+### The rule
+
+One rule, in one place: the `PhaseTDD` branch of `selectNext` (`go/internal/core/cyclerun_select.go:48`), next to the triage termination. Core keeps only the decision. The scan is in `internal/acspathscan`. The artifact schema is in `internal/committedset`.
+
+1. The host scans `go/acs/cycle<N>/` of the active worktree (`acspathscan.Needs`).
+2. A path counts only inside a `func Test*` body. It must be an argument of a file read: `os.ReadFile`, `os.Stat`, `os.Lstat`, `os.Open`, `os.OpenFile` or an `acsassert` file helper. A variable counts if it carries the path to such a call.
+3. A path is a whole-path literal, or a `filepath.Join` of literals. A `Join` can start with the repo root (`acsassert.RepoRoot(t)`, or a variable that holds it). A temp directory base does not count.
+4. Unused variables, `_ =` lines, message calls, struct tags, prose and helpers that are not tests do not count.
+5. Each path must pass the membership function that the composition root injects (`protectedMembership` in `go/cmd/evolve/cmd_cycle.go`). Without it, nothing routes.
+6. The committed set must hold exactly one item.
+7. The host copies the predicate files into the run directory (`tdd-protected-predicates/`). It writes `tdd-protected-route.json` (cycle and item). It records the tdd ending as `FAIL` with the route code, and the termination `tdd-protected-predicate-route`. The cycle then takes the normal FAIL path. The worktree is kept, and the ledger and dossier stay consistent.
+8. A scan fault (a bad pattern, a file that does not parse) writes a WARN. The paths found in the other files still count.
+
+The closeout is the existing failure closeout. `RefusalDisposition` maps the route code to the task level and the console route. `ApplyFailure` then does these steps.
+
+1. It reads the artifact. It requires the same cycle and the same one committed item.
+2. It scans the kept copy of the predicates again, with the same membership function. The artifact holds no path. A path in the run directory is never trusted.
+3. It adds each proven path to the `files` of the item. A path that is already there is not added twice.
+4. It calls `RouteConsole`. The reason names each file, the test function and the predicate file.
+5. It drains the claims with no failure bump.
+
+If any step fails, the closeout writes a `[cycleoutcome] WARN` line. The item takes the normal task-level path: bump, release the claim and no route. No claim stays in `processing/`.
+
+### Worked example
+
+Take cycle 1933 with the rule. The predicate joins `RepoRoot`, `agents` and `evolve-auditor.md`, and passes the path to `acsassert`. The path passes the manifest. The only committed item is `audit-eval-existence-path-convention`.
+
+The cycle stops after tdd with the verdict `FAIL` and the code `PROTECTED_PREDICATE_ROUTE`. The item gets `route: console-manual`, `routed_cycle: 1933` and `files` that gain `agents/evolve-auditor.md`. `wave status` shows the verdict FAIL and the line "Termination: tdd-protected-predicate-route". `cyclehealth` shows `FAILED_EXPLAINED` with the same reason.
+
+### Why a lane cannot relabel a failure
+
+- **The cycle still counts.** The verdict is FAIL, the exit code is 2, and the ship streak and the fail breaker see the cycle. Gaming the route gains nothing.
+- **The proof is a path, not a claim.** The path comes from predicate source that the host scans twice. The build report is never read.
+- **A denied path stays a normal FAIL.** The closeout bumps the item and says why.
+- **The route is not a drop.** The item stays in the inbox with an operator stamp. The console reads the file, the test function and the kept predicate, and decides.
+- **Limit.** A path that a variable or a helper builds is not found. The cycle then follows the normal path and seals FAIL, as before.
+- **Limit.** A tdd phase can still write a read that the task does not need. The cost is one console review of an item, and the cycle counts as a FAIL.
+
+### What changes our mind
+
+Count `PROTECTED_PREDICATE_ROUTE` cycles per wave. If most routes prove to be false, tighten rule 2. If a measured miss rate shows hidden paths, add the helper case. Each added input must stay a path that the manifest proves.
+
+### Tests
+
+- `acspathscan`: `TestNeeds_*` and `TestSnapshot_*` (100% coverage, strict).
+- `core`: `TestRunCycle_APredicateThatReadsAProtectedPathStopsAfterTddAsAFailureWithTheRouteCode`, `TestRunCycle_APredicateThatDoesNotReadAProvenProtectedPathRunsTheSpine`, `TestRunCycle_NoProofMeansNoRoute`, `TestRunCycle_ARouteThatCannotBeRecordedLeavesTheCycleOnItsNormalPath`, `TestRunCycle_AScanFaultIsLoudButTheFindingsStillCount`.
+- `cycleoutcome`: `TestApplyFailure_AProvenProtectedPredicateRoutesTheItemWithItsFileAndReason` and `TestApplyFailure_AnUnprovenRouteReleasesTheClaimBumpsAndSaysSo`.
+- `cmd/evolve`: `TestCloseoutCycleOutcome_AProvenProtectedPredicateRoutesTheItemButStaysAFailure`, which also pins exit code 2.
+- `wave` and `cyclehealth`: the termination reason is shown.
 
 ## Invariants
 
