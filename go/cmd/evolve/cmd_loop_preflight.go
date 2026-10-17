@@ -28,8 +28,13 @@ func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Option
 		SkipBoot:            cfg.SkipPreflightBoot,
 		NestedFallbackStage: parseGateStage(pol.SandboxConfig().NestedFallback),
 		MinFreeBytes:        pol.PreflightConfig().MinFreeBytes(),
-		Routing:             func() (looppreflight.Routing, error) { return preflightRouting(cfg.ProjectRoot) },
-		UsageEvidence:       evidenceSummary(usageEvidenceFn(cfg.ProjectRoot, cfg.EvolveDir, stderr)),
+		LatestRelease:       looppreflight.DefaultLatestRelease,
+		ReleaseLag: looppreflight.ReleaseLagConfig{
+			Threshold: pol.PreflightConfig().ReleaseLagThreshold,
+			CacheTTL:  pol.PreflightConfig().ReleaseCheckTTL,
+		},
+		Routing:       func() (looppreflight.Routing, error) { return preflightRouting(cfg.ProjectRoot) },
+		UsageEvidence: evidenceSummary(usageEvidenceFn(cfg.ProjectRoot, cfg.EvolveDir, stderr)),
 	}
 }
 
