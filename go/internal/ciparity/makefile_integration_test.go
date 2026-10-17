@@ -519,3 +519,71 @@ func TestMakeIntegration_TeesAJSONStreamWithoutLosingTheVerdict(t *testing.T) {
 		})
 	}
 }
+
+func TestMakeE2E_RunsOnlyTheTestsOfE2ETaggedFiles(t *testing.T) {
+	t.Parallel()
+	root := makeFixture(t)
+	writeMakeFixture(t, root, "test/e2e/probe.go", "package probe\n")
+	writeMakeFixture(t, root, "cmd/probe/probe.go", "package probe\n")
+	writeMakeFixture(t, root, "cmd/probe/plain_test.go", "package probe\nimport \"testing\"\nfunc TestPlain(t *testing.T) { t.Fatal(\"plain-test-ran\") }\nfunc TestTaggedExtra(t *testing.T) { t.Fatal(\"prefix-sibling-ran\") }\n")
+	writeMakeFixture(t, root, "cmd/probe/first_test.go", "//go:build e2e && evolve_test_phases\n\npackage probe\nimport \"testing\"\nfunc TestTagged(t *testing.T) {}\n")
+
+	out, err := runMakeFixture(t, root, "test-e2e")
+
+	if err != nil || strings.Contains(out, "ran") {
+		t.Fatalf("test-e2e ran a test of a plain file: %v\n%s", err, out)
+	}
+	writeMakeFixture(t, root, "cmd/probe/added_test.go", "//go:build e2e\n\npackage probe\nimport \"testing\"\nfunc TestAddedLater(t *testing.T) { t.Fatal(\"added-e2e-test-ran\") }\n")
+	out, err = runMakeFixture(t, root, "test-e2e")
+	if err == nil || !strings.Contains(out, "added-e2e-test-ran") || strings.Contains(out, "plain-test-ran") {
+		t.Fatalf("a new e2e file was not picked up, or a plain test ran: %v\n%s", err, out)
+	}
+}
+
+func TestMakeE2E_FailsWhenNoTestCarriesTheTag(t *testing.T) {
+	t.Parallel()
+	root := makeFixture(t)
+	writeMakeFixture(t, root, "test/e2e/probe.go", "package probe\n")
+	writeMakeFixture(t, root, "cmd/probe/probe.go", "package probe\n")
+	writeMakeFixture(t, root, "cmd/probe/plain_test.go", "package probe\nimport \"testing\"\nfunc TestPlain(t *testing.T) {}\n")
+	out, err := runMakeFixture(t, root, "test-e2e")
+	if err == nil || !strings.Contains(out, "no e2e test") {
+		t.Fatalf("an e2e tier with no e2e test passed silently: %v\n%s", err, out)
+	}
+}
+
+func TestMakeRaceRecipes_DropTheExitSleepAndKeepOtherOptions(t *testing.T) {
+	probe := `package probe
+
+import (
+	"os"
+	"testing"
+)
+
+func TestRaceOptions(t *testing.T) {
+	if got := os.Getenv("GORACE"); got != "WANT" {
+		t.Errorf("GORACE = %q, want %q", got, "WANT")
+	}
+}
+`
+	for _, tc := range []struct{ name, preset, want string }{
+		{"unset", "", "atexit_sleep_ms=0"},
+		{"appended", "halt_on_error=1", "halt_on_error=1 atexit_sleep_ms=0"},
+	} {
+		for _, target := range []string{"test", "test-integration"} {
+			t.Run(tc.name+"/"+target, func(t *testing.T) {
+				t.Setenv("GORACE", tc.preset)
+				if tc.preset == "" {
+					if err := os.Unsetenv("GORACE"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				root := makeFixture(t)
+				writeMakeFixture(t, root, "internal/probe/probe_test.go", strings.ReplaceAll(probe, "WANT", tc.want))
+				if out, err := runMakeFixture(t, root, target); err != nil {
+					t.Fatalf("%s: GORACE reaches the race run wrong: %v\n%s", target, err, out)
+				}
+			})
+		}
+	}
+}

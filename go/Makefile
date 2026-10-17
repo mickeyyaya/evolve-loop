@@ -43,6 +43,8 @@ export GIT_CONFIG_VALUE_0 := false
 export GIT_CONFIG_KEY_1   := gc.auto
 export GIT_CONFIG_VALUE_1 := 0
 
+export GORACE := $(strip $(GORACE) atexit_sleep_ms=0)
+
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency test-budget cover apicover lint tidy clean help dist dist-clean \
         cover-strict cover-changed apicover-enforce apicover-check \
@@ -129,17 +131,21 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 	mv coverage.partial.txt coverage.txt
 
 E2E_JSON ?=
-E2E_TEST = $(GO) test -count=1 -timeout 45m -tags "e2e evolve_test_phases"
+E2E_TAGS = e2e evolve_test_phases
+E2E_TEST = $(GO) test -count=1 -timeout 45m -tags "$(E2E_TAGS)"
+E2E_ROOTS = cmd test/e2e
 E2E_PKGS = ./cmd/... ./test/e2e/...
 
-test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in; E2E_JSON=<file> also writes the go test -json stream while the console keeps the plain text
-ifneq ($(strip $(E2E_JSON)),)
-	@$(GO) build -o $(BIN_DIR)/testlatency ./cmd/testlatency || exit $$?; \
-	status=$$( { { $(E2E_TEST) -json $(E2E_PKGS); echo $$? >&3; } | tee "$(E2E_JSON)" | $(BIN_DIR)/testlatency -render >&2; } 3>&1 ); \
+test-e2e: ## E2E tier: only the tests of e2e-tagged files, full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in; E2E_JSON=<file> also writes the go test -json stream while the console keeps the plain text
+	@$(GO) build -o $(BIN_DIR)/e2elist ./cmd/e2elist || exit $$?; \
+	run=$$($(BIN_DIR)/e2elist -tags "$(E2E_TAGS)" $(E2E_ROOTS)) || exit $$?; \
+	if [ -n "$(E2E_JSON)" ]; then \
+		$(GO) build -o $(BIN_DIR)/testlatency ./cmd/testlatency || exit $$?; \
+		status=$$( { { $(E2E_TEST) -run "$$run" -json $(E2E_PKGS); echo $$? >&3; } | tee "$(E2E_JSON)" | $(BIN_DIR)/testlatency -render >&2; } 3>&1 ); \
+	else \
+		$(E2E_TEST) -run "$$run" $(E2E_PKGS); status=$$?; \
+	fi; \
 	exit $${status:-1}
-else
-	$(E2E_TEST) $(E2E_PKGS)
-endif
 
 test-acs-durable: ## Durable ACS regression tier (//go:build acs); artifact-free predicates, mirrors the ci.yml acs-durable gate
 	$(GO) test -count=1 -tags acs ./acs/regression/...
