@@ -118,16 +118,18 @@ func TestCheck_SentenceSplitting(t *testing.T) {
 		doc  string
 		want []string
 	}{
-		"a decimal number does not split":                          {half + " 1.5 " + half + " end.\n", []string{"1 STE-SENTENCE"}},
-		"a house abbreviation does not split":                      {half + " e.g. " + half + " end.\n", []string{"1 STE-SENTENCE", "1 STE-WORD"}},
-		"a code span with a full stop does not split":              {half + " `a. b` " + half + " end.\n", []string{"1 STE-SENTENCE"}},
-		"a path does not split":                                    {half + " docs/a.md " + half + " end.\n", []string{"1 STE-SENTENCE"}},
-		"bold text that ends a sentence splits":                    {"**" + words(20) + ".** " + sentence(20) + "\n", nil},
-		"a closing parenthesis after a full stop splits":           {"(" + words(20) + ".) " + sentence(20) + "\n", nil},
-		"vs. does not split":                                       {half + " vs. " + half + " end.\n", []string{"1 STE-SENTENCE", "1 STE-WORD"}},
-		"et al. does not split":                                    {half + " et al. " + half + " end.\n", []string{"1 STE-SENTENCE", "1 STE-WORD"}},
-		"incl. does not split":                                     {half + " incl. " + half + " end.\n", []string{"1 STE-SENTENCE", "1 STE-WORD"}},
-		"a quotation that ends with a full stop ends the sentence": {`He said "` + words(20) + `." ` + sentence(23) + "\n", nil},
+		"a decimal number does not split":                                  {half + " 1.5 " + half + " end.\n", []string{"1 STE-SENTENCE"}},
+		"a house abbreviation does not split":                              {half + " e.g. " + half + " end.\n", []string{"1 STE-SENTENCE", "1 STE-WORD"}},
+		"a code span with a full stop does not split":                      {half + " `a. b` " + half + " end.\n", []string{"1 STE-SENTENCE"}},
+		"a path does not split":                                            {half + " docs/a.md " + half + " end.\n", []string{"1 STE-SENTENCE"}},
+		"bold text that ends a sentence splits":                            {"**" + words(20) + ".** " + sentence(20) + "\n", nil},
+		"a closing parenthesis after a full stop splits":                   {"(" + words(20) + ".) " + sentence(20) + "\n", nil},
+		"vs. does not split":                                               {half + " vs. " + half + " end.\n", []string{"1 STE-SENTENCE", "1 STE-WORD"}},
+		"et al. does not split":                                            {half + " et al. " + half + " end.\n", []string{"1 STE-SENTENCE", "1 STE-WORD"}},
+		"incl. does not split":                                             {half + " incl. " + half + " end.\n", []string{"1 STE-SENTENCE", "1 STE-WORD"}},
+		"a quotation that ends with a full stop ends the sentence":         {`He said "` + words(20) + `." ` + sentence(23) + "\n", nil},
+		"a quotation that ends with a question mark ends the sentence":     {`He said "` + words(20) + `?" ` + sentence(23) + "\n", nil},
+		"a quotation that ends with an exclamation mark ends the sentence": {`He said "` + words(20) + `!" ` + sentence(23) + "\n", nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			assertRules(t, tc.doc, tc.want...)
@@ -261,6 +263,28 @@ func TestCheck_ABlockquoteIsProse(t *testing.T) {
 	assertRules(t, "> - "+sentence(25)+"\n> 1. "+sentence(21)+"\n", "2 STE-SENTENCE")
 	assertRules(t, "> “A quoted passage, we utilize it.”\n\nWe utilize it.\n", "3 STE-WORD")
 	assertRules(t, "> \"We utilize the first paragraph of the passage.\n>\n> We utilize the second paragraph.\"\n\nGo via it.\n", "5 STE-WORD")
+}
+
+func TestCheck_AnEmptyFirstBlockquoteLineDoesNotDecideTheQuotation(t *testing.T) {
+	assertRules(t, ">\n> “We utilize the first paragraph.\n>\n> We utilize the second paragraph.”\n")
+	assertRules(t, ">\n> We utilize it.\n", "2 STE-WORD")
+}
+
+func TestCheck_EachBlockquoteDecidesItsOwnQuotation(t *testing.T) {
+	assertRules(t, "> “We utilize the quoted passage.”\n\n> We utilize it.\n", "3 STE-WORD")
+	assertRules(t, "> “We utilize the quoted passage.”\nWe utilize it.\n", "2 STE-WORD")
+}
+
+func TestCheck_ABlockquoteEndClosesItsFenceAndComment(t *testing.T) {
+	runRuleCases(t, map[string]ruleCase{
+		"an unclosed backtick fence":                      {"> ```go\n> x\n\nWe utilize it.\n", []string{"4 STE-WORD"}},
+		"an unclosed tilde fence":                         {"> ~~~\n\n" + sentence(26) + "\n", []string{"3 STE-SENTENCE"}},
+		"an unclosed fence before a text line":            {"> ```\nWe utilize it.\n", []string{"2 STE-WORD"}},
+		"an unclosed HTML comment":                        {"> <!-- note\n\nWe utilize it.\n", []string{"3 STE-WORD"}},
+		"an open fence still hides the rest of its quote": {"> ```\n> We utilize it.\n\nGo via it.\n", []string{"4 STE-WORD"}},
+		"a closed fence in a quote hides its lines":       {"> ```\n> " + sentence(40) + " utilize\n> ```\n", nil},
+		"a closed comment in a quote hides its lines":     {"> <!--\n> We utilize it.\n> -->\n", nil},
+	})
 }
 
 func TestCheck_AHeadingIsCheckedForWordsOnly(t *testing.T) {

@@ -31,8 +31,9 @@ const (
 )
 
 type paragraph struct {
-	lines []srcLine
-	kind  paragraphKind
+	lines  []srcLine
+	kind   paragraphKind
+	isItem bool
 }
 
 func (p paragraph) atoms() []atom {
@@ -191,7 +192,7 @@ func listItem(text string) (paragraph, bool) {
 	if marker := m[1]; marker[0] >= '0' && marker[0] <= '9' {
 		kind = stepParagraph
 	}
-	return paragraph{kind: kind, lines: []srcLine{{text: checkboxPattern.ReplaceAllString(m[2], "")}}}, true
+	return paragraph{kind: kind, isItem: true, lines: []srcLine{{text: checkboxPattern.ReplaceAllString(m[2], "")}}}, true
 }
 
 func quoteContent(trimmed string) string {
