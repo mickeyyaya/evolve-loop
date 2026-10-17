@@ -1,0 +1,16 @@
+trail ask — "catalog refresh"  (lexical)
+
+1. runStagedCatalogRefresh · function  [symbol]
+   go/cmd/evolve/cmd_models_live.go:L51-L82
+   func runStagedCatalogRefresh(ctx context.Context, evolveDir, stage string, refresh func(context.Context, modelcatalog.Catalog) (modelcatalog.Catalog, error), now func() time.Time, log io.Writer) error
+
+2. CatalogConfig · method  [symbol]
+   go/internal/policy/merge_catalog.go:L80-L93
+   func (p Policy) CatalogConfig() CatalogPolicy
+
+3. Refresh · function  [symbol]
+   go/internal/modelquery/query.go:L36-L56
+   func Refresh(ctx context.Context, deps RefreshDeps) (modelcatalog.Catalog, error)
+
+matched in: go/ (8)
+also matched: landing/ — narrow with --in landing/
