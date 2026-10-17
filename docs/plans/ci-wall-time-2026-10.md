@@ -295,6 +295,16 @@ In approach A, the `-run` pattern is anchored (`^(…)$`), so a plain test with 
 3. **C8, C10, C9.** They cut ubuntu CPU-seconds and package walls. Each re-measures with C1.
 4. **C14 only under D23.**
 
+### Build status of C6, C7 and C11
+
+C7, C6 and C11 are built, in that order, on the branch `perf/ci-c6-c7-c11`.
+
+| Id | Built as | Red test | What the build records |
+|---|---|---|---|
+| C7 | `go/Makefile` exports `GORACE` with `atexit_sleep_ms=0` appended to any value that the caller set. The line covers `make test`, `make test-component` and `make test-integration`. | `TestMakeRaceRecipes_DropTheExitSleepAndKeepOtherOptions` runs the recipes in a fixture and checks the value that the test binary sees, with and without a preset `GORACE`. | The plan's timing test (a race binary exits in under 0.5 s) is not built. The speed of the runner can change the time. The test checks the value, not the time. |
+| C6 | `make test-e2e` builds `cmd/e2elist`. The command prints one anchored pattern, `^(TestA\|TestB\|...)$`, and the recipe passes it to `go test -run`. `internal/ciparity` holds the logic (`E2ETestNames`). A test function is on the list when only the `e2e` tag adds its file to the package. The list follows the build tag, not a name. | `TestE2ETestNames_PicksUpANewE2EFileAndIgnoresANewPlainFile` and `TestMakeE2E_RunsOnlyTheTestsOfE2ETaggedFiles`. | The count is 28 tests, and the no-race repeat of the other `cmd/*` tests is lost; the scoring accepted this loss. A plain test with the name of an e2e test in **another** package still runs. One `-run` pattern applies to every package. This costs only time. The anchor stops a prefix match. The recipe fails when the list is empty. |
+| C11 | The step `vet + fmt` leaves the matrix job `build-test`. The job `lint` (ubuntu, Go 1.23) runs `go vet ./...`, `GOOS=darwin go vet ./...` and gofmt. The job `vet-current` (ubuntu, Go 1.27) runs `go vet ./...`. | `TestGoWorkflow_VetsAndFormatsOncePerPlatformNotOncePerMatrixLeg` | The `required` workflow forbids a conditional `run` step in a validation job. The platform split is therefore made with jobs, not with a step `if`. A failed job still fails the reusable workflow. The job names `lint` and `vet-current` replace the step name `vet + fmt` that some audit messages quote. |
+
 ## 7. Order
 
 1. **C0, then C0b, then C1.** Measure before you change: time first, then resources, then the joined report. The history is also the input for any sharding later.
