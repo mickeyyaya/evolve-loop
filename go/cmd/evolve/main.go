@@ -52,6 +52,10 @@ Commands:
               the branch, index or tree; restore it into a new or clean worktree
               ( checkpoint save [--worktree DIR | --all] [--label T] [--push] |
                 list [--worktree DIR] | restore <ref> --into DIR | prune [--landed] )
+  treewalk   Fail when a test run leaves a new file or empty directory in the tree
+              ( treewalk snapshot --root DIR --out FILE | treewalk check --root DIR --baseline FILE )
+  kb         Read-only graph over cycle dossiers and inbox items
+              ( kb graph neighbors <node-id> [--hops N] | kb graph recurrences <fingerprint> )
   land       Land a patch or a salvaged cycle uncommitted on a dev worktree at origin/main
               ( land --branch B (--patch F | --salvage <leaf>) [--project-root P] )
   gc         Release what finished cycles left behind: tmux sessions/sockets,
