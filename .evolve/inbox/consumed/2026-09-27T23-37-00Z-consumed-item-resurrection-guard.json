@@ -15,5 +15,11 @@
     "A root item whose id also has a retirement record is reported at plan time instead of dispatched."
   ],
   "source": "inbox review 2026-09-27 (design doc §5.10)",
-  "priority_rationale": "inbox review 2026-09-27: a recovered claim resurrects finished work as pending, which the planner then dispatches"
+  "priority_rationale": "inbox review 2026-09-27: a recovered claim resurrects finished work as pending, which the planner then dispatches",
+  "consumed": {
+    "at": "2026-10-17T18:46:13Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "inboxbatch.ScanDir skips and names a root item whose id has a consumed record; RecoverOrphans leaves such a claim in processing/ and names it."
+  }
 }
