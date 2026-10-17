@@ -16,5 +16,11 @@
   "source": "console",
   "summary": "ADR-0113 made every correction directive ask for an appended ## Correction N section. The build remediation fix dispatch (cyclerun_remediate.go, 'REMEDIATION round %d') is the same class: a source-writing re-dispatch whose fix lives outside build-report.md. It is already covered by the worktree-evidence backstop (it carries a directive and WorktreeReadOnly=false), but only at the first idle checkpoint (1200 s).",
   "title": "The remediation fix directive asks for an appended numbered section",
-  "weight": 0.4
+  "weight": 0.4,
+  "consumed": {
+    "at": "2026-10-17T14:28:54Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "maybeRemediate fix directive now ends with correctionRecord(round); pinned by remediation directive and round-trip tests."
+  }
 }
