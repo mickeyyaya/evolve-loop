@@ -1,3 +1,2 @@
-// Package cycle1158 holds the ACS predicates for the cycle-1158 eval
-// (.evolve/evals/land-cycle-1156-lifecycle-seam-with-audit-fixes.md).
+// Package cycle1158 holds the acceptance predicates of one landed eval.
 package cycle1158

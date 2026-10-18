@@ -112,9 +112,6 @@ func defaultRollout() RolloutStages {
 	}
 }
 
-// defaultMandatory omits triage; the registry adds it. It deliberately
-// diverges from phasecontract.RequiredRoles(): the router must always plan ship,
-// which writes no report. It stays in config.go because acs/cycle1141 reads this file.
 func defaultMandatory() []string { return []string{"scout", "build", "audit", "ship"} }
 
 func defaultPhaseEnable() map[string]Enable {

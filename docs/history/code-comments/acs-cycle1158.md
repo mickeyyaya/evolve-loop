@@ -118,3 +118,12 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // The bounding-mechanism requirement is what stops this from being a one-liner:
 // a risk paragraph naming no mechanism is not an accepted risk, it is a shrug.
 ```
+
+## comment-zero E1
+
+### `go/acs/cycle1158/doc.go:1` — above `package cycle1158`
+
+```text
+// Package cycle1158 holds the ACS predicates for the cycle-1158 eval
+// (.evolve/evals/land-cycle-1156-lifecycle-seam-with-audit-fixes.md).
+```
