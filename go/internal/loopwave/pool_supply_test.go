@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"slices"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -159,13 +161,9 @@ func TestPoolSupply_AtEnforceAHotRankZeroCellStillFillsTheTarget(t *testing.T) {
 	live := awaitLaunches(t, m, 4, done)
 	close(m.release)
 	awaitPool(t, done)
-	if live[0] != "rank0" {
-		t.Fatalf("live lanes before any exit = %v, want rank0 plus three cold lanes: the pool was supplied %d todos %v", live, len(backlog), todoIDs(backlog))
-	}
-	for _, id := range live[1:] {
-		if id == "hot1" || id == "hot2" || id == "hot3" || id == "hot4" {
-			t.Errorf("lane %s shares the busy hot cell with rank0 and must wait: %v", id, live)
-		}
+	sort.Strings(live)
+	if want := []string{"cold1", "cold2", "cold3", "rank0"}; !slices.Equal(live, want) {
+		t.Fatalf("live lanes before any exit = %v, want rank0 plus three cold lanes %v: the pool was supplied %d todos %v", live, want, len(backlog), todoIDs(backlog))
 	}
 }
 
