@@ -421,42 +421,7 @@ func TestSeal_ResumeAfterCrashBeforeAnchor(t *testing.T) {
 }
 
 func TestSeal_RealLedgerCopy(t *testing.T) {
-	candidates := []string{
-		filepath.Join("..", "..", "..", "..", ".evolve"),
-		filepath.Join("..", "..", "..", "..", "..", ".evolve"),
-		filepath.Join("..", "..", "..", "..", "..", "..", "..", ".evolve"),
-	}
-	var src string
-	for _, c := range candidates {
-		abs, err := filepath.Abs(c)
-		if err != nil {
-			continue
-		}
-		if _, err := os.Stat(filepath.Join(abs, "ledger.jsonl")); err == nil {
-			src = abs
-			break
-		}
-	}
-	if src == "" {
-		t.Skip("real .evolve/ledger.jsonl not reachable from this test cwd")
-	}
-	dir := t.TempDir()
-	for _, f := range []string{"ledger.jsonl", "ledger.tip"} {
-		path := filepath.Join(src, f)
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			t.Skipf("cannot copy real %s: %v", f, err)
-		}
-		if f == "ledger.jsonl" {
-			if lines := len(splitLines(raw)); lines <= 100 {
-				t.Skipf("real %s has only %d lines (want > 100 for seal test)", path, lines)
-			}
-		}
-		if err := os.WriteFile(filepath.Join(dir, f), raw, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	l := New(dir)
+	l, dir := seedLedger(t, 250)
 	pre := l.VerifyDeep(context.Background())
 	if err := l.Seal(context.Background(), 100); err != nil {
 		t.Fatalf("real-copy Seal: %v", err)

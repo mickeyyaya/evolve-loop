@@ -122,6 +122,7 @@ type waveHarness struct {
 	alive   map[int]bool
 	sleeps  int
 	onSleep func(n int)
+	save    func(s wave.Store, r wave.Record) error
 	stdout  bytes.Buffer
 	stderr  bytes.Buffer
 }
@@ -156,6 +157,12 @@ func (h *waveHarness) env(root string) waveEnv {
 			}
 		},
 		pidAlive: func(pid int) bool { return h.alive[pid] },
+		saveRecord: func(s wave.Store, r wave.Record) error {
+			if h.save != nil {
+				return h.save(s, r)
+			}
+			return s.Save(r)
+		},
 		mainHead: func(string) (string, error) { return waveTestHead, h.headErr },
 		mergedPRs: func(_, since string) ([]string, error) {
 			h.since = append(h.since, since)

@@ -31,7 +31,7 @@ Run the plane's own binary, `<plane>/go/bin/evolve`. The build step rebuilds tha
 | 1 | `refused: "loop_live"` | A loop is live. | Wait, or stop it with `evolve loop-stop --wait`. |
 | 1 | `refused: "number_taken"` | `--number` is not more than the last wave. | Remove `--number`. |
 | 2 | `launched: false`, `error` | A file read or write failed before the steps. | Fix the named file. |
-| 2 | `launched: true`, `recorded: false` | The loop runs, but the record save failed. The notes are consumed. | Do not run `wave next` again. Fix `.evolve/waves/`; `wave status` shows no record for this wave. |
+| 2 | `launched: true`, `recorded: false` | The loop runs, but the record save failed twice. The notes are consumed, and the old wave stays open. | Do not run `wave next` again. Fix `.evolve/waves/`; `wave status` shows no record for this wave. |
 | 10 | `error: "usage: …"` | A bad argument. | Fix the arguments. |
 | other | `failed_step`, `error` | A step failed with this exit code. The wave is not recorded, and the notes stay. | Fix the cause, then run step 2 again. A failure before the brake release leaves the brake on, which is the safe state. |
 

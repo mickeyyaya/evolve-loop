@@ -87,7 +87,11 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	cur := records[len(records)-1]
 	cycles, warnings := wave.ReadCycles(plane.root, cur.CycleFloor, 0)
 	report.Wave, report.RunID, report.PID, report.Warnings = cur.Number, cur.RunID, cur.PID, warnings
-	report.PIDAlive = waveOwnsPID(env, cur)
+	var startWarning string
+	report.PIDAlive, startWarning = waveOwnsPID(env, cur)
+	if startWarning != "" {
+		report.Warnings = append(report.Warnings, startWarning)
+	}
 	report.Outcome = wave.Facts{Cycles: cycles}.Outcome()
 	runs, measureWarnings := measureWaveRuns(plane, records, cycles, report.PIDAlive || report.LoopLive, env.now())
 	report.Runs, report.Measures = runs, runs[len(runs)-1].Measures
@@ -176,13 +180,11 @@ func (w *waveWatcher) poll() (bool, error) {
 		return false, err
 	}
 	cycles, warnings := wave.ReadCycles(w.plane.root, w.cur.CycleFloor, 0)
-	for _, warn := range warnings {
-		if !w.seen[warn] {
-			w.seen[warn] = true
-			fmt.Fprintf(w.stderr, "%sWARN: %s\n", wavePrefix, warn)
-		}
+	loopLive, startWarning := waveLoopLive(w.env, w.plane.evolveDir, w.cur)
+	for _, warn := range append(warnings, startWarning) {
+		w.warnOnce(warn)
 	}
-	snap := wave.Snapshot{Cycles: cycles, LoopLive: waveLoopLive(w.env, w.plane.evolveDir, w.cur)}
+	snap := wave.Snapshot{Cycles: cycles, LoopLive: loopLive}
 	for _, e := range wave.Diff(w.prev, snap) {
 		if err := writeWaveEvent(w.stdout, w.cur.Number, e, w.asJSON); err != nil {
 			return false, fmt.Errorf("write: %w", err)
@@ -191,6 +193,14 @@ func (w *waveWatcher) poll() (bool, error) {
 	done := w.prev.LoopLive && !snap.LoopLive
 	w.prev = snap
 	return done, nil
+}
+
+func (w *waveWatcher) warnOnce(warn string) {
+	if warn == "" || w.seen[warn] {
+		return
+	}
+	w.seen[warn] = true
+	fmt.Fprintf(w.stderr, "%sWARN: %s\n", wavePrefix, warn)
 }
 
 func (w *waveWatcher) followNewerWave() error {

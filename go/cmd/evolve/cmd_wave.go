@@ -47,6 +47,7 @@ type waveEnv struct {
 	now         func() time.Time
 	sleep       func(time.Duration)
 	pidAlive    func(int) bool
+	saveRecord  func(wave.Store, wave.Record) error
 	mainHead    func(root string) (string, error)
 	mergedPRs   func(root, since string) ([]string, error)
 }
@@ -65,7 +66,7 @@ func defaultWaveEnv() waveEnv {
 	return waveEnv{
 		resolveRoot: loopStopRoot, executable: os.Executable, pidStarted: processStartTime,
 		dispatch: dispatchWaveVerb(sysexec.DefaultRunner), now: time.Now, sleep: time.Sleep,
-		pidAlive: runlease.PIDAlive, mainHead: gitMainHead, mergedPRs: gitMergedPRs,
+		pidAlive: runlease.PIDAlive, saveRecord: wave.Store.Save, mainHead: gitMainHead, mergedPRs: gitMergedPRs,
 	}
 }
 
@@ -101,19 +102,25 @@ func waveLiveRuns(evolveDir string, now time.Time) []runlease.LiveRun {
 	return runlease.LiveRuns(filepath.Join(evolveDir, "runs"), now)
 }
 
-func waveLoopLive(env waveEnv, evolveDir string, rec wave.Record) bool {
-	return len(waveLiveRuns(evolveDir, env.now())) > 0 || waveOwnsPID(env, rec)
+func waveLoopLive(env waveEnv, evolveDir string, rec wave.Record) (bool, string) {
+	if len(waveLiveRuns(evolveDir, env.now())) > 0 {
+		return true, ""
+	}
+	return waveOwnsPID(env, rec)
 }
 
-func waveOwnsPID(env waveEnv, rec wave.Record) bool {
+func waveOwnsPID(env waveEnv, rec wave.Record) (bool, string) {
 	if rec.PID <= 0 || !env.pidAlive(rec.PID) {
-		return false
+		return false, ""
 	}
 	if writer, err := readWriterPID(rec.LogPath); err != nil || writer != rec.PID {
-		return false
+		return false, ""
 	}
 	started, known := env.pidStarted(rec.PID)
-	return !known || !started.After(rec.StartedAt)
+	if !known {
+		return true, fmt.Sprintf("the start time of pid %d is unknown; the wave counts it as the loop", rec.PID)
+	}
+	return !started.After(rec.StartedAt), ""
 }
 
 func processStartTime(pid int) (time.Time, bool) {

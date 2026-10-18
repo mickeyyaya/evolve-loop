@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -102,8 +101,15 @@ func waveStepDetail(rc int, tail []string) string {
 
 func runWaveNext(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	e := waveNextEnvelope{Schema: waveNextSchema, Steps: []waveStepResult{}, Warnings: []string{}}
-	rc := waveNext(env, args, &e, stdout, stderr)
-	if slices.Contains(args, "--json") {
+	a, err := parseWaveNextArgs(args)
+	var rc int
+	if err != nil {
+		e.Error = "usage: " + err.Error()
+		rc = waveUsageError(stderr, err)
+	} else {
+		rc = waveNext(env, a, &e, stdout, stderr)
+	}
+	if a.json {
 		if jrc := writeWaveJSON(e, stdout, stderr); rc == 0 {
 			rc = jrc
 		}
@@ -116,12 +122,7 @@ func runWaveNext(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	return rc
 }
 
-func waveNext(env waveEnv, args []string, e *waveNextEnvelope, stdout, stderr io.Writer) int {
-	a, err := parseWaveNextArgs(args)
-	if err != nil {
-		e.Error = "usage: " + err.Error()
-		return waveUsageError(stderr, err)
-	}
+func waveNext(env waveEnv, a waveNextArgs, e *waveNextEnvelope, stdout, stderr io.Writer) int {
 	plan, err := prepareWave(env, a, stderr)
 	e.Wave, e.RunID, e.DryRun, e.Warnings = plan.number, plan.args.boundary.runID, a.dryRun, plan.warnings
 	if plan.goal != "" {
@@ -291,9 +292,6 @@ func recordWave(env waveEnv, plan *wavePlan) (int, error) {
 	if err != nil {
 		plan.warnings = append(plan.warnings, fmt.Sprintf("read the main SHA: %v", err))
 	}
-	if err := closeLastWave(env, plan); err != nil {
-		plan.warnings = append(plan.warnings, err.Error())
-	}
 	if err := plan.plane.store.RemoveNotes(plan.notes); err != nil {
 		plan.warnings = append(plan.warnings, err.Error())
 	}
@@ -302,11 +300,17 @@ func recordWave(env waveEnv, plan *wavePlan) (int, error) {
 		MainSHA: head, CycleFloor: plan.floor, PID: pid, LogPath: logPath, StartedAt: env.now(),
 	}
 	for attempt := 0; attempt < waveRecordAttempts; attempt++ {
-		if err = plan.plane.store.Save(rec); err == nil {
-			return pid, nil
+		if err = env.saveRecord(plan.plane.store, rec); err == nil {
+			break
 		}
 	}
-	return pid, err
+	if err != nil {
+		return pid, err
+	}
+	if err := closeLastWave(env, plan); err != nil {
+		plan.warnings = append(plan.warnings, err.Error())
+	}
+	return pid, nil
 }
 
 func readWriterPID(logPath string) (int, error) {
@@ -331,7 +335,7 @@ func closeLastWave(env waveEnv, plan *wavePlan) error {
 		ended = env.now()
 	}
 	closed.EndedAt, closed.Outcome = &ended, plan.facts.Outcome()
-	return plan.plane.store.Save(closed)
+	return env.saveRecord(plan.plane.store, closed)
 }
 
 func waveLogEnded(r wave.Record) (time.Time, bool) {
