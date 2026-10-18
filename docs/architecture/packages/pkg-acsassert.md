@@ -13,6 +13,7 @@
 - **Equality does not panic.** `JSONFieldEquals` compares with `reflect.DeepEqual` (`equalAny`). A dot path that resolves to a map or slice is compared and does not panic.
 - **Source parsing ignores comments.** `CountInGoFunc` parses with `parser.ParseFile(..., 0)`. No comment is read or kept as a node, and nothing in the package parses comments.
 - **`RepoRoot` skips outside a git work tree.** Predicate suites then run cleanly on bare exports, with no false failures.
+- **`GoTests` judges the events of `go test -json`.** For each name in `Names`, it requires one `run` event and then one `pass` event. A pattern made of `^Name$` and `^(A|B)$` terms, joined by `|`, names exact tests, and `Names` must list each one. The spec is [acs-predicate-quality-gate.md](../acs-predicate-quality-gate.md#structured-go-test-evidence-acsassertgotests-2026-09-28).
 
 ## Invariants
 
@@ -20,8 +21,10 @@
 - **A missing file or function is a loud error, never a silent zero.** A bool-only reader cannot tell "file missing" from "content absent". A count of 0 cannot tell "function renamed" from "no occurrences". The `...Checked` forms and `CountInGoFunc` return an error for a missing file, unparsable source or a missing function. Thus a renamed function fails an `==0` predicate and does not satisfy it. `TestCountInGoFunc` and the `...Checked` tests pin this.
 - **Function-scoped counting resists rot.** File-wide counts (`CountOccurrencesAny == N`) break when a later change adds an occurrence elsewhere in the file. `CountInGoFunc` counts only inside the named top-level function. A method matches by its bare name, and the receiver is ignored. On a name collision the first declaration in the file wins. `TestCountInGoFunc_MethodReceiver` pins this.
 - **A line counts once.** `CountOccurrencesAny` counts a line that matches several variants one time.
+- **`GoTests` refuses an exact pattern name that `Names` omits.** A name outside `Names` is never checked, so a renamed test passes by omission. `unlistedExactNames` compares the exact names of the pattern with `Names` before the run starts. `TestExactNames_ReadsOnlyFullyAnchoredLists`, `TestUnlistedExactNames_ReportsEachExactNameThatNamesLacks`, `TestGoTests_RefusesAnExactPatternNameThatNamesDoNotList` and `TestGoTests_AStaleExactPatternNameCannotHideOutsideNames` pin this.
 
 ## Findings
 
 - A predicate had a file-wide count that was refreshed from 1 to 2 within one day. That rot is the reason `CountInGoFunc` exists.
 - Predicates that inverted `FileContains` were red on the correct state. That is the reason `FileNotContains` exists.
+- A predicate that ran a test by name through `go test -run` passed when a rename or a delete removed the test. `go test` exits 0 on a name that matches nothing. `GoTests` now refuses an exact pattern name that `Names` omits. For the predicates that do not call `GoTests`, [the `acsnames` check](../acs-predicate-quality-gate.md#predicate-test-names-resolve-acsnames-2026-10-18) fails when a named test does not exist. On 2026-10-18 it found 20 stale names in 16 packages.

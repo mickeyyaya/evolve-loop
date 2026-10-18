@@ -19,6 +19,14 @@ import (
 type routingRun struct {
 	bypass bool
 	env    map[string]string
+	role   string
+}
+
+func (r routingRun) centerRole() string {
+	if r.role == "" {
+		return roleCycle
+	}
+	return r.role
 }
 
 func overrideRefusals(r *cliroute.Router, projectRoot string, env map[string]string) ([]string, error) {

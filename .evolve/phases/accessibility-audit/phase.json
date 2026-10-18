@@ -38,6 +38,11 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "accessibility"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "frontend-ui"
       }
     ],
     "skip_when": null

@@ -241,11 +241,6 @@ func TestInboxSplit_AnItemWhoseTextNamesAProtectedPathGetsNoSplit(t *testing.T) 
 			t.Errorf("%s: err = %v, want ErrFixNamesProtected naming the path", field, err)
 		}
 	}
-	item := mixedItem(t)
-	item["acceptance"] = json.RawMessage(`["fine", "guard/a.go still builds"]`)
-	if _, err := Propose(item, isProtected, false); !errors.Is(err, ErrFixNamesProtected) {
-		t.Errorf("acceptance: err = %v", err)
-	}
 }
 
 func TestInboxSplit_ADirectoryInFilesWithAFixThatNamesAProtectedChildGetsNoSplit(t *testing.T) {
@@ -270,9 +265,8 @@ func TestInboxSplit_TextThatNamesOnlyCleanPathsSplitsAndTheLanePartIsScoped(t *t
 	if strings.Contains(lane, "guard/") {
 		t.Errorf("the lane part names a protected path: %s", lane)
 	}
-	want := "The change that fix-it describes is made in lib/b.go, lib/d.go only."
-	if got := strs(t, p.Lane, "acceptance"); !reflect.DeepEqual(got, []string{want}) {
-		t.Errorf("lane acceptance = %v, want %q", got, want)
+	if got := strs(t, p.Lane, "acceptance"); !reflect.DeepEqual(got, []string{"grader judges this"}) {
+		t.Errorf("lane acceptance = %v, want the original criterion", got)
 	}
 }
 

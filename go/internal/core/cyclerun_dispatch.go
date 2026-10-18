@@ -31,6 +31,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		return dispatchResult{}, loopAbort, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 	}
+	cr.o.emitPhaseDispatched(cr.cycle, cr.cs.RunID, next)
 	if next == PhaseRetro {
 		cr.o.ensureFailureDigest(cr.cycle, cr.req.ProjectRoot, cr.cs.WorkspacePath, string(cr.current),
 			agentGradedFailReason(string(cr.current), cr.cs.WorkspacePath))

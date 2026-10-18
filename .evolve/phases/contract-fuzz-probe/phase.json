@@ -38,6 +38,11 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "api-design"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "messaging"
       }
     ],
     "skip_when": null

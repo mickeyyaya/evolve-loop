@@ -11,6 +11,8 @@ const ClassificationMidExecutionFail = "cycle-mid-execution-fail"
 
 const CycleTerminationTriageNoWork = "triage-empty-commitment"
 
+const CycleTerminationTddProtectedRoute = "tdd-protected-predicate-route"
+
 const CycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
 
 const CycleTerminationLaneWorktreeDeferred = "lane-worktree-deferred"

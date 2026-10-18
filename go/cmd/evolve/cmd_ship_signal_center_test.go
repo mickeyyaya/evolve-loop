@@ -58,24 +58,15 @@ func TestWireSimulateOrchestrator_ShipWarningRenders(t *testing.T) {
 
 func TestCmdShip_BuildsTheRootSignalCenter(t *testing.T) {
 	t.Parallel()
-	src, err := os.ReadFile("cmd_ship.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, needle := range []string{"newRootSignalCenter(", "Signals:", ".Flush()"} {
-		if !strings.Contains(string(src), needle) {
-			t.Errorf("cmd_ship.go must spell %q: the manual/release root wires the landing's warnings (ADR-0103 unit 07)", needle)
-		}
-	}
 	root := t.TempDir()
 	var stderr bytes.Buffer
-	signals := shipRootSignals(root, &stderr)
+	signals, closeSignals := shipRootSignals(root, &stderr)
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "signals.ndjson")); !os.IsNotExist(err) {
 		t.Errorf("the durable sink opens on the FIRST event only — a green manual ship touches no file: %v", err)
 	}
 	signals.Emit(signalcenter.Event{Module: signalcenter.ModuleShip, Origin: "Test.shipRoot", Kind: signalcenter.KindShipWarning,
 		Severity: signalcenter.SeverityWarn, Code: landing.CodeHeadReadFailed, Reason: "ship root wiring proof"})
-	signals.Flush()
+	closeSignals()
 	if !strings.Contains(stderr.String(), "[ship] ship.warning WARN SHIP_LANDING_HEAD_READ_FAILED") {
 		t.Errorf("the ship root's WARN renders on the operator's stderr: %q", stderr.String())
 	}

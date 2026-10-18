@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxsplit"
@@ -38,7 +39,7 @@ func runInboxSplit(args []string, stdout, stderr io.Writer) int {
 	}
 	opts := inboxmover.Options{ProjectRoot: *projectRoot, Stderr: stderr, IsProtectedPath: laneForbidden(*projectRoot, stderr),
 		PriorityClasses: pol.InboxPriorityConfig().ClassOrder}
-	res, err := inboxsplit.Accept(newSplitInbox(opts), id, opts.IsProtectedPath, *afterConsole)
+	res, err := inboxsplit.Accept(newSplitInbox(opts), id, splitForbidden(opts.IsProtectedPath), *afterConsole)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox split: %v\n", err)
 		return splitExitCode(err)
@@ -48,14 +49,22 @@ func runInboxSplit(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, string(body))
 		return 0
 	}
-	fmt.Fprintf(stdout, "inbox split: %s retired to inbox/consumed/; console part %s keeps every protected file, lane part %s is lane-dispatchable\n",
-		res.OriginalID, res.ConsoleID, res.LaneID)
+	lane := "is lane-dispatchable"
+	if res.LaneWaits {
+		lane = "waits for " + res.ConsoleID
+	}
+	fmt.Fprintf(stdout, "inbox split: %s retired to inbox/consumed/; console part %s keeps every protected file, lane part %s %s\n",
+		res.OriginalID, res.ConsoleID, res.LaneID, lane)
 	return 0
+}
+
+func splitForbidden(lane func(string) bool) func(string) bool {
+	return func(path string) bool { return lane(path) || guards.TouchesProtectedSurface(path) }
 }
 
 func splitExitCode(err error) int {
 	for _, refusal := range []error{inboxsplit.ErrNotPending, inboxsplit.ErrHasDependents, inboxsplit.ErrNoFiles,
-		inboxsplit.ErrAllProtected, inboxsplit.ErrNoneProtected, inboxsplit.ErrFixNamesProtected, inboxsplit.ErrStamped, inboxsplit.ErrMalformed,
+		inboxsplit.ErrAllProtected, inboxsplit.ErrNoneProtected, inboxsplit.ErrFixNamesProtected, inboxsplit.ErrNoCriterion, inboxsplit.ErrStamped, inboxsplit.ErrMalformed,
 		inboxmover.ErrInvalidItem, inboxmover.ErrConsoleRouted} {
 		if errors.Is(err, refusal) {
 			return 1

@@ -62,7 +62,7 @@ func TestKind_ClosedSetAndTerminal(t *testing.T) {
 	all := []Kind{KindPhaseDispatched, KindPhaseOutcome, KindPhaseAborted, KindGateRejected, KindGateCorrected,
 		KindShipLanded, KindShipError, KindShipWarning, KindLoopWarning, KindAdvisorWarning, KindRunnerWarning, KindInboxWarning, KindAuditWarning, KindSystemFailure, KindQuotaPaused, KindBridgeWarning, KindBridgeTripwire,
 		KindPaneLiveness, KindLedgerAppended, KindOutcomeWarning, KindFailureDiagWarning, KindCarryoverWarning, KindFailureLearningWarning, KindConfigWarning, KindObserverWarning, KindGatePassed, KindCycleSealed, KindLoopWave, KindLoopHalt, KindLoopEscalation,
-		KindListenerPanicked, KindRegistryDrift, KindSinkDropped}
+		KindLoopStarted, KindLoopExit, KindLoopLost, KindListenerPanicked, KindRegistryDrift, KindSinkDropped}
 	for _, k := range all {
 		if !k.Known() {
 			t.Errorf("%q must be known", k)

@@ -31,6 +31,36 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "project-management"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "accessibility"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "i18n"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "data-pipeline"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "strategy-options"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "business-plan"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "partnership-deal"
       }
     ]
   },

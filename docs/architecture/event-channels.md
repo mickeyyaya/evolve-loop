@@ -84,6 +84,7 @@ Every watcher of the pipeline polls, and no program outside one process can subs
 - **One producer path.** Every event is a Signal Center event. Wave, loop, ship, inbox and CI lifecycle events are emitted into the Center (§14).
 - **One publisher.** The `Publisher` is one Center `Listener`. `newRootSignalCenter(role)` (`go/cmd/evolve/cmd_cycle.go:352`) subscribes it and returns `close(deadline)`.
 - **Every root.** Each process that emits builds its Center through `newRootSignalCenter`. The phase-observer Center gets the Publisher too. A root-list guard test keeps the list complete.
+- **State: Built (E10, 2026-10-18).** The function `newRoleSignalCenter` in `go/cmd/evolve/cmd_cycle.go` builds the Center of a root and subscribes one Publisher through `rootwire.Attach`. The phase observer calls `rootwire.Attach` itself. Each root defers the closer. Package note: [internal-events-rootwire.md](packages/internal-events-rootwire.md).
 - **Listeners observe and never decide** ([ADR-0101](adr/0101-signal-center.md) decision 5). The Publisher never emits and never calls `Flush`.
 - **No broker.** A subscriber reads the channel logs. No process forwards an event, so no process needs a supervisor.
 - **Roles.** The `role` names the root: `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate`, `phase-observer`, `wave`, `inbox`, `ci` or `subscriber`. A reader marks the records that it makes with `watch`.
@@ -92,7 +93,7 @@ Every watcher of the pipeline polls, and no program outside one process can subs
 
 The catalog is config: `.evolve/policy.json` `events.channels`. The compiled defaults are in `internal/policy` (`EventsConfig()`). The catalog is closed: a publisher appends only to a configured channel, and a selector never makes a channel.
 
-**The message family** ([ADR-0129](adr/0129-cycle-scoped-agent-messaging.md)). The channels `msg.<cycle>` and `msg.dead` are outside the catalog. The messaging service of a cycle is their only writer, and its records hold a `message` variant ([agent-messaging.md](agent-messaging.md) §7). A reader selects them as any channel, for example `--channel 'msg.>'`.
+**The message family** ([ADR-0129](adr/0129-cycle-scoped-agent-messaging.md)). The channels `msg.<cycle>` and `msg.dead.<cycle>` are outside the catalog. The messaging service of a cycle is their only writer, and its records have the source `msg` and hold a `message` variant ([agent-messaging.md](agent-messaging.md) §7). A reader selects them as any channel, for example `--channel 'msg.>'`.
 
 Each channel has these keys:
 
@@ -119,13 +120,14 @@ The default channels:
 
 - One event can go to several channels. The Publisher writes it once in each channel.
 - The `signals` channel replaces the project-level `.evolve/signals.ndjson`. The per-cycle `runs/cycle-N/signals.ndjson` stays as the cycle record.
+- **State: Built (E10, 2026-10-18).** The compiled defaults are `EventsDefaults()` in `go/internal/policy/policy_events.go`. They hold the table above without the `ci` channel. The route `kind=ci.*` matches no registered kind until E11 adds `ci.completed`, and the grammar refuses such a route (§8). E7 moves the table to `policy.json`.
 - **Names.** A name is one or more tokens separated by dots. A token matches `[a-z0-9_-]+`.
 - **Selectors.** `--channel` takes a comma list of names or patterns. `*` matches one token, and `>` matches one or more tokens at the end (NATS subjects, research F4.4). For example, if the catalog has `ci.required` and `ci.release`, `--channel 'ci.>'` selects both.
 - **Resolution.** The reader resolves the selectors when it starts. A selector that matches no channel is refused. With a wildcard, the reader also watches `.evolve/events/ch/`, and it resolves the selection again when a new channel directory appears.
 
 ### 3. Records
 
-Two record types exist on disk, one JSON object on each line:
+Three record types exist on disk, one JSON object on each line. The examples show a `signal` record and a `gap` record:
 
 ```json
 {"source":"loop","dispatch":"events/0/sub-alerts/p4242n1t0","signal":{"schema_version":"signal/1.0","seq":41,"pid":9055,"ts":"2026-10-09T17:46:02.114Z","cycle":1841,"module":"orchestrator","origin":"cycleRun.completeCycle","kind":"cycle.sealed","severity":"INFO","reason":"final verdict PASS","fields":{"final_verdict":"PASS"}}}
@@ -137,8 +139,9 @@ Two record types exist on disk, one JSON object on each line:
 - **`dispatch`** is the `EVOLVE_DISPATCH_ID` of the process that published the record, if it has one. A record from a process with no tag has no `dispatch` key.
 - **`gap`** names events that this channel does not hold: the reason, a severity, the `pid` of the process, the `seq` range and the count. The reasons are `queue_full`, `write_error` and `lock_deadline` (§5, §6). A loss on a `lossless` channel has the severity `INCIDENT`, and a loss on a `best_effort` channel has `WARN`.
 - **`from` and `to`** are always in a gap, also when they are 0. A synthetic gap sets them to the two cursors of the move. A stored gap has 0 in both.
-- **Valid record.** A record has exactly one of `signal` and `gap`. A stored record never has the source `watch`. The writer refuses any other record, and the reader reads it as `malformed`.
-- **Size.** `Normalize` keeps a signal line at 4,096 bytes or less (`MaxLineBytes`, `event.go:33`). `source` comes from a closed set, and the Publisher cuts `dispatch` to 256 bytes. A record line is thus 4,608 bytes or less.
+- **`message`** holds a message of the channels `msg.<cycle>` and `msg.dead.<cycle>` ([agent-messaging.md](agent-messaging.md) §7). The log keeps it as raw JSON. A message line is 65,536 bytes or less.
+- **Valid record.** A record has exactly one of `signal`, `gap` and `message`. A stored record never has the source `watch`. The writer refuses any other record, and the reader reads it as `malformed`.
+- **Size.** `Normalize` keeps a signal line at 4,096 bytes or less (`MaxLineBytes`, `event.go:33`). `source` comes from a closed set, and the Publisher cuts `dispatch` to 256 bytes. A `signal` or `gap` record line is thus 4,608 bytes or less.
 
 The wire form is what `evolve events watch --json` prints and what a command reads on stdin. The reader adds four keys from the record and from the place where it read the line:
 
@@ -149,7 +152,7 @@ The wire form is what `evolve events watch --json` prints and what a command rea
 - `evolve.event/1` holds every `signal/1.0` field without a change, inside `signal`. A `signal/1.0` consumer reads `.signal`.
 - **The event id** (`id`) is `<signal.pid>.<signal.seq>.<signal.ts>`. It is the same in every channel and in the per-cycle file. One process has one `seq` order, and the time separates a pid that the system used again. The event id is the key to remove duplicates.
 - **The position** (`channel` and `cursor`) says where the record is. A consumer resumes and acks by position.
-- A gap record's id is `gap.<channel>.<cursor>`.
+- A gap record's id is `gap.<channel>.<cursor>`. A message record's id is `msg.<channel>.<cursor>`.
 - A **synthetic record** comes from a reader, not from a log: the last will (`loop.lost`, §7) and the reader gaps (`retention`, `malformed`, `reset`). Its `source` is `watch`, and it has no `cursor`. A synthetic gap has the id `gap.<channel>.<from>`. A consumer never acks a synthetic record. The reader moves the cursor past the lines that a synthetic gap names.
 
 ### 4. Cursors and segments
@@ -202,7 +205,7 @@ Each append takes the channel lock `ch/<channel>.lock` with `flock.LockWithin(pa
 - At most one lock call waits for each channel and process. While it waits, a new append to that channel fails at once with `ErrLockPending`, which wraps `ErrLockDeadline`. It starts no goroutine and opens no descriptor. It is a counted loss with the reason `lock_deadline`. The flag clears at the settle signal.
 - The deadline is `events.lock_deadline_ms` (default 250). E10 keeps it at 250 or less.
 - **The drain bound.** One event that matches k lossless channels waits up to k × the lock deadline. The worst case is the six default lossless channels: 6 × 250 ms = 1.5 s.
-- The lock deadline bounds only the wait for the lock. A disk that hangs inside the write, after the lock is taken, is not bounded. That is an accepted limit (see Limits).
+- The lock deadline bounds only the wait for the lock. A disk that hangs inside the write, after the lock is taken, is not bounded. The `close` call of the Publisher has the same limit (§6). That is an accepted limit (see Limits).
 
 **Errors:**
 - A write error (for example `ENOSPC` or `EIO`) or a lock deadline is a counted loss. The next good append writes one gap record with the reason `write_error` or `lock_deadline`.
@@ -223,7 +226,10 @@ A publisher never waits on a subscriber: no subscriber takes a channel lock. A s
 - **A loss.** The Publisher counts a loss for each channel of the event. It keeps the `pid`, the first and last `seq` and the count. The next good batch for that channel starts with one gap record.
 - **The pattern for the count** is the one in `ndjsonSink.reportDrops` (`go/internal/signalcenter/sinks.go:108`). The Publisher writes a record, and it does not emit.
 - **`close(deadline)`.** Each root calls it at exit, after `Flush`. It drains the queue until it is empty or the deadline passes. What is left is a counted loss. The gap record goes out if the lock comes before the deadline. Else `close` returns the count, and the root prints it on one stderr line.
+  - **What the deadline bounds.** The deadline bounds the wait for each channel lock. It does not bound a `write` that hangs in the kernel. `close` waits for each writer goroutine with no timeout (`awaitWriter` in `go/internal/events/publisher/queue.go`). A hung `write` thus holds `close`, and so it holds the exit of the root (see Limits).
+  - **More than one call.** A root can call its closer more than once, for example before a re-exec that then fails. Each call flushes and closes again. The second call writes the gap records for the events that came after the first call. The stderr line goes out once.
 - **Measured load.** About 2,000 events per day, with bursts of 50 per second (research F1.1, F1.2). A queue of 1,024 holds 20 seconds of the worst burst.
+- **Measured volume with E10 on (2026-10-18).** A cycle publishes about 138 events, and each event is about 386 bytes. 83 percent of the events are `ledger.appended`. At 8 lanes, the channel logs grow by 8 to 10 MB each day. Until E7 adds the gc category, nothing caps this growth (see Limits).
 
 ### 7. The wake: arm, catch up, wait
 
@@ -275,6 +281,7 @@ The order closes the window where an append lands between the read and the wait 
 - On darwin, `procstart_darwin.go` reads `p_starttime` from `kinfo_proc` (`KERN_PROC_PID`). It uses a general form of the raw `sysctl` call that `proctree` uses for `KERN_PROCARGS2` (`go/internal/proctree/procargs_darwin.go`).
 - On Linux, `procstart_linux.go` reads the start ticks from `/proc/<pid>/stat`, with the boot id.
 - The reader reads the live pid with the same port and compares the two values for equality. Equal means "the same process". Anything else means "gone".
+- **A re-exec keeps the identity.** `syscall.Exec` keeps the pid, and a probe on darwin showed the same `p_starttime` before and after the call. No probe ran on Linux yet. The new image emits a new `loop.started` with the same `proc_start`. The reader thus sees one live loop and makes no `loop.lost`.
 
 At arm time, for any `--since`:
 
@@ -478,6 +485,26 @@ Component E11 adds these producers and registers them in the closed sets (`go/in
 | `inbox.claimed`, `inbox.released` | `inbox` | the inbox mover lifecycle (`go/internal/inboxmover/lifecycle`) | INFO |
 | `ci.completed` | `ci` (new) | `evolve ci watch` and the ship CI watch; a red run has code `CI_RUN_RED` | INFO, or WARN when red |
 
+**State: Built for four kinds (E11, 2026-10-18).** These kinds have a producer:
+
+| Kind | Producer | Fields |
+|---|---|---|
+| `phase.dispatched` | `emitPhaseDispatched` in `go/internal/core/signal.go`. It runs once for each phase transition, at the three sites above. | none |
+| `ship.landed` | `settleLanding` in `go/internal/phases/ship/landing_intent.go`, after the intent is written as `complete` | `cycle`, `commit`, `branch` |
+| `loop.started` | `announceLoop` in `go/cmd/evolve/signal_loop.go` | `proc_start` |
+| `loop.exit` | the function that `announceLoop` returns | `exit` |
+
+The batch gets its announcer from `loopConfig.announce`. The default is `announceLoop`. The chain sets `silentLoop` on each batch it runs, so only the chain Center announces the process.
+
+- The kind `loop.lost` and the code `LOOP_LOST` are registered in `go/internal/signalcenter`. Only a reader makes a `loop.lost` record.
+- A loop process emits one `loop.exit` and at least one `loop.started`. In chain mode the `loop-chain` Center emits them, and a chained batch emits none.
+- A re-exec replaces the process image. The pid and the start time stay the same. A re-exec happens when the boot refresh, or a chain or wave boundary refresh, rebuilds the binary. The new image emits a new `loop.started` with the same `proc_start`. A process that re-executes N times thus emits N + 1 `loop.started` records and one `loop.exit`. The reader keys a live loop by its pid and its `proc_start`, so it arms the loop once.
+- Before each re-exec, the root retires its Centers: it flushes and closes them, so the best-effort queues are on disk. In a chain, the batch Center closes first and the chain Center second. If the re-exec fails, the loop goes on. The closers run again at exit, and the second run writes the gap records for the events that came after the first run.
+- A panic emits no `loop.exit`. The last will then reports the crash.
+- `ship.landed` is emitted at most once for a landing. The code emits it only after the write of the `complete` intent succeeds. If that write fails, nothing is emitted, and the retry settles the landing again and emits then. If the process stops between the write and the emit, the event is lost. No retry repeats it.
+- The kinds `wave.started`, `wave.ended`, `inbox.claimed`, `inbox.released` and `ci.completed` have no producer yet.
+- `.evolve/signals.ndjson` keeps the 33 kinds that existed before the channels, until E12 retires it. The list is an allow-list (`legacyProjectKinds` in `go/cmd/evolve/cmd_cycle.go`). A new kind, such as `loop.started`, `loop.exit` or `loop.lost`, reaches the channels only. `TestLegacyProjectRecord_AllowsOnlyTheKindsThatExistedBeforeTheChannels` pins the list.
+
 The module `events` (new) owns `EVENTS_DEAD_LETTERED`. A gap record is not a signal, so it has no kind.
 
 ### 15. Timers
@@ -526,8 +553,10 @@ The module `events` (new) owns `EVENTS_DEAD_LETTERED`. A gap record is not a sig
 - **Linux inotify limits.** Each process that watches uses one inotify instance, and two during an `Arm`. The kernel defaults are 128 instances for each user, 16,384 queued events, and 8,192 to 1,048,576 watches from the RAM size (research F2.10).
 - **The runtime wake.** An idle watcher still wakes about once a minute for Go runtime work.
 - **Descriptors.** A darwin reader holds one descriptor for each watched directory and tail segment, plus the kqueue.
-- **A hung disk holds the drain.** The lock deadline bounds the wait for the channel lock, not a `write` that the kernel holds. The console accepted it as a known limit; the operator can override it.
+- **A hung disk holds the drain.** The lock deadline bounds the wait for the channel lock, not a `write` that the kernel holds. `close` at exit has the same limit. It waits for each writer goroutine with no timeout (§6). A hung `write` thus holds the exit of a root. The console accepted it as a known limit; the operator can override it.
 - **One waiting lock call for each log, not for each process.** The rule of §5 is kept by one `channel.Log`. Two Publishers in one process have two logs for a channel, and thus can have two waiting lock calls. This is accepted. A later process-wide registry of waiting calls can close it.
 - **A deleted lock file splits the lock.** If someone deletes `ch/<channel>.lock` while a call waits, the waiter holds the old inode. A new writer then locks a new file. The current `flock` adapter has the same exposure.
 - **A time start is a scan.** `--since` with a time reads from the oldest retained segment. The cost grows with the retention.
 - **The duplicate window is in memory.** After a restart, a copy of an event in a second channel can run again.
+- **A re-exec can lose the events of other goroutines.** `syscall.Exec` replaces the process image, so no deferred closer runs. The root thus retires its Centers just before the call (§14). A goroutine that emits between the close and the exec loses its events, and no gap record names them. The window is very small.
+- **No retention before E7.** No gc category exists for the channel segments, so no segment is deleted. A measured cycle publishes about 138 events of about 386 bytes each, and 83 percent of them are `ledger.appended`. At 8 lanes, the logs grow by 8 to 10 MB each day. Nothing caps this growth until E7 adds the gc category. E7 must land within the first month of use.

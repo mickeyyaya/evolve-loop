@@ -727,6 +727,8 @@
 ./internal/overlap
 # E5 (ADR-0127): the channel reader and the last will of the event channels (internal/events/reader).
 ./internal/events/reader
+# E10 (ADR-0127): the root wiring that subscribes one Publisher to the Center of each root process and returns its closer (internal/events/rootwire).
+./internal/events/rootwire
 # derived — the one catalog of the generated outputs, their markers, regions and inputs, the conflict class and the regeneration (ADR-0128, plan Q1).
 ./internal/derived
 # R2 (ADR-0130): the attempt postmortem, a retry carries the evidence of the attempt that it replaces (internal/attemptpostmortem).
@@ -742,6 +744,8 @@
 ./internal/agentmsg/identity
 ./internal/agentmsg/memstore
 ./internal/agentmsg/policy
+# M2 (ADR-0129): the channel-log store adapter of cycle agent messaging, unwired (internal/agentmsg/channelstore).
+./internal/agentmsg/channelstore
 # cover-changed (2026-10-11): the gate that refuses a changed function below 100% (internal/covchanged).
 ./internal/covchanged
 ./internal/coverstrict
@@ -773,3 +777,4 @@
 ./internal/admission
 # orchestrator — the rolling pool under the orchestrator and the lane lease (ADR-0139 O4, O5): admission by cell for each free slot, one deadline timer over a heap, and the stop through the launch context only.
 ./internal/orchestrator
+./internal/acspathscan

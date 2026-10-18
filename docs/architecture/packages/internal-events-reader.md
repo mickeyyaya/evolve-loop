@@ -11,7 +11,7 @@
 - the start of a read (`Since`, `ParseSince`);
 - the result of a read (`Item`, `Item.ID`) and the two ends of a call (`ErrDeadline`, `ErrHangup`).
 
-Nothing in production calls the package yet. The CLI (E9) and the subscriptions (E8) use it, and E10 wires them.
+Nothing in production calls the package yet. The CLI (E9), the subscriptions (E8) and the oversight loop of the wave orchestrator use it. E10 wires the writer side only.
 
 ## Design
 
@@ -26,7 +26,7 @@ Nothing in production calls the package yet. The CLI (E9) and the subscriptions 
   - A catch-up reads every channel first, and it moves the cursors only when all reads are good. Thus a failed read moves no cursor and loses no item. The next `Next` reads the same records again, and a `loop.lost` of the failed catch-up comes again.
   - When a catch-up finds items, `Next` returns them at once. The next `Next` arms a changed watch set before its read.
 - **`Item.Next`** is the channel cursor after the item. It is the cursor of the next stored record, the `from` of the next synthetic gap, or the end of the read. A consumer stores it to ack the item. For a `loop.lost` record, `Next` is the current cursor of its channel, so an ack of it moves nothing.
-- **`Item.ID`** is `<pid>.<seq>.<ts>` for a signal, `gap.<channel>.<cursor>` for a stored gap and `gap.<channel>.<from>` for a synthetic gap (§3).
+- **`Item.ID`** is `<pid>.<seq>.<ts>` for a signal, `gap.<channel>.<cursor>` for a stored gap and `gap.<channel>.<from>` for a synthetic gap, and `msg.<channel>.<cursor>` for a message record (§3).
 - **The merge (the decided rule).** The reader merges the reads of one catch-up by `signal.ts`, with one head for each channel. It never changes the order of one channel, so the cursors of a channel stay in order. A gap comes before a signal, and a signal with a time that does not parse comes last.
   - The merge applies inside one batch only. Two batches are not in time order across channels, so the result is not a total order.
   - The synthetic records of the last will come after the records of their batch. Thus the `Next` of a `loop.lost` is never before an item that the consumer did not get.
@@ -48,7 +48,7 @@ Nothing in production calls the package yet. The CLI (E9) and the subscriptions 
 - **The second read.** After each arm that adds a live loop, the reader reads `proc_start` again. `ESRCH` or another value marks the loop as lost. A `loop.started` record after the seed gets no first read: it is live at once, and the arm and the second read decide.
 - **A decision first catches up `loop`.** An exit wake and a failed second read only mark a loop. The next catch-up reads the `loop` channel to its end, and a `loop.exit` from the same source and pid ends the loop with no loss. Only then does the reader make `loop.lost`.
 - **`loop.lost`** has the source `watch`, the module `loop`, the code `LOOP_LOST` and the severity `INCIDENT`. Its origin is `events.reader`, and it has the pid and the run id of the loop. Its fields are `pid`, `run_id` and `exit`, and `historical` for a history record. `exit` is `unknown` when an `INCIDENT` gap from the same source and pid follows the `loop.started` record. Else it is `crash`.
-- **Kinds are data.** `loop.started`, `loop.exit` and `loop.lost` are not registered yet (E11 registers them). The reader compares the kind text, so it does not depend on the registry.
+- **Kinds are registered.** Since E11 (2026-10-18), `go/internal/signalcenter` registers `loop.started`, `loop.exit` and `loop.lost`, and it registers the code `LOOP_LOST`. The reader uses these constants. A filter can name `loop.lost` (`TestRegistry_NewKindsAndCodesAreRegistered`).
 
 ## Invariants
 

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo.svg" alt="The Evolve Loop logo: a spark in a ring of four arcs. Each arc is thicker than the arc before it." width="160">
+</p>
+
 # Evolve Loop
 
 Current guarantees and supported modes: [runtime contract](docs/architecture/current-runtime-contract.md).

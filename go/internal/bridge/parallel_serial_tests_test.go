@@ -50,6 +50,7 @@ var serialTests = map[string]string{
 	"bridge.TestEngineLaunch_StdoutCompletion_ReadsScrollbackNotArtifact":                 "calls process-global setter Register",
 	"bridge.TestEngineLaunch_StepFailuresPrecedeTheExitSignal":                            "calls process-global setter Register",
 	"bridge.TestEveryShippedProfileAndTierLaunchesWithAnEffort":                           "swaps seam modelCatalogDirFn",
+	"bridge.TestLacksToolUse_AnUnloadableManifestIsNoEvidenceOfNoToolUse":                 "swaps seam bridgeManifestDirFn",
 	"bridge.TestLaunchArgs_ABadArtifactBudgetFallsBackToTheBuiltinDeadline":               "calls process-global setter Register",
 	"bridge.TestLaunchArgs_AFailedPreflightIsLoggedAndTheArtifactBudgetReachesTheDriver":  "calls process-global setter Register",
 	"bridge.TestLaunchArgs_AGlobInASandboxDenialIsABadFlag":                               "calls process-global setter Register",

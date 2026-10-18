@@ -56,6 +56,7 @@ const (
 	DiagCodeTriageTopNEmpty         = "TRIAGE_TOPN_EMPTY"
 	DiagCodeTriageCommitmentInvalid = "TRIAGE_COMMITMENT_INVALID"
 	DiagCodeTriageScopeUnanswered   = "TRIAGE_SCOPE_UNANSWERED"
+	DiagCodeProtectedPredicateRoute = "PROTECTED_PREDICATE_ROUTE"
 )
 
 const (
@@ -93,7 +94,7 @@ type Disposition struct {
 
 func RefusalDisposition(code string) Disposition {
 	switch code {
-	case DiagCodeTriageProtectedSurface:
+	case DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute:
 		return Disposition{TaskLevel: true, RouteConsole: true}
 	case DiagCodeTriageTopNEmpty, DiagCodeTriageScopeUnanswered:
 		return Disposition{TaskLevel: true}

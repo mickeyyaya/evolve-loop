@@ -38,6 +38,16 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "data-migration"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "data-pipeline"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "database"
       }
     ],
     "skip_when": null

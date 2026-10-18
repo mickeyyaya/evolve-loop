@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	kindLoopStarted signalcenter.Kind = "loop.started"
-	kindLoopExit    signalcenter.Kind = "loop.exit"
-	kindLoopLost    signalcenter.Kind = "loop.lost"
-	codeLoopLost    signalcenter.Code = "LOOP_LOST"
+	kindLoopStarted = signalcenter.KindLoopStarted
+	kindLoopExit    = signalcenter.KindLoopExit
+	kindLoopLost    = signalcenter.KindLoopLost
 )
+
+const codeLoopLost = signalcenter.CodeLoopLost
 
 type runKey struct {
 	source string

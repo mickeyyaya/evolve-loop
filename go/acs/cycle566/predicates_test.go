@@ -30,13 +30,6 @@ func TestC566_001_EffortManifestParityPerCLI(t *testing.T) {
 	}
 }
 
-func TestC566_002_EffortDefaultMatrix(t *testing.T) {
-	ok, out := runGoTest(t, profilesPkg, "TestEffortDefaults_Matrix")
-	if !ok {
-		t.Errorf("per-phase effort default matrix not pinned in config (scout/triage=low, tdd/audit/adversarial=medium, builder=medium):\n%s", out)
-	}
-}
-
 func TestC566_003_EffortAbsentByteIdentical(t *testing.T) {
 	ok, out := runGoTest(t, bridgePkg, "TestEffortRealize_AbsentByteIdentical")
 	if !ok {

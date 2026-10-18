@@ -584,6 +584,7 @@ func TestItem_IDNamesTheEventOrThePositionOfAGap(t *testing.T) {
 		{"signal", Item{Channel: "cycle", Record: ev}, "4242.41.2026-10-09T17:46:41.000Z"},
 		{"stored gap", Item{Channel: "loop", Record: channel.Record{Cursor: 77, Source: "loop", Gap: &channel.Gap{From: 0, To: 0}}}, "gap.loop.77"},
 		{"synthetic gap", Item{Channel: "loop", Record: channel.Record{Source: channel.SourceWatch, Gap: &channel.Gap{From: 12, To: 90}}}, "gap.loop.12"},
+		{"message", Item{Channel: "msg.5", Record: channel.Record{Cursor: 310, Source: "msg", Message: []byte(`{}`)}}, "msg.msg.5.310"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -644,5 +645,22 @@ func TestReader_EachItemCarriesTheCursorAfterIt(t *testing.T) {
 	got := []int64{items[0].Next, items[1].Next, items[2].Next}
 	if describe(items) != "cycle:cycle.sealed#1 cycle:gap(malformed "+strconv.FormatInt(first, 10)+"->"+strconv.FormatInt(first+2, 10)+") cycle:cycle.sealed#2" || !slices.Equal(got, want) {
 		t.Errorf("items = %s with next %v, want next %v", describe(items), got, want)
+	}
+}
+
+func TestPlaceWill_ARecordWithNoSignalAndNoGapIsNotPlaced(t *testing.T) {
+	t.Parallel()
+	r := &Reader{
+		routes:    map[string]filter.Filter{"cycle": {}},
+		followers: []*follower{{name: "cycle"}},
+	}
+	message := channel.Record{Source: "msg", Message: []byte(`{}`)}
+	gap := channel.Record{Source: "loop", Gap: &channel.Gap{From: 3, To: 9}}
+	lost := sealed(5)
+
+	items := r.placeWill([]channel.Record{message, gap, lost})
+
+	if len(items) != 2 || items[0].Channel != loopChannel || items[0].Next != 9 || items[1].Channel != "cycle" {
+		t.Errorf("placeWill = %+v, want the gap on the loop channel and the signal on its follower, and no message item", items)
 	}
 }

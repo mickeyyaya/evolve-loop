@@ -62,6 +62,12 @@ func repoRootFromCwd() (string, error) {
 
 func runCLI(t *testing.T, root string, args ...string) (out string, code int) {
 	t.Helper()
+	stdout, stderr, code := runCLISplit(t, root, args...)
+	return stdout + stderr, code
+}
+
+func runCLISplit(t *testing.T, root string, args ...string) (stdout, stderr string, code int) {
+	t.Helper()
 	if evolveBuildErr != nil {
 		t.Fatalf("evolve CLI unavailable: %v", evolveBuildErr)
 	}
@@ -75,9 +81,9 @@ func runCLI(t *testing.T, root string, args ...string) (out string, code int) {
 		}
 	}
 	cmd.Env = append(kept, "EVOLVE_PROJECT_ROOT="+root)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
 	if err := cmd.Run(); err != nil {
 		var ee *exec.ExitError
 		if !errors.As(err, &ee) {
@@ -85,7 +91,7 @@ func runCLI(t *testing.T, root string, args ...string) (out string, code int) {
 		}
 		code = ee.ExitCode()
 	}
-	return strings.ReplaceAll(stdout.String()+stderr.String(), root, "<root>"), code
+	return strings.ReplaceAll(outBuf.String(), root, "<root>"), strings.ReplaceAll(errBuf.String(), root, "<root>"), code
 }
 
 const (
@@ -646,31 +652,24 @@ func TestC1678_009_LiveLedgerVerifiesReportsItsScopeAndIsNotMutated(t *testing.T
 
 func TestC1678_011_JSONPathCarriesTheSamePartitionAsTheTextPath(t *testing.T) {
 	root := mixedInbox(t)
-	out, code := runCLI(t, root, "inbox", "batches", "--json")
+	stdout, stderr, code := runCLISplit(t, root, "inbox", "batches", "--json")
 	if code != 0 {
-		t.Fatalf("RED: `evolve inbox batches --json` must succeed; exit=%d output=%q", code, out)
+		t.Fatalf("RED: `evolve inbox batches --json` must succeed; exit=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	if !json.Valid([]byte(strings.TrimSpace(stdoutOnly(out)))) {
-		t.Errorf("RED: --json output is not valid JSON; got %q", out)
+	if !json.Valid([]byte(stdout)) {
+		t.Errorf("RED: --json stdout is not valid JSON; got %q", stdout)
 	}
 	for _, tc := range []struct{ id, reason string }{
 		{routedID, routedReason},
 		{derivedID, derivedReason},
 	} {
-		if !strings.Contains(out, tc.reason) {
+		if !strings.Contains(stdout, tc.reason) {
 			t.Errorf("RED: the --json path does not carry the routing reason for %q (want %q) — the partition is "+
 				"wired into the text renderer only, so machine consumers still read operator-owned work as dispatchable; got %q",
-				tc.id, tc.reason, out)
+				tc.id, tc.reason, stdout)
 		}
 	}
-	if !containsID(out, laneID) {
-		t.Errorf("RED: dispatchable item %q missing from the --json document; got %q", laneID, out)
+	if !containsID(stdout, laneID) {
+		t.Errorf("RED: dispatchable item %q missing from the --json document; got %q", laneID, stdout)
 	}
-}
-
-func stdoutOnly(out string) string {
-	if i := strings.IndexAny(out, "[{"); i >= 0 {
-		return out[i:]
-	}
-	return out
 }

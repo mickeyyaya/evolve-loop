@@ -173,3 +173,13 @@ func TestResolveFromEnv_IntegratesWithOsGetenv(t *testing.T) {
 		t.Errorf("PluginRoot=%q, want /plugin/env", got.PluginRoot)
 	}
 }
+
+func TestEventChannelsRoot_IsTheChDirectoryUnderTheEventsDirectoryOfTheEvolveDir(t *testing.T) {
+	t.Parallel()
+
+	got := EventChannelsRoot(filepath.Join("proj", ".evolve"))
+
+	if want := filepath.Join("proj", ".evolve", "events", "ch"); got != want {
+		t.Errorf("EventChannelsRoot = %q, want %q: the Publisher, the reader and the gc category must name the same directory (spec §4)", got, want)
+	}
+}

@@ -5,7 +5,8 @@
 - **Deciders:** operator (console session) + strong review (commit-gate dual review)
 - **Supersedes/extends:** builds on ADR-0072 (system-failure policy), ADR-0073
   (mint registry), and the cycles 215–231 retrospective's coherence diagnosis.
-- **Amended by:** [ADR-0139](0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) decision 5 (2026-10-17). A declared directory that only contains protected files no longer routes to the console. Only a directory inside a protected fragment does. Protected file spellings stay binding.
+- **Amended by:** [ADR-0139](0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) decision 5 (2026-10-17). A declared directory that only contains protected files no longer routes to the console. Only a directory inside a protected fragment does.
+  Amended again by the operator on 2026-10-18: every declared protected path is binding, file or directory. `route:lane` cannot relax it, and only a heuristic derivation stays open to it.
 
 ## Context
 

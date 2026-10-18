@@ -1,12 +1,15 @@
 package channel
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const MaxRecordBytes = signalcenter.MaxLineBytes + 512
+
+const MaxMessageBytes = 64 << 10
 
 const SourceWatch = "watch"
 
@@ -21,7 +24,7 @@ const (
 
 var (
 	ErrRecordTooLong = errors.New("channel: record line too long")
-	ErrInvalidRecord = errors.New("channel: a record needs exactly one of signal and gap, and a source that is not watch")
+	ErrInvalidRecord = errors.New("channel: a record needs exactly one of signal, gap and message, and a source that is not watch")
 )
 
 type Gap struct {
@@ -41,6 +44,7 @@ type Record struct {
 	Dispatch string              `json:"dispatch,omitempty"`
 	Signal   *signalcenter.Event `json:"signal,omitempty"`
 	Gap      *Gap                `json:"gap,omitempty"`
+	Message  json.RawMessage     `json:"message,omitempty"`
 }
 
 type Batch struct {
@@ -49,5 +53,26 @@ type Batch struct {
 }
 
 func (r Record) hasOnePayload() bool {
-	return (r.Signal == nil) != (r.Gap == nil)
+	held := 0
+	if r.Signal != nil {
+		held++
+	}
+	if r.Gap != nil {
+		held++
+	}
+	if r.hasMessage() {
+		held++
+	}
+	return held == 1
+}
+
+func (r Record) hasMessage() bool {
+	return len(r.Message) > 0 && string(r.Message) != "null"
+}
+
+func (r Record) lineLimit() int {
+	if r.hasMessage() {
+		return MaxMessageBytes
+	}
+	return MaxRecordBytes
 }

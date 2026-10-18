@@ -28,18 +28,16 @@
   },
   "cli_routing": {
     "clis": [
+      "agy",
+      "agy-claude",
       "claude"
     ],
     "default": [
+      "agy",
+      "agy-claude",
       "claude"
     ],
     "agents": {
-      "builder": {
-        "cli": [
-          "claude"
-        ],
-        "model": "balanced"
-      },
       "reflector": {
         "effort": "low"
       },
@@ -52,9 +50,12 @@
     },
     "tiers": {
       "deep": [
+        "agy",
+        "agy-claude",
         "claude"
       ],
       "top": [
+        "agy-claude",
         "claude"
       ]
     }
@@ -67,9 +68,9 @@
     "stage": "enforce"
   },
   "fleet": {
-    "count": 8,
+    "count": 4,
     "plan_source": "triage",
-    "min_lanes": 8,
+    "min_lanes": 4,
     "orchestrator": {
       "stage": "enforce"
     }

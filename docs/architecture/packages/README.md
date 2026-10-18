@@ -7,6 +7,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/bridge/panestream` | reads tmux pane snapshots of an interactive LLM REPL | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge/phaseidentity` | the identity statement a tmux driver appends to the pasted prompt | [internal-bridge-phaseidentity.md](internal-bridge-phaseidentity.md) |
 | `internal/agentmsg` | the skeleton of cycle agent messaging: the envelope, the address grammar, the identity and the token, the policy engine, the broker of one cycle, the in-memory store and the frame (ADR-0129, M1) | [internal-agentmsg.md](internal-agentmsg.md) |
+| `internal/agentmsg/channelstore` | the `Store` port of the broker on the ADR-0127 channel log: the channel `msg.<cycle>`, the channel `msg.dead.<cycle>` and the `message` record variant (ADR-0129, M2) | [internal-agentmsg-channelstore.md](internal-agentmsg-channelstore.md) |
 | `internal/admission` | admission by package cell: the conflict rule, the module graph and the hub cell of capacity 1 (ADR-0139 O3, ADR-0134 S14) | [internal-admission.md](internal-admission.md) |
 | `internal/orchestrator` | the rolling pool at stage `enforce` and the lane lease, with one deadline timer (ADR-0139 O4, O5) | [internal-orchestrator.md](internal-orchestrator.md) |
 | `internal/config` | resolves the routing configuration once, at the composition root | [internal-config.md](internal-config.md) |
@@ -112,6 +113,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/gitexec` | the git CLI behind one small injectable type | [internal-gitexec.md](internal-gitexec.md) |
 | `internal/events/channel` | one event channel as an append-only log of segments: the locked append with torn-tail repair and rotation, and the read with the cursor rules (ADR-0127) | [internal-events-channel.md](internal-events-channel.md) |
 | `internal/events/publisher` | the Signal Center listener of the event channels: routes, the lossless path, the best-effort queue and gap records (ADR-0127, E6) | [internal-events-publisher.md](internal-events-publisher.md) |
+| `internal/events/rootwire` | subscribes one Publisher to the Signal Center of a root process and returns the closer that the root defers (ADR-0127, E10) | [internal-events-rootwire.md](internal-events-rootwire.md) |
 | `internal/landed` | whether a worktree's changes since a merge-base are already in `origin/main`, judged per path by a three-way merge | [internal-landed.md](internal-landed.md) |
 | `internal/modelquery` | live model-catalog acquisition: each CLI's model list, classified into the canonical tiers | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/phases/audit/ciparitygate` | the audit phase's five CI-parity gates | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
@@ -187,6 +189,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/retrofile` | lifts the preventive actions of a retro report into weighted inbox todos | [internal-retrofile.md](internal-retrofile.md) |
 | `internal/log` | JSONL sidecar events, slog channels, the operator console and the safe rendering of untrusted diagnostic fields | [internal-log.md](internal-log.md) |
 | `internal/phasewatchdog` | kills the process group of a phase that shows no file activity for longer than a threshold | [internal-phasewatchdog.md](internal-phasewatchdog.md) |
+| `internal/acspathscan` | the scan for the repository paths that an ACS predicate reads, used by the tdd protected-predicate route | [internal-acspathscan.md](internal-acspathscan.md) |
 | `internal/committedset` | the one answer to which tasks a cycle committed to, read from the lane pin and triage's decision, and which ids triage answered for | [internal-committedset.md](internal-committedset.md) |
 | `internal/treefence` | a content fence around the worktree of a read-only phase: it takes a tree snapshot and restores every change the phase made | [internal-treefence.md](internal-treefence.md) |
 | `internal/verdictcache` | the content-addressed store that binds a reusable audit verdict to the tree SHA it judged (ADR-0048) | [internal-verdictcache.md](internal-verdictcache.md) |

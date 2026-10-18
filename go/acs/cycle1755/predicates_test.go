@@ -177,7 +177,7 @@ func TestC1755_007_RunACSSuiteCLIContractPreserved(t *testing.T) {
 			"TestRunACSSuite_FlagParseErrorExits10",
 			"TestRunACSSuite_MissingOrNonPositiveCycleExits10",
 			"TestRunACSSuite_SuiteErrorIsHardFailureExit1",
-			"TestRunACSSuite_NoPredicateTreePassesAndWritesVerdict",
+			"TestRunACSSuite_NoPredicateTreeWritesARedVerdictAndExits2",
 			"TestRunACSSuite_JSONFalseSkipsVerdictWrite",
 			"TestRunACSSuite_VerdictWriteFailureExits1AfterSummary",
 			"TestRunACSSuite_DotRootResolvesActiveWorktreeAndPlaneRoot",

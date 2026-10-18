@@ -178,9 +178,96 @@ A predicate that proves "these Go tests ran and passed" used to run `go test -v`
 - the package must start and pass;
 - every name in `Names` must have exactly one `run` event followed by `pass`;
 - a `skip` or `fail` of a named test fails the predicate, and so does a non-zero exit;
+- a pattern made of `^Name$` and `^(A|B)$` terms, joined by `|`, names exact tests, and `Names` must list each one;
 - events of other packages are ignored, because `go test`'s own exit code already reports them.
 
-The caller's test deadline bounds the subprocess. Printed `--- PASS:` text, an exact-name prefix collision and a post-`m.Run()` `os.Exit` are its pinned negative controls (`pkg/acsassert/go_tests_test.go` and `go_tests_integration_test.go`). Cycles 1013 and 1015 are the first predicates converted; the rest of the corpus (about 150 files still grep) converts as its predicates are next touched.
+The caller's test deadline bounds the subprocess. `GoTests` refuses a call that breaks the exact-name rule before it runs `go test`. Without this rule, a name outside `Names` is never checked, and a deleted test passes.
+
+Four negative controls are pinned in the tests of `pkg/acsassert`. They are printed `--- PASS:` text, an exact-name prefix collision, a post-`m.Run()` `os.Exit` and an omitted exact pattern name. Cycles 1013 and 1015 were the first predicates that used `GoTests`. On 2026-10-18, 14 files call it and 360 packages run tests by name. The next section covers the packages that do not call it.
+
+## Predicate test names resolve (`acsnames`, 2026-10-18)
+
+`go test -run` exits 0 when a name matches no test. A predicate that runs a test by name and judges only the exit code passes after a rename or a delete removes that test. The design record calls this defect A1 ([logic-first-delivery-design.md §5.10](logic-first-delivery-design.md)). `acsassert.GoTests` closes it for each predicate that calls it. The package `go/acs/regression/acsnames` closes it for every other predicate.
+
+### What the measurements show
+
+**F1.** On 2026-10-18, 360 of the 634 packages under `go/acs` run tests by name. A package runs tests by name when it holds a `-run` flag or a `GoTests` call. Only 14 files call `GoTests`.
+*Implication:* the run-time check reaches a small part of the corpus. A static check must cover the rest.
+
+**F2.** The first scan, before the repairs, covered 362 packages. It found 28 names that no test declares: 20 stale names, 6 names absent on purpose and 2 sentinels. The 2 sentinels belonged to two packages that this change retires.
+*Implication:* the 20 stale names are the defect. The other 8 names must not fail the check.
+
+**F3.** The 360 packages cite 2,601 names. 2,459 match a test exactly. 136 match as a `-run` fragment, for example the prefix `TestAck_` or the substring `TestStore`. 6 match nothing.
+*Implication:* a rule that reads every name as exact fails 136 predicates that select a family of tests on purpose.
+
+**F4.** 7 of the 20 stale names never existed. No commit defines them (`git log -S` finds none). The other 13 were renamed or deleted. Each is listed in the ledger below.
+*Implication:* a predicate can be wrong from its first day, and nothing noticed it.
+
+### Decisions
+
+| Id | Decision | Because | Rejected option and why |
+|---|---|---|---|
+| D1 | A static check reads the names in every package that runs tests by name. | F1 | Convert the 343 files that hold a `-run` flag to `GoTests`. The check is stronger at run time. But the files have about 65 helper shapes and each has its own failure text. The conversion goes on when a predicate is next touched. |
+| D2 | A name is read as `go test -run` reads it: exact when anchored at both ends, a prefix when anchored at the head, a substring if not. | F3 | Read every name as exact. 136 predicates fail although they work. |
+| D3 | A string that is an argument of a `strings` call is not a reference. | 24 such strings exist. Each is searched for in text. | Read every string. A predicate that asserts a test is gone fails on the name of that test. |
+| D4 | A name that the package defines in a fixture is not a reference. A fixture is a string in a source file or a file under `testdata`. | A predicate that writes a probe test into an overlay runs the probe by name. | List each probe. The list grows with each probe. |
+| D5 | A name that a predicate runs to prove that it is gone goes in `absentOnPurpose` with a reason. The check fails on an entry that no predicate uses, and on an entry that a test now declares. | F2: 6 names | Skip names that start with `old` or `stale`. The rule is implicit, and a stale name can hide behind it. Record all findings as a baseline. The baseline hides the 20 stale names. |
+| D6 | A scan that cannot do its work is an error. The cases are a missing module and a missing `acs` tree. They also include a file that does not parse, a file that cannot be read and a scan that reads no name. | A gate that reads no predicate passes for the wrong reason. | Skip the file and log it. |
+| D7 | The index of declared tests comes from `go/parser`, not from a text scan. | A text scan counted 100 names that no parsed file declares (23,484 against 23,384). They sit in raw-string fixtures and comments. The parse costs no more: 0.82 s against 0.72 s at a load average of 79. | List the gap under Limits. It is cheaper, but a fixture in one package can hide a stale name in another. |
+
+### How it works
+
+1. `declaredTests` parses every `*_test.go` file of the module. It keeps each top-level function `TestX` and `FuzzX` that has no receiver. A raw string or a comment declares nothing. The scan skips `testdata`, `vendor` and hidden directories.
+2. `findViolations` parses each package under `go/acs`, except the package of the check. It keeps only the packages that run tests by name.
+3. For each string in those packages, `parseAlternatives` splits the text at `|`. It reads the anchors `^` and `$` as a regular expression does. It cuts a subtest filter at `/`. It expands a group after a prefix, so `TestA_(B|C)` names `TestA_B` and `TestA_C`. A string that holds anything but test names is not a reference.
+4. A name resolves when a test matches it. The match is exact, a prefix or a substring, by rule D2.
+5. A name that does not resolve is a violation. Two cases are exempt: a fixture of the package defines it, or `absentOnPurpose` lists it.
+6. The message gives the file, the line and the pattern. It tells the author to repoint the predicate or to archive it.
+
+The test `TestPredicateNamesResolveToTests` runs the check on the real tree. It takes 0.45 s on a quiet host and 1.1 s at a load average of 79. It runs in the CI job `acs-durable` (`go test -tags acs ./acs/regression/...`) and in the Go lane of the ACS suite of every cycle. The package is not in `TreeReadingTests`, because the detector of that list skips `acs/`.
+
+### Limits
+
+- The check looks for a name in the whole module. It does not look in the package that the predicate runs. A name that moved to another package passes.
+- A bare name that is the prefix of a longer test name passes. If the predicate wraps the name in `^…$` at run time, the run still matches nothing. `GoTests` closes this case for its callers.
+- The check reads string literals. A name that a predicate builds at run time is out of reach.
+- A test counts under any build tag. A predicate passes its own `-tags`, and the check cannot know them. A test behind a tag that the predicate omits still counts.
+- An entry of `absentOnPurpose` exempts every reference to that name in its package, not one line.
+- `GoTests` reads a pattern only when it is `^Name$` and `^(A|B)$` terms joined by `|`. It does not check a pattern that mixes such terms with other text, or one that has a subtest filter.
+- `go/acs/regression/` is a protected surface. A loop lane cannot add an entry to `absentOnPurpose`. The console adds it.
+
+### The absent-on-purpose list
+
+| Package | Name | Why it is absent |
+|---|---|---|
+| `cycle1067` | `TestShipDirect_CycleClass_KeepsChurnDiscardAndAddAll` | The predicate runs the name to prove that the superseded test is gone. |
+| `cycle1712` | `TestLineageKey_DatedSnapshotsStayDistinct_KnownLimitation` | The predicate asserts that the test was migrated away. |
+| `cycle1718` | `TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy` | The predicate asserts that the test was renamed away. |
+| `cycle1737` | `TestC1737ProbeNoCycleBatchEndSink` | The predicate builds this probe into an overlay by concatenation and runs it. |
+| `cycle1765` | `TestC1761_` | The predicate asserts that the eval no longer cites this prefix. |
+| `cycle266` | `TestInvariant_DuplicatePhaseRejected` | The predicate asserts that the test was renamed away. |
+
+### The ledger of the 20 stale names
+
+A predicate is repointed when a successor test pins the same scenario. It is narrowed when one of its tests was retired on purpose and the rest stay. It is retired when the behavior it pinned is gone or never existed. A retired predicate moves to [the archive](../private/research/archived-2026-10-18/superseded-predicates/README.md) under the A2 retention rule. It is never deleted, and the README of the archive gives the reason.
+
+| Predicates | Stale name | Action | Now |
+|---|---|---|---|
+| `TestC1108_004`, `TestC1108_005` | `TestDropIgnoredPaths_QuotePathMatchesQuotedProbeOutput`, `TestDropIgnoredPaths_QuotePathKeepsUnignoredPaths` | repointed | `TestWithoutIgnored_DecodesQuotedProbeOutput` in `internal/shipmanifest`. Commit ab531a8a9 moved the probe filter and merged the two tests into one table, so both predicates now run the same test. |
+| `TestC1469_003` | `TestDropIgnoredPaths_QuotePath` | repointed | The same test. The pattern was a prefix of the two names above. |
+| `TestC1313_001` | `TestTriageClassify_Rejects…` (three names) | repointed | `TestTriageClassify_Routes…`. Commit 32db1785e made the host route a protected card, not refuse it. |
+| `TestC1718_004` | `TestEffortDefaults_Matrix` | repointed | `TestEveryTrackedProfileLoadsWithoutAnEffortField`. It still runs over the live profiles. |
+| `TestC442_007` | `TestOllamaListMetadataExceptionDocumented` | narrowed | The pattern keeps `TestOllamaListerReachesNoModel`. Commit 369294e3f retired the test that read source text, and `cycle1882` pins that. |
+| `TestC986_003` | `TestProtectedSurface_FableSkillOverlay` | repointed | `TestProtectedSurface_CompiledDefaultOverlaySkills`. Commit fc3cd0d33 made the guard cover each compiled-default overlay skill. |
+| `TestC1755_007` | `TestRunACSSuite_NoPredicateTreePassesAndWritesVerdict` | repointed | `TestRunACSSuite_NoPredicateTreeWritesARedVerdictAndExits2`. ADR-0114 (eb40bdd2a) made a run with no predicate tree a red verdict. |
+| `TestC463_005`, `TestC476_002` | `TestSanitizeAdvisorTier_RejectsHighTopAndRawModel` | repointed | `TestSanitizeAdvisorTier_RejectsHighAndRawModel`. Commit 8808db17f made `top` a valid tier. |
+| `TestC766_005`, `TestC776_009` | `TestLaneScopePin_ScoutGoalHashMismatchAbortsBeforeTriage` | retired | Commit c37dc324a made a goal-hash mismatch normalize and proceed. `TestLaneScopePin_ScoutGoalHashMismatchNormalizesAndProceeds` pins that. |
+| `TestC566_002` | `TestEffortDefaults_Matrix` | retired | Commit 0936a73c2 made every effort start at medium, with no per-phase matrix. |
+| `TestC786_001` | `TestTrivialRebase_CarriesAuditForward` | retired | Commit 09d32a190 (#535) made a changed tree require a predicate re-audit. `TestTrivialRebase_ChangedTreeRequiresPredicateReaudit` pins that. |
+| `TestC1580_008` | `TestVerify_Scout_MissingChallengeToken_Violation`, `TestVerify_Scout_WrongToken_Violation`, `TestVerify_Scout_TokenEchoed_OK`, `TestVerify_Scout_NoTokenFile_FailOpen`, `TestContract_RequireChallengeToken_CoversTokenConsumingPhases` | retired | None of the five ever existed. Only the build phase requires the token, and `TestContract_RequireChallengeToken_BuildOnlyAtV1` pins that. |
+| `TestC1222_001` to `TestC1222_004`, `TestC1241_001` to `TestC1241_005` | `TestCurrentCycleScopeReachable`, `TestGoLanePatterns_CycleNumberDrift` | retired | Neither ever existed. Each package also held a sentinel name that proved its harness, so both packages left the module whole. |
+
+The same item changes one more predicate. `TestC1678_011` now parses the standard output alone. It used to append the standard error after the output, and a warning on the standard error made the JSON invalid.
 
 ## Lifecycle
 

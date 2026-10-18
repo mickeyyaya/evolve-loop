@@ -43,6 +43,7 @@
 ./internal/events/reader 100
 ./test/structure 100
 ./internal/events/publisher 100
+./internal/events/rootwire 100
 ./internal/overlap 100
 ./internal/derived 100
 ./internal/attemptpostmortem 100
@@ -50,6 +51,7 @@
 ./internal/agentmsg 100
 ./internal/agentmsg/address 100
 ./internal/agentmsg/broker 100
+./internal/agentmsg/channelstore 100
 ./internal/agentmsg/delivery 100
 ./internal/agentmsg/envelope 100
 ./internal/agentmsg/identity 100
@@ -71,3 +73,4 @@
 ./internal/lanebudget 100
 ./internal/admission 100
 ./internal/orchestrator 100
+./internal/acspathscan 100

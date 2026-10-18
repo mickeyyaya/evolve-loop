@@ -29,6 +29,25 @@ func TestRegistry_BuiltInDriftCodesAreRegisteredWithDocs(t *testing.T) {
 	}
 }
 
+func TestRegistry_TheLoopLostCodeIsOwnedByTheLoopModuleWithADoc(t *testing.T) {
+	t.Parallel()
+
+	owner, registered := IsRegistered(CodeLoopLost)
+
+	if !registered || owner != ModuleLoop || !CodeLoopLost.BelongsTo(ModuleLoop) {
+		t.Errorf("LOOP_LOST owner = %q (registered %v), want the loop module: every build must hold the code of the synthetic loop.lost record, so the generated code list never depends on which packages a binary links", owner, registered)
+	}
+	var doc string
+	for _, d := range RegisteredCodes()[ModuleLoop] {
+		if d.Code == CodeLoopLost {
+			doc = d.Doc
+		}
+	}
+	if strings.TrimSpace(doc) == "" {
+		t.Error("LOOP_LOST has no doc in the registry")
+	}
+}
+
 func TestRegisterCode_DuplicateIdenticalIsNoOp_ConflictIsRecorded(t *testing.T) {
 	t.Parallel()
 	code := fixtureCode("AUDIT_TEST_REGISTRY_FIXTURE")

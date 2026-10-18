@@ -51,6 +51,8 @@ type loopConfig struct {
 	DetachArgv        []string          `json:"-"`
 	ResumeWaves       int               `json:"-"`
 	HandedOff         bool              `json:"-"`
+	announce          loopAnnouncer
+	retire            func()
 }
 
 func emitSignalStop(stdout, stderr io.Writer, lr *loopResult, cycle int) {
@@ -100,7 +102,7 @@ func printLoopDryRun(cfg loopConfig, stdout io.Writer) int {
 	return 0
 }
 
-func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
+func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit int) {
 	maybePrintSetupNudge(stderr, cfg.EvolveDir)
 
 	if pi, perr := plane.Classify(cfg.ProjectRoot); perr == nil {
@@ -119,12 +121,15 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 
 	gcOrphanSessions("startup", stderr)
 
-	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr, routingRun{bypass: cfg.BypassPolicy, env: buildCycleEnv(cfg, os.Environ())})
+	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr, routingRun{bypass: cfg.BypassPolicy, env: buildCycleEnv(cfg, os.Environ()), role: roleLoop})
+	defer deps.closeSignals()
 	if deps.RoutingErr != nil {
 		fmt.Fprintf(stderr, "evolve loop: %v\n", deps.RoutingErr)
 		return exitRoutingRefused
 	}
-	defer deps.Signals.Flush()
+	cfg = cfg.retiring(deps.closeSignals)
+	finish := cfg.announcer()(deps.Signals, stderr)
+	defer finish(&exit)
 	var orch loopCycleRunner = deps.Orchestrator
 	if loopOrchOverride != nil {
 		orch = loopOrchOverride

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
@@ -79,7 +80,7 @@ func (b *BaseRunner) launchRouter(req core.PhaseRequest, prep phasePreparation) 
 			return nil, policy.Policy{}, err
 		}
 	}
-	router, err := cliroute.NewSingleProfileRouter(loaded, cliroute.SingleProfile{Agent: prep.profileName, Profile: prep.profile}, cliroute.Host{Bench: b.bench})
+	router, err := cliroute.NewSingleProfileRouter(loaded, cliroute.SingleProfile{Agent: prep.profileName, Profile: prep.profile}, cliroute.Host{Bench: b.bench, Toolless: bridge.LacksToolUse})
 	return router, loaded, err
 }
 
@@ -91,7 +92,7 @@ func (b *BaseRunner) routeRequest(req core.PhaseRequest, prep phasePreparation, 
 	return cliroute.Request{
 		Agent: prep.profileName, Phase: prep.phase, ProjectRoot: req.ProjectRoot, DefaultModel: b.hooks.DefaultModel(),
 		Env: req.Env, Overlay: llmroute.Overlay{CLI: req.ModelRoutingCLI, Tier: req.ModelRoutingTier},
-		Expand: autoExpander(resolve), BypassPolicy: req.BypassPolicy,
+		Expand: autoExpander(resolve), BypassPolicy: req.BypassPolicy, NeedsTools: req.Worktree != "",
 	}
 }
 

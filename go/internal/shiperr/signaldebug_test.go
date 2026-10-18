@@ -6,8 +6,8 @@ import (
 )
 
 func TestShipErr_StepKeyAndSignalDebugKeys(t *testing.T) {
-	consts := []string{StepKey, GitRCKey, WorktreeKey, BranchKey, CycleBranchKey, RepairOutcomeKey}
-	wire := []string{"step", "git_rc", "worktree", "branch", "cycle_branch", "repair_outcome"}
+	consts := []string{StepKey, GitRCKey, WorktreeKey, BranchKey, CycleBranchKey, RepairOutcomeKey, OriginalCodeKey}
+	wire := []string{"step", "git_rc", "worktree", "branch", "cycle_branch", "repair_outcome", "original_code"}
 	if strings.Join(consts, ",") != strings.Join(wire, ",") {
 		t.Errorf("the Debug-key constants spell %v, want the wire strings %v", consts, wire)
 	}

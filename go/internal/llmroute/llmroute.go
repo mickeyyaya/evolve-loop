@@ -184,6 +184,26 @@ func Probe(p Plan, lookPath func(string) (string, error)) Plan {
 	return out
 }
 
+func DropToolless(p Plan, toolless func(driver string) bool) (Plan, []string) {
+	if toolless == nil {
+		return p, nil
+	}
+	var kept, dropped []string
+	for _, cli := range p.Candidates {
+		if toolless(defaultDriverForFamily(cli)) {
+			dropped = append(dropped, cli)
+		} else {
+			kept = append(kept, cli)
+		}
+	}
+	if len(dropped) == 0 {
+		return p, nil
+	}
+	out := p
+	out.Candidates = kept
+	return out, dropped
+}
+
 func ApplyUniversalFallback(p Plan, discovered []string) Plan {
 	if len(discovered) == 0 {
 		return p

@@ -177,7 +177,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 
 | Kind | Meaning | Severity default | Terminal? |
 |---|---|---|---|
-| `phase.dispatched` | a phase attempt started | INFO | |
+| `phase.dispatched` | a phase starts: one event for each dispatch, not for each retry (ADR-0127 E11) | INFO | |
 | `phase.outcome` | the C1 terminal disposition (verdict recorded); also the routing disposition the orchestrator takes after a phase: an audit FAIL's repair grant or decline (`ORCHESTRATOR_AUDIT_REPAIR_*`), and a post-Build writer's stale explanation routed back to Build (`ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED`, WARN). A routing disposition carries no verdict and is not a phase run: the dashboard counts a `phase.outcome` as a run only when `fields.verdict` is set | INFO on PASS, WARN on WARN/FAIL | ✓ on FAIL |
 | `phase.aborted` | the cycle aborted after a phase (review reject, guard, persistence) | WARN | ✓ |
 | `gate.passed` | the contract gate let the phase advance: verified (`GATE_CONTRACT_VERIFIED`, fields name the artifact, its size, the owed files and effects — where it searched), salvaged, or advanced with a WARN it should not hide (would-block under a shadow stage, breaker demotion, fail-open) — S2b | INFO; WARN for would-block / demoted / fail-open | |
@@ -202,6 +202,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | `audit.warning` | a CI-parity gate could not run (fail-open), skipped an env-exclusive scope, absorbed a contention flake, hit its retake deadline without a verdict, lost its log or lock, deferred a graduation obligation, or FAILED the audit on offenders; the diagnostics list and the verdict are unchanged, the cycle routes to retro on FAIL (unit 14) | WARN | |
 | `cycle.sealed` | final verdict decided (after `finalizeOutcome`) | INFO (FAIL → WARN) | ✓ on FAIL |
 | `loop.wave` / `loop.halt` / `loop.escalation` | batch-level events (today's `dispatchevents`); `loop.wave` carries `fields.wave` on every event — INFO for the coordinator's summary, WARN with a code for the wave engine's conditions (`LOOP_MIN_WIDTH_REPAIR`, `LOOP_WAVE_DISPATCH_FAILED`, `LOOP_WAVE_EMPTY_PLAN`, `LOOP_WAVE_ALL_LANES_STALE`; unit 13); `loop.halt` also carries the chain's two non-zero-exit stops (`LOOP_CHAIN_INBOX_UNREADABLE`, `LOOP_CHAIN_BATCH_ERROR`) | INFO or WARN / INCIDENT / WARN | / ✓ / |
+| `loop.started` / `loop.exit` / `loop.lost` | the life of a loop process (ADR-0127 E11). `announceLoop` emits `loop.started` with `fields.proc_start` and `loop.exit` with `fields.exit`. A re-exec of the loop emits a new `loop.started` with the same `proc_start`, and only the last image emits `loop.exit`. A reader makes `loop.lost` with the code `LOOP_LOST`, and no log holds it. | INFO / INFO / INCIDENT | |
 | `loop.warning` | a batch- or chain-boundary degradation with no wave index (unit 13): the boundary binary refresh degraded to the current binary (`LOOP_BOUNDARY_REFRESH_SKIPPED` with `fields.step`, `LOOP_BOUNDARY_REFRESH_AUDIT_FAILED`), an invalid inbox item (`LOOP_CHAIN_INBOX_ITEM_INVALID`), a quota defer (`LOOP_CHAIN_QUOTA_DEFER`). The written rule: wave-indexed → `loop.wave`; other non-terminal → `loop.warning`; a chain stop with a non-zero exit → `loop.halt` | WARN | |
 | `signalcenter.listener_panicked` / `signalcenter.sink_dropped` | self-reports: a panicking listener was dropped / the NDJSON sink could not write (count in `fields.dropped`) | INCIDENT / WARN | |
 
@@ -290,22 +291,29 @@ func (s *Summary) Snapshot() Summary                 // deep copy
 
 Semantics (each is a named test):
 
-1. **Total order, provable — one queue, one drainer.** `Emit` normalizes the event and stamps it
-   (`Seq`, `PID`, `TS`) under the Center's mutex, then appends it to a queue. The first emitter that
-   finds no drain in progress becomes the drainer: it pops events in `Seq` order and delivers each,
-   in registration order, to a snapshot of the listener list taken under the mutex — **the mutex is
-   never held while a listener runs**. Emitters that arrive while a drain is in progress (concurrent
-   evaluate-batch goroutines, or a listener emitting re-entrantly) enqueue and return; the running
-   drainer delivers their events before it returns, so the file order equals `Seq` order and every
-   listener sees the same sequence *(review 7)*. The order mutant to kill is "listeners observe
-   different orders", not "registration order reversed". **Consequence for producers on exit
-   paths** (S1 review): an emitter that arrives while another goroutine drains returns before its
-   event is delivered; the sole S1 producer runs on the draining goroutine, so delivery is
-   synchronous in practice. `Flush` (S2a) blocks until the queue is empty and no drain is running;
-   both production roots defer it after wiring the orchestrator
-   (`TestSignalCenterFlush_IsWiredAtBothRoots`), so a producer on an `os.Exit` path (`loop.halt`,
-   a watchdog goroutine — S3/S4) can never leave an unexplained gap in the file's `seq` at exit.
-   Never call `Flush` from inside a listener: the drain running the listener is the one it waits for.
+1. **Total order, provable: one queue, one drainer.** `Emit` normalizes the event and stamps it
+   (`Seq`, `PID`, `TS`) under the mutex of the Center. Then it appends the event to a queue. The
+   first emitter that finds no drain in progress becomes the drainer. The drainer pops the events in
+   `Seq` order. It delivers each event, in registration order, to a snapshot of the listener list.
+
+   The Center takes the snapshot under the mutex. **The mutex is never held while a listener runs.**
+   An emitter that arrives while a drain is in progress enqueues its event and returns. Such an
+   emitter is a concurrent evaluate-batch goroutine, or a listener that emits again. The running
+   drainer delivers the queued events before it returns. Thus the file order equals the `Seq` order,
+   and every listener sees the same sequence *(review 7)*.
+
+   The order mutant to kill is "listeners observe different orders". It is not "registration order
+   reversed".
+
+   **Consequence for producers on exit paths** (S1 review). An emitter that meets a drain in progress
+   returns before its event is delivered. The sole S1 producer runs on the draining goroutine, so
+   delivery is synchronous in practice. `Flush` (S2a) blocks until the queue is empty and no drain
+   is running.
+
+   Every root defers its closer, which flushes first, after it wires the Center
+   (`TestRootSignalCenter_EveryRootDefersItsCloser`). Thus an `os.Exit` path leaves no gap in `seq`.
+   Such a path is `loop.halt` or a watchdog goroutine (S3, S4). Never call `Flush` from inside a
+   listener. The drain that runs the listener is the one that `Flush` waits for.
 2. **Never drops.** Validation failures rewrite the event with a `SIGNALCENTER_*` code, keep the
    originals in `fields`, and raise severity to at least WARN (§5.4).
 3. **Panic isolation without self-deadlock** *(review 2)*. A panicking listener is recovered and

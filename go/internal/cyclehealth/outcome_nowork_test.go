@@ -24,3 +24,13 @@ func TestClassifyOutcome_TheRecordedPlannedNoWorkEndIsNoWork(t *testing.T) {
 		})
 	}
 }
+
+func TestClassifyOutcome_AProtectedPredicateRouteIsAnExplainedFailureThatNamesTheRoute(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeTiming(t, dir, `[{"phase":"tdd","verdict":"PASS"},{"phase":"tdd","verdict":"FAIL","abort_reason":"tdd-protected-predicate-route"}]`)
+	got, detail := ClassifyOutcome(dir)
+	if got != OutcomeFailedExplained || detail != "tdd-protected-predicate-route" {
+		t.Errorf("outcome=%s detail=%q: a route is counted as a failure and named, never neutral", got, detail)
+	}
+}

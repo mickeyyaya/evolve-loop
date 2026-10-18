@@ -20,6 +20,8 @@ func (i Item) ID() string {
 	case i.Record.Signal != nil:
 		s := i.Record.Signal
 		return fmt.Sprintf("%d.%d.%s", s.PID, s.Seq, s.TS)
+	case len(i.Record.Message) > 0:
+		return fmt.Sprintf("msg.%s.%d", i.Channel, i.Record.Cursor)
 	case i.Record.Source == channel.SourceWatch:
 		return fmt.Sprintf("gap.%s.%d", i.Channel, i.Record.Gap.From)
 	}

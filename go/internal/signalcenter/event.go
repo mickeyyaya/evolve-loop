@@ -126,6 +126,9 @@ const (
 	KindLoopWarning            Kind = "loop.warning"
 	KindLoopHalt               Kind = "loop.halt"
 	KindLoopEscalation         Kind = "loop.escalation"
+	KindLoopStarted            Kind = "loop.started"
+	KindLoopExit               Kind = "loop.exit"
+	KindLoopLost               Kind = "loop.lost"
 	KindListenerPanicked       Kind = "signalcenter.listener_panicked"
 	KindRegistryDrift          Kind = "signalcenter.registry_drift"
 	KindSinkDropped            Kind = "signalcenter.sink_dropped"
@@ -136,7 +139,7 @@ var knownKinds = map[Kind]bool{
 	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindShipWarning: true, KindSystemFailure: true,
 	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
-	KindLoopEscalation: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
+	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 }
 
 var terminalKinds = map[Kind]bool{
@@ -158,6 +161,8 @@ func Kinds() []Kind {
 }
 
 type Code string
+
+const CodeLoopLost Code = "LOOP_LOST"
 
 var codeRE = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$`)
 

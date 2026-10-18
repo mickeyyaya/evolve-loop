@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
@@ -72,7 +73,7 @@ func (m *Mover) RouteLane(taskID, reason string) (RouteResult, error) {
 	admit := func(body []byte) error { return m.admitToLanes(taskID, loc.Path, body) }
 	if err := updateAdmittedItemJSON(loc.Path, admit, func(it map[string]json.RawMessage) {
 		it[RouteField] = jsonString(inboxbatch.RouteLaneValue)
-		it[inboxbatch.RoutedReasonField] = jsonString(reason)
+		it[inboxbatch.RoutedReasonField] = jsonString(withEarlierReason(reason, it[inboxbatch.RoutedReasonField]))
 		it[inboxbatch.RoutedAtField] = jsonString(stamp)
 		delete(it, inboxbatch.RoutedCycleField)
 	}); err != nil {
@@ -94,6 +95,14 @@ func (m *Mover) admitToLanes(taskID, path string, body []byte) error {
 		return fmt.Errorf("%w: %s stays operator-owned: %s", ErrConsoleRouted, taskID, why)
 	}
 	return nil
+}
+
+func withEarlierReason(reason string, earlier json.RawMessage) string {
+	var prior string
+	if json.Unmarshal(earlier, &prior) != nil || strings.TrimSpace(prior) == "" {
+		return reason
+	}
+	return reason + "; earlier reason: " + prior
 }
 
 func jsonString(s string) json.RawMessage {

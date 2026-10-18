@@ -94,7 +94,8 @@ func routingHost(logw io.Writer, now func() time.Time) cliroute.Host {
 				logf("[cliroute] "+format, args...)
 			})
 		},
-		Logf: logf,
+		Logf:     logf,
+		Toolless: gobridge.LacksToolUse,
 	}
 }
 

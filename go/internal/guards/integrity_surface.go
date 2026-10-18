@@ -182,6 +182,32 @@ func IsProtectedScope(path string) bool {
 	return IsProtectedSurface(path)
 }
 
+func TouchesProtectedSurface(path string) bool {
+	if IsProtectedSurface(path) {
+		return true
+	}
+	p, ok := normalizeSurfacePath(path)
+	if !ok {
+		return false
+	}
+	dir := strings.TrimSuffix(p, "/") + "/"
+	for i := 0; i < len(dir)-1; i++ {
+		if dir[i] == '/' && startsAFragment(dir[i:]) {
+			return true
+		}
+	}
+	return false
+}
+
+func startsAFragment(tail string) bool {
+	for _, e := range ProtectedSurfaceManifest {
+		if strings.HasPrefix(e.Fragment, tail) {
+			return true
+		}
+	}
+	return false
+}
+
 func normalizeSurfacePath(raw string) (string, bool) {
 	if raw == "" {
 		return "", false

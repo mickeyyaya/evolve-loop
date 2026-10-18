@@ -10,12 +10,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const (
@@ -218,8 +220,19 @@ func settleLanding(ctx context.Context, opts *Options, res *RunResult, in landin
 	in.Status = landing.IntentComplete
 	if err := writeLandingIntent(opts, in); err != nil {
 		res.Logs = append(res.Logs, "[ship] WARN: ship cannot mark the landing intent complete (a retry settles it again and changes nothing): "+err.Error())
+	} else {
+		emitShipLanded(opts, in)
 	}
 	return maybeCreateRelease(ctx, opts, res)
+}
+
+func emitShipLanded(opts *Options, in landing.Intent) {
+	opts.Signals.Emit(signalcenter.Event{
+		Cycle: in.Cycle, RunID: in.RunID, Phase: "ship", Module: signalcenter.ModuleShip, Origin: "settleLanding",
+		Kind: signalcenter.KindShipLanded, Severity: signalcenter.SeverityInfo,
+		Reason: "the landing of " + in.CommitSHA + " on " + in.Branch + " is complete",
+		Fields: map[string]string{"cycle": strconv.Itoa(in.Cycle), "commit": in.CommitSHA, "branch": in.Branch},
+	})
 }
 
 func (s *worktreeShip) unwindUnlessResumable(in landing.Intent, err error) error {

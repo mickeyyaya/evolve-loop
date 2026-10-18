@@ -78,6 +78,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	}()
 
 	cursor := newResumeCursor(startPhase)
+	shipRecoveries := 0
 	maxIterations := o.maxPhaseIterations
 	if maxIterations <= 0 {
 		maxIterations = defaultMaxPhaseIterations
@@ -115,6 +116,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
+		o.emitPhaseDispatched(cycle, cs.RunID, next)
 
 		if resumePoint.StatePath != "" && ResumeBoundaryCheckpointer != nil {
 			if err := ResumeBoundaryCheckpointer(cs, req.ProjectRoot, o.now()); err != nil {
@@ -144,7 +146,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			Signals:                         dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
 		}
 		phaseReq = o.withWorktreeFence(phaseReq, next, cs)
-		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig, checkout: r.checkoutDecision()}
+		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig, checkout: r.checkoutDecision(), recoveryDepth: shipRecoveries}
 		dispatch.applyDispatchPolicy(next, &phaseReq)
 		if next != PhaseBuild {
 			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)
@@ -160,6 +162,12 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			return result, err
 		}
 		if err != nil {
+			dispatch.result, dispatch.phaseTimings = result, phaseTimings
+			if routed, recovered := dispatch.recoverResumedShip(next, err, resp, attempts); recovered {
+				cs, result, phaseTimings, shipRecoveries = dispatch.cs, dispatch.result, dispatch.phaseTimings, dispatch.recoveryDepth
+				cursor.rerouteFromShip(routed)
+				continue
+			}
 			phaseErr := fmt.Errorf("phase %s: %w", next, err)
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
 			return result, phaseErr

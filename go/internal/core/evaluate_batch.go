@@ -74,6 +74,7 @@ func (cr *cycleRun) dispatchEvaluateBatch(batch []Phase) (loopAction, error) {
 	reqs := make([]PhaseRequest, len(batch))
 	for i, p := range batch {
 		reqs[i] = cr.phaseRequestFor(p)
+		cr.o.emitPhaseDispatched(cr.cycle, cr.cs.RunID, p)
 	}
 
 	type res struct {

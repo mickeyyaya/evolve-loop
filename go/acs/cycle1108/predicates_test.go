@@ -49,7 +49,7 @@ func TestC1108_003_GitReadsDisableQuotePath(t *testing.T) {
 }
 
 func TestC1108_004_IgnoredProbeMatchesQuotedOutput(t *testing.T) {
-	ok, out := runGoTest(t, shipPkg, "TestDropIgnoredPaths_QuotePathMatchesQuotedProbeOutput")
+	ok, out := runGoTest(t, manifestPkg, "TestWithoutIgnored_DecodesQuotedProbeOutput")
 	if !ok {
 		t.Errorf("the check-ignore filter still keys off git's quoted spelling, so an ignored "+
 			"quote-bearing path survives into `git add` and reproduces the cycle-1101 rc=1 "+
@@ -58,7 +58,7 @@ func TestC1108_004_IgnoredProbeMatchesQuotedOutput(t *testing.T) {
 }
 
 func TestC1108_005_IgnoredProbeNeverOverMatches(t *testing.T) {
-	ok, out := runGoTest(t, shipPkg, "TestDropIgnoredPaths_QuotePathKeepsUnignoredPaths")
+	ok, out := runGoTest(t, manifestPkg, "TestWithoutIgnored_DecodesQuotedProbeOutput")
 	if !ok {
 		t.Errorf("the check-ignore filter now drops paths git never reported as ignored — an "+
 			"under-staged ship commits less than it declares:\n%s", out)

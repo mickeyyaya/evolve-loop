@@ -24,10 +24,11 @@ The package uses two parts of other packages:
 | `(*Log).End() (int64, error)` | returns the end of the last complete line of the tail, for `--since new` |
 | `(*Log).Dir() string`, `(*Log).Segments() ([]Segment, error)` | the channel directory, and its segments in base order with the tail last |
 | `Segment`, `SegmentOf([]Segment, cursor) (Segment, bool)` | a segment (`Base`, `Path`), and the segment that holds a cursor: the largest base at or below it |
-| `Record`, `Gap`, `Batch` | a stored or synthetic record, a gap, and the result of a read |
+| `Record`, `Gap`, `Batch` | a stored or synthetic record, a gap, and the result of a read. A `Record` holds one `Signal`, one `Gap` or one `Message` (raw JSON). |
 | `MaxRecordBytes` | 4,608: the longest record line, without its newline |
-| `ErrRecordTooLong` | the refusal of a record line that is longer than `MaxRecordBytes` |
-| `ErrInvalidRecord` | the refusal of a record that has not exactly one of `signal` and `gap`, or that has the source `watch` |
+| `MaxMessageBytes` | 65,536: the longest record line that holds a `message`, without its newline |
+| `ErrRecordTooLong` | the refusal of a record line that is longer than its limit: `MaxRecordBytes`, or `MaxMessageBytes` for a `message` |
+| `ErrInvalidRecord` | the refusal of a record that has not exactly one of `signal`, `gap` and `message`, or that has the source `watch` |
 | `ErrLockPending` | the refusal of an append while a lock call of this process for the channel still waits. It wraps `flock.ErrLockDeadline`. |
 | `ErrRotate` | the batch is on disk, but the next segment was not made. It is not a loss. |
 | `SourceWatch` | the source of a synthetic record |
@@ -50,7 +51,8 @@ The package uses two parts of other packages:
   - a cursor in a channel with no segment moves to 0 (`reset`);
   - a complete line that does not parse moves the cursor past the line (`malformed`).
   - a segment that gc removed after the listing moves the cursor to the base of the next segment (`retention`). A removed tail is an error that wraps `fs.ErrNotExist`.
-- **A valid record** is a JSON object with exactly one of `signal` and `gap`. The writer refuses the source `watch`.
+- **A valid record** is a JSON object with exactly one of `signal`, `gap` and `message`. The writer refuses the source `watch`. A `message` of `null` does not count.
+- **The message variant** (ADR-0129, component M2). The log keeps `message` as raw JSON and does not know its shape. The adapter [`channelstore`](internal-agentmsg-channelstore.md) owns the shape. A message line has its own limit, because the default body cap of 8,192 bytes does not fit in 4,608 bytes.
 - **Synthetic records have the cursor 0.** Tell them apart by `Source == SourceWatch`, never by `Cursor`.
 - **A missing channel directory** is an error that wraps `fs.ErrNotExist` from `Read`, `ReadN`, `Last`, `End` and `Segments`. The reader (E5) makes the directory again and arms again.
 - **Gap `from` and `to`** are always in the JSON, also when they are 0.
@@ -72,6 +74,7 @@ The package uses two parts of other packages:
 - **The tail opens with `O_APPEND` under the lock.** Pinned by `TestAppend_OpensTheTailWithAppendUnderTheLock`.
 - **A torn tail gets one newline before the batch, and an intact tail gets none.** Pinned by `TestAppend_RepairsATornTailBeforeTheBatch` and `TestAppend_AnIntactTailGetsNoRepair`.
 - **A segment rotates only when it is larger than the cap, and cursors increase across a rotation.** Pinned by `TestAppend_RotatesPastTheCapAndCursorsKeepIncreasing` and `TestRead_ACursorFindsItsSegmentAcrossRotation`.
+- **A record holds exactly one of `signal`, `gap` and `message`, and a message line has its own limit.** Pinned by `TestRecord_HoldsExactlyOneOfSignalGapAndMessage`, `TestAppend_AMessageRecordHasItsOwnLineLimit` and `TestAppend_ASignalRecordKeepsTheSignalLineLimit`.
 - **Each cursor rule gives one gap.** Pinned by `TestRead_ACursorPastTheTailMovesToTheTrueEndWithOneResetGap`, `TestRead_ACursorPastASegmentEndMovesToTheNextBase`, `TestRead_ACursorBelowTheOldestSegmentYieldsARetentionGap`, `TestRead_AChannelWithNoSegmentEndsAtZero` and `TestRead_AMalformedLineYieldsAGapAndTheCursorMovesPastIt`.
 - **Exactly one side owns the lock at the deadline.** Pinned by `TestLockWithin_ADeadlineAtTheGrantInstantHasExactlyOneOwner`.
 - **An abandoned call releases the lock when it gets it.** Pinned by `TestLockWithin_AnAbandonedCallReleasesTheLockWhenItArrives`.

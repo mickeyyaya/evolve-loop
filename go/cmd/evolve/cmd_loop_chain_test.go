@@ -163,6 +163,11 @@ func TestRunLoopChain_LoopStopFileBrakeHalts(t *testing.T) {
 	}
 }
 
+func withoutHooks(c loopConfig) loopConfig {
+	c.announce, c.retire = nil, nil
+	return c
+}
+
 func TestRunLoopChain_FleetWidthPreservedAcrossBatches(t *testing.T) {
 	cfg := chainTestEnv(t, 3, `{"fleet":{"count":3}}`)
 	seen := stubBatches(t, func(_ int, c loopConfig) int {
@@ -181,7 +186,7 @@ func TestRunLoopChain_FleetWidthPreservedAcrossBatches(t *testing.T) {
 		}
 	}
 	for i, c := range *seen {
-		if !reflect.DeepEqual(c, (*seen)[0]) {
+		if !reflect.DeepEqual(withoutHooks(c), withoutHooks((*seen)[0])) {
 			t.Errorf("batch %d received a mutated config (%+v) — the chain must hand every batch the same resolved config", i+1, c)
 		}
 	}
