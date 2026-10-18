@@ -201,6 +201,9 @@ func (r *Reader) placeWill(recs []channel.Record) []Item {
 			out = append(out, Item{Channel: loopChannel, Record: rec, Next: rec.Gap.To})
 			continue
 		}
+		if rec.Signal == nil {
+			continue
+		}
 		if f := r.holder(rec); f != nil {
 			out = append(out, Item{Channel: f.name, Record: rec, Next: f.cur})
 		}

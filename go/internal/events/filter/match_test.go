@@ -147,3 +147,13 @@ func TestMatch_AnInvalidSeverityIsAbsent(t *testing.T) {
 		t.Error("severity!=INFO must match a record whose severity DEBUG is not a tier")
 	}
 }
+
+func TestMatch_AMessageRecordHasNoSignalAndNeverPanics(t *testing.T) {
+	msg := Record{Source: "msg"}
+	for _, expr := range []string{"", "kind=loop.exit", "severity>=INCIDENT", "cycle=1 module!=loop", "fields.x=y", "seq=3"} {
+		f := mustParse(t, expr)
+		if !f.Match(msg) || f.Until(msg) {
+			t.Errorf("filter %q: Match = %v, Until = %v on a message record, want true and false", expr, f.Match(msg), f.Until(msg))
+		}
+	}
+}

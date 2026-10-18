@@ -50,6 +50,7 @@
 ./internal/agentmsg 100
 ./internal/agentmsg/address 100
 ./internal/agentmsg/broker 100
+./internal/agentmsg/channelstore 100
 ./internal/agentmsg/delivery 100
 ./internal/agentmsg/envelope 100
 ./internal/agentmsg/identity 100

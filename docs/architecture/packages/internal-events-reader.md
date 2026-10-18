@@ -26,7 +26,7 @@ Nothing in production calls the package yet. The CLI (E9) and the subscriptions 
   - A catch-up reads every channel first, and it moves the cursors only when all reads are good. Thus a failed read moves no cursor and loses no item. The next `Next` reads the same records again, and a `loop.lost` of the failed catch-up comes again.
   - When a catch-up finds items, `Next` returns them at once. The next `Next` arms a changed watch set before its read.
 - **`Item.Next`** is the channel cursor after the item. It is the cursor of the next stored record, the `from` of the next synthetic gap, or the end of the read. A consumer stores it to ack the item. For a `loop.lost` record, `Next` is the current cursor of its channel, so an ack of it moves nothing.
-- **`Item.ID`** is `<pid>.<seq>.<ts>` for a signal, `gap.<channel>.<cursor>` for a stored gap and `gap.<channel>.<from>` for a synthetic gap (§3).
+- **`Item.ID`** is `<pid>.<seq>.<ts>` for a signal, `gap.<channel>.<cursor>` for a stored gap and `gap.<channel>.<from>` for a synthetic gap, and `msg.<channel>.<cursor>` for a message record (§3).
 - **The merge (the decided rule).** The reader merges the reads of one catch-up by `signal.ts`, with one head for each channel. It never changes the order of one channel, so the cursors of a channel stay in order. A gap comes before a signal, and a signal with a time that does not parse comes last.
   - The merge applies inside one batch only. Two batches are not in time order across channels, so the result is not a total order.
   - The synthetic records of the last will come after the records of their batch. Thus the `Next` of a `loop.lost` is never before an item that the consumer did not get.

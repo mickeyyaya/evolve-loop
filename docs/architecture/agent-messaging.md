@@ -16,7 +16,7 @@
 > - **Roster:** the agents of one cycle: past, live and planned dispatches.
 > - **Store:** the channel `msg.<cycle>` of the ADR-0127 channel log.
 > - **Deliverer:** an adapter that puts messages in front of a recipient agent.
-> - **Dead letter:** a message that the service cannot deliver. It goes to the channel `msg.dead`.
+> - **Dead letter:** a message that the service cannot deliver. It goes to the channel `msg.dead.<cycle>` of its cycle.
 
 ## Table of contents
 
@@ -96,6 +96,7 @@ The Go packages are under `go/internal/agentmsg/`:
 | `agentmsg/policy` | the `Authorizer` port, the rule engine and the default rules |
 | `agentmsg/broker` | the service: `Send`, `Read`, the ports and the typed errors |
 | `agentmsg/memstore` | the in-memory store adapter |
+| `agentmsg/channelstore` | the channel-log store adapter: the channels `msg.<cycle>` and `msg.dead.<cycle>` |
 | `agentmsg/delivery` | the `Deliverer` port, the frame of a message and the prompt section |
 
 ### 2. The envelope
@@ -307,15 +308,16 @@ A negative cursor is `ErrCursor`, and the store is not called.
 ```
 
 - **`recipients`** are the roster entries that the broker admitted. A planned phase has no dispatch yet.
-- **The dead letters** go to the channel `msg.dead`, as `{"envelope":…,"recipient":…,"reason":"expired"}`.
+- **The dead letters** go to the channel `msg.dead.<cycle>`, one for each cycle. No two cycles share a channel or a lock. Each is a `message` record, and its payload is `{"envelope":…,"recipient":…,"reason":"expired"}`.
+- **The size.** A message line is 65,536 bytes or less (`channel.MaxMessageBytes`). The signal limit of 4,608 bytes is too small for the default body cap of 8,192 bytes.
 - **Protected.** The store is under `/.evolve/events/`, which is protected surface (ADR-0127, ADR-0064). No phase agent writes it.
 - **Retention.** The cycle seal archives `msg.<cycle>`, and `evolve gc` removes the channel after its retention.
-- **The skeleton** (M1) gives only the `Store` port and the in-memory adapter `memstore`. The channel adapter is component M2.
+- **The adapters.** The skeleton (M1) gives the `Store` port and the in-memory adapter `memstore`. Component M2 adds the channel adapter ([internal-agentmsg-channelstore.md](packages/internal-agentmsg-channelstore.md)). Both are unwired until M7.
 
 **The contract of the `Store` port.** Each adapter keeps these rules:
-- `Append` returns the cursor `c` of the record. A later `Read(from)` with `from` at or below `c` holds that record, and its `Next` is above `c`.
+- `Append` returns the cursor `c` of the record. A later `Read(from)` with `from` at or below `c` holds that record, and its `Next` is above `c`. A cursor is opaque: `memstore` counts records, and `channelstore` counts bytes.
 - `Read` returns the records from the cursor, the gaps (`Batch.Gaps`) and the next cursor. A gap is `{from, to, reason}`: the records between the two cursors are lost, for example by retention or a reset (ADR-0127). The broker reports each gap, so M2 needs no change to the core.
-- `DeadLetter` appends one dead letter to `msg.dead`.
+- `DeadLetter` appends one dead letter to `msg.dead.<cycle>`.
 - A call can block. The broker calls the store inside its lock (§6), so a slow store blocks the cycle.
 
 **The archive.** The retro reads `msg.<cycle>` from the protected store. The seal also writes the SHA-256 of the archive into the ledger. A copy in `runs/` is for people only. No roster, archive or evidence input is read from `runs/`, because an agent can write there.
@@ -378,7 +380,7 @@ Config gives each limit (§14). The broker checks them in the core.
 - **The idempotency key** is the `id`. A retry of a send with the same `id` gives the same receipt. A read drops a second copy of an `id`.
 - **The cursor** is the position of the reader in `msg.<cycle>`. Each recipient has its own cursor.
 - **Request and reply.** A request carries a `correlation_id` and an `expires_at` (research F7.3, F7.4).
-- **Dead letters.** An expired message goes to `msg.dead` once for each recipient. At the seal, a message to a phase that did not run goes there too. The seal moves the queue of each `planned` entry (§4, component M7).
+- **Dead letters.** An expired message goes to `msg.dead.<cycle>` once for each recipient. At the seal, a message to a phase that did not run goes there too. The seal moves the queue of each `planned` entry (§4, component M7).
 - **A retry reads a planned-phase message again.** A message to a phase while it is planned reaches each dispatch of that phase, so a retry gets a second copy (§3).
 - **No exactly-once delivery.** A consumer that must be exact keeps its own set of ids.
 
@@ -426,7 +428,7 @@ The service emits Signal Center events through the `Notifier` port (component M7
 | Path | Content | Writer | Reader |
 |---|---|---|---|
 | `.evolve/events/ch/msg.<cycle>/seg-<base>.ndjson` | the store of a cycle | the service only | the service; `evolve events watch` |
-| `.evolve/events/ch/msg.dead/seg-<base>.ndjson` | the dead letters | the service only | the retro; `evolve events watch` |
+| `.evolve/events/ch/msg.dead.<cycle>/seg-<base>.ndjson` | the dead letters | the service only | the retro; `evolve events watch` |
 | `.evolve/msg/<cycle>/<dispatch-key>/out/<id>.json` | the drafts of one dispatch | that dispatch, through `evolve msg` | the service |
 | `.evolve/msg/<cycle>/<dispatch-key>/box/messages.ndjson` | the messages that one dispatch received | the service only | that dispatch |
 | `.evolve/msg/<cycle>/<dispatch-key>/box/receipts/<id>.json` | the receipt of each send | the service only | that dispatch |

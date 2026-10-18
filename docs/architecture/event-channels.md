@@ -92,7 +92,7 @@ Every watcher of the pipeline polls, and no program outside one process can subs
 
 The catalog is config: `.evolve/policy.json` `events.channels`. The compiled defaults are in `internal/policy` (`EventsConfig()`). The catalog is closed: a publisher appends only to a configured channel, and a selector never makes a channel.
 
-**The message family** ([ADR-0129](adr/0129-cycle-scoped-agent-messaging.md)). The channels `msg.<cycle>` and `msg.dead` are outside the catalog. The messaging service of a cycle is their only writer, and its records hold a `message` variant ([agent-messaging.md](agent-messaging.md) §7). A reader selects them as any channel, for example `--channel 'msg.>'`.
+**The message family** ([ADR-0129](adr/0129-cycle-scoped-agent-messaging.md)). The channels `msg.<cycle>` and `msg.dead.<cycle>` are outside the catalog. The messaging service of a cycle is their only writer, and its records have the source `msg` and hold a `message` variant ([agent-messaging.md](agent-messaging.md) §7). A reader selects them as any channel, for example `--channel 'msg.>'`.
 
 Each channel has these keys:
 
@@ -125,7 +125,7 @@ The default channels:
 
 ### 3. Records
 
-Two record types exist on disk, one JSON object on each line:
+Three record types exist on disk, one JSON object on each line. The examples show a `signal` record and a `gap` record:
 
 ```json
 {"source":"loop","dispatch":"events/0/sub-alerts/p4242n1t0","signal":{"schema_version":"signal/1.0","seq":41,"pid":9055,"ts":"2026-10-09T17:46:02.114Z","cycle":1841,"module":"orchestrator","origin":"cycleRun.completeCycle","kind":"cycle.sealed","severity":"INFO","reason":"final verdict PASS","fields":{"final_verdict":"PASS"}}}
@@ -137,8 +137,9 @@ Two record types exist on disk, one JSON object on each line:
 - **`dispatch`** is the `EVOLVE_DISPATCH_ID` of the process that published the record, if it has one. A record from a process with no tag has no `dispatch` key.
 - **`gap`** names events that this channel does not hold: the reason, a severity, the `pid` of the process, the `seq` range and the count. The reasons are `queue_full`, `write_error` and `lock_deadline` (§5, §6). A loss on a `lossless` channel has the severity `INCIDENT`, and a loss on a `best_effort` channel has `WARN`.
 - **`from` and `to`** are always in a gap, also when they are 0. A synthetic gap sets them to the two cursors of the move. A stored gap has 0 in both.
-- **Valid record.** A record has exactly one of `signal` and `gap`. A stored record never has the source `watch`. The writer refuses any other record, and the reader reads it as `malformed`.
-- **Size.** `Normalize` keeps a signal line at 4,096 bytes or less (`MaxLineBytes`, `event.go:33`). `source` comes from a closed set, and the Publisher cuts `dispatch` to 256 bytes. A record line is thus 4,608 bytes or less.
+- **`message`** holds a message of the channels `msg.<cycle>` and `msg.dead.<cycle>` ([agent-messaging.md](agent-messaging.md) §7). The log keeps it as raw JSON. A message line is 65,536 bytes or less.
+- **Valid record.** A record has exactly one of `signal`, `gap` and `message`. A stored record never has the source `watch`. The writer refuses any other record, and the reader reads it as `malformed`.
+- **Size.** `Normalize` keeps a signal line at 4,096 bytes or less (`MaxLineBytes`, `event.go:33`). `source` comes from a closed set, and the Publisher cuts `dispatch` to 256 bytes. A `signal` or `gap` record line is thus 4,608 bytes or less.
 
 The wire form is what `evolve events watch --json` prints and what a command reads on stdin. The reader adds four keys from the record and from the place where it read the line:
 
@@ -149,7 +150,7 @@ The wire form is what `evolve events watch --json` prints and what a command rea
 - `evolve.event/1` holds every `signal/1.0` field without a change, inside `signal`. A `signal/1.0` consumer reads `.signal`.
 - **The event id** (`id`) is `<signal.pid>.<signal.seq>.<signal.ts>`. It is the same in every channel and in the per-cycle file. One process has one `seq` order, and the time separates a pid that the system used again. The event id is the key to remove duplicates.
 - **The position** (`channel` and `cursor`) says where the record is. A consumer resumes and acks by position.
-- A gap record's id is `gap.<channel>.<cursor>`.
+- A gap record's id is `gap.<channel>.<cursor>`. A message record's id is `msg.<channel>.<cursor>`.
 - A **synthetic record** comes from a reader, not from a log: the last will (`loop.lost`, §7) and the reader gaps (`retention`, `malformed`, `reset`). Its `source` is `watch`, and it has no `cursor`. A synthetic gap has the id `gap.<channel>.<from>`. A consumer never acks a synthetic record. The reader moves the cursor past the lines that a synthetic gap names.
 
 ### 4. Cursors and segments

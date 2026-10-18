@@ -2,7 +2,7 @@
 
 > The spec of record: [agent-messaging.md](../agent-messaging.md). The plan (component M1, decisions D1 to D15): [agent-messaging-2026-10.md](../../plans/agent-messaging-2026-10.md). The decision: [ADR-0129](../adr/0129-cycle-scoped-agent-messaging.md). The research: [agent-messaging-2026-10.md](../../research/agent-messaging-2026-10.md).
 
-This page covers `internal/agentmsg` and its seven subpackages: `address`, `envelope`, `identity`, `policy`, `broker`, `memstore` and `delivery`.
+This page covers `internal/agentmsg` and its seven subpackages: `address`, `envelope`, `identity`, `policy`, `broker`, `memstore` and `delivery`. The eighth subpackage, `channelstore` (component M2), has its own page: [internal-agentmsg-channelstore.md](internal-agentmsg-channelstore.md).
 
 ## Purpose
 
@@ -19,7 +19,7 @@ This page covers `internal/agentmsg` and its seven subpackages: `address`, `enve
 | `agentmsg/memstore` | the in-memory adapter of the `Store` port |
 | `agentmsg/delivery` | the `Deliverer` port, the frame of a message (`Frame`) and the prompt-section adapter (`Section`) |
 
-Nothing outside `internal/agentmsg` imports it yet. Components M2 to M7 add the adapters and wire it.
+Nothing outside `internal/agentmsg` imports it yet. Component M2 added the channel store. Components M3 to M7 add the other adapters and wire it.
 
 ## Design
 
