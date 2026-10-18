@@ -47,7 +47,12 @@ func (v resolver) legacyDispatch(req Request) (Decision, error) {
 	if pin == nil || pin.CLI == "" {
 		plan = v.legacyUnlocked(req, prof, plan)
 	}
-	return Decision{Plan: plan, Rule: legacyRule(req, plan, pin), Allowed: prof.AllowedFamilies()}, nil
+	rule := legacyRule(req, plan, pin)
+	toolPlan, notes, err := v.requireToolUse(req, rule, plan)
+	if err != nil {
+		return Decision{}, refused(req.Agent, err)
+	}
+	return Decision{Plan: toolPlan, Rule: rule, Allowed: prof.AllowedFamilies(), Trace: notes}, nil
 }
 
 func (t Table) legacyPin(phase string, prof *profiles.Profile) (*policy.Pin, error) {

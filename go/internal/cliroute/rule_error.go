@@ -33,3 +33,12 @@ type CeilingError struct {
 func (e *CeilingError) Error() string {
 	return fmt.Sprintf("rule %s: the tier ceiling leaves no CLI of %v at tiers %v (ceiling %v)", e.Rule, e.Chain, e.Tiers, e.Ceiling)
 }
+
+type ToolUseError struct {
+	Rule    string
+	Dropped []string
+}
+
+func (e *ToolUseError) Error() string {
+	return fmt.Sprintf("rule %s leaves no CLI with tool use for a worktree phase: %v dropped", e.Rule, e.Dropped)
+}
