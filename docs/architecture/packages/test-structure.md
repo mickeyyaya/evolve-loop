@@ -10,5 +10,5 @@
 
 ## Invariants
 
-- **The limits.** A function has fewer than 50 lines and at most four nested control statements. A file has fewer than 800 newline bytes.
+- **The limits.** A function has at most 50 lines (`sizeratchet.MaxLines`, the one cap that the module-wide ratchet reads too) and at most four nested control statements. A file has fewer than 800 newline bytes.
 - **Function doc comments are excluded** from a function's size; comments inside the function count.

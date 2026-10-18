@@ -38,7 +38,7 @@ func Walk(root string) ([]FuncSpan, error) {
 			}
 			return nil
 		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		if !measured(name) {
 			return nil
 		}
 		fileSpans, err := walkFile(fset, root, path)
@@ -56,15 +56,18 @@ func skipDir(name string) bool {
 }
 
 func walkFile(fset *token.FileSet, root, path string) ([]FuncSpan, error) {
-	file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
-	if err != nil {
-		return nil, err
-	}
 	rel, err := filepath.Rel(root, filepath.Dir(path))
 	if err != nil {
 		return nil, err
 	}
-	dir := filepath.ToSlash(rel)
+	return parseSpans(fset, filepath.ToSlash(rel), path, nil)
+}
+
+func parseSpans(fset *token.FileSet, dir, name string, src any) ([]FuncSpan, error) {
+	file, err := parser.ParseFile(fset, name, src, parser.SkipObjectResolution)
+	if err != nil {
+		return nil, err
+	}
 	var spans []FuncSpan
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
@@ -105,36 +108,45 @@ func LoadOffenders(path string) (map[string]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("sizeratchet: read offender list: %w", err)
 	}
+	return parseOffenders(body, path)
+}
+
+func parseOffenders(body []byte, name string) (map[string]int, error) {
 	var offenders map[string]int
 	if err := json.Unmarshal(body, &offenders); err != nil {
-		return nil, fmt.Errorf("sizeratchet: parse offender list %s: %w", path, err)
+		return nil, fmt.Errorf("sizeratchet: parse offender list %s: %w", name, err)
 	}
 	if offenders == nil {
-		return nil, fmt.Errorf("sizeratchet: offender list %s is not a JSON object", path)
+		return nil, fmt.Errorf("sizeratchet: offender list %s is not a JSON object", name)
 	}
 	for key, allowance := range offenders {
 		if allowance <= MaxLines {
-			return nil, fmt.Errorf("sizeratchet: offender list %s: %s allowance %d is not over %d; remove the entry", path, key, allowance, MaxLines)
+			return nil, fmt.Errorf("sizeratchet: offender list %s: %s allowance %d is not over %d; remove the entry", name, key, allowance, MaxLines)
 		}
 	}
 	return offenders, nil
 }
 
-func Check(spans []FuncSpan, offenders map[string]int) error {
-	sizes := make(map[string]int, len(spans))
+func sizes(spans []FuncSpan) map[string]int {
+	out := make(map[string]int, len(spans))
 	for _, s := range spans {
-		if s.Lines > sizes[s.Key] {
-			sizes[s.Key] = s.Lines
+		if s.Lines > out[s.Key] {
+			out[s.Key] = s.Lines
 		}
 	}
+	return out
+}
+
+func Check(spans []FuncSpan, offenders map[string]int) error {
+	current := sizes(spans)
 	var problems []string
-	for key, n := range sizes {
+	for key, n := range current {
 		if _, listed := offenders[key]; !listed && n > MaxLines {
 			problems = append(problems, fmt.Sprintf("%s is %d lines > %d: shrink it to %d or fewer", key, n, MaxLines, MaxLines))
 		}
 	}
 	for key, allowance := range offenders {
-		if problem := listedProblem(key, sizes[key], allowance); problem != "" {
+		if problem := listedProblem(key, current[key], allowance); problem != "" {
 			problems = append(problems, problem)
 		}
 	}
@@ -142,7 +154,7 @@ func Check(spans []FuncSpan, offenders map[string]int) error {
 		return nil
 	}
 	sort.Strings(problems)
-	return errors.New("sizeratchet: function-size ratchet violated (allowances live in go/internal/sizeratchet/offenders.json):\n  " +
+	return errors.New("sizeratchet: function-size ratchet violated (allowances live in " + OffendersRelPath + " under the module root):\n  " +
 		strings.Join(problems, "\n  "))
 }
 
