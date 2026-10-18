@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 func TestBenchOnEscalation_AgyQuotaWallBenchesTheAgyFamily(t *testing.T) {
@@ -50,5 +51,23 @@ func TestBenchOnEscalation_AgyWallScopeFollowsTheDispatchedTier(t *testing.T) {
 		if _, ok := active[tc.wantKey]; !ok || len(active) != 1 {
 			t.Errorf("%s wall at tier %q: benches = %v, want the single key %q", tc.cli, tc.tier, active, tc.wantKey)
 		}
+	}
+}
+
+func TestEscalationFor_TheTierOfTheTryScopesTheAgyWallToItsModelGroup(t *testing.T) {
+	root, ws := t.TempDir(), t.TempDir()
+	now := func() time.Time { return time.Date(2026, 10, 19, 1, 3, 0, 0, time.UTC) }
+	b, _ := json.Marshal(map[string]any{"captured_at": now(), "cli": "agy-tmux", "pattern_name": "exhausted",
+		"pane_tail": "Individual quota reached for this model."})
+	if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	req := core.BridgeRequest{CLI: "agy-tmux", Model: "deep", ProjectRoot: root, Workspace: ws, Env: map[string]string{}}
+
+	bridgechain.BenchOnEscalation(bridgechain.EscalationFor(req, now().Add(-time.Minute)), now, nil)
+
+	active := clihealth.NewStore(root, now).Active()
+	if _, ok := active["agy@Gemini 4 Argon"]; !ok || len(active) != 1 {
+		t.Fatalf("benches %v; an escalation made from a deep agy try must bench only the Argon model group (cycle 1951)", active)
 	}
 }

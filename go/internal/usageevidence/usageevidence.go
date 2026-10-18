@@ -125,7 +125,7 @@ func (b *Bridge) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		}
 	}
 	if res.ExitCode == exitEscalated {
-		bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: req.CLI, DispatchStart: start, Env: req.Env}, time.Now, warnf)
+		bridgechain.BenchOnEscalation(bridgechain.EscalationFor(req, start), time.Now, warnf)
 	}
 	return res, err
 }
