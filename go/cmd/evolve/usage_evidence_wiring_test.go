@@ -76,6 +76,66 @@ func TestCLIUpdateWiring_ABootTimeoutWithHealthyUsageStaysABootTimeout(t *testin
 	}
 }
 
+func foundChangeSmokeSeams(t *testing.T, root string) cliupdate.Seams {
+	t.Helper()
+	seams := productionCLIUpdateWiring(root, io.Discard).seams
+	seams.Version = func(string) (string, error) { return "1.4.1", nil }
+	seams.Smoke = func(context.Context, string) error {
+		return errors.New(`doctor live agy-tmux rc=85 pattern="exhausted"`)
+	}
+	seams.Run = func(context.Context, cliupdate.Family) error {
+		t.Error("a failed found-change smoke must not run the updater")
+		return nil
+	}
+	return seams
+}
+
+func TestCLIUpdateWiring_ASmokeFailureWithOnlyArgonDrainedStaysASmokeFailureNamingTheWindow(t *testing.T) {
+	root := t.TempDir()
+	probed := installUsageEvidence(t, "agy_usage_argon_drained.txt", nil)
+	history := []cliupdate.Record{{Family: "agy", Kind: cliupdate.KindBaseline, New: "1.4.0"}}
+
+	rep := cliupdate.Update(context.Background(), []cliupdate.Family{{Name: "agy", UpdateArgv: []string{"agy", "update"}}}, foundChangeSmokeSeams(t, root), history)
+
+	res := rep.Results[0]
+	if res.Status != cliupdate.StatusSmokeFailed || len(rep.SmokeFailed()) != 1 {
+		t.Fatalf("result %+v after probing %v; want smoke-failed: a drained Argon window cannot explain a failure of the dispatched model", res, *probed)
+	}
+	for _, want := range []string{"quota ruled out", "Gemini 4 Argon week window 100% used, resets 133h"} {
+		if !strings.Contains(res.Detail, want) {
+			t.Errorf("detail %q must carry %q, read from the real usage screen", res.Detail, want)
+		}
+	}
+	if strings.Contains(res.Detail, "verified the cause") {
+		t.Errorf("a window of one model is a note, never the verified cause: %q", res.Detail)
+	}
+}
+
+func TestCLIUpdateWiring_ASmokeFailureWhileTheFamilyIsDrainedIsAVerifiedQuotaCause(t *testing.T) {
+	root := t.TempDir()
+	probed := installUsageEvidence(t, "agy_usage_gemini_drained.txt", nil)
+	history := []cliupdate.Record{{Family: "agy", Kind: cliupdate.KindBaseline, New: "1.4.0"}}
+
+	rep := cliupdate.Update(context.Background(), []cliupdate.Family{{Name: "agy", UpdateArgv: []string{"agy", "update"}}}, foundChangeSmokeSeams(t, root), history)
+
+	res := rep.Results[0]
+	if res.Status != cliupdate.StatusQuotaExhausted || len(rep.SmokeFailed()) != 0 || !strings.Contains(res.Detail, "GEMINI MODELS") {
+		t.Fatalf("result %+v after probing %v; want quota-exhausted naming the drained family window, read from the real usage screen", res, *probed)
+	}
+}
+
+func TestCLIUpdateWiring_ASmokeFailureWithHealthyUsageStaysASmokeFailure(t *testing.T) {
+	root := t.TempDir()
+	installUsageEvidence(t, "agy_usage_groups.txt", nil)
+	history := []cliupdate.Record{{Family: "agy", Kind: cliupdate.KindBaseline, New: "1.4.0"}}
+
+	rep := cliupdate.Update(context.Background(), []cliupdate.Family{{Name: "agy", UpdateArgv: []string{"agy", "update"}}}, foundChangeSmokeSeams(t, root), history)
+
+	if res := rep.Results[0]; res.Status != cliupdate.StatusSmokeFailed || len(rep.SmokeFailed()) != 1 || !strings.Contains(res.Detail, "quota ruled out") {
+		t.Fatalf("result %+v; want smoke-failed with quota ruled out", res)
+	}
+}
+
 func TestLoopPreflightOptions_AFailedBootIsExplainedByTheUsageEvidence(t *testing.T) {
 	root := t.TempDir()
 	probed := installUsageEvidence(t, "", errors.New("REPL prompt never appeared after 60s"))

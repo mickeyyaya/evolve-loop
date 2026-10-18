@@ -8,12 +8,16 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliupdate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -240,5 +244,111 @@ func TestPrepareIteration_AProbeFailureSkipIsALoudWarn(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "[loop] WARN: cli-update: claude skipped 2.1.285: doctor live did not answer") {
 		t.Errorf("a family skipped on a failed probe is a WARN, not a plain line:\n%s", stderr)
+	}
+}
+
+func fixtureEvidence(t *testing.T, fixture string) usageprobe.Evidence {
+	t.Helper()
+	explain := usageevidence.New(usageevidence.Options{
+		ProjectRoot: t.TempDir(), Log: io.Discard,
+		Probe: func(context.Context, string) (string, error) { return usageFixture(t, fixture), nil },
+	})
+	return explain(context.Background(), "agy-tmux", time.Now())
+}
+
+func agySelfUpdatedHost(t *testing.T, evolveDir, fixture string) *fakeCLIHost {
+	t.Helper()
+	baseline := cliupdate.Result{Family: "agy", Status: cliupdate.StatusUnchanged, OldVersion: "1.4.0", NewVersion: "1.4.0"}
+	if err := cliupdate.Remember(evolveDir, cliupdate.Report{Results: []cliupdate.Result{baseline}}, cliUpdateNow); err != nil {
+		t.Fatal(err)
+	}
+	ev := fixtureEvidence(t, fixture)
+	h := &fakeCLIHost{
+		families: []cliupdate.Family{{Name: "agy", UpdateArgv: []string{"agy", "update"}}},
+		versions: map[string][]string{"agy": {"1.4.1"}},
+		smokeErr: map[string]error{"agy": errors.New(`doctor live agy-tmux rc=85 pattern="exhausted"`)},
+		usage:    &ev,
+	}
+	h.install(t)
+	return h
+}
+
+func TestBootCLIUpdate_ASmokeFailureWithOnlyArgonDrainedStillHaltsAndNamesTheWindow(t *testing.T) {
+	b, _, coordinatorErr := boundaryCoordinator(t, 0)
+	h := agySelfUpdatedHost(t, b.cfg.EvolveDir, "agy_usage_argon_drained.txt")
+	lr := &loopResult{}
+	var stdout, stderr bytes.Buffer
+
+	halted := bootCLIUpdateHalts(context.Background(), b.cfg, b.deps, lr, &stdout, &stderr)
+	b.deps.Signals.Flush()
+
+	if !halted || lr.StopReason != cliUpdateSmokeHalt || len(lr.CLIUpdateHalt) != 1 || lr.CLIUpdateHalt[0].Family != "agy" {
+		t.Fatalf("the smoke ran the dispatched model, so a drained Argon window cannot explain its failure: a real fault must halt: halted=%v stop=%q halt=%+v\n%s", halted, lr.StopReason, lr.CLIUpdateHalt, stderr.String())
+	}
+	if want := "[loop] HALT: cli-update: agy smoke-failed 1.4.0 → 1.4.1: "; !strings.Contains(stderr.String(), want) {
+		t.Errorf("want one %q line:\n%s", want, stderr.String())
+	}
+	for _, want := range []string{"Gemini 4 Argon week window 100% used", "quota ruled out", "rc=85"} {
+		if !strings.Contains(stderr.String(), want) {
+			t.Errorf("the halt line must show %q next to the smoke failure:\n%s", want, stderr.String())
+		}
+	}
+	if !strings.Contains(coordinatorErr.String(), "LOOP_HALT") || !strings.Contains(stdout.String(), cliUpdateSmokeHalt) {
+		t.Errorf("the halt stays a Signal Center incident and a loop result:\n%s\n%s", coordinatorErr.String(), stdout.String())
+	}
+	if got, err := cliupdate.LoadRecords(b.cfg.EvolveDir); err != nil || len(got) != 1 || got[0].New != "1.4.0" {
+		t.Errorf("the unproven 1.4.1 must stay unrecorded: %+v, %v", got, err)
+	}
+	if want := []string{"eligible agy", "version agy", "smoke agy", "explain agy"}; !slices.Equal(h.calls, want) {
+		t.Errorf("calls = %q, want %q", h.calls, want)
+	}
+}
+
+func TestBootCLIUpdate_ASmokeFailureWhileTheFamilyIsDrainedWarnsAndDoesNotHalt(t *testing.T) {
+	b, _, coordinatorErr := boundaryCoordinator(t, 0)
+	h := agySelfUpdatedHost(t, b.cfg.EvolveDir, "agy_usage_gemini_drained.txt")
+	lr := &loopResult{}
+	var stdout, stderr bytes.Buffer
+
+	halted := bootCLIUpdateHalts(context.Background(), b.cfg, b.deps, lr, &stdout, &stderr)
+	b.deps.Signals.Flush()
+
+	if halted || lr.StopReason != "" || len(lr.CLIUpdateHalt) != 0 || stdout.Len() != 0 {
+		t.Fatalf("a drained family explains the failed smoke: that is no broken CLI and must not halt: halted=%v stop=%q halt=%+v\n%s", halted, lr.StopReason, lr.CLIUpdateHalt, stderr.String())
+	}
+	if want := "[loop] WARN: cli-update: agy quota-exhausted 1.4.0 → 1.4.1: "; !strings.Contains(stderr.String(), want) || strings.Contains(stderr.String()+coordinatorErr.String(), "HALT") {
+		t.Errorf("want one %q WARN line and no halt:\n%s%s", want, stderr.String(), coordinatorErr.String())
+	}
+	if !strings.Contains(stderr.String(), "GEMINI MODELS") || !strings.Contains(stderr.String(), "rc=85") {
+		t.Errorf("the WARN line names the drained window and the smoke error:\n%s", stderr.String())
+	}
+	if got, err := cliupdate.LoadRecords(b.cfg.EvolveDir); err != nil || len(got) != 1 || got[0].New != "1.4.0" {
+		t.Errorf("the unproven 1.4.1 must stay unrecorded so the next boundary smokes it again: %+v, %v", got, err)
+	}
+	if want := []string{"eligible agy", "version agy", "smoke agy", "explain agy"}; !slices.Equal(h.calls, want) {
+		t.Errorf("calls = %q, want %q", h.calls, want)
+	}
+}
+
+func TestBootCLIUpdate_ASmokeFailureWithHealthyUsageStillHaltsTheLoop(t *testing.T) {
+	b, _, coordinatorErr := boundaryCoordinator(t, 0)
+	h := agySelfUpdatedHost(t, b.cfg.EvolveDir, "agy_usage_groups.txt")
+	lr := &loopResult{}
+	var stdout, stderr bytes.Buffer
+
+	halted := bootCLIUpdateHalts(context.Background(), b.cfg, b.deps, lr, &stdout, &stderr)
+	b.deps.Signals.Flush()
+
+	if !halted || lr.StopReason != cliUpdateSmokeHalt || len(lr.CLIUpdateHalt) != 1 || lr.CLIUpdateHalt[0].Family != "agy" {
+		t.Fatalf("no window is drained, so the failed smoke is a broken CLI and must halt: halted=%v stop=%q halt=%+v", halted, lr.StopReason, lr.CLIUpdateHalt)
+	}
+	if want := "[loop] HALT: cli-update: agy smoke-failed 1.4.0 → 1.4.1: "; !strings.Contains(stderr.String(), want) || !strings.Contains(stderr.String(), "quota ruled out") {
+		t.Errorf("the halt line says quota is ruled out:\n%s", stderr.String())
+	}
+	if !strings.Contains(coordinatorErr.String(), "LOOP_HALT") || !strings.Contains(stdout.String(), cliUpdateSmokeHalt) {
+		t.Errorf("the halt stays a Signal Center incident and a loop result:\n%s\n%s", coordinatorErr.String(), stdout.String())
+	}
+	if !slices.Contains(h.calls, "explain agy") {
+		t.Errorf("the failed smoke must ask the usage query before it halts: %q", h.calls)
 	}
 }

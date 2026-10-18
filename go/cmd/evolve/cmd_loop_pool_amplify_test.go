@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -25,8 +26,8 @@ func TestShouldRunPool_DegenerateAndBoundaryCounts(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := shouldRunPool(tc.fc); got != tc.want {
-				t.Errorf("shouldRunPool(%+v) = %v, want %v", tc.fc, got, tc.want)
+			if got := loopwave.ShouldRunPool(tc.fc); got != tc.want {
+				t.Errorf("loopwave.ShouldRunPool(%+v) = %v, want %v", tc.fc, got, tc.want)
 			}
 		})
 	}
@@ -43,8 +44,8 @@ func TestShouldRunPool_ExactStringMatchRequired(t *testing.T) {
 		{Count: 2, PlanSource: "triage ", Scheduling: "pool"},
 	}
 	for _, fc := range mismatches {
-		if shouldRunPool(fc) {
-			t.Errorf("shouldRunPool(%+v) = true, want false — comparisons must be exact-match, not fuzzy/case-insensitive", fc)
+		if loopwave.ShouldRunPool(fc) {
+			t.Errorf("loopwave.ShouldRunPool(%+v) = true, want false — comparisons must be exact-match, not fuzzy/case-insensitive", fc)
 		}
 		if fc.Scheduling != "pool" && !shouldRunWave(fc) {
 			t.Errorf("shouldRunWave(%+v) = false, want true — a non-exact-\"pool\" Scheduling must fall back to the wave path, never dispatch nowhere", fc)

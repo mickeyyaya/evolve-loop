@@ -28,11 +28,13 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		evolveDir string
 		tomlPath  string
 		goalHash  string
+		pool      bool
 	)
 	fs.IntVar(&count, "count", 0, "number of concurrent soak runs — required, must be > 0")
 	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve state directory")
 	fs.StringVar(&tomlPath, "toml-path", "", "path to shared TOML config for invariant-4 check (optional)")
 	fs.StringVar(&goalHash, "goal-hash", "", "goal hash passed to real --simulate launches (optional)")
+	fs.BoolVar(&pool, "pool", false, "also run the orchestrator pool at stage enforce over 4 x count simulated lanes and report its throughput, utilization and peak in-flight (row 5)")
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
@@ -72,7 +74,14 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	renderSoakTable(stdout, inv1S, inv1E, inv2S, inv2E, inv3S, inv3E, inv4S, inv4E)
 
-	if inv1S != "PASS" || inv2S != "PASS" || inv4S != "PASS" || !launchesOK {
+	poolOK := true
+	if pool {
+		status, evidence := soakPoolRow(soakPool(context.Background(), count, goalHash, launchFn, time.Now), count)
+		fmt.Fprintf(stdout, "| 5 — pool at enforce   | %s | %s |\n", evidence, status)
+		poolOK = status == "PASS"
+	}
+
+	if inv1S != "PASS" || inv2S != "PASS" || inv4S != "PASS" || !launchesOK || !poolOK {
 		return 1
 	}
 	return 0

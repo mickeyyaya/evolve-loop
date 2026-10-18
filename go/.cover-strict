@@ -26,6 +26,7 @@
 ./internal/cliupdate 100
 ./internal/inboxrank 100
 ./internal/inboxrank/rankinputs 100
+./internal/inboxsplit 100
 ./internal/codereview 100
 ./internal/qualityindex 100
 ./internal/events/channel 100
@@ -69,3 +70,4 @@
 ./internal/wavemeasure 100
 ./internal/lanebudget 100
 ./internal/admission 100
+./internal/orchestrator 100

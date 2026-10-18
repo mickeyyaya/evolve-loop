@@ -46,6 +46,7 @@
 | Site | Wired | How |
 |---|---|---|
 | Boundary CLI updater, a failed `doctor live` (`internal/cliupdate`) | yes | `Seams.Explain` decides the result: `quota-exhausted`, `boot-timeout` with the verdict appended, or `skipped` explained by the verdict. "Counts as unsubscribed" is no longer inferred. |
+| Boundary CLI updater, a failed smoke (`internal/cliupdate`) | yes | `Seams.Explain` decides the result: `quota-exhausted` for an exhausted family, otherwise `smoke-failed` with the verdict appended. A window of one model is a note in that verdict, never the cause. The halt stays for `smoke-failed`. |
 | Preflight `bridge-boot`, a failed boot (`internal/looppreflight`) | yes | `Options.UsageEvidence` adds a `usage:` line to the halt detail. The check still halts. |
 | Bridge launch failures before the fallback (exit 80, 81, 85, 86, 87 and any other non-zero but 127), for both chain walkers | yes | The `Wrap` decorator at `cmd/evolve` `wireOrchestratorDeps`. |
 | `LIVENESS_PHASE_STALLED`, a pane stall (`internal/adapters/observer`) | yes, as evidence only | `CoreAdapter.UsageEvidence`, read by the adapter's own `phaseStallSignal` and `reportStallUsage` methods. A stdout stall has no known CLI and is left alone. |

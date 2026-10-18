@@ -49,6 +49,16 @@ func geminiProEntries(t *testing.T, chain []string, tier string) []string {
 	return hits
 }
 
+func modelFamilyAt(t *testing.T, driver, tier string) string {
+	t.Helper()
+	m, err := gobridge.LoadManifest(driver)
+	if err != nil {
+		t.Errorf("chain entry %s has no manifest: %v", driver, err)
+		return ""
+	}
+	return modelquery.FamilyOf(m.ModelTierMap[tier])
+}
+
 func resolvedChain(t *testing.T, r *cliroute.Router, req cliroute.Request) []string {
 	t.Helper()
 	d, err := r.Resolve(req)
@@ -101,13 +111,30 @@ func TestDeepAndTopProfiles_NoChainEntryResolvesTheirTierToAGeminiProModel(t *te
 func TestRouter_EveryLaunchOfTheAdvisorStaysOnClaudeModels(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	r := everyBinaryInstalledRouter(t)
+	const tier = "deep"
 	for _, req := range []cliroute.Request{
 		{Agent: "router", Phase: cliroutetest.PhaseOf("router"), ProjectRoot: t.TempDir()},
 		{Agent: "router", Launch: cliroute.LaunchAdvisor, ProjectRoot: t.TempDir()},
 	} {
 		chain := resolvedChain(t, r, req)
-		if want := []string{"agy-claude-tmux", "claude-tmux"}; !slices.Equal(chain, want) {
-			t.Errorf("router (launch %q) resolves to %v, want %v: agy-owned Claude, then Claude Code, with no codex and no Gemini tail", req.Launch, chain, want)
+		if len(chain) == 0 {
+			t.Errorf("router (launch %q) resolves to no CLI: the advisor must keep a Claude seat", req.Launch)
+		}
+		for _, driver := range chain {
+			if family := modelFamilyAt(t, driver, tier); family != "claude" {
+				t.Errorf("router (launch %q) resolves to %v, and %s runs a %q model at %s: every advisor seat runs a Claude model, with no codex and no Gemini tail", req.Launch, chain, driver, family, tier)
+			}
+		}
+	}
+}
+
+func TestModelFamilyAt_ReadsTheFamilyOfEachDriversTierModel(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ driver, want string }{
+		{"claude-tmux", "claude"}, {"agy-claude-tmux", "claude"}, {"agy-tmux", "gemini"}, {"codex-tmux", "gpt"},
+	} {
+		if got := modelFamilyAt(t, tc.driver, "deep"); got != tc.want {
+			t.Errorf("modelFamilyAt(%s, deep) = %q, want %q", tc.driver, got, tc.want)
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package cliupdate_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliupdate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
 var boundary = time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
@@ -212,5 +214,41 @@ func TestRemember_ASkippedFamilyIsNeverRecorded(t *testing.T) {
 
 	if got := loaded(t, evolveDir); len(got) != 0 {
 		t.Errorf("an interrupted smoke or an unsubscribed family proves nothing, so nothing is accepted: %+v", got)
+	}
+}
+
+func TestRemember_AQuotaExhaustedResultIsNeverRecordedWhateverVersionsItCarries(t *testing.T) {
+	evolveDir := t.TempDir()
+
+	remember(t, evolveDir,
+		cliupdate.Result{Family: "agy", Status: cliupdate.StatusQuotaExhausted, SelfUpdatedFrom: "1.4.0", OldVersion: "1.4.1"},
+		cliupdate.Result{Family: "claude", Status: cliupdate.StatusQuotaExhausted, OldVersion: "2.1.285", NewVersion: "2.1.286"},
+	)
+
+	if got := loaded(t, evolveDir); len(got) != 0 {
+		t.Errorf("a smoke that a quota wall cut short proved nothing, so no version is accepted: %+v", got)
+	}
+}
+
+func TestRemember_AQuotaExhaustedSmokeLeavesTheVersionUnrecordedSoTheNextBoundarySmokesItAgain(t *testing.T) {
+	evolveDir := t.TempDir()
+	remember(t, evolveDir, cliupdate.Result{Family: "agy", Status: cliupdate.StatusUnchanged, OldVersion: "1.4.0", NewVersion: "1.4.0"})
+	h := &fakeHost{versions: map[string][]string{"agy": {"1.4.1"}}, smokeErr: map[string]error{"agy": smokeRefused}}
+	seams := h.seams()
+	seams.Explain = func(context.Context, string) usageprobe.Evidence { return geminiFamilyDrained() }
+
+	for pass := 1; pass <= 2; pass++ {
+		rep := cliupdate.Update(context.Background(), []cliupdate.Family{agy()}, seams, loaded(t, evolveDir))
+		if res := only(t, rep); res.Status != cliupdate.StatusQuotaExhausted || res.SelfUpdatedFrom != "1.4.0" {
+			t.Fatalf("boundary %d: want quota-exhausted on the found 1.4.1: %+v", pass, res)
+		}
+		remember(t, evolveDir, rep.Results...)
+	}
+
+	if smokes := strings.Count(strings.Join(h.calls, ","), "smoke agy"); smokes != 2 {
+		t.Errorf("%d smokes over two boundaries; the unproven 1.4.1 must be smoked at each: %q", smokes, h.calls)
+	}
+	if got := loaded(t, evolveDir); len(got) != 1 || got[0].Kind != cliupdate.KindBaseline || got[0].New != "1.4.0" {
+		t.Errorf("only the 1.4.0 baseline is on record: %+v", got)
 	}
 }
