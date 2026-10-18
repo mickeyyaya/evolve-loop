@@ -48,7 +48,8 @@
         "cli": [
           "claude"
         ],
-        "model": "deep"
+        "model": "balanced",
+        "effort": "high"
       },
       "triage": {
         "effort": "low"
