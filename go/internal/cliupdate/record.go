@@ -102,7 +102,8 @@ func acceptedRecords(rep Report, prior []Record, at time.Time) []Record {
 }
 
 func accepted(res Result, known bool, at time.Time) []Record {
-	if res.Status == StatusSmokeFailed || res.Status == StatusSkipped {
+	switch res.Status {
+	case StatusSmokeFailed, StatusSkipped, StatusQuotaExhausted:
 		return nil
 	}
 	var out []Record

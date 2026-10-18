@@ -106,7 +106,7 @@ func updateOne(ctx context.Context, f Family, s Seams, last string) Result {
 func smokeUnreadableStart(ctx context.Context, res Result, s Seams, versionErr error) Result {
 	notes := []string{"version before the update: " + versionErr.Error()}
 	if err := s.Smoke(ctx, res.Family); err != nil {
-		return res.failedSmoke(ctx, notes, err)
+		return res.failedSmoke(ctx, s, notes, err)
 	}
 	return res.with(StatusUpdateFailed, strings.Join(append(notes, "smoke OK; the updater did not run"), "; "))
 }
@@ -115,7 +115,7 @@ func checkStart(ctx context.Context, res Result, s Seams, last string) (Result, 
 	if last != "" && last != res.OldVersion {
 		res.SelfUpdatedFrom = last
 		if err := s.Smoke(ctx, res.Family); err != nil {
-			return res.failedSmoke(ctx, res.selfUpdateNote(), err), false
+			return res.failedSmoke(ctx, s, res.selfUpdateNote(), err), false
 		}
 		return res, true
 	}
@@ -138,7 +138,7 @@ func explain(ctx context.Context, s Seams, family string) *usageprobe.Evidence {
 
 func (r Result) unprobed(err error, ev *usageprobe.Evidence) Result {
 	switch {
-	case ev != nil && ev.Verdict == usageprobe.VerdictExhausted:
+	case exhaustedCause(ev):
 		return r.with(StatusQuotaExhausted, "doctor live failed, and a usage query verified the cause: "+ev.Summary()+"; doctor live: "+err.Error())
 	case errors.Is(err, ErrBootTimeout):
 		return r.with(StatusBootTimeout, "doctor live timed out booting the REPL, so this boundary neither checked nor updated the version: "+err.Error()+evidenceNote(ev))
@@ -146,6 +146,10 @@ func (r Result) unprobed(err error, ev *usageprobe.Evidence) Result {
 		return r.with(StatusSkipped, "doctor live did not answer and no usage query ran, so the cause is unverified: "+err.Error())
 	}
 	return r.with(StatusSkipped, "doctor live failed and was not updated; "+ev.Summary()+": "+err.Error())
+}
+
+func exhaustedCause(ev *usageprobe.Evidence) bool {
+	return ev != nil && ev.Verdict == usageprobe.VerdictExhausted
 }
 
 func evidenceNote(ev *usageprobe.Evidence) string {
@@ -182,7 +186,7 @@ func failures(runErr, verErr error) []string {
 func smoked(ctx context.Context, res Result, s Seams, problems []string) Result {
 	notes := append(res.selfUpdateNote(), problems...)
 	if err := s.Smoke(ctx, res.Family); err != nil {
-		return res.failedSmoke(ctx, notes, err)
+		return res.failedSmoke(ctx, s, notes, err)
 	}
 	switch {
 	case len(problems) > 0:
@@ -193,11 +197,19 @@ func smoked(ctx context.Context, res Result, s Seams, problems []string) Result 
 	return res.with(StatusUpdated, "")
 }
 
-func (r Result) failedSmoke(ctx context.Context, notes []string, err error) Result {
+func (r Result) failedSmoke(ctx context.Context, s Seams, notes []string, err error) Result {
 	if ctx.Err() != nil {
 		return r.interrupted(ctx)
 	}
-	return r.with(StatusSmokeFailed, strings.Join(append(notes, "smoke: "+err.Error()), "; "))
+	detail := strings.Join(append(notes, "smoke: "+err.Error()), "; ")
+	ev := explain(ctx, s, r.Family)
+	if ctx.Err() != nil {
+		return r.interrupted(ctx)
+	}
+	if exhaustedCause(ev) {
+		return r.with(StatusQuotaExhausted, "smoke failed, and a usage query verified the cause: "+ev.Summary()+"; "+detail)
+	}
+	return r.with(StatusSmokeFailed, detail+evidenceNote(ev))
 }
 
 func (r Result) interrupted(ctx context.Context) Result {

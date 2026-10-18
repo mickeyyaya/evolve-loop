@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliupdate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
 var cliUpdateNow = time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
@@ -28,6 +29,7 @@ type fakeCLIHost struct {
 	runErr   map[string]error
 	probeErr map[string]error
 	smokeErr map[string]error
+	usage    *usageprobe.Evidence
 	onRun    func()
 	onSmoke  func(family string)
 	calls    []string
@@ -43,6 +45,17 @@ func (h *fakeCLIHost) install(t *testing.T) {
 }
 
 func (h *fakeCLIHost) seams() cliupdate.Seams {
+	s := h.baseSeams()
+	if h.usage != nil {
+		s.Explain = func(_ context.Context, family string) usageprobe.Evidence {
+			h.calls = append(h.calls, "explain "+family)
+			return *h.usage
+		}
+	}
+	return s
+}
+
+func (h *fakeCLIHost) baseSeams() cliupdate.Seams {
 	return cliupdate.Seams{
 		Eligible: func(family string) (bool, string) {
 			h.calls = append(h.calls, "eligible "+family)
@@ -304,7 +317,7 @@ func TestLiveProbeWith_RetriesAnAgyBootTimeoutOnceBeforeConcluding(t *testing.T)
 	pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"Antigravity CLI\n  signing in…"}, 512)}
 	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: &log}
 
-	rc, _, scrollback := liveProbeWith(context.Background(), t.TempDir(), deps)("agy-tmux")
+	rc, _, scrollback := liveProbeWith(context.Background(), t.TempDir(), "", deps)("agy-tmux")
 
 	if rc != bridge.ExitREPLBootTimeout || !strings.Contains(scrollback, "signing in") {
 		t.Fatalf("rc=%d scrollback=%q; want a loud boot timeout with the pane", rc, scrollback)
@@ -314,6 +327,45 @@ func TestLiveProbeWith_RetriesAnAgyBootTimeoutOnceBeforeConcluding(t *testing.T)
 	}
 	if !strings.Contains(log.String(), "cold start: boot attempt 1 of 2") {
 		t.Errorf("the log does not name the cold start:\n%s", log.String())
+	}
+}
+
+func launchLines(sentKeys []string) []string {
+	var out []string
+	for _, keys := range sentKeys {
+		if strings.Contains(keys, "--dangerously-skip-permissions") {
+			out = append(out, keys)
+		}
+	}
+	return out
+}
+
+func TestCLIUpdateWiring_TheProbeAndTheSmokeLaunchTheDispatchTierNotTheCLIsOwnDefault(t *testing.T) {
+	t.Parallel()
+	pick := map[string]func(cliupdate.Seams) func(context.Context, string) error{
+		"probe": func(s cliupdate.Seams) func(context.Context, string) error { return s.Probe },
+		"smoke": func(s cliupdate.Seams) func(context.Context, string) error { return s.Smoke },
+	}
+	for seam, seamOf := range pick {
+		for family, model := range map[string]string{"agy": "Gemini 3.8 Flash (High)", "claude": "sonnet"} {
+			t.Run(seam+"/"+family, func(t *testing.T) {
+				t.Parallel()
+				pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"starting"}, 256)}
+				deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard}
+
+				_ = seamOf(cliUpdateWiringWith(t.TempDir(), deps, io.Discard).seams)(context.Background(), family)
+
+				launches := launchLines(pane.SentKeys)
+				if len(launches) == 0 {
+					t.Fatalf("the %s seam launched nothing: %q", seam, pane.SentKeys)
+				}
+				for _, line := range launches {
+					if !strings.Contains(strings.NewReplacer("'", "", `\`, "").Replace(line), "--model "+model) {
+						t.Errorf("the %s seam must launch %s on the dispatch tier %q, not on a tier it did not choose or the CLI's own persisted default: %s", seam, family, model, line)
+					}
+				}
+			})
+		}
 	}
 }
 

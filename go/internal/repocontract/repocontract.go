@@ -53,9 +53,15 @@ func TreeReadingTests() []TestSelection {
 var treeReadingSelections = []TestSelection{
 	{Package: "./cmd/evolve", Tests: []string{
 		"TestApicoverSubcommand_ByteParityWithStandalone",
+		"TestBootCLIUpdate_ASmokeFailureWhileTheFamilyIsDrainedWarnsAndDoesNotHalt",
+		"TestBootCLIUpdate_ASmokeFailureWithHealthyUsageStillHaltsTheLoop",
+		"TestBootCLIUpdate_ASmokeFailureWithOnlyArgonDrainedStillHaltsAndNamesTheWindow",
 		"TestBridgeEngineRootsAreEnumerated",
 		"TestCLIUpdateWiring_ABootTimeoutWithADrainedWindowIsAVerifiedQuotaCauseAndBenchesUntilTheReset",
 		"TestCLIUpdateWiring_ABootTimeoutWithHealthyUsageStaysABootTimeout",
+		"TestCLIUpdateWiring_ASmokeFailureWhileTheFamilyIsDrainedIsAVerifiedQuotaCause",
+		"TestCLIUpdateWiring_ASmokeFailureWithHealthyUsageStaysASmokeFailure",
+		"TestCLIUpdateWiring_ASmokeFailureWithOnlyArgonDrainedStaysASmokeFailureNamingTheWindow",
 		"TestCenterlessConfigLoadSitesArePinned",
 		"TestChainEngines_OneConstructionSite",
 		"TestChainResultAndLoopResult_BoundaryRefreshJSONTagPresent",

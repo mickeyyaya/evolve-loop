@@ -11,16 +11,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 )
 
-func defaultLiveProbe(ctx context.Context, projectRoot string, stderr io.Writer) liveProbe {
-	return liveProbeWith(ctx, projectRoot, bridge.Deps{Stderr: stderr})
+func defaultLiveProbe(ctx context.Context, projectRoot string, deps bridge.Deps) liveProbe {
+	return liveProbeWith(ctx, projectRoot, "", deps)
 }
 
-func liveProbeWith(ctx context.Context, projectRoot string, deps bridge.Deps) liveProbe {
+func liveProbeWith(ctx context.Context, projectRoot, model string, deps bridge.Deps) liveProbe {
 	return func(driver string) (rc int, pattern, scrollback string) {
 		bridge.BootProbe{Driver: driver, Log: deps.Stderr}.Retry(ctx, func() (int, string) {
 			probeCtx, cancel := context.WithTimeout(ctx, 4*time.Minute)
 			defer cancel()
-			rc, pattern, scrollback = bridge.LiveSmokeTest(probeCtx, driver, &bridge.Config{ProjectRoot: projectRoot}, deps)
+			rc, pattern, scrollback = bridge.LiveSmokeTest(probeCtx, driver, &bridge.Config{ProjectRoot: projectRoot, Model: model}, deps)
 			return rc, pattern
 		})
 		return rc, pattern, scrollback

@@ -138,7 +138,11 @@ func printCLIUpdateReport(rep cliupdate.Report, asJSON bool, stdout io.Writer) {
 }
 
 func productionCLIUpdateWiring(projectRoot string, log io.Writer) cliUpdateWiring {
-	live := liveCheck(func(ctx context.Context) liveProbe { return defaultLiveProbe(ctx, projectRoot, log) })
+	return cliUpdateWiringWith(projectRoot, bridge.Deps{Stderr: log}, log)
+}
+
+func cliUpdateWiringWith(projectRoot string, deps bridge.Deps, log io.Writer) cliUpdateWiring {
+	live := liveCheck(func(ctx context.Context) liveProbe { return liveProbeWith(ctx, projectRoot, unsetDispatchTier, deps) })
 	return cliUpdateWiring{
 		families: manifestUpdateFamilies(bridge.InteractiveFamilies(), driverSet, log),
 		seams: cliupdate.Seams{

@@ -17,7 +17,7 @@ import (
 )
 
 func runPreWaveProbes(ctx context.Context, projectRoot, evolveDir string, env map[string]string, stderr io.Writer) error {
-	runCLIHealthCanary(ctx, projectRoot, env, defaultLiveProbe(ctx, projectRoot, stderr), stderr)
+	runCLIHealthCanary(ctx, projectRoot, env, defaultLiveProbe(ctx, projectRoot, bridge.Deps{Stderr: stderr}), stderr)
 	runUsageProbe(ctx, projectRoot, evolveDir, env, stderr)
 	return ctx.Err()
 }
