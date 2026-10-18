@@ -305,6 +305,7 @@ Today's tier tables have **no** deep→top headroom in any family:
 | `CONVERGENCE_SPLIT` | WARN | `loop`, `component`, `followup` | rung 3 split |
 | `CONVERGENCE_ACCEPTED_LIMITS` | WARN | `loop`, `component`, `certificate` | rung 3 accept |
 | `CONVERGENCE_STOP` | WARN | `loop`, `round`, `open`, `land_round` | rung 3 stop |
+| `CONVERGENCE_DISPUTED` | INFO | `loop`, `count`, `critical`, `adjudicator` | the decided round holds a DISPUTED row; `adjudicator` is `operator` for `console-lane`, else `audit`; the decision is unchanged |
 | `CONVERGENCE_NO_HEADROOM` | INFO | `loop`, `family`, `from`, `to` | a raise that changes no (model, effort) |
 
 ### 10. Recovery rungs (only logic blocks)

@@ -32,7 +32,7 @@ func Decide(in Input) Decision {
 	next, cause := l.rungAfter(in.Round)
 	c := decider{ladder: l, next: next, cause: cause, bar: l.barOf(next), hot: l.concentration()}
 	d := c.choose()
-	d.Reasons = slices.Concat([]string{c.rungReason(d)}, c.roundGainReasons(), c.concentrationReasons(), d.Reasons)
+	d.Reasons = slices.Concat([]string{c.rungReason(d)}, c.roundGainReasons(), c.concentrationReasons(), c.disputedReasons(), d.Reasons)
 	return d
 }
 

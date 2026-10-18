@@ -73,6 +73,31 @@ func (c decider) concentrationReasons() []string {
 		"prev_share", formatShare(c.hot.prev), "window", strconv.Itoa(c.in.Config.ConcentrationWindow))}
 }
 
+func (c decider) disputedReasons() []string {
+	var count, critical int
+	for _, f := range c.in.Rounds[c.in.Round].Findings {
+		if f.Status != StatusDisputed {
+			continue
+		}
+		count++
+		if f.Severity == SeverityCritical {
+			critical++
+		}
+	}
+	if count == 0 {
+		return nil
+	}
+	return []string{c.reason("CONVERGENCE_DISPUTED", "count", strconv.Itoa(count), "critical", strconv.Itoa(critical),
+		"adjudicator", c.adjudicator())}
+}
+
+func (c decider) adjudicator() string {
+	if c.in.Loop == LoopConsoleLane {
+		return "operator"
+	}
+	return "audit"
+}
+
 func (c decider) noHeadroomReason(role string, from TierEffort, to string) string {
 	if to == "" {
 		to = "none"
