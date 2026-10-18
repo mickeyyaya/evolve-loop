@@ -28,8 +28,6 @@
   },
   "cli_routing": {
     "clis": [
-      "agy",
-      "agy-claude",
       "claude"
     ],
     "default": [
@@ -38,9 +36,9 @@
     "agents": {
       "builder": {
         "cli": [
-          "agy",
           "claude"
-        ]
+        ],
+        "model": "balanced"
       },
       "reflector": {
         "effort": "low"
