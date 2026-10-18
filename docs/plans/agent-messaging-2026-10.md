@@ -156,11 +156,11 @@ One broker binds a socket. Agents connect through `evolve msg`. The broker check
 | D4 | Authorization is an ordered rule list from `policy.json` `messaging.rules`. A deny wins, and the default denies. The compiled defaults: allow `same_cycle`; deny free text from build and tdd to audit (OD1); a reply right while a request lives. | Config, not code; the NATS model. | R7, R8, R9 |
 | D5 | The scope check runs before any lookup. An out-of-scope target or lookup gives "not found" (`ErrNotFound`), the same as an unknown recipient. | A2A §13.1: never show that an out-of-scope resource exists. | R10 |
 | D6 | The envelope `msg/1.0` has these fields: `id` (a ULID and the idempotency key), `ts`, `kind` (an open registry) and `from` (stamped). It also has `to`, `subject`, `body` (capped), `refs`, `reply_to`, `correlation_id`, `expires_at`, `hop` and `context_id` (the cycle). | A2A fields, with no A2A transport. | R11, R12 |
-| D7 | The store is the ADR-0127 channel log: one channel `msg.<cycle>` for each cycle, and a new `message` record variant. It is under the protected `/.evolve/events/`. The seal archives it, and gc removes it. Each recipient has its own cursor. The skeleton defines only the `Store` port and an in-memory adapter. | One log format; a durable store; one writer. | R13, R14 |
+| D7 | The store is the ADR-0127 channel log: one channel `msg.<cycle>` for each cycle, and a new `message` record variant. The dead letters of a cycle go to `msg.dead.<cycle>`. The store is under the protected `/.evolve/events/`. The seal archives it, and gc removes it. Each recipient has its own cursor. The skeleton defines only the `Store` port and an in-memory adapter. | One log format; a durable store; one writer. | R13, R14 |
 | D8 | Delivery adapters sit behind a `Deliverer` port. The main path is the prompt section after `cycleContextBoundary`. The live rungs are Claude `PostToolUse` and `asyncRewake`, the agy fixed-text nudge (OD3) and `evolve msg read\|wait`, which the kernel wakes. | Most recipients start later. Each live rung is a push. | R15, R16, R17 |
 | D9 | A message is untrusted data. The recipient sees it in a frame with its provenance and the statement that it has no authority. Never type message text into a pane. | Prompt infection and hijack studies; `send-keys` gives user authority. | R18 |
 | D10 | Config gives the limits: a body cap, a sender rate, a repeat drop and a queue cap of 50 for each recipient. A hop limit and a cycle budget tie it to ADR-0126. | The guards of Claude Code; a conversation converges or stops. | R19, R20 |
-| D11 | Delivery is at least once: the ULID, a cursor for each recipient and a seen set. A request carries a `correlation_id` and a deadline. An expired or undeliverable message goes to `msg.dead`. | The Idempotent Consumer, the Correlation Identifier and the Dead Letter Channel. | R21, R22 |
+| D11 | Delivery is at least once: the ULID, a cursor for each recipient and a seen set. A request carries a `correlation_id` and a deadline. An expired or undeliverable message goes to `msg.dead.<cycle>`. | The Idempotent Consumer, the Correlation Identifier and the Dead Letter Channel. | R21, R22 |
 | D12 | A send to a recipient outside the cycle roster (past, live or planned dispatches) is refused at send time. | Never store a message that can never be delivered. | R23 |
 | D13 | The command surface is OD2. Its exit codes follow the style of `evolve events`. | One surface for agents; one filter grammar for operators. | — |
 | D14 | Observability: the events `msg.sent`, `msg.denied` and `msg.dead` carry metadata only, never the body. `msg.denied` is WARN and goes to the `errors` channel. | An audit log makes misuse visible; a body in a log leaks it. | R24 |
@@ -177,6 +177,7 @@ More decisions that the skeleton made, each with its reason:
 - **D10c** (fix round 1) The service collects its events and notifies them after it releases its lock. The store append stays inside the lock, because the idempotency check, the limits and the append must be one step.
 - **D3c** (fix round 2) The roster entry has a state: `planned`, `live` or `past`. Only a `live` entry can send, read or ack. A token whose agent, phase or role differs from the entry is refused, never ignored. The roster comes from the memory of the kernel, never from `runs/`.
 - **D7a** (fix round 2) `Batch.Gaps` carries the gaps of the store. A read reports each one in the mailbox with a `msg.dead` event (reason `gap`), so the M2 adapter needs no change to the core.
+- **D7b** (M2) A `message` record line has its own limit, `MaxMessageBytes`, of 65,536 bytes. The signal limit of 4,608 bytes is below the default body cap of 8,192 bytes. A body of `<` escapes to six bytes for each byte, which is 49,152 bytes. The log keeps `message` as raw JSON, so `internal/events/channel` imports nothing of `agentmsg`.
 - **D8a** (fix round 2) The transport is drafts in the outbox: `send` and `ack{cursor}`. The token is a field of the draft, and the service deletes the draft after ingest. `Service.Ack` gives each delivery rung an ack path. For the prompt section, the kernel reads the queue with a credential that it mints itself.
 - **D12b** (fix round 2) `role:`, `phase:` and `*` skip a `past` entry. Only an exact `dispatch:` address selects it. Thus a retried phase gets one copy.
 - **D3d** (kept) A holder can add an earlier expiry to a token. The consumer is the M5 `asyncRewake` hook: the pane can give the hook a token with a shorter life. The rule is small, and a test pins it.
@@ -320,7 +321,7 @@ How "no poll" is proved:
 | Transactional outbox | the outbox of each dispatch and the channel log | The store is the record, and the id is the idempotency key. |
 | Idempotent consumer | the seen set and the idempotent send | At-least-once delivery with no duplicate effect. |
 | Correlation identifier | `correlation_id` and the reply right | A reply finds its request. |
-| Dead letter channel | `msg.dead` | An undeliverable message is never silent. |
+| Dead letter channel | `msg.dead.<cycle>` | An undeliverable message is never silent. |
 | Account isolation (NATS) | one service for each cycle | Cross-cycle delivery is impossible by construction. |
 
 Not abstracted:
@@ -351,12 +352,13 @@ The limits of record are in the spec: [agent-messaging.md](../architecture/agent
 | Q2 | A deny wins over the reply right, so build cannot answer an auditor's request with free text (D4a). | Keep it: build answers with `evidence`, which keeps OD1 strict. |
 | Q3 | agy has no async wake hook (research F5.4). | Use the fixed-text nudge (OD3). Check each new agy release in the `evolve cli update` smoke test. |
 | Q4 | The reply grants and the token key are in memory, so a restart of the service loses them. | Accept it: a resume mints new tokens for the new dispatches, and a lost grant needs only an allow rule. |
-| Q5 | At the seal, a message to a phase that did not run goes to `msg.dead` (M7). | Confirm it at M7. |
+| Q5 | At the seal, a message to a phase that did not run goes to `msg.dead.<cycle>` (M7). | Confirm it at M7. |
 
 ## 16. Status
 
 | # | Status |
 |---|---|
-| M0 | ☑ the research dossier, this plan, the spec and ADR-0129, in this lane. Not merged. |
-| M1 | ☑ `internal/agentmsg` and its seven subpackages: built, unwired, at 100% coverage, and in both gate files. The no-poll guard scans the tree. Fix rounds 1 and 2 closed the review items. 70 of 71 mutants killed, with 3 controls, and one is equivalent (§12). Package notes: [internal-agentmsg.md](../architecture/packages/internal-agentmsg.md). Not merged. |
-| M2 to M8 | ☐ not started |
+| M0 | ☑ the research dossier, this plan, the spec and ADR-0129, in this lane. Merged in PR #845 on 2026-10-12. |
+| M1 | ☑ `internal/agentmsg` and its seven subpackages: built, unwired, at 100% coverage, and in both gate files. The no-poll guard scans the tree. Fix rounds 1 and 2 closed the review items. 70 of 71 mutants killed, with 3 controls, and one is equivalent (§12). Package notes: [internal-agentmsg.md](../architecture/packages/internal-agentmsg.md). Merged in PR #845 on 2026-10-12. |
+| M2 | ☑ `internal/agentmsg/channelstore`: the `Store` adapter on the channel log (`msg.<cycle>` and `msg.dead.<cycle>`). The `message` record variant has its own line limit (D7b). The package is built, unwired, at 100% coverage and in both gate files. The four red tests of §11 pass, and the real broker runs over the adapter, and a named test kills each of 43 mutants. Package notes: [internal-agentmsg-channelstore.md](../architecture/packages/internal-agentmsg-channelstore.md). Not merged. |
+| M3 to M8 | ☐ not started |

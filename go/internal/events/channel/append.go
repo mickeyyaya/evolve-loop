@@ -41,7 +41,7 @@ func (l *Log) encode(records []Record) ([]byte, error) {
 		if err != nil {
 			return nil, l.errorf("encode: %w", err)
 		}
-		if len(line) > MaxRecordBytes {
+		if len(line) > r.lineLimit() {
 			return nil, l.errorf("%d bytes: %w", len(line), ErrRecordTooLong)
 		}
 		buf.Write(line)

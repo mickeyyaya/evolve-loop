@@ -7,7 +7,7 @@
 - **Amends:**
   - [ADR-0127](0127-push-only-event-channels.md), the event channels:
     - a channel record holds exactly one of `signal`, `gap` and a new `message` variant;
-    - a channel family `msg.<cycle>` holds the messages of one cycle, and `msg.dead` holds the dead letters;
+    - a channel family `msg.<cycle>` holds the messages of one cycle, and `msg.dead.<cycle>` holds the dead letters of that cycle;
     - the service of a cycle is the only writer of its channel, outside the closed catalog of the `Publisher`.
   - [ADR-0064](0064-pipeline-integrity-boundary.md), the protected surface: it adds `/.evolve/msg/`, the outboxes and the mailboxes. Only `evolve msg` writes the outbox of its own dispatch, through the grant of the sandbox.
 - **Evidence:**
@@ -45,7 +45,7 @@ The same day, the operator gave four decisions:
    - The transport is drafts in the outbox (`send`, `ack`). Each rung ends in a read or an ack.
 8. **A message is untrusted data.** A frame shows its provenance and states that it has no authority. No message text is ever typed into a pane.
 9. **Limits from config:** a body cap, a sender rate, a repeat drop and a queue cap. A hop limit and a cycle budget follow ADR-0126.
-10. **At-least-once delivery.** The id is the idempotency key. Each recipient has a cursor. An expired message goes to `msg.dead`.
+10. **At-least-once delivery.** The id is the idempotency key. Each recipient has a cursor. An expired message goes to `msg.dead.<cycle>`.
 11. **Observe the traffic.** `msg.sent`, `msg.denied` and `msg.dead` carry metadata only, never the body.
 12. **The names** are "mailbox" and "outbox". "Inbox" stays with ADR-0007 and the bridge.
 
@@ -65,7 +65,7 @@ The same day, the operator gave four decisions:
 - **Agents can talk inside a cycle.** A phase can send a question, a handoff or a finding to another phase. A later phase gets it in its prompt.
 - **Audit independence becomes a policy rule** in code and config, not a prompt rule.
 - **New surfaces:** the `evolve msg` verbs, the `messaging` block of `policy.json`, the env key `EVOLVE_MSG_TOKEN`, the module `msg` and its three kinds.
-- **New paths:** `.evolve/events/ch/msg.<cycle>/`, `.evolve/events/ch/msg.dead/` and `.evolve/msg/`. The `.evolve/*` rule of `.gitignore` already ignores them.
+- **New paths:** `.evolve/events/ch/msg.<cycle>/`, `.evolve/events/ch/msg.dead.<cycle>/` and `.evolve/msg/`. The `.evolve/*` rule of `.gitignore` already ignores them.
 - **The sandbox profile** grows one write grant for the own outbox and denies for the store and other mailboxes (M6).
 - **Accepted limits:**
   - an idle agy agent gets only a nudge;
