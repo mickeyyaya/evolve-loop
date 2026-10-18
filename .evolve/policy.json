@@ -38,6 +38,14 @@
       "claude"
     ],
     "agents": {
+      "builder": {
+        "cli": [
+          "agy",
+          "agy-claude",
+          "claude"
+        ],
+        "model": "balanced"
+      },
       "reflector": {
         "effort": "low"
       },
