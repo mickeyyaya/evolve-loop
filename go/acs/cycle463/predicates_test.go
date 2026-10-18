@@ -74,7 +74,7 @@ func TestC463_004_AbsentFieldsDegradeByteIdentical(t *testing.T) {
 }
 
 func TestC463_005_TierVocabularyConfinement(t *testing.T) {
-	out, code := runGoTest(t, "TestSanitizeAdvisorTier_RejectsHighTopAndRawModel", true, corePkg)
+	out, code := runGoTest(t, "TestSanitizeAdvisorTier_RejectsHighAndRawModel", true, corePkg)
 	requireTestsRan(t, out, 1)
 	if code != 0 {
 		t.Errorf("tier-vocabulary confinement contract is red (exit=%d)\n%s", code, out)

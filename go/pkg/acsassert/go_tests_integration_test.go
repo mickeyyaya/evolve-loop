@@ -43,6 +43,23 @@ func TestGoTests_ActualExecutionAndNegativeControls(t *testing.T) {
 	}
 }
 
+func TestGoTests_AStaleExactPatternNameCannotHideOutsideNames(t *testing.T) {
+	dir := t.TempDir()
+	for name, body := range map[string]string{
+		"go.mod":           "module example.test/contract\n\ngo 1.23\n",
+		"contract_test.go": "package contract\nimport \"testing\"\nfunc TestKept(t *testing.T) {}\n",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ft := &fakeT{}
+	spec := GoTestSpec{Dir: dir, Package: "example.test/contract", Pattern: "^(TestKept|TestRenamedAway)$", Names: []string{"TestKept"}}
+	if GoTests(ft, spec) || len(ft.errs) == 0 {
+		t.Fatalf("GoTests = true with errors %v: TestRenamedAway matches no function and Names never asked for it, so the run passed without it", ft.errs)
+	}
+}
+
 func TestGoTests_PreservesRaceAndBuildTags(t *testing.T) {
 	dir := t.TempDir()
 	for name, body := range map[string]string{

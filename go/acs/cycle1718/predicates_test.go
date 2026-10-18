@@ -245,9 +245,9 @@ func TestC1718_004_OneProfilesDirHelper(t *testing.T) {
 		t.Errorf("RED: %d funcs resolve .evolve through runtime.Caller in go/internal/profiles, want exactly 1 canonical helper: %v", len(resolvers), resolvers)
 	}
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
-		"go", "-C", filepath.Join(root, "go"), "test", "-count=1", "-run", "^TestEffortDefaults_Matrix$", "-v", "./internal/profiles")
-	if code != 0 || !strings.Contains(stdout, "--- PASS: TestEffortDefaults_Matrix ") {
-		t.Errorf("TestEffortDefaults_Matrix over the live profiles: exit=%d err=%v, want PASS\n%s%s", code, err, stdout, stderr)
+		"go", "-C", filepath.Join(root, "go"), "test", "-count=1", "-run", "^TestEveryTrackedProfileLoadsWithoutAnEffortField$", "-v", "./internal/profiles")
+	if code != 0 || !strings.Contains(stdout, "--- PASS: TestEveryTrackedProfileLoadsWithoutAnEffortField ") {
+		t.Errorf("TestEveryTrackedProfileLoadsWithoutAnEffortField over the live profiles: exit=%d err=%v, want PASS\n%s%s", code, err, stdout, stderr)
 	}
 }
 

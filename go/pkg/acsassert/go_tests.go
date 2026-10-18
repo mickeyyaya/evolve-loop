@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,6 +28,10 @@ type GoTestSpec struct {
 
 func GoTests(tb TB, spec GoTestSpec) bool {
 	tb.Helper()
+	if unlisted := unlistedExactNames(spec.Pattern, spec.Names); len(unlisted) > 0 {
+		tb.Errorf("go test pattern %q names %v, which Names does not list: a name outside Names is never checked for a pass", spec.Pattern, unlisted)
+		return false
+	}
 	args := []string{"test", "-json", "-count=1", "-v"}
 	if spec.Race {
 		args = append(args, "-race")
@@ -152,4 +158,30 @@ func (r *goTestRun) packageEvent(action string) error {
 		return fmt.Errorf("go package skipped: %s", r.packageName)
 	}
 	return nil
+}
+
+var (
+	exactTermRE = regexp.MustCompile(`\^(?:\((\w+(?:\|\w+)*)\)|(\w+))\$`)
+	termListRE  = regexp.MustCompile(`^\x00(?:\|\x00)*$`)
+)
+
+func exactNames(pattern string) []string {
+	if !termListRE.MatchString(exactTermRE.ReplaceAllString(pattern, "\x00")) {
+		return nil
+	}
+	var names []string
+	for _, term := range exactTermRE.FindAllStringSubmatch(pattern, -1) {
+		names = append(names, strings.Split(term[1]+term[2], "|")...)
+	}
+	return names
+}
+
+func unlistedExactNames(pattern string, names []string) []string {
+	var unlisted []string
+	for _, name := range exactNames(pattern) {
+		if !slices.Contains(names, name) {
+			unlisted = append(unlisted, name)
+		}
+	}
+	return unlisted
 }

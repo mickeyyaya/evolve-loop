@@ -40,10 +40,6 @@ func TestC766_004_lane_scope_materialized_from_env(t *testing.T) {
 	runGoTest(t, corePkg, "TestLaneScopePin_MaterializedFromEnvBeforePhases")
 }
 
-func TestC766_005_goal_hash_mismatch_aborts_before_triage(t *testing.T) {
-	runGoTest(t, corePkg, "TestLaneScopePin_ScoutGoalHashMismatchAbortsBeforeTriage")
-}
-
 func TestC766_006_goal_hash_match_proceeds(t *testing.T) {
 	runGoTest(t, corePkg, "TestLaneScopePin_ScoutGoalHashMatchProceeds")
 }

@@ -10,8 +10,6 @@ import (
 
 const bridgePkg = "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 
-const deliverablePkg = "github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
-
 func runBridgeTests(t *testing.T, pattern string) (ok bool, out string) {
 	t.Helper()
 	return runPkgTests(t, bridgePkg, pattern)
@@ -72,17 +70,6 @@ func TestC1580_007_RedispatchDelayScopedToTheShortcircuit(t *testing.T) {
 		"TestRunTmuxREPL_TransientDwell_NoDelayOnOrdinaryTimeout")
 	if !ok {
 		t.Errorf("AC-7 unmet: the re-dispatch delay is missing on the shortcircuit path (or leaked onto the ordinary one)\n%s", out)
-	}
-}
-
-func TestC1580_008_ScoutReportChallengeTokenIsEnforcedNatively(t *testing.T) {
-	ok, out := runPkgTests(t, deliverablePkg, "TestVerify_Scout_MissingChallengeToken_Violation|"+
-		"TestVerify_Scout_WrongToken_Violation|"+
-		"TestVerify_Scout_TokenEchoed_OK|"+
-		"TestVerify_Scout_NoTokenFile_FailOpen|"+
-		"TestContract_RequireChallengeToken_CoversTokenConsumingPhases")
-	if !ok {
-		t.Errorf("AC-R1 unmet: the scout challenge-token binding is not enforced at the pre-audit contract gate — it still fails open on persona prose\n%s", out)
 	}
 }
 

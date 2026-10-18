@@ -92,9 +92,11 @@ func TestC1469_003_ExistingQuotePathAndStagingContractsHold(t *testing.T) {
 	if out, code := runPkgTests(t, root, manifestPkg, "TestPorcelainChangedPaths_QuotePath"); code != 0 {
 		t.Errorf("pre-existing contract %q regressed (exit %d):\n%s", "TestPorcelainChangedPaths_QuotePath", code, out)
 	}
+	if out, code := runPkgTests(t, root, manifestPkg, "TestWithoutIgnored_DecodesQuotedProbeOutput"); code != 0 {
+		t.Errorf("pre-existing contract %q regressed (exit %d):\n%s", "TestWithoutIgnored_DecodesQuotedProbeOutput", code, out)
+	}
 	for _, pattern := range []string{
 		"TestStageExplicitPaths_QuotePathDisabledOnGitReads",
-		"TestDropIgnoredPaths_QuotePath",
 		"TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll",
 	} {
 		out, code := runShipTests(t, root, pattern)

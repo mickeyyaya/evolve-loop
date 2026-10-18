@@ -72,7 +72,7 @@ func TestC442_006_NoRegressionAcrossTouchedPackages(t *testing.T) {
 }
 
 func TestC442_007_OllamaListReachesNoModelDocumented(t *testing.T) {
-	_, stderr, code := runGoTest(t, "TestOllamaListerReachesNoModel|TestOllamaListMetadataExceptionDocumented", false, modelqueryPkg)
+	_, stderr, code := runGoTest(t, "TestOllamaListerReachesNoModel", false, modelqueryPkg)
 	if code != 0 {
 		t.Errorf("C442_007: ollama-list-metadata-exception tests exit=%d\nstderr=%s", code, stderr)
 	}

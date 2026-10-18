@@ -2,6 +2,7 @@ package acsassert
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -80,5 +81,65 @@ func TestValidateGoTests_RequiresEveryDeclaredCase(t *testing.T) {
 				t.Fatalf("validateGoTests(%v) = %v, want valid=%v", tc.tests, err, tc.wantOK)
 			}
 		})
+	}
+}
+
+func TestExactNames_ReadsOnlyFullyAnchoredLists(t *testing.T) {
+	for _, tc := range []struct {
+		name, pattern string
+		want          []string
+	}{
+		{"one name", "^TestA$", []string{"TestA"}},
+		{"a group of names", "^(TestA|TestB)$", []string{"TestA", "TestB"}},
+		{"a group of one name", "^(TestA)$", []string{"TestA"}},
+		{"names joined by a pipe", "^TestA$|^TestB$", []string{"TestA", "TestB"}},
+		{"a name and a group joined by a pipe", "^TestA$|^(TestB|TestC)$", []string{"TestA", "TestB", "TestC"}},
+		{"an exact term beside a bare term", "^TestA$|TestB", nil},
+		{"a pipe with nothing after it", "^TestA$|", nil},
+		{"head anchor only is a prefix", "^TestA_", nil},
+		{"tail anchor only is a suffix", "TestA$", nil},
+		{"no anchor is a substring", "TestA", nil},
+		{"a pipe without a group splits the anchors", "^TestA|TestB$", nil},
+		{"an unbalanced group", "^(TestA|TestB$", nil},
+		{"an empty group", "^()$", nil},
+		{"a regex metacharacter", "^TestA.*$", nil},
+		{"a subtest filter", "^TestParent$/^sub$", nil},
+		{"empty", "", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := exactNames(tc.pattern); !slices.Equal(got, tc.want) {
+				t.Fatalf("exactNames(%q) = %q, want %q", tc.pattern, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestUnlistedExactNames_ReportsEachExactNameThatNamesLacks(t *testing.T) {
+	for _, tc := range []struct {
+		name, pattern string
+		names, want   []string
+	}{
+		{"all listed", "^(TestA|TestB)$", []string{"TestB", "TestA"}, nil},
+		{"one missing", "^(TestA|TestB)$", []string{"TestA"}, []string{"TestB"}},
+		{"all missing", "^(TestA|TestB)$", nil, []string{"TestA", "TestB"}},
+		{"a pipe list of terms", "^TestA$|^TestB$", []string{"TestA"}, []string{"TestB"}},
+		{"a prefix pattern asks for nothing", "^TestA_", nil, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := unlistedExactNames(tc.pattern, tc.names); !slices.Equal(got, tc.want) {
+				t.Fatalf("unlistedExactNames(%q, %q) = %q, want %q", tc.pattern, tc.names, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGoTests_RefusesAnExactPatternNameThatNamesDoNotList(t *testing.T) {
+	ft := &fakeT{}
+	spec := GoTestSpec{Package: "example.test/contract", Pattern: "^(TestA|TestB)$", Names: []string{"TestA"}}
+	if GoTests(ft, spec) {
+		t.Fatal("GoTests accepted a pattern whose exact name Names does not list")
+	}
+	if len(ft.errs) != 1 || !strings.Contains(ft.errs[0], "which Names does not list") {
+		t.Fatalf("errors = %q, want one that says Names does not list the pattern name", ft.errs)
 	}
 }

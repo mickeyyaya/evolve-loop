@@ -48,7 +48,7 @@ func TestC476_001_RealPersonaComposedPromptCarriesTierAndCLI(t *testing.T) {
 
 func TestC476_002_PersonaFrontmatterAndDegradeContract(t *testing.T) {
 	out, code := runGoTest(t,
-		"TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI|TestParsePhasePlan_AbsentCLITierFieldsStayEmpty|TestSanitizeAdvisorTier_RejectsHighTopAndRawModel",
+		"TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI|TestParsePhasePlan_AbsentCLITierFieldsStayEmpty|TestSanitizeAdvisorTier_RejectsHighAndRawModel",
 		true, corePkg)
 	requireTestsRan(t, out, 3)
 	if code != 0 {
