@@ -25,13 +25,13 @@ type stage func(v resolver, res resolution) (resolution, error)
 
 var declaredStages = []stage{
 	selectRule, fixAgentModel, guardEnv, leadWithCaller, overlayCLI, overlayTier,
-	probeChain, benchChain, appendAfterChain, applyTierCeiling,
+	probeChain, benchChain, appendAfterChain, dropToolless, applyTierCeiling,
 }
 
 func (v resolver) resolveDeclared(req Request) (Decision, error) {
 	prof, err := v.table.profile(req.Agent)
 	if err != nil {
-		return Decision{}, fmt.Errorf("%w: agent %s: %w", ErrRefused, req.Agent, err)
+		return Decision{}, refused(req.Agent, err)
 	}
 	res := resolution{
 		req: req, prof: prof, allowed: v.table.allowed(req.Agent, prof),
@@ -40,7 +40,7 @@ func (v resolver) resolveDeclared(req Request) (Decision, error) {
 	for _, next := range declaredStages {
 		out, err := next(v, res)
 		if err != nil {
-			return Decision{}, fmt.Errorf("%w: agent %s: %w", ErrRefused, req.Agent, err)
+			return Decision{}, refused(req.Agent, err)
 		}
 		res = out
 	}

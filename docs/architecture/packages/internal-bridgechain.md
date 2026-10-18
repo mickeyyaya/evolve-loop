@@ -39,6 +39,8 @@
 
   Then the log line names the fix (`credential_wall_test.go`).
 
+- **A worktree launch never reaches a CLI without tool use.** `DefaultPlanResolver` sets `Request.NeedsTools` when `BridgeRequest.Worktree` is set, so the router drops a toolless CLI from the plan. A chain with no tool-capable CLI fails the launch and names the dropped CLIs. The inner bridge sees no call. Pinned by `TestDefaultPlanResolver_AWorktreeLaunchDropsACLIWithoutToolUseWhoeverNamedIt` and `TestWalking_AWorktreeLaunchWithNoToolCapableCLIFailsLoudlyAndLaunchesNothing`. The decision is in [internal-cliroute.md](internal-cliroute.md).
+
 ## Findings
 
 - **Lanes 1676 and 1677**: one CLI timeout cost the work of a whole cycle. This led to the decorator.

@@ -42,6 +42,7 @@ var serialTests = map[string]string{
 	"main.TestBridgeSessions_LiveLoopSocketsShowUnwatchedSessions":                                          "swaps seam bridgeSessionsTmux",
 	"main.TestBridgeSessions_TableNamesEveryColumn":                                                         "swaps seam bridgeSessionsTmux",
 	"main.TestBridgeSessions_WritesNothing":                                                                 "swaps seam bridgeSessionsTmux",
+	"main.TestBuildCLIRouter_AWorktreePhaseOfTheRootRouterNeverWalksOntoACLIWithoutToolUse":                 "swaps seam routingDoctor",
 	"main.TestBuildCLIRouter_TheRootRouterCarriesTheProductionHost":                                         "swaps seam routingDoctor",
 	"main.TestBuildHandoffProbes_AnExplainedBuildIsGreenOnBothProbes":                                       "sets env through a helper",
 	"main.TestBuildHandoffProbes_BothRunTheSeamFloorOnTheBoundCyclesInput":                                  "swaps seam buildHandoffFloorFor",

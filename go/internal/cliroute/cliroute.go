@@ -41,6 +41,7 @@ type Host struct {
 	LookPath func(string) (string, error)
 	Discover func() []string
 	Bench    func(projectRoot, phase string, plan llmroute.Plan, env map[string]string) llmroute.Plan
+	Toolless func(driver string) bool
 	Logf     func(format string, args ...any)
 }
 
@@ -64,6 +65,7 @@ type Request struct {
 	Expand       llmroute.AutoModel
 	BypassPolicy bool
 	Launch       Launch
+	NeedsTools   bool
 }
 
 type Decision struct {

@@ -23,6 +23,10 @@ type Setup struct {
 
 var ErrRefused = errors.New("cliroute: route refused")
 
+func refused(agent string, err error) error {
+	return fmt.Errorf("%w: agent %s: %w", ErrRefused, agent, err)
+}
+
 var errNoSetup = errors.New("cliroute: this router was built from one table, not a Setup, so it has nothing to recompile from")
 
 func Build(s Setup) (*Router, []Finding, error) {

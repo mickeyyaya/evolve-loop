@@ -164,6 +164,35 @@ func TestBuildCLIRouter_TheRootRouterCarriesTheProductionHost(t *testing.T) {
 	reportRoutingFindings(io.Discard, []cliroute.Finding{{Severity: cliroute.SeverityWarn, Key: "k", Message: "m"}})
 }
 
+func TestBuildCLIRouter_AWorktreePhaseOfTheRootRouterNeverWalksOntoACLIWithoutToolUse(t *testing.T) {
+	cases := []struct {
+		name   string
+		policy string
+	}{
+		{"no table", ""},
+		{"the allowed set of the Claude-only table keeps ollama out", `{"cli_routing":{"clis":["claude"]}}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeRoutingDoctor(t, doctorResult("claude-tmux", true, "ready"), doctorResult("ollama-tmux", true, "ready"))
+			root, evolveDir := wiringRoot(t, tc.policy)
+			if err := os.WriteFile(filepath.Join(evolveDir, "profiles", "scout.json"), []byte(`{"name":"scout","cli":"ollama-tmux","cli_fallback":["claude-tmux"]}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			r, _, err := loadCLIRouter(root, routingHost(io.Discard, time.Now))
+			if err != nil {
+				t.Fatalf("loadCLIRouter: %v", err)
+			}
+
+			d, err := r.Resolve(cliroute.Request{Agent: "scout", Phase: "scout", ProjectRoot: root, NeedsTools: true})
+
+			if err != nil || slices.Contains(d.Plan.Candidates, "ollama-tmux") || !slices.Contains(d.Plan.Candidates, "claude-tmux") {
+				t.Fatalf("the production host judges tool use from the bridge manifests: %v %v", d.Plan.Candidates, err)
+			}
+		})
+	}
+}
+
 func TestPreflightRouting_BootsOnlyWhatTheResolvedChainsLaunch(t *testing.T) {
 	t.Parallel()
 	root, evolveDir := wiringRoot(t, `{"cli_routing":{"clis":["agy","claude"],"default":["agy","claude"]}}`)
