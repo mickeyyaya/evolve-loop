@@ -68,9 +68,9 @@
     "stage": "enforce"
   },
   "fleet": {
-    "count": 4,
+    "count": 8,
     "plan_source": "triage",
-    "min_lanes": 2
+    "min_lanes": 8
   },
   "floor": [
     {
