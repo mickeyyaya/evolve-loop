@@ -9,11 +9,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
@@ -107,13 +106,11 @@ func scopeDeltaCycle(fs *flag.FlagSet, cycle int) (int, error) {
 }
 
 func buildScopeDeltaReport(evolveDir string, cycle int, stderr io.Writer) (scopeDeltaReport, error) {
-	runsDir := filepath.Join(evolveDir, "runs")
-	inboxDir := filepath.Join(evolveDir, "inbox")
-	state, err := readLaneState(runsDir, cycle)
+	state, err := readLaneState(filepath.Join(evolveDir, "runs"), cycle)
 	if err != nil {
 		return scopeDeltaReport{}, err
 	}
-	declared, err := laneDeclaredFiles(runsDir, inboxDir, cycle)
+	declared, err := core.LaneDeclaredFiles(evolveDir, cycle)
 	if err != nil {
 		return scopeDeltaReport{}, err
 	}
@@ -121,17 +118,9 @@ func buildScopeDeltaReport(evolveDir string, cycle int, stderr io.Writer) (scope
 	if err != nil {
 		return scopeDeltaReport{}, err
 	}
-	scope := scopedelta.Scope{
-		Cycle:      cycle,
-		Declared:   declared,
-		Protected:  slices.DeleteFunc(slices.Clone(changed), func(p string) bool { return !guards.IsProtectedSurface(p) }),
-		LaneOthers: siblingLaneFiles(runsDir, inboxDir, cycle, state.GoalHash, stderr),
-	}
-	entries := make([]scopedelta.Entry, 0, len(changed))
-	rows := make([]scopeDeltaRow, 0, len(changed))
-	for _, p := range changed {
-		e := scopedelta.Classify(p, scopedelta.Declaration{}, scope, scopedelta.DefaultClosureRules())
-		entries = append(entries, e)
+	entries := core.ClassifyLaneChanges(evolveDir, cycle, declared, changed, guards.IsProtectedSurface, stderr)
+	rows := make([]scopeDeltaRow, 0, len(entries))
+	for _, e := range entries {
 		rows = append(rows, scopeDeltaRow{Path: e.Path, Class: e.Class, Disposition: e.Disposition})
 	}
 	return scopeDeltaReport{Cycle: cycle, Summary: scopedelta.Summarize(entries), Entries: rows}, nil
@@ -150,22 +139,6 @@ func readLaneState(runsDir string, cycle int) (cyclestate.CycleState, error) {
 	return state, nil
 }
 
-func laneDeclaredFiles(runsDir, inboxDir string, cycle int) ([]string, error) {
-	workspace := inboxbatch.CycleDir(runsDir, strconv.Itoa(cycle))
-	items, _, err := inboxbatch.LoadDir(inboxbatch.ProcessingCycleDir(inboxDir, cycle))
-	if err != nil {
-		return nil, err
-	}
-	pin := committedset.LanePin(workspace)
-	var files []string
-	for _, it := range items {
-		if pin == nil || slices.Contains(pin, it.ID) {
-			files = append(files, it.Files...)
-		}
-	}
-	return files, nil
-}
-
 func laneChangedPaths(state cyclestate.CycleState) ([]string, error) {
 	if state.ActiveWorktree == "" || state.WorktreeBaseSHA == "" {
 		return nil, errors.New("cycle state names no active_worktree and worktree_base_sha to diff")
@@ -175,36 +148,6 @@ func laneChangedPaths(state cyclestate.CycleState) ([]string, error) {
 		return nil, fmt.Errorf("git diff %s in %s: %w", state.WorktreeBaseSHA, state.ActiveWorktree, err)
 	}
 	return strings.Fields(string(out)), nil
-}
-
-func siblingLaneFiles(runsDir, inboxDir string, cycle int, goalHash string, stderr io.Writer) []string {
-	if goalHash == "" {
-		return nil
-	}
-	var files []string
-	for _, dir := range inboxbatch.CycleDirs(runsDir) {
-		other, _ := inboxbatch.ParseProcessingCycle(filepath.Base(dir))
-		if other == cycle {
-			continue
-		}
-		state, err := readLaneState(runsDir, other)
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				fmt.Fprintf(stderr, "evolve cycle scope-delta: WARN: skip sibling cycle %d: %v\n", other, err)
-			}
-			continue
-		}
-		if state.GoalHash != goalHash {
-			continue
-		}
-		declared, err := laneDeclaredFiles(runsDir, inboxDir, other)
-		if err != nil {
-			fmt.Fprintf(stderr, "evolve cycle scope-delta: WARN: skip sibling cycle %d: %v\n", other, err)
-			continue
-		}
-		files = append(files, declared...)
-	}
-	return files
 }
 
 func writeScopeDeltaReport(w io.Writer, report scopeDeltaReport, jsonOut bool) error {

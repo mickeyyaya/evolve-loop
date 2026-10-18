@@ -10,10 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
 )
 
 const (
-	maxFuncLines = 50
 	maxNesting   = 4
 	maxFileLines = 800
 )
@@ -54,8 +55,8 @@ func checkFunctions(fset *token.FileSet, name string, file *ast.File) []error {
 			continue
 		}
 		lines := fset.Position(fn.End()).Line - fset.Position(fn.Pos()).Line + 1
-		if lines >= maxFuncLines {
-			failures = append(failures, fmt.Errorf("%s: %s is %d lines ≥ %d", name, fn.Name.Name, lines, maxFuncLines))
+		if lines > sizeratchet.MaxLines {
+			failures = append(failures, fmt.Errorf("%s: %s is %d lines > %d", name, fn.Name.Name, lines, sizeratchet.MaxLines))
 		}
 		if depth := nesting(fn.Body, 0); depth > maxNesting {
 			failures = append(failures, fmt.Errorf("%s: %s nests %d deep > %d", name, fn.Name.Name, depth, maxNesting))

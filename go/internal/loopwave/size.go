@@ -2,6 +2,8 @@ package loopwave
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/budgethistory"
@@ -12,9 +14,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
-func (e *Engine) Size(fc policy.FleetConfig, routing *policy.CLIRouting, states []quotastate.QuotaState, tp budgethistory.Throughput, now time.Time) (policy.FleetConfig, time.Duration) {
+func (e *Engine) QuotaCount(fc policy.FleetConfig, routing *policy.CLIRouting) (count int, paused []string) {
 	costed := fleet.ChainAwareBenches(e.benchedFamilies(), e.laneChains(routing), e.stderr)
-	fc.Count = e.ports.Shrink(fc.Count, costed, fc.MinLanes, e.stderr)
+	return e.ports.Shrink(fc.Count, costed, fc.MinLanes, e.stderr), slices.Sorted(maps.Keys(costed))
+}
+
+func (e *Engine) Size(fc policy.FleetConfig, routing *policy.CLIRouting, states []quotastate.QuotaState, tp budgethistory.Throughput, now time.Time) (policy.FleetConfig, time.Duration) {
+	fc.Count, _ = e.QuotaCount(fc, routing)
 	if fc.Budget == nil {
 		return fc, 0
 	}

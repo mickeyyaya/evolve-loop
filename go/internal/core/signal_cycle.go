@@ -3,6 +3,7 @@ package core
 import (
 	"strconv"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -45,7 +46,7 @@ func (cr *cycleRun) emitCycleClose(result CycleResult, origin string) {
 	e := base
 	e.Kind, e.Severity = signalcenter.KindCycleSealed, signalcenter.SeverityInfo
 	e.Reason = "final verdict " + result.FinalVerdict
-	e.Fields = map[string]string{"final_verdict": result.FinalVerdict, "phases_run": strconv.Itoa(len(result.PhasesRun))}
+	e.Fields = map[string]string{cyclestate.SealedVerdictField: result.FinalVerdict, "phases_run": strconv.Itoa(len(result.PhasesRun))}
 	if result.TerminationReason != "" {
 		e.Fields["termination_reason"] = result.TerminationReason
 	}

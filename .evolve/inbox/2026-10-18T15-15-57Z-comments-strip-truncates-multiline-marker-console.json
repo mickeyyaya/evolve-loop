@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "comments verify accepts a file whose marker group is unchanged and whose other comments were removed"
+  ],
+  "created_at": "2026-10-16T02:55:54Z",
+  "files": [
+    "go/internal/commentaudit"
+  ],
+  "fix": "Treat the comment lines that continue an acs-predicate marker, up to the first blank or code line, as part of the kept marker in strip, the same way the convention keeps multi-line markers whole. Then strip the rest of cmd_loop_wave_boundaryrefresh_wiring_test.go, which comment-zero lane M3 left untouched for this reason.",
+  "id": "comments-strip-truncates-multiline-marker-console",
+  "kind": "bug",
+  "priority_class": "maintainability",
+  "source": "comment-zero lane M3, 2026-10-16",
+  "split_from": "comments-strip-truncates-multiline-marker",
+  "summary": "In go/cmd/evolve/cmd_loop_wave_boundaryrefresh_wiring_test.go the acs-predicate marker spans lines 3-5. evolve comments strip kept only line 3, which then ended mid-sentence at 'inherent source-'. Completing the line by hand made comments verify report 'directive changed'. Lane M3 restored the file from HEAD and left its comments in place.",
+  "title": "comments strip keeps only the first line of a multi-line acs-predicate marker (console part)",
+  "weight": 0.3
+}

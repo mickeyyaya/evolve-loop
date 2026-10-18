@@ -192,7 +192,9 @@ v12.1 utilities + composition:
                               ( practice watch [--dry-run] [--json]
                               [--project-root P] )
   ratchet                   Function-size + raw-git-fixture ratchets
-                              ( ratchet check [size|rawgit] [--root DIR] )
+                              ( ratchet check [size|rawgit] [--root DIR] |
+                              ratchet tighten [--check] [--root DIR]
+                              [--project-root P] )
   cover                     Coverage gate over a change: refuses every
                               changed function below 100%
                               ( cover changed --base <ref> [--profile <path>]

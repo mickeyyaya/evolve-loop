@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"cmp"
 	"container/heap"
 	"context"
 	"errors"
@@ -58,6 +59,7 @@ type lease struct {
 	stalled  bool
 	seq      int
 	deadline time.Time
+	seen     time.Time
 }
 
 type Leases struct {
@@ -71,6 +73,7 @@ type Leases struct {
 	stops map[string]int
 	due   dueHeap
 	timer Timer
+	epoch uint64
 }
 
 func NewLeases(cfg LeaseConfig, clock Clock, beat Heartbeat, publish Publish) *Leases {
@@ -98,6 +101,7 @@ func (l *Leases) grant(scope []string, stop context.CancelFunc) Lane {
 	lane := Lane{Key: strings.Join(scope, "+"), Scope: scope, Started: now}
 	ls := &lease{lane: lane, stop: stop, deadline: now.Add(l.cfg.Deadline)}
 	l.live[lane.Key] = ls
+	l.epoch++
 	l.schedule(ls, now, now)
 	return lane
 }
@@ -110,6 +114,7 @@ func (l *Leases) give(lane Lane, r fleet.Result) (Return, error) {
 		return Return{Result: r}, fmt.Errorf("orchestrator: lane %s has no lease; a second lane holds the same key", lane.Key)
 	}
 	delete(l.live, lane.Key)
+	l.epoch++
 	ret := Return{Stopped: ls.stopped, Late: ls.late, Result: r}
 	if ls.stopped {
 		l.stops[lane.Key]++
@@ -181,8 +186,65 @@ func (l *Leases) reportStall(ls *lease, beat time.Time) func() {
 	}
 }
 
+func (l *Leases) Beat(key string, at time.Time) {
+	now := l.clock.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if at.After(now) {
+		at = now
+	}
+	if ls, ok := l.live[key]; ok && at.After(ls.seen) {
+		ls.seen = at
+	}
+}
+
+func (l *Leases) Stall(key string) {
+	if l.cfg.Stall <= 0 {
+		return
+	}
+	l.mu.Lock()
+	ls, ok := l.live[key]
+	if !ok || ls.stalled {
+		l.mu.Unlock()
+		return
+	}
+	ls.stalled = true
+	report := l.reportStall(ls, cmp.Or(ls.seen, ls.lane.Started))
+	l.mu.Unlock()
+	report()
+}
+
+func (l *Leases) Epoch() uint64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.epoch
+}
+
+func (l *Leases) Lane(key string) (Lane, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	ls, ok := l.live[key]
+	if !ok {
+		return Lane{}, false
+	}
+	return ls.lane, true
+}
+
+func (l *Leases) Live() []Lane {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]Lane, 0, len(l.live))
+	for _, ls := range l.live {
+		out = append(out, ls.lane)
+	}
+	return out
+}
+
 func (l *Leases) heartbeat(ls *lease, now time.Time) (time.Time, bool) {
 	at, ok := l.beat(ls.lane)
+	if ls.seen.After(at) {
+		at, ok = ls.seen, true
+	}
 	if !ok {
 		return now, false
 	}

@@ -19,6 +19,7 @@ type PoolConfig struct {
 	Prepare     func(td Todo, spec CycleSpec) (CycleSpec, bool)
 	Exited      func(td Todo, r Result) bool
 	Halted      func() bool
+	Kick        <-chan struct{}
 }
 
 type PoolTransitionKind string
@@ -58,8 +59,18 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 	}
 	p := newPool(ctx, cfg, backlog, launch, onTransition)
 	p.fill(PoolLaunched, true)
+	kick := cfg.Kick
 	for len(p.running) > 0 {
-		p.settle(<-p.completions)
+		select {
+		case idx := <-p.completions:
+			p.settle(idx)
+		case _, open := <-kick:
+			if !open {
+				kick = nil
+				continue
+			}
+			p.fill(PoolBackfilled, false)
+		}
 	}
 	return p.results
 }

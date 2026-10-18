@@ -10,7 +10,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
-	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
 )
@@ -19,12 +18,6 @@ const (
 	WidthFromSignal = "signal"
 	WidthFromPolicy = "policy"
 )
-
-var landingConflicts = map[signalcenter.Code]bool{
-	shiperr.SignalCode(shiperr.CodeGitFleetRebaseNeeded):   true,
-	shiperr.SignalCode(shiperr.CodeGitFleetRebaseConflict): true,
-	shiperr.SignalCode(shiperr.CodeAuditBindingHeadMoved):  true,
-}
 
 func ReadLoopSignals(root string) ([]signalcenter.Event, []string) {
 	path := filepath.Join(paths.EvolveDirOf(root), signalcenter.StreamFileName)

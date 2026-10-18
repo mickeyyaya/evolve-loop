@@ -111,3 +111,15 @@ func declaredStringConsts(t *testing.T, typeName string) map[string]bool {
 	}
 	return declared
 }
+
+func TestIsLandingConflict_IsTrueForTheThreeRecoveryCodesOnly(t *testing.T) {
+	for _, c := range AllCodes() {
+		want := c == CodeGitFleetRebaseNeeded || c == CodeGitFleetRebaseConflict || c == CodeAuditBindingHeadMoved
+		if got := IsLandingConflict(SignalCode(c)); got != want {
+			t.Errorf("IsLandingConflict(%s) = %v, want %v", SignalCode(c), got, want)
+		}
+	}
+	if IsLandingConflict("LOOP_ORCH_LANE_STALLED") || IsLandingConflict("") {
+		t.Error("IsLandingConflict accepted a code that no ship error projects")
+	}
+}

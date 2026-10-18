@@ -9,7 +9,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/agentmsg` | the skeleton of cycle agent messaging: the envelope, the address grammar, the identity and the token, the policy engine, the broker of one cycle, the in-memory store and the frame (ADR-0129, M1) | [internal-agentmsg.md](internal-agentmsg.md) |
 | `internal/agentmsg/channelstore` | the `Store` port of the broker on the ADR-0127 channel log: the channel `msg.<cycle>`, the channel `msg.dead.<cycle>` and the `message` record variant (ADR-0129, M2) | [internal-agentmsg-channelstore.md](internal-agentmsg-channelstore.md) |
 | `internal/admission` | admission by package cell: the conflict rule, the module graph and the hub cell of capacity 1 (ADR-0139 O3, ADR-0134 S14) | [internal-admission.md](internal-admission.md) |
-| `internal/orchestrator` | the rolling pool at stage `enforce` and the lane lease, with one deadline timer (ADR-0139 O4, O5) | [internal-orchestrator.md](internal-orchestrator.md) |
+| `internal/orchestrator` | the pool, the lane lease, the oversight loop and the supply census (ADR-0139 O4, O5, O6) | [internal-orchestrator.md](internal-orchestrator.md) |
 | `internal/config` | resolves the routing configuration once, at the composition root | [internal-config.md](internal-config.md) |
 | `internal/events/filter` | the one filter grammar of the event channels: the terms, the matcher, the channel selectors and the vocabulary (ADR-0127, E4) | [internal-events-filter.md](internal-events-filter.md) |
 | `internal/evalgate` | the verified checks that replace prose contracts between phases | [internal-evalgate.md](internal-evalgate.md) |

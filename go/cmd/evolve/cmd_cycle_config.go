@@ -41,6 +41,7 @@ func wireBridgeStages(br bridgeStageSink, cfg config.RoutingConfig) {
 
 func productionBuildFloorChecks(ctx context.Context, in core.ReviewInput) []string {
 	out := append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)
+	out = append(out, core.ScopeDeltaFloorChecks(guards.IsProtectedSurface)(ctx, in)...)
 	return append(out, core.RepoContractFloorChecks(repoContractPack)(ctx, in)...)
 }
 

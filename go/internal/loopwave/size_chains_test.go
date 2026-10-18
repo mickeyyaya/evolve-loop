@@ -95,3 +95,32 @@ func TestLoadRouting_AnUnreadablePolicyWarnsAndYieldsNoBlock(t *testing.T) {
 		t.Errorf("stderr = %q, want the WARN line for the unreadable policy", h.stderr.String())
 	}
 }
+
+func TestQuotaCount_NamesTheFamiliesWhoseBenchCostsALaneAndSizeCountsTheSame(t *testing.T) {
+	h := newHarness(t)
+	benchFamily(t, h, "claude")
+	benchFamily(t, h, "agy-claude")
+	h.ports.Chains = func(*policy.CLIRouting) [][]string { return [][]string{{"agy-claude", "claude"}, {"agy-claude"}} }
+	e := New(Roots{ProjectRoot: h.root, EvolveDir: h.evolveDir}, h.ports, h.stderr)
+	fc := policy.FleetConfig{Count: 4, MinLanes: 2}
+
+	count, paused := e.QuotaCount(fc, &policy.CLIRouting{})
+
+	if count != 2 || strings.Join(paused, ",") != "agy-claude,claude" {
+		t.Errorf("QuotaCount = %d, %v, want 2 and both families: each chain ends in a benched family", count, paused)
+	}
+	if sized, _ := e.Size(fc, &policy.CLIRouting{}, nil, budgethistory.Throughput{}, time.Now()); sized.Count != count {
+		t.Errorf("Size count = %d, want the QuotaCount %d", sized.Count, count)
+	}
+}
+
+func TestQuotaCount_WithNoBenchKeepsTheWidthAndPausesNothing(t *testing.T) {
+	h := newHarness(t)
+	e := New(Roots{ProjectRoot: h.root, EvolveDir: h.evolveDir}, h.ports, h.stderr)
+
+	count, paused := e.QuotaCount(policy.FleetConfig{Count: 4, MinLanes: 2}, nil)
+
+	if count != 4 || len(paused) != 0 {
+		t.Errorf("QuotaCount = %d, %v, want 4 and nothing paused", count, paused)
+	}
+}

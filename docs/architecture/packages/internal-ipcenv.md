@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`internal/ipcenv` is the one home of the lane protocol keys: the `EVOLVE_` environment keys a parent evolve process sets for its children (`FleetKey`, `FleetScopeKey`, `FleetWidthKey`, `WorktreeRootKey`, `CycleStateFileKey`, `TmuxSocketKey`, `DispatchIDKey`). They are not operator dials, so they have no `flagregistry` row, and the `flagreaders` and `envtaint` regression gates skip this directory. It also owns `Scrub`, the environment every `go test` a cycle spawns to judge the repository runs under.
+`internal/ipcenv` is the one home of the lane protocol keys. These are the `EVOLVE_` environment keys that a parent evolve process sets for its children (`FleetKey`, `FleetScopeKey`, `FleetWidthKey`, `WorktreeRootKey`, `CycleStateFileKey`, `TmuxSocketKey`, `DispatchIDKey`, `MsgTokenKey`). They are not operator dials, so they have no `flagregistry` row, and the `flagreaders` and `envtaint` regression gates skip this directory. It also owns `Scrub`, the environment every `go test` a cycle spawns to judge the repository runs under.
 
 ## Design
 
@@ -21,6 +21,7 @@
 - **`CycleStateFileKey`** (`EVOLVE_CYCLE_STATE_FILE`) names the own per-run cycle-state file of a fleet lane (`runs/cycle-N/cycle-state.json`). So two concurrent lanes never share `<evolveDir>/cycle-state.json`. It applies only to the evolve directory that holds it (`paths.CycleStateFileFor`).
 - **`TmuxSocketKey`** (`EVOLVE_TMUX_SOCKET`) is the per-run bridge tmux socket the loop exports to its bridge subprocesses. `bridge.TmuxSocketEnv` is defined as this constant, so the key has one spelling. It keeps its `flagregistry` row (status internal, "IPC channel, not an operator dial") for now; the row predates the constant moving here.
 
+- **`MsgTokenKey`** (`EVOLVE_MSG_TOKEN`) is the message token of one dispatch ([internal-agentmsg.md](internal-agentmsg.md)). `boot.Env` puts it in the environment of the dispatch. `Scrub` never forwards it.
 - **`DispatchIDKey`** (`EVOLVE_DISPATCH_ID`) is the tag of one dispatch. The bridge sets it in the environment of the CLI it starts, and each descendant inherits it. The bridge at dispatch end and `evolve gc` read it from the environment of other processes to prove ownership ([internal-proctree.md](internal-proctree.md)). No Go code reads it from its own environment.
 
 ## Invariants

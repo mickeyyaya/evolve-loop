@@ -22,6 +22,16 @@ const (
 	CodeLaneDeadline       signalcenter.Code = "LOOP_ORCH_LANE_DEADLINE"
 	CodeLaneLateExit       signalcenter.Code = "LOOP_ORCH_LANE_LATE_EXIT"
 	CodeLaneRecoveryFailed signalcenter.Code = "LOOP_ORCH_LANE_RECOVERY_FAILED"
+	CodeOversightAction    signalcenter.Code = "LOOP_ORCH_OVERSIGHT_ACTION"
+	CodeFamilyPaused       signalcenter.Code = "LOOP_ORCH_FAMILY_PAUSED"
+	CodeSupply             signalcenter.Code = "LOOP_ORCH_SUPPLY"
+	CodeSupplyShort        signalcenter.Code = "LOOP_ORCH_SUPPLY_SHORT"
+)
+
+const (
+	CodePhaseStalled  signalcenter.Code = "LIVENESS_PHASE_STALLED"
+	CodeUsageEvidence signalcenter.Code = "BRIDGE_USAGE_EVIDENCE"
+	CodePaneExhausted signalcenter.Code = "LIVENESS_PANE_EXHAUSTED"
 )
 
 func init() {
@@ -33,6 +43,10 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneDeadline, "a lane passed its lease deadline (the p95 lane time of the last 50 cycles without the longest one, at least fleet.orchestrator.deadline_floor_minutes, ADR-0139 O5); action recorded at stage shadow (nothing stops), action stopped at stage enforce (the lane's own launch context is cancelled, its dispatches are reaped, its inbox claim is released and its cells free); fields.todo, stage, action, deadline_minutes")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneLateExit, "a lane exited after its lease deadline had passed; the shadow exit measure of ADR-0139 O5: status ok means a deadline stop would have stopped a lane that passed; fields.todo, stage, status, rc, stopped")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneRecoveryFailed, "after a deadline stop the orchestrator could not release the todo's inbox claim (step release) or park it with route console (step park, reason deadline twice); the todo needs the console; fields.todo, step, error")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeOversightAction, "the oversight loop (ADR-0139 O6) mapped one event of the cycle, ship, errors or loop channel to an action on its own lanes: record_verdict, free_cells, count_clean_landing, count_conflict, backfill, resize or stop_admission; at stage shadow the action is recorded and changes nothing (applied false), at stage enforce it is applied (applied true); INFO; fields.actions, lane, cycle, event, stage, applied, and verdict or target for the actions that have one")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeFamilyPaused, "a bench left a CLI family with no healthy family after it in some lane chain, so the sizing step costs a slot and the family stops taking new lanes (ADR-0139 decision 13); lanes in flight finish; published once for each pause; at stage shadow it records the pause and changes nothing (applied false); INFO; fields.family, target (the window after the pause), stage, applied")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeSupply, "the supply census (ADR-0139 O6, spec section 4) before a plan: the count of the inbox items in each class (admissible, waiting_cell, waiting_deps, console_route, console_kind, console_protected), the window, and the first console items with the reason of the routing authority; the full record is .evolve/waves/supply.json; INFO; fields are the six class names, window and console")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeSupplyShort, "the supply census found fewer admissible items than the window, so the lanes of the plan cannot all be filled; the cause of each refusal is in the supply record and in evolve wave supply; INFO; fields are the six class names and window")
 }
 
 type Publish func(signalcenter.Event)

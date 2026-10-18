@@ -738,11 +738,13 @@
 # M1 (ADR-0129): the skeleton of cycle agent messaging, unwired (internal/agentmsg and its subpackages).
 ./internal/agentmsg
 ./internal/agentmsg/address
+./internal/agentmsg/boot
 ./internal/agentmsg/broker
 ./internal/agentmsg/delivery
 ./internal/agentmsg/envelope
 ./internal/agentmsg/identity
 ./internal/agentmsg/memstore
+./internal/agentmsg/outbox
 ./internal/agentmsg/policy
 # M2 (ADR-0129): the channel-log store adapter of cycle agent messaging, unwired (internal/agentmsg/channelstore).
 ./internal/agentmsg/channelstore
@@ -778,3 +780,5 @@
 # orchestrator — the rolling pool under the orchestrator and the lane lease (ADR-0139 O4, O5): admission by cell for each free slot, one deadline timer over a heap, and the stop through the launch context only.
 ./internal/orchestrator
 ./internal/acspathscan
+# gotypes — the type-checked Go index behind codeindex.Backend for callers and api, standard library only (ADR-0140, plan G1).
+./internal/adapters/codeindex/gotypes

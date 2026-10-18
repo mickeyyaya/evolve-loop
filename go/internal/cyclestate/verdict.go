@@ -7,6 +7,8 @@ const (
 	VerdictSKIPPED = "SKIPPED"
 )
 
+const SealedVerdictField = "final_verdict"
+
 const ClassificationMidExecutionFail = "cycle-mid-execution-fail"
 
 const CycleTerminationTriageNoWork = "triage-empty-commitment"
