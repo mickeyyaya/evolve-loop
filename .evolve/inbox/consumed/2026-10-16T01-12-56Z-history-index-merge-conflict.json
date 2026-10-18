@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Two branches that each archive comment history into different pages merge with no conflict in docs/history/code-comments/README.md",
+    "The index a reader sees still lists every page with its entry count"
+  ],
+  "consumed": {
+    "at": "2026-10-18T15:15:58Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "split into history-index-merge-conflict-console (console) and history-index-merge-conflict-lane (lane)"
+  },
+  "created_at": "2026-10-16T01:12:56Z",
+  "files": [
+    "go/internal/commentaudit/history.go",
+    "docs/history/code-comments/README.md"
+  ],
+  "fix": "Stop tracking the generated index rows. Either generate the index at read time (a docs build step or an `evolve comments history index` verb), or register a git merge driver that re-runs writeHistoryIndex. A page that two branches append to also needs a union merge (`merge=union` in .gitattributes) for its appended sections.",
+  "id": "history-index-merge-conflict",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console boundary train w100, 2026-10-16",
+  "summary": "Every comment-zero branch rewrites the generated table in docs/history/code-comments/README.md and appends a section to shared pages such as internal-core.md. On 2026-10-16, each of seven branches conflicted with the others there, and main's index was found stale by two counts after an earlier hand-merge. The landing needed a scratch rebuild script and a train.",
+  "title": "The generated comment-history index conflicts on every parallel merge",
+  "weight": 0.4
+}
