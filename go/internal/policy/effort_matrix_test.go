@@ -24,7 +24,8 @@ func TestTheCheckedInPolicy_EffortMatrix(t *testing.T) {
 		{"reflector", "balanced", "low"},
 		{"builder", "balanced", "medium"},
 		{"builder", "deep", "medium"},
-		{"tdd-engineer", "deep", "medium"},
+		{"tdd-engineer", "balanced", "high"},
+		{"tdd-engineer", "deep", "high"},
 		{"router", "deep", "medium"},
 		{"auditor", "deep", "medium"},
 		{"adversarial-review", "deep", "medium"},
@@ -45,12 +46,19 @@ func TestTheCheckedInPolicy_PinsNoEffortAboveMedium(t *testing.T) {
 		t.Fatal("the checked-in policy has no cli_routing block")
 	}
 	starting := []string{"low", "medium"}
+	raisedByOperator := map[string]string{"tdd-engineer": "high"}
 	for tier, rule := range block.Tiers {
 		if rule.Effort != "" && !slices.Contains(starting, rule.Effort) {
 			t.Errorf("tiers.%s.effort = %q, want medium or lower: the 2026-10-08 operator directive starts at medium and raises only after a measured gain", tier, rule.Effort)
 		}
 	}
 	for agent, rule := range block.Agents {
+		if raised, ok := raisedByOperator[agent]; ok {
+			if rule.Effort != raised {
+				t.Errorf("agents.%s.effort = %q, want %q (the 2026-10-18 operator directive raised this seat)", agent, rule.Effort, raised)
+			}
+			continue
+		}
 		if rule.Effort != "" && !slices.Contains(starting, rule.Effort) {
 			t.Errorf("agents.%s.effort = %q, want medium or lower (2026-10-08 operator directive)", agent, rule.Effort)
 		}
