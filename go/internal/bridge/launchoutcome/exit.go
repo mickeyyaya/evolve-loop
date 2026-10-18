@@ -1,5 +1,4 @@
-// Package launchoutcome is unit 10 of the component breakdown (ADR-0103):
-// what one bridge launch exit MEANS.
+// Package launchoutcome decides what one bridge launch exit means.
 package launchoutcome
 
 import (

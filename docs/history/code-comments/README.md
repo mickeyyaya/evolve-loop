@@ -58,7 +58,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `acs/cycle1155` | 1 | [acs-cycle1155.md](acs-cycle1155.md) |
 | `acs/cycle1156` | 4 | [acs-cycle1156.md](acs-cycle1156.md) |
 | `acs/cycle1157` | 2 | [acs-cycle1157.md](acs-cycle1157.md) |
-| `acs/cycle1158` | 7 | [acs-cycle1158.md](acs-cycle1158.md) |
+| `acs/cycle1158` | 8 | [acs-cycle1158.md](acs-cycle1158.md) |
 | `acs/cycle1159` | 1 | [acs-cycle1159.md](acs-cycle1159.md) |
 | `acs/cycle1160` | 7 | [acs-cycle1160.md](acs-cycle1160.md) |
 | `acs/cycle1166` | 2 | [acs-cycle1166.md](acs-cycle1166.md) |
@@ -510,7 +510,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/bridge/clicontrol` | 2 | [internal-bridge-clicontrol.md](internal-bridge-clicontrol.md) |
 | `internal/bridge/inbox` | 3 | [internal-bridge-inbox.md](internal-bridge-inbox.md) |
 | `internal/bridge/keyspec` | 1 | [internal-bridge-keyspec.md](internal-bridge-keyspec.md) |
-| `internal/bridge/launchoutcome` | 6 | [internal-bridge-launchoutcome.md](internal-bridge-launchoutcome.md) |
+| `internal/bridge/launchoutcome` | 7 | [internal-bridge-launchoutcome.md](internal-bridge-launchoutcome.md) |
 | `internal/bridge/panestream` | 44 | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge` | 434 | [internal-bridge.md](internal-bridge.md) |
 | `internal/bridgechain` | 2 | [internal-bridgechain.md](internal-bridgechain.md) |
@@ -628,6 +628,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phasewatchdog` | 1 | [internal-phasewatchdog.md](internal-phasewatchdog.md) |
 | `internal/plane` | 6 | [internal-plane.md](internal-plane.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
+| `internal/practicewatch` | 1 | [internal-practicewatch.md](internal-practicewatch.md) |
 | `internal/preflight` | 4 | [internal-preflight.md](internal-preflight.md) |
 | `internal/profiles` | 33 | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | 51 | [internal-prompts.md](internal-prompts.md) |
