@@ -16,10 +16,10 @@ const (
 	triagePkg = "github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 )
 
-var rejectTestNames = []string{
-	"TestTriageClassify_RejectsProtectedSurfaceTopNCard_BraceSyntax",
-	"TestTriageClassify_RejectsProtectedSurfaceTopNCard_BareSyntax",
-	"TestTriageClassify_RejectsAmongMultipleCards_NamesOffendingIdOnly",
+var routeTestNames = []string{
+	"TestTriageClassify_RoutesProtectedSurfaceTopNCard_BraceSyntax",
+	"TestTriageClassify_RoutesProtectedSurfaceTopNCard_BareSyntax",
+	"TestTriageClassify_RoutesAmongMultipleCards_NamesOffendingIdOnly",
 }
 
 var allowTestNames = []string{
@@ -28,14 +28,14 @@ var allowTestNames = []string{
 }
 
 func TestC1313_001_reject_protected_surface_contract_green(t *testing.T) {
-	pattern := "TestTriageClassify_(RejectsProtectedSurfaceTopNCard_BraceSyntax|RejectsProtectedSurfaceTopNCard_BareSyntax|RejectsAmongMultipleCards_NamesOffendingIdOnly)"
+	pattern := "TestTriageClassify_(RoutesProtectedSurfaceTopNCard_BraceSyntax|RoutesProtectedSurfaceTopNCard_BareSyntax|RoutesAmongMultipleCards_NamesOffendingIdOnly)"
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
 		"go", "test", "-count=1", "-v", "-run", pattern, triagePkg)
 	if code != 0 || err != nil {
 		t.Fatalf("go test -run %s %s exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s",
 			pattern, triagePkg, code, err, stdout, stderr)
 	}
-	for _, name := range rejectTestNames {
+	for _, name := range routeTestNames {
 		if !strings.Contains(stdout, "--- PASS: "+name) {
 			t.Errorf("admission-check test %s did not report PASS (renamed, skipped, or not run)", name)
 		}

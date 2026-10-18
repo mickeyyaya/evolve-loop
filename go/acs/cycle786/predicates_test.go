@@ -37,11 +37,6 @@ func runGoTest(t *testing.T, pkg, runExpr string, wantPass []string) {
 	}
 }
 
-func TestC786_001_trivial_rebase_carries_audit_forward(t *testing.T) {
-	runGoTest(t, shipPkg, "^TestTrivialRebase_CarriesAuditForward$",
-		[]string{"TestTrivialRebase_CarriesAuditForward"})
-}
-
 func TestC786_002_drift_and_failed_gates_fall_back_to_reaudit(t *testing.T) {
 	runGoTest(t, shipPkg,
 		"^TestTrivialRebase_(PatchIdDriftFallsBackToReaudit|FailedComposedGatesRejected)$",

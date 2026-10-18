@@ -125,8 +125,8 @@ func TestC986_003_recovered_features_remain_green(t *testing.T) {
 		{
 			feature:   "fable ProtectedSurface gate (884)",
 			pkg:       modPrefix + "internal/guards",
-			runFilter: "TestProtectedSurface_FableSkillOverlay",
-			mustPASS:  []string{"TestProtectedSurface_FableSkillOverlay"},
+			runFilter: "TestProtectedSurface_CompiledDefaultOverlaySkills",
+			mustPASS:  []string{"TestProtectedSurface_CompiledDefaultOverlaySkills"},
 		},
 		{
 			feature:   "scoped-review (898)",

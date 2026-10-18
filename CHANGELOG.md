@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a predicate that names a test that no longer exists fails (A1, 2026-10-18)
+
+- **The defect.** `go test -run` exits 0 when a name matches no test. A predicate that ran a test by name and judged the exit code passed after a rename or a delete removed the test. A scan found 20 stale names in 16 predicate packages.
+- **The helper.** `acsassert.GoTests` already judged the events of `go test -json`. It now also refuses an exact pattern name that `Names` omits, before it runs `go test`.
+- **The check.** The package `go/acs/regression/acsnames` reads the names in every predicate package that runs tests by name. It fails on a name that no test declares. The scan of the whole tree takes about 0.5 s on a quiet host. It runs in the CI job `acs-durable` and in the ACS suite of every cycle.
+- **The ledger.** 9 predicates are repointed to the renamed tests, and 1 is narrowed. 14 predicates are retired with a reason, and 7 of the 20 names never existed. 6 names stay absent on purpose and are listed with a reason.
+- **The CLI predicate.** `TestC1678_011` parses the standard output alone. A warning on the standard error no longer breaks the JSON.
+- Docs: [acs-predicate-quality-gate](docs/architecture/acs-predicate-quality-gate.md#predicate-test-names-resolve-acsnames-2026-10-18), [pkg-acsassert](docs/architecture/packages/pkg-acsassert.md), [logic-first-delivery-design §7.9](docs/architecture/logic-first-delivery-design.md).
+
 ## Fixed — the dev worktree sweep of `evolve gc` has its own time budget (2026-10-12)
 
 - **The defect.** `evolve gc` ran the dev worktree sweep inside the 15-second bound that protects the session and socket reapers. On a loaded host (load 12) the sweep judged 137 of 172 trees, then every git call failed with `context deadline exceeded`. 35 trees were `NOT-JUDGED`, the run exited 1, and the wave boundary stopped at step 4.

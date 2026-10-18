@@ -13,7 +13,6 @@ const (
 	scoutPkg = "github.com/mickeyyaya/evolve-loop/go/internal/phases/scout"
 	buildPkg = "github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
 	tddPkg   = "github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
-	corePkg  = "github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 func runGoTest(t *testing.T, pkg, name string) {
@@ -59,10 +58,6 @@ func TestC776_007_tdd_prompt_renders_lane_scope(t *testing.T) {
 
 func TestC776_008_tdd_prompt_unscoped_no_scope_line(t *testing.T) {
 	runGoTest(t, tddPkg, "TestTDD_ComposePrompt_NoFleetScope_NoScopeLine")
-}
-
-func TestC776_009_goal_hash_mismatch_gate_regression(t *testing.T) {
-	runGoTest(t, corePkg, "TestLaneScopePin_ScoutGoalHashMismatchAbortsBeforeTriage")
 }
 
 func TestC776_010_scout_prompt_instructs_goal_hash_echo(t *testing.T) {
