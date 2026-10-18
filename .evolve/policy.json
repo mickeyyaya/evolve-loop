@@ -44,6 +44,12 @@
       "scout": {
         "effort": "low"
       },
+      "tdd-engineer": {
+        "cli": [
+          "claude"
+        ],
+        "model": "deep"
+      },
       "triage": {
         "effort": "low"
       }
