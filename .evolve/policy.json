@@ -116,6 +116,7 @@
     "unblocks_cap": 3,
     "recurrence_cap": 5,
     "active_campaigns": [
+      "handoff-contract",
       "wave-orchestrator"
     ],
     "preempt_margin": 0.05
