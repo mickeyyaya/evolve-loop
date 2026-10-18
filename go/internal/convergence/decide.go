@@ -77,7 +77,7 @@ var keptRoundHasOpenCritical = func(c decider, keep int) bool { return c.hasOpen
 func (c decider) landing(d Decision, exit scopeExit) Decision {
 	keep := c.keepBest(c.bar, exit.exempt())
 	if keptRoundHasOpenCritical(c, keep) {
-		return c.stop("")
+		return c.landingGuardStop()
 	}
 	d.BlockingBar, d.LandRound = c.bar, keep
 	return c.settle(d, keep, exit)

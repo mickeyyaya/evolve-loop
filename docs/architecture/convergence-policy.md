@@ -63,7 +63,7 @@ round 1  fix 1 ─▶ J_1   (verify-only from here on: fixed scope + falsificati
         │ strict OPEN remains
         ▼  marginal gain ≤ 0? ── yes ─▶ skip to round 3's strategy change (or rung 3 if already past it)
 round 2  RUNG 1 — change the feedback: effort raise to top for reasoning-class blockers (headroom permitting);
-                  fixer raised once, if not already
+                  fixer raised once, if not already (the once-only raise: the fixer and judge raises are one change, made on the first rung-1 round or at rung 2 when no rung-1 round ran)
         │ strict OPEN remains
         ▼
 round 3  RUNG 2 — change the strategy: fresh-context fixer (or re-plan); bar → HIGH; MEDIUM/LOW deferred + filed

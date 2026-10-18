@@ -37,7 +37,7 @@ On 2026-10-07 the operator stopped L2 at round 7 ("It just retry for too many ti
    - **Round 1** is a normal fix (ADR-0096's raise stays here for audit repair).
    - **Round 2, rung 1, changes the feedback:**
      - an effort raise within the judge's family (deep high → top xhigh), for reasoning-class blockers, with headroom;
-     - a fixer raise, once.
+     - a fixer raise, once. This is the once-only raise: the fixer and judge raises go together with the first rung-1 round, or with rung 2 when no rung-1 round ran, and no later round raises again.
      - Code-review and console judgments are already verify-only from `J_1` on (decision 6).
    - **Round 3, rung 2, changes the strategy:** a fresh-context fixer or a re-plan; the bar rises to HIGH; MEDIUM/LOW are deferred and filed (code-review and console only).
    - **No round 4.**

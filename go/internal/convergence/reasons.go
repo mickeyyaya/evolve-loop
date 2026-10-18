@@ -2,6 +2,7 @@ package convergence
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -19,9 +20,27 @@ func (c decider) reason(code string, fields ...string) string {
 	return signal(code, append([]string{"loop", string(c.in.Loop)}, fields...)...)
 }
 
+const (
+	guardCauseName     = "landing-guard"
+	landingGuardSignal = "CONVERGENCE_LANDING_GUARD"
+)
+
+func isLandingGuardReason(reason string) bool {
+	return strings.HasPrefix(reason, landingGuardSignal+" ")
+}
+
+func (c decider) landingGuardStop() Decision {
+	d := c.stop("")
+	d.Reasons = slices.Concat([]string{c.reason(landingGuardSignal, "round", strconv.Itoa(c.in.Round))}, d.Reasons)
+	return d
+}
+
 func (c decider) rungReason(d Decision) string {
 	cause := c.cause
-	if d.Action == ActionLand {
+	switch {
+	case slices.ContainsFunc(d.Reasons, isLandingGuardReason):
+		cause = guardCauseName
+	case d.Action == ActionLand:
 		_, cause = c.landRung()
 	}
 	return c.reason("CONVERGENCE_RUNG", "round", strconv.Itoa(c.in.Round), "rung", strconv.Itoa(d.Rung),
