@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -140,8 +141,8 @@ func TestRunPool_MaxLaunchesEndsTheRunAtTheLimit(t *testing.T) {
 	if want := []string{"A", "B"}; !reflect.DeepEqual(log.got(), want) {
 		t.Errorf("launches = %v, want %v", log.got(), want)
 	}
-	if res[2].Status() != LaneFailed || res[2].Err == nil {
-		t.Errorf("result past the limit = %+v, want a failed never-launched result", res[2])
+	if res[2].Status() != LaneFailed || !errors.Is(res[2].Err, ErrNeverLaunched) {
+		t.Errorf("result past the limit = %+v, want a failed result that carries ErrNeverLaunched", res[2])
 	}
 }
 

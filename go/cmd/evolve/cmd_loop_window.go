@@ -176,7 +176,7 @@ func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.Fl
 		b.ctx,
 		fleetConfig,
 		productionWavePreflight(b.cfg.ProjectRoot),
-		productionPoolPlanFn(b.cfg, b.deps.Storage, fleetConfig.Count, b.stderr),
+		productionPoolPlanFn(b.cfg, b.deps.Storage, loopwave.PoolSupply(fleetConfig), b.stderr),
 		run,
 		iteration,
 	)

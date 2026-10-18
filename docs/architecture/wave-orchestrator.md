@@ -145,6 +145,8 @@ When the admissible count is below the window, the census publishes `LOOP_ORCH_S
 
 **The fix of 2026-10-18.** The split refuses an item whose text names a protected path or a console file. It refuses a part with no criterion. A lane part that only verifies waits for the console part.
 
+The supply that the pool gets at `enforce` is the ranked backlog up to `max(fleet.count, scan_k)`, not `fleet.count` (§6, the fix of 2026-10-19).
+
 The census never routes an item itself. ADR-0074 keeps the routing authority, and the four guards of F2.23 keep the protected files safe.
 
 **State: the library is built (O6, 2026-10-18). The loop call and `evolve wave supply` are pending.** `orchestrator.Census` ([internal-orchestrator.md](packages/internal-orchestrator.md)) has two calls:
@@ -234,6 +236,21 @@ The cells come from the tree at the run's base. A lane that adds an import adds 
 **The first measure (2026-10-17, width 4).** The ready list is empty, so both widths are 0. Each of the last 10 triage decisions holds 1 todo, so both widths are 1. The 9 todos of those decisions as one wave give 4 and 4.
 
 In 30 windows of 8 pending items, admission gives 58 lanes against 120. The cause: 120 of the 244 pending items edit `cmd/evolve` or `internal/core`, which import most of the module. The S14 exit takes 3 live runs ([internal-admission.md](packages/internal-admission.md) §Findings).
+
+**The supply depth of the pool (fix, 2026-10-19).** At `enforce`, admission picks the lanes from a backlog of up to `max(fleet.count, scan_k)` todos. The file-disjoint widen does not cut the backlog to `fleet.count`.
+
+- **The defect.** Cycle 1951 (wave 129) ran 1 lane of 4 at `fleet.count=4`, with 22 ranked todos in the inbox.
+- **The cause chain.**
+  1. `dispatchPool` (`cmd_loop_window.go`) gave `fleet.count` to `Engine.PlanFn` as the plan width.
+  2. `WidenNarrowDecision` (`decision.go`) took file-disjoint todos up to that width, plus one cluster mate. The pool got 5 of 22 todos.
+  3. The 4 todos after rank 0 edit `cmd/evolve` or `internal/core`. Each conflicts with the cell of rank 0, so `AdmitByCell` (`orchestrator/pool.go`) returned -1.
+  4. `fleet.RunPool` (`fleet/pool.go`) stops the fill when admission refuses and a lane is in flight. One lane ran.
+  5. `scan_k` went only to the shadow admission (`cmd_loop_admission.go`), not to the supply of the pool.
+- **The fix.** `loopwave.PoolSupply` gives the plan width of the pool. At `enforce`, the width is `max(fleet.count, scan_k)`. At `shadow`, and with no stage, the width is `fleet.count`, as before. `scan_k` is thus the one owner of the supply depth.
+- **The bounds stay.** The pool launches at most `min(fleet.count, concurrency)` lanes at a time. A run launches at most `run_max_lanes` lanes in total. A deeper backlog claims no inbox item at plan time, because the plan only reads the inbox. A lane claims its item in its own cycle (`ClaimPending`), after the launch.
+- **The pool line.** A todo that the pool never launches is not a lane. Its result carries `fleet.ErrNeverLaunched`, and `loopwave.Tally` does not count it. Thus `pool N: X/Y lanes ok` counts only the launched lanes.
+- **The proof.** On a copy of the wave-129 inbox, the deep plan gives 21 todos, and the pool holds 4 live lanes before the first exit. The old plan gives 5 todos and 1 lane. Pinned by `TestPoolSupply_AtEnforceAHotRankZeroCellStillFillsTheTarget`, `TestPoolSupply_ADeepSupplyStaysInsideTheTargetAndTheRunCap` and `cmd/evolve` `TestDispatchPool_AtEnforceThePoolIsSuppliedPastTheFleetCount`.
+- **The limit.** The widen still drops a todo that shares a file with an earlier todo, unless it is a cluster mate of one lane. Such a todo cannot run beside that todo, so the drop costs no live lane. The reach of `cmd/evolve` stays wide. The follow-up `admission-reach-drops-high-fanout-roots` holds that decision for ADR-0139.
 
 ## 7. The rolling pool
 
@@ -502,7 +519,7 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | `count` | int | 4 (was 3) | the largest window |
 | `min_lanes` | int | 2 | the smallest window after sizing |
 | `orchestrator.stage` | `shadow` \| `enforce` | `shadow` | §14 |
-| `orchestrator.scan_k` | int | 32 | the admissible todos that admission scans for each free slot |
+| `orchestrator.scan_k` | int | 32 | the admissible todos that admission scans for each free slot; at `enforce`, also the supply depth of the pool, `max(count, scan_k)` (§6) |
 | `orchestrator.hub_min_importers` | int | 120 | the importer count (direct or transitive) that makes a package a hub (§6) |
 | `orchestrator.deadline_floor_minutes` | int | 60 | the floor of the lane deadline |
 | `orchestrator.stall_minutes` | int | 30 | the heartbeat gap that reports a stall |

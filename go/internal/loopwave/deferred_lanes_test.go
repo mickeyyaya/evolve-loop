@@ -3,6 +3,7 @@ package loopwave
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -17,6 +18,13 @@ func TestTally_CountsEachLaneOnceAsOkDeferredOrFailed(t *testing.T) {
 	}
 	if Tally(nil) != (LaneTally{}) {
 		t.Error("no results, no lanes")
+	}
+}
+
+func TestTally_ATodoThePoolNeverLaunchedIsNoLane(t *testing.T) {
+	results := []fleet.Result{{}, {ExitCode: 1}, {ExitCode: -1, Err: fleet.ErrNeverLaunched}, {ExitCode: -1, Err: fmt.Errorf("pool: %w", fleet.ErrNeverLaunched)}}
+	if got := Tally(results); got != (LaneTally{OK: 1, Failed: 1}) {
+		t.Errorf("Tally = %+v, want {OK:1 Failed:1}: a deep pool supply leaves todos unlaunched, and they are not failed lanes", got)
 	}
 }
 
