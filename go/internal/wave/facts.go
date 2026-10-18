@@ -20,7 +20,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-const sealedVerdictField = "final_verdict"
+const (
+	sealedVerdictField = "final_verdict"
+	terminationField   = "termination_reason"
+)
 
 var (
 	runDirName      = regexp.MustCompile(`^cycle-(\d+)$`)
@@ -31,6 +34,7 @@ type Cycle struct {
 	ID          int       `json:"id"`
 	Phase       string    `json:"phase,omitempty"`
 	Verdict     string    `json:"verdict,omitempty"`
+	Termination string    `json:"termination,omitempty"`
 	Shipped     bool      `json:"shipped"`
 	QuotaPauses int       `json:"quota_pauses"`
 	Conflict    bool      `json:"conflict,omitempty"`
@@ -159,6 +163,7 @@ func applySignals(c *Cycle, path string) []string {
 		switch e.Kind {
 		case signalcenter.KindCycleSealed:
 			c.Verdict, c.EndedAt = e.Fields[sealedVerdictField], eventTime(e)
+			c.Termination = e.Fields[terminationField]
 		case signalcenter.KindQuotaPaused:
 			c.QuotaPauses++
 		case signalcenter.KindShipError:

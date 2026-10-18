@@ -48,6 +48,9 @@ func cycleLine(c Cycle) string {
 	if c.Verdict == "" {
 		parts = []string{fmt.Sprintf("Cycle %d: no final verdict.", c.ID)}
 	}
+	if c.Termination != "" {
+		parts = append(parts, "Termination: "+c.Termination+".")
+	}
 	if c.Phase != "" && !c.Shipped {
 		parts = append(parts, "Last phase: "+c.Phase+".")
 	}

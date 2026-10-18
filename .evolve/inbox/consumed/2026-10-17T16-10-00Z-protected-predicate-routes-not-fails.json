@@ -21,5 +21,11 @@
     ".evolve/wave-goal.md"
   ],
   "route": "console",
-  "routed_reason": "The fix changes how the kernel classifies a cycle outcome and reads the protected-surface manifest; both are console surfaces."
+  "routed_reason": "The fix changes how the kernel classifies a cycle outcome and reads the protected-surface manifest; both are console surfaces.",
+  "consumed": {
+    "at": "2026-10-17T18:08:36Z",
+    "via": "console-manual",
+    "cycle": "",
+    "resolution": "A tdd predicate that reads a guards.IsProtectedSurface path now stops the cycle after tdd, routes the item to the console with the proven file, and records a FAIL with code PROTECTED_PREDICATE_ROUTE. Acceptance line 3 (routed cycle is not a FAIL) is deliberately reversed: a neutral outcome let a gamed predicate hide a real failure from the fail breaker and the zero-ship halt (adversarial review)."
+  }
 }

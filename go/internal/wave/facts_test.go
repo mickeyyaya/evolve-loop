@@ -164,3 +164,20 @@ func TestReadCycles_ACycleAtTheFloorBelongsToTheEarlierWave(t *testing.T) {
 		t.Errorf("a resumed cycle 1836 at floor 1836: later wave %+v, earlier wave %+v; want 1837 and 1836", later, earlier)
 	}
 }
+
+func TestReadCycles_ASealedTerminationReasonIsKeptAndShownInTheFacts(t *testing.T) {
+	t.Parallel()
+	p := newPlane(t)
+	p.write(".evolve/runs/cycle-5/signals.ndjson",
+		signalLine("cycle.sealed", "", `"final_verdict":"FAIL","termination_reason":"tdd-protected-predicate-route"`))
+
+	got, _ := wave.ReadCycles(p.root, 4, 5)
+
+	if len(got) != 1 || got[0].Verdict != "FAIL" || got[0].Termination != "tdd-protected-predicate-route" {
+		t.Fatalf("cycles = %+v", got)
+	}
+	line := wave.Facts{Wave: 1, Cycles: got}.Section()
+	if !strings.Contains(line, "final verdict FAIL.") || !strings.Contains(line, "Termination: tdd-protected-predicate-route.") {
+		t.Errorf("a route is counted as a FAIL and named, never hidden:\n%s", line)
+	}
+}

@@ -34,10 +34,11 @@ const (
 )
 
 const (
-	CycleOutcomeShippedViaBuild      = cyclestate.CycleOutcomeShippedViaBuild
-	CycleOutcomeSkippedAuditAdvisory = cyclestate.CycleOutcomeSkippedAuditAdvisory
-	CycleOutcomeSkippedUnknown       = cyclestate.CycleOutcomeSkippedUnknown
-	CycleTerminationTriageNoWork     = cyclestate.CycleTerminationTriageNoWork
+	CycleOutcomeShippedViaBuild       = cyclestate.CycleOutcomeShippedViaBuild
+	CycleOutcomeSkippedAuditAdvisory  = cyclestate.CycleOutcomeSkippedAuditAdvisory
+	CycleOutcomeSkippedUnknown        = cyclestate.CycleOutcomeSkippedUnknown
+	CycleTerminationTriageNoWork      = cyclestate.CycleTerminationTriageNoWork
+	CycleTerminationTddProtectedRoute = cyclestate.CycleTerminationTddProtectedRoute
 )
 
 func IsVerdict(s string) bool { return cyclestate.IsVerdict(s) }

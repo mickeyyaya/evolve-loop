@@ -773,3 +773,4 @@
 ./internal/admission
 # orchestrator — the rolling pool under the orchestrator and the lane lease (ADR-0139 O4, O5): admission by cell for each free slot, one deadline timer over a heap, and the stop through the launch context only.
 ./internal/orchestrator
+./internal/acspathscan

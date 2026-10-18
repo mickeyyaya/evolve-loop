@@ -187,6 +187,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/retrofile` | lifts the preventive actions of a retro report into weighted inbox todos | [internal-retrofile.md](internal-retrofile.md) |
 | `internal/log` | JSONL sidecar events, slog channels, the operator console and the safe rendering of untrusted diagnostic fields | [internal-log.md](internal-log.md) |
 | `internal/phasewatchdog` | kills the process group of a phase that shows no file activity for longer than a threshold | [internal-phasewatchdog.md](internal-phasewatchdog.md) |
+| `internal/acspathscan` | the scan for the repository paths that an ACS predicate reads, used by the tdd protected-predicate route | [internal-acspathscan.md](internal-acspathscan.md) |
 | `internal/committedset` | the one answer to which tasks a cycle committed to, read from the lane pin and triage's decision, and which ids triage answered for | [internal-committedset.md](internal-committedset.md) |
 | `internal/treefence` | a content fence around the worktree of a read-only phase: it takes a tree snapshot and restores every change the phase made | [internal-treefence.md](internal-treefence.md) |
 | `internal/verdictcache` | the content-addressed store that binds a reusable audit verdict to the tree SHA it judged (ADR-0048) | [internal-verdictcache.md](internal-verdictcache.md) |

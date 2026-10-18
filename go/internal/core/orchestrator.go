@@ -178,6 +178,7 @@ type Orchestrator struct {
 	compositionGateRunner    func(ctx context.Context, worktree string) map[string]string
 	compositionVerdictWriter func(ledgerPath string, in CompositionVerdictInput) error
 	laneMenu                 LaneMenuFn
+	protectedSurface         func(string) bool
 
 	scopedMergeReviewer ScopedMergeReviewer
 
