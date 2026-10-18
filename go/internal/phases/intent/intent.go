@@ -47,6 +47,9 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	} else {
 		b.WriteString("- mode: full\n")
 	}
+	if req.Input.Active() {
+		b.WriteString(runner.UpstreamDigestBlock(req.Input.Upstream().DigestFor(string(core.PhaseIntent))))
+	}
 	return b.String()
 }
 

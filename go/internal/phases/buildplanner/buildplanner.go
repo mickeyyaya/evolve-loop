@@ -57,7 +57,11 @@ func (p *Phase) ArtifactFilename(_ core.PhaseRequest) string { return "build-pla
 func (p *Phase) DefaultModel() string { return "opus" }
 
 func (p *Phase) ComposePrompt(body string, req core.PhaseRequest) string {
-	return runner.BaseCycleContext(body, req)
+	prompt := runner.BaseCycleContext(body, req)
+	if req.Input.Active() {
+		prompt += runner.UpstreamDigestBlock(req.Input.Upstream().DigestFor(string(core.PhaseBuildPlanner)))
+	}
+	return prompt
 }
 
 func (p *Phase) Classify(artifact string, _ core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {

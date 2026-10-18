@@ -131,6 +131,9 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if len(req.WorktreeWritablePaths) > 0 {
 		fmt.Fprintf(&b, "- conflicted_paths: %s\n", strings.Join(req.WorktreeWritablePaths, ", "))
 	}
+	if req.Input.Active() {
+		b.WriteString(runner.UpstreamDigestBlock(req.Input.Upstream().DigestFor(string(core.PhaseDebugger))))
+	}
 	return b.String()
 }
 
