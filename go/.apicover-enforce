@@ -782,3 +782,5 @@
 ./internal/acspathscan
 # gotypes — the type-checked Go index behind codeindex.Backend for callers and api, standard library only (ADR-0140, plan G1).
 ./internal/adapters/codeindex/gotypes
+# envscope - the one scan rule of the envtaint read set, shared with commentaudit.
+./internal/envscope
