@@ -1,6 +1,8 @@
 package explanationdocs
 
 import (
+	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,5 +63,103 @@ func TestCycleFromRunWorkspaceDerivation(t *testing.T) {
 		if c, ok := cycleFromRunWorkspace(root, ws); ok {
 			t.Fatalf("%q must not derive a cycle, got %d", ws, c)
 		}
+	}
+}
+
+func TestCrossCheckActivation_AnUnsealedHostBindsNoWorktreeAndNoBase(t *testing.T) {
+	f := newFixture(t)
+	unsealed := f.binding()
+	unsealed.Worktree, unsealed.BaseSHA = "", ""
+	if err := Activate(unsealed); err != nil {
+		t.Fatal(err)
+	}
+
+	provisioned := f.binding()
+	if active, err := CrossCheckActivation(provisioned); !active || err != nil {
+		t.Fatalf("a provisioned worktree before the Build seal must pass: active=%v err=%v", active, err)
+	}
+	if _, _, err := Verify(context.Background(), provisioned); err == nil || !strings.Contains(err.Error(), "not sealed") {
+		t.Fatalf("ship and audit share the belt and must stay fail-closed against an unsealed host: %v", err)
+	}
+
+	if err := SealBuild(f.binding()); err != nil {
+		t.Fatal(err)
+	}
+	cleared := f.binding()
+	cleared.Worktree = ""
+	if _, err := CrossCheckActivation(cleared); err == nil || !strings.Contains(err.Error(), "worktree does not match host activation") {
+		t.Fatalf("a cleared worktree against a sealed host must fail naming the field: %v", err)
+	}
+	clearedBase := f.binding()
+	clearedBase.BaseSHA = ""
+	if _, err := CrossCheckActivation(clearedBase); err == nil || !strings.Contains(err.Error(), "base SHA does not match host activation") {
+		t.Fatalf("a cleared base against a sealed host must fail naming the field: %v", err)
+	}
+}
+
+func plantMarker(t *testing.T, root, body string) {
+	t.Helper()
+	if err := ensureActivationParent(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(activationPath(root, 42), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestActivationForCycle_RefusesEveryMarkerShapeThatIsNotAHostRecord(t *testing.T) {
+	workspace := filepath.Join("runs", "cycle-42")
+	for _, tc := range []struct {
+		name    string
+		plant   func(t *testing.T, root string)
+		cycle   int
+		wantErr string
+	}{
+		{name: "no project root", cycle: 42},
+		{name: "no cycle", cycle: 0},
+		{name: "contracts directory is a file", cycle: 42, wantErr: "inspect activation marker", plant: func(t *testing.T, root string) {
+			if err := os.WriteFile(filepath.Join(root, ".evolve"), []byte("x"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "marker is a symlink", cycle: 42, wantErr: "must be a regular file", plant: func(t *testing.T, root string) {
+			plantMarker(t, root, "{}")
+			if err := os.Rename(activationPath(root, 42), filepath.Join(root, "real.json")); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(filepath.Join(root, "real.json"), activationPath(root, 42)); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "marker is not JSON", cycle: 42, wantErr: "parse activation marker", plant: func(t *testing.T, root string) {
+			plantMarker(t, root, "{")
+		}},
+		{name: "marker names another cycle", cycle: 42, wantErr: "invalid identity or version", plant: func(t *testing.T, root string) {
+			plantMarker(t, root, `{"schema_version":1,"contract_version":1,"cycle":43,"run_id":"run-42","workspace":"`+workspace+`"}`)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := ""
+			if tc.plant != nil {
+				root = t.TempDir()
+				tc.plant(t, root)
+			} else if tc.cycle == 0 {
+				root = t.TempDir()
+			}
+			_, active, err := ActivationForCycle(root, tc.cycle, workspace)
+			if active {
+				t.Fatalf("%s must not resolve to an active host", tc.name)
+			}
+			if tc.wantErr == "" && err != nil || tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)) {
+				t.Fatalf("%s: err=%v, want %q", tc.name, err, tc.wantErr)
+			}
+			if tc.wantErr == "" {
+				return
+			}
+			typed := CycleBinding{ProjectRoot: root, Workspace: workspace, Cycle: tc.cycle, RunID: "run-42", ContractVersion: CurrentContractVersion}
+			if _, beltErr := CrossCheckActivation(typed); beltErr == nil || !strings.Contains(beltErr.Error(), "resolve host activation") {
+				t.Fatalf("%s: the belt must surface the host read failure, got %v", tc.name, beltErr)
+			}
+		})
 	}
 }
