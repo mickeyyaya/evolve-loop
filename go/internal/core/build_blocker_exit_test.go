@@ -118,6 +118,9 @@ func TestBuildBlockerExit_AProvenBlockerEndsTheRoundsAndRoutesTheItemToTheConsol
 	if !strings.Contains(last.Diagnostics[0].Message, selfcheckPath) || !strings.Contains(last.Diagnostics[0].Message, "needs a seam") {
 		t.Errorf("the route carries the proof and the lane's diagnosis: %q", last.Diagnostics[0].Message)
 	}
+	if _, err := os.Stat(filepath.Join(run.workspace, "failure-digest.json")); err == nil {
+		t.Error("a proven blocker writes no failure digest, so the batch breaker never counts it as a consecutive failure")
+	}
 	if !strings.Contains(strings.Join(run.signalCodes(), ","), string(CodeBlockerRouted)) {
 		t.Errorf("signals = %v; want %s", run.signalCodes(), CodeBlockerRouted)
 	}
@@ -179,5 +182,22 @@ func TestWorktreeDiffSince_AGitFaultIsAnEvidenceFaultNotAnEmptyDiff(t *testing.T
 	gittest.FaultOn(t, "ls-files")
 	if _, fault := worktreeDiffSince(context.Background(), repo.Dir, "HEAD"); !strings.Contains(fault, "ls-files") {
 		t.Errorf("fault = %q", fault)
+	}
+}
+
+func TestIsProvenBlockerResult_OnlyTheBlockedFailEnding(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		result CycleResult
+		want   bool
+	}{
+		"the blocked ending":            {CycleResult{FinalVerdict: VerdictFAIL, TerminationReason: CycleTerminationBlockedNeedsConsole}, true},
+		"a code FAIL":                   {CycleResult{FinalVerdict: VerdictFAIL}, false},
+		"the TDD protected route":       {CycleResult{FinalVerdict: VerdictFAIL, TerminationReason: CycleTerminationTddProtectedRoute}, false},
+		"a PASS with the reason forged": {CycleResult{FinalVerdict: VerdictPASS, TerminationReason: CycleTerminationBlockedNeedsConsole}, false},
+	} {
+		if got := IsProvenBlockerResult(tc.result); got != tc.want {
+			t.Errorf("%s: got %v, want %v", name, got, tc.want)
+		}
 	}
 }

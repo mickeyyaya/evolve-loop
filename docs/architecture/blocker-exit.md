@@ -207,4 +207,4 @@ The floor printed `100.0% < 100.0%` for 99.97% (plan F4). It told the lane to "t
 - The proof does not show that a branch is unreachable. It shows that the failure is in a file that the lane must not edit, or between two predicates that conflict. The console decides the rest.
 - The route needs exactly one committed item, as the TDD route does.
 - Only the build phase calls the prover today. Another phase must supply its own `Explainable` function.
-- The ending is a FAIL for the halt counters, as the TDD route is.
+- The ending is not a code FAIL for the halt counters (ADR-0141 decision 10). `completeSequentialCycle` keeps the consecutive-FAIL count as it was, and `core.IsProvenBlockerResult` decides it. The batch breaker counts only cycles with a `failure-digest.json`, and a blocked cycle writes none. The cycle still counts as no ship for the zero-ship rule. The TDD protected route still counts as a FAIL.

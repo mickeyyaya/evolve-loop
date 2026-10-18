@@ -158,7 +158,7 @@ A note from the coordinator on the same day added a rule: "keep its core phase-a
 | A failed `git diff` reads as an empty diff. | The caller sends an evidence fault, and the prover refuses. |
 | A bare file name in a failure matches a file of the same name in another package. | The claim path must exist and be protected or guarded. The risk stays small (synthesis). |
 | A lane edits the floor code to fake the evidence. | D10 puts the prover and the note writer on the manifest. |
-| The cycle counts as a FAIL for the halt counters. | This follows the TDD route, which also ends as FAIL (F6). |
+| A blocked cycle advances the consecutive-FAIL count. | ADR-0141 decision 10: the sequential loop keeps the count as it was (`IsProvenBlockerResult`), and the batch breaker sees no failure digest. The cycle still counts as no ship. |
 
 ## 10. Open questions
 

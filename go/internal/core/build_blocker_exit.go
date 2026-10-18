@@ -29,6 +29,10 @@ func buildFloorExplainable(failure string) bool {
 	return strings.HasPrefix(failure, coverStrictHeadline) || acsPredicateFailure.MatchString(failure)
 }
 
+func IsProvenBlockerResult(result CycleResult) bool {
+	return result.FinalVerdict == VerdictFAIL && result.TerminationReason == CycleTerminationBlockedNeedsConsole
+}
+
 func (cr *cycleRun) buildBlockerCase(next Phase, rin ReviewInput, rr ReviewResult) (BlockerCase, bool) {
 	if next != PhaseBuild || len(rr.Failures) == 0 {
 		return BlockerCase{}, false
