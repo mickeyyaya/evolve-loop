@@ -71,15 +71,11 @@ func AppendResolvedFingerprint(evolveDir, fingerprint, resolvedBy string, resolv
 		ResolvedAt:  resolvedAt.UTC().Format(time.RFC3339),
 		ResolvedBy:  resolvedBy,
 	})
-	buf, err := json.MarshalIndent(records, "", "  ")
+	buf, err := marshalIndentJSON(records, "", "  ")
 	if err != nil {
 		return fmt.Errorf("resolved-fingerprints.json: %w", err)
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, buf, 0o644); err != nil {
-		return fmt.Errorf("resolved-fingerprints.json: %w", err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := writeArtifactAtomically(path, buf); err != nil {
 		return fmt.Errorf("resolved-fingerprints.json: %w", err)
 	}
 	return nil

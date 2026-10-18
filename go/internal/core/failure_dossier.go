@@ -1,7 +1,6 @@
 package core
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -98,7 +97,7 @@ func writeFailureDossier(workspace string, d *failureDossier) error {
 	if workspace == "" || d == nil {
 		return nil
 	}
-	b, err := json.MarshalIndent(d, "", "  ")
+	b, err := marshalIndentJSON(d, "", "  ")
 	if err != nil {
 		return err
 	}

@@ -37,7 +37,7 @@ func persistFloorFailReasons(cs *CycleState, phase Phase, diags []Diagnostic) {
 		_ = os.Remove(path)
 		return
 	}
-	b, err := json.MarshalIndent(floorFailReason{SchemaVersion: 1, Phase: string(phase), Reasons: reasons}, "", "  ")
+	b, err := marshalIndentJSON(floorFailReason{SchemaVersion: 1, Phase: string(phase), Reasons: reasons}, "", "  ")
 	if err != nil {
 		return
 	}

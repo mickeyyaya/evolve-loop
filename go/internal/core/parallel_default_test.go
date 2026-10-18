@@ -31,6 +31,8 @@ const (
 	swapsCoveringTestsDeriver       = "test swaps package variable coveringTestsDeriver"
 	swapsFailureDecide              = "test swaps package variable failureDecide"
 	swapsFailureDigestMarshal       = "test swaps package variable failureDigestMarshal"
+	swapsMarshalIndentJSON          = "test swaps package variable marshalIndentJSON"
+	swapsResumeBoundaryCheckpointer = "test swaps package variable ResumeBoundaryCheckpointer"
 	swapsGitRunner                  = "test swaps package variable gitRunner"
 	swapsIdentityPatchID            = "test swaps package variable identityPatchID"
 	swapsNextCorrection             = "test swaps package variable nextCorrection"
@@ -48,6 +50,21 @@ const (
 )
 
 var serialRequiredTests = map[string]string{
+	"core.TestCheckpointInterruptedPhase_CheckpointFailureWarns":                                    swapsResumeBoundaryCheckpointer,
+	"core.TestOriginDefaultBranch_GitFailureFallsBackToMain":                                        swapsGitRunner,
+	"core.TestGitWorktree_CreateReusedWorktreeFailures":                                             swapsGitRunner,
+	"core.TestPersonaBudgetFailures_LongOutputIsTruncated":                                          swapsBuildSelfCheckRunner,
+	"core.TestMarshalFailures_AreReportedNotFatal":                                                  swapsMarshalIndentJSON,
+	"core.TestWorktreeBaseSHA_SkipsMalformedLogLines":                                               swapsGitRunner,
+	"core.TestEnsureCleanWorktree_QuarantineFailures":                                               swapsGitRunner,
+	"core.TestOriginDefaultBranch_EmptyRemoteHeadFallsBackToMain":                                   swapsGitRunner,
+	"core.TestDefaultCurrentHead_GitTransportError":                                                 swapsGitRunner,
+	"core.TestDiscardMainLeak_GitFailures":                                                          swapsGitRunner,
+	"core.TestGitStatusNames_Edges":                                                                 swapsGitRunner,
+	"core.TestCarryforward_GitFailureModes":                                                         swapsGitRunner,
+	"core.TestAdvanceContinuationBase_UnresolvableMain":                                             swapsGitRunner,
+	"core.TestSnapshotPreservedWorktree_GitStepFailures":                                            swapsGitRunner,
+	"core.TestValidateContinuation_Rejections":                                                      swapsGitRunner,
 	"core.TestDetectLostLanding_NoWorkspaceDoesNotReadTheProcessCWD":                                changesDirectory,
 	"core.TestEnsureFailureDigest_MissingWorkspaceNeverWritesToWorkingDirectory":                    changesDirectory,
 	"core.TestGitAndFileHelperCoverage":                                                             changesDirectory,

@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -168,7 +167,7 @@ func writePhaseIOShadowFile(workspace, phase string, h phaseio.Handoffs, cycle i
 		ScoutPresent: scOK, TriagePresent: trOK, BuildPresent: bOK, AuditPresent: aOK,
 		Mismatches: ms,
 	}
-	data, err := json.MarshalIndent(doc, "", "  ")
+	data, err := marshalIndentJSON(doc, "", "  ")
 	if err != nil {
 		return err
 	}

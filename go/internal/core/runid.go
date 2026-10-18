@@ -17,9 +17,7 @@ func MintRunID(t time.Time) string {
 		ms >>= 5
 	}
 	var entropy [10]byte
-	if _, err := rand.Read(entropy[:]); err != nil {
-		entropy = [10]byte{}
-	}
+	_, _ = rand.Read(entropy[:])
 	var acc uint64
 	bits := 0
 	pos := 10
