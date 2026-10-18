@@ -70,7 +70,10 @@
   "fleet": {
     "count": 8,
     "plan_source": "triage",
-    "min_lanes": 8
+    "min_lanes": 8,
+    "orchestrator": {
+      "stage": "enforce"
+    }
   },
   "floor": [
     {
