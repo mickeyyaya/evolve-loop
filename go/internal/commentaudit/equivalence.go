@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/envscope"
 )
 
 func Equivalent(name string, before, after []byte) (bool, string, error) {
@@ -26,7 +28,7 @@ func Equivalent(name string, before, after []byte) (bool, string, error) {
 	if a != b {
 		return false, "code changed", nil
 	}
-	if !slices.Equal(anchoredDirectives(before), anchoredDirectives(after)) {
+	if !slices.Equal(anchoredDirectives(name, before), anchoredDirectives(name, after)) {
 		return false, "directive changed", nil
 	}
 	return true, "", nil
@@ -102,37 +104,50 @@ type commentMarker struct {
 	anchorsParagraph bool
 }
 
-var commentMarkerRules = []struct {
+type commentMarkerRule struct {
 	pattern          string
 	extent           markerExtent
 	anchorsParagraph bool
-}{
-	{`//go:\S`, markerLine, false},
-	{`//line `, markerLine, false},
-	{`//export `, markerLine, false},
-	{`//extern `, markerLine, false},
-	{`//nolint(:|\s|$)`, markerLine, false},
-	{`// \+build `, markerLine, false},
-	{`// Code generated .* DO NOT EDIT\.$`, markerFile, false},
-	{`// acs-predicate:`, markerLine, false},
-	{`// minimal:`, markerParagraph, false},
-	{`// Deprecated:`, markerParagraph, true},
-	{`// (Unordered )?[Oo]utput:`, markerRestOfGroup, false},
-	{`//\s?apicover:ignore`, markerLine, false},
-	{`.*IPC-protocol-allowed`, markerGroup, false},
+	readByEnvtaint   bool
+}
+
+var commentMarkerRules = []commentMarkerRule{
+	{`//go:\S`, markerLine, false, false},
+	{`//line `, markerLine, false, false},
+	{`//export `, markerLine, false, false},
+	{`//extern `, markerLine, false, false},
+	{`//nolint(:|\s|$)`, markerLine, false, false},
+	{`// \+build `, markerLine, false, false},
+	{`// Code generated .* DO NOT EDIT\.$`, markerFile, false, false},
+	{`// acs-predicate:`, markerLine, false, false},
+	{`// minimal:`, markerParagraph, false, false},
+	{`// Deprecated:`, markerParagraph, true, false},
+	{`// (Unordered )?[Oo]utput:`, markerRestOfGroup, false, false},
+	{`//\s?apicover:ignore`, markerLine, false, false},
+	{`.*IPC-protocol-allowed`, markerGroup, false, true},
 }
 
 var (
-	directive      = anyMarker()
-	commentMarkers = compiledMarkers()
+	directive            = anyMarker(func(commentMarkerRule) bool { return true })
+	directiveOutsideScan = anyMarker(func(r commentMarkerRule) bool { return !r.readByEnvtaint })
+	commentMarkers       = compiledMarkers()
 )
 
-func anyMarker() *regexp.Regexp {
-	alternatives := make([]string, len(commentMarkerRules))
-	for i, rule := range commentMarkerRules {
-		alternatives[i] = rule.pattern
+func anyMarker(include func(commentMarkerRule) bool) *regexp.Regexp {
+	var alternatives []string
+	for _, rule := range commentMarkerRules {
+		if include(rule) {
+			alternatives = append(alternatives, rule.pattern)
+		}
 	}
 	return regexp.MustCompile(`^(` + strings.Join(alternatives, "|") + `)`)
+}
+
+func directivesFor(name string) *regexp.Regexp {
+	if envscope.Reads(name) {
+		return directive
+	}
+	return directiveOutsideScan
 }
 
 func compiledMarkers() []commentMarker {
@@ -160,7 +175,7 @@ func markerExtentOf(text string) (markerExtent, bool) {
 
 func Directives(src []byte) []string {
 	var found []string
-	for _, d := range scanDirectives(src) {
+	for _, d := range scanDirectives(directive, src) {
 		found = append(found, d.text)
 	}
 	return found
@@ -175,15 +190,15 @@ type placedDirective struct {
 	paragraph   bool
 }
 
-func anchoredDirectives(src []byte) []string {
+func anchoredDirectives(name string, src []byte) []string {
 	var found []string
-	for _, d := range scanDirectives(src) {
+	for _, d := range scanDirectives(directivesFor(name), src) {
 		found = append(found, fmt.Sprintf("%s @%d trailing=%t blank=%t paragraph=%t", d.text, d.nextToken, d.trailing, d.blankBefore, d.paragraph))
 	}
 	return found
 }
 
-func scanDirectives(src []byte) []placedDirective {
+func scanDirectives(matches *regexp.Regexp, src []byte) []placedDirective {
 	fset := token.NewFileSet()
 	file := fset.AddFile("", fset.Base(), len(src))
 	var s scanner.Scanner
@@ -207,7 +222,7 @@ func scanDirectives(src []byte) []placedDirective {
 		line := file.PositionFor(pos, false).Line
 		switch tok {
 		case token.COMMENT:
-			if text := strings.TrimSpace(lit); directive.MatchString(text) {
+			if text := strings.TrimSpace(lit); matches.MatchString(text) {
 				waiting = append(waiting, placedDirective{
 					text: text, line: line, trailing: line == lastCodeLine,
 					paragraph: anchorsItsParagraph(text) && opensParagraph(lines, line),
