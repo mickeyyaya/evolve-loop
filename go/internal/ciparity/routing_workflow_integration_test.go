@@ -138,7 +138,7 @@ func TestRequiredRouting_ConsumedPathsAndExplicitDocumentationSkips(t *testing.T
 			if err != nil {
 				t.Fatalf("routing failed: %v\n%s", err, got)
 			}
-			want := routeText(tc.wantGo, tc.wantLanding, false, false)
+			want := routeText(tc.wantGo, tc.wantLanding, false, false, false)
 			if got != want {
 				t.Fatalf("route = %q, want %q", got, want)
 			}
@@ -156,7 +156,7 @@ func TestRequiredRouting_MergeBaseExcludesBaseBranchOnlyChanges(t *testing.T) {
 	routingFile(t, dir, "landing/base-only.html")
 	base := routingCommit(t, dir)
 	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "pull_request", base, head)
-	if err != nil || got != routeText(true, false, false, false) {
+	if err != nil || got != routeText(true, false, false, false, false) {
 		t.Fatalf("PR route included unrelated base changes: %q, %v", got, err)
 	}
 }
@@ -174,7 +174,7 @@ func TestRequiredRouting_NonFastForwardPushDiffsTheReachableOldTip(t *testing.T)
 		t.Fatalf("old tip %s is not reachable from before-force-push (%s)", oldTip, got)
 	}
 	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "push", oldTip, head)
-	if err != nil || got != routeText(true, false, false, false) {
+	if err != nil || got != routeText(true, false, false, false, false) {
 		t.Fatalf("a push that drops a Go commit must run Go: %q, %v", got, err)
 	}
 }
@@ -203,7 +203,7 @@ func TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip(t *testing
 			if (err == nil) != tc.pass {
 				t.Fatalf("pass=%v want %v: %v\n%s", err == nil, tc.pass, err, got)
 			}
-			if tc.pass && got != routeText(true, true, false, false) {
+			if tc.pass && got != routeText(true, true, false, false, true) {
 				t.Fatalf("missing diff evidence weakened routing: %q", got)
 			}
 			if !tc.pass && strings.Contains(got, "=false") {
@@ -232,9 +232,53 @@ func TestRequiredRouting_GitFailuresStopWithoutShellErrexit(t *testing.T) {
 	}
 }
 
-func routeText(goRequired, landing, docsOnly, docs bool) string {
+func routeText(goRequired, landing, docsOnly, docs, inbox bool) string {
 	return "go=" + strconv.FormatBool(goRequired) + "\nlanding=" + strconv.FormatBool(landing) +
-		"\ndocs_only=" + strconv.FormatBool(docsOnly) + "\ndocs=" + strconv.FormatBool(docs) + "\n"
+		"\ndocs_only=" + strconv.FormatBool(docsOnly) + "\ndocs=" + strconv.FormatBool(docs) +
+		"\ninbox=" + strconv.FormatBool(inbox) + "\n"
+}
+
+func TestRequiredRouting_InboxOnlyChangesSkipTheGoMatrix(t *testing.T) {
+	t.Parallel()
+	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
+	for _, event := range []string{"push", "pull_request"} {
+		for _, tc := range []struct {
+			name                       string
+			paths                      []string
+			remove                     string
+			wantGo, wantLanding, inbox bool
+		}{
+			{"inbox_only", []string{".evolve/inbox/2026-10-19T00-00-00Z-item.json"}, "", false, false, true},
+			{"inbox_processed_only", []string{".evolve/inbox/processed/item.json"}, "", false, false, true},
+			{"inbox_deleted_only", nil, ".evolve/inbox/existing.json", false, false, true},
+			{"inbox_and_go", []string{".evolve/inbox/item.json", "go/internal/core/new.go"}, "", true, false, true},
+			{"inbox_and_policy", []string{".evolve/inbox/item.json", ".evolve/policy.json"}, "", true, true, true},
+			{"parked_inbox_is_not_the_inbox", []string{".evolve/inbox-parked/item.json"}, "", true, true, false},
+			{"other_evolve_state", []string{".evolve/profiles/a.json"}, "", true, true, false},
+		} {
+			t.Run(event+"/"+tc.name, func(t *testing.T) {
+				dir, _ := routingRepo(t)
+				routingFile(t, dir, ".evolve/inbox/existing.json")
+				base := routingCommit(t, dir)
+				if tc.remove != "" {
+					if err := os.Remove(filepath.Join(dir, tc.remove)); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for _, path := range tc.paths {
+					routingFile(t, dir, path)
+				}
+				head := routingCommit(t, dir)
+				got, err := routingOutput(t, dir, step.Run, event, base, head)
+				if err != nil {
+					t.Fatalf("routing failed: %v\n%s", err, got)
+				}
+				if want := routeText(tc.wantGo, tc.wantLanding, false, false, tc.inbox); got != want {
+					t.Fatalf("route = %q, want %q", got, want)
+				}
+			})
+		}
+	}
 }
 
 type docsRoutingCase struct {
@@ -297,7 +341,7 @@ func TestRequiredRouting_DocsOnlyPullRequestSelectsOnlyTheLint(t *testing.T) {
 			if err != nil {
 				t.Fatalf("routing failed: %v\n%s", err, got)
 			}
-			if want := routeText(tc.wantGo, tc.wantLanding, tc.wantDocsOnly, tc.wantDocs); got != want {
+			if want := routeText(tc.wantGo, tc.wantLanding, tc.wantDocsOnly, tc.wantDocs, false); got != want {
 				t.Fatalf("route = %q, want %q", got, want)
 			}
 		})
@@ -310,7 +354,7 @@ func TestRequiredRouting_AnEmptyPullRequestDiffKeepsTheFullSelection(t *testing.
 
 	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "pull_request", head, head)
 
-	if err != nil || got != routeText(true, true, false, false) {
+	if err != nil || got != routeText(true, true, false, false, true) {
 		t.Fatalf("an empty PR diff must run everything and no docs-only job: %q, %v", got, err)
 	}
 }

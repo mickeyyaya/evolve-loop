@@ -21,13 +21,18 @@ type workflowContract struct {
 		Outputs        map[string]struct{ Value string }
 	}
 	Permissions map[string]string
-	Jobs        map[string]workflowJobContract
+	Concurrency struct {
+		Group            string
+		CancelInProgress string `yaml:"cancel-in-progress"`
+	}
+	Jobs map[string]workflowJobContract
 }
 
 type workflowJobContract struct {
 	Name            string
 	Uses            string
 	If              string
+	RunsOn          string `yaml:"runs-on"`
 	Needs           yaml.Node
 	Outputs         map[string]string
 	ContinueOnError string `yaml:"continue-on-error"`
