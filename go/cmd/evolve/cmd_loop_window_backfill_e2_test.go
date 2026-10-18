@@ -292,3 +292,26 @@ func TestDispatchPool_AtEnforceTheOrchestratorRunsTheLanesAndPublishesEachTransi
 		}
 	}
 }
+
+func TestDispatchPool_AtEnforceThePoolIsSuppliedPastTheFleetCount(t *testing.T) {
+	t.Parallel()
+	items := map[string]string{
+		"a.json": `{"id":"alpha","weight":0.9,"priority_class":"feature","files":["a.go"]}`,
+		"b.json": `{"id":"beta","weight":0.8,"priority_class":"feature","files":["b.go"]}`,
+		"c.json": `{"id":"gamma","weight":0.7,"priority_class":"feature","files":["c.go"]}`,
+	}
+	f := newE2WindowFixture(t, items)
+	bin := fakeCycleBinary(t, "exit 0\n")
+	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave",
+		Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8}}
+
+	d, done := f.b.dispatchPool(0, fc, bin)
+	f.b.deps.Signals.Flush()
+
+	if !done || d.flow != batchNextIteration {
+		t.Fatalf("done=%v decision=%+v console:\n%s", done, d, f.console.String())
+	}
+	if !strings.Contains(f.console.String(), "[loop] pool 0: 3/3 lanes ok (orchestrator, target=2)") {
+		t.Fatalf("the enforce pool must get the ranked backlog up to scan_k, not fleet.count; console:\n%s", f.console.String())
+	}
+}

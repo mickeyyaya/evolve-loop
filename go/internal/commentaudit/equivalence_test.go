@@ -215,3 +215,118 @@ func TestDirectives_ApicoverIgnoreIsProtected(t *testing.T) {
 		t.Fatalf("both apicover:ignore forms are machine-read markers, got %q", got)
 	}
 }
+
+const cycle9Before = `//go:build acs
+
+package cycle9
+
+// Split form keeps the key out of the scan
+// (per SSOT §IPC-protocol-allowed): FanoutWorkerTokenEnv = "EVOLVE_" + "FANOUT_WORKER_TOKEN".
+func predicate() {}
+`
+
+const cycle14Before = `//go:build acs
+
+// Package cycle14 materializes the cycle-14 acceptance criteria for two tasks:
+//
+//   - ipcenv-leaf: Create the leaf package, each const marked SSOT IPC-protocol-allowed.
+//
+//   - ipcenv-wire: Route all readers through ipcenv.
+package cycle14
+
+func predicate() {}
+`
+
+func TestEquivalent_AMarkerInProseOutsideTheEnvtaintScanIsComment(t *testing.T) {
+	cycle9After := strings.Replace(cycle9Before, "// Split form keeps the key out of the scan\n// (per SSOT §IPC-protocol-allowed): FanoutWorkerTokenEnv = \"EVOLVE_\" + \"FANOUT_WORKER_TOKEN\".\n", "", 1)
+	cycle14Edited := strings.Replace(cycle14Before, "//   - ipcenv-leaf: Create the leaf package, each const marked SSOT IPC-protocol-allowed.\n//\n", "", 1)
+	cycle14Dropped := strings.Replace(cycle14Before, cycle14Before[strings.Index(cycle14Before, "// Package"):strings.Index(cycle14Before, "package cycle14")], "", 1)
+	for name, tc := range map[string]struct{ file, before, after string }{
+		"cycle9 prose block removed":      {"go/acs/cycle9/predicates_test.go", cycle9Before, cycle9After},
+		"cycle14 doc below build edited":  {"go/acs/cycle14/predicates_test.go", cycle14Before, cycle14Edited},
+		"cycle14 doc below build removed": {"go/acs/cycle14/predicates_test.go", cycle14Before, cycle14Dropped},
+		"production test file":            {"go/internal/x/x_test.go", cycle9Before, cycle9After},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if tc.before == tc.after {
+				t.Fatal("fixture pair is identical")
+			}
+			if ok, reason, err := Equivalent(tc.file, []byte(tc.before), []byte(tc.after)); err != nil || !ok {
+				t.Fatalf("Equivalent = %v (%s), %v; want comment-only", ok, reason, err)
+			}
+		})
+	}
+}
+
+func TestEquivalent_ARealWaiverInAProductionFileIsStillProtected(t *testing.T) {
+	before := "package subagent\n\nconst (\n\t// SSOT IPC-protocol-allowed: parent to child handoff\n\tDepthEnv = \"EVOLVE_\" + \"DEPTH\"\n)\n"
+	after := strings.Replace(before, "\t// SSOT IPC-protocol-allowed: parent to child handoff\n", "", 1)
+	if ok, reason, err := Equivalent("go/internal/subagent/recursion.go", []byte(before), []byte(after)); err != nil || ok || reason != "directive changed" {
+		t.Fatalf("Equivalent = %v (%s), %v; want directive changed", ok, reason, err)
+	}
+}
+
+func TestEquivalent_ABuildDirectiveChangeIsStillReportedInAnAcsFile(t *testing.T) {
+	for name, after := range map[string]string{
+		"edited": strings.Replace(cycle14Before, "//go:build acs", "//go:build !acs", 1),
+		"moved":  strings.Replace(cycle14Before, "//go:build acs\n\n", "", 1) + "\n//go:build acs\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if ok, reason, err := Equivalent("go/acs/cycle14/predicates_test.go", []byte(cycle14Before), []byte(after)); err != nil || ok || reason != "directive changed" {
+				t.Fatalf("Equivalent = %v (%s), %v; want directive changed", ok, reason, err)
+			}
+		})
+	}
+}
+
+func TestEquivalent_ADocBelowABuildDirectiveMovesNoAnchor(t *testing.T) {
+	const before = "//go:build acs\n\n// Package p does a thing\n// over two lines.\npackage p\n"
+	const after = "//go:build acs\n\n// Package p.\npackage p\n"
+	if ok, reason, err := Equivalent("go/acs/cycle14/predicates_test.go", []byte(before), []byte(after)); err != nil || !ok {
+		t.Fatalf("Equivalent = %v (%s), %v; want comment-only", ok, reason, err)
+	}
+}
+
+const exampleSrc = `package p_test
+
+// output: a prose line that go test does not read.
+const excerptHead = 200
+
+func helper() {
+	// Output: not inside an Example
+}
+
+func ExampleHello() {
+	// Output: hello
+}
+`
+
+func TestEquivalent_OutputMarkerCountsOnlyWhereGoTestReadsIt(t *testing.T) {
+	const acssuiteBefore = "package acssuite\n\n// output: a predicate's own t.Fatalf line prints first. The remainder\n// comes from the TAIL.\nconst excerptHead = 200\n"
+	const acssuiteAfter = "package acssuite\n\nconst excerptHead = 200\n"
+	for name, tc := range map[string]struct {
+		file, before, after string
+		want                bool
+	}{
+		"acssuite lowercase prose removed":  {"go/internal/acssuite/acssuite.go", acssuiteBefore, acssuiteAfter, true},
+		"lowercase prose in a test removed": {"x_test.go", exampleSrc, strings.Replace(exampleSrc, "// output: a prose line that go test does not read.\n", "", 1), true},
+		"output outside an Example removed": {"x_test.go", exampleSrc, strings.Replace(exampleSrc, "\t// Output: not inside an Example\n", "", 1), true},
+		"output in a non-test file removed": {"x.go", exampleSrc, strings.Replace(exampleSrc, "\t// Output: hello\n", "", 1), true},
+		"real Output edited":                {"x_test.go", exampleSrc, strings.Replace(exampleSrc, "// Output: hello", "// Output: bye", 1), false},
+		"real Output removed":               {"x_test.go", exampleSrc, strings.Replace(exampleSrc, "\t// Output: hello\n", "", 1), false},
+		"Unordered output removed":          {"x_test.go", strings.Replace(exampleSrc, "// Output: hello", "// Unordered output: hello", 1), strings.Replace(exampleSrc, "\t// Output: hello\n", "", 1), false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ok, reason, err := Equivalent(tc.file, []byte(tc.before), []byte(tc.after))
+			if err != nil || ok != tc.want {
+				t.Fatalf("Equivalent = %v (%s), %v; want %v", ok, reason, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestExampleSpans_IgnoresUnparsableSource(t *testing.T) {
+	if got := exampleSpans("x_test.go", []byte("package p\nfunc {")); got != nil {
+		t.Fatalf("exampleSpans = %v, want none", got)
+	}
+}

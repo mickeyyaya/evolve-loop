@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -155,7 +156,7 @@ func TestTDDScopeGate_ScopeMismatchIsDeterministic(t *testing.T) {
 		t.Fatalf("expected a scope-mismatch block to compare against; got %+v", first)
 	}
 	for i := 0; i < 8; i++ {
-		if got := reviewTDD(t, ws); got != first {
+		if got := reviewTDD(t, ws); !reflect.DeepEqual(got, first) {
 			t.Fatalf("run %d diverged from the first verdict:\n first=%+v\n   got=%+v", i+2, first, got)
 		}
 	}

@@ -99,6 +99,9 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
 
 ## Findings
 
+- **The pool supply was too shallow (cycle 1951, wave 129, 2026-10-19).** The pool ran 1 lane of 4. Its backlog held 5 todos, and the 4 todos after rank 0 conflicted with its cell, so `AdmitByCell` returned -1 for each. The cause was in the supply, not in `Pool`: the plan width was `fleet.count`, not `scan_k`. `loopwave.PoolSupply` now gives the pool up to `max(fleet.count, scan_k)` todos at `enforce`. `Pool` is unchanged.
+  - `Target` bounds the live lanes, and `MaxLanes` bounds the run. The spec is [wave-orchestrator.md](../wave-orchestrator.md) §6.
+
 - **The live lane time (2026-10-17, runtime plane, cycles 1873 to 1928).** 44 of the last 50 cycles have a `signals.ndjson` with a span. The median lane time is 39.0 minutes, the p95 is 98.9 minutes and the longest is 118.1 minutes. Without the longest lane, the p95 is 95.1 minutes. The deadline is thus 95.1 minutes, above the floor of 60 (plan Q1, `TestDeadlineOf_TheLiveSamplesOfPlanQ1GiveNinetyFiveMinutes`).
 - **The soak at N = 16 (2026-10-17, simulated driver).** `evolve fleet soak --count 16 --pool` in a fresh scratch clone ran 64 lanes at `enforce`. The clone did not ignore `knowledge-base/cycles/`. The peak in-flight was 16 of 16, and 64 lanes passed. The run took 43.6 s, with 88.0 lanes a minute and a utilization of 0.91. No tree-diff guard stopped a phase.
 - **A cross-lane finding of the soak, fixed in the guard.** The first soak run failed 54 of 64 pool lanes. The ship of one lane writes its dossier `knowledge-base/cycles/cycle-N.{json,md}` in the main tree. The tree-diff guard of a sibling lane counted those files as its own leak. The build recovery of a sibling also moved them into its own worktree. The barrier wave hides the race, because all lanes start at the same time.

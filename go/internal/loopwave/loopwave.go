@@ -5,6 +5,7 @@ package loopwave
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -120,6 +121,13 @@ func ShouldRunPool(fc policy.FleetConfig) bool {
 	return fc.Count > 1 && fc.PlanSource == "triage" && (fc.Scheduling == "pool" || fc.Orchestrator.Stage == "enforce")
 }
 
+func PoolSupply(fc policy.FleetConfig) int {
+	if fc.Orchestrator.Stage != "enforce" {
+		return fc.Count
+	}
+	return max(fc.Count, fc.Orchestrator.ScanK)
+}
+
 func LoadFleetConfig(evolveDir string, warn io.Writer, c *signalcenter.Center) policy.FleetConfig {
 	path := paths.PolicyPath(evolveDir)
 	pol, err := policy.Load(path)
@@ -171,6 +179,9 @@ type LaneTally struct {
 func Tally(results []fleet.Result) LaneTally {
 	var t LaneTally
 	for _, r := range results {
+		if errors.Is(r.Err, fleet.ErrNeverLaunched) {
+			continue
+		}
 		switch r.Status() {
 		case fleet.LaneOK:
 			t.OK++

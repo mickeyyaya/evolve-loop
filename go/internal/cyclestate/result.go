@@ -57,6 +57,7 @@ const (
 	DiagCodeTriageCommitmentInvalid = "TRIAGE_COMMITMENT_INVALID"
 	DiagCodeTriageScopeUnanswered   = "TRIAGE_SCOPE_UNANSWERED"
 	DiagCodeProtectedPredicateRoute = "PROTECTED_PREDICATE_ROUTE"
+	DiagCodeBlockerRoute            = "BLOCKER_ROUTE"
 )
 
 const (
@@ -88,12 +89,15 @@ func ErrorCodes(diags []Diagnostic) []string {
 }
 
 type Disposition struct {
-	TaskLevel    bool
-	RouteConsole bool
+	TaskLevel        bool
+	RouteConsole     bool
+	OutranksSentinel bool
 }
 
 func RefusalDisposition(code string) Disposition {
 	switch code {
+	case DiagCodeBlockerRoute:
+		return Disposition{TaskLevel: true, RouteConsole: true, OutranksSentinel: true}
 	case DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute:
 		return Disposition{TaskLevel: true, RouteConsole: true}
 	case DiagCodeTriageTopNEmpty, DiagCodeTriageScopeUnanswered:

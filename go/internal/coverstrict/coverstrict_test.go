@@ -351,3 +351,34 @@ func link(t *testing.T, path string) {
 		t.Fatal(err)
 	}
 }
+
+func TestMeasure_APercentJustUnderTheFloorNeverPrintsAsTheFloor(t *testing.T) {
+	var lines strings.Builder
+	lines.WriteString("mode: atomic\n")
+	lines.WriteString("example.com/m/p/a.go:3.10,4.5 3412 1\n")
+	lines.WriteString("example.com/m/p/a.go:5.1,6.5 1 0\n")
+	profile, err := covchanged.ParseProfile([]byte(lines.String()), strictModule)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := Measure([]Floor{{"p", 100}}, profile)
+
+	want := "99.97% (3412 of 3413 statements) < 100.0%"
+	if len(got) != 1 || got[0].Problem != want {
+		t.Fatalf("problem = %q; want %q: 99.97 must not round up to the floor it misses", got[0].Problem, want)
+	}
+}
+
+func TestMeasure_APercentThatRoundsBelowTheFloorKeepsTheShortForm(t *testing.T) {
+	profile, err := covchanged.ParseProfile([]byte(strictProfile), strictModule)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := Measure([]Floor{{"p", 100}}, profile)
+
+	if got[0].Problem != "75.0% < 100.0%" {
+		t.Errorf("problem = %q; a percent that reads below the floor keeps one decimal", got[0].Problem)
+	}
+}

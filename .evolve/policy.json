@@ -38,11 +38,26 @@
       "claude"
     ],
     "agents": {
+      "builder": {
+        "cli": [
+          "agy",
+          "agy-claude",
+          "claude"
+        ],
+        "model": "balanced"
+      },
       "reflector": {
         "effort": "low"
       },
       "scout": {
         "effort": "low"
+      },
+      "tdd-engineer": {
+        "cli": [
+          "claude"
+        ],
+        "model": "balanced",
+        "effort": "high"
       },
       "triage": {
         "effort": "low"

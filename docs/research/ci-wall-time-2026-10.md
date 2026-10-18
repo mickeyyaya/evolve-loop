@@ -9,6 +9,7 @@ Date: 2026-10-17. Method:
 - a local `go test -json` profile of the five slowest packages, and a race-cost run;
 - a code read of the slowest tests, and a web survey;
 - for F3.20 to F3.35: the artifacts of the C0b run 39031338517, four main runs and the PR #935 run. Section 3.1 gives the method.
+- for F7.1 to F7.8 (2026-10-19): the GitHub API job and run records, and a code read. Section 7 gives the method.
 
 Each local claim names its command or file. "Synthesis" marks our own inference.
 
@@ -21,6 +22,7 @@ Each local claim names its command or file. "Synthesis" marks our own inference.
 - [4. Current practice](#4-current-practice)
 - [5. Adopt or reject](#5-adopt-or-reject)
 - [6. Refinements to adopt](#6-refinements-to-adopt)
+- [7. Amendment 2026-10-19: the queue is the largest cost](#7-amendment-2026-10-19-the-queue-is-the-largest-cost)
 
 ## 1. The request
 
@@ -463,3 +465,55 @@ The duration history also mixes red and green runs, while `cicd.pipeline.run.dur
 - **R16** (F3.34): the C1 report decides the limit of a package over that package's own time window, with a lower bound on CPU.
 - **R17** (F3.30): vet and gofmt run once, on ubuntu 1.23, with `GOOS=darwin go vet` for the darwin files.
 - **R18** (F3.25): the `bridge` tick-loop tests reach their state in fewer ticks. An injected clock (C5) cannot help them, because they do not wait.
+
+## 7. Amendment 2026-10-19: the queue is the largest cost
+
+On 2026-10-19 the console read the job and run records of the GitHub API. The first set has 25 `required CI` runs, with the created, started and completed times and the runner of each job. The second set has the last 100 runs, with event, branch, SHA and conclusion. Queue time is `started - created` for one job. Run time is `completed - started`.
+
+**F7.1** The macOS job "go / build + test (Go) (macos-latest, 1.23)" waits for a runner. Over 25 runs, its queue time has a median of 60 min and a maximum of 87 min. Its run time has a median of 21 min and a maximum of 30 min. The ubuntu jobs queue for about 0 min and run for 11–12 min.
+*Implication:* the macOS slot, not the test suite, sets most of the wall time of a run.
+
+**F7.2** The wall time of one run starts when its first job is created and stops when its last job is complete. Its median is 80 min, and its range is 14 to 113 min. The macOS queue median (60 min) is 75% of that median wall.
+*Implication:* C2 to C14 cut only the run part (21 min). A cut of the queue gives a larger gain.
+
+**F7.3** At most 5 macOS jobs ran at the same time. 5 is the limit of concurrent macOS jobs for the GitHub Free and Pro plans (P7.1). ubuntu reached 12 concurrent jobs.
+*Implication:* the macOS demand is above the cap, so each added macOS job waits behind the others.
+
+**F7.4** The last 100 runs took 12.8 h, which is 7.7 runs per hour. 69 runs came from `pull_request` and 31 from `push` to main. In 36 of the 69 PR runs, a later push to the same branch replaced the head SHA. In 25 of the 31 main pushes, another main push followed within 20 min (the boundary merge trains).
+*Implication:* about half of the PR runs test a SHA that nobody merges. Most main runs have a newer main run behind them.
+
+**F7.5** `.github/workflows/required.yml` has no `concurrency` key. Thus GitHub starts each run, and it never cancels a superseded run (P7.2).
+*Implication:* the 36 superseded PR runs of F7.4 each took a macOS slot or a place in the macOS queue.
+
+**F7.6** The path classifier of `required.yml` (the `changes` job, step `paths`) sends each path outside its listed patterns to `go_required=true; landing_required=true`. `.evolve/inbox/*.json` is one such path. Thus inbox-only PRs, for example #978 and #982, ran the full Go matrix, with macOS.
+*Implication:* a PR that adds a todo item takes a macOS slot for 21 min, and it tests no code change.
+
+**F7.7** A code read found the Go tests that read the tracked inbox of the real repository. The method is a grep of `go/` for `.evolve/inbox`, `"inbox"` and the repository-root helpers (2026-10-19):
+
+| Test | What it reads | Where it runs |
+|---|---|---|
+| `TestTrackedCorpusDirsAllowNewBirths` (`go/internal/phasecoherence/gitignore_birth_test.go`) | `git ls-files -- .evolve/`, which includes each tracked inbox file | Go matrix |
+| `TestNoRuntimeArtifactsTracked` (`go/internal/phasecoherence/tracked_artifact_hygiene_test.go`) | `git ls-files` of the whole tree | Go matrix |
+| `TestC1292_004_DeferralClaimIsBackedByALoadableInboxItem` (`go/acs/cycle1292`) | `inboxbatch.LoadDir` of the real inbox | the per-cycle ACS gate only; `make test-integration` excludes `acs/` |
+| `acs/regression` predicates | durable ACS | the `validate` job (`ci.yml`), which still runs for an inbox-only PR |
+
+The other inbox tests (about 250 files) write their own inbox in `t.TempDir()`.
+*Implication:* one `go test` of `./internal/phasecoherence/` (under 1 s locally) covers the real-tree inbox readers of the Go matrix.
+
+**F7.8** `evolve inbox lint` exits 0 when the loader skips an unreadable item. A probe with an inbox file that holds `{` printed `inbox lint: WARN skipped bad.json: unexpected end of JSON input`, and the exit code was 0 (local, 2026-10-19).
+*Implication:* a CI check of the inbox must also fail on the `WARN skipped` line. The Go matrix does not catch this case today.
+
+**P7.1** GitHub limits the concurrent jobs of an account. For GitHub-hosted runners, the Free and Pro plans allow 5 concurrent macOS jobs ([GitHub, Actions limits](https://docs.github.com/en/actions/reference/limits)).
+
+**P7.2** A `concurrency` group keeps at most one run in progress and one run queued. A new run in the group replaces the queued one. With `cancel-in-progress: true`, GitHub also cancels the run in progress. The group name must include `github.workflow`, or two workflows can share a group ([GitHub, using concurrency](https://docs.github.com/en/enterprise-server@3.9/actions/using-jobs/using-concurrency)). A reusable workflow sees the `github.workflow` of its caller (synthesis from the same page). Thus a group in `go.yml` or `ci.yml` can collide with the group of its caller.
+
+| Practice | Decision | Reason |
+|---|---|---|
+| A `concurrency` group per PR, with `cancel-in-progress: true` (P7.2) | Adopt (C15) | F7.4, F7.5: 36 of 69 PR runs are superseded. |
+| A `concurrency` group for main, without cancel in progress (P7.2) | Adopt (C15) | F7.4: merge trains queue main runs. The newest main SHA still gets a full run. |
+| An inbox-only route without the Go matrix | Adopt (C16) | F7.6, F7.7, F7.8: the real-tree inbox tests run in under 1 s on ubuntu. |
+| A merge queue | Open question for the operator | It changes how the console merges. See the plan, Q6. |
+| More macOS slots from a paid plan (P7.1) | Open question for the operator | It costs money. See the plan, Q7. |
+
+- **R19** (F7.4, F7.5, P7.2): `required.yml` declares one `concurrency` group per PR, one per pushed ref and one per manual run.
+- **R20** (F7.6, F7.7, F7.8): a change of `.evolve/inbox/` paths alone runs a small ubuntu job, not the Go matrix.
