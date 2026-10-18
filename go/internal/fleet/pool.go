@@ -9,7 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-var errNeverLaunched = errors.New("fleet: the pool never launched this todo")
+var ErrNeverLaunched = errors.New("fleet: the pool never launched this todo")
 
 type PoolConfig struct {
 	Target      int
@@ -85,7 +85,7 @@ func newPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 		claimed: map[string]bool{}, completions: make(chan int, len(backlog))}
 	for i := range backlog {
 		p.pending = append(p.pending, i)
-		p.results[i] = Result{Index: i, ExitCode: -1, Err: errNeverLaunched}
+		p.results[i] = Result{Index: i, ExitCode: -1, Err: ErrNeverLaunched}
 	}
 	return p
 }
