@@ -70,6 +70,10 @@ enumerates predicate names. a tdd that wrote no predicates shows up as the loud
 - A task whose inbox item carries no `acceptance[]` is visible as such to the builder for the
   first time — that is the signal to author acceptance, not a regression.
 
+### Review correction: claimed items (2026-10-18)
+
+A claim moves an item into `processing/cycle-N/` after `fleet_scope_paths` is written. The old pending path then fails to open. Cycles 1946 and 1950 showed `inbox record unreadable` in every build correction, so the builder never saw the acceptance criteria. Now `taskItemRefs` asks the scope-path resolver again when a pair path is not readable. The resolver returns the `processing/` path of a claimed item.
+
 ## Wiring proofs
 `internal/core/task_contract_test.go::TestDispatch_TaskContractReachesTDDBuildAndAudit` (RunCycle
 with the scope-path resolver and an injected inventory; tdd, build and audit carry the preamble
