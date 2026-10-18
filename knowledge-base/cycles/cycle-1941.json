@@ -1,0 +1,242 @@
+{
+  "schema_version": 2,
+  "cycle": 1941,
+  "run_id": "01M55XMD2XX827KQ9WAD6TYPCR",
+  "goal": "Wave 126.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 125 facts (run 20261017T194548Z): 1 of 1 cycles shipped.\n- Cycle 1940: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 126:\n- Released v22.30.0 at the wave 125 boundary. This boundary merged #925 (O3 admission by cell, shadow), #932 (bridge factory F1), #954 (resurrection guard: copy, not recurrence), #956 (ledger tests), #957 (tmux boot cd quoting), #958 (lane routing for document-recipes).\n\nEarlier waves:\n- Wave 122 (run 20261017T115657Z): 4 of 4 cycles shipped.\n- Wave 123 (run 20261017T145443Z): 1 of 4 cycles shipped.\n- Wave 124 (run 20261017T174807Z): 2 of 3 cycles shipped.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "document-recipes-gated-off-by-their-own-triggers"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 42411,
+      "started_at": "2026-10-17T21:53:06Z",
+      "ended_at": "2026-10-17T21:53:49Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 3400,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 28839,
+      "started_at": "2026-10-17T21:54:19Z",
+      "ended_at": "2026-10-17T21:54:49Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 1500,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 38134,
+      "started_at": "2026-10-17T21:54:49Z",
+      "ended_at": "2026-10-17T21:55:28Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 3400,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 41325,
+      "started_at": "2026-10-17T21:55:28Z",
+      "ended_at": "2026-10-17T21:56:10Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 173772,
+      "started_at": "2026-10-17T21:56:10Z",
+      "ended_at": "2026-10-17T21:59:05Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 14900,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 438409,
+      "started_at": "2026-10-17T21:59:05Z",
+      "ended_at": "2026-10-17T22:06:48Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 18600,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 14024,
+      "started_at": "2026-10-17T22:07:07Z",
+      "ended_at": "2026-10-17T22:28:45Z",
+      "archetype": "evaluate",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 242046,
+      "started_at": "2026-10-18T09:57:47Z",
+      "ended_at": "2026-10-18T10:02:45Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 7500,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 124761,
+      "started_at": "2026-10-18T10:02:45Z",
+      "ended_at": "2026-10-18T10:04:50Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "ship|unknown|df1193ba9dbf",
+    "pre_class": "unknown",
+    "reasons": [
+      "cycle aborted in phase ship (abnormal-exit epilogue) cause=phase ship: ship: native: [GIT_FF_MERGE_DIVERGED/precondition @atomic-ship] ship: ff-merge cycle-cd3ae73e-1941 into main failed (rc=1; diverg"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1941",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase ship"
+    }
+  ],
+  "timing": {
+    "total_ms": 1143721,
+    "phase_count": 9,
+    "retried_count": 1,
+    "longest_phase": "build",
+    "longest_ms": 438409,
+    "by_archetype_ms": {
+      "build": 438409,
+      "control": 124761,
+      "evaluate": 297395,
+      "plan": 283156
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 49300,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 18600,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 0,
+        "output": 7500,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 0,
+        "output": 23200,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "inst-L1544b",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "cycle-1497-triage-decomposes-the-lane-id-into-child-slugs-and-empties-the-builders-authorized-set",
+    "cycle-93-worktree-branch-unmerged-but-build-reports-pass",
+    "inst-L1549b",
+    "cycle-93-build-report-commit-sha-fabrication"
+  ]
+}
