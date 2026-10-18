@@ -24,6 +24,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/events/rootwire"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
@@ -208,13 +209,13 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 
 	d := wireCycleRun(f, projectRoot, evolveDir, stderr)
+	defer d.closeSignals()
 	if d.RoutingErr != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", d.RoutingErr)
 		return exitRoutingRefused
 	}
 	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
 	orch, signals := d.Orchestrator, d.Signals
-	defer d.Signals.Flush()
 	result, err := orch.RunCycle(context.Background(), f.request(projectRoot, os.Environ()))
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
 		var lr loopResult
@@ -306,15 +307,33 @@ func filterEvolveEnv(environ []string) map[string]string {
 	return cmdutil.FilterEvolveEnv(environ)
 }
 
+const (
+	roleCycle     = "cycle"
+	roleLoop      = "loop"
+	roleLoopChain = "loop-chain"
+	roleShip      = "ship"
+	roleSubagent  = "subagent"
+	roleSimulate  = "simulate"
+)
+
 type orchDeps struct {
 	Storage      core.Storage
 	Ledger       rootLedger
 	Orchestrator *core.Orchestrator
 	Signals      *signalcenter.Center
+	CloseSignals func()
 	Bridge       *bridge.Adapter
 	Runners      map[core.Phase]core.PhaseRunner
 	Router       *cliroute.Router
 	RoutingErr   error
+}
+
+func (d orchDeps) closeSignals() {
+	if d.CloseSignals == nil {
+		d.Signals.Flush()
+		return
+	}
+	d.CloseSignals()
 }
 
 type rootLedger interface {
@@ -324,14 +343,49 @@ type rootLedger interface {
 
 func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
 	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
-	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
-		if cycle == 0 {
-			return filepath.Join(evolveDir, signalcenter.StreamFileName)
-		}
+	signals.Subscribe(listenWhen(cycleStamped, signals.NDJSONSink(func(cycle int) string {
 		return filepath.Join(core.RunWorkspacePath(projectRoot, cycle), signalcenter.StreamFileName)
-	}))
+	})))
+	signals.Subscribe(listenWhen(legacyProjectRecord, signals.NDJSONSink(func(int) string {
+		return filepath.Join(evolveDir, signalcenter.StreamFileName)
+	})))
 	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
+}
+
+func listenWhen(keep func(signalcenter.Event) bool, l signalcenter.Listener) signalcenter.Listener {
+	return func(e signalcenter.Event) {
+		if keep(e) {
+			l(e)
+		}
+	}
+}
+
+func cycleStamped(e signalcenter.Event) bool { return e.Cycle != 0 }
+
+var legacyProjectKinds = map[signalcenter.Kind]bool{
+	signalcenter.KindPhaseDispatched: true, signalcenter.KindPhaseOutcome: true, signalcenter.KindPhaseAborted: true,
+	signalcenter.KindGateRejected: true, signalcenter.KindGateCorrected: true, signalcenter.KindGatePassed: true,
+	signalcenter.KindShipLanded: true, signalcenter.KindShipError: true, signalcenter.KindShipWarning: true,
+	signalcenter.KindSystemFailure: true, signalcenter.KindQuotaPaused: true, signalcenter.KindBridgeWarning: true,
+	signalcenter.KindBridgeTripwire: true, signalcenter.KindPaneLiveness: true, signalcenter.KindLedgerAppended: true,
+	signalcenter.KindOutcomeWarning: true, signalcenter.KindFailureDiagWarning: true, signalcenter.KindCarryoverWarning: true,
+	signalcenter.KindFailureLearningWarning: true, signalcenter.KindConfigWarning: true, signalcenter.KindObserverWarning: true,
+	signalcenter.KindAuditWarning: true, signalcenter.KindInboxWarning: true, signalcenter.KindRunnerWarning: true,
+	signalcenter.KindAdvisorWarning: true, signalcenter.KindCycleSealed: true, signalcenter.KindLoopWave: true,
+	signalcenter.KindLoopWarning: true, signalcenter.KindLoopHalt: true, signalcenter.KindLoopEscalation: true,
+	signalcenter.KindListenerPanicked: true, signalcenter.KindRegistryDrift: true, signalcenter.KindSinkDropped: true,
+}
+
+func legacyProjectRecord(e signalcenter.Event) bool {
+	return e.Cycle == 0 && legacyProjectKinds[e.Kind]
+}
+
+var attachRootEventsFn = rootwire.Attach
+
+func newRoleSignalCenter(role, projectRoot, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
+	signals := newRootSignalCenter(projectRoot, evolveDir, console)
+	return signals, attachRootEventsFn(signals, role, evolveDir, console)
 }
 
 func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run routingRun) orchDeps {
@@ -339,7 +393,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		d := evolveDir
 		bridge.SetModelCatalogDirFn(func() string { return d })
 	}
-	signals := newRootSignalCenter(projectRoot, evolveDir, console)
+	signals, closeSignals := newRoleSignalCenter(run.centerRole(), projectRoot, evolveDir, console)
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
@@ -373,7 +427,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	catalog, builtinCat, userSpecs := loadPhaseCatalog(projectRoot, registryPath, prm)
 	cliRouter, routingErr := wireCLIRouter(routerSite{root: projectRoot, catalog: catalog}, run, console)
 	if routingErr != nil {
-		return orchDeps{Signals: signals, RoutingErr: routingErr}
+		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: routingErr}
 	}
 	runner.DefaultRouter = cliRouter
 
@@ -418,7 +472,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	registerBuiltinSpecRunners(runners, builtinCat, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}, os.Stderr)
 	advisor, advErr := wireRouterAdvisor(routerAdvisorWiring{router: cliRouter, root: projectRoot, bridge: walked, prompts: prm, signals: signals})
 	if advErr != nil {
-		return orchDeps{Signals: signals, RoutingErr: advErr}
+		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: advErr}
 	}
 	strategy := router.Select(cfg, advisor)
 	opts := []core.Option{
@@ -498,6 +552,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		Ledger:       ld,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, opts...),
 		Signals:      signals,
+		CloseSignals: closeSignals,
 		Bridge:       br,
 		Runners:      runners,
 		Router:       cliRouter,

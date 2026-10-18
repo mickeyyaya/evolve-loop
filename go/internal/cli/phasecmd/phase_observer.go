@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/events/rootwire"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
@@ -30,8 +31,8 @@ func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		close(shutdown)
 	}()
 
-	signals := observerSignalCenter(stderr)
-	defer signals.Flush()
+	signals, closeSignals := observerSignalCenter(stderr)
+	defer closeSignals()
 	pol := observerPolicy(a, signals)
 	return phaseobserver.Run(observerConfig(a, pol, shutdown, signals), "", stderr)
 }
@@ -122,10 +123,16 @@ func observerConfig(a observerArgs, pol policy.Policy, shutdown <-chan struct{},
 	return cfg
 }
 
-func observerSignalCenter(w io.Writer) *signalcenter.Center {
+func observerSignalCenter(w io.Writer) (*signalcenter.Center, func()) {
 	c := signalcenter.New(signalcenter.WithPID(os.Getpid()))
 	c.Subscribe(signalcenter.ConsoleSink(w))
-	return c
+	return c, rootwire.Attach(c, observerRole, observerEvolveDir(), w)
+}
+
+const observerRole = "phase-observer"
+
+func observerEvolveDir() string {
+	return filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve")
 }
 
 func observerEnvConfig(pol policy.Policy) phaseobserver.Config {
@@ -140,7 +147,7 @@ func observerEnvConfig(pol policy.Policy) phaseobserver.Config {
 }
 
 func loadPolicy() (policy.Policy, string, error) {
-	path := filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve", "policy.json")
+	path := filepath.Join(observerEvolveDir(), "policy.json")
 	pol, err := policy.Load(path)
 	return pol, path, err
 }

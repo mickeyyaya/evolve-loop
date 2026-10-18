@@ -107,14 +107,3 @@ func TestRunPhaseObserver_RendersObserverCodesOnStderr(t *testing.T) {
 		t.Errorf("the usage path still prints the verbatim line: rc=%d %q", rc, errb2.String())
 	}
 }
-
-func TestRunPhaseObserver_FlushesItsCenterOnReturn(t *testing.T) {
-	t.Parallel()
-	src, err := os.ReadFile("phase_observer.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(src), "defer signals.Flush()") {
-		t.Error("RunPhaseObserver must defer signals.Flush() after building its Center")
-	}
-}

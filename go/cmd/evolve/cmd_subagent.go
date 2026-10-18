@@ -377,8 +377,8 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		return exitRoutingRefused
 	}
 
-	signals := newRootSignalCenter(layout.ProjectRoot, layout.EvolveDir, stderr)
-	defer signals.Flush()
+	signals, closeSignals := newRoleSignalCenter(roleSubagent, layout.ProjectRoot, layout.EvolveDir, stderr)
+	defer closeSignals()
 
 	res, err := subagent.Run(context.Background(), subagent.RunRequest{
 		Agent:                  agent,

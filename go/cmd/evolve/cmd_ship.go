@@ -12,6 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
+var (
+	shipRunFn        = ship.Run
+	shipAbsoluteRoot = paths.AbsoluteRoot
+)
+
 func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve ship", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -53,20 +58,20 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if projectRoot == "" {
 		var err error
-		projectRoot, err = os.Getwd()
+		projectRoot, err = processGetwd()
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve ship: cwd: %v\n", err)
 			return 1
 		}
 	}
-	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+	projectRoot = shipAbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve ship: WARN: %s\n", m)
 	})
 	if pluginRoot == "" {
 		pluginRoot = os.Getenv("EVOLVE_PLUGIN_ROOT")
 	}
-	signals := shipRootSignals(projectRoot, stderr)
-	defer signals.Flush()
+	signals, closeSignals := shipRootSignals(projectRoot, stderr)
+	defer closeSignals()
 
 	opts := ship.Options{
 		Class:            ship.Class(class),
@@ -83,7 +88,7 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		Signals:          signals,
 	}
 
-	res, err := ship.Run(context.Background(), opts)
+	res, err := shipRunFn(context.Background(), opts)
 
 	for _, line := range res.Logs {
 		fmt.Fprintln(stderr, line)
@@ -98,6 +103,6 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return int(res.ExitCode)
 }
 
-func shipRootSignals(projectRoot string, stderr io.Writer) *signalcenter.Center {
-	return newRootSignalCenter(projectRoot, paths.EvolveDirOf(projectRoot), stderr)
+func shipRootSignals(projectRoot string, stderr io.Writer) (*signalcenter.Center, func()) {
+	return newRoleSignalCenter(roleShip, projectRoot, paths.EvolveDirOf(projectRoot), stderr)
 }

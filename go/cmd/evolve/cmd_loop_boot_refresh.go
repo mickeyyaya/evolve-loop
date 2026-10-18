@@ -196,6 +196,7 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	if werr := os.WriteFile(tmp, []byte(head+"\n"), 0o644); werr == nil {
 		_ = os.Rename(tmp, markerPath)
 	}
+	cfg.beforeReExec(func() {})()
 	if err := bootRefreshExecFn(); err != nil {
 		_ = os.Remove(markerPath)
 		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN re-exec failed (%v) — booting the old binary (rebuilt copy is on disk and pin-reconciled for the next launch)\n", err)

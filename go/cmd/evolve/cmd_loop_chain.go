@@ -83,7 +83,7 @@ func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Cent
 		},
 		Argv:    func() []string { return chainReExecArgvFn() },
 		Environ: os.Environ,
-		Flush:   signals.Flush,
+		Flush:   cfg.beforeReExec(signals.Flush),
 		ReExec:  func(argv0 string, argv, envv []string) error { return chainReExecFn(argv0, argv, envv) },
 	}
 	opts := append([]loopchain.Option{
@@ -95,8 +95,8 @@ func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Cent
 
 // Deprecated: production refreshes through wiredRefresher with its own Center.
 func maybeRefreshChainBoundary(cfg loopConfig, batch int, stderr io.Writer) (refreshed bool) {
-	signals := newRootSignalCenter(cfg.ProjectRoot, cfg.EvolveDir, stderr)
-	defer signals.Flush()
+	signals, closeSignals := newRoleSignalCenter(roleLoopChain, cfg.ProjectRoot, cfg.EvolveDir, stderr)
+	defer closeSignals()
 	return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch)
 }
 
@@ -134,6 +134,7 @@ func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, 
 		Batch: func() int {
 			signals.Flush()
 			batchCfg := next
+			batchCfg.announce = silentLoop
 			next.ResumeWaves, next.HandedOff = 0, false
 			return runLoopBatchFn(batchCfg, stdin, stdout, stderr)
 		},
@@ -149,10 +150,12 @@ func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, 
 		loopchain.WithSignals(func() *signalcenter.Center { return signals }))
 }
 
-func runLoopChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer) int {
-	signals := newRootSignalCenter(cfg.ProjectRoot, cfg.EvolveDir, stderr)
-	defer signals.Flush()
-	res := wiredChain(cfg, cc, stdin, stdout, stderr, signals).Run()
+func runLoopChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer) (exit int) {
+	signals, closeSignals := newRoleSignalCenter(roleLoopChain, cfg.ProjectRoot, cfg.EvolveDir, stderr)
+	defer closeSignals()
+	finish := cfg.announcer()(signals, stderr)
+	defer finish(&exit)
+	res := wiredChain(cfg.retiring(closeSignals), cc, stdin, stdout, stderr, signals).Run()
 	buf, _ := json.MarshalIndent(res, "", "  ")
 	fmt.Fprintln(stdout, string(buf))
 	return res.Exit
