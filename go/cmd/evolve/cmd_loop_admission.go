@@ -1,23 +1,15 @@
 package main
 
 import (
-	"context"
-	"time"
-
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-const admissionGraphTimeout = 30 * time.Second
-
-func admissionShadow(ctx context.Context, goDir string, run sysexec.RunFunc) loopwave.AdmissionFn {
-	return func(todos []fleet.Todo, text func(string) string, cfg policy.OrchestratorConfig) (loopwave.AdmissionShadow, error) {
-		bounded, cancel := context.WithTimeout(ctx, admissionGraphTimeout)
-		defer cancel()
-		graph, err := admission.LoadModuleGraph(bounded, run, goDir, cfg.HubMinImporters)
+func admissionShadow(graphOf func(oc policy.OrchestratorConfig, wave int) (*admission.ModuleGraph, error)) loopwave.AdmissionFn {
+	return func(wave int, todos []fleet.Todo, text func(string) string, cfg policy.OrchestratorConfig) (loopwave.AdmissionShadow, error) {
+		graph, err := graphOf(cfg, wave)
 		if err != nil {
 			return loopwave.AdmissionShadow{}, err
 		}

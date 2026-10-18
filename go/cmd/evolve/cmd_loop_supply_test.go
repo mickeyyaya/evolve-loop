@@ -55,10 +55,9 @@ func supplyCoordinator(t *testing.T, root string) (*loopBatchCoordinator, string
 	t.Helper()
 	evolveDir := filepath.Join(root, ".evolve")
 	console := &lockedBuffer{}
-	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: console}
+	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: console, loadGraph: noModuleGraph}
 	b.deps.Signals = newRootSignalCenter(root, evolveDir, console)
 	b.deps.Storage = &fixtures.FakeStorage{}
-	b.loadGraph = noModuleGraph
 	return b, evolveDir, console
 }
 
@@ -226,6 +225,53 @@ func TestTakeSupply_AndCellAdmissionShareOneModuleGraphLoadForEachIteration(t *t
 	b.cellAdmission(fc.Orchestrator, 4)
 	if loads != 2 {
 		t.Errorf("loads after a second census of iteration 4 = %d, want still 2", loads)
+	}
+}
+
+func TestDispatchFleetIteration_TheBarrierShadowAndTheCensusShareOneModuleGraphLoad(t *testing.T) {
+	t.Parallel()
+	b, evolveDir, console := supplyCoordinator(t, gittest.Fixture(t).Dir)
+	seedSupplyInbox(t, evolveDir)
+	loads := 0
+	b.loadGraph = constantGraph(&loads)
+	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave", Orchestrator: policy.OrchestratorConfig{Stage: "shadow", ScanK: 32, HubMinImporters: 120}}
+	var starvation fleet.StarvationTracker
+
+	b.dispatchFleetIteration(0, fc, "/nonexistent/evolve", &starvation)
+
+	if loads != 1 {
+		t.Errorf("module graph loads = %d, want 1: the census and the admission shadow of one wave share a load", loads)
+	}
+	want := "[loop] wave 0: admission shadow (stage shadow): admission launches 1 lane(s), the file partition launches 2; 1 todo(s) wait for a cell"
+	if !strings.Contains(console.String(), want) {
+		t.Errorf("console = %q, want the shadow line over the shared graph: %q", console.String(), want)
+	}
+}
+
+func TestTakeSupply_APanicInTheCensusIsAWarningAndTheNextCensusStillRuns(t *testing.T) {
+	t.Parallel()
+	b, evolveDir, console := supplyCoordinator(t, t.TempDir())
+	seedSupplyInbox(t, evolveDir)
+	b.loadGraph = func(context.Context, string, int) (*admission.ModuleGraph, error) { panic("go list exploded") }
+	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave"}
+	record := filepath.Join(evolveDir, "waves", orchestrator.SupplyFile)
+
+	b.takeSupply(4, fc)
+
+	if want := "[loop] WARN: orchestrator: census 4 panicked and was dropped: go list exploded"; !strings.Contains(console.String(), want) {
+		t.Errorf("console = %q, want %q", console.String(), want)
+	}
+	if _, err := os.Stat(record); err == nil {
+		t.Error("a census that panicked wrote a record")
+	}
+	loads := 0
+	b.loadGraph = constantGraph(&loads)
+
+	b.takeSupply(5, fc)
+
+	history, err := orchestrator.ReadSupply(record)
+	if err != nil || len(history) != 1 || loads != 1 {
+		t.Errorf("record = %+v, %v, loads %d, want the next census to run once after a panic", history, err, loads)
 	}
 }
 

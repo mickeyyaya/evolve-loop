@@ -110,7 +110,7 @@ func (b *loopBatchCoordinator) brakeStop(iteration int) batchDecision {
 }
 
 func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig, waveBinary *string) {
-	if !fleetPlanRuns(*fleetConfig) || *waveBinary != "" {
+	if !loopwave.ShouldRunPlan(*fleetConfig) || *waveBinary != "" {
 		return
 	}
 	binary, err := fleetExecutable()

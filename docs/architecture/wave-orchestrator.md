@@ -158,7 +158,7 @@ The loop and the console use the two calls as follows:
 
 - The loop calls `Take` one time for each plan, in `dispatchFleetIteration`. The call is after the disk check and before the plan.
 - When no plan runs, the loop makes no call.
-- The census and the pool admission of one plan share one load of the module graph.
+- The census, the pool admission and the admission shadow of one plan share one load of the module graph.
 - When that load fails, the census counts each ready item as `admissible` and prints a `[loop] WARN` line.
 - A census error prints a `[loop] WARN` line. It never stops the loop.
 - `evolve wave supply` calls `Count`. It writes no record and publishes no event (§13).

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -32,9 +33,14 @@ func (b *loopBatchCoordinator) moduleGraph(oc policy.OrchestratorConfig, iterati
 }
 
 func (b *loopBatchCoordinator) takeSupply(iteration int, fc policy.FleetConfig) {
-	if !fleetPlanRuns(fc) {
+	if !loopwave.ShouldRunPlan(fc) {
 		return
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: census %d panicked and was dropped: %v\n", iteration, r)
+		}
+	}()
 	graph, err := b.moduleGraph(fc.Orchestrator, iteration)
 	if err != nil {
 		fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: census %d counts without cells; the module graph did not load: %v\n", iteration, err)

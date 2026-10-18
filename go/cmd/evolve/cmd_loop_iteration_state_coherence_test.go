@@ -90,11 +90,12 @@ func iscsDossier(t *testing.T, root string, cycle int) {
 func iscsCoordinator(root, evolveDir string, st core.Storage) (*loopBatchCoordinator, *lockedBuffer) {
 	console := &lockedBuffer{}
 	b := &loopBatchCoordinator{
-		ctx:    context.Background(),
-		cfg:    loopConfig{ProjectRoot: root, EvolveDir: evolveDir},
-		result: &loopResult{},
-		stdout: console,
-		stderr: console,
+		ctx:       context.Background(),
+		cfg:       loopConfig{ProjectRoot: root, EvolveDir: evolveDir},
+		result:    &loopResult{},
+		stdout:    console,
+		stderr:    console,
+		loadGraph: noModuleGraph,
 	}
 	b.deps.Signals = newRootSignalCenter(root, evolveDir, console)
 	b.deps.Storage = st

@@ -47,12 +47,13 @@ func boundaryCoordinator(t *testing.T, resumeWaves int) (*loopBatchCoordinator, 
 	u13StubRefresh(t, func() bool { return false })
 	var stdout, stderr bytes.Buffer
 	b := &loopBatchCoordinator{
-		ctx:      context.Background(),
-		cfg:      loopConfig{ProjectRoot: root, EvolveDir: evolveDir, ResumeWaves: resumeWaves},
-		cycleEnv: map[string]string{"EVOLVE_CLI_HEALTH": "0"},
-		result:   &loopResult{},
-		stdout:   &stdout,
-		stderr:   &stderr,
+		ctx:       context.Background(),
+		cfg:       loopConfig{ProjectRoot: root, EvolveDir: evolveDir, ResumeWaves: resumeWaves},
+		cycleEnv:  map[string]string{"EVOLVE_CLI_HEALTH": "0"},
+		result:    &loopResult{},
+		stdout:    &stdout,
+		stderr:    &stderr,
+		loadGraph: noModuleGraph,
 	}
 	b.deps.Signals = newRootSignalCenter(root, evolveDir, &stderr)
 	b.deps.Storage = &fixtures.FakeStorage{}
