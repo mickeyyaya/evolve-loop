@@ -88,10 +88,12 @@ func TestBlockerProver_Cycle1946AProtectedSeamIsAProvenBlocker(t *testing.T) {
 	t.Parallel()
 	c := blockerCase(blockerWorktree(t), []string{cycle1946StrictFailure, cycle1946PredicateFailure}, []string{"other defect text", cycle1946Claim})
 
-	proof := NewBlockerProver().Prove(c)
+	var prover BlockerProver = NewBlockerProver()
+	var proof BlockerProof = prover.Prove(c)
 
-	if !proof.Blocked() || len(proof.Proven) != 1 || proof.Proven[0].Path != selfcheckPath {
-		t.Fatalf("proof = %+v; the 1946 seam is a real blocker", proof)
+	want := BlockerClaim{Kind: BlockerKindProtectedPath, Path: selfcheckPath, Defect: cycle1946Claim}
+	if !proof.Blocked() || len(proof.Proven) != 1 || proof.Proven[0] != want {
+		t.Fatalf("proof = %+v; the 1946 seam is a real blocker proving %+v", proof, want)
 	}
 }
 
