@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -20,13 +21,17 @@ var (
 	ErrMalformed     = errors.New("inboxsplit: the item is not well formed")
 
 	ErrFixNamesProtected = errors.New("inboxsplit: the item text names a protected path, so the lane part would carry work it must not do")
+	ErrNoCriterion       = errors.New("inboxsplit: a part would carry no acceptance criterion, so no grader could judge it")
 )
 
 const (
 	consoleSuffix = "-console"
 	laneSuffix    = "-lane"
 	splitFromKey  = "split_from"
+	testSuffix    = "_test.go"
 )
+
+var ratchetRegistries = []string{".cover-strict", ".apicover-enforce"}
 
 type Item = map[string]json.RawMessage
 
@@ -36,6 +41,7 @@ type Proposal struct {
 	LaneID     string
 	Console    Item
 	Lane       Item
+	LaneWaits  bool
 }
 
 var routeStamps = []string{
@@ -44,7 +50,7 @@ var routeStamps = []string{
 
 var routeKeys = append([]string{inboxbatch.RouteField}, routeStamps...)
 
-var textFields = []string{"title", "fix", "acceptance", "summary", "description", "source", "connects_to"}
+var textFields = []string{"title", "fix", "summary", "description", "source", "connects_to"}
 
 var laneFields = []string{
 	"kind", "class", "priority", "priority_class", "weight", "campaign", "source", "created_at",
@@ -55,6 +61,10 @@ var pathToken = regexp.MustCompile(`[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+/?`)
 
 func Propose(item Item, isProtected func(path string) bool, laneAfterConsole bool) (Proposal, error) {
 	id, files, deps, err := readSplittable(item)
+	if err != nil {
+		return Proposal{}, err
+	}
+	criteria, err := readCriteria(item)
 	if err != nil {
 		return Proposal{}, err
 	}
@@ -70,18 +80,20 @@ func Propose(item Item, isProtected func(path string) bool, laneAfterConsole boo
 	if key, stamped := firstStamp(item); stamped {
 		return Proposal{}, fmt.Errorf("%w: %s", ErrStamped, key)
 	}
-	if path, named := protectedTextPath(item, isProtected); named {
-		return Proposal{}, fmt.Errorf("%w: %s", ErrFixNamesProtected, path)
+	consoleCriteria, laneCriteria, err := newSurface(isProtected, protected, free).divide(item, criteria)
+	if err != nil {
+		return Proposal{}, err
 	}
 	consoleID, laneID := id+consoleSuffix, id+laneSuffix
+	laneWaits := laneAfterConsole || verifiesOnly(free)
 	laneDeps := slices.Clone(deps)
-	if laneAfterConsole {
+	if laneWaits {
 		laneDeps = append(laneDeps, consoleID)
 	}
 	return Proposal{
-		OriginalID: id, ConsoleID: consoleID, LaneID: laneID,
-		Console: consolePart(item, consoleID, id, protected),
-		Lane:    lanePart(item, laneID, id, free, laneDeps),
+		OriginalID: id, ConsoleID: consoleID, LaneID: laneID, LaneWaits: laneWaits,
+		Console: consolePart(item, consoleID, id, protected, consoleCriteria),
+		Lane:    lanePart(item, laneID, id, free, laneDeps, laneCriteria),
 	}, nil
 }
 
@@ -118,9 +130,19 @@ func readSplittable(item Item) (id string, files, deps []string, err error) {
 	return id, files, deps, nil
 }
 
+func readCriteria(item Item) ([]string, error) {
+	var criteria []string
+	if raw, present := item["acceptance"]; present {
+		if err := json.Unmarshal(raw, &criteria); err != nil {
+			return nil, fmt.Errorf("%w: acceptance must be a list of text: %v", ErrMalformed, err)
+		}
+	}
+	return criteria, nil
+}
+
 func partition(files []string, isProtected func(string) bool) (protected, free []string) {
 	for _, f := range files {
-		if isProtected(f) {
+		if isProtected(f) || slices.ContainsFunc(declaredPaths(f), isProtected) {
 			protected = append(protected, f)
 		} else {
 			free = append(free, f)
@@ -129,17 +151,20 @@ func partition(files []string, isProtected func(string) bool) (protected, free [
 	return protected, free
 }
 
-func protectedTextPath(item Item, isProtected func(string) bool) (string, bool) {
-	for _, field := range textFields {
-		for _, text := range textsOf(item[field]) {
-			for _, tok := range pathToken.FindAllString(text, -1) {
-				if tok = strings.TrimRight(tok, "."); isProtected(tok) {
-					return tok, true
-				}
-			}
-		}
-	}
-	return "", false
+func declaredPaths(entry string) []string {
+	return inboxbatch.Item{Files: []string{entry}}.DeclaredPaths()
+}
+
+func verifiesOnly(entries []string) bool {
+	return !slices.ContainsFunc(entries, func(entry string) bool {
+		paths := declaredPaths(entry)
+		return len(paths) == 0 || slices.ContainsFunc(paths, func(p string) bool { return !isVerification(p) })
+	})
+}
+
+func isVerification(p string) bool {
+	base := path.Base(p)
+	return strings.HasSuffix(base, testSuffix) || slices.Contains(ratchetRegistries, base)
 }
 
 func textsOf(raw json.RawMessage) []string {
@@ -172,16 +197,17 @@ func basePart(item Item, id, from string, files []string) Item {
 	return part
 }
 
-func consolePart(item Item, id, from string, protected []string) Item {
+func consolePart(item Item, id, from string, protected, criteria []string) Item {
 	part := basePart(item, id, from, protected)
 	part["title"] = encode(titleOf(item, from) + " (console part)")
+	part["acceptance"] = encode(criteria)
 	if !routesToConsole(item) {
 		delete(part, inboxbatch.RouteField)
 	}
 	return part
 }
 
-func lanePart(item Item, id, from string, free, deps []string) Item {
+func lanePart(item Item, id, from string, free, deps, criteria []string) Item {
 	part := Item{}
 	for _, key := range laneFields {
 		if raw, present := item[key]; present {
@@ -192,10 +218,10 @@ func lanePart(item Item, id, from string, free, deps []string) Item {
 	part["files"] = encode(free)
 	part[splitFromKey] = encode(from)
 	part["title"] = encode(titleOf(item, from) + " (lane part)")
-	part["deps"] = encode(deps)
-	part["acceptance"] = encode([]string{
-		fmt.Sprintf("The change that %s describes is made in %s only.", from, strings.Join(free, ", ")),
-	})
+	part["acceptance"] = encode(criteria)
+	if len(deps) > 0 {
+		part["deps"] = encode(deps)
+	}
 	return part
 }
 

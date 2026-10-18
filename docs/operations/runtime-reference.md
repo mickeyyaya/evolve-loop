@@ -277,18 +277,22 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 
 > **Split a mixed inbox item (2026-10-18).** `evolve inbox split <id> [--lane-after-console] [--json] [--project-root P]` splits one pending item that names protected files and files that are not protected ([wave orchestrator §4](../architecture/wave-orchestrator.md)). The command files two items, `<id>-console` and `<id>-lane`, and retires the original.
 >
-> - The console part keeps every protected file, the acceptance, and the `route` when the route is a console route.
-> - The lane part holds the files that are not protected. It gets one generated acceptance criterion and the `deps` of the original. With `--lane-after-console`, its `deps` also name the console part.
+> - The console part keeps every protected file, the criteria that name its files, and the `route` when the route is a console route.
+> - The lane part holds the files that are not protected, the criteria that name only those files, and the `deps` of the original. A criterion that names no file stays on both parts.
+> - The `deps` of the lane part also name the console part in two cases. In the first case, you pass `--lane-after-console`. In the second case, every lane file is a test file or a ratchet file (`.cover-strict` or `.apicover-enforce`). The command then says that the lane part waits.
 > - Both parts carry `split_from: <id>`. The command routes the lane part with the same check as `evolve inbox route-lane`.
 > - The original moves to `inbox/consumed/` with its fields unchanged. Its `consumed.resolution` names both parts. No evidence is deleted.
 > - The command refuses (exit `1`, nothing left filed) an item that is not pending in the inbox root. It also refuses an item that declares no file, only protected files, or only files that are not protected.
-> - The command refuses an item whose `fix`, `acceptance`, `summary` or `description` names a protected path.
+> - The command refuses an item whose `title`, `fix`, `summary`, `description`, `source` or `connects_to` names a protected path or the base name of a console file. The split also treats a directory that holds protected files as protected.
+> - The command refuses an item when the lane part or the console part has no acceptance criterion.
 > - The command refuses an item with a stamp that a lifecycle verb wrote. It refuses an item that a pending item names in `deps`. It refuses an item whose lane part the route check refuses.
 > - The command refuses every run while a loop lane is live.
 > - A second run on the same id is refused, because the original is no longer pending.
 > - When the lane route is refused, the command withdraws both parts, so the inbox stays as it was.
 > - Exit `0` split. Exit `1` refused. Exit `2` the inbox or the policy cannot be read or written. Exit `2` also means that both parts are filed but the original is not retired: retire it with `evolve inbox consume`. Exit `10` usage.
 > - `--json` prints `{"original","console","lane"}`.
+
+> **`route-lane` keeps the earlier reason (2026-10-18).** When the item already has a `routed_reason`, the new one reads `<new reason>; earlier reason: <old reason>`. A human reason is not lost. A blank or non-text earlier reason is dropped. A declared protected path, a file or a directory, now refuses `route-lane` and the claim floor over any route (operator decision of 2026-10-18, ADR-0074). Only a heuristic derivation stays open to `route:lane`.
 
 
 > **Interaction-rule commands (they write):**

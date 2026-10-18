@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -19,10 +20,15 @@ const splitProtectedFile = "go/internal/inboxrank/weightsort_ban_test.go"
 const splitLaneFile = "go/internal/inboxrank/inputs.go"
 
 func splitItem(id string, files ...string) string {
+	return splitItemWith(id, []string{"the grader judges this"}, files...)
+}
+
+func splitItemWith(id string, acceptance []string, files ...string) string {
 	list, _ := json.Marshal(files)
+	criteria, _ := json.Marshal(acceptance)
 	return `{"id":"` + id + `","kind":"feature","priority_class":"debuggability","weight":0.5,` +
 		`"title":"Mixed work","files":` + string(list) + `,` +
-		`"summary":"Two surfaces.","fix":"Change both.","acceptance":["the grader judges this"]}`
+		`"summary":"Two surfaces.","fix":"Change both.","acceptance":` + string(criteria) + `}`
 }
 
 func splitRoot(t *testing.T, item string) string {
@@ -393,5 +399,103 @@ func TestSplitInbox_ItemReadFailureIsReported(t *testing.T) {
 	defer func() { readSplitItem = prev }()
 	if _, err := newSplitInbox(inboxmover.Options{ProjectRoot: root}).Item("mixed"); err == nil {
 		t.Error("no error")
+	}
+}
+
+func stringsOf(t *testing.T, fields map[string]any, key string) []string {
+	t.Helper()
+	var out []string
+	for _, v := range fields[key].([]any) {
+		out = append(out, v.(string))
+	}
+	return out
+}
+
+func TestCmd_InboxSplit_ADirectoryThatHoldsProtectedSurfaceStaysOnTheConsolePart(t *testing.T) {
+	for _, dir := range []string{"go/internal/core", "go/internal/core/", "go/internal/core/ (the orchestrator)", "go/cmd/evolve"} {
+		root := splitRoot(t, splitItem("mixed", splitProtectedFile, dir, splitLaneFile))
+		var stdout, stderr bytes.Buffer
+
+		rc := runInbox([]string{"split", "mixed"}, nil, &stdout, &stderr)
+
+		if rc != 0 {
+			t.Fatalf("%q: rc = %d stderr = %q", dir, rc, stderr.String())
+		}
+		console := stringsOf(t, itemFields(t, inboxFile(t, root, "", "mixed-console")), "files")
+		lane := stringsOf(t, itemFields(t, inboxFile(t, root, "", "mixed-lane")), "files")
+		if !slices.Equal(console, []string{splitProtectedFile, dir}) || !slices.Equal(lane, []string{splitLaneFile}) {
+			t.Errorf("%q: console files = %v, lane files = %v, want the directory on the console part", dir, console, lane)
+		}
+	}
+}
+
+func TestCmd_InboxSplit_TheLanePartKeepsTheCriteriaThatNameOnlyLaneFiles(t *testing.T) {
+	item := splitItemWith("mixed", []string{
+		splitLaneFile + " returns the sorted list",
+		splitProtectedFile + " rejects an empty id",
+		"the suite stays green",
+	}, splitProtectedFile, splitLaneFile)
+	root := splitRoot(t, item)
+	var stdout, stderr bytes.Buffer
+
+	if rc := runInbox([]string{"split", "mixed"}, nil, &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d stderr = %q", rc, stderr.String())
+	}
+
+	lane := stringsOf(t, itemFields(t, inboxFile(t, root, "", "mixed-lane")), "acceptance")
+	console := stringsOf(t, itemFields(t, inboxFile(t, root, "", "mixed-console")), "acceptance")
+	if want := []string{splitLaneFile + " returns the sorted list", "the suite stays green"}; !slices.Equal(lane, want) {
+		t.Errorf("lane acceptance = %v, want %v", lane, want)
+	}
+	if want := []string{splitProtectedFile + " rejects an empty id", "the suite stays green"}; !slices.Equal(console, want) {
+		t.Errorf("console acceptance = %v, want %v", console, want)
+	}
+}
+
+func TestCmd_InboxSplit_RefusesAnItemWhoseLanePartWouldHaveNoCriterionAndFilesNothing(t *testing.T) {
+	root := splitRoot(t, splitItemWith("mixed", []string{splitProtectedFile + " rejects an empty id"}, splitProtectedFile, splitLaneFile))
+	before := listInboxTree(t, root)
+	var stdout, stderr bytes.Buffer
+
+	rc := runInbox([]string{"split", "mixed"}, nil, &stdout, &stderr)
+
+	if rc != 1 || !strings.Contains(stderr.String(), "lane part") {
+		t.Errorf("rc = %d stderr = %q", rc, stderr.String())
+	}
+	if after := listInboxTree(t, root); strings.Join(before, "\n") != strings.Join(after, "\n") {
+		t.Error("the tree changed")
+	}
+}
+
+func TestCmd_InboxSplit_ALanePartThatOnlyRegistersARatchetWaitsForTheConsolePartAndSaysSo(t *testing.T) {
+	root := splitRoot(t, splitItem("mixed", splitProtectedFile, "go/.cover-strict"))
+	var stdout, stderr bytes.Buffer
+
+	rc := runInbox([]string{"split", "mixed"}, nil, &stdout, &stderr)
+
+	if rc != 0 {
+		t.Fatalf("rc = %d stderr = %q", rc, stderr.String())
+	}
+	if deps := itemFields(t, inboxFile(t, root, "", "mixed-lane"))["deps"]; mustJSON(t, deps) != `["mixed-console"]` {
+		t.Errorf("deps = %v", deps)
+	}
+	if !strings.Contains(stdout.String(), "waits for mixed-console") {
+		t.Errorf("stdout = %q, want the wait named", stdout.String())
+	}
+}
+
+func TestCmd_InboxSplit_RefusesAnItemWhoseTextNamesAConsoleFileByItsBasename(t *testing.T) {
+	item := strings.Replace(splitItem("mixed", splitProtectedFile, splitLaneFile), "Change both.", "Tighten weightsort_ban_test.go first.", 1)
+	root := splitRoot(t, item)
+	before := listInboxTree(t, root)
+	var stdout, stderr bytes.Buffer
+
+	rc := runInbox([]string{"split", "mixed"}, nil, &stdout, &stderr)
+
+	if rc != 1 || !strings.Contains(stderr.String(), "weightsort_ban_test.go") {
+		t.Errorf("rc = %d stderr = %q", rc, stderr.String())
+	}
+	if after := listInboxTree(t, root); strings.Join(before, "\n") != strings.Join(after, "\n") {
+		t.Error("the tree changed")
 	}
 }

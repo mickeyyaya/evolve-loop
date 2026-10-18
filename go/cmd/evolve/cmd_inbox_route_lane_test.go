@@ -90,6 +90,18 @@ func TestCmd_InboxRouteLane_RefusesADeclaredProtectedFile(t *testing.T) {
 	}
 }
 
+func TestCmd_InboxRouteLane_RefusesAnOperatorItemThatListsAProtectedDirectoryEvenOverRouteLane(t *testing.T) {
+	d := pipelineRepairInbox(t, "task-1", `{"id":"task-1","kind":"hardening","route":"console","routed_reason":"a large task","files":["go/cmd/evolve","go/internal/explanationdocs","go/internal/core"]}`)
+	t.Setenv("EVOLVE_PROJECT_ROOT", d)
+	var stdout, stderr bytes.Buffer
+
+	rc := runInbox([]string{"route-lane", "task-1", "operator"}, nil, &stdout, &stderr)
+
+	if rc != 1 || !strings.Contains(stderr.String(), "protected fix surface: go/internal/explanationdocs") {
+		t.Errorf("rc = %d stderr = %q; want 1 naming the protected directory", rc, stderr.String())
+	}
+}
+
 func TestCmd_InboxRouteLane_AnUnreadableInboxExits2(t *testing.T) {
 	d := pipelineRepairInbox(t, "task-1", `{"id":"task-1","kind":"pipeline-repair"}`)
 	inbox := filepath.Join(d, ".evolve", "inbox")

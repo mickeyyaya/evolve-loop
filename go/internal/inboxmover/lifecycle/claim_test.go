@@ -48,8 +48,8 @@ func TestMover_Claim_Refused_EmitsClaimRefused(t *testing.T) {
 	if _, err := protected.Claim("task-y", "7"); !errors.Is(err, ErrConsoleRouted) {
 		t.Errorf("a protected fix surface refuses with a predicate: %v", err)
 	}
-	if res, err := protected.Claim("task-z", "7"); err != nil || res.DestPath == "" {
-		t.Errorf("route:lane claims a declared directory scope: %+v %v", res, err)
+	if _, err := protected.Claim("task-z", "7"); !errors.Is(err, ErrConsoleRouted) {
+		t.Errorf("route:lane cannot relax a declared protected directory: %v", err)
 	}
 	if _, err := protected.Claim("task-w", "7"); !errors.Is(err, ErrConsoleRouted) {
 		t.Errorf("route:lane cannot relax a declared protected file: %v", err)

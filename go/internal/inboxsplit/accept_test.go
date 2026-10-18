@@ -220,3 +220,22 @@ func TestAccept_AConsolePartThatCannotBeFiledWritesNothingElse(t *testing.T) {
 		t.Errorf("err = %v, calls = %v, pending = %d", err, f.calls, len(f.pending))
 	}
 }
+
+func TestAccept_ReportsWhetherTheLanePartWaitsForTheConsolePart(t *testing.T) {
+	plain := newFake(t)
+	res, err := Accept(plain, "fix-it", isProtected, false)
+	if err != nil || res.LaneWaits {
+		t.Fatalf("plain: res = %+v, err = %v, want a lane part that starts at once", res, err)
+	}
+
+	needy := newFake(t)
+	needy.pending["fix-it"] = itemWith(t, map[string]any{"files": []string{"guard/a.go", "go/.cover-strict"}})
+	res, err = Accept(needy, "fix-it", isProtected, false)
+	if err != nil || !res.LaneWaits {
+		t.Fatalf("registry-only lane part: res = %+v, err = %v, want a lane part that waits", res, err)
+	}
+	var lane map[string]json.RawMessage = needy.pending["fix-it-lane"]
+	if !reflect.DeepEqual(strs(t, lane, "deps"), []string{"other", "fix-it-console"}) {
+		t.Errorf("filed lane deps = %v", strs(t, lane, "deps"))
+	}
+}

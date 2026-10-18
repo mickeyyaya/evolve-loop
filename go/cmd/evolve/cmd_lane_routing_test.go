@@ -38,6 +38,24 @@ func TestLaneForbidden_WithoutTheBuilderProfileWarnsAndJudgesProtectedSurface(t 
 	}
 }
 
+func TestLaneForbidden_ADirectoryThatOnlyHoldsProtectedSurfaceStaysLaneWork(t *testing.T) {
+	t.Parallel()
+	for name, root := range map[string]string{"the repo builder profile": findRepoRoot(t), "no builder profile": t.TempDir()} {
+		var warn bytes.Buffer
+		forbidden := laneForbidden(root, &warn)
+		for _, dir := range []string{"go/internal/core", "go/internal/core/", "go/cmd/evolve"} {
+			if forbidden(dir) {
+				t.Errorf("%s: forbidden(%q) = true, want false (ADR-0139 decision 5)", name, dir)
+			}
+		}
+		for _, protected := range []string{"go/internal/explanationdocs", "go/internal/core/orchestrator.go"} {
+			if !forbidden(protected) {
+				t.Errorf("%s: forbidden(%q) = false, want true", name, protected)
+			}
+		}
+	}
+}
+
 func TestLaneForbidden_ARootThatNeverRoutesStaysSilent(t *testing.T) {
 	t.Parallel()
 	var warn bytes.Buffer

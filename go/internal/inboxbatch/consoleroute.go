@@ -32,7 +32,7 @@ func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 	if route == RouteLaneValue {
 		switch {
 		case surface.binding:
-			return true, surface.reason + " (route:lane cannot relax a declared protected file: triage's breaker and the ship tripwire refuse it whatever the route)"
+			return true, surface.reason + " (route:lane cannot relax a declared protected path: triage's breaker refuses it whatever the route)"
 		case strings.TrimSpace(it.InjectedBy) == "":
 			return false, ""
 		default:
@@ -59,18 +59,13 @@ func protectedDerivation(it Item, isProtected func(string) bool) surfaceDerivati
 	if isProtected == nil {
 		return surfaceDerivation{}
 	}
-	var scope surfaceDerivation
 	for _, tok := range declaredTokens(it.Files) {
-		switch {
-		case !isProtected(tok):
-		case isFileSpelling(tok):
+		if isProtected(tok) {
 			return surfaceDerivation{routed: true, binding: true, reason: "protected fix surface: " + tok}
-		case !scope.routed:
-			scope = surfaceDerivation{routed: true, reason: "protected fix surface: " + tok}
 		}
 	}
-	if scope.routed || it.DeclaredSurface() {
-		return scope
+	if it.DeclaredSurface() {
+		return surfaceDerivation{}
 	}
 	for _, p := range it.mentions {
 		if isProtected(p) {
