@@ -576,6 +576,7 @@ OuterLoop:
 			break OuterLoop
 		}
 		if next == PhaseBuild {
+			cr.predicatesAtBuild = cyclePredicateSources(cr.cs.ActiveWorktree, cr.cycle)
 			if err := sealBuildExplanationContext(req.ProjectRoot, cr.cs); err != nil {
 				return cr.result, fmt.Errorf("seal Build explanation context: %w", err)
 			}
@@ -598,8 +599,12 @@ OuterLoop:
 			continue
 		}
 
-		if act, rerr := cr.reviewAndGuard(next, &dr); act == loopAbort {
+		switch act, rerr := cr.reviewAndGuard(next, &dr); act {
+		case loopAbort:
 			return cr.result, rerr
+		case loopBreak:
+			cr.reachedPhaseEnd = true
+			break OuterLoop
 		}
 
 		if act, merr := cr.maybeRemediate(next, &dr); act == loopAbort {

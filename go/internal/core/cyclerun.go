@@ -43,6 +43,8 @@ type cycleRun struct {
 	ctx context.Context
 
 	protectedRouteDiags []Diagnostic
+	predicatesAtBuild   map[string]string
+	lastBlockerRefusal  string
 
 	req            CycleRequest
 	cycle          int

@@ -240,3 +240,18 @@ func TestProtectedSurfaceManifest_CoversTheDerivedOutputCatalog(t *testing.T) {
 		t.Error("a sibling package that only shares the prefix is not the catalog")
 	}
 }
+
+func TestProtectedSurfaceManifest_CoversTheBlockerProof(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/core/blocker_proof.go",
+		"go/internal/core/build_blocker_exit.go",
+		"/wt/go/internal/core/floor_blocker_notes.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("%q decides whether a lane's claimed blocker is real; a lane that edits it can turn its own FAIL into a console route", path)
+		}
+	}
+	if IsProtectedSurface("go/internal/core/blocker_proof_test.go") {
+		t.Error("the prover's tests stay cycle territory")
+	}
+}

@@ -15,6 +15,8 @@ const CycleTerminationTriageNoWork = "triage-empty-commitment"
 
 const CycleTerminationTddProtectedRoute = "tdd-protected-predicate-route"
 
+const CycleTerminationBlockedNeedsConsole = "blocked-needs-console"
+
 const CycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
 
 const CycleTerminationLaneWorktreeDeferred = "lane-worktree-deferred"

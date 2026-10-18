@@ -25,6 +25,7 @@ func (o *Orchestrator) reviewInputFor(cs CycleState, phase Phase, projectRoot st
 	in.Response = resp
 	in.BreakerExempt = o.degradesOnExhaustion(phase, cs.CompletedPhases)
 	in.Signals = o.signals
+	in.Protected = o.protectedSurface
 	return in
 }
 

@@ -95,3 +95,19 @@ func TestClassify_UnreadableRecord_FallsThrough(t *testing.T) {
 		t.Errorf("a corrupt record is not a refusal: %+v", r)
 	}
 }
+
+func TestClassify_AHostProvenBlockerOutranksTheLanesOwnFailSentinel(t *testing.T) {
+	ws := t.TempDir()
+	writePhaseTiming(t, ws, []phasetiming.Entry{
+		{Phase: "tdd", Verdict: "PASS"},
+		{Phase: "build", Verdict: "FAIL", Diagnostics: []cyclestate.Diagnostic{{Severity: cyclestate.SeverityError, Message: "blocked: needs console", Code: cyclestate.DiagCodeBlockerRoute, Subject: "item-1"}}},
+	})
+	sentinel := "# build\n<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"FAIL\",\"schema_version\":2,\"failure\":{\"class\":\"code-build-fail\",\"defects\":[\"BLOCKER protected-path go/x.go why\"]}} -->\n"
+	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(sentinel), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := Classify(ws)
+	if r.Class != ClassPhaseRefusal || r.Marker != cyclestate.DiagCodeBlockerRoute || r.Subject != "item-1" || r.Phase != "build" {
+		t.Errorf("the host's proof of the lane's claim supersedes the lane's FAIL: %+v", r)
+	}
+}

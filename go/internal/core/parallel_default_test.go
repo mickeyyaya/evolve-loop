@@ -53,6 +53,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestGitAndFileHelperCoverage":                                                             changesDirectory,
 	"core.TestGitWorktree_RelativeBaseRefused":                                                      changesDirectory,
 	"core.TestGitWorktree_RelativeProjectRootRefused":                                               changesDirectory,
+	"core.TestWorktreeDiffSince_AGitFaultIsAnEvidenceFaultNotAnEmptyDiff":                           setsEnv,
 	"core.TestNewCycleRun_RejectsRootCycleOccupiedInFetchedWorktree":                                setsEnv,
 	"core.TestNoteContractGateDemotion_EachFailingSinkWarnsAndTheOthersStillRecord":                 setsEnv,
 	"core.TestWriteBuildSelfCheck_HealthyWriteIsSilent":                                             swapsStderr,

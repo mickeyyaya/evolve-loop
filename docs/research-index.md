@@ -337,3 +337,10 @@ approaches / decision / results / retro) — lives at
 | [plans/phase-handoff-contract-2026-10.md](plans/phase-handoff-contract-2026-10.md) | Plan: four approaches with weighted scores. The winner is one handoff contract: a request, a ledger, a deterministic check and then a judge, with three exits. Decisions D1 to D12 and components H1 to H12 with red tests. |
 | [architecture/adr/0141-every-phase-handoff-is-a-request-build-check-loop-with-three-exits.md](architecture/adr/0141-every-phase-handoff-is-a-request-build-check-loop-with-three-exits.md) | Decision (Accepted): every phase pair runs a request, build and check loop. The exits are pass, cap and blocked. Only deterministic proof blocks. |
 | [architecture/phase-handoff-contract.md](architecture/phase-handoff-contract.md) | Design, the spec of record: the pairs and their requests, the ledger schema and the two layers of the check. It also gives the exits, the chain in the audit and a worked example on cycle 1950. |
+
+## 2026-10-19 — a proven blocker stops the correction rounds
+
+| Document | What it records |
+|---|---|
+| [plans/build-blocker-exit-2026-10.md](plans/build-blocker-exit-2026-10.md) | Plan: cycles 1946 and 1950 used all their correction rounds on blockers that no lane edit can fix. Three designs with weighted scores. The winner proves each `BLOCKER` claim in the review loop. Decisions D1 to D10 and components K1 to K7 with red tests. |
+| [architecture/blocker-exit.md](architecture/blocker-exit.md) | Spec: the claim grammar, the `BlockerProver` seam, the loop exit, the `blocked-needs-console` ending, the console route and the floor text. |
