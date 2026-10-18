@@ -149,10 +149,19 @@ The supply that the pool gets at `enforce` is the ranked backlog up to `max(flee
 
 The census never routes an item itself. ADR-0074 keeps the routing authority, and the four guards of F2.23 keep the protected files safe.
 
-**State: the library is built (O6, 2026-10-18). The loop call and `evolve wave supply` are pending.** `orchestrator.Census` ([internal-orchestrator.md](packages/internal-orchestrator.md)) has two calls:
+**State: built (O6, 2026-10-18).** `orchestrator.Census` ([internal-orchestrator.md](packages/internal-orchestrator.md)) has two calls:
 
 - `Count` reads the inbox and writes nothing. It returns the count of each class, the cause of each refusal and the split proposals.
 - `Take` runs `Count`. Then it appends the record to `.evolve/waves/supply.json`, which keeps the last 12 plans, and it publishes the events.
+
+The loop and the console use the two calls as follows:
+
+- The loop calls `Take` one time for each plan, in `dispatchFleetIteration`. The call is after the disk check and before the plan.
+- When no plan runs, the loop makes no call.
+- The census and the pool admission of one plan share one load of the module graph.
+- When that load fails, the census counts each ready item as `admissible` and prints a `[loop] WARN` line.
+- A census error prints a `[loop] WARN` line. It never stops the loop.
+- `evolve wave supply` calls `Count`. It writes no record and publishes no event (§13).
 
 The census builds on the lane menu of `inboxmover.RankLaneMenu`, the same menu as `evolve inbox rank`:
 
@@ -161,7 +170,7 @@ The census builds on the lane menu of `inboxmover.RankLaneMenu`, the same menu a
 - The ready items go to `admission.Admitter` in rank order, with the lanes in flight as holdings. An item that conflicts with an earlier admitted item is `waiting_cell`, as in §6 step 7.
 - With no module graph, every ready item is `admissible`, and the record holds a warning.
 
-The registry spells the event `orchestrator.supply` as `LOOP_ORCH_SUPPLY`, because a code must match `MODULE_SNAKE_CASE`. The proposal step is a function value. A nil value proposes nothing. The wiring to `inboxsplit.Proposals` waits for PR #959.
+The registry spells the event `orchestrator.supply` as `LOOP_ORCH_SUPPLY`, because a code must match `MODULE_SNAKE_CASE`. The proposal step is a function value. A nil value proposes nothing. The wiring to `inboxsplit.Proposals` waits for PR #959. Until then, the loop and `evolve wave supply` pass a nil value, and the proposals stay empty.
 
 **The directory rule (built, O2b, 2026-10-17; amended, 2026-10-18).** A declared directory routes to the console only when it lies inside a protected fragment (ADR-0139 decision 5). Thus `files: ["go/internal/core/"]` is lane work.
 
@@ -376,7 +385,7 @@ The deadline needs a timer, because "nothing happened" is not an event. The loop
 
 The loop observes and acts only on its own lanes. It does not edit a lane's worktree, its verdict or its ship. The landing stays with ADR-0128 and ADR-0134.
 
-**State: the library is built (O6, 2026-10-18). The loop wiring is pending.** `orchestrator.Oversight` ([internal-orchestrator.md](packages/internal-orchestrator.md)) runs `Next` of `internal/events/reader` in a loop. The reader arms the kernel wake, reads to the end of each log, and then waits. The oversight arms no timer. The lease table of §8 keeps the one timer.
+**State: the library is built (O6, 2026-10-18). The loop wiring of the oversight waits for the event producers E10 and E11 of the [event notification plan](../plans/event-notification-protocol-2026-10.md).** `orchestrator.Oversight` ([internal-orchestrator.md](packages/internal-orchestrator.md)) runs `Next` of `internal/events/reader` in a loop. The reader arms the kernel wake, reads to the end of each log, and then waits. The oversight arms no timer. The lease table of §8 keeps the one timer.
 
 The oversight finds the lane of an event by the cycle number. A lane that no cycle holds yet, and a cycle of another loop, get no action.
 
@@ -450,7 +459,7 @@ The window never stops a lane in flight. A smaller window only delays the next a
 | `conflict_rate` | the landed lanes that needed a rebase or a re-audit at landing, over all landed lanes (`conflicts`, `landed`) | `recoverFromShipError` calls `recordShipError` before it recovers. A lane that rebased and then landed thus still holds the event: a `ship.error` with `SHIP_GIT_FLEET_REBASE_NEEDED`, `SHIP_GIT_FLEET_REBASE_CONFLICT` or `SHIP_AUDIT_BINDING_HEAD_MOVED` in the lane's stream |
 | `admission_waits` | the todos that waited for a cell. It is 0 until O3 registers its code. | the count of `LOOP_ORCH_ADMIT_WAIT` in the run |
 | `deadline_stops` | the lanes that the lease stopped | not built: it arrives with O5, which emits `LOOP_ORCH_LANE_DEADLINE` |
-| `supply` | the class counts of the last census (§4) | `Measures.Supply` carries it. The read of `.evolve/waves/supply.json` by `wave status` is pending (O6) |
+| `supply` | the class counts of the last census (§4) | `Measures.Supply` carries it. `wave status` reads `.evolve/waves/supply.json` and takes the last census inside the run (O6). A run with no census has no `supply`. A record that it cannot read gives a warning, and the other measures stay. |
 
 The facts:
 
@@ -576,7 +585,7 @@ Each code goes into the Signal Center registry.
 | Command | What it does |
 |---|---|
 | `evolve wave status [--json]` | adds the measures of §11 and the cell table |
-| `evolve wave supply [--json]` | runs the census (§4) read-only and prints its classes and its split proposals. Pending (O6). |
+| `evolve wave supply [--json]` | runs the census (§4) read-only and prints its classes, the cause of each refusal and its split proposals. It writes no record. Built (O6). |
 | `evolve inbox split <id> [--lane-after-console] [--json] [--project-root P]` | the console accepts a split proposal (§4). Built (O2c). |
 
 ## 14. Stages

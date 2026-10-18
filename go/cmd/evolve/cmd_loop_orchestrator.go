@@ -13,7 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const laneTimeWindow = 50
@@ -71,9 +70,7 @@ func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fl
 }
 
 func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, iteration int) orchestrator.Admit {
-	ctx, cancel := context.WithTimeout(b.ctx, admissionGraphTimeout)
-	defer cancel()
-	graph, err := admission.LoadModuleGraph(ctx, sysexec.DefaultRunner, filepath.Join(b.cfg.ProjectRoot, "go"), oc.HubMinImporters)
+	graph, err := b.moduleGraph(oc, iteration)
 	if err != nil {
 		fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: pool %d admits by the file rule; the module graph did not load: %v\n", iteration, err)
 		return nil

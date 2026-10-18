@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
@@ -29,6 +30,10 @@ func recordWaveSized(signals *signalcenter.Center, n, desired, sized int) {
 
 func measureWaveRuns(plane wavePlaneDirs, records []wave.Record, current []wave.Cycle, live bool, now time.Time) ([]waveRunMeasures, []string) {
 	loop, warnings := wave.ReadLoopSignals(plane.root)
+	supply, err := orchestrator.ReadSupply(waveSupplyPath(plane.evolveDir))
+	if err != nil {
+		warnings = append(warnings, err.Error())
+	}
 	policyWidth := loadFleetConfig(plane.evolveDir, io.Discard, nilSignals()).Count
 	runs := []waveRunMeasures{}
 	for i := max(0, len(records)-waveMeasuredRuns); i < len(records); i++ {
@@ -42,11 +47,19 @@ func measureWaveRuns(plane wavePlaneDirs, records []wave.Record, current []wave.
 			rec.EndedAt = &ended
 		}
 		facts, source := wave.MeasureFacts(rec, next, cycles, loop, policyWidth)
+		if census, ok := orchestrator.SupplyIn(supply, facts.Start, facts.End); ok {
+			counts := census.Measure()
+			facts.Supply = &counts
+		}
 		runs = append(runs, waveRunMeasures{Wave: rec.Number, RunID: rec.RunID, WidthSource: source, Measures: wavemeasure.Compute(facts, now)})
 	}
 	return runs, warnings
 }
 
 func writeWaveMeasuresText(w io.Writer, m wavemeasure.Measures) {
-	fmt.Fprintf(w, "measures: width %d/%d · utilization %.2f · conflicts %d/%d\n", m.WidthRealized, m.WidthSized, m.Utilization, m.Conflicts, m.Landed)
+	fmt.Fprintf(w, "measures: width %d/%d · utilization %.2f · conflicts %d/%d", m.WidthRealized, m.WidthSized, m.Utilization, m.Conflicts, m.Landed)
+	if s := m.Supply; s != nil {
+		fmt.Fprintf(w, " · supply %d admissible, %d waiting, %d console", s.Admissible, s.WaitingCell+s.WaitingDeps, s.ConsoleRoute+s.ConsoleKind+s.ConsoleProtected)
+	}
+	fmt.Fprintln(w)
 }

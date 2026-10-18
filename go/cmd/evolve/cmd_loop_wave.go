@@ -55,6 +55,10 @@ func nullWaveEngine(roots loopwave.Roots, warn io.Writer) *loopwave.Engine {
 
 func shouldRunWave(fc policy.FleetConfig) bool { return loopwave.ShouldRunWave(fc) }
 
+func fleetPlanRuns(fc policy.FleetConfig) bool {
+	return shouldRunWave(fc) || loopwave.ShouldRunPool(fc)
+}
+
 func loadFleetConfig(evolveDir string, warn io.Writer, signals *signalcenter.Center) policy.FleetConfig {
 	return loopwave.LoadFleetConfig(evolveDir, warn, signals)
 }

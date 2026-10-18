@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
@@ -223,5 +225,85 @@ func TestCloseLastWave_WithNoLoopLogEndsAtTheClock(t *testing.T) {
 	records, err := p.store().Records()
 	if err != nil || len(records) != 1 || records[0].EndedAt == nil || !records[0].EndedAt.Equal(waveTestClock) {
 		t.Errorf("records = %+v, %v; want wave 3 closed at the clock", records, err)
+	}
+}
+
+func (p wavePlane) seedSupplyRecords() {
+	p.t.Helper()
+	ago := func(m int) time.Time { return waveTestClock.Add(-time.Duration(m) * time.Minute) }
+	path := waveSupplyPath(p.evolveDir())
+	for _, s := range []orchestrator.Supply{
+		{At: ago(570), Counts: map[string]int{orchestrator.ClassAdmissible: 1}},
+		{At: ago(500), Counts: map[string]int{orchestrator.ClassAdmissible: 2}},
+		{At: ago(110), Counts: map[string]int{orchestrator.ClassAdmissible: 5}},
+		{At: ago(100), Counts: map[string]int{orchestrator.ClassAdmissible: 3, orchestrator.ClassWaitingDeps: 4, orchestrator.ClassConsoleProtected: 40}},
+	} {
+		if err := orchestrator.AppendSupply(path, s); err != nil {
+			p.t.Fatal(err)
+		}
+	}
+}
+
+func TestWaveStatus_ReportsTheSupplyOfTheLastCensusOfEachRun(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	p.seedMeasuredRuns()
+	p.seedSupplyRecords()
+	h := newWaveHarness()
+
+	rc := h.run("status", "--json", "--project-root", p.root)
+
+	var got waveStatusReport
+	if err := json.Unmarshal(h.stdout.Bytes(), &got); err != nil || rc != 0 {
+		t.Fatalf("rc = %d, decode %v:\n%s", rc, err, h.stdout.String())
+	}
+	current := &wavemeasure.Supply{Admissible: 3, WaitingDeps: 4, ConsoleProtected: 40}
+	if len(got.Runs) != waveMeasuredRuns || !reflect.DeepEqual(got.Runs[0].Measures.Supply, &wavemeasure.Supply{Admissible: 1}) ||
+		!reflect.DeepEqual(got.Runs[1].Measures.Supply, &wavemeasure.Supply{Admissible: 2}) || !reflect.DeepEqual(got.Runs[2].Measures.Supply, current) {
+		t.Errorf("run supply = %+v %+v %+v, want the last census inside the window of each run, oldest first", got.Runs[0].Measures.Supply, got.Runs[1].Measures.Supply, got.Runs[2].Measures.Supply)
+	}
+	if !reflect.DeepEqual(got.Measures.Supply, current) {
+		t.Errorf("current supply = %+v, want the last census of the current run %+v", got.Measures.Supply, current)
+	}
+}
+
+func TestWaveStatus_TheTextLineNamesTheSupplyOfTheCurrentRunAndARunWithNoCensusHasNone(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	p.seedMeasuredRuns()
+	p.seedSupplyRecords()
+	h := newWaveHarness()
+
+	rc := h.run("status", "--project-root", p.root)
+
+	if want := "measures: width 1/3 · utilization 0.42 · conflicts 1/2 · supply 3 admissible, 4 waiting, 40 console\n"; rc != 0 || !strings.Contains(h.stdout.String(), want) {
+		t.Errorf("rc = %d; stdout lacks %q:\n%s", rc, want, h.stdout.String())
+	}
+	bare := newWavePlane(t)
+	bare.seedMeasuredRuns()
+	var report waveStatusReport
+	if h.run("status", "--json", "--project-root", bare.root); json.Unmarshal(h.stdout.Bytes(), &report) != nil || report.Measures.Supply != nil || report.Runs[0].Measures.Supply != nil {
+		t.Errorf("a plane with no census gave supply %+v, want none", report.Measures.Supply)
+	}
+}
+
+func TestWaveStatus_ABrokenSupplyRecordIsAWarningAndTheMeasuresStayWhole(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	p.seedMeasuredRuns()
+	p.write(".evolve/waves/supply.json", "{not json")
+	h := newWaveHarness()
+
+	rc := h.run("status", "--json", "--project-root", p.root)
+
+	var got waveStatusReport
+	if err := json.Unmarshal(h.stdout.Bytes(), &got); err != nil || rc != 0 {
+		t.Fatalf("rc = %d, decode %v:\n%s", rc, err, h.stdout.String())
+	}
+	if got.Measures.Supply != nil || got.Measures.Landed != 2 {
+		t.Errorf("measures = %+v, want the other measures whole and no supply", got.Measures)
+	}
+	if len(got.Warnings) != 1 || !strings.Contains(got.Warnings[0], "supply record") {
+		t.Errorf("warnings = %q, want one that names the supply record", got.Warnings)
 	}
 }

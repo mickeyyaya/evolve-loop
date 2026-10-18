@@ -14,7 +14,11 @@ This page tells the console (an operator or an LLM) how to run each wave through
 - To queue a fact for the next goal, run `evolve wave note add "<text>"`. Use one note for each fact. Write it in ASD-STE100. `evolve wave note list --json` shows the queue.
 - To see the state, run `evolve wave status --json`. It reads cycle state, signals and landing intents. It does not change anything.
   - The text output has one measures line, for example `measures: width 2/3 · utilization 0.71 · conflicts 0/2`. It gives the realized width over the sized width and the utilization. Then it gives the landed lanes with a rebase or a re-audit over all landed lanes.
+  - When the run has a census, the line ends with the supply, for example `· supply 3 admissible, 4 waiting, 40 console`.
   - The JSON has `measures` for the current run and `runs` for the last 3 runs. `width_source: policy` tells you that the run has no sizing record, and that `width_sized` is `fleet.count`. The definitions are in [wave-orchestrator.md §11](../architecture/wave-orchestrator.md#11-measures).
+- To see the supply of work for the lanes, run `evolve wave supply`. It counts the inbox items in six classes and shows the cause of each refusal. It changes nothing. Add `--json` for the full census.
+  - The classes are `admissible`, `waiting_cell`, `waiting_deps`, `console_route`, `console_kind` and `console_protected`. The definitions are in [wave-orchestrator.md §4](../architecture/wave-orchestrator.md#4-the-supply-census).
+  - The loop takes the same census at the start of each plan and keeps the last 12 in `.evolve/waves/supply.json`. When the `admissible` count is below the window, the loop publishes `LOOP_ORCH_SUPPLY_SHORT`.
 - To follow the wave, run `evolve wave watch` under a monitor. It prints one line for each phase change, seal, ship and quota pause. It exits when the loop exits. When a newer wave starts, it prints `wave-started` and follows the newer wave.
 
 ## 3. At the boundary
