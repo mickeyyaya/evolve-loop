@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The index a reader sees still lists every page with its entry count"
+  ],
+  "created_at": "2026-10-16T01:12:56Z",
+  "files": [
+    "go/internal/commentaudit/history.go"
+  ],
+  "fix": "Stop tracking the generated index rows. Either generate the index at read time (a docs build step or an `evolve comments history index` verb), or register a git merge driver that re-runs writeHistoryIndex. A page that two branches append to also needs a union merge (`merge=union` in .gitattributes) for its appended sections.",
+  "id": "history-index-merge-conflict-console",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console boundary train w100, 2026-10-16",
+  "split_from": "history-index-merge-conflict",
+  "summary": "Every comment-zero branch rewrites the generated table in docs/history/code-comments/README.md and appends a section to shared pages such as internal-core.md. On 2026-10-16, each of seven branches conflicted with the others there, and main's index was found stale by two counts after an earlier hand-merge. The landing needed a scratch rebuild script and a train.",
+  "title": "The generated comment-history index conflicts on every parallel merge (console part)",
+  "weight": 0.4
+}

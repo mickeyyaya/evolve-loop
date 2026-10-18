@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A test fails when a fleet-mode advisor input has an empty ActiveWorktree.",
+    "internal/router and the caller test pass with -count=1."
+  ],
+  "connects_to": [
+    "docs/architecture/packages/internal-router.md (Invariants: The fleet worktree is the caller's)"
+  ],
+  "created_at": "2026-10-09T00:00:00Z",
+  "files": [
+    "go/internal/core/advisor/"
+  ],
+  "fix": "Add a test in internal/router that builds the advisor input under EVOLVE_FLEET=1 with an empty ActiveWorktree and asserts the advisor-side guard refuses it, or the caller-side test in core asserts it is set. Then keep the invariant in the design page and remove the field reason from the test-less path.",
+  "id": "router-active-worktree-fleet-pin-console",
+  "kind": "test",
+  "notes": "Filed by the comment-reduction workstream (Phase 3d, batch r2). It is an invariant whose reason no test pins, so the one-line why goes with this item.",
+  "priority": "medium",
+  "priority_class": "stability",
+  "priority_rationale": "A fleet lane with an empty worktree fails at dispatch; the failure is loud but late.",
+  "root_cause": "The requirement lives only in the design notes; nothing fails when a fleet caller leaves ActiveWorktree empty.",
+  "split_from": "router-active-worktree-fleet-pin",
+  "summary": "internal/router RouteInput.ActiveWorktree is documented as required under EVOLVE_FLEET=1 because the tmux driver refuses an empty worktree. No test in internal/router or its callers pins that the advisor input carries it. The one-line why was removed by the comment-reduction batch 'phase 3d r2 (defectledger, router)' and recorded in docs/architecture/packages/internal-router.md.",
+  "title": "Pin the fleet-mode ActiveWorktree requirement with a router test (console part)",
+  "weight": 0.5
+}
