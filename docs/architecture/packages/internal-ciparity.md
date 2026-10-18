@@ -12,6 +12,7 @@
 - `PackageDirHasProductionGoFiles` is the one predicate both graduation seams consult. A test-only package has no exported production symbol, so its graduation obligation is vacuous.
 - `CoverageTags` is the one build-tag set. Every scoped coverage-measuring `go test` call builds through `CoverageTestArgs`.
 - `RequiredComposedGates` and `MissingComposedGates` define the full native gate set. A composed tree must record each gate as passing before ship's trivial-rebase fast path accepts it. The gates are the CI-parity runners the cycle audit uses (ADR-0069).
+- `E2ETestNames` and `E2ERunPattern` build the `-run` pattern of `make test-e2e`. A test belongs to the e2e tier when only the `e2e` tag adds its file to the package. `cmd/e2elist` is the thin command over `E2EMain`.
 
 ## Invariants
 
