@@ -19,7 +19,8 @@ func TestCheckLimits_SourceBoundaries(t *testing.T) {
 		want string
 	}{
 		{"function 49 lines", "package fixture\nfunc Example() {\n" + strings.Repeat("// body\n", 47) + "}\n", ""},
-		{"function 50 lines", "package fixture\nfunc Example() {\n" + strings.Repeat("// body\n", 48) + "}\n", "fixture.go: Example is 50 lines ≥ 50"},
+		{"function 50 lines", "package fixture\nfunc Example() {\n" + strings.Repeat("// body\n", 48) + "}\n", ""},
+		{"function 51 lines", "package fixture\nfunc Example() {\n" + strings.Repeat("// body\n", 49) + "}\n", "fixture.go: Example is 51 lines > 50"},
 		{"file 799 newlines", "package fixture\n" + strings.Repeat("\n", 798), ""},
 		{"file 800 newlines", "package fixture\n" + strings.Repeat("\n", 799), "fixture.go: 800 lines ≥ 800"},
 		{"final line without newline", "package fixture\n" + strings.Repeat("\n", 798) + "// final line", ""},

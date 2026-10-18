@@ -16,8 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
-	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
-	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
 
 const routingShipHint = "ship with: evolve ship --class manual (at a wave boundary)"
@@ -51,7 +49,7 @@ func runCLIRoutingWrite(verb string, args []string, stdout, stderr io.Writer) in
 		fmt.Fprintf(stderr, "evolve cli-routing %s: %v (%s)\n", verb, err, cliRoutingUsage)
 		return exitRoutingUsage
 	}
-	if err := refuseRoutingWrite(f.root, os.Getenv, time.Now()); err != nil {
+	if err := refuseBoundaryWrite(f.root, os.Getenv, time.Now(), "the routing table"); err != nil {
 		fmt.Fprintf(stderr, "evolve cli-routing %s: %v\n", verb, err)
 		return exitRoutingFinding
 	}
@@ -105,21 +103,6 @@ func splitRoutingList(value string) []string {
 		}
 	}
 	return out
-}
-
-func refuseRoutingWrite(root string, getenv func(string) string, now time.Time) error {
-	if subagent.ReadDispatchDepth(getenv) > 0 {
-		return errors.New("refused inside a phase: the routing table changes at a wave boundary, never from a phase agent")
-	}
-	live := runlease.LiveRuns(filepath.Join(root, ".evolve", "runs"), now)
-	if len(live) == 0 {
-		return nil
-	}
-	dirs := make([]string, 0, len(live))
-	for _, run := range live {
-		dirs = append(dirs, filepath.Base(run.Dir))
-	}
-	return fmt.Errorf("refused while a cycle runs (%s holds a live lease): change the table at a wave boundary", strings.Join(dirs, ", "))
 }
 
 func writeRoutingEdit(w routingWrite, edit routingEdit) int {
