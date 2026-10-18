@@ -1172,3 +1172,23 @@ The reasons that the comments of the phase-I/O, ports, reset, resume, repair, re
   - `ChainReviewers` short-circuits on the first rejection and carries earlier demotion evidence.
   - The wired-probe interfaces exist because core cannot import `internal/deliverable`.
 - **Tests that swap package hooks are serial.** In `quota_defer_retro_skip_test.go` and `quota_exhaustion_test.go`, the tests that assign `QuotaBoundaryCheckpointer` (or the sibling checkpoint hook) do not call `t.Parallel()`. The other tests in these files are parallel.
+
+## Test seams and the coverage floor
+
+The package is held at 100.0% statement coverage with `-tags integration`. The line `./internal/core 100` in `go/.cover-strict` enforces this floor. Cycles 1946 and 1950 built this work. Both cycles ended in FAIL, and the console landed it afterward.
+
+Two unexported package variables in `json_seam.go` let a test reach a failure that no real input can cause:
+
+| Seam | Default | Failure that it exposes |
+|---|---|---|
+| `marshalIndentJSON` | `json.MarshalIndent` | The encode-error branch of a writer. The encoder cannot fail on the plain structs that core writes. |
+| `randRead` | `rand.Read` | The entropy error in `MintRunID`. The guard zeroes the entropy and the run ID stays valid. |
+
+Rules for these seams:
+
+- Every `json.MarshalIndent` call in core that has an error branch goes through `marshalIndentJSON`. A new writer follows this rule, so its error branch stays testable.
+- A guard is covered through a seam. Do not delete a guard to reach 100.0%. Go 1.23 `rand.Read` can return an error, so the `MintRunID` guard stays.
+- A test that swaps a seam does not call `t.Parallel()`. Register the test in `serialRequiredTests` in `parallel_default_test.go`.
+- A test reaches each error branch through the real entry point, for example `writeBuildSelfCheckArtifact`, and not through the seam alone.
+
+For the related rule on test isolation, see [driver tests must be environment-hermetic](../../conventions/hermetic-driver-tests.md).
