@@ -3,6 +3,12 @@
     "Shortening a package doc that sits below a //go:build line passes `evolve comments verify` as comment-only (red first, on a fixture pair taken from acs/cycle14)",
     "A real change to the build directive is still reported"
   ],
+  "consumed": {
+    "at": "2026-10-18T16:50:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Root cause: the package doc in acs/cycle14 mentions IPC-protocol-allowed in prose, and the marker rule matched it in any comment of any file, so the edit changed a directive. No anchor field moved. verify now reads the marker only in files that envtaint parses (internal/envscope); a build directive change is still refused."
+  },
   "created_at": "2026-10-16T01:12:56Z",
   "files": [
     "go/internal/commentaudit/equivalence.go",
@@ -13,7 +19,7 @@
   "kind": "bug",
   "priority_class": "maintainability",
   "source": "comment-zero lane K1, 2026-10-16",
-  "summary": "In go/acs/cycle14/predicates_test.go the file starts with `//go:build acs`, then a blank line, then a package doc. Editing that doc makes `evolve comments verify` report \"directive changed\" (Equivalent -> anchoredDirectives in go/internal/commentaudit/equivalence.go). The lane had to leave acs/cycle14 untouched. The cause is not yet pinned: scanDirectives anchors on nextToken (code tokens only), trailing, blankBefore and paragraph, and none should move with the doc text. Reproduce with a before/after pair first.",
+  "summary": "In go/acs/cycle14/predicates_test.go the file starts with `//go:build acs`, then a blank line, then a package doc. Editing that doc makes `evolve comments verify` report \"directive changed\" (Equivalent -\u003e anchoredDirectives in go/internal/commentaudit/equivalence.go). The lane had to leave acs/cycle14 untouched. The cause is not yet pinned: scanDirectives anchors on nextToken (code tokens only), trailing, blankBefore and paragraph, and none should move with the doc text. Reproduce with a before/after pair first.",
   "title": "comments verify reports a directive change when the package doc below a build directive is edited",
   "weight": 0.3
 }

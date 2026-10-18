@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/envscope"
 )
 
 // ipcAllowedMarker is the in-source annotation that designates a split-const or
@@ -124,13 +126,6 @@ func sortedKeys(set map[string]bool) []string {
 	return out
 }
 
-var readSetSkipDirs = map[string]bool{
-	"vendor": true, "testdata": true, ".git": true, "node_modules": true,
-	".evolve": true, "ipcenv": true, "acs": true,
-}
-
-const registryTableSuffix = "internal/flagregistry/registry_table.go"
-
 func ReadSet(goRoot string) (keys []string, skipped []string, err error) {
 	set := map[string]bool{}
 	skipped, err = forEachProductionPackage(goRoot, func(fset *token.FileSet, pkgName string, files []*ast.File) {
@@ -152,15 +147,12 @@ func forEachProductionPackage(goRoot string, fn func(fset *token.FileSet, pkgNam
 			return e
 		}
 		if fi.IsDir() {
-			if readSetSkipDirs[fi.Name()] {
+			if envscope.SkipDir(fi.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		if strings.HasSuffix(filepath.ToSlash(path), registryTableSuffix) {
+		if !envscope.File(path) {
 			return nil
 		}
 		f, perr := parser.ParseFile(fset, path, nil, parser.ParseComments)

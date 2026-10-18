@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/envscope"
 )
 
 func Equivalent(name string, before, after []byte) (bool, string, error) {
@@ -26,7 +28,7 @@ func Equivalent(name string, before, after []byte) (bool, string, error) {
 	if a != b {
 		return false, "code changed", nil
 	}
-	if !slices.Equal(anchoredDirectives(before), anchoredDirectives(after)) {
+	if !slices.Equal(anchoredDirectives(name, before), anchoredDirectives(name, after)) {
 		return false, "directive changed", nil
 	}
 	return true, "", nil
@@ -102,37 +104,81 @@ type commentMarker struct {
 	anchorsParagraph bool
 }
 
-var commentMarkerRules = []struct {
+type commentMarkerRule struct {
 	pattern          string
 	extent           markerExtent
 	anchorsParagraph bool
-}{
-	{`//go:\S`, markerLine, false},
-	{`//line `, markerLine, false},
-	{`//export `, markerLine, false},
-	{`//extern `, markerLine, false},
-	{`//nolint(:|\s|$)`, markerLine, false},
-	{`// \+build `, markerLine, false},
-	{`// Code generated .* DO NOT EDIT\.$`, markerFile, false},
-	{`// acs-predicate:`, markerLine, false},
-	{`// minimal:`, markerParagraph, false},
-	{`// Deprecated:`, markerParagraph, true},
-	{`// (Unordered )?[Oo]utput:`, markerRestOfGroup, false},
-	{`//\s?apicover:ignore`, markerLine, false},
-	{`.*IPC-protocol-allowed`, markerGroup, false},
+	scope            markerScope
+}
+
+type markerScope int
+
+const (
+	scopeAnywhere markerScope = iota
+	scopeEnvtaintFiles
+	scopeExampleFuncs
+)
+
+var commentMarkerRules = []commentMarkerRule{
+	{`//go:\S`, markerLine, false, scopeAnywhere},
+	{`//line `, markerLine, false, scopeAnywhere},
+	{`//export `, markerLine, false, scopeAnywhere},
+	{`//extern `, markerLine, false, scopeAnywhere},
+	{`//nolint(:|\s|$)`, markerLine, false, scopeAnywhere},
+	{`// \+build `, markerLine, false, scopeAnywhere},
+	{`// Code generated .* DO NOT EDIT\.$`, markerFile, false, scopeAnywhere},
+	{`// acs-predicate:`, markerLine, false, scopeAnywhere},
+	{`// minimal:`, markerParagraph, false, scopeAnywhere},
+	{`// Deprecated:`, markerParagraph, true, scopeAnywhere},
+	{`// (Unordered output|Output):`, markerRestOfGroup, false, scopeExampleFuncs},
+	{`//\s?apicover:ignore`, markerLine, false, scopeAnywhere},
+	{`.*IPC-protocol-allowed`, markerGroup, false, scopeEnvtaintFiles},
 }
 
 var (
-	directive      = anyMarker()
-	commentMarkers = compiledMarkers()
+	directive       = anyMarker(func(markerScope) bool { return true })
+	directiveAlways = anyMarker(func(sc markerScope) bool { return sc == scopeAnywhere })
+	directiveEnv    = anyMarker(func(sc markerScope) bool { return sc == scopeEnvtaintFiles })
+	directiveInEx   = anyMarker(func(sc markerScope) bool { return sc == scopeExampleFuncs })
+	commentMarkers  = compiledMarkers()
 )
 
-func anyMarker() *regexp.Regexp {
-	alternatives := make([]string, len(commentMarkerRules))
-	for i, rule := range commentMarkerRules {
-		alternatives[i] = rule.pattern
+func anyMarker(include func(markerScope) bool) *regexp.Regexp {
+	var alternatives []string
+	for _, rule := range commentMarkerRules {
+		if include(rule.scope) {
+			alternatives = append(alternatives, rule.pattern)
+		}
 	}
 	return regexp.MustCompile(`^(` + strings.Join(alternatives, "|") + `)`)
+}
+
+func readsDirectives(name string, src []byte) func(text string, line int) bool {
+	envFile := envscope.Reads(name)
+	spans := exampleSpans(name, src)
+	return func(text string, line int) bool {
+		return directiveAlways.MatchString(text) ||
+			envFile && directiveEnv.MatchString(text) ||
+			directiveInEx.MatchString(text) && slices.ContainsFunc(spans, func(sp [2]int) bool { return line >= sp[0] && line <= sp[1] })
+	}
+}
+
+func exampleSpans(name string, src []byte) [][2]int {
+	if !strings.HasSuffix(name, "_test.go") {
+		return nil
+	}
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, name, src, parser.SkipObjectResolution)
+	if err != nil {
+		return nil
+	}
+	var spans [][2]int
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && strings.HasPrefix(fn.Name.Name, "Example") {
+			spans = append(spans, [2]int{fset.Position(fn.Pos()).Line, fset.Position(fn.End()).Line})
+		}
+	}
+	return spans
 }
 
 func compiledMarkers() []commentMarker {
@@ -160,7 +206,7 @@ func markerExtentOf(text string) (markerExtent, bool) {
 
 func Directives(src []byte) []string {
 	var found []string
-	for _, d := range scanDirectives(src) {
+	for _, d := range scanDirectives(func(text string, _ int) bool { return directive.MatchString(text) }, src) {
 		found = append(found, d.text)
 	}
 	return found
@@ -175,15 +221,15 @@ type placedDirective struct {
 	paragraph   bool
 }
 
-func anchoredDirectives(src []byte) []string {
+func anchoredDirectives(name string, src []byte) []string {
 	var found []string
-	for _, d := range scanDirectives(src) {
+	for _, d := range scanDirectives(readsDirectives(name, src), src) {
 		found = append(found, fmt.Sprintf("%s @%d trailing=%t blank=%t paragraph=%t", d.text, d.nextToken, d.trailing, d.blankBefore, d.paragraph))
 	}
 	return found
 }
 
-func scanDirectives(src []byte) []placedDirective {
+func scanDirectives(accept func(text string, line int) bool, src []byte) []placedDirective {
 	fset := token.NewFileSet()
 	file := fset.AddFile("", fset.Base(), len(src))
 	var s scanner.Scanner
@@ -207,7 +253,7 @@ func scanDirectives(src []byte) []placedDirective {
 		line := file.PositionFor(pos, false).Line
 		switch tok {
 		case token.COMMENT:
-			if text := strings.TrimSpace(lit); directive.MatchString(text) {
+			if text := strings.TrimSpace(lit); accept(text, line) {
 				waiting = append(waiting, placedDirective{
 					text: text, line: line, trailing: line == lastCodeLine,
 					paragraph: anchorsItsParagraph(text) && opensParagraph(lines, line),

@@ -77,3 +77,4 @@
 ./internal/orchestrator 100
 ./internal/acspathscan 100
 ./internal/adapters/codeindex/gotypes 100
+./internal/envscope 100
