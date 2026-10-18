@@ -82,8 +82,10 @@ func (o *Orchestrator) taskItemRefs(ctx map[string]string, projectRoot, workspac
 	refs := make([]taskItemRef, 0, len(ids))
 	for _, id := range ids {
 		path := pairs[id]
-		if path == "" && o.scopePathFor != nil {
-			path = o.scopePathFor(projectRoot, id)
+		if _, err := os.Stat(path); err != nil && o.scopePathFor != nil {
+			if resolved := o.scopePathFor(projectRoot, id); resolved != "" {
+				path = resolved
+			}
 		}
 		refs = append(refs, taskItemRef{id: id, path: path})
 	}

@@ -50,3 +50,17 @@ func TestResolveDispatchState_NonPendingCarriesNoPath(t *testing.T) {
 		t.Fatalf("a non-pending state must not hand out a path; got %q", st.Path)
 	}
 }
+
+func TestResolveDispatchState_ProcessingCarriesTheClaimedPath(t *testing.T) {
+	root := t.TempDir()
+	inbox := filepath.Join(root, ".evolve", "inbox")
+	claimed := writeInboxRecord(t, filepath.Join(inbox, "processing", "cycle-7"), "claimed-task")
+
+	st := ResolveDispatchState(Options{ProjectRoot: root}, "claimed-task")
+	if st.State != StateProcessing || st.Detail != "cycle-7" {
+		t.Fatalf("state = %q detail = %q, want processing cycle-7", st.State, st.Detail)
+	}
+	if st.Path != claimed {
+		t.Fatalf("Path must be the claimed record: got %q want %q", st.Path, claimed)
+	}
+}

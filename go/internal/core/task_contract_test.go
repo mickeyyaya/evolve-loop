@@ -65,8 +65,11 @@ func TestTaskItemRefs_PathsThenScopeThenTriage(t *testing.T) {
 		writeWSFile(t, ws, LaneScopeFile, `{"todo_ids":[`+ids+`]}`)
 		return ws
 	}
-	refs := o.taskItemRefs(map[string]string{"fleet_scope_paths": "a=/x/a.json b=/x/b.json"}, "/root", pinned(`"a","b"`))
-	if len(refs) != 2 || refs[0] != (taskItemRef{"a", "/x/a.json"}) || refs[1] != (taskItemRef{"b", "/x/b.json"}) {
+	itemDir := t.TempDir()
+	pathA := writeItem(t, itemDir, "a", `{"id":"a"}`)
+	pathB := writeItem(t, itemDir, "b", `{"id":"b"}`)
+	refs := o.taskItemRefs(map[string]string{"fleet_scope_paths": "a=" + pathA + " b=" + pathB}, "/root", pinned(`"a","b"`))
+	if len(refs) != 2 || refs[0] != (taskItemRef{"a", pathA}) || refs[1] != (taskItemRef{"b", pathB}) {
 		t.Fatalf("fleet_scope_paths must win: %+v", refs)
 	}
 	if refs := unresolving.taskItemRefs(map[string]string{"fleet_scope_paths": "ok=/x/ok.json broken"}, "/root", pinned(`"ok","broken"`)); len(refs) != 2 || refs[1] != (taskItemRef{id: "broken"}) {
@@ -513,6 +516,8 @@ func TestTaskItemRefs_ContractTaskIDsParity(t *testing.T) {
 func TestTaskItemRefs_ScopePathsResolvePathsNeverMembership(t *testing.T) {
 	t.Parallel()
 
+	pairsDir := t.TempDir()
+	writeItem(t, pairsDir, "a", `{"id":"a"}`)
 	resolver := WithScopePathResolver(func(_, id string) string { return "/resolver/" + id + ".json" })
 	cases := []struct {
 		name, pin, decision string
@@ -523,27 +528,27 @@ func TestTaskItemRefs_ScopePathsResolvePathsNeverMembership(t *testing.T) {
 		{
 			name: "pin_with_partial_and_stale_disclosure",
 			pin:  `{"todo_ids":["a","b","c"]}`,
-			ctx:  map[string]string{"fleet_scope": "a,b,c", "fleet_scope_paths": "a=/pairs/a.json x=/pairs/x.json"},
-			want: []taskItemRef{{"a", "/pairs/a.json"}, {"b", "/resolver/b.json"}, {"c", "/resolver/c.json"}},
+			ctx:  map[string]string{"fleet_scope": "a,b,c", "fleet_scope_paths": "a=" + pairsDir + "/a.json x=" + pairsDir + "/x.json"},
+			want: []taskItemRef{{"a", pairsDir + "/a.json"}, {"b", "/resolver/b.json"}, {"c", "/resolver/c.json"}},
 		},
 		{
 			name:     "decision_with_stale_disclosure",
 			decision: `{"top_n":[{"id":"a"},{"id":"b"}]}`,
-			ctx:      map[string]string{"fleet_scope_paths": "a=/pairs/a.json x=/pairs/x.json"},
-			want:     []taskItemRef{{"a", "/pairs/a.json"}, {"b", "/resolver/b.json"}},
+			ctx:      map[string]string{"fleet_scope_paths": "a=" + pairsDir + "/a.json x=" + pairsDir + "/x.json"},
+			want:     []taskItemRef{{"a", pairsDir + "/a.json"}, {"b", "/resolver/b.json"}},
 		},
 		{
 			name:     "pair_path_wins_over_resolver",
 			decision: `{"top_n":[{"id":"a"}]}`,
-			ctx:      map[string]string{"fleet_scope_paths": "a=/pairs/a.json"},
-			want:     []taskItemRef{{"a", "/pairs/a.json"}},
+			ctx:      map[string]string{"fleet_scope_paths": "a=" + pairsDir + "/a.json"},
+			want:     []taskItemRef{{"a", pairsDir + "/a.json"}},
 		},
 		{
 			name:       "unplaceable_member_renders_unresolved_never_dropped",
 			pin:        `{"todo_ids":["a","b"]}`,
-			ctx:        map[string]string{"fleet_scope_paths": "a=/pairs/a.json"},
+			ctx:        map[string]string{"fleet_scope_paths": "a=" + pairsDir + "/a.json"},
 			noResolver: true,
-			want:       []taskItemRef{{"a", "/pairs/a.json"}, {id: "b"}},
+			want:       []taskItemRef{{"a", pairsDir + "/a.json"}, {id: "b"}},
 		},
 	}
 	for _, c := range cases {
@@ -626,5 +631,24 @@ func TestSeedTaskContract_RendersIdenticallyForPinDecisionAndDeferral(t *testing
 				}
 			}
 		})
+	}
+}
+
+func TestTaskItemRefs_StalePendingPathReResolvesToTheClaimedRecord(t *testing.T) {
+	t.Parallel()
+
+	claimed := writeItem(t, t.TempDir(), "claimed", `{"id":"claimed"}`)
+	stale := filepath.Join(t.TempDir(), "claimed.json")
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithScopePathResolver(func(_, _ string) string { return claimed }))
+	ws := t.TempDir()
+	writeWSFile(t, ws, LaneScopeFile, `{"todo_ids":["claimed"]}`)
+	refs := o.taskItemRefs(map[string]string{"fleet_scope_paths": "claimed=" + stale}, "/root", ws)
+	if len(refs) != 1 || refs[0].path != claimed {
+		t.Fatalf("a pending path the claim moved away must re-resolve to the claimed record: %+v", refs)
+	}
+	live := writeItem(t, t.TempDir(), "claimed", `{"id":"claimed"}`)
+	refs = o.taskItemRefs(map[string]string{"fleet_scope_paths": "claimed=" + live}, "/root", ws)
+	if refs[0].path != live {
+		t.Fatalf("a readable pair path must stay authoritative: %+v", refs)
 	}
 }
