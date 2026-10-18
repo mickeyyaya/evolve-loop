@@ -5,6 +5,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,5 +156,31 @@ func TestNames_MatchTheSpecSignalsAndTheSizingField(t *testing.T) {
 		if got != want {
 			t.Errorf("name = %q, want %q (wave-orchestrator.md §11 and §13)", got, want)
 		}
+	}
+}
+
+func TestCompute_CarriesACopyOfTheClassCountsOfTheLastCensusAndOmitsAbsentOnes(t *testing.T) {
+	t.Parallel()
+	counts := wavemeasure.Supply{Admissible: 3, ConsoleProtected: 40}
+
+	got := wavemeasure.Compute(wavemeasure.Facts{Supply: &counts}, at(0))
+	counts.Admissible = 99
+
+	if got.Supply == nil || *got.Supply != (wavemeasure.Supply{Admissible: 3, ConsoleProtected: 40}) {
+		t.Errorf("supply = %+v, want the counts as the census left them: Compute must copy", got.Supply)
+	}
+	raw, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields struct {
+		Supply map[string]int `json:"supply"`
+	}
+	if err := json.Unmarshal(raw, &fields); err != nil || len(fields.Supply) != 6 || fields.Supply["console_protected"] != 40 {
+		t.Errorf("JSON = %s, %v, want a supply object with the six class names", raw, err)
+	}
+	empty := wavemeasure.Compute(wavemeasure.Facts{}, at(0))
+	if rawEmpty, _ := json.Marshal(empty); empty.Supply != nil || strings.Contains(string(rawEmpty), "supply") {
+		t.Errorf("a run with no census gave %s, want no supply key", rawEmpty)
 	}
 }

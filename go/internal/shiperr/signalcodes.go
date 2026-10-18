@@ -65,6 +65,14 @@ func AllCodes() []ShipErrorCode {
 
 func SignalCode(c ShipErrorCode) signalcenter.Code { return signalcenter.Code("SHIP_" + string(c)) }
 
+var landingConflicts = map[signalcenter.Code]bool{
+	SignalCode(CodeGitFleetRebaseNeeded):   true,
+	SignalCode(CodeGitFleetRebaseConflict): true,
+	SignalCode(CodeAuditBindingHeadMoved):  true,
+}
+
+func IsLandingConflict(c signalcenter.Code) bool { return landingConflicts[c] }
+
 const (
 	StepKey          = "step"
 	GitRCKey         = "git_rc"

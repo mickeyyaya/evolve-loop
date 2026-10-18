@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"sync"
 
@@ -33,6 +34,7 @@ type Pool struct {
 	Reap        func(Lane)
 	Publish     Publish
 	Halted      func() bool
+	Intake      *Intake
 }
 
 var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
@@ -42,7 +44,20 @@ var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
 	fleet.PoolIdle:       CodePoolIdle,
 }
 
+var errIntakeNeedsAdmit = errors.New("orchestrator: a pool with an intake needs an admit function: the freed cells and the limit act through it")
+
 func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
+	if p.Intake != nil && p.Admit == nil {
+		return refusedResults(len(backlog), errIntakeNeedsAdmit)
+	}
+	in := p.Intake
+	if in == nil {
+		in = NewIntake(max(p.Target, 1))
+	}
+	next := p.Admit
+	if next != nil {
+		next = in.Gate(next)
+	}
 	var mu sync.Mutex
 	retry := map[string]bool{}
 	launch := p.Launch
@@ -54,8 +69,13 @@ func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 			mu.Unlock()
 		})
 	}
-	cfg := fleet.PoolConfig{Target: p.Target, Concurrency: p.Concurrency, MaxLaunches: p.MaxLanes, Halted: p.Halted,
-		Next: p.Admit, Prepare: p.prepare,
+	cfg := fleet.PoolConfig{Target: p.Target, Concurrency: p.Concurrency, MaxLaunches: p.MaxLanes,
+		Halted: func() bool { return in.Stopped() || (p.Halted != nil && p.Halted()) },
+		Next:   next, Kick: in.Wake(),
+		Prepare: func(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {
+			in.Hold(td.ID)
+			return p.prepare(td, spec)
+		},
 		Exited: func(td fleet.Todo, _ fleet.Result) bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -64,6 +84,14 @@ func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 			return again
 		}}
 	return fleet.RunPool(ctx, cfg, backlog, launch, p.transition)
+}
+
+func refusedResults(n int, err error) []fleet.Result {
+	results := make([]fleet.Result, n)
+	for i := range results {
+		results[i] = fleet.Result{Index: i, ExitCode: -1, Err: err}
+	}
+	return results
 }
 
 func (p Pool) prepare(_ fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {

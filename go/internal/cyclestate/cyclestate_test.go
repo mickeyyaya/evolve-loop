@@ -106,3 +106,9 @@ func TestCycleOutcomeConstants(t *testing.T) {
 		}
 	}
 }
+
+func TestSealedVerdictField_IsTheWireNameOfTheFinalVerdictInACycleSealedEvent(t *testing.T) {
+	if SealedVerdictField != "final_verdict" {
+		t.Errorf("SealedVerdictField = %q, want the wire name final_verdict that dossiers and cycle state files also use", SealedVerdictField)
+	}
+}

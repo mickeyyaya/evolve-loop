@@ -11,9 +11,18 @@ import (
 )
 
 var bannedCalls = map[string]map[string]string{
-	"time":    {"Sleep": "a poll", "Tick": "a poll", "NewTicker": "a poll"},
+	"time":    {"Sleep": "a poll", "Tick": "a poll", "NewTicker": "a poll", "After": "a second timer", "NewTimer": "a second timer"},
 	"syscall": {"Kill": "a broad kill", "Exec": "a process start"},
 	"os":      {"FindProcess": "a stop by pid", "StartProcess": "a process start"},
+}
+
+const modulePath = "github.com/mickeyyaya/evolve-loop/go/internal/"
+
+var bannedImportPrefixes = map[string]string{
+	modulePath + "bridge":            "an LLM dispatch: the orchestrator runs no LLM",
+	modulePath + "adapters/bridge":   "an LLM dispatch: the orchestrator runs no LLM",
+	modulePath + "subagent":          "an LLM dispatch: the orchestrator runs no LLM",
+	modulePath + "consensusdispatch": "an LLM dispatch: the orchestrator runs no LLM",
 }
 
 var bannedImports = map[string]string{
@@ -46,8 +55,23 @@ func productionFiles(t *testing.T) []*ast.File {
 	return files
 }
 
-func violations(files []*ast.File) []string {
+func dispatchImports(files []*ast.File) []string {
 	var out []string
+	for _, f := range files {
+		for _, imp := range f.Imports {
+			path, _ := strconv.Unquote(imp.Path.Value)
+			for prefix, why := range bannedImportPrefixes {
+				if strings.HasPrefix(path, prefix) {
+					out = append(out, "import "+path+" ("+why+")")
+				}
+			}
+		}
+	}
+	return out
+}
+
+func violations(files []*ast.File) []string {
+	out := dispatchImports(files)
 	for _, f := range files {
 		for _, imp := range f.Imports {
 			path, _ := strconv.Unquote(imp.Path.Value)
@@ -85,5 +109,23 @@ func TestOrchestratorGuard_FindsAPlantedPollAndKill(t *testing.T) {
 	}
 	if got := violations([]*ast.File{f}); len(got) != 4 {
 		t.Errorf("violations of the planted file = %v, want 4 (exec import, Sleep, NewTicker, Kill)", got)
+	}
+}
+
+func TestOrchestratorGuard_FindsASecondTimerAndAnLLMDispatchImport(t *testing.T) {
+	src := "package p\nimport (\n\"time\"\n\"github.com/mickeyyaya/evolve-loop/go/internal/bridge\"\n\"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain\"\n\"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge\"\n\"github.com/mickeyyaya/evolve-loop/go/internal/subagent\"\n\"github.com/mickeyyaya/evolve-loop/go/internal/consensusdispatch\"\n)\nfunc f() { <-time.After(1); _ = time.NewTimer(1); _ = time.AfterFunc }\n"
+	f, err := parser.ParseFile(token.NewFileSet(), "planted.go", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := violations([]*ast.File{f})
+	if len(got) != 7 {
+		t.Errorf("violations of the planted file = %v, want 7 (5 dispatch imports, After, NewTimer); time.AfterFunc is the one allowed timer", got)
+	}
+}
+
+func TestOrchestrator_ImportsNoBridgeAndNoDriverPackage(t *testing.T) {
+	if got := dispatchImports(productionFiles(t)); len(got) != 0 {
+		t.Errorf("the orchestrator package has %v; it runs no LLM, so it imports no bridge and no driver package (ADR-0139 decision 1)", got)
 	}
 }

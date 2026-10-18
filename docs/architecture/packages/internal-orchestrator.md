@@ -1,15 +1,18 @@
 # internal/orchestrator
 
-> The spec of record: [wave-orchestrator §7](../wave-orchestrator.md#7-the-rolling-pool) and [§8](../wave-orchestrator.md#8-the-lane-lease). The decision: [ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md). The plan: [wave-orchestrator-2026-10](../../plans/wave-orchestrator-2026-10.md) (O4, O5, D8, D9, Q1). The scheduler under the pool: [internal-fleet.md](internal-fleet.md) (`RunPool`). The admission rule: [internal-admission.md](internal-admission.md). The loop wiring: [cmd-evolve.md](cmd-evolve.md).
+> The spec of record: [wave-orchestrator §4](../wave-orchestrator.md#4-the-supply-census), [§7](../wave-orchestrator.md#7-the-rolling-pool), [§8](../wave-orchestrator.md#8-the-lane-lease) and [§9](../wave-orchestrator.md#9-the-oversight-loop). The decision: [ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md). The plan: [wave-orchestrator-2026-10](../../plans/wave-orchestrator-2026-10.md) (O4, O5, D8, D9, Q1). The scheduler under the pool: [internal-fleet.md](internal-fleet.md) (`RunPool`). The admission rule: [internal-admission.md](internal-admission.md). The loop wiring: [cmd-evolve.md](cmd-evolve.md).
 
 ## Purpose
 
-`internal/orchestrator` runs the lanes of the loop at `fleet.orchestrator.stage` `enforce`. It has two parts:
+`internal/orchestrator` runs the lanes of the loop at the stage `enforce`. It oversees them at both stages. It has five parts:
 
 - **The pool (`Pool`).** It runs `fleet.RunPool` with admission by cell, a freshness check before each launch and one Signal Center event for each transition. A free slot takes the next admissible todo at once.
 - **The lease (`Leases`).** Each lane gets a lease at launch. The lease holds the start, the deadline and the last heartbeat. One timer serves all lanes.
+- **The intake (`Intake`).** It holds the state that the oversight changes: the lanes whose cells are free, the limit of the window and the stop.
+- **The oversight (`Oversight`).** One goroutine reads the channels `loop`, `cycle`, `errors` and `ship`, and it maps each event to one action.
+- **The census (`Census`).** It counts the supply before a plan and records the cause of each refusal.
 
-Built on 2026-10-17 as O4 and O5 of the wave-orchestrator plan. The package runs no LLM, starts no process and stops no process by itself.
+Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as the library of O6. The loop wiring of the oversight and of the census is pending. The package runs no LLM, starts no process and stops no process by itself.
 
 ## Design
 
@@ -20,6 +23,7 @@ Built on 2026-10-17 as O4 and O5 of the wave-orchestrator plan. The package runs
   - `Exited` returns true for a todo that the lease stopped once. That todo gets one more try at the head of the queue.
 - **The transitions.** `onTransition` publishes one INFO `loop.wave` event for each `fleet.PoolTransition`: `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_EXITED`, `LOOP_ORCH_LANE_BACKFILLED` and `LOOP_ORCH_POOL_IDLE`. Each event has `live` and `target`, and each lane event has `todo`.
 - **The lease table.** `Leases.Watch(launch, settle)` wraps a `fleet.LaunchFn`. It makes a child context for the lane, grants the lease, runs the launch and returns the lease. The key of a lane is its scope joined with `+`. When two lanes have the same key, the second return finds no lease. That lane then returns an error that names the key, and no panic occurs (`TestLease_AGiveWithNoLeaseIsAnErrorNotAPanic`, `TestLease_ADuplicateKeyFailsTheSecondLaneLoudly`).
+- **The observed heartbeat (O6).** `Leases.Beat` records the time of an event of the lane. It clamps a time stamp in the future to the clock, so a producer with a fast clock cannot hide a stall (`TestLease_ABeatFromTheFutureCountsAsNowAndNeverPostponesTheStall`). `Leases.Stall` publishes the stall once for a lane, and it does nothing when `stall_minutes` is 0 (`TestLease_AZeroStallTurnsTheReportedStallOffToo`). `Leases.Epoch` counts the grants and the gives (`TestLease_EpochCountsEachGrantAndEachGive`).
 - **One timer over a heap.** The heap holds one entry for each lane: the earlier of its deadline and its stall time. A changed lane gets a new entry, and the old entry goes stale by its sequence number. After each change, the table stops its timer and arms one `Clock.AfterFunc` for the top of the heap. `fire` pops each due entry, checks the lane, pushes its next time and arms the timer again. The cost of each lane event is O(log N).
 - **The heartbeat port.** `Heartbeat(Lane)` returns the time of the freshest live signal of the lane, or false when the heartbeat is unknown. `RunsHeartbeat` finds the newest `runs/cycle-N` that is not older than the lane and that holds the first todo of the lane in its `lane-scope.json` (`LaneCycle`). The heartbeat is the latest time of two kinds. One is the last time stamp of its `signals.ndjson`. The other is the modification time of each `*-pane-watch.json`, `*-events.ndjson` and `*-stdout.log` in that directory.
   - The lease adds no writer.
@@ -30,6 +34,31 @@ Built on 2026-10-17 as O4 and O5 of the wave-orchestrator plan. The package runs
 - **The stop.** At `enforce`, a passed deadline cancels the child context of that lane. The launch of `cmd/evolve` (`execCycleLaunch`, through `sysexec.Command`) then sends SIGTERM to that one lane process. The package holds no pid and imports no `os/exec`, `syscall`, `sysexec` or `proctree`.
 - **The recovery.** After a stopped lane exits, `Pool` first calls its `Reap` port with the lane. The loop gives `reapLane` of `cmd/evolve`, which runs the `evolve gc dispatch` sweep for the dispatch ids of that lane only. Then `Pool` releases the inbox claim through `Claims.Release`. At the second stop of one todo, `Claims.Park` routes it to the console with the reason `deadline twice`. A failed step publishes `LOOP_ORCH_LANE_RECOVERY_FAILED` with the step and the error.
 
+- **The intake (O6).** `Intake.Gate` wraps the admission function of the pool. It refuses a new lane when the lanes in flight reach the limit. It drops the lanes that `Free` marked from the holdings, so their cells admit a new todo. `Pool.Run` makes an intake when the caller gives none.
+  - `Free` and `Resize` kick the pool through `Wake`. `fleet.PoolConfig.Kick` makes the pool fill its open slots at once, with no lane exit. Many kicks make one (`TestIntake_StopIsStickyAndEveryChangeThatCanAdmitKicksOnce`).
+  - `Hold` runs in the `Prepare` hook of each launch. A todo that launches again holds its cells again (`TestPool_ALaunchClearsTheFreedMarkOfAnEarlierLifeOfTheSameTodo`).
+  - `Stop` ends all admission through the `Halted` hook. The lanes in flight finish (`TestPool_AStopOnTheIntakeEndsAdmissionAndLanesInFlightFinish`).
+  - A pool that has an intake needs an admit function. Without one, `Pool.Run` fails every lane with `errIntakeNeedsAdmit` and launches nothing, because the limit and the freed cells act through admission (`TestPool_AnIntakeWithNoAdmitFunctionRefusesEveryLaneLoudly`). A caller whose module graph did not load passes no intake, and the pool admits by the file rule.
+- **The oversight (O6).** `Oversight.Run` calls `Next` of the event reader with no deadline. The reader arms the kernel wake, reads to the end of each log and waits. A spurious wake reads again and acts on nothing (`TestOrchestrator_WakesOnlyOnEvents`). `Subscribe` builds the reader for the four channels with the compiled default routes of [event-channels §2](../event-channels.md).
+  - `Run` refuses to start, with an error, if an events, leases, intake, locate or resize port is missing (`TestOversight_RunRefusesToStartWithAMissingPort`). The publish port can be nil.
+  - `handle` is one `switch`. It maps each event to one method (`wave-orchestrator.md` §9 has the table). The order matters: a stall code is tested before the observer module, because a stall report is not a heartbeat.
+  - `laneOf` finds the lane of a cycle and says if that life of the lane is still live. The mapping stays after the lane exits, until the `cycle.sealed` event of the cycle comes. Thus the last events of a lane are counted and recorded when they arrive after the exit (`TestOversight_ASealAndALandingAfterTheirLaneLeftAreCountedAndRecorded`). Such an event frees no cells, because the exit freed them. A lane that exits before the oversight reads any event of its cycle is not found.
+  - An event of an earlier life of the same todo never touches the new life. It frees no cells, moves no heartbeat and reports no stall (`TestOversight_ALateEventOfAnEarlierLifeOfTheSameTodoIsCountedAndFreesNothingOfTheNewLife`, `TestOversight_AStallReportAndAHeartbeatOfAnEarlierLifeNeverTouchTheNewLife`).
+  - A cycle that no lane holds is located once for each change of the lease table (`Leases.Epoch`). The scan does not cache a miss while a lane has no cycle yet, because that lane can own the cycle (`TestOversight_AForeignCycleIsLocatedOncePerChangeOfTheLiveSet`, `TestOversight_AnUnlocatedLaneIsLookedForAgainSoItsFirstEventIsNeverLostToTheNegativeCache`).
+  - `RunsLocator` is the production port. It uses `LaneCycle` and keeps the cycle of each life of a lane. A new life of the same todo must get a cycle above that of the earlier life (`TestRunsLocator_ANewLifeNeverTakesTheCycleOfAnEarlierLifeOfTheSameTodo`). It keeps its cache without a lock, because the oversight is its only caller.
+  - `do` takes one `action` value: the names, the lane, the extra fields and the function to apply. It applies the function only at `enforce`, and it always publishes one `LOOP_ORCH_OVERSIGHT_ACTION` event with `actions`, `lane`, `cycle`, `event`, `stage` and `applied`. `stamped` clones the fields it gets (`TestOversight_StampedNeverMutatesItsInput`).
+  - The verdict field and the value `FAIL` come from `cyclestate`. The three codes of the bridge (`LIVENESS_PHASE_STALLED`, `LIVENESS_PANE_EXHAUSTED` and `BRIDGE_USAGE_EVIDENCE`) are copies, because the package imports no bridge package. `TestCopiedCodes_EqualTheConstantsOfTheirOwnersAndTheOwnersRegisterThem` imports the owners and fails if a copy differs or if the owner no longer registers it. The `usageevidence` package imports `bridge` and `bridgechain`, so it cannot be imported here.
+  - The events of one channel set reach the oversight once. One event in two channels gives one action and one count (`TestOversight_OneLandingEventInTwoChannelsIsOneActionAndOneCount`).
+  - A rebase code marks the lane. The next `ship.landed` of the lane counts as a conflict. A landing that no rebase code preceded counts as clean. The count goes to `LandingObserver` (`CleanLanding` and `Conflict`). The adaptive window of plan O8 (`*Window`) has both methods, so it needs no adapter.
+  - A quota signal runs the `Resize` port. The port returns the window and the families that have no fallback. The oversight publishes `LOOP_ORCH_FAMILY_PAUSED` once for each new family, and it sets the limit of the intake.
+  - A `loop.halt` event stops all admission.
+- **The census (O6).** `Census.Count` reads the inbox through `inboxbatch.ScanDir` and `inboxmover.RankLaneMenu`, and it writes nothing (`TestSupply_RecordsTheCauseOfEachRefusal` compares every byte of the inbox). `Take` also appends the record and publishes `LOOP_ORCH_SUPPLY`, and `LOOP_ORCH_SUPPLY_SHORT` when the admissible count is below the window.
+  - The record file is `.evolve/waves/supply.json`. It holds the last 12 censuses, and each write is atomic. `ReadSupply` and `SupplyIn` read it. A broken file is an error, so the operator sees it.
+  - `AppendSupply` holds an exclusive file lock (`supply.json.lock`) across its read, its change and its write, so two writers lose no record (`TestSupplyRecord_ConcurrentAppendsLoseNoRecord`). It waits at most 10 s for the lock, and a longer wait is an error (`TestSupplyRecord_AnAppendHoldsTheFileLockAcrossItsReadModifyWrite`). The lock and the write are ports of a `supplyStore`, so a test fails each one (`TestSupplyRecord_AFailedLockAndAFailedWriteAreErrorsThatNameTheRecord`).
+  - `Count` refuses a census with no clock (`TestSupply_CountRefusesACensusWithNoClock`).
+  - The proposal step is the `Proposer` function value. It runs only when the admissible count is below twice the window (`TestSupply_TheSplitProposalStepRunsBelowTwiceTheWindowOnlyAndNilMeansNone`). It gets the `console_protected` items. A nil value proposes nothing. PR #959 gives `inboxsplit.Proposals`, which fits behind a small adapter.
+  - `consoleClass` reads the class from the reason prefix. `TestConsoleClass_FollowsTheReasonsThatTheRoutingAuthorityGives` pins each prefix against `inboxbatch.ConsoleRouted`, so a change of the reason text fails a test.
+
 ## Stage behaviour
 
 | Event | `shadow` (the barrier wave) | `enforce` (the pool) |
@@ -39,6 +68,14 @@ Built on 2026-10-17 as O4 and O5 of the wave-orchestrator plan. The package runs
 | A lane exits after its deadline | `LOOP_ORCH_LANE_LATE_EXIT` with `status` and `rc` | the same, with `stopped` true |
 
 At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status` `ok`. Such a lane passed, so a deadline stop at `enforce` was a loss.
+
+| Event | `shadow` | `enforce` |
+|---|---|---|
+| `cycle.sealed` | `LOOP_ORCH_OVERSIGHT_ACTION`, `applied` false | the same with `applied` true. On `FAIL`, the cells of the lane are free |
+| `ship.landed` | the same | the cells are free, `LandingObserver` counts the landing, and the pool fills an open slot |
+| a quota signal | the record, and `LOOP_ORCH_FAMILY_PAUSED` with `applied` false | the limit of the intake changes |
+| `loop.halt` | the record | admission stops |
+| a phase signal, a stall report | the heartbeat moves and the stall publishes at both stages | the same |
 
 ## Invariants
 
@@ -51,7 +88,13 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
 - A stopped lane gets exactly one reap, and a lane that was not stopped gets none (`TestPool_AStoppedLaneIsReapedOnceAndAnUnstoppedLaneNever`, `TestPool_ShadowLeasesNeverReap`, `TestPool_AStoppedLaneWithNoClaimsIsReapedAndNotTriedAgain`).
 - With no lane in flight, the pool admits the top todo even when admission refuses it, because nothing can conflict with an empty set (`TestPool_WithNoLaneInFlightTheTopTodoIsAdmitted`).
 - Many lanes arm one timer (`TestLease_ManyLanesArmOneTimer`).
-- The package never polls and never stops a lane by itself. `TestOrchestrator_NeverPollsAndNeverStopsALaneByItself` parses each production file and refuses `time.Sleep`, `time.Tick`, `time.NewTicker`, `syscall.Kill`, `os.FindProcess` and the imports `os/exec`, `sysexec` and `proctree`. `TestOrchestratorGuard_FindsAPlantedPollAndKill` proves that the guard finds them.
+- A landing frees the cells of its lane while the lane still runs, and the pool fills the open slot (`TestOrchestrator_ShipLandedFreesTheCells`). A failed seal frees them too (`TestOversight_ASealedFAILFreesTheCellsOfItsLaneAndAPASSOnlyRecordsTheVerdict`). A passed seal only records the verdict.
+- At `shadow`, the oversight frees nothing, counts nothing, resizes nothing and stops nothing, and it records each action (`TestOversight_AShadowComputesEveryActionAndChangesNothing`).
+- A landing is a conflict when the stream of its lane held a rebase code. A rebase code of another cycle counts nothing (`TestOversight_ALandingIsAConflictWhenItsLaneStreamHeldARebaseCode`).
+- A stall report publishes the stall once. The report, a repeat and the lease timer share one mark (`TestOversight_APhaseStalledEventPublishesTheLaneStallOnce`).
+- A bench of a family with no fallback pauses the family once and shrinks the limit. A later signal with the same state adds no pause event (`TestOversight_ABenchWithNoFallbackPausesTheFamilyOnceAndShrinksTheLimit`).
+- The census counts the six classes, records the cause of each refusal and never changes the inbox. It publishes `LOOP_ORCH_SUPPLY_SHORT` only below the window.
+- The package never polls and never stops a lane by itself. `TestOrchestrator_NeverPollsAndNeverStopsALaneByItself` parses each production file and refuses `time.Sleep`, `time.Tick`, `time.NewTicker`, `syscall.Kill`, `os.FindProcess` and the imports `os/exec`, `sysexec` and `proctree`. `TestOrchestratorGuard_FindsAPlantedPollAndKill` proves that the guard finds them. The same guard now refuses `time.After` and `time.NewTimer`, so `time.AfterFunc` of the lease table is the only timer. `TestOrchestrator_ImportsNoBridgeAndNoDriverPackage` refuses the imports of `bridge`, `bridgechain`, `adapters/bridge`, `subagent` and `consensusdispatch`, because the orchestrator runs no LLM (`TestOrchestratorGuard_FindsASecondTimerAndAnLLMDispatchImport`).
 - The package has 100% statement coverage in `go/.cover-strict` and is listed in `go/.apicover-enforce`.
 
 ## Findings

@@ -147,6 +147,20 @@ When the admissible count is below the window, the census publishes `LOOP_ORCH_S
 
 The census never routes an item itself. ADR-0074 keeps the routing authority, and the four guards of F2.23 keep the protected files safe.
 
+**State: the library is built (O6, 2026-10-18). The loop call and `evolve wave supply` are pending.** `orchestrator.Census` ([internal-orchestrator.md](packages/internal-orchestrator.md)) has two calls:
+
+- `Count` reads the inbox and writes nothing. It returns the count of each class, the cause of each refusal and the split proposals.
+- `Take` runs `Count`. Then it appends the record to `.evolve/waves/supply.json`, which keeps the last 12 plans, and it publishes the events.
+
+The census builds on the lane menu of `inboxmover.RankLaneMenu`, the same menu as `evolve inbox rank`:
+
+- A console item gets its class from the reason of `inboxbatch.ConsoleRouted`: `route:` is `console_route`, `kind:` is `console_kind`, and every other reason is `console_protected`.
+- A waiting item is `waiting_deps`. This class also holds an item that another lane has claimed. The reason names the dependency or the claim.
+- The ready items go to `admission.Admitter` in rank order, with the lanes in flight as holdings. An item that conflicts with an earlier admitted item is `waiting_cell`, as in §6 step 7.
+- With no module graph, every ready item is `admissible`, and the record holds a warning.
+
+The registry spells the event `orchestrator.supply` as `LOOP_ORCH_SUPPLY`, because a code must match `MODULE_SNAKE_CASE`. The proposal step is a function value. A nil value proposes nothing. The wiring to `inboxsplit.Proposals` waits for PR #959.
+
 **The directory rule (built, O2b, 2026-10-17; amended, 2026-10-18).** A declared directory routes to the console only when it lies inside a protected fragment (ADR-0139 decision 5). Thus `files: ["go/internal/core/"]` is lane work.
 
 On 2026-10-18, the live review of the split found 17 of 112 lane parts that listed a protected path or a directory that holds one. The operator chose to keep four lanes supplied. Only `evolve inbox split` judges a directory with `guards.TouchesProtectedSurface`, so it refuses to put a directory that holds a fragment in a lane part. The claim floor accepts some items that the split refuses.
@@ -345,6 +359,28 @@ The deadline needs a timer, because "nothing happened" is not an event. The loop
 
 The loop observes and acts only on its own lanes. It does not edit a lane's worktree, its verdict or its ship. The landing stays with ADR-0128 and ADR-0134.
 
+**State: the library is built (O6, 2026-10-18). The loop wiring is pending.** `orchestrator.Oversight` ([internal-orchestrator.md](packages/internal-orchestrator.md)) runs `Next` of `internal/events/reader` in a loop. The reader arms the kernel wake, reads to the end of each log, and then waits. The oversight arms no timer. The lease table of §8 keeps the one timer.
+
+The oversight finds the lane of an event by the cycle number. A lane that no cycle holds yet, and a cycle of another loop, get no action.
+
+| Event | How the oversight matches it | At `enforce` |
+|---|---|---|
+| a phase signal | kind `phase.dispatched`, `phase.outcome` or `phase.aborted`, or module `observer`, but not the code `LIVENESS_PHASE_STALLED` | `Leases.Beat` moves the heartbeat |
+| `cycle.sealed` | the kind | record the verdict. On `final_verdict` `FAIL`, free the cells |
+| `ship.landed` | the kind | free the cells, count the landing and kick the pool |
+| a rebase code | `SHIP_GIT_FLEET_REBASE_NEEDED`, `SHIP_GIT_FLEET_REBASE_CONFLICT` or `SHIP_AUDIT_BINDING_HEAD_MOVED` | mark the lane. The next landing of the lane counts as a conflict |
+| a stall report | the code `LIVENESS_PHASE_STALLED` | `Leases.Stall` publishes `LOOP_ORCH_LANE_STALLED` once |
+| a quota signal | the code `BRIDGE_USAGE_EVIDENCE` or `LIVENESS_PANE_EXHAUSTED` | run the sizing step, set the limit of the intake, and publish `LOOP_ORCH_FAMILY_PAUSED` for each new family |
+| a halt | kind `loop.halt` | stop all admission |
+
+At `shadow`, an action publishes `LOOP_ORCH_OVERSIGHT_ACTION` with `applied` false, and nothing else changes. A heartbeat and a stall are observations, so both stages apply them.
+
+- **Freeing the cells.** `Intake.Free` marks the lane. Admission then ignores the cells of that lane, and the pool fills an open slot at once (`fleet.PoolConfig.Kick`). The lane keeps its slot until it exits.
+- **The window hook.** `LandingObserver` has `CleanLanding` and `Conflict`. The adaptive window of §10 (plan O8) has both methods, so `*Window` needs no adapter. With no observer, the landing is only counted in the action record.
+- **A lane that left.** The oversight keeps the cycle of a lane until the `cycle.sealed` event of that cycle comes. Thus a landing or a seal that arrives after the lane exited is still counted and recorded. It frees no cells then, because the exit freed them. A lane that exits before the oversight reads any event of its cycle is not found.
+- **No producer yet.** No code emits a bench event, an unbench event or an operator stop today. The oversight reads `BRIDGE_USAGE_EVIDENCE` and `LIVENESS_PANE_EXHAUSTED` for a bench, and `loop.halt` for a stop. An unbench by expiry gives no event. The next quota signal, or the next run, runs the sizing again (§5).
+- **A gap record.** A gap on a channel can lose one early release. The exit of the lane still frees its cells, so the pool loses speed and keeps its safety.
+
 ## 10. The adaptive window
 
 ### Issue
@@ -377,7 +413,7 @@ The window never stops a lane in flight. A smaller window only delays the next a
 | `conflict_rate` | the landed lanes that needed a rebase or a re-audit at landing, over all landed lanes (`conflicts`, `landed`) | `recoverFromShipError` calls `recordShipError` before it recovers. A lane that rebased and then landed thus still holds the event: a `ship.error` with `SHIP_GIT_FLEET_REBASE_NEEDED`, `SHIP_GIT_FLEET_REBASE_CONFLICT` or `SHIP_AUDIT_BINDING_HEAD_MOVED` in the lane's stream |
 | `admission_waits` | the todos that waited for a cell. It is 0 until O3 registers its code. | the count of `LOOP_ORCH_ADMIT_WAIT` in the run |
 | `deadline_stops` | the lanes that the lease stopped | not built: it arrives with O5, which emits `LOOP_ORCH_LANE_DEADLINE` |
-| `supply` | the class counts of the last census (§4) | not built: O6 adds it |
+| `supply` | the class counts of the last census (§4) | `Measures.Supply` carries it. The read of `.evolve/waves/supply.json` by `wave status` is pending (O6) |
 
 The facts:
 
@@ -480,8 +516,8 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 
 | Code | Channel | When |
 |---|---|---|
-| `orchestrator.supply` | `loop` | after each census |
-| `LOOP_ORCH_SUPPLY_SHORT` | `loop` | the admissible count is below the window |
+| `LOOP_ORCH_SUPPLY` | `loop` | §4: after each census. The registry spelling of `orchestrator.supply`. INFO. |
+| `LOOP_ORCH_SUPPLY_SHORT` | `loop` | the admissible count is below the window. INFO. |
 | `LOOP_ORCH_ADMIT_WAIT` | `loop` | a todo waits for a cell. Once for each todo. |
 | `LOOP_FLEET_POLICY_INVALID` | `loop` | `.evolve/policy.json` does not load at batch start (for example a misspelt `fleet.orchestrator` key), so the loop runs sequential until it is fixed |
 | `LOOP_ORCH_LANE_LAUNCHED` | `loop` | §7: the first fill of a run launched a lane. INFO. |
@@ -492,7 +528,8 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | `LOOP_ORCH_LANE_DEADLINE` | `errors` | §8 |
 | `LOOP_ORCH_LANE_LATE_EXIT` | `loop` | §8: a lane exited after its deadline. INFO. |
 | `LOOP_ORCH_LANE_RECOVERY_FAILED` | `errors` | §8: the claim release or the park after a stop failed |
-| `LOOP_ORCH_FAMILY_PAUSED` | `loop` | §9: a family with no fallback stops taking new lanes |
+| `LOOP_ORCH_FAMILY_PAUSED` | `loop` | §9: a family with no fallback stops taking new lanes. INFO. |
+| `LOOP_ORCH_OVERSIGHT_ACTION` | `loop` | §9: the oversight mapped one event to an action. `applied` is false at `shadow`. INFO. |
 | `LOOP_ORCH_WINDOW` | `loop` | §10: the window changes |
 
 Each code goes into the Signal Center registry.
@@ -502,7 +539,7 @@ Each code goes into the Signal Center registry.
 | Command | What it does |
 |---|---|
 | `evolve wave status [--json]` | adds the measures of §11 and the cell table |
-| `evolve wave supply [--json]` | runs the census (§4) read-only and prints its classes and its split proposals |
+| `evolve wave supply [--json]` | runs the census (§4) read-only and prints its classes and its split proposals. Pending (O6). |
 | `evolve inbox split <id> [--lane-after-console] [--json] [--project-root P]` | the console accepts a split proposal (§4). Built (O2c). |
 
 ## 14. Stages
@@ -518,14 +555,16 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 
 | Rule | Guard | State |
 |---|---|---|
-| The orchestrator runs no LLM. | a structure test: the orchestrator package imports no bridge and no driver package | proposed (O6) |
-| The orchestrator never polls. | `TestOrchestrator_NeverPollsAndNeverStopsALaneByItself` bans `time.Sleep`, `time.Tick` and `time.NewTicker` in `internal/orchestrator` | built (O4, O5) |
+| The orchestrator runs no LLM. | `TestOrchestrator_ImportsNoBridgeAndNoDriverPackage`: the package imports no bridge, no `subagent` and no `consensusdispatch` package | built (O6) |
+| The orchestrator never polls. | `TestOrchestrator_NeverPollsAndNeverStopsALaneByItself` bans `time.Sleep`, `time.Tick`, `time.NewTicker`, `time.After` and `time.NewTimer` in `internal/orchestrator`. Only `time.AfterFunc` of the lease table stays | built (O4, O5, O6) |
 | Two lanes in flight never hold one cell. | `TestAdmit_ATodoInABusyCellWaits` and `TestAdmit_TwoAdmittedTodosNeverConflict` | built (O3) |
 | The hub cell admits one lane. | `TestAdmit_TheGlobalCellAdmitsOne` | built (O3) |
 | The shadow changes no lane. | `TestAdmit_ShadowRecordsTheWaitAndChangesNothing` | built (O3) |
 | A stop is never a broad kill. | the stop cancels the launch context of that lane only (`TestLease_AnEnforcedDeadlineStopsOnlyThatLaneThroughItsInjectedStop`), and the guard test refuses `syscall.Kill`, `os.FindProcess`, `os/exec`, `sysexec` and `proctree` in the package | built (O5) |
 | The shadow lease keeps the barrier. | `TestWave_AShadowLeaseKeepsTheBarrierLaunchesExactlyAsToday` | built (O5) |
-| The census never routes an item. | `TestSupply_RecordsTheCauseOfEachRefusal` checks that the inbox files do not change | proposed (O6) |
+| The census never routes an item. | `TestSupply_RecordsTheCauseOfEachRefusal` checks that the inbox files do not change | built (O6) |
+| The oversight waits for events only. | `TestOrchestrator_WakesOnlyOnEvents` checks the order arm, read, wait, and that a wake with no event acts on nothing | built (O6) |
+| The oversight changes no lane at `shadow`. | `TestOversight_AShadowComputesEveryActionAndChangesNothing` | built (O6) |
 | A split keeps every protected file in the console part. | `TestInboxSplit_TheConsolePartKeepsEveryProtectedFile` | built (O2c) |
 | A bench with a fallback keeps its slot. | `TestQuotaAwareCount_ABenchWithAFallbackKeepsTheLane` | proposed (O1) |
 
