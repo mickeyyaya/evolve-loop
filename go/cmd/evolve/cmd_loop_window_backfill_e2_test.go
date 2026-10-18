@@ -24,7 +24,7 @@ var e2PoolFleet = policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "tria
 type e2WindowFixture struct {
 	root, evolveDir string
 	b               *loopBatchCoordinator
-	console         *bytes.Buffer
+	console         *lockedBuffer
 }
 
 func newE2WindowFixture(t *testing.T, items map[string]string) e2WindowFixture {
