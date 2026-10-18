@@ -17,7 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-var enforceOrchestrator = policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8}
+var enforceOrchestrator = policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8, WindowStart: 4, WindowMin: 2}
 
 func writeLaneSpan(t *testing.T, root string, cycle int, span time.Duration) {
 	t.Helper()
@@ -124,6 +124,9 @@ func TestOrchestratorPool_WiresTheEnforceKeysAndTheFileRuleWithoutAGraph(t *test
 	if p.Target != 3 || p.Concurrency != 2 || p.MaxLanes != 8 || p.Leases != b.leases["enforce"] || p.Freshen == nil || p.Claims == nil || p.Reap == nil || p.Halted == nil || p.Publish == nil {
 		t.Errorf("pool = %+v, want the fleet width, run_max_lanes and the enforce lease table", p)
 	}
+	if p.Stage != "enforce" || p.Window == nil || p.Window.Size() != 2 {
+		t.Errorf("stage = %q window = %v, want the enforce stage and a window of 2: window.start 4 is capped by the concurrency cap 2, which is under the fleet count 3", p.Stage, p.Window)
+	}
 	if p.Admit != nil || !strings.Contains(console.String(), "[loop] WARN: orchestrator: pool 4 admits by the file rule") {
 		t.Errorf("admit set = %v, console = %q, want the file rule with a WARN when the module graph does not load", p.Admit != nil, console.String())
 	}
@@ -153,5 +156,74 @@ func TestOrchestratorPool_AdmitsByCellWhenTheModuleGraphLoads(t *testing.T) {
 	}
 	if got := p.Admit(nil, []fleet.Todo{x}); got != 0 {
 		t.Errorf("admit of a todo in a free cell = %d, want 0", got)
+	}
+}
+
+func TestLaneWindow_OpensAtWindowStartPublishesEachChangeAndSaysSoOnTheConsole(t *testing.T) {
+	t.Parallel()
+	evolveDir := t.TempDir()
+	b, console := iscsCoordinator(t.TempDir(), evolveDir, nil)
+	fc := policy.FleetConfig{Count: 8, Concurrency: 8, PlanSource: "triage", Orchestrator: enforceOrchestrator}
+
+	w := b.laneWindow(fc)
+	if w.Size() != 4 {
+		t.Fatalf("window = %d, want window.start 4 of the fleet count 8", w.Size())
+	}
+	if !strings.Contains(console.String(), "[loop] orchestrator: adaptive window (stage enforce): 4 of 8 lane(s), min 2") {
+		t.Errorf("console = %q, want the line that names the opening window", console.String())
+	}
+	w.CleanLanding()
+	b.deps.Signals.Flush()
+	raw, err := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"code":"LOOP_ORCH_WINDOW"`) || !strings.Contains(string(raw), `"cause":"clean_landing"`) {
+		t.Errorf("signals = %s, want LOOP_ORCH_WINDOW with the cause clean_landing", raw)
+	}
+}
+
+func TestLaneWindow_ARunStartsAtWindowStartAndTheLoopKeepsNoWindowBetweenRuns(t *testing.T) {
+	t.Parallel()
+	b, _ := iscsCoordinator(t.TempDir(), t.TempDir(), nil)
+	fc := policy.FleetConfig{Count: 8, Concurrency: 8, PlanSource: "triage", Orchestrator: enforceOrchestrator}
+	first := b.laneWindow(fc)
+	for range 4 {
+		first.CleanLanding()
+	}
+	second := b.laneWindow(fc)
+	if second == first || second.Size() != 4 {
+		t.Errorf("second window = %p size %d, want a new window at window.start 4: a run is one boundary-to-boundary unit", second, second.Size())
+	}
+}
+
+func TestLaneWindow_TheSizedCountIsTheSmallerOfTheFleetCountAndTheConcurrencyCap(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		count, concurrency       int
+		wantSize, afterAConflict int
+		wantLine                 string
+	}{
+		"a cap under the count": {16, 6, 6, 3, "6 of 6 lane(s), min 2"},
+		"a cap over the count":  {8, 10, 8, 4, "8 of 8 lane(s), min 2"},
+		"no cap":                {8, 0, 8, 4, "8 of 8 lane(s), min 2"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			b, console := iscsCoordinator(t.TempDir(), t.TempDir(), nil)
+			oc := enforceOrchestrator
+			oc.WindowStart = 12
+			w := b.laneWindow(policy.FleetConfig{Count: tc.count, Concurrency: tc.concurrency, PlanSource: "triage", Orchestrator: oc})
+			if w.Size() != tc.wantSize {
+				t.Fatalf("window = %d, want %d: window.start 12 is capped by the pool width", w.Size(), tc.wantSize)
+			}
+			w.Conflict()
+			if w.Size() != tc.afterAConflict {
+				t.Errorf("window after a conflict = %d, want %d: a halving binds at once only when the window never exceeds the pool width", w.Size(), tc.afterAConflict)
+			}
+			if !strings.Contains(console.String(), tc.wantLine) {
+				t.Errorf("console = %q, want the line to end with %q", console.String(), tc.wantLine)
+			}
+		})
 	}
 }

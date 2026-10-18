@@ -20,6 +20,7 @@ type PoolConfig struct {
 	Exited      func(td Todo, r Result) bool
 	Halted      func() bool
 	Kick        <-chan struct{}
+	Window      func() int
 }
 
 type PoolTransitionKind string
@@ -110,8 +111,16 @@ func (p *pool) settle(idx int) {
 	}
 }
 
+func (p *pool) width() int {
+	if p.cfg.Window == nil {
+		return p.limit
+	}
+	return max(1, min(p.limit, p.cfg.Window()))
+}
+
 func (p *pool) fill(kind PoolTransitionKind, initial bool) (full bool) {
-	for len(p.running) < p.limit && len(p.pending) > 0 && p.open() {
+	width := p.width()
+	for len(p.running) < width && len(p.pending) > 0 && p.open() {
 		at := p.next(initial)
 		if at < 0 && len(p.running) > 0 {
 			break
@@ -121,7 +130,7 @@ func (p *pool) fill(kind PoolTransitionKind, initial bool) (full bool) {
 		p.pending = append(p.pending[:at:at], p.pending[at+1:]...)
 		p.dispatch(idx, kind)
 	}
-	return len(p.running) == p.limit
+	return len(p.running) >= width
 }
 
 func (p *pool) open() bool {

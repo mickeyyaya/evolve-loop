@@ -65,6 +65,8 @@ func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fl
 		Reap:    b.laneReap(),
 		Publish: b.deps.Signals.Emit,
 		Halted:  b.poolHalted,
+		Stage:   fc.Orchestrator.Stage,
+		Window:  b.laneWindow(fc),
 	}
 }
 
@@ -83,4 +85,15 @@ func (b *loopBatchCoordinator) orchestratedRun(fc policy.FleetConfig, launch fle
 	return func(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 		return b.orchestratorPool(fc, launch, iteration).Run(ctx, backlog)
 	}
+}
+
+func (b *loopBatchCoordinator) laneWindow(fc policy.FleetConfig) *orchestrator.Window {
+	oc := fc.Orchestrator
+	sized := fc.Count
+	if fc.Concurrency > 0 {
+		sized = min(sized, fc.Concurrency)
+	}
+	w := orchestrator.NewWindow(orchestrator.WindowConfig{Start: oc.WindowStart, Min: oc.WindowMin, Sized: sized}, b.deps.Signals.Emit)
+	fmt.Fprintf(b.stderr, "[loop] orchestrator: adaptive window (stage %s): %d of %d lane(s), min %d\n", oc.Stage, w.Size(), sized, oc.WindowMin)
+	return w
 }

@@ -191,7 +191,7 @@ Known limits: the step charges one slot for each empty chain. When many lanes sh
 
 Example: on 2026-10-17, `agy` and `agy-claude` are benched. Each chain of the table ends in `claude`, and `claude` is healthy. The wave keeps all 4 lanes.
 
-The window starts at `fleet.count`, minus the slots that the benches cost, and never below `fleet.min_lanes`. The budget step of `fleetbudget` stays as it is (`size.go:16-36`).
+The sized count is `fleet.count`, minus the slots that the benches cost, and never below `fleet.min_lanes`. The window (§10) is at most the sized count. The budget step of `fleetbudget` stays as it is (`size.go:16-36`).
 
 The sizing step runs at the start of each run and again on each `clihealth` bench event (§9). The window can thus shrink while lanes run. A shrink never stops a lane in flight. It only stops the next admission.
 
@@ -410,13 +410,33 @@ The width is a fixed `fleet.count`, and only quota benches change it.
 
 ### Solution
 
-**Deferred (plan O8).** The window has no effect at width 4. It starts when `fleet.count` goes above 6, with the ADR-0134 group commit. At or below width 4, the window is the sized count of §5. Above width 4, the window follows Zuul's rule (P3.10):
+**State: built (O8), 2026-10-18.** `orchestrator.Window` holds the size ([internal-orchestrator.md](packages/internal-orchestrator.md)). At `enforce`, the pool admits a lane only while the lanes in flight number fewer than the size. At `shadow`, the loop builds no window, so nothing publishes. The caller that moves the window is not built (see "What feeds the window").
+
+The window has no effect at width 4. At or below `window.min` (default 4), the window is the sized count of §5. Above that width, the window follows Zuul's rule (P3.10):
 
 - It starts at `fleet.orchestrator.window.start` (default 4).
 - It grows by 1 for each clean landing, up to the sized count.
-- It halves on each landing conflict, down to `fleet.orchestrator.window.min` (default 4).
+- It halves on each landing conflict, down to `fleet.orchestrator.window.min` (default 4). The halving rounds down.
 
 The window never stops a lane in flight. A smaller window only delays the next admission.
+
+**How the pool reads the window.** `fleet.RunPool` reads the window at each fill: the first fill of a run, and the fill after each lane exit (`fleet/pool.go:103-122`). It admits a lane while the lanes in flight number fewer than the smaller of the pool width and the window. The floor is 1, so a window of 0 cannot stop a run. `orchestrator.Pool` gives the window to `RunPool` only when its stage is `enforce` (`orchestrator/pool.go:71-76`).
+
+**The slots that the window holds back.** A slot that the window holds back is not idle, so the pool publishes no `LOOP_ORCH_POOL_IDLE` for it. A window that grows between two lane exits fills its new slot at the next exit.
+
+**The size.** `Resize(sized)` runs when sizing (§5) changes the sized count. A smaller count clamps the window. A larger count does not open it: only a clean landing grows it. The floor is the smaller of `window.min` and the sized count. The window thus stays at or above `window.min` while the sized count is above `window.min`.
+
+**The sized count.** The loop gives the window the smaller of `fleet.count` and `fleet.concurrency`, which is the pool width. Thus the window never exceeds the pool width, and each halving binds at once.
+
+**The signal.** The window publishes `LOOP_ORCH_WINDOW` once for each change, with the old size, the new size, the sized count and the cause (`clean_landing`, `conflict` or `resize`).
+
+**The config.** Both keys must be at least 1. `window.min` must not exceed `window.start`, and `window.start` must not exceed `fleet.count`. A violation refuses the policy, as for the other `fleet.orchestrator` keys. An unset `window.min` follows `window.start` down, so `window.start` of 2 alone is valid.
+
+**What feeds the window.** The window moves only when a caller runs `CleanLanding` or `Conflict`. That caller is the O6 loop, on each `ship.landed` and each landing conflict (§9). O6 is not built. Until it is, the window stays at `window.start`.
+
+**The width before O6.** Until O6 is built, the pool at `enforce` runs `window.start` lanes, whatever `fleet.count` says. To run all `fleet.count` lanes before then, set `window.start` to `fleet.count`.
+
+**The limit of the window.** The window bounds the conflict rate. It does not lift the serial landing limit of about 6 lanes (§12). One landing takes about 5 minutes, so landings queue at a larger width, whatever the window says. The group commit of ADR-0134 lifts that limit, and this component does not build it. This window also differs from the composition window of the landing queue ([fleet-landing-queue §4](fleet-landing-queue.md#4-the-composition-order)).
 
 ## 11. Measures
 
@@ -481,7 +501,7 @@ No step compares all pairs of lanes. The cost thus grows linearly with N, not wi
 | Host memory | above the CPU limit | one agy phase uses about 350 MB, and one Claude Code phase about 1.5 GB, on a 64 GB host (2026-10-17, `ps`) | none needed before the CPU limit |
 | Quota | changes each hour | the benches of §5 | more families in each chain |
 
-The first limit that binds is the serial landing, at about 6 lanes. A width of 4 is inside it. A width above 6 needs ADR-0134's group commit. The orchestrator then raises its window through §10, and the conflict rate shows if the cells hold.
+The first limit that binds is the serial landing, at about 6 lanes. A width of 4 is inside it. A width above 6 needs ADR-0134's group commit. The orchestrator then raises its window through §10, and the conflict rate shows if the cells hold. The window (built, O8) bounds the conflicts. It does not lift this limit.
 
 ### The lane CPU budget
 
@@ -512,7 +532,7 @@ The budget does not make a lane faster. It makes the lanes share the host, so th
 
 ### Config keys
 
-All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig()`. The `orchestrator` block is strict-decoded: an unknown key, an unknown `stage` or a negative number refuses the policy. Built on 2026-10-17: `stage`, `scan_k`, `hub_min_importers`, `deadline_floor_minutes`, `stall_minutes` and `run_max_lanes`.
+All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig()`. The `orchestrator` block is strict-decoded: an unknown key, an unknown `stage`, a negative number or a `window` key out of range refuses the policy. Built on 2026-10-17: `stage`, `scan_k`, `hub_min_importers`, `deadline_floor_minutes`, `stall_minutes` and `run_max_lanes`. Built on 2026-10-18: `window.start` and `window.min`.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
@@ -524,8 +544,8 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | `orchestrator.deadline_floor_minutes` | int | 60 | the floor of the lane deadline |
 | `orchestrator.stall_minutes` | int | 30 | the heartbeat gap that reports a stall |
 | `orchestrator.run_max_lanes` | int | `4 × count` | the lanes that one run launches before its boundary |
-| `orchestrator.window.start` | int | 4 | §10 |
-| `orchestrator.window.min` | int | 4 | §10 |
+| `orchestrator.window.start` | int | 4 | the window at the start of a run (§10). At least 1, at most `count`. |
+| `orchestrator.window.min` | int | 4 | the smallest window after a conflict (§10). At least 1, at most `window.start`. Unset, it is 4 or `window.start`, whichever is smaller. |
 
 `scheduling` goes away when the orchestrator is at `enforce`: the orchestrator always uses the pool. A policy with `scheduling` set then gets one WARN.
 
@@ -547,7 +567,7 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | `LOOP_ORCH_LANE_RECOVERY_FAILED` | `errors` | §8: the claim release or the park after a stop failed |
 | `LOOP_ORCH_FAMILY_PAUSED` | `loop` | §9: a family with no fallback stops taking new lanes. INFO. |
 | `LOOP_ORCH_OVERSIGHT_ACTION` | `loop` | §9: the oversight mapped one event to an action. `applied` is false at `shadow`. INFO. |
-| `LOOP_ORCH_WINDOW` | `loop` | §10: the window changes |
+| `LOOP_ORCH_WINDOW` | `loop` | §10: the window changed size. Once for each change. INFO. Fields `old`, `new`, `sized`, `cause`. |
 
 Each code goes into the Signal Center registry.
 
@@ -582,6 +602,10 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 | The census never routes an item. | `TestSupply_RecordsTheCauseOfEachRefusal` checks that the inbox files do not change | built (O6) |
 | The oversight waits for events only. | `TestOrchestrator_WakesOnlyOnEvents` checks the order arm, read, wait, and that a wake with no event acts on nothing | built (O6) |
 | The oversight changes no lane at `shadow`. | `TestOversight_AShadowComputesEveryActionAndChangesNothing` | built (O6) |
+| A smaller window never stops a lane in flight. | `TestPool_AShrinkingWindowNeverStopsALaneInFlightAndOnlyDelaysTheNextAdmission` and `TestRunPool_TheWindowHookBoundsAdmissionAndAShrinkNeverStopsALaneInFlight` | built (O8) |
+| Only `enforce` lets the window gate admission. | `TestPool_OnlyTheEnforceStageLetsTheWindowGateAdmission` | built (O8) |
+| At `shadow`, the loop builds no window. | `TestDispatchPool_AtShadowTheLoopBuildsNoWindow` | built (O8) |
+| A window never lifts the `fleet.concurrency` cap. | `TestRunPool_AWindowNeverLiftsTheConcurrencyCap` and `TestLaneWindow_TheSizedCountIsTheSmallerOfTheFleetCountAndTheConcurrencyCap` | built (O8) |
 | A split keeps every protected file in the console part. | `TestInboxSplit_TheConsolePartKeepsEveryProtectedFile` | built (O2c) |
 | A bench with a fallback keeps its slot. | `TestQuotaAwareCount_ABenchWithAFallbackKeepsTheLane` | proposed (O1) |
 
