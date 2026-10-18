@@ -1,6 +1,6 @@
 # ADR-0087 — Scope-delta adjudication: judge out-of-scope work by what it means
 
-**Status:** Accepted (core landed; wiring staged)
+**Status:** Accepted (core landed; the build-exit report landed 2026-10-18; the carve path staged)
 **Date:** 2026-08-12
 **Supersedes nothing. Related:** ADR-0074 (protected surfaces), ADR-0076 (continuation-on-fail), ADR-0084 (gate-integrity invariants)
 
@@ -97,3 +97,5 @@ This is the load-bearing section: everything above is only safe if "adjudicate o
 ## Implementation
 
 `go/internal/scopedelta` — pure, no I/O (`scopedelta.go` taxonomy + accounting, `gaming.go` the four discriminators), fully table-tested (94.6% coverage, apicover 37/37 with 0 false-green, race-clean). Wiring lands as separate slices: the `scope_delta[]` producer block in the deliverable contract (schema single-sourced with a literal example, ADR-0084 I2), the audit adjudication section, the ship-time accounting gate, and the carve/mint path.
+
+The first wired slice is the build handoff floor (`core.ScopeDeltaFloorChecks`, 2026-10-18, [internal-core.md](../packages/internal-core.md)). It classifies every changed path at build exit and emits one `ORCHESTRATOR_SCOPE_DELTA` signal per path outside the declared scope. It reports and does not act, as the rollout section asks. `evolve cycle scope-delta` (2026-10-16) is the operator view of the same classification. The carve/mint path stays staged.
