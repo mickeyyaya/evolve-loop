@@ -99,7 +99,7 @@ This is the repo's own P7 ("a cycle cannot edit, or draw, what grades it") appli
   - PRs iterate "until all agent reviewers are satisfied".
 - **Stripe Minions** (*secondary*). Blueprints alternate deterministic nodes with agent loops. The test-validation step is "a gate the harness enforces regardless of what the model thinks", and each run gets at most two CI rounds.
 
-**Shaped:** AR3. Each criterion is marked `Verifier: kernel` or `Verifier: audit`. Kernel-verified criteria reach the audit as facts it cannot overrule, and they fail at build's own handoff floor with remediation text, before any audit runs. This is the repo's P2 and P6 applied.
+**Shaped:** AR3. Each criterion is marked `Verifier: kernel`, `Verifier: audit` or `Verifier: both`, and a kernel fact counts only at the stage its own gate runs at (E-D9). Kernel-verified criteria reach the audit as facts it cannot overrule, and they fail at build's own handoff floor with remediation text, before any audit runs. This is the repo's P2 and P6 applied.
 
 ### F5. The judge is biased toward its own family, and needs calibration
 

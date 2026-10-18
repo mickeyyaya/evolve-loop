@@ -128,6 +128,8 @@ Approach C (a published standard, an `audit-plan` before build, and criterion-ke
 | `diff` | a hunk in the cycle's diff | `<file>:<from>-<to>` | the audit reads it; the kernel checks that the hunk is in the cycle diff |
 | `kernel` | a fact the kernel computed | `kernel` | nobody; it is read from `kernel-facts.json` |
 
+A certificate form may combine two kinds, such as `kernel` + `artifact` for `G-EVAL`, and §3.5 check 6 compares the planner's form with the one §2.1 gives. The form of `G-COMMENT` is resolved by stage: `kernel` when `comment_floor.stage=enforce`, else `diff`. Check 6 reads the stage from the persisted policy.
+
 A claim with no certificate is not evidence. Prose such as "tested manually" or "follows the pattern" satisfies nothing. A certificate states *what may be claimed and how to check it*, an idea borrowed from the research (dossier F3), not a measurement taken from it.
 
 #### 2.3 Version
@@ -202,7 +204,7 @@ Standard: quality-index@3f9a0c1b7d2e
 - …one line per remaining criterion ID…
 
 ## Dimensions
-- concurrency: required — bar 4 — watch: the single-flight leader's context and the followers' error path
+- concurrency: required — bar 4 — depth deep — watch: the single-flight leader's context and the followers' error path
 - performance: N/A — no executed hot path changes
 - …one line per remaining dimension…
 
@@ -226,10 +228,10 @@ Rules:
   - `- <ID>: required — kernel` (for a `kernel` criterion);
   - `- <ID>: required — kernel + <kind> — <evidence>` (for a `both` criterion);
   - `- <ID>: N/A — <reason>`.
-- **`## Dimensions`** has one line per quality-index key, either `- <key>: required — bar <n> — watch: <risk>` or `- <key>: N/A — <reason>`. The bar is the configured threshold and never lower.
+- **`## Dimensions`** has one line per quality-index key, either `- <key>: required — bar <n> — depth <light|standard|deep> — watch: <risk>` or `- <key>: N/A — <reason>`. The bar is the configured threshold and never lower. The depth uses the Review Plan's values (RL §3), and the Review Plan never runs a dimension at a lower depth (§6).
 - **`## Rejection Triggers`** name the *condition class* and the criterion or dimension it would FAIL. They never name an input, command or assertion the final audit will run (AR1).
 - **`## Need to Know`** has exactly two subsections, `### For build` and `### For review`.
-- **Tolerances** follow RL §2.2: an em dash, en dash or ` - ` separator, CRLF line endings, and `**bold**` keys.
+- **Tolerances** follow RL §2.2: an em dash, en dash or ` - ` separator, CRLF line endings, and `**bold**` keys. The `qualityindex` parsers and `reportdoc.Fields` implement them, so the expectations and Criteria parsers reuse that code and add no tolerance of their own.
 - **No implementation prescriptions (AR5).** The document states outcomes and evidence, never how to implement. This is a persona rule and a code-review lens, not a parser check.
 
 #### 3.4 Contract gaps (the sprint-contract analogue)
@@ -260,9 +262,11 @@ Each violation makes the document malformed and goes to the correction rung:
 - optional;
 - user-defined;
 - pinned only by `conditional_mandatory`;
-- declaring a skip signal in its spec.
+- declaring a skip signal in its spec, in the skip-signal field.
 
-Such a phase degrades to SKIPPED+WARN, wherever it runs, on an exhausted correction ladder, a failed dispatch, or a quota wall. Its blocks never carry the global contract breaker into the next phase. For `audit-plan` the skip signal is `AUDIT_PLAN_SKIPPED`, and build proceeds on the static standard. Scout, triage and intent keep the abort.
+The rule applies only to a phase that runs before the ship floor. The ship floor and every phase after it keep their aborts.
+
+Such a phase degrades to SKIPPED+WARN, wherever it runs before the ship floor, on an exhausted correction ladder, a failed dispatch, or a quota wall. Its blocks never carry the global contract breaker into the next phase. For `audit-plan` the skip signal is `AUDIT_PLAN_SKIPPED`, and build proceeds on the static standard. Scout, triage and intent keep the abort.
 
 #### 3.6 Re-entry
 
@@ -294,6 +298,7 @@ The kernel renders a recipient-specific digest:
 The fence is hash-and-restore, the RL §5.7 pattern, because the Claude-only role hook cannot fence another CLI's writes.
 - **The expectations.** When `audit-plan` completes, the kernel records `audit-expectations.md`'s hash in cycle state and keeps a copy under `audit-snapshots/`. It checks the hash after every build and code-review dispatch, and on a mismatch it restores from the copy and emits `AUDIT_EXPECTATIONS_TAMPERED{artifact}`. The document is never modified again, so no kernel write can race the check.
 - **New in E3: the instruments.** The same check extends to the files tdd wrote this cycle (its committed test files and `go/acs/cycle<N>/**`) and to the cycle's eval file. Today only `go/acs/regression/` is protected, through the manifest and the build floor's protected-surface check. A build that edits a fenced instrument is restored and signalled.
+- **The instrument fence re-snapshots after every tdd dispatch,** including a tdd re-entry from `audit-repair`. The set it covers is the `testFiles` of `test-report.md`, `go/acs/cycle<N>/**` and the eval file. A tdd dispatch may legitimately rewrite them, so the kernel takes a new copy and hash when that dispatch completes. Build and code-review dispatches are checked against the latest copy.
 
 #### 4.3 Kernel criteria reach build first where they exist (AR3)
 
@@ -355,7 +360,7 @@ Standard: quality-index@3f9a0c1b7d2e
 - **FAIL** names a finding in `## Findings`.
 - **N/A** carries a reason.
 - **When the plan said N/A.** A FAIL on a criterion the plan marked N/A is allowed only with a `Justification:` line (as for NEW), and raises `AUDIT_PLAN_DIVERGENCE`. Build was told N/A, so this case is a visible moved goalpost.
-- **Findings** use the shared grammar (RL §4.1) with these fields: `Criterion: <ID>` or `Dimension: <key>`, then Location, Scenario, Evidence, `Certificate: <kind> <reference>`, and Fix.
+- **Findings** use the shared grammar (RL §4.1) with these fields: `Criterion: <ID>` or `Dimension: <key>`, then Location, Scenario, Evidence, `Certificate: <certificate-kind> <reference>`, Fix, and the Kind and Blocking fields that ADR-0126 adds. The audit records Kind and never uses it to unblock.
 
 #### 5.2 Kernel facts and the cross-check (logic, not format)
 
@@ -378,6 +383,10 @@ The cross-check runs after the report passes its grammar. It extends RL §6.2, a
 | A finding cites an unknown criterion that is not NEW | malformed → correction rung | signal only, no correction dispatch |
 | The `Standard:` line differs from the persisted version | malformed → correction rung | signal only, no correction dispatch |
 | The audit and the builder are in the same model family | `AUDIT_SAME_FAMILY` (a WARN signal, never a block) | same |
+
+**Dedup.** Four criteria index RL §6.2's qualification conditions (`G-ACS`, `G-EVAL`, `G-ACCEPT` and `G-DISPO`), so the kernel keeps one flip and one signal per defect when RL §6.2 and a criterion find the same defect: it raises one `AUDIT_QUALIFICATION_GAP` with the criterion's cause and writes one defect line.
+
+A Criterion finding counts for its §2.1 dimension in the dimension's gap check. The cap of 3 (§2.1) for a failed criterion's dimension is applied by the kernel to the audit's Scores, and the cap applies to the audit's Scores only: it never lowers the code-review Scores.
 
 **Every criterion flip:**
 - emits `AUDIT_QUALIFICATION_GAP{cause: criterion | criterion_kernel, criterion: <ID>, …}`. `criterion` is a new field, and the total stays within `signalcenter.MaxFields`. The two values join RL's closed cause enum;
@@ -482,6 +491,10 @@ At the flip, the operator decides on that data whether to keep `audit-plan`, sli
 - **Retry envelope and audit-repair** (ADR-0093/0096). The envelope is unchanged. In enforce only, the repair brief gains a criterion-keyed section (§6), and criterion flips declare `code-audit-fail` through `audit-qualification.json` (§5.2).
 - **The auditor persona.** Its checklists (reference A–D, the verdict rules, predicate quality, goal integrity, the ADR-0084 lenses, explanation review) move into the standard and are referenced by ID. This happens at the flip and merges with RL's persona slimming (E7). It includes correcting the persona's claim that a constitution check runs at `gate_build_to_audit`: no such Go check exists.
 - **The constitution** (`audit-constitution.md`). P1–P8 are unchanged. `G-CONST` indexes them.
+- **The convergence policy** ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md)).
+  - Audit repair uses rung 1, rung 2(a) and Stop only, with no deferrals. The audit keeps its full verdict rules.
+  - On a repair round, the kernel hands the fixer the distilled brief (§6), and later judgments are verify-only on the previous findings and the fix's own hunks.
+  - Findings carry Kind and Blocking (§5.1). A CRITICAL is always a defect.
 
 ### 11. Security surface
 

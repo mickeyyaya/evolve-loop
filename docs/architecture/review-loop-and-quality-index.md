@@ -254,6 +254,8 @@ Each finding becomes a row in `defect-ledger.json`, merged by `defectledger.Appe
 
 ### 5. The loop until resolved
 
+The loop calls the convergence policy ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md)) at each decision after a round: `max_fix_rounds` is 3 (the budget of `max_rounds` 4 is unchanged), and U(n) (§5.3) is its mass.
+
 #### 5.1 Per-round state (cycle state, persisted on every path)
 
 ```go
