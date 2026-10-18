@@ -2,97 +2,204 @@ package fleet
 
 import (
 	"context"
+	"errors"
 	"runtime"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
+var errNeverLaunched = errors.New("fleet: the pool never launched this todo")
+
 type PoolConfig struct {
 	Target      int
 	Concurrency int
+	MaxLaunches int
+	Next        func(inFlight, pending []Todo) int
+	Prepare     func(td Todo, spec CycleSpec) (CycleSpec, bool)
+	Exited      func(td Todo, r Result) bool
+	Halted      func() bool
 }
 
+type PoolTransitionKind string
+
+const (
+	PoolLaunched   PoolTransitionKind = "launched"
+	PoolExited     PoolTransitionKind = "exited"
+	PoolBackfilled PoolTransitionKind = "backfilled"
+	PoolIdle       PoolTransitionKind = "idle"
+)
+
 type PoolTransition struct {
+	Kind   PoolTransitionKind
+	Todo   string
 	Live   int
 	Target int
+}
+
+type pool struct {
+	ctx          context.Context
+	cfg          PoolConfig
+	backlog      []Todo
+	launch       LaunchFn
+	onTransition func(PoolTransition)
+	limit        int
+	results      []Result
+	pending      []int
+	running      map[int]bool
+	claimed      map[string]bool
+	launches     int
+	completions  chan int
 }
 
 func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchFn, onTransition func(PoolTransition)) []Result {
 	if launch == nil {
 		return noLaunchResults(len(backlog))
 	}
-	results := make([]Result, len(backlog))
+	p := newPool(ctx, cfg, backlog, launch, onTransition)
+	p.fill(PoolLaunched, true)
+	for len(p.running) > 0 {
+		p.settle(<-p.completions)
+	}
+	return p.results
+}
 
+func newPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchFn, onTransition func(PoolTransition)) *pool {
 	limit := cfg.Target
 	if cfg.Concurrency > 0 && cfg.Concurrency < limit {
 		limit = cfg.Concurrency
 	}
-	if limit < 1 {
-		limit = 1
-	}
-
-	pending := make(map[int]bool, len(backlog))
+	p := &pool{ctx: ctx, cfg: cfg, backlog: backlog, launch: launch, onTransition: onTransition,
+		limit: max(limit, 1), results: make([]Result, len(backlog)), running: map[int]bool{},
+		claimed: map[string]bool{}, completions: make(chan int, len(backlog))}
 	for i := range backlog {
-		pending[i] = true
+		p.pending = append(p.pending, i)
+		p.results[i] = Result{Index: i, ExitCode: -1, Err: errNeverLaunched}
 	}
-	claimed := map[string]bool{}
-	running := 0
-	completions := make(chan int, len(backlog))
+	return p
+}
 
-	emit := func() {
-		if onTransition != nil {
-			onTransition(PoolTransition{Live: running, Target: cfg.Target})
-		}
+func (p *pool) emit(kind PoolTransitionKind, todo string) {
+	if p.onTransition != nil {
+		p.onTransition(PoolTransition{Kind: kind, Todo: todo, Live: len(p.running), Target: p.cfg.Target})
 	}
-	disjoint := func(idx int) bool {
-		for f := range normalizeFiles(backlog[idx].Files) {
-			if claimed[f] {
-				return false
+}
+
+func (p *pool) settle(idx int) {
+	for f := range normalizeFiles(p.backlog[idx].Files) {
+		delete(p.claimed, f)
+	}
+	delete(p.running, idx)
+	p.emit(PoolExited, p.backlog[idx].ID)
+	if p.cfg.Exited != nil && p.cfg.Exited(p.backlog[idx], p.results[idx]) {
+		p.pending = append([]int{idx}, p.pending...)
+	}
+	if !p.fill(PoolBackfilled, false) {
+		p.emit(PoolIdle, "")
+	}
+}
+
+func (p *pool) fill(kind PoolTransitionKind, initial bool) (full bool) {
+	for len(p.running) < p.limit && len(p.pending) > 0 && p.open() {
+		at := p.next(initial)
+		if at < 0 && len(p.running) > 0 {
+			break
+		}
+		at = max(at, 0)
+		idx := p.pending[at]
+		p.pending = append(p.pending[:at:at], p.pending[at+1:]...)
+		p.dispatch(idx, kind)
+	}
+	return len(p.running) == p.limit
+}
+
+func (p *pool) open() bool {
+	if p.cfg.MaxLaunches > 0 && p.launches >= p.cfg.MaxLaunches {
+		return false
+	}
+	return p.cfg.Halted == nil || !p.cfg.Halted()
+}
+
+func (p *pool) next(initial bool) int {
+	if p.cfg.Next != nil {
+		return p.cfg.Next(p.todos(p.inFlight()), p.todos(p.pending))
+	}
+	if initial {
+		for at, idx := range p.pending {
+			if p.disjoint(idx) {
+				return at
 			}
 		}
-		return true
+		return -1
 	}
-	dispatch := func(idx int) {
-		delete(pending, idx)
-		for f := range normalizeFiles(backlog[idx].Files) {
-			claimed[f] = true
-		}
-		running++
-		emit()
-		started := make(chan struct{})
-		go func() {
-			started <- struct{}{}
-			code, err := launch(ctx, poolSpec(backlog[idx], limit))
-			results[idx] = Result{Index: idx, ExitCode: code, Err: err}
-			completions <- idx
-		}()
-		<-started
-		runtime.Gosched()
-	}
+	return p.selectDisjoint()
+}
 
-	for i := 0; i < len(backlog) && running < limit; i++ {
-		if pending[i] && disjoint(i) {
-			dispatch(i)
+func (p *pool) inFlight() []int {
+	out := make([]int, 0, len(p.running))
+	for i := range p.backlog {
+		if p.running[i] {
+			out = append(out, i)
 		}
 	}
+	return out
+}
 
-	for running > 0 {
-		idx := <-completions
-		for f := range normalizeFiles(backlog[idx].Files) {
-			delete(claimed, f)
-		}
-		running--
-		emit()
-		for running < limit {
-			cand := selectDisjoint(backlog, pending, disjoint)
-			if cand < 0 {
-				break
-			}
-			dispatch(cand)
+func (p *pool) todos(idxs []int) []Todo {
+	out := make([]Todo, len(idxs))
+	for i, idx := range idxs {
+		out[i] = p.backlog[idx]
+	}
+	return out
+}
+
+func (p *pool) disjoint(idx int) bool {
+	for f := range normalizeFiles(p.backlog[idx].Files) {
+		if p.claimed[f] {
+			return false
 		}
 	}
-	return results
+	return true
+}
+
+func (p *pool) selectDisjoint() int {
+	best := -1
+	for at, idx := range p.pending {
+		if !p.disjoint(idx) {
+			continue
+		}
+		if best < 0 || p.backlog[idx].Priority > p.backlog[p.pending[best]].Priority {
+			best = at
+		}
+	}
+	return best
+}
+
+func (p *pool) dispatch(idx int, kind PoolTransitionKind) {
+	td := p.backlog[idx]
+	spec := poolSpec(td, p.limit)
+	if p.cfg.Prepare != nil {
+		prepared, ok := p.cfg.Prepare(td, spec)
+		if !ok {
+			return
+		}
+		spec = prepared
+	}
+	for f := range normalizeFiles(td.Files) {
+		p.claimed[f] = true
+	}
+	p.running[idx] = true
+	p.launches++
+	p.emit(kind, td.ID)
+	started := make(chan struct{})
+	go func() {
+		started <- struct{}{}
+		code, err := p.launch(p.ctx, spec)
+		p.results[idx] = Result{Index: idx, ExitCode: code, Err: err}
+		p.completions <- idx
+	}()
+	<-started
+	runtime.Gosched()
 }
 
 func noLaunchResults(n int) []Result {
@@ -101,19 +208,6 @@ func noLaunchResults(n int) []Result {
 		results[i] = Result{Index: i, ExitCode: -1, Err: errNoLaunch}
 	}
 	return results
-}
-
-func selectDisjoint(backlog []Todo, pending map[int]bool, disjoint func(int) bool) int {
-	best := -1
-	for i := range backlog {
-		if !pending[i] || !disjoint(i) {
-			continue
-		}
-		if best < 0 || backlog[i].Priority > backlog[best].Priority {
-			best = i
-		}
-	}
-	return best
 }
 
 func poolSpec(td Todo, width int) CycleSpec {

@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
@@ -104,7 +105,7 @@ func (b *loopBatchCoordinator) brakeStop(iteration int) batchDecision {
 }
 
 func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig, waveBinary *string) {
-	if (!shouldRunWave(*fleetConfig) && !shouldRunPool(*fleetConfig)) || *waveBinary != "" {
+	if (!shouldRunWave(*fleetConfig) && !loopwave.ShouldRunPool(*fleetConfig)) || *waveBinary != "" {
 		return
 	}
 	binary, err := fleetExecutable()
@@ -130,7 +131,7 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 	if decision, halt := b.diskSpaceHalt(iteration); halt {
 		return decision
 	}
-	if shouldRunPool(fleetConfig) {
+	if loopwave.ShouldRunPool(fleetConfig) {
 		if decision, done := b.dispatchPool(iteration, fleetConfig, waveBinary); done {
 			return decision
 		}
@@ -167,12 +168,16 @@ func (b *loopBatchCoordinator) diskSpaceHalt(iteration int) (batchDecision, bool
 
 func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, waveBinary string) (batchDecision, bool) {
 	poolLaunch := execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)
-	ran, _, results, err := dispatchPoolIteration(
+	run, mode := rollingPool(fleetConfig, poolLaunch), "rolling"
+	if fleetConfig.Orchestrator.Stage == orchestrator.StageEnforce {
+		run, mode = b.orchestratedRun(fleetConfig, poolLaunch, iteration), "orchestrator"
+	}
+	ran, _, results, err := planAndRunPool(
 		b.ctx,
 		fleetConfig,
 		productionWavePreflight(b.cfg.ProjectRoot),
 		productionPoolPlanFn(b.cfg, b.deps.Storage, fleetConfig.Count, b.stderr),
-		poolLaunch,
+		run,
 		iteration,
 	)
 	switch {
@@ -180,8 +185,8 @@ func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.Fl
 		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d dispatch failed, falling back to sequential: %v\n", iteration, err)
 	case ran:
 		t := laneTally(results)
-		fmt.Fprintf(b.stderr, "[loop] pool %d: %d/%d lanes ok%s (rolling, target=%d)\n",
-			iteration, t.OK, t.Total(), t.DeferredSuffix(), fleetConfig.Count)
+		fmt.Fprintf(b.stderr, "[loop] pool %d: %d/%d lanes ok%s (%s, target=%d)\n",
+			iteration, t.OK, t.Total(), t.DeferredSuffix(), mode, fleetConfig.Count)
 		if decision := b.fleetHaltDecision("pool", iteration, results); decision.flow == batchReturn {
 			return decision, true
 		}
@@ -199,7 +204,7 @@ func (b *loopBatchCoordinator) waveRequest(iteration int, cfg policy.FleetConfig
 		Wave:      iteration,
 		Preflight: productionWavePreflight(b.cfg.ProjectRoot),
 		Plan:      b.wave().PlanFn(cfg.Count),
-		Launcher:  b.wave().Launcher(iteration, cfg.Concurrency, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr)),
+		Launcher:  b.wave().Launcher(iteration, cfg.Concurrency, b.shadowLease(cfg.Orchestrator, execCycleLaunch(waveBinary, false, b.cfg.ProjectRoot, b.cfg.GoalHash, b.cfg.GoalText, b.stdout, b.stderr))),
 		Routed:    b.wave().RoutedResolver(),
 	}
 }

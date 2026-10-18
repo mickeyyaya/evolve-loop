@@ -48,7 +48,7 @@ func (e *Engine) shadowAdmission(wave, count int, cfg policy.OrchestratorConfig,
 }
 
 func (e *Engine) observeAdmission(wave, count int, cfg policy.OrchestratorConfig, todos []fleet.Todo, specs []fleet.CycleSpec) {
-	shadow, err := e.admission(todos, e.inboxText(wave), cfg)
+	shadow, err := e.admission(todos, e.InboxText(wave), cfg)
 	if err != nil {
 		fmt.Fprintf(e.stderr, "[loop] WARN: wave %d: admission shadow skipped: %v\n", wave, err)
 		return
@@ -64,7 +64,7 @@ func (e *Engine) observeAdmission(wave, count int, cfg policy.OrchestratorConfig
 	}
 }
 
-func (e *Engine) inboxText(wave int) func(id string) string {
+func (e *Engine) InboxText(wave int) func(id string) string {
 	scan, err := inboxbatch.ScanDir(e.lifecycle().InboxDir)
 	if err != nil {
 		fmt.Fprintf(e.stderr, "[loop] WARN: wave %d: admission shadow reads no inbox text: %v\n", wave, err)

@@ -186,7 +186,7 @@ The live partition is file-disjoint (F2.8). File-based parallel agents gain noth
 
 ### Solution
 
-**Built (shadow), 2026-10-17:** [`internal/admission`](packages/internal-admission.md) (plan O3). The admission step is ADR-0134 S14, built for the orchestrator. In the `shadow` stage, the loop runs it after the file partition of each wave. It records each todo that it holds back, and it changes no lane. Until O4 runs the lanes, the stage `enforce` also only records.
+**Built (shadow), 2026-10-17:** [`internal/admission`](packages/internal-admission.md) (plan O3). The admission step is ADR-0134 S14, built for the orchestrator. In the `shadow` stage, the loop runs it after the file partition of each wave. It records each todo that it holds back, and it changes no lane. At the stage `enforce`, the barrier wave does not run, and the pool of §7 admits each todo by this rule.
 
 1. **The edited packages.** `E(t)` is the set of module-internal packages that todo `t` edits: the packages of its Go files. Another path under `go/` maps to its nearest enclosing package. A file outside `go/` maps to no package.
    - Known limit: a todo with only files outside `go/` (docs, scripts) maps to no cell. So does a todo with non-Go files that no package encloses. Such a todo conflicts with nothing, and admission admits it at once. Only the landing proof of ADR-0128 finds a clash between such todos.
@@ -228,15 +228,27 @@ A barrier wave waits for its slowest lane. We simulated it with the lane duratio
 
 ### Solution
 
+**Built (enforce only), 2026-10-17:** [`internal/orchestrator`](packages/internal-orchestrator.md) `Pool` (plan O4). At the stage `shadow`, the barrier wave runs as before, and the pool does not run. At the stage `enforce`, the loop runs the pool in place of the wave `Supervisor`, whatever `scheduling` says. A policy with `scheduling: pool` at `enforce` gets one WARN at batch start.
+
 The orchestrator runs `RunPool` as its scheduler, with three changes:
 
 1. **Admission.** The pool asks the admission step (§6) for its next todo, in place of its own file rule.
 2. **Freshness.** The pool runs `FreshenSpecs` on each todo just before launch, as the wave path does now (`launcher.go:36-45`).
-3. **Transitions.** Each transition (`launched`, `exited`, `backfilled`, `idle`) goes to the `loop` channel through `onTransition`. The console and `evolve wave watch` read the channel.
+3. **Transitions.** Each transition (`launched`, `exited`, `backfilled`, `idle`) goes to the `loop` channel through `onTransition`, as `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_EXITED`, `LOOP_ORCH_LANE_BACKFILLED` and `LOOP_ORCH_POOL_IDLE`. The console and `evolve wave watch` read the channel.
+
+`RunPool` takes the three changes as hooks of `fleet.PoolConfig` (`Next`, `Prepare`, `Exited`), so the scheduler stays one function. With no hook, it keeps the file rule. The in-flight list of admission is the list of running lanes, so a lane exit frees its cells at once. The module graph loads once for each run. If it does not load, the run admits by the file rule and the loop writes one WARN.
 
 A run ends when the supply is empty and no lane is in flight, or on an operator stop (`evolve loop-stop --wait`). The wave boundary work (merge, `gc`, the code-index refresh, `cli update`) runs at the end of a run, as it does now after a wave. The rule "merge only at the boundary" thus holds unchanged: a run is one boundary-to-boundary unit.
 
 A run has a length limit, `fleet.orchestrator.run_max_lanes`, in lanes launched. It keeps boundaries regular, so merges and binary refreshes still happen. Its default is `4 × fleet.count`.
+
+The operator stop is the brake file of `evolve loop-stop` or a cancelled batch. The pool reads it at each admission. An admission happens only at a run start and at a lane exit, so the check is not a poll. At the run end, the loop prints `[loop] pool N: X/Y lanes ok (orchestrator, target=W)`. The boundary work runs at the next iteration.
+
+**The soak (2026-10-17, goal G5).** `evolve fleet soak --count 16 --pool` ran 64 simulated lanes at `enforce`. The peak in-flight was 16 of 16, and all 64 lanes passed. The run took 43.6 s, with 88.0 lanes a minute and a utilization of 0.91 ([internal-orchestrator.md](packages/internal-orchestrator.md) §Findings).
+
+An earlier run found a cross-lane race on `knowledge-base/cycles/`, which the barrier hides. The tree-diff guard of a lane counted the dossier of another cycle as its own leak. The guard now keys a dossier to its cycle, and the soak ran with no exclusion.
+
+**An empty pool always admits.** When no lane is in flight and the supply is not empty, `fleet.RunPool` launches the top todo even when admission refuses it. Nothing can conflict with an empty set. A refusal there can only end the run with work left.
 
 ## 8. The lane lease
 
@@ -250,22 +262,54 @@ A wave lane has no deadline (F2.12). The console decides by hand when a stuck la
 
 ### Solution
 
+**Built, 2026-10-17:** [`internal/orchestrator`](packages/internal-orchestrator.md) `Leases` (plan O5). The pool at `enforce` holds an `enforce` lease table. The barrier wave at `shadow` holds a `shadow` lease table, so the stage exit is measured on live waves.
+
 Each lane gets a lease when it launches. The lease holds:
 
-- **The heartbeat:** the time of the last event of that lane on the `cycle` channel. A phase start, a phase end and an observer report each count. The lease adds no new writer: the lane's existing events are its heartbeat.
-- **The deadline:** the 95th percentile of the lane time over the last 50 cycles, with a floor of `fleet.orchestrator.deadline_floor_minutes` (default 60). The plan's Q1 measures it in shadow first.
+- **The heartbeat:** the time of the freshest live signal of that lane. The lease adds no new writer: the lane's existing files are its heartbeat.
+  - `RunsHeartbeat` finds the cycle of the lane by its `lane-scope.json`. The heartbeat is the latest time of two kinds. One is the last time stamp of its `signals.ndjson`. The other is the modification time of each `<agent>-pane-watch.json`, `<agent>-events.ndjson` and `<agent>-stdout.log` in the cycle workspace. The newest of these files is a file of the current phase.
+  - A long `build` or `go test` phase writes no cycle event for many minutes. But the bridge writes the pane-watch snapshot again each time the pane changes, and the observer writes its heartbeat event each 12 polls (`observerengine.HeartbeatEvery`). Thus a busy phase keeps a fresh heartbeat.
+  - When no cycle holds the lane, the heartbeat is unknown. The lease then reports no stall, and it checks again after `stall_minutes`. It does not count from the launch time, because a lane can start before its cycle directory exists.
+- **The deadline:** the 95th percentile of the lane time over the last 50 cycles, without the longest lane time. Its floor is `fleet.orchestrator.deadline_floor_minutes` (default 60). The lane time of a cycle is the span of its `signals.ndjson`. The loop computes the deadline once for each batch. On 2026-10-17 the 44 lane times of cycles 1873 to 1928 give 95.1 minutes (plan Q1).
+
+**Why the deadline removes the longest lane.** With 44 samples, the nearest-rank p95 is the third-longest lane time, so the two longest lanes set it. We compared three rules on the same 44 samples (median 39.0 minutes, longest 118.1 minutes):
+
+| Rule | Deadline | Decision |
+|---|---|---|
+| The p95 of all samples | 98.9 min | rejected: one more long lane moves it to the next outlier |
+| The p95 of the samples without the longest lane | 95.1 min | chosen |
+| The p90 times 1.25 | 116.2 min | rejected: the factor 1.25 has no measure, and the value is almost the longest lane |
+
+The chosen rule stays a percentile of measured lane times, and one outlier cannot set it. With one sample, the rule keeps that sample.
 
 The oversight loop (§9) acts on a lease:
 
 | Condition | Action |
 |---|---|
-| No heartbeat for `stall_minutes` (default 20) | publish `LOOP_ORCH_LANE_STALLED`. The lane keeps its slot. |
+| No heartbeat for `stall_minutes` (default 30) | publish `LOOP_ORCH_LANE_STALLED`. The lane keeps its slot. |
 | The deadline passes | stop the lane through its process-group stop, release its inbox claim, free its cells, and publish `LOOP_ORCH_LANE_DEADLINE`. |
 | The lane stops twice for one todo | park the todo with `route: console` and the reason `deadline twice` |
 
+The stage decides the action:
+
+| Stage | A stall | A passed deadline | A lane that exits after its deadline |
+|---|---|---|---|
+| `shadow` | `LOOP_ORCH_LANE_STALLED` once | `LOOP_ORCH_LANE_DEADLINE` with `action` `recorded`. Nothing stops. | `LOOP_ORCH_LANE_LATE_EXIT` with its `status`: `ok` is a stop that the exit rule of §14 counts |
+| `enforce` | `LOOP_ORCH_LANE_STALLED` once | `LOOP_ORCH_LANE_DEADLINE` with `action` `stopped`, then the stop, the claim release and one more try | `LOOP_ORCH_LANE_LATE_EXIT` with `stopped` true. A second stop parks the todo. |
+
+One timer serves all lanes. A heap holds the next time of each lane: the earlier of its deadline and its stall time. The timer is armed for the top of the heap. The deadline timer is the only timer in the orchestrator.
+
 The restart rule follows OTP (P3.14): a todo gets one more try, and a second stop sends it to the console. A stop never runs a second copy of a lane in parallel, because a copy costs a full lane and writes `main` (P3.15).
 
-A stop must not be a broad kill. The orchestrator stops only the process group that its own launch made, through the injected stop of `sysexec`, and never by a name match.
+A stop must not be a broad kill. The orchestrator stops only the lane that its own launch made, and never by a name match. The lease cancels the child context of that launch. The launch of `cmd/evolve` (`execCycleLaunch`, which uses `sysexec.Command`) then sends SIGTERM to that one lane process, and the lane stops its own phase process groups. The package holds no pid and imports no process package. A guard test checks this.
+
+**The dispatch reap after a stop.** The lane reaps its own dispatches when it stops (`bridge/dispatch_reap.go`: a grace time of 2 s and a limit of 30 s). This can take longer than the `WaitDelay` of 10 s of `sysexec`. Go then sends SIGKILL to the lane, and the children of the lane (tmux, the LLM CLI, `go test`) stay alive with no parent. Thus, after a stopped lane returns, the pool calls its `Reap` port one time:
+
+- `cmd/evolve` (`reapLane`, `cmd_loop_lane_reap.go`) finds the cycle of the lane and reads the process table. The dispatch ids of the lane are the `EVOLVE_DISPATCH_ID` tags of that cycle on this project root.
+- It runs the sweep of `evolve gc dispatch` (`gc.StaleDispatch` and `proctree.Reaper`, through `gcRun.reapDispatches`), but only for those ids. The proof is the same: the owner of the dispatch is dead, and the process carries the tag or is in the recorded pane tree.
+- A lane that was not stopped gets no reap. When no cycle holds the lane, or the process table does not list, the loop writes a WARN, and `evolve gc` stays the backstop.
+
+The port is in `cmd/evolve`, because the orchestrator package imports no `os/exec`, `sysexec` or `proctree`.
 
 ## 9. The oversight loop
 
@@ -410,7 +454,7 @@ The budget does not make a lane faster. It makes the lanes share the host, so th
 
 ### Config keys
 
-All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig()`. The `orchestrator` block is strict-decoded: an unknown key, an unknown `stage` or a negative number refuses the policy. Built on 2026-10-17: `stage`, `scan_k` and `hub_min_importers`.
+All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig()`. The `orchestrator` block is strict-decoded: an unknown key, an unknown `stage` or a negative number refuses the policy. Built on 2026-10-17: `stage`, `scan_k`, `hub_min_importers`, `deadline_floor_minutes`, `stall_minutes` and `run_max_lanes`.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
@@ -420,7 +464,7 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | `orchestrator.scan_k` | int | 32 | the admissible todos that admission scans for each free slot |
 | `orchestrator.hub_min_importers` | int | 120 | the importer count (direct or transitive) that makes a package a hub (§6) |
 | `orchestrator.deadline_floor_minutes` | int | 60 | the floor of the lane deadline |
-| `orchestrator.stall_minutes` | int | 20 | the heartbeat gap that reports a stall |
+| `orchestrator.stall_minutes` | int | 30 | the heartbeat gap that reports a stall |
 | `orchestrator.run_max_lanes` | int | `4 × count` | the lanes that one run launches before its boundary |
 | `orchestrator.window.start` | int | 4 | §10 |
 | `orchestrator.window.min` | int | 4 | §10 |
@@ -435,8 +479,14 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | `LOOP_ORCH_SUPPLY_SHORT` | `loop` | the admissible count is below the window |
 | `LOOP_ORCH_ADMIT_WAIT` | `loop` | a todo waits for a cell. Once for each todo. |
 | `LOOP_FLEET_POLICY_INVALID` | `loop` | `.evolve/policy.json` does not load at batch start (for example a misspelt `fleet.orchestrator` key), so the loop runs sequential until it is fixed |
+| `LOOP_ORCH_LANE_LAUNCHED` | `loop` | §7: the first fill of a run launched a lane. INFO. |
+| `LOOP_ORCH_LANE_EXITED` | `loop` | §7: a lane exited and freed its slot and its cells. INFO. |
+| `LOOP_ORCH_LANE_BACKFILLED` | `loop` | §7: a freed slot took the next admissible todo. INFO. |
+| `LOOP_ORCH_POOL_IDLE` | `loop` | §7: a slot stays free after a lane exit. INFO. |
 | `LOOP_ORCH_LANE_STALLED` | `errors` | §8 |
 | `LOOP_ORCH_LANE_DEADLINE` | `errors` | §8 |
+| `LOOP_ORCH_LANE_LATE_EXIT` | `loop` | §8: a lane exited after its deadline. INFO. |
+| `LOOP_ORCH_LANE_RECOVERY_FAILED` | `errors` | §8: the claim release or the park after a stop failed |
 | `LOOP_ORCH_FAMILY_PAUSED` | `loop` | §9: a family with no fallback stops taking new lanes |
 | `LOOP_ORCH_WINDOW` | `loop` | §10: the window changes |
 
@@ -464,11 +514,12 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 | Rule | Guard | State |
 |---|---|---|
 | The orchestrator runs no LLM. | a structure test: the orchestrator package imports no bridge and no driver package | proposed (O6) |
-| The orchestrator never polls. | the AST guard of ADR-0127 bans `time.Sleep`, `time.Tick` and `time.NewTicker` in the orchestrator package | proposed (O6) |
+| The orchestrator never polls. | `TestOrchestrator_NeverPollsAndNeverStopsALaneByItself` bans `time.Sleep`, `time.Tick` and `time.NewTicker` in `internal/orchestrator` | built (O4, O5) |
 | Two lanes in flight never hold one cell. | `TestAdmit_ATodoInABusyCellWaits` and `TestAdmit_TwoAdmittedTodosNeverConflict` | built (O3) |
 | The hub cell admits one lane. | `TestAdmit_TheGlobalCellAdmitsOne` | built (O3) |
 | The shadow changes no lane. | `TestAdmit_ShadowRecordsTheWaitAndChangesNothing` | built (O3) |
-| A stop is never a broad kill. | the stop takes the injected process-group stop of the launch, and a test pins that no name match is used | proposed (O5) |
+| A stop is never a broad kill. | the stop cancels the launch context of that lane only (`TestLease_AnEnforcedDeadlineStopsOnlyThatLaneThroughItsInjectedStop`), and the guard test refuses `syscall.Kill`, `os.FindProcess`, `os/exec`, `sysexec` and `proctree` in the package | built (O5) |
+| The shadow lease keeps the barrier. | `TestWave_AShadowLeaseKeepsTheBarrierLaunchesExactlyAsToday` | built (O5) |
 | The census never routes an item. | `TestSupply_RecordsTheCauseOfEachRefusal` checks that the inbox files do not change | proposed (O6) |
 | A split keeps every protected file in the console part. | `TestInboxSplit_TheConsolePartKeepsEveryProtectedFile` | built (O2c) |
 | A bench with a fallback keeps its slot. | `TestQuotaAwareCount_ABenchWithAFallbackKeepsTheLane` | proposed (O1) |

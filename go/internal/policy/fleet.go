@@ -161,14 +161,14 @@ const (
 
 func (p Policy) FleetConfig() FleetConfig {
 	c := FleetConfig{Count: 1, Concurrency: 1, MinLanes: 1, PlanSource: "triage",
-		Scheduling: "wave", Landing: "per-lane", StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight, Orchestrator: orchestratorConfig(nil)}
+		Scheduling: "wave", Landing: "per-lane", StarvationK: defaultStarvationK, StarvationWeight: defaultStarvationWeight, Orchestrator: orchestratorConfig(nil, 1)}
 	if p.Fleet == nil {
 		return c
 	}
-	c.Orchestrator = orchestratorConfig(p.Fleet.Orchestrator)
 	if p.Fleet.Count > 0 {
 		c.Count = p.Fleet.Count
 	}
+	c.Orchestrator = orchestratorConfig(p.Fleet.Orchestrator, c.Count)
 	c.Concurrency = c.Count
 	if p.Fleet.Concurrency > 0 {
 		c.Concurrency = p.Fleet.Concurrency
@@ -188,15 +188,7 @@ func (p Policy) FleetConfig() FleetConfig {
 		c.PlanSource = "manual"
 		c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.plan_source: unknown value %q, falling back to \"manual\"", p.Fleet.PlanSource))
 	}
-	switch p.Fleet.Scheduling {
-	case "", "wave":
-		c.Scheduling = "wave"
-	case "pool":
-		c.Scheduling = "pool"
-	default:
-		c.Scheduling = "wave"
-		c.Warnings = append(c.Warnings, fmt.Sprintf("fleet.scheduling: unknown value %q, falling back to \"wave\"", p.Fleet.Scheduling))
-	}
+	c.Scheduling, c.Warnings = fleetScheduling(p.Fleet.Scheduling, c.Orchestrator.Stage, c.Warnings)
 	switch p.Fleet.Landing {
 	case "", "per-lane":
 		c.Landing = "per-lane"
@@ -235,4 +227,18 @@ func (p Policy) FleetConfig() FleetConfig {
 		}
 	}
 	return c
+}
+
+func fleetScheduling(raw, stage string, warnings []string) (string, []string) {
+	switch raw {
+	case "", "wave":
+		return "wave", warnings
+	case "pool":
+		if stage == "enforce" {
+			warnings = append(warnings, `fleet.scheduling: "pool" has no effect at fleet.orchestrator.stage "enforce": the orchestrator always runs the rolling pool; remove the key`)
+		}
+		return "pool", warnings
+	default:
+		return "wave", append(warnings, fmt.Sprintf("fleet.scheduling: unknown value %q, falling back to \"wave\"", raw))
+	}
 }

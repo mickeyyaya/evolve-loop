@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 	"syscall"
 	"time"
 
@@ -31,12 +32,28 @@ func gcProcesses() gcProcessHost {
 	return gcProcessHost{list: proctree.ExecLister(), signal: syscall.Kill, sleep: time.Sleep, alive: swarm.ExecPidAlive}
 }
 
-func (r gcRun) dispatchProcesses(projectRoot string, tempTTLHours int) bool {
-	host := gcProcesses()
-	o := gc.DispatchProcessOptions{ProjectRoot: projectRoot, PidAlive: host.alive, Now: time.Now(),
+func (r gcRun) dispatchOptions(host gcProcessHost, projectRoot string, tailTTL time.Duration) gc.DispatchProcessOptions {
+	return gc.DispatchProcessOptions{ProjectRoot: projectRoot, PidAlive: host.alive, Now: time.Now(),
 		CycleClosed:  func(n int) bool { return dossier.ClosedOut(projectRoot, n) },
 		RecordedTree: r.recordedTree(proctree.TreeDir(projectRoot)),
-		TailTTL:      time.Duration(tempTTLHours) * time.Hour}
+		TailTTL:      tailTTL}
+}
+
+func (h gcProcessHost) reaper() proctree.Reaper {
+	return proctree.Reaper{List: h.list, Signal: h.signal, Sleep: h.sleep, Grace: gcDispatchGrace, Self: os.Getpid()}
+}
+
+func (r gcRun) reapDispatches(projectRoot string, ids []string) proctree.Report {
+	host := gcProcesses()
+	stale := gc.StaleDispatch(r.dispatchOptions(host, projectRoot, 0))
+	return host.reaper().Reap(r.ctx, func(p proctree.Process) bool {
+		return slices.Contains(ids, p.Env[ipcenv.DispatchIDKey]) && stale(p)
+	})
+}
+
+func (r gcRun) dispatchProcesses(projectRoot string, tempTTLHours int) bool {
+	host := gcProcesses()
+	o := r.dispatchOptions(host, projectRoot, time.Duration(tempTTLHours)*time.Hour)
 	table, err := host.list(r.ctx)
 	if err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: dispatch process sweep skipped: %v\n", err)
@@ -54,8 +71,7 @@ func (r gcRun) dispatchProcesses(projectRoot string, tempTTLHours int) bool {
 	if r.dryRun || len(items) == 0 {
 		return false
 	}
-	reaper := proctree.Reaper{List: host.list, Signal: host.signal, Sleep: host.sleep, Grace: gcDispatchGrace, Self: os.Getpid()}
-	return r.reportDispatchReap(reaper.Reap(r.ctx, proctree.AnyOf(gc.StaleDispatch(o), gc.OrphanLogTail(o))))
+	return r.reportDispatchReap(host.reaper().Reap(r.ctx, proctree.AnyOf(gc.StaleDispatch(o), gc.OrphanLogTail(o))))
 }
 
 func gcProcessDetail(it gc.DispatchProcessItem) string {

@@ -11,12 +11,15 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -84,21 +87,21 @@ func iscsDossier(t *testing.T, root string, cycle int) {
 	}
 }
 
-func iscsCoordinator(root, evolveDir string, st core.Storage) (*loopBatchCoordinator, *bytes.Buffer) {
-	var console bytes.Buffer
+func iscsCoordinator(root, evolveDir string, st core.Storage) (*loopBatchCoordinator, *lockedBuffer) {
+	console := &lockedBuffer{}
 	b := &loopBatchCoordinator{
 		ctx:    context.Background(),
 		cfg:    loopConfig{ProjectRoot: root, EvolveDir: evolveDir},
 		result: &loopResult{},
-		stdout: &console,
-		stderr: &console,
+		stdout: console,
+		stderr: console,
 	}
-	b.deps.Signals = newRootSignalCenter(root, evolveDir, &console)
+	b.deps.Signals = newRootSignalCenter(root, evolveDir, console)
 	b.deps.Storage = st
-	return b, &console
+	return b, console
 }
 
-func iscsPrepare(t *testing.T, b *loopBatchCoordinator, console *bytes.Buffer, iteration int) {
+func iscsPrepare(t *testing.T, b *loopBatchCoordinator, console *lockedBuffer, iteration int) {
 	t.Helper()
 	fc := policy.FleetConfig{Count: 1}
 	bin := ""
@@ -135,6 +138,27 @@ func iscsAssertUntouched(t *testing.T, st *fixtures.FakeStorage, seed core.Cycle
 	}
 	if lines := iscsWarnLines(console, seed.CycleID); seed.CycleID != 0 && len(lines) != 0 {
 		t.Errorf("a WARN names cycle %d, which is not stale residue: %q", seed.CycleID, lines)
+	}
+}
+
+func TestIscsCoordinator_TheConsoleTakesConcurrentWriters(t *testing.T) {
+	t.Parallel()
+	b, console := iscsCoordinator(t.TempDir(), t.TempDir(), nil)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		fmt.Fprintln(b.stderr, "[loop] a direct console line")
+	}()
+	go func() {
+		defer wg.Done()
+		b.deps.Signals.Emit(signalcenter.Event{Phase: "triage", Attempt: 1, Module: signalcenter.ModuleOrchestrator, Origin: "Test.concurrent",
+			Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityWarn, Code: core.CodePhaseVerdictFail, Reason: "a center console line"})
+	}()
+	wg.Wait()
+	b.deps.Signals.Flush()
+	if got := console.String(); !strings.Contains(got, "a direct console line") || !strings.Contains(got, "a center console line") {
+		t.Fatalf("the console lost a writer:\n%s", got)
 	}
 }
 
@@ -451,7 +475,7 @@ func TestPrepareIteration_WiredBeforeEveryIteration(t *testing.T) {
 		enabled func(policy.FleetConfig) bool
 	}{
 		{"fleet_wave_config", `{"fleet":{"count":3,"scheduling":"wave"}}`, shouldRunWave},
-		{"fleet_pool_config", `{"fleet":{"count":3,"scheduling":"pool"}}`, shouldRunPool},
+		{"fleet_pool_config", `{"fleet":{"count":3,"scheduling":"pool"}}`, loopwave.ShouldRunPool},
 	} {
 		t.Run(fleet.name, func(t *testing.T) {
 			root, evolveDir := iscsProject(t)

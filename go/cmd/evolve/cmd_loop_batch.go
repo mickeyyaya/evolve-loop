@@ -9,6 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -25,6 +26,7 @@ type loopBatchCoordinator struct {
 	stderr       io.Writer
 	waveEngine   *loopwave.Engine
 	preWave      func(iteration int) (batchDecision, bool)
+	leases       map[string]*orchestrator.Leases
 }
 
 func (b *loopBatchCoordinator) run() int {
