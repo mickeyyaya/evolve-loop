@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"os"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 type ReviewInput struct {
@@ -20,6 +22,7 @@ type ReviewInput struct {
 	ChallengeToken string
 	BreakerExempt  bool
 	Stderr         io.Writer
+	Signals        *signalcenter.Center
 }
 
 func (in ReviewInput) errOut() io.Writer {

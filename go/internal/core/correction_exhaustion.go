@@ -24,6 +24,7 @@ func (o *Orchestrator) reviewInputFor(cs CycleState, phase Phase, projectRoot st
 	in := ReviewInputFor(cs, phase, projectRoot)
 	in.Response = resp
 	in.BreakerExempt = o.degradesOnExhaustion(phase, cs.CompletedPhases)
+	in.Signals = o.signals
 	return in
 }
 
