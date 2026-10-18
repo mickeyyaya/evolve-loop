@@ -738,11 +738,13 @@
 # M1 (ADR-0129): the skeleton of cycle agent messaging, unwired (internal/agentmsg and its subpackages).
 ./internal/agentmsg
 ./internal/agentmsg/address
+./internal/agentmsg/boot
 ./internal/agentmsg/broker
 ./internal/agentmsg/delivery
 ./internal/agentmsg/envelope
 ./internal/agentmsg/identity
 ./internal/agentmsg/memstore
+./internal/agentmsg/outbox
 ./internal/agentmsg/policy
 # M2 (ADR-0129): the channel-log store adapter of cycle agent messaging, unwired (internal/agentmsg/channelstore).
 ./internal/agentmsg/channelstore

@@ -3,6 +3,7 @@
 > The spec of record: [agent-messaging.md](../agent-messaging.md). The plan (component M1, decisions D1 to D15): [agent-messaging-2026-10.md](../../plans/agent-messaging-2026-10.md). The decision: [ADR-0129](../adr/0129-cycle-scoped-agent-messaging.md). The research: [agent-messaging-2026-10.md](../../research/agent-messaging-2026-10.md).
 
 This page covers `internal/agentmsg` and its seven subpackages: `address`, `envelope`, `identity`, `policy`, `broker`, `memstore` and `delivery`. The eighth subpackage, `channelstore` (component M2), has its own page: [internal-agentmsg-channelstore.md](internal-agentmsg-channelstore.md).
+This page covers `internal/agentmsg` and its nine subpackages: `address`, `envelope`, `identity`, `policy`, `broker`, `memstore`, `delivery`, `outbox` and `boot`.
 
 ## Purpose
 
@@ -18,6 +19,8 @@ This page covers `internal/agentmsg` and its seven subpackages: `address`, `enve
 | `agentmsg/broker` | the service of one cycle (`Send`, `Read`), its ports (`Store`, `Roster`, `Notifier`) and its typed errors |
 | `agentmsg/memstore` | the in-memory adapter of the `Store` port |
 | `agentmsg/delivery` | the `Deliverer` port, the frame of a message (`Frame`) and the prompt-section adapter (`Section`) |
+| `agentmsg/outbox` | the outbox watcher: `Layout`, `Watcher`, `Answer` and the ports `Sender` and `Waker` (component M3) |
+| `agentmsg/boot` | the token mint at boot: `Env` and the port `Minter` (component M3) |
 
 Nothing outside `internal/agentmsg` imports it yet. Component M2 added the channel store. Components M3 to M7 add the other adapters and wire it.
 
@@ -47,6 +50,19 @@ Nothing outside `internal/agentmsg` imports it yet. Component M2 added the chann
 - **The frame** escapes every field with `html.EscapeString`, so a body cannot close its `<agent_message>` block.
 - **The config** follows the `ci_watch` template: pointer fields, compiled defaults and a range check for each key. A nil `Rules` gives the defaults, and an empty list closes the messaging.
 
+## Outbox and boot (component M3)
+
+- **The path names the dispatch.** `Layout.Locate` resolves a draft path with `EvalSymlinks`. It accepts only `<root>/.evolve/msg/<cycle>/<key>/out/<ULID>.json`, where `<key>` is the canonical base64url form of the dispatch id. The dispatch of the credential is that key, never a field of the draft.
+- **A half-written draft is never read.** The watcher reads only names that are `<ULID>.json`. A writer that uses `atomicwrite` has a temporary name that starts with a dot, so the rename is the moment the draft appears.
+- **The wake.** `Watcher.Run` arms the own outbox, reads the entries, and then waits. A wake or a stop ends the wait. It never polls. A wake that finds no draft is harmless.
+- **The answer.** A `send` draft goes to `Sender.Send`. An `ack` draft goes to `Sender.Ack`. The watcher writes an `Answer` to `box/receipts/<id>.json`, then it deletes the draft. A crash between the two steps replays the draft, and the idempotent id gives the same receipt. A draft with no envelope id gets the id of its file name.
+- **A bad draft never stops the watcher.** A draft that is too large, malformed, not a regular file or of an unknown type gets an error answer. A path outside the exact form gets a `msg.denied` event with the rule `outbox.path`, and the watcher deletes it. A symlink in one outbox that points to the draft of another dispatch gets the same denial: a watcher serves only its own dispatch.
+- **A draft that vanishes is skipped.** The watcher raises no event for it.
+- **A failed write or delete is reported.** A receipt or a delete that fails gets a `msg.denied` event with the rule `outbox.receipt` or `outbox.remove`, and the watcher goes on. Only a failed mkdir, arm, wait or directory read ends `Run` with an error.
+- **Dispatch ids must differ when folded to lower case.** A host that folds case maps two keys that differ only in case to one directory.
+- **The token mint.** `boot.Env` mints the token of a dispatch from the cycle authority. It returns a new environment that holds `EVOLVE_MSG_TOKEN` (`ipcenv.MsgTokenKey`) once. It drops any older value and does not change the input. The key is in `ipcenv.ProtocolKeys`, so `Scrub` never forwards it.
+- **Unwired.** Nothing calls `outbox` or `boot` yet. Component M7 starts one watcher for each dispatch and calls `boot.Env` at the bridge boot.
+
 ## Invariants
 
 - **A message never crosses a cycle.** `TestSend_ACrossCycleAddressIsDeniedBeforeAnyRosterLookup`, `TestSend_ACrossCycleAddressThatThePolicyAllowsIsStillUnroutable`, `TestSend_APrincipalOfAnotherCycleIsRefused` and `TestRead_APrincipalOfAnotherCycleReadsNothing`.
@@ -61,6 +77,8 @@ Nothing outside `internal/agentmsg` imports it yet. Component M2 added the chann
 - **A gap is never silent.** `TestRead_AGapFromTheStoreIsReportedAndNeverSilent`.
 - **An ack clears the queue.** `TestAck_ClearsTheQueueWithoutARead`.
 - **An event never carries the body.** `TestNotify_EventsCarryMetadataAndNeverTheBody`.
+- **A draft is attributed by its path.** `TestOutbox_ThePathNamesTheDispatch` and `TestLayout_LocateAcceptsOnlyTheExactForm`.
+- **A half-written draft is never read.** `TestOutbox_AHalfWrittenDraftIsNeverRead`.
 - **No poll.** `TestNoPollTimerInTheEventChannelSources` scans `internal/agentmsg`.
 
 ## Findings

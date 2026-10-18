@@ -79,3 +79,12 @@ func TestDispatchIDKey_IsTheDispatchTag(t *testing.T) {
 		t.Errorf("DispatchIDKey = %q, want EVOLVE_DISPATCH_ID, the tag the bridge sets on each process of a dispatch", ipcenv.DispatchIDKey)
 	}
 }
+
+func TestProtocolKeys_HoldTheMessageToken(t *testing.T) {
+	if ipcenv.MsgTokenKey != "EVOLVE_MSG_TOKEN" {
+		t.Errorf("MsgTokenKey = %q, want EVOLVE_MSG_TOKEN", ipcenv.MsgTokenKey)
+	}
+	if !slices.Contains(ipcenv.ProtocolKeys(), ipcenv.MsgTokenKey) {
+		t.Errorf("ProtocolKeys() = %v, want the message token key in the set every consumer scrubs", ipcenv.ProtocolKeys())
+	}
+}
