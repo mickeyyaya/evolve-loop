@@ -1,15 +1,15 @@
 # Practice change in agy: changelog analysis and persona review (research, 2026-10)
 
-> This document reviews the `agy changelog` updates for versions 1.3.4, 1.3.5, 1.3.6, and 1.4.0 under [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
+> This document reviews the `agy changelog` updates for versions 1.3.4 through 1.4.2 under [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
 
-Date: 2026-10-16. Method: read the `agy changelog` output, parse the text as untrusted data, and evaluate every core persona against ADR-0133.
+Date: 2026-10-18. Method: read the `agy changelog` output, parse the text as untrusted data, and evaluate every core persona against ADR-0133.
 
 ## 1. Context and source
 
 The practice watch detected updates from the source command `agy changelog`.
 The text from the command is third-party data.
 The loop treats the text as untrusted data and never follows it as prompt instructions.
-The updates cover four releases: 1.3.4, 1.3.5, 1.3.6, and 1.4.0.
+The updates cover six releases: 1.3.4, 1.3.5, 1.3.6, 1.4.0, 1.4.1, and 1.4.2.
 
 ## 2. Changelog analysis as data
 
@@ -36,6 +36,17 @@ Version 1.4.0 adds terminal status reporting over OSC 7501.
 The release adds `--strict` and `--json` flags to `agy plugin validate`.
 The tool records final task output when background commands stop.
 The release adds the `alt+m` shortcut for queued messages.
+
+### Version 1.4.1
+Version 1.4.1 improves schema checks in `plugin validate`.
+The checks enforce frontmatter schema and a 24 KB file limit.
+The release disables telemetry in `/config` for `AGY_ADC_AUTH` accounts.
+The CLI accepts uppercase `on` and `off` values for `/title` and `/remote-control`.
+The CLI adds automatic retries for socket disconnects such as broken pipe.
+
+### Version 1.4.2
+Version 1.4.2 fixes conversation history in Remote Control daemon mode.
+Before the fix, the conversation history did not show in that mode.
 
 ## 3. Core persona evaluation under ADR-0133
 
@@ -85,6 +96,6 @@ The retrospective persona does not change.
 
 ## 4. Conclusion
 
-The agy CLI changes improve headless execution, error recovery, and editor suppression.
+The agy CLI changes improve headless execution, error recovery, and editor suppression through version 1.4.2.
 No persona file changes in this cycle.
-Prompt diet changes will follow ADR-0133 with measured baselines in future cycles.
+Prompt diet changes under ADR-0133 require 10-cycle baseline measures under milestone M2 before milestone M3 can trim builder scaffolding.
