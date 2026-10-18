@@ -72,9 +72,10 @@ const (
 	BranchKey        = "branch"
 	CycleBranchKey   = "cycle_branch"
 	RepairOutcomeKey = "repair_outcome"
+	OriginalCodeKey  = "original_code"
 )
 
-var SignalDebugKeys = []string{StepKey, GitRCKey, WorktreeKey, BranchKey, CycleBranchKey, RepairOutcomeKey}
+var SignalDebugKeys = []string{StepKey, GitRCKey, WorktreeKey, BranchKey, CycleBranchKey, RepairOutcomeKey, OriginalCodeKey}
 
 func init() {
 	for _, c := range AllCodes() {
