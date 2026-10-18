@@ -127,3 +127,23 @@ func TestForbidden_AnEmptyProjectRootIsAnError(t *testing.T) {
 		t.Fatal("an empty root must never resolve profiles against the working directory")
 	}
 }
+
+func TestForbidden_ADirectoryThatOnlyHoldsProtectedSurfaceStaysLaneWork(t *testing.T) {
+	root := t.TempDir()
+	writeProfile(t, root, "writer")
+	forbidden, err := Forbidden(root, "writer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]bool{
+		"go/internal/core":             false,
+		"go/internal/core/":            false,
+		"go/cmd/evolve":                false,
+		"go/internal/explanationdocs":  true,
+		"go/internal/core/cyclerun.go": true,
+	} {
+		if got := forbidden(path); got != want {
+			t.Errorf("forbidden(%q) = %v, want %v", path, got, want)
+		}
+	}
+}

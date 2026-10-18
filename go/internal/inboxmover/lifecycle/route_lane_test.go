@@ -164,3 +164,25 @@ func TestMover_RouteLane_ARewriteFaultLeavesTheItemAndTheLedgerAlone(t *testing.
 		t.Errorf("a failed rewrite changed the item or recorded a route:\n%s\nledger=%+v", after, rec.records)
 	}
 }
+
+func TestMover_RouteLane_KeepsTheReasonOfAnEarlierRoute(t *testing.T) {
+	for name, tc := range map[string]struct{ stored, want string }{
+		"an earlier text reason": {`,"routed_reason":"needs the console's judgement"`, "lane work; earlier reason: needs the console's judgement"},
+		"a blank earlier reason": {`,"routed_reason":"  "`, "lane work"},
+		"a non-text earlier one": {`,"routed_reason":7`, "lane work"},
+		"no earlier reason":      {``, "lane work"},
+	} {
+		inbox := newInbox(t)
+		path := filepath.Join(inbox, "fix.json")
+		writeItem(t, path, `{"id":"fix","kind":"pipeline-repair"`+tc.stored+`}`)
+		m := New(inbox, nil)
+
+		if _, err := m.RouteLane("fix", "lane work"); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+
+		if got := readItem(t, path)["routed_reason"]; got != tc.want {
+			t.Errorf("%s: routed_reason = %v, want %q", name, got, tc.want)
+		}
+	}
+}

@@ -46,7 +46,7 @@ func TestClaim_RefusesProtectedFixSurfaceItem(t *testing.T) {
 
 func TestClaim_LaneOverrideClaims(t *testing.T) {
 	root := t.TempDir()
-	writeClaimItem(t, root, "z.json", `{"id":"task-z","route":"lane","files":["go/internal/guards/"]}`)
+	writeClaimItem(t, root, "z.json", `{"id":"task-z","kind":"pipeline-repair","route":"lane"}`)
 	opts := Options{ProjectRoot: root, Stderr: io.Discard,
 		IsProtectedPath: func(p string) bool { return true }}
 	res, err := Claim(opts, "task-z", "7")
@@ -55,6 +55,16 @@ func TestClaim_LaneOverrideClaims(t *testing.T) {
 	}
 	if _, statErr := os.Stat(res.DestPath); statErr != nil {
 		t.Fatal("claimed item must exist in processing/")
+	}
+}
+
+func TestClaim_LaneOverrideCannotClaimAProtectedDirectory(t *testing.T) {
+	root := t.TempDir()
+	writeClaimItem(t, root, "z.json", `{"id":"task-z","route":"lane","files":["go/internal/guards/"]}`)
+	opts := Options{ProjectRoot: root, Stderr: io.Discard,
+		IsProtectedPath: func(p string) bool { return true }}
+	if _, err := Claim(opts, "task-z", "7"); !errors.Is(err, ErrConsoleRouted) {
+		t.Fatalf("route:lane must not claim a protected directory, got %v", err)
 	}
 }
 

@@ -25,6 +25,7 @@ type Result struct {
 	OriginalID string
 	ConsoleID  string
 	LaneID     string
+	LaneWaits  bool
 }
 
 func Accept(in Inbox, id string, isProtected func(path string) bool, laneAfterConsole bool) (Result, error) {
@@ -50,7 +51,7 @@ func Accept(in Inbox, id string, isProtected func(path string) bool, laneAfterCo
 	if err := in.Retire(id, resolution); err != nil {
 		return Result{}, fmt.Errorf("%w: %v", ErrRetireFailed, err)
 	}
-	return Result{OriginalID: id, ConsoleID: p.ConsoleID, LaneID: p.LaneID}, nil
+	return Result{OriginalID: id, ConsoleID: p.ConsoleID, LaneID: p.LaneID, LaneWaits: p.LaneWaits}, nil
 }
 
 func fileParts(in Inbox, p Proposal) error {

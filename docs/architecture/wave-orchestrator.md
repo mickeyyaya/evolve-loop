@@ -137,16 +137,21 @@ The census writes one record for each plan into the run record, and it publishes
 
 When the admissible count is below the window, the census publishes `LOOP_ORCH_SUPPLY_SHORT` with the counts. When it is below twice the window, the census writes a split proposal for each mixed item. A mixed item names protected files and files that are not protected. The console accepts a proposal with `evolve inbox split <id>` (plan O2c). The split makes two items:
 
-- The **console part** keeps every protected file, the route and the acceptance that a grader judges.
-- The **lane part** keeps the files that are not protected. It has `deps` on the console part when it needs the console part first.
+- The **console part** keeps every protected file, the route and the criteria that name its files.
+- The **lane part** keeps the files that are not protected and the criteria that name only those files. It has `deps` on the console part when it needs the console part first.
+- A criterion that names no file judges the whole item, so both parts keep it.
 
-**State: Built (O2c, 2026-10-18).** `evolve inbox split <id>` and the pure package `internal/inboxsplit` exist. The census that calls `inboxsplit.Proposals` is part of O6 and is not built yet. Until then, the command computes the proposal from the pending item when the console runs it. The split refuses an item whose text names a protected path. Package note: [internal-inboxsplit.md](packages/internal-inboxsplit.md).
+**State: Built (O2c, 2026-10-18).** `evolve inbox split <id>` and the pure package `internal/inboxsplit` exist. The census that calls `inboxsplit.Proposals` is part of O6 and is not built yet. Until then, the command computes the proposal from the pending item when the console runs it. Package note: [internal-inboxsplit.md](packages/internal-inboxsplit.md).
+
+**The fix of 2026-10-18.** The split refuses an item whose text names a protected path or a console file. It refuses a part with no criterion. A lane part that only verifies waits for the console part.
 
 The census never routes an item itself. ADR-0074 keeps the routing authority, and the four guards of F2.23 keep the protected files safe.
 
-**The directory rule (built, O2b, 2026-10-17).** A declared directory routes to the console only when it lies inside a protected fragment (ADR-0139 decision 5). `guards.IsProtectedScope` now gives the same answer as `guards.IsProtectedSurface` (`go/internal/guards/integrity_surface.go:180`). Thus `files: ["go/internal/core/"]` is lane work, and `go/internal/bridge/sub/` stays console work.
+**The directory rule (built, O2b, 2026-10-17; amended, 2026-10-18).** A declared directory routes to the console only when it lies inside a protected fragment (ADR-0139 decision 5). Thus `files: ["go/internal/core/"]` is lane work.
 
-A protected file spelling stays binding (`go/internal/inboxbatch/consoleroute.go:31-33`). Triage's breaker uses the same predicate, so it refuses a card that names a protected file and accepts the directory. On this tree, `evolve inbox rank --list ready` showed 1 item before the change and 9 after it.
+On 2026-10-18, the live review of the split found 17 of 112 lane parts that listed a protected path or a directory that holds one. The operator chose to keep four lanes supplied. Only `evolve inbox split` judges a directory with `guards.TouchesProtectedSurface`, so it refuses to put a directory that holds a fragment in a lane part. The claim floor accepts some items that the split refuses.
+
+A declared protected path is binding, a file or a directory. An operator `route:lane` cannot relax it, because triage's breaker refuses the card whatever the route. A heuristic derivation stays open to `route:lane`. Package notes: [internal-guards.md](packages/internal-guards.md) and [internal-lanerouting.md](packages/internal-lanerouting.md).
 
 ## 5. Sizing
 

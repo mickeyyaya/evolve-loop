@@ -29,7 +29,7 @@ Each cause has a built part that can fix it: `RunPool`, `PartitionGraph`, the ev
 2. A bench costs a lane only for a family with no fallback in the chains of the wave.
 3. `fleet.count` is 4, and `fleet.min_lanes` stays 2.
 4. Before each plan, a supply census counts the admissible items and records each refusal with its cause.
-5. A directory routes to the console only when it lies inside a protected fragment. (Built: O2b, 2026-10-17.)
+5. A directory routes to the console only when it lies inside a protected fragment. (Built: O2b, 2026-10-17. The split also refuses a directory that holds one: see the amendment below.)
 6. Dispatch admits a todo only when no lane in flight holds an overlapping package cell.
 7. The hub cell admits one lane.
 8. A todo with no files takes its named package cell, or else the hub cell.
@@ -75,3 +75,20 @@ Each cause has a built part that can fix it: `RunPool`, `PartitionGraph`, the ev
 | A learned conflict predictor that blocks pairs | It can find conflicts that the cells miss. | Its F1 on conflicts is 0.57–0.68 (P3.7). |
 | Hedged second copies of slow lanes | A lower tail of lane time. | A copy costs a full lane of tokens and writes `main` (P3.15). |
 | `--max-cycles 4` | No code change. | It runs four waves in sequence, not four lanes at once. |
+
+## Amendment of decision 5 (2026-10-18)
+
+**Evidence.** A live review of `evolve inbox split` on 2026-10-18 ran 34 real splits and reverted all of them. On the tracked inbox of commit `c2d0edb6c`, the old splitter proposed 112 splits. In 17 of them, the lane part listed a protected path or a directory that holds one. An example is `go/internal/core`, which holds 44 fragments. A lane that takes such a part edits a protected file and fails the integrity guard at ship.
+
+**Decision, by the operator on 2026-10-18.** The operator wants 4 concurrent lanes in each wave, so the lane supply must not shrink.
+1. `evolve inbox split` judges a path with the lane predicate and with `guards.TouchesProtectedSurface`. It refuses to put a directory that holds a fragment in a lane part.
+2. The claim floor, `evolve inbox route-lane`, the wave seed, `evolve inbox rank` and triage's breaker keep scope (`IsProtectedScope`). Decision 5 stands there.
+3. A declared protected path, file or directory, is binding. `route:lane` cannot relax it (ADR-0074).
+
+**Cost.** The claim floor accepts some items that the split refuses. The 2 coverage items `core-package-coverage-to-100` and `core-package-coverage-batches-after-1944` stay lane work. On the tracked inbox, the lane-routable items stay at 3.
+
+| Option | What it offers | Why it is not chosen |
+|---|---|---|
+| Containment for every routing root | One answer for each item. | The lane-routable items fall from 3 to 1, and the operator wants four lanes. |
+| Change `IsProtectedScope` itself | One name for the rule. | Tests and decision 5 pin it as membership, and the role guard and the ship tripwire read real file paths. |
+| Keep the `route:lane` override of a protected directory | The operator can open such an item. | Triage's breaker refuses the card of the item, so the lane bounces. The operator chose binding. |

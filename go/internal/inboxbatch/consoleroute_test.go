@@ -46,14 +46,18 @@ func TestConsoleRouted_AnnotatedFileEntryFirstToken(t *testing.T) {
 	}
 }
 
-func TestConsoleRouted_ExplicitLaneOverrideWins(t *testing.T) {
+func TestConsoleRouted_LaneOverrideCannotRelaxAProtectedDirectoryEither(t *testing.T) {
 	it := Item{ID: "x", Route: "lane", Files: []string{"go/internal/guards/"}}
-	if routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/")); routed {
-		t.Fatal("route:lane must override a directory-scope derivation")
+	if routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/")); !routed {
+		t.Fatal("route:lane must not relax a declared protected directory")
 	}
 	it.Files = []string{"go/internal/guards/role.go"}
 	if routed, _ := ConsoleRouted(it, protectedStub("go/internal/guards/role.go")); !routed {
 		t.Fatal("route:lane must not relax a declared protected file")
+	}
+	it = Item{ID: "x", Kind: "pipeline-repair", Route: "lane"}
+	if routed, _ := ConsoleRouted(it, protectedStub()); routed {
+		t.Fatal("route:lane must still override a pipeline kind")
 	}
 }
 
