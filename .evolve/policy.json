@@ -87,7 +87,10 @@
     "plan_source": "triage",
     "min_lanes": 4,
     "orchestrator": {
-      "stage": "enforce"
+      "stage": "enforce",
+      "window": {
+        "start": 8
+      }
     }
   },
   "floor": [
