@@ -28,7 +28,7 @@ Rejected option: exempt recipe phases from the clamp in Go. That change adds a s
 - `go/internal/router/document_lane_routing_test.go` — the cycle-1692 plan test now routes past premise-challenge, which the strategy-options lane runs now, before it asserts that the bugfix phases are skipped. The assertions are unchanged.
 
 ## Design Decisions
-The router test checks the trigger statically with `triggerFires` for every recipe phase whose trigger is goal-type-only. Thus it also catches post-build phases that a route evaluated at triage does not reach. That is how it found migration-safety-check, accessibility-audit and contract-fuzz-probe. A trigger with a size or kind condition is out of the sweep, because such a trigger can admit a lane on purpose for reasons other than the goal type.
+The router test checks the trigger statically with `triggerFires` for every recipe phase whose trigger is goal-type-only. Thus it also catches post-build phases that a route evaluated at triage does not reach. That is how it found migration-safety-check, accessibility-audit and contract-fuzz-probe. A trigger with a size or kind condition is out of the sweep. This is because such a trigger can admit a lane on purpose for reasons other than the goal type.
 
 ## Verification
 - `go test -tags acs -count=1 ./acs/cycle1941` — 4/4 predicates pass.
