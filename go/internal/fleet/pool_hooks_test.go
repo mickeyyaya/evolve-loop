@@ -4,7 +4,9 @@ import (
 	"context"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type launchLog struct {
@@ -186,5 +188,98 @@ func TestRunPool_EachTransitionNamesItsKindAndItsTodo(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("transitions =\n%+v\nwant\n%+v", got, want)
+	}
+}
+
+func TestRunPool_AKickRunsTheFillAgainWhileALaneRunsAndAnAbsentKickChangesNothing(t *testing.T) {
+	for name, kick := range map[string]bool{"kicked": true, "no kick channel": false} {
+		t.Run(name, func(t *testing.T) {
+			var mu sync.Mutex
+			refuse := true
+			refused := make(chan struct{}, 4)
+			kicks := make(chan struct{}, 1)
+			release := make(chan struct{})
+			started := make(chan string, 4)
+			cfg := PoolConfig{Target: 2, Next: func(inFlight, pending []Todo) int {
+				mu.Lock()
+				defer mu.Unlock()
+				if len(inFlight) > 0 && refuse {
+					refused <- struct{}{}
+					return -1
+				}
+				return 0
+			}}
+			if kick {
+				cfg.Kick = kicks
+			}
+			launch := func(_ context.Context, spec CycleSpec) (int, error) {
+				started <- scopeID(spec)
+				<-release
+				return 0, nil
+			}
+			done := make(chan []Result, 1)
+			go func() { done <- RunPool(context.Background(), cfg, []Todo{{ID: "A"}, {ID: "B"}}, launch, nil) }()
+			if got := <-started; got != "A" {
+				t.Fatalf("first launch = %q, want A", got)
+			}
+			<-refused
+			mu.Lock()
+			refuse = false
+			mu.Unlock()
+			if kick {
+				kicks <- struct{}{}
+				if got := <-started; got != "B" {
+					t.Fatalf("kicked launch = %q, want B while A still runs", got)
+				}
+			} else {
+				select {
+				case got := <-started:
+					t.Fatalf("launched %q with no exit and no kick, want the pool to wait", got)
+				default:
+				}
+			}
+			close(release)
+			for i, r := range <-done {
+				if r.Status() != LaneOK {
+					t.Errorf("result[%d] = %+v, want ok", i, r)
+				}
+			}
+		})
+	}
+}
+
+func TestRunPool_AClosedKickChannelIsIgnoredAndNeverSpinsTheFill(t *testing.T) {
+	kicks := make(chan struct{})
+	close(kicks)
+	var nexts atomic.Int64
+	release := make(chan struct{})
+	started := make(chan string, 4)
+	cfg := PoolConfig{Target: 2, Kick: kicks, Next: func(inFlight, pending []Todo) int {
+		nexts.Add(1)
+		if len(inFlight) > 0 {
+			return -1
+		}
+		return 0
+	}}
+	launch := func(_ context.Context, spec CycleSpec) (int, error) {
+		started <- scopeID(spec)
+		<-release
+		return 0, nil
+	}
+	done := make(chan []Result, 1)
+	go func() { done <- RunPool(context.Background(), cfg, []Todo{{ID: "A"}, {ID: "B"}}, launch, nil) }()
+	<-started
+	settled := nexts.Load()
+
+	time.Sleep(50 * time.Millisecond)
+
+	if grew := nexts.Load() - settled; grew > 2 {
+		t.Errorf("Next ran %d more times while a lane ran behind a closed Kick channel, want no spin: a closed channel is always ready", grew)
+	}
+	close(release)
+	for i, r := range <-done {
+		if r.Status() != LaneOK {
+			t.Errorf("result[%d] = %+v, want ok", i, r)
+		}
 	}
 }

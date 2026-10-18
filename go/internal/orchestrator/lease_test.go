@@ -268,3 +268,122 @@ func TestLease_AZeroStallChecksNoStallAndArmsOnlyTheDeadline(t *testing.T) {
 		<-done
 	}
 }
+
+func TestLease_ABeatMakesAnUnknownHeartbeatKnownAndMovesTheStall(t *testing.T) {
+	clock, events, g := newFakeClock(), &eventLog{}, newGatedLaunch()
+	leases := NewLeases(LeaseConfig{Stage: StageEnforce, Deadline: 5 * time.Hour, Stall: 20 * time.Minute}, clock, noHeartbeat, events.publish)
+	done := runLane(leases.Watch(g.launch, nil), "A")
+	waitStart(t, g)
+
+	clock.Advance(5 * time.Minute)
+	leases.Beat("missing", epoch.Add(5*time.Minute))
+	leases.Beat("A", epoch.Add(5*time.Minute))
+	leases.Beat("A", epoch.Add(time.Minute))
+	clock.Advance(16 * time.Minute)
+	if got := events.withCode(CodeLaneStalled); len(got) != 0 {
+		t.Fatalf("stall events at 21m with a beat at 5m = %+v, want none", got)
+	}
+	clock.Advance(5 * time.Minute)
+	got := events.withCode(CodeLaneStalled)
+	if len(got) != 1 || got[0].Fields["last_heartbeat"] != epoch.Add(5*time.Minute).Format(time.RFC3339) {
+		t.Errorf("stall events at 26m = %+v, want one that names the beat at 5m: an older beat never moves it back", got)
+	}
+	g.finish("A", 0)
+	<-done
+}
+
+func TestLease_ABeatFromTheFutureCountsAsNowAndNeverPostponesTheStall(t *testing.T) {
+	clock, events, g := newFakeClock(), &eventLog{}, newGatedLaunch()
+	leases := NewLeases(LeaseConfig{Stage: StageEnforce, Deadline: 5 * time.Hour, Stall: 20 * time.Minute}, clock, noHeartbeat, events.publish)
+	done := runLane(leases.Watch(g.launch, nil), "A")
+	waitStart(t, g)
+
+	leases.Beat("A", epoch.Add(10*time.Hour))
+	clock.Advance(21 * time.Minute)
+
+	got := events.withCode(CodeLaneStalled)
+	if len(got) != 1 || got[0].Fields["last_heartbeat"] != epoch.Format(time.RFC3339) {
+		t.Errorf("stall events = %+v, want one that counts the beat from the future as the clock of that moment: a skewed producer must not hide a stall", got)
+	}
+	g.finish("A", 0)
+	<-done
+}
+
+func TestLease_AZeroStallTurnsTheReportedStallOffToo(t *testing.T) {
+	clock, events, g := newFakeClock(), &eventLog{}, newGatedLaunch()
+	leases := NewLeases(LeaseConfig{Stage: StageEnforce, Deadline: 5 * time.Hour}, clock, noHeartbeat, events.publish)
+	done := runLane(leases.Watch(g.launch, nil), "A")
+	waitStart(t, g)
+
+	leases.Stall("A")
+
+	if got := events.withCode(CodeLaneStalled); len(got) != 0 {
+		t.Errorf("stall events = %+v, want none: stall_minutes 0 turns the stall check off for the reported stall as for the timer", got)
+	}
+	g.finish("A", 0)
+	<-done
+}
+
+func TestLease_EpochCountsEachGrantAndEachGive(t *testing.T) {
+	clock, g := newFakeClock(), newGatedLaunch()
+	leases := NewLeases(leaseConfig(StageEnforce), clock, noHeartbeat, nil)
+	before := leases.Epoch()
+	done := runLane(leases.Watch(g.launch, nil), "A")
+	waitStart(t, g)
+	granted := leases.Epoch()
+
+	g.finish("A", 0)
+	<-done
+
+	if granted != before+1 || leases.Epoch() != granted+1 {
+		t.Errorf("epoch = %d, %d, %d, want a step of 1 at the grant and a step of 1 at the give", before, granted, leases.Epoch())
+	}
+	if _, err := leases.give(Lane{Key: "none"}, fleet.Result{}); err == nil || leases.Epoch() != granted+1 {
+		t.Errorf("a give with no lease moved the epoch to %d (err %v), want it unchanged", leases.Epoch(), err)
+	}
+}
+
+func TestLease_AReportedStallPublishesOnceAndTheTimerNeverRepeatsIt(t *testing.T) {
+	clock, events, g := newFakeClock(), &eventLog{}, newGatedLaunch()
+	leases := NewLeases(LeaseConfig{Stage: StageShadow, Deadline: 5 * time.Hour, Stall: 20 * time.Minute}, clock, silentHeartbeat, events.publish)
+	done := runLane(leases.Watch(g.launch, nil), "A")
+	waitStart(t, g)
+
+	leases.Stall("missing")
+	leases.Stall("A")
+	leases.Stall("A")
+	clock.Advance(25 * time.Minute)
+	got := events.withCode(CodeLaneStalled)
+	if len(got) != 1 || got[0].Fields["todo"] != "A" || got[0].Fields["stage"] != StageShadow {
+		t.Errorf("stall events = %+v, want exactly one for A: the reported stall and the timer share one mark", got)
+	}
+	g.finish("A", 0)
+	<-done
+}
+
+func TestLease_LiveAndLaneListTheLanesInFlightWithTheirStart(t *testing.T) {
+	clock, g := newFakeClock(), newGatedLaunch()
+	leases := NewLeases(leaseConfig(StageEnforce), clock, noHeartbeat, nil)
+	launch := leases.Watch(g.launch, nil)
+	a := runLane(launch, "A")
+	waitStart(t, g)
+	clock.Advance(time.Minute)
+	b := runLane(launch, "B")
+	waitStart(t, g)
+
+	live := leases.Live()
+	if len(live) != 2 {
+		t.Fatalf("Live = %+v, want 2 lanes", live)
+	}
+	lane, ok := leases.Lane("B")
+	if !ok || !lane.Started.Equal(epoch.Add(time.Minute)) || lane.Key != "B" {
+		t.Errorf("Lane(B) = %+v, %v, want B started at 1m", lane, ok)
+	}
+	g.finish("A", 0)
+	<-a
+	if _, ok := leases.Lane("A"); ok {
+		t.Error("Lane(A) found a lane that exited")
+	}
+	g.finish("B", 0)
+	<-b
+}

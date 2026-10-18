@@ -106,11 +106,18 @@ func laneCycleDir(runsDir string, lane Lane) (string, bool) {
 }
 
 func LaneCycle(runsDir string, lane Lane) (int, bool) {
+	return laneCycleAbove(runsDir, lane, 0)
+}
+
+func laneCycleAbove(runsDir string, lane Lane, floor int) (int, bool) {
 	cycles, err := cycleDirs(runsDir)
 	if err != nil || len(lane.Scope) == 0 {
 		return 0, false
 	}
 	for _, c := range slices.Backward(cycles) {
+		if c <= floor {
+			break
+		}
 		dir := cycleDir(runsDir, c)
 		if info, err := os.Stat(dir); err != nil || info.ModTime().Before(lane.Started) {
 			continue
@@ -124,4 +131,20 @@ func LaneCycle(runsDir string, lane Lane) (int, bool) {
 
 func holdsTodo(dir, todo string) bool {
 	return slices.Contains(committedset.LanePin(dir), todo)
+}
+
+func RunsLocator(runsDir string) func(Lane) (int, bool) {
+	found := map[string]int{}
+	last := map[string]int{}
+	return func(lane Lane) (int, bool) {
+		life := lane.Key + "@" + lane.Started.Format(time.RFC3339Nano)
+		if cycle, ok := found[life]; ok {
+			return cycle, true
+		}
+		cycle, ok := laneCycleAbove(runsDir, lane, last[lane.Key])
+		if ok {
+			found[life], last[lane.Key] = cycle, cycle
+		}
+		return cycle, ok
+	}
 }

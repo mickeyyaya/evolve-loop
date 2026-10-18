@@ -13,6 +13,7 @@
 - **One sweep.** `Compute` clips each lane to the run window and sweeps the start and end edges in time order. The sweep gives the time at each width. The time-weighted median is the smallest width whose cumulative time is at least half the run time. Idle time counts as width 0, so a run with long gaps has a low realized width.
 - **No NaN.** Each ratio has a guard for a zero denominator: no landed lane, a sized width of 0, or a run time of 0. Each such ratio is 0, so the JSON always encodes.
 - **A lane with no start is not a lane.** A cycle with no signal and no dossier phase has no interval. It is out of the width and the busy time, but it still counts in `landed` when it shipped.
+- **The supply is a copy.** `Facts.Supply` holds the six class counts of the last census of the run. `orchestrator.Supply.Measure` builds it. `Compute` copies it into `Measures.Supply`, and the JSON key `supply` is absent when the run has no census (`TestCompute_CarriesACopyOfTheClassCountsOfTheLastCensusAndOmitsAbsentOnes`). The census is in [internal-orchestrator.md](internal-orchestrator.md). The read of its record by `wave status` is pending.
 - **The JSON names are a contract.** `TestMeasures_TheJSONFieldNamesAreStable` pins the seven keys. The constants `FieldWidthSized` and `CodeAdmitWait` are the names that the writer and the reader share.
 
 ## Where the facts come from

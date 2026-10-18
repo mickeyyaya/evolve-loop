@@ -17,13 +17,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-const (
-	sealedVerdictField = "final_verdict"
-	terminationField   = "termination_reason"
-)
+const terminationField = "termination_reason"
 
 var (
 	runDirName      = regexp.MustCompile(`^cycle-(\d+)$`)
@@ -162,12 +160,12 @@ func applySignals(c *Cycle, path string) []string {
 		c.StartedAt = earliest(c.StartedAt, eventTime(e))
 		switch e.Kind {
 		case signalcenter.KindCycleSealed:
-			c.Verdict, c.EndedAt = e.Fields[sealedVerdictField], eventTime(e)
+			c.Verdict, c.EndedAt = e.Fields[cyclestate.SealedVerdictField], eventTime(e)
 			c.Termination = e.Fields[terminationField]
 		case signalcenter.KindQuotaPaused:
 			c.QuotaPauses++
 		case signalcenter.KindShipError:
-			c.Conflict = c.Conflict || landingConflicts[e.Code]
+			c.Conflict = c.Conflict || shiperr.IsLandingConflict(e.Code)
 		}
 	}
 	if chunk.Skipped > 0 {

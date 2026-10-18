@@ -254,3 +254,50 @@ func TestLaneCycle_IsTheNumberOfTheCycleThatHoldsTheTodo(t *testing.T) {
 		t.Error("a todo that no cycle holds has a cycle")
 	}
 }
+
+func TestRunsLocator_FindsTheCycleOfALaneOnceAndKeysItByTheLaneStart(t *testing.T) {
+	runs := t.TempDir()
+	locate := RunsLocator(runs)
+	first := Lane{Key: "A", Scope: []string{"A"}, Started: time.Now().Add(-time.Hour)}
+
+	if _, ok := locate(first); ok {
+		t.Fatal("a lane that no cycle holds has a cycle")
+	}
+	writeCycle(t, runs, 61, []string{"A"})
+	if got, ok := locate(first); !ok || got != 61 {
+		t.Fatalf("locate = %d, %v, want 61", got, ok)
+	}
+	writeCycle(t, runs, 62, []string{"A"})
+	if got, _ := locate(first); got != 61 {
+		t.Errorf("locate of the same life = %d, want the cached 61", got)
+	}
+	second := first
+	second.Started = time.Now().Add(-time.Minute)
+	if got, ok := locate(second); !ok || got != 62 {
+		t.Errorf("locate of a new life of the same todo = %d, %v, want 62: the cache is keyed by the lane start", got, ok)
+	}
+}
+
+func TestRunsLocator_ANewLifeNeverTakesTheCycleOfAnEarlierLifeOfTheSameTodo(t *testing.T) {
+	runs := t.TempDir()
+	locate := RunsLocator(runs)
+	writeCycle(t, runs, 61, []string{"A"})
+	first := Lane{Key: "A", Scope: []string{"A"}, Started: time.Now().Add(-time.Hour)}
+	if got, ok := locate(first); !ok || got != 61 {
+		t.Fatalf("locate of the first life = %d, %v, want 61", got, ok)
+	}
+
+	second := Lane{Key: "A", Scope: []string{"A"}, Started: time.Now().Add(-time.Minute)}
+	if got, ok := locate(second); ok {
+		t.Fatalf("locate of the new life = %d, true, want none: cycle 61 is newer than the new start (the stopped lane still writes there) but it is the first life", got)
+	}
+	writeCycle(t, runs, 62, []string{"A"})
+	if got, ok := locate(second); !ok || got != 62 {
+		t.Errorf("locate of the new life once its cycle exists = %d, %v, want 62", got, ok)
+	}
+	other := Lane{Key: "B", Scope: []string{"B"}, Started: time.Now().Add(-time.Hour)}
+	writeCycle(t, runs, 50, []string{"B"})
+	if got, ok := locate(other); !ok || got != 50 {
+		t.Errorf("locate of another todo = %d, %v, want 50: the floor of A does not apply to B", got, ok)
+	}
+}

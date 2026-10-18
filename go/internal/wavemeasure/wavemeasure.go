@@ -17,12 +17,22 @@ type Lane struct {
 	Conflict bool
 }
 
+type Supply struct {
+	Admissible       int `json:"admissible"`
+	WaitingCell      int `json:"waiting_cell"`
+	WaitingDeps      int `json:"waiting_deps"`
+	ConsoleRoute     int `json:"console_route"`
+	ConsoleKind      int `json:"console_kind"`
+	ConsoleProtected int `json:"console_protected"`
+}
+
 type Facts struct {
 	Start          time.Time
 	End            time.Time
 	WidthSized     int
 	Lanes          []Lane
 	AdmissionWaits int
+	Supply         *Supply
 }
 
 type Measures struct {
@@ -33,10 +43,16 @@ type Measures struct {
 	Conflicts      int     `json:"conflicts"`
 	Landed         int     `json:"landed"`
 	AdmissionWaits int     `json:"admission_waits"`
+
+	Supply *Supply `json:"supply,omitempty"`
 }
 
 func Compute(f Facts, now time.Time) Measures {
 	m := Measures{WidthSized: f.WidthSized, AdmissionWaits: f.AdmissionWaits}
+	if f.Supply != nil {
+		supply := *f.Supply
+		m.Supply = &supply
+	}
 	for _, l := range f.Lanes {
 		if l.Landed {
 			m.Landed++
