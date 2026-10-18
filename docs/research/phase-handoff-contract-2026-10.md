@@ -47,7 +47,7 @@
 **F1.4** Each build prompt of both cycles says "inbox record unreadable at …: no such file or directory (acceptance unknown …)". The claim had moved the item to `processing/`. Fixed in PR #980.
 *Implication:* the builder did not see the acceptance that it had to meet.
 
-**F1.5** The tdd phase and the builder both ran Sonnet 5.5 at medium effort in cycles 1946 and 1950 (the pane header). `evolve cli-routing explain tdd-engineer` warned `cross_family_with.builder+tdd-engineer`. PR #981 moves tdd to the deep tier.
+**F1.5** The tdd phase and the builder both ran Sonnet 5.5 at medium effort in cycles 1946 and 1950 (the pane header). `evolve cli-routing explain tdd-engineer` warned `cross_family_with.builder+tdd-engineer`. PR #981 sets tdd to Sonnet at high effort. The builder now runs agy first (Gemini 3.8 Flash), so the two seats are of different families.
 *Implication:* the author of the tests and the author of the code had the same model.
 
 ### What the pipeline checks today
