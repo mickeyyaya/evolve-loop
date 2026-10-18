@@ -30,6 +30,11 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "business-strategy"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "business-plan"
       }
     ]
   },

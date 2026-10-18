@@ -31,6 +31,21 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "business-strategy"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "strategy-options"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "business-plan"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "partnership-deal"
       }
     ]
   },

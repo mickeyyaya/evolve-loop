@@ -32,6 +32,11 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "feature"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "api-design"
       }
     ]
   },

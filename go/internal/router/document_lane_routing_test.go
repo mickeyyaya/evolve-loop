@@ -61,6 +61,9 @@ func TestDocumentLane_NeverDispatchesTheBugfixPhasesOnCycle1692sPlan(t *testing.
 	for _, goalType := range []string{"strategy-options", "bugfix"} {
 		t.Run(goalType, func(t *testing.T) {
 			dec := routeCycle1692(cfg, goalType, "triage", []string{"scout", "triage"})
+			if dec.NextPhase == "premise-challenge" {
+				dec = routeCycle1692(cfg, goalType, "premise-challenge", []string{"scout", "triage", "premise-challenge"})
+			}
 			if slices.Contains(bugfixPhases, dec.NextPhase) {
 				t.Fatalf("NextPhase = %q: a document lane dispatched a bugfix phase", dec.NextPhase)
 			}

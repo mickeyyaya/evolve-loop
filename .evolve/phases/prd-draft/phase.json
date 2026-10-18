@@ -31,6 +31,11 @@
         "field": "scout.goal_type",
         "op": "==",
         "value": "product-discovery"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "frontend-ui"
       }
     ]
   },

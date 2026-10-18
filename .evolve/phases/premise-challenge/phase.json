@@ -39,6 +39,11 @@
         "field": "scout.cycle_size",
         "op": "==",
         "value": "large"
+      },
+      {
+        "field": "scout.goal_type",
+        "op": "==",
+        "value": "strategy-options"
       }
     ],
     "skip_when": null
