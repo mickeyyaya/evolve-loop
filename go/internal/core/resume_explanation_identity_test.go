@@ -167,8 +167,61 @@ func TestRequireResumeExplanationIdentity_RejectsClearedSealedFields(t *testing.
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 		ActiveWorktree:                  "", WorktreeBaseSHA: "",
 	}, 42)
-	if err == nil || !strings.Contains(err.Error(), "worktree/base") {
+	if err == nil || !strings.Contains(err.Error(), "worktree does not match host activation") {
 		t.Fatalf("cleared sealed resume identity was accepted: %v", err)
+	}
+}
+
+func TestRequireResumeExplanationIdentity_AcceptsAProvisionedWorktreeBeforeTheBuildSeal(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := explanationdocs.Activate(explanationdocs.CycleBinding{
+		ProjectRoot: root, Workspace: workspace, Cycle: 42, RunID: "run-42",
+		ContractVersion: explanationdocs.CurrentContractVersion,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	err := requireResumeExplanationIdentity(root, workspace, 42, CycleState{
+		CycleID: 42, RunID: "run-42", WorkspacePath: workspace,
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		ActiveWorktree:                  t.TempDir(), WorktreeBaseSHA: strings.Repeat("b", 40),
+	}, 42)
+	if err != nil {
+		t.Fatalf("a resume between activation and the Build seal was rejected: %v", err)
+	}
+}
+
+func TestRequireResumeExplanationIdentity_RejectsAZeroVersionAgainstAnActiveHost(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := explanationdocs.Activate(explanationdocs.CycleBinding{
+		ProjectRoot: root, Workspace: workspace, Cycle: 42, RunID: "run-42",
+		ContractVersion: explanationdocs.CurrentContractVersion,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	err := requireResumeExplanationIdentity(root, workspace, 42, CycleState{
+		CycleID: 42, RunID: "run-42", WorkspacePath: workspace,
+	}, 42)
+	if err == nil || !strings.Contains(err.Error(), "contract version does not match host activation") {
+		t.Fatalf("a dropped version against an active host was accepted: %v", err)
+	}
+	err = requireResumeExplanationIdentity(root, workspace, 42, CycleState{
+		RunID: "run-42", WorkspacePath: workspace,
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+	}, 0)
+	if err == nil || !strings.Contains(err.Error(), "cycle-state cycle 0 does not match") {
+		t.Fatalf("a checkpoint without a cycle was trusted against an active host: %v", err)
 	}
 }
 

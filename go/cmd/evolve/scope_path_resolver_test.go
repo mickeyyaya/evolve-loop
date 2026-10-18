@@ -75,3 +75,12 @@ func TestWireOrchestratorDeps_RegistersTheScopePathResolver(t *testing.T) {
 		t.Fatalf("the wired resolver must hand back the LIVE record; got %q want %q", got, live)
 	}
 }
+
+func TestScopePathResolver_ClaimedItemResolvesToItsProcessingPath(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	claimed := seedInbox(t, root, "processing/cycle-7", "claimed-task")
+	if got := scopePathResolver(root, "claimed-task"); got != claimed {
+		t.Fatalf("a claimed item must resolve to its processing path; got %q want %q", got, claimed)
+	}
+}

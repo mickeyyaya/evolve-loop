@@ -336,7 +336,7 @@ func ActivationForCycle(projectRoot string, cycle int, workspace string) (CycleB
 	if !supportedHostSchema(marker.SchemaVersion) || !supportedContract(marker.ContractVersion) || marker.Cycle != cycle || !safeRunID.MatchString(marker.RunID) || marker.Workspace == "" {
 		return CycleBinding{}, false, fmt.Errorf("activation marker cycle-%d has invalid identity or version", cycle)
 	}
-	if filepath.Clean(marker.Workspace) != filepath.Clean(workspace) {
+	if !sameWorkspacePath(marker.Workspace, workspace) {
 		return CycleBinding{}, false, nil
 	}
 	return CycleBinding{

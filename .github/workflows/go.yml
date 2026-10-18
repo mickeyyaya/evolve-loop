@@ -42,15 +42,6 @@ jobs:
             brew install tmux
           fi
       - run: go mod download
-      - name: vet + fmt
-        run: |
-          go vet ./...
-          diff_out=$(gofmt -d -s .)
-          if [ -n "$diff_out" ]; then
-            echo "$diff_out"
-            echo "FAIL: gofmt diff" >&2
-            exit 1
-          fi
       - name: build
         run: make build
       - name: test (race + cover, incl. integration tier)
@@ -145,6 +136,47 @@ jobs:
         # reads the coverage.txt of the earlier test step, which exists only
         # after a green run.
         run: make cover-strict
+
+  lint:
+    name: vet + gofmt (Go 1.23)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+      - run: go mod download
+      - name: vet (linux)
+        run: go vet ./...
+      - name: vet (darwin files, cross-checked from linux)
+        run: GOOS=darwin go vet ./...
+      - name: gofmt
+        run: |
+          diff_out=$(gofmt -d -s .)
+          if [ -n "$diff_out" ]; then
+            echo "$diff_out"
+            echo "FAIL: gofmt diff" >&2
+            exit 1
+          fi
+
+  vet-current:
+    name: vet (Go 1.27)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache-dependency-path: go/go.sum
+      - run: go mod download
+      - run: go vet ./...
 
   vulncheck:
     name: govulncheck (Go)

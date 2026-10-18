@@ -164,17 +164,19 @@ func TestC1141_004_routing_mandatory_no_regression(t *testing.T) {
 }
 
 func TestC1141_005_mandatory_divergence_derived_or_documented(t *testing.T) {
-	src := filepath.Join(acsRepoRoot(t), "go", "internal", "config", "config.go")
-	b, err := os.ReadFile(src)
-	if err != nil {
-		t.Fatalf("read config.go: %v", err)
+	cfg, _ := config.Load(filepath.Join(t.TempDir(), "absent-registry.json"), map[string]string{})
+	required := map[string]bool{}
+	for _, role := range phasecontract.RequiredRoles() {
+		required[phaseForRole(t, role)] = true
 	}
-	text := string(b)
-
-	derived := strings.Contains(text, "phasecontract")
-	documented := hasDivergenceComment(text)
-	if !derived && !documented {
-		t.Errorf("config.go Mandatory neither derives from phasecontract nor carries an explicit divergence comment naming the registry — the audit produced no recorded decision")
+	var extra []string
+	for _, p := range cfg.Mandatory {
+		if !required[p] {
+			extra = append(extra, p)
+		}
+	}
+	if len(extra) != 1 || extra[0] != "ship" {
+		t.Errorf("routing Mandatory %v adds %v beyond the registry-required phases, want exactly [ship]", cfg.Mandatory, extra)
 	}
 }
 
@@ -300,23 +302,6 @@ func assertReferencesRegistry(t *testing.T, path string) {
 	if !strings.Contains(string(b), "phasecontract") {
 		t.Errorf("%s does not reference phasecontract — the name is not derived from the registry SSOT", path)
 	}
-}
-
-func hasDivergenceComment(text string) bool {
-	for _, line := range strings.Split(text, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "//") {
-			continue
-		}
-		low := strings.ToLower(trimmed)
-		if !strings.Contains(low, "phasecontract") && !strings.Contains(low, "requiredroles") {
-			continue
-		}
-		if strings.Contains(low, "mandatory") || strings.Contains(low, "diverg") || strings.Contains(low, "deliberately") {
-			return true
-		}
-	}
-	return false
 }
 
 func phaseForRole(t *testing.T, role string) string {

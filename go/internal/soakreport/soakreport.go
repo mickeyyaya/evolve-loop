@@ -1,5 +1,4 @@
-// Package soakreport is the R8.3 soak evidence reporter — the read-only
-// instrument the EVOLVE_PHASE_RECOVERY enforce flip (plan R8.5) is gated on.
+// Package soakreport is the read-only soak evidence reporter that gates the EVOLVE_PHASE_RECOVERY enforce flip.
 package soakreport
 
 import (

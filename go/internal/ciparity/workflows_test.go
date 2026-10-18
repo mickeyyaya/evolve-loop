@@ -263,3 +263,46 @@ func TestGoWorkflow_GatesTheSuiteOnAPinnedGovulncheckFromTheMakeTarget(t *testin
 		t.Error("the vulncheck recipe must run the pinned govulncheck over every package")
 	}
 }
+
+func TestGoWorkflow_VetsAndFormatsOncePerPlatformNotOncePerMatrixLeg(t *testing.T) {
+	t.Parallel()
+	jobs := readWorkflowContract(t, "go.yml").Jobs
+	runsOf := func(name string) string {
+		var runs string
+		for _, step := range jobs[name].Steps {
+			if name != "build-test" && (step.If != "" || step.ContinueOnError != "") {
+				t.Errorf("%s step %q may not skip or ignore its failure", name, step.Run+step.Uses)
+			}
+			runs += step.Run + "\n"
+		}
+		return runs
+	}
+	goVersionOf := func(name string) string {
+		for _, step := range jobs[name].Steps {
+			if strings.HasPrefix(step.Uses, "actions/setup-go@") {
+				return step.With["go-version"]
+			}
+		}
+		return ""
+	}
+	if matrixRuns := runsOf("build-test"); strings.Contains(matrixRuns, "go vet") || strings.Contains(matrixRuns, "gofmt") {
+		t.Errorf("the OS and Go matrix runs vet or gofmt once per leg:\n%s", matrixRuns)
+	}
+	lint := runsOf("lint")
+	for _, want := range []string{"\ngo vet ./...\n", "GOOS=darwin go vet ./...", "gofmt -d -s ."} {
+		if !strings.Contains("\n"+lint, want) {
+			t.Errorf("lint job lacks %q:\n%s", want, lint)
+		}
+	}
+	if goVersionOf("lint") != "1.23" || goVersionOf("vet-current") != "1.27" {
+		t.Errorf("lint runs Go %q and vet-current runs Go %q; want 1.23 and 1.27", goVersionOf("lint"), goVersionOf("vet-current"))
+	}
+	if current := runsOf("vet-current"); !strings.Contains(current, "go vet ./...") || strings.Contains(current, "gofmt") {
+		t.Errorf("vet-current must vet the current toolchain and leave gofmt to the 1.23 job:\n%s", current)
+	}
+	for _, name := range []string{"lint", "vet-current"} {
+		if jobs[name].If != "" || jobs[name].ContinueOnError != "" {
+			t.Errorf("%s must always run and fail the suite: if=%q continue-on-error=%q", name, jobs[name].If, jobs[name].ContinueOnError)
+		}
+	}
+}

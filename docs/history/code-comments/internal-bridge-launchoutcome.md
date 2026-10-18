@@ -69,3 +69,12 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // lines, nesting depth ≤ 4, every file < 800 lines (signalcenter/limits_test.go
 // idiom; comments inside a function count, its doc comment does not).
 ```
+
+## comment-zero e4
+
+### `go/internal/bridge/launchoutcome/exit.go:1` — above `package launchoutcome`
+
+```text
+// Package launchoutcome is unit 10 of the component breakdown (ADR-0103):
+// what one bridge launch exit MEANS.
+```

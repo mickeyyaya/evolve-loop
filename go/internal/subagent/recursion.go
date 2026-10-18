@@ -12,10 +12,6 @@ const (
 	// Split form keeps it out of the flagreaders guard's standalone-literal
 	// scan (SSOT §IPC-protocol-allowed) — same pattern as FanoutWorkerTokenEnv.
 	dispatchDepthEnv = "EVOLVE_" + "DISPATCH_DEPTH"
-	// FanoutWorkerTokenEnv carries the parent-dictated per-worker challenge
-	// token to the worker dispatch (consumed by run.go as
-	// RunRequest.ChallengeTokenOverride) so the worker's artifact bears the
-	// token the parent verifies — the per-worker provenance boundary.
 	// Split form keeps it out of the flagreaders guard's standalone-literal
 	// scan (SSOT §IPC-protocol-allowed).
 	FanoutWorkerTokenEnv = "EVOLVE_" + "FANOUT_WORKER_TOKEN"

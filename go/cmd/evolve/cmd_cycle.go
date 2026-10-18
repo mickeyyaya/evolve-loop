@@ -660,7 +660,7 @@ func (m registrarMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseS
 
 func scopePathResolver(projectRoot, taskID string) string {
 	st := inboxmover.ResolveDispatchState(inboxmover.Options{ProjectRoot: projectRoot}, taskID)
-	if st.State != inboxmover.StatePending {
+	if st.State != inboxmover.StatePending && st.State != inboxmover.StateProcessing {
 		return ""
 	}
 	return st.Path

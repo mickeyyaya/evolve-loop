@@ -243,34 +243,38 @@ func (p *Phase) resolveCLI(req core.PhaseRequest, prof *profiles.Profile, model 
 }
 
 func refreshExplanationHandoff(ctx context.Context, req core.PhaseRequest) core.PhaseRequest {
-	if req.ExplanationDocumentationVersion == 0 {
-		req.BuildExplanationState = core.BuildExplanationLegacy
-		return req
-	}
-	if req.BuildExplanationState == core.BuildExplanationNotYetBuilt {
-		return req
-	}
-	verified, active, err := explanationdocs.Verify(ctx, explanationdocs.CycleBinding{
+	binding := explanationdocs.CycleBinding{
 		ProjectRoot: req.ProjectRoot, Worktree: req.Worktree, Workspace: req.Workspace,
 		BaseSHA: req.WorktreeBaseSHA, Cycle: req.Cycle, RunID: req.RunID,
 		ContractVersion: req.ExplanationDocumentationVersion,
-	})
-	if err != nil || !active || !explanationdocs.SameView(req.BuildExplanation, verified) {
-		req.BuildExplanation = nil
-		req.BuildExplanationState = core.BuildExplanationInvalid
-		switch {
-		case err != nil:
-			req.BuildExplanationError = compactError(err)
-		case !active:
-			req.BuildExplanationError = "active explanation contract was not found"
-		default:
-			req.BuildExplanationError = "typed handoff does not match verified host snapshot"
-		}
+	}
+	hostActive, err := explanationdocs.CrossCheckActivation(binding)
+	switch {
+	case err != nil:
+		return invalidExplanationHandoff(req, compactError(err))
+	case !hostActive:
+		req.BuildExplanationState = core.BuildExplanationLegacy
 		return req
+	case req.BuildExplanationState == core.BuildExplanationNotYetBuilt:
+		return req
+	}
+	verified, _, err := explanationdocs.Verify(ctx, binding)
+	switch {
+	case err != nil:
+		return invalidExplanationHandoff(req, compactError(err))
+	case !explanationdocs.SameView(req.BuildExplanation, verified):
+		return invalidExplanationHandoff(req, "typed handoff does not match verified host snapshot")
 	}
 	req.BuildExplanation = verified
 	req.BuildExplanationState = core.BuildExplanationAvailable
 	req.BuildExplanationError = ""
+	return req
+}
+
+func invalidExplanationHandoff(req core.PhaseRequest, reason string) core.PhaseRequest {
+	req.BuildExplanation = nil
+	req.BuildExplanationState = core.BuildExplanationInvalid
+	req.BuildExplanationError = reason
 	return req
 }
 
