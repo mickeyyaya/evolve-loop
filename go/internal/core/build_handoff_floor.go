@@ -46,14 +46,14 @@ func (f BuildHandoffFloor) Review(ctx context.Context, in ReviewInput) ReviewRes
 	if in.Phase != string(PhaseBuild) {
 		return ReviewResult{Approve: true}
 	}
-	failures := f.Failures(ctx, in)
+	failures := withProtectedFileNotes(f.Failures(ctx, in), in.Protected)
 	if len(failures) == 0 {
 		return ReviewResult{Approve: true}
 	}
 	reason := fmt.Sprintf("build handoff floor: %d deterministic check failure(s) — fix these exactly before handoff:\n  %s",
 		len(failures), strings.Join(failures, "\n  "))
 	fmt.Fprintf(os.Stderr, "[build-floor] REJECT: %s\n", reason)
-	return ReviewResult{Approve: false, Retry: true, Reason: reason}
+	return ReviewResult{Approve: false, Retry: true, Reason: reason, Failures: failures}
 }
 
 func (o *Orchestrator) BuildHandoffFloorNames() []string {

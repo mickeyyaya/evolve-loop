@@ -21,6 +21,7 @@ type ReviewInput struct {
 	ProjectRoot    string
 	ChallengeToken string
 	BreakerExempt  bool
+	Protected      func(string) bool
 	Stderr         io.Writer
 	Signals        *signalcenter.Center
 }
@@ -40,6 +41,7 @@ type ReviewResult struct {
 	Blocks            int
 	Remediation       string
 	DeliverableAbsent bool
+	Failures          []string
 }
 
 type DeliverableReviewer interface {

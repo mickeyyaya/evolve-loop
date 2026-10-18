@@ -51,7 +51,7 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 		return nil
 	}
 	failures := coverChangedFunctionFailures(ctx, in, stage, moduleDir, profile)
-	return append(failures, coverStrictFailures(stage, moduleDir, profile, pkgs)...)
+	return append(failures, coverStrictFailures(stage, moduleDir, profile, pkgs, newBlockNoter(in.Worktree, moduleDir, in.Protected))...)
 }
 
 func unitRunRefuses(ctx context.Context, in ReviewInput, moduleDir string, pkgs []string) bool {
@@ -70,7 +70,9 @@ func coverChangedFunctionFailures(ctx context.Context, in ReviewInput, stage con
 	return coverChangedReport(coverChangedResult(stage, headline, v.Problems()))
 }
 
-func coverStrictFailures(stage config.Stage, moduleDir, profile string, pkgs []string) []string {
+const coverStrictHeadline = "changed package(s) listed in go/.cover-strict are below their floor; test each uncovered block below, unless its note says a test cannot reach it"
+
+func coverStrictFailures(stage config.Stage, moduleDir, profile string, pkgs []string, noter blockNoter) []string {
 	results, err := coverStrictRunner(moduleDir, profile, pkgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not check go/.cover-strict (%v); `make -C go cover-strict` and CI still judge it\n", err)
@@ -80,9 +82,10 @@ func coverStrictFailures(stage config.Stage, moduleDir, profile string, pkgs []s
 	for _, r := range results {
 		if !r.OK() {
 			lines = append(lines, r.Line())
+			lines = append(lines, noter.notes(profile, r.Pkg)...)
 		}
 	}
-	return coverChangedReport(coverChangedResult(stage, "changed package(s) listed in go/.cover-strict are below their floor; test them back up to it", lines))
+	return coverChangedReport(coverChangedResult(stage, coverStrictHeadline, lines))
 }
 
 func changedStrictResults(moduleDir, profilePath string, pkgs []string) ([]coverstrict.Result, error) {

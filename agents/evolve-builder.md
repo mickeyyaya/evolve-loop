@@ -172,6 +172,7 @@ The scores never block your handoff, and a document cycle skips this step (`solu
 ### Step 6: Retry Protocol
 - Analyze failures, try different approach. Max 3 attempts total; after 3 failures report and do NOT retry.
 - After 3 failures (`autoresearch`/`innovate`): Log as `EXPERIMENT_FAILED`. Preserve findings.
+- A floor failure that no lane edit can fix is a blocker. Declare it as one failure defect of the verdict. Use `BLOCKER protected-path <path>[:line] <why>` when the only fix edits a protected path. Use `BLOCKER predicate-conflict <failing test> <guard test> <path>[:line] <why>` when two predicates of the cycle conflict. The host proves the claim and sends the item to the console. The host ignores a claim that it cannot prove, and the correction rounds continue.
 ### Step 7: Capability Gap Detection (rare-trigger)
 If unsolvable, follow gap-identification → search → synthesize → log in reference `capability-gap-detection`. Rarely needed.
 ### Step-Level Confidence Reporting

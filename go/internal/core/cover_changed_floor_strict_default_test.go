@@ -86,7 +86,9 @@ func TestCoverStrictFailures_ARunnerErrorWarnsAndLeavesTheHandoffAlone(t *testin
 	t.Cleanup(func() { coverStrictRunner = orig })
 
 	var failures []string
-	stderr := captureStderr(t, func() { failures = coverStrictFailures(config.StageEnforce, t.TempDir(), "cover.out", []string{"./p"}) })
+	stderr := captureStderr(t, func() {
+		failures = coverStrictFailures(config.StageEnforce, t.TempDir(), "cover.out", []string{"./p"}, blockNoter{})
+	})
 
 	if failures != nil {
 		t.Errorf("failures = %v, want none on a plumbing fault", failures)

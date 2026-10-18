@@ -64,6 +64,9 @@ func Classify(workspace string) Result {
 	reportData, _ := os.ReadFile(report)
 
 	record, recordOK := classifyFromRecord(workspace)
+	if recordOK && cyclestate.RefusalDisposition(record.Marker).OutranksSentinel {
+		return record
+	}
 	if cls, ok := classifyFromSentinels(workspace); ok && (!recordOK || sentinelPhase(cls.Source) == record.Phase) {
 		return cls
 	}

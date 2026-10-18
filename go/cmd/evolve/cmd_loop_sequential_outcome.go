@@ -10,14 +10,20 @@ import (
 
 func (b *loopBatchCoordinator) completeSequentialCycle(iteration int, cycle sequentialCycle, state *sequentialBatchState) batchDecision {
 	failed := cycle.result.FinalVerdict == core.VerdictFAIL
+	blocked := core.IsProvenBlockerResult(cycle.result)
 	var stop bool
-	state.consecutiveFails, stop = consecutiveFailBreaker(failed, state.consecutiveFails, state.maxConsecutiveFails)
+	if blocked {
+		fmt.Fprintf(b.stderr, "[loop] cycle %d blocked: needs console — not a code FAIL, so the consecutive-FAIL count stays %d of max %d\n",
+			cycle.cycle, state.consecutiveFails, state.maxConsecutiveFails)
+	} else {
+		state.consecutiveFails, stop = consecutiveFailBreaker(failed, state.consecutiveFails, state.maxConsecutiveFails)
+	}
 	b.closeoutCycleOutcome(cycle.result)
 	if stop {
 		b.result.StopReason = "fail"
 		return batchDecision{flow: batchStopIterations}
 	}
-	if failed {
+	if failed && !blocked {
 		recordAbsorbedFail(b.cfg, cycle.cycle, b.stderr)
 		b.result.ContinuedFailures++
 		fmt.Fprintf(b.stderr, "[loop] cycle %d verdict=FAIL — continuing (consecutive %d of max %d, workflow policy)\n",

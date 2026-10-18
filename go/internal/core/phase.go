@@ -39,6 +39,8 @@ const (
 	CycleOutcomeSkippedUnknown        = cyclestate.CycleOutcomeSkippedUnknown
 	CycleTerminationTriageNoWork      = cyclestate.CycleTerminationTriageNoWork
 	CycleTerminationTddProtectedRoute = cyclestate.CycleTerminationTddProtectedRoute
+
+	CycleTerminationBlockedNeedsConsole = cyclestate.CycleTerminationBlockedNeedsConsole
 )
 
 func IsVerdict(s string) bool { return cyclestate.IsVerdict(s) }

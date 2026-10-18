@@ -35,6 +35,9 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		corr := 0
 		salvagedFromInvalid := ""
 		for !rr.Approve {
+			if item, proof, ok := cr.provenBlocker(next, rin, rr); ok {
+				return cr.endOnProvenBlocker(next, dr, item, proof)
+			}
 			act := nextCorrection(interaction.CorrectionInput{
 				Phase:      string(next),
 				Workspace:  cr.cs.WorkspacePath,

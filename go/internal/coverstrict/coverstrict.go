@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -110,9 +111,18 @@ func measureFloor(f Floor, profile covchanged.Profile) Result {
 	}
 	r.Percent = 100 * float64(r.Covered) / float64(r.Statements)
 	if r.Percent < r.Min {
-		r.Problem = fmt.Sprintf("%.1f%% < %.1f%%", r.Percent, r.Min)
+		r.Problem = belowFloor(r)
 	}
 	return r
+}
+
+func belowFloor(r Result) string {
+	short := fmt.Sprintf("%.1f", r.Percent)
+	if rounded, _ := strconv.ParseFloat(short, 64); rounded < r.Min {
+		return fmt.Sprintf("%s%% < %.1f%%", short, r.Min)
+	}
+	truncated := math.Floor(r.Percent*100) / 100
+	return fmt.Sprintf("%.2f%% (%d of %d statements) < %.1f%%", truncated, r.Covered, r.Statements, r.Min)
 }
 
 func Check(moduleDir, profilePath, floorsPath string) ([]Result, error) {
