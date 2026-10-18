@@ -74,3 +74,4 @@
 ./internal/admission 100
 ./internal/orchestrator 100
 ./internal/acspathscan 100
+./internal/adapters/codeindex/gotypes 100
