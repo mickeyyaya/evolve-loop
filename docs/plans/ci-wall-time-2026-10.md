@@ -1,6 +1,6 @@
 # Plan: CI wall time falls from about 24 to about 9 minutes, and every run keeps the data that shows why
 
-- **Status:** accepted, 2026-10-17 (the operator approved it with "Ok").
+- **Status:** accepted, 2026-10-17 (the operator approved it with "Ok"). Amended 2026-10-19 with C15 and C16 (§6b).
 - **Research:** [ci-wall-time-2026-10](../research/ci-wall-time-2026-10.md). **Earlier campaign:** [test-system-efficiency-2026-10](test-system-efficiency-2026-10.md). **Decision:** [ADR-0135](../architecture/adr/0135-ci-measures-itself-before-it-changes-its-shape.md). **Design:** [ci-telemetry-and-critical-path](../architecture/ci-telemetry-and-critical-path.md).
 
 ## Table of contents
@@ -13,6 +13,7 @@
 - [5. Decisions](#5-decisions)
 - [6. Components](#6-components)
 - [6a. Components after the first instrumented run (C6 to C14)](#6a-components-after-the-first-instrumented-run-c6-to-c14)
+- [6b. Components after the queue measurement (C15 and C16)](#6b-components-after-the-queue-measurement-c15-and-c16)
 - [7. Order](#7-order)
 - [8. Verification](#8-verification)
 - [9. Risks](#9-risks)
@@ -307,8 +308,50 @@ C7, C6 and C11 are built, in that order, on the branch `perf/ci-c6-c7-c11`.
 | C6 | `make test-e2e` builds `cmd/e2elist`. The command prints one anchored pattern, `^(TestA\|TestB\|...)$`, and the recipe passes it to `go test -run`. `internal/ciparity` holds the logic (`E2ETestNames`). A test function is on the list when only the `e2e` tag adds its file to the package. The list follows the build tag, not a name. | `TestE2ETestNames_PicksUpANewE2EFileAndIgnoresANewPlainFile` and `TestMakeE2E_RunsOnlyTheTestsOfE2ETaggedFiles`. | The count is 28 tests, and the no-race repeat of the other `cmd/*` tests is lost; the scoring accepted this loss. A plain test with the name of an e2e test in **another** package still runs. One `-run` pattern applies to every package. This costs only time. The anchor stops a prefix match. The recipe fails when the list is empty. |
 | C11 | The step `vet + fmt` leaves the matrix job `build-test`. The job `lint` (ubuntu, Go 1.23) runs `go vet ./...`, `GOOS=darwin go vet ./...` and gofmt. The job `vet-current` (ubuntu, Go 1.27) runs `go vet ./...`. | `TestGoWorkflow_VetsAndFormatsOncePerPlatformNotOncePerMatrixLeg` | The `required` workflow forbids a conditional `run` step in a validation job. The platform split is therefore made with jobs, not with a step `if`. A failed job still fails the reusable workflow. The job names `lint` and `vet-current` replace the step name `vet + fmt` that some audit messages quote. |
 
+## 6b. Components after the queue measurement (C15 and C16)
+
+On 2026-10-19 the console measured the queue of the macOS job (research F7.1 to F7.8). The macOS job waits a median of 60 min for a runner and runs a median of 21 min. The median wall of a run is 80 min. Thus the queue is 75% of the median wall, and it is now the largest cost. C2 to C14 cut only the 21 min run part.
+
+*Worked example (F7.3, F7.4):* the account has 5 macOS slots (P7.1). 7.7 runs start per hour, and each run holds one slot for about 21 min. That is about 2.7 slot-hours of demand per hour on 5 slots, before the peaks of the merge trains. When 36 of 69 PR runs test a superseded SHA, half of that demand is waste.
+
+### The queue options
+
+| Option | What it does | macOS demand | Cost | Decision |
+|---|---|---|---|---|
+| A. Concurrency groups (C15) | GitHub cancels a superseded PR run, and it keeps only the newest queued main run | about −36 of 69 PR runs; fewer main runs in a merge train | none | Adopt now |
+| B. Inbox-only route (C16) | a PR that changes only `.evolve/inbox/` runs one small ubuntu job, not the Go matrix | −1 macOS job per inbox-only PR | none | Adopt now |
+| C. Scope the matrix (C2) | the macOS job runs only the darwin set and the e2e tier | the slot is held for less time per run | none | Approved; next after C15 and C16 |
+| D. A merge queue | GitHub tests each merge group once before it lands on main | fewer main runs per merge train | the console merge flow changes | Open question Q6 |
+| E. More macOS slots from GitHub | a paid plan raises the cap of 5 concurrent macOS jobs | the cap rises; the demand stays | money every month | Open question Q7 |
+
+*Expected effect (synthesis, not measured):* A and B together cut the macOS demand by about 60%. The estimate counts the 36 superseded PR runs, the queued main runs that a newer main run replaces, and the inbox-only PRs. C1 and the next API sample measure the real effect.
+
+### Decisions D24 to D26
+
+| Id | Decision | Because (findings) | Rejected options and why |
+|---|---|---|---|
+| D24 | `required.yml` declares one `concurrency` group. A PR run uses `<workflow>-pr-<number>` with cancel in progress. A push uses `<workflow>-<ref>` without cancel in progress. A manual run uses `<workflow>-dispatch-<run id>`, so nothing cancels it. | F7.4, F7.5, P7.2 | A group in `go.yml` or `ci.yml`: a called workflow sees the caller's `github.workflow`, so its group can cancel its own caller (P7.2). Cancel in progress on main: a merge train then never finishes a main run. |
+| D25 | The `CI required` job keeps `if: always()`. When GitHub cancels a run, the job still runs, sees a `cancelled` result and fails. | F7.5, P7.2 | `if: ${{ !cancelled() }}`: the job is then skipped, and a skipped required check counts as a pass. A cancelled run can then show a green `CI required`. |
+| D26 | A change of `.evolve/inbox/` paths alone sets `go=false` and `inbox=true`. The `inbox` job builds `evolve`, runs `evolve inbox lint`, fails on a `WARN skipped` line, and runs `go test ./internal/phasecoherence/`. `.evolve/policy.json` and each other `.evolve/` path keep the Go matrix. | F7.6, F7.7, F7.8 | No route: each inbox PR keeps a macOS slot for 21 min. Only `evolve inbox lint`: it misses the two `phasecoherence` real-tree tests and the skipped item of F7.8. |
+
+**The required check stays safe (D25).** A cancel happens only when a newer run of the same group starts.
+
+For a new push to a PR, the cancelled run fails `CI required` on the old head SHA. Branch protection reads the check of the new head SHA, which the newest run sets. A reopened PR can start a newer run on the same SHA. Then its `CI required` check is the later check of that name, and it replaces the failure. Thus no cancelled run blocks a merge for ever, and no cancelled run shows a pass.
+
+### Build status of C15 and C16
+
+Both are built on the branch `perf/ci-queue-concurrency-and-inbox-route`.
+
+| Id | Built as | Red test | What the build records |
+|---|---|---|---|
+| C15 | D24 and D25 in `.github/workflows/required.yml` | `TestRequiredWorkflow_ConcurrencyCancelsOnlySupersededPullRequestRuns` pins the group, the cancel rule, and no group in the called workflows | The test reads the expressions. It cannot run the GitHub scheduler. The real effect needs the next API sample. |
+| C16 | D26: the `changes` job writes `inbox=`, the `inbox` job runs on it, and `CI required` checks it | `TestRequiredRouting_InboxOnlyChangesSkipTheGoMatrix` runs the real routing script for `push` and `pull_request`. Its cases are inbox only, a deleted inbox item, inbox with a Go file, inbox with `policy.json`, and `.evolve/inbox-parked/`. `TestRequiredWorkflow_InboxJobLintsTheInboxAndRunsItsRealTreeTests` and new cases in `TestRequiredResult_RejectsMissingOrUnsuccessfulWork` pin the job and its result. | A full run (manual, first push, empty diff) also runs the `inbox` job. `TestC1292_004` stays in the per-cycle ACS gate, as before. |
+
 ## 7. Order
 
+The queue is now the largest cost (§6b), so C15 and C16 come first.
+
+0. **C15 and C16.** They cut the macOS queue, and they change only the workflow. C2 stays approved, and it is next.
 1. **C0, then C0b, then C1.** Measure before you change: time first, then resources, then the joined report. The history is also the input for any sharding later.
 2. **C2.** This is the largest wall-time cut, and it is a workflow-only change.
 3. **C3, then C5b, then C4 and C5.** These are ordered by CPU-seconds freed (F3.5, F3.6, F3.16). In run 39027224638, `phases/audit` used 31.9% of the test CPU (C3) and `bridge` used 17.5% (C5b and C5).
@@ -326,6 +369,7 @@ Each component is one PR, merged at a wave boundary. Each one follows the usual 
 | G2 telemetry | none kept | every Go job has the `-json`, rusage and sampler artifacts, and a critical-path summary with its limiting resource | artifact list of each run |
 | G3 evidence | — | every darwin-tagged package still runs on macOS | the C2 script test, and a diff of the macOS package list against the set |
 | G4 cost | 3 full jobs | macOS minutes cut by about 55% | billing summary |
+| G5 macOS queue | median 60 min, max 87 min (2026-10-19) | about −60% macOS demand after C15 and C16 | `started - created` of the macOS job over 25 runs, from the GitHub API |
 
 ## 9. Risks
 
@@ -337,6 +381,7 @@ Each component is one PR, merged at a wave boundary. Each one follows the usual 
 | Injected environments in C4 change what a test proves. | Each moved test keeps its assertions. The review checks that the environment it reads is the one it injects. |
 | The wrapper changes a test result or its timing. | The wrapper passes stdin, stdout, stderr and the exit code through, and its cost is one `exec` per package. A test proves the pass-through. |
 | The runner sampler costs CPU on a 3-vCPU runner. | It samples once per second and reads kernel counters only. |
+| C15 replaces a queued main run when a newer main push arrives. Then `evolve ci watch --sha` of the older SHA sees `cancelled`, and it files an escalation (`go/internal/ciwatch/ciwatch.go:87`). | Watch the newest main SHA, because it holds every older commit. A follow-up can make `ci watch` report a superseded run as its own result. |
 
 ## 10. Open questions
 
@@ -345,3 +390,5 @@ Each component is one PR, merged at a wave boundary. Each one follows the usual 
 - **Q3:** do the five `sandbox-exec`-only packages in F3.10 need macOS? Some name the binary only in a string. Proposed: keep them in the set until a test proves otherwise.
 - **Q4:** does `fetch-depth: 0` need the full history in all three Go jobs? Checkout takes 21–45 s per job (F3.30). Proposed: measure a blobless clone (`filter: blob:none`) before a change.
 - **Q5:** does the macOS runner gain from `-p 2` or `-p 4`? C13 must record its CPU first (F3.23).
+- **Q6 (operator):** queue option D, a GitHub merge queue. It tests one merge group before it lands, so a merge train makes fewer main runs. It changes the console merge flow at each boundary. Proposed: decide after C15 and C16 are measured.
+- **Q7 (operator):** queue option E, more macOS slots from a paid GitHub plan (P7.1). It raises the cap of 5, but the demand stays the same. Proposed: decide after C2, because C2 holds each slot for less time.

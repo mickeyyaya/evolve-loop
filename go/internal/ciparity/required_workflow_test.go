@@ -38,7 +38,7 @@ func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 	slices.Sort(needs)
-	if !slices.Equal(needs, []string{"changes", "go", "landing", "ste-lint", "validate"}) {
+	if !slices.Equal(needs, []string{"changes", "go", "inbox", "landing", "ste-lint", "validate"}) {
 		t.Fatalf("required result dependencies = %v", needs)
 	}
 	for id, source := range map[string]string{"go": "go.yml", "validate": "ci.yml", "landing": "landing-validation.yml"} {
@@ -87,6 +87,58 @@ func TestRequiredWorkflow_SteLintJobRunsOnlyTheLintOnTheAddedText(t *testing.T) 
 	for _, banned := range []string{"go test", "make ", "acs", "go vet"} {
 		if strings.Contains(script, banned) {
 			t.Errorf("a docs-only job may not run test code: %q", banned)
+		}
+	}
+}
+
+func TestRequiredWorkflow_InboxJobLintsTheInboxAndRunsItsRealTreeTests(t *testing.T) {
+	t.Parallel()
+	job := readWorkflowContract(t, RequiredWorkflow).Jobs["inbox"]
+	if job.If != "needs.changes.outputs.inbox == 'true'" || job.Needs.Value != "changes" || job.ContinueOnError != "" || job.Uses != "" {
+		t.Fatalf("inbox must run on the inbox route of the changes job: %+v", job)
+	}
+	if job.RunsOn != "ubuntu-latest" {
+		t.Errorf("the inbox route must not use a macOS slot: runs-on %q", job.RunsOn)
+	}
+	var runs []string
+	for _, step := range job.Steps {
+		if step.ContinueOnError != "" || (step.Run != "" && step.If != "") {
+			t.Errorf("inbox step %q may not be skipped or ignore its failure", step.Run)
+		}
+		runs = append(runs, step.Run)
+	}
+	script := strings.Join(runs, "\n")
+	for _, want := range []string{"go build -o \"$RUNNER_TEMP/evolve\" ./cmd/evolve", "\"$RUNNER_TEMP/evolve\" inbox lint", ": WARN skipped ", "go test -count=1 ./internal/phasecoherence/"} {
+		if !strings.Contains(script, want) {
+			t.Errorf("inbox job does not run %q", want)
+		}
+	}
+	for _, banned := range []string{"make ", "matrix"} {
+		if strings.Contains(script, banned) {
+			t.Errorf("the inbox route may not run the full suite: %q", banned)
+		}
+	}
+}
+
+func TestRequiredWorkflow_ConcurrencyCancelsOnlySupersededPullRequestRuns(t *testing.T) {
+	t.Parallel()
+	c := readWorkflowContract(t, RequiredWorkflow).Concurrency
+	for _, want := range []string{
+		"${{ github.workflow }}-",
+		"github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number)",
+		"github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id)",
+		"|| github.ref }}",
+	} {
+		if !strings.Contains(c.Group, want) {
+			t.Errorf("concurrency group %q lacks %q", c.Group, want)
+		}
+	}
+	if c.CancelInProgress != "${{ github.event_name == 'pull_request' }}" {
+		t.Errorf("only a superseded pull request run may be cancelled in progress; got %q", c.CancelInProgress)
+	}
+	for _, name := range []string{"go.yml", "ci.yml", "landing-validation.yml"} {
+		if g := readWorkflowContract(t, name).Concurrency.Group; g != "" {
+			t.Errorf("%s declares concurrency group %q; a called workflow shares the caller's github.workflow, so it can cancel its own caller", name, g)
 		}
 	}
 }

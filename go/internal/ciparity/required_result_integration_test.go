@@ -18,6 +18,7 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 		"ROUTE_RESULT": "${{ needs.changes.result }}", "VALIDATE_RESULT": "${{ needs.validate.result }}",
 		"GO_REQUIRED": "${{ needs.changes.outputs.go }}", "GO_RESULT": "${{ needs.go.result }}",
 		"LANDING_REQUIRED": "${{ needs.changes.outputs.landing }}", "LANDING_RESULT": "${{ needs.landing.result }}",
+		"INBOX_REQUIRED": "${{ needs.changes.outputs.inbox }}", "INBOX_RESULT": "${{ needs.inbox.result }}",
 	}
 	for key, want := range bindings {
 		if step.Env[key] != want {
@@ -48,6 +49,15 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 		{"lint_ran_without_the_docs_route", map[string]string{"STE_LINT_RESULT": "success"}, false},
 		{"go_only", map[string]string{"LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": ""}, true},
 		{"landing_only", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": ""}, true},
+		{"inbox_only_green", inboxOnlyResult(nil), true},
+		{"inbox_beside_go_green", map[string]string{"INBOX_REQUIRED": "true", "INBOX_RESULT": "success"}, true},
+		{"inbox_only_lint_failed", inboxOnlyResult(map[string]string{"INBOX_RESULT": "failure"}), false},
+		{"inbox_only_lint_cancelled", inboxOnlyResult(map[string]string{"INBOX_RESULT": "cancelled"}), false},
+		{"inbox_only_lint_skipped", inboxOnlyResult(map[string]string{"INBOX_RESULT": "skipped"}), false},
+		{"inbox_only_lint_missing", inboxOnlyResult(map[string]string{"INBOX_RESULT": ""}), false},
+		{"inbox_unselected_but_failed", map[string]string{"INBOX_RESULT": "failure"}, false},
+		{"inbox_unselected_but_cancelled", map[string]string{"INBOX_RESULT": "cancelled"}, false},
+		{"inbox_route_unknown", map[string]string{"INBOX_REQUIRED": "TRUE", "INBOX_RESULT": "success"}, false},
 		{"route_failed_docs_outputs", map[string]string{"ROUTE_RESULT": "failure", "GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": ""}, false},
 	}
 	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT", "STE_LINT_RESULT", "DOCS_ONLY", "DOCS_REQUIRED"} {
@@ -68,7 +78,7 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			env := map[string]string{"DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
+			env := map[string]string{"INBOX_REQUIRED": "false", "INBOX_RESULT": "skipped", "DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
 			for key, value := range tc.set {
 				env[key] = value
 			}
@@ -84,6 +94,18 @@ func docsOnlyResult(set map[string]string) map[string]string {
 	env := map[string]string{
 		"DOCS_ONLY": "true", "DOCS_REQUIRED": "true", "STE_LINT_RESULT": "success",
 		"VALIDATE_RESULT": "skipped", "PLUGIN_RESULT": "", "ACS_RESULT": "",
+		"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "",
+		"LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": "",
+	}
+	for key, value := range set {
+		env[key] = value
+	}
+	return env
+}
+
+func inboxOnlyResult(set map[string]string) map[string]string {
+	env := map[string]string{
+		"INBOX_REQUIRED": "true", "INBOX_RESULT": "success",
 		"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "",
 		"LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": "",
 	}

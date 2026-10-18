@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -18,6 +22,7 @@ jobs:
       landing: ${{ steps.paths.outputs.landing }}
       docs_only: ${{ steps.paths.outputs.docs_only }}
       docs: ${{ steps.paths.outputs.docs }}
+      inbox: ${{ steps.paths.outputs.inbox }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,11 +36,11 @@ jobs:
         shell: bash
         run: |
           route() {
-            printf 'go=%s\nlanding=%s\ndocs_only=%s\ndocs=%s\n' "$1" "$2" "${3:-false}" "${4:-false}" >> "$GITHUB_OUTPUT"
+            printf 'go=%s\nlanding=%s\ndocs_only=%s\ndocs=%s\ninbox=%s\n' "$1" "$2" "${3:-false}" "${4:-false}" "${5:-false}" >> "$GITHUB_OUTPUT"
             exit
           }
           case "$EVENT_NAME" in
-            workflow_dispatch) route true true ;;
+            workflow_dispatch) route true true false false true ;;
             push|pull_request) ;;
             *) echo "unsupported CI event: $EVENT_NAME" >&2; exit 1 ;;
           esac
@@ -44,7 +49,7 @@ jobs:
             exit 1
           fi
           if [[ "$EVENT_NAME" == push && "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
-            route true true
+            route true true false false true
           fi
           base="$BASE_SHA"
           if [[ "$EVENT_NAME" == pull_request ]] && ! base=$(git merge-base "$BASE_SHA" "$HEAD_SHA"); then
@@ -57,12 +62,13 @@ jobs:
             exit 1
           fi
           if [[ ! -s "$RUNNER_TEMP/ci-paths" ]]; then
-            route true true
+            route true true false false true
           fi
           go_required=false
           landing_required=false
           docs_found=false
           other_found=false
+          inbox_found=false
           while IFS= read -r -d '' path; do
             case "$path" in
               docs/explain/*.md|docs/conventions/ste100-writing.md) docs_found=true; other_found=true ;;
@@ -73,14 +79,15 @@ jobs:
               go/*|skills/*|agents/*) go_required=true ;;
               landing/*|docs/explain/*) landing_required=true ;;
               docs/reports/*.md|docs/research/*.md|docs/private/*.md) ;;
+              .evolve/inbox/*) inbox_found=true ;;
               *) go_required=true; landing_required=true ;;
             esac
           done < "$RUNNER_TEMP/ci-paths"
           if [[ "$EVENT_NAME" != pull_request || "$docs_found" != true ]]; then
-            route "$go_required" "$landing_required"
+            route "$go_required" "$landing_required" false false "$inbox_found"
           fi
           if [[ "$other_found" == true ]]; then
-            route "$go_required" "$landing_required" false true
+            route "$go_required" "$landing_required" false true "$inbox_found"
           fi
           route false false true true
 
@@ -99,6 +106,34 @@ jobs:
     needs: changes
     if: needs.changes.outputs.landing == 'true'
     uses: ./.github/workflows/landing-validation.yml
+
+  inbox:
+    name: inbox lint
+    needs: changes
+    if: needs.changes.outputs.inbox == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Build evolve
+        working-directory: go
+        run: go build -o "$RUNNER_TEMP/evolve" ./cmd/evolve
+      - name: Lint the inbox
+        run: |
+          status=0
+          "$RUNNER_TEMP/evolve" inbox lint 2> "$RUNNER_TEMP/inbox-lint.err" || status=$?
+          cat "$RUNNER_TEMP/inbox-lint.err" >&2
+          if grep -q ': WARN skipped ' "$RUNNER_TEMP/inbox-lint.err"; then
+            echo 'an inbox item is unreadable, so the loaders skip it' >&2
+            exit 1
+          fi
+          exit "$status"
+      - name: Tests that read the tracked inbox
+        working-directory: go
+        run: go test -count=1 ./internal/phasecoherence/
 
   ste-lint:
     name: STE lint
@@ -128,7 +163,7 @@ jobs:
 
   required:
     name: CI required
-    needs: [changes, validate, go, landing, ste-lint]
+    needs: [changes, validate, go, landing, inbox, ste-lint]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -148,6 +183,8 @@ jobs:
           LANDING_REQUIRED: ${{ needs.changes.outputs.landing }}
           LANDING_RESULT: ${{ needs.landing.result }}
           LANDING_SUITE_RESULT: ${{ needs.landing.outputs.suite_result }}
+          INBOX_REQUIRED: ${{ needs.changes.outputs.inbox }}
+          INBOX_RESULT: ${{ needs.inbox.result }}
         shell: bash
         run: |
           if [[ "$ROUTE_RESULT" != success ]]; then
@@ -161,6 +198,10 @@ jobs:
           case "$DOCS_REQUIRED:$STE_LINT_RESULT" in
             true:success|false:skipped) ;;
             *) echo "STE lint did not match the route: $DOCS_REQUIRED:$STE_LINT_RESULT" >&2; exit 1 ;;
+          esac
+          case "$INBOX_REQUIRED:$INBOX_RESULT" in
+            true:success|false:skipped) ;;
+            *) echo "inbox lint did not match the route: $INBOX_REQUIRED:$INBOX_RESULT" >&2; exit 1 ;;
           esac
           for result in "$GO_REQUIRED:$GO_RESULT:$GO_SUITE_RESULT" "$LANDING_REQUIRED:$LANDING_RESULT:$LANDING_SUITE_RESULT"; do
             case "$result" in
