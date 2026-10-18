@@ -33,11 +33,15 @@
       "claude"
     ],
     "default": [
-      "agy",
-      "agy-claude",
       "claude"
     ],
     "agents": {
+      "builder": {
+        "cli": [
+          "agy",
+          "claude"
+        ]
+      },
       "reflector": {
         "effort": "low"
       },
@@ -50,12 +54,9 @@
     },
     "tiers": {
       "deep": [
-        "agy",
-        "agy-claude",
         "claude"
       ],
       "top": [
-        "agy-claude",
         "claude"
       ]
     }

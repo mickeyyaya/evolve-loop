@@ -105,7 +105,8 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - gpt-5.6-sol is the value record of the CHANGELOG. The 2026-09-09 gpt-6-astra cutover was withdrawn the next day for token cost. Claude deep/top stay opus.
   - The resolution is policy pin > live catalog > manifest baseline. The manifest `codex-tmux.json` is the ONE tier table of the family.
 - Since 2026-10-07 the `cli_routing` table decides every dispatch:
-  - Every non-deep, non-top phase runs agy first (Gemini 3.8 Flash High at balanced). No tracked profile defaults to fast, and no tracked profile lets an envelope fall to fast.
+  - Since 2026-10-18 every chain (`default`, `tiers.deep` and `tiers.top`) is Claude Code only. The operator asked for it, to use the weekly Claude quota before its reset. The builder alone starts on agy and falls back to Claude Code (`agents.builder`). The router's `cross_family_with` rule refuses a builder that starts on the family of its graders, the auditor and the tdd-engineer.
+  - Before 2026-10-18, every non-deep, non-top phase ran agy first (Gemini 3.8 Flash High at balanced). No tracked profile defaults to fast, and no tracked profile lets an envelope fall to fast.
   - Since 2026-10-17 deep seats run agy's Gemini 4 Argon (Medium) first, then agy-owned Claude (`agy-claude-tmux`, Claude Opus 5.5), then Claude Code. The operator asked to share the deep build with Argon. Since cycle 1911 an Argon quota wall benches only the Argon model group, not all of agy. Top seats stay agy-owned Claude, then Claude Code.
   - `agy-claude-tmux` waits up to 10 s for a claude-family footer label before the prompt. If no label shows, it exits 87. Exit 87 is a walk trigger, so the seat falls through. The usage query that follows can bench an exhausted Claude group, and preflight only warns on it.
   - The claudeFamilyFloor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only.
