@@ -1,5 +1,10 @@
 package core
 
-import "encoding/json"
+import (
+	"crypto/rand"
+	"encoding/json"
+)
 
 var marshalIndentJSON = json.MarshalIndent
+
+var randRead = rand.Read

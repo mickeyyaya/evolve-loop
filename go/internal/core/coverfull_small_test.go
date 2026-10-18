@@ -362,3 +362,21 @@ func TestBackfillExhaustedArtifact_WriteFailureAndLedgerFailure(t *testing.T) {
 		t.Fatal("ledger failure is non-fatal")
 	}
 }
+
+func TestMintRunID_EntropyFailureZeroesTheRandomPart(t *testing.T) {
+	orig := randRead
+	randRead = func(b []byte) (int, error) {
+		for i := range b {
+			b[i] = 0xff
+		}
+		return 0, errors.New("entropy exhausted")
+	}
+	t.Cleanup(func() { randRead = orig })
+	got := MintRunID(time.Unix(1, 0))
+	if len(got) != 26 {
+		t.Fatalf("length %d", len(got))
+	}
+	if want := strings.Repeat("0", 16); got[10:] != want {
+		t.Fatalf("random part %q, want zeroed %q", got[10:], want)
+	}
+}

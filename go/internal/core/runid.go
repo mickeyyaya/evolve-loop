@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"crypto/rand"
 	"sync/atomic"
 	"time"
 )
@@ -17,7 +16,9 @@ func MintRunID(t time.Time) string {
 		ms >>= 5
 	}
 	var entropy [10]byte
-	_, _ = rand.Read(entropy[:])
+	if _, err := randRead(entropy[:]); err != nil {
+		entropy = [10]byte{}
+	}
 	var acc uint64
 	bits := 0
 	pos := 10

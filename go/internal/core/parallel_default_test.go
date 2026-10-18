@@ -32,6 +32,7 @@ const (
 	swapsFailureDecide              = "test swaps package variable failureDecide"
 	swapsFailureDigestMarshal       = "test swaps package variable failureDigestMarshal"
 	swapsMarshalIndentJSON          = "test swaps package variable marshalIndentJSON"
+	swapsRandRead                   = "test swaps package variable randRead"
 	swapsResumeBoundaryCheckpointer = "test swaps package variable ResumeBoundaryCheckpointer"
 	swapsGitRunner                  = "test swaps package variable gitRunner"
 	swapsIdentityPatchID            = "test swaps package variable identityPatchID"
@@ -55,6 +56,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestGitWorktree_CreateReusedWorktreeFailures":                                             swapsGitRunner,
 	"core.TestPersonaBudgetFailures_LongOutputIsTruncated":                                          swapsBuildSelfCheckRunner,
 	"core.TestMarshalFailures_AreReportedNotFatal":                                                  swapsMarshalIndentJSON,
+	"core.TestMintRunID_EntropyFailureZeroesTheRandomPart":                                          swapsRandRead,
 	"core.TestWorktreeBaseSHA_SkipsMalformedLogLines":                                               swapsGitRunner,
 	"core.TestEnsureCleanWorktree_QuarantineFailures":                                               swapsGitRunner,
 	"core.TestOriginDefaultBranch_EmptyRemoteHeadFallsBackToMain":                                   swapsGitRunner,
