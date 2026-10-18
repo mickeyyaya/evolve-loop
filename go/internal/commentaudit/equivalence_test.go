@@ -286,3 +286,47 @@ func TestEquivalent_ADocBelowABuildDirectiveMovesNoAnchor(t *testing.T) {
 		t.Fatalf("Equivalent = %v (%s), %v; want comment-only", ok, reason, err)
 	}
 }
+
+const exampleSrc = `package p_test
+
+// output: a prose line that go test does not read.
+const excerptHead = 200
+
+func helper() {
+	// Output: not inside an Example
+}
+
+func ExampleHello() {
+	// Output: hello
+}
+`
+
+func TestEquivalent_OutputMarkerCountsOnlyWhereGoTestReadsIt(t *testing.T) {
+	const acssuiteBefore = "package acssuite\n\n// output: a predicate's own t.Fatalf line prints first. The remainder\n// comes from the TAIL.\nconst excerptHead = 200\n"
+	const acssuiteAfter = "package acssuite\n\nconst excerptHead = 200\n"
+	for name, tc := range map[string]struct {
+		file, before, after string
+		want                bool
+	}{
+		"acssuite lowercase prose removed":  {"go/internal/acssuite/acssuite.go", acssuiteBefore, acssuiteAfter, true},
+		"lowercase prose in a test removed": {"x_test.go", exampleSrc, strings.Replace(exampleSrc, "// output: a prose line that go test does not read.\n", "", 1), true},
+		"output outside an Example removed": {"x_test.go", exampleSrc, strings.Replace(exampleSrc, "\t// Output: not inside an Example\n", "", 1), true},
+		"output in a non-test file removed": {"x.go", exampleSrc, strings.Replace(exampleSrc, "\t// Output: hello\n", "", 1), true},
+		"real Output edited":                {"x_test.go", exampleSrc, strings.Replace(exampleSrc, "// Output: hello", "// Output: bye", 1), false},
+		"real Output removed":               {"x_test.go", exampleSrc, strings.Replace(exampleSrc, "\t// Output: hello\n", "", 1), false},
+		"Unordered output removed":          {"x_test.go", strings.Replace(exampleSrc, "// Output: hello", "// Unordered output: hello", 1), strings.Replace(exampleSrc, "\t// Output: hello\n", "", 1), false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ok, reason, err := Equivalent(tc.file, []byte(tc.before), []byte(tc.after))
+			if err != nil || ok != tc.want {
+				t.Fatalf("Equivalent = %v (%s), %v; want %v", ok, reason, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestExampleSpans_IgnoresUnparsableSource(t *testing.T) {
+	if got := exampleSpans("x_test.go", []byte("package p\nfunc {")); got != nil {
+		t.Fatalf("exampleSpans = %v, want none", got)
+	}
+}
