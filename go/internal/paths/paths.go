@@ -119,6 +119,8 @@ func LoopStopPath(evolveDir string) string { return filepath.Join(evolveDir, Loo
 
 func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, ".evolve") }
 
+func EventChannelsRoot(evolveDir string) string { return filepath.Join(evolveDir, "events", "ch") }
+
 func RunWorkspace(projectRoot string, cycle int) string {
 	return filepath.Join(EvolveDirOf(projectRoot), "runs", "cycle-"+strconv.Itoa(cycle))
 }

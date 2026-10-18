@@ -68,11 +68,11 @@ func wireSimulateOrchestrator(projectRoot, evolveDir string, console io.Writer) 
 		runners[p] = &simulatePhase{name: p}
 	}
 
-	signals := newRootSignalCenter(projectRoot, evolveDir, console)
+	signals, closeSignals := newRoleSignalCenter(roleSimulate, projectRoot, evolveDir, console)
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 	return orchDeps{
-		Storage: st, Ledger: ld, Signals: signals,
+		Storage: st, Ledger: ld, Signals: signals, CloseSignals: closeSignals,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithSignalCenter(signals),
 			core.WithWorktreeProvisioner(simulateWorktrees{}), core.WithDossierDestination(core.DossierFilesOnly)),
 	}

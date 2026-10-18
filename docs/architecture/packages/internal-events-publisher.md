@@ -4,7 +4,7 @@
 
 `internal/events/publisher` is the Signal Center listener that appends each event to the event channels whose route matches it. It is component E6 of [ADR-0127](../adr/0127-push-only-event-channels.md). The spec of record is [event-channels.md](../event-channels.md) §1, §3, §5 and §6, and the plan is [event-notification-protocol-2026-10.md](../../plans/event-notification-protocol-2026-10.md) §7 and §10.
 
-The package is unwired. No production code calls it yet. Component E10 subscribes it at each root through `newRootSignalCenter(role)`, and component E7 gives it the channel catalog and the queue keys from `policy.json`.
+Component E10 wires the package: `internal/events/rootwire` subscribes it at each root and returns the closer ([internal-events-rootwire.md](internal-events-rootwire.md)). Component E7 gives it the channel catalog and the queue keys from `policy.json`. Until then, `policy.EventsDefaults()` holds the compiled defaults.
 
 The package uses two other packages:
 
@@ -16,7 +16,7 @@ The package uses two other packages:
 | Export | What it does |
 |---|---|
 | `New(Config) (*Publisher, error)` | parses the routes, opens the channel logs and starts one writer goroutine for each `best_effort` channel. It reads no environment. |
-| `Config` | `Root` (the `ch` directory), `Role` (the record `source`), `Dispatch` (the `EVOLVE_DISPATCH_ID` that E10 reads) and `Channels`. Also `Log` (the default segment size and the lock deadline), `QueueEvents`, `QueueBytes` and `EnqueueDeadline`. |
+| `Config` | `Root` (the `ch` directory), `Role` (the record `source`), `Dispatch` (the `EVOLVE_DISPATCH_ID` that `rootwire` reads) and `Channels`. Also `Log` (the default segment size and the lock deadline), `QueueEvents`, `QueueBytes` and `EnqueueDeadline`. |
 | `Channel` | `Name`, `Route` (a filter expression; empty selects every event), `QoS` and `SegmentBytes` (0 uses `Config.Log.SegmentBytes`) |
 | `Roles() []string` | the closed set of roles of the spec §1: `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate`, `phase-observer`, `wave`, `inbox`, `ci` and `subscriber` |
 | `QoS`, `QoSLossless`, `QoSBestEffort` | the two QoS classes of §6 |
@@ -57,6 +57,8 @@ The package uses two other packages:
 - **`Close(deadline)`.** It stops each writer. A writer appends the queue in batches until the queue is empty or the deadline passes. It does not start a batch after the deadline. An append that started before the deadline ends within the lock deadline. The records left in the queue are a `queue_full` loss.
 
   Then `Close` writes the pending gap records of each channel if the deadline has not passed. It returns the sum of the losses that are still pending. A second `Close` tries the pending gap records again. An event after `Close` is a `lossless` append, or a `queue_full` loss on a `best_effort` channel.
+
+  The deadline bounds the lock waits only. `Close` waits for each writer goroutine with no timeout (`awaitWriter` in `queue.go`). A `write` that hangs in the kernel thus holds `Close`. This is an accepted limit (spec §6 and Limits).
 
 ## Invariants
 

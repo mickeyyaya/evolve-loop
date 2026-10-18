@@ -11,7 +11,7 @@
 - the start of a read (`Since`, `ParseSince`);
 - the result of a read (`Item`, `Item.ID`) and the two ends of a call (`ErrDeadline`, `ErrHangup`).
 
-Nothing in production calls the package yet. The CLI (E9) and the subscriptions (E8) use it, and E10 wires them.
+Nothing in production calls the package yet. The CLI (E9), the subscriptions (E8) and the oversight loop of the wave orchestrator use it. E10 wires the writer side only.
 
 ## Design
 
@@ -48,7 +48,7 @@ Nothing in production calls the package yet. The CLI (E9) and the subscriptions 
 - **The second read.** After each arm that adds a live loop, the reader reads `proc_start` again. `ESRCH` or another value marks the loop as lost. A `loop.started` record after the seed gets no first read: it is live at once, and the arm and the second read decide.
 - **A decision first catches up `loop`.** An exit wake and a failed second read only mark a loop. The next catch-up reads the `loop` channel to its end, and a `loop.exit` from the same source and pid ends the loop with no loss. Only then does the reader make `loop.lost`.
 - **`loop.lost`** has the source `watch`, the module `loop`, the code `LOOP_LOST` and the severity `INCIDENT`. Its origin is `events.reader`, and it has the pid and the run id of the loop. Its fields are `pid`, `run_id` and `exit`, and `historical` for a history record. `exit` is `unknown` when an `INCIDENT` gap from the same source and pid follows the `loop.started` record. Else it is `crash`.
-- **Kinds are data.** `loop.started`, `loop.exit` and `loop.lost` are not registered yet (E11 registers them). The reader compares the kind text, so it does not depend on the registry.
+- **Kinds are registered.** Since E11 (2026-10-18), `go/internal/signalcenter` registers `loop.started`, `loop.exit` and `loop.lost`, and it registers the code `LOOP_LOST`. The reader uses these constants. A filter can name `loop.lost` (`TestRegistry_NewKindsAndCodesAreRegistered`).
 
 ## Invariants
 

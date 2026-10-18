@@ -89,8 +89,11 @@ func TestWorktreeShipLand_BinaryResetFailureIsTheLandingCodeNotStderr(t *testing
 	if strings.Contains(stderr.String(), "could not reset go/evolve") {
 		t.Errorf("the raw stderr line is gone (replaced by the code):\n%s", stderr.String())
 	}
-	if len(*got) != 1 || (*got)[0].Code != landing.CodeBinaryResetFailed || (*got)[0].Phase != phaseName || (*got)[0].Cycle != 7 || (*got)[0].RunID != "run-7" {
-		t.Errorf("the Center sees the landing code under the ship phase with the run identity: %+v", *got)
+	if len(*got) != 2 || (*got)[0].Code != landing.CodeBinaryResetFailed || (*got)[0].Phase != phaseName || (*got)[0].Cycle != 7 || (*got)[0].RunID != "run-7" {
+		t.Errorf("the Center sees the landing code under the ship phase with the run identity, then the landing: %+v", *got)
+	}
+	if (*got)[1].Kind != signalcenter.KindShipLanded {
+		t.Errorf("the second event is %q, want ship.landed: a failed binary reset does not stop the landing", (*got)[1].Kind)
 	}
 	if !strings.Contains(strings.Join(r.argvs(), "\n"), "checkout HEAD -- go/evolve [discard]\nmerge --ff-only "+pinHead+" [streams]") {
 		t.Errorf("the merge still runs after the failed reset: %v", r.argvs())
@@ -156,8 +159,8 @@ func TestShipFromWorktreeGreen_StreamIsByteIdenticalApartFromTheDeclaredCodes(t 
 	if res.CommitSHA != pinHead || !containsLog(*res, "[ship] OK: pushed to origin/main") {
 		t.Errorf("the ship landed: %+v", res)
 	}
-	if len(*got) != 0 {
-		t.Errorf("a green ship emits nothing from module ship: %+v", *got)
+	if len(*got) != 1 || (*got)[0].Kind != signalcenter.KindShipLanded || (*got)[0].Severity != signalcenter.SeverityInfo || (*got)[0].Code != "" {
+		t.Errorf("a green ship emits one INFO ship.landed and no warning or error: %+v", *got)
 	}
 }
 

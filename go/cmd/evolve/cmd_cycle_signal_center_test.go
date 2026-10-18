@@ -170,19 +170,6 @@ func TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly(t *testing.T) {
 	}
 }
 
-func TestSignalCenterFlush_IsWiredAtBothRoots(t *testing.T) {
-	t.Parallel()
-	for file, needle := range map[string]string{"cmd_cycle.go": "Signals.Flush()", "cmd_loop.go": "Signals.Flush()", "cmd_loop_chain.go": "signals.Flush()"} {
-		src, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.Contains(string(src), needle) {
-			t.Errorf("%s: the root must defer %s after wiring its Center", file, needle)
-		}
-	}
-}
-
 func TestWireOrchestratorDeps_SignalCenterReachesTheBridge(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

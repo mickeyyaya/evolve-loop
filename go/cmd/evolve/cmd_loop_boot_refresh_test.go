@@ -556,3 +556,37 @@ func TestBootBinaryRefresh_NoConcurrentLaneProceedsNormally(t *testing.T) {
 		t.Fatalf("no concurrent lane must preserve the existing rebuild+exec behavior: res=%+v spy=%+v", res, spy)
 	}
 }
+
+func TestBootBinaryRefresh_AnUnresolvableHeadSkipsTheStalenessCheckAndRetiresNothing(t *testing.T) {
+	swapBinaryCommit(t, "abc123def456")
+	spy := swapRefreshSeams(t, "", os.ErrInvalid, true, nil, nil, nil)
+	retired := 0
+	cfg := loopConfig{ProjectRoot: "/proj", EvolveDir: t.TempDir()}.retiring(func() { retired++ })
+	var errBuf bytes.Buffer
+
+	res := bootBinaryRefresh(cfg, &errBuf)
+
+	if res.Stale || res.Rebuilt || spy.deltaCalls != 0 || spy.rebuildCalls != 0 || spy.execCalls != 0 || retired != 0 {
+		t.Errorf("res=%+v spy=%+v retired=%d, want the check skipped: no delta read, no rebuild, no exec, and the Centers kept", res, spy, retired)
+	}
+	if !strings.Contains(errBuf.String(), "cannot resolve HEAD") {
+		t.Errorf("stderr = %q, want the skip named", errBuf.String())
+	}
+}
+
+func TestBootBinaryRefresh_AnUnverifiableDeltaBootsAsIsAndRetiresNothing(t *testing.T) {
+	swapBinaryCommit(t, "abc123def456")
+	spy := swapRefreshSeams(t, "eeee23def456fffffffffffffffffffffffffff0", nil, false, os.ErrInvalid, nil, nil)
+	retired := 0
+	cfg := loopConfig{ProjectRoot: "/proj", EvolveDir: t.TempDir()}.retiring(func() { retired++ })
+	var errBuf bytes.Buffer
+
+	res := bootBinaryRefresh(cfg, &errBuf)
+
+	if res.Stale || res.Rebuilt || spy.rebuildCalls != 0 || spy.execCalls != 0 || retired != 0 {
+		t.Errorf("res=%+v spy=%+v retired=%d, want the old binary kept: no rebuild, no exec, and the Centers kept", res, spy, retired)
+	}
+	if !strings.Contains(errBuf.String(), "unverifiable") {
+		t.Errorf("stderr = %q, want the unverifiable delta named", errBuf.String())
+	}
+}

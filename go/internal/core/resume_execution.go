@@ -116,6 +116,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 			return result, fmt.Errorf("write cycle-state pre-%s: %w", next, err)
 		}
+		o.emitPhaseDispatched(cycle, cs.RunID, next)
 
 		if resumePoint.StatePath != "" && ResumeBoundaryCheckpointer != nil {
 			if err := ResumeBoundaryCheckpointer(cs, req.ProjectRoot, o.now()); err != nil {
