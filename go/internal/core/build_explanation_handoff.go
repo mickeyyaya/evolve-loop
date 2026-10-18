@@ -110,25 +110,16 @@ func requireResumeExplanationIdentity(projectRoot, workspace string, authoritati
 	if authoritativeCycle <= 0 || checkpointCycle != 0 && checkpointCycle != authoritativeCycle {
 		return fmt.Errorf("resume identity mismatch: checkpoint/cycle-state cycle does not match the authoritative host cycle")
 	}
-	host, active, err := explanationdocs.ActivationForCycle(projectRoot, authoritativeCycle, workspace)
+	typed := explanationBinding(projectRoot, cs)
+	typed.Workspace, typed.Cycle = workspace, authoritativeCycle
+	hostActive, err := explanationdocs.CrossCheckActivation(typed)
 	if err != nil {
-		return fmt.Errorf("resume Build explanation activation: %w", err)
+		return fmt.Errorf("resume identity mismatch: %w", err)
 	}
-	if !active {
-		if cs.ExplanationDocumentationVersion == 0 {
-			return nil
-		}
-		return fmt.Errorf("resume Build explanation activation: no host marker matches workspace %q", workspace)
+	if hostActive && cs.CycleID != authoritativeCycle {
+		return fmt.Errorf("resume identity mismatch: cycle-state cycle %d does not match the authoritative host cycle %d", cs.CycleID, authoritativeCycle)
 	}
-	if authoritativeCycle != host.Cycle || cs.CycleID != host.Cycle ||
-		cs.RunID != host.RunID || cs.ExplanationDocumentationVersion != host.ContractVersion ||
-		filepath.Clean(cs.WorkspacePath) != filepath.Clean(host.Workspace) {
-		return fmt.Errorf("resume identity mismatch: checkpoint/cycle-state identity does not match host Build explanation activation")
-	}
-	if host.Worktree != "" && (filepath.Clean(cs.ActiveWorktree) != filepath.Clean(host.Worktree) || cs.WorktreeBaseSHA != host.BaseSHA) {
-		return fmt.Errorf("resume identity mismatch: worktree/base does not match host Build explanation activation")
-	}
-	return explanationdocs.RequireActivation(host)
+	return nil
 }
 
 func sealBuildExplanationContext(projectRoot string, cs CycleState) error {

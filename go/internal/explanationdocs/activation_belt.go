@@ -30,8 +30,8 @@ func CrossCheckActivation(typed CycleBinding) (bool, error) {
 		{"run id", typed.RunID != host.RunID},
 		{"contract version", typed.ContractVersion != host.ContractVersion},
 		{"workspace", !sameWorkspacePath(typed.Workspace, host.Workspace)},
-		{"worktree", typed.Worktree != host.Worktree},
-		{"base SHA", typed.BaseSHA != host.BaseSHA},
+		{"worktree", host.Worktree != "" && typed.Worktree != host.Worktree},
+		{"base SHA", host.BaseSHA != "" && typed.BaseSHA != host.BaseSHA},
 	} {
 		if f.mismatch {
 			return false, fmt.Errorf("typed %s does not match host activation", f.name)

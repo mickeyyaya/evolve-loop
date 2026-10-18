@@ -14,7 +14,7 @@ import (
 )
 
 func validateExplanationReview(report string, req core.PhaseRequest) (advisories []string, err error) {
-	if req.ExplanationDocumentationVersion == 0 {
+	if req.ExplanationDocumentationVersion == 0 && req.BuildExplanationState != core.BuildExplanationInvalid {
 		return nil, nil
 	}
 	if req.BuildExplanationState == core.BuildExplanationNotYetBuilt {

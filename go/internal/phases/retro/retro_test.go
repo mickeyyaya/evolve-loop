@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
@@ -393,6 +394,176 @@ func TestRefreshExplanationHandoff_PostBuildMissingSnapshotBecomesInvalid(t *tes
 	})
 	if req.BuildExplanationState != core.BuildExplanationInvalid || req.BuildExplanation != nil || req.BuildExplanationError == "" {
 		t.Fatalf("missing post-Build snapshot handoff=%+v", req)
+	}
+}
+
+func TestRefreshExplanationHandoff_AZeroVersionAgainstAnActiveHostBecomesInvalid(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	binding := explanationdocs.CycleBinding{
+		ProjectRoot: root, Worktree: t.TempDir(), Workspace: workspace,
+		BaseSHA: strings.Repeat("a", 40), Cycle: 42, RunID: "run-42",
+		ContractVersion: explanationdocs.CurrentContractVersion,
+	}
+	if err := explanationdocs.Activate(binding); err != nil {
+		t.Fatal(err)
+	}
+	if err := explanationdocs.SealBuild(binding); err != nil {
+		t.Fatal(err)
+	}
+	dropped := refreshExplanationHandoff(context.Background(), core.PhaseRequest{
+		Cycle: 42, RunID: "run-42", ProjectRoot: root, Worktree: binding.Worktree,
+		Workspace: workspace, WorktreeBaseSHA: binding.BaseSHA,
+		BuildExplanationState: core.BuildExplanationLegacy,
+	})
+	if dropped.BuildExplanationState != core.BuildExplanationInvalid || !strings.Contains(dropped.BuildExplanationError, "contract version") {
+		t.Fatalf("a dropped version against an active host was not degraded: %+v", dropped)
+	}
+	if _, err := validateExplanationReview("# Retrospective\n", dropped); err == nil {
+		t.Fatal("the review gate must not skip an invalid handoff because its typed version is zero")
+	}
+
+	legacy := refreshExplanationHandoff(context.Background(), core.PhaseRequest{
+		Cycle: 7, RunID: "run-7", ProjectRoot: root, Workspace: filepath.Join(root, ".evolve", "runs", "cycle-7"),
+	})
+	if legacy.BuildExplanationState != core.BuildExplanationLegacy || legacy.BuildExplanationError != "" {
+		t.Fatalf("a zero version with no host activation is genuine legacy: %+v", legacy)
+	}
+	if _, err := validateExplanationReview("# Retrospective\n", legacy); err != nil {
+		t.Fatalf("a legacy cycle needs no review: %v", err)
+	}
+}
+
+func TestValidateExplanationReview_AnInvalidHandoffAtVersionZeroWalksTheCorrectionPath(t *testing.T) {
+	workspace := t.TempDir()
+	invalid := core.PhaseRequest{
+		Workspace:             workspace,
+		BuildExplanationState: core.BuildExplanationInvalid,
+		BuildExplanationError: "typed contract version does not match host activation",
+	}
+	verified := "## Explanation Documentation Review\n- Status: VERIFIED\n- Evidence: the handoff matched the diff at config/app.yaml:1\n- Correction todo: none\n"
+	if advisories, err := validateExplanationReview(verified, invalid); err != nil || !strings.Contains(strings.Join(advisories, "\n"), "missing Build explanation requires NEEDS_CORRECTION") {
+		t.Fatalf("an invalid handoff at version zero must demand NEEDS_CORRECTION: advisories=%v err=%v", advisories, err)
+	}
+	sidecar := `[{"id":"fix-build-explanation","action":"Regenerate the base-bound Build explanation"}]`
+	if err := os.WriteFile(filepath.Join(workspace, "carryover-todos.json"), []byte(sidecar), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	corrected := "## Explanation Documentation Review\n- Status: NEEDS_CORRECTION\n- Evidence: the host reported that the typed contract version does not match its activation\n- Correction todo: fix-build-explanation\n"
+	if advisories, err := validateExplanationReview(corrected, invalid); err != nil || len(advisories) != 0 {
+		t.Fatalf("a concrete, backed NEEDS_CORRECTION review of an invalid handoff at version zero must pass clean: advisories=%v err=%v", advisories, err)
+	}
+}
+
+func TestRefreshExplanationHandoff_AFailBeforeTheBuildSealKeepsNotYetBuilt(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := explanationdocs.Activate(explanationdocs.CycleBinding{
+		ProjectRoot: root, Workspace: workspace, Cycle: 42, RunID: "run-42",
+		ContractVersion: explanationdocs.CurrentContractVersion,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	req := refreshExplanationHandoff(context.Background(), core.PhaseRequest{
+		Cycle: 42, RunID: "run-42", ProjectRoot: root, Worktree: t.TempDir(),
+		Workspace: workspace, WorktreeBaseSHA: strings.Repeat("b", 40),
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationNotYetBuilt,
+	})
+	if req.BuildExplanationState != core.BuildExplanationNotYetBuilt || req.BuildExplanationError != "" {
+		t.Fatalf("a provisioned worktree before the Build seal is not a host mismatch: %+v", req)
+	}
+}
+
+func verifiedExplanationDocument(base string) string {
+	return "# Build Explanation — Cycle 42\n\n## Build Binding\n- Cycle: 42\n- Base SHA: " + base + "\n\n" +
+		"## Summary\nEnable the application through its existing configuration field.\n\n" +
+		"## Rationale\nUsing the existing field is the smallest compatible behavior change and avoids a second configuration surface.\n\n" +
+		"## Changed Areas\n- `config/app.yaml` — flips the existing runtime setting while preserving its schema.\n\n" +
+		"## Design Decisions\nThe existing YAML setting remains the only public control for this behavior.\n\n" +
+		"## Verification\nThe targeted configuration tests exercise both enabled and disabled behavior.\n\n" +
+		"## Compatibility\nThe schema and setting name remain unchanged.\n\n" +
+		"## Limitations\nThis does not add per-user configuration.\n"
+}
+
+func sealedExplanationFixture(t *testing.T) (explanationdocs.CycleBinding, *phaseio.ExplanationView) {
+	t.Helper()
+	repo := gittest.Fixture(t)
+	root, worktree := t.TempDir(), repo.Dir
+	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
+	if err := os.MkdirAll(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(dir, rel, body string) {
+		t.Helper()
+		path := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(worktree, "config/app.yaml", "enabled: false\n")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
+	base := repo.Git("rev-parse", "HEAD")
+	binding := explanationdocs.CycleBinding{
+		ProjectRoot: root, Worktree: worktree, Workspace: workspace, BaseSHA: base,
+		Cycle: 42, RunID: "run-42", ContractVersion: explanationdocs.CurrentContractVersion,
+	}
+	activation := binding
+	activation.Worktree, activation.BaseSHA = "", ""
+	if err := explanationdocs.Activate(activation); err != nil {
+		t.Fatal(err)
+	}
+	if err := explanationdocs.SealBuild(binding); err != nil {
+		t.Fatal(err)
+	}
+	document, err := explanationdocs.DocumentPath(binding.Cycle, binding.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(worktree, "config/app.yaml", "enabled: true\n")
+	write(worktree, document, verifiedExplanationDocument(base))
+	write(workspace, "build-report.md", "# Build Report\n\n## Explanation Documentation\n- Status: REQUIRED\n- Document: "+document+"\n")
+	if failures := explanationdocs.CheckBuild(context.Background(), binding); len(failures) != 0 {
+		t.Fatal(failures)
+	}
+	if err := explanationdocs.SealResult(context.Background(), binding); err != nil {
+		t.Fatal(err)
+	}
+	view, err := explanationdocs.LoadSnapshot(binding)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return binding, view
+}
+
+func TestRefreshExplanationHandoff_AVerifiedHandoffStaysAvailableAndAForeignViewIsInvalid(t *testing.T) {
+	binding, view := sealedExplanationFixture(t)
+	request := func(view *phaseio.ExplanationView) core.PhaseRequest {
+		return core.PhaseRequest{
+			Cycle: binding.Cycle, RunID: binding.RunID, ProjectRoot: binding.ProjectRoot, Worktree: binding.Worktree,
+			Workspace: binding.Workspace, WorktreeBaseSHA: binding.BaseSHA,
+			ExplanationDocumentationVersion: binding.ContractVersion,
+			BuildExplanationState:           core.BuildExplanationAvailable,
+			BuildExplanation:                view,
+		}
+	}
+	verified := refreshExplanationHandoff(context.Background(), request(view))
+	if verified.BuildExplanationState != core.BuildExplanationAvailable || verified.BuildExplanationError != "" || !explanationdocs.SameView(verified.BuildExplanation, view) {
+		t.Fatalf("a verified handoff was not kept: %+v", verified)
+	}
+	foreign := refreshExplanationHandoff(context.Background(), request(&phaseio.ExplanationView{Status: "required"}))
+	if foreign.BuildExplanationState != core.BuildExplanationInvalid || foreign.BuildExplanation != nil || !strings.Contains(foreign.BuildExplanationError, "does not match verified host snapshot") {
+		t.Fatalf("a foreign typed view was accepted: %+v", foreign)
 	}
 }
 
