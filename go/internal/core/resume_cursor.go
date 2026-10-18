@@ -41,6 +41,11 @@ func (c *resumeCursor) schedule(next Phase) {
 	c.scheduledNext = next
 }
 
+func (c *resumeCursor) rerouteFromShip(to Phase) {
+	c.current = PhaseShip
+	c.scheduledNext = to
+}
+
 func (c *resumeCursor) finish() {
 	c.reachedEnd = true
 }

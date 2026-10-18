@@ -68,6 +68,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestApplyPostReviewGuards_AnExecutableOutsideTheMainTreeOrUnknownLeavesNoRelativeBinary":  swapsPostReviewExecutable,
 	"core.TestApplyPostReviewGuards_TheKnownGoEvolvePathIsNotDiscardedTwice":                        swapsPostReviewExecutable,
 	"core.TestLaneStartRef_RetriesRefLockContention":                                                swapsGitRunner,
+	"core.TestBaseBehindMain_WithNoWorktreeNeverRunsGit":                                            swapsGitRunner,
 	"core.TestCoverfixS2_UnresolvablePathsSurfaceAsRefusalNotSuccess":                               swapsAbsPath + "; " + swapsWorkingDir,
 	"core.TestExecuteRetryBackoff_AppliedOnAttempt2":                                                swapsBackoffSleep,
 	"core.TestExecuteRetryBackoff_ZeroBaseDisables":                                                 swapsBackoffSleep,

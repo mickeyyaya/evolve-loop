@@ -11,6 +11,7 @@
 - **Distinct codes.** A failure that a router must treat differently has its own code, not an alias of a broader one. Examples: a fleet fast-forward divergence is transient, because a clean rebase and re-audit fixes it. A fleet rebase conflict is an integrity blocker. A manifest refusal is not a retryable git stage failure. A repo-contract red is not a test-infrastructure death, which is retry-safe.
 - **Debug map.** `NewShipError` keeps an odd trailing key with an empty value, because a lost diagnostic key is worse than a blank one. `DebugString` sorts the keys, so ledger output is deterministic.
 - **Signal projection.** Each code projects into the Signal Center as `SHIP_<code>`. The integrity class is an incident, and every other class is a warning. `SignalDebugKeys` is the whitelist of debug keys that reach the signal line. The rest stays in `ship-error.json`.
+- **Rewritten codes.** The key `original_code` carries the code that a host rewrote before recovery. It is on the whitelist, so the signal line keeps it. Pinned by `TestShipErr_StepKeyAndSignalDebugKeys`.
 - **Source-derived tests.** The vocabulary tests parse `shiperr.go` for the declared constants. A new code or class therefore cannot go undocumented or unregistered.
 
 ## Invariants

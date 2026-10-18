@@ -22,7 +22,7 @@ enumerating every recovery hook a retry loop may run:
 | `backfill` | reconstruct the artifact from `stdout.clean.txt` after an `ErrArtifactTimeout` exhaustion | ✅ | ✖ | ✖ (writes the workspace; the batch runs concurrently) |
 | `optionalInfraSkip` | optional, off-floor phase with an infra-shaped exhaustion degrades to WARN | ✅ | ✅ | ✅ |
 | `postShipObserverSkip` | best-effort post-ship Control observer's failure degrades to WARN | ✅ | ✅ | ✅ |
-| `shipRecovery` | route a structured `ShipError` to the advisor's recovery chain | ✅ | ✖ | ✖ (rewrites the loop cursor; an evaluate batch never contains ship) |
+| `shipRecovery` | route a structured `ShipError` to the advisor's recovery chain | ✅ | ✖ (the loop calls `recoverResumedShip` after the dispatch) | ✖ (rewrites the loop cursor; an evaluate batch never contains ship) |
 
 A `nil` field means "this path does not run that hook" — divergence declared and
 inspectable, rather than implicit and discoverable only by diffing two loops.
@@ -35,6 +35,20 @@ reaches the resume loop without a second edit.
 The resume loop reads the ship latch from its checkpoint (`CycleState.Shipped`).
 A best-effort observer that fails after Ship on a resumed cycle therefore
 degrades to WARN, as it does on a fresh cycle.
+
+The resume loop does not need the `shipRecovery` hook.
+It calls `recoverResumedShip` (`go/internal/core/resume_ship_recovery.go`)
+when a dispatch returns a ship error.
+The call runs the recovery ladder of the fresh loop.
+The loop then reroutes its own cursor to the phase that the ladder picks.
+The allowed phases are Build, Audit and Ship.
+A ladder route to any other phase ends the cycle with the ship error.
+
+A resumed ship that finds main past the checkpoint base returns
+`GIT_FF_MERGE_DIVERGED`, because `evolve loop --resume` does not run in the fleet.
+`staleBaseAsRebase` changes that code to `GIT_FLEET_REBASE_NEEDED`
+when the base is behind `main`.
+The ladder then rebases the lane and verifies it again before the next ship.
 
 `retryPhaseRunner` is the shared retry core.
 `dispatchRunnerWithRetry` is a one-line delegation to it.
