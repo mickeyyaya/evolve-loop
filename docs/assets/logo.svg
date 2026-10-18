@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="evolve-loop-logo-title">
+  <title id="evolve-loop-logo-title">Evolve Loop</title>
+  <defs>
+    <linearGradient id="evolve-loop-ring" x1="40" y1="40" x2="216" y2="216" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#06B6D4"/>
+      <stop offset="0.5" stop-color="#0A84FF"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="evolve-loop-spark" x1="100" y1="100" x2="156" y2="156" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A84FF"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#evolve-loop-ring)" stroke-linecap="round">
+    <path d="M153.96 48.11 A84 84 0 0 1 212 128" stroke-width="10"/>
+    <path d="M207.89 153.96 A84 84 0 0 1 128 212" stroke-width="14"/>
+    <path d="M102.04 207.89 A84 84 0 0 1 44 128" stroke-width="18"/>
+    <path d="M48.11 102.04 A84 84 0 0 1 99.27 49.07" stroke-width="22"/>
+  </g>
+  <path d="M123.7 40.18 L106.11 67.86 L92.43 30.28 Z" fill="url(#evolve-loop-ring)" stroke="url(#evolve-loop-ring)" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M128 98 Q131.6 124.4 158 128 Q131.6 131.6 128 158 Q124.4 131.6 98 128 Q124.4 124.4 128 98 Z" fill="url(#evolve-loop-spark)"/>
+</svg>
