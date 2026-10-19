@@ -23,3 +23,5 @@ docs/private/ export-ignore
 # Append-only registries: parallel fleet lanes each add a line, and a union
 # merge keeps both instead of a rebase conflict (wave 21, cycle 1725).
 go/.apicover-enforce merge=union
+
+docs/history/code-comments/*.md merge=union

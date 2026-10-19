@@ -117,6 +117,11 @@ func Sites(root string, files []string) (map[string]int, error) {
 	return inits, nil
 }
 
+func isCommitMessageFlag(e ast.Expr) bool {
+	lit, ok := e.(*ast.BasicLit)
+	return ok && isString(lit, "-m")
+}
+
 func scanFile(p string) (hasGit bool, inits int, err error) {
 	src, err := os.ReadFile(p)
 	if err != nil {
@@ -136,10 +141,15 @@ func scanFile(p string) (hasGit bool, inits int, err error) {
 		case *ast.CompositeLit:
 			args = n.Elts
 		}
-		for _, arg := range args {
-			if lit, ok := arg.(*ast.BasicLit); ok && isString(lit, "init") {
-				inits++
+		for i, arg := range args {
+			lit, ok := arg.(*ast.BasicLit)
+			if !ok || !isString(lit, "init") {
+				continue
 			}
+			if i > 0 && isCommitMessageFlag(args[i-1]) {
+				continue
+			}
+			inits++
 		}
 		return true
 	})

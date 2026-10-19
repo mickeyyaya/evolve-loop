@@ -66,6 +66,7 @@ When a change alters the design or an invariant of a package, it updates the des
 - `evolve comments history -base <ref> [-label L] [-out DIR] [dir ...]` records the history that the change removes.
   - It records each removed comment group that carries history (the `check` rule), as it was, with its file, its line and the declaration below it. It appends them as a labelled section to `docs/history/code-comments/<dir>.md`. Without `-out`, it prints the section. A relative `-out` resolves against the repository root.
   - The anchor is the code below the comment, never another comment or a trailing one.
+  - `.gitattributes` sets `merge=union` on `docs/history/code-comments/*.md`. Two branches that archive into different pages, or append a section to the same page, merge with no conflict. The index keeps every page row.
   - A group that shows up again whole elsewhere in the change is a move, and the command does not record it. In a file, the match is first by the full text and the code below it, then by the text alone. Across files, the match is by the text alone. Thus the same group, removed from one file and newly written in another, reads as a move.
   - The command records a group that is reworded, split or merged as it was.
   - Every run rewrites the page's `README.md` index from the pages. The command refuses a label that is already on a target page, so it records a change once.

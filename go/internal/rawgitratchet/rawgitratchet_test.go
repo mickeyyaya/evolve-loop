@@ -62,3 +62,31 @@ func TestScan_BindsFilesSitesAndBaselineFromOneRoot(t *testing.T) {
 		t.Error("Scan without a baseline must fail loudly")
 	}
 }
+
+func TestScanFile_CommitMessageNamedInitIsNotARepoInit(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want int
+	}{
+		{"commit message", `r.Git("commit", "-q", "-m", "init")`, 0},
+		{"raw init", `exec.Command("git", "init")`, 1},
+		{"both", `exec.Command("git", "init"); r.Git("commit", "-m", "init")`, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := filepath.Join(t.TempDir(), "x_test.go")
+			src := "package p\n\nfunc f() { " + tc.body + " }\n"
+			if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, got, err := scanFile(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tc.want {
+				t.Errorf("init sites = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
