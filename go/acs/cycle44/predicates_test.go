@@ -82,9 +82,6 @@ func TestC44_005_ShipReleaseNotesIPCPreserved(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
 	f := filepath.Join(root, "go", "internal", "releasepipeline", "releasepipeline.go")
-	// The split-const form: "EVOLVE_" + "SHIP_RELEASE_NOTES" (with spaces around +)
-	// or "EVOLVE_"+"SHIP_RELEASE_NOTES" (no spaces). Either form satisfies the IPC preservation.
-	// Check for the SSOT IPC-protocol-allowed comment which Builder must add alongside the split-const.
 	if !acsassert.FileContains(t, f, "SSOT IPC-protocol-allowed") {
 		t.Errorf("RED: releasepipeline.go does not contain the required SSOT IPC-protocol-allowed comment.\n"+
 			"Builder must add: // SSOT IPC-protocol-allowed: releasepipeline → evolve-ship subprocess\n"+

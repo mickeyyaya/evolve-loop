@@ -95,20 +95,7 @@ func TestC28_005_DispatchConfigStructExistsInPolicy(t *testing.T) {
 	}
 }
 
-// TestC28_006_DispatchDepthSplitConstHasProtocolComment verifies that the
-// dispatchDepthEnv const in go/internal/subagent/recursion.go carries the
-// required protocol comment marking it as a legitimate IPC split-const.
-//
-// Covers AC6. The comment "SSOT IPC-protocol-allowed:" marks this const as the
-// canonical IPC handoff name for the parent→child recursion-depth contract —
-// allowing the flagreaders guard to recognize it as a split-const (not a stale
-// env read) and exempting it from the env-reader ban.
-//
 // acs-predicate: config-check
-//
-// RED: recursion.go has `dispatchDepthEnv = "EVOLVE_DISPATCH_DEPTH"` as a bare
-// const without the SSOT IPC-protocol-allowed comment. The const is live
-// (required for IPC), but the protocol annotation is missing.
 func TestC28_006_DispatchDepthSplitConstHasProtocolComment(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)

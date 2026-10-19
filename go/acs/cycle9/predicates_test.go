@@ -90,17 +90,6 @@ func TestC9_006_TestExecutorOsGetenvGoneFromSubagentCmd(t *testing.T) {
 	}
 }
 
-// TestC9_007_WorkerTokenConstIsSplitForm verifies that the standalone string
-// literal "EVOLVE_FANOUT_WORKER_TOKEN" has been removed from recursion.go.
-//
-// The IPC protocol flag WORKER_TOKEN is allowed to use the split-const form
-// (per SSOT §IPC-protocol-allowed): FanoutWorkerTokenEnv = "EVOLVE_" + "FANOUT_WORKER_TOKEN".
-// The split form is NOT extracted by the flagreaders guard's Go AST scanner
-// (which only extracts BasicLit tokens matching the complete flag name pattern).
-//
-// // acs-predicate: config-check — verifies structural code change (const form).
-//
-// RED: recursion.go:33 currently has fanoutWorkerTokenEnv = "EVOLVE_FANOUT_WORKER_TOKEN" (standalone literal).
 func TestC9_007_WorkerTokenConstIsSplitForm(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
