@@ -76,6 +76,8 @@ func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runCycleOutputs(args[1:], stdout, stderr)
 	case "scope-delta":
 		return runCycleScopeDelta(args[1:], stdout, stderr)
+	case "reaudit":
+		return runCycleReaudit(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve cycle: unknown subcommand %q\n", args[0])
 		return 10

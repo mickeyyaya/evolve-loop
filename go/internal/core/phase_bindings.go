@@ -81,38 +81,15 @@ func auditBindingExitCode(verdict string) int {
 }
 
 func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projectRoot, workspace, worktree, worktreeBase, verdict string) {
-	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
+	entry, err := auditBindingEntry(ctx, projectRoot, workspace, worktree, worktreeBase, verdict)
 	if err != nil {
-		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding: git rev-parse HEAD failed: %v (ship will refuse to bind)\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding: %v\n", err)
 		return
 	}
-	worktreeTree := worktreeContentSHA(ctx, projectRoot, worktree, workspace)
-	diff, code, err := gitCapture(ctx, projectRoot, "diff", "HEAD")
-	if err != nil || code > 1 {
-		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding: git diff HEAD failed (rc=%d): %v\n", code, err)
-		return
-	}
-	treeSum := sha256.Sum256([]byte(diff))
-	artPath := filepath.Join(workspace, phasecontract.ArtifactFilename(string(PhaseAudit)))
-	artBytes, err := os.ReadFile(artPath)
-	if err != nil {
-		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding: read %s: %v\n", artPath, err)
-		return
-	}
-	artSum := sha256.Sum256(artBytes)
-	if err := o.ledger.Append(ctx, LedgerEntry{
-		TS:              o.now().UTC().Format(time.RFC3339),
-		Cycle:           cycle,
-		Role:            "auditor",
-		Kind:            "agent_subprocess",
-		ExitCode:        auditBindingExitCode(verdict),
-		GitHEAD:         strings.TrimSpace(head),
-		TreeStateSHA:    hex.EncodeToString(treeSum[:]),
-		WorktreeTreeSHA: worktreeTree,
-		WorktreeBaseSHA: worktreeBase,
-		ArtifactPath:    artPath,
-		ArtifactSHA256:  hex.EncodeToString(artSum[:]),
-	}); err != nil {
+	entry.TS = o.now().UTC().Format(time.RFC3339)
+	entry.Cycle = cycle
+	artPath, worktreeTree, artSHA := entry.ArtifactPath, entry.WorktreeTreeSHA, entry.ArtifactSHA256
+	if err := o.ledger.Append(ctx, entry); err != nil {
 		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding ledger append: %v\n", err)
 	}
 
@@ -133,12 +110,42 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 			TreeSHA:        worktreeTree,
 			Cycle:          cycle,
 			Verdict:        verdict,
-			ArtifactSHA256: hex.EncodeToString(artSum[:]),
+			ArtifactSHA256: artSHA,
 			ArtifactPath:   artPath,
 		}); err != nil {
 			fmt.Fprintf(o.errOut(), "[orchestrator] WARN verdict-cache put: %v\n", err)
 		}
 	}
+}
+
+func auditBindingEntry(ctx context.Context, projectRoot, workspace, worktree, worktreeBase, verdict string) (LedgerEntry, error) {
+	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
+	if err != nil {
+		return LedgerEntry{}, fmt.Errorf("git rev-parse HEAD failed: %w (ship will refuse to bind)", err)
+	}
+	worktreeTree := worktreeContentSHA(ctx, projectRoot, worktree, workspace)
+	diff, code, err := gitCapture(ctx, projectRoot, "diff", "HEAD")
+	if err != nil || code > 1 {
+		return LedgerEntry{}, fmt.Errorf("git diff HEAD failed (rc=%d): %v", code, err)
+	}
+	treeSum := sha256.Sum256([]byte(diff))
+	artPath := filepath.Join(workspace, phasecontract.ArtifactFilename(string(PhaseAudit)))
+	artBytes, err := os.ReadFile(artPath)
+	if err != nil {
+		return LedgerEntry{}, fmt.Errorf("read %s: %w", artPath, err)
+	}
+	artSum := sha256.Sum256(artBytes)
+	return LedgerEntry{
+		Role:            "auditor",
+		Kind:            "agent_subprocess",
+		ExitCode:        auditBindingExitCode(verdict),
+		GitHEAD:         strings.TrimSpace(head),
+		TreeStateSHA:    hex.EncodeToString(treeSum[:]),
+		WorktreeTreeSHA: worktreeTree,
+		WorktreeBaseSHA: worktreeBase,
+		ArtifactPath:    artPath,
+		ArtifactSHA256:  hex.EncodeToString(artSum[:]),
+	}, nil
 }
 
 func worktreeContentSHA(ctx context.Context, projectRoot, worktree, workspace string) string {

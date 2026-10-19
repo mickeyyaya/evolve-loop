@@ -22,6 +22,7 @@ const (
 	setsEnv                         = "test sets the process environment through a helper"
 	swapsAbsPath                    = "test swaps package variable absPath"
 	swapsWorkingDir                 = "test swaps package variable workingDir"
+	swapsReauditRebase              = "test swaps package variable reauditRebase"
 	swapsBackoffSleep               = "test swaps package variable backoffSleep"
 	swapsBuildSelfCheckRunner       = "test swaps package variable buildSelfCheckRunner"
 	swapsChallengeTokenRead         = "test swaps package variable challengeTokenRead"
@@ -51,6 +52,17 @@ const (
 )
 
 var serialRequiredTests = map[string]string{
+	"core.TestReauditCycle_MovedBaseRebasesAuditsAndRecordsTheBinding":                              swapsReauditRebase,
+	"core.TestReauditCycle_RequestIsDerivedFromTheCycleState":                                       swapsReauditRebase,
+	"core.TestReauditCycle_VerdictIsDataNotAnError":                                                 swapsReauditRebase,
+	"core.TestReauditCycle_LiveLeaseRefusesBeforeAnyGitWrite":                                       swapsReauditRebase,
+	"core.TestReauditCycle_StaleLeaseDoesNotBlock":                                                  swapsReauditRebase,
+	"core.TestReauditCycle_RebaseConflictLeavesTheWorktreeUnchanged":                                swapsReauditRebase,
+	"core.TestReauditCycle_UnknownCycleIsNoSuchCycle":                                               swapsReauditRebase,
+	"core.TestReauditCycle_AuditRunnerFailureIsInfraAndRecordsNoBinding":                            swapsReauditRebase,
+	"core.TestReauditError_ErrorNamesTheKindAndConflicts":                                           swapsReauditRebase,
+	"core.TestReauditCycle_UnresolvableMainIsInfraAndAuditsNothing":                                 swapsReauditRebase,
+	"core.TestReauditCycle_RebasesThroughTheSharedRebaseStep":                                       swapsReauditRebase,
 	"core.TestCheckpointInterruptedPhase_CheckpointFailureWarns":                                    swapsResumeBoundaryCheckpointer,
 	"core.TestOriginDefaultBranch_GitFailureFallsBackToMain":                                        swapsGitRunner,
 	"core.TestGitWorktree_CreateReusedWorktreeFailures":                                             swapsGitRunner,

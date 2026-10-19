@@ -30,7 +30,7 @@ func (o *Orchestrator) resumeFleetRebaseAfterDebugger(ctx context.Context, proje
 	if err := carryResolvedTree(ctx, cs.ActiveWorktree, gitCapture, fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)); err != nil {
 		return o.abortRebaseReentry(cycle, *cs, "carry the resolved tree: "+err.Error())
 	}
-	ok, conflict := rebaseRecordingConflicts(ctx, projectRoot, cs)
+	ok, conflict := reauditRebase(ctx, projectRoot, cs)
 	switch {
 	case ok:
 	case conflict:
