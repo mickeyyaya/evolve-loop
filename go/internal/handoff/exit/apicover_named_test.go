@@ -23,3 +23,18 @@ func TestExportsAreNamed(t *testing.T) {
 		t.Fatalf("met round = %q, want %q", got, exit.Pass)
 	}
 }
+
+func TestBlockedExportsAreNamed(t *testing.T) {
+	req := handoff.Request{Asks: []handoff.Ask{{ID: "a1", Required: true}}}
+	results := []exit.Result{{Ask: "a1", Status: handoff.StatusBlocked, Resolved: true, Claim: "BLOCKER protected-path x.go why"}}
+	var prover exit.Prover = func(defects []string) exit.Proof {
+		return exit.Proof{Blocked: true, Proven: []exit.Claim{{Defect: defects[0], Path: "x.go", Failing: "a1", Guard: "a1"}}}
+	}
+	var decision exit.Decision = exit.Decide(req, results, nil, exit.Policy{Prover: prover})
+	if decision.Outcome != exit.Blocked {
+		t.Fatalf("proven claim = %q, want %q", decision.Outcome, exit.Blocked)
+	}
+	if len(decision.Blocked) != 1 || decision.Blocked[0] != "a1" || len(decision.Paths) != 1 || decision.Paths[0] != "x.go" {
+		t.Fatalf("decision = %+v, want a1 blocked on x.go", decision)
+	}
+}

@@ -16,6 +16,7 @@
 - **Digest binding.** `Request.Digest` computes a SHA-256 digest of the request JSON payload.
 
 - **Exit decision.** `internal/handoff/exit` decides the exit of a round. `Decide` is pure: it takes the request, the check results, the earlier rounds and a `Policy`, and returns a `Decision`.
+- **Blocked exit.** A `blocked` result carries a `Claim`. `Decide` hands the claims to the injected `Policy.Prover`. The exit is `blocked` only when the prover returns `Blocked` and every unmet required ask is named by a proven claim. The console wires the prover to `core.NewBlockerProver`, so `exit` imports neither `core` nor `guards` and holds no protected-path matcher. An unproven claim stays an unmet ask.
 
 ## Exits
 

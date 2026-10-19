@@ -1,6 +1,10 @@
 package exit
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/handoff"
+import (
+	"sort"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
+)
 
 type Outcome string
 
@@ -8,16 +12,34 @@ const (
 	Pass  Outcome = Outcome(handoff.ExitPass)
 	Retry Outcome = "retry"
 	Cap   Outcome = Outcome(handoff.ExitCap)
+
+	Blocked Outcome = Outcome(handoff.ExitBlocked)
 )
+
+type Claim struct {
+	Defect  string
+	Path    string
+	Failing string
+	Guard   string
+}
+
+type Proof struct {
+	Blocked bool
+	Proven  []Claim
+}
+
+type Prover func(defects []string) Proof
 
 type Policy struct {
 	MaxRedispatch int
+	Prover        Prover
 }
 
 type Result struct {
 	Ask      string
 	Status   handoff.Status
 	Resolved bool
+	Claim    string
 }
 
 type Round struct {
@@ -27,6 +49,8 @@ type Round struct {
 type Decision struct {
 	Outcome Outcome
 	Unmet   []string
+	Blocked []string
+	Paths   []string
 }
 
 func Decide(req handoff.Request, results []Result, history []Round, policy Policy) Decision {
@@ -35,6 +59,9 @@ func Decide(req handoff.Request, results []Result, history []Round, policy Polic
 	if len(unmet) == 0 {
 		return Decision{Outcome: Pass}
 	}
+	if blocked, ok := proveBlocked(req, results, unmet, policy); ok {
+		return blocked
+	}
 	if len(history) >= policy.MaxRedispatch {
 		return Decision{Outcome: Cap}
 	}
@@ -42,6 +69,67 @@ func Decide(req handoff.Request, results []Result, history []Round, policy Polic
 		return Decision{Outcome: Cap}
 	}
 	return Decision{Outcome: Retry, Unmet: unmet}
+}
+
+func proveBlocked(req handoff.Request, results []Result, unmet []string, policy Policy) (Decision, bool) {
+	if policy.Prover == nil {
+		return Decision{}, false
+	}
+	var defects []string
+	for _, r := range results {
+		if r.Status == handoff.StatusBlocked && r.Claim != "" {
+			defects = append(defects, r.Claim)
+		}
+	}
+	if len(defects) == 0 {
+		return Decision{}, false
+	}
+	proof := policy.Prover(defects)
+	if !proof.Blocked {
+		return Decision{}, false
+	}
+	named := map[string]bool{}
+	paths := map[string]bool{}
+	for _, claim := range proof.Proven {
+		matched := false
+		for _, r := range results {
+			if r.Status == handoff.StatusBlocked && r.Claim == claim.Defect {
+				named[r.Ask] = true
+				matched = true
+			}
+		}
+		if matched {
+			paths[claim.Path] = true
+			named[claim.Failing] = true
+			named[claim.Guard] = true
+		}
+	}
+	ids := askIDsIn(req, named)
+	for _, id := range unmet {
+		if !named[id] {
+			return Decision{}, false
+		}
+	}
+	return Decision{Outcome: Blocked, Blocked: ids, Paths: sortedKeys(paths)}, true
+}
+
+func askIDsIn(req handoff.Request, set map[string]bool) []string {
+	var ids []string
+	for _, ask := range req.Asks {
+		if set[ask.ID] {
+			ids = append(ids, ask.ID)
+		}
+	}
+	return ids
+}
+
+func sortedKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for k := range set {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func metAsks(results []Result) map[string]bool {
