@@ -148,7 +148,9 @@ Go has no flag that records the resources of each test binary. The Go runtime ca
 2. It waits for the test binary to end.
 3. It reads the rusage of its children from the operating system.
 4. It appends one JSON record to the file that `TESTRUSAGE_OUT` names.
-5. It exits with the exit code of the test binary.
+5. It exits with the exit code of the test binary. If a signal ends the test binary, it exits with 128 plus the signal number.
+
+The wrapper forwards SIGINT, SIGTERM and SIGQUIT to the test binary, so a `go test -timeout` kill does not leave a test process behind. If `TESTRUSAGE_OUT` is empty, the wrapper only runs the test binary. If it cannot write the record, it prints a warning on stderr and keeps the exit code of the test binary. The Makefile turns the wrapper on with `TEST_RUSAGE=1`, for `make test-integration` and `make test-e2e`.
 
 **Why the record is per package.** `go test` starts one wrapper process for each test binary, and each package has one test binary. The rusage of the children of one wrapper is therefore the rusage of one package.
 
@@ -190,7 +192,7 @@ Component C0b also adds a runner sampler. It starts at the start of the test ste
 
 | Field | Meaning | Source on Linux | Source on macOS |
 |---|---|---|---|
-| `cpu_busy_pct` | the share of CPU time not idle | `/proc/stat` | `host_statistics` (a Mach call, `HOST_CPU_LOAD_INFO`) |
+| `cpu_busy_pct` | the share of CPU time not idle | `/proc/stat` | not available: `host_statistics` needs cgo, and the sampler uses no cgo |
 | `runqueue` | the processes that are ready to run and wait for a free CPU | `procs_running` in `/proc/stat` | not available: `vm.loadavg` is a 1-minute average, so it cannot show one second |
 | `mem_used_mb`, `swap_used_mb` | the memory and swap in use | `/proc/meminfo` | `vm_stat`, `sysctl vm.swapusage` |
 | `disk_busy_pct` | the share of time that the disk is busy | `/proc/diskstats` | not available: macOS has no disk busy counter that is cheap to read |
@@ -198,6 +200,8 @@ Component C0b also adds a runner sampler. It starts at the start of the test ste
 This is the USE view of the runner: utilization and saturation. The sampler records no errors.
 - **Saturation:** on Linux, a run queue that stays above the CPU count means that the CPU is saturated. More parallel packages then make the run slower, not faster.
 - **Memory:** swap above 0 means that memory is too small for the runner.
+
+The sampler is `cmd/hostsampler`. It takes `-out <file>`, `-interval` (default 1 s) and `-duration` (default 0, which means until SIGTERM). Each record also has a `ts` field (UTC, RFC 3339). Fields that the host cannot give are absent from the record, not zero. The first record comes one interval after the start, because `cpu_busy_pct` is the change between two readings. On SIGTERM or SIGINT, the sampler writes no partial line and closes the file.
 
 **Why once each second.** The test step takes 10 to 18 minutes, so one second gives about 600 to 1,000 points per job. That is enough to see each phase. The sampler reads kernel counters only, so its cost is small on a runner with 3 CPUs.
 
@@ -275,12 +279,13 @@ A second example shows the resource view. In a local run on 14 CPUs, `phases/shi
 
 | Rule | Guard | State |
 |---|---|---|
-| The telemetry never changes a test result. | The wrapper passes the exit code, stdin, stdout and stderr through. A test proves the pass-through. | planned, C0b |
+| The telemetry never changes a test result. | The wrapper passes the exit code, stdin, stdout and stderr through. A test proves the pass-through. | built, C0b |
 | A red run keeps its telemetry. | The artifact step has `if: always()`. | built, C0 |
 | The split of serial and parallel time is correct. | A table test with a fixed stream: serial 7 s, parallel 10 s, floor 17 s, dominant "parallel". | built, C0 |
 | A rename in `cmd/testlatency` keeps its mutation test valid. | `acs/cycle1745` pins source anchors in `cmd/testlatency`, and C0 updates them. | in progress, C0 |
-| The sampler stops with the job. | A test: a 2 s run writes at least one record each second, and the file closes. | planned, C0b |
-| The memory number has the same unit on both systems. | The wrapper converts kilobytes (Linux) and bytes (macOS) to MB, and a test checks each case. | planned, C0b |
+| The sampler stops with the job. | A test: a 2 s run writes at least one record each second, and the file closes. | built, C0b |
+| The memory number has the same unit on both systems. | The wrapper converts kilobytes (Linux) and bytes (macOS) to MB, and a test checks each case. | built, C0b |
+| The sampler needs no cgo. | `source_darwin.go` runs `vm_stat` and `sysctl` through `sysexec.Command` with a deadline. A failed tool skips its field. A test with real captured output checks each parser. | built, C0b |
 
 ## 11. Limits
 

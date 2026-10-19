@@ -44,9 +44,18 @@ jobs:
       - run: go mod download
       - name: build
         run: make build
+      - name: runner sampler (host CPU, memory, load each second; runs until the job ends)
+        run: |
+          if go build -o bin/hostsampler ./cmd/hostsampler; then
+            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>&1 &
+          else
+            echo "::warning::hostsampler build failed; the run has no runner samples"
+          fi
       - name: test (race + cover, incl. integration tier)
         env:
           TEST_JSON: test-integration.json
+          TEST_RUSAGE: '1'
+          TESTRUSAGE_OUT: ${{ github.workspace }}/go/test-rusage.ndjson
         # Boot timeout is configured via BridgePolicy.BootTimeoutS in
         # .evolve/policy.json (bridge.boot_timeout_s) — no env override needed.
         run: |
@@ -81,6 +90,8 @@ jobs:
         # one budget; a future bump cannot reach one workflow and miss the other.
         env:
           E2E_JSON: test-e2e.json
+          TEST_RUSAGE: '1'
+          TESTRUSAGE_OUT: ${{ github.workspace }}/go/test-rusage.ndjson
         run: make test-e2e
       - name: function coverage warnings (<85%; advisory)
         run: |
@@ -129,6 +140,8 @@ jobs:
             go/apicover-report.txt
             go/test-integration.json
             go/test-e2e.json
+            go/test-rusage.ndjson
+            go/runner-samples.ndjson
       - name: line-coverage strict (go/.cover-strict; per-package hard-fail, ADR-0101)
         # Packages listed in go/.cover-strict declare the statement coverage they
         # ship with (100% for internal/signalcenter). Enforced here AND by

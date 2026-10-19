@@ -81,3 +81,5 @@
 ./internal/handoff 100
 ./internal/handoff/request 100
 ./internal/core 100
+./cmd/testrusage 100
+./cmd/hostsampler 100

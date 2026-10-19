@@ -396,7 +396,7 @@ func runMakeFixtureContext(t *testing.T, ctx context.Context, root, target strin
 	args := append([]string{"--no-print-directory", "-s", "-f", filepath.Join(workflowRepoRoot(t), "go/Makefile"), "GO=" + filepath.Join(root, "probe-go"), "BIN_DIR=" + filepath.Join(root, "bin")}, vars...)
 	cmd := exec.CommandContext(ctx, "make", append(args, target)...)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=", "APICOVER_PKGS=", "MAKEFLAGS=", "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"))
+	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=", "APICOVER_PKGS=", "MAKEFLAGS=", "TEST_RUSAGE=", "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() != nil {
 		t.Fatalf("fixture execution canceled: %v\n%s", ctx.Err(), out)
@@ -585,5 +585,40 @@ func TestRaceOptions(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestMakeIntegration_RoutesTestBinariesThroughTheRusageWrapperOnlyWhenAsked(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		vars    []string
+		wrapped bool
+	}{
+		{"default", nil, false},
+		{"requested", []string{"TEST_RUSAGE=1"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := probeFixture(t, false)
+			argLog := filepath.Join(root, "go-test-args.txt")
+			wrapper := "#!/bin/sh\nif [ \"$1\" = test ]; then echo \"$*\" > '" + argLog + "'; fi\n" + makeGoBuildRedirect(t) + makeGoRunRedirect(t) + "exec go \"$@\"\n"
+			fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
+			out, err := runMakeFixture(t, root, "test-integration", append([]string{"TESTRUSAGE_OUT=" + filepath.Join(root, "rusage.ndjson")}, tc.vars...)...)
+			if err != nil {
+				t.Fatalf("test-integration: %v\n%s", err, out)
+			}
+			got, err := os.ReadFile(argLog)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "-exec " + filepath.Join(root, "bin", "testrusage")
+			if strings.Contains(string(got), want) != tc.wrapped {
+				t.Fatalf("go test arguments = %q; want wrapper %q present = %v", got, want, tc.wrapped)
+			}
+			_, statErr := os.Stat(filepath.Join(root, "rusage.ndjson"))
+			if (statErr == nil) != tc.wrapped {
+				t.Fatalf("rusage file present = %v, want %v", statErr == nil, tc.wrapped)
+			}
+		})
 	}
 }
