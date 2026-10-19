@@ -27,6 +27,7 @@ type loopBatchCoordinator struct {
 	waveEngine   *loopwave.Engine
 	preWave      func(iteration int) (batchDecision, bool)
 	leases       map[string]*orchestrator.Leases
+	zeroShip     zeroShipTally
 }
 
 func (b *loopBatchCoordinator) run() int {

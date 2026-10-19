@@ -43,6 +43,11 @@ func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *poli
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: exitCode}
 	}
+	if exitCode, halted := b.zeroShipHalt(batchStartCycle); halted {
+		b.result.StopReason = "zero_ship_halt"
+		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
+		return batchDecision{flow: batchReturn, exitCode: exitCode}
+	}
 	if loopchain.BrakeEngaged(b.cfg.EvolveDir) {
 		return b.brakeStop(iteration)
 	}

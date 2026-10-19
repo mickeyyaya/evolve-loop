@@ -16,6 +16,7 @@ var loopProcStartFn = proctree.StartOf
 const (
 	CodeLoopSystemFailureHalt   signalcenter.Code = "LOOP_SYSTEM_FAILURE_HALT"
 	CodeLoopPipelineBlockerHalt signalcenter.Code = "LOOP_PIPELINE_BLOCKER_HALT"
+	CodeLoopZeroShipHalt        signalcenter.Code = "LOOP_ZERO_SHIP_HALT"
 	CodeLoopFleetLaneHalt       signalcenter.Code = "LOOP_FLEET_LANE_HALT"
 	CodeLoopHalt                signalcenter.Code = "LOOP_HALT"
 	CodeLoopEscalationBoundary  signalcenter.Code = "LOOP_ESCALATION_BOUNDARY"
@@ -25,6 +26,7 @@ const (
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopSystemFailureHalt, "the batch halted on an ADR-0072 system failure the cycle itself signalled (the pipeline, not the task, is the cause); fields.category names the floor, fields.next is the escalation dossier's next_action, fields.escalation and fields.inbox_item the dossier and the P0 item the halt wrote")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopPipelineBlockerHalt, "the pipeline-blocker breaker halted the batch (identical fingerprints, unexplained failures or consecutive failures over the ceiling, or consecutive fleet lanes deferred for want of a worktree: rule lane-deferrals, category lane-provisioning, the git cause in the reason); fields.rule and fields.fingerprint name the rule, the rest are the system-failure halt's own fields (next, escalation, inbox_item)")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopZeroShipHalt, "the zero-ship breaker halted the batch: consecutive waves (fleet) or cycles (sequential) landed no ship, failed and no-work lanes alike, up to failure_policy.thresholds.zero_ship_halt; fields.rule and fields.waves name the rule and the run, the rest are the system-failure halt's own fields (next, escalation, inbox_item)")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopFleetLaneHalt, "a fleet lane exited with the system-failure halt code; the lane's own LOOP_SYSTEM_FAILURE_HALT names the failure and the escalation it filed")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopHalt, "the batch halted at a boundary (plane diverged, sync refused, main CI red, disk below the floor, or a boundary CLI update whose smoke test failed: fields.families and fields.versions name it); the reason is the halt error")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopEscalationBoundary, "the escalation boundary staged inbox items (bumped/filed/planned) or refused a staged autofile intent that names no priority_class after a cycle; fields carry the counts (refused among them, each refused id also printed as a WARN line) and the stage")

@@ -204,8 +204,9 @@ and [runtime-reference.md](runtime-reference.md) link here and do not restate it
    - Never run more than two unproductive waves "to see if it self-corrects".
    - A zero-ship streak is SYSTEM-fail evidence: the ADR-0072 halt and its P0 apply.
      This does not conflict with "never stop the queue", because §2.1 governs task-level failures.
-2. **It is an operator guardrail, not a compiled breaker.**
-   - No Go code counts zero-ship cycles. The console operator applies the rule.
+2. **The operator guardrail has a compiled breaker.**
+   - The loop counts consecutive zero-ship waves (fleet) or cycles (sequential). A failed or SKIPPED no-work lane counts as zero-ship. A ship resets the count.
+   - At `failure_policy.thresholds.zero_ship_halt` (compiled default 2) the loop halts with `LOOP_ZERO_SHIP_HALT` before it launches the next wave. The console operator still applies the rule by hand.
      The rule came into use after the 2026-08-10
      [absorbing-FAIL incident](../incidents/2026-08-10-continuation-absorbing-fail.md),
      and #430 made it repo policy.
