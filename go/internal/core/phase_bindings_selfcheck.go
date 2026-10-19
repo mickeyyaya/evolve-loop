@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -142,7 +141,7 @@ func writeBuildSelfCheckArtifact(worktree string, fails []selfCheckFailure) {
 		fmt.Fprintf(os.Stderr, "[selfcheck] WARN could not persist build-selfcheck artifact %s: %v\n", dst, err)
 		return
 	}
-	data, err := json.MarshalIndent(fails, "", "  ")
+	data, err := marshalIndentJSON(fails, "", "  ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[selfcheck] WARN could not encode build-selfcheck artifact %s: %v\n", dst, err)
 		return
