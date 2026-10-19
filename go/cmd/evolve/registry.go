@@ -20,6 +20,7 @@ type subcommand struct {
 var commands = []subcommand{
 	{Name: "version", Aliases: []string{"--version", "-v"}, Summary: "Print build version", Run: runVersion},
 	{Name: "help", Aliases: []string{"--help", "-h"}, Summary: "Show usage", Run: runHelp},
+	{Name: "rebuild", Summary: "Rebuild the plane binary from HEAD (rebuild [--project-root P] [--repin])", Run: runRebuild},
 
 	{Name: "doctor", Summary: "Probe environment", Run: opscmd.RunDoctor},
 	{Name: "console-lease", Summary: "Time-bounded operator lease for runtime-tree paths (ADR-0080 S4)", Run: opscmd.RunConsoleLease},

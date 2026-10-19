@@ -14,6 +14,8 @@ Usage:
 Commands:
   version    Print build version and exit
   doctor     Probe environment ( doctor probe <tool> [--json] [--quiet] )
+  rebuild    Rebuild the plane binary from HEAD
+              ( rebuild [--project-root P] [--repin] )
   setup      Onboarding ( setup detect [--json] | setup complete )
   install    Manual install of evolve-loop agents + the loop skill into
               ~/.claude ( install [--ci] ); --ci validates structure only

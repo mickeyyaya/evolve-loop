@@ -452,6 +452,14 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 > - Without `--cycle`, stdin stays the input, unchanged: `evolve phase` exits 11 on malformed stdin JSON and `evolve compose` exits 10.
 > - **Spec phases (2026-10-09, cycle 1844).** Both commands also run a spec phase: an `llm` phase of the merged catalog (`docs/architecture/phase-registry.json` plus the `.evolve/phases/*` overlays) that has no compiled runner, for example `evolve phase plan-review --cycle N` or `evolve compose --phases plan-review,tdd --cycle N`. `phasecmd.ResolveRunner` resolves a name against the compiled registry first and the merged catalog second; a spec phase runs on the same spec runner the cycle mounts (default bridge and prompts of the project root). Names are case-insensitive. Native phases (`secret-leak-scan`, `flake-rerun-scan`) and control phases (`memo`, `retrospective`) are not spec-runnable. A name in neither set exits 10, and the message lists both: `unknown phase "x" (known built-in: …; known spec: …)` (`phasecmd.FormatUnknownPhaseError`; an unloadable catalog is named in the message). `ship` in a compose sequence still needs `--ship-anyway`, whatever the other phases are.
 
+> **Operator commands (rebuild the plane binary; 2026-10-19, cycle 1963):**
+>
+> - `evolve rebuild [--project-root P] [--repin]` builds HEAD of P to `go/bin/evolve` and prints both binary SHAs.
+> - A live run lease on P exits 1 without a build. A stale lease does not block.
+> - A failed build exits 2 and prints the tail of the build output.
+> - The boot refresh and the `rebuild` verb call one shared build function.
+> - Flag `--repin` re-pins the ship SHA through the provenance-gated path (`phaseintegrity.RepinShipSHA`).
+
 > **Session cost isolation (v10.8.0+):** `claude -p` subagent invocations bill to the OAuth session that launched the dispatcher (the parent Claude Code session), not the batch budget meter. To isolate `/evo:loop` costs from your prior session context, run `/clear` before starting a new evolve-loop batch. The batch meter (`state.json:currentBatch.cycleAccruedCostUSD`) tracks per-cycle accumulation but cannot capture OAuth session charges.
 
 ## Ship classes (`evolve ship --class <X>`, native)
@@ -471,7 +479,7 @@ currently-executing binary** — e.g. the gitignored `go/bin/evolve` that the ke
 rollback shellout (`evolve ship --class manual`) run — it is skipped with a
 `[ship] WARN: churn discard skipped …` line instead (cycle-764 fix; previously a *successful*
 manual ship deleted the running binary → exit 127 on the next invocation; heal was
-`make -C go build && evolve reset-sha -operator`). `release` ships skip the discard entirely —
+`evolve rebuild --repin` (or `make -C go build && evolve reset-sha -operator`)). `release` ships skip the discard entirely —
 the pipeline's rebuild-binary step is the audited producer of `go/evolve`.
 
 ### Ship self-healing (repair ladder, ADR-0039 §8)

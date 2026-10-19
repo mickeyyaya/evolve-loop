@@ -208,7 +208,7 @@ It never deletes.
 
     The inbox item `checkpoint-prune-converges-on-landed-proof` records this follow-up.
 - Plane sync: merge-only (`git merge origin/main`). Never rebase a plane.
-- Fresh worktree: run `make -C go build` before any `evolve` command.
+- Fresh worktree: run `evolve rebuild` before any other `evolve` command.
 - Bare-store notes: the store carries the standard refspec
   (`+refs/heads/*:refs/remotes/origin/*`). If you move the hub directory,
   run `evolve doctor plane --repair` to fix the bidirectional links.
