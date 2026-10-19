@@ -785,3 +785,5 @@
 # envscope - the one scan rule of the envtaint read set, shared with commentaudit.
 ./internal/envscope
 ./internal/handoff
+# evidence - the resolvers of the handoff evidence pointers (ADR-0141, plan H3).
+./internal/handoff/evidence

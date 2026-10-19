@@ -12,7 +12,19 @@
 - **Request and ledger types.** A `Request` contains asks. A `Ledger` contains answers for each ask of a request.
 - **Deterministic validation.** `Validate` checks the ledger against the request. It confirms pair names, request digests, and entry counts.
 - **Unified errors.** `Validate` reports all detected violations at once with `errors.Join`.
+- **Evidence resolvers.** `internal/handoff/evidence` decides in code whether an `Evidence` pointer resolves. `Resolve` returns `ErrUnresolved` when it does not, and the entry is then unmet.
 - **Digest binding.** `Request.Digest` computes a SHA-256 digest of the request JSON payload.
+
+## Evidence kinds
+
+| Kind | Ref form | Resolves when |
+|---|---|---|
+| `path` | `repo/path:line` | The file exists under the root and the line is within its line count. |
+| `test` | `Name` or `file_test.go:Name` | A `_test.go` file declares the `Test`, `Fuzz` or `Benchmark` function. |
+| `predicate` | `Name` or `go/acs/cycle<N>/file_test.go:Name` | The package of the cycle declares the function. |
+| `command` | the command line | The `Source` records the command result. |
+
+An unknown kind never resolves.
 
 ## Invariants
 
