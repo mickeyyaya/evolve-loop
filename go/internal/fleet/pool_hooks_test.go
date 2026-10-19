@@ -117,23 +117,6 @@ func TestRunPool_PrepareRewritesTheSpecAndADroppedTodoNeverLaunches(t *testing.T
 	}
 }
 
-func TestRunPool_AnExitHookThatRetriesLaunchesTheTodoOnceMore(t *testing.T) {
-	backlog := []Todo{{ID: "A"}}
-	tries := 0
-	cfg := PoolConfig{Target: 1, Exited: func(td Todo, r Result) bool {
-		tries++
-		return tries == 1
-	}}
-	var log launchLog
-	res := RunPool(context.Background(), cfg, backlog, log.launch(0), nil)
-	if want := []string{"A", "A"}; !reflect.DeepEqual(log.got(), want) {
-		t.Errorf("launches = %v, want %v (one retry)", log.got(), want)
-	}
-	if len(res) != 1 || res[0].Status() != LaneOK {
-		t.Errorf("results = %+v, want the one result of the last try", res)
-	}
-}
-
 func TestRunPool_MaxLaunchesEndsTheRunAtTheLimit(t *testing.T) {
 	backlog := []Todo{{ID: "A"}, {ID: "B"}, {ID: "C"}}
 	var log launchLog

@@ -64,7 +64,7 @@ The policy key `fleet.orchestrator.stage` sets how the loop runs its lanes ([wav
 | The end line | `[loop] wave N: X/Y lanes ok` | `[loop] pool N: X/Y lanes ok (orchestrator, target=W)` |
 | How many lanes run at once | `fleet.count`, after the quota shrink | at most the adaptive window ([wave-orchestrator §10](../architecture/wave-orchestrator.md#10-the-adaptive-window)). It starts at `window.start` lanes (default 4). It adds 1 for each clean landing, and it halves on each landing conflict, down to `window.min`. |
 | When a run ends | when the wave ends | when the supply is empty and no lane runs, at the operator stop, or after `run_max_lanes` launches (default 4 × `fleet.count`) |
-| A lane past its deadline | `LOOP_ORCH_LANE_DEADLINE`, action `recorded`. The lane runs on. | the loop stops the lane, reaps its dispatches, releases its inbox claim and gives the todo one more try. A second stop routes the todo to the console with the reason `deadline twice`. |
+| A lane past its deadline | `LOOP_ORCH_LANE_DEADLINE`, action `recorded`. The lane runs on. | the loop stops the lane, reaps its dispatches and releases its inbox claim. The todo does not launch again in the same run; a later run can take it. A second stop routes the todo to the console with the reason `deadline twice`. |
 | A lane with no live signal (cycle event, pane-watch, events or stdout file) for `stall_minutes` (default 30) | `LOOP_ORCH_LANE_STALLED` once. The lane runs on. | the same |
 
 At `enforce`:

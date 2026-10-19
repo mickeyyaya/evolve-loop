@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"slices"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -17,7 +18,7 @@ type PoolConfig struct {
 	MaxLaunches int
 	Next        func(inFlight, pending []Todo) int
 	Prepare     func(td Todo, spec CycleSpec) (CycleSpec, bool)
-	Exited      func(td Todo, r Result) bool
+	Resupply    func(held []Todo) []Todo
 	Halted      func() bool
 	Kick        <-chan struct{}
 	Window      func() int
@@ -29,6 +30,7 @@ const (
 	PoolLaunched   PoolTransitionKind = "launched"
 	PoolExited     PoolTransitionKind = "exited"
 	PoolBackfilled PoolTransitionKind = "backfilled"
+	PoolResupplied PoolTransitionKind = "resupplied"
 	PoolIdle       PoolTransitionKind = "idle"
 )
 
@@ -51,8 +53,14 @@ type pool struct {
 	pending      []int
 	running      map[int]bool
 	claimed      map[string]bool
+	known        map[string]bool
 	launches     int
-	completions  chan int
+	completions  chan completion
+}
+
+type completion struct {
+	idx    int
+	result Result
 }
 
 func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchFn, onTransition func(PoolTransition)) []Result {
@@ -64,8 +72,9 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 	kick := cfg.Kick
 	for len(p.running) > 0 {
 		select {
-		case idx := <-p.completions:
-			p.settle(idx)
+		case done := <-p.completions:
+			p.results[done.idx] = done.result
+			p.settle(done.idx)
 		case _, open := <-kick:
 			if !open {
 				kick = nil
@@ -82,14 +91,37 @@ func newPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 	if cfg.Concurrency > 0 && cfg.Concurrency < limit {
 		limit = cfg.Concurrency
 	}
-	p := &pool{ctx: ctx, cfg: cfg, backlog: backlog, launch: launch, onTransition: onTransition,
-		limit: max(limit, 1), results: make([]Result, len(backlog)), running: map[int]bool{},
-		claimed: map[string]bool{}, completions: make(chan int, len(backlog))}
-	for i := range backlog {
-		p.pending = append(p.pending, i)
-		p.results[i] = Result{Index: i, ExitCode: -1, Err: ErrNeverLaunched}
+	p := &pool{ctx: ctx, cfg: cfg, launch: launch, onTransition: onTransition,
+		limit: max(limit, 1), running: map[int]bool{}, claimed: map[string]bool{}, known: map[string]bool{}}
+	p.completions = make(chan completion, p.limit)
+	for _, td := range backlog {
+		p.add(td)
 	}
 	return p
+}
+
+func (p *pool) add(td Todo) {
+	idx := len(p.backlog)
+	p.known[td.ID] = true
+	p.backlog = append(p.backlog, td)
+	p.pending = append(p.pending, idx)
+	p.results = append(p.results, Result{Index: idx, ExitCode: -1, Err: ErrNeverLaunched})
+}
+
+func (p *pool) resupply() bool {
+	if p.cfg.Resupply == nil || !p.open() {
+		return false
+	}
+	added := false
+	for _, td := range p.cfg.Resupply(slices.Clone(p.backlog)) {
+		if p.known[td.ID] {
+			continue
+		}
+		p.add(td)
+		p.emit(PoolResupplied, td.ID)
+		added = true
+	}
+	return added
 }
 
 func (p *pool) emit(kind PoolTransitionKind, todo string) {
@@ -104,10 +136,10 @@ func (p *pool) settle(idx int) {
 	}
 	delete(p.running, idx)
 	p.emit(PoolExited, p.backlog[idx].ID)
-	if p.cfg.Exited != nil && p.cfg.Exited(p.backlog[idx], p.results[idx]) {
-		p.pending = append([]int{idx}, p.pending...)
+	if p.fill(PoolBackfilled, false) {
+		return
 	}
-	if !p.fill(PoolBackfilled, false) {
+	if !p.resupply() || !p.fill(PoolBackfilled, false) {
 		p.emit(PoolIdle, "")
 	}
 }
@@ -216,8 +248,7 @@ func (p *pool) dispatch(idx int, kind PoolTransitionKind) {
 	go func() {
 		started <- struct{}{}
 		code, err := p.launch(p.ctx, spec)
-		p.results[idx] = Result{Index: idx, ExitCode: code, Err: err}
-		p.completions <- idx
+		p.completions <- completion{idx: idx, result: Result{Index: idx, ExitCode: code, Err: err}}
 	}()
 	<-started
 	runtime.Gosched()

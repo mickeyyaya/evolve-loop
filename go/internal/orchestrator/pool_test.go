@@ -96,17 +96,20 @@ func sameSet(a, b []string) bool {
 	return len(a) == len(b)
 }
 
-func TestLease_ALanePastItsDeadlineStopsAndReleasesItsItem(t *testing.T) {
+func TestLease_ALanePastItsDeadlineIsReleasedAndNotRelaunchedInTheSameRun(t *testing.T) {
 	g, events, claims, clock := newGatedLaunch(), &eventLog{}, &claimLog{}, newFakeClock()
 	pool := Pool{Target: 1, Launch: g.launch, Publish: events.publish, Claims: claims,
-		Leases: NewLeases(leaseConfig(StageEnforce), clock, noHeartbeat, events.publish)}
-	done := runPool(pool, []fleet.Todo{{ID: "A"}})
+		Resupply: func([]fleet.Todo) []fleet.Todo { return []fleet.Todo{{ID: "A"}} },
+		Leases:   NewLeases(leaseConfig(StageEnforce), clock, noHeartbeat, events.publish)}
+	done := runPool(pool, []fleet.Todo{{ID: "A"}, {ID: "B"}})
 	waitStart(t, g)
 
 	clock.Advance(61 * time.Minute)
-	if again := waitStart(t, g); again != "A" {
-		t.Fatalf("relaunch = %q, want A to get one more try", again)
+	if next := waitStart(t, g); next != "B" {
+		t.Fatalf("launch after the stop = %q, want B: the stopped A waits for the next run", next)
 	}
+	g.finish("B", 0)
+	res := <-done
 	released, parked, reasons := claims.snapshot()
 	if !reflect.DeepEqual(released, []string{"A"}) || len(parked) != 0 {
 		t.Errorf("released = %v parked = %v, want A released once and nothing parked", released, parked)
@@ -118,36 +121,48 @@ func TestLease_ALanePastItsDeadlineStopsAndReleasesItsItem(t *testing.T) {
 	if len(stops) != 1 || stops[0].Fields["action"] != "stopped" {
 		t.Errorf("deadline events = %+v, want one stop", stops)
 	}
-	g.finish("A", 0)
-	if res := <-done; res[0].Status() != fleet.LaneOK {
-		t.Errorf("result = %+v, want the second try's ok", res[0])
+	if len(res) != 2 || res[0].ExitCode != 143 || res[1].Status() != fleet.LaneOK {
+		t.Errorf("results = %+v, want the stopped A and the ok B, and no second A", res)
 	}
 }
 
-func TestLease_ATodoStoppedTwiceIsParkedForTheConsole(t *testing.T) {
+func TestLease_ATodoStoppedInTwoRunsIsParkedForTheConsole(t *testing.T) {
 	g, events, claims, clock := newGatedLaunch(), &eventLog{}, &claimLog{}, newFakeClock()
 	pool := Pool{Target: 1, Launch: g.launch, Publish: events.publish, Claims: claims,
 		Leases: NewLeases(leaseConfig(StageEnforce), clock, noHeartbeat, events.publish)}
-	done := runPool(pool, []fleet.Todo{{ID: "A"}, {ID: "B"}})
-	if id := waitStart(t, g); id != "A" {
-		t.Fatalf("first launch = %q, want A", id)
+	for run := 1; run <= 2; run++ {
+		done := runPool(pool, []fleet.Todo{{ID: "A"}})
+		if id := waitStart(t, g); id != "A" {
+			t.Fatalf("run %d launch = %q, want A", run, id)
+		}
+		clock.Advance(61 * time.Minute)
+		<-done
 	}
-	clock.Advance(61 * time.Minute)
-	if id := waitStart(t, g); id != "A" {
-		t.Fatalf("second launch = %q, want A's one more try before B", id)
-	}
-	clock.Advance(61 * time.Minute)
-	if id := waitStart(t, g); id != "B" {
-		t.Fatalf("third launch = %q, want B: A is parked, not tried a third time", id)
-	}
-	g.finish("B", 0)
-	<-done
 	released, parked, reasons := claims.snapshot()
 	if !reflect.DeepEqual(released, []string{"A", "A"}) || !reflect.DeepEqual(parked, []string{"A"}) {
 		t.Errorf("released = %v parked = %v, want A released twice and parked once", released, parked)
 	}
 	if reasons[len(reasons)-1] != ParkReason {
 		t.Errorf("park reason = %q, want %q", reasons[len(reasons)-1], ParkReason)
+	}
+}
+
+func TestPool_ResupplyFeedsTheFreedSlotFromThePort(t *testing.T) {
+	var launched []string
+	events := &eventLog{}
+	pool := Pool{Target: 1, Publish: events.publish,
+		Resupply: func([]fleet.Todo) []fleet.Todo { return []fleet.Todo{{ID: "fresh"}} },
+		Launch: func(_ context.Context, s fleet.CycleSpec) (int, error) {
+			launched = append(launched, s.Scope[0])
+			return 0, nil
+		}}
+	res := pool.Run(context.Background(), []fleet.Todo{{ID: "first"}})
+	if !reflect.DeepEqual(launched, []string{"first", "fresh"}) || len(res) != 2 {
+		t.Errorf("launched = %v results = %d, want first then the resupplied fresh, with two results", launched, len(res))
+	}
+	got := events.withCode(CodePoolResupplied)
+	if len(got) != 1 || got[0].Fields["todo"] != "fresh" || got[0].Severity != signalcenter.SeverityInfo {
+		t.Errorf("resupplied events = %+v, want one INFO event for fresh", got)
 	}
 }
 
@@ -174,12 +189,12 @@ func TestPool_ARecoveryErrorIsPublishedLoudly(t *testing.T) {
 	g, events, clock := newGatedLaunch(), &eventLog{}, newFakeClock()
 	pool := Pool{Target: 1, Launch: g.launch, Publish: events.publish, Claims: failingClaims{},
 		Leases: NewLeases(leaseConfig(StageEnforce), clock, noHeartbeat, events.publish)}
-	done := runPool(pool, []fleet.Todo{{ID: "A"}})
-	waitStart(t, g)
-	clock.Advance(61 * time.Minute)
-	waitStart(t, g)
-	clock.Advance(61 * time.Minute)
-	<-done
+	for range 2 {
+		done := runPool(pool, []fleet.Todo{{ID: "A"}})
+		waitStart(t, g)
+		clock.Advance(61 * time.Minute)
+		<-done
+	}
 	got := events.withCode(CodeLaneRecoveryFailed)
 	if len(got) != 3 {
 		t.Fatalf("recovery-failed events = %+v, want 3 (two releases and one park)", got)
@@ -278,21 +293,21 @@ func (r *reapLog) keys() []string {
 
 func TestPool_AStoppedLaneIsReapedOnceAndAnUnstoppedLaneNever(t *testing.T) {
 	g, events, claims, clock, reaped := newGatedLaunch(), &eventLog{}, &claimLog{}, newFakeClock(), &reapLog{}
-	pool := Pool{Target: 2, Launch: g.launch, Publish: events.publish, Claims: claims, Reap: reaped.reap,
+	pool := Pool{Target: 1, Launch: g.launch, Publish: events.publish, Claims: claims, Reap: reaped.reap,
 		Leases: NewLeases(leaseConfig(StageEnforce), clock, noHeartbeat, events.publish)}
-	done := runPool(pool, []fleet.Todo{{ID: "slow"}})
+	done := runPool(pool, []fleet.Todo{{ID: "slow"}, {ID: "quick"}})
 	waitStart(t, g)
 	clock.Advance(61 * time.Minute)
-	if again := waitStart(t, g); again != "slow" {
-		t.Fatalf("relaunch = %q, want slow", again)
+	if next := waitStart(t, g); next != "quick" {
+		t.Fatalf("launch after the stop = %q, want quick", next)
 	}
 	if got := reaped.keys(); !reflect.DeepEqual(got, []string{"slow"}) {
 		t.Fatalf("reaped = %v after the stop, want exactly one reap of slow", got)
 	}
-	g.finish("slow", 0)
+	g.finish("quick", 0)
 	<-done
 	if got := reaped.keys(); !reflect.DeepEqual(got, []string{"slow"}) {
-		t.Errorf("reaped = %v, want no reap for the second try that exited by itself", got)
+		t.Errorf("reaped = %v, want no reap for the lane that exited by itself", got)
 	}
 }
 
