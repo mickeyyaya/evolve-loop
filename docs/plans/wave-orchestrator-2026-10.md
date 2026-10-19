@@ -184,7 +184,7 @@ Scores are 1 (worst) to 5 (best).
 | O5 | D9: the lane lease, the heartbeat and the deadline. **Built, 2026-10-17:** `orchestrator.Leases`, one timer over a heap, the heartbeat, `stall_minutes` (default 30) and `deadline_floor_minutes`. The heartbeat is the freshest of the cycle signals and the phase files. A stopped lane gets one dispatch reap of its own dispatch ids. At `enforce` a deadline stops the lane, releases its claim and parks it at the second stop. The wave path holds a shadow lease (spec §8). | `TestLease_ALanePastItsDeadlineStopsAndReleasesItsItem` | lane |
 | O6 | D4, D10, D11, D12: the orchestrator loop over the event channels, and the supply census. **Library built, 2026-10-18:** `orchestrator.Oversight`, `Intake` and `Census`, with `fleet.PoolConfig.Kick`, the shared `shiperr.IsLandingConflict` and `loopwave.Engine.QuotaCount`. **Pending:** the loop wiring of the oversight and of the census, `evolve wave supply`, and the read of the supply record by `evolve wave status`. The split proposal step waits for PR #959 (O2c). | `TestOrchestrator_WakesOnlyOnEvents`, `TestOrchestrator_ShipLandedFreesTheCells`, `TestSupply_RecordsTheCauseOfEachRefusal` | console (protected: loop) |
 | O7 | D14: width, utilization and the conflict rate in `evolve wave status`. **Built 2026-10-17:** `internal/wavemeasure`, spec §11, with the baseline of §8. | `TestWaveStatus_ReportsTheConflictRate` | lane |
-| O8 | D13: the adaptive window above width 4. **Deferred:** it has no effect at width 4. It starts when `fleet.count` goes above 6, together with the ADR-0134 group commit (spec §12). | `TestWindow_GrowsOnACleanLandingAndHalvesOnAConflict` | lane, later |
+| O8 | D13: the adaptive window above width 4. **Built, 2026-10-18:** `orchestrator.Window` with `fleet.orchestrator.window.start` and `window.min`, read by `fleet.RunPool` at `enforce` only. The window bounds the conflict rate. It does not lift the serial landing limit of about 6 lanes, which needs the ADR-0134 group commit (spec §10, §12). The O6 loop must call it on each `ship.landed`. Until then, it stays at `window.start`. | `TestWindow_GrowsOnACleanLandingAndHalvesOnAConflict` | lane |
 | O9 | The lane CPU budget of spec §12: each `go test` of a lane gets `-p`, `-parallel` and `GOMAXPROCS` of `max(1, host CPUs / width)`, from one package `internal/lanebudget`. A structure test refuses a `go test` argv that does not go through it. | `TestProcs_DividesTheHostAmongTheLanes`, `TestEveryGoTestArgvGoesThroughTheLaneBudget` | console (protected: ship, core floors, acssuite, commitgate) |
 
 Each component adds its spec section and its package note. Each new package is at 100% coverage in `.cover-strict` and listed in `.apicover-enforce`.
@@ -201,7 +201,7 @@ The order is O0, O1, O2a, O2b, O3, O7, O4, O5, O6, O2c, O8.
 6. O4 and O5 change how lanes run. The lease comes with the pool, so a backfilled slot has a deadline.
 7. O6 joins the parts into one loop that acts on events.
 8. O2c keeps the supply up after the one-time repair of O2a runs out (F2.17).
-9. O8 is deferred. It matters only above width 6, where the serial landing binds.
+9. O8 came when the operator raised `fleet.count` to 8. It matters above width 4, and the serial landing binds above width 6. O8 bounds the conflicts only. The ADR-0134 group commit lifts the landing limit.
 
 The inbox holds one item for each group of components, in the campaign `wave-orchestrator`:
 

@@ -67,3 +67,28 @@ func TestInboxText_IsTheTitleAndTheSummaryOfEachItem(t *testing.T) {
 		t.Errorf("InboxText = %q", got)
 	}
 }
+
+func TestClaims_TheLifecycleLedgerLandsUnderTheEngineEvolveDirNotTheWorkingDir(t *testing.T) {
+	h := newHarness(t)
+	lifecycleItem(t, h.evolveDir, inboxmover.StatePending, "slow")
+	cwd := t.TempDir()
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if err := h.e.Claims().Park("slow", "deadline twice"); err != nil {
+		t.Fatalf("park = %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(h.evolveDir, "ledger.jsonl")); err != nil {
+		t.Errorf("ledger under the engine evolve dir: %v, want the park recorded there", err)
+	}
+	if _, err := os.Stat(filepath.Join(cwd, ".evolve")); !os.IsNotExist(err) {
+		t.Errorf("stat %s/.evolve = %v, want no ledger written under the working dir", cwd, err)
+	}
+}

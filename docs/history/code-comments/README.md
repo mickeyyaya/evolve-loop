@@ -144,6 +144,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `acs/cycle1383` | 3 | [acs-cycle1383.md](acs-cycle1383.md) |
 | `acs/cycle1389` | 1 | [acs-cycle1389.md](acs-cycle1389.md) |
 | `acs/cycle1391` | 2 | [acs-cycle1391.md](acs-cycle1391.md) |
+| `acs/cycle14` | 1 | [acs-cycle14.md](acs-cycle14.md) |
 | `acs/cycle1403` | 2 | [acs-cycle1403.md](acs-cycle1403.md) |
 | `acs/cycle1407` | 6 | [acs-cycle1407.md](acs-cycle1407.md) |
 | `acs/cycle1409` | 4 | [acs-cycle1409.md](acs-cycle1409.md) |

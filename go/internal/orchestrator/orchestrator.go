@@ -26,6 +26,7 @@ const (
 	CodeFamilyPaused       signalcenter.Code = "LOOP_ORCH_FAMILY_PAUSED"
 	CodeSupply             signalcenter.Code = "LOOP_ORCH_SUPPLY"
 	CodeSupplyShort        signalcenter.Code = "LOOP_ORCH_SUPPLY_SHORT"
+	CodeWindow             signalcenter.Code = "LOOP_ORCH_WINDOW"
 )
 
 const (
@@ -47,6 +48,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeFamilyPaused, "a bench left a CLI family with no healthy family after it in some lane chain, so the sizing step costs a slot and the family stops taking new lanes (ADR-0139 decision 13); lanes in flight finish; published once for each pause; at stage shadow it records the pause and changes nothing (applied false); INFO; fields.family, target (the window after the pause), stage, applied")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeSupply, "the supply census (ADR-0139 O6, spec section 4) before a plan: the count of the inbox items in each class (admissible, waiting_cell, waiting_deps, console_route, console_kind, console_protected), the window, and the first console items with the reason of the routing authority; the full record is .evolve/waves/supply.json; INFO; fields are the six class names, window and console")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeSupplyShort, "the supply census found fewer admissible items than the window, so the lanes of the plan cannot all be filled; the cause of each refusal is in the supply record and in evolve wave supply; INFO; fields are the six class names and window")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeWindow, "the adaptive window of the orchestrator pool (ADR-0139 O8) changed size: it grows by 1 for each clean landing, halves on each landing conflict (never under fleet.orchestrator.window.min) and follows the sized count; published once for each change; INFO; fields.old, new, sized, cause (clean_landing, conflict or resize); the loop builds the window inside the enforce pool only, so nothing publishes at stage shadow; that pool admits a lane only while the lanes in flight number fewer than new")
 }
 
 type Publish func(signalcenter.Event)

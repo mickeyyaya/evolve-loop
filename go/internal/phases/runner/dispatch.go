@@ -57,7 +57,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		attemptLog = append(attemptLog, fmt.Sprintf("%s@%s=%d", candidateCLI, tier, bres.ExitCode))
 		walked = append(walked, candidateCLI)
 		if bridgeErr != nil && bres.ExitCode == 85 {
-			b.maybeBenchOnEscalation(bridgechain.Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: candidateCLI, DispatchStart: start, Env: req.Env})
+			b.maybeBenchOnEscalation(bridgechain.EscalationFor(attempt, start))
 		}
 		return bres.ExitCode, bridgeErr
 	}, func(from, to string) {

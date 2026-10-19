@@ -35,6 +35,8 @@ type Pool struct {
 	Publish     Publish
 	Halted      func() bool
 	Intake      *Intake
+	Stage       string
+	Window      *Window
 }
 
 var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
@@ -71,7 +73,7 @@ func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 	}
 	cfg := fleet.PoolConfig{Target: p.Target, Concurrency: p.Concurrency, MaxLaunches: p.MaxLanes,
 		Halted: func() bool { return in.Stopped() || (p.Halted != nil && p.Halted()) },
-		Next:   next, Kick: in.Wake(),
+		Next:   next, Kick: in.Wake(), Window: p.admissionWindow(),
 		Prepare: func(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {
 			in.Hold(td.ID)
 			return p.prepare(td, spec)
@@ -92,6 +94,13 @@ func refusedResults(n int, err error) []fleet.Result {
 		results[i] = fleet.Result{Index: i, ExitCode: -1, Err: err}
 	}
 	return results
+}
+
+func (p Pool) admissionWindow() func() int {
+	if p.Window == nil || p.Stage != StageEnforce {
+		return nil
+	}
+	return p.Window.Size
 }
 
 func (p Pool) prepare(_ fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {

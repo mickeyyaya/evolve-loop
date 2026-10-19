@@ -58,6 +58,7 @@ The policy key `fleet.orchestrator.stage` sets how the loop runs its lanes ([wav
 | How the lanes run | the barrier wave: all lanes start, and the wave ends when the last lane ends | the rolling pool: a free slot takes the next admissible todo at once |
 | Which todo takes a slot | the file partition | admission by package cell; `LOOP_ORCH_LANE_BACKFILLED` names it |
 | The end line | `[loop] wave N: X/Y lanes ok` | `[loop] pool N: X/Y lanes ok (orchestrator, target=W)` |
+| How many lanes run at once | `fleet.count`, after the quota shrink | at most the adaptive window ([wave-orchestrator §10](../architecture/wave-orchestrator.md#10-the-adaptive-window)). It starts at `window.start` lanes (default 4). It adds 1 for each clean landing, and it halves on each landing conflict, down to `window.min`. |
 | When a run ends | when the wave ends | when the supply is empty and no lane runs, at the operator stop, or after `run_max_lanes` launches (default 4 × `fleet.count`) |
 | A lane past its deadline | `LOOP_ORCH_LANE_DEADLINE`, action `recorded`. The lane runs on. | the loop stops the lane, reaps its dispatches, releases its inbox claim and gives the todo one more try. A second stop routes the todo to the console with the reason `deadline twice`. |
 | A lane with no live signal (cycle event, pane-watch, events or stdout file) for `stall_minutes` (default 30) | `LOOP_ORCH_LANE_STALLED` once. The lane runs on. | the same |
@@ -68,6 +69,8 @@ At `enforce`:
 - `evolve loop-stop --wait` stops new launches. The lanes in flight finish, and then the loop stops at the boundary.
 - A todo with route `console-manual` and the reason `deadline twice` needs the console. Read its last two cycles before you route it back to a lane.
 - Remove `fleet.scheduling: pool`. The orchestrator always runs the pool, and the loop gives a WARN for the key.
+- Read the line `[loop] orchestrator: adaptive window` at the start of a run. It names the lanes that the pool admits first. The window grows only when the oversight loop (plan O6) reports a clean landing. Until O6 is built, it stays at `window.start`. To run all `fleet.count` lanes before then, set `fleet.orchestrator.window.start` to `fleet.count`.
+- `LOOP_ORCH_WINDOW` shows each change of the window, with the old size, the new size and the cause. The window bounds conflicts. It does not lift the serial landing limit of about 6 lanes.
 - `LOOP_ORCH_LANE_RECOVERY_FAILED` means that a claim release or a park failed. Release or route the named todo by hand.
 
 At `shadow`, count the `LOOP_ORCH_LANE_LATE_EXIT` events with `status` `ok`. Each one is a lane that passed after its deadline. A deadline stop at `enforce` stops such a lane. The exit to `enforce` needs none over 3 runs ([wave-orchestrator §14](../architecture/wave-orchestrator.md#14-stages)).
