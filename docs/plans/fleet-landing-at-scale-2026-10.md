@@ -312,7 +312,7 @@ Each component is one lane, lands unwired first, and starts with its red tests. 
 | Id | Component | Red tests first | Reuses | Protected surface | Stage |
 |---|---|---|---|---|---|
 | S0 | These documents: the dossier, this plan, ADR-0134, the indexes | none (docs) | the sibling docs | no | n/a (docs) |
-| S1 | The fast-forward check before the scan | `TestRunNative_ADivergedLaneReturnsRebaseNeededWithNoScan`, `TestRunNative_AFastForwardLaneStillScans`, `TestRunNative_ADivergedLaneEmitsTheSameCodeAsTheLanding` | `Landing.CheckFastForward` | yes (ship) | enforce at once (it adds a check and removes no check) |
+| S1 | **S1 stays dropped:** the fast-forward check before the scan. `normalizeBuildWorktree` resets the lane to its base after build, so ship sees HEAD equal to base. A `RebaseNeeded` result sends the lane to recovery, where `FleetRebaseAlreadyLanded` discards it. If the check stages the lane and consumes the inbox first, it runs before `verifyAuditBinding` and bypasses the post-audit tamper guard. A read-only probe cannot meet both limits, so S5 and S6 (the content-keyed cache) save the scan. | none (dropped) | `Landing.CheckFastForward` | yes (ship) | n/a (dropped) |
 | S2 | Process shards for one large package in the scan, with a side-by-side shadow run | `TestShards_EveryListedTestRunsExactlyOnce`, `TestShards_ARedInOneShardIsARedOfThePackage`, `TestShards_ATestThatSetsEnvRunsInItsOwnProcess`, `TestShards_ASmallPackageRunsInOneProcess`, `TestShards_ATestThatNeedsStateFromAnEarlierTestShowsAsADifference`, `TestShardShadow_ComparesEachTestResultWithTheUnshardedRun`, `TestShardShadow_ChangesNoVerdict` | `runGoTestJSON`, `classifyPackEvents` | yes (ship) | shadow, then enforce |
 | S3 | `internal/testkey`: the content key, a pure function | `TestKey_ChangesWhenAFileOfADependencyChanges`, `TestKey_StaysWhenAnUnrelatedPackageChanges`, `TestKey_ChangesWhenADataRootChanges`, `TestKey_ChangesWhenATagOrFlagChanges`, `TestKey_ATreeReadingTestKeysOnTheWholeTree`, `TestKey_AnUnknownReadKeysOnTheWholeTree`, `TestKey_ATestdataChangeChangesTheKey`, `TestKey_ChangesWhenAProductionDependencyReadsAnOutsideRoot`, `TestKey_ChangesWhenAReadEnvVarChanges`, `TestKey_AnOutsideReadInTheTestLogKeysOnTheWholeTree`, `TestKey_AReadInTheTempDirIsNotAnOutsideRead`, `TestKey_AChangeOfADeclaredChildVarChangesTheKey` | the package map of `internal/overlap`, the data-edge catalog of Q5 | yes: a hit skips a test | n/a (an unwired pure function) |
 | S4 | `internal/testverdict`: the store of green results | `TestStore_ARedIsNeverStored`, `TestStore_ATimeoutIsNeverStored`, `TestStore_AHitNeedsAnEqualKey`, `TestStore_ATornWriteIsAMiss`, `TestStore_GCRemovesEntriesPastTheirAge` | `atomicwrite` | yes | n/a (an unwired store) |
@@ -335,7 +335,7 @@ Each component is one lane, lands unwired first, and starts with its red tests. 
 The order puts the measure first, then the gains that need no queue, then the queue.
 
 1. **S0** (this lane), then **S13**: the simulation sets the worker count and proves the design before any enforce stage.
-2. **S1 and S8**: small changes that help at N = 2 today. S1 goes live at once, because it adds a check and removes no check.
+2. **S8**: a small change that helps at N = 2 today. S1 stays dropped (§7), and S5 and S6 save the scan instead.
 3. **S2** in shadow: each scan of `cmd/evolve` also runs unsharded, and the two per-test results are compared. S2 enforces after 30 clean comparisons.
 4. **S3, S4 and S5**: the cache in shadow. Exit: zero escapes over at least 100 scans and 2 weeks, with at least 500 hits that it can skip.
 5. **S6**: the cache in enforce, only after the S5 exit.
@@ -347,7 +347,7 @@ The order puts the measure first, then the gains that need no queue, then the qu
 | Stage | Content | Entry | Exit |
 |---|---|---|---|
 | 0 | S0, S13 | the operator's choice | the simulation meets G4 and G5 for W at N = 200 |
-| 1 | S1 and S8 enforce; S2 shadow | stage 0 | S2: 30 scans with no per-test difference between the sharded and the unsharded run |
+| 1 | S8 enforce; S2 shadow | stage 0 | S2: 30 scans with no per-test difference between the sharded and the unsharded run |
 | 1b | S2 enforce | stage 1 | the test seconds of a rescan fall by ≥ 30% over 10 rebases |
 | 2 | S3 to S5 shadow | stage 0 | zero escapes over at least 100 scans and 2 weeks, with at least 500 hits that it can skip |
 | 3 | S6 enforce | the stage 2 exit (S5 escapes are the gate) | G2 holds over 20 rebases |
