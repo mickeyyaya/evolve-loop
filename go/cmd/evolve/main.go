@@ -80,6 +80,9 @@ Commands:
               ( ci classify <run-id|pr:N|sha:H> [--json] [--rerun] [--project-root P] )
              Watch a pushed SHA, PR or tag until its CI completes; exit 0 green, 1 red, 2 unobservable
               ( ci watch (--sha S | --pr N | --tag T) [--workflow W]... [--cycle N] )
+  handoff    Phase handoff exit check of the ledger in a run directory, read-only; exit 0 pass,
+              1 retry, blocked or invalid, 2 IO error, 10 usage
+              ( handoff check --cycle N --pair triage-tdd|tdd-build [--json] [--project-root P] | handoff show --cycle N [--json] [--project-root P] )
   comments   Comment-campaign proof tools (the commentaudit CLI)
               ( comments rank|check|comments|verify|history|strip ... )
   status     Read-only report: loop, cycles, ship streak, open PRs, failing CI jobs
