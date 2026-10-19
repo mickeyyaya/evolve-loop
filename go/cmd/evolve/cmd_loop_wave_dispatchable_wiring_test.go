@@ -71,7 +71,7 @@ func TestZeroLaneWavesCountTowardWorkSupplyStarvation(t *testing.T) {
 	writeWave20Shape(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
 	var console bytes.Buffer
-	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: &console}
+	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: &console, loadGraph: noModuleGraph}
 	b.deps.Signals = newRootSignalCenter(root, evolveDir, &console)
 	b.deps.Storage = &fixtures.FakeStorage{State: core.State{LastCycleNumber: 7}}
 	fleetCfg := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave", StarvationK: 2, StarvationWeight: 0.9}

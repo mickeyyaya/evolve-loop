@@ -128,6 +128,10 @@ func PoolSupply(fc policy.FleetConfig) int {
 	return max(fc.Count, fc.Orchestrator.ScanK)
 }
 
+func ShouldRunPlan(fc policy.FleetConfig) bool {
+	return ShouldRunWave(fc) || ShouldRunPool(fc)
+}
+
 func LoadFleetConfig(evolveDir string, warn io.Writer, c *signalcenter.Center) policy.FleetConfig {
 	path := paths.PolicyPath(evolveDir)
 	pol, err := policy.Load(path)

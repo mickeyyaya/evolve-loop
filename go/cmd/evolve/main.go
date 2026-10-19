@@ -75,7 +75,7 @@ Commands:
               ( boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--dry-run] )
   wave       Operator and LLM path: run the next wave as one verb (the boundary, a goal made from facts,
               the launch, a wave record); read its state; stream its events
-              ( wave next [--merge n,...] [--note T] [--dry-run] [--json] | status | watch | note add|list|clear [--json] )
+              ( wave next [--merge n,...] [--note T] [--dry-run] [--json] | status | supply | watch | note add|list|clear [--json] )
   ci         Classify a red CI run's failing tests from evidence; exit 0 = retry-safe
               ( ci classify <run-id|pr:N|sha:H> [--json] [--rerun] [--project-root P] )
              Watch a pushed SHA, PR or tag until its CI completes; exit 0 green, 1 red, 2 unobservable

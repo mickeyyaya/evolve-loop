@@ -15,7 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 type (
@@ -44,7 +43,7 @@ func (b *loopBatchCoordinator) wave() *loopwave.Engine {
 
 func (b *loopBatchCoordinator) wiredWave() *loopwave.Engine {
 	return newWaveEngine(b.cfg, b.deps.Storage, b.stderr, func() *signalcenter.Center { return b.deps.Signals },
-		loopwave.WithAdmission(admissionShadow(b.ctx, filepath.Join(b.cfg.ProjectRoot, "go"), sysexec.DefaultRunner)))
+		loopwave.WithAdmission(admissionShadow(b.moduleGraph)))
 }
 
 func nilSignals() *signalcenter.Center { return nil }

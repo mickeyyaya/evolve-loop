@@ -180,7 +180,7 @@ func TestChainEngines_OneConstructionSite(t *testing.T) {
 func TestLoopBatchCoordinator_WaveEngineIsCachedAndReadsTheCenterLive(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	b := &loopBatchCoordinator{cfg: loopConfig{ProjectRoot: root, EvolveDir: filepath.Join(root, ".evolve")}, stderr: io.Discard}
+	b := &loopBatchCoordinator{cfg: loopConfig{ProjectRoot: root, EvolveDir: filepath.Join(root, ".evolve")}, stderr: io.Discard, loadGraph: noModuleGraph}
 	first := b.wave()
 	if first != b.wave() {
 		t.Error("wave() caches the engine")
@@ -238,7 +238,7 @@ func TestDispatchFleetIteration_PreflightRefusalRendersDispatchFailedOnce(t *tes
 		t.Fatal(err)
 	}
 	var console bytes.Buffer
-	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: &console}
+	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: &console, loadGraph: noModuleGraph}
 	b.deps.Signals = newRootSignalCenter(root, evolveDir, &console)
 	b.deps.Storage = &fixtures.FakeStorage{}
 	var starvation fleet.StarvationTracker
@@ -313,7 +313,7 @@ func TestPrepareIteration_PassesTheBatchCenterToTheRefresh(t *testing.T) {
 	u13StubRefresh(t, func() bool { return true })
 	chainRebuildFn = func(string) error { return errors.New("build failed: syntax error") }
 	var console bytes.Buffer
-	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: &console}
+	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: &console, loadGraph: noModuleGraph}
 	b.deps.Signals = newRootSignalCenter(root, evolveDir, &console)
 	b.deps.Storage = &fixtures.FakeStorage{}
 	fc := policy.FleetConfig{Count: 1}

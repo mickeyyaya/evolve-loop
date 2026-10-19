@@ -123,12 +123,13 @@ type waveHarness struct {
 	sleeps  int
 	onSleep func(n int)
 	save    func(s wave.Store, r wave.Record) error
+	graph   graphLoader
 	stdout  bytes.Buffer
 	stderr  bytes.Buffer
 }
 
 func newWaveHarness() *waveHarness {
-	return &waveHarness{verbs: &fakeWaveVerbs{writePID: true}, alive: map[int]bool{}, started: map[int]time.Time{}}
+	return &waveHarness{verbs: &fakeWaveVerbs{writePID: true}, alive: map[int]bool{}, started: map[int]time.Time{}, graph: noModuleGraph}
 }
 
 func (h *waveHarness) env(root string) waveEnv {
@@ -168,6 +169,7 @@ func (h *waveHarness) env(root string) waveEnv {
 			h.since = append(h.since, since)
 			return []string{"812"}, h.prsErr
 		},
+		loadGraph: h.graph,
 	}
 }
 

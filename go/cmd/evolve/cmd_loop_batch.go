@@ -28,6 +28,8 @@ type loopBatchCoordinator struct {
 	preWave      func(iteration int) (batchDecision, bool)
 	leases       map[string]*orchestrator.Leases
 	zeroShip     zeroShipTally
+	loadGraph    graphLoader
+	lastGraph    graphLoad
 }
 
 func (b *loopBatchCoordinator) run() int {
