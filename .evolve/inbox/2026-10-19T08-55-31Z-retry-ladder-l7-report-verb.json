@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "On fixture run dirs with known rungs the report prints the exact counts per rung and class (red test first)",
+    "The verb writes nothing"
+  ],
+  "campaign": "retry-ladder",
+  "created_at": "2026-10-19T09:30:00Z",
+  "deps": [
+    "retry-ladder-l0-try-record"
+  ],
+  "files": [
+    "go/cmd/evolve",
+    "docs/operations/runtime-reference.md"
+  ],
+  "fix": "TDD first (red test before code), 100% coverage on new and changed functions, zero comments, the package note updated.",
+  "id": "retry-ladder-l7-report-verb",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "source": "plan retry-ladder-2026-10 (operator request and decisions 2026-10-19)",
+  "summary": "Component L7 of ADR-0142 (plan D13). A read-only verb reads the try records of the run dirs and prints, per rung and class, the tries, the fixes (the phase passed after that try) and the tokens; --json for machines. This is the evidence the operator uses to move the stage to enforce, and for the what-changes-our-mind rules of the plan. Spec docs/architecture/retry-ladder.md \u00a76; ADR-0142.",
+  "title": "Retry ladder L7: evolve ladder report",
+  "weight": 1.0
+}

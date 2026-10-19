@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A dispatch with a ladder effort of high at balanced launches claude with --effort high (red test first)",
+    "On agy at balanced, a request above Flash High is capped, and the report line names the requested and the granted effort",
+    "Without a ladder effort, the launch is byte-identical to today"
+  ],
+  "campaign": "retry-ladder",
+  "created_at": "2026-10-19T09:30:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/phase.go",
+    "go/internal/llmroute",
+    "go/internal/bridge"
+  ],
+  "fix": "TDD first (red test before code), 100% coverage on new and changed functions, zero comments, the package note updated.",
+  "id": "retry-ladder-l3-effort-overlay",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "source": "plan retry-ladder-2026-10 (operator request and decisions 2026-10-19)",
+  "summary": "Component L3 of ADR-0142. Effort has no per-attempt field; bridge.LaunchEffort derives it from the tier (research F2.5, go/internal/bridge/profile.go:26). Add the ladder effort to PhaseRequest and llmroute.Overlay; the launch uses it over the tier default; the family realizer caps it to the steps the family has (agy effort lives in the model name). Spec docs/architecture/retry-ladder.md \u00a74; ADR-0142.",
+  "title": "Retry ladder L3: a per-try effort overlay",
+  "weight": 1.0
+}

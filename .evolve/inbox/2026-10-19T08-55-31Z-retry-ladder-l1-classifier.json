@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Fixtures from cycles 1946, 1950 and 1953 classify as spec; 1965 and 1966 as capability (red test first)",
+    "Exits 2, 3, 10, 86 and 99 classify as halt; exit 85 without a bench is infra",
+    "The package does not import go/internal/core",
+    "Exit 85 with a bench-confirmed quota wall classifies as quota; a failure that matches no signal is unknown"
+  ],
+  "campaign": "retry-ladder",
+  "created_at": "2026-10-19T09:30:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/retryladder",
+    "docs/architecture/packages"
+  ],
+  "fix": "TDD first (red test before code), 100% coverage on new and changed functions, zero comments, the package note updated.",
+  "id": "retry-ladder-l1-classifier",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "source": "plan retry-ladder-2026-10 (operator request and decisions 2026-10-19)",
+  "summary": "Component L1 of ADR-0142, in the new package go/internal/retryladder. Classify a failed try as infra, quota, halt, spec, capability or unknown from host facts only (spec \u00a73): exit codes, the usage-probe bench, the audit failure class, host-proven BLOCKER claims, floor failures inside or outside the lane scope. Fingerprint = the violation-code set of the first failed check (reuse the identity of core/contract_escalation.go), else normalized text. Spec docs/architecture/retry-ladder.md \u00a73; ADR-0142.",
+  "title": "Retry ladder L1: the deterministic failure classifier",
+  "weight": 1.0
+}
