@@ -63,7 +63,7 @@ func TestDispatchPoolIteration_SingleLaneCountInertNoLaunch(t *testing.T) {
 	}
 	launch := func(context.Context, fleet.CycleSpec) (int, error) { launched++; return 0, nil }
 
-	ran, _, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+	ran, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 	if err != nil {
 		t.Fatalf("dispatchPoolIteration returned error: %v, want nil on the gated-off path", err)
 	}
@@ -88,7 +88,7 @@ func TestDispatchPoolIteration_ManualPlanSourceInertNoLaunch(t *testing.T) {
 	}
 	launch := func(context.Context, fleet.CycleSpec) (int, error) { launched++; return 0, nil }
 
-	ran, _, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+	ran, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 	if err != nil {
 		t.Fatalf("dispatchPoolIteration returned error: %v, want nil on the gated-off path", err)
 	}
@@ -108,7 +108,7 @@ func TestDispatchPoolIteration_PlanFnErrorSurfacesNoLaunch(t *testing.T) {
 	planFn := func(context.Context, int) ([]fleet.Todo, error) { return nil, wantErr }
 	launch := func(context.Context, fleet.CycleSpec) (int, error) { launched++; return 0, nil }
 
-	ran, _, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+	ran, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("dispatchPoolIteration error = %v, want it to wrap the planFn error %v", err, wantErr)
 	}
@@ -136,7 +136,7 @@ func TestDispatchPoolIteration_BacklogShorterThanTargetNeverBlocks(t *testing.T)
 		err     error
 	}, 1)
 	go func() {
-		ran, _, results, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+		ran, results, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 		done <- struct {
 			ran     bool
 			results []fleet.Result
@@ -191,7 +191,7 @@ func TestDispatchPoolIteration_LargeScaleBacklogAllDispatchedExactlyOnce(t *test
 		err     error
 	}, 1)
 	go func() {
-		ran, _, results, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+		ran, results, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 		done <- struct {
 			ran     bool
 			results []fleet.Result
@@ -242,7 +242,7 @@ func TestDispatchPoolIteration_NonPositiveConcurrencyNeverBlocks(t *testing.T) {
 			var results []fleet.Result
 			go func() {
 				var err error
-				ran, _, results, err = dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+				ran, results, err = dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 				done <- err
 			}()
 			select {

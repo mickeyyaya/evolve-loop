@@ -178,11 +178,11 @@ func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.Fl
 	if fleetConfig.Orchestrator.Stage == orchestrator.StageEnforce {
 		run, mode = b.orchestratedRun(fleetConfig, poolLaunch, iteration), "orchestrator"
 	}
-	ran, _, results, err := planAndRunPool(
+	ran, results, err := planAndRunPool(
 		b.ctx,
 		fleetConfig,
 		productionWavePreflight(b.cfg.ProjectRoot),
-		productionPoolPlanFn(b.cfg, b.deps.Storage, loopwave.PoolSupply(fleetConfig), b.stderr),
+		func(depth int) poolPlanFn { return productionPoolPlanFn(b.cfg, b.deps.Storage, depth, b.stderr) },
 		run,
 		iteration,
 	)

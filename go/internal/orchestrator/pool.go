@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"sync"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -39,6 +38,7 @@ type Pool struct {
 	Intake      *Intake
 	Stage       string
 	Window      *Window
+	Resupply    func(held []fleet.Todo) []fleet.Todo
 }
 
 var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
@@ -46,6 +46,7 @@ var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
 	fleet.PoolExited:     CodeLaneExited,
 	fleet.PoolBackfilled: CodeLaneBackfilled,
 	fleet.PoolIdle:       CodePoolIdle,
+	fleet.PoolResupplied: CodePoolResupplied,
 }
 
 var errIntakeNeedsAdmit = errors.New("orchestrator: a pool with an intake needs an admit function: the freed cells and the limit act through it")
@@ -62,30 +63,16 @@ func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 	if next != nil {
 		next = in.Gate(next)
 	}
-	var mu sync.Mutex
-	retry := map[string]bool{}
 	launch := p.Launch
 	if p.Leases != nil {
-		launch = p.Leases.Watch(p.Launch, func(lane Lane, ret Return) {
-			again := p.recover(lane, ret)
-			mu.Lock()
-			retry[lane.Key] = again
-			mu.Unlock()
-		})
+		launch = p.Leases.Watch(p.Launch, p.recover)
 	}
 	cfg := fleet.PoolConfig{Target: p.Target, Concurrency: p.Concurrency, MaxLaunches: p.MaxLanes,
 		Halted: func() bool { return in.Stopped() || (p.Halted != nil && p.Halted()) },
-		Next:   next, Kick: in.Wake(), Window: p.admissionWindow(),
+		Next:   next, Kick: in.Wake(), Window: p.admissionWindow(), Resupply: p.Resupply,
 		Prepare: func(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {
 			in.Hold(td.ID)
 			return p.prepare(td, spec)
-		},
-		Exited: func(td fleet.Todo, _ fleet.Result) bool {
-			mu.Lock()
-			defer mu.Unlock()
-			again := retry[td.ID]
-			delete(retry, td.ID)
-			return again
 		}}
 	return fleet.RunPool(ctx, cfg, backlog, launch, p.transition)
 }
@@ -132,23 +119,21 @@ func (p Pool) transition(t fleet.PoolTransition) {
 	}
 }
 
-func (p Pool) recover(lane Lane, ret Return) bool {
+func (p Pool) recover(lane Lane, ret Return) {
 	if !ret.Stopped {
-		return false
+		return
 	}
 	if p.Reap != nil {
 		p.Reap(lane)
 	}
 	if p.Claims == nil {
-		return false
+		return
 	}
 	todo := lane.Key
 	p.check(todo, "release", p.Claims.Release(todo, releaseReason))
-	if ret.Stops < 2 {
-		return true
+	if ret.Stops >= 2 {
+		p.check(todo, "park", p.Claims.Park(todo, ParkReason))
 	}
-	p.check(todo, "park", p.Claims.Park(todo, ParkReason))
-	return false
 }
 
 func (p Pool) check(todo, step string, err error) {

@@ -32,8 +32,9 @@ Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as the library of O6. The lo
   - `Next` is `Pool.Admit`. `AdmitByCell` adapts an `admission.Admitter`. The lanes in flight are the holdings, and the pending todos are the candidates in rank order. The first admitted todo takes the slot. A nil `Admit` keeps the file rule of `RunPool`.
   - `Prepare` is `Pool.Freshen`. The loop gives `loopwave.Engine.Freshen`, which runs `fleet.FreshenSpecs` on the one spec just before its launch. A stale todo does not launch, and the slot goes to the next todo.
   - `MaxLaunches` is `fleet.orchestrator.run_max_lanes`. `Halted` is the operator stop.
-  - `Exited` returns true for a todo that the lease stopped once. That todo gets one more try at the head of the queue.
-- **The transitions.** `onTransition` publishes one INFO `loop.wave` event for each `fleet.PoolTransition`: `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_EXITED`, `LOOP_ORCH_LANE_BACKFILLED` and `LOOP_ORCH_POOL_IDLE`. Each event has `live` and `target`, and each lane event has `todo`.
+  - `Resupply` is `Pool.Resupply`. The loop gives the plan source of the run (`orchestratorResupply` in `cmd/evolve`). A nil port keeps the backlog of the run start.
+  - No hook re-queues a stopped todo. After a deadline stop, `recover` reaps the lane and releases its claim. The todo does not launch again in the same run, and a later run can take it. The second stop of the todo in the batch parks it ([pool-resupply-2026-10](../../plans/pool-resupply-2026-10.md) D8).
+- **The transitions.** `onTransition` publishes one INFO `loop.wave` event for each `fleet.PoolTransition`: `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_EXITED`, `LOOP_ORCH_LANE_BACKFILLED`, `LOOP_ORCH_POOL_RESUPPLIED` and `LOOP_ORCH_POOL_IDLE`. Each event has `live` and `target`, and each lane event has `todo`.
 - **The lease table.** `Leases.Watch(launch, settle)` wraps a `fleet.LaunchFn`. It makes a child context for the lane, grants the lease, runs the launch and returns the lease. The key of a lane is its scope joined with `+`. When two lanes have the same key, the second return finds no lease. That lane then returns an error that names the key, and no panic occurs (`TestLease_AGiveWithNoLeaseIsAnErrorNotAPanic`, `TestLease_ADuplicateKeyFailsTheSecondLaneLoudly`).
 - **The observed heartbeat (O6).** `Leases.Beat` records the time of an event of the lane. It clamps a time stamp in the future to the clock, so a producer with a fast clock cannot hide a stall (`TestLease_ABeatFromTheFutureCountsAsNowAndNeverPostponesTheStall`). `Leases.Stall` publishes the stall once for a lane, and it does nothing when `stall_minutes` is 0 (`TestLease_AZeroStallTurnsTheReportedStallOffToo`). `Leases.Epoch` counts the grants and the gives (`TestLease_EpochCountsEachGrantAndEachGive`).
 - **One timer over a heap.** The heap holds one entry for each lane: the earlier of its deadline and its stall time. A changed lane gets a new entry, and the old entry goes stale by its sequence number. After each change, the table stops its timer and arms one `Clock.AfterFunc` for the top of the heap. `fire` pops each due entry, checks the lane, pushes its next time and arms the timer again. The cost of each lane event is O(log N).
@@ -92,7 +93,7 @@ Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as the library of O6. The lo
 | The window changes size | none: the loop builds no window at `shadow` | `LOOP_ORCH_WINDOW` once for each change. The pool admits a lane only while the lanes in flight number fewer than the size. |
 | The window is narrower than the pool width | the barrier wave starts every lane | a lane exit frees a slot, and the pool fills it only up to the size |
 | No heartbeat for `stall_minutes` | `LOOP_ORCH_LANE_STALLED` once for the lane | the same |
-| The deadline passes | `LOOP_ORCH_LANE_DEADLINE` with `action` `recorded`. Nothing stops. | `LOOP_ORCH_LANE_DEADLINE` with `action` `stopped`, the stop, the claim release, then one more try or the park |
+| The deadline passes | `LOOP_ORCH_LANE_DEADLINE` with `action` `recorded`. Nothing stops. | `LOOP_ORCH_LANE_DEADLINE` with `action` `stopped`, the stop and the claim release. A later run can take the todo. The second stop parks it. |
 | A lane exits after its deadline | `LOOP_ORCH_LANE_LATE_EXIT` with `status` and `rc` | the same, with `stopped` true |
 
 At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status` `ok`. Such a lane passed, so a deadline stop at `enforce` was a loss.
@@ -108,7 +109,8 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
 ## Invariants
 
 - A free slot takes the next admissible todo at once, and a lane exit frees its cells (`TestOrchestrator_AFreeSlotTakesTheNextAdmissibleTodoAtOnce`).
-- At `enforce`, a lane past its deadline stops, its claim is released and it gets one more try (`TestLease_ALanePastItsDeadlineStopsAndReleasesItsItem`). A second stop parks it (`TestLease_ATodoStoppedTwiceIsParkedForTheConsole`).
+- At `enforce`, a lane past its deadline stops and its claim is released. The todo does not launch again in the same run, even when the resupply gives it again (`TestLease_ALanePastItsDeadlineIsReleasedAndNotRelaunchedInTheSameRun`). A second stop in a later run parks it (`TestLease_ATodoStoppedInTwoRunsIsParkedForTheConsole`).
+- The resupply port feeds a freed slot (`TestPool_ResupplyFeedsTheFreedSlotFromThePort`).
 - At `shadow`, a passed deadline stops nothing and releases nothing (`TestLease_AShadowDeadlineRecordsTheEventAndStopsNothing`, `TestPool_ShadowLeasesNeverStopOrRelease`).
 - Only the lane past its deadline stops (`TestLease_AnEnforcedDeadlineStopsOnlyThatLaneThroughItsInjectedStop`).
 - A stall publishes once for each lane (`TestLease_ASilentLaneReportsItsStallOnce`). A fresh heartbeat moves the stall (`TestLease_AFreshHeartbeatPostponesTheStall`).
