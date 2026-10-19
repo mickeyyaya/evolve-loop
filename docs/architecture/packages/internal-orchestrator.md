@@ -24,6 +24,7 @@ Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as the library of O6. The lo
 - **The window (`Window`).** It holds the number of lanes that the pool admits. It grows by 1 for each clean landing and halves on each landing conflict.
 
 Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as O8, of the wave-orchestrator plan. The package runs no LLM, starts no process and stops no process by itself.
+Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as the library of O6. The loop wiring of the census is built (O6, 2026-10-18; see [cmd-evolve.md](cmd-evolve.md)). The loop wiring of the oversight is pending. The package runs no LLM, starts no process and stops no process by itself.
 
 ## Design
 
@@ -80,7 +81,8 @@ Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as O8, of the wave-orchestra
   - The record file is `.evolve/waves/supply.json`. It holds the last 12 censuses, and each write is atomic. `ReadSupply` and `SupplyIn` read it. A broken file is an error, so the operator sees it.
   - `AppendSupply` holds an exclusive file lock (`supply.json.lock`) across its read, its change and its write, so two writers lose no record (`TestSupplyRecord_ConcurrentAppendsLoseNoRecord`). It waits at most 10 s for the lock, and a longer wait is an error (`TestSupplyRecord_AnAppendHoldsTheFileLockAcrossItsReadModifyWrite`). The lock and the write are ports of a `supplyStore`, so a test fails each one (`TestSupplyRecord_AFailedLockAndAFailedWriteAreErrorsThatNameTheRecord`).
   - `Count` refuses a census with no clock (`TestSupply_CountRefusesACensusWithNoClock`).
-  - The proposal step is the `Proposer` function value. It runs only when the admissible count is below twice the window (`TestSupply_TheSplitProposalStepRunsBelowTwiceTheWindowOnlyAndNilMeansNone`). It gets the `console_protected` items. A nil value proposes nothing. PR #959 gives `inboxsplit.Proposals`, which fits behind a small adapter.
+  - `Supply.Total` is the count of every item that the census saw (`TestSupply_TotalIsTheCountOfEveryItemTheCensusSaw`).
+  - The proposal step is the `Proposer` function value. It runs only when the admissible count is below twice the window (`TestSupply_TheSplitProposalStepRunsBelowTwiceTheWindowOnlyAndNilMeansNone`). It gets the `console_protected` items. A nil value proposes nothing. PR #959 gives `inboxsplit.Proposals`, which fits behind a small adapter. Until then, the loop and `evolve wave supply` pass a nil value.
   - `consoleClass` reads the class from the reason prefix. `TestConsoleClass_FollowsTheReasonsThatTheRoutingAuthorityGives` pins each prefix against `inboxbatch.ConsoleRouted`, so a change of the reason text fails a test.
 
 ## Stage behaviour

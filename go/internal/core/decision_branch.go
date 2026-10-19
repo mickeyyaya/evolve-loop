@@ -175,7 +175,7 @@ func (o *Orchestrator) recordShipError(ctx context.Context, cycle int, cs CycleS
 		"message": se.Message,
 		"debug":   se.DebugString(),
 	}
-	if buf, err := json.MarshalIndent(payload, "", "  "); err != nil {
+	if buf, err := marshalIndentJSON(payload, "", "  "); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN ship-error marshal: %v\n", err)
 		artifactPath = ""
 	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
@@ -264,7 +264,7 @@ func (o *Orchestrator) recordPlanRejectionsKind(ctx context.Context, cycle int, 
 	if rejections == nil {
 		rejections = []router.PlanRejection{}
 	}
-	buf, err := json.MarshalIndent(rejections, "", "  ")
+	buf, err := marshalIndentJSON(rejections, "", "  ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN advisor-rejections marshal (cycle %d): %v\n", cycle, err)
 		return

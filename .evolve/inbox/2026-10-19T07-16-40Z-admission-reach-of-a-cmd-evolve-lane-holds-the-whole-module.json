@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "With a running lane that edits only go/cmd/evolve, a candidate that edits only go/internal/router is admitted (red test first)",
+    "A todo that edits go/cmd/evolve and go/internal/router keeps its full reach, so it still holds a candidate that edits a package router imports",
+    "A running lane that edits a non-leaf package still holds a candidate that edits a package in its reach",
+    "Two todos that edit go/cmd/evolve still never run at once, and the hub rule is unchanged",
+    "ModuleGraph.IsLeaf is true for go/cmd/evolve and false for go/internal/router on the fixture"
+  ],
+  "campaign": "wave-orchestrator",
+  "created_at": "2026-10-19T07:20:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/admission/admission.go",
+    "go/internal/admission/modulegraph.go",
+    "go/internal/admission/admission_test.go",
+    "go/internal/admission/modulegraph_test.go",
+    "docs/plans/wave-orchestrator-2026-10.md",
+    "docs/architecture/wave-orchestrator.md",
+    "docs/architecture/packages/internal-admission.md"
+  ],
+  "fix": "Approach (b), operator decision 2026-10-19. A todo whose edited packages are all leaves (zero importers in the module graph, such as the go/cmd/* mains) gets an empty reach, because nothing compiles against it and the ship's composed-tree gate (ADR-0105) catches API drift. Its edits still conflict with a todo that edits the same package, and the hub rule is unchanged. ModuleGraph keeps the importer count that NewModuleGraph already computes and exposes IsLeaf(pkg); test-only importers are not in Deps and do not count. footprintOf skips the reach loop only when len(pkgs) > 0 and every edited package is a leaf; a todo with no resolved package keeps today's named-path fallback. Non-Go files outside go/ add no package; a non-Go file under go/cmd/evolve maps to cmd/evolve. Design first (docs-write): record (b) with the rejected (a) direct-imports-only and (c) exported-API reach, and the wave 131 evidence, in docs/plans/wave-orchestrator-2026-10.md and the ADR-0139 admission section of docs/architecture/wave-orchestrator.md; amend internal-admission.md. TDD with a module-graph fixture (red test first; internal/router is not a hub in the fixture). 100% coverage on changed functions, zero comments.",
+  "id": "admission-reach-of-a-cmd-evolve-lane-holds-the-whole-module",
+  "kind": "fix",
+  "priority_class": "correctness",
+  "source": "wave 131 pool-width investigation 2026-10-19; operator chose approach (b) on 2026-10-19",
+  "summary": "In wave 131 the pool fell to 3 of 4 lanes at 07:05:32 (LOOP_ORCH_POOL_IDLE live=3) while 18 items were lane-ready. The running lane pool-underfill-warns-and-wave-watch-prints-it edits go/cmd/evolve. admission.footprintOf puts every package in the module graph's Deps of an edited package into the lane's reach, and ModuleGraph builds Deps from `go list -f {{.Deps}}`, which is the transitive set: cmd/evolve reaches 266 internal packages. Admitter.conflicts holds a candidate whose edits meet a running lane's reach, so every Go todo (router, ipcenv, clihealth, acsrunner, repostate and more) waits while that lane runs. Only non-Go or same-cell-free items can fill the slot. cmd/evolve has no importers, so it is not a hub, and the hub rule (capacity one at 120 importers) does not apply.",
+  "title": "A lane that edits go/cmd/evolve holds every Go todo out of the pool through its transitive reach",
+  "weight": 1.0
+}

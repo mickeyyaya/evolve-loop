@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -137,18 +138,10 @@ func TestOrchestratorPool_WiresTheEnforceKeysAndTheFileRuleWithoutAGraph(t *test
 
 func TestOrchestratorPool_AdmitsByCellWhenTheModuleGraphLoads(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir()
-	goDir := filepath.Join(root, "go")
-	if err := os.MkdirAll(filepath.Join(goDir, "internal", "x"), 0o755); err != nil {
-		t.Fatal(err)
+	b, console := iscsCoordinator(t.TempDir(), t.TempDir(), nil)
+	b.loadGraph = func(context.Context, string, int) (*admission.ModuleGraph, error) {
+		return admission.NewModuleGraph(admission.ModulePath+"/internal/x|\n", 120)
 	}
-	if err := os.WriteFile(filepath.Join(goDir, "go.mod"), []byte("module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(goDir, "internal", "x", "x.go"), []byte("package x\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	b, console := iscsCoordinator(root, t.TempDir(), nil)
 	p := b.orchestratorPool(policy.FleetConfig{Count: 2, PlanSource: "triage", Orchestrator: enforceOrchestrator}, nil, 1)
 	if p.Admit == nil {
 		t.Fatalf("admit = nil, console = %q, want admission by cell", console.String())

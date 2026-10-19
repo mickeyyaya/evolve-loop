@@ -91,6 +91,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"internal/loopwave/launcher.go":         "the wave engine's one read-only lifecycle, rooted at EvolveDir: the launch gate's probe and the plan-time prune (ADR-0106 W3) — WIRED (Signals: e.center())",
 		"internal/triagecap/lane_menu.go":       "the ProjectRoot-less read-only lifecycle (the undispatchable prune and the backlog deps check) — never writes",
 		"cmd/evolve/cmd_loop_escalate.go":       "the loop's escalation boundary reweight (cycle 1932) — WIRED (Signals: signals)",
+		"cmd/evolve/cmd_supply_wiring.go":       "the supply census of `evolve wave supply` and of each loop iteration (ADR-0139 O6) — it scans and ranks the inbox and never moves a file, so the mover has nothing to emit",
 		"internal/phases/ship/postship.go":      "the PASS closeout inside `evolve ship` (ship.Options carries no Center) — 06-F1",
 		"internal/cycleoutcome/cycleoutcome.go": "the FAIL closeout — WIRED (Signals: in.Signals); listed because its literal is the one that names the field",
 		"internal/cycleoutcome/nowork.go":       "the planned-no-work closeout (F30) — WIRED (Signals: in.Signals); listed for the same reason",

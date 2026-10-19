@@ -234,13 +234,14 @@ func sameDirectory(a, b string) bool {
 			return true
 		}
 	}
-	lexical := func(p string) string {
-		if abs, err := filepath.Abs(p); err == nil {
-			return filepath.Clean(abs)
-		}
-		return filepath.Clean(p)
+	return lexicalPath(a) == lexicalPath(b)
+}
+
+func lexicalPath(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		p = abs
 	}
-	return lexical(a) == lexical(b)
+	return filepath.Clean(p)
 }
 
 func inPlaceWorktree(worktree, projectRoot string) bool {

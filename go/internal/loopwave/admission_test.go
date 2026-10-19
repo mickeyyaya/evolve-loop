@@ -16,18 +16,19 @@ import (
 )
 
 type admissionCall struct {
+	wave  int
 	todos []fleet.Todo
 	texts map[string]string
 	cfg   policy.OrchestratorConfig
 }
 
 func fakeAdmission(shadow AdmissionShadow, err error, calls *[]admissionCall) AdmissionFn {
-	return func(todos []fleet.Todo, text func(string) string, cfg policy.OrchestratorConfig) (AdmissionShadow, error) {
+	return func(wave int, todos []fleet.Todo, text func(string) string, cfg policy.OrchestratorConfig) (AdmissionShadow, error) {
 		texts := map[string]string{}
 		for _, td := range todos {
 			texts[td.ID] = text(td.ID)
 		}
-		*calls = append(*calls, admissionCall{todos: todos, texts: texts, cfg: cfg})
+		*calls = append(*calls, admissionCall{wave: wave, todos: todos, texts: texts, cfg: cfg})
 		return shadow, err
 	}
 }
@@ -67,6 +68,9 @@ func TestAdmit_ShadowRecordsTheWaitAndChangesNothing(t *testing.T) {
 	}
 	if len(calls) != 1 {
 		t.Fatalf("admission ran %d times, want once over the planned todos", len(calls))
+	}
+	if calls[0].wave != 7 {
+		t.Errorf("admission got wave %d, want 7: the wave number lets the caller share one module graph per wave", calls[0].wave)
 	}
 	if got := todoIDs(calls[0].todos); !reflect.DeepEqual(got, []string{"a", "b", "d"}) {
 		t.Errorf("admission saw todos %v, want the partition's todos [a b d] in rank order", got)
@@ -213,7 +217,7 @@ func TestAdmit_ASlowShadowNeverDelaysTheLaunch(t *testing.T) {
 	h := newHarness(t)
 	release := make(chan struct{})
 	started := make(chan struct{})
-	slow := func([]fleet.Todo, func(string) string, policy.OrchestratorConfig) (AdmissionShadow, error) {
+	slow := func(int, []fleet.Todo, func(string) string, policy.OrchestratorConfig) (AdmissionShadow, error) {
 		close(started)
 		<-release
 		return AdmissionShadow{Admitted: 1}, nil
@@ -250,7 +254,7 @@ func TestAdmit_APanickingShadowNeverFailsTheLaunch(t *testing.T) {
 	}
 
 	h := newHarness(t)
-	boom := func([]fleet.Todo, func(string) string, policy.OrchestratorConfig) (AdmissionShadow, error) {
+	boom := func(int, []fleet.Todo, func(string) string, policy.OrchestratorConfig) (AdmissionShadow, error) {
 		panic("graph exploded")
 	}
 	h.e = New(Roots{ProjectRoot: h.root, EvolveDir: h.evolveDir}, h.ports, h.stderr, WithAdmission(boom))

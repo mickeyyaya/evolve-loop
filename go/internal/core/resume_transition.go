@@ -51,8 +51,6 @@ func (o *Orchestrator) degradeInsertedSuccessor(current Phase) Phase {
 	switch o.phaseArchetype(string(current)) {
 	case string(phasespec.RolePlan):
 		return PhaseBuild
-	case string(phasespec.RoleBuild), string(phasespec.RoleEvaluate):
-		return PhaseAudit
 	case string(phasespec.RoleControl):
 		return PhaseShip
 	default:

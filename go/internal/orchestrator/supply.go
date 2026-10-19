@@ -111,16 +111,12 @@ func (c Census) Take() (Supply, error) {
 	}
 	recordErr := AppendSupply(c.Path, s)
 	fields := s.countFields()
-	total := 0
-	for _, n := range s.Counts {
-		total += n
-	}
 	console := s.consoleSummary()
 	if console != "" {
 		fields["console"] = console
 	}
 	c.Publish.emit("Census.Take", CodeSupply, signalcenter.SeverityInfo,
-		fmt.Sprintf("supply: %d admissible of %d item(s), window %d", s.Counts[ClassAdmissible], total, s.Window), fields)
+		fmt.Sprintf("supply: %d admissible of %d item(s), window %d", s.Counts[ClassAdmissible], s.Total(), s.Window), fields)
 	if s.Counts[ClassAdmissible] < s.Window {
 		c.Publish.emit("Census.Take", CodeSupplyShort, signalcenter.SeverityInfo,
 			fmt.Sprintf("supply is short: %d admissible, window %d", s.Counts[ClassAdmissible], s.Window), s.countFields())
@@ -160,6 +156,14 @@ func (s *Supply) refuse(items []inboxbatch.Item, reasons []string, classOf func(
 		}
 	}
 	return protected
+}
+
+func (s Supply) Total() int {
+	total := 0
+	for _, n := range s.Counts {
+		total += n
+	}
+	return total
 }
 
 func (s Supply) Measure() wavemeasure.Supply {

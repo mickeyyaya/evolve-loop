@@ -24,7 +24,7 @@ type AdmissionShadow struct {
 	Waits    []AdmissionWait
 }
 
-type AdmissionFn func(todos []fleet.Todo, text func(id string) string, cfg policy.OrchestratorConfig) (AdmissionShadow, error)
+type AdmissionFn func(wave int, todos []fleet.Todo, text func(id string) string, cfg policy.OrchestratorConfig) (AdmissionShadow, error)
 
 func WithAdmission(fn AdmissionFn) Option {
 	return func(e *Engine) { e.admission = fn }
@@ -48,7 +48,7 @@ func (e *Engine) shadowAdmission(wave, count int, cfg policy.OrchestratorConfig,
 }
 
 func (e *Engine) observeAdmission(wave, count int, cfg policy.OrchestratorConfig, todos []fleet.Todo, specs []fleet.CycleSpec) {
-	shadow, err := e.admission(todos, e.InboxText(wave), cfg)
+	shadow, err := e.admission(wave, todos, e.InboxText(wave), cfg)
 	if err != nil {
 		fmt.Fprintf(e.stderr, "[loop] WARN: wave %d: admission shadow skipped: %v\n", wave, err)
 		return

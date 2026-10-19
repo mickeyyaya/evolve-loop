@@ -370,6 +370,17 @@ func TestSupply_MeasureCarriesEachClassUnderTheNameOfTheClass(t *testing.T) {
 	}
 }
 
+func TestSupply_TotalIsTheCountOfEveryItemTheCensusSaw(t *testing.T) {
+	root := t.TempDir()
+	seedInbox(t, filepath.Join(root, ".evolve", "inbox"))
+
+	got, err := newCensus(t, root, nil, &eventLog{}).Count()
+
+	if err != nil || got.Total() != 8 || (Supply{}).Total() != 0 {
+		t.Errorf("Total = %d, %v, want the 8 inbox items and 0 for an empty record", got.Total(), err)
+	}
+}
+
 func TestClasses_ListTheSixClassesOfTheSpecInOrder(t *testing.T) {
 	want := []string{"admissible", "waiting_cell", "waiting_deps", "console_route", "console_kind", "console_protected"}
 	if got := Classes(); !reflect.DeepEqual(got, want) {

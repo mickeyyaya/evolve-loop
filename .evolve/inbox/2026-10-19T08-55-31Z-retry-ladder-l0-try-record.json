@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A cycle with two correction rounds writes three records whose attempt is 1, 2 and 3 (red test first)",
+    "effort is the effort sent to the CLI, never null for a tmux dispatch",
+    "served_model is the model id the CLI reports, not balanced or deep",
+    "Until L5 lands, rung is R0 and failure_class and fingerprint are empty"
+  ],
+  "campaign": "retry-ladder",
+  "created_at": "2026-10-19T09:30:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge",
+    "go/internal/core",
+    "docs/architecture/retry-ladder.md"
+  ],
+  "fix": "TDD first (red test before code), 100% coverage on new and changed functions, zero comments, the package note updated.",
+  "id": "retry-ladder-l0-try-record",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "source": "plan retry-ladder-2026-10 (operator request and decisions 2026-10-19)",
+  "summary": "Component L0 of ADR-0142. llm-calls.ndjson records effort as null on every build call, attempt stays 1 through correction rounds, and model is the tier alias, not the served model (research F2.12). Add the fields of spec \u00a76: rung, failure_class, fingerprint, effort, served_model, context, ladder_stage, ladder_would; attempt counts every dispatch of the phase in the cycle including correction rounds. Spec docs/architecture/retry-ladder.md \u00a76; ADR-0142.",
+  "title": "Retry ladder L0: each dispatch records its rung, effort and served model",
+  "weight": 1.0
+}

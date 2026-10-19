@@ -161,6 +161,28 @@ func TestShouldRunWave_GateTable(t *testing.T) {
 	}
 }
 
+func TestShouldRunPlan_IsTheWaveGateOrThePoolGate(t *testing.T) {
+	cases := []struct {
+		name string
+		fc   policy.FleetConfig
+		want bool
+	}{
+		{"the default barrier wave", policy.FleetConfig{Count: 2, PlanSource: "triage"}, true},
+		{"a pool by scheduling", policy.FleetConfig{Count: 2, PlanSource: "triage", Scheduling: "pool"}, true},
+		{"a pool by the enforce stage", policy.FleetConfig{Count: 2, PlanSource: "triage", Orchestrator: policy.OrchestratorConfig{Stage: "enforce"}}, true},
+		{"a manual plan source", policy.FleetConfig{Count: 2, PlanSource: "manual", Scheduling: "pool"}, false},
+		{"one lane", policy.FleetConfig{Count: 1, PlanSource: "triage", Scheduling: "pool"}, false},
+		{"the empty value", policy.FleetConfig{}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := ShouldRunPlan(c.fc); got != c.want {
+				t.Errorf("ShouldRunPlan(%+v) = %v, want %v", c.fc, got, c.want)
+			}
+		})
+	}
+}
+
 func TestStepError_RendersTheThreeLiteralsAndUnwraps(t *testing.T) {
 	cause := errors.New("boom")
 	for step, want := range map[Step]string{
