@@ -36,8 +36,16 @@ type Decision struct {
 }
 
 type Admitter struct {
-	Graph Graph
-	Text  func(id string) string
+	Graph           Graph
+	Text            func(id string) string
+	OnlySharedEdits bool
+	Shadow          func(Shadowed)
+}
+
+type Shadowed struct {
+	Todo   string
+	Holder string
+	Reason string
 }
 
 type footprint struct {
@@ -64,9 +72,10 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 		}
 		fp := a.footprintOf(td)
 		d := Decision{ID: td.ID, Rank: rank, Cells: fp.cells()}
-		if blocker, busy := firstConflict(holders, fp); busy {
-			d.BlockedBy = blocker
+		if blocker, busy := firstConflict(holders, fp, a.rule()); busy {
+			d.BlockedBy = blocker.lane
 			waiting = append(waiting, d)
+			a.shadow(holders, td.ID, fp, blocker)
 			continue
 		}
 		holders = append(holders, holder{lane: td.ID, fp: fp})
@@ -75,17 +84,51 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 	return admitted, waiting
 }
 
-func firstConflict(holders []holder, fp footprint) (string, bool) {
+func (a Admitter) rule() func(x, y footprint) bool {
+	if a.OnlySharedEdits {
+		return sharedEdits
+	}
+	return conflict
+}
+
+func (a Admitter) shadow(holders []holder, id string, fp footprint, blocker holder) {
+	if a.OnlySharedEdits || a.Shadow == nil {
+		return
+	}
+	if _, busy := firstConflict(holders, fp, sharedEdits); busy {
+		return
+	}
+	a.Shadow(Shadowed{Todo: id, Holder: blocker.lane, Reason: "reach meets " + reachMet(blocker.fp, fp)})
+}
+
+func firstConflict(holders []holder, fp footprint, rule func(x, y footprint) bool) (holder, bool) {
 	for _, h := range holders {
-		if conflict(h.fp, fp) {
-			return h.lane, true
+		if rule(h.fp, fp) {
+			return h, true
 		}
 	}
-	return "", false
+	return holder{}, false
+}
+
+func sharedEdits(x, y footprint) bool {
+	return (x.hub && y.hub) || meets(x.edits, y.edits)
 }
 
 func conflict(x, y footprint) bool {
-	return (x.hub && y.hub) || meets(x.edits, y.edits) || meets(x.edits, y.reach) || meets(y.edits, x.reach)
+	return sharedEdits(x, y) || meets(x.edits, y.reach) || meets(y.edits, x.reach)
+}
+
+func reachMet(x, y footprint) string {
+	var met []string
+	for _, pair := range [][2]map[string]bool{{x.edits, y.reach}, {y.edits, x.reach}} {
+		for p := range pair[0] {
+			if pair[1][p] {
+				met = append(met, strings.TrimPrefix(p, ModulePath+"/"))
+			}
+		}
+	}
+	slices.Sort(met)
+	return met[0]
 }
 
 func meets(x, y map[string]bool) bool {

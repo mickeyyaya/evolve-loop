@@ -15,7 +15,7 @@ func TestFleetConfig_TheOrchestratorDefaultsToShadow(t *testing.T) {
 		"no fleet block":        {policy.Policy{}, 4},
 		"no orchestrator block": {policy.Policy{Fleet: &policy.FleetPolicy{Count: 4}}, 16},
 	} {
-		want := policy.OrchestratorConfig{Stage: "shadow", ScanK: 32, HubMinImporters: 120,
+		want := policy.OrchestratorConfig{Stage: "shadow", AdmissionStage: "shadow", ScanK: 32, HubMinImporters: 120,
 			DeadlineFloorMinutes: 60, StallMinutes: 30, RunMaxLanes: tc.runMaxLanes, WindowStart: 4, WindowMin: 4}
 		if got := tc.p.FleetConfig().Orchestrator; got != want {
 			t.Errorf("%s: Orchestrator = %+v, want %+v (run_max_lanes is 4 x count)", name, got, want)
@@ -24,11 +24,11 @@ func TestFleetConfig_TheOrchestratorDefaultsToShadow(t *testing.T) {
 }
 
 func TestFleetConfig_TheOrchestratorKeysOverrideTheDefaults(t *testing.T) {
-	p, err := policy.Parse([]byte(`{"fleet":{"count":8,"orchestrator":{"stage":"enforce","scan_k":8,"hub_min_importers":90,"deadline_floor_minutes":45,"stall_minutes":10,"run_max_lanes":6,"window":{"start":6,"min":3}}}}`))
+	p, err := policy.Parse([]byte(`{"fleet":{"count":8,"orchestrator":{"stage":"enforce","admission_stage":"enforce","scan_k":8,"hub_min_importers":90,"deadline_floor_minutes":45,"stall_minutes":10,"run_max_lanes":6,"window":{"start":6,"min":3}}}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := policy.OrchestratorConfig{Stage: "enforce", ScanK: 8, HubMinImporters: 90, DeadlineFloorMinutes: 45, StallMinutes: 10, RunMaxLanes: 6, WindowStart: 6, WindowMin: 3}
+	want := policy.OrchestratorConfig{Stage: "enforce", AdmissionStage: "enforce", ScanK: 8, HubMinImporters: 90, DeadlineFloorMinutes: 45, StallMinutes: 10, RunMaxLanes: 6, WindowStart: 6, WindowMin: 3}
 	if got := p.FleetConfig().Orchestrator; got != want {
 		t.Fatalf("Orchestrator = %+v, want %+v", got, want)
 	}
@@ -36,21 +36,22 @@ func TestFleetConfig_TheOrchestratorKeysOverrideTheDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := p.FleetConfig().Orchestrator; got.ScanK != 32 || got.HubMinImporters != 120 || got.DeadlineFloorMinutes != 60 || got.StallMinutes != 30 || got.RunMaxLanes != 4 || got.WindowStart != 4 || got.WindowMin != 4 {
+	if got := p.FleetConfig().Orchestrator; got.AdmissionStage != "shadow" || got.ScanK != 32 || got.HubMinImporters != 120 || got.DeadlineFloorMinutes != 60 || got.StallMinutes != 30 || got.RunMaxLanes != 4 || got.WindowStart != 4 || got.WindowMin != 4 {
 		t.Errorf("Orchestrator = %+v, want the unset keys at their defaults", got)
 	}
 }
 
 func TestParse_RefusesABadOrchestratorBlock(t *testing.T) {
 	cases := map[string]struct{ raw, want string }{
-		"an unknown stage":     {`{"stage":"enfroce"}`, `"enfroce"`},
-		"an unknown key":       {`{"stage":"shadow","width":4}`, `"width"`},
-		"a negative scan_k":    {`{"scan_k":-1}`, "scan_k"},
-		"a negative hub floor": {`{"hub_min_importers":-3}`, "hub_min_importers"},
-		"a malformed block":    {`{"scan_k":"many"}`, "scan_k"},
-		"a negative deadline":  {`{"deadline_floor_minutes":-1}`, "deadline_floor_minutes"},
-		"a negative stall":     {`{"stall_minutes":-5}`, "stall_minutes"},
-		"a negative run limit": {`{"run_max_lanes":-2}`, "run_max_lanes"},
+		"an unknown stage":           {`{"stage":"enfroce"}`, `"enfroce"`},
+		"an unknown admission stage": {`{"admission_stage":"optimistic"}`, "admission_stage"},
+		"an unknown key":             {`{"stage":"shadow","width":4}`, `"width"`},
+		"a negative scan_k":          {`{"scan_k":-1}`, "scan_k"},
+		"a negative hub floor":       {`{"hub_min_importers":-3}`, "hub_min_importers"},
+		"a malformed block":          {`{"scan_k":"many"}`, "scan_k"},
+		"a negative deadline":        {`{"deadline_floor_minutes":-1}`, "deadline_floor_minutes"},
+		"a negative stall":           {`{"stall_minutes":-5}`, "stall_minutes"},
+		"a negative run limit":       {`{"run_max_lanes":-2}`, "run_max_lanes"},
 
 		"a zero window start":                 {`{"window":{"start":0}}`, "window.start"},
 		"a negative window start":             {`{"window":{"start":-2}}`, "window.start"},
@@ -74,7 +75,7 @@ func TestParse_RefusesABadOrchestratorBlock(t *testing.T) {
 
 func TestFleetConfig_ATypedOrchestratorBlockKeepsItsStage(t *testing.T) {
 	p := policy.Policy{Fleet: &policy.FleetPolicy{Orchestrator: &policy.FleetOrchestratorPolicy{Stage: "enforce"}}}
-	if got := p.FleetConfig().Orchestrator; got != (policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 30, RunMaxLanes: 4, WindowStart: 4, WindowMin: 4}) {
+	if got := p.FleetConfig().Orchestrator; got != (policy.OrchestratorConfig{Stage: "enforce", AdmissionStage: "shadow", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 30, RunMaxLanes: 4, WindowStart: 4, WindowMin: 4}) {
 		t.Errorf("Orchestrator = %+v, want enforce with the default scan_k and hub floor", got)
 	}
 }
@@ -169,5 +170,16 @@ func TestFleetConfig_ATypedWindowBlockReachesTheConfig(t *testing.T) {
 		Window: &policy.FleetWindowPolicy{Start: &start, Min: &floor}}}}
 	if got := p.FleetConfig().Orchestrator; got.WindowStart != 5 || got.WindowMin != 2 {
 		t.Errorf("window = %d to %d, want 5 to 2", got.WindowStart, got.WindowMin)
+	}
+}
+
+func TestOrchestratorConfig_OnlySharedEditsHoldAtTheEnforceAdmissionStage(t *testing.T) {
+	for stage, want := range map[string]bool{"shadow": false, "enforce": true} {
+		if got := (policy.OrchestratorConfig{AdmissionStage: stage}).OnlySharedEdits(); got != want {
+			t.Errorf("admission_stage %s: OnlySharedEdits() = %v, want %v", stage, got, want)
+		}
+	}
+	if (policy.Policy{}).FleetConfig().Orchestrator.OnlySharedEdits() {
+		t.Error("the compiled default admission_stage is shadow, so the reach rule still decides")
 	}
 }

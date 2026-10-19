@@ -155,6 +155,32 @@ func TestOrchestratorPool_AdmitsByCellWhenTheModuleGraphLoads(t *testing.T) {
 	}
 }
 
+func TestOrchestratorPool_TheAdmissionStageChoosesTheRuleAndTheShadowPublishes(t *testing.T) {
+	t.Parallel()
+	m := admission.ModulePath + "/internal/"
+	listing := m + "router|\n" + m + "core|" + m + "router\n" + admission.ModulePath + "/cmd/evolve|" + m + "core\n"
+	core := []fleet.Todo{{ID: "c", Files: []string{"go/internal/core/x.go"}}}
+	router := []fleet.Todo{{ID: "r", Files: []string{"go/internal/router/r.go"}}}
+	for stage, want := range map[string]int{"shadow": -1, "enforce": 0} {
+		evolveDir := t.TempDir()
+		b, _ := iscsCoordinator(t.TempDir(), evolveDir, nil)
+		b.loadGraph = func(context.Context, string, int) (*admission.ModuleGraph, error) {
+			return admission.NewModuleGraph(listing, 120)
+		}
+		oc := enforceOrchestrator
+		oc.AdmissionStage = stage
+		p := b.orchestratorPool(policy.FleetConfig{Count: 2, PlanSource: "triage", Orchestrator: oc}, nil, 1)
+		if got := p.Admit(core, router); got != want {
+			t.Errorf("admission_stage %s: admit = %d, want %d", stage, got, want)
+		}
+		b.deps.Signals.Flush()
+		raw, _ := os.ReadFile(filepath.Join(evolveDir, "signals.ndjson"))
+		if published := strings.Contains(string(raw), `"code":"LOOP_ORCH_ADMISSION_REACH_SHADOW"`); published != (stage == "shadow") {
+			t.Errorf("admission_stage %s: shadow published %v, signals = %s", stage, published, raw)
+		}
+	}
+}
+
 func TestLaneWindow_OpensAtWindowStartPublishesEachChangeAndSaysSoOnTheConsole(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()

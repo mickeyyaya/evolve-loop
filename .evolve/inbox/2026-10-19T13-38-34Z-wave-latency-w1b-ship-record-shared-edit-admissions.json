@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "At admission_stage enforce, a lane admitted only by the shared-edit rule carries its would-be holder to the ship (red test first)",
+    "A composed-gate failure or rebase conflict of such a lane publishes one signal with todo, holder and gate",
+    "The rate is readable for one wave (evolve wave status or the wave record)"
+  ],
+  "campaign": "wave-latency",
+  "created_at": "2026-10-19T13:38:34Z",
+  "deps": [],
+  "files": [
+    "go/internal/phases/ship",
+    "go/internal/orchestrator",
+    "go/cmd/evolve"
+  ],
+  "fix": "TDD first (red test before code), 100% coverage on new and changed functions, zero comments, the package note and the spec updated; do not change the composed-tree gate itself.",
+  "id": "wave-latency-w1b-ship-record-shared-edit-admissions",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "route": "console-only",
+  "source": "W1 PR review (architecture-reviewer finding 1), plan wave-latency-2026-10 W1b",
+  "summary": "W1 built the admission half of plan wave-latency-2026-10 D2: fleet.orchestrator.admission_stage (default shadow) and LOOP_ORCH_ADMISSION_REACH_SHADOW. At shadow a freed candidate never runs beside its holder, so the D3 failure rate cannot be measured there. W1b: mark each lane that only the shared-edit rule admitted (at admission_stage enforce), and at its ship record each rebase conflict or composed-tree gate failure against the lane that the reach rule would have held it behind. W2 (the move to enforce) waits for W1b; above one in five failures in the first enforce wave the stage goes back to shadow.",
+  "title": "Wave latency W1b: the ship records a composed-gate failure between two lanes that only the shared-edit rule admitted (ADR-0143 D2)",
+  "weight": 0.9
+}

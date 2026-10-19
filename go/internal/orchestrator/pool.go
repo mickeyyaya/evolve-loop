@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -156,5 +157,23 @@ func AdmitByCell(a admission.Admitter) Admit {
 			return -1
 		}
 		return admitted[0].Rank
+	}
+}
+
+func ReachShadow(publish Publish) func(admission.Shadowed) {
+	var mu sync.Mutex
+	seen := map[[2]string]bool{}
+	return func(s admission.Shadowed) {
+		key := [2]string{s.Todo, s.Holder}
+		mu.Lock()
+		fresh := !seen[key]
+		seen[key] = true
+		mu.Unlock()
+		if !fresh {
+			return
+		}
+		publish.emit("AdmitByCell", CodeAdmissionReachShadow, signalcenter.SeverityInfo,
+			fmt.Sprintf("admission shadow: the reach rule holds %q behind %q and the shared-edit rule admits it (%s)", s.Todo, s.Holder, s.Reason),
+			map[string]string{"todo": s.Todo, "holder": s.Holder, "reason": s.Reason})
 	}
 }

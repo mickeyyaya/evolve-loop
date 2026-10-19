@@ -76,7 +76,8 @@ func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, itera
 		fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: pool %d admits by the file rule; the module graph did not load: %v\n", iteration, err)
 		return nil
 	}
-	return orchestrator.AdmitByCell(admission.Admitter{Graph: graph, Text: b.wave().InboxText(iteration)})
+	return orchestrator.AdmitByCell(admission.Admitter{Graph: graph, Text: b.wave().InboxText(iteration),
+		OnlySharedEdits: oc.OnlySharedEdits(), Shadow: orchestrator.ReachShadow(b.deps.Signals.Emit)})
 }
 
 func (b *loopBatchCoordinator) orchestratedRun(fc policy.FleetConfig, launch fleet.LaunchFn, iteration int) poolRunFn {

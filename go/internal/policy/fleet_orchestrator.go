@@ -7,6 +7,7 @@ import (
 
 type FleetOrchestratorPolicy struct {
 	Stage                string             `json:"stage,omitempty"`
+	AdmissionStage       string             `json:"admission_stage,omitempty"`
 	ScanK                int                `json:"scan_k,omitempty"`
 	HubMinImporters      int                `json:"hub_min_importers,omitempty"`
 	DeadlineFloorMinutes int                `json:"deadline_floor_minutes,omitempty"`
@@ -22,6 +23,7 @@ type FleetWindowPolicy struct {
 
 type OrchestratorConfig struct {
 	Stage                string
+	AdmissionStage       string
 	ScanK                int
 	HubMinImporters      int
 	DeadlineFloorMinutes int
@@ -59,6 +61,8 @@ func (o FleetOrchestratorPolicy) validate() error {
 	switch {
 	case o.Stage != "" && o.Stage != "shadow" && o.Stage != "enforce":
 		return fmt.Errorf("stage %q is not \"shadow\" or \"enforce\"", o.Stage)
+	case o.AdmissionStage != "" && o.AdmissionStage != "shadow" && o.AdmissionStage != "enforce":
+		return fmt.Errorf("admission_stage %q is not \"shadow\" or \"enforce\"", o.AdmissionStage)
 	case o.ScanK < 0:
 		return errors.New("scan_k must not be negative")
 	case o.HubMinImporters < 0:
@@ -74,7 +78,7 @@ func (o FleetOrchestratorPolicy) validate() error {
 }
 
 func orchestratorConfig(o *FleetOrchestratorPolicy, count int) OrchestratorConfig {
-	c := OrchestratorConfig{Stage: "shadow", ScanK: defaultOrchestratorScanK, HubMinImporters: defaultOrchestratorHubMinImporters,
+	c := OrchestratorConfig{Stage: "shadow", AdmissionStage: "shadow", ScanK: defaultOrchestratorScanK, HubMinImporters: defaultOrchestratorHubMinImporters,
 		DeadlineFloorMinutes: defaultOrchestratorDeadlineFloor, StallMinutes: defaultOrchestratorStallMinutes,
 		RunMaxLanes: orchestratorRunLanesPerSlot * count,
 		WindowStart: defaultOrchestratorWindowStart, WindowMin: defaultOrchestratorWindowMin}
@@ -83,6 +87,9 @@ func orchestratorConfig(o *FleetOrchestratorPolicy, count int) OrchestratorConfi
 	}
 	if o.Stage != "" {
 		c.Stage = o.Stage
+	}
+	if o.AdmissionStage != "" {
+		c.AdmissionStage = o.AdmissionStage
 	}
 	if o.ScanK > 0 {
 		c.ScanK = o.ScanK
@@ -102,6 +109,8 @@ func orchestratorConfig(o *FleetOrchestratorPolicy, count int) OrchestratorConfi
 	c.WindowStart, c.WindowMin = o.Window.resolve()
 	return c
 }
+
+func (c OrchestratorConfig) OnlySharedEdits() bool { return c.AdmissionStage == "enforce" }
 
 func (w *FleetWindowPolicy) validate() error {
 	if w == nil {

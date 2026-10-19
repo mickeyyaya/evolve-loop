@@ -14,21 +14,22 @@ const (
 )
 
 const (
-	CodeLaneLaunched       signalcenter.Code = "LOOP_ORCH_LANE_LAUNCHED"
-	CodeLaneExited         signalcenter.Code = "LOOP_ORCH_LANE_EXITED"
-	CodeLaneBackfilled     signalcenter.Code = "LOOP_ORCH_LANE_BACKFILLED"
-	CodePoolIdle           signalcenter.Code = "LOOP_ORCH_POOL_IDLE"
-	CodePoolResupplied     signalcenter.Code = "LOOP_ORCH_POOL_RESUPPLIED"
-	CodeLaneStalled        signalcenter.Code = "LOOP_ORCH_LANE_STALLED"
-	CodeLaneDeadline       signalcenter.Code = "LOOP_ORCH_LANE_DEADLINE"
-	CodeLaneLateExit       signalcenter.Code = "LOOP_ORCH_LANE_LATE_EXIT"
-	CodeLaneRecoveryFailed signalcenter.Code = "LOOP_ORCH_LANE_RECOVERY_FAILED"
-	CodeOversightAction    signalcenter.Code = "LOOP_ORCH_OVERSIGHT_ACTION"
-	CodeFamilyPaused       signalcenter.Code = "LOOP_ORCH_FAMILY_PAUSED"
-	CodeSupply             signalcenter.Code = "LOOP_ORCH_SUPPLY"
-	CodeSupplyShort        signalcenter.Code = "LOOP_ORCH_SUPPLY_SHORT"
-	CodeWindow             signalcenter.Code = "LOOP_ORCH_WINDOW"
-	CodePoolUnderfilled    signalcenter.Code = "LOOP_ORCH_POOL_UNDERFILLED"
+	CodeLaneLaunched         signalcenter.Code = "LOOP_ORCH_LANE_LAUNCHED"
+	CodeLaneExited           signalcenter.Code = "LOOP_ORCH_LANE_EXITED"
+	CodeLaneBackfilled       signalcenter.Code = "LOOP_ORCH_LANE_BACKFILLED"
+	CodePoolIdle             signalcenter.Code = "LOOP_ORCH_POOL_IDLE"
+	CodePoolResupplied       signalcenter.Code = "LOOP_ORCH_POOL_RESUPPLIED"
+	CodeLaneStalled          signalcenter.Code = "LOOP_ORCH_LANE_STALLED"
+	CodeLaneDeadline         signalcenter.Code = "LOOP_ORCH_LANE_DEADLINE"
+	CodeLaneLateExit         signalcenter.Code = "LOOP_ORCH_LANE_LATE_EXIT"
+	CodeLaneRecoveryFailed   signalcenter.Code = "LOOP_ORCH_LANE_RECOVERY_FAILED"
+	CodeOversightAction      signalcenter.Code = "LOOP_ORCH_OVERSIGHT_ACTION"
+	CodeFamilyPaused         signalcenter.Code = "LOOP_ORCH_FAMILY_PAUSED"
+	CodeSupply               signalcenter.Code = "LOOP_ORCH_SUPPLY"
+	CodeSupplyShort          signalcenter.Code = "LOOP_ORCH_SUPPLY_SHORT"
+	CodeWindow               signalcenter.Code = "LOOP_ORCH_WINDOW"
+	CodePoolUnderfilled      signalcenter.Code = "LOOP_ORCH_POOL_UNDERFILLED"
+	CodeAdmissionReachShadow signalcenter.Code = "LOOP_ORCH_ADMISSION_REACH_SHADOW"
 )
 
 const (
@@ -53,6 +54,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeSupplyShort, "the supply census found fewer admissible items than the window, so the lanes of the plan cannot all be filled; the cause of each refusal is in the supply record and in evolve wave supply; INFO; fields are the six class names and window")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeWindow, "the adaptive window of the orchestrator pool (ADR-0139 O8) changed size: it grows by 1 for each clean landing, halves on each landing conflict (never under fleet.orchestrator.window.min) and follows the sized count; published once for each change; INFO; fields.old, new, sized, cause (clean_landing, conflict or resize); the loop builds the window inside the enforce pool only, so nothing publishes at stage shadow; that pool admits a lane only while the lanes in flight number fewer than new")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodePoolUnderfilled, "the orchestrator pool had an idle transition while fewer lanes than fleet.min_lanes were in flight and the pool was not stopped; WARN; fields.live, target, min_lanes, ready")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeAdmissionReachShadow, "at fleet.orchestrator.admission_stage shadow (ADR-0143 D2) the reach rule held a todo that the shared-edit rule admits: the todo edits no package that a running lane edits, and the two are not both hubs; the reach rule still decides; published once for each todo and holder in a pool run; INFO; fields.todo, holder (the lane or todo that holds it), reason (the package where an edit meets the reach)")
 }
 
 type Publish func(signalcenter.Event)

@@ -1,6 +1,6 @@
 # internal/admission
 
-> The spec of record: [wave-orchestrator §6](../wave-orchestrator.md#6-admission-by-cell). The decision: [ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md). The plan: [wave-orchestrator-2026-10](../../plans/wave-orchestrator-2026-10.md) (O3, D6, D7, Q2). The landing design that names the rule: [fleet-landing-at-scale-2026-10](../../plans/fleet-landing-at-scale-2026-10.md) (S14). The shadow wiring: [internal-loopwave.md](internal-loopwave.md). The global-zone list: [internal-fleet.md](internal-fleet.md).
+> The spec of record: [wave-orchestrator §6](../wave-orchestrator.md#6-admission-by-cell). The decision: [ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md), and [ADR-0143](../adr/0143-admission-holds-only-shared-edits-and-the-ship-gate-owns-api-drift.md) for the shared-edit rule (plan [wave-latency-2026-10](../../plans/wave-latency-2026-10.md) W1). The plan: [wave-orchestrator-2026-10](../../plans/wave-orchestrator-2026-10.md) (O3, D6, D7, Q2). The landing design that names the rule: [fleet-landing-at-scale-2026-10](../../plans/fleet-landing-at-scale-2026-10.md) (S14). The shadow wiring: [internal-loopwave.md](internal-loopwave.md). The global-zone list: [internal-fleet.md](internal-fleet.md).
 
 ## Purpose
 
@@ -26,12 +26,16 @@ Built on 2026-10-17 as O3 of the wave-orchestrator plan, in the `shadow` stage. 
   2. `E(t1)` and `E(t2)` meet;
   3. `E(t1)` meets `D(E(t2))`;
   4. `E(t2)` meets `D(E(t1))`.
+- **The shared-edit rule (ADR-0143).** `Admitter.OnlySharedEdits` keeps only rules 1 and 2. The reach checks 3 and 4 leave admission, and the composed-tree gate of the ship owns API drift. The caller sets the field from `fleet.orchestrator.admission_stage`: `enforce` sets it, `shadow` (the compiled default) does not.
+- **The shadow.** With `OnlySharedEdits` unset and `Admitter.Shadow` set, `Admit` tests each todo that the four rules hold against rules 1 and 2 alone, with the same holders. When rules 1 and 2 admit it, `Admit` calls `Shadow` with a `Shadowed` record: the todo, the holder that blocks it and the reason `reach meets <package>`. The package is the first in sort order where an edit meets a reach. The admitted and waiting lists are unchanged. The orchestrator turns the record into `LOOP_ORCH_ADMISSION_REACH_SHADOW` (`orchestrator.ReachShadow`).
 - **No files.** A todo whose only file is its own id has no files: that is the placeholder of `fleet.TodosFromTriage`. A todo with no files takes the packages of the `go/internal/<pkg>` paths in its text. `Admitter.Text` gives the text. The loop gives the inbox title and summary.
 - **The scan.** `Admit` takes the candidates in the given rank order. It stops after `scanK` admitted todos. A waiting todo keeps its rank in `Decision.Rank`. `Decision.BlockedBy` names the lane in flight, or the earlier admitted todo, that holds the conflicting cell.
 
 ## Known limits
 
 - **Todos outside `go/`.** A todo whose files are all outside `go/` (docs, scripts), or that has non-Go files that no known package encloses, maps to no cell. It conflicts with nothing and `Admit` always admits it (`TestAdmit_FilesOutsideGoMapToNoCellAndConflictWithNothing`). Two such todos can edit the same file; only the landing proof of ADR-0128 catches it.
+
+- **The ship-side record of ADR-0143 D2 is not built.** At `shadow` a freed candidate does not run beside its holder, so its ship cannot show a composed-gate failure between the two lanes. The failure rate that moves the stage (plan D3) needs a ship record for each lane that only the shared-edit rule admitted. That record is useful only at `enforce`. It is component W1b of the plan, and W2 waits for it.
 
 ## Invariants
 
@@ -40,6 +44,8 @@ Built on 2026-10-17 as O3 of the wave-orchestrator plan, in the `shadow` stage. 
 - An import of a hub never conflicts (`TestAdmit_ImportingAHubNeverConflicts`).
 - An edited package that the other todo imports conflicts, in both directions (`TestAdmit_AnEditedPackageThatTheOtherImportsConflicts`).
 - A todo outside `go/` is always admitted (`TestAdmit_ATodoOutsideGoIsAlwaysAdmitted`).
+- Under the shared-edit rule, two admitted todos never share an edited package or both hold the hub cell (`TestAdmit_UnderTheSharedEditRuleTwoAdmittedTodosNeverShareAnEdit`, 500 random rounds). An import of a running lane no longer holds a todo (`TestAdmit_TheSharedEditRuleAdmitsAnImportOfARunningCoreLane`).
+- The shadow never changes a decision: with `Shadow` set, `Admit` returns the lists of the reach rule (`TestAdmit_AtShadowTheAdmittedSetIsTodaysAndTheShadowNamesTheHolder`).
 - The package has 100% statement coverage in `go/.cover-strict` and is listed in `go/.apicover-enforce`.
 
 ## Findings
