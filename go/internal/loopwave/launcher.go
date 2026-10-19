@@ -45,7 +45,7 @@ func (l gatedLauncher) Run(ctx context.Context, specs []fleet.CycleSpec) []fleet
 }
 
 func (e *Engine) lifecycle() inboxmover.Options {
-	return inboxmover.Options{InboxDir: filepath.Join(e.roots.EvolveDir, "inbox"), Stderr: io.Discard, Signals: e.center()}
+	return inboxmover.Options{ProjectRoot: e.roots.ProjectRoot, InboxDir: filepath.Join(e.roots.EvolveDir, "inbox"), LedgerPath: filepath.Join(e.roots.EvolveDir, "ledger.jsonl"), Stderr: io.Discard, Signals: e.center()}
 }
 
 func (e *Engine) probe() fleet.FreshnessProbeFn {
