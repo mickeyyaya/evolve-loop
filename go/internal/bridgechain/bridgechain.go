@@ -37,6 +37,10 @@ type Escalation struct {
 	Env           map[string]string
 }
 
+func EscalationFor(req core.BridgeRequest, dispatchStart time.Time) Escalation {
+	return Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: req.CLI, Tier: req.Model, DispatchStart: dispatchStart, Env: req.Env}
+}
+
 type Logf func(format string, args ...any)
 
 type Walking struct {
@@ -101,7 +105,7 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		keeper.Observe(cli+"@"+tier, last, lastErr)
 		attempts = append(attempts, fmt.Sprintf("%s@%s=%d", cli, tier, last.ExitCode))
 		if last.ExitCode == exitQuota && w.bench != nil {
-			w.bench(Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: cli, Tier: tier, DispatchStart: start, Env: req.Env})
+			w.bench(EscalationFor(attempt, start))
 		}
 		return last.ExitCode, lastErr
 	}, func(from, to string) {

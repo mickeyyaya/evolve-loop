@@ -211,3 +211,35 @@ func TestRun_AllFamiliesBenchedNeverStrands(t *testing.T) {
 		t.Errorf("dispatch order %v, want least-recently-benched (claude-tmux) first", sb.calls)
 	}
 }
+
+func TestRun_Cycle1951AnAgyExit85AtDeepBenchesOnlyTheArgonModelGroup(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, ".evolve", "profiles")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	profile := `{"name":"evolve-builder","cli":"agy-tmux","model_tier_default":"deep","cli_fallback":["claude-tmux"]}`
+	if err := os.WriteFile(filepath.Join(dir, "builder.json"), []byte(profile), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	eb := &escalatingBridge{
+		scriptedBridge: scriptedBridge{responses: map[string]scriptedResp{"agy-tmux": exit85(), "claude-tmux": {}}},
+		escalateCLI:    "agy-tmux", reportCLI: "agy-tmux", pattern: clihealth.ExhaustedPattern,
+	}
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "deep", prompt: "x", verdict: core.VerdictPASS, nextPhase: "audit"}
+	r := New(Options{Hooks: hooks, Bridge: eb, Prompts: fakePromptsFS("evolve-builder", "x")})
+	if _, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	benches, err := clihealth.NewStore(root, nil).Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, family := benches["agy"]; family {
+		t.Fatalf("benches %v; an exit 85 on agy at deep benched all of agy, not the Argon model group (cycle 1951)", benches)
+	}
+	if _, scoped := benches["agy@Gemini 4 Argon"]; !scoped {
+		t.Fatalf("benches %v; want the wall benched on the Argon model group", benches)
+	}
+}
