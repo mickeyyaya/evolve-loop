@@ -10,3 +10,4 @@
 # decoupling campaign's documentation invariant, fully enforced).
 ./internal/handoff
 ./internal/handoff/evidence
+./internal/handoff/exit

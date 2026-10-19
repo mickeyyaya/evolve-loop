@@ -15,6 +15,18 @@
 - **Evidence resolvers.** `internal/handoff/evidence` decides in code whether an `Evidence` pointer resolves. `Resolve` returns `ErrUnresolved` when it does not, and the entry is then unmet.
 - **Digest binding.** `Request.Digest` computes a SHA-256 digest of the request JSON payload.
 
+- **Exit decision.** `internal/handoff/exit` decides the exit of a round. `Decide` is pure: it takes the request, the check results, the earlier rounds and a `Policy`, and returns a `Decision`.
+
+## Exits
+
+| Outcome | When | `Unmet` |
+|---|---|---|
+| `pass` | Each required ask is met with resolved evidence. An optional unmet ask does not block. | empty |
+| `cap` | A required ask is unmet and the redispatch cap is spent, or the round met no ask that no earlier round met. | empty |
+| `retry` | A required ask is unmet, the cap has room and the round gained. | the ids of the unmet required asks, in request order |
+
+`pass` wins over `cap`. An ask with no result, unresolved evidence, a status other than `met` or conflicting results is unmet. The first round has no earlier round, so it never stops on no gain. A `MaxRedispatch` of zero or less caps the first failed round.
+
 ## Evidence kinds
 
 | Kind | Ref form | Resolves when |

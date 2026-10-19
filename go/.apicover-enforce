@@ -787,3 +787,6 @@
 ./internal/handoff
 # evidence - the resolvers of the handoff evidence pointers (ADR-0141, plan H3).
 ./internal/handoff/evidence
+
+# exit - the pass, retry or cap decision of a handoff round (ADR-0141, plan H4).
+./internal/handoff/exit
