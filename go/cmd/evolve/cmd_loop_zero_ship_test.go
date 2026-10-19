@@ -164,11 +164,12 @@ func zsCoordinator(t *testing.T, evolveDir, root string) *loopBatchCoordinator {
 	t.Helper()
 	u13StubRefresh(t, func() bool { return false })
 	b := &loopBatchCoordinator{
-		ctx:    context.Background(),
-		cfg:    loopConfig{ProjectRoot: root, EvolveDir: evolveDir},
-		result: &loopResult{},
-		stdout: io.Discard,
-		stderr: io.Discard,
+		ctx:       context.Background(),
+		cfg:       loopConfig{ProjectRoot: root, EvolveDir: evolveDir},
+		result:    &loopResult{},
+		stdout:    io.Discard,
+		stderr:    io.Discard,
+		loadGraph: noModuleGraph,
 	}
 	b.deps.Signals = newRootSignalCenter(root, evolveDir, io.Discard)
 	b.deps.Storage = &fixtures.FakeStorage{}
