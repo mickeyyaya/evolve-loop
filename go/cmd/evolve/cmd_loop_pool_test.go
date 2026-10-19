@@ -107,7 +107,7 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 	}
 	done := make(chan outcome, 1)
 	go func() {
-		ran, _, results, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+		ran, results, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 		done <- outcome{ran, results, err}
 	}()
 
@@ -158,7 +158,7 @@ func TestDispatchPoolIteration_EmptyBacklogStaysFalseNoLaunch(t *testing.T) {
 	launch := func(context.Context, fleet.CycleSpec) (int, error) { launched++; return 0, nil }
 	planFn := func(context.Context, int) ([]fleet.Todo, error) { return nil, nil }
 
-	ran, _, results, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+	ran, results, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 	if err != nil {
 		t.Fatalf("dispatchPoolIteration returned error: %v, want nil (an empty backlog is not an error)", err)
 	}
@@ -184,7 +184,7 @@ func TestDispatchPoolIteration_WaveConfigInertNoLaunch(t *testing.T) {
 		return []fleet.Todo{{ID: "A", Files: []string{"a.go"}}}, nil
 	}
 
-	ran, _, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
+	ran, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return nil }, planFn, launch, 0)
 	if err != nil {
 		t.Fatalf("dispatchPoolIteration returned error: %v, want nil on the gated-off path", err)
 	}
@@ -210,7 +210,7 @@ func TestDispatchPoolIteration_PreflightRefusalNeverPlansNorLaunches(t *testing.
 	}
 	launch := func(context.Context, fleet.CycleSpec) (int, error) { launched++; return 0, nil }
 
-	ran, _, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return refusal }, planFn, launch, 0)
+	ran, _, err := dispatchPoolIteration(context.Background(), fc, func() error { return refusal }, planFn, launch, 0)
 	if err == nil {
 		t.Fatalf("dispatchPoolIteration swallowed a preflight refusal — want a surfaced error")
 	}

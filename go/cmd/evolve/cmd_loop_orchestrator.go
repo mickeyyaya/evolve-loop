@@ -80,8 +80,21 @@ func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, itera
 }
 
 func (b *loopBatchCoordinator) orchestratedRun(fc policy.FleetConfig, launch fleet.LaunchFn, iteration int) poolRunFn {
-	return func(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
-		return b.orchestratorPool(fc, launch, iteration).Run(ctx, backlog)
+	return func(ctx context.Context, backlog []fleet.Todo, resupply poolSupplyFn) []fleet.Result {
+		pool := b.orchestratorPool(fc, launch, iteration)
+		pool.Resupply = b.orchestratorResupply(resupply, iteration)
+		return pool.Run(ctx, backlog)
+	}
+}
+
+func (b *loopBatchCoordinator) orchestratorResupply(resupply poolSupplyFn, iteration int) func([]fleet.Todo) []fleet.Todo {
+	return func(held []fleet.Todo) []fleet.Todo {
+		todos, err := resupply(held)
+		if err != nil {
+			fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: pool %d resupply: %v; the free slot waits for the next lane exit\n", iteration, err)
+			return nil
+		}
+		return todos
 	}
 }
 

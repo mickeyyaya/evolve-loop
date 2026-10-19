@@ -18,6 +18,7 @@ const (
 	CodeLaneExited         signalcenter.Code = "LOOP_ORCH_LANE_EXITED"
 	CodeLaneBackfilled     signalcenter.Code = "LOOP_ORCH_LANE_BACKFILLED"
 	CodePoolIdle           signalcenter.Code = "LOOP_ORCH_POOL_IDLE"
+	CodePoolResupplied     signalcenter.Code = "LOOP_ORCH_POOL_RESUPPLIED"
 	CodeLaneStalled        signalcenter.Code = "LOOP_ORCH_LANE_STALLED"
 	CodeLaneDeadline       signalcenter.Code = "LOOP_ORCH_LANE_DEADLINE"
 	CodeLaneLateExit       signalcenter.Code = "LOOP_ORCH_LANE_LATE_EXIT"
@@ -41,6 +42,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneExited, "a lane of the orchestrator pool exited and freed its slot and its cells; INFO; fields.todo, live, target")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneBackfilled, "the orchestrator pool gave a freed slot to the next admissible todo at once; INFO; fields.todo, live, target")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodePoolIdle, "a slot of the orchestrator pool stays free after a lane exit: no pending todo is admissible, the supply is empty, the operator stop is engaged or the run reached fleet.orchestrator.run_max_lanes; INFO; fields.live, target")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodePoolResupplied, "a slot of the orchestrator pool stayed free after a lane exit, so the pool ran the plan source again and added a ready todo that the run did not hold; one event for each added todo; INFO; fields.todo, live, target")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneStalled, "a lane had no live signal (its cycle signals, its phase pane-watch, events or stdout file) for fleet.orchestrator.stall_minutes (ADR-0139 O5); published once for each lane; a lane whose cycle is not found has an unknown heartbeat and no stall; the lane keeps its slot; fields.todo, stage, last_heartbeat, stall_minutes")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneDeadline, "a lane passed its lease deadline (the p95 lane time of the last 50 cycles without the longest one, at least fleet.orchestrator.deadline_floor_minutes, ADR-0139 O5); action recorded at stage shadow (nothing stops), action stopped at stage enforce (the lane's own launch context is cancelled, its dispatches are reaped, its inbox claim is released and its cells free); fields.todo, stage, action, deadline_minutes")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneLateExit, "a lane exited after its lease deadline had passed; the shadow exit measure of ADR-0139 O5: status ok means a deadline stop would have stopped a lane that passed; fields.todo, stage, status, rc, stopped")

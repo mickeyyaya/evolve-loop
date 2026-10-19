@@ -279,9 +279,9 @@ The orchestrator runs `RunPool` as its scheduler, with three changes:
 
 1. **Admission.** The pool asks the admission step (§6) for its next todo, in place of its own file rule.
 2. **Freshness.** The pool runs `FreshenSpecs` on each todo just before launch, as the wave path does now (`launcher.go:36-45`).
-3. **Transitions.** Each transition (`launched`, `exited`, `backfilled`, `idle`) goes to the `loop` channel through `onTransition`, as `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_EXITED`, `LOOP_ORCH_LANE_BACKFILLED` and `LOOP_ORCH_POOL_IDLE`. The console and `evolve wave watch` read the channel.
+3. **Transitions.** Each transition goes to the `loop` channel through `onTransition`. The transitions are `launched`, `exited`, `backfilled`, `resupplied` and `idle`, published as `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_EXITED`, `LOOP_ORCH_LANE_BACKFILLED`, `LOOP_ORCH_POOL_RESUPPLIED` and `LOOP_ORCH_POOL_IDLE`. The console and `evolve wave watch` read the channel.
 
-`RunPool` takes the three changes as hooks of `fleet.PoolConfig` (`Next`, `Prepare`, `Exited`), so the scheduler stays one function. With no hook, it keeps the file rule. The in-flight list of admission is the list of running lanes, so a lane exit frees its cells at once. The module graph loads once for each run. If it does not load, the run admits by the file rule and the loop writes one WARN.
+`RunPool` takes the changes as hooks of `fleet.PoolConfig` (`Next`, `Prepare`, `Resupply`), so the scheduler stays one function. With no hook, it keeps the file rule. The in-flight list of admission is the list of running lanes, so a lane exit frees its cells at once. The module graph loads once for each run. If it does not load, the run admits by the file rule and the loop writes one WARN.
 
 A run ends when the supply is empty and no lane is in flight, or on an operator stop (`evolve loop-stop --wait`). The wave boundary work (merge, `gc`, the code-index refresh, `cli update`) runs at the end of a run, as it does now after a wave. The rule "merge only at the boundary" thus holds unchanged: a run is one boundary-to-boundary unit.
 
@@ -292,6 +292,17 @@ The operator stop is the brake file of `evolve loop-stop` or a cancelled batch. 
 **The soak (2026-10-17, goal G5).** `evolve fleet soak --count 16 --pool` ran 64 simulated lanes at `enforce`. The peak in-flight was 16 of 16, and all 64 lanes passed. The run took 43.6 s, with 88.0 lanes a minute and a utilization of 0.91 ([internal-orchestrator.md](packages/internal-orchestrator.md) §Findings).
 
 An earlier run found a cross-lane race on `knowledge-base/cycles/`, which the barrier hides. The tree-diff guard of a lane counted the dossier of another cycle as its own leak. The guard now keys a dossier to its cycle, and the soak ran with no exclusion.
+
+**The resupply (2026-10-19, [pool-resupply-2026-10](../plans/pool-resupply-2026-10.md)).** The plan source gives the backlog at the run start. Work that becomes ready later (for example, an item whose `deps` ship in the run) is not in it. In wave 130 the pool thus ran 1 lane of 4 for 3 hours while 23 items were ready. Now, when the fill after a lane exit leaves a slot free, the pool calls its `Resupply` port one time:
+
+- The loop gives the port the same `PlanFn` path as the run start, for the same wave index. The rank, the console-route filter, the protected-path filter and admission by cell thus apply to each new todo.
+- The pool gives the port the todos that it holds. The plan depth is `PoolSupply` plus that count, so the held todos cannot fill the cut of the ranked list.
+- The plan releases stale claims, as at the run start. A claim whose holder has a live lease stays, so the lanes in flight keep their claims.
+- The pool adds only the todos whose id it does not hold, and publishes `LOOP_ORCH_POOL_RESUPPLIED` for each. Then it fills again. If a slot stays free, it publishes `LOOP_ORCH_POOL_IDLE`.
+- The port runs only on a lane exit, and not when the pool is stopped or at `run_max_lanes`. An empty inbox thus costs one plan call for each exit, and no timer.
+- The results grow with the backlog: `results[i]` is the result of the i-th todo that the run held.
+- A plan error writes one WARN and adds nothing. The slot waits for the next exit.
+- Only the orchestrator pool gets the port. The rolling pool of `scheduling: pool` has no launch limit, so it keeps its fixed backlog.
 
 **An empty pool always admits.** When no lane is in flight and the supply is not empty, `fleet.RunPool` launches the top todo even when admission refuses it. Nothing can conflict with an empty set. A refusal there can only end the run with work left.
 
@@ -340,11 +351,11 @@ The stage decides the action:
 | Stage | A stall | A passed deadline | A lane that exits after its deadline |
 |---|---|---|---|
 | `shadow` | `LOOP_ORCH_LANE_STALLED` once | `LOOP_ORCH_LANE_DEADLINE` with `action` `recorded`. Nothing stops. | `LOOP_ORCH_LANE_LATE_EXIT` with its `status`: `ok` is a stop that the exit rule of §14 counts |
-| `enforce` | `LOOP_ORCH_LANE_STALLED` once | `LOOP_ORCH_LANE_DEADLINE` with `action` `stopped`, then the stop, the claim release and one more try | `LOOP_ORCH_LANE_LATE_EXIT` with `stopped` true. A second stop parks the todo. |
+| `enforce` | `LOOP_ORCH_LANE_STALLED` once | `LOOP_ORCH_LANE_DEADLINE` with `action` `stopped`, then the stop and the claim release. The todo does not launch again in the same run. | `LOOP_ORCH_LANE_LATE_EXIT` with `stopped` true. A second stop, in any run of the batch, parks the todo. |
 
 One timer serves all lanes. A heap holds the next time of each lane: the earlier of its deadline and its stall time. The timer is armed for the top of the heap. The deadline timer is the only timer in the orchestrator.
 
-The restart rule follows OTP (P3.14): a todo gets one more try, and a second stop sends it to the console. A stop never runs a second copy of a lane in parallel, because a copy costs a full lane and writes `main` (P3.15).
+The restart rule follows OTP (P3.14): a todo gets one more try, and a second stop sends it to the console. Since 2026-10-19 the one more try comes in a later run, not at once in the same run. In wave 130 the relaunch at once repeated the stall, with no event for 76 minutes. The release puts the todo back in the inbox for a later plan, as a Kafka share group does with a released record ([pool-resupply-2026-10](../plans/pool-resupply-2026-10.md) D8). The lease table lives for the batch, so its stop count spans the runs. A stop never runs a second copy of a lane in parallel, because a copy costs a full lane and writes `main` (P3.15).
 
 A stop must not be a broad kill. The orchestrator stops only the lane that its own launch made, and never by a name match. The lease cancels the child context of that launch. The launch of `cmd/evolve` (`execCycleLaunch`, which uses `sysexec.Command`) then sends SIGTERM to that one lane process, and the lane stops its own phase process groups. The package holds no pid and imports no process package. A guard test checks this.
 
@@ -570,6 +581,7 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | `LOOP_ORCH_LANE_EXITED` | `loop` | §7: a lane exited and freed its slot and its cells. INFO. |
 | `LOOP_ORCH_LANE_BACKFILLED` | `loop` | §7: a freed slot took the next admissible todo. INFO. |
 | `LOOP_ORCH_POOL_IDLE` | `loop` | §7: a slot stays free after a lane exit. INFO. |
+| `LOOP_ORCH_POOL_RESUPPLIED` | `loop` | §7: a resupply after a lane exit added a todo that the run did not hold. INFO. |
 | `LOOP_ORCH_LANE_STALLED` | `errors` | §8 |
 | `LOOP_ORCH_LANE_DEADLINE` | `errors` | §8 |
 | `LOOP_ORCH_LANE_LATE_EXIT` | `loop` | §8: a lane exited after its deadline. INFO. |
