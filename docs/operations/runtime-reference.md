@@ -646,3 +646,7 @@ The lint checks text against the ASD-STE100 house rules ([the standard](../conve
 - **The CI job:** the `ste-lint` job of `.github/workflows/required.yml` runs `evolve docs ste-lint --strict --changed <merge-base> --added` on each pull request that changes a doc in scope. On a docs-only pull request, it is the only job that runs. Two paths are never docs-only. A page of `docs/explain/` is source of the landing site. The lint standard `docs/conventions/ste100-writing.md` must not weaken its own check. A push to `main` runs every suite.
 - **The local docs-only policy:** for a change of docs only, run `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added`, the relative link check, one `code-review-simplify` pass and the commit gate. No make target runs.
 - **The dial:** `.evolve/policy.json` `docs_floor.ste_stage` is `off`, `shadow` or `enforce`, and the compiled default is `shadow`. `off` stops the floor's line. `shadow` and `enforce` both only WARN. The policy loader refuses an unknown word in `stage` or `ste_stage`, and an unknown `docs_floor` key.
+
+## Phase handoff policy
+
+- In `.evolve/policy.json`, the `handoff` block sets the `stage` (`shadow` or `enforce`) and optional `judge_tier` for each pair. The five pairs are `build-audit`, `intent-scout`, `scout-triage`, `tdd-build`, and `triage-tdd`.

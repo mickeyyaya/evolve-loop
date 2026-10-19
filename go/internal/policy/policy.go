@@ -72,4 +72,5 @@ type Policy struct {
 	Overlays           *OverlaysPolicy           `json:"overlays,omitempty"`
 	Wave               *WavePolicy               `json:"wave,omitempty"`
 	AttemptPostmortem  *AttemptPostmortemPolicy  `json:"attempt_postmortem,omitempty"`
+	Handoff            *HandoffPolicy            `json:"handoff,omitempty"`
 }
