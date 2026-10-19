@@ -1,0 +1,2 @@
+{"schema_version": 2, "phase": "build", "cli": "claude-tmux", "started_at": "2026-10-19T10:10:00Z", "ended_at": "2026-10-19T10:30:00Z", "duration_ms": 1200000}
+{"schema_version": 2, "phase": "audit", "cli": "claude-tmux", "started_at": "2026-10-19T10:40:00Z", "ended_at": "2026-10-19T10:44:00Z", "duration_ms": 240000}

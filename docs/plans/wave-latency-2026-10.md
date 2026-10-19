@@ -96,7 +96,7 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 
 | # | Component | Home | Route |
 |---|---|---|---|
-| W0 | `evolve wave latency` (D7) | `cmd/evolve`, `internal/loopwave` | lane |
+| W0 | `evolve wave latency` (D7) | `cmd/evolve`, `internal/lanetime` | lane |
 | W1 | Optimistic admission at shadow (D1, D2) | `internal/admission` | lane |
 | W2 | The move of W1 to enforce (D3) | `.evolve/policy.json` | operator, after one wave |
 | W3 | Claude first for the builder now (D5) | `.evolve/policy.json` through `evolve cli-routing set` | console, at the next boundary |

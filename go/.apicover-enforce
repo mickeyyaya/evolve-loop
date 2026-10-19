@@ -798,3 +798,5 @@
 # CI telemetry commands (C0b): no exported API beyond Record/Sample/Counters, all named by tests.
 ./cmd/testrusage
 ./cmd/hostsampler
+# lanetime - the report of where the time of a wave goes (plan wave-latency-2026-10, W0).
+./internal/lanetime
