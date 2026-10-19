@@ -793,3 +793,5 @@
 
 # request - the request builders of the handoff pairs (ADR-0141, plan H2).
 ./internal/handoff/request
+# retryladder - the deterministic failure classifier of the retry ladder (ADR-0142, plan L1).
+./internal/retryladder
