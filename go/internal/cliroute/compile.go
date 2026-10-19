@@ -52,6 +52,7 @@ func (c *compiler) compileDeclared(t Table) Table {
 	agentChains, models := c.compileAgents()
 	maps.Copy(t.chains, agentChains)
 	t.models = models
+	t.orders = c.compileOrders()
 	t.tiers = c.compileTiers(t.clis)
 	t.stop = c.compileAfterChain()
 	t.roles = c.agentRoles()

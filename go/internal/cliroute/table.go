@@ -29,6 +29,7 @@ type Table struct {
 	clis      []string
 	chains    map[string][]string
 	models    map[string]string
+	orders    map[string]int
 	tiers     map[string][]string
 	stop      bool
 	pol       policy.Policy

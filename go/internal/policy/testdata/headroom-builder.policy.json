@@ -1,0 +1,18 @@
+{
+  "cli_routing": {
+    "clis": ["agy", "agy-claude", "claude"],
+    "default": ["agy", "agy-claude", "claude"],
+    "agents": {
+      "builder": {
+        "cli": ["agy", "agy-claude", "claude"],
+        "model": "balanced",
+        "order": "headroom",
+        "headroom_pct": 60
+      }
+    },
+    "tiers": {
+      "deep": ["agy", "agy-claude", "claude"],
+      "top": ["agy-claude", "claude"]
+    }
+  }
+}
