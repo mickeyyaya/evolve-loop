@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "A table test covers R0 to R1, R0 to R2 on a repeated fingerprint or no effort step, R2 to stop-as-spec on an earlier fingerprint, and no headroom at R0 and at R1 (red test first)",
+    "A property test: no input gives more than two raised tries, a tier above max_tier or an effort above max_effort",
+    "halt and spec never climb; unknown never passes R1",
+    "With no healthy family at the target tier the decider records LADDER_NO_HEADROOM, goes from R0 to R1, and stops at R1",
+    "Every decision records the rung that the shadow critic arm chooses",
+    "With no bound keys set, the bounds are max_tier deep and max_effort high"
+  ],
+  "campaign": "retry-ladder",
+  "created_at": "2026-10-19T09:30:00Z",
+  "deps": [
+    "retry-ladder-l1-classifier"
+  ],
+  "files": [
+    "go/internal/retryladder",
+    "docs/architecture/packages"
+  ],
+  "fix": "TDD first (red test before code), 100% coverage on new and changed functions, zero comments, the package note updated.",
+  "id": "retry-ladder-l2-decider",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "source": "plan retry-ladder-2026-10 (operator request and decisions 2026-10-19)",
+  "summary": "Component L2 of ADR-0142 in go/internal/retryladder. A pure Next(state, class, fingerprint, headroom) gives R1, R2 or a stop (spec \u00a72, plan D3-D9). Reuse the one-tier raise of go/internal/convergence; add no second tier table. Bounds: max_tier deep and max_effort high by default (operator decision 2026-10-19); never max effort, never top tier unless named. Records the shadow critic arm (D12). Spec docs/architecture/retry-ladder.md \u00a72 and \u00a74; ADR-0142.",
+  "title": "Retry ladder L2: the rung decider with the skip, stop and headroom rules",
+  "weight": 1.0
+}
