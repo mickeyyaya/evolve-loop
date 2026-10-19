@@ -117,3 +117,19 @@ func TestLoadModuleGraph_ReportsAGoListFailure(t *testing.T) {
 		t.Fatalf("err = %v, want it to wrap %v", err, boom)
 	}
 }
+
+func TestModuleGraph_ALeafIsAPackageNothingImports(t *testing.T) {
+	g, err := admission.NewModuleGraph(listing(map[string][]string{
+		"internal/sysexec": nil,
+		"internal/router":  {"internal/sysexec"},
+		"cmd/evolve":       {"internal/sysexec", "internal/router"},
+	}), testHubMin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for pkg, want := range map[string]bool{"cmd/evolve": true, "internal/router": false, "internal/sysexec": false, "internal/nosuch": false} {
+		if got := g.IsLeaf(admission.ModulePath + "/" + pkg); got != want {
+			t.Errorf("IsLeaf(%s) = %v, want %v", pkg, got, want)
+		}
+	}
+}

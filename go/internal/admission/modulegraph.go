@@ -16,9 +16,10 @@ const ModulePath = "github.com/mickeyyaya/evolve-loop/go"
 const goListFormat = `{{.ImportPath}}|{{join .Deps " "}}`
 
 type ModuleGraph struct {
-	known map[string]bool
-	deps  map[string][]string
-	hubs  map[string]bool
+	known  map[string]bool
+	deps   map[string][]string
+	hubs   map[string]bool
+	leaves map[string]bool
 }
 
 func LoadModuleGraph(ctx context.Context, run sysexec.RunFunc, goDir string, hubMinImporters int) (*ModuleGraph, error) {
@@ -42,7 +43,7 @@ func NewModuleGraph(listing string, hubMinImporters int) (*ModuleGraph, error) {
 		}
 		raw[pkg] = strings.Fields(deps)
 	}
-	g := &ModuleGraph{known: map[string]bool{}, deps: map[string][]string{}, hubs: map[string]bool{}}
+	g := &ModuleGraph{known: map[string]bool{}, deps: map[string][]string{}, hubs: map[string]bool{}, leaves: map[string]bool{}}
 	importers := map[string]int{}
 	for pkg, deps := range raw {
 		g.known[pkg] = true
@@ -58,11 +59,16 @@ func NewModuleGraph(listing string, hubMinImporters int) (*ModuleGraph, error) {
 		if importers[pkg] >= hubMinImporters {
 			g.hubs[pkg] = true
 		}
+		if importers[pkg] == 0 {
+			g.leaves[pkg] = true
+		}
 	}
 	return g, nil
 }
 
 func (g *ModuleGraph) Deps(pkg string) []string { return g.deps[pkg] }
+
+func (g *ModuleGraph) IsLeaf(pkg string) bool { return g.leaves[pkg] }
 
 func (g *ModuleGraph) Hubs() map[string]bool { return g.hubs }
 

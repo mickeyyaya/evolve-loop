@@ -10,14 +10,14 @@ Built on 2026-10-17 as O3 of the wave-orchestrator plan, in the `shadow` stage. 
 
 ## Design
 
-- **The `Graph` port.** It has three methods: `Packages(files)`, `Deps(pkg)` and `Hubs()`. `Admitter` takes the port, so the tests need no `go list`. `ModuleGraph` is the production adapter.
+- **The `Graph` port.** It has four methods: `Packages(files)`, `Deps(pkg)`, `Hubs()` and `IsLeaf(pkg)`. `Admitter` takes the port, so the tests need no `go list`. `ModuleGraph` is the production adapter.
 - **One `go list` for each plan.** `LoadModuleGraph` runs `go list -f '{{.ImportPath}}|{{join .Deps " "}}' ./...` once in the module directory. On this module it takes 0.8 s for 303 packages (2026-10-17). The loop gives it a deadline of 30 s.
   - The shadow runs in a goroutine with a recover. The loop joins it after the launch. A slow `go list` or a panic thus cannot delay or fail a launch.
   - `NewModuleGraph` parses the lines. It keeps only the module packages, so the standard library is never a cell.
 - **Paths to packages.** A `.go` file under `go/` maps to its directory package. Another path under `go/` (a package directory, or package data such as `testdata/`) maps to the nearest enclosing known package. A path outside `go/` maps to no package. The module root is not a package, so `go/.cover-strict` maps to no package.
   - The files `go/go.mod`, `go/go.sum` and `go/Makefile` map to no package, but each holds the hub cell. `go.mod` and `go.sum` are global-zone files (`fleet.GlobalZoneFiles`). The package names the Makefile.
 - **The hub set.** A package is a hub when at least `hub_min_importers` module packages import it, directly or transitively. The count is the transitive importer count, because it reproduces the ADR-0134 research F2.16 numbers (§Findings).
-- **The footprint of a todo.** `E(t)` is the set of packages that the todo edits. `D(E)` is the union of the module-internal transitive deps of those packages, minus the hubs. The todo holds the hub cell in three cases:
+- **The footprint of a todo.** `E(t)` is the set of packages that the todo edits. `D(E)` is the union of the module-internal transitive deps of those packages, minus the hubs. A leaf package has no importer, so nothing compiles against it: it adds nothing to `D(E)`. `cmd/evolve` is the main leaf. The todo holds the hub cell in three cases:
   - it edits a hub package;
   - it names a global-zone file;
   - it has no files, and its text names no known package.

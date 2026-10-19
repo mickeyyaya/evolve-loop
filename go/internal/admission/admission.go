@@ -19,6 +19,10 @@ type Graph interface {
 	Hubs() map[string]bool
 }
 
+type leafGraph interface {
+	IsLeaf(pkg string) bool
+}
+
 type Holding struct {
 	Lane string
 	Todo fleet.Todo
@@ -100,6 +104,11 @@ func (a Admitter) footprintOf(td fleet.Todo) footprint {
 	for _, p := range pkgs {
 		fp.edits[p] = true
 		fp.hub = fp.hub || hubs[p]
+	}
+	if a.allLeaves(pkgs) {
+		return fp
+	}
+	for _, p := range pkgs {
 		for _, d := range a.Graph.Deps(p) {
 			if !hubs[d] {
 				fp.reach[d] = true
@@ -107,6 +116,14 @@ func (a Admitter) footprintOf(td fleet.Todo) footprint {
 		}
 	}
 	return fp
+}
+
+func (a Admitter) allLeaves(pkgs []string) bool {
+	lg, ok := a.Graph.(leafGraph)
+	if !ok || len(pkgs) == 0 {
+		return false
+	}
+	return !slices.ContainsFunc(pkgs, func(p string) bool { return !lg.IsLeaf(p) })
 }
 
 func (a Admitter) edited(td fleet.Todo) (pkgs []string, hub bool) {

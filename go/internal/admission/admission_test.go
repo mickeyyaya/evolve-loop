@@ -19,6 +19,10 @@ var testModule = map[string][]string{
 	"internal/policy":     {"internal/sysexec", "internal/log"},
 }
 
+var importerOfLeaves = map[string][]string{
+	"cmd/evolve": {"internal/fleet", "internal/policy", "internal/quotastate"},
+}
+
 const testHubMin = 4
 
 func listing(module map[string][]string) string {
@@ -43,8 +47,23 @@ func testGraph(t *testing.T) *admission.ModuleGraph {
 	return g
 }
 
+func admissionGraph(t *testing.T) *admission.ModuleGraph {
+	t.Helper()
+	module := map[string][]string{}
+	for _, m := range []map[string][]string{testModule, importerOfLeaves} {
+		for pkg, deps := range m {
+			module[pkg] = deps
+		}
+	}
+	g, err := admission.NewModuleGraph(listing(module), testHubMin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return g
+}
+
 func admitter(t *testing.T, text map[string]string) admission.Admitter {
-	return admission.Admitter{Graph: testGraph(t), Text: func(id string) string { return text[id] }}
+	return admission.Admitter{Graph: admissionGraph(t), Text: func(id string) string { return text[id] }}
 }
 
 func todo(id string, files ...string) fleet.Todo { return fleet.Todo{ID: id, Files: files} }
@@ -169,6 +188,15 @@ func TestAdmit_ImportingAHubNeverConflicts(t *testing.T) {
 	}
 }
 
+func TestAdmit_ALeafLaneHoldsNoReachOverAnUnrelatedPackage(t *testing.T) {
+	a := admitter(t, nil)
+	held := []admission.Holding{{Lane: "lane-1", Todo: todo("c", "go/cmd/evolve/main.go")}}
+	admitted, waiting := a.Admit(held, []fleet.Todo{todo("i", "go/internal/inboxrank/inboxrank.go")}, 32)
+	if got := ids(admitted); len(waiting) != 0 || !reflect.DeepEqual(got, []string{"i"}) {
+		t.Fatalf("admitted = %v, waiting = %+v: cmd/evolve is a leaf, so it holds no reach over inboxrank", got, waiting)
+	}
+}
+
 func TestAdmit_AnEditedPackageThatTheOtherImportsConflicts(t *testing.T) {
 	a := admitter(t, nil)
 	_, waiting := a.Admit([]admission.Holding{{Lane: "lane-1", Todo: todo("i", "go/internal/inboxrank/inboxrank.go")}},
@@ -204,7 +232,7 @@ func TestAdmit_TheScanStopsAtScanK(t *testing.T) {
 }
 
 func TestAdmit_ANilTextReadsAsEmpty(t *testing.T) {
-	a := admission.Admitter{Graph: testGraph(t)}
+	a := admission.Admitter{Graph: admissionGraph(t)}
 	admitted, _ := a.Admit(nil, []fleet.Todo{todo("n")}, 32)
 	if len(admitted) != 1 || !reflect.DeepEqual(admitted[0].Cells, []string{admission.HubCell}) {
 		t.Fatalf("admitted = %+v: no text names no package, so the todo takes the hub cell", admitted)

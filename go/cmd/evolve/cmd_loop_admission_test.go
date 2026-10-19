@@ -51,7 +51,7 @@ func listingOf(pkgs map[string][]string) string {
 
 func TestAdmissionShadow_AdmitsThePlannedTodosOverTheGraphOfTheWave(t *testing.T) {
 	t.Parallel()
-	listing := listingOf(map[string][]string{"internal/sysexec": nil, "internal/inboxrank": {"internal/sysexec"}, "internal/fleet": {"internal/sysexec", "internal/inboxrank"}})
+	listing := listingOf(map[string][]string{"internal/sysexec": nil, "internal/inboxrank": {"internal/sysexec"}, "internal/fleet": {"internal/sysexec", "internal/inboxrank"}, "cmd/evolve": {"internal/fleet"}})
 	var asked []graphAsk
 	fn := admissionShadow(func(oc policy.OrchestratorConfig, wave int) (*admission.ModuleGraph, error) {
 		asked = append(asked, graphAsk{cfg: oc, wave: wave})
