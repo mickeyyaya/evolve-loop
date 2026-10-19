@@ -181,11 +181,11 @@ func TestRunPool_EachTransitionNamesItsKindAndItsTodo(t *testing.T) {
 		t.Errorf("transition kinds = %v, want one launch, two exits, one backfill and one idle", kinds)
 	}
 	want := []PoolTransition{
-		{Kind: PoolLaunched, Todo: "A", Live: 1, Target: 1},
-		{Kind: PoolExited, Todo: "A", Live: 0, Target: 1},
-		{Kind: PoolBackfilled, Todo: "B", Live: 1, Target: 1},
-		{Kind: PoolExited, Todo: "B", Live: 0, Target: 1},
-		{Kind: PoolIdle, Live: 0, Target: 1},
+		{Kind: PoolLaunched, Todo: "A", Live: 1, Target: 1, Pending: 1},
+		{Kind: PoolExited, Todo: "A", Live: 0, Target: 1, Pending: 1},
+		{Kind: PoolBackfilled, Todo: "B", Live: 1, Target: 1, Pending: 0},
+		{Kind: PoolExited, Todo: "B", Live: 0, Target: 1, Pending: 0},
+		{Kind: PoolIdle, Live: 0, Target: 1, Pending: 0},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("transitions =\n%+v\nwant\n%+v", got, want)

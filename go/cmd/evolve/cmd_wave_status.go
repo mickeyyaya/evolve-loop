@@ -2,10 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"path/filepath"
 	"strconv"
+	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
 )
@@ -173,10 +179,14 @@ type waveWatcher struct {
 	seen           map[string]bool
 	asJSON         bool
 	stdout, stderr io.Writer
+	signalOffset   int64
 }
 
 func (w *waveWatcher) poll() (bool, error) {
 	if err := w.followNewerWave(); err != nil {
+		return false, err
+	}
+	if err := w.pollSignals(); err != nil {
 		return false, err
 	}
 	cycles, warnings := wave.ReadCycles(w.plane.root, w.cur.CycleFloor, 0)
@@ -193,6 +203,63 @@ func (w *waveWatcher) poll() (bool, error) {
 	done := w.prev.LoopLive && !snap.LoopLive
 	w.prev = snap
 	return done, nil
+}
+
+func (w *waveWatcher) pollSignals() error {
+	signalPath := filepath.Join(w.plane.evolveDir, signalcenter.StreamFileName)
+	chunk, err := signalcenter.ReadStream(signalPath, w.signalOffset)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		w.warnOnce(err.Error())
+		return nil
+	}
+	w.signalOffset = chunk.Next
+	if chunk.Skipped > 0 {
+		s := "s"
+		if chunk.Skipped == 1 {
+			s = ""
+		}
+		w.warnOnce(fmt.Sprintf("skipped %d malformed signal line%s in %s", chunk.Skipped, s, signalPath))
+	}
+	for _, sig := range chunk.Events {
+		at, _ := time.Parse(time.RFC3339Nano, sig.TS)
+		if !w.cur.StartedAt.IsZero() && at.Before(w.cur.StartedAt) {
+			continue
+		}
+		if sig.Kind != signalcenter.KindLoopWave {
+			continue
+		}
+		if sig.Severity != signalcenter.SeverityWarn && !isPoolTransition(sig.Code) {
+			continue
+		}
+		e := wave.Event{Kind: wave.EventPool, Detail: poolEventDetail(sig)}
+		if err := writeWaveEvent(w.stdout, w.cur.Number, e, w.asJSON); err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
+	}
+	return nil
+}
+
+func isPoolTransition(c signalcenter.Code) bool {
+	switch c {
+	case orchestrator.CodeLaneLaunched,
+		orchestrator.CodeLaneExited,
+		orchestrator.CodeLaneBackfilled,
+		orchestrator.CodePoolIdle,
+		orchestrator.CodeLaneStalled,
+		orchestrator.CodeLaneLateExit:
+		return true
+	}
+	return false
+}
+
+func poolEventDetail(sig signalcenter.Event) string {
+	if sig.Reason != "" {
+		return fmt.Sprintf("%s: %s", sig.Code, sig.Reason)
+	}
+	return string(sig.Code)
 }
 
 func (w *waveWatcher) warnOnce(warn string) {

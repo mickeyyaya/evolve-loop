@@ -68,6 +68,7 @@ func TestEvent_String(t *testing.T) {
 		{wave.Event{Kind: wave.EventQuotaPaused, Cycle: 7, Detail: "scout"}, "cycle 7: quota-paused in scout"},
 		{wave.Event{Kind: wave.EventLoopExit}, "loop: exit"},
 		{wave.Event{Kind: wave.EventWaveStarted, Detail: "83"}, "wave 83 started; watch follows it"},
+		{wave.Event{Kind: wave.EventPool, Detail: "LOOP_ORCH_POOL_IDLE: pool idle"}, "LOOP_ORCH_POOL_IDLE: pool idle"},
 	}
 	for _, c := range cases {
 		if got := c.event.String(); got != c.want {
@@ -78,8 +79,8 @@ func TestEvent_String(t *testing.T) {
 
 func TestEventKind_IsTheWatchJSONVocabulary(t *testing.T) {
 	t.Parallel()
-	kinds := []wave.EventKind{wave.EventPhase, wave.EventSealed, wave.EventShipped, wave.EventQuotaPaused, wave.EventLoopExit, wave.EventWaveStarted}
-	want := []string{"phase", "sealed", "shipped", "quota-paused", "loop-exit", "wave-started"}
+	kinds := []wave.EventKind{wave.EventPhase, wave.EventSealed, wave.EventShipped, wave.EventQuotaPaused, wave.EventLoopExit, wave.EventWaveStarted, wave.EventPool}
+	want := []string{"phase", "sealed", "shipped", "quota-paused", "loop-exit", "wave-started", "pool"}
 	for i, k := range kinds {
 		if string(k) != want[i] {
 			t.Errorf("kind %d = %q, want %q: a watch consumer reads this text", i, k, want[i])

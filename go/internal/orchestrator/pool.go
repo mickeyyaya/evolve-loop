@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 
@@ -24,6 +25,7 @@ type Admit func(inFlight, pending []fleet.Todo) int
 
 type Pool struct {
 	Target      int
+	MinLanes    int
 	Concurrency int
 	MaxLanes    int
 	Admit       Admit
@@ -118,6 +120,16 @@ func (p Pool) transition(t fleet.PoolTransition) {
 		reason += " " + t.Todo
 	}
 	p.Publish.emit("Pool.Run", transitionCodes[t.Kind], signalcenter.SeverityInfo, reason, fields)
+	if t.Kind == fleet.PoolIdle && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
+		uFields := map[string]string{
+			"live":      strconv.Itoa(t.Live),
+			"target":    strconv.Itoa(t.Target),
+			"min_lanes": strconv.Itoa(p.MinLanes),
+			"ready":     strconv.Itoa(t.Pending),
+		}
+		uReason := fmt.Sprintf("pool underfilled: %d of %d lanes live, min_lanes %d", t.Live, t.Target, p.MinLanes)
+		p.Publish.emit("Pool.Run", CodePoolUnderfilled, signalcenter.SeverityWarn, uReason, uFields)
+	}
 }
 
 func (p Pool) recover(lane Lane, ret Return) bool {

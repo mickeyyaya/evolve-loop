@@ -57,16 +57,17 @@ func (b *loopBatchCoordinator) poolHalted() bool {
 func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fleet.LaunchFn, iteration int) orchestrator.Pool {
 	return orchestrator.Pool{
 		Target: fc.Count, Concurrency: fc.Concurrency, MaxLanes: fc.Orchestrator.RunMaxLanes,
-		Admit:   b.cellAdmission(fc.Orchestrator, iteration),
-		Freshen: b.wave().Freshen(),
-		Launch:  launch,
-		Leases:  b.laneLeases(fc.Orchestrator),
-		Claims:  b.wave().Claims(),
-		Reap:    b.laneReap(),
-		Publish: b.deps.Signals.Emit,
-		Halted:  b.poolHalted,
-		Stage:   fc.Orchestrator.Stage,
-		Window:  b.laneWindow(fc),
+		MinLanes: fc.MinLanes,
+		Admit:    b.cellAdmission(fc.Orchestrator, iteration),
+		Freshen:  b.wave().Freshen(),
+		Launch:   launch,
+		Leases:   b.laneLeases(fc.Orchestrator),
+		Claims:   b.wave().Claims(),
+		Reap:     b.laneReap(),
+		Publish:  b.deps.Signals.Emit,
+		Halted:   b.poolHalted,
+		Stage:    fc.Orchestrator.Stage,
+		Window:   b.laneWindow(fc),
 	}
 }
 

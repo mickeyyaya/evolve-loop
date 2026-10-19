@@ -118,11 +118,14 @@ func TestPoolHalted_TheOperatorStopOrACancelledBatchEndsAdmission(t *testing.T) 
 func TestOrchestratorPool_WiresTheEnforceKeysAndTheFileRuleWithoutAGraph(t *testing.T) {
 	t.Parallel()
 	b, console := iscsCoordinator(t.TempDir(), t.TempDir(), nil)
-	fc := policy.FleetConfig{Count: 3, Concurrency: 2, PlanSource: "triage", Orchestrator: enforceOrchestrator}
+	fc := policy.FleetConfig{Count: 3, Concurrency: 2, MinLanes: 4, PlanSource: "triage", Orchestrator: enforceOrchestrator}
 	launch := func(context.Context, fleet.CycleSpec) (int, error) { return 0, nil }
 	p := b.orchestratorPool(fc, launch, 4)
 	if p.Target != 3 || p.Concurrency != 2 || p.MaxLanes != 8 || p.Leases != b.leases["enforce"] || p.Freshen == nil || p.Claims == nil || p.Reap == nil || p.Halted == nil || p.Publish == nil {
 		t.Errorf("pool = %+v, want the fleet width, run_max_lanes and the enforce lease table", p)
+	}
+	if p.MinLanes != 4 {
+		t.Errorf("MinLanes = %d, want fleet.min_lanes 4 so the pool can tell a starved slot from a busy one", p.MinLanes)
 	}
 	if p.Stage != "enforce" || p.Window == nil || p.Window.Size() != 2 {
 		t.Errorf("stage = %q window = %v, want the enforce stage and a window of 2: window.start 4 is capped by the concurrency cap 2, which is under the fleet count 3", p.Stage, p.Window)

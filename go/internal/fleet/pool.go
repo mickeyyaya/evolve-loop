@@ -33,10 +33,11 @@ const (
 )
 
 type PoolTransition struct {
-	Kind   PoolTransitionKind
-	Todo   string
-	Live   int
-	Target int
+	Kind    PoolTransitionKind
+	Todo    string
+	Live    int
+	Target  int
+	Pending int
 }
 
 type pool struct {
@@ -93,7 +94,7 @@ func newPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 
 func (p *pool) emit(kind PoolTransitionKind, todo string) {
 	if p.onTransition != nil {
-		p.onTransition(PoolTransition{Kind: kind, Todo: todo, Live: len(p.running), Target: p.cfg.Target})
+		p.onTransition(PoolTransition{Kind: kind, Todo: todo, Live: len(p.running), Target: p.cfg.Target, Pending: len(p.pending)})
 	}
 }
 

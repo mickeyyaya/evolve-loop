@@ -14,6 +14,7 @@ const (
 	EventQuotaPaused EventKind = "quota-paused"
 	EventLoopExit    EventKind = "loop-exit"
 	EventWaveStarted EventKind = "wave-started"
+	EventPool        EventKind = "pool"
 )
 
 type Snapshot struct {
@@ -37,6 +38,8 @@ func (e Event) String() string {
 		return fmt.Sprintf("cycle %d: shipped", e.Cycle)
 	case EventQuotaPaused:
 		return fmt.Sprintf("cycle %d: quota-paused in %s", e.Cycle, e.Detail)
+	case EventPool:
+		return e.Detail
 	default:
 		return fmt.Sprintf("cycle %d: %s %s", e.Cycle, e.Kind, e.Detail)
 	}
