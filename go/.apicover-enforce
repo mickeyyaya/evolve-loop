@@ -790,3 +790,6 @@
 
 # exit - the pass, retry or cap decision of a handoff round (ADR-0141, plan H4).
 ./internal/handoff/exit
+
+# request - the request builders of the handoff pairs (ADR-0141, plan H2).
+./internal/handoff/request

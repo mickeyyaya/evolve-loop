@@ -79,4 +79,5 @@
 ./internal/adapters/codeindex/gotypes 100
 ./internal/envscope 100
 ./internal/handoff 100
+./internal/handoff/request 100
 ./internal/core 100

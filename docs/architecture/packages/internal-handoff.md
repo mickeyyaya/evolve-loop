@@ -18,6 +18,12 @@
 - **Exit decision.** `internal/handoff/exit` decides the exit of a round. `Decide` is pure: it takes the request, the check results, the earlier rounds and a `Policy`, and returns a `Decision`.
 - **Blocked exit.** A `blocked` result carries a `Claim`. `Decide` hands the claims to the injected `Policy.Prover`. The exit is `blocked` only when the prover returns `Blocked` and every unmet required ask is named by a proven claim. The console wires the prover to `core.NewBlockerProver`, so `exit` imports neither `core` nor `guards` and holds no protected-path matcher. An unproven claim stays an unmet ask.
 
+- **Request builders.** `internal/handoff/request` builds the `Request` of each pair from one source. It does not import `core`, and a test enforces this.
+  - `ScoutTriage` makes one ask per selected slug. It trims, drops blanks and repeated slugs.
+  - `TriageTDD` reads the committed set and the inbox record of each committed id. It makes one ask per acceptance entry, with the inbox source and the verbatim text. It returns `ErrNoCommittedSet` or `ErrUnresolvedItem` when it cannot build the whole request.
+  - `TriageTDDFromItems` is the pure part of `TriageTDD`: it takes loaded inbox items.
+  - `TDDBuild` parses the `_test.go` files of an ACS cycle package and makes one ask per predicate. It returns `ErrNoPredicates` for a package without one.
+
 ## Exits
 
 | Outcome | When | `Unmet` |

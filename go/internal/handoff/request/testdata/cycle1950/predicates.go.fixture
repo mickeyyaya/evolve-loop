@@ -1,0 +1,90 @@
+//go:build acs
+
+package cycle1950
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+)
+
+const coreBatchTestPattern = "^TestCoreCoverageBatch_"
+
+var leaseBreakerCarryforwardFunctions = []string{
+	"console_lease.go:consoleLeasePath",
+	"console_lease.go:adoptConsoleLease",
+	"blocker_breaker.go:LoadResolvedFingerprints",
+	"blocker_breaker.go:AppendResolvedFingerprint",
+	"blocker_breaker.go:ConsumePipelineDefectFingerprint",
+	"carryforward_filter.go:CarryforwardCandidateLandable",
+	"carryforward_filter.go:ClassifyFleetRebaseCandidate",
+	"carryforward_filter.go:refSuperseded",
+	"carryforward_filter.go:commitsFullyLanded",
+	"cyclerun.go:clearActiveWorktree",
+}
+
+func sourceRoot(t *testing.T) string {
+	t.Helper()
+	if r := os.Getenv(ipcenv.WorktreeRootKey); r != "" {
+		return r
+	}
+	return acsassert.RepoRoot(t)
+}
+
+func funcCoverage(report string) map[string]string {
+	out := map[string]string{}
+	for _, line := range strings.Split(report, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		file := filepath.Base(strings.SplitN(fields[0], ":", 2)[0])
+		out[file+":"+fields[1]] = fields[len(fields)-1]
+	}
+	return out
+}
+
+func TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage(t *testing.T) {
+	goDir := filepath.Join(sourceRoot(t), "go")
+	profile := filepath.Join(t.TempDir(), "core-batch.cov")
+	stdout, stderr, code, err := acsassert.SubprocessOutput("go", "-C", goDir, "test", "-count=1",
+		"-run", coreBatchTestPattern, "-coverprofile="+profile, "./internal/core")
+	if code != 0 {
+		t.Fatalf("go test -run %s ./internal/core: code=%d err=%v\n%s%s", coreBatchTestPattern, code, err, stdout, stderr)
+	}
+	if strings.Contains(stdout, "no tests to run") {
+		t.Fatalf("no internal/core test matches %s", coreBatchTestPattern)
+	}
+	report, rerr, rcode, err := acsassert.SubprocessOutput("go", "-C", goDir, "tool", "cover", "-func="+profile)
+	if rcode != 0 {
+		t.Fatalf("go tool cover -func: code=%d err=%v\n%s", rcode, err, rerr)
+	}
+	got := funcCoverage(report)
+	for _, fn := range leaseBreakerCarryforwardFunctions {
+		pct, ok := got[fn]
+		if !ok {
+			t.Errorf("%s is absent from the coverage report — renamed or removed instead of tested", fn)
+			continue
+		}
+		if pct != "100.0%" {
+			t.Errorf("%s is at %s under the %s batch tests; want 100.0%% (error branches included)", fn, pct, coreBatchTestPattern)
+		}
+	}
+}
+
+func TestC1950_002_BatchAddsNoProductionEdits(t *testing.T) {
+	src := sourceRoot(t)
+	out, stderr, code, err := acsassert.SubprocessOutput("git", "-C", src, "diff", "--name-only", "origin/main...HEAD", "--", "go/internal/core")
+	if code != 0 {
+		t.Skipf("git diff unavailable: code=%d err=%v %s", code, err, stderr)
+	}
+	for _, f := range strings.Fields(out) {
+		if strings.HasSuffix(f, ".go") && !strings.HasSuffix(f, "_test.go") {
+			t.Errorf("%s is production code; this batch is test-only", f)
+		}
+	}
+}
