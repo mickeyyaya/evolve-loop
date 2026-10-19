@@ -1,0 +1,95 @@
+{
+  "schema_version": 2,
+  "cycle": 1975,
+  "run_id": "01M59RM3XJ8AR8AF649TP5V7ZM",
+  "goal": "Wave 132.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 131 facts (run 20261019T063503Z): 5 of 8 cycles shipped.\n- Cycle 1964: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 1965: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…geBatch_ batch tests; want 100.0% (error branches included) FAIL FAIL github.com/mickeyyaya/evolve-loop/go/internal/handoff/request/testdata/cycle-N 0.808s FAIL. Last phase: aborted. It did not ship.\n- Cycle 1966: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…md/commentaudit history -base HEAD -label \"\u003cthis change\u003e\" -out docs/history/code-comments FAIL FAIL github.com/mickeyyaya/evolve-loop/go/acs/cycle-N 1.688s FAIL. Last phase: aborted. It did not ship.\n- Cycle 1967: final verdict PASS. It shipped.\n- Cycle 1968: final verdict PASS. It shipped.\n- Cycle 1969: final verdict PASS. It shipped.\n- Cycle 1970: final verdict PASS. It shipped.\n- Cycle 1971: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 128 (run 20261018T120316Z): 4 of 6 cycles shipped.\n- Wave 129 (run 20261018T162843Z): 0 of 1 cycles shipped.\n- Wave 130 (run 20261018T235040Z): 8 of 12 cycles shipped.",
+  "final_verdict": "WARN",
+  "tasks": [
+    "history-refusal-names-the-evolve-comments-command-lane"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 45008,
+      "started_at": "2026-10-19T09:42:33Z",
+      "ended_at": "2026-10-19T09:43:19Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 3000,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 51290,
+      "started_at": "2026-10-19T09:43:54Z",
+      "ended_at": "2026-10-19T09:44:46Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 2100,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "WARN",
+      "ended_at": "2026-10-19T09:44:49Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 96298,
+    "phase_count": 3,
+    "retried_count": 0,
+    "longest_phase": "triage",
+    "longest_ms": 51290,
+    "by_archetype_ms": {
+      "plan": 96298
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 5100,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 0,
+        "output": 5100,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  },
+  "recalled_lessons": [
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-1496-new-executable-field-lands-three-lines-under-the-comment-stating-the-clamp-it-skips",
+    "cycle-1496-a-retry-carries-the-items-spec-and-never-its-predecessors-lesson",
+    "inst-L1549b"
+  ]
+}
