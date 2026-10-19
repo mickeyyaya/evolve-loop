@@ -784,3 +784,4 @@
 ./internal/adapters/codeindex/gotypes
 # envscope - the one scan rule of the envtaint read set, shared with commentaudit.
 ./internal/envscope
+./internal/handoff

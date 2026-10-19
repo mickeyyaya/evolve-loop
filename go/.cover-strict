@@ -78,3 +78,4 @@
 ./internal/acspathscan 100
 ./internal/adapters/codeindex/gotypes 100
 ./internal/envscope 100
+./internal/handoff 100

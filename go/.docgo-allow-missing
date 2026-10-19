@@ -8,3 +8,4 @@
 #
 # EMPTY = every internal package has a clear what/how/why definition (the
 # decoupling campaign's documentation invariant, fully enforced).
+./internal/handoff
