@@ -63,6 +63,7 @@ func LoadObservations(evolveDir string) (map[string]Observation, error) {
 
 type familyWall struct {
 	family   string
+	model    string
 	reset    time.Time
 	evidence []string
 }
@@ -123,7 +124,8 @@ func (p *Prober) judgeWindows(probed string, windows []quotastate.UsageWindow) {
 		case w.Family == "":
 			fmt.Fprintf(p.Log, "[usage-probe] WARN %s: the %s window is exhausted but its manifest maps it to no routing family, so nothing is benched: %s\n", probed, w.Scope, w.Evidence())
 		case !w.ExhaustsFamily():
-			fmt.Fprintf(p.Log, "[usage-probe] WARN %s: the %s model's window is exhausted (%s); benches are per family, so %s is not benched and the window is recorded for the router\n", probed, w.Model, w.Evidence(), w.Family)
+			fmt.Fprintf(p.Log, "[usage-probe] WARN %s: the %s model's window is exhausted (%s); the %s family is not benched, only that model\n", probed, w.Model, w.Evidence(), w.Family)
+			walls = withWall(walls, w)
 		default:
 			walls = withWall(walls, w)
 		}
@@ -136,12 +138,12 @@ func (p *Prober) judgeWindows(probed string, windows []quotastate.UsageWindow) {
 func withWall(walls []familyWall, w quotastate.UsageWindow) []familyWall {
 	i := len(walls)
 	for j, wall := range walls {
-		if wall.family == w.Family {
+		if wall.family == w.Family && wall.model == w.Model {
 			i = j
 		}
 	}
 	if i == len(walls) {
-		walls = append(walls, familyWall{family: w.Family})
+		walls = append(walls, familyWall{family: w.Family, model: w.Model})
 	}
 	if w.ResetsAt != nil && w.ResetsAt.After(walls[i].reset) {
 		walls[i].reset = *w.ResetsAt
@@ -152,11 +154,18 @@ func withWall(walls []familyWall, w quotastate.UsageWindow) []familyWall {
 
 func (p *Prober) benchWall(probed string, wall familyWall) {
 	evidence := strings.Join(wall.evidence, "; ")
-	entry, err := p.Store.BenchWallUntil(wall.family, clihealth.Wall{Pattern: benchReason, Evidence: evidence, Reset: wall.reset})
+	w := clihealth.Wall{Pattern: benchReason, Evidence: evidence, Reset: wall.reset}
+	target := wall.family
+	bench := func() (clihealth.Entry, error) { return p.Store.BenchWallUntil(wall.family, w) }
+	if wall.model != "" {
+		target = wall.family + "/" + wall.model
+		bench = func() (clihealth.Entry, error) { return p.Store.BenchModelUntil(wall.family, wall.model, w) }
+	}
+	entry, err := bench()
 	if err != nil {
-		fmt.Fprintf(p.Log, "[usage-probe] WARN bench %s failed: %v\n", wall.family, err)
+		fmt.Fprintf(p.Log, "[usage-probe] WARN bench %s failed: %v\n", target, err)
 		return
 	}
 	fmt.Fprintf(p.Log, "[usage-probe] %s: benched %s until %s (strikes=%d): %s\n",
-		probed, wall.family, entry.BenchedUntil.Format(time.RFC3339), entry.Strikes, evidence)
+		probed, target, entry.BenchedUntil.Format(time.RFC3339), entry.Strikes, evidence)
 }

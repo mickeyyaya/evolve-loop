@@ -11,7 +11,8 @@
 - `NewBenchEntry` composes the record after a classified wall. The strike count continues from the previous record. The bench lasts until the pane's reset hint, when one parses, or else the strike-scaled cooldown. The wall line is kept as evidence.
 - The runner's bench writer and the loop canary both compose entries through `NewBenchEntry`. The strike, cooldown and evidence logic therefore cannot drift between them.
 - `BenchWall` is the one read-previous, compose, write sequence. `Bench`, `Clear` and `RecordBootStrike` are the other writers.
-- `Active` returns the entries that routing must still avoid. `Expired` returns the canary candidates.
+- `Active` returns the family entries that routing must still avoid. `Expired` returns the canary candidates. Both skip model entries.
+- A model entry (`BenchModelUntil`, key `family\x00model`) benches one model of a family until its reset. `ActiveModels` returns them. No router or canary reads them yet.
 - `Benchable` is a deliberately closed set of escalation patterns. Re-dispatching a walled resource is guaranteed waste. Most escalations, such as trust prompts, are situational.
 
 ## Invariants

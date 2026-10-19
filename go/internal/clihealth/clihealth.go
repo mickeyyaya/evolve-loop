@@ -16,6 +16,7 @@ import (
 type Entry struct {
 	Family         string    `json:"family"`
 	Scope          string    `json:"scope,omitempty"`
+	Model          string    `json:"model,omitempty"`
 	Reason         string    `json:"reason"`
 	BenchedAt      time.Time `json:"benched_at"`
 	BenchedUntil   time.Time `json:"benched_until"`
@@ -96,6 +97,9 @@ func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) 
 }
 
 func (e Entry) Key() string {
+	if e.Model != "" {
+		return e.Family + "\x00" + e.Model
+	}
 	if e.Scope == "" {
 		return e.Family
 	}
@@ -185,12 +189,25 @@ type Wall struct {
 
 func (s *Store) BenchWallUntil(family string, w Wall) (Entry, error) {
 	return s.benchComposed(family, func(prev Entry, now time.Time) Entry {
-		entry := NewBenchEntry(prev, family, w.Pattern, w.Evidence, now)
-		if w.Reset.After(now) {
-			entry.BenchedUntil = capHint(w.Reset.Add(resetMargin), now)
-		}
+		return wallEntry(prev, family, w, now)
+	})
+}
+
+func (s *Store) BenchModelUntil(family, model string, w Wall) (Entry, error) {
+	key := Entry{Family: family, Model: model}.Key()
+	return s.benchComposed(key, func(prev Entry, now time.Time) Entry {
+		entry := wallEntry(prev, family, w, now)
+		entry.Model = model
 		return entry
 	})
+}
+
+func wallEntry(prev Entry, family string, w Wall, now time.Time) Entry {
+	entry := NewBenchEntry(prev, family, w.Pattern, w.Evidence, now)
+	if w.Reset.After(now) {
+		entry.BenchedUntil = capHint(w.Reset.Add(resetMargin), now)
+	}
+	return entry
 }
 
 func (s *Store) benchComposed(key string, compose func(prev Entry, now time.Time) Entry) (Entry, error) {
@@ -268,11 +285,17 @@ func (s *Store) withLock(fn func() error) error {
 }
 
 func (s *Store) Active() map[string]Entry {
-	return s.filter(func(e Entry) bool { return e.Reason == CredentialPattern || s.now().Before(e.BenchedUntil) })
+	return s.filter(func(e Entry) bool {
+		return e.Model == "" && (e.Reason == CredentialPattern || s.now().Before(e.BenchedUntil))
+	})
+}
+
+func (s *Store) ActiveModels() map[string]Entry {
+	return s.filter(func(e Entry) bool { return e.Model != "" && s.now().Before(e.BenchedUntil) })
 }
 
 func (s *Store) Expired() map[string]Entry {
-	return s.filter(func(e Entry) bool { return !s.now().Before(e.BenchedUntil) })
+	return s.filter(func(e Entry) bool { return e.Model == "" && !s.now().Before(e.BenchedUntil) })
 }
 
 func (s *Store) filter(keep func(Entry) bool) map[string]Entry {
