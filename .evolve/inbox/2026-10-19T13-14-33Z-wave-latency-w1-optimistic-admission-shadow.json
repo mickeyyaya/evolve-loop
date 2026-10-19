@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "With a running lane that edits internal/core, the new rule admits a candidate that edits internal/router (red test first)",
+    "Two candidates that edit one package never run at once, and the hub rule is unchanged",
+    "At shadow the admitted set is byte-identical to today and each new admission is recorded with its holder"
+  ],
+  "campaign": "wave-latency",
+  "created_at": "2026-10-19T13:30:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/admission",
+    "go/internal/orchestrator",
+    "docs/architecture/wave-orchestrator.md"
+  ],
+  "fix": "TDD first (red test before code), 100% coverage on new and changed functions, zero comments, the package note and the spec updated.",
+  "id": "wave-latency-w1-optimistic-admission-shadow",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "source": "plan wave-latency-2026-10 (operator request and decisions 2026-10-19)",
+  "summary": "Component W1 of plan wave-latency-2026-10 (D1, D2). ADR-0143: admission holds a candidate only when it edits a package that a running lane edits, or when both are hubs; the reach check leaves admission. A new fleet.orchestrator admission stage key starts at shadow: the admitted set stays the present one, and the shadow records each candidate that the reach rule holds and the new rule admits. The ship records a composed-gate failure between two such lanes. Research F2.3-F2.5, O1-O5.",
+  "title": "Wave latency W1: optimistic admission at stage shadow (ADR-0143)",
+  "weight": 1.0
+}
