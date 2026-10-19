@@ -13,6 +13,17 @@
 - **The census (`Census`).** It counts the supply before a plan and records the cause of each refusal.
 
 Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as the library of O6. The loop wiring of the oversight and of the census is pending. The package runs no LLM, starts no process and stops no process by itself.
+> The spec of record: [wave-orchestrator §7](../wave-orchestrator.md#7-the-rolling-pool), [§8](../wave-orchestrator.md#8-the-lane-lease) and [§10](../wave-orchestrator.md#10-the-adaptive-window). The decision: [ADR-0139](../adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md). The plan: [wave-orchestrator-2026-10](../../plans/wave-orchestrator-2026-10.md) (O4, O5, O8, D8, D9, D13, Q1). The scheduler under the pool: [internal-fleet.md](internal-fleet.md) (`RunPool`). The admission rule: [internal-admission.md](internal-admission.md). The loop wiring: [cmd-evolve.md](cmd-evolve.md).
+
+## Purpose
+
+`internal/orchestrator` runs the lanes of the loop at `fleet.orchestrator.stage` `enforce`. It has three parts:
+
+- **The pool (`Pool`).** It runs `fleet.RunPool` with admission by cell, a freshness check before each launch and one Signal Center event for each transition. A free slot takes the next admissible todo at once.
+- **The lease (`Leases`).** Each lane gets a lease at launch. The lease holds the start, the deadline and the last heartbeat. One timer serves all lanes.
+- **The window (`Window`).** It holds the number of lanes that the pool admits. It grows by 1 for each clean landing and halves on each landing conflict.
+
+Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as O8, of the wave-orchestrator plan. The package runs no LLM, starts no process and stops no process by itself.
 
 ## Design
 
@@ -33,6 +44,19 @@ Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as the library of O6. The lo
 - **The deadline.** `DeadlineOf(laneTimes, floor)` is the nearest-rank 95th percentile of the lane times without the longest one, at least the floor. One sample stays. The reason is in [wave-orchestrator §8](../wave-orchestrator.md#8-the-lane-lease). `LaneTimes(runsDir, 50)` reads the lane time of each of the last 50 cycles as the span from the first to the last event of its `signals.ndjson`.
 - **The stop.** At `enforce`, a passed deadline cancels the child context of that lane. The launch of `cmd/evolve` (`execCycleLaunch`, through `sysexec.Command`) then sends SIGTERM to that one lane process. The package holds no pid and imports no `os/exec`, `syscall`, `sysexec` or `proctree`.
 - **The recovery.** After a stopped lane exits, `Pool` first calls its `Reap` port with the lane. The loop gives `reapLane` of `cmd/evolve`, which runs the `evolve gc dispatch` sweep for the dispatch ids of that lane only. Then `Pool` releases the inbox claim through `Claims.Release`. At the second stop of one todo, `Claims.Park` routes it to the console with the reason `deadline twice`. A failed step publishes `LOOP_ORCH_LANE_RECOVERY_FAILED` with the step and the error.
+- **The window.** `NewWindow(WindowConfig{Start, Min, Sized}, publish)` returns a `*Window` (`window.go`). One mutex guards it, because the oversight loop writes it while the pool reads it.
+  - `CleanLanding()` adds 1. `Conflict()` halves and rounds down. `Resize(sized)` sets the sized count. Each call then goes through one clamp: not above the sized count, and not under `Min` (`window.go:49-51`). A `Min` above the sized count pins the window to the sized count. Thus a width of 4 or less gets no effect with the default keys.
+  - `Size()` returns the size. A call that leaves the size as it was publishes nothing. A call that changes it publishes `LOOP_ORCH_WINDOW` once, after the mutex is free, with `old`, `new`, `sized` and `cause`.
+  - The mutex is free during the publish, so a publisher can read the window. The oversight loop is the one writer. A second writer can reorder the published events, because the publish runs after the unlock.
+  - `*Window` has the methods `CleanLanding()` and `Conflict()` for the landing events. The O6 loop can thus hold it through a small interface of its own. The package defines no such interface.
+  - A zero or negative key in `WindowConfig` clamps to 1. Policy refuses such a key first.
+- **The pool gate.** `Pool.Window` and `Pool.Stage` are fields of `Pool`. `admissionWindow` gives `Window.Size` to `fleet.PoolConfig.Window` only when the window is set and the stage is `enforce` (`pool.go:71-76`). `fleet.RunPool` then admits a lane while the lanes in flight number fewer than the smaller of its width and the window ([internal-fleet.md](internal-fleet.md)). The pool never stops a lane when the window shrinks.
+- **The loop wiring.** `laneWindow` of `cmd/evolve` makes one window for each run, and prints `[loop] orchestrator: adaptive window (stage S): N of M lane(s), min K` ([cmd-evolve.md](cmd-evolve.md)).
+  - It takes `window.start` and `window.min` from the policy. The sized count M is the smaller of `fleet.count` and `fleet.concurrency`, which is the pool width. Thus the window never exceeds the pool width, and each halving binds at once.
+  - `laneWindow` runs only inside `orchestratorPool`, and `dispatchPool` builds that pool only at `enforce` (`cmd_loop_window.go:172-174`). At `shadow`, the loop builds no window and publishes no `LOOP_ORCH_WINDOW`.
+  - A run is one boundary-to-boundary unit, so each run starts at `window.start`.
+- **What feeds the window.** Nothing yet. The O6 loop must call `CleanLanding` and `Conflict` on each `ship.landed` and each landing conflict, and `Resize` on each bench event ([wave-orchestrator §9](../wave-orchestrator.md#9-the-oversight-loop)). Until then, the window stays at `window.start`.
+- **Not the landing window.** This window gates lane admission. The composition window of the landing queue (`fleet.landing_queue.window`, [fleet-landing-queue §4](../fleet-landing-queue.md#4-the-composition-order)) is a different window with different keys.
 
 - **The intake (O6).** `Intake.Gate` wraps the admission function of the pool. It refuses a new lane when the lanes in flight reach the limit. It drops the lanes that `Free` marked from the holdings, so their cells admit a new todo. `Pool.Run` makes an intake when the caller gives none.
   - `Free` and `Resize` kick the pool through `Wake`. `fleet.PoolConfig.Kick` makes the pool fill its open slots at once, with no lane exit. Many kicks make one (`TestIntake_StopIsStickyAndEveryChangeThatCanAdmitKicksOnce`).
@@ -63,6 +87,8 @@ Built on 2026-10-17 as O4 and O5, and on 2026-10-18 as the library of O6. The lo
 
 | Event | `shadow` (the barrier wave) | `enforce` (the pool) |
 |---|---|---|
+| The window changes size | none: the loop builds no window at `shadow` | `LOOP_ORCH_WINDOW` once for each change. The pool admits a lane only while the lanes in flight number fewer than the size. |
+| The window is narrower than the pool width | the barrier wave starts every lane | a lane exit frees a slot, and the pool fills it only up to the size |
 | No heartbeat for `stall_minutes` | `LOOP_ORCH_LANE_STALLED` once for the lane | the same |
 | The deadline passes | `LOOP_ORCH_LANE_DEADLINE` with `action` `recorded`. Nothing stops. | `LOOP_ORCH_LANE_DEADLINE` with `action` `stopped`, the stop, the claim release, then one more try or the park |
 | A lane exits after its deadline | `LOOP_ORCH_LANE_LATE_EXIT` with `status` and `rc` | the same, with `stopped` true |
@@ -95,6 +121,14 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
 - A bench of a family with no fallback pauses the family once and shrinks the limit. A later signal with the same state adds no pause event (`TestOversight_ABenchWithNoFallbackPausesTheFamilyOnceAndShrinksTheLimit`).
 - The census counts the six classes, records the cause of each refusal and never changes the inbox. It publishes `LOOP_ORCH_SUPPLY_SHORT` only below the window.
 - The package never polls and never stops a lane by itself. `TestOrchestrator_NeverPollsAndNeverStopsALaneByItself` parses each production file and refuses `time.Sleep`, `time.Tick`, `time.NewTicker`, `syscall.Kill`, `os.FindProcess` and the imports `os/exec`, `sysexec` and `proctree`. `TestOrchestratorGuard_FindsAPlantedPollAndKill` proves that the guard finds them. The same guard now refuses `time.After` and `time.NewTimer`, so `time.AfterFunc` of the lease table is the only timer. `TestOrchestrator_ImportsNoBridgeAndNoDriverPackage` refuses the imports of `bridge`, `bridgechain`, `adapters/bridge`, `subagent` and `consensusdispatch`, because the orchestrator runs no LLM (`TestOrchestratorGuard_FindsASecondTimerAndAnLLMDispatchImport`).
+- The window grows by 1 for each clean landing and halves, rounded down, on each landing conflict. It stays between `window.min` and the sized count (`TestWindow_GrowsOnACleanLandingAndHalvesOnAConflict`, `TestWindow_AConflictNeverHalvesBelowWindowMin`, `TestWindow_NeverGrowsPastTheSizedCount`).
+- At or below `window.min` (default 4), the window is the sized count and never moves (`TestWindow_AtOrBelowWidthFourItIsTheSizedCount`).
+- A smaller sized count clamps the window. A larger one does not open it (`TestWindow_ResizeDownBelowTheWindowClampsItAndResizeUpDoesNotJumpIt`, `TestWindow_AResizeBelowWindowMinPinsTheWindowToTheSizedCountAndTheFloorLiftsWithIt`).
+- The window publishes `LOOP_ORCH_WINDOW` once for each change, and nothing for a call that changes nothing (`TestWindow_PublishesOnceForEachChangeWithTheOldSizeTheNewSizeAndTheCause`). The event goes out after the unlock (`TestWindow_APublisherCanReadTheWindowBecauseTheEventGoesOutAfterTheUnlock`). Concurrent calls keep the size in bounds (`TestWindow_ConcurrentLandingsResizesAndReadsKeepItInsideItsBounds`, run with `-race`).
+- A smaller window never stops a lane in flight. It delays the next admission (`TestPool_AShrinkingWindowNeverStopsALaneInFlightAndOnlyDelaysTheNextAdmission`, `TestRunPool_TheWindowHookBoundsAdmissionAndAShrinkNeverStopsALaneInFlight`). A grown window fills each freed slot at the next exit (`TestPool_AGrowingWindowFillsEveryFreedSlotAtTheNextExit`).
+- Only `enforce` lets the window gate admission (`TestPool_OnlyTheEnforceStageLetsTheWindowGateAdmission`). The loop wires the policy window into a real pool run (`TestDispatchPool_AtEnforceTheWindowFromThePolicyGatesTheRun`, `TestOrchestratorPool_WiresTheEnforceKeysAndTheFileRuleWithoutAGraph`). At `shadow`, the loop builds no window (`TestDispatchPool_AtShadowTheLoopBuildsNoWindow`).
+- The window never exceeds the pool width, so a window never lifts the `fleet.concurrency` cap and each halving binds at once (`TestRunPool_AWindowNeverLiftsTheConcurrencyCap`, `TestLaneWindow_TheSizedCountIsTheSmallerOfTheFleetCountAndTheConcurrencyCap`).
+- The package never polls and never stops a lane by itself. `TestOrchestrator_NeverPollsAndNeverStopsALaneByItself` parses each production file and refuses `time.Sleep`, `time.Tick`, `time.NewTicker`, `syscall.Kill`, `os.FindProcess` and the imports `os/exec`, `sysexec` and `proctree`. `TestOrchestratorGuard_FindsAPlantedPollAndKill` proves that the guard finds them.
 - The package has 100% statement coverage in `go/.cover-strict` and is listed in `go/.apicover-enforce`.
 
 ## Findings
@@ -107,3 +141,5 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
 - **A cross-lane finding of the soak, fixed in the guard.** The first soak run failed 54 of 64 pool lanes. The ship of one lane writes its dossier `knowledge-base/cycles/cycle-N.{json,md}` in the main tree. The tree-diff guard of a sibling lane counted those files as its own leak. The build recovery of a sibling also moved them into its own worktree. The barrier wave hides the race, because all lanes start at the same time.
   - The fix is in `internal/core` (`leak_ownership.go`). A dossier file is keyed to its cycle N. The dossier of another cycle with a run directory is not a leak of this lane, and recovery leaves it in the main tree. A file of the cycle of this lane stays a leak ([internal-core.md](internal-core.md)).
   - The soak above proves the fix with no exclusion.
+- **The width-4 policy meets the window (2026-10-18).** PR #971 sets `count` 4 and `min_lanes` 4, with `orchestrator.stage` `enforce`. The default `window.start` is 4 and the default `window.min` is 4. Thus the pool runs all 4 lanes, and `.evolve/policy.json` has no `window` key.
+  - *Implication:* a policy with a `count` above 4 must set `window.start` to `count` until the O6 loop calls `CleanLanding`. Without that key, the pool runs 4 lanes.

@@ -14,6 +14,9 @@ func Parse(raw []byte) (Policy, error) {
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return Policy{}, err
 	}
+	if err := p.Fleet.validateWindowStart(); err != nil {
+		return Policy{}, fmt.Errorf("fleet.orchestrator: %w", err)
+	}
 	return p, nil
 }
 

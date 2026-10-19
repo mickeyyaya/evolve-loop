@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -15,7 +16,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -271,7 +274,7 @@ func TestDispatchPool_AtEnforceTheOrchestratorRunsTheLanesAndPublishesEachTransi
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin := fakeCycleBinary(t, "exit 0\n")
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave",
-		Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8}}
+		Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8, WindowStart: 2, WindowMin: 2}}
 
 	d, done := f.b.dispatchPool(0, fc, bin)
 	f.b.deps.Signals.Flush()
@@ -313,5 +316,67 @@ func TestDispatchPool_AtEnforceThePoolIsSuppliedPastTheFleetCount(t *testing.T) 
 	}
 	if !strings.Contains(f.console.String(), "[loop] pool 0: 3/3 lanes ok (orchestrator, target=2)") {
 		t.Fatalf("the enforce pool must get the ranked backlog up to scan_k, not fleet.count; console:\n%s", f.console.String())
+	}
+}
+
+func TestDispatchPool_AtEnforceTheWindowFromThePolicyGatesTheRun(t *testing.T) {
+	t.Parallel()
+	f := newE2WindowFixture(t, e2TwoItems)
+	bin := fakeCycleBinary(t, "exit 0\n")
+	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave",
+		Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8, WindowStart: 1, WindowMin: 1}}
+
+	d, done := f.b.dispatchPool(0, fc, bin)
+	f.b.deps.Signals.Flush()
+
+	if !done || d.flow != batchNextIteration {
+		t.Fatalf("done=%v decision=%+v console:\n%s", done, d, f.console.String())
+	}
+	chunk, err := signalcenter.ReadStream(filepath.Join(f.evolveDir, signalcenter.StreamFileName), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var launched, backfilled []string
+	for _, e := range chunk.Events {
+		switch e.Code {
+		case orchestrator.CodeLaneLaunched:
+			launched = append(launched, e.Fields["live"])
+		case orchestrator.CodeLaneBackfilled:
+			backfilled = append(backfilled, e.Fields["live"])
+		}
+	}
+	if !reflect.DeepEqual(launched, []string{"1"}) || !reflect.DeepEqual(backfilled, []string{"1"}) {
+		t.Errorf("live lanes at each launch = %v and at each backfill = %v, want [1] and [1]: window.start 1 admits the second lane only after the first exited", launched, backfilled)
+	}
+	if !strings.Contains(f.console.String(), "adaptive window (stage enforce): 1 of 2 lane(s), min 1") {
+		t.Errorf("console:\n%s", f.console.String())
+	}
+}
+
+func TestDispatchPool_AtShadowTheLoopBuildsNoWindow(t *testing.T) {
+	t.Parallel()
+	f := newE2WindowFixture(t, e2TwoItems)
+	bin := fakeCycleBinary(t, "exit 0\n")
+	fc := e2PoolFleet
+	fc.Orchestrator = policy.OrchestratorConfig{Stage: "shadow", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 20, RunMaxLanes: 8, WindowStart: 1, WindowMin: 1}
+
+	d, done := f.b.dispatchPool(0, fc, bin)
+	f.b.deps.Signals.Flush()
+
+	if !done || d.flow != batchNextIteration {
+		t.Fatalf("done=%v decision=%+v console:\n%s", done, d, f.console.String())
+	}
+	if !strings.Contains(f.console.String(), "[loop] pool 0: 2/2 lanes ok (rolling, target=2)") {
+		t.Fatalf("console:\n%s", f.console.String())
+	}
+	if strings.Contains(f.console.String(), "adaptive window") {
+		t.Errorf("console:\n%s\nwant no adaptive window line: only the enforce pool builds the window", f.console.String())
+	}
+	raw, err := os.ReadFile(filepath.Join(f.evolveDir, signalcenter.StreamFileName))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "LOOP_ORCH_WINDOW") {
+		t.Errorf("signals:\n%s\nwant no LOOP_ORCH_WINDOW at shadow", raw)
 	}
 }
