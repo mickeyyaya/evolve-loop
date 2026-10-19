@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "With the wave 130 LOOP_ORCH signal sequence, wave status prints width 1/4, not 3/4 (red test first)",
+    "A cycle whose lane hit LOOP_ORCH_LANE_DEADLINE shows as stopped by the deadline, never as a live phase",
+    "wave-operations.md states where the width comes from"
+  ],
+  "campaign": "wave-orchestrator",
+  "created_at": "2026-10-19T05:35:00Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_wave.go",
+    "go/internal/loopwave",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "TDD first with the wave 130 signal sequence as a fixture (red test: status reports width 1/4 and cycles 1955 and 1957 as stopped by the deadline). Update docs/operations/wave-operations.md and the package notes. 100% coverage on changed functions, zero comments.",
+  "id": "wave-status-counts-live-lanes-from-the-pool",
+  "kind": "fix",
+  "priority_class": "correctness",
+  "source": "wave 130 starvation investigation 2026-10-19",
+  "summary": "In wave 130 the lane deadline (LOOP_ORCH_LANE_DEADLINE, 2h7m) killed cycles 1955 (02:02Z) and 1957 (03:00Z). Their cycle state stayed 'phase build', so evolve wave status kept listing them as running and printed 'width 3/4 · utilization 0.83' while the pool ran live=1 of 4 for three hours (LOOP_ORCH_POOL_IDLE fields.live=1 target=4). The operator found the stall before the console did. wave status must take the live lane count and the per-lane state from the pool's LOOP_ORCH_* signals (launched, exited, deadline, late-exit), and a lane stopped by its deadline must leave a sealed, labelled outcome for its cycle (for example 'stopped: lane deadline') instead of a live phase.",
+  "title": "wave status counts live lanes from the pool, and a deadline-killed lane seals its cycle",
+  "weight": 1.0
+}
