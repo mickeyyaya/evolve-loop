@@ -19,10 +19,12 @@ type fakeRepoContractPack struct {
 	diagnostic string
 	err        error
 	dirs       []string
+	projects   []string
 }
 
-func (f *fakeRepoContractPack) run(_ context.Context, root string) ([]string, string, error) {
+func (f *fakeRepoContractPack) run(_ context.Context, projectRoot, root string) ([]string, string, error) {
 	f.dirs = append(f.dirs, root)
+	f.projects = append(f.projects, projectRoot)
 	return f.reds, f.diagnostic, f.err
 }
 
@@ -68,6 +70,17 @@ func TestRepoContractFloorChecks_ARawGitFixtureIsCorrectedAtBuildExitByTheRatche
 	}
 }
 
+func TestRepoContractFloorChecks_HandsThePackTheProjectRootOfTheSharedVerdictStore(t *testing.T) {
+	t.Parallel()
+
+	wt, project := worktreeWithModule(t), t.TempDir()
+	pack := &fakeRepoContractPack{}
+	RepoContractFloorChecks(pack.run)(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: wt, ProjectRoot: project})
+	if len(pack.projects) != 1 || pack.projects[0] != project || pack.dirs[0] != wt {
+		t.Fatalf("the floor writes the store of the project that the ship reads, and tests the worktree; got projects %v dirs %v", pack.projects, pack.dirs)
+	}
+}
+
 func TestRepoContractFloorChecks_GreenOrAnUnnamedExitPassesTheHandoff(t *testing.T) {
 	t.Parallel()
 
@@ -109,7 +122,7 @@ func TestRepoContractFloorChecks_RunsThePackUnderItsOwnDeadline(t *testing.T) {
 
 	var remaining time.Duration
 	var hasDeadline bool
-	run := func(ctx context.Context, _ string) ([]string, string, error) {
+	run := func(ctx context.Context, _, _ string) ([]string, string, error) {
 		var deadline time.Time
 		deadline, hasDeadline = ctx.Deadline()
 		remaining = time.Until(deadline)
@@ -129,7 +142,7 @@ func TestRepoContractFloorChecks_ADeadlineKillWarnsAndPassesTheHandoff(t *testin
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	blocking := func(ctx context.Context, _ string) ([]string, string, error) {
+	blocking := func(ctx context.Context, _, _ string) ([]string, string, error) {
 		<-ctx.Done()
 		return nil, "partial output before the kill\n", ctx.Err()
 	}

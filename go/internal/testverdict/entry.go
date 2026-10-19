@@ -16,7 +16,10 @@ const (
 	entryFile = ".json"
 )
 
-var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+var (
+	digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	gatePattern   = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
+)
 
 type envelope struct {
 	Record Record
@@ -43,7 +46,7 @@ func open(path string) (Record, bool) {
 	if err := json.Unmarshal(data, &env); err != nil {
 		return Record{}, false
 	}
-	if checksum(env.Record) != env.Sum || env.Record.Outcome != Pass {
+	if checksum(env.Record) != env.Sum || env.Record.Outcome != Pass || !gatePattern.MatchString(env.Record.Gate) {
 		return Record{}, false
 	}
 	if !validKey(env.Record.Key) || !env.Record.Key.Valid() || !env.Record.Key.Consistent(env.Record.Log) {
@@ -52,8 +55,8 @@ func open(path string) (Record, bool) {
 	return env.Record, true
 }
 
-func entryPath(root, file, full string) string {
-	return filepath.Join(root, file, full+entryFile)
+func entryPath(root, file, full, gate string) string {
+	return filepath.Join(root, file, full+"."+gate+entryFile)
 }
 
 func indexPath(root, pkg string) string {

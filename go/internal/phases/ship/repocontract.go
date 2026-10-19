@@ -105,9 +105,16 @@ func repoContractSelectionArgs(selections []repocontract.TestSelection) []string
 	return append(args, packages...)
 }
 
-func RunRepoContractPack(ctx context.Context, root string) (reds []string, diagnostic string, err error) {
+func RunRepoContractPack(ctx context.Context, projectRoot, root string) (reds []string, diagnostic string, err error) {
+	return runRecordedPack(ctx, floorRecorderFor(projectRoot), root, repoContractTestFn, os.Stderr)
+}
+
+func runRecordedPack(ctx context.Context, rec *scanShadow, root string, test func(context.Context, string, packLog) packOutcome, notes io.Writer) (reds []string, diagnostic string, err error) {
+	rec.begin(ctx, root)
 	var out strings.Builder
-	o := repoContractTestFn(ctx, repocontract.ModuleDir(root), packLog{notes: &out, raw: &out})
+	o := test(withScanShadow(ctx, rec), repocontract.ModuleDir(root), packLog{notes: &out, raw: &out})
+	rec.observe(o)
+	rec.note(notes)
 	switch {
 	case o.realRed():
 		return o.failedNames(), o.failureLog, o.err
@@ -198,6 +205,18 @@ func failuresOf(pkg string, failures []packFailure) []packFailure {
 }
 
 func runGoTestJSON(ctx context.Context, moduleDir string, log packLog, args []string) packOutcome {
+	run, skipped := scanShadowFrom(ctx).prune(ctx, moduleDir, args)
+	if len(skipped) == 0 {
+		return runGoTestJSONArgs(ctx, moduleDir, log, args)
+	}
+	fmt.Fprintf(log, "[ship] verdict store: skipped %d package(s) green on the same key: %s\n", len(skipped), strings.Join(skipped, " "))
+	if run == nil {
+		return packOutcome{}
+	}
+	return runGoTestJSONArgs(ctx, moduleDir, log, run)
+}
+
+func runGoTestJSONArgs(ctx context.Context, moduleDir string, log packLog, args []string) packOutcome {
 	out := &lockedWriter{w: log.raw}
 	cmd := sysexec.Command(ctx, "go", args...)
 	cmd.Dir = moduleDir

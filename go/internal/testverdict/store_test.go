@@ -50,7 +50,7 @@ func recordWith(t *testing.T, codeID, logText string, env map[string]string) Rec
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
-	return Record{Package: packageA, Outcome: Pass, Key: key, Log: log}
+	return Record{Package: packageA, Outcome: Pass, Key: key, Log: log, Gate: "ship"}
 }
 
 func recordFor(t *testing.T, codeID string, env map[string]string) Record {
@@ -223,7 +223,7 @@ func TestStore_ATornWriteIsAMiss(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s, root := newStore(t)
 			mustPut(t, s, g)
-			mutate(t, entryPath(root, g.Key.File, g.Key.Full))
+			mutate(t, entryPath(root, g.Key.File, g.Key.Full, g.Gate))
 
 			got, ok := s.Lookup(g.Key.File, currentEnv())
 
@@ -240,7 +240,7 @@ func TestStore_ATornWriteLeavesTheIntactSiblingAHit(t *testing.T) {
 	sibling := recordFor(t, "1", map[string]string{"MODE": "slow"})
 	mustPut(t, s, g)
 	mustPut(t, s, sibling)
-	if err := os.WriteFile(entryPath(root, g.Key.File, g.Key.Full), []byte("{"), 0o644); err != nil {
+	if err := os.WriteFile(entryPath(root, g.Key.File, g.Key.Full, g.Gate), []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -260,7 +260,7 @@ func TestStore_GCRemovesEntriesPastTheirAge(t *testing.T) {
 	mustPut(t, s, fresh)
 	mustPut(t, s, other)
 	past := epoch.Add(-48 * time.Hour)
-	for _, p := range []string{entryPath(root, old.Key.File, old.Key.Full), indexPath(root, old.Package)} {
+	for _, p := range []string{entryPath(root, old.Key.File, old.Key.Full, old.Gate), indexPath(root, old.Package)} {
 		if err := os.Chtimes(p, past, past); err != nil {
 			t.Fatal(err)
 		}
@@ -303,7 +303,7 @@ func TestStore_GCReportsWhatItCannotRemove(t *testing.T) {
 	g := greenRecord(t)
 	mustPut(t, s, g)
 	past := epoch.Add(-48 * time.Hour)
-	if err := os.Chtimes(entryPath(root, g.Key.File, g.Key.Full), past, past); err != nil {
+	if err := os.Chtimes(entryPath(root, g.Key.File, g.Key.Full, g.Gate), past, past); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(root, g.Key.File)
@@ -322,7 +322,7 @@ func TestStore_GCReportsADirectoryItCannotRemove(t *testing.T) {
 	g := greenRecord(t)
 	mustPut(t, s, g)
 	past := epoch.Add(-48 * time.Hour)
-	if err := os.Chtimes(entryPath(root, g.Key.File, g.Key.Full), past, past); err != nil {
+	if err := os.Chtimes(entryPath(root, g.Key.File, g.Key.Full, g.Gate), past, past); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chtimes(indexPath(root, g.Package), past, past); err != nil {
@@ -504,7 +504,7 @@ func TestStore_GCIgnoresAFileThatAnotherRemoverTookFirst(t *testing.T) {
 	g := greenRecord(t)
 	mustPut(t, s, g)
 	past := epoch.Add(-48 * time.Hour)
-	for _, p := range []string{entryPath(root, g.Key.File, g.Key.Full), indexPath(root, g.Package)} {
+	for _, p := range []string{entryPath(root, g.Key.File, g.Key.Full, g.Gate), indexPath(root, g.Package)} {
 		if err := os.Chtimes(p, past, past); err != nil {
 			t.Fatal(err)
 		}
@@ -538,7 +538,7 @@ func TestStore_AForgedRecordAtItsOwnPathIsAMiss(t *testing.T) {
 			s, root := newStore(t)
 			r := forge(t)
 			r.StoredAt = epoch
-			path := entryPath(root, r.Key.File, r.Key.Full)
+			path := entryPath(root, r.Key.File, r.Key.Full, r.Gate)
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				t.Fatal(err)
 			}

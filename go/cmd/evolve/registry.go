@@ -54,6 +54,7 @@ var commands = []subcommand{
 	{Name: "treewalk", Summary: "Guard the test tiers against leaked files and empty directories: treewalk snapshot --root DIR --out FILE | treewalk check --root DIR --baseline FILE (exit 1 names each new path)", Run: runTreewalk},
 	{Name: "kb", Summary: "Query the read-only knowledge-base graph over cycle dossiers and inbox items: kb graph neighbors <node-id> [--hops N] | kb graph recurrences <fingerprint> (each takes --json and --project-root P)", Run: runKB},
 	{Name: "gc", Summary: "Release what finished cycles left behind: tmux sessions/sockets, orphan processes, worktrees, run dirs, go build cache (gc --project-root <dir> [--dry-run])", Run: runGC},
+	{Name: "verdicts", Summary: "Read or empty the shared verdict store of the build floor and the ship: verdicts stats | verdicts wipe [--apply] (a preview without --apply; each takes --project-root P)", Run: runVerdicts},
 	{Name: "failures", Summary: "Inspect and clear state.json:failedApproaches: failures list [--class C] [--json] | failures reset [--fingerprint F] | failures prune [--dry-run] (prune also drops expired carryoverTodos; reset and a real prune require --project-root)", Run: runFailures},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "loop-stop", Summary: "Stop a running loop after its current wave: engage the .evolve/loop-stop brake (loop-stop [--release] [--project-root P])", Run: runLoopStop},
