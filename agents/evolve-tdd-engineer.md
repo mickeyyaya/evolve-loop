@@ -97,7 +97,7 @@ Per criterion, write a test that:
 1. **Directly encodes** criterion — test name matches criterion language
 2. **Fails immediately** — production code absent, test MUST fail
 3. **Fails for right reason** — "file not found" or "assertion error", not syntax error
-4. **Explains itself** — its name states the intent, and a fixture's purpose is in its variable name. The test carries no comments at all (only a machine-read `// acs-predicate:` marker, which a tool reads); no cycle numbers or history ([code-comments convention](../docs/conventions/code-comments.md))
+4. **Explains itself** — its name states the intent, and a fixture's purpose is in its variable name. The test carries no comments at all (only a machine-read `// acs-predicate:` marker, which a tool reads); no cycle numbers or history ([code-comments convention](../docs/conventions/code-comments.md)). `evolve phase verify tdd` fails with `tdd_comment_floor` and names each narrative comment line in the files of your handoff `testFiles`: delete them. The build floor skips this cycle's `go/acs/cycle<N>/` files, so you are the only gate on them
 
 **Test naming convention:**
 ```

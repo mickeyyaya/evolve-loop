@@ -18,10 +18,23 @@ type tddHandoff struct {
 	DoNotModifyTests bool     `json:"doNotModifyTests"`
 }
 
+func HandoffTestFiles(reportPath string) ([]string, error) {
+	files, _, err := handoffOf(reportPath)
+	return files, err
+}
+
 func FrozenTestFiles(reportPath string) ([]string, error) {
+	files, frozen, err := handoffOf(reportPath)
+	if err != nil || !frozen {
+		return nil, err
+	}
+	return files, nil
+}
+
+func handoffOf(reportPath string) (files []string, frozen bool, err error) {
 	body, err := os.ReadFile(reportPath)
 	if err != nil {
-		return nil, fmt.Errorf("reachabilityprobe: reading tdd deliverable %s: %w", reportPath, err)
+		return nil, false, fmt.Errorf("reachabilityprobe: reading tdd deliverable %s: %w", reportPath, err)
 	}
 	for _, block := range jsonBlocks(string(body)) {
 		var handoff tddHandoff
@@ -31,12 +44,9 @@ func FrozenTestFiles(reportPath string) ([]string, error) {
 		if len(handoff.TestFiles) == 0 {
 			continue
 		}
-		if !handoff.DoNotModifyTests {
-			return nil, nil
-		}
-		return handoff.TestFiles, nil
+		return handoff.TestFiles, handoff.DoNotModifyTests, nil
 	}
-	return nil, nil
+	return nil, false, nil
 }
 
 func jsonBlocks(body string) []string {

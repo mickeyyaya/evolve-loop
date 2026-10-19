@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/commentaudit"
@@ -14,13 +15,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
+var unboundTddPredicateDir = regexp.MustCompile(`^go/acs/cycle[0-9]+/`)
+
 func commentFloorFailures(ctx context.Context, in ReviewInput) []string {
 	stage := commentFloorStage(in.ProjectRoot, in.errOut())
 	if stage == config.StageOff || in.Worktree == "" {
 		return nil
 	}
 	base := floorBase(in)
-	paths := changedWorktreePathsSince(ctx, in.Worktree, base, "--no-renames")
+	paths := withoutTddOwnedPredicates(changedWorktreePathsSince(ctx, in.Worktree, base, "--no-renames"), in.Cycle)
 	added, err := commentaudit.AddedAcrossDiff(paths, commentaudit.ReadAtBase(worktreeGit(ctx, in.Worktree), base), worktreeFile(in.Worktree))
 	if err != nil {
 		fmt.Fprintf(in.errOut(), "[build-floor] WARN comment floor could not read the diff (%v); the audit still judges comments\n", err)
@@ -31,6 +34,39 @@ func commentFloorFailures(ctx context.Context, in ReviewInput) []string {
 		fmt.Fprintln(in.errOut(), warning)
 	}
 	return failures
+}
+
+func withoutTddOwnedPredicates(paths []string, cycle int) []string {
+	kept := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if !isTddOwnedPredicate(p, cycle) {
+			kept = append(kept, p)
+		}
+	}
+	return kept
+}
+
+func isTddOwnedPredicate(path string, cycle int) bool {
+	if cycle > 0 {
+		return strings.HasPrefix(path, fmt.Sprintf("go/acs/cycle%d/", cycle))
+	}
+	return unboundTddPredicateDir.MatchString(path)
+}
+
+func TddCommentFloorFailures(ctx context.Context, worktree, projectRoot string, files []string, warn io.Writer) []string {
+	if commentFloorStage(projectRoot, warn) == config.StageOff || worktree == "" || len(files) == 0 {
+		return nil
+	}
+	added, err := commentaudit.AddedAcrossDiff(files, commentaudit.ReadAtBase(worktreeGit(ctx, worktree), "HEAD"), worktreeFile(worktree))
+	if err != nil {
+		fmt.Fprintf(warn, "[tdd-floor] WARN comment floor could not read the predicate files (%v)\n", err)
+		return nil
+	}
+	lines := make([]string, 0, len(added))
+	for _, c := range added {
+		lines = append(lines, c.File+": "+c.Line)
+	}
+	return lines
 }
 
 func commentFloorResult(stage config.Stage, added []commentaudit.Added) (failures []string, warning string) {

@@ -123,7 +123,26 @@ func verifyDeliverable(phase string, roots phasecontract.Roots, resolver phaseco
 	if err != nil || phase != "tdd" || roots.Worktree == "" {
 		return res, err
 	}
-	return withFrozenPinViolations(res, roots.Worktree), nil
+	return withTddCommentViolations(withFrozenPinViolations(res, roots.Worktree), roots.Worktree), nil
+}
+
+const codeTddCommentFloor = "tdd_comment_floor"
+
+func withTddCommentViolations(res deliverable.Result, worktree string) deliverable.Result {
+	files, err := reachabilityprobe.HandoffTestFiles(res.ArtifactPath)
+	if err != nil || len(files) == 0 {
+		return res
+	}
+	lines := core.TddCommentFloorFailures(context.Background(), worktree, cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), files, io.Discard)
+	if len(lines) == 0 {
+		return res
+	}
+	res.Violations = append(res.Violations, deliverable.Violation{
+		Code:    codeTddCommentFloor,
+		Message: fmt.Sprintf("the predicate files add %d comment line(s); delete each one (docs/conventions/code-comments.md):\n    %s", len(lines), strings.Join(lines, "\n    ")),
+	})
+	res.OK = false
+	return res
 }
 
 const codeUnreachableFrozenPin = "unreachable_frozen_pin"
