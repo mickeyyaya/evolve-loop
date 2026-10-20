@@ -12,7 +12,7 @@ import (
 func TestWorktreePhase(t *testing.T) {
 	t.Parallel()
 
-	for _, p := range []Phase{PhaseTDD, PhaseBuild, Phase("test-amplification")} {
+	for _, p := range []Phase{PhaseTDD, PhaseBuild, Phase("test-amplification"), Phase("bug-reproduction")} {
 		if !WorktreePhase(p) {
 			t.Errorf("%s should be a worktree (source-writing) phase", p)
 		}

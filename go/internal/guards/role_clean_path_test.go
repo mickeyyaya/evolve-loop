@@ -84,3 +84,29 @@ func TestIsProtectedScope_JudgesTheDirectorySpellingOfACleanPath(t *testing.T) {
 		t.Error("a directory spelling that cleans to go/internal/bridge/sub/ lies inside a fragment and must stay in scope")
 	}
 }
+
+func TestRole_EverySourceWriterPhaseMayWriteItsLaneWorktreeAndAReaderMayNot(t *testing.T) {
+	worktree := "/work/wt/cycle-62"
+	for phase, want := range map[string]bool{"bug-reproduction": true, "test-amplification": true, "build": true, "tdd": true, "fault-localization": false, "audit": false} {
+		s := cycleStateOnly{cs: core.CycleState{
+			CycleID:        62,
+			Phase:          phase,
+			ActiveWorktree: worktree,
+			WorkspacePath:  "/work/evolve/runs/cycle-62",
+		}}
+		dec := newRoleWithHome(s, false, fixtureHome).Decide(context.Background(), core.GuardInput{
+			ToolName:  "Write",
+			ToolInput: map[string]any{"file_path": worktree + "/go/internal/policy/coverchanged_repro_test.go"},
+		})
+		if dec.Allow != want {
+			t.Errorf("phase %s: allow=%v (%s), want %v", phase, dec.Allow, dec.Reason, want)
+		}
+		outside := newRoleWithHome(s, false, fixtureHome).Decide(context.Background(), core.GuardInput{
+			ToolName:  "Write",
+			ToolInput: map[string]any{"file_path": "/work/other-lane/go/internal/policy/x_test.go"},
+		})
+		if outside.Allow {
+			t.Errorf("phase %s: a write outside its lane worktree was allowed", phase)
+		}
+	}
+}
