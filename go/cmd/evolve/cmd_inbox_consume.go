@@ -180,7 +180,7 @@ func releaseConsumedItemBinding(projectRoot, itemPath string, stderr io.Writer) 
 			ID string `json:"id"`
 		}
 		if json.Unmarshal(raw, &doc) == nil {
-			id = doc.ID
+			id = inboxbatch.ItemID(doc.ID, itemPath)
 		}
 	}
 	if id == "" {

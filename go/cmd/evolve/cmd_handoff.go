@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/evidence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/exit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/request"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
 const (
@@ -265,13 +266,11 @@ func buildHandoffRequest(root string, cycle int, pair string) (handoff.Request, 
 
 func handoffInboxResolver(root string) request.PathResolver {
 	return func(id string) string {
-		matches, _ := filepath.Glob(filepath.Join(root, ".evolve", "inbox", "*"+id+".json"))
-		for _, m := range matches {
-			if base := filepath.Base(m); base == id+".json" || strings.HasSuffix(base, "-"+id+".json") {
-				return m
-			}
+		loc, err := inboxmover.Locate(filepath.Join(root, ".evolve", "inbox"), id)
+		if err != nil {
+			return ""
 		}
-		return ""
+		return loc.Path
 	}
 }
 

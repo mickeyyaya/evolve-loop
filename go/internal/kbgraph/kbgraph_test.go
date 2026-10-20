@@ -64,14 +64,45 @@ func TestBuildRejectsMalformedInboxItem(t *testing.T) {
 	}
 }
 
-func TestBuildSkipsItemWithoutID(t *testing.T) {
+func TestBuildNamesAnItemWithoutIDByItsFileName(t *testing.T) {
 	root := t.TempDir()
 	writeInbox(t, root, "anon.json", `{"title":"x"}`)
 	g, err := Build(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(g.nodes) != 0 {
-		t.Errorf("nodes = %v, want none", g.nodes)
+	if _, ok := g.nodes["item:anon"]; !ok || len(g.nodes) != 1 {
+		t.Errorf("nodes = %v, want the one item named by its file, item:anon", g.nodes)
+	}
+}
+
+func TestBuild_InboxReadFailuresAreErrorsAndNonItemsAreSkipped(t *testing.T) {
+	notADir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(notADir, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(notADir, ".evolve", "inbox"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(notADir); err == nil {
+		t.Error("an inbox that is not a directory is an error")
+	}
+	root := t.TempDir()
+	writeInbox(t, root, "notes.txt", "not an item")
+	if err := os.MkdirAll(filepath.Join(root, ".evolve", "inbox", "consumed"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "gone"), filepath.Join(root, ".evolve", "inbox", "dangling.json")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(root); err == nil {
+		t.Error("an inbox item it cannot read is an error")
+	}
+	if err := os.Remove(filepath.Join(root, ".evolve", "inbox", "dangling.json")); err != nil {
+		t.Fatal(err)
+	}
+	g, err := Build(root)
+	if err != nil || len(g.nodes) != 0 {
+		t.Errorf("a note and a subdirectory are not items: nodes=%v err=%v", g.nodes, err)
 	}
 }

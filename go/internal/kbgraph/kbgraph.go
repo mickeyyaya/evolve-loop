@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 const (
@@ -137,10 +138,7 @@ func (g *Graph) addInbox(dir string) error {
 		if err := json.Unmarshal(body, &item); err != nil {
 			return fmt.Errorf("kbgraph: parse %s: %w", path, err)
 		}
-		if item.ID == "" {
-			continue
-		}
-		from := "item:" + item.ID
+		from := "item:" + inboxbatch.ItemID(item.ID, path)
 		g.addNode(from, "item", item.Title)
 		for _, to := range item.ConnectsTo {
 			g.addNode("item:"+to, "item", "")

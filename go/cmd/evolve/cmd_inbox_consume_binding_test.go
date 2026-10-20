@@ -151,3 +151,46 @@ func TestReconcileConsumedBindings_RefiledLiveCopyKeepsItsBinding(t *testing.T) 
 		t.Fatal("the re-filed LIVE copy's binding was released on the old consumed copy's evidence")
 	}
 }
+
+func TestReleaseConsumedItemBinding_ReleasesAnIDLessItemByItsFileName(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := filepath.Join(root, "consumed", "no-id.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"title":"x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeBinding(t, root, "no-id", 42)
+
+	var errb bytes.Buffer
+	if !releaseConsumedItemBinding(root, path, &errb) {
+		t.Fatalf("the binding of an id-less item must be released under the loader's id; stderr=%s", errb.String())
+	}
+	if _, ok, _ := continuation.ReadRegistryEntry(root, "no-id"); ok {
+		t.Fatal("the binding survived")
+	}
+}
+
+func TestReleaseConsumedItemBinding_ReleasesNothingItCannotName(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	var errb bytes.Buffer
+	if releaseConsumedItemBinding(root, filepath.Join(root, "missing.json"), &errb) {
+		t.Error("an unreadable item has no id, so nothing is released")
+	}
+	path := filepath.Join(root, "item.json")
+	if err := os.WriteFile(path, []byte(`{"id":"item"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(continuation.RegistryPath(root)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(continuation.RegistryPath(root), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if releaseConsumedItemBinding(root, path, &errb) || !strings.Contains(errb.String(), `binding release "item"`) {
+		t.Errorf("an unreadable registry releases nothing and WARNs; stderr=%q", errb.String())
+	}
+}
