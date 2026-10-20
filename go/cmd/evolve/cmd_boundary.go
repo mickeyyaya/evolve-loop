@@ -58,7 +58,7 @@ func runBoundary(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 func dispatchBoundaryVerb(verb string, args []string, stdout, stderr io.Writer) int {
 	handlers := map[string]func([]string, io.Reader, io.Writer, io.Writer) int{
 		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "gc": runGC, "loop": runLoop,
-		boundaryLogVerb: runBoundaryLog,
+		boundaryLogVerb: runBoundaryLog, boundaryRatchetVerb: runBoundaryRatchetTighten,
 	}
 	run, ok := handlers[verb]
 	if !ok {
@@ -155,7 +155,8 @@ func boundaryHaltSteps(a boundaryArgs, root string) []boundaryStep {
 	if len(a.prs) > 0 {
 		steps = append(steps, boundaryStep{verb: "pr", args: append(append([]string{"merge"}, a.prs...), at...)})
 	}
-	return append(steps, boundaryStep{verb: "sync-main", args: at}, boundaryStep{verb: "gc", args: at})
+	return append(steps, boundaryStep{verb: boundaryRatchetVerb, args: at, desc: boundaryRatchetDesc},
+		boundaryStep{verb: "sync-main", args: at}, boundaryStep{verb: "gc", args: at})
 }
 
 func boundaryLoopLogPath(root, runID string) string {
