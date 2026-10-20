@@ -169,20 +169,16 @@ func TestPredicate(t *testing.T) {}
 }
 
 func TestPredicateEnv_AllBranches(t *testing.T) {
-	t.Run("empty projectRoot and nil pkgs: neither var injected", func(t *testing.T) {
+	t.Run("empty exports inject no suite var, even when the caller's env carries one", func(t *testing.T) {
+		t.Setenv("EVOLVE_PROJECT_ROOT", "/elsewhere/plane")
+		t.Setenv("EVOLVE_WORKTREE_ROOT", "/elsewhere")
+		t.Setenv("CHANGED_PACKAGES", "./elsewhere/pkg")
 		env := predicateEnv(predicateExports{})
 		for _, e := range env {
-			if strings.HasPrefix(e, "CHANGED_PACKAGES=") {
-				t.Errorf("nil pkgs must not inject CHANGED_PACKAGES; got %q", e)
-			}
-			if strings.HasPrefix(e, "EVOLVE_PROJECT_ROOT=") {
-				v := strings.TrimPrefix(e, "EVOLVE_PROJECT_ROOT=")
-				if v == "" {
-					t.Errorf("empty projectRoot must not inject EVOLVE_PROJECT_ROOT; got %q", e)
+			for _, key := range []string{"CHANGED_PACKAGES=", "EVOLVE_PROJECT_ROOT=", "EVOLVE_WORKTREE_ROOT="} {
+				if strings.HasPrefix(e, key) {
+					t.Errorf("empty exports must not pass %s through from the caller's env; got %q", strings.TrimSuffix(key, "="), e)
 				}
-			}
-			if strings.HasPrefix(e, "EVOLVE_WORKTREE_ROOT=") {
-				t.Errorf("empty worktreeRoot must not inject EVOLVE_WORKTREE_ROOT; got %q", e)
 			}
 		}
 	})
