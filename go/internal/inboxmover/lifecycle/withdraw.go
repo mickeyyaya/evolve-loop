@@ -115,5 +115,5 @@ func readIDAndDeps(path string) (string, []string) {
 	if json.Unmarshal(body, &doc) != nil {
 		return "", nil
 	}
-	return doc.ID, doc.Deps
+	return inboxbatch.ItemID(doc.ID, path), doc.Deps
 }

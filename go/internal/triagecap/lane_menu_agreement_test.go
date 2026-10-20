@@ -24,20 +24,32 @@ func TestReadInboxBacklog_OffersExactlyTheLaneMenusReadyItemsThatCarryAnID(t *te
 	}
 }
 
-func TestReadInboxBacklog_DropsAnIDLessItemTheLaneMenuStillOffers(t *testing.T) {
+func TestInboxReaders_GiveEachItemOneID(t *testing.T) {
 	evolveDir := t.TempDir()
 	inbox := filepath.Join(evolveDir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(inbox, "no-id.json"), []byte(`{"weight":0.5}`), 0o644); err != nil {
-		t.Fatal(err)
+	fixtures := []struct{ id, file, body string }{
+		{"no-id", "no-id.json", `{"weight":0.5}`},
+		{"bell item", "bell.json", `{"id":"bell\u0007item","weight":0.5}`},
 	}
-	if got := menuReadyIDs(t, evolveDir); !reflect.DeepEqual(got, []string{"no-id"}) {
-		t.Fatalf("the lane menu names an id-less item by its file, got %v", got)
+	for _, f := range fixtures {
+		if err := os.WriteFile(filepath.Join(inbox, f.file), []byte(f.body), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if got := backlogIDs(evolveDir); len(got) != 0 {
-		t.Errorf("the planner's backlog drops an id-less item, got %v", got)
+	want := []string{"bell item", "no-id"}
+	if got := menuReadyIDs(t, evolveDir); !reflect.DeepEqual(got, want) {
+		t.Errorf("the lane menu names the items %q, want %q", got, want)
+	}
+	if got := backlogIDs(evolveDir); !reflect.DeepEqual(got, want) {
+		t.Errorf("the planner's backlog names the items %q, want %q", got, want)
+	}
+	for _, f := range fixtures {
+		if loc, err := inboxmover.Locate(inbox, f.id); err != nil || loc.Path != filepath.Join(inbox, f.file) {
+			t.Errorf("the lifecycle finds %q by the loader's id: %+v %v", f.id, loc, err)
+		}
 	}
 }
 

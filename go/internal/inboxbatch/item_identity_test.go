@@ -16,7 +16,7 @@ func TestItem_KeyIsTheIDAndThePath(t *testing.T) {
 	}
 }
 
-func TestLoadFile_RecordsAnIDTakenFromTheFileName(t *testing.T) {
+func TestLoadFile_GivesAnIDLessItemItsFileName(t *testing.T) {
 	dir := t.TempDir()
 	for name, body := range map[string]string{"no-id.json": `{"weight":0.5}`, "with-id.json": `{"id":"named","weight":0.5}`} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
@@ -24,12 +24,30 @@ func TestLoadFile_RecordsAnIDTakenFromTheFileName(t *testing.T) {
 		}
 	}
 	fallback, _, err := LoadFile(filepath.Join(dir, "no-id.json"))
-	if err != nil || fallback.ID != "no-id" || !fallback.IDFromFileName {
-		t.Errorf("an id-less record takes its file name and says so: %+v %v", fallback, err)
+	if err != nil || fallback.ID != "no-id" {
+		t.Errorf("an id-less record takes its file name: %+v %v", fallback, err)
 	}
 	named, _, err := LoadFile(filepath.Join(dir, "with-id.json"))
-	if err != nil || named.ID != "named" || named.IDFromFileName {
-		t.Errorf("a recorded id is not a fallback: %+v %v", named, err)
+	if err != nil || named.ID != "named" {
+		t.Errorf("a recorded id is the id: %+v %v", named, err)
+	}
+}
+
+func TestItemID_IsTheLoadersID(t *testing.T) {
+	if got := ItemID("named", "/inbox/2026-x.json"); got != "named" {
+		t.Errorf("ItemID with a recorded id = %q", got)
+	}
+	if got := ItemID("", "/inbox/2026-x.json"); got != "2026-x" {
+		t.Errorf("ItemID without a recorded id = %q", got)
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "x.json")
+	if err := os.WriteFile(path, []byte(`{"id":"bell\u0007item"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	loaded, _, err := LoadFile(path)
+	if got := ItemID("bell\aitem", path); err != nil || got != loaded.ID || got != "bell item" {
+		t.Errorf("ItemID = %q, want the loader's sanitized id %q (%v)", got, loaded.ID, err)
 	}
 }
 

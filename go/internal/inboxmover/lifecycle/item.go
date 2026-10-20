@@ -91,7 +91,7 @@ func readID(path string) (string, bool) {
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return "", false
 	}
-	return doc.ID, true
+	return inboxbatch.ItemID(doc.ID, path), true
 }
 
 func readTaskIDOrUnknown(path string) string {

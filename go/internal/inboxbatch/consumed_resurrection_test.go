@@ -210,3 +210,18 @@ func TestConsumedRecord_DescribeNamesWhenHowAndWhichRecord(t *testing.T) {
 		t.Fatalf("Describe() = %q, want %q", got, want)
 	}
 }
+
+func TestConsumedRecords_KeysEachRecordByTheLoadersID(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeUnder(t, dir, map[string]string{
+		"consumed/bell.json":  `{"id":"bell\u0007item","consumed":{"at":"A","via":"ship"}}`,
+		"consumed/no-id.json": `{"consumed":{"at":"A","via":"ship"}}`,
+	})
+	got := ConsumedRecords(dir)
+	for _, id := range []string{"bell item", "no-id"} {
+		if len(got[id]) != 1 {
+			t.Errorf("ConsumedRecords has no record under the loader's id %q: %v", id, got)
+		}
+	}
+}
