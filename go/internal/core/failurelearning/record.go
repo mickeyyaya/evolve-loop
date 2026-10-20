@@ -40,7 +40,7 @@ func (e *Engine) RecordFailedApproach(state *cyclestate.State, f Failure) Learne
 	record.ExpiresAt = failurelog.ComputeExpiresAt(failurelog.NormalizeLegacy(record.Classification), now)
 	e.todos.Append(state, cyclestate.CarryoverTodo{
 		ID: todoID, Action: summary, Priority: carryover.PriorityBlocking,
-		FirstSeenCycle: f.Cycle, ExpiresAt: record.ExpiresAt,
+		FirstSeenCycle: f.Cycle, ExpiresAt: carryover.BoundedExpiry(record.ExpiresAt, now),
 	})
 	state.FailedAt = append(state.FailedAt, record)
 	state.LastCycleNumber = f.Cycle
