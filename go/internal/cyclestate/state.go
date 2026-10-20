@@ -73,6 +73,8 @@ type CycleState struct {
 	AuditDispatches                 int            `json:"audit_dispatches,omitempty"`
 	AuditRepairActive               bool           `json:"audit_repair_active,omitempty"`
 	FailureDecisionUntrusted        bool           `json:"failure_decision_untrusted,omitempty"`
+	PredicateRepairBrief            string         `json:"predicate_repair_brief,omitempty"`
+	PredicateReroutes               int            `json:"predicate_reroutes,omitempty"`
 	ExplanationCorrections          []string       `json:"explanation_corrections,omitempty"`
 	ExplanationCorrectionActive     bool           `json:"explanation_correction_active,omitempty"`
 	ExplanationDocumentationVersion int            `json:"explanation_documentation_version,omitempty"`

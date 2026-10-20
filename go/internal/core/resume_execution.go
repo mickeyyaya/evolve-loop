@@ -126,9 +126,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		phaseCtx := seedAuditRepairContext(ctxSnap, next, cs)
 		phaseCtx = o.seedDispatchContext(ctx, phaseCtx, next, cs, req.ProjectRoot)
 		archiveRepairPrompts(cs, next)
-		if next == PhaseAudit {
-			cs.AuditRepairActive = false
-		}
+		consumeDispatchFlags(&cs, next)
 		if next == PhaseRetro {
 			o.clearRetroDecisionInput(&cs)
 		}

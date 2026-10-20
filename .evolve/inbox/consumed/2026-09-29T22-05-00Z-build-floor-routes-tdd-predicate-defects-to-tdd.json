@@ -15,5 +15,11 @@
     "A predicate failure Build can fix still corrects at Build"
   ],
   "created_at": "2026-09-29T22:05:00Z",
-  "source": "console, 2026-09-29, cycle 1761 retro (inst-L1761b)"
+  "source": "console, 2026-09-29, cycle 1761 retro (inst-L1761b)",
+  "consumed": {
+    "at": "2026-10-21T08:00:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fix/build-floor-tdd-predicate: reviewWithCorrections routes a ./acs/cycle<N> predicate failure that repeats byte-identically across a Build correction to TDD (once per cycle) with the failures as a predicate_repair_brief in the TDD prompt; a failure Build moves keeps correcting at Build; remediation builder fixes never reroute"
+  }
 }

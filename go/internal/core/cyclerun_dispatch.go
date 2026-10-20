@@ -53,9 +53,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	phaseCtx = seedAuditRepairContext(phaseCtx, next, cr.cs)
 	phaseCtx = cr.o.seedDispatchContext(cr.ctx, phaseCtx, next, cr.cs, cr.req.ProjectRoot)
 	archiveRepairPrompts(cr.cs, next)
-	if next == PhaseAudit {
-		cr.cs.AuditRepairActive = false
-	}
+	consumeDispatchFlags(&cr.cs, next)
 	if next == PhaseRetro {
 		cr.o.clearRetroDecisionInput(&cr.cs)
 	}
