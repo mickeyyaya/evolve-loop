@@ -100,7 +100,7 @@ func routeRefusal(opts inboxmover.Options, in FailureInputs, committed []string,
 		detail, files = core.ProtectedRouteMessage(proven), protectedPaths(proven)
 	}
 	if len(files) > 0 {
-		if ferr := addItemFiles(opts.ProjectRoot, in.RefusalSubject, files); ferr != nil {
+		if ferr := addItemProtectedFiles(opts.ProjectRoot, in.RefusalSubject, files); ferr != nil {
 			fmt.Fprintf(stderr, "[cycleoutcome] WARN: the item %q could not gain its protected files (%v) — task-level bump instead\n", in.RefusalSubject, ferr)
 			return false
 		}

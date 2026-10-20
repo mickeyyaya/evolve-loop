@@ -497,3 +497,27 @@ func TestPlanAgainst_AMalformedOriginCopyIsAnError(t *testing.T) {
 		t.Errorf("PlanAgainst = %v, want a malformed origin copy reported, never read as a retirement", err)
 	}
 }
+
+func TestClassify_AProvenProtectedFileCanBeAddedButNeverRemovedAsAStamp(t *testing.T) {
+	w := newWorld(t)
+	write(t, w.plane, curatedItem, `{"id":"curated","weight":0.5,"failure_count":1,"protected_files":["go/internal/core/a.go"]}`)
+	w.plane.Git("commit", "-q", "-am", "the closeout proved a.go")
+
+	write(t, w.plane, curatedItem, `{"id":"curated","weight":0.5,"failure_count":1,"protected_files":["go/internal/core/a.go","go/internal/core/b.go"]}`)
+	grown, err := Classify(context.Background(), git(w.plane))
+	if err != nil || len(grown.Stamps) != 1 || len(grown.Other) != 0 {
+		t.Errorf("an added proven file = (%+v, %v), want one stamp", grown, err)
+	}
+
+	for name, body := range map[string]string{
+		"a removed file":   `{"id":"curated","weight":0.5,"failure_count":1,"protected_files":["go/internal/core/b.go"]}`,
+		"a dropped field":  `{"id":"curated","weight":0.5,"failure_count":1}`,
+		"a non-list value": `{"id":"curated","weight":0.5,"failure_count":1,"protected_files":"go/internal/core/a.go"}`,
+	} {
+		write(t, w.plane, curatedItem, body)
+		shrunk, err := Classify(context.Background(), git(w.plane))
+		if err != nil || len(shrunk.Stamps) != 0 || !slices.Contains(shrunk.Other, curatedItem) {
+			t.Errorf("%s = (%+v, %v), want other dirt that sync-main refuses", name, shrunk, err)
+		}
+	}
+}

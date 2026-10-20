@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A replay of an escalation bump in the plane does not block sync-main (red test first)",
+    "No loop writer changes a curated inbox field outside a reviewed verb"
+  ],
+  "campaign": "pr-merge-latency",
+  "created_at": "2026-10-20T13:01:02Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_loop_escalate.go",
+    "go/internal/recurrence/apply.go",
+    "go/internal/inboxstamps"
+  ],
+  "fix": "TDD first. Choose one: the escalation writes a loop stamp that the ranking reads (and the cycle 1932 predicates are retired with a reason), or sync-main lands a weight raise that the ledger records as an escalation edit. Record the choice in the plan, 100% coverage on new and changed functions, zero comments, the package note and the spec updated.",
+  "id": "pr-merge-latency-p5b-escalation-reweight-stamp",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "split_from": "pr-merge-latency-p5-boundary-self-heal",
+  "summary": "Split of P5 of plan pr-merge-latency-2026-10. P5 stopped the cycle closeout from writing the curated field files. One loop writer still changes a curated field: the escalation boundary sets weight through inbox edit (moverReweight in go/cmd/evolve/cmd_loop_escalate.go). failure_disposition.stage is enforce in the live policy. When it bumps an item in the plane, sync-main refuses the change as other dirt and blocks the boundary, as for cycle 2000. The ACS predicates of cycle 1932 pin the write through inbox edit, so the change needs its own decision.",
+  "title": "PR merge latency P5b: the escalation reweight of the loop never blocks the boundary",
+  "weight": 0.6
+}

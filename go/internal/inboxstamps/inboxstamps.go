@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -101,7 +102,7 @@ func (w worktree) lifecycleOnlyChange(ctx context.Context, g Git, status, path s
 	}
 	stamp := Stamp{Path: path, Set: map[string]json.RawMessage{}}
 	for _, key := range changedKeys(head, now) {
-		if !inboxmover.IsMoverWritten(key) {
+		if !inboxmover.IsMoverWritten(key) || (inboxbatch.RoleOf(key).IsGrowOnly() && !grows(head[key], now[key])) {
 			return Stamp{}, false, nil
 		}
 		if value, present := now[key]; present {
@@ -111,6 +112,19 @@ func (w worktree) lifecycleOnlyChange(ctx context.Context, g Git, status, path s
 		}
 	}
 	return stamp, len(stamp.Set)+len(stamp.Removed) > 0, nil
+}
+
+func grows(before, after json.RawMessage) bool {
+	var was, is []string
+	if json.Unmarshal(after, &is) != nil || (before != nil && json.Unmarshal(before, &was) != nil) {
+		return false
+	}
+	for _, path := range was {
+		if !slices.Contains(is, path) {
+			return false
+		}
+	}
+	return true
 }
 
 func isModification(status string) bool {
