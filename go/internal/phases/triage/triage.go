@@ -105,6 +105,7 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if section := premiseDriftSection(context.Background(), req.ProjectRoot, runner.LaneScope(req)); section != "" {
 		b.WriteString(section)
 	}
+	b.WriteString(scoutPlanProtectedSection(req.Workspace))
 	ctx, cancel := context.WithTimeout(context.Background(), carryforwardCandidatesTimeout)
 	defer cancel()
 	if section := CarryforwardCandidatesSection(ctx, req.ProjectRoot, "main"); section != "" {

@@ -506,7 +506,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		reviewers = append(reviewers, floor)
 	}
 	if cfg.EvalGate != config.StageOff {
-		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate))
+		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate, evalgate.WithConsoleFollowupFiler(hostFollowupFiler(ld, signals, forbidden, pol.InboxPriorityConfig().ClassOrder))))
 	}
 	if cfg.ContractGate != config.StageOff {
 		rev := deliverable.NewReviewerWithCatalogStageReportSize(
@@ -607,6 +607,13 @@ func continuationForScope(root string, cycle int, scopeIDs []string) *continuati
 func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) deliverable.Claimer {
 	return func(inboxDir string, cycle int, ids []string) error {
 		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden}, cycle, ids)
+	}
+}
+
+func hostFollowupFiler(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool, classes []string) evalgate.ConsoleFollowupFiler {
+	return func(projectRoot string, raw []byte) error {
+		_, err := inboxmover.File(inboxmover.Options{ProjectRoot: projectRoot, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden, PriorityClasses: classes}, raw)
+		return err
 	}
 }
 

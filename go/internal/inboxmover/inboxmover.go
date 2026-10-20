@@ -30,6 +30,7 @@ var (
 	ErrBadState      = lifecycle.ErrBadState
 	ErrConsoleRouted = lifecycle.ErrConsoleRouted
 	ErrInvalidItem   = lifecycle.ErrInvalidItem
+	ErrAlreadyFiled  = lifecycle.ErrAlreadyFiled
 )
 
 type (
@@ -285,6 +286,8 @@ func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, 
 }
 
 type RouteResult = lifecycle.RouteResult
+
+const RouteConsoleValue = lifecycle.RouteConsoleValue
 
 func RouteLane(opts Options, taskID, reason string) (RouteResult, error) {
 	return withMover(opts, func(m *lifecycle.Mover) (RouteResult, error) { return m.RouteLane(taskID, reason) })
