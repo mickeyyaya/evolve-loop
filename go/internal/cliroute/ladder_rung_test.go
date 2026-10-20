@@ -138,3 +138,43 @@ func TestResolve_ALegacyPinKeepsTheLadderOff(t *testing.T) {
 		t.Fatalf("model %q rule %q, want the legacy pin to hold balanced", d.Plan.Model, d.Rule)
 	}
 }
+
+func TestResolve_TheLadderNeverGoesBelowThePin(t *testing.T) {
+	r := syntheticRouter(t, policy.CLIRouting{CLIs: agyClaude, Default: agyClaude, Agents: map[string]policy.AgentRule{"builder": {CLI: agyClaude, Model: "top", Effort: "xhigh"}}}, cliroute.Host{})
+
+	d := mustResolve(t, r, builderRequest(llmroute.Overlay{LadderTier: "top", Effort: "xhigh"}))
+	if d.Plan.Model != "top" || d.Plan.Effort != "xhigh" || traced(d, "clamped") {
+		t.Fatalf("model %q effort %q trace %v, want the top/xhigh pin kept above the default bounds", d.Plan.Model, d.Plan.Effort, d.Trace)
+	}
+	d = mustResolve(t, r, builderRequest(llmroute.Overlay{LadderTier: "fast", Effort: "low"}))
+	if d.Plan.Model != "top" || d.Plan.Effort != "xhigh" || !traced(d, "ladder tier fast raised to the base tier top", "ladder effort low raised to the base effort xhigh") {
+		t.Fatalf("model %q effort %q trace %v, want a rung below the pin raised to it and reported", d.Plan.Model, d.Plan.Effort, d.Trace)
+	}
+}
+
+func TestResolve_ALadderRungThatIsNotATierOrAnEffortIsRefused(t *testing.T) {
+	r := pinnedBuilderRouter(t, policy.AgentRule{})
+
+	for _, ov := range []llmroute.Overlay{{LadderTier: "claude-opus-9"}, {Effort: "turbo"}} {
+		if _, err := r.Resolve(builderRequest(ov)); err == nil {
+			t.Errorf("rung %+v resolved, want a refusal", ov)
+		}
+	}
+}
+
+func TestResolve_ABoundBelowThePinHoldsTheRungAtThePin(t *testing.T) {
+	r := syntheticRouter(t, policy.CLIRouting{CLIs: agyClaude, Default: agyClaude, Agents: map[string]policy.AgentRule{"builder": {CLI: agyClaude, Model: "deep", MaxTier: "balanced"}}}, cliroute.Host{})
+
+	d := mustResolve(t, r, builderRequest(llmroute.Overlay{LadderTier: "top"}))
+	if d.Plan.Model != "deep" || !traced(d, "ladder tier top clamped to the base tier deep") {
+		t.Fatalf("model %q trace %v, want the rung held at the deep pin", d.Plan.Model, d.Trace)
+	}
+}
+
+func TestResolve_TheLegacyPathRefusesALadderRungThatIsNotATier(t *testing.T) {
+	r := mustRouter(t, cliroute.Table{}, cliroute.Host{LookPath: everyBinary()})
+
+	if _, err := r.Resolve(cliroute.Request{Agent: "scout", DefaultModel: "balanced", Overlay: llmroute.Overlay{LadderTier: "claude-opus-9"}}); err == nil {
+		t.Fatal("legacy resolve accepted a ladder rung that is not a tier")
+	}
+}

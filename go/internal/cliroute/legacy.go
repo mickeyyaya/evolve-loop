@@ -45,7 +45,9 @@ func (v resolver) legacyDispatch(req Request) (Decision, error) {
 	var clamped []string
 	if pin == nil && req.Overlay != (llmroute.Overlay{}) {
 		var ov llmroute.Overlay
-		ov, clamped = clampLadder(req.Overlay, retryladder.Bounds{}.Resolved())
+		if ov, clamped, err = clampLadder(req.Overlay, retryladder.Bounds{}.Resolved(), v.table.ladderBase(req.Agent, plan.Model)); err != nil {
+			return Decision{}, refused(req.Agent, err)
+		}
 		plan = llmroute.ApplySoftOverlay(plan, ov, prof)
 	}
 	if pin == nil || pin.CLI == "" {

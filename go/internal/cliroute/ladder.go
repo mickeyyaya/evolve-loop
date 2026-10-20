@@ -10,12 +10,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
+type ladderFloor struct {
+	tier, effort string
+}
+
 func applyLadder(v resolver, res resolution) (resolution, error) {
 	ov := res.req.Overlay
 	if ov.LadderTier == "" && ov.Effort == "" {
 		return res, nil
 	}
-	rung, notes := clampLadder(llmroute.Overlay{LadderTier: ov.LadderTier, Effort: ov.Effort}, v.table.bounds[res.req.Agent].Resolved())
+	rung, notes, err := clampLadder(llmroute.Overlay{LadderTier: ov.LadderTier, Effort: ov.Effort}, v.table.bounds[res.req.Agent].Resolved(), v.table.ladderBase(res.req.Agent, res.plan.Model))
+	if err != nil {
+		return res, err
+	}
 	for _, note := range notes {
 		res = res.noted("%s", note)
 	}
@@ -23,18 +30,42 @@ func applyLadder(v resolver, res resolution) (resolution, error) {
 	return res, nil
 }
 
-func clampLadder(ov llmroute.Overlay, bounds retryladder.Bounds) (llmroute.Overlay, []string) {
-	var notes []string
-	if ov.LadderTier != "" && policy.TierRank(ov.LadderTier) > policy.TierRank(bounds.MaxTier) {
-		notes = append(notes, fmt.Sprintf("ladder tier %s clamped to max_tier %s", ov.LadderTier, bounds.MaxTier))
-		ov.LadderTier = bounds.MaxTier
+func (t Table) ladderBase(agent, tier string) ladderFloor {
+	effort, _ := t.pol.Efforts().Resolve(tier, agent, t.agentKeys[agent])
+	return ladderFloor{tier: tier, effort: effort}
+}
+
+func clampLadder(ov llmroute.Overlay, bounds retryladder.Bounds, base ladderFloor) (llmroute.Overlay, []string, error) {
+	tier, tierNote, err := clampStep("tier", ov.LadderTier, policy.TierNames(), bounds.MaxTier, base.tier)
+	if err != nil {
+		return ov, nil, err
 	}
-	levels := policy.EffortLevels()
-	if ov.Effort != "" && slices.Index(levels, ov.Effort) > slices.Index(levels, bounds.MaxEffort) {
-		notes = append(notes, fmt.Sprintf("ladder effort %s clamped to max_effort %s", ov.Effort, bounds.MaxEffort))
-		ov.Effort = bounds.MaxEffort
+	effort, effortNote, err := clampStep("effort", ov.Effort, policy.EffortLevels(), bounds.MaxEffort, base.effort)
+	if err != nil {
+		return ov, nil, err
 	}
-	return ov, notes
+	ov.LadderTier, ov.Effort = tier, effort
+	return ov, slices.DeleteFunc([]string{tierNote, effortNote}, func(n string) bool { return n == "" }), nil
+}
+
+func clampStep(kind, rung string, levels []string, bound, base string) (string, string, error) {
+	if rung == "" {
+		return "", "", nil
+	}
+	at, floor, ceiling := slices.Index(levels, rung), slices.Index(levels, base), slices.Index(levels, bound)
+	switch {
+	case at < 0:
+		return "", "", fmt.Errorf("ladder %s %q is not one of %s", kind, rung, strings.Join(levels, ", "))
+	case floor >= 0 && at < floor:
+		return base, fmt.Sprintf("ladder %s %s raised to the base %s %s", kind, rung, kind, base), nil
+	case max(ceiling, floor) >= 0 && at > max(ceiling, floor):
+		limit, label := bound, "max_"+kind
+		if ceiling < floor {
+			limit, label = base, "the base "+kind
+		}
+		return limit, fmt.Sprintf("ladder %s %s clamped to %s %s", kind, rung, label, limit), nil
+	}
+	return rung, "", nil
 }
 
 func (c *compiler) compileLadderBounds() map[string]retryladder.Bounds {
