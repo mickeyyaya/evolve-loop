@@ -28,6 +28,7 @@ const (
 type contractHost struct {
 	prefix                      []string
 	root, worktree, run, events string
+	resumeWitness               string
 	otherCycle, socketDir       string
 	runSocket, defaultSocket    string
 	runName, runPID             string
@@ -97,6 +98,8 @@ var agentContract = []contractRow{
 		}},
 	{action: "write in the protected .evolve/events/", want: contractDeny,
 		script: func(h contractHost) string { return "echo x > " + h.events + "/forged" }},
+	{action: "write the host resume witness in .evolve/resume-witness/", want: contractDeny,
+		script: func(h contractHost) string { return "echo x > " + h.resumeWitness + "/cycle-7.json" }},
 	{action: "write to another pane's tty", want: contractDeny,
 		script: func(h contractHost) string { return "printf '' > " + h.peerTTY }},
 	{action: "read another pane's tty", want: contractDeny,
@@ -209,7 +212,8 @@ func (h *contractHost) withProject(t *testing.T) {
 	h.run = filepath.Join(h.root, ".evolve", "runs", "cycle-7")
 	h.otherCycle = filepath.Join(h.root, ".evolve", "runs", "cycle-8")
 	h.events = filepath.Join(h.root, ".evolve", "events")
-	for _, dir := range []string{h.run, h.otherCycle, h.events} {
+	h.resumeWitness = filepath.Join(h.root, ".evolve", "resume-witness")
+	for _, dir := range []string{h.run, h.otherCycle, h.events, h.resumeWitness} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}

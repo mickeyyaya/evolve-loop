@@ -49,6 +49,7 @@ After each row, the host must still reach the run server with its sessions `agen
 | Write in its own cycle run directory | allow | The file reads back. |
 | Write in another cycle's `.evolve/runs/cycle-M` | deny | The write gets `Operation not permitted`, and no file is made on the host. See "The run directory grant". |
 | Write in the protected `.evolve/events/` | deny | The write gets `Operation not permitted`. |
+| Write the host resume witness in `.evolve/resume-witness/` | deny | The write gets `Operation not permitted`. A resume trusts this file ([ADR-0039 D4](adr/0039-failure-floor-and-failure-signal-contract.md)). |
 | Write to another pane's tty | deny | The open for write gets `Operation not permitted`. |
 | Read another pane's tty | deny | The open for read gets `Operation not permitted`. |
 | Open its own pane tty for read and write | allow | Both opens succeed. |
@@ -61,7 +62,7 @@ The agent is a model that runs commands in a pane. The agent is not hostile by i
 
 - **The run tmux server and its panes.** A loss stops every phase of the wave. The socket rows, the signal row and the incident rows protect it.
 - **The other panes.** A pane tty carries the keystrokes and the output of another agent. The tty rows protect it. Before 2026-10-10 the profile granted a read of all of `/dev`, and the read of another pane's tty was not denied.
-- **The shared state of the run.** `.evolve/events/` and the run directories of other cycles hold the evidence that the loop trusts. The write rows protect it.
+- **The shared state of the run.** `.evolve/events/`, `.evolve/resume-witness/` and the run directories of other cycles hold the evidence that the loop trusts. The write rows protect it.
 - **The useful work.** An agent must run `go test`, `git` and `tmux` with a private server. The allow rows protect it. A profile that is too strict causes a red test, and a red test caused the cycle-1853 probe.
 
 The contract does not cover these items:
