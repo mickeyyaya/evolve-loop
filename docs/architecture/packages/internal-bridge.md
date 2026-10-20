@@ -74,6 +74,8 @@ The decision-matrix fixtures in `autorespond_decision_test.go` are verbatim pane
 
 `recordModelAttempt` writes the one `llm-calls` ledger row per launch attempt (`llmcalls` owns the filename and I/O). It derives the attempt number (at least 1) and the call id once and returns the `attemptLogContext`, so every later signal of the same launch carries the row's identity. Usage status follows the resolver's source: transcript or events result is `measured`, scrollback peak is `partial`, anything else is `unavailable`, and a resolver error is `resolver_error`. Negative counters and a NaN or infinite fill are discarded with a warning. `launchWarn` is the only `bridge.warning` producer; `tripwire` emits `bridge.tripwire` when a successful non-claude launch runs past `tripwireSuccessThreshold` with no usage source. The ledger's cause code comes from `launchoutcome.CauseCode` ([decomposition unit 10](../decomposition/10-bridgeengine.md), [ADR-0101](../adr/0101-signal-center.md)).
 
+The agy conversation store is a measured source too. `resolveAttemptTokens` records `tokenusage.SourceAgyConversation` as `measured` (`TestResolveAttemptTokens_TheAgyConversationStoreIsAMeasuredUsage`, [internal-tokenusage.md](internal-tokenusage.md)).
+
 `markTry` writes the try fields of [retry-ladder §6](../retry-ladder.md#6-the-try-record) (ADR-0142 L0):
 
 - `effort` is the effort of the launch intent. `LaunchArgs` reports it through `observeLaunchEffort`, so each tmux launch records it.

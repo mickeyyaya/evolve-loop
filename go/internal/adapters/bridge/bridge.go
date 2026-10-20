@@ -95,7 +95,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		PhaseArtifactTimeoutS: a.bridgeConfig.PhaseArtifactTimeouts(),
 		Efforts:               a.efforts,
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
-		TokenResolver:         tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(env)),
+		TokenResolver:         tokenusage.Resolver(tokenusage.Roots{Claude: tokenusage.ClaudeConfigRoot(env), Agy: tokenusage.AgyDataRoot(env)}, tokenusage.SQLiteCLI),
 		ContextFillWarnPct:    a.contextFillWarnPct,
 		PaneCaptureMaxBytes:   a.paneCaptureMaxBytes,
 		RecoveryStage:         a.recoveryStage,
