@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "A pre-planted read-only failure-dossier.json that claims a system class (build_declared infrastructure-systemic) does not defer the item; the build's class counts only from orchestrator memory (the ledger and the build report) for the current cycle (red first: the planted file deferred the item as pipeline-repair)",
+    "A failure-decision.json that exists before the retro dispatch is removed by the host, so only this cycle's retro can write one; when the host cannot remove it, the cycle marks the decision untrusted and neither the defer rule nor the retro floor reads it (fail closed)",
+    "The FAIL closeout routes the defer that ended the cycle from a value carried on the cycle result and reads no workspace file"
+  ],
+  "created_at": "2026-10-21T06:00:00Z",
+  "files": [
+    "go/internal/core/reintent_decision.go",
+    "go/internal/core/failure_decision.go",
+    "go/internal/core/failure_dossier.go",
+    "go/internal/cycleoutcome/defer_route.go",
+    "go/cmd/evolve/cmd_cycle.go"
+  ],
+  "fix": "Take the defer inputs from orchestrator memory for the current cycle: the build's corroborated class from failureDossier (never the dossier file), a failure-decision.json that the host cleared before the retro (untrusted when the clear fails), and the resolved defer carried on CycleResult (DeferCategory, DeferFixType) for the closeout.",
+  "id": "defer-inputs-come-from-host-memory",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "independent review of #1083, 2026-10-21: a forged dossier defers an item",
+  "summary": "After #1083, deferDecisionIn read build_declared back from failure-dossier.json in the cycle workspace, and the closeout read failure-decision.json from the workspace. Any agent that can write the workspace can create a read-only failure-dossier.json that claims a system class, so the host write fails silently (the write error was dropped) and the planted claim defers the item. failure-decision.json (#1078) had the same weakness: a file planted before the retro survived as the retro's decision.",
+  "title": "A planted read-only failure-dossier.json or failure-decision.json decides the defer of an item",
+  "weight": 0.7,
+  "consumed": {
+    "at": "2026-10-21T06:00:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fix/defer-inputs-from-host-memory (stacked on #1083): deferDecision takes the build's class from failureDossier in memory; clearRetroDecisionInput removes failure-decision.json before each retro and sets CycleState.FailureDecisionUntrusted when it cannot; trustedFailureDecision gates the defer rule and the retro floor; carryDefer puts the defer on CycleResult and cycleoutcome routes core.DeferOf(result). A failed dossier write is a WARN. ADR-0072 D4. The review's LOW (recoveryguard and gatesOnIntactTree drop the first snapshot error on retake) is not in this change: it needs RetakenAfter from #1082."
+  }
+}

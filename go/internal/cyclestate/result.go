@@ -6,6 +6,8 @@ type CycleResult struct {
 	PhasesRun          []Phase
 	TerminationReason  string
 	RetroDecision      string
+	DeferCategory      string
+	DeferFixType       string
 	SkippedPhases      []SkippedPhase
 	VerdictsNotAdopted []VerdictNotAdopted
 	SystemFailure      *SystemFailureSignal

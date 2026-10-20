@@ -292,7 +292,7 @@ func applyResultFailureOutcome(result core.CycleResult, projectRoot, evolveDir s
 	}
 	in := cycleoutcome.FailureInputsFor(projectRoot, evolveDir, cycleWorkspace(projectRoot, result.Cycle), result.Cycle, stderr)
 	in.Protected = protectedMembership
-	in.Deferred = core.IsAuditDeferResult(result)
+	in.Defer, _ = core.DeferOf(result)
 	_, err := cycleoutcome.ApplyFailure(in.WithLedger(lifecycle).WithSignals(signals))
 	return err
 }

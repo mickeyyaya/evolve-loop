@@ -25,7 +25,7 @@ func reentryPhase(a retryAction) (Phase, bool) {
 
 func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *SystemFailureSignal) {
 	d := o.failureDossier(cs, VerdictFAIL)
-	_ = writeFailureDossier(cs.WorkspacePath, d)
+	o.writeDossier(cs, d)
 
 	env, fb := o.auditFailEnvelope(cs, d.FloorCandidate)
 	if d.BuildDeclared != nil && !env.Halt {

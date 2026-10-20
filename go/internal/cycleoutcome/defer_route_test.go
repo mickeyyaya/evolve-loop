@@ -2,6 +2,7 @@ package cycleoutcome
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -20,15 +22,25 @@ func deferredCycle(t *testing.T, decision string) (string, string, FailureInputs
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "lane-item", "7"); err != nil {
 		t.Fatalf("claim: %v", err)
 	}
-	if decision != "" {
-		if err := os.WriteFile(filepath.Join(ws, "failure-decision.json"), []byte(decision), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
 	var stderr bytes.Buffer
 	in := FailureInputsFor(root, filepath.Join(root, ".evolve"), ws, 7, &stderr)
-	in.Deferred, in.SystemLevel = true, false
+	in.Defer, in.SystemLevel = deferOf(t, decision), false
 	return root, inbox, in, &stderr
+}
+
+func deferOf(t *testing.T, decision string) core.RecordedDefer {
+	t.Helper()
+	if decision == "" {
+		return core.RecordedDefer{}
+	}
+	var d struct {
+		Category string `json:"category"`
+		FixType  string `json:"fix_type"`
+	}
+	if err := json.Unmarshal([]byte(decision), &d); err != nil {
+		t.Fatal(err)
+	}
+	return core.RecordedDefer{Category: d.Category, FixType: d.FixType}
 }
 
 func TestApplyFailure_Cycle1953ReintentRoutesTheItemToTheConsole(t *testing.T) {
@@ -107,16 +119,13 @@ func TestApplyFailure_ADeferWithNoRouteKeepsTheReleaseAndSaysWhy(t *testing.T) {
 	unknown := strings.Replace(cycle1953Decision, `"fix_type":"reintent"`, `"fix_type":"rewrite-the-world"`, 1)
 	for name, c := range map[string]struct {
 		decision string
-		deferred bool
 		warn     string
 	}{
-		"no recorded decision":           {"", true, "no defer-or-quarantine decision in its audit failure block or failure-decision.json"},
-		"an unknown fix_type":            {unknown, true, `fix_type "rewrite-the-world" has no route`},
-		"a cycle not ended by the defer": {cycle1953Decision, false, ""},
+		"a cycle not ended by the defer": {"", ""},
+		"an unknown fix_type":            {unknown, `fix_type "rewrite-the-world" has no route`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, inbox, in, stderr := deferredCycle(t, c.decision)
-			in.Deferred = c.deferred
 
 			if _, err := ApplyFailure(in); err != nil {
 				t.Fatalf("ApplyFailure: %v", err)
@@ -205,12 +214,9 @@ func TestApplyFailure_OnlyTheItemThatFailedToRouteIsBumped(t *testing.T) {
 					t.Fatalf("claim %s: %v", id, err)
 				}
 			}
-			if err := os.WriteFile(filepath.Join(ws, "failure-decision.json"), []byte(c.decision), 0o644); err != nil {
-				t.Fatal(err)
-			}
 			var stderr bytes.Buffer
 			in := FailureInputsFor(root, filepath.Join(root, ".evolve"), ws, 7, &stderr)
-			in.Deferred, in.SystemLevel = true, false
+			in.Defer, in.SystemLevel = deferOf(t, c.decision), false
 			c.fail()
 
 			if _, err := ApplyFailure(in); err != nil {
@@ -234,10 +240,10 @@ func writeSecondItem(t *testing.T, inbox string) {
 	}
 }
 
-func TestApplyFailure_TheAuditBlockAloneRoutesTheItem(t *testing.T) {
-	_, inbox, in, _ := deferredCycle(t, "")
-	audit := "## Verdict\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\",\"schema_version\":2,\"failure\":{\"class\":\"intent-malformed\"}} -->\n"
-	if err := os.WriteFile(filepath.Join(in.Workspace, "audit-report.md"), []byte(audit), 0o644); err != nil {
+func TestApplyFailure_TheCloseoutRoutesTheCarriedDeferAndReadsNoWorkspaceFile(t *testing.T) {
+	_, inbox, in, _ := deferredCycle(t, cycle1953Decision)
+	planted := strings.Replace(cycle1953Decision, `"fix_type":"reintent"`, `"fix_type":"pipeline-repair"`, 1)
+	if err := os.WriteFile(filepath.Join(in.Workspace, "failure-decision.json"), []byte(planted), 0o444); err != nil {
 		t.Fatal(err)
 	}
 
@@ -246,8 +252,8 @@ func TestApplyFailure_TheAuditBlockAloneRoutesTheItem(t *testing.T) {
 	}
 
 	rec := itemRecord(t, inbox, "lane-item")
-	if reason, _ := rec["routed_reason"].(string); rec["route"] != "console-manual" || !strings.Contains(reason, "fix_type reintent") {
-		t.Errorf("item = %v, want the console route from the audit's declared intent-malformed class with no failure-decision.json", rec)
+	if reason, _ := rec["routed_reason"].(string); rec["route"] != "console-manual" || !strings.Contains(reason, "fix_type reintent") || hasItem(t, inbox, "pipeline-repair-cycle-7") {
+		t.Errorf("item = %v, want the reintent route that the cycle carried, not the pipeline repair of a file in the workspace", rec)
 	}
 }
 

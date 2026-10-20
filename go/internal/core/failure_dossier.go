@@ -2,7 +2,7 @@ package core
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,14 +165,8 @@ func writeFailureDossier(workspace string, d *failureDossier) error {
 	return os.WriteFile(filepath.Join(workspace, failureDossierFile), b, 0o644)
 }
 
-func readBuildDeclared(workspace string) *auditDeclared {
-	b, err := os.ReadFile(filepath.Join(workspace, failureDossierFile))
-	if err != nil {
-		return nil
+func (o *Orchestrator) writeDossier(cs CycleState, d *failureDossier) {
+	if err := writeFailureDossier(cs.WorkspacePath, d); err != nil {
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d: %s not written (%v); no decision reads it\n", cs.CycleID, failureDossierFile, err)
 	}
-	var d failureDossier
-	if json.Unmarshal(b, &d) != nil {
-		return nil
-	}
-	return d.BuildDeclared
 }

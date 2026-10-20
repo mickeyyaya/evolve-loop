@@ -69,9 +69,8 @@ func TestDecideAfterAuditFail_ABuildersSystemClassNeverHaltsTheLoop(t *testing.T
 			t.Errorf("%s: next = %s sig = %+v reason %q; want no halt from the builder's word, only a decline to retro", name, next, sig, reason)
 		}
 		d, defers := o.auditDeclineDefers(cs)
-		recorded, ok := RecordedDeferDecision(cs.WorkspacePath, o.failurePolicy)
-		if !defers || d.fixType != policy.FixTypePipelineRepair || d.source != "build" || !ok || recorded != (RecordedDefer{Category: policy.CategoryInfraSystemic, FixType: policy.FixTypePipelineRepair}) {
-			t.Errorf("%s: defer = %+v %t, recorded %+v %t; want a pipeline-repair defer of the item that costs one lane", name, d, defers, recorded, ok)
+		if !defers || d.fixType != policy.FixTypePipelineRepair || d.source != "build" || d.category != policy.CategoryInfraSystemic {
+			t.Errorf("%s: defer = %+v %t; want a pipeline-repair defer of the item that costs one lane", name, d, defers)
 		}
 	}
 }
@@ -153,19 +152,5 @@ func TestFailureDossier_ANonFloorSystemClassIsRecordedAndIsNoFloor(t *testing.T)
 
 	if d.FloorCandidate != "" || d.BuildDeclared == nil || d.BuildDeclared.Class != policy.CategoryTransportHang {
 		t.Errorf("dossier = %+v (build %+v), want transport-hang recorded as build_declared and no floor candidate", d, d.BuildDeclared)
-	}
-}
-
-func TestReadBuildDeclared_OnlyAWellFormedDossierDefers(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	if readBuildDeclared(dir) != nil {
-		t.Error("a missing dossier declared a build class")
-	}
-	if err := os.WriteFile(filepath.Join(dir, failureDossierFile), []byte("not json"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, defers := deferDecisionIn(dir, policy.DefaultSystemFailurePolicy()); defers || readBuildDeclared(dir) != nil {
-		t.Error("a malformed dossier declared a build class")
 	}
 }

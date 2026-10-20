@@ -37,8 +37,7 @@ type FailureInputs struct {
 	Stderr          io.Writer
 	Ledger          inboxmover.LedgerAppender
 	Signals         *signalcenter.Center
-	Deferred        bool
-	FailurePolicy   policy.SystemFailurePolicy
+	Defer           core.RecordedDefer
 	PriorityClasses []string
 }
 
@@ -138,7 +137,6 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 		Fingerprint:     retryladder.Fingerprint(firstFailureReason(workspace)),
 		Stderr:          stderr,
 		PriorityClasses: pol.InboxPriorityConfig().ClassOrder,
-		FailurePolicy:   failPol,
 	}
 	if cls.Class == cycleclassify.ClassPhaseRefusal {
 		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject

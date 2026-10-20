@@ -22,12 +22,8 @@ var (
 const companionWeight = 0.8
 
 func routeDeferral(opts inboxmover.Options, in FailureInputs, committed []string, stderr io.Writer) []string {
-	if !in.Deferred || len(committed) == 0 {
-		return nil
-	}
-	d, ok := core.RecordedDeferDecision(in.Workspace, in.FailurePolicy)
-	if !ok {
-		fmt.Fprintf(stderr, "[cycleoutcome] WARN: defer route: cycle %d has no defer-or-quarantine decision in its audit failure block or failure-decision.json; the items are released\n", in.Cycle)
+	d := in.Defer
+	if d == (core.RecordedDefer{}) || len(committed) == 0 {
 		return nil
 	}
 	reason := fmt.Sprintf("cycle %d ended by a defer-or-quarantine decision: category %s, fix_type %s", in.Cycle, d.Category, d.FixType)

@@ -65,7 +65,7 @@ The fingerprint of a try is the set of violation codes of its first failed check
 
 - A `halt` failure never climbs. It keeps the present halt rules.
 - An audit FAIL whose class maps to `defer-or-quarantine` (`intent-malformed`, fix type `reintent`) never climbs and is never rebuilt in its cycle. The retry envelope declines it to retro, and retro ends the cycle with an `audit-fail-defer: ` reason. The router cannot overrule that end (`core/reintent_decision.go`, [internal-core](packages/internal-core.md)).
-- The FAIL closeout of a cycle that the defer ended routes its committed items by the `fix_type` of the decision that ended the cycle (`cycleoutcome/defer_route.go`). The closeout reads that decision with the precedence of `auditDeclineDefers`: the declared class of the audit through the policy table first, then `failure-decision.json`. The category text does not decide. The table below gives the route.
+- The FAIL closeout of a cycle that the defer ended routes its committed items by the `fix_type` of the decision that ended the cycle (`cycleoutcome/defer_route.go`). The cycle result carries that decision as a value (`core.DeferOf`), so the closeout reads no workspace file. `auditDeclineDefers` picks the decision in this order: the class of the audit, the class of the build from orchestrator memory, then a cleared `failure-decision.json`. The category text does not decide. The table below gives the route.
 
 | `fix_type` | Route of each committed item | Failure count |
 |---|---|---|

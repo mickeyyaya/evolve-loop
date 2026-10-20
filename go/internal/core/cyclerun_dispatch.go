@@ -56,6 +56,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	if next == PhaseAudit {
 		cr.cs.AuditRepairActive = false
 	}
+	if next == PhaseRetro {
+		cr.o.clearRetroDecisionInput(&cr.cs)
+	}
 	phaseReq := PhaseRequest{
 		Cycle:                           cr.cycle,
 		AuditRound:                      cr.cs.AuditDispatches,
