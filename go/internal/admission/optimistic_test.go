@@ -114,7 +114,7 @@ func TestAdmit_ShadowRecordsEachAdmissionTheReachRuleHoldsWithItsHolder(t *testi
 	if got := ids(waiting); !reflect.DeepEqual(got, []string{"i", "f2"}) {
 		t.Fatalf("waiting = %v, want [i f2]", got)
 	}
-	want := []admission.ShadowAdmission{{ID: "i", Rank: 0, Cells: []string{"internal/inboxrank"}, HeldBy: "lane-1"}}
+	want := []admission.ShadowAdmission{{ID: "i", Rank: 0, Cells: []string{"internal/inboxrank"}, HeldBy: "lane-1", Reason: "reach meets internal/inboxrank"}}
 	if !reflect.DeepEqual(*records, want) {
 		t.Fatalf("records = %+v, want %+v: only i is held by import alone; f2 shares fleet with lane-1", *records, want)
 	}
@@ -123,9 +123,17 @@ func TestAdmit_ShadowRecordsEachAdmissionTheReachRuleHoldsWithItsHolder(t *testi
 func TestAdmit_ShadowNamesTheCandidateThatTookTheCellAsTheHolder(t *testing.T) {
 	a, records := shadowAdmitter(t)
 	a.Admit(nil, []fleet.Todo{todo("f", "go/internal/fleet/pool.go"), todo("i", "go/internal/inboxrank/inboxrank.go")}, 32)
-	want := []admission.ShadowAdmission{{ID: "i", Rank: 1, Cells: []string{"internal/inboxrank"}, HeldBy: "f"}}
+	want := []admission.ShadowAdmission{{ID: "i", Rank: 1, Cells: []string{"internal/inboxrank"}, HeldBy: "f", Reason: "reach meets internal/inboxrank"}}
 	if !reflect.DeepEqual(*records, want) {
 		t.Fatalf("records = %+v, want %+v: f was admitted first and its import holds i", *records, want)
+	}
+}
+
+func TestAdmit_ShadowNamesThePackageWhereTheReachOfTheCandidateMeetsTheEditOfTheHolder(t *testing.T) {
+	a, records := shadowAdmitter(t)
+	a.Admit([]admission.Holding{{Lane: "lane-1", Todo: todo("i", "go/internal/inboxrank/inboxrank.go")}}, []fleet.Todo{todo("f", "go/internal/fleet/pool.go")}, 32)
+	if len(*records) != 1 || (*records)[0].Reason != "reach meets internal/inboxrank" || (*records)[0].HeldBy != "lane-1" {
+		t.Fatalf("records = %+v, want f held by lane-1 because the reach of f meets the inboxrank that lane-1 edits", *records)
 	}
 }
 

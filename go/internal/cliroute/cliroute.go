@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanetime"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -38,11 +39,13 @@ type ProfileSource interface {
 }
 
 type Host struct {
-	LookPath func(string) (string, error)
-	Discover func() []string
-	Bench    func(projectRoot, phase string, plan llmroute.Plan, env map[string]string) llmroute.Plan
-	Toolless func(driver string) bool
-	Logf     func(format string, args ...any)
+	LookPath  func(string) (string, error)
+	Discover  func() []string
+	Bench     func(projectRoot, phase string, plan llmroute.Plan, env map[string]string) llmroute.Plan
+	Toolless  func(driver string) bool
+	Logf      func(format string, args ...any)
+	WeekUsed  func(projectRoot string) (map[string]float64, error)
+	LaneTimes func(projectRoot string) ([]lanetime.FamilyLane, error)
 }
 
 type Launch string

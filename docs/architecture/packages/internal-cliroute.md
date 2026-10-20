@@ -19,7 +19,7 @@ Status: L1a (2026-10-05) built and tested the resolver unwired. **L1b (2026-10-0
 | `(*Router).Resolve(req Request) (Decision, error)` | The plan for one launch. |
 | `Catalog` | `Get(name)` and `Names()` of the merged phase catalog; `phasespec.Catalog` satisfies it. |
 | `ProfileSource` | `Get(name)` and `List()`; `*profiles.Loader` satisfies it. |
-| `Host` | The host seams: `LookPath` (the probe), `Discover` (the raw installed-CLI list for the legacy universal tail), `Bench` (the CLI-health reordering; production passes `bridgechain.ApplyCLIHealthBench`), `Logf`. |
+| `Host` | The host seams: `LookPath` (the probe), `Discover` (the raw installed-CLI list for the legacy universal tail), `Bench` (the CLI-health reordering; production passes `bridgechain.ApplyCLIHealthBench`), `Logf`. `WeekUsed` and `LaneTimes` (W4) feed the headroom order. |
 | `Request` | `Agent` (the profile name), `Phase` (empty for a launch with no phase), `ProjectRoot`, `DefaultModel`, `Env`, `Overlay` (the advisor's soft CLI and tier), `CallerCLI` (the CLI a non-phase caller asked for), `Expand` (the `"auto"` expander). |
 | `Decision` | `Plan`, `Rule` (`agents:<agent>`, `work:<role>`, `default`, `profile`, or one of `legacy:pin`, `legacy:env`, `legacy:caller`, `legacy:default`, `legacy:profile`), `Allowed` (the families the agent may use), `Trace` (one line per filtered or ignored input), and `Allows(cli)`. A legacy decision whose profile does not restrict `allowed_clis` has a nil `Allowed`, which allows every family. |
 | `Finding` | `Severity` (`error` or `warn`), `Key` (the policy path or check, such as `cli_routing.agents.auditor`, `cross_family_with.auditor+builder`, `agent.auditor`, `pins`) and `Message`. |
@@ -38,7 +38,7 @@ Status: L1a (2026-10-05) built and tested the resolver unwired. **L1b (2026-10-0
 ## Design
 
 - **Strategy: two resolvers behind one call.** A declared table runs the declared pipeline; an absent block runs the legacy projection. The caller never branches.
-- **Pipeline: the declared resolve is a list of stages**, each a function of under 50 lines that takes and returns a `resolution` value: rule → the agent's `model` → guarded env → caller CLI → advisor CLI → advisor tier → probe → bench → `after_chain` → the tier ceiling. A stage that refuses returns an error naming the agent; a stage that drops or ignores an input appends a `Trace` line.
+- **Pipeline: the declared resolve is a list of stages.** Each stage is a function of under 50 lines that takes and returns a `resolution` value. The stages are: rule → the agent's `model` → the headroom order (W4) → guarded env → caller CLI → advisor CLI → advisor tier → probe → bench → `after_chain` → the tier ceiling. A stage that refuses returns an error naming the agent; a stage that drops or ignores an input appends a `Trace` line.
 - **Builder: `Compile` accumulates findings** instead of stopping at the first. Each finding is recorded once, so an agent that serves two roles under one bad rule is reported once.
 - **One rule predicate.** `Table.selectRule(agent, role selection, profile, allowed)` picks the rule, filters its chain by the allowed set and returns either the selection or a `RuleError`. `Compile` and `Resolve` both call it, so the check that a launch can run and the check that the table is valid are one function.
 - **Profiles are snapshotted at `Compile`.** `Compile` lists the profiles and loads each once; `Resolve` never reads them again. In declared mode a listed profile that failed to load is an error from `Resolve` (and a `profiles.<agent>` finding), never a nil profile, because a nil profile would widen the allowed set to every CLI in `clis`. The legacy projection keeps today's behaviour: an unloadable profile resolves as no profile, as the bridge chain does now. An agent with no profile at all resolves with no profile restriction in both modes. A profile minted after `Compile` is not seen until the table is compiled again (an L1b decision in the plan).
@@ -99,6 +99,9 @@ The read-only verbs are `evolve cli-routing show [--static] [--json]` (agents gr
 | `cli_routing.tiers.<tier>` | error | an unknown tier; an empty ceiling; an entry not in `clis`; a ceiling that excludes claude at a tier a floor agent runs at (its `agents.<agent>.model` when set, otherwise its default tier and its `model_tier_overrides` tiers) |
 | `agent.<agent>.tier_ceiling` | error | a selection's static plan has no CLI the ceiling permits along a tier chain the configuration can produce (`CeilingError`); for example an agy-only chain with `after_chain: stop` for an agent whose envelope pins it to deep under `tiers.deep: [claude]` |
 | `cli_routing.after_chain` | error | a value other than `other_clis` or `stop` |
+| `cli_routing.agents.<key>.order` | error | a value other than `headroom`; `headroom` on a rule with no `cli` |
+| `cli_routing.agents.<key>.headroom_pct` | error | set without `order: headroom`; a value outside 1 to 100 (0 or absent means 60) |
+| `cross_family_with.<a>+<b>` | warn | one agent of the pair has `order: headroom`, and its chain holds the first family of the other agent. This warning replaces the static first-family check of that pair. |
 | `agent.<agent>` | error | the agent's chain is empty after the allowed-set filter, for any selection `Resolve` can make: each role of its phases, and the no-role selection when a phase-less launch has no single role |
 | `cross_family_with.<a>+<b>` | error, or warn | the two resolved primaries share a family: an error when `clis` has two or more families, a warning on a Claude-only install; a warning when only their fallbacks share a family |
 | `pins`, `workflow.universal_fallback`, `workflow.universal_fallback_exclude`, `router.cli`, `router.model`, `router.plan_model`, `router.propose_model` | error | set together with the block (two sources); the message points to `evolve cli-routing migrate`. The per-decision models were added in the L1b fix round (2026-10-06): the advisor root lays them over the decision's model, so beside a table they would swap the tier the table and its ceiling chose |
@@ -106,6 +109,46 @@ The read-only verbs are `evolve cli-routing show [--static] [--json]` (agents gr
 | `profiles.<agent>` | error | a listed profile does not load (declared mode) |
 
 An unknown key inside the block, or a `null` block or agent rule, is not a finding: `policy.Load` refuses the file (strict decode, see internal-policy.md).
+
+## The headroom order (W4, 2026-10-19)
+
+> Plan: [wave-latency-2026-10](../../plans/wave-latency-2026-10.md) D4 and W4. Research: [wave-latency-2026-10](../../research/wave-latency-2026-10.md) F3.3, F3.5, O8 and O9. The measure: [internal-lanetime.md](internal-lanetime.md). The week use: [internal-usageprobe.md](internal-usageprobe.md).
+
+An agent rule can sort its chain by quota headroom and by the measured lane time to a PASS of each family. The rule is policy data: `cli_routing.agents.<agent>.order: "headroom"`, with `headroom_pct` (`DefaultHeadroomPct`, 60, when absent or 0). A rule without `order` routes as before, and the stage reads no port.
+
+**Example.** `.evolve/usage-windows.json` of 2026-10-19 records the week windows claude 15%, agy 100% and agy-claude 100%. W0 has no measure yet. With `headroom_pct` 60, the chain `agy, agy-claude, claude` becomes `claude, agy, agy-claude`: claude has headroom, and agy and agy-claude go to the tail in the order without a measure.
+
+The stage `orderByHeadroom` (`headroom.go`) runs after `fixAgentModel` and before `guardEnv`:
+
+1. It reads `Host.WeekUsed(projectRoot)`: the percent used of the family week window of each family. With no port, a failed read, or no family of the chain in the read, the policy order stays. The stage logs that and adds a `Trace` line.
+2. It reads `Host.LaneTimes(projectRoot)`: the `[]lanetime.FamilyLane` of the last wave boundary. A failed read means no measure. The stage logs that and adds a `Trace` line.
+3. It sorts the chain, stable, on three keys. First, a family at or above `headroom_pct` goes after the families below it. Then a family with a measure (`PerPass` above 0) goes first, the shorter `PerPass` first. Last, the order without a measure is claude, agy, agy-claude. Another family keeps its policy place after these.
+4. It adds two `Trace` lines: the week use of each family and the measure of each family. `evolve cli-routing explain <agent>` prints them as `note:` lines.
+
+The stage moves a family and never removes one. The probe, the cli-health bench, `after_chain` and the tier ceiling run after it as before. Thus a quota exit still puts the family in its cooldown, and the bench demotes it again (`TestHeadroom_TheCliHealthBenchStillDemotesAFamilyInCooldown`). An env override still leads, because `guardEnv` runs after this stage. The caller CLI and the advisor CLI do not apply to an `agents` rule, as before.
+
+**The seam.** Each cycle of a wave is its own `evolve cycle` process (`execCycleLaunch`, `cmd/evolve/cmd_fleet.go`), and each process compiles its own router. A measure at router build thus reads the run history once for each cycle. Instead, the parent loop computes the measure once for each wave: `runPreWaveProbes` (`cmd/evolve/cli_usage_probe.go`) calls `recordLaneTimes`, which writes `LaneTimeToPass(ReadCycles(evolveDir, 0, 0), DefaultBuilds)` to `.evolve/lane-time.json`. The production `routingHost` reads that file (`projectLaneTimes`) and the usage windows that the pre-wave usage probe recorded (`usageprobe.WeekUsed`). This package makes no network call, no tmux call and no read of the run dirs.
+
+| Design | Rejected because |
+|---|---|
+| Compute the measure in `wireCLIRouter` | Each cycle is a process, so this reads the whole history once for each dispatch. |
+| Pass the measure to each lane in an env var | The usage probe already shares its cache through a file in `.evolve`. One more file keeps one pattern. |
+| Remove a family at the limit from the chain | The family is then not a fallback. The plan asks only that it leaves the head (§6 W4). |
+
+**The cross-family pair.** The auditor and the tdd engineer have `cross_family_with: builder` and run on claude only. A builder rule with `order: headroom` and claude in its chain starts on claude while claude has headroom. The static first-family check reads the policy order, so it cannot see this. Thus `Compile` gives a `cross_family_with.<a>+<b>` warning for each such pair, and `evolve cli-routing check` and `explain` print it. An error is rejected: claude is in each builder chain, so the rule never compiles with it.
+
+The order without a measure is the plan value (D4), not the order of the `cli` list. The `cli` list keeps its role as the order of the other families and as the order when the usage read fails.
+
+Limits:
+
+- The routing host reads `<project>/.evolve`, the same directory as the policy. A loop with `--evolve-dir` writes the files to another directory, so the order fails open there.
+- The usage file keeps one observation for each CLI. A failed usage query replaces the last good one, and the families of that CLI then count as families with headroom.
+- The week use is as old as the last pre-wave usage probe (`cli_health.proactive_probe`). A window whose reset has passed does not count.
+- A family with no week window in the file counts as a family with headroom.
+- The measure compares different tasks, so it is an estimate (F3.3).
+- `evolve cli-routing set` keeps the order keys of a rule, but it cannot write them yet.
+
+Tests (`headroom_test.go`): `TestHeadroom_WithTheWeekAt14PercentAndNoMeasureTheBuildStartsOnClaude`, `TestHeadroom_AFamilyAtTheLimitLeavesTheHead`, `TestHeadroom_WithAMeasureTheShorterLaneTimeToAPassGoesFirst`, `TestHeadroom_AFailedUsageReadKeepsThePolicyOrder`, `TestHeadroom_ASeatWithoutTheOrderKeyRoutesAsBefore` and `TestCompile_TheOrderKeysAreChecked`. Without an order key, every tracked agent resolves the same with and without the ports, and no port is read.
 
 ## The legacy goldens
 

@@ -193,8 +193,25 @@ func (c *compiler) checkCrossFamily(t Table, primaries map[string][]string) {
 			continue
 		}
 		seen[pair.key] = true
+		if c.warnOrderedPair(t, pair) {
+			continue
+		}
 		c.compareFamilies(pair, len(t.clis))
 	}
+}
+
+func (c *compiler) warnOrderedPair(t Table, pair familyPair) bool {
+	for i, name := range pair.names {
+		if _, ordered := t.orders[name]; !ordered {
+			continue
+		}
+		partner, other := familyOf(pair.chains[1-i][0]), pair.names[1-i]
+		if slices.ContainsFunc(t.chains[agentsPrefix+name], func(cli string) bool { return familyOf(cli) == partner }) {
+			c.add(SeverityWarn, pair.key, "%s has order %s, so it can start on %s, the first family of %s; cross_family_with holds only while %s is at or above its headroom limit", name, OrderHeadroom, partner, other, partner)
+			return true
+		}
+	}
+	return false
 }
 
 func (c *compiler) compareFamilies(pair familyPair, familyCount int) {

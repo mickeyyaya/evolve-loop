@@ -24,7 +24,7 @@ type resolution struct {
 type stage func(v resolver, res resolution) (resolution, error)
 
 var declaredStages = []stage{
-	selectRule, fixAgentModel, guardEnv, leadWithCaller, overlayCLI, overlayTier,
+	selectRule, fixAgentModel, orderByHeadroom, guardEnv, leadWithCaller, overlayCLI, overlayTier,
 	probeChain, benchChain, appendAfterChain, dropToolless, applyTierCeiling,
 }
 

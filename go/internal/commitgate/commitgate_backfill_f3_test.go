@@ -124,6 +124,7 @@ func TestRun_AttestationFailuresExitGitFatalWithTheirReason(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			o, _, root := gateF3(t, "README.md", tc.present, tc.rules...)
+			o.Reviewers = "docs-review"
 			if tc.tweak != nil {
 				tc.tweak(t, &o, root)
 			}
@@ -160,6 +161,7 @@ func TestHasherName_PrefersShasumThenSha256sumThenNothing(t *testing.T) {
 func TestRun_Sha256sumHostStampsItsToolName(t *testing.T) {
 	t.Parallel()
 	o, _, _ := gateF3(t, "README.md", []string{"sha256sum"})
+	o.Reviewers = "docs-review"
 
 	res := o.Run(context.Background())
 

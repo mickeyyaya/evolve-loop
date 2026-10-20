@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -317,5 +318,17 @@ func TestTakeSupply_AModuleGraphThatDoesNotLoadCountsEveryReadyItemAndSaysWhy(t 
 	}
 	if !strings.Contains(console.String(), "census 5 counts without cells; the module graph did not load: go list is gone") {
 		t.Errorf("console = %q, want the census WARN that names the cause", console.String())
+	}
+}
+
+func TestSupplyWiring_TheCensusTakesTheAdmissionRuleOfTheKey(t *testing.T) {
+	t.Parallel()
+	for admissionKey, want := range map[string]bool{"shadow": false, "enforce": true} {
+		root := t.TempDir()
+		w := supplyWiring{root: root, evolveDir: filepath.Join(root, ".evolve"), now: func() time.Time { return time.Time{} }, stderr: io.Discard,
+			fleet: policy.FleetConfig{Count: 2, Orchestrator: policy.OrchestratorConfig{Admission: admissionKey}}}
+		if got := w.census().Optimistic; got != want {
+			t.Errorf("admission %s: census Optimistic = %v, want %v", admissionKey, got, want)
+		}
 	}
 }

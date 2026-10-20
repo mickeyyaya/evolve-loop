@@ -14,7 +14,7 @@ Follow in order. **Do not edit any file between step 4 and step 5** — that wou
 
 1. **Stage everything**: `git add -A`. The sanctioned commit path (`evolve ship --class manual`) commits the whole working tree, so this is an all-or-nothing commit (not a partial one). Staging now also lets new files be reviewed and bound into the attestation.
 2. **Detect changed languages**: `git diff --name-only HEAD`, then map extensions (`.go`→go, `.py`→python, `.ts/.tsx/.js/.jsx`→ts, `.rs`→rust).
-3. **Review chain** — invoke via the **Agent tool** on the staged diff. Apply every CRITICAL/HIGH finding, re-stage (`git add -A`), and re-run until clean. Record the names you actually ran. Two reviewers are required, except for a proven comment removal (see the contract below):
+3. **Review chain** — invoke via the **Agent tool** on the staged diff. Apply every CRITICAL/HIGH finding, re-stage (`git add -A`), and re-run until clean. Record the names you actually ran. Two reviewers are required, except for a proven comment removal and a docs-only change (see the contract below). A docs-only change, where every changed path ends in `.md`, runs the `docs-review` skill instead:
    | # | Agent (or skill) | Covers |
    |---|---|---|
    | a | **simplify**: `code-simplifier` (or `ecc:code-simplifier`) | clarity, dead code, simplification |
@@ -46,9 +46,11 @@ The runner refuses to write an attestation unless `--reviewers` declares, by cap
 - a **simplify** reviewer (`code-simplifier` / `code-review-simplify` / `refactor`), AND
 - **one review** reviewer — either the general `code-reviewer` / `code-review`, or the matching `<lang>-reviewer` for a changed language (`go-reviewer`, `python-reviewer`, `typescript-reviewer`, `rust-reviewer`). Only one is needed.
 
+**A docs-only change needs the docs review.** When every changed path ends in `.md`, the runner requires the capability "docs review" (`docs-review`) in place of simplify and review. The code reviewers do not satisfy it. Run [docs-review](../docs-review/SKILL.md), then pass `--reviewers docs-review`.
+
 Namespace prefixes are stripped, so `ecc:go-reviewer` counts as `go-reviewer`. Pass the names you genuinely ran — fabricating the list to skip review is a CLAUDE.md Rule 9/12 violation.
 
-**A proven comment removal needs no reviewer.** The runner checks this itself. At least one changed Go file must be comment-only against `HEAD`, by the same check as `commentaudit verify`. Every other changed file must be a regular Markdown file under `docs/`. When both hold, pass `--reviewers ""`. The attestation records no reviewer and `review_waiver: "comment-only"`, so the commit carries a `Review-waived: comment-only` trailer instead of `Reviewed-by:`. A code or test change, a rename, a symlink, a deletion, a `testdata/` fixture or a docs-only change still needs both reviewers (for docs-only, one `code-review-simplify` pass covers both) ([code comments](../../docs/conventions/code-comments.md)).
+**A proven comment removal needs no reviewer.** The runner checks this itself. At least one changed Go file must be comment-only against `HEAD`, by the same check as `commentaudit verify`. Every other changed file must be a regular Markdown file under `docs/`. When both hold, pass `--reviewers ""`. The attestation records no reviewer and `review_waiver: "comment-only"`, so the commit carries a `Review-waived: comment-only` trailer instead of `Reviewed-by:`. A code or test change, a rename, a symlink, a deletion, a `testdata/` fixture still needs both reviewers. A docs-only change needs the docs review instead (above) ([code comments](../../docs/conventions/code-comments.md)).
 
 **A removed history comment must be recorded.** When the change removes a comment group that carries history (a cycle, wave, batch or round number, a date, a PR number, a SHA, an incident), the runner refuses it until the change adds the group to its package's page under `docs/history/code-comments/`. Run the command the refusal names, stage the pages it writes, and re-run the gate. The archive only grows: a change that deletes or rewrites an archive page (other than the generated `README.md` index) is refused, even when it is a waived comment removal.
 

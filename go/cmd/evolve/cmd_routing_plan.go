@@ -96,7 +96,7 @@ func runRoutingPlan(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve routing plan: %v\n", err)
 		return 1
 	}
-	defer os.RemoveAll(scratch)
+	defer func() { _ = os.RemoveAll(scratch) }()
 	in, err := routingPlanInput(projectRoot, *cycle, *goalText, scratch)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve routing plan: %v\n", err)

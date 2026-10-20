@@ -62,6 +62,8 @@ The probe is opt-in (`cli_health.proactive_probe`, compiled default off; this pr
     - Pinned by `TestEvidence_ALeaderCancelledMidQueryReturnsAtOnceAndNeitherCachesNorRecordsTheCancellation`, `TestEvidence_AFollowerWithALiveContextGetsTheQuerysAnswerWhenTheLeaderIsCancelled`, `TestEvidence_AFollowerOfAQueryInFlightGetsAFreshAnswerNotACachedOne` and `TestEvidence_AFollowerWhoseOwnContextEndsStopsWaitingForASlowQuery`.
 - **The pre-wave probe and the evidence share one reading.** `probeOne` is `read` (the pane, the windows, else the regex verdict), then `record`, then `act` (`judgeWindows`, or `benchFamily` for a regex wall). `Explain` calls the same `read`, `judgeWindows` and `benchFamily`.
 
+- **`WeekUsed(evolveDir, now)` gives the week use of each family** (2026-10-19, W4 of [wave-latency-2026-10](../../plans/wave-latency-2026-10.md)). It reads `.evolve/usage-windows.json` and returns the percent used of the family week window of each family (`Kind` week, no `Model`). It skips an observation with an `Error`, and a window whose reset has passed. An exhausted family window counts as 100%, and of two windows of a family the higher one counts. The build seat of `internal/cliroute` reads it through `Host.WeekUsed`, so a dispatch reads a file and sends no usage query. Pinned by the `TestWeekUsed_*` tests in `week_used_test.go`.
+
 ## Invariants
 
 - **The probe never invents a cap.** An unsupported usage command, a probe error, an unreadable pane, or a healthy pane writes no bench. Pinned by the `TestProber_*` tests in `usageprobe_test.go`.

@@ -58,13 +58,14 @@ func (w supplyWiring) census() orchestrator.Census {
 	engine := nullWaveEngine(loopwave.RootsOf(w.root), w.stderr)
 	window, _ := engine.QuotaCount(w.fleet, loopwave.LoadRouting(w.evolveDir, w.stderr))
 	return orchestrator.Census{
-		Inbox:     inboxmover.Options{InboxDir: filepath.Join(w.evolveDir, "inbox"), Stderr: io.Discard},
-		Rank:      rank,
-		Protected: laneForbidden(w.root, w.stderr),
-		Graph:     w.graph,
-		Text:      engine.InboxText(w.iteration),
-		Window:    window,
-		Path:      waveSupplyPath(w.evolveDir),
-		Now:       w.now,
+		Inbox:      inboxmover.Options{InboxDir: filepath.Join(w.evolveDir, "inbox"), Stderr: io.Discard},
+		Rank:       rank,
+		Protected:  laneForbidden(w.root, w.stderr),
+		Graph:      w.graph,
+		Optimistic: w.fleet.Orchestrator.OptimisticAdmission(),
+		Text:       engine.InboxText(w.iteration),
+		Window:     window,
+		Path:       waveSupplyPath(w.evolveDir),
+		Now:        w.now,
 	}
 }

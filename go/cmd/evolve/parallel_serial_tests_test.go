@@ -435,6 +435,8 @@ var serialTests = map[string]string{
 	"main.TestRunCIWatch_SetupAndFetchFailuresAreIOErrors":                                                                 "sets env through a helper",
 	"main.TestRunCI_AnUnreadableWorkingDirectoryIsAnIOErrorForBothVerbs":                                                   "sets env through a helper",
 	"main.TestRunCLIRoutingExplainAndShow_AMalformedPolicyIsAFinding":                                                      "calls process-global setter SetModelCatalogDirFn",
+	"main.TestCLIRoutingExplain_TheBuildSeatShowsTheHeadroomFilterAndTheMeasuredOrder":                                     "calls process-global setter SetModelCatalogDirFn",
+	"main.TestCLIRoutingExplain_TheStaticViewHasNoUsageReadSoThePolicyOrderStays":                                          "calls process-global setter SetModelCatalogDirFn",
 	"main.TestRunCLIRoutingShow_AnAbsentProfilesDirFailsTheReport":                                                         "calls process-global setter SetModelCatalogDirFn",
 	"main.TestRunCLIRoutingShow_AnUnmarshallableReportIsAFinding":                                                          "swaps seam cliRoutingShowMarshalIndent",
 	"main.TestRunCLIRoutingWrite_RefusesABadFlagAndWrongArguments":                                                         "sets env through a helper",

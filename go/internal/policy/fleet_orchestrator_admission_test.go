@@ -60,3 +60,11 @@ func TestFleetConfig_ATypedOrchestratorBlockKeepsItsAdmissionStage(t *testing.T)
 		t.Errorf("Admission = %q, want enforce", got)
 	}
 }
+
+func TestOrchestratorConfig_TheOptimisticRuleGovernsOnlyAtTheEnforceAdmissionKey(t *testing.T) {
+	for admission, want := range map[string]bool{"": false, "shadow": false, "enforce": true} {
+		if got := (policy.OrchestratorConfig{Stage: "enforce", Admission: admission}).OptimisticAdmission(); got != want {
+			t.Errorf("Admission %q: OptimisticAdmission = %v, want %v", admission, got, want)
+		}
+	}
+}
