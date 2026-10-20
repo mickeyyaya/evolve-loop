@@ -121,7 +121,7 @@ func TestOptionsMover_ThreadsEverySeam(t *testing.T) {
 	if len(rc.events) != 1 || rc.events[0].Code != lifecycle.CodeClaimRefused || rc.events[0].Origin != "Mover.Claim" {
 		t.Errorf("Signals threads (the refusal is the only fault): %+v", rc.events)
 	}
-	if !opts.mover().SignalsWired() || (Options{ProjectRoot: repo}).mover().SignalsWired() {
+	if !opts.reader().SignalsWired() || (Options{ProjectRoot: repo}).reader().SignalsWired() {
 		t.Error("SignalsWired follows Options.Signals")
 	}
 }
