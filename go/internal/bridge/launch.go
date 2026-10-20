@@ -227,11 +227,13 @@ const paneAuthorityFile = "pane-authority.md"
 
 func launchIntentFor(cfg *Config, prof Profile, efforts policy.EffortTable) LaunchIntent {
 	intent := LaunchIntent{
-		ModelTier:   cfg.Model,
-		Permission:  permissionIntent(cfg.PermissionMode),
-		SessionMode: "ephemeral",
-		Effort:      LaunchEffort(cfg.CLI, cfg.Model, efforts, prof.Name),
-		RawByCLI:    prof.ExtraFlagsByCLI,
+		ModelTier:       cfg.Model,
+		Permission:      permissionIntent(cfg.PermissionMode),
+		SessionMode:     "ephemeral",
+		Effort:          LaunchEffort(cfg.CLI, cfg.Model, efforts, prof.Name),
+		AllowedTools:    prof.AllowedTools,
+		DisallowedTools: prof.DisallowedTools,
+		RawByCLI:        prof.ExtraFlagsByCLI,
 	}
 	if cfg.SessionName != "" {
 		intent.SessionMode = "named:" + cfg.SessionName

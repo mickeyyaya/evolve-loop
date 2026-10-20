@@ -86,6 +86,12 @@ specific Read and Bash deny patterns:
 `bwrap` (Linux), AND in nested-Claude environments where the OS sandbox
 is disabled (`EVOLVE_SANDBOX=off`). This is the load-bearing layer.
 
+**Applies only on Claude Code.** The bridge passes both lists to
+`claude-tmux` as `--allowedTools` and `--disallowedTools` (since 2026-10-20).
+The agy, codex and ollama drivers have no tool-list flag. On these drivers
+Layer 2 is the only boundary
+([internal-bridge.md](packages/internal-bridge.md)).
+
 ### Layer 2: OS sandbox (`sandbox.deny_subpaths`)
 
 `legacy/scripts/cli_adapters/claude.sh:494-506` emits `(deny file-write* ...)`

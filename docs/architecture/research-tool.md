@@ -98,9 +98,9 @@ Each agent profile (`.evolve/profiles/<agent>.json`) includes:
 
 `allowed_tools` includes `"WebSearch"`, `"WebFetch"`, and `"Bash(legacy/scripts/research/kb-search.sh:*)"`.
 
-### Dual-entry note (verified-intentional)
+### No tool in both lists
 
-Several profiles retain `"WebSearch"` and `"WebFetch"` in both `allowed_tools` and `disallowed_tools`. This dual-entry was present when Phase A predicates passed, indicating the Claude Code permission model resolves it correctly: explicit `allowed_tools` entries within scope supersede `disallowed_tools` entries. This state is **intentional** — `disallowed_tools` provides a default-deny baseline; `allowed_tools` grants scoped exceptions. Do not remove either entry without verifying the runner's resolution order.
+A profile must not name `WebSearch` or `WebFetch` in both `allowed_tools` and `disallowed_tools`. Claude Code applies a deny rule before an allow rule ([permissions](https://code.claude.com/docs/en/permissions)). Since 2026-10-20 the bridge passes `disallowed_tools` to `claude-tmux`, so a tool in both lists is denied. The 2026-10-20 change removed the dual entries from `intent.json`, `retrospective.json` and `triage.json`. `TestRealProfiles_NoToolIsBothAllowedAndDenied` keeps the lists disjoint.
 
 ---
 

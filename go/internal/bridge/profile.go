@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -14,6 +17,7 @@ type Profile struct {
 	Name            string
 	Model           string
 	AllowedTools    []string
+	DisallowedTools []string
 	PermissionMode  string
 	StreamOutput    bool
 	SessionName     string
@@ -56,6 +60,7 @@ type profileWire struct {
 	Name            string              `json:"name"`
 	Model           string              `json:"model"`
 	AllowedTools    []string            `json:"allowed_tools"`
+	DisallowedTools []string            `json:"disallowed_tools"`
 	PermissionMode  string              `json:"permission_mode"`
 	StreamOutput    *bool               `json:"stream_output"`
 	SessionName     string              `json:"session_name"`
@@ -101,10 +106,19 @@ func LoadProfile(path string) (Profile, error) {
 		}
 	}
 
+	allowed, disallowed, err := expandToolPolicies(path, w.AllowedTools, w.DisallowedTools)
+	if err != nil {
+		return Profile{}, fmt.Errorf("bridge:profile: %w", err)
+	}
+	if i := slices.IndexFunc(allowed, func(t string) bool { return slices.Contains(disallowed, t) }); i >= 0 {
+		return Profile{}, fmt.Errorf("bridge:profile: %q is in allowed_tools and disallowed_tools (in %s); Claude Code applies the deny, so remove one", allowed[i], path)
+	}
+
 	p := Profile{
 		Name:            w.Name,
 		Model:           w.Model,
-		AllowedTools:    w.AllowedTools,
+		AllowedTools:    allowed,
+		DisallowedTools: disallowed,
 		PermissionMode:  w.PermissionMode,
 		SessionName:     w.SessionName,
 		Sandbox:         w.Sandbox,
@@ -114,4 +128,19 @@ func LoadProfile(path string) (Profile, error) {
 		p.StreamOutput = *w.StreamOutput
 	}
 	return p, nil
+}
+
+func expandToolPolicies(path string, allowed, disallowed []string) ([]string, []string, error) {
+	if !hasToolPolicySentinel(allowed) && !hasToolPolicySentinel(disallowed) {
+		return allowed, disallowed, nil
+	}
+	expanded, err := profiles.NewFromDir(filepath.Dir(path)).Get(strings.TrimSuffix(filepath.Base(path), ".json"))
+	if err != nil {
+		return nil, nil, err
+	}
+	return expanded.AllowedTools, expanded.DisallowedTools, nil
+}
+
+func hasToolPolicySentinel(tools []string) bool {
+	return slices.ContainsFunc(tools, func(t string) bool { return strings.HasPrefix(t, "$include_policy:") })
 }
