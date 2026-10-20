@@ -37,3 +37,10 @@ func TestAuditCascadeConfigFor_ReadsTheProjectPolicyAndDegradesToOff(t *testing.
 		}
 	}
 }
+
+func TestAuditCascadePolicy_ALiteralBlockResolvesLikeTheDecodedOne(t *testing.T) {
+	p := Policy{AuditCascade: &AuditCascadePolicy{Stage: AuditCascadeShadow, MaxChangedFiles: 3}}
+	if got := p.AuditCascadeConfig(); got.Stage != AuditCascadeShadow || got.MaxChangedFiles != 3 {
+		t.Errorf("AuditCascadeConfig() = %+v, want the literal block", got)
+	}
+}
