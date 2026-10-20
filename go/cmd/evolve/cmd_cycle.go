@@ -430,7 +430,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	cfg, _ = loader.ApplyPolicyStages(cfg, policyStagesOf(gatesCfg, recoveryCfg, routerCfg, pol.ParallelEvaluateConfig()))
 	wfCfg := pol.WorkflowConfig()
 
-	catalog, builtinCat, userSpecs := loadPhaseCatalog(projectRoot, registryPath, prm)
+	catalog, builtinCat, userSpecs := loadPhaseCatalog(projectRoot, registryPath, prm, signals.Emit)
 	cliRouter, routingErr := wireCLIRouter(routerSite{root: projectRoot, catalog: catalog}, run, console)
 	if routingErr != nil {
 		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: routingErr}
@@ -464,9 +464,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 
 	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
 	wireBridgeStages(br, cfg)
-	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat) {
-		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
-	}
+	emitRoutingDefects(signals.Emit, "wireOrchestratorDeps", phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat))
 	for _, s := range catalog.UserPhases() {
 		if len(phasespec.ValidateUserSpecWithCatalog(s, builtinCat)) > 0 {
 			continue
@@ -688,17 +686,21 @@ func failureAdvisorCLI(projectRoot string, r *cliroute.Router, console io.Writer
 	return res.CLI
 }
 
-func loadPhaseCatalog(projectRoot, registryPath string, prm *prompts.Loader) (phasespec.Catalog, phasespec.Catalog, []phasespec.PhaseSpec) {
+func loadPhaseCatalog(projectRoot, registryPath string, prm *prompts.Loader, emit signalcenter.Listener) (phasespec.Catalog, phasespec.Catalog, []phasespec.PhaseSpec) {
 	builtinCat, builtinErr := phasespec.Load(registryPath)
 	if builtinErr != nil {
-		fmt.Fprintf(os.Stderr, "[phases] WARN builtin registry load failed (%v); builtin spec-runners not registered\n", builtinErr)
+		emit(phasespec.RoutingDefectEvent("loadPhaseCatalog", fmt.Sprintf("builtin registry load failed (%v); builtin spec-runners not registered", builtinErr)))
 	}
 	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, prm)
 	catalog, mergeWarns := builtinCat.Merge(userSpecs)
-	for _, w := range append(discWarns, mergeWarns...) {
-		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
-	}
+	emitRoutingDefects(emit, "loadPhaseCatalog", append(discWarns, mergeWarns...))
 	return catalog, builtinCat, userSpecs
+}
+
+func emitRoutingDefects(emit signalcenter.Listener, origin string, warnings []string) {
+	for _, w := range warnings {
+		emit(phasespec.RoutingDefectEvent(origin, w))
+	}
 }
 
 func documentSpecPtr(cfg config.RoutingConfig) *config.DeliverableKindSpec {

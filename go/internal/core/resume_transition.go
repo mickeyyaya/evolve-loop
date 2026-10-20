@@ -5,28 +5,61 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
 func (o *Orchestrator) resolveResumeNext(cs CycleState, current Phase, verdict string) (Phase, error) {
 	if current.IsValid() {
 		return o.sm.Next(current, verdict)
 	}
-	if next, ok := nextFromRoutingPlan(cs.WorkspacePath, current); ok {
+	plan := readRoutingPlan(cs.WorkspacePath)
+	if next, ok := o.nextInOrderRun(current, plan); ok {
+		return next, nil
+	}
+	if next, ok := nextFromRoutingPlan(plan, current); ok {
 		return next, nil
 	}
 	return o.degradeInsertedSuccessor(current), nil
 }
 
-func nextFromRoutingPlan(workspace string, current Phase) (Phase, bool) {
+func readRoutingPlan(workspace string) *router.PhasePlan {
 	if workspace == "" {
-		return "", false
+		return nil
 	}
 	raw, err := os.ReadFile(filepath.Join(workspace, "routing-plan.json"))
 	if err != nil {
-		return "", false
+		return nil
 	}
 	plan, err := parsePhasePlan(string(raw))
 	if err != nil {
+		return nil
+	}
+	return plan
+}
+
+func (o *Orchestrator) nextInOrderRun(current Phase, plan *router.PhasePlan) (Phase, bool) {
+	i := orderIndex(o.cfg.Order, string(current))
+	if i < 0 {
+		return "", false
+	}
+	skip := map[string]bool{}
+	if plan != nil {
+		for _, e := range plan.Entries {
+			if !e.Run {
+				skip[e.Phase] = true
+			}
+		}
+	}
+	for _, name := range o.cfg.Order[i+1:] {
+		if !skip[name] {
+			return Phase(name), true
+		}
+	}
+	return PhaseEnd, true
+}
+
+func nextFromRoutingPlan(plan *router.PhasePlan, current Phase) (Phase, bool) {
+	if plan == nil {
 		return "", false
 	}
 	found := false

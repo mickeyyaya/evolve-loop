@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 var errUnknownCycle = errors.New("no recorded state")
@@ -28,7 +29,7 @@ func wireRoutingPlanAdvisor(projectRoot string, console io.Writer) (*core.PhaseA
 	evolveDir := paths.EvolveDirOf(projectRoot)
 	bridge.SetModelCatalogDirFn(func() string { return evolveDir })
 	prm := cmdutil.NewPromptsLoader(projectRoot)
-	catalog, _, _ := loadPhaseCatalog(projectRoot, config.RegistryPath(projectRoot), prm)
+	catalog, _, _ := loadPhaseCatalog(projectRoot, config.RegistryPath(projectRoot), prm, signalcenter.ConsoleSink(console))
 	cliRouter, err := wireCLIRouter(routerSite{root: projectRoot, catalog: catalog}, routingRun{env: filterEvolveEnv(os.Environ()), role: roleCycle}, console)
 	if err != nil {
 		return nil, err
