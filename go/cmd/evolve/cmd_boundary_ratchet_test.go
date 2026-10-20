@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,9 +14,61 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const ratchetListPath = "go/" + sizeratchet.OffendersRelPath
+
+type fakeGH struct {
+	list     string
+	failVerb string
+	lease    string
+	calls    [][]string
+}
+
+func (f *fakeGH) install(t *testing.T) {
+	t.Helper()
+	prev := ratchetRun
+	t.Cleanup(func() { ratchetRun = prev })
+	ratchetRun = f.run
+}
+
+func (f *fakeGH) run(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+	if name == "git" && len(args) > 0 && args[0] == "ls-remote" && f.lease != "" {
+		fmt.Fprintf(stdout, "%s\t%s\n", f.lease, args[len(args)-1])
+		return 0, nil
+	}
+	if name != "gh" {
+		return sysexec.DefaultRunner(ctx, name, dir, args, env, stdin, stdout, stderr)
+	}
+	f.calls = append(f.calls, args)
+	if len(args) > 1 && args[1] == f.failVerb {
+		fmt.Fprintln(stderr, "gh "+f.failVerb+" refused")
+		return 1, nil
+	}
+	if len(args) > 1 && args[1] == "list" {
+		fmt.Fprint(stdout, f.list)
+	}
+	return 0, nil
+}
+
+func (f *fakeGH) created() []string {
+	for _, c := range f.calls {
+		if len(c) > 1 && c[1] == "create" {
+			return c
+		}
+	}
+	return nil
+}
+
+func flagAfter(args []string, name string) string {
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
 
 type ratchetOrigin struct {
 	bare  *gittest.Repo
@@ -61,33 +115,74 @@ func (o ratchetOrigin) planeIsUntouched(t *testing.T) {
 	}
 }
 
-func TestBoundaryRatchetTighten_LandsTheTightenedListOnOriginMain(t *testing.T) {
+func (o ratchetOrigin) assertProposed(t *testing.T, branch, main string) {
+	t.Helper()
+	if got := o.bare.Git("show", branch+":"+ratchetListPath); got != "{\n  \"internal/fixture.Big\": 64\n}" {
+		t.Errorf("%s holds %q, want the tightened list", branch, got)
+	}
+	if parent := o.bare.Git("rev-parse", branch+"^"); parent != main {
+		t.Errorf("%s^ = %s, want origin main %s: one commit on top of main", branch, parent, main)
+	}
+	if files := o.bare.Git("show", "--name-only", "--format=", branch); files != ratchetListPath {
+		t.Errorf("the commit touches %q, want only %s", files, ratchetListPath)
+	}
+	if got := o.originHead(); got != main {
+		t.Errorf("origin main moved to %s: the step never pushes to main", got)
+	}
+	o.planeIsUntouched(t)
+}
+
+func TestBoundaryRatchetTighten_OpensAPullRequestFromADatedBranch(t *testing.T) {
 	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90, "internal/fixture.Gone": 60}`)
+	gh := &fakeGH{list: "[]"}
+	gh.install(t)
 	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
-	before := o.originHead()
+	main := o.originHead()
 
 	rc, out, errOut := o.tighten(t)
 
 	if rc != 0 || errOut != "" || !strings.Contains(out, "internal/fixture.Big: 90 -> 64") || !strings.Contains(out, "internal/fixture.Gone: 60 removed") {
 		t.Fatalf("rc=%d stdout=%q stderr=%q, want each change named and no warning", rc, out, errOut)
 	}
-	if got := o.bare.Git("show", "main:"+ratchetListPath); got != "{\n  \"internal/fixture.Big\": 64\n}" {
-		t.Errorf("origin main holds %q, want the tightened list", got)
+	create := gh.created()
+	branch := flagAfter(create, "--head")
+	if !strings.HasPrefix(branch, ratchetBranchPrefix+time.Now().UTC().Format("2006-01")) || flagAfter(create, "--base") != "main" ||
+		flagAfter(create, "--title") != ratchetTightenMessage || !strings.Contains(flagAfter(create, "--body"), "internal/fixture.Big: 90 -> 64") {
+		t.Fatalf("gh pr create argv %q, want a PR from a dated %s branch into main that lists the changes", create, ratchetBranchPrefix)
 	}
-	if parent := o.bare.Git("rev-parse", "main^"); parent != before {
-		t.Errorf("origin main^ = %s, want the old head %s: one commit on top, no rewrite", parent, before)
+	if !strings.Contains(out, "opened a pull request from "+branch) {
+		t.Errorf("stdout %q, want the opened branch named", out)
 	}
-	if subject := o.bare.Git("log", "-1", "--format=%s", "main"); subject != ratchetTightenMessage {
-		t.Errorf("commit subject %q, want %q", subject, ratchetTightenMessage)
+	o.assertProposed(t, branch, main)
+}
+
+func TestBoundaryRatchetTighten_UpdatesTheOpenTightenPullRequest(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	const branch = ratchetBranchPrefix + "2026-10-01"
+	o.plane.Git("checkout", "-q", "-b", "stale")
+	o.plane.Git("commit", "-q", "--allow-empty", "-m", "an older tighten")
+	o.plane.Git("push", "-q", "origin", "HEAD:refs/heads/"+branch)
+	o.plane.Git("checkout", "-q", "main")
+	gh := &fakeGH{list: `[{"number":12,"headRefName":"feat/other"},{"number":9,"headRefName":"chore/ratchet-tighten-fork","isCrossRepository":true},{"number":7,"headRefName":"` + branch + `"}]`}
+	gh.install(t)
+	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
+	main := o.originHead()
+
+	rc, out, errOut := o.tighten(t)
+
+	if rc != 0 || errOut != "" || !strings.Contains(out, "updated pull request #7 ("+branch+")") {
+		t.Fatalf("rc=%d stdout=%q stderr=%q, want the open PR updated", rc, out, errOut)
 	}
-	if files := o.bare.Git("show", "--name-only", "--format=", "main"); files != ratchetListPath {
-		t.Errorf("the commit touches %q, want only %s", files, ratchetListPath)
+	if create := gh.created(); create != nil {
+		t.Errorf("gh pr create ran (%q): an open tighten PR must be updated, never duplicated", create)
 	}
-	o.planeIsUntouched(t)
+	o.assertProposed(t, branch, main)
 }
 
 func TestBoundaryRatchetTighten_ATightListLandsNothing(t *testing.T) {
 	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 64}`)
+	gh := &fakeGH{list: "[]"}
+	gh.install(t)
 	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
 	before := o.originHead()
 
@@ -96,6 +191,9 @@ func TestBoundaryRatchetTighten_ATightListLandsNothing(t *testing.T) {
 	if rc != 0 || errOut != "" || !strings.Contains(out, "ratchet tighten: tight") || o.originHead() != before {
 		t.Fatalf("rc=%d stdout=%q stderr=%q origin moved=%v, want a tight report and no commit", rc, out, errOut, o.originHead() != before)
 	}
+	if len(gh.calls) != 0 {
+		t.Errorf("gh ran %q for a tight list", gh.calls)
+	}
 	o.planeIsUntouched(t)
 }
 
@@ -103,14 +201,24 @@ func TestBoundaryRatchetTighten_AFailureWarnsAndNeverStopsTheBoundary(t *testing
 	cases := []struct {
 		name    string
 		prep    func(t *testing.T) ratchetOrigin
+		gh      fakeGH
 		wantErr string
 	}{
+		{"gh cannot list the pull requests", func(t *testing.T) ratchetOrigin {
+			return newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+		}, fakeGH{failVerb: "list"}, "gh list refused"},
+		{"gh lists something that is not JSON", func(t *testing.T) ratchetOrigin {
+			return newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+		}, fakeGH{list: "not json"}, "gh pr list"},
+		{"gh cannot open the pull request", func(t *testing.T) ratchetOrigin {
+			return newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+		}, fakeGH{list: "[]", failVerb: "create"}, "gh create refused"},
 		{"a red ratchet on main is not pushed", func(t *testing.T) ratchetOrigin {
 			return newRatchetOrigin(t, 60, `{"internal/fixture.Big": 60, "internal/fixture.Gone": 60}`)
-		}, "function-size ratchet violated"},
+		}, fakeGH{list: "[]"}, "function-size ratchet violated"},
 		{"a module without the list", func(t *testing.T) ratchetOrigin {
 			return newRatchetOrigin(t, 60, "")
-		}, "read offender list"},
+		}, fakeGH{list: "[]"}, "read offender list"},
 		{"a refused push", func(t *testing.T) ratchetOrigin {
 			o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
 			hook := filepath.Join(o.bare.Dir, "hooks", "pre-receive")
@@ -118,12 +226,12 @@ func TestBoundaryRatchetTighten_AFailureWarnsAndNeverStopsTheBoundary(t *testing
 				t.Fatal(err)
 			}
 			return o
-		}, "protected"},
+		}, fakeGH{list: "[]"}, "protected"},
 		{"a plane without origin", func(t *testing.T) ratchetOrigin {
 			o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
 			o.plane.Git("remote", "remove", "origin")
 			return o
-		}, "fetch"},
+		}, fakeGH{list: "[]"}, "fetch"},
 		{"a live cycle", func(t *testing.T) ratchetOrigin {
 			o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
 			runDir := filepath.Join(o.plane.Dir, ".evolve", "runs", "cycle-7")
@@ -134,12 +242,14 @@ func TestBoundaryRatchetTighten_AFailureWarnsAndNeverStopsTheBoundary(t *testing
 				t.Fatal(err)
 			}
 			return o
-		}, "cycle-7"},
+		}, fakeGH{list: "[]"}, "cycle-7"},
 	}
 	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			o := c.prep(t)
+			gh := c.gh
+			gh.install(t)
 			before := o.originHead()
 
 			rc, _, errOut := o.tighten(t)
@@ -149,6 +259,11 @@ func TestBoundaryRatchetTighten_AFailureWarnsAndNeverStopsTheBoundary(t *testing
 			}
 			if o.originHead() != before {
 				t.Errorf("origin main moved after a failed tighten")
+			}
+			if c.gh.failVerb != "create" {
+				if heads := o.bare.Git("for-each-ref", "--format=%(refname)", "refs/heads/"+ratchetBranchPrefix); heads != "" {
+					t.Errorf("a tighten branch was pushed after a failure: %s", heads)
+				}
 			}
 		})
 	}
@@ -190,5 +305,27 @@ func TestBoundaryHaltSteps_TightenBeforeSyncMainSoThePlaneMergesIt(t *testing.T)
 	var stderr bytes.Buffer
 	if rc := dispatchBoundaryVerb(boundaryRatchetVerb, nil, &bytes.Buffer{}, &stderr); rc != exitUsage {
 		t.Errorf("the boundary dispatch has no %s handler: rc=%d stderr=%q", boundaryRatchetVerb, rc, stderr.String())
+	}
+}
+
+func TestBoundaryRatchetTighten_AMovedTightenBranchIsNotOverwritten(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	const branch = ratchetBranchPrefix + "2026-10-01"
+	o.plane.Git("checkout", "-q", "-b", "stale")
+	o.plane.Git("commit", "-q", "--allow-empty", "-m", "a commit the step did not read")
+	o.plane.Git("push", "-q", "origin", "HEAD:refs/heads/"+branch)
+	o.plane.Git("checkout", "-q", "main")
+	tip := o.bare.Git("rev-parse", branch)
+	gh := &fakeGH{list: `[{"number":7,"headRefName":"` + branch + `"}]`, lease: o.originHead()}
+	gh.install(t)
+	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
+
+	rc, _, errOut := o.tighten(t)
+
+	if rc != 0 || !strings.Contains(errOut, "WARN") || !strings.Contains(errOut, "stale info") {
+		t.Errorf("rc=%d stderr=%q, want a WARN for the lease refusal", rc, errOut)
+	}
+	if got := o.bare.Git("rev-parse", branch); got != tip {
+		t.Errorf("%s moved to %s: a branch that moved after ls-remote must not be overwritten", branch, got)
 	}
 }
