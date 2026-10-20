@@ -43,6 +43,7 @@ var codeDocs = map[ShipErrorCode]string{
 	CodeManifestGate:                "atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard)",
 	CodeRepoContractGate:            "atomic-ship: a repo-contract guard suite is RED in the lane worktree; pushing would red main",
 	CodeRepoContractInfra:           "atomic-ship: the repo-contract scanner toolchain died twice without a test-level failure (re-dispatchable)",
+	CodeCommittedDocDeleted:         "atomic-ship: the landing deletes a path under docs/ or knowledge-base/ that the target branch holds; only a rename that keeps it under docs/ ships",
 	CodeWorktreeResolve:             "atomic-ship: the cycle worktree could not be resolved",
 	CodeIntegrityTreeDrift:          "post-ship: the shipped tree drifted from the verified one (integrity)",
 	CodeGitLaneNotOnOrigin:          "atomic-ship: nothing to commit, but the lane holds commits that origin does not hold, and no landing intent proves them; ship refuses a PASS with no push (integrity)",

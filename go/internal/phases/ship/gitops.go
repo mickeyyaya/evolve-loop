@@ -214,6 +214,9 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		if err := stageBinaryGuard(ctx, opts); err != nil {
 			return err
 		}
+		if err := refuseCommittedDocDeletion(ctx, opts, "--cached"); err != nil {
+			return err
+		}
 	}
 
 	exit, err := opts.run(ctx, "git", []string{"diff", "--cached", "--quiet"}, io.Discard, io.Discard)
