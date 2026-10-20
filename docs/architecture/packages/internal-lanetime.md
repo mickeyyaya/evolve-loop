@@ -37,6 +37,8 @@ W4 must call only this pure function. The caller reads the run dirs, at the loop
 - `PerPass` is the lane time of all kept builds over the count of passes. A failed build thus adds to the cost of a pass. A family with no pass has `PerPass` of 0, which means no measure.
 - The result is sorted by family name. A family with no build call is absent.
 
+The consumer (W4, 2026-10-19): at each wave boundary, `runPreWaveProbes` in `cmd/evolve` calls `recordLaneTimes`. It writes the result to `.evolve/lane-time.json`, and the routing host of each cycle reads that file ([internal-cliroute.md](internal-cliroute.md), *The headroom order*).
+
 `ReadCycles(evolveDir, 0, 0)` reads the whole history that gc has kept. The caller can pass a floor and a ceiling to read a range.
 
 ## Limits

@@ -17,9 +17,11 @@ type CLIRouting struct {
 }
 
 type AgentRule struct {
-	CLI    []string `json:"cli,omitempty"`
-	Model  string   `json:"model,omitempty"`
-	Effort string   `json:"effort,omitempty"`
+	CLI         []string `json:"cli,omitempty"`
+	Model       string   `json:"model,omitempty"`
+	Effort      string   `json:"effort,omitempty"`
+	Order       string   `json:"order,omitempty"`
+	HeadroomPct int      `json:"headroom_pct,omitempty"`
 }
 
 type TierRule struct {
