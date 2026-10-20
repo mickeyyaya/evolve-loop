@@ -806,3 +806,5 @@
 ./internal/ledgertip
 # builddiff - the host-derived diff metrics and Changes table of the build report.
 ./internal/builddiff
+# auditcascade - the escalation rule of the auditor tier cascade (inbox auditor-tier-cascade, shadow stage).
+./internal/auditcascade
