@@ -140,6 +140,9 @@ var treeReadingSelections = []TestSelection{
 		"TestCoveringTests_ReachableFromProduction",
 		"TestDirectImporters_ReachableFromProduction",
 	}},
+	{Package: "./internal/committedset", Tests: []string{
+		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
+	}},
 	{Package: "./internal/core", Tests: []string{
 		"TestAgentSubprocessWriters_AllStampRunID",
 		"TestAgentSubprocessWriters_SetIsClosed",

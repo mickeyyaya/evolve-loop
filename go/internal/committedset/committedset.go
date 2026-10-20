@@ -113,7 +113,7 @@ func Unanswered(workspace string) []string {
 }
 
 func DispositionsFrom(body []byte) []Disposition {
-	var decision answeringBuckets
+	var decision DecisionBuckets
 	if json.Unmarshal(body, &decision) != nil {
 		return nil
 	}
@@ -153,7 +153,25 @@ func DispositionsFrom(body []byte) []Disposition {
 	return out
 }
 
-type answeringBuckets struct {
+type Dropped struct {
+	ID     string `json:"id"`
+	Reason string `json:"reason,omitempty"`
+}
+
+type SkipShipped struct {
+	TaskID string `json:"task_id"`
+	GitSHA string `json:"git_sha,omitempty"`
+}
+
+type DroppedBucket struct {
+	Dropped []Dropped `json:"dropped"`
+}
+
+type SkipShippedBucket struct {
+	SkipShipped []SkipShipped `json:"skip_shipped"`
+}
+
+type DecisionBuckets struct {
 	EscalateBlock []struct {
 		TaskID    string `json:"task_id"`
 		Reason    string `json:"reason"`
@@ -162,14 +180,8 @@ type answeringBuckets struct {
 	SkipRejected []struct {
 		TaskID string `json:"task_id"`
 	} `json:"skip_rejected"`
-	SkipShipped []struct {
-		TaskID string `json:"task_id"`
-		GitSHA string `json:"git_sha"`
-	} `json:"skip_shipped"`
-	Dropped []struct {
-		ID     string `json:"id"`
-		Reason string `json:"reason"`
-	} `json:"dropped"`
+	SkipShippedBucket
+	DroppedBucket
 }
 
 func readJSON(workspace, name string, into any) bool {

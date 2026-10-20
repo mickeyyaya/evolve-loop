@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 )
 
 type card struct {
@@ -20,16 +22,11 @@ type ref struct {
 	ID string `json:"id"`
 }
 
-type dropped struct {
-	ID     string `json:"id"`
-	Reason string `json:"reason,omitempty"`
-}
-
 type decision struct {
-	Cycle      int             `json:"cycle"`
-	TopN       []card          `json:"top_n"`
-	Deferred   []ref           `json:"deferred"`
-	Dropped    []dropped       `json:"dropped"`
+	Cycle    int    `json:"cycle"`
+	TopN     []card `json:"top_n"`
+	Deferred []ref  `json:"deferred"`
+	committedset.DroppedBucket
 	Superseded []string        `json:"superseded"`
 	PhaseSkip  json.RawMessage `json:"phase_skip"`
 	Projected  bool            `json:"projected_by_orchestrator"`
@@ -53,7 +50,7 @@ func Project(report string, cycle int) ([]byte, error) {
 
 func build(report string, cycle int, strict bool) (decision, error) {
 	d := decision{Cycle: cycle, Projected: true, PhaseSkip: json.RawMessage("[]"),
-		TopN: []card{}, Deferred: []ref{}, Dropped: []dropped{}, Superseded: []string{}}
+		TopN: []card{}, Deferred: []ref{}, DroppedBucket: committedset.DroppedBucket{Dropped: []committedset.Dropped{}}, Superseded: []string{}}
 	top, present, err := section(report, "top_n", strict, true)
 	if err != nil {
 		return d, err
@@ -76,7 +73,7 @@ func build(report string, cycle int, strict bool) (decision, error) {
 		return d, err
 	}
 	for _, it := range droppedCards {
-		d.Dropped = append(d.Dropped, dropped{ID: it.ID, Reason: ReasonOf(it.Rest)})
+		d.Dropped = append(d.Dropped, committedset.Dropped{ID: it.ID, Reason: ReasonOf(it.Rest)})
 	}
 	superseded, _, err := section(report, "superseded", strict, false)
 	if err != nil {
