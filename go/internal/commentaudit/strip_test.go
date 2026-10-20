@@ -466,3 +466,25 @@ func TestStripComments_AMultiLineInlineCommentLeavesTheNewlineTheLanguageReads(t
 		t.Errorf("stripped = %q, want two statements: a comment holding a newline reads as one", got)
 	}
 }
+
+func TestStripComments_KeepsEveryLineOfAMultiLineAcsPredicateMarker(t *testing.T) {
+	marker := "// acs-predicate: config-check — caller-existence is an inherent source-\n// structure check; maybeRefreshChainBoundary's behavior is already pinned by\n// cmd_loop_chain_boundaryrefresh_test.go / _hardening_test.go (both GREEN).\n"
+	src := "package main\n\n" + marker + "import (\n\t\"testing\"\n)\n\n// TestX narrates itself.\nfunc TestX(t *testing.T) {\n\t// a step\n\t_ = t\n}\n\n// acs-predicate: config-check\n//\n// Trailing prose after the marker paragraph.\nvar c = 1\n"
+
+	got := strippedSource(t, "x_test.go", src)
+
+	if !strings.Contains(got, marker+"import (") {
+		t.Errorf("stripped =\n%s\nwant the whole marker group kept above the import", got)
+	}
+	for _, gone := range []string{"narrates", "a step", "Trailing prose"} {
+		if strings.Contains(got, gone) {
+			t.Errorf("stripped =\n%s\nwant the non-marker comment %q removed", got, gone)
+		}
+	}
+	violations, err := VerifyChanges([]string{"x_test.go"},
+		func(string) ([]byte, error) { return []byte(src), nil },
+		func(string) ([]byte, error) { return []byte(got), nil })
+	if err != nil || len(violations) != 0 {
+		t.Errorf("VerifyChanges = (%q, %v), want the stripped file accepted", violations, err)
+	}
+}
