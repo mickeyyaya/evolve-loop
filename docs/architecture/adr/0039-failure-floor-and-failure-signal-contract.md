@@ -301,6 +301,19 @@ The request is the inbox item `lost-ship-closeout-universal-landing-witness`. Th
 
 **Limit.** A sibling lane can land between the start of this cycle and its close. An agent that copies that sibling's commit into a binding of this cycle still passes D2. The latch (D1) does not have this gap, and a ship that PASSes sets it.
 
-**Limit on resume.** In process, the latch and the pre-cycle `HEAD` are host memory. A resume reads both back from the run's `run.json`, a file that a phase agent can write. Inbox `resume-reads-the-ship-latch-from-an-agent-writable-file` tracks the fix. The gap is narrow: a resumed cycle ships only through a new ship PASS, and that PASS sets the latch in memory again. `TestResumeLifecycle_ThePersistedPreCycleHeadReachesTheCloseout` pins that the resumed closeout reads the persisted pre-cycle `HEAD`.
+**D4 (resume).** In process, the latch and the pre-cycle `HEAD` are host memory. A resume read both back from the run's `run.json` and `cycle-state.json` (`resume_bootstrap.go`). A phase agent can write these files, because they are in its run workspace.
+
+Now the host also writes both values to `.evolve/resume-witness/cycle-<N>.json` (`core/resume_witness.go`). It writes the file when it sets the pre-cycle `HEAD` and when a ship PASS sets the latch, on both dispatch roots. The sandbox does not grant this directory to a phase agent.
+
+A resume takes both values from that file. The cycle number comes from the host identity, not from the state file. The file must name the same cycle and the same `run_id`, or the resume clears the latch and the pre-cycle `HEAD`. Then the old fallback applies: the resume takes the current `HEAD` and logs a WARN.
+
+| Rejected option | Why |
+|---|---|
+| A sandbox deny of `run.json` and `cycle-state.json` in the workspace | A deny needs proof that no tool in the sandbox writes these files. A deny also does not protect a phase that ran without a sandbox. |
+| A hash of the whole state file | Other host writers (`clearActiveWorktree`, the checkpoint verbs) read the file and write it again. Each such write seals a forged value. |
+
+**Limit.** The `run_id` check reads the `run_id` of the state file, which an agent can write. A changed `run_id` cannot forge the two values. It only clears them, so a cycle that shipped can show as `landing-lost` after a resume. A failed write of the witness has the same result, with a WARN. Both failures are safe: they flag a landing, and they never clear the floor.
+
+`TestResumeWitness_AShipLatchPlantedInRunStateIsStillALostLanding` and `TestResumeWitness_APreCycleHeadMovedBackInRunStateDoesNotClearTheFloor` plant the forged values in the state file before a resume. The sandbox contract row "write the host resume witness" proves the deny under the real `sandbox-exec`. Inbox `resume-reads-the-ship-latch-from-an-agent-writable-file` is consumed.
 
 The test `TestResumeLifecycle_LostLandingUsesSameTerminalFloor` asserted that a resumed ship PASS with an earlier ship error was a lost landing. That is the cycle-1536 shape, so D1 reverses it: `TestResumeLifecycle_AShipThatPassedAfterAStaleShipErrorIsNotALostLanding` replaces it.

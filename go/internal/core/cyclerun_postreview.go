@@ -26,7 +26,7 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 		}
 	}
 
-	if latchShippedState(&cr.cs, next, dr.resp.Verdict) {
+	if cr.o.latchShip(cr.req.ProjectRoot, &cr.cs, next, dr.resp.Verdict) {
 		cr.preserveWorktree = false
 	}
 

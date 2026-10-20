@@ -37,12 +37,13 @@ func TestResumeLifecycle_PostShipSkippedVerdictReadsTheCheckpointLatch(t *testin
 			st.cycleState.CompletedPhases = append(st.cycleState.CompletedPhases, "audit", "ship")
 			st.cycleState.FinalVerdict = VerdictSKIPPED
 			st.cycleState.Shipped = tc.shipped
+			hostWitness(t, req.ProjectRoot, st.cycleState)
 			result, err := o.RunCycleFromPhase(context.Background(), req, rp)
 			if err != nil {
 				t.Fatalf("RunCycleFromPhase: %v", err)
 			}
 			if result.FinalVerdict != tc.want {
-				t.Errorf("FinalVerdict = %q, want %q (checkpoint Shipped=%t)", result.FinalVerdict, tc.want, tc.shipped)
+				t.Errorf("FinalVerdict = %q, want %q (host witness Shipped=%t)", result.FinalVerdict, tc.want, tc.shipped)
 			}
 		})
 	}

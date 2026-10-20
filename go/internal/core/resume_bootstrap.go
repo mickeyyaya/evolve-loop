@@ -51,6 +51,7 @@ func (o *Orchestrator) loadResumeBootstrap(
 	if identity.fleet {
 		resumeCycle = identity.cycle
 	}
+	applyResumeWitness(req.ProjectRoot, resumeCycle, &cs)
 
 	recoveryBinding := cs
 	if recoveryBinding.CycleID == 0 {
