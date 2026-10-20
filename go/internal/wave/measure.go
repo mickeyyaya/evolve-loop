@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
@@ -61,6 +62,10 @@ func applyLoopSignals(f wavemeasure.Facts, events []signalcenter.Event) (wavemea
 		switch {
 		case e.Code == wavemeasure.CodeAdmitWait:
 			f.AdmissionWaits++
+		case e.Code == orchestrator.CodeAdmissionOptimistic:
+			f.OptimisticAdmissions++
+		case e.Code == orchestrator.CodeOptimisticAdmissionFailed:
+			f.OptimisticFailures++
 		case e.Kind == signalcenter.KindLoopWave:
 			if w, err := strconv.Atoi(e.Fields[wavemeasure.FieldWidthSized]); err == nil {
 				f.WidthSized, source = w, WidthFromSignal

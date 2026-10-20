@@ -59,6 +59,9 @@ func assertOneOrchestratorDeclineEvent(t *testing.T, events []signalcenter.Event
 	if !strings.Contains(e.Reason, wantGate) {
 		t.Errorf("event.Reason = %q, must name the failing gate %q", e.Reason, wantGate)
 	}
+	if !strings.Contains(e.Fields["gates"], wantGate) {
+		t.Errorf("event.Fields[gates] = %q, must name the failing gate %q for a reader that keys on fields", e.Fields["gates"], wantGate)
+	}
 	if !strings.Contains(eventText(e), wantTail) {
 		t.Errorf("event = %+v, must carry the failing gate's captured tail %q in its Reason or Fields", e, wantTail)
 	}

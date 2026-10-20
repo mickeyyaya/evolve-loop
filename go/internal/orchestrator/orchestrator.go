@@ -14,22 +14,24 @@ const (
 )
 
 const (
-	CodeLaneLaunched       signalcenter.Code = "LOOP_ORCH_LANE_LAUNCHED"
-	CodeLaneExited         signalcenter.Code = "LOOP_ORCH_LANE_EXITED"
-	CodeLaneBackfilled     signalcenter.Code = "LOOP_ORCH_LANE_BACKFILLED"
-	CodePoolIdle           signalcenter.Code = "LOOP_ORCH_POOL_IDLE"
-	CodePoolResupplied     signalcenter.Code = "LOOP_ORCH_POOL_RESUPPLIED"
-	CodeLaneStalled        signalcenter.Code = "LOOP_ORCH_LANE_STALLED"
-	CodeLaneDeadline       signalcenter.Code = "LOOP_ORCH_LANE_DEADLINE"
-	CodeLaneLateExit       signalcenter.Code = "LOOP_ORCH_LANE_LATE_EXIT"
-	CodeLaneRecoveryFailed signalcenter.Code = "LOOP_ORCH_LANE_RECOVERY_FAILED"
-	CodeOversightAction    signalcenter.Code = "LOOP_ORCH_OVERSIGHT_ACTION"
-	CodeFamilyPaused       signalcenter.Code = "LOOP_ORCH_FAMILY_PAUSED"
-	CodeSupply             signalcenter.Code = "LOOP_ORCH_SUPPLY"
-	CodeSupplyShort        signalcenter.Code = "LOOP_ORCH_SUPPLY_SHORT"
-	CodeWindow             signalcenter.Code = "LOOP_ORCH_WINDOW"
-	CodePoolUnderfilled    signalcenter.Code = "LOOP_ORCH_POOL_UNDERFILLED"
-	CodeAdmissionShadow    signalcenter.Code = "LOOP_ORCH_ADMISSION_SHADOW"
+	CodeLaneLaunched              signalcenter.Code = "LOOP_ORCH_LANE_LAUNCHED"
+	CodeLaneExited                signalcenter.Code = "LOOP_ORCH_LANE_EXITED"
+	CodeLaneBackfilled            signalcenter.Code = "LOOP_ORCH_LANE_BACKFILLED"
+	CodePoolIdle                  signalcenter.Code = "LOOP_ORCH_POOL_IDLE"
+	CodePoolResupplied            signalcenter.Code = "LOOP_ORCH_POOL_RESUPPLIED"
+	CodeLaneStalled               signalcenter.Code = "LOOP_ORCH_LANE_STALLED"
+	CodeLaneDeadline              signalcenter.Code = "LOOP_ORCH_LANE_DEADLINE"
+	CodeLaneLateExit              signalcenter.Code = "LOOP_ORCH_LANE_LATE_EXIT"
+	CodeLaneRecoveryFailed        signalcenter.Code = "LOOP_ORCH_LANE_RECOVERY_FAILED"
+	CodeOversightAction           signalcenter.Code = "LOOP_ORCH_OVERSIGHT_ACTION"
+	CodeFamilyPaused              signalcenter.Code = "LOOP_ORCH_FAMILY_PAUSED"
+	CodeSupply                    signalcenter.Code = "LOOP_ORCH_SUPPLY"
+	CodeSupplyShort               signalcenter.Code = "LOOP_ORCH_SUPPLY_SHORT"
+	CodeWindow                    signalcenter.Code = "LOOP_ORCH_WINDOW"
+	CodePoolUnderfilled           signalcenter.Code = "LOOP_ORCH_POOL_UNDERFILLED"
+	CodeAdmissionShadow           signalcenter.Code = "LOOP_ORCH_ADMISSION_SHADOW"
+	CodeAdmissionOptimistic       signalcenter.Code = "LOOP_ORCH_ADMISSION_OPTIMISTIC"
+	CodeOptimisticAdmissionFailed signalcenter.Code = "LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED"
 )
 
 const (
@@ -55,6 +57,8 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeWindow, "the adaptive window of the orchestrator pool (ADR-0139 O8) changed size: it grows by 1 for each clean landing, halves on each landing conflict (never under fleet.orchestrator.window.min) and follows the sized count; published once for each change; INFO; fields.old, new, sized, cause (clean_landing, conflict or resize); the loop builds the window inside the enforce pool only, so nothing publishes at stage shadow; that pool admits a lane only while the lanes in flight number fewer than new")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodePoolUnderfilled, "the orchestrator pool had an idle transition while fewer lanes than fleet.min_lanes were in flight and the pool was not stopped; WARN; fields.live, target, min_lanes, ready")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeAdmissionShadow, "at fleet.orchestrator.admission shadow (ADR-0143 W1) the import-reach rule held a todo that the optimistic rule (a shared edited package or a second hub todo) would admit; the reach rule still governs; published once for each todo and holder in a pool run; INFO; fields.todo, held_by, rank, cells, reason (the package where an edit meets the reach)")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeAdmissionOptimistic, "at fleet.orchestrator.admission enforce (ADR-0143 W1b) the pool launched a lane that only the optimistic rule admitted: the import-reach rule would have held it behind a lane in flight; the lane carries that holder in EVOLVE_FLEET_REACH_HOLDER; the count of the wave; INFO; fields.todo, held_by, reason (the package where an edit meets the reach)")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeOptimisticAdmissionFailed, "a lane that only the optimistic rule admitted (ADR-0143 W1b) hit a composed-tree gate failure or a fleet rebase conflict; published once for each lane, at its first such failure, which names the gate; the failures of the wave over its LOOP_ORCH_ADMISSION_OPTIMISTIC count is the D3 rate; WARN; fields.todo, held_by, gate (the failed composed-tree gates, or rebase)")
 }
 
 type Publish func(signalcenter.Event)

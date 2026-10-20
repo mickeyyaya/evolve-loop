@@ -39,7 +39,7 @@ func (o *Orchestrator) runGateSet(ctx context.Context, worktree string) (map[str
 
 func (o *Orchestrator) declineComposedGates(cycle int, cs CycleState, origin, label string, missing []string, outcomes map[string]ciparity.GateOutcome) {
 	gates := strings.Join(missing, ",")
-	fields := map[string]string{}
+	fields := map[string]string{"gates": gates}
 	for _, gate := range missing {
 		if tail := outcomes[gate].Tail; tail != "" {
 			fields["tail_"+gate] = boundedTail(tail, signalcenter.MaxLineBytes/2/len(missing))

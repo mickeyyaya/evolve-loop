@@ -44,10 +44,11 @@ type ShadowAdmission struct {
 }
 
 type Admitter struct {
-	Graph      Graph
-	Text       func(id string) string
-	Optimistic bool
-	OnShadow   func(ShadowAdmission)
+	Graph        Graph
+	Text         func(id string) string
+	Optimistic   bool
+	OnShadow     func(ShadowAdmission)
+	OnOptimistic func(ShadowAdmission)
 }
 
 type footprint struct {
@@ -80,6 +81,7 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 			waiting = append(waiting, d)
 			continue
 		}
+		a.recordOptimistic(holders, fp, d)
 		holders = append(holders, holder{lane: td.ID, fp: fp})
 		admitted = append(admitted, d)
 	}
@@ -109,6 +111,18 @@ func (a Admitter) recordShadow(holders []holder, fp footprint, d Decision, block
 		}
 	}
 	a.OnShadow(ShadowAdmission{ID: d.ID, Rank: d.Rank, Cells: d.Cells, HeldBy: d.BlockedBy, Reason: "reach meets " + reachMet(blocker.fp, fp)})
+}
+
+func (a Admitter) recordOptimistic(holders []holder, fp footprint, d Decision) {
+	if a.OnOptimistic == nil || !a.Optimistic {
+		return
+	}
+	for _, h := range holders {
+		if conflict(h.fp, fp) {
+			a.OnOptimistic(ShadowAdmission{ID: d.ID, Rank: d.Rank, Cells: d.Cells, HeldBy: h.lane, Reason: "reach meets " + reachMet(h.fp, fp)})
+			return
+		}
+	}
 }
 
 func reachMet(x, y footprint) string {

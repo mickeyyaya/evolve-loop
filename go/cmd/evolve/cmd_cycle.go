@@ -399,6 +399,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		bridge.SetModelCatalogDirFn(func() string { return d })
 	}
 	signals, closeSignals := newRoleSignalCenter(run.centerRole(), projectRoot, evolveDir, console)
+	watchOptimisticAdmission(signals, os.Getenv)
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
