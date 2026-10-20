@@ -92,6 +92,7 @@ func TestDossierSystemFailure_LandedSiblingCarriesNone(t *testing.T) {
 	t.Parallel()
 
 	cr, root := closeoutRun(t, 1536, "cycle-1536")
+	cr.cs.Shipped = true
 	if err := cr.completeCycle(); err != nil {
 		t.Fatalf("completeCycle: %v", err)
 	}
@@ -163,7 +164,7 @@ func TestDossierSystemFailure_AbnormalEpilogueThreadsTheSignal(t *testing.T) {
 		name   string
 		signal *SystemFailureSignal
 	}{
-		{"stamped-signal-reaches-the-abnormal-dossier", detectLostLanding(realCycleWorkspace(t, "cycle-1535"), VerdictPASS)},
+		{"stamped-signal-reaches-the-abnormal-dossier", detectLostLanding(graded(realCycleWorkspace(t, "cycle-1535"), 1535, VerdictPASS))},
 		{"no-signal-fabricates-nothing", nil},
 	}
 	if cases[0].signal == nil {
