@@ -80,8 +80,11 @@ func TestPRWindow_AtStageOnACodePathIsABoundaryAndExitsThree(t *testing.T) {
 	}
 }
 
-func TestPRWindow_UntilP1EveryPRIsABoundaryAndTheRuleStillShows(t *testing.T) {
+func TestPRWindow_UntilIntegrationEnforceEveryPRIsABoundaryAndTheRuleStillShows(t *testing.T) {
 	t.Parallel()
+	if reasonStageOff != "merge windows wait for fleet.integration.stage enforce (ADR-0147)" {
+		t.Fatalf("the off-stage reason must name the integration stage of ADR-0147: %q", reasonStageOff)
+	}
 	for _, policyJSON := range []string{"", `{"pr":{"merge_window":{"stage":"off"}}}`} {
 		root := windowPlane(t, policyJSON)
 		list := writeWindowFile(t, filepath.Join(t.TempDir(), "files"), "docs/plans/a.md\n")

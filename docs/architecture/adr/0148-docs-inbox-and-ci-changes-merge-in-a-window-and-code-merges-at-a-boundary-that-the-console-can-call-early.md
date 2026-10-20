@@ -1,8 +1,8 @@
 # ADR-0148: docs, inbox and CI changes merge in a window; code merges at a boundary that the console can call early
 
-- **Status:** Accepted (2026-10-20). The operator chose "windows + on-demand". The window stays off until P1 lands.
+- **Status:** Accepted (2026-10-20). The operator chose "windows + on-demand". The window stays off until `fleet.integration.stage` is `enforce` (ADR-0147).
 - **Plan:** [pr-merge-latency-2026-10](../../plans/pr-merge-latency-2026-10.md). **Research:** [wave-latency-2026-10](../../research/wave-latency-2026-10.md) §6, [latency-gates-2026-10](../../research/latency-gates-2026-10.md). **Design:** [internal-mergewindow.md](../packages/internal-mergewindow.md).
-- **Relates to:** [ADR-0144](0144-latency-is-gated-by-invariants-at-merge-and-by-trends-on-main.md), which gates latency fixes at merge. ADR-0147 is held for P1, the lane ship that recovers from an external origin move.
+- **Relates to:** [ADR-0144](0144-latency-is-gated-by-invariants-at-merge-and-by-trends-on-main.md), which gates latency fixes at merge. ADR-0147 (`docs/architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md`, from the branch `docs/wave-integration`) is the prerequisite: at `fleet.integration.stage: enforce` the wave orchestrator owns integration and no lane writes `main`. ADR-0147 is Proposed until its PR merges.
 - **Evidence:**
   - Green PRs waited 61 PR-hours for a boundary over #979 to #1005. The median wait was 1.2 h, and the maximum was 9.6 h (plan F2).
   - The median time from open to the first green run was 0.4 h (plan F1).
@@ -19,7 +19,7 @@ Each PR merges only at a wave boundary. Most PRs are green long before the bound
 2. Each other PR is a boundary PR. It merges only at a boundary.
 3. The CI router of `required.yml` defines the path classes. `evolve pr window` reads that table, so one rule serves both.
 4. The policy key `pr.merge_window.stage` is `off` by default. At `off`, each PR is a boundary PR.
-5. The operator sets the stage to `on` only after P1 lands.
+5. The operator sets the stage to `on` only after `fleet.integration.stage` is `enforce` (ADR-0147, plan D15).
 6. The console calls an early boundary when a green boundary PR waits and the pool runs below its window.
 
 ## Consequences

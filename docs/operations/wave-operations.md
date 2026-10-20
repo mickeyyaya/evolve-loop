@@ -91,14 +91,14 @@ The merge rule is in [ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-chang
 
 - A code PR merges only at a boundary. Use `evolve wave next --merge <n,...>`.
 - A window PR has only docs, inbox or CI paths. It can merge when green, also in a wave, but only at stage `on`.
-- The policy key `pr.merge_window.stage` is `off` by default. Keep it at `off` until P1 lands: today a merge in a wave strands the next lane push.
+- The policy key `pr.merge_window.stage` is `off` by default. Keep it at `off` until `fleet.integration.stage` is `enforce` (ADR-0147): before that stage, a merge in a wave strands the next lane push.
 
 To classify a PR, run `evolve pr window <n>`. Add `--json` for the envelope `{pr, stage, verdict, rule, reason, boundary_paths}`. The field `pr` is present only for a PR number.
 
 | Exit | Verdict | Next action |
 |---|---|---|
 | 0 | `window` | After P2b, merge the green PR with `evolve pr merge <n>`. Before P2b, merge it at the boundary. Do not use `gh pr merge`. |
-| 3 | `boundary` | Merge the PR at the next boundary. At stage `off`, the reason is `merge windows wait for P1`, and `rule` shows the class of the paths. |
+| 3 | `boundary` | Merge the PR at the next boundary. At stage `off`, the reason is `merge windows wait for fleet.integration.stage enforce (ADR-0147)`, and `rule` shows the class of the paths. |
 | 2 | — | A read or a parse failed (policy, `required.yml`, the file list, `gh`). Fix the named cause. |
 | 10 | — | A usage error. |
 

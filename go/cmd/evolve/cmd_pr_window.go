@@ -21,7 +21,7 @@ const (
 	prWindowPrefix  = "evolve pr window: "
 	exitBoundary    = 3
 	prWindowTimeout = 2 * time.Minute
-	reasonStageOff  = "merge windows wait for P1"
+	reasonStageOff  = "merge windows wait for fleet.integration.stage enforce (ADR-0147)"
 	reasonNoPaths   = "the PR changes no path"
 	reasonWindow    = "every path is docs, inbox or CI-only"
 )
