@@ -31,6 +31,9 @@ func deferDecisionIn(workspace string, pol policy.SystemFailurePolicy) (deferDec
 			return deferDecision{category: category, fixType: cat.FixType, source: "audit"}, true
 		}
 	}
+	if bd := readBuildDeclared(workspace); bd != nil {
+		return deferDecision{category: bd.Class, fixType: policy.FixTypePipelineRepair, source: "build"}, true
+	}
 	if dec, _ := readFailureDecision(workspace); dec != nil && dec.Action == policy.ActionDeferOrQuarantine {
 		return deferDecision{category: dec.Category, fixType: dec.FixType, source: "failure-decision.json"}, true
 	}

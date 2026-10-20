@@ -24,10 +24,14 @@ func reentryPhase(a retryAction) (Phase, bool) {
 }
 
 func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *SystemFailureSignal) {
-	d := buildFailureDossier(cs, VerdictFAIL, o.failurePolicy)
+	d := o.failureDossier(cs, VerdictFAIL)
 	_ = writeFailureDossier(cs.WorkspacePath, d)
 
 	env, fb := o.auditFailEnvelope(cs, d.FloorCandidate)
+	if d.BuildDeclared != nil && !env.Halt {
+		env = declineOnly("the build declared system-level class " + d.BuildDeclared.Class +
+			" after the gate remedy round, and the audited tree did not change; no rebuild repairs it, so the item is deferred to a pipeline repair")
+	}
 	declared := fb.Class
 
 	if env.Halt {

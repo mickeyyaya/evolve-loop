@@ -17,5 +17,11 @@
   "source": "console lane cl-skills-drift-peer, 2026-10-09: why cycle 1841 filed no pipeline-defect item",
   "summary": "Cycle 1840 got pipeline-defect-infra-systemic-cycle1840 because its auditor wrote FAIL with a failure block class=infrastructure-systemic. Cycle 1841 met the same false red, but its auditor wrote PASS each round (evolve-verdict schema 1, no block) and only the skills-drift gate forced FAIL. buildFailureDossier (go/internal/core/failure_dossier.go:74) reads only the audit phase's failure block, so audit_declared={} and no floor candidate. The builder declared WARN class=infrastructure-systemic in build-report.md after repair round 2, but the dossier does not read the build block, and decideAfterAuditFail spent the code-audit-fail budget (2/2). The coherence check sees a gate-forced FAIL with substantive reasons as coherent. Residuals of cl-skills-drift-peer, also here: (a) the skills-drift WARN is a diagnostic, not a Signal Center event (see skills-drift-gate-generator-dependency-closure residual d); (b) every audit of a tree with the generator source now pays one go run of the worktree evolve (about 0.3 s warm); a failed run is a skip WARN and only CI TestSkills_NoDrift grades the lane; (c) core.ChangedWorktreePathsSinceBase has no caller outside core after the gate stopped using it, so it can be unexported.",
   "title": "A gate-forced audit FAIL with a builder-declared infrastructure-systemic block files no pipeline-defect item and spends the repair budget",
-  "weight": 0.7
+  "weight": 0.7,
+  "consumed": {
+    "at": "2026-10-21T04:30:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fix/dossier-builder-system-class (stacked on #1078): the dossier records the last build's system-level class as build_declared when only deterministic gates forced the audit FAIL, at least one repair round ran, the build handed off WARN or FAIL, and the last two audits of the run bound the same worktree tree. By operator decision 2026-10-21 the builder's word never halts the loop: decideAfterAuditFail declines further code-audit-fail rounds and the defer rule routes the item as a pipeline-repair defer (a console companion item pipeline-repair-cycle-N with a deps entry), instead of the ADR-0072 halt that acceptance 1 names. ADR-0072 extension 'a builder's system class defers, never halts'. Residuals (a)-(c) are not in this change."
+  }
 }
