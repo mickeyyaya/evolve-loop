@@ -22,4 +22,4 @@
 
 ## Limits
 
-- GitHub does not apply a merge driver of `.gitattributes` to a PR merge ([rubocop #3594](https://github.com/rubocop-hq/rubocop/pull/3594), 2016). Thus the second PR still shows a conflict on GitHub. `evolve pr refresh` resolves it with no hand merge.
+- GitHub does not apply a merge driver of `.gitattributes` to a PR merge ([rubocop #3594](https://github.com/rubocop-hq/rubocop/pull/3594), 2016). Thus the second PR still shows a conflict on GitHub. `evolve pr refresh` resolves it with no hand merge. The operator accepted this form of the acceptance on 2026-10-21 (plan D12).

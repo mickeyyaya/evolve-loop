@@ -1,6 +1,6 @@
 # Plan: a green docs, inbox or CI PR merges in a window, and a code PR merges at a boundary that the console can call early
 
-- **Status:** accepted, 2026-10-20. P2 and P2b are built in stage `off`. P4 and P5 are built. P3 and P5b are open. P1 is shelved: ADR-0147 replaces it.
+- **Status:** accepted, 2026-10-20. P2 and P2b are built in stage `off`. P4 and P5 are built. P3 is built. P5b is open. P1 is shelved: ADR-0147 replaces it.
 - **Decision:** [ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md). **Research:** [wave-latency-2026-10](../research/wave-latency-2026-10.md) §6 (O1 to O5), [latency-gates-2026-10](../research/latency-gates-2026-10.md). **Design:** [internal-mergewindow.md](../architecture/packages/internal-mergewindow.md).
 - **Operator guide:** [wave-operations.md](../operations/wave-operations.md) §5, [operating-policy.md](../operations/operating-policy.md) §2 item 5.
 
@@ -126,8 +126,10 @@ Before P3 each docs PR appended a section to the end of `docs/research-index.md`
 | D9 | Each dated entry of the research index is one file in `docs/research-index/`. `evolve docs index generate` writes the entries into one generated region, and the CI job `ste-lint` runs `evolve docs index check`. | F4 | The `merge=union` driver of `.gitattributes`: GitHub does not apply it to a PR merge ([rubocop #3594](https://github.com/rubocop-hq/rubocop/pull/3594)). |
 | D10 | `evolve pr refresh` regenerates `signal-codes`, `darwin-set` and `research-index` through the catalog of `internal/derived`, and commits only their outputs. In a stopped merge or rebase it stages them. | F4 | A second list of generated files in the verb: the catalog already owns it, and the lane rebase reads the same catalog. |
 | D11 | The docs-write skill and the runbook tell authors to open each PR from `origin/main`. | F4: a squash merge rewrites the commits of the first PR of a stack. | |
+| D12 | The acceptance of P3 line 1 reads: "Two docs PRs that each add an index section merge in either order. The second PR's conflict is confined to the generated region of docs/research-index.md, `evolve pr refresh` resolves it with no hand merge, and both merge orders give the identical file." | The operator, 2026-10-21: "Follow your suggestions". On GitHub, two PRs that extend one committed index always conflict (D9). | The old line, "with no conflict": no design that keeps the index text in `docs/research-index.md` meets it, and 12 ACS predicates read that text. |
+| D13 | `go/.cover-strict` stays hand-written. | Each line is a coverage floor that a person sets, not a derived output. | A generator: it cannot derive a floor. Two PRs that each add a package still conflict at the end of the file. The fix keeps both lines (#1056 and #1058, 2026-10-21). |
 
-*Limit:* the second docs PR still shows a textual conflict on GitHub, inside the generated region. `evolve pr refresh` resolves it with no hand merge, and the result is the same in each merge order. `go/.cover-strict` stays hand-written: no generator owns it.
+*Limit:* the second docs PR still shows a textual conflict on GitHub, inside the generated region. `evolve pr refresh` resolves it with no hand merge, and the result is the same in each merge order (`TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex` runs the real generators in a clone).
 
 ### How P2 works
 
