@@ -64,6 +64,12 @@ The inbox item `same-subsystem-wave-scheduling` asks that two items of one subsy
 
 - **The rule.** `idFamily` takes the text before the first hyphen of the todo id. The footprint holds it as the cell `family:<token>`. `sharedEdit` calls `sameFamily`, which reports a conflict when two footprints have the same family. Thus the reach rule and the optimistic rule both hold the second todo. An id without a hyphen, or with a hyphen first, has no family.
 - **The record.** `Decision.Cells` holds the family cell. The census refusal reads `cells family:context,internal/inboxrank held by context-fill-cap`, and `supply.jsonl` keeps it. The wave shadow writes the same cells into `LOOP_ORCH_ADMIT_WAIT`. Thus no family hold is silent.
+- **Kernel-minted ids have no family** (review of PR #1085). The kernel mints ids for unrelated sources under one prefix, so the prefix names no subsystem.
+  - `practice-*` comes from `practicewatch/item.go`, for example from the agy and the claude changelog.
+  - `retro-<cycle>-*` comes from `failurelearning/remediation.go`, and `cycle-<cycle>-*` from `carryover/mint.go`.
+  - In the `top_n` of the last 150 runs, `practice` was the largest prefix, with 22 ids. On 2026-10-17 the practice lanes of cycles 1919 and 1920 ran together.
+  - `idFamily` gives no family to these ids, nor to an id that holds a `/` (a package path from `cardPackages`). A filed `retro-` item without a cycle number keeps its family.
+- **The live pool names a family hold.** `Admitter.OnWait` gets each waiting decision. `orchestrator.FamilyHolds` keeps the family holds and forgets a todo when the pool launches it. `LOOP_ORCH_POOL_UNDERFILLED` adds `family_held`, so a hold does not read as a supply failure.
 - **The cost (2026-10-21).** The runtime inbox holds 209 items in 128 families. 35 families have more than one item, and they hold 116 items. A scan of `scan_k` todos thus finds other families to fill the width of 4.
 - **Rejected: the first two tokens.** `tokenopt-cache-discipline-audit` and `tokenopt-session-resume-on-retry` then get different families, and so do `handoff-h9-*` and `handoff-h10-*`. The item names `tokenopt-*` as one family.
 - **Rejected: one multi-slug lane for the family.** The pool launches one todo for each lane (`fleet.poolSpec`). A shared lane needs the multi-slug scope work that the item names as a precondition.
@@ -75,7 +81,7 @@ The inbox item `same-subsystem-wave-scheduling` asks that two items of one subsy
 - **The proof.**
   - `TestAdmit_TwoTodosOfOneIDFamilyWaitForEachOther` checks both rules. `TestAdmit_ALaneInFlightHoldsItsIDFamily` checks a lane in flight.
   - `TestAdmit_TodosOfDifferentIDFamiliesAreUnaffected` checks the preservation case. `TestAdmit_AFamilyHoldIsNoReachShadow` checks that a family hold sends no shadow record.
-  - `orchestrator` `TestSupply_RecordsATodoHeldBehindASiblingOfItsIDFamily` checks the census record.
+  - `orchestrator` `TestSupply_RecordsATodoHeldBehindASiblingOfItsIDFamily` checks the census record. `TestPool_TwoTodosOfOneFamilyRunOneAfterTheOther` checks the live pool and its `family_held` field. `TestAdmit_KernelMintedAndPackagePathIDsHaveNoFamily` checks the minted ids.
   - The first two tests and the census test fail when `sharedEdit` drops the family term.
 
 ## Optimistic rule and shadow record (ADR-0143 W1)

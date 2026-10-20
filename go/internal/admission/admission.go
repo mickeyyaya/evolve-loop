@@ -13,7 +13,7 @@ import (
 
 const HubCell = "hub"
 
-const familyCellPrefix = "family:"
+const FamilyCellPrefix = "family:"
 
 type Graph interface {
 	Packages(files []string) []string
@@ -51,6 +51,7 @@ type Admitter struct {
 	Optimistic   bool
 	OnShadow     func(ShadowAdmission)
 	OnOptimistic func(ShadowAdmission)
+	OnWait       func(Decision)
 }
 
 type footprint struct {
@@ -81,6 +82,7 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 		if blocker, busy := a.firstConflict(holders, fp); busy {
 			d.BlockedBy = blocker.lane
 			a.recordShadow(holders, fp, d, blocker)
+			a.recordWait(d)
 			waiting = append(waiting, d)
 			continue
 		}
@@ -114,6 +116,12 @@ func (a Admitter) recordShadow(holders []holder, fp footprint, d Decision, block
 		}
 	}
 	a.OnShadow(ShadowAdmission{ID: d.ID, Rank: d.Rank, Cells: d.Cells, HeldBy: d.BlockedBy, Reason: "reach meets " + reachMet(blocker.fp, fp)})
+}
+
+func (a Admitter) recordWait(d Decision) {
+	if a.OnWait != nil {
+		a.OnWait(d)
+	}
 }
 
 func (a Admitter) recordOptimistic(holders []holder, fp footprint, d Decision) {
@@ -223,12 +231,18 @@ func globalZone(file string) bool {
 	return fleet.IsGlobalZone(file) || fleet.IsGlobalZone(strings.TrimPrefix(file, "go/")) || filepath.Clean(file) == moduleMakefile
 }
 
+var mintedWithACycle = regexp.MustCompile(`^(retro|cycle)-[0-9]+-`)
+
 func idFamily(id string) string {
 	family, _, found := strings.Cut(id, "-")
-	if !found || family == "" {
+	if !found || family == "" || kernelMinted(id) {
 		return ""
 	}
-	return familyCellPrefix + family
+	return FamilyCellPrefix + family
+}
+
+func kernelMinted(id string) bool {
+	return strings.HasPrefix(id, "practice-") || strings.Contains(id, "/") || mintedWithACycle.MatchString(id)
 }
 
 func (fp footprint) cells() []string {
