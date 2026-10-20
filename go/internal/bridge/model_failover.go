@@ -34,7 +34,7 @@ func (e *Engine) launchOnce(ctx context.Context, req core.BridgeRequest) (core.B
 func (e *Engine) modelChain(req core.BridgeRequest) []string {
 	if e.deps.ModelChain != nil && req.SessionName == "" {
 		if chain := e.deps.ModelChain(req.CLI, req.Model); len(chain) > 0 {
-			return e.floorChain(req.Agent, chain)
+			return e.floorChain(floorSeat(req), chain)
 		}
 	}
 	return []string{req.Model}
@@ -63,8 +63,8 @@ func isClaudeFamilyModel(model string) bool {
 	return slices.ContainsFunc(claudeModelWords, func(w string) bool { return strings.Contains(lower, w) })
 }
 
-func (e *Engine) floorChain(agent string, chain []string) []string {
-	if !profiles.IsClaudeFamilyFloor(seatName(agent)) {
+func (e *Engine) floorChain(seat string, chain []string) []string {
+	if !profiles.IsClaudeFamilyFloor(seat) {
 		return chain
 	}
 	kept := []string{chain[0]}
@@ -73,9 +73,16 @@ func (e *Engine) floorChain(agent string, chain []string) []string {
 			kept = append(kept, model)
 			continue
 		}
-		fmt.Fprintf(e.deps.Stderr, "[bridge] WARN model failover: %s holds the Claude family floor; skipping fallback %s, which is not a Claude model\n", agent, model)
+		fmt.Fprintf(e.deps.Stderr, "[bridge] WARN model failover: %s holds the Claude family floor; skipping fallback %s, which is not a Claude model\n", seat, model)
 	}
 	return kept
+}
+
+func floorSeat(req core.BridgeRequest) string {
+	if req.Profile != "" {
+		return seatName(req.Profile)
+	}
+	return seatName(req.Agent)
 }
 
 func seatName(agent string) string {
