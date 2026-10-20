@@ -67,6 +67,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/floor_lists_regression_test.go", Rationale: "the floor list regression refusal's own pins"},
 	{Fragment: "/go/internal/core/cover_changed_floor.go", Rationale: "the build floor's cover-changed and cover-strict checks, which read the merged floor lists"},
 	{Fragment: "/go/internal/profiles/gate_inputs_realtree_test.go", Rationale: "the write-scope regression test over docs/architecture/gate-input-inventory.md, with the pinned authority rows and open seams; a cycle that relabelled a row or a pin would silence it"},
+	{Fragment: "/go/internal/core/ste_floor.go", Rationale: "the build floor's STE check: at docs_floor.ste_stage enforce it sends a doc whose added lines fail the lint back to the build; a cycle that weakened it could land the doc CI refuses"},
+	{Fragment: "/go/internal/stelint/added.go", Rationale: "the one added-line scope of the STE lint, shared by the build floor and evolve docs ste-lint --added (the CI job)"},
 	{Fragment: "/go/internal/core/build_explanation_floor_test.go", Rationale: "composition tripwire proving optional reviewers cannot replace the explanation floor"},
 	{Fragment: "/go/internal/core/reviewer.go", Rationale: "mandatory explanation-review chain composition"},
 	{Fragment: "/go/internal/core/orchestrator.go", Rationale: "fresh-cycle explanation activation and Build-context sealing call sites"},
