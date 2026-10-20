@@ -19,6 +19,8 @@
 
   An import of `core` is not safe.
 
+- **A bound on the entries.** `Put` keeps the newest `Keep(k)` entries by `cached_at` and drops the rest, so the file and its full read on each lookup stay small. A tie keeps the lower tree SHA. A store with no `Keep` call keeps the `gc.verdict_cache_keep` compiled default of 50. The orchestrator passes the project's `gc.verdict_cache_keep` (`policy.GCFor`). An evicted tree is a miss, which costs a fresh audit and nothing else.
+
 ## Invariants
 
 - **No content identity, no cache.** An empty tree SHA never hits in `Lookup`. `Put` on it is a no-op, not an error, so a best-effort caller need not branch. Pinned by `TestPut_EmptyTreeSHA_NoOp` and `TestPut_EmptyTreeSHAStaysNoOp`.

@@ -3,11 +3,17 @@
 package verdictcache
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 
@@ -33,6 +39,12 @@ type fileSchema struct {
 type Store struct {
 	path string
 	now  func() time.Time
+	keep int
+}
+
+func (s *Store) Keep(k int) *Store {
+	s.keep = k
+	return s
 }
 
 func NewStore(projectRoot string, now func() time.Time) *Store {
@@ -85,7 +97,22 @@ func (s *Store) Put(e Entry) error {
 	}
 	verdicts, _ := s.Load()
 	verdicts[e.TreeSHA] = e
-	return s.write(verdicts)
+	return s.write(newest(verdicts, gcpolicy.Policy{VerdictCacheKeepEntries: s.keep}.VerdictCacheKeep()))
+}
+
+func newest(verdicts map[string]Entry, keep int) map[string]Entry {
+	if len(verdicts) <= keep {
+		return verdicts
+	}
+	entries := slices.Collect(maps.Values(verdicts))
+	slices.SortFunc(entries, func(a, b Entry) int {
+		return cmp.Or(b.CachedAt.Compare(a.CachedAt), strings.Compare(a.TreeSHA, b.TreeSHA))
+	})
+	kept := make(map[string]Entry, keep)
+	for _, e := range entries[:keep] {
+		kept[e.TreeSHA] = e
+	}
+	return kept
 }
 
 func (s *Store) Lookup(treeSHA string) (Entry, bool) {
