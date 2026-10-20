@@ -112,10 +112,22 @@ boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (sta
 | P1 | Shelved. ADR-0147 replaces it: at `fleet.integration.stage: enforce` no lane writes `main`, so a window merge strands no lane push. | the ADR-0147 plan owns the tests | wave-integration plan |
 | P2 | `evolve pr window <n> \| --files-from FILE [--json]` and `pr.merge_window.stage` (this PR, stage `off`). | `TestClassify_TheLiveCIRoutingTableDecidesEachPath`, `TestPRWindow_UntilIntegrationEnforceEveryPRIsABoundaryAndTheRuleStillShows` | console, built |
 | P2b | `evolve pr merge` takes a window PR while a loop is live, and the console calls an early boundary (D6). | a live loop and stage `on`: a docs PR merges, a `go/` PR is refused | console, built: see [How P2b works](#how-p2b-works) |
-| P3 | One file for each research-index entry and a generated index with a check. A verb regenerates the generated files on a rebase. Stacked PRs are discouraged. | two docs PRs merge in each order with no conflict | inbox `pr-merge-latency-p3-conflict-hotspots`, console |
+| P3 | One file for each research-index entry and a generated index with a check. A verb regenerates the generated files on a rebase. Stacked PRs are discouraged. | `TestTwoEntryPRs_MergeInEitherOrderToOneIndexWithNoHandMerge` (two docs PRs merge in each order to one index) | inbox `pr-merge-latency-p3-conflict-hotspots`, console, built. Acceptance line 1 amended by the operator on 2026-10-21 (D12). |
 | P4 | Fix or retire the stale ACS predicates of cycles 43, 813 and 1801. `evolve ci classify` files a fix-first item for a base red. | the predicates pass on `main` under `-tags acs` | console, built: see [How P4 works](#how-p4-works) |
 | P5 | A loop write to a curated inbox field never blocks `sync-main`. The closeout writes the proven file to the loop stamp `protected_files`, not to `files`. | `TestApplyFailure_TheProtectedRouteWriteIsAStampThatSyncMainLands` (a replay of the cycle 2000 write) | inbox `pr-merge-latency-p5-boundary-self-heal`, console, built. The escalation reweight is split to `pr-merge-latency-p5b-escalation-reweight-stamp`. |
 | — | Operator decision: the lane STE check moves from `shadow` to `enforce` (cycle 1979 shipped a doc that failed the strict lint). | a failed lane doc goes back to the build | inbox `lane-ste-lint-stage-enforce`, operator |
+
+### How P3 works
+
+Before P3 each docs PR appended a section to the end of `docs/research-index.md`. Thus two open docs PRs changed the same lines (F4).
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D9 | Each dated entry of the research index is one file in `docs/research-index/`. `evolve docs index generate` writes the entries into one generated region, and the CI job `ste-lint` runs `evolve docs index check`. | F4 | The `merge=union` driver of `.gitattributes`: GitHub does not apply it to a PR merge ([rubocop #3594](https://github.com/rubocop-hq/rubocop/pull/3594)). |
+| D10 | `evolve pr refresh` regenerates `signal-codes`, `darwin-set` and `research-index` through the catalog of `internal/derived`, and commits only their outputs. In a stopped merge or rebase it stages them. | F4 | A second list of generated files in the verb: the catalog already owns it, and the lane rebase reads the same catalog. |
+| D11 | The docs-write skill and the runbook tell authors to open each PR from `origin/main`. | F4: a squash merge rewrites the commits of the first PR of a stack. | |
+
+*Limit:* the second docs PR still shows a textual conflict on GitHub, inside the generated region. `evolve pr refresh` resolves it with no hand merge, and the result is the same in each merge order. `go/.cover-strict` stays hand-written: no generator owns it.
 
 ### How P2 works
 

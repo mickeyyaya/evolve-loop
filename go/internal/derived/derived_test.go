@@ -27,6 +27,8 @@ func TestCatalog_SkillProjectionsAreDerivedOutputs(t *testing.T) {
 		{"skills/build/SKILL.md", "skill-projections", "GENERATED:phase-facts"},
 		{"docs/architecture/control-flags.md", "flag-index", "GENERATED:flag-index"},
 		{"docs/architecture/signal-codes.md", "signal-codes", "GENERATED:signal-codes"},
+		{"docs/research-index.md", "research-index", "GENERATED:research-index"},
+		{"go/.darwin-set", "darwin-set", ""},
 	}
 	for _, c := range cases {
 		e, o, ok := OutputOf(c.path)
@@ -43,8 +45,8 @@ func TestCatalog_SkillProjectionsAreDerivedOutputs(t *testing.T) {
 
 func TestCatalog_EveryOutputCarriesItsGeneratedMarker(t *testing.T) {
 	root := repoRootForTest(t)
-	if got := names(Catalog()); !reflect.DeepEqual(got, []string{"flag-index", "signal-codes", "skill-projections"}) {
-		t.Fatalf("Catalog entries = %v, want [flag-index signal-codes skill-projections]", got)
+	if got := names(Catalog()); !reflect.DeepEqual(got, []string{"flag-index", "signal-codes", "research-index", "darwin-set", "skill-projections"}) {
+		t.Fatalf("Catalog entries = %v, want [flag-index signal-codes research-index darwin-set skill-projections]", got)
 	}
 	for _, e := range Catalog() {
 		for _, o := range e.Outputs {
@@ -223,6 +225,7 @@ func TestStale_AnInputChangeMakesItsEntryStale(t *testing.T) {
 		{"an exact input file", []string{".claude-plugin/plugin.json"}, []string{"skill-projections"}},
 		{"a package in the skillcheck closure", []string{"go/internal/phasespec/catalog.go"}, []string{"skill-projections"}},
 		{"a code registrar", []string{"go/internal/core/signal.go"}, []string{"signal-codes"}},
+		{"a research-index entry", []string{"docs/research-index/2026-10-21-a.md"}, []string{"research-index"}},
 		{"a file that only shares a prefix", []string{".claude-plugin/plugin.json.bak", "go/internal/phasespecx/a.go"}, nil},
 		{"an output alone", []string{flagsDoc}, nil},
 		{"nothing", nil, nil},

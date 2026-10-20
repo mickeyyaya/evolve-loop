@@ -4,11 +4,11 @@
 
 ## Purpose
 
-`derived` is the one catalog of the generated outputs. It tells which paths a generator writes, with which marker or region, from which inputs, and which `evolve` verbs generate and check them. Each consumer reads this catalog and keeps no second list. Today the consumers are the post-build normalizer (`core.normalizeDerivedProjections`) and the fleet rebase (`core.rebaseWithDerivedRegen`). The overlap proof (Q3) and the composition (Q4) read it next.
+`derived` is the one catalog of the generated outputs. It tells which paths a generator writes, with which marker or region, from which inputs, and which `evolve` verbs generate and check them. Each consumer reads this catalog and keeps no second list. Today the consumers are the post-build normalizer (`core.normalizeDerivedProjections`), the fleet rebase (`core.rebaseWithDerivedRegen`) and `evolve pr refresh`. The overlap proof (Q3) and the composition (Q4) read it next.
 
 ## Design
 
-- **Three entries.** `flag-index` writes the `GENERATED:flag-index` region of `docs/architecture/control-flags.md`. `signal-codes` writes the `GENERATED:signal-codes` region of `docs/architecture/signal-codes.md`. `skill-projections` writes `commands/*.md`, `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` as whole files, and the `GENERATED:phase-facts` region of `skills/*/SKILL.md`.
+- **Five entries.** `flag-index` writes the `GENERATED:flag-index` region of `docs/architecture/control-flags.md`. `signal-codes` writes the `GENERATED:signal-codes` region of `docs/architecture/signal-codes.md`. `research-index` writes the `GENERATED:research-index` region of `docs/research-index.md` from the files in `docs/research-index/` (`evolve docs index`). `darwin-set` writes `go/.darwin-set` as a whole file with a marker (`evolve ci darwin-set`), and only a conflict fires it. `skill-projections` writes `commands/*.md`, `.codex-plugin/plugin.json` and `.agents/plugins/marketplace.json` as whole files, and the `GENERATED:phase-facts` region of `skills/*/SKILL.md`.
 - **No entry for the router recipes.** `agents/evolve-router.md` holds the `GENERATED:goal-recipes` region, but no `evolve` verb writes it. A conflict there is genuine.
 - **Inputs.** An entry has path inputs (a prefix that ends in `/`, or an exact path) and, at most, one set of Go inputs. The caller resolves the Go inputs with `ResolveGoInputs`. `CodeRegistrars` are the directories of the Go files that call `RegisterCode(`. `SkillcheckClosure` is the main-module closure of `go/internal/skillcheck` from `go list -deps`. When `go list` fails, `ResolveGoInputs` returns the error and keeps the registrars that it found.
 - **Staleness.** `Stale(changed, dirs)` gives the entries whose inputs one change touched. The normalizer uses it.
@@ -29,6 +29,7 @@
 - **A block inside the region is derived, and a block outside it is genuine.** Pinned by `TestRegionConflict_ABlockInsideTheRegionIsDerived` and `TestRegionConflict_ABlockOutsideTheRegionIsGenuine`.
 - **Cross staleness needs both sides.** Pinned by `TestFires_CrossStalenessNeedsBothSides`.
 - **A leftover conflict marker fails the regeneration.** Pinned by `TestRegen_RefusesALeftoverConflictMarker`.
+- **Two research-index PRs merge in either order to one index.** Pinned in `researchindex` by `TestTwoEntryPRs_MergeInEitherOrderToOneIndexWithNoHandMerge`.
 - **The rebase regenerates a conflict in a command stub.** Pinned in `core` by `TestRebaseWithDerivedRegen_ACommandStubConflictRegenerates` and `TestRegen_UsesTheGeneratorOfTheWorktree`.
 
 ## Findings

@@ -16,6 +16,7 @@
 - Rule one: its file list under `GOOS=darwin` differs from its file list under `GOOS=linux`. Rule two: a file names `darwin` in a `//go:build` line outside a `!`. Rule three: a file uses `runtime.GOOS`, except in a comparison with a literal other than `darwin` or `linux`. Rule four: a non-test file holds the string `sandbox-exec`. Test files count for the first three rules.
 - `DarwinSetText` writes `go/.darwin-set`, and `cmd/darwinset` is the thin command over `DarwinMain`. `TestDarwinSetFile_MatchesTheSetDerivedFromTheTree` fails when the committed file differs from the derived set.
 - `E2ETestNames` and `E2ERunPattern` build the `-run` pattern of `make test-e2e`. A test belongs to the e2e tier when only the `e2e` tag adds its file to the package. `cmd/e2elist` is the thin command over `E2EMain`.
+- **The darwin set has one writer.** `SyncDarwinSet(moduleDir, write)` derives the set and compares it with `go/.darwin-set`. With `write` it writes the file. Without `write`, a different file returns `ErrDarwinSetStale`. `evolve ci darwin-set <generate|check>` and the `darwin-set` entry of `internal/derived` call it, so `evolve pr refresh` can write the file after a rebase (plan [pr-merge-latency-2026-10](../../plans/pr-merge-latency-2026-10.md) P3). Pinned by `TestSyncDarwinSet_ChecksThenWritesTheSetFile`.
 
 ## Invariants
 

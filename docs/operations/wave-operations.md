@@ -108,6 +108,12 @@ To classify a PR, run `evolve pr window <n>`. Add `--json` for the envelope `{pr
 
 The path classes come from the CI router of `.github/workflows/required.yml`. A change to that router also changes the merge window.
 
+### Rebase a PR
+
+- Open each PR from `origin/main`. Do not stack a PR on another open PR: a squash merge rewrites the commits of the first PR, so the stacked PR conflicts.
+- After a rebase onto `origin/main`, run `evolve pr refresh`. It writes `docs/architecture/signal-codes.md`, `go/.darwin-set` and the generated region of `docs/research-index.md` again, and commits only those files. In a merge or a rebase that stopped on a conflict, it stages the files, and you continue the merge or the rebase.
+- Do not merge a generated file by hand.
+
 ### The on-demand boundary
 
 Call an early boundary when a green boundary PR waits longer than the policy bound and the pool runs below its width:

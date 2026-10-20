@@ -24,7 +24,9 @@ const (
 	docsUsage     = "usage: evolve docs <verb>\n\nverbs:\n" +
 		"  ste-lint   check text against the ASD-STE100 house rules in " + stelint.StandardPath + "\n" +
 		"             ( " + steLintForm + " )\n" +
-		"             The findings are a WARN: the exit code is 0, or 1 with --strict.\n"
+		"             The findings are a WARN: the exit code is 0, or 1 with --strict.\n" +
+		"  index      write or check the dated entries of docs/research-index.md from docs/research-index/\n" +
+		"             ( docs index <generate|check> [--project-root P] )\n"
 )
 
 type steMode struct {
@@ -63,6 +65,9 @@ func runDocs(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 	if args[0] == "ste-lint" {
 		return runSteLint(args[1:], stdout, stderr)
+	}
+	if args[0] == "index" {
+		return docsIndexVerb.run(args[1:], stdout, stderr)
 	}
 	fmt.Fprintf(stderr, "evolve docs: unknown verb %q\n%s", args[0], docsUsage)
 	return exitUsage

@@ -806,3 +806,5 @@
 ./internal/ledgertip
 # builddiff - the host-derived diff metrics and Changes table of the build report.
 ./internal/builddiff
+# researchindex - the generated dated entries of docs/research-index.md.
+./internal/researchindex

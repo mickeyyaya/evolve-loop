@@ -79,7 +79,10 @@ The full rules are in docs/conventions/ste100-writing.md. The short form:
 2. Read the documents that already cover the subject. Link to them. Do not repeat them.
 3. Collect the evidence: local measurements, code reads with `path:line`, and outside sources. Write the findings first.
 4. Write the reasoning chain, then the decisions, then the design or the steps.
-5. Add the document to `docs/research-index.md`, and add a pointer in the file that owns the subject.
+5. Index the document, and add a pointer in the file that owns the subject:
+   - add one entry file to `docs/research-index/`, named `<yyyy-mm-dd>-<nn>-<slug>.md`, that starts with a `## ` heading line;
+   - run `evolve docs index generate`. Do not edit the generated region of `docs/research-index.md` by hand;
+   - write the links of the entry relative to `docs/`, because the entry renders into `docs/research-index.md`.
 6. Run the checks:
    - `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added`
    - each relative link resolves (`[text](path)` targets exist)
@@ -94,5 +97,6 @@ The full rules are in docs/conventions/ste100-writing.md. The short form:
 | "The decision is obvious." | Then the reason is short. Write it. |
 | "I will list the options later." | A decision without its options cannot be judged. |
 | "This number is roughly right." | Measure it, or say "estimate" and give the method. |
+| "I will stack this docs PR on my open PR." | Open each PR from `origin/main`. A squash merge rewrites the commits of the first PR, so the stacked PR conflicts. |
 | "One more section on a different topic fits here." | It belongs in its own document of its own type. |
 | "The agent needs exact steps, so the why can go." | The why is what lets an agent apply the rule to a new case. |
