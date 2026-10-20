@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 const transientShipError = `{"code":"GIT_FLEET_REBASE_NEEDED","class":"transient","message":"lane lost the landing race"}`
@@ -39,18 +40,14 @@ func plantBinding(t *testing.T, dir string, b dossier.ShipBinding) {
 
 func landedRepo(t *testing.T) (root, commit, tree string) {
 	t.Helper()
-	root = t.TempDir()
-	runGit(t, root, "init", "-q")
-	runGit(t, root, "config", "user.email", "ci@example.com")
-	runGit(t, root, "config", "user.name", "ci")
-	runGit(t, root, "config", "commit.gpgsign", "false")
-	writeWorkspaceFile(t, root, "base.txt", "main before the cycle started in "+root+"\n")
-	runGit(t, root, "add", ".")
-	runGit(t, root, "commit", "-q", "-m", "base")
-	writeWorkspaceFile(t, root, "delivered.txt", "the work this cycle landed in "+root+"\n")
-	runGit(t, root, "add", ".")
-	runGit(t, root, "commit", "-q", "-m", "landed")
-	return root, gitRev(t, root, "HEAD"), gitRev(t, root, "HEAD^{tree}")
+	r := gittest.Fixture(t)
+	r.Write("base.txt", "main before the cycle started in "+r.Dir+"\n")
+	r.Git("add", ".")
+	r.Git("commit", "-q", "-m", "base")
+	r.Write("delivered.txt", "the work this cycle landed in "+r.Dir+"\n")
+	r.Git("add", ".")
+	r.Git("commit", "-q", "-m", "landed")
+	return r.Dir, gitRev(t, r.Dir, "HEAD"), gitRev(t, r.Dir, "HEAD^{tree}")
 }
 
 func gitRev(t *testing.T, dir, rev string) string {
