@@ -58,9 +58,9 @@ func TierWeek(evolveDir, family, model string, now time.Time) (quotastate.UsageW
 			}
 			switch {
 			case w.Model == "":
-				familyWindow = &w
-			case strings.HasPrefix(model, w.Model):
-				modelWindow = &w
+				familyWindow = closerWindow(familyWindow, w)
+			case model == w.Model || strings.HasPrefix(model, w.Model+" "):
+				modelWindow = closerWindow(modelWindow, w)
 			}
 		}
 	}
@@ -71,4 +71,14 @@ func TierWeek(evolveDir, family, model string, now time.Time) (quotastate.UsageW
 		return *familyWindow, true, nil
 	}
 	return quotastate.UsageWindow{}, false, nil
+}
+
+func closerWindow(kept *quotastate.UsageWindow, w quotastate.UsageWindow) *quotastate.UsageWindow {
+	switch {
+	case kept == nil, len(w.Model) > len(kept.Model):
+		return &w
+	case len(w.Model) == len(kept.Model) && w.PercentUsed > kept.PercentUsed:
+		return &w
+	}
+	return kept
 }

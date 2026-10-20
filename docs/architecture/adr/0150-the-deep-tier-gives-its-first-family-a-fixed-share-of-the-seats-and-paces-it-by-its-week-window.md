@@ -22,6 +22,8 @@ A first-in-chain rule is an order, not a share. The operator asked for a true sh
 4. A family whose week is used faster than the week goes gives the seat away.
 5. A seat that is given away moves the shared family to the end of the chain.
 6. The checked-in policy sets the deep share to 50.
+7. An explicit pin wins over the share. The stage skips the share when an env override leads the chain, for example `EVOLVE_BUILDER_CLI=agy`.
+8. For a profile-rule agent, a caller CLI or an advisor CLI in the shared family also skips the share.
 
 ## Consequences
 
@@ -29,12 +31,15 @@ A first-in-chain rule is an order, not a share. The operator asked for a true sh
 - The split is the same for the same cycle, agent and phase, so a retry of a phase gets the same first family.
 - A dispatch with no cycle always gets one bucket. Only operator verbs dispatch without a cycle.
 - When no usage window is readable, only the share decides. The trace says that the pace does not apply.
+- A pinned seat stays on the shared family even when the family is paced. The trace says `share N% at <tier> skipped: <pin> pins <family>`.
+- A contract escalation resolves its route with the cycle, so its deep seat gets the bucket of that cycle.
 
 ## Rejected
 
 - **Smooth weighted round-robin:** its counters must persist across the lanes of a wave. The router has no shared store (P2.4).
 - **A token bucket:** the router does not know the token cost of a dispatch before the launch (P2.5).
 - **A pace only:** it sends every seat to Argon while Argon is on pace. Thus the early days of a week repeat the burn of F1.2.
+- **A share that wins over a pin:** an env pin is the strongest control of the operator for one agent. The other stages of the resolver already let it win over the headroom order.
 - **A share that the advisor sets:** it moves a deterministic decision into a prompt (AGENTS.md rule 5).
 
 ## What changes this decision

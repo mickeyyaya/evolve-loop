@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute/cliroutetest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
@@ -201,4 +203,65 @@ func TestShareNotes_NameEachSharedTierAndItsPace(t *testing.T) {
 	if len(notes) != 1 || notes[0] != want {
 		t.Fatalf("notes = %q, want [%q]", notes, want)
 	}
+}
+
+func TestShare_AnOperatorEnvPinKeepsTheSharedFamilyOnTheSeat(t *testing.T) {
+	t.Parallel()
+	r := syntheticRouter(t, shareBlock(1), shareHost(argonWeek(90, 6*24*time.Hour)))
+
+	for cycle := 1; cycle <= 10; cycle++ {
+		req := deepRequest(cycle)
+		req.Env = map[string]string{"EVOLVE_BUILDER_CLI": "agy"}
+		d := mustResolve(t, r, req)
+
+		if llmroute.Family(d.Plan.Candidates[0]) != "agy" {
+			t.Fatalf("cycle %d: chain %v trace %q; the operator pinned agy, so the share must not demote it", cycle, d.Plan.Candidates, d.Trace)
+		}
+		requireTrace(t, d, "share 1% at deep skipped: env(EVOLVE_BUILDER_CLI) pins agy")
+	}
+}
+
+func TestShare_ACallerOrAdvisorCLIPinKeepsTheSharedFamilyOnTheSeat(t *testing.T) {
+	t.Parallel()
+	block := policy.CLIRouting{
+		CLIs:   shareChain,
+		Agents: map[string]policy.AgentRule{"builder": {CLI: shareChain}},
+		Tiers:  map[string]policy.TierRule{"deep": {CLIs: shareChain, SharePct: 1}},
+	}
+	r := syntheticRouter(t, block, shareHost(argonWeek(90, 6*24*time.Hour)))
+
+	pins := map[string]cliroute.Request{
+		"the caller cli agy-tmux": {Agent: "scout", Phase: "scout", CallerCLI: "agy-tmux", Overlay: llmroute.Overlay{LadderTier: "deep"}},
+		"the advisor cli agy":     {Agent: "scout", Phase: "scout", Overlay: llmroute.Overlay{CLI: "agy", LadderTier: "deep"}},
+	}
+	for pin, req := range pins {
+		for cycle := 1; cycle <= 10; cycle++ {
+			req.Cycle = cycle
+			d := mustResolve(t, r, req)
+
+			if llmroute.Family(d.Plan.Candidates[0]) != "agy" {
+				t.Fatalf("%s, cycle %d: chain %v trace %q; the pin asked for agy, so the share must not demote it", pin, cycle, d.Plan.Candidates, d.Trace)
+			}
+			requireTrace(t, d, "share 1% at deep skipped: "+pin+" pins agy")
+		}
+	}
+}
+
+func TestShare_AGivenSeatKeepsAgyClaudeAsItsOwnFamilyBeforeClaude(t *testing.T) {
+	t.Parallel()
+	chain := []string{"agy", "agy-claude", "claude"}
+	block := policy.CLIRouting{
+		CLIs: chain, Default: chain,
+		Agents: map[string]policy.AgentRule{"builder": {CLI: chain, Model: "balanced"}},
+		Tiers:  map[string]policy.TierRule{"deep": {CLIs: chain, SharePct: 50}},
+	}
+	profileDir, _ := cliroutetest.TrackedProfiles(t)
+	host := shareHost(argonWeek(60, 6*24*time.Hour))
+	host.LookPath = everyBinary()
+	r := mustRouter(t, mustCompile(t, routingPolicy(block), realCatalog(t), profiles.NewFromDir(profileDir)), host)
+
+	d := mustResolve(t, r, deepRequest(1))
+
+	requireChain(t, d, "agy-claude", "claude", "agy")
+	requireTrace(t, d, "share gives the seat to agy-claude")
 }

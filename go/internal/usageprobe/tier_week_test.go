@@ -59,3 +59,33 @@ func TestTierWeek_SkipsAFailedReadAPassedResetAndAnUnreadableFile(t *testing.T) 
 		t.Fatal("an unreadable windows file must be an error")
 	}
 }
+
+func TestTierWeek_TwoWindowsOfOneModelReadTheMostUsed(t *testing.T) {
+	t.Parallel()
+	for _, order := range [][2]float64{{30, 70}, {70, 30}} {
+		dir := t.TempDir()
+		recordAll(t, dir, Observation{CLI: "agy", ObservedAt: probeNow, Windows: []quotastate.UsageWindow{argonWindow(order[0], 100*time.Hour), argonWindow(order[1], 100*time.Hour)}})
+
+		if w, ok, err := TierWeek(dir, "agy", "Gemini 4 Argon (Medium)", probeNow); err != nil || !ok || w.PercentUsed != 70 {
+			t.Fatalf("order %v: TierWeek = %+v, %v, %v; want the most-used window at 70%%", order, w, ok, err)
+		}
+	}
+}
+
+func TestTierWeek_TheLongestMatchingWindowModelWins(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	short := argonWindow(90, 100*time.Hour)
+	short.Model = "Gemini 4"
+	recordAll(t, dir, Observation{CLI: "agy", ObservedAt: probeNow, Windows: append(agyWindows(10), short, argonWindow(37, 100*time.Hour))})
+
+	if w, ok, err := TierWeek(dir, "agy", "Gemini 4 Argon (Medium)", probeNow); err != nil || !ok || w.Model != "Gemini 4 Argon" {
+		t.Fatalf("TierWeek = %+v, %v, %v; want the Argon window, not the shorter Gemini 4 name", w, ok, err)
+	}
+	if w, ok, err := TierWeek(dir, "agy", "Gemini 4 Argon", probeNow); err != nil || !ok || w.PercentUsed != 37 {
+		t.Fatalf("TierWeek = %+v, %v, %v; want the exact model name to match", w, ok, err)
+	}
+	if w, ok, err := TierWeek(dir, "agy", "Gemini 4Turbo", probeNow); err != nil || !ok || w.Model != "" {
+		t.Fatalf("TierWeek = %+v, %v, %v; a window model matches only at a word boundary", w, ok, err)
+	}
+}

@@ -129,6 +129,7 @@ An unknown key inside the block, or a `null` block or agent rule, is not a findi
 - The stage `shareTier` runs after `applyLadder`. When the chain starts with the shared family, it hashes `<cycle>|<agent>|<phase>` into a bucket from 0 to 99 (`shareBucket`, FNV-1a). `Request.Cycle` carries the cycle from the runner and the bridge chain.
 - A bucket below the share keeps the seat. Otherwise, or when the family is paced, `lastFamily` moves the shared family to the end of the chain. The walk keeps it as a fallback.
 - The pace reads `Host.TierWeek` (production: `projectTierWeek` in `cmd/evolve`) and `Host.Now`. A family is paced when its week window is used faster than the week goes. A missing reader, a read error, no window or no reset time leave only the share, and the trace says why.
+- An explicit pin wins over the share (`sharePin`). The stage skips the share when an env override leads the chain. It also skips the share when the caller CLI or the advisor CLI of a profile-rule agent is in the shared family. The trace names the pin.
 - `Router.ShareNotes(projectRoot, chain)` gives one `share:` note for each shared tier whose family is in the chain. `evolve cli-routing explain` prints it.
 - Pinned by the `TestShare_*` tests in `share_test.go`, `TestShareNotes_NameEachSharedTierAndItsPace`, `TestCompile_AShareNeedsATierChainAndAPercentInRange` and `TestShareBucket_TheBucketsOfTheSpecExample`.
 

@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"math"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
@@ -48,6 +49,9 @@ func shareTier(v resolver, res resolution) (resolution, error) {
 	if !ok || len(res.plan.Candidates) == 0 || familyOf(res.plan.Candidates[0]) != share.family {
 		return res, nil
 	}
+	if pin := sharePin(res, share.family); pin != "" {
+		return res.noted("share %d%% at %s skipped: %s pins %s", share.pct, tier, pin, share.family), nil
+	}
 	bucket := shareBucket(res.req)
 	paced, pace := v.pace(res.req.ProjectRoot, share.family, tier)
 	res = res.noted("share %d%%: bucket %d of %d; %s", share.pct, bucket, shareBuckets, pace)
@@ -56,6 +60,22 @@ func shareTier(v resolver, res resolution) (resolution, error) {
 	}
 	res.plan.Candidates = lastFamily(res.plan.Candidates, share.family)
 	return res.noted("share gives the seat to %s", familyOf(res.plan.Candidates[0])), nil
+}
+
+func sharePin(res resolution, family string) string {
+	switch {
+	case strings.HasPrefix(res.plan.PrimarySource, "env("):
+		return res.plan.PrimarySource
+	case res.pinsFamily(res.req.CallerCLI, family):
+		return "the caller cli " + res.req.CallerCLI
+	case res.pinsFamily(res.req.Overlay.CLI, family):
+		return "the advisor cli " + res.req.Overlay.CLI
+	}
+	return ""
+}
+
+func (res resolution) pinsFamily(cli, family string) bool {
+	return res.rule == ruleProfile && cli != "" && familyOf(cli) == family
 }
 
 func dispatchTier(plan llmroute.Plan) string {
