@@ -10,6 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
 const (
@@ -29,6 +30,7 @@ type Table struct {
 	clis      []string
 	chains    map[string][]string
 	models    map[string]string
+	bounds    map[string]retryladder.Bounds
 	orders    map[string]int
 	tiers     map[string][]string
 	stop      bool

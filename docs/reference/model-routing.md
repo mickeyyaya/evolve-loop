@@ -83,6 +83,7 @@ Since v22.27.0, one table in `.evolve/policy.json` (`cli_routing`) decides which
 - A phase at the deep or the top tier runs agy-owned Claude first, then Claude Code. Gemini 4 Argon, the successor of Gemini 3.1 Pro, is agy's deep model. It was in the chain on 2026-10-16 and is out again from 2026-10-17. A quota wall on Argon benched all of agy, Flash included (inbox `agy-model-429-benches-whole-family`).
 - The Claude-family floor agents (the auditor, the adversarial review, the tdd engineer, the code reviewer and the spec verifiers) run Claude Code only.
 - Codex runs only under `--bypass-policy`.
+- `agents.<agent>.model` is the base rung of the retry ladder ([retry-ladder](../architecture/retry-ladder.md)). The first try runs at that tier, and an advisor tier does not change it. A ladder rung raises the tier and the effort up to `max_tier` (default `deep`) and `max_effort` (default `high`). The ladder never reaches `top` or `xhigh` unless the rule names it.
 - An agent rule with `order: headroom` sorts its chain at each dispatch (W4, 2026-10-19). A family at or above `headroom_pct` (default 60) of its week window leaves the head. The other families go in the order of their lane time to a PASS. With no measure, the order is claude, agy, agy-claude. This repository's table does not set it yet. See [model-routing-policy.md](../architecture/model-routing-policy.md#family-order-by-quota-headroom).
 
 A project without a table uses the chain of each profile (`cli`, then `cli_fallback`). Then the loop probes each CLI, skips a benched CLI and falls back to an installed CLI.
@@ -93,6 +94,7 @@ A project without a table uses the chain of each profile (`cli`, then `cli_fallb
 |---|---|
 | `evolve cli-routing init --clis a,b,c` | Writes `clis` and `default`, and moves the legacy keys into the table |
 | `evolve cli-routing set <key> <a,b>` | Sets one key: `clis`, `default`, `after_chain`, `tiers.<tier>`, `work.<role>` or `agents.<agent>` |
+| `evolve cli-routing set agents.<agent> [--max-tier T] [--max-effort E]` | Sets the bounds of the retry ladder for one agent. It refuses a tier or an effort that does not exist |
 | `evolve cli-routing unset <key>` | Removes one key |
 | `evolve cli-routing migrate [--dry-run]` | Moves `pins`, `workflow.universal_fallback` and `router.cli/model` into the table. It refuses a non-empty `workflow.universal_fallback_exclude` |
 | `evolve cli-routing show`, `check`, `explain <agent>` | Prints the table, checks it, or prints the chain of one agent |

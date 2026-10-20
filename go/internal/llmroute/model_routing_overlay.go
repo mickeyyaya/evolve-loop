@@ -1,11 +1,16 @@
 package llmroute
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+import (
+	"cmp"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+)
 
 type Overlay struct {
-	CLI    string
-	Tier   string
-	Effort string
+	CLI        string
+	Tier       string
+	LadderTier string
+	Effort     string
 }
 
 func ApplySoftOverlay(in Plan, ov Overlay, prof *profiles.Profile) Plan {
@@ -41,9 +46,9 @@ func ApplySoftOverlay(in Plan, ov Overlay, prof *profiles.Profile) Plan {
 		}
 		out.Candidates = candidates
 	}
-	if ov.Tier != "" {
-		out.Model = ov.Tier
-		out.Tiers = TierChain(ov.Tier, envelopeMin(prof))
+	if tier := cmp.Or(ov.LadderTier, ov.Tier); tier != "" {
+		out.Model = tier
+		out.Tiers = TierChain(tier, envelopeMin(prof))
 	}
 	if ov.Effort != "" {
 		out.Effort = ov.Effort

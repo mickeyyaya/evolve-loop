@@ -52,6 +52,7 @@ func (c *compiler) compileDeclared(t Table) Table {
 	agentChains, models := c.compileAgents()
 	maps.Copy(t.chains, agentChains)
 	t.models = models
+	t.bounds = c.compileLadderBounds()
 	t.orders = c.compileOrders()
 	t.tiers = c.compileTiers(t.clis)
 	t.stop = c.compileAfterChain()
@@ -180,7 +181,7 @@ func (c *compiler) compileAgents() (map[string][]string, map[string]string) {
 		if rule.Effort != "" && agent != key {
 			c.add(SeverityError, path+".effort", "an effort is keyed by the agent name: set it on agents.%s, not on the alias %s", agent, key)
 		}
-		if len(rule.CLI) > 0 || rule.Effort == "" {
+		if !inheritsChain(rule) {
 			if chain, ok := c.compileChain(path, rule.CLI); ok {
 				chains[agentsPrefix+agent] = chain
 			}
