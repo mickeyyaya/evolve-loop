@@ -123,3 +123,30 @@ func TestApply_TheBuildersProseInTheChangesSectionStays(t *testing.T) {
 		}
 	}
 }
+
+func TestApply_ASecondPassRewritesTheHostRowsAndAFailedSecondDiffStatesAbsent(t *testing.T) {
+	first, _ := Apply(cycle1479Report, Summary{Files: 1, Added: 5}, "abc", nil)
+
+	second, _ := Apply(first, Summary{Files: 3, Added: 40, Deleted: 2}, "abc", nil)
+	for _, want := range []string{
+		"| files_changed | 3 <!-- host-derived: git diff --numstat abc --> |",
+		"| lines_added / lines_removed | 40 / 2 <!-- host-derived: git diff --numstat abc --> |",
+		"- **Files changed:** 3 (host-derived from the cycle base abc)",
+	} {
+		if !strings.Contains(second, want) {
+			t.Errorf("the second pass lacks %q:\n%s", want, second)
+		}
+	}
+	if strings.Contains(second, "| files_changed | 1 ") {
+		t.Errorf("the second pass keeps the stale count:\n%s", second)
+	}
+
+	failed, _ := Apply(first, Summary{}, "abc", errors.New("boom"))
+	if !strings.Contains(failed, "| files_changed | absent <!-- host could not derive the diff: boom --> |") || strings.Contains(failed, "| files_changed | 1 ") {
+		t.Errorf("a failed second diff must state absent:\n%s", failed)
+	}
+	again, _ := Apply(failed, Summary{Files: 2}, "abc", nil)
+	if !strings.Contains(again, "| files_changed | 2 <!-- host-derived") {
+		t.Errorf("a pass after a failed one must write the value again:\n%s", again)
+	}
+}

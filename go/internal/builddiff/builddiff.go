@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
+
+const untrackedReadLimit = 1 << 20
 
 var ErrNoBase = errors.New("builddiff: the cycle has no recorded base")
 
@@ -90,10 +93,23 @@ func (s *Summary) addUntracked(root string, paths []string) {
 		if path == "" {
 			continue
 		}
-		body, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
-		s.Added += textLineCount(body)
+		s.Added += untrackedLines(filepath.Join(root, filepath.FromSlash(path)))
 		s.Changes = append(s.Changes, Change{Action: "ADD", Path: path})
 	}
+}
+
+func untrackedLines(path string) int {
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > untrackedReadLimit {
+		return 0
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = f.Close() }()
+	body, _ := io.ReadAll(io.LimitReader(f, untrackedReadLimit))
+	return textLineCount(body)
 }
 
 func textLineCount(body []byte) int {

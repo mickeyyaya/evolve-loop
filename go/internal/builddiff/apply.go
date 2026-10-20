@@ -5,12 +5,15 @@ import (
 	"strings"
 )
 
+var metricMarkers = []string{"<!-- POSTHOC:", hostDerivedMarker, hostFaultMarker}
+
 const (
-	posthocMarker   = "<!-- POSTHOC:"
-	filesBullet     = "- **Files changed:**"
-	changesHeading  = "## Changes"
-	notDescribed    = "(not described by the build)"
-	shortBaseLength = 12
+	hostDerivedMarker = "<!-- host-derived: git diff --numstat "
+	hostFaultMarker   = "<!-- host could not derive the diff: "
+	filesBullet       = "- **Files changed:**"
+	changesHeading    = "## Changes"
+	notDescribed      = "(not described by the build)"
+	shortBaseLength   = 12
 )
 
 type metric int
@@ -25,11 +28,11 @@ const (
 
 func Apply(report string, s Summary, base string, deriveErr error) (string, []string) {
 	short := base[:min(len(base), shortBaseLength)]
-	values := hostValues{s: s, comment: "<!-- host-derived: git diff --numstat " + short + " -->", short: short}
+	values := hostValues{s: s, comment: hostDerivedMarker + short + " -->", short: short}
 	var warnings []string
 	if deriveErr != nil {
 		cause := commentSafe.Replace(deriveErr.Error())
-		values = hostValues{err: deriveErr, comment: "<!-- host could not derive the diff: " + cause + " -->"}
+		values = hostValues{err: deriveErr, comment: hostFaultMarker + cause + " -->"}
 		warnings = append(warnings, "build-diff-summary: the host could not derive the diff of the cycle, so the report states absent: "+deriveErr.Error())
 	}
 	lines := strings.Split(report, "\n")
@@ -74,7 +77,7 @@ func (v hostValues) substitute(line string) string {
 		}
 		return fmt.Sprintf("%s %d (host-derived from the cycle base %s)", filesBullet, v.s.Files, v.short)
 	}
-	at := strings.Index(line, posthocMarker)
+	at := firstMarker(line)
 	if at < 0 {
 		return line
 	}
@@ -100,4 +103,14 @@ func metricOf(cell string) metric {
 		return deletedMetric
 	}
 	return noMetric
+}
+
+func firstMarker(line string) int {
+	first := -1
+	for _, marker := range metricMarkers {
+		if at := strings.Index(line, marker); at >= 0 && (first < 0 || at < first) {
+			first = at
+		}
+	}
+	return first
 }

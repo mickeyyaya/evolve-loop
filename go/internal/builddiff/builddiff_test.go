@@ -138,3 +138,20 @@ func TestAddStatus_KeepsAnUnknownCodeAndSkipsALineWithNoPath(t *testing.T) {
 		t.Errorf("Changes = %v", s.Changes)
 	}
 }
+
+func TestDerive_AnUntrackedSymlinkOrAnOversizedFileIsListedWithoutReadingIt(t *testing.T) {
+	repo, base := cycleRepo(t)
+	if err := os.Symlink("/dev/zero", filepath.Join(repo.Dir, "zero")); err != nil {
+		t.Fatal(err)
+	}
+	repo.Write("big.txt", strings.Repeat("x\n", untrackedReadLimit))
+	repo.Write("small.txt", "a\n")
+	repo.Write("locked.txt", "a\nb\n")
+	if err := os.Chmod(filepath.Join(repo.Dir, "locked.txt"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	got := derive(t, repo, base)
+	if got.Files != 4 || got.Added != 1 {
+		t.Errorf("Derive = %s, want the link and the oversized file listed with no lines, and 1 line of small.txt", got)
+	}
+}
