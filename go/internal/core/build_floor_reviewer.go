@@ -32,6 +32,7 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out = append(out, commentFloorFailures(ctx, in)...)
 	out = append(out, sizeFloorFailures(ctx, in)...)
 	out = append(out, coverChangedFailures(ctx, in, paths)...)
+	out = append(out, floorListRegressions(ctx, in)...)
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 

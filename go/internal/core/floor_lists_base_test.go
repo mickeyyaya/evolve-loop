@@ -18,6 +18,7 @@ func floorListRepo(t *testing.T) (*gittest.Repo, string) {
 	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
 	writeFile(t, filepath.Join(repo.Dir, "go", ".apicover-enforce"), "./p\n")
 	writeFile(t, filepath.Join(repo.Dir, "go", ".cover-strict"), "./p 100\n")
+	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n")
 	repo.Git("add", "-A")
 	repo.Git("commit", "-q", "-m", "base")
 	base := repo.Git("rev-parse", "HEAD")

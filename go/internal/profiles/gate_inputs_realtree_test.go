@@ -20,6 +20,15 @@ var gateTrustClasses = map[string]bool{"authority": true, "verified": true, "sub
 
 var unlaunchedProfiles = map[string]bool{"orchestrator": true}
 
+var pinnedAuthority = []string{
+	".evolve/ledger.jsonl",
+	".evolve/build-explanation-contracts",
+	".evolve/cycle-state.json",
+	".commit-gate/attestation.json",
+	".evolve/profiles",
+	".evolve/policy.json",
+}
+
 var pinnedOpenSeams = []string{
 	"{worktree_path}/go/acs/",
 	".evolve/runs/cycle-*/failure-digest.json",
@@ -200,5 +209,17 @@ func TestParseGateInventory_ReadsOnlyTheInventoryTable(t *testing.T) {
 	}
 	if got := parseGateInventory("# no inventory\n"); got != nil {
 		t.Errorf("rows = %+v, want none without the section", got)
+	}
+}
+
+func TestGateInputInventory_TheAuthorityRowsArePinned(t *testing.T) {
+	var authority []string
+	for _, r := range realGateInventory(t) {
+		if r.trust == "authority" {
+			authority = append(authority, r.path)
+		}
+	}
+	if !reflect.DeepEqual(authority, pinnedAuthority) {
+		t.Errorf("authority rows = %v, want %v: relabelling a row, or a new authority input, changes this protected pin with it", authority, pinnedAuthority)
 	}
 }

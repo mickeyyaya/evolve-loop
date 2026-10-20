@@ -52,6 +52,7 @@ The test reads each row of this table. Column 2 holds one path in backticks. Col
 | Audit EGPS (`prepareEvidence`, `phases/audit/classification.go`) | `.evolve/runs/cycle-*/acs-verdict.json` | harness | verified | An agent copy is retired as a candidate. The harness re-runs the suite and seals it. |
 | Audit predicate run (`acssuite`) | `{worktree_path}/go/acs/` | tdd engineer, and the builder through its shell | open-seam | The audit runs the predicates on disk. Nothing freezes them at the TDD handoff. Follow-up: `tdd-predicates-frozen-at-handoff`. |
 | Audit repository gates (`phases/audit/gates.go`) | `{worktree_path}/go` | builder | verified | The harness runs gofmt, vet, acs-durable and apicover itself. |
+| Audit apicover -enforce gate, its package list (`ciparitygate.enforceList`) | `{worktree_path}/go/.apicover-enforce` | builder | verified | The gate reads the list of the main plane beside the tree list. A worktree that deletes the list fails the gate (2026-10-21). |
 | Audit contract rescue (`acsFloorRescues`, `phases/runner/verdict/artifact.go`) | `.evolve/runs/cycle-*/acs-verdict.json` | harness, or an agent copy before the audit retires it | verified | It accepts only the shape of the audit artifact after an infra error. The classification then re-runs and seals the suite. |
 | Ship explanation gate (`verifyNativeExplanation`) | `{worktree_path}/docs/explain/builds/` | builder | verified | The host snapshot and a recomputed diff SHA must agree with the document. |
 | Ship explanation gate, host snapshot (`contract_state.go`) | `.evolve/build-explanation-contracts` | harness | authority | No profile grants it, and the builder denies it. |
@@ -61,8 +62,9 @@ The test reads each row of this table. Column 2 holds one path in backticks. Col
 | Commit gate persona lint (`runPersonaLint`) | `.evolve/profiles` | repository | authority | Every profile denies it. |
 | Eval gates (`evalgate`: materialization, quality, floor binding, predicate lint) | `.evolve/runs/cycle-*/scout-report.md` | scout, triage | subject | The gate judges the plan of the phase that just ran, before the build. |
 | Eval gates, predicate lint and floor binding | `{worktree_path}/go/acs/` | tdd engineer | subject | The gate judges the predicates of the TDD phase that just ran. |
-| Build floor, apicover list (`enforcedPackages`, `core/floor_lists_base.go`) | `{worktree_path}/go/.apicover-enforce` | builder | verified | The floor enforces the union of the base list and the tree list (2026-10-21). |
-| Build floor, strict floors (`coverChangedFailures`) | `{worktree_path}/go/.cover-strict` | builder | verified | The floor judges the base floors and the tree floors together (2026-10-21). |
+| Build floor, apicover list (`enforcedPackages`, `core/floor_lists_base.go`) | `{worktree_path}/go/.apicover-enforce` | builder | verified | The floor enforces the union of the base list and the tree list. `floorListRegressions` refuses a dropped line (2026-10-21). |
+| Build floor, strict floors (`coverChangedFailures`) | `{worktree_path}/go/.cover-strict` | builder | verified | The floor judges the base floors and the tree floors together. `floorListRegressions` refuses a dropped or lowered floor and a line that does not parse (2026-10-21). |
+| Ship strict audit (`policy.StrictAuditFor`) | `.evolve/policy.json` | repository | authority | No profile grants it, and it is a protected surface. |
 | Build handoff probe (`BuildHandoffProbe`, `evolve phase verify`) | `.evolve/runs/cycle-*/run.json` | harness | advisory | Only the builder self-check reads it. |
 | Retro disposition gate (`VerifyDisposition`) | `.evolve/runs/cycle-*/disposition.json` | retrospective | subject | The gate checks the vocabulary and the identity of the retro deliverable. |
 | Retro disposition cross-check (`crossCheckAgainstDigest`) | `.evolve/runs/cycle-*/failure-digest.json` | harness | open-seam | The retro can write its workspace, so it can make the digest agree. Follow-up: `failure-digest-outside-the-retro-workspace`. |
@@ -76,7 +78,7 @@ The test reads each row of this table. Column 2 holds one path in backticks. Col
 |---|---|---|---|
 | D1 | The inventory is this table, and the test parses it. | One list for the person and the test, so the two cannot drift. | A Go table beside the doc: two lists drift. A table only in the test: a person cannot read it. |
 | D2 | The test derives "agent-writable" from the profiles. | A widened write scope then fails the test, not a review. | A hand-written writer column alone: it is a claim, not a check. |
-| D3 | The build floor reads the apicover and strict lists from the base and the tree. | A build can add a package to a list, but it cannot drop one or lower a floor. | Mark both lists protected: then a lane cannot add its new package. Read the base list alone: then the floor does not enforce a new package. |
+| D3 | The build floor reads the apicover and strict lists from the base and the tree. It refuses a lane that drops a base line, lowers a base floor or writes a line that does not parse. The audit apicover gate also reads the list of the main plane. | A build can add a package to a list or raise a floor. It cannot drop or lower one, so a weaker list never lands from a lane. | Mark both lists protected: then a lane cannot add its new package. Read the base list alone: then the floor does not enforce a new package. Merge without a refusal: then the weaker list lands, and the next base is weaker (review of PR #1091). |
 | D4 | A host WARN outranks a PASS in the audit text. | The host verdict is harness evidence. The text is the auditor's claim. | Refuse the ship: a WARN ships by policy unless `strict_audit` is set. |
 | D5 | Two seams stay open, with follow-up items. | Each needs a new harness-owned record, which is its own change. | Close them here: that change touches the ledger, the TDD binding and the retro flow. |
 
@@ -84,8 +86,15 @@ The test reads each row of this table. Column 2 holds one path in backticks. Col
 
 - The test checks the sandbox write scopes. It does not check a tool allow-list. The builder profile denies Edit and Write on `go/acs/**`, but its shell can still write there. That is open seam 1.
 - The worktree check ignores `deny_subpaths`, so it can mark a path agent-writable that the sandbox denies. This errs toward a stricter class.
-- A lane cannot lower a floor or drop a package from an enforced list, because the base line still binds (D3). A maintainer who lowers a floor on purpose lands that change first, in its own commit. The next build then reads the new base.
-- The table names the gates that existed on 2026-10-21. A new gate needs a new row. A reviewer must add it, because the test cannot find gates by itself.
+- A lane cannot lower a floor or drop a package from an enforced list (D3). A maintainer who lowers a floor on purpose lands that change as an operator change of its own.
+- The D3 refusal has three exceptions, each fail-open on purpose:
+  - A dropped line passes when the package directory is gone from the tree, so a lane can delete a package with its lines.
+  - A base that cannot be read WARNs, and the check does not run. The base comes from `cycle-state.json`, which no launchable profile writes.
+  - A base `.cover-strict` that does not parse WARNs, and its floors are not compared.
+- The audit apicover gate reads the list of the main plane. When main is ahead of the base, a package that main added binds too. That fails closed.
+- The gate code of D3 is on `guards.ProtectedSurfaceManifest` (`floor_lists_base.go`, `floor_lists_regression.go`, `cover_changed_floor.go`). So is the test that reads this table. Its pinned list of `authority` rows fails when a row is relabelled.
+- The trust classes are a hand list. Only `authority` and `open-seam` rows are checked against the write scopes. A new gate needs a new row, and a reviewer must add it.
+- The ship test of D4 runs under `-tags integration`, which the cover-changed floor uses.
 
 ## Proof
 
