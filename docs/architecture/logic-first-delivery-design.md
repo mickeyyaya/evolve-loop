@@ -356,7 +356,7 @@ The request is the inbox item `explanation-correction-is-a-rung`: an inaccurate 
 How it works:
 
 - **The trigger.** `pendingExplanationCorrection` reads the audit report of the workspace with `reportdoc.ReasonedReview`, the reader the gate uses. It returns the cycle's `explanationdocs.DocumentPath` and the review's Evidence.
-- **The two dispatch roots.** `recordAndBranch` and the resume loop call `decideExplanationCorrection` after the audit FAIL decision. The live root releases the ship-window lease before it schedules Build.
+- **The two dispatch roots.** `recordAndBranch` and the resume loop call `decideExplanationCorrection` after the audit FAIL decision.
 - **The state.** `CycleState.ExplanationCorrections` holds the Evidence of each round, and its length is the budget used. `ExplanationCorrectionActive` seeds the next Build, and the Build that completes clears it.
 - **The brief.** `seedAuditRepairContext` gives that Build `CtxKeyExplanationReauthor` and `CtxKeyExplanationCorrection`. The second key lists the document lines the Evidence cites (`explanationCorrectionBrief`) and quotes the Evidence. The build prompt opens an "Explanation Correction" section: edit only those lines, rewrite the report, leave the code and the tests unchanged. The section does not say that the audit rejected the build.
 - **The record.** Each round emits INFO `ORCHESTRATOR_EXPLANATION_CORRECTION_RUNG` with `fields.round` and `fields.budget`. The cycle dossier carries `explanation_corrections` (`schemas/cycle-dossier.schema.json`).

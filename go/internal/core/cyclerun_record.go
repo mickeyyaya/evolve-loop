@@ -71,7 +71,6 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 	}
 
 	if branch, ok := cr.o.decideExplanationCorrection(&cr.cs, cr.current, dr.resp.Verdict); ok {
-		cr.releaseShipWindow()
 		cr.scheduledNext = branch
 	}
 
