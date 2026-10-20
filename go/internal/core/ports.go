@@ -182,6 +182,7 @@ type BridgeRequest struct {
 	CLI                 string             `json:"cli"`
 	Profile             string             `json:"profile"`
 	Model               string             `json:"model"`
+	Effort              string             `json:"effort,omitempty"`
 	Prompt              string             `json:"prompt"`
 	Workspace           string             `json:"workspace"`
 	Worktree            string             `json:"worktree,omitempty"`

@@ -127,6 +127,7 @@ func (b *BaseRunner) baseRequest(req core.PhaseRequest, prep phasePreparation, r
 		Agent:               prep.phase,
 		Cycle:               req.Cycle,
 		Attempt:             req.Attempt,
+		Effort:              resolved.plan.Effort,
 		BudgetScale:         req.BudgetScale,
 		RequireSandbox:      requiresExplanationSandbox(prep.phase, req),
 		Env:                 req.Env,

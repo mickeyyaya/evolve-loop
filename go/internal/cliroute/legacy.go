@@ -41,7 +41,7 @@ func (v resolver) legacyDispatch(req Request) (Decision, error) {
 	}
 	plan := llmroute.Resolve(req.Agent, req.Phase, req.DefaultModel, req.Env, prof, req.Expand, pin)
 	plan.Candidates = leadWith(req.CallerCLI, plan.Candidates)
-	if pin == nil && (req.Overlay.CLI != "" || req.Overlay.Tier != "") {
+	if pin == nil && req.Overlay != (llmroute.Overlay{}) {
 		plan = llmroute.ApplySoftOverlay(plan, req.Overlay, prof)
 	}
 	if pin == nil || pin.CLI == "" {

@@ -6,6 +6,7 @@ type LaunchIntent struct {
 	SettingsScope    string
 	SessionMode      string
 	Effort           string
+	LadderEffort     string
 	AllowedTools     []string
 	DisallowedTools  []string
 	SystemPromptFile string

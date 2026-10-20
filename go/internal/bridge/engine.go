@@ -152,6 +152,7 @@ type Config struct {
 	CLI                  string
 	Profile              string
 	Model                string
+	Effort               string
 	PromptFile           string
 	Workspace            string
 	StdoutLog            string
@@ -231,6 +232,9 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 	}
 	if req.Cycle > 0 {
 		args = append(args, "--cycle="+strconv.Itoa(req.Cycle))
+	}
+	if req.Effort != "" {
+		args = append(args, "--effort="+req.Effort)
 	}
 	if req.Agent != "" {
 		args = append(args, "--agent="+req.Agent)
