@@ -164,7 +164,14 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	}
 
 	if result.SystemFailure == nil {
-		if sig := detectLostLanding(cs.WorkspacePath, result.FinalVerdict); sig != nil {
+		if sig := detectLostLanding(landingEvidence{
+			Workspace:    cs.WorkspacePath,
+			ProjectRoot:  projectRoot,
+			PreCycleHEAD: preCycleHEAD,
+			Cycle:        cycle,
+			Shipped:      cs.Shipped,
+			FinalVerdict: result.FinalVerdict,
+		}); sig != nil {
 			result.SystemFailure = sig
 			result.FinalVerdict = lostLandingVerdict()
 		}

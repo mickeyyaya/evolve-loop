@@ -28,6 +28,30 @@ func assertDefaultSuiteTestsPass(t *testing.T, pkg string, names ...string) {
 	}
 }
 
+func TestC1544_001_APlantedBindingNeverClearsTheLostLandingFloor(t *testing.T) {
+	assertDefaultSuiteTestsPass(t, corePkg,
+		"TestDetectLostLanding_PlantedShipBindingDoesNotClearTheFloor",
+		"TestDetectLostLanding_ValidatedBindingClearsTheFloor",
+		"TestDetectLostLanding_CorruptBindingIsNotAWitness",
+		"TestDetectLostLanding_HostileActiveWorktreeCannotRedirectTheWitness",
+	)
+}
+
+func TestC1544_002_SuccessfulShipExitsAreNeverFlaggedLandingLost(t *testing.T) {
+	assertDefaultSuiteTestsPass(t, corePkg,
+		"TestDetectLostLanding_ShippedViaBuildExitIsNotFlagged",
+		"TestDetectLostLanding_CleanNoOpExitIsNotFlagged",
+		"TestFinalizeCycle_ShipLatchAndProjectRootReachTheFloor",
+	)
+}
+
+func TestC1544_003_TheWitnessIsCycleOwnedNeverRepoWide(t *testing.T) {
+	assertDefaultSuiteTestsPass(t, corePkg,
+		"TestDetectLostLanding_SiblingCycleBindingDoesNotCreditThisCycle",
+		"TestDetectLostLanding_WitnessNeverConsultsRepoHEAD",
+	)
+}
+
 func TestC1544_004_LostLandingEvidenceReachesTheCommittedDossier(t *testing.T) {
 	assertDefaultSuiteTestsPass(t, corePkg,
 		"TestDossierSystemFailure_LostLandingReachesTheCommittedDossier",

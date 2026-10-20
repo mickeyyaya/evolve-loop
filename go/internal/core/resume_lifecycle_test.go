@@ -107,7 +107,7 @@ func TestResumeLifecycle_EmptyTriageStopsBeforeImplementation(t *testing.T) {
 	}
 }
 
-func TestResumeLifecycle_LostLandingUsesSameTerminalFloor(t *testing.T) {
+func TestResumeLifecycle_AShipThatPassedAfterAStaleShipErrorIsNotALostLanding(t *testing.T) {
 	t.Parallel()
 
 	o, st, req, rp := resumedLifecycleFixture(t)
@@ -118,8 +118,8 @@ func TestResumeLifecycle_LostLandingUsesSameTerminalFloor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.FinalVerdict != VerdictWARN || got.SystemFailure == nil || got.SystemFailure.Category != "landing-lost" {
-		t.Fatalf("resume counted a lost landing as success: %+v", got)
+	if got.FinalVerdict != VerdictPASS || got.SystemFailure != nil {
+		t.Fatalf("the resumed ship PASSed, so the host latched the landing; the earlier ship-error is stale: %+v", got)
 	}
 }
 
