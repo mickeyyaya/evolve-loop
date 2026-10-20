@@ -8,11 +8,12 @@ import (
 
 var resumeRecoveryRoutes = map[Phase]bool{PhaseBuild: true, PhaseAudit: true, PhaseShip: true}
 
-func (cr *cycleRun) recoverResumedShip(next Phase, err error, resp PhaseResponse, attempts int) (Phase, bool) {
-	if !cr.recoverShipError(next, cr.staleBaseAsRebase(err), resp, attempts) {
-		return "", false
+func (cr *cycleRun) recoverResumedShip(next Phase, err error, resp PhaseResponse, attempts int) (Phase, bool, error) {
+	err = cr.staleBaseAsRebase(err)
+	if !cr.recoverShipError(next, err, resp, attempts) {
+		return "", false, err
 	}
-	return cr.scheduledNext, resumeRecoveryRoutes[cr.scheduledNext]
+	return cr.scheduledNext, resumeRecoveryRoutes[cr.scheduledNext], err
 }
 
 func (cr *cycleRun) staleBaseAsRebase(err error) error {

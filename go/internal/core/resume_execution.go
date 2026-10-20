@@ -163,12 +163,13 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		if err != nil {
 			dispatch.result, dispatch.phaseTimings = result, phaseTimings
-			if routed, recovered := dispatch.recoverResumedShip(next, err, resp, attempts); recovered {
+			routed, recovered, shipErr := dispatch.recoverResumedShip(next, err, resp, attempts)
+			if recovered {
 				cs, result, phaseTimings, shipRecoveries = dispatch.cs, dispatch.result, dispatch.phaseTimings, dispatch.recoveryDepth
 				cursor.rerouteFromShip(routed)
 				continue
 			}
-			phaseErr := fmt.Errorf("phase %s: %w", next, err)
+			phaseErr := fmt.Errorf("phase %s: %w", next, shipErr)
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
 			return result, phaseErr
 		}
