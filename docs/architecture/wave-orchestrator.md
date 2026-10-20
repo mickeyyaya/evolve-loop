@@ -266,6 +266,18 @@ In 30 windows of 8 pending items, admission gives 58 lanes against 120. The caus
   - **Rejected (c): reach by the exported API.** It needs a type-level diff of each edit before the launch. Admission runs before the build, so the diff does not exist yet. Its cost and its false negatives are high for a gain that the leaf rule already gives.
   - **Pinned by** `TestAdmit_ALeafLaneHoldsNoReachOverAnUnrelatedPackage` and the predicates `TestC1972_002` and `TestC1972_007`.
 
+**The shared-edit rule (ADR-0143, plan W1, built at stage `shadow`, 2026-10-20).** The reach of a lane that edits `internal/core` still held the backlog after the leaf rule. In wave 133 such a lane held 13 ready items for 71 minutes (research F2.3). `internal/core` imports 86 internal packages directly, so a smaller reach frees almost nothing (F2.4).
+
+- **The rule.** Admission holds a candidate only when its edits meet the edits of a lane in flight, or when both hold the hub cell. The reach checks (items 3b and 3c above) leave the rule. The composed-tree gate of the ship owns API drift between lanes (ADR-0105, research F2.5). The code name of the rule is `admission.Admitter.Optimistic`.
+- **The stage key.** `fleet.orchestrator.admission` (`shadow` \| `enforce`, compiled default `shadow`) chooses the rule. `policy.OrchestratorConfig.OptimisticAdmission()` reads it. Each `admission.Admitter` of the loop takes it: the pool (`cellAdmission`), the supply census (`Census.Optimistic`, set in `cmd_supply_wiring.go`) and the wave shadow (`admissionShadow`). Thus at `enforce` the census and the pool count by one rule. The loop gives the census no lanes in flight, so the census compares each ready item only with the ready items of higher rank.
+- **At `shadow`.** The reach rule decides, so the admitted set does not change. For each candidate that the reach rule holds, `Admit` also tests the shared-edit rule against the same holders. When that rule admits it, `Admit` calls `OnShadow`, and the sink `orchestrator.RecordShadow` publishes one `LOOP_ORCH_ADMISSION_SHADOW` event with `todo`, `held_by`, `rank`, `cells` and `reason`. The reason names the package where an edit meets a reach, for example `reach meets internal/router`.
+- **Once for each pair.** The pool asks admission again for each free slot, so the same held todo comes back on each pass. `orchestrator.RecordShadow` publishes each pair of todo and holder once in a pool run. A new holder of the same todo gets its own event.
+- **At `enforce`.** The shared-edit rule decides, and nothing records the shadow.
+- **A worked example.** Lane `core-todo` edits `go/internal/core/state.go`, and candidate `router-todo` edits `go/internal/router/router.go`. Core imports router, so the reach rule holds `router-todo` behind `core-todo`. The two todos edit no common package, so the shared-edit rule admits `router-todo`. At `shadow` the pool records `todo=router-todo held_by=core-todo reason="reach meets internal/router"` once, and `router-todo` waits. At `enforce`, `router-todo` launches.
+- **Why a second stage key.** `fleet.orchestrator.stage` is already `enforce`, and the pool runs only at that stage. The new rule needs its own shadow inside that pool, so it gets its own key (ADR-0143 decision 4).
+- **The measure that moves the stage (plan D3).** The shadow counts the candidates that the new rule frees. At `shadow` those candidates do not run beside their holder, so no composed-gate failure between such lanes can occur yet. The failure rate of D3 thus needs the ship-side record of plan D2. W1 does not build it. It is component W1b of the plan.
+- **Pinned by** `TestAdmit_OptimisticAdmitsACandidateThatOnlyTheRunningLaneImports`, `TestAdmit_OptimisticStillHoldsTwoTodosThatEditOnePackage`, `TestAdmit_OptimisticKeepsTheHubRule`, `TestAdmit_ShadowRecordsEachAdmissionTheReachRuleHoldsWithItsHolder`, `TestAdmit_ShadowNamesThePackageWhereTheReachOfTheCandidateMeetsTheEditOfTheHolder` and the 500-round property `TestAdmit_OptimisticAdmitsExactlyTheTodosThatShareNoPackageAndAreNotBothHubs`. In `orchestrator`: `TestRecordShadow_TwoPassesOverOneHeldTodoPublishOnce`, `TestRecordShadow_TheTodoAndItsHolderAreTheKeyNotTheReason` and `TestCensus_AtEnforceACandidateThatOnlyMeetsARunningLaneReachIsAdmissible`. In `cmd/evolve`: `TestCellAdmission_AtEnforceACoreLaneDoesNotHoldARouterTodo`, `TestAdmissionShadow_AtTheEnforceAdmissionKeyTheSharedEditRuleCounts` and `TestSupplyWiring_TheCensusTakesTheAdmissionRuleOfTheKey`.
+
 ## 7. The rolling pool
 
 ### Issue
@@ -557,13 +569,14 @@ The budget does not make a lane faster. It makes the lanes share the host, so th
 
 ### Config keys
 
-All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig()`. The `orchestrator` block is strict-decoded: an unknown key, an unknown `stage`, a negative number or a `window` key out of range refuses the policy. Built on 2026-10-17: `stage`, `scan_k`, `hub_min_importers`, `deadline_floor_minutes`, `stall_minutes` and `run_max_lanes`. Built on 2026-10-18: `window.start` and `window.min`.
+All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig()`. The `orchestrator` block is strict-decoded: an unknown key, an unknown `stage`, a negative number or a `window` key out of range refuses the policy. Built on 2026-10-17: `stage`, `scan_k`, `hub_min_importers`, `deadline_floor_minutes`, `stall_minutes` and `run_max_lanes`. Built on 2026-10-18: `window.start` and `window.min`. Built on 2026-10-20: `admission` (ADR-0143).
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `count` | int | 4 (was 3) | the largest window |
 | `min_lanes` | int | 2 | the smallest window after sizing |
 | `orchestrator.stage` | `shadow` \| `enforce` | `shadow` | §14 |
+| `orchestrator.admission` | `shadow` \| `enforce` | `shadow` | the admission rule (§6, ADR-0143). At `shadow` the reach rule decides, and the shared-edit rule is recorded. At `enforce` the shared-edit rule decides. |
 | `orchestrator.scan_k` | int | 32 | the admissible todos that admission scans for each free slot; at `enforce`, also the supply depth of the pool, `max(count, scan_k)` (§6) |
 | `orchestrator.hub_min_importers` | int | 120 | the importer count (direct or transitive) that makes a package a hub (§6) |
 | `orchestrator.deadline_floor_minutes` | int | 60 | the floor of the lane deadline |
@@ -581,6 +594,7 @@ All keys are under `.evolve/policy.json` `fleet`, decoded by `policy.FleetConfig
 | `LOOP_ORCH_SUPPLY` | `loop` | §4: after each census. The registry spelling of `orchestrator.supply`. INFO. |
 | `LOOP_ORCH_SUPPLY_SHORT` | `loop` | the admissible count is below the window. INFO. |
 | `LOOP_ORCH_ADMIT_WAIT` | `loop` | a todo waits for a cell. Once for each todo. |
+| `LOOP_ORCH_ADMISSION_SHADOW` | `loop` | §6: at `admission` `shadow`, the reach rule holds a todo that the shared-edit rule admits. Once for each todo and holder in a pool run. INFO. Fields `todo`, `held_by`, `rank`, `cells`, `reason`. |
 | `LOOP_FLEET_POLICY_INVALID` | `loop` | `.evolve/policy.json` does not load at batch start (for example a misspelt `fleet.orchestrator` key), so the loop runs sequential until it is fixed |
 | `LOOP_ORCH_LANE_LAUNCHED` | `loop` | §7: the first fill of a run launched a lane. INFO. |
 | `LOOP_ORCH_LANE_EXITED` | `loop` | §7: a lane exited and freed its slot and its cells. INFO. |
@@ -612,7 +626,7 @@ Each code goes into the Signal Center registry.
 | `shadow` | The barrier wave runs as now. The orchestrator computes the census, the sizing, the admission and the leases. It records each action that it computes, and changes nothing. | 3 runs: the admission costs at most 10% of the width. No computed deadline stop hits a lane that passed later. |
 | `enforce` | The orchestrator runs the lanes. | the soak at N = 16 with the simulated driver passes, and the conflict rate is at most 5% over 3 runs |
 
-The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each component lands in shadow first, so each part has a measure before it acts.
+The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each component lands in shadow first, so each part has a measure before it acts. One exception: `admission` stages the admission rule of ADR-0143 inside the pool, which runs only at `stage` `enforce` (§6).
 
 ## Guards
 

@@ -78,7 +78,7 @@ func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, itera
 	}
 	return orchestrator.AdmitByCell(admission.Admitter{
 		Graph: graph, Text: b.wave().InboxText(iteration),
-		Optimistic: oc.Admission == "enforce", OnShadow: orchestrator.RecordShadow(b.deps.Signals.Emit),
+		Optimistic: oc.OptimisticAdmission(), OnShadow: orchestrator.RecordShadow(b.deps.Signals.Emit),
 	})
 }
 

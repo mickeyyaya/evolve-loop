@@ -40,6 +40,7 @@ type ShadowAdmission struct {
 	Rank   int
 	Cells  []string
 	HeldBy string
+	Reason string
 }
 
 type Admitter struct {
@@ -74,8 +75,8 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 		fp := a.footprintOf(td)
 		d := Decision{ID: td.ID, Rank: rank, Cells: fp.cells()}
 		if blocker, busy := a.firstConflict(holders, fp); busy {
-			d.BlockedBy = blocker
-			a.recordShadow(holders, fp, d)
+			d.BlockedBy = blocker.lane
+			a.recordShadow(holders, fp, d, blocker)
 			waiting = append(waiting, d)
 			continue
 		}
@@ -85,20 +86,20 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 	return admitted, waiting
 }
 
-func (a Admitter) firstConflict(holders []holder, fp footprint) (string, bool) {
+func (a Admitter) firstConflict(holders []holder, fp footprint) (holder, bool) {
 	rule := conflict
 	if a.Optimistic {
 		rule = sharedEdit
 	}
 	for _, h := range holders {
 		if rule(h.fp, fp) {
-			return h.lane, true
+			return h, true
 		}
 	}
-	return "", false
+	return holder{}, false
 }
 
-func (a Admitter) recordShadow(holders []holder, fp footprint, d Decision) {
+func (a Admitter) recordShadow(holders []holder, fp footprint, d Decision, blocker holder) {
 	if a.OnShadow == nil || a.Optimistic {
 		return
 	}
@@ -107,7 +108,19 @@ func (a Admitter) recordShadow(holders []holder, fp footprint, d Decision) {
 			return
 		}
 	}
-	a.OnShadow(ShadowAdmission{ID: d.ID, Rank: d.Rank, Cells: d.Cells, HeldBy: d.BlockedBy})
+	a.OnShadow(ShadowAdmission{ID: d.ID, Rank: d.Rank, Cells: d.Cells, HeldBy: d.BlockedBy, Reason: "reach meets " + reachMet(blocker.fp, fp)})
+}
+
+func reachMet(x, y footprint) string {
+	var met []string
+	for _, pair := range [][2]map[string]bool{{x.edits, y.reach}, {y.edits, x.reach}} {
+		for p := range pair[0] {
+			if pair[1][p] {
+				met = append(met, strings.TrimPrefix(p, ModulePath+"/"))
+			}
+		}
+	}
+	return slices.Min(met)
 }
 
 func conflict(x, y footprint) bool {

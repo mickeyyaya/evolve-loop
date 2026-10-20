@@ -73,8 +73,8 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 | Id | Decision | Because | Rejected options and why |
 |---|---|---|---|
 | D1 | Admission holds a candidate only when it edits a package that a running lane edits, or when both are hubs. It drops the reach check. The ship-window lease usually serializes the ships of overlapping lanes. | F2.3 to F2.5, O1 to O5 | A1, A2, A4, A5: see §3. |
-| D2 | D1 starts at stage `shadow`. The admission shadow records each candidate that the reach rule holds and D1 admits, and the ship records each rebase conflict between two such lanes. | the stage pattern of ADR-0139 | Enforce at once: the conflict rate is unknown. |
-| D3 | After one wave of shadow, D1 moves to `enforce` if fewer than one in five new admissions fail the ship gate. | F2.5 | A fixed date: the data decides. |
+| D2 | D1 starts at stage `shadow`. The admission shadow records each candidate that the reach rule holds and D1 admits, and the ship records each rebase conflict between two such lanes. W1 builds the admission record only. At `shadow` such lanes never run together, so the ship record (W1b) counts only at `enforce`. | the stage pattern of ADR-0139 | Enforce at once: the conflict rate is unknown. |
+| D3 | After one wave of shadow, D1 moves to `enforce` if fewer than one in five new admissions fail the ship gate. The shadow gives the count of new admissions only. The failure rate comes from the ship record of W1b in the first `enforce` wave. Above one in five, the stage goes back to `shadow`. | F2.5 | A fixed date: the data decides. |
 | D4 | The build seat moves a family whose week window is at or above `headroom_pct` (default 60%) to the tail of the chain. It orders the rest by the measured lane time to a PASS of each family over the last 20 builds, from W0. With no measure yet, the order is claude, agy, agy-claude. A quota exit puts the family in the present cooldown. | F3.3, F3.5, O8, O9 | B1, B2: see §3. An order by call latency: O9. |
 | D5 | Until D4 lands, the policy sets the builder to claude first at the next boundary, because the week window is 14% used. | F3.5 | Wait for D4: the gain starts now. |
 | D6 | The build floor writes its package verdicts to the store of `internal/testverdict` with the content key of the ship. The audit does not write the store, because its test runs are tagged `acs` or `integration`, and a tagged run is never cacheable. The key also holds the toolchain, the test flags and the gate id, and the store refuses a record with no gate id. The ship skips a package with a green verdict on the same key, and it never reuses a FAIL. At `shadow` the ship looks up, still runs, and records each mismatch. After one wave with 0 mismatches it moves to `enforce`, and a new verb, `evolve verdicts wipe`, empties the store. | F4.2, F4.3, O6, O7 | C1, C3: see §3. The Go test cache: O6. |
@@ -98,7 +98,8 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 |---|---|---|---|
 | W0 | `evolve wave latency` (D7) | `cmd/evolve`, `internal/lanetime` | lane |
 | W1 | Optimistic admission at shadow (D1, D2) | `internal/admission` | lane |
-| W2 | The move of W1 to enforce (D3) | `.evolve/policy.json` | operator, after one wave |
+| W1b | The ship record of a composed-gate failure between two lanes that only D1 admitted (D2) | `internal/phases/ship`, `internal/orchestrator` | console, before W2 |
+| W2 | The move of W1 to enforce (D3): `fleet.orchestrator.admission` | `.evolve/policy.json` | operator, after one wave and W1b |
 | W3 | Claude first for the builder now (D5) | `.evolve/policy.json` through `evolve cli-routing set` | console, at the next boundary |
 | W4 | The headroom-aware family order (D4) | `internal/cliroute`, `internal/usageprobe` | console |
 | W5 | One verdict store for the floor and the ship (D6). The audit does not write the store, because its test runs are tagged `acs` or `integration`, and these runs are never cacheable. | `internal/testverdict`, `internal/core`, `internal/phases/ship` | console |
@@ -110,6 +111,9 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
   - with a running lane that edits `internal/core`, a candidate that edits `internal/router` is admitted;
   - two candidates that edit one package still never run at once, and the hub rule is unchanged;
   - at shadow, the admitted set is unchanged, and the shadow records the new admission.
+  - the shadow records each held todo once for each holder in a pool run, with the package where the edit meets the reach;
+  - at enforce, the supply census and the wave shadow count by the same rule as the pool.
+- **W1 status (2026-10-20):** shipped by lane cycle `ca763e7c2` (key `fleet.orchestrator.admission`, signal `LOOP_ORCH_ADMISSION_SHADOW`). A follow-up adds the once-for-each-pair shadow, its `reason` field, and the rule in the census and the wave shadow. W1b is pending (inbox item `wave-latency-w1b-ship-record-shared-edit-admissions`).
 - **W4:**
   - with the week window at 14% and no lane-time measure, the builder chain starts with claude;
   - at 60% claude leaves the chain head;

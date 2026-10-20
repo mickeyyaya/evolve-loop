@@ -150,3 +150,7 @@ func (f *FleetPolicy) validateWindowStart() error {
 	}
 	return nil
 }
+
+func (c OrchestratorConfig) OptimisticAdmission() bool {
+	return c.Admission == "enforce"
+}
