@@ -15,7 +15,7 @@ func TestFleetConfig_TheOrchestratorDefaultsToShadow(t *testing.T) {
 		"no fleet block":        {policy.Policy{}, 4},
 		"no orchestrator block": {policy.Policy{Fleet: &policy.FleetPolicy{Count: 4}}, 16},
 	} {
-		want := policy.OrchestratorConfig{Stage: "shadow", ScanK: 32, HubMinImporters: 120,
+		want := policy.OrchestratorConfig{Stage: "shadow", Admission: "shadow", ScanK: 32, HubMinImporters: 120,
 			DeadlineFloorMinutes: 60, StallMinutes: 30, RunMaxLanes: tc.runMaxLanes, WindowStart: 4, WindowMin: 4}
 		if got := tc.p.FleetConfig().Orchestrator; got != want {
 			t.Errorf("%s: Orchestrator = %+v, want %+v (run_max_lanes is 4 x count)", name, got, want)
@@ -28,7 +28,7 @@ func TestFleetConfig_TheOrchestratorKeysOverrideTheDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := policy.OrchestratorConfig{Stage: "enforce", ScanK: 8, HubMinImporters: 90, DeadlineFloorMinutes: 45, StallMinutes: 10, RunMaxLanes: 6, WindowStart: 6, WindowMin: 3}
+	want := policy.OrchestratorConfig{Stage: "enforce", Admission: "shadow", ScanK: 8, HubMinImporters: 90, DeadlineFloorMinutes: 45, StallMinutes: 10, RunMaxLanes: 6, WindowStart: 6, WindowMin: 3}
 	if got := p.FleetConfig().Orchestrator; got != want {
 		t.Fatalf("Orchestrator = %+v, want %+v", got, want)
 	}
@@ -74,7 +74,7 @@ func TestParse_RefusesABadOrchestratorBlock(t *testing.T) {
 
 func TestFleetConfig_ATypedOrchestratorBlockKeepsItsStage(t *testing.T) {
 	p := policy.Policy{Fleet: &policy.FleetPolicy{Orchestrator: &policy.FleetOrchestratorPolicy{Stage: "enforce"}}}
-	if got := p.FleetConfig().Orchestrator; got != (policy.OrchestratorConfig{Stage: "enforce", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 30, RunMaxLanes: 4, WindowStart: 4, WindowMin: 4}) {
+	if got := p.FleetConfig().Orchestrator; got != (policy.OrchestratorConfig{Stage: "enforce", Admission: "shadow", ScanK: 32, HubMinImporters: 120, DeadlineFloorMinutes: 60, StallMinutes: 30, RunMaxLanes: 4, WindowStart: 4, WindowMin: 4}) {
 		t.Errorf("Orchestrator = %+v, want enforce with the default scan_k and hub floor", got)
 	}
 }

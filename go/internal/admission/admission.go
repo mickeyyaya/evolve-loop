@@ -35,9 +35,18 @@ type Decision struct {
 	BlockedBy string
 }
 
+type ShadowAdmission struct {
+	ID     string
+	Rank   int
+	Cells  []string
+	HeldBy string
+}
+
 type Admitter struct {
-	Graph Graph
-	Text  func(id string) string
+	Graph      Graph
+	Text       func(id string) string
+	Optimistic bool
+	OnShadow   func(ShadowAdmission)
 }
 
 type footprint struct {
@@ -64,8 +73,9 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 		}
 		fp := a.footprintOf(td)
 		d := Decision{ID: td.ID, Rank: rank, Cells: fp.cells()}
-		if blocker, busy := firstConflict(holders, fp); busy {
+		if blocker, busy := a.firstConflict(holders, fp); busy {
 			d.BlockedBy = blocker
+			a.recordShadow(holders, fp, d)
 			waiting = append(waiting, d)
 			continue
 		}
@@ -75,17 +85,37 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 	return admitted, waiting
 }
 
-func firstConflict(holders []holder, fp footprint) (string, bool) {
+func (a Admitter) firstConflict(holders []holder, fp footprint) (string, bool) {
+	rule := conflict
+	if a.Optimistic {
+		rule = sharedEdit
+	}
 	for _, h := range holders {
-		if conflict(h.fp, fp) {
+		if rule(h.fp, fp) {
 			return h.lane, true
 		}
 	}
 	return "", false
 }
 
+func (a Admitter) recordShadow(holders []holder, fp footprint, d Decision) {
+	if a.OnShadow == nil || a.Optimistic {
+		return
+	}
+	for _, h := range holders {
+		if sharedEdit(h.fp, fp) {
+			return
+		}
+	}
+	a.OnShadow(ShadowAdmission{ID: d.ID, Rank: d.Rank, Cells: d.Cells, HeldBy: d.BlockedBy})
+}
+
 func conflict(x, y footprint) bool {
-	return (x.hub && y.hub) || meets(x.edits, y.edits) || meets(x.edits, y.reach) || meets(y.edits, x.reach)
+	return sharedEdit(x, y) || meets(x.edits, y.reach) || meets(y.edits, x.reach)
+}
+
+func sharedEdit(x, y footprint) bool {
+	return (x.hub && y.hub) || meets(x.edits, y.edits)
 }
 
 func meets(x, y map[string]bool) bool {

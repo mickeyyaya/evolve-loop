@@ -147,3 +147,7 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
   - The soak above proves the fix with no exclusion.
 - **The width-4 policy meets the window (2026-10-18).** PR #971 sets `count` 4 and `min_lanes` 4, with `orchestrator.stage` `enforce`. The default `window.start` is 4 and the default `window.min` is 4. Thus the pool runs all 4 lanes, and `.evolve/policy.json` has no `window` key.
   - *Implication:* a policy with a `count` above 4 must set `window.start` to `count` until the O6 loop calls `CleanLanding`. Without that key, the pool runs 4 lanes.
+
+## Admission shadow record (ADR-0143 W1)
+
+`RecordShadow` turns an `admission.ShadowAdmission` into the signal `LOOP_ORCH_ADMISSION_SHADOW` (INFO; `todo`, `held_by`, `rank`, `cells`). `AdmitByCell` is unchanged: the admitter it wraps decides.

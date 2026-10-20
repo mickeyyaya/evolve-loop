@@ -56,3 +56,9 @@ Built on 2026-10-17 as O3 of the wave-orchestrator plan, in the `shadow` stage. 
 | The pending queue in 30 windows of 8 todos | 120 lanes in total | 58 lanes in total | 52% |
 
 - **The cause of the 52%.** 120 of the 244 pending items edit `cmd/evolve` or `internal/core`. These packages import most of the module, so their `D` meets almost every other todo. The window test is a stress case: the orchestrator scans the whole queue, not 8 items. The S14 exit (at most 10% of the width over 3 runs) is measured by the shadow events of live runs. If the live cost is above 10%, the plan's fallback applies: the non-hub cells fall back to files (plan §4, "What changes our mind").
+
+## Optimistic rule and shadow record (ADR-0143 W1)
+
+- `Admitter.Optimistic` drops the import-reach term. Two todos conflict only when they edit one package or both touch the hub. A core lane no longer holds a router todo.
+- `Admitter.OnShadow` runs only under the reach rule. It receives a `ShadowAdmission` for each todo that the reach rule holds and the optimistic rule would admit, with the first holder as `HeldBy`. It changes no decision.
+- The policy key `fleet.orchestrator.admission` (`shadow` by default, `enforce`) selects the rule in `cellAdmission` (`go/cmd/evolve/cmd_loop_orchestrator.go`). The shadow event is `LOOP_ORCH_ADMISSION_SHADOW`.

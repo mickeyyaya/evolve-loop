@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -143,6 +144,14 @@ func (p Pool) check(todo, step string, err error) {
 	p.Publish.emit("Pool.recover", CodeLaneRecoveryFailed, signalcenter.SeverityWarn,
 		"orchestrator: "+step+" of "+todo+" after its deadline stop failed: "+err.Error(),
 		map[string]string{"todo": todo, "step": step, "error": err.Error()})
+}
+
+func RecordShadow(publish Publish) func(admission.ShadowAdmission) {
+	return func(s admission.ShadowAdmission) {
+		publish.emit("admission.Shadow", CodeAdmissionShadow, signalcenter.SeverityInfo,
+			fmt.Sprintf("optimistic admission would admit %s beside %s", s.ID, s.HeldBy),
+			map[string]string{"todo": s.ID, "held_by": s.HeldBy, "rank": strconv.Itoa(s.Rank), "cells": strings.Join(s.Cells, ",")})
+	}
 }
 
 func AdmitByCell(a admission.Admitter) Admit {
