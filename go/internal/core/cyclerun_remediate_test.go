@@ -16,6 +16,7 @@ type scriptedRunner struct {
 	verdicts   []string
 	calls      int
 	directives []string
+	attempts   []int
 }
 
 func (r *scriptedRunner) Name() string { return string(r.name) }
@@ -26,6 +27,7 @@ func (r *scriptedRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse
 	}
 	r.calls++
 	r.directives = append(r.directives, req.CorrectionDirective)
+	r.attempts = append(r.attempts, req.Attempt)
 	return PhaseResponse{Phase: string(r.name), Verdict: r.verdicts[i], ArtifactsDir: req.Workspace}, nil
 }
 

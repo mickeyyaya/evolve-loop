@@ -137,7 +137,7 @@ Each dispatch writes one try record into `llm-calls.ndjson`. These fields are ne
 
 `attempt` counts every dispatch of the phase in the cycle, including the correction rounds.
 
-L0 writes these fields. Until L5 wires the decider, each try records `rung` `R0`, `context` `new` and `ladder_stage` `shadow`, and `failure_class`, `fingerprint` and `ladder_would` stay empty. `served_model` is the transcript model of the try, else the footer label that the launch model check verified, else empty ([internal-bridge](packages/internal-bridge.md)). `evolve ladder report` reads the records of the run dirs and prints, for each rung and class, the tries, the fixes and the tokens.
+L0 writes these fields. Until L5 wires the decider, each try records `rung` `R0`, `context` `new` and `ladder_stage` `shadow`, and `failure_class`, `fingerprint` and `ladder_would` stay empty. `attempt` lives in the memory of the cycle run, so a resumed process starts it at 1 again. `served_model` is the transcript model of the try (`tokenusage.Result.ServedModel`), else the footer label that the launch model check verified, else empty ([internal-bridge](packages/internal-bridge.md)). `evolve ladder report` reads the records of the run dirs and prints, for each rung and class, the tries, the fixes and the tokens.
 
 ## 7. Policy
 
