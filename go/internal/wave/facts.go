@@ -30,6 +30,7 @@ var (
 
 type Cycle struct {
 	ID          int       `json:"id"`
+	Todo        string    `json:"todo,omitempty"`
 	Phase       string    `json:"phase,omitempty"`
 	Verdict     string    `json:"verdict,omitempty"`
 	Termination string    `json:"termination,omitempty"`
@@ -99,6 +100,9 @@ func sortedKeys(set map[int]bool) []int {
 func readCycle(root string, id int, live cyclestate.CycleState, d *dossier.Dossier) (Cycle, []string) {
 	ws := paths.RunWorkspace(root, id)
 	c := Cycle{ID: id}
+	if todos := core.LaneScopeIDs(ws); len(todos) > 0 {
+		c.Todo = todos[0]
+	}
 	st, ok, warnings := workspaceState(ws, id, live)
 	if ok {
 		c.Phase, c.Shipped = st.Phase, st.Shipped

@@ -92,14 +92,16 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	}
 	cur := records[len(records)-1]
 	cycles, warnings := wave.ReadCycles(plane.root, cur.CycleFloor, 0)
-	report.Wave, report.RunID, report.PID, report.Warnings = cur.Number, cur.RunID, cur.PID, warnings
+	loop, loopWarnings := wave.ReadLoopSignals(plane.root)
+	cycles = wave.ApplyLaneDeadlines(cycles, loop)
+	report.Wave, report.RunID, report.PID, report.Warnings = cur.Number, cur.RunID, cur.PID, append(warnings, loopWarnings...)
 	var startWarning string
 	report.PIDAlive, startWarning = waveOwnsPID(env, cur)
 	if startWarning != "" {
 		report.Warnings = append(report.Warnings, startWarning)
 	}
 	report.Outcome = wave.Facts{Cycles: cycles}.Outcome()
-	runs, measureWarnings := measureWaveRuns(plane, records, cycles, report.PIDAlive || report.LoopLive, env.now())
+	runs, measureWarnings := measureWaveRuns(plane, records, cycles, loop, report.PIDAlive || report.LoopLive, env.now())
 	report.Runs, report.Measures = runs, runs[len(runs)-1].Measures
 	report.Warnings = append(report.Warnings, measureWarnings...)
 	if over := len(cycles) - waveStatusMaxCycles; over > 0 {
@@ -135,6 +137,9 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 
 func waveCycleText(c wave.Cycle) string {
 	text := fmt.Sprintf("cycle %d: phase %s", c.ID, c.Phase)
+	if c.Termination == wave.TerminationLaneDeadline {
+		text = fmt.Sprintf("cycle %d: stopped: %s (phase %s)", c.ID, c.Termination, c.Phase)
+	}
 	if c.Verdict != "" {
 		shipped := "not shipped"
 		if c.Shipped {
