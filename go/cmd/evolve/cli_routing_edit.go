@@ -27,6 +27,7 @@ type routingSet struct {
 	effort    string
 	maxTier   string
 	maxEffort string
+	sharePct  int
 }
 
 func (s routingSet) setsBounds() bool { return s.maxTier != "" || s.maxEffort != "" }
@@ -35,8 +36,10 @@ func setRoutingKey(block policy.CLIRouting, set routingSet) (policy.CLIRouting, 
 	key, values, model := set.key, set.values, set.model
 	group, name, scoped := strings.Cut(key, ".")
 	switch {
-	case len(values) == 0 && set.effort == "" && !set.setsBounds():
+	case len(values) == 0 && set.effort == "" && set.sharePct == 0 && !set.setsBounds():
 		return block, fmt.Errorf("%s needs a value", key)
+	case set.sharePct != 0 && (!scoped || group != "tiers"):
+		return block, fmt.Errorf("--share-pct applies only to tiers.<tier>, not %s", key)
 	case set.setsBounds() && (!scoped || group != "agents"):
 		return block, fmt.Errorf("--max-tier and --max-effort apply only to agents.<agent>, not %s", key)
 	case model != "" && group != "agents":
@@ -56,7 +59,7 @@ func setRoutingKey(block policy.CLIRouting, set routingSet) (policy.CLIRouting, 
 	case key == "after_chain":
 		block.AfterChain = values[0]
 	case scoped && group == "tiers":
-		block.Tiers = withEntry(block.Tiers, name, tierRuleWith(block.Tiers[name], values, set.effort))
+		block.Tiers = withEntry(block.Tiers, name, tierRuleWith(block.Tiers[name], values, set))
 	case scoped && group == "work":
 		block.Work = withEntry(block.Work, name, values)
 	case scoped && group == "agents":
@@ -67,13 +70,12 @@ func setRoutingKey(block policy.CLIRouting, set routingSet) (policy.CLIRouting, 
 	return block, nil
 }
 
-func tierRuleWith(rule policy.TierRule, chain []string, effort string) policy.TierRule {
+func tierRuleWith(rule policy.TierRule, chain []string, set routingSet) policy.TierRule {
 	if len(chain) > 0 {
 		rule.CLIs = chain
 	}
-	if effort != "" {
-		rule.Effort = effort
-	}
+	rule.Effort = cmp.Or(set.effort, rule.Effort)
+	rule.SharePct = cmp.Or(set.sharePct, rule.SharePct)
 	return rule
 }
 
@@ -87,7 +89,20 @@ func agentRuleWith(rule policy.AgentRule, set routingSet) policy.AgentRule {
 	return rule
 }
 
-const effortSuffix = ".effort"
+const (
+	effortSuffix = ".effort"
+	shareSuffix  = ".share_pct"
+)
+
+func unsetShare(block policy.CLIRouting, group, name string) (policy.CLIRouting, error) {
+	rule, ok := block.Tiers[name]
+	if group != "tiers" || !ok {
+		return block, fmt.Errorf("%s.%s%s is not set (a share is set only on tiers.<tier>)", group, name, shareSuffix)
+	}
+	rule.SharePct = 0
+	block.Tiers = withEntry(block.Tiers, name, rule)
+	return block, nil
+}
 
 func unsetEffort(block policy.CLIRouting, group, name string) (policy.CLIRouting, error) {
 	switch group {
@@ -121,6 +136,9 @@ func unsetRoutingKey(block policy.CLIRouting, key string) (policy.CLIRouting, er
 	group, name, scoped := strings.Cut(key, ".")
 	if base, isEffort := strings.CutSuffix(name, effortSuffix); scoped && isEffort {
 		return unsetEffort(block, group, base)
+	}
+	if base, isShare := strings.CutSuffix(name, shareSuffix); scoped && isShare {
+		return unsetShare(block, group, base)
 	}
 	switch {
 	case key == "clis":

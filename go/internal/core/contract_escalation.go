@@ -113,7 +113,7 @@ func (cr *cycleRun) routingDecision(phase Phase) (cliroute.Decision, bool) {
 	router, err := cr.cliRouter(agent, prof)
 	d := cliroute.Decision{}
 	if err == nil {
-		d, err = router.Resolve(cliroute.Request{Agent: agent, Phase: string(phase), ProjectRoot: cr.req.ProjectRoot, Env: cr.envSnap})
+		d, err = router.Resolve(cliroute.Request{Agent: agent, Phase: string(phase), ProjectRoot: cr.req.ProjectRoot, Env: cr.envSnap, Cycle: cr.cycle})
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract escalation has no route: %v\n", phase, err)

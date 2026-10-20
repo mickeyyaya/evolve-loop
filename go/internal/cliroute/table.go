@@ -33,6 +33,7 @@ type Table struct {
 	bounds    map[string]retryladder.Bounds
 	orders    map[string]int
 	tiers     map[string][]string
+	shares    map[string]tierShare
 	stop      bool
 	pol       policy.Policy
 	catalog   Catalog

@@ -121,7 +121,7 @@ func DefaultPlanResolver(router *cliroute.Router) PlanResolver {
 	return func(req core.BridgeRequest) (llmroute.Plan, error) {
 		d, err := router.Resolve(cliroute.Request{
 			Agent: req.Agent, ProjectRoot: req.ProjectRoot, DefaultModel: req.Model, Env: req.Env, CallerCLI: req.CLI,
-			NeedsTools: req.Worktree != "",
+			NeedsTools: req.Worktree != "", Cycle: req.Cycle,
 		})
 		return d.Plan, err
 	}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanetime"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
@@ -49,6 +50,16 @@ func loadLaneTimes(evolveDir string) ([]lanetime.FamilyLane, error) {
 
 func projectLaneTimes(projectRoot string) ([]lanetime.FamilyLane, error) {
 	return loadLaneTimes(filepath.Join(projectRoot, ".evolve"))
+}
+
+func projectTierWeek(now func() time.Time, tierModel func(cli, tier string) (string, bool)) func(string, string, string) (quotastate.UsageWindow, bool, error) {
+	return func(projectRoot, family, tier string) (quotastate.UsageWindow, bool, error) {
+		model, ok := tierModel(family, tier)
+		if !ok {
+			return quotastate.UsageWindow{}, false, nil
+		}
+		return usageprobe.TierWeek(filepath.Join(projectRoot, ".evolve"), family, model, now())
+	}
 }
 
 func projectWeekUsed(now func() time.Time) func(string) (map[string]float64, error) {

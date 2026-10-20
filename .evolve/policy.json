@@ -64,11 +64,14 @@
       }
     },
     "tiers": {
-      "deep": [
-        "agy",
-        "agy-claude",
-        "claude"
-      ],
+      "deep": {
+        "clis": [
+          "agy",
+          "agy-claude",
+          "claude"
+        ],
+        "share_pct": 50
+      },
       "top": [
         "agy-claude",
         "claude"

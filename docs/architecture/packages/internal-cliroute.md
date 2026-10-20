@@ -121,6 +121,18 @@ The read-only verbs are `evolve cli-routing show [--static] [--json]` (agents gr
 
 An unknown key inside the block, or a `null` block or agent rule, is not a finding: `policy.Load` refuses the file (strict decode, see internal-policy.md).
 
+## The tier share (ADR-0150, 2026-10-21)
+
+> Spec of record: [deep-tier-share.md](../deep-tier-share.md). Plan: [deep-tier-share-2026-10](../../plans/deep-tier-share-2026-10.md).
+
+- `cli_routing.tiers.<tier>.share_pct` (1 to 99) gives the first family of the tier chain that percent of the seats at the tier. `compileShares` refuses a value outside 1 to 99, a tier with no `clis`, and a chain of one family. The key of each finding is `cli_routing.tiers.<tier>.share_pct`.
+- The stage `shareTier` runs after `applyLadder`. When the chain starts with the shared family, it hashes `<cycle>|<agent>|<phase>` into a bucket from 0 to 99 (`shareBucket`, FNV-1a). `Request.Cycle` carries the cycle from the runner and the bridge chain.
+- A bucket below the share keeps the seat. Otherwise, or when the family is paced, `lastFamily` moves the shared family to the end of the chain. The walk keeps it as a fallback.
+- The pace reads `Host.TierWeek` (production: `projectTierWeek` in `cmd/evolve`) and `Host.Now`. A family is paced when its week window is used faster than the week goes. A missing reader, a read error, no window or no reset time leave only the share, and the trace says why.
+- An explicit pin wins over the share (`sharePin`). The stage skips the share when an env override leads the chain. It also skips the share when the caller CLI or the advisor CLI of a profile-rule agent is in the shared family. The trace names the pin.
+- `Router.ShareNotes(projectRoot, chain)` gives one `share:` note for each shared tier whose family is in the chain. `evolve cli-routing explain` prints it.
+- Pinned by the `TestShare_*` tests in `share_test.go`, `TestShareNotes_NameEachSharedTierAndItsPace`, `TestCompile_AShareNeedsATierChainAndAPercentInRange` and `TestShareBucket_TheBucketsOfTheSpecExample`.
+
 ## The headroom order (W4, 2026-10-19)
 
 > Plan: [wave-latency-2026-10](../../plans/wave-latency-2026-10.md) D4 and W4. Research: [wave-latency-2026-10](../../research/wave-latency-2026-10.md) F3.3, F3.5, O8 and O9. The measure: [internal-lanetime.md](internal-lanetime.md). The week use: [internal-usageprobe.md](internal-usageprobe.md).
