@@ -14,7 +14,7 @@ import (
 
 const repoContractFloorDeadline = 120 * time.Second
 
-type RepoContractPackFn func(ctx context.Context, root string) (reds []string, diagnostic string, err error)
+type RepoContractPackFn func(ctx context.Context, projectRoot, root string) (reds []string, diagnostic string, err error)
 
 func RepoContractFloorChecks(run RepoContractPackFn) BuildFloorCheckFn {
 	return func(ctx context.Context, in ReviewInput) []string {
@@ -30,7 +30,7 @@ func RepoContractFloorChecks(run RepoContractPackFn) BuildFloorCheckFn {
 		}
 		runCtx, cancel := context.WithTimeout(ctx, repoContractFloorDeadline)
 		defer cancel()
-		reds, diagnostic, err := run(runCtx, in.Worktree)
+		reds, diagnostic, err := run(runCtx, in.ProjectRoot, in.Worktree)
 		if len(reds) == 0 {
 			if err != nil {
 				fmt.Fprintf(in.errOut(), "[build-floor] WARN repo-contract scanner pack exited nonzero naming no test (%v; the floor's deadline is %s); ship's gate runs the pack again before it pushes:\n%s\n", err, repoContractFloorDeadline, floorFailureDiagnostic(diagnostic))

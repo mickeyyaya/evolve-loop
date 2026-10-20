@@ -28,7 +28,7 @@ func TestProductionBuildFloorChecks_ReportsAScopeDeltaThroughTheComposedFloor(t 
 	writeScopeDeltaLane(t, filepath.Join(projectRoot, ".evolve"), "8", "g", "sib", "docs/beta.md")
 	prev := repoContractPack
 	t.Cleanup(func() { repoContractPack = prev })
-	repoContractPack = func(context.Context, string) ([]string, string, error) { return nil, "", nil }
+	repoContractPack = func(context.Context, string, string) ([]string, string, error) { return nil, "", nil }
 	center := signalcenter.New()
 	classes := map[string]string{}
 	center.Subscribe(func(e signalcenter.Event) {

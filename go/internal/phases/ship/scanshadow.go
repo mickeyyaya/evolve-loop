@@ -3,7 +3,6 @@ package ship
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,6 +21,11 @@ import (
 const (
 	CodeScanShadowEscape signalcenter.Code = "SHIP_SCAN_SHADOW_ESCAPE"
 	CodeScanShadowFault  signalcenter.Code = "SHIP_SCAN_SHADOW_FAULT"
+
+	shipGateID   = "ship"
+	floorGateID  = "build-floor"
+	stageEnforce = "enforce"
+	stageOff     = "off"
 )
 
 func init() {
@@ -35,6 +39,10 @@ type scanShadow struct {
 	signals *signalcenter.Center
 	cycle   int
 	limits  policy.ScanCacheConfig
+
+	gate       string
+	enforce    bool
+	recordOnly bool
 
 	root      string
 	treeID    string
@@ -51,10 +59,31 @@ type scanShadow struct {
 	recorded    int
 	unkeyed     int
 	storeErrors int
+	skipped     int
+	uncacheable int
 }
 
 func newScanShadow(store *testverdict.Store, run sysexec.RunFunc, signals *signalcenter.Center, cycle int, limits policy.ScanCacheConfig) *scanShadow {
-	return &scanShadow{store: store, run: run, signals: signals, cycle: cycle, limits: limits, settled: map[string]bool{}}
+	return &scanShadow{store: store, run: run, signals: signals, cycle: cycle, limits: limits, gate: shipGateID, enforce: limits.Gate == stageEnforce, settled: map[string]bool{}}
+}
+
+func newFloorRecorder(store *testverdict.Store, run sysexec.RunFunc, limits policy.ScanCacheConfig) *scanShadow {
+	return &scanShadow{store: store, run: run, limits: limits, gate: floorGateID, recordOnly: true, settled: map[string]bool{}}
+}
+
+func verdictStore(projectRoot string, now func() time.Time) *testverdict.Store {
+	return testverdict.NewStore(testverdict.DirFor(projectRoot), now)
+}
+
+func floorRecorderFor(projectRoot string) *scanShadow {
+	if projectRoot == "" {
+		return nil
+	}
+	cfg := policy.ScanCacheFor(projectRoot)
+	if cfg.Gate == stageOff {
+		return nil
+	}
+	return newFloorRecorder(verdictStore(projectRoot, time.Now), sysexec.DefaultRunner, cfg)
 }
 
 type scanShadowKey struct{}
@@ -73,15 +102,14 @@ func (p *Phase) scanShadowFor(req core.PhaseRequest) *scanShadow {
 		return nil
 	}
 	cfg := policy.ScanCacheFor(req.ProjectRoot)
-	if cfg.Gate == "off" {
+	if cfg.Gate == stageOff {
 		return nil
 	}
 	now := p.nowFn
 	if now == nil {
 		now = time.Now
 	}
-	store := testverdict.NewStore(filepath.Join(req.ProjectRoot, ".evolve", "landing", "testcache"), now)
-	return newScanShadow(store, sysexec.DefaultRunner, p.signals, req.Cycle, cfg)
+	return newScanShadow(verdictStore(req.ProjectRoot, now), sysexec.DefaultRunner, p.signals, req.Cycle, cfg)
 }
 
 func (s *scanShadow) begin(ctx context.Context, root string) {
@@ -91,7 +119,7 @@ func (s *scanShadow) begin(ctx context.Context, root string) {
 	defer s.guard("begin")
 	ctx, cancel := context.WithTimeout(ctx, s.limits.Budget)
 	defer cancel()
-	s.root = root
+	s.root, s.treeID, s.goVersion, s.buildEnv = root, "", "", nil
 	id, err := treeID(ctx, s.run, root, s.limits.MaxBytes)
 	if err != nil {
 		s.degrade(err.Error())
@@ -143,6 +171,10 @@ func (s *scanShadow) observe(o packOutcome) {
 func (s *scanShadow) settle(r pkgResult) {
 	defer s.guard("settle")
 	s.packages++
+	if !cacheable(r) {
+		s.uncacheable++
+		return
+	}
 	key, err := s.keyOf(r)
 	if err != nil {
 		s.unkeyed++
@@ -152,15 +184,31 @@ func (s *scanShadow) settle(r pkgResult) {
 		return
 	}
 	s.settled[key.Full] = true
-	_, hit := s.store.Lookup(key.File, nil)
+	if s.recordOnly {
+		s.recordGreen(r, key)
+		return
+	}
+	stored, hit := s.store.Lookup(key.File, nil)
 	switch {
 	case hit && r.Passed:
 		s.hits = append(s.hits, r.Package)
 	case hit:
-		s.escape(r, key)
+		s.escape(r, key, stored.Gate)
 	case r.Passed:
 		s.record(r, key)
 	}
+}
+
+func (s *scanShadow) recordGreen(r pkgResult, key testkey.Key) {
+	if r.Passed {
+		s.record(r, key)
+	}
+}
+
+func cacheable(r pkgResult) bool {
+	return len(r.Tags) == 0 && !slices.ContainsFunc(repoContractSelections, func(sel repocontract.TestSelection) bool {
+		return strings.HasSuffix(r.Package, strings.TrimPrefix(sel.Package, "."))
+	})
 }
 
 func (s *scanShadow) keyOf(r pkgResult) (testkey.Key, error) {
@@ -176,15 +224,18 @@ func (s *scanShadow) keyOf(r pkgResult) (testkey.Key, error) {
 }
 
 func (s *scanShadow) record(r pkgResult, key testkey.Key) {
-	rec := testverdict.Record{Package: r.Package, Outcome: testverdict.Pass, Key: key, Log: testkey.Log{Unknown: true}}
+	rec := testverdict.Record{Package: r.Package, Outcome: testverdict.Pass, Key: key, Log: testkey.Log{Unknown: true}, Gate: s.gate}
 	if err := s.store.Put(rec); err != nil {
 		s.storeErrors++
+		if s.storeErrors == 1 {
+			s.degrade("store: " + err.Error())
+		}
 		return
 	}
 	s.recorded++
 }
 
-func (s *scanShadow) escape(r pkgResult, key testkey.Key) {
+func (s *scanShadow) escape(r pkgResult, key testkey.Key, gate string) {
 	s.escapes++
 	s.signals.Emit(signalcenter.Event{
 		Cycle: s.cycle, Phase: phaseName,
@@ -196,6 +247,7 @@ func (s *scanShadow) escape(r pkgResult, key testkey.Key) {
 			"key":     key.File,
 			"tags":    strings.Join(r.Tags, ","),
 			"flags":   strings.Join(r.Flags, " "),
+			"gate":    gate,
 		},
 	})
 }
@@ -214,6 +266,9 @@ func (s *scanShadow) finish() {
 		"store_errors":  strconv.Itoa(s.storeErrors),
 		"dropped_lines": strconv.Itoa(s.dropped),
 		"hit_packages":  strings.Join(sortedCopy(s.hits), ","),
+		"stage":         s.stage(),
+		"skipped":       strconv.Itoa(s.skipped),
+		"uncacheable":   strconv.Itoa(s.uncacheable),
 	}
 	if s.degraded != "" {
 		fields["degraded"] = s.degraded
@@ -231,4 +286,11 @@ func sortedCopy(xs []string) []string {
 	out := slices.Clone(xs)
 	slices.Sort(out)
 	return out
+}
+
+func (s *scanShadow) stage() string {
+	if s.enforce {
+		return stageEnforce
+	}
+	return "shadow"
 }
