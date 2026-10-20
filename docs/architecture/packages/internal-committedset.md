@@ -33,3 +33,14 @@
 
 - **F30, cycle 1682**: a lane scoped to one dropped item ended as a claim failure. The dispositions reader gave triage's answer a typed form, so the closeout can end such a lane as planned no-work.
 - **Cycle 1621**: the lane pin named two members while `top_n` named one. That showed the four readers disagreed, and led to this package.
+
+## One declaration of the decision document (2026-10-21)
+
+The inbox item `decision-document-single-declaration` (F30 architecture review M2) found three readers of `dropped[]` and two of `skip_shipped[]`, each with its own struct. The import cycle that once justified the copies is gone, because `committedset` imports only the standard library.
+
+- `committedset` declares the wire tags once: `Dropped`, `SkipShipped`, `DroppedBucket`, `SkipShippedBucket` and `DecisionBuckets`. `DecisionBuckets` embeds the two buckets beside `escalate_block` and `skip_rejected`.
+- The readers embed `DecisionBuckets`: `DispositionsFrom`, `inboxmover.CommittedIDs`, `inboxmover.ClosedDroppedIDs` and `carryover.triageDroppedIDs`. Each keeps its own policy byte for byte, and their existing tests pass unchanged.
+- The writer `triagedecision` embeds only `DroppedBucket`, so its output keeps its keys and their order.
+- `TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags` fails when another non-test file declares `json:"dropped"` or `json:"skip_shipped"`.
+- Not done: the item proposes a new name for `inboxmover.CommittedIDs`. The acceptance does not ask for it, and the rename changes an exported name with its callers, so it is left for its own change.
+

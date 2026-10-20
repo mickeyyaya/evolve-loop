@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 )
 
@@ -122,9 +123,7 @@ func CommittedIDs(body []byte) []string {
 		TopN []struct {
 			ID string `json:"id"`
 		} `json:"top_n"`
-		SkipShipped []struct {
-			TaskID string `json:"task_id"`
-		} `json:"skip_shipped"`
+		committedset.SkipShippedBucket
 	}
 	if json.Unmarshal(body, &d) != nil {
 		return nil
@@ -158,12 +157,7 @@ func DeferredIDs(body []byte) []string {
 var closedDropReasons = []string{"already-shipped", "already-done", "already-landed", "duplicate", "superseded", "obsolete"}
 
 func ClosedDroppedIDs(body []byte) []string {
-	var d struct {
-		Dropped []struct {
-			ID     string `json:"id"`
-			Reason string `json:"reason"`
-		} `json:"dropped"`
-	}
+	var d committedset.DroppedBucket
 	if json.Unmarshal(body, &d) != nil {
 		return nil
 	}
