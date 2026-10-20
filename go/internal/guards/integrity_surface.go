@@ -3,6 +3,8 @@ package guards
 import (
 	"path"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -223,4 +225,18 @@ func normalizeSurfacePath(raw string) (string, bool) {
 		p += "/"
 	}
 	return strings.ToLower(p), true
+}
+
+var pathInTextRE = regexp.MustCompile(`[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+/?`)
+
+func ProtectedPathsIn(text string) []string {
+	var out []string
+	for _, tok := range pathInTextRE.FindAllString(text, -1) {
+		candidate := strings.TrimRight(tok, ".")
+		if IsProtectedScope(candidate) && !slices.Contains(out, candidate) {
+			out = append(out, candidate)
+		}
+	}
+	slices.Sort(out)
+	return out
 }
