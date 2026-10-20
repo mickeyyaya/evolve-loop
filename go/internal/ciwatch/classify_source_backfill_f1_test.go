@@ -94,7 +94,7 @@ func TestGHClassifySourceBackfillF1_ResolveAPullRequestUsesItsBaseBranchAndLates
 		ghRouteF1{prefix: "api repos/{owner}/{repo}/compare/release...h", out: compareJSONF1("ahead", "m", "go/a/a.go", "go/b/b.go")},
 		ghRouteF1{prefix: "run list --workflow", out: listJSONF1(runJSONF1(60, "h", 1, "in_progress", ""))},
 	)
-	ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetPR, "12"})
+	ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetPR, "12"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestGHClassifySourceBackfillF1_AFullFileListMarksThePullRequestDiffTruncate
 		ghRouteF1{prefix: "api repos/{owner}/{repo}/compare/main...h", out: compareJSONF1("ahead", "m", files...)},
 		ghRouteF1{prefix: "run list", out: "[]"},
 	)
-	ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetPR, "3"})
+	ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetPR, "3"})
 	if err != nil || !ch.Truncated || len(ch.Files) != compareFileCap {
 		t.Fatalf("change = %+v, err = %v; %d files is the API cap, so the list cannot be trusted", ch, err, compareFileCap)
 	}
@@ -141,7 +141,7 @@ func TestGHClassifySourceBackfillF1_EachPullRequestStepFailureIsReturnedWithTheP
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			routedGHF1(t, tc.routes...)
-			ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetPR, "5"})
+			ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetPR, "5"})
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v, want %q", err, tc.want)
 			}
@@ -158,7 +158,7 @@ func TestGHClassifySourceBackfillF1_ResolveASHAFindsItsCommitThenItsRun(t *testi
 		ghRouteF1{prefix: "run list --workflow", out: listJSONF1(runJSONF1(70, "h", 1, "completed", "success"))},
 		ghRouteF1{prefix: compareMainF1, out: compareJSONF1("ahead", "m", "go/x.go")},
 	)
-	ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetSHA, "abc1234"})
+	ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetSHA, "abc1234"})
 	if err != nil || ch.HeadSHA != "h" || ch.BaseSHA != "m" || ch.Run.RunID != 70 || !slices.Equal(ch.Files, []string{"go/x.go"}) {
 		t.Fatalf("change = %+v, err = %v", ch, err)
 	}
@@ -167,7 +167,7 @@ func TestGHClassifySourceBackfillF1_ResolveASHAFindsItsCommitThenItsRun(t *testi
 func TestGHClassifySourceBackfillF1_ResolveFailuresAndUnknownKinds(t *testing.T) {
 	t.Run("unknown commit", func(t *testing.T) {
 		routedGHF1(t, ghRouteF1{prefix: "api repos/{owner}/{repo}/commits/dead", err: errors.New("404")})
-		ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetSHA, "dead"})
+		ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetSHA, "dead"})
 		if err == nil || ch.HeadSHA != "" {
 			t.Fatalf("change = %+v, err = %v; want the lookup failure and no head", ch, err)
 		}
@@ -177,27 +177,27 @@ func TestGHClassifySourceBackfillF1_ResolveFailuresAndUnknownKinds(t *testing.T)
 			ghRouteF1{prefix: "api repos/{owner}/{repo}/commits/abc1234", out: `{"sha":"h"}`},
 			ghRouteF1{prefix: "run list", err: errors.New("runs 502")},
 		)
-		if _, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetSHA, "abc1234"}); err == nil || !strings.Contains(err.Error(), "runs 502") {
+		if _, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetSHA, "abc1234"}); err == nil || !strings.Contains(err.Error(), "runs 502") {
 			t.Fatalf("err = %v", err)
 		}
 	})
 	t.Run("a target kind the source cannot resolve", func(t *testing.T) {
 		routedGHF1(t)
-		_, err := NewGHClassifySource(".").Resolve(context.Background(), Target{Kind: "branch", Value: "main"})
+		_, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{Kind: "branch", Value: "main"})
 		if !errors.Is(err, ErrBadTarget) || !strings.Contains(err.Error(), `kind "branch"`) {
 			t.Fatalf("err = %v, want ErrBadTarget naming the kind", err)
 		}
 	})
 	t.Run("a run whose view carries no head sha stops before the base lookup", func(t *testing.T) {
 		seen := routedGHF1(t, ghRouteF1{prefix: "run view 9 --json", out: runJSONF1(9, "", 1, "queued", "")})
-		ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "9"})
+		ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "9"})
 		if err != nil || ch.HeadSHA != "" || ch.BaseSHA != "" || len(*seen) != 1 {
 			t.Fatalf("change = %+v, err = %v, calls = %v", ch, err, *seen)
 		}
 	})
 	t.Run("run view fails", func(t *testing.T) {
 		routedGHF1(t, ghRouteF1{prefix: "run view 9", err: errors.New("gone")})
-		if _, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "9"}); err == nil || !strings.Contains(err.Error(), "gone") {
+		if _, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "9"}); err == nil || !strings.Contains(err.Error(), "gone") {
 			t.Fatalf("err = %v", err)
 		}
 	})
@@ -206,7 +206,7 @@ func TestGHClassifySourceBackfillF1_ResolveFailuresAndUnknownKinds(t *testing.T)
 			ghRouteF1{prefix: "run view 9 --json", out: runJSONF1(9, "h", 1, "queued", "")},
 			ghRouteF1{prefix: "api repos", err: errors.New("compare 502")},
 		)
-		if _, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "9"}); err == nil || !strings.Contains(err.Error(), "compare 502") {
+		if _, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "9"}); err == nil || !strings.Contains(err.Error(), "compare 502") {
 			t.Fatalf("err = %v", err)
 		}
 	})
@@ -220,7 +220,7 @@ func TestGHClassifySourceBackfillF1_MainBaseHandlesCommitsAlreadyOnMain(t *testi
 			ghRouteF1{prefix: commitHF1, out: `{"sha":"h","parents":[{"sha":"p1"},{"sha":"p2"}]}`},
 			ghRouteF1{prefix: "api repos/{owner}/{repo}/compare/p1...h", out: compareJSONF1("ahead", "p1", "go/y.go")},
 		)
-		ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "9"})
+		ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "9"})
 		if err != nil || ch.BaseSHA != "p1" || !slices.Equal(ch.Files, []string{"go/y.go"}) {
 			t.Fatalf("change = %+v, err = %v; want the FIRST parent as the base", ch, err)
 		}
@@ -230,7 +230,7 @@ func TestGHClassifySourceBackfillF1_MainBaseHandlesCommitsAlreadyOnMain(t *testi
 			ghRouteF1{prefix: compareMainF1, out: compareJSONF1("identical", "h")},
 			ghRouteF1{prefix: commitHF1, out: `{"sha":"h","parents":[]}`},
 		)
-		ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "9"})
+		ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "9"})
 		if err != nil || ch.BaseSHA != "" || len(ch.Files) != 0 || ch.Truncated {
 			t.Fatalf("change = %+v, err = %v", ch, err)
 		}
@@ -240,7 +240,7 @@ func TestGHClassifySourceBackfillF1_MainBaseHandlesCommitsAlreadyOnMain(t *testi
 			ghRouteF1{prefix: compareMainF1, out: compareJSONF1("identical", "h")},
 			ghRouteF1{prefix: commitHF1, err: errors.New("commit 502")},
 		)
-		if _, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "9"}); err == nil || !strings.Contains(err.Error(), "commit 502") {
+		if _, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "9"}); err == nil || !strings.Contains(err.Error(), "commit 502") {
 			t.Fatalf("err = %v", err)
 		}
 	})
@@ -250,7 +250,7 @@ func TestGHClassifySourceBackfillF1_MainBaseHandlesCommitsAlreadyOnMain(t *testi
 			ghRouteF1{prefix: commitHF1, out: `{"sha":"h","parents":[{"sha":"p1"}]}`},
 			ghRouteF1{prefix: "api repos/{owner}/{repo}/compare/p1...h", err: errors.New("compare p1 502")},
 		)
-		ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "9"})
+		ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "9"})
 		if err == nil || !strings.Contains(err.Error(), "compare p1 502") || ch.BaseSHA != "" {
 			t.Fatalf("change = %+v, err = %v; a failed second comparison must not leak a half-known base", ch, err)
 		}
@@ -260,14 +260,14 @@ func TestGHClassifySourceBackfillF1_MainBaseHandlesCommitsAlreadyOnMain(t *testi
 func TestGHClassifySourceBackfillF1_LatestRunOnAndListRunsFailuresStayQueuedOrPropagate(t *testing.T) {
 	t.Run("no run yet is queued", func(t *testing.T) {
 		routedGHF1(t, ghRouteF1{prefix: "run list", out: "[]"})
-		st, err := NewGHClassifySource(".").LatestRunOn(context.Background(), "h")
+		st, err := NewGHClassifySource(".", "").LatestRunOn(context.Background(), "h")
 		if err != nil || st.Status != "queued" || st.RunID != 0 {
 			t.Fatalf("status = %+v, err = %v", st, err)
 		}
 	})
 	t.Run("a failed listing is an error and still reads as queued", func(t *testing.T) {
 		routedGHF1(t, ghRouteF1{prefix: "run list", err: errors.New("runs 502")})
-		st, err := NewGHClassifySource(".").LatestRunOn(context.Background(), "h")
+		st, err := NewGHClassifySource(".", "").LatestRunOn(context.Background(), "h")
 		if err == nil || st.Status != "queued" {
 			t.Fatalf("status = %+v, err = %v", st, err)
 		}
@@ -277,7 +277,7 @@ func TestGHClassifySourceBackfillF1_LatestRunOnAndListRunsFailuresStayQueuedOrPr
 			ghRouteF1{prefix: "run list", out: listJSONF1(runJSONF1(80, "h", 2, "completed", "failure"))},
 			ghRouteF1{prefix: "run view 80 --log-failed --attempt 2", err: errors.New("log 502")},
 		)
-		if _, err := NewGHClassifySource(".").MainRunsBefore(context.Background(), time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), 3); err == nil || !strings.Contains(err.Error(), "log 502") {
+		if _, err := NewGHClassifySource(".", "").MainRunsBefore(context.Background(), time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), 3); err == nil || !strings.Contains(err.Error(), "log 502") {
 			t.Fatalf("err = %v", err)
 		}
 	})
@@ -285,8 +285,9 @@ func TestGHClassifySourceBackfillF1_LatestRunOnAndListRunsFailuresStayQueuedOrPr
 		seen := routedGHF1(t,
 			ghRouteF1{prefix: "run list", out: listJSONF1(runJSONF1(81, "h", 0, "completed", "failure"))},
 			ghRouteF1{prefix: "run view 81 --log-failed", out: ghLog("job", "--- FAIL: TestA (0s)", "FAIL\tm/a\t0.1s")},
+			ghRouteF1{prefix: "api repos/{owner}/{repo}/actions/runs/81/artifacts", out: `{"artifacts":[]}`},
 		)
-		st, err := NewGHClassifySource(".").LatestRunOn(context.Background(), "h")
+		st, err := NewGHClassifySource(".", "").LatestRunOn(context.Background(), "h")
 		if err != nil || len(st.FailingTests) != 1 || st.FailingTests[0].Test != "TestA" {
 			t.Fatalf("status = %+v, err = %v", st, err)
 		}
@@ -299,13 +300,13 @@ func TestGHClassifySourceBackfillF1_LatestRunOnAndListRunsFailuresStayQueuedOrPr
 func TestGHClassifySourceBackfillF1_RerunFailed(t *testing.T) {
 	t.Run("the rerun request itself fails", func(t *testing.T) {
 		routedGHF1(t, ghRouteF1{prefix: "run rerun 5 --failed", err: errors.New("not permitted")})
-		if _, err := NewGHClassifySource(".").RerunFailed(context.Background(), 5, 1, time.Minute, time.Millisecond); err == nil || !strings.Contains(err.Error(), "not permitted") {
+		if _, err := NewGHClassifySource(".", "").RerunFailed(context.Background(), 5, 1, time.Minute, time.Millisecond); err == nil || !strings.Contains(err.Error(), "not permitted") {
 			t.Fatalf("err = %v", err)
 		}
 	})
 	t.Run("a status poll fails", func(t *testing.T) {
 		routedGHF1(t, ghRouteF1{prefix: "run rerun 5", out: ""}, ghRouteF1{prefix: "run view 5", err: errors.New("view 502")})
-		if _, err := NewGHClassifySource(".").RerunFailed(context.Background(), 5, 1, time.Minute, time.Millisecond); err == nil || !strings.Contains(err.Error(), "view 502") {
+		if _, err := NewGHClassifySource(".", "").RerunFailed(context.Background(), 5, 1, time.Minute, time.Millisecond); err == nil || !strings.Contains(err.Error(), "view 502") {
 			t.Fatalf("err = %v", err)
 		}
 	})
@@ -313,7 +314,7 @@ func TestGHClassifySourceBackfillF1_RerunFailed(t *testing.T) {
 		routedGHF1(t, ghRouteF1{prefix: "run rerun 5", out: ""}, ghRouteF1{prefix: "run view 5 --json", out: runJSONF1(5, "h", 1, "in_progress", "")})
 		guard, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		st, err := NewGHClassifySource(".").RerunFailed(guard, 5, 1, 0, 30*time.Minute)
+		st, err := NewGHClassifySource(".", "").RerunFailed(guard, 5, 1, 0, 30*time.Minute)
 		if err != nil || st.Attempt != 1 || st.Status != "in_progress" {
 			t.Fatalf("status = %+v, err = %v; want the stale observation, not an error", st, err)
 		}
@@ -322,7 +323,7 @@ func TestGHClassifySourceBackfillF1_RerunFailed(t *testing.T) {
 		routedGHF1(t, ghRouteF1{prefix: "run rerun 5", out: ""}, ghRouteF1{prefix: "run view 5 --json", out: runJSONF1(5, "h", 1, "in_progress", "")})
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		st, err := NewGHClassifySource(".").RerunFailed(ctx, 5, 1, time.Hour, time.Millisecond)
+		st, err := NewGHClassifySource(".", "").RerunFailed(ctx, 5, 1, time.Hour, time.Millisecond)
 		if !errors.Is(err, context.Canceled) || st.RunID != 0 {
 			t.Fatalf("status = %+v, err = %v; want context.Canceled and no run", st, err)
 		}
@@ -343,7 +344,7 @@ func TestGHClassifySourceBackfillF1_RerunFailed(t *testing.T) {
 			}
 			return nil, fmt.Errorf("unrouted: %s", joined)
 		})
-		st, err := NewGHClassifySource(".").RerunFailed(context.Background(), 5, 1, time.Minute, time.Millisecond)
+		st, err := NewGHClassifySource(".", "").RerunFailed(context.Background(), 5, 1, time.Minute, time.Millisecond)
 		if err != nil || st.Attempt != 2 || st.Conclusion != ConclusionSuccess || views != 3 {
 			t.Fatalf("status = %+v, err = %v, views = %d", st, err, views)
 		}

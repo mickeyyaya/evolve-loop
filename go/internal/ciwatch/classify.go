@@ -37,6 +37,7 @@ type Evidence struct {
 type FailingTest struct {
 	Package string   `json:"package"`
 	Test    string   `json:"test"`
+	Step    string   `json:"step,omitempty"`
 	Jobs    []string `json:"jobs"`
 }
 
@@ -242,6 +243,9 @@ func failureKeys(run RunStatus) map[string]bool {
 }
 
 func failureKey(f FailingTest) string {
+	if f.Step != "" {
+		return "step\x00" + f.Step
+	}
 	if f.Package == "" && f.Test == "" {
 		return "job\x00" + strings.Join(f.Jobs, ",")
 	}

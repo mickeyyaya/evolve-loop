@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A fixture of run 39389719309 yields only the sizeratchet failure rows (sizeratchet TestRatchet_ModuleFunctionsFitTheirAllowances and the cmd/evolve ratchet test that runs the same check) plus the CI required step row; no fixture text row",
+    "Run 39381369373 yields the step row make apicover-check",
+    "Text inside the output of another test never becomes a failure row",
+    "New and changed functions at 100% coverage"
+  ],
+  "created_at": "2026-10-20T09:30:00Z",
+  "files": [
+    "go/internal/ciwatch",
+    "go/cmd/evolve/cmd_ci.go",
+    "docs/architecture/packages/internal-ciwatch.md"
+  ],
+  "fix": "Read the failures of a run from the go test -json stream that each test job uploads (test-integration.json in the coverage-* artifacts): a row is a failed top-level test of a failed package, or a failed package with no failed test. Keep the --log-failed text only for the job names and for non-test failures, named by the failing make target or step. Fall back to the text parser when a run has no test JSON or is a rerun attempt. Pin the four real runs as trimmed testdata fixtures; RED first on run 39389719309. Update the internal/ciwatch package note.",
+  "id": "ci-classify-ignores-printed-test-output",
+  "kind": "fix",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "source": "console triage of PRs #1017 #1020 #1022 #1030, 2026-10-20",
+  "summary": "On CI runs 39381369373, 39385027012, 39386265940 and 39389719309 (PRs #1017, #1020, #1022, #1030) `evolve ci classify` listed acs/cycle1946 TestC1946_001_CoreStatementCoverageIsFull, TestRatchet_NoNewRawGitFixtures, TestInnerRunCycleErrorF4, TestPersonaStopCriterionDedupe_CombinedLineCountReduced and a package p / test TestF. All of them are fixture text that passing tests print (for example go/internal/core/floor_blocker_notes_test.go:172). The real failures were make apicover-check (#1017), repocontract TestPackages_HoldEveryTestThatReadsTheWholeTree (#1020) and sizeratchet TestRatchet_ModuleFunctionsFitTheirAllowances (#1022, #1030); the classifier missed all of them. The parser reads the --log-failed text, and go test -json interleaves the output of all packages, so the text cannot tell a printed line from a result line.",
+  "title": "evolve ci classify lists fixture text that passing tests print as CI failures and misses the real failures",
+  "weight": 0.9,
+  "consumed": {
+    "at": "2026-10-20T09:30:00Z",
+    "via": "console-manual",
+    "resolution": "branch fix/ci-classify-printed-output: ci classify reads failures from the go test -json artifact (failed top-level tests of failed packages), names non-test failures by make target or step, and falls back to the log text only without test JSON or on a rerun attempt; four real runs pinned under go/internal/ciwatch/testdata/cirun"
+  }
+}
