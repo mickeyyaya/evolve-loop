@@ -57,16 +57,11 @@ func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) {
 			continue
 		}
 		answers[d.ID] = noWorkRouteReason(in.Cycle, d)
-		if present, alreadyRouted := itemRouteState(inboxDir, d.ID, os.ReadFile); !present || alreadyRouted {
-			continue
+		routed, err := handOffDisposition(in, opts, inboxDir, d, answers[d.ID])
+		if routed {
+			res.Routed = append(res.Routed, d.ID)
 		}
-		if _, err := inboxmover.RouteConsole(opts, d.ID, answers[d.ID], in.Cycle); err != nil {
-			if !errors.Is(err, inboxmover.ErrNotFound) {
-				errs = append(errs, err)
-			}
-			continue
-		}
-		res.Routed = append(res.Routed, d.ID)
+		errs = appendErr(errs, err)
 	}
 	if err := committedset.WriteHandoff(in.Workspace, committedset.Handoff{Cycle: in.Cycle, Routed: res.Routed}); err != nil {
 		errs = append(errs, fmt.Errorf("record the no-work hand-off: %w", err))
@@ -80,6 +75,31 @@ func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) {
 		errs = append(errs, err)
 	}
 	return res, errors.Join(errs...)
+}
+
+func handOffDisposition(in NoWorkInputs, opts inboxmover.Options, inboxDir string, d committedset.Disposition, reason string) (bool, error) {
+	path, alreadyRouted := itemRouteState(inboxDir, d.ID, os.ReadFile)
+	switch {
+	case path == "":
+		return false, nil
+	case alreadyRouted:
+		return false, stampDropEvidence(in, path, d)
+	}
+	routed, err := inboxmover.RouteConsole(opts, d.ID, reason, in.Cycle)
+	if err != nil {
+		if errors.Is(err, inboxmover.ErrNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, stampDropEvidence(in, routed.Path, d)
+}
+
+func appendErr(errs []error, err error) []error {
+	if err == nil {
+		return errs
+	}
+	return append(errs, err)
 }
 
 func retireUnbackedScope(opts inboxmover.Options, cycle int, scope []string, answers map[string]string) ([]string, error) {
@@ -99,20 +119,20 @@ func retireUnbackedScope(opts inboxmover.Options, cycle int, scope []string, ans
 	return retired, errors.Join(errs...)
 }
 
-func itemRouteState(inboxDir, id string, readFile func(string) ([]byte, error)) (present, consoleRouted bool) {
+func itemRouteState(inboxDir, id string, readFile func(string) ([]byte, error)) (path string, consoleRouted bool) {
 	loc, err := inboxmover.Locate(inboxDir, id)
 	if err != nil {
-		return false, false
+		return "", false
 	}
 	body, err := readFile(loc.Path)
 	if err != nil {
-		return true, false
+		return loc.Path, false
 	}
 	var item struct {
 		Route string `json:"route"`
 	}
 	_ = json.Unmarshal(body, &item)
-	return true, strings.HasPrefix(item.Route, "console")
+	return loc.Path, strings.HasPrefix(item.Route, "console")
 }
 
 func noWorkRouteReason(cycle int, d committedset.Disposition) string {

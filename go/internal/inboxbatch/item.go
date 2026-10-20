@@ -37,6 +37,9 @@ type Item struct {
 	Acceptance      []string                   `json:"acceptance,omitempty"`
 	DeliverableKind string                     `json:"deliverable_kind,omitempty"`
 	CreatedAt       string                     `json:"created_at,omitempty"`
+	PremiseVerified string                     `json:"-"`
+	StaleDrops      int                        `json:"-"`
+	LastStaleDropAt string                     `json:"-"`
 	Path            string                     `json:"-"`
 	mentions        []string
 	basenames       []string
@@ -64,6 +67,10 @@ func (it *Item) UnmarshalJSON(raw []byte) error {
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err == nil {
 		it.mentions, it.basenames = mentionedFiles(doc)
+		it.PremiseVerified, _ = doc[PremiseVerifiedAtField].(string)
+		it.LastStaleDropAt, _ = doc[LastStaleDropAtField].(string)
+		drops, _ := doc[StaleDropsField].(float64)
+		it.StaleDrops = int(drops)
 	}
 	return nil
 }
@@ -356,4 +363,12 @@ func StripControl(s string) string {
 		}
 		return r
 	}, s)
+}
+
+const StaleDropHold = 2
+
+func VerifiedAfter(verifiedAt, lastDropAt string) bool {
+	v, verr := time.Parse(time.RFC3339, strings.TrimSpace(verifiedAt))
+	l, lerr := time.Parse(time.RFC3339, strings.TrimSpace(lastDropAt))
+	return verr == nil && (lerr != nil || v.After(l))
 }

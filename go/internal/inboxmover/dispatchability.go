@@ -1,6 +1,8 @@
 package inboxmover
 
 import (
+	"fmt"
+
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
 )
@@ -57,6 +59,9 @@ const (
 func PlaceOnLaneMenu(opts Options, it inboxbatch.Item, isProtected func(string) bool) (MenuPlace, string) {
 	if routed, reason := inboxbatch.ConsoleRouted(it, isProtected); routed {
 		return MenuConsole, reason
+	}
+	if it.StaleDrops >= inboxbatch.StaleDropHold && !inboxbatch.VerifiedAfter(it.PremiseVerified, it.LastStaleDropAt) {
+		return MenuConsole, fmt.Sprintf("stale-dropped %d times since its premise was last verified; run `evolve inbox verify %s --evidence <text>` first", it.StaleDrops, it.ID)
 	}
 	opts.resolveOpts()
 	if claimDir, _, held := claimHolding(opts.InboxDir, it.ID); held {

@@ -15,10 +15,10 @@ func TestItemRouteState_ALocatedItemThatCannotBeReadIsPresentAndNotConsoleRouted
 	}
 	failing := func(string) ([]byte, error) { return nil, errors.New("read raced away") }
 
-	present, routed := itemRouteState(inbox, "a", failing)
+	path, routed := itemRouteState(inbox, "a", failing)
 
-	if !present || routed {
-		t.Fatalf("an unreadable located item: present=%v routed=%v, want present=true routed=false", present, routed)
+	if path != filepath.Join(inbox, "a.json") || routed {
+		t.Fatalf("an unreadable located item: path=%q routed=%v, want the located path and routed=false", path, routed)
 	}
 }
 
@@ -29,9 +29,9 @@ func TestItemRouteState_ReadsTheConsoleStampThroughTheRealReader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	present, routed := itemRouteState(inbox, "a", os.ReadFile)
+	path, routed := itemRouteState(inbox, "a", os.ReadFile)
 
-	if !present || !routed {
-		t.Fatalf("a console-stamped item: present=%v routed=%v, want both true", present, routed)
+	if path != filepath.Join(inbox, "a.json") || !routed {
+		t.Fatalf("a console-stamped item: path=%q routed=%v, want the located path and routed=true", path, routed)
 	}
 }

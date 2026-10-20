@@ -12,8 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "last_failure_class", "last_failure_fingerprint", "last_failure_reason", "protected_files", "released_continuations",
-	"retired_cycle", "retired_reason", "route", "routed_at", "routed_cycle", "routed_reason", "unbacked"}
+var loopStampKeys = []string{"consumed", "continuation", "evidence_note", "evidence_verified", "failure_count", "git_sha", "last_failure_class", "last_failure_fingerprint", "last_failure_reason",
+	"last_stale_drop_at", "protected_files", "released_continuations", "retired_cycle", "retired_reason", "route", "routed_at", "routed_cycle", "routed_reason", "stale_drops", "unbacked"}
 
 var operatorStampKeys = []string{"premise_verified_at", "premise_verified_evidence", "premise_verified_sha"}
 
