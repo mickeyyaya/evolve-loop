@@ -61,7 +61,7 @@ func pastePrompt(ctx context.Context, deps Deps, pfx, session, promptFile string
 	return out, nil
 }
 
-func humanSendKeysCSV(ctx context.Context, deps Deps, session, csv string) {
+func humanSendKeysCSV(ctx context.Context, deps Deps, session, csv, rule string) {
 	for _, tok := range strings.Split(csv, ",") {
 		if tok == "Enter" {
 			_ = deps.Tmux.SendKeys(ctx, session, "", true)
@@ -70,7 +70,7 @@ func humanSendKeysCSV(ctx context.Context, deps Deps, session, csv string) {
 		}
 		deps.Sleep(humanSampleMS(65, 20))
 	}
-	fmt.Fprintf(deps.Stderr, "[human-input] sent keys: %s\n", csv)
+	fmt.Fprintf(deps.Stderr, "[human-input] sent keys: %s (rule=%s)\n", csv, rule)
 }
 
 func humanReadingPause(deps Deps, text string) {

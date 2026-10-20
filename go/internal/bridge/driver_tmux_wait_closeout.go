@@ -19,6 +19,7 @@ func (w replWaiter) closeout(state *replWaitState) (replWaitResult, int) {
 
 	strippedPane := strippedForExhaustionScan(state.result.lastGoodPane, w.responder.injectedPrompt)
 	warnExhaustionRegexDrift(w.deps.Stderr, w.prefix, w.launch.name, strippedPane, state.paneProfile.ExhaustedRegex)
+	warnPromptRuleDrift(w.deps.Stderr, w.prefix, w.launch.name, strippedPane)
 	transient := classifyTransientPane(w.launch.name, strippedPane)
 	w.writeArtifactTimeoutMarker(state, transient)
 
