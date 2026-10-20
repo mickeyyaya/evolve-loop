@@ -1,6 +1,7 @@
 package usageprobe
 
 import (
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
@@ -38,4 +39,36 @@ func familyWeekPct(w quotastate.UsageWindow, now time.Time) (float64, bool) {
 		return fullWindowPct, true
 	}
 	return w.PercentUsed, true
+}
+
+func TierWeek(evolveDir, family, model string, now time.Time) (quotastate.UsageWindow, bool, error) {
+	all, err := LoadObservations(evolveDir)
+	if err != nil {
+		return quotastate.UsageWindow{}, false, err
+	}
+	var familyWindow, modelWindow *quotastate.UsageWindow
+	for _, obs := range all {
+		if obs.Error != "" {
+			continue
+		}
+		for i := range obs.Windows {
+			w := obs.Windows[i]
+			if w.Kind != quotastate.KindWeek || w.Family != family || (w.ResetsAt != nil && !now.Before(*w.ResetsAt)) {
+				continue
+			}
+			switch {
+			case w.Model == "":
+				familyWindow = &w
+			case strings.HasPrefix(model, w.Model):
+				modelWindow = &w
+			}
+		}
+	}
+	if modelWindow != nil {
+		return *modelWindow, true, nil
+	}
+	if familyWindow != nil {
+		return *familyWindow, true, nil
+	}
+	return quotastate.UsageWindow{}, false, nil
 }

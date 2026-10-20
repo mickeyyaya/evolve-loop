@@ -154,3 +154,24 @@ func TestTierRule_AnEmptyRuleDoesNotMarshal(t *testing.T) {
 		t.Fatalf("MarshalJSON(empty) = %s, want an error: an empty rule names no CLI and no effort", raw)
 	}
 }
+
+func TestTierRule_AShareKeepsTheObjectFormThroughARoundTrip(t *testing.T) {
+	raw, err := json.Marshal(policy.TierRule{CLIs: []string{"agy", "claude"}, SharePct: 40})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != `{"clis":["agy","claude"],"share_pct":40}` {
+		t.Fatalf("marshal = %s, want the object form that keeps share_pct", raw)
+	}
+	var back policy.TierRule
+	if err := json.Unmarshal(raw, &back); err != nil || back.SharePct != 40 || len(back.CLIs) != 2 {
+		t.Fatalf("round trip = %+v, %v", back, err)
+	}
+}
+
+func TestTierRule_AShareWithoutAChainDoesNotMarshal(t *testing.T) {
+	_, err := json.Marshal(policy.TierRule{Effort: "high", SharePct: 50})
+	if err == nil || !strings.Contains(err.Error(), "share_pct needs clis") {
+		t.Fatalf("err = %v, want the share_pct hint", err)
+	}
+}

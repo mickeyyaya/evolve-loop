@@ -98,6 +98,8 @@ func routingHost(logw io.Writer, now func() time.Time) cliroute.Host {
 		Toolless:  gobridge.LacksToolUse,
 		WeekUsed:  projectWeekUsed(now),
 		LaneTimes: projectLaneTimes,
+		TierWeek:  projectTierWeek(now, resolveModelTier),
+		Now:       now,
 	}
 }
 

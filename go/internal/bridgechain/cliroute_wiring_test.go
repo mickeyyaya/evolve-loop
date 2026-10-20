@@ -102,3 +102,21 @@ func TestUnlaunched_AnEmptyWalkWithNoErrorStillNamesTheCause(t *testing.T) {
 		t.Fatalf("a walk with no attempt and no error never formats a nil cause: %v", err)
 	}
 }
+
+func TestDefaultPlanResolver_TheCycleReachesTheDeepTierShare(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, ".evolve", "profiles")
+	writeProfile(t, dir, "retrospective", map[string]any{"name": "retrospective", "cli": "agy-tmux", "model_tier_default": "deep"})
+	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"},
+		Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"agy", "claude"}, SharePct: 50}}}
+	resolve := bridgechain.DefaultPlanResolver(routerOver(t, dir, policy.Policy{CLIRouting: &block}))
+
+	leads := map[string]bool{}
+	for cycle := 1; cycle <= 20; cycle++ {
+		plan := mustPlan(t, resolve, core.BridgeRequest{Agent: "retrospective", Model: "deep", ProjectRoot: root, Cycle: cycle})
+		leads[plan.Candidates[0]] = true
+	}
+	if !leads["agy-tmux"] || !leads["claude-tmux"] {
+		t.Fatalf("over 20 cycles a 50%% share must lead with both families, got %v; the cycle must reach the share", leads)
+	}
+}
