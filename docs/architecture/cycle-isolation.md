@@ -88,6 +88,8 @@ is disabled (`EVOLVE_SANDBOX=off`). This is the load-bearing layer.
 
 **Applies only on Claude Code.** The bridge passes both lists to
 `claude-tmux` as `--allowedTools` and `--disallowedTools` (since 2026-10-20).
+`claude-p` gets `--disallowedTools` from its manifest. In bypass mode only
+the deny list restricts a tool.
 The agy, codex and ollama drivers have no tool-list flag. On these drivers
 Layer 2 is the only boundary
 ([internal-bridge.md](packages/internal-bridge.md)).

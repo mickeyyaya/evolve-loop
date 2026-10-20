@@ -12,8 +12,6 @@
     "Bash(evolve phase verify:*)"
   ],
   "disallowed_tools": [
-    "Edit",
-    "Write",
     "Bash(git push:*)",
     "Bash(git commit:*)",
     "Bash(git merge:*)",

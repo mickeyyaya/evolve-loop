@@ -189,3 +189,40 @@ func stageRealProfile(t *testing.T, dst, role string) {
 		}
 	}
 }
+
+func TestRealizeFor_ClaudePCarriesTheDenyListOnce(t *testing.T) {
+	t.Parallel()
+	intent := LaunchIntent{AllowedTools: []string{"Read"}, DisallowedTools: []string{"Bash(curl:*)", "WebFetch"}}
+
+	flags := RealizeFor("claude-p", intent).LaunchFlags
+
+	if !containsRun(flags, []string{"--disallowedTools", "Bash(curl:*)", "WebFetch"}) {
+		t.Fatalf("claude-p flags = %v, want the deny run", flags)
+	}
+	if slices.Contains(flags, "--allowedTools") {
+		t.Fatalf("claude-p emits --allowedTools from the driver; the realization must not repeat it: %v", flags)
+	}
+	args, _ := claudePArgs(&Config{AllowedTools: intent.AllowedTools, Realization: RealizeFor("claude-p", intent)}, "the prompt")
+	denies := 0
+	for _, a := range args {
+		if a == "--disallowedTools" {
+			denies++
+		}
+	}
+	if !slices.Equal(args[:2], []string{"-p", "the prompt"}) || denies != 1 || !containsRun(args, []string{"--allowedTools", "Read"}) {
+		t.Fatalf("claude-p argv = %v, want -p <prompt> first, one --disallowedTools and the allow run", args)
+	}
+}
+
+func TestDebuggerProfile_KeepsTheWriteAndEditToolsItsPersonaNeeds(t *testing.T) {
+	t.Parallel()
+	p, err := LoadProfile(filepath.Join(realProfilesDir(t), "debugger.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range []string{"Edit", "Write"} {
+		if slices.Contains(p.DisallowedTools, tool) {
+			t.Errorf("debugger denies bare %s: on claude-tmux it cannot write debug-decision.json or edit conflicted_paths", tool)
+		}
+	}
+}
