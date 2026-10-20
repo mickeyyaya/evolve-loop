@@ -116,7 +116,7 @@ Call an early boundary when a green boundary PR waits longer than the policy bou
 2. If it exits 0, run `evolve loop-stop --wait`. The lanes in flight finish, and the loop stops.
 3. Run `evolve wave next --merge <n,...>`.
 
-The bound is `pr.merge_window.early_boundary_after_s` (compiled default 3600, plan Q2). The pool width is `fleet.count`, and the live lanes come from the pool signal of the live wave.
+The bound is `pr.merge_window.early_boundary_after_s` (compiled default 3600, plan Q2). The pool width is `fleet.count`, and the live lanes come from the pool signal of the live wave. The operator decided this on 2026-10-20: "Combine them to fleet count". The width is not `fleet.min_lanes`.
 
 ```
 $ evolve pr boundary

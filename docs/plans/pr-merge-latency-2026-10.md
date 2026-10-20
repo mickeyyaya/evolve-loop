@@ -137,6 +137,7 @@ boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (sta
 - `evolve pr merge` asks `evolve pr window` for each PR while a loop runs. It does so only at `pr.merge_window.stage: on` and `fleet.integration.stage: enforce`. A window PR merges, and a boundary PR keeps the live-loop refusal with the window reason. Below that gate, nothing changes.
 - `evolve pr boundary` gives the early-boundary call (D6) in one line: the green boundary PR that waited longest, its wait, the bound and the pool. Exit 0 means: call `evolve loop-stop --wait`, then `evolve wave next --merge`.
 - The bound is the policy key `pr.merge_window.early_boundary_after_s`. Its compiled default is 3600 s, the 1 h of Q2. The width of the pool is `fleet.count`.
+- Operator decision, 2026-10-20: "Combine them to fleet count". Thus "the pool runs below its window" (D6) means that the live lanes are fewer than `fleet.count`, not fewer than `fleet.min_lanes`.
 
 The design is in [internal-mergewindow](../architecture/packages/internal-mergewindow.md#consumers), and the operator steps are in [wave-operations.md](../operations/wave-operations.md) §5.
 
@@ -175,3 +176,4 @@ P2 is verified by tests at 100% coverage of the new code. The tests read the liv
 
 - Q1: must a change to `CLAUDE.md` or `AGENTS.md` wait for a boundary? If yes, the CI router must route it as non-docs, so the two rules stay one rule.
 - Q2: what is the bound for the early boundary in D6? Answered by P2b: `pr.merge_window.early_boundary_after_s`, compiled default 3600 s (1 h, the median wait of F2).
+- Q3: in D6, is the window of the pool `fleet.count` or `fleet.min_lanes`? Answered by the operator on 2026-10-20: "Combine them to fleet count". The window is `fleet.count`.
