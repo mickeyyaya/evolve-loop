@@ -26,6 +26,7 @@ func TestRoleOf_EveryItemFieldHasOneOwner(t *testing.T) {
 		"route":                     {Owner: inboxbatch.LoopStampOwned},
 		"routed_reason":             {Owner: inboxbatch.LoopStampOwned},
 		"failure_count":             {Owner: inboxbatch.LoopStampOwned, Shape: inboxbatch.CounterValue},
+		"protected_files":           {Owner: inboxbatch.LoopStampOwned, Shape: inboxbatch.GrowOnlyList},
 		"premise_verified_evidence": {Owner: inboxbatch.OperatorStampOwned},
 		"kind":                      {Owner: inboxbatch.AuthorOwned},
 		"created_at":                {Owner: inboxbatch.AuthorOwned},
