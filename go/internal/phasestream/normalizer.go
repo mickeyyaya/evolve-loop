@@ -30,6 +30,7 @@ type Normalizer struct {
 	stderrOff    int64
 	lastActivity time.Time
 	stallFired   bool
+	tail         func(path string, off int64) ([]string, int64)
 }
 
 func NewNormalizer(cfg NormalizerConfig) *Normalizer {
@@ -45,25 +46,12 @@ func NewNormalizer(cfg NormalizerConfig) *Normalizer {
 		cfg:          cfg,
 		classifier:   NewClassifier(cfg.Source, cfg.TraceID, cfg.Now),
 		lastActivity: cfg.Now(),
+		tail:         tailFile,
 	}
 }
 
 func (n *Normalizer) Poll() ([]Envelope, error) {
-	var out []Envelope
-
-	var outLines []string
-	outLines, n.stdoutOff = tailFile(n.cfg.StdoutPath, n.stdoutOff)
-	for _, ln := range outLines {
-		out = append(out, n.classifier.Line([]byte(ln))...)
-	}
-
-	if n.cfg.StderrPath != "" {
-		var errLines []string
-		errLines, n.stderrOff = tailFile(n.cfg.StderrPath, n.stderrOff)
-		for _, ln := range errLines {
-			out = append(out, n.classifier.Stderr([]byte(ln))...)
-		}
-	}
+	out := n.classifyNewLines()
 
 	if env, ok := n.classifier.FlushProgress(); ok {
 		out = append(out, env)
@@ -101,6 +89,24 @@ func (n *Normalizer) Poll() ([]Envelope, error) {
 		}
 	}
 	return out, nil
+}
+
+func (n *Normalizer) classifyNewLines() []Envelope {
+	var errLines []string
+	if n.cfg.StderrPath != "" {
+		errLines, n.stderrOff = n.tail(n.cfg.StderrPath, n.stderrOff)
+	}
+	var outLines []string
+	outLines, n.stdoutOff = n.tail(n.cfg.StdoutPath, n.stdoutOff)
+
+	var out []Envelope
+	for _, ln := range outLines {
+		out = append(out, n.classifier.Line([]byte(ln))...)
+	}
+	for _, ln := range errLines {
+		out = append(out, n.classifier.Stderr([]byte(ln))...)
+	}
+	return out
 }
 
 func tailFile(path string, off int64) ([]string, int64) {
