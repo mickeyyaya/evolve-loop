@@ -158,10 +158,16 @@ func TestLoadBaseline_ReadsCountsAndRejectsBadLists(t *testing.T) {
 	}
 }
 
-func TestCheck_ListOnlyShrinks(t *testing.T) {
+func TestCheck_TheBaselineIsACeiling(t *testing.T) {
 	baseline := map[string]int{"a_test.go": 2, "b_test.go": 1}
-	if err := Check(map[string]int{"a_test.go": 2, "b_test.go": 1}, baseline); err != nil {
-		t.Errorf("exact match: %v", err)
+	for name, sites := range map[string]map[string]int{
+		"exact match":   {"a_test.go": 2, "b_test.go": 1},
+		"shrunk count":  {"a_test.go": 1, "b_test.go": 1},
+		"migrated file": {"a_test.go": 2},
+	} {
+		if err := Check(sites, baseline); err != nil {
+			t.Errorf("%s: %v; a lane that removes sites passes without an edit to baseline.json", name, err)
+		}
 	}
 	cases := []struct {
 		name  string
@@ -170,8 +176,6 @@ func TestCheck_ListOnlyShrinks(t *testing.T) {
 	}{
 		{"unlisted file", map[string]int{"a_test.go": 2, "b_test.go": 1, "new_test.go": 1}, "new_test.go builds a raw git repo"},
 		{"grown count", map[string]int{"a_test.go": 3, "b_test.go": 1}, "a_test.go grew to 3"},
-		{"shrunk count", map[string]int{"a_test.go": 1, "b_test.go": 1}, "lower its baseline.json entry to 1"},
-		{"migrated file", map[string]int{"a_test.go": 2}, "b_test.go is listed with 1 raw git init sites but has none"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

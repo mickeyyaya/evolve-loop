@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -91,9 +94,18 @@ type ratchetOrigin struct {
 	plane *gittest.Repo
 }
 
+const rawGitBaselinePath = "go/" + rawgitratchet.BaselineRelPath
+
 func newRatchetOrigin(t *testing.T, funcLines int, offenders string) ratchetOrigin {
 	t.Helper()
+	return newRatchetOriginWith(t, funcLines, offenders, `{"internal/fixture/raw_test.go": 1}`)
+}
+
+func newRatchetOriginWith(t *testing.T, funcLines int, offenders, rawBaseline string) ratchetOrigin {
+	t.Helper()
 	seed := gittest.Fixture(t)
+	seed.Write("go/internal/fixture/raw_test.go", "package fixture\n\nimport \"testing\"\n\nfunc TestRaw(t *testing.T) {\n\t_ = []string{"+strconv.Quote("gi"+"t")+", "+strconv.Quote("in"+"it")+"}\n}\n")
+	seed.Write(rawGitBaselinePath, rawBaseline)
 	var src strings.Builder
 	src.WriteString("package fixture\n\nfunc Big() int {\n\ttotal := 0\n")
 	for i := 0; i < funcLines; i++ {
@@ -170,6 +182,58 @@ func TestBoundaryRatchetTighten_OpensAPullRequestFromADatedBranch(t *testing.T) 
 		t.Errorf("stdout %q, want the opened branch named", out)
 	}
 	o.assertProposed(t, branch, main)
+}
+
+func TestBoundaryRatchetTighten_LowersTheRawGitBaselineInTheSameTightenPullRequest(t *testing.T) {
+	o := newRatchetOriginWith(t, 60, `{"internal/fixture.Big": 90}`, `{"internal/fixture/raw_test.go": 3, "internal/fixture/gone_test.go": 2}`)
+	gh := &fakeGH{list: "[]"}
+	gh.install(t)
+	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
+
+	rc, out, errOut := o.tighten(t)
+
+	branch := flagAfter(gh.created(), "--head")
+	body := flagAfter(gh.created(), "--body")
+	if rc != 0 || errOut != "" || !strings.Contains(body, "internal/fixture.Big: 90 -> 64") || !strings.Contains(body, "internal/fixture/raw_test.go: 3 -> 1") || !strings.Contains(out, "internal/fixture/gone_test.go: 2 removed") {
+		t.Fatalf("rc=%d stdout=%q stderr=%q body=%q, want both lists tightened in one pull request", rc, out, errOut, body)
+	}
+	if got := o.bare.Git("show", branch+":"+rawGitBaselinePath); got != "{\n  \"internal/fixture/raw_test.go\": 1\n}" {
+		t.Errorf("%s holds the baseline %q, want it lowered", branch, got)
+	}
+	if files := o.bare.Git("show", "--name-only", "--format=", branch); files != ratchetListPath+"\n"+rawGitBaselinePath && files != rawGitBaselinePath+"\n"+ratchetListPath {
+		t.Errorf("the commit touches %q, want both lists in one commit", files)
+	}
+}
+
+func TestBoundaryRatchetTighten_AListThatCannotBeWrittenWarnsAndPushesNothing(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	gh := &fakeGH{list: "[]"}
+	gh.install(t)
+	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
+	prev := ratchetWrite
+	t.Cleanup(func() { ratchetWrite = prev })
+	ratchetWrite = func(string, []byte, os.FileMode) error { return errors.New("disk full") }
+	main := o.originHead()
+
+	rc, _, errOut := o.tighten(t)
+
+	if rc != 0 || !strings.Contains(errOut, "disk full") || gh.created() != nil || o.originHead() != main {
+		t.Errorf("rc=%d stderr=%q created=%v, want a warning and no pull request", rc, errOut, gh.created())
+	}
+}
+
+func TestBoundaryRatchetTighten_OnlyTheRawGitBaselineCanBeLoose(t *testing.T) {
+	o := newRatchetOriginWith(t, 60, `{"internal/fixture.Big": 64}`, `{"internal/fixture/raw_test.go": 2}`)
+	gh := &fakeGH{list: "[]"}
+	gh.install(t)
+	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
+
+	rc, _, errOut := o.tighten(t)
+
+	branch := flagAfter(gh.created(), "--head")
+	if files := o.bare.Git("show", "--name-only", "--format=", branch); rc != 0 || errOut != "" || files != rawGitBaselinePath {
+		t.Errorf("rc=%d stderr=%q, the commit touches %q, want only %s", rc, errOut, files, rawGitBaselinePath)
+	}
 }
 
 func TestBoundaryRatchetTighten_UpdatesTheOpenTightenPullRequest(t *testing.T) {
