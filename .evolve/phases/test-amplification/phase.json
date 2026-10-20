@@ -40,5 +40,6 @@
     ]
   },
   "after": "build",
-  "writes_source": true
+  "writes_source": true,
+  "retract_on_fail": true
 }
