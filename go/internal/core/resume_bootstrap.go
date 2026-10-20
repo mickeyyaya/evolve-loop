@@ -75,6 +75,14 @@ func (o *Orchestrator) loadResumeBootstrap(
 		return boot, fmt.Errorf("resume identity mismatch: cycle-state worktree %q does not match checkpoint worktree %q", cs.ActiveWorktree, resumePoint.WorktreePath)
 	}
 
+	carrierCycle := cs.CycleID
+	if carrierCycle == 0 {
+		carrierCycle = resumePoint.CycleID
+	}
+	if err := o.healCarrierAtHead(ctx, req.ProjectRoot, carrierCycle, cs); err != nil {
+		return boot, fmt.Errorf("heal a carrier left at HEAD: %w", err)
+	}
+
 	req, err = restoreResumeGoal(req, cs, state, identity.fleet)
 	if err != nil {
 		return boot, err
