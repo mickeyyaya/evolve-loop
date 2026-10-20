@@ -1,6 +1,15 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestWireRoutingPlanAdvisor_RefusesAProjectWhoseRoutingTableDoesNotCompile":                        "swaps the bridge model catalog dir",
+	"main.TestWireRoutingPlanAdvisor_WiresAnAdvisorForAProjectRoot":                                         "swaps the bridge model catalog dir",
+	"main.TestRoutingPlan_AdvisorLaunchFailureExitsTwoWithTheCause":                                         "swaps seam routingPlanAdvisor",
+	"main.TestRoutingPlan_AdvisorWiringFailureIsNotAnUnknownCycle":                                          "swaps seam routingPlanAdvisor",
+	"main.TestRoutingPlan_GoalTextOverridesTheRecordedGoal":                                                 "swaps seam routingPlanAdvisor",
+	"main.TestRoutingPlan_PrintsParsedPlanAndWritesNothingUnderTheCycle":                                    "swaps seam routingPlanAdvisor",
+	"main.TestRoutingPlan_SendsTheCyclesOwnComposedPrompt":                                                  "swaps seam routingPlanAdvisor",
+	"main.TestRoutingPlan_UnknownCycleExitsOneWithoutLaunchingTheAdvisor":                                   "swaps seam routingPlanAdvisor",
+	"main.TestRoutingPlan_UsageErrors":                                                                      "swaps seam routingPlanAdvisor",
 	"main.TestAbsOrWarn_ResolvesOrWarnsAndKeepsThePath":                                                     "swaps seam loopAbsoluteRoot",
 	"main.TestAgyClaudeRouting_OnlyARunnableRuleOnTheResolvedTargetCounts":                                  "sets env through a helper",
 	"main.TestAnnounceLoop_AnUnreadableStartTimeWarnsOnceAndEmitsNothing":                                   "swaps seam loopProcStartFn",

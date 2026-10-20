@@ -217,6 +217,10 @@ func (o *Orchestrator) resolvedShipFloor() []string {
 	return router.DefaultShipFloor()
 }
 
+func AdvisorCatalog(cat phasespec.Catalog) ([]router.PhaseCard, []string) {
+	return phaseCardsFromCatalog(cat), onDemandCatalogNames(cat)
+}
+
 func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
 	var cards []router.PhaseCard
 	for _, spec := range cat.All() {

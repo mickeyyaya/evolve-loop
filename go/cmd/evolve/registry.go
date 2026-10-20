@@ -75,7 +75,7 @@ var commands = []subcommand{
 	{Name: "detect-cli", Summary: "Identify driving AI CLI", Run: runDetectCLI},
 	{Name: "detect-nested-claude", Summary: "Detect nested claude -p", Run: runDetectNested},
 	{Name: "phase-order", Summary: "List phases from registry", Run: phasecmd.RunPhaseOrder},
-	{Name: "routing", Summary: "Explain a recorded routing decision (read-only)", Run: runRouting},
+	{Name: "routing", Summary: "Explain a recorded routing decision, or ask the advisor for a plan (writes nothing under the cycle)", Run: runRouting},
 	{Name: "convergence", Summary: "The convergence policy (ADR-0126): decide --input <rounds.json> [--json] prints the next rung of a repeat-until-accepted loop (read-only)", Run: runConvergence},
 	{Name: "cli-routing", Summary: "The CLI routing table (ADR-0119): show [--static] [--json] | check | explain <agent> (read-only)", Run: runCLIRouting},
 	{Name: "estimate-quota-reset", Summary: "Predict quota reset timestamp", Run: runQuotaReset},

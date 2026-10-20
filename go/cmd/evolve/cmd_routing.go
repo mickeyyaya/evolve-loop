@@ -13,9 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
+var routingGetwd = os.Getwd
+
 func runRouting(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "evolve routing: usage: routing explain --cycle N [--project-root P]")
+		fmt.Fprintln(stderr, "evolve routing: usage: routing explain|replay|plan --cycle N [--project-root P]")
 		return 10
 	}
 	sub, rest := args[0], args[1:]
@@ -24,8 +26,10 @@ func runRouting(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runRoutingExplain(rest, stdout, stderr)
 	case "replay":
 		return runRoutingReplay(rest, stdout, stderr)
+	case "plan":
+		return runRoutingPlan(rest, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "evolve routing: unknown subcommand %q (want: explain | replay)\n", sub)
+		fmt.Fprintf(stderr, "evolve routing: unknown subcommand %q (want: explain | replay | plan)\n", sub)
 		return 10
 	}
 }
@@ -38,17 +42,10 @@ func routingCycleRoot(fs *flag.FlagSet, cycle *int, root *string, args []string,
 		fmt.Fprintf(stderr, "evolve routing %s: --cycle N is required (N>=1)\n", name)
 		return "", 10
 	}
-	pr := *root
-	if pr == "" {
-		pr = os.Getenv("EVOLVE_PROJECT_ROOT")
-	}
-	if pr == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			fmt.Fprintf(stderr, "evolve routing %s: %v\n", name, err)
-			return "", 1
-		}
-		pr = cwd
+	pr, err := routingProjectRoot(*root, routingGetwd)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve routing %s: %v\n", name, err)
+		return "", 1
 	}
 	return cycleWorkspace(pr, *cycle), 0
 }
@@ -128,6 +125,11 @@ func explainPlan(w io.Writer, ws string) {
 		return
 	}
 	fmt.Fprintln(w, "Plan:")
+	writePlanEntries(w, entries)
+	fmt.Fprintln(w)
+}
+
+func writePlanEntries(w io.Writer, entries []router.PhasePlanEntry) {
 	for _, e := range entries {
 		verb := "SKIP"
 		if e.Run {
@@ -142,7 +144,6 @@ func explainPlan(w io.Writer, ws string) {
 		}
 		fmt.Fprintln(w)
 	}
-	fmt.Fprintln(w)
 }
 
 func explainClamps(w io.Writer, ws string) {
