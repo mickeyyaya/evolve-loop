@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -61,6 +62,7 @@ type Request struct {
 type Rejection struct {
 	Defects       []string
 	Prescriptions []string
+	Findings      []reportdoc.Finding
 }
 
 type Verdict struct {

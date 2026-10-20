@@ -10,6 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -62,7 +63,7 @@ func rejectionOf(artifact string) (defectledger.Rejection, bool) {
 	if !ok || s.Failure == nil {
 		return defectledger.Rejection{}, false
 	}
-	return defectledger.Rejection{Defects: s.Failure.Defects, Prescriptions: s.Failure.Prescription}, true
+	return defectledger.Rejection{Defects: s.Failure.Defects, Prescriptions: s.Failure.Prescription, Findings: reportdoc.Findings(artifact)}, true
 }
 
 func resolveEvidence(evidence string, r defectledger.Request) (bool, string) {
