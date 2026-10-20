@@ -92,6 +92,8 @@ var treeReadingSelections = []TestSelection{
 		"TestHandoffCheck_PassExitsZero",
 		"TestHandoffCheck_UnmetAsksNameTheIdsToRetry",
 		"TestHandoffCoverage_FailureFileProblemsAreIOErrors",
+		"TestHandoffReviewCheck_NamesTheEvidenceThatDidNotResolve",
+		"TestHandoffReviewCheck_ReadsTheLedgerOfTheCycleWorkspaceAndTheEvidenceOfTheWorktree",
 		"TestHandoffShow_JSONListsEveryPairInPipelineOrder",
 		"TestHandoffShow_ListsTheResultOfEachPair",
 		"TestHandoff_VerbsWriteNothingAndRepeatTheSameAnswer",
