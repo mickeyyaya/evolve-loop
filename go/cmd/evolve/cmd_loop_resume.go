@@ -24,7 +24,7 @@ func runResumeBatch(
 	stdout, stderr io.Writer,
 ) int {
 	lr.Resumed = true
-	rp, err := core.LoadResumeState(ctx, cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{})
+	rp, err := core.LoadResumeState(ctx, cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{Log: stderr})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
 		lr.StopReason = "error"
