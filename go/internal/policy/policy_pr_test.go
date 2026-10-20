@@ -58,3 +58,22 @@ func TestPRMergeWindowStage_DefaultsOffUntilTheOperatorEnablesIt(t *testing.T) {
 		})
 	}
 }
+
+func TestPRMergeWindowStage_ALiteralMergeWindowPolicyResolvesToItsStage(t *testing.T) {
+	cases := []struct {
+		name   string
+		policy Policy
+		want   string
+	}{
+		{"no window block resolves to MergeWindowOff", Policy{PR: &PRPolicy{}}, MergeWindowOff},
+		{"a MergeWindowPolicy at MergeWindowOn resolves to on", Policy{PR: &PRPolicy{MergeWindow: &MergeWindowPolicy{Stage: MergeWindowOn}}}, MergeWindowOn},
+		{"a MergeWindowPolicy at MergeWindowOff resolves to off", Policy{PR: &PRPolicy{MergeWindow: &MergeWindowPolicy{Stage: MergeWindowOff}}}, MergeWindowOff},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got, err := c.policy.PRMergeWindowStage(); err != nil || got != c.want {
+				t.Fatalf("PRMergeWindowStage() = %q, %v; want %q", got, err, c.want)
+			}
+		})
+	}
+}
