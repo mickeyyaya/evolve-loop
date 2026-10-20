@@ -38,6 +38,13 @@ func TestBegin_ATransientSnapshotFailureIsRetakenOnce(t *testing.T) {
 	if out.TakeErr != nil || !out.Verified || len(out.Restored) != 1 {
 		t.Errorf("outcome = %+v, want the retaken snapshot to fence the phase: restored stray.txt and verified", out)
 	}
+	if f.RetakenAfter() == nil || !strings.Contains(f.RetakenAfter().Error(), "write-tree failure 1") || out.RetakenAfter == nil {
+		t.Errorf("RetakenAfter = %v, outcome %v, want the first failure kept: the retry must not hide the failure the open item tracks", f.RetakenAfter(), out.RetakenAfter)
+	}
+	diags := out.Diagnostics("audit")
+	if len(diags) == 0 || !strings.Contains(diags[0].Message, "snapshot retaken after:") || !strings.Contains(diags[0].Message, "write-tree failure 1") {
+		t.Errorf("diagnostics = %+v, want a warning that names the first snapshot failure", diags)
+	}
 }
 
 func TestBegin_ASecondSnapshotFailureNamesBothAttempts(t *testing.T) {
@@ -61,5 +68,13 @@ func TestBegin_ADispatchThatEndsDuringTheWaitDoesNotRetake(t *testing.T) {
 
 	if err == nil || !strings.HasSuffix(err.Error(), "; retry: "+context.DeadlineExceeded.Error()) {
 		t.Errorf("TakeErr = %v, want the first failure and the context error of the wait, with no second snapshot", err)
+	}
+}
+
+func TestFence_ANilFenceWasNeverRetaken(t *testing.T) {
+	t.Parallel()
+	var f *Fence
+	if f.RetakenAfter() != nil || Begin(context.Background(), "", true).RetakenAfter() != nil {
+		t.Error("a nil or inert fence reports a retake")
 	}
 }
