@@ -30,6 +30,7 @@ Narrative kept verbatim.
 
 func seedFlagsProject(t *testing.T) string {
 	t.Helper()
+	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
 	root := t.TempDir()
 	dir := filepath.Join(root, "docs", "architecture")
 	if err := os.MkdirAll(dir, 0o755); err != nil {

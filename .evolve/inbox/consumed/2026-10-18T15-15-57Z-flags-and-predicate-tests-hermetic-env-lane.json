@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "EVOLVE_WORKTREE_ROOT=/elsewhere go test -run 'TestFlags|TestPredicateEnv_AllBranches' passes",
+    "generate never writes outside the test's temp root"
+  ],
+  "consumed": {
+    "at": "2026-10-20T07:15:33Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-09-29T21:41:00Z",
+  "deps": [
+    "flags-and-predicate-tests-hermetic-env-console"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_flags_test.go"
+  ],
+  "fix": "Make the tests hermetic: seedFlagsProject sets EVOLVE_WORKTREE_ROOT to empty (t.Setenv) and the predicateEnv test clears it before asserting.",
+  "id": "flags-and-predicate-tests-hermetic-env-lane",
+  "kind": "bug",
+  "priority_class": "stability",
+  "route": "lane",
+  "routed_at": "2026-10-18T15:15:57Z",
+  "routed_reason": "split of flags-and-predicate-tests-hermetic-env: the files that are not protected",
+  "source": "console, 2026-09-29, C6 reproduction + architecture review (M4)",
+  "split_from": "flags-and-predicate-tests-hermetic-env",
+  "summary": "C6 scrubbed the carry's composed gates, but any lane phase that runs go test (TDD, build self-checks) still inherits the lane's EVOLVE_WORKTREE_ROOT: TestFlagsGenerateThenCheck_RoundTrip / TestFlagsCheck_DriftExitsTwo resolve their root through sourceRoot(), which prefers it (so generate can write docs/architecture/control-flags.md into the lane worktree), and TestPredicateEnv_AllBranches builds its env from os.Environ(). Reproduced deterministically with EVOLVE_WORKTREE_ROOT set.",
+  "title": "TestFlags* and TestPredicateEnv_AllBranches go red whenever a lane's EVOLVE_WORKTREE_ROOT reaches the test run (lane part)",
+  "weight": 0.55
+}
