@@ -14,6 +14,7 @@
 - **Restore diffs a fresh tree against the snapshot** (`diff-tree -z`) and undoes every difference. Added paths are removed. Modified, deleted and retyped paths are written back from the snapshot with their mode. The directories that the phase created around its files are pruned.
 - **Ignored paths are outside the fence by construction.** Build outputs and the `.evolve/` scratch of the worktree are in this set. It is the same set that the explanation digest ignores.
 - **Two dispatch surfaces hold one `Fence`.** The shared phase runner and the retro phase's own runner both call the bridge. `Begin` runs before the agent and `End` runs after it, so the mechanism cannot be wired on one surface and forgotten on the other.
+- **Retract keeps the evidence, then restores** ([ADR-0149](../adr/0149-a-test-writing-phase-that-states-fail-on-its-own-work-is-retracted-to-its-dispatch-tree.md)). `Snapshot.Retract` diffs a fresh tree against the snapshot, copies each path that still exists to the keep directory, and then calls `Restore`. A path that the phase deleted has no content to keep. The shared runner calls it for a test-writing phase that states FAIL on its own work. A symlink is kept as a link and a file keeps its mode. A directory, such as a nested repository, and a path whose parent became a file have nothing to keep.
 
 ## Invariants
 
@@ -26,6 +27,7 @@
 - **The fence reports; the gates decide.** `Diagnostics` is silent for a clean phase. It warns with the restored paths for a writing phase. It warns with the failure when the fence failed to do its job. It is never an error severity. A source writer (`readOnly` false) or a dispatch without a worktree gets an inert fence.
 - **Ambient git environment is ignored.** `GIT_DIR` and `GIT_WORK_TREE` of the parent process must never redirect the fence to another repository. Pinned by `TestTake_IgnoresAmbientGitEnvironment`.
 - **Restore is idempotent.** A second restore over a restored tree changes nothing.
+- **A retraction that cannot keep its evidence restores nothing.** The tree stays as the phase left it, so the gates judge the same tree as before ADR-0149. Pinned by `TestRetract_AnEvidenceFailureRestoresNothing`, with the restore itself pinned by `TestRetract_KeepsThePhaseWritesAsEvidenceAndRestoresTheDispatchTree`.
 
 ## Findings
 

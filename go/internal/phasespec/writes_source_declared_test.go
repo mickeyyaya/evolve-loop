@@ -28,3 +28,22 @@ func TestUserSpecs_SourceWritersDeclareWritesSource(t *testing.T) {
 		}
 	}
 }
+
+func TestUserSpecs_TestAmplificationRetractsOnFail(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot locate test file")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
+	raw, err := os.ReadFile(filepath.Join(root, ".evolve", "phases", "test-amplification", "phase.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spec PhaseSpec
+	if err := json.Unmarshal(raw, &spec); err != nil {
+		t.Fatal(err)
+	}
+	if !spec.RetractOnFail {
+		t.Error("test-amplification must declare \"retract_on_fail\": true — a self-FAILed amplified test would otherwise red an innocent green cycle (cycle-1493)")
+	}
+}
