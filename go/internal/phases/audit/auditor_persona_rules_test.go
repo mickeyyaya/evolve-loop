@@ -132,3 +132,26 @@ func TestComposePrompt_TheRulesLiveOnlyInTheRenderedBlockAndNoStalePhrasingReapp
 		}
 	}
 }
+
+func TestAuditAndShipSkills_PointAtTheRenderedWarnRuleInsteadOfRestatingIt(t *testing.T) {
+	t.Parallel()
+	for rel, rowPrefix := range map[string]string{"skills/audit/SKILL.md": "| `WARN` |", "skills/ship/SKILL.md": "| 1 |"} {
+		raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := string(raw)
+		if strings.Contains(body, "strict_audit") {
+			t.Errorf("%s restates the WARN ship rule; it must point at go/internal/phases/audit/audit_rules.go", rel)
+		}
+		var row string
+		for _, line := range strings.Split(body, "\n") {
+			if strings.HasPrefix(line, rowPrefix) {
+				row = line
+			}
+		}
+		if !strings.Contains(row, "go/internal/phases/audit/audit_rules.go") {
+			t.Errorf("%s: the row %q does not point at the one source of the WARN rule: %q", rel, rowPrefix, row)
+		}
+	}
+}
