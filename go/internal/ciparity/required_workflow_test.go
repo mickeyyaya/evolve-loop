@@ -61,7 +61,7 @@ func TestRequiredWorkflow_SteLintJobRunsOnlyTheLintOnTheAddedText(t *testing.T) 
 	if job.If != "needs.changes.outputs.docs == 'true'" || job.Needs.Value != "changes" || job.ContinueOnError != "" || job.Uses != "" {
 		t.Fatalf("ste-lint must run on the docs route of the changes job: %+v", job)
 	}
-	var checkout, setupGo bool
+	var checkout, setupGo, liveBase bool
 	var runs []string
 	for _, step := range job.Steps {
 		switch {
@@ -69,6 +69,8 @@ func TestRequiredWorkflow_SteLintJobRunsOnlyTheLintOnTheAddedText(t *testing.T) 
 			checkout = step.With["fetch-depth"] == "0" && step.With["ref"] == "${{ github.event.pull_request.head.sha }}"
 		case strings.HasPrefix(step.Uses, "actions/setup-go@"):
 			setupGo = step.With["go-version-file"] == "go/go.mod"
+		case step.ID == "lint":
+			liveBase = step.Env["BASE_REF"] == "${{ github.base_ref }}" && step.Env["BASE_SHA"] == ""
 		}
 		if step.ContinueOnError != "" || (step.Run != "" && step.If != "") {
 			t.Errorf("ste-lint step %q may not be skipped or ignore its failure", step.ID)
@@ -78,8 +80,11 @@ func TestRequiredWorkflow_SteLintJobRunsOnlyTheLintOnTheAddedText(t *testing.T) 
 	if !checkout || !setupGo {
 		t.Errorf("ste-lint needs full history at the PR head (%v) and the module Go version (%v)", checkout, setupGo)
 	}
+	if !liveBase {
+		t.Errorf("ste-lint must diff from the live base branch, not the base sha the event recorded")
+	}
 	script := strings.Join(runs, "\n")
-	for _, want := range []string{"git merge-base \"$BASE_SHA\" \"$HEAD_SHA\"", "docs ste-lint --strict --changed \"$base\" --added"} {
+	for _, want := range []string{"git merge-base \"refs/remotes/origin/$BASE_REF\" \"$HEAD_SHA\"", "docs ste-lint --strict --changed \"$base\" --added"} {
 		if !strings.Contains(script, want) {
 			t.Errorf("ste-lint does not run %q", want)
 		}
