@@ -3,10 +3,11 @@ package treefence
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestRetract_KeepsThePhaseWritesAsEvidenceAndRestoresTheDispatchTree(t *testing.T) {
@@ -227,13 +228,10 @@ func TestRetract_RemovesANestedRepositoryAndAPathWhoseParentBecameAFile(t *testi
 		t.Fatal(err)
 	}
 	nested := filepath.Join(dir, "nested")
-	if out, err := exec.Command("git", "init", "-q", nested).CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v: %s", err, out)
-	}
+	origin := gittest.Fixture(t)
+	origin.Git("commit", "-q", "--allow-empty", "-m", "n")
+	origin.Git("clone", "-q", origin.Dir, nested)
 	write(t, nested, "x.txt", "x\n")
-	if out, err := exec.Command("git", "-C", nested, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "n").CombinedOutput(); err != nil {
-		t.Fatalf("git commit: %v: %s", err, out)
-	}
 	if err := os.RemoveAll(filepath.Join(dir, "src")); err != nil {
 		t.Fatal(err)
 	}
