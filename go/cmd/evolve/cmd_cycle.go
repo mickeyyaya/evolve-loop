@@ -62,7 +62,7 @@ import (
 
 func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | reset | timing)")
+		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | reset | timing | models)")
 		return 10
 	}
 	switch args[0] {
@@ -72,6 +72,8 @@ func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runCycleReset(args[1:], stdout, stderr)
 	case "timing":
 		return runCycleTiming(args[1:], stdout, stderr)
+	case "models":
+		return runCycleModels(args[1:], stdout, stderr)
 	case "outputs":
 		return runCycleOutputs(args[1:], stdout, stderr)
 	case "scope-delta":
