@@ -107,3 +107,12 @@ Writable paths: `internal/treefence/writable_test.go`,
 `internal/core/worktree_writable_paths_test.go` (the eligibility table and the resume dispatch),
 `internal/core/ship_recovery_debugger_test.go::TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile`
 (a genuine conflict through a debugger held by the production fence, shipped on main).
+
+## Amendment (2026-10-21) — the fence is one value from one projection
+
+Inbox item `worktree-fence-one-value`.
+
+- `PhaseRequest.Fence` (`*WorktreeFence{Writable}`) replaces the pair `WorktreeReadOnly` and `WorktreeWritablePaths`. A nil fence means that the phase writes source. The writable paths live inside the fence, so a request with writable paths and no fence cannot exist.
+- `FenceFor(writesSource, writable)` is the one projection, and `PhaseWritesSource(phase, catalog)` is the one rule. Every root that builds a request with a worktree calls the projection. The orchestrator calls it for its dispatches, the out-of-band retro and a remediation fix. `ReauditCycle`, `evolve campaign`, `evolve phase --cycle`, `evolve compose --cycle` and the audit defect ledger call it too.
+- Before, the out-of-band retro ran unfenced, `ReauditCycle` and `evolve phase --cycle` set no fence, and `evolve campaign` derived its own flag.
+- A structure test enumerates every `PhaseRequest` literal that sets a worktree and requires `Fence` from the projection (`TestEveryPhaseRequestWithAWorktreeTakesTheFenceFromTheOneProjection`).

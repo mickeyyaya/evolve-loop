@@ -72,8 +72,8 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		Signals:                         dispatchSignals(next, cr.cs.WorkspacePath, cr.req.ProjectRoot),
 		BypassPolicy:                    cr.req.BypassPolicy,
 		OperatorDirectives:              cr.directivesSet.Merged,
+		Fence:                           cr.o.fenceFor(next, cr.cs),
 	}
-	phaseReq = cr.o.withWorktreeFence(phaseReq, next, cr.cs)
 	if cr.o.cfg.ModelRouting == config.ModelRoutingAuto && cr.clampedPlan != nil {
 		for _, e := range cr.clampedPlan.Entries {
 			if e.Phase == string(next) {

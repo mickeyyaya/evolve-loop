@@ -245,17 +245,17 @@ func TestDispatch_ReadOnlyPhasesAreFencedAndSourceWritersAreNot(t *testing.T) {
 		t.Fatalf("build dispatched %d time(s); want the remediation fix + the normal build", len(build.requests))
 	}
 	for i, r := range build.requests {
-		if r.WorktreeReadOnly {
+		if r.Fence != nil {
 			t.Errorf("build request %d is fenced — a source writer (and a remediation fix inheriting a read-only gate's request) must keep its writes", i)
 		}
 	}
 	for _, p := range []Phase{PhaseAudit, PhaseTriage} {
 		fr := runners[p].(*fakeRunner)
-		if len(fr.requests) == 0 || !fr.requests[0].WorktreeReadOnly {
+		if len(fr.requests) == 0 || fr.requests[0].Fence == nil {
 			t.Errorf("%s is not a declared source writer and must be dispatched fenced", p)
 		}
 	}
-	if tdd := runners[PhaseTDD].(*fakeRunner); len(tdd.requests) > 0 && tdd.requests[0].WorktreeReadOnly {
+	if tdd := runners[PhaseTDD].(*fakeRunner); len(tdd.requests) > 0 && tdd.requests[0].Fence != nil {
 		t.Error("tdd writes source and must not be fenced")
 	}
 }
@@ -271,7 +271,7 @@ func TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces(t *testing.T) {
 		t.Fatalf("RunCycleFromPhase: %v", err)
 	}
 	audit := runners[PhaseAudit].(*fakeRunner)
-	if len(audit.requests) == 0 || !audit.requests[0].WorktreeReadOnly {
+	if len(audit.requests) == 0 || audit.requests[0].Fence == nil {
 		t.Errorf("a resumed audit must be dispatched fenced (resume.go request builder)")
 	}
 
@@ -284,7 +284,7 @@ func TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces(t *testing.T) {
 		t.Fatalf("batch: act=%v err=%v", act, err)
 	}
 	for _, fr := range []*fakeRunner{tester, evaluator} {
-		if len(fr.requests) == 0 || !fr.requests[0].WorktreeReadOnly {
+		if len(fr.requests) == 0 || fr.requests[0].Fence == nil {
 			t.Errorf("evaluate-batch phase %s must be dispatched fenced (evaluate_batch.go request builder)", fr.name)
 		}
 	}

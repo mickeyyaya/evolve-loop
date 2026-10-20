@@ -53,7 +53,7 @@ func TestRun_ReadOnlyWorktreeIsFencedAroundRetrosOwnLaunch(t *testing.T) {
 	fb := &mutatingRetroBridge{fakeBridge{writeArtifact: "# Retrospective\n\n## Verdict\nFAIL\n"}}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{
-		Cycle: 7, ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir, WorktreeReadOnly: true,
+		Cycle: 7, ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir, Fence: &core.WorktreeFence{},
 		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
 	})
 	if err != nil {

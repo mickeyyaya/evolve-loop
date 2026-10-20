@@ -54,7 +54,7 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 		return 10
 	}
 
-	req, rc := phaseRequest(args[1:], stdin, stderr)
+	req, rc := phaseRequest(name, args[1:], stdin, stderr)
 	if rc != 0 {
 		return rc
 	}
@@ -96,7 +96,7 @@ func resolvePhaseRunner(name string, req core.PhaseRequest, stderr io.Writer) (c
 	return runner, 0
 }
 
-func phaseRequest(flags []string, stdin io.Reader, stderr io.Writer) (core.PhaseRequest, int) {
+func phaseRequest(name string, flags []string, stdin io.Reader, stderr io.Writer) (core.PhaseRequest, int) {
 	fs := flag.NewFlagSet("phase", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	cycle := fs.Int("cycle", 0, "derive the request from .evolve/runs/cycle-N/cycle-state.json instead of stdin")
@@ -105,7 +105,7 @@ func phaseRequest(flags []string, stdin io.Reader, stderr io.Writer) (core.Phase
 		return core.PhaseRequest{}, exitCycleUsage
 	}
 	if *cycle != 0 {
-		req, err := RequestForCycle(*projectRoot, *cycle, stdin)
+		req, err := RequestForCycle(*projectRoot, *cycle, stdin, name)
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve phase: %v\n", err)
 			return core.PhaseRequest{}, CycleRequestExitCode(err)

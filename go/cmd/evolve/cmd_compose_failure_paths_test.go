@@ -133,7 +133,7 @@ func TestComposeRequest_StdinReadFailureExits1(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
 
-	req, code := composeRequest(0, "", iotest.ErrReader(errors.New("pipe closed")), &stderr)
+	req, code := composeRequest(0, "", nil, iotest.ErrReader(errors.New("pipe closed")), &stderr)
 
 	if code != 1 || stderr.String() != "evolve compose: read stdin: pipe closed\n" {
 		t.Errorf("code=%d stderr=%q, want 1 and the read failure", code, stderr.String())

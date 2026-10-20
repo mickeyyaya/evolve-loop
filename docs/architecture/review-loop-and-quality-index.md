@@ -585,7 +585,7 @@ All codes but the last are in module `review`. `AUDIT_QUALIFICATION_GAP` belongs
 | Fence | How it holds |
 |---|---|
 | A fresh agent | No access to the builder's transcript. `build-report.md` is a claim to verify. |
-| Read-only | The phase does not write source, so `withWorktreeFence` makes its worktree read-only (ADR-0097). Probes and `go test -overlay` mutants write only to the workspace and tmp. |
+| Read-only | The phase does not write source, so `fenceFor` gives its request a fence (ADR-0097). Probes and `go test -overlay` mutants write only to the workspace and tmp. |
 | A role fence | The hash-and-restore check (§5.7) protects `defect-ledger.json` and `code-review-report.md` from any build CLI. Build writes only `defect-dispositions.json`. |
 | Cross-family | The profile is a Claude-floor member at the deep tier (claude-tmux, then claude-p). The builder runs codex today and agy (Gemini 3.8 Flash) once L2's routing table lands, so the families differ either way. The same family is a WARN. |
 | Not a gate | The review's verdict never unlocks ship. Only the never-re-rolled audit does. |

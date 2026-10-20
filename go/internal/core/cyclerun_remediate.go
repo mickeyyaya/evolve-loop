@@ -52,7 +52,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	breq := dr.phaseReq
 	breq.ModelRoutingCLI = ""
 	breq.ModelRoutingTier = ""
-	breq.WorktreeReadOnly = false
+	breq.Fence = cr.o.fenceFor(PhaseBuild, cr.cs)
 	breq.CorrectionDirective = fmt.Sprintf(
 		"REMEDIATION round %d: the deterministic gate %q FAILED after your build. "+
 			"Read its report at %s and fix EXACTLY the enumerated defects in the worktree — "+

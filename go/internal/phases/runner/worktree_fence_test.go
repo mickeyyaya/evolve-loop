@@ -70,7 +70,7 @@ func runFencedObserving(t *testing.T, phase string, readOnly bool) (dir string, 
 		atClassify = string(b)
 	}
 	r := New(Options{Hooks: hooks, Bridge: &mutatingBridge{}, Prompts: fakePromptsFS("evolve-"+phase, "body")})
-	req := core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir, WorktreeReadOnly: readOnly}
+	req := core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir, Fence: core.FenceFor(!readOnly, nil)}
 	resp, err := r.Run(context.Background(), req)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -128,7 +128,7 @@ func TestRun_FenceUnavailableWarnsAndProceeds(t *testing.T) {
 	t.Parallel()
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-audit", model: "sonnet", prompt: "body", verdict: core.VerdictPASS}
 	r := New(Options{Hooks: hooks, Bridge: &mutatingBridge{}, Prompts: fakePromptsFS("evolve-audit", "body")})
-	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: t.TempDir(), WorktreeReadOnly: true})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: t.TempDir(), Fence: &core.WorktreeFence{}})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
