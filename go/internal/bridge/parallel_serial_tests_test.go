@@ -84,6 +84,7 @@ var serialTests = map[string]string{
 	"bridge.TestRealizerWiring_NoCrossCLILeak":                                            "swaps seam modelCatalogDirFn",
 	"bridge.TestRunTmuxREPL_ExtendTimeout":                                                "swaps seam manifestFS",
 	"bridge.TestRunTmuxREPL_InboxPrecedesAutoRespondOnSameTick":                           "swaps seam manifestFS",
+	"bridge.TestCatalogModelChain_ReadsTheLiveCatalogOfTheBaseCLI":                        "swaps seam modelCatalogDirFn through the process-global setter SetModelCatalogDirFn",
 	"bridge.TestSetModelCatalogDirFn":                                                     "swaps seam modelCatalogDirFn and calls process-global setter SetModelCatalogDirFn",
 	"bridge.TestSmokeLaunchConfig_CarriesTheTierDefaultEffort":                            "swaps seam modelCatalogDirFn",
 	"bridge.TestSmokeTests_AModelOnTheConfigReachesTheLaunchArgv":                         "swaps seam modelCatalogDirFn",
