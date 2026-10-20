@@ -72,3 +72,12 @@ func TestLiveSmokeTest_NonTmuxDriverRejected(t *testing.T) {
 		t.Fatalf("rc=%d, want ExitBadFlags for non-tmux driver", rc)
 	}
 }
+
+func TestLiveSmokeResult_ARejectedDriverCarriesOnlyTheExitCode(t *testing.T) {
+	t.Parallel()
+	got := LiveSmokeTest(context.Background(), "claude-p", nil, liveSmokeDeps(&FakeTmuxController{}))
+	want := LiveSmokeResult{RC: ExitBadFlags}
+	if got != want {
+		t.Fatalf("LiveSmokeTest = %+v, want %+v", got, want)
+	}
+}
