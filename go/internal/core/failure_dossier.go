@@ -2,11 +2,12 @@ package core
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -162,17 +163,11 @@ func writeFailureDossier(workspace string, d *failureDossier) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(workspace, failureDossierFile), b, 0o644)
+	return atomicwrite.Bytes(filepath.Join(workspace, failureDossierFile), b)
 }
 
-func readBuildDeclared(workspace string) *auditDeclared {
-	b, err := os.ReadFile(filepath.Join(workspace, failureDossierFile))
-	if err != nil {
-		return nil
+func (o *Orchestrator) writeDossier(cs CycleState, d *failureDossier) {
+	if err := writeFailureDossier(cs.WorkspacePath, d); err != nil {
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d: %s not written (%v); no decision reads it\n", cs.CycleID, failureDossierFile, err)
 	}
-	var d failureDossier
-	if json.Unmarshal(b, &d) != nil {
-		return nil
-	}
-	return d.BuildDeclared
 }

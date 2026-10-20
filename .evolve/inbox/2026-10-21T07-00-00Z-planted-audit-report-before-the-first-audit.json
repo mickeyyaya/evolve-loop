@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A read-only audit-report.md that a phase plants in the workspace before the first audit dispatch never reaches deferDecision, the dossier or the retro floor; the host removes it before audit round 0, or the audit deliverable check rejects a report the auditor of this round did not write (red first: plant the file, run an audit whose runner writes nothing, and show phasecontract.ReadFailureBlock(ws, \"audit\") feeds the defer)",
+    "The core test fixtures that pre-write audit-report.md for a fake auditor write it from the fake audit runner instead, so the round-0 clear does not break them (13 tests in internal/core fail with a plain round-0 remove)",
+    "Audit rounds 1 and later keep today's archive behaviour byte for byte"
+  ],
+  "created_at": "2026-10-21T07:00:00Z",
+  "files": [
+    "go/internal/core/audit_round_artifacts.go",
+    "go/internal/core/reintent_decision.go"
+  ],
+  "fix": "At audit round 0, remove audit-report.md and acs-verdict.json from the workspace before the dispatch (WARN when one was present), the same fresh-input rule as clearRetroDecisionInput, and move the fixtures that plant an audit report into their fake audit runners.",
+  "id": "planted-audit-report-before-the-first-audit",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "independent review of #1094 (MEDIUM-3), 2026-10-21",
+  "summary": "deferDecision reads the audit failure block first (phasecontract.ReadFailureBlock(ws, \"audit\"), reintent_decision.go). retireSupersededAuditArtifacts returns early when round < 1 (audit_round_artifacts.go:33), so an audit-report.md that the builder plants before the first audit is not retired by the host. A plain round-0 remove is correct for production but breaks 13 core tests whose fixtures pre-write the report for a fake auditor. It was not verified end to end whether the auditor's deliverable check rejects a stale report that it could not overwrite. ADR-0072 names this as a limit of D4.",
+  "title": "An audit-report.md planted before the first audit is a defer input the host never cleared",
+  "weight": 0.5
+}

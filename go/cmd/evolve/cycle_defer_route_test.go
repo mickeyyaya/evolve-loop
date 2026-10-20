@@ -15,21 +15,22 @@ import (
 func TestCloseoutCycleOutcome_AReintentDeferEndRoutesTheItemToTheConsole(t *testing.T) {
 	t.Parallel()
 	for name, c := range map[string]struct {
-		retroDecision string
-		wantRoute     string
+		result    core.CycleResult
+		wantRoute string
 	}{
-		"a cycle ended by the defer":    {"audit-fail-defer: intent-malformed maps to defer-or-quarantine (reintent), per failure-decision.json; the cycle ends", "console-manual"},
-		"a cycle that failed otherwise": {"proceed: no retry", ""},
+		"a cycle ended by the defer":    {core.CycleResult{RetroDecision: "audit-fail-defer: intent-malformed maps to defer-or-quarantine (reintent)", DeferCategory: "intent-malformed", DeferFixType: "reintent"}, "console-manual"},
+		"a cycle that failed otherwise": {core.CycleResult{RetroDecision: "proceed: no retry"}, ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()
 			evolveDir, ws := seedFailedCycleInbox(t, root, "lane-item", 1953)
-			decision := `{"category":"intent-malformed","level":"task","action":"defer-or-quarantine","fix_type":"reintent"}`
-			if err := os.WriteFile(filepath.Join(ws, "failure-decision.json"), []byte(decision), 0o644); err != nil {
+			planted := `{"category":"intent-malformed","level":"task","action":"defer-or-quarantine","fix_type":"reintent"}`
+			if err := os.WriteFile(filepath.Join(ws, "failure-decision.json"), []byte(planted), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			result := core.CycleResult{Cycle: 1953, FinalVerdict: cyclestate.VerdictFAIL, RetroDecision: c.retroDecision}
+			result := c.result
+			result.Cycle, result.FinalVerdict = 1953, cyclestate.VerdictFAIL
 
 			if _, err := closeoutCycleOutcome(result, root, evolveDir, io.Discard, newFakeLedger(), nil); err != nil {
 				t.Fatalf("closeout: %v", err)

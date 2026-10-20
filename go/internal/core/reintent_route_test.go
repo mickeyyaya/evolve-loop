@@ -8,7 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-func TestRecordedDeferDecision_ReadsTheFixTypeOfADeferDecisionOnly(t *testing.T) {
+func TestDeferDecision_ReadsTheFixTypeOfADeferDecisionOnly(t *testing.T) {
 	t.Parallel()
 	reintent := cycle1953Workspace(t, "intent-malformed", true)
 	retry := t.TempDir()
@@ -16,40 +16,21 @@ func TestRecordedDeferDecision_ReadsTheFixTypeOfADeferDecisionOnly(t *testing.T)
 		t.Fatal(err)
 	}
 
-	pol := policy.DefaultSystemFailurePolicy()
-	got, ok := RecordedDeferDecision(reintent, pol)
-	_, retryOK := RecordedDeferDecision(retry, pol)
-	_, noneOK := RecordedDeferDecision(t.TempDir(), pol)
+	o := floorOrchestrator(nil)
+	got, ok := o.deferDecision(CycleState{WorkspacePath: reintent})
+	_, retryOK := o.deferDecision(CycleState{WorkspacePath: retry})
+	_, noneOK := o.deferDecision(CycleState{WorkspacePath: t.TempDir()})
 
-	if !ok || got != (RecordedDefer{Category: "intent-malformed", FixType: policy.FixTypeReintent}) {
-		t.Errorf("RecordedDeferDecision(cycle 1953) = %+v, %t; want intent-malformed with fix_type reintent", got, ok)
+	if !ok || got.category != "intent-malformed" || got.fixType != policy.FixTypeReintent {
+		t.Errorf("deferDecision(cycle 1953) = %+v, %t; want intent-malformed with fix_type reintent", got, ok)
 	}
 	if retryOK || noneOK {
 		t.Errorf("a retry-with-fix decision (%t) or no decision (%t) gave a defer route", retryOK, noneOK)
 	}
 }
 
-func TestIsAuditDeferResult_IsTheRetroDecisionOfADeferEnd(t *testing.T) {
+func TestDeferDecision_TheAuditBlockWinsOverTheRetroDecision(t *testing.T) {
 	t.Parallel()
-	d := deferDecision{category: "intent-malformed", fixType: "reintent", source: "failure-decision.json"}
-	for _, c := range []struct {
-		decision string
-		want     bool
-	}{
-		{d.reason(), true},
-		{"phase-gate: retro artifact missing; " + d.reason(), true},
-		{"proceed: no retry", false},
-		{"", false},
-	} {
-		if got := IsAuditDeferResult(CycleResult{RetroDecision: c.decision}); got != c.want {
-			t.Errorf("IsAuditDeferResult(%q) = %t, want %t", c.decision, got, c.want)
-		}
-	}
-}
-
-func TestRecordedDeferDecision_TheAuditBlockWinsAsItDoesWhenTheCycleEnds(t *testing.T) {
-	t.Parallel()
-	pol := policy.DefaultSystemFailurePolicy()
 	alone := cycle1953Workspace(t, "intent-malformed", false)
 	disagree := cycle1953Workspace(t, "intent-malformed", false)
 	if err := os.WriteFile(filepath.Join(disagree, "failure-decision.json"), []byte(`{"category":"infra-systemic","level":"task","action":"defer-or-quarantine","fix_type":"pipeline-repair"}`), 0o644); err != nil {
@@ -58,10 +39,9 @@ func TestRecordedDeferDecision_TheAuditBlockWinsAsItDoesWhenTheCycleEnds(t *test
 	o := floorOrchestrator(nil)
 
 	for name, ws := range map[string]string{"the audit block alone": alone, "a retro decision that disagrees": disagree} {
-		got, ok := RecordedDeferDecision(ws, pol)
 		ended, defers := o.auditDeclineDefers(CycleState{WorkspacePath: ws, AuditDeclineReason: "declined"})
-		if !ok || got != (RecordedDefer{Category: "intent-malformed", FixType: policy.FixTypeReintent}) || !defers || ended.fixType != got.FixType {
-			t.Errorf("%s: RecordedDeferDecision = %+v, %t; the cycle ended on %+v: want the audit's intent-malformed with fix_type reintent for both", name, got, ok, ended)
+		if !defers || ended.category != "intent-malformed" || ended.fixType != policy.FixTypeReintent || ended.source != "audit" {
+			t.Errorf("%s: the cycle ended on %+v %t; want the audit's intent-malformed with fix_type reintent", name, ended, defers)
 		}
 	}
 }
