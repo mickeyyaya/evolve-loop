@@ -371,3 +371,11 @@ approaches / decision / results / retro) — lives at
 | [plans/guidance-layers-2026-10.md](plans/guidance-layers-2026-10.md) | Plan: five designs with scores. The winner is one rule registry that generates every layer, with a check in CI. Decisions D1 to D11, components G0 to G7 and G3a, the migration and eight conflicts for the operator. |
 | [architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md](architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md) | Decision (Proposed): one registry, five layers, four triggers, and a forced load for every rule that must hold. |
 | [architecture/guidance-layers.md](architecture/guidance-layers.md) | Design, the spec of record: the layers, the budgets, the triggers and their loaders, and the registry schema. It also gives the load of each audience, the situation skills, the checks and a worked example. |
+
+## 2026-10-20 — latency is gated by invariants at merge and by trends on main (ADR-0144)
+
+| Document | What it records |
+|---|---|
+| [research/latency-gates-2026-10.md](research/latency-gates-2026-10.md) | Research: the latency fixes, the existing test tools and current practice for gates on noisy runners (F3.1 to F3.5, G1 to G12). |
+| [plans/latency-gates-2026-10.md](plans/latency-gates-2026-10.md) | Plan: hard gates on behavior, a seeded wave simulation and soft trend gates (D1 to D5, T1 to T7). |
+| [architecture/adr/0144-latency-is-gated-by-invariants-at-merge-and-by-trends-on-main.md](architecture/adr/0144-latency-is-gated-by-invariants-at-merge-and-by-trends-on-main.md) | Decision (Proposed): hard gates never read the wall clock, and measured times file an item after two breaches. |
