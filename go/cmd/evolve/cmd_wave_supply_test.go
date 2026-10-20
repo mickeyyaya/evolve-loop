@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 )
 
@@ -233,5 +234,52 @@ func TestWriteWaveSupplyText_PrintsTheProposalsAndTheWarningsOfTheCensus(t *test
 	writeWaveSupplyText(&none, orchestrator.Supply{Counts: map[string]int{}})
 	if strings.Contains(none.String(), "refused:") || strings.Contains(none.String(), "split proposals:") || strings.Contains(none.String(), "warnings:") {
 		t.Errorf("an empty census printed a section it has nothing for:\n%s", none.String())
+	}
+}
+
+func TestWaveSupply_ProposesASplitOfAMixedItemWhenTheSupplyIsLow(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	inbox := filepath.Join(p.evolveDir(), "inbox")
+	u13WriteJSON(t, filepath.Join(inbox, "lane-a.json"), map[string]any{"id": "lane-a", "weight": 0.9, "priority_class": "feature", "files": []string{"go/internal/alpha/a.go"}})
+	u13WriteJSON(t, filepath.Join(inbox, "mixed.json"), map[string]any{
+		"id": "mixed", "title": "Mend the beta flow", "weight": 0.8, "priority_class": "feature",
+		"files":      []string{"go/internal/guards/phase.go", "go/internal/beta/b.go"},
+		"acceptance": []string{"the beta flow passes"},
+	})
+	u13WriteJSON(t, filepath.Join(inbox, "guard-only.json"), map[string]any{"id": "guard-only", "weight": 0.7, "priority_class": "feature", "files": []string{"go/internal/guards/phase.go"}, "acceptance": []string{"it passes"}})
+	before := treeBytes(t, p.root)
+	h := newWaveHarness()
+
+	rc := h.run("supply", "--json", "--project-root", p.root)
+
+	var got orchestrator.Supply
+	if err := json.Unmarshal(h.stdout.Bytes(), &got); err != nil || rc != 0 {
+		t.Fatalf("rc = %d, decode %v; stderr:\n%s", rc, err, h.stderr.String())
+	}
+	want := []orchestrator.Proposal{{Item: "mixed", Console: "mixed-console", Lane: "mixed-lane"}}
+	if !reflect.DeepEqual(got.Proposals, want) {
+		t.Errorf("proposals = %+v, want only the mixed item split: the census below twice the window proposes a split of each mixed console item", got.Proposals)
+	}
+	if after := treeBytes(t, p.root); !reflect.DeepEqual(before, after) {
+		t.Errorf("a split proposal changed the plane: the census proposes and the console accepts with evolve inbox split")
+	}
+}
+
+func TestSplitProposer_AnUnreadableCandidateIsAWarningAndTheOthersAreProposed(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	good := filepath.Join(dir, "mixed.json")
+	u13WriteJSON(t, good, map[string]any{"id": "mixed", "files": []string{"guard/a.go", "lib/b.go"}, "acceptance": []string{"it passes"}})
+	var stderr bytes.Buffer
+	propose := splitProposer(dir, func(path string) bool { return strings.HasPrefix(path, "guard/") }, &stderr)
+
+	got := propose([]inboxbatch.Item{{ID: "gone", Path: "gone.json"}, {ID: "mixed", Path: filepath.Base(good)}}, 0, 1)
+
+	if want := []orchestrator.Proposal{{Item: "mixed", Console: "mixed-console", Lane: "mixed-lane"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("proposals = %+v, want %+v", got, want)
+	}
+	if !strings.Contains(stderr.String(), "[census] WARN: split proposal: gone:") {
+		t.Errorf("stderr = %q, want a warning that names the unreadable item", stderr.String())
 	}
 }

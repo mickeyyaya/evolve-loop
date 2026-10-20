@@ -142,7 +142,11 @@ When the admissible count is below the window, the census publishes `LOOP_ORCH_S
 - The **lane part** keeps the files that are not protected and the criteria that name only those files. It has `deps` on the console part when it needs the console part first.
 - A criterion that names no file judges the whole item, so both parts keep it.
 
-**State: Built (O2c, 2026-10-18).** `evolve inbox split <id>` and the pure package `internal/inboxsplit` exist. The census that calls `inboxsplit.Proposals` is part of O6 and is not built yet. Until then, the command computes the proposal from the pending item when the console runs it. Package note: [internal-inboxsplit.md](packages/internal-inboxsplit.md).
+**State: Built (O2c, 2026-10-18).** `evolve inbox split <id>` and the pure package `internal/inboxsplit` exist.
+
+**The census call is built (O6, 2026-10-20).** The census calls `inboxsplit.Proposals` through `splitProposer` (`cmd_supply_split.go`). It uses the protected judge of `evolve inbox split`, so a proposal that the census writes is a split that the command accepts. The census writes the proposals into the supply record, and `evolve wave supply` prints them. The census never splits an item. The console accepts each split.
+
+Package note: [internal-inboxsplit.md](packages/internal-inboxsplit.md).
 
 **The fix of 2026-10-18.** The split refuses an item whose text names a protected path or a console file. It refuses a part with no criterion. A lane part that only verifies waits for the console part.
 
@@ -171,7 +175,7 @@ The census builds on the lane menu of `inboxmover.RankLaneMenu`, the same menu a
 - The ready items go to `admission.Admitter` in rank order, with the lanes in flight as holdings. An item that conflicts with an earlier admitted item is `waiting_cell`, as in §6 step 7.
 - With no module graph, every ready item is `admissible`, and the record holds a warning.
 
-The registry spells the event `orchestrator.supply` as `LOOP_ORCH_SUPPLY`, because a code must match `MODULE_SNAKE_CASE`. The proposal step is a function value. A nil value proposes nothing. The wiring to `inboxsplit.Proposals` waits for PR #959. Until then, the loop and `evolve wave supply` pass a nil value, and the proposals stay empty.
+The registry spells the event `orchestrator.supply` as `LOOP_ORCH_SUPPLY`, because a code must match `MODULE_SNAKE_CASE`. The proposal step is a function value. A nil value proposes nothing. The loop and `evolve wave supply` pass `splitProposer`, which calls `inboxsplit.Proposals` (2026-10-20).
 
 **The directory rule (built, O2b, 2026-10-17; amended, 2026-10-18).** A declared directory routes to the console only when it lies inside a protected fragment (ADR-0139 decision 5). Thus `files: ["go/internal/core/"]` is lane work.
 
