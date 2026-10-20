@@ -229,6 +229,11 @@ and [runtime-reference.md](runtime-reference.md) link here and do not restate it
      `failure_policy.thresholds.lane_deferral_halt_ceiling` (default 3) of them in a row.
      So a persistent provisioning fault is a halt, never a silent zero-ship wave after wave
      ([cycle 1806](../incidents/2026-10-06-cycle-1806-fetch-ref-lock.md)).
+   - A planned no-work lane hands its item to the console and exits 0, so no FAIL rule sees it.
+     The `no-work-handoffs` rule of the breaker halts at
+     `failure_policy.thresholds.no_work_handoff_halt_ceiling` (default 6) such lanes in one batch,
+     also when other lanes ship. So a triage that drops one lane of three in each wave is a halt,
+     not a quiet drain of the queue to the console.
 3. **Ship-streak goal: six consecutive ships.** The pipeline-health target of the operator is six
    consecutive shipped cycles. The target was five consecutive ships during the 2026-09-14
    [verification wave](../research/verification-wave-findings-2026-09-14.md). It moved to six by

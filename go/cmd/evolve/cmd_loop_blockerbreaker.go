@@ -49,6 +49,10 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		}
 		return haltPipelineBlocker(evolveDir, projectRoot, latest, "lane-provisioning", v, stderr, signals), true
 	}
+	handoffs := core.CollectBatchNoWorkHandoffs(evolveDir, batchStartCycle+1)
+	if v := core.EvaluateNoWorkHandoffs(handoffs, fp.Thresholds.NoWorkHandoffHaltCeiling); v.Halt {
+		return haltPipelineBlocker(evolveDir, projectRoot, handoffs[len(handoffs)-1], "no-work-handoff", v, stderr, signals), true
+	}
 	return 0, false
 }
 
