@@ -66,17 +66,18 @@ type Supply struct {
 }
 
 type Census struct {
-	Inbox     inboxmover.Options
-	Rank      inboxrank.Inputs
-	Protected func(path string) bool
-	Graph     admission.Graph
-	Text      func(id string) string
-	InFlight  []admission.Holding
-	Window    int
-	Propose   Proposer
-	Path      string
-	Publish   Publish
-	Now       func() time.Time
+	Inbox      inboxmover.Options
+	Rank       inboxrank.Inputs
+	Protected  func(path string) bool
+	Graph      admission.Graph
+	Text       func(id string) string
+	InFlight   []admission.Holding
+	Optimistic bool
+	Window     int
+	Propose    Proposer
+	Path       string
+	Publish    Publish
+	Now        func() time.Time
 }
 
 func (c Census) Count() (Supply, error) {
@@ -136,7 +137,7 @@ func (c Census) admit(s *Supply, ranked []inboxrank.Ranked) {
 		}
 		return
 	}
-	admitted, waiting := admission.Admitter{Graph: c.Graph, Text: c.Text}.Admit(c.InFlight, todos, len(todos))
+	admitted, waiting := admission.Admitter{Graph: c.Graph, Text: c.Text, Optimistic: c.Optimistic}.Admit(c.InFlight, todos, len(todos))
 	s.Counts[ClassAdmissible] = len(admitted)
 	for _, d := range waiting {
 		s.Counts[ClassWaitingCell]++

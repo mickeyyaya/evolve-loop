@@ -79,6 +79,27 @@ func TestAdmissionShadow_AdmitsThePlannedTodosOverTheGraphOfTheWave(t *testing.T
 	}
 }
 
+func TestAdmissionShadow_AtTheEnforceAdmissionKeyTheSharedEditRuleCounts(t *testing.T) {
+	t.Parallel()
+	listing := listingOf(map[string][]string{"internal/sysexec": nil, "internal/inboxrank": {"internal/sysexec"}, "internal/fleet": {"internal/sysexec", "internal/inboxrank"}, "cmd/evolve": {"internal/fleet"}})
+	fn := admissionShadow(func(oc policy.OrchestratorConfig, _ int) (*admission.ModuleGraph, error) {
+		return admission.NewModuleGraph(listing, oc.HubMinImporters)
+	})
+	todos := []fleet.Todo{{ID: "a", Files: []string{"go/internal/inboxrank/a.go"}}, {ID: "f", Files: []string{"go/internal/fleet/pool.go"}}}
+	for admissionKey, want := range map[string]int{"shadow": 1, "enforce": 2} {
+		cfg := policy.OrchestratorConfig{Stage: "shadow", Admission: admissionKey, ScanK: 32, HubMinImporters: 2}
+
+		got, err := fn(9, todos, func(string) string { return "" }, cfg)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Admitted != want {
+			t.Errorf("admission %s: admitted = %d, want %d: f imports the inboxrank that a edits but edits no package of a", admissionKey, got.Admitted, want)
+		}
+	}
+}
+
 func TestAdmissionShadow_ReportsAGraphFailure(t *testing.T) {
 	t.Parallel()
 	fn := admissionShadow(func(policy.OrchestratorConfig, int) (*admission.ModuleGraph, error) {

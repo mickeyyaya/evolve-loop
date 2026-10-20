@@ -13,7 +13,7 @@ func admissionShadow(graphOf func(oc policy.OrchestratorConfig, wave int) (*admi
 		if err != nil {
 			return loopwave.AdmissionShadow{}, err
 		}
-		admitted, waiting := admission.Admitter{Graph: graph, Text: text}.Admit(nil, todos, cfg.ScanK)
+		admitted, waiting := admission.Admitter{Graph: graph, Text: text, Optimistic: cfg.OptimisticAdmission()}.Admit(nil, todos, cfg.ScanK)
 		shadow := loopwave.AdmissionShadow{Admitted: len(admitted)}
 		for _, w := range waiting {
 			shadow.Waits = append(shadow.Waits, loopwave.AdmissionWait(w))

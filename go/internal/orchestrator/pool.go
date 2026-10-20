@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -147,10 +148,20 @@ func (p Pool) check(todo, step string, err error) {
 }
 
 func RecordShadow(publish Publish) func(admission.ShadowAdmission) {
+	var mu sync.Mutex
+	seen := map[[2]string]bool{}
 	return func(s admission.ShadowAdmission) {
+		key := [2]string{s.ID, s.HeldBy}
+		mu.Lock()
+		fresh := !seen[key]
+		seen[key] = true
+		mu.Unlock()
+		if !fresh {
+			return
+		}
 		publish.emit("admission.Shadow", CodeAdmissionShadow, signalcenter.SeverityInfo,
-			fmt.Sprintf("optimistic admission would admit %s beside %s", s.ID, s.HeldBy),
-			map[string]string{"todo": s.ID, "held_by": s.HeldBy, "rank": strconv.Itoa(s.Rank), "cells": strings.Join(s.Cells, ",")})
+			fmt.Sprintf("optimistic admission would admit %s beside %s (%s)", s.ID, s.HeldBy, s.Reason),
+			map[string]string{"todo": s.ID, "held_by": s.HeldBy, "rank": strconv.Itoa(s.Rank), "cells": strings.Join(s.Cells, ","), "reason": s.Reason})
 	}
 }
 

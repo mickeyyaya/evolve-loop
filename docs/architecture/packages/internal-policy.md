@@ -95,4 +95,4 @@
 
 ## fleet.orchestrator.admission (ADR-0143 W1)
 
-`OrchestratorConfig.Admission` is `shadow` by default. `enforce` moves the pool to the optimistic admission rule. Any other word is refused at parse. The key is independent of `fleet.orchestrator.stage`.
+`OrchestratorConfig.Admission` is `shadow` by default. `enforce` moves the pool to the optimistic admission rule. Any other word is refused at parse. The key is independent of `fleet.orchestrator.stage`. `OrchestratorConfig.OptimisticAdmission()` is true only at `enforce`. The pool, the supply census and the wave shadow read it, so the three count by one rule.

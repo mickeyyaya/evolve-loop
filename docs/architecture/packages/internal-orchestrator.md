@@ -150,4 +150,7 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
 
 ## Admission shadow record (ADR-0143 W1)
 
-`RecordShadow` turns an `admission.ShadowAdmission` into the signal `LOOP_ORCH_ADMISSION_SHADOW` (INFO; `todo`, `held_by`, `rank`, `cells`). `AdmitByCell` is unchanged: the admitter it wraps decides.
+`RecordShadow` turns an `admission.ShadowAdmission` into the signal `LOOP_ORCH_ADMISSION_SHADOW` (INFO; `todo`, `held_by`, `rank`, `cells`, `reason`). `AdmitByCell` is unchanged: the admitter it wraps decides.
+
+- **Once for each pair.** The pool asks admission again for each free slot, so one held todo comes back on each pass. The sink of one `RecordShadow` call publishes each pair of `todo` and `held_by` once. The loop builds one sink for each pool run, so the dedup lasts for one run. A mutex guards the seen set. Pinned by `TestRecordShadow_TwoPassesOverOneHeldTodoPublishOnce` and `TestRecordShadow_TheTodoAndItsHolderAreTheKeyNotTheReason`.
+- **The census uses the same rule.** `Census.Optimistic` goes to the admitter of the census. At `fleet.orchestrator.admission` `enforce`, a todo that only meets the reach of a holding counts as `admissible`, not `waiting_cell`. The loop sets no `InFlight` today, so the holdings are the ready items of higher rank. Pinned by `TestCensus_AtEnforceACandidateThatOnlyMeetsARunningLaneReachIsAdmissible`.
