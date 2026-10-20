@@ -1,6 +1,6 @@
 # Logic-first delivery — design document
 
-- **Status:** living document, kept current with every landing. Last updated 2026-09-29 15:25.
+- **Status:** living document, kept current with every landing. Last updated 2026-10-20.
 - **Decision record:** [ADR-0106](adr/0106-logic-first-delivery.md). **Policy:** [operating-policy §0](../operations/operating-policy.md).
 - **Landings:** the design in #655 (merged `5600b77a`; it replaced #653 after a CHANGELOG conflict); the first code train in #656 (merged; eight commits, replacing #654 the same way); ADR-0105 B1 in #652 (merged `e5af27fe`).
 - **Owner of the request:** the operator. **Priority:** P0; everything else parks.
@@ -336,6 +336,34 @@ Limits. The classifier reads the auditor's text. A defect that names the documen
 | X2a.4 | `retry@explanation`: the narrowed envelope, the Build re-entry, the record and the seed wired on both dispatch roots | built (this landing) |
 | X2a.5 | `auditRejectionReasons`: the repair brief and the adjudicator read the runner's reasons (`CycleState.AuditFailReasons`), or else the failure block's defects, for every agent-graded FAIL, with no "unreadable" WARN; the X2a.2 record is removed, so a re-author that dies is digested from its own failure | built (2026-09-29) |
 
+### 5.15 A document correction of a verified build is a rung (X2)
+
+The request is the inbox item `explanation-correction-is-a-rung`: an inaccurate explanation document of verified code cost a full audit-repair round in cycles 1712, 1719 and 1731. X2a (§5.14) made that round cheaper, but the audit still failed and the round still spent the `code-audit-fail` budget. X2 removes the FAIL.
+
+**F15.1** The gate already records `NEEDS_CORRECTION` as an advisory (`phases/audit/explanation_review_gate.go:35`). Only the auditor rule turned it into the FAIL ("make it FAIL, because the audit-repair round is the path that corrects the document").
+*Implication:* the host needs a path that corrects the document after a PASS. Then the rule can keep the PASS.
+
+**F15.2** Build can already correct only the document. X2a's re-author dispatch edits the named document and rewrites `build-report.md`. The code and the tests stay unchanged (`phases/build/build.go`, `CtxKeyExplanationReauthor`).
+*Implication:* the rung reuses that dispatch. It does not need a new agent.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D15.1 | A PASS or WARN audit can review the document as `NEEDS_CORRECTION`. Then the host schedules Build with the review as its brief (`decideExplanationCorrection`). The audit runs again on the corrected document, and the cycle ships. | F15.1, F15.2 | A host rewrite of each claim: the review is prose, and only counts and paths are mechanical. That rung is a later step. A review-only dispatch: no phase does a document-only review today. A new phase is more work than the item asks for. |
+| D15.2 | The budget is the failure-policy category `explanation-correction` (`max_retries`, default 1). It does not spend `code-audit-fail`. | principle 5 (bounded, from config) | A new policy key: a category already has a bound, a level and an override path (`FailurePolicyConfig`). |
+| D15.3 | The budget can be spent while the review is still `NEEDS_CORRECTION`. Then the verified code ships, with a WARN `ORCHESTRATOR_EXPLANATION_CORRECTION_EXHAUSTED`. | goal 1 (a cycle whose logic is right ships) | A FAIL at exhaustion: that brings back the FAIL that X2 removes, for a defect of form. |
+| D15.4 | A FAIL verdict never takes the rung. It keeps the X2a and repair routes. | the acceptance ("a review that names the code still FAILs") | A search of the review's paths for a code defect: the Evidence must cite every material path. Thus the paths do not show which side is wrong. The verdict does. |
+
+How it works:
+
+- **The trigger.** `pendingExplanationCorrection` reads the audit report of the workspace with `reportdoc.ReasonedReview`, the reader the gate uses. It returns the cycle's `explanationdocs.DocumentPath` and the review's Evidence.
+- **The two dispatch roots.** `recordAndBranch` and the resume loop call `decideExplanationCorrection` after the audit FAIL decision. The live root releases the ship-window lease before it schedules Build.
+- **The state.** `CycleState.ExplanationCorrections` holds the Evidence of each round, and its length is the budget used. `ExplanationCorrectionActive` seeds the next Build, and the Build that completes clears it.
+- **The brief.** `seedAuditRepairContext` gives that Build `CtxKeyExplanationReauthor` and `CtxKeyExplanationCorrection`. The second key lists the document lines the Evidence cites (`explanationCorrectionBrief`) and quotes the Evidence. The build prompt opens an "Explanation Correction" section: edit only those lines, rewrite the report, leave the code and the tests unchanged. The section does not say that the audit rejected the build.
+- **The record.** Each round emits INFO `ORCHESTRATOR_EXPLANATION_CORRECTION_RUNG` with `fields.round` and `fields.budget`. The cycle dossier carries `explanation_corrections` (`schemas/cycle-dossier.schema.json`).
+- **The rule.** When only the document is wrong, the rendered audit rule keeps the PASS with `NEEDS_CORRECTION`. The auditor FAILs only for a defect in the code or the tests.
+
+Limits. The re-review is a full audit dispatch at the audit's tier, because no smaller review exists. The rung saves the TDD dispatch, the FAIL and the repair budget, not the audit cost. The host rewrite of a mechanical claim (a count, a path) is not built.
+
 ## 6. Decision tables
 
 ### 6.1 Routing by violation code (`deliverable`, beside the codes)
@@ -453,7 +481,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | W8 | the batch classifier's dependency half (`inboxbatch.depRule`'s deps loop, `topoOrder`'s dependency ordering) is removed with its tests: under W3 a dependent never shares a menu with its unlanded dependency, so the grouping is unreachable (links and campaigns stay) | shipped (cycle 1724, `7889cc5b`; §5.10, second architecture review) | `internal/inboxbatch`, `go/acs/cycle1205` |
 | W6 | a work-supply census: an empty or short plan's signal names the pending items by why they are not lane material (console kind, console route, protected surface, unmet dependency with its blocker, no id) | designed (§5.10) | `internal/triagecap`, `internal/loopwave` |
 | X1 | `.evolve/inbox/` is non-material to the explanation document: the host claims, moves, stamps and retires those records | shipped | `internal/explanationdocs` |
-| X2 | an explanation review that names only the document of a verified build is a recovery rung, never the audit's FAIL | designed (§5.6) | `phases/audit/explanation_review_gate.go`, the recovery agent (F4/F6) |
+| X2 | A review that names only the document of a verified build is a rung, not the audit's FAIL. Build corrects the named document lines, and the audit re-reviews them before ship. | built (§5.15) | `core/explanation_correction_rung.go`, `core/cyclerun_record.go`, `core/resume_execution.go`, `phases/build/build.go`, `phases/audit/audit_rules.go`, `policy`, `dossier` |
 | X2a | an audit FAIL whose every defect locates in the cycle's own explanation document (and no runner gate diagnosed it) is `explanation-needs-correction`: the granted envelope narrows to `retry@explanation`, Build re-authors the document with TDD skipped, the brief carries the defects from the failure block (X2a.5, which also serves every other agent-graded FAIL; the first landing's copy in `audit-fail-reason.json` is removed), and the audit re-runs; the FAIL itself stays until X2 | shipped (§5.14) | `core/explanation_correction.go`, `core/audit_fail_decision.go`, `core/repair_eligibility.go`, `core/repair_brief.go`, `phases/build/build.go` |
 | X3 | the cycle's own explanation record is never history: only foreign cycle records are immutable, in every branch; a no-material diff declared `REQUIRED` is verified with an empty material set, one declared `NOT_APPLICABLE` keeps an undeclared own record as documentation; the Verify mirror branches on the recorded status | shipped (§5.9) | `internal/explanationdocs` (`checkBuildV1`, `verifyResolvedV1`) |
 
@@ -742,3 +770,4 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-10-18 | §7.9 A1 shipped (console lane, inbox `acs-run-names-vacuous`). `acsassert.GoTests` now refuses an exact pattern name that `Names` omits, because that name passed unseen. 343 predicate files hold a `-run` flag and only 14 call `GoTests`, so `go/acs/regression/acsnames` fails on a name that no test declares. The first scan found 20 stale names in 16 packages. 9 predicates are repointed to the renamed tests, 1 is narrowed, and 14 are retired with a reason. `TestC1678_011` parses the standard output alone. |
 | 2026-10-18 | §5.13 R2–R5 built (`sizeratchet-allowances-not-a-shared-registry`): `Tighten` and `Encode`, `evolve ratchet tighten [--check]` as the one writer, the floor's check against the base (`sizeFloorFailures`), one path constant and one cap. The rebase of two shrink lanes in different packages is proven identical by `treedelta.Identical` (`TestTighten_TwoLanesThatShrinkListedFunctionsInDifferentPackagesRebaseIdentically`). R3 is built, not wired: the boundary commits nothing and `sync-main` refuses a dirty tree, so `evolve boundary run` does not call the tighten. The console runs it by hand until that write can land; the raw-git list keeps its exact-match rule until one tighten serves both lists. Review round 1: the refusal does not name the writer, which refuses inside a phase or under a live lease (`refuseBoundaryWrite`), and `moduleRelPrefix` uses `filepath.Rel` |
 | 2026-10-20 | W5 shipped (console lane, inbox `inbox-item-identity-one-rule`). `inboxbatch.ItemID` is the one identity rule: the recorded id, else the filename stem, then the loader's sanitizer. `lifecycle.readID` and `readIDAndDeps` call it, and the planner's backlog keeps an id-less item. `TestInboxReaders_GiveEachItemOneID` pins the lane menu, the backlog and the lifecycle to one id, also for an id that the sanitizer rewrites. `Item.IDFromFileName` is deleted. Five more readers from an independent review call `ItemID` now, and an AST guard in `internal/guards` stops a new copy. |
+| 2026-10-20 | §5.15 X2 built (console lane, inbox `explanation-correction-is-a-rung`). A passing audit's `NEEDS_CORRECTION` runs one document-only Build correction and a re-review before ship. The `explanation-correction` failure category sets the budget, and the dossier records each round. |

@@ -123,6 +123,11 @@
       "type": "array",
       "items": {"type": "string", "minLength": 1},
       "description": "Ids of the lessons seedTaskRecall injected into this cycle phase prompts, in lookup order, read from recalled-lessons.json. Absent when none were injected."
+    },
+    "explanation_corrections": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "description": "The review evidence of each document-only correction a passing audit's NEEDS_CORRECTION started (X2), in order. Absent when the cycle ran none."
     }
   },
   "definitions": {

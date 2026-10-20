@@ -251,6 +251,10 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			}
 		}
 
+		if branch, ok := o.decideExplanationCorrection(&cs, cursor.current, resp.Verdict); ok {
+			cursor.schedule(branch)
+		}
+
 		if o.successorStrategy(cursor.current) == phasespec.BranchingHistory {
 			cs.FailedAt = state.FailedAt
 			branch, extraEnv, reason, sysFail := o.decideAfterRetro(cs, resp.Verdict, state.FailedAt)
