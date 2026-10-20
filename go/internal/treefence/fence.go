@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
@@ -291,10 +292,28 @@ func Begin(ctx context.Context, worktree string, readOnly bool, writable ...stri
 	}
 	snap, err := Take(ctx, worktree)
 	if err != nil {
+		snap, err = retake(ctx, worktree, err)
+	}
+	if err != nil {
 		return &Fence{takeErr: err}
 	}
 	snap.writable = writableSet(writable)
 	return &Fence{snap: &snap}
+}
+
+const retakeDelay = 100 * time.Millisecond
+
+func retake(ctx context.Context, worktree string, first error) (Snapshot, error) {
+	select {
+	case <-ctx.Done():
+		return Snapshot{}, fmt.Errorf("%w; retry: %w", first, ctx.Err())
+	case <-time.After(retakeDelay):
+	}
+	snap, err := Take(ctx, worktree)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("%w; retry: %w", first, err)
+	}
+	return snap, nil
 }
 
 func writableSet(paths []string) map[string]bool {

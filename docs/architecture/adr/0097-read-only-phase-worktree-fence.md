@@ -65,6 +65,14 @@ ran `sandbox=false`.
    still judged downstream: a changed byte fails B3's identity proof, so the change is re-authored
    and re-audited before it ships.
 
+7. **A snapshot that fails is retaken once (2026-10-21).** `treefence.Begin` takes the snapshot again after 100 ms when the first `Take` fails.
+   - When the retry also fails, the fence is inert. The error names both attempts: `<first>; retry: <second>`.
+   - The phase then proceeds with the loud fail-open of decision 3. The runner logs a WARN. The phase response carries the `snapshot unavailable` warning diagnostic. A read-only phase therefore never runs with an unchecked fence silently.
+   - Why a retry and not a refusal: the failure under load was seen three times on 2026-09-28 (`TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile`). It did not reproduce on 2026-10-21. There were 0 failures in 120 runs (`-race -cpu 1,8`, beside `go test -race ./internal/phases/ship/`) on `origin/main`, and 0 in 120 runs of the 2026-09-28 tree (`ab531a8a9`). Since 2026-10-16 the snapshot uses `gitexec.TreeOfIndexCopy`: the index is copied from one file handle with its mtime, and the git environment is isolated. The cause of the 2026-09-28 failures is thus not named.
+   - The cost: the retry bounds a transient failure. A deterministic failure (no repository) costs one more `git` call and the 100 ms wait. Only a test dispatches a read-only phase into a directory that is not a repository.
+   - What changes the decision: a measured failure that the retry does not clear. Then the dispatch must refuse the read-only phase, because a fence that cannot snapshot cannot protect the tree.
+   - Pinned by `TestBegin_ATransientSnapshotFailureIsRetakenOnce`, `TestBegin_ASecondSnapshotFailureNamesBothAttempts`, `TestBegin_ADispatchThatEndsDuringTheWaitDoesNotRetake` and the runner test `TestRun_FenceUnavailableWarnsAndProceeds`.
+
 ## Alternatives considered
 
 - **Make the OS sandbox mandatory for read-only phases.** Right layer for defence in depth,
