@@ -23,7 +23,7 @@ When this dispatch writes or changes a document, follow these rules. The full sk
   - an instruction has 20 words or fewer, a description 25 or fewer;
   - active voice, no "-ing" form, "must" or "can" only;
   - six sentences or fewer in a paragraph; a table for data with two or more attributes.
-- **Index it:** add a design set to `docs/research-index.md`.
+- **Index it:** add one entry file for a design set to `docs/research-index/`, then run `evolve docs index generate`. Do not edit the generated region of `docs/research-index.md`.
 - **Check it:**
   - `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added` reports 0;
   - each relative link resolves.

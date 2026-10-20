@@ -1,6 +1,11 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestPRRefresh_AConflictOutsideTheGeneratedRegionIsNeverStaged":                                    "swaps seam prRefreshWorktree",
+	"main.TestPRRefresh_AnEntryTheCatalogLacksFailsLoudly":                                                  "swaps seam prRefreshWorktree",
+	"main.TestPRRefresh_EachFailedGitStepFailsTheRefresh":                                                   "swaps seam prRefreshWorktree",
+	"main.TestPRRefresh_InAConflictedMergeItRegeneratesTheIndexAndStagesIt":                                 "swaps seam prRefreshWorktree",
+	"main.TestPRRefresh_RegeneratesTheThreeDerivedFilesAndCommitsNothingElse":                               "swaps seam prRefreshWorktree",
 	"main.TestPRWindow_AnUnreadableWorkingDirectoryExitsTwo":                                                "sets env through a helper",
 	"main.TestWireRoutingPlanAdvisor_RefusesAProjectWhoseRoutingTableDoesNotCompile":                        "swaps the bridge model catalog dir",
 	"main.TestWireRoutingPlanAdvisor_ARefusedTableIsAnErrorAndTheCatalogDefectsReachTheConsole":             "calls process-global setter SetModelCatalogDirFn",

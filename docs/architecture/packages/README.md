@@ -182,6 +182,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/posteditvalidate` | the PostToolUse hook that checks a just-edited json, shell or python file and warns without blocking | [internal-posteditvalidate.md](internal-posteditvalidate.md) |
 | `internal/mergegate` | the merge-to-main gate's deterministic kernel: the cadence advisor and the promoter | [internal-mergegate.md](internal-mergegate.md) |
 | `internal/builddiff` | derives the diff of a cycle from its recorded base and writes it into the build report | [internal-builddiff.md](internal-builddiff.md) |
+| `internal/researchindex` | writes the dated entries of `docs/research-index.md` from one file for each entry | [internal-researchindex.md](internal-researchindex.md) |
 | `internal/mergewindow` | decides if a PR merges in a window or at a boundary, from the CI routing table of `required.yml` | [internal-mergewindow.md](internal-mergewindow.md) |
 | `internal/dispatchevents` | writes the dispatcher-level abnormal events of a cycle workspace and owns the event vocabulary | [internal-dispatchevents.md](internal-dispatchevents.md) |
 | `internal/contextfillcorrelate` | joins the per-phase context fill ratio with the final verdict of each cycle and reports the FAIL rate for each fill band | [internal-contextfillcorrelate.md](internal-contextfillcorrelate.md) |
