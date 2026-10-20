@@ -111,3 +111,61 @@ func TestClassify_AHostProvenBlockerOutranksTheLanesOwnFailSentinel(t *testing.T
 		t.Errorf("the host's proof of the lane's claim supersedes the lane's FAIL: %+v", r)
 	}
 }
+
+func rejectedBuildBeforeTheRetro(code, retroVerdict string) []phasetiming.Entry {
+	return []phasetiming.Entry{
+		{Phase: "scout", Verdict: "PASS"},
+		{Phase: "tdd", Verdict: "PASS"},
+		{Phase: "build", Verdict: "FAIL", AbortReason: `review gate: phase "build" deliverable rejected after 2 correction(s): build handoff floor`, Diagnostics: []cyclestate.Diagnostic{{Severity: cyclestate.SeverityError, Message: "rejected", Code: code, Subject: "item-1"}}},
+		{Phase: string(cyclestate.PhaseRetro), Verdict: retroVerdict},
+	}
+}
+
+func TestClassify_ARejectedBuildClassifiesFromItsOwnEntryAndNotTheRetroAfterIt(t *testing.T) {
+	for _, code := range []string{cyclestate.DiagCodeBuildRejected, cyclestate.DiagCodeBlockerRoute} {
+		for _, retro := range []string{"PASS", "FAIL"} {
+			ws := t.TempDir()
+			writePhaseTiming(t, ws, rejectedBuildBeforeTheRetro(code, retro))
+
+			r := Classify(ws)
+
+			if r.Class != ClassPhaseRefusal || r.Marker != code || r.Phase != "build" || r.Subject != "item-1" {
+				t.Errorf("code %s, retro %s: Classify = %+v; the retro runs after the failing phase and does not decide its class", code, retro, r)
+			}
+		}
+	}
+}
+
+func TestClassify_ARetroAloneIsNotARefusal(t *testing.T) {
+	ws := t.TempDir()
+	writePhaseTiming(t, ws, []phasetiming.Entry{{Phase: string(cyclestate.PhaseRetro), Verdict: "PASS"}})
+	if r := Classify(ws); r.Class != ClassIntegrityBreach {
+		t.Errorf("a record of only the retro holds no failing phase, so the record pass falls through: %+v", r)
+	}
+}
+
+func TestClassify_ACodeWithNoDispositionBeforeTheRetroFallsThroughToTheReport(t *testing.T) {
+	ws := writeReport(t, "## Verdict\nAUDIT_FAIL: Verdict FAIL\n")
+	writePhaseTiming(t, ws, []phasetiming.Entry{
+		{Phase: "build", Verdict: "PASS"},
+		{Phase: "audit", Verdict: "FAIL", Diagnostics: []cyclestate.Diagnostic{{Severity: cyclestate.SeverityError, Message: "x", Code: "AUDIT_SOMETHING_NEW"}}},
+		{Phase: string(cyclestate.PhaseRetro), Verdict: "PASS"},
+	})
+
+	if r := Classify(ws); r.Class != ClassAuditFail {
+		t.Errorf("Classify = %+v; past the retro only a code with a disposition is a refusal, so the audit FAIL keeps its class", r)
+	}
+}
+
+func TestClassify_TheRejectedBuildsOwnFailSentinelStillWins(t *testing.T) {
+	ws := t.TempDir()
+	writePhaseTiming(t, ws, rejectedBuildBeforeTheRetro(cyclestate.DiagCodeBuildRejected, "PASS"))
+	sentinel := "# build\n<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"FAIL\",\"failure\":{\"class\":\"code-build-fail\"}} -->\n"
+	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(sentinel), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if r := Classify(ws); r.Class != Classification("code-build-fail") || r.Source != "build-report.md" {
+		t.Errorf("Classify = %+v; the build's own FAIL sentinel names the class, which also charges the item", r)
+	}
+}

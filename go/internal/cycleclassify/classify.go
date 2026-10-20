@@ -321,15 +321,15 @@ func firstInfraMarker(workspace, logPath string) (marker string, ok bool) {
 
 func classifyFromRecord(workspace string) (Result, bool) {
 	entries, err := phasetiming.Read(workspace)
-	if err != nil || len(entries) == 0 {
+	if err != nil {
 		return Result{}, false
 	}
-	last := entries[len(entries)-1]
-	if last.Verdict != "FAIL" {
+	last, afterRetro, ok := endingEntry(entries)
+	if !ok || last.Verdict != "FAIL" {
 		return Result{}, false
 	}
 	codes := cyclestate.ErrorCodes(last.Diagnostics)
-	if len(codes) == 0 {
+	if len(codes) == 0 || afterRetro && cyclestate.RefusalDisposition(codes[0]) == (cyclestate.Disposition{}) {
 		return Result{}, false
 	}
 	res := Result{Class: ClassPhaseRefusal, Marker: codes[0], Source: phasetiming.FileName, Phase: last.Phase}
@@ -340,6 +340,15 @@ func classifyFromRecord(workspace string) (Result, bool) {
 		}
 	}
 	return res, true
+}
+
+func endingEntry(entries []phasetiming.Entry) (entry phasetiming.Entry, afterRetro, ok bool) {
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].Phase != string(cyclestate.PhaseRetro) {
+			return entries[i], i < len(entries)-1, true
+		}
+	}
+	return phasetiming.Entry{}, false, false
 }
 
 func sentinelPhase(source string) string {
