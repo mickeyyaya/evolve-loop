@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -69,5 +70,36 @@ func TestProductionEngineDeps_ResolverAppliesRealFixture(t *testing.T) {
 	}
 	if res.Source != tokenusage.SourceTranscript {
 		t.Errorf("Source = %q, want %q — the wired resolver must actually scan HOME/.claude, not stub SourceNone", res.Source, tokenusage.SourceTranscript)
+	}
+}
+
+func TestProductionEngineDeps_ResolverReadsTheAgyConversationStoreUnderHome(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not on PATH")
+	}
+	home := t.TempDir()
+	worktree := "/repo/worktrees/cycle-1967"
+	store := filepath.Join(home, ".gemini", "antigravity-cli")
+	id := "587d3641-24fd-443d-8989-c539a294e080"
+	if err := os.MkdirAll(filepath.Join(store, "conversations"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	seed := func(db, sql string) {
+		t.Helper()
+		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+			t.Fatalf("seed %s: %v %s", db, err, out)
+		}
+	}
+	seed(filepath.Join(store, "conversation_summaries.db"), `create table conversation_summaries(conversation_id text, workspace_uris text, last_user_input_time datetime);
+insert into conversation_summaries values ('`+id+`', '["file://`+worktree+`"]', '2026-10-19 07:07:41.401316+00:00');`)
+	seed(filepath.Join(store, "conversations", id+".db"), `create table gen_metadata(idx integer, data blob);
+insert into gen_metadata values (1, x'0a0b220910d012181e28c0c403');`)
+
+	d := NewDefault(t.TempDir(), nil).productionEngineDeps(map[string]string{"HOME": home})
+	got, err := d.TokenResolver(tokenusage.Window{Driver: "agy-tmux", Worktree: worktree,
+		Start: mustParseRFC3339(t, "2026-10-19T07:07:30Z"), End: mustParseRFC3339(t, "2026-10-19T07:23:34Z")})
+
+	if err != nil || got.Source != tokenusage.SourceAgyConversation || got.Usage.Input != 2384 || got.Usage.Output != 30 || got.Usage.CacheRead != 57920 {
+		t.Errorf("resolver = %+v, %v; want the agy conversation under HOME", got, err)
 	}
 }

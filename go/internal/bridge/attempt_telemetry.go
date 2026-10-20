@@ -163,7 +163,7 @@ func (e *Engine) resolveAttemptTokens(req core.BridgeRequest, start, end time.Ti
 	}
 	status := llmcalls.UsageUnavailable
 	switch result.Source {
-	case tokenusage.SourceTranscript, tokenusage.SourceEventsResult:
+	case tokenusage.SourceTranscript, tokenusage.SourceEventsResult, tokenusage.SourceAgyConversation:
 		status = llmcalls.UsageMeasured
 	case tokenusage.SourceScrollbackPeak:
 		status = llmcalls.UsagePartial
