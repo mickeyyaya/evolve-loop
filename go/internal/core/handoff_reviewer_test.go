@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
+	"github.com/mickeyyaya/evolve-loop/go/internal/handoff/request"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
@@ -360,5 +361,25 @@ func TestHandoffReviewer_AResumedRefusedRouteKeepsTheCorrectionRounds(t *testing
 	}
 	if tdd.calls != 2 {
 		t.Errorf("tdd dispatched %d times; a refused route spends a correction round", tdd.calls)
+	}
+}
+
+func TestHandoffReviewer_GivesItsHandoffCheckerTheReviewInputAndThePairThePhaseEnds(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	var gotWorkspace, gotPair string
+	var check HandoffChecker = func(in ReviewInput, pair string) handoff.Check {
+		gotWorkspace, gotPair = in.Workspace, pair
+		return handoff.Check{Outcome: string(handoff.ExitPass)}
+	}
+	var reviewer HandoffReviewer = NewHandoffReviewer(handoffStages("enforce"), check)
+
+	got := reviewer.Review(context.Background(), ReviewInput{Phase: string(PhaseBuild), Workspace: ws})
+
+	if !got.Approve {
+		t.Errorf("a passing check must approve, got %+v", got)
+	}
+	if gotPair != request.PairTDDBuild || gotWorkspace != ws {
+		t.Errorf("checker got pair %q workspace %q, want %q %q", gotPair, gotWorkspace, request.PairTDDBuild, ws)
 	}
 }

@@ -19,6 +19,9 @@ func TestIpcenv_ConstValues(t *testing.T) {
 	if ipcenv.WorktreeRootKey != "EVOLVE_WORKTREE_ROOT" {
 		t.Errorf("WorktreeRootKey = %q, want %q", ipcenv.WorktreeRootKey, "EVOLVE_WORKTREE_ROOT")
 	}
+	if ipcenv.FleetReachHolderKey != "EVOLVE_FLEET_REACH_HOLDER" {
+		t.Errorf("FleetReachHolderKey = %q, want %q", ipcenv.FleetReachHolderKey, "EVOLVE_FLEET_REACH_HOLDER")
+	}
 	if ipcenv.CycleStateFileKey != "EVOLVE_CYCLE_STATE_FILE" {
 		t.Errorf("CycleStateFileKey = %q, want %q", ipcenv.CycleStateFileKey, "EVOLVE_CYCLE_STATE_FILE")
 	}

@@ -115,3 +115,25 @@ func TestPool_AnEarlierOptimisticRecordDoesNotFollowALaterReachAdmission(t *test
 		t.Errorf("optimistic admissions = %+v, want none", got)
 	}
 }
+
+func TestReachHolders_GateClearsTheLastFillAndTakeHandsEachHolderOutOnce(t *testing.T) {
+	var holders *ReachHolders = NewReachHolders()
+	holders.Record(admission.ShadowAdmission{ID: "stale", HeldBy: "old"})
+	admit := holders.gate(func(_, _ []fleet.Todo) int {
+		holders.Record(admission.ShadowAdmission{ID: "router-todo", HeldBy: "core-todo"})
+		return 1
+	})
+
+	if n := admit(nil, nil); n != 1 {
+		t.Fatalf("gate must return the count of the wrapped rule, got %d", n)
+	}
+	if _, ok := holders.take("stale"); ok {
+		t.Error("a holder recorded before the fill must be cleared by the gate")
+	}
+	if s, ok := holders.take("router-todo"); !ok || s.HeldBy != "core-todo" {
+		t.Errorf("take(router-todo) = %+v, %v; want the holder core-todo", s, ok)
+	}
+	if _, ok := holders.take("router-todo"); ok {
+		t.Error("take must hand a holder out only once")
+	}
+}
