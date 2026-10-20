@@ -4,6 +4,7 @@
 package cycleoutcome
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -13,8 +14,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -28,6 +31,8 @@ type FailureInputs struct {
 	RefusalDetail  string
 	RefusalSubject string
 	Reason         string
+	FailureClass   retryladder.Class
+	Fingerprint    string
 	Protected      func(string) bool
 	Stderr         io.Writer
 	Ledger         inboxmover.LedgerAppender
@@ -68,6 +73,8 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		Ceiling:      in.Ceiling,
 		SystemLevel:  in.SystemLevel,
 		Routed:       routed,
+		FailureClass: string(in.FailureClass),
+		Fingerprint:  in.Fingerprint,
 	})
 	if err != nil {
 		return res, fmt.Errorf("apply cycle %d failure outcome: %w", in.Cycle, err)
@@ -111,13 +118,15 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 	}
 	cls := cycleclassify.Classify(workspace)
 	in := FailureInputs{
-		ProjectRoot: projectRoot,
-		Workspace:   workspace,
-		Cycle:       cycle,
-		Ceiling:     failPol.Thresholds.TaskRetryCeiling,
-		SystemLevel: !IsTaskLevelResult(cls),
-		Reason:      "cycle-failure-release",
-		Stderr:      stderr,
+		ProjectRoot:  projectRoot,
+		Workspace:    workspace,
+		Cycle:        cycle,
+		Ceiling:      failPol.Thresholds.TaskRetryCeiling,
+		SystemLevel:  !IsTaskLevelResult(cls),
+		Reason:       "cycle-failure-release",
+		FailureClass: failureClassOf(cls),
+		Fingerprint:  retryladder.Fingerprint(firstFailureReason(workspace)),
+		Stderr:       stderr,
 	}
 	if cls.Class == cycleclassify.ClassPhaseRefusal {
 		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject
@@ -126,12 +135,41 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 }
 
 func IsTaskLevelFailure(c cycleclassify.Classification) bool {
-	switch c {
-	case cycleclassify.ClassBuildFail, cycleclassify.ClassAuditFail, cycleclassify.ClassShipGateConfig:
+	norm := failurelog.NormalizeLegacy(string(c))
+	switch ladderClassOf(norm) {
+	case retryladder.Spec, retryladder.Capability:
 		return true
-	default:
-		return false
 	}
+	return norm == failurelog.ShipGateConfig
+}
+
+func failureClassOf(cls cycleclassify.Result) retryladder.Class {
+	if cls.Marker == cycleclassify.MarkerQuotaLikelyEmptyOutput {
+		return retryladder.Quota
+	}
+	return ladderClassOf(failurelog.NormalizeLegacy(string(cls.Class)))
+}
+
+func ladderClassOf(c failurelog.Classification) retryladder.Class {
+	switch c {
+	case failurelog.InfrastructureTransient, failurelog.InfrastructureSystemic, failurelog.ExitTransportHang:
+		return retryladder.Infra
+	}
+	return retryladder.Classify(retryladder.Facts{AuditClass: string(c)}).Class
+}
+
+func firstFailureReason(workspace string) string {
+	body, err := os.ReadFile(filepath.Join(workspace, "audit-fail-reason.json"))
+	if err != nil {
+		return ""
+	}
+	var doc struct {
+		Reasons []string `json:"reasons"`
+	}
+	if json.Unmarshal(body, &doc) != nil || len(doc.Reasons) == 0 {
+		return ""
+	}
+	return doc.Reasons[0]
 }
 
 func CommittedIDsFor(workspace string) []string {

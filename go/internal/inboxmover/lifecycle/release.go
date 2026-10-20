@@ -83,7 +83,7 @@ func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (b
 	if q == nil || q.SystemLevel || q.Routed || (q.Committed != nil && !q.Committed[d.taskID]) {
 		return false, ""
 	}
-	count, bumpErr := bumpWith(d.src, reason, func(n int) bool { return ShouldQuarantine(n, q.Ceiling, q.SystemLevel) })
+	count, bumpErr := bumpWith(d.src, failureRecord{reason: reason, class: q.FailureClass, fingerprint: q.Fingerprint}, func(n int) bool { return ShouldQuarantine(n, q.Ceiling, q.SystemLevel) })
 	if bumpErr != nil {
 		m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",
 			reason: fmt.Sprintf("release-cycle: failure_count bump failed for %s (%v) — quarantine skipped, releasing to inbox root", d.base, bumpErr),

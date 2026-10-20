@@ -96,6 +96,21 @@ Every retry path asks the decider for the next rung. None of them sets a tier or
 | Next item after a failure | starts the build at deep when `failure_count >= 1` (`core/retry_tier_escalation.go:31`) | starts at R2 only when the last failure was `capability` at R1 or higher |
 | Infra re-dispatch | the same request | unchanged |
 
+### The failure record of an item
+
+Each sealed FAIL of a lane item writes one failure record on the item. The next-item row above reads it.
+
+| Key | Value | Writer |
+|---|---|---|
+| `failure_count` | one more than before | the failure drain, `lifecycle.bumpWith` |
+| `last_failure_class` | the classifier class of the failure: `capability` or `spec` | the same rewrite |
+| `last_failure_fingerprint` | `retryladder.Fingerprint` of the first reason in `audit-fail-reason.json` | the same rewrite |
+
+- The closeout (`cycleoutcome.FailureInputsFor`) maps the cycle class to a classifier class. An `infra` or `quota` class is system-level, so the drain writes no record. At the retry ceiling, the drain parks a charged item in `quarantine/`.
+- The keys are loop stamps in the field-owner table (`inboxbatch/fieldowner.go`), so `sync-main` accepts them as stamps.
+- From 2026-10-13 to 2026-10-20, no lane FAIL charged its item. The blame rule did not know the `code-build-fail` and `code-audit-fail` spellings of the FAIL sentinel. So every item kept `failure_count` 0, and the deep floor and the ceiling did not fire. [internal-cycleoutcome.md](packages/internal-cycleoutcome.md) has the evidence.
+- A `spec` failure now also charges the item. Until L5 of the plan lands, a charged item starts its next build at deep. With D10, only a `capability` record does that.
+
 The ladder serves the phases that produce a deliverable: build, tdd, scout, triage, fault localization and bug reproduction. Judge seats never climb.
 
 The raise reaches the dispatch through its own field, not the advisor overlay:
