@@ -170,6 +170,23 @@ func TestRecoverBeforeReview_ASourceALiveSiblingDeclaresStaysInTheMainTree(t *te
 	requireAbsent(t, lane.worktree, theirs)
 }
 
+func TestRecoverBeforeReview_ASiblingsDirectoryEntryDoesNotHoldThisLanesLeak(t *testing.T) {
+	t.Parallel()
+	repo, lane, sibling := twoLanesOnOneMainTree(t)
+	const leak = "go/internal/core/cyclerun.go"
+	writeLaneClaim(t, repo, 1811, lane.slug, "go/internal/router/")
+	writeLaneClaim(t, repo, 1812, sibling.slug, "go/internal/core")
+	cr, dr := lane.phaseStart(t, repo, 1811, PhaseBuild)
+	writeTreeFile(t, repo, leak, "package core\n")
+
+	if err := cr.recoverBeforeReview(PhaseBuild, dr); err != nil {
+		t.Fatalf("recovery failed: %v", err)
+	}
+
+	requireAbsent(t, repo, leak)
+	requireTreeFile(t, lane.worktree, leak, "package core\n")
+}
+
 func TestRecoverBeforeReview_ScoutsOwnMainTreeEvalCopyLeavesTheMainTree(t *testing.T) {
 	t.Parallel()
 	repo, lane, _ := twoLanesOnOneMainTree(t)
@@ -486,7 +503,9 @@ func TestGuard_APathALiveSiblingDeclaresDoesNotAbortThisLanesPhase(t *testing.T)
 			t.Parallel()
 			root := t.TempDir()
 			const theirs = "go/internal/phasespec/roots.go"
+			writeGoalPin(t, root, 1, "g", "router-silent-errors")
 			writeLaneClaim(t, root, 1, "router-silent-errors", "go/internal/router/")
+			writeGoalPin(t, root, 1812, "g", "phasespec-roots")
 			writeLaneClaim(t, root, 1812, "phasespec-roots", theirs)
 			heartbeat := time.Now()
 			if !live {

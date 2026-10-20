@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -316,32 +317,57 @@ func writeLaneClaim(t *testing.T, root string, cycle int, id string, files ...st
 	writeTreeFile(t, root, ".evolve/inbox/processing/cycle-"+strconv.Itoa(cycle)+"/"+id+".json", string(body))
 }
 
-func TestFilterRealLeaks_APathOnlyALiveSiblingDeclaresIsNotThisLanesLeak(t *testing.T) {
+func writeGoalPin(t *testing.T, root string, cycle int, goal string, ids ...string) {
+	t.Helper()
+	pin, err := json.Marshal(LaneScope{TodoIDs: ids, GoalHash: goal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTreeFile(t, RunWorkspacePath(root, cycle), LaneScopeFile, string(pin))
+}
+
+func TestFilterRealLeaks_OnlyAFileALiveSameGoalSiblingNamesIsNotThisLanesLeak(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeLaneClaim(t, root, 1811, "router-silent-errors", "go/internal/router/", "go/internal/shared/both.go")
-	writeLaneClaim(t, root, 1812, "phasespec-roots", "go/internal/phasespec/roots.go", "go/internal/shared/both.go", "go/internal/guards/role.go")
+	writeGoalPin(t, root, 1811, "g", "router-silent-errors")
+	writeLaneClaim(t, root, 1811, "router-silent-errors", "go/internal/router/", "go/internal/shared/both.go", "go/internal/router2/x.go")
+	writeGoalPin(t, root, 1812, "g", "phasespec-roots")
+	writeLaneClaim(t, root, 1812, "phasespec-roots", "go/internal/phasespec/roots.go", "go/internal/shared/both.go", "go/internal/guards/role.go", "go/internal/core", "go/internal/router2/x_test.go")
+	writeGoalPin(t, root, 1814, "other", "other-goal")
+	writeLaneClaim(t, root, 1814, "other-goal", "go/internal/other/y.go")
 	writeLaneClaim(t, root, 1700, "stale-lane", "go/internal/stale/x.go")
-	writeRunLease(t, RunWorkspacePath(root, 1812), time.Now())
+	for _, cycle := range []int{1812, 1814} {
+		writeRunLease(t, RunWorkspacePath(root, cycle), time.Now())
+	}
 	writeRunLease(t, RunWorkspacePath(root, 1700), time.Now().Add(-24*time.Hour))
-	writeRunLease(t, filepath.Join(filepath.Dir(RunWorkspacePath(root, 1812)), "adhoc"), time.Now())
+	adhoc := filepath.Join(filepath.Dir(RunWorkspacePath(root, 1812)), "adhoc")
+	writeRunLease(t, adhoc, time.Now())
+	writeTreeFile(t, adhoc, LaneScopeFile, `{"goal_hash":"g"}`)
+	writeGoalPin(t, root, 1813, "g")
 	writeTreeFile(t, root, ".evolve/inbox/processing/cycle-1813", "a file where the claims dir must be")
 	writeRunLease(t, RunWorkspacePath(root, 1813), time.Now())
 	exempt := guardedLaneOneEightOneOne().exemptions(root, RunWorkspacePath(root, 1811), nil)
 	leaked := []string{
 		"go/internal/phasespec/roots.go",
+		"go/internal/core/cyclerun.go",
 		"go/internal/router/router.go",
 		"go/internal/shared/both.go",
 		"go/internal/guards/role.go",
+		"go/internal/router2/x_test.go",
+		"go/internal/other/y.go",
 		"go/internal/stale/x.go",
 		"docs/nobody.md",
 	}
+	var warn strings.Builder
 
-	real, waived := filterRealLeaks(leaked, exempt, io.Discard)
+	real, waived := filterRealLeaks(leaked, exempt, &warn)
 
-	want := []string{"go/internal/router/router.go", "go/internal/shared/both.go", "go/internal/guards/role.go", "go/internal/stale/x.go", "docs/nobody.md"}
+	want := leaked[1:]
 	if !reflect.DeepEqual(real, want) || waived != 0 {
-		t.Errorf("real leaks = %v (waived %d), want %v: only an unprotected path that a live sibling declares and this lane does not is the sibling's", real, waived, want)
+		t.Errorf("real leaks = %v (waived %d), want %v: only an unprotected file that a live sibling of this goal names exactly, and that this lane does not hold, is the sibling's", real, waived, want)
+	}
+	if got := warn.String(); !strings.Contains(got, `"go/internal/phasespec/roots.go"`) || !strings.Contains(got, "cycle 1812") || strings.Count(got, "excused") != 1 {
+		t.Errorf("the guard must WARN once, naming the excused path and its holder; got %q", got)
 	}
 }
 
@@ -368,6 +394,13 @@ func TestFilterRealLeaks_ALaneWithoutAKnownScopeOrSurfaceIsChargedForEveryUnkeye
 			ownClaims: func(*testing.T, string) {},
 			owner:     guardedLaneOneEightOneOne(),
 		},
+		"no goal hash on this lane's pin": {
+			ownClaims: func(t *testing.T, root string) {
+				writeGoalPin(t, root, 1811, "", "router-silent-errors")
+				writeLaneClaim(t, root, 1811, "router-silent-errors", "go/internal/router/")
+			},
+			owner: guardedLaneOneEightOneOne(),
+		},
 		"no protected-surface rule": {
 			ownClaims: func(t *testing.T, root string) {
 				writeLaneClaim(t, root, 1811, "router-silent-errors", "go/internal/router/")
@@ -379,7 +412,9 @@ func TestFilterRealLeaks_ALaneWithoutAKnownScopeOrSurfaceIsChargedForEveryUnkeye
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()
+			writeGoalPin(t, root, 1811, "g", "router-silent-errors")
 			tc.ownClaims(t, root)
+			writeGoalPin(t, root, 1812, "g", "phasespec-roots")
 			writeLaneClaim(t, root, 1812, "phasespec-roots", theirs)
 			writeRunLease(t, RunWorkspacePath(root, 1812), time.Now())
 			exempt := tc.owner.exemptions(root, RunWorkspacePath(root, 1811), nil)
@@ -390,5 +425,26 @@ func TestFilterRealLeaks_ALaneWithoutAKnownScopeOrSurfaceIsChargedForEveryUnkeye
 				t.Errorf("real leaks = %v: with %s the lane holds every unkeyed path, as the single-writer rule says", real, name)
 			}
 		})
+	}
+}
+
+func TestRecoverPath_LeavesAPathAnotherLaneHoldsAndNamesTheHolder(t *testing.T) {
+	t.Parallel()
+	var warn strings.Builder
+	r := leakRecovery{
+		warn:      &warn,
+		ownership: laneOneEightOneOne(),
+		exempt: leakExemptions{holder: func(p string) (string, bool) {
+			return "the declared scope of cycle 1812", p == "go/internal/phasespec/roots.go"
+		}},
+	}
+
+	stage, recovered := r.recoverPath(context.Background(), "??", "go/internal/phasespec/roots.go")
+
+	if stage || !recovered {
+		t.Errorf("recoverPath = stage %v, recovered %v; want the path left in place and the recovery clean", stage, recovered)
+	}
+	if got := warn.String(); !strings.Contains(got, "go/internal/phasespec/roots.go") || !strings.Contains(got, "cycle 1812") {
+		t.Errorf("recovery must name the path and its holder; got %q", got)
 	}
 }
