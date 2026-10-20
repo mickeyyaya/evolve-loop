@@ -218,3 +218,19 @@ func TestRequestShapes_HaveExactlyTheDeclaredFields(t *testing.T) {
 		t.Fatal("positional construction")
 	}
 }
+
+func TestRecordFailedApproach_ATodoNeverOutlivesTheCarryoverTTL(t *testing.T) {
+	ws := t.TempDir()
+	seedBlock(t, ws, "audit", &phasecontract.FailureBlock{Class: string(failurelog.IntentRejected)})
+	st := &cyclestate.State{}
+
+	New(clock, carryover.New()).RecordFailedApproach(st, auditFailure(t.TempDir(), ws))
+
+	record, todo := st.FailedAt[0], st.CarryoverTodos[0]
+	if want := failurelog.ComputeExpiresAt(failurelog.IntentRejected, fixedNow); record.ExpiresAt != want {
+		t.Fatalf("record expiry = %s, want %s: the failed approach keeps its class retention", record.ExpiresAt, want)
+	}
+	if want := fixedNow.Add(failurelog.DefaultCarryoverBackfillTTL).Format(time.RFC3339); todo.ExpiresAt != want {
+		t.Fatalf("todo expiry = %s, want %s: an intent-rejected class gave cycle-1063-failed-build a 2058 expiry, so the TTL never evicted it", todo.ExpiresAt, want)
+	}
+}
