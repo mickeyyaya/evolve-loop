@@ -46,13 +46,16 @@ func (m *Mover) EditHeld(taskID string, cycle int, edits []FieldEdit) (string, e
 	if err := checkEditRequest(edits); err != nil {
 		return "", err
 	}
+	if cycle <= 0 {
+		return "", fmt.Errorf("%w: edit-held needs the cycle that holds %s", ErrBadArgs, taskID)
+	}
 	loc, err := Locate(m.inboxDir, taskID)
 	switch {
 	case errors.Is(err, ErrNotFound):
 		return "", fmt.Errorf("%w: %s", ErrNotFound, taskID)
 	case err != nil:
 		return "", fmt.Errorf("edit-held: locate %s: %w", taskID, err)
-	case loc.Cycle != 0 && loc.Cycle != cycle:
+	case loc.Cycle != cycle:
 		return "", fmt.Errorf("%w: %s (held by cycle %d, not cycle %d)", ErrNotFound, taskID, loc.Cycle, cycle)
 	}
 	return m.editAt(loc.Path, edits)

@@ -30,17 +30,25 @@ func TestMover_EditHeld_EditsTheCyclesOwnClaimInPlace(t *testing.T) {
 	writeItem(t, held, `{"id":"held","title":"H","kind":"fix","summary":"s","fix":"f"}`)
 	writeItem(t, filepath.Join(inbox, "companion.json"), `{"id":"companion"}`)
 	writeItem(t, procPath(inbox, 8, "other.json"), `{"id":"other"}`)
+	writeItem(t, filepath.Join(inbox, "pending.json"), `{"id":"pending"}`)
 	m := New(inbox, &recordingAppender{})
 
 	path, err := m.EditHeld("held", 7, []FieldEdit{{Op: EditAdd, Field: "deps", Value: "companion"}})
 	_, otherErr := m.EditHeld("other", 7, []FieldEdit{{Op: EditAdd, Field: "deps", Value: "companion"}})
 	_, missingErr := m.EditHeld("missing", 7, []FieldEdit{{Op: EditAdd, Field: "deps", Value: "companion"}})
+	_, rootErr := m.EditHeld("pending", 7, []FieldEdit{{Op: EditAdd, Field: "deps", Value: "companion"}})
+	if _, err := m.EditHeld("pending", 0, []FieldEdit{{Op: EditAdd, Field: "deps", Value: "companion"}}); !errors.Is(err, ErrBadArgs) {
+		t.Errorf("cycle 0 = %v, want ErrBadArgs: no cycle holds a root item", err)
+	}
 
 	if err != nil || path != held || !reflect.DeepEqual(readItem(t, held)["deps"], []any{"companion"}) {
 		t.Errorf("EditHeld = (%q, %v), item %v; want the deps entry written in the claim dir", path, err, readItem(t, held))
 	}
-	if !errors.Is(otherErr, ErrNotFound) || !errors.Is(missingErr, ErrNotFound) {
-		t.Errorf("another cycle's claim = %v, a missing item = %v; want ErrNotFound for both", otherErr, missingErr)
+	if !errors.Is(otherErr, ErrNotFound) || !errors.Is(missingErr, ErrNotFound) || !errors.Is(rootErr, ErrNotFound) {
+		t.Errorf("another cycle's claim = %v, a missing item = %v, a root item = %v; want ErrNotFound for each", otherErr, missingErr, rootErr)
+	}
+	if _, has := readItem(t, filepath.Join(inbox, "pending.json"))["deps"]; has {
+		t.Error("EditHeld wrote a root item that no cycle holds: a lane claim in the write window makes a second copy")
 	}
 }
 

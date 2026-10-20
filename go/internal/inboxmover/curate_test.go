@@ -43,6 +43,16 @@ func TestEdit_RewritesACurationFieldThroughTheLeaf(t *testing.T) {
 	}
 }
 
+func TestRouteConsoleValue_IsTheRouteThatRouteConsoleStamps(t *testing.T) {
+	root, inboxDir := seedInbox(t, "task-a")
+	if _, err := RouteConsole(Options{ProjectRoot: root}, "task-a", "operator", 3); err != nil {
+		t.Fatal(err)
+	}
+	if got := readItemFields(t, filepath.Join(inboxDir, "task-a.json"))["route"]; got != RouteConsoleValue {
+		t.Errorf("route = %v, want RouteConsoleValue %q: a filer that authors the console route writes the same value", got, RouteConsoleValue)
+	}
+}
+
 func TestEditHeld_AddsADepToTheItemThatTheCycleHolds(t *testing.T) {
 	root, inboxDir := seedInbox(t, "task-a")
 	opts := Options{ProjectRoot: root}
