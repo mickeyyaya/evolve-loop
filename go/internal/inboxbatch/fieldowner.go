@@ -43,6 +43,8 @@ const (
 	RoutedAtField                = "routed_at"
 	FailureCountField            = "failure_count"
 	LastFailureReasonField       = "last_failure_reason"
+	LastFailureClassField        = "last_failure_class"
+	LastFailureFingerprintField  = "last_failure_fingerprint"
 	ContinuationField            = "continuation"
 	ReleasedContinuationsField   = "released_continuations"
 	ConsumedField                = "consumed"
@@ -74,19 +76,21 @@ var fieldRoles = map[string]FieldRole{
 	"deps":           curated(ListValue),
 	"connects_to":    curated(ListValue),
 
-	RouteField:                 loopStamp,
-	RoutedReasonField:          loopStamp,
-	RoutedCycleField:           loopStamp,
-	RoutedAtField:              loopStamp,
-	FailureCountField:          loopCounter,
-	LastFailureReasonField:     loopStamp,
-	ContinuationField:          loopStamp,
-	ReleasedContinuationsField: loopStamp,
-	ConsumedField:              loopStamp,
-	UnbackedField:              loopStamp,
-	RetiredReasonField:         loopStamp,
-	RetiredCycleField:          loopStamp,
-	GitSHAField:                loopStamp,
+	RouteField:                  loopStamp,
+	RoutedReasonField:           loopStamp,
+	RoutedCycleField:            loopStamp,
+	RoutedAtField:               loopStamp,
+	FailureCountField:           loopCounter,
+	LastFailureReasonField:      loopStamp,
+	LastFailureClassField:       loopStamp,
+	LastFailureFingerprintField: loopStamp,
+	ContinuationField:           loopStamp,
+	ReleasedContinuationsField:  loopStamp,
+	ConsumedField:               loopStamp,
+	UnbackedField:               loopStamp,
+	RetiredReasonField:          loopStamp,
+	RetiredCycleField:           loopStamp,
+	GitSHAField:                 loopStamp,
 
 	PremiseVerifiedAtField:       operatorStamp,
 	PremiseVerifiedSHAField:      operatorStamp,

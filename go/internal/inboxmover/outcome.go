@@ -20,6 +20,8 @@ type CycleOutcome struct {
 	Ceiling      int
 	SystemLevel  bool
 	Routed       bool
+	FailureClass string
+	Fingerprint  string
 }
 
 type OutcomeResult struct {
@@ -77,10 +79,12 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 		}
 	}
 	rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, &quarantinePolicy{
-		Ceiling:     oc.Ceiling,
-		SystemLevel: oc.SystemLevel,
-		Routed:      oc.Routed,
-		Committed:   committedSet,
+		Ceiling:      oc.Ceiling,
+		SystemLevel:  oc.SystemLevel,
+		Routed:       oc.Routed,
+		Committed:    committedSet,
+		FailureClass: oc.FailureClass,
+		Fingerprint:  oc.Fingerprint,
 	})
 	for _, p := range rr.Paths {
 		if strings.Contains(p, filepath.Join(opts.InboxDir, "quarantine")+string(filepath.Separator)) {

@@ -14,10 +14,12 @@ func ShouldQuarantine(failureCount, ceiling int, systemLevelFailure bool) bool {
 }
 
 type Policy struct {
-	Ceiling     int
-	SystemLevel bool
-	Committed   map[string]bool
-	Routed      bool
+	Ceiling      int
+	SystemLevel  bool
+	Committed    map[string]bool
+	Routed       bool
+	FailureClass string
+	Fingerprint  string
 }
 
 func (m *Mover) ReleaseFromQuarantine(taskID string) (PromoteResult, error) {
@@ -38,6 +40,8 @@ func (m *Mover) ReleaseFromQuarantine(taskID string) (PromoteResult, error) {
 	if rerr := UpdateItemJSON(src, func(item map[string]json.RawMessage) {
 		item[inboxbatch.FailureCountField] = json.RawMessage("0")
 		delete(item, inboxbatch.LastFailureReasonField)
+		delete(item, inboxbatch.LastFailureClassField)
+		delete(item, inboxbatch.LastFailureFingerprintField)
 	}); rerr != nil {
 		m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.ReleaseFromQuarantine", legacy: "WARN: ",
 			reason: fmt.Sprintf("quarantine-release: failure_count reset failed for '%s' (%v) — released with its stale count", taskID, rerr),
