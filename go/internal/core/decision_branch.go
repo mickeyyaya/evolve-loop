@@ -26,6 +26,10 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 	if sig != nil {
 		return PhaseEnd, nil, detReason, sig
 	}
+	if d, defers := o.auditDeclineDefers(cs); defers {
+		o.recordRoutingDecision(ctx, cycle, cs, seq, d.routingDecision())
+		return PhaseEnd, nil, detReason, nil
+	}
 	if strings.HasPrefix(detReason, BookkeepingRegradeReasonPrefix) {
 		return detNext, extraEnv, detReason, nil
 	}
@@ -114,6 +118,9 @@ func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, hist
 	s := o.applyFailureDecisionFloor(cs, cycleVerdict)
 	if s != nil {
 		return PhaseEnd, nil, "system-failure-floor: " + s.Category, s
+	}
+	if d, defers := o.auditDeclineDefers(cs); defers {
+		return PhaseEnd, nil, d.reason(), nil
 	}
 	if !cs.BookkeepingRegradeAttempted && BookkeepingRegradeEligible(cs.AuditFailReasons) {
 		return o.recoveryTarget(PhaseRetro, recoveryKeyBookkeepingRegrade, PhaseAudit), nil,
