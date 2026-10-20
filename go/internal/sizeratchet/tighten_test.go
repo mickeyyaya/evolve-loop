@@ -122,3 +122,22 @@ func TestTightenModule_CarriesTheWalkListAndEncoderFailures(t *testing.T) {
 		t.Errorf("encoder failure: %v", err)
 	}
 }
+
+func TestTightenCounts_KeepsOnlyCountsAboveTheFloorAtTheirLowerValue(t *testing.T) {
+	current := map[string]int{"shrunk": 3, "grown": 9, "healed": 2, "zero": 0, "unlisted": 7}
+	allowances := map[string]int{"shrunk": 5, "grown": 4, "healed": 6, "zero": 1, "gone": 3}
+
+	got := TightenCounts(current, allowances, 2)
+
+	if want := map[string]int{"shrunk": 3, "grown": 4}; !reflect.DeepEqual(got, want) {
+		t.Errorf("TightenCounts = %v, want %v", got, want)
+	}
+}
+
+func TestTightenEncoded_NamesEachChangeAndEncodesTheTightList(t *testing.T) {
+	changes, encoded, err := TightenEncoded(map[string]int{"a": 1}, map[string]int{"a": 2, "b": 1}, 0)
+
+	if err != nil || !reflect.DeepEqual(changes, []string{"a: 2 -> 1", "b: 1 removed"}) || string(encoded) != "{\n  \"a\": 1\n}\n" {
+		t.Errorf("TightenEncoded = %v, %q, %v", changes, encoded, err)
+	}
+}

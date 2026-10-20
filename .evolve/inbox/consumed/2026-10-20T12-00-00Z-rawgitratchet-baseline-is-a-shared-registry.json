@@ -19,5 +19,11 @@
     "Growth past a baseline count and a new raw-git site both still fail the ratchet",
     "The boundary ratchet-tighten step lowers baseline.json in the same tighten pull request as offenders.json",
     "Two lanes that shrink sites in different packages rebase identically under treedelta.Identical (test)"
-  ]
+  ],
+  "consumed": {
+    "at": "2026-10-21T09:00:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fix/rawgit-ratchet-ceiling: rawgitratchet.Check is a ceiling (a shrink or a migrated file passes; growth and a new site fail); sizeratchet.TightenCounts/TightenEncoded take a per-list floor (MaxLines, zero sites) and serve both lists; rawgitratchet.TightenModule; the boundary ratchet-tighten step commits offenders.json and baseline.json in the same tighten pull request; two lanes that shrink sites in different packages rebase identically under treedelta.Identical (test)"
+  }
 }
