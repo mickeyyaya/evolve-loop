@@ -682,3 +682,13 @@ The lint checks text against the ASD-STE100 house rules ([the standard](../conve
 ## Phase handoff policy
 
 - In `.evolve/policy.json`, the `handoff` block sets the `stage` (`shadow` or `enforce`) and optional `judge_tier` for each pair. The five pairs are `build-audit`, `intent-scout`, `scout-triage`, `tdd-build`, and `triage-tdd`.
+
+## Retry ladder report: `evolve ladder report`
+
+- Run `evolve ladder report [--json] [--project-root DIR]` to read the retry ladder telemetry.
+- The verb reads `llm-calls.ndjson` of each run dir under `.evolve/runs/`. It skips a run dir without a ledger.
+- It prints one row for each rung and failure class: the tries, the fixes and the tokens.
+- A fix is a try at a rung above R0 whose exit code is 0. A first try at R0 is never a fix.
+- A record without a rung (written before the ladder) stays out of the report.
+- The `TOKENS` column is the sum of the input, output, cache read and cache write tokens. The JSON form keeps the four counts apart.
+- The verb writes nothing. An absent runs dir exits 2. A usage error exits 10.

@@ -84,3 +84,13 @@ func TestTryRecordVocabularyIsNamed(t *testing.T) {
 		t.Fatalf("context %q stage %q, want new and shadow as spec section 6 spells them", tryContext, stage)
 	}
 }
+
+func TestReportExportsAreNamed(t *testing.T) {
+	var rows []retryladder.ReportRow = retryladder.BuildReport(nil)
+	if len(rows) != 0 {
+		t.Fatalf("no runs gave rows %+v", rows)
+	}
+	if _, err := retryladder.LoadRuns(t.TempDir()); err != nil {
+		t.Fatalf("LoadRuns on an empty dir: %v", err)
+	}
+}

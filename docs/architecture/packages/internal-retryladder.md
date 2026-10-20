@@ -26,3 +26,5 @@
 - The normalizer copies the rules of `core/failure_digest.go`. A rule change must change both until a later cycle moves the shared rules into one package.
 - A raise moves the rung up, so a chain has at most two raised tries. No target has a tier above `max_tier` or an effort above `max_effort`.
 - `Next` has no production caller yet. A later ladder component wires it into the loop.
+- `BuildReport` groups try records by rung and class (component L7). A fix is a try above R0 with exit code 0. It sorts the rows by rung, then class, and skips a record without a rung.
+- `LoadRuns` reads `llm-calls.ndjson` of each run dir in name order. It skips a dir without a ledger and fails on an absent runs dir. `evolve ladder report` prints the result and writes nothing.

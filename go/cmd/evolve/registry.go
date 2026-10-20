@@ -129,6 +129,7 @@ var commands = []subcommand{
 	{Name: "floor", Summary: "Run the local CI floor tier by tier (fmt on CI's pinned Go, vet, integration, e2e, acs-durable, apicover, cover, ratchet): floor run [--tier fmt,vet,...] [--root DIR] [--dry-run]; one PASS/RED/ERROR line per tier, every tier runs, exit 1 on a red tier, 2 when a tier cannot run", Run: runFloor},
 	{Name: "cover", Summary: "Coverage gate over a change: changed --base <ref> [--profile <path>] [--json] [--root DIR] refuses every changed function below 100%; strict [--profile <path>] [--floors <path>] [--json] [--root DIR] refuses every package of go/.cover-strict below its floor", Run: runCover},
 	{Name: "code", Summary: "Read-only code index for phase agents: callers <symbol> [--direction in|out] | api <file> | find <query> | map [dir] [--project-root P]; one hit per line as file:line, symbol, text; exit 1 no result, 2 index absent, 3 unsupported, 10 usage; each call appends one record to the cycle workspace in a phase, else to the user cache (a write failure never changes the exit code); code usage [--since D] [--json] counts the calls by phase and command", Run: runCodeCommand},
+	{Name: "ladder", Summary: "Retry ladder telemetry: report [--json] [--project-root DIR] prints the tries, fixes and tokens per rung and failure class from each run dir's llm-calls.ndjson; read-only (exit 2 on an absent runs dir, 10 on usage)", Run: runLadderCommand},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }
 
