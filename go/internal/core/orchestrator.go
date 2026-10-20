@@ -514,7 +514,6 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		workflowConfig: o.workflowConfig,
 	}
 	defer func() { cleanup(cr.preserveWorktree, cr.cycleCompletedNormally) }()
-	defer cr.releaseShipWindow()
 	defer func() { cr.abnormalEpilogue(retErr) }()
 	defer func() { cr.checkpointInterruptedPhase(retErr) }()
 	if cr.cs.ExplanationDocumentationVersion != 0 {

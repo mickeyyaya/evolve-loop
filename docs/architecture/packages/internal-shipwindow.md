@@ -2,7 +2,27 @@
 
 ## Purpose
 
-`internal/shipwindow` is the lease that serializes the critical section from the audit binding snapshot to the ship push across concurrent lanes. A sibling lane can land on main between the audit-binding `HEAD` snapshot and the ship push. Ship then sees a moved `HEAD` and forces a deep-tier `AUDIT_BINDING_HEAD_MOVED` re-audit. In cycles 767 to 774 this made the audit run about ten times for eight cycles. The retry of the binding lets a lane survive the race. This lease lets a lane avoid it, because the window becomes mutually exclusive.
+`internal/shipwindow` is the lease that serializes the short critical section of a lane ship across concurrent lanes. The window holds the audit-binding check against `main`, the identity-carry composed-tree gate (ADR-0105) and the fast-forward push. When a sibling lane lands on main inside that window, ship sees a moved `HEAD` and forces a deep-tier `AUDIT_BINDING_HEAD_MOVED` re-audit. In cycles 767 to 774 this made the audit run about ten times for eight cycles. The retry of the binding lets a lane survive the race. This lease lets a lane avoid it, because the window becomes mutually exclusive.
+
+The ship phase takes the lease (`enterShipWindow` in [internal-phases-ship](internal-phases-ship.md)). The slow ship checks run before the lease: the repo-contract scanner pack, the explanation gate and the self-SHA check.
+
+### Why the window moved (2026-10-19)
+
+**F1** In wave 130, cycle 1956 waited the full 15-minute `DefaultTTL` after its audit passed (01:13:10 to 01:28:10, no child process, no CPU). It then shipped unleased with `WARN ship-window lease not acquired (context deadline exceeded); proceeding unleased` (inbox item `ship-window-holds-only-the-rebase-and-push`).
+*Implication:* the waiter timed out on a healthy holder, and then raced the push that the lease guards.
+
+**F2** Before this change, the orchestrator took the lease at audit PASS (`cyclerun_record.go:26`). It held the lease across the whole ship phase. The ship phase runs the repo-contract pack first, about 10 minutes, with a `ship-repocontract-scan.log` of about 500 KB.
+*Implication:* with 4 lanes, the lanes ran the audit-PASS-to-push window one at a time.
+
+**F3** Over 66 audits in waves 130 to 133, the lease wait totals 0.8 hours. The spikes are 15.0, 9.5, 8.8 and 8.6 minutes ([wave-latency research F5.2](../../research/wave-latency-2026-10.md)).
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D1 | The ship phase takes the lease after the repo-contract pack. It holds the lease over `verifyClass` and `atomicShip`. It releases the lease before `postShip`. | F1, F2 | Keep the lease at audit PASS with a longer wait: the lanes still ship one at a time for 10 minutes each. Drop the lease: the plan's limit says the composed-tree gate must stay inside the leased window ([wave-latency plan §7](../../plans/wave-latency-2026-10.md)). |
+| D2 | `DefaultTTL` is 5 minutes. | D1: the window is the binding check, the commit and the push. | 15 minutes: a hung holder then wedges the sibling ships for 15 minutes. |
+| D3 | A waiter has no wait limit of its own. Only the context of the ship ends the wait. | F1, the stale break | A wait limit equal to the TTL: a lane behind three healthy holders can wait longer than one TTL. It then ships unleased. |
+
+*Consequence:* a sibling can now land between the audit binding and the ship of a lane. The ship then takes the trivial-rebase carry or the identity carry, and a carry that does not prove goes back to audit. Operator choice (a) of 2026-10-19 accepts this cost. A carry that is not provable is the condition that changes this decision.
 
 ## Design
 
@@ -10,7 +30,8 @@
 - **A held lease is respected only while live.** Its heartbeat must be fresh within the TTL and the holder pid must be alive. A dead holder before the TTL, or a TTL expiry for a live but hung holder, makes the lease stale. A waiter breaks a stale lease and goes on. The lease is the only liveness oracle, so no operator is needed.
 - **Breaking renames the lock away.** Only one breaker wins the rename. A loser can then never remove a fresh lease that a faster sibling just created at the lock path.
 - **A lock that does not parse is crash debris.** Atomic link writes make a torn file impossible. The zero record has an empty heartbeat, which classifies as stale, so the next waiter breaks it.
-- **No heartbeat refresh while held.** The guarded window is about five to ten minutes, from binding snapshot to push. `DefaultTTL` (15 minutes) is a ceiling above it. It still bounds how long a hung holder can wedge sibling ships. A holder that outlives the TTL is hung by definition and must be breakable. A refresh defeats that.
+- **No heartbeat refresh while held.** The guarded window is seconds to about one minute, from the binding check to the push. `DefaultTTL` (5 minutes) is a ceiling above it. It still bounds how long a hung holder can wedge sibling ships. A holder that outlives the TTL is hung by definition and must be breakable. A refresh defeats that.
+- **A waiter waits for a live holder.** The stale break makes the queue progress: a dead holder breaks at once, and a hung holder breaks at the TTL. Thus a waiter needs no wait limit of its own, and the caller passes only its context.
 - **Waiters queue as ticket files** under `<evolveDir>/ship-window.queue` and acquire in FIFO order of their `Acquire` calls, so no lane starves. A ticket name has three parts. The first is the zero-padded nanosecond time. The second is a per-process sequence number (`ticketSeq`), which breaks ties when a test freezes the clock. The third is the pid, which is unique across processes. The names sort in the order of arrival, and `os.ReadDir` returns them sorted.
 - **A crashed waiter cannot wedge the queue.** `queueHead` removes the ticket of a dead pid. It never sweeps the caller's own ticket. A ticket whose pid does not parse is never swept (fail-safe), and it holds the head.
 - **`Release` is idempotent and safe after a break.** The record carries a token (the ticket). If the lease was broken and taken again by another lane, the token does not match and `Release` removes nothing. A lock that does not parse also counts as already broken.
@@ -24,6 +45,8 @@
 - **Stale break.** `TestShipWindowLease_HolderDeathRecovered` pins both paths (dead holder, TTL expiry).
 - **FIFO.** `TestShipWindowLease_FIFOFairness` pins the order.
 - **Safe `Release`, corrupt lock and dead waiter.** The edge tests in `shipwindow_edge_test.go` pin them.
+- **The ship phase holds the lease only over the binding, the carry gate and the push.** `TestShip_TheShipWindowCoversTheBindingTheCarryGateAndThePush` (integration tier) pins it. `TestRecordAndBranch_AnAuditPassLeavesTheShipWindowFreeForASibling` (integration tier) pins that an audit PASS leaves the lease free.
+- **A waiter outlasts a healthy holder without a WARN.** `TestEnterShipWindow_AWaiterOutlastsAHealthyHolderWithoutAWarn` pins it.
 - **Lease path.** `TestShipWindowLease_PathIn` pins `<evolveDir>/ship-window.lock`, the path that operators search for and that `gc` sweeps.
 
 ## Findings

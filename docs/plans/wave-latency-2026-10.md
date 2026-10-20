@@ -131,5 +131,5 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 
 - The supply limit of F2.6 stays. Most of the inbox is console-owned, so a wider admission cannot fill slots that have no admissible work.
 - D1 trusts the composed-tree gate of the ship. A defect that the tests do not cover can still pass it.
-- The lease does not guarantee one ship at a time: a lane that cannot take it ships unleased. The pending item `ship-window-holds-only-the-rebase-and-push` must keep the composed-tree gate inside the leased window.
+- The lease does not guarantee one ship at a time: a lane whose context ends in the wait ships unleased. Since 2026-10-19 the ship phase holds the lease over the binding check, the composed-tree gate and the push ([internal-shipwindow](../architecture/packages/internal-shipwindow.md)).
 - The model time of D4 is an estimate from different tasks (F3.3).

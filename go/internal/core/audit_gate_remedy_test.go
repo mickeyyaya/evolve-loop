@@ -57,7 +57,6 @@ func TestAuditGateFail_SkillsDriftOverPassNarrativeGrantsOneBuildRepairLedByItsR
 	t.Parallel()
 
 	cr := retroGateHarness(t, phasespec.Catalog{})
-	defer cr.releaseShipWindow()
 
 	if _, err := cr.recordAndBranch(PhaseAudit, gateFailDispatch(tSkillsDrift1828, tConflict1828)); err != nil {
 		t.Fatalf("recordAndBranch: %v", err)
@@ -81,7 +80,6 @@ func TestAuditGateFail_IdenticalGateFailsAreBoundedByTheEnvelopeBudget(t *testin
 	for _, budget := range []int{1, shipped} {
 		t.Run(fmt.Sprintf("max_retries=%d", budget), func(t *testing.T) {
 			cr := retroGateHarness(t, phasespec.Catalog{})
-			defer cr.releaseShipWindow()
 			cr.o.failurePolicy = withCodeAuditFailBudget(budget)
 
 			grants := 0
@@ -111,7 +109,6 @@ func TestAuditGateFail_ProseInfraSystemicRetroDoesNotHaltAGateDiagnosedFail(t *t
 	t.Parallel()
 
 	cr := retroGateHarness(t, phasespec.Catalog{})
-	defer cr.releaseShipWindow()
 	cr.o.failurePolicy = withCodeAuditFailBudget(1)
 
 	if _, err := cr.recordAndBranch(PhaseAudit, gateFailDispatch(tSkillsDrift1828, tConflict1828)); err != nil {
@@ -191,7 +188,6 @@ func TestAuditGateFail_AnIntegrationTierRedKeepsItsRepairAndTheProseInfraSystemi
 	t.Parallel()
 
 	cr := retroGateHarness(t, phasespec.Catalog{})
-	defer cr.releaseShipWindow()
 	cr.o.failurePolicy = withCodeAuditFailBudget(1)
 
 	if _, err := cr.recordAndBranch(PhaseAudit, gateFailDispatch(tTierRetakeNoRun, tConflict1828)); err != nil {
@@ -314,7 +310,6 @@ func TestAuditGateFail_BookkeepingConflictStillTakesTheRegrade(t *testing.T) {
 	t.Parallel()
 
 	cr := retroGateHarness(t, phasespec.Catalog{})
-	defer cr.releaseShipWindow()
 
 	if _, err := cr.recordAndBranch(PhaseAudit, gateFailDispatch(tLedger, tConflictPASS)); err != nil {
 		t.Fatalf("audit: %v", err)
@@ -337,7 +332,6 @@ func TestAuditGateFail_GateBesideBookkeepingEarnsNeitherRoute(t *testing.T) {
 	t.Parallel()
 
 	cr := retroGateHarness(t, phasespec.Catalog{})
-	defer cr.releaseShipWindow()
 
 	if _, err := cr.recordAndBranch(PhaseAudit, gateFailDispatch(tSkillsDrift1828, tLedger, tConflictPASS)); err != nil {
 		t.Fatalf("audit: %v", err)

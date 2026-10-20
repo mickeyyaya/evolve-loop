@@ -23,17 +23,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		return loopAbort, lerr
 	}
 
-	if next == PhaseAudit && (dr.resp.Verdict == VerdictPASS || dr.resp.Verdict == VerdictWARN) {
-		cr.acquireShipWindow(next)
-	} else if next == PhaseAudit {
-		cr.releaseShipWindow()
-	}
-
 	cr.o.emitPhaseBindings(cr.ctx, cr.cycle, cr.req.ProjectRoot, cr.cs, next, dr.resp.Verdict)
-
-	if next != PhaseAudit {
-		cr.releaseShipWindow()
-	}
 
 	if next == PhaseBuild {
 		repinShipSHAAfterBuild(cr.req.ProjectRoot)

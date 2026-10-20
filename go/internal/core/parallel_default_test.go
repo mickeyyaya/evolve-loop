@@ -46,7 +46,6 @@ const (
 	swapsPostScoutReplanProbe       = "test swaps package variable postScoutReplanProbe"
 	swapsPredicateModuleDir         = "test swaps package variable predicateModuleDir"
 	swapsQuotaBoundaryCheckpointer  = "test swaps package variable QuotaBoundaryCheckpointer"
-	swapsShipWindowAcquireTimeout   = "test swaps package variable shipWindowAcquireTimeout"
 	swapsStderr                     = "test swaps os.Stderr"
 	swapsWorktreeAddRetrySleep      = "test swaps package variable worktreeAddRetrySleep"
 )
@@ -203,7 +202,6 @@ var serialRequiredTests = map[string]string{
 	"core.TestRunCycle_MixedExitCodes_NoDefer":                                                      swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_WalledCorrectionRedispatch_DefersLikeAFirstDispatch":                         swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_WalledRemediationRerun_DefersLikeAFirstDispatch":                             swapsQuotaBoundaryCheckpointer,
-	"core.TestShipWindowWiring_FailOpenWhenSiblingHolds":                                            swapsShipWindowAcquireTimeout,
 	"core.TestAdvisorStderrAndStream_HappyPathAreSilent":                                            swapsStderr,
 	"core.TestCoreFacades_ProjectTheLeaf":                                                           swapsStderr,
 	"core.TestPhaseAdvisor_SeesTheSignalCenterAppliedThroughTheOption":                              swapsStderr,

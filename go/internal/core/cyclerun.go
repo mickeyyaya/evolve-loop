@@ -19,7 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
-	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 )
 
 var (
@@ -73,8 +72,6 @@ type cycleRun struct {
 	remediationRounds map[Phase]int
 	recoveryDepth     int
 	replanDepth       int
-
-	shipLease *shipwindow.Lease
 
 	preserveWorktree       bool
 	cycleCompletedNormally bool

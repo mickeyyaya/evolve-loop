@@ -20,7 +20,7 @@ import (
 
 const FileName = "ship-window.lock"
 
-const DefaultTTL = 15 * time.Minute
+const DefaultTTL = 5 * time.Minute
 
 const (
 	queueDirName = "ship-window.queue"
