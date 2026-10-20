@@ -47,6 +47,7 @@ type loopConfig struct {
 	PerAgentModel     map[string]string `json:"per_agent_model,omitempty"`
 	PreflightOnly     bool              `json:"preflight_only,omitempty"`
 	Detach            bool              `json:"detach,omitempty"`
+	Relaunch          bool              `json:"relaunch,omitempty"`
 	LogPath           string            `json:"log_path,omitempty"`
 	DetachArgv        []string          `json:"-"`
 	ResumeWaves       int               `json:"-"`
@@ -73,17 +74,14 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if rc != 0 {
 		return rc
 	}
+	if cfg.PreflightOnly || cfg.Detach {
+		return runLoopFrontDoor(cfg, stdout, stderr)
+	}
+	cfg.ResumeWaves, cfg.HandedOff = takeReexecHandoff(cfg.EvolveDir, stderr)
 	if rc := refuseInertGoalItems(cfg, stderr); rc != 0 {
 		return rc
 	}
-	if cfg.PreflightOnly {
-		return runLoopPreflightOnly(cfg, stdout, stderr)
-	}
-	if cfg.Detach {
-		return runLoopDetached(cfg, stdout, stderr)
-	}
 	recordLaunchGoal(cfg, stderr)
-	cfg.ResumeWaves, cfg.HandedOff = takeReexecHandoff(cfg.EvolveDir, stderr)
 	chainCfg := loadChainConfig(cfg.EvolveDir)
 	cfg.ChainMode = cfg.ChainMode || chainCfg.Enabled
 
@@ -94,6 +92,16 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runLoopChain(cfg, chainCfg, stdin, stdout, stderr)
 	}
 	return runLoopBatch(cfg, stdin, stdout, stderr)
+}
+
+func runLoopFrontDoor(cfg loopConfig, stdout, stderr io.Writer) int {
+	if rc := refuseInertGoalItems(cfg, stderr); rc != 0 {
+		return rc
+	}
+	if cfg.PreflightOnly {
+		return runLoopPreflightOnly(cfg, stdout, stderr)
+	}
+	return runLoopDetached(cfg, stdout, stderr)
 }
 
 func printLoopDryRun(cfg loopConfig, stdout io.Writer) int {

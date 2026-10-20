@@ -323,8 +323,8 @@ func TestLoopDetach_ChildArgvIsTheParentsWithoutTheDetachFlags(t *testing.T) {
 			if rc != 0 || len(probe.argv) != 1 {
 				t.Fatalf("rc=%d children=%d want 0 and 1\nstdout:\n%s\nstderr:\n%s", rc, len(probe.argv), stdout, stderr)
 			}
-			if got, want := probe.argv[0], tc.want(p); !reflect.DeepEqual(got, want) {
-				t.Errorf("child argv must be the parent's minus --detach/--log, order kept:\n got %q\nwant %q", got, want)
+			if got, want := probe.argv[0], append([]string{"--relaunch"}, tc.want(p)...); !reflect.DeepEqual(got, want) {
+				t.Errorf("child argv must be --relaunch plus the parent's minus --detach/--log, order kept:\n got %q\nwant %q", got, want)
 			}
 		})
 	}

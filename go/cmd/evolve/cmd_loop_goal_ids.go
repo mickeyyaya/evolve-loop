@@ -13,51 +13,82 @@ import (
 
 const exitGoalNamesInertItems = 10
 
+type goalItems struct {
+	inert      []string
+	consumed   []string
+	selectable []string
+}
+
+func relaunchArgv(argv []string) []string {
+	if len(argv) < 2 || argv[1] != "loop" || slices.Contains(argv, "--relaunch") {
+		return argv
+	}
+	return slices.Concat(argv[:2], []string{"--relaunch"}, argv[2:])
+}
+
+func operatorGoalLaunch(cfg loopConfig) bool {
+	return cfg.GoalText != "" && !cfg.Resume && !cfg.HandedOff && !cfg.Relaunch && cfg.GoalSource != "goal-from-last"
+}
+
 func refuseInertGoalItems(cfg loopConfig, stderr io.Writer) int {
-	if cfg.Resume || cfg.GoalText == "" {
+	if !operatorGoalLaunch(cfg) {
 		return 0
 	}
-	inert, err := inertGoalItems(cfg.ProjectRoot, cfg.EvolveDir, cfg.GoalText, stderr)
+	items, err := namedGoalItems(cfg.ProjectRoot, cfg.EvolveDir, cfg.GoalText, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve loop: WARN: cannot check the items the goal names: %v\n", err)
 		return 0
 	}
-	if len(inert) == 0 {
+	warnGoalItems(items, stderr)
+	if len(items.inert) == 0 {
 		return 0
 	}
-	fmt.Fprintln(stderr, "evolve loop: the goal names inbox items that no lane can take; goal text does not select or exclude inbox items, so remove these ids from the goal or route the items:")
-	for _, line := range inert {
+	fmt.Fprintln(stderr, "evolve loop: GOAL_NAMES_INERT_ITEMS: the goal names inbox items that no lane can take; goal text does not select or exclude inbox items, so remove these ids from the goal or route the items:")
+	for _, line := range items.inert {
 		fmt.Fprintf(stderr, "  %s\n", line)
 	}
 	return exitGoalNamesInertItems
 }
 
-func inertGoalItems(projectRoot, evolveDir, goal string, warn io.Writer) ([]string, error) {
+func warnGoalItems(items goalItems, stderr io.Writer) {
+	for _, line := range items.consumed {
+		fmt.Fprintf(stderr, "evolve loop: WARN: the goal names a consumed item, which no lane takes: %s\n", line)
+	}
+	if len(items.selectable) > 0 {
+		fmt.Fprintf(stderr, "evolve loop: WARN: goal text does not select or exclude inbox items; the lanes can take %s whatever the goal says. To keep the lanes off an item, run `evolve inbox route-console <id> <reason> <cycle>`\n", strings.Join(items.selectable, ", "))
+	}
+}
+
+func namedGoalItems(projectRoot, evolveDir, goal string, warn io.Writer) (goalItems, error) {
 	inboxDir := filepath.Join(evolveDir, "inbox")
 	scan, err := inboxbatch.ScanDir(inboxDir)
 	if err != nil {
-		return nil, fmt.Errorf("inbox %s: %w", inboxDir, err)
+		return goalItems{}, fmt.Errorf("inbox %s: %w", inboxDir, err)
 	}
 	named := goalTokens(goal)
 	opts := inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}
 	isProtected := laneForbidden(projectRoot, warn)
-	var inert []string
+	var items goalItems
 	for _, it := range scan.Items {
 		if !named[it.ID] {
 			continue
 		}
 		delete(named, it.ID)
 		if place, reason := inboxmover.PlaceOnLaneMenu(opts, it, isProtected); place != inboxmover.MenuReady {
-			inert = append(inert, it.ID+": "+reason)
+			items.inert = append(items.inert, it.ID+": "+reason)
+		} else {
+			items.selectable = append(items.selectable, it.ID)
 		}
 	}
 	for id, recs := range inboxbatch.ConsumedRecords(inboxDir) {
 		if named[id] {
-			inert = append(inert, id+": "+recs[0].Describe())
+			items.consumed = append(items.consumed, id+": "+recs[0].Describe())
 		}
 	}
-	slices.Sort(inert)
-	return inert, nil
+	slices.Sort(items.inert)
+	slices.Sort(items.consumed)
+	slices.Sort(items.selectable)
+	return items, nil
 }
 
 func goalTokens(goal string) map[string]bool {

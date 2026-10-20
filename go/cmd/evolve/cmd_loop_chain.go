@@ -30,7 +30,7 @@ var (
 	chainReExecTargetFn             = defaultChainReExecTarget
 	chainBoundaryRefreshAttemptFile = loopchain.AttemptFile
 	chainRebuildFn                  = defaultChainRebuild
-	chainReExecArgvFn               = func() []string { return os.Args }
+	chainReExecArgvFn               = func() []string { return relaunchArgv(os.Args) }
 	chainReExecFn                   = defaultChainReExec
 	chainBoundaryRefreshLogFile     = loopchain.LogFile
 	chainBoundaryFleetLaneFn        = defaultChainBoundaryFleetLaneActive
