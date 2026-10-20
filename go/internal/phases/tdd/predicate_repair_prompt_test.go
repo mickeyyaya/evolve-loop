@@ -12,7 +12,7 @@ func TestComposePrompt_ThePredicateRepairBriefReachesTheAgentAsData(t *testing.T
 	out := hooks{}.ComposePrompt("BODY", core.PhaseRequest{Context: map[string]string{core.CtxKeyPredicateRepair: failure}})
 	plain := hooks{}.ComposePrompt("BODY", core.PhaseRequest{Context: map[string]string{}})
 
-	if !strings.Contains(out, "## Predicate Repair") || !strings.Contains(out, "```text\n"+failure+"\n```") {
+	if !strings.Contains(out, "## Predicate Repair") || !strings.Contains(out, "````text\n"+failure+"\n````") {
 		t.Errorf("the repeated predicate failure must reach the tdd prompt fenced as data:\n%s", out)
 	}
 	if strings.Contains(plain, "Predicate Repair") {

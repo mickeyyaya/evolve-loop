@@ -12,7 +12,17 @@ import (
 const cycle1761Failure = "./acs/cycle10 (-tags acs): unit tests FAIL\n" +
 	"--- FAIL: TestC1761_009_OnlyTargetPackagesTouched (0.02s)\n" +
 	"    predicates_test.go:88: touched outside the allow-list: docs/explain/builds/cycle-1761.md, .evolve/evals/cycle-1761.md\n" +
-	"FAIL"
+	"FAIL\n" +
+	"FAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle10\t0.239s\n" +
+	"FAIL\n"
+
+func realFloorFailure(perTest, pkg string, padding int) string {
+	out := strings.Repeat("=== RUN   TestC1761_00x\n", padding) +
+		"--- FAIL: TestC1761_009_OnlyTargetPackagesTouched (" + perTest + ")\n" +
+		"    predicates_test.go:88: touched outside the allow-list: docs/explain/builds/cycle-1761.md, .evolve/evals/cycle-1761.md\n" +
+		"FAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle10\t" + pkg + "\nFAIL\n"
+	return "./acs/cycle10 (-tags acs): unit tests FAIL\n" + floorFailureDiagnostic(out)
+}
 
 type phaseOrderRunner struct {
 	inner PhaseRunner
@@ -51,11 +61,12 @@ func (f *changingFloor) Review(_ context.Context, in ReviewInput) ReviewResult {
 
 type predicateRun struct {
 	result CycleResult
+	err    error
 	seq    []string
 	tdd    *fakeRunner
 }
 
-func runPredicateCycle(t *testing.T, floor DeliverableReviewer) predicateRun {
+func runPredicateCycle(t *testing.T, floor DeliverableReviewer, extra ...Option) predicateRun {
 	t.Helper()
 	root := writeClaimableInbox(t, 1)
 	repo := gittest.Fixture(t)
@@ -69,8 +80,8 @@ func runPredicateCycle(t *testing.T, floor DeliverableReviewer) predicateRun {
 		runners[p] = phaseOrderRunner{inner: r, seq: &run.seq, mu: &mu}
 	}
 	runners[PhaseTriage] = phaseOrderRunner{inner: triageDecisionRunner{verdict: VerdictPASS, decision: oneCardDecision}, seq: &run.seq, mu: &mu}
-	run.result, _ = NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 9}}, &fakeLedger{}, runners,
-		WithWorktreeProvisioner(&fakeWorktree{path: repo.Dir}), WithReviewer(floor)).RunCycle(context.Background(), CycleRequest{
+	run.result, run.err = NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 9}}, &fakeLedger{}, runners,
+		append([]Option{WithWorktreeProvisioner(&fakeWorktree{path: repo.Dir}), WithReviewer(floor), WithContractVerifier(&fakeVerifier{destSub: "build-report.md"})}, extra...)...).RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: root, GoalHash: "lane-goal", Env: laneEnv,
 	})
 	return run
@@ -125,6 +136,23 @@ func TestBuildFloor_APredicateFailureThatBuildMovesStillCorrectsAtBuild(t *testi
 	}
 }
 
+func TestSamePredicateFailures_RealGoTestOutputOfTwoRunsIsTheSameFailure(t *testing.T) {
+	t.Parallel()
+	first := realFloorFailure("0.02s", "0.239s", 20)
+	second := realFloorFailure("1.5s", "10.054s", 21)
+	moved := strings.Replace(second, "cycle-1761.md, ", "", 1)
+
+	if first == second || !strings.Contains(first, "…") {
+		t.Fatalf("the fixture must be two truncated outputs that differ in their timings:\n%s\n%s", first, second)
+	}
+	if !samePredicateFailures([]string{first}, []string{second}) {
+		t.Errorf("two runs of one failing predicate differ only in timings and in the cut of the tail, want the same failure:\n%s\n---\n%s", first, second)
+	}
+	if samePredicateFailures([]string{first}, []string{moved}) {
+		t.Error("a changed assertion line compared as the same failure")
+	}
+}
+
 func TestPredicateDefectRepeats_OnlyAnIdenticalPredicateFailureOfTheMainBuildDispatchOncePerCycle(t *testing.T) {
 	t.Parallel()
 	same := []string{cycle1761Failure}
@@ -161,5 +189,75 @@ func TestSeedAuditRepairContext_OnlyTDDGetsThePredicateRepairBrief(t *testing.T)
 	}
 	if got := seedAuditRepairContext(nil, PhaseBuild, cs)[CtxKeyPredicateRepair]; got != "" {
 		t.Errorf("Build got the TDD brief: %q", got)
+	}
+}
+
+func TestConsumeDispatchFlags_EachDispatchSpendsItsOneShotFlag(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		next Phase
+		want CycleState
+	}{
+		{PhaseAudit, CycleState{PredicateRepairBrief: "brief"}},
+		{PhaseTDD, CycleState{AuditRepairActive: true}},
+		{PhaseBuild, CycleState{AuditRepairActive: true, PredicateRepairBrief: "brief"}},
+	} {
+		cs := CycleState{AuditRepairActive: true, PredicateRepairBrief: "brief"}
+		consumeDispatchFlags(&cs, c.next)
+		if cs.AuditRepairActive != c.want.AuditRepairActive || cs.PredicateRepairBrief != c.want.PredicateRepairBrief {
+			t.Errorf("%s: state = %+v, want %+v", c.next, cs, c.want)
+		}
+	}
+}
+
+func TestMaybeRemediate_ARepeatedPredicateFailureOfABuilderFixNeverReroutesToTDD(t *testing.T) {
+	t.Parallel()
+	reviewer := &remediateReviewerE4{decide: map[string]ReviewResult{"build": {Approve: false, Retry: true, Reason: "build handoff floor: " + cycle1761Failure, Failures: []string{cycle1761Failure}}}}
+	rig := remediateRigE4(t, 1, reviewer, []string{VerdictPASS})
+	rig.cr.o.stderr = &injectedStderr{}
+
+	if _, err := rig.cr.maybeRemediate(PhaseTDD, rig.dr); err != nil {
+		t.Fatalf("maybeRemediate: %v", err)
+	}
+
+	if rig.build.calls < 2 || rig.cr.scheduledNext == PhaseTDD || rig.cr.cs.PredicateReroutes != 0 {
+		t.Errorf("builder fixes = %d, scheduled = %q, reroutes = %d; want the remediation fix corrected at Build and never rerouted", rig.build.calls, rig.cr.scheduledNext, rig.cr.cs.PredicateReroutes)
+	}
+}
+
+func TestBuildFloor_TheRejectedBuildOfAReroutePassesThePostReviewGuards(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	leak := false
+	dirty := func(context.Context, string) ([]string, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if leak {
+			return []string{"leaked-by-build.txt"}, nil
+		}
+		return nil, nil
+	}
+	floor := &changingFloor{fixed: func(call int) []string {
+		if call == 2 {
+			mu.Lock()
+			leak = true
+			mu.Unlock()
+		}
+		return []string{cycle1761Failure}
+	}}
+
+	run := runPredicateCycle(t, floor, WithGitDirtyPaths(dirty))
+
+	if tdds := phaseRuns(run.seq, PhaseTDD); len(tdds) != 1 || run.err == nil || !strings.Contains(run.err.Error(), "tree") {
+		t.Errorf("sequence = %v, err = %v; want the main-tree guard to stop the rerouted Build that leaked, before TDD runs again", run.seq, run.err)
+	}
+}
+
+func TestAcsPredicateFailures_OnlyThePredicatesOfThisCycle(t *testing.T) {
+	t.Parallel()
+	other := strings.Replace(cycle1761Failure, "./acs/cycle10 ", "./acs/cycle9 ", 1)
+	got := acsPredicateFailures([]string{cycle1761Failure, other, "gofmt: 1 file(s) unformatted"}, 10)
+	if len(got) != 1 || got[0] != cycle1761Failure {
+		t.Errorf("acsPredicateFailures = %q, want only cycle 10's predicate failure", got)
 	}
 }

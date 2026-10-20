@@ -9,12 +9,16 @@ import (
 
 const maxPredicateReroutes = 1
 
-var testDuration = regexp.MustCompile(`\(\d+(\.\d+)?s\)`)
+var (
+	testDuration   = regexp.MustCompile(`\(\d+(\.\d+)?s\)`)
+	packageSummary = regexp.MustCompile(`^(FAIL|ok)\t`)
+)
 
-func acsPredicateFailures(failures []string) []string {
+func acsPredicateFailures(failures []string, cycle int) []string {
+	own := fmt.Sprintf("./acs/cycle%d ", cycle)
 	var out []string
 	for _, f := range failures {
-		if acsPredicateFailure.MatchString(f) {
+		if acsPredicateFailure.MatchString(f) && strings.HasPrefix(f, own) {
 			out = append(out, f)
 		}
 	}
@@ -23,8 +27,20 @@ func acsPredicateFailures(failures []string) []string {
 
 func samePredicateFailures(prev, cur []string) bool {
 	return slices.EqualFunc(prev, cur, func(a, b string) bool {
-		return testDuration.ReplaceAllString(a, "") == testDuration.ReplaceAllString(b, "")
+		return predicateFailureIdentity(a) == predicateFailureIdentity(b)
 	})
+}
+
+func predicateFailureIdentity(failure string) string {
+	lines := strings.Split(testDuration.ReplaceAllString(failure, ""), "\n")
+	kept := lines[:1]
+	for i, line := range lines[1:] {
+		if (i == 0 && strings.HasPrefix(line, "…")) || packageSummary.MatchString(line) || strings.HasPrefix(line, "=== ") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }
 
 func (cr *cycleRun) predicateDefectRepeats(next Phase, dr *dispatchResult, prev, cur []string) bool {
@@ -40,4 +56,13 @@ func (cr *cycleRun) routePredicateDefectToTDD(dr *dispatchResult, predicates []s
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(PhaseBuild, dr.resp, dr.attemptCount, reason, cr.cs.PhaseStartedAt))
 	cr.scheduledNext = PhaseTDD
 	return loopContinue
+}
+
+func consumeDispatchFlags(cs *CycleState, next Phase) {
+	switch next {
+	case PhaseAudit:
+		cs.AuditRepairActive = false
+	case PhaseTDD:
+		cs.PredicateRepairBrief = ""
+	}
 }

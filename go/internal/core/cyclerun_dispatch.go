@@ -53,12 +53,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	phaseCtx = seedAuditRepairContext(phaseCtx, next, cr.cs)
 	phaseCtx = cr.o.seedDispatchContext(cr.ctx, phaseCtx, next, cr.cs, cr.req.ProjectRoot)
 	archiveRepairPrompts(cr.cs, next)
-	if next == PhaseAudit {
-		cr.cs.AuditRepairActive = false
-	}
-	if next == PhaseTDD {
-		cr.cs.PredicateRepairBrief = ""
-	}
+	consumeDispatchFlags(&cr.cs, next)
 	phaseReq := PhaseRequest{
 		Cycle:                           cr.cycle,
 		AuditRound:                      cr.cs.AuditDispatches,
