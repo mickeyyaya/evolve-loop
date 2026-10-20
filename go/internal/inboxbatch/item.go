@@ -80,6 +80,10 @@ func (it *Item) readPriority(raw json.RawMessage) error {
 		it.priorityNote = fmt.Sprintf("priority %v is a number; the weight %v stays", n, it.Weight)
 		return nil
 	}
+	if n < 0 || n > 1 {
+		it.priorityNote = fmt.Sprintf("priority %v of item %q is outside the weight range 0..1, so it is not read as the weight", n, it.ID)
+		return nil
+	}
 	it.priorityNote = fmt.Sprintf("priority %v is a number; it is read as the weight", n)
 	it.Weight = n
 	return nil
