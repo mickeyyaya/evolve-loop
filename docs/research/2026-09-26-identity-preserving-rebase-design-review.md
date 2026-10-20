@@ -83,6 +83,8 @@ Add `RebindIdenticalRebase` to the explanation call-site vocabulary floor in `in
 | The marker write | marker = new base, cycle state and snapshot = old | `RecoverRebaseSplit` recognises it and routes to Build |
 | `persist` or the handoff write | marker = cycle state = new, snapshot = old | recoverable, routes to Build |
 | The snapshot write | committed | atomic rename, so no partial file |
+| B1: the carrier reset, before the rebase | the carrier of the audited tree is HEAD, on the audited base | the resume heal pends it on that base. Without the heal, a re-ship binds `T0` again and the unwind repeats |
+| B1: the rebase, before the pend | the carrier is HEAD, rebased onto the new base | the resume heal (`healCarrierAtHead`) reads the `Evolve-Carrier: cycle-<N>/<run>` trailer of HEAD. If it names this cycle and run, the heal pends the change on its fork point before a phase runs, and it emits `ORCHESTRATOR_RESUME_CARRIER_PENDED`. A carrier of another cycle or run stays |
 
 - The snapshot is written before the carry record. A committed rebind with no record reaches ship with a tree mismatch and routes to Audit, not Build. A stale record is inert, because matching requires the composed tree to equal the current one.
 - A pre-existing window (W0) remains: git has rebased while host state is still on the old base. The review recommends a git-aware split heal on resume.

@@ -114,6 +114,8 @@ Content drift is covered by the whitespace and binary drift tests. The check tha
 
 B1 opens two crash windows. After the carrier reset and before the rebase, a resumed ship binds `T0` again and the unwind repeats, so that window heals itself. Between the rebase and the pend, the carrier sits committed on the new base, and a resumed ship would go to a re-audit of a committed change. The resume heal (`resume-heals-a-carrier-left-at-head`, via the `Evolve-Carrier` trailer) is therefore required before B3 or B4 builds on B1. Before building B3, confirm that the first live fleet-rebase recovery logs `unwound its ship commit`, not `ship unwind declined:`.
 
+The heal landed on 2026-10-20 (`resume_carrier_heal.go`). On resume, before a phase runs, `healCarrierAtHead` reads the `Evolve-Carrier` trailer of HEAD. When it names this cycle and run, the heal pends the change on its fork point and emits `ORCHESTRATOR_RESUME_CARRIER_PENDED`. The debugger's carrier (B5) has the same trailer, so the same heal covers it. The heal also covers the first window: a carrier on the audited base is pended there, so the unwind does not repeat.
+
 ### Phase by phase
 
 - **Build.** A change that is not identical still invalidates the snapshot and returns to Build (step 5's non-identical test).

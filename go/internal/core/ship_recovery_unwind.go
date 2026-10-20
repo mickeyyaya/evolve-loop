@@ -168,10 +168,6 @@ func releasedAContinuation(ctx context.Context, worktree, consumedPath string, g
 }
 
 func pendRebasedChange(ctx context.Context, worktree string, git gitFn) error {
-	onto, err := forkPoint(ctx, git, worktree)
-	if err != nil {
-		return err
-	}
-	_, err = gitStdout(ctx, git, worktree, "reset", "--soft", onto)
+	_, err := pendOnForkPoint(ctx, worktree, git)
 	return err
 }
