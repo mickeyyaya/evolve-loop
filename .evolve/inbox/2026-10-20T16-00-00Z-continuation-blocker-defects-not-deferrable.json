@@ -1,0 +1,31 @@
+{
+  "id": "continuation-blocker-defects-not-deferrable",
+  "kind": "bug",
+  "title": "A continuation can defer every inherited blocker defect and still count as delivery; the defect ledger has no severity",
+  "summary": "Split from continuation-findings-anchor-first (its absorbed continuation-remediation-first-contract half). The repair-first directive for inherited red predicates landed with that item. Still open: cycle 1573 deferred 19 of 19 inherited defects, both parent blockers among them, and the defect-ledger gate counted it as delivery (wave 3 went 0/3). gradeClaim knows no severity (core/defectledger/reconcile.go), and the Entry schema has none (core/defectledger/schema.go).",
+  "root_cause": "The defect ledger grades a DEFERRED disposition the same for a blocker and for a nit, so a continuation can carry its parent's blockers forward without a repair.",
+  "fix": "Console design task (core/defectledger is protected). (a) Give each ledger entry a severity taken from the audit finding that minted it. (b) Refuse a DEFERRED disposition of a blocker-class inherited defect, or refuse the continuation at mint. (c) Optional, overlaps posthoc-diff-anchor-no-op-cycle: derive the build-report Changes table from `git diff --cached --name-status` instead of the builder's text (1572-M1, 1574-M1).",
+  "files": [
+    "go/internal/core/defectledger/schema.go",
+    "go/internal/core/defectledger/reconcile.go",
+    "go/internal/core/defectledger/dispositions.go",
+    "go/internal/continuation/continuation.go",
+    "go/internal/phasecontract/contract.go"
+  ],
+  "acceptance": [
+    "A defect-ledger entry carries a severity from the audit finding that minted it (red test first).",
+    "A continuation that disposes a blocker-class inherited defect as DEFERRED fails the defect-ledger gate, or is refused at mint; a non-blocker DEFERRED with a reason still passes (twin test).",
+    "go vet, the touched package suites with -race, and the defect-ledger package note updated."
+  ],
+  "connects_to": [
+    "continuation-findings-anchor-first (the parent; its repair-first half landed)",
+    "posthoc-diff-anchor-no-op-cycle (the derived Changes table overlaps it)",
+    "docs/incidents/2026-08-17-failure-rate-review-1481-1503.md §4.4"
+  ],
+  "priority": "high",
+  "weight": 0.86,
+  "priority_class": "stability",
+  "route": "console-manual",
+  "created_at": "2026-10-20T16:00:00Z",
+  "notes": "Filed by the console build of continuation-findings-anchor-first on 2026-10-20, so that the absorbed acceptance is not lost when the parent is consumed."
+}

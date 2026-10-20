@@ -140,6 +140,19 @@ func readContinuationFindings(path string, warn io.Writer) string {
 	return truncateFindings(strings.TrimSpace(string(body)))
 }
 
+const CtxKeyContinuationRepairFirst = "continuation_repair_first"
+
+func continuationRepairFirst(c *continuation.Continuation, worktree string, warn io.Writer) string {
+	if c.FindingsPath == "" {
+		return ""
+	}
+	directive, err := continuation.RepairFirst(filepath.Dir(c.FindingsPath), worktree)
+	if err != nil {
+		fmt.Fprintf(warn, "[orchestrator] WARN continuation: no repair-first directive from %s (%v) — builder gets the descriptive findings only\n", filepath.Dir(c.FindingsPath), err)
+	}
+	return directive
+}
+
 func renderFailReasons(phase string, reasons []string) string {
 	return truncateFindings("failed phase: " + phase + "\n- " + strings.Join(reasons, "\n- "))
 }
@@ -206,6 +219,9 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 	SeedDispositionSkeleton(cr.cs.WorkspacePath, cr.req.ProjectRoot, c.Cycle)
 	if findings := readContinuationFindings(c.FindingsPath, cr.o.errOut()); findings != "" {
 		cr.ctxSnap["continuation_findings"] = findings
+	}
+	if first := continuationRepairFirst(c, wt, cr.o.errOut()); first != "" {
+		cr.ctxSnap[CtxKeyContinuationRepairFirst] = first
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], base)
 	return nil
