@@ -16,6 +16,7 @@
 - **Import.** `Import` copies valid source records through the same serialized append path. `call_id` is the primary identity. A legacy record uses its exact trimmed JSON bytes. Repeating a salvage is idempotent and rewrites no history.
 - **Valid record.** `validRecord` is the minimum historical contract: every real row names its phase. This rejects JSON null, empty objects and unrelated envelopes, and it adds no requirement for legacy data.
 - **Aggregate.** `Aggregate` builds a deterministic performance index and persists no second copy. A `Performance` group is one comparable model and outcome. Token volumes include every valid count. The output rate uses only complete measurements with a positive duration of the try. Legacy labels stay in `RequestedModel`.
+- **Try fields (ADR-0142 L0).** `Rung`, `FailureClass`, `Fingerprint`, `Effort`, `ServedModel`, `Context`, `LadderStage` and `LadderWould` are the try record of [retry-ladder §6](../retry-ladder.md#6-the-try-record). Each field is optional, so an old line decodes unchanged. `ServedModel` is the model that the CLI reports, never the tier alias of `Model`.
 - **Call id.** `NewCallID` makes an opaque id that is unique in the process, with no third-party UUID dependency. Random bytes prevent collisions across processes. The timestamp, the pid and a monotonic sequence keep it unique if the random source fails.
 
 ## Invariants

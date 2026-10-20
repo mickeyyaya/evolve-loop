@@ -155,6 +155,7 @@ func TestReviewResumedDeliverable_WalledCorrection_ReturnsTheExhaustionSentinel(
 		context.Background(), t.TempDir(), 9, cs, PhaseBuild,
 		&fakeRunner{name: string(PhaseBuild), failErr: wrapTransient(85), failUntil: 99},
 		PhaseRequest{Workspace: cs.WorkspacePath}, PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS}, nil,
+		(&cycleRun{}).countDispatch,
 	)
 	if !errors.Is(err, ErrAllFamiliesExhausted) {
 		t.Fatalf("err = %v, want the exhaustion sentinel the resume path defers on", err)

@@ -126,6 +126,7 @@ func (cr *cycleRun) snapshotThenRun(phase Phase, runner PhaseRunner, req PhaseRe
 }
 
 func (cr *cycleRun) observedRun(phase Phase, runner PhaseRunner, req PhaseRequest) (PhaseResponse, error) {
+	req = cr.countDispatch(phase, req)
 	cancel := cr.o.observer.Start(cr.ctx, string(phase), req)
 	resp, err := runner.Run(cr.ctx, req)
 	if cancel != nil {

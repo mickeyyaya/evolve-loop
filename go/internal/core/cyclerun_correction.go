@@ -160,6 +160,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				origin: "cycleRun.reviewWithCorrections", cycle: cr.cycle, phase: next, correction: corr, max: maxCorrections,
 				rung: interaction.RungRedispatch, cli: dr.phaseReq.ModelRoutingCLI, escalated: escalated, salvageRetry: salvageRetry, reason: rr.Reason,
 			})
+			dr.phaseReq = cr.countDispatch(next, dr.phaseReq)
 			obsCancel := cr.o.observer.Start(cr.ctx, string(next), dr.phaseReq)
 			var rerr error
 			dr.resp, rerr = dr.runner.Run(cr.ctx, dr.phaseReq)

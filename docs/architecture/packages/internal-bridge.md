@@ -74,6 +74,15 @@ The decision-matrix fixtures in `autorespond_decision_test.go` are verbatim pane
 
 `recordModelAttempt` writes the one `llm-calls` ledger row per launch attempt (`llmcalls` owns the filename and I/O). It derives the attempt number (at least 1) and the call id once and returns the `attemptLogContext`, so every later signal of the same launch carries the row's identity. Usage status follows the resolver's source: transcript or events result is `measured`, scrollback peak is `partial`, anything else is `unavailable`, and a resolver error is `resolver_error`. Negative counters and a NaN or infinite fill are discarded with a warning. `launchWarn` is the only `bridge.warning` producer; `tripwire` emits `bridge.tripwire` when a successful non-claude launch runs past `tripwireSuccessThreshold` with no usage source. The ledger's cause code comes from `launchoutcome.CauseCode` ([decomposition unit 10](../decomposition/10-bridgeengine.md), [ADR-0101](../adr/0101-signal-center.md)).
 
+`markTry` writes the try fields of [retry-ladder §6](../retry-ladder.md#6-the-try-record) (ADR-0142 L0):
+
+- `effort` is the effort of the launch intent. `LaunchArgs` reports it through `observeLaunchEffort`, so each tmux launch records it.
+- `served_model` is the model that the CLI reports. The transcript model of the try (`tokenusage.Result.ServedModel`) comes first. The footer label that the launch model check verified (`observeServedModel`) comes next. `servedModelOfFooterLabel` spells that label as the agy model id: `Claude Opus 5.5 · high` becomes `Claude Opus 5.5 (High)`. With no report, the field stays empty. It never holds the tier alias.
+- `rung` is `R0`, `context` is `new` and `ladder_stage` is `shadow`. `failure_class`, `fingerprint` and `ladder_would` stay empty until L5 wires the decider.
+- `attempt` follows `BridgeRequest.Attempt`, which the runner copies from `PhaseRequest.Attempt`.
+
+Pinned by `TestTryRecord_ATmuxDispatchRecordsTheEffortItSentAndTheR0Rung`, `TestTryRecord_ServedModelIsTheModelTheTranscriptReportsNotTheTier`, `TestTryRecord_ServedModelStaysEmptyWhenTheCLIReportsNone`, `TestTryRecord_ServedModelIsTheVerifiedFooterLabel`, `TestServedModelOfFooterLabel_SpellsTheLabelAsTheAgyModelID` and `TestTryRecord_ATranscriptModelOutranksTheFooterLabel`.
+
 ### Codex launch preparation (`codex_pretrust.go`, `codex_model_clamp.go`)
 
 - **Pretrust.** codex-tmux's `Preflight` runs `pretrustCodexProjects` and `dismissCodexUpdateNag` at the engine's `CLIPreflight` chokepoint, strictly before the driver's `Launch`, for the exact worktree of every launch: fresh, reused or resumed. A provisioning-time hook was rejected: it would duplicate the same write through a new core→bridge seam (core cannot import bridge) for no behavioural gain. The recipe path (`newRecipeDriver`) bypasses `CLIPreflight`, so it pretrusts codex-family CLIs itself.

@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
@@ -90,9 +92,7 @@ func (e *Engine) recordModelAttempt(
 	}
 	e.emitTokenWarnings(req, code, start, end, callID, attempt, result)
 
-	if dispatched.source == "" {
-		dispatched.source = llmcalls.DispatchNotStarted
-	}
+	dispatched.source = cmp.Or(dispatched.source, llmcalls.DispatchNotStarted)
 	duration := end.Sub(start).Milliseconds()
 	var durationMS *int64
 	if duration >= 0 {
@@ -127,6 +127,7 @@ func (e *Engine) recordModelAttempt(
 		Tripwire:        tripwire,
 		FillPct:         result.FillPct,
 		CauseCode:       launchoutcome.CauseCode(code, launchStderr),
+		ServedModel:     result.ServedModel,
 	}
 	for _, mark := range marks {
 		mark(&rec)
@@ -226,4 +227,26 @@ func isTelemetryTripwire(cli string, code int, start, end time.Time, source toke
 
 func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int, start time.Time, resp *core.BridgeResponse) {
 	e.recordModelAttempt(req, model, code, start, e.deps.Now(), modelDispatch{}, "", resp)
+}
+
+func markTry(run launchRun) func(*llmcalls.Record) {
+	return func(rec *llmcalls.Record) {
+		rec.Rung = string(retryladder.R0)
+		rec.Context = string(retryladder.ContextNew)
+		rec.LadderStage = string(retryladder.StageShadow)
+		rec.Effort = run.effort
+		rec.ServedModel = cmp.Or(rec.ServedModel, run.servedModel)
+	}
+}
+
+func observeLaunchEffort(deps Deps, effort string) {
+	if deps.onLaunchEffort != nil {
+		deps.onLaunchEffort(effort)
+	}
+}
+
+func observeServedModel(deps Deps, model string) {
+	if deps.onServedModel != nil {
+		deps.onServedModel(model)
+	}
 }

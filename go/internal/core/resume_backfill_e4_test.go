@@ -97,7 +97,7 @@ func TestReviewResumedDeliverable_NoReviewerOrASkippedPhaseIsReturnedUnreviewed(
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	o.reviewer = nil
 	resp := PhaseResponse{Phase: "build", Verdict: VerdictFAIL, ArtifactsDir: "/ws"}
-	got, err := o.reviewResumedDeliverable(context.Background(), t.TempDir(), 4, CycleState{CycleID: 4}, PhaseBuild, &scriptedResumeRunnerE4{}, PhaseRequest{}, resp, nil)
+	got, err := o.reviewResumedDeliverable(context.Background(), t.TempDir(), 4, CycleState{CycleID: 4}, PhaseBuild, &scriptedResumeRunnerE4{}, PhaseRequest{}, resp, nil, (&cycleRun{}).countDispatch)
 	if err != nil || !reflect.DeepEqual(got, resp) {
 		t.Fatalf("no reviewer = (%+v, %v), want the response unchanged", got, err)
 	}
@@ -105,7 +105,7 @@ func TestReviewResumedDeliverable_NoReviewerOrASkippedPhaseIsReturnedUnreviewed(
 	rev := &recordingReviewer{default_: ReviewResult{Approve: false, Reason: "never asked"}}
 	o.reviewer = rev
 	skipped := PhaseResponse{Phase: "build", Verdict: VerdictSKIPPED}
-	got, err = o.reviewResumedDeliverable(context.Background(), t.TempDir(), 4, CycleState{CycleID: 4}, PhaseBuild, &scriptedResumeRunnerE4{}, PhaseRequest{}, skipped, nil)
+	got, err = o.reviewResumedDeliverable(context.Background(), t.TempDir(), 4, CycleState{CycleID: 4}, PhaseBuild, &scriptedResumeRunnerE4{}, PhaseRequest{}, skipped, nil, (&cycleRun{}).countDispatch)
 	if err != nil || !reflect.DeepEqual(got, skipped) || len(rev.calls) != 0 {
 		t.Fatalf("skipped = (%+v, %v) after %d reviews, want it returned unreviewed", got, err, len(rev.calls))
 	}
@@ -127,7 +127,7 @@ func TestReviewResumedDeliverable_ACorrectionThatCannotBeEvaluatedStopsTheResume
 			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 			o.reviewer = rev
 
-			_, err := o.reviewResumedDeliverable(context.Background(), t.TempDir(), 4, CycleState{CycleID: 4, WorkspacePath: t.TempDir()}, PhaseBuild, tc.runner, PhaseRequest{}, PhaseResponse{Phase: "build", Verdict: VerdictPASS}, nil)
+			_, err := o.reviewResumedDeliverable(context.Background(), t.TempDir(), 4, CycleState{CycleID: 4, WorkspacePath: t.TempDir()}, PhaseBuild, tc.runner, PhaseRequest{}, PhaseResponse{Phase: "build", Verdict: VerdictPASS}, nil, (&cycleRun{}).countDispatch)
 
 			if err == nil || err.Error() != tc.wantErr {
 				t.Fatalf("err = %v, want %q", err, tc.wantErr)
@@ -156,7 +156,7 @@ func TestReviewResumedDeliverable_ALeakWrittenByTheCorrectionStopsBeforeTheReRev
 	var err error
 	var sink injectedStderr
 	o.stderr = &sink
-	_, err = o.reviewResumedDeliverable(context.Background(), root, 9, cs, PhaseBuild, runner, PhaseRequest{}, PhaseResponse{Phase: "build", Verdict: VerdictPASS}, map[string]bool{"blocked-worktree": true})
+	_, err = o.reviewResumedDeliverable(context.Background(), root, 9, cs, PhaseBuild, runner, PhaseRequest{}, PhaseResponse{Phase: "build", Verdict: VerdictPASS}, map[string]bool{"blocked-worktree": true}, (&cycleRun{}).countDispatch)
 
 	if err == nil || !strings.Contains(err.Error(), "worktree-leak recovery failed") {
 		t.Fatalf("err = %v, want the correction's leak to stop the resume", err)

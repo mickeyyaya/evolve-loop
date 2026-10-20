@@ -151,6 +151,7 @@ func TestReviewResumedDeliverable_LeakRecoveryFailureStopsBeforeReview(t *testin
 		PhaseBuild, &fakeRunner{name: string(PhaseBuild)},
 		PhaseRequest{}, PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS},
 		map[string]bool{"blocked-worktree": true},
+		(&cycleRun{}).countDispatch,
 	)
 	if err == nil || !strings.Contains(err.Error(), "worktree-leak recovery failed") {
 		t.Fatalf("resume accepted failed leak recovery: %v", err)
@@ -182,6 +183,7 @@ func TestReviewResumedDeliverable_LargeBuildUsesScaledCorrectionBudget(t *testin
 		context.Background(), t.TempDir(), 9, cs, PhaseBuild, builder,
 		PhaseRequest{Workspace: workspace},
 		PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS}, nil,
+		(&cycleRun{}).countDispatch,
 	)
 	if err != nil {
 		t.Fatalf("scaled resumed correction rejected: %v", err)

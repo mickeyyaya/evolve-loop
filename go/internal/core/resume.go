@@ -292,6 +292,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	req PhaseRequest,
 	resp PhaseResponse,
 	phaseBaseline map[string]bool,
+	count func(Phase, PhaseRequest) PhaseRequest,
 ) (PhaseResponse, error) {
 	if o.reviewer == nil || resp.Verdict == VerdictSKIPPED {
 		return resp, nil
@@ -307,6 +308,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 			origin: "Orchestrator.reviewResumedDeliverable", cycle: cycle, phase: phase, correction: correction, max: maxCorrections,
 			rung: interaction.RungRedispatch, cli: req.ModelRoutingCLI, reason: review.Reason,
 		})
+		req = count(phase, req)
 		cancel := o.observer.Start(ctx, string(phase), req)
 		corrected, err := runner.Run(ctx, req)
 		if cancel != nil {

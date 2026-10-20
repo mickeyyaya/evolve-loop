@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
@@ -115,6 +116,7 @@ func (lp tmuxLaunch) verifyBootedModel(ctx context.Context, run bootedModelRun) 
 	switch {
 	case w.verified:
 		fmt.Fprintf(run.deps.Stderr, "[%s] launch model verified: %q is %s\n", lp.name, w.footer.label, lp.modelCheck.family)
+		observeServedModel(run.deps, servedModelOfFooterLabel(w.footer.label))
 		return ExitOK
 	case w.cancelled:
 		return lp.endCancelledWait(ctx, run)
@@ -205,4 +207,13 @@ func (lp tmuxLaunch) mismatchEvent(cfg *Config, label, observed string) signalce
 		Reason: fmt.Sprintf("%s booted %s, not the %s family it dispatches: killed before the prompt, the walk moves to the next CLI", lp.name, observed, lp.modelCheck.family),
 		Fields: map[string]string{"expected": lp.modelCheck.family, "observed": observed, "label": label, "cli": lp.name, "phase": id.phase},
 	}
+}
+
+func servedModelOfFooterLabel(label string) string {
+	name, variant, found := strings.Cut(label, "·")
+	variant = strings.TrimSpace(variant)
+	if !found || variant == "" {
+		return label
+	}
+	return strings.TrimSpace(name) + " (" + strings.ToUpper(variant[:1]) + variant[1:] + ")"
 }
