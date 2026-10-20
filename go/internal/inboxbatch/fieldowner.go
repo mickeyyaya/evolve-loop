@@ -61,6 +61,10 @@ const (
 	PremiseVerifiedAtField       = "premise_verified_at"
 	PremiseVerifiedSHAField      = "premise_verified_sha"
 	PremiseVerifiedEvidenceField = "premise_verified_evidence"
+	EvidenceVerifiedField        = "evidence_verified"
+	EvidenceNoteField            = "evidence_note"
+	StaleDropsField              = "stale_drops"
+	LastStaleDropAtField         = "last_stale_drop_at"
 )
 
 var (
@@ -99,6 +103,10 @@ var fieldRoles = map[string]FieldRole{
 	RetiredCycleField:           loopStamp,
 	GitSHAField:                 loopStamp,
 	ProtectedFilesField:         loopGrowOnly,
+	EvidenceVerifiedField:       loopStamp,
+	EvidenceNoteField:           loopStamp,
+	StaleDropsField:             loopCounter,
+	LastStaleDropAtField:        loopStamp,
 
 	PremiseVerifiedAtField:       operatorStamp,
 	PremiseVerifiedSHAField:      operatorStamp,

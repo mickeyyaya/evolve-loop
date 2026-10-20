@@ -64,11 +64,11 @@ func locateItem(inboxDir, id string) (inboxbatch.Item, bool) {
 }
 
 func itemDrift(ctx context.Context, root string, it inboxbatch.Item) string {
-	since := it.FiledAt()
+	since, label := driftSince(it)
 	if since.IsZero() {
 		return ""
 	}
-	head := fmt.Sprintf("  - %s (filed %s): ", promptSafe(it.ID), since.UTC().Format("2006-01-02"))
+	head := fmt.Sprintf("  - %s (%s %s): ", promptSafe(it.ID), label, since.UTC().Format("2006-01-02"))
 	naming, ok := commitsSince(ctx, root, since, []string{"-E", "--grep=" + idMentionPattern(it.ID)}, nil)
 	if !ok {
 		return head + premiseDriftUnavailable
@@ -92,6 +92,15 @@ func itemDrift(ctx context.Context, root string, it inboxbatch.Item) string {
 		return ""
 	}
 	return head + strings.Join(parts, " | ") + "\n"
+}
+
+func driftSince(it inboxbatch.Item) (time.Time, string) {
+	filed := it.FiledAt()
+	verified, err := time.Parse(time.RFC3339, strings.TrimSpace(it.PremiseVerified))
+	if err == nil && verified.After(filed) {
+		return verified, "premise verified"
+	}
+	return filed, "filed"
 }
 
 func declaredDrift(ctx context.Context, root string, since time.Time, declared []string) (parts []string, ok bool) {

@@ -273,6 +273,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 |---|---|
 | `OUTCOME_SIDECAR_SKIPPED` | the phase's <phase>-usage.json sidecar was not written because the workspace is empty (the CWD-relative leak guard); the in-memory record and the phase.outcome event still stand |
 | `OUTCOME_SIDECAR_WRITE_FAILED` | the phase's <phase>-usage.json sidecar could not be encoded or written; the reason names the step and the error, fields name the phase and the path; the in-memory record stands |
+| `OUTCOME_STALE_DROP_REPEATED` | a lane triage stale-dropped the same inbox item a second time since its premise was last verified; the item stays console-routed and the wave planner holds it off the lanes until `evolve inbox verify` stamps its premise; fields.task_id, stale_drops, evidence_verified |
 | `OUTCOME_TIMING_SKIPPED` | phase-timing.json was not written because the workspace is empty; the composed timing set is returned to the caller unchanged |
 | `OUTCOME_TIMING_WRITE_FAILED` | phase-timing.json could not be encoded or written (marshal, temp write or rename); the reason names the step and the error; the composed set is still returned |
 

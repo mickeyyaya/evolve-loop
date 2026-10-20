@@ -28,3 +28,20 @@ func TestPlaceOnLaneMenu_OneJudgmentPerItem(t *testing.T) {
 		}
 	}
 }
+
+func TestPlaceOnLaneMenu_AnItemStaleDroppedTwiceWaitsForAVerifiedPremise(t *testing.T) {
+	t.Parallel()
+	opts := Options{InboxDir: filepath.Join(t.TempDir(), ".evolve", "inbox")}
+	twice := inboxbatch.Item{ID: "twice", Route: "lane", StaleDrops: inboxbatch.StaleDropHold, LastStaleDropAt: "2026-10-01T00:00:00Z"}
+
+	if place, reason := PlaceOnLaneMenu(opts, twice, nil); place != MenuConsole || reason != "stale-dropped 2 times since its premise was last verified; run `evolve inbox verify twice --evidence <text>` first" {
+		t.Fatalf("PlaceOnLaneMenu = %v, %q; a third lane must not run before the console verifies the premise", place, reason)
+	}
+	twice.PremiseVerified = "2026-10-02T00:00:00Z"
+	if place, _ := PlaceOnLaneMenu(opts, twice, nil); place != MenuReady {
+		t.Fatalf("PlaceOnLaneMenu = %v; a premise verified after the last drop puts the item back on the menu", place)
+	}
+	if place, _ := PlaceOnLaneMenu(opts, inboxbatch.Item{ID: "once", StaleDrops: 1, LastStaleDropAt: "2026-10-01T00:00:00Z"}, nil); place != MenuReady {
+		t.Fatalf("PlaceOnLaneMenu = %v; one stale drop holds nothing", place)
+	}
+}

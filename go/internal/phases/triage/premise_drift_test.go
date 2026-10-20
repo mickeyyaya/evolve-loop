@@ -173,3 +173,38 @@ func TestComposePrompt_RendersPremiseDriftOnlyForAFleetLane(t *testing.T) {
 		t.Errorf("a sequential cycle renders no premise_drift section:\n%s", got)
 	}
 }
+
+func TestPremiseDriftSection_AConsoleVerifiedPremiseResetsTheDriftWindow(t *testing.T) {
+	verified := `{"id":"warn-gap","title":"t","kind":"bug","created_at":"2026-08-16T19:30:00Z","premise_verified_at":"2026-09-05T00:00:00Z",
+ "files":["go/internal/ship/consume.go (gate condition, both ship paths)"]}`
+	dir := premiseRepo(t, verified)
+
+	section := premiseDriftSection(context.Background(), dir, "warn-gap")
+
+	if !strings.Contains(section, "warn-gap (premise verified 2026-09-05)") || strings.Contains(section, "single-source committed-inbox-id resolution") {
+		t.Fatalf("drift must count from the console verification of 2026-09-05, not the filing:\n%s", section)
+	}
+	if !strings.Contains(section, "fix: restore audit authority (ReadVerdict)") {
+		t.Fatalf("a commit after the verification still counts:\n%s", section)
+	}
+}
+
+func TestPremiseDriftSection_AVerificationBeforeTheFilingIsIgnored(t *testing.T) {
+	early := `{"id":"warn-gap","title":"t","kind":"bug","created_at":"2026-08-16T19:30:00Z","premise_verified_at":"2026-08-01T00:00:00Z",
+ "files":["go/internal/ship/consume.go"]}`
+	dir := premiseRepo(t, early)
+
+	if s := premiseDriftSection(context.Background(), dir, "warn-gap"); !strings.Contains(s, "warn-gap (filed 2026-08-16)") {
+		t.Fatalf("an older verification stamp does not move the window back:\n%s", s)
+	}
+}
+
+func TestPremiseDriftSection_APathspecGitRefusesIsUnavailable(t *testing.T) {
+	dir := premiseRepo(t, staleItem)
+	t.Setenv("GIT_LITERAL_PATHSPECS", "1")
+	t.Setenv("GIT_GLOB_PATHSPECS", "1")
+
+	if s := premiseDriftSection(context.Background(), dir, "warn-gap"); !strings.Contains(s, "warn-gap (filed 2026-08-16): "+premiseDriftUnavailable) {
+		t.Fatalf("a pathspec that git refuses makes the drift unavailable, not silent:\n%s", s)
+	}
+}
