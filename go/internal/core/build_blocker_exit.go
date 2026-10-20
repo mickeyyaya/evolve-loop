@@ -143,6 +143,11 @@ func (cr *cycleRun) consoleRouteItem(next Phase) (string, bool) {
 }
 
 func (cr *cycleRun) endOnProvenBlocker(next Phase, dr *dispatchResult, diag Diagnostic) (loopAction, error) {
+	cr.recordProvenBlocker(next, dr, diag)
+	return loopBreak, nil
+}
+
+func (cr *cycleRun) recordProvenBlocker(next Phase, dr *dispatchResult, diag Diagnostic) {
 	resp := dr.resp
 	resp.Verdict = VerdictFAIL
 	resp.Diagnostics = append([]Diagnostic{diag}, resp.Diagnostics...)
@@ -153,7 +158,29 @@ func (cr *cycleRun) endOnProvenBlocker(next Phase, dr *dispatchResult, diag Diag
 	cr.result.TerminationReason = CycleTerminationBlockedNeedsConsole
 	cr.emitBlockerSignal(next, CodeBlockerRouted, signalcenter.SeverityWarn, diag.Message)
 	dr.phaseReq.CorrectionDirective = ""
-	return loopBreak, nil
+}
+
+type resumedBlocker struct{ diag Diagnostic }
+
+func (b resumedBlocker) Error() string { return b.diag.Message }
+
+func (o *Orchestrator) resumedBlockerRoute(cs CycleState, cycle int, phase Phase, review ReviewResult) error {
+	if review.ProvenBlocker == "" {
+		return nil
+	}
+	item, ok := (&cycleRun{o: o, cs: cs, cycle: cycle}).consoleRouteItem(phase)
+	if !ok {
+		return nil
+	}
+	return resumedBlocker{diag: blockerRouteDiagnostic(item, review.ProvenBlocker)}
+}
+
+func (cr *cycleRun) endResumeOnBlocker(next Phase, dr *dispatchResult, diag Diagnostic, result CycleResult, timings []phaseTimingEntry, cursor *resumeCursor) (CycleResult, []phaseTimingEntry) {
+	cr.result, cr.phaseTimings = result, timings
+	cr.recordProvenBlocker(next, dr, diag)
+	cursor.termination.reason = CycleTerminationBlockedNeedsConsole
+	cursor.finish()
+	return cr.result, cr.phaseTimings
 }
 
 func (cr *cycleRun) refuseBlocker(next Phase, reason string) {

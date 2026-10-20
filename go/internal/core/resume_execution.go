@@ -179,6 +179,11 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
 		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, phaseBaseline)
+		var blocked resumedBlocker
+		if errors.As(err, &blocked) {
+			result, phaseTimings = dispatch.endResumeOnBlocker(next, &dispatchResult{resp: resp, attemptCount: attempts, phaseReq: phaseReq}, blocked.diag, result, phaseTimings, &cursor)
+			break
+		}
 		if errors.Is(err, ErrAllFamiliesExhausted) {
 			pauseOnQuotaWall()
 			return result, err

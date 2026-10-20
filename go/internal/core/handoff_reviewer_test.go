@@ -306,3 +306,59 @@ func TestHandoffReviewer_TheCheckRecordKeepsEachLedgerValueVerbatim(t *testing.T
 		t.Errorf("check = %+v", c)
 	}
 }
+
+func resumeAtTDDWithHandoff(t *testing.T, decision string, checks ...handoff.Check) (CycleResult, error, *fakeRunner, *fakeWorktree) {
+	t.Helper()
+	root := t.TempDir()
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-9")
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "triage-decision.json"), []byte(decision), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wt := &fakeWorktree{path: t.TempDir()}
+	st := &fakeStorage{state: State{LastCycleNumber: 9}, cycleState: CycleState{CycleID: 9, WorkspacePath: ws, ActiveWorktree: wt.path}}
+	runners := buildRunners(nil)
+	tdd := &fakeRunner{name: string(PhaseTDD)}
+	runners[PhaseTDD] = tdd
+	script := &scriptedHandoffCheck{checks: checks}
+	o := NewOrchestrator(st, &fakeLedger{}, runners, WithWorktreeProvisioner(wt),
+		WithReviewer(NewHandoffReviewer(handoffStages("enforce"), script.check)))
+	res, err := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"}, &ResumePoint{Phase: string(PhaseTDD), CycleID: 9})
+	return res, err, tdd, wt
+}
+
+func TestHandoffReviewer_AResumedPhaseEndsBlockedOnAProvenHandoffBlocker(t *testing.T) {
+	t.Parallel()
+	res, err, tdd, wt := resumeAtTDDWithHandoff(t, oneCardDecision, handoff.Check{Outcome: "blocked", Blocked: []string{"a1"}, Paths: []string{breakerPath}})
+
+	if err != nil {
+		t.Fatalf("RunCycleFromPhase: %v; a proven handoff blocker is a planned ending on resume too", err)
+	}
+	if res.TerminationReason != CycleTerminationBlockedNeedsConsole || !IsProvenBlockerResult(res) {
+		t.Fatalf("result = %+v; want the blocked-needs-console ending", res)
+	}
+	if tdd.calls != 1 {
+		t.Errorf("tdd dispatched %d times; a blocked handoff spends no correction round", tdd.calls)
+	}
+	if len(wt.cleaned) != 0 {
+		t.Errorf("the salvage worktree must be kept: cleaned=%v", wt.cleaned)
+	}
+	if got := (resumedBlocker{diag: Diagnostic{Message: "blocked: needs console"}}).Error(); got != "blocked: needs console" {
+		t.Errorf("Error() = %q; the resumed blocker reads as its revision", got)
+	}
+}
+
+func TestHandoffReviewer_AResumedRefusedRouteKeepsTheCorrectionRounds(t *testing.T) {
+	t.Parallel()
+	twoCards := `{"top_n":[{"id":"claimable-lane-item"},{"id":"other-item"}]}`
+	res, _, tdd, _ := resumeAtTDDWithHandoff(t, twoCards, handoff.Check{Outcome: "blocked", Blocked: []string{"a1"}}, handoff.Check{Outcome: "pass"})
+
+	if res.TerminationReason == CycleTerminationBlockedNeedsConsole {
+		t.Errorf("result = %+v; the console route names exactly one item", res)
+	}
+	if tdd.calls != 2 {
+		t.Errorf("tdd dispatched %d times; a refused route spends a correction round", tdd.calls)
+	}
+}

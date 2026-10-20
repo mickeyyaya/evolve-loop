@@ -179,6 +179,8 @@ The check is the same code as `evolve handoff check` (`evaluateHandoffAt` in `go
 
 The reviewer adds its result to `handoff-<pair>.json` under the key `check`, and it keeps every key of the ledger as written. When no ledger exists, it writes a file with `schema_version`, `pair` and `check` only. When the file is not a JSON object, it keeps the file and writes a `WARN` line.
 
+A file with only these keys holds no ledger. `handoff.IsCheckOnly` finds it, and every reader treats it as an absent ledger. Thus `evolve handoff show` prints `absent`, `evolve handoff check` reports a missing ledger, and the next round of the reviewer gets the same outcome as the first. The shadow data keeps "the phase wrote nothing" apart from "the phase wrote a bad ledger".
+
 | Stage of the pair | Outcome | What the reviewer returns |
 |---|---|---|
 | `shadow` | any | approve: the verdict of the phase does not change |
@@ -213,7 +215,7 @@ No exit means "the request is wrong", and an agent claim alone must not stop a l
 
 An agent can name a blocker in its ledger. The exit decision accepts it only when the proof holds. A claim without proof is `unmet`.
 
-A `blocked` check at stage `enforce` uses the exit of [blocker-exit.md](blocker-exit.md). The reviewer returns the revision in `ReviewResult.ProvenBlocker`, and `provenBlocker` ends the cycle with the `BLOCKER_ROUTE` diagnostic. The route needs exactly one committed item. Without one, the correction rounds continue. The worktree stays, so the salvage snapshot stays.
+A `blocked` check at stage `enforce` uses the exit of [blocker-exit.md](blocker-exit.md). The reviewer returns the revision in `ReviewResult.ProvenBlocker`, and `provenBlocker` ends the cycle with the `BLOCKER_ROUTE` diagnostic. The route needs exactly one committed item. Without one, the correction rounds continue. A resumed cycle uses the same route: `reviewResumedDeliverable` returns the blocker, and the resume loop ends the cycle as `blocked-needs-console`. The worktree stays, so the salvage snapshot stays.
 
 **The revision** names the ask ids, the proof and the pair. The console, or the requester phase in a later round, rewrites the request. This is the `C → A` edge that the operator asked for: a later phase sends the request back, and the earlier phase does not repeat it.
 

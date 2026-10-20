@@ -61,3 +61,33 @@ func TestHandoffReviewer_IsInTheCycleReviewerChain(t *testing.T) {
 		t.Fatal("the cycle reviewer chain must hold the handoff reviewer")
 	}
 }
+
+func TestHandoff_AFileThatHoldsOnlyTheCheckRecordIsAnAbsentLedger(t *testing.T) {
+	t.Parallel()
+	p := newHCProject(t)
+	p.cycle1950()
+	p.write(".evolve/runs/cycle-1950/handoff-tdd-build.json", `{"schema_version":1,"pair":"tdd-build","check":{"stage":"shadow","outcome":"error"}}`)
+
+	rc, stdout, _ := runHC(t, "show", "--cycle", "1950", "--project-root", p.root, "--json")
+	var shown hcShowResult
+	decodeOneObject(t, stdout, &shown)
+	if rc != 0 || !strings.Contains(stdout, `{"pair":"tdd-build","outcome":"absent"}`) {
+		t.Errorf("rc=%d pairs=%v; a check-only file shows absent, not invalid", rc, shown.Pairs)
+	}
+
+	rc, stdout, _ = runHC(t, checkArgs(p, 1950, "tdd-build", "--json")...)
+	var checked hcResult
+	decodeOneObject(t, stdout, &checked)
+	if rc != handoffExitIO || checked.Outcome != "error" || !strings.Contains(strings.Join(checked.Errors, " "), "only the check record") {
+		t.Errorf("rc=%d result=%+v; check treats a check-only file as a missing ledger", rc, checked)
+	}
+
+	stub := handoffReviewCheck(core.ReviewInput{Cycle: 1950, Workspace: p.runDir(1950), ProjectRoot: p.root}, "tdd-build")
+	if err := os.Remove(filepath.Join(p.runDir(1950), "handoff-tdd-build.json")); err != nil {
+		t.Fatal(err)
+	}
+	missing := handoffReviewCheck(core.ReviewInput{Cycle: 1950, Workspace: p.runDir(1950), ProjectRoot: p.root}, "tdd-build")
+	if stub.Outcome != missing.Outcome {
+		t.Errorf("stub outcome %q, missing outcome %q; the reviewer's own record must not change the next round's outcome", stub.Outcome, missing.Outcome)
+	}
+}

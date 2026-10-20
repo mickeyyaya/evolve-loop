@@ -196,7 +196,7 @@ func runHandoffShow(args []string, asJSON bool, stdout, stderr io.Writer) int {
 }
 
 func handoffShowOutcome(root string, cycle int, pair string) string {
-	if _, err := os.Stat(handoffLedgerPath(root, cycle, pair)); errors.Is(err, fs.ErrNotExist) {
+	if _, err := readHandoffLedger(handoffLedgerPath(root, cycle, pair)); errors.Is(err, fs.ErrNotExist) {
 		return "absent"
 	}
 	return evaluateHandoff(root, cycle, pair).Outcome
@@ -241,7 +241,7 @@ func evaluateHandoffAt(site handoffSite, cycle int, pair string) handoffResult {
 	if err != nil {
 		return newHandoffResult(cycle, pair, "error", handoffExitIO, err.Error())
 	}
-	raw, err := os.ReadFile(filepath.Join(site.runDir, "handoff-"+pair+".json"))
+	raw, err := readHandoffLedger(filepath.Join(site.runDir, "handoff-"+pair+".json"))
 	if err != nil {
 		return newHandoffResult(cycle, pair, "error", handoffExitIO, err.Error())
 	}
@@ -291,6 +291,14 @@ func handoffInboxResolver(root string) request.PathResolver {
 		}
 		return ""
 	}
+}
+
+func readHandoffLedger(path string) ([]byte, error) {
+	raw, err := os.ReadFile(path)
+	if err == nil && handoff.IsCheckOnly(raw) {
+		return nil, fmt.Errorf("%s holds only the check record: %w", filepath.Base(path), fs.ErrNotExist)
+	}
+	return raw, err
 }
 
 func readHandoffFailures(path string) ([]string, error) {

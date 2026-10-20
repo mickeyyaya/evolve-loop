@@ -96,6 +96,7 @@ var treeReadingSelections = []TestSelection{
 		"TestHandoffReviewCheck_ReadsTheLedgerOfTheCycleWorkspaceAndTheEvidenceOfTheWorktree",
 		"TestHandoffShow_JSONListsEveryPairInPipelineOrder",
 		"TestHandoffShow_ListsTheResultOfEachPair",
+		"TestHandoff_AFileThatHoldsOnlyTheCheckRecordIsAnAbsentLedger",
 		"TestHandoff_VerbsWriteNothingAndRepeatTheSameAnswer",
 		"TestInboxCenterlessRootsArePinned",
 		"TestLoopPreflightOptions_AFailedBootIsExplainedByTheUsageEvidence",

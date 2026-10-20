@@ -75,3 +75,19 @@ func Validate(l Ledger, req Request) error {
 	}
 	return nil
 }
+
+func IsCheckOnly(raw []byte) bool {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return false
+	}
+	if _, ok := fields["check"]; !ok {
+		return false
+	}
+	for key := range fields {
+		if key != "check" && key != "schema_version" && key != "pair" {
+			return false
+		}
+	}
+	return true
+}
