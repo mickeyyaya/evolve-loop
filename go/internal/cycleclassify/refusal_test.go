@@ -241,3 +241,25 @@ func TestFirstInfraMarker_SkipsAMalformedLineAndANestedKind(t *testing.T) {
 		t.Fatalf("firstInfraMarker = %q, %v; a broken line and a nested kind are not events, the 529 envelope is", marker, ok)
 	}
 }
+
+func TestClassify_AnUncodedFailureWhoseOnlyInfraWasPaneNoiseIsUnknownNotABreach(t *testing.T) {
+	ws := t.TempDir()
+	writePhaseTiming(t, ws, []phasetiming.Entry{{Phase: "scout", Verdict: "PASS"}, {Phase: "tdd", Verdict: "FAIL"}})
+	writeFile(t, ws, "tdd-events.ndjson", infraEnvelope("tdd", "eperm", zshCompinitExcerpt))
+
+	r := Classify(ws)
+
+	if r.Class != ClassUnknown || r.Marker != MarkerPaneNoiseOnly || r.Source != "tdd-events.ndjson" {
+		t.Fatalf("Classify = %+v; on main the pane noise read as infrastructure, so with it stripped the cycle has no evidence of a breach either", r)
+	}
+}
+
+func TestClassify_AnUncodedFailureWithNoEvidenceStaysABreach(t *testing.T) {
+	ws := t.TempDir()
+	writePhaseTiming(t, ws, []phasetiming.Entry{{Phase: "scout", Verdict: "PASS"}, {Phase: "tdd", Verdict: "FAIL"}})
+	writeFile(t, ws, "tdd-events.ndjson", `{"kind":"progress"}`+"\n")
+
+	if r := Classify(ws); r.Class != ClassIntegrityBreach {
+		t.Fatalf("Classify = %+v; with no noise and no evidence the fallback is unchanged", r)
+	}
+}

@@ -40,9 +40,13 @@ const (
 	ClassIntegrityBreach   Classification = "integrity-breach"
 	ClassExitTransportHang Classification = "exit-transport-hang"
 	ClassPhaseRefusal      Classification = "phase-refusal"
+	ClassUnknown           Classification = "unknown"
 )
 
-const MarkerQuotaLikelyEmptyOutput = "quota-likely-empty-output"
+const (
+	MarkerQuotaLikelyEmptyOutput = "quota-likely-empty-output"
+	MarkerPaneNoiseOnly          = "pane-noise-only"
+)
 
 var (
 	reInfrastructure = regexp.MustCompile(`(?i)INFRASTRUCTURE FAILURE|sandbox-exec.*Operation not permitted|sandbox_apply.*permitted|EPERM|rate.?limit|429.*Too Many|529.*Overloaded|connection.refused|ETIMEDOUT|operation timed out`)
@@ -100,6 +104,9 @@ func Classify(workspace string) Result {
 	}
 	if src, ok := detectEmptyOutputSession(workspace); ok {
 		return Result{Class: ClassInfrastructure, Marker: MarkerQuotaLikelyEmptyOutput, Source: src}
+	}
+	if src, ok := scanEventsForPaneNoise(workspace); ok {
+		return Result{Class: ClassUnknown, Marker: MarkerPaneNoiseOnly, Source: src}
 	}
 	return Result{Class: ClassIntegrityBreach}
 }
@@ -314,12 +321,26 @@ func driverExitedZero(workspace, phase string) bool {
 }
 
 func firstInfraMarker(workspace, logPath string) (marker string, ok bool) {
+	eachInfraEvent(logPath, func(ev infraEventEnvelope) bool {
+		m := ev.Data.Marker
+		if ev.Data.Excerpt != "" {
+			m = phasestream.InfraMarker(ev.Data.Excerpt)
+		}
+		if m == "" || isPromptEchoSelfReport(workspace, ev.Source.Phase, ev.Data.Excerpt) {
+			return false
+		}
+		marker, ok = m, true
+		return true
+	})
+	return marker, ok
+}
+
+func eachInfraEvent(logPath string, visit func(infraEventEnvelope) bool) {
 	f, err := os.Open(logPath)
 	if err != nil {
-		return "", false
+		return
 	}
 	defer func() { _ = f.Close() }()
-
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
 	for scanner.Scan() {
@@ -328,25 +349,13 @@ func firstInfraMarker(workspace, logPath string) (marker string, ok bool) {
 			continue
 		}
 		var ev infraEventEnvelope
-		if err := json.Unmarshal(line, &ev); err != nil {
+		if json.Unmarshal(line, &ev) != nil || ev.Kind != "infra_failure" {
 			continue
 		}
-		if ev.Kind != "infra_failure" {
-			continue
+		if visit(ev) {
+			return
 		}
-		marker := ev.Data.Marker
-		if ev.Data.Excerpt != "" {
-			marker = phasestream.InfraMarker(ev.Data.Excerpt)
-		}
-		if marker == "" || isPromptEchoSelfReport(workspace, ev.Source.Phase, ev.Data.Excerpt) {
-			continue
-		}
-		return marker, true
 	}
-	if err := scanner.Err(); err != nil {
-		return "", false
-	}
-	return "", false
 }
 
 func classifyFromRecord(workspace string) (Result, bool) {
@@ -383,4 +392,27 @@ func endingEntry(entries []phasetiming.Entry) (entry phasetiming.Entry, afterRet
 
 func sentinelPhase(source string) string {
 	return strings.TrimSuffix(filepath.Base(source), "-report.md")
+}
+
+func scanEventsForPaneNoise(workspace string) (string, bool) {
+	logs, err := globFn(filepath.Join(workspace, "*-events.ndjson"))
+	if err != nil {
+		return "", false
+	}
+	sort.Strings(logs)
+	for _, log := range logs {
+		if holdsPaneNoiseEvent(log) {
+			return filepath.Base(log), true
+		}
+	}
+	return "", false
+}
+
+func holdsPaneNoiseEvent(logPath string) bool {
+	found := false
+	eachInfraEvent(logPath, func(ev infraEventEnvelope) bool {
+		found = ev.Data.Marker != "" && ev.Data.Excerpt != "" && phasestream.InfraMarker(ev.Data.Excerpt) == ""
+		return found
+	})
+	return found
 }
