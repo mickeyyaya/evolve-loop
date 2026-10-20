@@ -61,7 +61,7 @@ type Adapter struct {
 func New() *Adapter {
 	return &Adapter{
 		engineFactory: func(env map[string]string) core.Bridge {
-			return gobridge.NewEngine(gobridge.Deps{Env: env})
+			return gobridge.NewEngine(gobridge.Deps{Env: env, TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(env))})
 		},
 		resolver: phasecontract.BuiltinResolver{},
 	}

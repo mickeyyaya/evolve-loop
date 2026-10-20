@@ -21,12 +21,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
 const routingDiscoveryTimeout = 30 * time.Second
 
 var routingDoctor = func(ctx context.Context) gobridge.DoctorReport {
-	rep, _ := gobridge.NewEngine(gobridge.Deps{}).Doctor(ctx, "", false)
+	rep, _ := gobridge.NewEngine(gobridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))}).Doctor(ctx, "", false)
 	return rep
 }
 

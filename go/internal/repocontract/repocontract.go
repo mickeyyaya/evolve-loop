@@ -58,6 +58,7 @@ var treeReadingSelections = []TestSelection{
 		"TestBootCLIUpdate_ASmokeFailureWithHealthyUsageStillHaltsTheLoop",
 		"TestBootCLIUpdate_ASmokeFailureWithOnlyArgonDrainedStillHaltsAndNamesTheWindow",
 		"TestBridgeEngineRootsAreEnumerated",
+		"TestBridgeEngineRoots_EachWiresATokenResolver",
 		"TestCLIUpdateWiring_ABootTimeoutWithADrainedWindowIsAVerifiedQuotaCauseAndBenchesUntilTheReset",
 		"TestCLIUpdateWiring_ABootTimeoutWithHealthyUsageStaysABootTimeout",
 		"TestCLIUpdateWiring_ASmokeFailureWhileTheFamilyIsDrainedIsAVerifiedQuotaCause",
