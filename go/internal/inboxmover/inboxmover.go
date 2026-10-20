@@ -299,8 +299,6 @@ func File(opts Options, raw []byte) (FileResult, error) {
 	return withMover(opts, func(m *lifecycle.Mover) (FileResult, error) { return m.File(raw) })
 }
 
-const RouteConsoleValue = lifecycle.RouteConsoleValue
-
 func RouteConsole(opts Options, taskID, reason string, cycle int) (RouteResult, error) {
 	return withMover(opts, func(m *lifecycle.Mover) (RouteResult, error) { return m.RouteConsole(taskID, reason, cycle) })
 }
