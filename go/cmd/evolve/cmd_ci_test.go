@@ -90,3 +90,29 @@ func TestRunComments_IsCommentauditMain(t *testing.T) {
 		}
 	}
 }
+
+func TestFileBaseRedItems_NamesEachNewItemOnStderrAndReportsAnUnreadableInbox(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	rep := ciwatch.ClassifyReport{Target: "run:7", RunID: 7, BaseSHA: "fedcba9876543210", Failures: []ciwatch.ClassifiedFailure{{
+		FailingTest: ciwatch.FailingTest{Package: "p", Test: "TestRed"}, Evidence: ciwatch.Evidence{BaseRed: ciwatch.FactYes, RerunGreen: ciwatch.FactNo},
+	}}}
+	var stderr bytes.Buffer
+	if err := fileBaseRedItems(root, rep, &stderr); err != nil || !strings.HasPrefix(stderr.String(), ciClassifyPrefix+"filed fix-first item "+ciwatch.BaseRedItemPrefix+"testred-") {
+		t.Fatalf("err %v stderr %q, want the new item named", err, stderr.String())
+	}
+	stderr.Reset()
+	if err := fileBaseRedItems(root, rep, &stderr); err != nil || stderr.Len() != 0 {
+		t.Errorf("second run: err %v stderr %q, want silence", err, stderr.String())
+	}
+	file := filepath.Join(t.TempDir(), "root")
+	if err := os.MkdirAll(filepath.Join(file, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(file, ".evolve", "inbox"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := fileBaseRedItems(file, rep, &stderr); err == nil {
+		t.Error("an unreadable inbox must be reported")
+	}
+}

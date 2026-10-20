@@ -12,20 +12,22 @@ import (
 )
 
 func baseRedReport() ClassifyReport {
-	failure := func(pkg, test string, baseRed Fact) ClassifiedFailure {
+	failure := func(pkg, test string, baseRed, rerunGreen Fact) ClassifiedFailure {
 		return ClassifiedFailure{
 			FailingTest: FailingTest{Package: pkg, Test: test, Jobs: []string{"test (ubuntu)"}},
-			Evidence:    Evidence{Touched: FactNo, BaseRed: baseRed, RecurredOnMain: FactUnknown, RerunGreen: FactUnknown},
+			Evidence:    Evidence{Touched: FactNo, BaseRed: baseRed, RecurredOnMain: FactUnknown, RerunGreen: rerunGreen},
 		}
 	}
 	return ClassifyReport{
 		Target: "pr:12", RunID: 501, RunURL: "https://ci/runs/501", Conclusion: "failure",
 		HeadSHA: "0123456789abcdef0123", BaseSHA: "fedcba9876543210fedc",
 		Failures: []ClassifiedFailure{
-			failure("example.com/m/internal/old", "TestOld_IsRedOnMain", FactYes),
-			failure("example.com/m/internal/new", "TestNew_IsThisChange", FactNo),
-			failure("example.com/m/internal/maybe", "TestMaybe", FactUnknown),
-			{FailingTest: FailingTest{Step: "make apicover-check", Jobs: []string{"build"}}, Evidence: Evidence{BaseRed: FactYes}},
+			failure("example.com/m/internal/old", "TestOld_IsRedOnMain", FactYes, FactNo),
+			failure("example.com/m/internal/new", "TestNew_IsThisChange", FactNo, FactNo),
+			failure("example.com/m/internal/maybe", "TestMaybe", FactUnknown, FactNo),
+			failure("example.com/m/internal/flaky", "TestFlaky_GreenOnRerun", FactYes, FactYes),
+			failure("example.com/m/internal/unrun", "TestUnrun_NoRerunYet", FactYes, FactUnknown),
+			{FailingTest: FailingTest{Step: "make apicover-check", Jobs: []string{"build"}}, Evidence: Evidence{BaseRed: FactYes, RerunGreen: FactNo}},
 		},
 	}
 }
@@ -74,6 +76,9 @@ func TestFileBaseRedItems_OneFixFirstItemPerBaseRedFailureAndNoneOnASecondRun(t 
 		if strings.Contains(it.Title, "TestNew") || strings.Contains(it.Title, "TestMaybe") {
 			t.Errorf("a failure that is not red on the base was filed: %+v", it)
 		}
+		if strings.Contains(it.Title, "TestFlaky") || strings.Contains(it.Title, "TestUnrun") {
+			t.Errorf("a failure that is not proven red on the head after a rerun was filed: %+v", it)
+		}
 	}
 	if test.ID == "" || !strings.HasPrefix(test.ID, BaseRedItemPrefix) || test.Source != BaseRedSource || test.Evidence != "https://ci/runs/501" {
 		t.Errorf("base-red item = %+v, want a %s item from %s that cites the run", test, BaseRedItemPrefix, BaseRedSource)
@@ -91,26 +96,33 @@ func TestFileBaseRedItems_OneFixFirstItemPerBaseRedFailureAndNoneOnASecondRun(t 
 	}
 }
 
-func TestFileBaseRedItems_AnItemThatACycleClaimedStillDeduplicates(t *testing.T) {
-	inbox := filepath.Join(t.TempDir(), "inbox")
-	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
-	if _, err := FileBaseRedItems(inbox, baseRedReport(), now); err != nil {
-		t.Fatal(err)
-	}
-	claimed := inboxbatch.ProcessingCycleDir(inbox, 7)
-	if err := os.MkdirAll(claimed, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	paths, _ := filepath.Glob(filepath.Join(inbox, "*.json"))
-	for _, p := range paths {
-		if err := os.Rename(p, filepath.Join(claimed, filepath.Base(p))); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	again, err := FileBaseRedItems(inbox, baseRedReport(), now.Add(time.Hour))
-	if err != nil || len(again) != 0 {
-		t.Errorf("filed %v (err %v) while a cycle holds the items, want none", again, err)
+func TestFileBaseRedItems_AnItemInAnyPendingFolderStillDeduplicates(t *testing.T) {
+	for name, folder := range map[string]func(inbox string) string{
+		"claimed by a cycle": func(inbox string) string { return inboxbatch.ProcessingCycleDir(inbox, 7) },
+		"waiting for retry":  func(inbox string) string { return filepath.Join(inbox, "retry") },
+		"quarantined":        func(inbox string) string { return filepath.Join(inbox, "quarantine") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			inbox := filepath.Join(t.TempDir(), "inbox")
+			now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+			if _, err := FileBaseRedItems(inbox, baseRedReport(), now); err != nil {
+				t.Fatal(err)
+			}
+			dest := folder(inbox)
+			if err := os.MkdirAll(dest, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			paths, _ := filepath.Glob(filepath.Join(inbox, "*.json"))
+			for _, p := range paths {
+				if err := os.Rename(p, filepath.Join(dest, filepath.Base(p))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			again, err := FileBaseRedItems(inbox, baseRedReport(), now.Add(time.Hour))
+			if err != nil || len(again) != 0 {
+				t.Errorf("filed %v (err %v) while the items are %s, want none", again, err, name)
+			}
+		})
 	}
 }
 

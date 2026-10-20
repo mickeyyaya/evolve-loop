@@ -139,8 +139,9 @@ func testMainIsolatesTmux(files map[string]*ast.File) bool {
 			if !ok || fn.Name.Name != "TestMain" || fn.Body == nil {
 				continue
 			}
+			temps := mkdirTempNames(fn.Body)
 			ast.Inspect(fn.Body, func(n ast.Node) bool {
-				tmpdir = tmpdir || osEnvCall(n, "Setenv", 2, "TMUX_TMPDIR")
+				tmpdir = tmpdir || (osEnvCall(n, "Setenv", 2, "TMUX_TMPDIR") && setsATempDir(n, temps))
 				unset = unset || osEnvCall(n, "Unsetenv", 1, "TMUX")
 				return true
 			})
@@ -149,9 +150,33 @@ func testMainIsolatesTmux(files map[string]*ast.File) bool {
 	return tmpdir && unset
 }
 
-func osEnvCall(n ast.Node, fn string, arity int, key string) bool {
+func mkdirTempNames(body *ast.BlockStmt) map[string]bool {
+	names := map[string]bool{}
+	ast.Inspect(body, func(n ast.Node) bool {
+		as, ok := n.(*ast.AssignStmt)
+		if !ok || len(as.Rhs) != 1 || len(as.Lhs) == 0 || !isOSCall(as.Rhs[0], "MkdirTemp") {
+			return true
+		}
+		if id, ok := as.Lhs[0].(*ast.Ident); ok {
+			names[id.Name] = true
+		}
+		return true
+	})
+	return names
+}
+
+func setsATempDir(n ast.Node, temps map[string]bool) bool {
 	call, ok := n.(*ast.CallExpr)
-	if !ok || len(call.Args) != arity {
+	if !ok || len(call.Args) != 2 {
+		return false
+	}
+	id, ok := call.Args[1].(*ast.Ident)
+	return ok && temps[id.Name]
+}
+
+func isOSCall(e ast.Expr, fn string) bool {
+	call, ok := e.(*ast.CallExpr)
+	if !ok {
 		return false
 	}
 	sel, ok := call.Fun.(*ast.SelectorExpr)
@@ -159,8 +184,16 @@ func osEnvCall(n ast.Node, fn string, arity int, key string) bool {
 		return false
 	}
 	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "os"
+}
+
+func osEnvCall(n ast.Node, fn string, arity int, key string) bool {
+	call, ok := n.(*ast.CallExpr)
+	if !ok || len(call.Args) != arity || !isOSCall(call, fn) {
+		return false
+	}
 	lit, isLit := call.Args[0].(*ast.BasicLit)
-	return ok && pkg.Name == "os" && isLit && lit.Value == `"`+key+`"`
+	return isLit && lit.Value == `"`+key+`"`
 }
 
 // acs-predicate: config-check
@@ -174,9 +207,12 @@ func TestC1801_004_NoCmdEvolveTestReachesTheHostTmuxReapers(t *testing.T) {
 			if !ok {
 				return true
 			}
-			if strings.HasSuffix(name, "_test.go") {
+			switch {
+			case strings.HasSuffix(name, "_test.go") && fn == "ExecReapOrphanSockets":
 				testRefs = append(testRefs, name+": swarm."+fn)
-			} else if name == "cmd_gc.go" {
+			case strings.HasSuffix(name, "_test.go"):
+				t.Errorf("%s references swarm.%s: a cmd/evolve test would reap host tmux sessions", name, fn)
+			case name == "cmd_gc.go":
 				ctorDefaults++
 			}
 			return true

@@ -20,6 +20,9 @@ func TestC813_001_GoWorkflowIntegrationTagPresent(t *testing.T) {
 	if !acsassert.FileMatchesRegex(t, workflow, `(?m)^\s+make test-integration\s*$`) {
 		t.Errorf("go.yml test step no longer runs `make test-integration` (the inline go test line moved there in 3efc783bb) — TestFleetSoak_AllFourInvariants (cmd/evolve, //go:build integration) would silently stop executing in CI")
 	}
+	if !acsassert.FileNotContains(t, workflow, "INTEGRATION_SET") {
+		t.Errorf("go.yml sets INTEGRATION_SET, so a CI job can narrow the integration packages below ./... while this predicate stays green")
+	}
 	makefile := filepath.Join(root, "go", "Makefile")
 	if !acsassert.FileMatchesRegex(t, makefile, `(?m)^INTEGRATION_TEST = \$\(GO\) test [^\n]*-race -count=1 [^\n]*-tags integration`) {
 		t.Errorf("go/Makefile INTEGRATION_TEST no longer runs `go test -race -count=1 ... -tags integration`")

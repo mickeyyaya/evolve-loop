@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -20,10 +21,12 @@ const (
 
 var nonSlugRun = regexp.MustCompile(`[^a-z0-9]+`)
 
+var pendingFolders = []string{"retry", "quarantine"}
+
 func FileBaseRedItems(inboxDir string, rep ClassifyReport, now time.Time) ([]string, error) {
 	var reds []ClassifiedFailure
 	for _, f := range rep.Failures {
-		if f.Evidence.BaseRed == FactYes {
+		if f.Evidence.BaseRed == FactYes && f.Evidence.RerunGreen == FactNo {
 			reds = append(reds, f)
 		}
 	}
@@ -52,7 +55,12 @@ func FileBaseRedItems(inboxDir string, rep ClassifyReport, now time.Time) ([]str
 
 func knownItemIDs(inboxDir string) (map[string]bool, error) {
 	known := map[string]bool{}
-	for _, dir := range append([]string{inboxDir}, inboxbatch.ProcessingCycleDirs(inboxDir)...) {
+	dirs := []string{inboxDir}
+	for _, folder := range pendingFolders {
+		dirs = append(dirs, filepath.Join(inboxDir, folder))
+	}
+	dirs = append(dirs, inboxbatch.ProcessingCycleDirs(inboxDir)...)
+	for _, dir := range dirs {
 		scan, err := inboxbatch.ScanDir(dir)
 		if err != nil {
 			return nil, fmt.Errorf("ciwatch: base-red dedup: %w", err)

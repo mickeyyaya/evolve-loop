@@ -175,7 +175,7 @@ func ciBaseRedItem(t *testing.T) inboxbatch.Item {
 	t.Helper()
 	inbox := t.TempDir()
 	rep := ciwatch.ClassifyReport{Target: "pr:7", RunID: 9, RunURL: "https://ci/runs/9", BaseSHA: "fedcba9876543210", Failures: []ciwatch.ClassifiedFailure{{
-		FailingTest: ciwatch.FailingTest{Package: "example.com/m/p", Test: "TestX"}, Evidence: ciwatch.Evidence{BaseRed: ciwatch.FactYes},
+		FailingTest: ciwatch.FailingTest{Package: "example.com/m/p", Test: "TestX"}, Evidence: ciwatch.Evidence{BaseRed: ciwatch.FactYes, RerunGreen: ciwatch.FactNo},
 	}}}
 	if _, err := ciwatch.FileBaseRedItems(inbox, rep, autofilerClock()); err != nil {
 		t.Fatal(err)
