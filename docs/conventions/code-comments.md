@@ -113,7 +113,7 @@ When a change alters the design or an invariant of a package, it updates the des
   - These still need code-simplifier and a reviewer: a symlink, a deletion, a `testdata/` fixture, a docs-only change, or anything that touches code, tests or personas.
   - The attestation of a waived commit records no reviewer and `review_waiver: "comment-only"`. Thus ship adds no `Reviewed-by:` trailer, and adds a `Review-waived: comment-only` trailer. That trailer tells it apart from a `--bypass-commit-gate` commit in `git log`. A denied waiver logs the reason.
 - `apicover -enforce -require-doc` lists the exported symbols of enforced packages that have no doc. It only reports. Its exit code counts untested symbols, not absent docs. An absent doc is the target, not a defect.
-- Console reviewers flag every comment that a diff adds, if it is not machine-read and not the enforced package doc (`.claude/agents/architecture-reviewer.md`, the three-book audit). The loop auditor reports each one as a LOW, advisory finding (`agents/evolve-auditor.md`, the review checklist line).
+- Console reviewers flag every comment that a diff adds, if it is not machine-read and not the enforced package doc (`.claude/agents/architecture-reviewer.md`, the three-book audit). The loop auditor reports each one as a LOW, advisory finding (the `## Audit Rules` block that `go/internal/phases/audit/audit_rules.go` renders into the audit prompt).
   - For loop lanes, the build handoff floor counts them at build exit with the same rule (`comment_floor`, batch 0b).
   - In `shadow`, the compiled default, it WARNs on the phase log.
   - Set `policy.json` `comment_floor.stage` to `enforce`, and a build that adds a comment gets a correction before its audit.
