@@ -31,7 +31,7 @@ Do not report "running" or "in progress" as a status without these numbers.
 - **Jobs that run for a long time**: after the launch, verify the health (exit codes, log tail). Make a checkpoint every cycle so that `--resume` works. Report failures immediately.
 - **Pre-commit review fleet**: change → code-simplifier → (**architecture-reviewer ∥ code-reviewer**, parallel, both read-only) → address the findings → commit.
   - architecture-reviewer ([.claude/agents/architecture-reviewer.md](.claude/agents/architecture-reviewer.md)) blocks the commit: you must fix each CRITICAL finding (by the rubric of the profile) before the commit.
-  - A pure-docs diff skips the architecture-reviewer, but not the commit gate. The commit gate still requires the simplify and review capabilities. One `code-review-simplify` diff-review pass covers both (ADR-0115).
+  - A pure-docs diff (every changed path ends in `.md`) gets a docs review, not a code review. Run the `docs-review` skill and pass `--reviewers docs-review`. The commit gate requires that capability, and the code reviewers do not satisfy it.
   - Only a proven comment removal needs no reviewer.
 
 ## Autonomous execution (bypass mode)

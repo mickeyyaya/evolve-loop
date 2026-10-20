@@ -112,7 +112,7 @@ func (o Options) reviewDecision(ctx context.Context, langs []string, res *Result
 	case waived != "":
 		res.log("reviewers not required: %s", waived)
 		return commentOnlyWaiver, ExitPass
-	case !o.reviewersSatisfied(langs, res):
+	case !o.requiredReviewSatisfied(o.listedChange(ctx), langs, res):
 		res.log("no review waiver: %s", refused)
 		return "", ExitFail
 	}

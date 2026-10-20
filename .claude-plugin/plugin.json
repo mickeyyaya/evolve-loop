@@ -40,6 +40,7 @@
     "./skills/code-review-simplify/",
     "./skills/commit/",
     "./skills/diff-review",
+    "./skills/docs-review/",
     "./skills/docs-write/",
     "./skills/engineering-craft/",
     "./skills/evaluator/",

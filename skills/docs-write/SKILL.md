@@ -84,7 +84,7 @@ The full rules are in docs/conventions/ste100-writing.md. The short form:
    - `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added`
    - each relative link resolves (`[text](path)` targets exist)
    - each `path:line` that you cite points at the code that you describe
-7. Run one review pass (`code-review-simplify`, ADR-0115), then the commit gate.
+7. Run one review pass with the [docs-review](../docs-review/SKILL.md) skill, then the commit gate with `--reviewers docs-review`.
 
 ## Red flags
 
