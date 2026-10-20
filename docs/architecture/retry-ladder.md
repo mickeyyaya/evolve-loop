@@ -115,10 +115,11 @@ The ladder serves the phases that produce a deliverable: build, tdd, scout, tria
 
 The raise reaches the dispatch through its own field, not the advisor overlay:
 
-- `PhaseRequest` carries the ladder rung beside `ModelRoutingCLI` and `ModelRoutingTier`.
+- `PhaseRequest` carries the ladder rung beside `ModelRoutingCLI` and `ModelRoutingTier`. L3 added its effort part, `ModelRoutingEffort`. The runner puts it into `llmroute.Overlay.Effort`, and the bridge sends it as `--effort` over the tier default. On agy-tmux, a ladder effort above the variant of the model name is capped, and the launch writes the requested and the granted effort ([internal-bridge](packages/internal-bridge.md)).
 - A new `cliroute` step runs after `overlayTier`. It applies the ladder tier and effort, ignores `modelFixed`, and clamps them to `max_tier` and `max_effort`.
 - The allowed set and the family floor (`profiles/family_floor.go`) still apply. A floor seat never goes below its floor.
 - `evolve cli-routing set` validates `max_tier` and `max_effort` when it compiles the table.
+- L4 built these four rules in `cliroute` (`applyLadder`, `clampLadder`) and in `evolve cli-routing set` (`--max-tier`, `--max-effort`). The rung reaches the router as `llmroute.Overlay.LadderTier` and `Overlay.Effort`. L5 sets them from the decider ([internal-cliroute](packages/internal-cliroute.md)).
 
 ## 6. The try record
 
@@ -135,7 +136,9 @@ Each dispatch writes one try record into `llm-calls.ndjson`. These fields are ne
 | `ladder_stage` | `shadow` or `enforce` |
 | `ladder_would` | at `shadow`, the rung that the decider chose |
 
-`attempt` counts every dispatch of the phase in the cycle, including the correction rounds. `evolve ladder report` reads the records of the run dirs and prints, for each rung and class, the tries, the fixes and the tokens.
+`attempt` counts every dispatch of the phase in the cycle, including the correction rounds.
+
+L0 writes these fields. Until L5 wires the decider, each try records `rung` `R0`, `context` `new` and `ladder_stage` `shadow`, and `failure_class`, `fingerprint` and `ladder_would` stay empty. `attempt` lives in the memory of the cycle run, so a resumed process starts it at 1 again. `served_model` is the transcript model of the try (`tokenusage.Result.ServedModel`), else the footer label that the launch model check verified, else empty ([internal-bridge](packages/internal-bridge.md)). `evolve ladder report` reads the records of the run dirs and prints, for each rung and class, the tries, the fixes and the tokens.
 
 ## 7. Policy
 

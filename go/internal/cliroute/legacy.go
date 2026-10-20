@@ -7,6 +7,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 )
 
 const (
@@ -41,8 +42,13 @@ func (v resolver) legacyDispatch(req Request) (Decision, error) {
 	}
 	plan := llmroute.Resolve(req.Agent, req.Phase, req.DefaultModel, req.Env, prof, req.Expand, pin)
 	plan.Candidates = leadWith(req.CallerCLI, plan.Candidates)
-	if pin == nil && (req.Overlay.CLI != "" || req.Overlay.Tier != "") {
-		plan = llmroute.ApplySoftOverlay(plan, req.Overlay, prof)
+	var clamped []string
+	if pin == nil && req.Overlay != (llmroute.Overlay{}) {
+		var ov llmroute.Overlay
+		if ov, clamped, err = clampLadder(req.Overlay, retryladder.Bounds{}.Resolved(), v.table.ladderBase(req.Agent, plan.Model)); err != nil {
+			return Decision{}, refused(req.Agent, err)
+		}
+		plan = llmroute.ApplySoftOverlay(plan, ov, prof)
 	}
 	if pin == nil || pin.CLI == "" {
 		plan = v.legacyUnlocked(req, prof, plan)
@@ -52,7 +58,7 @@ func (v resolver) legacyDispatch(req Request) (Decision, error) {
 	if err != nil {
 		return Decision{}, refused(req.Agent, err)
 	}
-	return Decision{Plan: toolPlan, Rule: rule, Allowed: prof.AllowedFamilies(), Trace: notes}, nil
+	return Decision{Plan: toolPlan, Rule: rule, Allowed: prof.AllowedFamilies(), Trace: slices.Concat(clamped, notes)}, nil
 }
 
 func (t Table) legacyPin(phase string, prof *profiles.Profile) (*policy.Pin, error) {

@@ -61,7 +61,7 @@ func moveOneProfileEffort(block policy.CLIRouting, p profileEffort, file string)
 		case current != "" && current != level:
 			return block, fmt.Errorf("%s: effort_level %q and cli_routing.agents.%s.effort %q differ: keep one", file, level, p.Name, current)
 		case current == "" && level != inherited:
-			block.Agents = withEntry(maps.Clone(block.Agents), p.Name, agentRuleWith(block.Agents[p.Name], nil, "", level))
+			block.Agents = withEntry(maps.Clone(block.Agents), p.Name, agentRuleWith(block.Agents[p.Name], routingSet{effort: level}))
 		}
 	}
 	table := efforts(block)

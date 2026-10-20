@@ -3,12 +3,16 @@
 package core
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 )
 
-func TestRecordAndBranch_AuditLeaseOnlyForShippableVerdict(t *testing.T) {
+func TestRecordAndBranch_AnAuditPassLeavesTheShipWindowFreeForASibling(t *testing.T) {
 	t.Parallel()
 
 	for _, verdict := range []string{VerdictFAIL, VerdictPASS, VerdictWARN} {
@@ -18,12 +22,17 @@ func TestRecordAndBranch_AuditLeaseOnlyForShippableVerdict(t *testing.T) {
 			cr.o = NewOrchestrator(&fakeStorage{}, led, buildRunners(nil))
 			root, ws := initBindingRepo(t, "cycle-5")
 			cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.cs.ActiveWorktree = root, ws, root
-			defer cr.releaseShipWindow()
 			if _, err := cr.recordAndBranch(PhaseAudit, dispatchResult{resp: PhaseResponse{Verdict: verdict}, attemptCount: 1}); err != nil {
 				t.Fatal(err)
 			}
-			if got, want := cr.shipLease != nil, verdict != VerdictFAIL; got != want {
-				t.Fatalf("audit %s holds ship lease=%v, want %v", verdict, got, want)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			sibling, err := shipwindow.Acquire(ctx, filepath.Join(root, ".evolve"), shipwindow.Options{OwnerPID: 1})
+			if err != nil {
+				t.Fatalf("audit %s: a sibling lane cannot take the ship window while this lane heads into its slow ship checks: %v", verdict, err)
+			}
+			if err := sibling.Release(); err != nil {
+				t.Fatal(err)
 			}
 			bound := false
 			for _, entry := range led.entries {
@@ -36,14 +45,6 @@ func TestRecordAndBranch_AuditLeaseOnlyForShippableVerdict(t *testing.T) {
 			}
 			if verdict == VerdictFAIL && len(cr.state.FailedAt) != 1 {
 				t.Fatalf("audit failure evidence lost: %+v", cr.state.FailedAt)
-			}
-			if verdict != VerdictFAIL {
-				if _, err := cr.recordAndBranch(PhaseShip, dispatchResult{resp: PhaseResponse{Verdict: VerdictPASS}, attemptCount: 1}); err != nil {
-					t.Fatal(err)
-				}
-				if cr.shipLease != nil {
-					t.Fatal("ship completion retained lease")
-				}
 			}
 		})
 	}

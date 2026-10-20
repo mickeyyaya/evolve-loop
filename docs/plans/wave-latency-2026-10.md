@@ -113,7 +113,11 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
   - at shadow, the admitted set is unchanged, and the shadow records the new admission.
   - the shadow records each held todo once for each holder in a pool run, with the package where the edit meets the reach;
   - at enforce, the supply census and the wave shadow count by the same rule as the pool.
-- **W1 status (2026-10-20):** shipped by lane cycle `ca763e7c2` (key `fleet.orchestrator.admission`, signal `LOOP_ORCH_ADMISSION_SHADOW`). A follow-up adds the once-for-each-pair shadow, its `reason` field, and the rule in the census and the wave shadow. W1b is pending (inbox item `wave-latency-w1b-ship-record-shared-edit-admissions`).
+- **W1 status (2026-10-20):** shipped by lane cycle `ca763e7c2` (key `fleet.orchestrator.admission`, signal `LOOP_ORCH_ADMISSION_SHADOW`). A follow-up adds the once-for-each-pair shadow, its `reason` field, and the rule in the census and the wave shadow. W1b is built (inbox item `wave-latency-w1b-ship-record-shared-edit-admissions`): see the next item.
+- **W1b:**
+  - at `enforce`, a lane that only the optimistic rule admits carries the holder of the reach rule in `EVOLVE_FLEET_REACH_HOLDER`, and the pool publishes `LOOP_ORCH_ADMISSION_OPTIMISTIC`;
+  - the first composed-gate failure or rebase conflict of that lane publishes one `LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED` with the todo, the holder and the gate;
+  - `evolve wave status` prints the failures over the admissions of the wave, which is the D3 rate. The composed-tree gate does not change.
 - **W4:**
   - with the week window at 14% and no lane-time measure, the builder chain starts with claude;
   - at 60% claude leaves the chain head;
@@ -131,5 +135,5 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 
 - The supply limit of F2.6 stays. Most of the inbox is console-owned, so a wider admission cannot fill slots that have no admissible work.
 - D1 trusts the composed-tree gate of the ship. A defect that the tests do not cover can still pass it.
-- The lease does not guarantee one ship at a time: a lane that cannot take it ships unleased. The pending item `ship-window-holds-only-the-rebase-and-push` must keep the composed-tree gate inside the leased window.
+- The lease does not guarantee one ship at a time: a lane whose context ends in the wait ships unleased. Since 2026-10-19 the ship phase holds the lease over the binding check and the push. A fleet-rebase recovery holds it over the rebase, the composed-tree gates and the re-ship ([internal-shipwindow](../architecture/packages/internal-shipwindow.md)).
 - The model time of D4 is an estimate from different tasks (F3.3).

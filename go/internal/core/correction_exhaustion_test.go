@@ -262,7 +262,7 @@ func resumedReview(t *testing.T, phase Phase, spec phasespec.PhaseSpec, verdictO
 		o.cfg.Mandatory = []string{"scout", "build", string(phase), "audit", "ship"}
 	}
 	cs := CycleState{CycleID: 21, WorkspacePath: t.TempDir(), CompletedPhases: []string{"scout", "build"}}
-	resp, err := o.reviewResumedDeliverable(context.Background(), t.TempDir(), 21, cs, phase, &fakeRunner{name: string(phase)}, PhaseRequest{}, PhaseResponse{Phase: string(phase), Verdict: VerdictPASS}, nil)
+	resp, err := o.reviewResumedDeliverable(context.Background(), t.TempDir(), 21, cs, phase, &fakeRunner{name: string(phase)}, PhaseRequest{}, PhaseResponse{Phase: string(phase), Verdict: VerdictPASS}, nil, (&cycleRun{}).countDispatch)
 	return o, rev, led, resp, err
 }
 

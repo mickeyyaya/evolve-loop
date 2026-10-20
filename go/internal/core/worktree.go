@@ -6,10 +6,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
@@ -213,7 +215,7 @@ func deleteCycleBranch(projectRoot, worktree string) {
 }
 
 func WorktreePhase(p Phase) bool {
-	return p == PhaseTDD || p == PhaseBuild || p == Phase("test-amplification")
+	return slices.Contains(phasecontract.SourceWriterPhases(), string(p))
 }
 
 func LeakRecoverablePhase(p Phase) bool {

@@ -17,6 +17,7 @@
 - With no headroom at R2, the decision carries `LADDER_NO_HEADROOM`. R0 goes to R1 and R1 stops. A bound that blocks the step records no signal.
 - A capability failure at R2 stops. It becomes `spec` with `LADDER_STOP_SPEC` when its fingerprint is an earlier one.
 - Unset bounds are `max_tier` deep and `max_effort` high.
+- `Context` and `Stage` name the try-record values of [spec §6](../retry-ladder.md#6-the-try-record). Until L5 wires the decider, the bridge writes `ContextNew` and `StageShadow` on each try.
 - `Input.Critic` is the rung of the shadow critic arm. `Decision.CriticRung` copies it and nothing reads it.
 
 ## Invariants

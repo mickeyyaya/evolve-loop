@@ -102,7 +102,7 @@
   "internal/core.Orchestrator.newCycleRun": 183,
   "internal/core.Orchestrator.planCycle": 215,
   "internal/core.Orchestrator.recordAuditBinding": 66,
-  "internal/core.Orchestrator.recoverFromShipError": 124,
+  "internal/core.Orchestrator.recoverShipErrorRoute": 74,
   "internal/core.Orchestrator.reviewResumedDeliverable": 58,
   "internal/core.Orchestrator.salvageDeliverable": 82,
   "internal/core.Orchestrator.scopedMergeCarryForward": 75,

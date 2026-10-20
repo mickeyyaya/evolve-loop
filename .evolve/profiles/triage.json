@@ -48,8 +48,6 @@
     "Bash(npm:*)",
     "Bash(pip:*)",
     "Bash(brew:*)",
-    "WebFetch",
-    "WebSearch",
     "Edit(skills/**)",
     "Edit(agents/**)",
     "Edit(scripts/**)",

@@ -39,7 +39,11 @@ func (cr *cycleRun) recoverBeforeReview(next Phase, dr *dispatchResult) error {
 
 func filterRealLeaks(leaked []string, exempt leakExemptions, warn io.Writer) (real []string, waived int) {
 	for _, p := range leaked {
-		if isLegitimateMainTreePath(p) || exempt.heldElsewhere(p) {
+		if isLegitimateMainTreePath(p) {
+			continue
+		}
+		if owner, held := exempt.heldElsewhere(p); held {
+			fmt.Fprintf(warn, "[orchestrator] WARN tree-diff: leaked path %q excused: %s holds it, not this lane\n", p, owner)
 			continue
 		}
 		if exempt.leased[p] {

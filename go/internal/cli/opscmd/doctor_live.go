@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
@@ -106,21 +107,44 @@ type liveOutcome struct {
 	asJSON              bool
 	rc                  int
 	pattern, scrollback string
+	servedModel         string
 	usage               *usageprobe.Evidence
 }
 
+const servedModelUnreported = "unreported"
+
+func servedModelLabel(rc int, model string) string {
+	switch {
+	case rc == bridge.ExitBadFlags:
+		return ""
+	case model == "":
+		return servedModelUnreported
+	default:
+		return model
+	}
+}
+
+func writeLiveJSON(stdout io.Writer, o liveOutcome, served string) {
+	buf, _ := json.MarshalIndent(struct {
+		Driver      string               `json:"driver"`
+		Model       string               `json:"model,omitempty"`
+		ServedModel string               `json:"served_model,omitempty"`
+		ExitCode    int                  `json:"exit_code"`
+		Healthy     bool                 `json:"healthy"`
+		Pattern     string               `json:"pattern,omitempty"`
+		Usage       *usageprobe.Evidence `json:"usage,omitempty"`
+	}{o.target.driver, o.target.model, served, o.rc, o.rc == bridge.ExitOK, o.pattern, o.usage}, "", "  ")
+	fmt.Fprintf(stdout, "%s\n", buf)
+}
+
 func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
-	target, asJSON, rc, pattern, scrollback, usage := o.target, o.asJSON, o.rc, o.pattern, o.scrollback, o.usage
-	if asJSON {
-		buf, _ := json.MarshalIndent(struct {
-			Driver   string               `json:"driver"`
-			Model    string               `json:"model,omitempty"`
-			ExitCode int                  `json:"exit_code"`
-			Healthy  bool                 `json:"healthy"`
-			Pattern  string               `json:"pattern,omitempty"`
-			Usage    *usageprobe.Evidence `json:"usage,omitempty"`
-		}{target.driver, target.model, rc, rc == bridge.ExitOK, pattern, usage}, "", "  ")
-		fmt.Fprintf(stdout, "%s\n", buf)
+	target, rc, pattern, scrollback, usage := o.target, o.rc, o.pattern, o.scrollback, o.usage
+	served := servedModelLabel(rc, o.servedModel)
+	if o.asJSON {
+		writeLiveJSON(stdout, o, served)
+	}
+	if served != "" {
+		fmt.Fprintf(stderr, "[doctor] served model: %s\n", served)
 	}
 
 	switch {
@@ -158,7 +182,7 @@ func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
 }
 
 func runDoctorLive(args []string, stdout, stderr io.Writer) int {
-	return runDoctorLiveWith(args, stdout, bridge.Deps{Stderr: stderr})
+	return runDoctorLiveWith(args, stdout, bridge.Deps{Stderr: stderr, TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))})
 }
 
 func runDoctorLiveWith(args []string, stdout io.Writer, deps bridge.Deps) int {
@@ -189,8 +213,8 @@ func runDoctorLiveWith(args []string, stdout io.Writer, deps bridge.Deps) int {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	rc, pattern, scrollback := bridge.LiveSmokeTest(ctx, target.driver, &bridge.Config{Workspace: ws, ProjectRoot: cwd, Model: target.model}, deps)
+	probe := bridge.LiveSmokeTest(ctx, target.driver, &bridge.Config{Workspace: ws, ProjectRoot: cwd, Model: target.model}, deps)
 
-	usage := doctorUsage(doctorRun{projectRoot: cwd, driver: target.driver, deps: deps}, rc)
-	return reportDoctorLiveResult(liveOutcome{target: target, asJSON: asJSON, rc: rc, pattern: pattern, scrollback: scrollback, usage: usage}, stdout, stderr)
+	usage := doctorUsage(doctorRun{projectRoot: cwd, driver: target.driver, deps: deps}, probe.RC)
+	return reportDoctorLiveResult(liveOutcome{target: target, asJSON: asJSON, rc: probe.RC, pattern: probe.Pattern, scrollback: probe.Scrollback, servedModel: probe.ServedModel, usage: usage}, stdout, stderr)
 }

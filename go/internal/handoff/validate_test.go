@@ -285,3 +285,26 @@ func TestParse_AcceptsEveryStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestIsCheckOnly_AFileWithACheckAndNoLedgerFieldsHasNoLedger(t *testing.T) {
+	cases := map[string]struct {
+		raw  string
+		want bool
+	}{
+		"the reviewer stub":            {`{"schema_version":1,"pair":"tdd-build","check":{"outcome":"error"}}`, true},
+		"a check alone":                {`{"check":{}}`, true},
+		"a ledger with a check":        {`{"schema_version":1,"pair":"tdd-build","entries":[],"check":{}}`, false},
+		"a ledger with only an author": {`{"pair":"tdd-build","author":{},"check":{}}`, false},
+		"an empty object":              {`{}`, false},
+		"a ledger without a check":     {`{"schema_version":1,"pair":"tdd-build"}`, false},
+		"not JSON":                     {`not json`, false},
+		"JSON null":                    {`null`, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := handoff.IsCheckOnly([]byte(tc.raw)); got != tc.want {
+				t.Errorf("IsCheckOnly(%s) = %v, want %v", tc.raw, got, tc.want)
+			}
+		})
+	}
+}

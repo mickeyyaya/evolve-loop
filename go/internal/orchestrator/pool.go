@@ -41,6 +41,7 @@ type Pool struct {
 	Stage       string
 	Window      *Window
 	Resupply    func(held []fleet.Todo) []fleet.Todo
+	Holders     *ReachHolders
 }
 
 var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
@@ -62,6 +63,9 @@ func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 		in = NewIntake(max(p.Target, 1))
 	}
 	next := p.Admit
+	if next != nil && p.Holders != nil {
+		next = p.Holders.gate(next)
+	}
 	if next != nil {
 		next = in.Gate(next)
 	}
@@ -94,11 +98,15 @@ func (p Pool) admissionWindow() func() int {
 	return p.Window.Size
 }
 
-func (p Pool) prepare(_ fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {
-	if p.Freshen == nil {
-		return spec, true
+func (p Pool) prepare(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {
+	if p.Freshen != nil {
+		fresh, ok := p.Freshen(spec)
+		if !ok {
+			return fresh, false
+		}
+		spec = fresh
 	}
-	return p.Freshen(spec)
+	return p.carryReachHolder(td, spec), true
 }
 
 func (p Pool) transition(t fleet.PoolTransition) {

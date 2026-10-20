@@ -72,6 +72,8 @@ func TestJSONKeys_MatchTheSpecSchema(t *testing.T) {
 		{"entry", handoff.Entry{}, []string{"ask", "evidence", "note", "status"}},
 		{"author", handoff.Author{}, []string{"cli", "model", "tier"}},
 		{"ledger", handoff.Ledger{}, []string{"author", "entries", "output_digest", "pair", "request_digest", "round", "schema_version"}},
+		{"checked ledger", handoff.Ledger{Check: &handoff.Check{}}, []string{"author", "check", "entries", "output_digest", "pair", "request_digest", "round", "schema_version"}},
+		{"check", handoff.Check{}, []string{"blocked", "errors", "failed_evidence", "outcome", "paths", "stage", "unmet"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

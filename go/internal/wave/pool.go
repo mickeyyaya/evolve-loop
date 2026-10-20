@@ -1,8 +1,10 @@
 package wave
 
 import (
+	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
@@ -11,18 +13,39 @@ import (
 const (
 	TerminationLaneDeadline = "lane deadline"
 	todoField               = "todo"
+	liveField               = "live"
 	deadlineStopped         = "stopped"
 )
 
-func poolLanes(f wavemeasure.Facts, events []signalcenter.Event) []wavemeasure.Lane {
+type loopRun struct {
+	pid      int
+	from, to time.Time
+}
+
+func loopRunOf(rec Record, next *Record) loopRun {
+	run := loopRun{pid: rec.PID, from: rec.StartedAt, to: runEnd(rec, next)}
+	if at, ok := gcpolicy.ParseLogRunID(rec.RunID); ok && at.Before(run.from) {
+		run.from = at
+	}
+	return run
+}
+
+func (r loopRun) holds(e signalcenter.Event) bool {
+	return (r.pid == 0 || e.PID == r.pid) && r.spans(eventTime(e))
+}
+
+func (r loopRun) spans(at time.Time) bool {
+	return !at.Before(r.from) && (r.to.IsZero() || !at.After(r.to))
+}
+
+func poolLanes(run loopRun, events []signalcenter.Event) []wavemeasure.Lane {
 	var lanes []wavemeasure.Lane
 	open := map[string][]int{}
 	for _, e := range events {
-		at := eventTime(e)
-		if !inRun(f, at) {
+		if !run.holds(e) {
 			continue
 		}
-		todo := e.Fields[todoField]
+		at, todo := eventTime(e), e.Fields[todoField]
 		switch e.Code {
 		case orchestrator.CodeLaneLaunched, orchestrator.CodeLaneBackfilled:
 			open[todo] = append(open[todo], len(lanes))
@@ -35,6 +58,17 @@ func poolLanes(f wavemeasure.Facts, events []signalcenter.Event) []wavemeasure.L
 		}
 	}
 	return lanes
+}
+
+func PoolLive(rec Record, next *Record, events []signalcenter.Event) (int, bool) {
+	run := loopRunOf(rec, next)
+	live, found := 0, false
+	for _, e := range events {
+		if n, err := strconv.Atoi(e.Fields[liveField]); err == nil && run.holds(e) {
+			live, found = n, true
+		}
+	}
+	return live, found
 }
 
 func ApplyLaneDeadlines(cycles []Cycle, events []signalcenter.Event) []Cycle {

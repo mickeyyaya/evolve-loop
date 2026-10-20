@@ -399,6 +399,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		bridge.SetModelCatalogDirFn(func() string { return d })
 	}
 	signals, closeSignals := newRoleSignalCenter(run.centerRole(), projectRoot, evolveDir, console)
+	watchOptimisticAdmission(signals, os.Getenv)
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
@@ -517,6 +518,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	if cfg.TopNGate != config.StageOff {
 		reviewers = append(reviewers, topngate.NewReviewer(cfg.TopNGate))
 	}
+	reviewers = append(reviewers, core.NewHandoffReviewer(pol.HandoffConfig(), handoffReviewCheck))
 	if len(reviewers) > 0 {
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))
 	}

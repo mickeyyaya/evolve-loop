@@ -83,6 +83,7 @@ type Options struct {
 	Signals             func() *signalcenter.Center
 	GitExec             sysexec.RunFunc
 	AttemptClock        func() time.Time
+	RetractOnFail       bool
 }
 
 type ContractVerifier interface {
@@ -106,6 +107,7 @@ type BaseRunner struct {
 	judge            *verdict.Engine
 	gitExec          sysexec.RunFunc
 	attemptClock     func() time.Time
+	retractOnFail    bool
 }
 
 func New(opts Options) *BaseRunner {
@@ -146,6 +148,7 @@ func New(opts Options) *BaseRunner {
 	b.signals = resolveSignals(opts)
 	b.verifyInjected = opts.VerifyFn != nil
 	b.gitExec, b.attemptClock = opts.GitExec, opts.AttemptClock
+	b.retractOnFail = opts.RetractOnFail
 	if b.gitExec == nil {
 		b.gitExec = sysexec.DefaultRunner
 	}
@@ -173,6 +176,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	if err != nil {
 		return failedPhase(early, err)
 	}
+	retractable := b.takeRetraction(ctx, req)
 	dispatchResult := b.dispatchPhaseAttempts(ctx, req, prep, dispatchPlan)
 	if errors.Is(dispatchResult.bridgeErr, bridgechain.ErrUnlaunched) {
 		return b.unlaunchedFailure(req, prep, dispatchResult)
@@ -181,7 +185,8 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 
 	d := dispatchOf(req, prep, dispatchPlan, dispatchResult)
 	b.performHostEffects(ctx, d)
-	return b.judge.Judge(ctx, d, b.classifyWith(req, d, dispatchResult.skills))
+	resp, err := b.judge.Judge(ctx, d, b.classifyWith(req, d, dispatchResult.skills))
+	return retractable.apply(context.WithoutCancel(ctx), prep.phase, prep.artifactPath, req.Workspace, resp), err
 }
 
 func failedPhase(early *core.PhaseResponse, err error) (core.PhaseResponse, error) {

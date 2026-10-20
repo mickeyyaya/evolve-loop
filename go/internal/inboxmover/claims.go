@@ -130,7 +130,11 @@ func ReleaseStaleClaims(opts Options, reason string) ([]ClaimRelease, error) {
 }
 
 func releaseHeld(opts Options, taskID string, loc Location, holder Holder, reason string, release claimReleaser) (ClaimRelease, error) {
-	res, err := release(opts.mover(), taskID, loc, reason)
+	m, err := opts.mover()
+	if err != nil {
+		return ClaimRelease{}, err
+	}
+	res, err := release(m, taskID, loc, reason)
 	if err != nil {
 		return ClaimRelease{}, err
 	}
@@ -157,5 +161,5 @@ const (
 )
 
 func AbsorbRootCopies(opts Options) ([]Absorbed, error) {
-	return opts.mover().AbsorbRootCopies()
+	return withMover(opts, func(m *lifecycle.Mover) ([]Absorbed, error) { return m.AbsorbRootCopies() })
 }

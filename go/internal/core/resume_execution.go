@@ -58,6 +58,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		cs: cs, state: state, result: result,
 	}
 	r.closeout = timingOwner
+	defer o.releaseShipWindow()
 	defer func() {
 		if completed || errors.Is(retErr, ErrAllFamiliesExhausted) || ctx.Err() != nil {
 			return
@@ -79,10 +80,8 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 
 	cursor := newResumeCursor(startPhase)
 	shipRecoveries := 0
-	maxIterations := o.maxPhaseIterations
-	if maxIterations <= 0 {
-		maxIterations = defaultMaxPhaseIterations
-	}
+	dispatches := map[Phase]int{}
+	maxIterations := o.phaseIterationLimit()
 	for safety := 0; safety < maxIterations; safety++ {
 		next, err := cursor.next(o, cs, req.ProjectRoot)
 		if err != nil {
@@ -146,7 +145,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			Signals:                         dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
 		}
 		phaseReq = o.withWorktreeFence(phaseReq, next, cs)
-		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig, checkout: r.checkoutDecision(), recoveryDepth: shipRecoveries}
+		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig, checkout: r.checkoutDecision(), recoveryDepth: shipRecoveries, phaseDispatches: dispatches}
 		dispatch.applyDispatchPolicy(next, &phaseReq)
 		if next != PhaseBuild {
 			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)
@@ -163,12 +162,13 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		if err != nil {
 			dispatch.result, dispatch.phaseTimings = result, phaseTimings
-			if routed, recovered := dispatch.recoverResumedShip(next, err, resp, attempts); recovered {
+			routed, recovered, shipErr := dispatch.recoverResumedShip(next, err, resp, attempts)
+			if recovered {
 				cs, result, phaseTimings, shipRecoveries = dispatch.cs, dispatch.result, dispatch.phaseTimings, dispatch.recoveryDepth
 				cursor.rerouteFromShip(routed)
 				continue
 			}
-			phaseErr := fmt.Errorf("phase %s: %w", next, err)
+			phaseErr := fmt.Errorf("phase %s: %w", next, shipErr)
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
 			return result, phaseErr
 		}
@@ -178,7 +178,12 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			return result, ferr
 		}
 		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
-		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, phaseBaseline)
+		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, phaseBaseline, dispatch.countDispatch)
+		var blocked resumedBlocker
+		if errors.As(err, &blocked) {
+			result, phaseTimings = dispatch.endResumeOnBlocker(next, &dispatchResult{resp: resp, attemptCount: attempts, phaseReq: phaseReq}, blocked.diag, result, phaseTimings, &cursor)
+			break
+		}
 		if errors.Is(err, ErrAllFamiliesExhausted) {
 			pauseOnQuotaWall()
 			return result, err

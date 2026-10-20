@@ -94,7 +94,7 @@ func (c Census) Count() (Supply, error) {
 		s.Counts[class] = 0
 	}
 	for _, w := range scan.Warnings {
-		s.Warnings = append(s.Warnings, w.Text)
+		s.Warnings = append(s.Warnings, w.String())
 	}
 	protected := s.refuse(menu.Console, menu.ConsoleReasons, consoleClass)
 	s.refuse(menu.Waiting, menu.WaitingReasons, func(string) string { return ClassWaitingDeps })

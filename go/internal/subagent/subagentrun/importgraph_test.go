@@ -9,9 +9,11 @@ import (
 )
 
 var allowedImports = map[string]bool{
-	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate":   true,
-	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli":    true,
-	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter": true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock": true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate":     true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli":      true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgertip":      true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter":   true,
 }
 
 func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
@@ -34,7 +36,7 @@ func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
 			switch {
 			case allowedImports[path]:
 			case strings.Contains(path, "/internal/"):
-				t.Errorf("%s imports %s: the dispatcher is a leaf — stdlib plus the three declared packages only", name, path)
+				t.Errorf("%s imports %s: the dispatcher is a leaf — stdlib plus the five declared packages only", name, path)
 			case strings.Contains(strings.SplitN(path, "/", 2)[0], "."):
 				t.Errorf("%s imports third-party %s: stdlib only", name, path)
 			}

@@ -20,13 +20,7 @@ func TestNativeRetrospectiveLessonBoundary(t *testing.T) {
 	for _, role := range []string{"retrospective", "builder"} {
 		t.Run(role, func(t *testing.T) {
 			fx := newFixture(t, "claude-p", "")
-			profile, err := os.ReadFile(filepath.Join("..", "..", "..", ".evolve", "profiles", role+".json"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(fx.profile, profile, 0600); err != nil {
-				t.Fatal(err)
-			}
+			stageRealProfile(t, fx.profile, role)
 			root := t.TempDir()
 			wt := filepath.Join(root, "worktree")
 			lesson := filepath.Join(root, ".evolve", "instincts", "lessons", "fixture.yaml")
@@ -88,13 +82,7 @@ func TestNativeDecisionProfileOwnedCWD(t *testing.T) {
 		for _, active := range []bool{false, true} {
 			t.Run(role+map[bool]string{false: "/workspace", true: "/worktree"}[active], func(t *testing.T) {
 				fx := newFixture(t, "claude-p", "")
-				body, err := os.ReadFile(filepath.Join("..", "..", "..", ".evolve", "profiles", role+".json"))
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(fx.profile, body, 0600); err != nil {
-					t.Fatal(err)
-				}
+				stageRealProfile(t, fx.profile, role)
 				root := t.TempDir()
 				cwd := fx.ws
 				if active {

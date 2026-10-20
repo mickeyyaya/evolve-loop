@@ -231,14 +231,14 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 				t.Fatal("bug-reproduction require_sections missing Reproduction / Verification")
 			}
 		}},
-		{"wave1-bugfix.sh/both-optional-not-writes-source", func(t *testing.T) {
-			for _, n := range []string{"fault-localization", "bug-reproduction"} {
+		{"wave1-bugfix.sh/both-optional-only-the-reproducer-writes-source", func(t *testing.T) {
+			for n, wantWriter := range map[string]bool{"fault-localization": false, "bug-reproduction": true} {
 				s := readPhaseSpec(t, cat, n)
 				if !s.Optional {
 					t.Fatalf("%s optional != true", n)
 				}
-				if s.WritesSource {
-					t.Fatalf("%s writes_source != false", n)
+				if s.WritesSource != wantWriter {
+					t.Fatalf("%s writes_source = %v, want %v", n, s.WritesSource, wantWriter)
 				}
 			}
 		}},

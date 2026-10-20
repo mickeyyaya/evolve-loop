@@ -22,7 +22,7 @@ description: Use after audit returns Verdict PASS. Atomic git commit + ledger up
 
 | Step | Action | Exit criteria |
 |---|---|---|
-| 1 | Verify audit verdict = PASS (or WARN without `workflow.strict_audit`). `evolve ship` checks the audit binding itself (`go/internal/phases/ship/audit.go`) | Binding check passes |
+| 1 | Verify audit verdict = PASS, or a WARN that the WARN rule of `go/internal/phases/audit/audit_rules.go` lets ship. `evolve ship` checks the audit binding itself (`go/internal/phases/ship/audit.go`) | Binding check passes |
 | 2 | Run `evolve release-consistency <version>` for consistency check | Markers consistent |
 | 3 | Run `evolve ship --class cycle "<commit message>"` | Atomic commit created. Only the `evolve release` path makes a tag |
 | 4 | Verify ledger entry added | `kind: "ship"` with cycle binding |

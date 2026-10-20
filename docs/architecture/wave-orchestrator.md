@@ -142,7 +142,11 @@ When the admissible count is below the window, the census publishes `LOOP_ORCH_S
 - The **lane part** keeps the files that are not protected and the criteria that name only those files. It has `deps` on the console part when it needs the console part first.
 - A criterion that names no file judges the whole item, so both parts keep it.
 
-**State: Built (O2c, 2026-10-18).** `evolve inbox split <id>` and the pure package `internal/inboxsplit` exist. The census that calls `inboxsplit.Proposals` is part of O6 and is not built yet. Until then, the command computes the proposal from the pending item when the console runs it. Package note: [internal-inboxsplit.md](packages/internal-inboxsplit.md).
+**State: Built (O2c, 2026-10-18).** `evolve inbox split <id>` and the pure package `internal/inboxsplit` exist.
+
+**The census call is built (O6, 2026-10-20).** The census calls `inboxsplit.Proposals` through `splitProposer` (`cmd_supply_split.go`). It uses the protected judge of `evolve inbox split` (`splitForbidden`), so both divide the files of an item the same way. The command can still refuse a proposal: it refuses an item that another pending item depends on (`ErrHasDependents`). The census writes the proposals into the supply record, and `evolve wave supply` prints them. The census never splits an item.
+
+Package note: [internal-inboxsplit.md](packages/internal-inboxsplit.md).
 
 **The fix of 2026-10-18.** The split refuses an item whose text names a protected path or a console file. It refuses a part with no criterion. A lane part that only verifies waits for the console part.
 
@@ -171,7 +175,7 @@ The census builds on the lane menu of `inboxmover.RankLaneMenu`, the same menu a
 - The ready items go to `admission.Admitter` in rank order, with the lanes in flight as holdings. An item that conflicts with an earlier admitted item is `waiting_cell`, as in §6 step 7.
 - With no module graph, every ready item is `admissible`, and the record holds a warning.
 
-The registry spells the event `orchestrator.supply` as `LOOP_ORCH_SUPPLY`, because a code must match `MODULE_SNAKE_CASE`. The proposal step is a function value. A nil value proposes nothing. The wiring to `inboxsplit.Proposals` waits for PR #959. Until then, the loop and `evolve wave supply` pass a nil value, and the proposals stay empty.
+The registry spells the event `orchestrator.supply` as `LOOP_ORCH_SUPPLY`, because a code must match `MODULE_SNAKE_CASE`. The proposal step is a function value. A nil value proposes nothing. The loop and `evolve wave supply` pass `splitProposer`, which calls `inboxsplit.Proposals` (2026-10-20).
 
 **The directory rule (built, O2b, 2026-10-17; amended, 2026-10-18).** A declared directory routes to the console only when it lies inside a protected fragment (ADR-0139 decision 5). Thus `files: ["go/internal/core/"]` is lane work.
 
@@ -496,6 +500,8 @@ The facts:
 - **The one exception to "reads state and signals".** `wave status` reads the mtime of the loop log for the run end. It reads the metadata only, never the text. A live run ends at the clock.
 - **A lane interval.** When the run has pool signals, the pool gives each interval. A `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens a lane, and the next `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it (`wave.MeasureFacts`). The cycles then give only `landed` and the conflicts.
   - Why: a lane that the lease stops at its deadline has no `cycle.sealed`. In wave 130 the cycles 1955 and 1957 thus stayed in flight, and `wave status` printed `width 3/4 · utilization 0.83` while the pool ran 1 lane of 4. The pool signals give `width 1/4` (`TestWaveStatus_Wave130CountsTheLiveLanesFromThePool`).
+  - The pool signals of a run have the `pid` of the wave record. Their time is from the run ID to the run end (`wave.loopRunOf`). `wave next` writes the record after the loop starts. In wave 137 the three first lanes launched at 06:41:09Z, and `started_at` is 06:41:11.72Z. A cutoff at `started_at` dropped them, and `wave status` printed `width 0/4` with a lane live. The match by `pid` gives `width 2/4` (`TestWaveStatus_Wave137CountsTheLanesThatLaunchedBeforeTheRecord`).
+  - The measure clips each lane to the run window.
   - A run with no pool signals uses the span of the cycle's signals: from the first event to `cycle.sealed`. The phase times of the cycle dossier widen it. A lane with no seal and no dossier is in flight, and it ends at the end of the run window.
 - **The sized width.** The loop writes one INFO `loop.wave` record at each sizing, with `fields.width_sized` and `fields.desired`, to `.evolve/signals.ndjson`. Before O7, no record held the sized width. The loop log has the line `wave count X -> Y`, but `wave status` reads state and signals, never the text log. A run from before O7 thus shows `width_source: policy`.
 

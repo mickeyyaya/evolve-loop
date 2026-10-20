@@ -119,7 +119,6 @@ func TestRecordAndBranch_AuditFAILRecordsFloorFailure(t *testing.T) {
 	t.Parallel()
 
 	cr := retroGateHarness(t, phasespec.Catalog{})
-	defer cr.releaseShipWindow() // audit acquires the ship-window lease; free it + its heartbeat
 
 	dr := dispatchResult{resp: PhaseResponse{
 		Verdict:     VerdictFAIL,
@@ -148,7 +147,6 @@ func TestRecordAndBranch_AuditPASSDoesNotRecord(t *testing.T) {
 	t.Parallel()
 
 	cr := retroGateHarness(t, phasespec.Catalog{})
-	defer cr.releaseShipWindow()
 
 	dr := dispatchResult{resp: PhaseResponse{Verdict: VerdictPASS}, attemptCount: 1}
 	if _, err := cr.recordAndBranch(PhaseAudit, dr); err != nil {

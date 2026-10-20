@@ -6,6 +6,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -28,6 +29,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -62,6 +64,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -96,6 +99,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -131,6 +135,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -160,6 +165,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -187,6 +193,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -216,6 +223,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -254,6 +262,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",
@@ -291,6 +300,7 @@
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
         "diff --cached --name-only [capture]",
+        "diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
         "diff --cached --shortstat [capture]",

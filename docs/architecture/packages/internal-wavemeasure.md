@@ -14,19 +14,24 @@
 - **No NaN.** Each ratio has a guard for a zero denominator: no landed lane, a sized width of 0, or a run time of 0. Each such ratio is 0, so the JSON always encodes.
 - **A lane with no start is not a lane.** A cycle with no signal and no dossier phase has no interval. It is out of the width and the busy time, but it still counts in `landed` when it shipped.
 - **The supply is a copy.** `Facts.Supply` holds the six class counts of the last census of the run. `orchestrator.Supply.Measure` builds it. `Compute` copies it into `Measures.Supply`, and the JSON key `supply` is absent when the run has no census (`TestCompute_CarriesACopyOfTheClassCountsOfTheLastCensusAndOmitsAbsentOnes`). The census is in [internal-orchestrator.md](internal-orchestrator.md). `wave status` reads the record `.evolve/waves/supply.json` and takes the last census inside the run (`TestWaveStatus_ReportsTheSupplyOfTheLastCensusOfEachRun`).
-- **The JSON names are a contract.** `TestMeasures_TheJSONFieldNamesAreStable` pins the seven keys. The constants `FieldWidthSized` and `CodeAdmitWait` are the names that the writer and the reader share.
+- **The optimistic failure rate (ADR-0143 W1b).** `Facts.OptimisticAdmissions` and `Facts.OptimisticFailures` give `optimistic_failure_rate`. It is the failures over the admissions, or 0 with no admission. It is the D3 rate of the wave-latency plan. Pinned by `TestCompute_TheOptimisticFailureRateIsFailuresOverAdmissions`.
+
+  `wave.MeasureFacts` counts each todo once, over the same loop run as the pool lanes (`loopRun`: from the run-id time to the run end). An admission is a todo with an optimistic launch by the run loop pid. A failure is an admitted todo that failed in that window. The lane process has its own pid, so a failure matches by time only. Thus the rate stays in [0,1], and a lane launched before `started_at` counts. Pinned by `TestMeasureFacts_AFailureCountsOnlyWhenItsAdmissionIsCounted` and `TestMeasureFacts_TheOptimisticCountsUseThePoolLaneWindowOfTheRunLoop`.
+- **The JSON names are a contract.** `TestMeasures_TheJSONFieldNamesAreStable` pins the ten keys. The constants `FieldWidthSized` and `CodeAdmitWait` are the names that the writer and the reader share.
 
 ## Where the facts come from
 
 | Fact | Writer | Reader |
 |---|---|---|
-| the lane interval | the pool: `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens it, and `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it | `wave.MeasureFacts` over `wave.ReadLoopSignals` |
+| the lane interval | the pool: `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens it, and `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it. Only the signals of the wave loop count. They have the `pid` of the record and a time from the run ID (`gcpolicy.ParseLogRunID`) to the run end. | `wave.MeasureFacts` over `wave.ReadLoopSignals` |
+| the live lanes now | `fields.live` of the latest pool signal of the wave loop | `wave.PoolLive`, shown as `pool:    live N` |
 | the lane interval, in a run with no pool signals | the cycle's signals (`.evolve/runs/cycle-N/signals.ndjson`), widened by the dossier phase times | `wave.ReadCycles` (`Cycle.StartedAt`, `Cycle.EndedAt`) |
 | a deadline stop | the lease: `LOOP_ORCH_LANE_DEADLINE` with `action: stopped` | `wave.ApplyLaneDeadlines`. It finds the unsealed cycle of that todo (`lane-scope.json`) that started last before the stop. It sets `Termination: lane deadline` and ends the cycle at the stop. |
 | `Conflict` | ship: `recoverFromShipError` calls `recordShipError` before it recovers. Each ship error thus emits a `ship.error` with the code `SHIP_` plus the error code | `wave.ReadCycles` (`Cycle.Conflict`) |
 | `Landed` | the landing intent or the dossier commit | `wave.ReadCycles` (`Cycle.Shipped`) |
 | the sized width | the loop: one INFO `loop.wave` record at each sizing (`recordWaveSized` in `cmd/evolve`) | `wave.MeasureFacts` over `wave.ReadLoopSignals` |
 | `AdmissionWaits` | the orchestrator (O3) | `wave.MeasureFacts`, by the string `LOOP_ORCH_ADMIT_WAIT`. PR #925 (O3) is not on main yet, so no registered code exists. When it lands, the reader takes the registered constant. |
+| `OptimisticAdmissions`, `OptimisticFailures` | the pool publishes `LOOP_ORCH_ADMISSION_OPTIMISTIC` when it launches an optimistic-only lane. That lane publishes `LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED` at its first composed-gate failure or rebase conflict | `wave.MeasureFacts` over `wave.ReadLoopSignals` |
 
 `internal/loopwave` does not write the sizing record. Its import guard keeps it a leaf, so `cmd/evolve` writes the record through `loopwave.EmitWave`.
 
@@ -43,6 +48,7 @@ The ship phase has no code named `REBASE_CONFLICT`. Its code is `GIT_FLEET_REBAS
 - An empty run gives zeros, not NaN (`TestCompute_AnEmptyRunGivesZerosNotNaN`).
 - A lane that rebased and then landed counts one conflict (`TestReadCycles_ALaneThatRebasedAndThenLandedCountsOneConflict`).
 - The pool signals give the lane intervals, and the cycles give only `landed` and the conflicts (`TestMeasureFacts_ThePoolSignalsGiveTheLaneSpans`).
+- A lane that the wave loop launched before the record counts. A signal of another `pid` or from before the run ID does not count (`TestMeasureFacts_ThePoolLanesOfTheRunLoopCountFromTheRunIDTime`). The wave 137 signals give `width 2/4` and `pool:    live 1` (`cmd/evolve` `TestWaveStatus_Wave137CountsTheLanesThatLaunchedBeforeTheRecord`).
 - A deadline stop stops the unsealed cycle of that todo that started last before the stop. A `recorded` action stops nothing (`TestApplyLaneDeadlines_AStoppedLaneStopsTheCycleThatRanIt`).
 - The wave 130 signals give `width 1/4`, and the cycles 1955 and 1957 show as stopped (`cmd/evolve` `TestWaveStatus_Wave130CountsTheLiveLanesFromThePool`).
 - The command reports the rate end to end (`cmd/evolve` `TestWaveStatus_ReportsTheConflictRate`), and the loop writes one sizing record for each wave (`TestDispatchFleetIteration_RecordsTheSizedWidth`).

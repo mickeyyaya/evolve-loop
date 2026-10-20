@@ -27,13 +27,13 @@ func TestLeakRecoverablePhase_ExcludesPhasesWithoutAnActiveWorktree(t *testing.T
 func TestWorktreePhase_UnchangedByRecoveryDecoupling(t *testing.T) {
 	t.Parallel()
 
-	mustBeTrue := []Phase{PhaseTDD, PhaseBuild, Phase("test-amplification")}
+	mustBeTrue := []Phase{PhaseTDD, PhaseBuild, Phase("test-amplification"), Phase("bug-reproduction")}
 	for _, p := range mustBeTrue {
 		if !WorktreePhase(p) {
 			t.Errorf("WorktreePhase(%q) = false, want true", p)
 		}
 	}
-	mustBeFalse := []Phase{PhaseTriage, PhaseAudit, PhaseScout, Phase("bug-reproduction"),
+	mustBeFalse := []Phase{PhaseTriage, PhaseAudit, PhaseScout, Phase("fault-localization"),
 		PhaseShip, PhaseRetro, PhaseEnd, PhaseStart, PhaseIntent}
 	for _, p := range mustBeFalse {
 		if WorktreePhase(p) {

@@ -415,7 +415,7 @@ func TestRunFleet_PublishesTheLanesPendingCloseoutsInItsWorkingTree(t *testing.T
 	t.Cleanup(func() { _ = os.Chdir(wd) })
 	var stdout, stderr bytes.Buffer
 
-	code := runFleet([]string{"--count", "1", "--goal-hash", "fleet-publish"}, strings.NewReader(""), &stdout, &stderr)
+	code := runFleet([]string{"--count", "1", "--goal-hash", "fleet-publish", "--simulate"}, strings.NewReader(""), &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("runFleet = %d, want 0; stderr=%s", code, stderr.String())

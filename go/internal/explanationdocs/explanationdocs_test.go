@@ -857,6 +857,13 @@ func TestRecoverRebaseSplit_RecognizesNewMarkerWithOldApprovedSnapshot(t *testin
 	if err != nil || !recoverable || got != newBase {
 		t.Fatalf("second RecoverRebaseSplit base=%q recoverable=%v err=%v, want %q/true/nil", got, recoverable, err, newBase)
 	}
+
+	unclean := rebased
+	unclean.Workspace += string(filepath.Separator) + "."
+	got, recoverable, err = RecoverRebaseSplit(context.Background(), unclean)
+	if err != nil || !recoverable || got != newBase {
+		t.Fatalf("RecoverRebaseSplit with an unclean workspace path base=%q recoverable=%v err=%v, want %q/true/nil", got, recoverable, err, newBase)
+	}
 }
 
 func TestSameView_UsesCompleteValue(t *testing.T) {

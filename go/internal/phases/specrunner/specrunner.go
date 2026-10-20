@@ -179,6 +179,7 @@ func New(spec phasespec.PhaseSpec, c Config) *Phase {
 			HostEffects:      c.HostEffects,
 			Prompts:          c.Prompts,
 			NowFn:            c.NowFn,
+			RetractOnFail:    spec.RetractOnFail,
 		}),
 	}
 }

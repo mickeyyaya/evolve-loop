@@ -76,3 +76,11 @@ func TestDeciderExportsAreNamed(t *testing.T) {
 		t.Fatalf("Resolved = %+v", r)
 	}
 }
+
+func TestTryRecordVocabularyIsNamed(t *testing.T) {
+	var tryContext retryladder.Context = retryladder.ContextNew
+	var stage retryladder.Stage = retryladder.StageShadow
+	if tryContext != "new" || stage != "shadow" {
+		t.Fatalf("context %q stage %q, want new and shadow as spec section 6 spells them", tryContext, stage)
+	}
+}

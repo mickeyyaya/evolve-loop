@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
@@ -32,9 +31,7 @@ func readRankedBacklog(evolveDir string, isProtected func(string) bool, now time
 	for _, w := range append(warnings, inboxrank.ClassWarnings(queue, rank.Config)...) {
 		fmt.Fprintf(loopLog, "[triagecap] WARN inbox rank: %s\n", w)
 	}
-	ranked := slices.DeleteFunc(inboxmover.RankLaneMenu(lifecycle, queue, isProtected, rank).Ranked, func(r inboxrank.Ranked) bool {
-		return r.Item.IDFromFileName
-	})
+	ranked := inboxmover.RankLaneMenu(lifecycle, queue, isProtected, rank).Ranked
 	candidates := make([]FleetCandidate, len(ranked))
 	for i, r := range ranked {
 		candidates[i] = FleetCandidate{ID: r.Item.ID, Weight: r.Item.Weight, Files: r.Item.Files}

@@ -242,7 +242,7 @@ func RecoverRebaseSplit(ctx context.Context, binding CycleBinding) (newBaseSHA s
 		return "", false, err
 	}
 	if marker.ContractVersion != binding.ContractVersion || marker.Cycle != binding.Cycle || marker.RunID != binding.RunID ||
-		filepath.Clean(marker.Workspace) != filepath.Clean(binding.Workspace) || filepath.Clean(marker.Worktree) != filepath.Clean(binding.Worktree) {
+		!sameWorkspacePath(marker.Workspace, binding.Workspace) || filepath.Clean(marker.Worktree) != filepath.Clean(binding.Worktree) {
 		return "", false, nil
 	}
 	if err := validateBaseCommit(ctx, binding.Worktree, marker.BaseSHA); err != nil {

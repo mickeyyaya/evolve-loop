@@ -18,6 +18,7 @@ const (
 )
 
 var serialTests = map[string]string{
+	"ship.TestPhase_TheRepoContractPackRunsOutsideTheShipWindow":                  seamRepoContract,
 	"ship.TestAppendQuarantineManifestCoverfix_AnEncodingFailureLeavesNoManifest": seamMarshalIndent,
 	"ship.TestRepairSelfSHAPinCoverfix_AnUnlocatableExecutableDeclines":           seamExecutable,
 	"ship.TestRepinPostCycleCoverfix_AnUnknownRunningBinaryLeavesThePinUntouched": seamExecutable,

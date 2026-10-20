@@ -15,6 +15,8 @@ This page tells the console (an operator or an LLM) how to run each wave through
 - To see the state, run `evolve wave status --json`. It reads cycle state, signals and landing intents. It does not change anything.
   - The text output has one measures line, for example `measures: width 2/3 · utilization 0.71 · conflicts 0/2`. It gives the realized width over the sized width and the utilization. Then it gives the landed lanes with a rebase or a re-audit over all landed lanes.
   - The realized width and the utilization come from the pool signals in `.evolve/signals.ndjson`: `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_BACKFILLED` and `LOOP_ORCH_LANE_EXITED`. The cycle state does not give them. A run with no pool signals uses the cycle signals.
+  - The pool signals of the run come from the wave loop. They have the `pid` of the wave record, and they start at the run ID time. The pool launches its first lanes before `wave next` writes the record, so a cutoff at `started_at` loses them.
+  - The width is the time-weighted median over the run. It is not the count of lanes that are live now. For that count, read the line `pool:    live N` (JSON `pool_live`). It is `fields.live` of the latest pool signal of the run. The line shows only while the wave loop is live.
   - A cycle whose lane got `LOOP_ORCH_LANE_DEADLINE` with `action: stopped` shows `cycle N: stopped: lane deadline (phase build)`. It is not a live lane. The JSON gives `termination: lane deadline` and `todo` for that cycle.
   - When the run has a census, the line ends with the supply, for example `· supply 3 admissible, 4 waiting, 40 console`.
   - The JSON has `measures` for the current run and `runs` for the last 3 runs. `width_source: policy` tells you that the run has no sizing record, and that `width_sized` is `fleet.count`. The definitions are in [wave-orchestrator.md §11](../architecture/wave-orchestrator.md#11-measures).
@@ -87,7 +89,36 @@ At `enforce`:
 
 At `shadow`, count the `LOOP_ORCH_LANE_LATE_EXIT` events with `status` `ok`. Each one is a lane that passed after its deadline. A deadline stop at `enforce` stops such a lane. The exit to `enforce` needs none over 3 runs ([wave-orchestrator §14](../architecture/wave-orchestrator.md#14-stages)).
 
-## 5. Other cases
+## 5. When a PR merges
+
+The merge rule is in [ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md). The plan is [pr-merge-latency-2026-10](../plans/pr-merge-latency-2026-10.md).
+
+- A code PR merges only at a boundary. Use `evolve wave next --merge <n,...>`.
+- A window PR is a PR that CI routes to no Go suite and no landing suite, after its `.github/` paths are dropped. It can merge when green, also in a wave, but only at stage `on` and `fleet.integration.stage: enforce`.
+- The policy key `pr.merge_window.stage` is `off` by default. Below `fleet.integration.stage: enforce` (ADR-0147) the verb gives `boundary` at each stage: before that stage, a merge in a wave strands the next lane push.
+
+To classify a PR, run `evolve pr window <n>`. Add `--json` for the envelope `{pr, stage, integration_stage, verdict, rule, reason, boundary_paths}`. The field `pr` is present only for a PR number.
+
+| Exit | Verdict | Next action |
+|---|---|---|
+| 0 | `window` | After P2b, merge the green PR with `evolve pr merge <n>`. Before P2b, merge it at the boundary. Do not use `gh pr merge`. |
+| 3 | `boundary` | Merge the PR at the next boundary. Below integration `enforce`, the reason is `merge windows wait for fleet.integration.stage enforce (ADR-0147)`. At integration `enforce` and stage `off`, it is `pr.merge_window.stage is off`. The field `rule` shows the class of the paths. |
+| 2 | — | A read or a parse failed (policy, `required.yml`, the file list, `gh`). A routing line in `required.yml` that the rule does not model also exits 2. Fix the named cause. |
+| 10 | — | A usage error. |
+
+The path classes come from the CI router of `.github/workflows/required.yml`. A change to that router also changes the merge window.
+
+### The on-demand boundary
+
+Call an early boundary when a green boundary PR waits and the pool runs below its window:
+
+1. Run `evolve wave status` and read the width of the pool.
+2. Run `evolve loop-stop --wait`. The lanes in flight finish, and the loop stops.
+3. Run `evolve wave next --merge <n,...>`.
+
+Until P2b gives a policy bound, call it when a green code PR has waited 1 h (plan Q2).
+
+## 6. Other cases
 
 | Case | Verb |
 |---|---|

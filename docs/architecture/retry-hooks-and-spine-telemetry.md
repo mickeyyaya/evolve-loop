@@ -44,6 +44,9 @@ The loop then reroutes its own cursor to the phase that the ladder picks.
 The allowed phases are Build, Audit and Ship.
 A ladder route to any other phase ends the cycle with the ship error.
 
+When the ladder declines, the loop ends the cycle with the error that `recoverResumedShip` returns.
+For a stale base, that error is `GIT_FLEET_REBASE_NEEDED`, and `original_code` keeps the landing code.
+
 A resumed ship that finds main past the checkpoint base returns
 `GIT_FF_MERGE_DIVERGED`, because `evolve loop --resume` does not run in the fleet.
 `staleBaseAsRebase` changes that code to `GIT_FLEET_REBASE_NEEDED`

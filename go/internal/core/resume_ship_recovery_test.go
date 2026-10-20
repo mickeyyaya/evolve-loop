@@ -59,22 +59,30 @@ func newStaleBaseLane(t *testing.T, peerFile string) staleBaseLane {
 
 type orderedRunner struct {
 	PhaseRunner
-	name  string
-	order *[]string
+	name    string
+	order   *[]string
+	observe func(context.Context)
 }
 
 func (r orderedRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
 	*r.order = append(*r.order, r.name)
+	if r.observe != nil {
+		r.observe(ctx)
+	}
 	return r.PhaseRunner.Run(ctx, req)
 }
 
 type landingShip struct {
 	*fakeRunner
-	order *[]string
+	order   *[]string
+	observe func(context.Context)
 }
 
 func (r landingShip) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
 	*r.order = append(*r.order, "ship")
+	if r.observe != nil {
+		r.observe(ctx)
+	}
 	resp, err := r.fakeRunner.Run(ctx, req)
 	if err != nil {
 		return resp, err
@@ -88,6 +96,8 @@ type staleBaseScenario struct {
 	shipErr        error
 	shipFailures   int
 	options        []Option
+	observeShip    func(context.Context)
+	observeAudit   func(context.Context)
 }
 
 type staleBaseOutcome struct {
@@ -123,8 +133,8 @@ func (l staleBaseLane) resumeShip(t *testing.T, sc staleBaseScenario) staleBaseO
 		},
 	}
 	runners := buildRunners(nil)
-	runners[PhaseShip] = landingShip{fakeRunner: out.ship, order: &out.order}
-	runners[PhaseAudit] = orderedRunner{PhaseRunner: out.audit, name: "audit", order: &out.order}
+	runners[PhaseShip] = landingShip{fakeRunner: out.ship, order: &out.order, observe: sc.observeShip}
+	runners[PhaseAudit] = orderedRunner{PhaseRunner: out.audit, name: "audit", order: &out.order, observe: sc.observeAudit}
 	runners[PhaseDebugger] = orderedRunner{PhaseRunner: out.debugger, name: "debugger", order: &out.order}
 	center, events := recordingCenter()
 	out.signals = events
@@ -217,7 +227,7 @@ func TestRunCycleFromPhase_TheRecoveryRebasesTheLaneOntoMainAndKeepsItsChange(t 
 	}
 }
 
-func TestRunCycleFromPhase_ARecoveryBudgetSpentEndsWithTheShipError(t *testing.T) {
+func TestRunCycleFromPhase_ASpentBudgetOnAStaleBaseAbortsAsARebaseNeedNotADivergence(t *testing.T) {
 	t.Parallel()
 
 	lane := newStaleBaseLane(t, "peer.txt")
@@ -225,7 +235,31 @@ func TestRunCycleFromPhase_ARecoveryBudgetSpentEndsWithTheShipError(t *testing.T
 	out := lane.resumeShip(t, staleBaseScenario{shipErr: landingDiverged(), shipFailures: 99})
 
 	requireOrder(t, out.order, "ship", "audit", "ship", "audit", "ship")
-	requireShipErrorSurfaced(t, out, CodeGitFFMergeDiverged)
+	requireStaleBaseAbort(t, out)
+}
+
+func requireStaleBaseAbort(t *testing.T, out staleBaseOutcome) {
+	t.Helper()
+	se, ok := AsShipError(out.err)
+	if !ok || se.Code != CodeGitFleetRebaseNeeded || se.Debug[shiperr.OriginalCodeKey] != string(CodeGitFFMergeDiverged) {
+		t.Fatalf("err = %v, want %s carrying %s=%s for a base behind main", out.err, CodeGitFleetRebaseNeeded, shiperr.OriginalCodeKey, CodeGitFFMergeDiverged)
+	}
+	found := false
+	for _, e := range *out.signals {
+		if e.Code != CodePhaseAborted {
+			continue
+		}
+		found = true
+		if reason := e.Fields["abort_reason"]; strings.Contains(reason, string(CodeGitFFMergeDiverged)) || !strings.Contains(reason, string(CodeGitFleetRebaseNeeded)) {
+			t.Fatalf("a resumed cycle whose base is behind main aborted on %s: %s", CodeGitFFMergeDiverged, e.Fields["abort_reason"])
+		}
+	}
+	if !found {
+		t.Fatal("no ORCHESTRATOR_PHASE_ABORTED event was recorded, so the abort reason is unchecked")
+	}
+	if out.result.FinalVerdict != VerdictFAIL {
+		t.Fatalf("FinalVerdict = %q, want FAIL", out.result.FinalVerdict)
+	}
 }
 
 func TestRunCycleFromPhase_ADivergenceThatIsNotAStaleBaseEndsTheCycle(t *testing.T) {
@@ -296,7 +330,7 @@ func TestRunCycleFromPhase_ARebaseConflictEndsTheCycleInsteadOfDispatchingTheDeb
 	out := lane.resumeShip(t, staleBaseScenario{shipErr: landingDiverged(), shipFailures: 1})
 
 	requireOrder(t, out.order, "ship")
-	requireShipErrorSurfaced(t, out, CodeGitFFMergeDiverged)
+	requireStaleBaseAbort(t, out)
 	if out.debugger.calls != 0 {
 		t.Fatalf("the resume loop dispatched the debugger %d time(s); it has no debugger re-entry", out.debugger.calls)
 	}

@@ -219,7 +219,7 @@ func waveStepVerbs(e waveEnvelope) []string {
 	return out
 }
 
-var waveFullSteps = []string{"checkpoint", "loop-stop", "pr", "sync-main", "gc", waveBuildVerb, "reset-sha", "doctor", waveCodeRefreshVerb, "loop-stop", boundaryLogVerb, "loop"}
+var waveFullSteps = []string{"checkpoint", "loop-stop", "pr", boundaryRatchetVerb, "sync-main", "gc", waveBuildVerb, "reset-sha", "doctor", waveCodeRefreshVerb, "loop-stop", boundaryLogVerb, "loop"}
 
 func TestWaveNext_DryRunComposesTheGoalAndWritesNothing(t *testing.T) {
 	t.Parallel()
@@ -242,7 +242,7 @@ func TestWaveNext_DryRunComposesTheGoalAndWritesNothing(t *testing.T) {
 	if launch := e.Steps[len(e.Steps)-1].Name; strings.Contains(launch, waveTestStanding) || !strings.Contains(launch, fmt.Sprintf("--goal-text <goal: %d bytes>", len(strings.TrimSpace(e.Goal)))) {
 		t.Errorf("launch step name = %q, want the goal shown by its size only", launch)
 	}
-	if build := e.Steps[5]; build.Name != "make -C "+filepath.Join(p.root, "go")+" build" || build.OK || build.Detail != "planned" {
+	if build := e.Steps[6]; build.Name != "make -C "+filepath.Join(p.root, "go")+" build" || build.OK || build.Detail != "planned" {
 		t.Errorf("planned build step = %+v, want the make command, not run", build)
 	}
 	for _, want := range []string{"Wave 82.", waveTestStanding, "Wave 81 facts (run 20261008T080000Z): 1 of 2 cycles shipped.",
@@ -330,7 +330,7 @@ func TestWaveNext_FailedStepRecordsNothingAndKeepsTheNotes(t *testing.T) {
 	p := newWavePlane(t)
 	p.seedWave81()
 	h := newWaveHarness()
-	h.verbs.failAt, h.verbs.code = 3, 7
+	h.verbs.failAt, h.verbs.code = 4, 7
 
 	rc := h.run("next", "--json", "--project-root", p.root)
 
@@ -338,8 +338,8 @@ func TestWaveNext_FailedStepRecordsNothingAndKeepsTheNotes(t *testing.T) {
 		t.Fatalf("rc = %d, want the failed step's 7", rc)
 	}
 	e := decodeWaveEnvelope(t, h.stdout.Bytes())
-	if len(e.Steps) != 3 || e.Steps[2].OK || e.Steps[2].Detail != "rc=7\nfake sync-main failed rc=7" || !strings.Contains(e.Steps[2].Name, "sync-main") {
-		t.Errorf("steps = %+v, want 3 with sync-main failed rc=7 and its stderr tail", e.Steps)
+	if len(e.Steps) != 4 || e.Steps[3].OK || e.Steps[3].Detail != "rc=7\nfake sync-main failed rc=7" || !strings.Contains(e.Steps[3].Name, "sync-main") {
+		t.Errorf("steps = %+v, want 4 with sync-main failed rc=7 and its stderr tail", e.Steps)
 	}
 	records, _ := p.store().Records()
 	notes, _ := p.store().Notes()
@@ -468,7 +468,7 @@ func TestWaveNext_TextOutputEndsWithTheLaunchedWave(t *testing.T) {
 	rc := h.run("next", "--project-root", p.root)
 
 	out := h.stdout.String()
-	if rc != 0 || !strings.Contains(out, "boundary: step 1/11: evolve checkpoint save --all") ||
+	if rc != 0 || !strings.Contains(out, "boundary: step 1/12: evolve checkpoint save --all") ||
 		!strings.HasSuffix(out, fmt.Sprintf("wave: launched wave 1: run %s, pid %d, goal %d bytes\n", gcpolicy.LogRunID(waveTestClock), waveTestPID, len(waveFirstGoal()))) {
 		t.Errorf("rc = %d stdout:\n%s", rc, out)
 	}

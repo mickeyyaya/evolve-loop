@@ -86,3 +86,10 @@ func duplicateIDWarnings(sorted []Item) []LoadWarning {
 	}
 	return out
 }
+
+func (w LoadWarning) String() string {
+	if w.Unreadable {
+		return "WARN skipped " + w.Text
+	}
+	return "WARN " + w.Text
+}

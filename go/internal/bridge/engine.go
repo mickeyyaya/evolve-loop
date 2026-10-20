@@ -66,6 +66,8 @@ type Deps struct {
 	onFatalPane           func(fatalPaneObservation)
 	onBootLoss            func(launchoutcome.BootLossCause)
 	onDispatchID          func(string)
+	onLaunchEffort        func(string)
+	onServedModel         func(string)
 	PaneCaptureMaxBytes   int
 	onPaneCapture         func(string)
 	KeychainProbe         func(service string) bool
@@ -150,6 +152,7 @@ type Config struct {
 	CLI                  string
 	Profile              string
 	Model                string
+	Effort               string
 	PromptFile           string
 	Workspace            string
 	StdoutLog            string
@@ -230,6 +233,9 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 	if req.Cycle > 0 {
 		args = append(args, "--cycle="+strconv.Itoa(req.Cycle))
 	}
+	if req.Effort != "" {
+		args = append(args, "--effort="+req.Effort)
+	}
 	if req.Agent != "" {
 		args = append(args, "--agent="+req.Agent)
 	}
@@ -280,7 +286,7 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 		ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS,
 		DispatchID: run.dispatchID, PaneCapture: run.paneCapture, SessionRecoverable: e.freshSessionAllowed(ctx, run),
 	}
-	marks := append(sessionMarks(req.FreshSession, resp.SessionRecoverable), markBootLoss(run))
+	marks := append(sessionMarks(req.FreshSession, resp.SessionRecoverable), markBootLoss(run), markTry(run))
 	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp, marks...)
 	e.reportFreshSession(c, req)
 	e.clearBootStrike(c, req.CLI, run.code)
@@ -331,6 +337,8 @@ type launchRun struct {
 	bootLoss    launchoutcome.BootLossCause
 	dispatchID  string
 	paneCapture string
+	effort      string
+	servedModel string
 }
 
 func (e *Engine) reportFreshSession(c attemptLogContext, req core.BridgeRequest) {
@@ -399,6 +407,8 @@ func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]st
 	}
 	callDeps.onDispatchID = func(id string) { run.dispatchID = id }
 	callDeps.onPaneCapture = func(path string) { run.paneCapture = path }
+	callDeps.onLaunchEffort = func(effort string) { run.effort = effort }
+	callDeps.onServedModel = func(model string) { run.servedModel = model }
 	callEngine := &Engine{deps: callDeps}
 	var stderrBuf bytes.Buffer
 	run.start = e.deps.Now()

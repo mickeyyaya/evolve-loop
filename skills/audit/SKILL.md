@@ -31,7 +31,7 @@ description: Use after build has produced build-report.md. Validates the build w
 |---|---|---|
 | `PASS` | The auditor reports PASS | Allow ship |
 | `FAIL` | The auditor reports FAIL | Block ship; orchestrator → retrospective |
-| `WARN` | The auditor reports WARN | Ship continues and logs the WARN. `workflow.strict_audit` in `.evolve/policy.json` blocks it |
+| `WARN` | The auditor reports WARN | The WARN rule of the `## Audit Rules` block decides; the host renders it from `go/internal/phases/audit/audit_rules.go` |
 
 ## Adversarial mode (CLAUDE.md rule 8)
 

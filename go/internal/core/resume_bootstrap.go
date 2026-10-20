@@ -68,11 +68,8 @@ func (o *Orchestrator) loadResumeBootstrap(
 	if err := requireResumeExplanationIdentity(req.ProjectRoot, identity.workspace, resumeCycle, cs, resumePoint.CycleID); err != nil {
 		return boot, err
 	}
-	if cs.CycleID != 0 && resumePoint.CycleID != 0 && cs.CycleID != resumePoint.CycleID {
-		return boot, fmt.Errorf("resume identity mismatch: cycle-state cycle %d does not match checkpoint cycle %d", cs.CycleID, resumePoint.CycleID)
-	}
-	if cs.ActiveWorktree != "" && resumePoint.WorktreePath != "" && filepath.Clean(cs.ActiveWorktree) != filepath.Clean(resumePoint.WorktreePath) {
-		return boot, fmt.Errorf("resume identity mismatch: cycle-state worktree %q does not match checkpoint worktree %q", cs.ActiveWorktree, resumePoint.WorktreePath)
+	if err := o.verifyResumeIdentityAndHealCarrier(ctx, req.ProjectRoot, resumePoint, cs); err != nil {
+		return boot, err
 	}
 
 	req, err = restoreResumeGoal(req, cs, state, identity.fleet)
@@ -92,6 +89,23 @@ func (o *Orchestrator) loadResumeBootstrap(
 	boot.cycleState = cs
 	boot.cycle = cs.CycleID
 	return boot, nil
+}
+
+func (o *Orchestrator) verifyResumeIdentityAndHealCarrier(ctx context.Context, projectRoot string, resumePoint *ResumePoint, cs CycleState) error {
+	if cs.CycleID != 0 && resumePoint.CycleID != 0 && cs.CycleID != resumePoint.CycleID {
+		return fmt.Errorf("resume identity mismatch: cycle-state cycle %d does not match checkpoint cycle %d", cs.CycleID, resumePoint.CycleID)
+	}
+	if cs.ActiveWorktree != "" && resumePoint.WorktreePath != "" && filepath.Clean(cs.ActiveWorktree) != filepath.Clean(resumePoint.WorktreePath) {
+		return fmt.Errorf("resume identity mismatch: cycle-state worktree %q does not match checkpoint worktree %q", cs.ActiveWorktree, resumePoint.WorktreePath)
+	}
+	carrierCycle := cs.CycleID
+	if carrierCycle == 0 {
+		carrierCycle = resumePoint.CycleID
+	}
+	if err := o.healCarrierAtHead(ctx, projectRoot, carrierCycle, cs, gitCapture); err != nil {
+		return fmt.Errorf("heal a carrier left at HEAD: %w", err)
+	}
+	return nil
 }
 
 type resumeInputs struct {
