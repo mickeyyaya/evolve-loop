@@ -30,8 +30,8 @@ The Builder **must not self-quote** these metrics. Each must appear in build-rep
 | `input_tokens` | `<role>-usage.json` | `jq '.usage.input_tokens' .evolve/runs/cycle-N/<role>-usage.json` |
 | `output_tokens` | `<role>-usage.json` | `jq '.usage.output_tokens' .evolve/runs/cycle-N/<role>-usage.json` |
 | `cache_read_input_tokens` | `<role>-usage.json` | `jq '.usage.cache_read_input_tokens' .evolve/runs/cycle-N/<role>-usage.json` |
-| `files_changed` | `git show <sha> --numstat` | `git show <sha> --numstat \| wc -l` |
-| `lines_added` / `lines_removed` | `git show <sha> --numstat` | `git show <sha> --numstat \| awk '{a+=$1;d+=$2}END{print a,d}'` |
+| `files_changed` | `git diff --numstat <cycle base>` | written by the host after the build (`internal/builddiff`) |
+| `lines_added` / `lines_removed` | `git diff --numstat <cycle base>` | written by the host after the build (`internal/builddiff`) |
 
 ### AC-existence claims
 
@@ -60,6 +60,18 @@ The Auditor persona (`agents/evolve-auditor.md`) must:
 2. **Execute every POSTHOC command** and substitute the result before computing verdict.
 3. **Compare ground-truth result to any Builder claim** in the surrounding prose. If Builder said "reduced 50%" but the ground-truth shows reduced 10%, that's a `claim-discrepancy` defect.
 4. **Cite the substituted value in audit-report.md** so reviewers can verify provenance.
+
+## The diff metrics are host-derived
+
+Cycle 1479 authored no commit, but its report claimed 2 files and 238 insertions. Those were the numbers of the ship commit of cycle 1477. The command read the tip commit, and after the post-build soft reset the tip is the cycle base: the prior commit. Cycle 1480 left the literal `pending` in the report.
+
+Thus the host now writes the diff metrics. The soft reset (`core.normalizeWorktreeToBase`), gofmt and the refresh of the derived files run first. Then `core.writeBuildDiffSummary` runs `builddiff.Derive` on `git diff --numstat` and `--name-status` against `WorktreeBaseSHA` of the run state, plus the untracked files. `builddiff.Apply` then rewrites `build-report.md`:
+
+- each POSTHOC row of `files_changed`, `lines_added` or `lines_removed`, and the `Files changed` line, gets the host value;
+- the table of `## Changes` becomes the diff, with the description of the build for each path. A path that the build declared but that is not in the diff is named below the table;
+- when the host cannot derive the diff, each such row reads `absent` with the cause, and the host writes a `WARN build-diff-summary` line. A report never keeps `pending` for these metrics.
+
+This is the host-derived declaration of ADR-0106 H3, applied to the diff. Pinned by `TestDerive_AnchorsOnTheCycleBaseNotOnTheTipCommit` and `TestWriteBuildDiffSummary_ANoOpCycleReportsZeroFilesFromItsBase`.
 
 ## Why this works structurally
 

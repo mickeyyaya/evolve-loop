@@ -489,6 +489,7 @@ The reasons that the comments of the orchestrator, phase advisor, phase binding,
     - The binding mirrors the audit one and WARNs loudly without blocking the cycle.
   - `recordGenericBinding` is reached only at `EVOLVE_PHASE_IO=enforce`, gated by `emitPhaseBindings`.
 - **Build worktree normalization.**
+  - `writeBuildDiffSummary` runs after the soft reset, gofmt and the refresh of the derived files, because each of them changes the diff. It writes the diff metrics and the `## Changes` table of `build-report.md` from `WorktreeBaseSHA` (`internal/builddiff`, [posthoc-schema.md](../posthoc-schema.md)). A failed derivation writes `absent` and a WARN line. Pinned by `TestWriteBuildDiffSummary_ANoOpCycleReportsZeroFilesFromItsBase`.
   - `normalizeWorktreeToBase` soft-resets to the cycle base so a committing builder's work becomes pending again. The builder commits for crash safety, but the auditor and the audit binding inspect the pending diff, which a commit empties. It never aborts the cycle and is a no-op when HEAD already equals the base.
   - A persisted base on the resume path can be stale after the operator rebased the worktree onto a moved main.
     - A soft reset to a non-ancestor repoints the branch and stages the whole delta between histories as a spurious diff.
