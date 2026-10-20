@@ -251,7 +251,7 @@ func TestReconcile_AnAncestorHoldingOnlyShadowRowsIsTheEmptyAncestor(t *testing.
 
 func TestReconcile_AnAncestorsOpenRowIsOwedWhateverItsSource(t *testing.T) {
 	f := newFixture(t)
-	f.ancestorLedger(t, `{"origin_cycle":1255,"entries":[{"id":"d1","text":"[HIGH] correctness go/x.go:1 — t","status":"OPEN","source":"code-review","round":1,"severity":"HIGH"}]}`)
+	f.ancestorLedger(t, `{"origin_cycle":1255,"entries":[{"id":"d1","text":"[MEDIUM] correctness go/x.go:1 — t","status":"OPEN","source":"code-review","round":1,"severity":"MEDIUM"}]}`)
 	f.claims(t, `{"dispositions":[{"id":"d1","status":"DEFERRED","reason":"later"}]}`)
 	l, got := observed(scopeOf(), resolveNever)
 
@@ -266,8 +266,8 @@ func TestReconcile_AnAuditDefectQuotingAShadowRowIsGradedLikeOneAlone(t *testing
 	shadowText := "[HIGH] correctness go/x.go:1 — t | scenario: s | evidence: e | fix: f"
 	auditText := "code-review: " + shadowText
 	beside, _, _ := Append(Doc{OriginCycle: 1255}, []Entry{{Text: shadowText, Status: StatusDeferred, Reason: "shadow stage", Source: "code-review", Round: 1, Severity: "HIGH"}}, 1255)
-	beside, _, _ = Append(beside, openRows([]string{auditText}), 1255)
-	alone, _, _ := Append(Doc{OriginCycle: 1255}, openRows([]string{auditText}), 1255)
+	beside, _, _ = Append(beside, rejectionRows(Rejection{Defects: []string{auditText}}), 1255)
+	alone, _, _ := Append(Doc{OriginCycle: 1255}, rejectionRows(Rejection{Defects: []string{auditText}}), 1255)
 	claims := `{"dispositions":[{"id":"` + alone.Entries[0].ID + `","status":"DEFERRED","reason":"tracked in the inbox"}]}`
 	verdict := func(doc Doc) Verdict {
 		f := newFixture(t)

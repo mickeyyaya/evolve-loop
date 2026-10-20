@@ -69,7 +69,7 @@ func TestAppend_AnAuditDefectWhoseTextAShadowRowHoldsIsStillOwed(t *testing.T) {
 	shadow := reviewRow(text, "HIGH")
 	shadow.ID = ID("code-review" + sourceSeparator + text)
 
-	got, added, overflow := Append(Doc{OriginCycle: 7, Entries: []Entry{shadow}}, openRows([]string{text}), 7)
+	got, added, overflow := Append(Doc{OriginCycle: 7, Entries: []Entry{shadow}}, rejectionRows(Rejection{Defects: []string{text}}), 7)
 
 	want := Entry{ID: ID(text), Text: text, Status: StatusOpen}
 	if !added || overflow != 0 || len(got.Entries) != 2 || got.Entries[1] != want {
@@ -119,7 +119,7 @@ func TestAppend_TheAuditsStandInIsNeverSwallowedByAShadowStandIn(t *testing.T) {
 	doc := Doc{Entries: append(held("", MaxEntries), held("code-review", MaxEntries)...)}
 	doc, _, _ = Append(doc, []Entry{reviewRow("cut r1", "HIGH"), reviewRow("cut r2", "HIGH")}, 7)
 
-	got, added, overflow := Append(doc, openRows([]string{"audit cut 1", "audit cut 2"}), 7)
+	got, added, overflow := Append(doc, rejectionRows(Rejection{Defects: []string{"audit cut 1", "audit cut 2"}}), 7)
 
 	if want := overflowRow(2, 7); !added || overflow != 2 || got.Entries[len(got.Entries)-1] != want {
 		t.Errorf("audit overflow=%d added=%v tail=%+v, want the audit's own OPEN stand-in %+v: a shadow stand-in must never swallow it", overflow, added, got.Entries[2*MaxEntries:], want)
@@ -154,8 +154,8 @@ func TestAppend_TheAuditsRowsAreTheSameWithOrWithoutShadowRows(t *testing.T) {
 		shadow[i] = reviewRow(defects[i], "HIGH")
 	}
 
-	alone, aloneAdded, aloneOverflow := Append(Doc{OriginCycle: 7}, openRows(defects), 7)
-	beside, besideAdded, besideOverflow := Append(Doc{OriginCycle: 7, Entries: shadow}, openRows(defects), 7)
+	alone, aloneAdded, aloneOverflow := Append(Doc{OriginCycle: 7}, rejectionRows(Rejection{Defects: defects}), 7)
+	beside, besideAdded, besideOverflow := Append(Doc{OriginCycle: 7, Entries: shadow}, rejectionRows(Rejection{Defects: defects}), 7)
 
 	if aloneAdded != besideAdded || aloneOverflow != besideOverflow || !reflect.DeepEqual(alone.Entries, auditOnly(beside.Entries)) {
 		t.Errorf("the audit's rows beside shadow rows differ from the audit's rows alone (overflow %d vs %d): the shadow stage must leave the audit byte-identical", besideOverflow, aloneOverflow)
@@ -215,7 +215,7 @@ func TestAppend_AnAuditDefectSpellingAShadowRowsPreimageKeepsItsOwnID(t *testing
 	}
 	doc, _, _ := Append(Doc{OriginCycle: 1255}, []Entry{reviewRow(shadowText, "HIGH")}, 1255)
 
-	got, _, _ := Append(doc, openRows(quoting), 1255)
+	got, _, _ := Append(doc, rejectionRows(Rejection{Defects: quoting}), 1255)
 
 	ids := map[string]bool{}
 	for _, e := range got.Entries {

@@ -120,6 +120,9 @@ func gradeClaim(a Entry, claim Entry, has bool, resolve func(string) (bool, stri
 		if strings.TrimSpace(claim.Reason) == "" {
 			return e, "DEFERRED without reason"
 		}
+		if blocksDeferral(a) {
+			return e, "DEFERRED but it is a " + a.Severity + " blocker: a continuation repairs it and disposes it FIXED with evidence"
+		}
 		e.Status, e.Evidence, e.Reason = claim.Status, claim.Evidence, claim.Reason
 		return e, ""
 	default:
