@@ -115,3 +115,13 @@ func TestFailurePolicyConfig_RejectsUnknownLevel(t *testing.T) {
 		t.Error("expected error for unknown level 'weird', got nil")
 	}
 }
+
+func TestFixTypes_TheDeferRouteVocabularyIsTheDefaultPolicys(t *testing.T) {
+	cats := DefaultSystemFailurePolicy().Categories
+	if FixTypeReintent != "reintent" || cats[CategoryIntentMalformed].FixType != FixTypeReintent {
+		t.Errorf("reintent = %q, intent-malformed fix_type %q", FixTypeReintent, cats[CategoryIntentMalformed].FixType)
+	}
+	if FixTypePipelineRepair != "pipeline-repair" || cats[CategoryInfraSystemic].FixType != FixTypePipelineRepair {
+		t.Errorf("pipeline-repair = %q, infra-systemic fix_type %q", FixTypePipelineRepair, cats[CategoryInfraSystemic].FixType)
+	}
+}

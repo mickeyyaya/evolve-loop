@@ -1,6 +1,8 @@
 package core
 
 import (
+	"strings"
+
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -42,4 +44,21 @@ func (d deferDecision) routingDecision() router.RouterDecision {
 		Reason:    d.reason(),
 		Evidence:  map[string]interface{}{"category": d.category, "fix_type": d.fixType, "source": d.source},
 	}
+}
+
+type RecordedDefer struct {
+	Category string
+	FixType  string
+}
+
+func RecordedDeferDecision(workspace string) (RecordedDefer, bool) {
+	dec, _ := readFailureDecision(workspace)
+	if dec == nil || dec.Action != policy.ActionDeferOrQuarantine {
+		return RecordedDefer{}, false
+	}
+	return RecordedDefer{Category: dec.Category, FixType: dec.FixType}, true
+}
+
+func IsAuditDeferResult(result CycleResult) bool {
+	return strings.Contains(result.RetroDecision, auditDeferReasonPrefix)
 }

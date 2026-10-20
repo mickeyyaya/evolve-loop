@@ -262,7 +262,7 @@ var protectedMembership = guards.IsProtectedSurface
 func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) (applied string, err error) {
 	switch {
 	case result.FinalVerdict == cyclestate.VerdictFAIL:
-		return "failure outcome", applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycle, signals)
+		return "failure outcome", applyResultFailureOutcome(result, projectRoot, evolveDir, stderr, lifecycle, signals)
 	case core.IsTriageNoWorkResult(result):
 		return "no-work hand-off", applyCycleNoWorkOutcome(projectRoot, result.Cycle, stderr, lifecycle, signals)
 	}
@@ -283,11 +283,16 @@ func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, li
 }
 
 func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
-	if cycle == 0 {
+	return applyResultFailureOutcome(core.CycleResult{Cycle: cycle}, projectRoot, evolveDir, stderr, lifecycle, signals)
+}
+
+func applyResultFailureOutcome(result core.CycleResult, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
+	if result.Cycle == 0 {
 		return nil
 	}
-	in := cycleoutcome.FailureInputsFor(projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr)
+	in := cycleoutcome.FailureInputsFor(projectRoot, evolveDir, cycleWorkspace(projectRoot, result.Cycle), result.Cycle, stderr)
 	in.Protected = protectedMembership
+	in.Deferred = core.IsAuditDeferResult(result)
 	_, err := cycleoutcome.ApplyFailure(in.WithLedger(lifecycle).WithSignals(signals))
 	return err
 }

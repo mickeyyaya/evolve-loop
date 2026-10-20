@@ -65,6 +65,18 @@ The fingerprint of a try is the set of violation codes of its first failed check
 
 - A `halt` failure never climbs. It keeps the present halt rules.
 - An audit FAIL whose class maps to `defer-or-quarantine` (`intent-malformed`, fix type `reintent`) never climbs and is never rebuilt in its cycle. The retry envelope declines it to retro, and retro ends the cycle with an `audit-fail-defer: ` reason. The router cannot overrule that end (`core/reintent_decision.go`, [internal-core](packages/internal-core.md)).
+- The FAIL closeout of a cycle that the defer ended routes its committed items by the `fix_type` of the recorded `failure-decision.json` (`cycleoutcome/defer_route.go`). The category text does not decide. The table below gives the route.
+
+| `fix_type` | Route of each committed item | Failure count |
+|---|---|---|
+| `reintent` | `inbox route-console` (`inboxmover.RouteConsole`). The `routed_reason` names the cycle, the category and the `fix_type`. | not bumped |
+| `pipeline-repair` | The closeout files one console item `pipeline-repair-cycle-<N>`, with that `routed_reason`. Each item gets a `deps` entry on it, so it waits until the repair lands. | not bumped |
+| any other value, or no recorded defer decision | the plain release, with a WARN that says why | bumped |
+
+- The route uses the existing writers: `RouteConsole`, `File` and `Edit`. It adds no new writer and no flag.
+- A second closeout of the same cycle reuses the companion item and adds no second `deps` entry.
+- The `deps` entry is written after the release. In that short window a lane can claim the item one time.
+
 - A quota exit inside a raised rung keeps the rung. The chain walk moves to the next family at the same rung, and the walk is not a new try of the ladder.
 
 ## 4. The rungs
