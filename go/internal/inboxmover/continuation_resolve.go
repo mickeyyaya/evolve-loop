@@ -45,9 +45,9 @@ func resolveClaim(opts Options, cycle int, inScope map[string]bool) *continuatio
 		if it.Continuation == nil || it.Continuation.SnapshotSHA == "" {
 			continue
 		}
-		if inScope != nil && !inScope[strings.TrimSpace(it.ID)] {
+		if id := inboxbatch.ItemID(it.ID, name); inScope != nil && !inScope[id] {
 			fmt.Fprintf(opts.Stderr, "[inbox] cycle %d skipping claim %q: it carries a continuation from cycle %d but is OUTSIDE this lane's declared scope — adopting it would make two lanes work one task\n",
-				cycle, it.ID, it.Continuation.Cycle)
+				cycle, id, it.Continuation.Cycle)
 			continue
 		}
 		resolved := continuation.ExpandHostPaths(*it.Continuation)

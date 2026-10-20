@@ -83,10 +83,7 @@ func readConsumedRecord(path string) (ConsumedRecord, bool) {
 	if json.Unmarshal(raw, &doc) != nil {
 		return ConsumedRecord{}, false
 	}
-	rec := ConsumedRecord{ID: doc.ID, At: doc.Consumed.At, Via: doc.Consumed.Via, CreatedAt: doc.CreatedAt, File: filepath.Base(path)}
-	if rec.ID == "" {
-		rec.ID = strings.TrimSuffix(filepath.Base(path), ".json")
-	}
+	rec := ConsumedRecord{ID: ItemID(doc.ID, path), At: doc.Consumed.At, Via: doc.Consumed.Via, CreatedAt: doc.CreatedAt, File: filepath.Base(path)}
 	if rec.At == "" {
 		rec.At = unknownConsumedField
 	}

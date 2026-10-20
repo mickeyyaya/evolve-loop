@@ -155,7 +155,7 @@ func findItem(inboxDir, id string) (weight float64, state itemState) {
 			ID     string  `json:"id"`
 			Weight float64 `json:"weight"`
 		}
-		if json.Unmarshal(raw, &it) != nil || it.ID != id {
+		if json.Unmarshal(raw, &it) != nil || inboxbatch.ItemID(it.ID, p) != id {
 			return nil
 		}
 		weight = it.Weight

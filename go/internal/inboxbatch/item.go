@@ -36,7 +36,6 @@ type Item struct {
 	DeliverableKind string                     `json:"deliverable_kind,omitempty"`
 	CreatedAt       string                     `json:"created_at,omitempty"`
 	Path            string                     `json:"-"`
-	IDFromFileName  bool                       `json:"-"`
 	mentions        []string
 	basenames       []string
 }
@@ -228,15 +227,24 @@ func LoadFile(path string) (Item, []string, error) {
 		return Item{}, nil, err
 	}
 	name := filepath.Base(path)
-	if it.ID == "" {
-		it.ID, it.IDFromFileName = strings.TrimSuffix(name, ".json"), true
-	}
-	it.Path = name
+	it.ID, it.Path = idOrStem(it.ID, path), name
 	var warnings []string
 	if r := sanitizeItem(&it); len(r.changed) > 0 {
 		warnings = append(warnings, name+": "+r.notice())
 	}
 	return it, warnings, nil
+}
+
+func ItemID(recorded, path string) string {
+	var r fieldRewrites
+	return r.clean("id", idOrStem(recorded, path), maxFieldLen)
+}
+
+func idOrStem(recorded, path string) string {
+	if recorded != "" {
+		return recorded
+	}
+	return strings.TrimSuffix(filepath.Base(path), ".json")
 }
 
 type fieldRewrites struct {

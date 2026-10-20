@@ -115,5 +115,5 @@ func itemIDAt(path string) string {
 	if json.Unmarshal(body, &doc) != nil {
 		return ""
 	}
-	return doc.ID
+	return inboxbatch.ItemID(doc.ID, path)
 }

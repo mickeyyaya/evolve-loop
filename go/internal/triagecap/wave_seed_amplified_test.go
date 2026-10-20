@@ -65,13 +65,13 @@ func TestC541Amp_ReadInboxBacklog_SkipsMalformedAndNonJSON(t *testing.T) {
 	}
 }
 
-func TestC541Amp_ReadInboxBacklog_SkipsEmptyIDTodos(t *testing.T) {
+func TestC541Amp_ReadInboxBacklog_NamesAnEmptyIDTodoByItsFileName(t *testing.T) {
 	evolveDir, inboxDir := c541ampInboxDir(t)
 	c541ampWriteInboxTodo(t, inboxDir, "1-empty-id.json", c541ampInboxTodo{ID: "", Weight: 0.9, Files: []string{"a.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "2-real.json", c541ampInboxTodo{ID: "real-item", Weight: 0.1, Files: []string{"b.go"}})
 	got := ReadInboxBacklog(evolveDir, nil)
-	if len(got) != 1 || got[0].ID != "real-item" {
-		t.Fatalf("empty-id todos must be skipped, got %v", got)
+	if len(got) != 2 || got[0].ID != "1-empty-id" || got[1].ID != "real-item" {
+		t.Fatalf("an empty-id todo takes its file name as its id, got %v", got)
 	}
 }
 
