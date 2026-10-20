@@ -17,7 +17,7 @@ func clampedAtCycleStart(t *testing.T) *PhasePlan {
 	t.Helper()
 	cfg, _ := realRoutingConfig(t)
 	plan, clamps := ClampPlanToFloor(RouteInput{Cfg: cfg}, advisorPlanWithoutTDD())
-	if !planRuns(plan, "tdd") || !slices.ContainsFunc(clamps, func(c Clamp) bool { return c.Rule == "ship-requires-tdd" }) {
+	if !planRuns(plan, "tdd") || !slices.ContainsFunc(clamps, func(c Clamp) bool { return c.Rule == RuleShipRequiresTdd }) {
 		t.Fatalf("plan %+v clamps %+v: with empty signals the floor forces tdd at cycle start", plan, clamps)
 	}
 	return plan
@@ -57,7 +57,7 @@ func TestClampPlanToFloor_RecordsWhichEntriesTheFloorForced(t *testing.T) {
 	for _, e := range plan.Entries {
 		want := ""
 		if e.Phase == "tdd" {
-			want = "ship-requires-tdd"
+			want = RuleShipRequiresTdd
 		}
 		if e.ForcedBy != want {
 			t.Errorf("entry %s ForcedBy = %q, want %q: only the entries the floor turned on carry the rule", e.Phase, e.ForcedBy, want)
