@@ -308,7 +308,9 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 > - When `origin/main` has moved past the checkpoint's base, `evolve loop --resume` warns and resumes. The checkpoint stays `resume-pending` and keeps its claim. Ship rebases the cycle onto main before it lands.
 > - `resume.max_checkpoint_age_h` in `.evolve/policy.json` sets the age bound. The compiled default is 192 h, one weekly quota reset plus a day. The block is strict-decoded, and a zero or negative value is refused.
 > - Discovery refuses a per-run checkpoint that is past the age bound. It also refuses one when a later launch of another goal shipped or started after it.
-> - The claim judge (`evolve inbox claims`, the wave planner) does not apply the later-launch rules. Such a checkpoint keeps its claim, and `evolve loop --resume` refuses it until the operator resets it.
+> - The claim judge (`go/internal/inboxmover/holder.go`) releases the claim of a paused checkpoint on two rules. Every caller releases it when a higher cycle of another goal exists (`superseded_by`). The wave planner also releases it when the running loop has another goal (`superseded_by_running_loop`).
+> - A reset then only clears the checkpoint for `--resume`; the item is already free.
+> - Known limit: the claim judge and `--resume` use different "later launch" rules. The claim judge counts any higher cycle of another goal, or a running loop of another goal. Resume counts only one that shipped or started after the pause. When two launches overlap, the claim is released while `--resume` still accepts the checkpoint, so the item can be built twice.
 
 > **Split a mixed inbox item (2026-10-18).** `evolve inbox split <id> [--lane-after-console] [--json] [--project-root P]` splits one pending item that names protected files and files that are not protected ([wave orchestrator §4](../architecture/wave-orchestrator.md)). The command files two items, `<id>-console` and `<id>-lane`, and retires the original.
 >
