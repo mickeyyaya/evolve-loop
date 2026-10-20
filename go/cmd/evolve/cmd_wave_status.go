@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
@@ -92,10 +93,8 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 		return report
 	}
 	cur := records[len(records)-1]
-	cycles, warnings := wave.ReadCycles(plane.root, cur.CycleFloor, 0)
-	loop, loopWarnings := wave.ReadLoopSignals(plane.root)
-	cycles = wave.ApplyLaneDeadlines(cycles, loop)
-	report.Wave, report.RunID, report.PID, report.Warnings = cur.Number, cur.RunID, cur.PID, append(warnings, loopWarnings...)
+	cycles, loop, warnings := wave.ReadRunCycles(plane.root, cur.CycleFloor, 0)
+	report.Wave, report.RunID, report.PID, report.Warnings = cur.Number, cur.RunID, cur.PID, warnings
 	var startWarning string
 	report.PIDAlive, startWarning = waveOwnsPID(env, cur)
 	if live, ok := wave.PoolLive(cur, nil, loop); ok && (report.PIDAlive || report.LoopLive) {
@@ -144,8 +143,8 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 
 func waveCycleText(c wave.Cycle) string {
 	text := fmt.Sprintf("cycle %d: phase %s", c.ID, c.Phase)
-	if c.Termination == wave.TerminationLaneDeadline {
-		text = fmt.Sprintf("cycle %d: stopped: %s (phase %s)", c.ID, c.Termination, c.Phase)
+	if c.Termination == cyclestate.CycleTerminationLaneDeadline {
+		text = fmt.Sprintf("cycle %d: %s (phase %s)", c.ID, c.Termination, c.Phase)
 	}
 	if c.Verdict != "" {
 		shipped := "not shipped"
@@ -201,7 +200,7 @@ func (w *waveWatcher) poll() (bool, error) {
 	if err := w.pollSignals(); err != nil {
 		return false, err
 	}
-	cycles, warnings := wave.ReadCycles(w.plane.root, w.cur.CycleFloor, 0)
+	cycles, _, warnings := wave.ReadRunCycles(w.plane.root, w.cur.CycleFloor, 0)
 	loopLive, startWarning := waveLoopLive(w.env, w.plane.evolveDir, w.cur)
 	for _, warn := range append(warnings, startWarning) {
 		w.warnOnce(warn)
@@ -228,13 +227,6 @@ func (w *waveWatcher) pollSignals() error {
 		return nil
 	}
 	w.signalOffset = chunk.Next
-	if chunk.Skipped > 0 {
-		s := "s"
-		if chunk.Skipped == 1 {
-			s = ""
-		}
-		w.warnOnce(fmt.Sprintf("skipped %d malformed signal line%s in %s", chunk.Skipped, s, signalPath))
-	}
 	for _, sig := range chunk.Events {
 		at, _ := time.Parse(time.RFC3339Nano, sig.TS)
 		if !w.cur.StartedAt.IsZero() && at.Before(w.cur.StartedAt) {

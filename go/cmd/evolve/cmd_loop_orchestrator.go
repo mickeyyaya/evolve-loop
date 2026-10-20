@@ -18,7 +18,7 @@ import (
 const laneTimeWindow = 50
 
 func newLaneLeases(projectRoot string, oc policy.OrchestratorConfig, publish orchestrator.Publish, warn io.Writer) (*orchestrator.Leases, orchestrator.LeaseConfig) {
-	runs := filepath.Dir(paths.RunWorkspace(projectRoot, 0))
+	runs := laneRunsDir(projectRoot)
 	times, err := orchestrator.LaneTimes(runs, laneTimeWindow)
 	if err != nil {
 		fmt.Fprintf(warn, "[loop] WARN: orchestrator: no lane times (%v); the lease deadline is the %d-minute floor\n", err, oc.DeadlineFloorMinutes)
@@ -30,6 +30,15 @@ func newLaneLeases(projectRoot string, oc policy.OrchestratorConfig, publish orc
 	}
 	fmt.Fprintf(warn, "[loop] orchestrator: lane lease (stage %s): deadline %s from %d lane time(s), stall %s\n", cfg.Stage, cfg.Deadline, len(times), cfg.Stall)
 	return orchestrator.NewLeases(cfg, orchestrator.SystemClock{}, orchestrator.RunsHeartbeat(runs), publish), cfg
+}
+
+func laneRunsDir(projectRoot string) string {
+	return filepath.Dir(paths.RunWorkspace(projectRoot, 0))
+}
+
+func laneLocator(projectRoot string) func(orchestrator.Lane) (int, bool) {
+	runs := laneRunsDir(projectRoot)
+	return func(lane orchestrator.Lane) (int, bool) { return orchestrator.LaneCycle(runs, lane) }
 }
 
 func (b *loopBatchCoordinator) laneLeases(oc policy.OrchestratorConfig) *orchestrator.Leases {
@@ -65,6 +74,7 @@ func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fl
 		Leases:   b.laneLeases(fc.Orchestrator),
 		Claims:   b.wave().Claims(),
 		Reap:     b.laneReap(),
+		Locate:   laneLocator(b.cfg.ProjectRoot),
 		Publish:  b.deps.Signals.Emit,
 		Halted:   b.poolHalted,
 		Stage:    fc.Orchestrator.Stage,

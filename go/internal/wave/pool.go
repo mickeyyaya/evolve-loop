@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -11,10 +12,9 @@ import (
 )
 
 const (
-	TerminationLaneDeadline = "lane deadline"
-	todoField               = "todo"
-	liveField               = "live"
-	deadlineStopped         = "stopped"
+	todoField       = "todo"
+	liveField       = "live"
+	deadlineStopped = "stopped"
 )
 
 type loopRun struct {
@@ -78,8 +78,8 @@ func ApplyLaneDeadlines(cycles []Cycle, events []signalcenter.Event) []Cycle {
 			continue
 		}
 		at := eventTime(e)
-		if i := laneCycle(out, e.Fields[todoField], at); i >= 0 {
-			out[i].Termination, out[i].EndedAt = TerminationLaneDeadline, at
+		if i := laneCycle(out, e.Fields[todoField], at); i >= 0 && out[i].Verdict == "" && out[i].Termination == "" {
+			out[i].Termination, out[i].EndedAt = cyclestate.CycleTerminationLaneDeadline, at
 		}
 	}
 	return out
@@ -88,7 +88,7 @@ func ApplyLaneDeadlines(cycles []Cycle, events []signalcenter.Event) []Cycle {
 func laneCycle(cycles []Cycle, todo string, at time.Time) int {
 	found := -1
 	for i, c := range cycles {
-		if c.Todo != todo || c.Verdict != "" || c.StartedAt.IsZero() || c.StartedAt.After(at) {
+		if c.Todo != todo || c.StartedAt.IsZero() || c.StartedAt.After(at) {
 			continue
 		}
 		if found < 0 || c.StartedAt.After(cycles[found].StartedAt) {
@@ -96,4 +96,10 @@ func laneCycle(cycles []Cycle, todo string, at time.Time) int {
 		}
 	}
 	return found
+}
+
+func ReadRunCycles(root string, floor, ceiling int) ([]Cycle, []signalcenter.Event, []string) {
+	cycles, warnings := ReadCycles(root, floor, ceiling)
+	loop, loopWarnings := ReadLoopSignals(root)
+	return ApplyLaneDeadlines(cycles, loop), loop, append(warnings, loopWarnings...)
 }

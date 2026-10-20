@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -35,6 +36,7 @@ type Pool struct {
 	Leases      *Leases
 	Claims      Claims
 	Reap        func(Lane)
+	Locate      func(Lane) (int, bool)
 	Publish     Publish
 	Halted      func() bool
 	Intake      *Intake
@@ -136,6 +138,9 @@ func (p Pool) recover(lane Lane, ret Return) {
 	if p.Reap != nil {
 		p.Reap(lane)
 	}
+	if p.Locate != nil {
+		p.check(lane.Key, "seal", p.seal(lane))
+	}
 	if p.Claims == nil {
 		return
 	}
@@ -144,6 +149,20 @@ func (p Pool) recover(lane Lane, ret Return) {
 	if ret.Stops >= 2 {
 		p.check(todo, "park", p.Claims.Park(todo, ParkReason))
 	}
+}
+
+func (p Pool) seal(lane Lane) error {
+	cycle, ok := p.Locate(lane)
+	if !ok {
+		return errors.New("no cycle of the lane was found in the runs directory")
+	}
+	if p.Publish != nil {
+		p.Publish(signalcenter.Event{Cycle: cycle, Module: signalcenter.ModuleLoop, Origin: "Pool.seal",
+			Kind: signalcenter.KindCycleSealed, Severity: signalcenter.SeverityInfo,
+			Reason: cyclestate.CycleTerminationLaneDeadline,
+			Fields: map[string]string{cyclestate.SealedTerminationField: cyclestate.CycleTerminationLaneDeadline, "todo": lane.Key}})
+	}
+	return nil
 }
 
 func (p Pool) check(todo, step string, err error) {

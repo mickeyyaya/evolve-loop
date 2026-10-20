@@ -26,5 +26,11 @@
   "source": "PR #1013 (wave status counts live lanes from the pool signals), its out-of-scope note; triage pass 2026-10-20",
   "summary": "In wave 130 the lane deadline (LOOP_ORCH_LANE_DEADLINE, action stopped) stopped cycles 1955 and 1957. The loop wrote no seal for them. PR #1013 made `evolve wave status` read the stop from the deadline signal (wave.ApplyLaneDeadlines in go/internal/wave/pool.go:40, called only from go/cmd/evolve/cmd_wave_status.go:96). The PR states what it left open: the loop still seals no outcome for a deadline-stopped cycle, and the goal facts of `wave watch` and `wave next` do not apply deadline stops. Those readers therefore still see the cycle as in flight.",
   "title": "A cycle stopped by the lane deadline seals a labelled outcome, and wave watch and wave next apply the stop",
-  "weight": 0.7
+  "weight": 0.7,
+  "consumed": {
+    "at": "2026-10-21T01:20:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fix/wave-deadline-seal: Pool.recover seals the stopped lane's cycle (cycle.sealed, termination_reason 'stopped: lane deadline', no verdict) through the loop signal center after the reap; wave status, watch and next read cycles through wave.ReadRunCycles, with ApplyLaneDeadlines as the fallback for unsealed runs; wave 130 fixture pinned for all three"
+  }
 }
