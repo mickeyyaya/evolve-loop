@@ -6,6 +6,7 @@ type LaunchIntent struct {
 	SettingsScope    string
 	SessionMode      string
 	Effort           string
+	LadderEffort     string
 	AllowedTools     []string
 	SystemPromptFile string
 	RawByCLI         map[string][]string

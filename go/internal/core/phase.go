@@ -102,6 +102,8 @@ type PhaseRequest struct {
 	ModelRoutingCLI  string  `json:"model_routing_cli,omitempty"`
 	ModelRoutingTier string  `json:"model_routing_tier,omitempty"`
 	BudgetScale      float64 `json:"budget_scale,omitempty"`
+
+	ModelRoutingEffort string `json:"model_routing_effort,omitempty"`
 }
 
 type PhaseResponse struct {

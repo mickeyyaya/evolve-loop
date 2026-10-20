@@ -3,8 +3,9 @@ package llmroute
 import "github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 
 type Overlay struct {
-	CLI  string
-	Tier string
+	CLI    string
+	Tier   string
+	Effort string
 }
 
 func ApplySoftOverlay(in Plan, ov Overlay, prof *profiles.Profile) Plan {
@@ -43,6 +44,9 @@ func ApplySoftOverlay(in Plan, ov Overlay, prof *profiles.Profile) Plan {
 	if ov.Tier != "" {
 		out.Model = ov.Tier
 		out.Tiers = TierChain(ov.Tier, envelopeMin(prof))
+	}
+	if ov.Effort != "" {
+		out.Effort = ov.Effort
 	}
 	return out
 }

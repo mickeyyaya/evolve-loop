@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 type ParamSpec struct {
@@ -53,6 +54,7 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	realizeScalar(&r, m, "permission", intent.Permission)
 	realizeScalar(&r, m, "settings_scope", intent.SettingsScope)
 	realizeEffort(&r, m, intent.Effort)
+	capLadderEffort(&r, m, intent.LadderEffort)
 	realizeSystemPromptFile(&r, m, intent.SystemPromptFile)
 
 	realizeSessionMode(&r, m, intent.SessionMode)
@@ -177,7 +179,10 @@ func resolveTierModel(m Manifest, value string) string {
 	return value
 }
 
-const effortChannelModelVariant = "model_variant"
+const (
+	effortChannelModelVariant = "model_variant"
+	effortChannelNoop         = "noop"
+)
 
 var modelVariantRE = regexp.MustCompile(`\([A-Za-z]+\)$`)
 
@@ -214,5 +219,21 @@ func realizeModelVariant(r *Realization, m Manifest, effort string) {
 	r.EffortVariant = suffix
 	if !strings.EqualFold(effort, toks[0]) {
 		r.EffortCapped = effort
+	}
+}
+
+func capLadderEffort(r *Realization, m Manifest, requested string) {
+	if requested == "" || m.Params["effort"].Channel != effortChannelNoop {
+		return
+	}
+	i := slices.Index(r.LaunchFlags, m.Params["model_tier"].Flag)
+	if i < 0 || i+1 >= len(r.LaunchFlags) {
+		return
+	}
+	variant := modelVariantRE.FindString(r.LaunchFlags[i+1])
+	granted := strings.ToLower(strings.Trim(variant, "()"))
+	levels := policy.EffortLevels()
+	if g := slices.Index(levels, granted); g >= 0 && slices.Index(levels, requested) > g {
+		r.EffortCapped, r.EffortVariant = requested, variant
 	}
 }

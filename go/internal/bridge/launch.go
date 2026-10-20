@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -55,6 +56,13 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		effectiveModel = prof.Model
 	}
 
+	if raw.effort != "" {
+		if err := policy.ValidateEffort(raw.effort); err != nil {
+			fmt.Fprintf(stderr, "[bridge] invalid --effort value: %v\n", err)
+			return ExitBadFlags
+		}
+	}
+
 	permMode := raw.permissionMode
 	if permMode == "" {
 		permMode = prof.PermissionMode
@@ -104,6 +112,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		CLI:                raw.cli,
 		Profile:            raw.profile,
 		Model:              effectiveModel,
+		Effort:             raw.effort,
 		PromptFile:         raw.promptFile,
 		Workspace:          raw.workspace,
 		StdoutLog:          raw.stdoutLog,
@@ -198,7 +207,7 @@ func splitNonEmptyCSV(s string) []string {
 
 type rawLaunch struct {
 	cli, profile, model, promptFile, workspace, stdoutLog, stderrLog, artifact string
-	cycle, worktree, projectRoot, agent, completion                            string
+	cycle, worktree, projectRoot, agent, completion, effort                    string
 	permissionMode, sessionName, streamOutput, runID                           string
 	anthropicBaseURL, artifactTimeoutS, secondaryArtifacts                     string
 	validateOnly, dryRun, requireFull, requireSandbox, allowBypass, humanInput bool
@@ -230,9 +239,10 @@ func launchIntentFor(cfg *Config, prof Profile, efforts policy.EffortTable) Laun
 		ModelTier:   cfg.Model,
 		Permission:  permissionIntent(cfg.PermissionMode),
 		SessionMode: "ephemeral",
-		Effort:      LaunchEffort(cfg.CLI, cfg.Model, efforts, prof.Name),
+		Effort:      cmp.Or(cfg.Effort, LaunchEffort(cfg.CLI, cfg.Model, efforts, prof.Name)),
 		RawByCLI:    prof.ExtraFlagsByCLI,
 	}
+	intent.LadderEffort = cfg.Effort
 	if cfg.SessionName != "" {
 		intent.SessionMode = "named:" + cfg.SessionName
 	}
@@ -284,7 +294,7 @@ func parseLaunchArgs(args []string, env map[string]string) (rawLaunch, error) {
 	}
 
 	stringDest := map[string]*string{
-		"--cli": &r.cli, "--profile": &r.profile, "--model": &r.model,
+		"--cli": &r.cli, "--profile": &r.profile, "--model": &r.model, "--effort": &r.effort,
 		"--prompt-file": &r.promptFile, "--workspace": &r.workspace,
 		"--stdout-log": &r.stdoutLog, "--stderr-log": &r.stderrLog,
 		"--artifact": &r.artifact, "--secondary-artifacts": &r.secondaryArtifacts, "--cycle": &r.cycle, "--worktree": &r.worktree,
