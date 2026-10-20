@@ -30,6 +30,17 @@ type Normalizer struct {
 	stderrOff    int64
 	lastActivity time.Time
 	stallFired   bool
+	tail         func(path string, off int64) ([]string, int64)
+}
+
+type signalSender func(pid int, sig syscall.Signal) error
+
+var defaultKillPgrp = groupKiller(syscall.Kill)
+
+func groupKiller(send signalSender) func(pgid int, sig syscall.Signal) error {
+	return func(pgid int, sig syscall.Signal) error {
+		return send(-pgid, sig)
+	}
 }
 
 func NewNormalizer(cfg NormalizerConfig) *Normalizer {
@@ -37,33 +48,18 @@ func NewNormalizer(cfg NormalizerConfig) *Normalizer {
 		cfg.Now = time.Now
 	}
 	if cfg.KillPgrp == nil {
-		cfg.KillPgrp = func(pgid int, sig syscall.Signal) error {
-			return syscall.Kill(-pgid, sig)
-		}
+		cfg.KillPgrp = defaultKillPgrp
 	}
 	return &Normalizer{
 		cfg:          cfg,
 		classifier:   NewClassifier(cfg.Source, cfg.TraceID, cfg.Now),
 		lastActivity: cfg.Now(),
+		tail:         tailFile,
 	}
 }
 
 func (n *Normalizer) Poll() ([]Envelope, error) {
-	var out []Envelope
-
-	var outLines []string
-	outLines, n.stdoutOff = tailFile(n.cfg.StdoutPath, n.stdoutOff)
-	for _, ln := range outLines {
-		out = append(out, n.classifier.Line([]byte(ln))...)
-	}
-
-	if n.cfg.StderrPath != "" {
-		var errLines []string
-		errLines, n.stderrOff = tailFile(n.cfg.StderrPath, n.stderrOff)
-		for _, ln := range errLines {
-			out = append(out, n.classifier.Stderr([]byte(ln))...)
-		}
-	}
+	out := n.classifyNewLines()
 
 	if env, ok := n.classifier.FlushProgress(); ok {
 		out = append(out, env)
@@ -101,6 +97,24 @@ func (n *Normalizer) Poll() ([]Envelope, error) {
 		}
 	}
 	return out, nil
+}
+
+func (n *Normalizer) classifyNewLines() []Envelope {
+	var errLines []string
+	if n.cfg.StderrPath != "" {
+		errLines, n.stderrOff = n.tail(n.cfg.StderrPath, n.stderrOff)
+	}
+	var outLines []string
+	outLines, n.stdoutOff = n.tail(n.cfg.StdoutPath, n.stdoutOff)
+
+	var out []Envelope
+	for _, ln := range outLines {
+		out = append(out, n.classifier.Line([]byte(ln))...)
+	}
+	for _, ln := range errLines {
+		out = append(out, n.classifier.Stderr([]byte(ln))...)
+	}
+	return out
 }
 
 func tailFile(path string, off int64) ([]string, int64) {
