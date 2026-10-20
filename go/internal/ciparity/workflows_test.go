@@ -311,3 +311,114 @@ func TestGoWorkflow_VetsAndFormatsOncePerPlatformNotOncePerMatrixLeg(t *testing.
 		}
 	}
 }
+
+func runLines(job workflowJobContract) []string {
+	var lines []string
+	for _, step := range job.Steps {
+		for _, line := range strings.Split(step.Run, "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				lines = append(lines, line)
+			}
+		}
+	}
+	return lines
+}
+
+func setupGoVersion(job workflowJobContract) string {
+	for _, step := range job.Steps {
+		if strings.HasPrefix(step.Uses, "actions/setup-go@") {
+			return step.With["go-version"]
+		}
+	}
+	return ""
+}
+
+func TestGoWorkflow_MacOSRunsOnlyTheDarwinSetWithItsCoverageGatesAndTheE2ETier(t *testing.T) {
+	t.Parallel()
+	jobs := readWorkflowContract(t, "go.yml").Jobs
+	var macJobs []string
+	for name, job := range jobs {
+		if strings.HasPrefix(job.RunsOn, "macos") {
+			macJobs = append(macJobs, name)
+		}
+	}
+	if !slices.Equal(macJobs, []string{"build-test-darwin"}) {
+		t.Fatalf("macOS jobs = %v; want only build-test-darwin", macJobs)
+	}
+	mac := jobs["build-test-darwin"]
+	if mac.If != "" || mac.ContinueOnError != "" || setupGoVersion(mac) != "1.23" {
+		t.Errorf("the macOS job must always run on Go 1.23 and fail the suite: if=%q continue-on-error=%q go=%q", mac.If, mac.ContinueOnError, setupGoVersion(mac))
+	}
+	lines := runLines(mac)
+	for _, want := range []string{"make test-integration-darwin", `make cover-changed-darwin COVER_CHANGED_BASE="$base"`, "make test-e2e", "make cover-strict-darwin"} {
+		if !slices.Contains(lines, want) {
+			t.Errorf("the macOS job does not run %q", want)
+		}
+	}
+	for _, line := range lines {
+		if slices.Contains([]string{"make test-integration", "make cover-strict", "make apicover-check"}, line) || strings.HasPrefix(line, "make cover-changed ") {
+			t.Errorf("the macOS job runs the whole-module %q; ubuntu Go 1.23 owns it", line)
+		}
+	}
+	integration, cover := -1, -1
+	for i, step := range mac.Steps {
+		if step.Run != "" && (step.If != "" || step.ContinueOnError != "") {
+			t.Errorf("macOS step %q may not skip or ignore its failure", step.Run)
+		}
+		if strings.Contains(step.Run, "make test-integration-darwin") {
+			integration = i
+		}
+		if strings.Contains(step.Run, "make cover-changed-darwin") {
+			cover = i
+			if step.Env["COVER_BASE"] != "${{ github.event.pull_request.base.sha || github.event.before }}" {
+				t.Errorf("the macOS COVER_BASE = %q, want the PR base or the pushed-over commit", step.Env["COVER_BASE"])
+			}
+		}
+	}
+	if integration < 0 || cover != integration+1 {
+		t.Errorf("macOS cover-changed step at %d, darwin-set test step at %d; want it right after the profile is written", cover, integration)
+	}
+}
+
+func TestGoWorkflow_Ubuntu123OwnsEveryWholeModuleGateAndGo127RunsTheSuiteOnly(t *testing.T) {
+	t.Parallel()
+	jobs := readWorkflowContract(t, "go.yml").Jobs
+	full, current := jobs["build-test"], jobs["build-test-current"]
+	if full.RunsOn != "ubuntu-latest" || setupGoVersion(full) != "1.23" {
+		t.Errorf("build-test runs on %q with Go %q; want ubuntu-latest and 1.23", full.RunsOn, setupGoVersion(full))
+	}
+	for _, want := range []string{"make test-integration", `make cover-changed COVER_CHANGED_BASE="$base"`, "make apicover-check", "make cover-strict", "make test-e2e"} {
+		if !slices.Contains(runLines(full), want) {
+			t.Errorf("ubuntu Go 1.23 does not run %q", want)
+		}
+	}
+	if current.RunsOn != "ubuntu-latest" || setupGoVersion(current) != "1.27" || current.If != "" || current.ContinueOnError != "" {
+		t.Errorf("build-test-current runs on %q with Go %q (if=%q); want ubuntu-latest, 1.27, always", current.RunsOn, setupGoVersion(current), current.If)
+	}
+	lines := runLines(current)
+	if !slices.Contains(lines, "make test-integration") {
+		t.Error("Go 1.27 does not run the whole suite")
+	}
+	for _, line := range lines {
+		if strings.HasPrefix(line, "make cover") || strings.HasPrefix(line, "make apicover") || strings.HasPrefix(line, "make test-e2e") {
+			t.Errorf("Go 1.27 runs %q; its gates and the e2e tier belong to the Go 1.23 jobs", line)
+		}
+	}
+}
+
+func TestMakefile_DarwinTargetsReadTheOneDarwinSetFile(t *testing.T) {
+	t.Parallel()
+	makefile, err := os.ReadFile(filepath.Join(workflowRepoRoot(t), "go", "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(makefile)
+	if !regexp.MustCompile(`(?m)^DARWIN_SET := ` + regexp.QuoteMeta(DarwinSetFile) + `$`).MatchString(text) {
+		t.Errorf("the Makefile must name %s as DARWIN_SET", DarwinSetFile)
+	}
+	for _, want := range []string{"test-integration-darwin: INTEGRATION_SET = $(DARWIN_SET)", "test-integration-darwin: test-integration", "cover changed --base $(COVER_CHANGED_BASE) --root . --packages $(DARWIN_SET)", "cover strict --root . --packages $(DARWIN_SET)", "./cmd/darwinset > $(DARWIN_SET).tmp"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("the Makefile lacks %q", want)
+		}
+	}
+}

@@ -382,3 +382,19 @@ func TestMeasure_APercentThatRoundsBelowTheFloorKeepsTheShortForm(t *testing.T) 
 		t.Errorf("problem = %q; a percent that reads below the floor keeps one decimal", got[0].Problem)
 	}
 }
+
+func TestWithin_KeepsOnlyThePackagesOfTheSetAndEveryPackageForANilSet(t *testing.T) {
+	results := []Result{{Pkg: "p"}, {Pkg: "q", Problem: "below"}, {Pkg: "p/sub"}}
+
+	got := Within(results, covchanged.PackageSet{"p": true})
+
+	if len(got) != 1 || got[0].Pkg != "p" {
+		t.Errorf("Within = %+v, want only p", got)
+	}
+	if all := Within(results, nil); len(all) != 3 || Clean(all) {
+		t.Errorf("Within(nil) = %+v, want every result kept, the refusal included", all)
+	}
+	if none := Within(results, covchanged.PackageSet{"r": true}); none == nil || len(none) != 0 {
+		t.Errorf("Within of a disjoint set = %#v, want an empty, non-nil list", none)
+	}
+}

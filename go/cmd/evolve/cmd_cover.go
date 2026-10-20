@@ -15,13 +15,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-const coverUsage = "usage: evolve cover changed --base <ref> [--profile <path>] [--json] [--root DIR]\n       evolve cover strict [--profile <path>] [--floors <path>] [--json] [--root DIR]"
+const coverUsage = "usage: evolve cover changed --base <ref> [--profile <path>] [--packages <file>] [--json] [--root DIR]\n       evolve cover strict [--profile <path>] [--floors <path>] [--packages <file>] [--json] [--root DIR]"
 
 var coverChangedRunner sysexec.RunFunc = sysexec.DefaultRunner
 
 type coverChangedArgs struct {
-	root, base, profile string
-	asJSON              bool
+	root, base, profile, packages string
+	asJSON                        bool
 }
 
 func runCover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -48,8 +48,13 @@ func runCoverChanged(args []string, stdout, stderr io.Writer) int {
 			return exitIO
 		}
 	}
+	packages, err := readPackageSet(in.packages)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve cover changed: %v\n", err)
+		return exitIO
+	}
 	ws := covchanged.Workspace{ModuleDir: moduleDir, Run: coverChangedRunner}
-	v, err := ws.Check(context.Background(), covchanged.Options{Base: in.base, Profile: in.profile, Tags: covchanged.DefaultTags})
+	v, err := ws.Check(context.Background(), covchanged.Options{Base: in.base, Profile: in.profile, Tags: covchanged.DefaultTags, Packages: packages})
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cover changed: %v\n", err)
 		return exitIO
@@ -75,6 +80,7 @@ func parseCoverChanged(args []string, stderr io.Writer) (coverChangedArgs, bool)
 	flags.StringVar(&in.root, "root", ".", "repository root or Go module root")
 	flags.StringVar(&in.base, "base", "", "the git ref the change is measured against")
 	flags.StringVar(&in.profile, "profile", "", "coverage profile (default: <module>/coverage.txt)")
+	flags.StringVar(&in.packages, "packages", "", packagesFlagUsage)
 	flags.BoolVar(&in.asJSON, "json", false, "print the verdict as JSON")
 	positional, err := parseInterspersed(flags, args[1:])
 	switch {
@@ -89,6 +95,19 @@ func parseCoverChanged(args []string, stderr io.Writer) (coverChangedArgs, bool)
 		return in, false
 	}
 	return in, true
+}
+
+const packagesFlagUsage = "file of package directories, one per line, relative to the working directory; judge only those packages (default: every package)"
+
+func readPackageSet(file string) (covchanged.PackageSet, error) {
+	if file == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("read the package set: %w", err)
+	}
+	return covchanged.ParsePackageSet(data)
 }
 
 func coverModuleDir(root string) (string, error) {

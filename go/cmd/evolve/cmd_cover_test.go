@@ -277,3 +277,52 @@ func TestCoverUsage_NamesBothVerbs(t *testing.T) {
 		t.Errorf("exit = %d; stderr %q must name both verbs", code, errOut)
 	}
 }
+
+func TestCoverChanged_PackagesJudgesOnlyTheChangedFilesOfTheSet(t *testing.T) {
+	fakeCoverGit(t, nil)
+	root := coverModule(t, map[string]string{"go/inset": "# header\n./p\n", "go/outset": "./q\n"})
+
+	inOut, _, inCode := runDispatch("cover", "changed", "--base", "main", "--root", root, "--packages", filepath.Join(root, "go", "inset"))
+	outOut, outErr, outCode := runDispatch("cover", "changed", "--base", "main", "--root", root, "--packages", filepath.Join(root, "go", "outset"))
+
+	if inCode != 1 || !strings.Contains(inOut, "REFUSED p/a.go:3 p.F") {
+		t.Errorf("a set that holds p: exit %d, want 1 and p.F refused:\n%s", inCode, inOut)
+	}
+	if outCode != 0 || !strings.Contains(outOut, "0 changed, 0 full, 0 refused, 1 exempt") {
+		t.Errorf("a set without p: exit %d, want 0 and p/a.go exempt; out=%s err=%s", outCode, outOut, outErr)
+	}
+}
+
+func TestCoverStrict_PackagesJudgesOnlyTheFloorsOfTheSet(t *testing.T) {
+	t.Parallel()
+	root := coverStrictModule(t, "./p 100\n")
+	if err := os.WriteFile(filepath.Join(root, "go", "set"), []byte("./other\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, errOut, code := runDispatch("cover", "strict", "--root", root, "--packages", filepath.Join(root, "go", "set"))
+	all, _, allCode := runDispatch("cover", "strict", "--root", root)
+
+	if code != 0 || out != "" {
+		t.Errorf("a set without p: exit %d, out %q (err %s); want 0 and no line", code, out, errOut)
+	}
+	if allCode != 1 || !strings.Contains(all, "p: 66.7% < 100.0% FAIL") {
+		t.Errorf("without --packages: exit %d, want 1 and the p refusal:\n%s", allCode, all)
+	}
+}
+
+func TestCover_APackageSetItCannotReadExitsIO(t *testing.T) {
+	fakeCoverGit(t, nil)
+	root := coverModule(t, map[string]string{"go/.cover-strict": strictFloorsPass, "go/bad": "../outside\n"})
+	missing := filepath.Join(root, "none")
+	for name, args := range map[string][]string{
+		"changed, a missing file":  {"cover", "changed", "--base", "main", "--root", root, "--packages", missing},
+		"changed, an invalid line": {"cover", "changed", "--base", "main", "--root", root, "--packages", filepath.Join(root, "go", "bad")},
+		"strict, a missing file":   {"cover", "strict", "--root", root, "--packages", missing},
+		"strict, an invalid line":  {"cover", "strict", "--root", root, "--packages", filepath.Join(root, "go", "bad")},
+	} {
+		if _, errOut, code := runDispatch(args...); code != exitIO || !strings.Contains(errOut, "package") {
+			t.Errorf("%s: exit %d, stderr %q; want exitIO naming the package set", name, code, errOut)
+		}
+	}
+}

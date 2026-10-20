@@ -212,6 +212,8 @@ var serialTests = map[string]string{
 	"main.TestCoverChanged_JSONCarriesTheVerdictAndTheCleanBit":                                             "swaps seam coverChangedRunner",
 	"main.TestCoverChanged_NamesAFunctionWithNoProfile":                                                     "swaps seam coverChangedRunner",
 	"main.TestCoverChanged_PassesWithExit0WhenEveryChangedFunctionIsFull":                                   "swaps seam coverChangedRunner",
+	"main.TestCoverChanged_PackagesJudgesOnlyTheChangedFilesOfTheSet":                                       "swaps seam coverChangedRunner",
+	"main.TestCover_APackageSetItCannotReadExitsIO":                                                         "swaps seam coverChangedRunner",
 	"main.TestCoverChanged_RefusesWithExit1AndNamesTheFunctionItsPercentAndCounts":                          "swaps seam coverChangedRunner",
 	"main.TestCycleDiagfAndBench_WriteToTheProcessStderr":                                                   "calls os.Pipe",
 	"main.TestCycleHealth_DossierCommitmentSignalStaysQuietOnHealthyShapes":                                 "sets env through a helper",

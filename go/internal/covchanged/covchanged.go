@@ -54,6 +54,7 @@ const (
 	ReasonTestdata         = "testdata"
 	ReasonVendor           = "vendor"
 	ReasonBuildConstraints = "build constraints exclude it"
+	ReasonOutsidePackages  = "outside the package set"
 )
 
 type Report struct {
@@ -71,4 +72,5 @@ type Sources struct {
 	Profile  Profile
 	ReadFile func(rel string) ([]byte, error)
 	Build    build.Context
+	Packages PackageSet
 }

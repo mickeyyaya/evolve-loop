@@ -334,8 +334,16 @@ schema-filter enforcement) are tracked in `PORTING-LEDGER.md` and map to
 
 `.github/workflows/go.yml`:
 
-- Linux/macOS Go 1.23 compatibility lanes plus Linux Go 1.27; the module language
-  baseline remains Go 1.23. Checkout includes full history.
+- Three test jobs (plan `ci-wall-time-2026-10`, C2). `build-test` (ubuntu,
+  Go 1.23) runs every package and every gate below. `build-test-darwin`
+  (macOS, Go 1.23) runs `make test-integration-darwin`, `make test-e2e`,
+  `make cover-changed-darwin` and `make cover-strict-darwin` over the packages
+  of `go/.darwin-set`. `build-test-current` (ubuntu, Go 1.27) runs
+  `make test-integration` without gates. The module language baseline remains
+  Go 1.23. Checkout includes full history.
+- `go/.darwin-set` lists the packages whose code or tests differ on macOS.
+  `make darwin-set` writes it from the tree (`cmd/darwinset`), and
+  `TestDarwinSetFile_MatchesTheSetDerivedFromTheTree` fails when it is stale.
 - `make test-integration` — all non-ACS runtime packages with integration,
   race detection, uncached execution and coverage. This includes commit-gate,
   component, fixtures, public-package and trustkernel tests.
@@ -398,8 +406,8 @@ entry point for every pull request and for pushes to `main` and
   routing and the `validate` call succeeded, `validate` and `acs-durable`
   each reported `success` through `ci.yml`'s outputs, and each optional suite
   either ran and succeeded or was deliberately unselected. A selected suite
-  needs both its call result (`needs.go.result`, which fails when any matrix
-  leg fails) and its inner job's `job.status` output, which is empty when the
+  needs both its call result (`needs.go.result`, which fails when any Go
+  job fails) and its inner job's `job.status` output, which is empty when the
   inner job was skipped. An unselected suite must be `skipped` with an empty
   output. A failed, cancelled, skipped or missing required job fails it
   (`TestRequiredResult_RejectsMissingOrUnsuccessfulWork`). Every other job in
@@ -408,7 +416,10 @@ entry point for every pull request and for pushes to `main` and
 
 Through the reusable calls, the check names carry the caller's prefix:
 `plugin and durable ACS / validate`, `plugin and durable ACS / acs-durable`,
-`go / build + test (Go) (<os>, <go>)` and `landing / test landing module`.
+`go / build + test (Go 1.23, ubuntu, every package and every gate)`,
+`go / build + test (Go 1.23, macOS, the darwin package set)`,
+`go / build + test (Go 1.27, ubuntu, every package, no gates)` and
+`landing / test landing module`.
 The job `CI required` (not the workflow name `required CI`) is the stable
 check name for a branch rule. Tools that read the CI verdict of a commit
 (`releasepreflight`, `ciwatch`, the `/evo:publish` and `/evo:release` skills)

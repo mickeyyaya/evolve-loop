@@ -14,6 +14,7 @@
 - [6. Components](#6-components)
 - [6a. Components after the first instrumented run (C6 to C14)](#6a-components-after-the-first-instrumented-run-c6-to-c14)
 - [6b. Components after the queue measurement (C15 and C16)](#6b-components-after-the-queue-measurement-c15-and-c16)
+- [6c. Build status of C2 (2026-10-20)](#6c-build-status-of-c2-2026-10-20)
 - [7. Order](#7-order)
 - [8. Verification](#8-verification)
 - [9. Risks](#9-risks)
@@ -217,7 +218,7 @@ Each level keeps the indexes that explain its time. The last column says which d
 | C0 | D1 artifact upload, plus D2 in `cmd/testlatency` | a `testlatency` test: a fixture stream with a serial chain reports that chain as the floor | Sonnet |
 | C0b | D10 rusage wrapper and D11 runner sampler, both uploaded with the C0 artifacts | a wrapper test: a child allocates 64 MB and spawns one subprocess. The record shows peak RSS ≥ 64 MB and system CPU > 0. The exit code passes through. A sampler test: a 2 s run writes at least one record per second, and the file closes when the job ends. | Sonnet |
 | C1 | D3 `ci-critical-path` report, as `evolve ci telemetry` (D12). Its red-test fixture also holds a rusage record and a sampler record, so the join is proven | a fixture of jobs, steps and test JSON gives the expected L5→L1 path | Sonnet |
-| C2 | D4–D6 matrix scope, plus the darwin-set script | a script test: a package with a `_darwin.go` file is in the set, and a plain package is not | Sonnet, workflow review by the console |
+| C2 | D4–D6 matrix scope, plus the darwin-set script. **Built (2026-10-20, §6c).** | a script test: a package with a `_darwin.go` file is in the set, and a plain package is not | Sonnet, workflow review by the console |
 | C3 | D7 skills-drift build sharing. **In progress (2026-10-17).** | a test counts generator builds per run: one per distinct tree | Sonnet |
 | C4 | D8 `cmd/evolve` serial chain | the AST parallel guard shows the moved tests as parallel | Sonnet |
 | C5 | D9 `bridge` injected clock | each dwell test passes with the fake clock in under 1 s | Sonnet |
@@ -322,7 +323,7 @@ On 2026-10-19 the console measured the queue of the macOS job (research F7.1 to 
 |---|---|---|---|---|
 | A. Concurrency groups (C15) | GitHub cancels a superseded PR run, and it keeps only the newest queued main run | about −36 of 69 PR runs; fewer main runs in a merge train | none | Adopt now |
 | B. Inbox-only route (C16) | a PR that changes only `.evolve/inbox/` runs one small ubuntu job, not the Go matrix | −1 macOS job per inbox-only PR | none | Adopt now |
-| C. Scope the matrix (C2) | the macOS job runs only the darwin set and the e2e tier | the slot is held for less time per run | none | Approved; next after C15 and C16 |
+| C. Scope the matrix (C2) | the macOS job runs only the darwin set and the e2e tier | the slot is held for less time per run | none | Built 2026-10-20 (§6c) |
 | D. A merge queue | GitHub tests each merge group once before it lands on main | fewer main runs per merge train | the console merge flow changes | Open question Q6 |
 | E. More macOS slots from GitHub | a paid plan raises the cap of 5 concurrent macOS jobs | the cap rises; the demand stays | money every month | Open question Q7 |
 
@@ -348,6 +349,35 @@ Both are built on the branch `perf/ci-queue-concurrency-and-inbox-route`.
 |---|---|---|---|
 | C15 | D24 and D25 in `.github/workflows/required.yml` | `TestRequiredWorkflow_ConcurrencyCancelsOnlySupersededPullRequestRuns` pins the group, the cancel rule, and no group in the called workflows | The test reads the expressions. It cannot run the GitHub scheduler. The real effect needs the next API sample. |
 | C16 | D26: the `changes` job writes `inbox=`, the `inbox` job runs on it, and `CI required` checks it | `TestRequiredRouting_InboxOnlyChangesSkipTheGoMatrix` runs the real routing script for `push` and `pull_request`. Its cases are inbox only, a deleted inbox item, inbox with a Go file, inbox with `policy.json`, and `.evolve/inbox-parked/`. `TestRequiredWorkflow_InboxJobLintsTheInboxAndRunsItsRealTreeTests` and new cases in `TestRequiredResult_RejectsMissingOrUnsuccessfulWork` pin the job and its result. | A full run (manual, first push, empty diff) also runs the `inbox` job. `TestC1292_004` stays in the per-cycle ACS gate, as before. |
+
+## 6c. Build status of C2 (2026-10-20)
+
+On 2026-10-20 the macOS queue was gone (research F8.1). The macOS run set the wall: 19.8 min against 10.7 min for ubuntu Go 1.23 (F8.3). C2 is built on the branch `ci/c2-scoped-macos`.
+
+**The new shape of `go.yml`.** The matrix job becomes three jobs. A failed job fails the reusable workflow, so `CI required` still sees each failure through `needs.go.result`.
+
+| Job | Runner and Go | Tests | Gates (all hard-fail) |
+|---|---|---|---|
+| `build-test` | ubuntu, 1.23 | `make test-integration` (every package), `make test-e2e` | `cover-changed`, `cover-strict`, `apicover-check` over every package; the function and apicover warnings |
+| `build-test-darwin` | macOS, 1.23 | `make test-integration-darwin` (the packages of `go/.darwin-set`), `make test-e2e` | `cover-changed-darwin`, `cover-strict-darwin` over the set |
+| `build-test-current` | ubuntu, 1.27 | `make test-integration` (every package) | none (D6) |
+
+The `lint`, `vet-current` and `vulncheck` jobs do not change. `required.yml` does not change, so `if: always()` and the inbox-only route of C16 stay.
+
+| Item | Built as | Red test |
+|---|---|---|
+| The darwin set (D5) | `ciparity.DarwinPackages` applies four rules to each package, test files included. The file lists differ between `GOOS=darwin` and `GOOS=linux`. A `//go:build` line names `darwin` outside a `!`. A file uses `runtime.GOOS`, except in a comparison with a literal other than `darwin` or `linux`. A non-test file holds `sandbox-exec`. `make darwin-set` writes the result to `go/.darwin-set` (19 packages, research F8.4). | `TestDarwinPackages_SelectsEveryPackageWhoseCodeOrTestsDifferOnMacOS` |
+| The drift guard | `TestDarwinSetFile_MatchesTheSetDerivedFromTheTree` derives the set from the real tree and compares it with the committed file. It runs in the ubuntu suite, so a new darwin file in a package outside the set fails CI. | the same test |
+| The scoped gates (D4) | `evolve cover changed` and `evolve cover strict` take `--packages <file>`. `cover changed` exempts a changed file outside the set, and it names the file in the verdict. `cover strict` judges only the floors of the set. | `TestCoverChanged_PackagesJudgesOnlyTheChangedFilesOfTheSet`, `TestCoverStrict_PackagesJudgesOnlyTheFloorsOfTheSet`, `TestMakeDarwinTargets_TestAndGateOnlyThePackagesOfTheDarwinSet` |
+| The workflow | the three jobs above | `TestGoWorkflow_MacOSRunsOnlyTheDarwinSetWithItsCoverageGatesAndTheE2ETier`, `TestGoWorkflow_Ubuntu123OwnsEveryWholeModuleGateAndGo127RunsTheSuiteOnly` |
+
+**What the build records.**
+
+- Go 1.27 loses the e2e tier and the coverage gates, as D6 and the proposal of Q2 say. These gates measure the same Linux code as ubuntu Go 1.23.
+- macOS loses `apicover-check`, the function warnings and the whole-module `cover-strict`. Ubuntu Go 1.23 keeps each of them.
+- `internal/core` is in the set because of a test branch on `runtime.GOOS` (F8.4). The set errs on the safe side, as F3.10 does. C14 can cut its macOS cost later.
+- The rules cannot see macOS behavior without a branch on the OS. Examples are a `tmux` call, a `syscall` call and an aliased import of `runtime`. Such a failure shows only in a full macOS run. This is the risk of §9.
+- The weekly full macOS run of §9 is not built. Q1 is still open, and that run is the backstop for the risk above.
 
 ## 7. Order
 

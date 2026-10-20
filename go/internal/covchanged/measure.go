@@ -61,6 +61,9 @@ func measureFile(src Sources, rel string) ([]Func, string, error) {
 	if reason := pathExemption(rel); reason != "" {
 		return nil, reason, nil
 	}
+	if !src.Packages.Holds(rel) {
+		return nil, ReasonOutsidePackages, nil
+	}
 	data, err := src.ReadFile(rel)
 	if err != nil {
 		return nil, "", fmt.Errorf("covchanged: read %s: %w", rel, err)
