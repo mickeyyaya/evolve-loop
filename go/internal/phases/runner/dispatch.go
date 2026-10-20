@@ -59,7 +59,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		if bridgeErr != nil && bres.ExitCode == 85 {
 			b.maybeBenchOnEscalation(bridgechain.EscalationFor(attempt, start))
 		}
-		return bres.ExitCode, bridgeErr
+		return llmroute.TieringExit(bres.ExitCode, bres.CauseCode), bridgeErr
 	}, func(from, to string) {
 		log.Diag().Infof("[runner] phase=%s tier step-down: %s → %s (CLI chain exhausted at quota)\n", phase, from, to)
 	})

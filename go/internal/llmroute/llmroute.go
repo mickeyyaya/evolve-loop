@@ -56,6 +56,9 @@ func (p Plan) Permits(cli, tier string) bool {
 func DefaultDriverForFamily(cli string) string { return defaultDriverForFamily(cli) }
 
 func (p Plan) TriggersFallback(exitCode int) bool {
+	if exitCode == ExitUnknownPromptNotQuota {
+		exitCode = exitQuotaExhausted
+	}
 	for _, t := range p.Triggers {
 		if t == exitCode {
 			return true

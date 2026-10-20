@@ -44,6 +44,8 @@ func Benchable(pattern string) bool {
 
 const QuotaExhaustedPattern = "quota_exhausted"
 
+const ModelUnsupportedPattern = "model_unsupported"
+
 const UsageProbePattern = "usage_probe"
 
 func QuotaPattern(pattern string) bool {
@@ -57,10 +59,13 @@ func QuotaPattern(pattern string) bool {
 const CredentialPattern = "auth_recheck"
 
 func OperatorAction(family, pattern string) string {
-	if pattern != CredentialPattern {
-		return ""
+	switch pattern {
+	case CredentialPattern:
+		return fmt.Sprintf("operator: the %s CLI needs to be logged in again; the bench clears itself once a probe succeeds", family)
+	case ModelUnsupportedPattern:
+		return fmt.Sprintf("operator: the account cannot run this %s model; re-pin the tier, or accept the fallback; the bench stops binding once the tier resolves to another model", family)
 	}
-	return fmt.Sprintf("operator: the %s CLI needs to be logged in again; the bench clears itself once a probe succeeds", family)
+	return ""
 }
 
 const ExhaustedPattern = "exhausted"
@@ -81,6 +86,8 @@ func NewBenchEntry(prev Entry, family, pattern, paneText string, now time.Time) 
 	until, parsed := time.Time{}, false
 	switch pattern {
 	case CredentialPattern:
+	case ModelUnsupportedPattern:
+		until, parsed = now.Add(MaxCooldown), true
 	case ExhaustedPattern:
 		until, parsed = parseHints(clockedHints, paneText, now)
 	default:

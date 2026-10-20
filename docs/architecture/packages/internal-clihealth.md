@@ -34,3 +34,10 @@
 ## Findings
 
 - The bench record is the one place that stores a family's wall. A new routing consumer must read `Active` and must not keep a second store.
+
+## The model_unsupported pattern (2026-10-21)
+
+- `ModelUnsupportedPattern` (`model_unsupported`) names an account that cannot run a model. The exit is deterministic for the pair of the family and the model.
+- `NewBenchEntry` benches it for `MaxCooldown`, and `OperatorAction` names the two operator choices: re-pin the tier, or accept the fallback.
+- `Benchable` does not hold it, so the canary and the family benches never bench a whole family on it. Only `bridgechain.BenchOnEscalation` uses it, with a model scope.
+- Pinned by `TestModelUnsupported_BenchesForTheLongestCooldownWithAnOperatorAction`.
