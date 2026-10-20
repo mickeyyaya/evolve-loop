@@ -37,7 +37,8 @@ func ReadLoopSignals(root string) ([]signalcenter.Event, []string) {
 
 func MeasureFacts(rec Record, next *Record, cycles []Cycle, loop []signalcenter.Event, policyWidth int) (wavemeasure.Facts, string) {
 	f := wavemeasure.Facts{Start: rec.StartedAt, End: runEnd(rec, next), WidthSized: policyWidth}
-	pool := poolLanes(loopRunOf(rec, next), loop)
+	run := loopRunOf(rec, next)
+	pool := poolLanes(run, loop)
 	for _, c := range cycles {
 		lane := wavemeasure.Lane{Landed: c.Shipped, Conflict: c.Conflict}
 		if len(pool) == 0 {
@@ -46,6 +47,7 @@ func MeasureFacts(rec Record, next *Record, cycles []Cycle, loop []signalcenter.
 		f.Lanes = append(f.Lanes, lane)
 	}
 	f.Lanes = append(f.Lanes, pool...)
+	f.OptimisticAdmissions, f.OptimisticFailures = countOptimistic(run, loop)
 	return applyLoopSignals(f, loop)
 }
 
@@ -68,20 +70,16 @@ func applyLoopSignals(f wavemeasure.Facts, events []signalcenter.Event) (wavemea
 			}
 		}
 	}
-	f.OptimisticAdmissions, f.OptimisticFailures = countOptimistic(f, events)
 	return f, source
 }
 
-func countOptimistic(f wavemeasure.Facts, events []signalcenter.Event) (admissions, failures int) {
+func countOptimistic(run loopRun, events []signalcenter.Event) (admissions, failures int) {
 	admitted, failed := map[string]bool{}, map[string]bool{}
 	for _, e := range events {
-		if !inRun(f, eventTime(e)) {
-			continue
-		}
-		switch todo := e.Fields[todoField]; e.Code {
-		case orchestrator.CodeAdmissionOptimistic:
+		switch todo := e.Fields[todoField]; {
+		case e.Code == orchestrator.CodeAdmissionOptimistic && run.holds(e):
 			admitted[todo] = true
-		case orchestrator.CodeOptimisticAdmissionFailed:
+		case e.Code == orchestrator.CodeOptimisticAdmissionFailed && run.spans(eventTime(e)):
 			failed[todo] = true
 		}
 	}

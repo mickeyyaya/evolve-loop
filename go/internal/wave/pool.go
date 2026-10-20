@@ -31,8 +31,11 @@ func loopRunOf(rec Record, next *Record) loopRun {
 }
 
 func (r loopRun) holds(e signalcenter.Event) bool {
-	at := eventTime(e)
-	return (r.pid == 0 || e.PID == r.pid) && !at.Before(r.from) && (r.to.IsZero() || !at.After(r.to))
+	return (r.pid == 0 || e.PID == r.pid) && r.spans(eventTime(e))
+}
+
+func (r loopRun) spans(at time.Time) bool {
+	return !at.Before(r.from) && (r.to.IsZero() || !at.After(r.to))
 }
 
 func poolLanes(run loopRun, events []signalcenter.Event) []wavemeasure.Lane {

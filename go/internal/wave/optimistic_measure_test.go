@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
 )
@@ -50,5 +51,29 @@ func TestMeasureFacts_AFailureCountsOnlyWhenItsAdmissionIsCounted(t *testing.T) 
 	}
 	if m := wavemeasure.Compute(facts, clock(60)); m.OptimisticFailureRate > 1 {
 		t.Errorf("rate = %v, want a value in [0,1]", m.OptimisticFailureRate)
+	}
+}
+
+func TestMeasureFacts_TheOptimisticCountsUseThePoolLaneWindowOfTheRunLoop(t *testing.T) {
+	t.Parallel()
+	optimistic, failed := string(orchestrator.CodeAdmissionOptimistic), string(orchestrator.CodeOptimisticAdmissionFailed)
+	rec := wave.Record{Number: 7, RunID: clock(-10).Format("20060102T150405Z"), PID: 42, StartedAt: clock(0)}
+	loop := []signalcenter.Event{
+		runEvent(-20, 42, optimistic, "before-the-boundary", ""),
+		runEvent(-2, 42, optimistic, "opening", ""),
+		runEvent(-1, 7, optimistic, "other-loop", ""),
+		runEvent(-1, 42, string(orchestrator.CodeLaneLaunched), "opening", ""),
+		runEvent(20, 900, failed, "opening", ""),
+		runEvent(21, 901, failed, "other-loop", ""),
+		runEvent(22, 902, failed, "before-the-boundary", ""),
+	}
+
+	facts, _ := wave.MeasureFacts(rec, nil, nil, loop, 4)
+
+	if facts.OptimisticAdmissions != 1 || facts.OptimisticFailures != 1 {
+		t.Fatalf("facts = %+v, want the opening lane launched before started_at counted once in both (its failure comes from the lane pid 900, so failures are deliberately not pid-filtered), and nothing from another loop or before the run id", facts)
+	}
+	if len(facts.Lanes) != 1 {
+		t.Errorf("lanes = %+v, want the one pool lane of the same window", facts.Lanes)
 	}
 }
