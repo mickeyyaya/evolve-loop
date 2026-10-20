@@ -20,6 +20,8 @@ import (
 
 var ErrInvalidItem = errors.New("inboxmover: invalid inbox item")
 
+var ErrAlreadyFiled = errors.New("already filed in the inbox")
+
 type FileResult struct {
 	Path          string
 	ConsoleReason string
@@ -190,7 +192,7 @@ func filedItemIDs(inboxDir string) (map[string]bool, error) {
 
 func checkNewIdentity(item inboxbatch.Item, filed map[string]bool) error {
 	if filed[item.ID] {
-		return fmt.Errorf("%w: id %q is already filed in the inbox", ErrInvalidItem, item.ID)
+		return fmt.Errorf("%w: id %q is %w", ErrInvalidItem, item.ID, ErrAlreadyFiled)
 	}
 	for _, dep := range item.Deps {
 		if !filed[dep] {

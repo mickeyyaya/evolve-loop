@@ -324,6 +324,8 @@ Each AC is assigned exactly one of:
 
 The `Needs changed` column lists every repo path that each AC needs changed, including the wiring a plan step names ("wire into pre-flight"). A lane builder can never change a protected path, so a predicate that needs one is red on every legal tree. The `protected-ac-predicate` gate refuses a `predicate` row whose `Needs changed` cell names a protected path or no path, a `console-followup` row that still lists a predicate, and an AC section without that column or without a `Disposition` table. Give such an AC the `console-followup` disposition and write no predicate for it.
 
+The host files a console-manual inbox item for each `console-followup` row when the gate passes. Do not file it yourself. Put the criterion in the `Criterion` cell, because that cell becomes the item's acceptance.
+
 ### Bare defer-to-Auditor ban
 
 Bare "defer to Auditor" disposition **not allowed** without explicit Auditor checklist. Use `manual+checklist` with checklist addressed to Auditor instead.

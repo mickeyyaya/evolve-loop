@@ -15,17 +15,20 @@ import (
 )
 
 const (
-	needsChangedColumn = "needs changed"
-	dispositionColumn  = "disposition"
-	predicatesColumn   = "predicate"
+	needsChangedColumn    = "needs changed"
+	dispositionColumn     = "disposition"
+	predicatesColumn      = "predicate"
+	criterionColumnPrefix = "criteri"
 )
 
-type protectedACGate struct{}
+type protectedACGate struct {
+	file ConsoleFollowupFiler
+}
 
 func (protectedACGate) name() string                { return "protected-ac-predicate" }
 func (protectedACGate) appliesTo(phase string) bool { return phase == string(core.PhaseTDD) }
 
-func (protectedACGate) check(in core.ReviewInput) (string, bool) {
+func (g protectedACGate) check(in core.ReviewInput) (string, bool) {
 	report, err := os.ReadFile(filepath.Join(in.Workspace, phasecontract.ArtifactFilename(string(core.PhaseTDD))))
 	if err != nil {
 		return "", false
@@ -44,12 +47,12 @@ func (protectedACGate) check(in core.ReviewInput) (string, bool) {
 	if problems := table.problems(); len(problems) > 0 {
 		return strings.Join(problems, "; "), true
 	}
-	return "", false
+	return g.fileFollowups(in, table)
 }
 
 type acMaterialization struct {
-	disposition, needs, predicates int
-	rows                           [][]string
+	disposition, needs, predicates, criterion int
+	rows                                      [][]string
 }
 
 func acTable(lines []string) (acMaterialization, bool) {
@@ -59,7 +62,7 @@ func acTable(lines []string) (acMaterialization, bool) {
 		if disposition < 0 {
 			continue
 		}
-		t := acMaterialization{disposition: disposition, needs: columnIndex(header, needsChangedColumn), predicates: columnWithPrefix(header, predicatesColumn)}
+		t := acMaterialization{disposition: disposition, needs: columnIndex(header, needsChangedColumn), predicates: columnWithPrefix(header, predicatesColumn), criterion: columnWithPrefix(header, criterionColumnPrefix)}
 		for _, row := range lines[i+1:] {
 			cells := tableCells(row)
 			if cells == nil {
@@ -80,11 +83,8 @@ func (t acMaterialization) problems() []string {
 		if t.disposition >= len(row) {
 			continue
 		}
-		needs := ""
-		if t.needs < len(row) {
-			needs = row[t.needs]
-		}
-		switch disposition := strings.ToLower(strings.Trim(row[t.disposition], " *`")); {
+		needs := cellAt(row, t.needs)
+		switch disposition := dispositionOf(row[t.disposition]); {
 		case strings.HasPrefix(disposition, "predicate"):
 			found := guards.ProtectedPathsIn(needs)
 			switch {
@@ -94,7 +94,7 @@ func (t acMaterialization) problems() []string {
 			case len(guards.PathsIn(needs)) == 0:
 				unnamed = append(unnamed, row[0])
 			}
-		case strings.HasPrefix(disposition, "console-followup") && t.predicates >= 0 && t.predicates < len(row) && listsPredicates(row[t.predicates]):
+		case t.isConsoleFollowup(row) && listsPredicates(cellAt(row, t.predicates)):
 			leftover = append(leftover, fmt.Sprintf("AC %s is a console-followup but lists predicate(s) %s — a console follow-up keeps no lane predicate; delete it", row[0], strings.TrimSpace(row[t.predicates])))
 		}
 	}
@@ -108,6 +108,19 @@ func (t acMaterialization) problems() []string {
 		out = append(out, fmt.Sprintf("AC %s names no path in %q — a predicate AC always needs a path changed; name each one, including the wiring a plan step names", strings.Join(unnamed, ", "), needsChangedColumn))
 	}
 	return append(out, leftover...)
+}
+
+func (t acMaterialization) isConsoleFollowup(row []string) bool {
+	return strings.HasPrefix(dispositionOf(cellAt(row, t.disposition)), "console-followup")
+}
+
+func dispositionOf(cell string) string { return strings.ToLower(strings.Trim(cell, " *`")) }
+
+func cellAt(row []string, i int) string {
+	if i < 0 || i >= len(row) {
+		return ""
+	}
+	return row[i]
 }
 
 func appendNew(dst []string, items ...string) []string {
