@@ -377,7 +377,19 @@ The `lint`, `vet-current` and `vulncheck` jobs do not change. `required.yml` doe
 - macOS loses `apicover-check`, the function warnings and the whole-module `cover-strict`. Ubuntu Go 1.23 keeps each of them.
 - `internal/core` is in the set because of a test branch on `runtime.GOOS` (F8.4). The set errs on the safe side, as F3.10 does. C14 can cut its macOS cost later.
 - The rules cannot see macOS behavior without a branch on the OS. Examples are a `tmux` call, a `syscall` call and an aliased import of `runtime`. Such a failure shows only in a full macOS run. This is the risk of §9.
-- The weekly full macOS run of §9 is not built. Q1 is still open, and that run is the backstop for the risk above.
+- The weekly full macOS run of §9 is built (below). It is the backstop for the risk above.
+
+**The weekly full macOS run (Q1, decided).** The operator decided on 2026-10-20: the per-PR macOS job runs only the darwin set, and a weekly full-suite macOS run on `main` is the backstop.
+
+| Item | Built as | Red test |
+|---|---|---|
+| The workflow | `.github/workflows/macos-weekly.yml`. It runs on `schedule` (Sunday 04:17 UTC) and on `workflow_dispatch`. It checks out `main`, uses Go 1.23 on `macos-latest`, and calls `make test-integration` and `make test-e2e`. It keeps the `-json` streams as the artifact `macos-weekly-json`. Its concurrency group is `macos-weekly`, and a run is never cancelled. | `TestMacosWeekly_RunsWeeklyOnMainAndIsNotAPullRequestCheck`, `TestMacosWeekly_RunsTheFullSuiteThroughTheMakeTargets` |
+| The soft gate | `required.yml` does not call it and `CI required` does not depend on it. ADR-0144 treats it as a soft gate: a failure files an item and never blocks a merge. | `TestMacosWeekly_IsASoftGateOutsideTheRequiredResult` |
+| The failure report | The `report` job runs only when the suite job fails. It reads the failing packages from the `-json` streams. It opens one issue titled `macOS weekly full-suite run failed` with the label `ci-macos-weekly`. When that issue is open, it adds a comment with the run URL instead. Only this job has `issues: write`. The other permission is `contents: read`. | `TestMacosWeekly_OnlyTheReportJobCanWriteIssues` |
+
+The console boundary (the latency gate T5 of ADR-0144) will later turn these issues into inbox items. This change does not build that step.
+
+The tests read the workflow text. They cannot run the GitHub scheduler, and they cannot prove that the `gh` calls succeed on a real runner. The first scheduled or manual run proves that.
 
 ## 7. Order
 
@@ -417,7 +429,7 @@ Each component is one PR, merged at a wave boundary. Each one follows the usual 
 
 ## 10. Open questions
 
-- **Q1:** keep a weekly full macOS run, or a nightly one? Proposed: weekly, on main.
+- **Q1 (decided, operator, 2026-10-20):** keep a weekly full macOS run on main. Built in §6c.
 - **Q2:** does Go 1.27 need the e2e tier, or only the unit and integration suite? Proposed: the suite only.
 - **Q3:** do the five `sandbox-exec`-only packages in F3.10 need macOS? Some name the binary only in a string. Proposed: keep them in the set until a test proves otherwise.
 - **Q4:** does `fetch-depth: 0` need the full history in all three Go jobs? Checkout takes 21–45 s per job (F3.30). Proposed: measure a blobless clone (`filter: blob:none`) before a change.

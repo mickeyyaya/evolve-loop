@@ -34,6 +34,8 @@ type workflowJobContract struct {
 	If              string
 	RunsOn          string `yaml:"runs-on"`
 	Needs           yaml.Node
+	Permissions     map[string]string
+	Env             map[string]string
 	Outputs         map[string]string
 	ContinueOnError string `yaml:"continue-on-error"`
 	Steps           []workflowStepContract
