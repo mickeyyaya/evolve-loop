@@ -236,3 +236,27 @@ func TestCompanion_ARowWithNoCriterionColumnOrProtectedPathStillMakesAValidItem(
 		t.Errorf("files = %v; a row with no protected path names no files", it.Files)
 	}
 }
+
+func TestWithConsoleFollowupFiler_AFilerThatReportsAlreadyFiledIsNotAFault(t *testing.T) {
+	in, _ := followupCycle(t, "fix-the-lint")
+	var calls []string
+	var filer ConsoleFollowupFiler = func(root string, _ []byte) error {
+		calls = append(calls, root)
+		return fmt.Errorf("file: %w", inboxmover.ErrAlreadyFiled)
+	}
+	var opt Option = WithConsoleFollowupFiler(filer)
+	rev := NewReviewer(config.StageEnforce, opt).(*reviewer)
+	var logged []string
+	rev.logf = func(f string, a ...any) { logged = append(logged, fmt.Sprintf(f, a...)) }
+
+	res := rev.Review(context.Background(), in)
+
+	if !res.Approve || len(calls) != 2 || calls[0] != in.ProjectRoot {
+		t.Fatalf("review = %+v, filer calls = %v; want approval and one call per console-followup row at the project root", res, calls)
+	}
+	for _, line := range logged {
+		if strings.Contains(line, "could not be filed") {
+			t.Errorf("an already-filed companion is done, not a fault: %q", line)
+		}
+	}
+}
