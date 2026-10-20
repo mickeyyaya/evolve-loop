@@ -79,3 +79,12 @@
 - **WS-876**: added the tier walk (`TierChain`, `DispatchTiered`, `Plan.Tiers`) and the overlay's envelope floor.
 - **cycle-1265**: collapsed `candidatesFrom` and `chainCandidates` into `buildCandidates` (policy-config.md).
 - **ADR-0104**: made the universal tail unconditional. Before it, the tail was added only when every configured binary was absent, so a configured CLI that was present but walled ended the phase and, at the last phase, the cycle.
+
+## The undelivered prompt is no quota wall (2026-10-21)
+
+- `TieringExit(exit, cause)` maps an exit 85 whose cause is `unknown_prompt` to `ExitUnknownPromptNotQuota`. Every other exit and cause passes through unchanged. An exit 85 with no cause stays a quota wall.
+- `Plan.TriggersFallback` treats `ExitUnknownPromptNotQuota` as exit 85, so a plan that falls back on 85 also falls back on an undelivered prompt.
+- `DispatchTiered` counts only exit 85 as a wall. An undelivered prompt at every CLI therefore steps no tier down, and the result is not `Walled`.
+- Pinned by `TestTieringExit_OnlyAnUnknownPromptLeavesTheQuotaClass`, `TestDispatchTiered_AnUnknownPromptAtEveryCLIIsNoQuotaWall` and `TestPlanTriggersFallback_AnUnknownPromptFollowsTheTriggerOfExit85`.
+- **A mixed tier.** When one CLI exits 85 `rate_limit` and another exits 85 `unknown_prompt` at one tier, the tier is not all walls. The walk then does not step the tier down, although the first CLI is walled.
+- **The cycle layer reads the same cause.** The runner wraps its error in `core.LaunchCause` with the cause of the last try. `core.quotaExit` maps it with `TieringExit`, so `isQuotaWall` and `allFamiliesQuotaExhausted` never pause a cycle for quota on an undelivered prompt. Pinned by `TestRunCycle_AnUndeliveredPromptAtEveryAttemptDoesNotPauseForQuota` and `TestRun_TheErrorCarriesTheCauseOfTheLastAttempt`.

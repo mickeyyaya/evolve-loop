@@ -34,3 +34,13 @@
 ## Findings
 
 - The bench record is the one place that stores a family's wall. A new routing consumer must read `Active` and must not keep a second store.
+
+## The model_unsupported pattern (2026-10-21)
+
+- `ModelUnsupportedPattern` (`model_unsupported`) names an account that cannot run a model. The exit is deterministic for the pair of the family and the model.
+- `NewBenchEntry` benches it for `MaxCooldown`, and `OperatorAction` names the two operator choices: re-pin the tier, or accept the fallback.
+- `Benchable` does not hold it, so the canary and the family benches never bench a whole family on it. Only `bridgechain.BenchOnEscalation` uses it, with a model scope.
+- Pinned by `TestModelUnsupported_BenchesForTheLongestCooldownWithAnOperatorAction`.
+- A campaign retry does not wait for a `model_unsupported` bench (`campaignQuotaCooldown`), because the chain already routes around the model.
+- Two per-model keys exist. `Entry.Scope` (`<family>@<model group>`) is the one the router reads, through `scopeCoversSeat`, and this bench uses it. `Entry.Model` (`BenchModelUntil`, `ActiveModels`) holds the usage-probe walls of one model, and no router reads it.
+- Known limit: the advisor prompt and the loop preflight print a scoped bench as a family bench ("dispatch chains start at the fallback CLI"). That holds only at the tiers of the benched model.

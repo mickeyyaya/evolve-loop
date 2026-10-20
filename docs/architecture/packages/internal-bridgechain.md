@@ -48,3 +48,9 @@
 ## Findings
 
 - **Lanes 1676 and 1677**: one CLI timeout cost the work of a whole cycle. This led to the decorator.
+
+## The model bench and the undelivered prompt (2026-10-21)
+
+- **The model bench.** `BenchOnEscalation` benches a `model_unsupported` escalation with the scope of the model group of its tier (`seatModel`), for every family. A tier that names no model benches nothing and logs why. `scopeCoversSeat` already makes the bench stop binding once the tier resolves to another model, so a re-pin clears it.
+- **The undelivered prompt.** The walk returns `llmroute.TieringExit(exit, cause)`. An `unknown_prompt` exit 85 is no quota wall: the walk still falls back to the next CLI, but it does not step down the tier.
+- Pinned by `TestBenchOnEscalation_AModelUnsupportedExitBenchesOnlyThatModelOfTheFamily`, `TestBenchOnEscalation_AModelUnsupportedExitWithNoTierModelBenchesNothing`, `TestApplyCLIHealthBench_AModelBenchClearsWhenTheTierResolvesToAnotherModel` and `TestWalking_AnUnknownPromptAtEveryCLIDoesNotStepDownTheTier`. The runner walk is pinned by `TestRun_AnUndeliveredPromptIsNoWallThatTheWalkSurfaces`.

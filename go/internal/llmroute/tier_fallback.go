@@ -79,3 +79,12 @@ func DispatchTiered(plan Plan, launch func(cli, tier string) (exitCode int, err 
 }
 
 var ErrNoPermittedAttempt = errors.New("llmroute: the tier ceiling permits no attempt on this chain")
+
+const ExitUnknownPromptNotQuota = 1085
+
+func TieringExit(exit int, cause string) int {
+	if exit == exitQuotaExhausted && cause == "unknown_prompt" {
+		return ExitUnknownPromptNotQuota
+	}
+	return exit
+}

@@ -122,7 +122,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			break
 		}
 		if err != nil {
-			attemptExits = append(attemptExits, bridgeExitCode(err))
+			attemptExits = append(attemptExits, quotaExit(err))
 			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
 				if retryHooks.quotaExhausted(attemptExits) {
 					return dispatchResult{}, loopAbort, cr.pauseForQuota(next, resp, attempt, err)
