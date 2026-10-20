@@ -606,6 +606,8 @@ OuterLoop:
 		case loopBreak:
 			cr.reachedPhaseEnd = true
 			break OuterLoop
+		case loopContinue:
+			continue
 		}
 
 		if act, merr := cr.maybeRemediate(next, &dr); act == loopAbort {

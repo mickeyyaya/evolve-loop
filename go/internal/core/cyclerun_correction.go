@@ -34,10 +34,16 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		}
 		corr := 0
 		salvagedFromInvalid := ""
+		var prevPredicates []string
 		for !rr.Approve {
 			if diag, ok := cr.provenBlocker(next, rin, rr); ok {
 				return cr.endOnProvenBlocker(next, dr, diag)
 			}
+			predicates := acsPredicateFailures(rr.Failures)
+			if cr.predicateDefectRepeats(next, dr, prevPredicates, predicates) {
+				return cr.routePredicateDefectToTDD(dr, predicates), nil
+			}
+			prevPredicates = predicates
 			act := nextCorrection(interaction.CorrectionInput{
 				Phase:      string(next),
 				Workspace:  cr.cs.WorkspacePath,

@@ -56,6 +56,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	if next == PhaseAudit {
 		cr.cs.AuditRepairActive = false
 	}
+	if next == PhaseTDD {
+		cr.cs.PredicateRepairBrief = ""
+	}
 	phaseReq := PhaseRequest{
 		Cycle:                           cr.cycle,
 		AuditRound:                      cr.cs.AuditDispatches,

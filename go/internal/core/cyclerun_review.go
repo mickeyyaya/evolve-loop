@@ -12,8 +12,16 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 		return loopAbort, phaseErr
 	}
 
-	if action, err := cr.reviewWithCorrections(next, dr); err != nil || action == loopBreak {
+	action, err := cr.reviewWithCorrections(next, dr)
+	if err != nil || action == loopBreak {
 		return action, err
+	}
+	if action == loopContinue {
+		guard, gerr := cr.applyPostReviewGuards(next, dr)
+		if guard == loopNext {
+			guard = loopContinue
+		}
+		return guard, gerr
 	}
 
 	return cr.applyPostReviewGuards(next, dr)

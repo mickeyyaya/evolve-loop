@@ -23,6 +23,8 @@ const CtxKeyExplanationReauthor = "explanation_reauthor_document"
 
 const CtxKeyExplanationCorrection = "explanation_correction_brief"
 
+const CtxKeyPredicateRepair = "predicate_repair_brief"
+
 func consumeAuditRepairGrant(cs *CycleState, reason string) {
 	switch {
 	case strings.HasPrefix(reason, auditRepairReasonPrefix):
@@ -39,6 +41,9 @@ func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
 func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) map[string]string {
 	if !repairSeededPhase(next) {
 		return base
+	}
+	if next == PhaseTDD {
+		base = withContext(base, CtxKeyPredicateRepair, cs.PredicateRepairBrief)
 	}
 	if next == PhaseBuild && cs.ExplanationCorrectionActive && !cs.AuditRepairActive {
 		return seedExplanationCorrection(base, cs)
