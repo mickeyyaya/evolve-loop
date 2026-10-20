@@ -307,6 +307,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_AUDIT_BINDING_VERDICT_WARN_STRICT` | verify-class: the bound audit verdict is WARN under strict audit |
 | `SHIP_BACKSTOP_FLAKE` | the importer backstop named red tests that were green when their packages re-ran by themselves, without the pack's concurrent load; the ship proceeded on that evidence — recurrence is a hygiene item, not proof of a timing window |
 | `SHIP_CARRY_NOT_REPROVEN` | an identical-rebase carry record named the bound audit but ship could not re-prove it; the reason names the failed check (record, ledger chain, ancestry, tree bytes or patch-id) and the change is audited again; fields.carry_cycle |
+| `SHIP_COMMITTED_DOC_DELETED` | atomic-ship: the landing deletes a path under docs/ or knowledge-base/ that the target branch holds; only a rename that keeps it under docs/ ships |
 | `SHIP_COMMIT_GATE_MALFORMED` | verify-class: the commit-gate attestation cannot be parsed |
 | `SHIP_COMMIT_GATE_MISSING` | verify-class: no commit-gate attestation exists for the staged tree |
 | `SHIP_COMMIT_GATE_STALE` | verify-class: the commit-gate attestation is for a different tree |

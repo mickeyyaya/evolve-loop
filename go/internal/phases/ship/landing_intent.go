@@ -31,7 +31,7 @@ func (s *worktreeShip) land(pending string) error {
 		return err
 	}
 	s.catchUpMain()
-	if err := s.opts.landing().CheckFastForward(s.ctx, s.integration(commit)); err != nil {
+	if err := s.checkLanding(commit); err != nil {
 		if merr := s.moveLaneRef(pending); merr != nil {
 			return merr
 		}
@@ -45,6 +45,13 @@ func (s *worktreeShip) land(pending string) error {
 		return err
 	}
 	return s.completeLanding(in)
+}
+
+func (s *worktreeShip) checkLanding(commit string) error {
+	if err := s.opts.landing().CheckFastForward(s.ctx, s.integration(commit)); err != nil {
+		return err
+	}
+	return refuseCommittedDocDeletion(s.ctx, s.opts, s.branch, commit)
 }
 
 func (s *worktreeShip) landingCommit(pending string) (string, error) {

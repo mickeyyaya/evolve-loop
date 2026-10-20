@@ -80,6 +80,7 @@ const (
 	CodeManifestGate           ShipErrorCode = "MANIFEST_GATE"
 	CodeRepoContractGate       ShipErrorCode = "REPO_CONTRACT_GATE"
 	CodeRepoContractInfra      ShipErrorCode = "REPO_CONTRACT_INFRA"
+	CodeCommittedDocDeleted    ShipErrorCode = "COMMITTED_DOC_DELETED"
 	CodeWorktreeResolve        ShipErrorCode = "WORKTREE_RESOLVE"
 	CodeIntegrityTreeDrift     ShipErrorCode = "INTEGRITY_TREE_DRIFT"
 
