@@ -221,6 +221,7 @@ func settleLanding(ctx context.Context, opts *Options, res *RunResult, in landin
 		res.Logs = append(res.Logs, verified)
 	}
 	res.CommitSHA = in.CommitSHA
+	releaseLandedBindings(ctx, opts, res, in.CommitSHA)
 	if err := writeShipBinding(opts, committedTree, in.CommitSHA); err != nil {
 		res.Logs = append(res.Logs, "[ship] WARN: could not write ship-binding.json: "+err.Error())
 	}

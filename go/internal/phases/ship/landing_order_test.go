@@ -61,6 +61,7 @@ func TestWorktreeShipLand_PushesTheLaneCommitBeforeMainMoves(t *testing.T) {
 		"checkout HEAD -- go/evolve [discard]",
 		"merge --ff-only " + pinHead + " [streams]",
 		"rev-parse " + pinHead + "^{tree} [capture]",
+		"-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A " + pinHead + "^ " + pinHead + " -- .evolve/inbox/consumed [capture]",
 	}
 	if strings.Join(r.argvs(), "\n") != strings.Join(want, "\n") {
 		t.Errorf("argv\n got %q\nwant %q: the lane commit is pushed by refspec before the plane main moves", r.argvs(), want)

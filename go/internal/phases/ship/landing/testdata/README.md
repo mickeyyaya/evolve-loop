@@ -17,3 +17,7 @@ these files. Never regenerate silently: a missing golden fails the pin.
 ## Amendment (2026-10-20, the committed-documentation check)
 
 - Changed by hand in `push_direct`: each row has one more argv, `diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]`, after `diff --cached --name-only`. It is the read that refuses a commit that deletes committed documentation (`committed_doc_guard.go`). The other argv, the streams and the Debug keys are as captured.
+
+## Amendment (2026-10-20, the continuation release after the landing)
+
+- Changed by hand in `push_direct` and `push_pushonly`: each row whose push succeeds has one more argv at the end, `-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A <commit>^ <commit> -- .evolve/inbox/consumed [capture]`. It is the read that finds the consumed items of the landed commit, so the landing releases their continuation bindings (`releaseLandedBindings` in `consume.go`). The other argv, the logs, the streams and the Debug keys are as captured.

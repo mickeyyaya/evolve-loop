@@ -21,7 +21,10 @@ const scopeID = "context-fill-telemetry-and-cap"
 
 const liveSibling = "some-other-live-todo"
 
-const consumeRegressionTest = "TestConsumeCommittedItems_ReleasesRegistryBinding"
+var consumeRegressionTests = []string{
+	"TestConsumeCommittedItems_RecordsThePointerAndLeavesTheReleaseToTheLanding",
+	"TestReleaseLandedBindings_ReleasesEachBindingThatTheLandedCommitRecords",
+}
 
 func binding(cycle int) continuation.Continuation {
 	return continuation.Continuation{
@@ -161,12 +164,14 @@ func TestC1507_003_ConsumeReleasesRegistryBinding(t *testing.T) {
 	goDir := filepath.Join(repo, "go")
 
 	cmd := exec.Command("go", "test", "-count=1", "-v",
-		"-run", "^"+consumeRegressionTest+"$", "./internal/phases/ship")
+		"-run", "^("+strings.Join(consumeRegressionTests, "|")+")$", "./internal/phases/ship")
 	cmd.Dir = goDir
 	out, err := cmd.CombinedOutput()
-	if !strings.Contains(string(out), "--- PASS: "+consumeRegressionTest) {
-		t.Errorf("RED: %s did not PASS in ./internal/phases/ship (err=%v). The ship-time consumption path must release the consumed item's registry binding and preserve the pointer into the consumed item file; this named test is its wiring proof.\n%s",
-			consumeRegressionTest, err, string(out))
+	for _, name := range consumeRegressionTests {
+		if !strings.Contains(string(out), "--- PASS: "+name) {
+			t.Errorf("RED: %s did not PASS in ./internal/phases/ship (err=%v). The ship-time consumption path must preserve the pointer into the consumed item file, and the landing must release the consumed item's registry binding; these named tests are its wiring proof.\n%s",
+				name, err, string(out))
+		}
 	}
 
 	consumeSrc := filepath.Join(goDir, "internal", "phases", "ship", "consume.go")
