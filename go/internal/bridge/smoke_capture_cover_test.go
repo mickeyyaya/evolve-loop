@@ -18,7 +18,7 @@ func TestSmokeTests_AnUnmakeableScratchWorkspaceIsABadFlagAndLaunchesNothing(t *
 	live := &FakeTmuxController{CaptureFrames: []string{"❯"}}
 
 	bootRC, _ := BootSmokeTest(context.Background(), "claude-tmux", &Config{}, bootDeps)
-	liveRC, _, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{}, liveSmokeDeps(live))
+	liveRC := LiveSmokeTest(context.Background(), "claude-tmux", &Config{}, liveSmokeDeps(live)).RC
 
 	if bootRC != ExitBadFlags || len(boot.existing) != 0 {
 		t.Errorf("BootSmokeTest rc=%d sessions=%v, want ExitBadFlags and no session", bootRC, boot.existing)
@@ -34,7 +34,7 @@ func TestLiveSmokeTest_AMinimalConfigOwnsAndRemovesItsScratchWorkspace(t *testin
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "done ❯", "cleanup"}}
 	tm := &scratchArtifactTmux{FakeTmuxController: base}
 
-	rc, _, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{}, liveSmokeDeps(tm))
+	rc := LiveSmokeTest(context.Background(), "claude-tmux", &Config{}, liveSmokeDeps(tm)).RC
 
 	if rc != ExitOK || base.PasteCount == 0 || tm.workspace == "" || !strings.HasPrefix(tm.workspace, tmp) {
 		t.Errorf("rc=%d pastes=%d workspace=%q, want a healthy probe in a scratch workspace under %s", rc, base.PasteCount, tm.workspace, tmp)
@@ -52,7 +52,7 @@ func TestLiveSmokeTest_AnUnwritablePromptIsABadFlag(t *testing.T) {
 	}
 	tm := &FakeTmuxController{CaptureFrames: []string{"❯"}}
 
-	rc, _, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
+	rc := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm)).RC
 
 	if rc != ExitBadFlags || tm.PasteCount != 0 {
 		t.Errorf("rc=%d pastes=%d, want ExitBadFlags and no prompt", rc, tm.PasteCount)

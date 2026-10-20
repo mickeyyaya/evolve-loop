@@ -34,7 +34,8 @@ func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
 	ws := t.TempDir()
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "done ❯", "cleanup"}}
 	tm := &liveArtifactTmux{FakeTmuxController: base, artifact: filepath.Join(ws, LiveSmokeArtifact)}
-	rc, pattern, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
+	got := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
+	rc, pattern := got.RC, got.Pattern
 	if rc != ExitOK {
 		t.Fatalf("rc=%d, want ExitOK", rc)
 	}
@@ -51,7 +52,8 @@ func TestLiveSmokeTest_QuotaWallClassified(t *testing.T) {
 	ws := t.TempDir()
 	wall := "■ You've hit your usage limit. Upgrade to Pro or try again at 6:11 AM."
 	tm := &FakeTmuxController{CaptureFrames: []string{"›", "thinking", wall, wall, wall, wall, wall, wall}}
-	rc, pattern, scrollback := LiveSmokeTest(context.Background(), "codex-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
+	got := LiveSmokeTest(context.Background(), "codex-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
+	rc, pattern, scrollback := got.RC, got.Pattern, got.Scrollback
 	if rc != ExitUnknownPrompt {
 		t.Fatalf("rc=%d, want ExitUnknownPrompt(85); scrollback tail: %s", rc, ScrollbackTail(scrollback, 4))
 	}
@@ -65,7 +67,7 @@ func TestLiveSmokeTest_QuotaWallClassified(t *testing.T) {
 
 func TestLiveSmokeTest_NonTmuxDriverRejected(t *testing.T) {
 	t.Parallel()
-	rc, _, _ := LiveSmokeTest(context.Background(), "claude-p", nil, liveSmokeDeps(&FakeTmuxController{}))
+	rc := LiveSmokeTest(context.Background(), "claude-p", nil, liveSmokeDeps(&FakeTmuxController{})).RC
 	if rc != ExitBadFlags {
 		t.Fatalf("rc=%d, want ExitBadFlags for non-tmux driver", rc)
 	}

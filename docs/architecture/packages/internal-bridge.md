@@ -379,6 +379,9 @@ agy 1.2.17 serves Claude models as well as Gemini ones: `agy models` lists `Clau
 - **Stop review.** `NewDeterministicReviewer` bounds a busy but silent agent to `interval x 6` extends, then pauses for investigation. An empty `InjectedPrompt` is fail-open: no echo is stripped and no signal is suppressed.
 - **Recipe adapter.** `recipeBootScrollback` is 200 lines, so the prompt marker shows for visible-pane CLIs (claude, ollama) and alt-screen CLIs (codex, agy). Every body that the recipe injects accumulates for the prompt-echo strip of the exhaustion guard. The interrupt of the caller wins over the `/help` settle ticks.
 - **Live smoke.** `LiveSmokeTest` is the only probe that sees a quota wall. A boot smoke passes against a rate-limited CLI. The artifact wait is far below the phase default, because a probe fails fast.
+  - It returns a `LiveSmokeResult`: the exit code, the escalation pattern, the final scrollback and the served model.
+  - The served model is `Deps.TokenResolver`'s `ServedModel` for the probe's scratch cwd and launch window. Without a resolver or a scratch cwd it is empty. A resolver error leaves it empty and prints the error on stderr. Pinned by `TestLiveSmokeTest_ReportsTheModelThatServedTheReplyFromTheTranscript`, `TestLiveSmokeTest_NoResolverLeavesTheServedModelUnreported`, `TestServedModel_NoScratchCwdAttributesNoTranscript` and `TestLiveSmokeTest_AResolverErrorLeavesTheServedModelUnreportedAndSaysWhy`.
+  - The scan tries the scratch cwd as given, then its resolved path (`cwdSpellings`). On macOS the temp directory is a symlink, and a CLI can record the resolved path as its cwd. Pinned by `TestLiveSmokeTest_ATranscriptThatRecordsTheResolvedCwdOfASymlinkedWorkspaceStillReportsTheModel`.
 
 ## Invariants
 

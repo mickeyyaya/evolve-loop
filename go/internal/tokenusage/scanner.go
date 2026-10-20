@@ -40,6 +40,7 @@ type Result struct {
 	FillPct          float64
 	PeakPromptTokens int
 	PeakUsage        cyclestate.TokenUsage
+	ServedModel      string
 }
 
 type transcriptLine struct {
@@ -48,6 +49,7 @@ type transcriptLine struct {
 	Timestamp string `json:"timestamp"`
 	Message   struct {
 		ID    string `json:"id"`
+		Model string `json:"model"`
 		Usage *struct {
 			Input      int `json:"input_tokens"`
 			Output     int `json:"output_tokens"`
@@ -81,6 +83,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	perMsg := map[string]cyclestate.TokenUsage{}
 	matched := false
 	warn := ""
+	var served servedReply
 
 	err := walkDir(projects, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil || d.IsDir() || !strings.HasSuffix(path, ".jsonl") {
@@ -98,6 +101,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 		}
 		matched = true
 		recordAssistantUsage(perMsg, lines, w)
+		served = latestServedReply(served, lines, w)
 		return nil
 	})
 	if err != nil {
@@ -120,7 +124,28 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 			peakUsage = u
 		}
 	}
-	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage, Warn: warn}, nil
+	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage, Warn: warn, ServedModel: served.model}, nil
+}
+
+const syntheticModel = "<synthetic>"
+
+type servedReply struct {
+	model string
+	at    time.Time
+}
+
+func latestServedReply(latest servedReply, lines []transcriptLine, w Window) servedReply {
+	for _, ln := range lines {
+		model := ln.Message.Model
+		if ln.Type != "assistant" || model == "" || model == syntheticModel || !withinWindow(ln.Timestamp, w) {
+			continue
+		}
+		at, _ := time.Parse(time.RFC3339, ln.Timestamp)
+		if latest.model == "" || !at.Before(latest.at) {
+			latest = servedReply{model: model, at: at}
+		}
+	}
+	return latest
 }
 
 func recordAssistantUsage(perMsg map[string]cyclestate.TokenUsage, lines []transcriptLine, w Window) {
