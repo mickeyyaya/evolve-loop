@@ -155,6 +155,14 @@ func (p BridgePolicy) PhaseArtifactTimeouts() map[string]int {
 			out[phase] = budget
 		}
 	}
+	for label := range legacyAgentLabels {
+		if p.PhaseArtifactTimeoutS[label] > 0 {
+			continue
+		}
+		if budget, ok := legacyLabelValue(p.PhaseArtifactTimeoutS, "phase_artifact_timeout_s", label, func(b int) bool { return b > 0 }); ok {
+			out[label] = budget
+		}
+	}
 	return out
 }
 

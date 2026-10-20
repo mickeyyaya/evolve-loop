@@ -80,7 +80,7 @@ func TestRun_TimeoutOnThePrimaryCLIFallsBackThroughTheChain(t *testing.T) {
 	if strings.Join(clis, " ") != "codex-tmux claude-tmux" {
 		t.Fatalf("attempts = %v", clis)
 	}
-	if len(logs) != 1 || !strings.Contains(logs[0], "agent=retrospective fallback 2: trying cli=claude-tmux") {
-		t.Fatalf("fallback must be one readable line: %q", logs)
+	if len(logs) != 0 {
+		t.Fatalf("the shared runner owns the walk, so the bridge handle must not walk the chain a second time: %q", logs)
 	}
 }
