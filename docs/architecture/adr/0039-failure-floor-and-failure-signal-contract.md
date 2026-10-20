@@ -278,3 +278,29 @@ A stop between ship's inbox consumption and the record is a window from before t
 ## Amendment (2026-09-15) — the failure block's class is vocabulary, validated at the gate
 
 §7's failure block was verified for presence only; the `class` string went unvalidated straight into the retry envelope, where an unrecognised class declines the direct repair grant. Cycle 1684's audit wrote `superseded-predicate-contradiction`, the decline was silent, and the retry the retrospective later adjudicated rebuilt without the audit's findings. Now: the deliverables gate refuses an audit `class` outside `failurelog.KnownClassifications` (`failure_class_unknown`, the correction names the vocabulary), the audit contract block renders that vocabulary (`failurelog.VocabularyList`, one spelling for prompt and correction), and the decision is a coded signal (`ORCHESTRATOR_AUDIT_REPAIR_DECLINED` / `_GRANTED`). The two vocabularies — failurelog's 13 classes (what agents declare) and the failure-policy table's 7 categories (what the retry envelope reads) — meet in ONE join, `core.policyCategoryFor`; a known class with no repair row declines by name ("no retry policy row"), never as "unrecognised". The prompt exemplar draws its class from the vocabulary. The check is scoped to the audit's unconditional block; the PhaseIO self-report path's class feeds no decision today. Research F19 in `docs/research/verification-wave-findings-2026-09-14.md`.
+
+## Amendment (2026-10-20) — the lost-landing floor reads only witnesses an agent cannot forge
+
+The request is the inbox item `lost-ship-closeout-universal-landing-witness`. The lost-landing floor (`core/lost_landing_floor.go`) turns a shipping verdict into WARN with a `landing-lost` signal. It fires when ship recorded an error and no witness says that the cycle landed.
+
+**F1** The floor cleared on the presence of `ship-binding.json` alone. That file is in the run workspace, which a phase agent can write. So a planted file cleared an integrity floor. The 2026-08-23 salvage excised a first redesign for the same defect (d22c3331: a bare `os.Stat`; d6ed7e1d: a witness path joined from an unvalidated `active_worktree`).
+*Implication:* each witness must come from the host or from git.
+
+**F2** A cycle can land after a transient ship error. Cycle 1536 recorded `GIT_FLEET_REBASE_NEEDED`, then shipped. The error file stays in the workspace (`testdata/lostlanding/cycle-1536`).
+*Implication:* the error file does not decide the question. A witness of the landing does.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D1 | Witness 1 is the host's ship latch, `CycleState.Shipped` (`latchShippedState`, set when this cycle's ship phase PASSes). The `SHIPPED_VIA_BUILD` label reads the same latch. | F2, the acceptance ("SHIPPED_VIA_BUILD and clean no-op exits are never flagged") | The binding alone: an exit that PASSes with no binding was a false `landing-lost`. |
+| D2 | Witness 2 is a binding that git confirms. The binding names this cycle, and its `commit_sha` is a full object id. The tree of that commit equals the tree that the binding claims. The commit is an ancestor of the project root's `HEAD` and not an ancestor of the `HEAD` that the host took at cycle start. | F1 | Commit existence alone: a lane worktree shares the object store, so an agent can make a real commit and its tree. An ancestor of `HEAD` alone: any older commit of `main` is free to copy. A check of `HEAD` movement: a sibling lane moves `HEAD`, so that credits the wrong cycle. |
+| D3 | The floor reads its inputs from the host (`landingEvidence`: the workspace, the project root, the pre-cycle `HEAD`, the cycle, the latch). It reads no `cycle-state.json` path out of the workspace. With no project root, no binding is a witness. | d6ed7e1d | A fallback to the process directory: that directory can be another repository. |
+
+`TestDetectLostLanding_PlantedShipBindingDoesNotClearTheFloor` plants eight forged bindings. Two of them are real commits: one never reached the project `HEAD`, and one was on `main` before the cycle started. `TestDetectLostLanding_HostileActiveWorktreeCannotRedirectTheWitness` pins D3. `go/acs/cycle1544` predicates 001–003 bind these tests again; 004 and 005 were restored by cycle 1663.
+
+**ADR-0147.** At `fleet.integration.stage=enforce` a lane's ship stops before `main` and writes a deliverable record ([wave-orchestrator §15](../wave-orchestrator.md)). Then the latch is the witness of the deliverable, and the orchestrator owns the landing. This floor reads the per-lane path of today. The deliverable record can become a third witness when §15 is built.
+
+**Limit.** A sibling lane can land between the start of this cycle and its close. An agent that copies that sibling's commit into a binding of this cycle still passes D2. The latch (D1) does not have this gap, and a ship that PASSes sets it.
+
+**Limit on resume.** In process, the latch and the pre-cycle `HEAD` are host memory. A resume reads both back from the run's `run.json`, a file that a phase agent can write. Inbox `resume-reads-the-ship-latch-from-an-agent-writable-file` tracks the fix. The gap is narrow: a resumed cycle ships only through a new ship PASS, and that PASS sets the latch in memory again. `TestResumeLifecycle_ThePersistedPreCycleHeadReachesTheCloseout` pins that the resumed closeout reads the persisted pre-cycle `HEAD`.
+
+The test `TestResumeLifecycle_LostLandingUsesSameTerminalFloor` asserted that a resumed ship PASS with an earlier ship error was a lost landing. That is the cycle-1536 shape, so D1 reverses it: `TestResumeLifecycle_AShipThatPassedAfterAStaleShipErrorIsNotALostLanding` replaces it.
