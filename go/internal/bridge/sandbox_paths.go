@@ -112,7 +112,9 @@ func canonicalSandboxPath(path string) (string, error) {
 
 const worktreePathTemplate = "{worktree_path}"
 
-func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]string, error) {
+const runDirGlob = ".evolve/runs/cycle-*"
+
+func resolveSandboxWriteGrants(subpaths []string, root, worktree, workspace string) ([]string, error) {
 	var out []string
 	for _, declared := range subpaths {
 		if declared == "" || strings.ContainsAny(declared, "\x00\n\r") {
@@ -127,6 +129,11 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]stri
 				continue
 			}
 			base, rel = worktree, strings.TrimPrefix(declared, worktreePathTemplate)
+		case declared == runDirGlob || strings.HasPrefix(declared, runDirGlob+"/"):
+			if workspace == "" {
+				continue
+			}
+			base, rel = workspace, strings.TrimPrefix(declared, runDirGlob)
 		default:
 			base, rel = root, declared
 		}
@@ -136,7 +143,7 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree string) ([]stri
 		}
 		rel = globFreeAncestor(rel)
 		if base == "" || !filepath.IsAbs(base) {
-			return nil, fmt.Errorf("write grant %q needs an absolute project root or worktree", declared)
+			return nil, fmt.Errorf("write grant %q needs an absolute project root, worktree or workspace", declared)
 		}
 		canonicalBase, err := canonicalSandboxPath(base)
 		if err != nil {

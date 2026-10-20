@@ -1,0 +1,21 @@
+{
+  "id": "sandbox-cross-cycle-evals-write",
+  "kind": "pipeline-repair",
+  "priority_class": "security",
+  "weight": 0.6,
+  "title": "The scout sandbox grant .evolve/evals/cycle-* widens to every cycle's evals",
+  "summary": "Found in the review of the sandbox-cross-cycle-run-dir-write fix (2026-10-20). The run-dir glob .evolve/runs/cycle-* now resolves to the dispatch workspace. The scout profile also declares .evolve/evals/cycle-*, and resolveSandboxWriteGrants still widens that glob to its glob-free ancestor .evolve/evals (go/internal/bridge/sandbox_paths.go). So a scout agent can write the evals of any other cycle.",
+  "fix": "Bind the evals glob to the running cycle (the resolver can take the cycle number from the workspace name, or the profile can name the own cycle through a template), or drop the grant if the scout writes evals only in its run dir. Add a row to the sandbox contract test.",
+  "acceptance": [
+    "A scout agent of cycle N cannot write in .evolve/evals/cycle-M",
+    "The scout still writes the evals of its own cycle",
+    "docs/architecture/agent-sandbox-contract.md no longer lists this as a known gap"
+  ],
+  "files": [
+    "go/internal/bridge/sandbox_paths.go",
+    ".evolve/profiles/scout.json"
+  ],
+  "route": "console-manual",
+  "created_at": "2026-10-20T15:00:00Z",
+  "source": "console builder R, go-reviewer finding on the sandbox-cross-cycle-run-dir-write fix"
+}

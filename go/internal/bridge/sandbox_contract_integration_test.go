@@ -88,11 +88,11 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string { return "echo ok > " + h.worktree + "/own && cat " + h.worktree + "/own" }},
 	{action: "write in its own cycle run directory", want: contractAllow,
 		script: func(h contractHost) string { return "echo ok > " + h.run + "/own && cat " + h.run + "/own" }},
-	{action: "write in another cycle's .evolve/runs/cycle-M", want: contractGap,
-		script: func(h contractHost) string { return "echo x > " + h.otherCycle + "/forged && echo wrote" },
-		check: func(t *testing.T, h contractHost, out string) {
-			if _, err := os.Stat(filepath.Join(h.otherCycle, "forged")); out != "wrote" || err != nil {
-				t.Fatalf("the gap row must prove the write: out=%q, forged file on the host: %v", out, err)
+	{action: "write in another cycle's .evolve/runs/cycle-M", want: contractDeny,
+		script: func(h contractHost) string { return "echo x > " + h.otherCycle + "/forged" },
+		check: func(t *testing.T, h contractHost, _ string) {
+			if _, err := os.Stat(filepath.Join(h.otherCycle, "forged")); !os.IsNotExist(err) {
+				t.Fatalf("the denied write left a file on the host: %v", err)
 			}
 		}},
 	{action: "write in the protected .evolve/events/", want: contractDeny,

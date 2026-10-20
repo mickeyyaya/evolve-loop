@@ -11,7 +11,7 @@ func TestNoProfileCanWriteTheDossierPendingDir(t *testing.T) {
 	t.Parallel()
 	for name, prof := range realSandboxProfiles(t) {
 		root := t.TempDir()
-		grants, err := resolveSandboxWriteGrants(prof.Sandbox.WriteSubpaths, root, t.TempDir())
+		grants, err := resolveSandboxWriteGrants(prof.Sandbox.WriteSubpaths, root, t.TempDir(), filepath.Join(root, ".evolve", "runs", "cycle-1705"))
 		if err != nil {
 			t.Fatalf("%s: the resolver refused the profile's own declarations: %v", name, err)
 		}

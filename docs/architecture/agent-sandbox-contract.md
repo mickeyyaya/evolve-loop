@@ -47,7 +47,7 @@ After each row, the host must still reach the run server with its sessions `agen
 | Signal its own child | allow | The child `sleep` stops with a signal status. |
 | Write in its own worktree | allow | The file reads back. |
 | Write in its own cycle run directory | allow | The file reads back. |
-| Write in another cycle's `.evolve/runs/cycle-M` | gap | The write succeeds today. See "Known gap". |
+| Write in another cycle's `.evolve/runs/cycle-M` | deny | The write gets `Operation not permitted`, and no file is made on the host. See "The run directory grant". |
 | Write in the protected `.evolve/events/` | deny | The write gets `Operation not permitted`. |
 | Write to another pane's tty | deny | The open for write gets `Operation not permitted`. |
 | Read another pane's tty | deny | The open for read gets `Operation not permitted`. |
@@ -91,9 +91,25 @@ Two results of this rule are known and accepted:
 - **The serial devices stay readable.** `/dev/cu.*` does not match the regex. The risk is low: a pane does not use a serial device, and an agent rarely has a reason to open one.
 - **A headless agent cannot read a tty device.** A headless launch has no pane terminal, so no literal grant gives back a `/dev/ttysN` device. The agent can still open `/dev/tty` and its own pseudo-terminals.
 
+## The run directory grant
+
+Each profile declares `.evolve/runs/cycle-*` in `sandbox.write_subpaths`. Before 2026-10-20, `resolveSandboxWriteGrants` granted the longest ancestor without a glob, which is `.evolve/runs`. Thus an agent had write access to the run directory of each other cycle. The agent-messaging design (ADR-0129 D3) needs this isolation, because it finds the sender of an outbox file by its directory.
+
+Now the resolver treats `.evolve/runs/cycle-*` as a template, like `{worktree_path}`. The template resolves to the workspace of the dispatch, which is the run directory of its own cycle. A subpath of the template stays inside that directory: `.evolve/runs/cycle-*/learn` becomes `<workspace>/learn`. Without a workspace, the grant is skipped. Each launch has a workspace, because `--workspace` is a required launch argument.
+
+| Rejected option | Why |
+|---|---|
+| A `{cycle}` template in each profile | It changes about 90 profiles, and a profile that keeps the old glob keeps the gap. The resolver fix closes the gap for each profile at one place. |
+| The glob matched against the cycle number | The resolver does not get the cycle number. The workspace is already the own run directory. |
+
+`TestEveryProfileWritesOnlyItsOwnCycleRunDir` checks each launchable real profile: no grant reaches another cycle, and each declared run-directory path is writable in the own run directory. A profile whose denials do not resolve is not launchable, so the test skips it (the `orchestrator` profile declares a glob denial).
+
+The gap verdict stays in the test for the next known gap. No row uses it now.
+
 ## Known gap
 
-Each profile declares `.evolve/runs/cycle-*` in `sandbox.write_subpaths`. `resolveSandboxWriteGrants` grants the longest ancestor without a glob, which is `.evolve/runs`. Thus an agent can write in the run directory of each other cycle. The workspace of the phase already grants its own cycle directory. The fix changes about 90 profiles and is not in this lane. The row stays `gap` until that fix lands.
+The scout profile declares `.evolve/evals/cycle-*`. That glob is not a run directory, so it still widens to `.evolve/evals`. Thus the scout can write the evals of each other cycle. Inbox `sandbox-cross-cycle-evals-write` tracks the fix.
+
 
 ## How to add a row
 
