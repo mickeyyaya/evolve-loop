@@ -73,6 +73,9 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if rc != 0 {
 		return rc
 	}
+	if rc := refuseInertGoalItems(cfg, stderr); rc != 0 {
+		return rc
+	}
 	if cfg.PreflightOnly {
 		return runLoopPreflightOnly(cfg, stdout, stderr)
 	}

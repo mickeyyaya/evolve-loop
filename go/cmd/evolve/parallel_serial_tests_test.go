@@ -585,6 +585,7 @@ var serialTests = map[string]string{
 	"main.TestRunLoop_ABrakePresentAtLaunchRunsZeroIterations":                                                             "swaps seam loopOrchOverride",
 	"main.TestRunLoop_AChainBoundaryReExecArmsNoHandoff":                                                                   "swaps seam chainBoundaryAheadFn",
 	"main.TestRunLoop_AChainedResumeWarnsAndRunsTheSingleBatch":                                                            "calls process-global setter SetHangClassifier",
+	"main.TestRunLoop_RefusesAGoalThatNamesItemsNoLaneCanTake":                                                             "calls runLoop, whose batch path calls process-global setter SetHangClassifier",
 	"main.TestRunLoop_AHandoffArmedByAnotherProcessIsNotInherited":                                                         "swaps seam chainRunningCommitFn",
 	"main.TestRunLoop_AHandoffThatCannotBeConsumedIsNotHonouredAndSaysSo":                                                  "swaps seam chainRunningCommitFn",
 	"main.TestRunLoop_ARefusedRoutingTableExitsTwo":                                                                        "swaps seam wireOrchestratorDepsFn",
