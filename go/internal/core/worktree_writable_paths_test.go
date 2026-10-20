@@ -43,7 +43,7 @@ func TestResumePath_TheDebuggerOfAFleetRebaseMayWriteItsConflicts(t *testing.T) 
 	if len(dbg.requests) == 0 {
 		t.Fatal("the resumed cycle never dispatched its debugger")
 	}
-	if got := dbg.requests[0].WorktreeWritablePaths; !reflect.DeepEqual(got, conflicts) {
+	if got := dbg.requests[0].Fence.WritablePaths(); !reflect.DeepEqual(got, conflicts) {
 		t.Fatalf("resumed debugger request writable = %v, want %v", got, conflicts)
 	}
 }

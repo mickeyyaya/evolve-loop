@@ -102,7 +102,7 @@ func TestRun_AFenceThatCannotSnapshotStillRunsTheRetro(t *testing.T) {
 	b := &deadShellFirstFake{alive: true}
 
 	resp := runRetro(t, b, func(r *core.PhaseRequest) {
-		r.Worktree, r.WorktreeReadOnly = filepath.Join(t.TempDir(), "absent"), true
+		r.Worktree, r.Fence = filepath.Join(t.TempDir(), "absent"), &core.WorktreeFence{}
 	})
 
 	if len(b.calls) != 1 || resp.Verdict != core.VerdictPASS {

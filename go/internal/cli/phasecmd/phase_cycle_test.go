@@ -42,9 +42,27 @@ func TestRequestForCycle_DerivesTheRequestAndFallsBackToTheRunDirWorkspace(t *te
 		t.Fatalf("RequestForCycle: %v", err)
 	}
 	want := core.PhaseRequest{Cycle: 9, ProjectRoot: root, Workspace: paths.RunWorkspace(root, 9), Worktree: state.ActiveWorktree,
-		WorktreeBaseSHA: "base", RunID: "01RERUN", GoalHash: "goal"}
+		WorktreeBaseSHA: "base", RunID: "01RERUN", GoalHash: "goal", Fence: &core.WorktreeFence{}}
 	if !reflect.DeepEqual(req, want) {
 		t.Errorf("RequestForCycle = %+v, want %+v", req, want)
+	}
+}
+
+func TestRequestForCycle_ThePhaseDecidesTheFence(t *testing.T) {
+	root, _ := writeRerunFixture(t, 9)
+	for _, tc := range []struct {
+		phases []string
+		fenced bool
+	}{
+		{[]string{"build"}, false},
+		{[]string{"audit"}, true},
+		{[]string{"scout", "tdd"}, false},
+		{[]string{"scout", "triage"}, true},
+	} {
+		req, err := RequestForCycle(root, 9, nil, tc.phases...)
+		if err != nil || (req.Fence != nil) != tc.fenced {
+			t.Errorf("RequestForCycle(%v) fence = %+v, %v; want fenced=%v: a request is unfenced only when a phase it runs writes source", tc.phases, req.Fence, err, tc.fenced)
+		}
 	}
 }
 
@@ -75,5 +93,20 @@ func TestRequestForCycle_ExitCodeSeparatesUsageFromRefusal(t *testing.T) {
 				t.Errorf("error %q must name %q", err, tc.wantText)
 			}
 		})
+	}
+}
+
+func TestRequestForCycle_AnUnreadableCatalogFailsInsteadOfGuessingTheFence(t *testing.T) {
+	root, _ := writeRerunFixture(t, 9)
+	registry := filepath.Join(root, "docs", "architecture", "phase-registry.json")
+	if err := os.MkdirAll(filepath.Dir(registry), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(registry, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := RequestForCycle(root, 9, nil, "audit"); err == nil || !strings.Contains(err.Error(), "worktree fence") {
+		t.Fatalf("err = %v; a catalog that exists but does not parse cannot decide the fence", err)
 	}
 }

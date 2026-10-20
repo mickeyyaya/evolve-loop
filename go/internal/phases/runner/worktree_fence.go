@@ -9,7 +9,7 @@ import (
 )
 
 func takeWorktreeFence(ctx context.Context, phase string, req core.PhaseRequest) *treefence.Fence {
-	f := treefence.Begin(ctx, req.Worktree, req.WorktreeReadOnly, req.WorktreeWritablePaths...)
+	f := treefence.Begin(ctx, req.Worktree, req.Fence != nil, req.Fence.WritablePaths()...)
 	if first := f.RetakenAfter(); first != nil {
 		log.Diag().Warnf("[runner] WARN worktree fence phase=%s: snapshot retaken after: %v\n", phase, first)
 	}

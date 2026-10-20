@@ -146,8 +146,8 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			Env:                             envSnap,
 			Context:                         phaseCtx,
 			Signals:                         dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
+			Fence:                           o.fenceFor(next, cs),
 		}
-		phaseReq = o.withWorktreeFence(phaseReq, next, cs)
 		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig, checkout: r.checkoutDecision(), recoveryDepth: shipRecoveries, phaseDispatches: dispatches}
 		dispatch.applyDispatchPolicy(next, &phaseReq)
 		if next != PhaseBuild {

@@ -53,6 +53,7 @@ const (
 var serialRequiredTests = map[string]string{
 	"core.TestReauditCycle_MovedBaseRebasesAuditsAndRecordsTheBinding":                              swapsReauditRebase,
 	"core.TestReauditCycle_RequestIsDerivedFromTheCycleState":                                       swapsReauditRebase,
+	"core.TestReauditCycle_TheAuditRunsBehindTheReadOnlyFence":                                      swapsReauditRebase,
 	"core.TestReauditCycle_VerdictIsDataNotAnError":                                                 swapsReauditRebase,
 	"core.TestReauditCycle_LiveLeaseRefusesBeforeAnyGitWrite":                                       swapsReauditRebase,
 	"core.TestReauditCycle_StaleLeaseDoesNotBlock":                                                  swapsReauditRebase,
