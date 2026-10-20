@@ -39,6 +39,9 @@
     "read_only_repo": false,
     "deny_subpaths": [
       ".git",
+      ".claude-plugin",
+      "agents",
+      "skills",
       ".evolve/state.json",
       ".evolve/ledger.jsonl",
       ".evolve/profiles",

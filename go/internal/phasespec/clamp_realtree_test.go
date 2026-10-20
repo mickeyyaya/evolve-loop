@@ -53,7 +53,7 @@ func TestSourceWriterProfiles_DeclareOnlyTheLaneWorktreeAndRunDir(t *testing.T) 
 		if !slices.Equal(sb.WriteSubpaths, want) {
 			t.Errorf("%s: write_subpaths = %v, want exactly %v", name, sb.WriteSubpaths, want)
 		}
-		for _, deny := range []string{".git", ".evolve/state.json", ".evolve/ledger.jsonl", ".evolve/profiles", ".evolve/evals"} {
+		for _, deny := range []string{".git", ".claude-plugin", "agents", "skills", ".evolve/state.json", ".evolve/ledger.jsonl", ".evolve/profiles", ".evolve/evals"} {
 			if !slices.Contains(sb.DenySubpaths, deny) {
 				t.Errorf("%s: deny_subpaths lacks %q", name, deny)
 			}

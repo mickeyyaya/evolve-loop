@@ -156,9 +156,32 @@ func TestSelect_NothingSelectedAsksNoIgnoreProbe(t *testing.T) {
 	}
 }
 
-func TestReportFiles_AreTheBuildTDDAndAmplificationReports(t *testing.T) {
-	if got := ReportFiles(); !slices.Equal(got, []string{"build-report.md", "test-report.md", "test-amplification-report.md"}) {
-		t.Fatalf("ReportFiles = %v", got)
+func TestReportFiles_AreTheReportsOfEverySourceWriterPhase(t *testing.T) {
+	want := []string{"build-report.md", "test-report.md", "test-amplification-report.md", "bug-reproduction-report.md"}
+	if got := ReportFiles(); !slices.Equal(got, want) {
+		t.Fatalf("ReportFiles = %v, want %v", got, want)
+	}
+}
+
+func TestTakeShipTree_AReproductionTestDeclaredOnlyInTheBugReproductionReportShips(t *testing.T) {
+	root := gitRepo(t)
+	writeUnder(t, root, "go/internal/policy/coverchanged.go", "package policy\n")
+	gitAt(t, root, "add", "-A")
+	gitAt(t, root, "commit", "-q", "-m", "base")
+	writeUnder(t, root, "go/internal/policy/coverchanged.go", "package policy\n\nfunc Fixed() {}\n")
+	writeUnder(t, root, "go/internal/policy/coverchanged_repro_test.go", "package policy\n")
+	ws := t.TempDir()
+	writeUnder(t, ws, "build-report.md", "Changed `go/internal/policy/coverchanged.go`.\n")
+	writeUnder(t, ws, "bug-reproduction-report.md", "## Reproduction\nThe FAIL_TO_PASS test is `go/internal/policy/coverchanged_repro_test.go`.\n")
+
+	snap, err := TakeShipTree(context.Background(), GitIn(context.Background(), root), root, ws)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := gitAt(t, root, "ls-tree", "-r", "--name-only", snap.Tree)
+	if !slices.Contains(strings.Fields(out), "go/internal/policy/coverchanged_repro_test.go") {
+		t.Fatalf("the ship tree lacks the reproduction test:\n%s", out)
 	}
 }
 
