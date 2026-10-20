@@ -13,6 +13,8 @@ import (
 
 const HubCell = "hub"
 
+const familyCellPrefix = "family:"
+
 type Graph interface {
 	Packages(files []string) []string
 	Deps(pkg string) []string
@@ -52,9 +54,10 @@ type Admitter struct {
 }
 
 type footprint struct {
-	edits map[string]bool
-	reach map[string]bool
-	hub   bool
+	edits  map[string]bool
+	reach  map[string]bool
+	hub    bool
+	family string
 }
 
 type holder struct {
@@ -142,7 +145,11 @@ func conflict(x, y footprint) bool {
 }
 
 func sharedEdit(x, y footprint) bool {
-	return (x.hub && y.hub) || meets(x.edits, y.edits)
+	return (x.hub && y.hub) || meets(x.edits, y.edits) || sameFamily(x, y)
+}
+
+func sameFamily(x, y footprint) bool {
+	return x.family != "" && x.family == y.family
 }
 
 func meets(x, y map[string]bool) bool {
@@ -157,7 +164,7 @@ func meets(x, y map[string]bool) bool {
 func (a Admitter) footprintOf(td fleet.Todo) footprint {
 	pkgs, hub := a.edited(td)
 	hubs := a.Graph.Hubs()
-	fp := footprint{edits: map[string]bool{}, reach: map[string]bool{}, hub: hub}
+	fp := footprint{edits: map[string]bool{}, reach: map[string]bool{}, hub: hub, family: idFamily(td.ID)}
 	for _, p := range pkgs {
 		fp.edits[p] = true
 		fp.hub = fp.hub || hubs[p]
@@ -216,10 +223,21 @@ func globalZone(file string) bool {
 	return fleet.IsGlobalZone(file) || fleet.IsGlobalZone(strings.TrimPrefix(file, "go/")) || filepath.Clean(file) == moduleMakefile
 }
 
+func idFamily(id string) string {
+	family, _, found := strings.Cut(id, "-")
+	if !found || family == "" {
+		return ""
+	}
+	return familyCellPrefix + family
+}
+
 func (fp footprint) cells() []string {
-	out := make([]string, 0, len(fp.edits)+1)
+	out := make([]string, 0, len(fp.edits)+2)
 	for p := range fp.edits {
 		out = append(out, strings.TrimPrefix(p, ModulePath+"/"))
+	}
+	if fp.family != "" {
+		out = append(out, fp.family)
 	}
 	slices.Sort(out)
 	if fp.hub {
