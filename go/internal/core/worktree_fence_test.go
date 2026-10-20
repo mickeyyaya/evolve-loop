@@ -1,7 +1,9 @@
 package core
 
 import (
+	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -63,5 +65,56 @@ func TestPhaseWritesSource_TheBuiltinWritersOrACatalogSpecThatDeclaresIt(t *test
 		if got := PhaseWritesSource(phase, cat); got != want {
 			t.Errorf("PhaseWritesSource(%s) = %v, want %v", phase, got, want)
 		}
+	}
+}
+
+func TestPhaseRequestJSON_TheFenceCrossesABinaryOnEitherSideOfTheKeyRename(t *testing.T) {
+	t.Parallel()
+	fenced := PhaseRequest{Worktree: "/wt", Fence: &WorktreeFence{Writable: []string{"a.go"}}}
+	raw, err := json.Marshal(fenced)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var old struct {
+		ReadOnly bool     `json:"worktree_read_only"`
+		Writable []string `json:"worktree_writable_paths"`
+	}
+	if err := json.Unmarshal(raw, &old); err != nil || !old.ReadOnly || !slices.Equal(old.Writable, []string{"a.go"}) {
+		t.Fatalf("legacy view of %s = %+v, %v; a binary built before the rename must still see the fence", raw, old, err)
+	}
+	for name, body := range map[string]string{
+		"the new key":     string(raw),
+		"the legacy keys": `{"worktree":"/wt","worktree_read_only":true,"worktree_writable_paths":["a.go"]}`,
+	} {
+		var got PhaseRequest
+		if err := json.Unmarshal([]byte(body), &got); err != nil || got.Fence == nil || !slices.Equal(got.Fence.Writable, []string{"a.go"}) || got.Worktree != "/wt" {
+			t.Errorf("%s: decoded %+v (fence %+v), %v; the fence must survive either spelling", name, got, got.Fence, err)
+		}
+	}
+	var open PhaseRequest
+	if err := json.Unmarshal([]byte(`{"worktree":"/wt"}`), &open); err != nil || open.Fence != nil {
+		t.Errorf("a request with no fence key = %+v, %v; want unfenced", open.Fence, err)
+	}
+	if raw, _ := json.Marshal(PhaseRequest{Worktree: "/wt"}); strings.Contains(string(raw), "worktree_read_only") {
+		t.Errorf("an unfenced request marshals %s; it must not claim read-only", raw)
+	}
+}
+
+func TestPhaseRequest_MarshalJSONAndUnmarshalJSONKeepTheFenceAndRefuseBadJSON(t *testing.T) {
+	t.Parallel()
+	raw, err := PhaseRequest{Worktree: "/wt", Fence: &WorktreeFence{}}.MarshalJSON()
+	if err != nil || !strings.Contains(string(raw), `"worktree_read_only":true`) || !strings.Contains(string(raw), `"worktree_fence":{}`) {
+		t.Fatalf("MarshalJSON = %s, %v; want both the new and the legacy fence keys", raw, err)
+	}
+	var back PhaseRequest
+	if err := back.UnmarshalJSON(raw); err != nil || back.Fence == nil {
+		t.Fatalf("UnmarshalJSON = %+v, %v; want the fence back", back.Fence, err)
+	}
+	var mixed PhaseRequest
+	if err := mixed.UnmarshalJSON([]byte(`{"worktree_fence":{"writable":["x.go"]},"worktree_read_only":true,"worktree_writable_paths":["y.go"]}`)); err != nil || mixed.Fence == nil || !slices.Equal(mixed.Fence.Writable, []string{"x.go"}) {
+		t.Fatalf("UnmarshalJSON = %+v, %v; when both spellings disagree, the new key wins", mixed.Fence, err)
+	}
+	if err := back.UnmarshalJSON([]byte("{not json")); err == nil {
+		t.Fatal("UnmarshalJSON of broken JSON must fail")
 	}
 }

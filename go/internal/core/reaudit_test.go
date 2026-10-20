@@ -398,3 +398,16 @@ func reauditSHA(b []byte) string {
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
 }
+
+func TestReauditCycle_TheAuditRunsBehindTheReadOnlyFence(t *testing.T) {
+	fx := newReauditFixture(t, "lane.txt", "peer.txt")
+	runner := fx.runner(VerdictPASS)
+
+	if _, err := ReauditCycle(context.Background(), fx.input(runner, &fakeLedger{})); err != nil {
+		t.Fatal(err)
+	}
+
+	if runner.req.Fence == nil || runner.req.WritesSource() {
+		t.Fatalf("audit fence = %+v; the re-audit is read-only, so the runner must fence the worktree", runner.req.Fence)
+	}
+}

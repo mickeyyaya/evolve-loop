@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"slices"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -30,4 +31,36 @@ func PhaseWritesSource(p Phase, cat phasespec.Catalog) bool {
 	}
 	spec, ok := cat.Get(string(p))
 	return ok && spec.WritesSource
+}
+
+type phaseRequestFields PhaseRequest
+
+type legacyFenceKeys struct {
+	ReadOnly bool     `json:"worktree_read_only,omitempty"`
+	Writable []string `json:"worktree_writable_paths,omitempty"`
+}
+
+type phaseRequestWire struct {
+	phaseRequestFields
+	legacyFenceKeys
+}
+
+func (r PhaseRequest) MarshalJSON() ([]byte, error) {
+	wire := phaseRequestWire{phaseRequestFields: phaseRequestFields(r)}
+	if r.Fence != nil {
+		wire.legacyFenceKeys = legacyFenceKeys{ReadOnly: true, Writable: r.Fence.Writable}
+	}
+	return json.Marshal(wire)
+}
+
+func (r *PhaseRequest) UnmarshalJSON(raw []byte) error {
+	var wire phaseRequestWire
+	if err := json.Unmarshal(raw, &wire); err != nil {
+		return err
+	}
+	*r = PhaseRequest(wire.phaseRequestFields)
+	if r.Fence == nil && (wire.ReadOnly || len(wire.Writable) > 0) {
+		r.Fence = &WorktreeFence{Writable: wire.Writable}
+	}
+	return nil
 }
