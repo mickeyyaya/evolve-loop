@@ -139,7 +139,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	}
 	cycleSrc, _ := os.ReadFile(filepath.Join(moduleRoot, "cmd", "evolve", "cmd_cycle.go"))
 	loopSrc, _ := os.ReadFile(filepath.Join(moduleRoot, "cmd", "evolve", "cmd_loop_sequential_outcome.go"))
-	callRE := regexp.MustCompile(`\bapplyCycleFailureOutcome\(([^)]*)\)`)
+	callRE := regexp.MustCompile(`\bapply(?:Cycle|Result)FailureOutcome\(([^)]*)\)`)
 	calls := 0
 	for _, src := range []string{string(cycleSrc), string(loopSrc)} {
 		for _, line := range strings.Split(src, "\n") {
@@ -158,8 +158,8 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 			}
 		}
 	}
-	if calls != 3 {
-		t.Errorf("the three package-level call sites (cmd_cycle.go ×2, cmd_loop_sequential_outcome.go ×1) must be present, found %d", calls)
+	if calls != 4 {
+		t.Errorf("the four package-level call sites (cmd_cycle.go ×3 with the result closeout, cmd_loop_sequential_outcome.go ×1) must be present, found %d", calls)
 	}
 	centerRoots := map[string]bool{"cmd/evolve/cmd_cycle.go": true, "internal/cli/phasecmd/phase_observer.go": true}
 	got := nonTestConstructionsOf(t, moduleRoot, `\bsignalcenter\.New\(`)

@@ -9,6 +9,9 @@ const (
 	ActionHaltAndDiagnose   = "halt-and-diagnose"
 	ActionRetryWithFix      = "retry-with-fix"
 	ActionDeferOrQuarantine = "defer-or-quarantine"
+
+	FixTypeReintent       = "reintent"
+	FixTypePipelineRepair = "pipeline-repair"
 )
 
 const (
@@ -56,17 +59,17 @@ type SystemFailurePolicy struct {
 func DefaultSystemFailurePolicy() SystemFailurePolicy {
 	return SystemFailurePolicy{
 		Categories: map[string]FailureCategory{
-			CategoryVerdictIncoherence: {Level: LevelSystem, Action: ActionHaltAndDiagnose, FixType: "pipeline-repair", Floor: true,
+			CategoryVerdictIncoherence: {Level: LevelSystem, Action: ActionHaltAndDiagnose, FixType: FixTypePipelineRepair, Floor: true,
 				Signature: "recorded FAIL/WARN but on-disk audit AND acs verdicts are PASS"},
-			CategoryInfraSystemic: {Level: LevelSystem, Action: ActionHaltAndDiagnose, FixType: "pipeline-repair", Floor: true,
+			CategoryInfraSystemic: {Level: LevelSystem, Action: ActionHaltAndDiagnose, FixType: FixTypePipelineRepair, Floor: true,
 				Signature: "all CLI families exhausted / systemic infrastructure teardown"},
-			CategoryTransportHang: {Level: LevelSystem, Action: ActionHaltAndDiagnose, FixType: "pipeline-repair",
+			CategoryTransportHang: {Level: LevelSystem, Action: ActionHaltAndDiagnose, FixType: FixTypePipelineRepair,
 				Signature: "exit-transport hang: session ended without a well-formed deliverable or verdict"},
-			CategoryNonProgress: {Level: LevelSystem, Action: ActionHaltAndDiagnose, FixType: "pipeline-repair",
+			CategoryNonProgress: {Level: LevelSystem, Action: ActionHaltAndDiagnose, FixType: FixTypePipelineRepair,
 				Signature: "same task/failure-class recurs >= repeat_ceiling with no landed progress, OR verified-green not landed >= verified_not_landed_ceiling"},
 			CategoryCodeBuildFail:         {Level: LevelTask, Action: ActionRetryWithFix, FixType: "build-repair", MaxRetries: 2},
 			CategoryCodeAuditFail:         {Level: LevelTask, Action: ActionRetryWithFix, FixType: "address-audit-findings", MaxRetries: 2},
-			CategoryIntentMalformed:       {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: "reintent"},
+			CategoryIntentMalformed:       {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: FixTypeReintent},
 			CategoryExplanationCorrection: {Level: LevelTask, Action: ActionRetryWithFix, FixType: "explanation-correction", MaxRetries: 1},
 		},
 		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, ConsecutiveFailuresHaltCeiling: 3, LaneDeferralHaltCeiling: 3, ZeroShipHalt: 2, NoWorkHandoffHaltCeiling: 4, NoWorkHandoffWindow: 12, BuildDeepEscalateAtFailures: 1},

@@ -22,5 +22,11 @@
   "source": "PR #1015 (a defer-or-quarantine audit decline ends the cycle after retro); triage pass 2026-10-20",
   "summary": "PR #1015 ends a cycle after retro when the audit decline carries a defer-or-quarantine decision (go/internal/core/reintent_decision.go, auditDeclineDefers; decideAfterRetro returns PhaseEnd with an audit-fail-defer reason). The decision's fix_type (for example reintent or pipeline-repair) is only copied into the routing-decision evidence (reintent_decision.go:43) and the FixType field of go/internal/core/failure_decision.go:17. No Go code routes the inbox item by fix_type. The item of the ended cycle therefore goes back to the same queue and can be picked again for the same failed attempt.",
   "title": "The item of a cycle ended by a reintent decision is routed by its fix_type",
-  "weight": 0.7
+  "weight": 0.7,
+  "consumed": {
+    "at": "2026-10-21T02:30:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fix/reintent-fix-type-route: the FAIL closeout of a cycle ended by audit-fail-defer routes its committed items by the fix_type of failure-decision.json (cycleoutcome/defer_route.go): reintent -> inbox route-console with a routed_reason naming cycle, category and fix_type; pipeline-repair -> a console companion pipeline-repair-cycle-N and a deps entry on it; neither bumps failure_count"
+  }
 }
