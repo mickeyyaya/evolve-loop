@@ -1,0 +1,145 @@
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:22.9111597Z === RUN   TestLastLines
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8759672Z === RUN   TestParallelDefault_EveryTopLevelTestIsParallelOrListedSerial
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8762431Z === RUN   TestParallelDefaultGuard_FlagsATestWithoutParallel
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8785726Z === RUN   TestParallelDefaultGuard_FlagsStaleAndRedundantListEntries
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8787493Z === RUN   TestParallelDefaultGuard_ParallelOnlyInSubtestDoesNotCount
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8791430Z === RUN   TestParallelDefaultGuard_ReadsTheTestingTParameterName
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8793332Z === RUN   TestParallelDefaultGuard_ParallelTestMustNotMutateProcessState
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8795178Z === RUN   TestParallelDefaultGuard_ShadowedNamesAreNotPackageWrites
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8796876Z === RUN   TestParallelDefaultGuard_SerialListIsKeyedByPackageAndName
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:15:29.8800769Z === RUN   TestParallelDefaultGuard_ParallelTestMustNotReachProcessStateThroughHelpers
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:08.2970850Z --- FAIL: TestPersonaStopCriterionDedupe_CombinedLineCountReduced
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:08.9636778Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/core/advisor	1.352s	coverage: 100.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:11.5122873Z === RUN   TestCoverChangedFailures_AFailingTestRefusesAtEnforceAndOnlyWarnsAtShadow
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:11.5915051Z     --- FAIL: TestF
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:11.5915910Z FAIL	p
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:11.5970936Z --- PASS: TestCoverChangedFailures_AFailingTestRefusesAtEnforceAndOnlyWarnsAtShadow (0.09s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:12.5024787Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/covchanged	0.275s	coverage: 100.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:48.8309087Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:48.8324423Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.3961803Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.3963598Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.3969010Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.3971083Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.5090704Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.5093671Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.5236393Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.5237928Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.5819103Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.5820908Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:49.7492465Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/events/channel	0.551s	coverage: 100.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:58.1515539Z === RUN   TestReviewer_CircuitBreaker_DemotesAfterN
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:59.0288937Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:59.0307598Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:18:59.7528314Z --- PASS: TestReviewer_CircuitBreaker_DemotesAfterN (1.54s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:03.8898731Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/deliverable	42.257s	coverage: 97.5% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:25.4705374Z === RUN   TestRefreshResult_AFaultKeepsTheValidatorsFaultText
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:25.5339252Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:25.5452524Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:25.6392582Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:25.6539389Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:25.6663023Z --- PASS: TestRefreshResult_AFaultKeepsTheValidatorsFaultText (0.18s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:26.3812817Z === RUN   TestRefreshResult_AnOversizedDocumentIsExplanationContent
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:26.4307322Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:26.4313309Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:26.4481304Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:26.4486371Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:26.4819912Z --- PASS: TestRefreshResult_AnOversizedDocumentIsExplanationContent (0.30s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:19:28.0635023Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/core	80.439s	coverage: 100.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5843901Z === RUN   TestValidateExplanationReview_PathOnlyEvidenceIsAdvisory
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5846132Z === RUN   TestValidateExplanationReview_NotApplicableDocumentClaimsAreAdvisory
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5866344Z === RUN   TestRun_EmptyArtifact_FAIL
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5870244Z === RUN   TestRun_BridgeError_FAIL
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5871915Z === RUN   TestRun_MissingBridge_ReturnsError
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5873680Z === RUN   TestRun_MissingPrompts_ReturnsError
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5875379Z === RUN   TestRun_AgentLoadFails_ReturnsError
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5876855Z === RUN   TestName
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:20:23.5904433Z === RUN   TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:21:20.6345492Z === RUN   TestGuardSuite
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:22:24.0047988Z === RUN   TestPackages_HoldEveryTestThatReadsTheWholeTree
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:22:43.9604863Z --- FAIL: TestPackages_HoldEveryTestThatReadsTheWholeTree (20.07s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:22:44.1884911Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/routingeval	0.047s	coverage: 94.4% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:22:46.3317046Z === RUN   TestInnerRunCycleErrorF4
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:22:46.3327528Z --- FAIL: TestInnerRunCycleErrorF4 (0.01s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:22:46.4440528Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord	0.029s	coverage: 97.9% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:23:08.8287583Z FAIL	github.com/mickeyyaya/evolve-loop/go/internal/repocontract	45.026s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:23:09.2338396Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/verdictcache	0.104s	coverage: 95.6% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T07:23:29.8142438Z make: *** [Makefile:127: test-integration] Error 1
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:18.6761551Z === RUN   TestLastLines
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.3987984Z === RUN   TestParallelDefault_EveryTopLevelTestIsParallelOrListedSerial
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.3989558Z === RUN   TestParallelDefaultGuard_FlagsATestWithoutParallel
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.3990964Z === RUN   TestParallelDefaultGuard_AcceptsParallelListedAndEnvTests
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.3992534Z === RUN   TestParallelDefaultGuard_FlagsStaleAndRedundantListEntries
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.3994099Z === RUN   TestParallelDefaultGuard_ParallelOnlyInSubtestDoesNotCount
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.3995695Z === RUN   TestParallelDefaultGuard_ParallelMustBeTheFirstStatement
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.3997358Z === RUN   TestParallelDefaultGuard_ReadsTheTestingTParameterName
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.3998866Z === RUN   TestParallelDefaultGuard_ParallelTestMustNotMutateProcessState
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.4000523Z === RUN   TestParallelDefaultGuard_ShadowedNamesAreNotPackageWrites
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.4002065Z === RUN   TestParallelDefaultGuard_SerialListIsKeyedByPackageAndName
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.4003998Z === RUN   TestParallelDefaultGuard_NonTestFilesSupplyPackageVariables
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.4005705Z === RUN   TestParallelDefaultGuard_ParallelTestMustNotReachProcessStateThroughHelpers
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:15:25.4007712Z === RUN   TestParallelDefaultGuard_HelpersThatOnlyReadAreAccepted
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:17:20.1987115Z --- FAIL: TestPersonaStopCriterionDedupe_CombinedLineCountReduced
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:17:21.4684885Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/core/advisor	1.705s	coverage: 100.0% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:17:25.1376784Z === RUN   TestFailureCloseout_ACycle1757ShapedLaneChargesItsPinnedItem
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:17:25.1596655Z     --- FAIL: TestF
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:17:25.1627856Z FAIL	p
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:17:25.7455258Z --- PASS: TestFailureCloseout_ACycle1757ShapedLaneChargesItsPinnedItem (0.02s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:17:25.7470945Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/cycleoutcome	0.676s	coverage: 100.0% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:04.7531339Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:04.7532678Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.1221325Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/events/wake	0.188s	coverage: 100.0% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.4074011Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.4075581Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.4079695Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.4080980Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.4322632Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.4324104Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.4332043Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.4333019Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.5552712Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:05.5553701Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:11.1301579Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/deliverable	42.837s	coverage: 97.5% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:20.0519745Z === RUN   TestArchiveSupersededPredicatePackages_EveryFailureIsReturned
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:20.3036986Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:20.3122185Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:20.4425482Z --- PASS: TestArchiveSupersededPredicatePackages_EveryFailureIsReturned (0.38s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:20.8004921Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/flagregistry	0.038s	coverage: 100.0% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.4618137Z === RUN   TestRebind_AnyOtherInboxChangeStillDeclines
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.6458505Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.6606840Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.7143105Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.7283162Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.8597627Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.8649527Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.9148999Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.9154836Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:27.9591438Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/fleetbudget	0.035s	coverage: 93.0% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:18:29.0663367Z --- PASS: TestRebind_AnyOtherInboxChangeStillDeclines (1.60s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4450447Z === RUN   TestValidateExplanationReview_PathOnlyEvidenceIsAdvisory
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4451749Z === RUN   TestValidateExplanationReview_NotApplicableDocumentClaimsAreAdvisory
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4462574Z === RUN   TestRun_EmptyArtifact_FAIL
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4464547Z === RUN   TestRun_BridgeError_FAIL
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4465265Z === RUN   TestRun_MissingBridge_ReturnsError
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4466212Z === RUN   TestRun_MissingPrompts_ReturnsError
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4466973Z === RUN   TestRun_AgentLoadFails_ReturnsError
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4467691Z === RUN   TestName
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:21.4490982Z === RUN   TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:22.3246821Z === RUN   TestComposePrompt_RendersTaskContractVerbatim
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:53.0922917Z === RUN   TestGuardSuite
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:19:53.1493437Z === RUN   TestName
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:20:55.3187626Z === RUN   TestPackages_HoldEveryTestThatReadsTheWholeTree
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:11.7423188Z --- FAIL: TestPackages_HoldEveryTestThatReadsTheWholeTree (16.48s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:13.4861982Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/releasepipeline	19.744s	coverage: 99.5% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:17.7097070Z === RUN   TestInnerRunCycleErrorF4
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:17.7146790Z --- FAIL: TestInnerRunCycleErrorF4 (0.01s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:18.1012667Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/routingtest	2.499s	coverage: 96.2% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:26.5469174Z === RUN   TestModuleTestMainsNeverDeferCleanupPastOsExit
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:29.5567808Z FAIL	github.com/mickeyyaya/evolve-loop/go/internal/repocontract	34.336s
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:29.8579828Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/testverdict	0.123s	coverage: 100.0% of statements
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:32.2447337Z === RUN   TestAPICoverNamedExports
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:33.5258471Z --- PASS: TestModuleTestMainsNeverDeferCleanupPastOsExit (6.98s)
+go / build + test (Go 1.27, ubuntu, every package, no gates)	UNKNOWN STEP	2026-10-20T07:21:53.8375221Z make: *** [Makefile:127: test-integration] Error 1
+CI required	Require every selected suite to succeed	2026-10-20T07:27:25.8530945Z ^[[36;1m    *) echo "required CI work did not succeed: $result" >&2; exit 1 ;;^[[0m
+CI required	Require every selected suite to succeed	2026-10-20T07:27:25.9635527Z required CI work did not succeed: true:failure:failure
+CI required	Require every selected suite to succeed	2026-10-20T07:27:25.9652895Z ##[error]Process completed with exit code 1.

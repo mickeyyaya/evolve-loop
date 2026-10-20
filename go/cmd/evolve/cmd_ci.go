@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -144,7 +145,7 @@ func writeClassifyReport(w io.Writer, rep ciwatch.ClassifyReport, asJSON bool) e
 	fmt.Fprintln(&b, ciClassifyHeader)
 	for _, f := range rep.Failures {
 		e := f.Evidence
-		fmt.Fprintf(&b, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", f.Label, orDash(f.Package), orDash(f.Test), f.Rule,
+		fmt.Fprintf(&b, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", f.Label, orDash(f.Package), orDash(cmp.Or(f.Test, f.Step)), f.Rule,
 			e.Touched, e.BaseRed, e.RecurredOnMain, e.RerunGreen)
 	}
 	fmt.Fprintf(&b, "retry-safe: %s\n", map[bool]string{true: "yes", false: "no"}[rep.RetrySafe])

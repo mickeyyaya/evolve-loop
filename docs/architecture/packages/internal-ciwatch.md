@@ -17,11 +17,23 @@
 - **Escalation shape.** `escalationItem` mirrors the hand-filed `.evolve/inbox` items that triage already reads.
 - **Options.** `SHA` and `Fetch` are required. `Cycle` is recorded in the item (0 means unknown). A non-empty `WorkspaceDir` receives the verdict artifact. `ErrWatchTimeout` reports a run that did not complete in time.
 
+## Failure attribution of `ci classify`
+
+`ClassifyTarget` labels the failures of one red run. The failure list of each run comes from `withFailures` in `classify_source.go`. This section tells how that list is made.
+
+- **The problem.** The CI step renders the `go test -json` stream as plain text, and `go test -json` interleaves the output of all packages. Some passing tests also print fixture text such as `--- FAIL: TestC1946_001_CoreStatementCoverageIsFull` and `FAIL\tp`. On 2026-10-20 the text parser listed such fixtures as failures on runs 39381369373, 39385027012, 39386265940 and 39389719309, and it missed the real ones. The plain text cannot tell a printed line from a result line, so no text rule is correct.
+- **The test JSON wins.** Each test job uploads its `go test -json` stream as `test-integration.json` in an artifact whose name starts with `coverage-`. `testJSONFailures` lists the run artifacts, downloads each such artifact and reads its `fail` events. A failure row is a failed top-level test of a failed package, or a failed package with no failed test. A test that fails inside a passing package is not a row. Printed text is an `output` event, so it is never a row.
+- **The log gives the jobs.** `attributeFailures` gives each JSON row the jobs whose log shows its `--- FAIL` or `FAIL` line. If no job log shows it, the row keeps the artifact name.
+- **Non-test failures.** A failed job with no test row gets one step row. The step is the first `make` error target of the job, for example `make apicover-check`. Else it is the step name of the log. Else the row names only the job.
+- **Fallback.** The text parser `parseFailingTests` still runs when the run has no test JSON. It also runs for a rerun (`Attempt` 2 or more), because the artifact can belong to an earlier run of the jobs.
+- **Fixtures.** `testdata/cirun/<run>/` holds the trimmed `--log-failed` text and the trimmed test JSON of the four runs. `TestWithFailures_RealCIRunsYieldOnlyTheGoCommandsFailures` pins the rows of each run.
+
 ## Invariants
 
 - A green run files nothing. Pinned by `ciwatch_test.go`.
 - A red run files one critical item that names the failing test. Pinned by `ciwatch_test.go`.
 - Tests never call the live `gh` CLI. The `execCapture` seam enforces this.
+- `ci classify` makes no failure row from text that a test prints. Pinned by `classify_testjson_test.go`.
 
 ## Findings
 

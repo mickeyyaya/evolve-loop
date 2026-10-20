@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -275,53 +276,106 @@ func (s ghClassifySource) withFailures(ctx context.Context, st RunStatus) (RunSt
 	if err != nil {
 		return RunStatus{}, err
 	}
-	st.FailingTests, st.FailingJobs = parseFailingTests(string(out)), failedJobNames(string(out))
+	truth, found, err := s.testJSONFailures(ctx, st)
+	if err != nil {
+		return RunStatus{}, err
+	}
+	log := string(out)
+	st.FailingJobs = failedJobNames(log)
+	if found {
+		st.FailingTests = attributeFailures(log, truth)
+	} else {
+		st.FailingTests = parseFailingTests(log)
+	}
 	return st, nil
 }
 
-func logText(line string) (job, text string, ok bool) {
+const unknownStep = "UNKNOWN STEP"
+
+var makeErrorLine = regexp.MustCompile(`^make(?:\[\d+\])?: \*\*\* \[(?:[^\]]*:\d+: )?([^\]]+)\] Error \d+`)
+
+func logText(line string) (job, step, text string, ok bool) {
 	job, rest, ok := strings.Cut(line, "\t")
 	if !ok || job == "" {
-		return "", "", false
+		return "", "", "", false
 	}
-	if _, after, stepped := strings.Cut(rest, "\t"); stepped {
-		rest = after
+	if name, after, stepped := strings.Cut(rest, "\t"); stepped {
+		step, rest = name, after
 	}
 	if stamp, after, spaced := strings.Cut(rest, " "); spaced {
 		if _, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
 			rest = after
 		}
 	}
-	return job, strings.TrimSpace(rest), true
+	return job, step, strings.TrimSpace(rest), true
 }
 
 type failureParse struct {
-	found   map[string]*FailingTest
-	pending map[string][]string
-	named   map[string]bool
-	jobs    []string
+	found    map[string]*FailingTest
+	pending  map[string][]string
+	named    map[string]bool
+	jobs     []string
+	makes    map[string]string
+	steps    map[string]string
+	mentions map[string]map[string]bool
 }
 
-func (p *failureParse) add(pkg, test, job string) {
+func scanLog(log string) *failureParse {
+	p := &failureParse{found: map[string]*FailingTest{}, pending: map[string][]string{}, named: map[string]bool{},
+		makes: map[string]string{}, steps: map[string]string{}, mentions: map[string]map[string]bool{}}
+	for _, line := range strings.Split(log, "\n") {
+		if job, step, text, ok := logText(line); ok {
+			p.line(job, step, text)
+		}
+	}
+	return p
+}
+
+func (p *failureParse) add(row FailingTest, job string) {
 	p.named[job] = true
-	f := FailingTest{Package: pkg, Test: test, Jobs: []string{job}}
-	key := failureKey(f)
+	row.Jobs = []string{job}
+	key := failureKey(row)
 	if prev, ok := p.found[key]; ok {
 		if !slices.Contains(prev.Jobs, job) {
 			prev.Jobs = append(prev.Jobs, job)
 		}
 		return
 	}
-	p.found[key] = &f
+	p.found[key] = &row
 }
 
-func (p *failureParse) line(job, text string) {
+func mentionKey(pkg, test string) string {
+	if test != "" {
+		return "test\x00" + test
+	}
+	return "pkg\x00" + pkg
+}
+
+func (p *failureParse) mention(job, key string) {
+	if p.mentions[job] == nil {
+		p.mentions[job] = map[string]bool{}
+	}
+	p.mentions[job][key] = true
+}
+
+func (p *failureParse) note(job, step, text string) {
 	if !slices.Contains(p.jobs, job) {
 		p.jobs = append(p.jobs, job)
 	}
+	if m := makeErrorLine.FindStringSubmatch(text); m != nil && p.makes[job] == "" {
+		p.makes[job] = "make " + m[1]
+	}
+	if step != "" && step != unknownStep && p.steps[job] == "" {
+		p.steps[job] = step
+	}
+}
+
+func (p *failureParse) line(job, step, text string) {
+	p.note(job, step, text)
 	if name, isFail := strings.CutPrefix(text, "--- FAIL: "); isFail {
 		if fields := strings.Fields(name); len(fields) > 0 {
 			top, _, _ := strings.Cut(fields[0], "/")
+			p.mention(job, mentionKey("", top))
 			if !slices.Contains(p.pending[job], top) {
 				p.pending[job] = append(p.pending[job], top)
 			}
@@ -332,32 +386,60 @@ func (p *failureParse) line(job, text string) {
 	if len(fields) < 2 || !strings.HasPrefix(text, "FAIL\t") {
 		return
 	}
+	p.mention(job, mentionKey(fields[1], ""))
 	tests := p.pending[job]
 	delete(p.pending, job)
 	if len(tests) == 0 {
-		p.add(fields[1], "", job)
+		p.add(FailingTest{Package: fields[1]}, job)
 	}
 	for _, test := range tests {
-		p.add(fields[1], test, job)
+		p.add(FailingTest{Package: fields[1], Test: test}, job)
+	}
+}
+
+func (p *failureParse) addUnnamedJobs() {
+	for _, job := range p.jobs {
+		if !p.named[job] {
+			p.add(FailingTest{Step: cmp.Or(p.makes[job], p.steps[job])}, job)
+		}
 	}
 }
 
 func parseFailingTests(log string) []FailingTest {
-	p := failureParse{found: map[string]*FailingTest{}, pending: map[string][]string{}, named: map[string]bool{}}
-	for _, line := range strings.Split(log, "\n") {
-		if job, text, ok := logText(line); ok {
-			p.line(job, text)
-		}
-	}
+	p := scanLog(log)
 	for _, job := range p.jobs {
 		for _, test := range p.pending[job] {
-			p.add("", test, job)
-		}
-		if !p.named[job] {
-			p.add("", "", job)
+			p.add(FailingTest{Test: test}, job)
 		}
 	}
+	p.addUnnamedJobs()
 	return sortedFailures(p.found)
+}
+
+func attributeFailures(log string, truth []FailingTest) []FailingTest {
+	p := scanLog(log)
+	p.found, p.named = map[string]*FailingTest{}, map[string]bool{}
+	for _, f := range truth {
+		jobs := f.Jobs
+		if mentioned := p.jobsMentioning(mentionKey(f.Package, f.Test)); len(mentioned) > 0 {
+			jobs = mentioned
+		}
+		for _, job := range jobs {
+			p.add(FailingTest{Package: f.Package, Test: f.Test}, job)
+		}
+	}
+	p.addUnnamedJobs()
+	return sortedFailures(p.found)
+}
+
+func (p *failureParse) jobsMentioning(key string) []string {
+	var jobs []string
+	for _, job := range p.jobs {
+		if p.mentions[job][key] {
+			jobs = append(jobs, job)
+		}
+	}
+	return jobs
 }
 
 func sortedFailures(found map[string]*FailingTest) []FailingTest {
@@ -367,7 +449,7 @@ func sortedFailures(found map[string]*FailingTest) []FailingTest {
 		out = append(out, *f)
 	}
 	slices.SortFunc(out, func(a, b FailingTest) int {
-		return cmp.Or(cmp.Compare(a.Package, b.Package), cmp.Compare(a.Test, b.Test), cmp.Compare(a.Jobs[0], b.Jobs[0]))
+		return cmp.Or(cmp.Compare(a.Package, b.Package), cmp.Compare(a.Test, b.Test), cmp.Compare(a.Step, b.Step), cmp.Compare(a.Jobs[0], b.Jobs[0]))
 	})
 	return out
 }

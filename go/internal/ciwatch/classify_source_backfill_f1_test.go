@@ -285,6 +285,7 @@ func TestGHClassifySourceBackfillF1_LatestRunOnAndListRunsFailuresStayQueuedOrPr
 		seen := routedGHF1(t,
 			ghRouteF1{prefix: "run list", out: listJSONF1(runJSONF1(81, "h", 0, "completed", "failure"))},
 			ghRouteF1{prefix: "run view 81 --log-failed", out: ghLog("job", "--- FAIL: TestA (0s)", "FAIL\tm/a\t0.1s")},
+			ghRouteF1{prefix: "api repos/{owner}/{repo}/actions/runs/81/artifacts", out: `{"artifacts":[]}`},
 		)
 		st, err := NewGHClassifySource(".").LatestRunOn(context.Background(), "h")
 		if err != nil || len(st.FailingTests) != 1 || st.FailingTests[0].Test != "TestA" {
