@@ -6,7 +6,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
 const ledgerKindContractExhaustionSkip = "contract_exhaustion_skip"
@@ -39,9 +41,18 @@ func (cr *cycleRun) rejectAfterCorrections(next Phase, dr *dispatchResult, rr Re
 		dr.resp = cr.o.degradeExhaustedReview(cr.ctx, cr.cs, next, phaseErr)
 		return loopNext, nil
 	}
-	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
+	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, rejectedOutcome(phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt)))
 	cr.recordFailureLearning(next, phaseErr, max(corrections, 1))
 	return loopAbort, wrapCycleLevelError(next, phaseErr)
+}
+
+func rejectedOutcome(out recovery.PhaseOutcome) recovery.PhaseOutcome {
+	if out.Phase != string(PhaseBuild) {
+		return out
+	}
+	out.Verdict = VerdictFAIL
+	out.Diagnostics = append([]Diagnostic{{Severity: cyclestate.SeverityError, Code: cyclestate.DiagCodeBuildRejected, Message: out.AbortReason}}, out.Diagnostics...)
+	return out
 }
 
 func (o *Orchestrator) degradeExhaustedReview(ctx context.Context, cs CycleState, phase Phase, cause error) PhaseResponse {

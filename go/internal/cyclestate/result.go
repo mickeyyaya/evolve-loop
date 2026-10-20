@@ -61,6 +61,7 @@ const (
 	DiagCodeTriageLanePinMissing    = "TRIAGE_LANE_PIN_MISSING"
 	DiagCodeProtectedPredicateRoute = "PROTECTED_PREDICATE_ROUTE"
 	DiagCodeBlockerRoute            = "BLOCKER_ROUTE"
+	DiagCodeBuildRejected           = "BUILD_DELIVERABLE_REJECTED"
 )
 
 const (
@@ -95,6 +96,7 @@ type Disposition struct {
 	TaskLevel        bool
 	RouteConsole     bool
 	OutranksSentinel bool
+	YieldsToInfra    bool
 }
 
 func RefusalDisposition(code string) Disposition {
@@ -103,6 +105,8 @@ func RefusalDisposition(code string) Disposition {
 		return Disposition{TaskLevel: true, RouteConsole: true, OutranksSentinel: true}
 	case DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute:
 		return Disposition{TaskLevel: true, RouteConsole: true}
+	case DiagCodeBuildRejected:
+		return Disposition{TaskLevel: true, YieldsToInfra: true}
 	case DiagCodeTriageTopNEmpty, DiagCodeTriageScopeUnanswered:
 		return Disposition{TaskLevel: true}
 	default:
