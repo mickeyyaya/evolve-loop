@@ -517,6 +517,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	if cfg.TopNGate != config.StageOff {
 		reviewers = append(reviewers, topngate.NewReviewer(cfg.TopNGate))
 	}
+	reviewers = append(reviewers, core.NewHandoffReviewer(pol.HandoffConfig(), handoffReviewCheck))
 	if len(reviewers) > 0 {
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))
 	}

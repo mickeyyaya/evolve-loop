@@ -70,4 +70,15 @@ type Ledger struct {
 	Author        Author  `json:"author"`
 	Round         int     `json:"round"`
 	Entries       []Entry `json:"entries"`
+	Check         *Check  `json:"check,omitempty"`
+}
+
+type Check struct {
+	Stage          string   `json:"stage"`
+	Outcome        string   `json:"outcome"`
+	Unmet          []string `json:"unmet"`
+	Blocked        []string `json:"blocked"`
+	Paths          []string `json:"paths"`
+	FailedEvidence []string `json:"failed_evidence"`
+	Errors         []string `json:"errors"`
 }

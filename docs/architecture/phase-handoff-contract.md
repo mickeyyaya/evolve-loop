@@ -171,6 +171,23 @@ The check has two layers. The deterministic layer always runs first.
 
 **The pass condition:** each `required` ask is `met`, the deterministic layer resolved its evidence, and the judge (if any) agrees. A stated confidence never counts (research P2.10).
 
+### Where the check runs (H8)
+
+`core.HandoffReviewer` (`go/internal/core/handoff_reviewer.go`) is a `core.DeliverableReviewer`. `go/cmd/evolve/cmd_cycle.go` puts it last in the reviewer chain of each cycle. At the end of the `tdd` phase it checks `triage-tdd`. At the end of the `build` phase it checks `tdd-build`. The other pairs have no check yet.
+
+The check is the same code as `evolve handoff check` (`evaluateHandoffAt` in `go/cmd/evolve/cmd_handoff.go`). The reviewer reads the ledger in the run directory of the cycle and the inbox of the project root. It reads the ACS predicates and the evidence in the worktree.
+
+The reviewer adds its result to `handoff-<pair>.json` under the key `check`, and it keeps every key of the ledger as written. When no ledger exists, it writes a file with `schema_version`, `pair` and `check` only. When the file is not a JSON object, it keeps the file and writes a `WARN` line.
+
+| Stage of the pair | Outcome | What the reviewer returns |
+|---|---|---|
+| `shadow` | any | approve: the verdict of the phase does not change |
+| `enforce` | `pass` | approve |
+| `enforce` | `retry`, `cap`, `invalid` or `error` | reject, with the unmet ask ids, the evidence that did not resolve and the validation errors; the existing correction loop sends them to the phase |
+| `enforce` | `blocked` | reject, with a proven blocker; the cycle ends as `blocked-needs-console` (§6) |
+
+The `check` record has the keys `stage`, `outcome`, `unmet`, `blocked`, `paths`, `failed_evidence` and `errors`. Each pair starts at `shadow`, so this record is the shadow data that H12 reads.
+
 ## 6. The exits
 
 ### Issue
@@ -195,6 +212,8 @@ No exit means "the request is wrong", and an agent claim alone must not stop a l
 2. **A conflict:** two asks of the same request cannot both be met. Example: one ask forbids a production edit, and another ask needs a line that only a production edit can reach.
 
 An agent can name a blocker in its ledger. The exit decision accepts it only when the proof holds. A claim without proof is `unmet`.
+
+A `blocked` check at stage `enforce` uses the exit of [blocker-exit.md](blocker-exit.md). The reviewer returns the revision in `ReviewResult.ProvenBlocker`, and `provenBlocker` ends the cycle with the `BLOCKER_ROUTE` diagnostic. The route needs exactly one committed item. Without one, the correction rounds continue. The worktree stays, so the salvage snapshot stays.
 
 **The revision** names the ask ids, the proof and the pair. The console, or the requester phase in a later round, rewrites the request. This is the `C → A` edge that the operator asked for: a later phase sends the request back, and the earlier phase does not repeat it.
 
@@ -244,7 +263,7 @@ The tdd phase wrote `TestC1950_001` (100.0% of `AppendResolvedFingerprint`, erro
 | `go/internal/handoff/exit` | the exit decision and the blocker proof (H4, H5) | no |
 | `go/internal/policy/handoff.go` | the `handoff` policy block (H6) | no |
 | `go/cmd/evolve/cmd_handoff.go` | `evolve handoff check` and `evolve handoff show` (H7) | no |
-| `go/internal/core` and `go/cmd/evolve/cmd_cycle.go` | the handoff reviewer in the reviewer chain (H8) | yes, console |
+| `go/internal/core/handoff_reviewer.go` and `go/cmd/evolve/cmd_cycle.go` | the handoff reviewer in the reviewer chain (H8, §5) | yes, console |
 | `agents/` and `go/internal/core/task_contract.go` | the ledger in the personas and the request in the task contract (H9) | yes, console |
 
 The `handoff` package depends on `inboxbatch`, `committedset` and the guards manifest. It does not depend on `core`, so `core` can call it without a cycle.
@@ -259,6 +278,9 @@ The `handoff` package depends on `inboxbatch`, `committedset` and the guards man
 | A round with no new met ask ends the loop. | the H4 test | planned |
 | A judge seat is not the model of the author at stage enforce. | the H10 refusal test | planned |
 | Each pair starts at shadow. | the H6 default test | planned |
+| A check at stage shadow records its result and keeps the verdict. | `TestHandoffReviewer_AtShadowACycleWritesTheCheckAndKeepsItsVerdict` | done |
+| A blocked check at stage enforce ends the cycle as blocked and keeps the worktree. | `TestHandoffReviewer_AtEnforceABlockedCheckEndsTheCycleBlockedAndKeepsTheSalvageWorktree` | done |
+| A correction at stage enforce names the unmet ask ids and the failed evidence. | `TestHandoffReviewer_AtEnforceTheRetryCorrectionListsTheUnmetAsksAndTheFailedEvidence` | done |
 | The replay of cycles 1946 and 1950 ends blocked in round 1. | the H7 replay test with the archived run artifacts | planned |
 
 ## Limits
