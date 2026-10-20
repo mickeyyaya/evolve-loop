@@ -19,6 +19,7 @@ const (
 type amplifyingBridge struct {
 	stated        string
 	deleteBuilder bool
+	editBuilder   bool
 	noArtifact    bool
 }
 
@@ -28,6 +29,9 @@ func (b *amplifyingBridge) Launch(_ context.Context, req core.BridgeRequest) (co
 	_ = os.WriteFile(path, []byte("package cycle7 // $-anchored meta-test\n"), 0o644)
 	if b.deleteBuilder {
 		_ = os.Remove(filepath.Join(req.Worktree, filepath.FromSlash(builderPredicate)))
+	}
+	if b.editBuilder {
+		_ = os.WriteFile(filepath.Join(req.Worktree, filepath.FromSlash(builderPredicate)), []byte("package cycle7 // loosened to pass\n"), 0o644)
 	}
 	if !b.noArtifact {
 		body := "## Generated Tests\n## Results\n"
@@ -182,5 +186,19 @@ func TestRetractsOnFail_ReportsTheOption(t *testing.T) {
 	}
 	if New(Options{Hooks: hooks}).RetractsOnFail() {
 		t.Error("a runner retracts only when its phase opts in")
+	}
+}
+
+func TestRun_AStatedFailRestoresABuilderRedThePhaseEdited(t *testing.T) {
+	t.Parallel()
+	dir, ws := amplificationRepo(t), t.TempDir()
+
+	runAmplification(t, &amplifyingBridge{stated: core.VerdictFAIL, editBuilder: true}, true, dir, ws)
+
+	if got, _ := fileBody(t, dir, builderPredicate); got != builderRedBody {
+		t.Errorf("a builder red the phase edited must come back byte-identical, got %q", got)
+	}
+	if got, _ := fileBody(t, filepath.Join(ws, "test-amplification-retracted"), builderPredicate); !strings.Contains(got, "loosened") {
+		t.Errorf("the phase's edit must be kept as evidence, got %q", got)
 	}
 }

@@ -3,6 +3,7 @@ package treefence
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -130,7 +131,7 @@ func TestRetract_FailsLoudOnAnUnknownDispatchTree(t *testing.T) {
 	}
 }
 
-func TestRetract_FailsLoudWhenAWriteCannotBeRead(t *testing.T) {
+func TestRetract_KeepsASymlinkAsALinkAndAnExecutableWithItsMode(t *testing.T) {
 	t.Parallel()
 	dir := initRepo(t)
 	ctx := context.Background()
@@ -141,11 +142,61 @@ func TestRetract_FailsLoudWhenAWriteCannotBeRead(t *testing.T) {
 	if err := os.Symlink("src", filepath.Join(dir, "dirlink")); err != nil {
 		t.Fatal(err)
 	}
+	write(t, dir, "tool.sh", "#!/bin/sh\n")
+	if err := os.Chmod(filepath.Join(dir, "tool.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	keep := filepath.Join(t.TempDir(), "retracted")
+
+	if _, err := snap.Retract(ctx, keep); err != nil {
+		t.Fatalf("a symlink to a directory must not defeat the retraction: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "dirlink")); !os.IsNotExist(err) {
+		t.Errorf("the phase's symlink must leave the worktree, lstat err = %v", err)
+	}
+	if target, err := os.Readlink(filepath.Join(keep, "dirlink")); err != nil || target != "src" {
+		t.Errorf("the evidence must keep the link itself, got %q, %v", target, err)
+	}
+	if info, err := os.Stat(filepath.Join(keep, "tool.sh")); err != nil || info.Mode().Perm() != 0o755 {
+		t.Errorf("the evidence must keep the mode of an executable, got %v, %v", info, err)
+	}
+}
+
+func TestRetract_FailsLoudWhenAWriteCannotBeRead(t *testing.T) {
+	dir := initRepo(t)
+	ctx := context.Background()
+	snap, err := Take(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, dir, "go/acs/cycle7/amplified_test.go", "package cycle7\n")
+	readKept = func(string) ([]byte, error) { return nil, os.ErrPermission }
+	t.Cleanup(func() { readKept = os.ReadFile })
 	if _, err := snap.Retract(ctx, t.TempDir()); err == nil {
 		t.Fatal("Retract must fail when it cannot read a write to keep it")
 	}
-	if _, err := os.Lstat(filepath.Join(dir, "dirlink")); err != nil {
-		t.Errorf("a failed retraction must leave the write in place: %v", err)
+	if got := read(t, dir, "go/acs/cycle7/amplified_test.go"); got != "package cycle7\n" {
+		t.Errorf("a failed retraction must leave the write in place, got %q", got)
+	}
+}
+
+func TestRetract_FailsLoudWhenALinkCannotBeKept(t *testing.T) {
+	t.Parallel()
+	dir := initRepo(t)
+	ctx := context.Background()
+	snap, err := Take(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("src", filepath.Join(dir, "dirlink")); err != nil {
+		t.Fatal(err)
+	}
+	keep := t.TempDir()
+	if err := os.WriteFile(filepath.Join(keep, "dirlink"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := snap.Retract(ctx, keep); err == nil {
+		t.Fatal("Retract must fail when it cannot keep the link")
 	}
 }
 
@@ -164,5 +215,68 @@ func TestRetract_FailsLoudWhenTheEvidenceFileCannotBeWritten(t *testing.T) {
 	}
 	if _, err := snap.Retract(ctx, keep); err == nil {
 		t.Fatal("Retract must fail when it cannot write the evidence copy")
+	}
+}
+
+func TestRetract_RemovesANestedRepositoryAndAPathWhoseParentBecameAFile(t *testing.T) {
+	t.Parallel()
+	dir := initRepo(t)
+	ctx := context.Background()
+	snap, err := Take(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(dir, "nested")
+	if out, err := exec.Command("git", "init", "-q", nested).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, out)
+	}
+	write(t, nested, "x.txt", "x\n")
+	if out, err := exec.Command("git", "-C", nested, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "n").CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, out)
+	}
+	if err := os.RemoveAll(filepath.Join(dir, "src")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, dir, "src", "now a file\n")
+
+	keep := filepath.Join(t.TempDir(), "retracted")
+	if _, err := snap.Retract(ctx, keep); err != nil {
+		t.Fatalf("Retract: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(keep, "nested")); !os.IsNotExist(err) {
+		t.Errorf("a nested repository has no content to keep, stat err = %v", err)
+	}
+	if _, err := os.Stat(nested); !os.IsNotExist(err) {
+		t.Errorf("the phase's nested repository must leave the worktree, stat err = %v", err)
+	}
+	if got := read(t, dir, "src/mat.go"); got != "package src // builder change\n" {
+		t.Errorf("a builder file under a replaced directory must come back, got %q", got)
+	}
+}
+
+func TestRetract_FailsLoudWhenAWriteCannotBeStatedOrItsLinkRead(t *testing.T) {
+	for name, fail := range map[string]func(){
+		"stat":     func() { lstatKept = func(string) (os.FileInfo, error) { return nil, os.ErrPermission } },
+		"readlink": func() { readlinkKept = func(string) (string, error) { return "", os.ErrPermission } },
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := initRepo(t)
+			ctx := context.Background()
+			snap, err := Take(ctx, dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink("src", filepath.Join(dir, "dirlink")); err != nil {
+				t.Fatal(err)
+			}
+			fail()
+			t.Cleanup(func() { lstatKept, readlinkKept = os.Lstat, os.Readlink })
+			if _, err := snap.Retract(ctx, t.TempDir()); err == nil {
+				t.Fatalf("%s: Retract must fail when it cannot keep the write", name)
+			}
+			if _, err := os.Lstat(filepath.Join(dir, "dirlink")); err != nil {
+				t.Errorf("%s: a failed retraction must leave the write in place: %v", name, err)
+			}
+		})
 	}
 }

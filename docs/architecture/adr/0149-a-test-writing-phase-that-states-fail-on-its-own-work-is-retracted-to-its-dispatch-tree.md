@@ -50,12 +50,13 @@ Option B fails acceptance 2 by construction. Option C fails acceptance 1. Option
 | D3 | The runner snapshots the whole worktree before the dispatch (`treefence.Take`). On a stated FAIL, it restores the snapshot (`Snapshot.Retract`). Added paths go, and changed or deleted paths come back from the snapshot. | F4: the snapshot is the host's record. The phase cannot change it. | Retract the paths that the report names: the report is the phase's self-report, so it is not proof of authorship. |
 | D4 | Before the restore, the runner copies each path the phase wrote to `<workspace>/<phase>-retracted/`. When it cannot keep a copy, it restores nothing. | F5: the evidence must outlive the retraction. A failure leaves the cycle as it is today. | Restore without a copy: an unlogged deletion hides what the phase tried. |
 | D5 | A retraction never changes the verdict. It adds one `retraction:` diagnostic to the response and one WARN line to the log. | The fence of ADR-0097 follows the same rule: the fence reports, and the gates decide. | Change the verdict to WARN or SKIPPED: the verdict then hides the retraction. |
+| D6 | A `retract_on_fail` phase never runs in an evaluate batch. `batchArchetype` (`go/internal/core/evaluate_batch.go`) gives it no archetype, so `evaluateBatch` runs it alone. | A read-only sibling in the same worktree holds a fence. That fence restores its own snapshot, so it can write a retracted test back. | Make the fence aware of the retraction: two snapshots of one tree that each restore are a race, and a serial phase removes it. |
 
 ## Why a builder red cannot leave through this path
 
 The retraction can only make the tree equal to the tree before the phase. That tree has every builder and TDD file exactly as they were. Three cases cover each move of an attacker.
 
-1. **The phase deletes or edits a builder red, then states FAIL.** The restore writes the builder red back byte for byte. Pinned by `TestRun_AStatedFailRetractsThePhaseWritesAndCannotLaunderABuilderRed`.
+1. **The phase deletes or edits a builder red, then states FAIL.** The restore writes the builder red back byte for byte. Pinned by `TestRun_AStatedFailRetractsThePhaseWritesAndCannotLaunderABuilderRed` (a deletion) and `TestRun_AStatedFailRestoresABuilderRedThePhaseEdited` (an edit).
 2. **The builder plants text in `build-report.md` that makes the phase state FAIL.** The result is the tree before the phase, with the builder's reds in it. At worst the cycle has no amplified tests. That equals a cycle without the phase.
 3. **The phase states FAIL to hide a real catch.** The result is again a cycle without the amplified tests. A different agent on a different CLI still audits the build (ADR-0088).
 
@@ -74,6 +75,7 @@ So the retraction can only remove the phase's own contribution. It cannot remove
 - The trigger depends on the phase's honesty about FAIL. A phase that leaves a broken test and states WARN still reds the cycle, as today. The persona states the rule (`agents/evolve-test-amplification.md`).
 - The retraction does not touch paths that `.gitignore` covers. The snapshot does not see them (ADR-0097).
 - The retraction runs after the judge of the phase itself. The EGPS suite runs later, in the audit, so it sees the restored tree. A host effect of the phase sees the phase's writes.
+- A symlink is kept as a link, and a file keeps its mode. A nested repository or a directory has no content to keep, so the restore only removes it.
 - A restore that fails part way names the paths that it restored. The other paths stay as the phase left them.
 
 ## What changes this decision
@@ -85,3 +87,4 @@ A stated FAIL can hide a real defect that the audit then misses. If a cycle show
 - `TestUserSpecs_TestAmplificationRetractsOnFail` pins the opt-in in the tracked `phase.json`.
 - `TestNew_ThreadsRetractOnFailFromTheSpec` pins that `specrunner.New`, the one constructor of every catalog phase, passes the opt-in to the runner.
 - `TestRun_AStatedFailRetractsThePhaseWritesAndCannotLaunderABuilderRed` runs the shared runner over a git worktree with the cycle-1493 shape.
+- `TestEvaluateBatchAt_ARetractOnFailPhaseNeverRunsBesideAnotherPhase` pins D6.
