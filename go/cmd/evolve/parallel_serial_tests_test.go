@@ -577,6 +577,7 @@ var serialTests = map[string]string{
 	"main.TestRunLoop_ZeroShip_AShipResetsTheCount":                                                                        "swaps seam loopOrchOverride",
 	"main.TestRunLoop_ZeroShip_FailedAndSkippedNoWorkWavesCountAsZeroShip":                                                 "swaps seam loopOrchOverride",
 	"main.TestRunLoop_ZeroShip_ThresholdComesFromPolicyJSON":                                                               "swaps seam loopOrchOverride",
+	"main.TestRunLoop_AOneWaveBatchWhoseWaveTipsTheWindowHaltsAfterTheWave":                                                "swaps seam loopOrchOverride",
 	"main.TestRunLoop_ZeroShip_TwoConsecutiveZeroShipWavesHaltBeforeTheThird":                                              "swaps seam loopOrchOverride",
 	"main.TestZeroShipHalt_UnreadableFailurePolicyWarnsAndKeepsTheCompiledDefault":                                         "swaps seam chainBoundaryAheadFn",
 	"main.TestRunLoop_ABoundaryReExecKeepsTheWaveIndexAndTheRemainingBudget":                                               "swaps seam chainRunningCommitFn",

@@ -12,21 +12,12 @@ import (
 )
 
 func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stderr io.Writer, signals *signalcenter.Center) (rc int, halted bool) {
-	pol, _ := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	fp, err := pol.FailurePolicyConfig()
-	if err != nil {
-		fmt.Fprintf(stderr, "[loop] WARN: blocker-breaker: failure policy unreadable (%v) — using compiled defaults\n", err)
-		fp = policy.DefaultSystemFailurePolicy()
-	}
+	fp := breakerFailurePolicy(evolveDir, stderr)
 	digests := core.CollectBatchFailureDigests(evolveDir, batchStartCycle+1)
 	deferrals := core.CollectBatchLaneDeferrals(evolveDir, batchStartCycle+1)
 	reconcileConsumedFingerprints(evolveDir, stderr)
 	reconcileConsumedBindings(projectRoot, evolveDir, stderr)
-	acked, lerr := core.LoadResolvedFingerprints(evolveDir)
-	if lerr != nil {
-		fmt.Fprintf(stderr, "[loop] WARN: blocker-breaker: resolved-fingerprints ledger unreadable (%v) — proceeding without exclusions\n", lerr)
-		acked = nil
-	}
+	acked := breakerAckedFingerprints(evolveDir, stderr)
 	v := core.EvaluateBlockerBreaker(digests, core.BlockerBreakerConfig{
 		GuardClassCeiling:           fp.Thresholds.GuardClassHaltCeiling,
 		IdenticalFingerprintCeiling: fp.Thresholds.IdenticalFingerprintHaltCeiling,
@@ -49,11 +40,44 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		}
 		return haltPipelineBlocker(evolveDir, projectRoot, latest, "lane-provisioning", v, stderr, signals), true
 	}
-	handoffs := core.CollectBatchNoWorkHandoffs(evolveDir, batchStartCycle+1)
-	if v := core.EvaluateNoWorkHandoffs(handoffs, fp.Thresholds.NoWorkHandoffHaltCeiling); v.Halt {
-		return haltPipelineBlocker(evolveDir, projectRoot, handoffs[len(handoffs)-1], "no-work-handoff", v, stderr, signals), true
+	return noWorkHandoffHalt(evolveDir, projectRoot, fp.Thresholds, acked, stderr, signals)
+}
+
+func breakerFailurePolicy(evolveDir string, stderr io.Writer) policy.SystemFailurePolicy {
+	pol, _ := policy.Load(filepath.Join(evolveDir, "policy.json"))
+	fp, err := pol.FailurePolicyConfig()
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: blocker-breaker: failure policy unreadable (%v) — using compiled defaults\n", err)
+		return policy.DefaultSystemFailurePolicy()
 	}
-	return 0, false
+	return fp
+}
+
+func breakerAckedFingerprints(evolveDir string, stderr io.Writer) map[string]bool {
+	acked, err := core.LoadResolvedFingerprints(evolveDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: blocker-breaker: resolved-fingerprints ledger unreadable (%v) — proceeding without exclusions\n", err)
+		return nil
+	}
+	return acked
+}
+
+func noWorkHandoffHalt(evolveDir, projectRoot string, th policy.FailureThresholds, acked map[string]bool, stderr io.Writer, signals *signalcenter.Center) (rc int, halted bool) {
+	through := core.NoWorkHandoffsResolvedThrough(acked)
+	if through > 0 {
+		fmt.Fprintf(stderr, "[loop] no-work-handoffs: hand-offs through cycle %d are acknowledged and not counted\n", through)
+	}
+	handoffs := core.CollectNoWorkHandoffs(evolveDir, through, th.NoWorkHandoffWindow)
+	v := core.EvaluateNoWorkHandoffs(handoffs, th.NoWorkHandoffHaltCeiling)
+	if !v.Halt {
+		return 0, false
+	}
+	return haltPipelineBlocker(evolveDir, projectRoot, handoffs[len(handoffs)-1], "no-work-handoff", v, stderr, signals), true
+}
+
+func noWorkHandoffHaltAfterWave(evolveDir, projectRoot string, stderr io.Writer, signals *signalcenter.Center) (rc int, halted bool) {
+	reconcileConsumedFingerprints(evolveDir, stderr)
+	return noWorkHandoffHalt(evolveDir, projectRoot, breakerFailurePolicy(evolveDir, stderr).Thresholds, breakerAckedFingerprints(evolveDir, stderr), stderr, signals)
 }
 
 func haltPipelineBlocker(evolveDir, projectRoot string, cycle int, category string, v core.BlockerVerdict, stderr io.Writer, signals *signalcenter.Center) int {

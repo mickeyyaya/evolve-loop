@@ -8,28 +8,49 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 )
 
-const noWorkHandoffsRule = "no-work-handoffs"
+const (
+	noWorkHandoffsRule             = "no-work-handoffs"
+	noWorkHandoffFingerprintPrefix = noWorkHandoffsRule + "|cycle|"
+)
 
-func CollectBatchNoWorkHandoffs(evolveDir string, fromCycle int) []int {
+func NoWorkHandoffFingerprint(cycle int) string {
+	return noWorkHandoffFingerprintPrefix + strconv.Itoa(cycle)
+}
+
+func NoWorkHandoffsResolvedThrough(acked map[string]bool) int {
+	through := 0
+	for fp := range acked {
+		rest, ours := strings.CutPrefix(fp, noWorkHandoffFingerprintPrefix)
+		if n, err := strconv.Atoi(rest); ours && err == nil {
+			through = max(through, n)
+		}
+	}
+	return through
+}
+
+func CollectNoWorkHandoffs(evolveDir string, resolvedThrough, window int) []int {
 	entries, err := os.ReadDir(filepath.Join(evolveDir, "runs"))
 	if err != nil {
 		return nil
 	}
 	var cycles []int
 	for _, e := range entries {
-		n, inBatch := batchCycleNumber(e, fromCycle)
-		if !inBatch {
-			continue
-		}
-		if outcome, _ := cyclehealth.ClassifyOutcome(filepath.Join(evolveDir, "runs", e.Name())); outcome == cyclehealth.OutcomeNoWork {
+		if n, ok := batchCycleNumber(e, resolvedThrough+1); ok {
 			cycles = append(cycles, n)
 		}
 	}
 	sort.Ints(cycles)
-	return cycles
+	cycles = cycles[max(0, len(cycles)-window):]
+	var handoffs []int
+	for _, n := range cycles {
+		if committedset.HandedOff(filepath.Join(evolveDir, "runs", "cycle-"+strconv.Itoa(n))) {
+			handoffs = append(handoffs, n)
+		}
+	}
+	return handoffs
 }
 
 func EvaluateNoWorkHandoffs(cycles []int, ceiling int) BlockerVerdict {
@@ -40,9 +61,10 @@ func EvaluateNoWorkHandoffs(cycles []int, ceiling int) BlockerVerdict {
 	for i, c := range cycles {
 		names[i] = strconv.Itoa(c)
 	}
+	last := cycles[len(cycles)-1]
 	return BlockerVerdict{
-		Halt: true, Rule: noWorkHandoffsRule, Count: len(cycles),
-		Reason: fmt.Sprintf("%d planned no-work lanes in this batch handed their items to the console (cycles %s; ceiling %d) — a triage that drops work it should commit drains the queue to the console while the other lanes ship",
-			len(cycles), strings.Join(names, ", "), ceiling),
+		Halt: true, Rule: noWorkHandoffsRule, Count: len(cycles), Fingerprint: NoWorkHandoffFingerprint(last),
+		Reason: fmt.Sprintf("%d no-work lanes in the recent window handed their items to the console (cycles %s; ceiling %d) — a triage that drops work it should commit drains the queue to the console while the other lanes ship; consume this item or run evolve loop --reset --fingerprint %s to acknowledge them",
+			len(cycles), strings.Join(names, ", "), ceiling, NoWorkHandoffFingerprint(last)),
 	}
 }
