@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
@@ -67,7 +68,7 @@ func TestApplyLaneDeadlines_AStoppedLaneStopsTheCycleThatRanIt(t *testing.T) {
 
 	want := []wave.Cycle{
 		{ID: 1, Todo: "a", Phase: "build", StartedAt: clock(0)},
-		{ID: 2, Todo: "a", Phase: "build", Termination: wave.TerminationLaneDeadline, StartedAt: clock(5), EndedAt: clock(30)},
+		{ID: 2, Todo: "a", Phase: "build", Termination: cyclestate.CycleTerminationLaneDeadline, StartedAt: clock(5), EndedAt: clock(30)},
 		{ID: 3, Todo: "a", Phase: "build", StartedAt: clock(40)},
 		{ID: 4, Todo: "b", Phase: "build", StartedAt: clock(0)},
 		{ID: 5, Todo: "c", Verdict: "PASS", StartedAt: clock(0)},

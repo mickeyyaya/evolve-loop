@@ -34,6 +34,14 @@ func TestDiff(t *testing.T) {
 				{Kind: wave.EventSealed, Cycle: 7, Detail: "PASS"},
 				{Kind: wave.EventShipped, Cycle: 7},
 			}},
+		{"a lane deadline stop with no verdict is a stop",
+			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{building}},
+			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{{ID: 7, Phase: "build", Termination: "stopped: lane deadline"}}},
+			[]wave.Event{{Kind: wave.EventStopped, Cycle: 7, Detail: "stopped: lane deadline"}}},
+		{"a termination beside a verdict is the seal only",
+			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{building}},
+			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{{ID: 7, Phase: "build", Verdict: "FAIL", Termination: "blocked-needs-console"}}},
+			[]wave.Event{{Kind: wave.EventSealed, Cycle: 7, Detail: "FAIL"}}},
 		{"the loop exit comes last",
 			wave.Snapshot{LoopLive: true, Cycles: []wave.Cycle{{ID: 8, Phase: "audit"}}},
 			wave.Snapshot{LoopLive: false, Cycles: []wave.Cycle{{ID: 8, Phase: "audit", Verdict: "FAIL"}}},
@@ -67,6 +75,7 @@ func TestEvent_String(t *testing.T) {
 		{wave.Event{Kind: wave.EventShipped, Cycle: 7}, "cycle 7: shipped"},
 		{wave.Event{Kind: wave.EventQuotaPaused, Cycle: 7, Detail: "scout"}, "cycle 7: quota-paused in scout"},
 		{wave.Event{Kind: wave.EventLoopExit}, "loop: exit"},
+		{wave.Event{Kind: wave.EventStopped, Cycle: 7, Detail: "stopped: lane deadline"}, "cycle 7: stopped: lane deadline"},
 		{wave.Event{Kind: wave.EventWaveStarted, Detail: "83"}, "wave 83 started; watch follows it"},
 		{wave.Event{Kind: wave.EventPool, Detail: "LOOP_ORCH_POOL_IDLE: pool idle"}, "LOOP_ORCH_POOL_IDLE: pool idle"},
 	}
@@ -79,8 +88,8 @@ func TestEvent_String(t *testing.T) {
 
 func TestEventKind_IsTheWatchJSONVocabulary(t *testing.T) {
 	t.Parallel()
-	kinds := []wave.EventKind{wave.EventPhase, wave.EventSealed, wave.EventShipped, wave.EventQuotaPaused, wave.EventLoopExit, wave.EventWaveStarted, wave.EventPool}
-	want := []string{"phase", "sealed", "shipped", "quota-paused", "loop-exit", "wave-started", "pool"}
+	kinds := []wave.EventKind{wave.EventPhase, wave.EventSealed, wave.EventShipped, wave.EventQuotaPaused, wave.EventLoopExit, wave.EventWaveStarted, wave.EventPool, wave.EventStopped}
+	want := []string{"phase", "sealed", "shipped", "quota-paused", "loop-exit", "wave-started", "pool", "stopped"}
 	for i, k := range kinds {
 		if string(k) != want[i] {
 			t.Errorf("kind %d = %q, want %q: a watch consumer reads this text", i, k, want[i])

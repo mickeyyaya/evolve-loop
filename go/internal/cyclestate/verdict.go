@@ -9,6 +9,8 @@ const (
 
 const SealedVerdictField = "final_verdict"
 
+const SealedTerminationField = "termination_reason"
+
 const ClassificationMidExecutionFail = "cycle-mid-execution-fail"
 
 const CycleTerminationTriageNoWork = "triage-empty-commitment"
@@ -20,6 +22,8 @@ const CycleTerminationBlockedNeedsConsole = "blocked-needs-console"
 const CycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
 
 const CycleTerminationLaneWorktreeDeferred = "lane-worktree-deferred"
+
+const CycleTerminationLaneDeadline = "stopped: lane deadline"
 
 const (
 	CycleOutcomeShippedViaBuild      = "SHIPPED_VIA_BUILD"
