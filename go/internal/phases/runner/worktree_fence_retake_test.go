@@ -28,7 +28,7 @@ func TestRun_ARetakenSnapshotNamesTheFirstFailure(t *testing.T) {
 	hooks := &fakeHooks{phase: "audit", agent: "evolve-audit", model: "sonnet", prompt: "body", verdict: core.VerdictPASS}
 	r := New(Options{Hooks: hooks, Bridge: &mutatingBridge{}, Prompts: fakePromptsFS("evolve-audit", "body")})
 
-	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir, WorktreeReadOnly: true})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir, Fence: &core.WorktreeFence{}})
 
 	var retaken, restored bool
 	for _, d := range resp.Diagnostics {
