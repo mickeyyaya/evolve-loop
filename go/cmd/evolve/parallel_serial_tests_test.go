@@ -3,6 +3,7 @@ package main
 var serialTests = map[string]string{
 	"main.TestPRWindow_AnUnreadableWorkingDirectoryExitsTwo":                                                "sets env through a helper",
 	"main.TestWireRoutingPlanAdvisor_RefusesAProjectWhoseRoutingTableDoesNotCompile":                        "swaps the bridge model catalog dir",
+	"main.TestWireRoutingPlanAdvisor_ARefusedTableIsAnErrorAndTheCatalogDefectsReachTheConsole":             "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireRoutingPlanAdvisor_WiresAnAdvisorForAProjectRoot":                                         "swaps the bridge model catalog dir",
 	"main.TestRoutingPlan_AdvisorLaunchFailureExitsTwoWithTheCause":                                         "swaps seam routingPlanAdvisor",
 	"main.TestRoutingPlan_AdvisorWiringFailureIsNotAnUnknownCycle":                                          "swaps seam routingPlanAdvisor",
@@ -773,6 +774,7 @@ var serialTests = map[string]string{
 	"main.TestWireOrchestrator_MemoRunnerRegistered":                                                                       "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_ModelCatalogLookupWired":                                                                    "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_TheCycleRootSendsTheRoutingFallbackToItsSignalCenter":                                       "calls process-global setter SetModelCatalogDirFn",
+	"main.TestWireOrchestrator_AnUnresolvableUserAnchorReachesTheSignalCenter":                                             "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_TheNoWorkCheckAsksTheLaneMenu":                                                              "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestrator_ThroughputRecorderWired":                                                                    "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireRouterAdvisor_AHealthyFamilyDoesNotWarnAboutBenches":                                                     "calls os.Pipe",

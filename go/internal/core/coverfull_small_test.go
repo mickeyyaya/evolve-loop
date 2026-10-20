@@ -111,7 +111,7 @@ func TestDegradeInsertedSuccessor_ByArchetype(t *testing.T) {
 		specWith("e1", "evaluate", ""), specWith("c1", "control", ""))}
 	cases := map[string]Phase{"p1": PhaseBuild, "b1": PhaseAudit, "e1": PhaseAudit, "c1": PhaseShip}
 	for name, want := range cases {
-		if got := o.degradeInsertedSuccessor(Phase(name)); got != want {
+		if got := o.degradeInsertedSuccessor(CycleState{CompletedPhases: []string{"build", "audit"}}, Phase(name)); got != want {
 			t.Errorf("%s -> %s, want %s", name, got, want)
 		}
 	}
@@ -120,25 +120,25 @@ func TestDegradeInsertedSuccessor_ByArchetype(t *testing.T) {
 func TestNextFromRoutingPlan_Edges(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	if _, ok := nextFromRoutingPlan("", "scout"); ok {
+	if _, ok := nextFromRoutingPlan(readRoutingPlan(""), "scout", nil); ok {
 		t.Fatal("blank workspace")
 	}
-	if _, ok := nextFromRoutingPlan(ws, "scout"); ok {
+	if _, ok := nextFromRoutingPlan(readRoutingPlan(ws), "scout", nil); ok {
 		t.Fatal("missing plan")
 	}
 	writeFileAt(t, filepath.Join(ws, "routing-plan.json"), "garbage")
-	if _, ok := nextFromRoutingPlan(ws, "scout"); ok {
+	if _, ok := nextFromRoutingPlan(readRoutingPlan(ws), "scout", nil); ok {
 		t.Fatal("unparseable plan")
 	}
 	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
 		`[{"phase":"scout","run":true},{"phase":"skipped","run":false},{"phase":"build","run":true}]`)
-	if next, ok := nextFromRoutingPlan(ws, "scout"); !ok || next != "build" {
+	if next, ok := nextFromRoutingPlan(readRoutingPlan(ws), "scout", nil); !ok || next != "build" {
 		t.Fatalf("skip-over next = %q %v", next, ok)
 	}
-	if next, ok := nextFromRoutingPlan(ws, "build"); !ok || next != PhaseEnd {
+	if next, ok := nextFromRoutingPlan(readRoutingPlan(ws), "build", nil); !ok || next != PhaseEnd {
 		t.Fatalf("tail next = %q %v", next, ok)
 	}
-	if _, ok := nextFromRoutingPlan(ws, "absent"); ok {
+	if _, ok := nextFromRoutingPlan(readRoutingPlan(ws), "absent", nil); ok {
 		t.Fatal("phase outside the plan")
 	}
 }
