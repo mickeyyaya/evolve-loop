@@ -10,7 +10,9 @@ import (
 
 const committedDocsDest = "docs/"
 
-var committedDocRoots = []string{committedDocsDest, "knowledge-base/"}
+const committedKnowledgeBase = "knowledge-base/"
+
+var committedDocRoots = []string{committedDocsDest, committedKnowledgeBase}
 
 func refuseCommittedDocDeletion(ctx context.Context, opts *Options, revs ...string) error {
 	out, err := captureGitOutput(ctx, opts, append([]string{"diff", "--name-status", "-z", "-M", "-l0", "--diff-filter=DR"}, revs...)...)
@@ -39,12 +41,19 @@ func committedDocDeletions(nameStatus string) []string {
 		if len(paths) < n {
 			break
 		}
-		if underCommittedDocRoot(paths[0]) && (n == 1 || !strings.HasPrefix(paths[1], committedDocsDest)) {
+		if underCommittedDocRoot(paths[0]) && (n == 1 || !keepsDocumentation(paths[0], paths[1])) {
 			deleted = append(deleted, paths[0])
 		}
 		fields = paths[n:]
 	}
 	return deleted
+}
+
+func keepsDocumentation(src, dst string) bool {
+	if strings.HasPrefix(dst, committedDocsDest) {
+		return true
+	}
+	return strings.HasPrefix(strings.ToLower(src), committedKnowledgeBase) && strings.HasPrefix(dst, committedKnowledgeBase)
 }
 
 func underCommittedDocRoot(path string) bool {
