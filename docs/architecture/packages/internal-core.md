@@ -90,6 +90,15 @@
     - A keyed path the lane does not hold is exempt only when a live sibling run holds its owner (`liveSiblingsOf`: `runlease.LiveRuns` over the run root, minus this lane's own workspace) or it is a registered mint.
     - A console-leased path is exempt. Recovery leaves it with one line, and the guard waives it with its WARN.
     - A key nobody live holds is still charged to the phase, so the guard is never weaker than before.
+    - An unkeyed path, such as a source file, can have an owner too. The owner is a live sibling of the same goal that names the exact file in its scope, when this lane does not hold it. This closed the inbox item `treediff-guard-worktree-phase-crosslane-residual` (2026-10-20).
+    - Only an exact-file entry counts. A directory entry, such as `go/internal/core`, holds nothing. Real items declare directories often, and a prefix match excused this lane's own leaks under them (independent review of PR #1037).
+    - A sibling counts only when its lane pin has the goal hash of this lane's pin, the sibling rule of `SiblingLaneFiles`. A lane pin without a goal hash gives no exemption.
+    - This lane holds a path that its own declared scope or a closure rule covers. `liveSiblings.declaresAgainst` asks `scopedelta.Classify` with `DefaultClosureRules`, so the scope rule has one home.
+    - The guard does not charge such a path. It WARNs with the path and the holder (`excused: the declared scope of cycle N holds it`). Recovery leaves the path in the main tree with one line. The guard of the sibling charges it.
+    - The trade-off: the sibling's file can be a leak of this lane. Then the sibling's guard charges it only inside its own phase window.
+    - A lane with an unreadable or empty scope holds every unkeyed path. A sibling with an unreadable scope holds none. A WARN names each unreadable scope, so an unknown scope never makes the guard weaker.
+    - A protected surface is never exempt, and with no protected-surface rule (`WithProtectedSurface`) no unkeyed path is exempt. The production orchestrator always has the rule.
+    - Pinned by `TestFilterRealLeaks_OnlyAFileALiveSameGoalSiblingNamesIsNotThisLanesLeak`, `TestFilterRealLeaks_ALaneWithoutAKnownScopeOrSurfaceIsChargedForEveryUnkeyedPath`, `TestRecoverPath_LeavesAPathAnotherLaneHoldsAndNamesTheHolder`, `TestRecoverBeforeReview_ASourceALiveSiblingDeclaresStaysInTheMainTree`, `TestRecoverBeforeReview_ASiblingsDirectoryEntryDoesNotHoldThisLanesLeak` and `TestGuard_APathALiveSiblingDeclaresDoesNotAbortThisLanesPhase`.
     - The registry is one of the owner rules, so `filterRealLeaks` has no second copy of the mint check.
     - Crash-resume adopts no console lease, so a leased keyed path no live lane holds fails a resume.
     - Pinned by `TestRecoverBeforeReview_AConsoleLeasedPathIsLeftJustAsTheGuardWaivesIt`.
