@@ -33,8 +33,7 @@ func TestCheckpointResumable_IsTheRuleLoopResumeApplies(t *testing.T) {
 		}
 		return p
 	}
-	head := func(string) (string, error) { return "abc123\n", nil }
-	opts := ResumeOptions{CurrentHead: head}
+	opts := ResumeOptions{MainAhead: mainAheadOf(map[string]int{"abc123": 0, "def456": 2})}
 	cases := []struct {
 		name, body string
 		wantErr    error

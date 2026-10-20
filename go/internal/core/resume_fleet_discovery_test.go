@@ -41,7 +41,7 @@ func TestLoadResumeState_DiscoversFleetPerRunCheckpoint(t *testing.T) {
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-1581"), fleetCheckpointState(1581, "2026-08-29T03:40:00Z", "tdd", wt))
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-1582"), fleetCheckpointState(1582, "2026-08-29T04:55:00Z", "triage", wt))
 
-	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{})
+	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{MaxAge: unboundedAge})
 	if err != nil {
 		t.Fatalf("resume over three live per-run checkpoints must not fail: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestLoadResumeState_HostGlobalWinsOverPerRun(t *testing.T) {
 	writeStateFile(t, evolveDir, fleetCheckpointState(900, "2026-08-29T01:00:00Z", "build", wt))
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-901"), fleetCheckpointState(901, "2026-08-29T09:00:00Z", "audit", wt))
 
-	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{})
+	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{MaxAge: unboundedAge})
 	if err != nil {
 		t.Fatalf("LoadResumeState: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestLoadResumeState_StalePerRunCheckpointReportsStaleNotMissing(t *testing.
 	gone := filepath.Join(tmp, "deleted-worktree")
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-970"), fleetCheckpointState(970, "2026-08-29T05:00:00Z", "audit", gone))
 
-	_, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{})
+	_, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{MaxAge: unboundedAge})
 	if !errors.Is(err, ErrStaleCheckpoint) {
 		t.Fatalf("err = %v, want ErrStaleCheckpoint (honest) — a stale checkpoint is not an absent one", err)
 	}
@@ -220,7 +220,7 @@ func TestLoadResumeState_StaleLeaseDoesNotExclude(t *testing.T) {
 		t.Fatalf("write lease: %v", err)
 	}
 
-	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{})
+	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{MaxAge: unboundedAge})
 	if err != nil {
 		t.Fatalf("a dead lane's quota checkpoint must be discoverable: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestLoadResumeState_NewestStaleFallsBackToOlderValidAndSaysSo(t *testing.T)
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-1593"), fleetCheckpointState(1593, "2026-08-31T03:00:00Z", "audit", gone))
 
 	var log strings.Builder
-	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{Log: &log})
+	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{MaxAge: unboundedAge, Log: &log})
 	if err != nil {
 		t.Fatalf("older valid candidate must win when newest is stale: %v", err)
 	}

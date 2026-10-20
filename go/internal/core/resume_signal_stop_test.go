@@ -99,7 +99,7 @@ func TestLoadResumeState_ASiblingThatSealedBeforeTheCheckpointLeavesItResumable(
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-1804"), map[string]any{"cycle_id": 1804, "phase": "aborted", "final_verdict": "FAIL", "goal_hash": "other-launch"})
 	writeShipRows(t, evolveDir, map[int]string{1802: "2026-10-01T10:00:00Z", 1800: "2026-10-01T11:00:00Z", 1803: "2026-10-01T10:45:00Z"})
 
-	rp, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{})
+	rp, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{MaxAge: unboundedAge})
 
 	if err != nil || rp.CycleID != 1801 {
 		t.Fatalf("rp=%+v err=%v — a ship before the pause, a lower cycle, a pool refill of the same launch, or a later launch that did not ship does not make the checkpoint stale", rp, err)
@@ -264,7 +264,7 @@ func TestLoadResumeState_AnUnreadableLedgerWarnsInTheLog(t *testing.T) {
 	}
 	var log bytes.Buffer
 
-	if _, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{Log: &log}); err != nil {
+	if _, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{MaxAge: unboundedAge, Log: &log}); err != nil {
 		t.Fatal(err)
 	}
 

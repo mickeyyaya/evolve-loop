@@ -49,7 +49,7 @@ func TestDiscoverPerRunResumeState_ATiedSaveTimePrefersTheNewerCycle(t *testing.
 	writeStateFile(t, filepath.Join(runs, "cycle-11"), fleetCheckpointState(11, "2026-10-12T05:00:00Z", "tdd", wt))
 	writeStateFile(t, filepath.Join(runs, "cycle-9"), fleetCheckpointState(9, "2026-10-12T04:59:59Z", "build", wt))
 
-	rp, err := discoverPerRunResumeState(evolveDir, tmp, ResumeOptions{}.withDefaults())
+	rp, err := discoverPerRunResumeState(evolveDir, tmp, ResumeOptions{MaxAge: unboundedAge}.withDefaults())
 
 	if err != nil || rp.CycleID != 11 || rp.Phase != "tdd" {
 		t.Fatalf("discover = (%+v, %v), want cycle 11 to win the tie on save time", rp, err)
