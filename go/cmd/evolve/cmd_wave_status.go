@@ -27,6 +27,7 @@ type waveStatusReport struct {
 	PID           int                  `json:"pid"`
 	PIDAlive      bool                 `json:"pid_alive"`
 	LoopLive      bool                 `json:"loop_live"`
+	PoolLive      *int                 `json:"pool_live,omitempty"`
 	Outcome       string               `json:"outcome"`
 	Cycles        []wave.Cycle         `json:"cycles"`
 	CyclesOmitted int                  `json:"cycles_omitted,omitempty"`
@@ -97,6 +98,9 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	report.Wave, report.RunID, report.PID, report.Warnings = cur.Number, cur.RunID, cur.PID, append(warnings, loopWarnings...)
 	var startWarning string
 	report.PIDAlive, startWarning = waveOwnsPID(env, cur)
+	if live, ok := wave.PoolLive(cur, nil, loop); ok && (report.PIDAlive || report.LoopLive) {
+		report.PoolLive = &live
+	}
 	if startWarning != "" {
 		report.Warnings = append(report.Warnings, startWarning)
 	}
@@ -118,6 +122,9 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 	fmt.Fprintf(w, "wave:    %d run %s\n", r.Wave, r.RunID)
 	fmt.Fprintf(w, "loop:    live=%t pid=%d alive=%t\n", r.LoopLive, r.PID, r.PIDAlive)
+	if r.PoolLive != nil {
+		fmt.Fprintf(w, "pool:    live %d\n", *r.PoolLive)
+	}
 	fmt.Fprintf(w, "outcome: %s\n", r.Outcome)
 	writeWaveMeasuresText(w, r.Measures)
 	if r.CyclesOmitted > 0 {

@@ -42,7 +42,7 @@ func (p wavePlane) seedWave130() {
 	p.write(".evolve/signals.ndjson", string(pool))
 	p.write(".evolve/policy.json", `{"fleet":{"count":4}}`)
 	started, _ := time.Parse(time.RFC3339, "2026-10-18T23:54:49Z")
-	if err := p.store().Save(wave.Record{Number: 130, RunID: "20261018T235040Z", CycleFloor: 1951, StartedAt: started}); err != nil {
+	if err := p.store().Save(wave.Record{Number: 130, RunID: "20261018T235040Z", CycleFloor: 1951, PID: 20898, StartedAt: started}); err != nil {
 		p.t.Fatal(err)
 	}
 	for _, c := range wave130Cycles {
@@ -71,11 +71,43 @@ func TestWaveStatus_Wave130CountsTheLiveLanesFromThePool(t *testing.T) {
 
 	out := h.stdout.String()
 	for _, want := range []string{
-		"measures: width 1/4 ",
+		"measures: width 1/4 · utilization 0.56 ",
 		"cycle 1955: stopped: lane deadline (phase build)",
 		"cycle 1957: stopped: lane deadline (phase build)",
 		"cycle 1963: phase build",
 	} {
+		if rc != 0 || !strings.Contains(out, want) {
+			t.Errorf("rc = %d; stdout lacks %q:\n%s", rc, want, out)
+		}
+	}
+	if strings.Contains(out, "pool:") {
+		t.Errorf("a wave whose loop is gone printed a live pool count:\n%s", out)
+	}
+}
+
+func TestWaveStatus_Wave137CountsTheLanesThatLaunchedBeforeTheRecord(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	pool, err := os.ReadFile("testdata/wave-137-signals.ndjson")
+	if err != nil {
+		t.Fatal(err)
+	}
+	earlier := `{"schema_version":"signal/1.0","seq":9,"pid":91234,"ts":"2026-10-20T06:41:10Z","module":"loop","origin":"Pool.Run","kind":"loop.wave","code":"LOOP_ORCH_LANE_LAUNCHED","severity":"INFO","reason":"r","fields":{"live":"4","target":"4","todo":"a-lane-of-the-stopped-loop"}}` + "\n"
+	p.write(".evolve/signals.ndjson", earlier+string(pool))
+	p.write(".evolve/policy.json", `{"fleet":{"count":4}}`)
+	started := time.Date(2026, 10, 20, 6, 41, 11, 721016000, time.UTC)
+	if err := p.store().Save(wave.Record{Number: 137, RunID: "20261020T063647Z", CycleFloor: 2008, PID: 38124, LogPath: p.loopLog("20261020T063647Z", 38124), StartedAt: started}); err != nil {
+		t.Fatal(err)
+	}
+	h := newWaveHarness()
+	h.alive[38124] = true
+	env := h.env(p.root)
+	env.now = func() time.Time { return time.Date(2026, 10, 20, 8, 15, 0, 0, time.UTC) }
+
+	rc := runWaveWith(env, []string{"status", "--project-root", p.root}, &h.stdout, &h.stderr)
+
+	out := h.stdout.String()
+	for _, want := range []string{"measures: width 2/4 · utilization 0.48 ", "pool:    live 1\n"} {
 		if rc != 0 || !strings.Contains(out, want) {
 			t.Errorf("rc = %d; stdout lacks %q:\n%s", rc, want, out)
 		}

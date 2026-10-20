@@ -93,3 +93,64 @@ func TestReadCycles_TheLaneScopeNamesTheCycleTodo(t *testing.T) {
 		t.Errorf("cycles = %+v, want cycle 4 with todo lane-a", got)
 	}
 }
+
+func runEvent(minutes, pid int, code, todo, live string) signalcenter.Event {
+	e := poolEvent(minutes, code, todo)
+	e.PID = pid
+	if live != "" {
+		e.Fields["live"] = live
+	}
+	return e
+}
+
+func TestMeasureFacts_ThePoolLanesOfTheRunLoopCountFromTheRunIDTime(t *testing.T) {
+	t.Parallel()
+	rec := wave.Record{Number: 7, RunID: clock(-10).Format("20060102T150405Z"), PID: 42, StartedAt: clock(0)}
+	loop := []signalcenter.Event{
+		runEvent(-20, 42, "LOOP_ORCH_LANE_LAUNCHED", "before-the-boundary", ""),
+		runEvent(-2, 42, "LOOP_ORCH_LANE_LAUNCHED", "opening", ""),
+		runEvent(-1, 7, "LOOP_ORCH_LANE_LAUNCHED", "other-loop", ""),
+		runEvent(30, 42, "LOOP_ORCH_LANE_EXITED", "opening", ""),
+	}
+
+	facts, _ := wave.MeasureFacts(rec, nil, nil, loop, 4)
+
+	want := []wavemeasure.Lane{{Start: clock(-2), End: clock(30)}}
+	if !reflect.DeepEqual(facts.Lanes, want) {
+		t.Errorf("lanes =\n%+v\nwant\n%+v", facts.Lanes, want)
+	}
+}
+
+func TestMeasureFacts_ARecordWithNoRunIDTimeOrPIDUsesItsStart(t *testing.T) {
+	t.Parallel()
+	rec := wave.Record{Number: 7, RunID: "manual", StartedAt: clock(0)}
+	loop := []signalcenter.Event{
+		runEvent(-2, 42, "LOOP_ORCH_LANE_LAUNCHED", "before", ""),
+		runEvent(1, 42, "LOOP_ORCH_LANE_LAUNCHED", "after", ""),
+	}
+
+	facts, _ := wave.MeasureFacts(rec, nil, nil, loop, 4)
+
+	if want := []wavemeasure.Lane{{Start: clock(1)}}; !reflect.DeepEqual(facts.Lanes, want) {
+		t.Errorf("lanes = %+v, want %+v", facts.Lanes, want)
+	}
+}
+
+func TestPoolLive_TheLatestPoolSignalOfTheRunGivesTheLiveLanes(t *testing.T) {
+	t.Parallel()
+	rec := wave.Record{Number: 7, RunID: clock(-10).Format("20060102T150405Z"), PID: 42, StartedAt: clock(0)}
+	loop := []signalcenter.Event{
+		runEvent(-2, 42, "LOOP_ORCH_LANE_LAUNCHED", "a", "3"),
+		runEvent(5, 42, "LOOP_ORCH_LANE_EXITED", "a", "2"),
+		runEvent(6, 42, "LOOP_ORCH_LANE_DEADLINE", "b", ""),
+		runEvent(7, 7, "LOOP_ORCH_LANE_LAUNCHED", "c", "9"),
+		runEvent(8, 42, "LOOP_ORCH_POOL_IDLE", "", "x"),
+	}
+
+	live, ok := wave.PoolLive(rec, nil, loop)
+	none, noneOK := wave.PoolLive(rec, nil, loop[2:4])
+
+	if live != 2 || !ok || none != 0 || noneOK {
+		t.Errorf("PoolLive = %d %t and %d %t, want 2 true and 0 false", live, ok, none, noneOK)
+	}
+}

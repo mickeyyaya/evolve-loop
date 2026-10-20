@@ -168,3 +168,14 @@ func TestIsLogRunID_MatchesOnlyTheExactRunIDLayout(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLogRunID_ReadsBackTheTimeOfARunID(t *testing.T) {
+	at := time.Date(2026, 10, 20, 6, 36, 47, 0, time.UTC)
+
+	got, ok := gcpolicy.ParseLogRunID(gcpolicy.LogRunID(at))
+	_, badOK := gcpolicy.ParseLogRunID("manual")
+
+	if !ok || !got.Equal(at) || badOK {
+		t.Errorf("ParseLogRunID = %v %t, bad %t; want %v true, false", got, ok, badOK, at)
+	}
+}
