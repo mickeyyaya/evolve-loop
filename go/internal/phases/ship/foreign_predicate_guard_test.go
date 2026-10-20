@@ -109,3 +109,20 @@ func TestRefuseForeignPredicatePackages_AnUnreadableCycleStateFailsClosed(t *tes
 
 	wantShipErr(t, err, core.CodeStateIO, core.ShipClassTransient, "read the shipping cycle")
 }
+
+func TestRefuseForeignPredicatePackages_ARepairOfAnExistingPredicateOfAnotherCycleShips(t *testing.T) {
+	t.Parallel()
+	root := docRepo(t)
+	writeDoc(t, root, "go/acs/cycle1707/predicates_test.go", fmt.Sprintf(foreignPredicate, 1707))
+	gitIn(t, root, "add", "-A")
+	gitIn(t, root, "commit", "-q", "-m", "an old cycle's predicates")
+	wt := filepath.Join(t.TempDir(), "lane")
+	gitIn(t, root, "worktree", "add", "-q", "-b", "lane", wt)
+	writeDoc(t, wt, "go/acs/cycle1707/predicates_test.go", fmt.Sprintf(foreignPredicate, 1707)+"\nfunc TestRepaired(t *testing.T) {}\n")
+	gitIn(t, wt, "add", "-A")
+	pending := gitOut(t, wt, "commit-tree", gitOut(t, wt, "write-tree"), "-p", "HEAD", "-m", "evolve-cycle 1712")
+
+	if err := refuseForeignPredicatePackages(context.Background(), &Options{Class: ClassCycle, CycleID: 1712, ProjectRoot: root}, "main", pending); err != nil {
+		t.Fatalf("a repair of a predicate that main already holds is no new foreign package: %v", err)
+	}
+}
