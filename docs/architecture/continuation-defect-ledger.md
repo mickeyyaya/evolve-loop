@@ -131,6 +131,7 @@ can read it even on the run where the gate blocks.
 Cycle 1573 deferred 19 of its 19 inherited defects, and both blockers of its parent were among them. The gate counted the deferrals as delivery, and wave 3 shipped 0 of 3 lanes (inbox `continuation-blocker-defects-not-deferrable`).
 
 - **Severity at mint.** Each audit row takes a `severity` when Emit mints it. The source is the finding of the audit report whose id leads the defect text (`H1 go/x.go:3 ...` reads finding `H1` from `reportdoc.Findings`). If the report has no such finding, the letter of the id decides: `C` CRITICAL, `H` HIGH, `M` MEDIUM, `L` LOW. A defect with no leading id, and each prescription, has no severity.
+- **Severity tags.** A leading severity tag decides first: `[HIGH] ...`, `HIGH: ...` or `**[CRITICAL]** ...`. A code-review row already carries its severity, so an inherited HIGH review row is a blocker too.
 - **The rule.** A CRITICAL or HIGH inherited row is a blocker (`isBlocker` in `go/internal/core/defectledger/severity.go`). The gate refuses a DEFERRED disposition of a blocker as `DEFERRED but it is a <severity> blocker`, and the cycle stays blocked until a FIXED disposition with resolving evidence. A MEDIUM, LOW or unrated row can still be DEFERRED with a reason.
 - **The prompt.** The inherited-defects block marks each blocker row as `(<severity> blocker: FIXED only)`.
 - **The id shape.** The id is a capital letter and digits, then a space, a colon, a `*`, a `)`, a `]`, a `.` or the end. Thus `C2-foo.go: ...` is a path, not a finding id, and has no severity.

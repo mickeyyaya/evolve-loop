@@ -71,7 +71,7 @@ func TestAppend_AnAuditDefectWhoseTextAShadowRowHoldsIsStillOwed(t *testing.T) {
 
 	got, added, overflow := Append(Doc{OriginCycle: 7, Entries: []Entry{shadow}}, rejectionRows(Rejection{Defects: []string{text}}), 7)
 
-	want := Entry{ID: ID(text), Text: text, Status: StatusOpen}
+	want := Entry{ID: ID(text), Text: text, Status: StatusOpen, Severity: "HIGH"}
 	if !added || overflow != 0 || len(got.Entries) != 2 || got.Entries[1] != want {
 		t.Errorf("Append = %+v (added %v), want the audit's OPEN row %+v beside the shadow row: a shadow row must never launder an audit defect", got.Entries, added, want)
 	}

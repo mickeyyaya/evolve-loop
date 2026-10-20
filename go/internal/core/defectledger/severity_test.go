@@ -96,3 +96,44 @@ func TestPromptRows_MarkABlockerAsFixedOnly(t *testing.T) {
 		t.Fatalf("rows = %q, want %q", rows, want)
 	}
 }
+
+func TestSeverityOf_ALeadingSeverityTagCountsLikeAFindingID(t *testing.T) {
+	for text, want := range map[string]string{
+		"[HIGH] go/x.go leak":              "HIGH",
+		"[CRITICAL] the ship gate is open": "CRITICAL",
+		"HIGH: go/x.go leak":               "HIGH",
+		"**[MEDIUM]** docs drift":          "MEDIUM",
+		"[LOW] a nit":                      "LOW",
+		"HIGHLY unusual text":              "",
+		"[high] lower case is no tag":      "",
+		"[HIGH half a bracket":             "",
+		"[HIGH]x no separator":             "",
+		"HIGH loose word":                  "",
+	} {
+		if got := severityOf(text, nil); got != want {
+			t.Errorf("severityOf(%q) = %q, want %q", text, got, want)
+		}
+	}
+}
+
+func TestReconcile_AnInheritedHighCodeReviewRowCannotBeDeferredButAMediumOneCan(t *testing.T) {
+	row := func(sev string) string {
+		return `{"origin_cycle":1255,"entries":[{"id":"d1","text":"[` + sev + `] correctness go/x.go:1 — t","status":"OPEN","source":"code-review","round":1,"severity":"` + sev + `"}]}`
+	}
+	for sev, blocked := range map[string]bool{"HIGH": true, "MEDIUM": false} {
+		f := newFixture(t)
+		f.ancestorLedger(t, row(sev))
+		f.claims(t, `{"dispositions":[{"id":"d1","status":"DEFERRED","reason":"later"}]}`)
+		l, _ := observed(scopeOf(), resolveNever)
+		v := l.Reconcile(f.req)
+		if v.Blocked != blocked || (blocked && !strings.Contains(diagsText(v.Diagnostics), "DEFERRED but it is a HIGH blocker")) {
+			t.Errorf("%s code-review row DEFERRED: blocked=%v %+v, want blocked=%v", sev, v.Blocked, v.Diagnostics, blocked)
+		}
+	}
+}
+
+func TestSeverityOf_ALeadingTagWinsOverTheFindingOfAnID(t *testing.T) {
+	if got := severityOf("[LOW] H1 a nit beside a high finding", []reportdoc.Finding{{ID: "H1", Severity: "HIGH"}}); got != "LOW" {
+		t.Errorf("severityOf = %q, want the tag LOW", got)
+	}
+}
