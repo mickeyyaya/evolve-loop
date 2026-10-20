@@ -35,6 +35,7 @@ type loopArgFlags struct {
 	untilInboxEmpty   bool
 	preflightOnly     bool
 	detach            bool
+	relaunch          bool
 	logPath           string
 }
 
@@ -61,6 +62,7 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.BoolVar(&lf.untilInboxEmpty, "until-inbox-empty", false, "chain batches: after each batch, start another until the inbox drains (bounded by policy.json chain.max_batches; .evolve/loop-stop brakes it)")
 	fs.BoolVar(&lf.preflightOnly, "preflight-only", false, "run the pre-batch readiness gate, print each check's verdict and exit without dispatching (exit 0 ready, 1 naming the blocking check)")
 	fs.BoolVar(&lf.detach, "detach", false, "launch the loop in a new session with stdout/stderr appended to --log, print its pid and wait (policy boot.detach_wait_s) for its run lease: exit 0 running, 1 exited or unconfirmed")
+	fs.BoolVar(&lf.relaunch, "relaunch", false, "the launch continues an earlier goal: skip the check of the inbox items that the goal names")
 	fs.StringVar(&lf.logPath, "log", "", "with --detach: the file the detached loop's stdout and stderr are appended to (required with --detach)")
 	fs.BoolVar(&lf.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
 	return lf
@@ -207,7 +209,7 @@ func withDetachLaunch(cfg loopConfig, lf *loopArgFlags, args []string, flagEnd i
 		return loopConfig{}, 10
 	}
 	cfg.LogPath = logPath
-	cfg.DetachArgv = detachChildArgs(args, flagEnd)
+	cfg.DetachArgv = append([]string{"--relaunch"}, detachChildArgs(args, flagEnd)...)
 	return cfg, 0
 }
 
@@ -296,6 +298,7 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 		ChainMode:         lf.untilInboxEmpty,
 		PreflightOnly:     lf.preflightOnly,
 		Detach:            lf.detach,
+		Relaunch:          lf.relaunch,
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 	}

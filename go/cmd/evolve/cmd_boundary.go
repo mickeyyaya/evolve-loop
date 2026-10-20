@@ -165,7 +165,7 @@ func boundaryLoopLogPath(root, runID string) string {
 
 func boundaryLaunchSteps(a boundaryArgs, root string) []boundaryStep {
 	at := []string{"--project-root", root}
-	launch := []string{"--detach", "--log", boundaryLoopLogPath(root, a.runID), "--goal-text", a.goalText}
+	launch := []string{"--detach", "--relaunch", "--log", boundaryLoopLogPath(root, a.runID), "--goal-text", a.goalText}
 	if a.maxCycles != "" {
 		launch = append(launch, "--max-cycles", a.maxCycles)
 	}
