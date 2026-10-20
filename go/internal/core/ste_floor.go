@@ -59,6 +59,9 @@ func steLintFloorLines(worktree string, paths []string, keep steKeep) (warnings 
 		return nil, ""
 	}
 	if err != nil {
+		if enforced := keep != nil; enforced {
+			return nil, fmt.Sprintf("the STE standard %s does not load (%v), so no changed document can be judged", stelint.StandardPath, err)
+		}
 		return []string{fmt.Sprintf("[ste-lint] WARN: the lint did not run: %v", err)}, ""
 	}
 	return steFindingLines(worktree, docs, stelint.Options{Words: words}, keep)

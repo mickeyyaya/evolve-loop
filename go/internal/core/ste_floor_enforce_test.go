@@ -50,20 +50,35 @@ func TestDefaultBuildFloorChecks_AtEnforceACleanDocPasses(t *testing.T) {
 	}
 }
 
-func TestDefaultBuildFloorChecks_AtEnforceALintThatDidNotRunOnlyWarns(t *testing.T) {
+func TestDefaultBuildFloorChecks_AtEnforceABrokenStandardSendsTheDocBack(t *testing.T) {
 	t.Parallel()
 	in := steFloorFixture(t, map[string]string{stelint.StandardPath: "# The standard\n\nNo word table.\n", "docs/new.md": longSentence(30) + "\n"})
 	writeFile(t, filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), `{"docs_floor":{"ste_stage":"enforce"}}`)
 	var sink injectedStderr
 	in.Stderr = &sink
 
+	var ste []string
 	for _, f := range DefaultBuildFloorChecks(context.Background(), in) {
 		if strings.Contains(f, "[ste-lint]") {
-			t.Fatalf("a lint that could not run is a WARN, not a reason to send the doc back: %q", f)
+			ste = append(ste, f)
 		}
 	}
-	if !strings.Contains(sink.String(), "did not run") {
-		t.Errorf("stderr = %q, want the WARN that the lint did not run", sink.String())
+	if len(ste) != 1 || !strings.Contains(ste[0], "does not load") {
+		t.Fatalf("floor failures = %q: at enforce a lane that breaks the standard cannot pass its docs unjudged", ste)
+	}
+}
+
+func TestDocsFloorChecks_APolicyThatDoesNotLoadWarns(t *testing.T) {
+	t.Parallel()
+	in := steFloorFixture(t, map[string]string{"docs/new.md": "Short and clean.\n"})
+	writeFile(t, filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), `{"docs_floor":{"ste_stage":"enforce","bogus":1}}`)
+	var sink injectedStderr
+	in.Stderr = &sink
+
+	docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
+
+	if !strings.Contains(sink.String(), "[ste-lint] WARN: the policy did not load") {
+		t.Errorf("stderr = %q, want a WARN: an enforce stage that silently falls to shadow hides the stage", sink.String())
 	}
 }
 
