@@ -45,14 +45,21 @@ type handoffArgs struct {
 }
 
 type handoffResult struct {
-	Cycle   int      `json:"cycle"`
-	Pair    string   `json:"pair"`
-	Outcome string   `json:"outcome"`
-	Exit    int      `json:"exit"`
-	Unmet   []string `json:"unmet"`
-	Blocked []string `json:"blocked"`
-	Paths   []string `json:"paths"`
-	Errors  []string `json:"errors"`
+	Cycle          int      `json:"cycle"`
+	Pair           string   `json:"pair"`
+	Outcome        string   `json:"outcome"`
+	Exit           int      `json:"exit"`
+	Unmet          []string `json:"unmet"`
+	Blocked        []string `json:"blocked"`
+	Paths          []string `json:"paths"`
+	Errors         []string `json:"errors"`
+	FailedEvidence []string `json:"failed_evidence"`
+}
+
+type handoffSite struct {
+	runDir    string
+	inboxRoot string
+	tree      string
 }
 
 type handoffPairOutcome struct {
@@ -190,7 +197,7 @@ func runHandoffShow(args []string, asJSON bool, stdout, stderr io.Writer) int {
 }
 
 func handoffShowOutcome(root string, cycle int, pair string) string {
-	if _, err := os.Stat(handoffLedgerPath(root, cycle, pair)); errors.Is(err, fs.ErrNotExist) {
+	if _, err := readHandoffLedger(handoffLedgerPath(root, cycle, pair)); errors.Is(err, fs.ErrNotExist) {
 		return "absent"
 	}
 	return evaluateHandoff(root, cycle, pair).Outcome
@@ -210,23 +217,32 @@ func handoffLedgerPath(root string, cycle int, pair string) string {
 	return filepath.Join(handoffRunDir(root, cycle), "handoff-"+pair+".json")
 }
 
-func handoffFailuresPath(root string, cycle int, pair string) string {
-	return filepath.Join(handoffRunDir(root, cycle), "handoff-"+pair+"-failures.json")
-}
-
 func newHandoffResult(cycle int, pair, outcome string, code int, errs ...string) handoffResult {
 	return handoffResult{
 		Cycle: cycle, Pair: pair, Outcome: outcome, Exit: code,
-		Unmet: []string{}, Blocked: []string{}, Paths: []string{}, Errors: append([]string{}, errs...),
+		Unmet: []string{}, Blocked: []string{}, Paths: []string{}, Errors: append([]string{}, errs...), FailedEvidence: []string{},
 	}
 }
 
 func evaluateHandoff(root string, cycle int, pair string) handoffResult {
-	req, err := buildHandoffRequest(root, cycle, pair)
+	return evaluateHandoffAt(handoffSite{runDir: handoffRunDir(root, cycle), inboxRoot: root, tree: root}, cycle, pair)
+}
+
+func handoffReviewCheck(in core.ReviewInput, pair string) handoff.Check {
+	tree := in.Worktree
+	if tree == "" {
+		tree = in.ProjectRoot
+	}
+	res := evaluateHandoffAt(handoffSite{runDir: in.Workspace, inboxRoot: in.ProjectRoot, tree: tree}, in.Cycle, pair)
+	return handoff.Check{Outcome: res.Outcome, Unmet: res.Unmet, Blocked: res.Blocked, Paths: res.Paths, FailedEvidence: res.FailedEvidence, Errors: res.Errors}
+}
+
+func evaluateHandoffAt(site handoffSite, cycle int, pair string) handoffResult {
+	req, err := buildHandoffRequest(site, cycle, pair)
 	if err != nil {
 		return newHandoffResult(cycle, pair, "error", handoffExitIO, err.Error())
 	}
-	raw, err := os.ReadFile(handoffLedgerPath(root, cycle, pair))
+	raw, err := readHandoffLedger(filepath.Join(site.runDir, "handoff-"+pair+".json"))
 	if err != nil {
 		return newHandoffResult(cycle, pair, "error", handoffExitIO, err.Error())
 	}
@@ -237,14 +253,16 @@ func evaluateHandoff(root string, cycle int, pair string) handoffResult {
 	if err != nil {
 		return newHandoffResult(cycle, pair, "invalid", handoffExitBlocked, strings.Split(err.Error(), "\n")...)
 	}
-	failures, err := readHandoffFailures(handoffFailuresPath(root, cycle, pair))
+	failures, err := readHandoffFailures(filepath.Join(site.runDir, "handoff-"+pair+"-failures.json"))
 	if err != nil {
 		return newHandoffResult(cycle, pair, "error", handoffExitIO, err.Error())
 	}
-	src := evidence.Source{Root: root, Cycle: cycle}
-	policy := exit.Policy{MaxRedispatch: 1, Prover: handoffProver(root, cycle, failures)}
-	decision := exit.Decide(req, handoffResults(src, ledger), nil, policy)
+	src := evidence.Source{Root: site.tree, Cycle: cycle}
+	policy := exit.Policy{MaxRedispatch: 1, Prover: handoffProver(site.tree, cycle, failures)}
+	results, failed := handoffResults(src, ledger)
+	decision := exit.Decide(req, results, nil, policy)
 	res := newHandoffResult(cycle, pair, string(decision.Outcome), handoffExitBlocked)
+	res.FailedEvidence = append(res.FailedEvidence, failed...)
 	if decision.Outcome == exit.Pass {
 		res.Exit = handoffExitPass
 	}
@@ -254,12 +272,12 @@ func evaluateHandoff(root string, cycle int, pair string) handoffResult {
 	return res
 }
 
-func buildHandoffRequest(root string, cycle int, pair string) (handoff.Request, error) {
+func buildHandoffRequest(site handoffSite, cycle int, pair string) (handoff.Request, error) {
 	switch pair {
 	case request.PairTDDBuild:
-		return request.TDDBuild(filepath.Join(root, "go", "acs", fmt.Sprintf("cycle%d", cycle)))
+		return request.TDDBuild(filepath.Join(site.tree, "go", "acs", fmt.Sprintf("cycle%d", cycle)))
 	case request.PairTriageTDD:
-		return request.TriageTDD(handoffRunDir(root, cycle), handoffInboxResolver(root))
+		return request.TriageTDD(site.runDir, handoffInboxResolver(site.inboxRoot))
 	}
 	return handoff.Request{}, fmt.Errorf("no request for pair %s", pair)
 }
@@ -272,6 +290,14 @@ func handoffInboxResolver(root string) request.PathResolver {
 		}
 		return loc.Path
 	}
+}
+
+func readHandoffLedger(path string) ([]byte, error) {
+	raw, err := os.ReadFile(path)
+	if err == nil && handoff.IsCheckOnly(raw) {
+		return nil, fmt.Errorf("%s holds only the check record: %w", filepath.Base(path), fs.ErrNotExist)
+	}
+	return raw, err
 }
 
 func readHandoffFailures(path string) ([]string, error) {
@@ -289,28 +315,35 @@ func readHandoffFailures(path string) ([]string, error) {
 	return failures, nil
 }
 
-func handoffResults(src evidence.Source, ledger handoff.Ledger) []exit.Result {
+func handoffResults(src evidence.Source, ledger handoff.Ledger) ([]exit.Result, []string) {
 	results := make([]exit.Result, 0, len(ledger.Entries))
+	var failed []string
 	for _, e := range ledger.Entries {
-		res := exit.Result{Ask: e.Ask, Status: e.Status, Resolved: handoffEvidenceResolves(src, e.Evidence)}
+		unresolved := handoffUnresolvedEvidence(src, e)
+		failed = append(failed, unresolved...)
+		res := exit.Result{Ask: e.Ask, Status: e.Status, Resolved: len(e.Evidence) > 0 && len(unresolved) == 0}
 		if e.Status == handoff.StatusBlocked {
 			res.Claim = e.Note
 		}
 		results = append(results, res)
 	}
-	return results
+	return results, failed
 }
 
-func handoffEvidenceResolves(src evidence.Source, evs []handoff.Evidence) bool {
-	if len(evs) == 0 {
-		return false
+func handoffUnresolvedEvidence(src evidence.Source, e handoff.Entry) []string {
+	if e.Status != handoff.StatusMet {
+		return nil
 	}
-	for _, ev := range evs {
-		if evidence.Resolve(src, ev) != nil {
-			return false
+	if len(e.Evidence) == 0 {
+		return []string{e.Ask + ": a met entry cites no evidence"}
+	}
+	var failed []string
+	for _, ev := range e.Evidence {
+		if err := evidence.Resolve(src, ev); err != nil {
+			failed = append(failed, e.Ask+": "+err.Error())
 		}
 	}
-	return true
+	return failed
 }
 
 func handoffPredicateSources(root string, cycle int) map[string]string {

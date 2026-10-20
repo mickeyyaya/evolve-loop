@@ -53,7 +53,7 @@ func TestHandoffCoverage_AFailedJSONWriteIsReportedOnStderr(t *testing.T) {
 
 func TestHandoffCoverage_APairWithoutARequestIsAnError(t *testing.T) {
 	t.Parallel()
-	if _, err := buildHandoffRequest(t.TempDir(), 1, "bogus"); err == nil || !strings.Contains(err.Error(), "no request for pair bogus") {
+	if _, err := buildHandoffRequest(handoffSite{}, 1, "bogus"); err == nil || !strings.Contains(err.Error(), "no request for pair bogus") {
 		t.Fatalf("err = %v, want no request for pair bogus", err)
 	}
 }

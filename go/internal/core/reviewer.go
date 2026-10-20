@@ -42,6 +42,7 @@ type ReviewResult struct {
 	Remediation       string
 	DeliverableAbsent bool
 	Failures          []string
+	ProvenBlocker     string
 }
 
 type DeliverableReviewer interface {
