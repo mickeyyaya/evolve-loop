@@ -3,6 +3,7 @@ package bridge
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 )
 
@@ -28,4 +29,27 @@ func manifestDriftProbePattern(cli string) string {
 		return spec.DriftProbeRegex
 	}
 	return ""
+}
+
+func warnPromptRuleDrift(w io.Writer, pfx, cli, pane string) {
+	if w == nil || strings.TrimSpace(pane) == "" {
+		return
+	}
+	m, err := LoadManifest(cli)
+	if err != nil {
+		return
+	}
+	subject := autoRespondSubject(pane)
+	for _, p := range m.InteractivePrompts {
+		if p.DriftProbe == "" || promptMatches(p, subject) {
+			continue
+		}
+		tail := subject
+		if p.TailLines > 0 {
+			tail = lastLines(subject, p.TailLines)
+		}
+		if probe, err := regexp.Compile(p.DriftProbe); err == nil && probe.MatchString(tail) {
+			fmt.Fprintf(w, "%s POSSIBLE PROMPT-RULE DRIFT: the teardown pane matches the drift_probe_regex of %s's interactive_prompts.%s but its regex did not; the dialog wording may have changed; update the rule regex (diagnostic only, this exit-81 verdict is unchanged).\n", pfx, cli, p.Name)
+		}
+	}
 }

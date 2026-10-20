@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A plan_approval send on a pane whose footer names an existing plan file leaves a copy of that file in the run workspace (test with a fixture pane and a temp plan file)",
+    "A footer whose plan file is missing gives a WARN and the send still happens",
+    "The auto_respond outcome of the send records the path of the copy"
+  ],
+  "connects_to": [
+    ".evolve/inbox/consumed/2026-08-27T09-01-00Z-autorespond-tail-and-attribution-residuals.json"
+  ],
+  "created_at": "2026-10-21T02:00:00Z",
+  "files": [
+    "go/internal/bridge/autorespond.go",
+    "go/internal/bridge/manifests/claude-tmux.json"
+  ],
+  "fix": "When plan_approval fires, read the .md path from the tail of the matched pane and copy the plan file into the run workspace (for example <workspace>/<agent>-plan.md). Record the copied path on the auto_respond outcome. A missing or unreadable file is a WARN, never a failure of the send.",
+  "id": "plan-dialog-plan-file-harvest",
+  "kind": "improvement",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "summary": "The plan_approval rule of claude-tmux answers the ExitPlanMode dialog with Enter. The dialog footer names the plan file (a path that ends in .md after 'ctrl+g to edit in Vim'). The responder discards that scrollback, so the plan that the agent executed is not evidence in the run dir and no gate can grade it. Filed from autorespond-tail-and-attribution-residuals.",
+  "title": "An auto-approved plan is lost: harvest the plan file path from the claude plan dialog into the run dir",
+  "weight": 0.5
+}
