@@ -215,6 +215,7 @@ func TestMaybeRemediate_ARepeatedPredicateFailureOfABuilderFixNeverReroutesToTDD
 	reviewer := &remediateReviewerE4{decide: map[string]ReviewResult{"build": {Approve: false, Retry: true, Reason: "build handoff floor: " + cycle1761Failure, Failures: []string{cycle1761Failure}}}}
 	rig := remediateRigE4(t, 1, reviewer, []string{VerdictPASS})
 	rig.cr.o.stderr = &injectedStderr{}
+	rig.cr.cycle, rig.cr.cs.CycleID = 10, 10
 
 	if _, err := rig.cr.maybeRemediate(PhaseTDD, rig.dr); err != nil {
 		t.Fatalf("maybeRemediate: %v", err)
