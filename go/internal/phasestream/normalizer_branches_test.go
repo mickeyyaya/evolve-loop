@@ -2,9 +2,12 @@ package phasestream
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -33,35 +36,61 @@ func TestNormalizer_NewNormalizer_DefaultsKillPgrp(t *testing.T) {
 	}
 }
 
-func TestNormalizer_DefaultKillPgrp_RunsOnStallEnforce(t *testing.T) {
+func TestGroupKiller_NegatesPgidForSender(t *testing.T) {
+	t.Parallel()
+	var gotPID int
+	var gotSig syscall.Signal
+	kill := groupKiller(func(pid int, sig syscall.Signal) error {
+		gotPID, gotSig = pid, sig
+		return errors.New("sender-error")
+	})
+	err := kill(4242, syscall.SIGTERM)
+	if gotPID != -4242 || gotSig != syscall.SIGTERM {
+		t.Fatalf("sender got pid=%d sig=%v want -4242/SIGTERM", gotPID, gotSig)
+	}
+	if err == nil || err.Error() != "sender-error" {
+		t.Fatalf("sender error must propagate, got %v", err)
+	}
+}
+
+func TestNewNormalizer_WiresDefaultKillPgrp(t *testing.T) {
+	t.Parallel()
+	n := NewNormalizer(NormalizerConfig{StdoutPath: filepath.Join(t.TempDir(), "o.log")})
+	got := reflect.ValueOf(n.cfg.KillPgrp).Pointer()
+	want := reflect.ValueOf(defaultKillPgrp).Pointer()
+	if got != want {
+		t.Fatalf("nil KillPgrp must default to defaultKillPgrp")
+	}
+}
+
+func TestNormalizer_StallEnforce_KillErrorSurfacesInEnvelope(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	clk := &testClock{t: baseClock()}
-	var sink bytes.Buffer
+	var calls int
 	n := NewNormalizer(NormalizerConfig{
 		Source:     Source{Producer: "normalizer", Cycle: 1, Phase: "tdd", Agent: "tdd"},
 		TraceID:    "t",
 		StdoutPath: filepath.Join(dir, "tdd-stdout.log"),
-		Sink:       &sink,
 		StallS:     600,
 		Enforce:    true,
-		PGID:       0x3FFFFFFF,
+		PGID:       4242,
 		Now:        clk.now,
+		KillPgrp: func(int, syscall.Signal) error {
+			calls++
+			return errors.New("no such process")
+		},
 	})
 	clk.t = clk.t.Add(601 * time.Second)
 	got, err := n.Poll()
 	if err != nil {
 		t.Fatalf("poll: %v", err)
 	}
-	if len(got) != 1 || got[0].Kind != KindStall {
-		t.Fatalf("want 1 stall envelope, got %#v", got)
+	if len(got) != 1 || got[0].Kind != KindStall || got[0].Data["kill_result"] != "no such process" {
+		t.Fatalf("want stall envelope carrying the kill error, got %#v", got)
 	}
-	kr, ok := got[0].Data["kill_result"].(string)
-	if !ok || kr == "" {
-		t.Fatalf("stall envelope must carry a kill_result string, got %#v", got[0].Data["kill_result"])
-	}
-	if kr == "ok" {
-		t.Errorf("killing a non-existent process group should surface an error, got kill_result=ok")
+	if calls != 1 {
+		t.Fatalf("sender calls=%d want 1", calls)
 	}
 }
 

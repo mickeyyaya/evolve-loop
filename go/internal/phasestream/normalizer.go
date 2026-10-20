@@ -33,14 +33,22 @@ type Normalizer struct {
 	tail         func(path string, off int64) ([]string, int64)
 }
 
+type signalSender func(pid int, sig syscall.Signal) error
+
+var defaultKillPgrp = groupKiller(syscall.Kill)
+
+func groupKiller(send signalSender) func(pgid int, sig syscall.Signal) error {
+	return func(pgid int, sig syscall.Signal) error {
+		return send(-pgid, sig)
+	}
+}
+
 func NewNormalizer(cfg NormalizerConfig) *Normalizer {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
 	if cfg.KillPgrp == nil {
-		cfg.KillPgrp = func(pgid int, sig syscall.Signal) error {
-			return syscall.Kill(-pgid, sig)
-		}
+		cfg.KillPgrp = defaultKillPgrp
 	}
 	return &Normalizer{
 		cfg:          cfg,
