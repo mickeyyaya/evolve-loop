@@ -122,7 +122,7 @@ undiagnosable. Its blast radius is every later cycle.
    *Evidence: three innocent cycles (1011/1023/1027) died because of mid-batch console
    writes. One cycle (1043) died because of a mid-wave queue hold.*
 5. **A code PR merges only at a boundary.** A green docs, inbox or CI PR can merge
-   in a wave at `pr.merge_window.stage=on`, through `evolve pr merge` after P2b. The default is `off` until `fleet.integration.stage` is `enforce` (ADR-0147).
+   in a wave at `pr.merge_window.stage=on`, through `evolve pr merge` after P2b. The verb gives `boundary` below `fleet.integration.stage: enforce` (ADR-0147), at each stage.
    `evolve pr window <n>` gives the class (exit 0 window, 3 boundary). The console can
    call an early boundary with `evolve loop-stop --wait` ([ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md)).
 

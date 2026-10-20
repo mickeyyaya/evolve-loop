@@ -17,13 +17,15 @@ import (
 )
 
 const (
-	prWindowUsage   = "usage: evolve pr window <n> | --files-from FILE [--json] [--project-root P]"
-	prWindowPrefix  = "evolve pr window: "
-	exitBoundary    = 3
-	prWindowTimeout = 2 * time.Minute
-	reasonStageOff  = "merge windows wait for fleet.integration.stage enforce (ADR-0147)"
-	reasonNoPaths   = "the PR changes no path"
-	reasonWindow    = "every path is docs, inbox or CI-only"
+	prWindowUsage        = "usage: evolve pr window <n> | --files-from FILE [--json] [--project-root P]"
+	prWindowPrefix       = "evolve pr window: "
+	exitBoundary         = 3
+	prWindowTimeout      = 2 * time.Minute
+	ghFileLimit          = 3000
+	reasonIntegration    = "merge windows wait for fleet.integration.stage enforce (ADR-0147)"
+	reasonWindowStageOff = "pr.merge_window.stage is off"
+	reasonNoPaths        = "the PR changes no path"
+	reasonWindow         = "CI routes the PR to no Go and no landing suite"
 )
 
 var requiredWorkflowPath = filepath.Join(".github", "workflows", "required.yml")
@@ -33,9 +35,14 @@ type prWindowArgs struct {
 	asJSON                     bool
 }
 
+type windowGate struct {
+	stage, integration string
+}
+
 type prWindowDecision struct {
 	PR            string            `json:"pr,omitempty"`
 	Stage         string            `json:"stage"`
+	Integration   string            `json:"integration_stage"`
 	Verdict       mergewindow.Class `json:"verdict"`
 	Rule          mergewindow.Class `json:"rule"`
 	Reason        string            `json:"reason"`
@@ -103,6 +110,10 @@ func decidePRWindow(ctx context.Context, root string, a prWindowArgs, gh func(co
 	if err != nil {
 		return prWindowDecision{}, err
 	}
+	integration, err := pol.FleetIntegrationStage()
+	if err != nil {
+		return prWindowDecision{}, err
+	}
 	workflow, err := os.ReadFile(filepath.Join(root, requiredWorkflowPath))
 	if err != nil {
 		return prWindowDecision{}, err
@@ -115,7 +126,7 @@ func decidePRWindow(ctx context.Context, root string, a prWindowArgs, gh func(co
 	if err != nil {
 		return prWindowDecision{}, err
 	}
-	return windowDecision(a.pr, stage, rule.Classify(changed), len(changed) == 0), nil
+	return windowDecision(a.pr, windowGate{stage: stage, integration: integration}, rule.Classify(changed), len(changed)), nil
 }
 
 func prWindowPaths(ctx context.Context, a prWindowArgs, gh func(context.Context, ...string) ([]byte, error)) ([]string, error) {
@@ -151,21 +162,27 @@ func pathLines(out []byte) []string {
 	return lines
 }
 
-func windowDecision(pr, stage string, v mergewindow.Verdict, noPaths bool) prWindowDecision {
-	d := prWindowDecision{PR: pr, Stage: stage, Verdict: v.Class, Rule: v.Class, BoundaryPaths: v.BoundaryPaths}
+func windowDecision(pr string, gate windowGate, v mergewindow.Verdict, changed int) prWindowDecision {
+	d := prWindowDecision{PR: pr, Stage: gate.stage, Integration: gate.integration, Verdict: v.Class, Rule: v.Class, BoundaryPaths: v.BoundaryPaths}
 	if d.BoundaryPaths == nil {
 		d.BoundaryPaths = []string{}
 	}
 	switch {
-	case noPaths:
+	case changed == 0:
 		d.Reason = reasonNoPaths
+	case changed >= ghFileLimit:
+		d.Verdict, d.Rule = mergewindow.Boundary, mergewindow.Boundary
+		d.Reason = fmt.Sprintf("the PR lists %d files, the GitHub limit, so the list can be partial", changed)
 	case v.Class == mergewindow.Window:
 		d.Reason = reasonWindow
 	default:
 		d.Reason = fmt.Sprintf("%d paths need a boundary: %s", len(v.BoundaryPaths), strings.Join(v.BoundaryPaths, ", "))
 	}
-	if stage != policy.MergeWindowOn {
-		d.Verdict, d.Reason = mergewindow.Boundary, reasonStageOff
+	switch {
+	case gate.integration != policy.FleetIntegrationEnforce:
+		d.Verdict, d.Reason = mergewindow.Boundary, reasonIntegration
+	case gate.stage != policy.MergeWindowOn:
+		d.Verdict, d.Reason = mergewindow.Boundary, reasonWindowStageOff
 	}
 	return d
 }
@@ -174,6 +191,6 @@ func writePRWindow(w io.Writer, d prWindowDecision, asJSON bool) error {
 	if asJSON {
 		return json.NewEncoder(w).Encode(d)
 	}
-	_, err := fmt.Fprintf(w, "%s: %s (stage %s, paths %s)\n", d.Verdict, d.Reason, d.Stage, d.Rule)
+	_, err := fmt.Fprintf(w, "%s: %s (stage %s, integration %s, paths %s)\n", d.Verdict, d.Reason, d.Stage, d.Integration, d.Rule)
 	return err
 }

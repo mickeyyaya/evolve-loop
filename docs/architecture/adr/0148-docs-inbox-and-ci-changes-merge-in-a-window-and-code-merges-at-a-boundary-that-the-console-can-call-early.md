@@ -15,12 +15,13 @@ Each PR merges only at a wave boundary. Most PRs are green long before the bound
 
 ## Decision
 
-1. A PR whose paths are all docs, inbox or CI paths is a window PR. It merges when green, also in a wave.
-2. Each other PR is a boundary PR. It merges only at a boundary.
-3. The CI router of `required.yml` defines the path classes. `evolve pr window` reads that table, so one rule serves both.
-4. The policy key `pr.merge_window.stage` is `off` by default. At `off`, each PR is a boundary PR.
-5. The operator sets the stage to `on` only after `fleet.integration.stage` is `enforce` (ADR-0147, plan D15).
-6. The console calls an early boundary when a green boundary PR waits and the pool runs below its window.
+1. Drop the `.github/` paths of a PR. When CI routes the rest to no Go and no landing suite, it is a window PR.
+2. A window PR merges when green, also in a wave.
+3. Each other PR is a boundary PR. It merges only at a boundary.
+4. The CI router of `required.yml` defines the path classes. `evolve pr window` reads that table, so one rule serves both.
+5. The policy key `pr.merge_window.stage` is `off` by default. At `off`, each PR is a boundary PR.
+6. Below `fleet.integration.stage: enforce` (ADR-0147, plan D15) each PR is a boundary PR, at each value of `pr.merge_window.stage`.
+7. The console calls an early boundary when a green boundary PR waits and the pool runs below its window.
 
 ## Consequences
 
@@ -28,6 +29,7 @@ Each PR merges only at a wave boundary. Most PRs are green long before the bound
 - Good: CI routing and the merge window cannot drift, because one table defines both.
 - Bad: a change to the CI router also changes the merge window. A reviewer of `required.yml` must know this.
 - Bad: `CLAUDE.md` and `AGENTS.md` are docs to CI, so they are window paths (plan Q1).
+- Bad: a docs PR that also adds inbox items is a boundary PR, because CI runs the Go suite for it.
 - Bad: an early boundary stops lanes before their wave ends. The pool must be below its window, so the loss is small.
 
 ## Rejected

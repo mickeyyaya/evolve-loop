@@ -64,12 +64,23 @@ func TestClassify_TheLiveCIRoutingTableDecidesEachPath(t *testing.T) {
 func TestClassify_OneBoundaryPathMakesThePRBoundaryAndIsNamed(t *testing.T) {
 	r := liveRule(t)
 	got := r.Classify([]string{"docs/plans/a.md", "go/x.go", ".evolve/inbox/a.json", "Makefile", "go/x.go"})
-	want := Verdict{Class: Boundary, BoundaryPaths: []string{"go/x.go", "Makefile"}}
+	want := Verdict{Class: Boundary, BoundaryPaths: []string{"docs/plans/a.md", "go/x.go", "Makefile"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Classify = %+v, want %+v", got, want)
 	}
-	if got := r.Classify([]string{"docs/plans/a.md", ".evolve/inbox/a.json", ".github/workflows/required.yml"}); got.Class != Window || len(got.BoundaryPaths) != 0 {
-		t.Fatalf("a docs, inbox and CI PR = %+v, want window", got)
+	if got := r.Classify([]string{"docs/plans/a.md", "README.md", ".github/workflows/required.yml"}); got.Class != Window || len(got.BoundaryPaths) != 0 {
+		t.Fatalf("a docs and CI PR = %+v, want window", got)
+	}
+	if got := r.Classify([]string{".evolve/inbox/a.json", "docs/research/x.md", ".github/CODEOWNERS"}); got.Class != Window {
+		t.Fatalf("an inbox, research and CI PR = %+v, want window", got)
+	}
+}
+
+func TestClassify_ADocsAndInboxPRIsBoundaryBecauseCIRunsTheGoSuiteForIt(t *testing.T) {
+	got := liveRule(t).Classify([]string{"README.md", ".evolve/inbox/x.json"})
+	want := Verdict{Class: Boundary, BoundaryPaths: []string{"README.md"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Classify = %+v, want %+v", got, want)
 	}
 }
 
@@ -79,26 +90,43 @@ func TestClassify_AnEmptyChangeIsBoundaryAsCIRoutesItToEverySuite(t *testing.T) 
 	}
 }
 
-const loop = "while IFS= read -r -d '' path; do\n"
-const done = "done < \"$RUNNER_TEMP/ci-paths\"\n"
+func liveText(t *testing.T) string {
+	t.Helper()
+	return string(requiredWorkflow(t))
+}
 
-func table(classes, suites string) []byte {
-	return []byte("steps:\n" + loop +
-		"  case \"$path\" in\n" + classes + "  esac\n" +
-		"  case \"$path\" in\n" + suites + "  esac\n" + done +
-		"  case \"$x\" in\n    *) other_found=true ;;\n  esac\n")
+func mutate(t *testing.T, old, replacement string) []byte {
+	t.Helper()
+	text := liveText(t)
+	if !strings.Contains(text, old) {
+		t.Fatalf("required.yml has no %q", old)
+	}
+	return []byte(strings.Replace(text, old, replacement, 1))
+}
+
+const loopStart = "while IFS= read -r -d '' path; do\n"
+const loopEnd = "          done < \"$RUNNER_TEMP/ci-paths\""
+
+func table(t *testing.T, classes, suites string) []byte {
+	t.Helper()
+	text := liveText(t)
+	head := text[:strings.Index(text, loopStart)+len(loopStart)]
+	tail := text[strings.Index(text, loopEnd):]
+	return []byte(head + "case \"$path\" in\n" + classes + "esac\ncase \"$path\" in\n" + suites + "esac\n" + tail)
 }
 
 const goodClasses = "    docs/*.md) docs_found=true ;;\n    *) other_found=true ;;\n"
 const goodSuites = "    go/*) go_required=true ;;\n    .evolve/inbox/*) inbox_found=true ;;\n    *) go_required=true; landing_required=true ;;\n"
 
 func TestParse_ReadsASmallTableAndMatchesStarAcrossSlashes(t *testing.T) {
-	r, err := Parse(table(goodClasses, goodSuites))
+	r, err := Parse(table(t, goodClasses, goodSuites))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := r.Classify([]string{"docs/a/b/c.md", ".evolve/inbox/a.json"}); got.Class != Window {
-		t.Fatalf("nested docs and inbox = %+v, want window", got)
+	for _, paths := range [][]string{{"docs/a/b/c.md"}, {".evolve/inbox/a.json"}} {
+		if got := r.Classify(paths); got.Class != Window {
+			t.Fatalf("%q = %+v, want window", paths, got)
+		}
 	}
 	if got := r.Classify([]string{"docs/a.txt"}); got.Class != Boundary {
 		t.Fatalf("docs/a.txt = %+v, want boundary", got)
@@ -110,25 +138,41 @@ func TestParse_FailsClosedOnATableItCannotRead(t *testing.T) {
 		body []byte
 		want string
 	}{
-		"no loop":            {[]byte("jobs: {}\n"), "want one path loop"},
-		"two loops":          {append([]byte(loop+done), table(goodClasses, goodSuites)...), "found 2"},
-		"no end of loop":     {[]byte(loop + "  case \"$path\" in\n    *) other_found=true ;;\n  esac\n"), "no path loop"},
-		"one block":          {[]byte(loop + "  case \"$path\" in\n" + goodClasses + "  esac\n" + done), "2 case blocks"},
-		"open block":         {[]byte(loop + "  case \"$path\" in\n" + goodClasses + done), "2 case blocks"},
-		"empty block":        {table("", goodSuites), "no catch-all"},
-		"no catch-all":       {table("    docs/*.md) docs_found=true ;;\n", goodSuites), "no catch-all"},
-		"bad arm":            {table("    docs/*.md) docs_found=true\n"+goodClasses, goodSuites), "unreadable arm"},
-		"class glob":         {table("    docs/?.md) docs_found=true ;;\n"+goodClasses, goodSuites), "unsupported glob"},
-		"quoted glob":        {table("    \"docs\"/*.md) docs_found=true ;;\n"+goodClasses, goodSuites), "unsupported glob"},
-		"empty alternative":  {table("    docs/*.md|) docs_found=true ;;\n"+goodClasses, goodSuites), "unsupported glob"},
-		"false action":       {table("    docs/*.md) docs_found=false ;;\n"+goodClasses, goodSuites), "unreadable action"},
-		"renamed class flag": {table("    docs/*.md) docs_seen=true ;;\n"+goodClasses, goodSuites), "unknown flag docs_seen"},
-		"renamed suite flag": {table(goodClasses, "    go/*) go_needed=true ;;\n"+goodSuites), "unknown flag go_needed"},
-		"no docs flag":       {table("    *) other_found=true ;;\n", goodSuites), "never sets docs_found"},
-		"no go flag":         {table(goodClasses, "    *) landing_required=true ;;\n"), "must set go_required"},
-		"no landing flag":    {table(goodClasses, "    *) go_required=true ;;\n"), "must set landing_required"},
-		"no other flag":      {table("    docs/*.md) docs_found=true ;;\n    *) ;;\n", goodSuites), "must set other_found"},
-		"early catch-all":    {table("    *) other_found=true ;;\n"+goodClasses, goodSuites), "hides arm 2"},
+		"no changes job":     {mutate(t, "\n  changes:\n", "\n  paths:\n"), "no job \"changes\""},
+		"no loop":            {mutate(t, loopStart, "while read path; do\n"), "want one path loop"},
+		"two loops":          {mutate(t, loopStart, loopStart+loopStart), "found 2"},
+		"no end of loop":     {mutate(t, loopEnd, "          finished"), "no path loop end"},
+		"open third block":   {mutate(t, loopEnd, "case \"$path\" in\n"+loopEnd), "2 case blocks"},
+		"if inside loop":     {mutate(t, loopEnd, "if [[ \"$path\" == .evolve/inbox/* ]]; then go_required=true; fi\n"+loopEnd), "unparsed line"},
+		"unquoted block":     {mutate(t, loopEnd, "case $path in\n.evolve/inbox/*) go_required=true ;;\nesac\n"+loopEnd), "unparsed line"},
+		"flag after loop":    {mutate(t, "route false false true true", "if [[ \"$inbox_found\" == true ]]; then go_required=true; fi\nroute false false true true"), "routing flag go_required"},
+		"route after loop":   {mutate(t, "route false false true true", "route true true false false true\nroute false false true true"), "after the path loop changed"},
+		"flag before loop":   {mutate(t, "go_required=false", "go_required=true"), "routing flag go_required"},
+		"exit before loop":   {mutate(t, "go_required=false", "exit 0\ngo_required=false"), "before the path loop changed"},
+		"no run block":       {mutate(t, "run: |", "run: >"), "before the path loop changed"},
+		"output forced":      {mutate(t, "go: ${{ steps.paths.outputs.go }}", "go: 'true'"), "before the path loop changed"},
+		"env override":       {mutate(t, "HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}", "HEAD_SHA: ${{ github.sha }}"), "before the path loop changed"},
+		"step condition":     {mutate(t, "name: Select required suites", "name: Select required suites\n        if: false"), "before the path loop changed"},
+		"step before script": {mutate(t, "- id: paths", "- run: echo go=true >> $GITHUB_OUTPUT\n      - id: paths"), "before the path loop changed"},
+		"go job always":      {mutate(t, "if: needs.changes.outputs.go == 'true'", "if: always()"), "gate of job go"},
+		"landing job reads":  {mutate(t, "if: needs.changes.outputs.landing == 'true'", "if: needs.changes.outputs.docs == 'true'"), "gate of job landing"},
+		"no go job":          {mutate(t, "\n  go:\n", "\n  go-suite:\n"), "no job \"go\""},
+		"digit flag":         {mutate(t, "route false false true true", "go2_required=true\nroute false false true true"), "routing flag go2_required"},
+		"route before loop":  {mutate(t, "go_required=false", "if grep -qz inbox \"$RUNNER_TEMP/ci-paths\"; then route true true; fi\ngo_required=false"), "before the path loop changed"},
+		"empty block":        {table(t, "", goodSuites), "no catch-all"},
+		"no catch-all":       {table(t, "    docs/*.md) docs_found=true ;;\n", goodSuites), "no catch-all"},
+		"bad arm":            {table(t, "    docs/*.md) docs_found=true\n"+goodClasses, goodSuites), "unreadable arm"},
+		"class glob":         {table(t, "    docs/?.md) docs_found=true ;;\n"+goodClasses, goodSuites), "unsupported glob"},
+		"quoted glob":        {table(t, "    \"docs\"/*.md) docs_found=true ;;\n"+goodClasses, goodSuites), "unsupported glob"},
+		"empty alternative":  {table(t, "    docs/*.md|) docs_found=true ;;\n"+goodClasses, goodSuites), "unsupported glob"},
+		"false action":       {table(t, "    docs/*.md) docs_found=false ;;\n"+goodClasses, goodSuites), "unreadable action"},
+		"renamed class flag": {table(t, "    docs/*.md) docs_seen=true ;;\n"+goodClasses, goodSuites), "unknown flag docs_seen"},
+		"renamed suite flag": {table(t, goodClasses, "    go/*) go_needed=true ;;\n"+goodSuites), "unknown flag go_needed"},
+		"no docs flag":       {table(t, "    *) other_found=true ;;\n", goodSuites), "never sets docs_found"},
+		"no go flag":         {table(t, goodClasses, "    *) landing_required=true ;;\n"), "must set go_required"},
+		"no landing flag":    {table(t, goodClasses, "    *) go_required=true ;;\n"), "must set landing_required"},
+		"no other flag":      {table(t, "    docs/*.md) docs_found=true ;;\n    *) ;;\n", goodSuites), "must set other_found"},
+		"early catch-all":    {table(t, "    *) other_found=true ;;\n"+goodClasses, goodSuites), "hides arm 2"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

@@ -87,10 +87,10 @@ A wins because it removes the largest wait (F2) and keeps code merges at a bound
 | Id | Decision | Because | Rejected options and why |
 |---|---|---|---|
 | D1 | Choose design A. | F2, F10, §4 | B: F5, F11. C: window PRs keep their wait. D: F2. |
-| D2 | A path under `.github/` is a window path. A path that the CI router routes to no Go suite and no landing suite is a window path. Each other path is a boundary path. | F7, F10 | A second list of path classes in Go: it drifts from CI. |
-| D3 | The rule reads its classes from the case tables of `required.yml` at run time, and it fails closed on a table that it cannot read. | F7 | A Go copy with a parity test: two copies of one rule. A shared data file: it changes the required CI job in a live wave. |
-| D4 | The policy key `pr.merge_window.stage` has the values `off` and `on`. The compiled default is `off`. At `off` each PR is a boundary PR, with the reason "merge windows wait for fleet.integration.stage enforce (ADR-0147)". | F5 | Turn the window on at once: F5 strands lanes. |
-| D5 | The operator sets the stage to `on` only after `fleet.integration.stage` is `enforce` (ADR-0147, wave-integration D15). | F5 | Wait for P1, a fix to the lane ship: P1 is shelved, and wave-integration F2.7 shows that a lane-side fix cannot be complete. |
+| D2 | Drop each path under `.github/`. A PR is a window PR when the CI router routes its other paths to no Go suite and no landing suite. Each other PR is a boundary PR. | F7, F10 | A second list of path classes in Go: it drifts from CI. |
+| D3 | The rule reads its classes from the case tables of `required.yml` at run time. It fails closed on each part of the job `changes` that it does not model. Examples are a routing line outside the tables, or a change to the routing before or after the loop. | F7 | A Go copy with a parity test: two copies of one rule. A shared data file: it changes the required CI job in a live wave. |
+| D4 | The policy key `pr.merge_window.stage` has the values `off` and `on`. The compiled default is `off`. At `off` each PR is a boundary PR. | F5 | Turn the window on at once: F5 strands lanes. |
+| D5 | The verb reads `fleet.integration.stage` (compiled default `shadow`). Below `enforce` each PR is a boundary PR, with the reason "merge windows wait for fleet.integration.stage enforce (ADR-0147)", also at `pr.merge_window.stage: on`. | F5, wave-integration D15 | Wait for P1, a fix to the lane ship: P1 is shelved, and wave-integration F2.7 shows that a lane-side fix cannot be complete. |
 | D6 | The console calls an early boundary when a green boundary PR waits longer than a policy bound and the pool runs below its window. | F2 | A fixed boundary clock: it stops waves that have work. |
 | D7 | Remove the rebase hotspots and keep `main` green (P3, P4). | F3, F4 | |
 
@@ -100,10 +100,10 @@ PR #1005 changed only files under `docs/` (`gh pr diff 1005 --name-only`, 2026-1
 
 ```
 $ evolve pr window --files-from files.txt
-boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (stage off, paths window)
+boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (stage off, integration shadow, paths window)
 ```
 
-`paths window` shows that the rule finds only window paths. At stage `on`, the same PR exits 0 with `window: every path is docs, inbox or CI-only`. A PR that also changes `go/.cover-strict` exits 3 and names that path.
+`paths window` shows that CI routes the PR to no Go and no landing suite. At stage `on` and integration `enforce`, the same PR exits 0 with `window: CI routes the PR to no Go and no landing suite`. A PR that also changes `go/.cover-strict` exits 3 and names that path.
 
 ## 6. Components
 
@@ -119,11 +119,11 @@ boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (sta
 
 ### How P2 works
 
-1. The verb reads `pr.merge_window.stage` from `.evolve/policy.json`.
+1. The verb reads `pr.merge_window.stage` and `fleet.integration.stage` from `.evolve/policy.json`.
 2. It reads `.github/workflows/required.yml` and parses the two case tables of the job `changes` (`mergewindow.Parse`).
 3. It gets the changed paths. For a PR it calls `gh api --paginate repos/{owner}/{repo}/pulls/<n>/files` and takes each file name and each old name of a rename. A test gives a file list with `--files-from`.
-4. It classifies each path (`Rule.Classify`). One boundary path makes the PR a boundary PR.
-5. At stage `off` the verdict is `boundary`. The JSON field `rule` keeps the class of the paths. Thus the operator can count the window PRs.
+4. It gives the routing of CI for the PR (`Rule.Classify`). A PR that CI routes to a Go or landing suite is a boundary PR. A list of 3000 files is a boundary PR. That is the limit of the GitHub API, so the list can be partial.
+5. At stage `off`, or below integration `enforce`, the verdict is `boundary`. The JSON field `rule` keeps the class of the paths. Thus the operator can count the window PRs.
 
 | Exit | Meaning |
 |---|---|
@@ -156,7 +156,8 @@ P2 is verified by tests at 100% coverage of the new code. The tests read the liv
 | Risk | Control |
 |---|---|
 | A window merge strands a lane before the ADR-0147 stage is `enforce`. | The stage default is `off` (D4). |
-| A change to the CI router changes the window rule. | That is the intent (D3). The parser fails closed on an unknown flag, a missing catch-all arm or an unknown glob. |
+| A change to the CI router changes the window rule. | That is the intent (D3). The parser fails closed on each routing line that it does not model. |
+| A docs PR that also files inbox items is a boundary PR, because CI routes it to the Go suite. | This is the routing of CI. A change of the CI router to route docs paths to no suite also widens the window. |
 | `CLAUDE.md` and `AGENTS.md` are docs to CI, so they are window paths. A lane that starts after the merge reads the new instructions. | The same is true at a boundary. See open question Q1. |
 | A rename hides a code path. | The verb reads the old name of each rename. |
 | A path under `.github/` is a window path, also `required.yml`, the table that the verb reads. | The operator asked for CI-only PRs in the window. A CI file does not change the plane binary or a lane base. The PR still needs green CI and a review. |

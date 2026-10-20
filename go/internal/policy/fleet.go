@@ -122,6 +122,7 @@ type FleetPolicy struct {
 	StarvationK      int                      `json:"starvation_k,omitempty"`
 	StarvationWeight float64                  `json:"starvation_weight,omitempty"`
 	Orchestrator     *FleetOrchestratorPolicy `json:"orchestrator,omitempty"`
+	Integration      *FleetIntegrationPolicy  `json:"integration,omitempty"`
 }
 
 type FleetBudgetPolicy struct {

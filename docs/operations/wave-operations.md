@@ -90,16 +90,16 @@ At `shadow`, count the `LOOP_ORCH_LANE_LATE_EXIT` events with `status` `ok`. Eac
 The merge rule is in [ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md). The plan is [pr-merge-latency-2026-10](../plans/pr-merge-latency-2026-10.md).
 
 - A code PR merges only at a boundary. Use `evolve wave next --merge <n,...>`.
-- A window PR has only docs, inbox or CI paths. It can merge when green, also in a wave, but only at stage `on`.
-- The policy key `pr.merge_window.stage` is `off` by default. Keep it at `off` until `fleet.integration.stage` is `enforce` (ADR-0147): before that stage, a merge in a wave strands the next lane push.
+- A window PR is a PR that CI routes to no Go suite and no landing suite, after its `.github/` paths are dropped. It can merge when green, also in a wave, but only at stage `on` and `fleet.integration.stage: enforce`.
+- The policy key `pr.merge_window.stage` is `off` by default. Below `fleet.integration.stage: enforce` (ADR-0147) the verb gives `boundary` at each stage: before that stage, a merge in a wave strands the next lane push.
 
-To classify a PR, run `evolve pr window <n>`. Add `--json` for the envelope `{pr, stage, verdict, rule, reason, boundary_paths}`. The field `pr` is present only for a PR number.
+To classify a PR, run `evolve pr window <n>`. Add `--json` for the envelope `{pr, stage, integration_stage, verdict, rule, reason, boundary_paths}`. The field `pr` is present only for a PR number.
 
 | Exit | Verdict | Next action |
 |---|---|---|
 | 0 | `window` | After P2b, merge the green PR with `evolve pr merge <n>`. Before P2b, merge it at the boundary. Do not use `gh pr merge`. |
-| 3 | `boundary` | Merge the PR at the next boundary. At stage `off`, the reason is `merge windows wait for fleet.integration.stage enforce (ADR-0147)`, and `rule` shows the class of the paths. |
-| 2 | — | A read or a parse failed (policy, `required.yml`, the file list, `gh`). Fix the named cause. |
+| 3 | `boundary` | Merge the PR at the next boundary. Below integration `enforce`, the reason is `merge windows wait for fleet.integration.stage enforce (ADR-0147)`. At integration `enforce` and stage `off`, it is `pr.merge_window.stage is off`. The field `rule` shows the class of the paths. |
+| 2 | — | A read or a parse failed (policy, `required.yml`, the file list, `gh`). A routing line in `required.yml` that the rule does not model also exits 2. Fix the named cause. |
 | 10 | — | A usage error. |
 
 The path classes come from the CI router of `.github/workflows/required.yml`. A change to that router also changes the merge window.

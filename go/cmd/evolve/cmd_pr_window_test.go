@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/mergewindow"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func windowPlane(t *testing.T, policyJSON string) string {
@@ -39,7 +40,7 @@ func writeWindowFile(t *testing.T, path, body string) string {
 	return path
 }
 
-const windowOn = `{"pr":{"merge_window":{"stage":"on"}}}`
+const windowOn = `{"pr":{"merge_window":{"stage":"on"}},"fleet":{"integration":{"stage":"enforce"}}}`
 
 func runWindow(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
@@ -48,10 +49,10 @@ func runWindow(t *testing.T, args ...string) (int, string, string) {
 	return code, stdout.String(), stderr.String()
 }
 
-func TestPRWindow_AtStageOnADocsAndInboxPRIsAWindowAndExitsZero(t *testing.T) {
+func TestPRWindow_AtStageOnADocsAndCIPRIsAWindowAndExitsZero(t *testing.T) {
 	t.Parallel()
 	root := windowPlane(t, windowOn)
-	list := writeWindowFile(t, filepath.Join(t.TempDir(), "files"), "docs/plans/a.md\n.evolve/inbox/b.json\n\n.github/workflows/go.yml\n")
+	list := writeWindowFile(t, filepath.Join(t.TempDir(), "files"), "docs/plans/a.md\nREADME.md\n\n.github/workflows/go.yml\n")
 	code, stdout, stderr := runWindow(t, "--files-from", list, "--json", "--project-root", root)
 	if code != 0 || stderr != "" {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
@@ -60,7 +61,7 @@ func TestPRWindow_AtStageOnADocsAndInboxPRIsAWindowAndExitsZero(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
 		t.Fatalf("decode %q: %v", stdout, err)
 	}
-	want := prWindowDecision{Stage: "on", Verdict: mergewindow.Window, Rule: mergewindow.Window, Reason: reasonWindow, BoundaryPaths: []string{}}
+	want := prWindowDecision{Stage: "on", Integration: "enforce", Verdict: mergewindow.Window, Rule: mergewindow.Window, Reason: reasonWindow, BoundaryPaths: []string{}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("decision = %+v, want %+v", got, want)
 	}
@@ -74,7 +75,7 @@ func TestPRWindow_AtStageOnACodePathIsABoundaryAndExitsThree(t *testing.T) {
 	root := windowPlane(t, windowOn)
 	list := writeWindowFile(t, filepath.Join(t.TempDir(), "files"), "docs/plans/a.md\r\ngo/x.go\n.evolve/policy.json\ndocs/a.md .github/x\n")
 	code, stdout, _ := runWindow(t, "--files-from", list, "--project-root", root)
-	want := "boundary: 3 paths need a boundary: go/x.go, .evolve/policy.json, docs/a.md .github/x (stage on, paths boundary)\n"
+	want := "boundary: 4 paths need a boundary: docs/plans/a.md, go/x.go, .evolve/policy.json, docs/a.md .github/x (stage on, integration enforce, paths boundary)\n"
 	if code != exitBoundary || stdout != want {
 		t.Fatalf("exit %d, stdout %q; want %d, %q", code, stdout, exitBoundary, want)
 	}
@@ -82,17 +83,34 @@ func TestPRWindow_AtStageOnACodePathIsABoundaryAndExitsThree(t *testing.T) {
 
 func TestPRWindow_UntilIntegrationEnforceEveryPRIsABoundaryAndTheRuleStillShows(t *testing.T) {
 	t.Parallel()
-	if reasonStageOff != "merge windows wait for fleet.integration.stage enforce (ADR-0147)" {
-		t.Fatalf("the off-stage reason must name the integration stage of ADR-0147: %q", reasonStageOff)
+	if reasonIntegration != "merge windows wait for fleet.integration.stage enforce (ADR-0147)" {
+		t.Fatalf("the reason must name the integration stage of ADR-0147: %q", reasonIntegration)
 	}
-	for _, policyJSON := range []string{"", `{"pr":{"merge_window":{"stage":"off"}}}`} {
-		root := windowPlane(t, policyJSON)
+	cases := []struct{ policyJSON, want string }{
+		{"", "boundary: " + reasonIntegration + " (stage off, integration shadow, paths window)\n"},
+		{`{"pr":{"merge_window":{"stage":"on"}}}`, "boundary: " + reasonIntegration + " (stage on, integration shadow, paths window)\n"},
+		{`{"pr":{"merge_window":{"stage":"on"}},"fleet":{"integration":{"stage":"shadow"}}}`, "boundary: " + reasonIntegration + " (stage on, integration shadow, paths window)\n"},
+		{`{"fleet":{"integration":{"stage":"enforce"}}}`, "boundary: " + reasonWindowStageOff + " (stage off, integration enforce, paths window)\n"},
+	}
+	for _, c := range cases {
+		root := windowPlane(t, c.policyJSON)
 		list := writeWindowFile(t, filepath.Join(t.TempDir(), "files"), "docs/plans/a.md\n")
 		code, stdout, _ := runWindow(t, "--files-from", list, "--project-root", root)
-		want := "boundary: " + reasonStageOff + " (stage off, paths window)\n"
-		if code != exitBoundary || stdout != want {
-			t.Errorf("policy %q: exit %d, stdout %q; want %d, %q", policyJSON, code, stdout, exitBoundary, want)
+		if code != exitBoundary || stdout != c.want {
+			t.Errorf("policy %q: exit %d, stdout %q; want %d, %q", c.policyJSON, code, stdout, exitBoundary, c.want)
 		}
+	}
+}
+
+func TestWindowDecision_AListAtTheGitHubFileLimitIsABoundary(t *testing.T) {
+	t.Parallel()
+	open := windowGate{stage: policy.MergeWindowOn, integration: policy.FleetIntegrationEnforce}
+	d := windowDecision("7", open, mergewindow.Verdict{Class: mergewindow.Window}, ghFileLimit)
+	if d.Verdict != mergewindow.Boundary || d.Rule != mergewindow.Boundary || !strings.Contains(d.Reason, "3000 files") {
+		t.Fatalf("decision = %+v, want a boundary that names the limit", d)
+	}
+	if d := windowDecision("7", open, mergewindow.Verdict{Class: mergewindow.Window}, ghFileLimit-1); d.Verdict != mergewindow.Window {
+		t.Fatalf("below the limit: %+v, want window", d)
 	}
 }
 
@@ -112,13 +130,13 @@ func TestDecidePRWindow_ReadsThePRFilesWithTheirOldNamesThroughGH(t *testing.T) 
 	var calls []string
 	gh := func(_ context.Context, args ...string) ([]byte, error) {
 		calls = append(calls, strings.Join(args, " "))
-		return []byte("\"docs/moved.md\"\n\"go/old.go\"\n\"docs/a b.md\"\n"), nil
+		return []byte("\"docs/moved.md\"\n\"go/old.go\"\n"), nil
 	}
 	d, err := decidePRWindow(context.Background(), root, prWindowArgs{pr: "1009"}, gh)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.PR != "1009" || d.Verdict != mergewindow.Boundary || !reflect.DeepEqual(d.BoundaryPaths, []string{"go/old.go"}) {
+	if d.PR != "1009" || d.Verdict != mergewindow.Boundary || !reflect.DeepEqual(d.BoundaryPaths, []string{"docs/moved.md", "go/old.go"}) {
 		t.Fatalf("decision = %+v", d)
 	}
 	want := "api --paginate repos/{owner}/{repo}/pulls/1009/files --jq .[] | .filename, (.previous_filename // empty) | @json"
@@ -143,9 +161,10 @@ func TestDecidePRWindow_EachUnreadableInputIsAnError(t *testing.T) {
 			r := t.TempDir()
 			writeWindowFile(t, filepath.Join(r, requiredWorkflowPath), "jobs: {}\n")
 			return r
-		}, prWindowArgs{pr: "1"}, "path loop"},
-		"no file list": {func(t *testing.T) string { return windowPlane(t, windowOn) }, prWindowArgs{filesFrom: missing}, "absent"},
-		"gh fails":     {func(t *testing.T) string { return windowPlane(t, windowOn) }, prWindowArgs{pr: "1"}, "HTTP 502"},
+		}, prWindowArgs{pr: "1"}, "no job"},
+		"no file list":     {func(t *testing.T) string { return windowPlane(t, windowOn) }, prWindowArgs{filesFrom: missing}, "absent"},
+		"integration word": {func(t *testing.T) string { return windowPlane(t, `{"fleet":{"integration":{"stage":"on"}}}`) }, prWindowArgs{pr: "1"}, "fleet.integration.stage"},
+		"gh fails":         {func(t *testing.T) string { return windowPlane(t, windowOn) }, prWindowArgs{pr: "1"}, "HTTP 502"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
