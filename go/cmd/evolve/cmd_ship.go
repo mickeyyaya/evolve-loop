@@ -27,6 +27,9 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var pushOnly bool
 	var projectRoot string
 	var pluginRoot string
+	var pr shipPrRequest
+	fs.BoolVar(&pr.enabled, "pr", false, "after a successful manual ship, open the pull request of the pushed branch (or report the open one)")
+	fs.StringVar(&pr.bodyFile, "pr-body-file", "", "file holding the pull request body (requires --pr)")
 	fs.StringVar(&class, "class", "cycle", "commit class (cycle|manual|release|trivial)")
 	fs.BoolVar(&pushOnly, "push-only", false, "push an already-committed, provenance-verified ahead set (the sanctioned completion after GIT_PUSH_REJECTED + sync-main); commits nothing")
 	fs.BoolVar(&dryRun, "dry-run", false, "run all read-only checks but skip commit/push/release")
@@ -53,22 +56,16 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	if projectRoot == "" {
-		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")
+	projectRoot, rc := resolveShipRoot(projectRoot, stderr)
+	if rc != 0 {
+		return rc
 	}
-	if projectRoot == "" {
-		var err error
-		projectRoot, err = processGetwd()
-		if err != nil {
-			fmt.Fprintf(stderr, "evolve ship: cwd: %v\n", err)
-			return 1
-		}
-	}
-	projectRoot = shipAbsoluteRoot("--project-root", projectRoot, func(m string) {
-		fmt.Fprintf(stderr, "evolve ship: WARN: %s\n", m)
-	})
 	if pluginRoot == "" {
 		pluginRoot = os.Getenv("EVOLVE_PLUGIN_ROOT")
+	}
+	prBranch, prRc := resolveShipPrBranch(pr, class, pushOnly, projectRoot, stderr)
+	if prRc != 0 {
+		return prRc
 	}
 	signals, closeSignals := shipRootSignals(projectRoot, stderr)
 	defer closeSignals()
@@ -100,9 +97,30 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		return int(ship.ExitFailure)
 	}
+	if pr.enabled && !dryRun && res.ExitCode == ship.ExitOK {
+		return openShipPr(pr, projectRoot, prBranch, fs.Arg(0), stdout, stderr)
+	}
 	return int(res.ExitCode)
 }
 
 func shipRootSignals(projectRoot string, stderr io.Writer) (*signalcenter.Center, func()) {
 	return newRoleSignalCenter(roleShip, projectRoot, paths.EvolveDirOf(projectRoot), stderr)
+}
+
+func resolveShipRoot(projectRoot string, stderr io.Writer) (string, int) {
+	if projectRoot == "" {
+		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")
+	}
+	if projectRoot == "" {
+		var err error
+		projectRoot, err = processGetwd()
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve ship: cwd: %v\n", err)
+			return "", 1
+		}
+	}
+	projectRoot = shipAbsoluteRoot("--project-root", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve ship: WARN: %s\n", m)
+	})
+	return projectRoot, 0
 }
