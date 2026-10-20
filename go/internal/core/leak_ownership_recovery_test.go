@@ -63,7 +63,7 @@ func takePhaseSnapshot(t *testing.T, cr *cycleRun, dr *dispatchResult, phase Pha
 
 func (l fleetLane) phaseStart(t *testing.T, repo string, cycle int, phase Phase) (*cycleRun, *dispatchResult) {
 	t.Helper()
-	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithProtectedSurface(func(string) bool { return false }))
 	cr := &cycleRun{
 		o:     o,
 		ctx:   context.Background(),
@@ -151,6 +151,23 @@ func TestRecoverBeforeReview_SourceLeakStillRelocatesBesideASibling(t *testing.T
 	requireAbsent(t, repo, leak)
 	requireTreeFile(t, lane.worktree, leak, "package router\n")
 	requireStaged(t, lane.worktree, leak)
+}
+
+func TestRecoverBeforeReview_ASourceALiveSiblingDeclaresStaysInTheMainTree(t *testing.T) {
+	t.Parallel()
+	repo, lane, sibling := twoLanesOnOneMainTree(t)
+	const theirs = "go/internal/phasespec/roots.go"
+	writeLaneClaim(t, repo, 1811, lane.slug, "go/internal/router/")
+	writeLaneClaim(t, repo, 1812, sibling.slug, theirs)
+	cr, dr := lane.phaseStart(t, repo, 1811, PhaseBuild)
+	writeTreeFile(t, repo, theirs, "package phasespec\n")
+
+	if err := cr.recoverBeforeReview(PhaseBuild, dr); err != nil {
+		t.Fatalf("recovery failed: %v", err)
+	}
+
+	requireTreeFile(t, repo, theirs, "package phasespec\n")
+	requireAbsent(t, lane.worktree, theirs)
 }
 
 func TestRecoverBeforeReview_ScoutsOwnMainTreeEvalCopyLeavesTheMainTree(t *testing.T) {
@@ -459,5 +476,36 @@ func TestRecoverBeforeReview_ThisCyclesOwnDossierInTheMainTreeIsStillALeak(t *te
 	res := dr.treeGuard.Check(cr.ctx, repo, dr.beforeDirty)
 	if real, _ := filterRealLeaks(res.Leaked, cr.leakExemptions(), io.Discard); !slices.Contains(real, own) {
 		t.Fatalf("real leaks = %v, want %s: a phase of cycle 1811 must not write its dossier into the main tree", real, own)
+	}
+}
+
+func TestGuard_APathALiveSiblingDeclaresDoesNotAbortThisLanesPhase(t *testing.T) {
+	t.Parallel()
+	for name, live := range map[string]bool{"live sibling": true, "expired sibling": false} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			const theirs = "go/internal/phasespec/roots.go"
+			writeLaneClaim(t, root, 1, "router-silent-errors", "go/internal/router/")
+			writeLaneClaim(t, root, 1812, "phasespec-roots", theirs)
+			heartbeat := time.Now()
+			if !live {
+				heartbeat = heartbeat.Add(-24 * time.Hour)
+			}
+			writeRunLease(t, RunWorkspacePath(root, 1812), heartbeat)
+
+			dirty := &fakeGitDirty{baseline: []string{}, afterLeak: []string{theirs}}
+			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, minimalRunners(PhaseScout, &leakInjector{name: PhaseScout}),
+				WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}),
+				WithGitDirtyPaths(dirty.Fn()),
+				WithProtectedSurface(func(string) bool { return false }),
+			)
+			_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
+
+			aborted := err != nil && strings.Contains(err.Error(), "tree-diff") && strings.Contains(err.Error(), theirs)
+			if aborted == live {
+				t.Errorf("tree-diff abort = %v with a %s declaring %s; err = %v", aborted, name, theirs, err)
+			}
+		})
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -303,5 +304,91 @@ func TestFilterRealLeaks_AnotherCyclesDossierIsNotThisLanesLeakButItsOwnIs(t *te
 	want := []string{"knowledge-base/cycles/cycle-9999.json", "knowledge-base/cycles/cycle-1811.json", "knowledge-base/cycles/notes.md", "go/internal/router/router.go"}
 	if !reflect.DeepEqual(real, want) || waived != 0 {
 		t.Errorf("real leaks = %v (waived %d), want %v: a dossier of a real other cycle (live or with a run directory) belongs to that cycle; a cycle that does not exist and this cycle's own file stay leaks", real, waived, want)
+	}
+}
+
+func writeLaneClaim(t *testing.T, root string, cycle int, id string, files ...string) {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{"id": id, "files": files})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTreeFile(t, root, ".evolve/inbox/processing/cycle-"+strconv.Itoa(cycle)+"/"+id+".json", string(body))
+}
+
+func TestFilterRealLeaks_APathOnlyALiveSiblingDeclaresIsNotThisLanesLeak(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeLaneClaim(t, root, 1811, "router-silent-errors", "go/internal/router/", "go/internal/shared/both.go")
+	writeLaneClaim(t, root, 1812, "phasespec-roots", "go/internal/phasespec/roots.go", "go/internal/shared/both.go", "go/internal/guards/role.go")
+	writeLaneClaim(t, root, 1700, "stale-lane", "go/internal/stale/x.go")
+	writeRunLease(t, RunWorkspacePath(root, 1812), time.Now())
+	writeRunLease(t, RunWorkspacePath(root, 1700), time.Now().Add(-24*time.Hour))
+	writeRunLease(t, filepath.Join(filepath.Dir(RunWorkspacePath(root, 1812)), "adhoc"), time.Now())
+	writeTreeFile(t, root, ".evolve/inbox/processing/cycle-1813", "a file where the claims dir must be")
+	writeRunLease(t, RunWorkspacePath(root, 1813), time.Now())
+	exempt := guardedLaneOneEightOneOne().exemptions(root, RunWorkspacePath(root, 1811), nil)
+	leaked := []string{
+		"go/internal/phasespec/roots.go",
+		"go/internal/router/router.go",
+		"go/internal/shared/both.go",
+		"go/internal/guards/role.go",
+		"go/internal/stale/x.go",
+		"docs/nobody.md",
+	}
+
+	real, waived := filterRealLeaks(leaked, exempt, io.Discard)
+
+	want := []string{"go/internal/router/router.go", "go/internal/shared/both.go", "go/internal/guards/role.go", "go/internal/stale/x.go", "docs/nobody.md"}
+	if !reflect.DeepEqual(real, want) || waived != 0 {
+		t.Errorf("real leaks = %v (waived %d), want %v: only an unprotected path that a live sibling declares and this lane does not is the sibling's", real, waived, want)
+	}
+}
+
+func guardedLaneOneEightOneOne() mainTreeOwnership {
+	owner := laneOneEightOneOne()
+	owner.protected = func(p string) bool { return strings.HasPrefix(p, "go/internal/guards/") }
+	return owner
+}
+
+func TestFilterRealLeaks_ALaneWithoutAKnownScopeOrSurfaceIsChargedForEveryUnkeyedPath(t *testing.T) {
+	t.Parallel()
+	const theirs = "go/internal/phasespec/roots.go"
+	cases := map[string]struct {
+		ownClaims func(t *testing.T, root string)
+		owner     mainTreeOwnership
+	}{
+		"an unreadable own scope": {
+			ownClaims: func(t *testing.T, root string) {
+				writeTreeFile(t, root, ".evolve/inbox/processing/cycle-1811", "a file where the claims dir must be")
+			},
+			owner: guardedLaneOneEightOneOne(),
+		},
+		"an empty own scope": {
+			ownClaims: func(*testing.T, string) {},
+			owner:     guardedLaneOneEightOneOne(),
+		},
+		"no protected-surface rule": {
+			ownClaims: func(t *testing.T, root string) {
+				writeLaneClaim(t, root, 1811, "router-silent-errors", "go/internal/router/")
+			},
+			owner: laneOneEightOneOne(),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			tc.ownClaims(t, root)
+			writeLaneClaim(t, root, 1812, "phasespec-roots", theirs)
+			writeRunLease(t, RunWorkspacePath(root, 1812), time.Now())
+			exempt := tc.owner.exemptions(root, RunWorkspacePath(root, 1811), nil)
+
+			real, _ := filterRealLeaks([]string{theirs}, exempt, io.Discard)
+
+			if !reflect.DeepEqual(real, []string{theirs}) {
+				t.Errorf("real leaks = %v: with %s the lane holds every unkeyed path, as the single-writer rule says", real, name)
+			}
+		})
 	}
 }

@@ -86,6 +86,14 @@
     - A keyed path the lane does not hold is exempt only when a live sibling run holds its owner (`liveSiblingsOf`: `runlease.LiveRuns` over the run root, minus this lane's own workspace) or it is a registered mint.
     - A console-leased path is exempt. Recovery leaves it with one line, and the guard waives it with its WARN.
     - A key nobody live holds is still charged to the phase, so the guard is never weaker than before.
+    - An unkeyed path, such as a source file, can have an owner too: a live sibling that declares it, when this lane does not. This closed the inbox item `treediff-guard-worktree-phase-crosslane-residual` (2026-10-20).
+    - `liveSiblings.declaresAgainst` applies the cross-lane rule of `scopedelta.Classify` to the `LaneDeclaredFiles` of each lane. Thus the scope rule has one home.
+    - The guard does not charge such a path, and recovery leaves it in the main tree with one line. The guard of the sibling charges it, because the sibling holds it.
+    - The trade-off: a leak of this lane into the declared scope of a live sibling goes to the sibling's guard. That guard charges it only when the leak falls in its own phase window.
+    - A lane with an unreadable or empty scope holds every unkeyed path. A sibling with an unreadable scope holds none, and a WARN names it. Thus an unknown scope never makes the guard weaker.
+    - A protected surface is never exempt, and with no protected-surface rule (`WithProtectedSurface`) no unkeyed path is exempt. The production orchestrator always has the rule.
+    - A limit: a sibling that declares a directory, such as `go/internal/router/`, holds every path under it. The declared files come from triage and the operator, and the exemption needs a live lease and a claim.
+    - Pinned by `TestFilterRealLeaks_APathOnlyALiveSiblingDeclaresIsNotThisLanesLeak`, `TestFilterRealLeaks_ALaneWithoutAKnownScopeOrSurfaceIsChargedForEveryUnkeyedPath`, `TestRecoverBeforeReview_ASourceALiveSiblingDeclaresStaysInTheMainTree` and `TestGuard_APathALiveSiblingDeclaresDoesNotAbortThisLanesPhase`.
     - The registry is one of the owner rules, so `filterRealLeaks` has no second copy of the mint check.
     - Crash-resume adopts no console lease, so a leased keyed path no live lane holds fails a resume.
     - Pinned by `TestRecoverBeforeReview_AConsoleLeasedPathIsLeftJustAsTheGuardWaivesIt`.

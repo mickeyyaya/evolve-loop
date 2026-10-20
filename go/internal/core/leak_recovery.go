@@ -59,6 +59,7 @@ func (o *Orchestrator) recoverPhaseLeak(ctx context.Context, scope phaseLeakScop
 		return nil
 	}
 	ownership := laneOwnership(scope.cycleState, activeVerifiedMints(scope.projectRoot, o.errOut()))
+	ownership.protected = o.protectedSurface
 	recovery := leakRecovery{
 		projectRoot: scope.projectRoot,
 		worktree:    scope.cycleState.ActiveWorktree,
@@ -247,6 +248,10 @@ func (r leakRecovery) recoverPath(ctx context.Context, xy, p string) (stage, rec
 	}
 	if owner, foreign := r.ownership.foreignOwner(p); foreign {
 		return false, r.leaveForOwner(p, owner)
+	}
+	if r.exempt.heldElsewhere(p) {
+		fmt.Fprintf(r.errOut(), "[orchestrator] build-leak-recover: left %s in the main tree — a live sibling lane declares it, not this lane\n", p)
+		return false, true
 	}
 	switch {
 	case strings.Contains(xy, "?"):
