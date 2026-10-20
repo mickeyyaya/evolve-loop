@@ -21,11 +21,13 @@ import (
 const routingShipHint = "ship with: evolve ship --class manual (at a wave boundary)"
 
 type routingWriteFlags struct {
-	root   string
-	clis   string
-	model  string
-	effort string
-	dryRun bool
+	root      string
+	clis      string
+	model     string
+	effort    string
+	maxTier   string
+	maxEffort string
+	dryRun    bool
 }
 
 type routingEdit func(existing []byte, pol policy.Policy) (map[string]any, error)
@@ -64,6 +66,8 @@ func parseRoutingWriteFlags(verb string, args []string, stderr io.Writer) (routi
 	fs.StringVar(&f.clis, "clis", "", "init: the CLIs this operator has, in walk order")
 	fs.StringVar(&f.model, "model", "", "set agents.<agent>: the tier the agent dispatches at")
 	fs.StringVar(&f.effort, "effort", "", "set tiers.<tier> or agents.<agent>: the reasoning effort (low, medium, high, xhigh, max)")
+	fs.StringVar(&f.maxTier, "max-tier", "", "set agents.<agent>: the highest tier the retry ladder reaches (default deep)")
+	fs.StringVar(&f.maxEffort, "max-effort", "", "set agents.<agent>: the highest effort the retry ladder reaches (default high)")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the result and write nothing")
 	rest, err := cmdutil.ParseInterspersed(fs, args)
 	if err != nil {
@@ -84,15 +88,19 @@ func routingEditFor(verb string, f routingWriteFlags, rest []string, rewrites ma
 	case verb == "init" && len(rest) == 0 && f.clis != "":
 		return initRoutingEdit(splitRoutingList(f.clis), dir, rewrites), nil
 	case verb == "set" && len(rest) == 2:
-		return setRoutingEdit(routingSet{key: rest[0], values: splitRoutingList(rest[1]), model: f.model, effort: f.effort}), nil
-	case verb == "set" && len(rest) == 1 && f.effort != "":
-		return setRoutingEdit(routingSet{key: rest[0], model: f.model, effort: f.effort}), nil
+		return setRoutingEdit(f.routingSet(rest[0], splitRoutingList(rest[1]))), nil
+	case verb == "set" && len(rest) == 1 && (f.effort != "" || f.maxTier != "" || f.maxEffort != ""):
+		return setRoutingEdit(f.routingSet(rest[0], nil)), nil
 	case verb == "unset" && len(rest) == 1:
 		return unsetRoutingEdit(rest[0]), nil
 	case verb == "migrate" && len(rest) == 0:
 		return migrateRoutingEdit(dir, rewrites), nil
 	}
 	return nil, errors.New("wrong arguments")
+}
+
+func (f routingWriteFlags) routingSet(key string, values []string) routingSet {
+	return routingSet{key: key, values: values, model: f.model, effort: f.effort, maxTier: f.maxTier, maxEffort: f.maxEffort}
 }
 
 func splitRoutingList(value string) []string {

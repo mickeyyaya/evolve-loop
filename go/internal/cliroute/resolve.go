@@ -25,7 +25,7 @@ type stage func(v resolver, res resolution) (resolution, error)
 
 var declaredStages = []stage{
 	selectRule, fixAgentModel, orderByHeadroom, guardEnv, leadWithCaller, overlayCLI, overlayTier,
-	overlayEffort, probeChain, benchChain, appendAfterChain, dropToolless, applyTierCeiling,
+	applyLadder, probeChain, benchChain, appendAfterChain, dropToolless, applyTierCeiling,
 }
 
 func (v resolver) resolveDeclared(req Request) (Decision, error) {
@@ -126,11 +126,6 @@ func overlayTier(_ resolver, res resolution) (resolution, error) {
 		return res.noted("advisor tier %s kept off: agents.%s.model fixes the tier", tier, res.req.Agent), nil
 	}
 	res.plan = llmroute.ApplySoftOverlay(res.plan, llmroute.Overlay{Tier: tier}, res.prof)
-	return res, nil
-}
-
-func overlayEffort(_ resolver, res resolution) (resolution, error) {
-	res.plan = llmroute.ApplySoftOverlay(res.plan, llmroute.Overlay{Effort: res.req.Overlay.Effort}, res.prof)
 	return res, nil
 }
 
