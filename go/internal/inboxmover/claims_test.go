@@ -375,7 +375,7 @@ func TestClassifyHolder_TheRunningLoopsGoalSupersedesAPauseOfAnotherGoal(t *test
 	}
 }
 
-func TestClassifyHolder_FollowsLoopResumeOnAMovedMainAndAMissingPhase(t *testing.T) {
+func TestClassifyHolder_KeepsAPausedClaimWhoseMainMovedAndFollowsLoopResumeOnAMissingPhase(t *testing.T) {
 	repo := gittest.Fixture(t)
 	repo.Git("commit", "-q", "--allow-empty", "-m", "seed")
 	base := repo.Git("rev-parse", "HEAD")
@@ -392,7 +392,7 @@ func TestClassifyHolder_FollowsLoopResumeOnAMovedMainAndAMissingPhase(t *testing
 		wantReason       string
 	}{
 		{"the head did not move", `{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"` + head + `","worktreePath":"` + worktree + `"}`, HolderResumePending, "paused (quota-likely)"},
-		{"main moved past the base", `{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"` + base + `","worktreePath":"` + worktree + `"}`, HolderStale, "origin/main is 1 commit(s) past its base"},
+		{"main moved past the base", `{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"` + base + `","worktreePath":"` + worktree + `"}`, HolderResumePending, "paused (quota-likely)"},
 		{"no resumeFromPhase", `{"enabled":true,"reason":"quota-likely","gitHead":"` + head + `"}`, HolderStale, "resumeFromPhase missing"},
 	}
 	for _, tc := range cases {

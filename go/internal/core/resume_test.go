@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -110,7 +111,7 @@ func TestLoadResumeState_CheckpointDisabled(t *testing.T) {
 	}
 }
 
-func TestLoadResumeState_StaleHead(t *testing.T) {
+func TestLoadResumeState_AMovedMainWarnsAndResumes(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
@@ -122,15 +123,17 @@ func TestLoadResumeState_StaleHead(t *testing.T) {
 			"gitHead":         "abc123",
 		},
 	})
-	_, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
+	var log bytes.Buffer
+	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
 		MainAhead:  mainAheadOf(map[string]int{"abc123": 3}),
 		PathExists: func(_ string) bool { return true },
+		Log:        &log,
 	})
-	if err == nil || !errors.Is(err, ErrStaleCheckpoint) {
-		t.Errorf("got %v, want ErrStaleCheckpoint", err)
+	if err != nil || rp.Phase != "audit" {
+		t.Fatalf("LoadResumeState = %+v, %v; main moving alone does not stale a checkpoint", rp, err)
 	}
-	if !strings.Contains(err.Error(), "origin/main is 3 commit(s) past its base abc123") {
-		t.Errorf("error message: %v", err)
+	if !strings.Contains(log.String(), "origin/main is 3 commit(s) past the base abc123") {
+		t.Errorf("log %q; the resume warns how far main moved", log.String())
 	}
 }
 

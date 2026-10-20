@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,42 +40,64 @@ func cycle2017Fixture(t *testing.T, checkpointHead string) (root, evolveDir stri
 	st["worktree_base_sha"] = "7aa5456e2"
 	st["checkpoint"].(map[string]any)["gitHead"] = checkpointHead
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-2017"), st)
-	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-2020"), stoppedLaneState(2020, "2026-10-20T16:32:00Z"))
 	return root, evolveDir
 }
 
-func TestLoadResumeState_RefusesACheckpointWhoseBaseMainHasMovedPastWithNoLedgerShip(t *testing.T) {
+func withLaterLaunch(t *testing.T, evolveDir string) {
+	t.Helper()
+	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-2020"), stoppedLaneState(2020, "2026-10-20T16:32:00Z"))
+}
+
+func TestLoadResumeState_RefusesACheckpointThatALaterLaunchStartedAfter(t *testing.T) {
+	t.Parallel()
+	root, evolveDir := cycle2017Fixture(t, "7aa5456e2")
+	withLaterLaunch(t, evolveDir)
+
+	_, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{
+		MainAhead: mainAheadOf(map[string]int{"7aa5456e2": 65}), Now: func() time.Time { return baseNow },
+	})
+
+	msg := err.Error()
+	if !errors.Is(err, ErrNoCheckpoint) || !strings.Contains(msg, "cycle 2017: stale: cycle 2020 of another launch started at 2026-10-20T16:32:00Z, after this checkpoint") {
+		t.Fatalf("err = %v; launch 2020 started after the pause, so the 2017 checkpoint is obsolete work (the live case)", err)
+	}
+	if !strings.Contains(msg, "evolve cycle reset") || !strings.Contains(msg, "only while `evolve inbox claims` shows its item still held") {
+		t.Errorf("err = %v; the refusal names the reset, and the override only while the claim is held", err)
+	}
+}
+
+func TestLoadResumeState_AMainThatOnlyMovedResumesWithAWarning(t *testing.T) {
 	t.Parallel()
 	for name, head := range map[string]string{"a recorded gitHead": "7aa5456e2", "a legacy empty gitHead": ""} {
 		t.Run(name, func(t *testing.T) {
 			root, evolveDir := cycle2017Fixture(t, head)
 			var log bytes.Buffer
 
-			_, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{
+			rp, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{
 				MainAhead: mainAheadOf(map[string]int{"7aa5456e2": 65}), Now: func() time.Time { return baseNow }, Log: &log,
 			})
 
-			msg := err.Error()
-			if !errors.Is(err, ErrNoCheckpoint) || !strings.Contains(msg, "cycle 2017: stale: origin/main is 65 commit(s) past its base 7aa5456e2") {
-				t.Fatalf("err = %v; console merges move main with no ledger ship row, so the base itself must show the checkpoint is stale", err)
+			if err != nil || rp.CycleID != 2017 {
+				t.Fatalf("LoadResumeState = %+v, %v; main moving through console merges is routine, and ship rebases the cycle", rp, err)
 			}
-			if !strings.Contains(msg, "evolve cycle reset") || !strings.Contains(msg, "evolve loop --resume") {
-				t.Errorf("err = %v; the refusal names the reset and the deliberate override", err)
+			if !strings.Contains(log.String(), "WARN: origin/main is 65 commit(s) past the base 7aa5456e2; resuming") {
+				t.Errorf("log %q; the resume says how far main moved", log.String())
 			}
 		})
 	}
 }
 
-func TestLoadResumeState_ACheckpointOnTheCurrentMainStaysResumable(t *testing.T) {
+func TestLoadResumeState_ACheckpointOnTheCurrentMainResumesWithoutAWarning(t *testing.T) {
 	t.Parallel()
 	root, evolveDir := cycle2017Fixture(t, "7aa5456e2")
+	var log bytes.Buffer
 
 	rp, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{
-		MainAhead: mainAheadOf(map[string]int{"7aa5456e2": 0}), Now: func() time.Time { return baseNow },
+		MainAhead: mainAheadOf(map[string]int{"7aa5456e2": 0}), Now: func() time.Time { return baseNow }, Log: &log,
 	})
 
-	if err != nil || rp.CycleID != 2017 {
-		t.Fatalf("LoadResumeState = %+v, %v; a checkpoint whose base is still main resumes", rp, err)
+	if err != nil || rp.CycleID != 2017 || strings.Contains(log.String(), "past the base") {
+		t.Fatalf("LoadResumeState = %+v, %v, log %q; a checkpoint whose base is still main resumes quietly", rp, err, log.String())
 	}
 }
 
@@ -106,18 +129,22 @@ func TestLoadResumeState_AnUnreadableMainKeepsTheCheckpointAndSaysSo(t *testing.
 	}
 }
 
-func TestCheckpointResumable_AnExplicitOverrideResumesAStaleBaseDeliberately(t *testing.T) {
+func TestCheckpointResumable_AMovedMainKeepsTheCheckpointAndAllowHeadMovedWaivesTheAge(t *testing.T) {
 	t.Parallel()
 	root, evolveDir := cycle2017Fixture(t, "7aa5456e2")
 	path := filepath.Join(evolveDir, "runs", "cycle-2017", CycleStateFile)
 	opts := ResumeOptions{MainAhead: mainAheadOf(map[string]int{"7aa5456e2": 65}), Now: func() time.Time { return baseNow }}
 
+	if rp, err := CheckpointResumable(path, root, opts); err != nil || rp.CycleID != 2017 {
+		t.Fatalf("CheckpointResumable = %+v, %v; the claim judge keeps a paused lane whose base main merely moved past", rp, err)
+	}
+	opts.MaxAge = time.Hour
 	if _, err := CheckpointResumable(path, root, opts); !errors.Is(err, ErrStaleCheckpoint) {
-		t.Fatalf("err = %v; the default load refuses the stale base", err)
+		t.Fatalf("err = %v; the age bound refuses on the direct path", err)
 	}
 	opts.AllowHeadMoved = true
 	if rp, err := CheckpointResumable(path, root, opts); err != nil || rp.CycleID != 2017 {
-		t.Fatalf("CheckpointResumable = %+v, %v; AllowHeadMoved resumes it deliberately", rp, err)
+		t.Fatalf("CheckpointResumable = %+v, %v; AllowHeadMoved waives the age bound deliberately", rp, err)
 	}
 }
 
@@ -130,20 +157,20 @@ func writePolicy(t *testing.T, evolveDir, body string) {
 
 const unboundedAge = time.Duration(1<<63 - 1)
 
-func TestLoadResumeState_TheStateFileOverrideResumesAStaleBaseDeliberately(t *testing.T) {
+func TestLoadResumeState_TheStateFileOverrideWaivesTheAgeBoundVisibly(t *testing.T) {
 	root, evolveDir := cycle2017Fixture(t, "7aa5456e2")
+	writePolicy(t, evolveDir, `{"resume":{"max_checkpoint_age_h":1}}`)
 	t.Setenv(ipcenv.CycleStateFileKey, filepath.Join(evolveDir, "runs", "cycle-2017", CycleStateFile))
-
 	var log bytes.Buffer
 
 	rp, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{
-		MainAhead: mainAheadOf(map[string]int{"7aa5456e2": 65}), Now: func() time.Time { return baseNow }, Log: &log,
+		MainAhead: mainAheadOf(map[string]int{"7aa5456e2": 0}), Now: func() time.Time { return baseNow }, Log: &log,
 	})
 
 	if err != nil || rp.CycleID != 2017 {
-		t.Fatalf("LoadResumeState = %+v, %v; naming the state file is the operator's deliberate choice, so the base check is waived", rp, err)
+		t.Fatalf("LoadResumeState = %+v, %v; naming the state file is the operator's deliberate choice, so the age bound is waived", rp, err)
 	}
-	if !strings.Contains(log.String(), "so the base and age checks are waived") {
+	if !strings.Contains(log.String(), "so the age check is waived") {
 		t.Errorf("log %q; a waived check must be visible", log.String())
 	}
 }
@@ -180,5 +207,28 @@ func TestLoadResumeState_AnUnreadablePolicyKeepsTheDefaultAgeAndSaysSo(t *testin
 
 	if err != nil || rp.CycleID != 2017 || !strings.Contains(log.String(), "policy.json is unreadable") {
 		t.Fatalf("LoadResumeState = %+v, %v, log %q; an unreadable policy keeps the 192h default and warns", rp, err, log.String())
+	}
+}
+
+func TestLoadResumeState_ALaterStartOnlyOfAnotherGoalAfterThePauseMakesTheCheckpointStale(t *testing.T) {
+	t.Parallel()
+	for name, later := range map[string]map[string]any{
+		"the same launch started later":         {"cycle_id": 2020, "phase": "build", "goal_hash": "142ce4a0d4", "started_at": "2026-10-20T16:32:00Z"},
+		"another goal started before the pause": {"cycle_id": 2020, "phase": "build", "goal_hash": "wave-27", "started_at": "2026-10-20T14:00:00Z"},
+		"another goal with no start time":       {"cycle_id": 2020, "phase": "build", "goal_hash": "wave-27"},
+		"an earlier cycle started later":        {"cycle_id": 2010, "phase": "build", "goal_hash": "wave-27", "started_at": "2026-10-20T16:32:00Z"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root, evolveDir := cycle2017Fixture(t, "7aa5456e2")
+			writeStateFile(t, filepath.Join(evolveDir, "runs", fmt.Sprintf("cycle-%d", later["cycle_id"])), later)
+
+			rp, err := LoadResumeState(context.Background(), root, evolveDir, ResumeOptions{
+				MainAhead: mainAheadOf(map[string]int{"7aa5456e2": 0}), Now: func() time.Time { return baseNow },
+			})
+
+			if err != nil || rp.CycleID != 2017 {
+				t.Fatalf("LoadResumeState = %+v, %v; only a later cycle of another goal that started after the pause is evidence the work is obsolete", rp, err)
+			}
+		})
 	}
 }

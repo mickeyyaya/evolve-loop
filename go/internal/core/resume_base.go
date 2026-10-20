@@ -29,22 +29,24 @@ func (o ResumeOptions) withMaxAge(evolveDir string) ResumeOptions {
 	return o
 }
 
-func staleBase(projectRoot, base, savedAt string, opts ResumeOptions) string {
+func tooOld(savedAt string, opts ResumeOptions) string {
 	if saved, err := time.Parse(time.RFC3339, savedAt); err == nil && opts.Now().Sub(saved) > opts.MaxAge {
 		return fmt.Sprintf("saved at %s, older than the %s bound of policy resume.max_checkpoint_age_h", savedAt, opts.MaxAge)
 	}
+	return ""
+}
+
+func warnMainMoved(projectRoot, base string, opts ResumeOptions) {
 	if base == "" {
-		return ""
+		return
 	}
 	ahead, err := opts.MainAhead(projectRoot, base)
-	if err != nil {
+	switch {
+	case err != nil:
 		fmt.Fprintf(opts.Log, "[resume] WARN: could not compare the base %s with %s (%v); the checkpoint is kept\n", base, resumeMainRef, err)
-		return ""
+	case ahead > 0:
+		fmt.Fprintf(opts.Log, "[resume] WARN: %s is %d commit(s) past the base %s; resuming, and ship rebases the cycle onto main before it lands\n", resumeMainRef, ahead, base)
 	}
-	if ahead == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%s is %d commit(s) past its base %s", resumeMainRef, ahead, base)
 }
 
 func checkpointBase(gitHead string, blob map[string]any) string {
@@ -57,7 +59,7 @@ func checkpointBase(gitHead string, blob map[string]any) string {
 }
 
 func staleHint(statePath string) string {
-	return fmt.Sprintf("discard it with `%s=%s evolve cycle reset`, or resume it deliberately with `%s=%s evolve loop --resume`",
+	return fmt.Sprintf("discard it with `%s=%s evolve cycle reset`; resume it deliberately with `%s=%s evolve loop --resume` only while `evolve inbox claims` shows its item still held",
 		ipcenv.CycleStateFileKey, statePath, ipcenv.CycleStateFileKey, statePath)
 }
 
@@ -70,4 +72,27 @@ func defaultMainAhead(projectRoot, base string) (int, error) {
 		return 0, fmt.Errorf("git rev-list %s..%s: rc=%d: %s", base, resumeMainRef, code, strings.TrimSpace(stderr))
 	}
 	return strconv.Atoi(strings.TrimSpace(out))
+}
+
+func startedAfter(st perRunState, all []perRunState) (int, time.Time, bool) {
+	return laterLaunch(st, all, func(o perRunState) (time.Time, bool) {
+		at, err := time.Parse(time.RFC3339, o.startedAt)
+		return at, err == nil
+	})
+}
+
+func laterLaunch(st perRunState, all []perRunState, when func(perRunState) (time.Time, bool)) (int, time.Time, bool) {
+	saved, err := time.Parse(time.RFC3339, st.savedAt)
+	if err != nil {
+		return 0, time.Time{}, false
+	}
+	for _, o := range all {
+		if o.cycle <= st.cycle || (st.goalHash != "" && o.goalHash == st.goalHash) {
+			continue
+		}
+		if at, ok := when(o); ok && at.After(saved) {
+			return o.cycle, at, true
+		}
+	}
+	return 0, time.Time{}, false
 }

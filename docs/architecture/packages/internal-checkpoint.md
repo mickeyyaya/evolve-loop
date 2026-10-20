@@ -23,7 +23,7 @@
 - A phase-complete write carries the integrity chain. Pinned by `TestPhaseBoundaryCheckpointer_CarriesIntegrityChain` and `TestComposeWithIntegrity_CarriesChain`.
 - The phase-complete reason is canonical and validated. Pinned by `TestReasonPhaseComplete_IsValid` and `TestComposeChecked_AcceptsPhaseComplete`.
 - The quota wake time follows the source order, and a routine checkpoint never invents one. Pinned by `TestQuotaBoundaryCheckpointer_UsesWorkspaceHint`, `TestQuotaBoundaryCheckpointer_HonoursOperatorOverride` and `TestPhaseBoundaryCheckpointer_DoesNotFabricateWakeAt`.
-- Each boundary writer records the cycle base as `gitHead`: the run's `worktree_base_sha`, else its `pre_cycle_head` (`cycleBase`, 2026-10-21). `core.LoadResumeState` refuses the checkpoint when `origin/main` has moved past that base. Pinned by `TestBoundaryCheckpointers_RecordTheCycleBaseAsGitHead`.
+- Each boundary writer records the cycle base as `gitHead`: the run's `worktree_base_sha`, else its `pre_cycle_head` (`cycleBase`, 2026-10-21). `core.LoadResumeState` warns when `origin/main` has moved past that base, and resumes. Pinned by `TestBoundaryCheckpointers_RecordTheCycleBaseAsGitHead`.
 
 ## Findings
 
