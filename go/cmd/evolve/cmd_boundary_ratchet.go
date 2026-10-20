@@ -21,6 +21,7 @@ const (
 	ratchetTightenMessage = "chore: tighten the size-ratchet allowances"
 	ratchetTightenBody    = "The boundary step ratchet-tighten wrote this list from origin/main. It merges at a wave boundary like every other pull request.\n\n"
 	ratchetBranchPrefix   = "chore/ratchet-tighten-"
+	ratchetPRBase         = "main"
 	ratchetGitTimeout     = 2 * time.Minute
 )
 
@@ -77,7 +78,7 @@ func tightenAndPropose(wt string, stdout io.Writer) error {
 		err = commitAndPushTightenBranch(wt, pr.HeadRefName)
 	}
 	if err == nil && pr.Number == 0 {
-		_, err = ratchetCmd(wt, "gh", "pr", "create", "--base", "main", "--head", pr.HeadRefName,
+		_, err = ratchetCmd(wt, "gh", "pr", "create", "--base", ratchetPRBase, "--head", pr.HeadRefName,
 			"--title", ratchetTightenMessage, "--body", ratchetTightenBody+strings.Join(changes, "\n"))
 	}
 	if err != nil {
@@ -102,7 +103,7 @@ func (p ratchetPR) report() string {
 }
 
 func openTightenPR(wt string) (ratchetPR, error) {
-	out, err := ratchetCmd(wt, "gh", "pr", "list", "--state", "open", "--limit", "500", "--json", "number,headRefName,isCrossRepository")
+	out, err := ratchetCmd(wt, "gh", "pr", "list", "--state", "open", "--base", ratchetPRBase, "--limit", "500", "--json", "number,headRefName,isCrossRepository")
 	if err != nil {
 		return ratchetPR{}, err
 	}

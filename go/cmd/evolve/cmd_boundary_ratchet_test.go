@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -47,9 +48,24 @@ func (f *fakeGH) run(ctx context.Context, name, dir string, args, env []string, 
 		return 1, nil
 	}
 	if len(args) > 1 && args[1] == "list" {
-		fmt.Fprint(stdout, f.list)
+		fmt.Fprint(stdout, listForBase(f.list, flagAfter(args, "--base")))
 	}
 	return 0, nil
+}
+
+func listForBase(list, base string) string {
+	var prs []map[string]any
+	if base == "" || json.Unmarshal([]byte(list), &prs) != nil {
+		return list
+	}
+	kept := []map[string]any{}
+	for _, pr := range prs {
+		if got, ok := pr["baseRefName"].(string); !ok || got == base {
+			kept = append(kept, pr)
+		}
+	}
+	out, _ := json.Marshal(kept)
+	return string(out)
 }
 
 func (f *fakeGH) created() []string {
@@ -328,4 +344,32 @@ func TestBoundaryRatchetTighten_AMovedTightenBranchIsNotOverwritten(t *testing.T
 	if got := o.bare.Git("rev-parse", branch); got != tip {
 		t.Errorf("%s moved to %s: a branch that moved after ls-remote must not be overwritten", branch, got)
 	}
+}
+
+func TestBoundaryRatchetTighten_ATightenBranchIntoAnotherBaseIsLeftAlone(t *testing.T) {
+	o := newRatchetOrigin(t, 60, `{"internal/fixture.Big": 90}`)
+	const other = ratchetBranchPrefix + "release"
+	o.plane.Git("checkout", "-q", "-b", "release-work")
+	o.plane.Git("commit", "-q", "--allow-empty", "-m", "a tighten aimed at a release branch")
+	o.plane.Git("push", "-q", "origin", "HEAD:refs/heads/"+other)
+	o.plane.Git("checkout", "-q", "main")
+	tip := o.bare.Git("rev-parse", other)
+	gh := &fakeGH{list: `[{"number":5,"headRefName":"` + other + `","baseRefName":"release-1"}]`}
+	gh.install(t)
+	t.Setenv("EVOLVE_DISPATCH_DEPTH", "")
+	main := o.originHead()
+
+	rc, out, errOut := o.tighten(t)
+
+	if rc != 0 || errOut != "" || !strings.Contains(out, "opened a pull request") {
+		t.Fatalf("rc=%d stdout=%q stderr=%q, want a new pull request into main", rc, out, errOut)
+	}
+	if got := o.bare.Git("rev-parse", other); got != tip {
+		t.Errorf("%s moved to %s: a tighten PR into another base must not be reused", other, got)
+	}
+	branch := flagAfter(gh.created(), "--head")
+	if branch == other || branch == "" {
+		t.Fatalf("gh pr create --head %q, want a new dated branch", branch)
+	}
+	o.assertProposed(t, branch, main)
 }
