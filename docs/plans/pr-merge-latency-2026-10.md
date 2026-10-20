@@ -1,6 +1,6 @@
 # Plan: a green docs, inbox or CI PR merges in a window, and a code PR merges at a boundary that the console can call early
 
-- **Status:** accepted, 2026-10-20. P2 is built in stage `off`. P2b and P3 to P5 are open. P1 is shelved: ADR-0147 replaces it.
+- **Status:** accepted, 2026-10-20. P2 is built in stage `off`. P5 is built. P2b, P3, P4 and P5b are open. P1 is shelved: ADR-0147 replaces it.
 - **Decision:** [ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md). **Research:** [wave-latency-2026-10](../research/wave-latency-2026-10.md) §6 (O1 to O5), [latency-gates-2026-10](../research/latency-gates-2026-10.md). **Design:** [internal-mergewindow.md](../architecture/packages/internal-mergewindow.md).
 - **Operator guide:** [wave-operations.md](../operations/wave-operations.md) §5, [operating-policy.md](../operations/operating-policy.md) §2 item 5.
 
@@ -114,7 +114,7 @@ boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (sta
 | P2b | `evolve pr merge` takes a window PR while a loop is live, and the console calls an early boundary (D6). | a live loop and stage `on`: a docs PR merges, a `go/` PR is refused | inbox `pr-merge-latency-p2b-window-consumers`, console |
 | P3 | One file for each research-index entry and a generated index with a check. A verb regenerates the generated files on a rebase. Stacked PRs are discouraged. | two docs PRs merge in each order with no conflict | inbox `pr-merge-latency-p3-conflict-hotspots`, console |
 | P4 | Fix or retire the stale ACS predicates of cycles 43, 813 and 1801. `evolve ci classify` files a fix-first item for a base red. | the predicates pass on `main` under `-tags acs` | inbox `pr-merge-latency-p4-keep-main-green`, console |
-| P5 | A loop write to a curated inbox field never blocks `sync-main`. | a replay of the cycle 2000 write | inbox `pr-merge-latency-p5-boundary-self-heal`, console |
+| P5 | A loop write to a curated inbox field never blocks `sync-main`. The closeout writes the proven file to the loop stamp `protected_files`, not to `files`. | `TestApplyFailure_TheProtectedRouteWriteIsAStampThatSyncMainLands` (a replay of the cycle 2000 write) | inbox `pr-merge-latency-p5-boundary-self-heal`, console, built. The escalation reweight is split to `pr-merge-latency-p5b-escalation-reweight-stamp`. |
 | — | Operator decision: the lane STE check moves from `shadow` to `enforce` (cycle 1979 shipped a doc that failed the strict lint). | a failed lane doc goes back to the build | inbox `lane-ste-lint-stage-enforce`, operator |
 
 ### How P2 works
@@ -131,6 +131,18 @@ boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (sta
 | 3 | `boundary`: the PR waits for a boundary, or the stage is `off`. |
 | 2 | A read or a parse failed: the policy, `required.yml`, the file list or `gh`. |
 | 10 | A usage error. |
+
+### How P5 works
+
+On 2026-10-20 the failure closeout of cycle 2000 routed `router-active-worktree-fleet-pin-lane` to the console. It also added `go/internal/core/cyclerun.go` to the curated field `files` (`addFiles` in `go/internal/cycleoutcome/protected_route.go` before P5). `sync-main` lands only the stamp fields of the loop (ADR-0112, `inboxstamps.Classify`). Thus it refused the change, and the boundary stayed blocked until #1008.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D8 | The loop writes no curated field. The closeout writes each proven file to the new loop stamp `protected_files`. `inboxbatch.ConsoleRouted` reads `files` and `protected_files` together, so the proven path still binds the console route. | The binding is the only reason for the write (`protectedDerivation`). A stamp keeps it, and `sync-main` lands a stamp with no review. | A verb that lands a curated change through a review: it adds a review to each such boundary. The review checks a value that the loop proved. |
+
+The test replays the write. It runs the closeout and commits the item as it was before the cycle. Then it puts the written copy on the item. `inboxstamps.Classify` must see one stamp and no other change. Before P5 the same test saw the item as other dirt, which is the refusal of cycle 2000.
+
+One other loop writer changes a curated field. The escalation boundary sets `weight` through `inbox edit` (`moverReweight` in `go/cmd/evolve/cmd_loop_escalate.go`). Its stage is `enforce` in the live policy. It has not written yet (`.evolve/escalation-apply-report.json`, 2026-10-20). The inbox item `pr-merge-latency-p5b-escalation-reweight-stamp` owns it. The ACS predicates of cycle 1932 pin its write through `inbox edit`, so the change needs its own decision.
 
 ## 7. Order
 

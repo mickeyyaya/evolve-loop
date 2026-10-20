@@ -52,6 +52,7 @@ const (
 	RetiredReasonField           = "retired_reason"
 	RetiredCycleField            = "retired_cycle"
 	GitSHAField                  = "git_sha"
+	ProtectedFilesField          = "protected_files"
 	PremiseVerifiedAtField       = "premise_verified_at"
 	PremiseVerifiedSHAField      = "premise_verified_sha"
 	PremiseVerifiedEvidenceField = "premise_verified_evidence"
@@ -91,6 +92,7 @@ var fieldRoles = map[string]FieldRole{
 	RetiredReasonField:          loopStamp,
 	RetiredCycleField:           loopStamp,
 	GitSHAField:                 loopStamp,
+	ProtectedFilesField:         loopStamp,
 
 	PremiseVerifiedAtField:       operatorStamp,
 	PremiseVerifiedSHAField:      operatorStamp,

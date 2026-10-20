@@ -28,6 +28,7 @@ type Item struct {
 	PriorityClass   string                     `json:"priority_class"`
 	Campaign        string                     `json:"campaign"`
 	Files           []string                   `json:"files"`
+	ProtectedFiles  []string                   `json:"protected_files"`
 	ConnectsTo      []string                   `json:"connects_to"`
 	Deps            []string                   `json:"deps"`
 	Route           string                     `json:"route"`
