@@ -106,11 +106,7 @@ func decidePRWindow(ctx context.Context, root string, a prWindowArgs, gh func(co
 	if err != nil {
 		return prWindowDecision{}, err
 	}
-	stage, err := pol.PRMergeWindowStage()
-	if err != nil {
-		return prWindowDecision{}, err
-	}
-	integration, err := pol.FleetIntegrationStage()
+	gate, err := windowGateOf(pol)
 	if err != nil {
 		return prWindowDecision{}, err
 	}
@@ -126,7 +122,23 @@ func decidePRWindow(ctx context.Context, root string, a prWindowArgs, gh func(co
 	if err != nil {
 		return prWindowDecision{}, err
 	}
-	return windowDecision(a.pr, windowGate{stage: stage, integration: integration}, rule.Classify(changed), len(changed)), nil
+	return windowDecision(a.pr, gate, rule.Classify(changed), len(changed)), nil
+}
+
+func windowGateOf(pol policy.Policy) (windowGate, error) {
+	stage, err := pol.PRMergeWindowStage()
+	if err != nil {
+		return windowGate{}, err
+	}
+	integration, err := pol.FleetIntegrationStage()
+	if err != nil {
+		return windowGate{}, err
+	}
+	return windowGate{stage: stage, integration: integration}, nil
+}
+
+func (g windowGate) open() bool {
+	return g.integration == policy.FleetIntegrationEnforce && g.stage == policy.MergeWindowOn
 }
 
 func prWindowPaths(ctx context.Context, a prWindowArgs, gh func(context.Context, ...string) ([]byte, error)) ([]string, error) {
