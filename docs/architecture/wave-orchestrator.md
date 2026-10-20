@@ -144,7 +144,7 @@ When the admissible count is below the window, the census publishes `LOOP_ORCH_S
 
 **State: Built (O2c, 2026-10-18).** `evolve inbox split <id>` and the pure package `internal/inboxsplit` exist.
 
-**The census call is built (O6, 2026-10-20).** The census calls `inboxsplit.Proposals` through `splitProposer` (`cmd_supply_split.go`). It uses the protected judge of `evolve inbox split`, so a proposal that the census writes is a split that the command accepts. The census writes the proposals into the supply record, and `evolve wave supply` prints them. The census never splits an item. The console accepts each split.
+**The census call is built (O6, 2026-10-20).** The census calls `inboxsplit.Proposals` through `splitProposer` (`cmd_supply_split.go`). It uses the protected judge of `evolve inbox split` (`splitForbidden`), so both divide the files of an item the same way. The command can still refuse a proposal: it refuses an item that another pending item depends on (`ErrHasDependents`). The census writes the proposals into the supply record, and `evolve wave supply` prints them. The census never splits an item.
 
 Package note: [internal-inboxsplit.md](packages/internal-inboxsplit.md).
 

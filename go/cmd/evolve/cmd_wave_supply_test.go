@@ -247,6 +247,11 @@ func TestWaveSupply_ProposesASplitOfAMixedItemWhenTheSupplyIsLow(t *testing.T) {
 		"files":      []string{"go/internal/guards/phase.go", "go/internal/beta/b.go"},
 		"acceptance": []string{"the beta flow passes"},
 	})
+	u13WriteJSON(t, filepath.Join(inbox, "guard-dir.json"), map[string]any{
+		"id": "guard-dir", "title": "Mend the guard flow", "weight": 0.75, "priority_class": "feature",
+		"files":      []string{"go/internal/guards/phase.go", "go/internal/"},
+		"acceptance": []string{"the guard flow passes"},
+	})
 	u13WriteJSON(t, filepath.Join(inbox, "guard-only.json"), map[string]any{"id": "guard-only", "weight": 0.7, "priority_class": "feature", "files": []string{"go/internal/guards/phase.go"}, "acceptance": []string{"it passes"}})
 	before := treeBytes(t, p.root)
 	h := newWaveHarness()
@@ -259,7 +264,7 @@ func TestWaveSupply_ProposesASplitOfAMixedItemWhenTheSupplyIsLow(t *testing.T) {
 	}
 	want := []orchestrator.Proposal{{Item: "mixed", Console: "mixed-console", Lane: "mixed-lane"}}
 	if !reflect.DeepEqual(got.Proposals, want) {
-		t.Errorf("proposals = %+v, want only the mixed item split: the census below twice the window proposes a split of each mixed console item", got.Proposals)
+		t.Errorf("proposals = %+v, want only the mixed item split: guard-dir declares a directory that holds a protected file, so the judge of evolve inbox split refuses it and the census must too", got.Proposals)
 	}
 	if after := treeBytes(t, p.root); !reflect.DeepEqual(before, after) {
 		t.Errorf("a split proposal changed the plane: the census proposes and the console accepts with evolve inbox split")
