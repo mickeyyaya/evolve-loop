@@ -494,7 +494,9 @@ The facts:
 
 - **The run window.** It starts at the `started_at` of the wave record. It ends at `ended_at`, else at the next record's `started_at`. A current run whose loop is not live ends at the mtime of its loop log. `wave next` uses the same rule to close a wave.
 - **The one exception to "reads state and signals".** `wave status` reads the mtime of the loop log for the run end. It reads the metadata only, never the text. A live run ends at the clock.
-- **A lane interval.** It is the span of the cycle's signals: from the first event to `cycle.sealed`. The phase times of the cycle dossier widen it. A lane with no seal and no dossier is in flight, and it ends at the end of the run window.
+- **A lane interval.** When the run has pool signals, the pool gives each interval. A `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens a lane, and the next `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it (`wave.MeasureFacts`). The cycles then give only `landed` and the conflicts.
+  - Why: a lane that the lease stops at its deadline has no `cycle.sealed`. In wave 130 the cycles 1955 and 1957 thus stayed in flight, and `wave status` printed `width 3/4 · utilization 0.83` while the pool ran 1 lane of 4. The pool signals give `width 1/4` (`TestWaveStatus_Wave130CountsTheLiveLanesFromThePool`).
+  - A run with no pool signals uses the span of the cycle's signals: from the first event to `cycle.sealed`. The phase times of the cycle dossier widen it. A lane with no seal and no dossier is in flight, and it ends at the end of the run window.
 - **The sized width.** The loop writes one INFO `loop.wave` record at each sizing, with `fields.width_sized` and `fields.desired`, to `.evolve/signals.ndjson`. Before O7, no record held the sized width. The loop log has the line `wave count X -> Y`, but `wave status` reads state and signals, never the text log. A run from before O7 thus shows `width_source: policy`.
 
 The conflict rate is the main measure of G2 (P3.3, P3.8). No outside source gives a good predictor of conflicts, so the loop measures its own rate.

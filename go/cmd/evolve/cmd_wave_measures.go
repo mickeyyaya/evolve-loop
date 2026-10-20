@@ -28,8 +28,8 @@ func recordWaveSized(signals *signalcenter.Center, n, desired, sized int) {
 		fmt.Sprintf("wave %d sized to %d of %d lane(s)", n, sized, desired), fields)
 }
 
-func measureWaveRuns(plane wavePlaneDirs, records []wave.Record, current []wave.Cycle, live bool, now time.Time) ([]waveRunMeasures, []string) {
-	loop, warnings := wave.ReadLoopSignals(plane.root)
+func measureWaveRuns(plane wavePlaneDirs, records []wave.Record, current []wave.Cycle, loop []signalcenter.Event, live bool, now time.Time) ([]waveRunMeasures, []string) {
+	var warnings []string
 	supply, err := orchestrator.ReadSupply(waveSupplyPath(plane.evolveDir))
 	if err != nil {
 		warnings = append(warnings, err.Error())

@@ -14,6 +14,8 @@ This page tells the console (an operator or an LLM) how to run each wave through
 - To queue a fact for the next goal, run `evolve wave note add "<text>"`. Use one note for each fact. Write it in ASD-STE100. `evolve wave note list --json` shows the queue.
 - To see the state, run `evolve wave status --json`. It reads cycle state, signals and landing intents. It does not change anything.
   - The text output has one measures line, for example `measures: width 2/3 · utilization 0.71 · conflicts 0/2`. It gives the realized width over the sized width and the utilization. Then it gives the landed lanes with a rebase or a re-audit over all landed lanes.
+  - The realized width and the utilization come from the pool signals in `.evolve/signals.ndjson`: `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_BACKFILLED` and `LOOP_ORCH_LANE_EXITED`. The cycle state does not give them. A run with no pool signals uses the cycle signals.
+  - A cycle whose lane got `LOOP_ORCH_LANE_DEADLINE` with `action: stopped` shows `cycle N: stopped: lane deadline (phase build)`. It is not a live lane. The JSON gives `termination: lane deadline` and `todo` for that cycle.
   - When the run has a census, the line ends with the supply, for example `· supply 3 admissible, 4 waiting, 40 console`.
   - The JSON has `measures` for the current run and `runs` for the last 3 runs. `width_source: policy` tells you that the run has no sizing record, and that `width_sized` is `fleet.count`. The definitions are in [wave-orchestrator.md §11](../architecture/wave-orchestrator.md#11-measures).
 - To see the supply of work for the lanes, run `evolve wave supply`. It counts the inbox items in six classes and shows the cause of each refusal. It changes nothing. Add `--json` for the full census.

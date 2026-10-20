@@ -36,17 +36,26 @@ func ReadLoopSignals(root string) ([]signalcenter.Event, []string) {
 
 func MeasureFacts(rec Record, next *Record, cycles []Cycle, loop []signalcenter.Event, policyWidth int) (wavemeasure.Facts, string) {
 	f := wavemeasure.Facts{Start: rec.StartedAt, End: runEnd(rec, next), WidthSized: policyWidth}
+	pool := poolLanes(f, loop)
 	for _, c := range cycles {
-		f.Lanes = append(f.Lanes, wavemeasure.Lane{Start: c.StartedAt, End: c.EndedAt, Landed: c.Shipped, Conflict: c.Conflict})
+		lane := wavemeasure.Lane{Landed: c.Shipped, Conflict: c.Conflict}
+		if len(pool) == 0 {
+			lane.Start, lane.End = c.StartedAt, c.EndedAt
+		}
+		f.Lanes = append(f.Lanes, lane)
 	}
+	f.Lanes = append(f.Lanes, pool...)
 	return applyLoopSignals(f, loop)
+}
+
+func inRun(f wavemeasure.Facts, at time.Time) bool {
+	return !at.Before(f.Start) && (f.End.IsZero() || !at.After(f.End))
 }
 
 func applyLoopSignals(f wavemeasure.Facts, events []signalcenter.Event) (wavemeasure.Facts, string) {
 	source := WidthFromPolicy
 	for _, e := range events {
-		at := eventTime(e)
-		if at.Before(f.Start) || (!f.End.IsZero() && at.After(f.End)) {
+		if !inRun(f, eventTime(e)) {
 			continue
 		}
 		switch {
