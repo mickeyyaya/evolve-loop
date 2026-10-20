@@ -102,7 +102,7 @@ func (o *Orchestrator) verifyResumeIdentityAndHealCarrier(ctx context.Context, p
 	if carrierCycle == 0 {
 		carrierCycle = resumePoint.CycleID
 	}
-	if err := o.healCarrierAtHead(ctx, projectRoot, carrierCycle, cs); err != nil {
+	if err := o.healCarrierAtHead(ctx, projectRoot, carrierCycle, cs, gitCapture); err != nil {
 		return fmt.Errorf("heal a carrier left at HEAD: %w", err)
 	}
 	return nil

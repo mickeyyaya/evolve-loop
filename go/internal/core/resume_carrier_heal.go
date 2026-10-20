@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,27 +16,34 @@ import (
 const CodeResumeCarrierPended signalcenter.Code = "ORCHESTRATOR_RESUME_CARRIER_PENDED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeResumeCarrierPended, "a resume found this cycle's Evolve-Carrier commit at the lane's HEAD (a crash between the fleet rebase and the pend) and pended it on its fork point before any phase ran, so ship binds the pending change and no re-audit sees an empty diff")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeResumeCarrierPended, "a resume found this cycle's Evolve-Carrier commit at the lane's HEAD (a crash between the fleet rebase and the pend) and pended it on its fork point before any phase ran, so the resumed cycle sees the change pending and never re-audits an empty diff")
 }
 
-func (o *Orchestrator) healCarrierAtHead(ctx context.Context, projectRoot string, cycle int, cs CycleState) error {
+func (o *Orchestrator) healCarrierAtHead(ctx context.Context, projectRoot string, cycle int, cs CycleState, git gitFn) error {
 	if cs.ActiveWorktree == "" || cs.RunID == "" || inPlaceWorktree(cs.ActiveWorktree, projectRoot) {
 		return nil
 	}
+	checkout, err := isGitCheckout(cs.ActiveWorktree)
+	if err != nil || !checkout {
+		return err
+	}
 	label := fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)
-	carried, err := carrierAtHead(ctx, cs.ActiveWorktree, label, gitCapture)
+	carried, err := carrierAtHead(ctx, cs.ActiveWorktree, label, git)
 	if err != nil {
-		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d resume cannot read the lane HEAD for a carrier (%v); a carrier left there stays committed\n", cycle, err)
-		return nil
+		return fmt.Errorf("read the HEAD of lane %s: %w", cs.ActiveWorktree, err)
 	}
 	if !carried {
 		return nil
 	}
-	if rebasing, err := rebaseInProgress(ctx, cs.ActiveWorktree, gitCapture); err != nil || rebasing {
-		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d resume leaves the carrier %s at HEAD: a rebase is in progress or unreadable (%v)\n", cycle, label, err)
+	rebasing, err := rebaseInProgress(ctx, cs.ActiveWorktree, git)
+	if err != nil {
+		return fmt.Errorf("check lane %s for a rebase in progress: %w", cs.ActiveWorktree, err)
+	}
+	if rebasing {
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d resume leaves the carrier %s at HEAD: a rebase is in progress\n", cycle, label)
 		return nil
 	}
-	onto, err := pendOnForkPoint(ctx, cs.ActiveWorktree, gitCapture)
+	onto, err := pendOnForkPoint(ctx, cs.ActiveWorktree, git)
 	if err != nil {
 		return fmt.Errorf("pend the carrier %s: %w", label, err)
 	}
@@ -45,6 +54,17 @@ func (o *Orchestrator) healCarrierAtHead(ctx context.Context, projectRoot string
 		Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn, Code: CodeResumeCarrierPended, Reason: reason,
 	})
 	return nil
+}
+
+func isGitCheckout(worktree string) (bool, error) {
+	_, err := os.Stat(filepath.Join(worktree, ".git"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read the git checkout of lane %s: %w", worktree, err)
+	}
+	return true, nil
 }
 
 func carrierAtHead(ctx context.Context, worktree, label string, git gitFn) (bool, error) {

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,20 +170,75 @@ func TestLoadResumeBootstrap_LeavesAnotherRunsCarrierAndAnInPlaceWorktreeAlone(t
 	}
 }
 
-func TestLoadResumeBootstrap_AnUnreadableLaneHEADWarnsAndResumes(t *testing.T) {
+func TestLoadResumeBootstrap_AWorktreeThatIsNotAGitCheckoutIsNotHealed(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	cs := CycleState{CycleID: 7, RunID: "run-7", WorkspacePath: filepath.Join(root, "ws"), ActiveWorktree: t.TempDir()}
-	var sink injectedStderr
-	o := NewOrchestrator(&fakeStorage{cycleState: cs}, &fakeLedger{}, buildRunners(nil), WithStderr(&sink))
+	center := signalcenter.New()
+	events := recordSignals(center)
+	o := NewOrchestrator(&fakeStorage{cycleState: cs}, &fakeLedger{}, buildRunners(nil), WithSignalCenter(center))
 
 	if _, err := o.loadResumeBootstrap(context.Background(), CycleRequest{ProjectRoot: root}, &ResumePoint{CycleID: 7}, PhaseShip); err != nil {
 		t.Fatalf("loadResumeBootstrap: %v", err)
 	}
 
-	if !strings.Contains(sink.String(), "WARN cycle 7 resume cannot read the lane HEAD for a carrier") {
-		t.Fatalf("stderr does not warn about the unreadable HEAD:\n%s", sink.String())
+	if coded := codedEvents(*events, CodeResumeCarrierPended); len(coded) != 0 {
+		t.Fatalf("signals = %+v, want none", coded)
 	}
+}
+
+func TestHealCarrierAtHead_AGitFailureInAGitCheckoutFailsTheResumeAndMovesNothing(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, failing, want string
+		makeGit             func(worktree string) error
+	}{
+		{"a HEAD read in a checkout", "log", "read the HEAD of lane %s: log failed", func(wt string) error { return os.Mkdir(filepath.Join(wt, ".git"), 0o755) }},
+		{"a rebase check in a checkout", "rev-parse", "check lane %s for a rebase in progress: rev-parse failed", func(wt string) error { return os.Mkdir(filepath.Join(wt, ".git"), 0o755) }},
+		{"a HEAD read in a linked worktree", "log", "read the HEAD of lane %s: log failed", func(wt string) error {
+			return os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: /elsewhere/.git/worktrees/lane\n"), 0o644)
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			worktree := t.TempDir()
+			if err := tc.makeGit(worktree); err != nil {
+				t.Fatal(err)
+			}
+			git := func(_ context.Context, _ string, args ...string) (string, int, error) {
+				switch args[0] {
+				case tc.failing:
+					return "", 0, errors.New(tc.failing + " failed")
+				case "log":
+					return fmt.Sprintf("cycle-%d/%s\n", unwindCycle, unwindRunID), 0, nil
+				default:
+					return "", 0, errors.New("unexpected git " + args[0])
+				}
+			}
+			cs := CycleState{CycleID: unwindCycle, RunID: unwindRunID, ActiveWorktree: worktree}
+
+			err := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil)).healCarrierAtHead(context.Background(), t.TempDir(), unwindCycle, cs, git)
+
+			if want := fmt.Sprintf(tc.want, worktree); err == nil || err.Error() != want {
+				t.Fatalf("err = %v, want %q", err, want)
+			}
+		})
+	}
+}
+
+func TestVerifyResumeIdentityAndHealCarrier_AnUnnumberedCycleStateHealsTheCheckpointCyclesCarrier(t *testing.T) {
+	t.Parallel()
+	fx := rebasedCarrierLane(t)
+	cs := fx.cycleState()
+	cs.CycleID = 0
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+
+	if err := o.verifyResumeIdentityAndHealCarrier(context.Background(), fx.root, &ResumePoint{CycleID: unwindCycle}, cs); err != nil {
+		t.Fatalf("verifyResumeIdentityAndHealCarrier: %v", err)
+	}
+
+	fx.requirePendingLaneChangeOn(fx.newBase)
 }
 
 func TestLoadResumeBootstrap_ACarrierThatCannotBePendedFailsTheResume(t *testing.T) {
@@ -242,5 +298,27 @@ func TestVerifyResumeIdentityAndHealCarrier_ACheckpointForAnotherWorktreeIsRejec
 	}
 	if got := fx.git("rev-parse", "HEAD"); got != head {
 		t.Fatalf("HEAD moved from %s to %s on a mismatched resume", head, got)
+	}
+}
+
+func TestIsGitCheckout_AnUnreadableLaneIsAnErrorNotASkip(t *testing.T) {
+	t.Parallel()
+	parent := t.TempDir()
+	worktree := filepath.Join(parent, "lane")
+	if err := os.Mkdir(worktree, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(worktree, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(worktree, 0o755) })
+
+	checkout, err := isGitCheckout(worktree)
+
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a mode-000 directory")
+	}
+	if checkout || err == nil || !strings.Contains(err.Error(), "read the git checkout of lane "+worktree) {
+		t.Fatalf("isGitCheckout = (%v, %v), want the stat error", checkout, err)
 	}
 }
