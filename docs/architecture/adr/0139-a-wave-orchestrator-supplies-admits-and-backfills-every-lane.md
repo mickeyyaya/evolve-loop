@@ -2,6 +2,7 @@
 
 - **Status:** Proposed (2026-10-17).
 - **Plan:** [wave-orchestrator-2026-10](../../plans/wave-orchestrator-2026-10.md). **Research:** [wave-orchestrator-2026-10](../../research/wave-orchestrator-2026-10.md). **Design:** [wave-orchestrator](../wave-orchestrator.md).
+- **Amended by (proposed):** [ADR-0147](0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (2026-10-20). The orchestrator also owns integration: the order, the compose, the test and the push of the deliverables. Integration has its own stage key, `fleet.integration.stage`.
 - **Relates to:**
   - [ADR-0049](0049-concurrent-multi-cycle-execution.md): the orchestrator replaces the fire-and-wait supervisor on the wave path. The isolation of each lane stays.
   - [ADR-0134](0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md): the orchestrator builds S14, admission by cell, as its admit step. ADR-0134 keeps the landing.

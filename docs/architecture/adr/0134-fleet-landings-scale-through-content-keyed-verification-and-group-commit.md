@@ -3,6 +3,7 @@
 - **Status:** Proposed (2026-10-13). Each decision moves to Accepted when its component leaves shadow ([plan](../../plans/fleet-landing-at-scale-2026-10.md) §8).
 - **Plan:** [fleet-landing-at-scale-2026-10.md](../../plans/fleet-landing-at-scale-2026-10.md). **Research:** [fleet-landing-at-scale-2026-10.md](../../research/fleet-landing-at-scale-2026-10.md). **Design:** [fleet-landing-queue.md](../fleet-landing-queue.md), the spec of record, which the amended rules join when they land.
 - **Amends:** [ADR-0128](0128-landing-queue-tiered-reverification.md). D3 (strict FIFO) holds only between candidates with an edge. D10 (a review only at the head) becomes a review bound to the evidence digest. The head checks keys, and gates run before the head.
+- **Amended by (proposed):** [ADR-0147](0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (2026-10-20). The order by the conflict graph becomes one key of the integration order. The wave orchestrator flushes a batch as one PR instead of a group commit by a lane.
 - **Relates to:**
   - [ADR-0039](0039-failure-floor-and-failure-signal-contract.md) §8.1: each owner keeps its own two-phase landing intent inside a group commit;
   - [ADR-0072](0072-system-failure-policy-and-halt.md): a red `main` stays a system failure, so optimistic landing is out;
