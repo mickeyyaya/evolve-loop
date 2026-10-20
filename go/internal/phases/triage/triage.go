@@ -17,11 +17,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -47,10 +49,26 @@ func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "triage-repor
 func (hooks) DefaultModel() string                        { return "auto" }
 
 func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTriage)) {
-		return false, "", "", nil
+	if !router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTriage)) {
+		return true, core.VerdictSKIPPED, string(core.PhaseTDD), nil
 	}
-	return true, core.VerdictSKIPPED, string(core.PhaseTDD), nil
+	if d, refused := lanePinRefusal(req); refused {
+		return true, core.VerdictFAIL, "", []core.Diagnostic{d}
+	}
+	return false, "", "", nil
+}
+
+func lanePinRefusal(req core.PhaseRequest) (core.Diagnostic, bool) {
+	if !envchain.BoolValue(req.Env[ipcenv.FleetKey], false) || len(committedset.LanePin(req.Workspace)) > 0 {
+		return core.Diagnostic{}, false
+	}
+	return core.Diagnostic{
+		Severity: cyclestate.SeverityError,
+		Code:     cyclestate.DiagCodeTriageLanePinMissing,
+		Subject:  fmt.Sprintf("cycle-%d", req.Cycle),
+		Message: fmt.Sprintf("fleet lane cycle %d has no non-empty %s in %s; triage refuses to run, because without the host's pin the committed set would fall to the agent's top_n",
+			req.Cycle, committedset.LanePinFile, req.Workspace),
+	}, true
 }
 
 func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {

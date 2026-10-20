@@ -51,7 +51,7 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.StringVar(&goalHash, "goal-hash", "", "goal hash passed to each cycle (required)")
 	fs.IntVar(&concurrency, "concurrency", 0, "max concurrent cycles (0 = count)")
 	fs.BoolVar(&simulate, "simulate", false, "no-LLM walk: each cycle returns PASS without calling out — validates the fleet concurrency plumbing (lock-skip, distinct cycle numbers, isolated worktrees, serialized ship) deterministically")
-	fs.StringVar(&planPath, "plan", "", "advisor backlog JSON ([{\"id\",\"files\"}]); partitioned into <=count disjoint-scoped cycles so each works independent files (ADR-0049 E). Without it, count identical cycles launch.")
+	fs.StringVar(&planPath, "plan", "", "advisor backlog JSON ([{\"id\",\"files\"}]); partitioned into <=count disjoint-scoped cycles so each works independent files (ADR-0049 E). Required without --simulate: each lane needs the lane-scope.json pin its plan writes. A --simulate run without it launches count identical cycles.")
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
@@ -61,6 +61,10 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if goalHash == "" {
 		fmt.Fprintln(stderr, "evolve fleet: --goal-hash is required")
+		return 1
+	}
+	if planPath == "" && !simulate {
+		fmt.Fprintln(stderr, "evolve fleet: --plan is required without --simulate: a lane with no plan has no lane-scope.json pin, so its triage refuses with TRIAGE_LANE_PIN_MISSING")
 		return 1
 	}
 	binPath, err := fleetExecutable()
