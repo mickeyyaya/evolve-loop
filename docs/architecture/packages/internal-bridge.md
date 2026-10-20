@@ -409,6 +409,19 @@ agy 1.2.17 serves Claude models as well as Gemini ones: `agy models` lists `Clau
   - The served model is `Deps.TokenResolver`'s `ServedModel` for the probe's scratch cwd and launch window. Without a resolver or a scratch cwd it is empty. A resolver error leaves it empty and prints the error on stderr. Pinned by `TestLiveSmokeTest_ReportsTheModelThatServedTheReplyFromTheTranscript`, `TestLiveSmokeTest_NoResolverLeavesTheServedModelUnreported`, `TestServedModel_NoScratchCwdAttributesNoTranscript` and `TestLiveSmokeTest_AResolverErrorLeavesTheServedModelUnreportedAndSaysWhy`.
   - The scan tries the scratch cwd as given, then its resolved path (`cwdSpellings`). On macOS the temp directory is a symlink, and a CLI can record the resolved path as its cwd. Pinned by `TestLiveSmokeTest_ATranscriptThatRecordsTheResolvedCwdOfASymlinkedWorkspaceStillReportsTheModel`.
 
+### The within-tier model failover (inbox `within-tier-model-fallback`)
+
+The fallback has three axes: the CLI chain, the tier chain and the model inside a tier. The first two exist upstream. This one is the innermost.
+
+- **The rule.** When `Deps.ModelChain` is set, `Engine.Launch` asks it for the chain of `(cli, tier)`. It dispatches each concrete model in order. It moves to the next model only on exit 85 with the cause `rate_limit` (a quota wall) or `model_unsupported`. Every other exit returns at once, also exit 85 for an unknown prompt. Exit 85 returns to the caller only when the whole chain walls, so the CLI and tier walk then runs as before.
+- **Between tries.** A cancelled context stops the chain. Before a retry, `Launch` removes the artifact that the walled model left, so the next model never reads it.
+- **The log.** Each step prints `[bridge] model failover: <model> on <cli> ended with exit 85 (rate_limit or model_unsupported); trying <next> at the same tier`.
+- **The Claude family floor holds in the walk** (2026-10-21, review of PR #1076). `floorSeat` reads the seat from `req.Profile` (for example `.evolve/profiles/auditor.json`). Both the phase runner and the subagent adapter set it, while `req.Agent` holds the phase name (`audit`, `tdd`) and stands in only without a profile. The chain of a seat in `profiles.IsClaudeFamilyFloor` keeps its first model and each Claude fallback. `isClaudeFamilyModel` names a model Claude when the name holds `claude`, `opus`, `sonnet` or `haiku`, and `floorChain` drops each other fallback with `[bridge] WARN model failover: <agent> holds the Claude family floor; skipping fallback <model>, which is not a Claude model`. The walk keeps the first model, because routing chose it under the floor (TestLaunch_AFlooredSeatSkipsAFallbackModelOutsideTheClaudeFamily, TestLaunch_AnUnflooredSeatKeepsEveryFallbackModel, TestLaunch_AFlooredSeatKeepsItsRoutedFirstModel).
+- **The chain.** `CatalogModelChain` reads `modelcatalog.DispatchModelChain` of the base CLI: `tier_models[tier]` first, then `tier_fallbacks[tier]`, deduped, for a live entry only. Today claude deep is `[opus, sonnet]`, and agy deep is `[Gemini 4 Argon (Medium), Gemini 3.1 Pro (High), ...]`.
+- **Off by default.** The production roots (`adapters/bridge.productionEngineDeps`, `subagent.execAdapterDeps`) wire the chain only at `bridge.model_failover: "on"` in `.evolve/policy.json`. At each other value, and without the key, `Deps.ModelChain` is nil. Then the launch dispatches `req.Model` once, as before.
+- **Single-shot cases.** A launch with a `SessionName` dispatches once. A named session keeps its REPL, so a new `--model` on a later try has no effect. An empty chain also dispatches `req.Model` once.
+- **The decision before `on`.** With the axis on, a deep seat on agy tries the other Gemini models before the table moves to agy-claude. Also, claude deep steps from opus to sonnet. The operator decides if that order is right.
+
 ## Invariants
 
 *Pane liveness and walls (2026-10).*

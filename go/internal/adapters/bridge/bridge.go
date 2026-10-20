@@ -102,6 +102,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		FatalPaneStage:        a.fatalPaneStage,
 		Signals:               a.signals,
 		CorroborateWall:       gobridge.DefaultWallCorroborator(nil, os.Stderr),
+		ModelChain:            gobridge.ModelChainFor(a.bridgeConfig.ModelFailoverOn()),
 	}
 }
 
