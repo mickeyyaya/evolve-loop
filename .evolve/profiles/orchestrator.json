@@ -206,7 +206,8 @@
     "enabled": true,
     "write_subpaths": [
       ".evolve/runs/cycle-*",
-      ".evolve/cycle-state*",
+      ".evolve/cycle-state.json",
+      ".evolve/cycle-state.json.lock",
       ".evolve/ledger.jsonl",
       ".evolve/audit-investigations/*"
     ],

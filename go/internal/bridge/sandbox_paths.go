@@ -120,22 +120,9 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree, workspace stri
 		if declared == "" || strings.ContainsAny(declared, "\x00\n\r") {
 			return nil, fmt.Errorf("write grant must be a path: %q", declared)
 		}
-		var base, rel string
-		switch {
-		case filepath.IsAbs(declared):
-			base, rel = filepath.Clean(declared), "."
-		case strings.HasPrefix(declared, worktreePathTemplate):
-			if worktree == "" {
-				continue
-			}
-			base, rel = worktree, strings.TrimPrefix(declared, worktreePathTemplate)
-		case declared == runDirGlob || strings.HasPrefix(declared, runDirGlob+"/"):
-			if workspace == "" {
-				continue
-			}
-			base, rel = workspace, strings.TrimPrefix(declared, runDirGlob)
-		default:
-			base, rel = root, declared
+		base, rel, ownRunDir, ok := writeGrantBase(declared, root, worktree, workspace)
+		if !ok {
+			continue
 		}
 		rel = filepath.Clean(strings.TrimPrefix(rel, string(filepath.Separator)))
 		if escapesBase(rel) {
@@ -157,11 +144,56 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree, workspace stri
 		if actual != expected {
 			return nil, fmt.Errorf("write grant %q resolves outside its declared scope (%s -> %s)", declared, expected, actual)
 		}
+		if err := refuseRunDirsReach(declared, expected, root, ownRunDir); err != nil {
+			return nil, err
+		}
 		if !slices.Contains(out, expected) {
 			out = append(out, expected)
 		}
 	}
 	return out, nil
+}
+
+func writeGrantBase(declared, root, worktree, workspace string) (base, rel string, ownRunDir, ok bool) {
+	if filepath.IsAbs(declared) {
+		return filepath.Clean(declared), ".", false, true
+	}
+	if strings.HasPrefix(declared, worktreePathTemplate) {
+		return worktree, strings.TrimPrefix(declared, worktreePathTemplate), false, worktree != ""
+	}
+	plain := withoutNoopSegments(declared)
+	if plain == runDirGlob || strings.HasPrefix(plain, runDirGlob+"/") {
+		return workspace, strings.TrimPrefix(plain, runDirGlob), true, workspace != ""
+	}
+	return root, declared, false, true
+}
+
+func withoutNoopSegments(path string) string {
+	var kept []string
+	for _, segment := range strings.Split(filepath.ToSlash(path), "/") {
+		if segment != "" && segment != "." {
+			kept = append(kept, segment)
+		}
+	}
+	return strings.Join(kept, "/")
+}
+
+func refuseRunDirsReach(declared, grant, root string, ownRunDir bool) error {
+	if root == "" {
+		return nil
+	}
+	canonicalRoot, err := canonicalSandboxPath(root)
+	if err != nil {
+		return fmt.Errorf("write grant %q: %w", declared, err)
+	}
+	runs := strings.ToLower(filepath.Join(canonicalRoot, ".evolve", "runs"))
+	folded := strings.ToLower(grant)
+	covers := folded == runs || strings.HasPrefix(runs, folded+string(filepath.Separator))
+	inside := strings.HasPrefix(folded, runs+string(filepath.Separator))
+	if covers || (inside && !ownRunDir) {
+		return fmt.Errorf("write grant %q covers the run directories of other cycles (%s); declare %s for the own run directory", declared, grant, runDirGlob)
+	}
+	return nil
 }
 
 func globFreeAncestor(rel string) string {

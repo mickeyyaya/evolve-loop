@@ -97,12 +97,18 @@ Each profile declares `.evolve/runs/cycle-*` in `sandbox.write_subpaths`. Before
 
 Now the resolver treats `.evolve/runs/cycle-*` as a template, like `{worktree_path}`. The template resolves to the workspace of the dispatch, which is the run directory of its own cycle. A subpath of the template stays inside that directory: `.evolve/runs/cycle-*/learn` becomes `<workspace>/learn`. Without a workspace, the grant is skipped. Each launch has a workspace, because `--workspace` is a required launch argument.
 
+The resolver matches the template after it removes empty and `.` segments, so `./.evolve/runs/cycle-*` and `.evolve//runs/cycle-*/learn` are the same template. It keeps each `..` segment, so `.evolve/runs/cycle-*/../cycle-8` escapes its base and is refused.
+
+Every other grant that reaches the run directories is refused with "covers the run directories of other cycles". Examples are `.evolve/runs/*`, `.evolve/runs/cycle-*x`, `.evolve/runs/cycle-8`, `.evolve/runs` and `.evolve`. The check ignores case, because the default macOS volume does too. Thus a new spelling cannot widen the grant again. A refused grant stops the launch, because the wrapper gives no sandbox and the profile requires one.
+
+The `orchestrator` profile declared `.evolve/cycle-state*`, which widened to all of `.evolve`. It now declares `.evolve/cycle-state.json` and `.evolve/cycle-state.json.lock`.
+
 | Rejected option | Why |
 |---|---|
 | A `{cycle}` template in each profile | It changes about 90 profiles, and a profile that keeps the old glob keeps the gap. The resolver fix closes the gap for each profile at one place. |
 | The glob matched against the cycle number | The resolver does not get the cycle number. The workspace is already the own run directory. |
 
-`TestEveryProfileWritesOnlyItsOwnCycleRunDir` checks each launchable real profile: no grant reaches another cycle, and each declared run-directory path is writable in the own run directory. A profile whose denials do not resolve is not launchable, so the test skips it (the `orchestrator` profile declares a glob denial).
+`TestEveryProfileWritesOnlyItsOwnCycleRunDir` checks each launchable real profile: no grant reaches another cycle, and each declared run-directory path is writable in the own run directory. A profile whose denials do not resolve cannot launch. The test requires that this set is exactly the `orchestrator` profile, which declares a glob denial.
 
 The gap verdict stays in the test for the next known gap. No row uses it now.
 
