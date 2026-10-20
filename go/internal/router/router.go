@@ -110,6 +110,7 @@ type PhasePlanEntry struct {
 	CLI           string    `json:"cli,omitempty"`
 	Tier          string    `json:"tier,omitempty"`
 	Mint          *MintSpec `json:"mint,omitempty"`
+	ForcedBy      string    `json:"forced_by,omitempty"`
 }
 
 type MintSpec struct {
@@ -366,10 +367,16 @@ func mandatoryPhaseRun(in RouteInput, phase string, enable config.Enable) (bool,
 const (
 	RuleSkipWhenGatesPlan   = "skip-when-gates-plan"
 	RuleInsertWhenGatesPlan = "insert-when-gates-plan"
+	RuleTddPinReleased      = "tdd-pin-released"
+	RuleShipRequiresTdd     = "ship-requires-tdd"
 )
 
 func shouldRunFromPlan(in RouteInput, phase string, enable config.Enable, optionalUsed int) (bool, bool, *Clamp) {
-	runs := planRuns(in.Plan, phase)
+	entry := planEntry(in.Plan, phase)
+	runs := entry.Run
+	if runs && entry.ForcedBy == RuleShipRequiresTdd && !TddPinned(in.Cfg, in.Signals) {
+		return false, true, &Clamp{Phase: phase, Rule: RuleTddPinReleased, Proposed: phase + "=run", Forced: phase + "=skip"}
+	}
 	block := in.Cfg.Triggers[phase]
 	if runs && !isFloorPhase(phase) && skipWhenFires(in.Signals, block) {
 		return false, true, &Clamp{Phase: phase, Rule: RuleSkipWhenGatesPlan, Proposed: phase + "=run", Forced: phase + "=skip"}

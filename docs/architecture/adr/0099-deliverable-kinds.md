@@ -167,3 +167,16 @@ Decisions:
 Not changed: the plan-time floor clamp still forces tdd into the initial plan on the conservative
 side (signals are empty before scout), so a document lane runs tdd unless the post-scout re-plan,
 still shadow, drops it.
+
+## Amendment (2026-10-21) — a floor-forced tdd lapses on a document lane
+
+The plan-time clamp still forces tdd with empty signals. Each entry that the clamp turns on now records its rule in `forced_by`.
+
+- At tdd's turn, the walk reads the entry. A tdd entry with `forced_by: ship-requires-tdd` lapses when `router.TddPinned` no longer holds, for example after scout declares a document deliverable. The decision carries the `tdd-pin-released` clamp (`tdd=run` to `tdd=skip`).
+- A tdd that the advisor itself planned still runs on a document lane. A code lane keeps the plan-time force.
+- The re-plan stays `shadow`. The lapse needs no re-plan, because the clamp records which entries it forced.
+- The plan in `routing-plan.json` keeps `forced_by`, so a resumed cycle skips the released tdd too (`skipsOnResume`).
+
+Rejected: raising `router_replan` to `advisory`. That changes every post-scout plan, not only the tdd that the floor forced, and no soak shows that re-plans are sound yet.
+
+Pinned by `TestDocumentLane_AFloorForcedTDDLapsesOnceScoutDeclaresADocument`, `TestCodeLane_AFloorForcedTDDStillRuns`, `TestClampPlanToFloor_RecordsWhichEntriesTheFloorForced`, `TestDocumentLane_TheOrchestratorNeverDispatchesAFloorForcedTDDAfterThePlanRoundTrips` and `TestSkipsOnResume_AReleasedFloorForcedTDDIsSkipped`.

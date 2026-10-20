@@ -51,7 +51,7 @@ func (o *Orchestrator) resumeFloor(cs CycleState) map[string]bool {
 }
 
 func skipsOnResume(e router.PhasePlanEntry, keep map[string]bool) bool {
-	return !e.Run && !keep[e.Phase]
+	return (!e.Run || e.ForcedBy == router.RuleShipRequiresTdd) && !keep[e.Phase]
 }
 
 func readRoutingPlan(workspace string) *router.PhasePlan {
