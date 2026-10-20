@@ -221,9 +221,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	orch, signals := d.Orchestrator, d.Signals
 	result, err := orch.RunCycle(context.Background(), f.request(projectRoot, os.Environ()))
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
-		var lr loopResult
-		lr.emitQuotaPause(loopConfig{EvolveDir: evolveDir}, result.Cycle, stdout, stderr)
-		return fleet.ExitDeferred
+		return cycleRunQuotaExit(result.Cycle, projectRoot, evolveDir, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)
 	}
 	if err != nil {
 		return cycleRunErrorExit(err, result.Cycle, projectRoot, evolveDir, stderr, lifecycleLedger, signals)
@@ -242,7 +240,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 func cycleRunErrorExit(err error, cycle int, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) int {
 	var deferral *core.LaneDeferral
 	if errors.As(err, &deferral) {
-		if rerr := releaseDeferredLaneClaims(projectRoot, deferral.Cycle, stderr, lifecycle, signals); rerr != nil {
+		if rerr := releaseDeferredLaneClaims(projectRoot, deferral.Cycle, cyclestate.CycleTerminationLaneWorktreeDeferred, stderr, lifecycle, signals); rerr != nil {
 			fmt.Fprintf(stderr, "evolve cycle run: WARN: could not release cycle %d claims: %v\n", deferral.Cycle, rerr)
 		}
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
@@ -253,9 +251,9 @@ func cycleRunErrorExit(err error, cycle int, projectRoot, evolveDir string, stde
 	return 1
 }
 
-func releaseDeferredLaneClaims(projectRoot string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
+func releaseDeferredLaneClaims(projectRoot string, cycle int, reason string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
 	opts := inboxmover.Options{ProjectRoot: projectRoot, Ledger: lifecycle, Stderr: stderr, Signals: signals}
-	_, err := inboxmover.ReleaseCycleProcessingWithReason(opts, cycle, cyclestate.CycleTerminationLaneWorktreeDeferred)
+	_, err := inboxmover.ReleaseCycleProcessingWithReason(opts, cycle, reason)
 	return err
 }
 
