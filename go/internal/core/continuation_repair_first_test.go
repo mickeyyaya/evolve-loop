@@ -49,10 +49,10 @@ func adoptWithPriorVerdict(t *testing.T, cycle int, verdict string) PhaseRequest
 
 func TestRunCycle_AContinuationWithAnInheritedRedLeadsWithTheRepairDirective(t *testing.T) {
 	t.Parallel()
-	req := adoptWithPriorVerdict(t, 86, `{"results":[{"ac_id":"regression/TestKeepsTheCacheKey","result":"red"}]}`)
+	req := adoptWithPriorVerdict(t, 86, `{"results":[{"ac_id":"regression/TestKeepsTheCacheKey","result":"red","is_regression":true}]}`)
 
 	got := req.Context[CtxKeyContinuationRepairFirst]
-	if !strings.HasPrefix(got, "FIRST ACTION:") || !strings.Contains(got, "- go/acs/regression/cache_key_test.go: TestKeepsTheCacheKey") {
+	if !strings.HasPrefix(got, "FIRST ACTION:") || !strings.Contains(got, "- go/acs/regression/cache_key_test.go: TestKeepsTheCacheKey") || !strings.Contains(got, "Do not edit") {
 		t.Errorf("the build context must carry the repair directive naming the file; got %q", got)
 	}
 	if !strings.Contains(req.Context["continuation_findings"], "EGPS red_count=1") {

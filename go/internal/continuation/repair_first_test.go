@@ -27,8 +27,8 @@ func writeTreeFile(t *testing.T, root, rel, body string) {
 
 const inheritedRedVerdict = `{"results":[
  {"ac_id":"cycle1495/TestC1495_001_Green","result":"green"},
- {"ac_id":"regression/TestKeepsTheCacheKey/sub","result":"red"},
- {"ac_id":"regression/TestKeepsTheCacheKey","result":"red"},
+ {"ac_id":"regression/TestKeepsTheCacheKey/sub","result":"red","is_regression":true},
+ {"ac_id":"regression/TestKeepsTheCacheKey","result":"red","is_regression":true},
  {"ac_id":"cycle1488/TestC1488_003_Absent","result":"red"},
  {"ac_id":"cycle1490/TestC1490_002_Undeclared","result":"red"},
  {"ac_id":"egps/go-lane-incomplete/x/TestY","result":"red"},
@@ -57,9 +57,10 @@ func TestRepairFirst_LeadsWithTheInheritedRedPredicatesNamingTheirFiles(t *testi
 	if !strings.HasPrefix(got, "FIRST ACTION:") {
 		t.Fatalf("the directive must lead, got:\n%s", got)
 	}
-	want := "- go/acs/regression/cache_key_test.go: TestKeepsTheCacheKey\n- go/acs/cycle1490/: TestC1490_002_Undeclared"
-	if !strings.HasSuffix(got, want) {
-		t.Errorf("the directive must name each live red once, file first, in verdict order; got:\n%s\nwant suffix:\n%s", got, want)
+	shipped := shippedHeader + "- go/acs/regression/cache_key_test.go: TestKeepsTheCacheKey\n"
+	own := ownHeader + "- go/acs/cycle1490/: TestC1490_002_Undeclared"
+	if !strings.Contains(got, shipped) || !strings.HasSuffix(got, own) {
+		t.Errorf("the directive must name each live red once, file first, under its class; got:\n%s\nwant:\n%s\n%s", got, shipped, own)
 	}
 	for _, gone := range []string{"cycle1488", "egps", "escape", "TestC1495_001_Green", "TestOther", "IGNORE", "helperNotATest", "mentions_test.go"} {
 		if strings.Contains(got, gone) {
@@ -126,5 +127,24 @@ func TestRepairFirst_AnUnlistablePredicatePackageIsLoud(t *testing.T) {
 	writeTreeFile(t, wt, "go/acs/regression/a_test.go", "package regression\n")
 	if _, err := RepairFirst(ws, wt); err == nil {
 		t.Error("a predicate package that cannot be listed must be an error")
+	}
+}
+
+func TestRepairFirst_ARedRegressionPredicateIsFixedInTheCodeNeverRetracted(t *testing.T) {
+	t.Parallel()
+	ws, wt := t.TempDir(), t.TempDir()
+	writeVerdict(t, ws, `{"results":[{"ac_id":"regression/TestKeepsTheCacheKey","result":"red","is_regression":true},{"ac_id":"redteam/TestNoBypass","result":"red","is_red_team":true}]}`)
+	writeTreeFile(t, wt, "go/acs/regression/cache_key_test.go", "package regression\n\nfunc TestKeepsTheCacheKey(t *testing.T) {}\n")
+	writeTreeFile(t, wt, "go/acs/redteam/no_bypass_test.go", "package redteam\n\nfunc TestNoBypass(t *testing.T) {}\n")
+
+	got, err := RepairFirst(ws, wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "Fix the code") || !strings.Contains(got, "TestKeepsTheCacheKey") || !strings.Contains(got, "TestNoBypass") {
+		t.Errorf("a shipped or red-team red must be listed with the order to fix the code; got:\n%s", got)
+	}
+	if strings.Contains(got, ownHeader) || strings.Contains(got, "Repair or retract") {
+		t.Errorf("a shipped red must never be offered a retraction; got:\n%s", got)
 	}
 }

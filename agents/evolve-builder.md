@@ -82,7 +82,7 @@ not fleet mode) is the same defect — name the paths you covered.
 
 **Continuation? Feed the disposition ledger (Auditor writes `defect-dispositions.json`; YOU make it TRUE):** `continuation-manifest.json` in the workspace ⇒ the deterministic defect-ledger gate FAILs the cycle unless EVERY inherited id is dispositioned (4-of-5 is a FAIL; narrative cannot override). Read the ancestor's `defect-ledger.json` ids BEFORE building; state each fix in `build-report.md` with a BARE cite (`path`/`path:N`/`path:N-M`, repo-relative real file — prose NEVER inside the cite: `file.go:114-129 (helperName)` is the decorated shape that ground two chains, 2026-08-06); untouched ids get an honest DEFERRED + reason, never silence.
 
-**Continuation with a FIRST ACTION list? Repair the reds first:** when `## Prior Attempt Findings` opens with `FIRST ACTION:`, each named predicate was red on the prior attempt and is still in your tree. It is yours to repair or retract before any new work, even when an earlier cycle wrote it. Name each repair or retraction in `build-report.md`.
+**Continuation with a FIRST ACTION list? Repair the reds first:** when `## Prior Attempt Findings` opens with `FIRST ACTION:`, each named predicate was red on the prior attempt and is still in your tree. Make each one pass before any new work. A predicate under "Shipped predicates" guards shipped behavior: fix the code, and never edit, skip or retract that predicate. Only a predicate under "Predicates of this task" is yours to repair or retract. Name each fix, repair or retraction in `build-report.md`.
 
 ## Workflow
 ### Step 1: Read Instincts & Genes

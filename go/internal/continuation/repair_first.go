@@ -12,9 +12,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 )
 
-const repairFirstHeader = "FIRST ACTION: the prior attempt left these predicates RED, and they are still in the tree you resume. " +
-	"Repair or retract each one BEFORE any new work. A predicate that cannot hold is yours to fix or retract on a continuation; " +
-	"record the change in your report.\n"
+const (
+	repairFirstHeader = "FIRST ACTION: the prior attempt left these predicates RED, and they are still in the tree you resume. " +
+		"Make each one pass BEFORE any new work.\n"
+	shippedHeader = "Shipped predicates that the change breaks. Fix the code. Do not edit, skip or retract these predicates:\n"
+	ownHeader     = "Predicates of this task. Repair or retract each one, and record the change in your report:\n"
+)
 
 var (
 	predicatePackage = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
@@ -34,7 +37,7 @@ func RepairFirst(priorWorkspace, worktree string) (string, error) {
 	if err := json.Unmarshal(raw, &v); err != nil {
 		return "", fmt.Errorf("continuation: parse prior %s: %w", acsverdict.Filename, err)
 	}
-	var lines []string
+	var shipped, own []string
 	seen := map[string]bool{}
 	for _, r := range v.Results {
 		pkg, test, ok := livePredicate(r, worktree)
@@ -46,12 +49,24 @@ func RepairFirst(priorWorkspace, worktree string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		lines = append(lines, fmt.Sprintf("- %s: %s", file, test))
+		line := fmt.Sprintf("- %s: %s", file, test)
+		if r.IsRegression || r.IsRedTeam {
+			shipped = append(shipped, line)
+		} else {
+			own = append(own, line)
+		}
 	}
-	if len(lines) == 0 {
+	if len(shipped)+len(own) == 0 {
 		return "", nil
 	}
-	return repairFirstHeader + strings.Join(lines, "\n"), nil
+	return strings.TrimSuffix(repairFirstHeader+section(shippedHeader, shipped)+section(ownHeader, own), "\n"), nil
+}
+
+func section(header string, lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	return header + strings.Join(lines, "\n") + "\n"
 }
 
 func livePredicate(r acssuite.Result, worktree string) (pkg, test string, ok bool) {
