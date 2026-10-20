@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "RED: a docs-only change with --reviewers docs-review passes the review step",
+    "RED: a docs-only change with only code-reviewer is denied with the docs review capability named",
+    "RED: a change with one Go file still needs simplify + review; docs-review alone is denied",
+    "evolve skills check passes; ste-lint --strict 0"
+  ],
+  "created_at": "2026-10-20T04:20:00Z",
+  "files": [
+    "skills/docs-review/SKILL.md (new)",
+    ".claude-plugin/plugin.json (skills list)",
+    "commands/docs-review.md (generated)",
+    "go/internal/commitgate/reviewers.go",
+    "go/internal/commitgate/commitgate.go",
+    "docs/architecture/packages/internal-commitgate.md",
+    "docs/research/docs-review-skill-2026-10.md (new)"
+  ],
+  "fix": "Add skills/docs-review; in commitgate, map a docs-only change to the docs review capability (docs-review).",
+  "id": "docs-review-skill-and-gate-capability",
+  "kind": "feature",
+  "priority": "high",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "route_note": "2026-10-20: the operator asked the console to build the skill and use it directly. The commit gate is a protected surface.",
+  "source": "operator 2026-10-20: 'why do we run code review against doc diff? It should be doc review' and 'build the doc review skill and use it directly, research online'",
+  "summary": "A change that touches only Markdown gets a docs review, not a code review. New skill skills/docs-review (deterministic checks first: ste-lint, links, cited path:line and symbols; then LLM lenses for type and home, the reasoning chain, claims against the code, and the cross-file consistency of a design set). go/internal/commitgate: when every changed path is a .md file, the required capability is 'docs review' (docs-review), in place of simplify + review.",
+  "title": "docs-review skill, and the commit gate asks a docs-only change for a docs review",
+  "weight": 0.6
+}
