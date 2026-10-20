@@ -3,6 +3,7 @@ package subagentrun
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -130,11 +131,15 @@ func TestLedger_EveryOpFailureIsBareTextWithTheOpInFields(t *testing.T) {
 		{"close", "close", func(t *testing.T, dir string) (string, []Option) {
 			return filepath.Join(dir, "ledger.jsonl"), []Option{WithLedgerOpener(func(string) (io.WriteCloser, error) { return failingWriter{close: errors.New("close failed")}, nil })}
 		}},
-		{"tip tmp (a directory at ledger.tip.tmp)", "tip_tmp", func(t *testing.T, dir string) (string, []Option) {
-			_ = os.Mkdir(filepath.Join(dir, "ledger.tip.tmp"), 0o755)
+		{"flock (a directory at ledger.lock)", "flock", func(t *testing.T, dir string) (string, []Option) {
+			_ = os.Mkdir(filepath.Join(dir, "ledger.lock"), 0o755)
 			return filepath.Join(dir, "ledger.jsonl"), nil
 		}},
-		{"tip rename (a directory at ledger.tip)", "tip_rename", func(t *testing.T, dir string) (string, []Option) {
+		{"tip tmp (a directory at this process's ledger.tip.tmp)", "tip_tmp", func(t *testing.T, dir string) (string, []Option) {
+			_ = os.Mkdir(filepath.Join(dir, fmt.Sprintf("ledger.tip.tmp.%d", os.Getpid())), 0o755)
+			return filepath.Join(dir, "ledger.jsonl"), nil
+		}},
+		{"tip read (a directory at ledger.tip)", "chain_link", func(t *testing.T, dir string) (string, []Option) {
 			_ = os.Mkdir(filepath.Join(dir, "ledger.tip"), 0o755)
 			return filepath.Join(dir, "ledger.jsonl"), nil
 		}},
