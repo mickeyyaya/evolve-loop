@@ -1,14 +1,20 @@
 package core
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
+
+const failureDossierFile = "failure-dossier.json"
 
 type auditDeclared struct {
 	Class   string   `json:"class,omitempty"`
@@ -25,12 +31,13 @@ type nonProgress struct {
 }
 
 type failureDossier struct {
-	CycleID         int           `json:"cycle_id"`
-	RecordedVerdict string        `json:"recorded_verdict"`
-	FloorCandidate  string        `json:"floor_candidate,omitempty"`
-	AuditDeclared   auditDeclared `json:"audit_declared"`
-	NonProgress     nonProgress   `json:"non_progress"`
-	Evidence        string        `json:"evidence,omitempty"`
+	CycleID         int            `json:"cycle_id"`
+	RecordedVerdict string         `json:"recorded_verdict"`
+	FloorCandidate  string         `json:"floor_candidate,omitempty"`
+	AuditDeclared   auditDeclared  `json:"audit_declared"`
+	BuildDeclared   *auditDeclared `json:"build_declared,omitempty"`
+	NonProgress     nonProgress    `json:"non_progress"`
+	Evidence        string         `json:"evidence,omitempty"`
 }
 
 func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFailurePolicy) *failureDossier {
@@ -75,6 +82,60 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 	return d
 }
 
+func (o *Orchestrator) failureDossier(cs CycleState, finalVerdict string) *failureDossier {
+	d := buildFailureDossier(cs, finalVerdict, o.failurePolicy)
+	if d.AuditDeclared.Class != "" {
+		return d
+	}
+	if bd := builderSystemClassUnderGates(cs, o.failurePolicy); bd != nil && o.auditedTreeUnchanged(cs.RunID) {
+		d.BuildDeclared = bd
+	}
+	return d
+}
+
+func (o *Orchestrator) auditedTreeUnchanged(runID string) bool {
+	if o.ledger == nil {
+		return false
+	}
+	it, err := o.ledger.Iter(context.Background())
+	if err != nil {
+		return false
+	}
+	defer func() { _ = it.Close() }()
+	var trees []string
+	for {
+		e, ok, err := it.Next()
+		if err != nil || !ok {
+			break
+		}
+		if auditledger.IsAuditorRow(auditledger.Entry{Role: e.Role, Kind: e.Kind}) && e.RunID == runID {
+			trees = append(trees, e.WorktreeTreeSHA)
+		}
+	}
+	n := len(trees)
+	return n >= 2 && trees[n-1] != "" && trees[n-1] == trees[n-2]
+}
+
+func builderSystemClassUnderGates(cs CycleState, fp policy.SystemFailurePolicy) *auditDeclared {
+	if _, gateForced := gateForcedDiagnoses(cs.AuditFailReasons); !gateForced || cs.AuditRepairAttempts == 0 {
+		return nil
+	}
+	raw, err := os.ReadFile(filepath.Join(cs.WorkspacePath, "build-report.md"))
+	if err != nil {
+		return nil
+	}
+	s, ok := phasecontract.ParseVerdictSentinelFull(string(raw))
+	if !ok || s.Failure == nil || (s.Verdict != VerdictWARN && s.Verdict != VerdictFAIL) {
+		return nil
+	}
+	fb := s.Failure
+	category := policyCategoryFor(failurelog.NormalizeLegacy(fb.Class))
+	if cat, known := fp.Categories[category]; !known || cat.Level != policy.LevelSystem {
+		return nil
+	}
+	return &auditDeclared{Class: category, Level: policy.LevelSystem, Defects: fb.Defects}
+}
+
 func sameClassStreak(history []FailedRecord) int {
 	if len(history) == 0 {
 		return 0
@@ -101,5 +162,17 @@ func writeFailureDossier(workspace string, d *failureDossier) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(workspace, "failure-dossier.json"), b, 0o644)
+	return os.WriteFile(filepath.Join(workspace, failureDossierFile), b, 0o644)
+}
+
+func readBuildDeclared(workspace string) *auditDeclared {
+	b, err := os.ReadFile(filepath.Join(workspace, failureDossierFile))
+	if err != nil {
+		return nil
+	}
+	var d failureDossier
+	if json.Unmarshal(b, &d) != nil {
+		return nil
+	}
+	return d.BuildDeclared
 }
