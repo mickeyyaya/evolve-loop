@@ -4,15 +4,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-const needsChangedColumn = "needs changed"
+const (
+	needsChangedColumn = "needs changed"
+	dispositionColumn  = "disposition"
+	predicatesColumn   = "predicate"
+)
 
 type protectedACGate struct{}
 
@@ -24,35 +30,36 @@ func (protectedACGate) check(in core.ReviewInput) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	table, ok := acTable(string(report))
-	if !ok {
+	section, found := acSection(strings.Split(string(report), "\n"))
+	if !found {
 		return "", false
 	}
-	if table.needs < 0 {
+	table, ok := acTable(section)
+	switch {
+	case !ok:
+		return fmt.Sprintf("the AC section has no AC table with a %q column — give each AC one row with its disposition, so the gate can check it before the build", dispositionColumn), true
+	case table.needs < 0:
 		return fmt.Sprintf("the AC-Materialization table has no %q column — list the repo paths each AC needs changed, so a predicate on a protected path can be found before the build", needsChangedColumn), true
 	}
-	acs, paths := table.protectedPredicates()
-	if len(acs) == 0 {
-		return "", false
+	if problems := table.problems(); len(problems) > 0 {
+		return strings.Join(problems, "; "), true
 	}
-	return fmt.Sprintf("AC %s need protected path(s) %s changed — a lane builder can never change them, so the predicate is unsatisfiable (cycle 1788); "+
-		"give each such AC the console-followup disposition and drop its predicate", strings.Join(acs, ", "), strings.Join(paths, ", ")), true
+	return "", false
 }
 
 type acMaterialization struct {
-	disposition, needs int
-	rows               [][]string
+	disposition, needs, predicates int
+	rows                           [][]string
 }
 
-func acTable(report string) (acMaterialization, bool) {
-	lines := acSection(strings.Split(report, "\n"))
+func acTable(lines []string) (acMaterialization, bool) {
 	for i, line := range lines {
 		header := tableCells(line)
-		disposition := columnIndex(header, "disposition")
+		disposition := columnIndex(header, dispositionColumn)
 		if disposition < 0 {
 			continue
 		}
-		t := acMaterialization{disposition: disposition, needs: columnIndex(header, needsChangedColumn)}
+		t := acMaterialization{disposition: disposition, needs: columnIndex(header, needsChangedColumn), predicates: columnWithPrefix(header, predicatesColumn)}
 		for _, row := range lines[i+1:] {
 			cells := tableCells(row)
 			if cells == nil {
@@ -67,24 +74,93 @@ func acTable(report string) (acMaterialization, bool) {
 	return acMaterialization{}, false
 }
 
-func (t acMaterialization) protectedPredicates() (acs, paths []string) {
+func (t acMaterialization) problems() []string {
+	var unnamed, leftover, protected, paths []string
 	for _, row := range t.rows {
-		if max(t.disposition, t.needs) >= len(row) || !isPredicateDisposition(row[t.disposition]) {
+		if t.disposition >= len(row) {
 			continue
 		}
-		found := guards.ProtectedPathsIn(row[t.needs])
-		if len(found) == 0 {
-			continue
+		needs := ""
+		if t.needs < len(row) {
+			needs = row[t.needs]
 		}
-		acs = append(acs, row[0])
-		for _, p := range found {
-			if !slices.Contains(paths, p) {
-				paths = append(paths, p)
+		switch disposition := strings.ToLower(strings.Trim(row[t.disposition], " *`")); {
+		case strings.HasPrefix(disposition, "predicate"):
+			found := guards.ProtectedPathsIn(needs)
+			switch {
+			case len(found) > 0:
+				protected = append(protected, row[0])
+				paths = appendNew(paths, found...)
+			case len(guards.PathsIn(needs)) == 0:
+				unnamed = append(unnamed, row[0])
 			}
+		case strings.HasPrefix(disposition, "console-followup") && t.predicates >= 0 && t.predicates < len(row) && listsPredicates(row[t.predicates]):
+			leftover = append(leftover, fmt.Sprintf("AC %s is a console-followup but lists predicate(s) %s — a console follow-up keeps no lane predicate; delete it", row[0], strings.TrimSpace(row[t.predicates])))
 		}
 	}
-	slices.Sort(paths)
-	return acs, paths
+	var out []string
+	if len(protected) > 0 {
+		slices.Sort(paths)
+		out = append(out, fmt.Sprintf("AC %s need protected path(s) %s changed — a lane builder can never change them, so the predicate is unsatisfiable (cycle 1788); "+
+			"give each such AC the console-followup disposition and drop its predicate", strings.Join(protected, ", "), strings.Join(paths, ", ")))
+	}
+	if len(unnamed) > 0 {
+		out = append(out, fmt.Sprintf("AC %s names no path in %q — a predicate AC always needs a path changed; name each one, including the wiring a plan step names", strings.Join(unnamed, ", "), needsChangedColumn))
+	}
+	return append(out, leftover...)
+}
+
+func appendNew(dst []string, items ...string) []string {
+	for _, it := range items {
+		if !slices.Contains(dst, it) {
+			dst = append(dst, it)
+		}
+	}
+	return dst
+}
+
+var predicateIDRE = regexp.MustCompile(`\b\d{3}\b|TestC\d+_\d+`)
+
+func listsPredicates(cell string) bool { return predicateIDRE.MatchString(cell) }
+
+func acSection(lines []string) ([]string, bool) {
+	start := slices.IndexFunc(lines, isACHeading)
+	if start < 0 {
+		return nil, false
+	}
+	level := headingLevel(lines[start])
+	fenced := false
+	for i, l := range lines[start+1:] {
+		if strings.HasPrefix(strings.TrimSpace(l), "```") {
+			fenced = !fenced
+		}
+		if !fenced && headingLevel(l) > 0 && headingLevel(l) <= level {
+			return lines[start+1 : start+1+i], true
+		}
+	}
+	return lines[start+1:], true
+}
+
+func headingLevel(line string) int {
+	n := len(line) - len(strings.TrimLeft(line, "#"))
+	if n == 0 || !strings.HasPrefix(line[n:], " ") {
+		return 0
+	}
+	return n
+}
+
+func isACHeading(line string) bool {
+	if headingLevel(line) == 0 {
+		return false
+	}
+	title := strings.ToLower(strings.TrimSpace(strings.TrimLeft(line, "#")))
+	return slices.ContainsFunc(phasecontract.TDD.Sections[0].Accepted, func(accepted string) bool {
+		name := strings.ToLower(strings.TrimSpace(strings.TrimLeft(accepted, "#")))
+		rest, ok := strings.CutPrefix(title, name)
+		suffix := strings.TrimSpace(rest)
+		first, _ := utf8.DecodeRuneInString(suffix)
+		return ok && (rest == "" || strings.HasPrefix(rest, ":") || (rest != suffix && strings.ContainsRune("(:-–—", first)))
+	})
 }
 
 func tableCells(line string) []string {
@@ -103,6 +179,10 @@ func columnIndex(header []string, name string) int {
 	return slices.IndexFunc(header, func(c string) bool { return strings.ToLower(c) == name })
 }
 
+func columnWithPrefix(header []string, prefix string) int {
+	return slices.IndexFunc(header, func(c string) bool { return strings.HasPrefix(strings.ToLower(c), prefix) })
+}
+
 func isSeparatorRow(cells []string) bool {
 	for _, c := range cells {
 		if strings.Trim(c, "-: ") != "" {
@@ -110,22 +190,4 @@ func isSeparatorRow(cells []string) bool {
 		}
 	}
 	return true
-}
-
-func isPredicateDisposition(cell string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.Trim(cell, " *`")), "predicate")
-}
-
-func acSection(lines []string) []string {
-	start := slices.IndexFunc(lines, func(l string) bool {
-		return slices.Contains(phasecontract.TDD.Sections[0].Accepted, strings.TrimSpace(l))
-	})
-	if start < 0 {
-		return nil
-	}
-	rest := lines[start+1:]
-	if end := slices.IndexFunc(rest, func(l string) bool { return strings.HasPrefix(l, "## ") }); end >= 0 {
-		rest = rest[:end]
-	}
-	return rest
 }

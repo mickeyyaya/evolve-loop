@@ -23,3 +23,28 @@ func TestProtectedPathsIn_TextWithoutAProtectedPathNamesNone(t *testing.T) {
 		t.Fatalf("ProtectedPathsIn = %v, want none", got)
 	}
 }
+
+func TestProtectedPathsIn_AModuleRelativePathIsReadUnderGo(t *testing.T) {
+	got := ProtectedPathsIn("wire it into internal/cli/guardcmd/eval.go and cmd/evolve/main.go; skills/audit/SKILL.md stays")
+
+	want := []string{"go/internal/cli/guardcmd/eval.go", "skills/audit/SKILL.md"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("ProtectedPathsIn = %v, want %v: a Go agent writes paths relative to the go/ module", got, want)
+	}
+}
+
+func TestPathsIn_NamesEachPathOrFileToken(t *testing.T) {
+	for text, want := range map[string]int{
+		"go/internal/x/x.go and docs/a.md": 2,
+		"Makefile.am":                      1,
+		"-":                                0,
+		"n/a":                              0,
+		"none":                             0,
+		"e.g. none":                        0,
+		"version 1.5 or v1.2":              0,
+	} {
+		if got := len(PathsIn(text)); got != want {
+			t.Errorf("PathsIn(%q) = %d paths, want %d", text, got, want)
+		}
+	}
+}

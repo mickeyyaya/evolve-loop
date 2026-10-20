@@ -233,10 +233,34 @@ func ProtectedPathsIn(text string) []string {
 	var out []string
 	for _, tok := range pathInTextRE.FindAllString(text, -1) {
 		candidate := strings.TrimRight(tok, ".")
+		if slices.ContainsFunc(goModuleDirs, func(dir string) bool { return strings.HasPrefix(candidate, dir) }) {
+			candidate = "go/" + candidate
+		}
 		if IsProtectedScope(candidate) && !slices.Contains(out, candidate) {
 			out = append(out, candidate)
 		}
 	}
 	slices.Sort(out)
 	return out
+}
+
+var fileInTextRE = regexp.MustCompile(`[A-Za-z0-9_@-]{2,}\.[A-Za-z][A-Za-z0-9]*`)
+
+var goModuleDirs = []string{"internal/", "cmd/", "pkg/", "acs/", "test/"}
+
+func PathsIn(text string) []string {
+	var out []string
+	for _, re := range []*regexp.Regexp{pathInTextRE, fileInTextRE} {
+		for _, tok := range re.FindAllString(text, -1) {
+			candidate := strings.TrimRight(tok, ".")
+			if pathShaped(candidate) && !slices.ContainsFunc(out, func(p string) bool { return strings.Contains(p, candidate) }) {
+				out = append(out, candidate)
+			}
+		}
+	}
+	return out
+}
+
+func pathShaped(tok string) bool {
+	return slices.ContainsFunc(strings.Split(strings.TrimSuffix(tok, "/"), "/"), func(seg string) bool { return len(seg) > 1 })
 }
