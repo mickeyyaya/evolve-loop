@@ -237,18 +237,8 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		cursor.advance(next, resp.Verdict)
 
-		if cursor.current == PhaseAudit && resp.Verdict == VerdictFAIL {
-			branch, reason, sysFail := o.decideAfterAuditFail(cs)
-			consumeAuditRepairGrant(&cs, reason)
-			if sysFail != nil && result.SystemFailure == nil {
-				result.SystemFailure = sysFail
-			}
-			if branch != PhaseRetro {
-				if !o.sm.CanTransition(PhaseAudit, branch) {
-					return result, fmt.Errorf("audit→%s not allowed by state machine", branch)
-				}
-				cursor.schedule(branch)
-			}
+		if err := o.resumeAfterAudit(&cs, &cursor, &result, resp.Verdict); err != nil {
+			return result, err
 		}
 
 		if o.successorStrategy(cursor.current) == phasespec.BranchingHistory {

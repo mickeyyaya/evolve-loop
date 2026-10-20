@@ -95,18 +95,19 @@ func (cr *cycleRun) dossierParams(outcome string) cycleDossierParams {
 		goal = cr.req.GoalHash
 	}
 	return cycleDossierParams{
-		ProjectRoot:        cr.req.ProjectRoot,
-		WorkspacePath:      cr.cs.WorkspacePath,
-		Cycle:              cr.cycle,
-		Goal:               goal,
-		RunID:              cr.cs.RunID,
-		Outcome:            outcome,
-		SystemFailure:      cr.result.SystemFailure,
-		SkippedPhases:      cr.result.SkippedPhases,
-		VerdictsNotAdopted: cr.result.VerdictsNotAdopted,
-		SpineFailOpens:     cr.result.SpineFailOpens,
-		PhaseTimings:       cr.flushPhaseTimings(),
-		Destination:        cr.dossierDestination(),
+		ProjectRoot:            cr.req.ProjectRoot,
+		WorkspacePath:          cr.cs.WorkspacePath,
+		Cycle:                  cr.cycle,
+		Goal:                   goal,
+		RunID:                  cr.cs.RunID,
+		Outcome:                outcome,
+		SystemFailure:          cr.result.SystemFailure,
+		SkippedPhases:          cr.result.SkippedPhases,
+		VerdictsNotAdopted:     cr.result.VerdictsNotAdopted,
+		SpineFailOpens:         cr.result.SpineFailOpens,
+		ExplanationCorrections: cr.cs.ExplanationCorrections,
+		PhaseTimings:           cr.flushPhaseTimings(),
+		Destination:            cr.dossierDestination(),
 	}
 }
 

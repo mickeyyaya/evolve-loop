@@ -53,15 +53,16 @@ func normalizeVerdict(v string) string {
 }
 
 type BuildOpts struct {
-	WorkspacePath      string
-	Goal               string
-	RunID              string
-	FinalVerdict       string
-	SystemFailure      *cyclestate.SystemFailureSignal
-	SkippedPhases      []cyclestate.SkippedPhase
-	VerdictsNotAdopted []cyclestate.VerdictNotAdopted
-	SpineFailOpens     []cyclestate.SpineFailOpen
-	PhaseTimings       []phasetiming.Entry
+	WorkspacePath          string
+	Goal                   string
+	RunID                  string
+	FinalVerdict           string
+	SystemFailure          *cyclestate.SystemFailureSignal
+	SkippedPhases          []cyclestate.SkippedPhase
+	VerdictsNotAdopted     []cyclestate.VerdictNotAdopted
+	SpineFailOpens         []cyclestate.SpineFailOpen
+	ExplanationCorrections []string
+	PhaseTimings           []phasetiming.Entry
 }
 
 func Build(cycle int, opts BuildOpts) (*Dossier, error) {
@@ -83,6 +84,7 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 		SkippedPhases:              opts.SkippedPhases,
 		PhasesRunVerdictNotAdopted: opts.VerdictsNotAdopted,
 		SpineFailOpens:             opts.SpineFailOpens,
+		ExplanationCorrections:     opts.ExplanationCorrections,
 	}
 	if records, summary, ok := timingRecords(opts.WorkspacePath, opts.PhaseTimings); ok {
 		d.Phases = records
