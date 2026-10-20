@@ -109,7 +109,7 @@ func TestRunResumeBatch_RefusesAStaleCheckpointAndListsEveryCheckpointItConsider
 	evolveDir := filepath.Join(root, ".evolve")
 	for name, body := range map[string]string{
 		"cycle-1709": `{"cycle_id":1709,"phase":"build","checkpoint":{"enabled":true,"reason":"quota-likely","savedAt":"2026-09-27T10:00:00Z","resumeFromPhase":"build","gitHead":"unknown"}}`,
-		"cycle-1738": `{"cycle_id":1738,"phase":"end","started_at":"2026-09-28T09:00:00Z","goal_hash":"wave-26"}`,
+		"cycle-1738": `{"cycle_id":1738,"phase":"ship","final_verdict":"PASS","goal_hash":"wave-26"}`,
 		"cycle-1739": `{"cycle_id":1739,"phase":"build","started_at":"2026-09-28T20:00:00Z"}`,
 	} {
 		dir := filepath.Join(evolveDir, "runs", name)
@@ -119,6 +119,9 @@ func TestRunResumeBatch_RefusesAStaleCheckpointAndListsEveryCheckpointItConsider
 		if err := os.WriteFile(filepath.Join(dir, "cycle-state.json"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := os.WriteFile(filepath.Join(evolveDir, "ledger.jsonl"), []byte(`{"ts":"2026-09-28T09:30:00Z","cycle":1738,"role":"ship","kind":"phase","exit_code":0}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
 	}
 	var lr loopResult
 	var out, errOut bytes.Buffer
@@ -132,5 +135,27 @@ func TestRunResumeBatch_RefusesAStaleCheckpointAndListsEveryCheckpointItConsider
 	}
 	if rc != 2 {
 		t.Fatalf("rc=%d, want 2: a stale checkpoint must not be resumed", rc)
+	}
+}
+
+func TestBatchExitCode_AnInterruptInTheLastWaveNamesTheStoppedLanes(t *testing.T) {
+	t.Parallel()
+	b, stderr := signalStopCoordinator(t, 1739)
+
+	if rc := b.batchExitCode(); rc != 130 {
+		t.Fatalf("rc = %d, want 130", rc)
+	}
+
+	if !strings.Contains(stderr.String(), "cycle 1739 holds lane-a") || !strings.Contains(stderr.String(), "recover-orphans") || strings.Contains(stderr.String(), "the batch completed") {
+		t.Fatalf("an interrupt that ends the last wave must name the stopped lanes and their recovery:\n%s", stderr)
+	}
+}
+
+func TestBatchExitCode_AnInterruptWithNoLaneClaimKeepsTheCloseoutMessage(t *testing.T) {
+	t.Parallel()
+	b, stderr := signalStopCoordinator(t, 1800)
+
+	if rc := b.batchExitCode(); rc != 130 || !strings.Contains(stderr.String(), "the batch completed — exiting 130") {
+		t.Fatalf("rc = %d, stderr = %q", rc, stderr)
 	}
 }

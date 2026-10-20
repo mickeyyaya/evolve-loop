@@ -94,15 +94,14 @@ var resumableReasons = map[string]bool{
 const resetArchiveMarker = ".reset-"
 
 type perRunState struct {
-	path      string
-	cycle     int
-	phase     string
-	startedAt string
-	goalHash  string
-	savedAt   string
-	reason    string
-	enabled   bool
-	leased    bool
+	path     string
+	cycle    int
+	goalHash string
+	savedAt  string
+	reason   string
+	enabled  bool
+	leased   bool
+	phase    string
 }
 
 func discoverPerRunResumeState(evolveDir, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
@@ -114,31 +113,33 @@ func discoverPerRunResumeState(evolveDir, projectRoot string, opts ResumeOptions
 	if log == nil {
 		log = io.Discard
 	}
+	ships, err := landedShips(evolveDir)
+	if err != nil {
+		fmt.Fprintf(log, "[resume] WARN: the ledger scan stopped early (%v); a later ship can be missed\n", err)
+	}
 	var cands []perRunState
-	var refused []string
+	var refusals refusalList
 	for _, st := range states {
-		if st.phase == string(PhaseEnd) {
+		if _, shipped := ships[st.cycle]; shipped || st.phase == string(PhaseEnd) || st.phase == "aborted" {
 			continue
 		}
-		verdict := perRunVerdict(st, states)
-		fmt.Fprintf(log, "[resume] considered %s (cycle %d): %s\n", st.path, st.cycle, verdictText(verdict, st))
+		verdict := perRunVerdict(st, states, ships)
 		if verdict == "" {
+			fmt.Fprintf(log, "[resume] considered %s (cycle %d): %s\n", st.path, st.cycle, candidateText(st))
 			cands = append(cands, st)
 			continue
 		}
-		refused = append(refused, fmt.Sprintf("cycle %d: %s", st.cycle, verdict))
+		refusals.add(log, st, verdict)
 	}
+	refusals.logSummary(log)
 	if len(cands) == 0 {
-		return nil, noPerRunCandidates{refused: refused}
+		return nil, noPerRunCandidates{refused: refusals.lines()}
 	}
 	return firstLoadable(newestFirst(cands), projectRoot, opts, log)
 }
 
-func verdictText(verdict string, st perRunState) string {
-	switch {
-	case verdict != "":
-		return verdict
-	case !rfc3339(st.savedAt):
+func candidateText(st perRunState) string {
+	if !rfc3339(st.savedAt) {
 		return fmt.Sprintf("resumable; the stale rule did not apply, because savedAt %q is not RFC3339", st.savedAt)
 	}
 	return "resumable"
@@ -177,7 +178,7 @@ func readPerRunState(dir string) (perRunState, bool) {
 	if json.Unmarshal(raw, &blob) != nil {
 		return perRunState{}, false
 	}
-	st := perRunState{path: path, cycle: intFromAny(blob["cycle_id"]), phase: strFromAny(blob["phase"]), startedAt: strFromAny(blob["started_at"]), goalHash: strFromAny(blob["goal_hash"])}
+	st := perRunState{path: path, cycle: intFromAny(blob["cycle_id"]), goalHash: strFromAny(blob["goal_hash"]), phase: strFromAny(blob["phase"])}
 	if cp, ok := blob["checkpoint"].(map[string]any); ok {
 		st.enabled, _ = cp["enabled"].(bool)
 		st.reason, st.savedAt = strFromAny(cp["reason"]), strFromAny(cp["savedAt"])
@@ -188,7 +189,7 @@ func readPerRunState(dir string) (perRunState, bool) {
 	return st, true
 }
 
-func perRunVerdict(st perRunState, all []perRunState) string {
+func perRunVerdict(st perRunState, all []perRunState, ships map[int]time.Time) string {
 	switch {
 	case st.leased:
 		return "a live run holds it"
@@ -197,27 +198,29 @@ func perRunVerdict(st perRunState, all []perRunState) string {
 	case !resumableReasons[st.reason]:
 		return fmt.Sprintf("checkpoint reason %q is not resumable", st.reason)
 	}
-	if later, ok := sealedAfter(st, all); ok {
-		return fmt.Sprintf("stale: cycle %d started at %s, after this checkpoint (%s), and sealed; discard it with `%s=%s evolve cycle reset`",
-			later.cycle, later.startedAt, st.savedAt, ipcenv.CycleStateFileKey, st.path)
+	if later, at, ok := shippedAfter(st, all, ships); ok {
+		return fmt.Sprintf("%s: cycle %d of another launch shipped at %s, after this checkpoint (%s); discard it with `%s=%s evolve cycle reset`",
+			staleVerdict, later, at.UTC().Format(time.RFC3339), st.savedAt, ipcenv.CycleStateFileKey, st.path)
 	}
 	return ""
 }
 
-func sealedAfter(st perRunState, all []perRunState) (perRunState, bool) {
+const staleVerdict = "stale"
+
+func shippedAfter(st perRunState, all []perRunState, ships map[int]time.Time) (int, time.Time, bool) {
 	saved, err := time.Parse(time.RFC3339, st.savedAt)
 	if err != nil {
-		return perRunState{}, false
+		return 0, time.Time{}, false
 	}
 	for _, o := range all {
-		if o.phase != string(PhaseEnd) || o.cycle <= st.cycle || o.goalHash == st.goalHash {
+		if o.cycle <= st.cycle || (st.goalHash != "" && o.goalHash == st.goalHash) {
 			continue
 		}
-		if started, perr := time.Parse(time.RFC3339, o.startedAt); perr == nil && started.After(saved) {
-			return o, true
+		if at, landed := ships[o.cycle]; landed && at.After(saved) {
+			return o.cycle, at, true
 		}
 	}
-	return perRunState{}, false
+	return 0, time.Time{}, false
 }
 
 func newestFirst(cands []perRunState) []perRunState {

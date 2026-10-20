@@ -28,11 +28,15 @@ func batchLaneClaims(projectRoot string, firstCycle int, stderr io.Writer) []str
 }
 
 func fleetSignalStop(stdout, stderr io.Writer, lr *loopResult, where string, lanes []string) {
-	fmt.Fprintf(stderr, "[loop] received interrupt (SIGINT/SIGTERM) %s; these lanes of this batch held inbox claims when it stopped. A signal stop writes no resumable checkpoint, so `evolve loop --resume` cannot continue them (it names each lane that it considered):\n", where)
+	printStoppedLanes(stderr, where, lanes)
+	lr.StopReason = "signal"
+	lr.emit(stdout)
+}
+
+func printStoppedLanes(stderr io.Writer, where string, lanes []string) {
+	fmt.Fprintf(stderr, "[loop] received interrupt (SIGINT/SIGTERM) %s; cycles of this batch or later held these inbox claims when it stopped. A signal stop writes no resumable checkpoint, so `evolve loop --resume` cannot continue them (it names each lane that it considered):\n", where)
 	for _, l := range lanes {
 		fmt.Fprintf(stderr, "  %s\n", l)
 	}
-	fmt.Fprintln(stderr, "[loop] release their claims with `evolve inbox-mover recover-orphans`, then launch the goal again")
-	lr.StopReason = "signal"
-	lr.emit(stdout)
+	fmt.Fprintln(stderr, "[loop] release their claims with `evolve inbox-mover recover-orphans` (it releases only claims whose holder is gone), then launch the goal again")
 }
