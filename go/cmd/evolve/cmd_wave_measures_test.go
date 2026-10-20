@@ -307,3 +307,17 @@ func TestWaveStatus_ABrokenSupplyRecordIsAWarningAndTheMeasuresStayWhole(t *test
 		t.Errorf("warnings = %q, want one that names the supply record", got.Warnings)
 	}
 }
+
+func TestWaveStatus_TextPrintsTheOptimisticFailureCountWhenTheWaveHadOptimisticAdmissions(t *testing.T) {
+	t.Parallel()
+	var with, without strings.Builder
+	writeWaveMeasuresText(&with, wavemeasure.Measures{WidthSized: 3, OptimisticAdmissions: 4, OptimisticFailures: 1, OptimisticFailureRate: 0.25})
+	writeWaveMeasuresText(&without, wavemeasure.Measures{WidthSized: 3})
+
+	if want := " · optimistic 1/4 failed (0.25)\n"; !strings.HasSuffix(with.String(), want) {
+		t.Errorf("text = %q, want suffix %q", with.String(), want)
+	}
+	if strings.Contains(without.String(), "optimistic") {
+		t.Errorf("text = %q, want no optimistic part without an optimistic admission", without.String())
+	}
+}

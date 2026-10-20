@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`internal/ipcenv` is the one home of the lane protocol keys. These are the `EVOLVE_` environment keys that a parent evolve process sets for its children (`FleetKey`, `FleetScopeKey`, `FleetWidthKey`, `WorktreeRootKey`, `CycleStateFileKey`, `TmuxSocketKey`, `DispatchIDKey`, `MsgTokenKey`). They are not operator dials, so they have no `flagregistry` row, and the `flagreaders` and `envtaint` regression gates skip this directory. It also owns `Scrub`, the environment every `go test` a cycle spawns to judge the repository runs under.
+`internal/ipcenv` is the one home of the lane protocol keys. These are the `EVOLVE_` environment keys that a parent evolve process sets for its children (`FleetKey`, `FleetScopeKey`, `FleetWidthKey`, `FleetReachHolderKey`, `WorktreeRootKey`, `CycleStateFileKey`, `TmuxSocketKey`, `DispatchIDKey`, `MsgTokenKey`). They are not operator dials, so they have no `flagregistry` row, and the `flagreaders` and `envtaint` regression gates skip this directory. It also owns `Scrub`, the environment every `go test` a cycle spawns to judge the repository runs under.
 
 ## Design
 
@@ -14,6 +14,7 @@
   - Everything outside the namespace (`PATH`, `HOME`, `GOFLAGS`, `GOTOOLCHAIN`) stays, so the toolchain still works.
   - A test that needs an `EVOLVE_` key sets it with `t.Setenv` inside the child, after the scrub.
 - **`FleetWidthKey`** (`EVOLVE_FLEET_WIDTH`) advertises the effective lane width of the fleet supervisor to each launched cycle.
+- **`FleetReachHolderKey`** (`EVOLVE_FLEET_REACH_HOLDER`) is set for a lane that only the optimistic admission rule admitted (ADR-0143 W1b). It names the lane in flight that the import-reach rule holds it behind. The orchestrator pool sets it, and the lane process reads it to report a composed-gate failure or a rebase conflict.
   - The orchestrator scales the ship-recovery budget of a contention-class error (`shipRecoveryBudget`: the larger of 2 and width plus 1). The width is the number of siblings that race for main.
   - `core.fleetWidthFromEnv` reads it from `CycleRequest.Env`, never from `os.Getenv`. So fleet siblings cannot leak their width into each other.
   - An absent, garbage or non-positive value means solo (1).

@@ -70,6 +70,7 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 			}
 		case conflict:
 			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet rebase CONFLICT (overlapping work the partition should have separated) → debugger\n", cycle)
+			o.emitFleetRebaseConflict(cycle, *cs)
 			recoverCode, recoverClass = CodeGitFleetRebaseConflict, ShipClassIntegrity
 		default:
 			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet rebase onto main failed (infra); aborting\n", cycle)

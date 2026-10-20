@@ -141,7 +141,7 @@ func TestMeasures_TheJSONFieldNamesAreStable(t *testing.T) {
 	}
 	sort.Strings(got)
 
-	want := []string{"admission_waits", "conflict_rate", "conflicts", "landed", "utilization", "width_realized", "width_sized"}
+	want := []string{"admission_waits", "conflict_rate", "conflicts", "landed", "optimistic_admissions", "optimistic_failure_rate", "optimistic_failures", "utilization", "width_realized", "width_sized"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("JSON fields = %v, want %v", got, want)
 	}
