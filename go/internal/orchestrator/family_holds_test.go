@@ -11,7 +11,8 @@ import (
 func TestFamilyHolds_TheUnderfilledWarnNamesEachFamilyHold(t *testing.T) {
 	t.Parallel()
 	holds := NewFamilyHolds()
-	holds.Record(admission.Decision{ID: "ctx-telemetry", Cells: []string{"family:ctx", "internal/x"}, BlockedBy: "ctx-cap"})
+	holds.Record(admission.Decision{ID: "pkg-in-a-family", Cells: []string{"family:ctx", "internal/z"}, BlockedBy: "lane-3"})
+	holds.Record(admission.Decision{ID: "ctx-telemetry", Cells: []string{"family:ctx", "internal/x"}, BlockedBy: "ctx-cap", FamilyHold: true})
 	holds.Record(admission.Decision{ID: "pkg-held", Cells: []string{"internal/y"}, BlockedBy: "lane-2"})
 	events := &eventLog{}
 
@@ -26,7 +27,7 @@ func TestFamilyHolds_ALaunchedTodoLeavesTheList(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []fleet.PoolTransitionKind{fleet.PoolLaunched, fleet.PoolBackfilled} {
 		holds := NewFamilyHolds()
-		holds.Record(admission.Decision{ID: "ctx-telemetry", Cells: []string{"family:ctx"}, BlockedBy: "ctx-cap"})
+		holds.Record(admission.Decision{ID: "ctx-telemetry", Cells: []string{"family:ctx"}, BlockedBy: "ctx-cap", FamilyHold: true})
 		events := &eventLog{}
 		p := Pool{MinLanes: 4, Publish: events.publish, FamilyHolds: holds}
 
@@ -46,13 +47,13 @@ func TestFamilyHolds_ALaunchedTodoLeavesTheList(t *testing.T) {
 func TestFamilyHolds_AHoldThatLosesItsFamilyCellLeavesTheList(t *testing.T) {
 	t.Parallel()
 	holds := NewFamilyHolds()
-	holds.Record(admission.Decision{ID: "ctx-telemetry", Cells: []string{"family:ctx"}, BlockedBy: "ctx-cap"})
-	holds.Record(admission.Decision{ID: "ctx-telemetry", Cells: []string{"internal/x"}, BlockedBy: "lane-2"})
+	holds.Record(admission.Decision{ID: "ctx-telemetry", Cells: []string{"family:ctx"}, BlockedBy: "ctx-cap", FamilyHold: true})
+	holds.Record(admission.Decision{ID: "ctx-telemetry", Cells: []string{"family:ctx", "internal/x"}, BlockedBy: "lane-2"})
 	if got := holds.Summary(); got != "" {
-		t.Fatalf("summary = %q: the todo now waits on a package cell, so the family hold is gone", got)
+		t.Fatalf("summary = %q: the todo now waits on a package cell, so the family hold is gone, though it still has a family", got)
 	}
 	var none *FamilyHolds
-	none.Record(admission.Decision{ID: "x", Cells: []string{"family:x"}})
+	none.Record(admission.Decision{ID: "x", Cells: []string{"family:x"}, FamilyHold: true})
 	if none.Summary() != "" {
 		t.Error("a nil hold list records nothing")
 	}

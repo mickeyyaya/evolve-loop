@@ -68,8 +68,10 @@ The inbox item `same-subsystem-wave-scheduling` asks that two items of one subsy
   - `practice-*` comes from `practicewatch/item.go`, for example from the agy and the claude changelog.
   - `retro-<cycle>-*` comes from `failurelearning/remediation.go`, and `cycle-<cycle>-*` from `carryover/mint.go`.
   - In the `top_n` of the last 150 runs, `practice` was the largest prefix, with 22 ids. On 2026-10-17 the practice lanes of cycles 1919 and 1920 ran together.
+  - `auto-heuristic-demotion-*` comes from `triagecap/demotion.go`, and `auto-retro-<cycle>-*` from `retrofile.go`. A filed `auto-` item keeps its family.
   - `idFamily` gives no family to these ids, nor to an id that holds a `/` (a package path from `cardPackages`). A filed `retro-` item without a cycle number keeps its family.
-- **The live pool names a family hold.** `Admitter.OnWait` gets each waiting decision. `orchestrator.FamilyHolds` keeps the family holds and forgets a todo when the pool launches it. `LOOP_ORCH_POOL_UNDERFILLED` adds `family_held`, so a hold does not read as a supply failure.
+  - `TestKernelMinters_StillMintTheFormatsTheFamilyRuleExempts` fails when a minter changes its form, so the list moves with the minters.
+- **The live pool names a family hold.** `Decision.FamilyHold` is true only when the family rule alone holds the todo: no package cell, reach or hub of the blocker holds it. `Admitter.OnWait` gets each waiting decision. `orchestrator.FamilyHolds` keeps the family holds and forgets a todo when the pool launches it. `LOOP_ORCH_POOL_UNDERFILLED` adds `family_held`, so a hold does not read as a supply failure.
 - **The cost (2026-10-21).** The runtime inbox holds 209 items in 128 families. 35 families have more than one item, and they hold 116 items. A scan of `scan_k` todos thus finds other families to fill the width of 4.
 - **Rejected: the first two tokens.** `tokenopt-cache-discipline-audit` and `tokenopt-session-resume-on-retry` then get different families, and so do `handoff-h9-*` and `handoff-h10-*`. The item names `tokenopt-*` as one family.
 - **Rejected: one multi-slug lane for the family.** The pool launches one todo for each lane (`fleet.poolSpec`). A shared lane needs the multi-slug scope work that the item names as a precondition.

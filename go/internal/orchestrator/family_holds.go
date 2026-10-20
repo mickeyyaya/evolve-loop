@@ -21,10 +21,10 @@ func (h *FamilyHolds) Record(d admission.Decision) {
 	if h == nil {
 		return
 	}
-	i := slices.IndexFunc(d.Cells, func(c string) bool { return strings.HasPrefix(c, admission.FamilyCellPrefix) })
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if i < 0 {
+	i := slices.IndexFunc(d.Cells, func(c string) bool { return strings.HasPrefix(c, admission.FamilyCellPrefix) })
+	if !d.FamilyHold || i < 0 {
 		delete(h.held, d.ID)
 		return
 	}

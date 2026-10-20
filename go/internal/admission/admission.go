@@ -31,10 +31,11 @@ type Holding struct {
 }
 
 type Decision struct {
-	ID        string
-	Rank      int
-	Cells     []string
-	BlockedBy string
+	ID         string
+	Rank       int
+	Cells      []string
+	BlockedBy  string
+	FamilyHold bool
 }
 
 type ShadowAdmission struct {
@@ -81,6 +82,7 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 		d := Decision{ID: td.ID, Rank: rank, Cells: fp.cells()}
 		if blocker, busy := a.firstConflict(holders, fp); busy {
 			d.BlockedBy = blocker.lane
+			d.FamilyHold = sameFamily(blocker.fp, fp) && !a.heldWithoutFamily(holders, fp)
 			a.recordShadow(holders, fp, d, blocker)
 			a.recordWait(d)
 			waiting = append(waiting, d)
@@ -154,6 +156,17 @@ func conflict(x, y footprint) bool {
 
 func sharedEdit(x, y footprint) bool {
 	return (x.hub && y.hub) || meets(x.edits, y.edits) || sameFamily(x, y)
+}
+
+func (a Admitter) heldWithoutFamily(holders []holder, fp footprint) bool {
+	fp.family = ""
+	for _, h := range holders {
+		h.fp.family = ""
+		if (a.Optimistic && sharedEdit(h.fp, fp)) || (!a.Optimistic && conflict(h.fp, fp)) {
+			return true
+		}
+	}
+	return false
 }
 
 func sameFamily(x, y footprint) bool {
@@ -242,7 +255,7 @@ func idFamily(id string) string {
 }
 
 func kernelMinted(id string) bool {
-	return strings.HasPrefix(id, "practice-") || strings.Contains(id, "/") || mintedWithACycle.MatchString(id)
+	return strings.HasPrefix(id, "practice-") || strings.HasPrefix(id, "auto-retro-") || strings.HasPrefix(id, "auto-heuristic-demotion-") || strings.Contains(id, "/") || mintedWithACycle.MatchString(id)
 }
 
 func (fp footprint) cells() []string {
