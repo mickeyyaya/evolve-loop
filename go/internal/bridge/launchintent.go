@@ -7,6 +7,7 @@ type LaunchIntent struct {
 	SessionMode      string
 	Effort           string
 	AllowedTools     []string
+	DisallowedTools  []string
 	SystemPromptFile string
 	RawByCLI         map[string][]string
 }

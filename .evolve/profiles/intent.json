@@ -22,8 +22,6 @@
     "Bash(scripts/research/kb-search.sh:*)"
   ],
   "disallowed_tools": [
-    "WebSearch",
-    "WebFetch",
     "Bash(git commit:*)",
     "Bash(git push:*)",
     "Bash(git reset:*)",

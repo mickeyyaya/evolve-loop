@@ -57,10 +57,8 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 
 	realizeSessionMode(&r, m, intent.SessionMode)
 
-	if spec, ok := m.Params["allowed_tools"]; ok && spec.Channel == "flag" && spec.Flag != "" && len(intent.AllowedTools) > 0 {
-		r.LaunchFlags = append(r.LaunchFlags, spec.Flag)
-		r.LaunchFlags = append(r.LaunchFlags, intent.AllowedTools...)
-	}
+	realizeToolList(&r, m, "allowed_tools", intent.AllowedTools)
+	realizeToolList(&r, m, "disallowed_tools", intent.DisallowedTools)
 
 	trustedFlags := dedupeLaunchFlags(r.LaunchFlags)
 	combinedFlags := append([]string(nil), r.LaunchFlags...)
@@ -71,6 +69,13 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	r.LaunchFlags = dedupeLaunchFlags(combinedFlags)
 	r.modelDispatchEffect = modelDispatchFromFinalizedFlags(m.CLI, trustedFlags, r.LaunchFlags)
 	return r
+}
+
+func realizeToolList(r *Realization, m Manifest, param string, tools []string) {
+	if spec, ok := m.Params[param]; ok && spec.Channel == "flag" && spec.Flag != "" && len(tools) > 0 {
+		r.LaunchFlags = append(r.LaunchFlags, spec.Flag)
+		r.LaunchFlags = append(r.LaunchFlags, tools...)
+	}
 }
 
 func realizeSessionMode(r *Realization, m Manifest, mode string) {
