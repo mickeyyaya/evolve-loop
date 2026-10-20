@@ -57,6 +57,7 @@
       }
     ]
   },
+  "stage": "pre-build",
   "after": "triage",
   "optional": true
 }

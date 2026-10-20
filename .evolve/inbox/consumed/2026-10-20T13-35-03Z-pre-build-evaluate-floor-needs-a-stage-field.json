@@ -5,6 +5,11 @@
     "bug-reproduction and fault-localization declare the pre-build stage, and the bug-reproduction window pin in go/cmd/evolve/routing_order_realtree_test.go reads the field instead of the phase names.",
     "The phasespec package note and the phase-config spec document the field."
   ],
+  "consumed": {
+    "at": "2026-10-20T18:52:52Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-10-20T14:00:00Z",
   "files": [
     "go/internal/phasespec/phasespec.go",

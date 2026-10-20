@@ -1,6 +1,7 @@
 package phasespec
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -8,7 +9,7 @@ import (
 
 func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Catalog) []string {
 	var warnings []string
-	var pending []PhaseSpec
+	pending, known := []PhaseSpec(nil), slices.Clone(cfg.Order)
 	for _, s := range specs {
 		if v := ValidateUserSpecWithCatalog(s, builtin); len(v) > 0 {
 			warnings = append(warnings, "phase "+s.Name+" not routed (invalid): "+strings.Join(v, "; "))
@@ -74,7 +75,33 @@ func ApplyUserRouting(cfg *config.RoutingConfig, specs []PhaseSpec, builtin Cata
 		}
 		pending = deferred
 	}
+	return append(warnings, refusePreBuildAfterBuild(cfg, specs, known)...)
+}
+
+func refusePreBuildAfterBuild(cfg *config.RoutingConfig, specs []PhaseSpec, known []string) []string {
+	var warnings []string
+	for _, s := range specs {
+		if slices.Contains(known, s.Name) {
+			continue
+		}
+		build := indexOfStr(cfg.Order, "build")
+		at := indexOfStr(cfg.Order, s.Name)
+		if s.Stage != StagePreBuild || build < 0 || at < build {
+			continue
+		}
+		cfg.Order = append(cfg.Order[:at:at], cfg.Order[at+1:]...)
+		delete(cfg.PhaseEnable, s.Name)
+		delete(cfg.Triggers, s.Name)
+		warnings = append(warnings, "phase "+s.Name+" not routed: stage pre-build must precede build, but its slot (after "+anchorOrDefault(s.After)+") is after build")
+	}
 	return warnings
+}
+
+func anchorOrDefault(anchor string) string {
+	if anchor == "" {
+		return "the pre-audit default"
+	}
+	return anchor
 }
 
 func spliceAfter(order []string, name, anchor string) []string {

@@ -172,6 +172,11 @@
       "type": "string",
       "description": "Slot this phase right after the named phase in the routing order. Empty defaults to the pre-audit slot."
     },
+    "stage": {
+      "type": "string",
+      "enum": ["pre-build", "post-build"],
+      "description": "Where the phase sits relative to build. A pre-build phase (a red-first Evaluate phase such as bug-reproduction) is refused, with a routing-defect signal, when its slot would fall after build."
+    },
     "on_pass": {
       "type": "string"
     },

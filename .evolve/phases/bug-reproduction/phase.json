@@ -55,6 +55,7 @@
       }
     ]
   },
+  "stage": "pre-build",
   "after": "fault-localization",
   "writes_source": true
 }

@@ -61,6 +61,7 @@ type PhaseSpec struct {
 	Routing           *config.RoutingBlock        `json:"routing,omitempty"`
 	Gates             Gates                       `json:"gates,omitempty"`
 	After             string                      `json:"after,omitempty"`
+	Stage             string                      `json:"stage,omitempty"`
 	OnPass            string                      `json:"on_pass,omitempty"`
 	OnFail            string                      `json:"on_fail,omitempty"`
 	BranchingStrategy string                      `json:"branching_strategy,omitempty"`
@@ -77,6 +78,11 @@ type ArtifactGate struct {
 	RequiresPresent bool     `json:"requires_present,omitempty"`
 	VerdictIn       []string `json:"verdict_in,omitempty"`
 }
+
+const (
+	StagePreBuild  = "pre-build"
+	StagePostBuild = "post-build"
+)
 
 const (
 	BranchingVerdict = "verdict"
@@ -223,6 +229,9 @@ func Load(path string) (Catalog, error) {
 			return Catalog{}, fmt.Errorf("phase registry %q: phase %q: %s", path, s.Name, strings.Join(viol, "; "))
 		}
 		if viol := ValidateOutputsPartition(s); len(viol) > 0 {
+			return Catalog{}, fmt.Errorf("phase registry %q: phase %q: %s", path, s.Name, strings.Join(viol, "; "))
+		}
+		if viol := ValidateStage(s); len(viol) > 0 {
 			return Catalog{}, fmt.Errorf("phase registry %q: phase %q: %s", path, s.Name, strings.Join(viol, "; "))
 		}
 		if _, ok := cat.byName[s.Name]; ok {

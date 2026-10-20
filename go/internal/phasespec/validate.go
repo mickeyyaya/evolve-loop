@@ -52,6 +52,7 @@ func isOptionalBuiltinName(name string, builtin Catalog) bool {
 func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 	var v []string
 	v = append(v, ValidateOutputsPartition(s)...)
+	v = append(v, ValidateStage(s)...)
 
 	if s.Name == "" {
 		v = append(v, "name is required")
@@ -110,6 +111,14 @@ func ValidateActivatingFields(s PhaseSpec) []string {
 			s.OnPass, s.OnFail))
 	}
 	return v
+}
+
+func ValidateStage(s PhaseSpec) []string {
+	switch s.Stage {
+	case "", StagePreBuild, StagePostBuild:
+		return nil
+	}
+	return []string{fmt.Sprintf("stage %q must be one of %s/%s (or empty)", s.Stage, StagePreBuild, StagePostBuild)}
 }
 
 func ValidateOutputsPartition(s PhaseSpec) []string {

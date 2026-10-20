@@ -54,9 +54,14 @@ func TestRealTreeRoutingOrder_AnchoredPhasesFollowTheirAnchors(t *testing.T) {
 		t.Skip("no anchored user specs routed")
 	}
 
-	if bi, fi, bu := idx("bug-reproduction"), idx("fault-localization"), idx("build"); bi >= 0 && fi >= 0 && bu >= 0 {
-		if bi < fi || bi > bu {
-			t.Errorf("bug-reproduction at %d must sit after fault-localization (%d) and before build (%d); executing a red-first repro post-build reds the lane (cycle-1550)", bi, fi, bu)
+	bu := idx("build")
+	for _, s := range userSpecs {
+		if s.Stage != phasespec.StagePreBuild || s.After == "" {
+			continue
+		}
+		si, ai := idx(s.Name), idx(s.After)
+		if si >= 0 && ai >= 0 && bu >= 0 && (si < ai || si > bu) {
+			t.Errorf("pre-build phase %q at %d must sit after its anchor %q (%d) and before build (%d); executing a red-first phase post-build reds the lane (cycle-1550)", s.Name, si, s.After, ai, bu)
 		}
 	}
 }

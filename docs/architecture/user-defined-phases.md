@@ -56,6 +56,7 @@ what does it do about it."*
 | `kind` | `llm` (only executable kind today; `native`/`command` reserved) | `llm` |
 | `optional` | **must be `true`** for user phases (floor) | — |
 | `after` | the phase to slot in right after (e.g. `"build"`) | before `audit` |
+| `stage` | `pre-build` or `post-build`. A `pre-build` phase must sit before `build`: the routing floor refuses it, with a routing-defect signal, when its `after` anchor (or the default pre-audit slot) falls after `build`. An unknown word is refused. Empty is unconstrained | — |
 | `agent` | agent doc name | `evolve-<name>` |
 | `model` | model tier or `auto` | `auto` |
 | `writes_source` | `true` ⇒ may edit code in the worktree. `false` ⇒ the phase is FENCED (ADR-0097): the runner snapshots the worktree before dispatch and restores it after; any write the agent made is undone and reported as a diagnostic on the phase response. Declare `true` for any phase that must write source. | `false` |
