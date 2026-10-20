@@ -107,7 +107,7 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 	t := now()
 	stamp := t.UTC().Format("20060102T150405.000000000")
 	rfc := t.UTC().Format(time.RFC3339)
-	archiveDir := workspace + ".reset-" + stamp
+	archiveDir := workspace + resetArchiveMarker + stamp
 
 	res := SealResult{
 		SealedCycleID: cycleID,

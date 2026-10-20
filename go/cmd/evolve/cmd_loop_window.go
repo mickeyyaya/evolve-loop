@@ -123,7 +123,12 @@ func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig
 }
 
 func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batchDecision {
-	signalStop(b.stdout, b.stderr, b.result, fmt.Sprintf("%sbefore cycle %d — stopping", when, iteration+1))
+	where := fmt.Sprintf("%sbefore cycle %d — stopping", when, iteration+1)
+	if lanes := batchLaneClaims(b.cfg.ProjectRoot, b.result.batchFirstCycle, b.stderr); len(lanes) > 0 {
+		fleetSignalStop(b.stdout, b.stderr, b.result, where, lanes)
+	} else {
+		signalStop(b.stdout, b.stderr, b.result, where)
+	}
 	return batchDecision{flow: batchReturn, exitCode: 130}
 }
 

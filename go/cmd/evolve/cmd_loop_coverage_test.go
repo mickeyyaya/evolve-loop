@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
@@ -563,10 +564,10 @@ func TestRunLoop_ResumeFullProtocol(t *testing.T) {
     "worktreePath": %q,
     "gitHead": %q,
     "reason": "test resume",
-    "savedAt": "2026-05-23T00:00:00Z",
+    "savedAt": %q,
     "costAtCheckpoint": 1.25
   }
-}`, worktree, head)
+}`, worktree, head, time.Now().UTC().Format(time.RFC3339))
 	if err := os.WriteFile(filepath.Join(evolveDir, "cycle-state.json"), []byte(csContent), 0o644); err != nil {
 		t.Fatalf("write cycle-state: %v", err)
 	}

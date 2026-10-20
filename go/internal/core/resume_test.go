@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func writeStateFile(t *testing.T, dir string, body any) string {
@@ -54,8 +56,9 @@ func TestLoadResumeState_HappyPath(t *testing.T) {
 	writeStateFile(t, evolveDir, state)
 
 	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
-		CurrentHead: func(_ string) (string, error) { return "abc123\n", nil },
-		PathExists:  func(_ string) bool { return true },
+		MainAhead:  mainAheadOf(map[string]int{"abc123": 0}),
+		Now:        func() time.Time { return time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC) },
+		PathExists: func(_ string) bool { return true },
 	})
 	if err != nil {
 		t.Fatalf("LoadResumeState: %v", err)
@@ -108,7 +111,7 @@ func TestLoadResumeState_CheckpointDisabled(t *testing.T) {
 	}
 }
 
-func TestLoadResumeState_StaleHead(t *testing.T) {
+func TestLoadResumeState_AMovedMainWarnsAndResumes(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()
 	evolveDir := filepath.Join(tmp, ".evolve")
@@ -120,15 +123,17 @@ func TestLoadResumeState_StaleHead(t *testing.T) {
 			"gitHead":         "abc123",
 		},
 	})
-	_, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
-		CurrentHead: func(_ string) (string, error) { return "def456\n", nil },
-		PathExists:  func(_ string) bool { return true },
+	var log bytes.Buffer
+	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
+		MainAhead:  mainAheadOf(map[string]int{"abc123": 3}),
+		PathExists: func(_ string) bool { return true },
+		Log:        &log,
 	})
-	if err == nil || !errors.Is(err, ErrStaleCheckpoint) {
-		t.Errorf("got %v, want ErrStaleCheckpoint", err)
+	if err != nil || rp.Phase != "audit" {
+		t.Fatalf("LoadResumeState = %+v, %v; main moving alone does not stale a checkpoint", rp, err)
 	}
-	if !strings.Contains(err.Error(), "git HEAD moved") {
-		t.Errorf("error message: %v", err)
+	if !strings.Contains(log.String(), "origin/main is 3 commit(s) past the base abc123") {
+		t.Errorf("log %q; the resume warns how far main moved", log.String())
 	}
 }
 
@@ -146,7 +151,7 @@ func TestLoadResumeState_AllowHeadMoved(t *testing.T) {
 	})
 	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
 		AllowHeadMoved: true,
-		CurrentHead:    func(_ string) (string, error) { return "def456\n", nil },
+		MainAhead:      mainAheadOf(map[string]int{"abc123": 3}),
 		PathExists:     func(_ string) bool { return true },
 	})
 	if err != nil {
@@ -170,8 +175,7 @@ func TestLoadResumeState_WorktreeMissing(t *testing.T) {
 		},
 	})
 	_, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
-		CurrentHead: func(_ string) (string, error) { return "", nil },
-		PathExists:  func(_ string) bool { return false },
+		PathExists: func(_ string) bool { return false },
 	})
 	if err == nil || !errors.Is(err, ErrStaleCheckpoint) {
 		t.Errorf("got %v, want ErrStaleCheckpoint", err)
@@ -208,8 +212,7 @@ func TestLoadResumeState_UnknownHeadSkipsValidation(t *testing.T) {
 		},
 	})
 	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{
-		CurrentHead: func(_ string) (string, error) { return "any-head", nil },
-		PathExists:  func(_ string) bool { return true },
+		PathExists: func(_ string) bool { return true },
 	})
 	if err != nil {
 		t.Fatalf("expected success when checkpoint head=unknown: %v", err)

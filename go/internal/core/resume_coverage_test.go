@@ -277,8 +277,7 @@ func TestLoadResumeState_InvalidJSON(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	_, err := LoadResumeState(context.Background(), dir, evolveDir, ResumeOptions{
-		CurrentHead: func(_ string) (string, error) { return "abc", nil },
-		PathExists:  func(_ string) bool { return true },
+		PathExists: func(_ string) bool { return true },
 	})
 	if err == nil {
 		t.Errorf("expected JSON parse error")

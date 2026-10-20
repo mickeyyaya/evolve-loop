@@ -13,6 +13,11 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
 ## Design
 
 - **Thin handlers.** Each `runX(args, stdin, stdout, stderr) int` parses its flags and delegates. Most handlers exit 10 on bad arguments; `campaign`, `audit`, `build-invocation-context` and `cli-routing` exit 2. `reorderArgs` forwards to `cmdutil.ReorderArgs`, the one definition the extracted `internal/cli/*` groups share.
+- **A signal stop names the lanes that it stopped** (`cmd_loop_signal_stop.go`, inbox item `resume-after-a-fleet-signal-stop`).
+  - A fleet lane that a SIGINT stops writes no resumable checkpoint. `interruptReturn` calls `batchLaneClaims`, which lists the inbox claims of the cycles of this batch (`inboxmover.SurveyClaims`, from `loopResult.batchFirstCycle`).
+  - When a lane holds a claim, `fleetSignalStop` names each lane and its item and `evolve inbox-mover recover-orphans`. An interrupt that ends the last wave reaches `batchExitCode`, which names the same lanes (`printStoppedLanes`). It does not name `evolve loop --resume`. With no such claim, or an unknown batch start, the old message stays.
+  - `runResumeBatch` passes stderr as the discovery log, so `--resume` prints each checkpoint that it considered.
+  - Pinned by `TestInterruptReturn_AFleetStopNamesTheStoppedLanesAndTheirRecovery` and `TestRunResumeBatch_RefusesAStaleCheckpointAndListsEveryCheckpointItConsidered`.
 - **Removed budget flags.** `loop` and `cycle run` strip `--budget-usd`, `--budget` and `--batch-cap-usd` before `flag.Parse` in every form it accepts (`-f`, `--f`, `-f=v`, `--f=v`, `-f v`), with one WARN, so an old script gets a notice instead of a "flag provided but not defined" abort. A following token is the flag's value only when it parses as a finite float: `-1` is consumed, while `--cycles` and a goal word such as `NaN` are not.
 - **A goal that names an item no lane can take refuses the launch** (`cmd_loop_goal_ids.go`, inbox item `goal-text-has-no-selection-authority`).
   - Goal text is prose for the agents. It does not select or exclude inbox items. The wave partitions the lane menu before an agent reads the goal.
