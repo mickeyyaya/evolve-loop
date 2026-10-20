@@ -166,6 +166,9 @@ var treeReadingSelections = []TestSelection{
 		"TestDefectLedgerSeam_OneConstructionSite",
 		"TestNullLedgerFacades_HaveNoProductionCaller",
 	}},
+	{Package: "./internal/phases/audit/ciparitygate", Tests: []string{
+		"TestEnvExclusive_TheCIJobsTheBridgeBackstopNamesRunTheTmuxTier",
+	}},
 	{Package: "./internal/phases/runner", Tests: []string{
 		"TestVerdictEngine_OneConstructionSite",
 	}},

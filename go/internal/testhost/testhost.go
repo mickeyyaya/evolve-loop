@@ -4,7 +4,10 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 )
+
+const RequiredToolsEnv = "TESTHOST_REQUIRED_TOOLS"
 
 type T interface {
 	Helper()
@@ -30,10 +33,23 @@ func (h Host) Unavailable(t T, reason string) {
 func (h Host) Tool(t T, name string) string {
 	t.Helper()
 	path, err := h.LookPath(name)
+	if err != nil && h.requires(name) {
+		t.Fatal("this job declares " + name + " required (" + RequiredToolsEnv + "), but " + name + " not installed")
+		return path
+	}
 	if err != nil {
 		h.Unavailable(t, name+" not installed")
 	}
 	return path
+}
+
+func (h Host) requires(name string) bool {
+	for _, tool := range strings.Split(h.Getenv(RequiredToolsEnv), ",") {
+		if strings.TrimSpace(tool) == name {
+			return true
+		}
+	}
+	return false
 }
 
 func Unavailable(t T, reason string) {
