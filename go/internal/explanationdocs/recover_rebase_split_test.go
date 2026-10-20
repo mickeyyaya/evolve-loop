@@ -89,6 +89,16 @@ func TestRecoverRebaseSplit_RefusesEverySplitItCannotProve(t *testing.T) {
 			b.Workspace = filepath.Join(f.root, ".evolve", "runs", "cycle-43")
 			return b
 		}},
+		"a marker of another contract version": {setup: func(t *testing.T) CycleBinding {
+			f, _ := rebasedFixture(t)
+			editJSONFile(t, activationPath(f.root, f.cycle), func(doc map[string]any) { doc["contract_version"] = CurrentContractVersion + 1 })
+			return f.binding()
+		}},
+		"a marker of another cycle": {setup: func(t *testing.T) CycleBinding {
+			f, _ := rebasedFixture(t)
+			editJSONFile(t, activationPath(f.root, f.cycle), func(doc map[string]any) { doc["cycle"] = f.cycle + 1 })
+			return f.binding()
+		}},
 		"another worktree": {setup: func(t *testing.T) CycleBinding {
 			f, _ := rebasedFixture(t)
 			b := f.binding()
