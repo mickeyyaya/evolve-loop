@@ -303,16 +303,32 @@ The request is the inbox item `lost-ship-closeout-universal-landing-witness`. Th
 
 **D4 (resume).** In process, the latch and the pre-cycle `HEAD` are host memory. A resume read both back from the run's `run.json` and `cycle-state.json` (`resume_bootstrap.go`). A phase agent can write these files, because they are in its run workspace.
 
-Now the host also writes both values to `.evolve/resume-witness/cycle-<N>.json` (`core/resume_witness.go`). It writes the file when it sets the pre-cycle `HEAD` and when a ship PASS sets the latch, on both dispatch roots. The sandbox does not grant this directory to a phase agent.
+Now the host also writes both values to `.evolve/resume-witness/cycle-<N>.json` (`core/resume_witness.go`). It writes the file when it sets the pre-cycle `HEAD` and when a ship PASS sets the latch, on both dispatch roots.
 
-A resume takes both values from that file. The cycle number comes from the host identity, not from the state file. The file must name the same cycle and the same `run_id`, or the resume clears the latch and the pre-cycle `HEAD`. Then the old fallback applies: the resume takes the current `HEAD` and logs a WARN.
+A resume takes both values from that file. The cycle number comes from the host identity, not from the state file (`TestResumeWitness_TheResumeTakesTheWitnessOfTheHostCycle`). The file must name the same cycle and the same `run_id`, or the resume clears the latch and the pre-cycle `HEAD`. Then the old fallback applies: the resume takes the current `HEAD` and logs a WARN.
+
+**D5 (the ship error).** The floor fires only when ship recorded an error. That error was only `ship-error.json` in the run workspace. An agent that runs after the ship failure can write `{}` into that file, and then the floor does not fire.
+
+Now `recoverShipErrorRoute` also writes the code, the class and the message into the witness. The floor reads the witness first and the workspace file only when the witness has no ship error. A later latch of the same run keeps the recorded ship error. The witness check uses the cycle only, because a changed `run_id` must not hide the error. `TestResumeWitness_AnOverwrittenShipErrorStillFlagsTheLostLanding` pins D5.
+
+**D6 (who can write the witness).** The witness is safe only if no agent can write `.evolve/resume-witness/`. Each sandboxed profile is denied this directory. Three in-cycle profiles had no sandbox: `failure-adjudicator`, `failure-advisor` and `swarm-planner`. They ran unconfined, so they had write access to the witness and to every other host file.
+
+Each of the three now enables the sandbox and writes only its own run directory, which holds its one artifact. `TestEveryAgentProfileRunsInTheSandbox` refuses an agent profile without the sandbox. `TestNoProfileCanWriteTheResumeWitness` checks each sandboxed profile. It requires that the only profile it cannot launch is `orchestrator`, which the launcher refuses because of its glob denial.
 
 | Rejected option | Why |
 |---|---|
-| A sandbox deny of `run.json` and `cycle-state.json` in the workspace | A deny needs proof that no tool in the sandbox writes these files. A deny also does not protect a phase that ran without a sandbox. |
+| A sandbox deny of `run.json` and `cycle-state.json` in the workspace | A deny needs proof that no tool in the sandbox writes these files. A deny also does not protect a phase that runs without a sandbox. |
 | A hash of the whole state file | Other host writers (`clearActiveWorktree`, the checkpoint verbs) read the file and write it again. Each such write seals a forged value. |
+| An HMAC with a host key, or a witness outside the project tree | An unconfined agent runs as the same user. It can read any key file and write any path that the host can. A key in host memory does not survive the crash that a resume recovers from. Only the sandbox separates the agent from the host. |
 
-**Limit.** The `run_id` check reads the `run_id` of the state file, which an agent can write. A changed `run_id` cannot forge the two values. It only clears them, so a cycle that shipped can show as `landing-lost` after a resume. A failed write of the witness has the same result, with a WARN. Both failures are safe: they flag a landing, and they never clear the floor.
+**Limits.**
+
+- The operator opt-out `EVOLVE_SANDBOX=off` and the nested-sandbox fallback run every phase unconfined. Then an agent can write the witness. The design does not protect a run that turns the sandbox off.
+- The `run_id` check reads the `run_id` of the state file, which an agent can write. A changed `run_id` cannot forge the latch or the pre-cycle `HEAD`. It only clears them.
+- A resume with no witness clears the latch and the pre-cycle `HEAD`. This occurs for a cycle that was in flight when this change deployed, and after a failed witness write (a WARN).
+- The verdict effects of a missing witness follow from `Shipped=false`. A SKIPPED cycle that shipped is labelled `SKIPPED_UNKNOWN`, not `SHIPPED_VIA_BUILD`. A failed post-ship control phase fails the cycle, because the post-ship observer skip needs the latch. A ship error in the workspace then flags `landing-lost`.
+- All of these effects flag work. None of them clears the floor.
+- When the witness write of a ship error fails, the floor uses the workspace file, which an agent can change.
 
 `TestResumeWitness_AShipLatchPlantedInRunStateIsStillALostLanding` and `TestResumeWitness_APreCycleHeadMovedBackInRunStateDoesNotClearTheFloor` plant the forged values in the state file before a resume. The sandbox contract row "write the host resume witness" proves the deny under the real `sandbox-exec`. Inbox `resume-reads-the-ship-latch-from-an-agent-writable-file` is consumed.
 

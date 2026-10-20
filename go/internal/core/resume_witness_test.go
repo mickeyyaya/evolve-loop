@@ -196,3 +196,91 @@ func TestResumeWitness_AnUnwritableWitnessDirIsAnError(t *testing.T) {
 		t.Fatalf("an unrecorded witness must be logged, got %q", stderr.String())
 	}
 }
+
+func TestResumeWitness_AnOverwrittenShipErrorStillFlagsTheLostLanding(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name     string
+		hostSaw  bool
+		wantLost bool
+	}{
+		{"the host recorded the ship error", true, true},
+		{"the host recorded no ship error", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			ws := RunWorkspacePath(root, witnessCycle)
+			if err := os.MkdirAll(ws, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			cs := CycleState{CycleID: witnessCycle, RunID: "host-run", WorkspacePath: ws}
+			if tc.hostSaw {
+				o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithStderr(&bytes.Buffer{}))
+				o.recoverFromShipError(context.Background(), root, witnessCycle, &cs,
+					NewShipError(CodeGitFleetRebaseNeeded, ShipClassTransient, StageAtomicShip, "peer moved main"), 99, 1)
+			}
+			writeWorkspaceFile(t, ws, "ship-error.json", `{}`)
+			sig := detectLostLanding(landingEvidence{Workspace: ws, ProjectRoot: root, Cycle: witnessCycle, FinalVerdict: VerdictPASS})
+			if lost := sig != nil && sig.Category == "landing-lost"; lost != tc.wantLost {
+				t.Fatalf("lost=%v, want %v: the floor must read the ship error the host recorded, not the agent-writable file", lost, tc.wantLost)
+			}
+		})
+	}
+}
+
+func TestResumeWitness_ALatchAfterAShipErrorKeepsTheShipError(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	cs := CycleState{CycleID: witnessCycle, RunID: "host-run", PreCycleHEAD: "pre"}
+	o := &Orchestrator{stderr: &bytes.Buffer{}}
+	o.persistShipErrorWitness(root, cs, NewShipError(CodeGitFleetRebaseNeeded, ShipClassTransient, StageAtomicShip, "peer moved main"))
+	if !o.latchShip(root, &cs, PhaseShip, VerdictPASS) {
+		t.Fatal("a ship PASS must latch")
+	}
+	w, ok := readResumeWitness(root, witnessCycle)
+	if !ok || !w.Shipped || w.ShipError == nil || w.ShipError.Code != string(CodeGitFleetRebaseNeeded) || w.PreCycleHEAD != "pre" {
+		t.Fatalf("the latch must keep the earlier ship error and the pre-cycle HEAD: %+v ok=%v", w, ok)
+	}
+	next := CycleState{CycleID: witnessCycle, RunID: "next-run"}
+	if err := recordResumeWitness(root, next); err != nil {
+		t.Fatal(err)
+	}
+	if w, _ := readResumeWitness(root, witnessCycle); w.ShipError != nil {
+		t.Fatalf("a ship error of another run must not carry into this run's witness: %+v", w)
+	}
+}
+
+func TestResumeWitness_AnUnrecordedShipErrorIsLogged(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".evolve"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	o := &Orchestrator{stderr: &stderr}
+	o.persistShipErrorWitness(root, CycleState{CycleID: witnessCycle}, NewShipError(CodeGitFleetRebaseNeeded, ShipClassTransient, StageAtomicShip, "x"))
+	if !strings.Contains(stderr.String(), "ship error not recorded in the resume witness") {
+		t.Fatalf("an unrecorded ship error must be logged, got %q", stderr.String())
+	}
+}
+
+func TestResumeWitness_TheResumeTakesTheWitnessOfTheHostCycle(t *testing.T) {
+	t.Parallel()
+
+	root, _, _ := landedRepo(t)
+	o, st, req, rp := resumedAfterShipFixture(t, root)
+	hostWitness(t, root, CycleState{CycleID: witnessCycle - 1, RunID: "host-run", Shipped: true, PreCycleHEAD: gitRev(t, root, "HEAD")})
+	st.cycleState.CycleID = witnessCycle - 1
+	rp.CycleID = 0
+	got, err := o.RunCycleFromPhase(context.Background(), req, rp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SystemFailure == nil || got.SystemFailure.Category != "landing-lost" {
+		t.Fatalf("a state file naming cycle %d borrowed that cycle's shipped witness for host cycle %d: %+v", witnessCycle-1, witnessCycle, got)
+	}
+}

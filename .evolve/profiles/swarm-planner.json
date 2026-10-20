@@ -78,5 +78,30 @@
     "Write(.evolve/runs/cycle-*/intent.md)",
     "Write(.evolve/runs/cycle-*/orchestrator-report.md)"
   ],
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_read_subpaths": [
+      "docs/private"
+    ],
+    "deny_subpaths": [
+      ".git",
+      "scripts",
+      "skills",
+      "agents",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals",
+      ".evolve/worktrees",
+      ".evolve/inbox",
+      "docs/private"
+    ],
+    "allow_network": true
+  },
   "output_artifact": ".evolve/runs/cycle-{cycle}/swarm-plan.md"
 }

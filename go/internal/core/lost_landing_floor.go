@@ -32,7 +32,10 @@ func detectLostLanding(ev landingEvidence) *SystemFailureSignal {
 	if bindingWitnessesLanding(ev) {
 		return nil
 	}
-	code, class, msg, ok := readShipError(ev.Workspace)
+	code, class, msg, ok := hostShipError(ev.ProjectRoot, ev.Cycle)
+	if !ok {
+		code, class, msg, ok = readShipError(ev.Workspace)
+	}
 	if !ok {
 		return nil
 	}
