@@ -11,16 +11,29 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/stelint"
 )
 
-func steLintWarn(worktree, stageWord string, paths []string, warn io.Writer) {
-	if stage, _ := config.GateStage(stageWord); stage == config.StageOff || worktree == "" {
-		return
+const steLintRemedy = "fix each finding; `evolve docs ste-lint --strict --changed <base> --added` lists them"
+
+func steLintFloor(worktree, stageWord string, paths []string, warn io.Writer) []string {
+	stage, _ := config.GateStage(stageWord)
+	if stage == config.StageOff || worktree == "" {
+		return nil
 	}
-	for _, line := range steLintFloorLines(worktree, paths) {
+	warnings, finding := steLintFloorLines(worktree, paths)
+	for _, line := range warnings {
 		fmt.Fprintln(warn, line)
+	}
+	switch {
+	case finding == "":
+		return nil
+	case stage == config.StageEnforce:
+		return []string{"[ste-lint] the changed documents fail the STE lint: " + finding + "; " + steLintRemedy}
+	default:
+		fmt.Fprintln(warn, "[ste-lint] WARN: "+finding)
+		return nil
 	}
 }
 
-func steLintFloorLines(worktree string, paths []string) []string {
+func steLintFloorLines(worktree string, paths []string) (warnings []string, finding string) {
 	var docs []string
 	for _, p := range paths {
 		if stelint.InDocsScope(p) {
@@ -28,20 +41,19 @@ func steLintFloorLines(worktree string, paths []string) []string {
 		}
 	}
 	if len(docs) == 0 {
-		return nil
+		return nil, ""
 	}
 	words, err := stelint.LoadStandard(worktree)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil
+		return nil, ""
 	}
 	if err != nil {
-		return []string{fmt.Sprintf("[ste-lint] WARN: the lint did not run: %v", err)}
+		return []string{fmt.Sprintf("[ste-lint] WARN: the lint did not run: %v", err)}, ""
 	}
 	return steFindingLines(worktree, docs, stelint.Options{Words: words})
 }
 
-func steFindingLines(worktree string, docs []string, opt stelint.Options) []string {
-	var lines []string
+func steFindingLines(worktree string, docs []string, opt stelint.Options) (lines []string, finding string) {
 	findings, files, first := 0, 0, ""
 	for _, p := range docs {
 		fileFindings, err := stelint.LintFile(filepath.Join(worktree, filepath.FromSlash(p)), opt)
@@ -68,7 +80,7 @@ func steFindingLines(worktree string, docs []string, opt stelint.Options) []stri
 		}
 	}
 	if findings > 0 {
-		lines = append(lines, fmt.Sprintf("[ste-lint] WARN: %d finding(s) in %d file(s) (first: %s)", findings, files, first))
+		finding = fmt.Sprintf("%d finding(s) in %d file(s) (first: %s)", findings, files, first)
 	}
-	return lines
+	return lines, finding
 }

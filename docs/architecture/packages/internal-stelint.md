@@ -52,7 +52,9 @@
 
 `steLintFloorLines` returns the lines, and `steLintWarn` prints them. A changed document that the floor cannot read gets its own `[ste-lint] WARN: <path> was not checked` line. At the stage `shadow`, the floor counts every finding in a changed document, not only the findings that the change adds.
 
-The floor reads the standard from the cycle worktree, and only when a document in scope changed. A worktree without the standard has no STE rule, so the floor prints nothing. A standard that does not parse gives a WARN that the lint did not run. The policy key `docs_floor.ste_stage` (`off`, `shadow` or `enforce`; the compiled default is `shadow`) controls the floor. Every stage only WARNs.
+The floor reads the standard from the cycle worktree, and only when a document in scope changed. A worktree without the standard has no STE rule, so the floor prints nothing. A standard that does not parse gives a WARN that the lint did not run. The policy key `docs_floor.ste_stage` (`off`, `shadow` or `enforce`; the compiled default is `shadow`) controls the floor.
+
+At `shadow` the floor only WARNs. At `enforce` a finding in a changed document is a floor failure, so the build gets the document back (`steLintFloor`, 2026-10-21). A lint that did not run stays a WARN at every stage. So does a document that the lint cannot read, so such a document can still land at `enforce`.
 
 ## Tests
 

@@ -29,7 +29,7 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out = append(out, PlaceholderTokenFailures(ctx, in)...)
 	paths := changedFloorPaths(ctx, in)
 	out = append(out, personaBudgetFailures(ctx, in.Worktree, paths)...)
-	docsFloorWarn(in, paths)
+	out = append(out, docsFloorChecks(in, paths)...)
 	out = append(out, commentFloorFailures(ctx, in)...)
 	out = append(out, sizeFloorFailures(ctx, in)...)
 	out = append(out, coverChangedFailures(ctx, in, paths)...)
@@ -74,7 +74,7 @@ func explanationDocumentationFailures(ctx context.Context, in ReviewInput) []str
 	})
 }
 
-func docsFloorWarn(in ReviewInput, paths []string) {
+func docsFloorChecks(in ReviewInput, paths []string) []string {
 	var cfg docsfloor.Config
 	steStage := policy.Policy{}.DocsFloorConfig().SteStage
 	if in.ProjectRoot != "" {
@@ -83,7 +83,7 @@ func docsFloorWarn(in ReviewInput, paths []string) {
 			steStage = p.DocsFloorConfig().SteStage
 		}
 	}
-	steLintWarn(in.Worktree, steStage, paths, in.errOut())
+	failures := steLintFloor(in.Worktree, steStage, paths, in.errOut())
 	v := docsfloor.Evaluate(cfg, docsfloor.Input{
 		ArchitectureLabeled: docsfloor.IsArchitectureClass(paths),
 		ChangedFiles:        paths,
@@ -91,6 +91,7 @@ func docsFloorWarn(in ReviewInput, paths []string) {
 	if v.Status == docsfloor.StatusWarn {
 		fmt.Fprintf(in.errOut(), "[docs-floor] WARN: %s\n", v.Reason)
 	}
+	return failures
 }
 
 func changedFloorPaths(ctx context.Context, in ReviewInput) []string {
