@@ -307,6 +307,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 			origin: "Orchestrator.reviewResumedDeliverable", cycle: cycle, phase: phase, correction: correction, max: maxCorrections,
 			rung: interaction.RungRedispatch, cli: req.ModelRoutingCLI, reason: review.Reason,
 		})
+		req.Attempt++
 		cancel := o.observer.Start(ctx, string(phase), req)
 		corrected, err := runner.Run(ctx, req)
 		if cancel != nil {

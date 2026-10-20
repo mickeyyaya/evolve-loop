@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -71,6 +72,8 @@ type cycleRun struct {
 	scheduledNext     Phase
 	routingSeq        int
 	remediationRounds map[Phase]int
+	phaseDispatches   map[Phase]int
+	dispatchMu        sync.Mutex
 	recoveryDepth     int
 	replanDepth       int
 

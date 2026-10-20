@@ -128,7 +128,9 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		AnthropicBaseURL:   raw.anthropicBaseURL,
 		ArtifactTimeoutS:   artifactTimeoutS,
 	}
-	cfg.Realization = RealizeFor(raw.cli, launchIntentFor(&cfg, prof, e.deps.Efforts))
+	intent := launchIntentFor(&cfg, prof, e.deps.Efforts)
+	cfg.Realization = RealizeFor(raw.cli, intent)
+	observeLaunchEffort(e.deps, intent.Effort)
 	if prof.Sandbox != nil {
 		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
 		if prof.Sandbox.Enabled {
