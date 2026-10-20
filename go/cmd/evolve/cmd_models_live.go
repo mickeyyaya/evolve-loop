@@ -23,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
 func shouldRefreshCatalog(cat modelcatalog.Catalog, now time.Time, autoRefresh bool) bool {
@@ -155,7 +156,7 @@ func (d bridgePromptDispatcher) launcher() func(context.Context, core.BridgeRequ
 	if d.launch != nil {
 		return d.launch
 	}
-	return bridge.NewEngine(bridge.Deps{}).Launch
+	return bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))}).Launch
 }
 
 func (d bridgePromptDispatcher) request(cli, prompt string) core.BridgeRequest {
