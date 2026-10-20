@@ -13,6 +13,9 @@ import (
 
 func ReleaseContinuationBinding(opts Options, scopeID, reason, releasedBy string) (continuation.Continuation, bool, error) {
 	opts.resolveOpts()
+	if err := cycleWorktreeRefusal(opts.InboxDir); err != nil {
+		return continuation.Continuation{}, false, err
+	}
 	if strings.TrimSpace(scopeID) == "" {
 		return continuation.Continuation{}, false, fmt.Errorf("inboxmover: empty scope id is not releasable")
 	}

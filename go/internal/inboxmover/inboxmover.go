@@ -6,11 +6,14 @@ package inboxmover
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
@@ -124,7 +127,42 @@ func (o *Options) logf(prefix, format string, args ...any) {
 	fmt.Fprintf(o.Stderr, lifecycle.LegacyPrefix+prefix+format+"\n", args...)
 }
 
-func (o Options) mover() *lifecycle.Mover {
+var errCycleWorktreeInbox = errors.New("inboxmover: refusing to move items in the tracked inbox copy of a cycle worktree")
+
+func cycleWorktreeRefusal(inboxDir string) error {
+	inboxDir = filepath.Clean(inboxDir)
+	target, err := os.Readlink(filepath.Join(filepath.Dir(inboxDir), "state.json"))
+	switch {
+	case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.EINVAL):
+		return nil
+	case err != nil:
+		return fmt.Errorf("%w %s: cannot read its state.json link: %w", errCycleWorktreeInbox, inboxDir, err)
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(inboxDir), target)
+	}
+	plane := filepath.Dir(filepath.Dir(target))
+	return fmt.Errorf("%w %s; the plane root is %s: run the command with EVOLVE_PROJECT_ROOT=%s", errCycleWorktreeInbox, inboxDir, plane, plane)
+}
+
+func (o Options) mover() (*lifecycle.Mover, error) {
+	o.resolveOpts()
+	if err := cycleWorktreeRefusal(o.InboxDir); err != nil {
+		return nil, err
+	}
+	return o.reader(), nil
+}
+
+func withMover[T any](opts Options, call func(*lifecycle.Mover) (T, error)) (T, error) {
+	m, err := opts.mover()
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return call(m)
+}
+
+func (o Options) reader() *lifecycle.Mover {
 	o.resolveOpts()
 	return lifecycle.New(o.InboxDir, o.Ledger,
 		lifecycle.WithStderr(o.Stderr),
@@ -146,11 +184,11 @@ func (o Options) mover() *lifecycle.Mover {
 }
 
 func Claim(opts Options, taskID, cycle string) (ClaimResult, error) {
-	return opts.mover().Claim(taskID, cycle)
+	return withMover(opts, func(m *lifecycle.Mover) (ClaimResult, error) { return m.Claim(taskID, cycle) })
 }
 
 func Promote(opts Options, taskID, newState string, p PromoteOpts) (PromoteResult, error) {
-	return opts.mover().Promote(taskID, newState, p)
+	return withMover(opts, func(m *lifecycle.Mover) (PromoteResult, error) { return m.Promote(taskID, newState, p) })
 }
 
 func ShouldQuarantine(failureCount, ceiling int, systemLevelFailure bool) bool {
@@ -158,11 +196,11 @@ func ShouldQuarantine(failureCount, ceiling int, systemLevelFailure bool) bool {
 }
 
 func ReleaseFromQuarantine(opts Options, taskID string) (PromoteResult, error) {
-	return opts.mover().ReleaseFromQuarantine(taskID)
+	return withMover(opts, func(m *lifecycle.Mover) (PromoteResult, error) { return m.ReleaseFromQuarantine(taskID) })
 }
 
 func RecoverOrphans(opts Options) (RecoverResult, error) {
-	return opts.mover().RecoverOrphans()
+	return withMover(opts, func(m *lifecycle.Mover) (RecoverResult, error) { return m.RecoverOrphans() })
 }
 
 func ReleaseCycleProcessing(opts Options, cycle int) (RecoverResult, error) {
@@ -176,11 +214,11 @@ func ReleaseCycleProcessingWithReason(opts Options, cycle int, reason string) (R
 type quarantinePolicy = lifecycle.Policy
 
 func releaseCycleProcessing(opts Options, cycle int, reason string, quar *quarantinePolicy) (RecoverResult, error) {
-	return opts.mover().Release(cycle, reason, quar)
+	return withMover(opts, func(m *lifecycle.Mover) (RecoverResult, error) { return m.Release(cycle, reason, quar) })
 }
 
 func ReadFailureCount(opts Options, taskID string) (int, bool) {
-	return opts.mover().ReadFailureCount(taskID)
+	return opts.reader().ReadFailureCount(taskID)
 }
 
 func FindFileByTaskID(dir, taskID string) (string, error) {
@@ -226,8 +264,11 @@ func SupersededInboxIDs(triageDecisionJSON []byte) []string {
 }
 
 func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, p PromoteOpts) ([]string, error) {
+	m, err := opts.mover()
+	if err != nil {
+		return nil, err
+	}
 	var retired []string
-	m := opts.mover()
 	for _, id := range supersededIDs {
 		if id == "" {
 			continue
@@ -246,15 +287,15 @@ func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, 
 type RouteResult = lifecycle.RouteResult
 
 func RouteLane(opts Options, taskID, reason string) (RouteResult, error) {
-	return opts.mover().RouteLane(taskID, reason)
+	return withMover(opts, func(m *lifecycle.Mover) (RouteResult, error) { return m.RouteLane(taskID, reason) })
 }
 
 type FileResult = lifecycle.FileResult
 
 func File(opts Options, raw []byte) (FileResult, error) {
-	return opts.mover().File(raw)
+	return withMover(opts, func(m *lifecycle.Mover) (FileResult, error) { return m.File(raw) })
 }
 
 func RouteConsole(opts Options, taskID, reason string, cycle int) (RouteResult, error) {
-	return opts.mover().RouteConsole(taskID, reason, cycle)
+	return withMover(opts, func(m *lifecycle.Mover) (RouteResult, error) { return m.RouteConsole(taskID, reason, cycle) })
 }

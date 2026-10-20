@@ -23,15 +23,15 @@ const (
 var ErrNotWithdrawable = lifecycle.ErrNotWithdrawable
 
 func Edit(opts Options, target string, edits []FieldEdit) (string, error) {
-	return opts.mover().Edit(target, edits)
+	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.Edit(target, edits) })
 }
 
 func Withdraw(opts Options, taskID, reason string) (string, error) {
-	return opts.mover().Withdraw(taskID, reason)
+	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.Withdraw(taskID, reason) })
 }
 
 func VerifyPremise(opts Options, taskID, evidence string) (string, error) {
-	return opts.mover().VerifyPremise(taskID, evidence)
+	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.VerifyPremise(taskID, evidence) })
 }
 
 const verifiedMainRef = "origin/main"
