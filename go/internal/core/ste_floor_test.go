@@ -72,7 +72,7 @@ func TestDocsFloorWarn_NamesTheFirstFindingOfTheChangedDocs(t *testing.T) {
 
 	var sink injectedStderr
 	in.Stderr = &sink
-	_ = docsFloorChecks(in, changedFloorPaths(context.Background(), in))
+	_ = docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
 	got := sink.String()
 
 	if want := "[ste-lint] WARN: 1 finding(s) in 1 file(s) (first: docs/new.md:5 STE-SENTENCE)\n"; !strings.Contains(got, want) {
@@ -88,7 +88,7 @@ func TestDocsFloorWarn_SteStageOffPrintsNothing(t *testing.T) {
 
 	var sink injectedStderr
 	in.Stderr = &sink
-	_ = docsFloorChecks(in, changedFloorPaths(context.Background(), in))
+	_ = docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
 	got := sink.String()
 
 	if strings.Contains(got, "[ste-lint]") {
@@ -103,7 +103,7 @@ func TestDocsFloorWarn_TheShadowStageOnlyWarns(t *testing.T) {
 	var sink injectedStderr
 	in.Stderr = &sink
 
-	failures := docsFloorChecks(in, changedFloorPaths(context.Background(), in))
+	failures := docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
 
 	if len(failures) != 0 {
 		t.Fatalf("failures = %q, want none: shadow only warns", failures)
@@ -131,7 +131,7 @@ func TestDocsFloorWarn_CleanOrOutOfScopeDocsPrintNothing(t *testing.T) {
 
 			var sink injectedStderr
 			in.Stderr = &sink
-			_ = docsFloorChecks(in, paths)
+			_ = docsFloorChecks(context.Background(), in, paths)
 			got := sink.String()
 
 			if strings.Contains(got, "[ste-lint]") {
@@ -156,7 +156,7 @@ func TestDocsFloorWarn_AWorktreeWithoutTheStandardIsSilent(t *testing.T) {
 
 	var sink injectedStderr
 	in.Stderr = &sink
-	_ = docsFloorChecks(in, changedFloorPaths(context.Background(), in))
+	_ = docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
 	got := sink.String()
 
 	if strings.Contains(got, "[ste-lint]") {
@@ -174,7 +174,7 @@ func TestDocsFloorWarn_ABrokenStandardWarnsThatTheLintDidNotRun(t *testing.T) {
 
 	var sink injectedStderr
 	in.Stderr = &sink
-	_ = docsFloorChecks(in, changedFloorPaths(context.Background(), in))
+	_ = docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
 	got := sink.String()
 
 	if !strings.Contains(got, "[ste-lint] WARN:") || !strings.Contains(got, "did not run") {
@@ -189,7 +189,7 @@ func TestDocsFloorWarn_AChangedGeneratedDocIsNotAFinding(t *testing.T) {
 
 	var sink injectedStderr
 	in.Stderr = &sink
-	_ = docsFloorChecks(in, changedFloorPaths(context.Background(), in))
+	_ = docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
 	got := sink.String()
 
 	if strings.Contains(got, "[ste-lint]") {
@@ -203,7 +203,7 @@ func TestSteLintFloorLines_ABrokenStandardIsSilentWhenNoDocChanged(t *testing.T)
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, filepath.FromSlash(stelint.StandardPath)), "# Broken\n")
 
-	if got, finding := steLintFloorLines(dir, []string{"go/x.go"}); len(got) != 0 || finding != "" {
+	if got, finding := steLintFloorLines(dir, []string{"go/x.go"}, nil); len(got) != 0 || finding != "" {
 		t.Fatalf("no doc changed, so the floor must not read the standard; got %q", got)
 	}
 }
@@ -218,7 +218,7 @@ func TestDocsFloorWarn_NamesADocThatItCannotRead(t *testing.T) {
 
 	var sink injectedStderr
 	in.Stderr = &sink
-	_ = docsFloorChecks(in, append(changedFloorPaths(context.Background(), in), "docs/dir.md"))
+	_ = docsFloorChecks(context.Background(), in, append(changedFloorPaths(context.Background(), in), "docs/dir.md"))
 	got := sink.String()
 
 	if !strings.Contains(got, "[ste-lint] WARN: docs/dir.md was not checked:") || !strings.Contains(got, "[ste-lint] WARN: 1 finding(s) in 1 file(s) (first: docs/new.md:1 STE-SENTENCE)") {
@@ -253,7 +253,7 @@ func TestDocsFloorWarn_AnUndocumentedArchitectureChangeWarnsByStage(t *testing.T
 
 			var sink injectedStderr
 			in.Stderr = &sink
-			_ = docsFloorChecks(in, tc.paths)
+			_ = docsFloorChecks(context.Background(), in, tc.paths)
 			got := sink.String()
 
 			if strings.Contains(got, warn) != tc.want {

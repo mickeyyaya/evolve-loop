@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
@@ -16,8 +15,6 @@ var (
 	steParseDiff = covchanged.ParseDiff
 	steReadFile  = os.ReadFile
 )
-
-var steListItem = regexp.MustCompile(`^\s*([-*+]|\d{1,9}[.)])\s+`)
 
 func scopeToAddedLines(root, base string, targets []steTarget, untracked map[string]bool) ([]steTarget, error) {
 	out, errOut, code, err := gitexec.Default(root).Capture(context.Background(),
@@ -53,45 +50,5 @@ func keepAddedFindings(t steTarget, findings []stelint.Finding) ([]stelint.Findi
 	if err != nil {
 		return nil, err
 	}
-	lines := strings.Split(string(raw), "\n")
-	exactLines := strings.HasSuffix(t.abs, ".go")
-	kept := make([]stelint.Finding, 0, len(findings))
-	for _, f := range findings {
-		from, to := f.Line, f.Line
-		if !exactLines {
-			from, to = steBlockSpan(lines, f.Line)
-		}
-		if f.IsSkipNotice() || f.Line < 1 || addedWithin(t.added, from, to) {
-			kept = append(kept, f)
-		}
-	}
-	return kept, nil
-}
-
-func addedWithin(added map[int]bool, from, to int) bool {
-	for n := from; n <= to; n++ {
-		if added[n] {
-			return true
-		}
-	}
-	return false
-}
-
-func steBlockSpan(lines []string, line int) (int, int) {
-	from, to := line, line
-	if line < 1 || line > len(lines) || steBlockEdge(lines[line-1]) {
-		return from, to
-	}
-	for from > 1 && !steListItem.MatchString(lines[from-1]) && !steBlockEdge(lines[from-2]) {
-		from--
-	}
-	for to < len(lines) && !steListItem.MatchString(lines[to]) && !steBlockEdge(lines[to]) {
-		to++
-	}
-	return from, to
-}
-
-func steBlockEdge(line string) bool {
-	t := strings.TrimSpace(line)
-	return t == "" || strings.HasPrefix(t, "|") || strings.HasPrefix(t, "#")
+	return stelint.KeepAdded(raw, strings.HasSuffix(t.abs, ".go"), t.added, findings), nil
 }
