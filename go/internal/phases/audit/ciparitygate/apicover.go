@@ -7,13 +7,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
+
+const deletedEnforceList = "the worktree deletes go/.apicover-enforce, which the main plane holds — the apicover -enforce gate cannot pick its packages; restore the list, treat as FAIL, do not ship"
 
 const (
 	underivableEnforce    = "changed-package set is underivable this cycle (git diff failed) — apicover -enforce gate cannot verify coverage; treat as FAIL, do not ship"
@@ -32,8 +36,14 @@ func (g *Gates) inputs(at gateOrigin, req Request, underivable string) (in enfor
 		return enforceInputs{}, nil, true
 	}
 	changed, derivable := g.changedSet(req.root(), req.Cycle)
-	enforceBytes, err := os.ReadFile(filepath.Join(dir, ".apicover-enforce"))
-	if err != nil {
+	enforceBytes, missing := treeEnforceList(dir), false
+	if at == gateEnforce {
+		enforceBytes, missing = enforceList(req, dir)
+	}
+	if missing {
+		return enforceInputs{}, g.failed(at, req, causeApicover, []string{deletedEnforceList}), true
+	}
+	if enforceBytes == nil {
 		return enforceInputs{}, nil, true
 	}
 	if !derivable {
@@ -125,4 +135,27 @@ func enforceVerdict(code int, runErr error, report string) ([]string, error) {
 		detail = strings.TrimSpace(detail + "\napicover -enforce measurement error: " + runErr.Error())
 	}
 	return offenderLines(detail), nil
+}
+
+func treeEnforceList(dir string) []byte {
+	list, err := os.ReadFile(filepath.Join(dir, ".apicover-enforce"))
+	if err != nil {
+		return nil
+	}
+	return list
+}
+
+func enforceList(req Request, dir string) (list []byte, missing bool) {
+	tree := treeEnforceList(dir)
+	if req.Worktree == "" || req.ProjectRoot == "" || req.Worktree == req.ProjectRoot {
+		return tree, false
+	}
+	mainList, mainErr := os.ReadFile(filepath.Join(codequality.ModuleDir(req.ProjectRoot), ".apicover-enforce"))
+	if mainErr != nil {
+		return tree, false
+	}
+	if tree == nil {
+		return nil, true
+	}
+	return slices.Concat(tree, []byte("\n"), mainList), false
 }

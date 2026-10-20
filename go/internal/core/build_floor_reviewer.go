@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
-	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
@@ -33,6 +32,7 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out = append(out, commentFloorFailures(ctx, in)...)
 	out = append(out, sizeFloorFailures(ctx, in)...)
 	out = append(out, coverChangedFailures(ctx, in, paths)...)
+	out = append(out, floorListRegressions(ctx, in)...)
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 
@@ -118,12 +118,7 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	if len(pkgs) == 0 {
 		return floorLinesFor(nil, taggedFails, nil)
 	}
-	enforcedSet := map[string]bool{}
-	if enforceBytes, err := os.ReadFile(filepath.Join(moduleDir, ".apicover-enforce")); err == nil {
-		for _, p := range ciparity.IntersectEnforced(pkgs, enforceBytes) {
-			enforcedSet[p] = true
-		}
-	}
+	enforcedSet := enforcedPackages(ctx, in, moduleDir, pkgs)
 	plain := make([]string, 0, len(pkgs))
 	enforced := make([]string, 0, len(enforcedSet))
 	for _, p := range pkgs {

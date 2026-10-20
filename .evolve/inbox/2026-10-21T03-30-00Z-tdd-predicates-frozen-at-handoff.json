@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The harness records a digest of go/acs/cycle<N> at the TDD handoff in a record that no phase profile can write",
+    "The audit refuses a predicate package whose digest differs from the TDD record, unless a named repair path rebinds it",
+    "A test: a build that rewrites a predicate through its shell gets a FAIL that names the file",
+    "docs/architecture/gate-input-inventory.md reclassifies the row from open-seam to verified, and TestGateInputInventory_TheOpenSeamsArePinned drops it from the pinned list"
+  ],
+  "connects_to": [
+    ".evolve/inbox/2026-09-02T23-40-00Z-verifier-isolation-audit.json"
+  ],
+  "created_at": "2026-10-21T03:30:00Z",
+  "files": [
+    "go/internal/phases/audit/classification.go",
+    "go/internal/core/phase_bindings.go",
+    "docs/architecture/gate-input-inventory.md",
+    "go/internal/profiles/gate_inputs_realtree_test.go"
+  ],
+  "fix": "Bind the predicate package at the TDD handoff (a ledger entry with the tree SHA of go/acs/cycle<N>) and check it in prepareEvidence before the suite runs.",
+  "id": "tdd-predicates-frozen-at-handoff",
+  "kind": "pipeline-repair",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "summary": "Open seam 1 of the gate input inventory (verifier-isolation-audit). The builder profile denies Edit and Write on go/acs/**, but its sandbox grants the whole worktree, so a shell command can rewrite the TDD predicates. The audit runs the predicates on disk, and nothing records them at the TDD handoff.",
+  "title": "The audit runs TDD predicates that the build can rewrite through its shell; freeze them at the TDD handoff",
+  "weight": 0.6
+}
