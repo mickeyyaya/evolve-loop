@@ -9,7 +9,8 @@
         "fetch origin main [streams]",
         "rev-list origin/main..HEAD [capture]",
         "push origin main [streams]",
-        "rev-parse HEAD [capture]"
+        "rev-parse HEAD [capture]",
+        "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A a1b2c3d4e5f60718293a4b5c6d7e8f9012345678^ a1b2c3d4e5f60718293a4b5c6d7e8f9012345678 -- .evolve/inbox/consumed [capture]"
       ],
       "logs": [
         "[ship] PUSH-ONLY: pushed 1 attested commit(s) to origin/main"
@@ -123,7 +124,8 @@
         "rev-parse HEAD [capture]",
         "merge-base --is-ancestor 0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98 HEAD [discard]",
         "push origin main [streams]",
-        "rev-parse HEAD [capture]"
+        "rev-parse HEAD [capture]",
+        "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A a1b2c3d4e5f60718293a4b5c6d7e8f9012345678^ a1b2c3d4e5f60718293a4b5c6d7e8f9012345678 -- .evolve/inbox/consumed [capture]"
       ],
       "logs": [
         "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry",
@@ -146,7 +148,8 @@
         "fetch origin main [discard]",
         "rev-parse origin/main [capture]",
         "rev-parse HEAD [capture]",
-        "rev-parse HEAD [capture]"
+        "rev-parse HEAD [capture]",
+        "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A a1b2c3d4e5f60718293a4b5c6d7e8f9012345678^ a1b2c3d4e5f60718293a4b5c6d7e8f9012345678 -- .evolve/inbox/consumed [capture]"
       ],
       "logs": [
         "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry",
@@ -171,7 +174,8 @@
         "rev-parse HEAD [capture]",
         "merge-base --is-ancestor 0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98 HEAD [discard]",
         "push origin main [streams]",
-        "rev-parse HEAD [capture]"
+        "rev-parse HEAD [capture]",
+        "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A a1b2c3d4e5f60718293a4b5c6d7e8f9012345678^ a1b2c3d4e5f60718293a4b5c6d7e8f9012345678 -- .evolve/inbox/consumed [capture]"
       ],
       "logs": [
         "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry",

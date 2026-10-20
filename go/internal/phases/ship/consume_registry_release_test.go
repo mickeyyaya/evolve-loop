@@ -44,7 +44,7 @@ func consumeFixture(t *testing.T, id string) (root, workspace, itemBase string) 
 	return root, workspace, itemBase
 }
 
-func TestConsumeCommittedItems_ReleasesRegistryBinding(t *testing.T) {
+func TestConsumeCommittedItems_RecordsThePointerAndLeavesTheReleaseToTheLanding(t *testing.T) {
 	t.Parallel()
 	const id = "context-fill-telemetry-and-cap"
 	const liveSibling = "some-other-live-todo"
@@ -77,8 +77,8 @@ func TestConsumeCommittedItems_ReleasesRegistryBinding(t *testing.T) {
 	consumeCommittedItems(context.Background(), opts, res, "")
 
 	logs := strings.Join(res.Logs, "\n")
-	if _, ok, err := continuation.ReadRegistryEntry(root, id); err != nil || ok {
-		t.Errorf("consuming %q left its continuation-registry binding intact (ok=%v err=%v) — the consumed scope re-arms on the next wave\nlogs:\n%s", id, ok, err, logs)
+	if _, ok, err := continuation.ReadRegistryEntry(root, id); err != nil || !ok {
+		t.Errorf("consuming %q released its continuation-registry binding before the landing (ok=%v err=%v) — releaseLandedBindings owns the release\nlogs:\n%s", id, ok, err, logs)
 	}
 	if _, ok, err := continuation.ReadRegistryEntry(root, liveSibling); err != nil || !ok {
 		t.Errorf("consuming %q also released the UNRELATED live scope %q (ok=%v err=%v) — release must be scoped to the consumed item", id, liveSibling, ok, err)

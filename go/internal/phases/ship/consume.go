@@ -99,8 +99,6 @@ type itemConsumer struct {
 type consumedMove struct {
 	id, src, dstAbs, srcRel, dstRel string
 	raw                             []byte
-	bound                           continuation.Continuation
-	boundOK                         bool
 }
 
 type moveOutcome int
@@ -184,9 +182,6 @@ func (c *itemConsumer) rollback(m consumedMove) {
 func (c *itemConsumer) record(m consumedMove) {
 	c.opts.internalConsumedPaths = append(c.opts.internalConsumedPaths, m.srcRel, m.dstRel)
 	c.res.Logs = append(c.res.Logs, fmt.Sprintf("[ship] OK: consumed inbox item %q into %s (rides this ship commit)", m.id, m.dstRel))
-	if m.boundOK {
-		releaseBindingForConsume(c.opts, c.res, m.id, m.bound)
-	}
 }
 
 var (
@@ -220,9 +215,8 @@ func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
 		"cycle": c.cid,
 	}
 	m := consumedMove{id: id, src: src, raw: raw}
-	m.bound, m.boundOK = readBindingForConsume(opts, res, id)
-	if m.boundOK {
-		doc[inboxbatch.ReleasedContinuationsField] = appendReleasedForConsume(doc, m.bound, c.cid)
+	if bound, ok := readBindingForConsume(opts, res, id); ok {
+		doc[inboxbatch.ReleasedContinuationsField] = appendReleasedForConsume(doc, bound, c.cid)
 	}
 	out, err := marshalInboxItem(doc, "", "  ")
 	if err != nil {
@@ -288,11 +282,18 @@ func releaseBindingForConsume(opts *Options, res *RunResult, id string, c contin
 	switch {
 	case err != nil:
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume %q: continuation binding release failed: %v", id, err))
-	case !released:
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume %q: continuation binding was rebound by another lane (cycle %d no longer owns it) — left intact", id, c.Cycle))
-	default:
+	case released:
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: released continuation binding for %q (snapshot %s, cycle %d) — pointer preserved in the consumed item", id, c.SnapshotSHA, c.Cycle))
+	case !bindingPresent(opts, id):
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: continuation binding for %q is already released", id))
+	default:
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume %q: continuation binding was rebound by another lane (cycle %d no longer owns it) — left intact", id, c.Cycle))
 	}
+}
+
+func bindingPresent(opts *Options, id string) bool {
+	_, ok, err := continuation.ReadRegistryEntry(opts.ProjectRoot, id)
+	return ok || err != nil
 }
 
 func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir, boundTree, actualTree string) (bool, string) {
@@ -368,4 +369,40 @@ func mustStateMap(opts *Options) map[string]any {
 		return map[string]any{}
 	}
 	return m
+}
+
+func releaseLandedBindings(ctx context.Context, opts *Options, res *RunResult, commit string) {
+	var out strings.Builder
+	args := shipmanifest.RawPathRead("diff-tree", "-r", "--no-commit-id", "--name-only", "--diff-filter=A", commit+"^", commit, "--", consumedRel)
+	if exit, err := opts.run(ctx, "git", args, &out, io.Discard); err != nil || exit != 0 {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: landed commit %s: cannot list its consumed items (rc=%d err=%v) — continuation binding NOT released", commit, exit, err))
+		return
+	}
+	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+		if path := shipmanifest.UnquoteGitPath(strings.TrimSpace(line)); path != "" {
+			releaseLandedItem(ctx, opts, res, commit, path)
+		}
+	}
+}
+
+func releaseLandedItem(ctx context.Context, opts *Options, res *RunResult, commit, path string) {
+	var body strings.Builder
+	var doc struct {
+		ID       string                      `json:"id"`
+		Released []continuation.Continuation `json:"released_continuations"`
+	}
+	unreadable := func(exit int, err error) {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: landed item %s: unreadable (rc=%d err=%v) — continuation binding NOT released", path, exit, err))
+	}
+	if exit, err := opts.run(ctx, "git", []string{"show", commit + ":" + path}, &body, io.Discard); err != nil || exit != 0 {
+		unreadable(exit, err)
+		return
+	}
+	if err := json.Unmarshal([]byte(body.String()), &doc); err != nil {
+		unreadable(0, err)
+		return
+	}
+	if len(doc.Released) > 0 {
+		releaseBindingForConsume(opts, res, inboxbatch.ItemID(doc.ID, path), doc.Released[len(doc.Released)-1])
+	}
 }
