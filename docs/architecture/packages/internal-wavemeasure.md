@@ -20,7 +20,8 @@
 
 | Fact | Writer | Reader |
 |---|---|---|
-| the lane interval | the pool: `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens it, and `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it | `wave.MeasureFacts` over `wave.ReadLoopSignals` |
+| the lane interval | the pool: `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens it, and `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it. Only the signals of the wave loop count. They have the `pid` of the record and a time from the run ID (`gcpolicy.ParseLogRunID`) to the run end. | `wave.MeasureFacts` over `wave.ReadLoopSignals` |
+| the live lanes now | `fields.live` of the latest pool signal of the wave loop | `wave.PoolLive`, shown as `pool:    live N` |
 | the lane interval, in a run with no pool signals | the cycle's signals (`.evolve/runs/cycle-N/signals.ndjson`), widened by the dossier phase times | `wave.ReadCycles` (`Cycle.StartedAt`, `Cycle.EndedAt`) |
 | a deadline stop | the lease: `LOOP_ORCH_LANE_DEADLINE` with `action: stopped` | `wave.ApplyLaneDeadlines`. It finds the unsealed cycle of that todo (`lane-scope.json`) that started last before the stop. It sets `Termination: lane deadline` and ends the cycle at the stop. |
 | `Conflict` | ship: `recoverFromShipError` calls `recordShipError` before it recovers. Each ship error thus emits a `ship.error` with the code `SHIP_` plus the error code | `wave.ReadCycles` (`Cycle.Conflict`) |
@@ -43,6 +44,7 @@ The ship phase has no code named `REBASE_CONFLICT`. Its code is `GIT_FLEET_REBAS
 - An empty run gives zeros, not NaN (`TestCompute_AnEmptyRunGivesZerosNotNaN`).
 - A lane that rebased and then landed counts one conflict (`TestReadCycles_ALaneThatRebasedAndThenLandedCountsOneConflict`).
 - The pool signals give the lane intervals, and the cycles give only `landed` and the conflicts (`TestMeasureFacts_ThePoolSignalsGiveTheLaneSpans`).
+- A lane that the wave loop launched before the record counts. A signal of another `pid` or from before the run ID does not count (`TestMeasureFacts_ThePoolLanesOfTheRunLoopCountFromTheRunIDTime`). The wave 137 signals give `width 2/4` and `pool:    live 1` (`cmd/evolve` `TestWaveStatus_Wave137CountsTheLanesThatLaunchedBeforeTheRecord`).
 - A deadline stop stops the unsealed cycle of that todo that started last before the stop. A `recorded` action stops nothing (`TestApplyLaneDeadlines_AStoppedLaneStopsTheCycleThatRanIt`).
 - The wave 130 signals give `width 1/4`, and the cycles 1955 and 1957 show as stopped (`cmd/evolve` `TestWaveStatus_Wave130CountsTheLiveLanesFromThePool`).
 - The command reports the rate end to end (`cmd/evolve` `TestWaveStatus_ReportsTheConflictRate`), and the loop writes one sizing record for each wave (`TestDispatchFleetIteration_RecordsTheSizedWidth`).
