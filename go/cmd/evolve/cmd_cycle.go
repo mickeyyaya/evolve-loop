@@ -29,7 +29,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
-	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -222,7 +221,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	orch, signals := d.Orchestrator, d.Signals
 	result, err := orch.RunCycle(context.Background(), f.request(projectRoot, os.Environ()))
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
-		return cycleRunQuotaExit(result.Cycle, projectRoot, evolveDir, os.Getenv(ipcenv.FleetKey) != "", stdout, stderr, lifecycleLedger, signals)
+		return cycleRunQuotaExit(result.Cycle, projectRoot, evolveDir, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)
 	}
 	if err != nil {
 		return cycleRunErrorExit(err, result.Cycle, projectRoot, evolveDir, stderr, lifecycleLedger, signals)

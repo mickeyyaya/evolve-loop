@@ -40,6 +40,12 @@ func TestCycleRunQuotaExit_AFleetLaneReleasesItsClaimWithTheQuotaDeferralNote(t 
 	if !strings.Contains(stderr.String(), "claims are pending again") {
 		t.Errorf("stderr does not tell the operator the lane needs no resume: %q", stderr.String())
 	}
+	if !strings.Contains(stdout.String(), `"quota-pause"`) {
+		t.Errorf("the lane's stdout envelope does not carry the quota-pause stop reason: %q", stdout.String())
+	}
+	if strings.Contains(stderr.String(), "evolve loop --resume") {
+		t.Errorf("a released lane must not also steer the operator to a resume: %q", stderr.String())
+	}
 }
 
 func TestCycleRunQuotaExit_ANonFleetCycleKeepsItsClaimForResume(t *testing.T) {
@@ -107,6 +113,30 @@ func TestCycleRunRoot_AFleetLaneOnAQuotaWallReleasesItsClaim(t *testing.T) {
 	}
 	if !lifecycleNotes(fake, laneQuotaDeferredReason) {
 		t.Errorf("no lifecycle record names the quota deferral: %+v", fake.lifecycle)
+	}
+}
+
+func TestCycleRunRoot_ACycleRunOutsideAFleetKeepsItsClaimOnAQuotaWall(t *testing.T) {
+	for _, fleetValue := range []string{"", "0"} {
+		t.Run("EVOLVE_FLEET="+fleetValue, func(t *testing.T) {
+			t.Setenv(ipcenv.FleetKey, fleetValue)
+			var claim, pending string
+			rc, fake, _, stderr := runCycleRunWith(t, cycleRunQuotaRunner{}, false, func(root string) {
+				claim, pending = claimedInboxItem(t, root, 1, "manual-cycle-run-item")
+			})
+			if rc != fleet.ExitDeferred {
+				t.Errorf("rc = %d, want fleet.ExitDeferred; stderr=%s", rc, stderr)
+			}
+			if _, err := os.Stat(claim); err != nil {
+				t.Errorf("a manual cycle run lost the claim that evolve loop --resume needs: %v; stderr=%s", err, stderr)
+			}
+			if _, err := os.Stat(pending); !errors.Is(err, os.ErrNotExist) {
+				t.Errorf("a manual cycle run put its item back in the queue: %v", err)
+			}
+			if lifecycleNotes(fake, laneQuotaDeferredReason) {
+				t.Errorf("a manual cycle run wrote a quota-deferral release: %+v", fake.lifecycle)
+			}
+		})
 	}
 }
 
