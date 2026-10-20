@@ -64,3 +64,18 @@ func TestClampPlanToFloor_RecordsWhichEntriesTheFloorForced(t *testing.T) {
 		}
 	}
 }
+
+func TestShouldRunFromPlan_AFloorForcedTDDRunsWhileThePinHoldsEvenOnADocumentLane(t *testing.T) {
+	cfg, _ := realRoutingConfig(t)
+	cfg.Conditional = nil
+	plan, _ := ClampPlanToFloor(RouteInput{Cfg: cfg}, advisorPlanWithoutTDD())
+	if !TddPinned(cfg, documentLaneSignals("strategy-options")) {
+		t.Fatal("precondition: with no tdd conditional rule the pin holds on every lane")
+	}
+
+	dec := Route(RouteInput{Current: "triage", Verdict: "PASS", Completed: []string{"scout", "triage"}, Signals: documentLaneSignals("strategy-options"), Cfg: cfg, Plan: plan}, nil)
+
+	if dec.NextPhase != "tdd" || clampForces(dec, RuleTddPinReleased, "tdd=skip") {
+		t.Fatalf("NextPhase %q clamps %+v; with no tdd conditional rule the pin always holds, so the floor-forced tdd is never released", dec.NextPhase, dec.Clamps)
+	}
+}
