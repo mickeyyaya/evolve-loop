@@ -164,6 +164,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `INBOX_RELEASE_DOUBLE_MOVE` | the cycle drain found the item's basename already at the inbox root (a concurrent release landed it first); the root copy is never clobbered, the processing copy stays and is not counted; fields.step=release_cycle, task_id, base |
 | `INBOX_RELEASE_MOVE_FAILED` | an item could not be renamed back to the inbox root — by the cycle drain (fields.step=release_cycle, origin Mover.Release) or by orphan recovery (fields.step=recover_orphans, origin Mover.RecoverOrphans); the item stays in processing/cycle-N/ and the walk continues; fields.task_id, base, err |
 | `INBOX_ROUTE_NOT_FOUND` | the FAIL closeout could not find the item it was told to route (fields.task_id, inbox_dir, step=locate) — or found it held by another cycle's claim (fields.held_by_cycle) — the refusal is NOT recorded on it and it WILL be re-picked; neither processing/cycle-*/ nor the inbox root holds the id |
+| `INBOX_ROUTING_FALLBACK` | the lane-routing predicate could not load the build profile (fields.profile, fields.project_root; the reason is the load error), so routing judges protected surface only and a sandbox-denied item can reach a lane; emitted once per predicate, on its first routing question |
 
 ### ledger
 

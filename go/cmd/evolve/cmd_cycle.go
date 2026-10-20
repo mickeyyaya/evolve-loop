@@ -447,7 +447,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	verifierOf := func() runner.ContractVerifier { return contractVerifier }
 	var hostEffects core.HostEffects
 	hostEffectsOf := func() core.HostEffects { return hostEffects }
-	forbidden := laneForbidden(projectRoot, os.Stderr)
+	forbidden := laneForbiddenTo(projectRoot, signals.Emit)
 
 	runners := map[core.Phase]core.PhaseRunner{
 		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),

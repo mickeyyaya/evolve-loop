@@ -15,26 +15,32 @@ Links: [ADR-0074](../adr/0074-typed-signal-contracts-routing-authority.md) (rout
   - Adding the TDD profile's denials would be wrong. It also denies `agents/` and `skills/`, which is routine builder work, so every persona and skill item would go to the console.
   - Using only paths both profiles deny would repeat the incident: TDD can write `.evolve/evals`, which the builder cannot.
   - The runner loads `<ProjectRoot>/.evolve/profiles/<trim(AgentPromptName)>.json` (`runner/preparation.go`), the same file routing reads. `build.ProfileName` names it once.
-- **Composition root.** In `cmd/evolve`, `laneForbidden` is the only non-test use of `guards.IsProtectedScope`.
+- **The lazy predicate.** `LazyForbidden(projectRoot, writerProfile, emit)` is the predicate that each routing root uses.
   - It loads the profile on the first routing question (`sync.Once`), so a root that never routes stays silent.
-  - A profile that will not load leaves protected surface only and says so on stderr (`[routing] WARN …`). Failing closed would forbid everything and stop the queue. A builder profile that will not load already fails the build itself.
-  - Triage receives the predicate through `triage.Config.LaneForbidden`, both for its prompt partition and for its breaker on `top_n` cards. A nil predicate keeps the old behavior: protected surface for the partition and manifest membership for the breaker.
+  - A profile that does not load leaves protected surface only (`guards.IsProtectedScope`). A fail-closed predicate forbids everything and stops the queue. A builder profile that does not load already fails the build itself.
+  - The fallback emits one registered signal, `INBOX_ROUTING_FALLBACK` (module `inbox`, kind `inbox.warning`, WARN). Its fields name the profile and the project root, and its reason is the load error.
+- **Composition roots.** In `cmd/evolve`, `laneForbidden(root, warn)` renders the signal on a writer through `signalcenter.ConsoleSink`. `laneForbiddenTo(root, emit)` sends it to a Signal Center.
+  - The cycle root and the simulate root pass their Center (`signals.Emit`). Thus the fallback reaches the cycle's `signals.ndjson`, and the console sink prints it.
+  - The other `cmd/evolve` roots (inbox verbs, wave seeding, supply) have no Center, so they print the same coded line on stderr.
+  - The triage phase-registry factory (`registryConfig` in `internal/phases/triage`, used by `serve-phase` and `evolve phase triage`) builds the same predicate from `req.ProjectRoot` and `build.ProfileName`. It prints the coded line on stderr.
+  - Triage receives the predicate through `triage.Config.LaneForbidden`, both for its prompt partition and for its breaker on `top_n` cards. A nil predicate keeps the old behavior: protected surface for the partition and manifest membership for the breaker. After this change, only a test builds triage with a nil predicate.
 - **One term.** The routing reasons still read "protected fix surface: <path>". That now means lane-forbidden: on the integrity manifest, inside it, or denied by the build sandbox. The manifest alone does not list a sandbox-denied path.
 
 ## Invariants
 
 - A sandbox-denied path routes its item to the console. Pinned by `TestForbidden_RoutesAnItemThatNeedsASandboxDeniedFileToTheConsole`, and by `TestLaneForbidden_TheRepoBuilderSandboxRoutesAProfileItemToTheConsole`, which uses the repo's real builder profile.
 - Routing follows the profile and its enabled flag, not a copy. Pinned by `TestForbidden_FollowsTheProfileNotACopy`, `TestForbidden_ADisabledSandboxDeniesNothingBecauseNothingEnforcesIt` and `TestForbidden_AProfileWithoutASandboxAddsNothingToProtectedSurface`.
-- A missing profile or an empty root is an error, and the composition root degrades loudly, exactly once. Pinned by `TestForbidden_WithoutTheProfileIsAnError`, `TestForbidden_AnEmptyProjectRootIsAnError`, `TestLaneForbidden_WithoutTheBuilderProfileWarnsAndJudgesProtectedSurface` and `TestLaneForbidden_ARootThatNeverRoutesStaysSilent`.
+- A missing profile or an empty root is an error, and the composition root degrades loudly, exactly once, with the registered code. Pinned by `TestForbidden_WithoutTheProfileIsAnError`, `TestForbidden_AnEmptyProjectRootIsAnError`, `TestLazyForbidden_WithoutTheProfileEmitsTheRegisteredFallbackCodeOnceAndJudgesProtectedSurface`, `TestCodeRoutingFallback_IsRegisteredToTheInboxModule`, `TestLaneForbidden_WithoutTheBuilderProfileWarnsAndJudgesProtectedSurface` and `TestLaneForbidden_ARootThatNeverRoutesStaysSilent`.
+- The cycle root sends the fallback to its Signal Center. Pinned by `TestLaneForbiddenTo_EmitsTheRoutingFallbackIntoTheCycleCenter`.
 - A directory that only holds protected surface is not forbidden, and a directory inside a fragment is. Pinned by `TestForbidden_ADirectoryThatOnlyHoldsProtectedSurfaceStaysLaneWork` and `TestLaneForbidden_ADirectoryThatOnlyHoldsProtectedSurfaceStaysLaneWork`.
 - Every `cmd/evolve` routing root uses the one predicate, and the production `triage.Config` sets it. Pinned by `TestRoutingRoots_JudgeWithTheLanePredicate`, an AST scan.
+- The triage registry factory judges with the builder sandbox. Pinned by `TestRegistryFactory_TriageJudgesWithTheBuilderSandboxPredicate` and `TestRegistryConfig_WithoutTheBuilderProfileEmitsTheRoutingFallbackCode`.
+- Every orchestrator root in `cmd/evolve` gives the no-work check the lane menu. Only the `routingtest` root can leave it nil. Pinned by `TestCompositionRoots_EveryOrchestratorRootWiresTheLaneMenu` (an AST scan), `TestWireOrchestrator_TheNoWorkCheckAsksTheLaneMenu` and `TestWireSimulateOrchestrator_TheNoWorkCheckAsksTheLaneMenu`.
+- A root whose only item declares a protected file offers no lane work. Pinned by `TestLaneMenuOf_TheProductionPredicateWithholdsARootThatHoldsOnlyAProtectedFileItem`. With `TestRunCycle_EmptyTriageOverWorkTheLaneMenuWithholdsIsPlannedNoWork` in `core`, the cycle then ends as planned no-work, not as a claim failure.
 - Triage's breaker refuses a `top_n` card that names a lane-forbidden path, whatever the card's source. Pinned by `TestTriageClassify_RefusesATopNCardNamingAPathTheLanePredicateForbids`.
 - `Denies` matches a denied subpath or anything under it on path-segment boundaries (`.evolve/profilesX` is not `.evolve/profiles`), after `path.Clean`. A directory spelling (`dir/`) that contains a denied subpath is also denied. Pinned by `TestSandboxConfig_DeniesPathsUnderADeniedSubpath`.
 
 ## Known gaps
-
-- `core/triage_termination.go`'s claimable-work check still calls `PartitionConsole(items, nil)`. In a sequential cycle whose only pending item is lane-forbidden, it can call that item claimable after triage correctly commits nothing. Filed as inbox item `termination-check-uses-no-routing-predicate`.
-- The triage phase-registry factory (used by `serve-phase` and `evolve phase triage`) builds triage with no predicate, and falls back to protected surface without a warning. It is filed in the same item.
 
 - The claim floor accepts an item that lists a directory holding a fragment, and the split refuses to put that directory in a lane part. The trade-off keeps four lanes supplied (ADR-0139 amendment).
 

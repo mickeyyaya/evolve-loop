@@ -9,6 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanerouting"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 func TestLaneForbidden_TheRepoBuilderSandboxRoutesAProfileItemToTheConsole(t *testing.T) {
@@ -33,8 +37,20 @@ func TestLaneForbidden_WithoutTheBuilderProfileWarnsAndJudgesProtectedSurface(t 
 	if !forbidden("go/internal/guards/role.go") || forbidden(".evolve/profiles/historian.json") {
 		t.Fatal("the fallback judges protected surface only")
 	}
-	if strings.Count(warn.String(), "WARN") != 1 {
-		t.Fatalf("a missing builder profile must be loud exactly once, got %q", warn.String())
+	if strings.Count(warn.String(), "WARN") != 1 || !strings.Contains(warn.String(), string(lanerouting.CodeRoutingFallback)) {
+		t.Fatalf("a missing builder profile must be loud exactly once, with the registered code, got %q", warn.String())
+	}
+}
+
+func TestLaneForbiddenTo_EmitsTheRoutingFallbackIntoTheCycleCenter(t *testing.T) {
+	t.Parallel()
+	signals := signalcenter.New()
+	forbidden := laneForbiddenTo(t.TempDir(), signals.Emit)
+	_ = forbidden("go/internal/fleet/fleet.go")
+	signals.Flush()
+	recent := signals.Recent()
+	if len(recent) != 1 || recent[0].Code != lanerouting.CodeRoutingFallback || recent[0].Fields["profile"] != build.ProfileName {
+		t.Fatalf("the cycle root's fallback must reach its Signal Center as the coded event naming the build profile, got %+v", recent)
 	}
 }
 
