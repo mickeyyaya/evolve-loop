@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 func TestTierScope_PureSplitAndEnvExclusiveEventsWithoutStderr(t *testing.T) {
@@ -133,16 +135,22 @@ func TestEnvExclusive_TheCIJobsTheBridgeBackstopNamesRunTheTmuxTier(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	requires := testhost.RequiredToolsEnv + ": tmux"
 	jobs := map[string][]string{
-		"build-test":         {"runs-on: ubuntu-latest", "make test-integration\n"},
-		"build-test-current": {"runs-on: ubuntu-latest", "make test-integration\n"},
-		"build-test-darwin":  {"runs-on: macos-latest", "brew install tmux", "make test-integration-darwin"},
+		"build-test":         {"runs-on: ubuntu-latest", "make test-integration\n", requires},
+		"build-test-current": {"runs-on: ubuntu-latest", "make test-integration\n", requires},
+		"build-test-darwin":  {"runs-on: macos-latest", "brew install tmux", "make test-integration-darwin", requires},
 	}
 	for job, wants := range jobs {
 		block := workflowJob(t, string(raw), job)
 		for _, want := range wants {
 			if !strings.Contains(block, want) {
 				t.Errorf("the bridge backstop names CI job %s as a run of the requireTmux tier, but that job lacks %q", job, want)
+			}
+		}
+		for _, narrowing := range []string{"\n    if:", "INTEGRATION_SET"} {
+			if strings.Contains("\n"+block, narrowing) {
+				t.Errorf("CI job %s carries %q, which can stop it from running the requireTmux tier that the bridge backstop names", job, strings.TrimSpace(narrowing))
 			}
 		}
 	}
