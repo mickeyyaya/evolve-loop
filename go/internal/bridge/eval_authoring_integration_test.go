@@ -21,13 +21,7 @@ func TestNativeRoleEvalAuthoringBoundary(t *testing.T) {
 	for _, role := range []string{"tdd-engineer", "builder"} {
 		t.Run(role, func(t *testing.T) {
 			fx := newFixture(t, "claude-p", "")
-			body, err := os.ReadFile(filepath.Join("..", "..", "..", ".evolve", "profiles", role+".json"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(fx.profile, body, 0600); err != nil {
-				t.Fatal(err)
-			}
+			stageRealProfile(t, fx.profile, role)
 			root := t.TempDir()
 			wt := filepath.Join(root, "worktree")
 			evalDir := filepath.Join(wt, ".evolve", "evals")

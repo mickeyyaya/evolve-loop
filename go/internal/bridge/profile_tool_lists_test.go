@@ -176,3 +176,16 @@ func TestLoadProfile_RefusesAToolInBothLists(t *testing.T) {
 		t.Fatalf("LoadProfile err = %v, want a refusal naming WebFetch in both lists", err)
 	}
 }
+
+func stageRealProfile(t *testing.T, dst, role string) {
+	t.Helper()
+	for src, to := range map[string]string{role + ".json": dst, "tool-policy.json": filepath.Join(filepath.Dir(dst), "tool-policy.json")} {
+		body, err := os.ReadFile(filepath.Join(realProfilesDir(t), src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(to, body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

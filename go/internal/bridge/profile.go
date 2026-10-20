@@ -89,23 +89,9 @@ func LoadProfile(path string) (Profile, error) {
 	if w.EffortLevel != nil || w.EffortOverrides != nil {
 		return Profile{}, fmt.Errorf("bridge:profile: %s: %w", path, profiles.ErrRetiredEffortField)
 	}
-	if w.Name == "" {
-		return Profile{}, fmt.Errorf("bridge:profile: missing required field: name (in %s)", path)
+	if err := validateProfileWire(w, path); err != nil {
+		return Profile{}, err
 	}
-	if !validPermissionModes[w.PermissionMode] {
-		return Profile{}, fmt.Errorf(
-			"bridge:profile: invalid permission_mode '%s' (in %s); valid: plan, default, acceptEdits, bypassPermissions, auto, dontAsk",
-			w.PermissionMode, path)
-	}
-	if w.SessionName != "" {
-		if len(w.SessionName) > 32 {
-			return Profile{}, fmt.Errorf("bridge:profile: invalid session_name (in %s) — max 32 chars (got %d)", path, len(w.SessionName))
-		}
-		if !sessionNameRE.MatchString(w.SessionName) {
-			return Profile{}, fmt.Errorf("bridge:profile: invalid session_name '%s' (in %s) — must match [a-zA-Z0-9._-]+", w.SessionName, path)
-		}
-	}
-
 	allowed, disallowed, err := expandToolPolicies(path, w.AllowedTools, w.DisallowedTools)
 	if err != nil {
 		return Profile{}, fmt.Errorf("bridge:profile: %w", err)
@@ -143,4 +129,24 @@ func expandToolPolicies(path string, allowed, disallowed []string) ([]string, []
 
 func hasToolPolicySentinel(tools []string) bool {
 	return slices.ContainsFunc(tools, func(t string) bool { return strings.HasPrefix(t, "$include_policy:") })
+}
+
+func validateProfileWire(w profileWire, path string) error {
+	if w.Name == "" {
+		return fmt.Errorf("bridge:profile: missing required field: name (in %s)", path)
+	}
+	if !validPermissionModes[w.PermissionMode] {
+		return fmt.Errorf(
+			"bridge:profile: invalid permission_mode '%s' (in %s); valid: plan, default, acceptEdits, bypassPermissions, auto, dontAsk",
+			w.PermissionMode, path)
+	}
+	if w.SessionName != "" {
+		if len(w.SessionName) > 32 {
+			return fmt.Errorf("bridge:profile: invalid session_name (in %s) — max 32 chars (got %d)", path, len(w.SessionName))
+		}
+		if !sessionNameRE.MatchString(w.SessionName) {
+			return fmt.Errorf("bridge:profile: invalid session_name '%s' (in %s) — must match [a-zA-Z0-9._-]+", w.SessionName, path)
+		}
+	}
+	return nil
 }
