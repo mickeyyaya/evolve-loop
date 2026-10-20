@@ -114,10 +114,14 @@ func TestCycleWorktreeRefusal_ARelativeStateLinkResolvesThePlane(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.Symlink(filepath.Join("..", "..", "plane", ".evolve", "state.json"), filepath.Join(wtEvolve, "state.json")); err != nil {
+	rel, err := filepath.Rel(wtEvolve, filepath.Join(plane, ".evolve", "state.json"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	err := cycleWorktreeRefusal(filepath.Join(wtEvolve, "inbox"))
+	if err := os.Symlink(rel, filepath.Join(wtEvolve, "state.json")); err != nil {
+		t.Fatal(err)
+	}
+	err = cycleWorktreeRefusal(filepath.Join(wtEvolve, "inbox"))
 	if !errors.Is(err, errCycleWorktreeInbox) || !strings.Contains(err.Error(), "EVOLVE_PROJECT_ROOT="+plane) {
 		t.Fatalf("err = %v, want the refusal naming the plane %s", err, plane)
 	}
@@ -195,4 +199,20 @@ func TestReleaseContinuationBinding_TheBranchesBesideTheRefusal(t *testing.T) {
 			t.Fatalf("released = %v, err = %v, stderr = %q", released, err, stderr.String())
 		}
 	})
+}
+
+func TestCycleWorktreeRefusal_AnUncleanInboxPathStillRefuses(t *testing.T) {
+	plane := makeRepo(t)
+	wt := cycleWorktreeOf(t, plane)
+	wtCopy := dropInboxFile(t, wt, "task-1.json", "task-1")
+	inbox := filepath.Join(wt, ".evolve", "inbox")
+	for _, dir := range []string{inbox + "/", inbox + "/.", inbox + "//"} {
+		_, err := Claim(Options{ProjectRoot: wt, InboxDir: dir}, "task-1", "9")
+		if !errors.Is(err, errCycleWorktreeInbox) {
+			t.Errorf("InboxDir %q: err = %v, want the cycle-worktree refusal", dir, err)
+		}
+	}
+	if _, err := os.Stat(wtCopy); err != nil {
+		t.Errorf("the worktree copy moved: %v", err)
+	}
 }

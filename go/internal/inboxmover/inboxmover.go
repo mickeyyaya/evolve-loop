@@ -130,6 +130,7 @@ func (o *Options) logf(prefix, format string, args ...any) {
 var errCycleWorktreeInbox = errors.New("inboxmover: refusing to move items in the tracked inbox copy of a cycle worktree")
 
 func cycleWorktreeRefusal(inboxDir string) error {
+	inboxDir = filepath.Clean(inboxDir)
 	target, err := os.Readlink(filepath.Join(filepath.Dir(inboxDir), "state.json"))
 	switch {
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.EINVAL):
