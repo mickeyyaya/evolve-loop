@@ -31,3 +31,13 @@ func TestResolve_TheLegacyPathCarriesALadderEffort(t *testing.T) {
 		t.Fatalf("legacy plan effort %q model %q, want high at balanced", d.Plan.Effort, d.Plan.Model)
 	}
 }
+
+func TestResolve_ALegacyPinKeepsTheLadderEffortOff(t *testing.T) {
+	table := mustCompile(t, policy.Policy{Pins: map[string]policy.Pin{"scout": {CLI: "claude", Model: "balanced"}}}, syntheticCatalog(), syntheticProfiles(t))
+	r := mustRouter(t, table, cliroute.Host{LookPath: everyBinary()})
+
+	d := mustResolve(t, r, cliroute.Request{Agent: "scout", Phase: "scout", DefaultModel: "balanced", Overlay: llmroute.Overlay{Effort: "high"}})
+	if d.Rule != cliroute.RuleLegacyPin || d.Plan.Effort != "" {
+		t.Fatalf("rule %q effort %q, want the legacy pin to keep every overlay off, the ladder effort too", d.Rule, d.Plan.Effort)
+	}
+}
