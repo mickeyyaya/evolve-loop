@@ -74,4 +74,5 @@ type Policy struct {
 	Wave               *WavePolicy               `json:"wave,omitempty"`
 	AttemptPostmortem  *AttemptPostmortemPolicy  `json:"attempt_postmortem,omitempty"`
 	Handoff            *HandoffPolicy            `json:"handoff,omitempty"`
+	AuditCascade       *AuditCascadePolicy       `json:"audit_cascade,omitempty"`
 }

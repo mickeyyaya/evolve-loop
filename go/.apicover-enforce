@@ -808,3 +808,5 @@
 ./internal/builddiff
 # researchindex - the generated dated entries of docs/research-index.md.
 ./internal/researchindex
+# auditcascade - the escalation rule of the auditor tier cascade (inbox auditor-tier-cascade, shadow stage).
+./internal/auditcascade
