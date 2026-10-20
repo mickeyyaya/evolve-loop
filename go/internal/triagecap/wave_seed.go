@@ -12,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
 )
 
-func SelectWaveSeedTopN(evolveDir string, count int, isProtected func(string) bool) []FleetCandidate {
-	return SelectFleetWidthTopN(ReadInboxBacklog(evolveDir, isProtected), count)
-}
-
 func ReadInboxBacklog(evolveDir string, isProtected func(string) bool) []FleetCandidate {
 	return readRankedBacklog(evolveDir, isProtected, time.Now(), os.Stderr)
 }
