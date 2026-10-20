@@ -564,10 +564,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		}
 	}
 
-	maxIter := o.maxPhaseIterations
-	if maxIter <= 0 {
-		maxIter = defaultMaxPhaseIterations
-	}
+	maxIter := o.phaseIterationLimit()
 OuterLoop:
 	for safety := 0; safety < maxIter; safety++ {
 		next, act, serr := cr.selectNext()

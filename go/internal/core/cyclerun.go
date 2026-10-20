@@ -38,6 +38,13 @@ const (
 
 const defaultMaxPhaseIterations = 32
 
+func (o *Orchestrator) phaseIterationLimit() int {
+	if o.maxPhaseIterations <= 0 {
+		return defaultMaxPhaseIterations
+	}
+	return o.maxPhaseIterations
+}
+
 type cycleRun struct {
 	o   *Orchestrator
 	ctx context.Context

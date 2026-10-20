@@ -312,19 +312,9 @@ func (o *Orchestrator) reviewResumedDeliverable(
 			rung: interaction.RungRedispatch, cli: req.ModelRoutingCLI, reason: review.Reason,
 		})
 		req = count(phase, req)
-		cancel := o.observer.Start(ctx, string(phase), req)
-		corrected, err := runner.Run(ctx, req)
-		if cancel != nil {
-			cancel()
-		}
+		corrected, err := o.redispatchResumedCorrection(ctx, runner, req, phase, correction)
 		if err != nil {
-			if isQuotaWall(err) {
-				return corrected, fmt.Errorf("resume review gate: phase %s correction %d: %w", phase, correction, quotaWall{err})
-			}
-			return corrected, fmt.Errorf("resume review gate: phase %q correction %d dispatch failed: %w", phase, correction, err)
-		}
-		if !IsVerdict(corrected.Verdict) {
-			return corrected, fmt.Errorf("resume review gate: phase %q correction %d returned non-canonical verdict %q", phase, correction, corrected.Verdict)
+			return corrected, err
 		}
 		resp = corrected
 		if err := o.recoverPhaseLeak(ctx, phaseLeakScope{projectRoot: projectRoot, cycleState: cs, phase: phase, baseline: phaseBaseline}); err != nil {
@@ -341,6 +331,24 @@ func (o *Orchestrator) reviewResumedDeliverable(
 		return o.degradeExhaustedReview(ctx, cs, phase, phaseErr), nil
 	}
 	return resp, phaseErr
+}
+
+func (o *Orchestrator) redispatchResumedCorrection(ctx context.Context, runner PhaseRunner, req PhaseRequest, phase Phase, correction int) (PhaseResponse, error) {
+	cancel := o.observer.Start(ctx, string(phase), req)
+	corrected, err := runner.Run(ctx, req)
+	if cancel != nil {
+		cancel()
+	}
+	if err != nil {
+		if isQuotaWall(err) {
+			return corrected, fmt.Errorf("resume review gate: phase %s correction %d: %w", phase, correction, quotaWall{err})
+		}
+		return corrected, fmt.Errorf("resume review gate: phase %q correction %d dispatch failed: %w", phase, correction, err)
+	}
+	if !IsVerdict(corrected.Verdict) {
+		return corrected, fmt.Errorf("resume review gate: phase %q correction %d returned non-canonical verdict %q", phase, correction, corrected.Verdict)
+	}
+	return corrected, nil
 }
 
 func defaultCurrentHead(projectRoot string) (string, error) {

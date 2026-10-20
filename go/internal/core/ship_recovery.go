@@ -77,6 +77,10 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 			return "", false
 		}
 	}
+	return o.routeShipRecovery(se, recoverCode, recoverClass)
+}
+
+func (o *Orchestrator) routeShipRecovery(se *ShipError, recoverCode ShipErrorCode, recoverClass ShipErrorClass) (Phase, bool) {
 	dec := router.Recover(router.RouteInput{
 		Blocker: &router.Blocker{
 			Code:  string(recoverCode),

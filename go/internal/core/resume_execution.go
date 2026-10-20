@@ -81,10 +81,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	cursor := newResumeCursor(startPhase)
 	shipRecoveries := 0
 	dispatches := map[Phase]int{}
-	maxIterations := o.maxPhaseIterations
-	if maxIterations <= 0 {
-		maxIterations = defaultMaxPhaseIterations
-	}
+	maxIterations := o.phaseIterationLimit()
 	for safety := 0; safety < maxIterations; safety++ {
 		next, err := cursor.next(o, cs, req.ProjectRoot)
 		if err != nil {
