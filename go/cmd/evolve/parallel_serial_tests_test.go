@@ -430,6 +430,8 @@ var serialTests = map[string]string{
 	"main.TestRunBridge_AddRuleWritesEveryFlagAndDefaultsTheRest":                                                          "sets env through a helper",
 	"main.TestRunCIClassify_AGreenRunIsRetrySafe":                                                                          "sets env through a helper",
 	"main.TestRunCIClassify_ARedRunIsRefusedAndAMissingGoModWarns":                                                         "sets env through a helper",
+	"main.TestRunCIClassify_ABaseRedFilesOneFixFirstItemAndASecondRunFilesNone":                                            "sets env through a helper",
+	"main.TestRunCIClassify_AnUnwritableInboxIsAnIOErrorAfterTheReport":                                                    "sets env through a helper",
 	"main.TestRunCIClassify_AnUnwritableStdoutIsAnIOError":                                                                 "sets env through a helper",
 	"main.TestRunCIClassify_RefusalsAndIOErrors":                                                                           "sets env through a helper",
 	"main.TestRunCIWatch_AGreenSHAExits0":                                                                                  "sets env through a helper",

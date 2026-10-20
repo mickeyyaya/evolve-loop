@@ -30,12 +30,24 @@
 - **Fallback.** The text parser `parseFailingTests` still runs when the run has no test JSON. It also runs for a rerun (`Attempt` 2 or more), because the artifact can belong to an earlier run of the jobs.
 - **Fixtures.** `testdata/cirun/<run>/` holds the trimmed `--log-failed` text and the trimmed test JSON of the four runs. `TestWithFailures_RealCIRunsYieldOnlyTheGoCommandsFailures` pins the rows of each run.
 
+## Fix-first items for a base red
+
+`ci classify` files one fix-first inbox item for each failure that is also red on the base (`FileBaseRedItems` in `basered.go`). Plan [pr-merge-latency-2026-10](../../plans/pr-merge-latency-2026-10.md) §6 P4 asks for it.
+
+- **Why.** Four PRs (#983, #984, #986 and #997) used 33 of their 43 PR-hours on reds that their change did not cause (plan F3). The classify label `pre-existing` told the author to retry, but no item asked anyone to fix `main`. Thus the next PR paid for the same red again.
+- **When.** A failure gets an item only when its `base_red` fact is `yes`. A fact of `no` or `unknown` files nothing, because the red can belong to the change.
+- **One item for one red.** The item ID is `ci-base-red-<slug>-<hash>`. The slug is the test name, else the step, else the jobs. The hash is the first 8 hex digits of the SHA-256 of the failure key, so two packages with one test name get two items. Before it writes, the verb reads the IDs of the open inbox and of each `processing/cycle-N` folder. A known ID files nothing, so a second run for the same red files no item.
+- **Item shape.** The item is a `critical` fix of class `correctness` from source `ciclassify`. It names the test, the package, the run, the target and the base commit, and its evidence is the run URL. It uses the same atomic write as the fix-forward item of `Watch` (`writeInboxItem`).
+- **Output.** The verb prints `filed fix-first item <id>` on stderr for each new item, so the `--json` output stays one JSON document. A failed inbox read or write exits 2 after the report.
+- **Limits.** A consumed item does not stop a new item. If the same test is red on the base after its fix landed, the red is new evidence. `ci watch` does not file these items: a red `--sha` already files its fix-forward item, and a red `--pr` files nothing.
+
 ## Invariants
 
 - A green run files nothing. Pinned by `ciwatch_test.go`.
 - A red run files one critical item that names the failing test. Pinned by `ciwatch_test.go`.
 - Tests never call the live `gh` CLI. The `execCapture` seam enforces this.
 - `ci classify` makes no failure row from text that a test prints. Pinned by `classify_testjson_test.go`.
+- `ci classify` files one fix-first item for each base red and no item for the same red again. Pinned by `basered_test.go` and `TestRunCIClassify_ABaseRedFilesOneFixFirstItemAndASecondRunFilesNone`.
 
 ## Findings
 

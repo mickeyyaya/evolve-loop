@@ -34,7 +34,8 @@ type autofiler struct {
 }
 
 var autofilers = []autofiler{
-	{"post-push CI watch", []string{"internal/ciwatch.fileEscalation"}, inboxbatch.ClassCorrectness, ciRedItem},
+	{"post-push CI watch", []string{"internal/ciwatch.writeInboxItem"}, inboxbatch.ClassCorrectness, ciRedItem},
+	{"ci classify base red", []string{"internal/ciwatch.writeInboxItem"}, inboxbatch.ClassCorrectness, ciBaseRedItem},
 	{"recurrence boundary applier, retro autofile", []string{"internal/retrofile.FileActions"}, inboxbatch.ClassCorrectness, contractGateDemotedItem},
 	{"fleet starvation observer", []string{"internal/fleet.WriteTo"}, inboxbatch.ClassStability, starvationItem},
 	{"fail-learning floor", []string{"internal/faillearn.writeInboxItems", "internal/faillearn.WriteArtifacts"}, inboxbatch.ClassCorrectness, remediationItem},
@@ -170,6 +171,18 @@ func ciRedItem(t *testing.T) inboxbatch.Item {
 	return onlyItemIn(t, inbox)
 }
 
+func ciBaseRedItem(t *testing.T) inboxbatch.Item {
+	t.Helper()
+	inbox := t.TempDir()
+	rep := ciwatch.ClassifyReport{Target: "pr:7", RunID: 9, RunURL: "https://ci/runs/9", BaseSHA: "fedcba9876543210", Failures: []ciwatch.ClassifiedFailure{{
+		FailingTest: ciwatch.FailingTest{Package: "example.com/m/p", Test: "TestX"}, Evidence: ciwatch.Evidence{BaseRed: ciwatch.FactYes},
+	}}}
+	if _, err := ciwatch.FileBaseRedItems(inbox, rep, autofilerClock()); err != nil {
+		t.Fatal(err)
+	}
+	return onlyItemIn(t, inbox)
+}
+
 func contractGateDemotedItem(t *testing.T) inboxbatch.Item {
 	t.Helper()
 	root := t.TempDir()
@@ -300,9 +313,12 @@ func WritesElsewhere(runDir string) error {
 
 func TestEnrollmentProblems_NameAnUnenrolledWriterAndAStaleEnrollment(t *testing.T) {
 	t.Parallel()
+	stale := autofilers[0].sites[0]
 	var sites []string
-	for _, w := range autofilers[1:] {
-		sites = append(sites, w.sites...)
+	for _, w := range autofilers {
+		if !slices.Contains(w.sites, stale) {
+			sites = append(sites, w.sites...)
+		}
 	}
 	for key := range inboxWritersThatFileNothing {
 		sites = append(sites, key)
@@ -312,7 +328,7 @@ func TestEnrollmentProblems_NameAnUnenrolledWriterAndAStaleEnrollment(t *testing
 	if !strings.Contains(problems, "internal/ninth.fileItem writes into .evolve/inbox/ but is not enrolled") {
 		t.Errorf("a ninth writer must be named: %s", problems)
 	}
-	if !strings.Contains(problems, "internal/ciwatch.fileEscalation is enrolled as an autofiler but the scan no longer finds it") {
+	if !strings.Contains(problems, stale+" is enrolled as an autofiler but the scan no longer finds it") {
 		t.Errorf("a stale enrollment must be named: %s", problems)
 	}
 }
