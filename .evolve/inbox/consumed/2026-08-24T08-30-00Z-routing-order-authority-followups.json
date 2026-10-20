@@ -25,7 +25,7 @@
   "priority_rationale": "inbox review 2026-09-27: A catalog defect repeats silently every cycle with only a stderr line. The resume-order defect is real but reachable only on a no-plan resume.",
   "acceptance": [
     "(1) Each ApplyUserRouting and catalog-load warning (unresolvable anchor, invalid, dropped, clamped or demoted spec, registry load failure) is the registered Signal Center code CONFIG_PHASE_ROUTING_DEFECT in the cycle wiring and the mint path (tests).",
-    "(2) A resume of an inserted phase takes its successor from cfg.Order, skipping the plan's run:false phases; a no-plan resume of bug-reproduction goes to build, not audit (tests).",
+    "(2) A resume of an inserted phase takes its successor from cfg.Order and skips only optional phases that the plan marks run:false; build, audit, ship, the ship floor (tdd unless its conditional rule unpins it) and every cfg.Mandatory phase always run on resume, because the raw plan is pre-clamp; the archetype degrade never reaches ship before build and audit; a no-plan resume of bug-reproduction goes to build, not audit (tests).",
     "(3) registerMintedPhases calls ApplyUserRouting once per batch, so a minted phase anchored to a later batch-mate slots after it (test).",
     "(4) The pre-build Evaluate floor is split into inbox item pre-build-evaluate-floor-needs-a-stage-field, because it needs a new phase.json field."
   ]

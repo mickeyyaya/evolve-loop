@@ -54,14 +54,146 @@ func TestResolveResumeNext_TheOrderWalkSkipsWhatThePlanDoesNotRun(t *testing.T) 
 	}
 }
 
-func TestResolveResumeNext_APlanThatRunsNothingAfterThePhaseEndsTheCycle(t *testing.T) {
+func TestResolveResumeNext_APlanThatRunsNoLaterOptionalPhaseEndsTheCycle(t *testing.T) {
 	t.Parallel()
-	o := &Orchestrator{cfg: config.RoutingConfig{Order: []string{"scout", "closing-note", "audit", "ship", "audit"}}}
+	o := &Orchestrator{cfg: config.RoutingConfig{Order: []string{"build", "audit", "closing-note", "digest", "recap", "digest"}}}
 	ws := t.TempDir()
 	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
-		`[{"phase":"closing-note","run":true},{"phase":"audit","run":false},{"phase":"ship","run":false}]`)
+		`[{"phase":"closing-note","run":true},{"phase":"digest","run":false},{"phase":"recap","run":false}]`)
 	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws}, "closing-note", VerdictPASS); err != nil || next != PhaseEnd {
-		t.Fatalf("with every later phase marked run:false, and a duplicate name in the order, the walk ends the cycle: next=%q err=%v", next, err)
+		t.Fatalf("with every later optional phase marked run:false, and a duplicate name in the order, the walk ends the cycle: next=%q err=%v", next, err)
+	}
+}
+
+func TestResolveResumeNext_ThePlanCannotSkipTheIntegrityFloor(t *testing.T) {
+	t.Parallel()
+	o := preBuildEvaluateOrchestrator(t)
+	ws := t.TempDir()
+	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
+		`[{"phase":"bug-reproduction","run":true},{"phase":"build","run":false},{"phase":"audit","run":false},{"phase":"ship","run":true}]`)
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws}, "bug-reproduction", VerdictPASS); err != nil || next != PhaseBuild {
+		t.Fatalf("routing-plan.json is the raw plan before the floor clamp; a resume must never skip build: next=%q err=%v", next, err)
+	}
+	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
+		`[{"phase":"minted-check","run":true},{"phase":"build","run":false},{"phase":"audit","run":false},{"phase":"ship","run":true}]`)
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws}, "minted-check", VerdictPASS); err != nil || next != PhaseBuild {
+		t.Fatalf("the plan-array fallback must not skip build either: next=%q err=%v", next, err)
+	}
+}
+
+func TestResolveResumeNext_ThePlanCannotSkipAuditOrShip(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{cfg: config.RoutingConfig{Order: []string{"build", "test-amplification", "audit", "post-audit-note", "ship"}}}
+	ws := t.TempDir()
+	cs := CycleState{WorkspacePath: ws, CompletedPhases: []string{"build", "test-amplification"}}
+	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
+		`[{"phase":"test-amplification","run":true},{"phase":"audit","run":false},{"phase":"post-audit-note","run":true},{"phase":"ship","run":false}]`)
+	if next, err := o.resolveResumeNext(cs, "test-amplification", VerdictPASS); err != nil || next != PhaseAudit {
+		t.Fatalf("a resume must never skip audit: next=%q err=%v", next, err)
+	}
+	afterAudit := CycleState{WorkspacePath: ws, CompletedPhases: []string{"build", "test-amplification", "audit", "post-audit-note"}}
+	if next, err := o.resolveResumeNext(afterAudit, "post-audit-note", VerdictPASS); err != nil || next != PhaseShip {
+		t.Fatalf("a resume must never skip ship: next=%q err=%v", next, err)
+	}
+}
+
+func TestResolveResumeNext_ThePlanCannotSkipAPinnedTDD(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{cfg: config.RoutingConfig{Order: []string{"scout", "bug-reproduction", "tdd", "build", "audit", "ship"}}}
+	ws := t.TempDir()
+	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
+		`[{"phase":"bug-reproduction","run":true},{"phase":"tdd","run":false},{"phase":"build","run":true}]`)
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws}, "bug-reproduction", VerdictPASS); err != nil || next != PhaseTDD {
+		t.Fatalf("tdd is on the ship floor unless a conditional rule unpins it, so a resume must not skip it: next=%q err=%v", next, err)
+	}
+}
+
+func TestResolveResumeNext_ATrivialCycleUnpinsTDDAsTheFloorClampDoes(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{cfg: config.RoutingConfig{
+		Order:       []string{"scout", "bug-reproduction", "tdd", "build", "audit", "ship"},
+		Conditional: map[string]config.CondRule{"tdd": {Field: "cycle_size", Op: "!=", Value: "trivial"}},
+	}}
+	ws := t.TempDir()
+	writeFileAt(t, filepath.Join(ws, "handoff-scout.json"), `{"cycle_size_estimate":"trivial"}`)
+	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
+		`[{"phase":"bug-reproduction","run":true},{"phase":"tdd","run":false},{"phase":"build","run":true}]`)
+	cs := CycleState{WorkspacePath: ws, CompletedPhases: []string{"scout", "bug-reproduction"}}
+	if next, err := o.resolveResumeNext(cs, "bug-reproduction", VerdictPASS); err != nil || next != PhaseBuild {
+		t.Fatalf("a trivial cycle does not pin tdd, so the plan's tdd run:false holds on resume: next=%q err=%v", next, err)
+	}
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: filepath.Join(ws, "absent")}, "bug-reproduction", VerdictPASS); err != nil || next != PhaseTDD {
+		t.Fatalf("when the signals cannot be read, tdd stays on the floor (fail closed): next=%q err=%v", next, err)
+	}
+}
+
+func TestResolveResumeNext_ThePlanFallbackCannotSkipAConfiguredMandatoryPhase(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{cfg: config.RoutingConfig{Order: []string{"build", "audit", "ship"}, Mandatory: []string{"security-scan"}}}
+	ws := t.TempDir()
+	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
+		`[{"phase":"minted-check","run":true},{"phase":"security-scan","run":false},{"phase":"build","run":true}]`)
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws}, "minted-check", VerdictPASS); err != nil || next != "security-scan" {
+		t.Fatalf("the plan-array fallback must run a cfg.Mandatory phase: next=%q err=%v", next, err)
+	}
+}
+
+func TestHoldShipFloor_ShipWaitsForBuildAndAudit(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		next      Phase
+		completed []string
+		want      Phase
+	}{
+		{PhaseShip, nil, PhaseBuild},
+		{PhaseShip, []string{"build"}, PhaseAudit},
+		{PhaseShip, []string{"build", "audit"}, PhaseShip},
+		{PhaseEnd, nil, PhaseEnd},
+	} {
+		if got := holdShipFloor(CycleState{CompletedPhases: tc.completed}, tc.next); got != tc.want {
+			t.Errorf("holdShipFloor(%s after %v) = %s, want %s", tc.next, tc.completed, got, tc.want)
+		}
+	}
+}
+
+func TestResolveResumeNext_TheDegradeNeverReachesShipBeforeAudit(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{catalog: catalogOf(t, specWith("c1", "control", ""))}
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: t.TempDir(), CompletedPhases: []string{"build"}}, "c1", VerdictPASS); err != nil || next != PhaseAudit {
+		t.Fatalf("a control phase degrades toward ship, and the floor holds it at audit: next=%q err=%v", next, err)
+	}
+}
+
+func TestDegradeInsertedSuccessor_GoesToBuildUntilBuildIsComplete(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{catalog: catalogOf(t, specWith("c1", "control", ""), specWith("e1", "evaluate", ""))}
+	for _, tc := range []struct {
+		phase     Phase
+		completed []string
+		want      Phase
+	}{
+		{"c1", nil, PhaseBuild},
+		{"e1", nil, PhaseBuild},
+		{"c1", []string{"build"}, PhaseShip},
+		{"c1", []string{"build", "audit"}, PhaseShip},
+	} {
+		if got := o.degradeInsertedSuccessor(CycleState{CompletedPhases: tc.completed}, tc.phase); got != tc.want {
+			t.Errorf("%s after %v -> %s, want %s (build first, then the archetype)", tc.phase, tc.completed, got, tc.want)
+		}
+	}
+}
+
+func TestResolveResumeNext_ThePlanCannotSkipAConfiguredMandatoryPhase(t *testing.T) {
+	t.Parallel()
+	o := &Orchestrator{cfg: config.RoutingConfig{
+		Order:     []string{"scout", "bug-reproduction", "security-scan", "build", "audit", "ship"},
+		Mandatory: []string{"security-scan"},
+	}}
+	ws := t.TempDir()
+	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
+		`[{"phase":"bug-reproduction","run":true},{"phase":"security-scan","run":false},{"phase":"build","run":true}]`)
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws}, "bug-reproduction", VerdictPASS); err != nil || next != "security-scan" {
+		t.Fatalf("a phase in cfg.Mandatory runs on resume whatever the raw plan says: next=%q err=%v", next, err)
 	}
 }
 
@@ -71,8 +203,15 @@ func TestResolveResumeNext_APhaseOutsideTheOrderFallsBackToThePlan(t *testing.T)
 	ws := t.TempDir()
 	writeFileAt(t, filepath.Join(ws, "routing-plan.json"),
 		`[{"phase":"minted-check","run":true},{"phase":"ship","run":true}]`)
-	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws}, "minted-check", VerdictPASS); err != nil || next != PhaseShip {
+	done := CycleState{WorkspacePath: ws, CompletedPhases: []string{"build", "audit"}}
+	if next, err := o.resolveResumeNext(done, "minted-check", VerdictPASS); err != nil || next != PhaseShip {
 		t.Fatalf("a minted phase that is not in the order resumes by the plan: next=%q err=%v", next, err)
+	}
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws}, "minted-check", VerdictPASS); err != nil || next != PhaseBuild {
+		t.Fatalf("a plan with no build entry must not reach ship before build: next=%q err=%v", next, err)
+	}
+	if next, err := o.resolveResumeNext(CycleState{WorkspacePath: ws, CompletedPhases: []string{"build"}}, "minted-check", VerdictPASS); err != nil || next != PhaseAudit {
+		t.Fatalf("a plan with no audit entry must not reach ship before audit: next=%q err=%v", next, err)
 	}
 }
 
