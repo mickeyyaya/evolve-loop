@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
 const pinnedTopNArtifact = "## top_n\n- id: a\n"
@@ -105,5 +107,43 @@ func TestShouldSkip_DisabledTriageSkipsBeforeThePinCheck(t *testing.T) {
 	})
 	if !skipped || verdict != core.VerdictSKIPPED || next != string(core.PhaseTDD) || len(diags) != 0 {
 		t.Errorf("ShouldSkip = (%v, %q, %q, %+v), want a plain SKIPPED to tdd: a lane that runs no triage has no agent top_n to refuse", skipped, verdict, next, diags)
+	}
+}
+
+func TestRunCycle_AFleetLaneWithoutAPinEndsFAILAtTriage(t *testing.T) {
+	fb := &fakeBridge{writeArtifact: pinnedTopNArtifact, writeDecision: `{"top_n":[{"id":"a"}]}`}
+	runners := fixtures.BuildRunners(nil)
+	runners[core.PhaseTriage] = New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	orchestrator := core.NewOrchestrator(&fixtures.FakeStorage{}, &fixtures.FakeLedger{}, runners,
+		core.WithWorktreeProvisioner(&triageTestWorktree{path: t.TempDir()}))
+
+	result, err := orchestrator.RunCycle(context.Background(), core.CycleRequest{
+		ProjectRoot: t.TempDir(), GoalHash: "lane", Env: map[string]string{ipcenv.FleetKey: "1"},
+	})
+	if err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	if result.FinalVerdict != core.VerdictFAIL {
+		t.Fatalf("FinalVerdict = %q, want FAIL; result = %+v", result.FinalVerdict, result)
+	}
+	if got, want := result.PhasesRun, []core.Phase{core.PhaseScout, core.PhaseTriage}; !slices.Equal(got, want) {
+		t.Errorf("PhasesRun = %v, want %v: nothing runs after the refused triage", got, want)
+	}
+	if fb.gotReq.ArtifactPath != "" {
+		t.Error("the triage agent was launched for a fleet lane with no pin")
+	}
+	if !slices.ContainsFunc(result.FailReasons, func(r string) bool {
+		return strings.Contains(r, committedset.LanePinFile)
+	}) {
+		t.Errorf("FailReasons = %v, want the triage refusal that names %s", result.FailReasons, committedset.LanePinFile)
+	}
+	for _, phase := range []core.Phase{core.PhaseTDD, core.PhaseBuild, core.PhaseAudit, core.PhaseShip} {
+		fr, ok := runners[phase].(*fixtures.FakeRunner)
+		if !ok {
+			t.Fatalf("runner for %s is %T, want *fixtures.FakeRunner", phase, runners[phase])
+		}
+		if fr.Calls != 0 {
+			t.Errorf("%s dispatched %d time(s) after the refused triage", phase, fr.Calls)
+		}
 	}
 }
