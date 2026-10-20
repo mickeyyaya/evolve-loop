@@ -4,6 +4,8 @@
 >
 > [ADR-0134](adr/0134-fleet-landings-scale-through-content-keyed-verification-and-group-commit.md) (Proposed, 2026-10-13) amends this design for 200 concurrent lanes: content-keyed verification, an order by the conflict graph and group commit. Plan: [fleet-landing-at-scale-2026-10.md](../plans/fleet-landing-at-scale-2026-10.md).
 >
+> [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (Proposed, 2026-10-20) moves the ownership of landing to the wave orchestrator ([wave-orchestrator §15](wave-orchestrator.md#15-integration)). The composition, the overlap proof, the tiers and the order by the conflict graph become parts of its integration engine. A lane no longer lands its own candidate.
+>
 > This file is the spec of record for the landing queue. It holds the lifecycle, the composition, the overlap proof, the tiers, the gates and the review. It also holds ejection, the budgets, the signals, the config, the failure modes and the limits. The plan holds the decisions, the components and the rollout. The ADR holds the decision.
 > Written in the Issue / Gap / Solution shape.
 >

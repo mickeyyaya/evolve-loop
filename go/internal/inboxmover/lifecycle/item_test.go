@@ -94,14 +94,14 @@ func TestBumpWith_ShedsContinuationOnlyAtCeiling_OneRename(t *testing.T) {
 	inbox := newInbox(t)
 	item := filepath.Join(inbox, "a.json")
 	writeItem(t, item, `{"id":"a","failure_count":"weird","continuation":{"cycle":1}}`)
-	n, err := bumpWith(item, "r1", func(c int) bool { return c >= 2 })
+	n, err := bumpWith(item, failureRecord{reason: "r1"}, func(c int) bool { return c >= 2 })
 	if err != nil || n != 1 {
 		t.Fatalf("n = %d, err = %v (a non-numeric count reads as 0)", n, err)
 	}
 	if body, _ := os.ReadFile(item); string(body) != `{"continuation":{"cycle":1},"failure_count":1,"id":"a","last_failure_reason":"r1"}` {
 		t.Errorf("below the ceiling: %s", body)
 	}
-	n, err = bumpWith(item, "r2", func(c int) bool { return c >= 2 })
+	n, err = bumpWith(item, failureRecord{reason: "r2"}, func(c int) bool { return c >= 2 })
 	if err != nil || n != 2 {
 		t.Fatalf("n = %d, err = %v", n, err)
 	}

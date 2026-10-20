@@ -129,11 +129,15 @@ func readFailureCountAt(path string) (int, bool) {
 	return doc.FailureCount, true
 }
 
-func BumpFailureCount(path, reason string) (int, error) {
-	return bumpWith(path, reason, nil)
+type failureRecord struct {
+	reason, class, fingerprint string
 }
 
-func bumpWith(path, reason string, shedAt func(count int) bool) (int, error) {
+func BumpFailureCount(path, reason string) (int, error) {
+	return bumpWith(path, failureRecord{reason: reason}, nil)
+}
+
+func bumpWith(path string, rec failureRecord, shedAt func(count int) bool) (int, error) {
 	count := 0
 	err := UpdateItemJSON(path, func(item map[string]json.RawMessage) {
 		if raw, ok := item[inboxbatch.FailureCountField]; ok {
@@ -141,10 +145,9 @@ func bumpWith(path, reason string, shedAt func(count int) bool) (int, error) {
 		}
 		count++
 		item[inboxbatch.FailureCountField] = json.RawMessage(strconv.Itoa(count))
-		if reason != "" {
-			rb, _ := json.Marshal(reason)
-			item[inboxbatch.LastFailureReasonField] = rb
-		}
+		stampText(item, inboxbatch.LastFailureReasonField, rec.reason)
+		stampOrClear(item, inboxbatch.LastFailureClassField, rec.class)
+		stampOrClear(item, inboxbatch.LastFailureFingerprintField, rec.fingerprint)
 		if shedAt != nil && shedAt(count) {
 			delete(item, inboxbatch.ContinuationField)
 		}
@@ -153,6 +156,18 @@ func bumpWith(path, reason string, shedAt func(count int) bool) (int, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+func stampText(item map[string]json.RawMessage, key, value string) {
+	if value != "" {
+		rb, _ := json.Marshal(value)
+		item[key] = rb
+	}
+}
+
+func stampOrClear(item map[string]json.RawMessage, key, value string) {
+	delete(item, key)
+	stampText(item, key, value)
 }
 
 func UpdateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {

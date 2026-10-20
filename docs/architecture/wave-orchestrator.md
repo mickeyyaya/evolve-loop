@@ -2,7 +2,7 @@
 
 > [ADR-0139](adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (Proposed, 2026-10-17) · plan: [wave-orchestrator-2026-10](../plans/wave-orchestrator-2026-10.md) · research: [wave-orchestrator-2026-10](../research/wave-orchestrator-2026-10.md) (F2.1 to F2.24, P3.1 to P3.17, R1 to R8).
 >
-> This file is the spec of record for how the loop runs its lanes. It holds the census, the sizing, the admission, the pool, the lease, the oversight, the window, the measures and the scale limits. The plan holds the decisions, the components and the order. The ADR holds the decision. Landing stays in [fleet-landing-queue](fleet-landing-queue.md) (ADR-0128, ADR-0134). The events come from [event-channels](event-channels.md) (ADR-0127).
+> This file is the spec of record for how the loop runs its lanes. It holds the census, the sizing, the admission, the pool, the lease, the oversight, the window, the measures and the scale limits. The plan and the ADR hold the decisions. The orchestrator owns integration: the order, the compose, the test and the push of the deliverables of a wave (§15, [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md)). It reuses the composition, the overlap proof and the tiers of [fleet-landing-queue](fleet-landing-queue.md) (ADR-0128, ADR-0134). The events come from [event-channels](event-channels.md) (ADR-0127).
 >
 > Written in the Issue / Gap / Solution shape.
 >
@@ -34,6 +34,7 @@
 - [12. Scale](#12-scale)
 - [13. Config keys, signals and commands](#13-config-keys-signals-and-commands)
 - [14. Stages](#14-stages)
+- [15. Integration](#15-integration)
 - [Guards](#guards)
 - [Limits](#limits)
 
@@ -411,7 +412,7 @@ The oversight loop is one goroutine in the loop process. It reads the ADR-0127 c
 
 The deadline needs a timer, because "nothing happened" is not an event. The loop holds one timer for the nearest deadline, not one timer for each lane.
 
-The loop observes and acts only on its own lanes. It does not edit a lane's worktree, its verdict or its ship. The landing stays with ADR-0128 and ADR-0134.
+The loop observes and acts only on its own lanes. It does not edit a lane's worktree, its verdict or its ship. The integration of §15 owns the landing.
 
 **State: the library is built (O6, 2026-10-18). The loop wiring of the oversight waits for the event producers E10 and E11 of the [event notification plan](../plans/event-notification-protocol-2026-10.md).** `orchestrator.Oversight` ([internal-orchestrator.md](packages/internal-orchestrator.md)) runs `Next` of `internal/events/reader` in a loop. The reader arms the kernel wake, reads to the end of each log, and then waits. The oversight arms no timer. The lease table of §8 keeps the one timer.
 
@@ -493,7 +494,9 @@ The facts:
 
 - **The run window.** It starts at the `started_at` of the wave record. It ends at `ended_at`, else at the next record's `started_at`. A current run whose loop is not live ends at the mtime of its loop log. `wave next` uses the same rule to close a wave.
 - **The one exception to "reads state and signals".** `wave status` reads the mtime of the loop log for the run end. It reads the metadata only, never the text. A live run ends at the clock.
-- **A lane interval.** It is the span of the cycle's signals: from the first event to `cycle.sealed`. The phase times of the cycle dossier widen it. A lane with no seal and no dossier is in flight, and it ends at the end of the run window.
+- **A lane interval.** When the run has pool signals, the pool gives each interval. A `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens a lane, and the next `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it (`wave.MeasureFacts`). The cycles then give only `landed` and the conflicts.
+  - Why: a lane that the lease stops at its deadline has no `cycle.sealed`. In wave 130 the cycles 1955 and 1957 thus stayed in flight, and `wave status` printed `width 3/4 · utilization 0.83` while the pool ran 1 lane of 4. The pool signals give `width 1/4` (`TestWaveStatus_Wave130CountsTheLiveLanesFromThePool`).
+  - A run with no pool signals uses the span of the cycle's signals: from the first event to `cycle.sealed`. The phase times of the cycle dossier widen it. A lane with no seal and no dossier is in flight, and it ends at the end of the run window.
 - **The sized width.** The loop writes one INFO `loop.wave` record at each sizing, with `fields.width_sized` and `fields.desired`, to `.evolve/signals.ndjson`. Before O7, no record held the sized width. The loop log has the line `wave count X -> Y`, but `wave status` reads state and signals, never the text log. A run from before O7 thus shows `width_source: policy`.
 
 The conflict rate is the main measure of G2 (P3.3, P3.8). No outside source gives a good predictor of conflicts, so the loop measures its own rate.
@@ -628,6 +631,125 @@ Each code goes into the Signal Center registry.
 
 The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each component lands in shadow first, so each part has a measure before it acts. One exception: `admission` stages the admission rule of ADR-0143 inside the pool, which runs only at `stage` `enforce` (§6).
 
+## 15. Integration
+
+> [ADR-0147](adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (Proposed, 2026-10-20) · plan: [wave-integration-2026-10](../plans/wave-integration-2026-10.md) (D1 to D23) · research: [wave-integration-2026-10](../research/wave-integration-2026-10.md) (F2.1 to F2.7, M1 to M16).
+
+### Issue
+
+Each lane lands its own deliverable on `main`. The landings race each other and the other writers of `main`. About one lane in four needed a rebase recovery in waves 130 to 135 (research F2.4). A console merge during a wave strands the next lane (F2.6).
+
+### Gap
+
+No part of the system owns the order of the landings or the decision to push. The landing queue of ADR-0128 and ADR-0134 has the parts of an integration engine, but each lane still lands itself. A patch to the per-lane ship cannot remove the race, because the plane's `main` holds local-only commits (F2.7).
+
+### Solution
+
+The orchestrator owns integration. A fleet lane delivers its audited change to the orchestrator and does not push `main`. The orchestrator orders the deliverables and composes them on one integration branch. It tests the combined tree and decides when a batch goes to `main` as one PR.
+
+```
+ lane A ─┐ deliver                    integration/w<wave>-b<n>
+ lane B ─┼──────────► order (D3) ──► compose + L1 prefix ──► L2 batch ──► flush (D7) ──► batch PR ──► L3 CI ──► fast-forward main ──► L4
+ lane C ─┘                               │ conflict or red                                    │ red: re-run, then split (D10)
+                                         ▼                                                    ▼
+                                  eject to the lane with the diff it met (D6)          eject the culprit
+```
+
+**The deliverable record (D2).** A lane's ship stops before `main` and writes one record. The record holds the cycle commits, the audit binding, the declared scope and the deps. It also holds the inbox rank, the risk class, the `base_sha` and the patch-id of each commit. It publishes the kind `ship.delivered` on the `ship` channel, which the oversight reads by `kind=ship.*`.
+
+The landed identity of a cycle is its trailer plus its patch-id, not a SHA, because each compose makes a new SHA. The ledger, the dossier closeout and the consume check find a cycle on `main` by that identity. `ship.landed` comes after the merge. So the oversight frees the cells of the lane at the merge (§9, D20). The lane exit still frees the slot, and the pool backfills it at once (§7).
+
+**The order (D3).** The order is a deterministic score, in this sequence of keys:
+
+1. the deps: a producer before its consumer;
+2. the conflict graph of ADR-0134: deliverables with no shared cell keep their place;
+3. the inbox rank, and the count of queued items that the deliverable unblocks;
+4. low risk before high risk;
+5. low verification cost before high cost;
+6. the time of delivery.
+
+The score is a pure function. The same input always gives the same order. No LLM decides the order.
+
+**The compose (D4, D5, D23).** Each batch has its own branch, `integration/w<wave>-b<n>`, cut from `origin/main` when its first deliverable composes. Each deliverable composes onto the branch tip as one commit, with trailers for its cycle and its audit binding. The compose changes the tree that the audit saw. The overlap proof of ADR-0128 accepts that change and records it as a witness. Each compose then runs the gates of its tier (ADR-0128 §8), scoped and cached by the verdict store.
+
+**Ejection (D6).** A textual conflict, a failed gate or a tier-T4 proof ejects the deliverable. The orchestrator sends it back to its lane with the diff of the change it met. The retry ladder of ADR-0142 takes the lane. No LLM resolves a conflict by default (research M16).
+
+**The flush (D7 to D9).** The orchestrator flushes the batch as one PR when the first of these holds:
+
+- the wave ends;
+- the batch reaches its cap;
+- its oldest deliverable reaches `max_age_minutes`;
+- a deliverable unblocks queued work.
+
+The cap adapts like the window of Zuul. It starts at 4, halves on a red batch that the re-run confirms and grows by 1 on a green batch, between 1 and 4. A risky deliverable flushes alone: one that touches the protected surface or the global zone.
+
+**The merge (D10, D11).** On a red CI, the orchestrator runs the PR once more to screen a flake. On a second red, it splits the batch in halves until each part has at most 2 deliverables.
+
+When the CI is green and `origin/main` still equals the batch base, the orchestrator fast-forwards `main` to the tested tip. So `main` holds the tree that CI tested, with one commit for each cycle, and GitHub marks the PR merged. If `main` moved, the orchestrator composes again and tests again. It does not use a rebase merge, because a rebase merge rewrites each SHA and can land a tree that no CI tested.
+
+**The other writers of `main` (D12, D13).** The loop's own commits (dossier closeouts, inbox stamps) go to a bookkeeping batch of their own. That batch holds no code, skips L2, and flushes alone at each code flush and at wave end. A console PR that merges into `main` makes the orchestrator compose the open batch again on the new `main`. It cancels a CI run of the old tip. The patch-ids show which deliverables `main` already holds.
+
+**Ownership (D19, D20, D22).**
+
+- The integration record `.evolve/waves/integration-<wave>.json` holds the branch, the tip, the open PR, the members and the loop lease epoch. Each branch write uses `--force-with-lease` on the recorded tip. On a resume, the new lease holder adopts the branch or discards it, and closes a PR of an older epoch.
+- The cells of a deliverable stay held until its merge. An ejected deliverable goes back to its lane, so a new lane in the same cell can still conflict with it.
+- One blocking `gh run watch` child in `internal/integration` wakes the orchestrator on the CI result. The `max_age_minutes` flush uses one `time.AfterFunc` for the oldest deliverable, in `internal/integration`. `internal/orchestrator` keeps its no-timer guard.
+- After each merge, the plane's `main` moves by a fast-forward (I11). It holds no local-only commit, because of D12.
+
+#### The test strategy for the combined tree (D16 to D18)
+
+Each lane passed its own tests on its own base. The integration branch holds a tree that no lane tested. Four layers test that tree:
+
+| Layer | When | What runs | On a red |
+|---|---|---|---|
+| L1 Prefix | after each compose | the gates of the deliverable's tier, scoped to the affected packages | eject that deliverable |
+| L2 Batch | before the flush pushes the PR | build, vet and gofmt; the tests of the affected set; the acceptance predicates (`acs/cycleN`) of each deliverable. Also the repo-contract pack, cover-changed over the batch diff and cover-strict of each touched package. | run L2 on each prefix, and eject the first deliverable whose prefix fails |
+| L3 PR | on the batch PR | the required CI of `main` | re-run once, then split (D10) |
+| L4 After merge | after the batch lands | the CI of `main`, the weekly macOS run, the latency gates (ADR-0144) | classify and re-run once; bisect by cycle commit; revert the culprit's commit alone, and eject it. A confirmed red after a green L3 is a system failure of ADR-0072. |
+
+- **The affected set** is each package that a deliverable edits, plus every package that imports one of them, through any path.
+- **Each deliverable's predicates run on the combined tree**, because two changes that pass alone can fail together (research M14).
+- **A flake gets one re-run, in every layer.** A test that fails and then passes does not eject a deliverable, and does not halve the cap. The record keeps its name.
+- **Each layer records its verdict for each deliverable** in the integration record: the tests that ran, the tests that the store skipped, and the result.
+
+#### Stage
+
+`fleet.integration.stage` starts at `shadow` (D14). At `shadow`, lanes land as today. The orchestrator runs a textual compose only, records its order, its composes and its flush decisions, and changes nothing. It runs no test gate, so the host load stays as today. At `enforce`, no lane writes `main`. This is a second stage key, an exception to the single key of §14, because integration can only start after the pool is at `enforce`.
+
+| Stage | Exit |
+|---|---|
+| `shadow` | 3 waves with at least 2 deliverables each. The recorded order has no dependency inversion. The textual compose predicts the real `SHIP_GIT_FLEET_REBASE_*` events with a precision and a recall of at least 0.8. |
+| `enforce` | Over 10 batches, the batch red rate is below one in three. The median time from delivery to merge is at most the per-lane baseline. |
+
+The merge window of the PR-latency plan (P2) waits for `enforce` (D15). At `enforce`, the window of §10 takes its conflict feed from `SHIP_INTEGRATION_EJECTED` with `cause=conflict`, and the ship and zero-ship counters count merged deliverables (D21).
+
+#### Config keys, signals and commands
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `integration.stage` | `shadow` \| `enforce` | `shadow` | the stage above |
+| `integration.cap` | int | 4 | the largest batch; the adaptive cap stays between 1 and this value |
+| `integration.max_age_minutes` | int | 45 | the age of the oldest deliverable that flushes a batch |
+
+The keys are under `.evolve/policy.json` `fleet`.
+
+| Code | Channel | When |
+|---|---|---|
+| `SHIP_INTEGRATION_DELIVERED` | `ship` | a lane delivered a record |
+| `SHIP_INTEGRATION_COMPOSED` | `ship` | a deliverable composed and passed L1 |
+| `SHIP_INTEGRATION_EJECTED` | `errors` | a deliverable went back to its lane, with the cause and the layer |
+| `SHIP_INTEGRATION_FLUSHED` | `ship` | a batch PR opened, with the trigger of D7 |
+| `SHIP_INTEGRATION_MERGED` | `ship` | a batch PR merged |
+| `SHIP_INTEGRATION_REVERTED` | `errors` | L4 reverted one commit |
+
+| Command | What it does |
+|---|---|
+| `evolve wave integration status [--json]` | prints the order, the batch, the cap, the age of the oldest deliverable and the verdict of each layer |
+
+Each code goes into the Signal Center registry under the module prefix `SHIP_`. The kind `ship.delivered` is new (I0).
+
+**State: proposed (2026-10-20).** The components are I0 to I11 and I3b of the plan.
+
 ## Guards
 
 | Rule | Guard | State |
@@ -647,11 +769,13 @@ The stage key is one key for the whole orchestrator (ADR-0139 decision 16). Each
 | At `shadow`, the loop builds no window. | `TestDispatchPool_AtShadowTheLoopBuildsNoWindow` | built (O8) |
 | A window never lifts the `fleet.concurrency` cap. | `TestRunPool_AWindowNeverLiftsTheConcurrencyCap` and `TestLaneWindow_TheSizedCountIsTheSmallerOfTheFleetCountAndTheConcurrencyCap` | built (O8) |
 | A split keeps every protected file in the console part. | `TestInboxSplit_TheConsolePartKeepsEveryProtectedFile` | built (O2c) |
+| Integration waits for CI and `max_age_minutes` with no poll. | the guard of `internal/orchestrator` stays; `internal/integration` gets its own guard that allows one `gh run watch` child and one `time.AfterFunc` (D22) | proposed (I5) |
 | A bench with a fallback keeps its slot. | `TestQuotaAwareCount_ABenchWithAFallbackKeepsTheLane` | proposed (O1) |
 
 ## Limits
 
-- **Landing.** The orchestrator does not land. ADR-0128 and ADR-0134 own the queue, the tiers and the group commit. Above about 6 lanes, the width needs their group commit (§12).
+- **Landing.** Until `fleet.integration.stage` is at `enforce`, each lane lands itself. The integration of §15 reuses the tiers and the overlap proof of ADR-0128 and ADR-0134.
+- **Integration.** A deliverable waits in its batch until a flush. The prefix check catches what the scoped gates test, and the batch CI is the backstop. The orchestrator is the single writer of `main` for the loop.
 - **Edges added in a lane.** Cells come from the tree at the run's base. An import that a lane adds is found at landing, not at admission (§6).
 - **Todos outside `go/`.** A todo whose files are all outside `go/`, or that has unmapped non-Go files, maps to no cell. It conflicts with nothing, so admission cannot hold it back (§6).
 - **Accuracy of the cells.** The package graph of `go list -deps` misses runtime coupling: shared files under `.evolve/`, shared test data and generated outputs. The landing proof of ADR-0128 covers these (fleet-landing-queue §7).

@@ -69,7 +69,10 @@ func TestFieldOwners_EveryKeyALifecycleWriterWritesIsAStampOfItsOwner(t *testing
 		"RouteLane":        {func() error { _, err := m.RouteLane("x", "lane work"); return err }, inboxbatch.LoopStampOwned},
 		"BumpFailureCount": {func() error { _, err := BumpFailureCount(path, "red"); return err }, inboxbatch.LoopStampOwned},
 		"VerifyPremise":    {func() error { _, err := m.VerifyPremise("x", "checked"); return err }, inboxbatch.OperatorStampOwned},
-		"bump and shed":    {func() error { _, err := bumpWith(path, "red", func(int) bool { return true }); return err }, inboxbatch.LoopStampOwned},
+		"bump and shed": {func() error {
+			_, err := bumpWith(path, failureRecord{reason: "red", class: "capability", fingerprint: "codes:x"}, func(int) bool { return true })
+			return err
+		}, inboxbatch.LoopStampOwned},
 	} {
 		t.Run(name, func(t *testing.T) {
 			writeItem(t, path, `{"id":"x","kind":"bug","weight":0.5,"continuation":{"snapshot_sha":"abc"}}`)
