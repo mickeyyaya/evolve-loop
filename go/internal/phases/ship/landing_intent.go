@@ -51,7 +51,10 @@ func (s *worktreeShip) checkLanding(commit string) error {
 	if err := s.opts.landing().CheckFastForward(s.ctx, s.integration(commit)); err != nil {
 		return err
 	}
-	return refuseCommittedDocDeletion(s.ctx, s.opts, s.branch, commit)
+	if err := refuseCommittedDocDeletion(s.ctx, s.opts, s.branch, commit); err != nil {
+		return err
+	}
+	return refuseForeignPredicatePackages(s.ctx, s.opts, s.branch, commit)
 }
 
 func (s *worktreeShip) landingCommit(pending string) (string, error) {
