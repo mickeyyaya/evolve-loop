@@ -401,3 +401,11 @@ approaches / decision / results / retro) — lives at
 | [research/wave-integration-2026-10.md](research/wave-integration-2026-10.md) | Research: about one lane in four needed a rebase recovery at landing, and `main` moved 100 times in two days. It also surveys merge trains, merge queues, batching and culprit finding. Findings F2.1 to F2.7 and M1 to M16. |
 | [plans/wave-integration-2026-10.md](plans/wave-integration-2026-10.md) | Plan: five designs with scores. The orchestrator orders, composes and tests the deliverables on one integration branch, and flushes a batch as one PR. Decisions D1 to D23, with four test layers L1 to L4, and components I0 to I11. |
 | [architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md](architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) | Decision (Proposed): lanes deliver and do not push `main`; the orchestrator owns the order, the compose, the test and the push. |
+
+## 2026-10-20 — docs, inbox and CI PRs merge in a window; code merges at a boundary (ADR-0148)
+
+| Document | What it records |
+|---|---|
+| [plans/pr-merge-latency-2026-10.md](plans/pr-merge-latency-2026-10.md) | Plan: the merge wait of PRs #979 to #1005, four designs with weighted scores, and components P1 to P5. P1 is shelved. The window stays off until `fleet.integration.stage` is `enforce` (ADR-0147). |
+| [architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md](architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md) | Decision (Accepted): a window PR merges when green, also in a wave. A code PR merges at a boundary, and the console can call one early. |
+| [architecture/packages/internal-mergewindow.md](architecture/packages/internal-mergewindow.md) | Package note: the merge window rule reads the CI routing table of `required.yml`. |
