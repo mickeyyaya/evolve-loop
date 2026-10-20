@@ -315,3 +315,21 @@ func TestHandleCycle_AnUnlistableWorkspaceIsAWarningAndAFailedCycleOpensOnItsAud
 		t.Fatalf("a failed cycle opens on the audit report: %+v", failed)
 	}
 }
+
+func TestReadQueue_OnlyAnUnreadableFileIsCalledSkipped(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	inbox := filepath.Join(root, ".evolve", "inbox")
+	writeFile(t, filepath.Join(inbox, "bad.json"), `{"id":"gamma","weight":"high"}`)
+	writeFile(t, filepath.Join(inbox, "num.json"), `{"id":"beta","priority":0.86}`)
+
+	q, warns := readQueue(root, time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC))
+
+	joined := strings.Join(warns, "\n")
+	if len(q.Pending) != 1 || q.Pending[0].Weight != 0.86 {
+		t.Errorf("pending %+v, want beta with its number as the weight", q.Pending)
+	}
+	if !strings.Contains(joined, "inbox: WARN skipped bad.json") || !strings.Contains(joined, "inbox: WARN num.json: priority 0.86") {
+		t.Errorf("warnings %q, want the skipped file named skipped and the read number as a notice", warns)
+	}
+}
