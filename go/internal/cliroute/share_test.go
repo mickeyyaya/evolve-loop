@@ -265,3 +265,22 @@ func TestShare_AGivenSeatKeepsAgyClaudeAsItsOwnFamilyBeforeClaude(t *testing.T) 
 	requireChain(t, d, "agy-claude", "claude", "agy")
 	requireTrace(t, d, "share gives the seat to agy-claude")
 }
+
+func TestShare_ACallerOrAdvisorCLIIsNoPinForAnAgentThatATableRuleCovers(t *testing.T) {
+	t.Parallel()
+	r := syntheticRouter(t, shareBlock(50), shareHost(argonWeek(60, 6*24*time.Hour)))
+
+	for name, mutate := range map[string]func(*cliroute.Request){
+		"the bridge caller cli": func(req *cliroute.Request) { req.CallerCLI = "agy-tmux" },
+		"the advisor cli":       func(req *cliroute.Request) { req.Overlay.CLI = "agy" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := deepRequest(1)
+			mutate(&req)
+
+			d := mustResolve(t, r, req)
+
+			requireChain(t, d, "claude", "agy")
+		})
+	}
+}
