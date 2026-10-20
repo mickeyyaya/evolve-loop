@@ -30,6 +30,7 @@ const (
 	waveUsage           = `usage: evolve wave next [--max-cycles N] [--merge n,...] [--note TEXT]... [--number N] [--dry-run] [--json] [--project-root P]
        evolve wave status [--json] [--project-root P]
        evolve wave supply [--json] [--project-root P]
+       evolve wave latency [--wave N | --cycles A-B] [--json] [--project-root P]
        evolve wave watch [--json] [--project-root P]
        evolve wave note add TEXT | list [--json] | clear [--project-root P]
 one cycle in the foreground: evolve cycle run --goal-text G; resume a paused cycle: evolve loop --resume; stop at the next wave boundary: evolve loop-stop --wait`
@@ -74,7 +75,7 @@ func defaultWaveEnv() waveEnv {
 
 func runWaveWith(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	handlers := map[string]func(waveEnv, []string, io.Writer, io.Writer) int{
-		"next": runWaveNext, "status": runWaveStatus, "supply": runWaveSupply, "watch": runWaveWatch, "note": runWaveNote,
+		"next": runWaveNext, "status": runWaveStatus, "supply": runWaveSupply, "latency": runWaveLatency, "watch": runWaveWatch, "note": runWaveNote,
 	}
 	if len(args) == 0 {
 		return waveUsageError(stderr, errors.New("a sub-verb is required"))

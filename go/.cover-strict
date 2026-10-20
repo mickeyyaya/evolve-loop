@@ -83,3 +83,4 @@
 ./internal/core 100
 ./cmd/testrusage 100
 ./cmd/hostsampler 100
+./internal/lanetime 100

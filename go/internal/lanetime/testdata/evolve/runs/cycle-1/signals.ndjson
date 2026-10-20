@@ -1,0 +1,7 @@
+{"schema_version": "signal/1.0", "ts": "2026-10-19T10:00:00Z", "phase": "scout", "kind": "phase.dispatched"}
+{"ts":"2026-10-19T00:00:00Z","kind":"ledger.appended"}
+{"schema_version": "signal/1.0", "ts": "2026-10-19T10:10:00Z", "phase": "scout", "kind": "phase.outcome", "fields": {"verdict": "PASS"}}
+{"schema_version": "signal/1.0", "ts": "2026-10-19T10:10:00Z", "phase": "build", "kind": "phase.dispatched"}
+{"schema_version": "signal/1.0", "ts": "2026-10-19T10:40:00Z", "phase": "build", "kind": "phase.outcome", "fields": {"verdict": "PASS"}}
+{"schema_version": "signal/1.0", "ts": "2026-10-19T10:40:00Z", "phase": "audit", "kind": "phase.dispatched"}
+{"schema_version": "signal/1.0", "ts": "2026-10-19T10:50:00Z", "phase": "audit", "kind": "phase.outcome", "fields": {"verdict": "PASS"}}
