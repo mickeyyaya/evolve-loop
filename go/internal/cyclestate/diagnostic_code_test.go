@@ -91,3 +91,11 @@ func TestCycleTerminationBlockedNeedsConsole_IsTheSealedSpelling(t *testing.T) {
 		t.Errorf("the sealed termination reason is %q", CycleTerminationBlockedNeedsConsole)
 	}
 }
+
+func TestRefusalDisposition_OnlyTheBuildRejectionYieldsToInfrastructure(t *testing.T) {
+	for _, code := range []string{DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute, DiagCodeBlockerRoute, DiagCodeTriageTopNEmpty, DiagCodeTriageCommitmentInvalid, DiagCodeTriageScopeUnanswered, DiagCodeTriageLanePinMissing, DiagCodeBuildRejected} {
+		if got, want := RefusalDisposition(code).YieldsToInfra, code == DiagCodeBuildRejected; got != want {
+			t.Errorf("RefusalDisposition(%q).YieldsToInfra = %v, want %v: a build rejection is often an infrastructure symptom, an agent refusal is not", code, got, want)
+		}
+	}
+}

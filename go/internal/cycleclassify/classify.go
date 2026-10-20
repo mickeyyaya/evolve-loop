@@ -64,21 +64,24 @@ func Classify(workspace string) Result {
 	reportData, _ := os.ReadFile(report)
 
 	record, recordOK := classifyFromRecord(workspace)
-	if recordOK && cyclestate.RefusalDisposition(record.Marker).OutranksSentinel {
+	disposition := cyclestate.RefusalDisposition(record.Marker)
+	if recordOK && disposition.OutranksSentinel {
 		return record
 	}
 	if cls, ok := classifyFromSentinels(workspace); ok && (!recordOK || sentinelPhase(cls.Source) == record.Phase) {
 		return cls
 	}
+	if recordOK && disposition.YieldsToInfra {
+		if infra, ok := infraEvidence(workspace, reportData); ok {
+			return infra
+		}
+	}
 	if recordOK {
 		return record
 	}
 
-	if m := reInfrastructure.Find(reportData); m != nil {
-		return Result{Class: ClassInfrastructure, Marker: string(m), Source: "orchestrator-report.md"}
-	}
-	if src, marker, ok := scanEventsForInfra(workspace); ok {
-		return Result{Class: ClassInfrastructure, Marker: marker, Source: src}
+	if infra, ok := infraMarker(workspace, reportData); ok {
+		return infra
 	}
 	if m := reShipGate.Find(reportData); m != nil {
 		return Result{Class: ClassShipGateConfig, Marker: string(m), Source: "orchestrator-report.md"}
@@ -98,6 +101,26 @@ func Classify(workspace string) Result {
 		return Result{Class: ClassInfrastructure, Marker: MarkerQuotaLikelyEmptyOutput, Source: src}
 	}
 	return Result{Class: ClassIntegrityBreach}
+}
+
+func infraMarker(workspace string, reportData []byte) (Result, bool) {
+	if m := reInfrastructure.Find(reportData); m != nil {
+		return Result{Class: ClassInfrastructure, Marker: string(m), Source: "orchestrator-report.md"}, true
+	}
+	if src, marker, ok := scanEventsForInfra(workspace); ok {
+		return Result{Class: ClassInfrastructure, Marker: marker, Source: src}, true
+	}
+	return Result{}, false
+}
+
+func infraEvidence(workspace string, reportData []byte) (Result, bool) {
+	if infra, ok := infraMarker(workspace, reportData); ok {
+		return infra, true
+	}
+	if src, ok := detectEmptyOutputSession(workspace); ok {
+		return Result{Class: ClassInfrastructure, Marker: MarkerQuotaLikelyEmptyOutput, Source: src}, true
+	}
+	return Result{}, false
 }
 
 func classifyFromSentinels(workspace string) (Result, bool) {

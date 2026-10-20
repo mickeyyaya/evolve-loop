@@ -94,6 +94,7 @@ type Disposition struct {
 	TaskLevel        bool
 	RouteConsole     bool
 	OutranksSentinel bool
+	YieldsToInfra    bool
 }
 
 func RefusalDisposition(code string) Disposition {
@@ -102,7 +103,9 @@ func RefusalDisposition(code string) Disposition {
 		return Disposition{TaskLevel: true, RouteConsole: true, OutranksSentinel: true}
 	case DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute:
 		return Disposition{TaskLevel: true, RouteConsole: true}
-	case DiagCodeTriageTopNEmpty, DiagCodeTriageScopeUnanswered, DiagCodeBuildRejected:
+	case DiagCodeBuildRejected:
+		return Disposition{TaskLevel: true, YieldsToInfra: true}
+	case DiagCodeTriageTopNEmpty, DiagCodeTriageScopeUnanswered:
 		return Disposition{TaskLevel: true}
 	default:
 		return Disposition{}

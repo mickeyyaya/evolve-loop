@@ -169,3 +169,43 @@ func TestClassify_TheRejectedBuildsOwnFailSentinelStillWins(t *testing.T) {
 		t.Errorf("Classify = %+v; the build's own FAIL sentinel names the class, which also charges the item", r)
 	}
 }
+
+func TestClassify_ABuildRejectedBecauseOfInfrastructureStaysInfrastructure(t *testing.T) {
+	for name, tc := range map[string]struct {
+		file, body, source string
+	}{
+		"a rate limit":   {"orchestrator-report.md", "build: HTTP 429 Too Many Requests\n", "orchestrator-report.md"},
+		"a 529":          {"orchestrator-report.md", "build: 529 Overloaded\n", "orchestrator-report.md"},
+		"sandbox EPERM":  {"orchestrator-report.md", "sandbox-exec: Operation not permitted\n", "orchestrator-report.md"},
+		"an infra event": {"builder-events.ndjson", `{"kind":"infra_failure","excerpt":"ETIMEDOUT"}` + "\n", "builder-events.ndjson"},
+		"empty output":   {"builder-stdout.log", "", "builder-stdout.log"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ws := t.TempDir()
+			writePhaseTiming(t, ws, rejectedBuildBeforeTheRetro(cyclestate.DiagCodeBuildRejected, "PASS"))
+			writeFile(t, ws, tc.file, tc.body)
+
+			if r := Classify(ws); r.Class != ClassInfrastructure || r.Source != tc.source {
+				t.Fatalf("Classify = %+v, want infrastructure from %s; infrastructure evidence explains the rejection, so the item is not charged", r, tc.source)
+			}
+		})
+	}
+}
+
+func TestClassify_TheRejectedBuildsOwnSentinelOutranksInfrastructureAsOnMain(t *testing.T) {
+	ws := t.TempDir()
+	writePhaseTiming(t, ws, rejectedBuildBeforeTheRetro(cyclestate.DiagCodeBuildRejected, "PASS"))
+	writeFile(t, ws, "build-report.md", "# build\n<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"FAIL\",\"failure\":{\"class\":\"code-build-fail\"}} -->\n")
+	writeFile(t, ws, "orchestrator-report.md", "scout: HTTP 429 Too Many Requests, retried\n")
+
+	if r := Classify(ws); r.Class != Classification("code-build-fail") {
+		t.Fatalf("Classify = %+v; the build's own FAIL sentinel names the class before any infrastructure marker, as on main", r)
+	}
+}
+
+func writeFile(t *testing.T, dir, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
