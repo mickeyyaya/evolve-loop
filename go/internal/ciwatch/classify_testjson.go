@@ -13,14 +13,19 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
 	testJSONArtifactPrefix = "coverage-"
 	testJSONFile           = "test-integration.json"
+	e2eJSONFile            = "test-e2e.json"
+	downloadTries          = 3
 	testJSONLineCap        = 64 << 20
 	artifactPageCap        = 100
 )
+
+var downloadBackoff = 2 * time.Second
 
 var failEventMark = []byte(`"Action":"fail"`)
 
@@ -30,7 +35,7 @@ type testEvent struct {
 	Test    string
 }
 
-func readTestJSONFailures(r io.Reader) ([]FailingTest, error) {
+func readTestJSONFailures(r io.Reader, module string) ([]FailingTest, error) {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(nil, testJSONLineCap)
 	failedPkgs := map[string]bool{}
@@ -45,6 +50,7 @@ func readTestJSONFailures(r io.Reader) ([]FailingTest, error) {
 			return nil, fmt.Errorf("test json: %w", err)
 		}
 		switch {
+		case !inModule(e.Package, module):
 		case e.Test == "":
 			failedPkgs[e.Package] = true
 		case !strings.Contains(e.Test, "/"):
@@ -74,38 +80,36 @@ func failuresOfFailedPackages(failedPkgs map[string]bool, tests []FailingTest) [
 	return out
 }
 
-func (s ghClassifySource) testJSONFailures(ctx context.Context, st RunStatus) ([]FailingTest, bool, error) {
+func (s ghClassifySource) testJSONFailures(ctx context.Context, st RunStatus) ([]FailingTest, map[string]bool, error) {
 	if st.Attempt > 1 {
-		return nil, false, nil
+		return nil, nil, nil
 	}
 	id := strconv.FormatInt(st.RunID, 10)
 	names, err := s.testJSONArtifacts(ctx, id)
 	if err != nil {
-		return nil, false, err
+		return nil, nil, err
 	}
 	dir, err := os.MkdirTemp("", "ciwatch-testjson-")
 	if err != nil {
-		return nil, false, fmt.Errorf("test json temp dir: %w", err)
+		return nil, nil, fmt.Errorf("test json temp dir: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 	var all []FailingTest
-	found := false
+	withJSON := map[string]bool{}
 	for _, name := range names {
-		dest := filepath.Join(dir, name)
-		if _, err := s.gh(ctx, "run", "download", id, "--name", name, "--dir", dest); err != nil {
-			return nil, false, err
-		}
-		rows, ok, err := readTestJSONFile(filepath.Join(dest, testJSONFile))
+		rows, ok, err := s.artifactFailures(ctx, id, name, filepath.Join(dir, name))
 		if err != nil {
-			return nil, false, fmt.Errorf("artifact %s: %w", name, err)
+			return nil, nil, err
 		}
-		found = found || ok
+		if ok {
+			withJSON[name] = true
+		}
 		for _, row := range rows {
 			row.Jobs = []string{name}
 			all = append(all, row)
 		}
 	}
-	return all, found, nil
+	return all, withJSON, nil
 }
 
 func (s ghClassifySource) testJSONArtifacts(ctx context.Context, id string) ([]string, error) {
@@ -131,7 +135,44 @@ func (s ghClassifySource) testJSONArtifacts(ctx context.Context, id string) ([]s
 	return names, nil
 }
 
-func readTestJSONFile(path string) ([]FailingTest, bool, error) {
+func (s ghClassifySource) artifactFailures(ctx context.Context, id, name, base string) ([]FailingTest, bool, error) {
+	dest, err := s.download(ctx, id, name, base)
+	if err != nil {
+		return nil, false, err
+	}
+	var rows []FailingTest
+	found := false
+	for _, file := range []string{testJSONFile, e2eJSONFile} {
+		got, ok, err := readTestJSONFile(filepath.Join(dest, file), s.module)
+		if err != nil {
+			return nil, false, fmt.Errorf("artifact %s: %w", name, err)
+		}
+		found = found || ok
+		rows = append(rows, got...)
+	}
+	return rows, found, nil
+}
+
+func (s ghClassifySource) download(ctx context.Context, id, name, base string) (string, error) {
+	for try := 1; ; try++ {
+		dest := base + "-" + strconv.Itoa(try)
+		_, err := s.gh(ctx, "run", "download", id, "--name", name, "--dir", dest)
+		if err == nil || try == downloadTries {
+			return dest, err
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(downloadBackoff):
+		}
+	}
+}
+
+func inModule(pkg, module string) bool {
+	return module == "" || pkg == module || strings.HasPrefix(pkg, module+"/")
+}
+
+func readTestJSONFile(path, module string) ([]FailingTest, bool, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil
@@ -140,6 +181,6 @@ func readTestJSONFile(path string) ([]FailingTest, bool, error) {
 		return nil, false, err
 	}
 	defer func() { _ = f.Close() }()
-	rows, err := readTestJSONFailures(f)
+	rows, err := readTestJSONFailures(f, module)
 	return rows, err == nil, err
 }

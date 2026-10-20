@@ -95,7 +95,7 @@ func TestWithFailures_RealCIRunsYieldOnlyTheGoCommandsFailures(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(fmt.Sprint(tc.run), func(t *testing.T) {
 			fixtureRunGH(t, fmt.Sprint(tc.run))
-			got, err := ghClassifySource{root: "."}.withFailures(context.Background(), failedRun(tc.run))
+			got, err := ghClassifySource{root: ".", module: strings.TrimSuffix(modPrefix, "/")}.withFailures(context.Background(), failedRun(tc.run))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -156,25 +156,30 @@ func TestWithFailures_ArtifactFailuresPropagate(t *testing.T) {
 	logRoute := ghRouteF1{prefix: "run view 9 --log-failed", out: ghLog("j", "FAIL\tm/a\t0.1s")}
 	listing := ghRouteF1{prefix: "api repos/{owner}/{repo}/actions/runs/9/artifacts", out: `{"artifacts":[{"name":"coverage-x","expired":false}]}`}
 	cases := []struct {
-		name   string
-		routes []ghRouteF1
-		want   string
+		name      string
+		routes    []ghRouteF1
+		want      string
+		downloads int
 	}{
-		{"listing", []ghRouteF1{logRoute, {prefix: "api repos/{owner}/{repo}/actions/runs/9/artifacts", err: errors.New("HTTP 502")}}, "HTTP 502"},
-		{"download", []ghRouteF1{logRoute, listing, {prefix: "run download 9", err: errors.New("download 410")}}, "download 410"},
-		{"a listing over one page", []ghRouteF1{logRoute, {prefix: "api repos/{owner}/{repo}/actions/runs/9/artifacts", out: `{"total_count":101,"artifacts":[{"name":"coverage-x","expired":false}]}`}}, "lists 101 artifacts, over the 1 read"},
+		{"listing", []ghRouteF1{logRoute, {prefix: "api repos/{owner}/{repo}/actions/runs/9/artifacts", err: errors.New("HTTP 502")}}, "HTTP 502", 0},
+		{"download, after every try", []ghRouteF1{logRoute, listing, {prefix: "run download 9", err: errors.New("download 410")}}, "download 410", downloadTries},
+		{"a listing over one page", []ghRouteF1{logRoute, {prefix: "api repos/{owner}/{repo}/actions/runs/9/artifacts", out: `{"total_count":101,"artifacts":[{"name":"coverage-x","expired":false}]}`}}, "lists 101 artifacts, over the 1 read", 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			routedGHF1(t, tc.routes...)
+			noBackoff(t)
+			seen := routedGHF1(t, tc.routes...)
 			if _, err := (ghClassifySource{root: "."}).withFailures(context.Background(), failedRun(9)); err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+			if got := countPrefix(*seen, "run download 9"); got != tc.downloads {
+				t.Errorf("downloads = %d, want %d", got, tc.downloads)
 			}
 		})
 	}
 }
 
-func TestReadTestJSONFailures_KeepsFailedTestsOfFailedPackagesOnly(t *testing.T) {
+func TestReadTestJSONFailures_KeepsFailedTestsOfFailedPackagesOfTheModuleOnly(t *testing.T) {
 	stream := strings.Join([]string{
 		`{"Action":"run","Package":"m/a","Test":"TestA"}`,
 		`{"Action":"output","Package":"m/b","Test":"TestPrinter","Output":"--- FAIL: TestFake (0.1s)\n"}`,
@@ -184,9 +189,12 @@ func TestReadTestJSONFailures_KeepsFailedTestsOfFailedPackagesOnly(t *testing.T)
 		`{"Action":"fail","Package":"m/b","Test":"TestPrintedByAPassingPackage"}`,
 		`{"Action":"pass","Package":"m/b"}`,
 		`{"Action":"fail","Package":"m/c"}`,
+		`{"Action":"fail","Package":"gateprobe/internal/probe","Test":"TestValue"}`,
+		`{"Action":"fail","Package":"gateprobe/internal/probe"}`,
+		`{"Action":"fail","Package":"mx/d"}`,
 		``,
 	}, "\n")
-	got, err := readTestJSONFailures(strings.NewReader(stream))
+	got, err := readTestJSONFailures(strings.NewReader(stream), "m")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,10 +202,10 @@ func TestReadTestJSONFailures_KeepsFailedTestsOfFailedPackagesOnly(t *testing.T)
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("readTestJSONFailures = %+v, want %+v", got, want)
 	}
-	if _, err := readTestJSONFailures(strings.NewReader(`{"Action":"fail",` + "\n")); err == nil {
+	if _, err := readTestJSONFailures(strings.NewReader(`{"Action":"fail",`+"\n"), "m"); err == nil {
 		t.Error("a failure event that is not JSON must be reported")
 	}
-	if _, err := readTestJSONFailures(strings.NewReader(strings.Repeat("x", testJSONLineCap+1))); err == nil {
+	if _, err := readTestJSONFailures(strings.NewReader(strings.Repeat("x", testJSONLineCap+1)), "m"); err == nil {
 		t.Error("a line over the cap must be reported")
 	}
 }
@@ -251,5 +259,109 @@ func TestWithFailures_ANoTempDirIsReported(t *testing.T) {
 	)
 	if _, err := (ghClassifySource{root: "."}).withFailures(context.Background(), failedRun(9)); err == nil || !strings.Contains(err.Error(), "test json temp dir") {
 		t.Fatalf("err = %v, want the temp dir failure", err)
+	}
+}
+
+func noBackoff(t *testing.T) {
+	t.Helper()
+	orig := downloadBackoff
+	downloadBackoff = 0
+	t.Cleanup(func() { downloadBackoff = orig })
+}
+
+func countPrefix(calls []string, prefix string) int {
+	n := 0
+	for _, c := range calls {
+		if strings.HasPrefix(c, prefix) {
+			n++
+		}
+	}
+	return n
+}
+
+func uploaded(artifact string) string {
+	return "Artifact " + artifact + " has been successfully uploaded! Final size is 1 bytes. Artifact ID is 1"
+}
+
+func artifactGH(t *testing.T, log string, download func(name string, try int, dest string) error) *[]string {
+	t.Helper()
+	tries := map[string]int{}
+	var seen []string
+	fakeGH(t, func(args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		seen = append(seen, joined)
+		switch {
+		case strings.HasPrefix(joined, "run view 9 --log-failed"):
+			return []byte(log), nil
+		case strings.HasPrefix(joined, "api repos/{owner}/{repo}/actions/runs/9/artifacts"):
+			return []byte(`{"artifacts":[{"name":"coverage-x","expired":false},{"name":"coverage-y","expired":false}]}`), nil
+		}
+		name := args[slices.Index(args, "--name")+1]
+		tries[name]++
+		return nil, download(name, tries[name], args[slices.Index(args, "--dir")+1])
+	})
+	return &seen
+}
+
+func writeArtifactFile(dest, name, body string) error {
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dest, name), []byte(body), 0o644)
+}
+
+func TestWithFailures_OnlyAJobWhoseArtifactHoldsTestJSONDropsItsTextRows(t *testing.T) {
+	log := ghLog("go", uploaded("coverage-x"), "=== RUN   TestFake", "--- FAIL: TestFake (0s)", "FAIL\tm/fake\t0.1s") +
+		ghLog("go-darwin", uploaded("coverage-y"), "--- FAIL: TestDarwin (0s)", "FAIL\tm/darwin\t0.1s") +
+		ghLog("acs-durable", "--- FAIL: TestACS (0s)", "FAIL\tm/acs\t0.1s")
+	artifactGH(t, log, func(name string, _ int, dest string) error {
+		if name == "coverage-y" {
+			return os.MkdirAll(dest, 0o755)
+		}
+		return writeArtifactFile(dest, testJSONFile, `{"Action":"fail","Package":"m/real","Test":"TestReal"}`+"\n"+`{"Action":"fail","Package":"m/real"}`+"\n")
+	})
+	got, err := ghClassifySource{root: ".", module: "m"}.withFailures(context.Background(), failedRun(9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []FailingTest{
+		{Package: "m/acs", Test: "TestACS", Jobs: []string{"acs-durable"}},
+		{Package: "m/darwin", Test: "TestDarwin", Jobs: []string{"go-darwin"}},
+		{Package: "m/real", Test: "TestReal", Jobs: []string{"go"}},
+	}
+	if fmt.Sprint(got.FailingTests) != fmt.Sprint(want) {
+		t.Errorf("FailingTests = %+v, want %+v", got.FailingTests, want)
+	}
+}
+
+func TestWithFailures_ARetriedDownloadReadsTheE2EJSON(t *testing.T) {
+	noBackoff(t)
+	seen := artifactGH(t, ghLog("go", "make: *** [Makefile:9: test-e2e] Error 1"), func(name string, try int, dest string) error {
+		if name == "coverage-y" {
+			return nil
+		}
+		if try == 1 {
+			return errors.New("HTTP 502")
+		}
+		return writeArtifactFile(dest, e2eJSONFile, `{"Action":"fail","Package":"m/e2e","Test":"TestE2E"}`+"\n"+`{"Action":"fail","Package":"m/e2e"}`+"\n")
+	})
+	got, err := ghClassifySource{root: ".", module: "m"}.withFailures(context.Background(), failedRun(9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []FailingTest{{Step: "make test-e2e", Jobs: []string{"go"}}, {Package: "m/e2e", Test: "TestE2E", Jobs: []string{"coverage-x"}}}
+	if fmt.Sprint(got.FailingTests) != fmt.Sprint(want) || countPrefix(*seen, "run download 9 --name coverage-x") != 2 {
+		t.Errorf("FailingTests = %+v after %v, want %+v on the second try", got.FailingTests, *seen, want)
+	}
+}
+
+func TestWithFailures_ACancelledContextStopsTheRetry(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	artifactGH(t, ghLog("go"), func(string, int, string) error {
+		cancel()
+		return errors.New("HTTP 502")
+	})
+	if _, err := (ghClassifySource{root: "."}).withFailures(ctx, failedRun(9)); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 }

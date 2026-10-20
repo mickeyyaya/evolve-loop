@@ -302,7 +302,7 @@ func TestNewGHClassifySource_ResolvesARunAgainstItsFirstParent(t *testing.T) {
 		"api repos/{owner}/{repo}/compare/b...h":              `{"status":"ahead","merge_base_commit":{"sha":"b"},"files":[{"filename":"go/a/a.go"}]}`,
 	}
 	fakeGHExec(t, answers, "")
-	ch, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "501"})
+	ch, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "501"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestNewGHClassifySource_ResolvesARunAgainstItsFirstParent(t *testing.T) {
 		t.Errorf("run = %+v, want run 501 failing TestA", ch.Run)
 	}
 	fakeGHExec(t, answers, "--log-failed")
-	if _, err := NewGHClassifySource(".").Resolve(context.Background(), Target{TargetRun, "501"}); err == nil || !strings.Contains(err.Error(), "--log-failed") {
+	if _, err := NewGHClassifySource(".", "").Resolve(context.Background(), Target{TargetRun, "501"}); err == nil || !strings.Contains(err.Error(), "--log-failed") {
 		t.Errorf("a failed-log fetch failure must propagate, got %v", err)
 	}
 }
@@ -324,7 +324,7 @@ func TestNewGHClassifySource_MainRunsAndRerun(t *testing.T) {
 		"run rerun 501":     "",
 		"run view 501 --js": `{"attempt":2,"conclusion":"success","createdAt":"2026-10-01T12:00:00Z","databaseId":501,"headSha":"h","status":"completed","url":"u"}`,
 	}, "")
-	src := NewGHClassifySource(".")
+	src := NewGHClassifySource(".", "")
 	before := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	runs, err := src.MainRunsBefore(context.Background(), before, 10)
 	if err != nil || len(runs) != 1 || runs[0].RunID != 401 {

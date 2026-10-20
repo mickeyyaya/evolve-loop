@@ -1,3 +1,4 @@
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:48:19.0584163Z Artifact coverage-ubuntu-latest-go1.23 has been successfully uploaded! Final size is 7966268 bytes. Artifact ID is 12246141371
 go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:39:08.6629271Z === RUN   TestNew_RefusesAnIncompleteConfig
 go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:39:25.7510829Z === RUN   TestLastLines
 go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:39:32.2684392Z === RUN   TestParallelDefaultGuard_ParallelTestMustNotMutateProcessState

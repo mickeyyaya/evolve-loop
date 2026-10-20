@@ -48,11 +48,12 @@ type ghCompareDoc struct {
 }
 
 type ghClassifySource struct {
-	root string
+	root   string
+	module string
 }
 
-func NewGHClassifySource(repoRoot string) ClassifySource {
-	return ghClassifySource{root: repoRoot}
+func NewGHClassifySource(repoRoot, modulePath string) ClassifySource {
+	return ghClassifySource{root: repoRoot, module: modulePath}
 }
 
 func (s ghClassifySource) gh(ctx context.Context, args ...string) ([]byte, error) {
@@ -276,14 +277,14 @@ func (s ghClassifySource) withFailures(ctx context.Context, st RunStatus) (RunSt
 	if err != nil {
 		return RunStatus{}, err
 	}
-	truth, found, err := s.testJSONFailures(ctx, st)
+	truth, withJSON, err := s.testJSONFailures(ctx, st)
 	if err != nil {
 		return RunStatus{}, err
 	}
 	log := string(out)
 	st.FailingJobs = failedJobNames(log)
-	if found {
-		st.FailingTests = attributeFailures(log, truth)
+	if len(withJSON) > 0 {
+		st.FailingTests = attributeFailures(log, truth, withJSON)
 	} else {
 		st.FailingTests = parseFailingTests(log)
 	}
@@ -293,6 +294,8 @@ func (s ghClassifySource) withFailures(ctx context.Context, st RunStatus) (RunSt
 const unknownStep = "UNKNOWN STEP"
 
 var makeErrorLine = regexp.MustCompile(`^make(?:\[\d+\])?: \*\*\* \[(?:[^\]]*:\d+: )?([^\]]+)\] Error \d+`)
+
+var uploadedArtifactLine = regexp.MustCompile(`^Artifact (\S+) has been successfully uploaded!`)
 
 func logText(line string) (job, step, text string, ok bool) {
 	job, rest, ok := strings.Cut(line, "\t")
@@ -311,18 +314,18 @@ func logText(line string) (job, step, text string, ok bool) {
 }
 
 type failureParse struct {
-	found    map[string]*FailingTest
-	pending  map[string][]string
-	named    map[string]bool
-	jobs     []string
-	makes    map[string]string
-	steps    map[string]string
-	mentions map[string]map[string]bool
+	found   map[string]*FailingTest
+	pending map[string][]string
+	named   map[string]bool
+	jobs    []string
+	makes   map[string]string
+	steps   map[string]string
+	uploads map[string]string
 }
 
 func scanLog(log string) *failureParse {
 	p := &failureParse{found: map[string]*FailingTest{}, pending: map[string][]string{}, named: map[string]bool{},
-		makes: map[string]string{}, steps: map[string]string{}, mentions: map[string]map[string]bool{}}
+		makes: map[string]string{}, steps: map[string]string{}, uploads: map[string]string{}}
 	for _, line := range strings.Split(log, "\n") {
 		if job, step, text, ok := logText(line); ok {
 			p.line(job, step, text)
@@ -344,26 +347,15 @@ func (p *failureParse) add(row FailingTest, job string) {
 	p.found[key] = &row
 }
 
-func mentionKey(pkg, test string) string {
-	if test != "" {
-		return "test\x00" + test
-	}
-	return "pkg\x00" + pkg
-}
-
-func (p *failureParse) mention(job, key string) {
-	if p.mentions[job] == nil {
-		p.mentions[job] = map[string]bool{}
-	}
-	p.mentions[job][key] = true
-}
-
 func (p *failureParse) note(job, step, text string) {
 	if !slices.Contains(p.jobs, job) {
 		p.jobs = append(p.jobs, job)
 	}
 	if m := makeErrorLine.FindStringSubmatch(text); m != nil && p.makes[job] == "" {
 		p.makes[job] = "make " + m[1]
+	}
+	if m := uploadedArtifactLine.FindStringSubmatch(text); m != nil {
+		p.uploads[job] = m[1]
 	}
 	if step != "" && step != unknownStep && p.steps[job] == "" {
 		p.steps[job] = step
@@ -375,7 +367,6 @@ func (p *failureParse) line(job, step, text string) {
 	if name, isFail := strings.CutPrefix(text, "--- FAIL: "); isFail {
 		if fields := strings.Fields(name); len(fields) > 0 {
 			top, _, _ := strings.Cut(fields[0], "/")
-			p.mention(job, mentionKey("", top))
 			if !slices.Contains(p.pending[job], top) {
 				p.pending[job] = append(p.pending[job], top)
 			}
@@ -386,7 +377,6 @@ func (p *failureParse) line(job, step, text string) {
 	if len(fields) < 2 || !strings.HasPrefix(text, "FAIL\t") {
 		return
 	}
-	p.mention(job, mentionKey(fields[1], ""))
 	tests := p.pending[job]
 	delete(p.pending, job)
 	if len(tests) == 0 {
@@ -405,39 +395,51 @@ func (p *failureParse) addUnnamedJobs() {
 	}
 }
 
-func parseFailingTests(log string) []FailingTest {
-	p := scanLog(log)
+func (p *failureParse) addPending() {
 	for _, job := range p.jobs {
 		for _, test := range p.pending[job] {
 			p.add(FailingTest{Test: test}, job)
 		}
 	}
+}
+
+func parseFailingTests(log string) []FailingTest {
+	p := scanLog(log)
+	p.addPending()
 	p.addUnnamedJobs()
 	return sortedFailures(p.found)
 }
 
-func attributeFailures(log string, truth []FailingTest) []FailingTest {
+func attributeFailures(log string, truth []FailingTest, withJSON map[string]bool) []FailingTest {
 	p := scanLog(log)
+	p.addPending()
+	text := sortedFailures(p.found)
 	p.found, p.named = map[string]*FailingTest{}, map[string]bool{}
 	for _, f := range truth {
-		jobs := f.Jobs
-		if mentioned := p.jobsMentioning(mentionKey(f.Package, f.Test)); len(mentioned) > 0 {
-			jobs = mentioned
-		}
-		for _, job := range jobs {
+		for _, job := range p.uploaders(f.Jobs[0]) {
 			p.add(FailingTest{Package: f.Package, Test: f.Test}, job)
+		}
+	}
+	for _, row := range text {
+		for _, job := range row.Jobs {
+			if !withJSON[p.uploads[job]] {
+				p.add(FailingTest{Package: row.Package, Test: row.Test}, job)
+			}
 		}
 	}
 	p.addUnnamedJobs()
 	return sortedFailures(p.found)
 }
 
-func (p *failureParse) jobsMentioning(key string) []string {
+func (p *failureParse) uploaders(artifact string) []string {
 	var jobs []string
 	for _, job := range p.jobs {
-		if p.mentions[job][key] {
+		if p.uploads[job] == artifact {
 			jobs = append(jobs, job)
 		}
+	}
+	if len(jobs) == 0 {
+		return []string{artifact}
 	}
 	return jobs
 }

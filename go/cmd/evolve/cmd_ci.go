@@ -75,7 +75,7 @@ func runCI(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s%v\n", ciClassifyPrefix, err)
 		return exitIO
 	}
-	rep, err := ciwatch.ClassifyTarget(context.Background(), ciwatch.NewGHClassifySource(root), a.target, opts)
+	rep, err := ciwatch.ClassifyTarget(context.Background(), ciwatch.NewGHClassifySource(root, opts.ModulePath), a.target, opts)
 	switch {
 	case errors.Is(err, ciwatch.ErrNoRun), errors.Is(err, ciwatch.ErrRunNotCompleted):
 		fmt.Fprintf(stderr, "%s%v\n", ciClassifyPrefix, err)
