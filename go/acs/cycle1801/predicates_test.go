@@ -128,23 +128,98 @@ func referencesHostReaper(n ast.Node) (string, bool) {
 	return se.Sel.Name, true
 }
 
+func testMainIsolatesTmux(files map[string]*ast.File) bool {
+	tmpdir, unset := false, false
+	for name, f := range files {
+		if !strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Name.Name != "TestMain" || fn.Body == nil {
+				continue
+			}
+			temps := mkdirTempNames(fn.Body)
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				tmpdir = tmpdir || (osEnvCall(n, "Setenv", 2, "TMUX_TMPDIR") && setsATempDir(n, temps))
+				unset = unset || osEnvCall(n, "Unsetenv", 1, "TMUX")
+				return true
+			})
+		}
+	}
+	return tmpdir && unset
+}
+
+func mkdirTempNames(body *ast.BlockStmt) map[string]bool {
+	names := map[string]bool{}
+	ast.Inspect(body, func(n ast.Node) bool {
+		as, ok := n.(*ast.AssignStmt)
+		if !ok || len(as.Rhs) != 1 || len(as.Lhs) == 0 || !isOSCall(as.Rhs[0], "MkdirTemp") {
+			return true
+		}
+		if id, ok := as.Lhs[0].(*ast.Ident); ok {
+			names[id.Name] = true
+		}
+		return true
+	})
+	return names
+}
+
+func setsATempDir(n ast.Node, temps map[string]bool) bool {
+	call, ok := n.(*ast.CallExpr)
+	if !ok || len(call.Args) != 2 {
+		return false
+	}
+	id, ok := call.Args[1].(*ast.Ident)
+	return ok && temps[id.Name]
+}
+
+func isOSCall(e ast.Expr, fn string) bool {
+	call, ok := e.(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != fn {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "os"
+}
+
+func osEnvCall(n ast.Node, fn string, arity int, key string) bool {
+	call, ok := n.(*ast.CallExpr)
+	if !ok || len(call.Args) != arity || !isOSCall(call, fn) {
+		return false
+	}
+	lit, isLit := call.Args[0].(*ast.BasicLit)
+	return isLit && lit.Value == `"`+key+`"`
+}
+
 // acs-predicate: config-check
 func TestC1801_004_NoCmdEvolveTestReachesTheHostTmuxReapers(t *testing.T) {
 	_, files := parseCmdEvolveDir(t)
 	ctorDefaults := 0
+	var testRefs []string
 	for name, f := range files {
 		ast.Inspect(f, func(n ast.Node) bool {
 			fn, ok := referencesHostReaper(n)
 			if !ok {
 				return true
 			}
-			if strings.HasSuffix(name, "_test.go") {
+			switch {
+			case strings.HasSuffix(name, "_test.go") && fn == "ExecReapOrphanSockets":
+				testRefs = append(testRefs, name+": swarm."+fn)
+			case strings.HasSuffix(name, "_test.go"):
 				t.Errorf("%s references swarm.%s: a cmd/evolve test would reap host tmux sessions", name, fn)
-			} else if name == "cmd_gc.go" {
+			case name == "cmd_gc.go":
 				ctorDefaults++
 			}
 			return true
 		})
+	}
+	if len(testRefs) > 0 && !testMainIsolatesTmux(files) {
+		t.Errorf("%s reach the real tmux reapers, but no cmd/evolve TestMain sets TMUX_TMPDIR and unsets TMUX: a cmd/evolve test would reap host tmux sessions", strings.Join(testRefs, ", "))
 	}
 	if ctorDefaults == 0 {
 		t.Errorf("cmd_gc.go no longer defaults to the real swarm reapers, so a mutating gc reaps nothing")

@@ -47,6 +47,10 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "TestMain: set TMUX_TMPDIR: %v\n", err)
 		os.Exit(1)
 	}
+	if err := os.Unsetenv("TMUX"); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: unset TMUX: %v\n", err)
+		os.Exit(1)
+	}
 	usageDir, err := os.MkdirTemp("", "evcodeusage")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: isolate the code usage log: %v\n", err)

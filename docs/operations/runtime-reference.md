@@ -247,6 +247,8 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 
 > - How `ci classify` finds the failures of a run: [internal/ciwatch](../architecture/packages/internal-ciwatch.md#failure-attribution-of-ci-classify).
 
+> - A second side effect of `ci classify --rerun`: it files a fix-first inbox item once for each red. The red must be on the base and stay red after the rerun. See [internal/ciwatch](../architecture/packages/internal-ciwatch.md#fix-first-items-for-a-base-red).
+
 > - `evolve cycle scope-delta --cycle N [--json] [--project-root P] [--evolve-dir D]` (cycle 1879) — the operator view of `scopedelta.Classify`. It shows the paths a lane changed outside its declared scope. A positional cycle (`scope-delta 1879`) also works. The build handoff floor runs the same classification at build exit and emits one `ORCHESTRATOR_SCOPE_DELTA` signal per path outside the scope (2026-10-18, ADR-0087).
 >   - Declared scope: the `files` of each claimed record in `.evolve/inbox/processing/cycle-N/` whose id is in `lane-scope.json` `todo_ids`. Without a pin, every claimed record counts.
 >   - Changed paths: `git -C <active_worktree> diff --name-only <worktree_base_sha>`, with both values from the cycle's `cycle-state.json`.
