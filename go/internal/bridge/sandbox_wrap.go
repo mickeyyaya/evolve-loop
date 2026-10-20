@@ -72,7 +72,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			return nil, false
 		}
-		grants, err := resolveSandboxWriteGrants(req.WriteSubpaths, req.RepoRoot, req.Worktree)
+		grants, err := resolveSandboxWriteGrants(req.WriteSubpaths, req.RepoRoot, req.Worktree, req.Workspace)
 		if err != nil {
 			if deps.Stderr != nil {
 				fmt.Fprintf(deps.Stderr, "[bridge] sandbox write grant unavailable: %v\n", err)
