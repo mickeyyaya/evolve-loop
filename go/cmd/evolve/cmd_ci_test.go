@@ -58,6 +58,10 @@ func TestWriteClassifyReport_TextTableAndJSON(t *testing.T) {
 			FailingTest: ciwatch.FailingTest{Jobs: []string{"lint"}},
 			Evidence:    ciwatch.Evidence{Touched: ciwatch.FactUnknown, BaseRed: ciwatch.FactNo, RecurredOnMain: ciwatch.FactNo, RerunGreen: ciwatch.FactUnknown},
 			Label:       ciwatch.LabelUnknown, Rule: "default",
+		}, {
+			FailingTest: ciwatch.FailingTest{Step: "make apicover-check", Jobs: []string{"build"}},
+			Evidence:    ciwatch.Evidence{Touched: ciwatch.FactUnknown, BaseRed: ciwatch.FactNo, RecurredOnMain: ciwatch.FactNo, RerunGreen: ciwatch.FactUnknown},
+			Label:       ciwatch.LabelUnknown, Rule: "default",
 		}},
 	}
 	var text bytes.Buffer
@@ -65,7 +69,7 @@ func TestWriteClassifyReport_TextTableAndJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "run 501 https://x/runs/501 head=0123456789ab base=fedcba987654 conclusion=failure\n" + ciClassifyHeader +
-		"\nunknown\t-\t-\tdefault\tunknown\tno\tno\tunknown\nretry-safe: no\n"
+		"\nunknown\t-\t-\tdefault\tunknown\tno\tno\tunknown\nunknown\t-\tmake apicover-check\tdefault\tunknown\tno\tno\tunknown\nretry-safe: no\n"
 	if text.String() != want {
 		t.Errorf("text report:\n%q\nwant\n%q", text.String(), want)
 	}

@@ -39,7 +39,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeArtifactIntegrityFail, "the adapter returned but the artifact failed the integrity ladder (fields.rung = missing | stale | unreadable | empty | token_missing); the reason is the ladder's diagnostic the run's result used to drop; fields.step=verify, artifact, exit_code")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeVerdictFail, "the artifact is sound but the adapter exited non-zero (the bridge's exit codes reach here as fields.exit_code); fields.step=verify, cli, artifact")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeArtifactHashFailed, "the artifact stood the ladder (PASS or FAIL) but could not be hashed, so the ledger line stamps artifact_sha256=\"\" — silent before unit 16; fields.step=hash, artifact")
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeLedgerWriteFailed, "the agent_subprocess ledger line or its tip could not be written (fields.op = mkdir | chain_link | open | write | close | tip_tmp | tip_rename); the returned error keeps its bare text and masks any adapter error, exactly as before; fields.step=ledger, path")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeLedgerWriteFailed, "the agent_subprocess ledger line or its tip could not be written (fields.op = mkdir | flock | chain_link | open | write | close | tip_tmp | tip_rename); the returned error keeps its bare text and masks any adapter error, exactly as before; fields.step=ledger, path")
 }
 
 const (

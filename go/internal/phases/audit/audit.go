@@ -79,6 +79,7 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	}
 	b.WriteString(inheritedDefectsPromptBlockVia(h.defectLedger(), req))
 	b.WriteString(chainExamplePromptBlock())
+	b.WriteString(auditRulesPromptBlock(req))
 	return b.String()
 }
 

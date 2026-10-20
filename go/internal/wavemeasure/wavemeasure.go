@@ -33,6 +33,9 @@ type Facts struct {
 	Lanes          []Lane
 	AdmissionWaits int
 	Supply         *Supply
+
+	OptimisticAdmissions int
+	OptimisticFailures   int
 }
 
 type Measures struct {
@@ -44,11 +47,19 @@ type Measures struct {
 	Landed         int     `json:"landed"`
 	AdmissionWaits int     `json:"admission_waits"`
 
+	OptimisticAdmissions  int     `json:"optimistic_admissions"`
+	OptimisticFailures    int     `json:"optimistic_failures"`
+	OptimisticFailureRate float64 `json:"optimistic_failure_rate"`
+
 	Supply *Supply `json:"supply,omitempty"`
 }
 
 func Compute(f Facts, now time.Time) Measures {
-	m := Measures{WidthSized: f.WidthSized, AdmissionWaits: f.AdmissionWaits}
+	m := Measures{WidthSized: f.WidthSized, AdmissionWaits: f.AdmissionWaits,
+		OptimisticAdmissions: f.OptimisticAdmissions, OptimisticFailures: f.OptimisticFailures}
+	if f.OptimisticAdmissions > 0 {
+		m.OptimisticFailureRate = float64(f.OptimisticFailures) / float64(f.OptimisticAdmissions)
+	}
 	if f.Supply != nil {
 		supply := *f.Supply
 		m.Supply = &supply

@@ -158,7 +158,7 @@ func (cr *cycleRun) planRunOrder() []string {
 }
 
 func (cr *cycleRun) evaluateBatchAt(next Phase) []Phase {
-	grp := evaluateBatch(cr.planRunOrder(), cr.o.phaseArchetype)
+	grp := evaluateBatch(cr.planRunOrder(), cr.o.batchArchetype)
 	if len(grp) < 2 || grp[0] != string(next) {
 		return nil
 	}
@@ -167,6 +167,13 @@ func (cr *cycleRun) evaluateBatchAt(next Phase) []Phase {
 		out[i] = Phase(p)
 	}
 	return out
+}
+
+func (o *Orchestrator) batchArchetype(phase string) string {
+	if spec, ok := o.specFor(Phase(phase)); ok && spec.RetractOnFail {
+		return ""
+	}
+	return o.phaseArchetype(phase)
 }
 
 func mergeVerdict(acc, v string) string {

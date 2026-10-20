@@ -25,7 +25,7 @@ type stage func(v resolver, res resolution) (resolution, error)
 
 var declaredStages = []stage{
 	selectRule, fixAgentModel, orderByHeadroom, guardEnv, leadWithCaller, overlayCLI, overlayTier,
-	probeChain, benchChain, appendAfterChain, dropToolless, applyTierCeiling,
+	applyLadder, probeChain, benchChain, appendAfterChain, dropToolless, applyTierCeiling,
 }
 
 func (v resolver) resolveDeclared(req Request) (Decision, error) {

@@ -71,8 +71,6 @@
     "Bash(brew:*)",
     "Bash(jq -i:*)",
     "Bash(jq --in-place:*)",
-    "WebFetch",
-    "WebSearch",
     "Edit(skills/**)",
     "Edit(agents/**)",
     "Edit(scripts/**)",

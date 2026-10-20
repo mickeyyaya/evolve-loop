@@ -8,7 +8,10 @@ import (
 
 func RetireUnbacked(opts Options, cycle int, state, reason, commitSHA string, ids []string) ([]string, error) {
 	opts.resolveOpts()
-	mover := opts.mover()
+	mover, err := opts.mover()
+	if err != nil {
+		return nil, err
+	}
 	promote := PromoteOpts{Cycle: strconv.Itoa(cycle), CommitSHA: commitSHA}
 	var retired []string
 	var errs []error

@@ -37,6 +37,7 @@ type Plan struct {
 	PrimarySource string
 	Model         string
 	Tiers         []string
+	Effort        string
 
 	TierCeiling map[string][]string
 }

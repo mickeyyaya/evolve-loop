@@ -4,6 +4,7 @@ package inboxbatch
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -36,9 +37,9 @@ type Item struct {
 	DeliverableKind string                     `json:"deliverable_kind,omitempty"`
 	CreatedAt       string                     `json:"created_at,omitempty"`
 	Path            string                     `json:"-"`
-	IDFromFileName  bool                       `json:"-"`
 	mentions        []string
 	basenames       []string
+	priorityNote    string
 }
 
 type ItemKey struct{ ID, Path string }
@@ -47,15 +48,43 @@ func (it Item) Key() ItemKey { return ItemKey{ID: it.ID, Path: it.Path} }
 
 func (it *Item) UnmarshalJSON(raw []byte) error {
 	type record Item
-	var r record
+	type itemRecord struct {
+		record
+		Priority json.RawMessage `json:"priority"`
+	}
+	var r itemRecord
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return err
 	}
-	*it = Item(r)
+	*it = Item(r.record)
+	if err := it.readPriority(r.Priority); err != nil {
+		return err
+	}
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err == nil {
 		it.mentions, it.basenames = mentionedFiles(doc)
 	}
+	return nil
+}
+
+func (it *Item) readPriority(raw json.RawMessage) error {
+	if len(raw) == 0 || json.Unmarshal(raw, &it.Priority) == nil {
+		return nil
+	}
+	var n float64
+	if err := json.Unmarshal(raw, &n); err != nil {
+		return fmt.Errorf("priority must be a string or a number: %w", err)
+	}
+	if it.Weight != 0 {
+		it.priorityNote = fmt.Sprintf("priority %v is a number; the weight %v stays", n, it.Weight)
+		return nil
+	}
+	if n < 0 || n > 1 {
+		it.priorityNote = fmt.Sprintf("priority %v of item %q is outside the weight range 0..1, so it is not read as the weight", n, it.ID)
+		return nil
+	}
+	it.priorityNote = fmt.Sprintf("priority %v is a number; it is read as the weight", n)
+	it.Weight = n
 	return nil
 }
 
@@ -228,15 +257,27 @@ func LoadFile(path string) (Item, []string, error) {
 		return Item{}, nil, err
 	}
 	name := filepath.Base(path)
-	if it.ID == "" {
-		it.ID, it.IDFromFileName = strings.TrimSuffix(name, ".json"), true
-	}
-	it.Path = name
+	it.ID, it.Path = idOrStem(it.ID, path), name
 	var warnings []string
+	if it.priorityNote != "" {
+		warnings = append(warnings, name+": "+it.priorityNote)
+	}
 	if r := sanitizeItem(&it); len(r.changed) > 0 {
 		warnings = append(warnings, name+": "+r.notice())
 	}
 	return it, warnings, nil
+}
+
+func ItemID(recorded, path string) string {
+	var r fieldRewrites
+	return r.clean("id", idOrStem(recorded, path), maxFieldLen)
+}
+
+func idOrStem(recorded, path string) string {
+	if recorded != "" {
+		return recorded
+	}
+	return strings.TrimSuffix(filepath.Base(path), ".json")
 }
 
 type fieldRewrites struct {

@@ -17,11 +17,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -47,10 +49,26 @@ func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "triage-repor
 func (hooks) DefaultModel() string                        { return "auto" }
 
 func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
-	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTriage)) {
-		return false, "", "", nil
+	if !router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTriage)) {
+		return true, core.VerdictSKIPPED, string(core.PhaseTDD), nil
 	}
-	return true, core.VerdictSKIPPED, string(core.PhaseTDD), nil
+	if d, refused := lanePinRefusal(req); refused {
+		return true, core.VerdictFAIL, "", []core.Diagnostic{d}
+	}
+	return false, "", "", nil
+}
+
+func lanePinRefusal(req core.PhaseRequest) (core.Diagnostic, bool) {
+	if !envchain.BoolValue(req.Env[ipcenv.FleetKey], false) || len(committedset.LanePin(req.Workspace)) > 0 {
+		return core.Diagnostic{}, false
+	}
+	return core.Diagnostic{
+		Severity: cyclestate.SeverityError,
+		Code:     cyclestate.DiagCodeTriageLanePinMissing,
+		Subject:  fmt.Sprintf("cycle-%d", req.Cycle),
+		Message: fmt.Sprintf("fleet lane cycle %d has no non-empty %s in %s; triage refuses to run, because without the host's pin the committed set would fall to the agent's top_n",
+			req.Cycle, committedset.LanePinFile, req.Workspace),
+	}, true
 }
 
 func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
@@ -150,9 +168,14 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 		return ""
 	}
 	inboxDir := filepath.Join(projectRoot, ".evolve", "inbox")
-	items, _, err := inboxbatch.LoadDir(inboxDir)
-	if err != nil || len(items) == 0 {
+	scan, err := inboxbatch.ScanDir(inboxDir)
+	if err != nil {
 		return ""
+	}
+	skipped := skippedFilesNote(scan.Warnings)
+	items := scan.Items
+	if len(items) == 0 {
+		return skipped
 	}
 	if forbidden == nil {
 		forbidden = guards.IsProtectedScope
@@ -160,6 +183,7 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 	rank := rankInputs(projectRoot)
 	menu := inboxmover.RankLaneMenu(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}, items, forbidden, rank)
 	var sect strings.Builder
+	sect.WriteString(skipped)
 	sect.WriteString(unknownClassNote(inboxrank.ClassWarnings(items, rank.Config)))
 	sect.WriteString(selectableBatchesNote(menu.Ready, menu.Ranked))
 	sect.WriteString(consoleRoutedNote(menu.Console))
@@ -176,6 +200,20 @@ func rankInputs(projectRoot string) inboxrank.Inputs {
 		fmt.Fprintf(os.Stderr, "[triage] WARN inbox rank: %s\n", w)
 	}
 	return in
+}
+
+func skippedFilesNote(warnings []inboxbatch.LoadWarning) string {
+	var skipped []string
+	for _, w := range warnings {
+		if w.Unreadable {
+			skipped = append(skipped, inboxbatch.StripControl(w.Text))
+		}
+	}
+	if len(skipped) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("- skipped_inbox_files: %d file(s) in .evolve/inbox did not parse and are not on the menu; "+
+		"the console must repair each: %s\n", len(skipped), strings.Join(skipped, "; "))
 }
 
 func selectableBatchesNote(ready []inboxbatch.Item, ranked []inboxrank.Ranked) string {

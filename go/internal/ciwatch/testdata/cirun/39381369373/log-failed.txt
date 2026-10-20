@@ -1,0 +1,51 @@
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:48:19.0584163Z Artifact coverage-ubuntu-latest-go1.23 has been successfully uploaded! Final size is 7966268 bytes. Artifact ID is 12246141371
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:39:08.6629271Z === RUN   TestNew_RefusesAnIncompleteConfig
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:39:25.7510829Z === RUN   TestLastLines
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:39:32.2684392Z === RUN   TestParallelDefaultGuard_ParallelTestMustNotMutateProcessState
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:39:32.2692345Z === RUN   TestParallelDefaultGuard_ParallelTestMustNotReachProcessStateThroughHelpers
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:11.2118034Z --- FAIL: TestPersonaStopCriterionDedupe_CombinedLineCountReduced
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:11.3710136Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/core/advisor	1.049s	coverage: 100.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:15.0774124Z === RUN   TestWorkspaceCheck_RealGit_RefusesExactlyTheChangedFunctionBelowFull
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:15.1820825Z     --- FAIL: TestF
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:15.1850161Z FAIL	p
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:15.3947746Z --- PASS: TestWorkspaceCheck_RealGit_RefusesExactlyTheChangedFunctionBelowFull (0.33s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:15.4749349Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/covchanged	0.429s	coverage: 100.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:27.8021893Z === RUN   TestEvaluateZeroShip
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:52.9053848Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:52.9055577Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.0684249Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.0685369Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.0688906Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.0690224Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.1082593Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.1083964Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.1087480Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.1088613Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.2651573Z === RUN   TestRatchet_NoNewRawGitFixtures
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:53.2654156Z --- FAIL: TestRatchet_NoNewRawGitFixtures (0.27s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:42:54.6883574Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/events/reader	0.257s	coverage: 100.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:23.4519212Z === RUN   TestTransitivePackageSet_ResolvesTransitiveImport
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:23.4764070Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:23.4768140Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:23.6954787Z --- PASS: TestTransitivePackageSet_ResolvesTransitiveImport (0.20s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:28.2901003Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/fleet	4.861s	coverage: 98.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:31.9582313Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:31.9587957Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:31.9942812Z --- FAIL: TestC1950_001_CoreLeaseBreakerCarryforwardBatchReachesFullCoverage (1.19s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:31.9946572Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1950	1.471s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:32.7638909Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:32.7644408Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:32.8261311Z --- FAIL: TestC1946_001_CoreStatementCoverageIsFull (197.14s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:32.8281661Z FAIL	github.com/mickeyyaya/evolve-loop/go/acs/cycle1946	197.400s
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:33.1959702Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy	0.070s	coverage: 100.0% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:43:38.2713194Z --- PASS: TestEvaluateZeroShip (0.00s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:44:28.9009135Z === RUN   TestComposePrompt_RendersTaskContractVerbatim
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:45:12.8413302Z === RUN   TestGuardSuite
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:46:52.3766636Z === RUN   TestInnerRunCycleErrorF4
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:46:52.3820536Z --- FAIL: TestInnerRunCycleErrorF4 (0.01s)
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:46:52.8369173Z ok  	github.com/mickeyyaya/evolve-loop/go/internal/routingtest	1.955s	coverage: 96.2% of statements
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:47:09.5847847Z === RUN   TestAPICoverNamedExports
+go / build + test (Go 1.23, ubuntu, every package and every gate)	UNKNOWN STEP	2026-10-20T06:48:17.2793951Z make: *** [Makefile:232: apicover-check] Error 1
+CI required	UNKNOWN STEP	2026-10-20T06:52:11.8557600Z ^[[36;1m    *) echo "required CI work did not succeed: $result" >&2; exit 1 ;;^[[0m
+CI required	UNKNOWN STEP	2026-10-20T06:52:11.9973458Z required CI work did not succeed: true:failure:failure
+CI required	UNKNOWN STEP	2026-10-20T06:52:12.0003174Z ##[error]Process completed with exit code 1.

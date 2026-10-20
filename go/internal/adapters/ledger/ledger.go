@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerartifacts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgertip"
 )
 
 const ZeroSeed = "0000000000000000000000000000000000000000000000000000000000000000"
@@ -170,7 +171,7 @@ func (l *FileLedger) appendLineAndReplaceTip(entry any, seq int) error {
 	}
 
 	newHash := sha256Hex(line)
-	tip := fmt.Sprintf("%d:%s", seq, newHash)
+	tip := ledgertip.Format(seq, newHash)
 	tmp := fmt.Sprintf("%s.tmp.%d", l.tipPath, os.Getpid())
 	if err := hooks.writeF(tmp, []byte(tip), 0o644); err != nil {
 		_ = os.Remove(tmp)
@@ -398,7 +399,7 @@ func (t tipRead) check(lastSeq int, lastSha string) error {
 }
 
 func compareTip(tip string, lastSeq int, lastSha string) error {
-	wantTip := fmt.Sprintf("%d:%s", lastSeq, lastSha)
+	wantTip := ledgertip.Format(lastSeq, lastSha)
 	if tip != wantTip {
 		return fmt.Errorf("%w: tip mismatch (have %q want %q)", core.ErrLedgerChainBroken, tip, wantTip)
 	}

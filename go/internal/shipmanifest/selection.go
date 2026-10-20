@@ -5,12 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
-
-const amplificationPhase = "test-amplification"
 
 type GitRead func(args ...string) (string, error)
 
@@ -23,11 +20,12 @@ type Selection struct {
 }
 
 func ReportFiles() []string {
-	return []string{
-		phasecontract.ArtifactName(string(cyclestate.PhaseBuild)),
-		phasecontract.ArtifactName(string(cyclestate.PhaseTDD)),
-		phasecontract.ArtifactFilename(amplificationPhase),
+	writers := phasecontract.SourceWriterPhases()
+	out := make([]string, len(writers))
+	for i, phase := range writers {
+		out[i] = phasecontract.ArtifactFilename(phase)
 	}
+	return out
 }
 
 func RawPathRead(args ...string) []string {

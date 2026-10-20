@@ -84,6 +84,11 @@ func ToolOutputFiles() []string {
 
 func LogRunID(at time.Time) string { return at.UTC().Format(logRunIDLayout) }
 
+func ParseLogRunID(id string) (time.Time, bool) {
+	at, err := time.Parse(logRunIDLayout, id)
+	return at, err == nil
+}
+
 func IsLogRunDir(name string) bool {
 	ok, err := filepath.Match(LogRunDirGlob, name)
 	return err == nil && ok

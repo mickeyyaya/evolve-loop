@@ -53,23 +53,25 @@ func TestHandoffCoverage_AFailedJSONWriteIsReportedOnStderr(t *testing.T) {
 
 func TestHandoffCoverage_APairWithoutARequestIsAnError(t *testing.T) {
 	t.Parallel()
-	if _, err := buildHandoffRequest(t.TempDir(), 1, "bogus"); err == nil || !strings.Contains(err.Error(), "no request for pair bogus") {
+	if _, err := buildHandoffRequest(handoffSite{}, 1, "bogus"); err == nil || !strings.Contains(err.Error(), "no request for pair bogus") {
 		t.Fatalf("err = %v, want no request for pair bogus", err)
 	}
 }
 
-func TestHandoffCoverage_TheInboxResolverMatchesOnlyTheExactIdSuffix(t *testing.T) {
+func TestHandoffCoverage_TheInboxResolverFindsAnItemByTheLoadersID(t *testing.T) {
 	t.Parallel()
 	p := newHCProject(t)
-	p.write(".evolve/inbox/2026-10-09-real-id.json", "{}")
-	p.write(".evolve/inbox/2026-10-09-surreal-id.json", "{}")
+	p.write(".evolve/inbox/2026-10-09-real-id.json", `{"id":"real-id"}`)
+	p.write(".evolve/inbox/2026-10-09-surreal-id.json", `{"id":"surreal-id"}`)
+	p.write(".evolve/inbox/2026-07-20-short-name.json", `{"id":"a-longer-recorded-id"}`)
 	p.write(".evolve/inbox/glued-id.json", "{}")
 	resolve := handoffInboxResolver(p.root)
 	tests := map[string]string{
-		"real-id":    filepath.Join(p.root, ".evolve", "inbox", "2026-10-09-real-id.json"),
-		"missing-id": "",
-		"d":          "",
-		"glued-id":   filepath.Join(p.root, ".evolve", "inbox", "glued-id.json"),
+		"real-id":              filepath.Join(p.root, ".evolve", "inbox", "2026-10-09-real-id.json"),
+		"a-longer-recorded-id": filepath.Join(p.root, ".evolve", "inbox", "2026-07-20-short-name.json"),
+		"missing-id":           "",
+		"d":                    "",
+		"glued-id":             filepath.Join(p.root, ".evolve", "inbox", "glued-id.json"),
 	}
 	for id, want := range tests {
 		if got := resolve(id); got != want {

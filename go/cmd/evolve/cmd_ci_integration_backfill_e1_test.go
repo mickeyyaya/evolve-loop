@@ -25,6 +25,7 @@ D='%DIR%'
 printf '%s\n' "$*" >> "$D/calls.log"
 reply() { if [ -f "$D/$1" ]; then cat "$D/$1"; exit 0; fi; echo "fake gh: no $1" >&2; exit 1; }
 case "$*" in
+  "api repos/{owner}/{repo}/actions/runs/"*"/artifacts"*) reply artifacts.json ;;
   "api repos/{owner}/{repo}/commits/"*) reply commit.json ;;
   "api repos/{owner}/{repo}/compare/"*) reply compare.json ;;
   "pr view "*"headRefOid,baseRefName") reply pr-full.json ;;
@@ -46,6 +47,9 @@ type ciFakeGH struct {
 func newCIFakeGH(t *testing.T, replies map[string]string) ciFakeGH {
 	t.Helper()
 	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "artifacts.json"), []byte(`{"artifacts":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for name, body := range replies {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)

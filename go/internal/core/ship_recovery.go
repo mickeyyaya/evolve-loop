@@ -18,6 +18,10 @@ import (
 )
 
 func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot string, cycle int, cs *CycleState, se *ShipError, depth, fleetWidth int) (Phase, bool) {
+	return o.keepShipWindowOnlyForShip(o.recoverShipErrorRoute(ctx, projectRoot, cycle, cs, se, depth, fleetWidth))
+}
+
+func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot string, cycle int, cs *CycleState, se *ShipError, depth, fleetWidth int) (Phase, bool) {
 	o.recordShipError(ctx, cycle, *cs, se)
 	budget := shipRecoveryBudget(se.Code, fleetWidth)
 	if depth >= budget {
@@ -44,6 +48,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 			case verdict == FleetRebaseClean:
 			}
 		}
+		o.holdShipWindow(ctx, projectRoot, cycle, cs.RunID)
 		unwind := o.unwindUnlessPredictedConflict(ctx, projectRoot, cycle, *cs, predictedConflict)
 		ok, conflict := rebaseRecordingConflicts(ctx, projectRoot, cs)
 		if unwind == unwindDone || (ok && unwind == unwindKeepsConsumption) {
@@ -65,12 +70,17 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 			}
 		case conflict:
 			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet rebase CONFLICT (overlapping work the partition should have separated) → debugger\n", cycle)
+			o.emitFleetRebaseConflict(cycle, *cs)
 			recoverCode, recoverClass = CodeGitFleetRebaseConflict, ShipClassIntegrity
 		default:
 			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet rebase onto main failed (infra); aborting\n", cycle)
 			return "", false
 		}
 	}
+	return o.routeShipRecovery(se, recoverCode, recoverClass)
+}
+
+func (o *Orchestrator) routeShipRecovery(se *ShipError, recoverCode ShipErrorCode, recoverClass ShipErrorClass) (Phase, bool) {
 	dec := router.Recover(router.RouteInput{
 		Blocker: &router.Blocker{
 			Code:  string(recoverCode),

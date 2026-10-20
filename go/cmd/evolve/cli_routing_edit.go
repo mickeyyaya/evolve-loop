@@ -21,18 +21,24 @@ func cloneRouting(block policy.CLIRouting) policy.CLIRouting {
 }
 
 type routingSet struct {
-	key    string
-	values []string
-	model  string
-	effort string
+	key       string
+	values    []string
+	model     string
+	effort    string
+	maxTier   string
+	maxEffort string
 }
+
+func (s routingSet) setsBounds() bool { return s.maxTier != "" || s.maxEffort != "" }
 
 func setRoutingKey(block policy.CLIRouting, set routingSet) (policy.CLIRouting, error) {
 	key, values, model := set.key, set.values, set.model
 	group, name, scoped := strings.Cut(key, ".")
 	switch {
-	case len(values) == 0 && set.effort == "":
+	case len(values) == 0 && set.effort == "" && !set.setsBounds():
 		return block, fmt.Errorf("%s needs a value", key)
+	case set.setsBounds() && (!scoped || group != "agents"):
+		return block, fmt.Errorf("--max-tier and --max-effort apply only to agents.<agent>, not %s", key)
 	case model != "" && group != "agents":
 		return block, fmt.Errorf("--model applies only to agents.<agent>, not %s", key)
 	case set.effort != "" && (!scoped || (group != "tiers" && group != "agents")):
@@ -54,7 +60,7 @@ func setRoutingKey(block policy.CLIRouting, set routingSet) (policy.CLIRouting, 
 	case scoped && group == "work":
 		block.Work = withEntry(block.Work, name, values)
 	case scoped && group == "agents":
-		block.Agents = withEntry(block.Agents, name, agentRuleWith(block.Agents[name], values, model, set.effort))
+		block.Agents = withEntry(block.Agents, name, agentRuleWith(block.Agents[name], set))
 	default:
 		return block, fmt.Errorf("unknown key %q (clis, default, after_chain, tiers.<tier>, work.<role>, agents.<agent>)", key)
 	}
@@ -71,13 +77,13 @@ func tierRuleWith(rule policy.TierRule, chain []string, effort string) policy.Ti
 	return rule
 }
 
-func agentRuleWith(rule policy.AgentRule, chain []string, model, effort string) policy.AgentRule {
-	if len(chain) > 0 {
-		rule.CLI, rule.Model = chain, model
+func agentRuleWith(rule policy.AgentRule, set routingSet) policy.AgentRule {
+	if len(set.values) > 0 {
+		rule.CLI, rule.Model = set.values, set.model
 	}
-	if effort != "" {
-		rule.Effort = effort
-	}
+	rule.Effort = cmp.Or(set.effort, rule.Effort)
+	rule.MaxTier = cmp.Or(set.maxTier, rule.MaxTier)
+	rule.MaxEffort = cmp.Or(set.maxEffort, rule.MaxEffort)
 	return rule
 }
 
@@ -102,7 +108,7 @@ func unsetEffort(block policy.CLIRouting, group, name string) (policy.CLIRouting
 		}
 		rule.Effort = ""
 		block.Agents = withEntry(block.Agents, name, rule)
-		if len(rule.CLI) == 0 && rule.Model == "" {
+		if len(rule.CLI) == 0 && rule.Model == "" && rule.MaxTier == "" && rule.MaxEffort == "" {
 			delete(block.Agents, name)
 		}
 	default:

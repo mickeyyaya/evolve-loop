@@ -2,6 +2,7 @@ package subagent
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -313,7 +314,7 @@ func TestWriteFanoutLedgerEntry_OpenLedgerError(t *testing.T) {
 		Cycle: 1, Agent: "scout", ChallengeToken: "x",
 		WorkerNames: []string{"w"}, WorkerCount: 1,
 	}, nil)
-	if err == nil || !strings.Contains(err.Error(), "open ledger") {
+	if err == nil || !strings.Contains(err.Error(), "ledger open") {
 		t.Fatalf("expected open ledger error, got %v", err)
 	}
 }
@@ -321,19 +322,19 @@ func TestWriteFanoutLedgerEntry_OpenLedgerError(t *testing.T) {
 func TestWriteFanoutLedgerEntry_TipWriteError(t *testing.T) {
 	tmp := t.TempDir()
 	ledger := filepath.Join(tmp, "ledger.jsonl")
-	if err := os.Mkdir(filepath.Join(tmp, "ledger.tip.tmp"), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(tmp, fmt.Sprintf("ledger.tip.tmp.%d", os.Getpid())), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	err := WriteFanoutLedgerEntry(ledger, FanoutLedgerEntry{
 		Cycle: 1, Agent: "scout", ChallengeToken: "x",
 		WorkerNames: []string{"w"}, WorkerCount: 1,
 	}, nil)
-	if err == nil || !strings.Contains(err.Error(), "write tip tmp") {
+	if err == nil || !strings.Contains(err.Error(), "ledger tip_tmp") {
 		t.Fatalf("expected tip write error, got %v", err)
 	}
 }
 
-func TestWriteFanoutLedgerEntry_TipRenameError(t *testing.T) {
+func TestWriteFanoutLedgerEntry_ADirectoryAtTheTipFailsTheChainLink(t *testing.T) {
 	tmp := t.TempDir()
 	ledger := filepath.Join(tmp, "ledger.jsonl")
 	if err := os.Mkdir(filepath.Join(tmp, "ledger.tip"), 0o755); err != nil {
@@ -343,8 +344,8 @@ func TestWriteFanoutLedgerEntry_TipRenameError(t *testing.T) {
 		Cycle: 1, Agent: "scout", ChallengeToken: "x",
 		WorkerNames: []string{"w"}, WorkerCount: 1,
 	}, nil)
-	if err == nil || !strings.Contains(err.Error(), "rename tip") {
-		t.Fatalf("expected tip rename error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "ledger chain_link") {
+		t.Fatalf("expected the tip read to fail the chain link, got %v", err)
 	}
 }
 
@@ -389,7 +390,7 @@ func TestWriteFanoutLedgerEntry_ChainLinkError(t *testing.T) {
 		Cycle: 1, Agent: "scout", ChallengeToken: "x",
 		WorkerNames: []string{"w"}, WorkerCount: 1,
 	}, nil)
-	if err == nil || !strings.Contains(err.Error(), "chain link") {
+	if err == nil || !strings.Contains(err.Error(), "ledger chain_link") {
 		t.Errorf("expected chain-link error, got %v", err)
 	}
 }

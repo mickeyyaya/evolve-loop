@@ -115,26 +115,39 @@ func phaseVerdictDefects(workspace string, phase Phase) []string {
 	return s.Failure.Defects
 }
 
-func (cr *cycleRun) provenBlocker(next Phase, rin ReviewInput, rr ReviewResult) (string, BlockerProof, bool) {
+func (cr *cycleRun) provenBlocker(next Phase, rin ReviewInput, rr ReviewResult) (Diagnostic, bool) {
+	if rr.ProvenBlocker != "" {
+		item, ok := cr.consoleRouteItem(next)
+		return blockerRouteDiagnostic(item, rr.ProvenBlocker), ok
+	}
 	c, ok := cr.buildBlockerCase(next, rin, rr)
 	if !ok {
-		return "", BlockerProof{}, false
+		return Diagnostic{}, false
 	}
 	proof := NewBlockerProver().Prove(c)
 	if !proof.Blocked() {
 		cr.refuseBlocker(next, "the declared blocker is not proven: "+strings.Join(proof.Refusals, "; "))
-		return "", proof, false
+		return Diagnostic{}, false
 	}
+	item, ok := cr.consoleRouteItem(next)
+	return BlockerRouteDiagnostic(string(next), item, proof), ok
+}
+
+func (cr *cycleRun) consoleRouteItem(next Phase) (string, bool) {
 	committed, decided := committedset.Committed(cr.cs.WorkspacePath)
 	if !decided || len(committed) != 1 {
 		cr.refuseBlocker(next, fmt.Sprintf("the blocker is proven, but the console route names one item and the cycle committed %v", committed))
-		return "", proof, false
+		return "", false
 	}
-	return committed[0], proof, true
+	return committed[0], true
 }
 
-func (cr *cycleRun) endOnProvenBlocker(next Phase, dr *dispatchResult, item string, proof BlockerProof) (loopAction, error) {
-	diag := BlockerRouteDiagnostic(string(next), item, proof)
+func (cr *cycleRun) endOnProvenBlocker(next Phase, dr *dispatchResult, diag Diagnostic) (loopAction, error) {
+	cr.recordProvenBlocker(next, dr, diag)
+	return loopBreak, nil
+}
+
+func (cr *cycleRun) recordProvenBlocker(next Phase, dr *dispatchResult, diag Diagnostic) {
 	resp := dr.resp
 	resp.Verdict = VerdictFAIL
 	resp.Diagnostics = append([]Diagnostic{diag}, resp.Diagnostics...)
@@ -145,7 +158,29 @@ func (cr *cycleRun) endOnProvenBlocker(next Phase, dr *dispatchResult, item stri
 	cr.result.TerminationReason = CycleTerminationBlockedNeedsConsole
 	cr.emitBlockerSignal(next, CodeBlockerRouted, signalcenter.SeverityWarn, diag.Message)
 	dr.phaseReq.CorrectionDirective = ""
-	return loopBreak, nil
+}
+
+type resumedBlocker struct{ diag Diagnostic }
+
+func (b resumedBlocker) Error() string { return b.diag.Message }
+
+func (o *Orchestrator) resumedBlockerRoute(cs CycleState, cycle int, phase Phase, review ReviewResult) error {
+	if review.ProvenBlocker == "" {
+		return nil
+	}
+	item, ok := (&cycleRun{o: o, cs: cs, cycle: cycle}).consoleRouteItem(phase)
+	if !ok {
+		return nil
+	}
+	return resumedBlocker{diag: blockerRouteDiagnostic(item, review.ProvenBlocker)}
+}
+
+func (cr *cycleRun) endResumeOnBlocker(next Phase, dr *dispatchResult, diag Diagnostic, result CycleResult, timings []phaseTimingEntry, cursor *resumeCursor) (CycleResult, []phaseTimingEntry) {
+	cr.result, cr.phaseTimings = result, timings
+	cr.recordProvenBlocker(next, dr, diag)
+	cursor.termination.reason = CycleTerminationBlockedNeedsConsole
+	cursor.finish()
+	return cr.result, cr.phaseTimings
 }
 
 func (cr *cycleRun) refuseBlocker(next Phase, reason string) {

@@ -61,5 +61,8 @@ func writeWaveMeasuresText(w io.Writer, m wavemeasure.Measures) {
 	if s := m.Supply; s != nil {
 		fmt.Fprintf(w, " · supply %d admissible, %d waiting, %d console", s.Admissible, s.WaitingCell+s.WaitingDeps, s.ConsoleRoute+s.ConsoleKind+s.ConsoleProtected)
 	}
+	if m.OptimisticAdmissions > 0 {
+		fmt.Fprintf(w, " · optimistic %d/%d failed (%.2f)", m.OptimisticFailures, m.OptimisticAdmissions, m.OptimisticFailureRate)
+	}
 	fmt.Fprintln(w)
 }

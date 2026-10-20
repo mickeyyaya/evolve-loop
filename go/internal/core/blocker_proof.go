@@ -287,12 +287,11 @@ func BlockerRouteDiagnostic(phase, item string, proof BlockerProof) Diagnostic {
 	for _, c := range proof.Proven {
 		parts = append(parts, c.summary())
 	}
-	return Diagnostic{
-		Severity: cyclestate.SeverityError,
-		Code:     DiagCodeBlockerRoute,
-		Subject:  item,
-		Message:  "blocked: needs console — phase " + phase + " stopped on a proven blocker the lane cannot remove: " + strings.Join(parts, "; "),
-	}
+	return blockerRouteDiagnostic(item, "blocked: needs console — phase "+phase+" stopped on a proven blocker the lane cannot remove: "+strings.Join(parts, "; "))
+}
+
+func blockerRouteDiagnostic(item, message string) Diagnostic {
+	return Diagnostic{Severity: cyclestate.SeverityError, Code: DiagCodeBlockerRoute, Subject: item, Message: message}
 }
 
 func (c BlockerClaim) summary() string {

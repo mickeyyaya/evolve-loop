@@ -89,6 +89,7 @@ secret channel. The enforced invariant is therefore **clamp parity**, not proven
 - The residual cross-lane case — two concurrent **source-writer** phases and leak-recovery's
   relocation of another lane's artifacts — remains queued as
   `treediff-guard-worktree-phase-crosslane-residual` (Option B, fleet-lane-owned-paths registry).
+- Update 2026-10-20: the residual is closed without a new registry. The declared scope of each live lane is the registry of the paths it owns. See the leak-ownership rules in [internal-core.md](../packages/internal-core.md).
 - TTL means an idle registry decays to zero exemptions; an actively-minting batch refreshes
   entries on every mint. A corrupt registry self-heals via quarantine instead of disabling the
   exemption fleet-wide until the next mint.

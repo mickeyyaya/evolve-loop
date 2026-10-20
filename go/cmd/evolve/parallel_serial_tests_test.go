@@ -1,6 +1,7 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestPRWindow_AnUnreadableWorkingDirectoryExitsTwo":                                                "sets env through a helper",
 	"main.TestWireRoutingPlanAdvisor_RefusesAProjectWhoseRoutingTableDoesNotCompile":                        "swaps the bridge model catalog dir",
 	"main.TestWireRoutingPlanAdvisor_WiresAnAdvisorForAProjectRoot":                                         "swaps the bridge model catalog dir",
 	"main.TestRoutingPlan_AdvisorLaunchFailureExitsTwoWithTheCause":                                         "swaps seam routingPlanAdvisor",
@@ -80,7 +81,9 @@ var serialTests = map[string]string{
 	"main.TestCLIRoutingSet_EditsOneEntryOfEachShape":                                                       "sets env through a helper",
 	"main.TestCLIRoutingSet_EffortWithoutAChainKeepsTheChain":                                               "sets env through a helper",
 	"main.TestCLIRoutingSet_RefusesABadEffortBeforeTheWrite":                                                "sets env through a helper",
+	"main.TestCLIRoutingSet_RefusesABadLadderBoundBeforeTheWrite":                                           "sets env through a helper",
 	"main.TestCLIRoutingSet_RefusesAMisshapenEdit":                                                          "sets env through a helper",
+	"main.TestCLIRoutingSet_WritesTheLadderBoundsOfAnAgent":                                                 "sets env through a helper",
 	"main.TestCLIRoutingShow_ARefusedTableExitsOne":                                                         "calls process-global setter SetModelCatalogDirFn",
 	"main.TestCLIRoutingShow_GroupsAgentsByChainAndNotesTheFloorAndTheCeiling":                              "calls process-global setter SetModelCatalogDirFn",
 	"main.TestCLIRoutingShow_JSONCarriesEveryAgentRoute":                                                    "calls process-global setter SetModelCatalogDirFn",
@@ -483,6 +486,7 @@ var serialTests = map[string]string{
 	"main.TestRunFleetSoak_WithoutAnInjectedLauncherRunsTheBinaryInSimulateMode":                                           "swaps seam soakLaunchFn",
 	"main.TestRunFleet_ANilLauncherFailsValidation":                                                                        "swaps seam fleetLaunchFactory",
 	"main.TestRunFleet_APlanLaunchesDisjointCyclesAndDefersTheBridge":                                                      "swaps seam fleetLaunchFactory",
+	"main.TestRunFleet_ARealFleetWithoutAPlanIsRefusedBeforeAnyLaunch":                                                     "swaps seam fleetLaunchFactory",
 	"main.TestRunFleet_AnUnresolvableBinaryExits1":                                                                         "swaps seam fleetLaunchFactory",
 	"main.TestRunFleet_PlanErrorsExit1WithoutLaunching":                                                                    "swaps seam fleetLaunchFactory",
 	"main.TestRunFleet_PublishesTheLanesPendingCloseoutsInItsWorkingTree":                                                  "swaps seam fleetLaunchFactory",

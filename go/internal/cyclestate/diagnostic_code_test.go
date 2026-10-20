@@ -27,6 +27,7 @@ func TestDiagCodes_TriageRefusalVocabulary(t *testing.T) {
 		DiagCodeTriageTopNEmpty:         "TRIAGE_TOPN_EMPTY",
 		DiagCodeTriageCommitmentInvalid: "TRIAGE_COMMITMENT_INVALID",
 		DiagCodeTriageScopeUnanswered:   "TRIAGE_SCOPE_UNANSWERED",
+		DiagCodeTriageLanePinMissing:    "TRIAGE_LANE_PIN_MISSING",
 		DiagCodeProtectedPredicateRoute: "PROTECTED_PREDICATE_ROUTE",
 		DiagCodeBlockerRoute:            "BLOCKER_ROUTE",
 	}
@@ -64,6 +65,7 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		{DiagCodeTriageTopNEmpty, true, false, false},
 		{DiagCodeTriageCommitmentInvalid, false, false, false},
 		{DiagCodeTriageScopeUnanswered, true, false, false},
+		{DiagCodeTriageLanePinMissing, false, false, false},
 		{"", false, false, false},
 		{"SOMETHING_NEW", false, false, false},
 	}

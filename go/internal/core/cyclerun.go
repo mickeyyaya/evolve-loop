@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -19,7 +20,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
-	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 )
 
 var (
@@ -37,6 +37,13 @@ const (
 )
 
 const defaultMaxPhaseIterations = 32
+
+func (o *Orchestrator) phaseIterationLimit() int {
+	if o.maxPhaseIterations <= 0 {
+		return defaultMaxPhaseIterations
+	}
+	return o.maxPhaseIterations
+}
 
 type cycleRun struct {
 	o   *Orchestrator
@@ -71,10 +78,10 @@ type cycleRun struct {
 	scheduledNext     Phase
 	routingSeq        int
 	remediationRounds map[Phase]int
+	phaseDispatches   map[Phase]int
+	dispatchMu        sync.Mutex
 	recoveryDepth     int
 	replanDepth       int
-
-	shipLease *shipwindow.Lease
 
 	preserveWorktree       bool
 	cycleCompletedNormally bool

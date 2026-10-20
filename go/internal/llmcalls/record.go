@@ -76,6 +76,15 @@ type Record struct {
 
 	FirstOutputMS     *int64 `json:"first_output_ms,omitempty"`
 	FirstOutputSource string `json:"first_output_source,omitempty"`
+
+	Rung         string `json:"rung,omitempty"`
+	FailureClass string `json:"failure_class,omitempty"`
+	Fingerprint  string `json:"fingerprint,omitempty"`
+	Effort       string `json:"effort,omitempty"`
+	ServedModel  string `json:"served_model,omitempty"`
+	Context      string `json:"context,omitempty"`
+	LadderStage  string `json:"ladder_stage,omitempty"`
+	LadderWould  string `json:"ladder_would,omitempty"`
 }
 
 func (r Record) ModelIdentity() (model, source string) {

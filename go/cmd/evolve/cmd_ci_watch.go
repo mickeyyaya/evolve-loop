@@ -199,7 +199,7 @@ func classifyRedRuns(ctx context.Context, root string, red []redWorkflow, stdout
 	}
 	for _, r := range red {
 		target := ciwatch.Target{Kind: ciwatch.TargetRun, Value: strconv.FormatInt(r.runID, 10)}
-		rep, err := ciwatch.ClassifyTarget(ctx, ciwatch.NewGHClassifySource(root), target, opts)
+		rep, err := ciwatch.ClassifyTarget(ctx, ciwatch.NewGHClassifySource(root, opts.ModulePath), target, opts)
 		if err == nil {
 			err = writeClassifyReport(stdout, rep, false)
 		}

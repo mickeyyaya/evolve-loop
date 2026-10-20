@@ -226,6 +226,22 @@ func reportPostPush(ctx context.Context, opts *Options, res *RunResult, commitSH
 }
 
 func shipVerified(ctx context.Context, opts *Options, res *RunResult) (RunResult, error) {
+	out, landed, err := verifyAndLandInShipWindow(ctx, opts, res)
+	if !landed {
+		return out, err
+	}
+	if err := postShip(ctx, opts, res); err != nil {
+		res.Logs = append(res.Logs, "[ship] WARN: post-ship hook error: "+err.Error())
+	}
+	return finalize(ctx, opts, res, nil, "normal")
+}
+
+func verifyAndLandInShipWindow(ctx context.Context, opts *Options, res *RunResult) (RunResult, bool, error) {
+	defer enterShipWindow(ctx, opts, res)()
+	return verifyAndLand(ctx, opts, res)
+}
+
+func verifyAndLand(ctx context.Context, opts *Options, res *RunResult) (RunResult, bool, error) {
 	resumed, err := runStageWithRepair(ctx, opts, res, func() error {
 		return verifyClass(ctx, opts, res)
 	})
@@ -233,22 +249,21 @@ func shipVerified(ctx context.Context, opts *Options, res *RunResult) (RunResult
 		if _, isClean := err.(*cleanExitError); isClean {
 			res.ExitCode = ExitOK
 			writeDryRunJournal(ctx, opts, res, "no-staged-changes")
-			return *res, nil
+			return *res, false, nil
 		}
-		return finalize(ctx, opts, res, err, "verify-class")
+		out, ferr := finalize(ctx, opts, res, err, "verify-class")
+		return out, false, ferr
 	}
 	res.Logs = append(res.Logs, "[ship] provenance: "+res.Provenance)
 	if !resumed {
 		if _, err := runStageWithRepair(ctx, opts, res, func() error {
 			return atomicShip(ctx, opts, res)
 		}); err != nil {
-			return finalize(ctx, opts, res, err, "atomic-ship")
+			out, ferr := finalize(ctx, opts, res, err, "atomic-ship")
+			return out, false, ferr
 		}
 	}
-	if err := postShip(ctx, opts, res); err != nil {
-		res.Logs = append(res.Logs, "[ship] WARN: post-ship hook error: "+err.Error())
-	}
-	return finalize(ctx, opts, res, nil, "normal")
+	return *res, true, nil
 }
 
 func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exitReason string) (RunResult, error) {

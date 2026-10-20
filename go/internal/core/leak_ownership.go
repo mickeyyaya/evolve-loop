@@ -14,8 +14,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/scopedelta"
 )
 
 const evalsDir = ".evolve/evals/"
@@ -52,9 +55,10 @@ func (k ownerKey) String() string {
 }
 
 type mainTreeOwnership struct {
-	cycle int
-	items map[string]bool
-	mints map[string]bool
+	cycle     int
+	items     map[string]bool
+	mints     map[string]bool
+	protected func(string) bool
 }
 
 type ownerRule func(o mainTreeOwnership, p string) (ownerKey, bool)
@@ -183,10 +187,12 @@ type liveSiblings struct {
 	projectRoot string
 	runs        map[string]bool
 	items       map[string]bool
+	declared    map[string]int
 }
 
 func liveSiblingsOf(projectRoot, ownWorkspace string, now time.Time) liveSiblings {
 	siblings := liveSiblings{projectRoot: projectRoot, runs: map[string]bool{}, items: map[string]bool{}}
+	goal := laneGoal(ownWorkspace)
 	for _, run := range runlease.LiveRuns(runWorkspacesRoot(projectRoot), now) {
 		if sameDirectory(run.Dir, ownWorkspace) {
 			continue
@@ -195,8 +201,45 @@ func liveSiblingsOf(projectRoot, ownWorkspace string, now time.Time) liveSibling
 		for id, held := range laneItems(run.Dir) {
 			siblings.items[id] = held
 		}
+		if goal != "" && laneGoal(run.Dir) == goal {
+			siblings = siblings.withDeclaredFiles(run.Dir)
+		}
 	}
 	return siblings
+}
+
+func laneGoal(workspace string) string {
+	if pin := loadLaneScope(workspace); pin != nil {
+		return pin.GoalHash
+	}
+	return ""
+}
+
+func (s liveSiblings) withDeclaredFiles(runDir string) liveSiblings {
+	cycle, ok := inboxbatch.ParseProcessingCycle(filepath.Base(runDir))
+	if !ok {
+		return s
+	}
+	files, err := LaneDeclaredFiles(paths.EvolveDirOf(s.projectRoot), cycle)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN lane ownership: sibling cycle %d has an unreadable scope (%v), so it holds no undeclared path\n", cycle, err)
+	}
+	for _, f := range files {
+		if s.declared == nil {
+			s.declared = map[string]int{}
+		}
+		s.declared[f] = cycle
+	}
+	return s
+}
+
+func (s liveSiblings) declaresAgainst(p string, own []string, ownCycle int) (int, bool) {
+	cycle, named := s.declared[p]
+	if !named {
+		return 0, false
+	}
+	scope := scopedelta.Scope{Cycle: ownCycle, Declared: own, LaneOthers: []string{p}}
+	return cycle, scopedelta.Classify(p, scopedelta.Declaration{}, scope, scopedelta.DefaultClosureRules()).Class == scopedelta.ClassCrossLane
 }
 
 func runWorkspacesRoot(projectRoot string) string {
@@ -226,12 +269,15 @@ func (o mainTreeOwnership) heldBySibling(p string, siblings liveSiblings) bool {
 }
 
 type leakExemptions struct {
-	holder func(string) bool
+	holder func(string) (string, bool)
 	leased map[string]bool
 }
 
-func (e leakExemptions) heldElsewhere(p string) bool {
-	return e.holder != nil && e.holder(p)
+func (e leakExemptions) heldElsewhere(p string) (string, bool) {
+	if e.holder == nil {
+		return "", false
+	}
+	return e.holder(p)
 }
 
 func (o mainTreeOwnership) exemptions(projectRoot, ownWorkspace string, leased map[string]bool) leakExemptions {
@@ -240,20 +286,43 @@ func (o mainTreeOwnership) exemptions(projectRoot, ownWorkspace string, leased m
 
 func (cr *cycleRun) leakExemptions() leakExemptions {
 	ownership := laneOwnership(cr.cs, activeVerifiedMints(cr.req.ProjectRoot, cr.o.errOut()))
+	ownership.protected = cr.o.protectedSurface
 	return ownership.exemptions(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.consoleLeased)
 }
 
-func liveHolderCheck(projectRoot, ownWorkspace string, ownership mainTreeOwnership) func(string) bool {
+func liveHolderCheck(projectRoot, ownWorkspace string, ownership mainTreeOwnership) func(string) (string, bool) {
 	var siblings *liveSiblings
-	return func(p string) bool {
-		if _, foreign := ownership.foreignOwner(p); !foreign {
-			return false
-		}
+	var own *[]string
+	load := func() liveSiblings {
 		if siblings == nil {
 			loaded := liveSiblingsOf(projectRoot, ownWorkspace, time.Now())
 			siblings = &loaded
 		}
-		return ownership.heldBySibling(p, *siblings)
+		return *siblings
+	}
+	ownScope := func() []string {
+		if own == nil {
+			files, err := LaneDeclaredFiles(paths.EvolveDirOf(projectRoot), ownership.cycle)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "[orchestrator] WARN lane ownership: this lane's scope is unreadable (%v), so it holds every undeclared path\n", err)
+			}
+			own = &files
+		}
+		return *own
+	}
+	return func(p string) (string, bool) {
+		if key, keyed := ownership.ownerOf(p); keyed {
+			return key.String(), !ownership.holds(key) && ownership.heldBySibling(p, load())
+		}
+		if ownership.protected == nil || ownership.protected(p) {
+			return "", false
+		}
+		scope := ownScope()
+		if len(scope) == 0 {
+			return "", false
+		}
+		cycle, held := load().declaresAgainst(p, scope, ownership.cycle)
+		return "the declared scope of cycle " + strconv.Itoa(cycle), held
 	}
 }
 

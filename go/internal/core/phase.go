@@ -99,9 +99,11 @@ type PhaseRequest struct {
 
 	UpstreamSignals map[string]any `json:"upstream_signals,omitempty"`
 
-	ModelRoutingCLI  string  `json:"model_routing_cli,omitempty"`
-	ModelRoutingTier string  `json:"model_routing_tier,omitempty"`
-	BudgetScale      float64 `json:"budget_scale,omitempty"`
+	ModelRoutingCLI    string  `json:"model_routing_cli,omitempty"`
+	ModelRoutingTier   string  `json:"model_routing_tier,omitempty"`
+	BudgetScale        float64 `json:"budget_scale,omitempty"`
+	Attempt            int     `json:"attempt,omitempty"`
+	ModelRoutingEffort string  `json:"model_routing_effort,omitempty"`
 }
 
 type PhaseResponse struct {

@@ -170,8 +170,8 @@ func TestReadTaskIDOrUnknown_Fallbacks(t *testing.T) {
 		t.Errorf("malformed: got %q, want unknown", got)
 	}
 	writeItem(t, filepath.Join(dir, "no-id.json"), `{"payload":"x"}`)
-	if got := readTaskIDOrUnknown(filepath.Join(dir, "no-id.json")); got != "unknown" {
-		t.Errorf("empty id: got %q, want unknown", got)
+	if got := readTaskIDOrUnknown(filepath.Join(dir, "no-id.json")); got != "no-id" {
+		t.Errorf("empty id: got %q, want the file name no-id", got)
 	}
 	writeItem(t, filepath.Join(dir, "ok.json"), `{"id":"ok"}`)
 	if got := readTaskIDOrUnknown(filepath.Join(dir, "ok.json")); got != "ok" {
@@ -190,5 +190,22 @@ func TestUpdateItemJSON_ANullItemIsRefusedNotAPanic(t *testing.T) {
 	}
 	if body, _ := os.ReadFile(path); string(body) != "null" {
 		t.Errorf("the item was rewritten: %s", body)
+	}
+}
+
+func TestLifecycleReaders_UseTheLoadersID(t *testing.T) {
+	dir := t.TempDir()
+	bell, stem := filepath.Join(dir, "bell.json"), filepath.Join(dir, "no-id.json")
+	writeItem(t, bell, `{"id":"bell\u0007item","deps":["up"]}`)
+	writeItem(t, stem, `{"deps":["up"]}`)
+	for id, want := range map[string]string{"bell item": bell, "no-id": stem} {
+		if got, err := FindFileByTaskID(dir, id); err != nil || got != want {
+			t.Errorf("FindFileByTaskID(%q) = %q, %v, want %q", id, got, err, want)
+		}
+	}
+	for path, want := range map[string]string{bell: "bell item", stem: "no-id"} {
+		if id, deps := readIDAndDeps(path); id != want || len(deps) != 1 {
+			t.Errorf("readIDAndDeps(%s) = %q %v, want %q", filepath.Base(path), id, deps, want)
+		}
 	}
 }

@@ -22,6 +22,8 @@ type AgentRule struct {
 	Effort      string   `json:"effort,omitempty"`
 	Order       string   `json:"order,omitempty"`
 	HeadroomPct int      `json:"headroom_pct,omitempty"`
+	MaxTier     string   `json:"max_tier,omitempty"`
+	MaxEffort   string   `json:"max_effort,omitempty"`
 }
 
 type TierRule struct {

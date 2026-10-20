@@ -17,6 +17,7 @@
 ## Invariants
 
 - **Precedence.** The lane pin comes first. If it is present and not empty, its ids are the commitment, also when a resumed triage re-labels its working ids. Otherwise the decision's `top_n` is the commitment. In both cases every id that the decision deferred is removed. Pinned by `TestCommitted_Precedence`.
+- **A fleet lane never falls through to `top_n`.** The fall-through to the decision is for a sequential cycle only. In a fleet lane, triage refuses to run without a non-empty pin (`TRIAGE_LANE_PIN_MISSING`, see [internal-phases-triage.md](internal-phases-triage.md)), so the agent's `top_n` never becomes a lane's commitment.
 - **Unknown is not empty.** `ok` is false only when neither artifact yields a binding. A present decision that committed to nothing returns an empty non-nil slice and true, because an explicit empty commitment is a finding. A corrupt artifact must never read as "committed to nothing". Pinned by `TestCommitted_MalformedIsUnknownNotEmpty`.
 - **No phantom members.** An absent, malformed or empty pin returns nil, so the caller falls through to the decision and never gets a silent empty commitment. A blank id in a pin or a decision is dropped. Pinned by `TestLanePinAndDecision_BlankIDsDropped`.
 - **Only an explicit deferral removes a task** from its acceptance contract. An absent or unreadable decision defers nothing.

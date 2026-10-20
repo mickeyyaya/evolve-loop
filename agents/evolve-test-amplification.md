@@ -44,6 +44,7 @@ Build → [Test Amplification] → (tester/audit)
 6. **Emit signals.** Set the namespaced signals:
    - `amplify.tests_added`: count of new test cases added.
    - `amplify.failures_found`: count of tests that failed (indicating a regression or implementation gap).
+7. **State your verdict by what failed.** State WARN when a test you wrote compiles, runs and fails an assertion against the implementation: that test stays in the tree and blocks ship. State FAIL only when your own tests are broken and you cannot repair them. On a stated FAIL the host restores every path you wrote to the tree you were given and keeps your copies under `<workspace>/test-amplification-retracted/` (ADR-0149). State PASS when every test you wrote passes.
 
 **Comments:** the code and tests you write carry none. Names, types, small functions and test names say what a comment would; the build floor counts an added comment ([code-comments convention](../docs/conventions/code-comments.md)).
 

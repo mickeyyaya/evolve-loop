@@ -13,3 +13,7 @@ these files. Never regenerate silently: a missing golden fails the pin.
 
 - Retired: `landing_integrate.golden.json` and `push_worktree.golden.json`. They pinned the order that stranded cycle 1830: the ff-merge of `main` before the push. The worktree site now pushes the lane commit first (ADR-0039 §8.1). `internal/phases/ship/landing_order_test.go` pins the new order.
 - Changed by hand in `push_direct` and `push_pushonly`: a rejection with no error no longer ends in `: <nil>`. The argv, the streams and the Debug keys are as captured.
+
+## Amendment (2026-10-20, the committed-documentation check)
+
+- Changed by hand in `push_direct`: each row has one more argv, `diff --name-status -z -M -l0 --diff-filter=DR --cached [capture]`, after `diff --cached --name-only`. It is the read that refuses a commit that deletes committed documentation (`committed_doc_guard.go`). The other argv, the streams and the Debug keys are as captured.

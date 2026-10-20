@@ -16,6 +16,10 @@
     "effort": {
       "channel": "flag",
       "flag": "--effort"
+    },
+    "disallowed_tools": {
+      "channel": "flag",
+      "flag": "--disallowedTools"
     }
   },
   "interactive_prompts": []

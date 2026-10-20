@@ -17,6 +17,8 @@ var explanationActivationBeltPins = []struct{ path, fn string }{
 
 var sameWorkspacePathPins = []struct{ path, fn string }{
 	{"../explanationdocs/contract_state.go", "ActivationForCycle"},
+	{"../explanationdocs/contract_state.go", "RecoverRebaseSplit"},
+	{"../explanationdocs/explanationdocs.go", "resolveActivation"},
 }
 
 func TestExplanationActivationBelt_SharedByEveryHostConsult(t *testing.T) {

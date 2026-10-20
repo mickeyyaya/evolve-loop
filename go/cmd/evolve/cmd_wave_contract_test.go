@@ -40,7 +40,7 @@ func TestWaveNext_JSONEnvelopeOnEveryExit(t *testing.T) {
 			_ = os.Remove(filepath.Join(p.evolveDir(), "wave-goal.md"))
 		}},
 		{name: "failed step", wantRC: 7, wantFailed: "evolve sync-main", wantError: "sync-main", prep: func(_ wavePlane, h *waveHarness) {
-			h.verbs.failAt, h.verbs.code = 3, 7
+			h.verbs.failAt, h.verbs.code = 4, 7
 		}},
 	}
 	for _, c := range cases {

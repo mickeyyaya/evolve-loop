@@ -16,6 +16,10 @@ func init() {
 }
 
 func (o *Orchestrator) resumeFleetRebaseAfterDebugger(ctx context.Context, projectRoot string, cycle int, cs *CycleState, decided Phase, depth, fleetWidth int) (Phase, bool) {
+	return o.keepShipWindowOnlyForShip(o.resumeFleetRebaseRoute(ctx, projectRoot, cycle, cs, decided, depth, fleetWidth))
+}
+
+func (o *Orchestrator) resumeFleetRebaseRoute(ctx context.Context, projectRoot string, cycle int, cs *CycleState, decided Phase, depth, fleetWidth int) (Phase, bool) {
 	if !fleetRebaseRecovery(cs.ShipRecoveryCode) || cs.ActiveWorktree == "" || inPlaceWorktree(cs.ActiveWorktree, projectRoot) {
 		return "", false
 	}
@@ -27,6 +31,7 @@ func (o *Orchestrator) resumeFleetRebaseAfterDebugger(ctx context.Context, proje
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d the debugger's tests-first re-run is superseded: after a rebase the explanation contract admits Build, Audit or Ship, and Build re-authors on the rebased tree\n", cycle)
 	}
 	backoffSleep(contentionBackoff(depth))
+	o.holdShipWindow(ctx, projectRoot, cycle, cs.RunID)
 	if err := carryResolvedTree(ctx, cs.ActiveWorktree, gitCapture, fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)); err != nil {
 		return o.abortRebaseReentry(cycle, *cs, "carry the resolved tree: "+err.Error())
 	}

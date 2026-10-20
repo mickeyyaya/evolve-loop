@@ -44,6 +44,7 @@ type PhaseSpec struct {
 	Agent             string                      `json:"agent,omitempty"`
 	Model             string                      `json:"model,omitempty"`
 	WritesSource      bool                        `json:"writes_source,omitempty"`
+	RetractOnFail     bool                        `json:"retract_on_fail,omitempty"`
 	Description       string                      `json:"description,omitempty"`
 	WhenToUse         string                      `json:"when_to_use,omitempty"`
 	Categories        []string                    `json:"categories,omitempty"`

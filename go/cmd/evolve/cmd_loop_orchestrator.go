@@ -54,10 +54,12 @@ func (b *loopBatchCoordinator) poolHalted() bool {
 }
 
 func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fleet.LaunchFn, iteration int) orchestrator.Pool {
+	holders := orchestrator.NewReachHolders()
 	return orchestrator.Pool{
 		Target: fc.Count, Concurrency: fc.Concurrency, MaxLanes: fc.Orchestrator.RunMaxLanes,
 		MinLanes: fc.MinLanes,
-		Admit:    b.cellAdmission(fc.Orchestrator, iteration),
+		Admit:    b.cellAdmission(fc.Orchestrator, iteration, holders.Record),
+		Holders:  holders,
 		Freshen:  b.wave().Freshen(),
 		Launch:   launch,
 		Leases:   b.laneLeases(fc.Orchestrator),
@@ -70,7 +72,7 @@ func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fl
 	}
 }
 
-func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, iteration int) orchestrator.Admit {
+func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, iteration int, onOptimistic func(admission.ShadowAdmission)) orchestrator.Admit {
 	graph, err := b.moduleGraph(oc, iteration)
 	if err != nil {
 		fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: pool %d admits by the file rule; the module graph did not load: %v\n", iteration, err)
@@ -79,6 +81,7 @@ func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, itera
 	return orchestrator.AdmitByCell(admission.Admitter{
 		Graph: graph, Text: b.wave().InboxText(iteration),
 		Optimistic: oc.OptimisticAdmission(), OnShadow: orchestrator.RecordShadow(b.deps.Signals.Emit),
+		OnOptimistic: onOptimistic,
 	})
 }
 
