@@ -7,6 +7,12 @@
   "connects_to": [
     "no-work-hand-off-rate-alarm"
   ],
+  "consumed": {
+    "at": "2026-10-20T07:06:57Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "DONE: 6aa8ea99c; go/cmd/evolve/cmd_loop_zeroship.go checked each iteration (cmd_loop_window.go:46); threshold from policy (policy_failure.go:68); halt files the inbox item (cmd_loop_systemfailure_halt.go:29); docs operating-policy.md:209, runtime-reference.md:199; TestRunLoop_ZeroShip_TwoConsecutiveZeroShipWavesHaltBeforeTheThird passes. Triage 2026-10-20, verified twice."
+  },
   "created_at": "2026-09-30T10:51:14Z",
   "files": [
     "go/internal/loopwave"

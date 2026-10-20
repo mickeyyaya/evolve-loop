@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "After a cycle ends with an audit-fail-defer reason, its item carries a route decided by fix_type: console for reintent, deps on a companion console item for pipeline-repair (red tests first)",
+    "The route comes from the fix_type of the recorded failure-decision.json, not from the category text",
+    "The routed_reason names the cycle, the category and the fix_type",
+    "retry-ladder.md and internal-core.md state the fix_type routing table"
+  ],
+  "created_at": "2026-10-20T12:00:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/reintent_decision.go",
+    "go/internal/core/failure_decision.go",
+    "go/internal/inboxmover",
+    "docs/architecture/retry-ladder.md",
+    "docs/architecture/packages/internal-core.md"
+  ],
+  "fix": "Design first: amend docs/architecture/retry-ladder.md and docs/architecture/packages/internal-core.md with a fix_type routing table. TDD: a red test with the cycle 1953 fixture (intent-malformed, fix_type reintent) that the item of the ended cycle is routed to the console through the existing route verb path (inbox route-console) with the decision as reason, and a red test that fix_type pipeline-repair adds a deps entry on a companion console item instead. Route through the one existing routing writer; add no new writer and no flag. 100% coverage on changed functions, zero comments.",
+  "id": "reintent-fix-type-routes-the-item",
+  "kind": "fix",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "PR #1015 (a defer-or-quarantine audit decline ends the cycle after retro); triage pass 2026-10-20",
+  "summary": "PR #1015 ends a cycle after retro when the audit decline carries a defer-or-quarantine decision (go/internal/core/reintent_decision.go, auditDeclineDefers; decideAfterRetro returns PhaseEnd with an audit-fail-defer reason). The decision's fix_type (for example reintent or pipeline-repair) is only copied into the routing-decision evidence (reintent_decision.go:43) and the FixType field of go/internal/core/failure_decision.go:17. No Go code routes the inbox item by fix_type. The item of the ended cycle therefore goes back to the same queue and can be picked again for the same failed attempt.",
+  "title": "The item of a cycle ended by a reintent decision is routed by its fix_type",
+  "weight": 0.7
+}

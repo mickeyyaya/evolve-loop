@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "A cycle that LOOP_ORCH_LANE_DEADLINE stopped (action stopped) has a sealed outcome with termination \"stopped: lane deadline\" (red test first)",
+    "`evolve wave watch` and `evolve wave next` goal facts count a deadline-stopped cycle as ended, not in flight, through the same rule as `wave status`",
+    "On the wave 130 fixture, wave status, wave watch and wave next agree on the width (1/4) and on cycles 1955 and 1957 as stopped",
+    "wave-orchestrator.md §11 and wave-operations.md state where the deadline outcome is sealed"
+  ],
+  "campaign": "wave-orchestrator",
+  "created_at": "2026-10-20T12:00:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/orchestrator/lease.go",
+    "go/internal/wave/pool.go",
+    "go/internal/wave/goal.go",
+    "go/cmd/evolve/cmd_wave.go",
+    "go/cmd/evolve/cmd_wave_next.go",
+    "go/cmd/evolve/cmd_wave_status.go",
+    "docs/architecture/wave-orchestrator.md",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Design first: amend docs/architecture/wave-orchestrator.md §11 and docs/operations/wave-operations.md with the sealed outcome of a deadline stop. TDD: (1) a red test that the lease fire path that cancels a lane (go/internal/orchestrator/lease.go) leads to a sealed cycle outcome with termination \"stopped: lane deadline\" for that lane's cycle, written by the loop's one outcome writer and not by a new writer; (2) a red test that the goal facts of `wave watch` and `wave next` call the same deadline rule as `wave status` (one function, no copy), with the wave 130 fixture go/cmd/evolve/testdata/wave-130-signals.ndjson. When the seal exists, wave.ApplyLaneDeadlines becomes a fallback for runs with no seal. 100% coverage on changed functions, zero comments.",
+  "id": "wave-deadline-stop-seals-a-labelled-outcome",
+  "kind": "fix",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "source": "PR #1013 (wave status counts live lanes from the pool signals), its out-of-scope note; triage pass 2026-10-20",
+  "summary": "In wave 130 the lane deadline (LOOP_ORCH_LANE_DEADLINE, action stopped) stopped cycles 1955 and 1957. The loop wrote no seal for them. PR #1013 made `evolve wave status` read the stop from the deadline signal (wave.ApplyLaneDeadlines in go/internal/wave/pool.go:40, called only from go/cmd/evolve/cmd_wave_status.go:96). The PR states what it left open: the loop still seals no outcome for a deadline-stopped cycle, and the goal facts of `wave watch` and `wave next` do not apply deadline stops. Those readers therefore still see the cycle as in flight.",
+  "title": "A cycle stopped by the lane deadline seals a labelled outcome, and wave watch and wave next apply the stop",
+  "weight": 0.7
+}
