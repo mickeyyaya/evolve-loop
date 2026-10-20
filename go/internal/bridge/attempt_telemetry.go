@@ -92,9 +92,7 @@ func (e *Engine) recordModelAttempt(
 	}
 	e.emitTokenWarnings(req, code, start, end, callID, attempt, result)
 
-	if dispatched.source == "" {
-		dispatched.source = llmcalls.DispatchNotStarted
-	}
+	dispatched.source = cmp.Or(dispatched.source, llmcalls.DispatchNotStarted)
 	duration := end.Sub(start).Milliseconds()
 	var durationMS *int64
 	if duration >= 0 {
