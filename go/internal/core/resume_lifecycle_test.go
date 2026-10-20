@@ -465,3 +465,30 @@ func TestResumeLifecycle_NonCanonicalVerdictAborts(t *testing.T) {
 		t.Errorf("FinalVerdict = %q, want %q", got.FinalVerdict, VerdictFAIL)
 	}
 }
+
+func TestResumeLifecycle_ThePersistedPreCycleHeadReachesTheCloseout(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		pre     string
+		records bool
+	}{
+		{"the checkpoint's pre-cycle HEAD bounds the closeout", "pre-cycle-sha", true},
+		{"the same HEAD before and after records nothing", "post-cycle-sha", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o, st, req, rp := resumedLifecycleFixture(t)
+			st.cycleState.PreCycleHEAD = tc.pre
+			o.gitHEAD = func() (string, error) { return "post-cycle-sha", nil }
+			recorded := 0
+			WithThroughputRecorder(func(*State, int, string) { recorded++ })(o)
+			if _, err := o.RunCycleFromPhase(context.Background(), req, rp); err != nil {
+				t.Fatal(err)
+			}
+			if (recorded == 1) != tc.records {
+				t.Fatalf("recorded %d time(s), want records=%v: the resumed closeout must compare against the checkpoint's pre-cycle HEAD", recorded, tc.records)
+			}
+		})
+	}
+}

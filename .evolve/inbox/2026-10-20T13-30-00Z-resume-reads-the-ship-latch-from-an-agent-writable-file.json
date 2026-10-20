@@ -1,0 +1,23 @@
+{
+  "id": "resume-reads-the-ship-latch-from-an-agent-writable-file",
+  "kind": "pipeline-repair",
+  "priority_class": "debuggability",
+  "weight": 0.7,
+  "title": "On resume the lost-landing floor's witnesses (ship latch, pre-cycle HEAD) come from run.json, which a phase agent can write",
+  "summary": "Found in the PR #1048 review (lost-ship-closeout-universal-landing-witness). The floor now trusts CycleState.Shipped and CycleState.PreCycleHEAD as host witnesses. In process they are host memory. On resume, loadResumeBootstrap reads them back through FilesystemStorage.ReadCycleState, whose target statemap resolves to the run workspace's run.json (go/internal/adapters/storage/statejson.go:49, go/internal/core/resume_bootstrap.go:138). The sandbox grants phase agents write access to the run workspace, and no guard in go/internal/guards names run.json or cycle-state.json. So an agent can set shipped=true, or move pre_cycle_head back to bless an old main commit, before a crash-resume.",
+  "fix": "Make the resume witnesses host-owned: either deny agent writes to run.json and the cycle-state symlink (sandbox deny rule plus a role-guard test), or sign/hash-bind the persisted latch and pre-cycle HEAD (for example a ledger entry at the ship PASS) and have the resume bootstrap verify it before the floor reads it.",
+  "acceptance": [
+    "A test plants shipped=true in a run workspace's run.json before a resume, and the resumed lost landing is still flagged landing-lost",
+    "A test moves pre_cycle_head back in run.json before a resume, and a binding that names an old main commit still does not clear the floor",
+    "The ADR-0039 amendment of 2026-10-20 no longer lists this as a limit"
+  ],
+  "files": [
+    "go/internal/core/resume_bootstrap.go",
+    "go/internal/adapters/storage/statejson.go",
+    "go/internal/adapters/sandbox/sandbox.go",
+    "go/internal/core/lost_landing_floor.go"
+  ],
+  "route": "console-manual",
+  "created_at": "2026-10-20T13:30:00Z",
+  "source": "console builder M, PR #1048 review MEDIUM-2"
+}
