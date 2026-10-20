@@ -1,30 +1,10 @@
 package retro
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
-
-func TestResolveCLI_AWalkRefusalIsReturnedAndNeverBecomesACandidate(t *testing.T) {
-	orig := walkRetroDecision
-	t.Cleanup(func() { walkRetroDecision = orig })
-	boom := errors.New("nothing permitted at the tier")
-	walkRetroDecision = func(cliroute.Decision) (llmroute.Plan, error) { return llmroute.Plan{}, boom }
-	p := &Phase{}
-
-	cli, err := p.resolveCLI(core.PhaseRequest{ProjectRoot: t.TempDir()}, &profiles.Profile{Name: retroAgent, CLI: "claude-tmux"}, "balanced")
-
-	if !errors.Is(err, boom) || cli != "" {
-		t.Fatalf("cli=%q err=%v", cli, err)
-	}
-}
 
 func TestMatchesCycleLesson_OnlyTheExactCycleNumberMatches(t *testing.T) {
 	cases := []struct {
