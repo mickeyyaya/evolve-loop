@@ -94,6 +94,7 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 	}
 
 	runRunDirGC(cfg, workspace, mode, gcPol, stderr)
+	sealLedgerGC(cfg, ledgerSealMode(mode, gcPol), gcPol.LedgerSealKeep(), stderr)
 	runWorktreeGC(cfg, workspace, mode, gcPol, stderr)
 	runDevWorktreeGC(cfg, workspace, gcPol, stderr)
 }

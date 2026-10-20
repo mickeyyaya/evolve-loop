@@ -74,6 +74,8 @@ func Plan(opts Options) (Manifest, error) {
 
 	planTrackerTTL(opts.Runs, items, pol, now, add)
 
+	planGuardsLog(opts.EvolveDir, pol, add)
+
 	for _, e := range dirEntriesOlderThan(OperatorSalvageDir(opts.EvolveDir), now(), pol.SalvageTTLDays, nil) {
 		add(e, ActionDelete, "salvage_ttl_days")
 	}
@@ -160,6 +162,10 @@ func Apply(evolveDir string, m Manifest) error {
 			}
 		case ActionArchive:
 			if err := archiveItem(evolveDir, it.Path); err != nil {
+				errs = append(errs, err)
+			}
+		case ActionRotate:
+			if err := rotateItem(evolveDir, it.Path, time.Now()); err != nil {
 				errs = append(errs, err)
 			}
 		default:

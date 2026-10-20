@@ -19,6 +19,11 @@ type Policy struct {
 	TestCacheTTLDays int `json:"testcache_ttl_days,omitempty"`
 	TestCacheMaxMB   int `json:"testcache_max_mb,omitempty"`
 
+	GuardsLogMaxMB          int    `json:"guards_log_max_mb,omitempty"`
+	VerdictCacheKeepEntries int    `json:"verdict_cache_keep,omitempty"`
+	LedgerSealKeepLines     int    `json:"ledger_seal_keep,omitempty"`
+	LedgerSeal              string `json:"ledger_seal,omitempty"`
+
 	Logs         LogsPolicy         `json:"logs,omitempty"`
 	Worktrees    WorktreesPolicy    `json:"worktrees,omitempty"`
 	DevWorktrees DevWorktreesPolicy `json:"dev_worktrees,omitempty"`
