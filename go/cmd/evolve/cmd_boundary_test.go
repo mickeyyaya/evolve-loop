@@ -91,10 +91,10 @@ func TestBoundaryRun_StopsAtFirstFailedStepWithItsExitCode(t *testing.T) {
 		{"loop-stop --wait times out", 1, exitRefused, []string{"loop-stop"}},
 		{"pr merge refused", 2, exitRefused, []string{"loop-stop", "pr"}},
 		{"pr merge I/O failure", 2, exitIO, []string{"loop-stop", "pr"}},
-		{"sync-main refused", 3, exitRefused, []string{"loop-stop", "pr", "sync-main"}},
-		{"gc I/O failure", 4, exitIO, []string{"loop-stop", "pr", "sync-main", "gc"}},
-		{"brake release fails", 5, exitRefused, []string{"loop-stop", "pr", "sync-main", "gc", "loop-stop"}},
-		{"log dir switch fails", 6, exitIO, []string{"loop-stop", "pr", "sync-main", "gc", "loop-stop", boundaryLogVerb}},
+		{"sync-main refused", 4, exitRefused, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main"}},
+		{"gc I/O failure", 5, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "gc"}},
+		{"brake release fails", 6, exitRefused, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "gc", "loop-stop"}},
+		{"log dir switch fails", 7, exitIO, []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "gc", "loop-stop", boundaryLogVerb}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -123,11 +123,11 @@ func TestBoundaryRun_FullFakeRunEndsWithDetachedPidAndBootVerdict(t *testing.T) 
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0 for a run whose every step succeeds\n%s%s", rc, stdout.String(), stderr.String())
 	}
-	want := []string{"loop-stop", "pr", "sync-main", "gc", "loop-stop", boundaryLogVerb, "loop"}
+	want := []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", "gc", "loop-stop", boundaryLogVerb, "loop"}
 	if got := fake.verbs(); !slices.Equal(got, want) {
-		t.Fatalf("dispatched %v, want the seven steps %v in order", got, want)
+		t.Fatalf("dispatched %v, want the eight steps %v in order", got, want)
 	}
-	stop, merge, release, logStep, launch := fake.calls[0].args, fake.calls[1].args, fake.calls[4].args, fake.calls[5].args, fake.calls[6].args
+	stop, merge, release, logStep, launch := fake.calls[0].args, fake.calls[1].args, fake.calls[5].args, fake.calls[6].args, fake.calls[7].args
 	if !slices.Contains(stop, "--wait") || slices.Contains(stop, "--release") {
 		t.Errorf("first loop-stop args %v: want --wait and no --release", stop)
 	}

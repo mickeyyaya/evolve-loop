@@ -70,7 +70,7 @@ Commands:
   pr         Merge reviewed PRs at a wave boundary; refuses while a loop runs or
               required CI is not green on the verified head
               ( pr merge <n>... [--update-branch] [--wait D] [--project-root P] )
-  boundary   Low-level boundary primitive (wave next is the operator path): loop-stop --wait, pr merge, sync-main, gc,
+  boundary   Low-level boundary primitive (wave next is the operator path): loop-stop --wait, pr merge, ratchet-tighten, sync-main, gc,
               loop-stop --release, loop --detach; stops at the first failed step
               ( boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--dry-run] )
   wave       Operator and LLM path: run the next wave as one verb (the boundary, a goal made from facts,
