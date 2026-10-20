@@ -66,6 +66,10 @@ func TestCommittedDocDeletions_NamesOnlyDocPathsThatLeaveTheDocRoots(t *testing.
 		{"rename out of the doc roots", "R100\x00docs/a.md\x00tmp/a.md\x00D\x00docs/b.md\x00", []string{"docs/a.md", "docs/b.md"}},
 		{"rename into the retired knowledge-base", "R100\x00docs/a.md\x00knowledge-base/a.md\x00", []string{"docs/a.md"}},
 		{"rename into an upper-case Docs", "R100\x00docs/a.md\x00Docs/a.md\x00", []string{"docs/a.md"}},
+		{"rename within knowledge-base", "R100\x00knowledge-base/research/r.md\x00knowledge-base/notes/r.md\x00", nil},
+		{"rename into an upper-case Knowledge-Base", "R100\x00knowledge-base/r.md\x00Knowledge-Base/r.md\x00", []string{"knowledge-base/r.md"}},
+		{"rename from an upper-case Knowledge-Base within the root", "R100\x00Knowledge-Base/r.md\x00knowledge-base/r.md\x00", nil},
+		{"rename out of knowledge-base", "R100\x00knowledge-base/r.md\x00tmp/r.md\x00", []string{"knowledge-base/r.md"}},
 		{"rename into the doc roots", "R100\x00tmp/a.md\x00docs/a.md\x00", nil},
 		{"truncated rename", "R100\x00docs/a.md", nil},
 	}
