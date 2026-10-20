@@ -228,3 +228,19 @@ func TestLoadResumeBootstrap_LeavesACarrierAloneWhileARebaseIsInProgress(t *test
 		})
 	}
 }
+
+func TestVerifyResumeIdentityAndHealCarrier_ACheckpointForAnotherWorktreeIsRejectedBeforeAnyHeal(t *testing.T) {
+	t.Parallel()
+	fx := rebasedCarrierLane(t)
+	head := fx.git("rev-parse", "HEAD")
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+
+	err := o.verifyResumeIdentityAndHealCarrier(context.Background(), fx.root, &ResumePoint{CycleID: unwindCycle, WorktreePath: t.TempDir()}, fx.cycleState())
+
+	if err == nil || !strings.HasPrefix(err.Error(), "resume identity mismatch: cycle-state worktree ") {
+		t.Fatalf("err = %v, want the worktree identity mismatch", err)
+	}
+	if got := fx.git("rev-parse", "HEAD"); got != head {
+		t.Fatalf("HEAD moved from %s to %s on a mismatched resume", head, got)
+	}
+}
