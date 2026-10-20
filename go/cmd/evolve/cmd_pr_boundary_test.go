@@ -49,13 +49,16 @@ func greenRun(ago time.Duration) string {
 
 func boundaryGH() *fakeBoundaryGH {
 	return &fakeBoundaryGH{
-		prs: `[{"number":20,"isDraft":false,"headRefOid":"h20"},{"number":21,"isDraft":false,"headRefOid":"h21"},` +
-			`{"number":22,"isDraft":true,"headRefOid":"h22"},{"number":23,"isDraft":false,"headRefOid":"h23"},{"number":24,"isDraft":false,"headRefOid":"h24"}]`,
+		prs: `[{"number":20,"isDraft":false,"mergeable":"MERGEABLE","headRefOid":"h20"},{"number":21,"isDraft":false,"mergeable":"MERGEABLE","headRefOid":"h21"},` +
+			`{"number":22,"isDraft":true,"mergeable":"MERGEABLE","headRefOid":"h22"},{"number":23,"isDraft":false,"mergeable":"MERGEABLE","headRefOid":"h23"},` +
+			`{"number":24,"isDraft":false,"mergeable":"MERGEABLE","headRefOid":"h24"},{"number":25,"isDraft":false,"mergeable":"CONFLICTING","headRefOid":"h25"},` +
+			`{"number":26,"isDraft":false,"mergeable":"UNKNOWN","headRefOid":"h26"}]`,
 		runs: map[string]string{
 			"h20": greenRun(150 * time.Minute), "h21": greenRun(90 * time.Minute), "h22": greenRun(5 * time.Hour),
 			"h23": `[{"status":"completed","conclusion":"failure","updatedAt":"2026-10-20T01:00:00Z"}]`, "h24": `[]`,
+			"h25": greenRun(6 * time.Hour), "h26": greenRun(7 * time.Hour),
 		},
-		files: map[string]string{"20": "\"docs/a.md\"\n", "21": "\"go/x.go\"\n"},
+		files: map[string]string{"20": "\"docs/a.md\"\n", "21": "\"go/x.go\"\n", "25": "\"go/y.go\"\n", "26": "\"go/z.go\"\n"},
 	}
 }
 

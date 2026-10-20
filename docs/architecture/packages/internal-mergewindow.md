@@ -39,7 +39,7 @@
   - The PR that waited longest is the candidate. A tie keeps the first PR in the list.
   - The call is due when that wait is longer than the bound and the live lanes are fewer than the width. A wait equal to the bound is not due.
 - **The facts of `evolve pr boundary`.** The bound is `pr.merge_window.early_boundary_after_s` (compiled default 3600 s, plan Q2). The width is `fleet.count`, by the operator decision of 2026-10-20 ("Combine them to fleet count"). The live lanes are the pool signal of the last wave record (`wave.PoolLive`), the same count as `evolve wave status`.
-- **Green and waiting.** A green PR is a non-draft PR whose newest `required.yml` run on its head is `completed` and `success`. Its wait starts at the `updatedAt` of that run. A window PR does not wait, so the rule skips it.
+- **Green and waiting.** A green PR is a non-draft PR whose newest `required.yml` run on its head is `completed` and `success`. It must also be `MERGEABLE` against `main`. A `CONFLICTING` or `UNKNOWN` PR does not wait, because `wave next --merge` cannot land it. Its wait starts at the `updatedAt` of that run. A window PR does not wait, so the rule skips it.
 - **No call.** No live loop exits 3, because the plane is at a boundary. A missing pool signal for a live loop exits 2, because the verb cannot prove that the pool is below its width.
 
 ## Tests

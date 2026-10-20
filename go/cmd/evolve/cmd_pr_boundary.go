@@ -23,6 +23,7 @@ const (
 	prBoundaryUsage  = "usage: evolve pr boundary [--json] [--project-root P]"
 	prBoundaryPrefix = "evolve pr boundary: "
 	prListLimit      = "200"
+	prMergeable      = "MERGEABLE"
 	reasonNoLoop     = "no early boundary: no loop is running, so the plane is at a boundary"
 )
 
@@ -146,12 +147,13 @@ func decidePRBoundary(ctx context.Context, root string, p boundaryPlane) (prBoun
 type openPRDoc struct {
 	Number     int    `json:"number"`
 	IsDraft    bool   `json:"isDraft"`
+	Mergeable  string `json:"mergeable"`
 	HeadRefOid string `json:"headRefOid"`
 }
 
 func waitingBoundaryPRs(ctx context.Context, root string, p boundaryPlane) ([]mergewindow.WaitingPR, error) {
 	var prs []openPRDoc
-	if err := decodeGH(ctx, p.gh, &prs, "pr", "list", "--state", "open", "--base", "main", "--json", "number,isDraft,headRefOid", "--limit", prListLimit); err != nil {
+	if err := decodeGH(ctx, p.gh, &prs, "pr", "list", "--state", "open", "--base", "main", "--json", "number,isDraft,mergeable,headRefOid", "--limit", prListLimit); err != nil {
 		return nil, err
 	}
 	var waiting []mergewindow.WaitingPR
@@ -168,7 +170,7 @@ func waitingBoundaryPRs(ctx context.Context, root string, p boundaryPlane) ([]me
 }
 
 func waitOf(ctx context.Context, root string, p boundaryPlane, pr openPRDoc) (mergewindow.WaitingPR, bool, error) {
-	if pr.IsDraft {
+	if pr.IsDraft || pr.Mergeable != prMergeable {
 		return mergewindow.WaitingPR{}, false, nil
 	}
 	since, green, err := greenSince(ctx, p.gh, pr.HeadRefOid)
