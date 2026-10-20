@@ -93,5 +93,5 @@ func writeLadderText(stdout io.Writer, rows []retryladder.ReportRow) {
 		t := row.Tokens
 		fmt.Fprintf(w, ladderRowTextShape, row.Rung, class, row.Tries, row.Fixes, t.Input+t.Output+t.CacheRead+t.CacheWrite)
 	}
-	w.Flush()
+	_ = w.Flush()
 }
