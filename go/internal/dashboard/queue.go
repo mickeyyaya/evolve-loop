@@ -17,13 +17,15 @@ func inboxDir(root string) string { return filepath.Join(paths.EvolveDirOf(root)
 
 func readQueue(root string, now time.Time) (QueueSummary, []string) {
 	inbox := inboxDir(root)
-	items, warnings, err := inboxbatch.LoadDir(inbox)
+	scan, err := inboxbatch.ScanDir(inbox)
 	var q QueueSummary
 	if err != nil {
 		return q, []string{"inbox: " + err.Error()}
 	}
-	for i := range warnings {
-		warnings[i] = "inbox: " + warnings[i]
+	items := scan.Items
+	var warnings []string
+	for _, w := range scan.Warnings {
+		warnings = append(warnings, "inbox: "+w.String())
 	}
 	in, rankWarnings := rankinputs.Load(paths.EvolveDirOf(root), now)
 	for _, w := range rankWarnings {

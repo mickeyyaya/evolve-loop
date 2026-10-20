@@ -168,9 +168,14 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 		return ""
 	}
 	inboxDir := filepath.Join(projectRoot, ".evolve", "inbox")
-	items, _, err := inboxbatch.LoadDir(inboxDir)
-	if err != nil || len(items) == 0 {
+	scan, err := inboxbatch.ScanDir(inboxDir)
+	if err != nil {
 		return ""
+	}
+	skipped := skippedFilesNote(scan.Warnings)
+	items := scan.Items
+	if len(items) == 0 {
+		return skipped
 	}
 	if forbidden == nil {
 		forbidden = guards.IsProtectedScope
@@ -178,6 +183,7 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 	rank := rankInputs(projectRoot)
 	menu := inboxmover.RankLaneMenu(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}, items, forbidden, rank)
 	var sect strings.Builder
+	sect.WriteString(skipped)
 	sect.WriteString(unknownClassNote(inboxrank.ClassWarnings(items, rank.Config)))
 	sect.WriteString(selectableBatchesNote(menu.Ready, menu.Ranked))
 	sect.WriteString(consoleRoutedNote(menu.Console))
@@ -194,6 +200,20 @@ func rankInputs(projectRoot string) inboxrank.Inputs {
 		fmt.Fprintf(os.Stderr, "[triage] WARN inbox rank: %s\n", w)
 	}
 	return in
+}
+
+func skippedFilesNote(warnings []inboxbatch.LoadWarning) string {
+	var skipped []string
+	for _, w := range warnings {
+		if w.Unreadable {
+			skipped = append(skipped, inboxbatch.StripControl(w.Text))
+		}
+	}
+	if len(skipped) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("- skipped_inbox_files: %d file(s) in .evolve/inbox did not parse and are not on the menu; "+
+		"the console must repair each: %s\n", len(skipped), strings.Join(skipped, "; "))
 }
 
 func selectableBatchesNote(ready []inboxbatch.Item, ranked []inboxrank.Ranked) string {

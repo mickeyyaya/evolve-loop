@@ -288,3 +288,26 @@ func TestSplitProposer_AnUnreadableCandidateIsAWarningAndTheOthersAreProposed(t 
 		t.Errorf("stderr = %q, want a warning that names the unreadable item", stderr.String())
 	}
 }
+
+func TestWaveSupply_ASkippedInboxFileReachesTheOperatorAsAWarning(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	seedSupplyInbox(t, p.evolveDir())
+	inbox := filepath.Join(p.evolveDir(), "inbox")
+	if err := os.WriteFile(filepath.Join(inbox, "bad.json"), []byte(`{"id":"gamma","weight":"high"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inbox, "num.json"), []byte(`{"id":"numeric","priority":0.86}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := newWaveHarness()
+
+	rc := h.run("supply", "--project-root", p.root)
+
+	out := h.stdout.String()
+	if rc != 0 || !strings.Contains(out, "warnings:\n") || !strings.Contains(out, "  WARN skipped bad.json: ") ||
+		!strings.Contains(out, "  WARN num.json: priority 0.86 is a number; it is read as the weight\n") ||
+		!strings.Contains(out, "of 4 item(s)") {
+		t.Errorf("rc = %d stdout:\n%s", rc, out)
+	}
+}

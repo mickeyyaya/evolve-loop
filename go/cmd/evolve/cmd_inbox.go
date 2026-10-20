@@ -101,11 +101,7 @@ func loadPendingInbox(verb string, stderr io.Writer) (pendingInbox, error) {
 
 func printLoadWarnings(stderr io.Writer, prefix string, warns []inboxbatch.LoadWarning) {
 	for _, w := range warns {
-		if w.Unreadable {
-			fmt.Fprintf(stderr, "%s: WARN skipped %s\n", prefix, w.Text)
-		} else {
-			fmt.Fprintf(stderr, "%s: WARN %s\n", prefix, w.Text)
-		}
+		fmt.Fprintf(stderr, "%s: %s\n", prefix, w.String())
 	}
 }
 

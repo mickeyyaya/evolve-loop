@@ -4,6 +4,7 @@ package inboxbatch
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -38,6 +39,7 @@ type Item struct {
 	Path            string                     `json:"-"`
 	mentions        []string
 	basenames       []string
+	priorityNote    string
 }
 
 type ItemKey struct{ ID, Path string }
@@ -46,15 +48,43 @@ func (it Item) Key() ItemKey { return ItemKey{ID: it.ID, Path: it.Path} }
 
 func (it *Item) UnmarshalJSON(raw []byte) error {
 	type record Item
-	var r record
+	type itemRecord struct {
+		record
+		Priority json.RawMessage `json:"priority"`
+	}
+	var r itemRecord
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return err
 	}
-	*it = Item(r)
+	*it = Item(r.record)
+	if err := it.readPriority(r.Priority); err != nil {
+		return err
+	}
 	var doc map[string]any
 	if err := json.Unmarshal(raw, &doc); err == nil {
 		it.mentions, it.basenames = mentionedFiles(doc)
 	}
+	return nil
+}
+
+func (it *Item) readPriority(raw json.RawMessage) error {
+	if len(raw) == 0 || json.Unmarshal(raw, &it.Priority) == nil {
+		return nil
+	}
+	var n float64
+	if err := json.Unmarshal(raw, &n); err != nil {
+		return fmt.Errorf("priority must be a string or a number: %w", err)
+	}
+	if it.Weight != 0 {
+		it.priorityNote = fmt.Sprintf("priority %v is a number; the weight %v stays", n, it.Weight)
+		return nil
+	}
+	if n < 0 || n > 1 {
+		it.priorityNote = fmt.Sprintf("priority %v of item %q is outside the weight range 0..1, so it is not read as the weight", n, it.ID)
+		return nil
+	}
+	it.priorityNote = fmt.Sprintf("priority %v is a number; it is read as the weight", n)
+	it.Weight = n
 	return nil
 }
 
@@ -229,6 +259,9 @@ func LoadFile(path string) (Item, []string, error) {
 	name := filepath.Base(path)
 	it.ID, it.Path = idOrStem(it.ID, path), name
 	var warnings []string
+	if it.priorityNote != "" {
+		warnings = append(warnings, name+": "+it.priorityNote)
+	}
 	if r := sanitizeItem(&it); len(r.changed) > 0 {
 		warnings = append(warnings, name+": "+r.notice())
 	}
