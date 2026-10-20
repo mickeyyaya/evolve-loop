@@ -62,17 +62,36 @@ func applyLoopSignals(f wavemeasure.Facts, events []signalcenter.Event) (wavemea
 		switch {
 		case e.Code == wavemeasure.CodeAdmitWait:
 			f.AdmissionWaits++
-		case e.Code == orchestrator.CodeAdmissionOptimistic:
-			f.OptimisticAdmissions++
-		case e.Code == orchestrator.CodeOptimisticAdmissionFailed:
-			f.OptimisticFailures++
 		case e.Kind == signalcenter.KindLoopWave:
 			if w, err := strconv.Atoi(e.Fields[wavemeasure.FieldWidthSized]); err == nil {
 				f.WidthSized, source = w, WidthFromSignal
 			}
 		}
 	}
+	f.OptimisticAdmissions, f.OptimisticFailures = countOptimistic(f, events)
 	return f, source
+}
+
+func countOptimistic(f wavemeasure.Facts, events []signalcenter.Event) (admissions, failures int) {
+	admitted, failed := map[string]bool{}, map[string]bool{}
+	for _, e := range events {
+		if !inRun(f, eventTime(e)) {
+			continue
+		}
+		switch todo := e.Fields[todoField]; e.Code {
+		case orchestrator.CodeAdmissionOptimistic:
+			admitted[todo] = true
+		case orchestrator.CodeOptimisticAdmissionFailed:
+			failed[todo] = true
+		}
+	}
+	delete(admitted, "")
+	for todo := range failed {
+		if admitted[todo] {
+			failures++
+		}
+	}
+	return len(admitted), failures
 }
 
 func runEnd(rec Record, next *Record) time.Time {

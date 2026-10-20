@@ -114,7 +114,7 @@ func (a Admitter) recordShadow(holders []holder, fp footprint, d Decision, block
 }
 
 func (a Admitter) recordOptimistic(holders []holder, fp footprint, d Decision) {
-	if a.OnOptimistic == nil || !a.Optimistic {
+	if a.OnOptimistic == nil {
 		return
 	}
 	for _, h := range holders {

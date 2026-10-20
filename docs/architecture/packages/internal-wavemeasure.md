@@ -15,6 +15,8 @@
 - **A lane with no start is not a lane.** A cycle with no signal and no dossier phase has no interval. It is out of the width and the busy time, but it still counts in `landed` when it shipped.
 - **The supply is a copy.** `Facts.Supply` holds the six class counts of the last census of the run. `orchestrator.Supply.Measure` builds it. `Compute` copies it into `Measures.Supply`, and the JSON key `supply` is absent when the run has no census (`TestCompute_CarriesACopyOfTheClassCountsOfTheLastCensusAndOmitsAbsentOnes`). The census is in [internal-orchestrator.md](internal-orchestrator.md). `wave status` reads the record `.evolve/waves/supply.json` and takes the last census inside the run (`TestWaveStatus_ReportsTheSupplyOfTheLastCensusOfEachRun`).
 - **The optimistic failure rate (ADR-0143 W1b).** `Facts.OptimisticAdmissions` and `Facts.OptimisticFailures` give `optimistic_failure_rate`. It is the failures over the admissions, or 0 with no admission. It is the D3 rate of the wave-latency plan. Pinned by `TestCompute_TheOptimisticFailureRateIsFailuresOverAdmissions`.
+
+  `wave.MeasureFacts` counts each todo once. An admission is a todo with an optimistic launch in the run. A failure is an admitted todo that failed. Thus the rate stays in [0,1], also when a lane launched before the wave `started_at` (#1013): such a lane drops out of both counts. Pinned by `TestMeasureFacts_AFailureCountsOnlyWhenItsAdmissionIsCounted`.
 - **The JSON names are a contract.** `TestMeasures_TheJSONFieldNamesAreStable` pins the ten keys. The constants `FieldWidthSized` and `CodeAdmitWait` are the names that the writer and the reader share.
 
 ## Where the facts come from
