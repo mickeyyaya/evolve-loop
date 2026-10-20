@@ -36,6 +36,8 @@ var serialTests = map[string]string{
 	"ship.TestRepoContractGate_RedErrorMessageNamesFailingTests":                  seamRepoContract,
 	"ship.TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests":     seamRepoContract,
 	"ship.TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns":                 seamRepoContract,
+	"ship.TestRepoContractGate_TheLoopLogCarriesOneSummaryLinePerRun":             seamRepoContract,
+	"ship.TestRepoContractGate_WithoutAScanLogTheNotesStayOnStderr":               seamRepoContract,
 	"ship.TestRepoContractGate_TransientFailureRetriesOnceThenShips":              seamRepoContract,
 	"ship.TestRepoContractGate_UnknownStageFailsTowardEnforce":                    seamRepoContract,
 	"ship.TestRepoContractPack_ShipAndTheBuildFloorMakeOneDecision":               seamRepoContract,

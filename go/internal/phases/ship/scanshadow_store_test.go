@@ -74,8 +74,8 @@ func TestVerdictStore_AtEnforceTheShipSkipsAPackageTheFloorStoredGreenOnTheSameK
 			t.Errorf("%s has a green from the floor on the same key and must not run at enforce\n%s", pkg, run.scanLog)
 		}
 	}
-	if !strings.Contains(run.notes, "[ship] verdict store: skipped 2 package(s)") {
-		t.Fatalf("the ship names each skip; got %q", run.notes)
+	if !strings.Contains(run.scanLog, "[ship] verdict store: skipped 2 package(s)") {
+		t.Fatalf("the ship names each skip in the scan log; got %q", run.scanLog)
 	}
 	if sum := run.summary(t); sum["skipped"] != "2" || sum["stage"] != "enforce" || sum["escapes"] != "0" {
 		t.Fatalf("the summary counts the skips at stage enforce; got %v", sum)

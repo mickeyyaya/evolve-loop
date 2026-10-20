@@ -373,13 +373,24 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 	if !repocontract.GateOn(gate) {
 		return nil
 	}
-	moduleDir := repocontract.ModuleDir(root)
-	out := packLog{notes: stderr, raw: stderr}
-	if scan := openScanLog(workspace, stderr); scan != nil {
-		defer func() { _ = scan.Close() }()
-		defer fmt.Fprintf(stderr, "[ship] repo-contract gate: full output: %s\n", scan.Name())
-		out = packLog{notes: io.MultiWriter(stderr, scan), raw: scan}
+	scan := openScanLog(workspace, stderr)
+	if scan == nil {
+		return runRepoContractSteps(ctx, packLog{notes: stderr, raw: stderr}, gate, root, baseRef, workspace, cleared)
 	}
+	defer func() { _ = scan.Close() }()
+	var flaky []string
+	err := runRepoContractSteps(ctx, packLog{notes: scan, raw: scan}, gate, root, baseRef, workspace, func(names []string) {
+		flaky = append(flaky, names...)
+		if cleared != nil {
+			cleared(names)
+		}
+	})
+	fmt.Fprintln(stderr, repoContractSummary(err, flaky, scan.Name()))
+	return err
+}
+
+func runRepoContractSteps(ctx context.Context, out packLog, gate, root, baseRef, workspace string, cleared func([]string)) error {
+	moduleDir := repocontract.ModuleDir(root)
 	shadow := scanShadowFrom(ctx)
 	shadow.begin(ctx, root)
 	defer shadow.finish()
