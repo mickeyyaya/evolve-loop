@@ -214,7 +214,7 @@ func TestTakeSupply_AndCellAdmissionShareOneModuleGraphLoadForEachIteration(t *t
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Orchestrator: enforceOrchestrator}
 
 	b.takeSupply(3, fc)
-	admit := b.cellAdmission(fc.Orchestrator, 3, nil)
+	admit := b.cellAdmission(fc.Orchestrator, 3, nil, nil)
 	if admit == nil || loads != 1 {
 		t.Fatalf("admit set = %v, loads = %d, want one load shared by the census and the pool admission of iteration 3", admit != nil, loads)
 	}
@@ -223,7 +223,7 @@ func TestTakeSupply_AndCellAdmissionShareOneModuleGraphLoadForEachIteration(t *t
 		t.Errorf("loads after iteration 4 = %d, want 2: the next iteration reads the tree again", loads)
 	}
 	b.takeSupply(4, fc)
-	b.cellAdmission(fc.Orchestrator, 4, nil)
+	b.cellAdmission(fc.Orchestrator, 4, nil, nil)
 	if loads != 2 {
 		t.Errorf("loads after a second census of iteration 4 = %d, want still 2", loads)
 	}
@@ -307,7 +307,7 @@ func TestTakeSupply_AModuleGraphThatDoesNotLoadCountsEveryReadyItemAndSaysWhy(t 
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Orchestrator: enforceOrchestrator}
 
 	b.takeSupply(5, fc)
-	admit := b.cellAdmission(fc.Orchestrator, 5, nil)
+	admit := b.cellAdmission(fc.Orchestrator, 5, nil, nil)
 
 	history, err := orchestrator.ReadSupply(filepath.Join(evolveDir, "waves", orchestrator.SupplyFile))
 	if err != nil || len(history) != 1 || history[0].Counts[orchestrator.ClassAdmissible] != 2 || len(history[0].Warnings) != 1 {

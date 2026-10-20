@@ -44,6 +44,7 @@ type Pool struct {
 	Window      *Window
 	Resupply    func(held []fleet.Todo) []fleet.Todo
 	Holders     *ReachHolders
+	FamilyHolds *FamilyHolds
 }
 
 var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
@@ -119,12 +120,18 @@ func (p Pool) transition(t fleet.PoolTransition) {
 		reason += " " + t.Todo
 	}
 	p.Publish.emit("Pool.Run", transitionCodes[t.Kind], signalcenter.SeverityInfo, reason, fields)
+	if t.Kind == fleet.PoolLaunched || t.Kind == fleet.PoolBackfilled {
+		p.FamilyHolds.forget(t.Todo)
+	}
 	if t.Kind == fleet.PoolIdle && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
 		uFields := map[string]string{
 			"live":      strconv.Itoa(t.Live),
 			"target":    strconv.Itoa(t.Target),
 			"min_lanes": strconv.Itoa(p.MinLanes),
 			"ready":     strconv.Itoa(t.Pending),
+		}
+		if held := p.FamilyHolds.Summary(); held != "" {
+			uFields["family_held"] = held
 		}
 		uReason := fmt.Sprintf("pool underfilled: %d of %d lanes live, min_lanes %d", t.Live, t.Target, p.MinLanes)
 		p.Publish.emit("Pool.Run", CodePoolUnderfilled, signalcenter.SeverityWarn, uReason, uFields)

@@ -238,6 +238,11 @@ The live partition is file-disjoint (F2.8). File-based parallel agents gain noth
 7. **The test.** A todo is admissible when it conflicts with no lane in flight and with no todo admitted before it. `Admit` records the cells of each decision and the lane or todo that blocks it.
 8. **The release.** `ship.landed`, a lane failure or a lane stop removes the lane from the in-flight list (§9).
 9. **Rank order.** The step takes the todos in `inboxrank` order. It stops after `scan_k` admitted todos (§12). A todo that waits keeps its rank. It does not lose its place to a later todo of lower rank when its cell frees.
+10. **The id family.** The first hyphen token of a todo id is its family.
+    - Example: the family of `context-fill-cap` is `context`.
+    - The family is a cell of capacity 1. Two todos of one family conflict under both rules. An id without a hyphen has no family.
+    - The cause is cycle 1484. A `context-fill` lane changed a contract under its sibling lane. The files of the two lanes were disjoint.
+    - The cell is `family:<token>`. The census refusal and `LOOP_ORCH_ADMIT_WAIT` name it ([internal-admission.md](packages/internal-admission.md) §Id family).
 
 The cell table is the shared view of all lanes in flight that the console has by hand today (F2.15). `evolve wave status` prints it (plan O7).
 
