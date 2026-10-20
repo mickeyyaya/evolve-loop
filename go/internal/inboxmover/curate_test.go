@@ -43,6 +43,26 @@ func TestEdit_RewritesACurationFieldThroughTheLeaf(t *testing.T) {
 	}
 }
 
+func TestEditHeld_AddsADepToTheItemThatTheCycleHolds(t *testing.T) {
+	root, inboxDir := seedInbox(t, "task-a")
+	opts := Options{ProjectRoot: root}
+	if err := os.WriteFile(filepath.Join(inboxDir, "repair.json"), []byte(`{"id":"repair"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Claim(opts, "task-a", "4"); err != nil {
+		t.Fatal(err)
+	}
+
+	path, err := EditHeld(opts, "task-a", 4, []FieldEdit{{Op: EditAdd, Field: "deps", Value: "repair"}})
+
+	if err != nil || !strings.Contains(path, "processing") {
+		t.Fatalf("EditHeld = (%q, %v), want the claimed file edited in place", path, err)
+	}
+	if deps, _ := readItemFields(t, path)["deps"].([]any); len(deps) != 1 || deps[0] != "repair" {
+		t.Errorf("deps = %v, want [repair]", deps)
+	}
+}
+
 func TestWithdraw_RemovesAnAsFiledItemAndRefusesARoutedOne(t *testing.T) {
 	root, inboxDir := seedInbox(t, "task-a")
 	opts := Options{ProjectRoot: root}

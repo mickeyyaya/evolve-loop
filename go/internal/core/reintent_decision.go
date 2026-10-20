@@ -21,13 +21,17 @@ func (o *Orchestrator) auditDeclineDefers(cs CycleState) (deferDecision, bool) {
 	if cs.AuditDeclineReason == "" {
 		return deferDecision{}, false
 	}
-	if fb, declared := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit)); declared {
+	return deferDecisionIn(cs.WorkspacePath, o.failurePolicy)
+}
+
+func deferDecisionIn(workspace string, pol policy.SystemFailurePolicy) (deferDecision, bool) {
+	if fb, declared := phasecontract.ReadFailureBlock(workspace, string(PhaseAudit)); declared {
 		category := policyCategoryFor(failurelog.NormalizeLegacy(fb.Class))
-		if cat, known := o.failurePolicy.RetryPolicyFor(category); known && cat.Action == policy.ActionDeferOrQuarantine {
+		if cat, known := pol.RetryPolicyFor(category); known && cat.Action == policy.ActionDeferOrQuarantine {
 			return deferDecision{category: category, fixType: cat.FixType, source: "audit"}, true
 		}
 	}
-	if dec, _ := readFailureDecision(cs.WorkspacePath); dec != nil && dec.Action == policy.ActionDeferOrQuarantine {
+	if dec, _ := readFailureDecision(workspace); dec != nil && dec.Action == policy.ActionDeferOrQuarantine {
 		return deferDecision{category: dec.Category, fixType: dec.FixType, source: "failure-decision.json"}, true
 	}
 	return deferDecision{}, false
@@ -51,12 +55,9 @@ type RecordedDefer struct {
 	FixType  string
 }
 
-func RecordedDeferDecision(workspace string) (RecordedDefer, bool) {
-	dec, _ := readFailureDecision(workspace)
-	if dec == nil || dec.Action != policy.ActionDeferOrQuarantine {
-		return RecordedDefer{}, false
-	}
-	return RecordedDefer{Category: dec.Category, FixType: dec.FixType}, true
+func RecordedDeferDecision(workspace string, pol policy.SystemFailurePolicy) (RecordedDefer, bool) {
+	d, ok := deferDecisionIn(workspace, pol)
+	return RecordedDefer{Category: d.category, FixType: d.fixType}, ok
 }
 
 func IsAuditDeferResult(result CycleResult) bool {

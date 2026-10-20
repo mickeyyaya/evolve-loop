@@ -38,6 +38,27 @@ func (m *Mover) Edit(target string, edits []FieldEdit) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return m.editAt(path, edits)
+}
+
+func (m *Mover) EditHeld(taskID string, cycle int, edits []FieldEdit) (string, error) {
+	edits = trimmedEdits(edits)
+	if err := checkEditRequest(edits); err != nil {
+		return "", err
+	}
+	loc, err := Locate(m.inboxDir, taskID)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return "", fmt.Errorf("%w: %s", ErrNotFound, taskID)
+	case err != nil:
+		return "", fmt.Errorf("edit-held: locate %s: %w", taskID, err)
+	case loc.Cycle != 0 && loc.Cycle != cycle:
+		return "", fmt.Errorf("%w: %s (held by cycle %d, not cycle %d)", ErrNotFound, taskID, loc.Cycle, cycle)
+	}
+	return m.editAt(loc.Path, edits)
+}
+
+func (m *Mover) editAt(path string, edits []FieldEdit) (string, error) {
 	filed, err := m.identityIndex(edits)
 	if err != nil {
 		return "", err

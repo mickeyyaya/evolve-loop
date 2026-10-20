@@ -110,7 +110,7 @@ func TestApplyFailure_ADeferWithNoRouteKeepsTheReleaseAndSaysWhy(t *testing.T) {
 		deferred bool
 		warn     string
 	}{
-		"no recorded decision":           {"", true, "no recorded defer-or-quarantine failure-decision.json"},
+		"no recorded decision":           {"", true, "no defer-or-quarantine decision in its audit failure block or failure-decision.json"},
 		"an unknown fix_type":            {unknown, true, `fix_type "rewrite-the-world" has no route`},
 		"a cycle not ended by the defer": {cycle1953Decision, false, ""},
 	} {
@@ -151,19 +151,103 @@ func TestApplyFailure_ACompanionThatCannotBeFiledKeepsTheReleaseAndSaysWhy(t *te
 	}
 }
 
-func TestApplyFailure_ADepsEditThatFailsIsAnError(t *testing.T) {
+func TestApplyFailure_TheDepsEntryIsWrittenWhileTheCycleStillHoldsTheClaim(t *testing.T) {
 	decision := strings.Replace(cycle1953Decision, `"fix_type":"reintent"`, `"fix_type":"pipeline-repair"`, 1)
-	_, _, in, _ := deferredCycle(t, decision)
+	root, _, in, _ := deferredCycle(t, decision)
 	edit := depsEdit
 	t.Cleanup(func() { depsEdit = edit })
-	depsEdit = func(inboxmover.Options, string, []inboxmover.FieldEdit) (string, error) {
-		return "", errors.New("disk full")
+	var stateAtEdit string
+	depsEdit = func(opts inboxmover.Options, id string, cycle int, edits []inboxmover.FieldEdit) (string, error) {
+		stateAtEdit = inboxmover.ResolveDispatchState(inboxmover.Options{ProjectRoot: root}, id).State
+		return edit(opts, id, cycle, edits)
 	}
 
-	_, err := ApplyFailure(in)
+	if _, err := ApplyFailure(in); err != nil {
+		t.Fatalf("ApplyFailure: %v", err)
+	}
 
-	if err == nil || !strings.Contains(err.Error(), "lane-item") || !strings.Contains(err.Error(), "disk full") {
-		t.Errorf("err = %v, want the failed deps edit of lane-item", err)
+	if stateAtEdit != inboxmover.StateProcessing {
+		t.Errorf("state at the deps edit = %q, want %q: no lane can claim the item before it waits on the companion", stateAtEdit, inboxmover.StateProcessing)
+	}
+}
+
+func TestApplyFailure_OnlyTheItemThatFailedToRouteIsBumped(t *testing.T) {
+	for name, c := range map[string]struct {
+		decision string
+		fail     func()
+	}{
+		"reintent": {cycle1953Decision, func() {
+			route := consoleRoute
+			consoleRoute = func(opts inboxmover.Options, id, reason string, cycle int) (inboxmover.RouteResult, error) {
+				if id == "second" {
+					return inboxmover.RouteResult{}, errors.New("rewrite failed")
+				}
+				return route(opts, id, reason, cycle)
+			}
+		}},
+		"pipeline-repair": {strings.Replace(cycle1953Decision, `"fix_type":"reintent"`, `"fix_type":"pipeline-repair"`, 1), func() {
+			edit := depsEdit
+			depsEdit = func(opts inboxmover.Options, id string, cycle int, edits []inboxmover.FieldEdit) (string, error) {
+				if id == "second" {
+					return "", errors.New("disk full")
+				}
+				return edit(opts, id, cycle, edits)
+			}
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			route, edit := consoleRoute, depsEdit
+			t.Cleanup(func() { consoleRoute, depsEdit = route, edit })
+			root, inbox, ws := seedProject(t, "lane-item", []string{"lane-item", "second"})
+			writeSecondItem(t, inbox)
+			for _, id := range []string{"lane-item", "second"} {
+				if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, id, "7"); err != nil {
+					t.Fatalf("claim %s: %v", id, err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(ws, "failure-decision.json"), []byte(c.decision), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			var stderr bytes.Buffer
+			in := FailureInputsFor(root, filepath.Join(root, ".evolve"), ws, 7, &stderr)
+			in.Deferred, in.SystemLevel = true, false
+			c.fail()
+
+			if _, err := ApplyFailure(in); err != nil {
+				t.Fatalf("ApplyFailure: %v", err)
+			}
+
+			if _, bumped := itemRecord(t, inbox, "lane-item")["failure_count"]; bumped {
+				t.Error("the routed item got a failure bump")
+			}
+			if got := itemRecord(t, inbox, "second")["failure_count"]; got != float64(1) || !strings.Contains(stderr.String(), "second") {
+				t.Errorf("the item that failed to route has failure_count %v (want 1), stderr %q", got, stderr.String())
+			}
+		})
+	}
+}
+
+func writeSecondItem(t *testing.T, inbox string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(inbox, "2026-07-29T00-00-01Z-second.json"), []byte(`{"id":"second","title":"fixture second","kind":"bug"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestApplyFailure_TheAuditBlockAloneRoutesTheItem(t *testing.T) {
+	_, inbox, in, _ := deferredCycle(t, "")
+	audit := "## Verdict\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\",\"schema_version\":2,\"failure\":{\"class\":\"intent-malformed\"}} -->\n"
+	if err := os.WriteFile(filepath.Join(in.Workspace, "audit-report.md"), []byte(audit), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := ApplyFailure(in); err != nil {
+		t.Fatalf("ApplyFailure: %v", err)
+	}
+
+	rec := itemRecord(t, inbox, "lane-item")
+	if reason, _ := rec["routed_reason"].(string); rec["route"] != "console-manual" || !strings.Contains(reason, "fix_type reintent") {
+		t.Errorf("item = %v, want the console route from the audit's declared intent-malformed class with no failure-decision.json", rec)
 	}
 }
 
@@ -171,9 +255,9 @@ func TestRouteEachConsole_AnIdWithNoItemIsNotRouted(t *testing.T) {
 	root, inbox, _, _ := deferredCycle(t, cycle1953Decision)
 	opts := inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}
 
-	routed := routeEachConsole(opts, []string{"lane-item", "ghost"}, "cycle 7 ended by a defer-or-quarantine decision", 7)
+	routed := routeEachConsole(opts, []string{"lane-item", "ghost"}, "cycle 7 ended by a defer-or-quarantine decision", 7, io.Discard)
 
-	if routed || itemRecord(t, filepath.Join(inbox, "processing", "cycle-7"), "lane-item")["route"] != "console-manual" {
-		t.Errorf("routed = %t, want false for the ghost id and the real item routed", routed)
+	if len(routed) != 1 || routed[0] != "lane-item" || itemRecord(t, filepath.Join(inbox, "processing", "cycle-7"), "lane-item")["route"] != "console-manual" {
+		t.Errorf("routed = %v, want only the real item routed", routed)
 	}
 }

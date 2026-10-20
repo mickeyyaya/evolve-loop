@@ -2,7 +2,6 @@ package cycleoutcome
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -10,52 +9,52 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-var depsEdit = inboxmover.Edit
+var (
+	depsEdit     = inboxmover.EditHeld
+	consoleRoute = inboxmover.RouteConsole
+)
 
 const companionWeight = 0.8
 
-type deferRoute struct {
-	routed    bool
-	companion string
-}
-
-func routeDeferral(opts inboxmover.Options, in FailureInputs, committed []string, stderr io.Writer) deferRoute {
+func routeDeferral(opts inboxmover.Options, in FailureInputs, committed []string, stderr io.Writer) []string {
 	if !in.Deferred || len(committed) == 0 {
-		return deferRoute{}
+		return nil
 	}
-	d, ok := core.RecordedDeferDecision(in.Workspace)
+	d, ok := core.RecordedDeferDecision(in.Workspace, in.FailurePolicy)
 	if !ok {
-		fmt.Fprintf(stderr, "[cycleoutcome] WARN: defer route: cycle %d has no recorded defer-or-quarantine failure-decision.json; the items are released\n", in.Cycle)
-		return deferRoute{}
+		fmt.Fprintf(stderr, "[cycleoutcome] WARN: defer route: cycle %d has no defer-or-quarantine decision in its audit failure block or failure-decision.json; the items are released\n", in.Cycle)
+		return nil
 	}
 	reason := fmt.Sprintf("cycle %d ended by a defer-or-quarantine decision: category %s, fix_type %s", in.Cycle, d.Category, d.FixType)
 	switch d.FixType {
 	case policy.FixTypeReintent:
-		return deferRoute{routed: routeEachConsole(opts, committed, reason, in.Cycle)}
+		return routeEachConsole(opts, committed, reason, in.Cycle, stderr)
 	case policy.FixTypePipelineRepair:
 		id, err := fileCompanion(opts, in.Cycle, reason, committed)
 		if err != nil {
 			fmt.Fprintf(stderr, "[cycleoutcome] WARN: defer route: the companion item %s was not filed and stamped (%v); the items are released\n", id, err)
-			return deferRoute{}
+			return nil
 		}
-		return deferRoute{routed: true, companion: id}
+		return waitOnCompanion(opts, committed, id, in.Cycle, stderr)
 	default:
 		fmt.Fprintf(stderr, "[cycleoutcome] WARN: defer route: fix_type %q has no route; the items are released\n", d.FixType)
-		return deferRoute{}
+		return nil
 	}
 }
 
-func routeEachConsole(opts inboxmover.Options, ids []string, reason string, cycle int) bool {
-	routed := true
+func routeEachConsole(opts inboxmover.Options, ids []string, reason string, cycle int, stderr io.Writer) []string {
+	var routed []string
 	for _, id := range ids {
-		if _, err := inboxmover.RouteConsole(opts, id, reason, cycle); err != nil {
-			routed = false
+		if _, err := consoleRoute(opts, id, reason, cycle); err != nil {
+			fmt.Fprintf(stderr, "[cycleoutcome] WARN: defer route: %s was not routed to the console (%v); it is released with a failure bump\n", id, err)
+			continue
 		}
+		routed = append(routed, id)
 	}
 	return routed
 }
@@ -72,7 +71,7 @@ func fileCompanion(opts inboxmover.Options, cycle int, reason string, waiting []
 		"summary":        reason + ". The items " + strings.Join(waiting, ", ") + " wait on this item.",
 		"fix":            "Read the failure-decision.json and the retrospective of cycle " + strconv.Itoa(cycle) + ", repair the pipeline, then consume this item so the waiting items can run.",
 		"acceptance":     []string{"The defect that the retrospective of cycle " + strconv.Itoa(cycle) + " classified is repaired, and a test pins the repair"},
-		"route":          lifecycle.RouteConsoleValue,
+		"route":          inboxmover.RouteConsoleValue,
 		"priority_class": "stability",
 		"weight":         companionWeight,
 	})
@@ -83,15 +82,23 @@ func fileCompanion(opts inboxmover.Options, cycle int, reason string, waiting []
 	return id, err
 }
 
-func waitOnCompanion(opts inboxmover.Options, ids []string, companion string) error {
-	var errs []error
+func waitOnCompanion(opts inboxmover.Options, ids []string, companion string, cycle int, stderr io.Writer) []string {
+	var waiting []string
 	for _, id := range ids {
-		if slices.Contains(inboxmover.ResolveDispatchState(opts, id).Deps, companion) {
+		if hasDep(opts, id, companion) {
+			waiting = append(waiting, id)
 			continue
 		}
-		if _, err := depsEdit(opts, id, []inboxmover.FieldEdit{{Op: inboxmover.EditAdd, Field: "deps", Value: companion}}); err != nil {
-			errs = append(errs, fmt.Errorf("add deps %s to %s: %w", companion, id, err))
+		if _, err := depsEdit(opts, id, cycle, []inboxmover.FieldEdit{{Op: inboxmover.EditAdd, Field: "deps", Value: companion}}); err != nil {
+			fmt.Fprintf(stderr, "[cycleoutcome] WARN: defer route: %s did not gain deps %s (%v); it is released with a failure bump\n", id, companion, err)
+			continue
 		}
+		waiting = append(waiting, id)
 	}
-	return errors.Join(errs...)
+	return waiting
+}
+
+func hasDep(opts inboxmover.Options, id, dep string) bool {
+	item, _, err := inboxbatch.LoadFile(inboxmover.ResolveDispatchState(opts, id).Path)
+	return err == nil && slices.Contains(item.Deps, dep)
 }

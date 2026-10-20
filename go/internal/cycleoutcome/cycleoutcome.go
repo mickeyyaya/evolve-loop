@@ -38,6 +38,7 @@ type FailureInputs struct {
 	Ledger          inboxmover.LedgerAppender
 	Signals         *signalcenter.Center
 	Deferred        bool
+	FailurePolicy   policy.SystemFailurePolicy
 	PriorityClasses []string
 }
 
@@ -68,10 +69,9 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		PriorityClasses: in.PriorityClasses,
 	}
 	routed := routeRefusal(opts, in, committed, stderr)
-	var deferral deferRoute
+	var routedIDs []string
 	if !routed {
-		deferral = routeDeferral(opts, in, committed, stderr)
-		routed = deferral.routed
+		routedIDs = routeDeferral(opts, in, committed, stderr)
 	}
 	res, err := inboxmover.ApplyCycleOutcome(opts, inboxmover.CycleOutcome{
 		Cycle:        in.Cycle,
@@ -81,16 +81,12 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		Ceiling:      in.Ceiling,
 		SystemLevel:  in.SystemLevel,
 		Routed:       routed,
+		RoutedIDs:    routedIDs,
 		FailureClass: string(in.FailureClass),
 		Fingerprint:  in.Fingerprint,
 	})
 	if err != nil {
 		return res, fmt.Errorf("apply cycle %d failure outcome: %w", in.Cycle, err)
-	}
-	if deferral.companion != "" {
-		if err := waitOnCompanion(opts, committed, deferral.companion); err != nil {
-			return res, fmt.Errorf("apply cycle %d defer route: %w", in.Cycle, err)
-		}
 	}
 	return res, nil
 }
@@ -142,6 +138,7 @@ func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stder
 		Fingerprint:     retryladder.Fingerprint(firstFailureReason(workspace)),
 		Stderr:          stderr,
 		PriorityClasses: pol.InboxPriorityConfig().ClassOrder,
+		FailurePolicy:   failPol,
 	}
 	if cls.Class == cycleclassify.ClassPhaseRefusal {
 		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject

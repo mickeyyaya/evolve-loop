@@ -48,3 +48,19 @@ func TestCloseoutCycleOutcome_AReintentDeferEndRoutesTheItemToTheConsole(t *test
 		})
 	}
 }
+
+func TestApplyResultFailureOutcome_ACycleZeroResultTouchesNoInbox(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	evolveDir, _ := seedFailedCycleInbox(t, root, "lane-item", 7)
+	fake := newFakeLedger()
+
+	err := applyResultFailureOutcome(core.CycleResult{FinalVerdict: cyclestate.VerdictFAIL}, root, evolveDir, io.Discard, fake, nil)
+
+	if err != nil || len(fake.lifecycle) != 0 {
+		t.Errorf("err = %v, lifecycle lines %v; want no closeout for a result with no cycle", err, fake.lifecycle)
+	}
+	if _, ferr := inboxmover.FindFileByTaskID(filepath.Join(evolveDir, "inbox"), "lane-item"); ferr != nil {
+		t.Errorf("the item left the inbox root: %v", ferr)
+	}
+}
