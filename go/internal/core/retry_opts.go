@@ -94,7 +94,7 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 	for attempt := 1; ; attempt++ {
 		req = cr.countDispatch(phase, req)
 		obsCancel := cr.o.observer.Start(cr.ctx, string(phase), req)
-		resp, err = runner.Run(cr.ctx, req)
+		resp, err = cr.o.runPhase(cr.ctx, phase, runner, req)
 		if obsCancel != nil {
 			obsCancel()
 		}

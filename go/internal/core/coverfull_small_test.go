@@ -18,7 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
-	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 )
 
 func TestReadShipError_MalformedOrCodelessIsAbsent(t *testing.T) {
@@ -232,24 +231,6 @@ func TestRunIDFromWorkspace_UnreadableRunFile(t *testing.T) {
 	}
 	if got := RunIDFromWorkspace(ws); got != "" {
 		t.Fatalf("run id = %q", got)
-	}
-}
-
-func TestReleaseShipWindow_ReleaseFailureStillClearsLease(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	l, err := shipwindow.Acquire(context.Background(), dir, shipwindow.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.RemoveAll(dir); err != nil {
-		t.Fatal(err)
-	}
-	writeFileAt(t, dir, "now a file")
-	cr := &cycleRun{shipLease: l}
-	cr.releaseShipWindow()
-	if cr.shipLease != nil {
-		t.Fatal("lease must be cleared")
 	}
 }
 

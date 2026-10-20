@@ -293,6 +293,7 @@ func resumeLanding(ctx context.Context, opts *Options, res *RunResult) (bool, er
 	if in.Branch, err = currentBranch(ctx, opts); err != nil || in.Branch == "" {
 		return false, err
 	}
+	defer enterShipWindow(ctx, opts, res)()
 	release, err := opts.acquireShipLock()
 	if err != nil {
 		return false, shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
