@@ -1,6 +1,9 @@
 package ipcenv
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 const namespace = "EVOLVE_"
 
@@ -13,4 +16,8 @@ func Scrub(environ []string) []string {
 		out = append(out, kv)
 	}
 	return out
+}
+
+func GoTestEnv(extra ...string) []string {
+	return append(Scrub(os.Environ()), extra...)
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -48,7 +49,7 @@ func GoTests(tb TB, spec GoTestSpec) bool {
 			defer cancel()
 		}
 	}
-	out, stderr, code, err := sysexec.Capture(ctx, sysexec.DefaultRunner, spec.Dir, "go", args...)
+	out, stderr, code, err := sysexec.Capture(ctx, sysexec.WithEnv(sysexec.DefaultRunner, ipcenv.GoTestEnv()), spec.Dir, "go", args...)
 	if err != nil || code != 0 {
 		tb.Errorf("go %v exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s", args, code, err, out, stderr)
 		return false

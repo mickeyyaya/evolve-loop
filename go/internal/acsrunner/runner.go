@@ -150,11 +150,11 @@ func (v Verdict) hasPredicateRed() bool {
 	return false
 }
 
-type runCommander func(ctx context.Context, args ...string) (stdout io.ReadCloser, wait func() error, err error)
+type runCommander func(ctx context.Context, env []string, args ...string) (stdout io.ReadCloser, wait func() error, err error)
 
-var execCommand runCommander = func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
+var execCommand runCommander = func(ctx context.Context, env []string, args ...string) (io.ReadCloser, func() error, error) {
 	cmd := sysexec.Command(ctx, args[0], args[1:]...)
-	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
+	cmd.Env = env
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -174,7 +174,7 @@ func withCommander(c runCommander, fn func()) {
 }
 
 func Run(ctx context.Context, cycle int, pkg string) (Verdict, error) {
-	stdout, wait, err := execCommand(ctx, append([]string{"go"}, lanebudget.Args([]string{"test", "-json", "-count=1", pkg})...)...)
+	stdout, wait, err := execCommand(ctx, lanebudget.Env(ipcenv.GoTestEnv()), append([]string{"go"}, lanebudget.Args([]string{"test", "-json", "-count=1", pkg})...)...)
 	if err != nil {
 		return Verdict{}, fmt.Errorf("acsrunner: %w", err)
 	}

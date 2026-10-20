@@ -34,6 +34,7 @@ func Packages() []string {
 		"./internal/fleet/...",
 		"./internal/evalqualitycheck/...",
 		"./internal/inboxrank/...",
+		"./internal/ipcenv/...",
 	}
 }
 

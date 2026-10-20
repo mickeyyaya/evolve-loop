@@ -281,7 +281,7 @@ type closingReader struct{ *strings.Reader }
 func (c *closingReader) Close() error { return nil }
 
 func TestRun_CommanderStartError(t *testing.T) {
-	withCommander(func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
+	withCommander(func(ctx context.Context, _ []string, args ...string) (io.ReadCloser, func() error, error) {
 		return nil, nil, errors.New("forced start fail")
 	}, func() {
 		_, err := Run(context.Background(), 1, "./...")
@@ -322,7 +322,7 @@ func TestRun_ParseErrorPropagates(t *testing.T) {
 	for i := range big {
 		big[i] = 'x'
 	}
-	withCommander(func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
+	withCommander(func(ctx context.Context, _ []string, args ...string) (io.ReadCloser, func() error, error) {
 		return &scanErrReader{b: big}, func() error { return nil }, nil
 	}, func() {
 		_, err := Run(context.Background(), 0, "./...")
@@ -333,7 +333,7 @@ func TestRun_ParseErrorPropagates(t *testing.T) {
 }
 
 func TestRun_CommanderInjectsPassFail(t *testing.T) {
-	withCommander(func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
+	withCommander(func(ctx context.Context, _ []string, args ...string) (io.ReadCloser, func() error, error) {
 		body := `{"Action":"run","Package":"p","Test":"TestA"}
 {"Action":"pass","Package":"p","Test":"TestA","Elapsed":0.001}
 {"Action":"run","Package":"p","Test":"TestB"}

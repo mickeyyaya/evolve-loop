@@ -201,7 +201,7 @@ func runGoTestJSON(ctx context.Context, moduleDir string, log packLog, args []st
 	out := &lockedWriter{w: log.raw}
 	cmd := sysexec.Command(ctx, "go", args...)
 	cmd.Dir = moduleDir
-	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
+	cmd.Env = lanebudget.Env(ipcenv.GoTestEnv())
 	cancelKillsTheProcessGroup(cmd)
 	cmd.WaitDelay = packWaitDelay
 	stdout, err := stdoutPipe(cmd)

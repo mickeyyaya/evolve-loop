@@ -46,3 +46,22 @@ func TestCombinedOutput_AGivenStdinReachesTheCommand(t *testing.T) {
 		t.Errorf("CombinedOutput = %q, %v (stdin seen %q), want the stdin piped to the command and its reply returned", got, err, seen)
 	}
 }
+
+func TestWithEnv_TheWrappedRunnerReplacesTheCallersEnv(t *testing.T) {
+	t.Parallel()
+	var got []string
+	inner := func(_ context.Context, _, _ string, _, env []string, _ io.Reader, _, _ io.Writer) (int, error) {
+		got = env
+		return 0, nil
+	}
+	run := sysexec.WithEnv(inner, []string{"A=1"})
+
+	code, err := run(context.Background(), "go", "", []string{"test"}, []string{"B=2"}, nil, nil, nil)
+
+	if err != nil || code != 0 {
+		t.Fatalf("run = %d, %v", code, err)
+	}
+	if len(got) != 1 || got[0] != "A=1" {
+		t.Errorf("inner env = %q, want only the pinned A=1", got)
+	}
+}

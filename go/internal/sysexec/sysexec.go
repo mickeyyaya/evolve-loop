@@ -35,6 +35,12 @@ func DefaultRunner(ctx context.Context, name, dir string, args, env []string,
 	return 0, nil
 }
 
+func WithEnv(run RunFunc, env []string) RunFunc {
+	return func(ctx context.Context, name, dir string, args, _ []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+		return run(ctx, name, dir, args, env, stdin, stdout, stderr)
+	}
+}
+
 func Capture(ctx context.Context, run RunFunc, dir, name string, args ...string) (stdout, stderr string, exitCode int, err error) {
 	var o, e strings.Builder
 	code, runErr := run(ctx, name, dir, args, nil, nil, &o, &e)

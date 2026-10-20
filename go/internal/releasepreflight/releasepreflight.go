@@ -192,7 +192,7 @@ func defaultNameGuard(repoRoot string) ([]naminguard.Violation, error) {
 func goTestCommand(repoRoot string, args ...string) *exec.Cmd {
 	cmd := sysexec.Command(context.Background(), defaultGoBinFn(), append([]string{"test"}, args...)...)
 	cmd.Dir = filepath.Join(repoRoot, "go")
-	cmd.Env = ipcenv.Scrub(os.Environ())
+	cmd.Env = ipcenv.GoTestEnv()
 	return cmd
 }
 

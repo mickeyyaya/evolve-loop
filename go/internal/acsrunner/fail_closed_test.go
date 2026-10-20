@@ -5,8 +5,8 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -47,7 +47,7 @@ func TestNoPredicates_BothVerdictWritersNameTheSameHarnessRed(t *testing.T) {
 }
 
 func TestRun_AnExitNoPredicateExplainsIsARunnerErrorBesideTheHarnessRed(t *testing.T) {
-	withCommander(func(context.Context, ...string) (io.ReadCloser, func() error, error) {
+	withCommander(func(context.Context, []string, ...string) (io.ReadCloser, func() error, error) {
 		return &closingReader{strings.NewReader("")}, func() error { return errors.New("exit status 1") }, nil
 	}, func() {
 		v, err := Run(context.Background(), 9, "./acs/cycle9")
@@ -71,29 +71,24 @@ func TestWriteVerdict_RefusesARelativeEvolveDir(t *testing.T) {
 	}
 }
 
-func TestExecCommand_ScrubsTheLaneIPCEnvironment(t *testing.T) {
-	if _, err := exec.LookPath("env"); err != nil {
-		t.Skip("env is not on PATH")
-	}
+func TestRun_ScrubsTheLaneIPCEnvironment(t *testing.T) {
 	t.Setenv(ipcenv.FleetKey, "1")
 	t.Setenv(ipcenv.CycleStateFileKey, "/plane/.evolve/runs/cycle-1700/cycle-state.json")
-	stdout, wait, err := execCommand(context.Background(), "env")
-	if err != nil {
-		t.Fatal(err)
-	}
-	out, readErr := io.ReadAll(stdout)
-	if err := wait(); err != nil {
-		t.Fatal(err)
-	}
-	if readErr != nil {
-		t.Fatal(readErr)
-	}
-	for _, key := range []string{ipcenv.FleetKey, ipcenv.CycleStateFileKey} {
-		if strings.Contains(string(out), key+"=") {
-			t.Errorf("%s reached the predicate process; a lane's IPC state must not flip env-sensitive predicates", key)
+	t.Setenv("PATH", "/usr/bin:/bin")
+	var env []string
+	withCommander(func(_ context.Context, got []string, _ ...string) (io.ReadCloser, func() error, error) {
+		env = got
+		return &closingReader{strings.NewReader("")}, func() error { return nil }, nil
+	}, func() {
+		_, _ = Run(context.Background(), 1, "./acs/cycle1")
+	})
+
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "EVOLVE_") {
+			t.Errorf("%s reached the predicate process; a lane's IPC state must not flip env-sensitive predicates", kv)
 		}
 	}
-	if !strings.Contains(string(out), "PATH=") {
+	if !slices.Contains(env, "PATH=/usr/bin:/bin") {
 		t.Error("the toolchain environment (PATH) must survive the scrub")
 	}
 }

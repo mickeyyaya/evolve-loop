@@ -204,7 +204,7 @@ func listACSPredicates(ctx context.Context, worktree string, cycle int) acsPredi
 	defer cancel()
 	cmd := sysexec.Command(ctx, "go", lanebudget.Args([]string{"test", "-list", ".", "-tags", "acs", pkg})...)
 	cmd.Dir = moduleDir
-	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
+	cmd.Env = lanebudget.Env(ipcenv.GoTestEnv())
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		tail := strings.TrimSpace(string(out))

@@ -39,3 +39,19 @@ func TestScrub_CoversEveryIPCKey(t *testing.T) {
 		}
 	}
 }
+
+func TestGoTestEnv_DropsAmbientEvolveKeysAndAppendsTheExtrasLast(t *testing.T) {
+	t.Setenv(ipcenv.FleetKey, "1")
+	t.Setenv("PATH", "/usr/bin:/bin")
+
+	env := ipcenv.GoTestEnv("CHANGED_PACKAGES=./internal/x")
+
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "EVOLVE_") {
+			t.Errorf("GoTestEnv kept %q", kv)
+		}
+	}
+	if n := len(env); n == 0 || env[n-1] != "CHANGED_PACKAGES=./internal/x" {
+		t.Errorf("GoTestEnv tail = %q, want the extra last", env)
+	}
+}

@@ -3,7 +3,6 @@ package acsrunner
 import (
 	"context"
 	"io"
-	"os/exec"
 	"runtime"
 	"slices"
 	"strconv"
@@ -18,7 +17,7 @@ func TestRun_ALaneGoTestCarriesTheLaneCPUBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "4")
 	procs := strconv.Itoa(lanebudget.Procs(runtime.NumCPU(), 4))
 	var seen []string
-	withCommander(func(_ context.Context, args ...string) (io.ReadCloser, func() error, error) {
+	withCommander(func(_ context.Context, _ []string, args ...string) (io.ReadCloser, func() error, error) {
 		seen = args
 		return &closingReader{strings.NewReader("")}, func() error { return nil }, nil
 	}, func() {
@@ -31,21 +30,18 @@ func TestRun_ALaneGoTestCarriesTheLaneCPUBudget(t *testing.T) {
 	}
 }
 
-func TestExecCommand_ALaneChildGetsGOMAXPROCS(t *testing.T) {
-	if _, err := exec.LookPath("env"); err != nil {
-		t.Skip("env is not on PATH")
-	}
+func TestRun_ALaneChildGetsGOMAXPROCSAndNoLaneKey(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "4")
-	stdout, wait, err := execCommand(context.Background(), "env")
-	if err != nil {
-		t.Fatal(err)
-	}
-	out, readErr := io.ReadAll(stdout)
-	if err := wait(); err != nil || readErr != nil {
-		t.Fatal(err, readErr)
-	}
-	want := "GOMAXPROCS=" + strconv.Itoa(lanebudget.Procs(runtime.NumCPU(), 4)) + "\n"
-	if !strings.Contains(string(out), want) || strings.Contains(string(out), ipcenv.FleetWidthKey+"=") {
-		t.Errorf("child env = %q, want %q and no lane key", out, want)
+	var env []string
+	withCommander(func(_ context.Context, got []string, _ ...string) (io.ReadCloser, func() error, error) {
+		env = got
+		return &closingReader{strings.NewReader("")}, func() error { return nil }, nil
+	}, func() {
+		_, _ = Run(context.Background(), 1, "./acs/cycle1")
+	})
+
+	want := "GOMAXPROCS=" + strconv.Itoa(lanebudget.Procs(runtime.NumCPU(), 4))
+	if !slices.Contains(env, want) || slices.ContainsFunc(env, func(kv string) bool { return strings.HasPrefix(kv, ipcenv.FleetWidthKey+"=") }) {
+		t.Errorf("child env lacks %q or carries a lane key: %q", want, env)
 	}
 }
