@@ -393,3 +393,11 @@ approaches / decision / results / retro) — lives at
 | Document | What it records |
 |---|---|
 | [research/docs-review-skill-2026-10.md](research/docs-review-skill-2026-10.md) | Research: the commit gate asked a docs-only change for code reviewers. It surveys docs review practice (Diátaxis quality, ADR review, docs-as-code checks). Three approaches are scored. A `docs-review` skill and gate capability win. Findings F2.1 to F2.4, M1 to M7, decisions D1 to D5. |
+
+## 2026-10-20 — docs, inbox and CI PRs merge in a window; code merges at a boundary (ADR-0148)
+
+| Document | What it records |
+|---|---|
+| [plans/pr-merge-latency-2026-10.md](plans/pr-merge-latency-2026-10.md) | Plan: the merge wait of PRs #979 to #1005, four designs with weighted scores, and components P1 to P5. The window stays off until P1 lands. |
+| [architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md](architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md) | Decision (Accepted): a window PR merges when green, also in a wave. A code PR merges at a boundary, and the console can call one early. |
+| [architecture/packages/internal-mergewindow.md](architecture/packages/internal-mergewindow.md) | Package note: the merge window rule reads the CI routing table of `required.yml`. |

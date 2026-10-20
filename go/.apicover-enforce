@@ -800,3 +800,5 @@
 ./cmd/hostsampler
 # lanetime - the report of where the time of a wave goes (plan wave-latency-2026-10, W0).
 ./internal/lanetime
+# mergewindow - the merge window rule of evolve pr window, read from the routing table of required.yml (plan pr-merge-latency-2026-10, P2).
+./internal/mergewindow

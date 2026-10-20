@@ -1,6 +1,7 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestPRWindow_AnUnreadableWorkingDirectoryExitsTwo":                                                "sets env through a helper",
 	"main.TestWireRoutingPlanAdvisor_RefusesAProjectWhoseRoutingTableDoesNotCompile":                        "swaps the bridge model catalog dir",
 	"main.TestWireRoutingPlanAdvisor_WiresAnAdvisorForAProjectRoot":                                         "swaps the bridge model catalog dir",
 	"main.TestRoutingPlan_AdvisorLaunchFailureExitsTwoWithTheCause":                                         "swaps seam routingPlanAdvisor",
