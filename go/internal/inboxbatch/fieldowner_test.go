@@ -160,3 +160,11 @@ func TestStampFieldConstants_SpellTheKeysTheInboxHolds(t *testing.T) {
 		}
 	}
 }
+
+func TestFieldRole_IsGrowOnlyNamesOnlyTheProvenProtectedFiles(t *testing.T) {
+	for key, want := range map[string]bool{"protected_files": true, "files": false, "failure_count": false, "route": false} {
+		if got := inboxbatch.RoleOf(key).IsGrowOnly(); got != want {
+			t.Errorf("RoleOf(%q).IsGrowOnly() = %v, want %v", key, got, want)
+		}
+	}
+}

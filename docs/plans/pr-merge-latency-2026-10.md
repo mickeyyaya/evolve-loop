@@ -138,7 +138,7 @@ On 2026-10-20 the failure closeout of cycle 2000 routed `router-active-worktree-
 
 | Id | Decision | Because | Rejected options and why |
 |---|---|---|---|
-| D8 | The loop writes no curated field. The closeout writes each proven file to the new loop stamp `protected_files`. `inboxbatch.ConsoleRouted` reads `files` and `protected_files` together, so the proven path still binds the console route. | The binding is the only reason for the write (`protectedDerivation`). A stamp keeps it, and `sync-main` lands a stamp with no review. | A verb that lands a curated change through a review: it adds a review to each such boundary. The review checks a value that the loop proved. |
+| D8 | The loop writes no curated field. The closeout writes each proven file to the new loop stamp `protected_files`. `inboxbatch.ConsoleRouted` reads `files` and `protected_files` together, so the proven path still binds the console route. | The binding is the only reason for the write (`protectedDerivation`). A stamp keeps it, and `sync-main` lands a stamp with no review. The stamp only grows: `sync-main` refuses a removal of a proven path. | A verb that lands a curated change through a review: it adds a review to each such boundary. The review checks a value that the loop proved. |
 
 The test replays the write. It runs the closeout and commits the item as it was before the cycle. Then it puts the written copy on the item. `inboxstamps.Classify` must see one stamp and no other change. Before P5 the same test saw the item as other dirt, which is the refusal of cycle 2000.
 

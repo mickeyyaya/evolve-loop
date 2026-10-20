@@ -332,6 +332,9 @@ func sanitizeItem(it *Item) fieldRewrites {
 	for i := range it.Files {
 		it.Files[i] = r.clean("files", it.Files[i], maxFieldLen)
 	}
+	for i := range it.ProtectedFiles {
+		it.ProtectedFiles[i] = r.clean(ProtectedFilesField, it.ProtectedFiles[i], maxFieldLen)
+	}
 	for i := range it.Acceptance {
 		it.Acceptance[i] = r.clean("acceptance", it.Acceptance[i], maxAcceptanceLen)
 	}
@@ -341,6 +344,7 @@ func sanitizeItem(it *Item) fieldRewrites {
 func SanitizedFields(it Item) []string {
 	probe := it
 	probe.Files = slices.Clone(it.Files)
+	probe.ProtectedFiles = slices.Clone(it.ProtectedFiles)
 	probe.Acceptance = slices.Clone(it.Acceptance)
 	return sanitizeItem(&probe).changed
 }
