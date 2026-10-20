@@ -22,6 +22,7 @@ Each PR merges only at a wave boundary. Most PRs are green long before the bound
 5. The policy key `pr.merge_window.stage` is `off` by default. At `off`, each PR is a boundary PR.
 6. Below `fleet.integration.stage: enforce` (ADR-0147, plan D15) each PR is a boundary PR, at each value of `pr.merge_window.stage`.
 7. The console calls an early boundary when a green boundary PR waits and the pool runs below its window.
+   - Clarified on 2026-10-20 by the operator: "Combine them to fleet count". The window of the pool is `fleet.count`, so the pool runs below its window when the live lanes are fewer than `fleet.count` ([plan](../../plans/pr-merge-latency-2026-10.md#10-open-questions) Q3).
 
 ## Consequences
 

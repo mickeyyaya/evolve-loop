@@ -101,7 +101,7 @@ To classify a PR, run `evolve pr window <n>`. Add `--json` for the envelope `{pr
 
 | Exit | Verdict | Next action |
 |---|---|---|
-| 0 | `window` | After P2b, merge the green PR with `evolve pr merge <n>`. Before P2b, merge it at the boundary. Do not use `gh pr merge`. |
+| 0 | `window` | Merge the green PR with `evolve pr merge <n>`, also while a loop runs. Do not use `gh pr merge`. |
 | 3 | `boundary` | Merge the PR at the next boundary. Below integration `enforce`, the reason is `merge windows wait for fleet.integration.stage enforce (ADR-0147)`. At integration `enforce` and stage `off`, it is `pr.merge_window.stage is off`. The field `rule` shows the class of the paths. |
 | 2 | — | A read or a parse failed (policy, `required.yml`, the file list, `gh`). A routing line in `required.yml` that the rule does not model also exits 2. Fix the named cause. |
 | 10 | — | A usage error. |
@@ -110,13 +110,27 @@ The path classes come from the CI router of `.github/workflows/required.yml`. A 
 
 ### The on-demand boundary
 
-Call an early boundary when a green boundary PR waits and the pool runs below its window:
+Call an early boundary when a green boundary PR waits longer than the policy bound and the pool runs below its width:
 
-1. Run `evolve wave status` and read the width of the pool.
-2. Run `evolve loop-stop --wait`. The lanes in flight finish, and the loop stops.
+1. Run `evolve pr boundary`. It prints one line that names the green boundary PR that waited longest, its wait, the bound and the pool.
+2. If it exits 0, run `evolve loop-stop --wait`. The lanes in flight finish, and the loop stops.
 3. Run `evolve wave next --merge <n,...>`.
 
-Until P2b gives a policy bound, call it when a green code PR has waited 1 h (plan Q2).
+The bound is `pr.merge_window.early_boundary_after_s` (compiled default 3600, plan Q2). The pool width is `fleet.count`, and the live lanes come from the pool signal of the live wave. The operator decided this on 2026-10-20: "Combine them to fleet count". The width is not `fleet.min_lanes`.
+
+```
+$ evolve pr boundary
+early boundary: #1012 waited 1h35m0s (bound 1h0m0s); pool 2/4 lanes: run evolve loop-stop --wait, then evolve wave next --merge 1012
+```
+
+| Exit | Meaning |
+|---|---|
+| 0 | Call the early boundary now. |
+| 3 | No early boundary: no loop runs, no green boundary PR waits past the bound, or the pool is full. |
+| 2 | A read failed: the policy, `gh`, `required.yml` or the pool signal of the live wave. |
+| 10 | A usage error. |
+
+`evolve pr merge` also merges a window PR while a loop runs, but only at stage `on` and integration `enforce`. A boundary PR keeps the refusal `a loop is running`, with the reason of `evolve pr window` added. Below that gate, `evolve pr merge` refuses each PR while a loop runs, as before.
 
 ## 6. Other cases
 
