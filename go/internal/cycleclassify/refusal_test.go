@@ -2,6 +2,7 @@ package cycleclassify
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -170,15 +171,21 @@ func TestClassify_TheRejectedBuildsOwnFailSentinelStillWins(t *testing.T) {
 	}
 }
 
+func infraEnvelope(phase, marker, excerpt string) string {
+	return fmt.Sprintf(`{"schema_version":"2.0","source":{"producer":"normalizer","cli":"claude-tmux","phase":%q,"agent":%q},"kind":"infra_failure","severity":"INCIDENT","data":{"excerpt":%q,"marker":%q,"source":"stdout"}}`+"\n", phase, phase, excerpt, marker)
+}
+
+const zshCompinitExcerpt = "⎿  compinit:527: operation not permitted: /opt/homebrew/share/zsh/site-functions/_docker-compose"
+
 func TestClassify_ABuildRejectedBecauseOfInfrastructureStaysInfrastructure(t *testing.T) {
 	for name, tc := range map[string]struct {
 		file, body, source string
 	}{
-		"a rate limit":   {"orchestrator-report.md", "build: HTTP 429 Too Many Requests\n", "orchestrator-report.md"},
-		"a 529":          {"orchestrator-report.md", "build: 529 Overloaded\n", "orchestrator-report.md"},
-		"sandbox EPERM":  {"orchestrator-report.md", "sandbox-exec: Operation not permitted\n", "orchestrator-report.md"},
-		"an infra event": {"builder-events.ndjson", `{"kind":"infra_failure","excerpt":"ETIMEDOUT"}` + "\n", "builder-events.ndjson"},
-		"empty output":   {"builder-stdout.log", "", "builder-stdout.log"},
+		"a rate limit":                   {"build-events.ndjson", infraEnvelope("build", "api_429", "HTTP 429 Too Many Requests"), "build-events.ndjson"},
+		"a 529":                          {"build-events.ndjson", infraEnvelope("build", "api_529", "API Error 529 Overloaded"), "build-events.ndjson"},
+		"sandbox EPERM":                  {"build-events.ndjson", infraEnvelope("build", "eperm", "sandbox-exec: sandbox_apply: Operation not permitted"), "build-events.ndjson"},
+		"a 529 beside the compinit line": {"build-events.ndjson", infraEnvelope("build", "eperm", zshCompinitExcerpt+"\nAPI Error 529 Overloaded"), "build-events.ndjson"},
+		"empty output":                   {"build-stdout.log", "", "build-stdout.log"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ws := t.TempDir()
@@ -186,9 +193,23 @@ func TestClassify_ABuildRejectedBecauseOfInfrastructureStaysInfrastructure(t *te
 			writeFile(t, ws, tc.file, tc.body)
 
 			if r := Classify(ws); r.Class != ClassInfrastructure || r.Source != tc.source {
-				t.Fatalf("Classify = %+v, want infrastructure from %s; infrastructure evidence explains the rejection, so the item is not charged", r, tc.source)
+				t.Fatalf("Classify = %+v, want infrastructure from %s; the build's own dispatch hit infrastructure, so the item is not charged", r, tc.source)
 			}
 		})
+	}
+}
+
+func TestClassify_ARejectedBuildIsChargedDespiteTheZshCompinitLineAndOtherPhasesInfra(t *testing.T) {
+	ws := t.TempDir()
+	writePhaseTiming(t, ws, rejectedBuildBeforeTheRetro(cyclestate.DiagCodeBuildRejected, "PASS"))
+	writeFile(t, ws, "build-events.ndjson", infraEnvelope("build", "eperm", zshCompinitExcerpt)+infraEnvelope("build", "eperm", "[acs] WARN: verification single-flight unavailable (verifylock: open /x/.repo.git/evolve-verify.lock: operation not permitted)"))
+	writeFile(t, ws, "build-stdout.log", "the builder worked\n")
+	writeFile(t, ws, "tdd-events.ndjson", infraEnvelope("tdd", "eperm", zshCompinitExcerpt)+infraEnvelope("tdd", "api_529", "API Error 529 Overloaded"))
+	writeFile(t, ws, "scout-stdout.log", "")
+	writeFile(t, ws, "orchestrator-report.md", "scout: HTTP 429 Too Many Requests, retried\n")
+
+	if r := Classify(ws); r.Class != ClassPhaseRefusal || r.Marker != cyclestate.DiagCodeBuildRejected {
+		t.Fatalf("Classify = %+v; every pane prints the compinit line, and infra in another phase did not reject this build, so the item is charged", r)
 	}
 }
 
@@ -207,5 +228,16 @@ func writeFile(t *testing.T, dir, name, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFirstInfraMarker_SkipsAMalformedLineAndANestedKind(t *testing.T) {
+	ws := t.TempDir()
+	writeFile(t, ws, "build-events.ndjson", `{"kind":"infra_failure",`+"\n"+
+		`{"kind":"progress","data":{"inner":{"kind":"infra_failure"}}}`+"\n"+
+		infraEnvelope("build", "api_529", "API Error 529 Overloaded"))
+
+	if marker, ok := firstInfraMarker(ws, filepath.Join(ws, "build-events.ndjson")); !ok || marker != "api_529" {
+		t.Fatalf("firstInfraMarker = %q, %v; a broken line and a nested kind are not events, the 529 envelope is", marker, ok)
 	}
 }

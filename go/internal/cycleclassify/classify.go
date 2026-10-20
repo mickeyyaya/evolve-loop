@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
@@ -72,7 +73,7 @@ func Classify(workspace string) Result {
 		return cls
 	}
 	if recordOK && disposition.YieldsToInfra {
-		if infra, ok := infraEvidence(workspace, reportData); ok {
+		if infra, ok := buildInfraEvidence(workspace); ok {
 			return infra
 		}
 	}
@@ -113,12 +114,14 @@ func infraMarker(workspace string, reportData []byte) (Result, bool) {
 	return Result{}, false
 }
 
-func infraEvidence(workspace string, reportData []byte) (Result, bool) {
-	if infra, ok := infraMarker(workspace, reportData); ok {
-		return infra, true
+func buildInfraEvidence(workspace string) (Result, bool) {
+	phase := string(cyclestate.PhaseBuild)
+	events := filepath.Join(workspace, phase+"-events.ndjson")
+	if marker, ok := firstInfraMarker(workspace, events); ok {
+		return Result{Class: ClassInfrastructure, Marker: marker, Source: filepath.Base(events)}, true
 	}
-	if src, ok := detectEmptyOutputSession(workspace); ok {
-		return Result{Class: ClassInfrastructure, Marker: MarkerQuotaLikelyEmptyOutput, Source: src}, true
+	if stdout := filepath.Join(workspace, phase+"-stdout.log"); emptySession(workspace, stdout) {
+		return Result{Class: ClassInfrastructure, Marker: MarkerQuotaLikelyEmptyOutput, Source: filepath.Base(stdout)}, true
 	}
 	return Result{}, false
 }
@@ -162,20 +165,20 @@ func detectEmptyOutputSession(workspace string) (source string, ok bool) {
 	}
 	sort.Strings(logs)
 	for _, logPath := range logs {
-		data, readErr := os.ReadFile(logPath)
-		if readErr != nil {
-			continue
+		if emptySession(workspace, logPath) {
+			return filepath.Base(logPath), true
 		}
-		if len(bytes.TrimSpace(data)) != 0 {
-			continue
-		}
-		agent := strings.TrimSuffix(filepath.Base(logPath), "-stdout.log")
-		if hasAssistantEvents(filepath.Join(workspace, agent+"-events.ndjson")) {
-			continue
-		}
-		return filepath.Base(logPath), true
 	}
 	return "", false
+}
+
+func emptySession(workspace, logPath string) bool {
+	data, err := os.ReadFile(logPath)
+	if err != nil || len(bytes.TrimSpace(data)) != 0 {
+		return false
+	}
+	agent := strings.TrimSuffix(filepath.Base(logPath), "-stdout.log")
+	return !hasAssistantEvents(filepath.Join(workspace, agent+"-events.ndjson"))
 }
 
 func hasAssistantEvents(eventsPath string) bool {
@@ -331,10 +334,14 @@ func firstInfraMarker(workspace, logPath string) (marker string, ok bool) {
 		if ev.Kind != "infra_failure" {
 			continue
 		}
-		if isPromptEchoSelfReport(workspace, ev.Source.Phase, ev.Data.Excerpt) {
+		marker := ev.Data.Marker
+		if ev.Data.Excerpt != "" {
+			marker = phasestream.InfraMarker(ev.Data.Excerpt)
+		}
+		if marker == "" || isPromptEchoSelfReport(workspace, ev.Source.Phase, ev.Data.Excerpt) {
 			continue
 		}
-		return ev.Data.Marker, true
+		return marker, true
 	}
 	if err := scanner.Err(); err != nil {
 		return "", false
