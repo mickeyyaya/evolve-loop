@@ -258,14 +258,15 @@ The decision:
 | D1 | The build's system class never halts and never sets the floor candidate. | Halt on the class: one agent-written line stops the batch. |
 | D2 | The class counts only with orchestrator corroboration. At least one repair round ran. The last two audits of the run bound the same worktree tree (the auditor ledger rows). | Trust the class alone: no evidence that the remedy round failed. |
 | D3 | A corroborated class declines further repair rounds. It defers the item with fix type `pipeline-repair`, so the item waits on a console `pipeline-repair-cycle-<N>` item (the route of `reintent-fix-type-routes-the-item`). | Retry until the budget is spent: cycle 1841 spent 2/2 rounds on a reading no rebuild moves. |
-| D4 | The defer inputs come from orchestrator memory for this cycle. The build's class comes from the ledger and the build report, not from `failure-dossier.json`. The host removes `failure-decision.json` before each retro. When the host cannot remove it, the orchestrator does not read it. The closeout gets the defer as a value on the cycle result. | Read the files back: any agent that can write the workspace can plant a read-only `failure-dossier.json` that claims a system class. |
+| D4 | The defer inputs are fresh for this cycle. The build's class comes from the ledger and the build report, not from `failure-dossier.json`. The host removes `failure-decision.json` before each retro, on the live path and on resume. When the host cannot remove it, the orchestrator does not read it. The closeout gets the defer as a value on the cycle result. | Read the files back: any agent that can write the workspace can plant a read-only `failure-dossier.json` that claims a system class. |
 
 The limits of D4:
 
 - The class itself still comes from `build-report.md`, which the build writes. D2 corroborates that the repair round did not move the tree. It does not prove the class.
-- The clear before the retro makes `failure-decision.json` fresh, not unforgeable. An agent that writes the workspace during the retro can still replace it.
+- The clear before the retro makes `failure-decision.json` fresh, not unforgeable. An agent that writes the workspace during the retro can still replace it. That file also feeds the retro floor (`applyFailureDecisionFloor`), which can halt the batch. Thus this limit can cost the batch, not one lane. Only `floorClaimRefutation` and the disposition check guard it.
+- The host does not clear `audit-report.md` before the first audit, so a report that is planted before round 0 is still a defer input. The item `planted-audit-report-before-the-first-audit` tracks this.
 
-The consequence: a false claim costs one lane and one console item, not the batch. A true pipeline defect still reaches the console. The halt paths of this ADR are unchanged: an incoherent verdict, an audit-declared floor class, and a retro floor claim that `floorClaimRefutation` does not refute.
+The consequence: a false build class costs one lane and one console item, not the batch. A true pipeline defect still reaches the console. The halt paths of this ADR are unchanged: an incoherent verdict, an audit-declared floor class, and a retro floor claim that `floorClaimRefutation` does not refute.
 
 ## Implementation slices (one campaign)
 

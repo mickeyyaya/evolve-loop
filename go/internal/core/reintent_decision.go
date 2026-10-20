@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -63,11 +64,14 @@ func DeferOf(result CycleResult) (RecordedDefer, bool) {
 	return d, d != RecordedDefer{}
 }
 
-func (cr *cycleRun) carryDefer(reason string) {
+func (o *Orchestrator) carryDefer(cs CycleState, reason string, result *CycleResult) {
 	if !strings.Contains(reason, auditDeferReasonPrefix) {
 		return
 	}
-	if d, ok := cr.o.auditDeclineDefers(cr.cs); ok {
-		cr.result.DeferCategory, cr.result.DeferFixType = d.category, d.fixType
+	d, ok := o.auditDeclineDefers(cs)
+	if !ok {
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d: the retro decision is a defer, but no defer decision resolves; the closeout releases the items\n", cs.CycleID)
+		return
 	}
+	result.DeferCategory, result.DeferFixType = d.category, d.fixType
 }

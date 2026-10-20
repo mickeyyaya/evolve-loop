@@ -129,6 +129,9 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		if next == PhaseAudit {
 			cs.AuditRepairActive = false
 		}
+		if next == PhaseRetro {
+			o.clearRetroDecisionInput(&cs)
+		}
 		phaseReq := PhaseRequest{
 			Cycle:                           cycle,
 			AuditRound:                      cs.AuditDispatches,
@@ -255,6 +258,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 				reason = gateErr.Error() + "; " + reason
 			}
 			result.RetroDecision = reason
+			o.carryDefer(cs, reason, &result)
 			if sysFail != nil && result.SystemFailure == nil {
 				result.SystemFailure = sysFail
 			}

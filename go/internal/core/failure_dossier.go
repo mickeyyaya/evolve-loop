@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -162,7 +163,7 @@ func writeFailureDossier(workspace string, d *failureDossier) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(workspace, failureDossierFile), b, 0o644)
+	return atomicwrite.Bytes(filepath.Join(workspace, failureDossierFile), b)
 }
 
 func (o *Orchestrator) writeDossier(cs CycleState, d *failureDossier) {
