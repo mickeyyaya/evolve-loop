@@ -1,0 +1,6 @@
+{"ts": "2026-10-19T10:00:00Z", "kind": "loop.wave", "code": "LOOP_ORCH_POOL_IDLE", "fields": {"live": "1", "target": "4"}}
+{"ts": "2026-10-19T10:10:00Z", "kind": "ledger.appended", "code": "OTHER"}
+{"ts": "2026-10-19T10:20:00Z", "kind": "loop.wave", "code": "LOOP_ORCH_SUPPLY", "fields": {"total": "9"}}
+{"ts": "2026-10-19T10:30:00Z", "kind": "loop.wave", "code": "LOOP_ORCH_POOL_IDLE", "fields": {"live": "3", "target": "4"}}
+{"ts": "2026-10-19T11:00:00Z", "kind": "loop.wave", "code": "LOOP_ORCH_POOL_IDLE", "fields": {"live": "2", "target": "4"}}
+{"ts": "2026-10-19T11:30:00Z", "kind": "loop.wave", "code": "LOOP_ORCH_POOL_IDLE", "fields": {"live": "0", "target": "4"}}

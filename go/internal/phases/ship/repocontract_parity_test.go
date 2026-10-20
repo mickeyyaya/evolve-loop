@@ -53,7 +53,7 @@ func shipRunsThePack(t *testing.T, root string) bool {
 func floorRunsThePack(t *testing.T, root string) bool {
 	t.Helper()
 	ran := false
-	pack := func(context.Context, string) ([]string, string, error) {
+	pack := func(context.Context, string, string) ([]string, string, error) {
 		ran = true
 		return nil, "", nil
 	}

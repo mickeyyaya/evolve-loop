@@ -622,3 +622,32 @@ func TestMakeIntegration_RoutesTestBinariesThroughTheRusageWrapperOnlyWhenAsked(
 		})
 	}
 }
+
+func TestMakeDarwinTargets_TestAndGateOnlyThePackagesOfTheDarwinSet(t *testing.T) {
+	t.Parallel()
+	root := makeFixture(t)
+	writeMakeFixture(t, root, "internal/mac/mac.go", "package mac\nfunc Value() int { return 1 }\n")
+	writeMakeFixture(t, root, "internal/mac/mac_test.go", "package mac\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 1 { t.Fatal(\"wrong value\") } }\n")
+	writeMakeFixture(t, root, "internal/other/other.go", "package other\nfunc Value() int { return 2 }\n")
+	writeMakeFixture(t, root, "internal/other/other_test.go", "package other\nimport \"testing\"\nfunc TestValue(t *testing.T) { t.Fatal(\"outside the darwin set\") }\n")
+	writeMakeFixture(t, root, ".cover-strict", "./internal/mac 100\n./internal/other 100\n")
+	writeMakeFixture(t, root, DarwinSetFile, "# header\n./internal/mac\n")
+	set := "DARWIN_SET=" + filepath.Join(root, DarwinSetFile)
+
+	requireMake(t, root, "test-integration-darwin")
+
+	profile, err := os.ReadFile(filepath.Join(root, "coverage.txt"))
+	if err != nil || !strings.Contains(string(profile), "gateprobe/internal/mac/") || strings.Contains(string(profile), "internal/other") {
+		t.Fatalf("coverage.txt = %q, %v; want the darwin-set package only", profile, err)
+	}
+	if out, err := runMakeFixture(t, root, "cover-strict-darwin", set); err != nil || !strings.Contains(out, "internal/mac: 100.0% >= 100.0% ok") || strings.Contains(out, "internal/other") {
+		t.Errorf("cover-strict-darwin: %v; want the darwin-set floor judged and no other:\n%s", err, out)
+	}
+	if out, err := runMakeFixture(t, root, "cover-strict"); err == nil || !strings.Contains(out, "internal/other: no statements") {
+		t.Errorf("cover-strict over a darwin-only profile: %v; want the other floor refused:\n%s", err, out)
+	}
+	writeMakeFixture(t, root, DarwinSetFile, "# no package\n")
+	if out, err := runMakeFixture(t, root, "test-integration-darwin"); err == nil || !strings.Contains(out, "names no package") {
+		t.Errorf("an empty darwin set: %v; want a refusal:\n%s", err, out)
+	}
+}

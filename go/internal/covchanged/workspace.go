@@ -16,9 +16,10 @@ import (
 var DefaultTags = []string{"integration"}
 
 type Options struct {
-	Base    string
-	Profile string
-	Tags    []string
+	Base     string
+	Profile  string
+	Tags     []string
+	Packages PackageSet
 }
 
 type Workspace struct {
@@ -77,7 +78,7 @@ func (w Workspace) sources(ctx context.Context, git gitexec.Git, base string, op
 	ctxt := build.Default
 	ctxt.BuildTags = opt.Tags
 	read := w.freshReader(opt.Profile, info.ModTime())
-	return Sources{Changed: changed, Profile: profile, ReadFile: read, Build: ctxt}, nil
+	return Sources{Changed: changed, Profile: profile, ReadFile: read, Build: ctxt, Packages: opt.Packages}, nil
 }
 
 func ModulePath(moduleDir string) (string, error) {

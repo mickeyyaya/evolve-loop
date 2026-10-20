@@ -63,7 +63,7 @@ B2 scores highest on this table, but it spends the Claude week window with no li
 | Design | Gain | Risk | Change | Total |
 |---|---|---|---|---|
 | C1. Each gate runs its own tests | 1 | 5 | 5 | 11 |
-| C2. The floor and the audit write the store; the ship reads it at stage shadow, then enforce | 4 | 4 | 3 | **11, chosen** |
+| C2. The floor writes the store; the ship reads it at stage shadow, then enforce | 4 | 4 | 3 | **11, chosen** |
 | C3. One gate run per tree SHA, shared by all phases | 5 | 2 | 1 | 8 |
 
 C2 ties C1 on the total. It is the only design with both a gain and a risk score of 4 or more. It reuses the store and the content key that the ship shadow already proved (0 escapes in 1826 results, F4.3). C3 changes the phase order of the gates. The Go test cache is not an option, because our tests read files outside the module (O6).
@@ -75,9 +75,9 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 | D1 | Admission holds a candidate only when it edits a package that a running lane edits, or when both are hubs. It drops the reach check. The ship-window lease usually serializes the ships of overlapping lanes. | F2.3 to F2.5, O1 to O5 | A1, A2, A4, A5: see §3. |
 | D2 | D1 starts at stage `shadow`. The admission shadow records each candidate that the reach rule holds and D1 admits, and the ship records each rebase conflict between two such lanes. | the stage pattern of ADR-0139 | Enforce at once: the conflict rate is unknown. |
 | D3 | After one wave of shadow, D1 moves to `enforce` if fewer than one in five new admissions fail the ship gate. | F2.5 | A fixed date: the data decides. |
-| D4 | The build seat drops a family whose week window is at or above `headroom_pct` (default 60%). It orders the rest by the measured lane time to a PASS of each family over the last 20 builds, from W0. With no measure yet, the order is claude, agy, agy-claude. A quota exit puts the family in the present cooldown. | F3.3, F3.5, O8, O9 | B1, B2: see §3. An order by call latency: O9. |
+| D4 | The build seat moves a family whose week window is at or above `headroom_pct` (default 60%) to the tail of the chain. It orders the rest by the measured lane time to a PASS of each family over the last 20 builds, from W0. With no measure yet, the order is claude, agy, agy-claude. A quota exit puts the family in the present cooldown. | F3.3, F3.5, O8, O9 | B1, B2: see §3. An order by call latency: O9. |
 | D5 | Until D4 lands, the policy sets the builder to claude first at the next boundary, because the week window is 14% used. | F3.5 | Wait for D4: the gain starts now. |
-| D6 | The build floor and the audit write their package verdicts to the store of `internal/testverdict` with the content key of the ship. The key also holds the toolchain, the test flags and the gate id. The store refuses a record with no gate id, and a FAIL is never reused. The ship skips a package with a green verdict on the same key. At `shadow` the ship looks up, still runs, and records each mismatch. After one wave with 0 mismatches it moves to `enforce`, and a new verb, `evolve verdicts wipe`, empties the store. | F4.2, F4.3, O6, O7 | C1, C3: see §3. The Go test cache: O6. |
+| D6 | The build floor writes its package verdicts to the store of `internal/testverdict` with the content key of the ship. The audit does not write the store, because its test runs are tagged `acs` or `integration`, and a tagged run is never cacheable. The key also holds the toolchain, the test flags and the gate id, and the store refuses a record with no gate id. The ship skips a package with a green verdict on the same key, and it never reuses a FAIL. At `shadow` the ship looks up, still runs, and records each mismatch. After one wave with 0 mismatches it moves to `enforce`, and a new verb, `evolve verdicts wipe`, empties the store. | F4.2, F4.3, O6, O7 | C1, C3: see §3. The Go test cache: O6. |
 | D7 | `evolve wave latency` prints the slot use, the lane time by phase, the model and host split and the gate time of a wave. | research §7 | A script outside the repository: no one can run it again. |
 
 ### Consequences
@@ -96,12 +96,12 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 
 | # | Component | Home | Route |
 |---|---|---|---|
-| W0 | `evolve wave latency` (D7) | `cmd/evolve`, `internal/loopwave` | lane |
+| W0 | `evolve wave latency` (D7) | `cmd/evolve`, `internal/lanetime` | lane |
 | W1 | Optimistic admission at shadow (D1, D2) | `internal/admission` | lane |
 | W2 | The move of W1 to enforce (D3) | `.evolve/policy.json` | operator, after one wave |
 | W3 | Claude first for the builder now (D5) | `.evolve/policy.json` through `evolve cli-routing set` | console, at the next boundary |
 | W4 | The headroom-aware family order (D4) | `internal/cliroute`, `internal/usageprobe` | console |
-| W5 | One verdict store for the floor, the audit and the ship (D6) | `internal/testverdict`, `internal/core`, `internal/phases/ship` | console |
+| W5 | One verdict store for the floor and the ship (D6). The audit does not write the store, because its test runs are tagged `acs` or `integration`, and these runs are never cacheable. | `internal/testverdict`, `internal/core`, `internal/phases/ship` | console |
 
 ## 6. Verification
 
@@ -119,6 +119,7 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
   - a package that the floor tested green is skipped at the ship on the same key;
   - a package with a changed input, toolchain or flag is run;
   - a stored FAIL is never reused;
+  - the audit writes no record, because its test runs are tagged `acs` or `integration`, and these runs are never cacheable;
   - a shadow mismatch blocks the move to enforce, and `evolve verdicts wipe` empties the store.
 - **Wave level:** after W1 to W5, measure the next three waves. The average live lanes must rise above 2.1, and the ships per hour above 1.4 (§1).
 

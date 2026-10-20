@@ -17,6 +17,9 @@ func (s *Store) Put(r Record) error {
 	if r.Outcome != Pass {
 		return ErrNotGreen
 	}
+	if !gatePattern.MatchString(r.Gate) {
+		return ErrNoGate
+	}
 	if !validKey(r.Key) || !r.Key.Valid() {
 		return ErrBadKey
 	}
@@ -25,7 +28,7 @@ func (s *Store) Put(r Record) error {
 	}
 	r.StoredAt = s.now().UTC()
 	data := sealRecord(r)
-	if err := atomicwrite.Bytes(entryPath(s.root, r.Key.File, r.Key.Full), data); err != nil {
+	if err := atomicwrite.Bytes(entryPath(s.root, r.Key.File, r.Key.Full, r.Gate), data); err != nil {
 		return err
 	}
 	return atomicwrite.Bytes(indexPath(s.root, r.Package), data)
@@ -42,7 +45,7 @@ func (s *Store) Lookup(file string, env map[string]string) (Record, bool) {
 	}
 	for _, e := range entries {
 		r, ok := open(filepath.Join(dir, e.Name()))
-		if ok && entryPath(s.root, r.Key.File, r.Key.Full) == filepath.Join(dir, e.Name()) && envMatches(r.Key.Env, env) {
+		if ok && entryPath(s.root, r.Key.File, r.Key.Full, r.Gate) == filepath.Join(dir, e.Name()) && envMatches(r.Key.Env, env) {
 			return r, true
 		}
 	}

@@ -1,0 +1,94 @@
+name: macos weekly
+
+# Soft gate (ADR-0144, plan ci-wall-time-2026-10 §6c): the per-PR macOS job tests only the darwin
+# package set. This run covers every package except acs once a week, so macOS behavior without an OS branch
+# in code (tmux, syscalls, aliased runtime imports) still gets a check. It is not part of
+# `CI required` and it is not a PR check. A failure files one issue and never blocks a merge.
+on:
+  schedule:
+    - cron: '17 4 * * 0' # Sunday 04:17 UTC, the lowest-traffic hour of the week
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-weekly
+  cancel-in-progress: false
+
+jobs:
+  full-suite:
+    name: full suite (Go 1.23, macOS, every non-acs package and the e2e tier)
+    runs-on: macos-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+      - run: go mod download
+      - name: build
+        run: make build
+      - name: integration tier (race, every package)
+        env:
+          TEST_JSON: test-integration.json
+        run: make test-integration
+      - name: e2e tier
+        if: ${{ !cancelled() }}
+        env:
+          E2E_JSON: test-e2e.json
+        run: make test-e2e
+      - name: keep the go test -json streams
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-weekly-json
+          path: |
+            go/test-integration.json
+            go/test-e2e.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  report:
+    name: file the failure as an issue
+    needs: full-suite
+    if: ${{ failure() && needs.full-suite.result == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      ISSUE_TITLE: macOS weekly full-suite run failed
+      ISSUE_LABEL: ci-macos-weekly
+    steps:
+      - name: download the json streams
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-weekly-json
+          path: streams
+      - name: open or update the issue
+        shell: bash
+        run: |
+          set -euo pipefail
+          failing=$(jq -R -r 'fromjson? | select(.Action == "fail" and .Test == null and .Package != null) | .Package' streams/*.json 2>/dev/null | sort -u || true)
+          if [ -z "$failing" ]; then
+            failing='none found in the streams (a build, timeout or runner failure): read the run log'
+          fi
+          printf 'The weekly full-suite macOS run failed.\n\nRun: %s\n\nFailing packages:\n\n%s\n' "$RUN_URL" "$(printf '%s\n' "$failing" | sed 's/^/- /')" > body.md
+          gh label create "$ISSUE_LABEL" --color d93f0b --description 'Weekly full-suite macOS run failed' || true
+          number=$(gh issue list --label "$ISSUE_LABEL" --state open --json number,title --jq '[.[] | select(.title == env.ISSUE_TITLE)][0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body-file body.md
+          else
+            gh issue create --title "$ISSUE_TITLE" --label "$ISSUE_LABEL" --body-file body.md
+          fi

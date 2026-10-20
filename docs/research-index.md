@@ -362,3 +362,28 @@ approaches / decision / results / retro) — lives at
 | [research/wave-latency-2026-10.md](research/wave-latency-2026-10.md) | Research: waves 130 to 133 used 51% of their slot-hours. A lane that edits `internal/core` held 13 ready items for 71 minutes. Build is 46% of lane time, and the gates are 28%. It also surveys merge queues, test caches, routers and pools. Findings F2.1 to F5.3 and O1 to O11. |
 | [plans/wave-latency-2026-10.md](plans/wave-latency-2026-10.md) | Plan: three levers with scored designs. The choices are optimistic admission, a headroom-aware build order and one verdict store. Decisions D1 to D7 and components W0 to W5. |
 | [architecture/adr/0143-admission-holds-only-shared-edits-and-the-ship-gate-owns-api-drift.md](architecture/adr/0143-admission-holds-only-shared-edits-and-the-ship-gate-owns-api-drift.md) | Decision (Accepted, stage shadow): admission holds only shared edits and the hub, and the composed-tree gate of the ship owns API drift. |
+
+## 2026-10-20 — each rule has one home and loads by audience, path, action or failure (ADR-0145)
+
+| Document | What it records |
+|---|---|
+| [research/guidance-layers-2026-10.md](research/guidance-layers-2026-10.md) | Research: the rules sit in seven kinds of source. The console carries about 316 always-on lines, and phase agents cannot read the memory rules. It also surveys skills, rule tiers, instruction load and rules as code. Findings F2.1 to F2.12 and S1 to S11. |
+| [plans/guidance-layers-2026-10.md](plans/guidance-layers-2026-10.md) | Plan: five designs with scores. The winner is one rule registry that generates every layer, with a check in CI. Decisions D1 to D11, components G0 to G7 and G3a, the migration and eight conflicts for the operator. |
+| [architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md](architecture/adr/0145-each-rule-has-one-home-and-loads-by-audience-path-action-or-failure.md) | Decision (Proposed): one registry, five layers, four triggers, and a forced load for every rule that must hold. |
+| [architecture/guidance-layers.md](architecture/guidance-layers.md) | Design, the spec of record: the layers, the budgets, the triggers and their loaders, and the registry schema. It also gives the load of each audience, the situation skills, the checks and a worked example. |
+
+## 2026-10-20 — latency is gated by invariants at merge and by trends on main (ADR-0144)
+
+| Document | What it records |
+|---|---|
+| [research/latency-gates-2026-10.md](research/latency-gates-2026-10.md) | Research: the latency fixes, the existing test tools and current practice for gates on noisy runners (F3.1 to F3.5, G1 to G12). |
+| [plans/latency-gates-2026-10.md](plans/latency-gates-2026-10.md) | Plan: hard gates on behavior, a seeded wave simulation and soft trend gates (D1 to D5, T1 to T7). |
+| [architecture/adr/0144-latency-is-gated-by-invariants-at-merge-and-by-trends-on-main.md](architecture/adr/0144-latency-is-gated-by-invariants-at-merge-and-by-trends-on-main.md) | Decision (Proposed): hard gates never read the wall clock, and measured times file an item after two breaches. |
+
+## 2026-10-20 — a defect that survives two builder rounds is fixed from the finder's spec (ADR-0146)
+
+| Document | What it records |
+|---|---|
+| [research/finder-fix-ownership-2026-10.md](research/finder-fix-ownership-2026-10.md) | Research: the first repair round fixes about 71% of audit failures. It also surveys who finds, writes and approves a fix. Findings F2.1 to F2.4 and R1 to R12. |
+| [plans/finder-fix-ownership-2026-10.md](plans/finder-fix-ownership-2026-10.md) | Plan: five designs with weighted scores. The finder writes the fix spec, a fresh builder applies it, and another check verifies. Decisions D1 to D8 and components F0 to F6. |
+| [architecture/adr/0146-a-defect-that-survives-two-builder-rounds-is-fixed-from-the-finders-spec-and-verified-by-another.md](architecture/adr/0146-a-defect-that-survives-two-builder-rounds-is-fixed-from-the-finders-spec-and-verified-by-another.md) | Decision (Accepted): R1 retry, R2 effort, R3 a fix from the finder's spec, verified by a check that did not write it. |

@@ -1,0 +1,24 @@
+# The packages whose code or tests differ on macOS. The macOS CI job tests only
+# these packages, and it runs cover-changed and cover-strict over them alone.
+# "make -C go darwin-set" writes it from build constraints, runtime.GOOS
+# checks and the callers of the macOS sandbox. Do not edit: a test fails when
+# the file is stale.
+./cmd/evolve
+./cmd/hostsampler
+./cmd/testrusage
+./internal/adapters/sandbox
+./internal/bedrock
+./internal/bridge
+./internal/capability
+./internal/core
+./internal/cycleclassify
+./internal/events/reader
+./internal/events/wake
+./internal/flagregistry
+./internal/looppreflight
+./internal/phases/ship
+./internal/phasestream
+./internal/preflight
+./internal/proctree
+./internal/reportdoc
+./internal/testhost

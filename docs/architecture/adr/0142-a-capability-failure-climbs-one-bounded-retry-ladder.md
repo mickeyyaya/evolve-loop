@@ -1,6 +1,7 @@
 # ADR-0142: a capability failure climbs one bounded retry ladder
 
 - **Status:** Accepted (2026-10-19). The operator chose `max_tier: deep`, `max_effort: high` and a shadow-only critic arm.
+- **Amended by:** [ADR-0146](0146-a-defect-that-survives-two-builder-rounds-is-fixed-from-the-finders-spec-and-verified-by-another.md) (accepted 2026-10-20): the ladder gains a third repair rung. R1 is now a plain retry with the findings. R2 is the old R1 (effort +1, or a tier step when the family has no higher effort). R3 is a fix from the finder's spec. "At most three tries" becomes four (R0 to R3), which is three repair rounds under ADR-0126. Item 5 is replaced by the stop after R3.
 - **Plan:** [retry-ladder-2026-10](../../plans/retry-ladder-2026-10.md). **Research:** [retry-ladder-2026-10](../../research/retry-ladder-2026-10.md). **Design:** [retry-ladder](../retry-ladder.md).
 - **Relates to:**
   - [ADR-0096](0096-repair-rounds-escalate-and-carry-findings.md): the repair-round tier raise becomes one rung of this ladder.

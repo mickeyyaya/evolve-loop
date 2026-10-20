@@ -15,16 +15,8 @@ jobs:
   build-test:
     outputs:
       result: ${{ job.status }}
-    name: build + test (Go)
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        go: ['1.23']
-        include:
-          - os: ubuntu-latest
-            go: '1.27'
+    name: build + test (Go 1.23, ubuntu, every package and every gate)
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: go
@@ -34,13 +26,8 @@ jobs:
           fetch-depth: 0 # Shared with release validation; preserve tag/history tests.
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go }}
+          go-version: '1.23'
           cache-dependency-path: go/go.sum
-      - name: install tmux (macOS CI fails a real-tmux test without it)
-        run: |
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            brew install tmux
-          fi
       - run: go mod download
       - name: build
         run: make build
@@ -134,7 +121,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coverage-${{ matrix.os }}-go${{ matrix.go }}
+          name: coverage-ubuntu-latest-go1.23
           path: |
             go/coverage.txt
             go/apicover-report.txt
@@ -149,6 +136,113 @@ jobs:
         # reads the coverage.txt of the earlier test step, which exists only
         # after a green run.
         run: make cover-strict
+
+  build-test-darwin:
+    name: build + test (Go 1.23, macOS, the darwin package set)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: go/go.sum
+      - name: install tmux (macOS CI fails a real-tmux test without it)
+        run: brew install tmux
+      - run: go mod download
+      - name: build
+        run: make build
+      - name: runner sampler (host CPU, memory, load each second; runs until the job ends)
+        run: |
+          if go build -o bin/hostsampler ./cmd/hostsampler; then
+            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>&1 &
+          else
+            echo "::warning::hostsampler build failed; the run has no runner samples"
+          fi
+      - name: test the darwin set (go/.darwin-set; race + cover, incl. integration tier)
+        env:
+          TEST_JSON: test-integration.json
+          TEST_RUSAGE: '1'
+          TESTRUSAGE_OUT: ${{ github.workspace }}/go/test-rusage.ndjson
+        run: |
+          make test-integration-darwin
+          go tool cover -func=coverage.txt
+      - name: changed functions of the darwin set at 100% (cover-changed; hard-fail)
+        env:
+          COVER_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          base="$COVER_BASE"
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base=$(git rev-parse HEAD~1)
+          fi
+          echo "cover-changed base: $base"
+          make cover-changed-darwin COVER_CHANGED_BASE="$base"
+      - name: package wall budget (advisory; job summary)
+        run: |
+          if [ -s test-integration.json ]; then
+            go run ./cmd/testlatency -budget 180s -title "Package wall time of the darwin set under race and integration" < test-integration.json >> "$GITHUB_STEP_SUMMARY" || echo "::warning::package wall budget report failed"
+          fi
+      - name: e2e tier (no race; live sub-tier self-skips without live flag)
+        env:
+          E2E_JSON: test-e2e.json
+          TEST_RUSAGE: '1'
+          TESTRUSAGE_OUT: ${{ github.workspace }}/go/test-rusage.ndjson
+        run: make test-e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-macos-latest-go1.23
+          path: |
+            go/coverage.txt
+            go/test-integration.json
+            go/test-e2e.json
+            go/test-rusage.ndjson
+            go/runner-samples.ndjson
+      - name: line-coverage strict of the darwin set (go/.cover-strict floors of go/.darwin-set packages; hard-fail)
+        run: make cover-strict-darwin
+
+  build-test-current:
+    name: build + test (Go 1.27, ubuntu, every package, no gates)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache-dependency-path: go/go.sum
+      - run: go mod download
+      - name: build
+        run: make build
+      - name: runner sampler (host CPU, memory, load each second; runs until the job ends)
+        run: |
+          if go build -o bin/hostsampler ./cmd/hostsampler; then
+            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>&1 &
+          else
+            echo "::warning::hostsampler build failed; the run has no runner samples"
+          fi
+      - name: test (race + cover, incl. integration tier)
+        env:
+          TEST_JSON: test-integration.json
+          TEST_RUSAGE: '1'
+          TESTRUSAGE_OUT: ${{ github.workspace }}/go/test-rusage.ndjson
+        run: make test-integration
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-ubuntu-latest-go1.27
+          path: |
+            go/test-integration.json
+            go/test-rusage.ndjson
+            go/runner-samples.ndjson
 
   lint:
     name: vet + gofmt (Go 1.23)
