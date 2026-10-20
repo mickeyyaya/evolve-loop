@@ -46,7 +46,7 @@ func TestLedger_LineGoldenChainAndRunID(t *testing.T) {
 	wantTips := strings.SplitAfter(golden(t, "ledger-tip.golden.txt"), "\n")
 	got, _ := os.ReadFile(ledger)
 	tip, _ := os.ReadFile(filepath.Join(dir, "ledger.tip"))
-	if string(got) != wantLines[0] || string(tip) != wantTips[0] || string(tip) != "0:"+SHA256Hex(strings.TrimSuffix(wantLines[0], "\n"))+"\n" {
+	if string(got) != wantLines[0] || string(tip)+"\n" != wantTips[0] || string(tip) != "0:"+SHA256Hex(strings.TrimSuffix(wantLines[0], "\n")) {
 		t.Fatalf("first line/tip drifted:\n%s%s", got, tip)
 	}
 	e.RunID = "01M09657TDN6Q1VMJK1XKYR376"
@@ -56,7 +56,7 @@ func TestLedger_LineGoldenChainAndRunID(t *testing.T) {
 	}
 	got, _ = os.ReadFile(ledger)
 	tip, _ = os.ReadFile(filepath.Join(dir, "ledger.tip"))
-	if string(got) != wantLines[0]+wantLines[1] || string(tip) != wantTips[1] {
+	if string(got) != wantLines[0]+wantLines[1] || string(tip)+"\n" != wantTips[1] {
 		t.Fatalf("second line/tip (the chain) drifted:\n%s%s", got, tip)
 	}
 	if renderLedgerLine(e, "2026-05-23T17:00:00Z", 1, SHA256Hex(strings.TrimSuffix(wantLines[0], "\n"))) != strings.TrimSuffix(wantLines[1], "\n") {

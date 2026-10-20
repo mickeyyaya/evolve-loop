@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgertip"
 )
 
 type ledgerEntry struct {
@@ -96,7 +97,7 @@ func AppendChainedLine(path string, render func(entrySeq int, prevHash string) s
 	if err := f.Close(); err != nil {
 		return "close", err
 	}
-	return replaceTip(tipPath, fmt.Sprintf("%d:%s\n", entrySeq, SHA256Hex(line)))
+	return replaceTip(tipPath, ledgertip.Format(entrySeq, SHA256Hex(line)))
 }
 
 func tipChainLink(tipPath, ledgerPath string) (prevHash string, entrySeq int, err error) {

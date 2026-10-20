@@ -221,3 +221,42 @@ func TestReplaceTip_ARenameOntoANonEmptyDirectoryIsTipRename(t *testing.T) {
 		t.Fatal("a failed rename must remove its tmp file")
 	}
 }
+
+func TestAppendLedger_AfterAFileLedgerAppendTheChainVerifies(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	fileLedger := ledger.New(dir)
+	if err := fileLedger.Append(context.Background(), core.LedgerEntry{Cycle: 1, Role: "orchestrator", Kind: "phase"}); err != nil {
+		t.Fatalf("FileLedger.Append: %v", err)
+	}
+
+	if op, err := writer(t).appendLedger(filepath.Join(dir, "ledger.jsonl"), ledgerEntry{Cycle: 1, Role: "scout"}); err != nil {
+		t.Fatalf("appendLedger %s: %v", op, err)
+	}
+
+	if err := fileLedger.Verify(context.Background()); err != nil {
+		t.Fatalf("a subagent append last must leave a tip the verifier accepts: %v", err)
+	}
+	if err := fileLedger.Append(context.Background(), core.LedgerEntry{Cycle: 1, Role: "orchestrator", Kind: "phase"}); err != nil {
+		t.Fatalf("FileLedger.Append after the subagent append: %v", err)
+	}
+	if err := fileLedger.Verify(context.Background()); err != nil {
+		t.Fatalf("the FileLedger must chain on the subagent tip: %v", err)
+	}
+}
+
+func TestTipChainLink_EveryMalformedTipShapeFails(t *testing.T) {
+	t.Parallel()
+	for _, tip := range []string{"not-a-tip", "x:abc", "5:", ":abc"} {
+		t.Run(tip, func(t *testing.T) {
+			dir := t.TempDir()
+			tipPath := filepath.Join(dir, "ledger.tip")
+			if err := os.WriteFile(tipPath, []byte(tip), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := tipChainLink(tipPath, filepath.Join(dir, "ledger.jsonl")); err == nil || !strings.Contains(err.Error(), "malformed ledger tip") {
+				t.Errorf("tip %q: err %v, want a malformed-tip failure", tip, err)
+			}
+		})
+	}
+}

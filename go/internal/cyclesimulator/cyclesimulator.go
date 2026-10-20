@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
-
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgertip"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -373,7 +373,7 @@ func appendLedgerLine(ledgerPath, line string) error {
 
 func writeLedgerTip(ledgerPath string, entrySeq int, line string) error {
 	tipPath := filepath.Join(filepath.Dir(ledgerPath), "ledger.tip")
-	tip := fmt.Sprintf("%d:%s\n", entrySeq, sha256Hex(line))
+	tip := ledgertip.Format(entrySeq, sha256Hex(line))
 	tmp := tipPath + ".tmp"
 	if err := os.WriteFile(tmp, []byte(tip), 0o644); err != nil {
 		_ = os.Remove(tmp)

@@ -800,3 +800,5 @@
 ./cmd/hostsampler
 # lanetime - the report of where the time of a wave goes (plan wave-latency-2026-10, W0).
 ./internal/lanetime
+# ledgertip - the one encoding of .evolve/ledger.tip that the ledger writers and the verifier share.
+./internal/ledgertip

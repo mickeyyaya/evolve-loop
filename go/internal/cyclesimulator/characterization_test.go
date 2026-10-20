@@ -148,7 +148,7 @@ func TestRunCharacterization_LedgerLinesAndTipGolden(t *testing.T) {
 		}
 		prev = sha256Hex(lines[i])
 	}
-	if tip := readString(t, filepath.Join(root, ".evolve", "ledger.tip")); tip != "4:"+sha256Hex(lines[4])+"\n" {
+	if tip := readString(t, filepath.Join(root, ".evolve", "ledger.tip")); tip != "4:"+sha256Hex(lines[4]) {
 		t.Errorf("ledger.tip %q", tip)
 	}
 }
