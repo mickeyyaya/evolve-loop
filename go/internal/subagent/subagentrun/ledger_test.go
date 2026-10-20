@@ -3,6 +3,7 @@ package subagentrun
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -45,7 +46,7 @@ func TestLedger_LineGoldenChainAndRunID(t *testing.T) {
 	wantTips := strings.SplitAfter(golden(t, "ledger-tip.golden.txt"), "\n")
 	got, _ := os.ReadFile(ledger)
 	tip, _ := os.ReadFile(filepath.Join(dir, "ledger.tip"))
-	if string(got) != wantLines[0] || string(tip) != wantTips[0] || string(tip) != "0:"+SHA256Hex(strings.TrimSuffix(wantLines[0], "\n"))+"\n" {
+	if string(got) != wantLines[0] || string(tip)+"\n" != wantTips[0] || string(tip) != "0:"+SHA256Hex(strings.TrimSuffix(wantLines[0], "\n")) {
 		t.Fatalf("first line/tip drifted:\n%s%s", got, tip)
 	}
 	e.RunID = "01M09657TDN6Q1VMJK1XKYR376"
@@ -55,7 +56,7 @@ func TestLedger_LineGoldenChainAndRunID(t *testing.T) {
 	}
 	got, _ = os.ReadFile(ledger)
 	tip, _ = os.ReadFile(filepath.Join(dir, "ledger.tip"))
-	if string(got) != wantLines[0]+wantLines[1] || string(tip) != wantTips[1] {
+	if string(got) != wantLines[0]+wantLines[1] || string(tip)+"\n" != wantTips[1] {
 		t.Fatalf("second line/tip (the chain) drifted:\n%s%s", got, tip)
 	}
 	if renderLedgerLine(e, "2026-05-23T17:00:00Z", 1, SHA256Hex(strings.TrimSuffix(wantLines[0], "\n"))) != strings.TrimSuffix(wantLines[1], "\n") {
@@ -130,11 +131,15 @@ func TestLedger_EveryOpFailureIsBareTextWithTheOpInFields(t *testing.T) {
 		{"close", "close", func(t *testing.T, dir string) (string, []Option) {
 			return filepath.Join(dir, "ledger.jsonl"), []Option{WithLedgerOpener(func(string) (io.WriteCloser, error) { return failingWriter{close: errors.New("close failed")}, nil })}
 		}},
-		{"tip tmp (a directory at ledger.tip.tmp)", "tip_tmp", func(t *testing.T, dir string) (string, []Option) {
-			_ = os.Mkdir(filepath.Join(dir, "ledger.tip.tmp"), 0o755)
+		{"flock (a directory at ledger.lock)", "flock", func(t *testing.T, dir string) (string, []Option) {
+			_ = os.Mkdir(filepath.Join(dir, "ledger.lock"), 0o755)
 			return filepath.Join(dir, "ledger.jsonl"), nil
 		}},
-		{"tip rename (a directory at ledger.tip)", "tip_rename", func(t *testing.T, dir string) (string, []Option) {
+		{"tip tmp (a directory at this process's ledger.tip.tmp)", "tip_tmp", func(t *testing.T, dir string) (string, []Option) {
+			_ = os.Mkdir(filepath.Join(dir, fmt.Sprintf("ledger.tip.tmp.%d", os.Getpid())), 0o755)
+			return filepath.Join(dir, "ledger.jsonl"), nil
+		}},
+		{"tip read (a directory at ledger.tip)", "chain_link", func(t *testing.T, dir string) (string, []Option) {
 			_ = os.Mkdir(filepath.Join(dir, "ledger.tip"), 0o755)
 			return filepath.Join(dir, "ledger.jsonl"), nil
 		}},

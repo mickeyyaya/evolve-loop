@@ -85,3 +85,4 @@
 ./cmd/hostsampler 100
 ./internal/lanetime 100
 ./internal/mergewindow 100
+./internal/ledgertip 100
