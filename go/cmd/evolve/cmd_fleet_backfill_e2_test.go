@@ -85,7 +85,7 @@ func TestRunFleet_AnUnresolvableBinaryExits1(t *testing.T) {
 	e2StubFleetExecutable(t, "", errors.New("no /proc"))
 	var stdout, stderr bytes.Buffer
 
-	code := runFleet([]string{"--count", "1", "--goal-hash", "g"}, nil, &stdout, &stderr)
+	code := runFleet([]string{"--count", "1", "--goal-hash", "g", "--simulate"}, nil, &stdout, &stderr)
 
 	if code != 1 || stderr.String() != "evolve fleet: cannot resolve binary: no /proc\n" || rec.factories != 0 {
 		t.Fatalf("code=%d stderr=%q factories=%d", code, stderr.String(), rec.factories)
@@ -96,7 +96,7 @@ func TestRunFleet_ANilLauncherFailsValidation(t *testing.T) {
 	e2StubFleetLaunch(t, 0, true)
 	var stdout, stderr bytes.Buffer
 
-	code := runFleet([]string{"--count", "2", "--goal-hash", "g"}, nil, &stdout, &stderr)
+	code := runFleet([]string{"--count", "2", "--goal-hash", "g", "--simulate"}, nil, &stdout, &stderr)
 
 	if code != 1 || !strings.HasPrefix(stderr.String(), "evolve fleet: ") || strings.Contains(stderr.String(), "[fleet] cycle") {
 		t.Fatalf("code=%d stderr=%q, want a validation refusal and no cycles", code, stderr.String())
@@ -181,7 +181,7 @@ func TestRunFleet_WithoutAPlanLaunchesCountIdenticalCyclesAndFailsOnAFailedLane(
 	chdirForTest(t, t.TempDir())
 	var stdout, stderr bytes.Buffer
 
-	code := runFleet([]string{"--count", "3", "--goal-hash", "same"}, nil, &stdout, &stderr)
+	code := runFleet([]string{"--count", "3", "--goal-hash", "same", "--simulate"}, nil, &stdout, &stderr)
 
 	if code != 1 {
 		t.Fatalf("code=%d, want 1 when every lane exits 4; stderr=%q", code, stderr.String())
@@ -255,5 +255,20 @@ func TestRunFleetSoak_AFailedLaunchFailsTheSoakWithPassingInvariants(t *testing.
 	}
 	if !strings.Contains(stderr.String(), "evolve fleet soak: 1/1 launches failed") {
 		t.Fatalf("stderr=%q, want the failed launch counted", stderr.String())
+	}
+}
+
+func TestRunFleet_ARealFleetWithoutAPlanIsRefusedBeforeAnyLaunch(t *testing.T) {
+	rec := e2StubFleetLaunch(t, 0, false)
+	e2StubFleetExecutable(t, "/bin/evolve-fake", nil)
+	var stdout, stderr bytes.Buffer
+
+	code := runFleet([]string{"--count", "2", "--goal-hash", "g"}, nil, &stdout, &stderr)
+
+	if code != 1 || rec.factories != 0 || len(rec.specs) != 0 {
+		t.Fatalf("code=%d factories=%d specs=%d, want a refusal that builds no launcher", code, rec.factories, len(rec.specs))
+	}
+	if !strings.Contains(stderr.String(), "--plan") || !strings.Contains(stderr.String(), "lane-scope.json") {
+		t.Fatalf("stderr = %q, want a refusal that names --plan and the lane pin", stderr.String())
 	}
 }

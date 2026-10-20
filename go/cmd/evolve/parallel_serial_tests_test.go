@@ -484,6 +484,7 @@ var serialTests = map[string]string{
 	"main.TestRunFleetSoak_WithoutAnInjectedLauncherRunsTheBinaryInSimulateMode":                                           "swaps seam soakLaunchFn",
 	"main.TestRunFleet_ANilLauncherFailsValidation":                                                                        "swaps seam fleetLaunchFactory",
 	"main.TestRunFleet_APlanLaunchesDisjointCyclesAndDefersTheBridge":                                                      "swaps seam fleetLaunchFactory",
+	"main.TestRunFleet_ARealFleetWithoutAPlanIsRefusedBeforeAnyLaunch":                                                     "swaps seam fleetLaunchFactory",
 	"main.TestRunFleet_AnUnresolvableBinaryExits1":                                                                         "swaps seam fleetLaunchFactory",
 	"main.TestRunFleet_PlanErrorsExit1WithoutLaunching":                                                                    "swaps seam fleetLaunchFactory",
 	"main.TestRunFleet_PublishesTheLanesPendingCloseoutsInItsWorkingTree":                                                  "swaps seam fleetLaunchFactory",

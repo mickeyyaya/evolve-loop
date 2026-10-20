@@ -56,6 +56,7 @@ const (
 	DiagCodeTriageTopNEmpty         = "TRIAGE_TOPN_EMPTY"
 	DiagCodeTriageCommitmentInvalid = "TRIAGE_COMMITMENT_INVALID"
 	DiagCodeTriageScopeUnanswered   = "TRIAGE_SCOPE_UNANSWERED"
+	DiagCodeTriageLanePinMissing    = "TRIAGE_LANE_PIN_MISSING"
 	DiagCodeProtectedPredicateRoute = "PROTECTED_PREDICATE_ROUTE"
 	DiagCodeBlockerRoute            = "BLOCKER_ROUTE"
 )
