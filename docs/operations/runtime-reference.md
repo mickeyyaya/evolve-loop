@@ -609,8 +609,8 @@ go build -trimpath -buildvcs=false -ldflags="$LDF" -o evolve ./cmd/evolve   # ru
   ```bash
   jq 'del(.expected_ship_sha)' .evolve/state.json > .evolve/state.json.tmp.$$ && mv .evolve/state.json.tmp.$$ .evolve/state.json
   ```
-- `go build ./...` (and `go test` on `cmd/evolve`) rebuild this binary as a side effect — `git checkout -- go/evolve`
-  after non-release builds to keep commits source-only.
+- **Dev builds go to `go/bin/evolve`, never to `go/evolve`.** Use `make -C go build`, or `go build -o bin/evolve ./cmd/evolve` from `go/`. A bare `go build ./cmd/evolve` in `go/` writes its output to `./evolve`, and that path is the tracked plugin binary (ADR-0094). `go build ./...` builds many packages and keeps no output, so it is safe. To check that the tree compiles, use `go build ./...` or `go build -o <scratch path> ./cmd/evolve`.
+- **When a build overwrites `go/evolve`.** The commit gate refuses the change and names the fix: `git checkout HEAD -- go/evolve`. The command restores the copy at HEAD, also when the overwritten copy is staged. Pinned by `TestRefuseBinaries_AnOverwrittenPluginBinaryNamesItsRestoreCommand`. Only the release flow writes `go/evolve` on purpose.
 Ship-local residues (`GIT_FF_MERGE_DIVERGED`, `COMMIT_PREFIX_GATE`, `GIT_DETACHED_HEAD`,
 `WORKTREE_RESOLVE`) route to the debugger phase, never back into the audit↔ship loop.
 
