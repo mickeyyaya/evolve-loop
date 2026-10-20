@@ -48,6 +48,7 @@ export GORACE := $(strip $(GORACE) atexit_sleep_ms=0)
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency test-budget cover apicover lint tidy clean help dist dist-clean \
         cover-strict cover-changed apicover-enforce apicover-check \
+        test-integration-darwin cover-changed-darwin cover-strict-darwin darwin-set \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64 \
         dist-darwin-universal dist-checksums
 
@@ -114,6 +115,8 @@ test-component: ## Component tier: several internal packages wired against temp 
 	$(GO) test -race -count=1 ./test/component/...
 
 TEST_TIMEOUT ?= 20m
+INTEGRATION_SET ?=
+DARWIN_SET := .darwin-set
 TEST_JSON ?=
 TEST_RUSAGE ?=
 RUSAGE_EXEC = $(if $(strip $(TEST_RUSAGE)),-exec $(abspath $(BIN_DIR))/testrusage,)
@@ -123,7 +126,12 @@ INTEGRATION_TEST = $(GO) test $(RUSAGE_EXEC) -race -count=1 -timeout $(TEST_TIME
 test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run; TEST_TIMEOUT=20m bounds each package; TEST_JSON=<file> also writes the go test -json stream while the console keeps the plain text; TEST_RUSAGE=1 runs every test binary through bin/testrusage (appends to TESTRUSAGE_OUT)
 	@rm -f coverage.txt coverage.partial.txt; \
 	$(BUILD_RUSAGE); \
-	pkgs=$$($(GO) list -tags integration ./...) || exit $$?; \
+	roots=./...; \
+	if [ -n "$(INTEGRATION_SET)" ]; then \
+		roots=$$(sed '/^[[:space:]]*\#/d; /^[[:space:]]*$$/d' "$(INTEGRATION_SET)") || exit $$?; \
+		[ -n "$$roots" ] || { echo "test-integration: $(INTEGRATION_SET) names no package" >&2; exit 1; }; \
+	fi; \
+	pkgs=$$($(GO) list -tags integration $$roots) || exit $$?; \
 	pkgs=$$(printf '%s\n' "$$pkgs" | grep -v '/acs/') || exit $$?; \
 	if [ -n "$(TEST_JSON)" ]; then \
 		$(GO) build -o $(BIN_DIR)/testlatency ./cmd/testlatency || exit $$?; \
@@ -133,6 +141,13 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 	fi; \
 	status=$${status:-1}; if [ "$$status" -ne 0 ]; then rm -f coverage.partial.txt; exit "$$status"; fi; \
 	mv coverage.partial.txt coverage.txt
+
+test-integration-darwin: ## test-integration over the packages of go/.darwin-set only (the macOS CI job); fails when the set file is missing or names no package
+test-integration-darwin: INTEGRATION_SET = $(DARWIN_SET)
+test-integration-darwin: test-integration
+
+darwin-set: ## Write go/.darwin-set: the packages whose code or tests differ on macOS (build constraints, runtime.GOOS checks, sandbox-exec callers)
+	@$(GO) run ./cmd/darwinset > $(DARWIN_SET).tmp && mv $(DARWIN_SET).tmp $(DARWIN_SET) || { rm -f $(DARWIN_SET).tmp; exit 1; }
 
 E2E_JSON ?=
 E2E_TAGS = e2e evolve_test_phases
@@ -190,6 +205,12 @@ COVER_PROFILE ?= coverage.txt
 
 cover-changed: ## Every function the change touches since COVER_CHANGED_BASE is at 100% in the coverage.txt of test-integration (no allowance: a touched gap must be tested)
 	$(GO) run ./cmd/evolve cover changed --base $(COVER_CHANGED_BASE) --root .
+
+cover-changed-darwin: ## cover-changed over the packages of go/.darwin-set only, read from the coverage.txt of test-integration-darwin
+	$(GO) run ./cmd/evolve cover changed --base $(COVER_CHANGED_BASE) --root . --packages $(DARWIN_SET)
+
+cover-strict-darwin: ## cover-strict over the floors of the go/.darwin-set packages only, read from the coverage.txt of test-integration-darwin
+	$(GO) run ./cmd/evolve cover strict --root . --packages $(DARWIN_SET)
 
 # Test-only ACS enrollments have no production API, and their artifact-dependent
 # predicates belong to the cycle runner. Inspect those dirs without running them.

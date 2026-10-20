@@ -11,8 +11,8 @@ import (
 )
 
 type coverStrictArgs struct {
-	root, profile, floors string
-	asJSON                bool
+	root, profile, floors, packages string
+	asJSON                          bool
 }
 
 func runCoverStrict(args []string, stdout, stderr io.Writer) int {
@@ -31,11 +31,17 @@ func runCoverStrict(args []string, stdout, stderr io.Writer) int {
 	if in.floors == "" {
 		in.floors = filepath.Join(moduleDir, ".cover-strict")
 	}
+	packages, err := readPackageSet(in.packages)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve cover strict: %v\n", err)
+		return exitIO
+	}
 	results, err := coverstrict.Check(moduleDir, in.profile, in.floors)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cover strict: %v\n", err)
 		return exitRefused
 	}
+	results = coverstrict.Within(results, packages)
 	if err := printCoverStrict(stdout, results, in.asJSON); err != nil {
 		fmt.Fprintf(stderr, "evolve cover strict: write the verdict: %v\n", err)
 		return exitIO
@@ -53,6 +59,7 @@ func parseCoverStrict(args []string, stderr io.Writer) (coverStrictArgs, bool) {
 	flags.StringVar(&in.root, "root", ".", "repository root or Go module root")
 	flags.StringVar(&in.profile, "profile", "", "coverage profile (default: <module>/coverage.txt)")
 	flags.StringVar(&in.floors, "floors", "", "package floors file (default: <module>/.cover-strict)")
+	flags.StringVar(&in.packages, "packages", "", packagesFlagUsage)
 	flags.BoolVar(&in.asJSON, "json", false, "print the verdict as JSON")
 	positional, err := parseInterspersed(flags, args)
 	switch {

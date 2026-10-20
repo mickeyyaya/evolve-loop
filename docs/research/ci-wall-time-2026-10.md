@@ -10,6 +10,7 @@ Date: 2026-10-17. Method:
 - a code read of the slowest tests, and a web survey;
 - for F3.20 to F3.35: the artifacts of the C0b run 39031338517, four main runs and the PR #935 run. Section 3.1 gives the method.
 - for F7.1 to F7.8 (2026-10-19): the GitHub API job and run records, and a code read. Section 7 gives the method.
+- for F8.1 to F8.5 (2026-10-20): the GitHub API job records of the last 40 `required.yml` runs, and a run of `cmd/darwinset` over the tree. Section 8 gives the method.
 
 Each local claim names its command or file. "Synthesis" marks our own inference.
 
@@ -23,6 +24,7 @@ Each local claim names its command or file. "Synthesis" marks our own inference.
 - [5. Adopt or reject](#5-adopt-or-reject)
 - [6. Refinements to adopt](#6-refinements-to-adopt)
 - [7. Amendment 2026-10-19: the queue is the largest cost](#7-amendment-2026-10-19-the-queue-is-the-largest-cost)
+- [8. Amendment 2026-10-20: the macOS run sets the wall again](#8-amendment-2026-10-20-the-macos-run-sets-the-wall-again)
 
 ## 1. The request
 
@@ -517,3 +519,32 @@ The other inbox tests (about 250 files) write their own inbox in `t.TempDir()`.
 
 - **R19** (F7.4, F7.5, P7.2): `required.yml` declares one `concurrency` group per PR, one per pushed ref and one per manual run.
 - **R20** (F7.6, F7.7, F7.8): a change of `.evolve/inbox/` paths alone runs a small ubuntu job, not the Go matrix.
+
+## 8. Amendment 2026-10-20: the macOS run sets the wall again
+
+On 2026-10-20 the console read the job records of the last 40 `required.yml` runs from the GitHub API. Queue time is `started - created` for one job. Run time is `completed - started`. Wall time is from the first job created to the last job completed.
+
+**F8.1** The macOS queue is gone. Its median over the 40 runs is 0.2 min, against 60 min on 2026-10-19 (F7.1). C15 and C16 (PR #988) caused the change.
+*Implication:* the queue no longer sets the wall. The run time of the slowest job sets it again.
+
+**F8.2** The median wall of a run is 22.4 min, and its 90th percentile is 36 min.
+*Implication:* the goal G1 (about 9 min) is still far away.
+
+**F8.3** The macOS job "build + test" has a median run time of 19.8 min. The ubuntu Go 1.23 job has a median of 10.7 min.
+*Implication:* the macOS job sets the wall by about 9 min. Design A (C2) moves the wall to the ubuntu job, so the target after C2 is about 11 to 12 min.
+
+**F8.4** `cmd/darwinset` derives 19 packages from the tree (2026-10-20, `go/.darwin-set`). The 16 packages of F3.10 are all in the set. Three packages are new:
+
+| Package | The rule that selects it | Why F3.10 does not have it |
+|---|---|---|
+| `cmd/hostsampler` | `_darwin.go` and `_linux.go` files | C0b added it after 2026-10-17 |
+| `cmd/testrusage` | `runtime.GOOS` passed to `usageOf` (`go/cmd/testrusage/main.go:122`) | C0b added it after 2026-10-17 |
+| `internal/core` | a test `switch runtime.GOOS` for `PATH_MAX` (`go/internal/core/small_paths_backfill_e4_test.go:97`) | F3.10 scanned `GOOS` checks in non-test files only |
+
+*Implication:* the rules of F3.10 must also scan test files. A darwin branch of a test runs only on macOS, so G3 needs that package on macOS. `internal/core` adds its macOS time (362 s, F3.22) to the macOS job. C14 is the lever for that cost.
+
+**F8.5** A `//go:build darwin || linux` file compiles the same files on both systems. The file-list rule alone does not select `events/reader` or `reportdoc`. F3.10 has them, because their files call `syscall` paths that behave differently on macOS (synthesis).
+*Implication:* the derivation keeps a separate rule: a build line that names `darwin` outside a `!` selects the package.
+
+- **R21** (F8.1 to F8.5): build C2 now. The macOS job runs `go/.darwin-set` and the e2e tier, with `cover-changed` and `cover-strict` over the set. A test fails when the set file is stale.
+

@@ -84,6 +84,16 @@ func Clean(results []Result) bool {
 	return true
 }
 
+func Within(results []Result, packages covchanged.PackageSet) []Result {
+	kept := []Result{}
+	for _, r := range results {
+		if packages.HasDir(r.Pkg) {
+			kept = append(kept, r)
+		}
+	}
+	return kept
+}
+
 func Measure(floors []Floor, profile covchanged.Profile) []Result {
 	results := make([]Result, 0, len(floors))
 	for _, f := range floors {
