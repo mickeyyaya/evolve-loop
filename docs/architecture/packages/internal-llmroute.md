@@ -86,3 +86,5 @@
 - `Plan.TriggersFallback` treats `ExitUnknownPromptNotQuota` as exit 85, so a plan that falls back on 85 also falls back on an undelivered prompt.
 - `DispatchTiered` counts only exit 85 as a wall. An undelivered prompt at every CLI therefore steps no tier down, and the result is not `Walled`.
 - Pinned by `TestTieringExit_OnlyAnUnknownPromptLeavesTheQuotaClass`, `TestDispatchTiered_AnUnknownPromptAtEveryCLIIsNoQuotaWall` and `TestPlanTriggersFallback_AnUnknownPromptFollowsTheTriggerOfExit85`.
+- **A mixed tier.** When one CLI exits 85 `rate_limit` and another exits 85 `unknown_prompt` at one tier, the tier is not all walls. The walk then does not step the tier down, although the first CLI is walled.
+- **The cycle layer reads the same cause.** The runner wraps its error in `core.LaunchCause` with the cause of the last try. `core.quotaExit` maps it with `TieringExit`, so `isQuotaWall` and `allFamiliesQuotaExhausted` never pause a cycle for quota on an undelivered prompt. Pinned by `TestRunCycle_AnUndeliveredPromptAtEveryAttemptDoesNotPauseForQuota` and `TestRun_TheErrorCarriesTheCauseOfTheLastAttempt`.

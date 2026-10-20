@@ -190,6 +190,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestCycleLoop_PostScoutHookFiresOncePreBuild":                                             swapsPostScoutReplanProbe,
 	"core.TestListACSPredicates_NoResolvableModuleIsALoudNote":                                      swapsPredicateModuleDir,
 	"core.TestDispatch_AllFamiliesExhausted_NoFailureLearning":                                      swapsQuotaBoundaryCheckpointer,
+	"core.TestRunCycle_AnUndeliveredPromptAtEveryAttemptDoesNotPauseForQuota":                       swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycleFromPhase_AWalledResumedDispatchNamesItsWalk":                                 swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycleFromPhase_WalledResumedCorrection_Defers":                                     swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_ALedgerFaultDoesNotLoseTheQuotaPause":                                        swapsQuotaBoundaryCheckpointer,

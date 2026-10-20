@@ -221,6 +221,9 @@ func campaignQuotaCooldown(projectRoot string) func() time.Duration {
 		store := clihealth.NewStore(projectRoot, nil)
 		var wait time.Duration
 		for _, e := range store.Active() {
+			if e.Reason == clihealth.ModelUnsupportedPattern {
+				continue
+			}
 			if d := time.Until(e.BenchedUntil); d > wait {
 				wait = d
 			}
