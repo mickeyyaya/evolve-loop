@@ -22,6 +22,7 @@
   | `Tasks` | `internal/committedset`: the lane pin, else triage's `top_n`, minus deferrals |
   | `CIWatch` | `ci-watch-verdict.json` |
   | `RecalledLessons` | `recalled-lessons.json` |
+  | `ExplanationCorrections` | `BuildOpts.ExplanationCorrections`, from `CycleState.ExplanationCorrections` (X2) |
   | `Failure` (FAIL only) | `failure-digest.json` and `audit-fail-reason.json` |
 - **Recalled lessons.** `seedTaskRecall` (`internal/core/task_recall.go`) selects lessons for the scout, tdd, build and audit prompts with the keyword selector in `internal/research` (see [internal-research.md](internal-research.md)). After each selection it calls `AppendRecalledLessons`, which adds the lesson ids to `recalled-lessons.json` in the cycle workspace. The file keeps the order of first selection and has no duplicate ids. `Build` copies the ids into `RecalledLessons`, so the dossier shows which lessons the cycle received. When no lesson is selected, no file exists and the field is absent.
 - **Live timings come first.** `core` passes the timing set it composed and flushed once (`cycleRun.flushPhaseTimings`). `phase-timing.json` is written by a deferred call in `RunCycle`, so on the normal path it lands after the dossier is built. The fallback to the workspace log stays live for a caller that never threads live timings.

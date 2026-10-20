@@ -17,6 +17,7 @@ const (
 	auditorPersona = "agents/evolve-auditor.md"
 	routedItem     = "routed-item"
 	keptPredicate  = "package p\nfunc TestC1933_004(t *testing.T) { os.ReadFile(\"agents/evolve-auditor.md\") }\n"
+	routedFixture  = `{"files":["go/internal/phases/audit/"],"id":"routed-item","kind":"bug","title":"fixture"}`
 )
 
 func protectsAuditor(p string) bool { return p == auditorPersona }
@@ -41,8 +42,7 @@ func defaultScenario() protectedScenario {
 func runProtectedScenario(t *testing.T, sc protectedScenario) (root, inbox string, stderr *bytes.Buffer) {
 	t.Helper()
 	root, inbox, ws := seedProject(t, routedItem, sc.committed)
-	item, _ := json.Marshal(map[string]any{"id": routedItem, "title": "fixture", "kind": "bug", "files": []string{"go/internal/phases/audit/"}})
-	if err := os.WriteFile(filepath.Join(inbox, "2026-07-29T00-00-00Z-"+routedItem+".json"), item, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(inbox, "2026-07-29T00-00-00Z-"+routedItem+".json"), []byte(routedFixture), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}, routedItem, "7"); err != nil {
@@ -83,9 +83,11 @@ func TestApplyFailure_AProvenProtectedPredicateRoutesTheItemWithItsFileAndReason
 	if !strings.Contains(reason, auditorPersona) || !strings.Contains(reason, "TestC1933_004") || !strings.Contains(reason, "predicates_test.go") {
 		t.Errorf("routed_reason must name the file and the test function: %q", reason)
 	}
-	files, _ := rec["files"].([]any)
-	if len(files) != 2 || files[0] != "go/internal/phases/audit/" || files[1] != auditorPersona {
-		t.Errorf("files keep the declared entries and gain the proven file: %v", files)
+	if files, _ := rec["files"].([]any); len(files) != 1 || files[0] != "go/internal/phases/audit/" {
+		t.Errorf("the curated files stay as the author wrote them: %v", files)
+	}
+	if proven, _ := rec["protected_files"].([]any); len(proven) != 1 || proven[0] != auditorPersona {
+		t.Errorf("the proven file is a loop stamp: %v", rec["protected_files"])
 	}
 	if _, bumped := rec["failure_count"]; bumped || stuckInProcessing(root) {
 		t.Errorf("a routed item is not bumped and not stranded: %v", rec)
@@ -165,10 +167,10 @@ func TestApplyFailure_AnItemThatLeftTheInboxDoesNotStrandOrFault(t *testing.T) {
 	}
 }
 
-func TestAddFiles_KeepsAnExistingEntryOnce(t *testing.T) {
-	item := map[string]json.RawMessage{"files": json.RawMessage(`["a",` + `"` + auditorPersona + `"]`)}
-	addFiles(item, []string{auditorPersona, "b"})
-	if string(item["files"]) != `["a","agents/evolve-auditor.md","b"]` {
-		t.Errorf("files = %s", item["files"])
+func TestAddProtectedFiles_KeepsAnExistingEntryOnceAndLeavesTheCuratedFiles(t *testing.T) {
+	item := map[string]json.RawMessage{"files": json.RawMessage(`["c"]`), "protected_files": json.RawMessage(`["a",` + `"` + auditorPersona + `"]`)}
+	addProtectedFiles(item, []string{auditorPersona, "b"})
+	if string(item["protected_files"]) != `["a","agents/evolve-auditor.md","b"]` || string(item["files"]) != `["c"]` {
+		t.Errorf("protected_files = %s, files = %s", item["protected_files"], item["files"])
 	}
 }

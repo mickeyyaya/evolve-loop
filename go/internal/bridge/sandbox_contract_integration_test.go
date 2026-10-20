@@ -28,6 +28,7 @@ const (
 type contractHost struct {
 	prefix                      []string
 	root, worktree, run, events string
+	resumeWitness               string
 	otherCycle, socketDir       string
 	runSocket, defaultSocket    string
 	runName, runPID             string
@@ -88,15 +89,17 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string { return "echo ok > " + h.worktree + "/own && cat " + h.worktree + "/own" }},
 	{action: "write in its own cycle run directory", want: contractAllow,
 		script: func(h contractHost) string { return "echo ok > " + h.run + "/own && cat " + h.run + "/own" }},
-	{action: "write in another cycle's .evolve/runs/cycle-M", want: contractGap,
-		script: func(h contractHost) string { return "echo x > " + h.otherCycle + "/forged && echo wrote" },
-		check: func(t *testing.T, h contractHost, out string) {
-			if _, err := os.Stat(filepath.Join(h.otherCycle, "forged")); out != "wrote" || err != nil {
-				t.Fatalf("the gap row must prove the write: out=%q, forged file on the host: %v", out, err)
+	{action: "write in another cycle's .evolve/runs/cycle-M", want: contractDeny,
+		script: func(h contractHost) string { return "echo x > " + h.otherCycle + "/forged" },
+		check: func(t *testing.T, h contractHost, _ string) {
+			if _, err := os.Stat(filepath.Join(h.otherCycle, "forged")); !os.IsNotExist(err) {
+				t.Fatalf("the denied write left a file on the host: %v", err)
 			}
 		}},
 	{action: "write in the protected .evolve/events/", want: contractDeny,
 		script: func(h contractHost) string { return "echo x > " + h.events + "/forged" }},
+	{action: "write the host resume witness in .evolve/resume-witness/", want: contractDeny,
+		script: func(h contractHost) string { return "echo x > " + h.resumeWitness + "/cycle-7.json" }},
 	{action: "write to another pane's tty", want: contractDeny,
 		script: func(h contractHost) string { return "printf '' > " + h.peerTTY }},
 	{action: "read another pane's tty", want: contractDeny,
@@ -209,7 +212,8 @@ func (h *contractHost) withProject(t *testing.T) {
 	h.run = filepath.Join(h.root, ".evolve", "runs", "cycle-7")
 	h.otherCycle = filepath.Join(h.root, ".evolve", "runs", "cycle-8")
 	h.events = filepath.Join(h.root, ".evolve", "events")
-	for _, dir := range []string{h.run, h.otherCycle, h.events} {
+	h.resumeWitness = filepath.Join(h.root, ".evolve", "resume-witness")
+	for _, dir := range []string{h.run, h.otherCycle, h.events, h.resumeWitness} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}

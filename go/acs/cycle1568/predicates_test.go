@@ -62,12 +62,8 @@ func TestC1568_004_retro_never_dispatches_auto_model(t *testing.T) {
 	assertNamedPass(t, "TestRun_AutoModel_ResolvedBeforeDispatch")
 }
 
-func TestC1568_005_explicit_model_tier_unchanged(t *testing.T) {
-	assertNamedPass(t, "TestRun_ExplicitModel_PassesThroughUnchanged")
-}
-
 func TestC1568_006_sentinel_never_survives_degraded_resolution(t *testing.T) {
-	assertNamedPass(t, "TestRun_AutoModel_ProfileWithoutTier_ResolvesToDefaultNotAuto")
+	assertNamedPass(t, "TestRun_AutoModel_ProfileWithoutTier_ResolvesThroughTheRouterNotAuto")
 	assertNamedPass(t, "TestRun_AutoModel_NoProfile_NeverDispatchesSentinel")
 }
 

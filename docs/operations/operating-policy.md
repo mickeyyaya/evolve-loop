@@ -122,9 +122,9 @@ undiagnosable. Its blast radius is every later cycle.
    *Evidence: three innocent cycles (1011/1023/1027) died because of mid-batch console
    writes. One cycle (1043) died because of a mid-wave queue hold.*
 5. **A code PR merges only at a boundary.** A green docs, inbox or CI PR can merge
-   in a wave at `pr.merge_window.stage=on`, through `evolve pr merge` after P2b. The verb gives `boundary` below `fleet.integration.stage: enforce` (ADR-0147), at each stage.
+   in a wave at `pr.merge_window.stage=on`, through `evolve pr merge`. The verb gives `boundary` below `fleet.integration.stage: enforce` (ADR-0147), at each stage.
    `evolve pr window <n>` gives the class (exit 0 window, 3 boundary). The console can
-   call an early boundary with `evolve loop-stop --wait` ([ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md)).
+   call an early boundary with `evolve loop-stop --wait` when `evolve pr boundary` exits 0 ([ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md)).
 
    *Evidence: green PRs waited 61 PR-hours for a boundary over #979 to #1005 (2026-10-20).
    A code merge in a wave strands the next lane push.*
@@ -229,6 +229,12 @@ and [runtime-reference.md](runtime-reference.md) link here and do not restate it
      `failure_policy.thresholds.lane_deferral_halt_ceiling` (default 3) of them in a row.
      So a persistent provisioning fault is a halt, never a silent zero-ship wave after wave
      ([cycle 1806](../incidents/2026-10-06-cycle-1806-fetch-ref-lock.md)).
+   - A planned no-work lane hands its item to the console and exits 0, so no FAIL rule sees it.
+     The `no-work-handoffs` rule of the breaker counts the console hand-offs among the last
+     `failure_policy.thresholds.no_work_handoff_window` (default 12) cycles, across batches.
+     It halts at `no_work_handoff_halt_ceiling` (default 4), also when other lanes ship.
+     So a triage that drops one lane of three in each wave is a halt,
+     not a quiet drain of the queue to the console. Consuming the halt's P0 item acknowledges it.
 3. **Ship-streak goal: six consecutive ships.** The pipeline-health target of the operator is six
    consecutive shipped cycles. The target was five consecutive ships during the 2026-09-14
    [verification wave](../research/verification-wave-findings-2026-09-14.md). It moved to six by

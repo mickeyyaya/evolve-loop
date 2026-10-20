@@ -43,6 +43,7 @@ jobs:
           TEST_JSON: test-integration.json
           TEST_RUSAGE: '1'
           TESTRUSAGE_OUT: ${{ github.workspace }}/go/test-rusage.ndjson
+          TESTHOST_REQUIRED_TOOLS: tmux
         # Boot timeout is configured via BridgePolicy.BootTimeoutS in
         # .evolve/policy.json (bridge.boot_timeout_s) — no env override needed.
         run: |
@@ -168,6 +169,7 @@ jobs:
           TEST_JSON: test-integration.json
           TEST_RUSAGE: '1'
           TESTRUSAGE_OUT: ${{ github.workspace }}/go/test-rusage.ndjson
+          TESTHOST_REQUIRED_TOOLS: tmux
         run: |
           make test-integration-darwin
           go tool cover -func=coverage.txt
@@ -234,6 +236,7 @@ jobs:
           TEST_JSON: test-integration.json
           TEST_RUSAGE: '1'
           TESTRUSAGE_OUT: ${{ github.workspace }}/go/test-rusage.ndjson
+          TESTHOST_REQUIRED_TOOLS: tmux
         run: make test-integration
       - uses: actions/upload-artifact@v4
         if: always()

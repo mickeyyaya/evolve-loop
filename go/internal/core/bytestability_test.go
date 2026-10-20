@@ -45,6 +45,8 @@ var additiveCycleStateKeys = []string{
 	"bookkeeping_regrade_attempted",
 	"audit_repair_attempts",
 	"audit_repair_active",
+	"explanation_corrections",
+	"explanation_correction_active",
 	"audit_dispatches",
 	"explanation_documentation_version",
 	"goal_hash",

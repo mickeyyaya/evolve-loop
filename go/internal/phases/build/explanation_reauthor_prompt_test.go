@@ -39,3 +39,24 @@ func TestComposePrompt_NoExplanationReauthorLeavesTheRepairRoundWhole(t *testing
 		t.Errorf("a repair round with a defect outside the document must not be scoped to it:\n%s", out)
 	}
 }
+
+func TestComposePrompt_AnExplanationCorrectionOfAPassingAuditNamesOnlyTheDocumentLines(t *testing.T) {
+	brief := "Document lines the review names:\n- " + reauthorDocument + ":8\n\nReview evidence: " + reauthorDocument + ":8 states 9 lines"
+	req := core.PhaseRequest{Context: map[string]string{
+		core.CtxKeyExplanationReauthor:   reauthorDocument,
+		core.CtxKeyExplanationCorrection: brief,
+	}}
+
+	out := hooks{}.ComposePrompt("BODY", req)
+
+	for _, want := range []string{"## Explanation Correction", "The audit verified the code", "Edit only " + reauthorDocument + " at the lines the review names", "leave code and tests unchanged", "The audit re-reviews the corrected document before ship", brief} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the correction section lacks %q:\n%s", want, out)
+		}
+	}
+	for _, stale := range []string{"## Explanation Re-author", "REJECTED", "## Audit Repair"} {
+		if strings.Contains(out, stale) {
+			t.Errorf("a correction of a passing audit is briefed as a rejection (%q):\n%s", stale, out)
+		}
+	}
+}

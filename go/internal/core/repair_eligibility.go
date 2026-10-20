@@ -21,6 +21,8 @@ const CtxKeyAuditDeclineReason = "audit_decline_reason"
 
 const CtxKeyExplanationReauthor = "explanation_reauthor_document"
 
+const CtxKeyExplanationCorrection = "explanation_correction_brief"
+
 func consumeAuditRepairGrant(cs *CycleState, reason string) {
 	switch {
 	case strings.HasPrefix(reason, auditRepairReasonPrefix):
@@ -37,6 +39,9 @@ func repairSeededPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild }
 func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) map[string]string {
 	if !repairSeededPhase(next) {
 		return base
+	}
+	if next == PhaseBuild && cs.ExplanationCorrectionActive && !cs.AuditRepairActive {
+		return seedExplanationCorrection(base, cs)
 	}
 	if cs.AuditRepairActive {
 		out := withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs, os.Stderr))

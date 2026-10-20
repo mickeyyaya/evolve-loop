@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mergewindow"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -111,8 +112,11 @@ func runPR(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "window" {
 		return runPRWindow(args[1:], stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "boundary" {
+		return runPRBoundary(args[1:], stdout, stderr)
+	}
 	if len(args) == 0 || args[0] != "merge" {
-		fmt.Fprintln(stderr, prUsage+"\n"+prWindowUsage)
+		fmt.Fprintln(stderr, prUsage+"\n"+prWindowUsage+"\n"+prBoundaryUsage)
 		return exitUsage
 	}
 	a, err := parsePRMergeArgs(args[1:])
@@ -134,6 +138,8 @@ func runPR(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 }
 
 type prMerger struct {
+	root         string
+	windowOpen   bool
 	method       string
 	poll, wait   time.Duration
 	updateBranch bool
@@ -159,8 +165,12 @@ func newPRMerger(root string, a prMergeArgs, stdout, stderr io.Writer) (prMerger
 	if err != nil {
 		return prMerger{}, err
 	}
+	gate, err := windowGateOf(pol)
+	if err != nil {
+		return prMerger{}, err
+	}
 	return prMerger{
-		method: method, poll: time.Duration(*cw.PollS) * time.Second, wait: a.wait, updateBranch: a.updateBranch,
+		root: root, windowOpen: gate.open(), method: method, poll: time.Duration(*cw.PollS) * time.Second, wait: a.wait, updateBranch: a.updateBranch,
 		gh: ghIn(root), fetch: ciwatch.NewGHFetcher(root), liveRuns: func() ([]runlease.LiveRun, error) { return planeLiveRuns(root, time.Now()) },
 		now: time.Now, sleep: time.Sleep, stdout: stdout, stderr: stderr,
 	}, nil
@@ -214,7 +224,7 @@ func (r prRefusal) Error() string { return string(r) }
 func refusef(format string, args ...any) error { return prRefusal(fmt.Sprintf(format, args...)) }
 
 func (m prMerger) mergeAll(ctx context.Context, prs []string) int {
-	if err := m.planeIdle(); err != nil {
+	if err := m.closedWindowIdle(); err != nil {
 		code := m.report("", err)
 		m.notAttempted(prs)
 		return code
@@ -284,7 +294,11 @@ func (p prView) refusal() error {
 }
 
 func (m prMerger) ghJSON(ctx context.Context, into any, args ...string) error {
-	out, err := m.gh(ctx, args...)
+	return decodeGH(ctx, m.gh, into, args...)
+}
+
+func decodeGH(ctx context.Context, gh func(context.Context, ...string) ([]byte, error), into any, args ...string) error {
+	out, err := gh(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -310,7 +324,33 @@ func (m prMerger) behindBy(ctx context.Context, base, head string) (int, error) 
 	return cmp.BehindBy, err
 }
 
+func (m prMerger) closedWindowIdle() error {
+	if m.windowOpen {
+		return nil
+	}
+	return m.planeIdle()
+}
+
+func (m prMerger) admit(ctx context.Context, n string) error {
+	err := m.planeIdle()
+	var refusal prRefusal
+	if !m.windowOpen || !errors.As(err, &refusal) {
+		return err
+	}
+	d, err := decidePRWindow(ctx, m.root, prWindowArgs{pr: n}, m.gh)
+	if err != nil {
+		return err
+	}
+	if d.Verdict == mergewindow.Window {
+		return nil
+	}
+	return refusef("%s; #%s waits for a boundary: %s", refusal, n, d.Reason)
+}
+
 func (m prMerger) mergeOne(ctx context.Context, n string) (string, error) {
+	if err := m.admit(ctx, n); err != nil {
+		return "", err
+	}
 	pr, err := m.view(ctx, n)
 	if err != nil {
 		return "", err
@@ -328,7 +368,7 @@ func (m prMerger) mergeOne(ctx context.Context, n string) (string, error) {
 	if behind > 0 {
 		return "", refusef("base moved during the wait: %s is behind %s by %d", shortSHA(pr.HeadRefOid), pr.BaseRefName, behind)
 	}
-	if err := m.planeIdle(); err != nil {
+	if err := m.admit(ctx, n); err != nil {
 		return "", err
 	}
 	if _, err := m.gh(ctx, "pr", "merge", n, "--"+m.method, "--match-head-commit", pr.HeadRefOid); err != nil {

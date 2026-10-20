@@ -37,7 +37,7 @@ func TestRepoContractGate_ImporterOfAChangedPackageBlocksShip(t *testing.T) {
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "base", "base.go"), "package base\n\nconst Stop = \"new-stop\"\n")
 	var out strings.Builder
-	err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), &out)
+	err := runRepoContractGate(context.Background(), "enforce", repo, "", &out)
 	if err == nil {
 		t.Fatal("a red importer must block the ship before it can red main")
 	}
@@ -59,7 +59,7 @@ func TestRepoContractGate_UnimportedChangeRunsOnlyItself(t *testing.T) {
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "other", "other.go"), "package other\n\nconst Unrelated = 2\n")
 	var out strings.Builder
-	if err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), &out); err != nil {
+	if err := runRepoContractGate(context.Background(), "enforce", repo, "", &out); err != nil {
 		t.Fatalf("an unrelated change ships: %v", err)
 	}
 	if strings.Contains(out.String(), "./internal/user") {
@@ -76,7 +76,7 @@ func TestRepoContractGate_NoGoChangeSkipsTheImporterBackstop(t *testing.T) {
 	repo, _ := importerFixture(t)
 	mustWrite(t, filepath.Join(repo, "docs", "only.md"), "docs\n")
 	var out strings.Builder
-	if err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), &out); err != nil {
+	if err := runRepoContractGate(context.Background(), "enforce", repo, "", &out); err != nil {
 		t.Fatalf("docs-only ships: %v", err)
 	}
 	if !strings.Contains(out.String(), "importer backstop: no Go change in the tree — skipped") {
@@ -99,7 +99,7 @@ func TestRepoContractGate_TagOnlyChangeIsSaidNotRun(t *testing.T) {
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "acs", "cycle9999", "predicates_test.go"), "//go:build acs\n\npackage cycle9999\n\nimport \"testing\"\n\nfunc TestHealthy(t *testing.T) {}\n")
 	var out strings.Builder
-	if err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), &out); err != nil {
+	if err := runRepoContractGate(context.Background(), "enforce", repo, "", &out); err != nil {
 		t.Fatalf("a tag-only package ships: %v", err)
 	}
 	if !strings.Contains(out.String(), "not run: ./acs/cycle9999/...") {

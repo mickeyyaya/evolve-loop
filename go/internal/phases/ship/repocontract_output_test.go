@@ -13,7 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
 
-func TestRepoContractGate_StderrGetsTheNotesAndThePathWhileTheScanLogGetsTheRawStream(t *testing.T) {
+func TestRepoContractGate_StderrGetsOneSummaryLineWhileTheScanLogGetsTheNotesAndTheRawStream(t *testing.T) {
 	t.Parallel()
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "base", "base.go"), "package base\n\nconst Stop = \"new-stop\"\n")
@@ -39,11 +39,11 @@ func TestRepoContractGate_StderrGetsTheNotesAndThePathWhileTheScanLogGetsTheRawS
 		}
 	}
 	note := "[ship] repo-contract importer backstop: go test -json"
-	if !strings.Contains(stderr.String(), note) || !strings.Contains(string(scan), note) {
-		t.Errorf("the [ship] note %q must reach stderr and the scan log", note)
+	if strings.Contains(stderr.String(), note) || !strings.Contains(string(scan), note) {
+		t.Errorf("the [ship] note %q must reach the scan log only", note)
 	}
-	if pointer := "[ship] repo-contract gate: full output: " + scanPath + "\n"; !strings.Contains(stderr.String(), pointer) {
-		t.Errorf("stderr does not end the gate with %q:\n%s", pointer, stderr.String())
+	if summary := "[ship] repo-contract gate: REPO_CONTRACT_GATE; full output: " + scanPath + "\n"; stderr.String() != summary {
+		t.Errorf("stderr must carry only the summary line %q:\n%s", summary, stderr.String())
 	}
 }
 

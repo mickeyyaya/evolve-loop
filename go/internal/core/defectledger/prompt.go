@@ -60,6 +60,10 @@ func promptRows(open []Entry) string {
 			}
 			return r
 		}, Truncate(e.Text, 200))
+		if blocksDeferral(e) {
+			fmt.Fprintf(&ids, "- %s (%s blocker: FIXED only): %s\n", e.ID, e.Severity, text)
+			continue
+		}
 		fmt.Fprintf(&ids, "- %s: %s\n", e.ID, text)
 	}
 	return ids.String()

@@ -12,8 +12,8 @@ func TestWireOrchestratorDeps_ContractVerifierReachesEveryPhaseRunner(t *testing
 		t.Fatal("orchDeps.Runners must expose the phase-runner map")
 	}
 	for phase, r := range d.Runners {
-		if phase == core.PhaseShip || phase == core.PhaseRetro {
-			continue // no BaseRunner-backed verdict engine
+		if phase == core.PhaseShip {
+			continue
 		}
 		w, ok := r.(interface{ ContractVerifierWired() bool })
 		if !ok {

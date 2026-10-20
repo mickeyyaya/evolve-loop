@@ -1,6 +1,6 @@
 # internal/mergewindow
 
-> Plan: [pr-merge-latency-2026-10](../../plans/pr-merge-latency-2026-10.md) (P2, D2 to D4). Decision: [ADR-0148](../adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md). Command: `evolve pr window` (`go/cmd/evolve/cmd_pr_window.go`). Operator use: [wave-operations.md](../../operations/wave-operations.md) §5.
+> Plan: [pr-merge-latency-2026-10](../../plans/pr-merge-latency-2026-10.md) (P2, D2 to D4). Decision: [ADR-0148](../adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md). Commands: `evolve pr window` (`go/cmd/evolve/cmd_pr_window.go`), `evolve pr merge` (`cmd_pr.go`) and `evolve pr boundary` (`cmd_pr_boundary.go`). Operator use: [wave-operations.md](../../operations/wave-operations.md) §5.
 
 ## Purpose
 
@@ -30,8 +30,22 @@
 - **Glob semantics.** A `*` in a `case` pattern matches each character, `/` and a newline included. `globRegexp` gives the same semantics with the flag `(?s)`.
 - **One name for each path.** The command reads one JSON string for each file name from `gh`, and one name for each line from `--files-from`. Thus a name with a space stays one path.
 
+## Consumers
+
+- **`evolve pr merge` at an open gate.** The gate is open at `pr.merge_window.stage: on` and `fleet.integration.stage: enforce`. While a loop runs, the verb asks `evolve pr window` for each PR, before the view and again before the merge. A window PR merges. A boundary PR gets the refusal `a loop is running: ... is live; #<n> waits for a boundary: <reason>`.
+- **`evolve pr merge` at a closed gate.** A live loop refuses each PR before any `gh` call, as before P2b. At each gate, the verb checks the plane again before the merge, so a loop that starts during the CI wait also counts.
+- **`evolve pr boundary`.** It gives the early-boundary call of ADR-0148 decision 7 in one line. `DecideEarlyBoundary` is the pure rule:
+  - The input is each green boundary PR with its wait, the pool (live lanes and width) and the bound.
+  - The PR that waited longest is the candidate. A tie keeps the first PR in the list.
+  - The call is due when that wait is longer than the bound and the live lanes are fewer than the width. A wait equal to the bound is not due.
+- **The facts of `evolve pr boundary`.** The bound is `pr.merge_window.early_boundary_after_s` (compiled default 3600 s, plan Q2). The width is `fleet.count`, by the operator decision of 2026-10-20 ("Combine them to fleet count"). The live lanes are the pool signal of the last wave record (`wave.PoolLive`), the same count as `evolve wave status`.
+- **Green and waiting.** A green PR is a non-draft PR whose newest `required.yml` run on its head is `completed` and `success`. It must also be `MERGEABLE` against `main`. A `CONFLICTING` or `UNKNOWN` PR does not wait, because `wave next --merge` cannot land it. Its wait starts at the `updatedAt` of that run. A window PR does not wait, so the rule skips it.
+- **No call.** No live loop exits 3, because the plane is at a boundary. A missing pool signal for a live loop exits 2, because the verb cannot prove that the pool is below its width.
+
 ## Tests
 
 - `TestClassify_TheLiveCIRoutingTableDecidesEachPath` parses the live `required.yml`. A change of the CI router changes the result of this test.
 - `TestParse_FailsClosedOnATableItCannotRead` covers each parse error.
 - `cmd/evolve/cmd_pr_window_test.go` covers the stage, the exit codes, the JSON and the `gh` query.
+- `TestDecideEarlyBoundary_DueOnlyWhenTheLongestWaitPassesTheBoundAndThePoolIsBelowItsWidth` covers the early-boundary rule.
+- `cmd/evolve/cmd_pr_merge_window_test.go` covers `evolve pr merge` with a live loop at each gate. `cmd/evolve/cmd_pr_boundary_test.go` covers `evolve pr boundary`.

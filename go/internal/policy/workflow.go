@@ -160,6 +160,9 @@ func InteractivePolicyFor(projectRoot string, agent string) string {
 		if v, ok := cfg.InteractivePolicies[agent]; ok && v != "" {
 			return v
 		}
+		if v, ok := legacyLabelValue(cfg.InteractivePolicies, "interactive_policies", agent, func(v string) bool { return v != "" }); ok {
+			return v
+		}
 	}
 	return cfg.InteractivePolicy
 }

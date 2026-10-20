@@ -77,7 +77,7 @@ func largeTriageArtifact() string {
 	return b.String()
 }
 
-func TestShouldDemote_WindowAndTemplateBoundsAmplified(t *testing.T) {
+func TestDemotionDecision_WindowAndTemplateBoundsAmplified(t *testing.T) {
 	const otherTemplate = "cycle 446 failed during build: tmux pane vanished before prompt delivery"
 	pair := []FailEntry{{Cycle: 448, Summary: gapSummary448}, {Cycle: 449, Summary: gapSummary449}}
 	tests := []struct {
@@ -100,9 +100,9 @@ func TestShouldDemote_WindowAndTemplateBoundsAmplified(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _ := ShouldDemote(tt.entries, tt.current)
+			_, _, _, got := demotionDecision(tt.entries, tt.current)
 			if got != tt.want {
-				t.Errorf("ShouldDemote(current=%d) = %v, want %v", tt.current, got, tt.want)
+				t.Errorf("demotionDecision(current=%d) = %v, want %v", tt.current, got, tt.want)
 			}
 		})
 	}

@@ -107,7 +107,7 @@ func TestResumeLifecycle_EmptyTriageStopsBeforeImplementation(t *testing.T) {
 	}
 }
 
-func TestResumeLifecycle_LostLandingUsesSameTerminalFloor(t *testing.T) {
+func TestResumeLifecycle_AShipThatPassedAfterAStaleShipErrorIsNotALostLanding(t *testing.T) {
 	t.Parallel()
 
 	o, st, req, rp := resumedLifecycleFixture(t)
@@ -118,8 +118,8 @@ func TestResumeLifecycle_LostLandingUsesSameTerminalFloor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.FinalVerdict != VerdictWARN || got.SystemFailure == nil || got.SystemFailure.Category != "landing-lost" {
-		t.Fatalf("resume counted a lost landing as success: %+v", got)
+	if got.FinalVerdict != VerdictPASS || got.SystemFailure != nil {
+		t.Fatalf("the resumed ship PASSed, so the host latched the landing; the earlier ship-error is stale: %+v", got)
 	}
 }
 
@@ -263,6 +263,7 @@ func TestResumeLifecycle_PostShipPauseRetainsThroughputBaseline(t *testing.T) {
 	if err := json.Unmarshal(raw, &st.cycleState); err != nil {
 		t.Fatal(err)
 	}
+	hostWitness(t, req.ProjectRoot, st.cycleState)
 	o.gitHEAD = func() (string, error) { return "already-shipped-head", nil }
 	o.throughputRecorder = func(s *State, cycle int, _ string) {
 		s.TriageThroughput = append(s.TriageThroughput, TriageThroughputEntry{Cycle: cycle, Floors: 3})
@@ -420,6 +421,7 @@ func TestResumeLifecycle_PostShipObserverFailureDegradesLikeFreshPath(t *testing
 	o.runners[Phase("memo")] = &fakeRunner{name: "memo", failErr: errors.New("memo tier/envelope policy error"), failUntil: 99}
 	st.cycleState.CompletedPhases = []string{"scout", "triage", "build", "audit", "ship"}
 	st.cycleState.Shipped = true
+	hostWitness(t, req.ProjectRoot, st.cycleState)
 	rp.Phase = "memo"
 
 	got, err := o.RunCycleFromPhase(context.Background(), req, rp)
@@ -463,5 +465,33 @@ func TestResumeLifecycle_NonCanonicalVerdictAborts(t *testing.T) {
 	}
 	if got.FinalVerdict != VerdictFAIL {
 		t.Errorf("FinalVerdict = %q, want %q", got.FinalVerdict, VerdictFAIL)
+	}
+}
+
+func TestResumeLifecycle_ThePersistedPreCycleHeadReachesTheCloseout(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		pre     string
+		records bool
+	}{
+		{"the host witness's pre-cycle HEAD bounds the closeout", "pre-cycle-sha", true},
+		{"the same HEAD before and after records nothing", "post-cycle-sha", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o, st, req, rp := resumedLifecycleFixture(t)
+			st.cycleState.PreCycleHEAD = tc.pre
+			hostWitness(t, req.ProjectRoot, st.cycleState)
+			o.gitHEAD = func() (string, error) { return "post-cycle-sha", nil }
+			recorded := 0
+			WithThroughputRecorder(func(*State, int, string) { recorded++ })(o)
+			if _, err := o.RunCycleFromPhase(context.Background(), req, rp); err != nil {
+				t.Fatal(err)
+			}
+			if (recorded == 1) != tc.records {
+				t.Fatalf("recorded %d time(s), want records=%v: the resumed closeout must compare against the host witness's pre-cycle HEAD", recorded, tc.records)
+			}
+		})
 	}
 }

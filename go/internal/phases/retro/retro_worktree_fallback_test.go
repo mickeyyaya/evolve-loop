@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner/runnertest"
 )
 
 func retroFailReq(projectRoot, workspace, worktree string, env map[string]string) core.PhaseRequest {
@@ -86,7 +87,7 @@ func TestRetro_RealWorktree_PassedThroughUnchanged(t *testing.T) {
 
 func TestRetro_EmptyWorktreeAndWorkspace_NoFabricatedPath(t *testing.T) {
 	fb := &fakeBridge{}
-	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
+	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body"), SleepFn: runnertest.FreeSleep, ContractVerifier: runnertest.EmptyArtifactVerifier})
 
 	if _, err := phase.Run(context.Background(), retroFailReq(t.TempDir(), "", "", map[string]string{"EVOLVE_FLEET": "1"})); err != nil {
 		t.Fatalf("Run returned a hard error with no workspace (%v) — retro must never abort the batch", err)

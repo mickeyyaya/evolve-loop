@@ -16,7 +16,7 @@ var explanationLifecycleCallPins = []struct {
 	{"../phases/ship/native.go", "Run", "runStages"},
 	{"../phases/ship/native.go", "runStages", "verifyNativeExplanation"},
 	{"../phases/audit/classification.go", "newAuditClassification", "validateExplanationReview"},
-	{"../phases/retro/retro.go", "Run", "validateExplanationReview"},
+	{"../phases/retro/retro.go", "Classify", "validateExplanationReview"},
 	{"../core/cyclerun_postreview.go", "applyPostReviewGuards", "explanationdocs.RefreshResult"},
 	{"../core/orchestrator.go", "RunCycle", "activateBuildExplanationContract"},
 	{"../core/orchestrator.go", "RunCycle", "sealBuildExplanationContext"},

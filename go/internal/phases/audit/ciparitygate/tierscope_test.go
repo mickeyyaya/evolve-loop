@@ -3,8 +3,13 @@ package ciparitygate
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 func TestTierScope_PureSplitAndEnvExclusiveEventsWithoutStderr(t *testing.T) {
@@ -32,7 +37,7 @@ func TestTierScope_PureSplitAndEnvExclusiveEventsWithoutStderr(t *testing.T) {
 		t.Fatalf("bridge-only scope: (%v, %v), want (nil, the golden env-exclusive WARN)", off, err)
 	}
 	e := only(t, *events, CodeTierEnvExclusiveSkipped)
-	if e.Fields["scope"] != "all" || e.Fields["pkgs"] != "./internal/bridge/..." || e.Fields["remainder"] != "0" || !strings.Contains(e.Fields["backstop"], envExclusiveNoCIMarker) || e.Reason != err.Error() {
+	if e.Fields["scope"] != "all" || e.Fields["pkgs"] != "./internal/bridge/..." || e.Fields["remainder"] != "0" || !strings.Contains(e.Fields["backstop"], envExclusiveCIMarker) || e.Reason != err.Error() {
 		t.Errorf("scope=all event: %+v", e)
 	}
 
@@ -77,11 +82,13 @@ func TestEnvExclusive_OnlyBridge(t *testing.T) {
 
 func TestEnvExclusive_BackstopNoteIsHonestForBridge(t *testing.T) {
 	note := envExclusiveBackstopNote([]string{"./internal/bridge/...", "internal/bridge"})
-	if strings.Contains(note, "CI's isolated integration-tier step covers internal/bridge") {
-		t.Fatalf("the note must never claim CI covers bridge — requireTmux skips there; got %q", note)
+	for _, falseBelief := range []string{"NOT covered by CI", "no tmux on runners", "loop-boot preflight"} {
+		if strings.Contains(note, falseBelief) {
+			t.Fatalf("the note must not state the false belief %q: the ubuntu and macOS CI jobs run the requireTmux tier; got %q", falseBelief, note)
+		}
 	}
-	if !strings.Contains(note, envExclusiveNoCIMarker) || !strings.Contains(note, "quiet-host") {
-		t.Fatalf("the note must deny CI coverage and name the quiet-host backstop; got %q", note)
+	if !strings.Contains(note, envExclusiveCIMarker) || !strings.Contains(note, "ubuntu") || !strings.Contains(note, "macOS") {
+		t.Fatalf("the note must say which CI jobs run bridge's requireTmux tier; got %q", note)
 	}
 	if !strings.Contains(note, "requireTmux tests boot real tmux sessions") {
 		t.Fatalf("the note must carry the entry's evidence (why), not only the backstop; got %q", note)
@@ -91,7 +98,7 @@ func TestEnvExclusive_BackstopNoteIsHonestForBridge(t *testing.T) {
 	}
 }
 
-func TestEnvExclusive_EntriesDeclareNoCIBackstop(t *testing.T) {
+func TestEnvExclusive_EntriesNameTheCIJobsThatRunThem(t *testing.T) {
 	if len(tierEnvExclusive) == 0 {
 		t.Fatal("the record table is empty — if the last exclusion was removed on purpose, retire this guard deliberately, not by vacuity")
 	}
@@ -99,12 +106,56 @@ func TestEnvExclusive_EntriesDeclareNoCIBackstop(t *testing.T) {
 		if e.pkg == "" || e.why == "" || e.backstop == "" {
 			t.Fatalf("entry %+v must carry pkg, evidence, and backstop — an unexplained exclusion is the fossil class", e)
 		}
-		if !strings.Contains(e.backstop, envExclusiveNoCIMarker) {
-			t.Fatalf("%s: an env-exclusive entry must declare CI does NOT back it — a CI-covered package belongs in the lane tier (cycle-1594); backstop: %q", e.pkg, e.backstop)
+		if !strings.Contains(e.backstop, envExclusiveCIMarker) {
+			t.Fatalf("%s: a lane that skips an env-exclusive package leaves CI as the only run, so the backstop must name the CI jobs that run it; backstop: %q", e.pkg, e.backstop)
 		}
-		if strings.Contains(e.backstop, "CI's isolated integration-tier step covers") {
-			t.Fatalf("%s: backstop claims CI coverage — contradiction with the selection criterion; backstop: %q", e.pkg, e.backstop)
+	}
+}
+
+func workflowJob(t *testing.T, workflow, job string) string {
+	t.Helper()
+	_, body, found := strings.Cut(workflow, "\n  "+job+":\n")
+	if !found {
+		t.Fatalf("go.yml has no job %q", job)
+	}
+	for _, line := range strings.SplitAfter(body, "\n") {
+		if len(line) > 2 && line[:2] == "  " && line[2] != ' ' {
+			return body[:strings.Index(body, line)]
 		}
+	}
+	return body
+}
+
+func TestEnvExclusive_TheCIJobsTheBridgeBackstopNamesRunTheTmuxTier(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", ".github", "workflows", "go.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	darwinSet, err := os.ReadFile(filepath.Join("..", "..", "..", "..", ".darwin-set"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requires := testhost.RequiredToolsEnv + ": tmux"
+	jobs := map[string][]string{
+		"build-test":         {"runs-on: ubuntu-latest", "make test-integration\n", requires},
+		"build-test-current": {"runs-on: ubuntu-latest", "make test-integration\n", requires},
+		"build-test-darwin":  {"runs-on: macos-latest", "brew install tmux", "make test-integration-darwin", requires},
+	}
+	for job, wants := range jobs {
+		block := workflowJob(t, string(raw), job)
+		for _, want := range wants {
+			if !strings.Contains(block, want) {
+				t.Errorf("the bridge backstop names CI job %s as a run of the requireTmux tier, but that job lacks %q", job, want)
+			}
+		}
+		for _, narrowing := range []string{"\n    if:", "INTEGRATION_SET"} {
+			if strings.Contains("\n"+block, narrowing) {
+				t.Errorf("CI job %s carries %q, which can stop it from running the requireTmux tier that the bridge backstop names", job, strings.TrimSpace(narrowing))
+			}
+		}
+	}
+	if !slices.Contains(strings.Fields(string(darwinSet)), "./internal/bridge") {
+		t.Error("the bridge backstop names the macOS job, but internal/bridge is not in go/.darwin-set")
 	}
 }
 
@@ -115,11 +166,11 @@ func TestIntegrationTierScope_ErrorCarriesTheHonestBackstop(t *testing.T) {
 		t.Fatalf("bridge-only scope must return the env-exclusive WARN error")
 	}
 	msg := err.Error()
-	if !strings.Contains(msg, "quiet-host") || !strings.Contains(msg, "NOT covered by CI") {
+	if !strings.Contains(msg, envExclusiveCIMarker) || !strings.Contains(msg, "macOS") {
 		t.Fatalf("the emitted skip must carry bridge's real backstop; got %q", msg)
 	}
-	if strings.Contains(msg, "CI's isolated integration-tier step covers internal/bridge") {
-		t.Fatalf("the emitted skip must not claim CI covers bridge; got %q", msg)
+	if strings.Contains(msg, "NOT covered by CI") || strings.Contains(msg, "quiet-host") {
+		t.Fatalf("the emitted skip must not deny the CI coverage; got %q", msg)
 	}
 }
 

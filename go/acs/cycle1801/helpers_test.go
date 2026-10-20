@@ -416,6 +416,8 @@ func runDoc(st fakeGHState, r fakeRun, seen int) map[string]any {
 
 func apiAnswer(st fakeGHState, path string) (string, error) {
 	switch {
+	case strings.Contains(path, "/artifacts"):
+		return asJSON(map[string]any{"total_count": 0, "artifacts": []any{}})
 	case strings.Contains(path, "/compare/"):
 		return asJSON(map[string]any{"status": "ahead", "ahead_by": 1, "behind_by": 0,
 			"merge_base_commit": map[string]any{"sha": st.BaseSHA},

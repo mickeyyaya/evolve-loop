@@ -46,7 +46,7 @@ func TestCountCommittedFloors_EvidenceCitationDoesNotCount(t *testing.T) {
 func newGateDefectReviewer(stage config.Stage, window []core.TriageThroughputEntry, fails []FailEntry, logs *[]string) *CapReviewer {
 	r := newCapReviewer(stage)
 	r.pkgsFn = func(string) []string { return []string{"swarmrunner", "bridge", "evalgate"} }
-	r.windowFn = func(string) []core.TriageThroughputEntry { return window }
+	r.windowFn = func(context.Context, string) []core.TriageThroughputEntry { return window }
 	r.failsFn = func(string) []FailEntry { return fails }
 	r.logf = func(f string, a ...any) {
 		if logs != nil {

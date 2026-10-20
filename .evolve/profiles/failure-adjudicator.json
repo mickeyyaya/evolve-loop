@@ -70,6 +70,31 @@
     "all"
   ],
   "stream_output": true,
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_read_subpaths": [
+      "docs/private"
+    ],
+    "deny_subpaths": [
+      ".git",
+      "scripts",
+      "skills",
+      "agents",
+      ".claude-plugin",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals",
+      ".evolve/worktrees",
+      ".evolve/inbox",
+      "docs/private"
+    ],
+    "allow_network": true
+  },
   "generated_from": "hand-authored (ADR-0093 retry envelope + terminal retro)",
   "cli_fallback": [
     "claude-tmux"

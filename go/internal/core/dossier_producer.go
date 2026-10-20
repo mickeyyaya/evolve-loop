@@ -11,18 +11,19 @@ import (
 type gitMutationLocker func(projectRoot string) (release func(), err error)
 
 type cycleDossierParams struct {
-	ProjectRoot        string
-	WorkspacePath      string
-	Cycle              int
-	Goal               string
-	RunID              string
-	Outcome            string
-	SystemFailure      *SystemFailureSignal
-	SkippedPhases      []SkippedPhase
-	VerdictsNotAdopted []VerdictNotAdopted
-	SpineFailOpens     []SpineFailOpen
-	PhaseTimings       []phaseTimingEntry
-	Destination        DossierDestination
+	ProjectRoot            string
+	WorkspacePath          string
+	Cycle                  int
+	Goal                   string
+	RunID                  string
+	Outcome                string
+	SystemFailure          *SystemFailureSignal
+	SkippedPhases          []SkippedPhase
+	VerdictsNotAdopted     []VerdictNotAdopted
+	SpineFailOpens         []SpineFailOpen
+	ExplanationCorrections []string
+	PhaseTimings           []phaseTimingEntry
+	Destination            DossierDestination
 }
 
 func defaultGitMutationLock(projectRoot string) (func(), error) {
@@ -42,15 +43,16 @@ func dossierVerdict(outcome string) string {
 
 func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
 	d, err := dossier.Build(p.Cycle, dossier.BuildOpts{
-		WorkspacePath:      p.WorkspacePath,
-		Goal:               p.Goal,
-		RunID:              p.RunID,
-		FinalVerdict:       dossierVerdict(p.Outcome),
-		SystemFailure:      p.SystemFailure,
-		SkippedPhases:      p.SkippedPhases,
-		VerdictsNotAdopted: p.VerdictsNotAdopted,
-		SpineFailOpens:     p.SpineFailOpens,
-		PhaseTimings:       p.PhaseTimings,
+		WorkspacePath:          p.WorkspacePath,
+		Goal:                   p.Goal,
+		RunID:                  p.RunID,
+		FinalVerdict:           dossierVerdict(p.Outcome),
+		SystemFailure:          p.SystemFailure,
+		SkippedPhases:          p.SkippedPhases,
+		VerdictsNotAdopted:     p.VerdictsNotAdopted,
+		SpineFailOpens:         p.SpineFailOpens,
+		ExplanationCorrections: p.ExplanationCorrections,
+		PhaseTimings:           p.PhaseTimings,
 	})
 	if err != nil {
 		return fmt.Errorf("build dossier: %w", err)

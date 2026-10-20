@@ -23,6 +23,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 
 func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot string, cycle int, cs *CycleState, se *ShipError, depth, fleetWidth int) (Phase, bool) {
 	o.recordShipError(ctx, cycle, *cs, se)
+	o.persistShipErrorWitness(projectRoot, *cs, se)
 	budget := shipRecoveryBudget(se.Code, fleetWidth)
 	if depth >= budget {
 		fmt.Fprintf(o.errOut(), "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s, budget %d, fleet width %d); aborting\n", depth, se.Code, se.Class, budget, fleetWidth)

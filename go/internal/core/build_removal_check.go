@@ -46,13 +46,19 @@ func RemovalClaimFailures(ctx context.Context, in ReviewInput) []string {
 }
 
 func readBuildReport(workspace string) (string, bool) {
+	_, body, ok := buildReportFile(workspace)
+	return body, ok
+}
+
+func buildReportFile(workspace string) (path, body string, ok bool) {
 	name := phasecontract.ArtifactFilename(string(PhaseBuild))
 	for _, rel := range []string{name, filepath.Join("deliverables", name)} {
-		if b, err := os.ReadFile(filepath.Join(workspace, rel)); err == nil {
-			return string(b), true
+		full := filepath.Join(workspace, rel)
+		if b, err := os.ReadFile(full); err == nil {
+			return full, string(b), true
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 func parseRemovalClaims(body string) []string {

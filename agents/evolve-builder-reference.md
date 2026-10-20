@@ -298,8 +298,8 @@ Loaded when authoring `build-report.md` metrics or AC-existence claims.
 | `input_tokens` | `<role>-usage.json` |
 | `output_tokens` | `<role>-usage.json` |
 | `cache_read_input_tokens` | `<role>-usage.json` |
-| `files_changed` | `git show <sha> --numstat` |
-| `lines_added` / `lines_removed` | `git show <sha> --numstat` |
+| `files_changed` | the host writes it from `git diff --numstat <cycle base>` |
+| `lines_added` / `lines_removed` | the host writes it from `git diff --numstat <cycle base>` |
 
 Plus all **AC-existence claims** ("file X exists" or "command Y exits 0").
 
@@ -373,7 +373,7 @@ Closes-Inbox: <inbox-item-id, or omit the line entirely>
 ## Worktree
 - **Branch:** <from `git branch --show-current`>
 - **Commit:** <SHA from `git rev-parse HEAD`>
-- **Files changed:** <N>
+- **Files changed:** <the host writes this from the cycle base>
 
 ## Build Steps
 ```tsv
@@ -387,6 +387,7 @@ Closes-Inbox: <inbox-item-id, or omit the line entirely>
 Action	File	Description
 MODIFY	path/to/file	<what changed>
 ```
+<!-- The host rewrites this table from `git diff <cycle base>` and keeps your Description per path. -->
 
 <!-- ANCHOR:test_results -->
 ## Self-Verification

@@ -42,6 +42,7 @@ type fakePRGitHub struct {
 	views    map[string]string
 	behind   map[string]string
 	merged   map[string]string
+	files    map[string]string
 	calls    []string
 	failCall string
 }
@@ -57,6 +58,8 @@ func (f *fakePRGitHub) gh(_ context.Context, args ...string) ([]byte, error) {
 		return []byte(f.merged[args[2]]), nil
 	case strings.HasPrefix(call, "pr view"):
 		return []byte(f.views[args[2]]), nil
+	case strings.HasPrefix(call, "api --paginate repos/{owner}/{repo}/pulls/"):
+		return []byte(f.files[strings.Split(args[2], "/")[4]]), nil
 	case strings.HasPrefix(call, "api "):
 		return []byte(f.behind[call[strings.LastIndex(call, "...")+3:]]), nil
 	}
