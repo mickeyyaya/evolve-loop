@@ -2,8 +2,10 @@ package ship
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -100,5 +102,49 @@ func TestEnterShipWindow_AReleaseFailureIsLogged(t *testing.T) {
 	release()
 	if !containsLog(*res, "[ship] WARN: ship-window lease release: ") {
 		t.Fatalf("logs=%v", res.Logs)
+	}
+}
+
+func TestEnterShipWindow_AHeldContextReentersWithoutWaitingOrReleasing(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	outer, err := shipwindow.Acquire(context.Background(), filepath.Join(root, ".evolve"), shipwindow.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = outer.Release() }()
+	ctx, cancel := context.WithTimeout(shipwindow.WithHeld(context.Background(), outer), 2*time.Second)
+	defer cancel()
+	res := &RunResult{}
+	release := enterShipWindow(ctx, &Options{Class: ClassCycle, ProjectRoot: root}, res)
+	release()
+	if ctx.Err() != nil || len(res.Logs) != 0 {
+		t.Fatalf("a ship inside the orchestrator's held window waited or warned: ctxErr=%v logs=%v", ctx.Err(), res.Logs)
+	}
+	if !leaseHeld(root) {
+		t.Fatal("the inner release removed the orchestrator's lease")
+	}
+}
+
+func TestEnterShipWindow_BreakingAHungHolderWarnsAndSignals(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustWrite(t, shipwindow.PathIn(filepath.Join(root, ".evolve")),
+		fmt.Sprintf(`{"owner_pid":%d,"heartbeat_at":"2026-10-19T01:13:10Z","token":"hung"}`+"\n", os.Getpid()))
+	center, events := recordingCenter()
+	res := &RunResult{}
+	release := enterShipWindow(context.Background(), &Options{Class: ClassCycle, ProjectRoot: root, CycleID: 7, Signals: center}, res)
+	defer release()
+	center.Flush()
+	want := fmt.Sprintf("[ship] WARN: ship-window lease of pid %d broken at the TTL (heartbeat 2026-10-19T01:13:10Z)", os.Getpid())
+	if !containsLog(*res, want) {
+		t.Fatalf("logs=%v, want %q", res.Logs, want)
+	}
+	found := false
+	for _, e := range *events {
+		found = found || (e.Code == codeShipWindowLeaseBroken && e.Fields["owner_pid"] == strconv.Itoa(os.Getpid()))
+	}
+	if !found {
+		t.Fatalf("signals=%+v, want %s naming the broken holder", *events, codeShipWindowLeaseBroken)
 	}
 }

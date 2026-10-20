@@ -186,6 +186,8 @@ type Orchestrator struct {
 
 	stderr io.Writer
 
+	shipWindow *shipWindowHold
+
 	worktree WorktreeProvisioner
 
 	cfg      config.RoutingConfig
@@ -448,6 +450,7 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		ledger:                     ledger,
 		runners:                    runners,
 		sm:                         NewStateMachine(),
+		shipWindow:                 &shipWindowHold{},
 		now:                        time.Now,
 		gitHEAD:                    defaultGitHEAD,
 		resumeDispatch:             (*cycleRun).snapshotThenDispatch,
@@ -514,6 +517,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		workflowConfig: o.workflowConfig,
 	}
 	defer func() { cleanup(cr.preserveWorktree, cr.cycleCompletedNormally) }()
+	defer o.releaseShipWindow()
 	defer func() { cr.abnormalEpilogue(retErr) }()
 	defer func() { cr.checkpointInterruptedPhase(retErr) }()
 	if cr.cs.ExplanationDocumentationVersion != 0 {

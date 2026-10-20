@@ -58,6 +58,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		cs: cs, state: state, result: result,
 	}
 	r.closeout = timingOwner
+	defer o.releaseShipWindow()
 	defer func() {
 		if completed || errors.Is(retErr, ErrAllFamiliesExhausted) || ctx.Err() != nil {
 			return

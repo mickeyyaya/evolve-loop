@@ -101,7 +101,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	for attempt := 1; ; attempt++ {
 		attemptCount = attempt
 		obsCancel := cr.o.observer.Start(cr.ctx, string(next), phaseReq)
-		resp, err = runner.Run(cr.ctx, phaseReq)
+		resp, err = cr.o.runPhase(cr.ctx, next, runner, phaseReq)
 		if obsCancel != nil {
 			obsCancel()
 		}

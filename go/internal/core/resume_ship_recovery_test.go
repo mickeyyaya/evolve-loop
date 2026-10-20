@@ -59,22 +59,30 @@ func newStaleBaseLane(t *testing.T, peerFile string) staleBaseLane {
 
 type orderedRunner struct {
 	PhaseRunner
-	name  string
-	order *[]string
+	name    string
+	order   *[]string
+	observe func(context.Context)
 }
 
 func (r orderedRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
 	*r.order = append(*r.order, r.name)
+	if r.observe != nil {
+		r.observe(ctx)
+	}
 	return r.PhaseRunner.Run(ctx, req)
 }
 
 type landingShip struct {
 	*fakeRunner
-	order *[]string
+	order   *[]string
+	observe func(context.Context)
 }
 
 func (r landingShip) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
 	*r.order = append(*r.order, "ship")
+	if r.observe != nil {
+		r.observe(ctx)
+	}
 	resp, err := r.fakeRunner.Run(ctx, req)
 	if err != nil {
 		return resp, err
@@ -88,6 +96,8 @@ type staleBaseScenario struct {
 	shipErr        error
 	shipFailures   int
 	options        []Option
+	observeShip    func(context.Context)
+	observeAudit   func(context.Context)
 }
 
 type staleBaseOutcome struct {
@@ -123,8 +133,8 @@ func (l staleBaseLane) resumeShip(t *testing.T, sc staleBaseScenario) staleBaseO
 		},
 	}
 	runners := buildRunners(nil)
-	runners[PhaseShip] = landingShip{fakeRunner: out.ship, order: &out.order}
-	runners[PhaseAudit] = orderedRunner{PhaseRunner: out.audit, name: "audit", order: &out.order}
+	runners[PhaseShip] = landingShip{fakeRunner: out.ship, order: &out.order, observe: sc.observeShip}
+	runners[PhaseAudit] = orderedRunner{PhaseRunner: out.audit, name: "audit", order: &out.order, observe: sc.observeAudit}
 	runners[PhaseDebugger] = orderedRunner{PhaseRunner: out.debugger, name: "debugger", order: &out.order}
 	center, events := recordingCenter()
 	out.signals = events

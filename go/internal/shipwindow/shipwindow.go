@@ -20,7 +20,7 @@ import (
 
 const FileName = "ship-window.lock"
 
-const DefaultTTL = 5 * time.Minute
+const DefaultTTL = 15 * time.Minute
 
 const (
 	queueDirName = "ship-window.queue"
@@ -29,12 +29,42 @@ const (
 
 var ticketSeq uint64
 
+var (
+	marshalRecord = json.Marshal
+	linkLease     = os.Link
+)
+
 type Options struct {
-	TTL      time.Duration
-	Now      func() time.Time
-	Alive    func(pid int) bool
-	Poll     time.Duration
-	OwnerPID int
+	TTL          time.Duration
+	Now          func() time.Time
+	Alive        func(pid int) bool
+	Poll         time.Duration
+	OwnerPID     int
+	OnStaleBreak func(StaleHolder)
+}
+
+type StaleHolder struct {
+	OwnerPID    int
+	HeartbeatAt string
+}
+
+func (h StaleHolder) Reason() string {
+	return fmt.Sprintf("ship-window lease of pid %d broken at the TTL (heartbeat %s)", h.OwnerPID, h.HeartbeatAt)
+}
+
+func (h StaleHolder) Fields() map[string]string {
+	return map[string]string{"owner_pid": strconv.Itoa(h.OwnerPID), "heartbeat_at": h.HeartbeatAt}
+}
+
+type heldKey struct{}
+
+func WithHeld(ctx context.Context, l *Lease) context.Context {
+	return context.WithValue(ctx, heldKey{}, l)
+}
+
+func Held(ctx context.Context) bool {
+	l, _ := ctx.Value(heldKey{}).(*Lease)
+	return l != nil
 }
 
 func (o Options) normalized() Options {
@@ -120,11 +150,12 @@ func tryAcquire(evolveDir, queueDir, ticket string, o Options) (*Lease, error) {
 		breakPath := lockPath + ".breaking." + ticket
 		if rerr := os.Rename(lockPath, breakPath); rerr == nil {
 			_ = os.Remove(breakPath)
+			reportStaleBreak(o, rec)
 		} else if !errors.Is(rerr, os.ErrNotExist) {
 			return nil, fmt.Errorf("shipwindow: break stale lease: %w", rerr)
 		}
 	}
-	b, err := json.Marshal(record{
+	b, err := marshalRecord(record{
 		OwnerPID:    o.OwnerPID,
 		HeartbeatAt: o.Now().UTC().Format(time.RFC3339Nano),
 		Token:       ticket,
@@ -136,7 +167,7 @@ func tryAcquire(evolveDir, queueDir, ticket string, o Options) (*Lease, error) {
 	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
 		return nil, fmt.Errorf("shipwindow: stage lease: %w", err)
 	}
-	linkErr := os.Link(tmp, lockPath)
+	linkErr := linkLease(tmp, lockPath)
 	_ = os.Remove(tmp)
 	if linkErr != nil {
 		if errors.Is(linkErr, os.ErrExist) {
@@ -145,6 +176,12 @@ func tryAcquire(evolveDir, queueDir, ticket string, o Options) (*Lease, error) {
 		return nil, fmt.Errorf("shipwindow: create lease: %w", linkErr)
 	}
 	return &Lease{path: lockPath, token: ticket}, nil
+}
+
+func reportStaleBreak(o Options, rec record) {
+	if o.OnStaleBreak != nil && rec.OwnerPID > 0 && o.Alive(rec.OwnerPID) {
+		o.OnStaleBreak(StaleHolder{OwnerPID: rec.OwnerPID, HeartbeatAt: rec.HeartbeatAt})
+	}
 }
 
 func queueHead(queueDir, own string, alive func(int) bool) (string, error) {
