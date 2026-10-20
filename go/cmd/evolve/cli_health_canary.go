@@ -20,7 +20,8 @@ func liveProbeWith(ctx context.Context, projectRoot, model string, deps bridge.D
 		bridge.BootProbe{Driver: driver, Log: deps.Stderr}.Retry(ctx, func() (int, string) {
 			probeCtx, cancel := context.WithTimeout(ctx, 4*time.Minute)
 			defer cancel()
-			rc, pattern, scrollback = bridge.LiveSmokeTest(probeCtx, driver, &bridge.Config{ProjectRoot: projectRoot, Model: model}, deps)
+			probe := bridge.LiveSmokeTest(probeCtx, driver, &bridge.Config{ProjectRoot: projectRoot, Model: model}, deps)
+			rc, pattern, scrollback = probe.RC, probe.Pattern, probe.Scrollback
 			return rc, pattern
 		})
 		return rc, pattern, scrollback
