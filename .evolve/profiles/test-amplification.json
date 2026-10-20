@@ -36,7 +36,7 @@
       "{worktree_path}",
       ".evolve/runs/cycle-*"
     ],
-    "read_only_repo": true,
+    "read_only_repo": false,
     "deny_subpaths": [
       ".git",
       ".evolve/state.json",
