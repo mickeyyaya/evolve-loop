@@ -74,7 +74,7 @@ When a change alters the design or an invariant of a package, it updates the des
 - `evolve comments strip [dir ...]` (default `.`) removes, in place, every comment that the table above does not allow.
   - One table in `equivalence.go` gives the allowed comments and how much of each comment it keeps. `verify` reads the same table. The command keeps:
     - the own line of a directive;
-    - the whole paragraph of a `minimal:` or `Deprecated:` note, up to a blank `//`;
+    - the whole paragraph of an `acs-predicate:` marker or of a `minimal:` or `Deprecated:` note, up to a blank `//`;
     - an `Output:` header and the rest of its group;
     - each comment group with the `IPC-protocol-allowed` marker, whole, because envtaint reads the group;
     - a whole generated file, with no change.

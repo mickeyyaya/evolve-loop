@@ -127,7 +127,7 @@ var commentMarkerRules = []commentMarkerRule{
 	{`//nolint(:|\s|$)`, markerLine, false, scopeAnywhere},
 	{`// \+build `, markerLine, false, scopeAnywhere},
 	{`// Code generated .* DO NOT EDIT\.$`, markerFile, false, scopeAnywhere},
-	{`// acs-predicate:`, markerLine, false, scopeAnywhere},
+	{`// acs-predicate:`, markerParagraph, false, scopeAnywhere},
 	{`// minimal:`, markerParagraph, false, scopeAnywhere},
 	{`// Deprecated:`, markerParagraph, true, scopeAnywhere},
 	{`// (Unordered output|Output):`, markerRestOfGroup, false, scopeExampleFuncs},

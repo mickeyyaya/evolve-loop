@@ -19,7 +19,12 @@
 
 ## Design
 
-- **One table of comments a tool reads.** `commentMarkerRules` in `equivalence.go` lists each marker's pattern and how much it spans: its own line (toolchain and linter directives, `acs-predicate:`, `apicover:ignore`), its paragraph (`minimal:`, `Deprecated:`), the rest of its group (an Example's `Output:`), its whole group (`IPC-protocol-allowed`, which the envtaint scan reads per group), or the whole file (a generated header). `verify`'s `directive` pattern is rendered from the table and `strip` reads the extents, so the two cannot disagree about which comment a tool reads.
+- **One table of comments a tool reads.** `commentMarkerRules` in `equivalence.go` lists each marker's pattern and how much it spans. `verify`'s `directive` pattern is rendered from the table and `strip` reads the extents, so the two cannot disagree about which comment a tool reads. The extents are:
+  - its own line: a toolchain or linter directive, `apicover:ignore`;
+  - its paragraph, up to a blank `//`: `acs-predicate:`, `minimal:`, `Deprecated:`;
+  - the rest of its group: an Example's `Output:`;
+  - its whole group: `IPC-protocol-allowed`, because the envtaint scan reads per group;
+  - the whole file: a generated header.
 - **One scan rule for the envtaint marker.** `IPC-protocol-allowed` is a marker only in a file that the envtaint regression scan parses. `internal/envscope` holds that rule (`SkipDir`, `File`, `Reads`). Envtaint walks with `SkipDir` and `File`. `Equivalent` calls `Reads` with the file name, so a prose mention in an `acs` or `_test.go` file is a plain comment. A production file keeps the strict rule.
 - **Proof after every transform.** `Equivalent` compares the code-only AST (positions and comments dropped) and each directive's anchoring (the next code token, a blank line before it, whether a `Deprecated:` note opens its paragraph: the one note the table marks `anchorsParagraph`, since staticcheck and gopls read it only there). `verify` applies it to a diff; `strip` applies it to its own output and refuses a file that fails, so a defect in the removal can never land code changes.
 - **`strip` plans edits against the original bytes and applies them once**, from the end backwards, then formats with gofmt. A whole-line comment takes its line; a trailing comment takes the space before it; a comment between tokens becomes the space, or the newline, the language reads it as.
@@ -49,5 +54,6 @@
 
 ## History
 
+- **2026-10-20:** `strip` keeps the whole paragraph of an `acs-predicate:` marker. Before, it kept only the first line, and the kept line ended in the middle of a sentence.
 - **2026-10-01:** `UnrecordedHistory`, `RewrittenHistoryPages`, `IsUnparsable` and the exported `HistoryArchiveDir` for the commit gate's history refusals; the added-comment rule stops counting `docs/`; the package joins the protected surface ([ADR-0115](../adr/0115-commit-gate-keeps-history-and-records-waivers.md)).
 - **2026-09-30:** `history` and the comment history archive; `strip`, the marker table and the shared package-doc floor, after a Clean Code review of a stripped trial ([report](../../reports/comment-strip-clean-code-review-2026-09-30.md)).
