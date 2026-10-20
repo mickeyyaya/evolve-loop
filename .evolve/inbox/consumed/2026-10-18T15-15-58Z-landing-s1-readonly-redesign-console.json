@@ -4,6 +4,12 @@
     "A test proves an edits-only diverged fleet lane leaves the inbox, the index and the worktree untouched before verifyAuditBinding",
     "It saves a scan for the lane shape ship actually sees (core resets the lane to its base after build: HEAD == base with staged edits), or the plan records why S1 stays dropped"
   ],
+  "consumed": {
+    "at": "2026-10-20T07:06:57Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "SUPERSEDED: acceptance 3 alternative met; docs/plans/fleet-landing-at-scale-2026-10.md:315 records 'S1 stays dropped' with its reasons (cycle 1960, 39f4c93e5); S5 and S6 save the scan instead. Triage 2026-10-20, verified twice."
+  },
   "created_at": "2026-10-13T08:10:00Z",
   "files": [
     "go/internal/phases/ship/ship.go",

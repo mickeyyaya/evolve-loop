@@ -7,6 +7,12 @@
     "comment-floor-enforce",
     "comment-regrowth-build-exit-gate"
   ],
+  "consumed": {
+    "at": "2026-10-20T07:06:57Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "DONE: 7b47cc927; core.TddCommentFloorFailures (go/internal/core/comment_floor.go:56) wired at go/internal/cli/phasecmd/phase_verify.go:126-147; TestCommentFloorFailures_ACommentOnlyInTheTddOwnedPredicateFilePassesTheWholeBuildFloor. Triage 2026-10-20, verified twice."
+  },
   "created_at": "2026-09-30T10:52:40Z",
   "files": [
     "go/internal/core",
