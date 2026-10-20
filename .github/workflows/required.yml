@@ -155,10 +155,10 @@ jobs:
       - id: lint
         name: Lint the added text
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          base=$(git merge-base "refs/remotes/origin/$BASE_REF" "$HEAD_SHA")
           "$RUNNER_TEMP/evolve" docs ste-lint --strict --changed "$base" --added --project-root "$GITHUB_WORKSPACE"
 
   required:
