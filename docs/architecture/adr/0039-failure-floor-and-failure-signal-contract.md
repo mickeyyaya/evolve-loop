@@ -301,4 +301,6 @@ The request is the inbox item `lost-ship-closeout-universal-landing-witness`. Th
 
 **Limit.** A sibling lane can land between the start of this cycle and its close. An agent that copies that sibling's commit into a binding of this cycle still passes D2. The latch (D1) does not have this gap, and a ship that PASSes sets it.
 
+**Limit on resume.** In process, the latch and the pre-cycle `HEAD` are host memory. A resume reads both back from the run's `run.json`, a file that a phase agent can write. Inbox `resume-reads-the-ship-latch-from-an-agent-writable-file` tracks the fix. The gap is narrow: a resumed cycle ships only through a new ship PASS, and that PASS sets the latch in memory again. `TestResumeLifecycle_ThePersistedPreCycleHeadReachesTheCloseout` pins that the resumed closeout reads the persisted pre-cycle `HEAD`.
+
 The test `TestResumeLifecycle_LostLandingUsesSameTerminalFloor` asserted that a resumed ship PASS with an earlier ship error was a lost landing. That is the cycle-1536 shape, so D1 reverses it: `TestResumeLifecycle_AShipThatPassedAfterAStaleShipErrorIsNotALostLanding` replaces it.
