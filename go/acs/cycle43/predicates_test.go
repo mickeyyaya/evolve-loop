@@ -54,7 +54,7 @@ func TestC43_002_NoProdEnvReadsForRemovedFlags(t *testing.T) {
 			flags:   []string{"EVOLVE_ARTIFACT_MAX_EXTENDS"},
 		},
 		{
-			relPath: "go/cmd/evolve/cmd_phase_observer.go",
+			relPath: "go/internal/cli/phasecmd/phase_observer.go",
 			flags:   []string{"EVOLVE_ARTIFACT_MAX_EXTENDS"},
 		},
 		{

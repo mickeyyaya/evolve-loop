@@ -17,9 +17,13 @@ func (r *recorder) Skip(args ...any)  { r.skipped = fmt.Sprint(args...) }
 func (r *recorder) Fatal(args ...any) { r.failed = fmt.Sprint(args...) }
 
 func host(goos, ci string, installed ...string) Host {
+	return hostRequiring(goos, ci, "", installed...)
+}
+
+func hostRequiring(goos, ci, required string, installed ...string) Host {
 	return Host{
 		GOOS:   goos,
-		Getenv: func(k string) string { return map[string]string{"CI": ci}[k] },
+		Getenv: func(k string) string { return map[string]string{"CI": ci, RequiredToolsEnv: required}[k] },
 		LookPath: func(name string) (string, error) {
 			for _, n := range installed {
 				if n == name {
@@ -91,5 +95,22 @@ func TestToolAndUnavailable_ReadTheProcessHost(t *testing.T) {
 	Unavailable(r, "ci reason")
 	if wantFail := runtime.GOOS == "darwin"; (r.failed != "") != wantFail {
 		t.Fatalf("in CI on %s: failed=%q skipped=%q, want failed=%v", runtime.GOOS, r.failed, r.skipped, wantFail)
+	}
+}
+
+func TestHost_ToolFailsOnAnyHostWhenTheJobDeclaresTheToolRequired(t *testing.T) {
+	r := &recorder{}
+	hostRequiring("linux", "true", "git, tmux").Tool(r, "tmux")
+	if !strings.Contains(r.failed, RequiredToolsEnv) || !strings.Contains(r.failed, "tmux not installed") || r.skipped != "" {
+		t.Fatalf("a Linux CI job that declares tmux required must fail when tmux is missing, got failed=%q skipped=%q", r.failed, r.skipped)
+	}
+	r = &recorder{}
+	hostRequiring("linux", "true", "git").Tool(r, "tmux")
+	if r.skipped != "tmux not installed" || r.failed != "" {
+		t.Fatalf("a tool the job does not declare keeps the host rule (skip on Linux), got failed=%q skipped=%q", r.failed, r.skipped)
+	}
+	r = &recorder{}
+	if got := hostRequiring("linux", "true", "tmux", "tmux").Tool(r, "tmux"); got != "/opt/bin/tmux" || r.skipped+r.failed != "" {
+		t.Fatalf("a declared tool that is installed returns its path: path=%q skipped=%q failed=%q", got, r.skipped, r.failed)
 	}
 }

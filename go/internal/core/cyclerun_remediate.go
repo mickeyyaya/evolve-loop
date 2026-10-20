@@ -81,6 +81,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		return loopNext, nil
 	}
 	bresp = fixResult.resp
+	cr.o.emitPhaseBindings(cr.ctx, cr.cycle, cr.req.ProjectRoot, cr.cs, PhaseBuild, bresp.Verdict)
 	if cr.cs.ExplanationDocumentationVersion != 0 {
 		handoff := projectBuildExplanation(cr.req.ProjectRoot, cr.cs)
 		if handoff.State != BuildExplanationAvailable {

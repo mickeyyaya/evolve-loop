@@ -68,6 +68,9 @@ func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) {
 		}
 		res.Routed = append(res.Routed, d.ID)
 	}
+	if err := committedset.WriteHandoff(in.Workspace, committedset.Handoff{Cycle: in.Cycle, Routed: res.Routed}); err != nil {
+		errs = append(errs, fmt.Errorf("record the no-work hand-off: %w", err))
+	}
 	retired, err := retireUnbackedScope(opts, in.Cycle, scope, answers)
 	res.Retired = retired
 	if err != nil {

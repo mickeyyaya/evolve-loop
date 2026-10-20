@@ -373,13 +373,24 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 	if !repocontract.GateOn(gate) {
 		return nil
 	}
-	moduleDir := repocontract.ModuleDir(root)
-	out := packLog{notes: stderr, raw: stderr}
-	if scan := openScanLog(workspace, stderr); scan != nil {
-		defer func() { _ = scan.Close() }()
-		defer fmt.Fprintf(stderr, "[ship] repo-contract gate: full output: %s\n", scan.Name())
-		out = packLog{notes: io.MultiWriter(stderr, scan), raw: scan}
+	scan := openScanLog(workspace, stderr)
+	if scan == nil {
+		return runRepoContractSteps(ctx, packLog{notes: stderr, raw: stderr}, gate, root, baseRef, workspace, cleared)
 	}
+	defer func() { _ = scan.Close() }()
+	tally := &gateTally{}
+	err := runRepoContractSteps(ctx, packLog{notes: scan, raw: scan, tally: tally}, gate, root, baseRef, workspace, func(names []string) {
+		tally.flaky = append(tally.flaky, names...)
+		if cleared != nil {
+			cleared(names)
+		}
+	})
+	fmt.Fprintln(stderr, repoContractSummary(err, *tally, scan.Name()))
+	return err
+}
+
+func runRepoContractSteps(ctx context.Context, out packLog, gate, root, baseRef, workspace string, cleared func([]string)) error {
+	moduleDir := repocontract.ModuleDir(root)
 	shadow := scanShadowFrom(ctx)
 	shadow.begin(ctx, root)
 	defer shadow.finish()
@@ -479,6 +490,9 @@ func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, na
 	switch {
 	case second.green():
 		fmt.Fprintf(out, "[ship] repo-contract gate: retry GREEN — first failure was infra noise, ship proceeds\n")
+		if r, ok := out.(infraRetryRecorder); ok {
+			r.recordInfraRetry(name)
+		}
 		return nil
 	case second.realRed():
 		return contractRed(name, second)
@@ -548,11 +562,12 @@ func openScanLog(workspace string, stderr io.Writer) *os.File {
 		return nil
 	}
 	path := filepath.Join(workspace, scanLogName)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		fmt.Fprintf(stderr, "[ship] repo-contract gate: scan log %s unavailable (%v) — continuing with stderr-only diagnostics\n", path, err)
 		return nil
 	}
+	fmt.Fprintf(f, "[ship] repo-contract gate: run started %s\n", time.Now().UTC().Format(time.RFC3339))
 	return f
 }
 

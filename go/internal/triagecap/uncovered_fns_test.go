@@ -1,6 +1,7 @@
 package triagecap
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -77,7 +78,7 @@ func TestCommittedFloorPackages_FallsBackToProse(t *testing.T) {
 }
 
 func TestReadWindow_MissingState_ReturnsNil(t *testing.T) {
-	if got := readWindow(t.TempDir()); got != nil {
+	if got := readWindow(context.Background(), t.TempDir()); got != nil {
 		t.Fatalf("missing state.json = %+v, want nil", got)
 	}
 }
@@ -86,7 +87,7 @@ func TestReadWindow_ParsesToThroughput(t *testing.T) {
 	root := t.TempDir()
 	writeStateJSON(t, root, `{"triageThroughput":[{"cycle":290,"floors":3}]}`)
 
-	got := readWindow(root)
+	got := readWindow(context.Background(), root)
 	if len(got) != 1 || got[0].Cycle != 290 || got[0].Floors != 3 {
 		t.Fatalf("readWindow = %+v, want cycle 290 floors 3", got)
 	}

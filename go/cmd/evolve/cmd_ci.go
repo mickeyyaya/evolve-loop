@@ -88,10 +88,22 @@ func runCI(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s%v\n", ciClassifyPrefix, err)
 		return exitIO
 	}
+	if err := fileBaseRedItems(root, rep, stderr); err != nil {
+		fmt.Fprintf(stderr, "%s%v\n", ciClassifyPrefix, err)
+		return exitIO
+	}
 	if rep.RetrySafe {
 		return 0
 	}
 	return exitRefused
+}
+
+func fileBaseRedItems(root string, rep ciwatch.ClassifyReport, stderr io.Writer) error {
+	filed, err := ciwatch.FileBaseRedItems(filepath.Join(paths.EvolveDirOf(root), "inbox"), rep, time.Now())
+	for _, id := range filed {
+		fmt.Fprintf(stderr, "%sfiled fix-first item %s\n", ciClassifyPrefix, id)
+	}
+	return err
 }
 
 func ciClassifyOptions(root string, rerun bool, stderr io.Writer) (ciwatch.ClassifyOptions, error) {

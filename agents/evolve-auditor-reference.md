@@ -41,8 +41,9 @@ current host values:
 - Evidence: docs/explain/builds/cycle-42-run-42.md:1 accurately explains the behavior implemented at config/app.yaml:1
 ```
 
-The rule for an inaccurate document (`NEEDS_CORRECTION`, the FAIL it needs and how
-the host routes its repair round) is in the host-rendered `## Audit Rules` block.
+The rule for an inaccurate document (`NEEDS_CORRECTION` on verified code keeps the
+verdict, and the host corrects the document before ship) is in the host-rendered
+`## Audit Rules` block.
 For an invalid or missing host handoff, use `Status: FAIL` and concrete evidence.
 A host integrity failure cannot be overridden by narrative `VERIFIED`. A
 version-zero legacy cycle has no explanation-review obligation.

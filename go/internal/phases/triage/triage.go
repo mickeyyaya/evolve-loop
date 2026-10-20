@@ -24,14 +24,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanerouting"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/specrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -366,9 +369,14 @@ func New(c Config) *Phase {
 
 func init() {
 	registry.Register(string(core.PhaseTriage), func(req core.PhaseRequest) core.PhaseRunner {
-		return New(Config{
-			Bridge:  bridge.NewDefault(req.ProjectRoot, nil),
-			Prompts: prompts.NewForProject(req.ProjectRoot),
-		})
+		return New(registryConfig(req, os.Stderr))
 	})
+}
+
+func registryConfig(req core.PhaseRequest, warn io.Writer) Config {
+	return Config{
+		Bridge:        bridge.NewDefault(req.ProjectRoot, nil),
+		Prompts:       prompts.NewForProject(req.ProjectRoot),
+		LaneForbidden: lanerouting.LazyForbidden(req.ProjectRoot, build.ProfileName, signalcenter.ConsoleSink(warn)),
+	}
 }

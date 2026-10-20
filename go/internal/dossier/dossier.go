@@ -38,6 +38,7 @@ type Dossier struct {
 	SkippedPhases              []cyclestate.SkippedPhase       `json:"skipped_phases,omitempty"`
 	PhasesRunVerdictNotAdopted []cyclestate.VerdictNotAdopted  `json:"phases_run_verdict_not_adopted,omitempty"`
 	SpineFailOpens             []cyclestate.SpineFailOpen      `json:"spine_fail_opens,omitempty"`
+	ExplanationCorrections     []string                        `json:"explanation_corrections,omitempty"`
 	StartedAt                  string                          `json:"started_at,omitempty"`
 	EndedAt                    string                          `json:"ended_at,omitempty"`
 	Timing                     *phasetiming.Summary            `json:"timing,omitempty"`

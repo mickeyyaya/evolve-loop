@@ -46,6 +46,7 @@
   - `GoalHash` and `GoalText` carry the original request across quota pauses. A legacy checkpoint lacks them, and resume then resolves conservatively. `ExplanationDocumentationVersion` is the Build explanation contract version that the cycle activated. Zero grandfathers a legacy checkpoint.
   - `PreCycleHEAD` keeps the closeout baseline across a pause after Ship. A new capture on resume loses the completed ship.
   - `AuditRepairActive` is true only inside a granted repair round. The monotonic `AuditRepairAttempts` cannot gate the repair brief without leaking it into later re-entries. `AuditDispatches` counts dispatches and not completions, and it is bumped before the pre-phase checkpoint write, so a resume retires an interrupted round.
+  - `ExplanationCorrections` holds the review Evidence of each document-only correction (X2). Its length is the budget used, so a resume keeps the bound. `ExplanationCorrectionActive` seeds only the next Build.
   - `FinalVerdict` is the floor-gated disposition at the last completed phase. A resume after the audit keeps it and does not default to PASS.
 - **Test fixtures.** `TestPhaseConstants` lists the constants in a slice. A map keyed by the constant compares each value with itself. The round-trip tests compare wire names, because `DeepEqual` cannot see a tag rename.
 

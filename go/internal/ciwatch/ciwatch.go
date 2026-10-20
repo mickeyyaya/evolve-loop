@@ -167,10 +167,7 @@ type escalationItem struct {
 }
 
 func fileEscalation(opts Options, st RunStatus, now time.Time) error {
-	short := opts.SHA
-	if len(short) > 12 {
-		short = short[:12]
-	}
+	short := shortCommit(opts.SHA)
 	failing := st.FailingTest
 	if strings.TrimSpace(failing) == "" {
 		failing = "(failing job/test not identified — open the run URL)"
@@ -193,15 +190,18 @@ func fileEscalation(opts Options, st RunStatus, now time.Time) error {
 		Evidence: st.RunURL,
 		Source:   "ciwatch",
 	}
+	return writeInboxItem(opts.InboxDir, fmt.Sprintf("%s-ci-red-%s.json", now.Format(inboxbatch.FilenameStampLayout), short), item)
+}
+
+func writeInboxItem(inboxDir, name string, item escalationItem) error {
 	body, err := marshalIndent(item, "", "  ")
 	if err != nil {
 		return fmt.Errorf("ciwatch: marshal escalation: %w", err)
 	}
-	if err := os.MkdirAll(opts.InboxDir, 0o755); err != nil {
+	if err := os.MkdirAll(inboxDir, 0o755); err != nil {
 		return fmt.Errorf("ciwatch: inbox dir: %w", err)
 	}
-	name := fmt.Sprintf("%s-ci-red-%s.json", now.Format(inboxbatch.FilenameStampLayout), short)
-	path := filepath.Join(opts.InboxDir, name)
+	path := filepath.Join(inboxDir, name)
 	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
 	if err := os.WriteFile(tmp, body, 0o644); err != nil {
 		return fmt.Errorf("ciwatch: write escalation: %w", err)

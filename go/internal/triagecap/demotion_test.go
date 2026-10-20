@@ -44,13 +44,13 @@ func TestReasonTemplateHash(t *testing.T) {
 	})
 }
 
-func TestShouldDemote(t *testing.T) {
+func TestDemotionDecision(t *testing.T) {
 	pair := []FailEntry{
 		{Cycle: 301, Summary: summary301},
 		{Cycle: 302, Summary: summary302},
 	}
 	t.Run("replay 301+302 fires for cycle 303", func(t *testing.T) {
-		ok, detail := ShouldDemote(pair, 303)
+		_, _, detail, ok := demotionDecision(pair, 303)
 		if !ok {
 			t.Fatal("two consecutive identical-template rejections must demote the next cycle")
 		}
@@ -59,18 +59,18 @@ func TestShouldDemote(t *testing.T) {
 		}
 	})
 	t.Run("window scope: fires through a reset-sealed gap (cycle 304)", func(t *testing.T) {
-		if ok, _ := ShouldDemote(pair, 304); !ok {
+		if _, _, _, ok := demotionDecision(pair, 304); !ok {
 			t.Error("the 301/302 pair is within the demotion window of cycle 304 — a reset-sealed 303 must be a transparent gap")
 		}
 	})
 	t.Run("beyond the demotion window does NOT fire", func(t *testing.T) {
-		if ok, _ := ShouldDemote(pair, 306); ok {
+		if _, _, _, ok := demotionDecision(pair, 306); ok {
 			t.Error("cycle 306 is beyond the demotion window of the 301/302 pair — stale pairs must keep enforcing")
 		}
 	})
 	t.Run("non-consecutive pair does not fire", func(t *testing.T) {
 		gap := []FailEntry{{Cycle: 300, Summary: summary301}, {Cycle: 302, Summary: summary302}}
-		if ok, _ := ShouldDemote(gap, 303); ok {
+		if _, _, _, ok := demotionDecision(gap, 303); ok {
 			t.Error("a PASS cycle between the rejections breaks the consecutive-identical signal")
 		}
 	})
@@ -79,7 +79,7 @@ func TestShouldDemote(t *testing.T) {
 			{Cycle: 301, Summary: "cycle 301 failed during triage: review gate: triage overpacked: 6 committed coverage floors exceed the capacity cap 5"},
 			{Cycle: 302, Summary: "cycle 302 failed during triage: review gate: triage overpacked: 700 committed coverage floors exceed the capacity cap 5"},
 		}
-		if ok, _ := ShouldDemote(diff, 303); ok {
+		if _, _, _, ok := demotionDecision(diff, 303); ok {
 			t.Error("different templates = real (varying) overpacking — must keep enforcing")
 		}
 	})
@@ -88,12 +88,12 @@ func TestShouldDemote(t *testing.T) {
 			{Cycle: 301, Summary: "cycle 301 failed during build: tests red"},
 			{Cycle: 302, Summary: "cycle 302 failed during build: tests red"},
 		}
-		if ok, _ := ShouldDemote(other, 303); ok {
+		if _, _, _, ok := demotionDecision(other, 303); ok {
 			t.Error("only this gate's rejections (marker match) may demote it")
 		}
 	})
 	t.Run("single entry does not fire", func(t *testing.T) {
-		if ok, _ := ShouldDemote(pair[:1], 302); ok {
+		if _, _, _, ok := demotionDecision(pair[:1], 302); ok {
 			t.Error("one rejection is not a pattern")
 		}
 	})
@@ -128,7 +128,7 @@ func newDemotionFixture(t *testing.T, cycleID string, fails []FailEntry) (*CapRe
 	r := newCapReviewer(config.StageEnforce)
 	r.logf = func(string, ...any) {}
 	r.pkgsFn = func(string) []string { return []string{"swarmrunner", "bridge", "evalgate"} }
-	r.windowFn = func(string) []core.TriageThroughputEntry {
+	r.windowFn = func(context.Context, string) []core.TriageThroughputEntry {
 		return []core.TriageThroughputEntry{{Cycle: 300, Floors: 1}}
 	}
 	r.failsFn = func(string) []FailEntry { return fails }

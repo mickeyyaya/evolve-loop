@@ -291,6 +291,7 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	normalizeBuildGofmt(cs.ActiveWorktree)
 	if completed == PhaseBuild {
 		o.normalizeDerivedProjections(ctx, cs.ActiveWorktree)
+		writeBuildDiffSummary(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA, cs.WorkspacePath, o.errOut())
 		writeCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath, o.errOut())
 		if !o.workflowConfig.BuildFloorEnforced {
 			o.buildSelfCheck(ctx, cs.ActiveWorktree)

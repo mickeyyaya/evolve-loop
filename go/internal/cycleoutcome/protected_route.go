@@ -8,6 +8,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acspathscan"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -43,21 +44,21 @@ func protectedPaths(needs []acspathscan.Need) []string {
 	return paths
 }
 
-func addFiles(item map[string]json.RawMessage, paths []string) {
+func addProtectedFiles(item map[string]json.RawMessage, paths []string) {
 	var files []string
-	_ = json.Unmarshal(item["files"], &files)
+	_ = json.Unmarshal(item[inboxbatch.ProtectedFilesField], &files)
 	for _, p := range paths {
 		if !slices.Contains(files, p) {
 			files = append(files, p)
 		}
 	}
-	item["files"], _ = json.Marshal(files)
+	item[inboxbatch.ProtectedFilesField], _ = json.Marshal(files)
 }
 
-func addItemFiles(projectRoot, id string, paths []string) error {
+func addItemProtectedFiles(projectRoot, id string, paths []string) error {
 	loc, err := inboxmover.Locate(filepath.Join(projectRoot, ".evolve", "inbox"), id)
 	if err != nil {
 		return err
 	}
-	return inboxmover.UpdateItemJSON(loc.Path, func(item map[string]json.RawMessage) { addFiles(item, paths) })
+	return inboxmover.UpdateItemJSON(loc.Path, func(item map[string]json.RawMessage) { addProtectedFiles(item, paths) })
 }

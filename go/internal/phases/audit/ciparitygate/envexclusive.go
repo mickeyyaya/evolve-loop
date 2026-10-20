@@ -8,12 +8,12 @@ type envExclusiveEntry struct {
 	backstop string
 }
 
-const envExclusiveNoCIMarker = "NOT covered by CI"
+const envExclusiveCIMarker = "runs in CI"
 
 var tierEnvExclusive = []envExclusiveEntry{{
 	pkg:      "internal/bridge",
 	why:      "requireTmux tests boot real tmux sessions; under a live wave those boots time out (13 offenders on cycle-1543, all exit=80; the same tests 7/7 PASS in 17.2s on a quiet host)",
-	backstop: "internal/bridge's requireTmux tier is " + envExclusiveNoCIMarker + " (no tmux on runners — the #483 finding); its backstop is a quiet-host run (loop-boot preflight, or `go test -tags integration` with no wave active)",
+	backstop: "internal/bridge's requireTmux tier " + envExclusiveCIMarker + ": the ubuntu and macOS jobs run it with tmux (main run 39422739711, 2026-10-20: ubuntu 22 and 22, macOS 25 pass, 0 skip); a lane skip leaves CI as its first run",
 }}
 
 func envExclusiveEntryFor(p string) (envExclusiveEntry, bool) {

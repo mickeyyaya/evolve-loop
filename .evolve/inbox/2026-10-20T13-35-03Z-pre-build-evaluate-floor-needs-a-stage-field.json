@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "phase.json accepts a stage field with a closed set of values, and phasespec validation refuses an unknown value (test).",
+    "The routing floor refuses, with a coded signal, an order that places a pre-build Evaluate phase after build (test with bug-reproduction anchored after build).",
+    "bug-reproduction and fault-localization declare the pre-build stage, and the bug-reproduction window pin in go/cmd/evolve/routing_order_realtree_test.go reads the field instead of the phase names.",
+    "The phasespec package note and the phase-config spec document the field."
+  ],
+  "created_at": "2026-10-20T14:00:00Z",
+  "files": [
+    "go/internal/phasespec/phasespec.go",
+    "go/internal/phasespec/validate.go",
+    "go/internal/phasespec/routing.go",
+    ".evolve/phases/bug-reproduction/phase.json",
+    "docs/architecture/phase-registry.json"
+  ],
+  "fix": "Add a stage field to PhaseSpec (for example pre-build or post-build), validate it in phasespec, declare it on bug-reproduction and fault-localization, and make the routing floor refuse an order that places a pre-build phase after build. Replace the name-based window pin with the field.",
+  "id": "pre-build-evaluate-floor-needs-a-stage-field",
+  "kind": "improvement",
+  "priority_class": "maintainability",
+  "source": "split from routing-order-authority-followups (console build 2026-10-20)",
+  "split_from": "routing-order-authority-followups",
+  "summary": "Split from routing-order-authority-followups (follow-up 4, 2026-10-20). The invariant 'a red-first Evaluate phase never runs after build' cannot be expressed today. audit and tester are Evaluate phases that run after build by design, so the archetype alone cannot encode it. phase.json has only an After anchor (go/internal/phasespec/phasespec.go). The config-not-code rule asks for a declared field, not a list of names in code. Until then the bug-reproduction window pin of the realtree test is the stand-in.",
+  "title": "Phase specs need a stage field so the routing floor can refuse a red-first Evaluate phase placed after build",
+  "weight": 0.6
+}

@@ -1,6 +1,6 @@
 # Plan: a green docs, inbox or CI PR merges in a window, and a code PR merges at a boundary that the console can call early
 
-- **Status:** accepted, 2026-10-20. P2 is built in stage `off`. P2b and P3 to P5 are open. P1 is shelved: ADR-0147 replaces it.
+- **Status:** accepted, 2026-10-20. P2 and P2b are built in stage `off`. P4 and P5 are built. P3 and P5b are open. P1 is shelved: ADR-0147 replaces it.
 - **Decision:** [ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md). **Research:** [wave-latency-2026-10](../research/wave-latency-2026-10.md) §6 (O1 to O5), [latency-gates-2026-10](../research/latency-gates-2026-10.md). **Design:** [internal-mergewindow.md](../architecture/packages/internal-mergewindow.md).
 - **Operator guide:** [wave-operations.md](../operations/wave-operations.md) §5, [operating-policy.md](../operations/operating-policy.md) §2 item 5.
 
@@ -111,10 +111,10 @@ boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (sta
 |---|---|---|---|
 | P1 | Shelved. ADR-0147 replaces it: at `fleet.integration.stage: enforce` no lane writes `main`, so a window merge strands no lane push. | the ADR-0147 plan owns the tests | wave-integration plan |
 | P2 | `evolve pr window <n> \| --files-from FILE [--json]` and `pr.merge_window.stage` (this PR, stage `off`). | `TestClassify_TheLiveCIRoutingTableDecidesEachPath`, `TestPRWindow_UntilIntegrationEnforceEveryPRIsABoundaryAndTheRuleStillShows` | console, built |
-| P2b | `evolve pr merge` takes a window PR while a loop is live, and the console calls an early boundary (D6). | a live loop and stage `on`: a docs PR merges, a `go/` PR is refused | inbox `pr-merge-latency-p2b-window-consumers`, console |
+| P2b | `evolve pr merge` takes a window PR while a loop is live, and the console calls an early boundary (D6). | a live loop and stage `on`: a docs PR merges, a `go/` PR is refused | console, built: see [How P2b works](#how-p2b-works) |
 | P3 | One file for each research-index entry and a generated index with a check. A verb regenerates the generated files on a rebase. Stacked PRs are discouraged. | two docs PRs merge in each order with no conflict | inbox `pr-merge-latency-p3-conflict-hotspots`, console |
-| P4 | Fix or retire the stale ACS predicates of cycles 43, 813 and 1801. `evolve ci classify` files a fix-first item for a base red. | the predicates pass on `main` under `-tags acs` | inbox `pr-merge-latency-p4-keep-main-green`, console |
-| P5 | A loop write to a curated inbox field never blocks `sync-main`. | a replay of the cycle 2000 write | inbox `pr-merge-latency-p5-boundary-self-heal`, console |
+| P4 | Fix or retire the stale ACS predicates of cycles 43, 813 and 1801. `evolve ci classify` files a fix-first item for a base red. | the predicates pass on `main` under `-tags acs` | console, built: see [How P4 works](#how-p4-works) |
+| P5 | A loop write to a curated inbox field never blocks `sync-main`. The closeout writes the proven file to the loop stamp `protected_files`, not to `files`. | `TestApplyFailure_TheProtectedRouteWriteIsAStampThatSyncMainLands` (a replay of the cycle 2000 write) | inbox `pr-merge-latency-p5-boundary-self-heal`, console, built. The escalation reweight is split to `pr-merge-latency-p5b-escalation-reweight-stamp`. |
 | — | Operator decision: the lane STE check moves from `shadow` to `enforce` (cycle 1979 shipped a doc that failed the strict lint). | a failed lane doc goes back to the build | inbox `lane-ste-lint-stage-enforce`, operator |
 
 ### How P2 works
@@ -131,6 +131,40 @@ boundary: merge windows wait for fleet.integration.stage enforce (ADR-0147) (sta
 | 3 | `boundary`: the PR waits for a boundary, or the stage is `off`. |
 | 2 | A read or a parse failed: the policy, `required.yml`, the file list or `gh`. |
 | 10 | A usage error. |
+
+### How P2b works
+
+- `evolve pr merge` asks `evolve pr window` for each PR while a loop runs. It does so only at `pr.merge_window.stage: on` and `fleet.integration.stage: enforce`. A window PR merges, and a boundary PR keeps the live-loop refusal with the window reason. Below that gate, nothing changes.
+- `evolve pr boundary` gives the early-boundary call (D6) in one line: the green boundary PR that waited longest, its wait, the bound and the pool. Exit 0 means: call `evolve loop-stop --wait`, then `evolve wave next --merge`.
+- The bound is the policy key `pr.merge_window.early_boundary_after_s`. Its compiled default is 3600 s, the 1 h of Q2. The width of the pool is `fleet.count`.
+- Operator decision, 2026-10-20: "Combine them to fleet count". Thus "the pool runs below its window" (D6) means that the live lanes are fewer than `fleet.count`, not fewer than `fleet.min_lanes`.
+
+The design is in [internal-mergewindow](../architecture/packages/internal-mergewindow.md#consumers), and the operator steps are in [wave-operations.md](../operations/wave-operations.md) §5.
+
+### How P4 works
+
+No predicate is retired. Each red predicate pointed at a fact that moved, so each one is fixed:
+
+| Predicate | Cause of the red | Fix |
+|---|---|---|
+| `TestC43_002` | `a3f483a8a` moved `cmd_phase_observer.go` to `internal/cli/phasecmd/phase_observer.go`. | The predicate reads the new path. |
+| `TestC813_001` | `3efc783bb` moved the inline `go test -race -count=1 -tags integration` line of `go.yml` into `make test-integration`. | The predicate checks the `make test-integration` step and the `INTEGRATION_TEST` line and the `./...` roots of `go/Makefile`. |
+| `TestC1801_004` | The cycle 1930 commit `51f50c55f` gave two test helpers of `cmd_loop_m4_test.go` the real `swarm.ExecReapOrphanSockets`. `TestRunLoopBatch_OrphanSocketGCReapsOnlyDeadSocketsInTheEnvNamedDir` needs it. The `TestMain` of `cmd/evolve` sets `TMUX_TMPDIR` to a temporary folder. | `TestMain` also unsets `TMUX`, because a tmux client with no `-L` uses the socket of `$TMUX` first. The predicate accepts a test reference to a real reaper only when a `TestMain` of `cmd/evolve` does both. |
+| `TestC1801_007` | `a2cf0c638` made `ci classify` list the run artifacts, and the fake `gh` of the predicate refused that API path. | The fake `gh` answers the artifacts path with an empty list. |
+
+`TestC1801_007` was red too, but the inbox item did not name it. For a red that is also red on the base, `evolve ci classify` now files one fix-first inbox item. The ID comes from the test name, so a second run files none ([internal-ciwatch](../architecture/packages/internal-ciwatch.md#fix-first-items-for-a-base-red)).
+
+### How P5 works
+
+On 2026-10-20 the failure closeout of cycle 2000 routed `router-active-worktree-fleet-pin-lane` to the console. It also added `go/internal/core/cyclerun.go` to the curated field `files` (`addFiles` in `go/internal/cycleoutcome/protected_route.go` before P5). `sync-main` lands only the stamp fields of the loop (ADR-0112, `inboxstamps.Classify`). Thus it refused the change, and the boundary stayed blocked until #1008.
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D8 | The loop writes no curated field. The closeout writes each proven file to the new loop stamp `protected_files`. `inboxbatch.ConsoleRouted` reads `files` and `protected_files` together, so the proven path still binds the console route. | The binding is the only reason for the write (`protectedDerivation`). A stamp keeps it, and `sync-main` lands a stamp with no review. The stamp only grows: `sync-main` refuses a removal of a proven path. | A verb that lands a curated change through a review: it adds a review to each such boundary. The review checks a value that the loop proved. |
+
+The test replays the write. It runs the closeout and commits the item as it was before the cycle. Then it puts the written copy on the item. `inboxstamps.Classify` must see one stamp and no other change. Before P5 the same test saw the item as other dirt, which is the refusal of cycle 2000.
+
+One other loop writer changes a curated field. The escalation boundary sets `weight` through `inbox edit` (`moverReweight` in `go/cmd/evolve/cmd_loop_escalate.go`). Its stage is `enforce` in the live policy. It has not written yet (`.evolve/escalation-apply-report.json`, 2026-10-20). The inbox item `pr-merge-latency-p5b-escalation-reweight-stamp` owns it. The ACS predicates of cycle 1932 pin its write through `inbox edit`, so the change needs its own decision.
 
 ## 7. Order
 
@@ -166,4 +200,5 @@ P2 is verified by tests at 100% coverage of the new code. The tests read the liv
 ## 10. Open questions
 
 - Q1: must a change to `CLAUDE.md` or `AGENTS.md` wait for a boundary? If yes, the CI router must route it as non-docs, so the two rules stay one rule.
-- Q2: what is the bound for the early boundary in D6? The plan proposes 1 h, the median wait of F2. P2b sets it as a policy value.
+- Q2: what is the bound for the early boundary in D6? Answered by P2b: `pr.merge_window.early_boundary_after_s`, compiled default 3600 s (1 h, the median wait of F2).
+- Q3: in D6, is the window of the pool `fleet.count` or `fleet.min_lanes`? Answered by the operator on 2026-10-20: "Combine them to fleet count". The window is `fleet.count`.

@@ -221,9 +221,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	orch, signals := d.Orchestrator, d.Signals
 	result, err := orch.RunCycle(context.Background(), f.request(projectRoot, os.Environ()))
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
-		var lr loopResult
-		lr.emitQuotaPause(loopConfig{EvolveDir: evolveDir}, result.Cycle, stdout, stderr)
-		return fleet.ExitDeferred
+		return cycleRunQuotaExit(result.Cycle, projectRoot, evolveDir, fleetLaneFromEnv(), stdout, stderr, lifecycleLedger, signals)
 	}
 	if err != nil {
 		return cycleRunErrorExit(err, result.Cycle, projectRoot, evolveDir, stderr, lifecycleLedger, signals)
@@ -242,7 +240,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 func cycleRunErrorExit(err error, cycle int, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) int {
 	var deferral *core.LaneDeferral
 	if errors.As(err, &deferral) {
-		if rerr := releaseDeferredLaneClaims(projectRoot, deferral.Cycle, stderr, lifecycle, signals); rerr != nil {
+		if rerr := releaseDeferredLaneClaims(projectRoot, deferral.Cycle, cyclestate.CycleTerminationLaneWorktreeDeferred, stderr, lifecycle, signals); rerr != nil {
 			fmt.Fprintf(stderr, "evolve cycle run: WARN: could not release cycle %d claims: %v\n", deferral.Cycle, rerr)
 		}
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
@@ -253,9 +251,9 @@ func cycleRunErrorExit(err error, cycle int, projectRoot, evolveDir string, stde
 	return 1
 }
 
-func releaseDeferredLaneClaims(projectRoot string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
+func releaseDeferredLaneClaims(projectRoot string, cycle int, reason string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
 	opts := inboxmover.Options{ProjectRoot: projectRoot, Ledger: lifecycle, Stderr: stderr, Signals: signals}
-	_, err := inboxmover.ReleaseCycleProcessingWithReason(opts, cycle, cyclestate.CycleTerminationLaneWorktreeDeferred)
+	_, err := inboxmover.ReleaseCycleProcessingWithReason(opts, cycle, reason)
 	return err
 }
 
@@ -430,7 +428,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	cfg, _ = loader.ApplyPolicyStages(cfg, policyStagesOf(gatesCfg, recoveryCfg, routerCfg, pol.ParallelEvaluateConfig()))
 	wfCfg := pol.WorkflowConfig()
 
-	catalog, builtinCat, userSpecs := loadPhaseCatalog(projectRoot, registryPath, prm)
+	catalog, builtinCat, userSpecs := loadPhaseCatalog(projectRoot, registryPath, prm, signals.Emit)
 	cliRouter, routingErr := wireCLIRouter(routerSite{root: projectRoot, catalog: catalog}, run, console)
 	if routingErr != nil {
 		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: routingErr}
@@ -447,7 +445,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	verifierOf := func() runner.ContractVerifier { return contractVerifier }
 	var hostEffects core.HostEffects
 	hostEffectsOf := func() core.HostEffects { return hostEffects }
-	forbidden := laneForbidden(projectRoot, os.Stderr)
+	forbidden := laneForbiddenTo(projectRoot, signals.Emit)
 
 	runners := map[core.Phase]core.PhaseRunner{
 		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
@@ -458,15 +456,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
 		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithHostEffects(hostEffectsOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
 		core.PhaseShip:         ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals}),
-		core.PhaseRetro:        retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: cliRouter}),
+		core.PhaseRetro:        retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: cliRouter, ContractVerifier: verifierOf}),
 		core.PhaseDebugger:     debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 	}
 
 	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
 	wireBridgeStages(br, cfg)
-	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat) {
-		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
-	}
+	emitRoutingDefects(signals.Emit, "wireOrchestratorDeps", phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat))
 	for _, s := range catalog.UserPhases() {
 		if len(phasespec.ValidateUserSpecWithCatalog(s, builtinCat)) > 0 {
 			continue
@@ -688,17 +684,21 @@ func failureAdvisorCLI(projectRoot string, r *cliroute.Router, console io.Writer
 	return res.CLI
 }
 
-func loadPhaseCatalog(projectRoot, registryPath string, prm *prompts.Loader) (phasespec.Catalog, phasespec.Catalog, []phasespec.PhaseSpec) {
+func loadPhaseCatalog(projectRoot, registryPath string, prm *prompts.Loader, emit signalcenter.Listener) (phasespec.Catalog, phasespec.Catalog, []phasespec.PhaseSpec) {
 	builtinCat, builtinErr := phasespec.Load(registryPath)
 	if builtinErr != nil {
-		fmt.Fprintf(os.Stderr, "[phases] WARN builtin registry load failed (%v); builtin spec-runners not registered\n", builtinErr)
+		emit(phasespec.RoutingDefectEvent("loadPhaseCatalog", fmt.Sprintf("builtin registry load failed (%v); builtin spec-runners not registered", builtinErr)))
 	}
 	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, prm)
 	catalog, mergeWarns := builtinCat.Merge(userSpecs)
-	for _, w := range append(discWarns, mergeWarns...) {
-		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
-	}
+	emitRoutingDefects(emit, "loadPhaseCatalog", append(discWarns, mergeWarns...))
 	return catalog, builtinCat, userSpecs
+}
+
+func emitRoutingDefects(emit signalcenter.Listener, origin string, warnings []string) {
+	for _, w := range warnings {
+		emit(phasespec.RoutingDefectEvent(origin, w))
+	}
 }
 
 func documentSpecPtr(cfg config.RoutingConfig) *config.DeliverableKindSpec {

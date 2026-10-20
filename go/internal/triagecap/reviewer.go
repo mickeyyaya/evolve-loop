@@ -16,7 +16,7 @@ type CapReviewer struct {
 	stage    config.Stage
 	logf     func(format string, args ...any)
 	pkgsFn   func(projectRoot string) []string
-	windowFn func(projectRoot string) []core.TriageThroughputEntry
+	windowFn func(ctx context.Context, projectRoot string) []core.TriageThroughputEntry
 	failsFn  func(projectRoot string) []FailEntry
 }
 
@@ -34,15 +34,18 @@ func newCapReviewer(stage config.Stage) *CapReviewer {
 	}
 }
 
-func readWindow(projectRoot string) []core.TriageThroughputEntry {
-	st, err := storage.New(filepath.Join(projectRoot, ".evolve")).ReadState(context.Background())
+func readWindow(ctx context.Context, projectRoot string) []core.TriageThroughputEntry {
+	if ctx.Err() != nil {
+		return nil
+	}
+	st, err := storage.New(filepath.Join(projectRoot, ".evolve")).ReadState(ctx)
 	if err != nil {
 		return nil
 	}
 	return st.TriageThroughput
 }
 
-func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewResult {
+func (r *CapReviewer) Review(ctx context.Context, in core.ReviewInput) core.ReviewResult {
 	if r.stage == config.StageOff || in.Phase != string(core.PhaseTriage) {
 		return core.ReviewResult{Approve: true}
 	}
@@ -56,13 +59,14 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 	if msg := MissingCardFilesWarning(string(data), companionPath); msg != "" {
 		r.logf("[triage-cap] WARN: %s", msg)
 	}
+	r.warnMalformedCompanion(in, companionPath)
 	floors := CommittedFloorCount(string(data), companionPath, pkgs)
 	if floors > 0 {
 		if _, declared, err := ReadDeclaredFloors(companionPath); err == nil && !declared {
 			r.logf("[triage-cap] WARN: floor-bearing triage report has no %s companion declaring committed_floors — prose counting is the fallback; declare {\"committed_floors\":[...]} to make the commitment authoritative", TriageDecisionName())
 		}
 	}
-	window := r.windowFn(in.ProjectRoot)
+	window := r.windowFn(ctx, in.ProjectRoot)
 	k := K(window)
 	capacity := Cap(k)
 	if floors <= capacity {
@@ -91,7 +95,9 @@ func (r *CapReviewer) Review(_ context.Context, in core.ReviewInput) core.Review
 				r.logf("[triage-cap] demotion relief for the c%d/c%d pair already consumed by cycle %d — enforcing (one-cycle relief)", older, newer, by)
 			} else {
 				r.logf("[triage-cap] DEMOTED to shadow for cycle %d — %s; gate defect suspected (ADR-0046 L2). Would-block: %s", cycle, why, reason)
-				autoFileDemotionDefect(in.ProjectRoot, cycle, older, newer, why, RemedyPending)
+				if err := autoFileDemotionDefect(in.ProjectRoot, cycle, older, newer, why, RemedyPending); err != nil {
+					r.warn(in, CodeDemotionDefectUnwritten, err.Error())
+				}
 				return core.ReviewResult{Approve: true}
 			}
 		}

@@ -67,3 +67,13 @@ incident is the third and supplied the mechanism). This fix removes the
 manufacturing defect (planned-pre-build phases can no longer silently execute
 post-build); the ship-gate-vs-t.Skip convention question in that item stays
 open.
+
+## Follow-ups (2026-10-20)
+
+The design review queued four follow-ups as inbox item `routing-order-authority-followups`.
+
+- The routing warnings are now the coded signal `CONFIG_PHASE_ROUTING_DEFECT` in the Signal Center ([internal-phasespec](../architecture/packages/internal-phasespec.md)).
+- A resume takes the successor of an inserted phase from `cfg.Order`, as the live walk does. A no-plan resume of `bug-reproduction` now goes to build, not to audit ([internal-core](../architecture/packages/internal-core.md)).
+- The mint path routes each batch once, so it gets the same fixpoint as discovery. The sentence above about single-spec mint calls describes the code before this change.
+- The pre-build Evaluate floor needs a declared field. It moved to inbox item `pre-build-evaluate-floor-needs-a-stage-field`.
+

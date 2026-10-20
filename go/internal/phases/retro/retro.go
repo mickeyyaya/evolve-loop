@@ -5,6 +5,7 @@ package retro
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,10 +22,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
-	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const (
@@ -33,36 +32,71 @@ const (
 )
 
 type Config struct {
-	Bridge         core.Bridge
-	Prompts        *prompts.Loader
-	NowFn          func() time.Time
-	Model          string
-	CompactPrompts bool
-	Router         *cliroute.Router
+	Bridge           core.Bridge
+	Prompts          *prompts.Loader
+	NowFn            func() time.Time
+	Model            string
+	CompactPrompts   bool
+	Router           *cliroute.Router
+	SleepFn          func(time.Duration)
+	ContractVerifier func() runner.ContractVerifier
 }
 
 type Phase struct {
-	bridge         core.Bridge
-	prompts        *prompts.Loader
-	nowFn          func() time.Time
-	model          string
-	compactPrompts bool
-	router         *cliroute.Router
+	*runner.BaseRunner
 }
 
 func New(c Config) *Phase {
-	nowFn := c.NowFn
-	if nowFn == nil {
-		nowFn = time.Now
-	}
 	model := c.Model
 	if model == "" {
 		model = "auto"
 	}
-	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn, model: model, compactPrompts: c.CompactPrompts, router: c.Router}
+	opts := runner.Options{
+		Hooks:            hooks{model: model},
+		Bridge:           relaunchingBridge(c.Bridge),
+		Prompts:          c.Prompts,
+		NowFn:            c.NowFn,
+		CompactPrompts:   c.CompactPrompts,
+		Router:           c.Router,
+		SleepFn:          c.SleepFn,
+		ContractVerifier: c.ContractVerifier,
+	}
+	if src, ok := c.Bridge.(signalSource); ok {
+		opts.Signals = src.Signals
+	}
+	return &Phase{BaseRunner: runner.New(opts)}
 }
 
-func (p *Phase) Name() string { return phaseName }
+type signalSource interface{ Signals() *signalcenter.Center }
+
+type deliveryRelaunch struct{ core.Bridge }
+
+func relaunchingBridge(b core.Bridge) core.Bridge {
+	if b == nil {
+		return nil
+	}
+	return deliveryRelaunch{b}
+}
+
+func (b deliveryRelaunch) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+	resp, err := b.Bridge.Launch(ctx, req)
+	cause := core.DeliveryFailureCause(err)
+	if cause == "" || ctx.Err() != nil {
+		return resp, err
+	}
+	fmt.Fprintf(os.Stderr, "[retro] WARN delivery failure (%s) on %s; relaunching once\n", cause, req.CLI)
+	keepFirstAttemptLogs(req)
+	return b.Bridge.Launch(ctx, req)
+}
+
+func keepFirstAttemptLogs(req core.BridgeRequest) {
+	for _, stream := range []string{"stdout", "stderr"} {
+		name := filepath.Join(req.Workspace, req.Agent+"-"+stream)
+		if err := os.Rename(name+".log", name+".attempt-1.log"); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(os.Stderr, "[retro] WARN the attempt-1 %s log is not kept: %v\n", stream, err)
+		}
+	}
+}
 
 func retroWorktree(req core.PhaseRequest) string {
 	bridgeGuardAcceptsWorktree := !fleetMode(req) || gobridge.IsDir(req.Worktree)
@@ -81,114 +115,57 @@ func fleetMode(req core.PhaseRequest) bool {
 }
 
 func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
-	start := p.nowFn()
+	if retroApplies(req) {
+		req = refreshExplanationHandoff(ctx, req)
+		req.Worktree = retroWorktree(req)
+	}
+	resp, err := p.BaseRunner.Run(ctx, req)
+	if err == nil || resp.Verdict != core.VerdictFAIL {
+		return resp, err
+	}
+	fmt.Fprintf(os.Stderr, "[retro] WARN %v — emitting FAIL verdict; orchestrator routes via failure-adapter (non-fatal)\n", err)
+	return resp, nil
+}
 
+func retroApplies(req core.PhaseRequest) bool {
 	prev := req.Context["previous_verdict"]
-	if prev != core.VerdictFAIL && prev != core.VerdictWARN {
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictSKIPPED,
-			NextPhase:    string(core.PhaseEnd),
-			ArtifactsDir: req.Workspace,
-			DurationMS:   p.nowFn().Sub(start).Milliseconds(),
-		}, nil
-	}
-	if p.bridge == nil {
-		return core.PhaseResponse{}, fmt.Errorf("retro: bridge required")
-	}
-	if p.prompts == nil {
-		return core.PhaseResponse{}, fmt.Errorf("retro: prompts loader required")
-	}
-	req = refreshExplanationHandoff(ctx, req)
+	return prev == core.VerdictFAIL || prev == core.VerdictWARN
+}
 
-	agent, err := p.prompts.Agent("evolve-retrospective")
-	if err != nil {
-		return core.PhaseResponse{}, fmt.Errorf("retro: load agent: %w", err)
-	}
+type hooks struct {
+	model string
+}
 
-	body := agent.Body
-	if p.compactPrompts {
-		body = prompts.StripOnDemandSections(body)
-	}
-	prompt := composePrompt(body, req, prev)
-	artifactPath := filepath.Join(req.Workspace, "retrospective-report.md")
-	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "retrospective.json")
+func (hooks) PhaseName() string { return phaseName }
 
-	prof := retroProfile(req.ProjectRoot)
-	model := p.model
-	if model == "auto" {
-		model = "balanced"
-		if prof != nil && prof.ModelTierDefault != "" {
-			model = prof.ModelTierDefault
-		}
-	}
-	cli, routeErr := p.resolveCLI(req, prof, model)
-	if routeErr != nil {
-		fmt.Fprintf(os.Stderr, "[retro] WARN routing refused (%v) — emitting FAIL verdict (non-fatal)\n", routeErr)
-		return core.PhaseResponse{
-			Phase: phaseName, Verdict: core.VerdictFAIL, ArtifactsDir: req.Workspace, NextPhase: string(core.PhaseEnd),
-			DurationMS:  p.nowFn().Sub(start).Milliseconds(),
-			Diagnostics: []core.Diagnostic{{Severity: "error", Message: routeErr.Error()}},
-		}, nil
-	}
+func (hooks) AgentPromptName() string { return "evolve-" + retroAgent }
 
-	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, model)
+func (hooks) ArtifactFilename(core.PhaseRequest) string { return "retrospective-report.md" }
 
-	bridgeReq := core.BridgeRequest{
-		CLI:         cli,
-		Profile:     profilePath,
-		Model:       model,
-		Prompt:      prompt,
-		Workspace:   req.Workspace,
-		Worktree:    retroWorktree(req),
-		ProjectRoot: req.ProjectRoot,
-		SecondaryArtifacts: []string{
-			filepath.Join(req.Workspace, "disposition.json"),
-			filepath.Join(req.Workspace, "carryover-todos.json"),
-		},
-		ArtifactPath: artifactPath,
-		Agent:        retroAgent,
-		Cycle:        req.Cycle,
-		Env:          req.Env,
-		Skills:       overlaySkills,
-	}
-	fence := treefence.Begin(ctx, bridgeReq.Worktree, req.WorktreeReadOnly)
-	if err := fence.TakeErr(); err != nil {
-		fmt.Fprintf(os.Stderr, "[retro] WARN worktree fence: snapshot failed (%v) — the tree this phase hands downstream is unverified\n", err)
-	}
-	bres, bridgeErr := core.LaunchWithFreshSession(ctx, p.bridge, bridgeReq)
-	if bridgeErr != nil && core.DeliveryFailureCause(bridgeErr) != "" {
-		bres, bridgeErr = core.LaunchWithFreshSession(ctx, p.bridge, bridgeReq)
-	}
-	durationMS := p.nowFn().Sub(start).Milliseconds()
-	fenceDiags := fence.End(context.WithoutCancel(ctx)).Diagnostics(phaseName)
-	for _, d := range fenceDiags {
-		fmt.Fprintf(os.Stderr, "[retro] WARN %s\n", d.Message)
-	}
+func (h hooks) DefaultModel() string { return h.model }
 
-	if bridgeErr != nil {
-		fmt.Fprintf(os.Stderr, "[retro] WARN bridge failed (%v) — emitting FAIL verdict; orchestrator routes via failure-adapter (non-fatal)\n", bridgeErr)
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictFAIL,
-			ArtifactsDir: req.Workspace,
-			NextPhase:    string(core.PhaseEnd),
-			CostUSD:      bres.CostUSD,
-			Tokens:       bres.Tokens,
-			DurationMS:   durationMS,
-			Diagnostics:  append(fenceDiags, core.Diagnostic{Severity: "error", Message: bridgeErr.Error()}),
-		}, nil
-	}
+func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
+	return composePrompt(body, req, req.Context["previous_verdict"])
+}
 
-	content := bres.Stdout
-	if content == "" {
-		if b, err := os.ReadFile(artifactPath); err == nil {
-			content = string(b)
-		}
+func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
+	if retroApplies(req) {
+		return false, "", "", nil
 	}
+	return true, core.VerdictSKIPPED, string(core.PhaseEnd), nil
+}
+
+func (hooks) SecondaryArtifacts(req core.PhaseRequest) []string {
+	return []string{
+		filepath.Join(req.Workspace, "disposition.json"),
+		filepath.Join(req.Workspace, "carryover-todos.json"),
+	}
+}
+
+func (hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
 	verdict := core.VerdictPASS
-	diagnostics := fenceDiags
-	advisories, reviewErr := validateExplanationReview(content, req)
+	var diagnostics []core.Diagnostic
+	advisories, reviewErr := validateExplanationReview(artifact, req)
 	for _, advisory := range advisories {
 		diagnostics = append(diagnostics, core.Diagnostic{Severity: "warning", Message: explanationdocs.AdvisoryPrefix + advisory})
 	}
@@ -196,50 +173,10 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		diagnostics = append(diagnostics, core.Diagnostic{Severity: "error", Message: reviewErr.Error()})
 		verdict = core.VerdictFAIL
 	}
-	if strings.TrimSpace(content) == "" || !hasFailureLesson(req.ProjectRoot, req.Workspace, req.Cycle) {
+	if strings.TrimSpace(artifact) == "" || !hasFailureLesson(req.ProjectRoot, req.Workspace, req.Cycle) {
 		verdict = core.VerdictFAIL
 	}
-
-	return core.PhaseResponse{
-		Phase:        phaseName,
-		Verdict:      verdict,
-		ArtifactsDir: req.Workspace,
-		NextPhase:    string(core.PhaseEnd),
-		CostUSD:      bres.CostUSD,
-		Tokens:       bres.Tokens,
-		DurationMS:   durationMS,
-		Diagnostics:  diagnostics,
-	}, nil
-}
-
-func retroProfile(projectRoot string) *profiles.Profile {
-	loaded, err := profiles.NewFromDir(filepath.Join(projectRoot, ".evolve", "profiles")).Get(retroAgent)
-	if err != nil {
-		return nil
-	}
-	return &loaded
-}
-
-var walkRetroDecision = cliroute.Decision.Walk
-
-func (p *Phase) resolveCLI(req core.PhaseRequest, prof *profiles.Profile, model string) (string, error) {
-	router := p.router
-	if router == nil {
-		launch, err := cliroute.NewLegacyLaunchRouter(req.ProjectRoot, cliroute.SingleProfile{Agent: retroAgent, Profile: prof})
-		if err != nil {
-			return "", err
-		}
-		router = launch
-	}
-	d, err := router.Resolve(cliroute.Request{Agent: retroAgent, ProjectRoot: req.ProjectRoot, DefaultModel: model, Env: req.Env})
-	if err != nil {
-		return "", err
-	}
-	walk, err := walkRetroDecision(d)
-	if err != nil {
-		return "", err
-	}
-	return walk.Candidates[0], nil
+	return verdict, diagnostics, string(core.PhaseEnd)
 }
 
 func refreshExplanationHandoff(ctx context.Context, req core.PhaseRequest) core.PhaseRequest {

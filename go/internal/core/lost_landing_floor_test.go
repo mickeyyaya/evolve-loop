@@ -32,7 +32,7 @@ func TestDetectLostLanding_RealCycle1535IsNotAPass(t *testing.T) {
 	t.Parallel()
 
 	ws := realCycleWorkspace(t, "cycle-1535")
-	sig := detectLostLanding(ws, VerdictPASS)
+	sig := detectLostLanding(graded(ws, 1535, VerdictPASS))
 	if sig == nil {
 		t.Fatalf("cycle-1535 shipped nothing (ship-error present, ship-binding absent) and must not close PASS")
 	}
@@ -48,7 +48,7 @@ func TestDetectLostLanding_RealCycle1536Landed(t *testing.T) {
 	t.Parallel()
 
 	ws := realCycleWorkspace(t, "cycle-1536")
-	if sig := detectLostLanding(ws, VerdictPASS); sig != nil {
+	if sig := detectLostLanding(landedOnThisRepo(t, ws, 1536)); sig != nil {
 		t.Fatalf("cycle-1536 hit the SAME error code and DID land (ship-binding commit adcbddb2); it must not be flagged: %+v", sig)
 	}
 }
@@ -56,7 +56,7 @@ func TestDetectLostLanding_RealCycle1536Landed(t *testing.T) {
 func TestDetectLostLanding_CycleThatNeverShippedIsNotFlagged(t *testing.T) {
 	t.Parallel()
 
-	if sig := detectLostLanding(t.TempDir(), VerdictPASS); sig != nil {
+	if sig := detectLostLanding(graded(t.TempDir(), 1, VerdictPASS)); sig != nil {
 		t.Fatalf("a cycle with no ship artifacts at all did not lose a landing: %+v", sig)
 	}
 }
@@ -66,7 +66,7 @@ func TestDetectLostLanding_OnlyShippingVerdictsAreFlagged(t *testing.T) {
 
 	ws := realCycleWorkspace(t, "cycle-1535")
 	for _, v := range []string{VerdictFAIL, VerdictWARN, VerdictSKIPPED} {
-		if sig := detectLostLanding(ws, v); sig != nil {
+		if sig := detectLostLanding(graded(ws, 1535, v)); sig != nil {
 			t.Fatalf("verdict %s already reports non-shipping; must not be flagged: %+v", v, sig)
 		}
 	}
@@ -91,7 +91,7 @@ func TestDetectLostLanding_NoWorkspaceDoesNotReadTheProcessCWD(t *testing.T) {
 		}
 	}()
 
-	if sig := detectLostLanding("", VerdictPASS); sig != nil {
+	if sig := detectLostLanding(graded("", 1, VerdictPASS)); sig != nil {
 		t.Fatalf("an empty workspace must not fall back to reading the process CWD; got %+v", sig)
 	}
 }
@@ -99,7 +99,7 @@ func TestDetectLostLanding_NoWorkspaceDoesNotReadTheProcessCWD(t *testing.T) {
 func TestDetectLostLanding_DoesNotHaltTheBatch(t *testing.T) {
 	t.Parallel()
 
-	sig := detectLostLanding(realCycleWorkspace(t, "cycle-1535"), VerdictPASS)
+	sig := detectLostLanding(graded(realCycleWorkspace(t, "cycle-1535"), 1535, VerdictPASS))
 	if sig == nil {
 		t.Fatalf("expected a signal")
 	}
@@ -150,11 +150,16 @@ func TestFinalizeCycle_LandedCycleIsUnchanged(t *testing.T) {
 	ws := realCycleWorkspace(t, "cycle-1536")
 	o := &Orchestrator{storage: &fakeUpdaterStorage{}, gitHEAD: func() (string, error) { return "same-head", nil }}
 	result := &CycleResult{FinalVerdict: VerdictPASS}
+	ev := landedOnThisRepo(t, ws, 1536)
 
-	if _, err := o.finalizeCycle(context.Background(), CycleState{WorkspacePath: ws}, 1536, "same-head", "", result, &State{}, nil); err != nil {
+	if _, err := o.finalizeCycle(context.Background(), CycleState{WorkspacePath: ws}, 1536, ev.PreCycleHEAD, ev.ProjectRoot, result, &State{}, nil); err != nil {
 		t.Fatalf("finalizeCycle: %v", err)
 	}
 	if result.FinalVerdict != VerdictPASS || result.SystemFailure != nil {
 		t.Fatalf("a landed cycle must be untouched; got verdict=%q sysfail=%+v", result.FinalVerdict, result.SystemFailure)
 	}
+}
+
+func graded(workspace string, cycle int, verdict string) landingEvidence {
+	return landingEvidence{Workspace: workspace, Cycle: cycle, FinalVerdict: verdict}
 }

@@ -804,3 +804,5 @@
 ./internal/mergewindow
 # ledgertip - the one encoding of .evolve/ledger.tip that the ledger writers and the verifier share.
 ./internal/ledgertip
+# builddiff - the host-derived diff metrics and Changes table of the build report.
+./internal/builddiff

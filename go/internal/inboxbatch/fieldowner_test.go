@@ -12,7 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "last_failure_class", "last_failure_fingerprint", "last_failure_reason", "released_continuations",
+var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "last_failure_class", "last_failure_fingerprint", "last_failure_reason", "protected_files", "released_continuations",
 	"retired_cycle", "retired_reason", "route", "routed_at", "routed_cycle", "routed_reason", "unbacked"}
 
 var operatorStampKeys = []string{"premise_verified_at", "premise_verified_evidence", "premise_verified_sha"}
@@ -26,6 +26,7 @@ func TestRoleOf_EveryItemFieldHasOneOwner(t *testing.T) {
 		"route":                     {Owner: inboxbatch.LoopStampOwned},
 		"routed_reason":             {Owner: inboxbatch.LoopStampOwned},
 		"failure_count":             {Owner: inboxbatch.LoopStampOwned, Shape: inboxbatch.CounterValue},
+		"protected_files":           {Owner: inboxbatch.LoopStampOwned, Shape: inboxbatch.GrowOnlyList},
 		"premise_verified_evidence": {Owner: inboxbatch.OperatorStampOwned},
 		"kind":                      {Owner: inboxbatch.AuthorOwned},
 		"created_at":                {Owner: inboxbatch.AuthorOwned},
@@ -85,7 +86,7 @@ func TestFieldsOwnedBy_ListsEachOwnersExactKeysSorted(t *testing.T) {
 func TestConsoleRouted_NoStampIsTheItemsText(t *testing.T) {
 	const protected = "go/internal/bridge/x.go:12 is where it breaks"
 	for _, key := range append(append([]string{}, loopStampKeys...), operatorStampKeys...) {
-		if key == "route" {
+		if key == "route" || key == "protected_files" {
 			continue
 		}
 		if ok, reason := routed(t, `{"id":"s","kind":"bug","`+key+`":{"note":"`+protected+`"}}`); ok {
@@ -150,12 +151,21 @@ func TestStampFieldConstants_SpellTheKeysTheInboxHolds(t *testing.T) {
 		{inboxbatch.RetiredReasonField, "retired_reason"},
 		{inboxbatch.RetiredCycleField, "retired_cycle"},
 		{inboxbatch.GitSHAField, "git_sha"},
+		{inboxbatch.ProtectedFilesField, "protected_files"},
 		{inboxbatch.PremiseVerifiedAtField, "premise_verified_at"},
 		{inboxbatch.PremiseVerifiedSHAField, "premise_verified_sha"},
 		{inboxbatch.PremiseVerifiedEvidenceField, "premise_verified_evidence"},
 	} {
 		if pair[0] != pair[1] {
 			t.Errorf("a stamp constant spells %q, but items on disk carry %q", pair[0], pair[1])
+		}
+	}
+}
+
+func TestFieldRole_IsGrowOnlyNamesOnlyTheProvenProtectedFiles(t *testing.T) {
+	for key, want := range map[string]bool{"protected_files": true, "files": false, "failure_count": false, "route": false} {
+		if got := inboxbatch.RoleOf(key).IsGrowOnly(); got != want {
+			t.Errorf("RoleOf(%q).IsGrowOnly() = %v, want %v", key, got, want)
 		}
 	}
 }

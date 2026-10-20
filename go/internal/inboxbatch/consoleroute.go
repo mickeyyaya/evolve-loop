@@ -1,6 +1,9 @@
 package inboxbatch
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 const RouteLaneValue = "lane"
 
@@ -59,7 +62,7 @@ func protectedDerivation(it Item, isProtected func(string) bool) surfaceDerivati
 	if isProtected == nil {
 		return surfaceDerivation{}
 	}
-	for _, tok := range declaredTokens(it.Files) {
+	for _, tok := range declaredTokens(slices.Concat(it.Files, it.ProtectedFiles)) {
 		if isProtected(tok) {
 			return surfaceDerivation{routed: true, binding: true, reason: "protected fix surface: " + tok}
 		}

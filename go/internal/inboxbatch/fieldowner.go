@@ -21,6 +21,7 @@ const (
 	NumberValue  ValueShape = "number"
 	ListValue    ValueShape = "list"
 	CounterValue ValueShape = "counter"
+	GrowOnlyList ValueShape = "grow-only-list"
 )
 
 type FieldRole struct {
@@ -30,6 +31,10 @@ type FieldRole struct {
 
 func (r FieldRole) IsCounter() bool {
 	return r.Shape == CounterValue
+}
+
+func (r FieldRole) IsGrowOnly() bool {
+	return r.Shape == GrowOnlyList
 }
 
 func (r FieldRole) IsStamp() bool {
@@ -52,6 +57,7 @@ const (
 	RetiredReasonField           = "retired_reason"
 	RetiredCycleField            = "retired_cycle"
 	GitSHAField                  = "git_sha"
+	ProtectedFilesField          = "protected_files"
 	PremiseVerifiedAtField       = "premise_verified_at"
 	PremiseVerifiedSHAField      = "premise_verified_sha"
 	PremiseVerifiedEvidenceField = "premise_verified_evidence"
@@ -61,6 +67,7 @@ var (
 	curated       = func(shape ValueShape) FieldRole { return FieldRole{Owner: CuratorOwned, Shape: shape} }
 	loopStamp     = FieldRole{Owner: LoopStampOwned}
 	loopCounter   = FieldRole{Owner: LoopStampOwned, Shape: CounterValue}
+	loopGrowOnly  = FieldRole{Owner: LoopStampOwned, Shape: GrowOnlyList}
 	operatorStamp = FieldRole{Owner: OperatorStampOwned}
 )
 
@@ -91,6 +98,7 @@ var fieldRoles = map[string]FieldRole{
 	RetiredReasonField:          loopStamp,
 	RetiredCycleField:           loopStamp,
 	GitSHAField:                 loopStamp,
+	ProtectedFilesField:         loopGrowOnly,
 
 	PremiseVerifiedAtField:       operatorStamp,
 	PremiseVerifiedSHAField:      operatorStamp,

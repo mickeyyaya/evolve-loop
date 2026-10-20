@@ -83,7 +83,7 @@ func TestComposePrompt_MakesAnAddedCommentALowFindingAndNeverAsksForOne(t *testi
 	}
 }
 
-func TestComposePrompt_KeepsAnInaccurateExplanationItsOwnFailWhileTheGateRecordsAnAdvisory(t *testing.T) {
+func TestComposePrompt_AnInaccurateExplanationOfVerifiedCodeKeepsThePassAndReachesTheCorrectionRung(t *testing.T) {
 	t.Parallel()
 	report, req := needsCorrectionReview()
 	if advisories, err := validateExplanationReview(report, req); err != nil || !containsAdvisory(advisories, "NEEDS_CORRECTION") {
@@ -91,13 +91,20 @@ func TestComposePrompt_KeepsAnInaccurateExplanationItsOwnFailWhileTheGateRecords
 	}
 	prompt := dispatchedAuditPrompt(t, "PERSONA", `{}`)
 	for _, want := range []string{
-		"records `NEEDS_CORRECTION` as an advisory (ADR-0102), so the verdict is yours: make it FAIL",
-		"name only the document",
-		"begin each such defect with the document's path and line",
-		"the host routes the repair round to Build's explanation re-author alone (`explanation-needs-correction`)",
+		"records `NEEDS_CORRECTION` as an advisory (ADR-0102)",
+		"keep the verdict PASS (or WARN) with `NEEDS_CORRECTION`",
+		"Build corrects only the document lines your Evidence names",
+		"begin each document defect in Evidence with the document's path and line",
+		"FAIL only for a defect in the code or tests, listed as its own entry beginning with its own path",
+		"an inaccurate document alone is never the audit's FAIL",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Errorf("the dispatched prompt does not say %q", want)
+		}
+	}
+	for _, stale := range []string{"make it FAIL", "the audit-repair round is the path that corrects the document"} {
+		if strings.Contains(prompt, stale) {
+			t.Errorf("the dispatched prompt still turns NEEDS_CORRECTION into a FAIL (%q)", stale)
 		}
 	}
 }

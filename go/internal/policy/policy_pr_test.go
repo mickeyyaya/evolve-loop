@@ -3,6 +3,7 @@ package policy
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPRMergeMethod_DefaultsAndRejects(t *testing.T) {
@@ -75,5 +76,33 @@ func TestPRMergeWindowStage_ALiteralMergeWindowPolicyResolvesToItsStage(t *testi
 				t.Fatalf("PRMergeWindowStage() = %q, %v; want %q", got, err, c.want)
 			}
 		})
+	}
+}
+
+func TestPREarlyBoundaryAfter_DefaultsToOneHourAndRefusesANonPositiveBound(t *testing.T) {
+	cases := []struct {
+		name, json string
+		want       time.Duration
+		wantErr    bool
+	}{
+		{"absent block is the compiled hour", `{}`, time.Hour, false},
+		{"absent key is the compiled hour", `{"pr":{"merge_window":{"stage":"on"}}}`, time.Hour, false},
+		{"a set bound", `{"pr":{"merge_window":{"early_boundary_after_s":1800}}}`, 30 * time.Minute, false},
+		{"zero fails closed", `{"pr":{"merge_window":{"early_boundary_after_s":0}}}`, 0, true},
+		{"negative fails closed", `{"pr":{"merge_window":{"early_boundary_after_s":-5}}}`, 0, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := loadCIWatchPolicy(t, c.json).PREarlyBoundaryAfter()
+			if (err != nil) != c.wantErr || got != c.want {
+				t.Fatalf("PREarlyBoundaryAfter() = %v, %v; want %v, err=%v", got, err, c.want, c.wantErr)
+			}
+			if err != nil && !strings.Contains(err.Error(), "pr.merge_window.early_boundary_after_s") {
+				t.Errorf("the error must name the key: %v", err)
+			}
+		})
+	}
+	if DefaultEarlyBoundaryAfterS != 3600 {
+		t.Errorf("DefaultEarlyBoundaryAfterS = %d, want the 1 h of plan Q2", DefaultEarlyBoundaryAfterS)
 	}
 }

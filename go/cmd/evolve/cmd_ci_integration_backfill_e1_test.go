@@ -32,8 +32,9 @@ case "$*" in
   "pr view "*) reply pr.json ;;
   "run list --workflow "*" status,conclusion,url,databaseId") reply "watch-$4.json" ;;
   "run list "*) reply runs.json ;;
+  "run rerun "*) : > "$D/rerun"; exit 0 ;;
   "run view "*"--log-failed"*) reply log.txt ;;
-  "run view "*) reply run.json ;;
+  "run view "*) if [ -f "$D/rerun" ] && [ -f "$D/run2.json" ]; then reply run2.json; fi; reply run.json ;;
 esac
 echo "fake gh: unexpected $*" >&2
 exit 2
@@ -101,6 +102,25 @@ func ciRunDoc(id int, status, conclusion string) string {
 var ciCompareDoc = `{"status":"ahead","merge_base_commit":{"sha":"` + ciFakeBase + `"},"files":[{"filename":"go/internal/x/x.go"}]}`
 
 const ciFailedLog = "test (ubuntu)\tRun tests\t--- FAIL: TestBroken (0.01s)\ntest (ubuntu)\tRun tests\tFAIL\tgithub.com/x/y/internal/x\t0.1s\n"
+
+func ciRerunDoc(id int, conclusion string) string {
+	return strings.Replace(ciRunDoc(id, "completed", conclusion), `"attempt":1`, `"attempt":2`, 1)
+}
+
+func TestRunCIClassify_ABaseRedThatGoesGreenOnTheRerunFilesNothing(t *testing.T) {
+	newCIFakeGH(t, map[string]string{
+		"run.json": ciRunDoc(502, "completed", "failure"), "compare.json": ciCompareDoc, "log.txt": ciFailedLog,
+		"runs.json": "[" + ciRunDoc(490, "completed", "failure") + "]", "run2.json": ciRerunDoc(502, "success"),
+	})
+	root := ciProjectRoot(t, `{"ci_watch":{"timeout_s":5,"poll_s":1}}`, true)
+
+	_, errOut, code := runCIIn("classify", "run:502", "--rerun", "--project-root", root)
+
+	items, _ := filepath.Glob(filepath.Join(root, ".evolve", "inbox", "*.json"))
+	if code != 0 || len(items) != 0 || strings.Contains(errOut, "filed fix-first item") {
+		t.Errorf("code=%d items=%v stderr=%q, want a retry-safe flake and no fix-first item", code, items, errOut)
+	}
+}
 
 func runCIIn(args ...string) (string, string, int) {
 	var out, errb bytes.Buffer
@@ -309,5 +329,48 @@ func TestClassifyRedRuns_AnUnloadablePolicyClassifiesNothing(t *testing.T) {
 	}
 	if gh.calls() != "" {
 		t.Errorf("gh calls = %q, want none", gh.calls())
+	}
+}
+
+func TestRunCIClassify_ABaseRedFilesOneFixFirstItemAndASecondRunFilesNone(t *testing.T) {
+	newCIFakeGH(t, map[string]string{
+		"run.json": ciRunDoc(502, "completed", "failure"), "compare.json": ciCompareDoc, "log.txt": ciFailedLog,
+		"runs.json": "[" + ciRunDoc(490, "completed", "failure") + "]", "run2.json": ciRerunDoc(502, "failure"),
+	})
+	root := ciProjectRoot(t, `{"ci_watch":{"timeout_s":5,"poll_s":1}}`, true)
+	inbox := filepath.Join(root, ".evolve", "inbox")
+
+	out, errOut, code := runCIIn("classify", "run:502", "--rerun", "--project-root", root)
+
+	if code != 0 || !strings.Contains(out, "\tbase-red\t") {
+		t.Fatalf("code=%d stdout=%q stderr=%q, want a retry-safe base-red row", code, out, errOut)
+	}
+	items, _ := filepath.Glob(filepath.Join(inbox, "*-"+ciwatch.BaseRedItemPrefix+"testbroken-*.json"))
+	if len(items) != 1 || !strings.Contains(errOut, ciClassifyPrefix+"filed fix-first item "+ciwatch.BaseRedItemPrefix+"testbroken-") {
+		t.Fatalf("items=%v stderr=%q, want one fix-first item for TestBroken, named on stderr", items, errOut)
+	}
+
+	_, errOut, code = runCIIn("classify", "run:502", "--rerun", "--json", "--project-root", root)
+
+	again, _ := filepath.Glob(filepath.Join(inbox, "*.json"))
+	if code != 0 || len(again) != 1 || strings.Contains(errOut, "filed fix-first item") {
+		t.Errorf("second run: code=%d items=%v stderr=%q, want the one item and nothing new filed", code, again, errOut)
+	}
+}
+
+func TestRunCIClassify_AnUnwritableInboxIsAnIOErrorAfterTheReport(t *testing.T) {
+	newCIFakeGH(t, map[string]string{
+		"run.json": ciRunDoc(502, "completed", "failure"), "compare.json": ciCompareDoc, "log.txt": ciFailedLog,
+		"runs.json": "[" + ciRunDoc(490, "completed", "failure") + "]", "run2.json": ciRerunDoc(502, "failure"),
+	})
+	root := ciProjectRoot(t, `{"ci_watch":{"timeout_s":5,"poll_s":1}}`, true)
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "inbox"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, errOut, code := runCIIn("classify", "run:502", "--rerun", "--project-root", root)
+
+	if code != exitIO || !strings.HasSuffix(out, "retry-safe: yes\n") || !strings.Contains(errOut, ciClassifyPrefix+"ciwatch: base-red dedup") {
+		t.Errorf("code=%d stdout=%q stderr=%q, want the report, then exitIO and the inbox error", code, out, errOut)
 	}
 }

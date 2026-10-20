@@ -14,7 +14,7 @@ func TestDeliverableRecoveryProfile_WritesOnlyTheRunDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
-	grants, err := resolveSandboxWriteGrants(prof.Sandbox.WriteSubpaths, root, "")
+	grants, err := resolveSandboxWriteGrants(prof.Sandbox.WriteSubpaths, root, "", filepath.Join(root, ".evolve", "runs", "cycle-1707"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestDeliverableRecoveryLaunch_GrantsNothingOfTheRepositoryButTheRunDir(t *t
 	sbpl := renderSBPL(t, SandboxWrapRequest{
 		Phase: "deliverable-recovery", RepoRoot: root, Workspace: ws, WriteSubpaths: prof.Sandbox.WriteSubpaths,
 	})
-	grants, err := resolveSandboxWriteGrants(prof.Sandbox.WriteSubpaths, root, "")
+	grants, err := resolveSandboxWriteGrants(prof.Sandbox.WriteSubpaths, root, "", ws)
 	if err != nil {
 		t.Fatal(err)
 	}

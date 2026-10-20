@@ -100,30 +100,39 @@ func (o *Orchestrator) registerMintedPhases(plan *router.PhasePlan) {
 	if plan == nil || o.registrar == nil || len(plan.MintPhases) == 0 {
 		return
 	}
+	var registered []phasespec.PhaseSpec
 	for _, cfg := range plan.MintPhases {
 		spec, runner, err := o.registrar.Register(cfg)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q rejected (skipping): %v\n", cfg.Name, err)
+			o.emitMintDefect(fmt.Sprintf("minted phase %q rejected (skipping): %v", cfg.Name, err))
 			continue
 		}
 		p := Phase(spec.Name)
 		if _, exists := o.runners[p]; exists {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q clashes with an existing runner — keeping existing\n", spec.Name)
+			o.emitMintDefect(fmt.Sprintf("minted phase %q clashes with an existing runner — keeping existing", spec.Name))
 			continue
 		}
 		merged, warns := o.catalog.Merge([]phasespec.PhaseSpec{spec})
 		for _, w := range warns {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q: %s\n", spec.Name, w)
+			o.emitMintDefect(fmt.Sprintf("minted phase %q: %s", spec.Name, w))
 		}
 		o.catalog = merged
-		for _, w := range phasespec.ApplyUserRouting(&o.cfg, []phasespec.PhaseSpec{spec}, o.catalog) {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q routing: %s\n", spec.Name, w)
-		}
 		o.runners[p] = runner
-		if o.catalogPublisher != nil {
-			o.catalogPublisher(o.catalog)
-		}
+		registered = append(registered, spec)
 	}
+	if len(registered) == 0 {
+		return
+	}
+	for _, w := range phasespec.ApplyUserRouting(&o.cfg, registered, o.catalog) {
+		o.emitMintDefect(w)
+	}
+	if o.catalogPublisher != nil {
+		o.catalogPublisher(o.catalog)
+	}
+}
+
+func (o *Orchestrator) emitMintDefect(warning string) {
+	o.signals.Emit(phasespec.RoutingDefectEvent("Orchestrator.registerMintedPhases", warning))
 }
 
 func (o *Orchestrator) nextInOrder(p Phase) Phase {

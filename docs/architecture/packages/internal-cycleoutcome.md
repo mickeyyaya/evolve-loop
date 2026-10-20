@@ -11,6 +11,7 @@
 ## Design
 
 - **A package, not inline `main` code.** The failure closeout was an inline block in the sequential branch of `cmd_loop.go`. `package main` cannot be imported. So no predicate can pin the behavior. The wave path cannot reuse it either: its lanes run `evolve cycle run` as a subprocess, and `fleet.Result` carries neither cycle number nor workspace.
+- **The no-work closeout records what it handed off.** `ApplyNoWork` writes `committedset.Handoff` with the ids it routed to the console, so the loop's `no-work-handoffs` rule counts hand-offs, not every no-work outcome. A failed write is an error of the closeout. Pinned by `TestApplyNoWork_RecordsTheHandOffOnlyWhenAnItemWentToTheConsole` and `TestApplyNoWork_AnUnwritableHandOffRecordIsAnError`.
 - **The effect of the old shape.** Fleet-dispatched work never bumped `failure_count`. The ADR-0072 retry ceiling was structurally unreachable. One batch burned four FAILs on the same ids with the count stuck at 0. Both paths now call `ApplyFailure`, so the two halves cannot drift apart.
 - **The committed set comes from the workspace.** The `Workspace` (`.evolve/runs/cycle-N`) is the sole source of the committed set, through `triage-decision.json`. So the seam bumps exactly the ids that triage worked, never the whole claimed menu of a lane. `CommittedIDsFor` is the one workspace-level reader. The failure seam and the loop try accounting cannot disagree about the worked set.
 - **A missing decision is not a no-op.** An absent, unreadable or malformed decision yields a nil set. That is the legacy whole-directory drain. A missing decision must never become a silent no-op that strands claims in `processing/`.
@@ -91,7 +92,7 @@ The closeout is the existing failure closeout. `RefusalDisposition` maps the rou
 
 1. It reads the artifact. It requires the same cycle and the same one committed item.
 2. It scans the kept copy of the predicates again, with the same membership function. The artifact holds no path. A path in the run directory is never trusted.
-3. It adds each proven path to the `files` of the item. A path that is already there is not added twice.
+3. It adds each proven path to the loop stamp `protected_files` of the item (`addProtectedFiles`). A path that is already there is not added twice. The curated `files` do not change. Thus `sync-main` lands the write as an inbox stamp and does not block the boundary (plan [pr-merge-latency-2026-10](../../plans/pr-merge-latency-2026-10.md) P5, `TestApplyFailure_TheProtectedRouteWriteIsAStampThatSyncMainLands`).
 4. It calls `RouteConsole`. The reason names each file, the test function and the predicate file.
 5. It drains the claims with no failure bump.
 
@@ -101,7 +102,7 @@ If any step fails, the closeout writes a `[cycleoutcome] WARN` line. The item ta
 
 Take cycle 1933 with the rule. The predicate joins `RepoRoot`, `agents` and `evolve-auditor.md`, and passes the path to `acsassert`. The path passes the manifest. The only committed item is `audit-eval-existence-path-convention`.
 
-The cycle stops after tdd with the verdict `FAIL` and the code `PROTECTED_PREDICATE_ROUTE`. The item gets `route: console-manual`, `routed_cycle: 1933` and `files` that gain `agents/evolve-auditor.md`. `wave status` shows the verdict FAIL and the line "Termination: tdd-protected-predicate-route". `cyclehealth` shows `FAILED_EXPLAINED` with the same reason.
+The cycle stops after tdd with the verdict `FAIL` and the code `PROTECTED_PREDICATE_ROUTE`. The item gets `route: console-manual`, `routed_cycle: 1933` and `protected_files: ["agents/evolve-auditor.md"]`. `wave status` shows the verdict FAIL and the line "Termination: tdd-protected-predicate-route". `cyclehealth` shows `FAILED_EXPLAINED` with the same reason.
 
 ### Why a lane cannot relabel a failure
 

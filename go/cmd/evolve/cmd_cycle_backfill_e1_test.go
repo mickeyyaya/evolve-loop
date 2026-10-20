@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -310,15 +311,16 @@ func TestWireOrchestratorDeps_AnInvalidUserPhaseIsWarnedAndGetsNoRunner(t *testi
 	if err := os.WriteFile(filepath.Join(phaseDir, "phase.json"), []byte(`{"name":"loudcheck","optional":false,"catalog":"on-demand"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var d orchDeps
+	var console strings.Builder
 
-	stderr := captureProcessStderr(t, func() { d = wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{}) })
+	d := wireOrchestratorDeps(root, evolveDir, &console, routingRun{})
+	d.Signals.Flush()
 
 	if d.RoutingErr != nil {
 		t.Fatalf("wiring err = %v", d.RoutingErr)
 	}
-	if !strings.Contains(stderr, "[phases] WARN phase loudcheck not routed (invalid): ") {
-		t.Errorf("stderr = %q, want the invalid-phase WARN", stderr)
+	if out := console.String(); !strings.Contains(out, "WARN "+string(phasespec.CodeRoutingDefect)) || !strings.Contains(out, "phase loudcheck not routed (invalid): ") {
+		t.Errorf("console = %q, want the invalid-phase WARN as the coded routing defect", out)
 	}
 	if _, wired := d.Runners[core.Phase("loudcheck")]; wired {
 		t.Error("an invalid user phase must get no runner")

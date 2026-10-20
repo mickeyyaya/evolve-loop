@@ -3,7 +3,7 @@ package defectledger
 import "testing"
 
 func reviewAncestor(status string) Entry {
-	return Entry{ID: "d9", Text: "[HIGH] concurrency go/x.go:3 — leak", Status: status, Source: "code-review", Round: 2, Severity: "HIGH", Dimension: "concurrency"}
+	return Entry{ID: "d9", Text: "[MEDIUM] concurrency go/x.go:3 — leak", Status: status, Source: "code-review", Round: 2, Severity: "MEDIUM", Dimension: "concurrency"}
 }
 
 func TestGradeClaim_KeepsTheRowsProvenanceWhateverTheStatus(t *testing.T) {
@@ -22,7 +22,7 @@ func TestGradeClaim_KeepsTheRowsProvenanceWhateverTheStatus(t *testing.T) {
 		"DISPUTED claimed":  {Entry{Status: "DISPUTED"}, true, yes, StatusOpen},
 	} {
 		got, _ := gradeClaim(reviewAncestor(StatusOpen), tc.claim, tc.has, tc.resolve)
-		if got.Status != tc.status || got.Source != "code-review" || got.Round != 2 || got.Severity != "HIGH" || got.Dimension != "concurrency" {
+		if got.Status != tc.status || got.Source != "code-review" || got.Round != 2 || got.Severity != "MEDIUM" || got.Dimension != "concurrency" {
 			t.Errorf("%s: graded %+v, want status %s with source, round, severity and dimension carried through", name, got, tc.status)
 		}
 	}

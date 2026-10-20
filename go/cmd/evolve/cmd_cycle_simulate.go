@@ -74,7 +74,8 @@ func wireSimulateOrchestrator(projectRoot, evolveDir string, console io.Writer) 
 	return orchDeps{
 		Storage: st, Ledger: ld, Signals: signals, CloseSignals: closeSignals,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithSignalCenter(signals),
-			core.WithWorktreeProvisioner(simulateWorktrees{}), core.WithDossierDestination(core.DossierFilesOnly)),
+			core.WithWorktreeProvisioner(simulateWorktrees{}), core.WithDossierDestination(core.DossierFilesOnly),
+			core.WithLaneMenu(laneMenuOf(laneForbiddenTo(projectRoot, signals.Emit)))),
 	}
 }
 

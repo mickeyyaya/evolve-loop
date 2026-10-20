@@ -58,7 +58,7 @@ func requireCycleRunUsesDepsSeam(t *testing.T) {
 	}
 }
 
-func runCycleRunWith(t *testing.T, runner core.PhaseRunner, onlyScout bool) (rc int, fake *fakeLedgerNoAppend, itemStillInInbox bool, stderr string) {
+func runCycleRunWith(t *testing.T, runner core.PhaseRunner, onlyScout bool, seeds ...func(root string)) (rc int, fake *fakeLedgerNoAppend, itemStillInInbox bool, stderr string) {
 	t.Helper()
 	requireCycleRunUsesDepsSeam(t)
 	bin := t.TempDir()
@@ -67,6 +67,9 @@ func runCycleRunWith(t *testing.T, runner core.PhaseRunner, onlyScout bool) (rc 
 	root := t.TempDir()
 	initLoopContractRepo(t, root)
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 1)
+	for _, seed := range seeds {
+		seed(root)
+	}
 	st := storage.New(evolveDir)
 	if err := st.WriteState(context.Background(), core.State{}); err != nil {
 		t.Fatal(err)

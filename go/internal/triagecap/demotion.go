@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
@@ -36,11 +37,6 @@ const (
 )
 
 const demotionWindow = 3
-
-func ShouldDemote(entries []FailEntry, currentCycle int) (bool, string) {
-	_, _, why, ok := demotionDecision(entries, currentCycle)
-	return ok, why
-}
 
 func demotionDecision(entries []FailEntry, currentCycle int) (older, newer int, why string, ok bool) {
 	byCycle := map[int]string{}
@@ -165,17 +161,13 @@ func NewDemotionLedgerRecord(currentCycle, older, newer int, detail string, stat
 	}
 }
 
-func autoFileDemotionDefect(projectRoot string, currentCycle, older, newer int, detail string, status RemedyStatus) {
+func autoFileDemotionDefect(projectRoot string, currentCycle, older, newer int, detail string, status RemedyStatus) error {
 	path := demotionDefectPath(projectRoot, older, newer)
 	if _, err := os.Stat(path); err == nil {
-		return
+		return nil
 	}
-	data, err := json.Marshal(NewDemotionLedgerRecord(currentCycle, older, newer, detail, status))
-	if err != nil {
-		return
+	if err := atomicwrite.JSON(path, NewDemotionLedgerRecord(currentCycle, older, newer, detail, status)); err != nil {
+		return fmt.Errorf("demotion defect %s: %w", path, err)
 	}
-	tmp := path + ".tmp"
-	if os.WriteFile(tmp, data, 0o644) == nil {
-		_ = os.Rename(tmp, path)
-	}
+	return nil
 }

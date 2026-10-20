@@ -142,13 +142,13 @@ func TestC541Amp_ReadInboxBacklog_LargeInboxDirectory(t *testing.T) {
 	}
 }
 
-func TestC541Amp_SelectWaveSeedTopN_DelegatesToReadInboxBacklogRegression(t *testing.T) {
+func TestC541Amp_SelectFleetWidthTopNOverTheInboxBacklogKeepsLanesDisjointRegression(t *testing.T) {
 	evolveDir, inboxDir := c541ampInboxDir(t)
 	c541ampWriteInboxTodo(t, inboxDir, "1-high.json", c541ampInboxTodo{ID: "high", Weight: 0.9, Files: []string{"pkg/a.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "2-mid.json", c541ampInboxTodo{ID: "mid", Weight: 0.5, Files: []string{"pkg/b.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "3-colliding.json", c541ampInboxTodo{ID: "colliding", Weight: 0.8, Files: []string{"pkg/a.go"}})
 
-	got := SelectWaveSeedTopN(evolveDir, 2, nil)
+	got := SelectFleetWidthTopN(ReadInboxBacklog(evolveDir, nil), 2)
 	if len(got) != 2 {
 		t.Fatalf("want 2 disjoint lane representatives, got %d: %v", len(got), c541ampIDs(got))
 	}
