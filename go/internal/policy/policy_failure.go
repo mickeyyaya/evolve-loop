@@ -41,6 +41,8 @@ type FailureThresholds struct {
 	ConsecutiveFailuresHaltCeiling  int `json:"consecutive_failures_halt_ceiling,omitempty"`
 	LaneDeferralHaltCeiling         int `json:"lane_deferral_halt_ceiling,omitempty"`
 	ZeroShipHalt                    int `json:"zero_ship_halt,omitempty"`
+	NoWorkHandoffHaltCeiling        int `json:"no_work_handoff_halt_ceiling,omitempty"`
+	NoWorkHandoffWindow             int `json:"no_work_handoff_window,omitempty"`
 	BuildDeepEscalateAtFailures     int `json:"build_deep_escalate_at_failures,omitempty"`
 }
 
@@ -67,7 +69,7 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 			CategoryIntentMalformed:       {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: "reintent"},
 			CategoryExplanationCorrection: {Level: LevelTask, Action: ActionRetryWithFix, FixType: "explanation-correction", MaxRetries: 1},
 		},
-		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, ConsecutiveFailuresHaltCeiling: 3, LaneDeferralHaltCeiling: 3, ZeroShipHalt: 2, BuildDeepEscalateAtFailures: 1},
+		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, ConsecutiveFailuresHaltCeiling: 3, LaneDeferralHaltCeiling: 3, ZeroShipHalt: 2, NoWorkHandoffHaltCeiling: 4, NoWorkHandoffWindow: 12, BuildDeepEscalateAtFailures: 1},
 		OnTaskRetryCeiling: "quarantine",
 		OnSystemLevel:      "halt-loop-and-escalate",
 	}
@@ -110,6 +112,8 @@ func mergeThresholds(base, override FailureThresholds) FailureThresholds {
 	out.ConsecutiveFailuresHaltCeiling = positiveOr(override.ConsecutiveFailuresHaltCeiling, base.ConsecutiveFailuresHaltCeiling)
 	out.LaneDeferralHaltCeiling = positiveOr(override.LaneDeferralHaltCeiling, base.LaneDeferralHaltCeiling)
 	out.ZeroShipHalt = positiveOr(override.ZeroShipHalt, base.ZeroShipHalt)
+	out.NoWorkHandoffHaltCeiling = positiveOr(override.NoWorkHandoffHaltCeiling, base.NoWorkHandoffHaltCeiling)
+	out.NoWorkHandoffWindow = positiveOr(override.NoWorkHandoffWindow, base.NoWorkHandoffWindow)
 	out.BuildDeepEscalateAtFailures = positiveOr(override.BuildDeepEscalateAtFailures, base.BuildDeepEscalateAtFailures)
 	return out
 }

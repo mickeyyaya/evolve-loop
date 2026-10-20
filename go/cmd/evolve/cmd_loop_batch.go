@@ -111,6 +111,11 @@ iterations:
 		lr.emitFatal(stdout, stderr, cfg, lastCycleIn(*lr))
 		return 2
 	}
+	if rc, halted := noWorkHandoffHaltAfterWave(cfg.EvolveDir, cfg.ProjectRoot, stderr, b.deps.Signals); halted {
+		lr.StopReason = "pipeline_blocker_halt"
+		lr.emitFatal(stdout, stderr, cfg, 0)
+		return rc
+	}
 	finalizeCompletedCycle(cfg, stderr)
 	gcHookFn(cfg, filepath.Join(gcManifestDir(cfg.EvolveDir), "batch-end"), stderr)
 	lr.emit(stdout)

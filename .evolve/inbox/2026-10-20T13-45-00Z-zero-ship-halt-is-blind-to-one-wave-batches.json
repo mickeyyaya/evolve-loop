@@ -1,0 +1,22 @@
+{
+  "id": "zero-ship-halt-is-blind-to-one-wave-batches",
+  "kind": "pipeline-repair",
+  "priority_class": "debuggability",
+  "weight": 0.8,
+  "title": "The zero-ship halt counts within one batch in memory, so wave next batches of one wave (wave.max_cycles 1) never trip it",
+  "summary": "Found in the PR #1049 review. zeroShipHalt (go/cmd/evolve/cmd_loop_zeroship.go) keeps its wave tally on the batch coordinator (b.zeroShip) and runs only in prepareIteration, before each wave. The console launches every wave with evolve wave next, whose default wave.max_cycles is 1 (go/internal/policy/policy_wave.go), so each batch runs one wave and the tally starts empty each time. A boundary re-exec resets it too. The compiled breaker of operating-policy.md section 4.1 therefore never fires in normal operation, and the rule rests on the operator alone.",
+  "fix": "Count zero-ship waves across batches from durable evidence (runs/ outcomes grouped by wave, or the wave records of evolve wave), check after each wave as well as before it, and acknowledge a halt through the resolved-fingerprints ledger, as the no-work-handoffs rule does since PR #1049.",
+  "acceptance": [
+    "A loop test with max_cycles 1 run as two consecutive batches, each with a zero-ship wave, halts with LOOP_ZERO_SHIP_HALT after the second wave",
+    "Consuming the halt's P0 item, or evolve loop --reset --fingerprint, acknowledges the run so the next batch does not halt again on the same waves",
+    "operating-policy.md section 4.1 and runtime-reference.md describe the cross-batch window"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_loop_zeroship.go",
+    "go/internal/core/zero_ship.go",
+    "docs/operations/operating-policy.md"
+  ],
+  "route": "console-manual",
+  "created_at": "2026-10-20T13:45:00Z",
+  "source": "console builder M, PR #1049 review"
+}
