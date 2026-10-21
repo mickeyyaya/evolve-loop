@@ -80,38 +80,16 @@ func eventText(e signalcenter.Event) string {
 	return strings.Join(parts, "\n")
 }
 
-func TestCompositionCarryForward_DeclineEmitsCodedSignalEvent(t *testing.T) {
-	t.Parallel()
-
-	worktree, diff, patchID := divergedCompositionFixture(t)
-	center := signalcenter.New()
-	var events []signalcenter.Event
-	center.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
-
-	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil),
-		WithSignalCenter(center),
-		WithCompositionSnapshot(snapshotFromFixture(diff, patchID)),
-		WithCompositionGateRunner(func(context.Context, string) map[string]ciparity.GateOutcome {
-			return map[string]ciparity.GateOutcome{
-				"compile":  {Status: "pass"},
-				"test":     {Status: "fail", Tail: "TAIL_MARKER_ONE"},
-				"acs":      {Status: "pass"},
-				"apicover": {Status: "pass"},
-			}
-		}),
-		WithCompositionVerdictWriter(func(string, CompositionVerdictInput) error {
-			t.Fatal("writer must not be called after a composed-gate decline")
-			return nil
-		}),
-	)
-
-	if o.compositionCarryForward(context.Background(), 42, CycleState{ActiveWorktree: worktree, RunID: "run-1"}, "") {
-		t.Fatal("a red composed gate must not carry forward")
+func carryOnScopedRung(o *Orchestrator, cycle int, cs CycleState) bool {
+	if o.scopedMergeReviewer == nil {
+		WithScopedMergeReviewer(func([]MergeHunk, string, string) ScopedMergeReviewOutcome {
+			return ScopedMergeReviewOutcome{Disposition: ScopedMergeCompatible}
+		})(o)
 	}
-	assertOneOrchestratorDeclineEvent(t, events, 42, "test", "TAIL_MARKER_ONE")
+	return o.scopedMergeCarryForward(context.Background(), cycle, cs, "")
 }
 
-func TestCompositionCarryForward_MultiGateFailure_NamesAllInOneEvent(t *testing.T) {
+func TestScopedMergeCarryForward_MultiGateFailure_NamesAllInOneEvent(t *testing.T) {
 	t.Parallel()
 
 	worktree, diff, patchID := divergedCompositionFixture(t)
@@ -136,7 +114,7 @@ func TestCompositionCarryForward_MultiGateFailure_NamesAllInOneEvent(t *testing.
 		}),
 	)
 
-	if o.compositionCarryForward(context.Background(), 43, CycleState{ActiveWorktree: worktree, RunID: "run-1b"}, "") {
+	if carryOnScopedRung(o, 43, CycleState{ActiveWorktree: worktree, RunID: "run-1b"}) {
 		t.Fatal("a red composed gate must not carry forward")
 	}
 	if len(events) != 1 {
@@ -155,7 +133,7 @@ func TestCompositionCarryForward_MultiGateFailure_NamesAllInOneEvent(t *testing.
 	}
 }
 
-func TestCompositionCarryForward_AllGatesGreen_NoDeclineEvent(t *testing.T) {
+func TestScopedMergeCarryForward_AllGatesGreen_NoDeclineEvent(t *testing.T) {
 	t.Parallel()
 
 	worktree, diff, patchID := divergedCompositionFixture(t)
@@ -177,7 +155,7 @@ func TestCompositionCarryForward_AllGatesGreen_NoDeclineEvent(t *testing.T) {
 		WithCompositionVerdictWriter(func(string, CompositionVerdictInput) error { return nil }),
 	)
 
-	if !o.compositionCarryForward(context.Background(), 44, CycleState{ActiveWorktree: worktree, RunID: "run-1c"}, "") {
+	if !carryOnScopedRung(o, 44, CycleState{ActiveWorktree: worktree, RunID: "run-1c"}) {
 		t.Fatal("all-green composed gates must carry forward")
 	}
 	if len(events) != 0 {

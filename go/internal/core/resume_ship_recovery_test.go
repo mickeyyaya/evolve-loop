@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -478,7 +479,7 @@ func TestRunCycleFromPhase_TheShipErrorSignalNamesTheCodeTheLandingReturned(t *t
 	}
 }
 
-func TestRunCycleFromPhase_ARebaseThatProvesTheAuditedChangeShipsWithoutAReAudit(t *testing.T) {
+func TestRunCycleFromPhase_ALegacyRebaseWhoseMainMovedIsAuditedAgainForAStatedReason(t *testing.T) {
 	t.Parallel()
 
 	lane := newStaleBaseLane(t, "peer.txt")
@@ -491,7 +492,9 @@ func TestRunCycleFromPhase_ARebaseThatProvesTheAuditedChangeShipsWithoutAReAudit
 		t.Fatal(err)
 	}
 	var verdicts []CompositionVerdictInput
+	var sink injectedStderr
 	out := lane.resumeShip(t, staleBaseScenario{shipErr: landingDiverged(), shipFailures: 1, options: []Option{
+		WithStderr(&sink),
 		WithCompositionSnapshot(snapshotFromFixture([]byte(audited), patchID)),
 		WithCompositionGateRunner(func(context.Context, string) map[string]ciparity.GateOutcome { return allComposedGatesPass() }),
 		WithCompositionVerdictWriter(func(_ string, in CompositionVerdictInput) error {
@@ -501,13 +504,13 @@ func TestRunCycleFromPhase_ARebaseThatProvesTheAuditedChangeShipsWithoutAReAudit
 	}})
 
 	if out.err != nil {
-		t.Fatalf("a rebase that the composition proof covers must ship, got %v", out.err)
+		t.Fatalf("the legacy rebase must ship after its re-audit, got %v", out.err)
 	}
-	requireOrder(t, out.order, "ship", "ship")
-	if len(verdicts) != 1 || verdicts[0].Cycle != staleBaseCycle || verdicts[0].PatchID != patchID {
-		t.Fatalf("composition verdicts = %+v, want one for cycle %d with patch id %s", verdicts, staleBaseCycle, patchID)
+	requireOrder(t, out.order, "ship", "audit", "ship")
+	if len(verdicts) != 0 || out.audit.calls != 1 {
+		t.Fatalf("composition verdicts = %+v, audits = %d; want no carry record and one re-audit", verdicts, out.audit.calls)
 	}
-	if out.audit.calls != 0 {
-		t.Fatalf("the audit ran %d time(s); the proof replaces the re-audit", out.audit.calls)
+	if !strings.Contains(sink.String(), fmt.Sprintf("cycle %d has no explanation contract", staleBaseCycle)) {
+		t.Fatalf("stderr does not state why the rebase is audited again:\n%s", sink.String())
 	}
 }

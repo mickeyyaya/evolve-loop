@@ -37,15 +37,6 @@ func runGoTest(t *testing.T, pkg, runExpr string, wantPass []string) {
 	}
 }
 
-func TestC786_002_drift_and_failed_gates_fall_back_to_reaudit(t *testing.T) {
-	runGoTest(t, shipPkg,
-		"^TestTrivialRebase_(PatchIdDriftFallsBackToReaudit|FailedComposedGatesRejected)$",
-		[]string{
-			"TestTrivialRebase_PatchIdDriftFallsBackToReaudit",
-			"TestTrivialRebase_FailedComposedGatesRejected",
-		})
-}
-
 func TestC786_003_ledger_verify_kernel_recomputes_patch_id(t *testing.T) {
 	runGoTest(t, cmdPkg, "^TestCompositionVerdict_",
 		[]string{

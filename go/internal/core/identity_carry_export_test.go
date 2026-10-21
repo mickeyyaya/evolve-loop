@@ -16,8 +16,8 @@ func CarryAPendedIdenticalLaneForTesting(t *testing.T, persist func(string, Comp
 }
 
 type CompositionRungsForTesting struct {
-	Worktree                    string
-	TrivialRebase, ScopedReview func() bool
+	Worktree     string
+	ScopedReview func() bool
 }
 
 func RungsOnALinkedLedgerForTesting(t *testing.T, projectRoot string, persist func(string, CompositionVerdictInput) error) CompositionRungsForTesting {
@@ -34,8 +34,7 @@ func RungsOnALinkedLedgerForTesting(t *testing.T, projectRoot string, persist fu
 	)
 	cs := CycleState{ActiveWorktree: worktree, RunID: "run"}
 	return CompositionRungsForTesting{
-		Worktree:      worktree,
-		TrivialRebase: func() bool { return o.compositionCarryForward(context.Background(), unwindCycle, cs, projectRoot) },
-		ScopedReview:  func() bool { return o.scopedMergeCarryForward(context.Background(), unwindCycle, cs, projectRoot) },
+		Worktree:     worktree,
+		ScopedReview: func() bool { return o.scopedMergeCarryForward(context.Background(), unwindCycle, cs, projectRoot) },
 	}
 }
