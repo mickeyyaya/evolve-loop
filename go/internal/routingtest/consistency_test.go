@@ -47,6 +47,7 @@ func TestSignalSpec_DualRenderingAgree(t *testing.T) {
 		if err != nil {
 			t.Fatalf("fixture %d: Digest: %v", i, err)
 		}
+		got.RunDir = router.RunDirSignals{}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("fixture %d: Digest != Signals\n got=%+v\nwant=%+v", i, got, want)
 		}
@@ -76,6 +77,7 @@ func TestSignalSpec_WrappedDualRenderingAgree(t *testing.T) {
 		if err != nil {
 			t.Fatalf("fixture %d: Digest: %v", i, err)
 		}
+		got.RunDir = router.RunDirSignals{}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("fixture %d: wrapped Digest != Signals\n got=%+v\nwant=%+v", i, got, want)
 		}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "evolve phases validate on a registry with an unproduced trigger field exits non-zero naming the phase and the field (red test first)",
+    "evolve phases create refuses such a phase"
+  ],
+  "campaign": "routing-triggers",
+  "created_at": "2026-10-21T01:22:09Z",
+  "deps": [],
+  "files": [
+    "go/internal/phasespec",
+    "go/cmd/evolve"
+  ],
+  "fix": "TDD first. Call UnproducedTriggerFields from the phases validate and create verbs and fail with the phase and field named. 100% coverage, zero comments, update the phases docs.",
+  "id": "phases-validate-refuses-an-unproduced-trigger-field",
+  "kind": "bug",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "summary": "Filed from the independent review of PR #1105 (M4, 2026-10-21). PR #1105 added phasespec.UnproducedTriggerFields but wires it only into the CI test TestTheCheckedInRegistry_EveryTriggerFieldHasAProducer. evolve phases validate and evolve phases create still accept a user phase whose insert trigger reads a field that no phase produces, which the item insert-when-fields-need-a-producer asked to refuse with the phase and field named.",
+  "title": "evolve phases validate and create must refuse a trigger field that no phase produces",
+  "weight": 0.5
+}

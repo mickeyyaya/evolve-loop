@@ -315,9 +315,13 @@ func TestUserPhases_BashSuiteParity(t *testing.T) {
 				}
 			}
 		}},
-		{"phases-quality-gates.sh/fuzz-probe-routing-parser-decoder-unmarshal", func(t *testing.T) {
-			if !hasInsertWhen(readPhaseSpec(t, cat, "fuzz-probe"), "scout.surface_type", []string{"==", "eq"}, "parser/decoder/unmarshal") {
-				t.Fatal("fuzz-probe insert_when missing scout.surface_type == parser/decoder/unmarshal")
+		{"phases-quality-gates.sh/fuzz-probe-routes-on-a-produced-signal", func(t *testing.T) {
+			s := readPhaseSpec(t, cat, "fuzz-probe")
+			if !hasInsertWhen(s, "build.files_touched", []string{"gt", ">"}, "0") {
+				t.Fatal("fuzz-probe insert_when missing build.files_touched > 0")
+			}
+			if hasInsertWhen(s, "scout.surface_type", []string{"==", "eq"}, "parser/decoder/unmarshal") {
+				t.Fatal("fuzz-probe routes on scout.surface_type, which no phase produces")
 			}
 		}},
 		{"phases-quality-gates.sh/four-profiles-name-matches-dir", func(t *testing.T) {

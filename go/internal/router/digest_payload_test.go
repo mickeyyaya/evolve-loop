@@ -33,6 +33,10 @@ func TestDigest_PayloadWrapped_EquivalentToFlat(t *testing.T) {
 		t.Fatalf("wrapped digest: %v", err)
 	}
 
+	if flatSig.RunDir.ArtifactBytes == 0 || wrappedSig.RunDir.ArtifactBytes == 0 {
+		t.Fatalf("both digests measure their run dir: flat=%+v wrapped=%+v", flatSig.RunDir, wrappedSig.RunDir)
+	}
+	flatSig.RunDir, wrappedSig.RunDir = RunDirSignals{}, RunDirSignals{}
 	if !reflect.DeepEqual(flatSig, wrappedSig) {
 		t.Fatalf("payload-wrapped digest != flat digest:\n flat   =%+v\n wrapped=%+v", flatSig, wrappedSig)
 	}
@@ -58,6 +62,7 @@ func TestDigest_PayloadWrapped_FoldsInnerSignals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("wrapped digest: %v", err)
 	}
+	flatSig.RunDir, wrapSig.RunDir = RunDirSignals{}, RunDirSignals{}
 	if !reflect.DeepEqual(flatSig, wrapSig) {
 		t.Fatalf("inner-signal fold not flat-equivalent:\n flat=%+v\n wrap=%+v", flatSig, wrapSig)
 	}

@@ -53,53 +53,62 @@ func evalCondRule(sig RoutingSignals, r config.CondRule) bool {
 	return true
 }
 
-func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool) {
-	switch field {
-	case "cycle_size", "triage.cycle_size":
-		return 0, false, sig.CycleSize(), true
-	case "scout.cycle_size":
-		return 0, false, sig.Scout.CycleSizeEstimate, true
-	case config.SignalDeliverableKind:
-		return 0, false, sig.DeliverableKind(), true
-	case config.SignalGoalType:
-		return resolveTypedOrGeneric(sig, field, sig.Scout.GoalType)
-	case "scout.deliverable_kind":
-		return resolveTypedOrGeneric(sig, field, sig.Scout.DeliverableKind)
-	case "triage.deliverable_kind":
-		return resolveTypedOrGeneric(sig, field, sig.Triage.DeliverableKind)
-	case "triage.unified_size":
-		return 0, false, sig.Triage.UnifiedSize, true
-	case "triage.unified_member_count":
-		return float64(sig.Triage.UnifiedMemberCount), true, "", true
-	case "scout.item_count":
-		return float64(sig.Scout.ItemCount), true, "", true
-	case "scout.carryover_count":
-		return float64(sig.Scout.CarryoverCount), true, "", true
-	case "scout.backlog_size":
-		return float64(sig.Scout.BacklogSize), true, "", true
-	case "build.acs_red":
-		return float64(sig.Build.ACSRed), true, "", true
-	case "build.acs_green":
-		return float64(sig.Build.ACSGreen), true, "", true
-	case "build.acs_regression":
-		return float64(sig.Build.ACSRegression), true, "", true
-	case "build.files_touched":
-		return float64(sig.Build.FilesTouched), true, "", true
-	case "build.diff_loc":
-		return float64(sig.Build.DiffLOC), true, "", true
-	case "build.severity_max":
-		return float64(sig.Build.SeverityMax), true, "", true
-	case "build.verdict":
-		return 0, false, sig.Build.Verdict, true
-	case "audit.confidence":
-		return sig.Audit.Confidence, true, "", true
-	case "audit.red_count":
-		return float64(sig.Audit.RedCount), true, "", true
-	case "audit.verdict":
-		return 0, false, sig.Audit.Verdict, true
-	default:
-		return resolveGeneric(sig, field)
+type fieldResolver func(sig RoutingSignals, field string) (float64, bool, string, bool)
+
+func textField(get func(RoutingSignals) string) fieldResolver {
+	return func(sig RoutingSignals, _ string) (float64, bool, string, bool) { return 0, false, get(sig), true }
+}
+
+func numberField(get func(RoutingSignals) float64) fieldResolver {
+	return func(sig RoutingSignals, _ string) (float64, bool, string, bool) { return get(sig), true, "", true }
+}
+
+func typedOrGenericField(get func(RoutingSignals) string) fieldResolver {
+	return func(sig RoutingSignals, field string) (float64, bool, string, bool) {
+		return resolveTypedOrGeneric(sig, field, get(sig))
 	}
+}
+
+var typedFields = map[string]fieldResolver{
+	"cycle_size":                  textField(RoutingSignals.CycleSize),
+	"triage.cycle_size":           textField(RoutingSignals.CycleSize),
+	"scout.cycle_size":            textField(func(s RoutingSignals) string { return s.Scout.CycleSizeEstimate }),
+	config.SignalDeliverableKind:  textField(RoutingSignals.DeliverableKind),
+	config.SignalGoalType:         typedOrGenericField(func(s RoutingSignals) string { return s.Scout.GoalType }),
+	"scout.deliverable_kind":      typedOrGenericField(func(s RoutingSignals) string { return s.Scout.DeliverableKind }),
+	"triage.deliverable_kind":     typedOrGenericField(func(s RoutingSignals) string { return s.Triage.DeliverableKind }),
+	"triage.unified_size":         textField(func(s RoutingSignals) string { return s.Triage.UnifiedSize }),
+	"triage.unified_member_count": numberField(func(s RoutingSignals) float64 { return float64(s.Triage.UnifiedMemberCount) }),
+	"scout.item_count":            numberField(func(s RoutingSignals) float64 { return float64(s.Scout.ItemCount) }),
+	"scout.carryover_count":       numberField(func(s RoutingSignals) float64 { return float64(s.Scout.CarryoverCount) }),
+	"scout.backlog_size":          numberField(func(s RoutingSignals) float64 { return float64(s.Scout.BacklogSize) }),
+	"build.acs_red":               numberField(func(s RoutingSignals) float64 { return float64(s.Build.ACSRed) }),
+	"build.acs_green":             numberField(func(s RoutingSignals) float64 { return float64(s.Build.ACSGreen) }),
+	"build.acs_regression":        numberField(func(s RoutingSignals) float64 { return float64(s.Build.ACSRegression) }),
+	"build.files_touched":         numberField(func(s RoutingSignals) float64 { return float64(s.Build.FilesTouched) }),
+	"build.diff_loc":              numberField(func(s RoutingSignals) float64 { return float64(s.Build.DiffLOC) }),
+	"build.severity_max":          numberField(func(s RoutingSignals) float64 { return float64(s.Build.SeverityMax) }),
+	"build.verdict":               textField(func(s RoutingSignals) string { return s.Build.Verdict }),
+	"audit.confidence":            numberField(func(s RoutingSignals) float64 { return s.Audit.Confidence }),
+	"audit.red_count":             numberField(func(s RoutingSignals) float64 { return float64(s.Audit.RedCount) }),
+	"audit.verdict":               textField(func(s RoutingSignals) string { return s.Audit.Verdict }),
+	"ship.class":                  textField(func(s RoutingSignals) string { return s.Ship.Class }),
+	"run_dir.artifact_bytes":      numberField(func(s RoutingSignals) float64 { return float64(s.RunDir.ArtifactBytes) }),
+}
+
+func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool) {
+	if resolve, ok := typedFields[field]; ok {
+		return resolve(sig, field)
+	}
+	return resolveGeneric(sig, field)
+}
+
+func HarnessProduces(field string) bool {
+	if _, ok := typedFields[field]; ok {
+		return true
+	}
+	phase, suffix, ok := strings.Cut(field, ".")
+	return ok && phase != "" && (suffix == failureClassSignal || suffix == defectCountSignal)
 }
 
 func resolveTypedOrGeneric(sig RoutingSignals, field, typed string) (float64, bool, string, bool) {

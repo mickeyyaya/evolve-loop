@@ -37,15 +37,6 @@
       "Verdict"
     ]
   },
-  "routing": {
-    "insert_when": [
-      {
-        "field": "campaign.mode",
-        "op": "==",
-        "value": "study"
-      }
-    ]
-  },
   "after": "intent",
   "optional": true
 }
