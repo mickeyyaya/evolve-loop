@@ -1,0 +1,29 @@
+{
+  "id": "judge-calibration-seeded-defects",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "weight": 0.44,
+  "route": "console-manual",
+  "title": "Quality indexes Q8: seeded-defect recall of the judges, structured review severity and judge family diversity",
+  "summary": "The independent review finds a HIGH or CRITICAL defect on 41.8% [32.6, 51.7] of 98 PRs, counted by a pattern over free text. All 234 audit calls ran on claude-tmux. No measure shows how often a judge finds a known defect. Spec: docs/architecture/llm-quality-indexes.md §9 JQ1, JQ3 and JQ4. Needs evolve agent run (ADR-0152), which is on main.",
+  "fix": "Build a seeded-defect corpus from past real defects re-applied to a frozen tree, each with its class and expected finding. Run each judge through evolve agent run (ADR-0152) at --scope judges and compute JQ1 per judge and class. Add a structured severity block to the review files so that JQ3 stops depending on a pattern. Compute JQ4 from llm-calls.ndjson and the family map of the routing table.",
+  "acceptance": [
+    "RED first: a seeded defect whose file and line range are absent from the judge report counts as missed",
+    "JQ1 reports per judge and per defect class with Wilson bounds",
+    "JQ3 reads the structured severity block when present and the pattern otherwise, and a line 'HIGH 0' never counts",
+    "JQ4 on a fixture with 3 audit calls on claude-tmux and 1 on another family gives 0.25",
+    "A test fails when a corpus file path appears in any resolved phase prompt of a fixture cycle",
+    "Changed functions at 100% coverage",
+    "JQ1 defaults to stage shadow; JQ3 and JQ4 default to report"
+  ],
+  "deps": [
+    "quality-index-collector"
+  ],
+  "files": [
+    "go/internal/qualitypanel/",
+    "docs/architecture/llm-quality-indexes.md",
+    "go/internal/policy/ (corpus location)"
+  ],
+  "created_at": "2026-10-21T12:00:08Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q8 (ADR-0153)"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "revert-sensitivity-probe",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "weight": 0.45,
+  "route": "console-manual",
+  "title": "Quality indexes Q6: revert sensitivity, the share of changed hunks whose covering tests fail when the hunk is reverted",
+  "summary": "The independent reviewers found the slack tests of #1103, #1106 and #1107 by reverting the change. TQ2 does that for every production hunk of a ship, deterministically. Spec: docs/architecture/llm-quality-indexes.md §7 TQ2.",
+  "fix": "For each production hunk of a ship commit: in a scratch worktree, revert only that hunk, run the tests that cover its lines (per-test coverage of the touched packages), and record sensitive when a test fails. A hunk that does not compile alone counts as sensitive and is reported. Exclude the kill paths of Q5.",
+  "acceptance": [
+    "RED first: a fixture change with a test that does not probe it counts that hunk as insensitive",
+    "A fixture change whose test fails without it counts as sensitive",
+    "The probe runs in a scratch worktree and never writes in the plane tree",
+    "The index starts at stage shadow",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": ["quality-index-collector"],
+  "files": ["go/internal/qualitypanel/", "docs/architecture/llm-quality-indexes.md"],
+  "created_at": "2026-10-21T12:00:06Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q6 (ADR-0153)"
+}

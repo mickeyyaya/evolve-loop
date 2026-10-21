@@ -1,0 +1,28 @@
+{
+  "id": "outcome-churn-revert-recovery",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "title": "Quality indexes Q4: 14-day churn, revert rate and recovery count with time to green",
+  "summary": "OQ2 baseline: 9.0% of production Go lines added by first-parent commits 14 to 30 days old were changed or removed within 14 days (4,271 of 47,424). OQ3: 0 of 695 first-parent commits in 30 days are reverts. OQ4 reads the ADR-0151 recovery detector, which has no published data yet. Spec: docs/architecture/llm-quality-indexes.md §10.",
+  "fix": "OQ2 with git blame --first-parent at the snapshot 14 days after each commit, with a cluster bootstrap by commit. OQ3 from subjects that start with Revert and bodies with 'This reverts commit'. OQ4 from recoveryretro.Recoveries over knowledge-base/cycles and .evolve/dossiers-pending, with the median hours from the first failed try to the ship.",
+  "acceptance": [
+    "RED first: a fixture repo where a later commit rewrites 1 of 10 added lines within 14 days gives churn 10%",
+    "A line rewritten after 14 days does not count",
+    "A commit with 'This reverts commit' in its body counts as a revert",
+    "OQ4 on a fixture of one failed and one later shipped dossier gives 1 recovery and the exact hours",
+    "Changed functions at 100% coverage",
+    "A commit whose subject starts with Revert counts as a revert, and a log with no revert gives 0 with the Wilson upper bound",
+    "OQ2 and OQ3 default to stage report; OQ4 defaults to shadow"
+  ],
+  "deps": [
+    "quality-index-collector"
+  ],
+  "files": [
+    "go/internal/qualitypanel/",
+    "docs/architecture/llm-quality-indexes.md"
+  ],
+  "created_at": "2026-10-21T12:00:04Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q4 (ADR-0153)"
+}
