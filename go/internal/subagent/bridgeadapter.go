@@ -82,6 +82,7 @@ func execAdapter(ctx context.Context, env map[string]string, signals *signalcent
 		Prompt:       prompt,
 		Workspace:    env["WORKSPACE_PATH"],
 		Worktree:     env["WORKTREE_PATH"],
+		ProjectRoot:  env["EVOLVE_PROJECT_ROOT"],
 		ArtifactPath: env["ARTIFACT_PATH"],
 		StdoutLog:    env["STDOUT_LOG"],
 		StderrLog:    env["STDERR_LOG"],
