@@ -14,6 +14,7 @@
 - **The stage.** `StageFor` takes the policy overrides and falls back to the registry default. The overrides come only from `.evolve/policy.json` `quality.indexes.<id>.stage`. The policy decode is strict: an unknown key, an unknown id or a stage outside `shadow`, `report` and `gate` refuses the policy.
 - **The breach test.** `Judge` returns `no_data` for n = 0 and `ok` for an index with no threshold. Otherwise it compares the whole interval with the threshold. A breach needs the whole interval on the bad side. An interval across the threshold is `inconclusive`. A breach under `NMin` is also `inconclusive`.
 - **The events.** `Events` returns one `quality.reading` (INFO, no code) with 11 field keys, under the `MaxFields` limit of 12, so `Normalize` drops none. At stage `report` or `gate`, a breach adds one `quality.breach` (WARN, `QUALITY_<ID>_BREACH`). A reading with n = 0 adds a `quality.warning` (`QUALITY_VACUOUS_DENOMINATOR`). `SourceWarning` builds the warning for an absent or unreadable source.
+- **A reader can refine a reading.** A `Reading` can carry its own `Threshold`, for a sub-measure such as the PQ4 system-fail rate. It can also carry its own `Status`, for a comparison under its MDE. `MethodMDE` names that comparison.
 - **The codes.** `init` registers 19 breach codes and three warning codes, so `evolve signals codes check` stays in sync with [signal-codes.md](../signal-codes.md).
 - **Where the events go.** The command builds its Center with publisher role `quality`. A reading with a cycle goes to that cycle's `signals.ndjson`. A cycle-0 reading goes to the channels `quality.reading`, `quality.breach`, `errors` and `signals`, never to the frozen project file. `evolve signals tail --channel <name>` reads them.
 
@@ -26,5 +27,5 @@
 
 ## Findings
 
-- On 2026-10-21 no reader exists, so each scope prints "has no index readers yet". The first real reading comes with Q2.
+- Since Q2, the wave scope has three readers ([internal-pipelinerates](internal-pipelinerates.md)). The tree, judges and replay scopes still print "has no index readers yet".
 - The inbox acceptance asked to add the quality kinds to `legacyProjectKinds`. A pinned test freezes that list at the kinds that existed before the channels, so Q1 routes the readings to the channels instead.

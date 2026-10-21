@@ -13,6 +13,7 @@ const (
 	MethodBootstrap95 Method = "bootstrap95"
 	MethodCensus      Method = "census"
 	MethodPassK       Method = "pass_k_unbiased"
+	MethodMDE         Method = "mde"
 )
 
 type Status string
@@ -27,17 +28,20 @@ const (
 const defaultOrigin = "qualitypanel.Events"
 
 type Reading struct {
-	Index    string
-	Interval Interval
-	Method   Method
-	N        int
-	Window   string
-	Source   string
-	Cycle    int
-	Origin   string
+	Index     string
+	Interval  Interval
+	Method    Method
+	N         int
+	Window    string
+	Source    string
+	Cycle     int
+	Origin    string
+	Threshold *float64
+	Status    Status
 }
 
 func Judge(ix Index, r Reading) Status {
+	ix = r.applyThreshold(ix)
 	switch {
 	case r.N == 0:
 		return StatusNoData
@@ -70,7 +74,11 @@ func Events(r Reading, stage Stage) []signalcenter.Event {
 	if !ok {
 		return []signalcenter.Event{SourceWarning(r.Index, CodeSourceUnreadable, r.Source, "a reading names the unknown index "+strconv.Quote(r.Index))}
 	}
-	status := Judge(ix, r)
+	ix = r.applyThreshold(ix)
+	status := r.Status
+	if status == "" {
+		status = Judge(ix, r)
+	}
 	out := []signalcenter.Event{readingEvent(ix, r, stage, status)}
 	if status == StatusBreach && stage != StageShadow && ix.Breachable {
 		out = append(out, r.event(signalcenter.KindQualityBreach, BreachCode(ix.ID), "the whole interval of "+ix.ID+" is on the bad side of its threshold", readingFields(ix, r, stage, status)))
@@ -116,4 +124,11 @@ func num(v float64) string { return strconv.FormatFloat(v, 'f', 3, 64) }
 
 func SourceWarning(index string, code signalcenter.Code, source, reason string) signalcenter.Event {
 	return Reading{Index: index, Source: source}.event(signalcenter.KindQualityWarning, code, reason, map[string]string{"index": index, "source": source})
+}
+
+func (r Reading) applyThreshold(ix Index) Index {
+	if r.Threshold != nil {
+		ix.Threshold, ix.HasThreshold = *r.Threshold, true
+	}
+	return ix
 }

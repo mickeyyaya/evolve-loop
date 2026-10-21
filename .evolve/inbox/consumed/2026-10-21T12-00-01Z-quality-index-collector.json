@@ -20,7 +20,7 @@
     "Each reading carries at most 11 field keys, and a test shows that every key survives signalcenter.Normalize (MaxFields is 12); unit, direction and baseline live in the index registry",
     "Indexes with a baseline (CQ1, CQ2, PQ1, PQ3, PQ4, JQ3, JQ4, OQ2, OQ3) default to stage report; the rest default to shadow",
     "19 breach codes are registered, one per id with a threshold; stage gate emits the same signals as report (table test over the three stages)",
-    "The three quality kinds are in legacyProjectKinds, so a cycle-0 reading reaches .evolve/signals.ndjson (test)"
+    "Cycle-0 quality readings are readable through evolve signals tail --channel (quality.reading, quality.breach, signals)"
   ],
   "files": [
     "go/internal/qualitypanel/ (new)",
@@ -36,5 +36,6 @@
     "go/.apicover-enforce"
   ],
   "created_at": "2026-10-21T12:00:01Z",
-  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q1 (ADR-0153)"
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q1 (ADR-0153)",
+  "acceptance_amendment": "2026-10-21, operator approved (\"Ok, continue\"): the line \"the three quality kinds are in legacyProjectKinds\" became \"readable through evolve signals tail --channel\". legacyProjectKinds only filters the legacy NDJSON project sink, and TestLegacyProjectRecord_AllowsOnlyTheKindsThatExistedBeforeTheChannels pins that list frozen. The independent review of PR #1116 (dev/console-notes/reviews/pr-1116.md) agreed."
 }

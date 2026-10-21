@@ -92,3 +92,4 @@
 ./internal/recoveryretro 100
 ./internal/cli/agentcmd 100
 ./internal/qualitypanel 100
+./internal/pipelinerates 100
