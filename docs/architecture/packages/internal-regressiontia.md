@@ -30,3 +30,12 @@
 ## Findings
 
 - The reverse-closure rule exists because the forward-only scope hid the cycle-1250 class. A change confined to `internal/router` skipped `internal/routingtest`, which holds the keystone parity invariant. Main stayed red for five commits. `TestChangedScope_WidensByReverseDependency` reproduces that case on the real import graph.
+
+## The shadow rollup (2026-10-21)
+
+- `Rollup(runsDir)` reads `acs-tia-shadow.json` and `acs-verdict.json` from each `cycle-<N>` directory, in cycle order. A run directory without the shadow artifact is not counted.
+- `Summary` holds the cycle count, the totals of the selected packages and of the packages the selection can skip (`would_skip`), and each `Miss`. A miss is a skippable package with any red predicate in the same cycle, written as `go/acs/regression/<pkg>/...:<Test>` or `go/acs/regression/<pkg>:<Test>`. `Decision.DurationMS` records the time of each selection, and the summary keeps the total and the largest.
+- A cycle with a shadow decision and no verdict is listed in `NoVerdict`. A file that does not parse is listed in `Unreadable`. A runs directory that does not exist is an error.
+- `evolve acs tia-report` prints the rollup, or `--json` prints the `Summary`.
+- Pinned by `TestRollup_CountsTheShadowDecisionsAndNamesEachMiss` and `TestRollup_AMissingRunsDirIsAnError`.
+
