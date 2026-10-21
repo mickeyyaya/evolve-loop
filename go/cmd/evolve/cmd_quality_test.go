@@ -310,3 +310,40 @@ func TestTreeQualityReaders_AMissingWaveRecordWarnsForTheAddedForm(t *testing.T)
 		t.Errorf("CQ4 absent warnings = %d, want 1 for the missing wave records", absent)
 	}
 }
+
+func TestTreeQualityReaders_AFailedShipDiffWarnsAndAddsNoEmptyReading(t *testing.T) {
+	t.Parallel()
+	root := qualityProject(t, "")
+	for rel, body := range map[string]string{
+		"go/internal/a/a.go":                     "package a\n\nfunc A() int { return 1 }\n",
+		".evolve/waves/wave-1.json":              `{"number":1,"cycle_floor":1}`,
+		".evolve/runs/cycle-1/run.json":          `{"shipped":true}`,
+		".evolve/runs/cycle-1/ship-binding.json": `{"commit_sha":"0000000000000000000000000000000000000000"}`,
+	} {
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env := qualityEnv{scopes: map[string][]qualityReader{"wave": treeQualityReaders()}, newCenter: publishingQualityCenter}
+
+	_, stdout := runQualityReport(t, env, root)
+
+	for _, e := range channelEvents(t, root, "quality.reading") {
+		if e.Fields["window"] == "wave:1/added" || e.Fields["window"] == "" {
+			t.Errorf("reading %v, want no added-form reading when its diff failed", e.Fields)
+		}
+	}
+	unreadable := 0
+	for _, e := range channelEvents(t, root, "quality.breach") {
+		if e.Code == "QUALITY_SOURCE_UNREADABLE" && e.Fields["index"] == "CQ4" {
+			unreadable++
+		}
+	}
+	if !strings.Contains(stdout, "3 reading(s)") || unreadable != 1 {
+		t.Errorf("stdout %q, CQ4 unreadable warnings %d; want CQ3, CQ4 tree and CQ5 and one warning for the failed git show", stdout, unreadable)
+	}
+}

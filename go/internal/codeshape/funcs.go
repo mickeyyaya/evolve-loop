@@ -99,8 +99,14 @@ func cyclomatic(n ast.Node) int {
 	c := 1
 	ast.Inspect(n, func(x ast.Node) bool {
 		switch t := x.(type) {
-		case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt, *ast.CaseClause, *ast.CommClause:
+		case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt:
 			c++
+		case *ast.CaseClause:
+			c += min(1, len(t.List))
+		case *ast.CommClause:
+			if t.Comm != nil {
+				c++
+			}
 		case *ast.BinaryExpr:
 			if t.Op == token.LAND || t.Op == token.LOR {
 				c++
@@ -112,24 +118,44 @@ func cyclomatic(n ast.Node) int {
 }
 
 func nesting(body ast.Node) int {
-	deepest := 0
-	var walk func(ast.Node, int)
-	walk = func(node ast.Node, depth int) {
-		ast.Inspect(node, func(x ast.Node) bool {
-			if x == node {
-				return true
-			}
-			switch x.(type) {
-			case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt, *ast.FuncLit:
-				deepest = max(deepest, depth+1)
-				walk(x, depth+1)
-				return false
-			}
+	n := &nester{}
+	n.walk(body, 0)
+	return n.deepest
+}
+
+type nester struct{ deepest int }
+
+func (n *nester) walk(node ast.Node, depth int) {
+	ast.Inspect(node, func(x ast.Node) bool {
+		if x == node {
 			return true
-		})
+		}
+		switch s := x.(type) {
+		case *ast.IfStmt:
+			n.ifChain(s, depth)
+			return false
+		case *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt, *ast.FuncLit:
+			n.deepest = max(n.deepest, depth+1)
+			n.walk(x, depth+1)
+			return false
+		}
+		return true
+	})
+}
+
+func (n *nester) ifChain(s *ast.IfStmt, depth int) {
+	n.deepest = max(n.deepest, depth+1)
+	for _, part := range []ast.Node{s.Init, s.Cond, s.Body} {
+		if part != nil {
+			n.walk(part, depth+1)
+		}
 	}
-	walk(body, 0)
-	return deepest
+	switch e := s.Else.(type) {
+	case *ast.IfStmt:
+		n.ifChain(e, depth)
+	case *ast.BlockStmt:
+		n.walk(e, depth+1)
+	}
 }
 
 func paramCount(fields *ast.FieldList) int {
