@@ -25,12 +25,19 @@ func (h hooks) DefaultModel() string    { return h.spec.ModelOrDefault() }
 
 func (h hooks) InlinePromptBody() (string, bool) { return h.inlinePromptBody, h.inlinePromptBody != "" }
 
-func (h hooks) ArtifactFilename(_ core.PhaseRequest) string {
-	if files := h.spec.Outputs.Files; len(files) > 0 && files[0] != "" {
+func (h hooks) ArtifactFilename(_ core.PhaseRequest) string { return ArtifactName(h.spec) }
+
+func ArtifactName(spec phasespec.PhaseSpec) string {
+	if files := spec.Outputs.Files; len(files) > 0 && files[0] != "" {
 		return filepath.Base(files[0])
 	}
-	return h.spec.Name + "-report.md"
+	return spec.Name + "-report.md"
 }
+
+const (
+	AgentInputKey  = "agent_input"
+	agentInputNote = "This is a standalone run with no cycle. The input below replaces the cycle artifacts that your instructions name. Read it in their place, and do not look for a cycle run directory."
+)
 
 func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b, blocks strings.Builder
@@ -43,6 +50,9 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 		default:
 			fmt.Fprintf(&b, "- %s: %s\n", key, v)
 		}
+	}
+	if input := req.Context[AgentInputKey]; input != "" {
+		fmt.Fprintf(&blocks, "\n\n## Agent Input\n%s\n\n%s", agentInputNote, input)
 	}
 	b.WriteString(blocks.String())
 	return b.String()
