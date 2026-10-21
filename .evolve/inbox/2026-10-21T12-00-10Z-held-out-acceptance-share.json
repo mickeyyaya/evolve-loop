@@ -1,0 +1,26 @@
+{
+  "id": "held-out-acceptance-share",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "weight": 0.41,
+  "route": "console-manual",
+  "title": "Quality indexes Q10: the share of acceptance checks that the builder cannot see or change",
+  "summary": "Hidden tests cut a measured cheat rate from 54% to near zero (ImpossibleBench, secondary summary). TQ4 measures how much of each cycle's acceptance the builder does not control. No hash of the acceptance checks at hand-off exists today. Spec: docs/architecture/llm-quality-indexes.md §7 TQ4.",
+  "fix": "Record the hash of each acceptance check file in handoff-tdd-build.json at hand-off. At the boundary, a check is held out when a phase other than the builder wrote it, it is outside lane-scope.json, and its hash at audit equals its hash at hand-off. Emit TQ4 per cycle.",
+  "acceptance": [
+    "RED first: a check whose hash changed between hand-off and audit is not held out",
+    "A check inside the builder write scope is not held out",
+    "TQ4 starts at stage shadow",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": [
+    "quality-index-collector"
+  ],
+  "files": [
+    "go/internal/qualitypanel/",
+    "go/cmd/evolve/cmd_handoff.go (writes handoff-<pair>.json)",
+    "docs/architecture/llm-quality-indexes.md"
+  ],
+  "created_at": "2026-10-21T12:00:10Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q10 (ADR-0153)"
+}

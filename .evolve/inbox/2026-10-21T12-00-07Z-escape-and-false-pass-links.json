@@ -1,0 +1,28 @@
+{
+  "id": "escape-and-false-pass-links",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "weight": 0.43,
+  "route": "console-manual",
+  "title": "Quality indexes Q7: link each fix to the ship it repairs, for the escape rate and the false-PASS rate",
+  "summary": "The loop repairs forward: 0 of 695 first-parent commits in 30 days are reverts. Nothing links a fix item to the ship that caused the defect, so OQ1 (escapes per 100 ships) and JQ2 (false-PASS rate) have no data. Spec: docs/architecture/llm-quality-indexes.md §9 JQ2 and §10 OQ1. The lint half has no dependency on Q1; only OQ1 and JQ2 need it.",
+  "fix": "Add an optional inbox field escapes (a list of commit shas or PR numbers) and a commit trailer Fixes-Ship: <sha>. The inbox lint warns on an item whose source names a commit or PR and that has no escapes field. Compute OQ1 and JQ2 over ships 14 to 44 days old.",
+  "acceptance": [
+    "RED first: an inbox item whose source names a shipped commit and has no escapes field fails evolve inbox lint with one WARN",
+    "A Fixes-Ship trailer on a commit marks the named ship as an escape",
+    "JQ2 counts a PASS ship as false when a revert, a Fixes-Ship link or a red main CI run that starts at the ship follows within 14 days",
+    "Both indexes start at stage shadow",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": [
+    "quality-index-collector"
+  ],
+  "files": [
+    "go/internal/inboxbatch/",
+    "go/internal/qualitypanel/",
+    "docs/architecture/llm-quality-indexes.md",
+    "go/cmd/evolve/cmd_inbox.go (inbox lint)"
+  ],
+  "created_at": "2026-10-21T12:00:07Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q7 (ADR-0153)"
+}

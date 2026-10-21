@@ -1,0 +1,29 @@
+{
+  "id": "pipeline-rates-with-intervals",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "weight": 0.48,
+  "route": "console-manual",
+  "title": "Quality indexes Q2: ship rate, deadline and system-fail rate, change locality and the comparison MDE, each with an interval",
+  "summary": "PQ1, PQ3, PQ4 and CQ2 have data today but no reader. Baselines on 2026-10-21: PQ1 64.0% [56.9, 70.5] over waves 82 to 140; deadline 16.7% [12.0, 22.7]; system-fail 4.8% [2.6, 8.9]; median 2 packages per ship. run.json final_verdict is not a reliable outcome (cycle 2024 says PASS, its seal says FAIL). Spec: docs/architecture/llm-quality-indexes.md §8 and CQ2 in §6.",
+  "fix": "Readers in internal/qualitypanel: wave membership from .evolve/waves/wave-N.json cycle_floor; ship from run.json shipped or the ship.landed signal; deadline from a missing cycle.sealed or a lane-deadline seal; system-fail from the codes in spec PQ4; CQ2 from ship-binding.json commit_sha and git show --numstat. Add evolve quality compare --index <id> --a <window> --b <window> with the MDE and a McNemar exact test for paired windows.",
+  "acceptance": [
+    "RED first: a cycle-2024 shape (run.json PASS, cycle.sealed FAIL, no ship) counts as not shipped",
+    "A fixture of waves 137 to 140 reproduces 2/5, 1/6, 2/5, 3/5 and their Wilson bounds",
+    "PQ4 counts a run directory with no cycle.sealed signal as a deadline end",
+    "evolve quality compare reports status=inconclusive when the observed difference is under the MDE",
+    "Each Q2 reading carries the 11 keys of spec §5.2 with the window and source of its reader",
+    "Changed functions at 100% coverage",
+    "evolve quality compare on a paired fixture with 8 discordant pairs (7 to 1) reports the exact McNemar p-value"
+  ],
+  "deps": [
+    "quality-index-collector"
+  ],
+  "files": [
+    "go/internal/qualitypanel/",
+    "go/cmd/evolve/cmd_quality.go",
+    "docs/architecture/llm-quality-indexes.md"
+  ],
+  "created_at": "2026-10-21T12:00:02Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q2 (ADR-0153)"
+}

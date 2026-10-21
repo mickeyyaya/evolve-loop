@@ -1,0 +1,40 @@
+{
+  "id": "quality-index-collector",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "Quality indexes Q1: the collector, the quality module of the Signal Center and evolve quality report",
+  "summary": "ADR-0153 makes quality a panel of separate indexes with intervals, published only through the Signal Center. Nothing computes or emits them today. Q1 builds the shared core that every other quality component uses: the statistics, the reading signal, the codes, the command, the boundary step and the channel routes. Spec: docs/architecture/llm-quality-indexes.md §4 and §5. Plan: docs/plans/llm-quality-indexes-2026-10.md §6 Q1. The package is new: internal/qualityindex already holds the review-score grammar, so the collector lives in internal/qualitypanel.",
+  "fix": "Add internal/qualitypanel with Wilson 95% (spec §4.2), cluster bootstrap by wave with a fixed seed (§4.3), the MDE (§4.6) and the breach test on the whole interval (§4.4). Add module quality, kinds quality.reading (INFO), quality.breach and quality.warning (WARN), and register QUALITY_<ID>_BREACH for the 19 ids that have a threshold (spec §1 table, all ids but PQ3 and JQ4) plus QUALITY_SOURCE_ABSENT, QUALITY_VACUOUS_DENOMINATOR and QUALITY_SOURCE_UNREADABLE; regenerate docs/architecture/signal-codes.md. Add the three kinds to legacyProjectKinds (go/cmd/evolve/cmd_cycle.go). Build the Center with newRoleSignalCenter(\"quality\", ...). Add evolve quality report --scope wave|tree|judges|replay, a boundary step before gc, the channels quality.breach (lossless) and quality.reading (best_effort) in policy.EventsDefaults, and policy quality.indexes.<id>.stage with compiled default shadow.",
+  "acceptance": [
+    "RED first: a reading with k=3, n=5 emits quality.reading with value 0.600, lo 0.231 and hi 0.882 (Wilson 95%)",
+    "A reading whose interval crosses its threshold emits status=inconclusive and no quality.breach",
+    "At stage shadow no quality.breach is emitted; at stage report a breach emits QUALITY_<ID>_BREACH at WARN",
+    "A reading with n=0 emits QUALITY_VACUOUS_DENOMINATOR; an absent source emits QUALITY_SOURCE_ABSENT",
+    "Every index that the collector computes emits through signalcenter and is visible in evolve signals tail --kind quality.reading,quality.breach,quality.warning",
+    "evolve signals codes check passes with the new codes in docs/architecture/signal-codes.md",
+    "The boundary runs evolve quality report --scope wave after sync-main and before gc, and a collector failure does not fail the boundary (WARN only)",
+    "No code path reads a quality signal to change a stage or a verdict (test: the stage comes only from policy)",
+    "New package at 100% coverage, in go/.cover-strict and go/.apicover-enforce",
+    "Each reading carries at most 11 field keys, and a test shows that every key survives signalcenter.Normalize (MaxFields is 12); unit, direction and baseline live in the index registry",
+    "Indexes with a baseline (CQ1, CQ2, PQ1, PQ3, PQ4, JQ3, JQ4, OQ2, OQ3) default to stage report; the rest default to shadow",
+    "19 breach codes are registered, one per id with a threshold; stage gate emits the same signals as report (table test over the three stages)",
+    "The three quality kinds are in legacyProjectKinds, so a cycle-0 reading reaches .evolve/signals.ndjson (test)"
+  ],
+  "files": [
+    "go/internal/qualitypanel/ (new)",
+    "go/internal/signalcenter/event.go",
+    "go/cmd/evolve/cmd_quality.go (new)",
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/cmd/evolve/cmd_boundary.go",
+    "go/internal/policy/policy_events.go",
+    "docs/architecture/signal-codes.md",
+    "docs/architecture/llm-quality-indexes.md",
+    "go/internal/policy/ (quality.indexes.<id>.stage, new strict block)",
+    "go/.cover-strict",
+    "go/.apicover-enforce"
+  ],
+  "created_at": "2026-10-21T12:00:01Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q1 (ADR-0153)"
+}

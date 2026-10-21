@@ -1,0 +1,27 @@
+{
+  "id": "pass-k-replay-harness",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.38,
+  "route": "console-manual",
+  "title": "Quality indexes Q9: a replay harness that runs one phase k times on a frozen item, for pass^k",
+  "summary": "Production data cannot give pass^k: no item ships twice, because a ship consumes it. Of 17 items with two or more tries, 13 shipped at last. pass^k per item is C(c,k)/C(n,k), averaged over items (tau-bench). Spec: docs/architecture/llm-quality-indexes.md §8 PQ2. Needs evolve agent run (ADR-0152), which is on main.",
+  "fix": "A fixed replay set in config (proposal: 10 items from the last 30 days, 5 shipped and 5 failed, frozen at their base commits). Run one phase k times per item through evolve agent run (ADR-0152), record pass or fail, and emit PQ2 for k = 1, 2, 4 with a cluster bootstrap by item at --scope replay.",
+  "acceptance": [
+    "RED first: 3 tries with 2 passes give pass^1 = 2/3 and pass^2 = 1/3",
+    "The harness uses a fake runner seam in tests and never launches a real LLM CLI",
+    "The replay set is read only from policy; a test shows that the harness has no write path to it",
+    "PQ2 starts at stage shadow",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": [
+    "quality-index-collector"
+  ],
+  "files": [
+    "go/internal/qualitypanel/",
+    "docs/architecture/llm-quality-indexes.md",
+    "go/internal/policy/ (replay set)"
+  ],
+  "created_at": "2026-10-21T12:00:09Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q9 (ADR-0153)"
+}
