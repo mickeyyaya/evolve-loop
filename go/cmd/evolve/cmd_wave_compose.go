@@ -90,7 +90,7 @@ func composeWaveGoal(env waveEnv, plan *wavePlan, cfg policy.WaveConfig, standin
 }
 
 func lastWaveFacts(env waveEnv, plan *wavePlan, last wave.Record) wave.Facts {
-	cycles, warnings := wave.ReadCycles(plan.plane.root, last.CycleFloor, 0)
+	cycles, _, warnings := wave.ReadRunCycles(plan.plane.root, last.CycleFloor, 0)
 	plan.warnings = append(plan.warnings, warnings...)
 	prs := slices.Clone(plan.args.boundary.prs)
 	if last.MainSHA != "" {

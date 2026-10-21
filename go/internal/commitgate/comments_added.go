@@ -25,6 +25,8 @@ func (o Options) refuseWhatNeverCommits(ctx context.Context, files []string, res
 	return ExitPass
 }
 
+const pluginBinary = "go/evolve"
+
 func (o Options) refuseBinaries(files []string, res *Result) int {
 	offenders, err := binaryguard.Scan(o.RepoRoot, files, binaryguard.DefaultThresholdBytes)
 	if err != nil {
@@ -32,6 +34,10 @@ func (o Options) refuseBinaries(files []string, res *Result) int {
 		return ExitGitFatal
 	}
 	for _, off := range offenders {
+		if filepath.ToSlash(filepath.Clean(off.Path)) == pluginBinary {
+			res.log("REJECTED: %s is the tracked plugin binary (ADR-0094) and a local go build overwrote it (%d bytes) — restore it with `git checkout HEAD -- %s`, then build with `make -C go build` (writes go/bin/evolve).", off.Path, off.Size, pluginBinary)
+			continue
+		}
 		res.log("REJECTED: %s is a %d-byte compiled executable — never commit build artifacts (add it to .gitignore).", off.Path, off.Size)
 	}
 	if len(offenders) > 0 {

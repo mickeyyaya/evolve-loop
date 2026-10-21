@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	cliRoutingUsage    = "usage: evolve cli-routing show [--static] [--json] | check | explain <agent> [--phase P] [--static] | init --clis a,b | set <key> [<a,b>] [--model T] [--effort L] | unset <key>[.effort] | migrate [--dry-run]  (all take --project-root DIR)"
+	cliRoutingUsage    = "usage: evolve cli-routing show [--static] [--json] | check | explain <agent> [--phase P] [--static] | init --clis a,b | set <key> [<a,b>] [--model T] [--effort L] [--share-pct N] | unset <key>[.effort|.share_pct] | migrate [--dry-run]  (all take --project-root DIR)"
 	exitRoutingUsage   = 2
 	exitRoutingFinding = 1
 )
@@ -269,6 +269,9 @@ func (v routingView) agentNotes(agent string, route agentRoute) []string {
 		if findingNamesAgent(f.Key, agent) {
 			notes = append(notes, fmt.Sprintf("%s %s: %s", f.Severity, f.Key, f.Message))
 		}
+	}
+	if v.router != nil {
+		notes = append(notes, v.router.ShareNotes(v.root, route.Chain)...)
 	}
 	for _, cli := range route.Chain {
 		if v.benched[llmroute.Family(cli)] {

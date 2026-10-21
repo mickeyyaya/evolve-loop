@@ -112,3 +112,9 @@ func TestSealedVerdictField_IsTheWireNameOfTheFinalVerdictInACycleSealedEvent(t 
 		t.Errorf("SealedVerdictField = %q, want the wire name final_verdict that dossiers and cycle state files also use", SealedVerdictField)
 	}
 }
+
+func TestCycleTerminationLaneDeadline_IsTheSealOfALaneDeadlineStop(t *testing.T) {
+	if CycleTerminationLaneDeadline != "stopped: lane deadline" || SealedTerminationField != "termination_reason" {
+		t.Errorf("termination %q in field %q, want \"stopped: lane deadline\" in \"termination_reason\": the loop seal and core's emitCycleClose share the field", CycleTerminationLaneDeadline, SealedTerminationField)
+	}
+}

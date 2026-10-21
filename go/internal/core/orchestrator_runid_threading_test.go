@@ -69,7 +69,7 @@ func TestCB5_FailureLearningRetroCarriesRunID(t *testing.T) {
 		Attempt:      1,
 		CycleState:   &CycleState{WorkspacePath: "/tmp/ws", RunID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"},
 	}
-	if got := fl.retroRequest("summary", "todo-1").RunID; got != "01ARZ3NDEKTSV4RRFFQ69G5FAV" {
+	if got := fl.retroRequest(&Orchestrator{}, "summary", "todo-1").RunID; got != "01ARZ3NDEKTSV4RRFFQ69G5FAV" {
 		t.Errorf("failure-learning retro RunID=%q, want the cycle's run id", got)
 	}
 }

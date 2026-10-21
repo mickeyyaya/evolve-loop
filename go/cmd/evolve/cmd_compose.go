@@ -39,7 +39,7 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return rc
 	}
 
-	req, rc := composeRequest(*cycle, *projectRoot, stdin, stderr)
+	req, rc := composeRequest(*cycle, *projectRoot, phases, stdin, stderr)
 	if rc != 0 {
 		return rc
 	}
@@ -85,9 +85,9 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return overall
 }
 
-func composeRequest(cycle int, projectRoot string, stdin io.Reader, stderr io.Writer) (core.PhaseRequest, int) {
+func composeRequest(cycle int, projectRoot string, phases []string, stdin io.Reader, stderr io.Writer) (core.PhaseRequest, int) {
 	if cycle != 0 {
-		req, err := phasecmd.RequestForCycle(projectRoot, cycle, stdin)
+		req, err := phasecmd.RequestForCycle(projectRoot, cycle, stdin, phases...)
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve compose: %v\n", err)
 			return core.PhaseRequest{}, phasecmd.CycleRequestExitCode(err)

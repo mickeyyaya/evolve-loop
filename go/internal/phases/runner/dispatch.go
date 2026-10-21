@@ -59,7 +59,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		if bridgeErr != nil && bres.ExitCode == 85 {
 			b.maybeBenchOnEscalation(bridgechain.EscalationFor(attempt, start))
 		}
-		return bres.ExitCode, bridgeErr
+		return llmroute.TieringExit(bres.ExitCode, bres.CauseCode), bridgeErr
 	}, func(from, to string) {
 		log.Diag().Infof("[runner] phase=%s tier step-down: %s → %s (CLI chain exhausted at quota)\n", phase, from, to)
 	})
@@ -70,7 +70,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 	if unlaunched := bridgechain.Unlaunched(tieredRes, plan); unlaunched != nil {
 		bridgeErr = unlaunched
 	}
-	bridgeErr = withWalk(bridgeErr, walked)
+	bridgeErr = withWalk(withCause(bridgeErr, bres.CauseCode), walked)
 	resolvedModel := terminalTier(tieredRes, model)
 	if len(attemptLog) > 1 {
 		log.Diag().Infof("[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
@@ -155,6 +155,13 @@ func FormatSkillOverlayLog(phase string, skills []string, tier string) string {
 	return "[runner] phase=" + phase +
 		" skill-overlays=[" + strings.Join(skills, ",") + "]" +
 		" (tier=" + tier + ")"
+}
+
+func withCause(err error, cause string) error {
+	if err == nil || cause == "" {
+		return err
+	}
+	return core.LaunchCause{Cause: cause, Err: err}
 }
 
 func withWalk(err error, walked []string) error {

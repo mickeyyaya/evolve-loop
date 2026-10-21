@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
@@ -281,20 +282,39 @@ func git(ctx context.Context, dir string, env []string, args ...string) (string,
 }
 
 type Fence struct {
-	snap    *Snapshot
-	takeErr error
+	snap         *Snapshot
+	takeErr      error
+	retakenAfter error
 }
 
 func Begin(ctx context.Context, worktree string, readOnly bool, writable ...string) *Fence {
 	if !readOnly || worktree == "" {
 		return &Fence{}
 	}
-	snap, err := Take(ctx, worktree)
-	if err != nil {
-		return &Fence{takeErr: err}
+	snap, first := Take(ctx, worktree)
+	if first != nil {
+		var err error
+		if snap, err = retake(ctx, worktree, first); err != nil {
+			return &Fence{takeErr: err}
+		}
 	}
 	snap.writable = writableSet(writable)
-	return &Fence{snap: &snap}
+	return &Fence{snap: &snap, retakenAfter: first}
+}
+
+const retakeDelay = 100 * time.Millisecond
+
+func retake(ctx context.Context, worktree string, first error) (Snapshot, error) {
+	select {
+	case <-ctx.Done():
+		return Snapshot{}, fmt.Errorf("%w; retry: %w", first, ctx.Err())
+	case <-time.After(retakeDelay):
+	}
+	snap, err := Take(ctx, worktree)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("%w; retry: %w", first, err)
+	}
+	return snap, nil
 }
 
 func writableSet(paths []string) map[string]bool {
@@ -309,11 +329,12 @@ func writableSet(paths []string) map[string]bool {
 }
 
 type Outcome struct {
-	Verified   bool
-	Restored   []string
-	Kept       []string
-	TakeErr    error
-	RestoreErr error
+	Verified     bool
+	Restored     []string
+	Kept         []string
+	TakeErr      error
+	RestoreErr   error
+	RetakenAfter error
 }
 
 func (f *Fence) End(ctx context.Context) Outcome {
@@ -330,7 +351,7 @@ func (f *Fence) End(ctx context.Context) Outcome {
 	if err == nil {
 		err = f.snap.verify(ctx)
 	}
-	return Outcome{Verified: err == nil, Restored: res.Restored, Kept: res.Kept, RestoreErr: err}
+	return Outcome{Verified: err == nil, Restored: res.Restored, Kept: res.Kept, RestoreErr: err, RetakenAfter: f.retakenAfter}
 }
 
 const listMax = 12
@@ -341,6 +362,10 @@ func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 			"worktree fence: snapshot unavailable for read-only phase %s (%v) — worktree writes by this phase were not checked", phase, o.TakeErr)}}
 	}
 	var out []cyclestate.Diagnostic
+	if o.RetakenAfter != nil {
+		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: fmt.Sprintf(
+			"worktree fence: snapshot retaken after: %v — read-only phase %s was fenced by the second snapshot", o.RetakenAfter, phase)})
+	}
 	if len(o.Restored) > 0 {
 		shown, more := o.Restored, ""
 		if len(shown) > listMax {
@@ -361,6 +386,13 @@ func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 			"worktree fence: restore failed for read-only phase %s (%v) — the worktree may carry this phase's writes", phase, o.RestoreErr)})
 	}
 	return out
+}
+
+func (f *Fence) RetakenAfter() error {
+	if f == nil {
+		return nil
+	}
+	return f.retakenAfter
 }
 
 func (f *Fence) TakeErr() error {

@@ -55,6 +55,7 @@ func (c *compiler) compileDeclared(t Table) Table {
 	t.bounds = c.compileLadderBounds()
 	t.orders = c.compileOrders()
 	t.tiers = c.compileTiers(t.clis)
+	t.shares = c.compileShares(t.tiers)
 	t.stop = c.compileAfterChain()
 	t.roles = c.agentRoles()
 	t.agentKeys = maps.Clone(c.agentKeys)

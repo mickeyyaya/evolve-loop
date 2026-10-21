@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
@@ -106,7 +107,7 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 		return
 	}
 	if verdictcache.ProbeEligible(baseTree, worktreeTree) {
-		if err := verdictcache.NewStore(projectRoot, o.now).Put(verdictcache.Entry{
+		if err := verdictcache.NewStore(projectRoot, o.now).Keep(policy.GCFor(projectRoot).VerdictCacheKeep()).Put(verdictcache.Entry{
 			TreeSHA:        worktreeTree,
 			Cycle:          cycle,
 			Verdict:        verdict,

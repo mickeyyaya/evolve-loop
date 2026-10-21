@@ -27,8 +27,9 @@ type AgentRule struct {
 }
 
 type TierRule struct {
-	CLIs   []string `json:"clis,omitempty"`
-	Effort string   `json:"effort,omitempty"`
+	CLIs     []string `json:"clis,omitempty"`
+	Effort   string   `json:"effort,omitempty"`
+	SharePct int      `json:"share_pct,omitempty"`
 }
 
 func (c *CLIRouting) UnmarshalJSON(raw []byte) error {
@@ -99,10 +100,13 @@ func validateRuleEffort(effort string) error {
 }
 
 func (r TierRule) MarshalJSON() ([]byte, error) {
+	if len(r.CLIs) == 0 && r.SharePct != 0 {
+		return nil, tierRuleError(errShareWithoutCLIs)
+	}
 	if len(r.CLIs) == 0 && r.Effort == "" {
 		return nil, tierRuleError(errEmptyTierRule)
 	}
-	if r.Effort == "" {
+	if r.Effort == "" && r.SharePct == 0 {
 		return json.Marshal(r.CLIs)
 	}
 	type rule TierRule
@@ -110,7 +114,7 @@ func (r TierRule) MarshalJSON() ([]byte, error) {
 }
 
 func tierRuleError(err error) error {
-	return fmt.Errorf(`tier rule: want an array of CLIs or {"clis": [...], "effort": "<level>"}: %w`, err)
+	return fmt.Errorf(`tier rule: want an array of CLIs or {"clis": [...], "effort": "<level>", "share_pct": <1-99>}: %w`, err)
 }
 
 func agentRuleError(err error) error {
@@ -122,6 +126,8 @@ func decodeStrict(raw []byte, into any) error {
 	dec.DisallowUnknownFields()
 	return dec.Decode(into)
 }
+
+var errShareWithoutCLIs = errors.New("share_pct needs clis: the first family of the tier chain takes the share")
 
 var errEmptyTierRule = errors.New("an empty rule names no CLI and no effort; remove the key instead")
 

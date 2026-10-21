@@ -126,8 +126,9 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		phaseCtx := seedAuditRepairContext(ctxSnap, next, cs)
 		phaseCtx = o.seedDispatchContext(ctx, phaseCtx, next, cs, req.ProjectRoot)
 		archiveRepairPrompts(cs, next)
-		if next == PhaseAudit {
-			cs.AuditRepairActive = false
+		consumeDispatchFlags(&cs, next)
+		if next == PhaseRetro {
+			o.clearRetroDecisionInput(&cs)
 		}
 		phaseReq := PhaseRequest{
 			Cycle:                           cycle,
@@ -143,8 +144,8 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			Env:                             envSnap,
 			Context:                         phaseCtx,
 			Signals:                         dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
+			Fence:                           o.fenceFor(next, cs),
 		}
-		phaseReq = o.withWorktreeFence(phaseReq, next, cs)
 		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig, checkout: r.checkoutDecision(), recoveryDepth: shipRecoveries, phaseDispatches: dispatches}
 		dispatch.applyDispatchPolicy(next, &phaseReq)
 		if next != PhaseBuild {
@@ -255,6 +256,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 				reason = gateErr.Error() + "; " + reason
 			}
 			result.RetroDecision = reason
+			o.carryDefer(cs, reason, &result)
 			if sysFail != nil && result.SystemFailure == nil {
 				result.SystemFailure = sysFail
 			}

@@ -3,6 +3,8 @@ package guards
 import (
 	"path"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -46,6 +48,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard_test.go", Rationale: "the staging backstop's own regression pin"},
 	{Fragment: "/go/internal/phases/ship/committed_doc_guard.go", Rationale: "the landing-time refusal of a diff that deletes committed documentation under docs/ or knowledge-base/; a cycle that weakened it could land the deletion of the repo's primary asset"},
 	{Fragment: "/go/internal/phases/ship/committed_doc_guard_test.go", Rationale: "the committed-documentation refusal's own regression pin"},
+	{Fragment: "/go/internal/phases/ship/foreign_predicate_guard.go", Rationale: "the landing-time refusal of a cycle landing that adds the predicate package of another cycle (logic-first-delivery-design §7.9 A2); a cycle that weakened it could land a superseded attempt's predicates beside its own"},
+	{Fragment: "/go/internal/phases/ship/foreign_predicate_guard_test.go", Rationale: "the foreign predicate package refusal's own regression pin"},
 	{Fragment: "/go/internal/bridge/driver_tmux_submitverify_guard_test.go", Rationale: "submit-verify's own keep-guard: pins that every real tmux driver declares an input-line marker (a family that omits it goes inert) and that a failed verification stays loud — a cycle editing this could re-open the cycles 1505/1510/1517 unsubmitted-prompt stall unobserved"},
 	{Fragment: "/go/internal/sysexec/command_guard_test.go", Rationale: "the K10 process guard: it fails on any production exec.Command or exec.CommandContext call outside sysexec.Command, so every process the pipeline starts has a Cancel and a WaitDelay; a cycle that quietly widened it could start processes that outlive their cancel"},
 	{Fragment: "/go/internal/orchestrator/guard_test.go", Rationale: "the wave orchestrator's own process guard: it fails on any poll (time.Sleep, Tick, NewTicker), any process start, any stop by pid and any broad or name-matched kill in the package, so the scheduler only decides and never stops a lane by itself; a cycle that quietly widened it could let the orchestrator start or kill processes"},
@@ -57,6 +61,14 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/reportdoc/", Rationale: "strict visible-Markdown parser shared by explanation review gates"},
 	{Fragment: "/go/internal/core/build_explanation_handoff.go", Rationale: "orchestrator activation and post-review sealing lifecycle"},
 	{Fragment: "/go/internal/core/build_floor_reviewer.go", Rationale: "mandatory deterministic Build explanation floor, and the floor coverage pass's go-test argv (coverTestArgs, under addedtests.PackageTimeout) and its verification-lock wait (coverLockWait = verifylock.MaxWait)"},
+	{Fragment: "/go/internal/core/floor_lists_base.go", Rationale: "the build floor reads go/.apicover-enforce and go/.cover-strict from the base and the tree together (gate-input-inventory D3); a cycle that weakened it could drop enforcement from its own floor"},
+	{Fragment: "/go/internal/core/floor_lists_base_test.go", Rationale: "the base-and-tree floor list merge's own regression pins"},
+	{Fragment: "/go/internal/core/floor_lists_regression.go", Rationale: "the build floor refuses a lane that drops an enforced package or lowers a coverage floor of the base (gate-input-inventory D3); a cycle that weakened it could land the weaker list on main"},
+	{Fragment: "/go/internal/core/floor_lists_regression_test.go", Rationale: "the floor list regression refusal's own pins"},
+	{Fragment: "/go/internal/core/cover_changed_floor.go", Rationale: "the build floor's cover-changed and cover-strict checks, which read the merged floor lists"},
+	{Fragment: "/go/internal/profiles/gate_inputs_realtree_test.go", Rationale: "the write-scope regression test over docs/architecture/gate-input-inventory.md, with the pinned authority rows and open seams; a cycle that relabelled a row or a pin would silence it"},
+	{Fragment: "/go/internal/core/ste_floor.go", Rationale: "the build floor's STE check: at docs_floor.ste_stage enforce it sends a doc whose added lines fail the lint back to the build; a cycle that weakened it could land the doc CI refuses"},
+	{Fragment: "/go/internal/stelint/added.go", Rationale: "the one added-line scope of the STE lint, shared by the build floor and evolve docs ste-lint --added (the CI job)"},
 	{Fragment: "/go/internal/core/build_explanation_floor_test.go", Rationale: "composition tripwire proving optional reviewers cannot replace the explanation floor"},
 	{Fragment: "/go/internal/core/reviewer.go", Rationale: "mandatory explanation-review chain composition"},
 	{Fragment: "/go/internal/core/orchestrator.go", Rationale: "fresh-cycle explanation activation and Build-context sealing call sites"},
@@ -223,4 +235,42 @@ func normalizeSurfacePath(raw string) (string, bool) {
 		p += "/"
 	}
 	return strings.ToLower(p), true
+}
+
+var pathInTextRE = regexp.MustCompile(`[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+/?`)
+
+func ProtectedPathsIn(text string) []string {
+	var out []string
+	for _, tok := range pathInTextRE.FindAllString(text, -1) {
+		candidate := strings.TrimRight(tok, ".")
+		if slices.ContainsFunc(goModuleDirs, func(dir string) bool { return strings.HasPrefix(candidate, dir) }) {
+			candidate = "go/" + candidate
+		}
+		if IsProtectedScope(candidate) && !slices.Contains(out, candidate) {
+			out = append(out, candidate)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+var fileInTextRE = regexp.MustCompile(`[A-Za-z0-9_@-]{2,}\.[A-Za-z][A-Za-z0-9]*`)
+
+var goModuleDirs = []string{"internal/", "cmd/", "pkg/", "acs/", "test/"}
+
+func PathsIn(text string) []string {
+	var out []string
+	for _, re := range []*regexp.Regexp{pathInTextRE, fileInTextRE} {
+		for _, tok := range re.FindAllString(text, -1) {
+			candidate := strings.TrimRight(tok, ".")
+			if pathShaped(candidate) && !slices.ContainsFunc(out, func(p string) bool { return strings.Contains(p, candidate) }) {
+				out = append(out, candidate)
+			}
+		}
+	}
+	return out
+}
+
+func pathShaped(tok string) bool {
+	return slices.ContainsFunc(strings.Split(strings.TrimSuffix(tok, "/"), "/"), func(seg string) bool { return len(seg) > 1 })
 }

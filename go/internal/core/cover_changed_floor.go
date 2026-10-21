@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"go/build"
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -51,7 +50,8 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 		return nil
 	}
 	failures := coverChangedFunctionFailures(ctx, in, stage, moduleDir, profile)
-	return append(failures, coverStrictFailures(stage, moduleDir, profile, pkgs, newBlockNoter(in.Worktree, moduleDir, in.Protected))...)
+	floors := baseAndTreeList(ctx, in, moduleDir, ".cover-strict")
+	return append(failures, coverStrictFailures(stage, moduleDir, profile, pkgs, floors, newBlockNoter(in.Worktree, moduleDir, in.Protected))...)
 }
 
 func unitRunRefuses(ctx context.Context, in ReviewInput, moduleDir string, pkgs []string) bool {
@@ -72,8 +72,8 @@ func coverChangedFunctionFailures(ctx context.Context, in ReviewInput, stage con
 
 const coverStrictHeadline = "changed package(s) listed in go/.cover-strict are below their floor; test each uncovered block below, unless its note says a test cannot reach it"
 
-func coverStrictFailures(stage config.Stage, moduleDir, profile string, pkgs []string, noter blockNoter) []string {
-	results, err := coverStrictRunner(moduleDir, profile, pkgs)
+func coverStrictFailures(stage config.Stage, moduleDir, profile string, pkgs []string, floors []byte, noter blockNoter) []string {
+	results, err := coverStrictRunner(moduleDir, profile, pkgs, floors)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN cover-changed could not check go/.cover-strict (%v); `make -C go cover-strict` and CI still judge it\n", err)
 		return nil
@@ -88,14 +88,7 @@ func coverStrictFailures(stage config.Stage, moduleDir, profile string, pkgs []s
 	return coverChangedReport(coverChangedResult(stage, coverStrictHeadline, lines))
 }
 
-func changedStrictResults(moduleDir, profilePath string, pkgs []string) ([]coverstrict.Result, error) {
-	data, err := os.ReadFile(filepath.Join(moduleDir, ".cover-strict"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
+func changedStrictResults(moduleDir, profilePath string, pkgs []string, data []byte) ([]coverstrict.Result, error) {
 	floors, err := coverstrict.ParseFloors(data)
 	if err != nil {
 		return nil, err

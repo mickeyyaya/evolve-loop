@@ -67,7 +67,7 @@ func rejectionOf(artifact string) (defectledger.Rejection, bool) {
 }
 
 func resolveEvidence(evidence string, r defectledger.Request) (bool, string) {
-	return evidenceResolves(evidence, core.PhaseRequest{ProjectRoot: r.ProjectRoot, Worktree: r.Worktree})
+	return evidenceResolves(evidence, core.PhaseRequest{ProjectRoot: r.ProjectRoot, Worktree: r.Worktree, Fence: core.FenceFor(core.WorktreePhase(core.PhaseAudit), nil)})
 }
 
 func emitDefectLedgerVia(l *defectledger.Ledger, artifact string, req core.PhaseRequest) []core.Diagnostic {

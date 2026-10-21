@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
 const Version = 1
@@ -119,7 +120,7 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 	doctorFn := o.Doctor
 	if doctorFn == nil {
 		doctorFn = func(ctx context.Context) bridge.DoctorReport {
-			rep, _ := bridge.NewEngine(bridge.Deps{}).Doctor(ctx, "", false)
+			rep, _ := bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))}).Doctor(ctx, "", false)
 			return rep
 		}
 	}

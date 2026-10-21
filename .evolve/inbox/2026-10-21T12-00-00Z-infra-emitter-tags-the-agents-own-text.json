@@ -1,0 +1,20 @@
+{
+  "id": "infra-emitter-tags-the-agents-own-text",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "The infra_failure emitter tags the agent's own text (diffs, docs, test literals, its thinking) as infrastructure",
+  "summary": "The phasestream normalizer (classifyPlain and the stderr path) tags any line that matches an infra marker, tool results and diffs included. In the review replay of PR #1079, about 14 of the 19 build-pane 'infrastructure' hits were the agent's own content: diff and doc lines (`agy-model-429-...md`, `orchestrator.go:429`, a diff line number `429 +`), package notes that mention EPERM, research rows with 'rate limit', test code with \"rate_limit\" literals, a commit message, the agent's own 'Thought for 6.5s (... rate limit tiers ...)', `transient_regex` config text holding 'overloaded', and `panic: test timed out` (the build's own test failing). A rejected build with such a line goes uncharged for a false reason (about 8% of live rejected builds).",
+  "fix": "Tag infra_failure only for lines that come from the CLI or the tool runtime, not from the agent's assistant text or from tool results that echo file content. Treat `panic: test timed out` as a code outcome, not a timeout marker. Add the `(eval):1: operation not permitted: ps` shell-startup line to the pane noise.",
+  "acceptance": [
+    "A build pane whose only marker text is in a diff, a document line, a test literal or the agent's own thinking emits no infra_failure event (red today)",
+    "A real CLI or runtime error line (429, 529, a sandbox EPERM from the tool runtime) still emits one"
+  ],
+  "files": [
+    "go/internal/phasestream/classify.go",
+    "go/internal/phasestream/marker.go"
+  ],
+  "created_at": "2026-10-21T12:00:00Z",
+  "source": "console, 2026-10-21, round-2 re-review of PR #1079 (MEDIUM 1)"
+}

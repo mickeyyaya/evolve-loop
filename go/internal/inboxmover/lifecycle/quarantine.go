@@ -18,6 +18,7 @@ type Policy struct {
 	SystemLevel  bool
 	Committed    map[string]bool
 	Routed       bool
+	RoutedIDs    map[string]bool
 	FailureClass string
 	Fingerprint  string
 }

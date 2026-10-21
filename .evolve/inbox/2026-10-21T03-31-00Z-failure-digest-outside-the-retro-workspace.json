@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "crossCheckAgainstDigest compares the disposition with a digest identity that the harness holds outside the retro workspace (the cycle state or the ledger)",
+    "A test: a retro that rewrites failure-digest.json to match its disposition still fails the cross-check",
+    "docs/architecture/gate-input-inventory.md reclassifies the row from open-seam to verified, and TestGateInputInventory_TheOpenSeamsArePinned drops it from the pinned list"
+  ],
+  "connects_to": [
+    ".evolve/inbox/2026-09-02T23-40-00Z-verifier-isolation-audit.json"
+  ],
+  "created_at": "2026-10-21T03:31:00Z",
+  "files": [
+    "go/internal/core/disposition_gate.go",
+    "go/internal/core/failure_digest.go",
+    "go/internal/core/decision_branch.go",
+    "docs/architecture/gate-input-inventory.md",
+    "go/internal/profiles/gate_inputs_realtree_test.go"
+  ],
+  "fix": "Record the fingerprint and the recurrence of the failure digest in a harness-owned record when ensureFailureDigest writes it, and cross-check the disposition against that record.",
+  "id": "failure-digest-outside-the-retro-workspace",
+  "kind": "pipeline-repair",
+  "priority_class": "hygiene",
+  "route": "console-manual",
+  "summary": "Open seam 2 of the gate input inventory (verifier-isolation-audit). The harness writes failure-digest.json into the run workspace. The retrospective can write that workspace and also writes disposition.json, so it can make the cross-check agree. readDispositionLegitimacy then steers the repair or contradiction decision (decision_branch.go).",
+  "title": "The disposition cross-check reads a failure digest that the retrospective can rewrite",
+  "weight": 0.55
+}

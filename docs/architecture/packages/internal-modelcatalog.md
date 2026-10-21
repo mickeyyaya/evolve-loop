@@ -11,6 +11,8 @@
 - `Commit` is the one write seam for a refresh. It carries the operator-authored `TierFallbacks` forward from the catalog on disk, then writes. Callers must not compose `Read`, `MergeFallbacks` and `Write` themselves.
 - `ReadShadow` and `WriteShadow` handle the shadow catalog. It is disposable output of the refresh pipeline in stage `shadow`. Dispatch never reads it.
 
+- `DispatchModelChain(cli, tier)` gives the ordered concrete-model chain of a tier: `tier_models[tier]` first, then `tier_fallbacks[tier]`, with empty and repeated names dropped. It is empty for a missing or non-live entry, the same trust gate as `DispatchModel`. The bridge model failover reads it.
+
 ## Invariants
 
 - Dispatch takes a model only from a `live`-sourced entry (`DispatchModel`). A `detect`-sourced entry is derived from the static manifest and is informational. Without this gate, a degenerate detect-derived catalog will override the proven manifest.

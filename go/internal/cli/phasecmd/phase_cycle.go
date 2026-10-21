@@ -7,12 +7,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -25,7 +27,7 @@ type cycleUsageError string
 
 func (e cycleUsageError) Error() string { return string(e) }
 
-func RequestForCycle(projectRoot string, cycle int, stdin io.Reader) (core.PhaseRequest, error) {
+func RequestForCycle(projectRoot string, cycle int, stdin io.Reader, phases ...string) (core.PhaseRequest, error) {
 	if cycle <= 0 {
 		return core.PhaseRequest{}, cycleUsageError(fmt.Sprintf("--cycle %d is not a positive cycle number", cycle))
 	}
@@ -52,7 +54,11 @@ func RequestForCycle(projectRoot string, cycle int, stdin io.Reader) (core.Phase
 	if err := requireWorktree(state.ActiveWorktree, cycle); err != nil {
 		return core.PhaseRequest{}, err
 	}
-	return requestFromState(state, root, runDir), nil
+	writes, err := anyPhaseWritesSource(root, phases)
+	if err != nil {
+		return core.PhaseRequest{}, err
+	}
+	return requestFromState(state, root, runDir, writes), nil
 }
 
 func CycleRequestExitCode(err error) int {
@@ -102,7 +108,15 @@ func requireWorktree(worktree string, cycle int) error {
 	return nil
 }
 
-func requestFromState(state core.CycleState, root, runDir string) core.PhaseRequest {
+func anyPhaseWritesSource(root string, phases []string) (bool, error) {
+	cat, _, _, err := phasespec.MergedCatalog(root)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("load the phase catalog for the worktree fence: %w", err)
+	}
+	return slices.ContainsFunc(phases, func(p string) bool { return core.PhaseWritesSource(core.Phase(p), cat) }), nil
+}
+
+func requestFromState(state core.CycleState, root, runDir string, writesSource bool) core.PhaseRequest {
 	workspace := state.WorkspacePath
 	if workspace == "" {
 		workspace = runDir
@@ -112,6 +126,7 @@ func requestFromState(state core.CycleState, root, runDir string) core.PhaseRequ
 		ProjectRoot:                     root,
 		Workspace:                       workspace,
 		Worktree:                        state.ActiveWorktree,
+		Fence:                           core.FenceFor(writesSource, nil),
 		WorktreeBaseSHA:                 state.WorktreeBaseSHA,
 		RunID:                           state.RunID,
 		GoalHash:                        state.GoalHash,

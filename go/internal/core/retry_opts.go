@@ -102,7 +102,7 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 			return resp, attempt, nil
 		}
 		if err != nil {
-			attemptExits = append(attemptExits, bridgeExitCode(err))
+			attemptExits = append(attemptExits, quotaExit(err))
 			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
 				if opts.quotaExhausted != nil && opts.quotaExhausted(attemptExits) {
 					return resp, attempt, fmt.Errorf("phase %s: %w", phase, quotaWall{err})

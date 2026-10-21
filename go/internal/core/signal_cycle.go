@@ -48,7 +48,7 @@ func (cr *cycleRun) emitCycleClose(result CycleResult, origin string) {
 	e.Reason = "final verdict " + result.FinalVerdict
 	e.Fields = map[string]string{cyclestate.SealedVerdictField: result.FinalVerdict, "phases_run": strconv.Itoa(len(result.PhasesRun))}
 	if result.TerminationReason != "" {
-		e.Fields["termination_reason"] = result.TerminationReason
+		e.Fields[cyclestate.SealedTerminationField] = result.TerminationReason
 	}
 	if result.RetroDecision != "" {
 		e.Fields["retro_decision"] = result.RetroDecision

@@ -86,6 +86,16 @@ The hook also plans the dev worktree archive. It publishes the plan as `dev-work
 - **Archive collisions take a numeric suffix.** The suffix is deterministic and needs no clock. A rename across filesystems fails with EXDEV, so `.evolve/archive` must stay on the same mount as the runs it receives.
 - **Subtree items re-check their parent.** Apply re-checks liveness on an item and on its parent, because a subtree item such as `.ephemeral` lives under a run dir. Any verification error counts as live.
 
+### Growth caps outside the run tree (inbox `state-growth-caps`, 2026-10-21)
+
+Three files grew without a bound, because the retention engine covered only the run tree and the log homes. In the runtime plane on 2026-10-21, `ledger.jsonl` was 56.9 MB with no segment, and `verdict-cache.json` was 397 KB. On the console plane, `guards.log` was 1.6 MB, and the item measured 23 MB in 72 days before.
+
+- **`guards.log` rotates.** `Plan` adds a `rotate` item when `.evolve/guards.log` is larger than `gc.guards_log_max_mb` (compiled default 10 MB). `Apply` renames the file to `dispatch-logs/guards-<run-id>.log`, with a counter when that name exists. The dispatch log home then ages it out with `logs_ttl_days`, so the rotation needs no new retention rule. The writers open, append and close the file for each line. Thus a line from the time of the rotation lands in one of the two files.
+- **The ledger seals at the batch end, behind its own stage.** The batch-end gc hook (`runGCHook`) calls `sealLedgerGC` after the run-dir sweep. It counts the lines of the live ledger with a 64 KB stream, not a full read. It acts only when the ledger holds more than twice `gc.ledger_seal_keep` lines (compiled default 20000, about 285 cycles at 70 lines a cycle).
+- **The seal stage.** Stage `enforce` needs both `gc.mode: enforce` and `gc.ledger_seal: enforce`. Then the hook seals all but the last `ledger_seal_keep` lines into a new segment, and runs the deep verify. At each other stage it prints the line count only.
+- **Why the seal has its own stage.** Several readers scan only the live `ledger.jsonl` (for example `dossier.phaseExecutionReceiptExists`, the ship audit lookup and `ledger.LatestCompositionVerdict`). A sealed line is invisible to them. On 2026-10-21 the last 500 lines held only 7 cycles, so the 500-line default of `evolve ledger seal` hides recent cycles. The operator turns on `gc.ledger_seal` after a check of those readers.
+- **The verdict cache keeps its newest entries.** See [internal-verdictcache](internal-verdictcache.md). Its bound is `gc.verdict_cache_keep` (compiled default 50).
+
 ## Invariants
 
 - **Nothing live is ever touched.** A live run dir, a live worktree, and a live cycle's processes are excluded at plan time and re-checked at apply time. Pinned by `TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property` (random populations of live, dirty, merged, closed-out and aged trees under a random salvage horizon), `TestApplyWorktrees_ASalvageTargetThatTurnedLiveIsRefusedUntouched` `TestApplyWorktrees_ATreeThatTurnsLiveDuringItsSalvageIsKept` and `TestIsLive_AClosedOutRunsStalePointerDoesNotKeepItsWorktreeLive`.

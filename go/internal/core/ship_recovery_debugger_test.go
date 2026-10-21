@@ -187,8 +187,8 @@ type fencedDebugger struct {
 
 func (d *fencedDebugger) Name() string { return string(core.PhaseDebugger) }
 func (d *fencedDebugger) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
-	d.writable = req.WorktreeWritablePaths
-	fence := treefence.Begin(ctx, req.Worktree, req.WorktreeReadOnly, req.WorktreeWritablePaths...)
+	d.writable = req.Fence.WritablePaths()
+	fence := treefence.Begin(ctx, req.Worktree, req.Fence != nil, req.Fence.WritablePaths()...)
 	resp, err := d.inner.Run(ctx, req)
 	d.outcome = fence.End(ctx)
 	d.kept = d.outcome.Kept
@@ -259,7 +259,7 @@ func TestFencedDebugger_ExposesTakeErrWhenFenceGoesInert(t *testing.T) {
 	shimDir := gitShimForcingTreefenceWriteTreeFailure(t)
 	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	req := core.PhaseRequest{Worktree: f.dir, WorktreeReadOnly: true, WorktreeWritablePaths: []string{"shared.md"}}
+	req := core.PhaseRequest{Worktree: f.dir, Fence: &core.WorktreeFence{Writable: []string{"shared.md"}}}
 	if _, err := fenced.Run(context.Background(), req); err != nil {
 		t.Fatalf("fencedDebugger.Run: %v", err)
 	}

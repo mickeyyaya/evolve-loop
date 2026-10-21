@@ -12,6 +12,7 @@ var pinnedGateWirings = map[string]string{
 	"evals-materialized":            "TestMaterializationGate_WiredIntoReviewer",
 	"flaky-predicate-shape":         "TestFlakyShapeGate_WiredIntoReviewer",
 	"unsatisfiable-predicate-shape": "TestUnsatisfiableShapeGate_WiredIntoReviewer",
+	"protected-ac-predicate":        "TestProtectedACGate_WiredIntoReviewer",
 }
 
 func TestAllReviewerGates_HaveWiringPin(t *testing.T) {

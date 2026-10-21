@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/recipe"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -79,7 +80,7 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if view, ok := bridgeReadOnlyViews[sub]; ok {
 		return view(rest, stdout, stderr)
 	}
-	eng := bridge.NewEngine(bridge.Deps{})
+	eng := bridge.NewEngine(bridge.Deps{TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(nil))})
 
 	switch sub {
 	case "launch":

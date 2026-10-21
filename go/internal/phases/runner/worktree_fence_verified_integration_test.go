@@ -30,7 +30,7 @@ func TestRun_FenceVerificationCannotBeSuppliedByCaller(t *testing.T) {
 			r := New(Options{Hooks: hooks, Bridge: &mutatingBridge{}, Prompts: fakePromptsFS("evolve-audit", "body")})
 			_, err := r.Run(context.Background(), core.PhaseRequest{
 				ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir,
-				WorktreeReadOnly: tc.readOnly, WorktreeVerified: true,
+				Fence: core.FenceFor(!tc.readOnly, nil), WorktreeVerified: true,
 			})
 			if err != nil {
 				t.Fatal(err)

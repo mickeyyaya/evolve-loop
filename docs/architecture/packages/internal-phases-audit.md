@@ -6,6 +6,7 @@
 
 ## Design
 
+- The tier cascade shadow: after the verdict is final, `finalize` writes `audit-cascade-shadow.json` when the policy `audit_cascade.stage` is `shadow`. The record tells if a cheap-tier pass escalates to the deep tier, and why. It changes no verdict. The rule and its limits are in [internal-auditcascade](internal-auditcascade.md).
 - Verdict resolution order: an empty or unparseable verdict declaration is FAIL; a missing or unparseable `acs-verdict.json` is FAIL with an error diagnostic; `acs-verdict.json` `red_count > 0` is FAIL with an EGPS diagnostic; WARN under `workflow.strict_audit` is FAIL; otherwise the verdict is whatever `audit-report.md` declares (PASS/WARN/FAIL/SKIPPED).
 - The verdict declaration is recognized in several agent-produced shapes — the canonical `## Verdict` heading and single-line inline variants such as `**Verdict: PASS**` — because prose formatting varies by CLI. `extractAuditVerdict` tries the machine-readable sentinel first (`phasecontract.ParseVerdictSentinel`), falling back to the prose grammar below `config.StageEnforce`.
 - The regex-on-prose verdict fallback is single-homed in `reportdoc.Verdict` (ADR-0095): the dashboard's round history and the repair-brief seed read the same grammar as the gate, so what the gate scores and what the operator sees cannot disagree.

@@ -191,3 +191,39 @@ func TestRun_AnUnscannablePathIsAFault(t *testing.T) {
 		t.Errorf("ExitCode = %d logs = %v, want ExitGitFatal naming the binary guard: a path the guard cannot stat is not a clean one", res.ExitCode, res.Logs)
 	}
 }
+
+func TestRefuseBinaries_AnOverwrittenPluginBinaryNamesItsRestoreCommand(t *testing.T) {
+	t.Parallel()
+	for name, c := range map[string]struct {
+		path       string
+		wantHint   bool
+		wantIgnore bool
+	}{
+		"the tracked plugin binary a go build overwrote": {path: "go/evolve", wantHint: true},
+		"the plugin binary named through --files":        {path: "./go/evolve", wantHint: true},
+		"an untracked dev build":                         {path: "go/bin/evolve", wantIgnore: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			elf := append([]byte{0x7f, 'E', 'L', 'F'}, make([]byte, binaryguard.DefaultThresholdBytes)...)
+			mustWrite(t, filepath.Join(root, filepath.FromSlash(c.path)), string(elf))
+			res := &Result{}
+
+			code := Options{RepoRoot: root}.refuseBinaries([]string{c.path}, res)
+
+			logs := strings.Join(res.Logs, "\n")
+			if code != ExitFail {
+				t.Fatalf("code = %d, want ExitFail: %v", code, res.Logs)
+			}
+			if got := strings.Contains(logs, "git checkout HEAD -- go/evolve"); got != c.wantHint {
+				t.Errorf("restore command present = %v, want %v: %q", got, c.wantHint, logs)
+			}
+			if got := strings.Contains(logs, "make -C go build"); got != c.wantHint {
+				t.Errorf("dev build target present = %v, want %v: %q", got, c.wantHint, logs)
+			}
+			if got := strings.Contains(logs, ".gitignore"); got != c.wantIgnore {
+				t.Errorf(".gitignore advice present = %v, want %v: %q", got, c.wantIgnore, logs)
+			}
+		})
+	}
+}

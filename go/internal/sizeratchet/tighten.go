@@ -12,10 +12,13 @@ import (
 var marshalIndent = json.MarshalIndent
 
 func Tighten(spans []FuncSpan, offenders map[string]int) map[string]int {
-	current := sizes(spans)
-	tight := make(map[string]int, len(offenders))
-	for key, allowance := range offenders {
-		if n := current[key]; n > MaxLines {
+	return TightenCounts(sizes(spans), offenders, MaxLines)
+}
+
+func TightenCounts(current, allowances map[string]int, floor int) map[string]int {
+	tight := make(map[string]int, len(allowances))
+	for key, allowance := range allowances {
+		if n := current[key]; n > floor {
 			tight[key] = min(n, allowance)
 		}
 	}
@@ -52,10 +55,14 @@ func TightenModule(root string) (changes []string, encoded []byte, err error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	tight := Tighten(spans, offenders)
+	return TightenEncoded(sizes(spans), offenders, MaxLines)
+}
+
+func TightenEncoded(current, allowances map[string]int, floor int) (changes []string, encoded []byte, err error) {
+	tight := TightenCounts(current, allowances, floor)
 	encoded, err = Encode(tight)
 	if err != nil {
 		return nil, nil, err
 	}
-	return Changes(offenders, tight), encoded, nil
+	return Changes(allowances, tight), encoded, nil
 }

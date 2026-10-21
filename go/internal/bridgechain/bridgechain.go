@@ -107,7 +107,7 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		if last.ExitCode == exitQuota && w.bench != nil {
 			w.bench(EscalationFor(attempt, start))
 		}
-		return last.ExitCode, lastErr
+		return llmroute.TieringExit(last.ExitCode, last.CauseCode), lastErr
 	}, func(from, to string) {
 		w.logf("[bridge-chain] agent=%s tier step-down %s -> %s (every CLI at %s exited %d)\n", req.Agent, from, to, from, exitQuota)
 	})
@@ -121,7 +121,7 @@ func DefaultPlanResolver(router *cliroute.Router) PlanResolver {
 	return func(req core.BridgeRequest) (llmroute.Plan, error) {
 		d, err := router.Resolve(cliroute.Request{
 			Agent: req.Agent, ProjectRoot: req.ProjectRoot, DefaultModel: req.Model, Env: req.Env, CallerCLI: req.CLI,
-			NeedsTools: req.Worktree != "",
+			NeedsTools: req.Worktree != "", Cycle: req.Cycle,
 		})
 		return d.Plan, err
 	}
@@ -262,10 +262,17 @@ func BenchOnEscalation(e Escalation, now func() time.Time, logf Logf) {
 	if err := json.Unmarshal(raw, &rep); err != nil {
 		return
 	}
-	if !clihealth.Benchable(rep.Pattern) || rep.CLI != e.CLI || rep.CapturedAt.Before(e.DispatchStart) {
+	if !escalationBenchable(rep.Pattern) || rep.CLI != e.CLI || rep.CapturedAt.Before(e.DispatchStart) {
 		return
 	}
 	target := clihealth.Entry{Family: llmroute.Family(e.CLI), Scope: wallScope(e.CLI, e.Tier)}
+	if rep.Pattern == clihealth.ModelUnsupportedPattern {
+		target.Scope = clihealth.ModelGroup(seatModel(e.CLI, e.Tier))
+		if target.Scope == "" {
+			logf("cli-health: %s exited model_unsupported at tier %q, which names no model; not benched\n", e.CLI, e.Tier)
+			return
+		}
+	}
 	store := clihealth.NewStore(e.ProjectRoot, now)
 	if benchedFor(store, target.Key(), rep.CapturedAt) {
 		logf("cli-health: family %s is already benched for this wall; not benched again\n", target.Key())
@@ -278,6 +285,10 @@ func BenchOnEscalation(e Escalation, now func() time.Time, logf Logf) {
 	}
 	logf("cli-health: benched family %s until %s (pattern=%s strikes=%d)%s\n",
 		entry.Key(), entry.BenchedUntil.Format(time.RFC3339), rep.Pattern, entry.Strikes, operatorSuffix(entry))
+}
+
+func escalationBenchable(pattern string) bool {
+	return clihealth.Benchable(pattern) || pattern == clihealth.ModelUnsupportedPattern
 }
 
 func benchedFor(store *clihealth.Store, key string, wallSeen time.Time) bool {

@@ -51,7 +51,10 @@ func (s *worktreeShip) checkLanding(commit string) error {
 	if err := s.opts.landing().CheckFastForward(s.ctx, s.integration(commit)); err != nil {
 		return err
 	}
-	return refuseCommittedDocDeletion(s.ctx, s.opts, s.branch, commit)
+	if err := refuseCommittedDocDeletion(s.ctx, s.opts, s.branch, commit); err != nil {
+		return err
+	}
+	return refuseForeignPredicatePackages(s.ctx, s.opts, s.branch, commit)
 }
 
 func (s *worktreeShip) landingCommit(pending string) (string, error) {
@@ -221,6 +224,7 @@ func settleLanding(ctx context.Context, opts *Options, res *RunResult, in landin
 		res.Logs = append(res.Logs, verified)
 	}
 	res.CommitSHA = in.CommitSHA
+	releaseLandedBindings(ctx, opts, res, in.CommitSHA)
 	if err := writeShipBinding(opts, committedTree, in.CommitSHA); err != nil {
 		res.Logs = append(res.Logs, "[ship] WARN: could not write ship-binding.json: "+err.Error())
 	}

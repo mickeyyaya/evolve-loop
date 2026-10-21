@@ -72,8 +72,7 @@ type PhaseRequest struct {
 	Worktree                        string            `json:"worktree"`
 	WorktreeBaseSHA                 string            `json:"worktree_base_sha,omitempty"`
 	ExplanationDocumentationVersion int               `json:"explanation_documentation_version,omitempty"`
-	WorktreeReadOnly                bool              `json:"worktree_read_only,omitempty"`
-	WorktreeWritablePaths           []string          `json:"worktree_writable_paths,omitempty"`
+	Fence                           *WorktreeFence    `json:"worktree_fence,omitempty"`
 	WorktreeVerified                bool              `json:"-"`
 	RunID                           string            `json:"run_id,omitempty"`
 	GoalHash                        string            `json:"goal_hash"`

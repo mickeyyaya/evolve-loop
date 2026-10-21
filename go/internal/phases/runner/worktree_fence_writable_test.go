@@ -15,7 +15,7 @@ func TestRun_ADispatchKeepsItsWritesToThePathsItMayWrite(t *testing.T) {
 	dir := fenceRepo(t)
 	hooks := &fakeHooks{phase: "debugger", agent: "evolve-debugger", model: "opus", prompt: "body", verdict: core.VerdictPASS}
 	r := New(Options{Hooks: hooks, Bridge: &mutatingBridge{}, Prompts: fakePromptsFS("evolve-debugger", "body")})
-	req := core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir, WorktreeReadOnly: true, WorktreeWritablePaths: []string{"src/mat.go"}}
+	req := core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: dir, Fence: &core.WorktreeFence{Writable: []string{"src/mat.go"}}}
 
 	resp, err := r.Run(context.Background(), req)
 	if err != nil {

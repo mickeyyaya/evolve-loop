@@ -58,6 +58,7 @@ var treeReadingSelections = []TestSelection{
 		"TestBootCLIUpdate_ASmokeFailureWithHealthyUsageStillHaltsTheLoop",
 		"TestBootCLIUpdate_ASmokeFailureWithOnlyArgonDrainedStillHaltsAndNamesTheWindow",
 		"TestBridgeEngineRootsAreEnumerated",
+		"TestBridgeEngineRoots_EachWiresATokenResolver",
 		"TestCLIUpdateWiring_ABootTimeoutWithADrainedWindowIsAVerifiedQuotaCauseAndBenchesUntilTheReset",
 		"TestCLIUpdateWiring_ABootTimeoutWithHealthyUsageStaysABootTimeout",
 		"TestCLIUpdateWiring_ASmokeFailureWhileTheFamilyIsDrainedIsAVerifiedQuotaCause",
@@ -139,6 +140,9 @@ var treeReadingSelections = []TestSelection{
 		"TestCoveringTests_ReachableFromProduction",
 		"TestDirectImporters_ReachableFromProduction",
 	}},
+	{Package: "./internal/committedset", Tests: []string{
+		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
+	}},
 	{Package: "./internal/core", Tests: []string{
 		"TestAgentSubprocessWriters_AllStampRunID",
 		"TestAgentSubprocessWriters_SetIsClosed",
@@ -186,6 +190,7 @@ var treeReadingSelections = []TestSelection{
 	}},
 	{Package: "./test/structure", Tests: []string{
 		"TestEveryGoTestArgvGoesThroughTheLaneBudget",
+		"TestEveryPhaseRequestWithAWorktreeTakesTheFenceFromTheOneProjection",
 		"TestEveryThirdPartyImportHasExactlyOneHome",
 		"TestNoPollTimerInTheEventChannelSources",
 		"TestNoTestRunsARawBareClone",

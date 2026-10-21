@@ -147,7 +147,7 @@ func TestArtifactsFor_PerPhaseShape(t *testing.T) {
 		{
 			phase:           "tdd",
 			mainPath:        filepath.Join(dir, "test-report.md"),
-			wantMainMarkers: []string{"## Acceptance", "## RED Tests"},
+			wantMainMarkers: []string{"## Acceptance", "| # | Criterion | Disposition | Needs changed | Predicates |", "| predicate | " + syntheticTestPath + " | 001 |", "## RED Tests"},
 		},
 		{
 			phase:           "build",

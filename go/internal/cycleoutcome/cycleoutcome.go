@@ -22,21 +22,23 @@ import (
 )
 
 type FailureInputs struct {
-	ProjectRoot    string
-	Workspace      string
-	Cycle          int
-	Ceiling        int
-	SystemLevel    bool
-	Refusal        string
-	RefusalDetail  string
-	RefusalSubject string
-	Reason         string
-	FailureClass   retryladder.Class
-	Fingerprint    string
-	Protected      func(string) bool
-	Stderr         io.Writer
-	Ledger         inboxmover.LedgerAppender
-	Signals        *signalcenter.Center
+	ProjectRoot     string
+	Workspace       string
+	Cycle           int
+	Ceiling         int
+	SystemLevel     bool
+	Refusal         string
+	RefusalDetail   string
+	RefusalSubject  string
+	Reason          string
+	FailureClass    retryladder.Class
+	Fingerprint     string
+	Protected       func(string) bool
+	Stderr          io.Writer
+	Ledger          inboxmover.LedgerAppender
+	Signals         *signalcenter.Center
+	Defer           core.RecordedDefer
+	PriorityClasses []string
 }
 
 func (in FailureInputs) WithLedger(l inboxmover.LedgerAppender) FailureInputs {
@@ -59,12 +61,17 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		committed = committedset.Unanswered(in.Workspace)
 	}
 	opts := inboxmover.Options{
-		ProjectRoot: in.ProjectRoot,
-		Ledger:      in.Ledger,
-		Stderr:      stderr,
-		Signals:     in.Signals,
+		ProjectRoot:     in.ProjectRoot,
+		Ledger:          in.Ledger,
+		Stderr:          stderr,
+		Signals:         in.Signals,
+		PriorityClasses: in.PriorityClasses,
 	}
 	routed := routeRefusal(opts, in, committed, stderr)
+	var routedIDs []string
+	if !routed {
+		routedIDs = routeDeferral(opts, in, committed, stderr)
+	}
 	res, err := inboxmover.ApplyCycleOutcome(opts, inboxmover.CycleOutcome{
 		Cycle:        in.Cycle,
 		Passed:       false,
@@ -73,6 +80,7 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 		Ceiling:      in.Ceiling,
 		SystemLevel:  in.SystemLevel,
 		Routed:       routed,
+		RoutedIDs:    routedIDs,
 		FailureClass: string(in.FailureClass),
 		Fingerprint:  in.Fingerprint,
 	})
@@ -111,22 +119,24 @@ func routeRefusal(opts inboxmover.Options, in FailureInputs, committed []string,
 
 func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stderr io.Writer) FailureInputs {
 	failPol := policy.DefaultSystemFailurePolicy()
-	if pol, err := policy.Load(filepath.Join(evolveDir, "policy.json")); err == nil {
+	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
+	if err == nil {
 		if fp, fpErr := pol.FailurePolicyConfig(); fpErr == nil {
 			failPol = fp
 		}
 	}
 	cls := cycleclassify.Classify(workspace)
 	in := FailureInputs{
-		ProjectRoot:  projectRoot,
-		Workspace:    workspace,
-		Cycle:        cycle,
-		Ceiling:      failPol.Thresholds.TaskRetryCeiling,
-		SystemLevel:  !IsTaskLevelResult(cls),
-		Reason:       "cycle-failure-release",
-		FailureClass: failureClassOf(cls),
-		Fingerprint:  retryladder.Fingerprint(firstFailureReason(workspace)),
-		Stderr:       stderr,
+		ProjectRoot:     projectRoot,
+		Workspace:       workspace,
+		Cycle:           cycle,
+		Ceiling:         failPol.Thresholds.TaskRetryCeiling,
+		SystemLevel:     !IsTaskLevelResult(cls),
+		Reason:          "cycle-failure-release",
+		FailureClass:    failureClassOf(cls),
+		Fingerprint:     retryladder.Fingerprint(firstFailureReason(workspace)),
+		Stderr:          stderr,
+		PriorityClasses: pol.InboxPriorityConfig().ClassOrder,
 	}
 	if cls.Class == cycleclassify.ClassPhaseRefusal {
 		in.Refusal, in.RefusalDetail, in.RefusalSubject = cls.Marker, cls.Detail, cls.Subject

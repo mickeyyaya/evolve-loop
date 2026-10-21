@@ -1,0 +1,8 @@
+## 2026-10-17 — code-index backends: trail-code, graphify and the type checker, measured (ADR-0140)
+
+| Document | What it records |
+|---|---|
+| [research/code-index-backends-2026-10.md](research/code-index-backends-2026-10.md) | Research: trail-code and graphify 0.9.92 measured against a stdlib Go type checker on 40 symbols and 10 files. For each backend, it gives the precision, the recall, the latency, the output size, the build, the disk and the refresh. It also records graphify's writes and advice text, a grep check of the truth and a CLI prototype of the type-checked index. It also surveys graphify, code-graph tools and type-checked Go options. Findings F2.1 to F2.22 and P3.1 to P3.8, refinements R1 to R7. |
+| [plans/code-index-backends-2026-10.md](plans/code-index-backends-2026-10.md) | Plan: four approaches with weighted scores, under the operator's rule that forbids MCP. The winner is a capability route that a benchmark fills: a type-checked `gotypes` backend for `callers` and `api`, trail-code for `find` and `map`. Decisions D1 to D11, which match the ADR numbers, and components G1 to G5 with red tests. |
+| [architecture/adr/0140-the-type-checker-answers-callers-and-each-query-goes-to-its-best-measured-backend.md](architecture/adr/0140-the-type-checker-answers-callers-and-each-query-goes-to-its-best-measured-backend.md) | Decision (Proposed): the type checker answers `callers` and `api`, and `evolve code bench` decides the backend of each query. graphify stays a bench-only run of its CLI. It relates to ADR-0138. |
+| [architecture/code-index-cli.md](architecture/code-index-cli.md) | Spec, section 9 "Backends and the benchmark": how each backend maps the four queries, the bench and its truth, the capability route and the guards. |

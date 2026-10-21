@@ -177,6 +177,9 @@ func (o *Oversight) rebased(e signalcenter.Event) {
 }
 
 func (o *Oversight) sealed(e signalcenter.Event) {
+	if e.Fields[cyclestate.SealedTerminationField] == cyclestate.CycleTerminationLaneDeadline {
+		return
+	}
 	h, ok := o.laneOf(e.Cycle)
 	if !ok {
 		return

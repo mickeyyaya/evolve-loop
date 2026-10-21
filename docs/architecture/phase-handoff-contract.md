@@ -217,6 +217,8 @@ An agent can name a blocker in its ledger. The exit decision accepts it only whe
 
 A `blocked` check at stage `enforce` uses the exit of [blocker-exit.md](blocker-exit.md). The reviewer returns the revision in `ReviewResult.ProvenBlocker`, and `provenBlocker` ends the cycle with the `BLOCKER_ROUTE` diagnostic. The route needs exactly one committed item. Without one, the correction rounds continue. A resumed cycle uses the same route: `reviewResumedDeliverable` returns the blocker, and the resume loop ends the cycle as `blocked-needs-console`. The worktree stays, so the salvage snapshot stays.
 
+The corrections can run out on a build without a proven blocker. Then the build entry of the C1 record is a FAIL with the `BUILD_DELIVERABLE_REJECTED` diagnostic. The classifier reads that entry, not the retro entry after it, so the failure charges the item (2026-10-21).
+
 **The revision** names the ask ids, the proof and the pair. The console, or the requester phase in a later round, rewrites the request. This is the `C → A` edge that the operator asked for: a later phase sends the request back, and the earlier phase does not repeat it.
 
 ## 7. The chain and the audit

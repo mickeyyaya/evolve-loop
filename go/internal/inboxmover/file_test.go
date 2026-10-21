@@ -24,8 +24,8 @@ func TestFile_FilesAnItemTheClaimFloorCanHandToALane(t *testing.T) {
 	if _, err := Claim(opts, "cli-x", "1790"); err != nil {
 		t.Errorf("Claim of the filed item: %v", err)
 	}
-	if _, err := File(opts, []byte(item)); !errors.Is(err, ErrInvalidItem) {
-		t.Errorf("filing the same id again: err = %v, want ErrInvalidItem", err)
+	if _, err := File(opts, []byte(item)); !errors.Is(err, ErrInvalidItem) || !errors.Is(err, ErrAlreadyFiled) {
+		t.Errorf("filing the same id again: err = %v, want ErrInvalidItem and ErrAlreadyFiled", err)
 	}
 }
 

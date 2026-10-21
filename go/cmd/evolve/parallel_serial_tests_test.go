@@ -1,6 +1,11 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestPRRefresh_AConflictOutsideTheGeneratedRegionIsNeverStaged":                                    "swaps seam prRefreshWorktree",
+	"main.TestPRRefresh_AnEntryTheCatalogLacksFailsLoudly":                                                  "swaps seam prRefreshWorktree",
+	"main.TestPRRefresh_EachFailedGitStepFailsTheRefresh":                                                   "swaps seam prRefreshWorktree",
+	"main.TestPRRefresh_InAConflictedMergeItRegeneratesTheIndexAndStagesIt":                                 "swaps seam prRefreshWorktree",
+	"main.TestPRRefresh_RegeneratesTheThreeDerivedFilesAndCommitsNothingElse":                               "swaps seam prRefreshWorktree",
 	"main.TestPRWindow_AnUnreadableWorkingDirectoryExitsTwo":                                                "sets env through a helper",
 	"main.TestWireRoutingPlanAdvisor_RefusesAProjectWhoseRoutingTableDoesNotCompile":                        "swaps the bridge model catalog dir",
 	"main.TestWireRoutingPlanAdvisor_ARefusedTableIsAnErrorAndTheCatalogDefectsReachTheConsole":             "calls process-global setter SetModelCatalogDirFn",
@@ -81,6 +86,9 @@ var serialTests = map[string]string{
 	"main.TestCLIRoutingSet_AWriteThatWouldNotCompileIsRefusedAndTheFileIsUnchanged":                        "sets env through a helper",
 	"main.TestCLIRoutingSet_EditsOneEntryOfEachShape":                                                       "sets env through a helper",
 	"main.TestCLIRoutingSet_EffortWithoutAChainKeepsTheChain":                                               "sets env through a helper",
+	"main.TestCLIRoutingSet_TheShareOfATierIsWrittenAndUnset":                                               "sets env through a helper",
+	"main.TestCLIRoutingSet_AShareOutsideATierOrOutOfRangeIsRefused":                                        "sets env through a helper",
+	"main.TestCLIRoutingExplain_PrintsTheShareAndThePaceOfASharedTier":                                      "sets env through a helper",
 	"main.TestCLIRoutingSet_RefusesABadEffortBeforeTheWrite":                                                "sets env through a helper",
 	"main.TestCLIRoutingSet_RefusesABadLadderBoundBeforeTheWrite":                                           "sets env through a helper",
 	"main.TestCLIRoutingSet_RefusesAMisshapenEdit":                                                          "sets env through a helper",
@@ -440,6 +448,9 @@ var serialTests = map[string]string{
 	"main.TestRunCIWatch_ARedPRFilesNoItemAndAFailedClassifyIsReported":                                                    "sets env through a helper",
 	"main.TestRunCIWatch_ARedTagWatchesBothWorkflowsAndClassifiesTheRedRun":                                                "sets env through a helper",
 	"main.TestRunCIWatch_SetupAndFetchFailuresAreIOErrors":                                                                 "sets env through a helper",
+	"main.TestRunGCHook_AnUnreadablePolicyWarnsAndRunsTheShadowDefault":                                                    "runs the batch-end gc hook, which sweeps processes and tmux sockets",
+	"main.TestRunGCHook_EnforceSealsLedgerBeyondKeep":                                                                      "runs the batch-end gc hook, which sweeps processes and tmux sockets",
+	"main.TestRunGCHook_ShadowNeverSeals":                                                                                  "runs the batch-end gc hook, which sweeps processes and tmux sockets",
 	"main.TestRunCI_AnUnreadableWorkingDirectoryIsAnIOErrorForBothVerbs":                                                   "sets env through a helper",
 	"main.TestPRBoundary_AnUnreadableWorkingDirectoryIsAnIOError":                                                          "sets env through a helper",
 	"main.TestRunCLIRoutingExplainAndShow_AMalformedPolicyIsAFinding":                                                      "calls process-global setter SetModelCatalogDirFn",

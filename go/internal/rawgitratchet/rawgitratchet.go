@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
 )
 
 const OwnerDir = "internal/gittest"
@@ -192,13 +193,8 @@ func Check(sites, baseline map[string]int) error {
 		}
 	}
 	for file, allowed := range baseline {
-		switch n := sites[file]; {
-		case n > allowed:
+		if n := sites[file]; n > allowed {
 			problems = append(problems, fmt.Sprintf("%s grew to %d raw git init sites > %d listed: use gittest.Fixture(t) / gittest.Bare(t) for the new one", file, n, allowed))
-		case n == 0:
-			problems = append(problems, fmt.Sprintf("%s is listed with %d raw git init sites but has none: remove its baseline.json entry", file, allowed))
-		case n < allowed:
-			problems = append(problems, fmt.Sprintf("%s shrank to %d raw git init sites < %d listed: lower its baseline.json entry to %d", file, n, allowed, n))
 		}
 	}
 	if len(problems) == 0 {
@@ -212,17 +208,29 @@ func Check(sites, baseline map[string]int) error {
 const BaselineRelPath = "internal/rawgitratchet/baseline.json"
 
 func Scan(root string) (note string, err error) {
-	files, note, err := BoundTestFiles(root)
-	if err != nil {
-		return note, err
-	}
-	sites, err := Sites(root, files)
-	if err != nil {
-		return note, err
-	}
-	baseline, err := LoadBaseline(filepath.Join(root, filepath.FromSlash(BaselineRelPath)))
+	sites, baseline, note, err := load(root)
 	if err != nil {
 		return note, err
 	}
 	return note, Check(sites, baseline)
+}
+
+func TightenModule(root string) (changes []string, encoded []byte, err error) {
+	sites, baseline, _, err := load(root)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sizeratchet.TightenEncoded(sites, baseline, 0)
+}
+
+func load(root string) (sites, baseline map[string]int, note string, err error) {
+	files, note, err := BoundTestFiles(root)
+	if err != nil {
+		return nil, nil, note, err
+	}
+	if sites, err = Sites(root, files); err != nil {
+		return nil, nil, note, err
+	}
+	baseline, err = LoadBaseline(filepath.Join(root, filepath.FromSlash(BaselineRelPath)))
+	return sites, baseline, note, err
 }

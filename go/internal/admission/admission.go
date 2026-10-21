@@ -13,6 +13,8 @@ import (
 
 const HubCell = "hub"
 
+const FamilyCellPrefix = "family:"
+
 type Graph interface {
 	Packages(files []string) []string
 	Deps(pkg string) []string
@@ -29,10 +31,11 @@ type Holding struct {
 }
 
 type Decision struct {
-	ID        string
-	Rank      int
-	Cells     []string
-	BlockedBy string
+	ID         string
+	Rank       int
+	Cells      []string
+	BlockedBy  string
+	FamilyHold bool
 }
 
 type ShadowAdmission struct {
@@ -49,12 +52,14 @@ type Admitter struct {
 	Optimistic   bool
 	OnShadow     func(ShadowAdmission)
 	OnOptimistic func(ShadowAdmission)
+	OnWait       func(Decision)
 }
 
 type footprint struct {
-	edits map[string]bool
-	reach map[string]bool
-	hub   bool
+	edits  map[string]bool
+	reach  map[string]bool
+	hub    bool
+	family string
 }
 
 type holder struct {
@@ -77,7 +82,9 @@ func (a Admitter) Admit(inFlight []Holding, candidates []fleet.Todo, scanK int) 
 		d := Decision{ID: td.ID, Rank: rank, Cells: fp.cells()}
 		if blocker, busy := a.firstConflict(holders, fp); busy {
 			d.BlockedBy = blocker.lane
+			d.FamilyHold = sameFamily(blocker.fp, fp) && !a.heldWithoutFamily(holders, fp)
 			a.recordShadow(holders, fp, d, blocker)
+			a.recordWait(d)
 			waiting = append(waiting, d)
 			continue
 		}
@@ -113,6 +120,12 @@ func (a Admitter) recordShadow(holders []holder, fp footprint, d Decision, block
 	a.OnShadow(ShadowAdmission{ID: d.ID, Rank: d.Rank, Cells: d.Cells, HeldBy: d.BlockedBy, Reason: "reach meets " + reachMet(blocker.fp, fp)})
 }
 
+func (a Admitter) recordWait(d Decision) {
+	if a.OnWait != nil {
+		a.OnWait(d)
+	}
+}
+
 func (a Admitter) recordOptimistic(holders []holder, fp footprint, d Decision) {
 	if a.OnOptimistic == nil {
 		return
@@ -142,7 +155,22 @@ func conflict(x, y footprint) bool {
 }
 
 func sharedEdit(x, y footprint) bool {
-	return (x.hub && y.hub) || meets(x.edits, y.edits)
+	return (x.hub && y.hub) || meets(x.edits, y.edits) || sameFamily(x, y)
+}
+
+func (a Admitter) heldWithoutFamily(holders []holder, fp footprint) bool {
+	fp.family = ""
+	for _, h := range holders {
+		h.fp.family = ""
+		if (a.Optimistic && sharedEdit(h.fp, fp)) || (!a.Optimistic && conflict(h.fp, fp)) {
+			return true
+		}
+	}
+	return false
+}
+
+func sameFamily(x, y footprint) bool {
+	return x.family != "" && x.family == y.family
 }
 
 func meets(x, y map[string]bool) bool {
@@ -157,7 +185,7 @@ func meets(x, y map[string]bool) bool {
 func (a Admitter) footprintOf(td fleet.Todo) footprint {
 	pkgs, hub := a.edited(td)
 	hubs := a.Graph.Hubs()
-	fp := footprint{edits: map[string]bool{}, reach: map[string]bool{}, hub: hub}
+	fp := footprint{edits: map[string]bool{}, reach: map[string]bool{}, hub: hub, family: idFamily(td.ID)}
 	for _, p := range pkgs {
 		fp.edits[p] = true
 		fp.hub = fp.hub || hubs[p]
@@ -216,10 +244,27 @@ func globalZone(file string) bool {
 	return fleet.IsGlobalZone(file) || fleet.IsGlobalZone(strings.TrimPrefix(file, "go/")) || filepath.Clean(file) == moduleMakefile
 }
 
+var mintedWithACycle = regexp.MustCompile(`^(retro|cycle)-[0-9]+-`)
+
+func idFamily(id string) string {
+	family, _, found := strings.Cut(id, "-")
+	if !found || family == "" || kernelMinted(id) {
+		return ""
+	}
+	return FamilyCellPrefix + family
+}
+
+func kernelMinted(id string) bool {
+	return strings.HasPrefix(id, "practice-") || strings.HasPrefix(id, "auto-retro-") || strings.HasPrefix(id, "auto-heuristic-demotion-") || strings.Contains(id, "/") || mintedWithACycle.MatchString(id)
+}
+
 func (fp footprint) cells() []string {
-	out := make([]string, 0, len(fp.edits)+1)
+	out := make([]string, 0, len(fp.edits)+2)
 	for p := range fp.edits {
 		out = append(out, strings.TrimPrefix(p, ModulePath+"/"))
+	}
+	if fp.family != "" {
+		out = append(out, fp.family)
 	}
 	slices.Sort(out)
 	if fp.hub {

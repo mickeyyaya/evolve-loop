@@ -33,7 +33,7 @@ func TestCellAdmission_AtShadowTheReachRuleHoldsAndThePoolAdmissionRecordsTheHol
 			oc.Admission = admissionStage
 			running, candidate := coreAndRouterTodos()
 
-			got := b.cellAdmission(oc, 1, nil)([]fleet.Todo{running}, []fleet.Todo{candidate})
+			got := b.cellAdmission(oc, 1, nil, nil)([]fleet.Todo{running}, []fleet.Todo{candidate})
 
 			if got != -1 {
 				t.Fatalf("admit = %d, want -1: the orchestrator stage is enforce but the admission key is %q, so the reach rule holds", got, admissionStage)
@@ -54,7 +54,7 @@ func TestCellAdmission_AtEnforceACoreLaneDoesNotHoldARouterTodo(t *testing.T) {
 	oc.Admission = "enforce"
 	running, candidate := coreAndRouterTodos()
 
-	admit := b.cellAdmission(oc, 1, nil)
+	admit := b.cellAdmission(oc, 1, nil, nil)
 
 	if got := admit([]fleet.Todo{running}, []fleet.Todo{candidate}); got != 0 {
 		t.Fatalf("admit = %d, want 0: the new rule admits router beside core", got)

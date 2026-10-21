@@ -56,6 +56,7 @@ func TestMutators_RefuseACycleWorktreeInboxCopyAndNameThePlane(t *testing.T) {
 		"RouteConsole":           func() error { _, err := RouteConsole(opts, "task-1", "r", 9); return err },
 		"File":                   func() error { _, err := File(opts, []byte(`{"id":"task-3"}`)); return err },
 		"Edit":                   func() error { _, err := Edit(opts, "task-1", nil); return err },
+		"EditHeld":               func() error { _, err := EditHeld(opts, "task-1", 9, nil); return err },
 		"Withdraw":               func() error { _, err := Withdraw(opts, "task-1", "r"); return err },
 		"VerifyPremise":          func() error { _, err := VerifyPremise(opts, "task-1", "e"); return err },
 		"ReleaseContinuationBinding": func() error {

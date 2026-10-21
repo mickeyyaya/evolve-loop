@@ -1,7 +1,10 @@
 // Package modelcatalog is the live, CLI-queried tier→model map.
 package modelcatalog
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 const DefaultTTL = 24 * time.Hour
 
@@ -61,4 +64,18 @@ func (c Catalog) IsStale(now time.Time, ttl time.Duration) bool {
 
 func (c Catalog) Empty() bool {
 	return len(c.CLIs) == 0
+}
+
+func (c Catalog) DispatchModelChain(cli, tier string) []string {
+	entry, found := c.CLIs[cli]
+	if !found || entry.Source != SourceLive {
+		return nil
+	}
+	var chain []string
+	for _, m := range append([]string{entry.TierModels[tier]}, entry.TierFallbacks[tier]...) {
+		if m != "" && !slices.Contains(chain, m) {
+			chain = append(chain, m)
+		}
+	}
+	return chain
 }

@@ -24,9 +24,9 @@ func TestPhaseRequest_WritesSource_TheWorktreeFenceDecidesWhoWrites(t *testing.T
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := o.withWorktreeFence(PhaseRequest{Worktree: "/wt/cycle-1"}, tc.phase, tc.cs)
+			req := PhaseRequest{Worktree: "/wt/cycle-1", Fence: o.fenceFor(tc.phase, tc.cs)}
 			if got := req.WritesSource(); got != tc.want {
-				t.Errorf("WritesSource() = %v, want %v (read_only=%v writable=%v)", got, tc.want, req.WorktreeReadOnly, req.WorktreeWritablePaths)
+				t.Errorf("WritesSource() = %v, want %v (fence=%+v)", got, tc.want, req.Fence)
 			}
 		})
 	}

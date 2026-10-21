@@ -214,3 +214,31 @@ func DarwinMain(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprint(stdout, DarwinSetText(pkgs))
 	return 0
 }
+
+var ErrDarwinSetStale = errors.New("the darwin set file is stale")
+
+func SyncDarwinSet(moduleDir string, write bool) (bool, error) {
+	pkgs, err := DarwinPackages(moduleDir)
+	if err != nil {
+		return false, err
+	}
+	if len(pkgs) == 0 {
+		return false, fmt.Errorf("no darwin-sensitive package under %s", moduleDir)
+	}
+	path := filepath.Join(moduleDir, DarwinSetFile)
+	current, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return false, err
+	}
+	want := DarwinSetText(pkgs)
+	switch {
+	case string(current) == want:
+		return false, nil
+	case !write:
+		return false, fmt.Errorf("%w: go/%s; run `evolve ci darwin-set generate`", ErrDarwinSetStale, DarwinSetFile)
+	}
+	if err := os.WriteFile(path, []byte(want), 0o644); err != nil {
+		return false, err
+	}
+	return true, nil
+}

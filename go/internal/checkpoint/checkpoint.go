@@ -156,7 +156,7 @@ func init() {
 			if err != nil {
 				return err
 			}
-			cp := ComposeWithIntegrity(cs, ReasonOperatorRequest, 0, "", now, readExistingIntegrity(path))
+			cp := ComposeWithIntegrity(cs, ReasonOperatorRequest, 0, cycleBase(cs), now, readExistingIntegrity(path))
 			cp.AutoResumeAttempts = attempts
 			return applyWithHooks(defaultHooks(), path, cp)
 		})
@@ -165,7 +165,7 @@ func init() {
 		cycleStatePath := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
 		return flock.WithPathLock(cycleStatePath, func() error {
 			existing := readExistingIntegrity(cycleStatePath)
-			cp := withQuotaReset(ComposeWithIntegrity(cs, ReasonQuotaLikely, 0, "", now, existing), cs, projectRoot, now)
+			cp := withQuotaReset(ComposeWithIntegrity(cs, ReasonQuotaLikely, 0, cycleBase(cs), now, existing), cs, projectRoot, now)
 			return applyQuotaPause(cycleStatePath, cp)
 		})
 	}
@@ -180,9 +180,16 @@ func init() {
 				return nil
 			}
 			existing := readExistingIntegrity(cycleStatePath)
-			return applyWithHooks(defaultHooks(), cycleStatePath, ComposeWithIntegrity(cs, ReasonPhaseComplete, 0, "", now, existing))
+			return applyWithHooks(defaultHooks(), cycleStatePath, ComposeWithIntegrity(cs, ReasonPhaseComplete, 0, cycleBase(cs), now, existing))
 		})
 	}
+}
+
+func cycleBase(cs core.CycleState) string {
+	if cs.WorktreeBaseSHA != "" {
+		return cs.WorktreeBaseSHA
+	}
+	return cs.PreCycleHEAD
 }
 
 var computeQuotaReset = quotareset.Compute

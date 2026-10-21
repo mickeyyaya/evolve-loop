@@ -64,8 +64,8 @@ func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs
 }
 
 func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict string) *SystemFailureSignal {
-	d := buildFailureDossier(cs, retroVerdict, o.failurePolicy)
-	_ = writeFailureDossier(cs.WorkspacePath, d)
+	d := o.failureDossier(cs, retroVerdict)
+	o.writeDossier(cs, d)
 
 	if d.FloorCandidate != "" && o.failurePolicy.IsFloor(d.FloorCandidate) {
 		return &SystemFailureSignal{
@@ -76,7 +76,7 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 		}
 	}
 
-	dec, _ := readFailureDecision(cs.WorkspacePath)
+	dec := trustedFailureDecision(cs)
 	if dec == nil || !o.failurePolicy.IsFloor(dec.Category) {
 		return nil
 	}

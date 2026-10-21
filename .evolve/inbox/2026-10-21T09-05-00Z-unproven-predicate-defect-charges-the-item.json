@@ -1,0 +1,20 @@
+{
+  "id": "unproven-predicate-defect-charges-the-item",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.55,
+  "route": "console-manual",
+  "title": "A build rejected because the TDD predicate is defective, but not proven so, is charged to the item",
+  "summary": "PR #1079 charges the item for BUILD_DELIVERABLE_REJECTED and leaves a defective predicate to the blocker prover, which ends a proven defect as BLOCKER_ROUTE (console, no charge). Cycle 1761 is the case it misses: its TDD predicate was unsatisfiable (#728), but the lane did not declare a blocker the prover could prove, so the rejection now charges the item. The ceiling bounds the harm: the item is quarantined, not redrawn forever. The predicate defect itself goes unreported to the pipeline.",
+  "fix": "Before the rejection is coded, run the unsatisfiable-predicate lint (evalqualitycheck.LintUnsatisfiablePredicates) and the protected-path AC check over the cycle's predicates. When either proves a predicate the build could not satisfy, record a pipeline-owned code (not task-level) instead of BUILD_DELIVERABLE_REJECTED.",
+  "acceptance": [
+    "A 1761-shaped workspace whose failing predicate is a proven-unsatisfiable shape classifies as a pipeline failure, not as a charge to the item (red today)",
+    "A rejection whose predicates lint clean still charges the item"
+  ],
+  "files": [
+    "go/internal/core/correction_exhaustion.go",
+    "go/internal/evalqualitycheck/"
+  ],
+  "created_at": "2026-10-21T09:05:00Z",
+  "source": "console, 2026-10-21, round-2 review of PR #1079 (MEDIUM 1)"
+}

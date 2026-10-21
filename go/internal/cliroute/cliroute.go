@@ -8,11 +8,13 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanetime"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
 type Severity string
@@ -46,6 +48,8 @@ type Host struct {
 	Logf      func(format string, args ...any)
 	WeekUsed  func(projectRoot string) (map[string]float64, error)
 	LaneTimes func(projectRoot string) ([]lanetime.FamilyLane, error)
+	TierWeek  func(projectRoot, family, tier string) (quotastate.UsageWindow, bool, error)
+	Now       func() time.Time
 }
 
 type Launch string
@@ -69,6 +73,7 @@ type Request struct {
 	BypassPolicy bool
 	Launch       Launch
 	NeedsTools   bool
+	Cycle        int
 }
 
 type Decision struct {

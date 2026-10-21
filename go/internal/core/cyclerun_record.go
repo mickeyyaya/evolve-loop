@@ -108,6 +108,7 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 			reason = gateErr.Error() + "; " + reason
 		}
 		cr.result.RetroDecision = reason
+		cr.o.carryDefer(cr.cs, reason, &cr.result)
 		if sysFail != nil && cr.result.SystemFailure == nil {
 			cr.result.SystemFailure = sysFail
 		}

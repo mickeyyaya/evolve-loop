@@ -29,3 +29,7 @@
 
 - **The artifact name comes from the `phasecontract` registry.** The registry is the single source for the name that the tdd-engineer agent doc and the downstream build-planner and builder contract use. The stale name `team-context.md` from before the rewrite left the bridge polling a file that the agent never writes. Every tdd phase then timed out (exit 81) after it finished its work.
 - **`ArtifactName`, not `ArtifactFilename`.** The registered artifact name of tdd differs from the `<phase>-report.md` convention. If the registration is ever lost, the convention fallback silently brings back `tdd-report.md` and the same exit-81 timeout. `ArtifactName` returns the empty string, which fails loudly.
+
+## The predicate repair brief
+
+The build floor can report the same failure of a cycle predicate before and after a Build correction. Then the cycle re-enters TDD with `predicate_repair_brief` in its context ([internal-core.md](internal-core.md), the predicate reroute). `ComposePrompt` adds a `## Predicate Repair` section with the failure fenced as data. It tells the agent to re-author a predicate whose premise is wrong. It also tells the agent never to delete a predicate or weaken a needed assertion (`TestComposePrompt_ThePredicateRepairBriefReachesTheAgentAsData`).

@@ -121,8 +121,8 @@ func TestMover_File_RefusesAnIDTheInboxAlreadyHolds(t *testing.T) {
 
 			_, err := newFiler(inbox, nil).File([]byte(validItem))
 
-			if !errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), "already") {
-				t.Errorf("err = %v, want ErrInvalidItem: the id is already filed", err)
+			if !errors.Is(err, ErrInvalidItem) || !errors.Is(err, ErrAlreadyFiled) {
+				t.Errorf("err = %v, want ErrInvalidItem and ErrAlreadyFiled: the id is already filed", err)
 			}
 		})
 	}

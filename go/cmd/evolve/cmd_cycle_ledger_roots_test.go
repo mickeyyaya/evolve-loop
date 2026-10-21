@@ -17,6 +17,7 @@ func TestUnobservedLedgerRootsArePinned(t *testing.T) {
 	t.Parallel()
 	pinned := map[string]pinnedLedgerRoot{
 		"cmd/evolve/cmd_cycle.go":           {1, "evolve cycle reset seals through its own ledger (an operator repair path; its seal anchor is unobserved) — S4b threads the root's; the root's own construction beside it IS observed"},
+		"cmd/evolve/cmd_gc_ledger_seal.go":  {1, "the batch-end gc hook seals the ledger behind gc.ledger_seal (state-growth-caps); the hook has no Signal Center, so the seal anchor is reported on stderr"},
 		"cmd/evolve/cmd_cycle_reaudit.go":   {1, "evolve cycle reaudit appends one audit binding through its own ledger (an operator repair verb outside the orchestrator process)"},
 		"cmd/evolve/cmd_ledger.go":          {6, "evolve ledger verify/seal/rebaseline/anchor/deep-verify/evidence restore: operator repair roots outside the orchestrator process"},
 		"internal/cli/guardcmd/guard.go":    {1, "the guard chain reads the ledger (a read-only consumer)"},

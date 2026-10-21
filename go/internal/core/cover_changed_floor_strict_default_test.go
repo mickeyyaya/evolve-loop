@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,18 +16,16 @@ func TestChangedStrictResults_JudgesOnlyListedChangedPackagesAndFailsLoudOnBadIn
 	const goMod = "module example.com/m\n\ngo 1.23\n"
 	const profile = "mode: set\nexample.com/m/p/a.go:3.19,4.11 1 1\nexample.com/m/p/b.go:3.14,5.2 1 0\n"
 	for name, tc := range map[string]struct {
-		goMod       string
-		floors      string
-		floorsIsDir bool
-		profile     string
-		pkgs        []string
-		wantPkgs    []string
-		wantErr     string
+		goMod    string
+		floors   string
+		profile  string
+		pkgs     []string
+		wantPkgs []string
+		wantErr  string
 	}{
 		"no floors file is silent":                 {goMod: goMod, profile: profile, pkgs: []string{"./p"}},
 		"an unlisted changed package is silent":    {goMod: goMod, floors: "./q 100\n", profile: profile, pkgs: []string{"./p"}},
 		"a listed changed package is measured":     {goMod: goMod, floors: "./p 100\n./q 100\n", profile: profile, pkgs: []string{"./p"}, wantPkgs: []string{"p"}},
-		"an unreadable floors file fails loud":     {goMod: goMod, floorsIsDir: true, profile: profile, pkgs: []string{"./p"}, wantErr: ".cover-strict"},
 		"a malformed floor line fails loud":        {goMod: goMod, floors: "./p\n", profile: profile, pkgs: []string{"./p"}, wantErr: "floors line 1"},
 		"a module without go.mod fails loud":       {floors: "./p 100\n", profile: profile, pkgs: []string{"./p"}, wantErr: "go.mod"},
 		"a missing profile fails loud":             {goMod: goMod, floors: "./p 100\n", pkgs: []string{"./p"}, wantErr: "cover.out"},
@@ -43,17 +40,12 @@ func TestChangedStrictResults_JudgesOnlyListedChangedPackagesAndFailsLoudOnBadIn
 			if tc.floors != "" {
 				writeFile(t, filepath.Join(module, ".cover-strict"), tc.floors)
 			}
-			if tc.floorsIsDir {
-				if err := os.MkdirAll(filepath.Join(module, ".cover-strict"), 0o755); err != nil {
-					t.Fatal(err)
-				}
-			}
 			profilePath := filepath.Join(module, "cover.out")
 			if tc.profile != "" {
 				writeFile(t, profilePath, tc.profile)
 			}
 
-			results, err := changedStrictResults(module, profilePath, tc.pkgs)
+			results, err := changedStrictResults(module, profilePath, tc.pkgs, []byte(tc.floors))
 
 			if tc.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
@@ -80,14 +72,14 @@ func TestChangedStrictResults_JudgesOnlyListedChangedPackagesAndFailsLoudOnBadIn
 
 func TestCoverStrictFailures_ARunnerErrorWarnsAndLeavesTheHandoffAlone(t *testing.T) {
 	orig := coverStrictRunner
-	coverStrictRunner = func(string, string, []string) ([]coverstrict.Result, error) {
+	coverStrictRunner = func(string, string, []string, []byte) ([]coverstrict.Result, error) {
 		return nil, errors.New("floors unreadable")
 	}
 	t.Cleanup(func() { coverStrictRunner = orig })
 
 	var failures []string
 	stderr := captureStderr(t, func() {
-		failures = coverStrictFailures(config.StageEnforce, t.TempDir(), "cover.out", []string{"./p"}, blockNoter{})
+		failures = coverStrictFailures(config.StageEnforce, t.TempDir(), "cover.out", []string{"./p"}, nil, blockNoter{})
 	})
 
 	if failures != nil {

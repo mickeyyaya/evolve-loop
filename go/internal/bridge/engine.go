@@ -63,6 +63,7 @@ type Deps struct {
 	OnStopReview          func(phase, action, reason string)
 	OnBoot                func(bootMS int64)
 	onModelDispatch       func(modelDispatch)
+	launchModel           func(context.Context, core.BridgeRequest) (core.BridgeResponse, error)
 	onFatalPane           func(fatalPaneObservation)
 	onBootLoss            func(launchoutcome.BootLossCause)
 	onDispatchID          func(string)
@@ -75,6 +76,7 @@ type Deps struct {
 	LivenessCenter        *panestream.LivenessCenter
 	Signals               *signalcenter.Center
 	TokenResolver         func(tokenusage.Window) (tokenusage.Result, error)
+	ModelChain            func(cli, model string) []string
 	ListProcesses         proctree.Lister
 	SignalProcess         proctree.Signaler
 	sweep                 *dispatchSweep
@@ -272,6 +274,22 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 }
 
 func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+	chain := e.modelChain(req)
+	var resp core.BridgeResponse
+	var err error
+	for i, model := range chain {
+		req.Model = model
+		resp, err = e.launchOnce(ctx, req)
+		if i == len(chain)-1 || !modelWalled(resp) || ctx.Err() != nil {
+			break
+		}
+		e.logModelStep(req, model, chain[i+1])
+		e.clearArtifact(req)
+	}
+	return resp, err
+}
+
+func (e *Engine) launchModel(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	if err := ValidateRequest(req); err != nil {
 		return core.BridgeResponse{}, err
 	}

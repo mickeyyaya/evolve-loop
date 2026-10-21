@@ -12,7 +12,8 @@
         "diff --cached --shortstat [capture]",
         "commit -m feat: pinned landing [streams]",
         "push origin main [streams]",
-        "rev-parse HEAD [capture]"
+        "rev-parse HEAD [capture]",
+        "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A HEAD^ HEAD -- .evolve/inbox/consumed [capture]"
       ],
       "logs": [
         "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
@@ -146,7 +147,8 @@
         "rev-parse HEAD [capture]",
         "merge-base --is-ancestor 0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98 HEAD [discard]",
         "push origin main [streams]",
-        "rev-parse HEAD [capture]"
+        "rev-parse HEAD [capture]",
+        "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A HEAD^ HEAD -- .evolve/inbox/consumed [capture]"
       ],
       "logs": [
         "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
@@ -174,7 +176,8 @@
         "fetch origin main [discard]",
         "rev-parse origin/main [capture]",
         "rev-parse HEAD [capture]",
-        "rev-parse HEAD [capture]"
+        "rev-parse HEAD [capture]",
+        "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A HEAD^ HEAD -- .evolve/inbox/consumed [capture]"
       ],
       "logs": [
         "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",
@@ -204,7 +207,8 @@
         "rev-parse HEAD [capture]",
         "merge-base --is-ancestor 0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98 HEAD [discard]",
         "push origin main [streams]",
-        "rev-parse HEAD [capture]"
+        "rev-parse HEAD [capture]",
+        "-c core.quotePath=false diff-tree -r --no-commit-id --name-only --diff-filter=A HEAD^ HEAD -- .evolve/inbox/consumed [capture]"
       ],
       "logs": [
         "[ship] staged 0 explicit path(s) (declared manifest=0, changed=0) — no `git add -A`",

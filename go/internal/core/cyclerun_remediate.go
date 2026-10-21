@@ -52,7 +52,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	breq := dr.phaseReq
 	breq.ModelRoutingCLI = ""
 	breq.ModelRoutingTier = ""
-	breq.WorktreeReadOnly = false
+	breq.Fence = cr.o.fenceFor(PhaseBuild, cr.cs)
 	breq.CorrectionDirective = fmt.Sprintf(
 		"REMEDIATION round %d: the deterministic gate %q FAILED after your build. "+
 			"Read its report at %s and fix EXACTLY the enumerated defects in the worktree — "+
@@ -72,7 +72,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	}
 	fixResult := dispatchResult{
 		resp: bresp, attemptCount: 1, phaseWorktree: cr.cs.ActiveWorktree,
-		runner: builder, phaseReq: breq, treeGuard: fixGuard, beforeDirty: fixBefore,
+		runner: builder, phaseReq: breq, treeGuard: fixGuard, beforeDirty: fixBefore, remediation: true,
 	}
 	if act, reviewErr := cr.reviewAndGuard(PhaseBuild, &fixResult); act == loopAbort {
 		note := fmt.Sprintf("%s: round %d voided (Build review rejected: %v)", next, round, reviewErr)

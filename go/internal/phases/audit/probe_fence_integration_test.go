@@ -85,7 +85,7 @@ func TestAudit_ContentFencePreservesBuilderTestsBeforeHostExecution(t *testing.T
 			phase := NewDefault(&probeFenceBridge{fakeBridge: fakeBridge{writeArtifact: "## Verdict\n**PASS**\n"}, t: t, mutate: mutate}, fakePromptsFS("body"))
 			resp, err := phase.Run(context.Background(), core.PhaseRequest{
 				Cycle: 7, RunID: "repair-7", AuditRound: 2,
-				ProjectRoot: root, Worktree: root, Workspace: ws, WorktreeReadOnly: true,
+				ProjectRoot: root, Worktree: root, Workspace: ws, Fence: &core.WorktreeFence{},
 			})
 			if err != nil {
 				t.Fatal(err)

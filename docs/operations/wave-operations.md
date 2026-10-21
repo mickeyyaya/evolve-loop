@@ -17,7 +17,8 @@ This page tells the console (an operator or an LLM) how to run each wave through
   - The realized width and the utilization come from the pool signals in `.evolve/signals.ndjson`: `LOOP_ORCH_LANE_LAUNCHED`, `LOOP_ORCH_LANE_BACKFILLED` and `LOOP_ORCH_LANE_EXITED`. The cycle state does not give them. A run with no pool signals uses the cycle signals.
   - The pool signals of the run come from the wave loop. They have the `pid` of the wave record, and they start at the run ID time. The pool launches its first lanes before `wave next` writes the record, so a cutoff at `started_at` loses them.
   - The width is the time-weighted median over the run. It is not the count of lanes that are live now. For that count, read the line `pool:    live N` (JSON `pool_live`). It is `fields.live` of the latest pool signal of the run. The line shows only while the wave loop is live.
-  - A cycle whose lane got `LOOP_ORCH_LANE_DEADLINE` with `action: stopped` shows `cycle N: stopped: lane deadline (phase build)`. It is not a live lane. The JSON gives `termination: lane deadline` and `todo` for that cycle.
+  - A cycle whose lane got `LOOP_ORCH_LANE_DEADLINE` with `action: stopped` shows `cycle N: stopped: lane deadline (phase build)`. It is not a live lane. The JSON gives `termination: stopped: lane deadline` and `todo` for that cycle.
+  - The loop seals that outcome in `.evolve/runs/cycle-N/signals.ndjson`: one `cycle.sealed` with `termination_reason: stopped: lane deadline` and no final verdict. A run from before 2026-10-21 has no seal, so the commands read the stop from the deadline signal. `wave watch` and the facts of `wave next` use the same rule ([wave-orchestrator.md §11](../architecture/wave-orchestrator.md#11-measures)).
   - When the run has a census, the line ends with the supply, for example `· supply 3 admissible, 4 waiting, 40 console`.
   - The JSON has `measures` for the current run and `runs` for the last 3 runs. `width_source: policy` tells you that the run has no sizing record, and that `width_sized` is `fleet.count`. The definitions are in [wave-orchestrator.md §11](../architecture/wave-orchestrator.md#11-measures).
 - To see the supply of work for the lanes, run `evolve wave supply`. It counts the inbox items in six classes and shows the cause of each refusal. It changes nothing. Add `--json` for the full census.
@@ -29,7 +30,7 @@ This page tells the console (an operator or an LLM) how to run each wave through
   - It also has the lane time to a PASS for each CLI family. The measure covers the last 20 builds of the whole history, not only of the wave. A family with no pass shows `none`.
   - The JSON gives each duration in nanoseconds. A wave that is still live is read to its last signal.
   - The definitions are in [internal-lanetime.md](../architecture/packages/internal-lanetime.md). The plan is [wave-latency-2026-10](../plans/wave-latency-2026-10.md).
-- To follow the wave, run `evolve wave watch` under a monitor. It prints one line for each phase change, seal, ship and quota pause. It exits when the loop exits. When a newer wave starts, it prints `wave-started` and follows the newer wave.
+- To follow the wave, run `evolve wave watch` under a monitor. It prints one line for each phase change, seal, deadline stop, ship and quota pause. It exits when the loop exits. When a newer wave starts, it prints `wave-started` and follows the newer wave.
 
 ## 3. At the boundary
 
@@ -107,6 +108,12 @@ To classify a PR, run `evolve pr window <n>`. Add `--json` for the envelope `{pr
 | 10 | — | A usage error. |
 
 The path classes come from the CI router of `.github/workflows/required.yml`. A change to that router also changes the merge window.
+
+### Rebase a PR
+
+- Open each PR from `origin/main`. Do not stack a PR on another open PR: a squash merge rewrites the commits of the first PR, so the stacked PR conflicts.
+- After a rebase onto `origin/main`, run `evolve pr refresh`. It writes `docs/architecture/signal-codes.md`, `go/.darwin-set` and the generated region of `docs/research-index.md` again, and commits only those files. In a merge or a rebase that stopped on a conflict, it stages the files, and you continue the merge or the rebase.
+- Do not merge a generated file by hand.
 
 ### The on-demand boundary
 

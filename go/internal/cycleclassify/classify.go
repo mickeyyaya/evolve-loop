@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
@@ -39,9 +40,13 @@ const (
 	ClassIntegrityBreach   Classification = "integrity-breach"
 	ClassExitTransportHang Classification = "exit-transport-hang"
 	ClassPhaseRefusal      Classification = "phase-refusal"
+	ClassUnknown           Classification = "unknown"
 )
 
-const MarkerQuotaLikelyEmptyOutput = "quota-likely-empty-output"
+const (
+	MarkerQuotaLikelyEmptyOutput = "quota-likely-empty-output"
+	MarkerPaneNoiseOnly          = "pane-noise-only"
+)
 
 var (
 	reInfrastructure = regexp.MustCompile(`(?i)INFRASTRUCTURE FAILURE|sandbox-exec.*Operation not permitted|sandbox_apply.*permitted|EPERM|rate.?limit|429.*Too Many|529.*Overloaded|connection.refused|ETIMEDOUT|operation timed out`)
@@ -64,21 +69,24 @@ func Classify(workspace string) Result {
 	reportData, _ := os.ReadFile(report)
 
 	record, recordOK := classifyFromRecord(workspace)
-	if recordOK && cyclestate.RefusalDisposition(record.Marker).OutranksSentinel {
+	disposition := cyclestate.RefusalDisposition(record.Marker)
+	if recordOK && disposition.OutranksSentinel {
 		return record
 	}
 	if cls, ok := classifyFromSentinels(workspace); ok && (!recordOK || sentinelPhase(cls.Source) == record.Phase) {
 		return cls
 	}
+	if recordOK && disposition.YieldsToInfra {
+		if infra, ok := buildInfraEvidence(workspace); ok {
+			return infra
+		}
+	}
 	if recordOK {
 		return record
 	}
 
-	if m := reInfrastructure.Find(reportData); m != nil {
-		return Result{Class: ClassInfrastructure, Marker: string(m), Source: "orchestrator-report.md"}
-	}
-	if src, marker, ok := scanEventsForInfra(workspace); ok {
-		return Result{Class: ClassInfrastructure, Marker: marker, Source: src}
+	if infra, ok := infraMarker(workspace, reportData); ok {
+		return infra
 	}
 	if m := reShipGate.Find(reportData); m != nil {
 		return Result{Class: ClassShipGateConfig, Marker: string(m), Source: "orchestrator-report.md"}
@@ -97,7 +105,32 @@ func Classify(workspace string) Result {
 	if src, ok := detectEmptyOutputSession(workspace); ok {
 		return Result{Class: ClassInfrastructure, Marker: MarkerQuotaLikelyEmptyOutput, Source: src}
 	}
+	if src, ok := scanEventsForPaneNoise(workspace); ok {
+		return Result{Class: ClassUnknown, Marker: MarkerPaneNoiseOnly, Source: src}
+	}
 	return Result{Class: ClassIntegrityBreach}
+}
+
+func infraMarker(workspace string, reportData []byte) (Result, bool) {
+	if m := reInfrastructure.Find(reportData); m != nil {
+		return Result{Class: ClassInfrastructure, Marker: string(m), Source: "orchestrator-report.md"}, true
+	}
+	if src, marker, ok := scanEventsForInfra(workspace); ok {
+		return Result{Class: ClassInfrastructure, Marker: marker, Source: src}, true
+	}
+	return Result{}, false
+}
+
+func buildInfraEvidence(workspace string) (Result, bool) {
+	phase := string(cyclestate.PhaseBuild)
+	events := filepath.Join(workspace, phase+"-events.ndjson")
+	if marker, ok := firstInfraMarker(workspace, events); ok {
+		return Result{Class: ClassInfrastructure, Marker: marker, Source: filepath.Base(events)}, true
+	}
+	if stdout := filepath.Join(workspace, phase+"-stdout.log"); emptySession(workspace, stdout) {
+		return Result{Class: ClassInfrastructure, Marker: MarkerQuotaLikelyEmptyOutput, Source: filepath.Base(stdout)}, true
+	}
+	return Result{}, false
 }
 
 func classifyFromSentinels(workspace string) (Result, bool) {
@@ -139,20 +172,20 @@ func detectEmptyOutputSession(workspace string) (source string, ok bool) {
 	}
 	sort.Strings(logs)
 	for _, logPath := range logs {
-		data, readErr := os.ReadFile(logPath)
-		if readErr != nil {
-			continue
+		if emptySession(workspace, logPath) {
+			return filepath.Base(logPath), true
 		}
-		if len(bytes.TrimSpace(data)) != 0 {
-			continue
-		}
-		agent := strings.TrimSuffix(filepath.Base(logPath), "-stdout.log")
-		if hasAssistantEvents(filepath.Join(workspace, agent+"-events.ndjson")) {
-			continue
-		}
-		return filepath.Base(logPath), true
 	}
 	return "", false
+}
+
+func emptySession(workspace, logPath string) bool {
+	data, err := os.ReadFile(logPath)
+	if err != nil || len(bytes.TrimSpace(data)) != 0 {
+		return false
+	}
+	agent := strings.TrimSuffix(filepath.Base(logPath), "-stdout.log")
+	return !hasAssistantEvents(filepath.Join(workspace, agent+"-events.ndjson"))
 }
 
 func hasAssistantEvents(eventsPath string) bool {
@@ -288,12 +321,26 @@ func driverExitedZero(workspace, phase string) bool {
 }
 
 func firstInfraMarker(workspace, logPath string) (marker string, ok bool) {
+	eachInfraEvent(logPath, func(ev infraEventEnvelope) bool {
+		m := ev.Data.Marker
+		if ev.Data.Excerpt != "" {
+			m = phasestream.InfraMarker(ev.Data.Excerpt)
+		}
+		if m == "" || isPromptEchoSelfReport(workspace, ev.Source.Phase, ev.Data.Excerpt) {
+			return false
+		}
+		marker, ok = m, true
+		return true
+	})
+	return marker, ok
+}
+
+func eachInfraEvent(logPath string, visit func(infraEventEnvelope) bool) {
 	f, err := os.Open(logPath)
 	if err != nil {
-		return "", false
+		return
 	}
 	defer func() { _ = f.Close() }()
-
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
 	for scanner.Scan() {
@@ -302,34 +349,26 @@ func firstInfraMarker(workspace, logPath string) (marker string, ok bool) {
 			continue
 		}
 		var ev infraEventEnvelope
-		if err := json.Unmarshal(line, &ev); err != nil {
+		if json.Unmarshal(line, &ev) != nil || ev.Kind != "infra_failure" {
 			continue
 		}
-		if ev.Kind != "infra_failure" {
-			continue
+		if visit(ev) {
+			return
 		}
-		if isPromptEchoSelfReport(workspace, ev.Source.Phase, ev.Data.Excerpt) {
-			continue
-		}
-		return ev.Data.Marker, true
 	}
-	if err := scanner.Err(); err != nil {
-		return "", false
-	}
-	return "", false
 }
 
 func classifyFromRecord(workspace string) (Result, bool) {
 	entries, err := phasetiming.Read(workspace)
-	if err != nil || len(entries) == 0 {
+	if err != nil {
 		return Result{}, false
 	}
-	last := entries[len(entries)-1]
-	if last.Verdict != "FAIL" {
+	last, afterRetro, ok := endingEntry(entries)
+	if !ok || last.Verdict != "FAIL" {
 		return Result{}, false
 	}
 	codes := cyclestate.ErrorCodes(last.Diagnostics)
-	if len(codes) == 0 {
+	if len(codes) == 0 || afterRetro && cyclestate.RefusalDisposition(codes[0]) == (cyclestate.Disposition{}) {
 		return Result{}, false
 	}
 	res := Result{Class: ClassPhaseRefusal, Marker: codes[0], Source: phasetiming.FileName, Phase: last.Phase}
@@ -342,6 +381,38 @@ func classifyFromRecord(workspace string) (Result, bool) {
 	return res, true
 }
 
+func endingEntry(entries []phasetiming.Entry) (entry phasetiming.Entry, afterRetro, ok bool) {
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].Phase != string(cyclestate.PhaseRetro) {
+			return entries[i], i < len(entries)-1, true
+		}
+	}
+	return phasetiming.Entry{}, false, false
+}
+
 func sentinelPhase(source string) string {
 	return strings.TrimSuffix(filepath.Base(source), "-report.md")
+}
+
+func scanEventsForPaneNoise(workspace string) (string, bool) {
+	logs, err := globFn(filepath.Join(workspace, "*-events.ndjson"))
+	if err != nil {
+		return "", false
+	}
+	sort.Strings(logs)
+	for _, log := range logs {
+		if holdsPaneNoiseEvent(log) {
+			return filepath.Base(log), true
+		}
+	}
+	return "", false
+}
+
+func holdsPaneNoiseEvent(logPath string) bool {
+	found := false
+	eachInfraEvent(logPath, func(ev infraEventEnvelope) bool {
+		found = ev.Data.Marker != "" && ev.Data.Excerpt != "" && phasestream.InfraMarker(ev.Data.Excerpt) == ""
+		return found
+	})
+	return found
 }

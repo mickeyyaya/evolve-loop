@@ -124,6 +124,10 @@ iterations:
 
 func (b *loopBatchCoordinator) batchExitCode() int {
 	if b.ctx.Err() != nil {
+		if lanes := batchLaneClaims(b.cfg.ProjectRoot, b.result.batchFirstCycle, b.stderr); len(lanes) > 0 {
+			printStoppedLanes(b.stderr, "during the batch closeout", lanes)
+			return 130
+		}
 		fmt.Fprintln(b.stderr, "[loop] received interrupt (SIGINT/SIGTERM) during the batch closeout; the batch completed — exiting 130 so a chained run stops")
 		return 130
 	}
