@@ -1,0 +1,35 @@
+{
+  "id": "wave-next-parses-policy-before-rebuild",
+  "title": "wave next strict-parses the policy before its own build step, so a batch that adds a policy key bricks the next boundary",
+  "summary": "On 2026-10-21, after batch three (#1097) merged, `evolve wave next --json` exited rc=2 with `policy: parse .../.evolve/policy.json: cli_routing: tier rule: ... json: unknown field \"share_pct\"`. sync-main had brought in the new policy key of #1068, but the runtime binary was the build from before the batch. wave next strict-parses the policy in prepareWave before its own wave-build step, so the console had to run `make -C go build` by hand first.",
+  "fix": "Before the first strict policy parse, a non-dry wave next runs the boot refresh of the loop (bootBinaryRefresh, cmd_loop_boot_refresh.go): a binary behind HEAD with a go/ delta is rebuilt and the process re-execs into it. When the parse still meets an unknown field, the error names the remedy: make -C <root>/go build, then run wave next again.",
+  "acceptance": [
+    "A wave next whose synced policy carries a key that the binary does not know rebuilds and re-execs before the policy parse and before any boundary step (TestWaveNext_APolicyKeyTheBinaryDoesNotKnowRebuildsAndReExecsBeforeTheParse).",
+    "A fresh binary launches with no rebuild (TestWaveNext_AFreshBinaryLaunchesWithNoRebuild); a dry run never rebuilds (TestWaveNext_ADryRunNeverRebuildsTheBinary).",
+    "An unknown policy key names the rebuild remedy; another parse error keeps its own text (TestWaveNext_AnUnknownPolicyKeyNamesTheRebuildRemedy, TestWaveNext_AnotherPolicyErrorKeepsItsOwnText).",
+    "The opt-out boot.binary_refresh=off holds also when the policy has an unknown key (TestWaveNext_TheRefreshOptOutHoldsWhenThePolicyHasAnUnknownKey).",
+    "The fix reuses bootBinaryRefresh; no second self-heal mechanism."
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_wave.go",
+    "go/cmd/evolve/cmd_wave_next.go",
+    "go/cmd/evolve/cmd_wave_compose.go",
+    "go/cmd/evolve/cmd_loop_boot_refresh.go",
+    "docs/plans/evolve-wave-cli-2026-10.md",
+    "docs/operations/wave-operations.md",
+    "docs/architecture/packages/cmd-evolve.md"
+  ],
+  "kind": "pipeline-repair",
+  "priority": "HIGH",
+  "weight": 0.8,
+  "route": "console-manual",
+  "routed_reason": "boundary tooling (wave next) that the console runs; a lane cannot run a boundary",
+  "injected_by": "console",
+  "injected_at": "2026-10-21T09:30:00Z",
+  "consumed": {
+    "at": "2026-10-21T09:30:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "wave next runs bootBinaryRefresh before the policy parse (rebuild and re-exec of a stale plane binary); an unknown-field policy error names make -C <root>/go build"
+  }
+}

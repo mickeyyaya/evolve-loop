@@ -158,6 +158,9 @@ func prepareWave(env waveEnv, a waveNextArgs, stderr io.Writer) (wavePlan, error
 	if err := checkWaveIdle(env, &plan); err != nil {
 		return plan, err
 	}
+	if !a.dryRun {
+		env.refreshBinary(loopConfig{ProjectRoot: plane.root, EvolveDir: plane.evolveDir}, stderr)
+	}
 	plan.warnings = append(plan.warnings, planeBinaryWarnings(env, plane.root)...)
 	cfg, standing, err := loadWaveInputs(plane)
 	var records []wave.Record
