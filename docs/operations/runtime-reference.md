@@ -493,6 +493,14 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 > - Without `--cycle`, stdin stays the input, unchanged: `evolve phase` exits 11 on malformed stdin JSON and `evolve compose` exits 10.
 > - **Spec phases (2026-10-09, cycle 1844).** Both commands also run a spec phase: an `llm` phase of the merged catalog (`docs/architecture/phase-registry.json` plus the `.evolve/phases/*` overlays) that has no compiled runner, for example `evolve phase plan-review --cycle N` or `evolve compose --phases plan-review,tdd --cycle N`. `phasecmd.ResolveRunner` resolves a name against the compiled registry first and the merged catalog second; a spec phase runs on the same spec runner the cycle mounts (default bridge and prompts of the project root). Names are case-insensitive. Native phases (`secret-leak-scan`, `flake-rerun-scan`) and control phases (`memo`, `retrospective`) are not spec-runnable. A name in neither set exits 10, and the message lists both: `unknown phase "x" (known built-in: …; known spec: …)` (`phasecmd.FormatUnknownPhaseError`; an unloadable catalog is named in the message). `ship` in a compose sequence still needs `--ship-anyway`, whatever the other phases are.
 
+> **One phase agent with no cycle (2026-10-21, [ADR-0152](../architecture/adr/0152-one-phase-agent-runs-from-the-command-line-with-no-cycle-through-the-phase-runner.md), spec [agent-run](../architecture/agent-run.md)):**
+>
+> - `git diff | evolve agent run <profile> [--input FILE|-] [--file PATH]... [--json] [--keep] [--project-root P]` runs one read-only spec phase through the phase runner and the routing table. stdout carries the report. `--json` carries one envelope with the report, the verdict, the model, the cost and the tokens.
+> - The run has cycle 0, no worktree, and a workspace under `.evolve/ephemeral/agent-runs/<label>` that is removed unless `--keep`. It writes one ledger entry: `cycle: 0`, `cycle_label` = the label, kind `agent_run`. It reads no cycle state and takes no lease.
+> - Exit 0 PASS, WARN or SKIPPED; 1 FAIL; 2 refused; 3 dispatch or ledger error; 10 usage; 11 input.
+> - A refusal is a built-in phase, a source-write profile, a call from inside a phase or a refused root router.
+> - `evolve agent list [--json]` names each profile that `agent run` accepts.
+
 > **Operator commands (rebuild the plane binary; 2026-10-19, cycle 1963):**
 >
 > - `evolve rebuild [--project-root P] [--repin]` builds HEAD of P to `go/bin/evolve` and prints both binary SHAs.
