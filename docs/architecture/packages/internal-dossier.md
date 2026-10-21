@@ -4,7 +4,15 @@
 
 ## Purpose
 
-`internal/dossier` owns the committed per-cycle record, `knowledge-base/cycles/cycle-N.{json,md}`. It holds the `Dossier` type and its `Validate` trust boundary, `Build` (a projection of the cycle's evidence), the JSON and markdown renderers, `Write` (an atomic write plus a scoped git commit), `PendingDir`, `ListPending` and `PublishPending` (a fleet lane's closeout, published at the wave boundary), `ClosedOut` and `ClosedOutAt` (whether, and since when, a cycle has a published or pending dossier), `SweepOrphans` (recovery of uncommitted pairs), and the corpus readers `ReadCommitted`, `PhaseSkipEvidence` and `RollupSpineFailOpens`.
+`internal/dossier` owns the committed record of each cycle, `knowledge-base/cycles/cycle-N.{json,md}`. It holds these parts:
+
+- the `Dossier` type and its `Validate` trust boundary;
+- `Build`, a projection of the evidence of the cycle;
+- the JSON and markdown renderers, and `Write` (an atomic write and a scoped git commit);
+- `PendingDir`, `ListPending` and `PublishPending`: the closeout of a fleet lane, published at the wave boundary;
+- `ClosedOut` and `ClosedOutAt`: if, and since when, a cycle has a published or pending dossier;
+- `SweepOrphans`, the recovery of uncommitted pairs;
+- the corpus readers `ReadCommitted`, `ReadDir`, `PhaseSkipEvidence` and `RollupSpineFailOpens`.
 
 ## Design
 
@@ -34,6 +42,7 @@
 - **Schema version.** `Build` is the only construction boundary (`core.writeCycleDossier` delegates to it), so it stamps `CurrentSchemaVersion` on every new record. The value is 2 because 1 is the implicit, never-written version of the pre-discriminator corpus. Zero (field absent) is the legacy signal. The schema declares the field as an integer and does not require it.
 - **`PhaseSkipEvidence` is the sanctioned read of `skipped_phases`.** It returns `none` (no entry for the phase), `trusted` (any nonzero version, so a future bump cannot reclassify version 2 as legacy), `contradicted` (a legacy record with a surviving execution receipt) or `unverified` (a legacy record without one: unknown, not a skip). There are two receipt sources, because the historical run dirs are gone: for retro, its report in `.evolve/runs/cycle-N/` (`retrospective-report.md`, or the pre-rename `retro-report.md`); for any phase, the ledger's `{cycle, role, kind: agent_subprocess}` entry.
 - **`ReadCommitted` is the fleet channel.** Fleet lane cycles run as separate `evolve cycle run` subprocesses whose results never return to the parent loop, so the committed dossier is the only way a batch-level surface (the loop summary's spine fail-open roll-up) sees what its lanes recorded. A lane's dossier is committed when the loop publishes it, and the loop publishes before the roll-up reads. It windows by filename before opening any file, and it is best-effort because its callers are reporting surfaces.
+- **`ReadDir` is the same reader for any directory.** `ReadCommitted` calls it with `CyclesDir`. `internal/recoveryretro` also calls it with `PendingDir`, because a fleet lane leaves its dossier pending until the boundary ([recovery-retrospective.md](../recovery-retrospective.md) §5). Pinned by `TestReadDir_ReadsThePendingDirWithTheSameWindow`.
 - **Write and commit.** `Write` renders both halves (each renderer calls `Validate`) and writes each through `atomicwrite`. With `commit`, `commitPairGit` stages and commits exactly the pair by pathspec. `commitPair` is the production wrapper; `commitPairGit` takes an injected `gitexec.Git` so the retry tests run without racing real locks. The commit subject names the pair's base name, so a nested pathspec (`knowledge-base/cycles/cycle-N`, the publisher's) still reads `dossier: cycle-N closeout`.
 - **A fleet lane does not commit its dossier.** A closeout commit moves the plane's `main`, which sends every in-flight sibling lane back through re-audit or rebase ([cycle 1704](../../incidents/2026-09-26-a-failed-cycles-closeout-moved-main-under-a-passed-sibling.md)).
   - A fleet lane (`fleetMode(req.Env)`) writes the pair to `PendingDir`, `.evolve/dossiers-pending/`. That is host runtime state: no phase profile grants writes there (`TestNoProfileCanWriteTheDossierPendingDir`), and `.evolve/*` is gitignored. The write takes no git-mutation lock.
