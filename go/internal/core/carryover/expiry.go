@@ -18,3 +18,7 @@ func refreshExpiry(t *cyclestate.CarryoverTodo, stamp string) bool {
 func defaultExpiresAt(now time.Time) string {
 	return now.Add(failurelog.DefaultCarryoverBackfillTTL).Format(time.RFC3339)
 }
+
+func BoundedExpiry(expiresAt string, now time.Time) string {
+	return min(expiresAt, defaultExpiresAt(now.UTC()))
+}

@@ -182,10 +182,10 @@ func TestRunPreliminaryStudy_RunsThePhaseWithTheCampaignRequest(t *testing.T) {
 			if f.registered.Prompt != "study the goal\n" || f.registered.Name != "preliminary-study" {
 				t.Errorf("registered = %+v, want the phase.json carrying agent.md as its prompt", *f.registered)
 			}
-			want := core.PhaseRequest{Cycle: 42, ProjectRoot: f.project, Workspace: f.workspace, Worktree: f.worktree, WorktreeReadOnly: true,
+			want := core.PhaseRequest{Cycle: 42, ProjectRoot: f.project, Workspace: f.workspace, Worktree: f.worktree, Fence: &core.WorktreeFence{},
 				Context: map[string]string{"campaign_feedback": "split wave two"}}
 			if f.req.Cycle != want.Cycle || f.req.ProjectRoot != want.ProjectRoot || f.req.Workspace != want.Workspace ||
-				f.req.Worktree != want.Worktree || f.req.WorktreeReadOnly != want.WorktreeReadOnly || f.req.Context["campaign_feedback"] != "split wave two" {
+				f.req.Worktree != want.Worktree || (f.req.Fence != nil) != (want.Fence != nil) || f.req.Context["campaign_feedback"] != "split wave two" {
 				t.Errorf("request = %+v, want %+v", *f.req, want)
 			}
 			if runner.DefaultRouter == nil {

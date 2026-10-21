@@ -98,3 +98,14 @@ func TestRun_AWalkThatLaunchesNothingFailsThePhaseWithAnError(t *testing.T) {
 		t.Fatalf("an unlaunched walk is a FAIL carrying the error: %+v %v", resp, err)
 	}
 }
+
+func TestRouteRequest_CarriesTheCycleToTheRouter(t *testing.T) {
+	root := writeFallbackProfile(t, "evolve-scout", "codex-tmux", nil)
+	b := New(Options{Hooks: &fakeHooks{phase: "scout", agent: "evolve-scout"}, Bridge: &fakeBridge{}, Prompts: fakePromptsFS("evolve-scout", "x")})
+
+	req := b.routeRequest(core.PhaseRequest{ProjectRoot: root, Cycle: 1739}, scoutPreparation(root), nil)
+
+	if req.Cycle != 1739 {
+		t.Fatalf("route request cycle = %d, want 1739: the deep-tier share buckets each dispatch by its cycle", req.Cycle)
+	}
+}

@@ -151,9 +151,13 @@ Plus 12 single-file notes from knowledge-base/research (lessons-and-resolutions,
 verdict-classifier drift, flag-reduction design, token histories, and others) — see
 `docs/research/`.
 
+**Dated entries.** The sections below the chronicle come from one file for each entry in [research-index/](research-index/). To add an entry, add a file there and run `evolve docs index generate`. Do not edit the generated region by hand. After a rebase, `evolve pr refresh` writes it again ([plan P3](plans/pr-merge-latency-2026-10.md)).
+
 **The engineering chronicle** — workstream-level narratives (problem /
 approaches / decision / results / retro) — lives at
 [docs/chronicle/](chronicle/README.md).
+
+<!-- GENERATED:research-index BEGIN — do not edit by hand; run `evolve docs index generate` -->
 
 ## 2026-09-02 — ship-rate hardening + pipeline dashboard
 
@@ -415,3 +419,14 @@ approaches / decision / results / retro) — lives at
 | Document | What it records |
 |---|---|
 | [architecture/adr/0149-a-test-writing-phase-that-states-fail-on-its-own-work-is-retracted-to-its-dispatch-tree.md](architecture/adr/0149-a-test-writing-phase-that-states-fail-on-its-own-work-is-retracted-to-its-dispatch-tree.md) | Decision (Proposed): on a stated FAIL, the runner restores every path the phase wrote and keeps its copies. Three options are scored, with the argument that a builder red cannot leave through this path. |
+
+## 2026-10-21 — the deep tier shares its seats between Argon and Claude by budget (ADR-0150)
+
+| Document | What it records |
+|---|---|
+| [research/deep-tier-share-2026-10.md](research/deep-tier-share-2026-10.md) | Research: the Argon burn of 2026-10-17, the usage windows the router can read, and current practice on budget pacing, hash splits and weighted routing. |
+| [plans/deep-tier-share-2026-10.md](plans/deep-tier-share-2026-10.md) | Plan: four designs with scores, the share plus the pace, and components S1 to S6. |
+| [architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md](architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md) | Decision: a fixed share by a hash of the seat, and a pace by the week window. |
+| [architecture/deep-tier-share.md](architecture/deep-tier-share.md) | Spec of record: the share stage, the pace and the operator surfaces. |
+
+<!-- GENERATED:research-index END -->

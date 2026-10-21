@@ -96,7 +96,7 @@ var existingConsumeContract = []string{
 	"TestCommittedInboxIDs_DropReasonGate",
 	"TestCommittedInboxIDs_WarnLandingGetsNoScopeUnion",
 	"TestInternalConsumedPaths_OnlyWrittenInConsumeGo",
-	"TestConsumeCommittedItems_ReleasesRegistryBinding",
+	"TestConsumeCommittedItems_RecordsThePointerAndLeavesTheReleaseToTheLanding",
 	"TestConsumeCommittedItems_NoBindingIsCleanNoOp",
 	"TestManualShip_ClosesInboxItemInShipCommit",
 }

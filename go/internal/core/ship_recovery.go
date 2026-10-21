@@ -362,7 +362,7 @@ func regenerateDerivedArtifact(ctx context.Context, worktree, entry string) erro
 	if !ok {
 		return fmt.Errorf("no regenerator registered for %q", entry)
 	}
-	return derivedWorktree(worktree).Regenerate(ctx, e)
+	return DerivedWorktree(worktree).Regenerate(ctx, e)
 }
 
 func refreshDerivedEntry(ctx context.Context, worktree, entry string) error {
@@ -370,10 +370,10 @@ func refreshDerivedEntry(ctx context.Context, worktree, entry string) error {
 	if !ok {
 		return fmt.Errorf("no regenerator registered for %q", entry)
 	}
-	return derivedWorktree(worktree).Refresh(ctx, e)
+	return DerivedWorktree(worktree).Refresh(ctx, e)
 }
 
-func derivedWorktree(worktree string) derived.Worktree {
+func DerivedWorktree(worktree string) derived.Worktree {
 	return derived.Worktree{
 		Run: worktreeGenerator(worktree),
 		Git: func(ctx context.Context, args ...string) (string, int, error) {

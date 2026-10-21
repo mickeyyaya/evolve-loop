@@ -283,6 +283,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		return err
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", branch))
+	releaseLandedBindings(ctx, opts, res, "HEAD")
 
 	if opts.internalAuditBoundTreeSHA != "" {
 		committedTree, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD^{tree}")

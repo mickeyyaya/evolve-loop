@@ -48,11 +48,19 @@
 | Consumer | What it does |
 |---|---|
 | `evolve docs ste-lint` (`cmd/evolve/cmd_docs.go`, `cmd_docs_report.go`) | checks the scope, the named paths, or the files that changed since a base ref, and prints `path:line RULE message` lines and a summary line, or JSON. It finds the root from `--project-root`, the root variables or the git top level, never from the current directory. |
-| the build handoff floor (`steLintWarn` in `internal/core/ste_floor.go`, from `docsFloorWarn`) | checks the changed documents in scope and prints `[ste-lint] WARN: <n> finding(s) in <m> file(s) (first: path:line RULE)` when it finds a problem |
+| the build handoff floor (`steLintFloor` in `internal/core/ste_floor.go`, from `docsFloorChecks`) | checks the changed documents in scope. At `shadow` it prints `[ste-lint] WARN: <n> finding(s) in <m> file(s) (first: path:line RULE)`. At `enforce` it returns a floor failure |
 
-`steLintFloorLines` returns the lines, and `steLintWarn` prints them. A changed document that the floor cannot read gets its own `[ste-lint] WARN: <path> was not checked` line. At the stage `shadow`, the floor counts every finding in a changed document, not only the findings that the change adds.
+`steLintFloorLines` returns the lines and the finding, and `steLintFloor` prints the lines. A changed document that the floor cannot read gets its own `[ste-lint] WARN: <path> was not checked` line. At the stage `shadow`, the floor counts every finding in a changed document, not only the findings that the change adds.
 
-The floor reads the standard from the cycle worktree, and only when a document in scope changed. A worktree without the standard has no STE rule, so the floor prints nothing. A standard that does not parse gives a WARN that the lint did not run. The policy key `docs_floor.ste_stage` (`off`, `shadow` or `enforce`; the compiled default is `shadow`) controls the floor. Every stage only WARNs.
+The floor reads the standard from the cycle worktree, and only when a document in scope changed. A worktree without the standard has no STE rule, so the floor prints nothing. A standard that does not parse gives a WARN that the lint did not run. The policy key `docs_floor.ste_stage` (`off`, `shadow` or `enforce`; the compiled default is `shadow`) controls the floor.
+
+The stages of the floor (2026-10-21):
+
+- At `shadow` the floor only WARNs. A lint that did not run is a WARN too.
+- At `enforce` a finding on an added line of a changed document is a floor failure, so the build gets the document back (`steLintFloor`).
+- The floor scopes the findings with `KeepAdded`, the same scope as `evolve docs ste-lint --changed <base> --added`, which CI runs. A document new at the base counts whole, and so does a document whose added lines git cannot report.
+- At `enforce` a standard that does not load is a floor failure, because a lane can break the standard in its worktree.
+- A document that the lint cannot read stays a WARN at every stage, so such a document can still land at `enforce`.
 
 ## Tests
 

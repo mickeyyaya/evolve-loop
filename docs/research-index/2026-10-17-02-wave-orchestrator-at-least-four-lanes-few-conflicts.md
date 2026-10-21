@@ -1,0 +1,9 @@
+## 2026-10-17 — wave orchestrator: at least four lanes, few conflicts, a large fleet (ADR-0139)
+
+| Document | What it records |
+|---|---|
+| [research/wave-orchestrator-2026-10.md](research/wave-orchestrator-2026-10.md) | The quota shrink costs a lane for a family with a fallback. 0 of 230 inbox items reach a lane. A barrier of 4 lanes keeps 66% of the slot time busy. The console-routing census shows the lane supply fell from 41 items to 1 in one month, and gives six remedies. It also has an outside survey. Findings F2.1 to F2.24 and P3.1 to P3.17, refinements R1 to R8. |
+| [plans/wave-orchestrator-2026-10.md](plans/wave-orchestrator-2026-10.md) | Plan: four approaches with weighted scores. The winner is one deterministic orchestrator that supplies, admits by cell, backfills a rolling pool, leases each lane and oversees on events. Decisions D1 to D15 and components O0 to O8 with red tests. |
+| [plans/pool-resupply-2026-10.md](plans/pool-resupply-2026-10.md) | Plan: a free pool slot takes the work that became ready after the run started. Four designs scored; the winner is a `Resupply` port that re-runs the plan source on a lane exit. A deadline stop no longer re-queues the todo in the same run. Decisions D1 to D8. |
+| [architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md](architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) | Decision (Proposed): one Go component owns the run of lanes. It builds ADR-0134 S14 as its admission step and wakes on the ADR-0127 channels. |
+| [architecture/wave-orchestrator.md](architecture/wave-orchestrator.md) | Design, the spec of record: the census, the sizing, the admission by cell, the pool, the lease, the oversight and the window. It gives the measures and the cost of each step as a function of N. The limits: about 6 lanes for the serial landing, 8–12 lanes for one host (estimate), and 139 disjoint Go cells. |

@@ -103,6 +103,11 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 		return err
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] PUSH-ONLY: pushed %d attested commit(s) to origin/%s", len(ahead), branch))
+	for _, sha := range ahead {
+		if journalHasSHA(opts.ProjectRoot, sha) {
+			releaseLandedBindings(ctx, opts, res, sha)
+		}
+	}
 	return nil
 }
 

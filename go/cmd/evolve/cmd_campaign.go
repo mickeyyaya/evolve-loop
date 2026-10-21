@@ -221,6 +221,9 @@ func campaignQuotaCooldown(projectRoot string) func() time.Duration {
 		store := clihealth.NewStore(projectRoot, nil)
 		var wait time.Duration
 		for _, e := range store.Active() {
+			if e.Reason == clihealth.ModelUnsupportedPattern {
+				continue
+			}
 			if d := time.Until(e.BenchedUntil); d > wait {
 				wait = d
 			}
@@ -380,12 +383,12 @@ func runPreliminaryStudy(workspace, feedback string) error {
 		return err
 	}
 	req := core.PhaseRequest{
-		Cycle:            cycleFromWorkspace(workspace),
-		ProjectRoot:      projectRoot,
-		Workspace:        workspace,
-		Worktree:         worktree,
-		WorktreeReadOnly: !cfg.WritesSource,
-		Context:          map[string]string{"campaign_feedback": feedback},
+		Cycle:       cycleFromWorkspace(workspace),
+		ProjectRoot: projectRoot,
+		Workspace:   workspace,
+		Worktree:    worktree,
+		Fence:       core.FenceFor(cfg.WritesSource, nil),
+		Context:     map[string]string{"campaign_feedback": feedback},
 	}
 	resp, err := registered.Runner.Run(context.Background(), req)
 	if err != nil {

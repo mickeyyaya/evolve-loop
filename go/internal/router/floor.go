@@ -41,7 +41,7 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 	for _, phase := range floor {
 		if phase == "tdd" {
 			if TddPinned(in.Cfg, in.Signals) {
-				forcePhase(out, &clamps, "tdd", "ship-requires-tdd")
+				forcePhase(out, &clamps, "tdd", RuleShipRequiresTdd)
 			}
 			continue
 		}
@@ -89,7 +89,7 @@ func forcePhase(plan *PhasePlan, clamps *[]Clamp, phase, rule string) {
 	if planRuns(plan, phase) {
 		return
 	}
-	ensureRun(plan, phase)
+	ensureRun(plan, phase, rule)
 	*clamps = append(*clamps, Clamp{
 		Rule:     rule,
 		Proposed: phase + "=skip",
@@ -128,19 +128,24 @@ func dropUnknownPhases(in RouteInput, plan *PhasePlan) ([]PhasePlanEntry, []Clam
 	return entries, clamps
 }
 
-func planRuns(plan *PhasePlan, phase string) bool {
+func planEntry(plan *PhasePlan, phase string) PhasePlanEntry {
 	for _, e := range plan.Entries {
 		if e.Phase == phase {
-			return e.Run
+			return e
 		}
 	}
-	return false
+	return PhasePlanEntry{}
 }
 
-func ensureRun(plan *PhasePlan, phase string) {
+func planRuns(plan *PhasePlan, phase string) bool {
+	return planEntry(plan, phase).Run
+}
+
+func ensureRun(plan *PhasePlan, phase, rule string) {
 	for i := range plan.Entries {
 		if plan.Entries[i].Phase == phase {
 			plan.Entries[i].Run = true
+			plan.Entries[i].ForcedBy = rule
 			return
 		}
 	}
@@ -148,6 +153,7 @@ func ensureRun(plan *PhasePlan, phase string) {
 		Phase:         phase,
 		Run:           true,
 		Justification: "floor: integrity floor requires " + phase,
+		ForcedBy:      rule,
 	})
 }
 

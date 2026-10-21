@@ -86,6 +86,7 @@ func ReauditCycle(ctx context.Context, in ReauditInput) (ReauditResult, error) {
 		ProjectRoot:                     in.ProjectRoot,
 		Workspace:                       cs.WorkspacePath,
 		Worktree:                        cs.ActiveWorktree,
+		Fence:                           FenceFor(WorktreePhase(PhaseAudit), nil),
 		WorktreeBaseSHA:                 base,
 		ExplanationDocumentationVersion: cs.ExplanationDocumentationVersion,
 		RunID:                           cs.RunID,

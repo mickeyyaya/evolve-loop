@@ -142,7 +142,7 @@ func (o *Orchestrator) learnDeterministically(ctx context.Context, fl failureLea
 }
 
 func (o *Orchestrator) dispatchRetro(ctx context.Context, fl failureLearningRequest, runner PhaseRunner, summary, todoID string) (PhaseResponse, error) {
-	retroReq := fl.retroRequest(summary, todoID)
+	retroReq := fl.retroRequest(o, summary, todoID)
 	o.ensureFailureDigest(fl.Cycle, retroReq.ProjectRoot, fl.CycleState.WorkspacePath, string(fl.Failed), fl.Err.Error())
 	retroStarted := o.now().UTC()
 	fl.CycleState.Phase = string(PhaseRetro)
@@ -189,7 +189,7 @@ func (o *Orchestrator) completeRetro(ctx context.Context, fl failureLearningRequ
 	o.writeFailureLearningState(ctx, fl.State)
 }
 
-func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseRequest {
+func (fl failureLearningRequest) retroRequest(o *Orchestrator, summary, todoID string) PhaseRequest {
 	retroCtx := make(map[string]string, len(fl.Context)+5)
 	for k, v := range fl.Context {
 		retroCtx[k] = v
@@ -206,6 +206,7 @@ func (fl failureLearningRequest) retroRequest(summary, todoID string) PhaseReque
 		Workspace:                       fl.CycleState.WorkspacePath,
 		Worktree:                        fl.CycleState.ActiveWorktree,
 		WorktreeBaseSHA:                 fl.CycleState.WorktreeBaseSHA,
+		Fence:                           o.fenceFor(PhaseRetro, *fl.CycleState),
 		ExplanationDocumentationVersion: fl.CycleState.ExplanationDocumentationVersion,
 		RunID:                           fl.CycleState.RunID,
 		GoalHash:                        fl.CycleRequest.GoalHash,

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
@@ -110,11 +111,7 @@ func triageDroppedIDs(workspace string) []string {
 	if err != nil {
 		return nil
 	}
-	var d struct {
-		Dropped []struct {
-			ID string `json:"id"`
-		} `json:"dropped"`
-	}
+	var d committedset.DroppedBucket
 	if json.Unmarshal(body, &d) != nil {
 		return nil
 	}

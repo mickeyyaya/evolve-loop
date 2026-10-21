@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -25,7 +26,10 @@ const (
 	ratchetGitTimeout     = 2 * time.Minute
 )
 
-var ratchetRun sysexec.RunFunc = sysexec.DefaultRunner
+var (
+	ratchetRun   sysexec.RunFunc = sysexec.DefaultRunner
+	ratchetWrite                 = os.WriteFile
+)
 
 func runBoundaryRatchetTighten(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var projectRoot string
@@ -56,26 +60,61 @@ func landRatchetTighten(root string, stdout io.Writer) (err error) {
 	return tightenAndPropose(wt, stdout)
 }
 
+type tightenedList struct {
+	rel     string
+	changes []string
+	encoded []byte
+}
+
+func tightenLists(module string) ([]tightenedList, error) {
+	var lists []tightenedList
+	for _, t := range []struct {
+		rel     string
+		tighten func(string) ([]string, []byte, error)
+	}{{sizeratchet.OffendersRelPath, sizeratchet.TightenModule}, {rawgitratchet.BaselineRelPath, rawgitratchet.TightenModule}} {
+		changes, encoded, err := t.tighten(module)
+		if err != nil {
+			return nil, err
+		}
+		if len(changes) > 0 {
+			lists = append(lists, tightenedList{rel: t.rel, changes: changes, encoded: encoded})
+		}
+	}
+	return lists, nil
+}
+
+func writeTightenedLists(module string, lists []tightenedList) (paths, changes []string, err error) {
+	for _, l := range lists {
+		if werr := ratchetWrite(filepath.Join(module, filepath.FromSlash(l.rel)), l.encoded, 0o644); werr != nil {
+			return nil, nil, werr
+		}
+		paths = append(paths, "go/"+l.rel)
+		changes = append(changes, l.changes...)
+	}
+	if serr := sizeratchet.Scan(module); serr != nil {
+		return nil, nil, serr
+	}
+	_, err = rawgitratchet.Scan(module)
+	return paths, changes, err
+}
+
 func tightenAndPropose(wt string, stdout io.Writer) error {
 	module := filepath.Join(wt, "go")
-	changes, encoded, err := sizeratchet.TightenModule(module)
+	lists, err := tightenLists(module)
 	if err != nil {
 		return err
 	}
-	if len(changes) == 0 {
+	if len(lists) == 0 {
 		fmt.Fprintln(stdout, "ratchet tighten: tight")
 		return nil
 	}
-	err = os.WriteFile(filepath.Join(module, filepath.FromSlash(sizeratchet.OffendersRelPath)), encoded, 0o644)
-	if err == nil {
-		err = sizeratchet.Scan(module)
-	}
+	paths, changes, err := writeTightenedLists(module, lists)
 	var pr ratchetPR
 	if err == nil {
 		pr, err = openTightenPR(wt)
 	}
 	if err == nil {
-		err = commitAndPushTightenBranch(wt, pr.HeadRefName)
+		err = commitAndPushTightenBranch(wt, pr.HeadRefName, paths)
 	}
 	if err == nil && pr.Number == 0 {
 		_, err = ratchetCmd(wt, "gh", "pr", "create", "--base", ratchetPRBase, "--head", pr.HeadRefName,
@@ -119,13 +158,13 @@ func openTightenPR(wt string) (ratchetPR, error) {
 	return ratchetPR{HeadRefName: ratchetBranchPrefix + time.Now().UTC().Format("2006-01-02")}, nil
 }
 
-func commitAndPushTightenBranch(wt, branch string) error {
+func commitAndPushTightenBranch(wt, branch string, paths []string) error {
 	ref := "refs/heads/" + branch
 	tip, err := ratchetCmd(wt, "git", "ls-remote", "origin", ref)
 	if err == nil {
 		lease, _, _ := strings.Cut(tip, "\t")
 		err = runGitSteps(wt,
-			[]string{"commit", "--quiet", "-m", ratchetTightenMessage, "--", "go/" + sizeratchet.OffendersRelPath},
+			append([]string{"commit", "--quiet", "-m", ratchetTightenMessage, "--"}, paths...),
 			[]string{"push", "--quiet", "--force-with-lease=" + ref + ":" + lease, "origin", "HEAD:" + ref})
 	}
 	return err

@@ -167,3 +167,37 @@ func TestNoteContractExhaustionSkip_ALedgerFailureWarnsWithoutDroppingTheSkip(t 
 		t.Fatalf("the code-review skip must still be signalled after a ledger failure: %+v", events)
 	}
 }
+
+func TestRoutingDecision_TheEscalationRouteCarriesTheCycleToTheDeepShare(t *testing.T) {
+	t.Setenv("EVOLVE_CLI", "")
+	root := t.TempDir()
+	writeRawProfile(t, root, "builder", map[string]any{
+		"name": "builder", "cli": "agy-tmux", "allowed_clis": []string{"agy", "claude"},
+		"model_tier_default": "deep", "model_tier_envelope": map[string]any{"min": "balanced", "max": "deep"},
+	})
+	chain := []string{"agy", "claude"}
+	block := policy.CLIRouting{CLIs: chain, Default: chain, Tiers: map[string]policy.TierRule{"deep": {CLIs: chain, SharePct: 50}}}
+	r, _, err := cliroute.Build(cliroute.Setup{
+		Policy: policy.Policy{CLIRouting: &block}, Profiles: profiles.NewFromDir(filepath.Join(root, ".evolve", "profiles")),
+		Host: cliroute.Host{LookPath: func(string) (string, error) { return "/fake", nil }},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	argon := 0
+	for cycle := 1; cycle <= 100; cycle++ {
+		cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}, cycle: cycle}
+		d, routed := cr.routingDecision(PhaseBuild)
+		if !routed || !strings.Contains(strings.Join(d.Trace, "\n"), "share 50%: bucket") {
+			t.Fatalf("cycle %d: routed %v trace %q, want the deep share applied", cycle, routed, d.Trace)
+		}
+		if strings.HasPrefix(d.Plan.Candidates[0], "agy") {
+			argon++
+		}
+	}
+
+	if argon < 30 || argon > 70 {
+		t.Fatalf("Argon led %d of 100 escalation routes; each cycle must reach the share bucket, so a 50%% share splits them", argon)
+	}
+}

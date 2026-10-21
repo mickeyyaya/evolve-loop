@@ -87,6 +87,7 @@ const (
 	CodeGitLaneNotOnOrigin       ShipErrorCode = "GIT_LANE_NOT_ON_ORIGIN"
 	CodeGitLandingUnwindDeclined ShipErrorCode = "GIT_LANDING_UNWIND_DECLINED"
 	CodeGitPushPolicyRefused     ShipErrorCode = "GIT_PUSH_POLICY_REFUSED"
+	CodeForeignPredicatePackage  ShipErrorCode = "FOREIGN_PREDICATE_PACKAGE"
 
 	CodeArgs    ShipErrorCode = "ARGS"
 	CodeGitIO   ShipErrorCode = "GIT_IO"

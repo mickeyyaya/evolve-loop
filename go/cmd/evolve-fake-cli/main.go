@@ -45,6 +45,8 @@ var agentHeadingToPhase = map[string]string{
 	"# Evolve Retrospective": "retro",
 }
 
+const syntheticTestPath = "tests/synthetic_test.go"
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
@@ -234,7 +236,7 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 	case "triage":
 		out[mainPath] = "# Triage\n\n## top_n\n- task-1\n\n## deferred\n- task-2\n"
 	case "tdd":
-		out[mainPath] = "# Team Context\n\n## Acceptance\n- cycle ships clean\n\n## RED Tests\n- tests/synthetic_test.go\n"
+		out[mainPath] = "# Team Context\n\n## Acceptance\n| # | Criterion | Disposition | Needs changed | Predicates |\n|---|---|---|---|---|\n| 1 | cycle ships clean | predicate | " + syntheticTestPath + " | 001 |\n\n## RED Tests\n- " + syntheticTestPath + "\n"
 	case "build":
 		out[mainPath] = "# Build Report\n\n## Files Modified\n- file.go (synthetic)\n\n" +
 			explanationdocs.RenderNotApplicableDeclaration("synthetic e2e build; the base-bound diff contains no material changes")

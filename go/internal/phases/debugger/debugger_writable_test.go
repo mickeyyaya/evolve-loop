@@ -12,7 +12,7 @@ func TestHooksComposePrompt_NamesTheConflictedPathsTheDebuggerMayWrite(t *testin
 		"- conflicted_paths: go/.apicover-enforce\n":            {"go/.apicover-enforce"},
 		"- conflicted_paths: go/.apicover-enforce, docs/a.md\n": {"go/.apicover-enforce", "docs/a.md"},
 	} {
-		req := core.PhaseRequest{Worktree: "/worktree", WorktreeReadOnly: true, WorktreeWritablePaths: paths}
+		req := core.PhaseRequest{Worktree: "/worktree", Fence: &core.WorktreeFence{Writable: paths}}
 		if prompt := (hooks{}).ComposePrompt("body", req); !strings.Contains(prompt, want) {
 			t.Errorf("prompt does not name %v as %q:\n%s", paths, want, prompt)
 		}

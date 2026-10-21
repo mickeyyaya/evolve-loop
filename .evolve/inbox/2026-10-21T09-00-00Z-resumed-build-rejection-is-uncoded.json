@@ -1,0 +1,20 @@
+{
+  "id": "resumed-build-rejection-is-uncoded",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.6,
+  "route": "console-manual",
+  "title": "A build rejected on a resumed cycle is still recorded with no code, so it releases the item uncharged",
+  "summary": "PR #1079 codes an in-cycle build rejection as BUILD_DELIVERABLE_REJECTED (core rejectAfterCorrections). The resume path does not: reviewResumedDeliverable (go/internal/core/resume.go:329) returns a plain error, and the generic error branch of resume_execution.go:191 records phaseOutcomeFrom with no code. A resumed rejected build therefore still classifies as system-level, and the item is redrawn with no failure_count. The failure is toward no charge, the same as before #1079.",
+  "fix": "Return a typed rejection error from reviewResumedDeliverable, and record the build outcome through rejectedOutcome in resume_execution.go when that error comes back. The classifier already lets infrastructure evidence outrank the code (YieldsToInfra).",
+  "acceptance": [
+    "A resumed cycle whose build is rejected after its corrections records the build entry as a FAIL with BUILD_DELIVERABLE_REJECTED (red today)",
+    "The same resumed rejection with an infrastructure marker classifies as infrastructure"
+  ],
+  "files": [
+    "go/internal/core/resume.go",
+    "go/internal/core/resume_execution.go"
+  ],
+  "created_at": "2026-10-21T09:00:00Z",
+  "source": "console, 2026-10-21, round-2 review of PR #1079 (MEDIUM 2)"
+}

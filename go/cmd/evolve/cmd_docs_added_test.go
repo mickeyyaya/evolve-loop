@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"os"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -224,48 +223,6 @@ func TestDocsSteLint_AddedExitsTwoWhenTheDiffIsRefused(t *testing.T) {
 	if code != exitIO || !strings.Contains(stderr, "refused") {
 		t.Fatalf("code %d, stderr %q; want %d naming the refusal", code, stderr, exitIO)
 	}
-}
-
-func TestSteBlockSpan(t *testing.T) {
-	t.Parallel()
-	lines := strings.Split("# Head\n\nfirst\nsecond\n- item one\n  more\n- item two\n\n| a | b |\nlast\n", "\n")
-	for name, tc := range map[string]struct {
-		line, from, to int
-	}{
-		"a heading is alone":                     {1, 1, 1},
-		"a blank line is alone":                  {2, 2, 2},
-		"a paragraph runs to the next list item": {3, 3, 4},
-		"a list item runs to its continuation":   {5, 5, 6},
-		"a continuation joins its item":          {6, 5, 6},
-		"the next item stands alone":             {7, 7, 7},
-		"a table row is alone":                   {9, 9, 9},
-		"a line after a table row is its own":    {10, 10, 10},
-		"a line before the file is itself":       {0, 0, 0},
-		"a line past the file is itself":         {99, 99, 99},
-	} {
-		t.Run(name, func(t *testing.T) {
-			from, to := steBlockSpan(lines, tc.line)
-			if got, want := []int{from, to}, []int{tc.from, tc.to}; !reflect.DeepEqual(got, want) {
-				t.Fatalf("steBlockSpan(%d) = %v, want %v", tc.line, got, want)
-			}
-		})
-	}
-}
-
-func FuzzSteBlockSpan(f *testing.F) {
-	f.Add("a\n\nb\n- c\n| d |\n# e\n", 3)
-	f.Add("", 1)
-	f.Add("x", -4)
-	f.Fuzz(func(t *testing.T, text string, line int) {
-		lines := strings.Split(text, "\n")
-		from, to := steBlockSpan(lines, line)
-		if from > to || from > line || to < line {
-			t.Fatalf("steBlockSpan(%q, %d) = %d, %d; want a span that holds the line", text, line, from, to)
-		}
-		if line >= 1 && line <= len(lines) && (from < 1 || to > len(lines)) {
-			t.Fatalf("steBlockSpan(%q, %d) = %d, %d; want a span inside the file", text, line, from, to)
-		}
-	})
 }
 
 func TestKeepAddedFindings_AFileLevelFindingIsKeptWhateverTheAddedLines(t *testing.T) {

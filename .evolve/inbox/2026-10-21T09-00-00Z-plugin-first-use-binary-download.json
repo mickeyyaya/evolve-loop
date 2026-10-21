@@ -1,0 +1,40 @@
+{
+  "id": "plugin-first-use-binary-download",
+  "title": "Plugin users get the binary from the tracked go/evolve; fetch it from GitHub Releases on first use, then untrack go/evolve",
+  "kind": "maintenance",
+  "priority_class": "hygiene",
+  "weight": 0.5,
+  "route": "console-manual",
+  "campaign": "one-binary",
+  "created_at": "2026-10-21T09:00:00Z",
+  "source": "operator decision 2026-10-21 on untrack-goevolve-binary: option B now (commit-gate restore hint, dev builds to go/bin/evolve), option A later (this item)",
+  "connects_to": [
+    ".evolve/inbox/2026-07-26T16-05-00Z-untrack-goevolve-binary.json",
+    "docs/architecture/adr/0094-runtime-corpora-tracked-upstream.md"
+  ],
+  "files": [
+    "go/evolve",
+    ".gitignore",
+    "install.sh",
+    ".claude/settings.json",
+    "go/internal/releasepipeline/releasepipeline.go",
+    "go/internal/phases/ship/binary_staging_guard.go",
+    "go/internal/phases/ship/landing_intent.go",
+    "go/internal/phases/ship/gitops.go",
+    "go/internal/core/leak_recovery.go",
+    "go/internal/core/cyclerun_postreview.go",
+    "go/internal/wtcheckpoint/wtcheckpoint.go",
+    "go/internal/gc/devleftovers.go",
+    "go/internal/commitgate/comments_added.go",
+    "go/acs/cycle1779"
+  ],
+  "summary": "ADR-0094 keeps go/evolve (36 MB) tracked because the Claude Code marketplace clones the repository and plugin users run that copy with no build step. The tracked copy costs repository size on every release, and a bare `go build ./cmd/evolve` in go/ overwrites it. Option B (the commit-gate restore hint) removed the friction but not the cause.",
+  "fix": "On first plugin use, fetch the platform binary from GitHub Releases into go/bin/evolve. Reuse the platform detection, download and checksum logic of install.sh (RELEASE_BASE, uname mapping, checksums.txt) instead of a second copy. Then, in the same change: git rm --cached go/evolve, add it to .gitignore, and remove the old readers: releasepipeline resolveEvolveBin and its rebuild-binary -o go/evolve write, the ship >1 MB staged-executable allowlist for go/evolve and landingBinary, the go/evolve entries in leak_recovery, cyclerun_postreview, ship gitops discard, wtcheckpoint exclusions and gc devleftovers, the go/evolve fallback of the hooks in .claude/settings.json, the go/evolve branch of the commit-gate refusal, and acs/cycle1779 TestC1779_005. Supersede the go/evolve section of ADR-0094 with a new ADR.",
+  "acceptance": [
+    "A fresh marketplace clone with no go/evolve and no Go toolchain runs the hooks: the first use downloads and checksum-verifies the platform binary into go/bin/evolve (a test drives it with a fake release server)",
+    "A checksum mismatch or an unsupported platform fails loudly and names the cause",
+    "go/evolve is untracked and gitignored, and `git grep -n 'go/evolve'` under go/ and .claude/ finds no reader",
+    "The release flow publishes the binaries to GitHub Releases and no longer writes or commits go/evolve",
+    "A new ADR supersedes the go/evolve section of ADR-0094"
+  ]
+}

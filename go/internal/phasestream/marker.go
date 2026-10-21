@@ -16,7 +16,10 @@ var infraMarkers = []infraMarker{
 	{regexp.MustCompile(`(?i)connection refused|\bECONNREFUSED\b`), "conn_refused"},
 }
 
+var paneNoise = regexp.MustCompile(`(?m)^.*(?:compinit:\d+: operation not permitted|verifylock: open \S*evolve-verify\.lock: operation not permitted).*$`)
+
 func detectInfraMarker(text string) string {
+	text = paneNoise.ReplaceAllString(text, "")
 	for _, m := range infraMarkers {
 		if m.re.MatchString(text) {
 			return m.marker
@@ -24,3 +27,5 @@ func detectInfraMarker(text string) string {
 	}
 	return ""
 }
+
+func InfraMarker(text string) string { return detectInfraMarker(text) }

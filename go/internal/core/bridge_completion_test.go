@@ -23,7 +23,7 @@ func TestPhaseRequest_BridgeCompletion_EveryOtherDispatchKeepsTheArtifactContrac
 		req  PhaseRequest
 	}{
 		{"a first dispatch refuses a leftover", PhaseRequest{Worktree: "/wt/cycle-1"}},
-		{"a read-only phase completes only by rewriting its verdict", PhaseRequest{Worktree: "/wt/cycle-1", CorrectionDirective: "fix it", WorktreeReadOnly: true}},
+		{"a read-only phase completes only by rewriting its verdict", PhaseRequest{Worktree: "/wt/cycle-1", CorrectionDirective: "fix it", Fence: &WorktreeFence{}}},
 		{"a degraded run has no worktree to take evidence from", PhaseRequest{CorrectionDirective: "fix it"}},
 	}
 	for _, tc := range cases {
@@ -41,12 +41,12 @@ func TestPhaseRequest_BridgeCompletion_TheWorktreeFenceDecidesWhoQualifies(t *te
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	correction := PhaseRequest{Worktree: "/wt/cycle-1", CorrectionDirective: composeCorrection(1, "rejected", "")}
 	for _, phase := range []Phase{PhaseAudit, Phase("adversarial-review")} {
-		if got := o.withWorktreeFence(correction, phase, CycleState{}).BridgeCompletion(); got != "" {
+		if got := withFence(correction, o.fenceFor(phase, CycleState{})).BridgeCompletion(); got != "" {
 			t.Errorf("read-only phase %s qualified for worktree evidence (%q): its stale verdict must be rewritten after dispatch", phase, got)
 		}
 	}
 	for _, phase := range []Phase{PhaseBuild, PhaseTDD} {
-		if got := o.withWorktreeFence(correction, phase, CycleState{}).BridgeCompletion(); got != CompletionWorktreeEvidence {
+		if got := withFence(correction, o.fenceFor(phase, CycleState{})).BridgeCompletion(); got != CompletionWorktreeEvidence {
 			t.Errorf("source-writing phase %s: BridgeCompletion() = %q, want %q", phase, got, CompletionWorktreeEvidence)
 		}
 	}
@@ -98,4 +98,9 @@ func TestBridgeRequest_EachCompletionContractTravelsAsTheNameTheBridgeParses(t *
 			t.Errorf("BridgeRequest{Completion: %s} marshals as %s, want %s: the bridge's --completion flag and BRIDGE_COMPLETION read this name", contract, b, want)
 		}
 	}
+}
+
+func withFence(req PhaseRequest, fence *WorktreeFence) PhaseRequest {
+	req.Fence = fence
+	return req
 }

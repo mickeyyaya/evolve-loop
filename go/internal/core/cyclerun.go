@@ -96,6 +96,7 @@ type dispatchResult struct {
 	beforeDirty   []string
 	runner        PhaseRunner
 	phaseReq      PhaseRequest
+	remediation   bool
 }
 
 func (cr *cycleRun) recordFailureLearning(failed Phase, failErr error, attempt int) {

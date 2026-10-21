@@ -65,6 +65,21 @@ The fingerprint of a try is the set of violation codes of its first failed check
 
 - A `halt` failure never climbs. It keeps the present halt rules.
 - An audit FAIL whose class maps to `defer-or-quarantine` (`intent-malformed`, fix type `reintent`) never climbs and is never rebuilt in its cycle. The retry envelope declines it to retro, and retro ends the cycle with an `audit-fail-defer: ` reason. The router cannot overrule that end (`core/reintent_decision.go`, [internal-core](packages/internal-core.md)).
+- The FAIL closeout of a cycle that the defer ended routes its committed items by the `fix_type` of the decision that ended the cycle (`cycleoutcome/defer_route.go`). The cycle result carries that decision as a value (`core.DeferOf`), so the closeout reads no workspace file. `auditDeclineDefers` picks the decision in this order: the class of the audit, the class of the build, then a cleared `failure-decision.json`. The category text does not decide. The table below gives the route.
+
+| `fix_type` | Route of each committed item | Failure count |
+|---|---|---|
+| `reintent` | `inbox route-console` (`inboxmover.RouteConsole`). The `routed_reason` names the cycle, the category and the `fix_type`. | not bumped |
+| `pipeline-repair` | The closeout files one console item `pipeline-repair-cycle-<N>`, with that `routed_reason`. Each item gets a `deps` entry on it, so it waits until the repair lands. | not bumped |
+| any other value, or no defer decision | the plain release, with a WARN that says why | bumped |
+| a route or a `deps` edit that fails for one item | that item has the plain release, with a WARN. The other items keep their route. | bumped for that item only |
+
+- The route uses the existing writers: `RouteConsole`, `File` and the edit verb. It adds no new writer and no flag.
+- The `deps` entry is written while the cycle still holds the claim (`inboxmover.EditHeld`). Thus no lane can claim the item before it waits on the companion.
+- The drain skips the failure bump only for the ids that routed (`CycleOutcome.RoutedIDs`).
+- A second closeout of the same cycle reuses the companion item and adds no second `deps` entry.
+- Only the result closeout routes. A cycle that the defer ended returns no error, so it always reaches `closeoutCycleOutcome`. The error exits of `cmd/evolve` use the closeout without a result.
+
 - A quota exit inside a raised rung keeps the rung. The chain walk moves to the next family at the same rung, and the walk is not a new try of the ladder.
 
 ## 4. The rungs

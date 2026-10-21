@@ -26,6 +26,10 @@ func Edit(opts Options, target string, edits []FieldEdit) (string, error) {
 	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.Edit(target, edits) })
 }
 
+func EditHeld(opts Options, taskID string, cycle int, edits []FieldEdit) (string, error) {
+	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.EditHeld(taskID, cycle, edits) })
+}
+
 func Withdraw(opts Options, taskID, reason string) (string, error) {
 	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.Withdraw(taskID, reason) })
 }

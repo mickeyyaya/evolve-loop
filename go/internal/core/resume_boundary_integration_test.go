@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -58,7 +59,7 @@ func TestResumeBoundaryCheckpointer_FailureStopsDispatchAndPreservesPause(t *tes
 		return compact.Bytes()
 	}
 	originalPause := readPause()
-	rp, err := core.LoadResumeState(ctx, w.Root, w.EvolveDir, core.ResumeOptions{})
+	rp, err := core.LoadResumeState(ctx, w.Root, w.EvolveDir, core.ResumeOptions{MaxAge: time.Duration(math.MaxInt64)})
 	if err != nil {
 		t.Fatal(err)
 	}

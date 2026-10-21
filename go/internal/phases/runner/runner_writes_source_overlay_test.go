@@ -31,7 +31,7 @@ func TestRunner_TheWriteAxisOfTheRequestSelectsEngineeringCraft(t *testing.T) {
 			hooks := &fakeHooks{phase: tc.phase, agent: tc.agent, model: "auto", prompt: "x", verdict: core.VerdictPASS}
 			fb := &fakeBridge{writeArtifact: "x"}
 			r := New(Options{Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS(tc.agent, "x")})
-			req := core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir(), Signals: code, WorktreeReadOnly: tc.readOnly, WorktreeWritablePaths: tc.writable}
+			req := core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir(), Signals: code, Fence: core.FenceFor(!tc.readOnly, tc.writable)}
 			if _, err := r.Run(context.Background(), req); err != nil {
 				t.Fatalf("Run: %v", err)
 			}

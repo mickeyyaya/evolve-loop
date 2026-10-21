@@ -241,6 +241,33 @@ pins the halt for a CLI wall, a gate beside a non-gate or ship reason, a conflic
 `ship_eligible=false`, a host predicate failure and no reason. See the
 [incident](../../incidents/2026-10-07-cycle-1828-gate-forced-fail-earned-no-repair-and-halted.md).
 
+## Extension: a builder's system class defers, never halts (cycle 1841)
+
+Cycle 1841 met the cycle-1828 shape again. The auditor wrote PASS, and only the skills-drift gate forced the FAIL. In the repair round the build handed off WARN with the class `infrastructure-systemic`. The dossier read only the audit's block, so the cycle spent its 2/2 `code-audit-fail` rounds and filed nothing.
+
+A first fix (#1083, round 1) made the build's class a floor candidate, so it halted the loop. The independent review and the operator rejected it:
+
+- `build-report.md` is a file that the build agent writes. The build is the agent whose work failed, so its word is the least trusted input (ADR-0064). The cycle-1828 extension above refutes the same claim from the retrospective, an independent agent.
+- A probe halted the loop with one unformatted file and a WARN that claimed `infrastructure-systemic`.
+- A halt stops every lane of the batch and files a P0 item, so a false claim cost the whole batch.
+
+The decision:
+
+| Id | Decision | Rejected options and why |
+|---|---|---|
+| D1 | The build's system class never halts and never sets the floor candidate. | Halt on the class: one agent-written line stops the batch. |
+| D2 | The class counts only with orchestrator corroboration. At least one repair round ran. The last two audits of the run bound the same worktree tree (the auditor ledger rows). | Trust the class alone: no evidence that the remedy round failed. |
+| D3 | A corroborated class declines further repair rounds. It defers the item with fix type `pipeline-repair`, so the item waits on a console `pipeline-repair-cycle-<N>` item (the route of `reintent-fix-type-routes-the-item`). | Retry until the budget is spent: cycle 1841 spent 2/2 rounds on a reading no rebuild moves. |
+| D4 | The defer inputs are fresh for this cycle. The build's class comes from the ledger and the build report, not from `failure-dossier.json`. The host removes `failure-decision.json` before each retro, on the live path and on resume. When the host cannot remove it, the orchestrator does not read it. The closeout gets the defer as a value on the cycle result. | Read the files back: any agent that can write the workspace can plant a read-only `failure-dossier.json` that claims a system class. |
+
+The limits of D4:
+
+- The class itself still comes from `build-report.md`, which the build writes. D2 corroborates that the repair round did not move the tree. It does not prove the class.
+- The clear before the retro makes `failure-decision.json` fresh, not unforgeable. An agent that writes the workspace during the retro can still replace it. That file also feeds the retro floor (`applyFailureDecisionFloor`), which can halt the batch. Thus this limit can cost the batch, not one lane. Only `floorClaimRefutation` and the disposition check guard it.
+- The host does not clear `audit-report.md` before the first audit, so a report that is planted before round 0 is still a defer input. The item `planted-audit-report-before-the-first-audit` tracks this.
+
+The consequence: a false build class costs one lane and one console item, not the batch. A true pipeline defect still reaches the console. The halt paths of this ADR are unchanged: an incoherent verdict, an audit-declared floor class, and a retro floor claim that `floorClaimRefutation` does not refute.
+
 ## Implementation slices (one campaign)
 
 - **S1 — Policy schema + loader:** `failure_policy` struct in `internal/policy` + compiled defaults + policy.json block. TDD.

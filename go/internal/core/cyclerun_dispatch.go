@@ -53,8 +53,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	phaseCtx = seedAuditRepairContext(phaseCtx, next, cr.cs)
 	phaseCtx = cr.o.seedDispatchContext(cr.ctx, phaseCtx, next, cr.cs, cr.req.ProjectRoot)
 	archiveRepairPrompts(cr.cs, next)
-	if next == PhaseAudit {
-		cr.cs.AuditRepairActive = false
+	consumeDispatchFlags(&cr.cs, next)
+	if next == PhaseRetro {
+		cr.o.clearRetroDecisionInput(&cr.cs)
 	}
 	phaseReq := PhaseRequest{
 		Cycle:                           cr.cycle,
@@ -72,8 +73,8 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		Signals:                         dispatchSignals(next, cr.cs.WorkspacePath, cr.req.ProjectRoot),
 		BypassPolicy:                    cr.req.BypassPolicy,
 		OperatorDirectives:              cr.directivesSet.Merged,
+		Fence:                           cr.o.fenceFor(next, cr.cs),
 	}
-	phaseReq = cr.o.withWorktreeFence(phaseReq, next, cr.cs)
 	if cr.o.cfg.ModelRouting == config.ModelRoutingAuto && cr.clampedPlan != nil {
 		for _, e := range cr.clampedPlan.Entries {
 			if e.Phase == string(next) {
@@ -121,7 +122,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 			break
 		}
 		if err != nil {
-			attemptExits = append(attemptExits, bridgeExitCode(err))
+			attemptExits = append(attemptExits, quotaExit(err))
 			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
 				if retryHooks.quotaExhausted(attemptExits) {
 					return dispatchResult{}, loopAbort, cr.pauseForQuota(next, resp, attempt, err)

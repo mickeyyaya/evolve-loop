@@ -21,8 +21,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-const terminationField = "termination_reason"
-
 var (
 	runDirName      = regexp.MustCompile(`^cycle-(\d+)$`)
 	landingFileName = regexp.MustCompile(`^cycle-(\d+)\.json$`)
@@ -164,8 +162,10 @@ func applySignals(c *Cycle, path string) []string {
 		c.StartedAt = earliest(c.StartedAt, eventTime(e))
 		switch e.Kind {
 		case signalcenter.KindCycleSealed:
-			c.Verdict, c.EndedAt = e.Fields[cyclestate.SealedVerdictField], eventTime(e)
-			c.Termination = e.Fields[terminationField]
+			if verdict := e.Fields[cyclestate.SealedVerdictField]; verdict != "" || c.Verdict == "" {
+				c.Verdict, c.EndedAt = verdict, eventTime(e)
+				c.Termination = e.Fields[cyclestate.SealedTerminationField]
+			}
 		case signalcenter.KindQuotaPaused:
 			c.QuotaPauses++
 		case signalcenter.KindShipError:

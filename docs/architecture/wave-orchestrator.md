@@ -238,6 +238,11 @@ The live partition is file-disjoint (F2.8). File-based parallel agents gain noth
 7. **The test.** A todo is admissible when it conflicts with no lane in flight and with no todo admitted before it. `Admit` records the cells of each decision and the lane or todo that blocks it.
 8. **The release.** `ship.landed`, a lane failure or a lane stop removes the lane from the in-flight list (§9).
 9. **Rank order.** The step takes the todos in `inboxrank` order. It stops after `scan_k` admitted todos (§12). A todo that waits keeps its rank. It does not lose its place to a later todo of lower rank when its cell frees.
+10. **The id family.** The first hyphen token of a todo id is its family.
+    - Example: the family of `context-fill-cap` is `context`.
+    - The family is a cell of capacity 1. Two todos of one family conflict under both rules. An id without a hyphen has no family.
+    - The cause is cycle 1484. A `context-fill` lane changed a contract under its sibling lane. The files of the two lanes were disjoint.
+    - The cell is `family:<token>`. The census refusal and `LOOP_ORCH_ADMIT_WAIT` name it ([internal-admission.md](packages/internal-admission.md) §Id family).
 
 The cell table is the shared view of all lanes in flight that the console has by hand today (F2.15). `evolve wave status` prints it (plan O7).
 
@@ -389,6 +394,8 @@ A stop must not be a broad kill. The orchestrator stops only the lane that its o
 
 The port is in `cmd/evolve`, because the orchestrator package imports no `os/exec`, `sysexec` or `proctree`.
 
+After the reap, the pool seals the cycle of the stopped lane with the termination `stopped: lane deadline` (§11, "The seal of a deadline stop"). Then it releases the inbox claim.
+
 ## 9. The oversight loop
 
 ### Issue
@@ -499,10 +506,15 @@ The facts:
 - **The run window.** It starts at the `started_at` of the wave record. It ends at `ended_at`, else at the next record's `started_at`. A current run whose loop is not live ends at the mtime of its loop log. `wave next` uses the same rule to close a wave.
 - **The one exception to "reads state and signals".** `wave status` reads the mtime of the loop log for the run end. It reads the metadata only, never the text. A live run ends at the clock.
 - **A lane interval.** When the run has pool signals, the pool gives each interval. A `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens a lane, and the next `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it (`wave.MeasureFacts`). The cycles then give only `landed` and the conflicts.
-  - Why: a lane that the lease stops at its deadline has no `cycle.sealed`. In wave 130 the cycles 1955 and 1957 thus stayed in flight, and `wave status` printed `width 3/4 · utilization 0.83` while the pool ran 1 lane of 4. The pool signals give `width 1/4` (`TestWaveStatus_Wave130CountsTheLiveLanesFromThePool`).
+  - Why: before 2026-10-21 a lane that the lease stopped at its deadline had no `cycle.sealed`. In wave 130 the cycles 1955 and 1957 thus stayed in flight, and `wave status` printed `width 3/4 · utilization 0.83` while the pool ran 1 lane of 4. The pool signals give `width 1/4` (`TestWaveStatus_Wave130CountsTheLiveLanesFromThePool`).
   - The pool signals of a run have the `pid` of the wave record. Their time is from the run ID to the run end (`wave.loopRunOf`). `wave next` writes the record after the loop starts. In wave 137 the three first lanes launched at 06:41:09Z, and `started_at` is 06:41:11.72Z. A cutoff at `started_at` dropped them, and `wave status` printed `width 0/4` with a lane live. The match by `pid` gives `width 2/4` (`TestWaveStatus_Wave137CountsTheLanesThatLaunchedBeforeTheRecord`).
   - The measure clips each lane to the run window.
   - A run with no pool signals uses the span of the cycle's signals: from the first event to `cycle.sealed`. The phase times of the cycle dossier widen it. A lane with no seal and no dossier is in flight, and it ends at the end of the run window.
+- **The seal of a deadline stop.** The loop seals the cycle of a stopped lane. After the reap, `Pool.recover` finds the cycle of the lane (`orchestrator.LaneCycle`). It publishes one `cycle.sealed` with `termination_reason: stopped: lane deadline` and no final verdict. The loop signal center writes it to `.evolve/runs/cycle-N/signals.ndjson`, the stream that `core` seals into. Thus the loop adds no new writer.
+  - The lane process cannot seal itself. Its context is cancelled, and `abnormalEpilogue` writes no seal for a cancelled cycle (`internal/core/cyclerun_epilogue.go:24`).
+  - The seal has no verdict, because no audit judged the work. The cycle shows `Termination: stopped: lane deadline`.
+  - When no cycle holds the lane, the pool publishes `LOOP_ORCH_LANE_RECOVERY_FAILED` with `step: seal` (`TestPool_AStoppedLaneWithNoLocatedCycleSaysSoLoudly`).
+  - `wave status`, `wave watch` and `wave next` read the cycles through one function, `wave.ReadRunCycles`. It applies `wave.ApplyLaneDeadlines` as the fallback for a run with no seal, for example wave 130. The fallback changes no cycle that has a verdict or a termination (`TestReadRunCycles_TheLoopSealHoldsAndTheDeadlineSignalIsTheFallback`, `TestWaveWatchAndNext_Wave130ApplyTheDeadlineStopsLikeWaveStatus`).
 - **The sized width.** The loop writes one INFO `loop.wave` record at each sizing, with `fields.width_sized` and `fields.desired`, to `.evolve/signals.ndjson`. Before O7, no record held the sized width. The loop log has the line `wave count X -> Y`, but `wave status` reads state and signals, never the text log. A run from before O7 thus shows `width_source: policy`.
 
 The conflict rate is the main measure of G2 (P3.3, P3.8). No outside source gives a good predictor of conflicts, so the loop measures its own rate.

@@ -264,7 +264,7 @@ var protectedMembership = guards.IsProtectedSurface
 func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) (applied string, err error) {
 	switch {
 	case result.FinalVerdict == cyclestate.VerdictFAIL:
-		return "failure outcome", applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycle, signals)
+		return "failure outcome", applyResultFailureOutcome(result, projectRoot, evolveDir, stderr, lifecycle, signals)
 	case core.IsTriageNoWorkResult(result):
 		return "no-work hand-off", applyCycleNoWorkOutcome(projectRoot, result.Cycle, stderr, lifecycle, signals)
 	}
@@ -285,11 +285,16 @@ func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, li
 }
 
 func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
-	if cycle == 0 {
+	return applyResultFailureOutcome(core.CycleResult{Cycle: cycle}, projectRoot, evolveDir, stderr, lifecycle, signals)
+}
+
+func applyResultFailureOutcome(result core.CycleResult, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
+	if result.Cycle == 0 {
 		return nil
 	}
-	in := cycleoutcome.FailureInputsFor(projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr)
+	in := cycleoutcome.FailureInputsFor(projectRoot, evolveDir, cycleWorkspace(projectRoot, result.Cycle), result.Cycle, stderr)
 	in.Protected = protectedMembership
+	in.Defer, _ = core.DeferOf(result)
 	_, err := cycleoutcome.ApplyFailure(in.WithLedger(lifecycle).WithSignals(signals))
 	return err
 }
@@ -501,7 +506,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		reviewers = append(reviewers, floor)
 	}
 	if cfg.EvalGate != config.StageOff {
-		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate))
+		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate, evalgate.WithConsoleFollowupFiler(hostFollowupFiler(ld, signals, forbidden, pol.InboxPriorityConfig().ClassOrder))))
 	}
 	if cfg.ContractGate != config.StageOff {
 		rev := deliverable.NewReviewerWithCatalogStageReportSize(
@@ -602,6 +607,13 @@ func continuationForScope(root string, cycle int, scopeIDs []string) *continuati
 func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) deliverable.Claimer {
 	return func(inboxDir string, cycle int, ids []string) error {
 		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden}, cycle, ids)
+	}
+}
+
+func hostFollowupFiler(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool, classes []string) evalgate.ConsoleFollowupFiler {
+	return func(projectRoot string, raw []byte) error {
+		_, err := inboxmover.File(inboxmover.Options{ProjectRoot: projectRoot, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden, PriorityClasses: classes}, raw)
+		return err
 	}
 }
 

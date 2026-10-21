@@ -5,9 +5,18 @@ import (
 	"strings"
 )
 
+type Roots struct {
+	Claude string
+	Agy    string
+}
+
 func DefaultResolver(configRoot string) func(Window) (Result, error) {
+	return Resolver(Roots{Claude: configRoot, Agy: AgyDataRoot(nil)}, SQLiteCLI)
+}
+
+func Resolver(roots Roots, query SQLiteQuery) func(Window) (Result, error) {
 	return func(w Window) (Result, error) {
-		r := Chain(driverChain(configRoot, w)...)
+		r := Chain(driverChain(roots, query, w)...)
 		if r.Source == SourceNone {
 			r.Warn = fmt.Sprintf("token usage uncovered for driver %q — no transcript/events/scrollback data (fail-open, recorded as unmeasured not zero-cost)", driverLabel(w.Driver))
 			r.FillPct = FillPctUnmeasured
@@ -18,19 +27,23 @@ func DefaultResolver(configRoot string) func(Window) (Result, error) {
 	}
 }
 
-func driverChain(configRoot string, w Window) []Collector {
+func driverChain(roots Roots, query SQLiteQuery, w Window) []Collector {
 	if isClaudeDriver(w.Driver) {
 		return []Collector{
-			TranscriptCollector(configRoot, w),
+			TranscriptCollector(roots.Claude, w),
 			EventsResultCollector(w.EventsLogPath),
 			ScrollbackPeakCollector(w.Scrollback),
 		}
 	}
-	return []Collector{
+	chain := []Collector{
 		EventsResultCollector(w.EventsLogPath),
 		ScrollbackPeakCollector(w.Scrollback),
 		TokenLinePeakCollector(w.Scrollback, w.TokenLineRegex),
 	}
+	if strings.HasPrefix(w.Driver, "agy") {
+		chain = append([]Collector{AgyConversationCollector(roots.Agy, w, query)}, chain...)
+	}
+	return chain
 }
 
 func isClaudeDriver(driver string) bool {

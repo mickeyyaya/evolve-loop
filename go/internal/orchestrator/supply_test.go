@@ -524,3 +524,24 @@ func TestSupplyRecord_AFailedLockAndAFailedWriteAreErrorsThatNameTheRecord(t *te
 		}
 	}
 }
+
+func TestSupply_RecordsATodoHeldBehindASiblingOfItsIDFamily(t *testing.T) {
+	root := t.TempDir()
+	inbox := filepath.Join(root, ".evolve", "inbox")
+	writeItem(t, inbox, "ctx-cap", map[string]any{"files": fileIn("alpha")})
+	writeItem(t, inbox, "ctx-telemetry", map[string]any{"files": fileIn("beta")})
+	writeItem(t, inbox, "other-item", map[string]any{"files": fileIn("gamma")})
+
+	got, err := newCensus(t, root, nil, &eventLog{}).Take()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Counts[ClassAdmissible] != 2 || got.Counts[ClassWaitingCell] != 1 || len(got.Refusals) != 1 {
+		t.Fatalf("counts = %v, refusals = %+v, want ctx-telemetry alone held: alpha and beta are disjoint packages", got.Counts, got.Refusals)
+	}
+	r := got.Refusals[0]
+	if r.ID != "ctx-telemetry" || r.Class != ClassWaitingCell || !strings.Contains(r.Reason, "family:ctx") || !strings.Contains(r.Reason, "held by ctx-cap") {
+		t.Errorf("refusal = %+v, want ctx-telemetry waiting on the family:ctx cell held by ctx-cap", r)
+	}
+}

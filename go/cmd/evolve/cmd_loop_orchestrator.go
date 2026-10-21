@@ -18,7 +18,7 @@ import (
 const laneTimeWindow = 50
 
 func newLaneLeases(projectRoot string, oc policy.OrchestratorConfig, publish orchestrator.Publish, warn io.Writer) (*orchestrator.Leases, orchestrator.LeaseConfig) {
-	runs := filepath.Dir(paths.RunWorkspace(projectRoot, 0))
+	runs := laneRunsDir(projectRoot)
 	times, err := orchestrator.LaneTimes(runs, laneTimeWindow)
 	if err != nil {
 		fmt.Fprintf(warn, "[loop] WARN: orchestrator: no lane times (%v); the lease deadline is the %d-minute floor\n", err, oc.DeadlineFloorMinutes)
@@ -30,6 +30,15 @@ func newLaneLeases(projectRoot string, oc policy.OrchestratorConfig, publish orc
 	}
 	fmt.Fprintf(warn, "[loop] orchestrator: lane lease (stage %s): deadline %s from %d lane time(s), stall %s\n", cfg.Stage, cfg.Deadline, len(times), cfg.Stall)
 	return orchestrator.NewLeases(cfg, orchestrator.SystemClock{}, orchestrator.RunsHeartbeat(runs), publish), cfg
+}
+
+func laneRunsDir(projectRoot string) string {
+	return filepath.Dir(paths.RunWorkspace(projectRoot, 0))
+}
+
+func laneLocator(projectRoot string) func(orchestrator.Lane) (int, bool) {
+	runs := laneRunsDir(projectRoot)
+	return func(lane orchestrator.Lane) (int, bool) { return orchestrator.LaneCycle(runs, lane) }
 }
 
 func (b *loopBatchCoordinator) laneLeases(oc policy.OrchestratorConfig) *orchestrator.Leases {
@@ -54,25 +63,27 @@ func (b *loopBatchCoordinator) poolHalted() bool {
 }
 
 func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fleet.LaunchFn, iteration int) orchestrator.Pool {
-	holders := orchestrator.NewReachHolders()
+	holders, families := orchestrator.NewReachHolders(), orchestrator.NewFamilyHolds()
 	return orchestrator.Pool{
 		Target: fc.Count, Concurrency: fc.Concurrency, MaxLanes: fc.Orchestrator.RunMaxLanes,
-		MinLanes: fc.MinLanes,
-		Admit:    b.cellAdmission(fc.Orchestrator, iteration, holders.Record),
-		Holders:  holders,
-		Freshen:  b.wave().Freshen(),
-		Launch:   launch,
-		Leases:   b.laneLeases(fc.Orchestrator),
-		Claims:   b.wave().Claims(),
-		Reap:     b.laneReap(),
-		Publish:  b.deps.Signals.Emit,
-		Halted:   b.poolHalted,
-		Stage:    fc.Orchestrator.Stage,
-		Window:   b.laneWindow(fc),
+		MinLanes:    fc.MinLanes,
+		Admit:       b.cellAdmission(fc.Orchestrator, iteration, holders.Record, families.Record),
+		Holders:     holders,
+		FamilyHolds: families,
+		Freshen:     b.wave().Freshen(),
+		Launch:      launch,
+		Leases:      b.laneLeases(fc.Orchestrator),
+		Claims:      b.wave().Claims(),
+		Reap:        b.laneReap(),
+		Locate:      laneLocator(b.cfg.ProjectRoot),
+		Publish:     b.deps.Signals.Emit,
+		Halted:      b.poolHalted,
+		Stage:       fc.Orchestrator.Stage,
+		Window:      b.laneWindow(fc),
 	}
 }
 
-func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, iteration int, onOptimistic func(admission.ShadowAdmission)) orchestrator.Admit {
+func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, iteration int, onOptimistic func(admission.ShadowAdmission), onWait func(admission.Decision)) orchestrator.Admit {
 	graph, err := b.moduleGraph(oc, iteration)
 	if err != nil {
 		fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: pool %d admits by the file rule; the module graph did not load: %v\n", iteration, err)
@@ -81,7 +92,7 @@ func (b *loopBatchCoordinator) cellAdmission(oc policy.OrchestratorConfig, itera
 	return orchestrator.AdmitByCell(admission.Admitter{
 		Graph: graph, Text: b.wave().InboxText(iteration),
 		Optimistic: oc.OptimisticAdmission(), OnShadow: orchestrator.RecordShadow(b.deps.Signals.Emit),
-		OnOptimistic: onOptimistic,
+		OnOptimistic: onOptimistic, OnWait: onWait,
 	})
 }
 

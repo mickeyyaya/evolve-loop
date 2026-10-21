@@ -160,7 +160,7 @@ func TestPhaseRequest_FlagAndCycleFailuresMapToExitCodes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var stderr bytes.Buffer
 
-			req, code := phaseRequest(tc.flags, nil, &stderr)
+			req, code := phaseRequest("scout", tc.flags, nil, &stderr)
 
 			if code != tc.wantCode {
 				t.Fatalf("code=%d, want %d (stderr=%q)", code, tc.wantCode, stderr.String())

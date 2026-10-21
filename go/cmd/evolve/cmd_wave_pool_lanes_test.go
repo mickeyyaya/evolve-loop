@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -111,5 +112,56 @@ func TestWaveStatus_Wave137CountsTheLanesThatLaunchedBeforeTheRecord(t *testing.
 		if rc != 0 || !strings.Contains(out, want) {
 			t.Errorf("rc = %d; stdout lacks %q:\n%s", rc, want, out)
 		}
+	}
+}
+
+func TestWaveWatchAndNext_Wave130ApplyTheDeadlineStopsLikeWaveStatus(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	p.seedWave130()
+	h := newWaveHarness()
+
+	watchRC := h.run("watch", "--project-root", p.root)
+	watch := h.stdout.String()
+	nextRC := h.run("next", "--dry-run", "--json", "--project-root", p.root)
+	goal := decodeWaveEnvelope(t, h.stdout.Bytes()).Goal
+
+	for _, id := range []int{1955, 1957} {
+		if want := fmt.Sprintf("wave 130: cycle %d: stopped: lane deadline\n", id); watchRC != 0 || !strings.Contains(watch, want) {
+			t.Errorf("watch rc = %d; stdout lacks %q:\n%s", watchRC, want, watch)
+		}
+		if want := fmt.Sprintf("- Cycle %d: no final verdict. Termination: stopped: lane deadline.", id); nextRC != 0 || !strings.Contains(goal, want) {
+			t.Errorf("next rc = %d; goal lacks %q:\n%s", nextRC, want, goal)
+		}
+	}
+	if strings.Contains(watch, "cycle 1963: stopped") || !strings.Contains(goal, "- Cycle 1963: no final verdict. Last phase: build.") {
+		t.Errorf("cycle 1963 had no deadline stop; watch:\n%s\ngoal:\n%s", watch, goal)
+	}
+}
+
+func TestWaveStatus_Wave130TheLoopSealOfADeadlineStopHoldsOverTheSignal(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	p.seedWave130()
+	seal := `{"schema_version":"1.0","seq":3,"pid":20898,"ts":"2026-10-19T02:02:31Z","module":"loop","origin":"Pool.seal","kind":"cycle.sealed","severity":"INFO","reason":"r","fields":{"termination_reason":"stopped: lane deadline","todo":"landing-s1-readonly-redesign-lane"}}` + "\n"
+	body, err := os.ReadFile(p.root + "/.evolve/runs/cycle-1955/signals.ndjson")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.write(".evolve/runs/cycle-1955/signals.ndjson", string(body)+seal)
+	h := newWaveHarness()
+
+	rc := h.run("status", "--json", "--project-root", p.root)
+
+	var report waveStatusReport
+	if err := json.Unmarshal(h.stdout.Bytes(), &report); err != nil || rc != 0 {
+		t.Fatalf("rc = %d, decode %v:\n%s", rc, err, h.stdout.String())
+	}
+	stopped := map[int]string{}
+	for _, c := range report.Cycles {
+		stopped[c.ID] = c.Termination
+	}
+	if stopped[1955] != "stopped: lane deadline" || stopped[1957] != "stopped: lane deadline" || stopped[1963] != "" {
+		t.Errorf("terminations = %v, want 1955 by its loop seal and 1957 by the deadline signal", stopped)
 	}
 }

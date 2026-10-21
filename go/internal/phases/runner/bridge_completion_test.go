@@ -31,7 +31,7 @@ func TestRun_DispatchesTheCompletionContractTheRequestNames(t *testing.T) {
 		{"a first dispatch keeps the artifact contract", "build",
 			core.PhaseRequest{Worktree: t.TempDir()}, ""},
 		{"a read-only correction keeps the artifact contract", "audit",
-			core.PhaseRequest{Worktree: t.TempDir(), CorrectionDirective: "fix the verdict", WorktreeReadOnly: true}, ""},
+			core.PhaseRequest{Worktree: t.TempDir(), CorrectionDirective: "fix the verdict", Fence: &core.WorktreeFence{}}, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

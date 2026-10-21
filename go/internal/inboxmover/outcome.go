@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 )
 
@@ -20,6 +21,7 @@ type CycleOutcome struct {
 	Ceiling      int
 	SystemLevel  bool
 	Routed       bool
+	RoutedIDs    []string
 	FailureClass string
 	Fingerprint  string
 }
@@ -71,18 +73,12 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	}
 
 	ClaimLaneScope(opts, oc.Cycle, committed)
-	var committedSet map[string]bool
-	if len(committed) > 0 {
-		committedSet = make(map[string]bool, len(committed))
-		for _, id := range committed {
-			committedSet[id] = true
-		}
-	}
 	rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, &quarantinePolicy{
 		Ceiling:      oc.Ceiling,
 		SystemLevel:  oc.SystemLevel,
 		Routed:       oc.Routed,
-		Committed:    committedSet,
+		RoutedIDs:    idSet(oc.RoutedIDs),
+		Committed:    idSet(committed),
 		FailureClass: oc.FailureClass,
 		Fingerprint:  oc.Fingerprint,
 	})
@@ -122,9 +118,7 @@ func CommittedIDs(body []byte) []string {
 		TopN []struct {
 			ID string `json:"id"`
 		} `json:"top_n"`
-		SkipShipped []struct {
-			TaskID string `json:"task_id"`
-		} `json:"skip_shipped"`
+		committedset.SkipShippedBucket
 	}
 	if json.Unmarshal(body, &d) != nil {
 		return nil
@@ -158,12 +152,7 @@ func DeferredIDs(body []byte) []string {
 var closedDropReasons = []string{"already-shipped", "already-done", "already-landed", "duplicate", "superseded", "obsolete"}
 
 func ClosedDroppedIDs(body []byte) []string {
-	var d struct {
-		Dropped []struct {
-			ID     string `json:"id"`
-			Reason string `json:"reason"`
-		} `json:"dropped"`
-	}
+	var d committedset.DroppedBucket
 	if json.Unmarshal(body, &d) != nil {
 		return nil
 	}
@@ -207,4 +196,15 @@ func dedupeIDs(ids []string) []string {
 		return nil
 	}
 	return out
+}
+
+func idSet(ids []string) map[string]bool {
+	if len(ids) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		set[id] = true
+	}
+	return set
 }

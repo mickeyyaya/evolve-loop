@@ -375,12 +375,15 @@ func TestClassifyHolder_TheRunningLoopsGoalSupersedesAPauseOfAnotherGoal(t *test
 	}
 }
 
-func TestClassifyHolder_FollowsLoopResumeOnAMovedHeadAndAMissingPhase(t *testing.T) {
+func TestClassifyHolder_KeepsAPausedClaimWhoseMainMovedAndFollowsLoopResumeOnAMissingPhase(t *testing.T) {
 	repo := gittest.Fixture(t)
 	repo.Git("commit", "-q", "--allow-empty", "-m", "seed")
+	base := repo.Git("rev-parse", "HEAD")
+	repo.Git("commit", "-q", "--allow-empty", "-m", "a console merge")
+	head := repo.Git("rev-parse", "HEAD")
+	repo.Git("update-ref", "refs/remotes/origin/main", head)
 	root := repo.Dir
 	opts := Options{ProjectRoot: root, Now: func() time.Time { return claimsNow }}
-	head := repo.Git("rev-parse", "HEAD")
 	worktree := filepath.Join(root, "wt")
 	writeFile(t, filepath.Join(worktree, ".keep"), "")
 	cases := []struct {
@@ -389,7 +392,7 @@ func TestClassifyHolder_FollowsLoopResumeOnAMovedHeadAndAMissingPhase(t *testing
 		wantReason       string
 	}{
 		{"the head did not move", `{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"` + head + `","worktreePath":"` + worktree + `"}`, HolderResumePending, "paused (quota-likely)"},
-		{"the boundary moved the head", `{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"0000000000000000000000000000000000000000","worktreePath":"` + worktree + `"}`, HolderStale, "git HEAD moved"},
+		{"main moved past the base", `{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"` + base + `","worktreePath":"` + worktree + `"}`, HolderResumePending, "paused (quota-likely)"},
 		{"no resumeFromPhase", `{"enabled":true,"reason":"quota-likely","gitHead":"` + head + `"}`, HolderStale, "resumeFromPhase missing"},
 	}
 	for _, tc := range cases {

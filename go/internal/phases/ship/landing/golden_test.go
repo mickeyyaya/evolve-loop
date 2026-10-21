@@ -64,7 +64,7 @@ func leafWindow(argv []string) []string {
 	}
 	var out []string
 	for _, a := range argv[start:] {
-		if strings.HasPrefix(a, "rev-parse HEAD^{tree}") {
+		if strings.HasPrefix(a, "rev-parse HEAD^{tree}") || strings.Contains(a, " diff-tree -r --no-commit-id ") {
 			break
 		}
 		out = append(out, a)

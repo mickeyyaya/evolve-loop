@@ -28,7 +28,7 @@ func TestLoadResumeState_AnotherTreesLaneOverrideDoesNotStopDiscovery(t *testing
 	}
 	writeStateFile(t, filepath.Join(evolveDir, "runs", "cycle-1582"), fleetCheckpointState(1582, "2026-08-29T04:55:00Z", "triage", wt))
 
-	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{})
+	rp, err := LoadResumeState(context.Background(), tmp, evolveDir, ResumeOptions{MaxAge: unboundedAge})
 	if err != nil {
 		t.Fatalf("this tree's own per-run checkpoint went undiscovered under another tree's override: %v", err)
 	}

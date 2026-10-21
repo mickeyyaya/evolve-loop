@@ -25,10 +25,20 @@ type reviewer struct {
 	logf  func(format string, args ...any)
 }
 
-func NewReviewer(stage config.Stage) core.DeliverableReviewer {
+type Option func(*options)
+
+type options struct {
+	fileFollowup ConsoleFollowupFiler
+}
+
+func NewReviewer(stage config.Stage, opts ...Option) core.DeliverableReviewer {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
 	return &reviewer{
 		stage: stage,
-		gates: []gate{materializationGate{}, qualityGate{}, floorBindingGate{}, flakyShapeGate(), unsatisfiableShapeGate()},
+		gates: []gate{materializationGate{}, qualityGate{}, floorBindingGate{}, flakyShapeGate(), unsatisfiableShapeGate(), protectedACGate{file: o.fileFollowup}},
 		logf:  func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
 	}
 }

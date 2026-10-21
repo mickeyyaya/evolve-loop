@@ -153,21 +153,11 @@ func orderIndex(order []string, phase string) int {
 }
 
 func (o *Orchestrator) worktreePhase(p Phase) bool {
-	if WorktreePhase(p) {
-		return true
-	}
-	if spec, ok := o.catalog.Get(string(p)); ok {
-		return spec.WritesSource
-	}
-	return false
+	return PhaseWritesSource(p, o.catalog)
 }
 
-func (o *Orchestrator) worktreeReadOnly(p Phase) bool { return !o.worktreePhase(p) }
-
-func (o *Orchestrator) withWorktreeFence(req PhaseRequest, next Phase, cs CycleState) PhaseRequest {
-	req.WorktreeReadOnly = o.worktreeReadOnly(next)
-	req.WorktreeWritablePaths = worktreeWritablePaths(next, cs)
-	return req
+func (o *Orchestrator) fenceFor(p Phase, cs CycleState) *WorktreeFence {
+	return FenceFor(o.worktreePhase(p), worktreeWritablePaths(p, cs))
 }
 
 func (o *Orchestrator) leakRecoverablePhase(p Phase) bool {

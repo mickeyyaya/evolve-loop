@@ -62,7 +62,7 @@ func TestRunner_ASourceWriterThatLoadedTheSelfReviewSkillOwesASelfReviewSection(
 			fb := &fakeBridge{writeArtifact: tc.report}
 			r := New(Options{Hooks: hooks, Bridge: fb, Prompts: fakePromptsFS(tc.agent, "x"),
 				Signals: func() *signalcenter.Center { return center }})
-			req := core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir(), Cycle: 42, Signals: tc.signals, WorktreeReadOnly: tc.readOnly, WorktreeWritablePaths: tc.writable}
+			req := core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir(), Cycle: 42, Signals: tc.signals, Fence: core.FenceFor(!tc.readOnly, tc.writable)}
 			resp, err := r.Run(context.Background(), req)
 			if err != nil {
 				t.Fatalf("Run: %v", err)

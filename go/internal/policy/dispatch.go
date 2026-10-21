@@ -110,7 +110,12 @@ type BridgePolicy struct {
 	ScrollbackLines       int            `json:"scrollback_lines,omitempty"`
 	PhaseArtifactTimeoutS map[string]int `json:"phase_artifact_timeout_s,omitempty"`
 	AnthropicBaseURL      string         `json:"anthropic_base_url,omitempty"`
+	ModelFailover         string         `json:"model_failover,omitempty"`
 }
+
+const ModelFailoverStageOn = "on"
+
+func (b BridgePolicy) ModelFailoverOn() bool { return b.ModelFailover == ModelFailoverStageOn }
 
 const (
 	effortLow    = "low"

@@ -27,6 +27,7 @@ type routingWriteFlags struct {
 	effort    string
 	maxTier   string
 	maxEffort string
+	sharePct  int
 	dryRun    bool
 }
 
@@ -68,6 +69,7 @@ func parseRoutingWriteFlags(verb string, args []string, stderr io.Writer) (routi
 	fs.StringVar(&f.effort, "effort", "", "set tiers.<tier> or agents.<agent>: the reasoning effort (low, medium, high, xhigh, max)")
 	fs.StringVar(&f.maxTier, "max-tier", "", "set agents.<agent>: the highest tier the retry ladder reaches (default deep)")
 	fs.StringVar(&f.maxEffort, "max-effort", "", "set agents.<agent>: the highest effort the retry ladder reaches (default high)")
+	fs.IntVar(&f.sharePct, "share-pct", 0, "set tiers.<tier>: the percent of the seats of the tier that the first family of its clis takes (1 to 99)")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the result and write nothing")
 	rest, err := cmdutil.ParseInterspersed(fs, args)
 	if err != nil {
@@ -89,7 +91,7 @@ func routingEditFor(verb string, f routingWriteFlags, rest []string, rewrites ma
 		return initRoutingEdit(splitRoutingList(f.clis), dir, rewrites), nil
 	case verb == "set" && len(rest) == 2:
 		return setRoutingEdit(f.routingSet(rest[0], splitRoutingList(rest[1]))), nil
-	case verb == "set" && len(rest) == 1 && (f.effort != "" || f.maxTier != "" || f.maxEffort != ""):
+	case verb == "set" && len(rest) == 1 && (f.effort != "" || f.maxTier != "" || f.maxEffort != "" || f.sharePct != 0):
 		return setRoutingEdit(f.routingSet(rest[0], nil)), nil
 	case verb == "unset" && len(rest) == 1:
 		return unsetRoutingEdit(rest[0]), nil
@@ -100,7 +102,7 @@ func routingEditFor(verb string, f routingWriteFlags, rest []string, rewrites ma
 }
 
 func (f routingWriteFlags) routingSet(key string, values []string) routingSet {
-	return routingSet{key: key, values: values, model: f.model, effort: f.effort, maxTier: f.maxTier, maxEffort: f.maxEffort}
+	return routingSet{key: key, values: values, model: f.model, effort: f.effort, maxTier: f.maxTier, maxEffort: f.maxEffort, sharePct: f.sharePct}
 }
 
 func splitRoutingList(value string) []string {

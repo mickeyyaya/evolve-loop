@@ -30,6 +30,7 @@ func execAdapterDeps(env map[string]string) gobridge.Deps {
 		RecoveryStage:  recoveryStage,
 		FatalPaneStage: fatalPaneStage,
 		Efforts:        pol.Efforts(),
+		ModelChain:     gobridge.ModelChainFor(pol.BridgeConfig().ModelFailoverOn()),
 	}
 }
 

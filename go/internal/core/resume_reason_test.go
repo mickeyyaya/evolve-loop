@@ -33,14 +33,13 @@ func TestCheckpointResumable_IsTheRuleLoopResumeApplies(t *testing.T) {
 		}
 		return p
 	}
-	head := func(string) (string, error) { return "abc123\n", nil }
-	opts := ResumeOptions{CurrentHead: head}
+	opts := ResumeOptions{MainAhead: mainAheadOf(map[string]int{"abc123": 0, "def456": 2})}
 	cases := []struct {
 		name, body string
 		wantErr    error
 	}{
 		{"resumable", `{"cycle_id":7,"phase":"tdd","checkpoint":{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"abc123","worktreePath":"` + worktree + `"}}`, nil},
-		{"head moved", `{"cycle_id":7,"phase":"tdd","checkpoint":{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"def456"}}`, ErrStaleCheckpoint},
+		{"main moved", `{"cycle_id":7,"phase":"tdd","checkpoint":{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","gitHead":"def456","worktreePath":"` + worktree + `"}}`, nil},
 		{"no resumeFromPhase", `{"cycle_id":7,"phase":"tdd","checkpoint":{"enabled":true,"reason":"quota-likely"}}`, ErrStaleCheckpoint},
 		{"worktree gone", `{"cycle_id":7,"phase":"tdd","checkpoint":{"enabled":true,"reason":"quota-likely","resumeFromPhase":"tdd","worktreePath":"` + filepath.Join(dir, "gone") + `"}}`, ErrStaleCheckpoint},
 		{"disabled", `{"cycle_id":7,"phase":"tdd","checkpoint":{"enabled":false,"resumeFromPhase":"tdd"}}`, ErrNoCheckpoint},

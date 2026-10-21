@@ -36,7 +36,7 @@ func TestRun_VerdictDiagnostics_OrderIsClassifyFenceViolationsReconcileOverride(
 	var counts probeCounts
 	r := New(Options{Hooks: hooks, Bridge: &goldenBridge{fileContent: unverifiedReport, stdout: panePASS}, Prompts: fakePromptsFS("evolve-auditor", "x"),
 		VerifyFn: verifySpec{kind: verifyNotOK, codes: []string{"a_code"}}.fn(&counts)})
-	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: t.TempDir(), WorktreeReadOnly: true})
+	resp, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir(), Worktree: t.TempDir(), Fence: &core.WorktreeFence{}})
 	if err != nil {
 		t.Fatal(err)
 	}

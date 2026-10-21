@@ -87,3 +87,5 @@
 ./internal/mergewindow 100
 ./internal/ledgertip 100
 ./internal/builddiff 100
+./internal/researchindex 100
+./internal/auditcascade 100

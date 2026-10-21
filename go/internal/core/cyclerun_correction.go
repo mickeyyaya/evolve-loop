@@ -34,9 +34,14 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		}
 		corr := 0
 		salvagedFromInvalid := ""
+		var prevPredicates []string
 		for !rr.Approve {
 			if diag, ok := cr.provenBlocker(next, rin, rr); ok {
 				return cr.endOnProvenBlocker(next, dr, diag)
+			}
+			predicates := acsPredicateFailures(rr.Failures, cr.cycle)
+			if cr.predicateDefectRepeats(next, dr, prevPredicates, predicates) {
+				return cr.routePredicateDefectToTDD(dr, predicates), nil
 			}
 			act := nextCorrection(interaction.CorrectionInput{
 				Phase:      string(next),
@@ -92,6 +97,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				continue
 			}
 			corr++
+			prevPredicates = predicates
 			fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
 				next, corr, maxCorrections, rr.Reason)
 			salvageRetry := false

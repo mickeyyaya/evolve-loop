@@ -36,6 +36,7 @@ type Policy struct {
 	PR                 *PRPolicy                 `json:"pr,omitempty"`
 	Bridge             *BridgePolicy             `json:"bridge,omitempty"`
 	QuotaReset         *QuotaResetConfig         `json:"quota_reset,omitempty"`
+	Resume             *ResumeConfig             `json:"resume,omitempty"`
 	Dispatch           *DispatchConfig           `json:"dispatch,omitempty"`
 	CLIHealth          *CLIHealthConfig          `json:"cli_health,omitempty"`
 	Workflow           *WorkflowPolicy           `json:"workflow,omitempty"`
@@ -73,4 +74,5 @@ type Policy struct {
 	Wave               *WavePolicy               `json:"wave,omitempty"`
 	AttemptPostmortem  *AttemptPostmortemPolicy  `json:"attempt_postmortem,omitempty"`
 	Handoff            *HandoffPolicy            `json:"handoff,omitempty"`
+	AuditCascade       *AuditCascadePolicy       `json:"audit_cascade,omitempty"`
 }

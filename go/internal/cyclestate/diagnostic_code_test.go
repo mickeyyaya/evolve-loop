@@ -30,6 +30,7 @@ func TestDiagCodes_TriageRefusalVocabulary(t *testing.T) {
 		DiagCodeTriageLanePinMissing:    "TRIAGE_LANE_PIN_MISSING",
 		DiagCodeProtectedPredicateRoute: "PROTECTED_PREDICATE_ROUTE",
 		DiagCodeBlockerRoute:            "BLOCKER_ROUTE",
+		DiagCodeBuildRejected:           "BUILD_DELIVERABLE_REJECTED",
 	}
 	for got, spelled := range want {
 		if got != spelled {
@@ -62,6 +63,7 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		{DiagCodeTriageProtectedSurface, true, true, false},
 		{DiagCodeProtectedPredicateRoute, true, true, false},
 		{DiagCodeBlockerRoute, true, true, true},
+		{DiagCodeBuildRejected, true, false, false},
 		{DiagCodeTriageTopNEmpty, true, false, false},
 		{DiagCodeTriageCommitmentInvalid, false, false, false},
 		{DiagCodeTriageScopeUnanswered, true, false, false},
@@ -87,5 +89,13 @@ func TestCycleTerminationTriageClaimFailed_IsTheSealedSpelling(t *testing.T) {
 func TestCycleTerminationBlockedNeedsConsole_IsTheSealedSpelling(t *testing.T) {
 	if CycleTerminationBlockedNeedsConsole != "blocked-needs-console" {
 		t.Errorf("the sealed termination reason is %q", CycleTerminationBlockedNeedsConsole)
+	}
+}
+
+func TestRefusalDisposition_OnlyTheBuildRejectionYieldsToInfrastructure(t *testing.T) {
+	for _, code := range []string{DiagCodeTriageProtectedSurface, DiagCodeProtectedPredicateRoute, DiagCodeBlockerRoute, DiagCodeTriageTopNEmpty, DiagCodeTriageCommitmentInvalid, DiagCodeTriageScopeUnanswered, DiagCodeTriageLanePinMissing, DiagCodeBuildRejected} {
+		if got, want := RefusalDisposition(code).YieldsToInfra, code == DiagCodeBuildRejected; got != want {
+			t.Errorf("RefusalDisposition(%q).YieldsToInfra = %v, want %v: a build rejection is often an infrastructure symptom, an agent refusal is not", code, got, want)
+		}
 	}
 }

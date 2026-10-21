@@ -36,6 +36,9 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		return err
 	}
 	pass, warn, fail := parseVerdicts(string(body), opts.PhaseIO)
+	if entry.ExitCode == 1 && pass && !fail {
+		pass, warn = false, true
+	}
 
 	if fail && pass {
 		return shipErr(core.CodeAuditBindingDualVerdict, core.ShipClassPrecondition, core.StageVerifyClass,

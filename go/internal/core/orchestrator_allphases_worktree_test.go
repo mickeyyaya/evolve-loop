@@ -127,7 +127,7 @@ func TestCB1_FailureLearningRetroCarriesWorktree(t *testing.T) {
 		Attempt:      1,
 		CycleState:   &CycleState{WorkspacePath: "/tmp/ws", ActiveWorktree: "/tmp/wt-fl"},
 	}
-	if got := fl.retroRequest("summary", "todo-1").Worktree; got != "/tmp/wt-fl" {
+	if got := fl.retroRequest(&Orchestrator{}, "summary", "todo-1").Worktree; got != "/tmp/wt-fl" {
 		t.Errorf("failure-learning retro Worktree=%q, want /tmp/wt-fl", got)
 	}
 }

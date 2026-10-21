@@ -25,7 +25,8 @@ Built on 2026-10-17 as O3 of the wave-orchestrator plan, in the `shadow` stage. 
   1. both hold the hub cell;
   2. `E(t1)` and `E(t2)` meet;
   3. `E(t1)` meets `D(E(t2))`;
-  4. `E(t2)` meets `D(E(t1))`.
+  4. `E(t2)` meets `D(E(t1))`;
+  5. both have the same id family (§Id family).
 - **No files.** A todo whose only file is its own id has no files: that is the placeholder of `fleet.TodosFromTriage`. A todo with no files takes the packages of the `go/internal/<pkg>` paths in its text. `Admitter.Text` gives the text. The loop gives the inbox title and summary.
 - **The scan.** `Admit` takes the candidates in the given rank order. It stops after `scanK` admitted todos. A waiting todo keeps its rank in `Decision.Rank`. `Decision.BlockedBy` names the lane in flight, or the earlier admitted todo, that holds the conflicting cell.
 
@@ -56,6 +57,34 @@ Built on 2026-10-17 as O3 of the wave-orchestrator plan, in the `shadow` stage. 
 | The pending queue in 30 windows of 8 todos | 120 lanes in total | 58 lanes in total | 52% |
 
 - **The cause of the 52%.** 120 of the 244 pending items edit `cmd/evolve` or `internal/core`. These packages import most of the module, so their `D` meets almost every other todo. The window test is a stress case: the orchestrator scans the whole queue, not 8 items. The S14 exit (at most 10% of the width over 3 runs) is measured by the shadow events of live runs. If the live cost is above 10%, the plan's fallback applies: the non-hub cells fall back to files (plan §4, "What changes our mind").
+
+## Id family (2026-10-21)
+
+The inbox item `same-subsystem-wave-scheduling` asks that two items of one subsystem do not run at the same time. In cycle 1484 a `context-fill` lane shipped the contract "unmeasured families stay unmeasured" while its sibling `context-fill` lane ran. The new test made the running lane red. The two lanes edited disjoint files, so no cell rule saw the coupling ([incident 2026-08-17](../../incidents/2026-08-17-failure-rate-review-1481-1503.md) §4 item 7).
+
+- **The rule.** `idFamily` takes the text before the first hyphen of the todo id. The footprint holds it as the cell `family:<token>`. `sharedEdit` calls `sameFamily`, which reports a conflict when two footprints have the same family. Thus the reach rule and the optimistic rule both hold the second todo. An id without a hyphen, or with a hyphen first, has no family.
+- **The record.** `Decision.Cells` holds the family cell. The census refusal reads `cells family:context,internal/inboxrank held by context-fill-cap`, and `supply.jsonl` keeps it. The wave shadow writes the same cells into `LOOP_ORCH_ADMIT_WAIT`. Thus no family hold is silent.
+- **Kernel-minted ids have no family** (review of PR #1085). The kernel mints ids for unrelated sources under one prefix, so the prefix names no subsystem.
+  - `practice-*` comes from `practicewatch/item.go`, for example from the agy and the claude changelog.
+  - `retro-<cycle>-*` comes from `failurelearning/remediation.go`, and `cycle-<cycle>-*` from `carryover/mint.go`.
+  - In the `top_n` of the last 150 runs, `practice` was the largest prefix, with 22 ids. On 2026-10-17 the practice lanes of cycles 1919 and 1920 ran together.
+  - `auto-heuristic-demotion-*` comes from `triagecap/demotion.go`, and `auto-retro-<cycle>-*` from `retrofile.go`. A filed `auto-` item keeps its family.
+  - `idFamily` gives no family to these ids, nor to an id that holds a `/` (a package path from `cardPackages`). A filed `retro-` item without a cycle number keeps its family.
+  - `TestKernelMinters_StillMintTheFormatsTheFamilyRuleExempts` fails when a minter changes its form, so the list moves with the minters.
+- **The live pool names a family hold.** `Decision.FamilyHold` is true only when the family rule alone holds the todo: no package cell, reach or hub of the blocker holds it. `Admitter.OnWait` gets each waiting decision. `orchestrator.FamilyHolds` keeps the family holds and forgets a todo when the pool launches it. `LOOP_ORCH_POOL_UNDERFILLED` adds `family_held`, so a hold does not read as a supply failure.
+- **The cost (2026-10-21).** The runtime inbox holds 209 items in 128 families. 35 families have more than one item, and they hold 116 items. A scan of `scan_k` todos thus finds other families to fill the width of 4.
+- **Rejected: the first two tokens.** `tokenopt-cache-discipline-audit` and `tokenopt-session-resume-on-retry` then get different families, and so do `handoff-h9-*` and `handoff-h10-*`. The item names `tokenopt-*` as one family.
+- **Rejected: one multi-slug lane for the family.** The pool launches one todo for each lane (`fleet.poolSpec`). A shared lane needs the multi-slug scope work that the item names as a precondition.
+- **Rejected: a declared `subsystem` field on each item.** No filed item has the field, so the rule holds nothing until every filer sets it.
+- **The limit.** A first token can be wider than one subsystem.
+  - Example: `cli-*`. Most `cli-*` items edit `cmd/evolve`, and their package cell already holds them.
+  - A generic verb such as `fix-*` is one family too. On 2026-10-21 two runtime inbox ids start with `fix`, `add`, `feat`, `docs` or `test`. Both start with `docs-`.
+  - The cost is a later start for a lane, not a lost lane.
+- **The proof.**
+  - `TestAdmit_TwoTodosOfOneIDFamilyWaitForEachOther` checks both rules. `TestAdmit_ALaneInFlightHoldsItsIDFamily` checks a lane in flight.
+  - `TestAdmit_TodosOfDifferentIDFamiliesAreUnaffected` checks the preservation case. `TestAdmit_AFamilyHoldIsNoReachShadow` checks that a family hold sends no shadow record.
+  - `orchestrator` `TestSupply_RecordsATodoHeldBehindASiblingOfItsIDFamily` checks the census record. `TestPool_TwoTodosOfOneFamilyRunOneAfterTheOther` checks the live pool and its `family_held` field. `TestAdmit_KernelMintedAndPackagePathIDsHaveNoFamily` checks the minted ids.
+  - The first two tests and the census test fail when `sharedEdit` drops the family term.
 
 ## Optimistic rule and shadow record (ADR-0143 W1)
 

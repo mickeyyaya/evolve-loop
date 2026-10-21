@@ -80,7 +80,7 @@ func (m *Mover) readStamp(cycle int) *continuation.Continuation {
 }
 
 func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (bool, string) {
-	if q == nil || q.SystemLevel || q.Routed || (q.Committed != nil && !q.Committed[d.taskID]) {
+	if q == nil || q.SystemLevel || q.Routed || q.RoutedIDs[d.taskID] || (q.Committed != nil && !q.Committed[d.taskID]) {
 		return false, ""
 	}
 	count, bumpErr := bumpWith(d.src, failureRecord{reason: reason, class: q.FailureClass, fingerprint: q.Fingerprint}, func(n int) bool { return ShouldQuarantine(n, q.Ceiling, q.SystemLevel) })

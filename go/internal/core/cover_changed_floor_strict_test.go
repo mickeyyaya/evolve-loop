@@ -23,7 +23,7 @@ func stubCoverStrictRunner(t *testing.T, results []coverstrict.Result) *[]strict
 	t.Helper()
 	var calls []strictRunnerCall
 	orig := coverStrictRunner
-	coverStrictRunner = func(moduleDir, profile string, pkgs []string) ([]coverstrict.Result, error) {
+	coverStrictRunner = func(moduleDir, profile string, pkgs []string, _ []byte) ([]coverstrict.Result, error) {
 		calls = append(calls, strictRunnerCall{moduleDir, pkgs, profile != ""})
 		return results, nil
 	}

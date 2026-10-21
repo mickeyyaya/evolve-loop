@@ -115,8 +115,11 @@ func runPR(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && args[0] == "boundary" {
 		return runPRBoundary(args[1:], stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "refresh" {
+		return runPRRefresh(args[1:], stdout, stderr)
+	}
 	if len(args) == 0 || args[0] != "merge" {
-		fmt.Fprintln(stderr, prUsage+"\n"+prWindowUsage+"\n"+prBoundaryUsage)
+		fmt.Fprintln(stderr, prUsage+"\n"+prWindowUsage+"\n"+prBoundaryUsage+"\n"+prRefreshUsage)
 		return exitUsage
 	}
 	a, err := parsePRMergeArgs(args[1:])
