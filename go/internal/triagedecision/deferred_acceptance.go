@@ -5,19 +5,22 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 const (
 	deferredAcceptanceSection = "deferred_acceptance"
 	reportFile                = "triage-report.md"
+	minReasonWords            = 3
 )
 
 var acceptanceIndexRE = regexp.MustCompile(`^acceptance\s+([0-9]+)$`)
 
 type AcceptanceDeferral struct {
-	ID     string
-	Index  int
-	Reason string
+	ID        string
+	Index     int
+	Reason    string
+	Criterion string
 }
 
 func DeferredAcceptance(report string) []AcceptanceDeferral {
@@ -38,7 +41,7 @@ func DeferredAcceptance(report string) []AcceptanceDeferral {
 		}
 		m := acceptanceIndexRE.FindStringSubmatch(ActionOf(it.Rest))
 		reason := ReasonOf(it.Rest)
-		if m == nil || reason == "" {
+		if m == nil || len(strings.Fields(reason)) < minReasonWords {
 			continue
 		}
 		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {

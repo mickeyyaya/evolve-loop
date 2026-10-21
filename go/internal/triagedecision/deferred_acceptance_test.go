@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const reportWithAcceptanceDeferral = "## top_n\n- item-a: fix it — files=a.go\n\n## deferred\n- item-z: later — defer_reason=next cycle\n\n## deferred_acceptance\n- item-a: acceptance 2 — defer_reason=needs the protected writer, console work\n- item-a: the second one — defer_reason=no index\n- item-b: acceptance 0 — defer_reason=zero\n- item-c: acceptance 3\n- item-q: acceptance 1 — defer_reason=item-q is not committed\n"
+const reportWithAcceptanceDeferral = "## top_n\n- item-a: fix it — files=a.go\n\n## deferred\n- item-z: later — defer_reason=next cycle\n\n## deferred_acceptance\n- item-a: acceptance 2 — defer_reason=needs the protected writer, console work\n- item-a: the second one — defer_reason=no index\n- item-b: acceptance 0 — defer_reason=zero\n- item-c: acceptance 3\n- item-q: acceptance 1 — defer_reason=item-q is not committed\n- item-a: acceptance 1 — defer_reason=x\n"
 
 func TestDeferredAcceptance_ReadsEachCriterionTheReportDefers(t *testing.T) {
 	t.Parallel()
@@ -16,7 +16,7 @@ func TestDeferredAcceptance_ReadsEachCriterionTheReportDefers(t *testing.T) {
 
 	want := []AcceptanceDeferral{{ID: "item-a", Index: 2, Reason: "needs the protected writer, console work"}}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("DeferredAcceptance = %+v, want %+v: only a card for a top_n item, with a 1-based index and a reason, defers a criterion", got, want)
+		t.Errorf("DeferredAcceptance = %+v, want %+v: only a card for a top_n item, with a 1-based index and a reason of at least three words, defers a criterion", got, want)
 	}
 }
 

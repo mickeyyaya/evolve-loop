@@ -194,7 +194,7 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 		o.stampContinuationManifest(ctx, cs, cycle, projectRoot)
 	}
 
-	o.closeoutCarryover(state, cs.WorkspacePath, cycle, shipped, time.Now().UTC())
+	o.closeoutCarryover(state, cs.WorkspacePath, projectRoot, cycle, shipped, time.Now().UTC())
 
 	state.LastCycleNumber = max(state.LastCycleNumber, cycle)
 	if perr := o.persistCycleEndState(ctx, *state); perr != nil {

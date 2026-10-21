@@ -68,15 +68,15 @@ func (l *Lifecycle) MergePrescriptions(state *cyclestate.State, workspace string
 	state.CarryoverTodos = MergeTodos(state.CarryoverTodos, incoming)
 }
 
-func (l *Lifecycle) MergeAcceptanceDeferrals(state *cyclestate.State, workspace string, cycle int, now time.Time) {
-	if state == nil || strings.TrimSpace(workspace) == "" {
+func (l *Lifecycle) MergeAcceptanceDeferrals(state *cyclestate.State, deferrals []triagedecision.AcceptanceDeferral, cycle int, now time.Time) {
+	if state == nil || len(deferrals) == 0 {
 		return
 	}
 	expiresAt := defaultExpiresAt(now)
-	var incoming []cyclestate.CarryoverTodo
-	for _, d := range triagedecision.DeferredAcceptanceIn(workspace) {
+	incoming := make([]cyclestate.CarryoverTodo, 0, len(deferrals))
+	for _, d := range deferrals {
 		id := fmt.Sprintf("%s-acceptance-%d", d.ID, d.Index)
-		action := fmt.Sprintf("acceptance %d of %s was deferred by triage in cycle %d: %s", d.Index, d.ID, cycle, d.Reason)
+		action := fmt.Sprintf("acceptance %d of %s was deferred by triage in cycle %d: %s. The criterion: %s", d.Index, d.ID, cycle, d.Reason, d.Criterion)
 		incoming = append(incoming, mintWorkspaceTodo(id, action, PriorityMemoDefault, cycle, expiresAt))
 	}
 	state.CarryoverTodos = MergeTodos(state.CarryoverTodos, incoming)

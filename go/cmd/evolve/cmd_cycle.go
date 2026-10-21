@@ -506,7 +506,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		reviewers = append(reviewers, floor)
 	}
 	if cfg.EvalGate != config.StageOff {
-		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate, evalgate.WithConsoleFollowupFiler(hostFollowupFiler(ld, signals, forbidden, pol.InboxPriorityConfig().ClassOrder)), evalgate.WithScopePathResolver(scopePathResolver)))
+		reviewers = append(reviewers, evalGateReviewer(cfg.EvalGate, hostFollowupFiler(ld, signals, forbidden, pol.InboxPriorityConfig().ClassOrder)))
 	}
 	if cfg.ContractGate != config.StageOff {
 		rev := deliverable.NewReviewerWithCatalogStageReportSize(
@@ -670,6 +670,10 @@ func (m registrarMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseS
 		return phasespec.PhaseSpec{}, nil, err
 	}
 	return res.Spec, res.Runner, nil
+}
+
+func evalGateReviewer(stage config.Stage, file evalgate.ConsoleFollowupFiler) core.DeliverableReviewer {
+	return evalgate.NewReviewer(stage, evalgate.WithConsoleFollowupFiler(file), evalgate.WithScopePathResolver(scopePathResolver))
 }
 
 func scopePathResolver(projectRoot, taskID string) string {
