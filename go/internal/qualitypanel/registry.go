@@ -1,0 +1,25 @@
+package qualitypanel
+
+var registry = []Index{
+	{ID: "CQ1", Name: "unit conformance", Unit: "ratio", Direction: HigherIsBetter, Threshold: 0.90, HasThreshold: true, Breachable: true, NMin: 30, Baseline: "0.888 of 11296 functions"},
+	{ID: "CQ2", Name: "packages per ship", Unit: "packages", Direction: LowerIsBetter, Threshold: 3, HasThreshold: true, Breachable: true, NMin: 20, Baseline: "median 2 of 119 ships"},
+	{ID: "CQ3", Name: "interface depth", Unit: "lines per exported symbol", Direction: HigherIsBetter, Threshold: 5, HasThreshold: true, Breachable: true, NMin: 1},
+	{ID: "CQ4", Name: "duplication", Unit: "windows per 1000 lines", Direction: LowerIsBetter, Threshold: 45.4, HasThreshold: true, Breachable: true, NMin: 1},
+	{ID: "CQ5", Name: "judgment surface", Unit: "rule lines", Breachable: true, NMin: 1},
+	{ID: "TQ1", Name: "mutation efficacy on changed functions", Unit: "ratio", Direction: HigherIsBetter, Threshold: 0.80, HasThreshold: true, Breachable: true, NMin: 20},
+	{ID: "TQ2", Name: "revert sensitivity", Unit: "ratio", Direction: HigherIsBetter, Threshold: 0.90, HasThreshold: true, Breachable: true, NMin: 15},
+	{ID: "TQ3", Name: "test value", Unit: "unique kills per test-second", Breachable: true, NMin: 1},
+	{ID: "TQ4", Name: "held-out share", Unit: "ratio", Direction: HigherIsBetter, Threshold: 0.50, HasThreshold: true, Breachable: true, NMin: 1},
+	{ID: "PQ1", Name: "ship rate", Unit: "ratio", Direction: HigherIsBetter, Threshold: 0.40, HasThreshold: true, Breachable: true, NMin: 40, Baseline: "0.424 of 66 cycles"},
+	{ID: "PQ2", Name: "pass^k per phase", Unit: "probability", Breachable: true, NMin: 1},
+	{ID: "PQ3", Name: "comparison noise floor", Unit: "percentage points", NMin: 1, Baseline: "MDE 0.24 at 66 per arm"},
+	{ID: "PQ4", Name: "deadline rate", Unit: "ratio", Direction: LowerIsBetter, Threshold: 0.20, HasThreshold: true, Breachable: true, NMin: 40, Baseline: "0.167 of 186 cycles"},
+	{ID: "JQ1", Name: "seeded-defect recall", Unit: "ratio", Direction: HigherIsBetter, Threshold: 0.75, HasThreshold: true, Breachable: true, NMin: 1},
+	{ID: "JQ2", Name: "false-PASS rate", Unit: "ratio", Direction: LowerIsBetter, Threshold: 0.10, HasThreshold: true, Breachable: true, NMin: 1},
+	{ID: "JQ3", Name: "independent-review escalation", Unit: "ratio", Direction: LowerIsBetter, Threshold: 0.40, HasThreshold: true, Breachable: true, NMin: 30, Baseline: "0.418 of 98 reviews"},
+	{ID: "JQ4", Name: "judge family diversity", Unit: "ratio", NMin: 1, Baseline: "0 of 234 audit calls"},
+	{ID: "OQ1", Name: "escape rate", Unit: "escapes per 100 ships", Breachable: true, NMin: 1},
+	{ID: "OQ2", Name: "14-day churn", Unit: "ratio", Direction: LowerIsBetter, Threshold: 0.15, HasThreshold: true, Breachable: true, NMin: 20, Baseline: "0.090 of 47424 lines"},
+	{ID: "OQ3", Name: "revert rate", Unit: "ratio", Direction: LowerIsBetter, Threshold: 0.02, HasThreshold: true, Breachable: true, NMin: 100, Baseline: "0 of 695 commits"},
+	{ID: "OQ4", Name: "recovery count", Unit: "recoveries", Breachable: true, NMin: 1},
+}

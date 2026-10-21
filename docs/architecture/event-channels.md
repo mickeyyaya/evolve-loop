@@ -87,7 +87,7 @@ Every watcher of the pipeline polls, and no program outside one process can subs
 - **State: Built (E10, 2026-10-18).** The function `newRoleSignalCenter` in `go/cmd/evolve/cmd_cycle.go` builds the Center of a root and subscribes one Publisher through `rootwire.Attach`. The phase observer calls `rootwire.Attach` itself. Each root defers the closer. Package note: [internal-events-rootwire.md](packages/internal-events-rootwire.md).
 - **Listeners observe and never decide** ([ADR-0101](adr/0101-signal-center.md) decision 5). The Publisher never emits and never calls `Flush`.
 - **No broker.** A subscriber reads the channel logs. No process forwards an event, so no process needs a supervisor.
-- **Roles.** The `role` names the root: `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate`, `phase-observer`, `wave`, `inbox`, `ci` or `subscriber`. A reader marks the records that it makes with `watch`.
+- **Roles.** The `role` names the root: `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate`, `phase-observer`, `wave`, `inbox`, `ci`, `subscriber` or `quality` (the collector of [ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)). A reader marks the records that it makes with `watch`.
 
 ### 2. Channels
 
@@ -116,6 +116,8 @@ The default channels:
 | `inbox` | `module=inbox` | lossless |
 | `ci` | `kind=ci.*` | lossless |
 | `ledger` | `kind=ledger.appended` | best_effort |
+| `quality.breach` | `kind=quality.breach,quality.warning` ([ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)) | lossless |
+| `quality.reading` | `kind=quality.reading` | best_effort |
 | `signals` | every event (the firehose) | best_effort |
 
 - One event can go to several channels. The Publisher writes it once in each channel.

@@ -75,4 +75,5 @@ type Policy struct {
 	AttemptPostmortem  *AttemptPostmortemPolicy  `json:"attempt_postmortem,omitempty"`
 	Handoff            *HandoffPolicy            `json:"handoff,omitempty"`
 	AuditCascade       *AuditCascadePolicy       `json:"audit_cascade,omitempty"`
+	Quality            *QualityPanelPolicy       `json:"quality,omitempty"`
 }

@@ -25,6 +25,8 @@ func EventsDefaults() EventsPolicy {
 			{Name: "ship", Route: "kind=ship.*", QoS: "lossless"},
 			{Name: "inbox", Route: "module=inbox", QoS: "lossless"},
 			{Name: "ledger", Route: "kind=ledger.appended", QoS: "best_effort"},
+			{Name: "quality.breach", Route: "kind=quality.breach,quality.warning", QoS: "lossless"},
+			{Name: "quality.reading", Route: "kind=quality.reading", QoS: "best_effort"},
 			{Name: "signals", Route: "", QoS: "best_effort"},
 		},
 		SegmentMB:         16,

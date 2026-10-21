@@ -17,7 +17,7 @@ import (
 const (
 	signalCodesBegin = "<!-- GENERATED:signal-codes BEGIN — do not edit by hand; run `evolve signals codes generate` -->"
 	signalCodesEnd   = "<!-- GENERATED:signal-codes END -->"
-	signalsTailUsage = "evolve signals tail [--cycle N] [--kind K[,K...]] [--code C[,C...]] [--follow] [--json]"
+	signalsTailUsage = "evolve signals tail [--cycle N | --channel NAME] [--kind K[,K...]] [--code C[,C...]] [--follow] [--json]"
 )
 
 func runSignals(args []string, _ io.Reader, stdout, stderr io.Writer) int {

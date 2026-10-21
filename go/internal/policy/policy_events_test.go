@@ -15,6 +15,8 @@ func TestEventsDefaults_AreTheChannelTableOfTheSpec(t *testing.T) {
 		{Name: "ship", Route: "kind=ship.*", QoS: "lossless"},
 		{Name: "inbox", Route: "module=inbox", QoS: "lossless"},
 		{Name: "ledger", Route: "kind=ledger.appended", QoS: "best_effort"},
+		{Name: "quality.breach", Route: "kind=quality.breach,quality.warning", QoS: "lossless"},
+		{Name: "quality.reading", Route: "kind=quality.reading", QoS: "best_effort"},
 		{Name: "signals", Route: "", QoS: "best_effort"},
 	}
 
@@ -70,7 +72,7 @@ func TestEventsDefaults_NameEachChannelOnceWithAValidName(t *testing.T) {
 		}
 		seen[name] = true
 	}
-	if len(seen) != 7 {
-		t.Errorf("defaults name %d channels, want the 7 of the spec table without ci", len(seen))
+	if len(seen) != 9 {
+		t.Errorf("defaults name %d channels, want the 7 of the spec table without ci plus the two quality channels of ADR-0153", len(seen))
 	}
 }

@@ -814,3 +814,5 @@
 ./internal/recoveryretro
 # agentcmd - evolve agent: one read-only phase agent from the command line, with no cycle (ADR-0152).
 ./internal/cli/agentcmd
+# qualitypanel - the quality index readings of ADR-0153 and their Signal Center events.
+./internal/qualitypanel
