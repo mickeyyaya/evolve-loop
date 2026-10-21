@@ -2,6 +2,7 @@ package carryover
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/triagedecision"
 )
 
 type memoTodo struct {
@@ -62,6 +64,20 @@ func (l *Lifecycle) MergePrescriptions(state *cyclestate.State, workspace string
 			continue
 		}
 		incoming = append(incoming, mintWorkspaceTodo(id, action, PriorityPrescription, cycle, expiresAt))
+	}
+	state.CarryoverTodos = MergeTodos(state.CarryoverTodos, incoming)
+}
+
+func (l *Lifecycle) MergeAcceptanceDeferrals(state *cyclestate.State, workspace string, cycle int, now time.Time) {
+	if state == nil || strings.TrimSpace(workspace) == "" {
+		return
+	}
+	expiresAt := defaultExpiresAt(now)
+	var incoming []cyclestate.CarryoverTodo
+	for _, d := range triagedecision.DeferredAcceptanceIn(workspace) {
+		id := fmt.Sprintf("%s-acceptance-%d", d.ID, d.Index)
+		action := fmt.Sprintf("acceptance %d of %s was deferred by triage in cycle %d: %s", d.Index, d.ID, cycle, d.Reason)
+		incoming = append(incoming, mintWorkspaceTodo(id, action, PriorityMemoDefault, cycle, expiresAt))
 	}
 	state.CarryoverTodos = MergeTodos(state.CarryoverTodos, incoming)
 }

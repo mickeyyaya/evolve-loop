@@ -74,6 +74,23 @@ enumerates predicate names. a tdd that wrote no predicates shows up as the loud
 
 A claim moves an item into `processing/cycle-N/` after `fleet_scope_paths` is written. The old pending path then fails to open. Cycles 1946 and 1950 showed `inbox record unreadable` in every build correction, so the builder never saw the acceptance criteria. Now `taskItemRefs` asks the scope-path resolver again when a pair path is not readable. The resolver returns the `processing/` path of a claimed item.
 
+### Extension: the eval never narrows the acceptance (2026-10-21)
+
+Cycles 1772 and 1773 failed the audit with the same H1 finding: "the build met a narrowed eval, not the filed item's acceptance". In 1772 the scout rewrote the eval and dropped acceptance 2. In 1773 triage narrowed the scope, and acceptance 2 had no deferred entry. Each failure cost a repair round, and only the audit, the most expensive phase, saw the gap.
+
+The decision:
+
+| Id | Decision | Rejected options and why |
+|---|---|---|
+| N1 | Triage records each criterion that this cycle does not deliver as a card in `## deferred_acceptance` of its report: `- <id>: acceptance <N> — defer_reason=<sentence>`. `triagedecision.DeferredAcceptance` is the one reader. | A field in the `top_n` card tail: the tail is comma-separated, and a reason has commas. A new field in `triage-decision.json`: the agent writes that file, so a second writer of the same fact. |
+| N2 | The Task Contract marks a deferred criterion `(deferred by triage: <reason>)`. Its preamble says that the eval never narrows the acceptance. | Leave the narrowing to the eval: that is the 1772 defect. |
+| N3 | TDD gives each criterion one row of its AC-Materialization table. It encodes every criterion that is not marked as at least one RED predicate, even when the eval omits it. The `acceptance-rows` gate of `internal/evalgate` refuses a table with fewer rows than the filed criteria of the contract (`core.ContractCriteria`). Thus a narrowed cycle stops at TDD, before the build. The auditor grades a marked criterion as `deferred`, not undelivered. | A host gate that maps eval rows to criteria by their words: a format gate that judges words, which the logic-over-format rule refuses. The row count judges no words. A plan-review lens: plan-review gets no verbatim acceptance, and each of its four lens templates needs the rule. |
+| N4 | A shipped cycle carries each deferred criterion to the next cycle as the todo `<id>-acceptance-<N>` (`closeoutCarryover`, `MergeAcceptanceDeferrals`). Thus the criterion survives when the ship consumes the parent item. A FAIL cycle mints nothing, because the parent item stays in the inbox with all its criteria. | File a new inbox item at ship: a write to the protected inbox mover for a fact that the carryover already holds. |
+
+The consequence: a criterion either reaches the RED predicates of the cycle, or it has a reason and a carryover todo. Nothing vanishes between the inbox item and the eval. A card for an id that is not in `top_n` defers nothing. A card whose number is past the end of the acceptance marks nothing. A ship still carries its todo, and the next triage drops it.
+
+Pinned by `TestDeferredAcceptance_ReadsEachCriterionTheReportDefers`, `TestComposeTaskContract_ACriterionTriageDeferredIsMarkedAndTheRestAreGraded`, `TestSeedTaskContract_TheTriageReportsAcceptanceDeferralReachesTheContract`, `TestAcceptanceRowsGate_ANarrowedACTableIsRefusedBeforeTheBuild`, `TestAcceptanceRowsGate_WiredIntoReviewer` and `TestCloseoutCarryover_OnlyAShippedCycleCarriesADeferredCriterion`.
+
 ## Wiring proofs
 `internal/core/task_contract_test.go::TestDispatch_TaskContractReachesTDDBuildAndAudit` (RunCycle
 with the scope-path resolver and an injected inventory; tdd, build and audit carry the preamble

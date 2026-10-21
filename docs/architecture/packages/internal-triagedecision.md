@@ -25,6 +25,7 @@
 - **Nothing the report does not state is invented.** Pinned by `TestDerive_NeverInventsWhatTheReportDoesNotState`.
 - **Only slug ids pass**, because promotion moves an id out of the inbox. `^[a-z0-9][a-z0-9-]*$`, as `triagecap` required. Pinned by the "a bullet with a non-slug id" and "a bullet with no id" cases of `TestDerive_DeclinesAnIncompleteOrUnreadableReport`.
 - **The heading is the contract's.** `## top_n` is `phasecontract.Triage.Sections[0].Canonical`; `triagecap.TestTopNHeadingIsTheContracts` pins the two to one belief without an import.
+- **`DeferredAcceptance` reads the criteria that triage defers** (`## deferred_acceptance`, ADR-0098 N1, since 2026-10-21). A card counts only for an id in the report's `## top_n`, with the action `acceptance <N>` (1-based) and a `defer_reason=`. `DeferredAcceptanceIn` reads the report of a workspace for the Task Contract and the carryover. A malformed card defers nothing, so the criterion stays graded. The section is not `## deferred`, so `build` never reads a deferred criterion as a deferred item. Pinned by `TestDeferredAcceptance_ReadsEachCriterionTheReportDefers` and `TestBuild_AnAcceptanceDeferralIsNotADeferredItem`.
 - **`Project` never declines.** Pinned by `TestProject_NeverDeclines`.
 - **Every exported symbol is named by a test** (`.apicover-enforce`), and the package is a protected surface (`guards.ProtectedSurfaceManifest`): a lane must not soften what it commits itself to.
 

@@ -70,3 +70,10 @@ const (
 )
 
 func truncateRunes(s string, max int) string { return carryover.TruncateRunes(s, max) }
+
+func (o *Orchestrator) closeoutCarryover(state *State, workspace string, cycle int, shipped bool, now time.Time) {
+	if shipped {
+		o.carryover().MergeAcceptanceDeferrals(state, workspace, cycle, now)
+	}
+	o.carryover().Closeout(state, workspace, cycle, now)
+}

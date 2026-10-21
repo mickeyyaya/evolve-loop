@@ -506,7 +506,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		reviewers = append(reviewers, floor)
 	}
 	if cfg.EvalGate != config.StageOff {
-		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate, evalgate.WithConsoleFollowupFiler(hostFollowupFiler(ld, signals, forbidden, pol.InboxPriorityConfig().ClassOrder))))
+		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate, evalgate.WithConsoleFollowupFiler(hostFollowupFiler(ld, signals, forbidden, pol.InboxPriorityConfig().ClassOrder)), evalgate.WithScopePathResolver(scopePathResolver)))
 	}
 	if cfg.ContractGate != config.StageOff {
 		rev := deliverable.NewReviewerWithCatalogStageReportSize(

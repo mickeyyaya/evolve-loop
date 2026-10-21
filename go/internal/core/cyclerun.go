@@ -183,7 +183,8 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	}
 
 	postCycleHEAD, _ := o.gitHEAD()
-	if o.throughputRecorder != nil && !hasThroughputCycle(state.TriageThroughput, cycle) && shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD) {
+	shipped := shippedOutcome(result.FinalVerdict, preCycleHEAD, postCycleHEAD)
+	if o.throughputRecorder != nil && !hasThroughputCycle(state.TriageThroughput, cycle) && shipped {
 		o.throughputRecorder(state, cycle, cs.WorkspacePath)
 	}
 
@@ -193,7 +194,7 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 		o.stampContinuationManifest(ctx, cs, cycle, projectRoot)
 	}
 
-	o.carryover().Closeout(state, cs.WorkspacePath, cycle, time.Now().UTC())
+	o.closeoutCarryover(state, cs.WorkspacePath, cycle, shipped, time.Now().UTC())
 
 	state.LastCycleNumber = max(state.LastCycleNumber, cycle)
 	if perr := o.persistCycleEndState(ctx, *state); perr != nil {

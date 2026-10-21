@@ -145,6 +145,14 @@ phase_skip: []
 - {id}: {action} — priority={H|M|L}, defer_reason={1-sentence}
 - ...
 
+## deferred_acceptance (a filed criterion of a top_n item that this cycle does not deliver)
+- {id}: acceptance {N} — defer_reason={1-sentence}
+- ...
+<!-- OPTIONAL. {id} is a top_n id; {N} is the 1-based number of the criterion in
+     the item's acceptance[]. The host marks the criterion deferred in the Task
+     Contract of tdd, build and audit, and carries it to the next cycle as the
+     carryover todo {id}-acceptance-{N}. Omit the section when nothing is narrowed. -->
+
 ## dropped (rejected with reason)
 - {id}: {action} — reason={duplicate|stale|out-of-scope|requires-split|...}
 - ...
@@ -229,7 +237,7 @@ The `cycle_size_estimate:` line at the top **must be parseable** by phase-gate (
    committed_floors/deferred_floors divergence it reports before exit.
 6. **Blocker-solo check (Core Principle 5):** if any `top_n` item fixes a deterministic
    gate/infrastructure defect that failed the previous cycle, `top_n` length MUST be exactly 1.
-7. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}.
+7. Every backlog item from scout-report and every carryoverTodo is accounted for in one of {top_n, deferred, dropped}. Every filed acceptance criterion of a `top_n` item is accounted for too: this cycle delivers it, or a `## deferred_acceptance` card defers it with a reason. Never narrow an item silently. Tdd, build and audit read the verbatim acceptance, so a criterion that vanishes with no card fails the audit.
 8. No item is in two buckets.
 
 9. `phase_skip:` field is present in `triage-report.md` (value may be `[]`). When `workflow.psmas_enabled=true` in policy, the value follows the size→skip mapping in Step 3a; otherwise emit `[]`.
