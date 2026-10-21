@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 )
 
 func requireNonRootF1(t *testing.T) {
@@ -154,7 +156,7 @@ func TestReleaseBackfillF1_RemoveOutcomes(t *testing.T) {
 func TestParseCwdListingBackfillF1_BlankLinesAndUnknownFieldsAreIgnored(t *testing.T) {
 	t.Parallel()
 	listing := "p100\nR1\nn/work/a\n\np200\n\nR100\nn/work/b\nfcwd\np300\nR1\n\n"
-	got := parseCwdListing(listing)
+	got := proctree.ParseCwdListing(listing)
 	want := []Process{{Pid: 100, Ppid: 1, Cwd: "/work/a"}, {Pid: 200, Ppid: 100, Cwd: "/work/b"}}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v (pid 300 has no cwd and must be dropped)", got, want)
@@ -164,7 +166,7 @@ func TestParseCwdListingBackfillF1_BlankLinesAndUnknownFieldsAreIgnored(t *testi
 			t.Errorf("process %d = %+v, want %+v", i, got[i], want[i])
 		}
 	}
-	if len(parseCwdListing("")) != 0 || len(parseCwdListing("\n\n")) != 0 {
+	if len(proctree.ParseCwdListing("")) != 0 || len(proctree.ParseCwdListing("\n\n")) != 0 {
 		t.Error("empty input has no processes")
 	}
 }

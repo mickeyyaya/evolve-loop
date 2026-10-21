@@ -20,5 +20,11 @@
   "source": "console lane cl-codexupdate, 2026-10-05: live codex 0.153.4 probes and wave 59b launch logs (runtime/.evolve/runs/cycle-179{1,2,3}/*-launch-error.txt: 'REPL prompt (›) detected' with no dialog handling, then Update now confirmed); docs/incidents/2026-10-05-codex-update-menu.md, Residual risk",
   "summary": "Live probe on codex 0.153.4 (2026-10-05, tmux 220x80, captures every 0.2 s): codex draws its composer ('› Ask Codex to do anything', whose › is the codex-tmux prompt marker) about 0.2 s after launch, then replaces it with a startup dialog: the update menu at about 2.4 s, the folder-trust dialog for an untrusted directory at about 3.4 s. The codex boot polls every 2 s, so its first capture can see only the composer: no rule fires, the marker is present, the pane process is codex, and bootTmuxREPL declares the REPL ready. The prompt is then pasted into the dialog and the submit Enter confirms the dialog's highlighted choice. This is how 16 of wave 59b's 19 codex launches died (Enter confirmed 'Update now'; exit 81). The update check is now off per launch and worktrees are pre-trusted, so no known dialog takes this path today, but any new codex startup dialog would.",
   "title": "codex boot readiness is judged on the composer codex draws before a startup dialog mounts, so the prompt's submit Enter can confirm the dialog",
-  "weight": 0.7
+  "weight": 0.7,
+  "consumed": {
+    "at": "2026-10-21T11:00:00Z",
+    "via": "console-retire",
+    "cycle": "console",
+    "reason": "Retired outright (operator decision 2026-10-21): codex-only; codex out of routing since 2026-10-07; refile if codex returns."
+  }
 }

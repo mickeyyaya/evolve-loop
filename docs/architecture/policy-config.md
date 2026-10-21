@@ -158,7 +158,7 @@ The block sets the stages of the two documentation floors of the build handoff. 
 | Key | Meaning | Default |
 |---|---|---|
 | `stage` | the documentation floor for an architecture change without a document ([ADR-0077](adr/0077-docs-floor-for-architecture-changes.md)). `off` or `0` turns it off. `shadow` and `enforce` turn it on. | `enforce` |
-| `ste_stage` | the STE lint of the changed documents ([internal-stelint](packages/internal-stelint.md), `evolve docs ste-lint`). `off` or `0` prints nothing. `shadow` prints the `[ste-lint] WARN:` line. `enforce` makes a finding on an added line a floor failure, which sends the document back to the build. | `shadow` |
+| `ste_stage` | the STE lint of the changed documents ([internal-stelint](packages/internal-stelint.md), `evolve docs ste-lint`). `off` or `0` prints nothing. `shadow` prints the `[ste-lint] WARN:` line. `enforce` makes a finding on an added line a floor failure, which sends the document back to the build. The checked-in policy sets `enforce` (operator decision of 2026-10-21). | `shadow` |
 
 ## Changed-function coverage (`cover_changed`)
 

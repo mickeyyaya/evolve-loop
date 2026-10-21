@@ -35,11 +35,11 @@ func windowOccupancy(r Result) int {
 }
 
 func EffectiveWindow(driver string) int {
-	if isClaudeDriver(driver) {
+	if HasCollector(driver) {
 		return claudeEffectiveWindow
 	}
-	switch driver {
-	case "codex", "codex-tmux", "agy", "agy-tmux":
+	switch strings.ToLower(driver) {
+	case "codex", "codex-tmux":
 		return claudeEffectiveWindow
 	}
 	return 0

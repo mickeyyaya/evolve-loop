@@ -78,6 +78,7 @@ type Deps struct {
 	TokenResolver         func(tokenusage.Window) (tokenusage.Result, error)
 	ModelChain            func(cli, model string) []string
 	ListProcesses         proctree.Lister
+	ListCwds              proctree.CwdLister
 	SignalProcess         proctree.Signaler
 	sweep                 *dispatchSweep
 }

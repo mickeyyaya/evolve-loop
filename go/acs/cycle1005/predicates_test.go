@@ -34,10 +34,10 @@ func TestC1005_001_tripwire_fires_on_nonclaude_exit0_success(t *testing.T) {
 
 func TestC1005_002_tripwire_stays_silent_on_non_signals(t *testing.T) {
 	runBridgeTest(t,
-		"^TestRecordTokenUsage_Tripwire_(QuotaAbortShortLaunch|Exit0ShortDuration|ClaudeBaseline|CoveredNonClaude)_Silent$",
+		"^TestRecordTokenUsage_Tripwire_(QuotaAbortShortLaunch|Exit0ShortDuration|NoCollectorFamily|CoveredNonClaude)_Silent$",
 		"TestRecordTokenUsage_Tripwire_QuotaAbortShortLaunch_Silent",
 		"TestRecordTokenUsage_Tripwire_Exit0ShortDuration_Silent",
-		"TestRecordTokenUsage_Tripwire_ClaudeBaseline_Silent",
+		"TestRecordTokenUsage_Tripwire_NoCollectorFamily_Silent",
 		"TestRecordTokenUsage_Tripwire_CoveredNonClaude_Silent")
 }
 

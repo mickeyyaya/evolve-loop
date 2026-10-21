@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
@@ -221,8 +220,7 @@ func (e *Engine) emitTokenWarnings(req core.BridgeRequest, code int, start, end 
 }
 
 func isTelemetryTripwire(cli string, code int, start, end time.Time, source tokenusage.Source) bool {
-	return code == ExitOK && end.Sub(start) > tripwireSuccessThreshold && source == tokenusage.SourceNone &&
-		!strings.HasPrefix(strings.ToLower(cli), "claude")
+	return code == ExitOK && end.Sub(start) > tripwireSuccessThreshold && source == tokenusage.SourceNone && tokenusage.HasCollector(cli)
 }
 
 func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int, start time.Time, resp *core.BridgeResponse) {

@@ -22,5 +22,11 @@
   "route": "console-manual",
   "summary": "Open seam 2 of the gate input inventory (verifier-isolation-audit). The harness writes failure-digest.json into the run workspace. The retrospective can write that workspace and also writes disposition.json, so it can make the cross-check agree. readDispositionLegitimacy then steers the repair or contradiction decision (decision_branch.go).",
   "title": "The disposition cross-check reads a failure digest that the retrospective can rewrite",
-  "weight": 0.55
+  "weight": 0.55,
+  "consumed": {
+    "at": "2026-10-21T13:00:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "AssembleFailureDigest also writes .evolve/failure-digests/cycle-<N>.json (no profile grants it); crossCheckAgainstDigest reads only that record for a run workspace, and a missing record is unverified. The inventory row moves from open-seam to authority (stronger than the verified the acceptance names: authority rows are checked against every write scope), pinned in pinnedAuthority, and pinnedOpenSeams drops it."
+  }
 }

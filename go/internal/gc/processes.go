@@ -1,23 +1,18 @@
 package gc
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-type Process struct {
-	Pid  int    `json:"pid"`
-	Ppid int    `json:"ppid"`
-	Cwd  string `json:"cwd"`
-}
+type Process = proctree.Cwd
 
 type ProcessReapReport struct {
 	Reaped []Process `json:"reaped"`
@@ -83,44 +78,9 @@ func (o WorktreeOptions) listProcesses(ctx context.Context) ([]Process, error) {
 }
 
 func listCwdProcesses(ctx context.Context, run sysexec.RunFunc, dir string) ([]Process, error) {
-	var out strings.Builder
-	code, err := run(ctx, "lsof", dir, []string{"-a", "-d", "cwd", "-u", uidArg(), "-R", "-F", "pRn"}, nil, nil, &out, nil)
+	procs, err := proctree.ListCwds(ctx, run, dir)
 	if err != nil {
-		return nil, fmt.Errorf("gc: list process cwds: %w", err)
+		return nil, fmt.Errorf("gc: %w", err)
 	}
-	if code != 0 && out.Len() == 0 {
-		return nil, fmt.Errorf("gc: list process cwds: lsof exit %d with no output", code)
-	}
-	return parseCwdListing(out.String()), nil
-}
-
-func uidArg() string { return strconv.Itoa(os.Getuid()) }
-
-func parseCwdListing(s string) []Process {
-	var out []Process
-	var cur Process
-	flush := func() {
-		if cur.Pid > 0 && cur.Cwd != "" {
-			out = append(out, cur)
-		}
-		cur = Process{}
-	}
-	sc := bufio.NewScanner(strings.NewReader(s))
-	for sc.Scan() {
-		line := sc.Text()
-		if line == "" {
-			continue
-		}
-		switch line[0] {
-		case 'p':
-			flush()
-			cur.Pid, _ = strconv.Atoi(line[1:])
-		case 'R':
-			cur.Ppid, _ = strconv.Atoi(line[1:])
-		case 'n':
-			cur.Cwd = line[1:]
-		}
-	}
-	flush()
-	return out
+	return procs, nil
 }

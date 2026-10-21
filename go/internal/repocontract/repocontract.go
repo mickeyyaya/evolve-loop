@@ -155,6 +155,9 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/cycleoutcome", Tests: []string{
 		"TestLaneScopeProjection_SingleWireShapeDeclaration",
 	}},
+	{Package: "./internal/inboxbatch", Tests: []string{
+		"TestNoProductionCodeCallsLoadDir",
+	}},
 	{Package: "./internal/inboxmover", Tests: []string{
 		"TestOptionsMover_OneConstructionSite",
 	}},

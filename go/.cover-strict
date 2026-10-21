@@ -90,3 +90,4 @@
 ./internal/researchindex 100
 ./internal/auditcascade 100
 ./internal/recoveryretro 100
+./internal/cli/agentcmd 100

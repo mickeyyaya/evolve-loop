@@ -36,10 +36,14 @@ func protectedAmong(paths []string, member func(string) bool) []string {
 }
 
 func LaneDeclaredFiles(evolveDir string, cycle int) ([]string, error) {
-	items, _, err := inboxbatch.LoadDir(inboxbatch.ProcessingCycleDir(filepath.Join(evolveDir, "inbox"), cycle))
+	scan, err := inboxbatch.ScanDir(inboxbatch.ProcessingCycleDir(filepath.Join(evolveDir, "inbox"), cycle))
 	if err != nil {
 		return nil, fmt.Errorf("lane %d claims: %w", cycle, err)
 	}
+	if scan.HasUnreadable() {
+		return nil, fmt.Errorf("lane %d claims are partial: %v", cycle, scan.Warnings)
+	}
+	items := scan.Items
 	pin := committedset.LanePin(laneWorkspace(evolveDir, cycle))
 	var files []string
 	for _, it := range items {
