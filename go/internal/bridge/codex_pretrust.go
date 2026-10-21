@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -55,7 +57,7 @@ func pretrustCodexProjects(cfg *Config) error {
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("read codex config: %w", err)
 		}
-		merged := appendCodexTrustEntries(string(existing), paths)
+		merged := appendCodexTrustEntries(pruneDeadCodexProjects(string(existing), paths), paths)
 		merged = appendCodexNotice(merged)
 		if merged == string(existing) {
 			return nil
@@ -105,22 +107,33 @@ func resolveCodexConfigPath(cfg *Config) (string, error) {
 	return defaultCodexConfigPath()
 }
 
-func defaultCodexConfigPath() (string, error) {
+func codexHome() (string, error) {
+	if dir := os.Getenv("CODEX_HOME"); dir != "" {
+		return dir, nil
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".codex", "config.toml"), nil
+	return filepath.Join(home, ".codex"), nil
+}
+
+func defaultCodexConfigPath() (string, error) {
+	dir, err := codexHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "config.toml"), nil
 }
 
 var codexVersionPathFn func() (string, error) = defaultCodexVersionPath
 
 func defaultCodexVersionPath() (string, error) {
-	home, err := os.UserHomeDir()
+	dir, err := codexHome()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".codex", "version.json"), nil
+	return filepath.Join(dir, "version.json"), nil
 }
 
 func codexVersionPath() (string, error) {
@@ -188,4 +201,42 @@ func appendCodexNotice(existing string) string {
 
 func codexProjectHeader(path string) string {
 	return fmt.Sprintf(`[projects."%s"]`, tomlKeyEscaper.Replace(path))
+}
+
+func pruneDeadCodexProjects(config string, keep []string) string {
+	lines := strings.SplitAfter(config, "\n")
+	var out strings.Builder
+	dropping := false
+	for _, line := range lines {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "[") {
+			dropping = deadScratchProject(trimmed, keep)
+		}
+		if !dropping {
+			out.WriteString(line)
+		}
+	}
+	return out.String()
+}
+
+func deadScratchProject(header string, keep []string) bool {
+	inner, ok := strings.CutPrefix(header, `[projects.`)
+	if !ok || !strings.HasSuffix(inner, "]") {
+		return false
+	}
+	path, err := strconv.Unquote(strings.TrimSuffix(inner, "]"))
+	if err != nil || slices.Contains(keep, path) || !scratchProjectPath(path) {
+		return false
+	}
+	_, err = os.Stat(path)
+	return os.IsNotExist(err)
+}
+
+func scratchProjectPath(path string) bool {
+	temp := filepath.Clean(os.TempDir()) + string(filepath.Separator)
+	for _, prefix := range []string{temp, "/private" + temp} {
+		if rel, ok := strings.CutPrefix(path, prefix); ok {
+			return strings.HasPrefix(rel, "Test") || strings.HasPrefix(rel, "evolve-")
+		}
+	}
+	return strings.Contains(path, "/.evolve/worktrees/")
 }
