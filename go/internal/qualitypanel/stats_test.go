@@ -12,7 +12,7 @@ func TestWilson_MatchesTheResearchWorkedExamples(t *testing.T) {
 	cases := []struct {
 		k, n      int
 		p, lo, hi float64
-	}{{3, 4, 0.750, 0.301, 0.954}, {119, 186, 0.640, 0.569, 0.705}, {0, 234, 0, 0, 0.016}, {5, 5, 1, 0.566, 1}}
+	}{{3, 4, 0.750, 0.301, 0.954}, {3, 5, 0.600, 0.231, 0.882}, {119, 186, 0.640, 0.569, 0.705}, {0, 234, 0, 0, 0.016}, {5, 5, 1, 0.566, 1}}
 	for _, c := range cases {
 		got := Wilson(c.k, c.n)
 		if !near(got.Value, c.p) || !near(got.Lo, c.lo) || !near(got.Hi, c.hi) {
@@ -29,8 +29,8 @@ func TestMDE_MatchesTheSampleRuleOfTheSpec(t *testing.T) {
 	if got := MDE(0.42, 66); !near(got, 0.2406) {
 		t.Errorf("MDE(0.42, 66) = %.4f, want 0.2406", got)
 	}
-	if got := MDE(0.42, 5); !near(got, 0.8742) {
-		t.Errorf("MDE(0.42, 5) = %.4f, want 0.8742", got)
+	if got := MDE(0.42, 5); !near(got, 0.8740) {
+		t.Errorf("MDE(0.42, 5) = %.4f, want 0.8740", got)
 	}
 	if got := MDE(0.42, 0); got != 1 {
 		t.Errorf("MDE with no sample = %v, want 1 (nothing is detectable)", got)

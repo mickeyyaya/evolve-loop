@@ -816,3 +816,5 @@
 ./internal/cli/agentcmd
 # qualitypanel - the quality index readings of ADR-0153 and their Signal Center events.
 ./internal/qualitypanel
+# pipelinerates - the pipeline quality index readers PQ1, PQ3, PQ4 and CQ2 of ADR-0153.
+./internal/pipelinerates
