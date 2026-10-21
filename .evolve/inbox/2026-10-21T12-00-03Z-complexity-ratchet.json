@@ -1,0 +1,22 @@
+{
+  "id": "complexity-ratchet",
+  "kind": "feature",
+  "priority_class": "maintainability",
+  "weight": 0.42,
+  "route": "console-manual",
+  "title": "Quality indexes Q3: unit conformance on changed functions and the tree, interface depth, duplication and judgment surface",
+  "summary": "CQ1 baseline at e0b8433fe: 88.8% of 11,296 production functions are 30 lines or fewer with cyclomatic 10, nesting 3 and 4 params at most; 83.5% also have 100% coverage. CQ3 median 15.2 lines per exported symbol. CQ4 22.7 repeated 5-line windows per 1,000 lines. CQ5 49 conditional rule lines in agents and skills. The sizeratchet bounds lines only. Spec: docs/architecture/llm-quality-indexes.md §6.",
+  "fix": "Port the AST scanner (cyclomatic, nesting, params, lines; spec CQ1) and the depth and duplication counters into internal/qualitypanel. Emit CQ1 tree at each boundary and CQ1 changed per cycle of the closing wave (functions changed by the ship commit). Emit CQ3, CQ4 (tree and diff form) and CQ5 at --scope tree.",
+  "acceptance": [
+    "RED first: a changed function with cyclomatic 11 is non-conforming and lowers the changed-function reading",
+    "The tree reading on a fixture tree matches a hand count for each of the four limits",
+    "CQ4 diff form counts only windows of added lines that match a window elsewhere",
+    "CQ5 counts list lines that start with If, When or Unless after the list and bold marks",
+    "Readings start at stage report for CQ1 and shadow for CQ3, CQ4 and CQ5",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": ["quality-index-collector"],
+  "files": ["go/internal/qualitypanel/", "docs/architecture/llm-quality-indexes.md"],
+  "created_at": "2026-10-21T12:00:03Z",
+  "source": "console, 2026-10-21, plan llm-quality-indexes-2026-10 component Q3 (ADR-0153)"
+}

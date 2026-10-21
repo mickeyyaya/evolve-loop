@@ -6,6 +6,8 @@
 
 `internal/dashboard` is the read-only observability surface behind `evolve dashboard`: a stdlib-only local web UI that renders the loop's on-disk state (`.evolve/cycle-state.json`, the run workspaces under `.evolve/runs/`, the committed dossiers under `knowledge-base/cycles/`, and the inbox) as one live page. It answers whether the loop is alive, what is queued, what each cycle did, what went wrong, and how the ship rate is trending.
 
+The quality indexes (ADR-0153, proposed) plan a `Snapshot.Quality` panel of separate readings with intervals and no total. The spec of record is [llm-quality-indexes.md](../llm-quality-indexes.md) §11. Component Q11 adds it.
+
 ## Design
 
 ### Reading rules
