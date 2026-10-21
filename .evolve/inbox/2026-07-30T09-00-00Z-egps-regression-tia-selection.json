@@ -2,7 +2,8 @@
   "connects_to": [
     "go/internal/acssuite/acssuite.go",
     "go/internal/changedpkgs/changedpkgs.go",
-    "docs/research/failed-loop-analysis-2026-07/README.md"
+    "docs/research/failed-loop-analysis-2026-07/README.md",
+    ".evolve/inbox/2026-10-21T05-00-00Z-regression-tia-declared-impact-surface.json"
   ],
   "created_at": "2026-07-30T09:00:00Z",
   "fix": "In acssuite runGoTest: partition ./acs/regression/... by predicate package's declared target packages (predicates already grep/shell specific packages — derive mapping from acs metadata or a manifest); select intersect(changedpkgs). Config via policy.json gates block (stage: off|shadow|enforce, shadow logs would-skip counts first). Full-corpus triggers: batch boundary, any red in selected set, weekly floor. Wiring proof: predicate pinning that an out-of-selection regression still runs at the boundary sweep.",
@@ -15,5 +16,6 @@
   "weight": 0.7,
   "priority_class": "performance",
   "priority_rationale": "inbox review 2026-09-27: It would cut per-cycle predicate time under fleet load and shrink the env-flake surface, but it is not failing anything and its next step is an operator policy flip.",
-  "review_status": "inbox review 2026-09-27: PARTIAL. The mechanism is built and wired: the regressiontia package, emitTIADecision (phases/audit/audit.go:649 and 674-703), and the policy block (policy/regressiontia.go). It has never run. The live policy.json has no regression_tia block, so the stage is the compiled-default off, and no acs-tia-shadow.json exists in any run dir (0 found). The corpus is 49 files / 188 test funcs under go/acs/regression. What remains, per the item's own 2026-08-04 note: (a) an operator edit of policy.json to stage 'sha"
+  "review_status": "inbox review 2026-09-27: PARTIAL. The mechanism is built and wired: the regressiontia package, emitTIADecision (phases/audit/audit.go:649 and 674-703), and the policy block (policy/regressiontia.go). It has never run. The live policy.json has no regression_tia block, so the stage is the compiled-default off, and no acs-tia-shadow.json exists in any run dir (0 found). The corpus is 49 files / 188 test funcs under go/acs/regression. What remains, per the item's own 2026-08-04 note: (a) an operator edit of policy.json to stage 'sha",
+  "operator_decision": "2026-10-21: \"Yes\" — run regression_tia in shadow. The checked-in .evolve/policy.json sets regression_tia.stage=shadow; evolve acs tia-report is the soak readout (ADR-0082 amendment 2026-10-21). Still open: the declared impact surface for non-Go edges (item regression-tia-declared-impact-surface), then a soak with would_skip > 0 and zero misses before enforce."
 }

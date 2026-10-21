@@ -702,6 +702,13 @@ The lint checks text against the ASD-STE100 house rules ([the standard](../conve
 - **The local docs-only policy:** for a change of docs only, run `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added`, the relative link check, one `docs-review` pass and the commit gate with `--reviewers docs-review`. No make target runs.
 - **The dial:** `.evolve/policy.json` `docs_floor.ste_stage` is `off`, `shadow` or `enforce`, and the compiled default is `shadow`. `off` stops the floor's line. `shadow` only WARNs. `enforce` sends a changed document back to the build when its added lines hold a finding, as CI judges them. The stage stays `shadow` until the operator records the decision (inbox `lane-ste-lint-stage-enforce`). The policy loader refuses an unknown word in `stage` or `ste_stage`, and an unknown `docs_floor` key.
 
+## Regression test-impact selection (shadow)
+
+- **The dial:** `.evolve/policy.json` `regression_tia.stage` is `off`, `shadow` or `enforce`. The checked-in file sets `shadow`, by the operator decision of 2026-10-21. The compiled default is `off`.
+- **What shadow does:** the audit writes `acs-tia-shadow.json` into the run directory. It changes no gate result, and the full regression corpus still runs.
+- **The readout:** `evolve acs tia-report` rolls up the shadow decisions of every run directory and names each miss. `--json` prints the summary.
+- **Not yet:** `enforce` skips nothing today. The import graph cannot see the files and processes that the predicates read, so the shadow reports `would_skip=0`. See [ADR-0082](../architecture/adr/0082-regression-test-impact-selection-shadow.md).
+
 ## Phase handoff policy
 
 - In `.evolve/policy.json`, the `handoff` block sets the `stage` (`shadow` or `enforce`) and optional `judge_tier` for each pair. The five pairs are `build-audit`, `intent-scout`, `scout-triage`, `tdd-build`, and `triage-tdd`.

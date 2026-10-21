@@ -30,3 +30,14 @@
 ## Findings
 
 - The reverse-closure rule exists because the forward-only scope hid the cycle-1250 class. A change confined to `internal/router` skipped `internal/routingtest`, which holds the keystone parity invariant. Main stayed red for five commits. `TestChangedScope_WidensByReverseDependency` reproduces that case on the real import graph.
+
+## The shadow rollup (2026-10-21)
+
+- `Rollup(runsDir)` reads `acs-tia-shadow.json` and `acs-verdict.json` from each `cycle-<N>` directory, in cycle order. A run directory without the shadow artifact is not counted.
+- `Summary` holds the cycle count, the totals of the selected packages and of the packages the selection can skip (`would_skip`), and each `Miss`. A miss is a red result with `is_regression: true` whose base name matches a skippable package. `acssuite` writes a regression predicate as `go/acs/<base>/...:<Test>`, with no `regression/` segment, so the rollup matches on the base name of `./acs/regression/<base>`. The rollup decodes each result as `acssuite.Result`, so the two cannot drift. `Decision.DurationMS` records the time of each selection, and the summary keeps the total and the largest.
+- Limit: the rollup does not tell apart two regression packages with one base name. The corpus is one flat directory, so this does not occur today.
+- A cycle with a shadow decision and no verdict is listed in `NoVerdict`. A file that does not parse is listed in `Unreadable`. A runs directory that does not exist is an error.
+- `evolve acs tia-report` prints the rollup, or `--json` prints the `Summary`.
+- Pinned by `TestRollup_CountsTheShadowDecisionsAndNamesEachMiss`, `TestRollup_AMissingRunsDirIsAnError` and `TestRollup_ARealCycleVerdictNamesTheMissOfASkippedRegressionPackage`. The last test reads a verbatim copy of the `acs-verdict.json` of cycle 2027 (`testdata/`).
+- **Known limit (filed).** `resolveDeps` treats a package as an escape hatch when any transitive dependency is `os`. Each test package reaches `os` through `testing`, so the selection never skips a package today and `would_skip` stays 0. The inbox item `regression-tia-escape-hatch-is-transitive` owns the fix.
+
