@@ -7,13 +7,14 @@ import (
 	"io/fs"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/pipelinerates"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/qualitypanel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const (
-	qualityUsage      = "usage: evolve quality report --scope wave|tree|judges|replay --project-root P"
+	qualityUsage      = "usage: evolve quality report --scope wave|tree|judges|replay --project-root P | evolve quality compare --index PQ1|PQ4 --a WINDOW --b WINDOW [--paired] --project-root P (WINDOW: wave:N or waves:A-B)"
 	qualityPolicyPath = ".evolve/" + paths.PolicyFile
 )
 
@@ -27,7 +28,31 @@ type qualityEnv struct {
 	newCenter func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func())
 }
 
-var qualityScopes = map[string][]qualityReader{"wave": nil, "tree": nil, "judges": nil, "replay": nil}
+var qualityScopes = map[string][]qualityReader{"wave": waveQualityReaders(), "tree": nil, "judges": nil, "replay": nil}
+
+func waveQualityReaders() []qualityReader {
+	return []qualityReader{
+		pipelineReader("PQ1", func(cs []pipelinerates.Cycle, _ string) ([]qualitypanel.Reading, error) {
+			return pipelinerates.ShipRate(cs), nil
+		}),
+		pipelineReader("PQ4", func(cs []pipelinerates.Cycle, _ string) ([]qualitypanel.Reading, error) {
+			return pipelinerates.DeadlineRate(cs), nil
+		}),
+		pipelineReader("CQ2", func(cs []pipelinerates.Cycle, root string) ([]qualitypanel.Reading, error) {
+			return pipelinerates.PackagesPerShip(cs, pipelinerates.GitShipPaths(root))
+		}),
+	}
+}
+
+func pipelineReader(index string, read func([]pipelinerates.Cycle, string) ([]qualitypanel.Reading, error)) qualityReader {
+	return qualityReader{index: index, read: func(root string) ([]qualitypanel.Reading, error) {
+		cycles, err := pipelinerates.LoadCycles(root)
+		if err != nil {
+			return nil, err
+		}
+		return read(cycles, root)
+	}}
+}
 
 func runQuality(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	return runQualityWith(qualityEnv{scopes: qualityScopes, newCenter: newQualityCenter}, args, stdout, stderr)
@@ -38,6 +63,9 @@ func newQualityCenter(root, evolveDir string, console io.Writer) (*signalcenter.
 }
 
 func runQualityWith(env qualityEnv, args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "compare" {
+		return runQualityCompare(env, args[1:], stdout, stderr)
+	}
 	scope, root, err := parseQualityArgs(args, env.scopes)
 	if err != nil {
 		fmt.Fprintf(stderr, "quality: %v\n%s\n", err, qualityUsage)
@@ -81,23 +109,31 @@ type qualityTally struct {
 
 func collectQuality(center *signalcenter.Center, root string, readers []qualityReader) qualityTally {
 	t := qualityTally{center: center}
-	stages, err := policy.QualityStagesFor(root)
-	if err != nil {
-		t.emit(qualitypanel.SourceWarning("", qualitypanel.CodeSourceUnreadable, qualityPolicyPath, err.Error()))
-	}
+	stages := t.stages(root)
 	for _, rd := range readers {
 		readings, err := rd.read(root)
 		if err != nil {
 			t.emit(readerWarning(rd.index, err))
-			continue
 		}
-		for _, r := range readings {
-			for _, e := range qualitypanel.Events(r, qualitypanel.StageFor(r.Index, stages)) {
-				t.emit(e)
-			}
-		}
+		t.publish(readings, stages)
 	}
 	return t
+}
+
+func (t *qualityTally) stages(root string) map[string]qualitypanel.Stage {
+	stages, err := policy.QualityStagesFor(root)
+	if err != nil {
+		t.emit(qualitypanel.SourceWarning("", qualitypanel.CodeSourceUnreadable, qualityPolicyPath, err.Error()))
+	}
+	return stages
+}
+
+func (t *qualityTally) publish(readings []qualitypanel.Reading, stages map[string]qualitypanel.Stage) {
+	for _, r := range readings {
+		for _, e := range qualitypanel.Events(r, qualitypanel.StageFor(r.Index, stages)) {
+			t.emit(e)
+		}
+	}
 }
 
 func (t *qualityTally) emit(e signalcenter.Event) {

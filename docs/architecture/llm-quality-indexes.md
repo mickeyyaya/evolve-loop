@@ -3,7 +3,7 @@
 > [ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md) · plan: [llm-quality-indexes-2026-10](../plans/llm-quality-indexes-2026-10.md) · research: [llm-quality-indexes-2026-10](../research/llm-quality-indexes-2026-10.md) (F2.1 to F2.16, P3.1 to P4.3, R1 to R8).
 > This file is the spec of record for each quality index: its formula, its data source, its interval, its stage and its signal. The plan holds the components and their order. The ADR holds the decision. The Signal Center design is in [signal-center-design.md](signal-center-design.md), and the event channels are in [event-channels.md](event-channels.md).
 >
-> Status: accepted (ADR-0153), 2026-10-21. Component Q1 is built: `internal/qualitypanel`, the `quality` module, `evolve quality report`, the boundary step and the two channels ([internal-qualitypanel](packages/internal-qualitypanel.md)). No index reader exists yet; Q2 to Q10 add them. The baselines below come from one-time Go programs (research §2).
+> Status: accepted (ADR-0153), 2026-10-21. Component Q1 is built: `internal/qualitypanel`, the `quality` module, `evolve quality report`, the boundary step and the two channels ([internal-qualitypanel](packages/internal-qualitypanel.md)). Component Q2 is built: the PQ1, PQ4 and CQ2 readers of the wave scope and `evolve quality compare` for PQ3 ([internal-pipelinerates](packages/internal-pipelinerates.md)). Q3 to Q10 add the other readers. The baselines below come from one-time Go programs (research §2).
 
 ## Table of contents
 

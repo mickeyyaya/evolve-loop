@@ -153,3 +153,20 @@ func TestEvents_AnUnknownIndexIsAWarningNotAReading(t *testing.T) {
 		t.Errorf("events = %+v, want one QUALITY_SOURCE_UNREADABLE warning naming ZQ9", events)
 	}
 }
+
+func TestEvents_AReadingCanCarryItsOwnThresholdAndStatus(t *testing.T) {
+	t.Parallel()
+	systemFail := 0.05
+	r := Reading{Index: "PQ4", Interval: Wilson(9, 186), Method: MethodWilson95, N: 186, Window: "waves:82-140/system-fail", Threshold: &systemFail}
+
+	own := Events(r, StageReport)[0]
+	r.Status = StatusInconclusive
+	forced := Events(Reading{Index: "PQ3", Interval: Interval{Value: 0.2, Lo: -0.67, Hi: 1.07}, Method: MethodMDE, N: 5, Status: StatusInconclusive}, StageReport)[0]
+
+	if own.Fields["threshold"] != "0.050" || own.Fields["status"] != "inconclusive" {
+		t.Errorf("fields = %v, want the reading's own threshold 0.050 (interval [0.026, 0.089] crosses it)", own.Fields)
+	}
+	if forced.Fields["status"] != "inconclusive" || forced.Fields["method"] != "mde" {
+		t.Errorf("fields = %v, want the reader's status and method mde", forced.Fields)
+	}
+}
