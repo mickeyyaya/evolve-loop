@@ -82,7 +82,36 @@ func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (F
 	if err := writeArtifactAtomically(filepath.Join(workspace, "failure-digest.json"), b); err != nil {
 		return digest, fmt.Errorf("write failure-digest.json: %w", err)
 	}
+	if err := writeFailureDigestRecord(workspace, b); err != nil {
+		return digest, err
+	}
 	return digest, nil
+}
+
+const failureDigestRecordDir = "failure-digests"
+
+func failureDigestRecordPath(workspace string) (string, bool) {
+	ws := filepath.Clean(workspace)
+	runs := filepath.Dir(ws)
+	if !strings.HasPrefix(filepath.Base(ws), "cycle-") || filepath.Base(runs) != "runs" || filepath.Base(filepath.Dir(runs)) != ".evolve" {
+		return "", false
+	}
+	return filepath.Join(filepath.Dir(runs), failureDigestRecordDir, filepath.Base(ws)+".json"), true
+}
+
+func writeFailureDigestRecord(workspace string, b []byte) error {
+	path, ok := failureDigestRecordPath(workspace)
+	if !ok {
+		return nil
+	}
+	err := os.MkdirAll(filepath.Dir(path), 0o755)
+	if err == nil {
+		err = writeArtifactAtomically(path, b)
+	}
+	if err != nil {
+		return fmt.Errorf("write the harness digest record: %w", err)
+	}
+	return nil
 }
 
 func readAuditFailReason(workspace string) (phase string, reasons []string) {
