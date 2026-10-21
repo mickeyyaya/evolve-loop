@@ -80,7 +80,7 @@ the historical fields used by older readers.
 | `duration_ms` | Milliseconds within `timing_scope`; absent means unavailable, while `0` is a measured zero duration. |
 | `exit_code` | Terminal Bridge exit when present. |
 | `cause_code` | Stable host-authored classification for non-zero exits. Provider prose cannot set it. |
-| `tripwire` | Existing uncovered, long-running, successful non-Claude collection warning signal. |
+| `tripwire` | A long-running, successful try of a family with its own usage collector (claude, agy) whose collectors found no usage. A family with no collector (codex, ollama) gets the "no usage collector" warning instead. |
 | `fill_pct` | Context-fill percentage, or `-1` when unavailable. |
 
 `first_output_ms` and `first_output_source` remain optional and are not emitted

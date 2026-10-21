@@ -37,26 +37,26 @@ func TestRecordTokenUsage_Tripwire_NonZeroExitCodeOtherThanQuotaAbort_Silent(t *
 	}
 }
 
-func TestRecordTokenUsage_Tripwire_ClaudeDriverCaseInsensitive_Silent(t *testing.T) {
+func TestRecordTokenUsage_Tripwire_ACollectorFamilyIsRecognizedInAnyCase(t *testing.T) {
 	t.Parallel()
-	for _, cli := range []string{"CLAUDE-TMUX", "Claude", "ClAuDe-Headless"} {
-		stderr, _ := runTripwireCase(t, tripwireCase{
-			cli: cli, agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
-		})
-		if line, ok := tripwireStderrLine(stderr); ok {
-			t.Errorf("cli %q must be recognized as a claude driver regardless of case, got: %s", cli, line)
-		}
-	}
-}
-
-func TestRecordTokenUsage_Tripwire_ClaudeSubstringNotPrefix_Warns(t *testing.T) {
-	t.Parallel()
-	for _, cli := range []string{"my-claude-wrapper", "wrapper-claude", "not-claude-at-all"} {
+	for _, cli := range []string{"CLAUDE-TMUX", "Claude", "ClAuDe-Headless", "AGY-TMUX"} {
 		stderr, _ := runTripwireCase(t, tripwireCase{
 			cli: cli, agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 		})
 		if _, ok := tripwireStderrLine(stderr); !ok {
-			t.Errorf("cli %q does not start with \"claude\" and must trip like any non-claude driver; stderr:\n%s", cli, stderr)
+			t.Errorf("cli %q names a family with a collector in any case, so it must trip; stderr:\n%s", cli, stderr)
+		}
+	}
+}
+
+func TestRecordTokenUsage_Tripwire_ANameThatOnlyContainsAFamilyHasNoCollector(t *testing.T) {
+	t.Parallel()
+	for _, cli := range []string{"my-claude-wrapper", "wrapper-claude", "not-agy-at-all"} {
+		stderr, _ := runTripwireCase(t, tripwireCase{
+			cli: cli, agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
+		})
+		if line, ok := tripwireStderrLine(stderr); ok {
+			t.Errorf("cli %q only contains a family name, so it has no collector and must stay silent; got: %s", cli, line)
 		}
 	}
 }
@@ -72,7 +72,7 @@ func TestRecordTokenUsage_Tripwire_EmptyCLI_NoPanicStillWarns(t *testing.T) {
 		cli: "", agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 	})
 	if _, ok := tripwireStderrLine(stderr); !ok {
-		t.Errorf("empty CLI (not a claude prefix) with exit-0/long-duration/uncovered must still trip; stderr:\n%s", stderr)
+		t.Errorf("an empty CLI is the claude default, which has a collector, so exit-0/long-duration/uncovered must trip; stderr:\n%s", stderr)
 	}
 }
 
@@ -100,7 +100,7 @@ func TestRecordTokenUsage_TripwireRecord_FalseFieldPresentAcrossAllSilentPaths(t
 	t.Parallel()
 	cases := map[string]tripwireCase{
 		"exit0-short-duration": {cli: "agy", agent: "builder", code: 0, durSecs: 5, cycleInDir: true},
-		"claude-baseline":      {cli: "claude-tmux", agent: "builder", code: 0, durSecs: 90, cycleInDir: true},
+		"no-collector-family":  {cli: "codex-tmux", agent: "builder", code: 0, durSecs: 90, cycleInDir: true},
 		"covered-nonclaude":    {cli: "agy", agent: "builder", code: 0, durSecs: 90, covered: true, cycleInDir: true},
 	}
 	for name, c := range cases {
