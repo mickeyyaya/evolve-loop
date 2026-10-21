@@ -36,7 +36,9 @@ This page tells the console (an operator or an LLM) how to run each wave through
 
 Run the plane's own binary, `<plane>/go/bin/evolve`. The build step rebuilds that file, `reset-sha` pins the running binary, and the loop starts the running binary. Only the plane binary makes these three one binary. With another binary, `wave next` gives a warning that names both paths.
 
-A `wave next` that is not a dry run first heals a stale plane binary. When the binary is behind `HEAD` with a `go/` change, it rebuilds the binary and starts again in the new binary. `evolve loop` does the same at boot (`boot.binary_refresh`). A batch that adds a policy key thus does not stop the next boundary. If the policy still has a key that the binary does not know, the error tells you to run `make -C <plane>/go build` and then `wave next` again.
+A `wave next` that is not a dry run first heals a stale plane binary. When the binary is behind `HEAD` with a `go/` change, it rebuilds the binary and starts again in the new binary. `evolve loop` does the same at boot (`boot.binary_refresh`). A batch that adds a policy key thus does not stop the next boundary. If the policy still has a key that the binary does not know, the error tells you to run `make -C <plane>/go build`. It also gives the `wave next` command to run again, with your arguments.
+
+The heal does not check for a dirty plane tree. The build uses the working tree, as at the boot of `evolve loop`.
 
 1. Run `<plane>/go/bin/evolve wave next --merge <n,...> --dry-run`. Read the goal and the steps.
 2. Run `<plane>/go/bin/evolve wave next --merge <n,...> --json`. Read the envelope on stdout. The step output goes to stderr.

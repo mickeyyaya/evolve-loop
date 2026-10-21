@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -142,5 +143,39 @@ func writeFileOrFail(t *testing.T, path, body string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestWaveNext_TheRefreshRunsBeforeThePolicyParseSoTheRebuiltBinaryLaunches(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	p.seedWave81()
+	p.write(".evolve/policy.json", waveFuturePolicy)
+	h := newWaveHarness()
+	h.refresh = func(loopConfig, io.Writer) bootBinaryRefreshResult {
+		p.write(".evolve/policy.json", `{"cli_routing": {"clis": ["claude"], "default": ["claude"]}}`)
+		return bootBinaryRefreshResult{Stale: true, Rebuilt: true}
+	}
+
+	rc := h.run("next", "--json", "--project-root", p.root)
+
+	if e := decodeWaveEnvelope(t, h.stdout.Bytes()); rc != 0 || !e.Launched || !e.Recorded {
+		t.Fatalf("rc = %d, envelope %+v; want a launch: the refresh, which stands in for the rebuilt binary that knows the key, must run before the parse; stderr:\n%s", rc, e, h.stderr.String())
+	}
+}
+
+func TestWaveNext_TheRemedyRepeatsTheOriginalArguments(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	p.seedWave81()
+	p.write(".evolve/policy.json", waveFuturePolicy)
+	h := newWaveHarness()
+
+	h.run("next", "--merge", "1101,1102", "--note", "two words", "--json", "--project-root", p.root)
+
+	e := decodeWaveEnvelope(t, h.stdout.Bytes())
+	want := filepath.Join(p.root, "go", "bin", "evolve") + ` wave next again with the arguments ["--merge" "1101,1102" "--note" "two words" "--json" "--project-root" "` + p.root + `"]`
+	if !strings.Contains(e.Error, want) {
+		t.Fatalf("error %q; want the rerun command %q", e.Error, want)
 	}
 }

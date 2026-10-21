@@ -5,8 +5,9 @@
   "fix": "Before the first strict policy parse, a non-dry wave next runs the boot refresh of the loop (bootBinaryRefresh, cmd_loop_boot_refresh.go): a binary behind HEAD with a go/ delta is rebuilt and the process re-execs into it. When the parse still meets an unknown field, the error names the remedy: make -C <root>/go build, then run wave next again.",
   "acceptance": [
     "A wave next whose synced policy carries a key that the binary does not know rebuilds and re-execs before the policy parse and before any boundary step (TestWaveNext_APolicyKeyTheBinaryDoesNotKnowRebuildsAndReExecsBeforeTheParse).",
+    "The refresh runs before the policy parse: when the refresh stands in for the rebuilt binary, the wave launches (TestWaveNext_TheRefreshRunsBeforeThePolicyParseSoTheRebuiltBinaryLaunches fails with the call moved after loadWaveInputs).",
     "A fresh binary launches with no rebuild (TestWaveNext_AFreshBinaryLaunchesWithNoRebuild); a dry run never rebuilds (TestWaveNext_ADryRunNeverRebuildsTheBinary).",
-    "An unknown policy key names the rebuild remedy; another parse error keeps its own text (TestWaveNext_AnUnknownPolicyKeyNamesTheRebuildRemedy, TestWaveNext_AnotherPolicyErrorKeepsItsOwnText).",
+    "An unknown policy key names the rebuild remedy with the original arguments; another parse error keeps its own text (TestWaveNext_AnUnknownPolicyKeyNamesTheRebuildRemedy, TestWaveNext_TheRemedyRepeatsTheOriginalArguments, TestWaveNext_AnotherPolicyErrorKeepsItsOwnText).",
     "The opt-out boot.binary_refresh=off holds also when the policy has an unknown key (TestWaveNext_TheRefreshOptOutHoldsWhenThePolicyHasAnUnknownKey).",
     "The fix reuses bootBinaryRefresh; no second self-heal mechanism."
   ],
