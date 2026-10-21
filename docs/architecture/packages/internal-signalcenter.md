@@ -4,6 +4,8 @@
 
 `internal/signalcenter` is the one event stream that host-side components produce into and the orchestrator listens to. It is a leaf: the standard library plus `internal/log` for the bounded-field sanitizer. `core`, `bridge` and `cmd` import it, and it imports none of them. Design: `docs/architecture/signal-center-design.md` (ADR-0101).
 
+The quality indexes (ADR-0153, proposed) plan to publish through this package as module `quality`. The spec of record is [llm-quality-indexes.md](../llm-quality-indexes.md) §5. Until component Q1 lands, the module, the kinds and the codes do not exist here.
+
 ## Design
 
 - `Event` is the one schema. `Emit` stamps `SchemaVersion`, `Seq`, `PID` and `TS`. Producers fill the rest. The schema has no nested structs, so one event is one greppable line. Structured detail goes in the artifact that `fields.path` names.
