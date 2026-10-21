@@ -111,21 +111,23 @@ func (f *fakeWaveVerbs) dispatch(verb string, args []string, stdout, stderr io.W
 }
 
 type waveHarness struct {
-	rootErr error
-	exeErr  error
-	prsErr  error
-	exe     string
-	started map[int]time.Time
-	verbs   *fakeWaveVerbs
-	since   []string
-	headErr error
-	alive   map[int]bool
-	sleeps  int
-	onSleep func(n int)
-	save    func(s wave.Store, r wave.Record) error
-	graph   graphLoader
-	stdout  bytes.Buffer
-	stderr  bytes.Buffer
+	rootErr   error
+	exeErr    error
+	prsErr    error
+	exe       string
+	started   map[int]time.Time
+	verbs     *fakeWaveVerbs
+	since     []string
+	headErr   error
+	alive     map[int]bool
+	sleeps    int
+	onSleep   func(n int)
+	save      func(s wave.Store, r wave.Record) error
+	graph     graphLoader
+	refresh   func(loopConfig, io.Writer) bootBinaryRefreshResult
+	refreshed []loopConfig
+	stdout    bytes.Buffer
+	stderr    bytes.Buffer
 }
 
 func newWaveHarness() *waveHarness {
@@ -170,6 +172,13 @@ func (h *waveHarness) env(root string) waveEnv {
 			return []string{"812"}, h.prsErr
 		},
 		loadGraph: h.graph,
+		refreshBinary: func(cfg loopConfig, w io.Writer) bootBinaryRefreshResult {
+			h.refreshed = append(h.refreshed, cfg)
+			if h.refresh != nil {
+				return h.refresh(cfg, w)
+			}
+			return bootBinaryRefreshResult{}
+		},
 	}
 }
 

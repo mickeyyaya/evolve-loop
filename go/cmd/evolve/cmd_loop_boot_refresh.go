@@ -124,7 +124,7 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	var res bootBinaryRefreshResult
 	projectRoot := cfg.ProjectRoot
 
-	if pol, _ := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json")); pol.BootBinaryRefresh() == "off" {
+	if bootRefreshOff(cfg.EvolveDir) {
 		fmt.Fprintf(stderr, "[loop] boot-refresh: policy boot.binary_refresh=off — staleness self-heal disabled by operator\n")
 		return res
 	}
@@ -202,4 +202,20 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN re-exec failed (%v) — booting the old binary (rebuilt copy is on disk and pin-reconciled for the next launch)\n", err)
 	}
 	return res
+}
+
+func bootRefreshOff(evolveDir string) bool {
+	path := filepath.Join(evolveDir, "policy.json")
+	pol, err := policy.Load(path)
+	if err == nil {
+		return pol.BootBinaryRefresh() == "off"
+	}
+	var lenient struct {
+		Boot *policy.BootPolicy `json:"boot"`
+	}
+	raw, rerr := os.ReadFile(path)
+	if rerr != nil || json.Unmarshal(raw, &lenient) != nil {
+		return false
+	}
+	return policy.Policy{Boot: lenient.Boot}.BootBinaryRefresh() == "off"
 }

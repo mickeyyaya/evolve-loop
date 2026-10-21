@@ -831,4 +831,7 @@ var serialTests = map[string]string{
 	"main.TestHandoff_UsageErrorsExit10":                                                                                   "TDD-authored handoff test without t.Parallel, earlier-phase-owned",
 	"main.TestHandoff_VerbsWriteNothingAndRepeatTheSameAnswer":                                                             "TDD-authored handoff test without t.Parallel, earlier-phase-owned",
 	"main.TestHandoffCoverage_AnUnresolvableProjectRootIsAUsageFailure":                                                    "swaps seam handoffAbsPath",
+	"main.TestWaveNext_APolicyKeyTheBinaryDoesNotKnowRebuildsAndReExecsBeforeTheParse":                                     "swaps seam bootRefreshBinaryCommitFn",
+	"main.TestWaveNext_AFreshBinaryLaunchesWithNoRebuild":                                                                  "swaps seam bootRefreshBinaryCommitFn",
+	"main.TestWaveNext_TheRefreshOptOutHoldsWhenThePolicyHasAnUnknownKey":                                                  "swaps seam bootRefreshBinaryCommitFn",
 }

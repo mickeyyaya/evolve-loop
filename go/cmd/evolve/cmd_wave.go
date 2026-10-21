@@ -42,17 +42,18 @@ var (
 )
 
 type waveEnv struct {
-	resolveRoot func(projectRoot string, stderr io.Writer) (string, error)
-	executable  func() (string, error)
-	pidStarted  func(int) (time.Time, bool)
-	dispatch    boundaryDispatch
-	now         func() time.Time
-	sleep       func(time.Duration)
-	pidAlive    func(int) bool
-	saveRecord  func(wave.Store, wave.Record) error
-	mainHead    func(root string) (string, error)
-	mergedPRs   func(root, since string) ([]string, error)
-	loadGraph   graphLoader
+	resolveRoot   func(projectRoot string, stderr io.Writer) (string, error)
+	executable    func() (string, error)
+	pidStarted    func(int) (time.Time, bool)
+	dispatch      boundaryDispatch
+	now           func() time.Time
+	sleep         func(time.Duration)
+	pidAlive      func(int) bool
+	saveRecord    func(wave.Store, wave.Record) error
+	mainHead      func(root string) (string, error)
+	mergedPRs     func(root, since string) ([]string, error)
+	loadGraph     graphLoader
+	refreshBinary func(loopConfig, io.Writer) bootBinaryRefreshResult
 }
 
 type wavePlaneDirs struct {
@@ -70,6 +71,7 @@ func defaultWaveEnv() waveEnv {
 		resolveRoot: loopStopRoot, executable: os.Executable, pidStarted: processStartTime,
 		dispatch: dispatchWaveVerb(sysexec.DefaultRunner), now: time.Now, sleep: time.Sleep,
 		pidAlive: runlease.PIDAlive, saveRecord: wave.Store.Save, mainHead: gitMainHead, mergedPRs: gitMergedPRs, loadGraph: loadModuleGraph,
+		refreshBinary: bootBinaryRefresh,
 	}
 }
 
