@@ -258,6 +258,12 @@ func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet rebase refused: the active worktree is the project root — a cycle never rebases the operator's tree\n")
 		return false, nil
 	}
+	if remote, ok := originMainRef(ctx, gitCapture, worktree); ok {
+		if err := refuseUnprovenAhead(ctx, gitCapture, worktree, remote, strings.TrimPrefix(remote, "origin/")); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet rebase refused: %v\n", err)
+			return false, nil
+		}
+	}
 	return rebaseWithDerivedRegen(ctx, worktree, gitCapture, regenerateDerivedArtifact, derivedConflictIn(worktree))
 }
 
