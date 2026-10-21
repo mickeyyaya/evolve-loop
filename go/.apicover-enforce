@@ -810,3 +810,5 @@
 ./internal/researchindex
 # auditcascade - the escalation rule of the auditor tier cascade (inbox auditor-tier-cascade, shadow stage).
 ./internal/auditcascade
+# recoveryretro - the host-written retrospective documents of a recovery and of a judgment lesson (ADR-0151).
+./internal/recoveryretro
