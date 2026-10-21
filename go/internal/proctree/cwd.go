@@ -71,15 +71,14 @@ func OrphanUnder(base string, since time.Time, cwds []Cwd) Proof {
 	if !filepath.IsAbs(clean) || filepath.Dir(clean) == clean {
 		return func(Process) bool { return false }
 	}
-	bases := []string{clean}
-	inside := make(map[int]bool, len(cwds))
+	under := make(map[int]bool, len(cwds))
 	for _, c := range cwds {
-		if within(bases, c.Cwd) {
-			inside[c.Pid] = true
+		if inside(clean, filepath.Clean(c.Cwd)) {
+			under[c.Pid] = true
 		}
 	}
 	return func(p Process) bool {
-		return p.Ppid == 1 && inside[p.Pid] && !p.Started.Before(since) && !SharedHelper(p)
+		return p.Ppid == 1 && under[p.Pid] && !p.Started.Before(since) && !SharedHelper(p)
 	}
 }
 
@@ -100,12 +99,17 @@ func within(bases []string, path string) bool {
 	}
 	for _, base := range bases {
 		for _, p := range []string{filepath.Clean(path), resolved(path)} {
-			if rel, err := filepath.Rel(base, p); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			if inside(base, p) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func inside(base, path string) bool {
+	rel, err := filepath.Rel(base, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func resolved(p string) string {

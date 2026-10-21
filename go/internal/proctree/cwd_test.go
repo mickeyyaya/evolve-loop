@@ -109,17 +109,26 @@ func TestUnder_MatchesThroughASymlinkAndRefusesASibling(t *testing.T) {
 	}
 }
 
-func TestOrphanUnder_ARootRelativeOrSymlinkedBaseMatchesNothing(t *testing.T) {
+func TestOrphanUnder_ARootRelativeOrSymlinkedPathMatchesNothing(t *testing.T) {
 	t.Parallel()
 	target := t.TempDir()
 	link := filepath.Join(t.TempDir(), "wt")
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
+	realTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	intoTarget := filepath.Join(t.TempDir(), "into")
+	if err := os.Symlink(realTarget, intoTarget); err != nil {
+		t.Fatal(err)
+	}
 	orphan := Process{Pid: 10, Ppid: 1, Comm: "sh"}
 	for _, tc := range []struct {
 		name, base, cwd string
 	}{
+		{"a cwd path that reaches the base only through a symlink", realTarget, intoTarget},
 		{"the filesystem root", "/", "/"},
 		{"the filesystem root, unclean", "//.", "/Users"},
 		{"an empty base", "", "/wt"},

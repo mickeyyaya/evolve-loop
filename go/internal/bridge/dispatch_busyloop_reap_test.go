@@ -48,12 +48,20 @@ type sweepHost struct {
 
 func newSweepHost(t *testing.T) sweepHost {
 	t.Helper()
-	root := t.TempDir()
-	worktree := filepath.Join(root, ".evolve", "worktrees", "cycle-a-1")
-	if err := os.MkdirAll(worktree, 0o755); err != nil {
+	root := gitCheckout(t, t.TempDir())
+	worktree := gitCheckout(t, filepath.Join(root, ".evolve", "worktrees", "cycle-a-1"))
+	return sweepHost{worktree: worktree, root: root, home: t.TempDir(), started: reapT0}
+}
+
+func gitCheckout(t *testing.T, dir string) string {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return sweepHost{worktree: worktree, root: root, home: t.TempDir(), started: reapT0}
+	if err := os.WriteFile(filepath.Join(dir, ".git"), []byte("gitdir: /nowhere\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }
 
 func (h sweepHost) sweep(root, worktree string) *dispatchSweep {
@@ -68,6 +76,9 @@ type cwdHost struct {
 
 func (c *cwdHost) orphan(pid int, cwd string, started time.Time) *cwdHost {
 	c.procs = append(c.procs, proctree.Process{Pid: pid, Ppid: 1, Started: started, Comm: "sh"})
+	if real, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = real
+	}
 	c.cwds = append(c.cwds, proctree.Cwd{Pid: pid, Ppid: 1, Cwd: cwd})
 	return c
 }
@@ -84,7 +95,7 @@ func TestDispatchSweep_AnUntaggedBusyLoopOrphanedInTheWorktreeStopsWhenTheDispat
 	if _, err := exec.LookPath("lsof"); err != nil {
 		t.Skip("lsof is not installed")
 	}
-	worktree := t.TempDir()
+	worktree := gitCheckout(t, t.TempDir())
 	started := time.Now()
 	loop := orphanBusyLoop(t, worktree)
 	onlyTheLoop := func(pid int, sig syscall.Signal) error {
@@ -118,10 +129,12 @@ func TestDispatchSweep_AnUnsafeBaseSignalsNothingAndWarns(t *testing.T) {
 		{"an ancestor of the project root", h.root, filepath.Dir(h.root), h.home},
 		{"the home directory", h.root, h.home, h.home},
 		{"an ancestor of the home directory", h.root, filepath.Dir(h.home), h.home},
+		{"a git checkout that holds the home directory", h.root, h.worktree, filepath.Join(h.worktree, "home")},
 		{"a relative worktree", h.root, "wt", h.home},
 		{"a relative project root", "plane", h.worktree, h.home},
 		{"an unknown home directory", h.root, h.worktree, ""},
 		{"a worktree that does not exist", h.root, filepath.Join(h.root, "gone"), h.home},
+		{"a directory that is not the top of a git checkout", h.root, filepath.Dir(h.worktree), h.home},
 	} {
 		host := (&cwdHost{}).orphan(700, "/", reapT0).orphan(701, h.worktree, reapT0).orphan(702, h.home, reapT0).orphan(703, h.root, reapT0)
 		center := signalcenter.New()
@@ -164,7 +177,7 @@ func TestDispatchSweep_ALaneWorktreeSweepsOnlyItsOwnNewOrphans(t *testing.T) {
 		t.Fatal(err)
 	}
 	host := (&cwdHost{}).orphan(800, filepath.Join(base, "go"), reapT0.Add(time.Minute)).
-		orphan(801, filepath.Join(base, "go"), reapT0.Add(-time.Second)).
+		orphan(801, filepath.Join(base, "go"), reapT0.Add(-psStartSlack-time.Second)).
 		orphan(802, h.root, reapT0.Add(time.Minute))
 	var stderr bytes.Buffer
 
@@ -175,20 +188,20 @@ func TestDispatchSweep_ALaneWorktreeSweepsOnlyItsOwnNewOrphans(t *testing.T) {
 	}
 }
 
-func TestDispatchSweep_TheStartTimeIsTruncatedToTheSecondOfThePSTable(t *testing.T) {
+func TestDispatchSweep_TheWindowAllowsForTheResolutionOfThePSStartTime(t *testing.T) {
 	t.Parallel()
 	h := newSweepHost(t)
-	h.started = reapT0.Add(400 * time.Millisecond)
+	h.started = reapT0.Add(psStartSlack).Add(900 * time.Millisecond)
 	base, err := filepath.EvalSymlinks(h.worktree)
 	if err != nil {
 		t.Fatal(err)
 	}
-	host := (&cwdHost{}).orphan(810, base, reapT0)
+	host := (&cwdHost{}).orphan(810, base, reapT0).orphan(811, base, reapT0.Add(-time.Second))
 
 	h.sweep(h.root, h.worktree).finish(context.Background(), host.deps(&bytes.Buffer{}, signalcenter.New()))
 
-	if len(host.signalled) == 0 {
-		t.Fatal("an orphan that ps dates to the dispatch's own second was spared; ps start times have one-second resolution")
+	if !slices.Equal(host.signalled, []int{810, 810}) {
+		t.Fatalf("signalled %v; want only pid 810 (SIGTERM, then SIGKILL), which ps dates %s before the dispatch second (Linux ps derives the start from a whole-second boot time and can read up to 1 s early); pid 811 is older than that bound", host.signalled, psStartSlack)
 	}
 }
 
