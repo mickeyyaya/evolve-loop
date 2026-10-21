@@ -31,7 +31,7 @@ type Recovery struct {
 }
 
 func Recoveries(history []*dossier.Dossier, pass *dossier.Dossier) []Recovery {
-	if pass == nil || pass.FinalVerdict != dossier.VerdictPass || pass.Tasks == nil {
+	if !shippedWithTasks(pass) {
 		return nil
 	}
 	ordered := slices.Clone(history)
@@ -53,14 +53,22 @@ func failuresSinceLastPass(ordered []*dossier.Dossier, task string, before int) 
 			continue
 		}
 		seen[d.Cycle] = true
-		switch d.FinalVerdict {
-		case dossier.VerdictPass:
+		switch {
+		case shipped(d):
 			failures = nil
-		case dossier.VerdictFail:
+		case d.FinalVerdict == dossier.VerdictFail:
 			failures = append(failures, tryOf(d))
 		}
 	}
 	return failures
+}
+
+func shipped(d *dossier.Dossier) bool {
+	return d != nil && d.FinalVerdict == dossier.VerdictPass && d.CommitSHA != ""
+}
+
+func shippedWithTasks(d *dossier.Dossier) bool {
+	return shipped(d) && d.Tasks != nil
 }
 
 func cycleOf(d *dossier.Dossier) int {

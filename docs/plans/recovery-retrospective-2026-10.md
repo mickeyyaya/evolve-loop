@@ -6,7 +6,7 @@
 
 **Terms used throughout:**
 
-- *recovery*: a PASS cycle that ships an item after two or more FAIL dossiers of the item since its last pass.
+- *recovery*: a ship of an item after two or more FAIL dossiers of the item since its last ship. A ship is a PASS dossier with a `commit_sha`.
 - *try row*: one line of the history table, made from one committed cycle dossier.
 - *judgment lesson*: the P1 carryover todo `cycle-<N>-judgment-<phase>` that `recordJudgmentLesson` writes.
 - *retrospective document*: a markdown file under `docs/retrospectives/`, with a lesson YAML of the same base name.
@@ -39,7 +39,9 @@ So this plan has two outputs. A recovery gets a retrospective document. A judgme
 | Fact | Research id |
 |---|---|
 | An item keeps only its last failure, and a quarantine release resets the count. | F2.1, F2.2 |
-| The ledger shows 39 items with two or more failures. 13 of them shipped later, and 12 meet the definition of a recovery. | F2.3, F2.4 |
+| The ledger shows 39 items with two or more failures, and 13 of them shipped later. The detector rule finds 12 recoveries in the dossiers: the number of record. | F2.3, F2.4 |
+| A PASS with no commit did not ship, and a WARN never has a commit. | F2.12 |
+| 51 FAIL dossiers have the class `infra-error`. | F2.13 |
 | The dossier names the items that a cycle tried. The ledger also names the items that a cycle only released. | F2.11 |
 | The committed dossier of each cycle has the item ids, the verdict, the failure class, the fingerprint, the reasons, the phases and the models. | F2.5 |
 | A worked recovery has three failures with three fingerprints, and one failure is infrastructure. | F2.6 |
@@ -101,18 +103,21 @@ Each criterion has a weight. The score is 1 (poor) to 5 (good).
 
 | Id | Decision | Because (findings) | Rejected options and why |
 |---|---|---|---|
-| D1 | The trigger is two or more committed FAIL dossiers that name the item, in a window of 400 cycles. | F2.1, F2.2, F2.4 | `failure_count`: it resets and is 0 or 1 today. |
+| D1 | The trigger is a ship of the item after two or more FAIL dossiers that name it. The count starts at its last ship, in a window of 400 cycles. A PASS with no commit and a WARN are neither a failure nor a reset. | F2.1, F2.2, F2.4, F2.12 | `failure_count`: it resets and is 0 or 1 today. Any PASS as a ship: cycle 1641 then gets a false document, and the real ship 1647 gets none. |
 | D2 | The history comes from `knowledge-base/cycles/` and `.evolve/dossiers-pending/`. | F2.5, F2.10 | Run dirs: the GC deletes them. The ledger: it has no class or fingerprint, and it counts a release as a try (F2.11). |
 | D3 | A recovery document has one try row for each FAIL dossier and one for the PASS dossier. | F2.6, P3.3 | A summary only: it hides the fingerprints. |
-| D4 | A row with the class `unknown` or a fingerprint that starts with `worktree\|` gets the mark "infrastructure?". | F2.6, P3.4 | No mark: the reader takes an infrastructure failure for a defect of the item. |
+| D4 | A row with the class `infra-error` or `unknown` (the constants of `internal/dossier`, which the classifier also uses) gets the mark "infrastructure?". | F2.6, F2.13, P3.4 | No mark: the reader takes an infrastructure failure for a defect of the item. |
 | D5 | The difference section compares the PASS dossier with the last FAIL dossier. It shows the phases, the models and the ladder rungs. | P3.5, P3.6 | A full diff of the code: the PASS commit already holds it, and the document cites the commit. |
-| D6 | A judgment-lesson document has the base name of the todo id: `cycle-<N>-judgment-<phase>`. A recovery document has `cycle-<N>-recovery-<item>`. | F2.8 | A date in the name: the same lesson can then get two names. |
+| D6 | A judgment-lesson document has the base name of the todo id: `cycle-<N>-judgment-<phase>`. A recovery document has `cycle-<N>-recovery-<slug>`. The slug is the item id in lower case, with each other run of characters as one `-`. It has at most 80 bytes, and it is `item` when empty. Two items with one name write one pair and report the collision. | F2.8 | A date in the name: the same lesson can then get two names. |
 | D7 | Each document has a sibling lesson YAML with the same base name. | F2.9 | A prompt change for scout: it adds a second recall path. |
 | D8 | The compiled stage is `shadow`. It writes the documents into `<workspace>/retrospectives/` and removes nothing. | G4 | A live default: the operator must see the output first. |
 | D9 | At `enforce`, the documents go to `.evolve/retrospectives-pending/`, and the boundary publish commits them with the dossiers. | F2.10 | A lane commit: it moves `main` mid-wave. |
-| D10 | At `enforce`, a judgment todo leaves the log only when `docs/retrospectives/<id>.md` exists in the published tree. The check repeats at each closeout. | G2 | Removal at write time: a failed publish then drops the lesson. |
+| D10 | At `enforce`, a judgment todo leaves the log only when `docs/retrospectives/<id>.md` exists in the published tree. The check repeats at each closeout. The publish is create-only (D13). | G2 | Removal at write time: a failed publish then drops the lesson. |
 | D11 | The host text in each document follows the STE house rules. Agent text appears only as a quoted code span. | ste100 convention | Free agent text: the strict lint fails the publish. |
 | D12 | A write failure prints a WARN line and never fails the closeout. | dossier precedent | A fatal error: a report must not stop a cycle. |
+| D13 | Each document write is create-only: a file that exists stays as it is. | R10, G2 | An overwrite: the next closeout erases the "Judgment" text of a person. |
+| D14 | The action of the lesson YAML names the document in one sentence with no period, and its pattern holds the slug of the item. | R11, F2.9 | The raw path and id: `firstSentence` cuts the recall digest at `.md`, and an agent-written id reaches the scout prompt. |
+| D15 | A corrupt or unreadable dossier of the current cycle is an error, so the closeout prints a WARN. A corrupt history dossier is still skipped with no report (limit). | D12 | A silent skip: a lost recovery leaves no trace. |
 
 **What changes our mind:** look at the first 20 recovery documents, over both stages. If most of them show no difference between the two tries, a fact table alone does not teach. Then D adds its LLM paragraph.
 
@@ -163,10 +168,11 @@ Each new and changed function has 100% measured coverage. The PR body has the ta
 - The document states facts. It does not prove why the passed try passed.
 - A try before cycle 1624 has no row: those dossiers have no `tasks` (F2.11). A try outside the window has no row.
 - A FAIL dossier names each item of the cycle. A multi-item FAIL thus counts for each item, also an item that it did not touch.
+- `dossier.ReadDir` skips a corrupt history dossier with no report, so a corrupt FAIL can hide one failure.
 - The ladder rungs are `R0` until the ladder leaves `shadow` (retry-ladder spec §6). The rung line then shows no climb.
 - A test cannot prove that a person reads the documents. The operator review at `shadow` is that check.
 
 ## 11. Open questions
 
-- **Q1 (operator):** when does the stage move to `enforce`? This plan proposes after five recoveries at `shadow`.
-- **Q2 (operator):** a judgment todo written before C5 lands keeps its long retention until its document lands. Is that the wanted order? This plan says yes, because a TTL alone drops lessons with no document.
+- **Q1 (operator, pending):** when does the stage move to `enforce`? Recommendation: after the operator reads five recovery documents at `shadow`.
+- **Q2 (operator, pending):** does a judgment todo keep its long retention until its document lands (C5)? Recommendation: yes, because a TTL alone drops a lesson that has no document.

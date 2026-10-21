@@ -18,8 +18,8 @@ type lessonEntry struct {
 
 func recoveryLessonYAML(r Recovery, docPath string) []byte {
 	return lessonEntry{
-		id: RecoveryName(r), pattern: "recovery of " + r.TaskID, description: recoveryLesson(r),
-		source: docPath, kind: kindRecovery, action: "Read " + docPath + " before a new try of the item " + r.TaskID + " or a similar item.",
+		id: RecoveryName(r), pattern: "recovery of " + itemSlug(r.TaskID), description: recoveryLesson(r),
+		source: docPath, kind: kindRecovery, action: "Before a new try of a similar item, read the retrospective " + RecoveryName(r) + " in " + DocsHome,
 		errorCategory: strings.Join(failureClasses(r.Failures), " "),
 	}.yaml()
 }
@@ -27,7 +27,7 @@ func recoveryLessonYAML(r Recovery, docPath string) []byte {
 func judgmentLessonYAML(l JudgmentLesson, docPath string) []byte {
 	return lessonEntry{
 		id: l.ID, pattern: "judgment of " + l.Phase, description: l.Action,
-		source: docPath, kind: kindJudgment, action: "Read " + docPath + " before the " + l.Phase + " phase judges a similar plan.",
+		source: docPath, kind: kindJudgment, action: "Before the " + l.Phase + " phase judges a similar plan, read the judgment lesson " + l.ID + " in " + DocsHome,
 		failedStep: l.Phase,
 	}.yaml()
 }

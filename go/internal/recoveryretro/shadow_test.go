@@ -91,23 +91,43 @@ func TestWriteShadow_AnEmptyWorkspaceIsAnError(t *testing.T) {
 	}
 }
 
-func TestWriteShadow_AWriteFailureIsReturnedAndTheOtherPairsStillWrite(t *testing.T) {
+func TestWriteShadow_AWriteFailureIsReturned(t *testing.T) {
 	root, workspace := t.TempDir(), t.TempDir()
 	dir := filepath.Join(workspace, DirName)
-	if err := os.MkdirAll(filepath.Join(dir, "cycle-2003-judgment-plan-review.md"), 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+	written, err := WriteShadow(root, workspace, 7, []cyclestate.CarryoverTodo{judgmentTodo()})
+
+	if err == nil || !strings.Contains(err.Error(), "cycle-2003-judgment-plan-review.md") || len(written) != 0 {
+		t.Fatalf("WriteShadow = %v, %v; want the failed paths and nothing written", written, err)
+	}
+}
+
+func TestWriteShadow_NeverFollowsALinkAtADocumentPath(t *testing.T) {
+	workspace, outside := t.TempDir(), t.TempDir()
+	dir := filepath.Join(workspace, DirName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(outside, "victim.txt")
+	writeFile(t, target, []byte("keep"))
+	if err := os.Symlink(target, filepath.Join(dir, "cycle-2003-judgment-plan-review.md")); err != nil {
 		t.Fatal(err)
 	}
 	todos := []cyclestate.CarryoverTodo{judgmentTodo(), {ID: "cycle-7-judgment-adversarial-review", Action: "y"}}
 
-	written, err := WriteShadow(root, workspace, 7, todos)
+	written, err := WriteShadow(t.TempDir(), workspace, 7, todos)
 
-	if err == nil || !strings.Contains(err.Error(), "cycle-2003-judgment-plan-review.md") {
-		t.Fatalf("WriteShadow error = %v, want the failed path", err)
-	}
 	sort.Strings(written)
 	want := []string{filepath.Join(dir, "cycle-2003-judgment-plan-review.yaml"), filepath.Join(dir, "cycle-7-judgment-adversarial-review.md"), filepath.Join(dir, "cycle-7-judgment-adversarial-review.yaml")}
-	if !equalStrings(written, want) {
-		t.Fatalf("written = %v, want %v", written, want)
+	if err != nil || !equalStrings(written, want) {
+		t.Fatalf("WriteShadow = %v, %v; want %v", written, err, want)
+	}
+	if got, _ := os.ReadFile(target); string(got) != "keep" {
+		t.Fatalf("WriteShadow wrote through a link: %q", got)
 	}
 }
 
@@ -203,20 +223,72 @@ func TestWriteShadow_ACycleInBothDossierDirsCountsOnce(t *testing.T) {
 	}
 }
 
-func TestWriteShadow_TheCurrentDossierComesFromThePendingDirOrNowhere(t *testing.T) {
+func TestWriteShadow_TheCurrentDossierCanComeFromThePendingDir(t *testing.T) {
 	root, workspace := t.TempDir(), t.TempDir()
 	history, pass := utf8History()
 	seedDossiers(t, dossier.CyclesDir(root), history[:3]...)
 	if err := os.MkdirAll(dossier.PendingDir(root), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(dossier.CyclesDir(root), "cycle-1809.json"), []byte("{not json"))
-
-	if written, err := WriteShadow(root, workspace, 1809, nil); err != nil || len(written) != 0 {
-		t.Fatalf("WriteShadow with a corrupt current dossier = %v, %v; want nothing", written, err)
-	}
 	seedDossiers(t, dossier.PendingDir(root), pass)
 	if written, err := WriteShadow(root, workspace, 1809, nil); err != nil || len(written) != 2 {
 		t.Fatalf("WriteShadow with a pending current dossier = %v, %v; want one pair", written, err)
+	}
+}
+
+func TestWriteShadow_NeverOverwritesADocumentThatExists(t *testing.T) {
+	workspace := t.TempDir()
+	dir := filepath.Join(workspace, DirName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	human := []byte("## Judgment\n\nA person wrote this.\n")
+	writeFile(t, filepath.Join(dir, "cycle-2003-judgment-plan-review.md"), human)
+
+	written, err := WriteShadow(t.TempDir(), workspace, 7, []cyclestate.CarryoverTodo{judgmentTodo()})
+
+	if err != nil || !equalStrings(written, []string{filepath.Join(dir, "cycle-2003-judgment-plan-review.yaml")}) {
+		t.Fatalf("WriteShadow = %v, %v; want only the absent YAML written", written, err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "cycle-2003-judgment-plan-review.md")); string(got) != string(human) {
+		t.Fatalf("WriteShadow replaced a document that exists:\n%s", got)
+	}
+}
+
+func TestWriteShadow_TwoItemsWithOneNameWriteOnePairAndReportTheCollision(t *testing.T) {
+	root, workspace := t.TempDir(), t.TempDir()
+	fail := func(cycle int) *dossier.Dossier {
+		return &dossier.Dossier{Cycle: cycle, FinalVerdict: dossier.VerdictFail, Tasks: tasks("a_b", "a-b")}
+	}
+	pass := &dossier.Dossier{Cycle: 3, FinalVerdict: dossier.VerdictPass, Tasks: tasks("a_b", "a-b"), CommitSHA: "c"}
+	seedDossiers(t, dossier.CyclesDir(root), fail(1), fail(2), pass)
+
+	written, err := WriteShadow(root, workspace, 3, nil)
+
+	if len(written) != 2 || err == nil || !strings.Contains(err.Error(), "cycle-3-recovery-a-b") {
+		t.Fatalf("WriteShadow = %v, %v; want one pair and the collision error", written, err)
+	}
+}
+
+func TestWriteShadow_ACorruptCurrentDossierIsAnError(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(dossier.CyclesDir(root), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dossier.CyclesDir(root), "cycle-9.json"), []byte("{not json"))
+
+	if _, err := WriteShadow(root, t.TempDir(), 9, nil); err == nil || !strings.Contains(err.Error(), "cycle-9.json") {
+		t.Fatalf("WriteShadow with a corrupt current dossier = %v, want an error that names it", err)
+	}
+}
+
+func TestWriteShadow_AnUnreadableCurrentDossierIsAnError(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dossier.CyclesDir(root), "cycle-9.json"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := WriteShadow(root, t.TempDir(), 9, nil); err == nil || !strings.Contains(err.Error(), "read the dossier") {
+		t.Fatalf("WriteShadow with a directory at the current dossier = %v, want the read error", err)
 	}
 }

@@ -7,11 +7,13 @@
   - [ADR-0142](0142-a-capability-failure-climbs-one-bounded-retry-ladder.md): the rungs of the passed try come from its try records.
   - PR #1081: it bounds the other failure-learning todos to the carryover TTL. This ADR decides the judgment-lesson todo that PR #1081 left open.
 - **Evidence:**
-  - 39 items failed in two or more cycles. 13 of them shipped later, and 12 are recoveries. No record of a recovery exists (research F2.3, F2.4, F2.7).
+  - The detector rule finds 12 recoveries in the dossiers of the plane tree on 2026-10-21. No record of a recovery exists (research F2.4, F2.7).
   - The committed dossiers hold the verdict, the class, the fingerprint, the reasons and the models of each try (F2.5, F2.6).
   - An inbox item keeps only its last failure, and its counter resets (F2.1, F2.2).
   - A judgment-lesson todo never expires today (F2.8).
   - The lesson recall reads only YAML lesson files (F2.9).
+  - A PASS with no commit did not ship, and no WARN has a commit (F2.12).
+  - 51 FAIL dossiers have the class `infra-error` of the failure classifier (F2.13).
 
 ## Context
 
@@ -21,7 +23,7 @@ The operator also decided on 2026-10-21 that a judgment lesson does not stay in 
 
 ## Decision
 
-1. A recovery is a PASS cycle that ships an item after two or more FAIL dossiers since its last pass.
+1. A ship is a PASS dossier with a commit. A recovery is a ship after two or more FAILs since the last ship.
 2. The host builds each document from committed records. It makes no LLM call.
 3. A recovery document has one row for each try and a difference section for the last two tries.
 4. A judgment-lesson todo `cycle-<N>-judgment-<phase>` gets a document with the same base name.
@@ -30,6 +32,8 @@ The operator also decided on 2026-10-21 that a judgment lesson does not stay in 
 7. At `enforce`, the documents reach `docs/retrospectives/` through the boundary publish of the dossiers.
 8. At `enforce`, a judgment todo leaves the log only when its document is in the published tree.
 9. A failure to write a document prints a WARN line. It never fails the closeout.
+10. Each document write is create-only, so the "Judgment" text of a person is never erased.
+11. A PASS with no commit and a WARN are neither a failure nor a reset of the count.
 
 ## Consequences
 

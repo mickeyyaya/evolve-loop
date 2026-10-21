@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
 const (
@@ -53,11 +55,11 @@ func writeTries(b *strings.Builder, r Recovery) {
 		passReason = "commit " + quote(shortSHA(r.Pass.CommitSHA))
 	}
 	fmt.Fprintf(b, "| %d | PASS | — | — | %s | |\n\n", r.Pass.Cycle, passReason)
-	b.WriteString("The mark \"infrastructure?\" shows the class `unknown` or a `worktree` fingerprint. Such a failure can come from the host, not from the item.\n\n")
+	b.WriteString("The mark \"infrastructure?\" shows the class `infra-error` or `unknown`. Such a failure can come from the host, not from the item.\n\n")
 }
 
 func mark(t Try) string {
-	if t.Class == "unknown" || strings.HasPrefix(t.Fingerprint, "worktree|") {
+	if t.Class == dossier.PreClassInfraError || t.Class == dossier.PreClassUnknown {
 		return infrastructureMark
 	}
 	return ""
@@ -104,7 +106,7 @@ func writeModelChanges(b *strings.Builder, changes []string) {
 func phaseDelta(from, against []PhaseModel) []string {
 	var out []string
 	for _, m := range from {
-		if !slices.ContainsFunc(against, func(o PhaseModel) bool { return o.Phase == m.Phase }) {
+		if !slices.Contains(out, m.Phase) && !slices.ContainsFunc(against, func(o PhaseModel) bool { return o.Phase == m.Phase }) {
 			out = append(out, m.Phase)
 		}
 	}

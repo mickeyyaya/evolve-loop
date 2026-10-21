@@ -74,9 +74,9 @@ func TestRecoveries_OneFailureIsNoRecovery(t *testing.T) {
 	}
 }
 
-func TestRecoveries_AnEarlierPassResetsTheFailureCount(t *testing.T) {
+func TestRecoveries_AnEarlierShipResetsTheFailureCount(t *testing.T) {
 	history, pass := utf8History()
-	earlierPass := &dossier.Dossier{Cycle: 1805, FinalVerdict: dossier.VerdictPass, Tasks: tasks(utf8Item)}
+	earlierPass := &dossier.Dossier{Cycle: 1805, FinalVerdict: dossier.VerdictPass, Tasks: tasks(utf8Item), CommitSHA: "e1"}
 	withReset := append([]*dossier.Dossier{earlierPass}, history...)
 
 	if got := Recoveries(withReset, pass); len(got) != 1 || len(got[0].Failures) != 2 {
@@ -241,11 +241,11 @@ func TestRenderRecovery_AShortOrMissingCommitStaysWhole(t *testing.T) {
 }
 
 func TestRecoveries_OnlyTheFailuresAfterTheLastPassCount(t *testing.T) {
-	d := func(cycle int, verdict string) *dossier.Dossier {
-		return &dossier.Dossier{Cycle: cycle, FinalVerdict: verdict, Tasks: tasks(utf8Item)}
+	d := func(cycle int, verdict, sha string) *dossier.Dossier {
+		return &dossier.Dossier{Cycle: cycle, FinalVerdict: verdict, Tasks: tasks(utf8Item), CommitSHA: sha}
 	}
-	pass := d(5, dossier.VerdictPass)
-	history := []*dossier.Dossier{d(1, dossier.VerdictFail), d(2, dossier.VerdictFail), d(3, dossier.VerdictPass), d(4, dossier.VerdictFail), pass}
+	pass := d(5, dossier.VerdictPass, "c5")
+	history := []*dossier.Dossier{d(1, dossier.VerdictFail, ""), d(2, dossier.VerdictFail, ""), d(3, dossier.VerdictPass, "c3"), d(4, dossier.VerdictFail, ""), pass}
 
 	if got := Recoveries(history, pass); len(got) != 0 {
 		t.Fatalf("Recoveries = %+v, want none: only cycle 4 failed after the pass of cycle 3", got)
@@ -268,5 +268,56 @@ func TestRenderJudgmentLesson_AnEmptyActionIsADash(t *testing.T) {
 
 	if !strings.Contains(doc, "## Lesson\n\n—\n") || strings.Contains(doc, "``") {
 		t.Fatalf("RenderJudgmentLesson with no action =\n%s", doc)
+	}
+}
+
+func TestRecoveries_APassWithNoCommitIsNeitherAShipNorAReset(t *testing.T) {
+	const item = "overlay-family-name-transport-ambiguity"
+	fail := func(cycle int) *dossier.Dossier {
+		return &dossier.Dossier{Cycle: cycle, FinalVerdict: dossier.VerdictFail, Tasks: tasks(item), Failure: &dossier.FailureRecord{PreClass: "gate-block"}}
+	}
+	noShip := &dossier.Dossier{Cycle: 1641, FinalVerdict: dossier.VerdictPass, Tasks: tasks(item),
+		Phases: []dossier.PhaseRecord{phase("scout", "flash"), phase("triage", "flash")}}
+	ship := &dossier.Dossier{Cycle: 1647, FinalVerdict: dossier.VerdictPass, Tasks: tasks(item), CommitSHA: "797b8518b0000000"}
+	history := []*dossier.Dossier{fail(1629), fail(1637), fail(1638), noShip, ship}
+
+	if got := Recoveries(history, noShip); got != nil {
+		t.Fatalf("Recoveries(1641, no commit) = %+v, want nil: a PASS with no commit did not ship", got)
+	}
+	got := Recoveries(history, ship)
+	if len(got) != 1 || len(got[0].Failures) != 3 || got[0].Pass.Cycle != 1647 {
+		t.Fatalf("Recoveries(1647) = %+v, want the 3 failures 1629, 1637 and 1638: the PASS of 1641 is no reset", got)
+	}
+}
+
+func TestRecoveries_AWarnIsNeitherAFailureNorAReset(t *testing.T) {
+	d := func(cycle int, verdict string) *dossier.Dossier {
+		return &dossier.Dossier{Cycle: cycle, FinalVerdict: verdict, Tasks: tasks(utf8Item)}
+	}
+	pass := &dossier.Dossier{Cycle: 5, FinalVerdict: dossier.VerdictPass, Tasks: tasks(utf8Item), CommitSHA: "abc"}
+	history := []*dossier.Dossier{d(1, dossier.VerdictFail), d(2, dossier.VerdictWarn), d(3, dossier.VerdictFail), pass}
+
+	got := Recoveries(history, pass)
+	if len(got) != 1 || len(got[0].Failures) != 2 || got[0].Failures[0].Cycle != 1 || got[0].Failures[1].Cycle != 3 {
+		t.Fatalf("Recoveries = %+v, want the FAILs 1 and 3 only", got)
+	}
+}
+
+func TestRenderRecovery_AnInfraErrorTryGetsTheMark(t *testing.T) {
+	r := Recovery{TaskID: "item", Failures: []Try{{Cycle: 1, Class: dossier.PreClassInfraError}, {Cycle: 2, Class: "gate-block", Fingerprint: "worktree|gate-block|1"}}, Pass: Try{Cycle: 3}}
+
+	doc := RenderRecovery(r)
+
+	if !strings.Contains(doc, "| 1 | FAIL | `infra-error` | — | — | infrastructure? |") || strings.Count(doc, "| infrastructure? |") != 1 {
+		t.Fatalf("RenderRecovery =\n%s", doc)
+	}
+}
+
+func TestRenderRecovery_ListsARepeatedPhaseOnce(t *testing.T) {
+	ran := []dossier.PhaseRecord{phase("tdd", "a"), phase("build", "a"), phase("tdd", "a"), phase("build", "a")}
+	r := Recovery{TaskID: "item", Failures: []Try{{Cycle: 1}, {Cycle: 2, Models: modelsOf(ran)}}, Pass: Try{Cycle: 3}}
+
+	if doc := RenderRecovery(r); !strings.Contains(doc, "Phases in the last failed try only: `tdd` and `build`.") {
+		t.Fatalf("RenderRecovery =\n%s", doc)
 	}
 }

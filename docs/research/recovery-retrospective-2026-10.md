@@ -39,24 +39,44 @@ So the research has two questions:
 39 task ids have two or more failure releases, and 13 of them shipped later. Command: the `jq -rs` join of `recover` and `promote` records by `task_id`, over the records with `kind` `inbox-lifecycle`. The older records with `class` `inbox-lifecycle` (298 lines) add 5 items and 3 ships (44 and 16).
 *Implication:* about one item in three that failed twice ships later. The recoveries are real, and each one has a lesson that nobody writes today.
 
-**F2.4** The 13 recoveries, with their failed cycles and their ship cycle:
+**F2.4** The ledger join of F2.3 lists 13 items that shipped after two or more releases. The ledger is not the number of record, because it counts a release as a try (F2.11). The number of record is the output of the detector rule (R1, R2, R9) over the dossiers. It finds 12 recoveries on 2026-10-21:
 
-| Item | Failed cycles | Shipped |
+| Ship cycle | Item | FAIL dossiers since the last ship |
 |---|---|---|
-| `tokenopt-handoff-digests-per-edge-remainder` | 1642, 1644, 1646, 1651, 1654, 1656, 1938 | 1944 |
-| `tokenopt-handoff-digests` | 1504, 1576, 1593, 1598, 1628, 1631 | 1632 |
-| `triage-unified-solution-synthesis` | 1500, 1602, 1629, 1633, 1637, 1638 | 1720 |
-| `overlay-family-name-transport-ambiguity` | 1602, 1629, 1633, 1637, 1638 | 1647 |
-| `retro-prompt-delivery-stall` | 1557, 1577, 1578, 1586 | 1574 |
-| `inboxbatch-utf8-and-resolution` | 1804, 1806, 1808 | 1809 |
-| `dossier-producer-params-struct` | 1640, 1652, 1657 | 1659 |
-| `triage-empty-commitment-still-dispatches-spine` | 1640, 1652, 1657 | 1659 |
-| `cli-failures`, `gc-reaps-before-its-refusal` | 1798, 1800 | 1803, 1801 |
-| `fence-kept-empty-macos-ci-flake` | 1762, 1763 | 1766 |
-| `lineage-datestamp-normalization` | 1707, 1708 | 1712 |
-| `sizeratchet-shrink-eval-validators` | 1761, 1764 | 1765 |
+| 1632 | `tokenopt-handoff-digests` | 1628, 1631 |
+| 1647 | `overlay-family-name-transport-ambiguity` | 1629, 1637, 1638 |
+| 1659 | `triage-empty-commitment-still-dispatches-spine` | 1640, 1652, 1657 |
+| 1712 | `lineage-datestamp-normalization` | 1707, 1708 |
+| 1720 | `triage-unified-solution-synthesis` | 1629, 1637, 1638 |
+| 1765 | `sizeratchet-shrink-eval-validators` | 1761, 1764 |
+| 1766 | `fence-kept-empty-macos-ci-flake` | 1762, 1763 |
+| 1801 | `gc-reaps-before-its-refusal` | 1798, 1800 |
+| 1803 | `cli-failures` | 1798, 1800 |
+| 1809 | `inboxbatch-utf8-and-resolution` | 1804, 1806, 1808 |
+| 1842 | `generated-skill-command-shadows-its-skill` | 1828, 1840 |
+| 1944 | `tokenopt-handoff-digests-per-edge-remainder` | 1642, 1644, 1646, 1651, 1654, 1656, 1938 |
 
-*Implication:* a recovery can take up to seven failures. One item (`retro-prompt-delivery-stall`) shipped at 1574 after one failure, and failed again at 1577, 1578 and 1586. A recovery is not always the end of the story. That item is not a recovery by the definition of R1, so 12 of the 13 are recoveries.
+Command, in the plane tree: `jq -rs -f recoveries.jq knowledge-base/cycles/cycle-*.json .evolve/dossiers-pending/cycle-*.json`. The program `recoveries.jq` applies the same rule as `recoveryretro.Recoveries`:
+
+```jq
+[.[] | select(.cycle != null)] | unique_by(.cycle) | sort_by(.cycle) as $all
+| [ $all[] | select(.final_verdict == "PASS" and (.commit_sha // "") != "" and .tasks != null) as $p
+    | $p.tasks[] as $t
+    | ([ $all[] | select(.cycle < $p.cycle and .cycle >= ($p.cycle - 400) and ((.tasks // []) | index($t)) != null) ]
+       | reduce .[] as $d ([]; if ($d.final_verdict == "PASS" and ($d.commit_sha // "") != "") then [] elif $d.final_verdict == "FAIL" then . + [$d.cycle] else . end)) as $f
+    | select(($f | length) >= 2)
+    | "\($p.cycle) \($t) \($f | map(tostring) | join(","))" ]
+| .[]
+```
+ An independent replay of `Recoveries` in Go gave the same 12 events.
+
+The two sets differ:
+
+- `dossier-producer-params-struct` is only in the ledger set. It has one FAIL dossier (F2.11).
+- `generated-skill-command-shadows-its-skill` is only in the dossier set.
+- `retro-prompt-delivery-stall` is in neither: it shipped in cycle 1574 after one failure, and failed again in cycles 1577, 1578 and 1586.
+
+*Implication:* a recovery can take up to seven failures, and a ship is not always the end of the story.
 
 **F2.5** The committed cycle dossier holds what a retrospective needs. `knowledge-base/cycles/cycle-N.json` has `tasks`, `final_verdict`, `commit_sha`, `phases` (with `resolved_model`) and, on a FAIL, `failure` with `fingerprint`, `pre_class` and `reasons` (`go/internal/dossier/dossier.go:22-45`). The corpus is tracked in git: 2,554 files on 2026-10-21 (`git ls-files knowledge-base/cycles | wc -l`).
 *Implication:* the host can build the try history from committed records, with no LLM call.
@@ -93,6 +113,15 @@ So the research has two questions:
 
 *Implication:* the dossier is the exact record of a try. The ledger counts a release as a try, so it counts too many. A cycle before 1624 has no try record, and a multi-item FAIL counts for each item.
 
+**F2.12** A PASS dossier is not always a ship. Cycles 1624, 1630 and 1641 are PASS with `tasks` and no `commit_sha`. Cycle 1641 ran only scout and triage, and the loop shipped its item in cycle 1647. The 26 WARN dossiers with `tasks` have no `commit_sha` either.
+
+Command: `jq -rs` over `knowledge-base/cycles/cycle-*.json`, on 2026-10-21.
+
+*Implication:* a ship is a PASS with a commit. A PASS with no commit and a WARN are neither a try that failed nor a reset of the count.
+
+**F2.13** 51 FAIL dossiers have the class `infra-error`, the first bucket of the failure classifier (`preClassRules`, `go/internal/core/failure_digest.go`). Four cycles of the recoveries in F2.4 have it: 1652, 1657, 1708 and 1800. Cycle 1800 counts for both `cli-failures` and `gc-reaps-before-its-refusal`, so five tries have the class.
+*Implication:* the infrastructure mark must use the classes of the classifier, from one table, not a pattern fitted to one example.
+
 ## 3. Current practice
 
 The searches ran on 2026-10-21.
@@ -100,7 +129,7 @@ The searches ran on 2026-10-21.
 **P3.1 Safety-II: learn from what goes right.** The EUROCONTROL white paper "From Safety-I to Safety-II" (2013) defines Safety-II as the aim "to ensure that 'as many things as possible go right'", and the ability "to succeed under varying conditions". Source: [EUROCONTROL white paper (ERA copy)](https://www.era.europa.eu/system/files/2022-10/From%20Safety-I%20to%20Safety-II%20White%20Paper.pdf); Hollnagel, Wears and Braithwaite, [From Safety-I to Safety-II: A White Paper (2015)](https://www.england.nhs.uk/signuptosafety/wp-content/uploads/sites/16/2015/10/safety-1-safety-2-whte-papr.pdf).
 *Implication:* a recovery is the "went right" case. Today the loop studies only the failures.
 
-**P3.2 Software teams rarely write the "what went well" part.** Lorin Hochstein (2026-04-26) writes that postmortems are almost all about failure, and that teams do not fill in the "what went well" section with care. Source: [The normal work of creating reliability](https://surfingcomplexity.blog/2026/04/26/the-normal-work-of-creating-reliability/).
+**P3.2 Software teams rarely write the "what went well" part.** Lorin Hochstein (2026-04-26) writes that "Safety-II hasn't caught on our field". Source: [The normal work of creating reliability](https://surfingcomplexity.blog/2026/04/26/the-normal-work-of-creating-reliability/). A reader comment on that post (niketasharma, 2026-04-27) says that postmortems are "almost entirely structured around failure". It adds: "There's usually a 'what went well' section but nobody fills it out seriously." This is one practitioner, not a study.
 
 A 2025 systematic review finds that "what should be learned, and who should be involved" in learning from success "remains unclear". Source: [BMC Health Services Research, 2025](https://link.springer.com/article/10.1186/s12913-025-12680-2).
 *Implication:* a free-form "what went right" field stays empty. A record that the host fills from facts does not depend on effort.
@@ -142,8 +171,11 @@ Other 2026 posts say that a pull request shows a bad line in a reviewed file. A 
 - **R1** The host writes a recovery retrospective when a PASS cycle ships an item that failed in two or more earlier cycles (F2.3, P3.1).
 - **R2** The trigger counts FAIL dossiers that name the item, not `failure_count` or ledger releases. The counter resets, and a release is not always a try (F2.1, F2.2, F2.11).
 - **R3** The document has one row for each try: cycle, verdict, class, fingerprint and the first reason (F2.6, P3.3).
-- **R4** The document marks a try with the class `unknown` or a `worktree` fingerprint as a possible infrastructure failure (F2.6, P3.4).
+- **R4** The document marks a try with the class `infra-error` or `unknown` as a possible infrastructure failure (F2.6, F2.13, P3.4).
 - **R5** The document compares the passed try with the last failed try: the phases, the model of each phase and the ladder rungs (P3.5, P3.6).
 - **R6** The document has a fixed "lesson" line that the host builds, and the lesson YAML repeats it for the recall (F2.9, P3.5).
 - **R7** A judgment-lesson todo becomes a document with the same id. The todo leaves the log only when the document is on `main` (F2.8, P3.7).
 - **R8** The documents reach `main` through the boundary publish path of the dossier, never from a lane mid-wave (F2.10).
+- **R9** A ship is a PASS dossier with a `commit_sha`. Only a ship triggers a document or resets the count. A WARN is neither a failure nor a reset (F2.12).
+- **R10** A document write is create-only, so a person can fill the "Judgment" section and no closeout erases it (P3.3).
+- **R11** The lesson YAML keeps the recall digest whole. Its action names the document in a first sentence with no period. Its pattern holds the slug of the item, not the raw id (F2.9).

@@ -24,7 +24,7 @@ func TestMinFailures_IsTheFewestFailuresThatMakeARecovery(t *testing.T) {
 
 func TestHistoryWindow_BoundsTheDossiersThatWriteShadowReads(t *testing.T) {
 	root, workspace := t.TempDir(), t.TempDir()
-	pass := &dossier.Dossier{Cycle: 1000, FinalVerdict: dossier.VerdictPass, Tasks: tasks(utf8Item)}
+	pass := &dossier.Dossier{Cycle: 1000, FinalVerdict: dossier.VerdictPass, Tasks: tasks(utf8Item), CommitSHA: "c"}
 	old := failDossier(1000-HistoryWindow-1, "build|a|1", "gate-block", "old")
 	recent := failDossier(1000-HistoryWindow, "build|b|2", "gate-block", "recent")
 	seedDossiers(t, dossier.CyclesDir(root), old, recent, pass)
