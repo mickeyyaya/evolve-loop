@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -112,5 +113,17 @@ func TestRegistry_HelpRun(t *testing.T) {
 	}
 	if !bytes.Contains(stdout.Bytes(), []byte("evolve — autonomous improvement loop")) {
 		t.Errorf("runHelp output missing usage banner: %s", stdout.String())
+	}
+}
+
+func TestRegistry_AgentRunsTheStandaloneAgentCommand(t *testing.T) {
+	t.Parallel()
+	cmd := lookupCommand("agent")
+	if cmd == nil {
+		t.Fatal(`lookupCommand("agent") = nil`)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := cmd.Run([]string{"help"}, nil, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "evolve agent run <profile>") {
+		t.Errorf("agent help: exit %d stdout %q", code, stdout.String())
 	}
 }

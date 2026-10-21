@@ -812,3 +812,5 @@
 ./internal/auditcascade
 # recoveryretro - the host-written retrospective documents of a recovery and of a judgment lesson (ADR-0151).
 ./internal/recoveryretro
+# agentcmd - evolve agent: one read-only phase agent from the command line, with no cycle (ADR-0152).
+./internal/cli/agentcmd

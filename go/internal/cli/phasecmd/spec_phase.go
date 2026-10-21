@@ -24,21 +24,24 @@ func ResolveRunner(name string, req core.PhaseRequest) (core.PhaseRunner, bool, 
 	if err != nil || !ok {
 		return nil, false, err
 	}
-	return specrunner.New(spec, specrunner.Config{
-		Bridge:  bridge.NewDefault(root, nil),
-		Prompts: prompts.NewForProject(root),
-	}), true, nil
+	return NewSpecRunner(spec, root, DefaultBridge(root)), true, nil
+}
+
+func DefaultBridge(root string) core.Bridge { return bridge.NewDefault(root, nil) }
+
+func NewSpecRunner(spec phasespec.PhaseSpec, root string, b core.Bridge) core.PhaseRunner {
+	return specrunner.New(spec, specrunner.Config{Bridge: b, Prompts: prompts.NewForProject(root)})
 }
 
 func CatalogPhaseNames(projectRoot string) ([]string, []string, error) {
 	builtins := registry.Names()
-	cat, err := loadCatalog(projectRootOr(projectRoot))
+	cat, err := LoadCatalog(projectRootOr(projectRoot))
 	if err != nil {
 		return builtins, nil, err
 	}
 	specs := make([]string, 0)
 	for _, s := range cat.All() {
-		if specRunnable(s) {
+		if SpecRunnable(s) {
 			specs = append(specs, s.Name)
 		}
 	}
@@ -68,18 +71,18 @@ func IsKnownPhase(name, projectRoot string) bool {
 }
 
 func runnableSpec(name, root string) (phasespec.PhaseSpec, bool, error) {
-	cat, err := loadCatalog(root)
+	cat, err := LoadCatalog(root)
 	if err != nil {
 		return phasespec.PhaseSpec{}, false, err
 	}
 	spec, ok := cat.Get(name)
-	if !ok || !specRunnable(spec) {
+	if !ok || !SpecRunnable(spec) {
 		return phasespec.PhaseSpec{}, false, nil
 	}
 	return spec, true, nil
 }
 
-func loadCatalog(root string) (phasespec.Catalog, error) {
+func LoadCatalog(root string) (phasespec.Catalog, error) {
 	cat, _, _, err := phasespec.MergedCatalog(root)
 	if err != nil {
 		return phasespec.Catalog{}, fmt.Errorf("load phase catalog: %w", err)
@@ -87,7 +90,7 @@ func loadCatalog(root string) (phasespec.Catalog, error) {
 	return cat, nil
 }
 
-func specRunnable(s phasespec.PhaseSpec) bool {
+func SpecRunnable(s phasespec.PhaseSpec) bool {
 	if _, builtin := registry.For(s.Name); builtin {
 		return false
 	}

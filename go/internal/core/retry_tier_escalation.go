@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,7 +60,7 @@ func (cr *cycleRun) escalationScopeIDs() []string {
 			ids = append(ids, id)
 		}
 	}
-	for _, id := range processingClaimIDs(cr.req.ProjectRoot, cr.cycle) {
+	for _, id := range processingClaimIDs(cr.req.ProjectRoot, cr.cycle, cr.o.errOut()) {
 		if !seen[id] {
 			seen[id] = true
 			ids = append(ids, id)
@@ -68,10 +69,16 @@ func (cr *cycleRun) escalationScopeIDs() []string {
 	return ids
 }
 
-func processingClaimIDs(projectRoot string, cycle int) []string {
-	items, _, _ := inboxbatch.LoadDir(inboxbatch.ProcessingCycleDir(filepath.Join(projectRoot, ".evolve", "inbox"), cycle))
+func processingClaimIDs(projectRoot string, cycle int, warn io.Writer) []string {
+	scan, err := inboxbatch.ScanDir(inboxbatch.ProcessingCycleDir(filepath.Join(projectRoot, ".evolve", "inbox"), cycle))
+	if err != nil {
+		fmt.Fprintf(warn, "[orchestrator] cycle %d: WARN claims unreadable: %v\n", cycle, err)
+	}
+	for _, w := range scan.Warnings {
+		fmt.Fprintf(warn, "[orchestrator] cycle %d: %s\n", cycle, w)
+	}
 	var ids []string
-	for _, it := range items {
+	for _, it := range scan.Items {
 		if it.ID != "" {
 			ids = append(ids, it.ID)
 		}

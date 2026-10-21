@@ -7,17 +7,19 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 )
 
 func TestParseCwdListing_ReadsEachProcessPidParentAndCwd(t *testing.T) {
 	t.Parallel()
 	listing := "p331\nR99913\nfcwd\nn/hub/runtime\np348\nR1\nfcwd\nn/hub/runtime/.evolve/worktrees/cycle-a-5/go\np400\nR1\nfcwd\n"
 
-	got := parseCwdListing(listing)
+	got := proctree.ParseCwdListing(listing)
 
 	want := []Process{
 		{Pid: 331, Ppid: 99913, Cwd: "/hub/runtime"},
@@ -110,7 +112,7 @@ func TestReapFinishedCycleOrphans_SignalsEachOwnedOrphanAndReportsFailures(t *te
 	if len(rep.Errors) != 1 || !strings.Contains(rep.Errors[0], "21") {
 		t.Errorf("Errors = %v, want the pid 21 failure named", rep.Errors)
 	}
-	if strings.Join(lsofArgs, " ") != "lsof -a -d cwd -u "+uidArg()+" -R -F pRn" {
+	if strings.Join(lsofArgs, " ") != "lsof -a -d cwd -u "+strconv.Itoa(os.Getuid())+" -R -F pRn" {
 		t.Errorf("listing ran %q", strings.Join(lsofArgs, " "))
 	}
 }

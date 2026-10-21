@@ -100,19 +100,23 @@ func VerifyDisposition(workspace string) error {
 }
 
 func crossCheckAgainstDigest(workspace string, d disposition) error {
-	raw, err := os.ReadFile(filepath.Join(workspace, "failure-digest.json"))
+	path, source := filepath.Join(workspace, "failure-digest.json"), "failure-digest.json"
+	if record, ok := failureDigestRecordPath(workspace); ok {
+		path, source = record, "the harness digest record "+record+" (a cycle older than 2026-10-21 has none)"
+	}
+	raw, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("cannot cross-check disposition: failure-digest.json unreadable: %w", err)
+		return fmt.Errorf("cannot cross-check disposition: %s unreadable: %w", source, err)
 	}
 	var dg FailureDigest
 	if err := json.Unmarshal(raw, &dg); err != nil {
-		return fmt.Errorf("cannot cross-check disposition: failure-digest.json malformed: %w", err)
+		return fmt.Errorf("cannot cross-check disposition: %s malformed: %w", source, err)
 	}
 	if d.Fingerprint != dg.Fingerprint {
-		return fmt.Errorf("disposition fingerprint %q disagrees with the digest %q (invented identity)", d.Fingerprint, dg.Fingerprint)
+		return fmt.Errorf("disposition fingerprint %q disagrees with %s %q (invented identity)", d.Fingerprint, source, dg.Fingerprint)
 	}
 	if d.Recurrence != dg.Recurrence {
-		return fmt.Errorf("disposition recurrence %d disagrees with the digest's ledger-derived %d", d.Recurrence, dg.Recurrence)
+		return fmt.Errorf("disposition recurrence %d disagrees with the ledger-derived %d of %s", d.Recurrence, dg.Recurrence, source)
 	}
 	return nil
 }

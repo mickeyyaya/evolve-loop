@@ -79,7 +79,7 @@ func TestRecordModelAttempt_ATripwireIsABridgeTripwire(t *testing.T) {
 	t.Parallel()
 	c, got := recordingSignals()
 	e := NewEngine(Deps{Signals: c, Stderr: io.Discard})
-	req := core.BridgeRequest{CLI: "codex", Agent: "build", Cycle: 7, RunID: "run-7", Workspace: t.TempDir()}
+	req := core.BridgeRequest{CLI: "agy", Agent: "build", Cycle: 7, RunID: "run-7", Workspace: t.TempDir()}
 	end := time.Now()
 	start := end.Add(-tripwireSuccessThreshold - time.Minute)
 	e.recordModelAttempt(req, "auto", ExitOK, start, end, modelDispatch{}, "", &core.BridgeResponse{})
@@ -94,7 +94,7 @@ func TestRecordModelAttempt_ATripwireIsABridgeTripwire(t *testing.T) {
 	}
 	tw := trip[0]
 	if tw.Severity != signalcenter.SeverityWarn || tw.Code != CodeTelemetryTripwire || tw.Cycle != 7 || tw.RunID != "run-7" || tw.Phase != "build" ||
-		tw.Origin != "attemptLogContext.tripwire" || tw.Fields["cli"] != "codex" || tw.Fields["call_id"] == "" || tw.Fields["duration_ms"] == "" {
+		tw.Origin != "attemptLogContext.tripwire" || tw.Fields["cli"] != "agy" || tw.Fields["call_id"] == "" || tw.Fields["duration_ms"] == "" {
 		t.Errorf("the tripwire names the call and its duration: %+v", tw)
 	}
 }

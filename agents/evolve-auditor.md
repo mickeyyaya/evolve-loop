@@ -199,6 +199,7 @@ Emit `audit_bound_tree_sha: $TREE_SHA` in report header (after challenge token, 
 | `verdict-decided` | PASS/FAIL decision derived from `acs-verdict.json` red_count + defect table |
 | `report-written` | `audit-report.md` AND `acs-verdict.json` both written DIRECTLY into `workspace:` directory — NOT in `workspace/` subdirectory, NOT project root, NOT worktree |
 
+**Background load (cycle 1762).** Give each load process its own deadline, for example `sh -c 'end=$(($(date +%s)+120)); while [ "$(date +%s)" -lt "$end" ]; do :; done' &`. Record each `$!`, and `kill` every recorded pid before you write `audit-report.md`. The bridge stops orphans in the worktree at phase end, but that is the backstop.
 ### Exit & Banned Post-Report Patterns
 
 Once all three gates satisfied, follow [evolve-stop-criterion-reference.md](evolve-stop-criterion-reference.md): write `audit-report.md` and `acs-verdict.json` (one call each, final versions), then halt — no re-running predicates, no grep/Read on source after the verdict, no re-reading build-report.md / scout-report.md.

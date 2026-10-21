@@ -20,6 +20,7 @@ func TestUnobservedLedgerRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_gc_ledger_seal.go":  {1, "the batch-end gc hook seals the ledger behind gc.ledger_seal (state-growth-caps); the hook has no Signal Center, so the seal anchor is reported on stderr"},
 		"cmd/evolve/cmd_cycle_reaudit.go":   {1, "evolve cycle reaudit appends one audit binding through its own ledger (an operator repair verb outside the orchestrator process)"},
 		"cmd/evolve/cmd_ledger.go":          {6, "evolve ledger verify/seal/rebaseline/anchor/deep-verify/evidence restore: operator repair roots outside the orchestrator process"},
+		"internal/cli/agentcmd/run.go":      {1, "evolve agent run appends one cycle-0 agent_run entry from an operator process that has no Signal Center; a failed append is exit 3 with the error on stderr and in the JSON envelope (ADR-0152)"},
 		"internal/cli/guardcmd/guard.go":    {1, "the guard chain reads the ledger (a read-only consumer)"},
 		"internal/inboxmover/inboxmover.go": {1, "the mover's fallback when no Ledger is injected — still reached by the ship phase's post-ship mover and the operator inbox commands until S4b threads the root's"},
 	}

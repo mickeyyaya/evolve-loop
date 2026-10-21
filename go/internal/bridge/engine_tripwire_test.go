@@ -113,14 +113,28 @@ func TestRecordTokenUsage_Tripwire_Exit0ShortDuration_Silent(t *testing.T) {
 	}
 }
 
-func TestRecordTokenUsage_Tripwire_ClaudeBaseline_Silent(t *testing.T) {
+func TestRecordTokenUsage_Tripwire_AClaudeLaunchWhoseCollectorFoundNothingWarns(t *testing.T) {
 	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "claude-tmux", agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 	})
 
+	if _, ok := tripwireStderrLine(stderr); !ok {
+		t.Errorf("claude has its own collector (the transcript), so a long successful launch with no usage must trip; stderr:\n%s", stderr)
+	}
+}
+
+func TestRecordTokenUsage_Tripwire_NoCollectorFamily_Silent(t *testing.T) {
+	t.Parallel()
+	stderr, _ := runTripwireCase(t, tripwireCase{
+		cli: "codex-tmux", agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
+	})
+
 	if line, ok := tripwireStderrLine(stderr); ok {
-		t.Errorf("claude is the measured baseline, not the tripwire target; must stay silent, got: %s", line)
+		t.Errorf("codex has no usage collector, so its unmeasured launch is a known gap, not a tripwire; got: %s", line)
+	}
+	if !strings.Contains(stderr, "has no usage collector") {
+		t.Errorf("the coverage warning must say why codex is unmeasured; stderr:\n%s", stderr)
 	}
 }
 
