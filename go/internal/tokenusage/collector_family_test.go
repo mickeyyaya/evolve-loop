@@ -12,7 +12,7 @@ func TestHasCollector_OnlyTheFamiliesWithTheirOwnCollector(t *testing.T) {
 	for driver, want := range map[string]bool{
 		"": true, "claude": true, "claude-tmux": true, "CLAUDE-TMUX": true, "claude-headless": true,
 		"agy-tmux": true, "agy-claude-tmux": true, "AGY": true,
-		"codex-tmux": false, "ollama-tmux": false, "my-claude-wrapper": false, "claudex": false,
+		"codex-tmux": false, "ollama-tmux": false, "my-claude-wrapper": false, "claudex": false, "agyx": false,
 	} {
 		if got := HasCollector(driver); got != want {
 			t.Errorf("HasCollector(%q) = %t, want %t", driver, got, want)
@@ -53,5 +53,19 @@ func TestResolver_AnUppercaseClaudeDriverStillReadsItsTranscript(t *testing.T) {
 
 	if err != nil || res.Source != SourceTranscript || EffectiveWindow("CLAUDE-TMUX") != claudeEffectiveWindow {
 		t.Fatalf("CLAUDE-TMUX = %+v, %v; HasCollector says claude in any case, so the chain must read the transcript too", res, err)
+	}
+}
+
+func TestEffectiveWindow_EveryCollectorFamilyInAnyCaseHasAWindow(t *testing.T) {
+	t.Parallel()
+	for _, driver := range []string{"agy-claude-tmux", "AGY-tmux", "Claude-Tmux", "CODEX-TMUX", "Codex"} {
+		if got := EffectiveWindow(driver); got != claudeEffectiveWindow {
+			t.Errorf("EffectiveWindow(%q) = %d, want %d: a driver that HasCollector or a measured codex driver must not read fill_pct -1", driver, got, claudeEffectiveWindow)
+		}
+	}
+	for driver := range map[string]bool{"agy-claude-tmux": true, "AGY-tmux": true, "Claude-Tmux": true} {
+		if !HasCollector(driver) {
+			t.Errorf("HasCollector(%q) = false; the window and the collector come from one family table", driver)
+		}
 	}
 }

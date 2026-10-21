@@ -161,7 +161,7 @@ func TestNextNumber_IsOnePastTheHighestContiguousRecord(t *testing.T) {
 }
 
 func TestWritesTranscript_IsTrueOnlyForAClaudeCLI(t *testing.T) {
-	for cli, want := range map[string]bool{"claude": true, "claude-tmux": true, "claude-p": true, "agy-claude-tmux": false, "agy": false, "codex-tmux": false, "": false} {
+	for cli, want := range map[string]bool{"claude": true, "claude-tmux": true, "claude-p": true, "Claude-Tmux": true, "CLAUDE": true, "agy-claude-tmux": false, "agy": false, "codex-tmux": false, "": false} {
 		if got := WritesTranscript(cli); got != want {
 			t.Errorf("WritesTranscript(%q) = %v, want %v", cli, got, want)
 		}

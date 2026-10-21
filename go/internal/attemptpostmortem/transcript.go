@@ -33,7 +33,8 @@ func TranscriptFor(cli, path string) Transcript {
 }
 
 func WritesTranscript(cli string) bool {
-	return cli == "claude" || strings.HasPrefix(cli, "claude-")
+	c := strings.ToLower(cli)
+	return c == "claude" || strings.HasPrefix(c, "claude-")
 }
 
 func ClaudeTranscript(path string) Transcript {

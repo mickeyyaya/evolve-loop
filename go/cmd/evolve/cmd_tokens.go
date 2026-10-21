@@ -239,7 +239,7 @@ func renderTripwires(w io.Writer, r TokensReport) {
 	if r.TripwireCount == 0 {
 		return
 	}
-	fmt.Fprintf(w, "⚠️  TRIPWIRE: %d non-claude success launch(es) resolved to source=none — token usage unmeasured\n", r.TripwireCount)
+	fmt.Fprintf(w, "⚠️  TRIPWIRE: %d success launch(es) of a family with its own usage collector resolved to source=none — token usage unmeasured\n", r.TripwireCount)
 	for _, t := range r.Tripwires {
 		fmt.Fprintf(w, "  TRIPWIRE cycle=%d cli=%s agent=%s phase=%s dur=%dms exit=%d\n",
 			t.Cycle, stripControlBytes(t.CLI), stripControlBytes(t.Agent), stripControlBytes(t.Phase), t.DurationMS, t.ExitCode)
