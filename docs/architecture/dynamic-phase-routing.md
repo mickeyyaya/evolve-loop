@@ -139,6 +139,18 @@ Triggers are honored only at `Stage >= Advisory`; in `Shadow` they are forensic-
 
 At `Stage >= Advisory` the advisor's whole-cycle plan drives the optional phases, and the registry bounds it. A phase whose `routing` block has an `insert_when` and no `rubric_hint` declares its trigger as its whole admission rule: a plan that runs it while the trigger does not fire is clamped to skip (`insert-when-gates-plan`, recorded in `routing-decision-N.json` and the ledger). A `rubric_hint` opens the phase to the advisor's judgment beyond the trigger (architecture-design: "a novel/cross-cutting goal also warrants architecture-design"), an operator `enabled: on` runs the phase whatever its trigger says, and floor phases are never gated. The advisor plans before scout, so it cannot evaluate a `scout.goal_type` trigger itself; the walk evaluates it at the phase's turn, when the signal exists (cycle 1733).
 
+A trigger that reads a signal nothing produces makes its phase unreachable at advisory. So each `insert_when` and `skip_when` field must have a producer (2026-10-21). These are the producers:
+
+- a typed routing signal (`router.HarnessProduces`);
+- a `<phase>.failure_class` or `<phase>.defect_count` field from a failure block;
+- an `outputs.signals` entry of a phase earlier in the routing order.
+
+`phasespec.UnproducedTriggerFields` names each field without a producer, with its phase. `TestTheCheckedInRegistry_EveryTriggerFieldHasAProducer` keeps the checked-in registry clean. The digest folds the handoff `signals` of every completed phase, so a declared output reaches the router.
+
+Two typed signals were added for existing triggers. `ship.class` is `cycle` after the ship of a cycle completes. Changelog-sync, post-ship-monitor and memo read it. `run_dir.artifact_bytes` is the byte total of the run directory, and context-condense reads it.
+
+Four triggers read signals with no producer, so they were changed. Authz-gap-scan and threat-model now read `scout.goal_type == security`, as the security recipe row does. Fuzz-probe lost its `scout.surface_type` condition, and its `build.files_touched` condition stays. Preliminary-study is an on-demand phase, and it lost its `campaign.mode` trigger.
+
 A phase's `skip_when` also gates the plan (`skip-when-gates-plan`), and it is where a phase states the deliverable kinds it does not admit: every bugfix-category phase (fault-localization, bug-reproduction, error-handling-scan, flake-rerun-scan, incident-postmortem) declares `{"field": "deliverable_kind", "op": "eq", "value": "document"}` in its `phase.json`, so a document lane never runs them, whatever goal type its scout declares (cycle 1692, ADR-0099 amendment 2026-10-01). Each removal of a planned phase by either gate raises `ORCHESTRATOR_PLAN_PHASE_GATED` on the Signal Center. The advisor sees the same rules before it plans: the rubric renders each `skip_when` as a skip line, and a fleet lane's plan prompt carries the lane's pinned item (id, kind, deliverable kind, acceptance) in a "Lane scope" section. A phase the plan runs records `plan:<phase>` as its reason; `forced-on:<phase>` means the enable forced it on the trigger path, where there is no plan.
 
 ## The LLM proposer

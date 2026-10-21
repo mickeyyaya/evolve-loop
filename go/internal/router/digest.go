@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -37,10 +38,49 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	if done["audit"] {
 		digestAuditPhase(workspace, &sig)
 	}
+	if done["ship"] {
+		sig.Ship.Class = ShipClassCycle
+	}
+	sig.RunDir.ArtifactBytes = runDirArtifactBytes(workspace, &sig.DigestDegraded)
 	for _, phase := range completed {
+		if !spineHandoffPhases[phase] {
+			sig.foldHandoffSignals(workspace, phase)
+		}
 		sig.foldFailureSentinel(workspace, phase)
 	}
 	return sig, nil
+}
+
+const (
+	ShipClassCycle     = "cycle"
+	failureClassSignal = "failure_class"
+	defectCountSignal  = "defect_count"
+)
+
+var spineHandoffPhases = map[string]bool{"scout": true, "triage": true, "build": true, "audit": true}
+
+func (s *RoutingSignals) foldHandoffSignals(workspace, phase string) {
+	if raw, ok := readFirstTracked(workspace, &s.DigestDegraded, "handoff-"+phase+".json"); ok {
+		s.foldGeneric(phase, unwrapPayload(raw))
+	}
+}
+
+func runDirArtifactBytes(workspace string, degraded *[]string) int64 {
+	var total int64
+	err := filepath.WalkDir(workspace, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil || !d.Type().IsRegular() {
+			return err
+		}
+		info, err := d.Info()
+		if err == nil {
+			total += info.Size()
+		}
+		return err
+	})
+	if err != nil {
+		*degraded = append(*degraded, "run_dir: artifact bytes: "+err.Error())
+	}
+	return total
 }
 
 func digestScout(workspace string, sig *RoutingSignals) {
@@ -157,8 +197,8 @@ func (s *RoutingSignals) foldFailureSentinel(workspace, phase string) {
 	if s.Generic == nil {
 		s.Generic = make(map[string]any, 2)
 	}
-	s.Generic[phase+".failure_class"] = fb.Class
-	s.Generic[phase+".defect_count"] = float64(len(fb.Defects))
+	s.Generic[phase+"."+failureClassSignal] = fb.Class
+	s.Generic[phase+"."+defectCountSignal] = float64(len(fb.Defects))
 }
 
 func (s *RoutingSignals) foldGeneric(phase string, raw []byte) {

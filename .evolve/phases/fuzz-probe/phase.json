@@ -32,11 +32,6 @@
         "field": "build.files_touched",
         "op": "gt",
         "value": 0
-      },
-      {
-        "field": "scout.surface_type",
-        "op": "==",
-        "value": "parser/decoder/unmarshal"
       }
     ]
   },

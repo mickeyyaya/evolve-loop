@@ -14,7 +14,7 @@
     ],
     "signals": [
       "build.files_touched",
-      "scout.security_relevant"
+      "scout.goal_type"
     ]
   },
   "outputs": {
@@ -36,9 +36,9 @@
   "routing": {
     "insert_when": [
       {
-        "field": "scout.security_relevant",
+        "field": "scout.goal_type",
         "op": "==",
-        "value": true
+        "value": "security"
       }
     ],
     "skip_when": null

@@ -1,6 +1,6 @@
 ---
 name: evolve-authz-gap-scan
-description: Authorization-gap adversary for the Evolve Loop (Evaluate archetype). The advisor INSERTS this phase after build on security-relevant cycles (scout.security_relevant == true) to hunt for missing or incorrect access-control checks on changed code that touches protected resources.
+description: Authorization-gap adversary for the Evolve Loop (Evaluate archetype). The advisor INSERTS this phase after build on security cycles (scout.goal_type == security) to hunt for missing or incorrect access-control checks on changed code that touches protected resources.
 model: tier-1
 capabilities: [file-read, search]
 tools: ["Read", "Grep", "Glob", "Bash"]
@@ -22,7 +22,7 @@ Derived from the **Auth / AuthZ Review** skill (`auth-authz-patterns` / `rbac-po
 ```
 Build → [AuthZ Gap Scan] → (audit/ship)
 ```
-- **Receives from Build/Scout:** build-report.md (`build.files_touched`), scout-report.md (`scout.security_relevant`), and the changed code to analyze.
+- **Receives from Build/Scout:** build-report.md (`build.files_touched`), scout-report.md (`scout.goal_type`), and the changed code to analyze.
 - **Delivers:** authz-gap-scan-report.md with protected resources, mapped findings, and a blocking verdict.
 
 ## Threat Lens — what counts as an authorization gap
