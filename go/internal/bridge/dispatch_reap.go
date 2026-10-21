@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 const (
 	CodeDispatchProcessSurvived signalcenter.Code = "BRIDGE_DISPATCH_PROCESS_SURVIVED"
 	CodeDispatchReapFailed      signalcenter.Code = "BRIDGE_DISPATCH_REAP_FAILED"
+	CodeDispatchSweepRefused    signalcenter.Code = "BRIDGE_DISPATCH_SWEEP_REFUSED"
 
 	dispatchReapGrace   = 2 * time.Second
 	dispatchReapTimeout = 30 * time.Second
@@ -31,6 +33,7 @@ const (
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeDispatchProcessSurvived, "a process of a finished dispatch was still alive after SIGTERM, the grace time and SIGKILL; it carried the dispatch tag or was in the pane tree recorded before kill-session; fields dispatch, pids")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeDispatchReapFailed, "the sweep at dispatch end could not list the processes or could not send a signal; the processes of the dispatch can still run, and gc is the backstop; fields dispatch, errors")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeDispatchSweepRefused, "the sweep at dispatch end did not look for orphans by cwd, because the worktree is not a safe base: it is empty or relative, it cannot be resolved, or it holds the project root or the home directory; the tag and pane-tree proofs still run; fields dispatch, reason")
 }
 
 var dispatchNonce atomic.Uint64
@@ -61,6 +64,8 @@ type dispatchSweep struct {
 	id          string
 	treeDir     string
 	cwdProofDir string
+	refusal     string
+	started     time.Time
 	panes       []proctree.Identity
 	recorded    []proctree.Identity
 	preserved   bool
@@ -136,6 +141,7 @@ func (s *dispatchSweep) finish(ctx context.Context, deps Deps) {
 func (s *dispatchSweep) ownership(ctx context.Context, deps Deps) proctree.Proof {
 	owned := proctree.OwnedByDispatch(s.id, s.recorded, s.livePaneTree(ctx, deps))
 	if s.cwdProofDir == "" {
+		s.refuse(deps)
 		return owned
 	}
 	cwds, err := deps.ListCwds(ctx)
@@ -143,7 +149,15 @@ func (s *dispatchSweep) ownership(ctx context.Context, deps Deps) proctree.Proof
 		fmt.Fprintf(deps.Stderr, "[bridge] WARN dispatch %s: cannot list the process cwds, so an untagged orphan in %s can outlive the dispatch: %v\n", s.id, s.cwdProofDir, err)
 		return owned
 	}
-	return proctree.AnyOf(owned, proctree.OrphanUnder(s.cwdProofDir, cwds))
+	return proctree.AnyOf(owned, proctree.OrphanUnder(s.cwdProofDir, s.started, cwds))
+}
+
+func (s *dispatchSweep) refuse(deps Deps) {
+	if s.refusal == "" {
+		return
+	}
+	fmt.Fprintf(deps.Stderr, "[bridge] WARN dispatch %s: no orphan sweep by cwd: %s\n", s.id, s.refusal)
+	s.emit(deps, CodeDispatchSweepRefused, signalcenter.SeverityWarn, "no orphan sweep by cwd", map[string]string{"reason": s.refusal})
 }
 
 func (s *dispatchSweep) livePaneTree(ctx context.Context, deps Deps) []proctree.Identity {
@@ -203,10 +217,13 @@ func randomStamp() string {
 func launchSwept(ctx context.Context, driver Driver, cfg *Config, deps Deps) (int, error) {
 	cfg.DispatchID = mintDispatchID(cfg, os.Getpid())
 	observeDispatchID(deps, cfg.DispatchID)
-	deps.sweep = newDispatchSweep(cfg.DispatchID, cfg.ProjectRoot, cfg.Worktree)
+	home, _ := os.UserHomeDir()
+	deps.sweep = newDispatchSweep(cfg.DispatchID, cfg.ProjectRoot, cfg.Worktree, home, time.Now())
 	defer deps.sweep.finish(ctx, deps)
 	return driver.Launch(ctx, cfg, deps)
 }
+
+var defaultSignalProcess proctree.Signaler = syscall.Kill
 
 func (d Deps) withProcessDefaults() Deps {
 	if d.ListProcesses == nil {
@@ -216,17 +233,34 @@ func (d Deps) withProcessDefaults() Deps {
 		d.ListCwds = proctree.ExecCwdLister()
 	}
 	if d.SignalProcess == nil {
-		d.SignalProcess = syscall.Kill
+		d.SignalProcess = defaultSignalProcess
 	}
 	return d
 }
 
-func newDispatchSweep(id, projectRoot, worktree string) *dispatchSweep {
-	s := &dispatchSweep{id: id, treeDir: dispatchTreeDir(projectRoot)}
-	if worktree != "" && !proctree.Under(worktree, projectRoot) {
-		s.cwdProofDir = worktree
-	}
+func newDispatchSweep(id, projectRoot, worktree, home string, started time.Time) *dispatchSweep {
+	s := &dispatchSweep{id: id, treeDir: dispatchTreeDir(projectRoot), started: started.Truncate(time.Second)}
+	s.cwdProofDir, s.refusal = cwdProofBase(projectRoot, worktree, home)
 	return s
+}
+
+func cwdProofBase(projectRoot, worktree, home string) (base, refusal string) {
+	if worktree == "" {
+		return "", ""
+	}
+	if !filepath.IsAbs(projectRoot) || !filepath.IsAbs(worktree) || !filepath.IsAbs(home) {
+		return "", fmt.Sprintf("the project root %q, the worktree %q and the home directory %q are not all absolute", projectRoot, worktree, home)
+	}
+	base, err := filepath.EvalSymlinks(worktree)
+	if err != nil {
+		return "", fmt.Sprintf("cannot resolve the worktree: %v", err)
+	}
+	for _, kept := range []string{projectRoot, home} {
+		if proctree.Under(base, kept) {
+			return "", fmt.Sprintf("the worktree %s holds %s", base, kept)
+		}
+	}
+	return base, ""
 }
 
 func dispatchTreeDir(projectRoot string) string {

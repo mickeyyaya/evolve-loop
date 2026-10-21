@@ -328,7 +328,7 @@ func TestRecordPane_KeepsEveryMemberAndPersistsTheTreeForGC(t *testing.T) {
 	tmux := &panePIDTmux{panePIDs: []int{500}, events: &events}
 	var stderr bytes.Buffer
 	deps := reapDeps(h, tmux, &stderr, nil)
-	sweep := newDispatchSweep(thisDispatch, root, "")
+	sweep := newDispatchSweep(thisDispatch, root, "", "", reapT0)
 
 	sweep.recordPane(context.Background(), deps, "s1")
 	sweep.recordPane(context.Background(), deps, "s1")
@@ -346,7 +346,7 @@ func TestDispatchSweep_ACleanSweepRemovesThePersistedTree(t *testing.T) {
 	h := &hostTable{tables: [][]proctree.Process{{hostProc(500, 400, "")}, nil}, events: &events}
 	var stderr bytes.Buffer
 	deps := reapDeps(h, &panePIDTmux{panePIDs: []int{500}, events: &events}, &stderr, nil)
-	sweep := newDispatchSweep(thisDispatch, root, "")
+	sweep := newDispatchSweep(thisDispatch, root, "", "", reapT0)
 	sweep.recordPane(context.Background(), deps, "s1")
 
 	sweep.finish(context.Background(), deps)

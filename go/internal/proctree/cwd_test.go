@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 )
 
 func lsofStub(out string, code int, err error, seen *[]string) func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
@@ -43,7 +44,8 @@ func TestExecCwdLister_FindsThisTestProcess(t *testing.T) {
 	if _, err := exec.LookPath("lsof"); err != nil {
 		t.Skip("lsof is not installed")
 	}
-	cwds, err := ExecCwdLister()(context.Background())
+	var list CwdLister = ExecCwdLister()
+	cwds, err := list(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,17 +62,19 @@ func TestOrphanUnder_TakesOnlyAPrivateOrphanWhoseCwdIsInsideTheTree(t *testing.T
 	t.Parallel()
 	tree := t.TempDir()
 	cwds := []Cwd{{Pid: 10, Cwd: filepath.Join(tree, "go")}, {Pid: 11, Cwd: tree}, {Pid: 12, Cwd: t.TempDir()}, {Pid: 13, Cwd: tree}}
-	proof := OrphanUnder(tree, cwds)
+	since := time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
+	proof := OrphanUnder(tree, since, cwds)
 	for _, tc := range []struct {
 		name string
 		p    Process
 		want bool
 	}{
-		{"an orphan busy loop in a subdirectory", Process{Pid: 10, Ppid: 1, Comm: "sh"}, true},
-		{"a child of a live parent", Process{Pid: 11, Ppid: 400, Comm: "sh"}, false},
-		{"an orphan elsewhere", Process{Pid: 12, Ppid: 1, Comm: "sh"}, false},
-		{"a shared helper", Process{Pid: 13, Ppid: 1, Comm: "tmux"}, false},
-		{"a process lsof did not list", Process{Pid: 14, Ppid: 1, Comm: "sh"}, false},
+		{"an orphan busy loop in a subdirectory", Process{Pid: 10, Ppid: 1, Started: since, Comm: "sh"}, true},
+		{"an orphan that started before the dispatch", Process{Pid: 10, Ppid: 1, Started: since.Add(-time.Second), Comm: "sh"}, false},
+		{"a child of a live parent", Process{Pid: 11, Ppid: 400, Started: since, Comm: "sh"}, false},
+		{"an orphan elsewhere", Process{Pid: 12, Ppid: 1, Started: since, Comm: "sh"}, false},
+		{"a shared helper", Process{Pid: 13, Ppid: 1, Started: since, Comm: "tmux"}, false},
+		{"a process lsof did not list", Process{Pid: 14, Ppid: 1, Started: since, Comm: "sh"}, false},
 	} {
 		if got := proof(tc.p); got != tc.want {
 			t.Errorf("%s: proof = %v, want %v", tc.name, got, tc.want)
@@ -101,6 +105,29 @@ func TestUnder_MatchesThroughASymlinkAndRefusesASibling(t *testing.T) {
 	} {
 		if got := Under(tc.dir, tc.path); got != tc.want {
 			t.Errorf("Under(%q, %q) = %v, want %v", tc.dir, tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestOrphanUnder_ARootRelativeOrSymlinkedBaseMatchesNothing(t *testing.T) {
+	t.Parallel()
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "wt")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	orphan := Process{Pid: 10, Ppid: 1, Comm: "sh"}
+	for _, tc := range []struct {
+		name, base, cwd string
+	}{
+		{"the filesystem root", "/", "/"},
+		{"the filesystem root, unclean", "//.", "/Users"},
+		{"an empty base", "", "/wt"},
+		{"a relative base", "wt", "wt"},
+		{"a link to the cwd, which is not resolved again", link, target},
+	} {
+		if OrphanUnder(tc.base, time.Time{}, []Cwd{{Pid: 10, Ppid: 1, Cwd: tc.cwd}})(orphan) {
+			t.Errorf("%s: OrphanUnder(%q) took an orphan in %q", tc.name, tc.base, tc.cwd)
 		}
 	}
 }

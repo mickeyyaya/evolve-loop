@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -65,15 +66,21 @@ func ParseCwdListing(s string) []Cwd {
 	return out
 }
 
-func OrphanUnder(dir string, cwds []Cwd) Proof {
-	bases := baseForms(dir)
+func OrphanUnder(base string, since time.Time, cwds []Cwd) Proof {
+	clean := filepath.Clean(base)
+	if !filepath.IsAbs(clean) || filepath.Dir(clean) == clean {
+		return func(Process) bool { return false }
+	}
+	bases := []string{clean}
 	inside := make(map[int]bool, len(cwds))
 	for _, c := range cwds {
 		if within(bases, c.Cwd) {
 			inside[c.Pid] = true
 		}
 	}
-	return func(p Process) bool { return p.Ppid == 1 && inside[p.Pid] && !SharedHelper(p) }
+	return func(p Process) bool {
+		return p.Ppid == 1 && inside[p.Pid] && !p.Started.Before(since) && !SharedHelper(p)
+	}
 }
 
 func Under(dir, path string) bool {
