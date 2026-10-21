@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
@@ -35,25 +36,14 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.BoolVar(&dryRun, "dry-run", false, "run all read-only checks but skip commit/push/release")
 	fs.BoolVar(&bypassCommitGate, "bypass-commit-gate", false, "emergency: skip manual commit-gate attestation")
 	fs.BoolVar(&bypassPrefixGate, "bypass-prefix-gate", false, "emergency: skip commit-prefix gate for manual class")
+	pathsFlag := fs.String("paths", "", "manual class: stage and commit only these comma-separated paths instead of the whole tree")
 	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
 	fs.StringVar(&pluginRoot, "plugin-root", "", "plugin root (default: $EVOLVE_PLUGIN_ROOT or project root)")
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
-	if pushOnly {
-		if fs.NArg() > 0 {
-			fmt.Fprintln(stderr, "evolve ship: --push-only takes no commit message (it commits nothing)")
-			return 1
-		}
-	} else {
-		if fs.NArg() < 1 {
-			fmt.Fprintln(stderr, `evolve ship: usage: evolve ship [--class cycle|manual|release|trivial] [--dry-run] "<commit-message>" | evolve ship --push-only`)
-			return 1
-		}
-		if fs.NArg() > 1 {
-			fmt.Fprintf(stderr, "evolve ship: extra positional args (only one commit message expected): %v\n", fs.Args()[1:])
-			return 1
-		}
+	if !validShipArgs(fs, pushOnly, stderr) {
+		return 1
 	}
 
 	projectRoot, rc := resolveShipRoot(projectRoot, stderr)
@@ -85,7 +75,7 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		Signals:          signals,
 	}
 
-	res, err := shipRunFn(context.Background(), opts)
+	res, err := shipRunFn(ship.WithPaths(context.Background(), splitShipPaths(*pathsFlag)), opts)
 
 	for _, line := range res.Logs {
 		fmt.Fprintln(stderr, line)
@@ -101,6 +91,25 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return openShipPr(pr, projectRoot, prBranch, fs.Arg(0), stdout, stderr)
 	}
 	return int(res.ExitCode)
+}
+
+func validShipArgs(fs *flag.FlagSet, pushOnly bool, stderr io.Writer) bool {
+	if pushOnly {
+		if fs.NArg() > 0 {
+			fmt.Fprintln(stderr, "evolve ship: --push-only takes no commit message (it commits nothing)")
+			return false
+		}
+		return true
+	}
+	if fs.NArg() < 1 {
+		fmt.Fprintln(stderr, `evolve ship: usage: evolve ship [--class cycle|manual|release|trivial] [--dry-run] "<commit-message>" | evolve ship --push-only`)
+		return false
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintf(stderr, "evolve ship: extra positional args (only one commit message expected): %v\n", fs.Args()[1:])
+		return false
+	}
+	return true
 }
 
 func shipRootSignals(projectRoot string, stderr io.Writer) (*signalcenter.Center, func()) {
@@ -123,4 +132,14 @@ func resolveShipRoot(projectRoot string, stderr io.Writer) (string, int) {
 		fmt.Fprintf(stderr, "evolve ship: WARN: %s\n", m)
 	})
 	return projectRoot, 0
+}
+
+func splitShipPaths(raw string) []string {
+	var out []string
+	for _, p := range strings.Split(raw, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
