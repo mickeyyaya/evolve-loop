@@ -1,6 +1,7 @@
 package policy_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -118,5 +119,43 @@ func TestDocsFloorPolicy_AcceptsEveryStageWord(t *testing.T) {
 		if err := json.Unmarshal([]byte(`{"stage":"`+word+`","ste_stage":"`+word+`"}`), &d); err != nil || d.SteStage != word || d.Stage != word {
 			t.Errorf("stage and ste_stage %q: got %+v, %v", word, d, err)
 		}
+	}
+}
+
+var checkedInPolicyPath = filepath.Join("..", "..", "..", ".evolve", "policy.json")
+
+func TestLoad_TheCheckedInPolicyRunsTheSTEFloorAtEnforce(t *testing.T) {
+	t.Parallel()
+	p, err := policy.Load(checkedInPolicyPath)
+	if err != nil {
+		t.Fatalf("the checked-in policy must load: %v", err)
+	}
+
+	if got := p.DocsFloorConfig(); p.DocsFloor == nil || got.SteStage != "enforce" {
+		t.Errorf("checked-in docs_floor = %+v (block %+v); the operator approved ste_stage enforce on 2026-10-21, so a lane doc that fails the STE lint goes back to the build", got, p.DocsFloor)
+	}
+}
+
+func TestLoad_TheCheckedInPolicyRecordsTheAuditCascadeInShadow(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(checkedInPolicyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file struct {
+		AuditCascade json.RawMessage `json:"audit_cascade"`
+	}
+	if err := json.Unmarshal(raw, &file); err != nil {
+		t.Fatal(err)
+	}
+	strict := json.NewDecoder(bytes.NewReader(file.AuditCascade))
+	strict.DisallowUnknownFields()
+	var block policy.AuditCascadePolicy
+	decodeErr := strict.Decode(&block)
+	p, loadErr := policy.Load(checkedInPolicyPath)
+
+	got := p.AuditCascadeConfig()
+	if decodeErr != nil || loadErr != nil || got.Stage != policy.AuditCascadeShadow || len(got.RiskPaths) == 0 || got.MaxChangedFiles == 0 || len(got.EscalateVerdicts) == 0 {
+		t.Errorf("audit_cascade = %+v (strict decode %v, load %v); the operator approved the shadow stage on 2026-10-21 with every threshold in config", got, decodeErr, loadErr)
 	}
 }

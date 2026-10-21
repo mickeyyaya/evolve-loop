@@ -24,6 +24,8 @@
 {"audit_cascade": {"stage": "shadow", "risk_paths": ["go/internal/core/", "go/internal/guards/", "go/internal/phases/ship/"], "max_changed_files": 40, "escalate_verdicts": ["FAIL", "WARN"]}}
 ```
 
+- **The checked-in policy runs the shadow stage** (operator decision of 2026-10-21), with the block above. `TestLoad_TheCheckedInPolicyRecordsTheAuditCascadeInShadow` decodes the block strictly and pins the stage. After one or two waves, the operator reads the escalation rate from the records. Above about 60%, the item is parked, because then the cascade saves little.
+
 ## Limits
 
 - The shadow record shows how often a cheap pass escalates. It cannot show the agreement of a cheap pass with the deep pass, because no cheap pass runs. That measure needs a second, cheap audit dispatch in shadow, which costs tokens. It is an open decision of the item.
