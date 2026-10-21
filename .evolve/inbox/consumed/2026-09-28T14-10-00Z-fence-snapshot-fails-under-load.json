@@ -16,5 +16,11 @@
     "A read-only phase never runs with an unchecked fence silently: the policy is stated in ADR-0097 and pinned by a runner test"
   ],
   "created_at": "2026-09-28T14:10:00Z",
-  "source": "console, 2026-09-28, the shipmanifest extraction floor (third occurrence of the fence test flake under load)"
+  "source": "console, 2026-09-28, the shipmanifest extraction floor (third occurrence of the fence test flake under load)",
+  "consumed": {
+    "at": "2026-10-21T11:00:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "#1082 (merged) is the evidence. Acceptance 1: the fence test reports Outcome.TakeErr, and Begin retakes a transient snapshot failure once, naming both attempts. Acceptance 2: bounded, cause not reproducible since 2026-10-16 (operator decision 2026-10-21): 240 clean runs, 120 on origin/main (go test -race -count=60 -cpu 1,8 beside ship's -race suite) and 120 on the 2026-09-28 tree ab531a8a9 with TakeErr and RestoreErr printed, 0 failures; since 2026-10-16 the snapshot runs through gitexec.TreeOfIndexCopy, which copies the index from one file handle, keeps its mtime and isolates the git environment. Acceptance 3: ADR-0097 decisions 3 and 7, pinned by the runner test."
+  }
 }
