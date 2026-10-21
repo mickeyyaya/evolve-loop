@@ -231,12 +231,21 @@ func deadScratchProject(header string, keep []string) bool {
 	return os.IsNotExist(err)
 }
 
+var scratchEvolveDirs = []string{"/.evolve/worktrees/", "/.evolve/runs/"}
+
 func scratchProjectPath(path string) bool {
+	if slices.ContainsFunc(scratchEvolveDirs, func(dir string) bool { return strings.Contains(path, dir) }) {
+		return true
+	}
 	temp := filepath.Clean(os.TempDir()) + string(filepath.Separator)
-	for _, prefix := range []string{temp, "/private" + temp} {
+	for _, prefix := range []string{temp, "/private" + temp, "/tmp/", "/private/tmp/"} {
 		if rel, ok := strings.CutPrefix(path, prefix); ok {
-			return strings.HasPrefix(rel, "Test") || strings.HasPrefix(rel, "evolve-")
+			return slices.ContainsFunc(strings.Split(rel, "/"), scratchSegment)
 		}
 	}
-	return strings.Contains(path, "/.evolve/worktrees/")
+	return false
+}
+
+func scratchSegment(segment string) bool {
+	return strings.HasPrefix(segment, "Test") || strings.HasPrefix(segment, "evolve-")
 }

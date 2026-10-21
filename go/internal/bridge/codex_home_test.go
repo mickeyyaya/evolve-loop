@@ -3,6 +3,7 @@ package bridge
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -106,5 +107,44 @@ func TestPruneDeadCodexProjects_FailsSafeOnHeadersItDoesNotKnow(t *testing.T) {
 		if !strings.Contains(got, keep) {
 			t.Errorf("pruned config lost %q: an indented header ends the dead table, and an unknown header form is kept:\n%s", keep, got)
 		}
+	}
+}
+
+func TestPruneDeadCodexProjects_DropsTheDeadScratchGroupsTheOperatorFileHolds(t *testing.T) {
+	t.Parallel()
+	temp := filepath.Clean(os.TempDir())
+	dead := []string{
+		filepath.Join(temp, "gremlins-381", "TestMutantSurvives912", "001"),
+		"/tmp/claude-501/TestCLIPreflight_CodexPreflightReturnsHelperError42/001",
+		"/private/tmp/claude-501/claude-501/TestCodexTmux_HappyPath7/001",
+		"/repo/.evolve/runs/cycle-2027",
+	}
+	kept := []string{filepath.Join(temp, "gremlins-381", "notes"), "/tmp/someones-project-gone", "/repo/.evolve/runs-archive/cycle-1"}
+	var config string
+	for _, p := range append(slices.Clone(dead), kept...) {
+		config += codexProjectHeader(p) + "\ntrust_level = \"trusted\"\n\n"
+	}
+
+	got := pruneDeadCodexProjects(config, nil)
+
+	for _, p := range dead {
+		if strings.Contains(got, codexProjectHeader(p)) {
+			t.Errorf("the dead scratch entry %q stays:\n%s", p, got)
+		}
+	}
+	for _, p := range kept {
+		if !strings.Contains(got, codexProjectHeader(p)) {
+			t.Errorf("the entry %q is no scratch path, so it stays:\n%s", p, got)
+		}
+	}
+}
+
+func TestScratchProjectPath_ReadsTheTempDirBehindThePrivateLink(t *testing.T) {
+	t.Setenv("TMPDIR", "/nonexistent-tmp-root/T")
+	if !scratchProjectPath("/private/nonexistent-tmp-root/T/TestA9/001") {
+		t.Error("macOS links /var to /private/var, so a test dir under /private + TMPDIR is scratch")
+	}
+	if scratchProjectPath("/private/elsewhere/TestA9/001") {
+		t.Error("a /private path outside the temp dir is no scratch path")
 	}
 }
