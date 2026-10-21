@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/codeshape"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/pipelinerates"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -28,7 +29,7 @@ type qualityEnv struct {
 	newCenter func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func())
 }
 
-var qualityScopes = map[string][]qualityReader{"wave": waveQualityReaders(), "tree": nil, "judges": nil, "replay": nil}
+var qualityScopes = map[string][]qualityReader{"wave": waveQualityReaders(), "tree": treeQualityReaders(), "judges": nil, "replay": nil}
 
 func waveQualityReaders() []qualityReader {
 	return []qualityReader{
@@ -41,7 +42,44 @@ func waveQualityReaders() []qualityReader {
 		pipelineReader("CQ2", func(cs []pipelinerates.Cycle, root string) ([]qualitypanel.Reading, error) {
 			return pipelinerates.PackagesPerShip(cs, pipelinerates.GitShipPaths(root))
 		}),
+		shapeReader("CQ1", func(t codeshape.Tree, _ string) ([]qualitypanel.Reading, error) {
+			return []qualitypanel.Reading{codeshape.TreeConformance(t)}, nil
+		}),
+		pipelineReader("CQ1", func(cs []pipelinerates.Cycle, root string) ([]qualitypanel.Reading, error) {
+			return codeshape.ChangedConformance(root, cs)
+		}),
 	}
+}
+
+func treeQualityReaders() []qualityReader {
+	return []qualityReader{
+		shapeReader("CQ4", func(t codeshape.Tree, root string) ([]qualitypanel.Reading, error) {
+			readings := []qualitypanel.Reading{codeshape.InterfaceDepth(t), codeshape.TreeDuplication(t)}
+			cycles, err := pipelinerates.LoadCycles(root)
+			if err != nil {
+				return readings, err
+			}
+			r, err := codeshape.DiffDuplication(root, t, cycles)
+			if err != nil {
+				return readings, err
+			}
+			return append(readings, r), nil
+		}),
+		{index: "CQ5", read: func(root string) ([]qualitypanel.Reading, error) {
+			lines, files, err := codeshape.RuleLines(root)
+			return []qualitypanel.Reading{codeshape.JudgmentSurface(lines, files)}, err
+		}},
+	}
+}
+
+func shapeReader(index string, read func(codeshape.Tree, string) ([]qualitypanel.Reading, error)) qualityReader {
+	return qualityReader{index: index, read: func(root string) ([]qualitypanel.Reading, error) {
+		tree, err := codeshape.Scan(codeshape.GoRoot(root))
+		if err != nil {
+			return nil, err
+		}
+		return read(tree, root)
+	}}
 }
 
 func pipelineReader(index string, read func([]pipelinerates.Cycle, string) ([]qualitypanel.Reading, error)) qualityReader {
@@ -99,7 +137,7 @@ func parseQualityArgs(args []string, scopes map[string][]qualityReader) (string,
 	if _, ok := scopes[scope]; !ok {
 		return "", "", fmt.Errorf("scope %q is not wave, tree, judges or replay", scope)
 	}
-	return scope, root, nil
+	return scope, paths.AbsoluteRoot("--project-root", root, nil), nil
 }
 
 type qualityTally struct {
