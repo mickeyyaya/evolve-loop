@@ -44,15 +44,32 @@ func processUnifiedCommitment(req core.PhaseRequest) ([]core.Diagnostic, error) 
 	if err := json.Unmarshal(claimRaw, &claim); err != nil {
 		return rejectUnified(fields, decisionPath, "invalid JSON: "+err.Error())
 	}
-	items, _, err := inboxbatch.LoadDir(filepath.Join(req.ProjectRoot, ".evolve", "inbox"))
+	items, skipped, err := unifiedInbox(req)
 	if err != nil {
-		return nil, fmt.Errorf("load inbox for unified_commitment: %w", err)
+		return nil, err
 	}
-	claimed, _, err := inboxbatch.LoadDir(filepath.Join(req.ProjectRoot, ".evolve", "inbox", "processing", fmt.Sprintf("cycle-%d", req.Cycle)))
+	diags, err := applyUnified(req, fields, raw, decisionPath, claim, items)
+	return append(skipped, diags...), err
+}
+
+func unifiedInbox(req core.PhaseRequest) ([]inboxbatch.Item, []core.Diagnostic, error) {
+	inbox := filepath.Join(req.ProjectRoot, ".evolve", "inbox")
+	open, err := inboxbatch.ScanDir(inbox)
 	if err != nil {
-		return nil, fmt.Errorf("load claimed inbox for unified_commitment: %w", err)
+		return nil, nil, fmt.Errorf("load inbox for unified_commitment: %w", err)
 	}
-	items = append(items, claimed...)
+	claimed, err := inboxbatch.ScanDir(filepath.Join(inbox, "processing", fmt.Sprintf("cycle-%d", req.Cycle)))
+	if err != nil {
+		return nil, nil, fmt.Errorf("load claimed inbox for unified_commitment: %w", err)
+	}
+	var diags []core.Diagnostic
+	for _, w := range append(open.Warnings, claimed.Warnings...) {
+		diags = append(diags, core.Diagnostic{Severity: "warning", Message: "unified_commitment inbox: " + w.String()})
+	}
+	return append(open.Items, claimed.Items...), diags, nil
+}
+
+func applyUnified(req core.PhaseRequest, fields map[string]json.RawMessage, raw []byte, decisionPath string, claim inboxbatch.UnifiedCommitment, items []inboxbatch.Item) ([]core.Diagnostic, error) {
 	if err := claim.Validate(items); err != nil {
 		return rejectUnified(fields, decisionPath, err.Error())
 	}

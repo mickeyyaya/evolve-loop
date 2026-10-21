@@ -18,5 +18,11 @@
   "acceptance": [
     "Each of the five sites names an unreadable inbox file on an operator-visible channel, or refuses on DirScan.HasUnreadable, pinned by a test with one malformed file",
     "No production call site discards the warnings of inboxbatch.LoadDir (a grep-level guard test)"
-  ]
+  ],
+  "consumed": {
+    "at": "2026-10-21T12:00:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "the five sites read inboxbatch.ScanDir: wave seed, LaneDeclaredFiles (refuses on HasUnreadable), processingClaimIDs and the two unified-commitment loads name each skipped file; TestNoProductionCodeCallsLoadDir refuses any production call of LoadDir"
+  }
 }
