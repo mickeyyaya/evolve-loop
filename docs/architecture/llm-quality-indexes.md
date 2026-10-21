@@ -437,9 +437,9 @@ The Signal Center does not compute an index, choose a threshold, change a stage 
 | Formula | killed / (killed + lived) over the mutants of the changed functions. TIMED OUT counts as killed (Stryker rule, P3.5). NOT COVERED is reported as its own count. NOT VIABLE is dropped. |
 | Unit | % of mutants |
 | Window | the changed functions of one cycle; pooled per wave |
-| Source | `gremlins` (installed in `~/go/bin`) run on the packages of the ship at its commit, limited to the changed line ranges |
+| Source | `gremlins` (installed in `~/go/bin`) run on the packages of the ship at its commit, limited to the changed line ranges. It runs only in a scratch worktree of the ship commit, never in the plane tree or the main tree. A crash during a run must not leave a mutant in a shared tree. |
 | Interval | Wilson over mutants; cluster bootstrap by cycle for the wave |
-| Exclusions | Never mutate a function that sends a signal to a process. This covers any body that calls `syscall.Kill`, `unix.Kill`, `os.Process.Kill` or `os.Process.Signal`. It also covers the packages `go/internal/proctree`, `go/internal/bridge` (`dispatch_reap.go`) and `go/internal/gc`. A kill-guard mutant once killed every user process (house rule). |
+| Exclusions | Never mutate a function that sends a signal to a process. This covers any body that calls `syscall.Kill`, `unix.Kill`, `os.Process.Kill` or `os.Process.Signal`. It also covers the packages `go/internal/proctree`, `go/internal/bridge` (`dispatch_reap.go`) and `go/internal/gc`. A kill-guard mutant once killed every user process (house rule). A file that contains a kill call is excluded whole. A body that does not parse is refused. |
 | Baseline | no data. This task did not run mutation. |
 | Stage and threshold | `shadow`. Proposed: higher is better, threshold 80%, `n_min` 20 mutants per wave. |
 | Good and bad | Over 90% is strong. Under 60% means that the tests mostly run the code without checks. |
