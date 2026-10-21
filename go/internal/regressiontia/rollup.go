@@ -5,11 +5,13 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 )
 
@@ -31,10 +33,7 @@ type Summary struct {
 }
 
 type cycleVerdict struct {
-	Results []struct {
-		Predicate string `json:"predicate"`
-		Result    string `json:"result"`
-	} `json:"results"`
+	Results []acssuite.Result `json:"results"`
 }
 
 func Rollup(runsDir string) (Summary, error) {
@@ -84,8 +83,10 @@ func (s *Summary) add(runsDir string, cycle int) {
 		return
 	}
 	for _, r := range v.Results {
-		pkg := regressionPackage(r.Predicate)
-		if r.Result == "red" && slices.Contains(d.WouldSkip, pkg) {
+		if r.ResultStr != "red" || !r.IsRegression {
+			continue
+		}
+		if pkg, skipped := skippedPackage(d.WouldSkip, r.Predicate); skipped {
 			s.Misses = append(s.Misses, Miss{Cycle: cycle, Package: pkg, Predicate: r.Predicate})
 		}
 	}
@@ -103,8 +104,16 @@ func (s *Summary) read(runsDir, dir, name string, into any) bool {
 	return true
 }
 
-func regressionPackage(predicate string) string {
-	pkg, _, _ := strings.Cut(predicate, ":")
-	pkg, _, _ = strings.Cut(pkg, "/...")
-	return "./" + strings.TrimPrefix(pkg, "go/")
+func skippedPackage(wouldSkip []string, predicate string) (string, bool) {
+	base, _, _ := strings.Cut(strings.TrimPrefix(predicate, "go/acs/"), "/")
+	base, _, _ = strings.Cut(base, ":")
+	if base == "" {
+		return "", false
+	}
+	for _, pkg := range wouldSkip {
+		if path.Base(pkg) == base {
+			return pkg, true
+		}
+	}
+	return "", false
 }

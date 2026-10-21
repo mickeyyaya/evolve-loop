@@ -19,7 +19,7 @@ func tiaEvolveDir(t *testing.T) string {
 		t.Fatal(err)
 	}
 	d, _ := json.Marshal(regressiontia.Decision{Stage: "shadow", Selected: []string{"./acs/regression/a"}, WouldSkip: []string{"./acs/regression/b"}, WouldSkipCount: 1})
-	v := `{"results":[{"predicate":"go/acs/regression/b/...:TestB","result":"red","is_regression":true}]}`
+	v := `{"results":[{"predicate":"go/acs/b/...:TestB","result":"red","is_regression":true}]}`
 	for name, body := range map[string]string{regressiontia.ArtifactName: string(d), "acs-verdict.json": v} {
 		if err := os.WriteFile(filepath.Join(ws, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -35,7 +35,7 @@ func TestACSTIAReport_PrintsTheRollupAndEachMiss(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code %d, stderr %q", code, errb.String())
 	}
-	for _, want := range []string{"1 cycle(s) with a shadow decision: 1 selected, 1 would skip (50%)", "MISS cycle 7: ./acs/regression/b would skip go/acs/regression/b/...:TestB, which was red"} {
+	for _, want := range []string{"1 cycle(s) with a shadow decision: 1 selected, 1 would skip (50%)", "MISS cycle 7: ./acs/regression/b would skip go/acs/b/...:TestB, which was red"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("stdout = %q, want %q", out.String(), want)
 		}
