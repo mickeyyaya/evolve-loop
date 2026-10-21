@@ -1,25 +1,30 @@
 package pipelinerates
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/qualitypanel"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
 	bootstrapResamples = 2000
 	bootstrapSeed      = 20261021
+	gitShowTimeout     = time.Minute
 )
 
 type ShipPaths func(commit string) ([]string, error)
 
 func GitShipPaths(root string) ShipPaths {
 	return func(commit string) ([]string, error) {
-		out, err := exec.Command("git", "-C", root, "show", "--numstat", "-z", "--no-renames", "--diff-merges=first-parent", "--format=", commit).Output()
+		ctx, cancel := context.WithTimeout(context.Background(), gitShowTimeout)
+		defer cancel()
+		out, err := sysexec.Command(ctx, "git", "-C", root, "show", "--numstat", "-z", "--no-renames", "--diff-merges=first-parent", "--format=", commit).Output()
 		if err != nil {
 			return nil, fmt.Errorf("git show %s: %w", commit, err)
 		}

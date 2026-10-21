@@ -21,6 +21,7 @@ var notInboxItemIDReaders = map[string]string{
 	"internal/phases/retro/explanation_review_gate.go requireCorrectionTodo": "carryover-todos.json",
 	"internal/phases/ship/consume.go validatedUnifiedMembers":                "the triage decision",
 	"internal/phases/triage/unified.go applyUnified":                         "the triage decision",
+	"internal/pipelinerates/cycles.go readCycle":                             "the triage decision",
 }
 
 func TestInboxItemIDReaders_ResolveTheIDThroughInboxbatchItemID(t *testing.T) {
