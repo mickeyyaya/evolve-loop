@@ -26,6 +26,9 @@ func (o *Options) runner() CmdRunner {
 }
 
 func (o *Options) run(ctx context.Context, name string, args []string, stdout, stderr io.Writer) (int, error) {
+	if name == "git" {
+		args = scopeStatusRead(ctx, args)
+	}
 	return o.runner()(ctx, name, o.ProjectRoot, args, os.Environ(), nil, stdout, stderr)
 }
 
