@@ -193,3 +193,49 @@ func TestRepoPaths_SplitsInRepoFromOutsideAndKeepsTheDirectoryMarker(t *testing.
 		t.Errorf("outside = %v, want %v", outside, want)
 	}
 }
+
+func TestProcessUnifiedCommitment_AnUnreadableInboxFileIsNamedInTheDiagnostics(t *testing.T) {
+	t.Parallel()
+	small := unifiedItems(2, "seam")
+	req := writeUnifiedFixture(t, small, itemIDs(small), itemIDs(small), false)
+	if err := os.WriteFile(filepath.Join(req.ProjectRoot, ".evolve", "inbox", "broken.json"), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	diags, err := processUnifiedCommitment(req)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range diags {
+		if d.Severity == "warning" && strings.Contains(d.Message, "WARN skipped broken.json") {
+			return
+		}
+	}
+	t.Fatalf("diags = %+v; want a warning that names broken.json", diags)
+}
+
+func TestProcessUnifiedCommitment_AnUnreadableClaimFileIsNamedInTheDiagnostics(t *testing.T) {
+	t.Parallel()
+	small := unifiedItems(2, "seam")
+	req := writeUnifiedFixture(t, small, itemIDs(small), itemIDs(small), false)
+	claimed := filepath.Join(req.ProjectRoot, ".evolve", "inbox", "processing", "cycle-1720")
+	if err := os.MkdirAll(claimed, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(claimed, "claim-broken.json"), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	diags, err := processUnifiedCommitment(req)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range diags {
+		if d.Severity == "warning" && strings.Contains(d.Message, "WARN skipped claim-broken.json") {
+			return
+		}
+	}
+	t.Fatalf("diags = %+v; want a warning that names claim-broken.json", diags)
+}

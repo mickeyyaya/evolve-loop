@@ -19,11 +19,15 @@ func ReadInboxBacklog(evolveDir string, isProtected func(string) bool) []FleetCa
 func readRankedBacklog(evolveDir string, isProtected func(string) bool, now time.Time, loopLog io.Writer) []FleetCandidate {
 	rank, warnings := rankinputs.Load(evolveDir, now)
 	lifecycle := readOnlyLifecycle(evolveDir)
-	queue, _, err := inboxbatch.LoadDir(lifecycle.InboxDir)
+	scan, err := inboxbatch.ScanDir(lifecycle.InboxDir)
 	if err != nil {
 		fmt.Fprintf(loopLog, "[triagecap] WARN inbox backlog unreadable: %v\n", err)
 		return nil
 	}
+	for _, w := range scan.Warnings {
+		fmt.Fprintf(loopLog, "[triagecap] %s\n", w)
+	}
+	queue := scan.Items
 	for _, w := range append(warnings, inboxrank.ClassWarnings(queue, rank.Config)...) {
 		fmt.Fprintf(loopLog, "[triagecap] WARN inbox rank: %s\n", w)
 	}
