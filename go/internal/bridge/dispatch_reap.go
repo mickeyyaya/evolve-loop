@@ -58,11 +58,12 @@ func dispatchEnv(deps Deps, cfg *Config) []string {
 func isDispatchTag(kv string) bool { return strings.HasPrefix(kv, ipcenv.DispatchIDKey+"=") }
 
 type dispatchSweep struct {
-	id        string
-	treeDir   string
-	panes     []proctree.Identity
-	recorded  []proctree.Identity
-	preserved bool
+	id          string
+	treeDir     string
+	cwdProofDir string
+	panes       []proctree.Identity
+	recorded    []proctree.Identity
+	preserved   bool
 }
 
 type panePIDLister interface {
@@ -123,13 +124,26 @@ func (s *dispatchSweep) finish(ctx context.Context, deps Deps) {
 	defer cancel()
 	reaper := proctree.Reaper{List: deps.ListProcesses, Signal: deps.SignalProcess, Sleep: deps.Sleep,
 		Grace: dispatchReapGrace, Self: os.Getpid()}
-	rep := reaper.Reap(ctx, proctree.OwnedByDispatch(s.id, s.recorded, s.livePaneTree(ctx, deps)))
+	rep := reaper.Reap(ctx, s.ownership(ctx, deps))
 	s.report(deps, rep)
 	if len(rep.Errors) == 0 && len(rep.Survivors) == 0 && s.treeDir != "" && s.id != "" {
 		if err := proctree.RemoveTree(s.treeDir, s.id); err != nil {
 			fmt.Fprintf(deps.Stderr, "[bridge] WARN dispatch %s: %v\n", s.id, err)
 		}
 	}
+}
+
+func (s *dispatchSweep) ownership(ctx context.Context, deps Deps) proctree.Proof {
+	owned := proctree.OwnedByDispatch(s.id, s.recorded, s.livePaneTree(ctx, deps))
+	if s.cwdProofDir == "" {
+		return owned
+	}
+	cwds, err := deps.ListCwds(ctx)
+	if err != nil {
+		fmt.Fprintf(deps.Stderr, "[bridge] WARN dispatch %s: cannot list the process cwds, so an untagged orphan in %s can outlive the dispatch: %v\n", s.id, s.cwdProofDir, err)
+		return owned
+	}
+	return proctree.AnyOf(owned, proctree.OrphanUnder(s.cwdProofDir, cwds))
 }
 
 func (s *dispatchSweep) livePaneTree(ctx context.Context, deps Deps) []proctree.Identity {
@@ -189,7 +203,7 @@ func randomStamp() string {
 func launchSwept(ctx context.Context, driver Driver, cfg *Config, deps Deps) (int, error) {
 	cfg.DispatchID = mintDispatchID(cfg, os.Getpid())
 	observeDispatchID(deps, cfg.DispatchID)
-	deps.sweep = newDispatchSweep(cfg.DispatchID, cfg.ProjectRoot)
+	deps.sweep = newDispatchSweep(cfg.DispatchID, cfg.ProjectRoot, cfg.Worktree)
 	defer deps.sweep.finish(ctx, deps)
 	return driver.Launch(ctx, cfg, deps)
 }
@@ -198,14 +212,21 @@ func (d Deps) withProcessDefaults() Deps {
 	if d.ListProcesses == nil {
 		d.ListProcesses = proctree.ExecLister()
 	}
+	if d.ListCwds == nil {
+		d.ListCwds = proctree.ExecCwdLister()
+	}
 	if d.SignalProcess == nil {
 		d.SignalProcess = syscall.Kill
 	}
 	return d
 }
 
-func newDispatchSweep(id, projectRoot string) *dispatchSweep {
-	return &dispatchSweep{id: id, treeDir: dispatchTreeDir(projectRoot)}
+func newDispatchSweep(id, projectRoot, worktree string) *dispatchSweep {
+	s := &dispatchSweep{id: id, treeDir: dispatchTreeDir(projectRoot)}
+	if worktree != "" && !proctree.Under(worktree, projectRoot) {
+		s.cwdProofDir = worktree
+	}
+	return s
 }
 
 func dispatchTreeDir(projectRoot string) string {
