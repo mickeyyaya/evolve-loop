@@ -147,7 +147,7 @@ A trigger that reads a signal nothing produces makes its phase unreachable at ad
 
 `phasespec.UnproducedTriggerFields` names each field without a producer, with its phase. `TestTheCheckedInRegistry_EveryTriggerFieldHasAProducer` keeps the checked-in registry clean. The digest folds the handoff `signals` of every completed phase, so a declared output reaches the router.
 
-Two typed signals were added for existing triggers. `ship.class` is `cycle` after the ship of a cycle completes. Changelog-sync, post-ship-monitor and memo read it. `run_dir.artifact_bytes` is the byte total of the run directory, and context-condense reads it.
+Two typed signals were added for existing triggers. `ship.class` is `cycle` after the ship of a cycle completes. Changelog-sync, post-ship-monitor and memo read it. `run_dir.artifact_bytes` is the byte total of the run directory, and context-condense reads it. That total includes logs and prompts, so the trigger is true on each real cycle; the inbox item `context-condense-trigger-measures-the-whole-run-dir` owns the fix.
 
 Four triggers read signals with no producer, so they were changed. Authz-gap-scan and threat-model now read `scout.goal_type == security`, as the security recipe row does. Fuzz-probe lost its `scout.surface_type` condition, and its `build.files_touched` condition stays. Preliminary-study is an on-demand phase, and it lost its `campaign.mode` trigger.
 

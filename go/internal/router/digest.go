@@ -25,18 +25,19 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	}
 	var sig RoutingSignals
 	done := toSet(completed)
+	owners := signalOwners(completed)
 
 	if done["scout"] {
-		digestScout(workspace, &sig)
+		digestScout(workspace, &sig, owners)
 	}
 	if done["triage"] {
-		digestTriagePhase(workspace, &sig)
+		digestTriagePhase(workspace, &sig, owners)
 	}
 	if done["build"] {
-		digestBuildPhase(workspace, &sig)
+		digestBuildPhase(workspace, &sig, owners)
 	}
 	if done["audit"] {
-		digestAuditPhase(workspace, &sig)
+		digestAuditPhase(workspace, &sig, owners)
 	}
 	if done["ship"] {
 		sig.Ship.Class = ShipClassCycle
@@ -44,8 +45,10 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	sig.RunDir.ArtifactBytes = runDirArtifactBytes(workspace, &sig.DigestDegraded)
 	for _, phase := range completed {
 		if !spineHandoffPhases[phase] {
-			sig.foldHandoffSignals(workspace, phase)
+			sig.foldHandoffSignals(workspace, phase, owners)
 		}
+	}
+	for _, phase := range completed {
 		sig.foldFailureSentinel(workspace, phase)
 	}
 	return sig, nil
@@ -59,10 +62,31 @@ const (
 
 var spineHandoffPhases = map[string]bool{"scout": true, "triage": true, "build": true, "audit": true}
 
-func (s *RoutingSignals) foldHandoffSignals(workspace, phase string) {
+func (s *RoutingSignals) foldHandoffSignals(workspace, phase string, owners map[string]bool) {
 	if raw, ok := readFirstTracked(workspace, &s.DigestDegraded, "handoff-"+phase+".json"); ok {
-		s.foldGeneric(phase, unwrapPayload(raw))
+		s.foldGeneric(phase, unwrapPayload(raw), owners)
 	}
+}
+
+func signalOwners(completed []string) map[string]bool {
+	owners := toSet(completed)
+	for phase := range spineHandoffPhases {
+		owners[phase] = true
+	}
+	for field := range typedFields {
+		if namespace, _, dotted := strings.Cut(field, "."); dotted {
+			owners[namespace] = true
+		}
+	}
+	return owners
+}
+
+func handoffMayWrite(phase, key string, owners map[string]bool) bool {
+	namespace, signal, _ := strings.Cut(key, ".")
+	if signal == failureClassSignal || signal == defectCountSignal {
+		return false
+	}
+	return namespace == phase || !owners[namespace]
 }
 
 func runDirArtifactBytes(workspace string, degraded *[]string) int64 {
@@ -83,21 +107,21 @@ func runDirArtifactBytes(workspace string, degraded *[]string) int64 {
 	return total
 }
 
-func digestScout(workspace string, sig *RoutingSignals) {
+func digestScout(workspace string, sig *RoutingSignals, owners map[string]bool) {
 	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-scout.json"); ok {
 		raw = unwrapPayload(raw)
 		sig.Scout = extractScout(raw)
-		sig.foldGeneric("scout", raw)
+		sig.foldGeneric("scout", raw, owners)
 	} else {
 		sig.Scout = scoutFromReportFallback(workspace, &sig.DigestDegraded)
 	}
 }
 
-func digestTriagePhase(workspace string, sig *RoutingSignals) {
+func digestTriagePhase(workspace string, sig *RoutingSignals, owners map[string]bool) {
 	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-triage.json"); ok {
 		raw = unwrapPayload(raw)
 		sig.Triage = extractTriage(raw)
-		sig.foldGeneric("triage", raw)
+		sig.foldGeneric("triage", raw, owners)
 	} else {
 		sig.Triage = triageFromReportFallback(workspace, &sig.DigestDegraded)
 	}
@@ -109,21 +133,21 @@ func digestTriagePhase(workspace string, sig *RoutingSignals) {
 	}
 }
 
-func digestBuildPhase(workspace string, sig *RoutingSignals) {
+func digestBuildPhase(workspace string, sig *RoutingSignals, owners map[string]bool) {
 	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-build.json", "handoff-builder.json"); ok {
 		raw = unwrapPayload(raw)
 		sig.Build = extractBuild(raw)
-		sig.foldGeneric("build", raw)
+		sig.foldGeneric("build", raw, owners)
 	} else {
 		sig.Build = buildFromGitFallback(workspace, &sig.DigestDegraded)
 	}
 }
 
-func digestAuditPhase(workspace string, sig *RoutingSignals) {
+func digestAuditPhase(workspace string, sig *RoutingSignals, owners map[string]bool) {
 	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-audit.json", "handoff-auditor.json"); ok {
 		raw = unwrapPayload(raw)
 		sig.Audit = extractAudit(raw)
-		sig.foldGeneric("audit", raw)
+		sig.foldGeneric("audit", raw, owners)
 	} else {
 		sig.Audit = auditFromACSVerdictFallback(workspace, &sig.DigestDegraded)
 	}
@@ -201,7 +225,7 @@ func (s *RoutingSignals) foldFailureSentinel(workspace, phase string) {
 	s.Generic[phase+"."+defectCountSignal] = float64(len(fb.Defects))
 }
 
-func (s *RoutingSignals) foldGeneric(phase string, raw []byte) {
+func (s *RoutingSignals) foldGeneric(phase string, raw []byte, owners map[string]bool) {
 	var doc struct {
 		Signals map[string]any `json:"signals"`
 	}
@@ -215,7 +239,9 @@ func (s *RoutingSignals) foldGeneric(phase string, raw []byte) {
 		if !strings.Contains(k, ".") {
 			k = phase + "." + k
 		}
-		s.Generic[k] = v
+		if handoffMayWrite(phase, k, owners) {
+			s.Generic[k] = v
+		}
 	}
 }
 

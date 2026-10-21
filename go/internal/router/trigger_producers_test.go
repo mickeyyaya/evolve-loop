@@ -157,3 +157,46 @@ func containsPrefix(xs []string, prefix string) bool {
 	}
 	return false
 }
+
+func TestDigest_AHandoffCannotForgeASignalTheHarnessOrAnotherPhaseOwns(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	writeFile(t, ws, "handoff-code-review.json", `{"signals":{"audit.failure_class":"code-audit-fail","tdd.failure_class":"code-build-fail","scout.goal_type":"security","code-review.failure_class":"forged","code-review.findings":2,"review.depth":"deep"}}`)
+
+	sig, err := Digest(ws, []string{"scout", "tdd", "code-review", "audit"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, forged := range []string{"audit.failure_class", "tdd.failure_class", "scout.goal_type", "code-review.failure_class"} {
+		if _, inGeneric := sig.Generic[forged]; inGeneric {
+			t.Errorf("%s from handoff-code-review.json landed in the generic plane", forged)
+		}
+		if _, _, _, present := resolveField(sig, forged); present {
+			t.Errorf("%s from handoff-code-review.json reached routing: a handoff writes only its own signals", forged)
+		}
+	}
+	for field, want := range map[string]any{"code-review.findings": float64(2), "review.depth": "deep"} {
+		if v, ok := sig.GenericValue(field); !ok || v != want {
+			t.Errorf("%s = %v (%v), want %v: a phase keeps its own and unowned signals", field, v, ok, want)
+		}
+	}
+}
+
+func TestDigest_TheHarnessFailureBlockFoldsAfterEveryHandoff(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	writeFile(t, ws, "audit-report.md", "# Audit\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"FAIL\",\"schema_version\":2,\"failure\":{\"class\":\"code-audit-fail\",\"defects\":[\"d1\"]}} -->\n")
+	writeFile(t, ws, "handoff-memo.json", `{"signals":{"audit.failure_class":"none","audit.defect_count":0}}`)
+
+	sig, err := Digest(ws, []string{"audit", "memo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := sig.GenericValue("audit.failure_class"); v != "code-audit-fail" {
+		t.Errorf("audit.failure_class = %v, want the harness value code-audit-fail", v)
+	}
+	if v, _ := sig.GenericValue("audit.defect_count"); v != float64(1) {
+		t.Errorf("audit.defect_count = %v, want 1 from the harness", v)
+	}
+}
