@@ -55,7 +55,7 @@ func TestIntegrationHead_ChoosesBaseByRelationOfLocalBranchToRemote(t *testing.T
 		{"detached head keeps the remote tip", scriptedHeadGit{branchRC: 1}, "origin/main", ""},
 		{"feature branch keeps the remote tip", scriptedHeadGit{branch: "feature"}, "origin/main", ""},
 		{"unreadable relation keeps the remote tip", scriptedHeadGit{branch: "main", revParseRC: 1}, "origin/main", ""},
-		{"local ahead of remote bases on the local commit", scriptedHeadGit{branch: "main", localSHA: localSHA, remoteSHA: remoteSHA, leftRight: "2\t0\n"}, localSHA, ""},
+		{"local ahead by commits no boundary step wrote is refused", scriptedHeadGit{branch: "main", localSHA: localSHA, remoteSHA: remoteSHA, leftRight: "2\t0\n"}, "", "origin does not hold"},
 		{"diverged local main is refused", scriptedHeadGit{branch: "main", localSHA: localSHA, remoteSHA: remoteSHA, leftRight: "1\t1\n"}, "", "DIVERGED"},
 		{"behind local main fast-forwards to the remote tip", scriptedHeadGit{branch: "main", localSHA: localSHA, remoteSHA: remoteSHA, leftRight: "0\t3\n"}, "origin/main", ""},
 		{"current local main uses the remote tip", scriptedHeadGit{branch: "main", localSHA: localSHA, remoteSHA: localSHA, leftRight: "0\t0\n"}, "origin/main", ""},

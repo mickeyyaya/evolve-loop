@@ -87,6 +87,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestWorktreeDiffSince_AGitFaultIsAnEvidenceFaultNotAnEmptyDiff":                           setsEnv,
 	"core.TestNewCycleRun_RejectsRootCycleOccupiedInFetchedWorktree":                                setsEnv,
 	"core.TestNoteContractGateDemotion_EachFailingSinkWarnsAndTheOthersStillRecord":                 setsEnv,
+	"core.TestRebaseCycleBranchOntoMain_AnUnpushedCodeCommitOnLocalMainIsNotALandedPeer":            swapsStderr,
 	"core.TestWriteBuildSelfCheck_HealthyWriteIsSilent":                                             swapsStderr,
 	"core.TestWriteBuildSelfCheck_WriteFailureSurfaces":                                             swapsStderr,
 	"core.TestWriteBuildSelfCheckArtifact_HealthyRoundTrip_LargeAndUnicodeContent":                  swapsStderr,
