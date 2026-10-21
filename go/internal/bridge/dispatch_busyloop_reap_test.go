@@ -42,15 +42,17 @@ func gone(pid int, within time.Duration) bool {
 }
 
 type sweepHost struct {
-	worktree, root, home string
-	started              time.Time
+	worktree, root, home, dev string
+	started                   time.Time
 }
 
 func newSweepHost(t *testing.T) sweepHost {
 	t.Helper()
 	root := gitCheckout(t, t.TempDir())
 	worktree := gitCheckout(t, filepath.Join(root, ".evolve", "worktrees", "cycle-a-1"))
-	return sweepHost{worktree: worktree, root: root, home: t.TempDir(), started: reapT0}
+	dev := filepath.Join(root, "dev")
+	gitCheckout(t, filepath.Join(dev, "cl-a"))
+	return sweepHost{worktree: worktree, root: root, home: t.TempDir(), dev: dev, started: reapT0}
 }
 
 func gitCheckout(t *testing.T, dir string) string {
@@ -135,6 +137,9 @@ func TestDispatchSweep_AnUnsafeBaseSignalsNothingAndWarns(t *testing.T) {
 		{"an unknown home directory", h.root, h.worktree, ""},
 		{"a worktree that does not exist", h.root, filepath.Join(h.root, "gone"), h.home},
 		{"a directory that is not the top of a git checkout", h.root, filepath.Dir(h.worktree), h.home},
+		{"the .evolve directory", h.root, filepath.Join(h.root, ".evolve"), h.home},
+		{"the dev directory of the hub", h.root, h.dev, h.home},
+		{"/private/var", h.root, "/private/var", h.home},
 	} {
 		host := (&cwdHost{}).orphan(700, "/", reapT0).orphan(701, h.worktree, reapT0).orphan(702, h.home, reapT0).orphan(703, h.root, reapT0)
 		center := signalcenter.New()
@@ -191,17 +196,19 @@ func TestDispatchSweep_ALaneWorktreeSweepsOnlyItsOwnNewOrphans(t *testing.T) {
 func TestDispatchSweep_TheWindowAllowsForTheResolutionOfThePSStartTime(t *testing.T) {
 	t.Parallel()
 	h := newSweepHost(t)
-	h.started = reapT0.Add(psStartSlack).Add(900 * time.Millisecond)
+	h.started = reapT0.Add(900 * time.Millisecond)
 	base, err := filepath.EvalSymlinks(h.worktree)
 	if err != nil {
 		t.Fatal(err)
 	}
-	host := (&cwdHost{}).orphan(810, base, reapT0).orphan(811, base, reapT0.Add(-time.Second))
+	host := (&cwdHost{}).orphan(810, base, reapT0.Add(-time.Second)).
+		orphan(812, base, reapT0.Add(-2*time.Second)).
+		orphan(811, base, reapT0.Add(-3*time.Second))
 
 	h.sweep(h.root, h.worktree).finish(context.Background(), host.deps(&bytes.Buffer{}, signalcenter.New()))
 
-	if !slices.Equal(host.signalled, []int{810, 810}) {
-		t.Fatalf("signalled %v; want only pid 810 (SIGTERM, then SIGKILL), which ps dates %s before the dispatch second (Linux ps derives the start from a whole-second boot time and can read up to 1 s early); pid 811 is older than that bound", host.signalled, psStartSlack)
+	if !slices.Equal(host.signalled, []int{810, 812, 810, 812}) {
+		t.Fatalf("signalled %v; want 810 and 812 (SIGTERM, then SIGKILL): Linux ps can date a new orphan 1 s before the dispatch second, and the window takes 2 s; 811, 3 s older, is spared", host.signalled)
 	}
 }
 
