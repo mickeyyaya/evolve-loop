@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
 func TestLoadShadowObservers_SkipsRuleWhosePatternDoesNotCompile(t *testing.T) {
@@ -154,5 +156,18 @@ func TestSandboxGitWritePaths_NamedBranchGrantsItsRefAndLock(t *testing.T) {
 		if !found {
 			t.Errorf("grant %q missing from %v", want, writes)
 		}
+	}
+}
+
+func TestSandboxGitWritePaths_ALinkedWorktreePaneMayTakeTheHostVerificationLock(t *testing.T) {
+	t.Parallel()
+	worktree, common := linkedWorktreeFixture(t, "ref: refs/heads/feature", true)
+	writes, _, err := sandboxGitWritePaths(worktree, "darwin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, hub := verifylock.LockPath(worktree)
+	if !hub || lock != filepath.Join(common, "evolve-verify.lock") || !slices.Contains(writes, lock) {
+		t.Errorf("verifylock.LockPath = %q (hub %t), grants = %v; want <common>/evolve-verify.lock granted", lock, hub, writes)
 	}
 }

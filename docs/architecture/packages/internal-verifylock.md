@@ -1,6 +1,6 @@
 # internal/verifylock
 
-> The decision: [ADR-0080](../adr/0080-runtime-console-plane-separation.md) (P1, the verification single flight; the hub location follows its plane discipline). Its callers: the ACS suite (`internal/acssuite`) and the build-floor coverage run (`internal/core/build_floor_reviewer.go`).
+> The decision: [ADR-0080](../adr/0080-runtime-console-plane-separation.md) (P1, the verification single flight; the hub location follows its plane discipline). Its callers: the ACS suite (`internal/acssuite`) and the build-floor coverage run (`internal/core/build_floor_reviewer.go`). The sandbox grant of `internal/bridge` reads its lock path.
 
 ## Purpose
 
@@ -15,6 +15,9 @@ One `flock`, resident in the hub, is shared by every lane of a repository. LLM p
 - **A waiter is never silent.** After `waitNoteAfter` (5 s) it prints a queue note. It repeats the note with the elapsed time every `renoteEvery` (60 s). A suite hold can last tens of minutes, and a single note reads as a hang to an operator and to the stall observer.
 - **`AcquireWithin` bounds the wait** with `MaxWait` (15 minutes). The caller gets an error that says the run goes unserialized. A deadline of the caller itself is not reported as that bound.
 - **`AcquireAt` is the one flock discipline**, taking an explicit lock path. `Acquire` resolves the path and calls it.
+- **`LockPath` is the one spelling of the lock path** (since 2026-10-21). `Acquire` resolves its path through it. The sandbox grant of a linked worktree pane (`internal/bridge` `sandboxGitWritePaths`) reads it too. `hub` is false for the fallback path beside the project root, and the sandbox grants only a hub path. Pinned by `TestLockPath_IsTheOneFileAcquireLocks`.
+- **A lost single-flight is recorded.** The callers write a `verify-single-flight-unavailable` abnormal event (`internal/dispatchevents`) that names the lock path and the error. The build-floor coverage pass writes it to the cycle workspace. The ACS suite writes it to the run directory of its cycle, beside its verdict, when that directory exists.
+- **The per-package unit runs of the floor take no lock** (decision of 2026-10-21). `realGoUnitTest` runs one changed package at a time, and `lanebudget` caps its parallelism. With the lock, each handoff of a lane also waits for the coverage pass and the ACS suite of every other lane. The lock serializes only the runs that load the host: the coverage pass and the ACS suite. Pinned by `TestRealGoUnitTest_TheFloorsUnitRunsDoNotTakeTheHostLock`.
 - **The release function is idempotent** (`sync.Once`).
 
 ## Invariants

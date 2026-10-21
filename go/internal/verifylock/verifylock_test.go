@@ -85,3 +85,32 @@ func TestAcquire_ResolvesTheHubLockPath(t *testing.T) {
 		t.Fatalf("lock file not hub-resident: %v", err)
 	}
 }
+
+func TestLockPath_IsTheOneFileAcquireLocks(t *testing.T) {
+	t.Parallel()
+	hubRoot, plainRoot := t.TempDir(), t.TempDir()
+	if err := os.MkdirAll(filepath.Join(hubRoot, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(hubRoot, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		root, want string
+		hub        bool
+	}{
+		{hubRoot, filepath.Join(hubRoot, ".git", "evolve-verify.lock"), true},
+		{plainRoot, filepath.Join(plainRoot, ".evolve", "evolve-verify.lock"), false},
+	} {
+		path, hub := LockPath(c.root)
+		release, err := Acquire(context.Background(), c.root, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, statErr := os.Stat(path)
+		release()
+		if path != c.want || hub != c.hub || statErr != nil {
+			t.Errorf("LockPath(%s) = %q, %t (stat %v); want %q, %t and the file Acquire locks", c.root, path, hub, statErr, c.want, c.hub)
+		}
+	}
+}

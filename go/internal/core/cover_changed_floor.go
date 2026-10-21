@@ -35,7 +35,7 @@ func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) [
 	if len(pkgs) == 0 {
 		return nil
 	}
-	profile, out, status := coverChangedProfiler(ctx, moduleDir, pkgs, covchanged.DefaultTags)
+	profile, out, status := coverChangedProfiler(ctx, in, moduleDir, pkgs, covchanged.DefaultTags)
 	if profile != "" {
 		defer func() { _ = os.RemoveAll(filepath.Dir(profile)) }()
 	}
