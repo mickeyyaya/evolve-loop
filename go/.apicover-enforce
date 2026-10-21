@@ -818,3 +818,5 @@
 ./internal/qualitypanel
 # pipelinerates - the pipeline quality index readers PQ1, PQ3, PQ4 and CQ2 of ADR-0153.
 ./internal/pipelinerates
+# codeshape - the code quality index readers CQ1, CQ3, CQ4 and CQ5 of ADR-0153.
+./internal/codeshape

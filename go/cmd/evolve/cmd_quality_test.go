@@ -243,3 +243,107 @@ func TestDispatchBoundaryVerb_AnUnknownVerbIsAnIOError(t *testing.T) {
 		t.Errorf("rc %d stderr %q, want %d and the verb named", rc, stderr.String(), exitIO)
 	}
 }
+
+func TestQualityArgs_ARelativeRootBecomesAbsoluteForThePublisher(t *testing.T) {
+	t.Parallel()
+	_, root, err := parseQualityArgs([]string{"report", "--scope", "wave", "--project-root", "."}, qualityScopes)
+	c, cerr := parseQualityCompare([]string{"--index", "PQ1", "--a", "wave:1", "--b", "wave:2", "--project-root", "."})
+	if err != nil || cerr != nil || !filepath.IsAbs(root) || !filepath.IsAbs(c.root) {
+		t.Errorf("report root %q (%v), compare root %q (%v); want absolute paths, since the publisher refuses a relative evolve directory", root, err, c.root, cerr)
+	}
+}
+
+func TestQualityReport_TheTreeScopeReadsDepthDuplicationAndJudgmentSurface(t *testing.T) {
+	t.Parallel()
+	root := pipelineProject(t)
+	for rel, body := range map[string]string{"go/internal/a/a.go": "package a\n\nfunc A() int { return 1 }\n", "agents/x.md": "- If asked, answer.\n"} {
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env := qualityEnv{scopes: map[string][]qualityReader{"wave": treeQualityReaders()}, newCenter: publishingQualityCenter}
+
+	rc, stdout := runQualityReport(t, env, root)
+
+	if rc != 0 || !strings.Contains(stdout, "4 reading(s)") {
+		t.Fatalf("rc %d stdout %q, want CQ3, CQ4 tree, CQ4 added and CQ5", rc, stdout)
+	}
+	got := map[string]string{}
+	for _, e := range channelEvents(t, root, "quality.reading") {
+		got[e.Fields["index"]+" "+e.Fields["window"]] = e.Fields["value"] + " " + e.Fields["stage"]
+	}
+	want := map[string]string{"CQ3 tree": "1.000 shadow", "CQ5 tree": "1.000 shadow", "CQ4 tree": "0.000 shadow", "CQ4 wave:2/added": "0.000 shadow"}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s = %q, want %q (all %v)", k, got[k], v, got)
+		}
+	}
+	if len(qualityScopes["tree"]) != 2 {
+		t.Errorf("the production tree scope has %d readers, want 2: one scan for CQ3 and CQ4, and CQ5", len(qualityScopes["tree"]))
+	}
+}
+
+func TestTreeQualityReaders_AMissingWaveRecordWarnsForTheAddedForm(t *testing.T) {
+	t.Parallel()
+	root := qualityProject(t, "")
+	if err := os.MkdirAll(filepath.Join(root, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := qualityEnv{scopes: map[string][]qualityReader{"wave": treeQualityReaders()}, newCenter: publishingQualityCenter}
+
+	_, stdout := runQualityReport(t, env, root)
+
+	if !strings.Contains(stdout, "3 reading(s)") || !strings.Contains(stdout, "4 warning(s)") {
+		t.Errorf("stdout %q", stdout)
+	}
+	absent := 0
+	for _, e := range channelEvents(t, root, "quality.breach") {
+		if e.Code == "QUALITY_SOURCE_ABSENT" && e.Fields["index"] == "CQ4" {
+			absent++
+		}
+	}
+	if absent != 1 {
+		t.Errorf("CQ4 absent warnings = %d, want 1 for the missing wave records", absent)
+	}
+}
+
+func TestTreeQualityReaders_AFailedShipDiffWarnsAndAddsNoEmptyReading(t *testing.T) {
+	t.Parallel()
+	root := qualityProject(t, "")
+	for rel, body := range map[string]string{
+		"go/internal/a/a.go":                     "package a\n\nfunc A() int { return 1 }\n",
+		".evolve/waves/wave-1.json":              `{"number":1,"cycle_floor":1}`,
+		".evolve/runs/cycle-1/run.json":          `{"shipped":true}`,
+		".evolve/runs/cycle-1/ship-binding.json": `{"commit_sha":"0000000000000000000000000000000000000000"}`,
+	} {
+		p := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env := qualityEnv{scopes: map[string][]qualityReader{"wave": treeQualityReaders()}, newCenter: publishingQualityCenter}
+
+	_, stdout := runQualityReport(t, env, root)
+
+	for _, e := range channelEvents(t, root, "quality.reading") {
+		if e.Fields["window"] == "wave:1/added" || e.Fields["window"] == "" {
+			t.Errorf("reading %v, want no added-form reading when its diff failed", e.Fields)
+		}
+	}
+	unreadable := 0
+	for _, e := range channelEvents(t, root, "quality.breach") {
+		if e.Code == "QUALITY_SOURCE_UNREADABLE" && e.Fields["index"] == "CQ4" {
+			unreadable++
+		}
+	}
+	if !strings.Contains(stdout, "3 reading(s)") || unreadable != 1 {
+		t.Errorf("stdout %q, CQ4 unreadable warnings %d; want CQ3, CQ4 tree and CQ5 and one warning for the failed git show", stdout, unreadable)
+	}
+}
