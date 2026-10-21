@@ -51,6 +51,15 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "TestMain: unset TMUX: %v\n", err)
 		os.Exit(1)
 	}
+	codexHome, err := os.MkdirTemp("", "evcodexhome")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: isolate CODEX_HOME: %v\n", err)
+		os.Exit(1)
+	}
+	if err := os.Setenv("CODEX_HOME", codexHome); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: set CODEX_HOME: %v\n", err)
+		os.Exit(1)
+	}
 	usageDir, err := os.MkdirTemp("", "evcodeusage")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: isolate the code usage log: %v\n", err)
@@ -61,6 +70,9 @@ func TestMain(m *testing.M) {
 	}
 	codeUsageCacheDir = func() (string, error) { return usageDir, nil }
 	code := m.Run()
+	if err := os.RemoveAll(codexHome); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", codexHome, err)
+	}
 	if err := os.RemoveAll(usageDir); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", usageDir, err)
 	}

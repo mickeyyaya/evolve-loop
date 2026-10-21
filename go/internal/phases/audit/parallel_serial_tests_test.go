@@ -1,6 +1,8 @@
 package audit
 
 var serialTests = map[string]string{
+	"audit.TestEmitTIADecision_AnEmptyDecisionWritesNoArtifact":                                  "swaps seam tiaCompute",
+	"audit.TestGenerateACSVerdict_AShadowDecisionThatWouldSkipTheCorpusStillRunsIt":              "swaps seam tiaCompute",
 	"audit.TestApicoverEnforceChangedDefault_CleanGitTree_StaysNoOp":                             "sets env through a helper",
 	"audit.TestApicoverEnforceChangedDefault_NewExportViaNewFileInExistingPackage_CaughtByGate":  "swaps seam runCmd",
 	"audit.TestApicoverEnforceChanged_MeasurementError_Fails":                                    "swaps seam runCmd",

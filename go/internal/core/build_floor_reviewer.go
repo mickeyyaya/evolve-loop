@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/docsfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -132,7 +133,7 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 		}
 	}
 	fails := runBuildSelfCheck(ctx, moduleDir, plain, buildSelfCheckRunner)
-	namingFails := apicoverNamingFailures(ctx, moduleDir, enforced, paths)
+	namingFails := apicoverNamingFailures(ctx, in, moduleDir, enforced, paths)
 	removeBuildSelfCheckArtifact(in.Worktree)
 	if len(fails) > 0 {
 		writeBuildSelfCheckArtifact(in.Worktree, fails)
@@ -229,7 +230,7 @@ func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []strin
 	return kept
 }
 
-func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []string, changedPaths []string) []string {
+func apicoverNamingFailures(ctx context.Context, in ReviewInput, moduleDir string, enforced []string, changedPaths []string) []string {
 	if len(enforced) == 0 {
 		return nil
 	}
@@ -238,7 +239,7 @@ func apicoverNamingFailures(ctx context.Context, moduleDir string, enforced []st
 		dirs = append(dirs, filepath.Join(moduleDir, strings.TrimPrefix(p, "./")))
 	}
 	changedByDir := changedFileBasenamesByDir(moduleDir, dirs, changedPaths)
-	coverFunc, testOut, status := scopedCoverFunc(ctx, moduleDir, enforced)
+	coverFunc, testOut, status := scopedCoverFunc(ctx, in, moduleDir, enforced)
 	if coverFunc != "" {
 		defer func() { _ = os.RemoveAll(filepath.Dir(coverFunc)) }()
 	}
@@ -285,8 +286,8 @@ func coverTestArgs(profile string, pkgs, tags []string) []string {
 	return lanebudget.Args(append(append(args, "-coverprofile", profile), pkgs...))
 }
 
-func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path, output string, status int) {
-	profile, out, status := scopedCoverProfile(ctx, moduleDir, pkgs, nil)
+func scopedCoverFunc(ctx context.Context, in ReviewInput, moduleDir string, pkgs []string) (path, output string, status int) {
+	profile, out, status := scopedCoverProfile(ctx, in, moduleDir, pkgs, nil)
 	if status != coverStatusOK {
 		return strings.TrimSuffix(profile, "cover.out"), out, status
 	}
@@ -305,11 +306,12 @@ func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path
 	return funcOut, "", coverStatusOK
 }
 
-func scopedCoverProfile(ctx context.Context, moduleDir string, pkgs, tags []string) (profile, output string, status int) {
-	if release, lerr := verifylock.AcquireWithin(ctx, filepath.Dir(moduleDir), coverLockWait, os.Stderr); lerr == nil {
+func scopedCoverProfile(ctx context.Context, in ReviewInput, moduleDir string, pkgs, tags []string) (profile, output string, status int) {
+	root := filepath.Dir(moduleDir)
+	if release, lerr := verifylock.AcquireWithin(ctx, root, coverLockWait, in.errOut()); lerr == nil {
 		defer release()
 	} else {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN: verification single-flight unavailable (%v) — running unserialized\n", lerr)
+		in.recordUnserializedFloor(root, lerr)
 	}
 	tmpDir, err := os.MkdirTemp("", "buildfloor-cover-*")
 	if err != nil {
@@ -342,4 +344,15 @@ func changedFileBasenamesByDir(moduleDir string, dirs []string, changedPaths []s
 		}
 	}
 	return out
+}
+
+func (in ReviewInput) recordUnserializedFloor(root string, lockErr error) {
+	lock, _ := verifylock.LockPath(root)
+	fmt.Fprintf(in.errOut(), "[build-floor] WARN: verification single-flight unavailable at %s (%v) — running unserialized\n", lock, lockErr)
+	if in.Workspace == "" {
+		return
+	}
+	if err := dispatchevents.NewWriter(in.Workspace).EmitVerifySingleFlightUnavailable(in.Cycle, "build-floor", lock, lockErr); err != nil {
+		fmt.Fprintf(in.errOut(), "[build-floor] WARN: the unserialized run was not recorded as an abnormal event: %v\n", err)
+	}
 }

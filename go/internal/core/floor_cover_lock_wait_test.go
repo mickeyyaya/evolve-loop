@@ -28,7 +28,7 @@ func TestScopedCoverFunc_BehindAHeldLockWaitsOnlyItsBoundThenRunsUnserialized(t 
 
 	var status int
 	start := time.Now()
-	stderr := captureStderr(t, func() { _, _, status = scopedCoverFunc(ctx, moduleDir, []string{"./p"}) })
+	stderr := captureStderr(t, func() { _, _, status = scopedCoverFunc(ctx, ReviewInput{}, moduleDir, []string{"./p"}) })
 	waited := time.Since(start)
 
 	if status != coverStatusOK {

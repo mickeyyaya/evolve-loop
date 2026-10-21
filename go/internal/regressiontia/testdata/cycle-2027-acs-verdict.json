@@ -1,0 +1,2447 @@
+{
+  "schema_version": "1.0",
+  "cycle": 2027,
+  "predicate_suite": {
+    "this_cycle_count": 0,
+    "regression_suite_count": 283,
+    "red_team_count": 6,
+    "skipped_count": 53,
+    "total": 289
+  },
+  "results": [
+    {
+      "ac_id": "acsnames/TestPredicateNamesResolveToTests",
+      "predicate": "go/acs/acsnames/...:TestPredicateNamesResolveToTests",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 620,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestAbsentOnPurposeEntriesCarryAReason",
+      "predicate": "go/acs/acsnames/...:TestAbsentOnPurposeEntriesCarryAReason",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_bare_name",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_bare_name",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/an_exact_name",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/an_exact_name",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/an_exact_group",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/an_exact_group",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_prefix",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_prefix",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_suffix",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_suffix",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_bare_group_is_not_anchored",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_bare_group_is_not_anchored",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_pipe_list_is_not_anchored",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_pipe_list_is_not_anchored",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/an_anchor_binds_the_edge_alternative_without_a_group",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/an_anchor_binds_the_edge_alternative_without_a_group",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/each_alternative_carries_its_own_anchors",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/each_alternative_carries_its_own_anchors",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_fragment_of_a_concatenated_pattern",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_fragment_of_a_concatenated_pattern",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_leading_pipe",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_leading_pipe",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/the_subtest_filter_is_cut",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/the_subtest_filter_is_cut",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_fuzz_target",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_fuzz_target",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_group_after_a_prefix",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_group_after_a_prefix",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_group_after_an_anchored_prefix",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_group_after_an_anchored_prefix",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/an_anchored_group_after_a_prefix_is_exact",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/an_anchored_group_after_a_prefix_is_exact",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_group_between_a_prefix_and_a_suffix",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_group_between_a_prefix_and_a_suffix",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_group_with_an_unreadable_member",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_group_with_an_unreadable_member",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_group_with_an_empty_member",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_group_with_an_empty_member",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/an_unclosed_group_after_a_prefix",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/an_unclosed_group_after_a_prefix",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/padding_is_trimmed",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/padding_is_trimmed",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/one_unreadable_alternative_drops_the_literal",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/one_unreadable_alternative_drops_the_literal",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_pipe_alone",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_pipe_alone",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/empty",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/empty",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/the_bare_prefix_word",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/the_bare_prefix_word",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/prose",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/prose",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_path",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_path",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_metacharacter",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_metacharacter",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestParseAlternatives_ReadsGoTestRunPatterns/a_benchmark",
+      "predicate": "go/acs/acsnames/...:TestParseAlternatives_ReadsGoTestRunPatterns/a_benchmark",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestDeclaredTests_ReadsEveryTestFunctionOfTheModule",
+      "predicate": "go/acs/acsnames/...:TestDeclaredTests_ReadsEveryTestFunctionOfTheModule",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestDeclaredTests_OnlyARealDeclarationCounts",
+      "predicate": "go/acs/acsnames/...:TestDeclaredTests_OnlyARealDeclarationCounts",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestDeclaredTests_ASyntaxErrorInATestFileIsAnError",
+      "predicate": "go/acs/acsnames/...:TestDeclaredTests_ASyntaxErrorInATestFileIsAnError",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestDeclaredTests_AMissingRootIsAnError",
+      "predicate": "go/acs/acsnames/...:TestDeclaredTests_AMissingRootIsAnError",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestDeclaredTests_AnUnreadableTestFileIsAnError",
+      "predicate": "go/acs/acsnames/...:TestDeclaredTests_AnUnreadableTestFileIsAnError",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_AnExactNameNoTestDeclaresIsNamedWithItsLine",
+      "predicate": "go/acs/acsnames/...:TestViolations_AnExactNameNoTestDeclaresIsNamedWithItsLine",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_AGroupAfterAPrefixIsExpandedIntoItsNames",
+      "predicate": "go/acs/acsnames/...:TestViolations_AGroupAfterAPrefixIsExpandedIntoItsNames",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_ANameATestDeclaresPasses",
+      "predicate": "go/acs/acsnames/...:TestViolations_ANameATestDeclaresPasses",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_OnlyAPackageThatRunsTestsByNameIsRead",
+      "predicate": "go/acs/acsnames/...:TestViolations_OnlyAPackageThatRunsTestsByNameIsRead",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APredicateTreeThatNamesNoTestIsAnError",
+      "predicate": "go/acs/acsnames/...:TestViolations_APredicateTreeThatNamesNoTestIsAnError",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_EveryRunSpellingMarksAPackage",
+      "predicate": "go/acs/acsnames/...:TestViolations_EveryRunSpellingMarksAPackage",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_EveryRunSpellingMarksAPackage/run_flag",
+      "predicate": "go/acs/acsnames/...:TestViolations_EveryRunSpellingMarksAPackage/run_flag",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_EveryRunSpellingMarksAPackage/run_equals",
+      "predicate": "go/acs/acsnames/...:TestViolations_EveryRunSpellingMarksAPackage/run_equals",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_EveryRunSpellingMarksAPackage/test_run_flag",
+      "predicate": "go/acs/acsnames/...:TestViolations_EveryRunSpellingMarksAPackage/test_run_flag",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_EveryRunSpellingMarksAPackage/test_run_eq",
+      "predicate": "go/acs/acsnames/...:TestViolations_EveryRunSpellingMarksAPackage/test_run_eq",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_EveryRunSpellingMarksAPackage/GoTests_call",
+      "predicate": "go/acs/acsnames/...:TestViolations_EveryRunSpellingMarksAPackage/GoTests_call",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_prefix_that_some_test_starts_with",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_prefix_that_some_test_starts_with",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_prefix_that_no_test_starts_with",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_prefix_that_no_test_starts_with",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_bare_name_that_some_test_contains",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_bare_name_that_some_test_contains",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_bare_name_that_no_test_contains",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_bare_name_that_no_test_contains",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_bare_name_as_a_prefix_of_a_longer_test",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_bare_name_as_a_prefix_of_a_longer_test",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_bare_name_inside_a_longer_test",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_bare_name_inside_a_longer_test",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_prefix_does_not_match_inside_a_longer_test",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_prefix_does_not_match_inside_a_longer_test",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_suffix_that_some_test_ends_with",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_suffix_that_some_test_ends_with",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_suffix_that_no_test_ends_with",
+      "predicate": "go/acs/acsnames/...:TestViolations_APrefixAndASubstringReadTheWayGoTestReadsThem/a_suffix_that_no_test_ends_with",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_ANameInAStringsCallIsNotAReference",
+      "predicate": "go/acs/acsnames/...:TestViolations_ANameInAStringsCallIsNotAReference",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_ANameThePackageDefinesInAFixtureIsNotAReference",
+      "predicate": "go/acs/acsnames/...:TestViolations_ANameThePackageDefinesInAFixtureIsNotAReference",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_AnAbsentNameWithAReasonIsAllowedOnce",
+      "predicate": "go/acs/acsnames/...:TestViolations_AnAbsentNameWithAReasonIsAllowedOnce",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_AnAbsentEntryThatNoLongerAppliesIsAViolation",
+      "predicate": "go/acs/acsnames/...:TestViolations_AnAbsentEntryThatNoLongerAppliesIsAViolation",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_ReportsFollowPackageThenSourceOrderAndTheOwnPackageIsSkipped",
+      "predicate": "go/acs/acsnames/...:TestViolations_ReportsFollowPackageThenSourceOrderAndTheOwnPackageIsSkipped",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_AHelperFileOfAPackageIsRead",
+      "predicate": "go/acs/acsnames/...:TestViolations_AHelperFileOfAPackageIsRead",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_ATestdataTreeIsNotAPredicatePackage",
+      "predicate": "go/acs/acsnames/...:TestViolations_ATestdataTreeIsNotAPredicatePackage",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_ASyntaxErrorInAPredicateIsAnError",
+      "predicate": "go/acs/acsnames/...:TestViolations_ASyntaxErrorInAPredicateIsAnError",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_AMissingModuleIsAnError",
+      "predicate": "go/acs/acsnames/...:TestViolations_AMissingModuleIsAnError",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_AModuleWithoutAnAcsTreeIsAnError",
+      "predicate": "go/acs/acsnames/...:TestViolations_AModuleWithoutAnAcsTreeIsAnError",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "acsnames/TestViolations_AnUnreadableFixtureFileIsAnError",
+      "predicate": "go/acs/acsnames/...:TestViolations_AnUnreadableFixtureFileIsAnError",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "apicover/TestApicoverEnforce_CoversEveryInternalPackage",
+      "predicate": "go/acs/apicover/...:TestApicoverEnforce_CoversEveryInternalPackage",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 740,
+      "is_regression": true
+    },
+    {
+      "ac_id": "buildselfcheck/TestParseSelfCheckFailures",
+      "predicate": "go/acs/buildselfcheck/...:TestParseSelfCheckFailures",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "buildselfcheck/TestChangedPackagesToolchainGreen",
+      "predicate": "go/acs/buildselfcheck/...:TestChangedPackagesToolchainGreen",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestChangedPackagesToolchainGreen\n    selfcheck_test.go:51: no build-selfcheck artifact (open /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2027/.evolve/build-selfcheck.json: no such file or directory); toolchain gate inert\n--- SKIP: TestChangedPackagesToolchainGreen (0.02s)"
+    },
+    {
+      "ac_id": "cycle100/TestC100_001_ObserverEnforceDefaultOn",
+      "predicate": "go/acs/cycle100/...:TestC100_001_ObserverEnforceDefaultOn",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle100/TestC100_002_WatchdogGlobIncludesObserverEvents",
+      "predicate": "go/acs/cycle100/...:TestC100_002_WatchdogGlobIncludesObserverEvents",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle100/TestC100_003_DeprecationWarnOnOptOut",
+      "predicate": "go/acs/cycle100/...:TestC100_003_DeprecationWarnOnOptOut",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle100/TestC100_004_PhaseObserverDocMigrationNote",
+      "predicate": "go/acs/cycle100/...:TestC100_004_PhaseObserverDocMigrationNote",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle100/TestC100_005_IncidentDocResolved",
+      "predicate": "go/acs/cycle100/...:TestC100_005_IncidentDocResolved",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle102/TestC102_001_ProfileMaxTurnsCeilings",
+      "predicate": "go/acs/cycle102/...:TestC102_001_ProfileMaxTurnsCeilings",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle102/TestC102_002_IncidentDocTurnOverrun",
+      "predicate": "go/acs/cycle102/...:TestC102_002_IncidentDocTurnOverrun",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle102/TestC102_003_IncidentDocShipRefused",
+      "predicate": "go/acs/cycle102/...:TestC102_003_IncidentDocShipRefused",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle103/TestC103_001_BuildPlannerPersonaExists",
+      "predicate": "go/acs/cycle103/...:TestC103_001_BuildPlannerPersonaExists",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle103/TestC103_002_BuildPlannerProfileValid",
+      "predicate": "go/acs/cycle103/...:TestC103_002_BuildPlannerProfileValid",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle103/TestC103_003_PhaseRegistryIncludesBuildPlanner",
+      "predicate": "go/acs/cycle103/...:TestC103_003_PhaseRegistryIncludesBuildPlanner",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle103/TestC103_004_ListPhaseOrderIncludesBuildPlanner",
+      "predicate": "go/acs/cycle103/...:TestC103_004_ListPhaseOrderIncludesBuildPlanner",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 30,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC103_004_ListPhaseOrderIncludesBuildPlanner\n    predicates_test.go:88: list-phase-order.sh missing — skip\n--- SKIP: TestC103_004_ListPhaseOrderIncludesBuildPlanner (0.03s)"
+    },
+    {
+      "ac_id": "cycle103/TestC103_005_SubagentRunAllowlistIncludesBuildPlanner",
+      "predicate": "go/acs/cycle103/...:TestC103_005_SubagentRunAllowlistIncludesBuildPlanner",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC103_005_SubagentRunAllowlistIncludesBuildPlanner\n    predicates_test.go:99: subagent-run.sh missing — skip\n--- SKIP: TestC103_005_SubagentRunAllowlistIncludesBuildPlanner (0.02s)"
+    },
+    {
+      "ac_id": "cycle103/TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner",
+      "predicate": "go/acs/cycle103/...:TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner\n    predicates_test.go:110: phase-gate-precondition.sh missing — skip\n--- SKIP: TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner (0.02s)"
+    },
+    {
+      "ac_id": "cycle103/TestC103_007_GateFunctionsPresent",
+      "predicate": "go/acs/cycle103/...:TestC103_007_GateFunctionsPresent",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC103_007_GateFunctionsPresent\n    predicates_test.go:121: phase-gate.sh missing — skip\n--- SKIP: TestC103_007_GateFunctionsPresent (0.02s)"
+    },
+    {
+      "ac_id": "cycle103/TestC103_008_ShadowCycleDoesNotProduceBuildPlan",
+      "predicate": "go/acs/cycle103/...:TestC103_008_ShadowCycleDoesNotProduceBuildPlan",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle103/TestC103_009_Adr0019ExistsAndComplete",
+      "predicate": "go/acs/cycle103/...:TestC103_009_Adr0019ExistsAndComplete",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_001_PermanentWorktreeAddFailureCostsZeroBackoff",
+      "predicate": "go/acs/cycle1270/...:TestC1270_001_PermanentWorktreeAddFailureCostsZeroBackoff",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 3960,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_002_CoreSuppliesTransiencePredicateAndHonestAnnouncement",
+      "predicate": "go/acs/cycle1270/...:TestC1270_002_CoreSuppliesTransiencePredicateAndHonestAnnouncement",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 1870,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_003_CmdEvolveNoLongerPaysTheRetryLadder",
+      "predicate": "go/acs/cycle1270/...:TestC1270_003_CmdEvolveNoLongerPaysTheRetryLadder",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 2760,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_004_UnionUniquenessScanCoversConsumerPackages",
+      "predicate": "go/acs/cycle1270/...:TestC1270_004_UnionUniquenessScanCoversConsumerPackages",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 1330,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_005_NarrowerPredicateSitesSurviveTheWidening",
+      "predicate": "go/acs/cycle1270/...:TestC1270_005_NarrowerPredicateSitesSurviveTheWidening",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 1490,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_006_MintedScratchCwdClearsTheFleetGuard",
+      "predicate": "go/acs/cycle1270/...:TestC1270_006_MintedScratchCwdClearsTheFleetGuard",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 1570,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_007_RetroFleetDispatchCarriesLaneWorktreeEndToEnd",
+      "predicate": "go/acs/cycle1270/...:TestC1270_007_RetroFleetDispatchCarriesLaneWorktreeEndToEnd",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 1480,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_008_AbsentCoveringCorpusIsNeverSilent",
+      "predicate": "go/acs/cycle1270/...:TestC1270_008_AbsentCoveringCorpusIsNeverSilent",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 1140,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1270/TestC1270_009_CoveringCorpusContractSurvives",
+      "predicate": "go/acs/cycle1270/...:TestC1270_009_CoveringCorpusContractSurvives",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 1410,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1515/TestC1515_001_ParkReleasesBindingAndPreservesPointer",
+      "predicate": "go/acs/cycle1515/...:TestC1515_001_ParkReleasesBindingAndPreservesPointer",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1515/TestC1515_002_ParkOfUnboundItemInventsNoAnnotation",
+      "predicate": "go/acs/cycle1515/...:TestC1515_002_ParkOfUnboundItemInventsNoAnnotation",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1515/TestC1515_003_ScopeResolveRefusesRetiredBinding",
+      "predicate": "go/acs/cycle1515/...:TestC1515_003_ScopeResolveRefusesRetiredBinding",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1515/TestC1515_004_ContinuationListShowsBindings",
+      "predicate": "go/acs/cycle1515/...:TestC1515_004_ContinuationListShowsBindings",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 460,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1515/TestC1515_005_ContinuationListOnEmptyRegistryIsCleanExit",
+      "predicate": "go/acs/cycle1515/...:TestC1515_005_ContinuationListOnEmptyRegistryIsCleanExit",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1515/TestC1515_006_ContinuationReleaseReleasesAndAnnotates",
+      "predicate": "go/acs/cycle1515/...:TestC1515_006_ContinuationReleaseReleasesAndAnnotates",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1515/TestC1515_007_ContinuationReleaseRejectsUnknownScope",
+      "predicate": "go/acs/cycle1515/...:TestC1515_007_ContinuationReleaseRejectsUnknownScope",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle1515/TestC1515_008_ContinuationRejectsMalformedInvocations",
+      "predicate": "go/acs/cycle1515/...:TestC1515_008_ContinuationRejectsMalformedInvocations",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 60,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle42/TestC42_003_PNew13Done",
+      "predicate": "go/acs/cycle42/...:TestC42_003_PNew13Done",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle42/TestC42_004_PNew16Done",
+      "predicate": "go/acs/cycle42/...:TestC42_004_PNew16Done",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle42/TestC42_005_P6CitationFix",
+      "predicate": "go/acs/cycle42/...:TestC42_005_P6CitationFix",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle42/TestC42_006_PNew17Exists",
+      "predicate": "go/acs/cycle42/...:TestC42_006_PNew17Exists",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle49/TestC49_001_TaskFingerprintExists",
+      "predicate": "go/acs/cycle49/...:TestC49_001_TaskFingerprintExists",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC49_001_TaskFingerprintExists\n    predicates_test.go:18: /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2027/legacy/scripts/utility/task-fingerprint.sh missing — skip\n--- SKIP: TestC49_001_TaskFingerprintExists (0.02s)"
+    },
+    {
+      "ac_id": "cycle49/TestC49_002_FingerprintDeterminism",
+      "predicate": "go/acs/cycle49/...:TestC49_002_FingerprintDeterminism",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC49_002_FingerprintDeterminism\n    predicates_test.go:30: /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2027/legacy/scripts/utility/task-fingerprint.sh missing — skip\n--- SKIP: TestC49_002_FingerprintDeterminism (0.02s)"
+    },
+    {
+      "ac_id": "cycle49/TestC49_003_ResearchCacheExists",
+      "predicate": "go/acs/cycle49/...:TestC49_003_ResearchCacheExists",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC49_003_ResearchCacheExists\n    predicates_test.go:55: /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2027/legacy/scripts/utility/research-cache.sh missing — skip\n--- SKIP: TestC49_003_ResearchCacheExists (0.02s)"
+    },
+    {
+      "ac_id": "cycle49/TestC49_004_PromoteResearchCacheExists",
+      "predicate": "go/acs/cycle49/...:TestC49_004_PromoteResearchCacheExists",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC49_004_PromoteResearchCacheExists\n    predicates_test.go:67: /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2027/legacy/scripts/lifecycle/promote-research-cache.sh missing — skip\n--- SKIP: TestC49_004_PromoteResearchCacheExists (0.02s)"
+    },
+    {
+      "ac_id": "cycle49/TestC49_005_ScoutProfileTools",
+      "predicate": "go/acs/cycle49/...:TestC49_005_ScoutProfileTools",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle49/TestC49_006_ClaudeMdSchema",
+      "predicate": "go/acs/cycle49/...:TestC49_006_ClaudeMdSchema",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle50/TestC50_001_ScoutStep45Exists",
+      "predicate": "go/acs/cycle50/...:TestC50_001_ScoutStep45Exists",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle50/TestC50_002_ScoutStep55Exists",
+      "predicate": "go/acs/cycle50/...:TestC50_002_ScoutStep55Exists",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC50_002_ScoutStep55Exists\n    predicates_test.go:36: research-cache-staging marker absent — source evolved past cycle-50-002\n--- SKIP: TestC50_002_ScoutStep55Exists (0.01s)"
+    },
+    {
+      "ac_id": "cycle50/TestC50_003_ScoutStopCriterionCacheSection",
+      "predicate": "go/acs/cycle50/...:TestC50_003_ScoutStopCriterionCacheSection",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle50/TestC50_004_BuilderStep25ResearchPointer",
+      "predicate": "go/acs/cycle50/...:TestC50_004_BuilderStep25ResearchPointer",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC50_004_BuilderStep25ResearchPointer\n    predicates_test.go:61: research_pointer marker absent — source evolved past cycle-50-004\n--- SKIP: TestC50_004_BuilderStep25ResearchPointer (0.01s)"
+    },
+    {
+      "ac_id": "cycle50/TestC50_005_TriagePassthroughAllThreeFields",
+      "predicate": "go/acs/cycle50/...:TestC50_005_TriagePassthroughAllThreeFields",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle50/TestC50_006_ReconcileInvalidateOnDrop",
+      "predicate": "go/acs/cycle50/...:TestC50_006_ReconcileInvalidateOnDrop",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC50_006_ReconcileInvalidateOnDrop\n    predicates_test.go:85: reconcile-carryover-todos.sh missing — skip cycle-50-006\n--- SKIP: TestC50_006_ReconcileInvalidateOnDrop (0.02s)"
+    },
+    {
+      "ac_id": "cycle50/TestC50_007_ReconcilePromoteOnPass",
+      "predicate": "go/acs/cycle50/...:TestC50_007_ReconcilePromoteOnPass",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC50_007_ReconcilePromoteOnPass\n    predicates_test.go:98: reconcile-carryover-todos.sh missing — skip cycle-50-007\n--- SKIP: TestC50_007_ReconcilePromoteOnPass (0.01s)"
+    },
+    {
+      "ac_id": "cycle50/TestC50_008_InjectTaskResearchPointerFlag",
+      "predicate": "go/acs/cycle50/...:TestC50_008_InjectTaskResearchPointerFlag",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC50_008_InjectTaskResearchPointerFlag\n    predicates_test.go:112: inject-task.sh missing — skip cycle-50-008\n--- SKIP: TestC50_008_InjectTaskResearchPointerFlag (0.01s)"
+    },
+    {
+      "ac_id": "cycle50/TestC50_009_TesterDualVarWorktreePattern",
+      "predicate": "go/acs/cycle50/...:TestC50_009_TesterDualVarWorktreePattern",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle57/TestC57_022_OrchestratorUsesRegistry",
+      "predicate": "go/acs/cycle57/...:TestC57_022_OrchestratorUsesRegistry",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC57_022_OrchestratorUsesRegistry\n    predicates_test.go:21: registry-dispatch markers absent in orchestrator.md — source evolved past cycle-57-022\n--- SKIP: TestC57_022_OrchestratorUsesRegistry (0.02s)"
+    },
+    {
+      "ac_id": "cycle57/TestC57_030_BuildReportVerdictCountMatch",
+      "predicate": "go/acs/cycle57/...:TestC57_030_BuildReportVerdictCountMatch",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC57_030_BuildReportVerdictCountMatch\n    predicates_test.go:38: cycle-57 acs-verdict.json missing — skip (runtime-only)\n--- SKIP: TestC57_030_BuildReportVerdictCountMatch (0.02s)"
+    },
+    {
+      "ac_id": "cycle62/TestC62_049_PostmortemCycle61Shipped",
+      "predicate": "go/acs/cycle62/...:TestC62_049_PostmortemCycle61Shipped",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC62_049_PostmortemCycle61Shipped\n    predicates_test.go:25: no cycle-61 postmortem at accepted paths\n--- SKIP: TestC62_049_PostmortemCycle61Shipped (0.02s)"
+    },
+    {
+      "ac_id": "cycle62/TestC62_050_GeminiNativeBlockShipped",
+      "predicate": "go/acs/cycle62/...:TestC62_050_GeminiNativeBlockShipped",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle62/TestC62_051_ClassifierScansRoleLogs",
+      "predicate": "go/acs/cycle62/...:TestC62_051_ClassifierScansRoleLogs",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle62/TestC62_052_ScoutFindingsGrounded",
+      "predicate": "go/acs/cycle62/...:TestC62_052_ScoutFindingsGrounded",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle62/TestC62_053_AuditCitationsInDiff",
+      "predicate": "go/acs/cycle62/...:TestC62_053_AuditCitationsInDiff",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle62/TestC62_054_CliResolutionAutoRendered",
+      "predicate": "go/acs/cycle62/...:TestC62_054_CliResolutionAutoRendered",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC62_054_CliResolutionAutoRendered\n    predicates_test.go:93: no CLI resolver found\n--- SKIP: TestC62_054_CliResolutionAutoRendered (0.01s)"
+    },
+    {
+      "ac_id": "cycle62/TestC62_055_MemoNoShellRedirectTools",
+      "predicate": "go/acs/cycle62/...:TestC62_055_MemoNoShellRedirectTools",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle65/TestC65_001_OrchestratorTrim",
+      "predicate": "go/acs/cycle65/...:TestC65_001_OrchestratorTrim",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle65/TestC65_002_SharedConstraintsAgentsMd",
+      "predicate": "go/acs/cycle65/...:TestC65_002_SharedConstraintsAgentsMd",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle65/TestC65_003_AnchorValidation",
+      "predicate": "go/acs/cycle65/...:TestC65_003_AnchorValidation",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle72/TestC72_001_P2InertCycle72",
+      "predicate": "go/acs/cycle72/...:TestC72_001_P2InertCycle72",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle73/TestC73_AssertScoutStopCriterion",
+      "predicate": "go/acs/cycle73/...:TestC73_AssertScoutStopCriterion",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle74/TestC74_AssertIntentStopCriterion",
+      "predicate": "go/acs/cycle74/...:TestC74_AssertIntentStopCriterion",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle77/TestC77_001_AuditorColdMoveStage8",
+      "predicate": "go/acs/cycle77/...:TestC77_001_AuditorColdMoveStage8",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle80/TestC80_AcTableInBuildReport",
+      "predicate": "go/acs/cycle80/...:TestC80_AcTableInBuildReport",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC80_AcTableInBuildReport\n    predicates_test.go:18: cycle-80 build-report.md missing — skip (ephemeral artifact)\n--- SKIP: TestC80_AcTableInBuildReport (0.01s)"
+    },
+    {
+      "ac_id": "cycle80/TestC80_BuilderWriteToAcTableDenied",
+      "predicate": "go/acs/cycle80/...:TestC80_BuilderWriteToAcTableDenied",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC80_BuilderWriteToAcTableDenied\n    predicates_test.go:35: role-gate.sh missing — skip cycle-80\n--- SKIP: TestC80_BuilderWriteToAcTableDenied (0.01s)"
+    },
+    {
+      "ac_id": "cycle80/TestC80_HarnessExists",
+      "predicate": "go/acs/cycle80/...:TestC80_HarnessExists",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC80_HarnessExists\n    predicates_test.go:52: build-report-ac-verify.sh missing — skip cycle-80\n--- SKIP: TestC80_HarnessExists (0.02s)"
+    },
+    {
+      "ac_id": "cycle83/TestC83_001_DoctorScriptBash32",
+      "predicate": "go/acs/cycle83/...:TestC83_001_DoctorScriptBash32",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC83_001_DoctorScriptBash32\n    predicates_test.go:39: no doctor script found at accepted paths\n--- SKIP: TestC83_001_DoctorScriptBash32 (0.01s)"
+    },
+    {
+      "ac_id": "cycle83/TestC83_002_DetectionOrder",
+      "predicate": "go/acs/cycle83/...:TestC83_002_DetectionOrder",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC83_002_DetectionOrder\n    predicates_test.go:56: no doctor script found\n--- SKIP: TestC83_002_DetectionOrder (0.01s)"
+    },
+    {
+      "ac_id": "cycle83/TestC83_003_SubagentRunGatedAndNotLedger",
+      "predicate": "go/acs/cycle83/...:TestC83_003_SubagentRunGatedAndNotLedger",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC83_003_SubagentRunGatedAndNotLedger\n    predicates_test.go:63: subagent-run.sh missing — skip\n--- SKIP: TestC83_003_SubagentRunGatedAndNotLedger (0.02s)"
+    },
+    {
+      "ac_id": "cycle83/TestC83_004_DocsUpdated",
+      "predicate": "go/acs/cycle83/...:TestC83_004_DocsUpdated",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle84/TestC84_001_LintBaselineExists",
+      "predicate": "go/acs/cycle84/...:TestC84_001_LintBaselineExists",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC84_001_LintBaselineExists\n    predicates_test.go:20: lint-markdown-structure-baseline.txt missing — skip cycle-84-001\n--- SKIP: TestC84_001_LintBaselineExists (0.01s)"
+    },
+    {
+      "ac_id": "cycle84/TestC84_002_CarryoverTodosSchemaValid",
+      "predicate": "go/acs/cycle84/...:TestC84_002_CarryoverTodosSchemaValid",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle84/TestC84_003_ChangelogEntryExists",
+      "predicate": "go/acs/cycle84/...:TestC84_003_ChangelogEntryExists",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 30,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle85/TestC85_BuilderWorktreeIsolationHardError",
+      "predicate": "go/acs/cycle85/...:TestC85_BuilderWorktreeIsolationHardError",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 60,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC85_BuilderWorktreeIsolationHardError\n    predicates_test.go:17: phase-gate.sh missing — skip\n--- SKIP: TestC85_BuilderWorktreeIsolationHardError (0.06s)"
+    },
+    {
+      "ac_id": "cycle85/TestC85_CycleStatePhaseValidation",
+      "predicate": "go/acs/cycle85/...:TestC85_CycleStatePhaseValidation",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC85_CycleStatePhaseValidation\n    predicates_test.go:28: phase-gate.sh missing — skip\n--- SKIP: TestC85_CycleStatePhaseValidation (0.02s)"
+    },
+    {
+      "ac_id": "cycle85/TestC85_MemoProfileHasMemoMdWrite",
+      "predicate": "go/acs/cycle85/...:TestC85_MemoProfileHasMemoMdWrite",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle85/TestC85_OrchestratorClosureModeCheck",
+      "predicate": "go/acs/cycle85/...:TestC85_OrchestratorClosureModeCheck",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle85/TestC85_PromoteACSFallbackPath",
+      "predicate": "go/acs/cycle85/...:TestC85_PromoteACSFallbackPath",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC85_PromoteACSFallbackPath\n    predicates_test.go:68: no promote script found\n--- SKIP: TestC85_PromoteACSFallbackPath (0.02s)"
+    },
+    {
+      "ac_id": "cycle85/TestC85_SubagentCostAttribution",
+      "predicate": "go/acs/cycle85/...:TestC85_SubagentCostAttribution",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC85_SubagentCostAttribution\n    predicates_test.go:75: subagent-run.sh missing — skip\n--- SKIP: TestC85_SubagentCostAttribution (0.02s)"
+    },
+    {
+      "ac_id": "cycle85/TestC85_TriageOperatorQueuePriorityFloor",
+      "predicate": "go/acs/cycle85/...:TestC85_TriageOperatorQueuePriorityFloor",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle86/TestC86_CarryoverShipRefusedDismissed",
+      "predicate": "go/acs/cycle86/...:TestC86_CarryoverShipRefusedDismissed",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle86/TestC86_CarryoverTurnOverrunDismissed",
+      "predicate": "go/acs/cycle86/...:TestC86_CarryoverTurnOverrunDismissed",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle86/TestC86_InboxC2C4Processed",
+      "predicate": "go/acs/cycle86/...:TestC86_InboxC2C4Processed",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC86_InboxC2C4Processed\n    predicates_test.go:56: /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2027/.evolve/inbox/processed/2026-05-19T03-48-14Z-6bfe8b89.json: not found in processed/ (cycle-86 not run)\n--- SKIP: TestC86_InboxC2C4Processed (0.01s)"
+    },
+    {
+      "ac_id": "cycle86/TestC86_NoNewTestBuildAbnormal",
+      "predicate": "go/acs/cycle86/...:TestC86_NoNewTestBuildAbnormal",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle86/TestC86_RegressionSuite86Passes",
+      "predicate": "go/acs/cycle86/...:TestC86_RegressionSuite86Passes",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC86_RegressionSuite86Passes\n    predicates_test.go:88: /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2027/acs/regression-suite/cycle-86/pred-auditor-predicate-quality.sh missing — skip cycle-86 regression-suite\n--- SKIP: TestC86_RegressionSuite86Passes (0.02s)"
+    },
+    {
+      "ac_id": "cycle87/TestC87_KbSearchFixture",
+      "predicate": "go/acs/cycle87/...:TestC87_KbSearchFixture",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC87_KbSearchFixture\n    predicates_test.go:18: kb-search.sh missing — skip\n--- SKIP: TestC87_KbSearchFixture (0.02s)"
+    },
+    {
+      "ac_id": "cycle87/TestC87_KbSearchGrepFallback",
+      "predicate": "go/acs/cycle87/...:TestC87_KbSearchGrepFallback",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC87_KbSearchGrepFallback\n    predicates_test.go:26: kb-search.sh missing — skip\n--- SKIP: TestC87_KbSearchGrepFallback (0.01s)"
+    },
+    {
+      "ac_id": "cycle87/TestC87_ProfilesJsonValidate",
+      "predicate": "go/acs/cycle87/...:TestC87_ProfilesJsonValidate",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle87/TestC87_ResearchQuotaConcurrentNoLoss",
+      "predicate": "go/acs/cycle87/...:TestC87_ResearchQuotaConcurrentNoLoss",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC87_ResearchQuotaConcurrentNoLoss\n    predicates_test.go:64: research-quota-gate.sh missing — skip\n--- SKIP: TestC87_ResearchQuotaConcurrentNoLoss (0.02s)"
+    },
+    {
+      "ac_id": "cycle87/TestC87_ResearchQuotaDeepFlag",
+      "predicate": "go/acs/cycle87/...:TestC87_ResearchQuotaDeepFlag",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC87_ResearchQuotaDeepFlag\n    predicates_test.go:75: research-quota-gate.sh missing — skip\n--- SKIP: TestC87_ResearchQuotaDeepFlag (0.01s)"
+    },
+    {
+      "ac_id": "cycle87/TestC87_ResearchQuotaGateArithmetic",
+      "predicate": "go/acs/cycle87/...:TestC87_ResearchQuotaGateArithmetic",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 30,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC87_ResearchQuotaGateArithmetic\n    predicates_test.go:86: research-quota-gate.sh missing — skip\n--- SKIP: TestC87_ResearchQuotaGateArithmetic (0.03s)"
+    },
+    {
+      "ac_id": "cycle87/TestC87_ResearchQuotaHookDisabled",
+      "predicate": "go/acs/cycle87/...:TestC87_ResearchQuotaHookDisabled",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC87_ResearchQuotaHookDisabled\n    predicates_test.go:97: research-quota-gate.sh missing — skip\n--- SKIP: TestC87_ResearchQuotaHookDisabled (0.02s)"
+    },
+    {
+      "ac_id": "cycle87/TestC87_RunCycleResetsResearchUsage",
+      "predicate": "go/acs/cycle87/...:TestC87_RunCycleResetsResearchUsage",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC87_RunCycleResetsResearchUsage\n    predicates_test.go:118: run-cycle.sh missing at all accepted paths — Go cycle dispatch is canonical now\n--- SKIP: TestC87_RunCycleResetsResearchUsage (0.02s)"
+    },
+    {
+      "ac_id": "cycle88/TestC88_OnlineResearcherNotScheduled",
+      "predicate": "go/acs/cycle88/...:TestC88_OnlineResearcherNotScheduled",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle88/TestC88_OrchestratorPhase1Purged",
+      "predicate": "go/acs/cycle88/...:TestC88_OrchestratorPhase1Purged",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle88/TestC88_PhaseGateDispatchLegacyError",
+      "predicate": "go/acs/cycle88/...:TestC88_PhaseGateDispatchLegacyError",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC88_PhaseGateDispatchLegacyError\n    predicates_test.go:45: phase-gate.sh missing — skip\n--- SKIP: TestC88_PhaseGateDispatchLegacyError (0.01s)"
+    },
+    {
+      "ac_id": "cycle88/TestC88_PhaseGateFunctionsMigrated",
+      "predicate": "go/acs/cycle88/...:TestC88_PhaseGateFunctionsMigrated",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC88_PhaseGateFunctionsMigrated\n    predicates_test.go:54: phase-gate.sh missing — skip\n--- SKIP: TestC88_PhaseGateFunctionsMigrated (0.01s)"
+    },
+    {
+      "ac_id": "cycle88/TestC88_PhaseRegistryIntentToDiscover",
+      "predicate": "go/acs/cycle88/...:TestC88_PhaseRegistryIntentToDiscover",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle88/TestC88_ScoutPersonaInlineResearch",
+      "predicate": "go/acs/cycle88/...:TestC88_ScoutPersonaInlineResearch",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle88/TestC88_ScoutReportSchemaStable",
+      "predicate": "go/acs/cycle88/...:TestC88_ScoutReportSchemaStable",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle89/TestC89_PersonaKbFirstPointer",
+      "predicate": "go/acs/cycle89/...:TestC89_PersonaKbFirstPointer",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle89/TestC89_OnlineResearcherReferenceDoc",
+      "predicate": "go/acs/cycle89/...:TestC89_OnlineResearcherReferenceDoc",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle89/TestC89_ClaudeMdResearchEnvVars",
+      "predicate": "go/acs/cycle89/...:TestC89_ClaudeMdResearchEnvVars",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle89/TestC89_ResearchToolAdrExists",
+      "predicate": "go/acs/cycle89/...:TestC89_ResearchToolAdrExists",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle90/TestC90_001_ExpectedShipShaRefreshed",
+      "predicate": "go/acs/cycle90/...:TestC90_001_ExpectedShipShaRefreshed",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle90/TestC90_002_OrphanWorktreesPruned",
+      "predicate": "go/acs/cycle90/...:TestC90_002_OrphanWorktreesPruned",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC90_002_OrphanWorktreesPruned\n    predicates_test.go:26: worktrees dir missing — skip\n--- SKIP: TestC90_002_OrphanWorktreesPruned (0.01s)"
+    },
+    {
+      "ac_id": "cycle90/TestC90_003_ReleaseTagsBackfilled",
+      "predicate": "go/acs/cycle90/...:TestC90_003_ReleaseTagsBackfilled",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle90/TestC90_004_KnowledgeStewardshipRule",
+      "predicate": "go/acs/cycle90/...:TestC90_004_KnowledgeStewardshipRule",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle90/TestC90_005_DocDeletionGuardHook",
+      "predicate": "go/acs/cycle90/...:TestC90_005_DocDeletionGuardHook",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC90_005_DocDeletionGuardHook\n    predicates_test.go:64: doc-deletion-guard.sh missing — skip\n--- SKIP: TestC90_005_DocDeletionGuardHook (0.01s)"
+    },
+    {
+      "ac_id": "cycle91/TestC91_001_RegressionSuiteSliceScript",
+      "predicate": "go/acs/cycle91/...:TestC91_001_RegressionSuiteSliceScript",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC91_001_RegressionSuiteSliceScript\n    predicates_test.go:24: regression-suite-slice script missing — may have been moved\n--- SKIP: TestC91_001_RegressionSuiteSliceScript (0.01s)"
+    },
+    {
+      "ac_id": "cycle91/TestC91_002_BuilderPreHandoffInstruction",
+      "predicate": "go/acs/cycle91/...:TestC91_002_BuilderPreHandoffInstruction",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle91/TestC91_003_TddEngineerOneToOneContract",
+      "predicate": "go/acs/cycle91/...:TestC91_003_TddEngineerOneToOneContract",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle91/TestC91_004_TriageMediumMinRubric",
+      "predicate": "go/acs/cycle91/...:TestC91_004_TriageMediumMinRubric",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle91/TestC91_005_PriorRegressionPredicatesStillPass",
+      "predicate": "go/acs/cycle91/...:TestC91_005_PriorRegressionPredicatesStillPass",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 0,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC91_005_PriorRegressionPredicatesStillPass\n    predicates_test.go:61: meta-predicate exercised by bash regression-suite runner\n--- SKIP: TestC91_005_PriorRegressionPredicatesStillPass (0.00s)"
+    },
+    {
+      "ac_id": "cycle91/TestC91_006_BuildReportSliceAttestation",
+      "predicate": "go/acs/cycle91/...:TestC91_006_BuildReportSliceAttestation",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC91_006_BuildReportSliceAttestation\n    predicates_test.go:77: build-report harness missing — skip\n--- SKIP: TestC91_006_BuildReportSliceAttestation (0.01s)"
+    },
+    {
+      "ac_id": "cycle94/TestC94_001_LessonTemplateExternalized",
+      "predicate": "go/acs/cycle94/...:TestC94_001_LessonTemplateExternalized",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle94/TestC94_002_FastFailCounterLogic",
+      "predicate": "go/acs/cycle94/...:TestC94_002_FastFailCounterLogic",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC94_002_FastFailCounterLogic\n    predicates_test.go:34: subagent-run.sh missing — skip\n--- SKIP: TestC94_002_FastFailCounterLogic (0.01s)"
+    },
+    {
+      "ac_id": "cycle94/TestC94_003_OrchestratorFastFailStopCriterion",
+      "predicate": "go/acs/cycle94/...:TestC94_003_OrchestratorFastFailStopCriterion",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle94/TestC94_004_StreamJsonOperatorVisibility",
+      "predicate": "go/acs/cycle94/...:TestC94_004_StreamJsonOperatorVisibility",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle94/TestC94_005_TrustKernelRegressionGuard",
+      "predicate": "go/acs/cycle94/...:TestC94_005_TrustKernelRegressionGuard",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC94_005_TrustKernelRegressionGuard\n    predicates_test.go:73: subagent-run.sh missing — skip\n--- SKIP: TestC94_005_TrustKernelRegressionGuard (0.01s)"
+    },
+    {
+      "ac_id": "cycle97/TestC97_001_OrchestratorProfileHasContextModeDigest",
+      "predicate": "go/acs/cycle97/...:TestC97_001_OrchestratorProfileHasContextModeDigest",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle97/TestC97_002_RoleContextBuilderHonorsProfileContextMode",
+      "predicate": "go/acs/cycle97/...:TestC97_002_RoleContextBuilderHonorsProfileContextMode",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle97/TestC97_003_RoleContextBuilderEnvVarWins",
+      "predicate": "go/acs/cycle97/...:TestC97_003_RoleContextBuilderEnvVarWins",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle97/TestC97_004_RoleContextBuilderPromotesToFullOnFail",
+      "predicate": "go/acs/cycle97/...:TestC97_004_RoleContextBuilderPromotesToFullOnFail",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle97/TestC97_005_TriageExtractionNoDuplication",
+      "predicate": "go/acs/cycle97/...:TestC97_005_TriageExtractionNoDuplication",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle98/TestC98_001_TriageSchemaDocumentsPhaseSkip",
+      "predicate": "go/acs/cycle98/...:TestC98_001_TriageSchemaDocumentsPhaseSkip",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle98/TestC98_002_OrchestratorHonorsPhaseSkipWithPrecedence",
+      "predicate": "go/acs/cycle98/...:TestC98_002_OrchestratorHonorsPhaseSkipWithPrecedence",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle98/TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag",
+      "predicate": "go/acs/cycle98/...:TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag\n    predicates_test.go:39: phase-gate.sh missing — skip\n--- SKIP: TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag (0.01s)"
+    },
+    {
+      "ac_id": "cycle98/TestC98_004_PhaseSkippedImpliesNoRoleExecution",
+      "predicate": "go/acs/cycle98/...:TestC98_004_PhaseSkippedImpliesNoRoleExecution",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC98_004_PhaseSkippedImpliesNoRoleExecution\n    predicates_test.go:50: subagent-run.sh missing — skip\n--- SKIP: TestC98_004_PhaseSkippedImpliesNoRoleExecution (0.01s)"
+    },
+    {
+      "ac_id": "cycle98/TestC98_005_DefaultOffNoPhaseSkippedBaseline",
+      "predicate": "go/acs/cycle98/...:TestC98_005_DefaultOffNoPhaseSkippedBaseline",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 20,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC98_005_DefaultOffNoPhaseSkippedBaseline\n    predicates_test.go:64: EVOLVE_PSMAS_SKIP not in CLAUDE.md (may be archived) — skip\n--- SKIP: TestC98_005_DefaultOffNoPhaseSkippedBaseline (0.02s)"
+    },
+    {
+      "ac_id": "cycle99/TestC99_001_PsmasABVerificationDocumented",
+      "predicate": "go/acs/cycle99/...:TestC99_001_PsmasABVerificationDocumented",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "cycle99/TestC99_002_GitignoreReachabilityGuardFunctional",
+      "predicate": "go/acs/cycle99/...:TestC99_002_GitignoreReachabilityGuardFunctional",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestC99_002_GitignoreReachabilityGuardFunctional\n    predicates_test.go:44: gitignore-reachability-check.sh missing — skip cycle-99-002\n--- SKIP: TestC99_002_GitignoreReachabilityGuardFunctional (0.01s)"
+    },
+    {
+      "ac_id": "cycle99/TestC99_003_TurnOverrunIncidentAnalysisComplete",
+      "predicate": "go/acs/cycle99/...:TestC99_003_TurnOverrunIncidentAnalysisComplete",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "docgo/TestDocGo_EveryInternalPackageDocumented",
+      "predicate": "go/acs/docgo/...:TestDocGo_EveryInternalPackageDocumented",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 330,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestGetenvKeysFromSrc_AllPrefixesFoldsDynamicExcluded",
+      "predicate": "go/acs/envtaint/...:TestGetenvKeysFromSrc_AllPrefixesFoldsDynamicExcluded",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestNoUnregisteredNonEvolveGetenvKey",
+      "predicate": "go/acs/envtaint/...:TestNoUnregisteredNonEvolveGetenvKey",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 460,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestRenameDodge_NonEvolveKeyIsFlagged",
+      "predicate": "go/acs/envtaint/...:TestRenameDodge_NonEvolveKeyIsFlagged",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestEveryGoReaderHasRegistryRow",
+      "predicate": "go/acs/envtaint/...:TestEveryGoReaderHasRegistryRow",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 410,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestCycle20Dodge_OrphanedWhenRowDeleted",
+      "predicate": "go/acs/envtaint/...:TestCycle20Dodge_OrphanedWhenRowDeleted",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestEvolveConstKeys_FoldsExcludesMarkedAndDynamic",
+      "predicate": "go/acs/envtaint/...:TestEvolveConstKeys_FoldsExcludesMarkedAndDynamic",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestReadSet_PackageGroupingAndSkips",
+      "predicate": "go/acs/envtaint/...:TestReadSet_PackageGroupingAndSkips",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestLoad_FoldsConcatenatedStringConstant",
+      "predicate": "go/acs/envtaint/...:TestLoad_FoldsConcatenatedStringConstant",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestGetenvCalls_FoldsConstantArg",
+      "predicate": "go/acs/envtaint/...:TestGetenvCalls_FoldsConstantArg",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 40,
+      "is_regression": true
+    },
+    {
+      "ac_id": "envtaint/TestGetenvCalls_DetectsNonConstantArg",
+      "predicate": "go/acs/envtaint/...:TestGetenvCalls_DetectsNonConstantArg",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagceiling/TestLiveFeatureFlags_DoesNotExceedBaseline",
+      "predicate": "go/acs/flagceiling/...:TestLiveFeatureFlags_DoesNotExceedBaseline",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagceiling/TestBaselineCounter_AgreesWithStructOnHEAD",
+      "predicate": "go/acs/flagceiling/...:TestBaselineCounter_AgreesWithStructOnHEAD",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagprogress/TestCountRowsInSource_CountsNameRows",
+      "predicate": "go/acs/flagprogress/...:TestCountRowsInSource_CountsNameRows",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagprogress/TestCountRowsInSource_StrictReduction",
+      "predicate": "go/acs/flagprogress/...:TestCountRowsInSource_StrictReduction",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagprogress/TestClassifyReduction",
+      "predicate": "go/acs/flagprogress/...:TestClassifyReduction",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagprogress/TestFlagCampaignCycle_StrictlyReducesRegistry",
+      "predicate": "go/acs/flagprogress/...:TestFlagCampaignCycle_StrictlyReducesRegistry",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 0,
+      "is_regression": true,
+      "evidence_excerpt": "=== RUN   TestFlagCampaignCycle_StrictlyReducesRegistry\n    progress_test.go:123: EVOLVE_FLAG_CAMPAIGN != 1; strict-reduction gate dormant (not an active flag campaign)\n--- SKIP: TestFlagCampaignCycle_StrictlyReducesRegistry (0.00s)"
+    },
+    {
+      "ac_id": "flagprogress/TestRowCounter_AgreesWithStructOnHEAD",
+      "predicate": "go/acs/flagprogress/...:TestRowCounter_AgreesWithStructOnHEAD",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagreaders/TestScanTextTree_SkipsASandboxDeniedDirectory",
+      "predicate": "go/acs/flagreaders/...:TestScanTextTree_SkipsASandboxDeniedDirectory",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagreaders/TestEveryProductionReaderHasRegistryRow",
+      "predicate": "go/acs/flagreaders/...:TestEveryProductionReaderHasRegistryRow",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 270,
+      "is_regression": true
+    },
+    {
+      "ac_id": "flagreaders/TestScanTextTree_DetectsNonGoOnlyReference",
+      "predicate": "go/acs/flagreaders/...:TestScanTextTree_DetectsNonGoOnlyReference",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "legacynames/TestNoForbiddenTokens",
+      "predicate": "go/acs/legacynames/...:TestNoForbiddenTokens",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 1190,
+      "is_regression": true
+    },
+    {
+      "ac_id": "legacynames/TestManifestValidates",
+      "predicate": "go/acs/legacynames/...:TestManifestValidates",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "noorphan/TestFindOrphanScripts_SkipsASandboxDeniedDirectory",
+      "predicate": "go/acs/noorphan/...:TestFindOrphanScripts_SkipsASandboxDeniedDirectory",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "noorphan/TestNoOrphanScripts",
+      "predicate": "go/acs/noorphan/...:TestNoOrphanScripts",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 80,
+      "is_regression": true
+    },
+    {
+      "ac_id": "noorphan/TestOrphanAllowlist",
+      "predicate": "go/acs/noorphan/...:TestOrphanAllowlist",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestNoNewRuntimeExecutableBuildSites",
+      "predicate": "go/acs/norebuild/...:TestNoNewRuntimeExecutableBuildSites",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 190,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestReleasepipelineStillHasTheAllowlistedSite",
+      "predicate": "go/acs/norebuild/...:TestReleasepipelineStillHasTheAllowlistedSite",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 170,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestDetector_MutationProof",
+      "predicate": "go/acs/norebuild/...:TestDetector_MutationProof",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestDetector_MutationProof/exec.Command_go_build_-o",
+      "predicate": "go/acs/norebuild/...:TestDetector_MutationProof/exec.Command_go_build_-o",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestDetector_MutationProof/sysexec-style_go_build_-o_args",
+      "predicate": "go/acs/norebuild/...:TestDetector_MutationProof/sysexec-style_go_build_-o_args",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestDetector_MutationProof/append([]string{...})_build_-o_idiom",
+      "predicate": "go/acs/norebuild/...:TestDetector_MutationProof/append([]string{...})_build_-o_idiom",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestDetector_MutationProof/shell_string_go_build_-o",
+      "predicate": "go/acs/norebuild/...:TestDetector_MutationProof/shell_string_go_build_-o",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestDetector_MutationProof/comment_mentioning_go_build_-o_is_NOT_a_site",
+      "predicate": "go/acs/norebuild/...:TestDetector_MutationProof/comment_mentioning_go_build_-o_is_NOT_a_site",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "norebuild/TestDetector_MutationProof/go_build_without_-o_(compile_check)_is_NOT_an_executable-build_site",
+      "predicate": "go/acs/norebuild/...:TestDetector_MutationProof/go_build_without_-o_(compile_check)_is_NOT_an_executable-build_site",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginnamespace/TestPluginManifest_NamespaceIsEvo",
+      "predicate": "go/acs/pluginnamespace/...:TestPluginManifest_NamespaceIsEvo",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginnamespace/TestMarketplaceManifest_NamespaceIsEvo",
+      "predicate": "go/acs/pluginnamespace/...:TestMarketplaceManifest_NamespaceIsEvo",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginnamespace/TestManifests_NamespaceConsistent",
+      "predicate": "go/acs/pluginnamespace/...:TestManifests_NamespaceConsistent",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginnamespace/TestLoopSkill_DescribesEvoCommand",
+      "predicate": "go/acs/pluginnamespace/...:TestLoopSkill_DescribesEvoCommand",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginnamespace/TestSkillRefsAreEvoNamespaced",
+      "predicate": "go/acs/pluginnamespace/...:TestSkillRefsAreEvoNamespaced",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 30,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginnamespace/TestBareEvoSkillRefDetection",
+      "predicate": "go/acs/pluginnamespace/...:TestBareEvoSkillRefDetection",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestClaudePlugin_BinariesIsRecordOrAbsent",
+      "predicate": "go/acs/pluginschema/...:TestClaudePlugin_BinariesIsRecordOrAbsent",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestClaudePlugin_NoCompatibilityField",
+      "predicate": "go/acs/pluginschema/...:TestClaudePlugin_NoCompatibilityField",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestClaudeMarketplace_EntriesUseStandardKeysOnly",
+      "predicate": "go/acs/pluginschema/...:TestClaudeMarketplace_EntriesUseStandardKeysOnly",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 10,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestCodexManifest_InSyncWithClaude",
+      "predicate": "go/acs/pluginschema/...:TestCodexManifest_InSyncWithClaude",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestBinariesRule_CatchesArrayAndString",
+      "predicate": "go/acs/pluginschema/...:TestBinariesRule_CatchesArrayAndString",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestBinariesRule_CatchesArrayAndString/absent",
+      "predicate": "go/acs/pluginschema/...:TestBinariesRule_CatchesArrayAndString/absent",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestBinariesRule_CatchesArrayAndString/null",
+      "predicate": "go/acs/pluginschema/...:TestBinariesRule_CatchesArrayAndString/null",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestBinariesRule_CatchesArrayAndString/array_(the_break)",
+      "predicate": "go/acs/pluginschema/...:TestBinariesRule_CatchesArrayAndString/array_(the_break)",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestBinariesRule_CatchesArrayAndString/string",
+      "predicate": "go/acs/pluginschema/...:TestBinariesRule_CatchesArrayAndString/string",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestBinariesRule_CatchesArrayAndString/record_(valid)",
+      "predicate": "go/acs/pluginschema/...:TestBinariesRule_CatchesArrayAndString/record_(valid)",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestEntryKeyRule_CatchesCustomFields",
+      "predicate": "go/acs/pluginschema/...:TestEntryKeyRule_CatchesCustomFields",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestEntryKeyRule_CatchesCustomFields/standard_entry",
+      "predicate": "go/acs/pluginschema/...:TestEntryKeyRule_CatchesCustomFields/standard_entry",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestEntryKeyRule_CatchesCustomFields/binaries_key_(the_break)",
+      "predicate": "go/acs/pluginschema/...:TestEntryKeyRule_CatchesCustomFields/binaries_key_(the_break)",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestEntryKeyRule_CatchesCustomFields/compatibility_key_(the_break)",
+      "predicate": "go/acs/pluginschema/...:TestEntryKeyRule_CatchesCustomFields/compatibility_key_(the_break)",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "pluginschema/TestEntryKeyRule_CatchesCustomFields/both",
+      "predicate": "go/acs/pluginschema/...:TestEntryKeyRule_CatchesCustomFields/both",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestEveryGateShapedFileIsProtectedSurface",
+      "predicate": "go/acs/protectedsurface/...:TestEveryGateShapedFileIsProtectedSurface",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestWalkerStillSeesKnownGateFiles",
+      "predicate": "go/acs/protectedsurface/...:TestWalkerStillSeesKnownGateFiles",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 20,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/ship_gate.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/ship_gate.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/commit_prefix_gate.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/commit_prefix_gate.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/workspace_guard.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/workspace_guard.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/binaryguard.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/binaryguard.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/orchestrator_guard_test.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/orchestrator_guard_test.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/safeguard.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/safeguard.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/SHIP_GATE.GO",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/SHIP_GATE.GO",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/gate.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/gate.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/evalgate.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/evalgate.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/gates_test.go",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/gates_test.go",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/guard.md",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/guard.md",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestClassifier_MutationProof/vanguard_notes.txt",
+      "predicate": "go/acs/protectedsurface/...:TestClassifier_MutationProof/vanguard_notes.txt",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "protectedsurface/TestPredicate_SelfProof_SyntheticUncoveredGateFileTrips",
+      "predicate": "go/acs/protectedsurface/...:TestPredicate_SelfProof_SyntheticUncoveredGateFileTrips",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": true
+    },
+    {
+      "ac_id": "redteam/TestCycleDossier",
+      "predicate": "go/acs/redteam/...:TestCycleDossier",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 60,
+      "is_regression": false,
+      "is_red_team": true
+    },
+    {
+      "ac_id": "redteam/TestCycleDossier_MissingDossier",
+      "predicate": "go/acs/redteam/...:TestCycleDossier_MissingDossier",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 0,
+      "is_regression": false,
+      "is_red_team": true
+    },
+    {
+      "ac_id": "redteam/TestCycleDossier_SkipsInProgress",
+      "predicate": "go/acs/redteam/...:TestCycleDossier_SkipsInProgress",
+      "exit_code": 77,
+      "result": "skip",
+      "duration_ms": 10,
+      "is_regression": false,
+      "is_red_team": true,
+      "evidence_excerpt": "=== RUN   TestCycleDossier_SkipsInProgress\n    cycle_dossier_test.go:68: cycle-state.json absent — not in an active cycle\n--- SKIP: TestCycleDossier_SkipsInProgress (0.01s)"
+    },
+    {
+      "ac_id": "redteam/TestRT001_LedgerRoleCompleteness",
+      "predicate": "go/acs/redteam/...:TestRT001_LedgerRoleCompleteness",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 160,
+      "is_regression": false,
+      "is_red_team": true
+    },
+    {
+      "ac_id": "redteam/TestRT002_NoBatchCycleJump",
+      "predicate": "go/acs/redteam/...:TestRT002_NoBatchCycleJump",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 160,
+      "is_regression": false,
+      "is_red_team": true
+    },
+    {
+      "ac_id": "redteam/TestRT003_ChallengeTokenIntegrity",
+      "predicate": "go/acs/redteam/...:TestRT003_ChallengeTokenIntegrity",
+      "exit_code": 0,
+      "result": "green",
+      "duration_ms": 160,
+      "is_regression": false,
+      "is_red_team": true
+    }
+  ],
+  "green_count": 236,
+  "red_count": 0,
+  "skip_count": 53,
+  "red_ids": null,
+  "skip_ids": [
+    "buildselfcheck/TestChangedPackagesToolchainGreen",
+    "cycle103/TestC103_004_ListPhaseOrderIncludesBuildPlanner",
+    "cycle103/TestC103_005_SubagentRunAllowlistIncludesBuildPlanner",
+    "cycle103/TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner",
+    "cycle103/TestC103_007_GateFunctionsPresent",
+    "cycle49/TestC49_001_TaskFingerprintExists",
+    "cycle49/TestC49_002_FingerprintDeterminism",
+    "cycle49/TestC49_003_ResearchCacheExists",
+    "cycle49/TestC49_004_PromoteResearchCacheExists",
+    "cycle50/TestC50_002_ScoutStep55Exists",
+    "cycle50/TestC50_004_BuilderStep25ResearchPointer",
+    "cycle50/TestC50_006_ReconcileInvalidateOnDrop",
+    "cycle50/TestC50_007_ReconcilePromoteOnPass",
+    "cycle50/TestC50_008_InjectTaskResearchPointerFlag",
+    "cycle57/TestC57_022_OrchestratorUsesRegistry",
+    "cycle57/TestC57_030_BuildReportVerdictCountMatch",
+    "cycle62/TestC62_049_PostmortemCycle61Shipped",
+    "cycle62/TestC62_054_CliResolutionAutoRendered",
+    "cycle80/TestC80_AcTableInBuildReport",
+    "cycle80/TestC80_BuilderWriteToAcTableDenied",
+    "cycle80/TestC80_HarnessExists",
+    "cycle83/TestC83_001_DoctorScriptBash32",
+    "cycle83/TestC83_002_DetectionOrder",
+    "cycle83/TestC83_003_SubagentRunGatedAndNotLedger",
+    "cycle84/TestC84_001_LintBaselineExists",
+    "cycle85/TestC85_BuilderWorktreeIsolationHardError",
+    "cycle85/TestC85_CycleStatePhaseValidation",
+    "cycle85/TestC85_PromoteACSFallbackPath",
+    "cycle85/TestC85_SubagentCostAttribution",
+    "cycle86/TestC86_InboxC2C4Processed",
+    "cycle86/TestC86_RegressionSuite86Passes",
+    "cycle87/TestC87_KbSearchFixture",
+    "cycle87/TestC87_KbSearchGrepFallback",
+    "cycle87/TestC87_ResearchQuotaConcurrentNoLoss",
+    "cycle87/TestC87_ResearchQuotaDeepFlag",
+    "cycle87/TestC87_ResearchQuotaGateArithmetic",
+    "cycle87/TestC87_ResearchQuotaHookDisabled",
+    "cycle87/TestC87_RunCycleResetsResearchUsage",
+    "cycle88/TestC88_PhaseGateDispatchLegacyError",
+    "cycle88/TestC88_PhaseGateFunctionsMigrated",
+    "cycle90/TestC90_002_OrphanWorktreesPruned",
+    "cycle90/TestC90_005_DocDeletionGuardHook",
+    "cycle91/TestC91_001_RegressionSuiteSliceScript",
+    "cycle91/TestC91_005_PriorRegressionPredicatesStillPass",
+    "cycle91/TestC91_006_BuildReportSliceAttestation",
+    "cycle94/TestC94_002_FastFailCounterLogic",
+    "cycle94/TestC94_005_TrustKernelRegressionGuard",
+    "cycle98/TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag",
+    "cycle98/TestC98_004_PhaseSkippedImpliesNoRoleExecution",
+    "cycle98/TestC98_005_DefaultOffNoPhaseSkippedBaseline",
+    "cycle99/TestC99_002_GitignoreReachabilityGuardFunctional",
+    "flagprogress/TestFlagCampaignCycle_StrictlyReducesRegistry",
+    "redteam/TestCycleDossier_SkipsInProgress"
+  ],
+  "verdict": "PASS",
+  "ship_eligible": true,
+  "suite_root": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2027",
+  "project_root": "/Users/danleemh/ai/claude/evolve-loop/runtime"
+}

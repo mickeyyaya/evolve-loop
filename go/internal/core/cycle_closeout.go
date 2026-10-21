@@ -22,6 +22,7 @@ func (cr *cycleRun) completeCycle() error {
 	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.dossierParams(cr.result.FinalVerdict)); derr != nil {
 		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
+	cr.writeShadowRetrospectives()
 	if perr := pruneToolOutputOnPass(cr.cs.WorkspacePath, cr.result.FinalVerdict); perr != nil {
 		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN cycle %d: the raw tool output stays (non-fatal): %v\n", cr.cycle, perr)
 	}

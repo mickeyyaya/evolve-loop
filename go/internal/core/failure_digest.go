@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
@@ -41,10 +42,10 @@ type preClassRule struct {
 }
 
 var preClassRules = []preClassRule{
-	{"infra-error", []string{"infra teardown", "quota", "bridge", "teardown"}},
-	{"guard-abort", []string{"statemap severed", "guard aborted", "guard abort", "statemap"}},
-	{"gate-block", []string{"egps", "floor blocked", "red_count", "gate block", "blocked ship", "handoff floor", "deliverable rejected", "deterministic check", "repo-contract", "would red main", "scanner pack"}},
-	{"verdict-fail", []string{"failed to compile", "predicate", "verdict", "acs"}},
+	{dossier.PreClassInfraError, []string{"infra teardown", "quota", "bridge", "teardown"}},
+	{dossier.PreClassGuardAbort, []string{"statemap severed", "guard aborted", "guard abort", "statemap"}},
+	{dossier.PreClassGateBlock, []string{"egps", "floor blocked", "red_count", "gate block", "blocked ship", "handoff floor", "deliverable rejected", "deterministic check", "repo-contract", "would red main", "scanner pack"}},
+	{dossier.PreClassVerdictFail, []string{"failed to compile", "predicate", "verdict", "acs"}},
 }
 
 func classifyPreClass(reasonLower string) string {
@@ -55,7 +56,7 @@ func classifyPreClass(reasonLower string) string {
 			}
 		}
 	}
-	return "unknown"
+	return dossier.PreClassUnknown
 }
 
 func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (FailureDigest, error) {

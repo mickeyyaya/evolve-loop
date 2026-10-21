@@ -61,7 +61,7 @@ func TestApicoverNamingFailures_TestFailureTruncatesAndReports(t *testing.T) {
 		"p/p.go":      "package p\n\nfunc A() int { return 1 }\n",
 		"p/p_test.go": fmt.Sprintf("package p\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) { t.Fatal(%q) }\n", strings.Repeat("x", 2000)),
 	})
-	got := apicoverNamingFailures(context.Background(), moduleDir, []string{"./p"}, nil)
+	got := apicoverNamingFailures(context.Background(), ReviewInput{}, moduleDir, []string{"./p"}, nil)
 	if len(got) != 1 || !strings.Contains(got[0], "enforced package tests FAIL") || !strings.HasSuffix(got[0], "…") {
 		t.Fatalf("got = %v", got)
 	}
@@ -78,7 +78,7 @@ func TestApicoverNamingFailures_UnnamedExportsReportIsTruncated(t *testing.T) {
 		"p/p.go":      src.String(),
 		"p/p_test.go": "package p\n\nimport \"testing\"\n\nfunc TestNothing(t *testing.T) {}\n",
 	})
-	got := apicoverNamingFailures(context.Background(), moduleDir, []string{"./p"}, []string{"go/p/p.go"})
+	got := apicoverNamingFailures(context.Background(), ReviewInput{}, moduleDir, []string{"./p"}, []string{"go/p/p.go"})
 	if len(got) != 1 || !strings.Contains(got[0], "apicover naming floor") {
 		t.Fatalf("got = %v", got)
 	}
@@ -94,7 +94,7 @@ func TestApicoverNamingFailures_CoverPlumbingFailureSkipsTheCheck(t *testing.T) 
 		"p/p_test.go": "package p\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) { _ = A() }\n",
 	})
 	t.Setenv("TMPDIR", absent)
-	if got := apicoverNamingFailures(context.Background(), moduleDir, []string{"./p"}, nil); got != nil {
+	if got := apicoverNamingFailures(context.Background(), ReviewInput{}, moduleDir, []string{"./p"}, nil); got != nil {
 		t.Fatalf("plumbing failure must skip, got %v", got)
 	}
 }
@@ -106,7 +106,7 @@ func TestApicoverNamingFailures_MeasurementFailureSkipsTheCheck(t *testing.T) {
 		"p/p_test.go":   "package p\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) { _ = A() }\n",
 		"p/bad_test.go": "//go:build ignore\n\nthis is not go\n",
 	})
-	if got := apicoverNamingFailures(context.Background(), moduleDir, []string{"./p"}, nil); got != nil {
+	if got := apicoverNamingFailures(context.Background(), ReviewInput{}, moduleDir, []string{"./p"}, nil); got != nil {
 		t.Fatalf("measurement failure must skip, got %v", got)
 	}
 }

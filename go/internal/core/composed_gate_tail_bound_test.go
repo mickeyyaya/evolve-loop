@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -36,7 +35,7 @@ func TestBoundedTail(t *testing.T) {
 	}
 }
 
-func TestCompositionCarryForward_HTMLEscapedTailsOfAllFourGatesFitOneEventLine(t *testing.T) {
+func TestScopedMergeCarryForward_HTMLEscapedTailsOfAllFourGatesFitOneEventLine(t *testing.T) {
 	t.Parallel()
 
 	worktree, diff, patchID := divergedCompositionFixture(t)
@@ -53,7 +52,7 @@ func TestCompositionCarryForward_HTMLEscapedTailsOfAllFourGatesFitOneEventLine(t
 	center.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
 	o := declineOrchestrator(t, center, diff, patchID, outcomes)
 
-	if o.compositionCarryForward(context.Background(), 9, CycleState{ActiveWorktree: worktree, RunID: "run-escaped"}, "") {
+	if carryOnScopedRung(o, 9, CycleState{ActiveWorktree: worktree, RunID: "run-escaped"}) {
 		t.Fatal("red composed gates must not carry forward")
 	}
 

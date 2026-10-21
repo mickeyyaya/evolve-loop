@@ -18,7 +18,7 @@ const CodeComposedGateDeclined signalcenter.Code = "ORCHESTRATOR_COMPOSED_GATE_D
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeComposedGateDeclined,
-		"a composed-tree gate did not report pass at a MissingComposedGates trip site (RUNG 0 compositionCarryForward, RUNG 2 scopedMergeCarryForward or the ADR-0105 B3 identityCarryForward); fields.tail_<gate> carries each failing gate's output tail and the cycle falls back to a full re-audit instead of carrying the audit verdict forward")
+		"a composed-tree gate did not report pass at a MissingComposedGates trip site (RUNG 2 scopedMergeCarryForward or the ADR-0105 B3 identityCarryForward); fields.tail_<gate> carries each failing gate's output tail and the cycle falls back to a full re-audit instead of carrying the audit verdict forward")
 }
 
 const signalFieldRunes = 512
@@ -123,58 +123,6 @@ func (o *Orchestrator) CompositionFastPathWired() bool {
 	return o.compositionSnapshot != nil &&
 		o.compositionGateRunner != nil &&
 		o.compositionVerdictWriter != nil
-}
-
-func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, cs CycleState, projectRoot string) bool {
-	if o.compositionSnapshot == nil || o.compositionGateRunner == nil || o.compositionVerdictWriter == nil {
-		return false
-	}
-	worktree := cs.ActiveWorktree
-	if worktree == "" {
-		return false
-	}
-	snap, err := o.compositionSnapshot(ctx, worktree, cs.RunID)
-	if err != nil {
-		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: snapshot unavailable: %v; falling back to full re-audit\n", err)
-		return false
-	}
-	composedDiff, exit, err := gitCapture(ctx, worktree, "diff", "main...HEAD")
-	if err != nil || exit != 0 {
-		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: composed diff unavailable (exit=%d, err=%v); falling back to full re-audit\n", exit, err)
-		return false
-	}
-	patchID, err := compositionPatchID([]byte(composedDiff))
-	if err != nil {
-		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: patch-id computation failed: %v; falling back to full re-audit\n", err)
-		return false
-	}
-	if patchID != snap.PatchID {
-		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: composed patch-id %s does not match audited %s (semantic drift); falling back to full re-audit\n", patchID, snap.PatchID)
-		return false
-	}
-	gateResults, ok := o.runComposedGates(ctx, cycle, cs, worktree, "Orchestrator.compositionCarryForward", "composition carry-forward")
-	if !ok {
-		return false
-	}
-	gitHead, _, _ := gitCapture(ctx, worktree, "rev-parse", "HEAD")
-	in := CompositionVerdictInput{
-		Cycle:        cycle,
-		LaneAuditRef: snap.LaneAuditRef,
-		PatchID:      patchID,
-		AuditedBase:  snap.AuditedBase,
-		GitHead:      strings.TrimSpace(gitHead),
-		TreeStateSHA: worktreeContentSHA(ctx, projectRoot, worktree, cs.WorkspacePath),
-		GateResults:  gateResults,
-		AuditedDiff:  snap.Diff,
-		ComposedDiff: []byte(composedDiff),
-	}
-	ledgerPath := filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
-	if err := o.compositionVerdictWriter(ledgerPath, in); err != nil {
-		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: writer failed (fail-closed): %v; falling back to full re-audit\n", err)
-		return false
-	}
-	fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: wrote composition-verdict for cycle %d; skipping re-audit\n", cycle)
-	return true
 }
 
 func WithScopedMergeReviewer(fn ScopedMergeReviewer) Option {

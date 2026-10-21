@@ -143,5 +143,8 @@
     "stage": "shadow",
     "concurrency": 3
   },
+  "regression_tia": {
+    "stage": "shadow"
+  },
   "version": 1
 }

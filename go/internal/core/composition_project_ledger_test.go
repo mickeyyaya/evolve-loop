@@ -14,8 +14,7 @@ func TestCompositionCarry_ChainsFromTheProjectLedgersTipThroughALinkedWorktree(t
 	t.Parallel()
 
 	for method, rung := range map[string]func(core.CompositionRungsForTesting) func() bool{
-		ledger.TrivialRebaseMethod: func(r core.CompositionRungsForTesting) func() bool { return r.TrivialRebase },
-		ledger.ScopedReviewMethod:  func(r core.CompositionRungsForTesting) func() bool { return r.ScopedReview },
+		ledger.ScopedReviewMethod: func(r core.CompositionRungsForTesting) func() bool { return r.ScopedReview },
 	} {
 		t.Run(method, func(t *testing.T) {
 			ctx := context.Background()

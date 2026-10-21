@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A run dir whose reports are under the threshold but whose logs and prompts are over it does not fire the trigger (red test first)",
+    "The threshold is chosen from a replay of real run dirs, recorded in the spec"
+  ],
+  "campaign": "routing-triggers",
+  "created_at": "2026-10-21T01:22:09Z",
+  "deps": [],
+  "files": [
+    "go/internal/router/digest.go",
+    ".evolve/phases/context-condense/phase.json",
+    "docs/architecture/packages/internal-router.md"
+  ],
+  "fix": "TDD first. Measure only the report artifacts that context-condense condenses (the phase reports and handoffs that the next phase reads), not logs, prompts or event streams; or re-key the trigger to a field that measures them. Replay the real run dirs of cycles 2020-2027 to pick the threshold. 100% coverage, zero comments, update internal-router.md and the phase spec.",
+  "id": "context-condense-trigger-measures-the-whole-run-dir",
+  "kind": "bug",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "summary": "Filed from the independent review of PR #1105 (M2, 2026-10-21). router.runDirArtifactBytes sums every regular file in the workspace: logs, *-prompt.txt, *-events.ndjson and sandbox profiles. Real run dirs are 1.6 to 2.9 MB (cycle-2020..2027); after triage, advisor-prompt-plan.txt (44 KB), triage-events.ndjson (43 KB) and triage-prompt.txt (41 KB) alone pass 102400. So context-condense's insert trigger run_dir.artifact_bytes > 102400 is true on every cycle and its gate decides nothing.",
+  "title": "context-condense: run_dir.artifact_bytes counts every file of the run dir, so its 100 KB trigger is always true",
+  "weight": 0.55
+}

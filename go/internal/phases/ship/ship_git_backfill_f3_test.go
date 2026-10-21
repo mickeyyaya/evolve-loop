@@ -53,22 +53,6 @@ func TestVerifyAuditBinding_AReportThatVanishesBeforeItsAgeIsReadIsATransientIOF
 	}
 }
 
-func TestVerifyAuditBinding_AFailingCarryForwardProbeStopsTheBindingWithThatFault(t *testing.T) {
-	t.Parallel()
-	s := trSetup(t)
-	trAppendLedgerLine(t, s.repo, s.entry(t, s.patchID, trPassingGates()))
-	opts := auditOpts(t, s.repo)
-	opts.Runner = failingGitF3(func(args []string) bool { return len(args) == 2 && args[0] == "diff" && args[1] == "HEAD" })
-	res := &RunResult{}
-
-	err := verifyAuditBinding(context.Background(), opts, res)
-
-	se := wantShipErr(t, err, core.CodeGitIO, core.ShipClassTransient, "git diff HEAD")
-	if core.CodeAuditBindingHeadMoved == se.Code || strings.Contains(strings.Join(res.Logs, "\n"), "carry-forward — audit verdict follows") {
-		t.Fatalf("the probe fault must surface as itself, not as a moved HEAD or a carried verdict: %v / %v", se, res.Logs)
-	}
-}
-
 func dirtyWorktreeF3(t *testing.T) (repo, wt string) {
 	t.Helper()
 	repo = makeRepo(t)

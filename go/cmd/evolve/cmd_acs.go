@@ -59,7 +59,7 @@ func mainProjectRoot(dir string) string {
 
 func runACS(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve acs: missing subcommand (try: run|suite)")
+		fmt.Fprintln(stderr, "evolve acs: missing subcommand (try: run|suite|tia-report)")
 		return 10
 	}
 	switch args[0] {
@@ -67,6 +67,8 @@ func runACS(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runACSRun(args[1:], stdout, stderr)
 	case "suite":
 		return runACSSuite(args[1:], stdout, stderr)
+	case "tia-report":
+		return runACSTIAReport(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve acs: unknown subcommand %q\n", args[0])
 		return 10

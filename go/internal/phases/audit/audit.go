@@ -378,6 +378,8 @@ func generateACSVerdict(req core.PhaseRequest) error {
 	return nil
 }
 
+var tiaCompute = regressiontia.Compute
+
 func emitTIADecision(req core.PhaseRequest, root string) {
 	stage := policy.RegressionTIAStageFor(req.ProjectRoot)
 	if stage == "off" {
@@ -387,7 +389,7 @@ func emitTIADecision(req core.PhaseRequest, root string) {
 	if !derivable {
 		changed = nil
 	}
-	d := regressiontia.Compute(stage, root, codequality.ModuleDir(root), changed)
+	d := tiaCompute(stage, root, codequality.ModuleDir(root), changed)
 	if d.Stage == "" {
 		return
 	}

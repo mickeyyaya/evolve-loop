@@ -114,6 +114,7 @@ func TestPretrustCodexProjects_UnreadableConfigIsAnError(t *testing.T) {
 }
 
 func TestPretrustCodexProjects_UnresolvableHomeIsAnError(t *testing.T) {
+	t.Setenv("CODEX_HOME", "")
 	t.Setenv("HOME", "")
 	err := pretrustCodexProjects(&Config{Worktree: "/tmp/wt"})
 	if err == nil || !strings.Contains(err.Error(), "resolve codex config path") {

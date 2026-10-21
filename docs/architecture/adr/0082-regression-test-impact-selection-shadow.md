@@ -97,3 +97,15 @@ graph.
   premature until the manifest work above exists; it stays deferred.
 - New package `go/internal/regressiontia` is enrolled in `go/.apicover-enforce` with an
   `apicover_named_test.go` naming every exported symbol (ADR-0069 dual edit).
+
+## Amendment (2026-10-21): the checked-in policy runs the shadow stage
+
+The operator approved the shadow soak on 2026-10-21 with the word "Yes" (item `egps-regression-tia-selection`). Until then no `regression_tia` block existed, so the stage was the compiled `off` and no cycle wrote `acs-tia-shadow.json`.
+
+- **The change.** `.evolve/policy.json` holds `"regression_tia": {"stage": "shadow"}`. `go/internal/policy` `TestTheCheckedInPolicy_RunsRegressionTIAInShadow` decodes the file with the strict loader and pins the stage. `RegressionTIAPolicy.UnmarshalJSON` refuses an unknown key and a stage other than `off`, `shadow` or `enforce` (`TestRegressionTIAPolicy_TheBlockIsStrictDecoded`).
+- **Shadow decides nothing.** The audit writes `acs-tia-shadow.json` beside the verdict, and the gate keeps every result. `go/internal/phases/audit` `TestGenerateACSVerdict_TheShadowStageChangesNoGateDecision` compares the verdict at `off` and at `shadow`. The only difference is the one artifact.
+- **The readout.** `evolve acs tia-report [--evolve-dir D] [--json]` rolls up the shadow decisions of every run directory (`regressiontia.Rollup`). It counts the selected packages and the packages that the selection can skip. It names each miss: a package the selection can skip whose regression predicate was red in the same cycle.
+- **The cost.** The selection runs before the suite in every audit. When the change has a scope, it can take up to 240 s. `ImporterClosure` and `resolveDeps` each run `go list` with a 120 s bound, one after the other. Each decision records `duration_ms`, and the readout prints the total and the largest, so the soak measures the cost.
+- **The expected first result.** The Finding above still holds: every predicate reads files or starts a process, so the import graph selects the whole corpus. The soak therefore shows `would_skip=0` until predicates declare their impact surface. That design is the follow-up item `regression-tia-declared-impact-surface`.
+- **What changes our mind.** Enforce needs a declared impact surface, a soak where `would_skip` is greater than zero, and zero misses in that soak.
+

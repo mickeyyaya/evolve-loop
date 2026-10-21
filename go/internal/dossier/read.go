@@ -74,7 +74,10 @@ func phaseExecutionReceiptExists(projectRoot string, cycle int, phase string) bo
 }
 
 func ReadCommitted(projectRoot string, minCycle int) []*Dossier {
-	dir := CyclesDir(projectRoot)
+	return ReadDir(CyclesDir(projectRoot), minCycle)
+}
+
+func ReadDir(dir string, minCycle int) []*Dossier {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
