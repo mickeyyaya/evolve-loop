@@ -91,3 +91,4 @@
 ./internal/auditcascade 100
 ./internal/recoveryretro 100
 ./internal/cli/agentcmd 100
+./internal/qualitypanel 100

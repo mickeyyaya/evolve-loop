@@ -26,11 +26,12 @@ type tailEnv struct {
 }
 
 type tailOptions struct {
-	cycle  int
-	kinds  map[signalcenter.Kind]bool
-	codes  map[signalcenter.Code]bool
-	follow bool
-	json   bool
+	cycle   int
+	kinds   map[signalcenter.Kind]bool
+	codes   map[signalcenter.Code]bool
+	follow  bool
+	json    bool
+	channel string
 }
 
 type tailLane struct {
@@ -62,6 +63,9 @@ func runSignalsTail(ctx context.Context, args []string, env tailEnv, stdout, std
 	if poll <= 0 {
 		poll = time.Second
 	}
+	if opts.channel != "" {
+		return runChannelTail(ctx, opts, env.ProjectRoot, poll, stdout, stderr)
+	}
 	t := &signalsTail{opts: opts, project: env.ProjectRoot, stdout: stdout, stderr: stderr}
 	if opts.cycle > 0 {
 		t.lanes = []*tailLane{t.lane(opts.cycle)}
@@ -88,6 +92,7 @@ func parseTailArgs(args []string, stderr io.Writer) (tailOptions, bool) {
 	fset.StringVar(&codes, "code", "", "comma-separated codes to print")
 	fset.BoolVar(&o.follow, "follow", false, "keep printing appended events until the cycle or wave seals")
 	fset.BoolVar(&o.json, "json", false, "print each event as one signal/1.0 JSON line")
+	fset.StringVar(&o.channel, "channel", "", "read one event channel from its start (.evolve/events/ch/<name>), for example quality.reading")
 	if err := fset.Parse(args); err != nil {
 		return o, false
 	}
@@ -99,6 +104,8 @@ func parseTailArgs(args []string, stderr io.Writer) (tailOptions, bool) {
 		err = fmt.Errorf("unexpected argument %q", fset.Arg(0))
 	case cycleSet && o.cycle < 1:
 		err = fmt.Errorf("--cycle must be >= 1, got %d", o.cycle)
+	case cycleSet && o.channel != "":
+		err = errors.New("--channel and --cycle are exclusive")
 	}
 	if err == nil {
 		o.kinds, err = parseTailSet("--kind", kinds, signalcenter.Kind.Known)

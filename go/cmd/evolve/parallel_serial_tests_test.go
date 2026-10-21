@@ -576,6 +576,7 @@ var serialTests = map[string]string{
 	"main.TestRunLoopChain_DrainedInboxRunsExactlyOneBatch":                                                                "swaps seam runLoopBatchFn",
 	"main.TestRunLoopChain_FleetWidthPreservedAcrossBatches":                                                               "swaps seam runLoopBatchFn",
 	"main.TestRunLoopChain_HandsItsCloserToItsBoundaryRefresh":                                                             "swaps seam attachRootEventsFn",
+	"main.TestNewQualityCenter_AttachesThePublisherUnderTheQualityRole":                                                    "swaps seam attachRootEventsFn",
 	"main.TestRunLoopChain_InboxDrainStartsNextBatchThenCleanExit":                                                         "swaps seam runLoopBatchFn",
 	"main.TestRunLoopChain_LoopBreakerLetsBatchesRunAfterAFruitlessReExec":                                                 "swaps seam chainRebuildFn",
 	"main.TestRunLoopChain_LoopStopFileBrakeHalts":                                                                         "swaps seam runLoopBatchFn",

@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/events/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -118,5 +121,99 @@ func TestSignalsTailDefaultsAPollAndReportsAMissingCycle(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if rc := runSignalsTail(context.Background(), []string{"--cycle", "9"}, tailEnv{ProjectRoot: root}, &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), paths.RunWorkspace(root, 9)) {
 		t.Fatalf("rc=%d stderr=%q", rc, stderr.String())
+	}
+}
+
+func appendChannel(t *testing.T, root, name string, records ...channel.Record) {
+	t.Helper()
+	log, err := channel.New(paths.EventChannelsRoot(paths.EvolveDirOf(root)), name, channel.Config{SegmentBytes: 1 << 20, LockDeadline: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := log.Append(records); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSignalsTail_ChannelPrintsItsHistoryFilteredAndNamesEachGap(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	reading := tailTestEvent(0, "2026-10-21T10:00:01Z", signalcenter.KindQualityReading)
+	wave := tailTestEvent(0, "2026-10-21T10:00:00Z", signalcenter.KindLoopWave)
+	appendChannel(t, root, "signals", channel.Record{Source: "loop", Signal: &wave}, channel.Record{Source: "quality", Signal: &reading},
+		channel.Record{Source: "quality", Gap: &channel.Gap{Reason: channel.ReasonQueueFull, FirstSeq: 4, LastSeq: 6, From: 1, To: 2}})
+	var stdout, stderr bytes.Buffer
+
+	rc := runSignalsTail(context.Background(), []string{"--channel", "signals", "--kind", "quality.reading"}, tailEnv{ProjectRoot: root}, &stdout, &stderr)
+
+	if rc != 0 || strings.Count(stdout.String(), "\n") != 1 || !strings.Contains(stdout.String(), "quality.reading") {
+		t.Errorf("rc %d stdout %q, want only the quality reading", rc, stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "gap") || !strings.Contains(stderr.String(), "queue_full") {
+		t.Errorf("stderr %q, want the gap record named", stderr.String())
+	}
+}
+
+func TestSignalsTail_ChannelArgumentsAndAbsentChannel(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	if rc := runSignalsTail(context.Background(), []string{"--channel", "quality.reading"}, tailEnv{ProjectRoot: root}, &stdout, &stderr); rc != 0 || stdout.Len() != 0 {
+		t.Errorf("an absent channel: rc %d stdout %q, want 0 and nothing", rc, stdout.String())
+	}
+	for _, args := range [][]string{{"--channel", "quality.reading", "--cycle", "3"}, {"--channel", "Bad Name"}} {
+		if rc := runSignalsTail(context.Background(), args, tailEnv{ProjectRoot: root}, &stdout, &stderr); rc != 10 {
+			t.Errorf("args %q: rc %d, want 10 (usage)", args, rc)
+		}
+	}
+}
+
+func TestSignalsTail_ChannelFollowPrintsLaterRecordsUntilCancelled(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	out := &lockedBuffer{}
+	done := make(chan int)
+	go func() {
+		done <- runSignalsTail(ctx, []string{"--channel", "quality.reading", "--follow"}, tailEnv{ProjectRoot: root, Poll: 2 * time.Millisecond}, out, io.Discard)
+	}()
+	reading := tailTestEvent(0, "2026-10-21T10:00:01Z", signalcenter.KindQualityReading)
+
+	appendChannel(t, root, "quality.reading", channel.Record{Source: "quality", Signal: &reading})
+
+	deadline := time.Now().Add(3 * time.Second)
+	for !strings.Contains(out.String(), "quality.reading") && time.Now().Before(deadline) {
+		time.Sleep(2 * time.Millisecond)
+	}
+	cancel()
+	if rc := <-done; rc != 0 || !strings.Contains(out.String(), "quality.reading") {
+		t.Errorf("rc %d output %q, want the appended reading and exit 0 after cancel", rc, out.String())
+	}
+}
+
+type failingTailWriter struct{}
+
+func (failingTailWriter) Write([]byte) (int, error) { return 0, errors.New("closed pipe") }
+
+func TestSignalsTail_ChannelFailuresExitTwo(t *testing.T) {
+	t.Parallel()
+	unreadable := t.TempDir()
+	chRoot := paths.EventChannelsRoot(paths.EvolveDirOf(unreadable))
+	if err := os.MkdirAll(chRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(chRoot, "quality.reading"), []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if rc := runSignalsTail(context.Background(), []string{"--channel", "quality.reading"}, tailEnv{ProjectRoot: unreadable}, &stdout, &stderr); rc != 2 || !strings.Contains(stderr.String(), "channel quality.reading") {
+		t.Errorf("an unreadable channel: rc %d stderr %q, want 2 naming the channel", rc, stderr.String())
+	}
+	full := t.TempDir()
+	reading := tailTestEvent(0, "2026-10-21T10:00:01Z", signalcenter.KindQualityReading)
+	appendChannel(t, full, "quality.reading", channel.Record{Source: "quality", Signal: &reading})
+	stderr.Reset()
+	if rc := runSignalsTail(context.Background(), []string{"--channel", "quality.reading"}, tailEnv{ProjectRoot: full}, failingTailWriter{}, &stderr); rc != 2 || !strings.Contains(stderr.String(), "write") {
+		t.Errorf("a failing stdout: rc %d stderr %q, want 2", rc, stderr.String())
 	}
 }
