@@ -266,7 +266,7 @@ The proofs that drive real processes:
 | The interim fix (Q12) | the identity proof for continuation lanes | deleted with B1 and B3 | stage 7 |
 | B4 `carrySatisfied` | ship accepts a carry | kept, with two new methods (Q8) | stage 5 |
 | B5 `resumeFleetRebaseAfterDebugger` | the debugger re-entry | a queue lane enqueues again after the debugger | stage 7 |
-| RUNG 0 `compositionCarryForward` | unreachable for contract cycles | retired | stage 7 |
+| RUNG 0 `compositionCarryForward` | retired on 2026-10-21 (ADR-0105) | retired | done |
 | RUNG 2 `scopedMergeCarryForward`, `mergerung2.go` | never wired | retired | stage 7 |
 | `composedGatesTo` (four full `make` targets) | the carry gates | replaced by the scoped gate set (Q7) | stage 7 |
 | Router rule `fleet-rebase-reaudit` | sends the rebase to Audit | kept for `per-lane` | none |

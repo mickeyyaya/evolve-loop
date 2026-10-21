@@ -26,7 +26,7 @@ const renoteEvery = 60 * time.Second
 const MaxWait = 15 * time.Minute
 
 func Acquire(ctx context.Context, projectRoot string, warn io.Writer) (func(), error) {
-	path, hub := lockPathFor(projectRoot)
+	path, hub := LockPath(projectRoot)
 	if !hub && warn != nil {
 		fmt.Fprintf(warn, "[verify] WARN: hub lock unresolvable for %s — degrading to a PER-WORKTREE lock (%s): concurrent lanes are NOT serialized\n", projectRoot, path)
 	}
@@ -43,7 +43,7 @@ func AcquireWithin(ctx context.Context, projectRoot string, wait time.Duration, 
 	return release, err
 }
 
-func lockPathFor(projectRoot string) (path string, hub bool) {
+func LockPath(projectRoot string) (path string, hub bool) {
 	if info, err := plane.Classify(projectRoot); err == nil {
 		if common, cerr := plane.CommonGitDir(info); cerr == nil {
 			return filepath.Join(common, lockFileName), true

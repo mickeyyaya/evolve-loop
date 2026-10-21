@@ -30,6 +30,7 @@ type Decision struct {
 	Selected        []string `json:"selected,omitempty"`
 	WouldSkip       []string `json:"would_skip,omitempty"`
 	WouldSkipCount  int      `json:"would_skip_count"`
+	DurationMS      int64    `json:"duration_ms"`
 }
 
 func Select(patterns, scope []string, deps map[string][]string) (selected, wouldSkip []string) {
@@ -63,6 +64,7 @@ func Compute(stage, repoRoot, moduleDir string, changed []string) Decision {
 	default:
 		return Decision{}
 	}
+	start := time.Now()
 	patterns := corpus(moduleDir)
 	scope := ChangedScope(repoRoot, changed)
 	var deps map[string][]string
@@ -76,6 +78,7 @@ func Compute(stage, repoRoot, moduleDir string, changed []string) Decision {
 		Selected:        selected,
 		WouldSkip:       wouldSkip,
 		WouldSkipCount:  len(wouldSkip),
+		DurationMS:      time.Since(start).Milliseconds(),
 	}
 }
 

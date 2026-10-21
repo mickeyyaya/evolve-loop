@@ -49,13 +49,24 @@ func TestLaneStartRef_IntegrationHeadAuthority(t *testing.T) {
 			t.Fatalf("ref=%q err=%v, want origin/main", ref, err)
 		}
 	})
-	t.Run("local ahead ⇒ the local main HEAD", func(t *testing.T) {
+	t.Run("local ahead by boundary commits ⇒ the local main HEAD", func(t *testing.T) {
 		_, runtime := startRefFixture(t)
-		writeCommit(t, runtime, "dossier.txt", "closeout")
+		commitPath(t, runtime, "knowledge-base/cycles/cycle-9.md", "closeout")
+		commitPath(t, runtime, ".evolve/inbox/a.json", "{}")
 		want := runtime.Git("rev-parse", "HEAD")
 		ref, err := laneStartRef(ctx, runtime.Dir)
 		if err != nil || ref != want {
 			t.Fatalf("ref=%q err=%v, want the local main HEAD %s", ref, err, want)
+		}
+	})
+	t.Run("local ahead by a commit no boundary step wrote ⇒ loud refusal naming it", func(t *testing.T) {
+		_, runtime := startRefFixture(t)
+		commitPath(t, runtime, "knowledge-base/cycles/cycle-9.md", "closeout")
+		writeCommit(t, runtime, "stranded.go", "package x")
+		stranded := runtime.Git("rev-parse", "--short=12", "HEAD")
+		ref, err := laneStartRef(ctx, runtime.Dir)
+		if err == nil || !strings.Contains(err.Error(), stranded) {
+			t.Fatalf("ref=%q err=%v, want a refusal naming %s: a lane must not fork from a commit origin does not hold (cycle 1830)", ref, err, stranded)
 		}
 	})
 	t.Run("diverged ⇒ loud refusal", func(t *testing.T) {

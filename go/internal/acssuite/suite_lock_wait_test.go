@@ -20,7 +20,7 @@ func TestAcquireSuiteLock_BehindAHeldLockWaitsOnlyItsBoundThenRunsUnserialized(t
 	defer func() { suiteLockWait = saved }()
 
 	done := make(chan func(), 1)
-	go func() { done <- acquireSuiteLock(root) }()
+	go func() { done <- acquireSuiteLock(Options{Root: root}) }()
 
 	select {
 	case release := <-done:

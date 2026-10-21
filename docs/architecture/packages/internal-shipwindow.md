@@ -8,7 +8,7 @@ Two holders take the lease. Each path holds it over its own part of the section:
 
 | Path | Holder | The lease covers | Pinned by |
 |---|---|---|---|
-| A normal ship | the ship phase, `enterShipWindow` ([internal-phases-ship](internal-phases-ship.md)) | the audit-binding check with the trivial-rebase carry, the commit, the re-proof of a recorded carry and the push | `TestShip_TheShipWindowCoversTheBindingTheCarryGateAndThePush` |
+| A normal ship | the ship phase, `enterShipWindow` ([internal-phases-ship](internal-phases-ship.md)) | the audit-binding check, the commit, the re-proof of a recorded carry and the push | `TestShip_TheShipWindowCoversTheBindingTheCarryGateAndThePush` |
 | A resumed landing | the ship phase, in `resumeLanding` | the roll-forward and the push of a prepared landing | `TestShip_AResumedLandingPushesInsideTheShipWindow` |
 | A fleet-rebase recovery | the orchestrator, `holdShipWindow` ([internal-core](internal-core.md)) | the rebase onto `main`, the identity-carry composed-tree gates (ADR-0105), the commit and the push of the re-ship | `TestRecoverFromShipError_HoldsTheShipWindowFromTheRebaseThroughTheReShip` |
 
@@ -30,7 +30,7 @@ The slow ship checks run before the lease: the repo-contract scanner pack, the e
 | D2 | `DefaultTTL` stays 15 minutes. | D1: a recovery holds the lease over the composed-tree gates (compile, test, acs and apicover), which take minutes. | 5 minutes: a waiter breaks a healthy recovery during its gates, and two lanes then overlap in the window. |
 | D3 | A waiter has no wait limit of its own. Only the context of the ship ends the wait. A waiter that breaks a live holder at the TTL reports it (`OnStaleBreak`), and the callers emit `SHIP_WINDOW_LEASE_BROKEN` or `ORCHESTRATOR_SHIP_WINDOW_LEASE_BROKEN`. | F1, the stale break | A wait limit equal to the TTL: a lane behind three healthy holders can wait longer than one TTL. It then ships unleased. |
 
-*Consequence:* a sibling can now land between the audit binding and the ship of a lane. The ship then takes the trivial-rebase carry or the identity carry, and a carry that does not prove goes back to audit. Operator choice (a) of 2026-10-19 accepts this cost. A carry that is not provable is the condition that changes this decision.
+*Consequence:* a sibling can now land between the audit binding and the ship of a lane. The ship then takes the identity carry, and a carry that does not prove goes back to audit. Operator choice (a) of 2026-10-19 accepts this cost. A carry that is not provable is the condition that changes this decision.
 
 ## Design
 

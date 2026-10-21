@@ -107,7 +107,7 @@ func TestScopedCoverFunc_GreenRunWritesTheFuncReport(t *testing.T) {
 	moduleDir := filepath.Join(t.TempDir(), "go")
 	writeCoverFixture(t, moduleDir)
 
-	path, output, status := scopedCoverFunc(context.Background(), moduleDir, []string{"./p"})
+	path, output, status := scopedCoverFunc(context.Background(), ReviewInput{}, moduleDir, []string{"./p"})
 	t.Cleanup(func() { _ = os.RemoveAll(filepath.Dir(path)) })
 
 	if status != coverStatusOK || output != "" || filepath.Base(path) != "cover.func.txt" {
@@ -128,7 +128,7 @@ func TestScopedCoverFunc_FailingTestsAreTestsFailedWithTheirOutput(t *testing.T)
 		"p/red_test.go": "package p\n\nimport \"testing\"\n\nfunc TestRed(t *testing.T) { t.Fatal(\"red-marker\") }\n",
 	})
 
-	path, output, status := scopedCoverFunc(context.Background(), moduleDir, []string{"./p"})
+	path, output, status := scopedCoverFunc(context.Background(), ReviewInput{}, moduleDir, []string{"./p"})
 	t.Cleanup(func() { _ = os.RemoveAll(path) })
 
 	if status != coverStatusTestsFailed || !strings.HasSuffix(path, "/") || !strings.Contains(output, "red-marker") {
@@ -157,7 +157,7 @@ func TestScopedCoverFunc_PlumbingFailuresAreNeverTestFailures(t *testing.T) {
 				stubGoTool(t, tc.script)
 			}
 
-			path, output, status := scopedCoverFunc(context.Background(), moduleDir, []string{"./p"})
+			path, output, status := scopedCoverFunc(context.Background(), ReviewInput{}, moduleDir, []string{"./p"})
 			if path != "" {
 				t.Cleanup(func() { _ = os.Chmod(path, 0o755) })
 			}

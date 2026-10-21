@@ -67,3 +67,34 @@ func TestReadCommitted_WindowedAscendingAndFaultTolerant(t *testing.T) {
 		t.Errorf("ReadCommitted(minCycle=0) returned %d, want all 3 parseable dossiers", len(got))
 	}
 }
+
+func TestReadDir_ReadsThePendingDirWithTheSameWindow(t *testing.T) {
+	root := t.TempDir()
+	pending := PendingDir(root)
+	if err := os.MkdirAll(pending, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []int{4, 7} {
+		raw, err := json.Marshal(&Dossier{Cycle: n, Goal: "pending fixture", FinalVerdict: VerdictFail})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(pending, fmt.Sprintf("cycle-%d.json", n)), raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	unreadable := filepath.Join(pending, "cycle-8.json")
+	if err := os.WriteFile(unreadable, []byte("{}"), 0o000); err != nil {
+		t.Fatal(err)
+	}
+
+	got := ReadDir(pending, 5)
+
+	if len(got) != 1 || got[0].Cycle != 7 || got[0].FinalVerdict != VerdictFail {
+		t.Fatalf("ReadDir(pending, 5) = %+v, want only the cycle-7 FAIL dossier, with the unreadable cycle 8 skipped", got)
+	}
+	if got := ReadCommitted(root, 0); got != nil {
+		t.Fatalf("ReadCommitted read the pending dir: %+v", got)
+	}
+}

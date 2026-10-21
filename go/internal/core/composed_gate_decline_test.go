@@ -62,7 +62,7 @@ func declineOrchestrator(t *testing.T, center *signalcenter.Center, diff []byte,
 	return NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), opts...)
 }
 
-func TestCompositionCarryForward_RealisticTails_EveryFailingGatesLastLineReachesTheEvent(t *testing.T) {
+func TestScopedMergeCarryForward_RealisticTails_EveryFailingGatesLastLineReachesTheEvent(t *testing.T) {
 	t.Parallel()
 
 	for name, failing := range map[string][]string{
@@ -86,7 +86,7 @@ func TestCompositionCarryForward_RealisticTails_EveryFailingGatesLastLineReaches
 			center.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
 			o := declineOrchestrator(t, center, diff, patchID, outcomes)
 
-			if o.compositionCarryForward(context.Background(), 42, CycleState{ActiveWorktree: worktree, RunID: "run-tails"}, "") {
+			if carryOnScopedRung(o, 42, CycleState{ActiveWorktree: worktree, RunID: "run-tails"}) {
 				t.Fatal("red composed gates must not carry forward")
 			}
 
@@ -109,7 +109,7 @@ func TestCompositionCarryForward_RealisticTails_EveryFailingGatesLastLineReaches
 	}
 }
 
-func TestCompositionCarryForward_AbsentGateIsNamedInTheDeclineEvent(t *testing.T) {
+func TestScopedMergeCarryForward_AbsentGateIsNamedInTheDeclineEvent(t *testing.T) {
 	t.Parallel()
 
 	worktree, diff, patchID := divergedCompositionFixture(t)
@@ -120,34 +120,13 @@ func TestCompositionCarryForward_AbsentGateIsNamedInTheDeclineEvent(t *testing.T
 	center.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
 	o := declineOrchestrator(t, center, diff, patchID, outcomes)
 
-	if o.compositionCarryForward(context.Background(), 45, CycleState{ActiveWorktree: worktree, RunID: "run-absent"}, "") {
+	if carryOnScopedRung(o, 45, CycleState{ActiveWorktree: worktree, RunID: "run-absent"}) {
 		t.Fatal("a gate the runner never reported must not carry forward")
 	}
 
 	if len(events) != 1 || !strings.Contains(events[0].Reason, "apicover") {
 		t.Fatalf("events = %+v, want one decline event naming the unreported gate apicover", events)
 	}
-}
-
-func TestCompositionCarryForward_GateDeclineWritesNoUntaggedStderr(t *testing.T) {
-	t.Parallel()
-
-	worktree, diff, patchID := divergedCompositionFixture(t)
-	testTail, _ := realisticGateTail("test")
-	acsTail, _ := realisticGateTail("acs")
-	outcomes := allComposedGatesPass()
-	outcomes["test"] = ciparity.GateOutcome{Status: "fail", Tail: testTail}
-	outcomes["acs"] = ciparity.GateOutcome{Status: "fail", Tail: acsTail}
-	o := declineOrchestrator(t, signalcenter.New(), diff, patchID, outcomes)
-
-	var sink injectedStderr
-	o.stderr = &sink
-	if o.compositionCarryForward(context.Background(), 42, CycleState{ActiveWorktree: worktree, RunID: "run-stderr"}, "") {
-		t.Error("red composed gates must not carry forward")
-	}
-	stderr := sink.String()
-
-	assertDeclineStderrTagged(t, stderr, 42, testTail, acsTail)
 }
 
 func TestScopedMergeCarryForward_GateDeclineWritesNoUntaggedStderr(t *testing.T) {

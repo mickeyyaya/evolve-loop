@@ -95,7 +95,6 @@
   "internal/core.Orchestrator.RunCycle": 220,
   "internal/core.Orchestrator.RunCycleFromPhase": 68,
   "internal/core.Orchestrator.adviseOnUnclassifiedFailure": 51,
-  "internal/core.Orchestrator.compositionCarryForward": 53,
   "internal/core.Orchestrator.enforceNext": 61,
   "internal/core.Orchestrator.finalizeCycle": 106,
   "internal/core.Orchestrator.loadResumeBootstrap": 75,

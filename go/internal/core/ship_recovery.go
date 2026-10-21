@@ -63,12 +63,10 @@ func (o *Orchestrator) recoverShipErrorRoute(ctx context.Context, projectRoot st
 			if cs.ExplanationDocumentationVersion > 0 {
 				return o.routeRebasedExplanation(ctx, projectRoot, cycle, cs)
 			}
-			if o.compositionCarryForward(ctx, cycle, *cs, projectRoot) {
-				return PhaseShip, true
-			}
 			if o.scopedMergeCarryForward(ctx, cycle, *cs, projectRoot) {
 				return PhaseShip, true
 			}
+			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d has no explanation contract, so the identity carry cannot prove the rebased change; auditing it again\n", cycle)
 		case conflict:
 			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet rebase CONFLICT (overlapping work the partition should have separated) → debugger\n", cycle)
 			o.emitFleetRebaseConflict(cycle, *cs)
@@ -257,6 +255,12 @@ func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string
 	if inPlaceWorktree(worktree, projectRoot) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet rebase refused: the active worktree is the project root — a cycle never rebases the operator's tree\n")
 		return false, nil
+	}
+	if remote, ok := originMainRef(ctx, gitCapture, worktree); ok {
+		if err := refuseUnprovenAhead(ctx, gitCapture, worktree, remote, strings.TrimPrefix(remote, "origin/")); err != nil {
+			fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet rebase refused: %v\n", err)
+			return false, nil
+		}
 	}
 	return rebaseWithDerivedRegen(ctx, worktree, gitCapture, regenerateDerivedArtifact, derivedConflictIn(worktree))
 }

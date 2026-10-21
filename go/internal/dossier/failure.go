@@ -13,6 +13,14 @@ const (
 )
 
 const (
+	PreClassInfraError  = "infra-error"
+	PreClassGuardAbort  = "guard-abort"
+	PreClassGateBlock   = "gate-block"
+	PreClassVerdictFail = "verdict-fail"
+	PreClassUnknown     = "unknown"
+)
+
+const (
 	maxFailureReasons     = 5
 	maxFailureReasonBytes = 200
 )

@@ -15,7 +15,7 @@ import (
 )
 
 func parseWaveNextArgs(args []string) (waveNextArgs, error) {
-	a := waveNextArgs{}
+	a := waveNextArgs{raw: args}
 	var merge, number string
 	operands, err := cliFlags{
 		bools:  map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json},
@@ -44,10 +44,10 @@ func parseWaveNextArgs(args []string) (waveNextArgs, error) {
 	return a, err
 }
 
-func loadWaveInputs(plane wavePlaneDirs) (policy.WaveConfig, string, error) {
+func loadWaveInputs(plane wavePlaneDirs, raw []string) (policy.WaveConfig, string, error) {
 	pol, err := policy.Load(filepath.Join(plane.evolveDir, "policy.json"))
 	if err != nil {
-		return policy.WaveConfig{}, "", err
+		return policy.WaveConfig{}, "", withRebuildRemedy(err, plane.root, raw)
 	}
 	cfg := pol.WaveSettings()
 	path := cfg.StandingGoal
@@ -141,4 +141,11 @@ func waveLaunchDesc(s boundaryStep, goal string) string {
 		args[i+1] = fmt.Sprintf("<goal: %d bytes>", len(goal))
 	}
 	return "evolve " + s.verb + " " + strings.Join(args, " ")
+}
+
+func withRebuildRemedy(err error, root string, raw []string) error {
+	if !strings.Contains(err.Error(), "unknown field") {
+		return err
+	}
+	return fmt.Errorf("%w; this binary is older than the policy: run make -C %s build, then run %s wave next again with the arguments %q", err, filepath.Join(root, "go"), filepath.Join(root, "go", "bin", "evolve"), raw)
 }

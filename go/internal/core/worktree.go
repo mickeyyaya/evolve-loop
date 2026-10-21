@@ -119,6 +119,9 @@ func integrationHead(ctx context.Context, git gitexec.Git, remote string) (strin
 	}
 	switch rel.Kind {
 	case gitexec.RelationAhead:
+		if err := refuseUnprovenAhead(ctx, captureIn(git), git.Dir, remote, "HEAD"); err != nil {
+			return "", fmt.Errorf("lane base: %s: %w", rel, err)
+		}
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN lane base: %s\n", rel)
 		return rel.Local, nil
 	case gitexec.RelationDiverged:
@@ -128,8 +131,14 @@ func integrationHead(ctx context.Context, git gitexec.Git, remote string) (strin
 	}
 }
 
+var originHeadArgs = []string{"symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"}
+
 func originDefaultBranch(ctx context.Context, git gitexec.Git) string {
-	out, _, code, err := git.Capture(ctx, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+	out, _, code, err := git.Capture(ctx, originHeadArgs...)
+	return defaultBranchOf(out, code, err)
+}
+
+func defaultBranchOf(out string, code int, err error) string {
 	if err != nil || code != 0 {
 		return "main"
 	}
@@ -137,6 +146,13 @@ func originDefaultBranch(ctx context.Context, git gitexec.Git) string {
 		return b
 	}
 	return "main"
+}
+
+func captureIn(git gitexec.Git) gitFn {
+	return func(ctx context.Context, _ string, args ...string) (string, int, error) {
+		out, _, code, err := git.Capture(ctx, args...)
+		return out, code, err
+	}
 }
 
 func (g gitWorktree) CreateFrom(projectRoot string, cycle int, startRef string) (string, error) {

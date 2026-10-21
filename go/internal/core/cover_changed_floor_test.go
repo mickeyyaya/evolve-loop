@@ -99,7 +99,7 @@ func stubCoverChangedProfiler(t *testing.T, profile, output string, status int) 
 	t.Helper()
 	var calls []profilerCall
 	orig := coverChangedProfiler
-	coverChangedProfiler = func(_ context.Context, moduleDir string, pkgs, tags []string) (string, string, int) {
+	coverChangedProfiler = func(_ context.Context, _ ReviewInput, moduleDir string, pkgs, tags []string) (string, string, int) {
 		calls = append(calls, profilerCall{moduleDir, pkgs, tags})
 		if status == coverStatusPlumbingError {
 			return "", output, status

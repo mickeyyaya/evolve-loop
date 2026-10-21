@@ -69,7 +69,7 @@ Two tiers — **the shape of a name encodes the phase's tier**:
 #### `threat-model` (plan)
 - **Responsibility:** Lightweight STRIDE pass over changed security-relevant surfaces (auth/authz, data handling, network boundary, subprocess/exec); emit threats × mitigations.
 - **Inputs:** scout-report.md (planned surfaces). **Outputs:** `threat-model.md`; signals `threat.count`, `threat.severity_max`.
-- **Routing:** `insert_when: [{field: "scout.security_relevant", op: "==", value: true}]` (advisor-selectable for security goals), `after: "triage"`.
+- **Routing:** `insert_when: [{field: "scout.goal_type", op: "==", value: "security"}]` (the security recipe row), `after: "triage"`.
 - **Classify:** require `["Threats", "Mitigations"]`; `fail_if_signal: {"threat.severity_max": ">=CRITICAL"}` (unmitigated critical threat blocks the plan).
 - **Evidence:** Microsoft SDL/STRIDE; STRIDE GPT; ThreatModeling-LLM (2411.17058); TMAC per-PR practice.
 
@@ -157,7 +157,7 @@ The advisor classifies the cycle goal (classify-then-route — Anthropic/LangGra
 
 Recipes are guidance, not law: the advisor may mix rows (e.g. a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
 
-Since 2026-09-28 the router enforces the drop: a planned phase whose `insert_when` is its whole rule (no `rubric_hint`) runs only when the trigger fires at its turn in the walk ([dynamic-phase-routing.md](dynamic-phase-routing.md), the phase registry section). Mixing rows still works wherever a row's triggers fire, such as threat-model on a refactor that scout marks `security_relevant`.
+Since 2026-09-28 the router enforces the drop. A planned phase whose `insert_when` is its whole rule (no `rubric_hint`) runs only when the trigger fires at its turn in the walk. See [dynamic-phase-routing.md](dynamic-phase-routing.md), the phase registry section. Mixing rows still works wherever a row's triggers fire, such as fault-localization on a refactor whose audit fails with `code-audit-fail`. Each trigger field needs a producer. `phasespec.UnproducedTriggerFields` names each field that has none.
 
 ### 4.2 Config change
 

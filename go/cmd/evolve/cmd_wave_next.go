@@ -25,6 +25,7 @@ const (
 
 type waveNextArgs struct {
 	boundary     boundaryArgs
+	raw          []string
 	notes        []string
 	number       int
 	dryRun, json bool
@@ -158,8 +159,11 @@ func prepareWave(env waveEnv, a waveNextArgs, stderr io.Writer) (wavePlan, error
 	if err := checkWaveIdle(env, &plan); err != nil {
 		return plan, err
 	}
+	if !a.dryRun {
+		env.refreshBinary(loopConfig{ProjectRoot: plane.root, EvolveDir: plane.evolveDir}, stderr)
+	}
 	plan.warnings = append(plan.warnings, planeBinaryWarnings(env, plane.root)...)
-	cfg, standing, err := loadWaveInputs(plane)
+	cfg, standing, err := loadWaveInputs(plane, a.raw)
 	var records []wave.Record
 	if err == nil {
 		records, err = plane.store.Records()

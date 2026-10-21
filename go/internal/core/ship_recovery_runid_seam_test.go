@@ -9,7 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-func TestFreshExplanationRebase_BypassesLegacyCompositionCarryForward(t *testing.T) {
+func TestFreshExplanationRebase_BypassesTheLegacyCompositionRungs(t *testing.T) {
 	t.Parallel()
 
 	dir, preDiff := initCleanRebaseRepoT(t)

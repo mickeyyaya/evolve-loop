@@ -54,6 +54,8 @@ type RoutingSignals struct {
 	Triage TriageSignals
 	Build  BuildSignals
 	Audit  AuditSignals
+	Ship   ShipSignals
+	RunDir RunDirSignals
 
 	Generic map[string]any
 
@@ -63,6 +65,14 @@ type RoutingSignals struct {
 func (s RoutingSignals) GenericValue(field string) (any, bool) {
 	v, ok := s.Generic[field]
 	return v, ok
+}
+
+type ShipSignals struct {
+	Class string
+}
+
+type RunDirSignals struct {
+	ArtifactBytes int64
 }
 
 type ScoutSignals struct {

@@ -27,9 +27,9 @@
   "routing": {
     "insert_when": [
       {
-        "field": "scout.security_relevant",
+        "field": "scout.goal_type",
         "op": "==",
-        "value": true
+        "value": "security"
       }
     ]
   },

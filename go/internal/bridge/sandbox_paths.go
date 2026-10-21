@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
+	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
 func resolveSandboxDenials(paths []string, root, worktree string, write bool) ([]string, error) {
@@ -71,6 +72,9 @@ func sandboxGitWritePaths(worktree, goos string) (writes, denies []string, err e
 		return nil, nil, err
 	}
 	writes = []string{filepath.Join(common, "objects")}
+	if lock, hub := verifylock.LockPath(worktree); hub {
+		writes = append(writes, lock)
+	}
 	for _, name := range []string{"index", "index.lock", "HEAD", "HEAD.lock", "logs/HEAD", "logs/HEAD.lock", "COMMIT_EDITMSG"} {
 		writes = append(writes, filepath.Join(info.GitDir, name))
 	}

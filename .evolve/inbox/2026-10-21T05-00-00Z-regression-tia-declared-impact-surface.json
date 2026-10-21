@@ -1,0 +1,26 @@
+{
+  "id": "regression-tia-declared-impact-surface",
+  "title": "Regression TIA cannot see non-Go edges: predicates need a declared impact surface before the shadow can skip anything",
+  "kind": "pipeline-integrity",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "routed_reason": "design work on the EGPS gate input (ADR-0082); operator-approved shadow soak follow-up",
+  "summary": "ADR-0082 found that every regression predicate reads files or starts a process, so the import graph selects the whole corpus and the shadow reports would_skip=0. changedpkgs.FileToPackage also rejects non-.go paths, so config-dir and profile edits (the phasespec and profiles incident classes) map to no test package. The shadow soak that the operator approved on 2026-10-21 therefore cannot show a saving until predicates declare what they observe.",
+  "fix": "Design and build a declared impact surface: each go/acs/regression/<pkg> declares the files, directories and commands it observes (a manifest beside the predicates), and regressiontia.Select treats a change under a declared path as an edge. Write the design as a plan and an ADR-0082 amendment with at least three options, then build it with a test that a non-Go edit selects its predicate.",
+  "acceptance": [
+    "A plan and an ADR-0082 amendment compare at least three designs for non-Go file to test-package edges",
+    "A change to a declared non-Go path selects the predicate that declares it (red test first)",
+    "evolve acs tia-report over a soak shows would_skip greater than zero, and each miss is explained"
+  ],
+  "files": [
+    "go/internal/regressiontia",
+    "go/internal/changedpkgs",
+    "go/acs/regression",
+    "docs/architecture/adr/0082-regression-test-impact-selection-shadow.md"
+  ],
+  "connects_to": [
+    ".evolve/inbox/2026-07-30T09-00-00Z-egps-regression-tia-selection.json"
+  ],
+  "created_at": "2026-10-21T05:00:00Z",
+  "weight": 0.6
+}
