@@ -93,3 +93,4 @@
 ./internal/cli/agentcmd 100
 ./internal/qualitypanel 100
 ./internal/pipelinerates 100
+./internal/codeshape 100

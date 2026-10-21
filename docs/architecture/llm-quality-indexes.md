@@ -3,7 +3,7 @@
 > [ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md) · plan: [llm-quality-indexes-2026-10](../plans/llm-quality-indexes-2026-10.md) · research: [llm-quality-indexes-2026-10](../research/llm-quality-indexes-2026-10.md) (F2.1 to F2.16, P3.1 to P4.3, R1 to R8).
 > This file is the spec of record for each quality index: its formula, its data source, its interval, its stage and its signal. The plan holds the components and their order. The ADR holds the decision. The Signal Center design is in [signal-center-design.md](signal-center-design.md), and the event channels are in [event-channels.md](event-channels.md).
 >
-> Status: accepted (ADR-0153), 2026-10-21. Component Q1 is built: `internal/qualitypanel`, the `quality` module, `evolve quality report`, the boundary step and the two channels ([internal-qualitypanel](packages/internal-qualitypanel.md)). Component Q2 is built: the PQ1, PQ4 and CQ2 readers of the wave scope and `evolve quality compare` for PQ3 ([internal-pipelinerates](packages/internal-pipelinerates.md)). Q3 to Q10 add the other readers. The baselines below come from one-time Go programs (research §2).
+> Status: accepted (ADR-0153), 2026-10-21. Component Q1 is built: `internal/qualitypanel`, the `quality` module, `evolve quality report`, the boundary step and the two channels ([internal-qualitypanel](packages/internal-qualitypanel.md)). Component Q2 is built: the PQ1, PQ4 and CQ2 readers of the wave scope and `evolve quality compare` for PQ3 ([internal-pipelinerates](packages/internal-pipelinerates.md)). Component Q3 is built: the CQ1, CQ3, CQ4 and CQ5 readers ([internal-codeshape](packages/internal-codeshape.md)). Q4 to Q10 add the other readers. The baselines below come from one-time Go programs (research §2).
 
 ## Table of contents
 
@@ -45,7 +45,7 @@ An index here is a measured reading with an interval, not a score. The loop has 
 | CQ1 | Unit conformance | % of functions | wave (tree), cycle (changed) | report | 88.8% of 11,296; 83.5% with 100% coverage |
 | CQ2 | Change locality | files, packages per ship | cycle | report | median 7 files [6, 7], 2 packages [2, 2], n = 119 |
 | CQ3 | Interface depth | lines per exported symbol | tree | shadow | median 15.2; 99 of 316 packages under 10 |
-| CQ4 | Duplication | repeated 5-line windows per 1,000 lines | tree | shadow | 22.7 (tree); per added line: no data |
+| CQ4 | Duplication | repeated 5-line windows per 1,000 lines | tree | shadow | 19.5 (tree, no `vendor/`); 0.0 per added line (wave 140) |
 | CQ5 | Judgment surface | conditional rules in prose | tree | shadow | 49 (37 in agents, 12 in skills) |
 | TQ1 | Mutation efficacy on changed functions | % of mutants killed | cycle | shadow | no data (Q5) |
 | TQ2 | Revert sensitivity | % of changed hunks | cycle | shadow | no data (Q6) |
@@ -393,7 +393,7 @@ The Signal Center does not compute an index, choose a threshold, change a stage 
 | Window | tree; diff form: the ships of one wave |
 | Source | `go/**/*.go` without tests; Git diff of each ship |
 | Interval | census (tree); bootstrap by wave (diff form) |
-| Baseline | 22.7 per 1,000 logical lines (3,550 windows in 156,436 lines) (F2.12). Diff form: no data. |
+| Baseline | 22.7 per 1,000 logical lines (3,550 windows in 156,436 lines) (F2.12). That scan also read `go/vendor/`. The `codeshape` reader leaves `vendor/` out and gives 19.5 (145,676 lines) at `12624d1e1`. Diff form: 0.0 for wave 140. |
 | Stage and threshold | `shadow`. Proposed: breach when the diff form is above twice the tree rate for 3 waves. |
 | Good and bad | A diff form under the tree rate means new code repeats less than old code. |
 | WARN action | Read the repeated windows. File one item to move each block into one helper. |

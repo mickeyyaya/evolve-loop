@@ -62,6 +62,7 @@ func parseQualityCompare(args []string) (qualityCompareArgs, error) {
 	case qualityCompareHits[o.index] == nil:
 		return o, fmt.Errorf("index %q is not PQ1 or PQ4", o.index)
 	}
+	o.root = paths.AbsoluteRoot("--project-root", o.root, nil)
 	if o.a, err = pipelinerates.ParseWindow(a); err == nil {
 		o.b, err = pipelinerates.ParseWindow(b)
 	}
