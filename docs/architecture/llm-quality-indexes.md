@@ -3,7 +3,7 @@
 > [ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md) · plan: [llm-quality-indexes-2026-10](../plans/llm-quality-indexes-2026-10.md) · research: [llm-quality-indexes-2026-10](../research/llm-quality-indexes-2026-10.md) (F2.1 to F2.16, P3.1 to P4.3, R1 to R8).
 > This file is the spec of record for each quality index: its formula, its data source, its interval, its stage and its signal. The plan holds the components and their order. The ADR holds the decision. The Signal Center design is in [signal-center-design.md](signal-center-design.md), and the event channels are in [event-channels.md](event-channels.md).
 >
-> Status: proposed, 2026-10-21. No index is computed in code yet. The baselines below come from one-time Go programs (research §2).
+> Status: accepted (ADR-0153), 2026-10-21. Component Q1 is built: `internal/qualitypanel`, the `quality` module, `evolve quality report`, the boundary step and the two channels ([internal-qualitypanel](packages/internal-qualitypanel.md)). No index reader exists yet; Q2 to Q10 add them. The baselines below come from one-time Go programs (research §2).
 
 ## Table of contents
 
@@ -279,8 +279,8 @@ Each value is a string, because `Event.Fields` is `map[string]string` (`event.go
 #### 5.3 Streams
 
 - A reading about one cycle carries `cycle: N`. The current cycle sink writes it to `.evolve/runs/cycle-N/signals.ndjson`.
-- A reading about a wave, a tree or a report carries cycle 0. Q1 adds the three quality kinds to `legacyProjectKinds`, so the root sink writes them to `.evolve/signals.ndjson`.
-- The collector builds its Center with `newRoleSignalCenter("quality", …)` (`cmd_cycle.go:396`), so `rootwire.Attach` also routes each signal to the event channels.
+- A reading about a wave, a tree or a report carries cycle 0. It goes to the event channels only. The project file `.evolve/signals.ndjson` is frozen at the kinds that existed before the channels (`TestLegacyProjectRecord_AllowsOnlyTheKindsThatExistedBeforeTheChannels`), so Q1 does not add the quality kinds to `legacyProjectKinds`.
+- The collector builds its Center with `newRoleSignalCenter("quality", …)` (`go/cmd/evolve/cmd_quality.go`, `newQualityCenter`). `quality` is a publisher role (`go/internal/events/publisher/publisher.go`, `Roles`), so `rootwire.Attach` routes each signal to the channels `quality.reading`, `quality.breach`, `errors` and `signals`.
 
 #### 5.4 Emission points
 
@@ -821,15 +821,15 @@ Quality (report stage; [95% interval], n, window)
 
 | Need | Command |
 |---|---|
-| The live stream of quality readings and breaches | `evolve signals tail --kind quality.reading,quality.breach,quality.warning --follow` |
-| Only the breaches | `evolve signals tail --kind quality.breach --json` |
-| One breach code | `evolve signals tail --code QUALITY_PQ1_BREACH` |
+| All quality signals, then new ones | `evolve signals tail --channel signals --kind quality.reading,quality.breach,quality.warning --follow` |
+| Only the breaches and warnings | `evolve signals tail --channel quality.breach --json` |
+| One breach code | `evolve signals tail --channel quality.breach --code QUALITY_PQ1_BREACH` |
 | The panel | `evolve status` (report stage) or `evolve status --quality all` |
 | A fresh computation | `evolve quality report --scope wave` or `--scope tree` |
 | A comparison with its MDE | `evolve quality compare --index PQ1 --a waves:121-130 --b waves:131-140` |
 | A program subscription (after E9) | `evolve events watch --channel 'quality.>' --json` |
 
-`evolve signals tail` takes `--kind` and `--code` today (`go/cmd/evolve/cmd_signals_tail.go:84-90`). It has no `--module` flag, so the kind list is the module filter.
+`evolve signals tail --channel NAME` reads one event channel from its start (`go/cmd/evolve/cmd_signals_tail_channel.go`). With `--follow` it then prints new records until it is stopped. It names each gap record on stderr. The tail has no `--module` flag, so the kind list is the module filter.
 
 ### Act on a breach code
 
@@ -869,11 +869,11 @@ Quality (report stage; [95% interval], n, window)
 
 | Rule | Guard | State |
 |---|---|---|
-| Every index emits through `signalcenter` | the Q1 acceptance test reads `evolve signals tail --kind quality.reading` output for each computed index | planned (Q1) |
+| Every index emits through `signalcenter` | `TestQualityReport_IsVisibleInSignalsTailByKind` reads `evolve signals tail --channel signals --kind quality.reading,…` output | built (Q1) |
 | The registry and `signal-codes.md` agree | `evolve signals codes check` (a `cmd/evolve` test) | exists; Q1 adds the codes |
-| No listener changes a stage | stage is read only from policy; the collector has no write path to policy | planned (Q1) |
+| No listener changes a stage | stage is read only from policy; the collector has no write path to policy | built (Q1): `TestQualityReport_TheStageComesOnlyFromPolicy` |
 | No mutation of kill paths | the TQ1 exclusion list, with a test that a kill path is refused | planned (Q5) |
-| A rule with an empty denominator is loud | `QUALITY_VACUOUS_DENOMINATOR` | planned (Q1) |
+| A rule with an empty denominator is loud | `QUALITY_VACUOUS_DENOMINATOR` | built (Q1): `TestEvents_AnEmptySampleWarnsVacuousDenominator` |
 | An outcome never comes from `final_verdict` alone | a collector test on the cycle-2024 shape | planned (Q2) |
 
 ## Limits

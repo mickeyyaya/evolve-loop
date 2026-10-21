@@ -277,6 +277,33 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `OUTCOME_TIMING_SKIPPED` | phase-timing.json was not written because the workspace is empty; the composed timing set is returned to the caller unchanged |
 | `OUTCOME_TIMING_WRITE_FAILED` | phase-timing.json could not be encoded or written (marshal, temp write or rename); the reason names the step and the error; the composed set is still returned |
 
+### quality
+
+| Code | Meaning |
+|---|---|
+| `QUALITY_CQ1_BREACH` | the whole 95% interval of CQ1 (unit conformance) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_CQ2_BREACH` | the whole 95% interval of CQ2 (packages per ship) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_CQ3_BREACH` | the whole 95% interval of CQ3 (interface depth) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_CQ4_BREACH` | the whole 95% interval of CQ4 (duplication) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_CQ5_BREACH` | the whole 95% interval of CQ5 (judgment surface) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_JQ1_BREACH` | the whole 95% interval of JQ1 (seeded-defect recall) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_JQ2_BREACH` | the whole 95% interval of JQ2 (false-PASS rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_JQ3_BREACH` | the whole 95% interval of JQ3 (independent-review escalation) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_OQ1_BREACH` | the whole 95% interval of OQ1 (escape rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_OQ2_BREACH` | the whole 95% interval of OQ2 (14-day churn) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_OQ3_BREACH` | the whole 95% interval of OQ3 (revert rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_OQ4_BREACH` | the whole 95% interval of OQ4 (recovery count) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_PQ1_BREACH` | the whole 95% interval of PQ1 (ship rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_PQ2_BREACH` | the whole 95% interval of PQ2 (pass^k per phase) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_PQ4_BREACH` | the whole 95% interval of PQ4 (deadline rate) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_SOURCE_ABSENT` | a declared source of a quality index does not exist; fields.index and fields.source name it (ADR-0153) |
+| `QUALITY_SOURCE_UNREADABLE` | a source of a quality index exists but does not parse; fields.source names it, the reason holds the error (ADR-0153) |
+| `QUALITY_TQ1_BREACH` | the whole 95% interval of TQ1 (mutation efficacy on changed functions) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_TQ2_BREACH` | the whole 95% interval of TQ2 (revert sensitivity) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_TQ3_BREACH` | the whole 95% interval of TQ3 (test value) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_TQ4_BREACH` | the whole 95% interval of TQ4 (held-out share) is on the bad side of its threshold at stage report or gate (ADR-0153) |
+| `QUALITY_VACUOUS_DENOMINATOR` | a quality reading has n = 0 where the index expects data; a rule that holds on an empty set proves nothing (ADR-0153) |
+
 ### review
 
 | Code | Meaning |
