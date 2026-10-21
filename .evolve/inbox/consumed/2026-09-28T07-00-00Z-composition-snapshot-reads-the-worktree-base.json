@@ -16,8 +16,14 @@
   "acceptance": [
     "The RUNG 0 path either proves the audited change from worktree_tree_sha on auditledger.Entry.AuditedBase, with ship's composition check (internal/phases/ship/composition.go) reading the same projection, or is removed with B3's carry serving its callers",
     "A test drives a rebased ship with no explanation version whose main moved before the audit, and it ships on the audited verdict or re-audits for a stated reason",
-    "ADR-0105 and the design doc \u00a75.8 name the outcome"
+    "ADR-0105 and the design doc §5.8 name the outcome"
   ],
   "source": "console, 2026-09-28, the audited-base fix for ADR-0105 B3",
-  "priority_rationale": "The same replicated belief B3 carried (git_head is the audited base); a RUNG 0 that cannot carry costs a re-audit per rebased ship on that path"
+  "priority_rationale": "The same replicated belief B3 carried (git_head is the audited base); a RUNG 0 that cannot carry costs a re-audit per rebased ship on that path",
+  "consumed": {
+    "at": "2026-10-21T08:00:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fix/composition-snapshot-base: measured first. The live ledger held 45 composition-verdict records, all identical-rebase (B3); RUNG 0 wrote none, and every new cycle has the explanation contract (only test storages set version 0). RUNG 0 is retired (acceptance 1, second option): compositionCarryForward and ship's tryTrivialRebaseCarryForward (internal/phases/ship/composition.go) are removed, and B3's identity carry serves its callers. A legacy cycle with no contract tries RUNG 2, then goes to Audit with a WARN that names the reason (acceptance 2: TestRecoverFromShipError_ALegacyCleanRebaseIsAuditedAgainForAStatedReason, TestRunCycleFromPhase_ALegacyRebaseWhoseMainMovedIsAuditedAgainForAStatedReason). ADR-0105 'RUNG 0 is retired' and the design doc §5.8 outcome name it (acceptance 3). RUNG 2 still reads the main...git_head snapshot; stage 7 of the landing-queue plan retires both."
+  }
 }

@@ -87,15 +87,9 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 	}
 	currentHEAD = strings.TrimSpace(currentHEAD)
 	if currentHEAD != entry.GitHEAD {
-		carried, cfErr := tryTrivialRebaseCarryForward(ctx, opts, res, ledgerPath, entry, currentHEAD)
-		if cfErr != nil {
-			return cfErr
-		}
-		if !carried {
-			return shipErr(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass,
-				fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state", entry.GitHEAD, currentHEAD),
-				"audited", entry.GitHEAD, "current", currentHEAD)
-		}
+		return shipErr(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass,
+			fmt.Sprintf("git HEAD has moved since audit (audited=%s current=%s) — re-run Auditor on the new state", entry.GitHEAD, currentHEAD),
+			"audited", entry.GitHEAD, "current", currentHEAD)
 	} else if filepath.Clean(testedRoot) == filepath.Clean(opts.ProjectRoot) {
 		currentTree, err := computeTreeStateSHA(ctx, opts)
 		if err != nil {

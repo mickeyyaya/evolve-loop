@@ -50,59 +50,6 @@ func (p *compositionProbeE4) orchestrator(snap CompositionAuditSnapshot, snapErr
 	return NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), opts...)
 }
 
-func TestCompositionCarryForward_DeclinesBeforeAnyGateOnEachUnverifiableComposition(t *testing.T) {
-	t.Parallel()
-
-	worktree, diff, patchID := divergedCompositionFixture(t)
-	empty := committedRepoE4(t, map[string]string{"file.txt": "base\n"}).Dir
-	cases := []struct {
-		name          string
-		worktree      string
-		snap          CompositionAuditSnapshot
-		wantSnapshots int
-		wantLog       string
-	}{
-		{"no active worktree", "", CompositionAuditSnapshot{Diff: diff, PatchID: patchID}, 0, ""},
-		{"composed diff fails outside a repository", t.TempDir(), CompositionAuditSnapshot{Diff: diff, PatchID: patchID}, 1, "composed diff unavailable"},
-		{"empty composed diff has no patch-id", empty, CompositionAuditSnapshot{Diff: diff, PatchID: patchID}, 1, "patch-id computation failed"},
-		{"semantic drift between audited and composed patch-id", worktree, CompositionAuditSnapshot{Diff: diff, PatchID: "0000000000000000000000000000000000000000"}, 1, "semantic drift"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := &compositionProbeE4{}
-			o := p.orchestrator(tc.snap, nil, nil, nil)
-			var carried bool
-			var sink injectedStderr
-			o.stderr = &sink
-			carried = o.compositionCarryForward(context.Background(), 3, CycleState{ActiveWorktree: tc.worktree, RunID: "r"}, t.TempDir())
-			log := sink.String()
-			if carried {
-				t.Fatal("an unverifiable composition carried forward; want a full re-audit")
-			}
-			if p.snapshotCalls != tc.wantSnapshots || p.gateCalls != 0 || p.writerCalls != 0 {
-				t.Fatalf("calls snapshot=%d gate=%d writer=%d, want snapshot=%d and no gate or writer", p.snapshotCalls, p.gateCalls, p.writerCalls, tc.wantSnapshots)
-			}
-			if !strings.Contains(log, tc.wantLog) {
-				t.Errorf("stderr %q lacks %q", log, tc.wantLog)
-			}
-		})
-	}
-}
-
-func TestCompositionCarryForward_MatchingPatchIDWritesTheVerdict(t *testing.T) {
-	t.Parallel()
-
-	worktree, diff, patchID := divergedCompositionFixture(t)
-	p := &compositionProbeE4{}
-	o := p.orchestrator(CompositionAuditSnapshot{LaneAuditRef: "ref-9", AuditedBase: "main", Diff: diff, PatchID: patchID}, nil, nil, nil)
-	if !o.compositionCarryForward(context.Background(), 9, CycleState{ActiveWorktree: worktree, RunID: "r"}, t.TempDir()) {
-		t.Fatal("a patch-id-identical composition with green gates must carry forward")
-	}
-	if p.written.Cycle != 9 || p.written.PatchID != patchID || p.written.LaneAuditRef != "ref-9" || p.written.GateResults["acs"] != "pass" {
-		t.Fatalf("written verdict = %+v", p.written)
-	}
-}
-
 func TestScopedMergeCarryForward_DeclinesOnEachFailClosedRung(t *testing.T) {
 	t.Parallel()
 

@@ -103,35 +103,13 @@ func (s trScenario) entry(t *testing.T, patchID string, gates map[string]string)
 	}
 }
 
-func TestTrivialRebase_ChangedTreeRequiresPredicateReaudit(t *testing.T) {
+func TestVerifyAuditBinding_ARetiredTrivialRebaseRecordNeverCarriesAMovedHead(t *testing.T) {
 	t.Parallel()
 	s := trSetup(t)
+	mustWrite(t, filepath.Join(s.repo, "fixture.txt"), "fixture line 1\nlane change\n")
 	trAppendLedgerLine(t, s.repo, s.entry(t, s.patchID, trPassingGates()))
+
 	err := verifyAuditBinding(context.Background(), auditOpts(t, s.repo), &RunResult{})
-	wantShipErr(t, err, core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, "tree-state mismatch")
-}
 
-func TestTrivialRebase_PatchIdDriftFallsBackToReaudit(t *testing.T) {
-	t.Parallel()
-	s := trSetup(t)
-	mustWrite(t, filepath.Join(s.repo, "fixture.txt"), "fixture line 1\nlane change\npost-audit drift\n")
-	trAppendLedgerLine(t, s.repo, s.entry(t, s.patchID, trPassingGates()))
-
-	opts := auditOpts(t, s.repo)
-	if err := verifyAuditBinding(context.Background(), opts, &RunResult{}); err == nil { //nolint:staticcheck
-		t.Fatalf("patch-id drift: verifyAuditBinding accepted a composition entry whose recorded patch_id does not match the composed tree — drift must fall back to full re-audit")
-	}
-}
-
-func TestTrivialRebase_FailedComposedGatesRejected(t *testing.T) {
-	t.Parallel()
-	s := trSetup(t)
-	gates := trPassingGates()
-	gates["test"] = "fail"
-	trAppendLedgerLine(t, s.repo, s.entry(t, s.patchID, gates))
-
-	opts := auditOpts(t, s.repo)
-	if err := verifyAuditBinding(context.Background(), opts, &RunResult{}); err == nil { //nolint:staticcheck
-		t.Fatalf("failed composed-tree gates: verifyAuditBinding accepted a composition entry with gate_results.test=fail — gates bind to the tree and must be green")
-	}
+	wantShipErr(t, err, core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, "git HEAD has moved since audit")
 }

@@ -71,7 +71,7 @@ func TestRecoverFromShipError_AFailedPendAfterAnUnwindAborts(t *testing.T) {
 	}
 }
 
-func legacyCompositionRecovery(t *testing.T, writer func(CompositionVerdictInput) error) (Phase, bool, []string) {
+func legacyCompositionRecovery(t *testing.T, writer func(CompositionVerdictInput) error) (Phase, bool, []string, string) {
 	t.Helper()
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	var methods []string
@@ -86,34 +86,34 @@ func legacyCompositionRecovery(t *testing.T, writer func(CompositionVerdictInput
 			return writer(in)
 		}),
 	)
+	var sink injectedStderr
+	o.stderr = &sink
 	cs := CycleState{CycleID: 7, RunID: "run-7", ActiveWorktree: worktree}
 	next, recovering := o.recoverFromShipError(context.Background(), t.TempDir(), 7, &cs,
 		NewShipError(CodeGitFleetRebaseNeeded, ShipClassTransient, StageAtomicShip, "peer moved main"), 0, 2)
-	return next, recovering, methods
+	return next, recovering, methods, sink.String()
 }
 
-func TestRecoverFromShipError_ALegacyCleanRebaseShipsOnTheTrivialRebaseRung(t *testing.T) {
+func TestRecoverFromShipError_ALegacyCleanRebaseIsAuditedAgainForAStatedReason(t *testing.T) {
 	t.Parallel()
 
-	next, recovering, methods := legacyCompositionRecovery(t, func(CompositionVerdictInput) error { return nil })
+	next, recovering, methods, stderr := legacyCompositionRecovery(t, func(CompositionVerdictInput) error { return errWriterRefused })
 
-	if !recovering || next != PhaseShip || len(methods) != 1 || methods[0] != "" {
-		t.Fatalf("recovery=(%s,%v) records=%q, want Ship on one RUNG 0 record", next, recovering, methods)
+	if !recovering || next != PhaseAudit || len(methods) != 1 || methods[0] != scopedReviewMethod {
+		t.Fatalf("recovery=(%s,%v) records=%q, want a re-audit after only the RUNG 2 record was tried", next, recovering, methods)
+	}
+	if !strings.Contains(stderr, "cycle 7 has no explanation contract, so the identity carry cannot prove the rebased change") {
+		t.Fatalf("stderr does not state why the legacy rebase is audited again:\n%s", stderr)
 	}
 }
 
-func TestRecoverFromShipError_ALegacyRebaseTheTrivialRungMissesShipsOnTheScopedReview(t *testing.T) {
+func TestRecoverFromShipError_ALegacyRebaseShipsOnlyOnTheScopedReview(t *testing.T) {
 	t.Parallel()
 
-	next, recovering, methods := legacyCompositionRecovery(t, func(in CompositionVerdictInput) error {
-		if in.Method != scopedReviewMethod {
-			return errWriterRefused
-		}
-		return nil
-	})
+	next, recovering, methods, _ := legacyCompositionRecovery(t, func(CompositionVerdictInput) error { return nil })
 
-	if !recovering || next != PhaseShip || len(methods) != 2 || methods[1] != scopedReviewMethod {
-		t.Fatalf("recovery=(%s,%v) records=%q, want Ship on the RUNG 2 record after RUNG 0 declined", next, recovering, methods)
+	if !recovering || next != PhaseShip || len(methods) != 1 || methods[0] != scopedReviewMethod {
+		t.Fatalf("recovery=(%s,%v) records=%q, want Ship on one RUNG 2 record", next, recovering, methods)
 	}
 }
 

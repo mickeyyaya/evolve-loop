@@ -15,7 +15,7 @@
 - **One eligibility predicate.** `ProbeEligible` is the single source of the fresh-base collision guard. The pre-loop shadow probe (`Lookup`) and the audit-binding projection (`Put`) share it. So the two sites cannot drift, and an enforce-stage lookup has one predicate to reuse.
 - **One verdict vocabulary.** `Reusable` is the single definition of the carry-forward vocabulary. Before cycle 1571 it existed three times. It was documented on `Entry.Verdict`, the store did not enforce it, and the binding call site wrote `verdict == VerdictFAIL` by hand.
 
-  The RUNG 0 composition snapshot needs the same rule. It consulted no verdict at all, and it can carry a rejected audit forward. The predicate uses the canonical constants from `cyclestate`, a zero-dependency leaf that does not import this package.
+  The composition snapshot (RUNG 0 until 2026-10-21, now RUNG 2) needs the same rule. It consulted no verdict at all, and it can carry a rejected audit forward. The predicate uses the canonical constants from `cyclestate`, a zero-dependency leaf that does not import this package.
 
   An import of `core` is not safe.
 

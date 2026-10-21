@@ -43,6 +43,9 @@ func TestRecoverFromShipError_HoldsTheShipWindowFromTheRebaseThroughTheReShip(t 
 		},
 		options: []Option{
 			WithCompositionSnapshot(snapshotFromFixture([]byte(audited), patchID)),
+			WithScopedMergeReviewer(func([]MergeHunk, string, string) ScopedMergeReviewOutcome {
+				return ScopedMergeReviewOutcome{Disposition: ScopedMergeCompatible}
+			}),
 			WithCompositionGateRunner(func(context.Context, string) map[string]ciparity.GateOutcome {
 				gates = append(gates, shipWindowHeldAt(lane.root))
 				return allComposedGatesPass()

@@ -152,6 +152,15 @@ A non-derived conflict aborts the fleet rebase (`rebaseWithDerivedRegen`) and ro
 
 **First live run (cycle 1725, wave 21, 2026-09-28).** A genuine conflict on the append-only `go/.apicover-enforce` routed to the debugger, whose resolution the read-only worktree fence reverted; the re-entry met the same conflict and aborted, and the cycle ended with the audit's WARN, leaving its item claimed. Two consequences landed: a cycle the debugger ends now ends FAIL with a ship fail reason, so its claim is released, and the append-only registry merges as a union (`.gitattributes`). The fence itself is the open item `fleet-rebase-debugger-resolution-fenced`: as configured, the debugger cannot write a resolution, so B5 cannot yet succeed on a real conflict. Fixed the same day: the rebase returns its non-derived conflicted paths, the cycle records them (`CycleState.ShipRecoveryConflicts`, cleared by the ship latch), and the debugger of that recovery gets them as `PhaseRequest.WorktreeWritablePaths`: its prompt names them as the only paths it may write, and the fence keeps its writes to them and reverts every other ([ADR-0097](0097-read-only-phase-worktree-fence.md) decision 6). Pinned end to end by `TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile`: a genuine conflict, a debugger held by the production fence, the resolution shipped on main and the debugger's other file reverted.
 
+### RUNG 0 is retired (2026-10-21)
+
+F1 of the Context stayed true after B3. The snapshot of RUNG 0 diffed `main...git_head`, and `git_head` is the tip of main when the audit was bound. Ship compared the `audited_base` of a record with the same `git_head`.
+
+- The measurement: the live ledger held 45 `composition-verdict` records, and all were `identical-rebase` records of B3. RUNG 0 wrote none.
+- Every new cycle has the explanation contract, so B3 serves the callers of RUNG 0.
+- The decision: `compositionCarryForward` and ship's `tryTrivialRebaseCarryForward` are removed. A legacy cycle with no contract tries RUNG 2, then goes to Audit with a WARN that names the reason. Stage 7 of the landing-queue plan retires RUNG 2 and the snapshot.
+- Pinned by `TestRecoverFromShipError_ALegacyCleanRebaseIsAuditedAgainForAStatedReason`, `TestRunCycleFromPhase_ALegacyRebaseWhoseMainMovedIsAuditedAgainForAStatedReason` and `TestVerifyAuditBinding_ARetiredTrivialRebaseRecordNeverCarriesAMovedHead`.
+
 ## Rollout, rung by rung, each test-first and merged at a boundary
 
 0. **Done.** The worktree-mode tree binding: ship binds a worktree ship to the worktree it lands from, not to the plane's bookkeeping. This removes 1701's second bounce.
