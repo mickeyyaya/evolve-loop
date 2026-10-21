@@ -133,6 +133,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestCoverChangedFailures_UncoveredFunction":                                               swapsStderr,
 	"core.TestCoverStrictFailures_ARunnerErrorWarnsAndLeavesTheHandoffAlone":                        swapsCoverStrictRunner,
 	"core.TestScopedCoverFunc_BehindAHeldLockWaitsOnlyItsBoundThenRunsUnserialized":                 swapsCoverLockWait,
+	"core.TestScopedCoverFunc_ALostSingleFlightIsAnAbnormalEventNamingTheLockPath":                  swapsCoverLockWait,
 	"core.TestCoveringTests_AvailableToTestAmplificationWithoutFreshBuild":                          swapsCoveringTestsDeriver,
 	"core.TestDecideAfterRetro_ABlockingDecisionEndsTheCycleNamingTheAction":                        swapsFailureDecide,
 	"core.TestRecordAndBranch_ARetroBranchTheStateMachineForbidsAborts":                             swapsFailureDecide,

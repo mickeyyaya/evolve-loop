@@ -22,23 +22,25 @@ const (
 type EventType string
 
 const (
-	EventCounterNonAdvance     EventType = "counter-non-advance"
-	EventCircuitBreakerTripped EventType = "circuit-breaker-tripped"
-	EventVerifyFailed          EventType = "verify-failed"
-	EventClassification        EventType = "classification"
-	EventGoalStallEscalated    EventType = "goal-stall-escalated"
-	EventStallDetected         EventType = "stall-detected"
-	EventPhaseOutputsSurveyed  EventType = "phase-outputs-surveyed"
+	EventCounterNonAdvance             EventType = "counter-non-advance"
+	EventCircuitBreakerTripped         EventType = "circuit-breaker-tripped"
+	EventVerifyFailed                  EventType = "verify-failed"
+	EventClassification                EventType = "classification"
+	EventGoalStallEscalated            EventType = "goal-stall-escalated"
+	EventStallDetected                 EventType = "stall-detected"
+	EventPhaseOutputsSurveyed          EventType = "phase-outputs-surveyed"
+	EventVerifySingleFlightUnavailable EventType = "verify-single-flight-unavailable"
 )
 
 var knownEventTypes = map[EventType]bool{
-	EventCounterNonAdvance:     true,
-	EventCircuitBreakerTripped: true,
-	EventVerifyFailed:          true,
-	EventClassification:        true,
-	EventGoalStallEscalated:    true,
-	EventStallDetected:         true,
-	EventPhaseOutputsSurveyed:  true,
+	EventCounterNonAdvance:             true,
+	EventCircuitBreakerTripped:         true,
+	EventVerifyFailed:                  true,
+	EventClassification:                true,
+	EventGoalStallEscalated:            true,
+	EventStallDetected:                 true,
+	EventPhaseOutputsSurveyed:          true,
+	EventVerifySingleFlightUnavailable: true,
 }
 
 func IsKnownEventType(t EventType) bool { return knownEventTypes[t] }
@@ -164,4 +166,15 @@ func (w *Writer) EmitPhaseOutputsSurveyed(cycle int, details string, abnormal bo
 		e.RemediationHint = fmt.Sprintf("run `evolve cycle outputs %d` for the per-phase rows; a missing/empty artifact means that phase's work cannot be reviewed", cycle)
 	}
 	return w.Emit(e)
+}
+
+func (w *Writer) EmitVerifySingleFlightUnavailable(cycle int, source, lockPath string, err error) error {
+	return w.Emit(Event{
+		EventType:       EventVerifySingleFlightUnavailable,
+		SourcePhase:     source,
+		Severity:        SeverityWarn,
+		Cycle:           cycle,
+		Details:         fmt.Sprintf("the host verification lock %s was not taken (%v), so this run went unserialized", lockPath, err),
+		RemediationHint: "an EPERM means the pane lacks the lock file in its sandbox write grants; a wait-bound miss means another lane held the lock past verifylock.MaxWait",
+	})
 }

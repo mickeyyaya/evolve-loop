@@ -14,6 +14,7 @@
 - **`Emit` returns an error where the shell ignored it.** The shell used `|| true`. Go callers must at least log the error. `Emit` fills a zero `Timestamp`.
 - **`marshalFn` and `writeFn` are test seams.** `json.Marshal` of the typed `Event` cannot fail in practice. A write fails only on a full disk or a closed pipe. The seams let `events_coverage_test.go` prove the error wrapping.
 - **The abnormality decision is not here.** `internal/phaseoutputs` decides. `EmitPhaseOutputsSurveyed` only maps it onto severity. `INFO` is the healthy heartbeat that a dashboard baselines on. `WARN` is the signal for missing review data. `phaseoutputs_event_test.go` pins this.
+- **`EmitVerifySingleFlightUnavailable` is a `WARN`** (since 2026-10-21). It names the lock path and the error of a run that went unserialized. `SourcePhase` is the caller: `build-floor` or `acs-suite`. `single_flight_event_test.go` pins this.
 - **`EmitClassification` uses `INFO` for a recoverable class.** It uses `ERROR` for an integrity breach, the signal that demands human investigation.
 
 ## Invariants

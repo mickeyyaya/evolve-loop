@@ -20,6 +20,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -103,7 +104,7 @@ func Run(opts Options) (Verdict, error) {
 	if err != nil {
 		return Verdict{}, err
 	}
-	release := acquireSuiteLock(opts.Root)
+	release := acquireSuiteLock(opts)
 	defer release()
 
 	cfg, refusals := loadLaneConfig(opts.stateRoot())
@@ -154,13 +155,28 @@ func (o Options) stateRoot() string {
 	return o.Root
 }
 
-func acquireSuiteLock(root string) func() {
-	release, lockErr := verifylock.AcquireWithin(context.Background(), root, suiteLockWait, os.Stderr)
+func acquireSuiteLock(opts Options) func() {
+	release, lockErr := verifylock.AcquireWithin(context.Background(), opts.Root, suiteLockWait, os.Stderr)
 	if lockErr != nil {
-		fmt.Fprintf(os.Stderr, "[acs] WARN: verification single-flight unavailable (%v) — running unserialized\n", lockErr)
+		recordUnserializedSuite(opts, lockErr)
 		return func() {}
 	}
 	return release
+}
+
+func recordUnserializedSuite(opts Options, lockErr error) {
+	lock, _ := verifylock.LockPath(opts.Root)
+	fmt.Fprintf(os.Stderr, "[acs] WARN: verification single-flight unavailable at %s (%v) — running unserialized\n", lock, lockErr)
+	if opts.ProjectRoot == "" || opts.Cycle <= 0 {
+		return
+	}
+	verdict, err := acsverdict.Path(filepath.Join(opts.ProjectRoot, ".evolve"), opts.Cycle)
+	if err == nil {
+		err = dispatchevents.NewWriter(filepath.Dir(verdict)).EmitVerifySingleFlightUnavailable(opts.Cycle, "acs-suite", lock, lockErr)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[acs] WARN: the unserialized run was not recorded as an abnormal event: %v\n", err)
+	}
 }
 
 func (v *Verdict) record(r Result) {
