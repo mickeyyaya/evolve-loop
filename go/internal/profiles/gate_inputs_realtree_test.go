@@ -27,11 +27,11 @@ var pinnedAuthority = []string{
 	".commit-gate/attestation.json",
 	".evolve/profiles",
 	".evolve/policy.json",
+	".evolve/failure-digests",
 }
 
 var pinnedOpenSeams = []string{
 	"{worktree_path}/go/acs/",
-	".evolve/runs/cycle-*/failure-digest.json",
 }
 
 type gateInput struct {
