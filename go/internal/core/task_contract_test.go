@@ -28,7 +28,7 @@ func TestComposeTaskContract_VerbatimAcceptanceAndLoudGaps(t *testing.T) {
 	a := writeItem(t, dir, "task-a", `{"id":"task-a","title":"Title A","acceptance":["build-prompt.txt carries acceptance[] verbatim","go vet ./... green"]}`)
 	b := writeItem(t, dir, "task-b", `{"id":"task-b","title":"No criteria"}`)
 	c := writeItem(t, dir, "task-c", `{"id":"task-c","title":"Control chars","acceptance":["line one\u0001 with control"]}`)
-	got := composeTaskContract([]taskItemRef{{"task-a", a}, {"task-b", b}, {"task-c", c}, {"task-d", ""}, {"task-e", filepath.Join(dir, "missing.json")}}, config.DeliverableKindSpec{Root: "solutions", MinOptions: 2})
+	got := composeTaskContract([]taskItemRef{{"task-a", a}, {"task-b", b}, {"task-c", c}, {"task-d", ""}, {"task-e", filepath.Join(dir, "missing.json")}}, config.DeliverableKindSpec{Root: "solutions", MinOptions: 2}, nil)
 	for _, want := range []string{
 		"### task-a — Title A", "1. build-prompt.txt carries acceptance[] verbatim", "2. go vet ./... green",
 		"### task-b — No criteria", "declares no acceptance[]", ".evolve/evals/task-b.md",
@@ -49,7 +49,7 @@ func TestComposeTaskContract_SanitizedCriteriaAreNotClaimedVerbatim(t *testing.T
 
 	dir := t.TempDir()
 	item := writeItem(t, dir, "large", `{"id":"large","acceptance":["`+strings.Repeat("a", 700)+`"]}`)
-	got := composeTaskContract([]taskItemRef{{"large", item}}, config.DeliverableKindSpec{Root: "solutions", MinOptions: 2})
+	got := composeTaskContract([]taskItemRef{{"large", item}}, config.DeliverableKindSpec{Root: "solutions", MinOptions: 2}, nil)
 	if strings.Contains(got, "Acceptance (verbatim") || !strings.Contains(got, "sanitized preview") || !strings.Contains(got, item) {
 		t.Fatalf("altered criteria must name their source without claiming verbatim authority: %q", got)
 	}
@@ -650,5 +650,57 @@ func TestTaskItemRefs_StalePendingPathReResolvesToTheClaimedRecord(t *testing.T)
 	refs = o.taskItemRefs(map[string]string{"fleet_scope_paths": "claimed=" + live}, "/root", ws)
 	if refs[0].path != live {
 		t.Fatalf("a readable pair path must stay authoritative: %+v", refs)
+	}
+}
+
+func TestComposeTaskContract_ACriterionTriageDeferredIsMarkedAndTheRestAreGraded(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	item := writeItem(t, dir, "prune-guard", `{"id":"prune-guard","title":"Prune guard","acceptance":["prune aborts on a checked-out branch","a continuation-bound branch is never pruned"]}`)
+	got := composeTaskContract([]taskItemRef{{"prune-guard", item}}, config.DeliverableKindSpec{}, map[string]map[int]string{"prune-guard": {2: "needs the continuation registry, filed for the next cycle"}})
+
+	for _, want := range []string{
+		"1. prune aborts on a checked-out branch\n",
+		"2. (deferred by triage: needs the continuation registry, filed for the next cycle) a continuation-bound branch is never pruned\n",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("block missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestSeedTaskContract_TheTriageReportsAcceptanceDeferralReachesTheContract(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	item := writeItem(t, dir, "prune-guard", `{"id":"prune-guard","title":"Prune guard","acceptance":["prune aborts on a checked-out branch","a continuation-bound branch is never pruned"]}`)
+	ws := t.TempDir()
+	writeWS(t, ws, "triage-report.md", "## top_n\n- prune-guard: guard prune\n\n## deferred_acceptance\n- prune-guard: acceptance 2 — defer_reason=needs the continuation registry\n")
+	writeWS(t, ws, "triage-decision.json", `{"top_n":[{"id":"prune-guard"}],"deferred":[]}`)
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+
+	block := o.seedTaskContract(context.Background(), map[string]string{"fleet_scope_paths": "prune-guard=" + item}, PhaseTDD, CycleState{CycleID: 1773, WorkspacePath: ws}, dir)[CtxKeyTaskContract]
+
+	if !strings.Contains(block, "2. (deferred by triage: needs the continuation registry) a continuation-bound branch is never pruned") ||
+		!strings.Contains(block, "The eval never narrows this acceptance") {
+		t.Errorf("the tdd contract must mark the deferred criterion and say the eval never narrows the rest:\n%s", block)
+	}
+}
+
+func TestContractCriteria_CountsTheFiledCriteriaOfEachCommittedItem(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	paths := map[string]string{
+		"prune-guard": writeItem(t, dir, "prune-guard", `{"id":"prune-guard","acceptance":["prune aborts on a checked-out branch","a continuation-bound branch is never pruned"]}`),
+		"tidy-docs":   writeItem(t, dir, "tidy-docs", `{"id":"tidy-docs","acceptance":["the doc names the flag"]}`),
+	}
+	ws := t.TempDir()
+	writeWS(t, ws, "triage-decision.json", `{"top_n":[{"id":"prune-guard"},{"id":"tidy-docs"},{"id":"gone"}],"deferred":[]}`)
+	resolve := func(_, id string) string { return paths[id] }
+
+	if got, none := ContractCriteria(ws, dir, resolve), ContractCriteria(ws, dir, nil); got != 3 || none != 0 {
+		t.Errorf("ContractCriteria = %d (want 3: two items, an unresolved id skipped) and %d without a resolver (want 0)", got, none)
 	}
 }
