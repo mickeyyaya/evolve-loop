@@ -57,7 +57,7 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 - The input is text. It comes from stdin, or from `--input FILE`. The value `-` means stdin.
 - Each `--file PATH` adds one section: a `### <path>` heading and the file in a fenced block. The flag can repeat.
 - The fence of a section is one backtick longer than the longest backtick run in the file, and at least three. A fence in the file thus cannot close its section.
-- Each source has a limit of 8 MiB (`maxInputBytes`). A larger source, or a device such as `/dev/zero`, is exit 11.
+- Each source has a limit of 8 MiB (`maxInputBytes`), and all sources together have the same limit. A larger input, or a device such as `/dev/zero`, is exit 11.
 - An empty input after composition is exit 11. A terminal on stdin with no `--input` and no `--file` is a usage error (exit 10), so the command never waits for typed input.
 - The command writes the composed input to `<run workspace>/agent-input.md`.
 - The request puts the input under the context key `specrunner.AgentInputKey` (`agent_input`). The spec runner renders it in every spec prompt as the section `## Agent Input`. A note in that section tells the agent that the input replaces the cycle artifacts that its instructions name.
@@ -125,7 +125,11 @@ flowchart LR
 ## 6. Profiles
 
 - `evolve agent list` prints each runnable profile: one line with the name, the archetype and the description. `--json` prints an array of objects with the same fields.
-- A runnable profile is a spec phase that `phasecmd.SpecRunnable` accepts: kind `llm`, not a control archetype, not a built-in. `core.PhaseWritesSource` must also mark it as read-only.
+- A runnable profile is a spec phase that `phasecmd.SpecRunnable` accepts: kind `llm`, not a control archetype, not a built-in.
+- The profile must also be read-only by two checks, and both fail closed:
+  - `core.PhaseWritesSource` marks the spec as read-only;
+  - the agent profile has a sandbox that is enabled and `read_only_repo`, and each write grant is under `.evolve/runs/cycle-*`, the run workspace.
+- A missing profile, a profile with no sandbox, or a grant such as `{worktree_path}` is a refusal (exit 2). The second check exists because a spec can omit `writes_source` and still name a profile that writes source.
 - A built-in phase is refused (exit 2) with a pointer to `evolve phase --cycle N`, because each built-in phase reads or writes cycle state.
 - A source-write spec phase (`bug-reproduction`, `test-amplification`) is refused (exit 2) in v1.
 

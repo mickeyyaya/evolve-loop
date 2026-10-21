@@ -41,6 +41,9 @@ func composeInput(input string, files []string, stdin io.Reader) (string, error)
 		}
 		f := fence(raw)
 		fmt.Fprintf(&b, "\n\n### %s\n%s\n%s\n%s\n", path, f, raw, f)
+		if b.Len() > maxInputBytes {
+			return "", refusal{exitInput, fmt.Sprintf("the input sources together are larger than %d bytes", maxInputBytes)}
+		}
 	}
 	if strings.TrimSpace(b.String()) == "" {
 		return "", refusal{exitInput, "the input is empty: pipe it on stdin, or give --input FILE or --file PATH"}

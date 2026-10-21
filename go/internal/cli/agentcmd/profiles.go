@@ -5,7 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"path"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
@@ -13,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 type Profile struct {
@@ -47,8 +51,8 @@ func admit(name, root string) (phasespec.PhaseSpec, error) {
 	switch {
 	case !ok || !phasecmd.SpecRunnable(spec):
 		return spec, refusal{exitUsage, fmt.Sprintf("unknown profile %q (see `evolve agent list`)", name)}
-	case core.PhaseWritesSource(core.Phase(name), cat):
-		return spec, refusal{exitRefused, fmt.Sprintf("%s writes source; a standalone run accepts read-only profiles only", name)}
+	case writesSource(spec, cat, root):
+		return spec, refusal{exitRefused, fmt.Sprintf("%s writes source: it declares writes_source, or its profile sandbox can write outside the run workspace; a standalone run accepts read-only profiles only", name)}
 	}
 	return spec, nil
 }
@@ -60,7 +64,7 @@ func listProfiles(root string) ([]Profile, error) {
 	}
 	out := []Profile{}
 	for _, spec := range cat.All() {
-		if phasecmd.SpecRunnable(spec) && !core.PhaseWritesSource(core.Phase(spec.Name), cat) {
+		if phasecmd.SpecRunnable(spec) && !writesSource(spec, cat, root) {
 			out = append(out, Profile{Name: spec.Name, Archetype: string(spec.RoleOrDefault()), Description: spec.Description})
 		}
 	}
@@ -94,4 +98,28 @@ func runList(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%s\t%s\t%s\n", p.Name, p.Archetype, p.Description)
 	}
 	return 0
+}
+
+const runDirGrant = ".evolve/runs/cycle-*"
+
+func writesSource(spec phasespec.PhaseSpec, cat phasespec.Catalog, root string) bool {
+	if core.PhaseWritesSource(core.Phase(spec.Name), cat) {
+		return true
+	}
+	name := strings.TrimPrefix(spec.AgentName(), "evolve-")
+	profile, err := profiles.NewFromDir(filepath.Join(paths.EvolveDirOf(root), "profiles")).Get(name)
+	return err != nil || !confinedToWorkspace(profile.Sandbox)
+}
+
+func confinedToWorkspace(s *profiles.SandboxConfig) bool {
+	if s == nil || !s.Enabled || !s.ReadOnlyRepo {
+		return false
+	}
+	for _, declared := range s.WriteSubpaths {
+		grant := path.Clean(declared)
+		if grant != runDirGrant && !strings.HasPrefix(grant, runDirGrant+"/") {
+			return false
+		}
+	}
+	return true
 }
