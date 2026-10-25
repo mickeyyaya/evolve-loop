@@ -15,7 +15,7 @@ import (
 )
 
 var diffReviewerReports = map[string]string{
-	"architecture-reviewer": "## Architecture Review Verdict\n### Findings\nNone.\n### Verdict: Approve\nVerdict: PASS\n",
+	"architecture-reviewer": "## Architecture Review Verdict\n### Findings\nNone.\n### Verdict\nVerdict: PASS\n",
 	"code-reviewer":         "## Findings\nNone.\n## Verdict\nVerdict: PASS\n",
 	"code-simplifier":       "## Simplifications\nNothing is worth a change.\n",
 	"go-reviewer":           "## Findings\nNone.\n## Verdict\nVerdict: PASS\n",

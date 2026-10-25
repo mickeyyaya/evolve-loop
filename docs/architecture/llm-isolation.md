@@ -13,7 +13,7 @@
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
 > - X3: built in this change. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on the branch, and matrix row N2 is green.
-> - X10: built in this change. `AGENTS.md` is the one source, and `evolve skills generate` renders `CLAUDE.md` and `GEMINI.md` from it, and the four `.claude/agents` reviewers from their neutral personas (§13).
+> - X10: built in this change. `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four `.claude/agents` reviewers from their neutral personas (§13).
 > - X4, X5, X7 to X9, X11 to X19: not started.
 
 ## Table of contents
@@ -748,15 +748,16 @@ Before X10, `CLAUDE.md` held facts that only Claude Code loaded. `GEMINI.md` des
 
 | Target | Source | Hand-written part of the target |
 |---|---|---|
-| `CLAUDE.md`, `GEMINI.md` | `AGENTS.md`, from its first level-2 heading | the overlay of the CLI |
+| `CLAUDE.md`, `GEMINI.md` | the `instructions-digest` region of `AGENTS.md` | the overlay of the CLI |
 | `.claude/agents/<name>.md` | `agents/evolve-diff-<name>.md`, without its frontmatter | the Claude Code frontmatter (tool list, model) |
 
 - The facts that only `CLAUDE.md` had moved to the `AGENTS.md` section "Operating rules and runtime facts". Thus Codex and agy, which read `AGENTS.md`, get the same policy as Claude Code.
 - The four reviewers are the phases `architecture-reviewer`, `code-reviewer`, `code-simplifier` and `go-reviewer` (`catalog: on-demand`, so the advisor never selects them). Their profiles are `.evolve/profiles/diff-<name>.json`. `evolve agent run <name>` routes them through `cli_routing` like any seat. `TestAgentRun_EachDiffReviewerRunsOnANonClaudeFamily` runs each one with an agy-first table and a fake bridge, and asserts a driver of a non-Claude family.
 - The personas name no tool of one family. They say "read the 40 lines around a hunk", not the tool syntax of a family (I-17).
+- Each CLI file holds only the digest, because a CLI loads its file into each session and each phase pane. The full rules stay in `AGENTS.md` and the docs, and a CLI reads them when a task needs them. The byte budget of each CLI file is 21,513 bytes, the size of `CLAUDE.md` before X10. `evolve skills check` fails with a `BUDGET:` line when a render is larger (`TestInstructionBudget_TheCheckedInCLIFilesStayWithinTheirByteBudget`). `evolve skills generate` still writes a render over its budget and prints the `BUDGET:` line, as it does for a manifest problem. After X10, `CLAUDE.md` is 6,551 bytes and `GEMINI.md` is 7,182 bytes.
 - Each reviewer verdict uses the words of the pipeline (`PASS`, `WARN`, `FAIL`), so the deliverable contract can parse it. The code simplifier has the `plan` archetype, because it gives patches and no verdict. A read-only seat gives each edit as a patch.
 - The guard is the drift check of `evolve skills check` (`TestCheck_CleanRepoNoDrift` and `TestInstructionDiffs_TheCheckedInGeminiFileMatchesItsRender`).
-- Rejected: an `@AGENTS.md` import line in each file. Claude Code and Gemini CLI read such a line, but other CLIs do not, and no check can compare an import with its source. Rejected: one rendered file per CLI with no hand-written part. The Claude Code frontmatter and the tool names of each CLI are data of that CLI, so they stay in its file.
+- Rejected: a copy of all of `AGENTS.md` in each file. It made `CLAUDE.md` 46 KB, about 6,000 more tokens in each session. Rejected: an `@AGENTS.md` import line in each file. It loads the same tokens, other CLIs do not read it, and no check can compare an import with its source. Rejected: one rendered file per CLI with no hand-written part. The Claude Code frontmatter and the tool names of each CLI are data of that CLI, so they stay in its file.
 
 ### The console seat
 

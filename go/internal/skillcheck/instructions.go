@@ -14,18 +14,22 @@ const (
 	instructionsBegin = "<!-- GENERATED:instructions BEGIN"
 	instructionsEnd   = "<!-- GENERATED:instructions END -->"
 	sharedSource      = "AGENTS.md"
+	digestBegin       = "<!-- instructions-digest BEGIN -->\n"
+	digestEnd         = "<!-- instructions-digest END -->"
+	cliFileByteBudget = 21513
 )
 
 type instructionRender struct {
-	target string
-	source string
-	body   func(string) (string, error)
+	target     string
+	source     string
+	body       func(string) (string, error)
+	byteBudget int
 }
 
 func instructionRenders() []instructionRender {
 	renders := []instructionRender{
-		{target: "CLAUDE.md", source: sharedSource, body: sharedBody},
-		{target: "GEMINI.md", source: sharedSource, body: sharedBody},
+		{target: "CLAUDE.md", source: sharedSource, body: digestBody, byteBudget: cliFileByteBudget},
+		{target: "GEMINI.md", source: sharedSource, body: digestBody, byteBudget: cliFileByteBudget},
 	}
 	for _, reviewer := range []string{"architecture-reviewer", "code-reviewer", "code-simplifier", "go-reviewer"} {
 		renders = append(renders, instructionRender{
@@ -37,12 +41,31 @@ func instructionRenders() []instructionRender {
 	return renders
 }
 
-func sharedBody(source string) (string, error) {
-	at := strings.Index(source, "\n## ")
-	if at < 0 {
-		return "", errors.New("no level-2 heading starts the shared body")
+func digestBody(source string) (string, error) {
+	begin := strings.Index(source, digestBegin)
+	if begin < 0 {
+		return "", errors.New("no instructions-digest region")
 	}
-	return source[at+1:], nil
+	body := source[begin+len(digestBegin):]
+	end := strings.Index(body, digestEnd)
+	if end < 0 {
+		return "", errors.New("no instructions-digest region")
+	}
+	return body[:end], nil
+}
+
+func budgetProblems(diffs []commandDiff, renders []instructionRender) []string {
+	budgets := map[string]int{}
+	for _, r := range renders {
+		budgets[r.target] = r.byteBudget
+	}
+	var problems []string
+	for _, d := range diffs {
+		if budget := budgets[d.rel]; budget > 0 && len(d.next) > budget {
+			problems = append(problems, fmt.Sprintf("BUDGET: %s renders to %d bytes; the budget is %d bytes (shorten the digest in %s)", d.rel, len(d.next), budget, sharedSource))
+		}
+	}
+	return problems
 }
 
 func personaBody(source string) (string, error) {

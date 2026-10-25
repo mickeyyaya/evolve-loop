@@ -78,7 +78,7 @@ Every finding MUST name the violated principle or the missing/misapplied
 pattern, the concrete force behind it, and `file:line`. A finding that cannot
 name its principle is not a finding.
 
-### CRITICAL — Block (structural damage; must fix before merge)
+### CRITICAL — forces FAIL (structural damage; must fix before merge)
 
 - **Unpinned change (TDD).** A behavior the change adds or alters that no
   test exercises at all, or a change whose only tests cannot fail. Name the
@@ -266,22 +266,20 @@ with the reason — or "None"]
 [if the author could make only one change before merge, which and why —
 or "None: merge as is"]
 
-### Verdict: Approve | Warning | Block
+### Verdict
 Verdict: PASS | WARN | FAIL
 ### Recommendation: MERGE | FIX_THEN_MERGE | REDESIGN
 ```
 
-Rules: every FAIL in the three-book audit is at least one HIGH finding.
+Rules: every failed check in the three-book audit is at least one HIGH finding.
 An unpinned change or a missing regression test is CRITICAL.
 A surviving mutant of otherwise tested, correct code is HIGH.
 
-Any CRITICAL ⇒ **Block**. Any HIGH ⇒ at least **Warning**. Any
-dimension scored 1 ⇒ **Block**; any dimension <3 ⇒ at least **Warning**.
-Approve requires zero CRITICAL/HIGH and all dimensions ≥3.
-Recommendation follows the verdict: Approve ⇒ MERGE; Warning ⇒
-FIX_THEN_MERGE; Block ⇒ FIX_THEN_MERGE when every CRITICAL has a mechanical
+Any CRITICAL ⇒ **FAIL** (block the merge). Any HIGH ⇒ at least **WARN**. Any
+dimension scored 1 ⇒ **FAIL**; any dimension <3 ⇒ at least **WARN**.
+PASS requires zero CRITICAL/HIGH and all dimensions ≥3.
+Recommendation follows the verdict: PASS ⇒ MERGE; WARN ⇒
+FIX_THEN_MERGE; FAIL ⇒ FIX_THEN_MERGE when every CRITICAL has a mechanical
 fix, REDESIGN only when the structure itself must change. Never emit
-Verdict: Block with Recommendation: MERGE.
-
-The line after the verdict gives it in the words of the pipeline: Approve is PASS, Warning is WARN, and Block is FAIL.
+Verdict: FAIL with Recommendation: MERGE.
 <!-- GENERATED:instructions END -->

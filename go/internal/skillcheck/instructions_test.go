@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const sharedFixture = "# AGENTS.md\n\n> Read this first.\n\n## Invariants\n\nThe pipeline is the only controller.\n"
+const sharedFixture = "# AGENTS.md\n\n> Read this first.\n\n" + digestBegin + "## Invariants\n\nThe pipeline is the only controller.\n" + digestEnd + "\n\n## Full rules\n\nThe long text stays in AGENTS.md.\n"
 
 func writeRel(t *testing.T, root, rel, body string) {
 	t.Helper()
@@ -31,7 +31,7 @@ func readRel(t *testing.T, root, rel string) string {
 }
 
 func geminiRender() []instructionRender {
-	return []instructionRender{{target: "GEMINI.md", source: sharedSource, body: sharedBody}}
+	return []instructionRender{{target: "GEMINI.md", source: sharedSource, body: digestBody}}
 }
 
 func TestInstructionDiffs_TheCheckedInGeminiFileMatchesItsRender(t *testing.T) {
@@ -157,10 +157,14 @@ func TestInstructionDiffs_Errors(t *testing.T) {
 				t.Fatal(err)
 			}
 		}, "read the render GEMINI.md from AGENTS.md"},
-		{"source with no level-2 heading", func(t *testing.T, root string) {
+		{"source with no digest region", func(t *testing.T, root string) {
 			writeRel(t, root, "AGENTS.md", "# AGENTS.md\n")
 			writeRel(t, root, "GEMINI.md", "# Gemini\n")
-		}, "AGENTS.md: no level-2 heading"},
+		}, "AGENTS.md: no instructions-digest region"},
+		{"source with the digest END only before its BEGIN", func(t *testing.T, root string) {
+			writeRel(t, root, "AGENTS.md", digestEnd+"\n"+digestBegin)
+			writeRel(t, root, "GEMINI.md", "# Gemini\n")
+		}, "AGENTS.md: no instructions-digest region"},
 		{"target with an unclosed region", func(t *testing.T, root string) {
 			writeRel(t, root, "AGENTS.md", sharedFixture)
 			writeRel(t, root, "GEMINI.md", instructionsBegin+" -->\n")
@@ -214,7 +218,7 @@ func TestRunAndCheck_FailOnAnInstructionRenderError(t *testing.T) {
 	writeRel(t, root, "GEMINI.md", "# Gemini\n")
 
 	if _, err := Check(root); err == nil {
-		t.Fatal("Check: want an error for a source with no level-2 heading")
+		t.Fatal("Check: want an error for a source with no digest region")
 	}
 	var out, errBuf bytes.Buffer
 	if code := Run(root, false, &out, &errBuf); code != 1 {
@@ -246,5 +250,59 @@ func TestCheck_AnUnlistableSkillsDirectoryIsAnError(t *testing.T) {
 	_, err := Check(root)
 	if err == nil || !strings.Contains(err.Error(), "read skills dir") {
 		t.Fatalf("err = %v, want the skills directory read error", err)
+	}
+}
+
+func TestInstructionBudget_TheCheckedInCLIFilesStayWithinTheirByteBudget(t *testing.T) {
+	root := repoRoot(t)
+	for _, target := range []string{"CLAUDE.md", "GEMINI.md"} {
+		if size := len(readRel(t, root, target)); size > cliFileByteBudget {
+			t.Errorf("%s is %d bytes; the budget is %d bytes", target, size, cliFileByteBudget)
+		}
+	}
+	diffs, err := instructionDiffs(root)
+	if problems := budgetProblems(diffs, instructionRenders()); err != nil || len(problems) != 0 {
+		t.Fatalf("problems=%v err=%v, want none", problems, err)
+	}
+}
+
+func TestInstructionBudget_ARenderOverItsBudgetIsAProblem(t *testing.T) {
+	root := t.TempDir()
+	writeRel(t, root, "AGENTS.md", sharedFixture)
+	writeRel(t, root, "GEMINI.md", "# Gemini\n")
+	render := geminiRender()
+	render[0].byteBudget = 10
+
+	diffs, err := instructionDiffsFor(root, render)
+	if err != nil {
+		t.Fatal(err)
+	}
+	problems := budgetProblems(diffs, render)
+	if len(problems) != 1 || !strings.HasPrefix(problems[0], "BUDGET: GEMINI.md renders to ") || !strings.Contains(problems[0], "the budget is 10 bytes") {
+		t.Fatalf("problems = %v, want one BUDGET line for GEMINI.md", problems)
+	}
+	render[0].byteBudget = 0
+	if problems := budgetProblems(diffs, render); len(problems) != 0 {
+		t.Fatalf("a render with no budget has problems %v", problems)
+	}
+}
+
+func TestRunAndCheck_ReportAnOverBudgetCLIFile(t *testing.T) {
+	root := prepareSkillsTree(t)
+	long := strings.Repeat("The pipeline is the only controller. ", cliFileByteBudget/30)
+	writeRel(t, root, "AGENTS.md", digestBegin+long+"\n"+digestEnd+"\n")
+	writeRel(t, root, "CLAUDE.md", "# Claude\n")
+
+	var out, errBuf bytes.Buffer
+	if code := Run(root, true, &out, &errBuf); code != 0 {
+		t.Fatalf("generate exit = %d; stderr=%s", code, errBuf.String())
+	}
+	errBuf.Reset()
+	if code := Run(root, false, &out, &errBuf); code != 2 || !strings.Contains(errBuf.String(), "BUDGET: CLAUDE.md") {
+		t.Fatalf("check exit = %d, stderr = %q; want 2 and a BUDGET line", code, errBuf.String())
+	}
+	drift, err := Check(root)
+	if err != nil || len(drift) != 1 || !strings.HasPrefix(drift[0], "BUDGET: CLAUDE.md") {
+		t.Fatalf("Check = %v, %v; want the BUDGET problem only", drift, err)
 	}
 }
