@@ -59,10 +59,13 @@ After each row, the host must still reach the run server with its sessions `agen
 | Isolation N3: exec an LLM binary (a `claude` stub) with `--version` | deny (green, X4) | The shell gets `Operation not permitted`. The profile is built at `isolation.i3.stage=enforce`. |
 | Exec an older installed version of the `claude` stub under the install root (`$HOME/.local/share/claude/versions/2.1.304`) | deny | The exec gets `Operation not permitted`. The `install_roots` entry of the claude manifests covers each version. |
 | Re-enter the profile through `sandbox-exec` to exec the `claude` stub | deny | The exec of `sandbox-exec` gets `Operation not permitted`. |
-| Isolation N5: read the raw output `<ws>/.bridge/scout-stdout.log` | deny (open until X5) | The read succeeds today. |
-| A retry opens the retrospective of its predecessor through a fixture `inputs/index.json` | allow | The read returns the lesson. The row keeps the lineage read of [llm-isolation.md](llm-isolation.md) row N6 open. |
-| Isolation N7: a retry reads the `audit-report.md` of an unrelated cycle | deny (open until X5) | The read succeeds today. |
-| Isolation N8: read `~/.ssh/id_fixture` in the test `HOME` | deny (open until X5) | The read succeeds today. The file is a fixture, not a host secret. |
+| Isolation N5: read the raw output `<ws>/.bridge/scout-stdout.log` | deny (green, X5) | The read gets `Operation not permitted`. The profile is built at `isolation.i5.stage=enforce`. |
+| Read a raw log that the bridge left in the own workspace (`build-stdout.log`) | deny | The read gets `Operation not permitted`. The raw logs stay in the workspace, and a rule denies them by name. |
+| A retry opens the retrospective of its predecessor through `inputs/index.json` | allow | The read returns the lesson. `inputindex.Build` writes the index from fixture `lane-scope.json` records, so cycle 6 is in the lineage of cycle 7. |
+| Isolation N7: a retry reads the `audit-report.md` of an unrelated cycle | deny (green, X5) | The read gets `Operation not permitted`. Cycle 9 built another item, so the index does not list it. |
+| Isolation N8: read `~/.ssh/id_fixture` in the test `HOME` | deny (green, X5) | The read gets `Operation not permitted`. The file is a fixture, not a host secret. |
+| The Claude OAuth login reads its Keychain item through the security service | allow | `security find-generic-password` returns the item `Claude Code-credentials` of a fixture keychain in the test `HOME`. |
+| Write the pipeline-written `inputs/index.json` | deny | The write gets `Operation not permitted`. |
 | Isolation N9: open a TCP connection to a loopback listener of the host | allow (green) | `nc -z` connects. The row records that the network stays open. |
 | Isolation N10: an agy pane writes the protected path `go/internal/guards/role.go` in its worktree | deny (open until X7) | The write succeeds today. |
 

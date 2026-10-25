@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
@@ -43,6 +44,7 @@ type contractHost struct {
 	stubBin, netPort, home      string
 	evolveBin                   string
 	dispatch                    dispatchcred.Store
+	keychain                    string
 }
 
 type contractRow struct {
@@ -180,6 +182,8 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string { return "cat " + filepath.Join(h.dispatch.HeldDir(), "credential") }},
 	{action: "isolation N5: read the raw output <ws>/.bridge/scout-stdout.log", want: contractDeny, isolation: "N5",
 		script: func(h contractHost) string { return "cat " + h.run + "/.bridge/scout-stdout.log" }},
+	{action: "read a raw log that the bridge left in the own workspace", want: contractDeny,
+		script: func(h contractHost) string { return "cat " + h.run + "/build-stdout.log" }},
 	{action: "a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow,
 		script: func(h contractHost) string {
 			return `p=$(sed -n 's/.*"path": *"\([^"]*retrospective-report\.md\)".*/\1/p' ` + h.run + `/inputs/index.json) && test -n "$p" && cat "` + h.root + `/$p"`
@@ -195,6 +199,17 @@ var agentContract = []contractRow{
 		}},
 	{action: "isolation N8: read ~/.ssh", want: contractDeny, isolation: "N8",
 		script: func(contractHost) string { return `cat "$HOME/.ssh/id_fixture"` }},
+	{action: "the Claude OAuth login reads its Keychain item through the security service", want: contractAllow,
+		script: func(h contractHost) string {
+			return `security find-generic-password -s "Claude Code-credentials" -w "` + h.keychain + `"`
+		},
+		check: func(t *testing.T, _ contractHost, out string) {
+			if out != "fixture-oauth-token" {
+				t.Fatalf("the cell must read the OAuth item of its Keychain, got %q", out)
+			}
+		}},
+	{action: "write the pipeline-written inputs/index.json", want: contractDeny,
+		script: func(h contractHost) string { return "echo '{}' > " + h.run + "/inputs/index.json" }},
 	{action: "isolation N9: open a TCP connection (loopback listener of the host)", want: contractAllow, isolation: "N9",
 		script: func(h contractHost) string { return "nc -z -w 2 127.0.0.1 " + h.netPort + " && echo ok" }},
 	{action: "isolation N10: an agy pane writes the protected path go/internal/guards/role.go", want: contractDeny, isolation: "N10",
@@ -276,6 +291,26 @@ func TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun(t *testing.T) {
 	if err != nil || out != "stub-claude 0.0.0" {
 		t.Fatalf("shadow must let the exec run: err=%v out=%q", err, out)
 	}
+	out, err = h.agent(t, contractRow{script: func(h contractHost) string {
+		return "cat " + filepath.Join(filepath.Dir(h.otherCycle), "cycle-9", "audit-report.md") + " " + h.run + "/.bridge/scout-stdout.log $HOME/.ssh/id_fixture"
+	}})
+	if err != nil || !strings.Contains(out, "audit of an unrelated item") || !strings.Contains(out, "fixture secret") {
+		t.Fatalf("shadow must let each guarded read run and only report it: err=%v out=%q", err, out)
+	}
+}
+
+func (h *contractHost) withKeychain(t *testing.T) {
+	t.Helper()
+	h.keychain = filepath.Join(h.home, "Library", "Keychains", "sbc.keychain-db")
+	for _, args := range [][]string{
+		{"create-keychain", "-p", "sbc", h.keychain},
+		{"add-generic-password", "-s", "Claude Code-credentials", "-a", "sbc", "-w", "fixture-oauth-token", h.keychain},
+	} {
+		if out, err := exec.Command("security", args...).CombinedOutput(); err != nil {
+			t.Fatalf("security %v: %v: %s", args[0], err, out)
+		}
+	}
+	t.Cleanup(func() { _ = exec.Command("security", "delete-keychain", h.keychain).Run() })
 }
 
 func TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead(t *testing.T) {
@@ -366,7 +401,10 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 		filepath.Join(h.run, ".bridge", "scout-stdout.log"):       "raw output of the scout\n",
 		filepath.Join(runs, "cycle-6", "retrospective-report.md"): "lesson of cycle 6\n",
 		filepath.Join(runs, "cycle-9", "audit-report.md"):         "audit of an unrelated item\n",
-		filepath.Join(h.run, "inputs", "index.json"):              `{"schema":"evolve.inputs.index/1","entries":[{"id":"l1","class":"lineage","path":".evolve/runs/cycle-6/retrospective-report.md"}]}` + "\n",
+		filepath.Join(h.run, "build-stdout.log"):                  "raw output of the build\n",
+		filepath.Join(runs, "cycle-6", "lane-scope.json"):         `{"todo_ids":["item-a"]}`,
+		filepath.Join(runs, "cycle-9", "lane-scope.json"):         `{"todo_ids":["item-b"]}`,
+		filepath.Join(h.run, "lane-scope.json"):                   `{"todo_ids":["item-a"]}`,
 		filepath.Join(h.home, ".ssh", "id_fixture"):               "fixture secret of the cell home\n",
 	} {
 		if err := os.MkdirAll(filepath.Dir(rel), 0o755); err != nil {
@@ -376,6 +414,14 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	idx, err := inputindex.Build(inputindex.Request{ProjectRoot: h.root, Workspace: h.run, Cycle: 7, Phase: "build"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := inputindex.Write(h.run, idx); err != nil {
+		t.Fatal(err)
+	}
+	h.withKeychain(t)
 	h.stubBin = contractTempDir(t, "", "sbc-bin")
 	fakeclitest.Install(t, filepath.Join(h.stubBin, "claude"), "#!/bin/sh\necho stub-claude 0.0.0\n")
 	olderVersion := filepath.Join(h.home, ".local", "share", "claude", "versions", "2.1.304")
@@ -426,7 +472,8 @@ func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, exec
 	if cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, h.root, h.worktree, true); err != nil {
 		t.Fatal(err)
 	}
-	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), ExecStage: execStage, LookPath: stubOnlyLookPath(h.stubBin),
+	cfg.DispatchID = "sbc-" + strconv.Itoa(os.Getpid())
+	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), ExecStage: execStage, ReadStage: execStage, LookPath: stubOnlyLookPath(h.stubBin),
 		DispatchStore: func() (dispatchcred.Store, error) { return h.dispatch, nil }}
 	deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, h.ownTTY)
