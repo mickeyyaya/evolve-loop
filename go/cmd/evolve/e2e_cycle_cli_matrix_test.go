@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -140,24 +141,17 @@ func stubFirstPath(t *testing.T, binDir string) string {
 
 func installFakeTmux(t *testing.T, binDir, fakeBin string) []string {
 	t.Helper()
-	root := t.TempDir()
-	fakeclitest.Install(t, filepath.Join(binDir, "tmux"), "#!/bin/sh\n"+`exec "`+fakeBin+`" `+faketmux.Flag+` "`+root+`" "$@"`+"\n")
-	t.Cleanup(func() { stopFakeTmux(t, fakeBin, root) })
-	return []string{"TMUX_TMPDIR=" + t.TempDir()}
-}
-
-func stopFakeTmux(t *testing.T, fakeBin, root string) {
-	t.Helper()
-	sockets, err := os.ReadDir(root)
+	root, err := faketmux.Claim(filepath.Join(os.TempDir(), "evolve-faketmux-"+strconv.Itoa(os.Getuid())))
 	if err != nil {
-		t.Errorf("list the fake tmux servers: %v", err)
-		return
+		t.Fatalf("claim a fake tmux root: %v", err)
 	}
-	for _, socket := range sockets {
-		if out, err := exec.Command(fakeBin, faketmux.Flag, root, "-L", socket.Name(), "kill-server").CombinedOutput(); err != nil {
-			t.Errorf("stop the fake tmux server %s: %v: %s", socket.Name(), err, out)
+	fakeclitest.Install(t, filepath.Join(binDir, "tmux"), "#!/bin/sh\n"+`exec "`+fakeBin+`" `+faketmux.Flag+` "`+root+`" "$@"`+"\n")
+	t.Cleanup(func() {
+		if err := faketmux.Reap(root); err != nil {
+			t.Errorf("stop the fake tmux panes under %s: %v", root, err)
 		}
-	}
+	})
+	return []string{"TMUX_TMPDIR=" + t.TempDir()}
 }
 
 func stubScript(bin, fakeBin, callLog, evolveBin, probeDir string) string {

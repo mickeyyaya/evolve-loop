@@ -19,13 +19,13 @@ type process struct {
 var formatVar = regexp.MustCompile(`#\{([a-z_]+)\}`)
 
 func (s *server) expand(sess session, format string) (string, error) {
-	pid, _, err := sess.pane()
+	rec, err := sess.pane()
 	if err != nil {
 		return "", err
 	}
 	var ferr error
 	line := formatVar.ReplaceAllStringFunc(format, func(v string) string {
-		value, err := s.variable(sess, pid, formatVar.FindStringSubmatch(v)[1])
+		value, err := s.variable(sess, rec.pid, formatVar.FindStringSubmatch(v)[1])
 		if err != nil && ferr == nil {
 			ferr = err
 		}

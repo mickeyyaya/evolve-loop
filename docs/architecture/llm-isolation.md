@@ -729,7 +729,7 @@ Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M
 
 Before X1b, a stub `tmux` on the row `PATH` refused, so rows M2 to M4 failed with `new-session: exit status 1` on each host. X1b puts a fake `tmux` there ([internal-faketmux](packages/internal-faketmux.md)). Each pane of the fake is a detached process that reads a FIFO and writes a screen file, so no tmux server starts. The pane runs the stub of the row family, and the stub runs `evolve-fake-cli` as a REPL. Thus each tmux driver boots, pastes the prompt and waits for the artifact, as with a real CLI.
 
-The `agy` REPL of the fake draws the footer label of its `--model` value, so the launch model check of `agy-claude-tmux` reads a Claude label. Each row keeps its real check: the cycle ships, the ledger holds each phase, and only the stub of the row family ran.
+The `agy` REPL of the fake draws the footer label of its `--model` value, so the launch model check of `agy-claude-tmux` reads a Claude label. The row thus proves that the driver sends a Claude model and reads the footer label. It does not prove that agy serves the model that it was asked for; the bridge real-tmux tests own that. Each row keeps its real check: the cycle ships, the ledger holds each phase, and only the stub of the row family ran.
 
 The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
 

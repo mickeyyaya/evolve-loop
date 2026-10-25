@@ -44,7 +44,11 @@ The pane process starts in its own session (`Setsid`), so `new-session` returns 
 
 **The foreground program.** `#{pane_current_command}` reads `ps -A -o pid= -o ppid= -o comm=` and follows the newest child from the pane process to the deepest descendant. The dead-shell guard of the bridge (`paneShellProcess`) thus sees `sh` before the launch and the CLI after it.
 
-**A session ends with its process.** `has-session` succeeds only while the pane process lives (`kill(pid, 0)`). A session whose program exited is gone, and its name is free for a new session.
+**A session ends with its process.** The `pane` record holds the pid, the rows and the start time of the pane process (`proctree.StartOf`). A session is live only while that pid exists with the same start time. A session whose program exited is gone, and its name is free for a new session. A pid that the host gives to an unrelated process does not match the start time, so the fake never signals it (`TestSession_APidThatStartedAgainIsNotTheRecordedPaneAndIsNeverSignalled`).
+
+**A killed test leaves no panes behind.** A pane runs in its own session, so a SIGKILL or a timeout panic of `go test` does not reach it. Also, `t.Cleanup` does not run then.
+
+Thus the matrix gets its state root from `faketmux.Claim(<tmp>/evolve-faketmux-<uid>)`, not from `t.TempDir()`. `Claim` writes an `owner` record (the pid and the start time of the test process) into a new `run-*` directory. Before that, it reaps each `run-*` directory whose owner does not live. It kills each pane that the fake started, by the record, and removes the directory. Cleanup calls `faketmux.Reap(root)` on its own root. Pinned by `TestClaim_ReapsThePanesOfARunWhoseOwnerIsGoneAndKeepsALiveOwnersRun`.
 
 **Writes block like a terminal.** A writer opens the FIFO without blocking, so a pane with no reader fails at once (`ENXIO`), not forever. Then it sets the descriptor to blocking, so a prompt larger than the pipe buffer waits for the reader. The first matrix run without this step failed with `resource temporarily unavailable` on each prompt paste.
 
@@ -69,4 +73,3 @@ The pane process starts in its own session (`Setsid`), so `new-session` returns 
 - `C-c` sends the byte `0x03` and no signal, because the pane has no terminal driver.
 - A blocked write to a pane that does not read waits. The fake sets no deadline of its own, because the bridge runs each tmux call with a 30 s bound (`tmuxCmdTimeout`, `go/internal/bridge/tmux.go`).
 - `has-session` reads `kill(pid, 0)`, which succeeds for a zombie. An orphaned pane is reaped by the init process of the host. In a container whose first process does not reap, a dead pane stays a session.
-- The `pane` record holds a pid and no start time. A pid that the host gives again to an unrelated process makes the old session look alive. The record lives only for one test run, so this window is small.

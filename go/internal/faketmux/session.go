@@ -12,15 +12,17 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const paneTerm = "TERM=screen"
 
 var (
-	openFile    = os.OpenFile
-	signalGroup = func(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
-	setBlocking = func(f *os.File) error { return syscall.SetNonblock(int(f.Fd()), false) }
+	openFile     = os.OpenFile
+	signalGroup  = func(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
+	setBlocking  = func(f *os.File) error { return syscall.SetNonblock(int(f.Fd()), false) }
+	processStart = proctree.StartOf
 )
 
 type session struct {
@@ -48,8 +50,13 @@ func (s session) start(argv []string, workdir string, height int) error {
 		return fmt.Errorf("start the pane: %w", err)
 	}
 	go func() { _ = cmd.Wait() }()
-	if err := s.writeFile("pane", fmt.Sprintf("%d %d", cmd.Process.Pid, height)); err != nil {
-		return errors.Join(err, signalGroup(cmd.Process.Pid))
+	pid := cmd.Process.Pid
+	begun, err := processStart(pid)
+	if err == nil {
+		err = s.writeFile("pane", fmt.Sprintf("%d %d %s", pid, height, begun))
+	}
+	if err != nil {
+		return errors.Join(fmt.Errorf("record the pane: %w", err), signalGroup(pid))
 	}
 	return nil
 }
@@ -82,28 +89,39 @@ func (s session) writeFile(file, body string) error {
 	return os.Rename(tmp, s.path(file))
 }
 
-func (s session) pane() (pid, height int, err error) {
+type paneRecord struct {
+	pid, height int
+	begun       string
+}
+
+func (s session) pane() (paneRecord, error) {
+	var rec paneRecord
 	body, err := os.ReadFile(s.path("pane"))
 	if err != nil {
-		return 0, 0, err
+		return rec, err
 	}
-	if _, err := fmt.Sscanf(string(body), "%d %d", &pid, &height); err != nil {
-		return 0, 0, fmt.Errorf("pane record %q: %w", body, err)
+	if _, err := fmt.Sscanf(string(body), "%d %d %s", &rec.pid, &rec.height, &rec.begun); err != nil {
+		return paneRecord{}, fmt.Errorf("pane record %q: %w", body, err)
 	}
-	if pid <= 1 {
-		return 0, 0, fmt.Errorf("pane record %q has no process", body)
+	if rec.pid <= 1 {
+		return paneRecord{}, fmt.Errorf("pane record %q has no process", body)
 	}
-	return pid, height, nil
+	return rec, nil
+}
+
+func startedAs(pid int, begun string) bool {
+	now, err := processStart(pid)
+	return err == nil && now == begun
 }
 
 func (s session) alive() bool {
-	pid, _, err := s.pane()
-	return err == nil && syscall.Kill(pid, 0) == nil
+	rec, err := s.pane()
+	return err == nil && startedAs(rec.pid, rec.begun)
 }
 
 func (s session) kill() error {
-	if pid, _, err := s.pane(); err == nil {
-		if err := signalGroup(pid); err != nil && !errors.Is(err, syscall.ESRCH) {
+	if rec, err := s.pane(); err == nil && startedAs(rec.pid, rec.begun) {
+		if err := signalGroup(rec.pid); err != nil && !errors.Is(err, syscall.ESRCH) {
 			return fmt.Errorf("kill session %s: %w", s.name, err)
 		}
 	}
@@ -144,7 +162,7 @@ func writeAndClose(f *os.File, text string) error {
 }
 
 func (s session) capture(scrollback int) (string, error) {
-	_, height, err := s.pane()
+	rec, err := s.pane()
 	if err != nil {
 		return "", err
 	}
@@ -154,7 +172,7 @@ func (s session) capture(scrollback int) (string, error) {
 	}
 	text := strings.ReplaceAll(strings.ReplaceAll(string(body), "\r\n", "\n"), "\r", "")
 	lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
-	if rows := height + scrollback; scrollback >= 0 && len(lines) > rows {
+	if rows := rec.height + scrollback; scrollback >= 0 && len(lines) > rows {
 		lines = lines[len(lines)-rows:]
 	}
 	return strings.Join(lines, "\n") + "\n", nil

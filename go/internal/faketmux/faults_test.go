@@ -127,11 +127,11 @@ func TestSession_ARecordWithoutAPaneFailsTheReaders(t *testing.T) {
 	wantErr(t, err, "no such file")
 	_, err = sess.capture(0)
 	wantErr(t, err, "no such file")
-	for body, want := range map[string]string{"x": "pane record", "1 24": "has no process"} {
+	for body, want := range map[string]string{"x": "pane record", "1 24 0.0": "has no process"} {
 		if err := os.WriteFile(sess.path("pane"), []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		_, _, err := sess.pane()
+		_, err := sess.pane()
 		wantErr(t, err, want)
 	}
 }
@@ -212,8 +212,10 @@ func TestSeams_InjectedFailuresSurface(t *testing.T) {
 
 func setSeams(t *testing.T) func() {
 	t.Helper()
-	open, signal, blocking, ps := openFile, signalGroup, setBlocking, runPS
-	restore := func() { openFile, signalGroup, setBlocking, runPS = open, signal, blocking, ps }
+	open, signal, blocking, ps, started, temp := openFile, signalGroup, setBlocking, runPS, processStart, mkdirTemp
+	restore := func() {
+		openFile, signalGroup, setBlocking, runPS, processStart, mkdirTemp = open, signal, blocking, ps, started, temp
+	}
 	t.Cleanup(restore)
 	return restore
 }

@@ -140,7 +140,7 @@ func awaitGone(t *testing.T, pid int) {
 func TestRun_APaneWhoseProgramExitedIsNoLongerASession(t *testing.T) {
 	t.Parallel()
 	f := newFakeTmux(t)
-	f.must("new-session", "-d", "-s", "e", "true")
+	f.must("new-session", "-d", "-s", "e", "sleep 0.2")
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		if _, _, code := f.run("has-session", "-t", "=e:"); code != 0 {
