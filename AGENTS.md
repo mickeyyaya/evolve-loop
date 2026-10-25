@@ -29,7 +29,7 @@ evolve-loop is a development pipeline that evolves itself. It orchestrates speci
 These rules apply on every CLI that you run under. They are STRUCTURAL: kernel hooks enforce them, not prompt instructions.
 
 ### 1. Pipeline ordering is non-negotiable
-Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`) denies in-process subagent dispatch while a cycle is active. Per ADR-0075, this hook was rewired onto the `Agent|Task` matcher.
+Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`) denies in-process subagent dispatch while a cycle is active. Per ADR-0075, this hook was rewired onto the `Agent|Task` matcher. The Go guard denies only `Agent` today (`go/internal/guards/phase.go:22`), so a `Task` call passes. X7 of ADR-0154 fixes it.
 
 The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag. With it, the guard allows the call and writes no special log line. Each use is a CRITICAL violation.
 
@@ -80,6 +80,10 @@ Before you write or change a document that a person reads, load the `docs-write`
 
 No phase, lane or project config uses an MCP server. Reach each outside service through a CLI, and build an `evolve` verb or an adapter CLI when none exists ([the cli-only-no-mcp convention](docs/conventions/cli-only-no-mcp.md)).
 
+### 13. The pipeline is the only controller (2026-10-25, proposed)
+
+No LLM controls another LLM. The `evolve` binary starts each agent in an isolated cell, carries each message and routes each seat by data ([ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [spec](docs/architecture/llm-isolation.md)). The `evolve` CLI is the interface for other services ([cli-contract.md](docs/architecture/cli-contract.md)). The pipeline must read no control flag from the environment ([ADR-0156](docs/architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)). The task assignment is CLI-neutral, and only the bridge drivers hold CLI specifics (ADR-0154 I-17). The components X1 to X19 build these rules, and only X1 is on `main`.
+
 ## 12 Core agent rules
 
 These are behavioral rules that every agent must follow, on every CLI. The kernel hooks above catch *structural* breaches. These rules catch *judgment* breaches. Bypass-permissions / autonomous mode overrides rule 4 ("stop and ask"): make the reasonable call and continue. All other rules apply unconditionally.
@@ -116,18 +120,18 @@ This file covers the universal contract. The CLI-specific runtime details are in
 
 - **Claude Code**: see [CLAUDE.md](CLAUDE.md). Tier-1 production. The skills at `skills/<name>/SKILL.md` are the only invocation/slash-command surface (per ADR-0040). They carry `argument-hint`. The plugin manifest at `.claude-plugin/plugin.json` declares only `agents` and `skills` (no `commands[]` array). Kernel hooks fire as PreToolUse hooks, as `.claude/settings.json` specifies.
 
-- **Codex CLI**: Codex discovers skills automatically at `.agents/skills/<name>/SKILL.md`. (This directory has symlinks to `skills/<name>/`.) Codex reads this AGENTS.md as its canonical config. The native codex bridge driver (`go/internal/bridge/driver_codex*.go`) drives Codex in one of three modes:
-  - NATIVE when `codex` is on PATH and supports non-interactive prompts;
-  - HYBRID (delegates to `claude`) in other cases;
-  - DEGRADED as a last resort (the pipeline still completes, with reduced isolation).
+- **Codex CLI**: Codex discovers skills automatically at `.agents/skills/<name>/SKILL.md`. (This directory has symlinks to `skills/<name>/`.) Codex reads this AGENTS.md as its canonical config. The native codex bridge drivers (`go/internal/bridge/driver_codex*.go`) drive Codex. No mode delegates to `claude`.
 
-  `evolve bridge probe` shows the capability tier.
+  `evolve bridge probe` shows the capability tier of each manifest. The tier comes from `resolveTier` (`go/internal/bridge/probe.go:10-27`):
+  - `none` when the manifest binary is not on PATH;
+  - the manifest `default_tier` (`full` for `codex`, `hybrid` for `codex-tmux`) when each dependency of that tier is on PATH;
+  - `degraded` when a dependency is absent, for example `tmux` for `codex-tmux`.
 
 - **Gemini CLI**: Gemini discovers skills automatically at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. `gemini` is a distinct CLI identity with its own adapter metadata (`adapters/gemini.capabilities.json`). There is **no** dedicated `driver_gemini*.go` bridge driver.
 
   A Gemini *model* is also reachable natively through the Antigravity (agy) driver (`go/internal/bridge/driver_agy*.go`; the code documents it as "Gemini-backed"). But `gemini` and `agy`/`antigravity` are separate CLI identities. Only `antigravity → agy` has a name resolution (see the Antigravity bullet below).
 
-- **Antigravity CLI (agy)**: agy discovers skills automatically at `.agents/skills/<name>/SKILL.md`. The native agy bridge driver (`go/internal/bridge/driver_agy*.go`) drives it. It uses NATIVE mode (`agy -p`) when the agy binary is on PATH, HYBRID when claude is on PATH, and DEGRADED in other cases. The cross-name resolver maps `antigravity → agy`. cost_blind:true in NATIVE mode (deferred billing tap).
+- **Antigravity CLI (agy)**: agy discovers skills automatically at `.agents/skills/<name>/SKILL.md`. The native agy bridge driver (`go/internal/bridge/driver_agy*.go`) drives it. Its capability tier follows the same `resolveTier` rule: `none` when `agy` is not on PATH, else the manifest `default_tier` (`full` for `agy`, `hybrid` for `agy-tmux`). `agy-tmux` is `degraded` when `tmux` is absent, and no mode delegates to `claude`. The cross-name resolver maps `antigravity → agy`. The legacy `adapters/agy.capabilities.json` sets `cost_blind: true` (deferred billing tap).
 
   The `agy-claude-tmux` driver routes to the Claude models that the agy binary serves (routing family `agy-claude`). Before the prompt, it verifies that agy booted a Claude model. If not, it exits 87.
 

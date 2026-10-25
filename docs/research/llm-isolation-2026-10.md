@@ -1,11 +1,12 @@
 # LLM isolation: where the pipeline is not yet the only controller, and what current practice says (research, 2026-10)
 
-> The plan that uses this research: [llm-isolation-2026-10](../plans/llm-isolation-2026-10.md). The design: [llm-isolation](../architecture/llm-isolation.md). The decision records: [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) and, for §5, [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md).
+> The plan that uses this research: [llm-isolation-2026-10](../plans/llm-isolation-2026-10.md). The design: [llm-isolation](../architecture/llm-isolation.md). The decision records: [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) and, for §5, [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md), and, for §6, [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md).
 
 Date: 2026-10-25. Method:
 
 - A read-only audit of `origin/main` on 2026-10-25 by three explorers. A second pass on the same day re-read each cited `path:line` on `origin/main` at `9fd56a0e0`. §1.13 lists each citation that moved or was wrong.
-- 28 live web searches over six topics for §1 to §4, and 20 more over five topics for §5. The search tool gave excerpts and summaries. No page was fetched in full, so each outside claim is as strong as its excerpt.
+- 28 live web searches over six topics for §1 to §4, and 20 more over five topics for §5.
+- 6 more live web searches over five topics for §6. The search tool gave excerpts and summaries. No page was fetched in full, so each outside claim is as strong as its excerpt.
 - Each outside source was accessed on 2026-10-25.
 - Each source has a mark: **P** is primary (an official document, a specification, a paper or a commit). **S** is secondary or weak (a blog, a forum, a mirror or a vendor explainer).
 
@@ -18,6 +19,7 @@ Date: 2026-10-25. Method:
 3. [Adopt or reject](#3-adopt-or-reject)
 4. [Refinements to adopt](#4-refinements-to-adopt)
 5. [Self-healing within boundaries](#5-self-healing-within-boundaries)
+6. [The CLI service contract and the control flags](#6-the-cli-service-contract-and-the-control-flags)
 
 ## 1. Local evidence
 
@@ -384,3 +386,163 @@ Weak spots:
 - **R15** Freeze checks at handoff, judge T1 with another family, and hide the indexes from the agents (F3.6, P3.3).
 - **R16** Bound the repairs with budgets, breakers and converge-or-escalate (P3.2, ADR-0126).
 - **R17** Move from the console to the loop by tier and by stage, on measured evidence (F3.5, P3.5).
+
+## 6. The CLI service contract and the control flags
+
+The operator asked two more things on 2026-10-25:
+
+> "Make sure evo loop cli can be invoked for most of the core functions all the time. It's the interfaces for other services to use it's functions anytime."
+
+> "this refactory is also the good timing to remove the global flag that should be removed and replaced with dynamic configuration long time ago"
+
+The decision is [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md). The contract is [cli-contract.md](../architecture/cli-contract.md). The design is [Part III of the spec](../architecture/llm-isolation.md#26-the-cli-service-contract-x17).
+
+Method: a read-only audit of `origin/main` at `603389ebd` on 2026-10-25 by one explorer. The docs builder re-read each cited `path:line` on the same commit. §6.3 lists each citation that was wrong or moved. `c/` is `go/cmd/evolve/` and `i/` is `go/internal/`.
+
+### 6.1 Local evidence: the CLI surface
+
+**F4.1** The CLI has 112 verbs in one registry (`grep -c 'Name: "' go/cmd/evolve/registry.go` = 112). No single document lists their inputs, outputs, exit codes and availability. The surface is spread over the usage text of `main.go`, the registry summaries and the usage text of each verb.
+*Implication:* a service caller cannot learn the contract without reading Go code.
+
+**F4.2** Many core verbs print human text only. Examples: `loop-stop`, `gc` and `sync-main` (`c/cmd_gc.go`, `c/cmd_syncmain.go`), `quality report` (`c/cmd_quality.go:121`), `ledger verify` (on stderr, `c/cmd_ledger.go:60`), `routing explain`, and the inbox curation verbs. No verb puts a schema version in its JSON. `loop status` encodes `dashboard.LoopStatus` directly (`c/cmd_loop_status.go:45`).
+*Implication:* a caller parses prose, and a field rename breaks it with no signal.
+
+**F4.3** There is no shared exit-code table. `exitUsage=10` and `exitIO=2` are in `c/cmd_pr.go:25-26`, and `exitRoutingRefused=2` is in `c/cli_routing_root.go:122`. A usage error exits 1 in `loop-stop` and `inbox-mover` (`c/cmd_loop_stop.go:34`, `c/cmd_inbox_mover.go:32`), and 10 in `gc`, `loop status` and `quality` (`c/cmd_gc.go:30`, `c/cmd_loop_status.go:26`, `c/cmd_quality.go:110`).
+*Implication:* a caller cannot tell "you called me wrong" from "the work failed" without a table for each verb.
+
+**F4.4** `evolve loop status foo` starts a real loop. `isLoopStatusInvocation` takes the read-only path only when `status` is alone or the next word starts with `-` (`c/cmd_loop_status.go:15`). Any other form goes to the loop parser, and `parsePositional` joins the rest into a goal (`c/cmd_loop_args.go:307-323`). The reserved-word guard refuses only a goal that is exactly `status` (`c/cmd_loop_args.go:178-181`).
+*Implication:* a read verb with one wrong word can start a batch. This is the first defect to fix.
+
+**F4.5** Five inbox verbs refuse while any run lease is live: `edit`, `withdraw`, `verify`, `route-console` and `route-lane`.
+- The check is `refusedMidWaveAt` (`c/cmd_inbox_curate.go:25-35`).
+- The calls are at `c/cmd_inbox_curate.go:58`, `:103`, `:124`, `c/cmd_inbox_route_lane.go:18` and `c/cmd_inbox_route_console.go:25`.
+- `add` and `consume` have no such gate. `cli-routing set|unset|init|migrate` refuse under a live lease or inside a phase (`c/boundary_write.go:13-27`).
+*Implication:* a service cannot curate the backlog during a wave, although the change can wait for the next boundary.
+
+**F4.6** These refusals are correct and stay:
+- `pr merge` (`c/cmd_pr.go:265-276`);
+- `sync-main` (`c/cmd_syncmain.go:58-63`);
+- `cycle reset` without `--force` (refusal at `c/cmd_cycle.go:131-133`, flag at `:109`);
+- `cli update` without `--dry-run` (`c/cmd_cli.go:57-59`);
+- the single owner of `loop` and `loop --detach` (`c/cmd_loop_detach.go:55`, `:129`).
+*Implication:* "available at all times" cannot mean "every verb mutates at all times". It means each verb has a declared availability class.
+
+**F4.7** `gc` has no top-level lease check (`c/cmd_gc.go:23-50`). Only `--only cache` says that it is safe while lanes run (`:28`).
+*Implication:* a full `gc` during a wave depends on the care of each sweep, not on one lease.
+
+**F4.8** Some verbs have no `--project-root` flag and read the root from `EVOLVE_PROJECT_ROOT` or the current directory: `inbox list|show|add|edit|withdraw|consume|rank` (`c/cmd_inbox.go:91`, `c/cmd_inbox_curate.go:18`), `inbox-mover` (`c/cmd_inbox_mover.go:18`) and `signals tail` (`c/cmd_signals.go:28`). `quota-reset` and `fanout-dispatch` join `os.Getenv("EVOLVE_PROJECT_ROOT")` with a relative path, so an unset variable gives a path relative to the current directory (`c/cmd_quota_reset.go:26`, `c/cmd_fanout_dispatch.go:44`). `cycle reset` defaults the root to `.` (`c/cmd_cycle.go:105`).
+*Implication:* a service with another working directory reads or writes the wrong plane.
+
+**F4.9** `install` asks for `y` on stdin unless `--ci` or `CI=true` is set (`c/cmd_install.go:103`, `:172-178`). `inbox add` reads the item from stdin when `--file` is absent.
+*Implication:* these two verbs are interactive by default.
+
+**F4.10** These verbs are absent:
+- `inbox claim`. It exists only as `inbox-mover claim` (`c/cmd_inbox_mover.go:29`).
+- A read of one dossier. `dossier` has only `verify`, `retro-mislabel`, `publish` and `sweep` (`c/cmd_dossier.go:19-32`).
+- `cycle resume`. Only `loop --resume` exists.
+- A wave stop. Only `loop-stop --wait` exists.
+- `events`. Plan E9 is not started ([event-notification-protocol-2026-10](../plans/event-notification-protocol-2026-10.md) §16).
+*Implication:* a service uses an internal verb or a flag of another verb for these functions.
+
+**F4.11** The only server is `dashboard`: loopback HTTP, read-only, with no authentication (`i/dashboard/server.go:90-98`). There is no socket and no RPC.
+*Implication:* the CLI is the service interface. A daemon is a separate decision.
+
+### 6.2 Local evidence: the control flags
+
+**F5.1** `control-flags.md` says that the registry has 35 rows (`docs/architecture/control-flags.md:3`). The generated table has 26 rows, which match `go/internal/flagregistry/registry_table.go`.
+*Implication:* the header is wrong.
+
+**F5.2** `EVOLVE_WORKTREE_PATH` and `EVOLVE_REFLECTION_JOURNAL` are in the registry, but no production code reads them. The unprefixed `WORKTREE_PATH` is a different, live subagent variable (`c/cmd_subagent.go:288`).
+*Implication:* two registry rows are dead.
+
+**F5.3** Many readers are not in the registry:
+- the `ipcenv` keys (`i/ipcenv/ipcenv.go:5-18`), `DISPATCH_DEPTH` and the `FANOUT_*` names;
+- the bridge launch names (`i/bridge/launch.go:275-297`);
+- `PHASE_RECOVERY_STAGE`, `SHIP_*`, `CLI_MAX_CONCURRENT_<FAM>` and `PHASE_<X>_BIN`;
+- the per-agent `EVOLVE_<AGENT>_*` names and `RESUME*`.
+
+Many names are built as `"EVOLVE_"+"X"` (`c/cmd_loop_args.go:357`), so a literal grep misses them.
+*Implication:* the registry is not the full inventory, and a grep guard alone cannot find each reader.
+
+**F5.4** `policy.Parse` decodes with plain `json.Unmarshal` (`i/policy/patch.go:9-21`). Only the `cli_routing` and `quality` blocks use `decodeStrict` with `DisallowUnknownFields` (`i/policy/cli_routing.go:124-126`, `i/policy/quality.go:23`).
+*Implication:* a typo in a policy key is silently ignored. A knob that moves into policy needs a strict decode first.
+
+**F5.5** `buildCycleEnv` copies each `EVOLVE_*` variable of the operator shell into the cycle environment (`c/cmd_loop_args.go:341-352`). `driverEnv` gives each LLM child the whole `os.Environ()` and strips only `EVOLVE_DISPATCH_ID` (research F1.1). The X2 review found the same hole at `enforce`: the hermetic allowlist still passes each `EVOLVE_*` and `BRIDGE_*` name (review of #1122, finding H2).
+*Implication:* each operator knob and each bypass reaches the LLM children today.
+
+**F5.6** The audit put each reader in one of five classes. After re-verification (§6.3), the counts are 32 pipeline markers (23 `EVOLVE_*`, 9 `BRIDGE_*`), 18 operator knobs, 10 bypasses, 6 dead names and 8 test seams. [control-flags.md](../architecture/control-flags.md#classes-of-the-readers-outside-the-registry) has the list.
+*Implication:* each class has a different fix. One rule for all the names fails.
+
+### 6.3 Citations that moved or were wrong on re-verification
+
+| Audit claim | On `603389ebd` | Status |
+|---|---|---|
+| "`loop --project-root P status` launches a loop" | The goal is exactly `status`, so the reserved-word guard refuses it with exit 10 (`c/cmd_loop_args.go:178-181`). It does not reach the status reader either. | **wrong**; the real launch case is `loop status <word>` |
+| "the packages under `i/events/{filter,channel,wake,reader,publisher}` exist but nothing calls them" | `channel` is called by `signals tail --channel` (`c/cmd_signals_tail_channel.go:17`) and `agentmsg/channelstore`; `filter` and `reader` by `orchestrator/oversight.go`; `wake` by `agentmsg/outbox`; `publisher` by `events/rootwire` (E10, merged in #967). | **wrong**; the CLI verbs of E9 are still absent |
+| `c/cmd_loop_args.go:343-352` (`buildCycleEnv`) | `:341-352` | moved |
+| `c/cmd_inbox_curate.go:22-33` | `:22-35` | range grew |
+| `i/dashboard/server.go:92-97` | `:90-98` | range grew |
+| `i/policy/patch.go:14` | `:14` in `Parse` at `:9` | same |
+| the worker variables of `dispatchparallel.go:176-178` | the shell line also exports `EVOLVE_FANOUT_WORKER_NAME` | one name missing: 23 `EVOLVE_*` markers, not 22 |
+| "17 operator knobs" | the audit's own list has 18 names: the per-agent family has four (`_CLI`, `_MODEL`, `_SYSTEM_PROMPT`, `_PERMISSION_MODE`) | count wrong by one |
+| "7 test seams" | the audit's own list has 8 names (`BRIDGE_<X>_BINARY` is one of them) | count wrong by one |
+
+Every other citation was the same.
+
+### 6.4 Local evidence: CLI specifics above the driver layer
+
+The operator added on 2026-10-25: "for different LLM clis, when assigned the tasks through agent bridge, the task assignment should only contains the general info without any LLM cli specification and settings... LLM specification can only be appended under the driver layer." The docs builder read `origin/main` at `72561f774` for these facts.
+
+**F6.1** `core.PhaseRequest` carries `ModelRoutingCLI`, `ModelRoutingTier` and `ModelRoutingEffort` (`go/internal/core/phase.go:101-105`). The phase runner reads `ModelRoutingCLI` as a routing overlay (`go/internal/phases/runner/routing.go:94`, `:113`).
+*Implication:* a named CLI travels in the assignment, above the bridge.
+
+**F6.2** The advisor prompt asks the LLM to name a `cli` for each phase and each minted phase (`go/internal/core/advisor/prompt.go:90`).
+*Implication:* a flow seat picks a CLI, not a capability.
+
+**F6.3** All 93 tracked agent profiles have a `cli` and a `cli_fallback` key (the 94th file, `tool-policy.json`, is not an agent profile). All 93 hold `Bash(evolve phase verify:*)` in their tool lists. `allowed_tools` and `disallowed_tools` use the Claude permission syntax, for example `Edit(.evolve/state.json)` and `Bash(git push:*)` (`.evolve/profiles/builder.json`). 27 profiles have `extra_flags_by_cli` with Claude Code flags such as `--strict-mcp-config` and `--plugin-dir`.
+*Implication:* the profile, which the pipeline reads, holds CLI flags and vendor tool syntax.
+
+**F6.4** Four flow seats name a family and a model in Go: `phase_advisor.go:73`, `failure_advisor.go:54`, `phase_judge.go:28` and `contract_escalation.go:22` (all `go/internal/core/`). Four phases have the default model `opus` (`audit.go:69`, `debugger.go:107`, `buildplanner.go:57`, `swarmplan.go:44` under `go/internal/phases/`).
+*Implication:* X6 already owns these; X19 must not build them again.
+
+**F6.5** 14 of 106 persona files under `agents/` name a Claude Code tool or feature (`grep -l 'Agent tool\|TodoWrite\|WebFetch\|Claude Code\|Task tool' agents/*.md`).
+*Implication:* the persona text is not CLI-neutral.
+
+**F6.6** The per-agent `EVOLVE_<AGENT>_CLI` and `_MODEL` names and the `.claude/settings.json` hooks are CLI specifics too. X18c and X7 own them.
+*Implication:* X19 lists them and leaves them to their owners.
+
+### 6.5 Current practice
+
+**P4.1 A CLI for programs.** The Command Line Interface Guidelines put the primary and machine-readable output on stdout and the messages on stderr. They add `--json` for machine output, document the exit codes, and prompt only when stdin is a terminal. The search gave only secondary summaries of clig.dev ([create-cli skill](https://tessl.io/registry/skills/github/marchatton/agent-skills/create-cli), [cli-output-conventions](https://tessl.io/registry/testland/cli-output-conventions)). **S**.
+
+**P4.2 A versioned output.** kubectl advises a script to name the API group and version of the output. The structure can change between versions ([kubectl field printing](https://kubectl.docs.k8s.io/guides/resource_printing/fields/), **P**; [kubectl conventions mirror](https://norazhao0728githubio.readthedocs.io/en/latest/user-guide/kubectl-conventions/), **S**). No primary source gives a stability promise for `-o json`.
+
+**P4.3 The environment leaks down the process tree.** A child process gets the environment of its parent. The systemd documentation warns that variables cross the setuid boundary ([HN quote of the systemd docs](https://hn.svelte.dev/item/31225921), **S**; [jolicode](https://jolicode.com/blog/what-you-need-to-know-about-environment-variables-with-php), **S**). Any user with privileges reads it through `/proc/<pid>/environ` ([GitGuardian](https://blog.gitguardian.com/secure-your-secrets-with-env)). **S**.
+
+**P4.4 Configuration in the environment.** The twelve-factor app keeps the deploy configuration in environment variables ([12factor.net/config](https://12factor.net/config)). **P**. It excludes internal settings that do not change between deploys. Critics say that the environment holds only strings and has no structure ([roots.io](https://roots.io/twelve-factor-03-config.md)). **S**.
+
+**P4.5 A strict decode.** Go's `encoding/json` skips an unknown key by default. `Decoder.DisallowUnknownFields` turns a misspelled key into an error ([oneuptime, 2026](https://oneuptime.com/blog/post/2026-01-23-go-json-unknown-fields/view), **S**; [sigs.k8s.io/json](https://pkg.go.dev/sigs.k8s.io/json), **P**).
+
+**P4.6 Flag debt.** A flag that nobody removes is technical debt. The advice is an owner and an expiry for each flag, and a check that finds flags that no code reads ([LaunchDarkly](https://docs.launchdarkly.com/guides/flags/technical-debt), **P**; [Statsig](https://statsig.com/perspectives/feature-flag-retirement), **S**).
+
+**P4.7 Provider specifics behind one interface.** LiteLLM forwards each non-OpenAI parameter as provider-specific, and by default it raises an error on a parameter that a model does not support. `drop_params` turns the error into a silent drop ([LiteLLM drop params](https://docs.litellm.ai/docs/completion/drop_params), [input params](https://docs.litellm.ai/docs/completion)). **P**. One search on 2026-10-25.
+
+*Synthesis:* a typed, versioned stdout and one exit-code table make the CLI a service contract. The environment is a channel that each child inherits, so a control value in it reaches each LLM. Twelve-factor puts the deploy values in the environment. Our control knobs change the flow, so they are not deploy values. They belong in the strict policy file, which the pipeline reads at a boundary.
+
+### 6.6 Adopt or reject
+
+| Practice | Decision | Reason |
+|---|---|---|
+| `--json` on stdout, messages on stderr (P4.1) | adopt | It closes F4.2. |
+| A schema version in each JSON envelope (P4.2) | adopt | A caller can check the version before it reads a field. |
+| One exit-code table (P4.1) | adopt | It closes F4.3. |
+| A daemon or an RPC server for services | reject now | The CLI already reaches every function (F4.11). A server adds authentication and a lifecycle. |
+| Control knobs in the environment (P4.4) | reject | They reach each LLM child (F5.5, P4.3) and leave no record. |
+| Strict decode of the policy file (P4.5) | adopt | It closes F5.4 before the knobs move in. |
+| An owner and a removal for each dead flag (P4.6) | adopt | It closes F5.2. |
+
+### 6.7 Refinements to adopt
+
+- **R18** Write one CLI contract with a versioned envelope, one exit-code table and an availability class for each core verb. Fix `loop status <word>` first. Pin the contract against the registry with a guard test (F4.1 to F4.11, P4.1, P4.2).
+- **R19** Read no control flag from the environment. Keep one named list of pipeline markers. Move the knobs into the strict policy file, and turn the bypasses into audited parameters. Delete the dead names, and inject the test seams (F5.1 to F5.6, P4.3 to P4.6).
+- **R20** Send a CLI-neutral task assignment. Keep each model name, CLI flag, tool syntax and parser in the driver and manifest layer. Ask for capabilities, never for a named CLI, and refuse a missing capability instead of a silent drop (F6.1 to F6.6, P4.7).

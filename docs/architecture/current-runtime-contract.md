@@ -15,7 +15,12 @@ This is the current capability index. Historical ADRs explain decisions; an Acce
 | Writer swarm | Live writer dispatch unsupported; explicit refusal before side effects, default shadow delegates | `phases/swarmrunner` | `TestDecorator_WriterLiveModesRefusedBeforeDispatch` |
 | Fleet visibility | Per-run state/lease liveness, active lanes survive history limit | `dashboard/loop.go`, `collect.go` | `TestCollect_FleetLivenessSurvivesHistoryCap` |
 | Retry adjudication | Bounded conservative TDD retry; deep adjudicator deferred | `core/audit_fail_decision.go`, ADR-0093 | Existing retry/resume tests; no claim of production adjudicator wiring |
-| Family separation | Setup/routing preference; not an unconditional cross-family kernel invariant | `setup`, routing profiles | Single-provider/failover behavior must remain explicit |
+| Family separation | The Claude floor holds six grading seats on `claude`. It is Go code on `main`. X6 (#1123) moves it to `cli_routing.floors` with the same values. It is not a kernel invariant. | `profiles/family_floor.go`, `cliroute` | `TestDeepTierFamilyArrangement` |
+| LLM agent isolation (ADR-0154) | Proposed. Only the conformance matrix (X1, #1121) is on `main`. Each open gap is an expected-failure row with its owner component. | `internal/isolation` | `isolation.Rows`, [llm-isolation.md](llm-isolation.md) §14 |
+| One agent with no cycle (ADR-0152) | `evolve agent run <profile>` runs one read-only spec phase and prints its report. It writes a ledger entry with cycle 0. | `cli/agentcmd` | [runtime-reference.md](../operations/runtime-reference.md) |
+| Quality panel (ADR-0153) | `quality report` publishes the readings of PQ1, PQ4, CQ1 to CQ5 through the Signal Center. The boundary runs it after `sync-main`. | `qualitypanel`, `pipelinerates`, `codeshape` | [llm-quality-indexes.md](llm-quality-indexes.md) |
+| CLI service contract (ADR-0156) | Proposed. No verb prints the versioned envelope yet, and `loop status <word>` starts a loop. | `cmd/evolve` | [cli-contract.md](cli-contract.md) |
+| Control flags (ADR-0156) | The pipeline still reads its knobs and bypasses from the environment, and they reach the LLM children. X18 removes them. | `flagregistry`, `config`, `bridge` | [control-flags.md](control-flags.md) |
 
 ## Documentation lifecycle
 

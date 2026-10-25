@@ -1,11 +1,18 @@
 # LLM isolation: the pipeline is the only controller, and each agent runs in a cell
 
-> [ADR-0154](adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) · [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) · plan: [llm-isolation-2026-10](../plans/llm-isolation-2026-10.md) · research: [llm-isolation-2026-10](../research/llm-isolation-2026-10.md) (F1.0 to F1.12, F3.1 to F3.6, P2.1 to P2.7, P3.1 to P3.5, R1 to R17).
+> [ADR-0154](adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) · [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) · [ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) ·
+> plan: [llm-isolation-2026-10](../plans/llm-isolation-2026-10.md). Research: [llm-isolation-2026-10](../research/llm-isolation-2026-10.md) (F1.0 to F1.12, F3.1 to F3.6, P2.1 to P2.7, P3.1 to P3.5, F4.1 to F5.6, P4.1 to P4.6, R1 to R19).
 > This file is the spec of record for the agent cell. It covers the environment, the launch path, the reads and writes and the outputs of a cell. It also covers the routing data that picks the family, and the proof that any family can fill the cell.
 >
-> The plan holds the components X1 to X16 and their order. The ADR holds the decision. The Signal Center contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md) §5.
+> The plan holds the components X1 to X19 and their order. The ADRs hold the decisions. [cli-contract.md](cli-contract.md) is the spec of record for the verbs of I-15. The Signal Center contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md) §5.
 >
-> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. X1 is built: the conformance matrix of §14 and the module, kind, codes and channel of §15. X2 (§6, I-2) is built at stage `shadow`. X6 is built: the routing data of §10. No other component is built. Each name in this file that does not exist on `main` is marked "proposed".
+> Status: proposed (ADR-0154, ADR-0155, ADR-0156), 2026-10-25. Each name in this file that does not exist on `main` is marked "proposed".
+>
+> Component state on 2026-10-25 (the plan §6.1 has the full table):
+> - X1: merged in #1121. The conformance matrix of §14 and the module, kind, codes and channel of §15 are on `main`. The follow-up X1b (item `isolation-matrix-tmux-repl-fake`) adds a tmux REPL fake, so the rows M2 to M4 can run a full cycle.
+> - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
+> - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
+> - X3 to X5, X7 to X19: not started.
 
 ## Table of contents
 
@@ -34,10 +41,13 @@
 23. [The blast radius of an accident](#23-the-blast-radius-of-an-accident)
 24. [Self-healing signals](#24-self-healing-signals)
 25. [Self-healing runbook](#25-self-healing-runbook)
-26. [Guards](#guards)
-27. [Limits](#limits)
+26. [The CLI service contract (X17)](#26-the-cli-service-contract-x17) (Part III)
+27. [No ambient control flags (X18)](#27-no-ambient-control-flags-x18)
+28. [The CLI-neutral task assignment (X19)](#28-the-cli-neutral-task-assignment-x19)
+29. [Guards](#guards)
+30. [Limits](#limits)
 
-*Part I: the agent cell (ADR-0154). Part II, from §17: self-healing within boundaries (ADR-0155).*
+*Part I: the agent cell (ADR-0154). Part II, from §17: self-healing within boundaries (ADR-0155). Part III, from §26: the CLI service contract and no ambient control flags (ADR-0156).*
 
 ## 1. Reading guide
 
@@ -204,6 +214,7 @@ The environment of a child is the union of three closed sets, and nothing else:
 - In `shadow`, the builder computes both environments. It logs each dropped name once for each wave and emits `ISOLATION_I2_VIOLATION` with the name, not the value. The child still gets today's environment.
 - In `enforce`, the child gets only the union.
 - `process_env_test.go` flips to assert the allowlist (`TestProcessEnv_IsTheAllowlistPlusTheManifest`).
+- The pipeline markers are one named list (I-16, §27). X2 closed review finding H2 inside the bridge with the explicit list `pipelineEnvMarkers` (§6.1). X18b makes one list the only source for the whole pipeline: `buildCycleEnv` still copies each `EVOLVE_*` name into the cycle.
 
 #### 6.1 As built (X2)
 
@@ -448,6 +459,7 @@ The floor becomes the `floors` key of `cli_routing` (proposed). Its value today 
 - The bare name `gemini` becomes an error that names the `agy` drivers.
 - A grep guard (proposed `TestFlowCodeNamesNoFamily`) checks each non-test Go file. It fails when flow code names a family as a string. The manifests, the bridge drivers and the routing data are exempt.
 - `evolve cli-routing explain <agent>` prints the same chain for each agent before and after X6. X6 records both outputs in its PR.
+- X6 alone does not make an agy-only table compile. 7 tracked profiles still set `allowed_clis` to Claude families: `auditor`, `adversarial-review`, `tdd-engineer`, `spec-verifier`, `spec-verify` and `code-reviewer` set `["claude"]`, and `router` sets `["agy-claude", "claude"]` (`.evolve/profiles/*.json`). The follow-up X6b moves these pins into the `floors` data, so that the matrix rows M2 and M3 can pass.
 
 ### Status of X6
 
@@ -926,6 +938,174 @@ The measures for the stage flips of §20.2 are proposed panel readings: repair s
 | `HEALING_I13_VIOLATION` | A repair ran past a budget or an open breaker. | This is a pipeline defect. Halt and fix from the console. |
 | `HEALING_I14_VIOLATION` | An incident closed with a close condition missing. | Reopen it and read the missing condition. |
 
+## 26. The CLI service contract (X17)
+
+*Part III of this spec: the control surface of the pipeline ([ADR-0156](adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)). It adds the invariants I-15 and I-16 and the components X17 and X18.*
+
+The operator said on 2026-10-25: "Make sure evo loop cli can be invoked for most of the core functions all the time. It's the interfaces for other services to use it's functions anytime."
+
+### Issue
+
+The CLI has 112 verbs and no contract document (research F4.1). Many core verbs print prose only, and no JSON output has a schema version (F4.2). Usage errors exit 1 in some verbs and 10 in others (F4.3). `evolve loop status foo` starts a real loop (F4.4). Five inbox verbs refuse during a wave (F4.5).
+
+### Gap
+
+Part I isolates the agents. It says nothing about the callers of the pipeline. A service that calls `evolve` today parses prose, guesses the exit codes and cannot curate the inbox during a wave.
+
+### Solution
+
+**I-15 The CLI is the service contract.** [cli-contract.md](cli-contract.md) is the spec of record. It has five parts:
+
+| Part | Rule | Section of cli-contract.md |
+|---|---|---|
+| Envelope | `--json` prints one object with `schema`, `ok`, `data`, `error` and `warnings`. | §2 |
+| Exit codes | one table: 0 ok, 1 failed, 2 io, 3 refused, 4 queued, 10 usage, 11 input | §3 |
+| Availability | each core verb is `always`, `queued`, `leased` or `boundary` | §4 |
+| Core verbs | the list, with the class, the flags today and the schema id | §5 |
+| New verbs | `inbox claim`, `dossier show`, `cycle resume`, `wave stop`, `events` (E9), `quality show` | §6 |
+
+The isolation link: inside a phase pane, each writing verb refuses with exit 3. A phase agent then cannot use the service interface to act outside its cell (I-3).
+
+X17 lands in four ordered items, because the first defect can start a loop:
+
+| Item | Scope | Red test first |
+|---|---|---|
+| X17a | `loop status <word>` goes to the status reader and exits 10 | `TestLoopStatus_AnExtraWordNeverStartsALoop` |
+| X17b | the envelope, the exit table, `--json` and `--project-root` on each core verb; the guard against the registry | `TestCLIContract_DocMatchesTheRegistry` fails on a missing verb |
+| X17c | the inbox and `cli-routing` writers queue during a wave; `gc` takes a lease | `TestInboxEdit_DuringAWaveQueuesAndExitsFour` |
+| X17d | `inbox claim`, `dossier show`, `cycle resume`, `wave stop`, `quality show` | one envelope test for each new verb |
+
+The `events` verbs are E9 of the [events plan](../plans/event-notification-protocol-2026-10.md). X17b sets the envelope that E9 uses. X17 does not build them a second time.
+
+## 27. No ambient control flags (X18)
+
+The operator said on 2026-10-25: "this refactory is also the good timing to remove the global flag that should be removed and replaced with dynamic configuration long time ago".
+
+### Issue
+
+- `buildCycleEnv` copies each `EVOLVE_*` variable of the operator shell into the cycle (`go/cmd/evolve/cmd_loop_args.go:341-352`).
+- At `enforce`, the X2 allowlist still passes each `EVOLVE_*` and `BRIDGE_*` name to an LLM child (review of #1122, H2).
+- So each knob and each bypass reaches each LLM child (F5.5). `EVOLVE_SANDBOX`, which §7 refuses in a phase, is one of them.
+- `policy.Parse` ignores an unknown key (`go/internal/policy/patch.go:9-21`), so a knob that moves into the policy file needs a strict decode first (F5.4).
+- The registry has 26 rows, but the header of control-flags.md says 35, and many readers are not in the registry (F5.1, F5.3).
+
+### Gap
+
+A deny list in the bridge cannot keep up with new names, which is the same reason as I-2. A knob in the environment also leaves no record of who set it and when.
+
+### Solution
+
+**I-16 No ambient control.** The pipeline reads no control value from the environment. Each reader goes into one of five classes, and each class has one fix. [control-flags.md](control-flags.md#classes-of-the-readers-outside-the-registry) lists the names.
+
+| Class | Count | Fix | Item |
+|---|---|---|---|
+| (a) pipeline markers | 23 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, for example `ipcenv.Markers()`. It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell (X2 H2). `buildCycleEnv` copies only these names. | X18b |
+| (b) operator knobs | 18 | move into `.evolve/policy.json`, strict-decoded. The pipeline reads them at each cycle or boundary. One wave of shadow: an environment value that differs from the policy value prints a WARN and loses. | X18c |
+| (c) bypasses | 10 | an explicit CLI parameter that writes a ledger record and a `CONTROL_BYPASS_USED` signal, or removal | X18d |
+| (d) dead names | 6 | delete, with the registry rows | X18e |
+| (e) test seams | 8 | move behind an injected field of a `Deps` struct; tests set the field | X18e |
+
+X18a and X18b go first, in either order. X18c to X18e follow X18b, and X18c also needs X18a:
+
+1. **X18a** makes `policy.Parse` strict with `DisallowUnknownFields`, like `decodeStrict` (`go/internal/policy/cli_routing.go:124`). It first lists each unknown key of the tracked policy file and of the test fixtures. The red test is a policy with the key `fleet.cuont` that parses today.
+2. **X18b** adds the marker list and closes the `buildCycleEnv` leak. It adds the AST guard `TestNoControlFlagReadOutsideTheMarkerList`:
+   - It walks each non-test Go file and finds each `os.Getenv`, `os.LookupEnv` and `envchain` read.
+   - It resolves constant concatenations such as `"EVOLVE_"+"RESUME"`.
+   - It allows a name in the marker list, a knob that is not yet moved, or an outside name (`HOME`, `PATH`, `TMUX`, `CI`, `CLAUDE_CODE_*`).
+   - It fails on each other name. The list of knobs not yet moved can only shrink.
+3. **X18c** moves the 18 knobs. Each knob that duplicates a policy key (for example, `EVOLVE_MANDATORY_PHASES` and `mandatory_phases`) keeps the policy key.
+4. **X18d** turns each bypass into a parameter or removes it. `EVOLVE_OPERATOR_CONFIRM` already has the `-operator` flag as its primary surface.
+5. **X18e** deletes the dead names and moves the test seams.
+
+When X18 is done, `evolve flags generate` prints only the marker list and the outside list. control-flags.md then describes the markers, and the knobs are in [runtime-reference.md](../operations/runtime-reference.md) as policy keys.
+
+## 28. The CLI-neutral task assignment (X19)
+
+*This section is the design of I-17 ([ADR-0154](adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) rules 20 to 24).*
+
+The operator said on 2026-10-25: "for different LLM clis, when assigned the tasks through agent bridge, the task assignment should only contains the general info without any LLM cli specification and settings. The specific setting for that particular LLM should be attached and hidden under agent bridge driver which is designed location for attaching LLM cli special configuration. The Pipeline itself must be agnostic for the assignment and configurations, LLM specification can only be appended under the driver layer."
+
+### Issue
+
+CLI specifics live above the driver layer today (research F6.1 to F6.6):
+
+| Leak | Evidence on `72561f774` | Owner |
+|---|---|---|
+| A named CLI in the assignment | `core.PhaseRequest.ModelRoutingCLI`, `ModelRoutingTier`, `ModelRoutingEffort` (`go/internal/core/phase.go:101-105`); the runner overlay (`go/internal/phases/runner/routing.go:94`, `:113`) | X19a |
+| The advisor names a CLI | the plan schema asks for `"cli"` (`go/internal/core/advisor/prompt.go:90`) | X19a |
+| CLI syntax in profiles | `cli` and `cli_fallback` in 93 agent profiles; Claude tool syntax in `allowed_tools` and `disallowed_tools`, for example `Bash(evolve phase verify:*)` in 93 profiles; `extra_flags_by_cli` in 27 profiles | X19b |
+| Claude tools in personas | 14 of 106 files under `agents/` | X19b |
+| Family and model literals in flow code | `phase_advisor.go:73`, `failure_advisor.go:54`, `phase_judge.go:28`, `contract_escalation.go:22`; the default model `opus` of four phases | X6 (not X19) |
+| Per-agent CLI and model flags | `EVOLVE_<AGENT>_CLI`, `_MODEL` (control-flags.md class (b)) | X18c (not X19) |
+| Guards as Claude Code hooks | `.claude/settings.json` | X7 (not X19) |
+
+### Gap
+
+I-6 says that flow logic names no family. It does not say what the assignment holds. A persona, a profile and a request can still carry a vendor's syntax, so a new family needs a change above the driver.
+
+### Solution
+
+**The neutral TaskAssignment (proposed).** The pipeline sends only these fields to the bridge:
+
+| Field | Example | Today's source |
+|---|---|---|
+| role or profile id | `builder` | the profile name |
+| input index | `inputs/index.json` (§8) | the workspace paths in the persona |
+| output contract and schema | `build-report.md`, the `phasecontract` schema | `output_artifact` |
+| capability tier | `fast`, `balanced`, `deep`, `top` | `model_tier_default`, `ModelRoutingTier` |
+| effort intent | `low`, `medium`, `high` | `ModelRoutingEffort` |
+| budgets and timeouts | turns, tokens, wall time | `max_turns`, `max_budget_usd` |
+| sandbox intents | read inputs, write worktree, run command class X, network yes or no | `allowed_tools`, `disallowed_tools`, `sandbox` |
+| persona text | the CLI-neutral persona | `agents/<name>.md` |
+
+**The driver binding is opaque.** `cli_routing` picks a driver identity, for example `agy-tmux`. The pipeline passes the identity through and never branches on it. Only the bridge reads it.
+
+**The driver and manifest layer holds everything else:**
+
+| CLI specific | Home after X19 |
+|---|---|
+| model names | the manifest `model_tier_map` |
+| CLI flags, such as a permission-bypass flag and `--strict-mcp-config` | the manifest `default_args`, or a driver flag table |
+| tool allowlist syntax, such as `Bash(evolve phase verify:*)` | the driver translates the neutral sandbox intents into its syntax |
+| system-prompt delivery | the driver |
+| environment passthrough | the manifest `env_passthrough` (proposed, X2) |
+| dialog auto-responses | the manifest `interactive_prompts` |
+| output, transcript and usage parsing | the manifest `parsers`, `collectors`, `transcript` (proposed, X9) |
+
+**Capability negotiation.** Each driver declares its capabilities in the manifest `capabilities` field (proposed, X9): tools, structured output, sandbox support and context size. A profile names the capabilities that its seat needs, for example `["edit", "shell"]`. The router keeps only the drivers that have each needed capability. When no driver in the chain has them, the router refuses the seat with a routing error. It never downgrades in silence.
+
+**What stays in a profile.** A family preference list is routing data, so it stays, or moves into `cli_routing` (X6b). The profile keeps the role, the output, the tier, the budgets, the needed capabilities and the sandbox intents.
+
+### Guard
+
+`TestNoCLISpecificsAboveTheDriver` (proposed) walks each non-test Go file and each tracked profile and persona. Outside `internal/bridge` and the routing-data loader, it fails on:
+
+- a model name from any manifest `model_tier_map`;
+- a CLI flag from any manifest `default_args` or driver flag table;
+- a vendor tool-permission pattern, such as `Bash(` or `Edit(` followed by an argument;
+- a driver identity used in a comparison or a switch.
+
+The guard starts with an allowlist of today's sites, and the allowlist can only shrink. X6 removes the Go family literals, and X19a to X19c remove the rest.
+
+### Relation to the other components
+
+| Component | Owns | X19 does not |
+|---|---|---|
+| X6 | the floor, the flow-seat defaults and the default models | rebuild the flow-seat chains |
+| X6b | the `allowed_clis` pins of 7 profiles | move those pins |
+| X9 | the manifest `parsers`, `collectors`, `transcript` and `capabilities` fields | add a second capability field; X19c uses the X9 field |
+| X10 | the instruction files `CLAUDE.md`, `GEMINI.md` and the `.claude/agents` reviewers | render instruction files; X19b neutralizes only the personas under `agents/` |
+| X18 | the per-agent `EVOLVE_<AGENT>_*` flags | touch the environment |
+| X7 | the Claude Code hooks | change the hooks |
+
+X19 lands in three items:
+
+| Item | Scope | Red test first | Depends on |
+|---|---|---|---|
+| X19a | The neutral `TaskAssignment`; `ModelRoutingCLI` leaves `PhaseRequest`; the advisor proposes a tier and capabilities, not a CLI; the guard with its shrinking allowlist | `TestNoCLISpecificsAboveTheDriver` lists `ModelRoutingCLI` and the advisor `"cli"` field | X6 |
+| X19b | Neutral sandbox intents in the profiles, which each driver translates. `extra_flags_by_cli` moves into the manifests. The 14 persona files that name a Claude Code tool or feature become neutral. | the guard lists `Bash(evolve phase verify:*)` in 93 profiles | X19a, X6b |
+| X19c | Capability negotiation: profiles name the needed capabilities, and the router refuses a seat with no capable driver | a seat that needs `edit` routes to a driver with no `edit` capability today | X9, X19a, X6b |
+
 ## Guards
 
 | Invariant | Guard test (proposed name unless stated) | Component | Stage when it lands | Signal code |
@@ -944,6 +1124,9 @@ The measures for the stage flips of §20.2 are proposed panel readings: repair s
 | I-12 Orchestrator proposes, pipeline disposes | `TestValidator_RefusesAnActionOutsideTheCatalog`; `TestRepairDispatch_NeedsAnAcceptedProposal`; the orchestrator profile has no dispatch tool | X13, X14 | `shadow`, then `enforce` for each tier | `HEALING_I12_VIOLATION` |
 | I-13 Bounded autonomy | `TestBudget_RefusesTheFourthT1RepairInAWindow`; `TestBreaker_OpensAfterTwoFailedRepairs` | X14 | `enforce` | `HEALING_I13_VIOLATION` |
 | I-14 Evidence closes an incident | `TestIncident_ClosesOnlyWithTheFourConditions` | X12, X16 | `enforce` | `HEALING_I14_VIOLATION` |
+| I-15 The CLI is the service contract | `TestLoopStatus_AnExtraWordNeverStartsALoop`; `TestCLIContract_DocMatchesTheRegistry`; `TestCLIContract_EachCoreVerbPrintsOneEnvelope` | X17 | `enforce` | none (a test guard) |
+| I-16 No ambient control | `TestNoControlFlagReadOutsideTheMarkerList` (AST); `TestPolicyParse_RefusesAnUnknownKey`; matrix row N1 extended with `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` | X18 | `enforce` | `CONTROL_BYPASS_USED` (INFO, for each audited bypass) |
+| I-17 The assignment is CLI-neutral | `TestNoCLISpecificsAboveTheDriver` (a shrinking allowlist); a routing test that refuses a seat with no capable driver | X19a to X19c | `enforce` | none (a test guard); a routing refusal is a normal routing error |
 
 ## Limits
 
@@ -958,3 +1141,5 @@ The measures for the stage flips of §20.2 are proposed panel readings: repair s
 - A diagnosis can be wrong with high confidence. The budgets limit the cost of a wrong diagnosis, not its rate.
 - The thresholds for the stage flips of §20.2 are proposals with no baseline. The `shadow` stage gives the first data.
 - Self-healing does not repair T0. A defect in the kernel always needs the operator.
+- The CLI contract covers the core verbs only. A caller that needs a push channel or a call faster than a process start needs a daemon, which is a separate decision.
+- X18 removes the control flags from the pipeline. It does not stop an operator who edits the policy file by hand. The strict decode and the boundary read make such an edit visible.
