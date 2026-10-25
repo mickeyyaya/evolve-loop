@@ -547,7 +547,9 @@ The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` parses ea
 
 A row passes when the cycle ships, the ledger holds each phase, and only the stub of the row family ran. X6 adds `floors: {}` to the row policy when the key exists.
 
-Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver, and the harness has no tmux REPL fake. A stub `tmux` on the row `PATH` refuses, so rows M2 to M4 fail with `new-session: exit status 1` on each host. Row M5 fails because `ollama-tmux cannot use tools`. The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
+Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver, and the harness has no tmux REPL fake. A stub `tmux` on the row `PATH` refuses, so rows M2 to M4 fail with `new-session: exit status 1` on each host. Row M5 fails because `ollama-tmux cannot use tools`.
+
+The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
 
 The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
 
