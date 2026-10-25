@@ -50,10 +50,10 @@ func TestRoleAndPhaseGuards_ReadOwnRunState(t *testing.T) {
 		t.Error("fixture self-check: the global (other-run) state should deny this write")
 	}
 
-	agent := core.GuardInput{ToolName: "Agent", ToolInput: map[string]any{}}
-	d := NewPhase(ownStore, false).Decide(ctx, agent)
+	agent := core.GuardInput{ToolName: "Agent", ToolInput: map[string]any{"subagent_type": "evo:evolve-builder"}}
+	d := newPhaseWithEnv(ownStore, false, noCellEnv).Decide(ctx, agent)
 	if d.Allow {
-		t.Fatal("phase guard must deny Agent during the run's own active cycle")
+		t.Fatal("phase guard must deny a phase-persona Agent outside a cell during the run's own active cycle")
 	}
 	if !strings.Contains(d.Reason, "build") || strings.Contains(d.Reason, "scout") {
 		t.Errorf("phase guard denial must cite the run's OWN phase (build), got: %s", d.Reason)

@@ -13,7 +13,7 @@
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
 > - X3: built in this change. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on the branch, and matrix row N2 is green.
-> - X7: built in this change at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` denies `Task`, and rows N10 and N11 are green (§9.1).
+> - X7: built in this change at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` follows §7.2 for `Agent` and `Task`, and rows N10 and N11 are green (§9.1).
 - X4, X5, X8 to X19: not started.
 
 ## Table of contents
@@ -724,7 +724,7 @@ A worked example: the build pane of an agy cell runs `echo x > go/internal/guard
 | `guard role`: a phase writes only its workspace and its worktree | the sandbox write grants (exist); the fence of a read-only phase restores each write outside its writable paths (exists) | `go/internal/bridge/sandbox_paths.go`; `go/internal/phases/runner/worktree_fence.go:12` |
 | `guard ship`: only `evolve ship` lands a commit | the sandbox grants the write of the own branch ref only, not of `main` (exists); the ship binds the audit to the tree (exists) | `bridge.sandboxGitWritePaths`; `go/internal/phases/ship/` |
 | `guard docdelete`: no delete of committed docs | the ship refuses the deletion of a file under `docs/` or `knowledge-base/` (exists) | `ship.refuseCommittedDocDeletion` (`go/internal/phases/ship/committed_doc_guard.go:17`) |
-| `guard phase`: no in-process `Agent` or `Task` during a cycle | the exec deny of each LLM binary (X4, §7.1); the hook now denies `Task` too (X7, row N11) | `go/internal/guards/phase.go` |
+| `guard phase`: a session outside a cell cannot start a phase persona during a cycle | the exec deny of each LLM binary and the cell markers (X4, §7.1); the hook judges `Agent` and `Task` alike (X7, row N11) | `go/internal/guards/phase.go` |
 | no global effect: `kill(-1)` from a cell | the SBPL profile grants `signal` only to `(target same-sandbox)` under `(deny default)`; `bwrap` runs the cell with `--unshare-pid` (exist; a contract row pins both, §23) | `go/internal/adapters/sandbox/sandbox.go` |
 
 | Item | As built |
@@ -747,7 +747,7 @@ Three facts set the form of the rule. Each was measured on macOS on 2026-10-26 w
 The guards are these tests:
 
 - row N10, `TestAgentSandboxContract_N10_AnAgyPaneCannotWriteAProtectedPath` (darwin, build tag `integration`): an `agy-tmux` cell writes three protected paths and gets `Operation not permitted` for each. It still writes `go/internal/guards2/x.go`, a sibling of a protected directory.
-- row N11, `TestIsolationMatrix_N11_GuardPhaseDeniesTaskDuringACycle`, and `TestPhase_TaskIsDeniedDuringACycleLikeAgentAndAllowedOutsideIt`
+- row N11, `TestIsolationMatrix_N11_GuardPhaseAllowsAnInCellTaskAndDeniesAnOutOfCellPhasePersonaTask`: a `Task` inside a cell passes, and a phase-persona `Task` outside a cell during a cycle is denied. A revert of either branch fails the row.
 - `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess`: it reads the generated profiles and runs no signal (§23)
 - `TestWithProtectedWrites_EnforceDeniesEachManifestFragmentUnderEachBase`, `TestSandboxWrap_TheProtectedRulesNameTheRealPathsOfASymlinkedWorktreeAndTheRoot`, `TestGenerateSBPL_EnforceDeniesEachProtectedPathAfterTheWorktreeGrant` and `TestBwrapPrefix_EnforceBindsEachProtectedPathReadOnlyBeforeTheExecMasks`
 
@@ -756,7 +756,10 @@ Known differences from the design:
 - At `shadow` no Go code emits `ISOLATION_I7_VIOLATION`. The report stays in the system log of macOS. The reader of the sandbox reports that X4 and X5 need is also the reader for I-7.
 - A rename of a parent directory of a protected path, for example `mv go/internal x`, is not denied. The ship tripwire lists each old path of the rename, so the cycle cannot ship it.
 - On Linux a protected path that does not exist at the launch gets no bind, because `bwrap` binds only a path that exists. A new file with a protected prefix also gets no bind. The ship tripwire refuses each such file.
-- `guard phase` denies `Task` in Claude Code panes, but §7.2 allows a subagent of the own harness. The two rules meet in the hook only: a Claude Code phase agent cannot start a `Task` subagent during a cycle. The hook is defence in depth, so a later change to it follows §7.2.
+- `guard phase` follows §7.2:
+  - Inside a cell (`EVOLVE_PHASE` set by the launcher), each `Agent` and `Task` call passes. A phase agent can start any subagent of its own harness.
+  - Outside a cell, during a cycle, the hook denies a call whose `subagent_type` names a phase persona. A phase persona is `evolve-*`, with or without a plugin prefix. Thus the console or an operator session cannot act as a phase. A generic subagent passes.
+  - The marker is advisory, because an agent can set or unset it. That is acceptable, because the hook is defence in depth. The cell boundary (sandbox, exec deny, dispatch credential) is the limit.
 
 ## 10. Routing data
 
@@ -977,7 +980,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N8 | a cell cannot read `~/.ssh` | I-5 | X5 | sandbox contract | green (X5) |
 | N9 | the network row records today's behavior (allowed) | none | X1 | sandbox contract | green |
 | N10 | an agy pane cannot write a protected path | I-7 | X7 | sandbox contract | green (X7, at `enforce`) |
-| N11 | `guard phase` denies `Task` | I-7 | X7 | `internal/guards` | green (X7) |
+| N11 | `guard phase` allows an in-cell `Task` and denies an out-of-cell phase-persona `Task` during a cycle | I-7 | X7 | `internal/guards` | green (X7) |
 | N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | green (X8, at `enforce`) |
 | N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | green |
 | N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |

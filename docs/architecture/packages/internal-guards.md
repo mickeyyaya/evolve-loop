@@ -16,7 +16,7 @@ The hooks are defence in depth, because they fire only in Claude Code panes. The
 | Guard | Tool | Rule | Off switch |
 |---|---|---|---|
 | `chain` | any | allow only while the ledger's hash chain verifies | none |
-| `phase` | `Agent`, `Task` | deny during an active cycle, so phase agents go through the native bridge | `--bypass` |
+| `phase` | `Agent`, `Task` | deny a phase persona (`subagent_type` `evolve-*`) outside a phase cell during an active cycle. Inside a cell (the advisory `EVOLVE_PHASE` marker), allow each call (llm-isolation §7.2). | `--bypass` |
 | `role` | `Edit`, `Write` | per-phase write allowlist plus the control-plane boundary | `--bypass` (still alarms on a protected path) |
 | `ship` | `Bash` | deny `git commit`, `git push` and `gh release create/edit` unless that simple command itself runs `evolve ship`; each command on the line is judged on its own | `--bypass` |
 | `docdelete` | `Bash` | deny an `rm` whose line names `docs/` or `knowledge-base/` anywhere (case-folded, bare or as a directory; a command substitution can feed the `rm` a path another command names), a removal (`rm`, `git rm`, `unlink`, `git clean`, a `find` with `-delete` or an `-exec`/`-execdir`/`-ok` of `rm` or `unlink` by any path) whose words name a doc root after quote removal, an `rm` or `mv` run inside one (`cd`, `pushd`, `git -C`, or the shell's own directory), and an `mv` or `git mv` (past git's global options) of doc content outside `docs/`, reading the destination from `-t`/`--target-directory` (and its abbreviations) when given and every word after `--` as a source; allow only an `rm`/`git rm` of exactly the active cycle's never-committed explanation document | `workflow.allow_doc_delete` |
