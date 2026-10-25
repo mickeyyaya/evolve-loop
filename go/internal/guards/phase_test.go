@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
@@ -100,5 +101,20 @@ func TestPhase_NilStorageDenies(t *testing.T) {
 	dec := g.Decide(context.Background(), core.GuardInput{ToolName: "Agent"})
 	if dec.Allow {
 		t.Error("nil storage must deny by default")
+	}
+}
+
+func TestPhase_TaskIsDeniedDuringACycleLikeAgentAndAllowedOutsideIt(t *testing.T) {
+	inCycle, _ := setupStorageWithCS(t, core.CycleState{CycleID: 7, Phase: "audit"})
+	dec := NewPhase(inCycle, false).Decide(context.Background(), core.GuardInput{ToolName: "Task"})
+	if dec.Allow || !strings.HasPrefix(dec.Reason, "Task tool denied during cycle audit") {
+		t.Fatalf("Task during a cycle must be denied with a reason that names it: %+v", dec)
+	}
+	if dec := NewPhase(nil, false).Decide(context.Background(), core.GuardInput{ToolName: "Task"}); dec.Allow || !strings.Contains(dec.Reason, "refusing Task invocation") {
+		t.Fatalf("Task with no storage must be denied by default: %+v", dec)
+	}
+	idle, _ := setupStorageWithCS(t, core.CycleState{})
+	if dec := NewPhase(idle, false).Decide(context.Background(), core.GuardInput{ToolName: "Task"}); !dec.Allow {
+		t.Fatalf("Task outside a cycle must pass: %s", dec.Reason)
 	}
 }

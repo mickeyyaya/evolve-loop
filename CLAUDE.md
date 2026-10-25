@@ -41,11 +41,11 @@ Bypass = "don't ask the user", NOT "skip integrity checks". These rules are mand
 1. Continue all cycles without a pause. Never ask "should I continue?".
 2. Run the FULL pipeline every cycle: real `scout-report.md` / `build-report.md` / `audit-report.md`.
 3. The Go orchestrator state machine (`go/internal/core`) enforces the phase order at every transition.
-   `evolve guard phase` is a live PreToolUse deny of in-process `Agent` dispatch while a cycle is active.
-   The hook matcher is `Agent|Task`, but the Go guard checks only `Agent` (`go/internal/guards/phase.go:22`), so a `Task` call passes today. Component X7 of [ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) fixes it (matrix row N11).
+   `evolve guard phase` denies in-process `Agent` and `Task` dispatch during a cycle (matrix row N11, X7 of [ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)).
+   The four `evolve guard` hooks are defence in depth in Claude Code panes only. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)).
    ADR-0075 rewired `evolve guard phase` (`go/internal/guards/phase.go`).
 4. Never fabricate cycle numbers (CRITICAL violation).
-5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). The in-process `Agent` is denied.
+5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). The in-process `Agent` and `Task` are denied.
 6. The OS sandbox wraps subprocesses (`EVOLVE_SANDBOX=1`). When the sandbox is nested, the EPERM fallback turns on automatically.
 7. Run the eval-quality pre-flight on every eval (`evolve eval quality-check`).
 8. The Adversarial Auditor is on by default. The auditor runs Claude Opus on Claude Code, and the builder runs agy first. `ADVERSARIAL_AUDIT=0` turns it off.

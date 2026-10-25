@@ -13,7 +13,8 @@
 > - X2: merged in #1122 at stage `shadow` (the policy key `isolation.i2.stage`). The flip to `enforce` is an operator decision.
 > - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
 > - X3: built in this change. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on the branch, and matrix row N2 is green.
-> - X4, X5, X7 to X19: not started.
+> - X7: built in this change at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` denies `Task`, and rows N10 and N11 are green (§9.1).
+- X4, X5, X8 to X19: not started.
 
 ## Table of contents
 
@@ -695,6 +696,7 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 | Read of the rest of `$HOME` | deny at `enforce` | no grant | not bound | I-5 | allowed |
 | Write of the worktree and the own run dir | allow | as today (`go/internal/bridge/sandbox_paths.go:161-201`) | as today | I-7 | allowed |
 | Write of another cycle, `.evolve/events/`, `.evolve/resume-witness/` | deny | as today | as today | I-7 | denied |
+| Write of a protected path of the worktree or the repo root | deny | `(deny file-write* (subpath "<base>/<dir>"))` for each directory fragment of `guards.ProtectedSurfaceManifest`, `(deny file-write* (prefix "<base>/<file>"))` for each file fragment, after every write grant (§9.1) | `--ro-bind <path> <path>` for each protected path that exists | I-7 | built at `shadow` (X7, §9.1) |
 | Write of `inputs/` | deny | `(deny file-write* (subpath "<ws>/inputs"))` | `--ro-bind-try` | I-4 | built at `shadow` (X5) |
 | Network | allow | as today | as today | none (a limit) | allowed |
 | Signal of a host process | deny | as today | as today | I-7 | denied |
@@ -709,6 +711,52 @@ The SBPL rule order matters: a later rule wins. The generator writes the rules i
 A contract row pins the order: a read of an unrelated run after the repo grant is denied. Only secondary sources describe the SBPL syntax (research P2.4), so each rule gets a row in the sandbox contract test that runs on the host.
 
 The macOS Keychain is reached through a system service, not through a file read. The deny of `$HOME` therefore does not stop the Claude OAuth login. X5 proves it with a contract row: the cell reads the item `Claude Code-credentials` of a fixture keychain with `security find-generic-password`.
+
+### 9.1 As built (X7)
+
+Before X7, the four kernel guards were Claude Code PreToolUse hooks only (`.claude/settings.json`, research F1.6). An agy, codex or ollama pane got none of them. X7 puts each guarantee in a layer that does not depend on the CLI. The hooks stay as defence in depth in Claude Code panes.
+
+A worked example: the build pane of an agy cell runs `echo x > go/internal/guards/role.go` in its worktree. At `enforce` the macOS profile denies the write, and the shell prints `Operation not permitted`. A write of `go/internal/feature/x.go` in the same worktree goes through. At `shadow` both writes go through, and the sandbox writes a report of the protected write to the system log.
+
+| Hook guarantee | CLI-neutral layer | Where |
+|---|---|---|
+| `guard role`: a cycle does not change the control plane | the sandbox denies each write of a protected path (new); the ship tripwire refuses a cycle diff that touches a protected path (exists) | `bridge.Deps.withProtectedWrites`, `sandbox.writeProtectedWriteRules`; `ship.verifyNoControlPlaneEdits` (`go/internal/phases/ship/integrity.go:11`) |
+| `guard role`: a phase writes only its workspace and its worktree | the sandbox write grants (exist); the fence of a read-only phase restores each write outside its writable paths (exists) | `go/internal/bridge/sandbox_paths.go`; `go/internal/phases/runner/worktree_fence.go:12` |
+| `guard ship`: only `evolve ship` lands a commit | the sandbox grants the write of the own branch ref only, not of `main` (exists); the ship binds the audit to the tree (exists) | `bridge.sandboxGitWritePaths`; `go/internal/phases/ship/` |
+| `guard docdelete`: no delete of committed docs | the ship refuses the deletion of a file under `docs/` or `knowledge-base/` (exists) | `ship.refuseCommittedDocDeletion` (`go/internal/phases/ship/committed_doc_guard.go:17`) |
+| `guard phase`: no in-process `Agent` or `Task` during a cycle | the exec deny of each LLM binary (X4, §7.1); the hook now denies `Task` too (X7, row N11) | `go/internal/guards/phase.go` |
+| no global effect: `kill(-1)` from a cell | the SBPL profile grants `signal` only to `(target same-sandbox)` under `(deny default)`; `bwrap` runs the cell with `--unshare-pid` (exist; a contract row pins both, §23) | `go/internal/adapters/sandbox/sandbox.go` |
+
+| Item | As built |
+|---|---|
+| Protected paths | `bridge.Deps.withProtectedWrites` maps each fragment of `guards.ProtectedSurfaceManifest` onto the real path of the worktree, and at `enforce` also of the repo root. A fragment that ends in `/` is a directory, so it gets `subpath`. Any other fragment is a file prefix, for example `probe_quarantine`, so it gets `prefix`. Thus the role guard and the sandbox read one list. |
+| Rule order | At `enforce`, `GenerateSBPL` writes the deny rules last, because a later SBPL rule wins. At `shadow`, it writes the report rules directly after the write grants, so each later deny still wins. The repo root is read-only, so a `shadow` report rule for it can open the root again. Thus `shadow` covers the worktree only. `BwrapPrefix` writes the binds after the worktree bind and before the exec masks. |
+| Stage source | the policy key `isolation.i7.stage`, read by `policy.IsolationGuaranteeStage`. An explicit `Deps.GuaranteeStage` wins. The default is `shadow`. |
+| SBPL, `enforce` | `(deny file-write* (subpath "<path>"))` and `(deny file-write* (prefix "<path>"))` |
+| SBPL, `shadow` | the same match as `(allow file-write* ... (with report))` |
+| `bwrap`, `enforce` | `--ro-bind <path> <path>` for each protected directory that exists and for each file that starts with a protected prefix |
+| `bwrap`, `shadow` | no bind |
+| `off` | no protected rule |
+
+Three facts set the form of the rule. Each was measured on macOS on 2026-10-26 with `sandbox-exec` and a scratch directory:
+
+- `prefix` is a valid SBPL filter. It denies `probe_quarantine.go` and allows `other.go` in the same directory.
+- A `subpath` deny of a directory also denies a rename of the directory itself.
+- The match is on the resolved path. A write of `GO/internal/guards/role.go` on a case-insensitive volume is denied by the rule for `go/internal/guards`.
+
+The guards are these tests:
+
+- row N10, `TestAgentSandboxContract_N10_AnAgyPaneCannotWriteAProtectedPath` (darwin, build tag `integration`): an `agy-tmux` cell writes three protected paths and gets `Operation not permitted` for each. It still writes `go/internal/guards2/x.go`, a sibling of a protected directory.
+- row N11, `TestIsolationMatrix_N11_GuardPhaseDeniesTaskDuringACycle`, and `TestPhase_TaskIsDeniedDuringACycleLikeAgentAndAllowedOutsideIt`
+- `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess`: it reads the generated profiles and runs no signal (§23)
+- `TestWithProtectedWrites_EnforceDeniesEachManifestFragmentUnderEachBase`, `TestSandboxWrap_TheProtectedRulesNameTheRealPathsOfASymlinkedWorktreeAndTheRoot`, `TestGenerateSBPL_EnforceDeniesEachProtectedPathAfterTheWorktreeGrant` and `TestBwrapPrefix_EnforceBindsEachProtectedPathReadOnlyBeforeTheExecMasks`
+
+Known differences from the design:
+
+- At `shadow` no Go code emits `ISOLATION_I7_VIOLATION`. The report stays in the system log of macOS. The reader of the sandbox reports that X4 and X5 need is also the reader for I-7.
+- A rename of a parent directory of a protected path, for example `mv go/internal x`, is not denied. The ship tripwire lists each old path of the rename, so the cycle cannot ship it.
+- On Linux a protected path that does not exist at the launch gets no bind, because `bwrap` binds only a path that exists. A new file with a protected prefix also gets no bind. The ship tripwire refuses each such file.
+- `guard phase` denies `Task` in Claude Code panes, but §7.2 allows a subagent of the own harness. The two rules meet in the hook only: a Claude Code phase agent cannot start a `Task` subagent during a cycle. The hook is defence in depth, so a later change to it follows §7.2.
 
 ## 10. Routing data
 
@@ -928,8 +976,8 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 | sandbox contract | green (X5) |
 | N8 | a cell cannot read `~/.ssh` | I-5 | X5 | sandbox contract | green (X5) |
 | N9 | the network row records today's behavior (allowed) | none | X1 | sandbox contract | green |
-| N10 | an agy pane cannot write a protected path | I-7 | X7 | sandbox contract | open |
-| N11 | `guard phase` denies `Task` | I-7 | X7 | `internal/guards` | open |
+| N10 | an agy pane cannot write a protected path | I-7 | X7 | sandbox contract | green (X7, at `enforce`) |
+| N11 | `guard phase` denies `Task` | I-7 | X7 | `internal/guards` | green (X7) |
 | N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | green (X8, at `enforce`) |
 | N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | green |
 | N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
@@ -1239,9 +1287,9 @@ An accident inside a cell must stay inside the cell. Two incidents show the risk
 | Global effect | Guard | Component |
 |---|---|---|
 | kill the shared tmux server | the private `tmux -L` server rows of the sandbox contract (exist) | X4 keeps them; X7 adds a row for each family |
-| signal a host process, `kill(-1)` | the "signal a host process" deny (exists); a contract row for `kill(-1)` | X7 |
+| signal a host process, `kill(-1)` | the "signal a host process" deny (exists); the contract row `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess` reads the profiles and runs no signal (§9.1) | X7 (built) |
 | start another LLM or a dispatch | the exec deny and the depth marker | X4 |
-| write the shared state of the loop | the write fence and the ADR-0064 deny | X7 |
+| write the shared state of the loop | the write fence, the protected write rule and the ADR-0064 deny | X7 (built, §9.1) |
 | run a mutation on kill code | the mutation gate skips code that signals a process (ADR-0153 rule 17) | X15 for the T1 mutation gate |
 
 ## 24. Self-healing signals
@@ -1385,7 +1433,7 @@ CLI specifics live above the driver layer today (research F6.1 to F6.6):
 | Claude tools in personas | 14 of 106 files under `agents/` | X19b |
 | Family and model literals in flow code | `phase_advisor.go:73`, `failure_advisor.go:54`, `phase_judge.go:28`, `contract_escalation.go:22`; the default model `opus` of four phases | X6, merged in #1123 after this read (not X19) |
 | Per-agent CLI and model flags | `EVOLVE_<AGENT>_CLI`, `_MODEL` (control-flags.md class (b)) | X18c (not X19) |
-| Guards as Claude Code hooks | `.claude/settings.json` | X7 (not X19) |
+| Guards as Claude Code hooks | `.claude/settings.json` | X7 (not X19; built, the hooks are defence in depth, §9.1) |
 
 ### Gap
 
@@ -1488,7 +1536,7 @@ X19 lands in three items:
 | I-4 Pipeline-mediated communication | rows N5, N6; `TestHandoffAsksTravelInTheIndex` (built) | X5 | `shadow` (built), then `enforce` | `ISOLATION_I4_VIOLATION` |
 | I-5 Read isolation | rows N6, N7, N8; `TestLineageComesOnlyFromPipelineRecords` (built) | X5 | `shadow` (built), then `enforce` | `ISOLATION_I5_VIOLATION` |
 | I-6 Family-agnostic flow | `TestFlowCodeNamesNoFamily`; rows N13, N14 | X6, X9, X10 | `enforce` | `ISOLATION_I6_VIOLATION` |
-| I-7 CLI-neutral guarantees | rows N10, N11 | X7 | `enforce` | `ISOLATION_I7_VIOLATION` |
+| I-7 CLI-neutral guarantees | rows N10, N11; `TestSandboxContract_KillMinusOneFromACellReachesNoHostProcess` | X7 | `shadow`, then `enforce` | `ISOLATION_I7_VIOLATION` |
 | I-8 Typed flow decisions | row N12; `TestFlowDecision_ValidateRejectsAnUnknownFieldAndAMissingField`; `TestFlowCode_OnlyTheLegacySpanFileNamesLastBalancedSpan` | X8 | `legacy`, then `shadow`, then `enforce` (§12.1) | `ISOLATION_I8_VIOLATION` |
 | I-9 Proven substitution | `TestE2ECycleCLIMatrix` rows M1 to M5 (exists, skipped today) | X1, X11 | `enforce` per row | none (a test guard) |
 | I-10 Constitution | `TestGateClassifier_FlagsEachWeakeningPattern` (one case for each pattern of §20.3); the ADR-0064 P2 check (exists) | X15 | `enforce` | `HEALING_I10_VIOLATION` |

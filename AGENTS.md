@@ -26,10 +26,10 @@ evolve-loop is a development pipeline that evolves itself. It orchestrates speci
 
 ## Cross-CLI invariants (the universal rules)
 
-These rules apply on every CLI that you run under. They are STRUCTURAL: kernel hooks enforce them, not prompt instructions.
+These rules apply on every CLI that you run under. They are STRUCTURAL: the OS sandbox, the worktree fence and the ship gates enforce them for every family, not prompt instructions. The Claude Code kernel hooks are defence in depth ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)).
 
 ### 1. Pipeline ordering is non-negotiable
-Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`) denies in-process subagent dispatch while a cycle is active. Per ADR-0075, this hook was rewired onto the `Agent|Task` matcher. The Go guard denies only `Agent` today (`go/internal/guards/phase.go:22`), so a `Task` call passes. X7 of ADR-0154 fixes it.
+Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`) denies in-process subagent dispatch while a cycle is active. Per ADR-0075, this hook was rewired onto the `Agent|Task` matcher. The Go guard denies both tool names (X7 of ADR-0154, matrix row N11).
 
 The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag. With it, the guard allows the call and writes no special log line. Each use is a CRITICAL violation.
 

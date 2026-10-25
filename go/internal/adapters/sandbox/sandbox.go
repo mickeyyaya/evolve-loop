@@ -33,7 +33,10 @@ type Config struct {
 	ExecDenyRoots   []string
 	ExecDenyEnforce bool
 
-	ReadIsolation ReadIsolation
+	ReadIsolation          ReadIsolation
+	ProtectedWriteSubpaths []string
+	ProtectedWritePrefixes []string
+	ProtectedWriteEnforce  bool
 }
 
 func homeStateWriteDirs(home string) []string {
@@ -140,6 +143,7 @@ func GenerateSBPL(cfg Config) string {
 	writeReadGrants(&b, cfg)
 	writeTerminalRules(&b, cfg.TerminalPath)
 	writeWriteGrants(&b, cfg)
+	writeProtectedWriteRules(&b, cfg, false)
 	for _, dp := range cfg.DenyPaths {
 		if dp != "" {
 			fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", dp)
@@ -153,6 +157,7 @@ func GenerateSBPL(cfg Config) string {
 	}
 	writeClosingRules(&b, cfg)
 	writeExecDenyRules(&b, cfg)
+	writeProtectedWriteRules(&b, cfg, true)
 	return b.String()
 }
 
@@ -330,6 +335,7 @@ func BwrapPrefix(cfg Config) []string {
 	if !cfg.AllowNetwork {
 		out = append(out, "--unshare-net")
 	}
+	out = append(out, bwrapProtectedWriteMasks(cfg)...)
 	return append(out, bwrapExecMasks(cfg)...)
 }
 

@@ -19,13 +19,13 @@ func (p *Phase) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisi
 	if p.bypass {
 		return core.GuardDecision{Allow: true}
 	}
-	if in.ToolName != "Agent" {
+	if !isSubagentTool(in.ToolName) {
 		return core.GuardDecision{Allow: true}
 	}
 	if p.storage == nil {
 		return core.GuardDecision{
 			Allow:  false,
-			Reason: "phase guard: storage not configured; refusing Agent invocation by default",
+			Reason: "phase guard: storage not configured; refusing " + in.ToolName + " invocation by default",
 		}
 	}
 	cs, err := p.storage.ReadCycleState(ctx)
@@ -38,9 +38,11 @@ func (p *Phase) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisi
 	if cs.CycleID != 0 {
 		return core.GuardDecision{
 			Allow: false,
-			Reason: "Agent tool denied during cycle " +
+			Reason: in.ToolName + " tool denied during cycle " +
 				cs.Phase + " (use the native subagent bridge); pass --bypass to override in an emergency",
 		}
 	}
 	return core.GuardDecision{Allow: true}
 }
+
+func isSubagentTool(name string) bool { return name == "Agent" || name == "Task" }

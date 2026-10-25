@@ -226,10 +226,6 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string { return "echo '{}' > " + h.run + "/inputs/index.json" }},
 	{action: "isolation N9: open a TCP connection (loopback listener of the host)", want: contractAllow, isolation: "N9",
 		script: func(h contractHost) string { return "nc -z -w 2 127.0.0.1 " + h.netPort + " && echo ok" }},
-	{action: "isolation N10: an agy pane writes the protected path go/internal/guards/role.go", want: contractDeny, isolation: "N10",
-		script: func(h contractHost) string {
-			return "mkdir -p " + h.worktree + "/go/internal/guards && echo x > " + h.worktree + "/go/internal/guards/role.go"
-		}},
 }
 
 func restoreDispatchStore(t *testing.T, h contractHost, _ string) {
@@ -333,6 +329,26 @@ func TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead(t *
 	out, err := exec.Command(h.evolveBin, "subagent", "run").CombinedOutput()
 	if strings.Contains(string(out), "dispatch credential") || !strings.Contains(string(out), "expected <agent> <cycle> <workspace>") {
 		t.Fatalf("outside the cell the pipeline holds the credential and the verb runs: err=%v out=%q", err, out)
+	}
+}
+
+func TestAgentSandboxContract_N10_AnAgyPaneCannotWriteAProtectedPath(t *testing.T) {
+	h := newContractHost(t)
+	h.prefix = cellPrefix(t, requireNativeSandbox(t), h, "enforce", "agy-tmux")
+	for _, rel := range []string{"go/internal/guards/role.go", ".claude/settings.json", "go/internal/phases/audit/probe_quarantine.go"} {
+		out, err := h.agent(t, contractRow{script: func(h contractHost) string {
+			return "mkdir -p " + filepath.Dir(filepath.Join(h.worktree, rel)) + " ; echo x > " + filepath.Join(h.worktree, rel)
+		}})
+		note, jerr := isolation.Judge("N10", contractFailure(contractDeny, out, err))
+		if jerr != nil {
+			t.Fatalf("%s: %v", rel, jerr)
+		}
+		t.Log(rel, note)
+	}
+	if out, err := h.agent(t, contractRow{script: func(h contractHost) string {
+		return "mkdir -p " + h.worktree + "/go/internal/guards2 && echo ok > " + h.worktree + "/go/internal/guards2/x.go && cat " + h.worktree + "/go/internal/guards2/x.go"
+	}}); err != nil || out != "ok" {
+		t.Fatalf("the agy cell must still write an unprotected path of its worktree: err=%v out=%q", err, out)
 	}
 }
 
@@ -471,6 +487,11 @@ func (h *contractHost) withEvolveBinary(t *testing.T) {
 
 func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execStage string) []string {
 	t.Helper()
+	return cellPrefix(t, probe, h, execStage, "claude-tmux")
+}
+
+func cellPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execStage, cli string) []string {
+	t.Helper()
 	profilesDir, err := filepath.Abs(filepath.Join("..", "..", "..", ".evolve", "profiles"))
 	if err != nil {
 		t.Fatal(err)
@@ -479,13 +500,13 @@ func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, exec
 	if err != nil || prof.Sandbox == nil || !prof.Sandbox.Enabled {
 		t.Fatalf("the builder profile must declare an enabled sandbox: %v", err)
 	}
-	cfg := &Config{CLI: "claude-tmux", Agent: "builder", ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
+	cfg := &Config{CLI: cli, Agent: "builder", ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
 		RequireSandbox: true, SandboxWriteSubpaths: prof.Sandbox.WriteSubpaths}
 	if cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, h.root, h.worktree, true); err != nil {
 		t.Fatal(err)
 	}
 	cfg.DispatchID = "sbc-" + strconv.Itoa(os.Getpid())
-	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), ExecStage: execStage, ReadStage: execStage, LookPath: stubOnlyLookPath(h.stubBin),
+	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), ExecStage: execStage, ReadStage: execStage, GuaranteeStage: execStage, LookPath: stubOnlyLookPath(h.stubBin),
 		DispatchStore: func() (dispatchcred.Store, error) { return h.dispatch, nil }}
 	deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, h.ownTTY)

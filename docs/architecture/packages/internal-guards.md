@@ -6,6 +6,8 @@
 
 `internal/guards` is the in-process trust kernel. It holds the five `core.Guard` implementations that `evolve guard <name>` runs as Claude Code PreToolUse hooks. It also holds `ProtectedSurfaceManifest`, the single list of the pipeline control plane that no autonomous cycle can change. Other packages (the ship tripwire, the build floor and the fleet preflight) inject `IsProtectedSurface` and keep no list of their own. The inbox routing roots and triage's breaker judge with `lanerouting.Forbidden`. It composes `IsProtectedScope` with the sandbox deny list of the build profile ([internal-lanerouting](internal-lanerouting.md)).
 
+The hooks are defence in depth, because they fire only in Claude Code panes. The OS sandbox, the worktree fence and the ship gates hold each guarantee for every family. The sandbox reads `ProtectedSurfaceManifest` for its protected write rule ([llm-isolation.md §9.1](../llm-isolation.md#91-as-built-x7), I-7).
+
 ## Design
 
 - **One decision per process.** `internal/cli/guardcmd` builds one guard (`buildGuard`), reads the PreToolUse JSON from stdin, calls `Decide` once, appends to `.evolve/guards.log`, writes an `Alarm` decision to `.evolve/integrity-alarm.jsonl`, and exits 2 on deny. `.claude/settings.json` wires `ship`, `phase`, `role` and `docdelete`. `chain` is run by hand (`evolve guard chain`, the same check as `evolve ledger verify`).
@@ -14,7 +16,7 @@
 | Guard | Tool | Rule | Off switch |
 |---|---|---|---|
 | `chain` | any | allow only while the ledger's hash chain verifies | none |
-| `phase` | `Agent` | deny during an active cycle, so phase agents go through the native bridge | `--bypass` |
+| `phase` | `Agent`, `Task` | deny during an active cycle, so phase agents go through the native bridge | `--bypass` |
 | `role` | `Edit`, `Write` | per-phase write allowlist plus the control-plane boundary | `--bypass` (still alarms on a protected path) |
 | `ship` | `Bash` | deny `git commit`, `git push` and `gh release create/edit` unless that simple command itself runs `evolve ship`; each command on the line is judged on its own | `--bypass` |
 | `docdelete` | `Bash` | deny an `rm` whose line names `docs/` or `knowledge-base/` anywhere (case-folded, bare or as a directory; a command substitution can feed the `rm` a path another command names), a removal (`rm`, `git rm`, `unlink`, `git clean`, a `find` with `-delete` or an `-exec`/`-execdir`/`-ok` of `rm` or `unlink` by any path) whose words name a doc root after quote removal, an `rm` or `mv` run inside one (`cd`, `pushd`, `git -C`, or the shell's own directory), and an `mv` or `git mv` (past git's global options) of doc content outside `docs/`, reading the destination from `-t`/`--target-directory` (and its abbreviations) when given and every word after `--` as a source; allow only an `rm`/`git rm` of exactly the active cycle's never-committed explanation document | `workflow.allow_doc_delete` |
