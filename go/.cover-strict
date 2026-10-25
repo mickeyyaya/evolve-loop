@@ -95,3 +95,4 @@
 ./internal/pipelinerates 100
 ./internal/codeshape 100
 ./internal/isolation 100
+./internal/faketmux 100

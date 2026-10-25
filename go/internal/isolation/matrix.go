@@ -23,9 +23,9 @@ const (
 
 var rows = []Row{
 	{ID: "M1", Check: "a full simulated cycle with claude as the only route", Invariant: "I-9", ClosedBy: "X1", Owner: ownerMatrix},
-	{ID: "M2", Check: "a full simulated cycle with agy as the only route", Invariant: "I-9", ClosedBy: "X1b", Open: true, Owner: ownerMatrix, Cause: "new-session: exit status 1"},
-	{ID: "M3", Check: "a full simulated cycle with agy-claude as the only route", Invariant: "I-9", ClosedBy: "X1b", Open: true, Owner: ownerMatrix, Cause: "new-session: exit status 1"},
-	{ID: "M4", Check: "a full simulated cycle with codex as the only route", Invariant: "I-9", ClosedBy: "X1b, X9", Open: true, Owner: ownerMatrix, Cause: "new-session: exit status 1"},
+	{ID: "M2", Check: "a full simulated cycle with agy as the only route", Invariant: "I-9", ClosedBy: "X1b", Owner: ownerMatrix},
+	{ID: "M3", Check: "a full simulated cycle with agy-claude as the only route", Invariant: "I-9", ClosedBy: "X1b", Owner: ownerMatrix},
+	{ID: "M4", Check: "a full simulated cycle with codex as the only route", Invariant: "I-9", ClosedBy: "X1b", Owner: ownerMatrix},
 	{ID: "M5", Check: "a full simulated cycle with ollama as the only route", Invariant: "I-9", ClosedBy: "X9", Open: true, Owner: ownerMatrix, Cause: "ollama-tmux cannot use tools"},
 	{ID: "N1", Check: "CLAUDECODE=1 on the parent does not reach any seat", Invariant: "I-2", ClosedBy: "X2", Owner: ownerMatrix},
 	{ID: "N2", Check: "no LLM spawn outside the bridge launch API", Invariant: "I-1", ClosedBy: "X3", Owner: "internal/sysexec/isolation_matrix_test.go"},
