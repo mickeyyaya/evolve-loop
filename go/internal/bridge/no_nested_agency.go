@@ -3,6 +3,7 @@ package bridge
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -35,16 +36,17 @@ func (deps Deps) refuseSandboxOffInPhase(cfg *Config) error {
 	return fmt.Errorf("%w (phase %s, cell %s)", ErrSandboxOffInPhase, phase, cfg.Agent)
 }
 
-func (deps Deps) execDeny(cli, goos string) ([]string, bool) {
+func (deps Deps) execDeny(cli, goos string) ([]string, []string, bool) {
 	stage := deps.execStage()
 	if stage == envStageOff {
-		return nil, false
+		return nil, nil, false
 	}
 	own := ""
 	if goos == "linux" {
 		own = manifestBinary(cli)
 	}
-	return deps.llmBinaryPaths(own), stage == envStageEnforce
+	files, roots := deps.execDenyTargets(own)
+	return files, roots, stage == envStageEnforce
 }
 
 func manifestBinary(cli string) string {
@@ -55,24 +57,46 @@ func manifestBinary(cli string) string {
 	return m.Binary
 }
 
-func (deps Deps) llmBinaryPaths(skip string) []string {
+func (deps Deps) execDenyTargets(skip string) (files, roots []string) {
 	lookPath := deps.LookPath
 	if lookPath == nil {
 		lookPath = exec.LookPath
 	}
-	var out []string
+	home, _ := os.UserHomeDir()
 	for _, name := range DriverNames() {
-		bin := manifestBinary(name)
-		if bin == "" || bin == skip {
+		m, err := loadManifestRaw(name)
+		if err != nil || m.Binary == skip {
 			continue
 		}
-		found, err := lookPath(bin)
-		if err != nil {
-			continue
+		if found, err := lookPath(m.Binary); err == nil {
+			files = appendRealPath(files, found)
 		}
-		if real, err := filepath.EvalSymlinks(found); err == nil && !slices.Contains(out, real) {
-			out = append(out, real)
+		for _, root := range m.InstallRoots {
+			roots = appendRealPath(roots, expandHomeRoot(root, home))
 		}
 	}
-	return out
+	return files, roots
+}
+
+func expandHomeRoot(root, home string) string {
+	rel, underHome := strings.CutPrefix(root, "~/")
+	switch {
+	case !underHome:
+		return root
+	case home == "":
+		return ""
+	default:
+		return filepath.Join(home, rel)
+	}
+}
+
+func appendRealPath(paths []string, path string) []string {
+	if path == "" {
+		return paths
+	}
+	real, err := filepath.EvalSymlinks(path)
+	if err != nil || slices.Contains(paths, real) {
+		return paths
+	}
+	return append(paths, real)
 }

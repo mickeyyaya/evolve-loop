@@ -123,7 +123,7 @@ func TestExecStage_ReadsIsolationI3OfThePolicy(t *testing.T) {
 	}
 }
 
-func TestLLMBinaryPaths_UsesTheProcessPathWhenNoLookPathIsInjected(t *testing.T) {
+func TestExecDenyTargets_UsesTheProcessPathWhenNoLookPathIsInjected(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "codex"), []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
@@ -133,7 +133,37 @@ func TestLLMBinaryPaths_UsesTheProcessPathWhenNoLookPathIsInjected(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := (Deps{}).llmBinaryPaths(""); !slices.Equal(got, []string{real}) {
-		t.Fatalf("llmBinaryPaths = %v, want [%s]", got, real)
+	if got, _ := (Deps{}).execDenyTargets(""); !slices.Equal(got, []string{real}) {
+		t.Fatalf("execDenyTargets files = %v, want [%s]", got, real)
+	}
+}
+
+func TestSandboxWrap_EnforceDeniesEveryInstalledVersionUnderTheManifestInstallRoot(t *testing.T) {
+	b := installLLMBinaries(t)
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	versions := filepath.Join(home, ".local", "share", "claude", "versions")
+	if err := os.MkdirAll(versions, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	rootRule := `(deny process-exec (require-all (subpath "` + versions + `")`
+	if sbpl := wrapForExecDeny(t, Deps{ExecStage: "enforce", LookPath: b.lookPath}, "darwin", "codex"); !strings.Contains(sbpl, rootRule) {
+		t.Fatalf("the profile must deny each version under the claude install root, not one file:\n%s", sbpl)
+	}
+	if argv := wrapForExecDeny(t, Deps{ExecStage: "enforce", LookPath: b.lookPath}, "linux", "codex"); !strings.Contains(argv, "--tmpfs "+versions) {
+		t.Fatalf("bwrap must hide the claude install root from a codex cell: %s", argv)
+	}
+	if argv := wrapForExecDeny(t, Deps{ExecStage: "enforce", LookPath: b.lookPath}, "linux", "claude-tmux"); strings.Contains(argv, versions) {
+		t.Fatalf("bwrap cannot hide the install root of the family that it launches: %s", argv)
+	}
+}
+
+func TestExecDenyTargets_AHomeRootNeedsAHome(t *testing.T) {
+	t.Setenv("HOME", "")
+	if _, roots := (Deps{LookPath: installLLMBinaries(t).lookPath}).execDenyTargets(""); slices.ContainsFunc(roots, func(r string) bool { return strings.Contains(r, ".local") }) {
+		t.Fatalf("with no home a ~/ root must resolve to nothing, never to a path under the working directory: %v", roots)
 	}
 }

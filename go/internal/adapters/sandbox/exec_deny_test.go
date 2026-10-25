@@ -79,3 +79,22 @@ func TestBwrapPrefix_TheExecMaskFollowsTheParentBindAndTheReadDenials(t *testing
 		t.Fatalf("a write path that holds the repo is bound once, before the repo: %s", argv)
 	}
 }
+
+func TestGenerateSBPL_EnforceDeniesEachExecUnderAnInstallRoot(t *testing.T) {
+	cfg := canonicalConfig()
+	cfg.ExecDenyRoots, cfg.ExecDenyEnforce = []string{"", "/opt/llm/versions"}, true
+	want := `(deny process-exec (require-all (subpath "/opt/llm/versions") (require-not (signing-identifier "com.apple.sandbox-exec"))))`
+	if sbpl := GenerateSBPL(cfg); !strings.Contains(sbpl, want) || strings.Count(sbpl, "subpath \"\"") != 0 {
+		t.Fatalf("an install root must deny each exec beneath it:\n%s", sbpl)
+	}
+}
+
+func TestBwrapPrefix_EnforceHidesEachInstallRootWithATmpfs(t *testing.T) {
+	argv := strings.Join(BwrapPrefix(Config{ExecDenyRoots: []string{"", "/opt/llm/versions"}, ExecDenyEnforce: true}), " ")
+	if !strings.HasSuffix(argv, "--tmpfs /opt/llm/versions") || strings.Contains(argv, "--tmpfs  ") {
+		t.Fatalf("enforce must end with a tmpfs over the install root: %s", argv)
+	}
+	if shadow := BwrapPrefix(Config{ExecDenyRoots: []string{"/opt/llm/versions"}}); slices.Contains(shadow, "/opt/llm/versions") {
+		t.Fatalf("shadow hides no root: %q", shadow)
+	}
+}

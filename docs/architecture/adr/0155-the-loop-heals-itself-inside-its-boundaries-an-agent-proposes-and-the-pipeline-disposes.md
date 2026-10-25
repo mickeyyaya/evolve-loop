@@ -1,6 +1,6 @@
 # ADR-0155: The loop heals itself inside its boundaries: an agent proposes, and the pipeline disposes
 
-- **Status:** Proposed (2026-10-25).
+- **Status:** Proposed (2026-10-25). Amended on 2026-10-26 by the operator: the catalog gets the action "dispatch phase agent". The orchestrator also judges the dispatch request of a phase agent ([llm-isolation.md](../llm-isolation.md) §7.2).
 - **Plan:** [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md) §11. **Research:** [llm-isolation-2026-10](../../research/llm-isolation-2026-10.md) §5. **Design:** [llm-isolation](../llm-isolation.md#17-self-healing-within-boundaries), Part II "Self-healing within boundaries".
 - **Relates to:**
   - [ADR-0154](0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md): the orchestrator agent is an isolated worker under I-1 to I-9. This ADR adds I-10 to I-14.
@@ -32,7 +32,7 @@ ADR-0154 says that no LLM controls another LLM. An "orchestrator agent" that tri
 6. **I-10 Constitution.** No agent changes a kernel surface. A diff classifier flags each change, a weaker gate among them.
 7. **I-11 No agent writes its own oracle.** Checks freeze at handoff. Judges are independent or held out.
 8. **I-12 Orchestrator proposes, pipeline disposes.** A proposal names one action from a closed catalog. Go checks its preconditions.
-9. The catalog: retry with variation, reroute, quarantine, revert the last landing, open a repair item, halt and escalate.
+9. The catalog: retry with variation, reroute, quarantine, revert the last landing, open a repair item, halt and escalate. *Amended 2026-10-26:* dispatch a phase agent, on a request of a phase agent that the pipeline validated.
 10. **I-13 Bounded autonomy.** Repair budgets for each window and circuit breakers apply. Two failed repairs escalate.
 11. **I-14 Evidence closes an incident.** The red test is green, the signal clears and no index regresses.
 12. A closed incident has a recovery retrospective (ADR-0151).

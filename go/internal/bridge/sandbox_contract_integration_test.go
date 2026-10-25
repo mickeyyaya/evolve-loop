@@ -131,6 +131,8 @@ var agentContract = []contractRow{
 		}},
 	{action: "isolation N3: exec an LLM binary (a claude stub) with --version", want: contractDeny, isolation: "N3",
 		script: func(h contractHost) string { return "PATH=" + h.stubBin + ":$PATH claude --version" }},
+	{action: "exec an older installed version of the claude stub under the install root", want: contractDeny,
+		script: func(h contractHost) string { return h.home + "/.local/share/claude/versions/2.1.304 --version" }},
 	{action: "re-enter the profile through sandbox-exec to exec the claude stub", want: contractDeny,
 		script: func(h contractHost) string {
 			return "sandbox-exec -f " + h.prefix[2] + " " + h.stubBin + "/claude --version"
@@ -303,6 +305,11 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 	}
 	h.stubBin = contractTempDir(t, "", "sbc-bin")
 	fakeclitest.Install(t, filepath.Join(h.stubBin, "claude"), "#!/bin/sh\necho stub-claude 0.0.0\n")
+	olderVersion := filepath.Join(h.home, ".local", "share", "claude", "versions", "2.1.304")
+	if err := os.MkdirAll(filepath.Dir(olderVersion), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fakeclitest.Install(t, olderVersion, "#!/bin/sh\necho stub-claude 2.1.304\n")
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
