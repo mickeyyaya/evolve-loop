@@ -88,7 +88,7 @@ func TestParse_UnparseableResponseWarnsOnceAndReturnsTheWrappedError(t *testing.
 			t.Errorf("%s: %v, want %q", c.name, err, c.want)
 			continue
 		}
-		e := assertOneEvent(t, *got, CodeResponseUnparseable, map[string]string{
+		e := assertOneEvent(t, eventsWithCode(*got, CodeResponseUnparseable), CodeResponseUnparseable, map[string]string{
 			"step": "parse", "cause": c.cause, "decision": c.decision, "contract": c.contract, "artifact": c.artifact,
 		})
 		if e.Reason != strings.TrimPrefix(err.Error(), decisionRows[decisionForKind(c.decision)].errPfx+": ") || e.Fields["stdout_bytes"] == "" {

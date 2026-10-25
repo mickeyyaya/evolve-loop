@@ -56,3 +56,24 @@ func TestIsolationExecStage_ReadsIsolationI3StageApartFromI2(t *testing.T) {
 		}
 	}
 }
+
+func TestIsolationFlowStage_ReadsIsolationI8StageAndDefaultsToEmpty(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		``:                 "",
+		`{"isolation":{}}`: "",
+		`{"isolation":{"i2":{"stage":"enforce"}}}`: "",
+		`{"isolation":{"i8":{"stage":"enforce"}}}`: "enforce",
+	}
+	for body, want := range cases {
+		var p policy.Policy
+		if body != "" {
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if got := p.IsolationFlowStage(); got != want {
+			t.Errorf("%s: IsolationFlowStage = %q, want %q", body, got, want)
+		}
+	}
+}

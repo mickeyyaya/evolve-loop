@@ -7,16 +7,31 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/advisor"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 type bridgeRetryAdjudicator struct {
 	bridge   Bridge
 	identity AgentIdentity
 	root     string
+	signals  *signalcenter.Center
 }
 
-func NewBridgeRetryAdjudicator(b Bridge, identity AgentIdentity, projectRoot string) RetryAdjudicator {
-	return &bridgeRetryAdjudicator{bridge: b, identity: identity, root: projectRoot}
+type RetryAdjudicatorOption func(*bridgeRetryAdjudicator)
+
+func WithRetryAdjudicatorSignals(c *signalcenter.Center) RetryAdjudicatorOption {
+	return func(a *bridgeRetryAdjudicator) { a.signals = c }
+}
+
+func NewBridgeRetryAdjudicator(b Bridge, identity AgentIdentity, projectRoot string, opts ...RetryAdjudicatorOption) RetryAdjudicator {
+	a := &bridgeRetryAdjudicator{bridge: b, identity: identity, root: projectRoot}
+	for _, o := range opts {
+		o(a)
+	}
+	return a
 }
 
 type adjudicationWire struct {
@@ -29,7 +44,8 @@ func (a *bridgeRetryAdjudicator) Adjudicate(cs CycleState, env retryEnvelope) *a
 	if a == nil || a.bridge == nil || cs.WorkspacePath == "" {
 		return nil
 	}
-	artifact := filepath.Join(cs.WorkspacePath, "failure-adjudication.json")
+	flow := phasecontract.MustFlowDecision(phasecontract.FlowSeatRetryAdjudicator)
+	artifact := filepath.Join(cs.WorkspacePath, flow.ArtifactName)
 	resp, err := LaunchWithFreshSession(context.Background(), a.bridge, BridgeRequest{
 		CLI:          a.identity.CLI,
 		Profile:      a.profilePath(),
@@ -45,7 +61,9 @@ func (a *bridgeRetryAdjudicator) Adjudicate(cs CycleState, env retryEnvelope) *a
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN retry-adjudicator: dispatch failed (%v) — policy default applies\n", err)
 		return nil
 	}
-	return parseAdjudication(resp.Stdout, artifact)
+	cell := phasecontract.FlowCell{Cycle: cs.CycleID, Phase: string(cs.Phase), Origin: "bridgeRetryAdjudicator.Adjudicate", Path: artifact}
+	legacy := func() ([]byte, bool) { return adjudicationSpan(resp.Stdout, artifact) }
+	return decodeAdjudication(flow.Resolve(a.root, cell, legacy, a.signals))
 }
 
 func (a *bridgeRetryAdjudicator) profilePath() string {
@@ -58,21 +76,24 @@ func (a *bridgeRetryAdjudicator) profilePath() string {
 	return filepath.Join(a.root, ".evolve", "profiles", "failure-adjudicator.json")
 }
 
-func parseAdjudication(stdout, artifactPath string) *adjudication {
+func adjudicationSpan(stdout, artifactPath string) ([]byte, bool) {
 	raw := strings.TrimSpace(stdout)
 	if raw == "" || !strings.Contains(raw, "{") {
 		b, err := os.ReadFile(artifactPath)
 		if err != nil {
-			return nil
+			return nil, false
 		}
 		raw = string(b)
 	}
-	start, end, ok := lastBalancedSpan(raw, '{', '}')
-	if !ok {
+	return advisor.StdoutSpan(raw, '{', '}')()
+}
+
+func decodeAdjudication(raw []byte) *adjudication {
+	if raw == nil {
 		return nil
 	}
 	var w adjudicationWire
-	if err := json.Unmarshal([]byte(raw[start:end+1]), &w); err != nil {
+	if err := json.Unmarshal(raw, &w); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN retry-adjudicator: malformed proposal (%v) — policy default applies\n", err)
 		return nil
 	}

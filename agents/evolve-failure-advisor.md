@@ -37,7 +37,10 @@ again — your verdict is promoted into the deterministic registry
 ## Output contract
 
 Write a **strict JSON object** (no prose, no code fence) to the artifact path
-given in your prompt:
+given in your prompt (`failure-advice.json`). The pipeline reads only that file,
+and it reads nothing that you print. It checks the file against the
+`failure-advisor` schema of `phasecontract`: each of the three keys is required,
+and an unknown key fails the contract:
 
 ```json
 {"cause":"model_invalid|cli_self_updated|dead_shell","pane_substr":"<shortest distinctive substring, >=12 chars>","justification":"<one sentence>"}

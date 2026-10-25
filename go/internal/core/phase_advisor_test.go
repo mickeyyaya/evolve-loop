@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 type fakeBridge struct {
 	stdout     string
+	asArtifact bool
 	err        error
 	durationMS int64
 	tokens     TokenUsage
@@ -25,6 +27,11 @@ func (f *fakeBridge) Launch(_ context.Context, req BridgeRequest) (BridgeRespons
 	f.gotReq = req
 	if f.err != nil {
 		return BridgeResponse{}, f.err
+	}
+	if f.asArtifact {
+		if err := os.WriteFile(req.ArtifactPath, []byte(f.stdout), 0o644); err != nil {
+			return BridgeResponse{}, err
+		}
 	}
 	return BridgeResponse{Stdout: f.stdout, ExitCode: 0, DurationMS: f.durationMS, Tokens: f.tokens}, nil
 }
@@ -57,7 +64,7 @@ func baseRouteInput() router.RouteInput {
 	return router.RouteInput{
 		Current:     "build",
 		Verdict:     VerdictPASS,
-		Workspace:   "/tmp/ws",
+		Workspace:   seatWorkspace,
 		ProjectRoot: "/proj",
 		Cycle:       7,
 		Env:         map[string]string{"EVOLVE_CLI": "claude-tmux"},

@@ -28,7 +28,7 @@ func TestBuildRoutingPrompt_MatchesGolden(t *testing.T) {
 }
 
 func TestBuildPlanPrompt_MatchesGolden(t *testing.T) {
-	assertGolden(t, "prompt-plan-legacy.golden.txt", buildPlanPrompt(richRouteInput()))
+	assertGolden(t, "prompt-plan-legacy.golden.txt", buildPlanPrompt(richRouteInput(), decisionPlan))
 }
 
 func TestComposePlanPrompt_MatchesGolden(t *testing.T) {

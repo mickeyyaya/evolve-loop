@@ -103,3 +103,4 @@ You MAY also propose a dispatch "cli" and abstract "tier" (fast|balanced|deep â€
 
 ## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):
 [{"phase":"<phase>","run":true,"justification":"<one sentence>","cli":"<cli>","tier":"balanced"},{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","description":"<what it produces>","when_to_use":"<when to select it>"}}]
+Write this JSON to /ws/cycle-42/routing-plan.json. The pipeline reads only that file and checks it against its schema; it reads nothing that you print.

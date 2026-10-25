@@ -163,10 +163,6 @@ func parsePhasePlan(stdout string) (*router.PhasePlan, error) {
 	return parsed.Plan, nil
 }
 
-func lastBalancedSpan(s string, open, close byte) (start, end int, ok bool) {
-	return advisor.LastBalancedSpan(s, open, close)
-}
-
 func truncateGoal(s string) string { return advisor.TruncateGoal(s) }
 
 const maxGoalTextChars = advisor.MaxGoalTextRunes

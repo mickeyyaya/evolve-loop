@@ -253,7 +253,7 @@ func TestComposePlanPrompt_PersonaCompositionAndAbsoluteArtifactPath(t *testing.
 		t.Error("no persona ⇒ the legacy inline framing")
 	}
 	prompts := map[string]string{
-		"legacy":  buildPlanPrompt(baseRouteInput()),
+		"legacy":  buildPlanPrompt(baseRouteInput(), decisionPlan),
 		"persona": a.ComposePlanPrompt(baseRouteInput(), "routing-plan.json"),
 	}
 	for name, got := range prompts {
@@ -266,10 +266,10 @@ func TestComposePlanPrompt_PersonaCompositionAndAbsoluteArtifactPath(t *testing.
 			t.Errorf("%s plan prompt carries the per-transition object spec", name)
 		}
 	}
-	if got := buildPlanPrompt(router.RouteInput{Cycle: 5, GoalText: "redesign the auth subsystem"}); !strings.Contains(got, "## Goal\nredesign the auth subsystem\n") {
+	if got := buildPlanPrompt(router.RouteInput{Cycle: 5, GoalText: "redesign the auth subsystem"}, decisionPlan); !strings.Contains(got, "## Goal\nredesign the auth subsystem\n") {
 		t.Errorf("the plan prompt surfaces the goal text:\n%s", got)
 	}
-	if strings.Contains(buildPlanPrompt(router.RouteInput{Cycle: 5}), "## Goal") {
+	if strings.Contains(buildPlanPrompt(router.RouteInput{Cycle: 5}, decisionPlan), "## Goal") {
 		t.Error("empty GoalText must not emit a Goal section")
 	}
 }
@@ -305,7 +305,7 @@ func TestBuildPlanPrompt_SharesTheRoutingContextAndAsksForTheArray(t *testing.T)
 			"plan-review": {},
 		}},
 	}
-	got := buildPlanPrompt(in)
+	got := buildPlanPrompt(in, decisionPlan)
 	for _, want := range []string{
 		"## Goal\nredesign the auth subsystem", "## Carryover todos from previous cycles", "- [P0] cycle-4-failed-build: Review failed build learning and fix missing audit binding (first_seen_cycle=4, cycles_unpicked=1)",
 		"scout: cycle_size_estimate=medium", "triage: cycle_size=small", "build: verdict=PASS", "audit: verdict=PASS",

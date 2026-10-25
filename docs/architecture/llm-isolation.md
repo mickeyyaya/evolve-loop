@@ -684,6 +684,45 @@ A family with another output style can steer the flow by accident. Each vendor h
 - Stage `legacy` (one wave): the pipeline reads the file first and falls back to the stdout span. Each fallback emits `ISOLATION_I8_VIOLATION`.
 - A vendor flag, for example `claude -p --json-schema` or `codex exec --output-schema`, can help an agent write the file. The check stays in Go.
 
+### 12.1 As built (X8)
+
+X8 keeps the file names that the seats already wrote. The bridge waits for the declared file of each seat (`Completion: artifact`), so a rename gives no gain and breaks the captures and the personas.
+
+| Seat | Declared file | Schema seat in `phasecontract` | Required keys | Reader |
+|---|---|---|---|---|
+| advisor plan | `routing-plan.json` (array) | `advisor-plan` | `phase`, `run` for each element | `Advisor.Plan` (`go/internal/core/advisor/advisor.go`) |
+| advisor re-plan | `routing-replan.json` (array) | `advisor-replan` | `phase`, `run` for each element | `Advisor.RePlan` |
+| advisor proposal | `routing-proposal.json` | `advisor-proposal` | `next_phase`, `justification` | `Advisor.Propose` |
+| plan judge | `routing-judge.json` | `plan-judge` | `score`, `rationale` | `PlanJudge.GradePlan` (`go/internal/core/phase_judge.go`) |
+| retry adjudicator | `failure-adjudication.json` | `retry-adjudicator` | `action`, `justification` | `bridgeRetryAdjudicator.Adjudicate` (`go/internal/core/retry_adjudicator_agent.go`) |
+| failure advisor | `failure-advice.json` | `failure-advisor` | `cause`, `pane_substr`, `justification` | `FailureAdvisor.Advise` (`go/internal/core/failure_advisor.go`) |
+| triage | `triage-decision.json` | `triage` | `top_n` | `CapReviewer.Review` (`go/internal/triagecap/flow_stage.go`) |
+
+The schemas are `phasecontract.FlowDecisions` (`go/internal/phasecontract/flow_decision.go`). `FlowDecision.Validate` refuses prose around the JSON, trailing data, the wrong top-level shape, an unknown key and a missing key. `TestFlowDecision_ValidateRejectsAnUnknownFieldAndAMissingField` runs both refusals for each seat.
+
+The stage is the policy key `isolation.i8.stage`. The checked-in policy does not set it, and the compiled default is `legacy`.
+
+| Stage | The decision comes from | Signal (`ISOLATION_I8_VIOLATION`) |
+|---|---|---|
+| `legacy` (default) | the declared file if it passes its schema; else the stdout span, as before X8 | `rule=flow.fallback.stdout`, `action=logged`, for each fallback |
+| `shadow` | the stdout span, as before X8; the file only when no span exists | `rule=flow.shadow.disagree`, `action=logged`, when the file and the span differ |
+| `enforce` | the declared file only; a missing or bad file gives no decision | `rule=flow.file.invalid`, `action=refused` |
+
+Each seat calls `FlowDecision.Resolve`. It reads the stage from `<root>/.evolve/policy.json`, reads the file and emits the violation. An unknown stage value or a policy that does not parse logs a WARN and keeps `legacy`.
+
+At `enforce` the seats keep their normal failure paths. The advisor returns `ADVISOR_RESPONSE_UNPARSEABLE`, and the caller keeps the static spine. The judge gives no opinion. The retry adjudicator gives the policy default. The failure advisor returns an error, and the operator gets the escalation.
+
+The two report readers have no decision file of their own:
+
+- The router digest (`go/internal/router/digest.go`) reads `goal_type`, `deliverable_kind` and `cycle_size_estimate` from the prose headers of `scout-report.md` and `triage-report.md` when the handoff is absent. Each such read goes into `RoutingSignals.ProseFallbacks`. At `enforce` the digest refuses the read and adds a `DigestDegraded` reason. The orchestrator emits `rule=flow.fallback.prose` once for each fallback in a cycle (`cycleRun.reportProseFallbacks`).
+- The triage capacity clamp counts the floors in the report prose when `triage-decision.json` declares no valid `committed_floors`. At `legacy` it emits `rule=flow.fallback.prose`. At `enforce` it never counts the prose. A missing or bad declaration emits `action=refused`, and the review fails with a reason that asks for the file, as a contract failure. Thus an agent cannot skip the clamp when it omits the file.
+
+`LastBalancedSpan` lives only in `go/internal/core/advisor/span.go`. The guard `TestFlowCode_OnlyTheLegacySpanFileNamesLastBalancedSpan` (`go/internal/core/flow_span_guard_test.go`) fails when another file of `internal/core`, `internal/router`, `internal/triagecap` or `internal/phasecontract` names it. Two readers keep the span parse, and neither is a new decision: the resume reads the recorded `routing-plan.json`, and `evolve routing replay` reads a captured response.
+
+The personas `evolve-router`, `evolve-failure-adjudicator`, `evolve-failure-advisor` and `evolve-triage` name their file and its schema. The judge has no persona; its prompt names `routing-judge.json`. The advisor prompts without a persona now name their file too.
+
+The flip to `enforce` is an operator decision after one clean wave at `legacy`. The span parsers go away in a later change, after the flip.
+
 ## 13. Instruction files and the console seat
 
 ### Instruction files
@@ -760,7 +799,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N9 | the network row records today's behavior (allowed) | none | X1 | sandbox contract | green |
 | N10 | an agy pane cannot write a protected path | I-7 | X7 | sandbox contract | open |
 | N11 | `guard phase` denies `Task` | I-7 | X7 | `internal/guards` | open |
-| N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | open |
+| N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | green (X8, at `enforce`) |
 | N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | green |
 | N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
 
@@ -1319,7 +1358,7 @@ X19 lands in three items:
 | I-5 Read isolation | rows N6, N7, N8; `TestLineageComesOnlyFromPipelineRecords` | X5 | `shadow`, then `enforce` | `ISOLATION_I5_VIOLATION` |
 | I-6 Family-agnostic flow | `TestFlowCodeNamesNoFamily`; rows N13, N14 | X6, X9, X10 | `enforce` | `ISOLATION_I6_VIOLATION` |
 | I-7 CLI-neutral guarantees | rows N10, N11 | X7 | `enforce` | `ISOLATION_I7_VIOLATION` |
-| I-8 Typed flow decisions | row N12; a schema test for each decision file | X8 | `legacy`, then `enforce` | `ISOLATION_I8_VIOLATION` |
+| I-8 Typed flow decisions | row N12; `TestFlowDecision_ValidateRejectsAnUnknownFieldAndAMissingField`; `TestFlowCode_OnlyTheLegacySpanFileNamesLastBalancedSpan` | X8 | `legacy`, then `shadow`, then `enforce` (§12.1) | `ISOLATION_I8_VIOLATION` |
 | I-9 Proven substitution | `TestE2ECycleCLIMatrix` rows M1 to M5 (exists, skipped today) | X1, X11 | `enforce` per row | none (a test guard) |
 | I-10 Constitution | `TestGateClassifier_FlagsEachWeakeningPattern` (one case for each pattern of §20.3); the ADR-0064 P2 check (exists) | X15 | `enforce` | `HEALING_I10_VIOLATION` |
 | I-11 No agent writes its own oracle | the TDD digest check (item `tdd-predicates-frozen-at-handoff`); `TestT1AuditSeatIsAnotherFamily` | X15, X16 | `enforce` | `HEALING_I11_VIOLATION` |

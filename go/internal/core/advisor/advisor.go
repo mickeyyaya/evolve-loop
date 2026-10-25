@@ -6,9 +6,11 @@ package advisor
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -166,7 +168,7 @@ func (a *Advisor) Propose(in router.RouteInput) (*router.Proposal, error) {
 	if err != nil {
 		return nil, err
 	}
-	prop, err := ParseProposal(resp.Stdout)
+	prop, err := DecodeProposal(a.decisionBytes(in, decisionProposal, StdoutSpan(resp.Stdout, '{', '}')))
 	if err != nil {
 		a.warnUnparseable(in, decisionProposal, err, resp)
 		return nil, fmt.Errorf("%s: %w", decisionProposal.errPfx(), err)
@@ -182,12 +184,17 @@ func (a *Advisor) RePlan(in router.RouteInput) (*router.PhasePlan, error) {
 	return a.plan(in, decisionRePlan)
 }
 
+func (a *Advisor) decisionBytes(in router.RouteInput, d decision, legacy func() ([]byte, bool)) []byte {
+	cell := phasecontract.FlowCell{Cycle: in.Cycle, Phase: in.Current, Origin: d.origin(), Path: filepath.Join(in.Workspace, d.artifactFile())}
+	return phasecontract.MustFlowDecision(d.flowSeat()).Resolve(in.ProjectRoot, cell, legacy, a.center())
+}
+
 func (a *Advisor) plan(in router.RouteInput, d decision) (*router.PhasePlan, error) {
 	resp, err := a.launch(in, d, a.composePlanPrompt(in, d, d.artifactFile()))
 	if err != nil {
 		return nil, err
 	}
-	parsed, err := ParsePhasePlan(resp.Stdout)
+	parsed, err := DecodePhasePlan(a.decisionBytes(in, d, StdoutSpan(resp.Stdout, '[', ']')))
 	if err != nil {
 		a.warnUnparseable(in, d, err, resp)
 		return nil, fmt.Errorf("%s: %w", d.errPfx(), err)

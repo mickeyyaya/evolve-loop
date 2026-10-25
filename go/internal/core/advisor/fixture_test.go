@@ -137,6 +137,8 @@ type scriptedResp struct {
 
 type fakeLauncher struct {
 	stdout     string
+	artifact   string
+	stdoutOnly bool
 	err        error
 	durationMS int64
 	tokens     cyclestate.TokenUsage
@@ -150,6 +152,9 @@ func (f *fakeLauncher) Launch(_ context.Context, req LaunchRequest) (LaunchRespo
 	f.calls++
 	f.gotReq = req
 	f.reqs = append(f.reqs, req)
+	if err := f.writeArtifact(req.ArtifactPath); err != nil {
+		return LaunchResponse{}, err
+	}
 	if len(f.seq) > 0 {
 		i := min(f.calls-1, len(f.seq)-1)
 		return f.seq[i].resp, f.seq[i].err
@@ -158,6 +163,17 @@ func (f *fakeLauncher) Launch(_ context.Context, req LaunchRequest) (LaunchRespo
 		return LaunchResponse{}, f.err
 	}
 	return LaunchResponse{Stdout: f.stdout, DurationMS: f.durationMS, Tokens: f.tokens}, nil
+}
+
+func (f *fakeLauncher) writeArtifact(path string) error {
+	body := f.artifact
+	if body == "" && !f.stdoutOnly {
+		body = f.stdout
+	}
+	if _, err := os.Stat(filepath.Dir(path)); body == "" || err != nil {
+		return nil
+	}
+	return os.WriteFile(path, []byte(body), 0o644)
 }
 
 func (f *fakeLauncher) calledCLIs() []string {

@@ -162,8 +162,8 @@ func TestCoreFacades_ProjectTheLeaf(t *testing.T) {
 	if strings.Contains(stderr, "dropping minted phase") || len(*got) != 0 {
 		t.Errorf("resume/replay re-parse a reserved mint silently (reported once at decision time): %q %+v", stderr, *got)
 	}
-	if s, e, ok := lastBalancedSpan("x [1] [2]", '[', ']'); s != 6 || e != 8 || !ok {
-		t.Errorf("lastBalancedSpan: %d %d %v", s, e, ok)
+	if s, e, ok := advisor.LastBalancedSpan("x [1] [2]", '[', ']'); s != 6 || e != 8 || !ok {
+		t.Errorf("LastBalancedSpan: %d %d %v", s, e, ok)
 	}
 	long := strings.Repeat("g", maxGoalTextChars+7)
 	if truncateGoal("  "+long+"  ") != advisor.TruncateGoal(long) || maxGoalTextChars != advisor.MaxGoalTextRunes {
@@ -280,7 +280,7 @@ func TestPhaseAdvisor_SeesTheSignalCenterAppliedThroughTheOption(t *testing.T) {
 		t.Fatalf("without a Center the drop is silent and the plan stands: %v %+v %q", err, plan, out)
 	}
 	c, got := recordingCenter()
-	p := NewPhaseAdvisor(&fakeBridge{stdout: stdout}, WithAdvisorSignals(c))
+	p := NewPhaseAdvisor(&fakeBridge{stdout: stdout, asArtifact: true}, WithAdvisorSignals(c))
 	if _, err := p.Plan(in); err != nil {
 		t.Fatal(err)
 	}

@@ -60,6 +60,8 @@ type RoutingSignals struct {
 	Generic map[string]any
 
 	DigestDegraded []string
+
+	ProseFallbacks []ProseFallback
 }
 
 func (s RoutingSignals) GenericValue(field string) (any, bool) {

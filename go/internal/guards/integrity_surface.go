@@ -43,6 +43,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/activating_fields_guard_test.go", Rationale: "ADR-0058 registry trust anchor (drift-loud activating-fields guard)"},
 	{Fragment: "/go/internal/core/orchestrator_guard_test.go", Rationale: "inserted-phase tree-diff guard pin (cycle-274 G)"},
 	{Fragment: "/go/internal/core/phase_advisor_guard_test.go", Rationale: "advisor routing guard pin"},
+	{Fragment: "/go/internal/core/flow_span_guard_test.go", Rationale: "the I-8 typed-flow-decision guard (ADR-0154 X8): it fails when LastBalancedSpan is named outside internal/core/advisor/span.go, so each flow seat reads its declared decision file and only the legacy stage reaches the stdout span; a cycle that quietly widened it could let a flow decision come from the prose of an agent again"},
 	{Fragment: "/go/internal/core/ledger_runid_writers_guard_test.go", Rationale: "the agent_subprocess run_id writer guard: closes the writer set and requires each writer to call core.RunIDFromWorkspace. Since #503 a run-scoped binding REFUSES an entry with no run_id, so a cycle that quietly delisted a writer here would make everything that writer emits unbindable and hard-stop ship at AUDIT_BINDING_NO_AUDITOR (cycle-1571 H1)"},
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard.go", Rationale: "staging-time backstop against compiled-binary commits (tracked-binary-in-acs-dir class fix)"},
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard_test.go", Rationale: "the staging backstop's own regression pin"},

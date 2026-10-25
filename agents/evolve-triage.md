@@ -192,6 +192,15 @@ phase_skip: []
 }
 ```
 
+The pipeline checks this file against the `triage` schema of `phasecontract`.
+`top_n` is required. A top-level key outside the list above, `unified_commitment`,
+`unified_projection`, `superseded` and `projected_by_orchestrator` fails the
+contract. The capacity clamp counts `committed_floors`. If the file declares no
+valid `committed_floors`, the clamp counts the floors in the report prose and
+records an `ISOLATION_I8_VIOLATION`. At the stage `enforce` it never counts the
+prose, and a file with no valid `committed_floors` fails the review. Write an
+empty list when you commit no floor.
+
 An optional `unified_commitment` sits beside these fields. Every member MUST
 also remain a distinct `top_n` entry so its original acceptance criteria stay
 separately enforceable. Valid small commitments run plan-review and
