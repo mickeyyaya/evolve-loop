@@ -168,6 +168,20 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `INBOX_ROUTE_NOT_FOUND` | the FAIL closeout could not find the item it was told to route (fields.task_id, inbox_dir, step=locate) — or found it held by another cycle's claim (fields.held_by_cycle) — the refusal is NOT recorded on it and it WILL be re-picked; neither processing/cycle-*/ nor the inbox root holds the id |
 | `INBOX_ROUTING_FALLBACK` | the lane-routing predicate could not load the build profile (fields.profile, fields.project_root; the reason is the load error), so routing judges protected surface only and a sandbox-denied item can reach a lane; emitted once per predicate, on its first routing question |
 
+### isolation
+
+| Code | Meaning |
+|---|---|
+| `ISOLATION_I1_VIOLATION` | I-1 single launcher: a code path started an LLM binary outside the bridge launch API; fields.target names the binary (ADR-0154) |
+| `ISOLATION_I2_VIOLATION` | I-2 hermetic environment: the allowlist dropped a variable of the launcher; fields.target names the variable, never its value (ADR-0154) |
+| `ISOLATION_I3_VIOLATION` | I-3 no nested agency: a cell tried to start an LLM binary or an evolve dispatch; fields.target names it (ADR-0154) |
+| `ISOLATION_I4_VIOLATION` | I-4 pipeline-mediated communication: a cell tried to read raw output or to write its inputs; fields.target names the path (ADR-0154) |
+| `ISOLATION_I5_VIOLATION` | I-5 read isolation: a cell tried to read outside its index, its worktree and its CLI files; fields.target names the path (ADR-0154) |
+| `ISOLATION_I6_VIOLATION` | I-6 family-agnostic flow: a launch resolved through a compiled family default, not through routing data; fields.cell names the seat (ADR-0154) |
+| `ISOLATION_I7_VIOLATION` | I-7 CLI-neutral guarantees: a gate or the fence stopped a write that no hook stopped; fields.target names the path (ADR-0154) |
+| `ISOLATION_I8_VIOLATION` | I-8 typed flow decisions: a flow parser fell back to stdout or prose; fields.cell names the seat (ADR-0154) |
+| `ISOLATION_I9_VIOLATION` | I-9 proven substitution: no run-time emitter; the conformance matrix TestE2ECycleCLIMatrix is its guard (ADR-0154) |
+
 ### ledger
 
 | Code | Meaning |

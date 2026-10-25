@@ -5,7 +5,7 @@
 >
 > The plan holds the components X1 to X16 and their order. The ADR holds the decision. The Signal Center contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md) §5.
 >
-> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. No component is built. Each name in this file that does not exist on `main` is marked "proposed".
+> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. X1 is built: the conformance matrix of §14 and the module, kind, codes and channel of §15. No other component is built. Each name in this file that does not exist on `main` is marked "proposed".
 
 ## Table of contents
 
@@ -447,52 +447,75 @@ The console runs builds and reviews as in-process Claude Code subagents (F1.10).
 
 X1 builds the matrix first. Each row is a test. A row for an open gap starts as an expected failure, so each later component turns its rows green, and the progress is measured.
 
+The catalog of the rows is `isolation.Rows` in `go/internal/isolation/matrix.go`. Package note: [internal-isolation](packages/internal-isolation.md). Each row has an id, its check, its invariant, the component that turns it green, its state and its owner test file. An open row also has its cause: a text that its failure must contain, for example `claude must be listed` for M2. Each owner test gives the result of its check to `isolation.Judge`:
+
+| Row state | Check result | `Judge` result |
+|---|---|---|
+| green | pass | the test passes |
+| green | fail | the test fails with the cause |
+| open | fail with its cause | the test passes and logs "expected failure until <component>" with the cause |
+| open | fail for another reason | the test fails as inconclusive: a broken harness cannot hide as an expected failure |
+| open | pass | the test fails: the component must set `Open` to false and mark the row green here |
+| unknown id | any | the test fails |
+
+The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` parses each owner file. A test function of the file must call `isolation.Judge` with the row id as its argument, or with a table field that holds the id. Thus a fix cannot go unseen, and a row cannot go away without a change of the catalog.
+
 ### 14.1 Substitution rows (I-9)
 
-`TestE2ECycleCLIMatrix` (`go/cmd/evolve/e2e_cycle_cli_matrix_test.go`) skips today (`:25-27`). X1 rebuilds it: it runs a simulated scout-to-ship cycle with `fakeclitest` stubs. The policy routes every seat to one family and sets `floors` to `{}`.
+`TestE2ECycleCLIMatrix` (`go/cmd/evolve/e2e_cycle_cli_matrix_test.go`, build tags `e2e evolve_test_phases`) runs a simulated scout-to-ship cycle for each row. A `fakeclitest` stub stands in for each of the binaries `claude`, `agy`, `codex` and `ollama`. Each stub records its call and its `CLAUDECODE` and `EVOLVE_DISPATCH_DEPTH` values, and then runs `evolve-fake-cli`. The environment is the same for each row. Only `cli_routing` and the profiles change: `clis` and `default` hold the one driver of the row.
 
-| Row | Only route | Seats | Turned green by |
-|---|---|---|---|
-| M1 | `claude` | all | X1 |
-| M2 | `agy` | all | X6 (the floors and defaults move to data) |
-| M3 | `agy-claude` | all | X6 |
-| M4 | `codex` | all | X6, X9 |
-| M5 | `ollama` | the seats that its `capabilities` allow | X6, X9 |
+A row passes when the cycle ships, the ledger holds each phase, and only the stub of the row family ran. X6 adds `floors: {}` to the row policy when the key exists.
+
+Today rows M2 to M5 fail on the Claude floor: the compiler refuses the table with "claude must be listed: the Claude-family floor agents run only on claude". The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
+
+The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
+
+| Row | Only route (driver) | Seats | Turned green by | State at X1 |
+|---|---|---|---|---|
+| M1 | `claude` (`claude-p`) | all | X1 | green |
+| M2 | `agy` (`agy`) | all | X6 (the floors and defaults move to data) | open |
+| M3 | `agy-claude` (`agy-claude-tmux`) | all | X6 | open |
+| M4 | `codex` (`codex`) | all | X6, X9 | open |
+| M5 | `ollama` (`ollama-tmux`) | the seats that its `capabilities` allow | X6, X9 | open |
 
 The stub for each family declares the same capabilities as the real manifest. The matrix proves that the pipeline has no family dependency. It does not prove that a real model can do the work.
 
 ### 14.2 Invariant rows
 
-| Row | Check | Invariant | Turned green by |
-|---|---|---|---|
-| N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 |
-| N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 |
-| N3 | a phase pane cannot exec `claude --version` | I-3 | X4 |
-| N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 |
-| N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 |
-| N6 | a retry opens its predecessor's `retrospective-report.md` | I-4, I-5 | X5 |
-| N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 |
-| N8 | a cell cannot read `~/.ssh` | I-5 | X5 |
-| N9 | the network row records today's behavior (allowed) | none | X1 |
-| N10 | an agy pane cannot write a protected path | I-7 | X7 |
-| N11 | `guard phase` denies `Task` | I-7 | X7 |
-| N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 |
-| N13 | the grep guard finds no family string in flow code | I-6 | X6 |
-| N14 | a new manifest with known format ids needs no Go change | I-6 | X9 |
+| Row | Check | Invariant | Turned green by | Owner test | State at X1 |
+|---|---|---|---|---|---|
+| N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run) | open |
+| N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | open |
+| N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | open |
+| N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | open |
+| N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 | sandbox contract | open |
+| N6 | a retry opens its predecessor's `retrospective-report.md` through the index that the pipeline writes | I-4, I-5 | X5 | the matrix (M1 run) | open |
+| N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 | sandbox contract | open |
+| N8 | a cell cannot read `~/.ssh` | I-5 | X5 | sandbox contract | open |
+| N9 | the network row records today's behavior (allowed) | none | X1 | sandbox contract | green |
+| N10 | an agy pane cannot write a protected path | I-7 | X7 | sandbox contract | open |
+| N11 | `guard phase` denies `Task` | I-7 | X7 | `internal/guards` | open |
+| N12 | a judge verdict in prose with no file fails the contract | I-8 | X8 | `internal/core` | open |
+| N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | open |
+| N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
 
-Rows N3, N5 to N8 and N10 extend `TestAgentSandboxContract` (`go/internal/bridge/sandbox_contract_integration_test.go:53-126`), which has 22 rows today and none for exec, network or a cross-cycle read.
+Rows N3, N5 and N7 to N10 extend `TestAgentSandboxContract` (`go/internal/bridge/sandbox_contract_integration_test.go`, build tags `integration` and `darwin`). Before X1 it had 22 rows and none for exec, network or a cross-cycle read. The exec row runs a `fakeclitest` stub named `claude`, never a real CLI.
+
+The network row connects to a loopback listener of the test, so it needs no outside host. N8 reads a fixture `.ssh` file in a test `HOME`, so the row does not depend on the host. A plain allow row reads the predecessor's retrospective through a fixture index. It keeps the lineage read open when X5 adds its denies. [agent-sandbox-contract.md](agent-sandbox-contract.md) lists the rows.
+
+The static rows read source, not a run. N2 parses the three launch sites outside the bridge of research F1.2 and counts each use of `sysexec`. N13 parses the non-test files of `internal/core` and counts each string literal that names a family or a driver. The component that closes the row replaces the probe with its own guard if it needs to.
 
 ## 15. The Signal Center contract
 
 The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md) §5: one module, a closed set of kinds and one registered code for each rule.
 
-### 15.1 Module, kinds and codes (proposed)
+### 15.1 Module, kinds and codes
 
 | Item | Value |
 |---|---|
 | Module | `isolation` (code prefix `ISOLATION_`) |
 | Kind `isolation.violation` | WARN. A cell did a thing that an invariant forbids. In `shadow` the action went through; in `enforce` the pipeline refused it. |
-| Kind `isolation.access` | INFO. The entries of the index that a cell opened (§8.4, optional). No code. |
+| Kind `isolation.access` | INFO. The entries of the index that a cell opened (§8.4, optional). No code. Proposed: X5 adds it if it builds §8.4. |
 | Origin | the Go function that found the violation, for example `bridge.buildEnv` |
 
 | Code | Invariant | Emitter |
@@ -550,7 +573,7 @@ I-1 and I-6 are static guards. They go to `enforce` when their component lands, 
 | What did a cell get to read? | `cat .evolve/runs/cycle-N/inputs/index.json` |
 | What stage is each invariant at? | `evolve config show isolation` (proposed) |
 
-The `isolation.violation` kind and the codes exist only after X1. Before X1, the commands return no rows.
+X1 registers the `isolation.violation` kind, the nine codes (`go/internal/isolation/codes.go`) and the channel. No component emits a violation yet, so the commands return no rows until X2.
 
 ### 16.2 What a violation means
 

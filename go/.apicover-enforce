@@ -820,3 +820,5 @@
 ./internal/pipelinerates
 # codeshape - the code quality index readers CQ1, CQ3, CQ4 and CQ5 of ADR-0153.
 ./internal/codeshape
+# isolation - the conformance matrix and the ISOLATION_ codes of the agent cell (ADR-0154).
+./internal/isolation

@@ -118,6 +118,7 @@ The default channels:
 | `ledger` | `kind=ledger.appended` | best_effort |
 | `quality.breach` | `kind=quality.breach,quality.warning` ([ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)) | lossless |
 | `quality.reading` | `kind=quality.reading` | best_effort |
+| `isolation.violation` | `kind=isolation.violation` ([ADR-0154](adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md); a violation is rare and must not be lost) | lossless |
 | `signals` | every event (the firehose) | best_effort |
 
 - One event can go to several channels. The Publisher writes it once in each channel.
