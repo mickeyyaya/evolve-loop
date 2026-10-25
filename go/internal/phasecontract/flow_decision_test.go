@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -171,7 +172,7 @@ func TestFlowDecision_ReadAtEachStage(t *testing.T) {
 		}
 		called := false
 		legacy := func() ([]byte, bool) { called = true; return span(c.stdout)() }
-		r := d.Read(c.stage, path, legacy)
+		r := d.Read(c.stage, path, time.Time{}, legacy)
 		if string(r.Raw) != c.raw || r.Source != c.source || r.Disagree != c.disagree || (r.FileErr != nil) != c.fileErr || r.Stage != c.stage {
 			t.Errorf("%s: got raw %q source %q disagree %v fileErr %v stage %q", c.name, r.Raw, r.Source, r.Disagree, r.FileErr, r.Stage)
 		}
@@ -188,11 +189,11 @@ func TestFlowDecision_ReadRejectsAFileThatFailsTheSchema(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"score":0.5}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r := d.Read(FlowStageEnforce, path, nil)
+	r := d.Read(FlowStageEnforce, path, time.Time{}, nil)
 	if r.Raw != nil || r.FileErr == nil || !strings.Contains(r.FileErr.Error(), `missing field "rationale"`) {
 		t.Fatalf("got raw %q err %v", r.Raw, r.FileErr)
 	}
-	r = d.Read(FlowStageEnforce, t.TempDir(), nil)
+	r = d.Read(FlowStageEnforce, t.TempDir(), time.Time{}, nil)
 	if r.FileErr == nil || errors.Is(r.FileErr, os.ErrNotExist) {
 		t.Fatalf("a directory at the path must be a read error, got %v", r.FileErr)
 	}
@@ -379,5 +380,62 @@ func TestFlowViolationEvent_CarriesTheProseFallbackOfAReportReader(t *testing.T)
 	if e.Code != isolation.ViolationCode(8) || e.Reason != "no handoff" || e.Cycle != 2 || e.Phase != "triage" ||
 		f["cell"] != "scout" || f["stage"] != "enforce" || f["action"] != "refused" || f["rule"] != FlowRuleProseFallback || f["target"] != "/ws/scout-report.md" {
 		t.Fatalf("event %+v", e)
+	}
+}
+
+func TestFlowDecision_ReadRejectsAFileWrittenBeforeTheLaunchAtEveryStage(t *testing.T) {
+	t.Parallel()
+	d := mustFlowDecision(t, FlowSeatRetryAdjudicator)
+	launched := time.Now()
+	fresh := func() ([]byte, bool) { return []byte(`{"action":"retry@tdd","justification":"fresh"}`), true }
+	for _, stage := range []FlowStage{FlowStageLegacy, FlowStageShadow, FlowStageEnforce} {
+		path := filepath.Join(t.TempDir(), d.ArtifactName)
+		if err := os.WriteFile(path, []byte(`{"action":"decline","justification":"stale"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		old := launched.Add(-time.Hour)
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatal(err)
+		}
+		r := d.Read(stage, path, launched, fresh)
+		if !errors.Is(r.FileErr, ErrFlowFileStale) || strings.Contains(string(r.Raw), "stale") {
+			t.Fatalf("%s: a stale file must never decide: raw %q err %v", stage, r.Raw, r.FileErr)
+		}
+		e, ok := d.ViolationEvent(r, FlowCell{Path: path})
+		if !ok || e.Fields["rule"] != FlowRuleFileStale || e.Fields["action"] != "refused" || e.Fields["stage"] != string(stage) {
+			t.Fatalf("%s: event %+v %v", stage, e, ok)
+		}
+	}
+	path := filepath.Join(t.TempDir(), d.ArtifactName)
+	if err := os.WriteFile(path, []byte(`{"action":"decline","justification":"this attempt"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := d.Read(FlowStageEnforce, path, launched, nil); r.FileErr != nil || r.Source != FlowSourceFile {
+		t.Fatalf("a file of this attempt decides: %+v", r)
+	}
+}
+
+func TestFlowDecision_ClearRemovesTheFileAndFailsClosed(t *testing.T) {
+	t.Parallel()
+	d := mustFlowDecision(t, FlowSeatJudge)
+	dir := t.TempDir()
+	path := filepath.Join(dir, d.ArtifactName)
+	if err := d.Clear(path); err != nil {
+		t.Fatalf("an absent file is already clear: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Clear(path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the file must be gone: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(path, "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Clear(path); err == nil || !strings.Contains(err.Error(), "clear the decision file before the launch") {
+		t.Fatalf("a path that cannot be removed must fail closed: %v", err)
 	}
 }

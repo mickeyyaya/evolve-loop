@@ -72,9 +72,8 @@ func TestPlanJudge_EnforceReadsTheVerdictFile(t *testing.T) {
 	t.Parallel()
 	in := judgeInput()
 	in.Workspace, in.ProjectRoot = t.TempDir(), flowRoot(t, enforceI8)
-	writeFlowFile(t, in.Workspace, "routing-judge.json", `{"score":0.4,"rationale":"thin","missing_phases":["audit"]}`)
 	c := signalcenter.New()
-	v := NewPlanJudge(&fakeBridge{stdout: "prose"}, WithPlanJudgeSignals(c)).GradePlan(context.Background(), in, samplePlan())
+	v := NewPlanJudge(&fakeBridge{stdout: "prose", artifact: `{"score":0.4,"rationale":"thin","missing_phases":["audit"]}`}, WithPlanJudgeSignals(c)).GradePlan(context.Background(), in, samplePlan())
 	if v.Score != 0.4 || len(v.MissingPhases) != 1 || len(i8Events(c)) != 0 {
 		t.Fatalf("verdict %+v, violations %+v", v, i8Events(c))
 	}
@@ -84,9 +83,8 @@ func TestPlanJudge_EnforceRefusesAVerdictFileOutsideTheSchema(t *testing.T) {
 	t.Parallel()
 	in := judgeInput()
 	in.Workspace, in.ProjectRoot = t.TempDir(), flowRoot(t, enforceI8)
-	writeFlowFile(t, in.Workspace, "routing-judge.json", `{"score":0.4}`)
 	c := signalcenter.New()
-	v := NewPlanJudge(&fakeBridge{stdout: `{"score":0.9,"rationale":"x"}`}, WithPlanJudgeSignals(c)).GradePlan(context.Background(), in, samplePlan())
+	v := NewPlanJudge(&fakeBridge{stdout: `{"score":0.9,"rationale":"x"}`, artifact: `{"score":0.4}`}, WithPlanJudgeSignals(c)).GradePlan(context.Background(), in, samplePlan())
 	if v.Score != judgeNoOpinion.Score {
 		t.Fatalf("a file without its rationale is no verdict: %+v", v)
 	}
@@ -109,11 +107,8 @@ func TestRetryAdjudicator_LegacyFallsBackAndEnforceReadsOnlyTheFile(t *testing.T
 	}
 	for _, tc := range cases {
 		ws := t.TempDir()
-		if tc.file != "" {
-			writeFlowFile(t, ws, "failure-adjudication.json", tc.file)
-		}
 		c := signalcenter.New()
-		a := NewBridgeRetryAdjudicator(&fakeBridge{stdout: stdout}, AgentIdentity{CLI: "x"}, flowRoot(t, tc.policy), WithRetryAdjudicatorSignals(c))
+		a := NewBridgeRetryAdjudicator(&fakeBridge{stdout: stdout, artifact: tc.file}, AgentIdentity{CLI: "x"}, flowRoot(t, tc.policy), WithRetryAdjudicatorSignals(c))
 		got := a.Adjudicate(CycleState{CycleID: 3, WorkspacePath: ws}, retryEnvelope{})
 		switch {
 		case tc.want == "" && got != nil:
@@ -145,11 +140,8 @@ func TestFailureAdvisor_LegacyFallsBackAndEnforceReadsOnlyTheFile(t *testing.T) 
 	for _, tc := range cases {
 		in := baseFailureInput()
 		in.Workspace, in.ProjectRoot = t.TempDir(), flowRoot(t, tc.policy)
-		if tc.file != "" {
-			writeFlowFile(t, in.Workspace, "failure-advice.json", tc.file)
-		}
 		c := signalcenter.New()
-		adv, err := NewFailureAdvisor(&fakeBridge{stdout: tc.stdout}, WithFailureAdvisorSignals(c)).Advise(context.Background(), in)
+		adv, err := NewFailureAdvisor(&fakeBridge{stdout: tc.stdout, artifact: tc.file}, WithFailureAdvisorSignals(c)).Advise(context.Background(), in)
 		if (err != nil) != tc.wantErr || (!tc.wantErr && adv.Cause != string(recovery.CauseDeadShell)) {
 			t.Errorf("%s: advice %+v, err %v", tc.name, adv, err)
 		}

@@ -708,6 +708,8 @@ The stage is the policy key `isolation.i8.stage`. The checked-in policy does not
 | `shadow` | the stdout span, as before X8; the file only when no span exists | `rule=flow.shadow.disagree`, `action=logged`, when the file and the span differ |
 | `enforce` | the declared file only; a missing or bad file gives no decision | `rule=flow.file.invalid`, `action=refused` |
 
+Each launched seat binds its file to its launch in two layers. Before the launch, `FlowDecision.Clear` removes the file of an earlier launch. If the remove fails, the seat does not launch. After the launch, `FlowDecision.Read` refuses a file that is older than the launch, at each stage, with `rule=flow.file.stale` and `action=refused`. Thus a stale file never decides, and the decisions at `legacy` match the code before X8 (`TestLegacyFlowDecisions_MatchMainOnTheOutputFixtures`). The triage decision is a phase deliverable with no launch of its own, so it has no launch binding (inbox item `isolation-x8-triage-floor-prose-gaps`).
+
 Each seat calls `FlowDecision.Resolve`. It reads the stage from `<root>/.evolve/policy.json`, reads the file and emits the violation. An unknown stage value or a policy that does not parse logs a WARN and keeps `legacy`.
 
 At `enforce` the seats keep their normal failure paths. The advisor returns `ADVISOR_RESPONSE_UNPARSEABLE`, and the caller keeps the static spine. The judge gives no opinion. The retry adjudicator gives the policy default. The failure advisor returns an error, and the operator gets the escalation.

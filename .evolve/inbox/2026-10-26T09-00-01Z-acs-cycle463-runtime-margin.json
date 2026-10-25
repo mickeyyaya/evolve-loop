@@ -1,0 +1,15 @@
+{
+  "id": "acs-cycle463-runtime-margin",
+  "kind": "test",
+  "priority_class": "stability",
+  "weight": 0.2,
+  "route": "console-manual",
+  "title": "acs/cycle463 runs about 530 to 550 s against the 600 s go test default timeout",
+  "summary": "The suite wraps a whole-tree vet and race run. On main it took about 533 s; under host load it hits the 600 s default timeout (seen 2026-10-26 during the review of #1131). It predates X8.",
+  "fix": "Scope the wrapped run to the packages the predicate names, or give the package an explicit -timeout in the acs runner.",
+  "acceptance": ["go test -tags acs ./acs/cycle463/ finishes under 300 s on the console host"],
+  "deps": [],
+  "files": ["go/acs/cycle463/"],
+  "created_at": "2026-10-26T09:00:01Z",
+  "source": "console, 2026-10-26, review of PR #1131"
+}

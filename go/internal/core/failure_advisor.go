@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -93,6 +94,10 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 	}
 	flow := phasecontract.MustFlowDecision(phasecontract.FlowSeatFailureAdvisor)
 	artifact := filepath.Join(in.Workspace, flow.ArtifactName)
+	if err := flow.Clear(artifact); err != nil {
+		return nil, fmt.Errorf("failure advisor: %w", err)
+	}
+	launched := time.Now()
 	resp, err := LaunchWithFreshSession(ctx, a.bridge, BridgeRequest{
 		CLI:          a.identity.CLI,
 		Profile:      profile,
@@ -108,7 +113,7 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 	if err != nil {
 		return nil, fmt.Errorf("failure advisor: bridge launch: %w", err)
 	}
-	cell := phasecontract.FlowCell{Cycle: in.Cycle, Phase: in.Phase, Origin: "FailureAdvisor.Advise", Path: artifact}
+	cell := phasecontract.FlowCell{Cycle: in.Cycle, Phase: in.Phase, Origin: "FailureAdvisor.Advise", Path: artifact, NotBefore: launched}
 	legacy := func() ([]byte, bool) { span := failureAdviceSpan(resp.Stdout); return span, len(span) > 0 }
 	return decodeFailureAdvice(flow.Resolve(in.ProjectRoot, cell, legacy, a.signals))
 }

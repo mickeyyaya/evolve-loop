@@ -138,3 +138,65 @@ func TestSpanBytesAndStdoutSpan_TakeTheLastBalancedSpanAndDecodersRefuseNil(t *t
 		t.Fatalf("DecodePhasePlan = %+v, %v", parsed, err)
 	}
 }
+
+func TestAdvisor_AStaleDecisionFileIsClearedAndTheFreshDecisionWins(t *testing.T) {
+	stale := map[decision]string{
+		decisionPlan:     `[{"phase":"retrospective","run":true}]`,
+		decisionRePlan:   `[{"phase":"retrospective","run":true}]`,
+		decisionProposal: `{"next_phase":"retrospective","justification":"attempt 1"}`,
+	}
+	for _, d := range []decision{decisionPlan, decisionRePlan, decisionProposal} {
+		in := flowInput(t, "")
+		path := filepath.Join(in.Workspace, d.artifactFile())
+		if err := os.WriteFile(path, []byte(stale[d]), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		l := &fakeLauncher{stdout: decisionBody(d), stdoutOnly: true}
+		a, _ := observed(t, l, defaultIdentity())
+		if err := runDecision(a, d, in); err != nil || l.sawStale {
+			t.Fatalf("%s: err %v, saw stale %v", d.captureKind(), err, l.sawStale)
+		}
+		if body, err := os.ReadFile(path); err == nil {
+			t.Fatalf("%s: the stale file survived the launch: %s", d.captureKind(), body)
+		}
+	}
+}
+
+func TestAdvisor_ADecisionFileThatCannotBeClearedRefusesTheLaunch(t *testing.T) {
+	for _, d := range []decision{decisionPlan, decisionRePlan, decisionProposal} {
+		in := flowInput(t, "")
+		if err := os.MkdirAll(filepath.Join(in.Workspace, d.artifactFile(), "keep"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		a, got := observed(t, refusingLauncher{t}, defaultIdentity())
+		err := runDecision(a, d, in)
+		if err == nil || !strings.Contains(err.Error(), "clear the decision file before the launch") {
+			t.Fatalf("%s: err %v", d.captureKind(), err)
+		}
+		if v := eventsWithCode(*got, CodeLaunchFailed); len(v) != 1 || v[0].Fields["step"] != "preflight" {
+			t.Fatalf("%s: events %+v", d.captureKind(), *got)
+		}
+	}
+}
+
+func TestAdvisor_LegacyProposalMatchesMainOnTheOutputFixtures(t *testing.T) {
+	cases := []struct {
+		stdout string
+		want   string
+	}{
+		{`{"next_phase":"audit","justification":"clean"}`, "audit"},
+		{"Here:\n```json\n{\"next_phase\":\"build\",\"justification\":\"fence\"}\n```\nThanks", "build"},
+		{"no json", ""},
+	}
+	for _, c := range cases {
+		in := flowInput(t, "")
+		if err := os.WriteFile(filepath.Join(in.Workspace, "routing-proposal.json"), []byte(`{"next_phase":"retrospective","justification":"stale"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		a, _ := observed(t, &fakeLauncher{stdout: c.stdout, stdoutOnly: true}, defaultIdentity())
+		prop, err := a.Propose(in)
+		if (c.want == "") != (err != nil) || (prop != nil && prop.NextPhase != c.want) {
+			t.Errorf("%q: %+v %v, main gives %q", c.stdout, prop, err, c.want)
+		}
+	}
+}

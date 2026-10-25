@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/advisor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -46,6 +47,11 @@ func (a *bridgeRetryAdjudicator) Adjudicate(cs CycleState, env retryEnvelope) *a
 	}
 	flow := phasecontract.MustFlowDecision(phasecontract.FlowSeatRetryAdjudicator)
 	artifact := filepath.Join(cs.WorkspacePath, flow.ArtifactName)
+	if err := flow.Clear(artifact); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN retry-adjudicator: %v — policy default applies\n", err)
+		return nil
+	}
+	launched := time.Now()
 	resp, err := LaunchWithFreshSession(context.Background(), a.bridge, BridgeRequest{
 		CLI:          a.identity.CLI,
 		Profile:      a.profilePath(),
@@ -61,7 +67,7 @@ func (a *bridgeRetryAdjudicator) Adjudicate(cs CycleState, env retryEnvelope) *a
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN retry-adjudicator: dispatch failed (%v) — policy default applies\n", err)
 		return nil
 	}
-	cell := phasecontract.FlowCell{Cycle: cs.CycleID, Phase: string(cs.Phase), Origin: "bridgeRetryAdjudicator.Adjudicate", Path: artifact}
+	cell := phasecontract.FlowCell{Cycle: cs.CycleID, Phase: string(cs.Phase), Origin: "bridgeRetryAdjudicator.Adjudicate", Path: artifact, NotBefore: launched}
 	legacy := func() ([]byte, bool) { return adjudicationSpan(resp.Stdout, artifact) }
 	return decodeAdjudication(flow.Resolve(a.root, cell, legacy, a.signals))
 }

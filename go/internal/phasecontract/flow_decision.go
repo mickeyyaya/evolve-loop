@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -112,7 +114,7 @@ func MustFlowDecision(seat string) FlowDecision {
 }
 
 func (d FlowDecision) Resolve(projectRoot string, cell FlowCell, legacy func() ([]byte, bool), signals *signalcenter.Center) []byte {
-	r := d.Read(FlowStageAt(projectRoot, os.Stderr), cell.Path, legacy)
+	r := d.Read(FlowStageAt(projectRoot, os.Stderr), cell.Path, cell.NotBefore, legacy)
 	if e, ok := d.ViolationEvent(r, cell); ok {
 		signals.Emit(e)
 	}
@@ -174,8 +176,8 @@ type FlowRead struct {
 	Disagree bool
 }
 
-func (d FlowDecision) Read(stage FlowStage, path string, legacy func() ([]byte, bool)) FlowRead {
-	file, fileErr := d.readFile(path)
+func (d FlowDecision) Read(stage FlowStage, path string, notBefore time.Time, legacy func() ([]byte, bool)) FlowRead {
+	file, fileErr := d.readFile(path, notBefore)
 	r := FlowRead{Stage: stage, FileErr: fileErr}
 	if fileErr == nil {
 		r.Raw, r.Source = file, FlowSourceFile
@@ -193,7 +195,26 @@ func (d FlowDecision) Read(stage FlowStage, path string, legacy func() ([]byte, 
 	return r
 }
 
-func (d FlowDecision) readFile(path string) ([]byte, error) {
+const flowClockSlack = 2 * time.Second
+
+var ErrFlowFileStale = errors.New("the decision file predates the launch of this attempt")
+
+func (d FlowDecision) Clear(path string) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%s: clear the decision file before the launch: %w", d.Seat, err)
+	}
+	return nil
+}
+
+func (d FlowDecision) readFile(path string, notBefore time.Time) ([]byte, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.ModTime().Before(notBefore.Add(-flowClockSlack).Truncate(time.Second)) {
+		return nil, fmt.Errorf("%s: %w (written %s, launched %s)", d.ArtifactName, ErrFlowFileStale,
+			info.ModTime().UTC().Format(time.RFC3339), notBefore.UTC().Format(time.RFC3339))
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -214,18 +235,23 @@ const (
 	FlowRuleShadowDisagree = "flow.shadow.disagree"
 	FlowRuleFileInvalid    = "flow.file.invalid"
 	FlowRuleProseFallback  = "flow.fallback.prose"
+	FlowRuleFileStale      = "flow.file.stale"
 )
 
 type FlowCell struct {
-	Cycle  int
-	Phase  string
-	Origin string
-	Path   string
+	Cycle     int
+	Phase     string
+	Origin    string
+	Path      string
+	NotBefore time.Time
 }
 
 func (d FlowDecision) ViolationEvent(r FlowRead, cell FlowCell) (signalcenter.Event, bool) {
 	action, rule, reason := "logged", "", ""
 	switch {
+	case errors.Is(r.FileErr, ErrFlowFileStale):
+		action, rule = "refused", FlowRuleFileStale
+		reason = fmt.Sprintf("%s refused a stale decision file: %v", d.Seat, r.FileErr)
 	case r.Stage == FlowStageEnforce && r.FileErr != nil:
 		action, rule = "refused", FlowRuleFileInvalid
 		reason = fmt.Sprintf("%s refused the decision: %s is missing or fails its schema (%v)", d.Seat, d.ArtifactName, r.FileErr)

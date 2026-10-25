@@ -139,6 +139,7 @@ type fakeLauncher struct {
 	stdout     string
 	artifact   string
 	stdoutOnly bool
+	sawStale   bool
 	err        error
 	durationMS int64
 	tokens     cyclestate.TokenUsage
@@ -152,6 +153,9 @@ func (f *fakeLauncher) Launch(_ context.Context, req LaunchRequest) (LaunchRespo
 	f.calls++
 	f.gotReq = req
 	f.reqs = append(f.reqs, req)
+	if _, err := os.Stat(req.ArtifactPath); err == nil {
+		f.sawStale = true
+	}
 	if err := f.writeArtifact(req.ArtifactPath); err != nil {
 		return LaunchResponse{}, err
 	}

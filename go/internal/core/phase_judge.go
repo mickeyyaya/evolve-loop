@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/advisor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -58,6 +60,11 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 	}
 	flow := phasecontract.MustFlowDecision(phasecontract.FlowSeatJudge)
 	artifactPath := filepath.Join(in.Workspace, flow.ArtifactName)
+	if err := flow.Clear(artifactPath); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN plan judge: %v — no opinion\n", err)
+		return judgeNoOpinion
+	}
+	launched := time.Now()
 	resp, err := LaunchWithFreshSession(ctx, j.bridge, BridgeRequest{
 		CLI:          j.cli,
 		Profile:      profile,
@@ -75,7 +82,7 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 	if err != nil {
 		return judgeNoOpinion
 	}
-	cell := phasecontract.FlowCell{Cycle: in.Cycle, Phase: in.Current, Origin: "PlanJudge.GradePlan", Path: artifactPath}
+	cell := phasecontract.FlowCell{Cycle: in.Cycle, Phase: in.Current, Origin: "PlanJudge.GradePlan", Path: artifactPath, NotBefore: launched}
 	return decodeJudgeVerdict(flow.Resolve(in.ProjectRoot, cell, advisor.StdoutSpan(resp.Stdout, '{', '}'), j.signals))
 }
 

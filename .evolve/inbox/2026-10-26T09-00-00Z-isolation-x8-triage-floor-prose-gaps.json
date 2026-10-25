@@ -1,0 +1,19 @@
+{
+  "id": "isolation-x8-triage-floor-prose-gaps",
+  "kind": "refactor",
+  "priority_class": "correctness",
+  "weight": 0.4,
+  "route": "console-manual",
+  "title": "LLM isolation X8 follow-up: the triage floor sets still come from prose, and the triage decision has no attempt binding",
+  "summary": "Review of #1131. At isolation.i8.stage=enforce, triagecap refuses a triage-decision.json without committed_floors, but deferred_floors stays optional, and the evalgate floor binding (go/internal/evalgate/floorbinding.go) still reads DeferredFloorPackagesDecl and CommittedFloorPackages with the report prose as the fallback. triagecap.Recorder counts prose floors when the triage-cap stage is below enforce. The host projection (triagedecision.Derive/Project) writes no committed_floors, so a projected decision fails the clamp at enforce. A triage-decision.json from an earlier triage dispatch of the same cycle survives (deliverable.HostEffects.derive skips an existing file), so it has no attempt binding. NewPlanJudge and NewBridgeRetryAdjudicator have no production caller; wire them with their Signal Center option or delete them. Spec: docs/architecture/llm-isolation.md §12.1.",
+  "fix": "At enforce: make deferred_floors required in the triage schema, make the evalgate floor binding and Recorder refuse the prose fallback, have the projection write committed_floors from the report only when the agent declared them, and clear or attempt-bind triage-decision.json at each triage dispatch. Decide the two unwired seats.",
+  "acceptance": [
+    "At enforce no floor set in evalgate or Recorder comes from report prose; a test for each",
+    "A stale triage-decision.json from an earlier dispatch cannot decide the clamp; a test that fails with the fix reverted",
+    "NewPlanJudge and NewBridgeRetryAdjudicator have a production caller with signals, or are removed with their tests"
+  ],
+  "deps": ["isolation-typed-flow-outputs"],
+  "files": ["go/internal/evalgate/floorbinding.go", "go/internal/triagecap/", "go/internal/triagedecision/", "go/internal/deliverable/host_effects.go", "go/internal/core/phase_judge.go", "go/internal/core/retry_adjudicator_agent.go"],
+  "created_at": "2026-10-26T09:00:00Z",
+  "source": "console, 2026-10-26, independent review of PR #1131 (X8)"
+}
