@@ -209,12 +209,12 @@ func dropListedModels(src string) string {
 
 func TestC1882_006_NilRunTestCatchesLostListingWhenOllamaSucceeds(t *testing.T) {
 	overlay := overlayOf(t, "ollama.go", dropListedModels)
-	out, passed := runModelqueryTest(t, "^TestOllamaLister_NilRunDefaultsToExecRunner$", fakeOllamaPath(t, listingWithOneModel), "-overlay", overlay)
-	if !strings.Contains(out, "TestOllamaLister_NilRunDefaultsToExecRunner") {
+	out, passed := runModelqueryTest(t, "^TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher$", fakeOllamaPath(t, listingWithOneModel), "-overlay", overlay)
+	if !strings.Contains(out, "TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher") {
 		t.Fatalf("nil-run test did not run:\n%s", out)
 	}
 	if passed {
-		t.Errorf("TestOllamaLister_NilRunDefaultsToExecRunner passed while the lister dropped every listed model:\n%s", out)
+		t.Errorf("TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher passed while the lister dropped every listed model:\n%s", out)
 	}
 }
 
@@ -225,7 +225,7 @@ func TestC1882_007_NilRunTestPassesOnHealthyListerEitherWay(t *testing.T) {
 	}
 	for name, script := range cases {
 		t.Run(name, func(t *testing.T) {
-			out, passed := runModelqueryTest(t, "^TestOllamaLister_NilRunDefaultsToExecRunner$", fakeOllamaPath(t, script))
+			out, passed := runModelqueryTest(t, "^TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher$", fakeOllamaPath(t, script))
 			if !passed {
 				t.Errorf("nil-run test fails on the real lister:\n%s", out)
 			}
