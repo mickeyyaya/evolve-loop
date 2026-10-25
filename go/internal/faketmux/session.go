@@ -16,11 +16,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-const paneTerm = "TERM=screen"
+const (
+	paneTerm       = "TERM=screen"
+	paneWrapper    = `"$@"; exit $?`
+	paneLeaderName = "faketmux-pane"
+)
 
 var (
-	openFile     = os.OpenFile
-	signalGroup  = func(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
+	openFile    = os.OpenFile
+	signalGroup = func(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
+	paneShell   = "/bin/sh"
+	commandOf   = func(pid int) (string, error) {
+		return sysexec.Output(context.Background(), sysexec.DefaultRunner, "", "ps", "-o", "comm=", "-p", strconv.Itoa(pid))
+	}
 	setBlocking  = func(f *os.File) error { return syscall.SetNonblock(int(f.Fd()), false) }
 	processStart = proctree.StartOf
 )
@@ -62,7 +70,7 @@ func (s session) start(argv []string, workdir string, height int) error {
 }
 
 func paneCommand(argv []string, workdir string, in, screen *os.File) *exec.Cmd {
-	cmd := sysexec.Command(context.Background(), argv[0], argv[1:]...)
+	cmd := sysexec.Command(context.Background(), paneShell, append([]string{"-c", paneWrapper, paneLeaderName}, argv...)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = in, screen, screen
 	cmd.Dir = workdir
 	cmd.Env = append(paneEnv(os.Environ()), paneTerm)
@@ -106,6 +114,9 @@ func (s session) pane() (paneRecord, error) {
 	if rec.pid <= 1 {
 		return paneRecord{}, fmt.Errorf("pane record %q has no process", body)
 	}
+	if rec.pid == os.Getpid() || rec.pid == os.Getppid() {
+		return paneRecord{}, fmt.Errorf("pane record %q names this process or its parent", body)
+	}
 	return rec, nil
 }
 
@@ -114,13 +125,22 @@ func startedAs(pid int, begun string) bool {
 	return err == nil && now == begun
 }
 
+func isPaneLeader(pid int) bool {
+	comm, err := commandOf(pid)
+	switch filepath.Base(strings.TrimPrefix(strings.TrimSpace(comm), "-")) {
+	case "sh", "bash", "dash", "zsh":
+		return err == nil
+	}
+	return false
+}
+
 func (s session) alive() bool {
 	rec, err := s.pane()
 	return err == nil && startedAs(rec.pid, rec.begun)
 }
 
 func (s session) kill() error {
-	if rec, err := s.pane(); err == nil && startedAs(rec.pid, rec.begun) {
+	if rec, err := s.pane(); err == nil && startedAs(rec.pid, rec.begun) && isPaneLeader(rec.pid) {
 		if err := signalGroup(rec.pid); err != nil && !errors.Is(err, syscall.ESRCH) {
 			return fmt.Errorf("kill session %s: %w", s.name, err)
 		}

@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -141,7 +140,7 @@ func stubFirstPath(t *testing.T, binDir string) string {
 
 func installFakeTmux(t *testing.T, binDir, fakeBin string) []string {
 	t.Helper()
-	root, err := faketmux.Claim(filepath.Join(os.TempDir(), "evolve-faketmux-"+strconv.Itoa(os.Getuid())))
+	root, err := faketmux.Claim()
 	if err != nil {
 		t.Fatalf("claim a fake tmux root: %v", err)
 	}

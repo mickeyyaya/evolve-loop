@@ -48,7 +48,21 @@ The pane process starts in its own session (`Setsid`), so `new-session` returns 
 
 **A killed test leaves no panes behind.** A pane runs in its own session, so a SIGKILL or a timeout panic of `go test` does not reach it. Also, `t.Cleanup` does not run then.
 
-Thus the matrix gets its state root from `faketmux.Claim(<tmp>/evolve-faketmux-<uid>)`, not from `t.TempDir()`. `Claim` writes an `owner` record (the pid and the start time of the test process) into a new `run-*` directory. Before that, it reaps each `run-*` directory whose owner does not live. It kills each pane that the fake started, by the record, and removes the directory. Cleanup calls `faketmux.Reap(root)` on its own root. Pinned by `TestClaim_ReapsThePanesOfARunWhoseOwnerIsGoneAndKeepsALiveOwnersRun`.
+Thus the matrix gets its state root from `faketmux.Claim()`, not from `t.TempDir()`. The base is `<os.TempDir()>/evolve-faketmux-<uid>`, a directory that only this user can use. The base holds a `marker` file with a random token, written once.
+
+`Claim` writes an `owner` record (the pid and the start time of the test process, and the token) into a new `run-*` directory. Before that, it reaps each marked `run-*` directory whose owner does not live. Cleanup calls `faketmux.Reap(root)` on its own root. Pinned by `TestClaimIn_ReapsOnlyTheMarkedRunsWhoseOwnerIsGone`.
+
+**The reaper deletes only what the fake made.** `Reap` refuses each root that is not a marked run of the base, with an explicit error. It refuses an empty or relative root, a path that is not clean, `/`, `$HOME`, the temporary directory and the base itself. It also refuses a `run-*` directory whose owner record does not carry the token.
+
+A run that holds an entry other than `owner` and the server directories is refused too. A server directory loses only its `sessions` and `buffers`, and then `os.Remove` must find it empty. Thus a foreign file stays. A symlinked run or server directory is refused, so the reaper never follows a link out of the base. The sweep of `Claim` leaves a refused run as it is and does not fail the claim. Pinned by `TestReapIn_RefusesEveryRootThatIsNotAMarkedRunOfTheBase`, which fails when the token check is removed.
+
+**The signal goes only to a pane leader.** Each pane runs under a shell wrapper (`/bin/sh -c '"$@"; exit $?'`), so the pane leader stays a shell for its life. The fake signals a group only when three checks pass:
+
+- the pid is not the process itself or its parent;
+- the start time matches the record;
+- `ps -o comm=` names a shell.
+
+Pinned by `TestSeams_TheFakeNeverSignalsItselfItsParentOrANonShellLeader`, which uses a recording sender.
 
 **Writes block like a terminal.** A writer opens the FIFO without blocking, so a pane with no reader fails at once (`ENXIO`), not forever. Then it sets the descriptor to blocking, so a prompt larger than the pipe buffer waits for the reader. The first matrix run without this step failed with `resource temporarily unavailable` on each prompt paste.
 

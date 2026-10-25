@@ -33,7 +33,14 @@ func (s *server) killServer(invocation) error {
 			return err
 		}
 	}
-	return os.RemoveAll(s.dir)
+	return ignoreNotExist(errors.Join(os.RemoveAll(s.sessionsDir()), os.RemoveAll(s.buffersDir()), os.Remove(s.dir)))
+}
+
+func ignoreNotExist(err error) error {
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
 }
 
 func (s *server) sessionsDir() string { return filepath.Join(s.dir, "sessions") }

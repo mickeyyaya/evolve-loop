@@ -241,7 +241,6 @@ func TestRun_RefusesWhatTmuxWouldRefuse(t *testing.T) {
 		{"can't find session: zz", []string{"display-message", "-p", "-t", "zz", "x"}},
 		{"display-message wants one format", []string{"display-message", "-p", "-t", "r"}},
 		{"can't find session: zz", []string{"list-panes", "-t", "zz"}},
-		{"start the pane", []string{"new-session", "-d", "-s", "m", filepath.Join(f.root, "missing"), "arg"}},
 	} {
 		f.refuses(tc.want, tc.args...)
 	}
