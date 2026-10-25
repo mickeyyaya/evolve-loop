@@ -52,7 +52,8 @@ func dispatchTagLine(id string) string {
 }
 
 func dispatchEnv(deps Deps, cfg *Config) []string {
-	env := slices.DeleteFunc(driverEnv(deps, cfg.Realization.Env), isDispatchTag)
+	cell, _ := deps.cellEnv(cfg)
+	env := slices.DeleteFunc(cell, isDispatchTag)
 	if cfg.DispatchID == "" {
 		return env
 	}

@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"io"
-	"os"
 	"slices"
 	"testing"
 )
@@ -20,22 +19,6 @@ func envCapturingEngine(seen map[string][]string) *Engine {
 			return 0, nil
 		},
 	})
-}
-
-func TestProcessEnv_IsTheProcessEnvironmentPlusTheFamilyManifestsDefaultEnv(t *testing.T) {
-	t.Parallel()
-	agy := ProcessEnv("agy")
-	if !slices.Contains(agy, agyAutoUpdateOffEnv+"=1") {
-		t.Errorf("a bare agy exec must carry %s=1 from the agy-tmux manifest; env has %d entries without it", agyAutoUpdateOffEnv, len(agy))
-	}
-	if len(agy) != len(os.Environ())+1 {
-		t.Errorf("agy env = the process env plus its one manifest variable; got %d, want %d", len(agy), len(os.Environ())+1)
-	}
-	for _, family := range []string{"codex", "no-such-family"} {
-		if got := ProcessEnv(family); !slices.Equal(got, os.Environ()) {
-			t.Errorf("%s declares no default_env, so its exec env is the process env unchanged", family)
-		}
-	}
 }
 
 func TestDoctorVersion_ProbesTheBinaryWithItsFamilyManifestEnv(t *testing.T) {

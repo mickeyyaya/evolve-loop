@@ -41,6 +41,8 @@ type Deps struct {
 	NewChallengeToken     func() (string, error)
 	CaptureBaseline       func(*Config) dispatchBaseline
 	Env                   map[string]string
+	EnvStage              string
+	EnvDrops              *EnvDropLog
 	RecoveryStage         string
 	FatalPaneStage        string
 	ContextFillWarnPct    int
@@ -82,6 +84,8 @@ type Deps struct {
 	ListCwds              proctree.CwdLister
 	SignalProcess         proctree.Signaler
 	sweep                 *dispatchSweep
+	hostOS                string
+	terminalCheck         func(string) error
 }
 
 type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available bool)
@@ -138,6 +142,9 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.Reviewer == nil {
 		d.Reviewer = newDeterministicReviewer(defaultIfZero(d.ArtifactMaxExtends, defaultArtifactMaxExtends))
+	}
+	if d.EnvDrops == nil {
+		d.EnvDrops = &EnvDropLog{}
 	}
 	if d.MkScratchDir == nil {
 		d.MkScratchDir = os.MkdirTemp

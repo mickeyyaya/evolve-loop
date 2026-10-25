@@ -76,4 +76,5 @@ type Policy struct {
 	Handoff            *HandoffPolicy            `json:"handoff,omitempty"`
 	AuditCascade       *AuditCascadePolicy       `json:"audit_cascade,omitempty"`
 	Quality            *QualityPanelPolicy       `json:"quality,omitempty"`
+	Isolation          *IsolationPolicy          `json:"isolation,omitempty"`
 }

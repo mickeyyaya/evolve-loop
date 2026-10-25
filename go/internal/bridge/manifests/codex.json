@@ -2,6 +2,7 @@
   "schema_version": 1,
   "cli": "codex",
   "binary": "codex",
+  "env_passthrough": ["CODEX_HOME", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "no_proxy", "all_proxy", "SSL_CERT_FILE"],
   "model_family": "gpt",
   "binary_min_version": "0.13.0",
   "transport": "headless",

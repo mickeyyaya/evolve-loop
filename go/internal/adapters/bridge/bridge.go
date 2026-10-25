@@ -51,6 +51,8 @@ type Adapter struct {
 	phaseIO             config.Stage
 	recoveryStage       string
 	fatalPaneStage      string
+	envStage            string
+	envDrops            *gobridge.EnvDropLog
 	bridgeConfig        policy.BridgePolicy
 	efforts             policy.EffortTable
 	floors              policy.Floors
@@ -65,6 +67,7 @@ func New() *Adapter {
 			return gobridge.NewEngine(gobridge.Deps{Env: env, TokenResolver: tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(env))})
 		},
 		resolver: phasecontract.BuiltinResolver{},
+		envDrops: &gobridge.EnvDropLog{},
 	}
 }
 
@@ -79,6 +82,7 @@ func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 		a.contextFillWarnPct = pol.ContextFillConfig().WarnThresholdPct
 	}
 	a.recoveryStage, a.fatalPaneStage = pol.BridgeRecoveryStages()
+	a.envStage = pol.IsolationEnvStage()
 	a.paneCaptureMaxBytes = pol.AttemptPostmortemConfig().MaxPaneCaptureBytes
 	a.bootTimeoutStore = clihealth.NewStore(projectRoot, nil)
 	a.engineFactory = func(env map[string]string) core.Bridge {
@@ -102,6 +106,8 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		PaneCaptureMaxBytes:   a.paneCaptureMaxBytes,
 		RecoveryStage:         a.recoveryStage,
 		FatalPaneStage:        a.fatalPaneStage,
+		EnvStage:              a.envStage,
+		EnvDrops:              a.envDrops,
 		Signals:               a.signals,
 		CorroborateWall:       gobridge.DefaultWallCorroborator(nil, os.Stderr),
 		ModelChain:            gobridge.ModelChainFor(a.bridgeConfig.ModelFailoverOn()),
