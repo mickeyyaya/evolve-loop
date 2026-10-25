@@ -19,7 +19,7 @@ var runLoopPreflightFn = defaultLoopPreflight
 
 func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Options {
 	layout := paths.ResolveFromEnv()
-	pol, _ := policy.Load(filepath.Join(cfg.ProjectRoot, ".evolve", "policy.json"))
+	pol := policy.LoadOrDefaults(filepath.Join(cfg.ProjectRoot, ".evolve", "policy.json"), stderr)
 	return looppreflight.Options{
 		ProjectRoot:         cfg.ProjectRoot,
 		EvolveDir:           cfg.EvolveDir,

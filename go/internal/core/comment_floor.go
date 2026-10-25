@@ -91,9 +91,7 @@ func commentFloorStage(projectRoot string, warn io.Writer) config.Stage {
 func floorStage(projectRoot, key, label string, word func(policy.Policy) string, warn io.Writer) config.Stage {
 	chosen := word(policy.Policy{})
 	if projectRoot != "" {
-		if p, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
-			chosen = word(p)
-		}
+		chosen = word(policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), warn))
 	}
 	stage, ok := config.GateStage(chosen)
 	if !ok {

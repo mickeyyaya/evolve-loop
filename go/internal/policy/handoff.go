@@ -21,6 +21,11 @@ type HandoffPairConfig struct {
 
 type HandoffConfig map[string]HandoffPairConfig
 
+type handoffPairJSON struct {
+	Stage     *string `json:"stage"`
+	JudgeTier *string `json:"judge_tier"`
+}
+
 type HandoffPolicy struct {
 	pairs map[string]HandoffPairConfig
 }
@@ -42,10 +47,7 @@ func (h *HandoffPolicy) UnmarshalJSON(raw []byte) error {
 			return fmt.Errorf("handoff: unknown pair %q; known pairs are %s", pairName, strings.Join(knownHandoffPairs, ", "))
 		}
 
-		var decoded struct {
-			Stage     *string `json:"stage"`
-			JudgeTier *string `json:"judge_tier"`
-		}
+		var decoded handoffPairJSON
 		if err := decodeStrict(rawPair, &decoded); err != nil {
 			return fmt.Errorf("handoff: pair %q: %w", pairName, err)
 		}

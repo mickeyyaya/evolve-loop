@@ -1175,7 +1175,13 @@ A deny list in the bridge cannot keep up with new names, which is the same reaso
 
 X18a and X18b go first, in either order. X18c to X18e follow X18b, and X18c also needs X18a:
 
-1. **X18a** makes `policy.Parse` strict with `DisallowUnknownFields`, like `decodeStrict` (`go/internal/policy/cli_routing.go:124`). It first lists each unknown key of the tracked policy file and of the test fixtures. The red test is a policy with the key `fleet.cuont` that parses today.
+1. **X18a** (built) makes `policy.Parse` strict at every level. The red test `TestPolicyParse_RefusesAnUnknownKey` parses a policy with the key `fleet.cuont`.
+   - `DisallowUnknownFields` names only the last key (`json: unknown field "cuont"`). So `Parse` first walks the raw JSON against the `Policy` type and fails with `ErrUnknownKey` and the full path: `unknown policy key "fleet.cuont"` (`go/internal/policy/strict_keys.go`).
+   - Three top-level metadata keys stay allowed, so a downstream file keeps its load: `$schema`, `description` and `version`.
+   - The tracked file had three stale keys with no reader: `description`, `disposition` (the live key is `failure_disposition`) and `version`. X18a removes them. The fixture `testdata/headroom-builder.policy.json` has none.
+   - The loop refuses to start on a refused policy: the `cli-routing` preflight check halts and names the key (`TestLoopPreflight_AnUnknownPolicyKeyRefusesTheLoopStart`). The loop keeps no last-known-good copy. A boundary rebuild and a preflight run before each batch, and the plane policy changes only at a boundary.
+   - A best-effort reader that runs mid-wave calls `policy.LoadOrDefaults`. It prints one `[policy] WARN` line and uses the compiled defaults, but each safety floor fails closed to `enforce`. 20 former silent readers use it, and the docs floor of the build handoff uses it too. The five readers under `internal/bridge` and `internal/adapters/bridge` still drop the error, because builders X3 and X4 change that code now; item `control-flags-bridge-policy-readers` moves them.
+   - Rollout: a strict binary refuses a key that a newer PR adds, as the `floors` key of X6 did. At the boundary, rebuild the plane binary (`make -C <plane>/go build`) before the next `wave next`. `wave next` names that remedy when it meets `ErrUnknownKey`. Each PR that adds a policy key must add the schema field in the same PR.
 2. **X18b** adds the marker list and closes the `buildCycleEnv` leak. It adds the AST guard `TestNoControlFlagReadOutsideTheMarkerList`:
    - It walks each non-test Go file and finds each `os.Getenv`, `os.LookupEnv` and `envchain` read.
    - It resolves constant concatenations such as `"EVOLVE_"+"RESUME"`.

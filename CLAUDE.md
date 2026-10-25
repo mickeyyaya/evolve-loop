@@ -92,7 +92,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - `repo_contract_gate=enforce`: the ship-time repo-contract scanner pack (`internal/phases/ship/repocontract.go`). Lane ships can no longer red main. The build handoff floor runs the same pack first, so a red goes back to the build. Both run the pack only in the module of evolve-loop itself (`internal/repocontract`);
   - EGPS `red_count==0` to ship;
   - the tdd phase is enabled.
-- `.evolve/policy.json` CAN override these defaults through a `gates`/`workflow` block. But the checked-in file sets only floor/cli_health/cli_routing/catalog/acs/parallel_evaluate/fleet/disposition/failure_disposition/gc/inbox_priority/docs_floor/audit_cascade. It does not contain the gate keys. Do not assume that policy.json is the source of the defaults. Details for some of these keys (see runtime-reference):
+- `.evolve/policy.json` CAN override these defaults through a `gates`/`workflow` block. But the checked-in file sets only floor/cli_health/cli_routing/catalog/acs/parallel_evaluate/fleet/failure_disposition/gc/inbox_priority/docs_floor/audit_cascade. It does not contain the gate keys. Do not assume that policy.json is the source of the defaults. Details for some of these keys (see runtime-reference):
   - `gc`: the retention horizons, since 2026-09-29.
   - `inbox_priority`: the class order and the factor weights of the inbox rank, since 2026-10-06 (ADR-0121). It is strict-decoded. The plan's P2 (2026-10-06) wired it: every lane consumer reads `inboxrank.Order`.
   - `docs_floor`: `ste_stage: enforce`, since 2026-10-21 (operator decision). A lane doc that fails the STE lint goes back to the build.

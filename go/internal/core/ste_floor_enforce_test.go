@@ -68,17 +68,20 @@ func TestDefaultBuildFloorChecks_AtEnforceABrokenStandardSendsTheDocBack(t *test
 	}
 }
 
-func TestDocsFloorChecks_APolicyThatDoesNotLoadWarns(t *testing.T) {
+func TestDocsFloorChecks_APolicyThatDoesNotLoadWarnsAndFailsClosed(t *testing.T) {
 	t.Parallel()
-	in := steFloorFixture(t, map[string]string{"docs/new.md": "Short and clean.\n"})
-	writeFile(t, filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), `{"docs_floor":{"ste_stage":"enforce","bogus":1}}`)
+	in := steFloorFixture(t, map[string]string{"docs/new.md": longSentence(30) + "\n"})
+	writeFile(t, filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), `{"docs_floor":{"ste_stage":"shadow","bogus":1}}`)
 	var sink injectedStderr
 	in.Stderr = &sink
 
-	docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
+	failures := docsFloorChecks(context.Background(), in, changedFloorPaths(context.Background(), in))
 
-	if !strings.Contains(sink.String(), "[ste-lint] WARN: the policy did not load") {
-		t.Errorf("stderr = %q, want a WARN: an enforce stage that silently falls to shadow hides the stage", sink.String())
+	if !strings.Contains(sink.String(), `[policy] WARN`) || !strings.Contains(sink.String(), `"docs_floor.bogus"`) {
+		t.Errorf("stderr = %q, want a WARN that names the refused key", sink.String())
+	}
+	if len(failures) != 1 || !strings.Contains(failures[0], "[ste-lint]") {
+		t.Fatalf("failures = %q: a refused policy runs the STE floor at enforce, never at the shadow stage it asked for", failures)
 	}
 }
 

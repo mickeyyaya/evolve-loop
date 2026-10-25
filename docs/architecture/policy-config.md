@@ -11,6 +11,23 @@ dispatch resolver use their built-in defaults). A present-but-malformed file is
 a hard error (a typo'd rule fails loudly rather than silently disabling the
 policy).
 
+The whole file decodes strictly (X18a, [llm-isolation.md](llm-isolation.md) §27).
+A key that is not in the schema below fails the load, at any level. The
+error names the file, the full key path and the fix, for example
+`policy: parse .evolve/policy.json: unknown policy key "fleet.cuont": remove it or check its spelling`.
+Three top-level metadata keys are allowed and have no effect: `$schema`,
+`description` and `version`. The same words below the top level are unknown keys.
+
+To fix a refused file, read the key path in the error. Then correct its
+spelling against the schema below, or remove the key. An older release
+ignored such a key, so the key had no effect before.
+
+The loop refuses to start on a refused file, because the `cli-routing` preflight
+check halts. A best-effort reader that runs mid-wave prints one
+`[policy] WARN` line (`policy.LoadOrDefaults`). It then uses the compiled
+defaults, but each safety floor fails closed to `enforce`: `docs_floor.stage`,
+`docs_floor.ste_stage`, `comment_floor.stage` and `cover_changed.stage`.
+
 ## Schema
 
 ```jsonc
@@ -61,7 +78,7 @@ policy).
   // The convergence policy (ADR-0126). The convergence sub-block decodes
   // STRICTLY: an unknown key or an out-of-range number fails the load; an
   // unknown stage or bar word warns and resolves to its default. Absent ⇒ the
-  // compiled default shown here. The other workflow keys stay lenient.
+  // compiled default shown here. An unknown key in any block fails the load.
   "workflow": {
     "convergence": {
       "stage": "shadow",

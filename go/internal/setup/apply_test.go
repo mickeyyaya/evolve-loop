@@ -240,8 +240,12 @@ func TestApply_TheFileItPatchesDecidesTheRefusalNotTheReport(t *testing.T) {
 			rep, loader := applyFixture(t)
 			rep.RoutingTableDeclared = false
 			existing := []byte(`{"` + key + `": {"clis": ["claude"], "default": ["claude"]}}`)
-			if p, err := policy.Parse(existing); err != nil || p.CLIRouting == nil {
+			p, err := policy.Parse(existing)
+			if key == "cli_routing" && (err != nil || p.CLIRouting == nil) {
 				t.Fatalf("policy.Parse(%s) = (%+v, %v): the policy loader reads this key as a live routing table", existing, p, err)
+			}
+			if key != "cli_routing" && !errors.Is(err, policy.ErrUnknownKey) {
+				t.Fatalf("policy.Parse(%s) err = %v: the strict loader refuses a key in another case", existing, err)
 			}
 
 			out, err := Apply(rep, builtinPresets, "recommended", existing, loader)

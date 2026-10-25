@@ -12,11 +12,7 @@ import (
 )
 
 func LoadChainConfig(evolveDir string) policy.ChainConfig {
-	pol, err := policy.Load(paths.PolicyPath(evolveDir))
-	if err != nil {
-		return policy.Policy{}.ChainConfig()
-	}
-	return pol.ChainConfig()
+	return policy.LoadOrDefaults(paths.PolicyPath(evolveDir), os.Stderr).ChainConfig()
 }
 
 func InboxPendingCount(evolveDir string) (int, []string, error) {

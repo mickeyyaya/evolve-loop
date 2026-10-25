@@ -15,7 +15,7 @@ func writeDossierFloorPolicy(t *testing.T, root string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	const js = `{"version":1,"floor":[{"id":"dossier-closeout","enforced_since_cycle":2}]}`
+	const js = `{"floor":[{"id":"dossier-closeout","enforced_since_cycle":2}]}`
 	if err := os.WriteFile(filepath.Join(dir, "policy.json"), []byte(js), 0o644); err != nil {
 		t.Fatal(err)
 	}

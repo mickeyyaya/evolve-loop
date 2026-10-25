@@ -1,6 +1,7 @@
 package policy_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -71,13 +72,10 @@ func TestLoad_CLIRoutingRejectsAnUnknownKeyInsideAnAgentRule(t *testing.T) {
 	}
 }
 
-func TestLoad_KeysOutsideTheCLIRoutingBlockStayLenient(t *testing.T) {
-	p, err := loadPolicyText(t, `{"not_a_policy_key": 1, "cli_routing": {"clis": ["claude"]}}`)
-	if err != nil {
-		t.Fatalf("only the cli_routing block is strict; the rest of policy.json stays lenient: %v", err)
-	}
-	if p.CLIRouting == nil || !reflect.DeepEqual(p.CLIRouting.CLIs, []string{"claude"}) {
-		t.Fatalf("CLIRouting = %+v, want clis [claude]", p.CLIRouting)
+func TestLoad_KeysOutsideTheCLIRoutingBlockAreStrictToo(t *testing.T) {
+	_, err := loadPolicyText(t, `{"not_a_policy_key": 1, "cli_routing": {"clis": ["claude"]}}`)
+	if !errors.Is(err, policy.ErrUnknownKey) || !strings.Contains(err.Error(), `"not_a_policy_key"`) {
+		t.Fatalf("an unknown key outside cli_routing fails the load too, got %v", err)
 	}
 }
 

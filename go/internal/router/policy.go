@@ -1,6 +1,7 @@
 package router
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -49,10 +50,9 @@ func (p PhasePolicy) ShouldRunPhase(phase string) bool {
 
 func PolicyForProject(projectRoot string, env map[string]string, opts ...config.Option) PhasePolicy {
 	cfg, _ := config.New(opts...).Load(config.RegistryPath(projectRoot), env)
-	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
-		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
-		cfg.AuditFailRoutesTo = FailureRouteFromPolicy(pol)
-	}
+	pol := policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr)
+	cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
+	cfg.AuditFailRoutesTo = FailureRouteFromPolicy(pol)
 	return PhasePolicy{Cfg: cfg}
 }
 

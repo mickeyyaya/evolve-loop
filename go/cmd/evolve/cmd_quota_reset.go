@@ -10,6 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
+var computeQuotaResetFn = quotareset.Compute
+
 func runQuotaReset(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var workspace string
 	for _, a := range args {
@@ -23,9 +25,9 @@ func runQuotaReset(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			}
 		}
 	}
-	pol, _ := policy.Load(filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve", "policy.json"))
+	pol := policy.LoadOrDefaults(filepath.Join(os.Getenv("EVOLVE_PROJECT_ROOT"), ".evolve", "policy.json"), stderr)
 	qr := pol.QuotaResetConfig()
-	r, err := quotareset.Compute(workspace, quotareset.Options{
+	r, err := computeQuotaResetFn(workspace, quotareset.Options{
 		ResetAt:      qr.ResetAt,
 		DefaultHours: qr.DefaultHours,
 	})

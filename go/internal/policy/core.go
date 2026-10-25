@@ -3,6 +3,7 @@ package policy
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -121,6 +122,25 @@ func Load(path string) (Policy, error) {
 	}
 	return p, nil
 }
+
+func LoadOrDefaults(path string, warn io.Writer) Policy {
+	p, err := Load(path)
+	if err != nil {
+		fmt.Fprintf(warn, "[policy] WARN %v; the compiled defaults apply and every safety floor fails closed to enforce\n", err)
+		return failClosed()
+	}
+	return p
+}
+
+func failClosed() Policy {
+	return Policy{
+		DocsFloor:    &DocsFloorPolicy{Stage: failClosedStage, SteStage: failClosedStage},
+		CommentFloor: &CommentFloorPolicy{Stage: failClosedStage},
+		CoverChanged: &CoverChangedPolicy{Stage: failClosedStage},
+	}
+}
+
+const failClosedStage = "enforce"
 
 func ValidatePin(phase string, pin Pin, prof *profiles.Profile) error {
 	if prof == nil {

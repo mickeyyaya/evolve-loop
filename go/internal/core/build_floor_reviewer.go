@@ -79,12 +79,8 @@ func docsFloorChecks(ctx context.Context, in ReviewInput, paths []string) []stri
 	var cfg docsfloor.Config
 	steStage := policy.Policy{}.DocsFloorConfig().SteStage
 	if in.ProjectRoot != "" {
-		if p, err := policy.Load(filepath.Join(in.ProjectRoot, ".evolve", "policy.json")); err == nil {
-			cfg.Stage = p.DocsFloorConfig().Stage
-			steStage = p.DocsFloorConfig().SteStage
-		} else {
-			fmt.Fprintf(in.errOut(), "[ste-lint] WARN: the policy did not load (%v), so the docs floors run at their compiled stages\n", err)
-		}
+		floors := policy.LoadOrDefaults(filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), in.errOut()).DocsFloorConfig()
+		cfg.Stage, steStage = floors.Stage, floors.SteStage
 	}
 	failures := steLintFloor(ctx, in.Worktree, floorBase(in), steStage, paths, in.errOut())
 	v := docsfloor.Evaluate(cfg, docsfloor.Input{
