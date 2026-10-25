@@ -163,17 +163,15 @@ var agentContract = []contractRow{
 	{action: "rename an ancestor of the dispatch store under a writable home, then run evolve agent run", want: contractCredentialRefusal,
 		script: func(h contractHost) string {
 			ancestor := filepath.Dir(h.dispatch.Dir)
-			return "mv " + ancestor + " " + ancestor + "-moved && " + strippedMarkers + h.evolveBin + " agent run --refused-before-parse"
+			return "mv " + ancestor + " " + ancestor + "-moved; " + strippedMarkers + h.evolveBin + " agent run --refused-before-parse"
 		},
-		check: func(t *testing.T, h contractHost, _ string) {
+		check: restoreDispatchStore},
+	{action: "swap a symlink to a store of its own in for an ancestor of the dispatch store", want: contractDeny,
+		script: func(h contractHost) string {
 			ancestor := filepath.Dir(h.dispatch.Dir)
-			if err := os.RemoveAll(ancestor); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Rename(ancestor+"-moved", ancestor); err != nil {
-				t.Fatalf("the host puts the store back for the next rows: %v", err)
-			}
-		}},
+			return "mv " + ancestor + " " + ancestor + "-moved && mkdir " + ancestor + "-evil && ln -s " + ancestor + "-evil " + ancestor + " && " + strippedMarkers + h.evolveBin + " agent run --refused-before-parse"
+		},
+		check: restoreDispatchStore},
 	{action: "turn the dispatch stage off", want: contractDeny,
 		script: func(h contractHost) string { return "echo off > " + filepath.Join(h.dispatch.Dir, "stage") }},
 	{action: "plant a dispatch credential", want: contractDeny,
@@ -203,6 +201,22 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string {
 			return "mkdir -p " + h.worktree + "/go/internal/guards && echo x > " + h.worktree + "/go/internal/guards/role.go"
 		}},
+}
+
+func restoreDispatchStore(t *testing.T, h contractHost, _ string) {
+	t.Helper()
+	ancestor := filepath.Dir(h.dispatch.Dir)
+	if _, err := os.Lstat(ancestor + "-moved"); err != nil {
+		return
+	}
+	for _, leftover := range []string{ancestor, ancestor + "-evil"} {
+		if err := os.RemoveAll(leftover); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Rename(ancestor+"-moved", ancestor); err != nil {
+		t.Fatalf("the host puts the store back for the next rows: %v", err)
+	}
 }
 
 const strippedMarkers = "env -u EVOLVE_DISPATCH_DEPTH -u EVOLVE_PHASE "

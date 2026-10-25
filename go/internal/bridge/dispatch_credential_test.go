@@ -37,7 +37,7 @@ func TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnMacOS(t *testing.T)
 	t.Parallel()
 	s, open := testDispatchStore(t)
 	sbpl := wrapForExecDeny(t, Deps{ExecStage: "enforce", DispatchStore: open}, "darwin", "claude-tmux")
-	if !strings.Contains(sbpl, `(deny file-read* (subpath "`+s.HeldDir()+`"))`) || !strings.Contains(sbpl, `(deny file-write* (subpath "`+s.Dir+`"))`) {
+	if !strings.Contains(sbpl, `(deny file-read* (subpath "`+s.HeldDir()+`"))`) || !strings.Contains(sbpl, `(deny file-write* (subpath "`+filepath.Dir(s.Dir)+`"))`) {
 		t.Fatalf("the profile must deny the read of %s and each write in %s:\n%s", s.HeldDir(), s.Dir, sbpl)
 	}
 	if got := s.Stage(); got != "enforce" {
@@ -52,7 +52,7 @@ func TestSandboxWrap_TheCellCannotReadTheDispatchCredentialOnLinux(t *testing.T)
 	t.Parallel()
 	s, open := testDispatchStore(t)
 	argv := wrapForExecDeny(t, Deps{ExecStage: "shadow", DispatchStore: open}, "linux", "claude-tmux")
-	if !strings.Contains(argv, "--tmpfs "+s.HeldDir()+" --chmod 000 "+s.HeldDir()+" --remount-ro "+s.HeldDir()) || !strings.Contains(argv, "--ro-bind "+s.Dir+" "+s.Dir) {
+	if !strings.Contains(argv, "--tmpfs "+s.HeldDir()+" --chmod 000 "+s.HeldDir()+" --remount-ro "+s.HeldDir()) || !strings.Contains(argv, "--ro-bind "+filepath.Dir(s.Dir)+" "+filepath.Dir(s.Dir)) {
 		t.Fatalf("bwrap must mask the held credential directory %s at shadow too:\n%s", s.HeldDir(), argv)
 	}
 	if got := s.Stage(); got != "shadow" {
@@ -89,15 +89,15 @@ func TestSandboxWrap_AStoreFailureWarnsAndKeepsTheWrap(t *testing.T) {
 		t.Fatal(err)
 	}
 	quiet := Deps{ExecStage: "enforce", DispatchStore: func() (dispatchcred.Store, error) { return dispatchcred.Store{Dir: blocker}, nil }}
-	read, write := quiet.dispatchCredentialDeny("enforce")
-	if len(read) != 1 || read[0] != filepath.Join(blocker, "held") || len(write) != 1 || write[0] != blocker {
-		t.Fatalf("an Ensure failure must still deny the store, so the cell cannot make its own credential: %v %v", read, write)
+	got := quiet.dispatchCredentialDeny("enforce")
+	if len(got.read) != 1 || got.read[0] != filepath.Join(blocker, "held") || len(got.write) != 1 || got.write[0] != tmp {
+		t.Fatalf("an Ensure failure must still deny the store, so the cell cannot make its own credential: %+v", got)
 	}
 }
 
 func TestDispatchCredentialDeny_TheDefaultStoreIsTheProcessStore(t *testing.T) {
 	t.Parallel()
-	held, _ := Deps{}.dispatchCredentialDeny("shadow")
+	held := Deps{}.dispatchCredentialDeny("shadow").read
 	s, _ := defaultDispatchStore()
 	want, err := filepath.EvalSymlinks(s.HeldDir())
 	if err != nil || len(held) != 1 || held[0] != want {
@@ -213,5 +213,19 @@ func TestLaunchAPI_ShadowReportsAndLaunchesAndAHeldCredentialIsSilent(t *testing
 		if launches != 4 || (stage == "held" && credential != 0) || logged != credential || logged < wantSignals {
 			t.Errorf("%s: launches = %d (want 4), credential signals = %d, logged = %d (want at least %d logged, none when held)", stage, launches, credential, logged, wantSignals)
 		}
+	}
+}
+
+func TestSandboxWrap_TheCellCannotMoveAnAncestorOfTheDispatchStore(t *testing.T) {
+	t.Parallel()
+	s, open := testDispatchStore(t)
+	sbpl := wrapForExecDeny(t, Deps{ExecStage: "enforce", DispatchStore: open}, "darwin", "claude-tmux")
+	for dir := filepath.Dir(filepath.Dir(s.Dir)); dir != "/"; dir = filepath.Dir(dir) {
+		if !strings.Contains(sbpl, `(deny file-write* (literal "`+dir+`"))`) {
+			t.Errorf("the profile must deny a rename of the ancestor %s, so a cell cannot swap in a store of its own:\n%s", dir, sbpl)
+		}
+	}
+	if strings.Contains(sbpl, `(deny file-write* (literal "/"))`) {
+		t.Fatal("the root needs no literal deny")
 	}
 }

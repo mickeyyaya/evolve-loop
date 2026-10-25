@@ -45,14 +45,18 @@ func (deps Deps) requireDispatchCredential(purpose LaunchPurpose, target string)
 	return fmt.Errorf("%w (%s %s: %v)", ErrNoDispatchCredential, purpose, target, v.Cause)
 }
 
-func (deps Deps) dispatchCredentialDeny(stage string) (read, write []string) {
+type credentialDenies struct {
+	read, write, literals []string
+}
+
+func (deps Deps) dispatchCredentialDeny(stage string) credentialDenies {
 	if stage == envStageOff {
-		return nil, nil
+		return credentialDenies{}
 	}
 	s, err := deps.dispatchStore()()
 	if err != nil {
 		deps.warnDispatchCredential(err, "the cell gets no deny for it")
-		return nil, nil
+		return credentialDenies{}
 	}
 	if err := s.Ensure(stage); err != nil {
 		deps.warnDispatchCredential(err, "the cell still gets the deny")
@@ -61,7 +65,20 @@ func (deps Deps) dispatchCredentialDeny(stage string) (read, write []string) {
 	if real, err := filepath.EvalSymlinks(dir); err == nil {
 		dir = real
 	}
-	return []string{filepath.Join(dir, filepath.Base(s.HeldDir()))}, []string{dir}
+	parent := filepath.Dir(dir)
+	return credentialDenies{
+		read:     []string{filepath.Join(dir, filepath.Base(s.HeldDir()))},
+		write:    []string{parent},
+		literals: ancestorsOf(parent),
+	}
+}
+
+func ancestorsOf(path string) []string {
+	var out []string
+	for dir := filepath.Dir(path); dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+		out = append(out, dir)
+	}
+	return out
 }
 
 func (deps Deps) warnDispatchCredential(err error, outcome string) {
