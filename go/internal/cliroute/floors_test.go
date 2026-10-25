@@ -88,3 +88,15 @@ func TestRouter_FloorFamilyReadsTheCompiledDefaultWithNoBlock(t *testing.T) {
 		t.Fatalf("FloorFamily(builder) = %q, want no floor", got)
 	}
 }
+
+func TestBuild_ABypassRunKeepsTheCompiledFloorEvenWhenThePolicyDeclaresNone(t *testing.T) {
+	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, Floors: policy.Floors{}}
+	setup := cliroute.Setup{Policy: routingPolicy(block), Profiles: openProfiles(), Host: cliroute.Host{LookPath: everyBinary()}}
+	if got := mustBuild(t, setup).FloorFamily("spec-verify"); got != "" {
+		t.Fatalf("the declared table honours floors: {}, got %q", got)
+	}
+	setup.Bypass = true
+	if got := mustBuild(t, setup).FloorFamily("spec-verify"); got != "claude" {
+		t.Fatalf("a bypass run ignores the declared table, floors included, so it keeps the compiled claude floor (fail-closed); got %q", got)
+	}
+}

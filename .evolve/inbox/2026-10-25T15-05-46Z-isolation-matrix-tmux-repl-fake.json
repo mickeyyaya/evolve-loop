@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Rows M2 and M3 pass a full simulated cycle on their only route; M4 passes or stays open on an X9 cause",
+    "The run is deterministic on macOS and Linux CI, with no real LLM CLI",
+    "isolation.Rows and the §14 table mark the rows green"
+  ],
+  "created_at": "2026-10-25T18:00:00Z",
+  "deps": [
+    "isolation-floors-and-defaults-as-routing-data"
+  ],
+  "files": [
+    "go/cmd/evolve/e2e_cycle_cli_matrix_test.go",
+    "go/internal/isolation/matrix.go",
+    "go/internal/fakeclitest/",
+    "docs/architecture/llm-isolation.md"
+  ],
+  "fix": "Give the matrix harness (go/cmd/evolve/e2e_cycle_cli_matrix_test.go) a tmux route: a private tmux server with a fake REPL (fakeclitest, as the bridge real-tmux tests do), or a headless driver per family. Then flip M2, M3 and M4 green in isolation.Rows.",
+  "id": "isolation-matrix-tmux-repl-fake",
+  "kind": "test",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console builder X6, 2026-10-25, follow-up of PR #1123 (ADR-0154)",
+  "summary": "After X6 the floor no longer blocks rows M2 to M4 (floors {} in the matrix policy). A bare family routes to its tmux driver (agy-tmux, agy-claude-tmux, codex-tmux), and the matrix harness has no tmux REPL fake: a stub tmux refuses, so each row fails with 'new-session: exit status 1'. With a real tmux on PATH the fake CLI never answers the REPL and the cycle times out after 300 s. Spec: docs/architecture/llm-isolation.md §10 status and §14.",
+  "title": "LLM isolation X1b: the substitution matrix gets a tmux REPL fake, so rows M2 to M4 can run a full cycle",
+  "weight": 0.5
+}
