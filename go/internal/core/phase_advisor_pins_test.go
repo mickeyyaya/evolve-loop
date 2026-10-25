@@ -217,14 +217,14 @@ func TestAdvisorStderrAndStream_HappyPathAreSilent(t *testing.T) {
 	in := baseRouteInput()
 	in.Workspace = ws
 	out := captureStderr(t, func() {
-		adv := NewPhaseAdvisor(&fakeBridge{stdout: `[{"phase":"scout","run":true,"justification":"x"}]`}, WithPersona("PERSONA"), WithAdvisorSignals(c))
+		adv := NewPhaseAdvisor(&fakeBridge{stdout: `[{"phase":"scout","run":true,"justification":"x"}]`, asArtifact: true}, WithPersona("PERSONA"), WithAdvisorSignals(c))
 		if _, err := adv.Plan(in); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := adv.RePlan(in); err != nil {
 			t.Fatal(err)
 		}
-		prop := NewPhaseAdvisor(&fakeBridge{stdout: `{"next_phase":"audit","justification":"ok"}`}, WithAdvisorSignals(c))
+		prop := NewPhaseAdvisor(&fakeBridge{stdout: `{"next_phase":"audit","justification":"ok"}`, asArtifact: true}, WithAdvisorSignals(c))
 		if _, err := prop.Propose(in); err != nil {
 			t.Fatal(err)
 		}

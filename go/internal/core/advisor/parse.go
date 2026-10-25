@@ -30,13 +30,12 @@ func (a *Advisor) warnUnparseable(in router.RouteInput, d decision, err error, r
 	})
 }
 
-func ParseProposal(stdout string) (*router.Proposal, error) {
-	start, end, ok := LastBalancedSpan(stdout, '{', '}')
-	if !ok {
+func DecodeProposal(raw []byte) (*router.Proposal, error) {
+	if raw == nil {
 		return nil, &parseFailure{cause: causeNoJSON, err: fmt.Errorf("no JSON object in proposer output")}
 	}
 	var prop router.Proposal
-	if err := json.Unmarshal([]byte(stdout[start:end+1]), &prop); err != nil {
+	if err := json.Unmarshal(raw, &prop); err != nil {
 		return nil, &parseFailure{cause: causeInvalidJSON, err: fmt.Errorf("parse proposal: %w", err)}
 	}
 	if prop.NextPhase == "" && len(prop.InsertPhases) == 0 &&
@@ -56,13 +55,12 @@ type ParsedPlan struct {
 	RejectedMints []RejectedMint
 }
 
-func ParsePhasePlan(stdout string) (ParsedPlan, error) {
-	start, end, ok := LastBalancedSpan(stdout, '[', ']')
-	if !ok {
+func DecodePhasePlan(raw []byte) (ParsedPlan, error) {
+	if raw == nil {
 		return ParsedPlan{}, &parseFailure{cause: causeNoJSON, err: fmt.Errorf("no JSON array in plan output")}
 	}
 	var entries []router.PhasePlanEntry
-	if err := json.Unmarshal([]byte(stdout[start:end+1]), &entries); err != nil {
+	if err := json.Unmarshal(raw, &entries); err != nil {
 		return ParsedPlan{}, &parseFailure{cause: causeInvalidJSON, err: fmt.Errorf("parse phase plan: %w", err)}
 	}
 	if len(entries) == 0 {
@@ -89,40 +87,4 @@ func ReplayPlanFromResponse(raw string, in router.RouteInput, floor []string) (*
 	}
 	clamped, clamps := router.ClampPlanToFloorWith(in, parsed.Plan, floor, in.IntentRequired)
 	return clamped, clamps, nil
-}
-
-func LastBalancedSpan(s string, open, close byte) (start, end int, ok bool) {
-	depth, spanStart := 0, -1
-	inStr, esc := false, false
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if inStr {
-			switch {
-			case esc:
-				esc = false
-			case c == '\\':
-				esc = true
-			case c == '"':
-				inStr = false
-			}
-			continue
-		}
-		switch c {
-		case '"':
-			inStr = true
-		case open:
-			if depth == 0 {
-				spanStart = i
-			}
-			depth++
-		case close:
-			if depth > 0 {
-				depth--
-				if depth == 0 && spanStart >= 0 {
-					start, end, ok = spanStart, i, true
-				}
-			}
-		}
-	}
-	return start, end, ok
 }

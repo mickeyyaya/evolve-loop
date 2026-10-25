@@ -3,6 +3,7 @@ package policy
 type IsolationPolicy struct {
 	I2 IsolationInvariantPolicy `json:"i2,omitempty"`
 	I3 IsolationInvariantPolicy `json:"i3,omitempty"`
+	I8 IsolationInvariantPolicy `json:"i8,omitempty"`
 }
 
 type IsolationInvariantPolicy struct {
@@ -21,4 +22,11 @@ func (p Policy) IsolationExecStage() string {
 		return ""
 	}
 	return p.Isolation.I3.Stage
+}
+
+func (p Policy) IsolationFlowStage() string {
+	if p.Isolation == nil {
+		return ""
+	}
+	return p.Isolation.I8.Stage
 }

@@ -34,6 +34,7 @@ The phase advisor is the LLM brain behind `router.Proposer` (per-transition advi
 
 ## Invariants
 
+- **Each decision comes from its declared file (I-8, X8).** `Propose`, `Plan` and `RePlan` read `routing-proposal.json`, `routing-plan.json` and `routing-replan.json` through `phasecontract.FlowDecision.Resolve`. At `legacy` a file that fails its schema falls back to the stdout span and emits `ISOLATION_I8_VIOLATION`. At `enforce` the stdout is never read. `LastBalancedSpan`, `ParseProposal` and `ParsePhasePlan` live only in `span.go`, and `DecodeProposal` and `DecodePhasePlan` decode the bytes (`TestAdvisor_EnforceStageNeverReadsStdout`). Spec: [llm-isolation.md](../llm-isolation.md) §12.1.
 - **Error texts are the orchestrator's printed texts**: the decision's prefix plus the preflight, launch or parse error. `TestAdvisor_ErrorTextsAreTheOrchestratorsStderrText`.
 - **Preflight order** is launcher, workspace, depth; a refusal never reaches the launcher. `TestLaunch_PreflightOrderIsBridgeWorkspaceDepth`.
 - **Compose before the guards**, so a recon fault reports ahead of a preflight refusal. `TestComposePlanPrompt_ReconGitFaultWarnsOnceAndTheDigestDegrades`.

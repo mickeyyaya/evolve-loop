@@ -488,7 +488,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		core.WithRouting(cfg, strategy),
 		core.WithCatalog(catalog),
 		core.WithPlanner(advisor),
-		core.WithFailureAdviser(core.NewFailureAdvisor(walked, failureAdvisorOpts(projectRoot, cliRouter, console)...)),
+		core.WithFailureAdviser(core.NewFailureAdvisor(walked, append(failureAdvisorOpts(projectRoot, cliRouter, console), core.WithFailureAdvisorSignals(signals))...)),
 		core.WithThroughputRecorder(triagecap.Recorder(projectRoot)),
 		core.WithCatalogPublisher(catalogPublisher(br, cliRouter)),
 		core.WithCLIRouter(cliRouter),

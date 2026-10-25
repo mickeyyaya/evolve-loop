@@ -26,12 +26,13 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	var sig RoutingSignals
 	done := toSet(completed)
 	owners := signalOwners(completed)
+	stage := digestFlowStage(workspace)
 
 	if done["scout"] {
-		digestScout(workspace, &sig, owners)
+		digestScout(workspace, &sig, owners, stage)
 	}
 	if done["triage"] {
-		digestTriagePhase(workspace, &sig, owners)
+		digestTriagePhase(workspace, &sig, owners, stage)
 	}
 	if done["build"] {
 		digestBuildPhase(workspace, &sig, owners)
@@ -107,23 +108,47 @@ func runDirArtifactBytes(workspace string, degraded *[]string) int64 {
 	return total
 }
 
-func digestScout(workspace string, sig *RoutingSignals, owners map[string]bool) {
+func digestFlowStage(workspace string) phasecontract.FlowStage {
+	root, ok := projectRootFromWorkspace(workspace)
+	if !ok {
+		return phasecontract.FlowStageLegacy
+	}
+	return phasecontract.FlowStageAt(root, os.Stderr)
+}
+
+type ProseFallback struct {
+	Seat    string
+	Path    string
+	Stage   phasecontract.FlowStage
+	Refused bool
+}
+
+func (s *RoutingSignals) admitProse(seat, path string, stage phasecontract.FlowStage) bool {
+	refused := stage == phasecontract.FlowStageEnforce
+	s.ProseFallbacks = append(s.ProseFallbacks, ProseFallback{Seat: seat, Path: path, Stage: stage, Refused: refused})
+	if refused {
+		s.DigestDegraded = append(s.DigestDegraded, seat+": handoff absent, and the I-8 stage enforce refuses the report-prose fallback")
+	}
+	return !refused
+}
+
+func digestScout(workspace string, sig *RoutingSignals, owners map[string]bool, stage phasecontract.FlowStage) {
 	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-scout.json"); ok {
 		raw = unwrapPayload(raw)
 		sig.Scout = extractScout(raw)
 		sig.foldGeneric("scout", raw, owners)
 	} else {
-		sig.Scout = scoutFromReportFallback(workspace, &sig.DigestDegraded)
+		sig.Scout = scoutFromReportFallback(workspace, sig, stage)
 	}
 }
 
-func digestTriagePhase(workspace string, sig *RoutingSignals, owners map[string]bool) {
+func digestTriagePhase(workspace string, sig *RoutingSignals, owners map[string]bool, stage phasecontract.FlowStage) {
 	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-triage.json"); ok {
 		raw = unwrapPayload(raw)
 		sig.Triage = extractTriage(raw)
 		sig.foldGeneric("triage", raw, owners)
 	} else {
-		sig.Triage = triageFromReportFallback(workspace, &sig.DigestDegraded)
+		sig.Triage = triageFromReportFallback(workspace, sig, stage)
 	}
 	if decision, ok := digestTriageDecision(workspace, &sig.DigestDegraded); ok {
 		sig.Triage.CommittedCount = decision.committedCount
@@ -281,9 +306,10 @@ func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 	return BuildSignals{Present: true, FilesTouched: changedPackageCount}
 }
 
-func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals {
-	md, present := readReportFallback(filepath.Join(workspace, phasecontract.ArtifactName("scout")), "scout", degraded)
-	if !present {
+func scoutFromReportFallback(workspace string, sig *RoutingSignals, stage phasecontract.FlowStage) ScoutSignals {
+	path := filepath.Join(workspace, phasecontract.ArtifactName("scout"))
+	md, present := readReportFallback(path, "scout", &sig.DigestDegraded)
+	if !present || !sig.admitProse("scout", path, stage) {
 		return ScoutSignals{}
 	}
 	return ScoutSignals{
@@ -330,9 +356,10 @@ func readReportFallback(path, role string, degraded *[]string) (string, bool) {
 	}
 }
 
-func triageFromReportFallback(workspace string, degraded *[]string) TriageSignals {
-	md, present := readReportFallback(filepath.Join(workspace, "triage-report.md"), "triage", degraded)
-	if !present {
+func triageFromReportFallback(workspace string, sig *RoutingSignals, stage phasecontract.FlowStage) TriageSignals {
+	path := filepath.Join(workspace, phasecontract.ArtifactName("triage"))
+	md, present := readReportFallback(path, "triage", &sig.DigestDegraded)
+	if !present || !sig.admitProse("triage", path, stage) {
 		return TriageSignals{}
 	}
 	return TriageSignals{

@@ -36,6 +36,7 @@
 
 ## Invariants
 
+- **A report-prose fallback is visible and has a stage (I-8, X8).** When the scout or triage handoff is absent, `Digest` reads the prose headers of the report and records a `ProseFallback` in `RoutingSignals.ProseFallbacks`. The stage is `isolation.i8.stage` of the project root of the cycle workspace. At `enforce` the digest refuses the read and adds a `DigestDegraded` reason. `TestDigest_LegacyStageRecordsEachReportProseFallback`, `TestDigest_EnforceStageRefusesTheReportProse`. Spec: [llm-isolation.md](../llm-isolation.md) §12.1.
 - **Every override is recorded.** A mandatory re-enable, a cap, a plan veto of the operator's off, a skip_when gate, an insert_when gate, a dropped entry and a clamped proposal each leave a `Clamp`, so the routing-plan artifact explains the decision.
 - **Clamps are pure.** `ClampPlanToFloorWith` and `ClampPlanModelRouting` return a new plan and leave the caller's untouched, because the re-plan comparison needs the original.
 - **On the plan path, floor phases are never capped or gated by skip_when or insert_when.** `isFloorPhase` (intent, scout, tdd, build, audit, ship) exempts them, because the floor is non-configurable and a config veto must never become a floor bypass.

@@ -36,6 +36,7 @@
 
 ## Invariants
 
+- **The prose floor count has a stage (I-8, X8).** When `triage-decision.json` declares no valid `committed_floors`, the review counts the floors in the report prose and emits `ISOLATION_I8_VIOLATION` with `rule=flow.fallback.prose`. At `enforce` it first checks the file against the `triage` schema of `phasecontract`. A missing or bad declaration emits `action=refused` and fails the review; a clamp below `enforce` only logs it. `Recorder` and `CommittedFloorPackages` keep the prose count. Spec: [llm-isolation.md](../llm-isolation.md) §12.1.
 - **Committed wins over deferred.** Gate C subtracts `CommittedFloorPackages` from the deferred set, so a floor predicate on the cycle's own committed package is a legitimate ratchet and never the deferred-floor starvation Gate C blocks.
 - **The attributed-package list never exceeds the count.** `proseFloorPackages` is target-scoped exactly like `CountCommittedFloors`, so the reject reason and the divergence corrective list only what the counter attributed.
 - **A footprint never adds a floor.** A declared path such as `go/internal/triagecap/floors.go` contains a floor trigger word and names packages; left in the item it would flip a non-floor card into a floor and attribute deferred floors to packages the card merely edits.

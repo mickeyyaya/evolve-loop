@@ -69,3 +69,14 @@ func TestPhaseAdvisorRoot_WiresTheSignalCenter(t *testing.T) {
 		t.Fatal("the composition root must hand its Signal Center to wireRouterAdvisor")
 	}
 }
+
+func TestFailureAdvisorRoot_WiresTheSignalCenter(t *testing.T) {
+	t.Parallel()
+	root, err := os.ReadFile("cmd_cycle.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`core\.NewFailureAdvisor\(walked, append\(failureAdvisorOpts\([^)]*\), core\.WithFailureAdvisorSignals\(signals\)\)\.\.\.\)`).Match(root) {
+		t.Fatal("the composition root must hand its Signal Center to the failure advisor, so an I-8 fallback reaches the stream")
+	}
+}

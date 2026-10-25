@@ -10,6 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 type CapReviewer struct {
@@ -45,6 +46,17 @@ func readWindow(ctx context.Context, projectRoot string) []core.TriageThroughput
 	return st.TriageThroughput
 }
 
+func (r *CapReviewer) warnProseFloors(in core.ReviewInput, companionPath string, floors int, stage phasecontract.FlowStage) {
+	_, declared, err := ReadDeclaredFloors(companionPath)
+	if floors == 0 || (err == nil && declared) {
+		return
+	}
+	if err == nil {
+		r.logf("[triage-cap] WARN: floor-bearing triage report has no %s companion declaring committed_floors — prose counting is the fallback; declare {\"committed_floors\":[...]} to make the commitment authoritative", TriageDecisionName())
+	}
+	r.reportProseFloors(in, companionPath, stage)
+}
+
 func (r *CapReviewer) Review(ctx context.Context, in core.ReviewInput) core.ReviewResult {
 	if r.stage == config.StageOff || in.Phase != string(core.PhaseTriage) {
 		return core.ReviewResult{Approve: true}
@@ -60,12 +72,12 @@ func (r *CapReviewer) Review(ctx context.Context, in core.ReviewInput) core.Revi
 		r.logf("[triage-cap] WARN: %s", msg)
 	}
 	r.warnMalformedCompanion(in, companionPath)
-	floors := CommittedFloorCount(string(data), companionPath, pkgs)
-	if floors > 0 {
-		if _, declared, err := ReadDeclaredFloors(companionPath); err == nil && !declared {
-			r.logf("[triage-cap] WARN: floor-bearing triage report has no %s companion declaring committed_floors — prose counting is the fallback; declare {\"committed_floors\":[...]} to make the commitment authoritative", TriageDecisionName())
-		}
+	stage := phasecontract.FlowStageAt(in.ProjectRoot, os.Stderr)
+	if refused, ok := r.refuseProseFloors(in, companionPath, stage); ok {
+		return refused
 	}
+	floors := CommittedFloorCount(string(data), companionPath, pkgs)
+	r.warnProseFloors(in, companionPath, floors, stage)
 	window := r.windowFn(ctx, in.ProjectRoot)
 	k := K(window)
 	capacity := Cap(k)

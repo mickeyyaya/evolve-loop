@@ -91,7 +91,7 @@ func TestCapture_RedactsPersistsAndWarnsPerFailedArtifact(t *testing.T) {
 			t.Fatal(err)
 		}
 		entries, _ := os.ReadDir(in.Workspace)
-		if len(entries) != 0 || len(*got) != 0 {
+		if len(entries) != 1 || entries[0].Name() != "routing-plan.json" || len(*got) != 0 {
 			t.Errorf("no forensics, no events: %v %+v", entries, *got)
 		}
 	})

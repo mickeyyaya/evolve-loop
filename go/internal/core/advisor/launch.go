@@ -6,24 +6,27 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-func (a *Advisor) launch(in router.RouteInput, d decision, prompt string) (LaunchResponse, error) {
+func (a *Advisor) launch(in router.RouteInput, d decision, prompt string) (LaunchResponse, time.Time, error) {
 	if err := a.preflight(in, d); err != nil {
 		a.warn(in, d, CodeLaunchFailed, err.Error(), map[string]string{"step": stepPreflight})
-		return LaunchResponse{}, err
+		return LaunchResponse{}, time.Time{}, err
 	}
+	launched := time.Now()
 	resp, err := a.dispatch(in, d, a.profilePath(in), prompt)
 	if err != nil {
-		return LaunchResponse{}, err
+		return LaunchResponse{}, time.Time{}, err
 	}
 	a.capture(in, d, prompt, resp)
-	return resp, nil
+	return resp, launched, nil
 }
 
 func (a *Advisor) preflight(in router.RouteInput, d decision) error {
@@ -35,6 +38,9 @@ func (a *Advisor) preflight(in router.RouteInput, d decision) error {
 	}
 	if a.checkDepth != nil && a.checkDepth(in.Env) {
 		return fmt.Errorf("%s: recursion guard: depth check failed", d.errPfx())
+	}
+	if err := phasecontract.MustFlowDecision(d.flowSeat()).Clear(filepath.Join(in.Workspace, d.artifactFile())); err != nil {
+		return fmt.Errorf("%s: %w", d.errPfx(), err)
 	}
 	return nil
 }
