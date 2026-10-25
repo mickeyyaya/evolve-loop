@@ -26,6 +26,8 @@ var (
 	openFile    = os.OpenFile
 	signalGroup = func(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
 	paneShell   = "/bin/sh"
+	groupOf     = syscall.Getpgid
+	ownGroup    = syscall.Getpgrp
 	commandOf   = func(pid int) (string, error) {
 		return sysexec.Output(context.Background(), sysexec.DefaultRunner, "", "ps", "-o", "comm=", "-p", strconv.Itoa(pid))
 	}
@@ -126,6 +128,10 @@ func startedAs(pid int, begun string) bool {
 }
 
 func isPaneLeader(pid int) bool {
+	pgid, err := groupOf(pid)
+	if err != nil || pgid != pid || pid == ownGroup() {
+		return false
+	}
 	comm, err := commandOf(pid)
 	switch filepath.Base(strings.TrimPrefix(strings.TrimSpace(comm), "-")) {
 	case "sh", "bash", "dash", "zsh":

@@ -369,3 +369,35 @@ func TestClaimIn_AStaleRunTheReaperRefusesIsLeftAndDoesNotFailTheClaim(t *testin
 
 	mustExist(t, filepath.Join(stale, "precious"))
 }
+
+func TestSeams_TheFakeSignalsOnlyALiveGroupLeaderThatIsNotItsOwnGroup(t *testing.T) {
+	restore := setSeams(t)
+	sender := &recordingSender{}
+	root := t.TempDir()
+	pid := startPane(t, root, "group")
+	sess := session{name: "group", dir: filepath.Join(root, "sock", "sessions", "group")}
+	for name, inject := range map[string]func(){
+		"the pid leads another group": func() { groupOf = func(int) (int, error) { return pid + 1, nil } },
+		"the pid leads our own group": func() { ownGroup = func() int { return pid } },
+		"the group cannot be read":    func() { groupOf = func(int) (int, error) { return 0, errInjected } },
+	} {
+		inject()
+		signalGroup = sender.send
+		if err := sess.kill(); err != nil {
+			t.Fatal(err)
+		}
+		if len(sender.pids) != 0 {
+			t.Errorf("%s: the fake signalled %v", name, sender.pids)
+		}
+		restore()
+		writeFile(t, sess.path("pane"), recordOf(t, pid))
+	}
+	signalGroup = sender.send
+	if err := sess.kill(); err != nil || len(sender.pids) != 1 || sender.pids[0] != pid {
+		t.Errorf("a live pane leader of its own group must be signalled once: %v, %v", sender.pids, err)
+	}
+	restore()
+	if err := signalGroup(pid); err != nil {
+		t.Fatal(err)
+	}
+}

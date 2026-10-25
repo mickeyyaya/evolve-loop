@@ -56,13 +56,14 @@ Thus the matrix gets its state root from `faketmux.Claim()`, not from `t.TempDir
 
 A run that holds an entry other than `owner` and the server directories is refused too. A server directory loses only its `sessions` and `buffers`, and then `os.Remove` must find it empty. Thus a foreign file stays. A symlinked run or server directory is refused, so the reaper never follows a link out of the base. The sweep of `Claim` leaves a refused run as it is and does not fail the claim. Pinned by `TestReapIn_RefusesEveryRootThatIsNotAMarkedRunOfTheBase`, which fails when the token check is removed.
 
-**The signal goes only to a pane leader.** Each pane runs under a shell wrapper (`/bin/sh -c '"$@"; exit $?'`), so the pane leader stays a shell for its life. The fake signals a group only when three checks pass:
+**The signal goes only to a pane leader.** Each pane runs under a shell wrapper (`/bin/sh -c '"$@"; exit $?'`), so the pane leader stays a shell for its life. The fake signals a group only when four checks pass:
 
 - the pid is not the process itself or its parent;
 - the start time matches the record;
+- the pid still leads its own process group (`getpgid`), and that group is not the group of the fake;
 - `ps -o comm=` names a shell.
 
-Pinned by `TestSeams_TheFakeNeverSignalsItselfItsParentOrANonShellLeader`, which uses a recording sender.
+Pinned by `TestSeams_TheFakeNeverSignalsItselfItsParentOrANonShellLeader` and `TestSeams_TheFakeSignalsOnlyALiveGroupLeaderThatIsNotItsOwnGroup`, which use a recording sender.
 
 **Writes block like a terminal.** A writer opens the FIFO without blocking, so a pane with no reader fails at once (`ENXIO`), not forever. Then it sets the descriptor to blocking, so a prompt larger than the pipe buffer waits for the reader. The first matrix run without this step failed with `resource temporarily unavailable` on each prompt paste.
 

@@ -213,10 +213,10 @@ func TestSeams_InjectedFailuresSurface(t *testing.T) {
 func setSeams(t *testing.T) func() {
 	t.Helper()
 	open, signal, blocking, ps, started, temp := openFile, signalGroup, setBlocking, runPS, processStart, mkdirTemp
-	token, shell, command := newToken, paneShell, commandOf
+	token, shell, command, group, own := newToken, paneShell, commandOf, groupOf, ownGroup
 	restore := func() {
 		openFile, signalGroup, setBlocking, runPS, processStart, mkdirTemp = open, signal, blocking, ps, started, temp
-		newToken, paneShell, commandOf = token, shell, command
+		newToken, paneShell, commandOf, groupOf, ownGroup = token, shell, command, group, own
 	}
 	t.Cleanup(restore)
 	return restore
