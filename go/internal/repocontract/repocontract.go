@@ -192,6 +192,7 @@ var treeReadingSelections = []TestSelection{
 		"TestSubagentRun_OneConstructionSite",
 	}},
 	{Package: "./internal/sysexec", Tests: []string{
+		"TestBridgeDriverLaunchFuncs_EachNamesARealDriverFunction",
 		"TestIsolationMatrix_N2_NoLLMSpawnOutsideTheBridgeLaunchAPI",
 		"TestOnlyTheBridgeStartsAnLLMBinary",
 		"TestPipelineCode_StartsEveryProcessThroughCommand",

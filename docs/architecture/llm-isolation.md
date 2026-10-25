@@ -207,9 +207,20 @@ Each entry applies the same three steps:
 2. The child has no `TMUX` and no `TMUX_PANE`. `LaunchLLM` removes the two names from the environment at each stage. A pane shell sends `unset TMUX TMUX_PANE` (`paneTmuxDetachLine`) before the launch command. The recipe pane sends it too.
 3. The sandbox decision follows the purpose. A `phase` or `smoke` pane uses the sandbox wrap of its driver. Each other purpose runs outside the sandbox and logs `[bridge] <purpose> <binary> runs unsandboxed: <reason>`. The reason is the manifest field `probe_unsandboxed_reason`. Each manifest has one (`TestEveryManifestGivesTheReasonItsProbeRunsUnsandboxed`). A binary with no manifest logs `no family manifest names this binary`.
 
-The launch API decides the bypass grant (`launchPurposeConfig`). Only the `probe` and `smoke` purposes get `AllowBypass`. The usage controller does not set it.
+The permission bypass of the CLI has more than one source:
 
-The `probe` purpose must keep the grant. The control capture boots the same REPL as a phase pane. The prompt markers and the auto-responder patterns of each manifest are proven only for the bypass boot. A boot in another permission mode shows other dialogs, for example the plan approval of claude. A live control capture in plan mode must prove that boot before the grant goes.
+| Source | Grant | Launches |
+|---|---|---|
+| `launchArgs` (`go/internal/bridge/engine.go:277`) | `--allow-bypass` on each phase dispatch | each phase pane |
+| `consensusdispatch.go:299` | `--allow-bypass` on each voter launch | each consensus voter |
+| `BRIDGE_ALLOW_BYPASS` (`launch.go`, `parseLaunchArgs`) | the same flag from the environment | a manual `evolve bridge launch` |
+| `launchPurposeConfig` (`launch_llm.go`) | `AllowBypass` on the `Config` | the `probe` and `smoke` purposes |
+
+Thus each phase runs with the permission bypass of its CLI. The permission prompt of the CLI is not the limit of a cell. The limit is the OS sandbox and the cell boundary of I-7. X3 does not change the phase grants.
+
+For a non-phase launch, `launchPurposeConfig` is the only grant, and only the `probe` and `smoke` purposes get it. The usage controller does not set it. The guard sees only a `Config` grant, not the argv flag or the environment variable.
+
+The `probe` purpose must keep the grant. The control capture boots the same REPL as a phase pane. The prompt markers and the auto-responder patterns of each manifest are proven only for the bypass boot. A boot in another permission mode shows other dialogs, for example the plan approval of claude. A live control capture in plan mode must prove that boot before the grant goes. The inbox item `isolation-probe-bypass-plan-mode-proof` tracks that proof.
 
 `LLMExec.Drop` removes names after the manifest defaults. The updater drops the auto-update off switch of its family, so `agy update` does not see `AGY_CLI_DISABLE_AUTO_UPDATE=1`.
 
@@ -217,11 +228,13 @@ The guard `TestOnlyTheBridgeStartsAnLLMBinary` (`go/internal/sysexec/llm_launch_
 
 | Rule | Where | Spawn |
 |---|---|---|
-| Literal | each file | a call of `sysexec.Command`, `sysexec.DefaultRunner`, `exec.Command`, `exec.CommandContext`, a `Runner` or a `sysexec.RunFunc` parameter, with an LLM name literal as the program |
+| Program | each file | a process start with an LLM program. `processStart` lists the process starts. They are the `sysexec` helpers, `os/exec` (also with an alias), `os.StartProcess` and `syscall.Exec`. `syscall.ForkExec`, a `Runner` and each call with the 8 arguments of a `RunFunc` are process starts too. An LLM program is an LLM name literal or a `.Binary` selector. It is also `exec.LookPath` of an LLM program, or a local name that the function set to one of them. |
+| Shell | each file | a process start of `sh`, `bash`, `zsh`, `dash` or `tmux` with a string literal that has an LLM word, for example `sh -c "claude -p hi"` or `tmux send-keys … "claude …"` |
+| Keys | each file | a `SendKeys` call with a string literal that has an LLM word |
 | Research sites | the three files of F1.2 outside the bridge | each process start, with any program |
 | Bridge | `internal/bridge`, outside the launch API | a `Runner` call with a program that is not a literal, a `Driver.Launch` call, a `launchCmdLine` call, and each `AllowBypass` grant of `true` |
 
-For the guard, the launch API is the functions `LaunchLLM`, `launchSwept`, `launchPane`, `launchPurposeConfig` and `newRecipeDriver`, and each function in a `driver_*.go` file. The drivers are inside the API, because only the API calls `Driver.Launch`.
+For the guard, the launch API is the functions `LaunchLLM`, `launchSwept`, `launchPane`, `launchPurposeConfig` and `newRecipeDriver`, and an explicit list of driver functions (`bridgeDriverLaunchFuncs`, as `file:function`). A new function in a driver file is not in the API. The drivers are inside the API, because only the API calls `Driver.Launch`. `TestLLMSpawns_FindsEachSpawnShapeOutsideTheLaunchAPI` pins each rule with a fixture.
 
 Before the change, the guard found 9 spawns on 7 paths:
 
@@ -238,7 +251,12 @@ After the change, the guard finds 0, and row N2 is green.
 
 Limits:
 
-- The guard cannot follow a program name through a variable. Outside the research sites, a process start with a dynamic LLM name passes the guard. The literal rule and the review find the other cases.
+- The guard follows a program name inside one function and from the constants and variables of its file. Outside a research site, the guard does not find a name from a parameter, a field, a return value, another file or a string build. Any `.Binary` selector counts as an LLM program, so the rule is broad on purpose.
+- A `RunFunc` with a number of arguments other than 8 is not found. An example is a `RunFunc` wrapped in a closure with other arguments.
+- A shell or keys string is found only when it is a literal. A string from `fmt.Sprintf` or a variable passes.
+- The guard finds an `AllowBypass` grant only when its value is the literal `true`. `cfg.AllowBypass = !false` or a grant from a variable passes.
+- The subpackages of `internal/bridge` (for example `internal/bridge/recipe`) are outside the bridge for the guard. Only the program rules apply there.
+- Each `LaunchLLM` call writes one `[bridge] <purpose> <binary> runs unsandboxed: <reason>` line to the stderr of the process. The loop log thus gets one line for each probe of each CLI at each boundary.
 - The recipe sessions do not use the sandbox. The probe reason of the manifest covers them.
 - `modelquery` cannot import the bridge, because the bridge imports `modelquery`. Thus `cmd/evolve` injects `bridge.ModelQueryRunner` through `modelquery.UseLauncher`. With no launcher, a model query starts nothing and returns an error.
 

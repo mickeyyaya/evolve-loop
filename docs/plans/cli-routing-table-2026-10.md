@@ -636,7 +636,7 @@ The CLI routing table needs a name for "Claude through agy" before it can route 
 ### Integration with the boundary updater (PR #774, merged)
 
 - #774 adds `default_env: {"AGY_CLI_DISABLE_AUTO_UPDATE": "1"}` and `update_argv: ["agy", "update"]` to `agy-tmux.json`.
-- `agy-claude-tmux` inherits the env through `base`, so its launches carry the off switch with no edit. `bridge.ProcessEnv("agy")` reads `agy-tmux` and covers the agy processes that are not launches.
+- `agy-claude-tmux` inherits the env through `base`, so its launches carry the off switch with no edit. `bridge.ProcessEnv("agy")` read `agy-tmux` and covered the agy processes that are not launches. Since X3 (#1127), `bridge.LaunchLLM` covers them through `probeEnv`.
 - The target's `update_argv: null` removes the inherited updater. #774's updater walks `InteractiveFamilies()`, deduped by binary, so agy updates once.
 - #774's `TestUpdateArgv_EveryOtherManifestDeclaresNoUpdater` stays green with either landing order.
 - The only expected conflict is textual: both change `agy-tmux.json`, near the top for #774 and at `transient_regex`, `model_family` and `interactive_prompts` here.

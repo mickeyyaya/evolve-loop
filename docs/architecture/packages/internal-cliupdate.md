@@ -52,6 +52,7 @@ A CLI only lists the models its installed version knows (Sonnet 5.5 was missed u
   - Each bare exec of agy carries it too, through `bridge.LaunchLLM`. The bare execs are `agy models` and `agy --help` of the catalog refresh, the version probe, and the version and deep probes of the bridge doctor. `cmd/evolve` wires the runner of `modelquery` with `modelquery.UseLauncher`.
   - `agy update` is the explicit path. `Exec` starts it through `bridge.LaunchLLM` with the `update` purpose. That purpose drops the off switch of the family (`LLMExec.Drop`) and gives the cell environment of [llm-isolation.md](../llm-isolation.md) §5.1.
   - A self-update can still come from the operator's own `agy` use outside the loop. The found-change step absorbs it.
+- **Hold a family at its version.** The updater has no off switch. Put a full copy of the family manifest with no `update_argv` in `.evolve/bridge-manifests/<family>-tmux.json`. That copy replaces the embedded manifest as a whole, so the family reports `no-updater`.
 
 ## Invariants
 

@@ -227,7 +227,7 @@ The spec is [llm-isolation.md](../llm-isolation.md) §5.1. Each start of an LLM 
 - Each `LaunchLLM` call logs `[bridge] <purpose> <binary> runs unsandboxed: <reason>`. The reason is the manifest field `probe_unsandboxed_reason` (`Manifest.ProbeUnsandboxedReason`). Each manifest has one.
 - `launchPane` starts a `smoke` pane through its driver. `launchPurposeConfig` grants `AllowBypass` to the `probe` and `smoke` purposes only. The usage controller takes its grant from it, and the spec records why the grant stays.
 - `newRecipeDriver` is the pane entry of the `probe` purpose. It logs the unsandboxed reason, and `EnsureSession` sends `unset TMUX TMUX_PANE` before the launch command.
-- The guard `TestOnlyTheBridgeStartsAnLLMBinary` (`internal/sysexec`) fails on an LLM spawn outside these functions and the `driver_*.go` files. Pinned by `TestLaunchLLM_EachExecPurposeKeepsCLAUDECODEFromTheChildAtEnforce`, `TestLaunchLLM_AtShadowTheChildKeepsTodaysEnvExceptTheRunTmux`, `TestLaunchPane_TheSmokePurposeGrantsBypassAndKeepsCLAUDECODEFromThePane` and `TestRecipeSession_ThePaneShellUnsetsTheRunTmuxBeforeTheLaunch`.
+- The guard `TestOnlyTheBridgeStartsAnLLMBinary` (`internal/sysexec`) fails on an LLM spawn outside these functions and the driver functions of `bridgeDriverLaunchFuncs`. Pinned by `TestLaunchLLM_EachExecPurposeKeepsCLAUDECODEFromTheChildAtEnforce`, `TestLaunchLLM_AtShadowTheChildKeepsTodaysEnvExceptTheRunTmux`, `TestLaunchPane_TheSmokePurposeGrantsBypassAndKeepsCLAUDECODEFromThePane` and `TestRecipeSession_ThePaneShellUnsetsTheRunTmuxBeforeTheLaunch`.
 
 ### The driver factory (`resolve.go`)
 
