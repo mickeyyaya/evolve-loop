@@ -5,6 +5,8 @@
 >
 > Status: proposed, 2026-10-25. The columns "today" describe `origin/main` at `603389ebd`. The target columns are the work of component X17. No verb emits the envelope yet.
 >
+> Amended on 2026-10-26 by the operator: each verb also has an agent class (§4.1 to §4.5). The column "agent" and the evidence of §4.1 describe `origin/main` at `5c010d7a4`. The work is component X17e.
+>
 > **Terms used throughout:**
 > - **core verb**: a verb in the table of §5. A service can depend on it.
 > - **envelope**: the one JSON object that a core verb prints on stdout with `--json`.
@@ -12,13 +14,17 @@
 > - **availability class**: when a verb works while a wave runs (§4).
 > - **live lease**: a run whose lease heartbeat is fresh and whose owner process is alive (`runlease.LiveRuns`).
 > - **queue**: a durable file of requested changes that the pipeline applies at the next boundary.
+> - **cell**: the sandbox around one phase agent ([llm-isolation.md](llm-isolation.md) §4).
+> - **agent class**: what a verb does when an agent in a cell calls it: `A`, `R` or `D` (§4.1).
+> - **request**: a typed JSON file in which an agent asks the pipeline to run an `R` verb for it (§4.3).
+> - **dispatch credential**: a secret that the pipeline holds and that no cell can read (item `isolation-dispatch-capability-token`).
 
 ## Table of contents
 
 1. [Goals](#1-goals)
 2. [The envelope](#2-the-envelope)
 3. [Exit codes](#3-exit-codes)
-4. [Availability classes](#4-availability-classes)
+4. [Availability classes](#4-availability-classes) and [agent classes](#41-agent-classes)
 5. [The core verbs](#5-the-core-verbs)
 6. [Verbs to add](#6-verbs-to-add)
 7. [Inputs and the project root](#7-inputs-and-the-project-root)
@@ -112,47 +118,213 @@ Rules:
 3. The queue is `.evolve/queue/<verb>-<utc>.json`, one file for each request. The boundary step applies the files in time order, before `sync-main`. Each applied file writes one `cli.queue.applied` signal.
 4. A `leased` verb holds the lease only for its own write. `gc` takes the `gc` lease and skips each resource that a live run owns. Today `gc` takes no lease (F4.7).
 5. A `boundary` verb keeps its refusal. These refusals are correct (F4.6).
-6. Inside a phase pane, each writing verb refuses with exit 3. This is the I-3 rule of ADR-0154.
+6. Inside a phase pane, each writing verb refuses with exit 3. This is the I-3 rule of ADR-0154. The agent class of §4.1 sets which verbs a cell can run.
+
+### 4.1 Agent classes
+
+The operator said on 2026-10-26: "make sure that LLM cli is able to justify how to interact with the evo loop pipeline as it can decide how to leverage evo loop cli to help it to complete its tasks."
+
+The availability class says when a verb works, relative to a wave. The agent class says if a phase agent in a cell can run the verb. The two classes are independent. For example, `inbox add` is `leased` for the operator, but an agent in a cell must send a request for it.
+
+| Agent class | Name | In a cell | Credential | Examples |
+|---|---|---|---|---|
+| `A` | allowed | The verb runs. | not needed | `phase verify`, `selfcheck build`, `code find`, `inbox show`, `docs ste-lint` |
+| `R` | request only | The verb refuses with exit 3. The agent writes a request (§4.3), and the pipeline runs the verb after the orchestrator approves it. | needed | `agent run`, `phase <name>`, `inbox add`, `quality report` |
+| `D` | denied | The verb refuses with exit 3. No request can ask for it. | needed | `loop`, `wave next`, `sync-main`, `pr merge`, `reset-sha`, `release`, `gc`, `cli update`, `cli-routing set` |
+
+Rules:
+
+1. The list of `A` and `R` verbs is an allowlist. Each verb that the list does not name is `D`. A new verb is thus `D` until a change of this file gives it another class.
+2. An `A` verb changes no shared state: no inbox, no policy, no signal, no lease and no git ref. It can write telemetry in the own workspace and a cache that a content key addresses.
+3. An `A` verb execs no LLM CLI. A verb form that execs one is `D` in a cell (I-3).
+4. An `R` verb changes shared state or starts an agent. The pipeline runs it, never the cell.
+5. A `D` verb is a verb of the operator or of the boundary. An agent has no reason to run it, so no request kind maps to it.
+6. In the subagents of its own harness, an agent can use each `A` verb. The subagents run in the cell, so the same classes apply to them ([llm-isolation.md](llm-isolation.md) §7.2 on the branch of #1126).
+
+The column "Agent" of §5 gives the class of each core verb. These verbs are outside §5, but a cell meets them:
+
+| Verb | Agent class | Why |
+|---|---|---|
+| `phase verify <phase>` | A | It reads the deliverables. For `build` it runs the handoff probe (F5). |
+| `selfcheck build` | A | the same probe as `phase verify build` (F5) |
+| `code callers`, `api`, `find`, `map` | A | one usage record in the own workspace (F4) |
+| `agent capabilities` (proposed, §4.2) | A | It reads the class table. |
+| `phase <name>` | R (`dispatch`) | It starts a phase agent. |
+| `subagent run` | D | The pipeline starts fan-out workers. A cell uses the subagents of its own harness. |
+| `reset-sha`, `release` | D | operator verbs |
+
+#### Findings
+
+**F1** The profiles tell an agent which verbs it can run in Claude Code tool syntax, for example `Bash(evolve phase verify:*)` in 93 profiles ([llm-isolation.md](llm-isolation.md) §28). *Implication:* an agent of another family gets no list it can read, and the list does not say why a verb is absent.
+
+**F2** The refusals of X4 read the markers `EVOLVE_DISPATCH_DEPTH` and `EVOLVE_PHASE` (`go/internal/cli/agentcmd/run.go:93`, `go/cmd/evolve/boundary_write.go:14`). `env -u` removes them (the review of #1126). *Implication:* a class that the markers alone enforce is advice, not a rule.
+
+**F3** `quality report` publishes its readings to the Signal Center (`go/cmd/evolve/cmd_quality.go:186`). `quality compare` publishes one PQ3 reading too (`go/cmd/evolve/cmd_quality_compare.go:44-47`). *Implication:* both change shared state. A reading from a cell can steer a stage flip that other cells depend on.
+
+**F4** Each `code` verb appends one usage record (`go/cmd/evolve/cmd_code_usage.go:46-48`). In a phase the record goes to the cycle workspace, else to the user cache (`go/cmd/evolve/registry.go:134`). *Implication:* the write is telemetry in the own workspace, not shared state.
+
+**F5** `phase verify` and `selfcheck build` read the deliverables and run the build handoff probe (`go/internal/cli/phasecmd/phase_verify.go:22-60`, `go/cmd/evolve/cmd_selfcheck.go:21-52`). For `build`, the probe runs `go test` and can put pass records in the test-verdict cache `.evolve/landing/testcache` (`go/internal/phases/ship/scanshadow.go:75`, `:228`). *Implication:* the only write is a cache that a content key addresses. A cached verdict is valid for each reader with the same key, so an agent can run both verbs in a cell. The profiles already allow `evolve phase verify` (F1).
+
+**F7** `clihealth usage` opens an interactive session of each LLM CLI to read its usage (`go/internal/usageevidence/production.go:58`). `cli-routing show` and `cli-routing explain` without `--static` run each installed LLM CLI with `--version` (`go/internal/bridge/doctor.go:188`). *Implication:* in a cell these forms exec an LLM binary, which I-3 forbids. The `--static` forms exec none.
+
+**F8** I read the other verbs that §5 marks `A` on `5c010d7a4`. They change no file, signal, lease, git ref or `gh` state. They read files, or they run `git`, `gh`, `go list` and `ps` reads. Examples: `status` runs `gh pr list` (`go/cmd/evolve/cmd_status.go:158`). `ledger verify` takes a shared `flock` on a lock file that exists (`go/internal/adapters/ledger/ledger.go:142`). `ci classify` can file an inbox item only when a rerun result is known, and only `--rerun` gets one (`go/internal/ciwatch/classify.go:153`, `:168`).
+
+**F6** `agent capabilities` is not a verb on `origin/main` (`go/cmd/evolve/registry.go:43`: `agent run` and `agent list` only).
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D1 | Three classes, and `D` is the default | F1, F2 | Two classes, allow and deny: an agent then has no way to ask for a justified dispatch, and the operator asked for that way. A deny list: a new verb is open until someone adds it. |
+| D2 | `quality report` and `quality compare` are `R`. The read form `quality show` (§6, X17d) is `A`. | F3 | `A`: a cell then publishes readings to the Signal Center, which is a channel to other cells outside I-4. `D`: a PQ3 reading is "on request" by design ([llm-quality-indexes.md](llm-quality-indexes.md) §5.4), so an agent needs a way to ask for it. |
+| D3 | `code callers`, `api`, `find` and `map` are `A` | F4 | `R`: the usage record is telemetry of the own cell, and a request for each code query costs a judgement for no gain. |
+| D4 | The cell reads its classes from one verb, `agent capabilities --json` (§4.2) | F1, F6 | A list in each persona: it is CLI text above the driver, which I-17 forbids. A tool server for each family: the house rule is CLI only ([cli-only-no-mcp.md](../conventions/cli-only-no-mcp.md)). |
+| D5 | `R` and `D` verbs need the dispatch credential (§4.4) | F2 | The markers only: `env -u` passes them. A sandbox deny of the `evolve` binary: the profiles must run `evolve phase verify`. |
+| D6 | `cli-routing set` is `D`. A routing change from an agent is a request of the kind `routing-proposal` (§4.3). | D1 rule 4 | `R` for `cli-routing set` itself: the verb writes the policy file at once. A change from a cell must wait for a judgement and for the boundary queue (§4 rule 3). |
+| D7 | `clihealth usage` is `D`. `cli-routing show` and `explain` are `A` only with `--static`. `ci classify --rerun` is `D`. | F7, F8 | `R` for `clihealth usage`: the operator and the boundary already read the usage, and a cell has no task that needs it. |
+
+What changes our mind: the orchestrator can approve more than 95% of the requests of one kind for two weeks. Then that kind can move to `A` with a cap. If an `A` verb gets a shared write, it moves to `R` in the same change.
+
+### 4.2 The capabilities verb
+
+`evolve agent capabilities --json` (proposed, X17e) tells the agent of the current cell what it can do. It is `A` and `always`. Each family reads the same JSON, so no persona needs CLI-specific text.
+
+```json
+{
+  "schema": "evolve.agent.capabilities/1",
+  "ok": true,
+  "data": {
+    "cell": {"cycle": 2101, "phase": "build", "workspace": ".evolve/runs/cycle-2101"},
+    "verbs": [
+      {"verb": "phase verify", "class": "A", "input": "args/1", "output": "evolve.phase.verify/1"},
+      {"verb": "code find", "class": "A", "input": "args/1", "output": "text/1"},
+      {"verb": "inbox add", "class": "R", "request": {"kind": "inbox-add", "schema": "evolve.request/1", "path": ".evolve/runs/cycle-2101/requests/inbox-add-<n>.json"}},
+      {"verb": "agent run", "class": "R", "request": {"kind": "dispatch", "schema": "evolve.request/1", "path": ".evolve/runs/cycle-2101/requests/dispatch-<n>.json"}},
+      {"verb": "wave next", "class": "D"}
+    ],
+    "default_class": "D",
+    "caps": {"dispatch": {"per_cycle": 2, "chain_depth": 1}, "inbox-add": {"per_cycle": 3}}
+  },
+  "error": null,
+  "warnings": []
+}
+```
+
+| Field | Rule |
+|---|---|
+| `cell` | The pipeline fills it from its own record of the dispatch, not from the environment of the caller. Outside a cell it is `null`, and each verb shows its class for a cell. |
+| `verbs[].class` | the class of §4.1 and of the column "agent" of §5 |
+| `verbs[].input`, `verbs[].output` | the schema id of the arguments and of the `--json` envelope (§2). `text/1` marks a verb whose output is lines, not an envelope. |
+| `verbs[].request` | only for `R`: the request kind, the request schema and the path to write |
+| `default_class` | always `D` (§4.1 rule 1) |
+| `caps` | the caps for each request kind that the validator applies (§4.3). The values in the example are not defaults. |
+
+The neutral TaskAssignment (I-17) carries a pointer to this verb ([llm-isolation.md](llm-isolation.md) §28). The agent calls it once at the start, and again when it needs a verb that it has not used.
+
+### 4.3 Requests
+
+An agent asks for an `R` verb through a request file. It writes one file for each request, in its own workspace:
+
+```json
+{
+  "schema": "evolve.request/1",
+  "kind": "inbox-add",
+  "what": {"verb": "inbox add", "args": {"id": "parser-nil-guard", "title": "..."}},
+  "why": "The build found a nil dereference in a parser that this item does not own. The fix is out of scope.",
+  "inputs": ["build-report.md"],
+  "expected_output": {"artifact": "an inbox item", "schema": "inbox-item/1"}
+}
+```
+
+| Kind | Verbs | What the pipeline does after approval |
+|---|---|---|
+| `dispatch` | `agent run`, `phase <name>` | It dispatches the phase agent ([llm-isolation.md](llm-isolation.md) §7.2 on the branch of #1126). |
+| `inbox-add` | `inbox add` | It files the item with `source` set to the request id. |
+| `routing-proposal` | `cli-routing set`, `cli-routing unset` | It writes the change to the queue of §4 rule 3. The boundary applies it after `cli-routing check` passes. |
+| `quality-reading` | `quality report`, `quality compare` | It runs the verb and publishes the reading. |
+
+The path from a request to a result:
+
+1. The agent writes `requests/<kind>-<n>.json` in its workspace. The file is a declared output of the cell.
+2. The pipeline validates the file in Go. It checks the schema, the kind, the allowlist of the seat and the caps. The caps for `dispatch` are the proposed policy key `isolation.dispatch_requests` of item `isolation-dispatch-request-channel`. The other kinds get a cap for each cycle in the same block (proposed).
+3. The orchestrator agent of [ADR-0155](adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) judges if the request is reasonable. It reads the `why`, the `inputs` and the scope of the item. It proposes "approve" or "refuse" with a reason, and the pipeline disposes.
+4. After approval the pipeline runs the verb with its own credential. The pipeline adds the result to the lineage index of the requester ([llm-isolation.md](llm-isolation.md) §8).
+5. A refusal records its reason in the same index. The agent never runs the verb itself.
+
+The agent does not wait in its turn for the decision. The pipeline reads the requests at the handoff of the phase. A later phase, a retry or the next item of the lineage reads the result through the index.
+
+### 4.4 Enforcement
+
+The class is a rule, not advice. Three layers enforce it:
+
+1. **The verb.** An `A` verb needs no credential. An `R` or `D` verb reads the dispatch credential first.
+   When the read fails, the verb exits 3. It prints one line that names the request path:
+   `refused inside a phase: inbox add is class R; write the request to .evolve/runs/cycle-2101/requests/inbox-add-<n>.json (schema evolve.request/1, see evolve agent capabilities --json)`
+   A `D` verb names no path: `refused inside a phase: wave next is class D; it is an operator or boundary verb`.
+2. **The credential.** The pipeline holds it, and the sandbox denies its read to each cell. The operator and the pipeline run outside a cell, so their verbs can read it. The design is item `isolation-dispatch-capability-token` of X4 (#1126). That item covers the dispatch verbs. X17e extends the same check to each `R` and `D` verb.
+3. **The sandbox.** A cell can write only in its own workspace and its worktree ([llm-isolation.md](llm-isolation.md) §9).
+   Past the first two layers, an `R` or `D` verb cannot write the inbox, the policy or the main tree.
+
+The markers of X4 stay as a fast first check with a clear message. They are not the guard (F2).
+
+### 4.5 Signals and quality readings
+
+Each request and each decision is a signal of the module `isolation` ([llm-isolation.md](llm-isolation.md) §15):
+
+| Kind | Severity | Code | When | Fields |
+|---|---|---|---|---|
+| `isolation.request` | INFO | none | the validator reads a request | `request`, `kind`, `verb`, `cell`, `family` |
+| `isolation.request.decision` | INFO | none | the orchestrator approves, or the pipeline runs the verb | `request`, `kind`, `decision`, `result` |
+| `isolation.request.decision` | WARN | `ISOLATION_REQUEST_REFUSED` (proposed) | the validator or the orchestrator refuses | `request`, `kind`, `decision`, `reason`, `stage` |
+| `isolation.violation` | WARN | `ISOLATION_I3_VIOLATION` | an `R` or `D` verb refuses in a cell (§4.4) | `rule` is `verb.class.r` or `verb.class.d`, and `target` is the verb |
+
+The last row closes a gap of X4: the refusal of `agent run` emits no signal yet.
+
+Three proposed readings of the quality panel ([llm-quality-indexes.md](llm-quality-indexes.md), ADR-0153) use these signals. An amendment of ADR-0153 adds them at stage `shadow`:
+
+| Reading | Unit | Window | What it shows |
+|---|---|---|---|
+| request rate | requests for each cycle, for each kind and family | wave | if agents use the request path, and which family asks the most |
+| approval rate | approved requests over decided requests, for each kind | wave | if the requests are reasonable. A low rate means that the persona text or the classes need a fix. |
+| refusal outcomes | refusals, split by reason: schema, cap, judged unreasonable, verb refused with no credential | wave | where agents try to go past the boundary |
 
 ## 5. The core verbs
 
-"json" and "root" say if the verb has `--json` and `--project-root` today. Each target is "yes".
+"json" and "root" say if the verb has `--json` and `--project-root` today. Each target is "yes". "Agent" is the agent class of §4.1, checked on `5c010d7a4`. The name in brackets is the request kind of §4.3.
 
-| Verb | Class | json today | root today | Schema id (target) | Note |
-|---|---|---|---|---|---|
-| `status` | always | yes | yes | `evolve.status/1` | one report of loop, cycles, PRs and CI |
-| `loop status` | always | yes | yes | `evolve.loop.status/1` | fix §8 first |
-| `wave status` | always | yes | yes | `evolve.wave.status/1` | |
-| `wave supply` | always | yes | yes | `evolve.wave.supply/1` | |
-| `wave watch` | always | yes | yes | `evolve.wave.watch/1` | a stream; it polls every 5 s today (`c/cmd_wave.go:27`) until E13 |
-| `inbox list`, `show`, `rank`, `lint`, `batches` | always | yes | no | `evolve.inbox.<verb>/1` | root from env or cwd today (F4.8) |
-| `signals tail` | always | yes | no | `evolve.signals.tail/1` | a stream; root from env or cwd today |
-| `ledger verify` | always | no | `--evolve-dir` only | `evolve.ledger.verify/1` | prints on stderr today (`c/cmd_ledger.go:60`) |
-| `dossier verify` | always | no | yes | `evolve.dossier.verify/1` | |
-| `cli-routing show`, `check`, `explain` | always | yes | yes | `evolve.cli-routing.<verb>/1` | |
-| `routing explain` | always | no | yes | `evolve.routing.explain/1` | |
-| `clihealth list`, `usage` | always | yes | yes | `evolve.clihealth.<verb>/1` | `usage` starts a usage probe of the CLI, not a model turn |
-| `agent list` | always | yes | yes | `evolve.agent.list/1` | ADR-0152 |
-| `ci classify` | always | yes | yes | `evolve.ci.classify/1` | `--rerun` makes it `leased` |
-| `scan secrets` | always | no | yes | `evolve.scan.secrets/1` | |
-| `docs ste-lint` | always | yes | yes | `evolve.docs.ste-lint/1` | |
-| `quality report` | leased | no | yes | `evolve.quality.report/1` | it publishes signals |
-| `quality compare` | leased | no | yes | `evolve.quality.compare/1` | it publishes one PQ3 reading |
-| `agent run` | leased | yes | yes | `evolve.agent.run/1` | read-only agent; it writes a ledger entry with cycle 0 |
-| `inbox add`, `consume` | leased | no | no | `evolve.inbox.<verb>/1` | no lease check today |
-| `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` | queued | no | no | `evolve.inbox.<verb>/1` | refuse during a wave today (F4.5) |
-| `cli-routing set`, `unset`, `init`, `migrate` | queued | no | yes | `evolve.cli-routing.<verb>/1` | refuse during a wave today (`c/boundary_write.go:13-27`) |
-| `wave note` | leased | yes | yes | `evolve.wave.note/1` | |
-| `checkpoint save`, `list`, `restore`, `prune` | leased | yes | yes | `evolve.checkpoint.<verb>/1` | ADR-0122 |
-| `gc` | leased | no | yes | `evolve.gc/1` | no lease today (F4.7) |
-| `loop-stop` | leased | no | yes | `evolve.loop-stop/1` | it sets the brake; `--wait` blocks |
-| `wave next` | boundary | yes | yes | `evolve.wave.next/1` | it runs the boundary |
-| `boundary run` | boundary | no | yes | `evolve.boundary.run/1` | |
-| `pr merge` | boundary | no | yes | `evolve.pr.merge/1` | refuses while a loop runs (`c/cmd_pr.go:265-276`) |
-| `sync-main` | boundary | no | yes | `evolve.sync-main/1` | (`c/cmd_syncmain.go:58-63`) |
-| `cycle reset` | boundary | no | yes, default `.` | `evolve.cycle.reset/1` | `--force` overrides (`c/cmd_cycle.go:109`, refusal at `:131-133`) |
-| `cli update` | boundary | yes | yes | `evolve.cli.update/1` | `--dry-run` is `always` (`c/cmd_cli.go:57`) |
-| `loop` | boundary | no | yes | `evolve.loop/1` | one owner only (`c/cmd_loop_detach.go:55`) |
+| Verb | Class | Agent | json today | root today | Schema id (target) | Note |
+|---|---|---|---|---|---|---|
+| `status` | always | A | yes | yes | `evolve.status/1` | one report of loop, cycles, PRs and CI |
+| `loop status` | always | A | yes | yes | `evolve.loop.status/1` | fix §8 first |
+| `wave status` | always | A | yes | yes | `evolve.wave.status/1` | |
+| `wave supply` | always | A | yes | yes | `evolve.wave.supply/1` | |
+| `wave watch` | always | A | yes | yes | `evolve.wave.watch/1` | a stream; it polls every 5 s today (`c/cmd_wave.go:27`) until E13 |
+| `inbox list`, `show`, `rank`, `lint`, `batches` | always | A | yes | no | `evolve.inbox.<verb>/1` | root from env or cwd today (F4.8) |
+| `signals tail` | always | A | yes | no | `evolve.signals.tail/1` | a stream; root from env or cwd today |
+| `ledger verify` | always | A | no | `--evolve-dir` only | `evolve.ledger.verify/1` | prints on stderr today (`c/cmd_ledger.go:60`) |
+| `dossier verify` | always | A | no | yes | `evolve.dossier.verify/1` | |
+| `cli-routing show`, `check`, `explain` | always | A (`show` and `explain` with `--static` only, F7) | yes | yes | `evolve.cli-routing.<verb>/1` | |
+| `routing explain` | always | A | no | yes | `evolve.routing.explain/1` | |
+| `clihealth list`, `usage` | always | `list` A, `usage` D (F7) | yes | yes | `evolve.clihealth.<verb>/1` | `usage` starts a usage probe of the CLI, not a model turn |
+| `agent list` | always | A | yes | yes | `evolve.agent.list/1` | ADR-0152 |
+| `ci classify` | always | A (`--rerun` is D) | yes | yes | `evolve.ci.classify/1` | `--rerun` makes it `leased` |
+| `scan secrets` | always | A | no | yes | `evolve.scan.secrets/1` | |
+| `docs ste-lint` | always | A | yes | yes | `evolve.docs.ste-lint/1` | |
+| `quality report` | leased | R (`quality-reading`) | no | yes | `evolve.quality.report/1` | it publishes signals |
+| `quality compare` | leased | R (`quality-reading`) | no | yes | `evolve.quality.compare/1` | it publishes one PQ3 reading |
+| `agent run` | leased | R (`dispatch`) | yes | yes | `evolve.agent.run/1` | read-only agent; it writes a ledger entry with cycle 0 |
+| `inbox add`, `consume` | leased | `add` R (`inbox-add`), `consume` D | no | no | `evolve.inbox.<verb>/1` | no lease check today |
+| `inbox edit`, `withdraw`, `verify`, `route-console`, `route-lane` | queued | D | no | no | `evolve.inbox.<verb>/1` | refuse during a wave today (F4.5) |
+| `cli-routing set`, `unset`, `init`, `migrate` | queued | D (`set` and `unset` through `routing-proposal`) | no | yes | `evolve.cli-routing.<verb>/1` | refuse during a wave today (`c/boundary_write.go:13-27`) |
+| `wave note` | leased | D | yes | yes | `evolve.wave.note/1` | |
+| `checkpoint save`, `list`, `restore`, `prune` | leased | D | yes | yes | `evolve.checkpoint.<verb>/1` | ADR-0122 |
+| `gc` | leased | D | no | yes | `evolve.gc/1` | no lease today (F4.7) |
+| `loop-stop` | leased | D | no | yes | `evolve.loop-stop/1` | it sets the brake; `--wait` blocks |
+| `wave next` | boundary | D | yes | yes | `evolve.wave.next/1` | it runs the boundary |
+| `boundary run` | boundary | D | no | yes | `evolve.boundary.run/1` | |
+| `pr merge` | boundary | D | no | yes | `evolve.pr.merge/1` | refuses while a loop runs (`c/cmd_pr.go:265-276`) |
+| `sync-main` | boundary | D | no | yes | `evolve.sync-main/1` | (`c/cmd_syncmain.go:58-63`) |
+| `cycle reset` | boundary | D | no | yes, default `.` | `evolve.cycle.reset/1` | `--force` overrides (`c/cmd_cycle.go:109`, refusal at `:131-133`) |
+| `cli update` | boundary | D | yes | yes | `evolve.cli.update/1` | `--dry-run` is `always` (`c/cmd_cli.go:57`) |
+| `loop` | boundary | D | no | yes | `evolve.loop/1` | one owner only (`c/cmd_loop_detach.go:55`) |
 
 Verbs outside this table are tools for the operator or for the pipeline itself. A caller must not depend on them. Examples are `inbox-mover`, `fanout-dispatch`, `serve-phase` and `phase-watchdog`.
 
@@ -165,7 +337,8 @@ Verbs outside this table are tools for the operator or for the pipeline itself. 
 | `cycle resume [--cycle N]` | boundary | only `loop --resume` | resume one cycle without the loop flags |
 | `wave stop [--wait D]` | leased | only `loop-stop --wait` | the wave verb set is complete |
 | `events channels`, `kinds`, `watch`, `subscribe` | always (`subscribe` is leased) | absent: plan E9 is not started | a service waits on an event, not on a poll ([event-notification-protocol-2026-10](../plans/event-notification-protocol-2026-10.md) E9) |
-| `quality show --scope S` | always | absent | the readings with no publish |
+| `quality show --scope S` | always | absent | the readings with no publish. Its agent class is `A` (§4.1 D2). |
+| `agent capabilities [--json]` | always | absent (`c/registry.go:43`) | the agent of a cell reads its classes, schemas and request paths (§4.2). Its agent class is `A`. Component X17e. |
 
 `events` is the E9 component of the events plan. X17 does not build a second `events` verb. The X17 item depends on the E9 item, and the E9 item takes the envelope and the exit table of this file.
 
@@ -207,6 +380,9 @@ A third rule closes the other forms: `reservedGoalVerb` refuses a positional goa
 | An `always` verb writes nothing | `TestCLIContract_AlwaysVerbsWriteNothing`: a tree hash of the temp root before and after | X17b | enforce |
 | A `queued` verb does not refuse during a wave | `TestInboxEdit_DuringAWaveQueuesAndExitsFour` | X17c | shadow, then enforce |
 | `gc` skips a resource that a live run owns | `TestGC_TakesItsLeaseAndSkipsLiveRuns` | X17c | enforce |
+| The agent class of each verb in Go matches §4.1 and the column "Agent" of §5 | `TestAgentClasses_MatchTheContract` | X17e | enforce |
+| An `R` verb with no credential exits 3 and names the request path. A `D` verb exits 3. | `TestAgentClass_RefusesWithoutTheCredentialAndNamesTheRequestPath` | X17e | shadow one wave, then enforce |
+| A valid request is run by the pipeline, and its result reaches the lineage index | `TestAgentRequest_AnApprovedRequestIsRunByThePipeline` | X17e | enforce |
 
 ## Limits
 

@@ -400,6 +400,7 @@ X19 has no scored designs. It is an operator directive of 2026-10-25, and §12.4
 | X17c | The queue for the inbox and `cli-routing` writers, and the `gc` lease | I-15 | `inbox edit` during a live lease exits 1 | X17b | `shadow` one wave, then `enforce` |
 | X17d | The new verbs: `inbox claim`, `dossier show`, `cycle resume`, `wave stop`, `quality show` | I-15 | the contract guard lists the five verbs as absent | X17b | `enforce` |
 | E9 | The `events` verbs (the events plan) on the X17b envelope | I-15 | the E9 tests of the events plan | X17b | as the events plan says |
+| X17e | The agent class of each verb, `agent capabilities --json`, the request kinds and the credential check (operator, 2026-10-26; [cli-contract.md](../architecture/cli-contract.md) §4.1 to §4.5) | I-15, I-3 | `TestAgentClasses_MatchTheContract` fails, because `agent capabilities` does not exist | X4 items `isolation-dispatch-capability-token` and `isolation-dispatch-request-channel` | `shadow` one wave, then `enforce` |
 | X18a | Strict `policy.Parse` | I-16 | a policy with `fleet.cuont` parses with no error | none | `enforce` |
 | X18b | The named marker list, the `buildCycleEnv` fix and the AST guard | I-16, I-2 | `EVOLVE_BYPASS_SHIP_GATE` on the parent reaches the cycle env | X2 | `enforce` |
 | X18c | The 18 knobs move into the policy file | I-16 | `EVOLVE_ROUTING_MODE=static` changes the routing with no policy key | X18a, X18b | one wave `shadow` (WARN on a differing env value), then `enforce` |
