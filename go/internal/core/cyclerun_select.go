@@ -53,6 +53,7 @@ func (cr *cycleRun) selectNext() (Phase, loopAction, error) {
 	if cr.o.cfg.Stage != config.StageOff {
 		cr.routingSeq++
 		signals, _ := router.Digest(cr.cs.WorkspacePath, cr.cs.CompletedPhases)
+		cr.reportProseFallbacks(signals)
 		dec := cr.o.strategy.Decide(router.RouteInput{
 			Current:        string(cr.current),
 			Verdict:        cr.lastVerdict,

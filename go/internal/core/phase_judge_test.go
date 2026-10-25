@@ -21,7 +21,7 @@ func TestJudgeVerdict_Fields(t *testing.T) {
 }
 
 func judgeInput() router.RouteInput {
-	return router.RouteInput{Workspace: "/tmp/ws", ProjectRoot: "/proj", Cycle: 9, GoalText: "fix the auth nil-panic"}
+	return router.RouteInput{Workspace: seatWorkspace, ProjectRoot: "/proj", Cycle: 9, GoalText: "fix the auth nil-panic"}
 }
 
 func samplePlan() *router.PhasePlan {

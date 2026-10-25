@@ -22,13 +22,19 @@ func buildRoutingPrompt(in router.RouteInput) string {
 		b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
 		b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>","learning_richness":"full|memo","recovery_action":"retry|end"}`)
 		b.WriteString("\n")
+		writeDecisionFile(&b, in, decisionProposal)
 		return b.String()
 	}
 
 	b.WriteString("\n## Respond with STRICT JSON only (no prose, no markdown fence):\n")
 	b.WriteString(`{"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>"}`)
 	b.WriteString("\n")
+	writeDecisionFile(&b, in, decisionProposal)
 	return b.String()
+}
+
+func writeDecisionFile(b *strings.Builder, in router.RouteInput, d decision) {
+	fmt.Fprintf(b, "Write this JSON to %s. The pipeline reads only that file and checks it against its schema; it reads nothing that you print.\n", filepath.Join(in.Workspace, d.artifactFile()))
 }
 
 func isFailureTransition(in router.RouteInput) bool {
@@ -50,7 +56,7 @@ func writeFailureVocabulary(b *strings.Builder) {
 	b.WriteString("- The failure-adapter's BLOCK verdicts are non-overridable: a blocked cycle ends no matter what you propose (the attempt is recorded as a clamp).\n")
 }
 
-func buildPlanPrompt(in router.RouteInput) string {
+func buildPlanPrompt(in router.RouteInput, d decision) string {
 	var b strings.Builder
 	b.WriteString("You are the evolve-loop PHASE ADVISOR. The model proposes; the kernel disposes.\n")
 	b.WriteString("From the objective signals below, decide which phases should RUN this cycle and which to SKIP, ")
@@ -63,6 +69,7 @@ func buildPlanPrompt(in router.RouteInput) string {
 	WriteCatalogWithOnDemand(&b, in.Catalog, in.OnDemandPhases)
 
 	writePlanResponseSchema(&b)
+	writeDecisionFile(&b, in, d)
 	return b.String()
 }
 
@@ -97,7 +104,7 @@ func (a *Advisor) ComposePlanPrompt(in router.RouteInput, artifactFile string) s
 
 func (a *Advisor) composePlanPrompt(in router.RouteInput, d decision, artifactFile string) string {
 	if a.identity.Persona == "" {
-		return buildPlanPrompt(in)
+		return buildPlanPrompt(in, d)
 	}
 	var b strings.Builder
 	b.WriteString(a.identity.Persona)

@@ -12,7 +12,7 @@ func baseFailureInput() FailureAdviseInput {
 	return FailureAdviseInput{
 		Phase: "build", CLI: "codex-tmux", ExitCode: 81,
 		PaneTail:    "⚠ session credential vault locked; interactive unlock required",
-		Workspace:   "/tmp/ws",
+		Workspace:   seatWorkspace,
 		ProjectRoot: "/proj",
 		Cycle:       262,
 		Env:         map[string]string{},

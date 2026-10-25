@@ -82,6 +82,7 @@ type cycleRun struct {
 	dispatchMu        sync.Mutex
 	recoveryDepth     int
 	replanDepth       int
+	proseReported     map[router.ProseFallback]bool
 
 	preserveWorktree       bool
 	cycleCompletedNormally bool

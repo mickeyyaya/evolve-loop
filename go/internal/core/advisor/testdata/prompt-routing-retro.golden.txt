@@ -77,3 +77,4 @@ FORBIDDEN: never propose reaching ship without audit. Any justification for skip
 
 ## Respond with STRICT JSON only (no prose, no markdown fence):
 {"next_phase":"<phase>","insert_phases":["<phase>",...],"justification":"<one sentence>","learning_richness":"full|memo","recovery_action":"retry|end"}
+Write this JSON to /ws/cycle-42/routing-proposal.json. The pipeline reads only that file and checks it against its schema; it reads nothing that you print.

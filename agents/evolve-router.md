@@ -29,7 +29,7 @@ Decision rubric + objective digest under "# This cycle" — reason from signals.
 
 ## Output contract
 
-Write the plan as a strict JSON array to workspace `routing-plan.json` — no prose, no fence. Each element:
+Write the plan as a strict JSON array to workspace `routing-plan.json` — no prose, no fence. The pipeline reads only this file, and it reads nothing that you print. It checks the file against the `advisor-plan` schema of `phasecontract`: an element with an unknown key, or an element without `phase` and `run`, fails the contract. A re-plan goes to `routing-replan.json` with the same schema. A proposal goes to `routing-proposal.json` as one object that has `next_phase` and `justification`. Each element:
 
 ```json
 {"phase": "<name>", "run": true, "justification": "<one sentence tied to a signal>", "cli": "<cli>", "tier": "balanced"}

@@ -29,7 +29,7 @@ func reportRow(t *testing.T) func(string, error) {
 func TestIsolationMatrix_N12_AJudgeVerdictInProseWithNoFileFailsTheContract(t *testing.T) {
 	t.Parallel()
 	in := judgeInput()
-	in.Workspace = t.TempDir()
+	in.Workspace, in.ProjectRoot = t.TempDir(), flowRoot(t, enforceI8)
 	fb := &fakeBridge{stdout: `I looked at the plan. My verdict: {"score":0.8,"rationale":"fine","missing_phases":[]}`}
 	var failure error
 	v := NewPlanJudge(fb).GradePlan(context.Background(), in, samplePlan())

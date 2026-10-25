@@ -7,10 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const (
@@ -21,6 +24,7 @@ const (
 type FailureAdvisor struct {
 	bridge   Bridge
 	identity AgentIdentity
+	signals  *signalcenter.Center
 }
 
 type FailureAdvisorOption func(*FailureAdvisor)
@@ -47,6 +51,10 @@ func WithFailureAdvisorPersona(body string) FailureAdvisorOption {
 			a.identity.Persona = body
 		}
 	}
+}
+
+func WithFailureAdvisorSignals(c *signalcenter.Center) FailureAdvisorOption {
+	return func(a *FailureAdvisor) { a.signals = c }
 }
 
 func NewFailureAdvisor(bridge Bridge, opts ...FailureAdvisorOption) *FailureAdvisor {
@@ -84,7 +92,12 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 	if profile == "" && in.ProjectRoot != "" {
 		profile = filepath.Join(in.ProjectRoot, ".evolve", "profiles", "failure-advisor.json")
 	}
-	artifact := filepath.Join(in.Workspace, "failure-advice.json")
+	flow := phasecontract.MustFlowDecision(phasecontract.FlowSeatFailureAdvisor)
+	artifact := filepath.Join(in.Workspace, flow.ArtifactName)
+	if err := flow.Clear(artifact); err != nil {
+		return nil, fmt.Errorf("failure advisor: %w", err)
+	}
+	launched := time.Now()
 	resp, err := LaunchWithFreshSession(ctx, a.bridge, BridgeRequest{
 		CLI:          a.identity.CLI,
 		Profile:      profile,
@@ -100,7 +113,9 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 	if err != nil {
 		return nil, fmt.Errorf("failure advisor: bridge launch: %w", err)
 	}
-	return parseFailureAdvice(resp.Stdout)
+	cell := phasecontract.FlowCell{Cycle: in.Cycle, Phase: in.Phase, Origin: "FailureAdvisor.Advise", Path: artifact, NotBefore: launched}
+	legacy := func() ([]byte, bool) { span := failureAdviceSpan(resp.Stdout); return span, len(span) > 0 }
+	return decodeFailureAdvice(flow.Resolve(in.ProjectRoot, cell, legacy, a.signals))
 }
 
 func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) string {
@@ -157,13 +172,17 @@ func usageEvidenceLines(workspace string) []string {
 	return out
 }
 
-func parseFailureAdvice(raw string) (*recovery.FailureAdvice, error) {
+func failureAdviceSpan(raw string) []byte {
 	trimmed := strings.TrimSpace(raw)
 	trimmed = strings.TrimPrefix(trimmed, "```json")
 	trimmed = strings.TrimPrefix(trimmed, "```")
 	trimmed = strings.TrimSuffix(trimmed, "```")
+	return []byte(strings.TrimSpace(trimmed))
+}
+
+func decodeFailureAdvice(raw []byte) (*recovery.FailureAdvice, error) {
 	var adv recovery.FailureAdvice
-	if err := json.Unmarshal([]byte(strings.TrimSpace(trimmed)), &adv); err != nil {
+	if err := json.Unmarshal(raw, &adv); err != nil {
 		return nil, fmt.Errorf("failure advisor: unparseable verdict (%v): %.200s", err, raw)
 	}
 	if adv.Cause == "" {

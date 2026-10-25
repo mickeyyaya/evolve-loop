@@ -4,11 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/advisor"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 type JudgeVerdict struct {
@@ -20,14 +25,25 @@ type JudgeVerdict struct {
 var judgeNoOpinion = JudgeVerdict{Score: -1}
 
 type PlanJudge struct {
-	bridge Bridge
-	cli    string
-	model  string
+	bridge  Bridge
+	cli     string
+	model   string
+	signals *signalcenter.Center
 }
 
-func NewPlanJudge(bridge Bridge) *PlanJudge {
+type PlanJudgeOption func(*PlanJudge)
+
+func WithPlanJudgeSignals(c *signalcenter.Center) PlanJudgeOption {
+	return func(j *PlanJudge) { j.signals = c }
+}
+
+func NewPlanJudge(bridge Bridge, opts ...PlanJudgeOption) *PlanJudge {
 	seat := policy.SeatDefault(policy.SeatPlanJudge)
-	return &PlanJudge{bridge: bridge, cli: seat.CLI, model: seat.Model}
+	j := &PlanJudge{bridge: bridge, cli: seat.CLI, model: seat.Model}
+	for _, o := range opts {
+		o(j)
+	}
+	return j
 }
 
 func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *router.PhasePlan) JudgeVerdict {
@@ -42,7 +58,13 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 	if worktree == "" {
 		worktree = in.Workspace
 	}
-	artifactPath := filepath.Join(in.Workspace, "routing-judge.json")
+	flow := phasecontract.MustFlowDecision(phasecontract.FlowSeatJudge)
+	artifactPath := filepath.Join(in.Workspace, flow.ArtifactName)
+	if err := flow.Clear(artifactPath); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN plan judge: %v — no opinion\n", err)
+		return judgeNoOpinion
+	}
+	launched := time.Now()
 	resp, err := LaunchWithFreshSession(ctx, j.bridge, BridgeRequest{
 		CLI:          j.cli,
 		Profile:      profile,
@@ -60,7 +82,8 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 	if err != nil {
 		return judgeNoOpinion
 	}
-	return parseJudgeVerdict(resp.Stdout)
+	cell := phasecontract.FlowCell{Cycle: in.Cycle, Phase: in.Current, Origin: "PlanJudge.GradePlan", Path: artifactPath, NotBefore: launched}
+	return decodeJudgeVerdict(flow.Resolve(in.ProjectRoot, cell, advisor.StdoutSpan(resp.Stdout, '{', '}'), j.signals))
 }
 
 func (j *PlanJudge) composeJudgePrompt(in router.RouteInput, plan *router.PhasePlan, artifactPath string) string {
@@ -82,13 +105,9 @@ func (j *PlanJudge) composeJudgePrompt(in router.RouteInput, plan *router.PhaseP
 	return b.String()
 }
 
-func parseJudgeVerdict(stdout string) JudgeVerdict {
-	start, end, ok := lastBalancedSpan(stdout, '{', '}')
-	if !ok {
-		return judgeNoOpinion
-	}
+func decodeJudgeVerdict(raw []byte) JudgeVerdict {
 	var v JudgeVerdict
-	if err := json.Unmarshal([]byte(stdout[start:end+1]), &v); err != nil {
+	if err := json.Unmarshal(raw, &v); err != nil {
 		return judgeNoOpinion
 	}
 	if v.Score < 0 || v.Score > 1 {

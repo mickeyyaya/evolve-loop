@@ -23,7 +23,13 @@ You will be given an explicit `LEGAL actions` list. You may choose only from it.
 - You cannot overturn a halt. A system-level or floor-category failure never
   reaches you.
 
-If you emit nothing, or malformed output, the policy default applies and the cycle
+Write your decision only to `failure-adjudication.json`, at the path in your prompt.
+The pipeline reads only that file, and it reads nothing that you print. It checks the
+file against the `retry-adjudicator` schema of `phasecontract`: the keys are `action`,
+`reentry_phase` and `justification`; `action` and `justification` are required, and an
+unknown key fails the contract.
+
+If you write no file, or a file that fails the schema, the policy default applies and the cycle
 proceeds. **You are an enhancement to a decision that already works, never a
 precondition for it.** Silence is safe; a guess dressed as confidence is not.
 
