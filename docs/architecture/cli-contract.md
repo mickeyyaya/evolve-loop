@@ -179,17 +179,22 @@ Verbs outside this table are tools for the operator or for the pipeline itself. 
 
 ## 8. The first defect: `loop status <word>`
 
-`isLoopStatusInvocation` sends `loop status` to the read-only report only when `status` is alone, or when the next word starts with `-` (`c/cmd_loop_status.go:14-16`). Any other form goes to the loop parser. `parsePositional` makes the rest of the words a goal (`c/cmd_loop_args.go:307-323`). The reserved-word guard refuses only a goal that is exactly a reserved word (`c/cmd_loop_args.go:178-181`, `:238-249`).
+Before X17a, `isLoopStatusInvocation` (removed) sent `loop status` to the read-only report only when `status` was alone, or when the next word started with `-`. Any other form went to the loop parser. `parsePositional` made the rest of the words a goal (`c/cmd_loop_args.go:307-323`). The reserved-word guard refused only a goal that was exactly a reserved word. The line references of this paragraph were on main at `9d8e8f174`, before #1125.
 
-| Call | Today | After X17a |
+| Call | Before X17a | After X17a |
 |---|---|---|
 | `evolve loop status` | report | report |
 | `evolve loop status --json` | report | report |
 | `evolve loop status foo` | **starts a loop** with the goal `status foo` | exit 10, nothing starts |
 | `evolve loop --project-root P status` | exit 10: the reserved-word guard refuses the goal `status` | report |
+| `evolve loop 3 status foo`, `evolve loop stop now` | **starts a loop** | exit 10: the goal starts with a reserved word |
 | `evolve loop --goal-text status` | starts a loop (a goal text, by design) | the same |
 
 The fix has two rules. When the first positional word is `status`, the call goes to the status reader. The status reader refuses each extra word with exit 10. The red test: `evolve loop status foo` with a fake loop runner records a launch.
+
+X17a (#1125) applies the rules. `loopStatusArgs` replaces `isLoopStatusInvocation`, which is removed. It reads the loop flags, so a `status` after leading flags goes to the reader too. The reader also refuses a loop flag with exit 10.
+
+A third rule closes the other forms: `reservedGoalVerb` refuses a positional goal whose first word is a reserved word (`status`, `stop`, `help`, `plan`, `watch`). Thus `plan the refactor` needs `--goal-text`. The tests swap the `loopLaunchFn` seam and count the launches (`TestLoopStatus_AnExtraWordNeverStartsALoop`).
 
 ## Guards
 
