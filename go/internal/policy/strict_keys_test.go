@@ -2,6 +2,7 @@ package policy_test
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -159,5 +160,55 @@ func TestLoadOrDefaults_IsSilentForAnAbsentFile(t *testing.T) {
 
 	if warn.Len() != 0 {
 		t.Fatalf("an absent policy is the compiled defaults with no warning: %q", warn.String())
+	}
+}
+
+func TestPolicyParse_AcceptsTheThreeTopLevelMetadataKeys(t *testing.T) {
+	for _, key := range []string{"$schema", "description", "version"} {
+		t.Run(key, func(t *testing.T) {
+			pol, err := policy.Parse([]byte(`{"` + key + `": "x", "fleet": {"count": 3}}`))
+
+			if err != nil || pol.Fleet == nil {
+				t.Fatalf("a top-level %s is metadata and parses: %v", key, err)
+			}
+		})
+	}
+}
+
+func TestPolicyParse_RefusesANearMissOfAMetadataKeyAndANestedMetadataKey(t *testing.T) {
+	for raw, path := range map[string]string{
+		`{"descripton": "x"}`:             `"descripton"`,
+		`{"fleet": {"description": "x"}}`: `"fleet.description"`,
+	} {
+		_, err := policy.Parse([]byte(raw))
+
+		if !errors.Is(err, policy.ErrUnknownKey) || !strings.Contains(err.Error(), path) {
+			t.Errorf("Parse(%s) err = %v, want ErrUnknownKey naming %s", raw, err, path)
+		}
+	}
+}
+
+func TestPolicyParse_TheUnknownKeyErrorSaysWhatToDo(t *testing.T) {
+	_, err := policy.Parse([]byte(`{"fleet": {"cuont": 3}}`))
+
+	if err == nil || !strings.Contains(err.Error(), "remove it or check its spelling") || !strings.Contains(err.Error(), "docs/architecture/policy-config.md") {
+		t.Fatalf("the refusal names the fix and the doc: %v", err)
+	}
+}
+
+func TestLoadOrDefaults_ARefusedPolicyFailsEverySafetyFloorClosed(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "policy.json")
+	body := `{"comment_floor": {"stage": "off"}, "docs_floor": {"stage": "off", "ste_stage": "off"}, "cover_changed": {"stage": "off"}, "fleet": {"cuont": 3}}`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	pol := policy.LoadOrDefaults(path, io.Discard)
+
+	got := []string{pol.CommentFloorConfig().Stage, pol.DocsFloorConfig().Stage, pol.DocsFloorConfig().SteStage, pol.CoverChangedConfig().Stage}
+	for _, stage := range got {
+		if stage != "enforce" {
+			t.Fatalf("comment, docs, ste and cover-changed stages = %v, want enforce for each", got)
+		}
 	}
 }

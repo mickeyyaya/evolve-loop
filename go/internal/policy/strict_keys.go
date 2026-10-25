@@ -12,6 +12,8 @@ import (
 
 var ErrUnknownKey = errors.New("unknown policy key")
 
+var metadataKeys = []string{"$schema", "description", "version"}
+
 var keyShapes = map[reflect.Type]reflect.Type{
 	reflect.TypeFor[HandoffPolicy]():      reflect.TypeFor[map[string]handoffPairJSON](),
 	reflect.TypeFor[QualityPanelPolicy](): reflect.TypeFor[qualityPanelJSON](),
@@ -21,6 +23,11 @@ func refuseUnknownKeys(raw []byte) error {
 	var doc any
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return err
+	}
+	if top, ok := doc.(map[string]any); ok {
+		for _, key := range metadataKeys {
+			delete(top, key)
+		}
 	}
 	return unknownKey(doc, reflect.TypeFor[Policy](), "")
 }
@@ -56,7 +63,7 @@ func unknownObjectKey(obj map[string]any, t reflect.Type, path string) error {
 		child := strings.TrimPrefix(path+"."+key, ".")
 		fieldType, ok := keyType(t, key)
 		if !ok {
-			return fmt.Errorf("%w %q", ErrUnknownKey, child)
+			return fmt.Errorf("%w %q: remove it or check its spelling; docs/architecture/policy-config.md lists the keys", ErrUnknownKey, child)
 		}
 		if err := unknownKey(obj[key], fieldType, child); err != nil {
 			return err

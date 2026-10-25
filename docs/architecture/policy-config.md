@@ -13,13 +13,20 @@ policy).
 
 The whole file decodes strictly (X18a, [llm-isolation.md](llm-isolation.md) §27).
 A key that is not in the schema below fails the load, at any level. The
-error names the full key path, for example `unknown policy key "fleet.cuont"`.
-The file has no free-text keys: write notes in the docs, not in the file.
+error names the file, the full key path and the fix, for example
+`policy: parse .evolve/policy.json: unknown policy key "fleet.cuont": remove it or check its spelling`.
+Three top-level metadata keys are allowed and have no effect: `$schema`,
+`description` and `version`. The same words below the top level are unknown keys.
+
+To fix a refused file, read the key path in the error. Then correct its
+spelling against the schema below, or remove the key. An older release
+ignored such a key, so the key had no effect before.
 
 The loop refuses to start on a refused file, because the `cli-routing` preflight
 check halts. A best-effort reader that runs mid-wave prints one
-`[policy] WARN` line. It then uses the compiled defaults
-(`policy.LoadOrDefaults`).
+`[policy] WARN` line (`policy.LoadOrDefaults`). It then uses the compiled
+defaults, but each safety floor fails closed to `enforce`: `docs_floor.stage`,
+`docs_floor.ste_stage`, `comment_floor.stage` and `cover_changed.stage`.
 
 ## Schema
 
