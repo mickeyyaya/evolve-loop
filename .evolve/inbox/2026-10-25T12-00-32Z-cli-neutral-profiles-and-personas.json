@@ -16,7 +16,7 @@
   ],
   "deps": [
     "cli-neutral-task-assignment-and-guard",
-    "isolation-floor-profile-pins-as-routing-data"
+    "isolation-floor-profiles-allowed-clis-as-routing-data"
   ],
   "files": [
     ".evolve/profiles/",

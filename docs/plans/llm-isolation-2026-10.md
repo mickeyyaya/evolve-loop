@@ -164,8 +164,9 @@ The state on 2026-10-25. Each component re-reads this table before it starts.
 |---|---|---|---|
 | X1 | merged | #1121 | The matrix is `isolation.Rows` (`go/internal/isolation/matrix.go`). Rows M1 and N9 are green, and each other row is an expected failure with its owner. |
 | X2 | in review fixes | #1122 | The stage key is `isolation.i2.stage` (`shadow` by default). The review found that the `enforce` allowlist passes each `EVOLVE_*` and `BRIDGE_*` name (H2). The named marker list of X18b closes it. |
-| X6 | in review | #1123 | `floors.claude` moves into the policy, and the flow defaults move into a JSON file. `evolve cli-routing explain` is byte-identical for the 94 profiles. |
-| X6b | not started | none | Follow-up of X6. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
+| X1b | not started | none | Follow-up of X1, item `isolation-matrix-tmux-repl-fake`: a tmux REPL fake, so the rows M2 to M4 can run a full cycle. |
+| X6 | merged | #1123 | `cli_routing.floors` holds the Claude floor, and its compiled default is `go/internal/policy/routing_defaults.json`. The flow seat defaults are routing data. |
+| X6b | not started | none | Follow-up of X6, item `isolation-floor-profiles-allowed-clis-as-routing-data`. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
 | X3 to X5, X7 to X19 | not started | none | |
 
 ### 6.2 The X6 follow-up (X6b)
@@ -177,7 +178,7 @@ X6 moves the Claude floor into routing data, but 7 tracked profiles keep their o
 | `auditor`, `adversarial-review`, `tdd-engineer`, `spec-verifier`, `spec-verify`, `code-reviewer` | `["claude"]` |
 | `router` | `["agy-claude", "claude"]` |
 
-A policy that routes every seat to `agy` and sets `floors` to `{}` still cannot compile, because these profiles refuse the family. So the matrix rows M2 to M5 stay red after X6. X6b moves each pin into the `floors` data or the `agents` chain of `cli_routing`, with the same values. Its red test is the matrix row M2 with `floors: {}`. It depends on X6.
+A policy that routes every seat to `agy` and sets `floors` to `{}` still cannot compile, because these profiles refuse the family. So the matrix rows M2 to M5 stay red after X6. X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`, filed by #1123) moves each pin into the `floors` data or the `agents` chain of `cli_routing`, with the same values. Its red test is the matrix row M2 with `floors: {}`. It depends on X6.
 
 The operator refinement of 2026-10-25 (the lineage index) is in D6 and D6b, in the spec §8 and in ADR-0154 rules 10 to 15. No change is needed for it.
 

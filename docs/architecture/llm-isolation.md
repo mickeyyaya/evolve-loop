@@ -420,7 +420,7 @@ The macOS Keychain is reached through a system service, not through a file read.
 
 ### Issue
 
-The Claude floor is a Go map (`go/internal/profiles/family_floor.go:5-12`). The compiler refuses a table without `claude` (`go/internal/cliroute/compile.go:126-127`). About 15 flow defaults name `claude-tmux` or `opus` in Go (F1.5). The bare name `gemini` maps to `claude-tmux` (`go/internal/bridge/driver.go:50`).
+Before X6 (#1123), the Claude floor was a Go map (`go/internal/profiles/family_floor.go:5-12`), and the compiler refused a table without `claude` (`go/internal/cliroute/compile.go:126-127`). About 15 flow defaults named `claude-tmux` or `opus` in Go (F1.5), and the bare name `gemini` mapped to `claude-tmux`. X6 moved both to data or retired them.
 
 ### Gap
 
@@ -428,7 +428,7 @@ A policy change cannot move these seats, so the matrix of §14 cannot pass.
 
 ### Solution
 
-The floor becomes the `floors` key of `cli_routing` (proposed). Its value today is the Claude floor, so the behavior does not change.
+The floor becomes the `floors` key of `cli_routing` (built in X6, #1123). Its value today is the Claude floor, so the behavior does not change.
 
 ```json
 {
@@ -459,7 +459,7 @@ The floor becomes the `floors` key of `cli_routing` (proposed). Its value today 
 - The bare name `gemini` becomes an error that names the `agy` drivers.
 - A grep guard (proposed `TestFlowCodeNamesNoFamily`) checks each non-test Go file. It fails when flow code names a family as a string. The manifests, the bridge drivers and the routing data are exempt.
 - `evolve cli-routing explain <agent>` prints the same chain for each agent before and after X6. X6 records both outputs in its PR.
-- X6 alone does not make an agy-only table compile. 7 tracked profiles still set `allowed_clis` to Claude families: `auditor`, `adversarial-review`, `tdd-engineer`, `spec-verifier`, `spec-verify` and `code-reviewer` set `["claude"]`, and `router` sets `["agy-claude", "claude"]` (`.evolve/profiles/*.json`). The follow-up X6b moves these pins into the `floors` data, so that the matrix rows M2 and M3 can pass.
+- X6 alone does not make an agy-only table compile. 7 tracked profiles still set `allowed_clis` to Claude families: `auditor`, `adversarial-review`, `tdd-engineer`, `spec-verifier`, `spec-verify` and `code-reviewer` set `["claude"]`, and `router` sets `["agy-claude", "claude"]` (`.evolve/profiles/*.json`). The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves these pins into the `floors` data, so that the matrix rows M2 and M3 can pass.
 
 ### Status of X6
 
@@ -1035,7 +1035,7 @@ CLI specifics live above the driver layer today (research F6.1 to F6.6):
 | The advisor names a CLI | the plan schema asks for `"cli"` (`go/internal/core/advisor/prompt.go:90`) | X19a |
 | CLI syntax in profiles | `cli` and `cli_fallback` in 93 agent profiles; Claude tool syntax in `allowed_tools` and `disallowed_tools`, for example `Bash(evolve phase verify:*)` in 93 profiles; `extra_flags_by_cli` in 27 profiles | X19b |
 | Claude tools in personas | 14 of 106 files under `agents/` | X19b |
-| Family and model literals in flow code | `phase_advisor.go:73`, `failure_advisor.go:54`, `phase_judge.go:28`, `contract_escalation.go:22`; the default model `opus` of four phases | X6 (not X19) |
+| Family and model literals in flow code | `phase_advisor.go:73`, `failure_advisor.go:54`, `phase_judge.go:28`, `contract_escalation.go:22`; the default model `opus` of four phases | X6, merged in #1123 after this read (not X19) |
 | Per-agent CLI and model flags | `EVOLVE_<AGENT>_CLI`, `_MODEL` (control-flags.md class (b)) | X18c (not X19) |
 | Guards as Claude Code hooks | `.claude/settings.json` | X7 (not X19) |
 
