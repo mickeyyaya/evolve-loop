@@ -164,6 +164,9 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/inboxmover/lifecycle", Tests: []string{
 		"TestLifecycle_OnlyHostImportsTheLeaf",
 	}},
+	{Package: "./internal/isolation", Tests: []string{
+		"TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped",
+	}},
 	{Package: "./internal/phaseobserver", Tests: []string{
 		"TestObserverEngine_OneConstructionSite",
 	}},
@@ -189,6 +192,7 @@ var treeReadingSelections = []TestSelection{
 		"TestSubagentRun_OneConstructionSite",
 	}},
 	{Package: "./internal/sysexec", Tests: []string{
+		"TestIsolationMatrix_N2_NoLLMSpawnOutsideTheBridgeLaunchAPI",
 		"TestPipelineCode_StartsEveryProcessThroughCommand",
 	}},
 	{Package: "./test/structure", Tests: []string{

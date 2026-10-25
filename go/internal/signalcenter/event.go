@@ -70,13 +70,14 @@ const (
 	ModuleSignalCenter    Module = "signalcenter"
 	ModuleReview          Module = "review"
 	ModuleQuality         Module = "quality"
+	ModuleIsolation       Module = "isolation"
 )
 
 var knownModules = map[Module]bool{
 	ModuleOrchestrator: true, ModuleAdvisor: true, ModuleRunner: true, ModuleBridge: true, ModuleLiveness: true,
 	ModuleShip: true, ModuleAudit: true, ModuleTriage: true, ModuleScout: true, ModuleBuild: true, ModuleTDD: true,
 	ModuleGateContract: true, ModuleGateEval: true, ModuleGateRepo: true, ModuleInbox: true, ModuleConfig: true,
-	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true,
+	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true,
 }
 
 func (m Module) Known() bool { return knownModules[m] }
@@ -136,6 +137,7 @@ const (
 	KindQualityReading         Kind = "quality.reading"
 	KindQualityBreach          Kind = "quality.breach"
 	KindQualityWarning         Kind = "quality.warning"
+	KindIsolationViolation     Kind = "isolation.violation"
 )
 
 var knownKinds = map[Kind]bool{
@@ -144,7 +146,7 @@ var knownKinds = map[Kind]bool{
 	KindQuotaPaused: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
-	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true,
+	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true,
 }
 
 var terminalKinds = map[Kind]bool{

@@ -19,7 +19,7 @@ func TestSignalsCodes_RepoDocIsInSyncWithTheLinkedRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"### orchestrator", "### ship", "### signalcenter", "`ORCHESTRATOR_PHASE_VERDICT_FAIL`", "`SHIP_GIT_FLEET_REBASE_NEEDED`", "`SIGNALCENTER_LISTENER_PANICKED`"} {
+	for _, want := range []string{"### orchestrator", "### ship", "### signalcenter", "`ORCHESTRATOR_PHASE_VERDICT_FAIL`", "`SHIP_GIT_FLEET_REBASE_NEEDED`", "`SIGNALCENTER_LISTENER_PANICKED`", "### isolation", "`ISOLATION_I1_VIOLATION`", "`ISOLATION_I9_VIOLATION`"} {
 		if !strings.Contains(string(doc), want) {
 			t.Errorf("the generated doc lists every linked module's codes; missing %s", want)
 		}
