@@ -27,7 +27,7 @@ func BootSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 		cfg.Workspace = tmp
 	}
 	applyScratchCwd(cfg)
-	rc, _ = d.Launch(ctx, cfg, deps)
+	rc, _ = launchPane(ctx, PurposeSmoke, d, cfg, deps)
 	if b, err := os.ReadFile(filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")); err == nil {
 		scrollback = string(b)
 	}
@@ -50,7 +50,6 @@ func smokeLaunchConfig(cfg *Config, driverName string, efforts policy.EffortTabl
 		cfg = &Config{}
 	}
 	cfg.CLI = driverName
-	cfg.AllowBypass = true
 	if reflect.ValueOf(cfg.Realization).IsZero() {
 		cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: "bypass", ModelTier: cfg.Model, Effort: LaunchEffort(driverName, cfg.Model, efforts)})
 	}

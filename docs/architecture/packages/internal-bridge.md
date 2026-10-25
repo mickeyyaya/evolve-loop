@@ -150,7 +150,7 @@ agy 1.2.17 serves Claude models as well as Gemini ones: `agy models` lists `Clau
 
 **Concerns the two agy targets share.**
 
-- **Environment.** `default_env` comes from the base, so whatever agy-tmux exports before its launch, agy-claude-tmux exports too. That includes `AGY_CLI_DISABLE_AUTO_UPDATE`, which the boundary updater (PR #774) added. Pinned by `TestAgyClaudeTmux_LaunchesWithWhateverEnvironmentAgyTmuxDeclares`. PR #774's `ProcessEnv(bin)` reads `<bin>-tmux`, which is agy-tmux for the binary, and covers the non-launch agy processes (`agy models`, `agy --version`).
+- **Environment.** `default_env` comes from the base, so whatever agy-tmux exports before its launch, agy-claude-tmux exports too. That includes `AGY_CLI_DISABLE_AUTO_UPDATE`, which the boundary updater (PR #774) added. Pinned by `TestAgyClaudeTmux_LaunchesWithWhateverEnvironmentAgyTmuxDeclares`. PR #774's `ProcessEnv(bin)`, now `probeEnv(bin)` through `LaunchLLM`, reads `<bin>-tmux`, which is agy-tmux for the binary, and covers the non-launch agy processes (`agy models`, `agy --version`).
 - **One updater per binary.** PR #774's boundary updater walks `InteractiveFamilies()`. That function dedupes registered `*-tmux` drivers by binary, so it yields `agy` once and loads `agy-tmux`. The target's `update_argv: null` keeps #774's `TestUpdateArgv_EveryOtherManifestDeclaresNoUpdater` true however the two land. Pinned by `TestInteractiveFamilies_AgyClaudeTmuxSharesTheAgyBinary`.
 - **Bench.**
   - The CLI-health quota bench is keyed by `llmroute.Family(driver)`, the routing family. For agy-claude-tmux that is `agy-claude`, the same name `profiles.BaseCLI` gives and the catalog key.
@@ -217,7 +217,17 @@ The spec is [llm-isolation.md](../llm-isolation.md) §6 and §6.1. An LLM child 
 - At `enforce`, `startSession` starts a pane through `envSessionStarter.NewSessionEnv`. The values go in a 0600 script that removes itself, never in an argv. The pane command `/bin/sh -c 'exec /usr/bin/env -i TERM="$TERM" /bin/sh <script>'` drops each other name. A controller with no `NewSessionEnv` refuses the launch.
 - At `enforce`, a named session is used again only when its `@evolve_env` fingerprint matches the cell environment (`checkReusedSessionEnv`).
 - The signal code is `isolation.ViolationCode(2)`, which `internal/isolation` registers.
-- `ProcessEnv(bin)` follows the same stage, for the version inventory and the model queries.
+- `LaunchLLM` gives `probeEnv(bin)` to the version inventory and the model queries, so they follow the same stage.
+
+### The single launch API (`launch_llm.go`, X3 of ADR-0154)
+
+The spec is [llm-isolation.md](../llm-isolation.md) §5.1. Each start of an LLM binary goes through the launch API, so each child gets the cell environment, no `TMUX` and the same sandbox decision.
+
+- `LaunchLLM(ctx, deps, LLMExec)` starts a bare LLM process for a purpose: `probe` (the doctor), `update` (`cliupdate`), `inventory` (`looppreflight`) or `modelquery` (`ModelQueryRunner`). It removes `TMUX`, `TMUX_PANE` and the names of `LLMExec.Drop` from `probeEnv`. A nil `Deps.Runner` is `execRunner`, and a nil `Deps.Stderr` is `os.Stderr`.
+- Each `LaunchLLM` call logs `[bridge] <purpose> <binary> runs unsandboxed: <reason>`. The reason is the manifest field `probe_unsandboxed_reason` (`Manifest.ProbeUnsandboxedReason`). Each manifest has one.
+- `launchPane` starts a `smoke` pane through its driver. `launchPurposeConfig` grants `AllowBypass` to the `probe` and `smoke` purposes only. The usage controller takes its grant from it, and the spec records why the grant stays.
+- `newRecipeDriver` is the pane entry of the `probe` purpose. It logs the unsandboxed reason, and `EnsureSession` sends `unset TMUX TMUX_PANE` before the launch command.
+- The guard `TestOnlyTheBridgeStartsAnLLMBinary` (`internal/sysexec`) fails on an LLM spawn outside these functions and the driver functions of `bridgeDriverLaunchFuncs`. Pinned by `TestLaunchLLM_EachExecPurposeKeepsCLAUDECODEFromTheChildAtEnforce`, `TestLaunchLLM_AtShadowTheChildKeepsTodaysEnvExceptTheRunTmux`, `TestLaunchPane_TheSmokePurposeGrantsBypassAndKeepsCLAUDECODEFromThePane` and `TestRecipeSession_ThePaneShellUnsetsTheRunTmuxBeforeTheLaunch`.
 
 ### The driver factory (`resolve.go`)
 
@@ -656,7 +666,7 @@ The fallback has three axes: the CLI chain, the tier chain and the model inside 
 - **`ModelFreshness` keeps claude's alias-freshness behavior as manifest data, not a hardcoded `if cli == "claude"` branch.** It sits beside `model_tier_map`, the same category as `chatgpt_safe_models`, so the realization path carries zero claude-specific conditionals. Pinned by `TestModelFreshness_ClaudeDeclaresAlias`.
 - **A CLI's self-updater off switch is manifest data.** `auto_update_off_env` (`Manifest.AutoUpdateOffEnv`) names the variable that turns off the launch-time self-updater of a CLI. The `default_env` of the same manifest sets it.
   - Each realized launch carries it: tmux, headless, the boot and live smokes, and the recipe boot.
-  - Each bare exec through `ProcessEnv(bin)` (`process_env.go`) carries it too. That environment is the allowlist plus the `env_passthrough` and `default_env` of the `<bin>-tmux` manifest. The bare execs are the version probe, the `agy models` and `agy --help` of `modelquery` (injected by `cmd/evolve`), and the doctor `--version` and deep probes (`probeEnv`).
+  - Each bare exec through `LaunchLLM` (`launch_llm.go`) carries it too, from `probeEnv(bin)`. That environment is the allowlist plus the `env_passthrough` and `default_env` of the `<bin>-tmux` manifest. The bare execs are the version probe, the `agy models` and `agy --help` of `modelquery` (injected by `cmd/evolve`), and the doctor `--version` and deep probes (`probeEnv`).
   - The `cli-version-freeze` check of the readiness gate reads the pair, and so finds that the CLI is frozen at the source. Both agy manifests declare `AGY_CLI_DISABLE_AUTO_UPDATE` (found read-only in the agy 1.2.17 binary, 2026-10-06).
   - Pinned by `TestAgyManifests_EveryLaunchRealizesTheSelfUpdaterOff`, `TestAutoUpdateOffEnv_EveryDeclaredOffSwitchIsSetInDefaultEnv`, `TestProcessEnv_IsTheAllowlistPlusTheManifest`, `TestDoctorVersion_ProbesTheBinaryWithItsFamilyManifestEnv`, `TestDoctorDeep_TheHeadlessAgyProbeRunsWithItsFamilyManifestEnv`, `TestRecipeBoot_ExportsTheRealizedEnvBetweenTheCdAndTheLaunch` and `TestRecipeBoot_AClaudeModelCaptureLaunchesWithTheRealManifestsDefaultEnv`. The claude `/model` capture is the recipe boot. The agy catalog list is the `agy models` of `modelquery`.
 - **Each Claude Code launch is strict about MCP.** The `claude-tmux` and `claude-p` manifests put `--strict-mcp-config` in `default_args`, so a profile with no `extra_flags_by_cli` gets the flag too. The `mcp_config_files` key (`Manifest.MCPConfigFiles`) names the MCP config files of a CLI, for the `mcp-config` preflight warning ([cli-only-no-mcp](../../conventions/cli-only-no-mcp.md)). Pinned by `TestEveryClaudeLaunchIsStrictMCPAndNamesNoMCPConfig`.

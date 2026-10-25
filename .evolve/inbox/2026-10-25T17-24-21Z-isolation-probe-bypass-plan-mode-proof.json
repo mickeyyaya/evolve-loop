@@ -1,0 +1,24 @@
+{
+  "id": "isolation-probe-bypass-plan-mode-proof",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "title": "LLM isolation X3 follow-up: prove a plan-mode control capture, then drop the probe bypass grant",
+  "summary": "X3 (#1127) moved every AllowBypass grant of a non-phase launch into bridge.launchPurposeConfig. The probe purpose (usage controller, /help and /model captures, RunRecipe) still gets AllowBypass, so its REPL boots with the bypass flag of the family. Spec llm-isolation.md §5.1 keeps the grant because the prompt markers and the auto-responder patterns of each manifest are proven only for the bypass boot. A plan-mode boot shows other dialogs, for example the plan approval of claude.",
+  "fix": "Run one live control capture (/usage) per family (claude-tmux, agy-tmux, codex-tmux) with the probe purpose in plan mode or in the default permission mode. Add the auto-responder patterns that the boot needs to the manifests. Then make launchPurposeConfig grant AllowBypass to the smoke purpose only, and update spec §5.1.",
+  "acceptance": [
+    "A live /usage capture in plan mode passes for each family with a usage control, with the pane transcript recorded in the PR",
+    "launchPurposeConfig grants AllowBypass to the smoke purpose only; TestLaunchPurposeConfig_GrantsBypassOnlyToTheProbeAndSmokePurposes is updated",
+    "Spec llm-isolation.md §5.1 no longer lists the probe bypass grant"
+  ],
+  "deps": [
+    "isolation-single-launcher"
+  ],
+  "files": [
+    "go/internal/bridge/launch_llm.go",
+    "go/internal/bridge/manifests/"
+  ],
+  "created_at": "2026-10-25T17:24:21Z",
+  "source": "console, 2026-10-26, independent review of PR #1127 (X3), item 2"
+}

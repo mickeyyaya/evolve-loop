@@ -7,7 +7,7 @@ import (
 )
 
 var processGlobalSetters = map[string]bool{
-	"SetModelCatalogDirFn": true, "RegisterCode": true, "UseProcessEnv": true, "SetHangClassifier": true,
+	"SetModelCatalogDirFn": true, "RegisterCode": true, "UseLauncher": true, "SetHangClassifier": true,
 }
 
 func TestParallelDefault_EveryTopLevelTestIsParallelOrListedSerial(t *testing.T) {

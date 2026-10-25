@@ -18,7 +18,7 @@ var processStateCalls = map[string]bool{
 }
 
 var processGlobalSetters = map[string]bool{
-	"SetModelCatalogDirFn": true, "RegisterCode": true, "UseProcessEnv": true, "SetHangClassifier": true,
+	"SetModelCatalogDirFn": true, "RegisterCode": true, "UseLauncher": true, "SetHangClassifier": true,
 }
 
 var processStateVars = map[string]bool{
@@ -467,7 +467,7 @@ func TestParallelDefaultGuard_ParallelTestMustNotMutateProcessState(t *testing.T
 		"testing chdir":                 {"main", "t.Chdir(\".\")", "t.Chdir"},
 		"catalog dir setter":            {"main", "bridge.SetModelCatalogDirFn(nil)", "SetModelCatalogDirFn"},
 		"register code setter":          {"main", "signalcenter.RegisterCode(nil)", "RegisterCode"},
-		"process env setter":            {"main", "modelquery.UseProcessEnv()", "UseProcessEnv"},
+		"launcher setter":               {"main", "modelquery.UseLauncher()", "UseLauncher"},
 		"hang classifier setter":        {"main", "cycleclassify.SetHangClassifier(nil)", "SetHangClassifier"},
 		"unqualified setter":            {"main", "SetModelCatalogDirFn(nil)", "SetModelCatalogDirFn"},
 		"mutation inside a closure":     {"main", "func() { sharedSeam = 3 }()", "sharedSeam = 3"},

@@ -61,6 +61,7 @@ type ModelFreshness struct {
 type Manifest struct {
 	CLI                     string                   `json:"cli"`
 	Binary                  string                   `json:"binary"`
+	ProbeUnsandboxedReason  string                   `json:"probe_unsandboxed_reason,omitempty"`
 	Transport               string                   `json:"transport,omitempty"`
 	BinaryMinVersion        string                   `json:"binary_min_version"`
 	UpdateArgv              []string                 `json:"update_argv,omitempty"`

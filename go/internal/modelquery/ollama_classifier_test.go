@@ -3,8 +3,6 @@ package modelquery
 import (
 	"context"
 	"errors"
-	"os/exec"
-	"slices"
 	"strings"
 	"testing"
 )
@@ -136,74 +134,12 @@ func TestSanitizeTierMap(t *testing.T) {
 	}
 }
 
-func TestDefaultRunner_CapturesOutput(t *testing.T) {
-	t.Parallel()
-	echo, err := exec.LookPath("echo")
-	if err != nil {
-		t.Skip("echo not on PATH")
-	}
-	out, rerr := defaultRunner(context.Background(), echo, []string{"hello-runner"}, "")
-	if rerr != nil {
-		t.Fatalf("defaultRunner: %v", rerr)
-	}
-	if !strings.Contains(out, "hello-runner") {
-		t.Errorf("output = %q, want it to contain %q", out, "hello-runner")
-	}
-}
-
-func TestDefaultRunner_PipesStdin(t *testing.T) {
-	t.Parallel()
-	cat, err := exec.LookPath("cat")
-	if err != nil {
-		t.Skip("cat not on PATH")
-	}
-	out, rerr := defaultRunner(context.Background(), cat, nil, "piped-in")
-	if rerr != nil {
-		t.Fatalf("defaultRunner: %v", rerr)
-	}
-	if strings.TrimSpace(out) != "piped-in" {
-		t.Errorf("output = %q, want %q", out, "piped-in")
-	}
-}
-
-func TestDefaultRunner_NonZeroExitReturnsError(t *testing.T) {
-	t.Parallel()
-	if _, err := exec.LookPath("false"); err != nil {
-		t.Skip("false not on PATH")
-	}
-	if _, rerr := defaultRunner(context.Background(), "false", nil, ""); rerr == nil {
-		t.Fatal("want error from non-zero exit")
-	}
-}
-
 func TestErrNoLister_Error(t *testing.T) {
 	t.Parallel()
 	got := errNoLister("ollama").Error()
 	want := "modelquery: no lister for cli ollama"
 	if got != want {
 		t.Errorf("Error() = %q, want %q", got, want)
-	}
-}
-
-func TestOllamaLister_NilRunDefaultsToExecRunner(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	direct, directErr := defaultRunner(ctx, "ollama", []string{"list"}, "")
-	ids, err := (OllamaLister{}).List(ctx, "ollama")
-	if (err != nil) != (directErr != nil) {
-		t.Fatalf("lister err = %v, direct ollama list err = %v: a nil Run must run ollama through the exec runner", err, directErr)
-	}
-	if err != nil {
-		if !strings.Contains(err.Error(), "ollama list") {
-			t.Errorf("want wrapped 'ollama list' error, got %v", err)
-		}
-		if ids != nil {
-			t.Errorf("ids must be nil on error, got %v", ids)
-		}
-		return
-	}
-	if want := parseOllamaList(direct); !slices.Equal(ids, want) {
-		t.Errorf("ids = %v, want the listed models %v", ids, want)
 	}
 }
 

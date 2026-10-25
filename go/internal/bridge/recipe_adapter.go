@@ -64,6 +64,7 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	}
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, "cd "+shellSingleQuote(d.workingDir), true)
+	_ = d.deps.Tmux.SendKeys(ctx, d.session, paneTmuxDetachLine, true)
 	for _, line := range exportLines(d.cfg.Realization.Env) {
 		_ = d.deps.Tmux.SendKeys(ctx, d.session, line, true)
 	}
@@ -131,6 +132,7 @@ func newRecipeDriver(cfg *Config, deps Deps, cli string) (*recipeSessionDriver, 
 			fmt.Fprintf(deps.Stderr, "[recipe] WARN codex pretrust: %v (continuing — best-effort)\n", err)
 		}
 	}
+	deps.logUnsandboxed(PurposeProbe, m.Binary)
 	session, _ := resolveSession(cfg, deps, recipeSessionPrefix)
 	workingDir := cfg.Worktree
 	if workingDir == "" {
