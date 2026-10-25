@@ -163,7 +163,7 @@ The state on 2026-10-25. Each component re-reads this table before it starts.
 | Id | State | PR | Note |
 |---|---|---|---|
 | X1 | merged | #1121 | The matrix is `isolation.Rows` (`go/internal/isolation/matrix.go`). Rows M1 and N9 are green, and each other row is an expected failure with its owner. |
-| X2 | in review fixes | #1122 | The stage key is `isolation.i2.stage` (`shadow` by default). The review found that the `enforce` allowlist passes each `EVOLVE_*` and `BRIDGE_*` name (H2). The named marker list of X18b closes it. |
+| X2 | merged, stage `shadow` | #1122 | The stage key is `isolation.i2.stage`, and the flip to `enforce` is an operator decision. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b makes one list the source for the whole pipeline. |
 | X1b | not started | none | Follow-up of X1, item `isolation-matrix-tmux-repl-fake`: a tmux REPL fake, so the rows M2 to M4 can run a full cycle. |
 | X6 | merged | #1123 | `cli_routing.floors` holds the Claude floor, and its compiled default is `go/internal/policy/routing_defaults.json`. The flow seat defaults are routing data. |
 | X6b | not started | none | Follow-up of X6, item `isolation-floor-profiles-allowed-clis-as-routing-data`. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
@@ -412,7 +412,7 @@ X19 has no scored designs. It is an operator directive of 2026-10-25, and §12.4
 
 1. X17a first. A wrong read can start a batch today.
 2. X18a and X17b in parallel. They touch different packages (`policy`, `cmd/evolve`).
-3. X18b after X2 merges, because both edit the cell environment. If X2 merges with H2 open, X18b closes it.
+3. X18b after X2, which is merged. X18b grows the bridge list `pipelineEnvMarkers` of X2 into the one list of the pipeline.
 4. X17c and X17d after X17b, because they use its envelope and exit table.
 5. X18c, X18d and X18e after X18b. The guard of X18b then stops a new reader while the knobs move.
 6. X19a after X6, because X6 removes the family literals of the flow seats first. X19b follows X19a and X6b, because they edit the same profiles. X19c waits for X6b and for the manifest `capabilities` field of X9. The spec §28 has the map of what X19 leaves to X6, X6b, X7, X9, X10 and X18.

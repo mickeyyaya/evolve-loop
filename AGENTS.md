@@ -82,7 +82,7 @@ No phase, lane or project config uses an MCP server. Reach each outside service 
 
 ### 13. The pipeline is the only controller (2026-10-25, proposed)
 
-No LLM controls another LLM. The `evolve` binary starts each agent in an isolated cell, carries each message and routes each seat by data ([ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [spec](docs/architecture/llm-isolation.md)). The `evolve` CLI is the interface for other services ([cli-contract.md](docs/architecture/cli-contract.md)). The pipeline must read no control flag from the environment ([ADR-0156](docs/architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)). The task assignment is CLI-neutral, and only the bridge drivers hold CLI specifics (ADR-0154 I-17). The components X1 to X19 build these rules, and only X1 is on `main`.
+No LLM controls another LLM. The `evolve` binary starts each agent in an isolated cell, carries each message and routes each seat by data ([ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [spec](docs/architecture/llm-isolation.md)). The `evolve` CLI is the interface for other services ([cli-contract.md](docs/architecture/cli-contract.md)). The pipeline must read no control flag from the environment ([ADR-0156](docs/architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)). The task assignment is CLI-neutral, and only the bridge drivers hold CLI specifics (ADR-0154 I-17). The components X1 to X19 build these rules, and X1, X2 and X6 are on `main`.
 
 ## 12 Core agent rules
 

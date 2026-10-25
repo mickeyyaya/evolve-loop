@@ -984,7 +984,7 @@ The operator said on 2026-10-25: "this refactory is also the good timing to remo
 ### Issue
 
 - `buildCycleEnv` copies each `EVOLVE_*` variable of the operator shell into the cycle (`go/cmd/evolve/cmd_loop_args.go:341-352`).
-- At `enforce`, the X2 allowlist still passes each `EVOLVE_*` and `BRIDGE_*` name to an LLM child (review of #1122, H2).
+- The review of #1122 (H2) found that the first X2 build passed each `EVOLVE_*` and `BRIDGE_*` name. At `enforce` the merged X2 passes only `pipelineEnvMarkers` (§6.1). At the default `shadow` each name still reaches the child, and `buildCycleEnv` still copies each `EVOLVE_*` name into the cycle.
 - So each knob and each bypass reaches each LLM child (F5.5). `EVOLVE_SANDBOX`, which §7 refuses in a phase, is one of them.
 - `policy.Parse` ignores an unknown key (`go/internal/policy/patch.go:9-21`), so a knob that moves into the policy file needs a strict decode first (F5.4).
 - The registry has 26 rows, but the header of control-flags.md says 35, and many readers are not in the registry (F5.1, F5.3).
@@ -999,7 +999,7 @@ A deny list in the bridge cannot keep up with new names, which is the same reaso
 
 | Class | Count | Fix | Item |
 |---|---|---|---|
-| (a) pipeline markers | 23 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, for example `ipcenv.Markers()`. It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell (X2 H2). `buildCycleEnv` copies only these names. | X18b |
+| (a) pipeline markers | 23 `EVOLVE_*`, 9 `BRIDGE_*` | one named Go list, for example `ipcenv.Markers()`. It is the only source of `EVOLVE_*` and `BRIDGE_*` names in a cell. It grows from `pipelineEnvMarkers` of X2. `buildCycleEnv` copies only these names. | X18b |
 | (b) operator knobs | 18 | move into `.evolve/policy.json`, strict-decoded. The pipeline reads them at each cycle or boundary. One wave of shadow: an environment value that differs from the policy value prints a WARN and loses. | X18c |
 | (c) bypasses | 10 | an explicit CLI parameter that writes a ledger record and a `CONTROL_BYPASS_USED` signal, or removal | X18d |
 | (d) dead names | 6 | delete, with the registry rows | X18e |
