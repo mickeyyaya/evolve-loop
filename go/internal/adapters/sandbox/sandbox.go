@@ -5,9 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +28,9 @@ type Config struct {
 	DenyReadPaths []string
 	DenySockets   []string
 	DenyLiterals  []string
+
+	ExecDenyPaths   []string
+	ExecDenyEnforce bool
 }
 
 func homeStateWriteDirs(home string) []string {
@@ -143,7 +148,27 @@ func GenerateSBPL(cfg Config) string {
 		}
 	}
 	writeClosingRules(&b, cfg)
+	writeExecDenyRules(&b, cfg)
 	return b.String()
+}
+
+const sandboxExecPath = "/usr/bin/sandbox-exec"
+
+func writeExecDenyRules(b *strings.Builder, cfg Config) {
+	if len(cfg.ExecDenyPaths) == 0 {
+		return
+	}
+	for _, p := range append(slices.Clone(cfg.ExecDenyPaths), sandboxExecPath) {
+		if p == "" {
+			continue
+		}
+		match := fmt.Sprintf(`(require-all (literal %q) (require-not (signing-identifier "com.apple.sandbox-exec")))`, p)
+		if cfg.ExecDenyEnforce {
+			fmt.Fprintf(b, "(deny process-exec %s)\n", match)
+		} else {
+			fmt.Fprintf(b, "(allow process-exec %s (with report))\n", match)
+		}
+	}
 }
 
 const sbplPreamble = `(version 1)
@@ -292,6 +317,11 @@ func BwrapPrefix(cfg Config) []string {
 	}
 	if !cfg.AllowNetwork {
 		out = append(out, "--unshare-net")
+	}
+	for _, p := range cfg.ExecDenyPaths {
+		if p != "" && cfg.ExecDenyEnforce {
+			out = append(out, "--ro-bind", os.DevNull, p)
+		}
 	}
 	return out
 }

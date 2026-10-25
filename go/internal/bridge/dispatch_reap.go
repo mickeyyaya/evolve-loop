@@ -217,6 +217,9 @@ func randomStamp() string {
 }
 
 func launchSwept(ctx context.Context, driver Driver, cfg *Config, deps Deps) (int, error) {
+	if err := deps.refuseSandboxOffInPhase(cfg); err != nil {
+		return ExitSafetyGate, err
+	}
 	cfg.DispatchID = mintDispatchID(cfg, os.Getpid())
 	observeDispatchID(deps, cfg.DispatchID)
 	home, _ := os.UserHomeDir()

@@ -362,6 +362,50 @@ A Go refusal only works when the marker reaches the pane. A sandbox rule only wo
 1. The launcher sets `EVOLVE_DISPATCH_DEPTH=1` and `EVOLVE_PHASE=<phase>` (proposed) on each phase pane.
 2. The existing refusals then fire: `evolve agent run`, the boundary writes and each `evolve` dispatch verb.
 3. The sandbox denies the exec of each manifest `binary` (§9). The rule covers `claude`, `agy`, `codex`, `gemini` and `ollama`.
+
+#### 7.1 As built (X4)
+
+A worked example: the scout pane of cycle 7 runs `claude --version` from its Bash tool. The pane carries `EVOLVE_DISPATCH_DEPTH=1` and `EVOLVE_PHASE=scout`. At `enforce` the macOS profile denies the exec, and the shell prints `Operation not permitted`. The agent then runs `evolve agent run scout`, and the command stops with "refused inside a phase".
+
+| Item | As built |
+|---|---|
+| Markers | `ipcenv.DispatchDepthKey` (`EVOLVE_DISPATCH_DEPTH`) and `ipcenv.PhaseKey` (`EVOLVE_PHASE`). `Deps.cellMarkers` sets the depth of the launcher plus 1, and the phase to `cfg.Agent`. |
+| Path of the markers | `Deps.cellEnv` adds them to `Deps.Env`, and both names are in `pipelineEnvMarkers`. So each stage of §6.1 gives them to the child. A tmux pane and a recipe pane also get them as `export` lines before the launch line. At `shadow` such a pane inherits the environment of the server. |
+| Refusals that now fire | `evolve agent run` (`go/internal/cli/agentcmd/run.go:93`) and the boundary writes (`go/cmd/evolve/boundary_write.go:14`). Both read the depth through `subagent.ReadDispatchDepth`, which calls `ipcenv.DispatchDepth`. |
+| `EVOLVE_SANDBOX=off` in a phase | `launchSwept` refuses the launch when the launcher carries `EVOLVE_PHASE` and the mode is `off`. The error is `bridge.ErrSandboxOffInPhase`, the exit code is `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION` with `action=refused` and `rule=sandbox.off.phase`. |
+| Why the phase marker and not the depth | A fan-out worker has depth 1 or more, but the pipeline starts it, not an agent. It carries no `EVOLVE_PHASE`, so a host opt-out still works for it. |
+| Exec deny set | `Deps.llmBinaryPaths`: the `binary` of each registered manifest, found on `PATH` (`Deps.LookPath`) and resolved to its real path. `gemini` has no manifest, so it has no rule. |
+| Stage source | the policy key `isolation.i3.stage`, read by `policy.IsolationExecStage`. An explicit `Deps.ExecStage` wins. The default is `shadow`. `Deps.envStage` and `Deps.execStage` share `Deps.isolationStage`. |
+| SBPL, `enforce` | `(deny process-exec (require-all (literal "<real path>") (require-not (signing-identifier "com.apple.sandbox-exec"))))` for each path, and the same rule for `/usr/bin/sandbox-exec` |
+| SBPL, `shadow` | the same match as `(allow process-exec ... (with report))`. The sandbox writes a report to the system log, and the exec goes through. |
+| `bwrap`, `enforce` | `--ro-bind /dev/null <real path>` for each path, after every other bind |
+| `bwrap`, `shadow` | no bind. The launcher only resolves the paths. |
+| `off` | no exec rule |
+
+Three facts set the form of the SBPL rule. Each was measured on macOS on 2026-10-26 with a stub script:
+
+- A `literal` matches the real path of the file, not the path of a symlink. A deny of `~/.local/bin/claude` does not stop the exec, because that file is a symlink to `~/.local/share/claude/versions/<v>`. So the generator writes the real path.
+- `sandbox-exec` applies the profile before it starts the CLI. A plain deny of the real path also stops the launch of the cell. The `signing-identifier` filter matches the process that does the exec. So the first exec, by `sandbox-exec`, goes through, and each later exec, by a shell or by the CLI, is denied.
+- A process in the cell can run `sandbox-exec` again with the same profile, and that exec of the CLI then comes from `sandbox-exec`. The deny of `/usr/bin/sandbox-exec` closes this path. A contract row pins it.
+
+The guards are these tests:
+
+- row N3 (`TestAgentSandboxContract`, green) and the row "re-enter the profile through sandbox-exec to exec the claude stub"
+- `TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec` and `TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun`
+- row N4 (the matrix, M1 run, green): a stub in the phase pane runs the real `evolve agent run`. It records the exit code 2 and the text "refused inside a phase".
+- `TestCellEnv_EachStageGivesTheChildTheDepthAndPhaseMarkers`, `TestLaunchSwept_RefusesSandboxOffInsideAPhaseWithANamedErrorAndASignal`
+- `TestSandboxWrap_EnforceDeniesTheRealPathOfEachManifestBinaryOnMacOS` and `TestSandboxWrap_EnforceMasksEachOtherFamilyBinaryOnLinux`
+
+Known differences from the design:
+
+- At `shadow` no Go code emits `ISOLATION_I3_VIOLATION` for an exec. The report stays in the system log of macOS, and Linux has no report. A reader of the sandbox reports does not exist yet. X5 needs the same reader for I4 and I5.
+- On Linux the bind of `/dev/null` also hides the file from the launch of the cell. So `bwrap` masks the binaries of the other families only, and a cell can still exec its own CLI.
+- The deny is best effort. The launcher finds each binary on its own `PATH`. A copy of a CLI at another path in the cell has no rule.
+- The macOS form depends on a measured behavior of `signing-identifier`: the filter matches the process that does the exec. A macOS update can change it. `TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec` fails first in that case.
+- A literal covers one file. An update of a CLI that installs a new version file is covered at the next launch, not during the run.
+- A copy of `sandbox-exec` keeps its signature, so a copy that re-applies the profile can still exec a CLI. The profile file is readable in the workspace.
+- The Go refusals depend on the environment. An agent that unsets the markers avoids them. The exec deny is the guard that does not depend on the agent.
+- The refusal of `evolve agent run` emits no signal yet (§15.1).
 4. Inside a phase, `EVOLVE_SANDBOX=off` is refused. The host opt-out stays for operator commands outside a phase.
 
 ## 8. The artifact index
@@ -459,9 +503,9 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 
 | Rule | Effect | SBPL form | `bwrap` form | Invariant | Today |
 |---|---|---|---|---|---|
-| Exec of LLM binaries | deny | `(deny process-exec (literal "<resolved binary>"))` for each manifest `binary` | `--ro-bind /dev/null <binary path>` | I-3 | allowed |
+| Exec of LLM binaries | deny | `(deny process-exec (literal "<resolved binary>"))` for each manifest `binary` | `--ro-bind /dev/null <binary path>` | I-3 | built at `shadow` (X4, §7.1) |
 | Exec of other tools | allow | the current `(allow process-exec)` | as today | none | allowed |
-| `EVOLVE_SANDBOX=off` in a phase | refuse the launch | Go check | Go check | I-3, I-7 | allowed |
+| `EVOLVE_SANDBOX=off` in a phase | refuse the launch | Go check | Go check | I-3, I-7 | refused (X4, §7.1) |
 | Read of the worktree and the repo source | allow | `(allow file-read* (subpath "<worktree>"))` | `--ro-bind` | none | allowed |
 | Read of the own workspace (`.evolve/runs/cycle-N/`), except `<ws>/.bridge/` | allow | `(allow file-read* (subpath "<ws>"))` after the runs deny | `--ro-bind <ws> <ws>` | I-5 | allowed |
 | Read of `inputs/index.json` and each indexed path | allow | `(allow file-read* (literal "<path>"))` for each entry | `--ro-bind <path> <path>` | I-4 | allowed |
@@ -652,8 +696,8 @@ The stub for each family declares the same capabilities as the real manifest. Th
 |---|---|---|---|---|---|
 | N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
 | N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | green (X3) |
-| N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | open |
-| N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | open |
+| N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | green (X4) |
+| N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | green (X4) |
 | N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 | sandbox contract | open |
 | N6 | a retry opens its predecessor's `retrospective-report.md` through the index that the pipeline writes | I-4, I-5 | X5 | the matrix (M1 run) | open |
 | N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 | sandbox contract | open |

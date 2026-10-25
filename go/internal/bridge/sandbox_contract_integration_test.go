@@ -131,6 +131,10 @@ var agentContract = []contractRow{
 		}},
 	{action: "isolation N3: exec an LLM binary (a claude stub) with --version", want: contractDeny, isolation: "N3",
 		script: func(h contractHost) string { return "PATH=" + h.stubBin + ":$PATH claude --version" }},
+	{action: "re-enter the profile through sandbox-exec to exec the claude stub", want: contractDeny,
+		script: func(h contractHost) string {
+			return "sandbox-exec -f " + h.prefix[2] + " " + h.stubBin + "/claude --version"
+		}},
 	{action: "isolation N5: read the raw output <ws>/.bridge/scout-stdout.log", want: contractDeny, isolation: "N5",
 		script: func(h contractHost) string { return "cat " + h.run + "/.bridge/scout-stdout.log" }},
 	{action: "a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow,
@@ -191,6 +195,24 @@ func TestAgentSandboxContract(t *testing.T) {
 	}
 }
 
+func TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec(t *testing.T) {
+	h := newContractHost(t)
+	args := append(append([]string{}, h.prefix[1:]...), filepath.Join(h.stubBin, "claude"), "--version")
+	out, err := exec.Command(h.prefix[0], args...).CombinedOutput()
+	if err != nil || strings.TrimSpace(string(out)) != "stub-claude 0.0.0" {
+		t.Fatalf("sandbox-exec must still exec the CLI of the cell; the deny is for each later exec: err=%v out=%q", err, out)
+	}
+}
+
+func TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun(t *testing.T) {
+	h := newContractHost(t)
+	h.prefix = builderPrefix(t, requireNativeSandbox(t), h, "shadow")
+	out, err := h.agent(t, contractRow{script: func(h contractHost) string { return "PATH=" + h.stubBin + ":$PATH claude --version" }})
+	if err != nil || out != "stub-claude 0.0.0" {
+		t.Fatalf("shadow must let the exec run: err=%v out=%q", err, out)
+	}
+}
+
 func (h contractHost) agent(t *testing.T, row contractRow) (string, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -241,7 +263,7 @@ func newContractHost(t *testing.T) contractHost {
 	h.ownTTY = contractTmux(t, h.runSocket, "display-message", "-p", "-t", "=agent:", "#{pane_tty}")
 	h.peerTTY = contractTmux(t, h.runSocket, "display-message", "-p", "-t", "=victim:", "#{pane_tty}")
 	h.withProject(t)
-	h.prefix = builderPrefix(t, probe, h)
+	h.prefix = builderPrefix(t, probe, h, "enforce")
 	return h
 }
 
@@ -298,7 +320,7 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 	h.netPort = strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)
 }
 
-func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost) []string {
+func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execStage string) []string {
 	t.Helper()
 	profilesDir, err := filepath.Abs(filepath.Join("..", "..", "..", ".evolve", "profiles"))
 	if err != nil {
@@ -308,18 +330,27 @@ func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost) []st
 	if err != nil || prof.Sandbox == nil || !prof.Sandbox.Enabled {
 		t.Fatalf("the builder profile must declare an enabled sandbox: %v", err)
 	}
-	cfg := &Config{Agent: "builder", ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
+	cfg := &Config{CLI: "claude-tmux", Agent: "builder", ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
 		RequireSandbox: true, SandboxWriteSubpaths: prof.Sandbox.WriteSubpaths}
 	if cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, h.root, h.worktree, true); err != nil {
 		t.Fatal(err)
 	}
-	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil)}
+	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), ExecStage: execStage, LookPath: stubOnlyLookPath(h.stubBin)}
 	deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, h.ownTTY)
 	if !ok {
 		t.Fatal("the bridge refused to wrap the builder")
 	}
 	return prefix
+}
+
+func stubOnlyLookPath(stubBin string) func(string) (string, error) {
+	return func(name string) (string, error) {
+		if name == "claude" {
+			return filepath.Join(stubBin, name), nil
+		}
+		return "", exec.ErrNotFound
+	}
 }
 
 func startContractServer(t *testing.T, socket string, sessions ...string) {

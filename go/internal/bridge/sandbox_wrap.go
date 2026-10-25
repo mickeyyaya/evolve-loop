@@ -62,6 +62,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			DenyPaths:     req.DenyPaths,
 			DenyReadPaths: req.DenyReadPaths,
 		}
+		cfg.ExecDenyPaths, cfg.ExecDenyEnforce = deps.execDeny(req.CLI, probe.OS)
 		gitWrites, gitDenies, err := sandboxGitWritePaths(req.Worktree, probe.OS)
 		if err == nil {
 			gitDenies, err = resolveSandboxDenials(gitDenies, "", "", true)
@@ -190,6 +191,7 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 		fmt.Fprintf(deps.Stderr, "[bridge] WARN: source-writing phase %q has sandbox.allow_network=false; forcing true (a sandboxed model-reaching CLI cannot boot with network denied)\n", cfg.Agent)
 	}
 	return deps.SandboxWrap(SandboxWrapRequest{
+		CLI:           cfg.CLI,
 		TerminalPath:  terminalPath,
 		Phase:         cfg.Agent,
 		Workspace:     cfg.Workspace,

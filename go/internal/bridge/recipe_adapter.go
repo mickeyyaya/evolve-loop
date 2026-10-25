@@ -65,7 +65,7 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, "cd "+shellSingleQuote(d.workingDir), true)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, paneTmuxDetachLine, true)
-	for _, line := range exportLines(d.cfg.Realization.Env) {
+	for _, line := range append(exportLines(d.cfg.Realization.Env), exportLines(d.deps.cellMarkers(d.cfg))...) {
 		_ = d.deps.Tmux.SendKeys(ctx, d.session, line, true)
 	}
 	d.deps.Sleep(time.Second)
