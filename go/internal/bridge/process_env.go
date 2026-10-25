@@ -1,10 +1,7 @@
 package bridge
 
-import "os"
-
 func ProcessEnv(bin string) []string {
-	r := familyRealization(bin)
-	return hermeticEnv(os.Environ(), r.EnvPassthrough, r.Env, nil)
+	return probeEnv(Deps{}, bin)
 }
 
 func probeEnv(deps Deps, bin string) []string {

@@ -211,10 +211,11 @@ agy 1.2.17 serves Claude models as well as Gemini ones: `agy models` lists `Clau
 The spec is [llm-isolation.md](../llm-isolation.md) §6 and §6.1. An LLM child gets the base allowlist, the manifest `env_passthrough`, the manifest `default_env` and the pipeline `EVOLVE_*` markers. No other variable of the launcher reaches it.
 
 - `Deps.cellEnv(cfg)` computes the environment of one child. `dispatchEnv` (headless), `paneEnv` (tmux boot and recipe boot) and `probeEnv` (doctor) call it. The git subprocesses of the bridge keep `driverEnv`, because they are not LLM children.
-- `Deps.EnvStage` sets the stage. The in-process adapter reads it from the policy key `isolation.i2.stage`. The default is `shadow`: the child gets today's environment, and the builder emits `ISOLATION_I2_VIOLATION` for each dropped name. At `enforce` the child gets only the union. At `off` the builder is silent.
+- `Deps.envStage` sets the stage. An explicit `Deps.EnvStage` wins. Otherwise the builder reads the policy key `isolation.i2.stage` of the project root, so no bridge entry can miss it. The default is `shadow`: the child gets today's environment, and the builder emits `ISOLATION_I2_VIOLATION` for each dropped name. At `enforce` the child gets only the union. At `off` the builder is silent.
+- Only the names of `pipelineEnvMarkers` pass from the `EVOLVE_` space, from the launcher or from `Deps.Env`. A `BRIDGE_ALLOW_*` opt-in passes its target variable (`envOptIns`).
 - A signal carries the name in `target`, never the value. `Deps.EnvDrops` reports each family and name once.
 - At `enforce`, `startSession` starts a pane through `envSessionStarter.NewSessionEnv`. The tmux client runs with the cell environment, `-e` sets each pair, and the pane command `/bin/sh -c 'exec env -i NAME="$NAME" ... /bin/sh'` drops each other name. A controller with no `NewSessionEnv` refuses the launch.
-- `ProcessEnv(bin)` returns the union with no stage, for the version inventory and the model queries.
+- `ProcessEnv(bin)` follows the same stage, for the version inventory and the model queries.
 
 ### The driver factory (`resolve.go`)
 

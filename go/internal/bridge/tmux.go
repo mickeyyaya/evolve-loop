@@ -150,13 +150,20 @@ func newSessionEnvArgs(name string, width, height int, workdir string, env []str
 	keep := make([]string, 0, len(env)+1)
 	env = ipcenv.Keep(env, isShellIdentifier)
 	for _, kv := range env {
-		args = append(args, "-e", kv)
+		args = append(args, "-e", tmuxArg(kv))
 	}
-	for _, n := range sortedEnvNames(env) {
+	for _, n := range sortedEnvNames(append(slices.Clone(env), "TERM=")) {
 		keep = append(keep, n+`="$`+n+`"`)
 	}
 	keep = append(keep, "/bin/sh")
 	return append(args, "/bin/sh", "-c", "exec env -i "+strings.Join(keep, " "))
+}
+
+func tmuxArg(arg string) string {
+	if head, ok := strings.CutSuffix(arg, ";"); ok {
+		return head + `\;`
+	}
+	return arg
 }
 
 func (t execTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {

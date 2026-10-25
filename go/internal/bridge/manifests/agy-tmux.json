@@ -2,7 +2,7 @@
   "schema_version": 1,
   "cli": "agy-tmux",
   "binary": "agy",
-  "env_passthrough": ["XDG_CONFIG_HOME", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY"],
+  "env_passthrough": ["XDG_CONFIG_HOME", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION", "GOOGLE_GENAI_USE_VERTEXAI", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "no_proxy", "all_proxy"],
   "model_family": "gemini",
   "binary_min_version": "1.0.0",
   "update_argv": ["agy", "update"],

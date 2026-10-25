@@ -175,19 +175,19 @@ func TestHermeticEnv_IsTheAllowlistThePassthroughTheManifestAndThePipeline(t *te
 	t.Parallel()
 	parent := []string{
 		"PATH=/usr/bin", "HOME=/h", "USER=u", "LOGNAME=u", "SHELL=/bin/zsh", "LANG=en_US.UTF-8", "LC_ALL=C", "LC_CTYPE=UTF-8",
-		"TERM=xterm", "TMPDIR=/t", "TMP=/t", "TEMP=/t", "TZ=UTC", "EVOLVE_CYCLE=3", ipcenv.DispatchIDKey + "=stale",
+		"TERM=xterm", "TMPDIR=/t", "TMP=/t", "TEMP=/t", "TZ=UTC", "EVOLVE_CYCLE_STATE_FILE=/c.json", "EVOLVE_BYPASS_SHIP_GATE=1", ipcenv.DispatchIDKey + "=stale",
 		"HTTPS_PROXY=http://p", "CLAUDECODE=1", "GEMINI_API_KEY=k", "LC_BAD-NAME=x", "TMUX=/tmp/s",
 	}
 	got := hermeticEnv(parent, []string{"HTTPS_PROXY"}, map[string]string{"B_DEFAULT": "2", "A_DEFAULT": "1"}, map[string]string{"EVOLVE_PROJECT_ROOT": "/repo"})
 	want := []string{
 		"PATH=/usr/bin", "HOME=/h", "USER=u", "LOGNAME=u", "SHELL=/bin/zsh", "LANG=en_US.UTF-8", "LC_ALL=C", "LC_CTYPE=UTF-8",
-		"TERM=xterm", "TMPDIR=/t", "TMP=/t", "TEMP=/t", "TZ=UTC", "EVOLVE_CYCLE=3", "HTTPS_PROXY=http://p",
+		"TERM=xterm", "TMPDIR=/t", "TMP=/t", "TEMP=/t", "TZ=UTC", "EVOLVE_CYCLE_STATE_FILE=/c.json", "HTTPS_PROXY=http://p",
 		"A_DEFAULT=1", "B_DEFAULT=2", "EVOLVE_PROJECT_ROOT=/repo",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("hermeticEnv =\n  %q\nwant\n  %q", got, want)
 	}
-	if dropped := droppedEnvNames(parent, []string{"HTTPS_PROXY"}); !slices.Equal(dropped, []string{"CLAUDECODE", "GEMINI_API_KEY", "LC_BAD-NAME", "TMUX"}) {
+	if dropped := droppedEnvNames(parent, []string{"HTTPS_PROXY"}); !slices.Equal(dropped, []string{"CLAUDECODE", "EVOLVE_BYPASS_SHIP_GATE", "GEMINI_API_KEY", "LC_BAD-NAME", "TMUX"}) {
 		t.Fatalf("dropped = %q", dropped)
 	}
 }
@@ -196,6 +196,7 @@ func TestProcessEnv_IsTheAllowlistPlusTheManifest(t *testing.T) {
 	for k, v := range pollutedEnv {
 		t.Setenv(k, v)
 	}
+	enforcePolicyRoot(t, "enforce")
 	t.Setenv("CLAUDE_CONFIG_DIR", "/Users/cell/.claude-alt")
 	agy := ProcessEnv("agy")
 	if !slices.Contains(agy, agyAutoUpdateOffEnv+"=1") {
@@ -251,12 +252,12 @@ func TestNewEngine_GivesEachEngineADropLog(t *testing.T) {
 func TestHermeticEnv_EachNameOnceAndOnlyShellIdentifiers(t *testing.T) {
 	t.Parallel()
 	got := hermeticEnv(
-		[]string{"PATH=/usr/bin", "HOME=/h", "EVOLVE_CYCLE=1"},
+		[]string{"PATH=/usr/bin", "HOME=/h", "EVOLVE_PROJECT_ROOT=/old"},
 		nil,
 		map[string]string{"PATH": "/manifest/bin", "X;rm -rf ~": "1"},
-		map[string]string{"EVOLVE_CYCLE": "2", "$(touch pwned)": "1", "PATH": "/pipeline/bin"},
+		map[string]string{"EVOLVE_PROJECT_ROOT": "/repo", "$(touch pwned)": "1", "PATH": "/pipeline/bin"},
 	)
-	want := []string{"HOME=/h", "EVOLVE_CYCLE=2", "PATH=/pipeline/bin"}
+	want := []string{"HOME=/h", "EVOLVE_PROJECT_ROOT=/repo", "PATH=/manifest/bin"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("hermeticEnv =\n  %q\nwant\n  %q", got, want)
 	}

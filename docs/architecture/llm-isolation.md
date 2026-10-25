@@ -211,31 +211,36 @@ The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM 
 
 | Item | As built |
 |---|---|
-| Stage source | the policy key `isolation.i2.stage` (`{"isolation":{"i2":{"stage":"enforce"}}}`), read by `policy.IsolationEnvStage`, carried by `Deps.EnvStage` |
+| Stage source | the policy key `isolation.i2.stage` (`{"isolation":{"i2":{"stage":"enforce"}}}`), read by `policy.IsolationEnvStage`. `Deps.envStage` reads it from the policy of the project root (`paths.ResolveFromEnv`) when `Deps.EnvStage` is empty, so each bridge entry follows the policy. An explicit `Deps.EnvStage` wins. |
 | Stage default | `shadow` (an empty value), resolved by `channel.ResolveStage`. An unknown word is `off`. |
 | `off` | today's environment, no signal |
 | `shadow` | today's environment, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=logged` |
 | `enforce` | the union only, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=refused` |
-| Base allowlist | the names of the table above, each `LC_*` name, and each `EVOLVE_*` name of the launcher (the pipeline markers) |
+| Base allowlist | the names of the table above and each `LC_*` name |
+| Pipeline markers | an explicit list, `pipelineEnvMarkers`: `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET` and the four `EVOLVE_FLEET*` keys. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
+| Operator opt-ins | `BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1` passes `ANTHROPIC_BASE_URL`, and `BRIDGE_ALLOW_OPENAI_API_KEY=1` passes `OPENAI_API_KEY`. So the route that the operator opted into stays the route of the child. |
 | Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
 | Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
 | Report once | `Deps.EnvDrops` (`EnvDropLog`) keeps the family and name pairs that it reported. The in-process adapter shares one log for its process. An engine with no log gets its own. |
-| Bare execs | `ProcessEnv(bin)` (the version inventory and the model queries) always returns the union, with no stage and no signal |
+| Bare execs | `ProcessEnv(bin)` (the version inventory and the model queries) follows the stage of the policy, with no signal |
 
 The manifest field `env_passthrough` is built (§11). The parser refuses a name that is not a shell identifier, and it refuses each loop, bridge and credential name, as for `default_env`. So `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and `OPENAI_API_KEY` cannot pass through.
 
-| Manifest | `env_passthrough` |
+Each manifest also lists the proxy names `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `ALL_PROXY` and their lowercase forms.
+
+| Manifest | `env_passthrough` besides the proxies |
 |---|---|
-| `claude-tmux`, `claude-p` | `CLAUDE_CONFIG_DIR`, `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS` |
-| `codex`, `codex-tmux` | `CODEX_HOME`, `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `SSL_CERT_FILE` |
-| `agy`, `agy-tmux`, `agy-claude-tmux` (from its base) | `XDG_CONFIG_HOME`, `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` |
-| `ollama-tmux` | `OLLAMA_HOST`, `OLLAMA_API_KEY`, `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` |
+| `claude-tmux`, `claude-p` | `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `NODE_EXTRA_CA_CERTS`; Bedrock: `CLAUDE_CODE_USE_BEDROCK`, `AWS_PROFILE`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK`; Vertex: `CLAUDE_CODE_USE_VERTEX`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION`, `GOOGLE_APPLICATION_CREDENTIALS` |
+| `codex`, `codex-tmux` | `CODEX_HOME`, `SSL_CERT_FILE` |
+| `agy`, `agy-tmux`, `agy-claude-tmux` (from its base) | `XDG_CONFIG_HOME`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_GENAI_USE_VERTEXAI` |
+| `ollama-tmux` | `OLLAMA_HOST`, `OLLAMA_API_KEY` |
 
 At `enforce`, a tmux pane starts through `execTmux.NewSessionEnv`, in three steps:
 
 1. The tmux client process runs with the cell environment and `TMUX_TMPDIR` only. tmux 3.8 takes `PATH` for a new pane from the client, not from `-e`. A server that this client starts has a clean global environment.
 2. `new-session` gets one `-e NAME=VALUE` for each variable.
-3. The pane command is `/bin/sh -c 'exec env -i NAME="$NAME" ... /bin/sh'`. tmux runs it with no `default-shell`, so no shell startup file runs. `env -i` keeps only the `-e` names, so a variable of a polluted server cannot reach the pane.
+3. The pane command is `/bin/sh -c 'exec env -i NAME="$NAME" ... /bin/sh'`. tmux runs it with no `default-shell`, so no shell startup file runs. `env -i` keeps only the `-e` names, so a variable of a polluted server cannot reach the pane. The keep list always holds `TERM`, because tmux sets it from `default-terminal`.
+4. A pair that ends in `;` gets the escape `\;`. tmux reads a final `;` as a command separator.
 
 A controller that cannot start a session in this way refuses the launch. The bridge never falls back to a polluted pane.
 
@@ -246,7 +251,10 @@ Known differences from the design:
 - tmux sets `SHELL` in a pane to its `default-shell` option. The name is in the base allowlist, but the value can come from the server option and not from `-e`.
 - The pane shell is `/bin/sh`, not the login shell of the operator. A user startup file does not change the cell environment.
 - The report is once for each family and name in a process, not once for each wave.
-- An operator opt-in that depends on a refused name stops at `enforce`. Examples are `BRIDGE_ALLOW_ANTHROPIC_BASE_URL` with `ANTHROPIC_BASE_URL`, and `BRIDGE_ALLOW_OPENAI_API_KEY` with `OPENAI_API_KEY`. The `shadow` signals show if a run uses them.
+- A `-e NAME=VALUE` pair is in the argv of the tmux client and in the session environment. Only the same user can read them.
+- A named session that exists before the launch is used again with no check of its environment.
+- Only the in-process adapter wires `Deps.Signals`. The other bridge entries follow the stage but emit no shadow signal.
+- With no explicit `Deps.EnvStage`, each child reads `policy.json` once. The project root comes from `Deps.Env`, then the process. A policy that cannot be read or parsed gives a `WARN isolation stage` line, and the stage stays `shadow`.
 - `envMap` in `go/cmd/evolve/cmd_bridge.go` feeds only the flag fallback of `parseLaunchArgs`. It does not reach a child, so X2 does not change it.
 
 ## 7. No nested agency

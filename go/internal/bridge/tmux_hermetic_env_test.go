@@ -116,12 +116,12 @@ func TestNewSessionEnvArgs_SetsEachPairAndStartsAShellWithOnlyThoseNames(t *test
 	want := []string{
 		"new-session", "-d", "-s", "s1", "-x", "200", "-y", "50", "-c", "/w",
 		"-e", "PATH=/bin", "-e", "HOME=/h", "-e", "PATH=/usr/bin",
-		"/bin/sh", "-c", `exec env -i HOME="$HOME" PATH="$PATH" /bin/sh`,
+		"/bin/sh", "-c", `exec env -i HOME="$HOME" PATH="$PATH" TERM="$TERM" /bin/sh`,
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("args =\n  %q\nwant\n  %q", got, want)
 	}
-	if bare := newSessionEnvArgs("s2", 1, 1, "", nil); !slices.Equal(bare, []string{"new-session", "-d", "-s", "s2", "-x", "1", "-y", "1", "/bin/sh", "-c", "exec env -i /bin/sh"}) {
+	if bare := newSessionEnvArgs("s2", 1, 1, "", nil); !slices.Equal(bare, []string{"new-session", "-d", "-s", "s2", "-x", "1", "-y", "1", "/bin/sh", "-c", `exec env -i TERM="$TERM" /bin/sh`}) {
 		t.Fatalf("no workdir means no -c, and no env means an empty environment; got %q", bare)
 	}
 }
