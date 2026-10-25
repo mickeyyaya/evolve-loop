@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -61,5 +62,21 @@ func TestSandboxTerminalOptOutDoesNotQueryPane(t *testing.T) {
 		if path != "" || err != nil || mux.calls != 0 {
 			t.Fatalf("mode %q: path=%q err=%v calls=%d", mode, path, err, mux.calls)
 		}
+	}
+}
+
+func TestSandboxTerminalLookupFailurePreventsLaunchOnEveryHost(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mux := &failedTerminalTmux{fakeTmux: &fakeTmux{}, err: errors.New("pane unavailable")}
+	var stderr strings.Builder
+	deps := Deps{Tmux: mux, Stderr: &stderr, Sleep: func(time.Duration) {}, Env: map[string]string{}, hostOS: "darwin"}.withDefaults()
+	cfg := &Config{ProjectRoot: root, Worktree: root, Workspace: root, RequireSandbox: true}
+	code, err := runTmuxREPL(context.Background(), cfg, deps, tmuxLaunch{name: "terminal-fixture", session: "terminal-any-host", launchCmd: "fixture-must-not-launch", bootOnly: true})
+	if err != nil || code != ExitSafetyGate || mux.calls != 1 {
+		t.Fatalf("got code %d err %v calls %d, want the safety gate after one terminal lookup", code, err, mux.calls)
+	}
+	if !strings.Contains(stderr.String(), "terminal lookup failed") || mux.sentContains("fixture-must-not-launch") {
+		t.Fatalf("a failed terminal lookup must stop before the launch and say so; stderr=%q", stderr.String())
 	}
 }

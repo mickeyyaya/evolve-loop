@@ -280,3 +280,11 @@ func (recipeReuseTmux) NewSessionEnv(context.Context, string, int, int, string, 
 func (recipeReuseTmux) SessionEnvFingerprint(context.Context, string) (string, error) {
 	return "born-at-shadow", nil
 }
+
+func TestFakeTmuxController_NewSessionEnvReportsAFailedStart(t *testing.T) {
+	t.Parallel()
+	f := &FakeTmuxController{NewSessionErr: errors.New("no server")}
+	if err := f.NewSessionEnv(context.Background(), "s", 1, 1, "", []string{"A=1"}); err == nil || f.Fingerprints["s"] != "" {
+		t.Fatalf("a failed start must return its error and record no fingerprint; err=%v fingerprints=%v", err, f.Fingerprints)
+	}
+}

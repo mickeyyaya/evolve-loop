@@ -84,6 +84,7 @@ type Deps struct {
 	ListCwds              proctree.CwdLister
 	SignalProcess         proctree.Signaler
 	sweep                 *dispatchSweep
+	hostOS                string
 }
 
 type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available bool)
