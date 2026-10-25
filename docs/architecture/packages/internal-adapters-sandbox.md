@@ -12,6 +12,8 @@
 - `Probe` checks the host for the binary and measures if it applies. It is cached once per process. The bridge's `ShouldWrap` and preflight therefore share one measured value, and the capability exec runs at most once.
 - `Sandbox` is the runtime-dispatching `Exec` wrapper. It degrades to a plain exec with a stderr NOTE when the host has no sandbox binary.
 - `DetectNested` and `ConfinementSatisfied` are the two halves of the confinement decision. `ShouldWrap` decides if to try the wrapper.
+- `Config.ExecDenyPaths` and `Config.ExecDenyEnforce` hold the exec deny of I-3 ([llm-isolation.md](../llm-isolation.md) §7.1). At `enforce`, `writeExecDenyRules` denies the exec of each path and of `/usr/bin/sandbox-exec`. An exec by `sandbox-exec` itself stays allowed, so the launch of the cell goes through. When `ExecDenyEnforce` is false, the same rules allow the exec and report it.
+- `Config.ExecDenyRoots` gets the same rules with `subpath`, so a deny covers each file under an install root. At `enforce`, `BwrapPrefix` ends with `--ro-bind /dev/null <path>` for each path and `--tmpfs <root>` for each root. The caller gives real paths, because an SBPL `literal` matches the real path of a file and not a symlink.
 - `getenv` is injected. The detection is tested with a map, and it reads the bridge's request-local env chain in production.
 
 ## Invariants

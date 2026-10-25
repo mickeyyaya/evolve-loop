@@ -3,10 +3,12 @@ package bridge
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -74,6 +76,7 @@ type Manifest struct {
 	DefaultArgs             []string                 `json:"default_args"`
 	DefaultEnv              map[string]string        `json:"default_env,omitempty"`
 	EnvPassthrough          []string                 `json:"env_passthrough,omitempty"`
+	InstallRoots            []string                 `json:"install_roots,omitempty"`
 	MCPConfigFiles          []string                 `json:"mcp_config_files,omitempty"`
 	InteractivePrompts      []ManifestPrompt         `json:"interactive_prompts"`
 	TransientRegex          string                   `json:"transient_regex,omitempty"`
@@ -176,7 +179,7 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	if err := validateEnvPassthrough(cli, m.EnvPassthrough); err != nil {
 		return Manifest{}, err
 	}
-	if err := validateMCPConfigFiles(cli, m.MCPConfigFiles); err != nil {
+	if err := errors.Join(validateMCPConfigFiles(cli, m.MCPConfigFiles), validateInstallRoots(cli, m.InstallRoots)); err != nil {
 		return Manifest{}, err
 	}
 	if err := validatePaneVocabulary(cli, m); err != nil {
@@ -202,6 +205,15 @@ func validateMCPConfigFiles(cli string, entries []string) error {
 	for _, entry := range entries {
 		if strings.HasPrefix(entry, "/") && !strings.HasPrefix(entry, "~/") || slices.Contains(strings.Split(entry, "/"), "..") {
 			return fmt.Errorf("bridge:manifest: mcp_config_files entry %q for cli=%s must be relative or start with ~/ and carry no .. segment", entry, cli)
+		}
+	}
+	return nil
+}
+
+func validateInstallRoots(cli string, roots []string) error {
+	for _, root := range roots {
+		if !strings.HasPrefix(root, "/") && !strings.HasPrefix(root, "~/") || slices.Contains(strings.Split(root, "/"), "..") || path.Clean(root) == "/" || path.Clean(root) == "~" {
+			return fmt.Errorf("bridge:manifest: install_roots entry %q for cli=%s must start with / or ~/, name a directory below it and carry no .. segment", root, cli)
 		}
 	}
 	return nil

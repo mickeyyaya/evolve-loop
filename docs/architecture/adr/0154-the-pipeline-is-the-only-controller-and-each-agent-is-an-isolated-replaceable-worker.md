@@ -1,6 +1,6 @@
 # ADR-0154: The pipeline is the only controller, and each agent is an isolated, replaceable worker
 
-- **Status:** Proposed (2026-10-25). Amended by [ADR-0156](0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (2026-10-25): the "pipeline markers" of I-2 are one named list (I-16). Amended on 2026-10-25 by the operator: rules 20 to 24 add I-17 (component X19).
+- **Status:** Proposed (2026-10-25). Amended by [ADR-0156](0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md) (2026-10-25): the "pipeline markers" of I-2 are one named list (I-16). Amended on 2026-10-25 by the operator: rules 20 to 24 add I-17 (component X19). Amended on 2026-10-26 by the operator: I-3 allows the own subagents of a CLI and adds a dispatch request ([llm-isolation.md](../llm-isolation.md) §7.2).
 - **Plan:** [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md). **Research:** [llm-isolation-2026-10](../../research/llm-isolation-2026-10.md). **Design:** [llm-isolation](../llm-isolation.md).
 - **Relates to:**
   - [ADR-0064](0064-pipeline-integrity-boundary.md): the protected control plane. This ADR adds the agent side of the same boundary.
@@ -30,7 +30,11 @@ The operator then set the limit of read isolation: "phase agent can read the out
 
 1. **I-1 Single launcher.** Only the bridge launch API starts an LLM binary.
 2. **I-2 Hermetic environment.** A child gets an allowlist plus manifest variables. No other launcher variable reaches it.
-3. **I-3 No nested agency.** An agent cannot start an LLM, an `evolve` dispatch or another agent.
+3. **I-3 No nested agency.** An agent cannot start a new LLM CLI process of any family, its own family too. It cannot run an `evolve` dispatch verb.
+   - *Amended 2026-10-26:* a subagent of the own harness, of any type and any model of the same family, is allowed. The harness chooses it, and it runs inside the boundary of the cell.
+   - The pipeline enforces the cell boundary: the sandbox scope, the input index, the exec denies, the network, the budget and the telemetry. The usage of each in-harness subagent counts against the budget of the cell.
+   - The latest-model rule governs only the model that the pipeline assigns to a seat. It does not govern the subagent choices of a harness.
+   - To get another phase agent, the agent writes a dispatch request. The pipeline validates it, the orchestrator judges it, and only the pipeline dispatches.
 4. **I-4 Pipeline-mediated communication.** Agents communicate only through declared artifacts that the pipeline records and indexes.
 5. **I-5 Read isolation.** An agent reads its own cycle, its item lineage and its own CLI files, and nothing else.
 6. **I-6 Family-agnostic flow.** Flow logic names no family. Floors, defaults and fallbacks are routing data.

@@ -1,0 +1,26 @@
+{
+  "id": "isolation-linux-own-family-exec",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "title": "LLM isolation: on Linux a cell cannot exec the CLI of its own family",
+  "summary": "X4 masks LLM binaries on Linux with a bwrap bind of /dev/null. The mask also hides the binary from the launch of the cell, so bwrap masks only the other families, and a claude cell can still run claude -p (review of #1126, MEDIUM-4). Row N3 is darwin only. Accepted at shadow. Spec: docs/architecture/llm-isolation.md \u00a77.1.",
+  "fix": "Apply an exec rule after the exec of the CLI: a Landlock ruleset (LANDLOCK_ACCESS_FS_EXECUTE) or a seccomp filter that a small launcher sets and then execs the CLI, so the children of the CLI cannot exec the binary and the install roots. A bind of the CLI to a private path is rejected: the private path stays reachable.",
+  "acceptance": [
+    "RED first: a Linux contract row (bwrap, stub CLI) that execs the own family from the cell fails before",
+    "The same row is denied after, and the launch of the cell still starts its CLI",
+    "Row N3 covers Linux; the darwin-only note leaves the matrix",
+    "Changed functions at 100% coverage on every CI OS; spec \u00a77.1 updated"
+  ],
+  "deps": [
+    "isolation-no-nested-agency"
+  ],
+  "files": [
+    "go/internal/adapters/sandbox/",
+    "go/internal/bridge/no_nested_agency.go",
+    "docs/architecture/llm-isolation.md"
+  ],
+  "created_at": "2026-10-26T12:00:02Z",
+  "source": "console, 2026-10-26, independent review of #1126 (MEDIUM-4); see docs/architecture/llm-isolation.md \u00a77.1"
+}

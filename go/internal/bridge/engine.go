@@ -42,6 +42,7 @@ type Deps struct {
 	CaptureBaseline       func(*Config) dispatchBaseline
 	Env                   map[string]string
 	EnvStage              string
+	ExecStage             string
 	EnvDrops              *EnvDropLog
 	RecoveryStage         string
 	FatalPaneStage        string
@@ -91,6 +92,7 @@ type Deps struct {
 type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available bool)
 
 type SandboxWrapRequest struct {
+	CLI           string
 	TerminalPath  string
 	DenyPaths     []string
 	DenyReadPaths []string

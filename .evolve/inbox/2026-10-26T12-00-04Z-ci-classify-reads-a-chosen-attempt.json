@@ -1,0 +1,24 @@
+{
+  "id": "ci-classify-reads-a-chosen-attempt",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.35,
+  "route": "console-manual",
+  "title": "evolve ci classify reads a chosen run attempt, not only the latest",
+  "summary": "evolve ci classify reads only the latest attempt of a run. After a rerun turns a flaky red green, the red of attempt 1 cannot be classified, so the flake evidence is lost (seen on #1126: TestRealTmux_AFailedStartLeavesNoEnvFile red on attempt 1, green on attempt 2).",
+  "fix": "Add an attempt selector to evolve ci classify (for example --attempt N, and an all-attempts mode) that reads the jobs and logs of that attempt, and records the attempt in the JSON envelope.",
+  "acceptance": [
+    "RED first: TestCIClassify_ReadsTheChosenAttempt (a fake API with a red attempt 1 and a green attempt 2) fails before",
+    "classify --attempt 1 labels the red of attempt 1, and the default stays the latest attempt",
+    "The --json envelope names the attempt",
+    "Changed functions at 100% coverage on every CI OS; the runtime reference names the flag"
+  ],
+  "deps": [],
+  "files": [
+    "go/internal/ciwatch/",
+    "go/cmd/evolve/cmd_ci.go",
+    "docs/operations/runtime-reference.md"
+  ],
+  "created_at": "2026-10-26T12:00:04Z",
+  "source": "console, 2026-10-26, round-2 review of #1126"
+}

@@ -229,6 +229,15 @@ The spec is [llm-isolation.md](../llm-isolation.md) §5.1. Each start of an LLM 
 - `newRecipeDriver` is the pane entry of the `probe` purpose. It logs the unsandboxed reason, and `EnsureSession` sends `unset TMUX TMUX_PANE` before the launch command.
 - The guard `TestOnlyTheBridgeStartsAnLLMBinary` (`internal/sysexec`) fails on an LLM spawn outside these functions and the driver functions of `bridgeDriverLaunchFuncs`. Pinned by `TestLaunchLLM_EachExecPurposeKeepsCLAUDECODEFromTheChildAtEnforce`, `TestLaunchLLM_AtShadowTheChildKeepsTodaysEnvExceptTheRunTmux`, `TestLaunchPane_TheSmokePurposeGrantsBypassAndKeepsCLAUDECODEFromThePane` and `TestRecipeSession_ThePaneShellUnsetsTheRunTmuxBeforeTheLaunch`.
 
+### No nested agency (`no_nested_agency.go`, X4 of ADR-0154)
+
+The spec is [llm-isolation.md](../llm-isolation.md) §7.1.
+
+- `Deps.cellMarkers(cfg)` gives `EVOLVE_DISPATCH_DEPTH` (the depth of the launcher plus 1) and `EVOLVE_PHASE` (`cfg.Agent`). `cellEnv` adds them through `withCellMarkers`, and `primePaneShell` and the recipe boot export them before the launch line.
+- `launchSwept` calls `Deps.refuseSandboxOffInPhase` first. A launcher with `EVOLVE_PHASE` and `EVOLVE_SANDBOX=off` gets `ErrSandboxOffInPhase` and `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION`.
+- `Deps.execDeny(cli, goos)` gives the sandbox its exec deny paths and stage. The stage is `Deps.execStage` (policy `isolation.i3.stage`, default `shadow`). The targets come from `execDenyTargets`: the real path of each manifest binary on `PATH`, and each manifest `install_roots` entry that exists. On Linux the binary and the roots of the launched family are left out, because the `bwrap` mask also hides them from the launch.
+- `SandboxWrapRequest.CLI` carries the family of the launch to the wrapper.
+
 ### The driver factory (`resolve.go`)
 
 *Added 2026-10-17 by component F1 of [bridge-factory-2026-10](../../plans/bridge-factory-2026-10.md) ([ADR-0137](../adr/0137-one-bridge-factory-resolves-every-llm-cli-and-the-manifest-holds-its-facts.md)). The spec of record is [agent-bridge-factory](../agent-bridge-factory.md) §2 and §3.*
