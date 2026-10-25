@@ -42,7 +42,7 @@ func (f runFixture) inputs() Inputs {
 }
 
 func twoVoterConsensus() map[string]any {
-	return map[string]any{"enabled": true, "cli_voters": []string{"claude", "gemini"}, "quorum": 2}
+	return map[string]any{"enabled": true, "cli_voters": []string{"claude", "agy"}, "quorum": 2}
 }
 
 func runCapturingStderr(in Inputs) (int, string) {
@@ -84,7 +84,7 @@ func TestRun_UnparsableProfileIsProfileError(t *testing.T) {
 
 func TestRun_NegativeQuorumIsProfileError(t *testing.T) {
 	t.Parallel()
-	f := newRunFixture(t, map[string]any{"enabled": true, "cli_voters": []string{"claude", "gemini"}, "quorum": -1})
+	f := newRunFixture(t, map[string]any{"enabled": true, "cli_voters": []string{"claude", "agy"}, "quorum": -1})
 
 	rc, stderr := runCapturingStderr(f.inputs())
 
@@ -155,7 +155,7 @@ func TestRun_AggregatorResolutionFailureIsRuntimeError(t *testing.T) {
 		t.Skip("no true binary on PATH")
 	}
 	f := newRunFixture(t, twoVoterConsensus())
-	for _, cli := range []string{"claude", "gemini"} {
+	for _, cli := range []string{"claude", "agy"} {
 		writeFile(t, filepath.Join(f.workspace, "consensus-workers", cli+"-audit.md"), "PASS")
 	}
 	var subcommands []string
@@ -189,5 +189,16 @@ func TestResolveEvolveBin_FallsBackToPathLookup(t *testing.T) {
 
 	if got != want {
 		t.Fatalf("resolveEvolveBin=%q want the PATH entry %q", got, want)
+	}
+}
+
+func TestRun_AVoterWithNoDriverIsNamedNotDroppedSilently(t *testing.T) {
+	t.Parallel()
+	f := newRunFixture(t, map[string]any{"enabled": true, "cli_voters": []string{"claude", "gemini"}, "quorum": 2})
+
+	rc, stderr := runCapturingStderr(f.inputs())
+
+	if rc != ExitRuntimeErr || !strings.Contains(stderr, "WARN: skipped 1 eligible voter(s) with no registered driver: gemini") {
+		t.Fatalf("rc=%d: the dropped gemini voter must be named on stderr: %s", rc, stderr)
 	}
 }

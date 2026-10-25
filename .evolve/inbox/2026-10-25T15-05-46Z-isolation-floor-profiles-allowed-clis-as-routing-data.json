@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "evolve cli-routing check passes for clis [agy] with floors {} over the tracked profiles",
+    "TestCLIRoutingShow_EveryShippedProfileKeepsItsResolvedRoute stays green with no golden change",
+    "The profiles floor guards (TestClaudeFamilyFloor) read the floor from the routing data only"
+  ],
+  "created_at": "2026-10-25T18:00:01Z",
+  "deps": [
+    "isolation-floors-and-defaults-as-routing-data"
+  ],
+  "files": [
+    ".evolve/profiles/",
+    "go/internal/profiles/",
+    "go/internal/cliroute/"
+  ],
+  "fix": "Decide one home for the floor. Either drop the Claude-only allowed_clis of the floor profiles (the floor key already enforces it), or make cliroute treat allowed_clis as a ceiling that floors {} can widen. Keep every current route identical (the shipped-routes golden of PR #1123).",
+  "id": "isolation-floor-profiles-allowed-clis-as-routing-data",
+  "kind": "refactor",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "console builder X6, 2026-10-25, follow-up of PR #1123 (ADR-0154)",
+  "summary": "X6 moved the floor into cli_routing.floors. But the tracked profiles of the floor agents (auditor, adversarial-review, tdd-engineer, spec-verifier, spec-verify, code-reviewer) and the router set allowed_clis to Claude families. An agy-only table with floors {} over the tracked profiles still refuses 7 agents: 'rule default leaves no allowed CLI'. The floor is thus held twice, once as routing data and once as profile data.",
+  "title": "LLM isolation: the allowed_clis of the floor-agent and router profiles stop pinning Claude families, so floors {} alone frees them",
+  "weight": 0.45
+}

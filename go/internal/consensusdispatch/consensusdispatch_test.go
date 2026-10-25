@@ -171,12 +171,15 @@ func TestBuildCommandsTSV(t *testing.T) {
 	if err := os.MkdirAll(workers, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	tsv, count := BuildCommandsTSV([]string{"claude", "gemini", "codex", "no-such-cli"},
+	tsv, count := BuildCommandsTSV([]string{"claude", "gemini", "codex", "agy", "no-such-cli"},
 		"/tmp/profile.json", "/tmp/prompt.md", "42", workers, "/usr/local/bin/evolve", "sonnet")
 	if count != 3 {
 		t.Errorf("want 3 driver-backed workers, got %d", count)
 	}
-	for _, cli := range []string{"claude", "gemini", "codex"} {
+	if strings.Contains(tsv, "gemini\t") {
+		t.Errorf("the retired bare name gemini resolves to no driver, so its voter is skipped:\n%s", tsv)
+	}
+	for _, cli := range []string{"claude", "agy", "codex"} {
 		if !strings.Contains(tsv, cli+"\t") {
 			t.Errorf("missing voter line for %s:\n%s", cli, tsv)
 		}
@@ -193,7 +196,7 @@ func TestBuildCommandsTSV(t *testing.T) {
 	if strings.Contains(tsv, "bash '") {
 		t.Errorf("worker command must not shell bash <cli>.sh anymore:\n%s", tsv)
 	}
-	if strings.Index(tsv, "claude\t") > strings.Index(tsv, "gemini\t") {
+	if strings.Index(tsv, "agy\t") > strings.Index(tsv, "claude\t") {
 		t.Errorf("voters not sorted: %s", tsv)
 	}
 }
@@ -229,7 +232,7 @@ func TestRun_ConsensusEnvOff(t *testing.T) {
 	dir := t.TempDir()
 	prof := filepath.Join(dir, "prof.json")
 	prompt := filepath.Join(dir, "prompt.md")
-	writeProfile(t, prof, map[string]any{"enabled": true, "cli_voters": []string{"claude", "gemini"}, "quorum": 2})
+	writeProfile(t, prof, map[string]any{"enabled": true, "cli_voters": []string{"claude", "agy"}, "quorum": 2})
 	writeFile(t, prompt, "audit me")
 	var stdout, stderr bytes.Buffer
 	rc := Run(Inputs{
@@ -322,7 +325,7 @@ func TestRun_E2E_WithFakeBash(t *testing.T) {
 	prompt := filepath.Join(dir, "prompt.md")
 	writeProfile(t, prof, map[string]any{
 		"enabled":          true,
-		"cli_voters":       []string{"claude", "gemini"},
+		"cli_voters":       []string{"claude", "agy"},
 		"quorum":           2,
 		"require_min_tier": "hybrid",
 	})
@@ -346,7 +349,7 @@ func TestRun_E2E_WithFakeBash(t *testing.T) {
 	if !strings.Contains(string(body), "Verdict: PASS") {
 		t.Errorf("aggregate missing verdict: %s", body)
 	}
-	for _, cli := range []string{"claude", "gemini"} {
+	for _, cli := range []string{"claude", "agy"} {
 		artifact := filepath.Join(workspace, "consensus-workers", cli+"-audit.md")
 		if _, err := os.Stat(artifact); err != nil {
 			t.Errorf("worker artifact missing: %s", artifact)
@@ -375,7 +378,7 @@ func TestRun_AggregatorFailPropagates(t *testing.T) {
 	prof := filepath.Join(dir, "p.json")
 	prompt := filepath.Join(dir, "pr.md")
 	writeProfile(t, prof, map[string]any{
-		"enabled": true, "cli_voters": []string{"claude", "gemini"},
+		"enabled": true, "cli_voters": []string{"claude", "agy"},
 		"quorum": 2, "require_min_tier": "hybrid",
 	})
 	writeFile(t, prompt, "x")
@@ -412,7 +415,7 @@ func TestRun_NoArtifactsProducedFails(t *testing.T) {
 	prof := filepath.Join(dir, "p.json")
 	prompt := filepath.Join(dir, "pr.md")
 	writeProfile(t, prof, map[string]any{
-		"enabled": true, "cli_voters": []string{"claude", "gemini"},
+		"enabled": true, "cli_voters": []string{"claude", "agy"},
 		"quorum": 2, "require_min_tier": "hybrid",
 	})
 	writeFile(t, prompt, "x")

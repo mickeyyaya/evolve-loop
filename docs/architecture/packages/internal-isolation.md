@@ -32,4 +32,4 @@ The package runs no check. Each row has an owner test in the package that owns t
 
 ## Findings
 
-- At X1, rows M1 and N9 are green. The other 17 rows are open. Rows M2 to M5 fail on the Claude floor in `go/internal/cliroute/compile.go`.
+- At X1, rows M1 and N9 are green. Since X6, row N13 is green too, and the other 16 rows are open. The row policy of the matrix sets `floors: {}`. Rows M2 to M4 fail on the tmux REPL fake that the harness does not have (`new-session: exit status 1`, X1b). Row M5 fails because `ollama-tmux cannot use tools` (X9).

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -25,7 +26,8 @@ type PlanJudge struct {
 }
 
 func NewPlanJudge(bridge Bridge) *PlanJudge {
-	return &PlanJudge{bridge: bridge, cli: "claude-tmux", model: "haiku"}
+	seat := policy.SeatDefault(policy.SeatPlanJudge)
+	return &PlanJudge{bridge: bridge, cli: seat.CLI, model: seat.Model}
 }
 
 func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *router.PhasePlan) JudgeVerdict {

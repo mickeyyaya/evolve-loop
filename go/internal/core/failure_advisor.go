@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 )
 
@@ -51,7 +52,7 @@ func WithFailureAdvisorPersona(body string) FailureAdvisorOption {
 func NewFailureAdvisor(bridge Bridge, opts ...FailureAdvisorOption) *FailureAdvisor {
 	a := &FailureAdvisor{
 		bridge:   bridge,
-		identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "failure-advisor"},
+		identity: seatIdentity(policy.SeatFailureAdvisor, "failure-advisor"),
 	}
 	for _, o := range opts {
 		o(a)
@@ -177,4 +178,9 @@ func parseFailureAdvice(raw string) (*recovery.FailureAdvice, error) {
 		return nil, fmt.Errorf("failure advisor: empty justification (every recovery decision is justified)")
 	}
 	return &adv, nil
+}
+
+func seatIdentity(seat, label string) AgentIdentity {
+	d := policy.SeatDefault(seat)
+	return AgentIdentity{CLI: d.CLI, Model: d.Model, AgentLabel: label}
 }

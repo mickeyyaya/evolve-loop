@@ -216,7 +216,7 @@ func (v routingView) report() (routingReport, error) {
 
 func (v routingView) route(agent, phase string) agentRoute {
 	route := agentRoute{Agent: agent, Phase: phase}
-	if profiles.IsClaudeFamilyFloor(agent) {
+	if v.router.FloorFamily(agent) != "" {
 		route.Notes = append(route.Notes, "FLOOR")
 	}
 	d, err := v.router.Resolve(cliroute.Request{Agent: agent, Phase: phase, ProjectRoot: v.root, DefaultModel: unsetDispatchTier})

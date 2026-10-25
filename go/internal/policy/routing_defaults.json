@@ -1,0 +1,20 @@
+{
+  "floors": {
+    "claude": ["auditor", "adversarial-review", "tdd-engineer", "spec-verifier", "spec-verify", "code-reviewer"]
+  },
+  "seats": {
+    "phase-advisor": {"cli": "claude-tmux", "model": "deep"},
+    "failure-advisor": {"cli": "claude-tmux", "model": "deep"},
+    "plan-judge": {"cli": "claude-tmux", "model": "fast"},
+    "router": {"model": "deep"},
+    "contract-escalation": {"cli": "claude-tmux"},
+    "postmortem": {"cli": "claude-tmux"},
+    "observer": {"cli": "claude-tmux"},
+    "subagent": {"cli": "claude-tmux"},
+    "no-profile": {"cli": "claude-tmux"},
+    "wave-health": {"cli": "claude-tmux"}
+  },
+  "classifier_families": ["codex", "claude", "agy"],
+  "unmeasured_order": ["claude", "agy", "agy-claude"],
+  "universal_fallback_exclude": ["agy"]
+}

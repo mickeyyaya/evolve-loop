@@ -26,18 +26,19 @@ func TestRows_AreTheNineteenRowsOfSpec14InOrder(t *testing.T) {
 	}
 }
 
-func TestRows_OnlyM1AndN9AreGreenAtX1AndEveryOpenRowNamesItsComponent(t *testing.T) {
+func TestRows_OnlyM1N9AndN13AreGreenAtX6AndEveryOpenRowNamesItsComponent(t *testing.T) {
 	t.Parallel()
+	greenBy := map[string]string{"M1": "X1", "N9": "X1", "N13": "X6"}
 	for _, r := range Rows() {
-		green := r.ID == "M1" || r.ID == "N9"
+		closer, green := greenBy[r.ID]
 		if r.Open == green {
-			t.Errorf("row %s Open = %v; at X1 only M1 and N9 are green", r.ID, r.Open)
+			t.Errorf("row %s Open = %v; after X6 only M1, N9 and N13 are green", r.ID, r.Open)
 		}
 		if !strings.HasPrefix(r.ClosedBy, "X") || r.Check == "" || r.Owner == "" {
 			t.Errorf("row %s must name its check, its owner test file and the component that turns it green: %+v", r.ID, r)
 		}
-		if green && r.ClosedBy != "X1" {
-			t.Errorf("green row %s is closed by %s, want X1", r.ID, r.ClosedBy)
+		if green && r.ClosedBy != closer {
+			t.Errorf("green row %s is closed by %s, want %s", r.ID, r.ClosedBy, closer)
 		}
 	}
 }
@@ -52,8 +53,8 @@ func TestRows_ReturnsACopy(t *testing.T) {
 
 func TestLookup_FindsARowAndRefusesAnUnknownID(t *testing.T) {
 	t.Parallel()
-	if r, ok := Lookup("M2"); !ok || r.ClosedBy != "X6" || !r.Open {
-		t.Fatalf("Lookup(M2) = %+v, %v; want the open row closed by X6", r, ok)
+	if r, ok := Lookup("M2"); !ok || r.ClosedBy != "X1b" || !r.Open {
+		t.Fatalf("Lookup(M2) = %+v, %v; want the open row closed by X1b", r, ok)
 	}
 	if _, ok := Lookup("N99"); ok {
 		t.Fatal("Lookup found a row that the matrix does not hold")
@@ -62,11 +63,11 @@ func TestLookup_FindsARowAndRefusesAnUnknownID(t *testing.T) {
 
 func TestJudge_AnOpenRowThatFailsIsTheExpectedFailureAndNamesItsComponent(t *testing.T) {
 	t.Parallel()
-	note, err := Judge("M2", errors.New("cli_routing.clis: claude must be listed: the Claude-family floor"))
+	note, err := Judge("M2", errors.New("bridge: launch exit=10: [bridge] [agy-tmux] new-session: exit status 1"))
 	if err != nil {
 		t.Fatalf("an open row that fails is expected, got %v", err)
 	}
-	for _, want := range []string{"M2", "expected failure", "X6", "claude must be listed"} {
+	for _, want := range []string{"M2", "expected failure", "X1b", "new-session: exit status 1"} {
 		if !strings.Contains(note, want) {
 			t.Errorf("the note %q must name %q", note, want)
 		}
@@ -79,7 +80,7 @@ func TestJudge_AnOpenRowThatFailsForAnotherReasonIsInconclusive(t *testing.T) {
 	if err == nil {
 		t.Fatal("an open row that fails for a reason other than its gap must fail the test")
 	}
-	for _, want := range []string{"M2", "inconclusive", "claude must be listed", "timed out"} {
+	for _, want := range []string{"M2", "inconclusive", "new-session: exit status 1", "timed out"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the error %q must name %q", err, want)
 		}

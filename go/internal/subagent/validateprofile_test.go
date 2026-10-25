@@ -477,7 +477,7 @@ func TestDefaultAdapterExists_DriverPresence(t *testing.T) {
 		want bool
 	}{
 		{filepath.Join(tmp, "claude.sh"), true},
-		{filepath.Join(tmp, "gemini.sh"), true},
+		{filepath.Join(tmp, "gemini.sh"), false},
 		{filepath.Join(tmp, "claude-tmux.sh"), true},
 		{filepath.Join(tmp, "codex.sh"), true},
 		{filepath.Join(tmp, "agy.sh"), true},

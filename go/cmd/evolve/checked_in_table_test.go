@@ -5,6 +5,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -51,7 +52,7 @@ func TestTheCheckedInTableRoutesNoLaunchToCodex(t *testing.T) {
 		}
 	}
 	requests = append(requests,
-		cliroute.Request{Agent: routerAgent, Launch: cliroute.LaunchAdvisor, ProjectRoot: root, DefaultModel: routerDefaultModel},
+		cliroute.Request{Agent: routerAgent, Launch: cliroute.LaunchAdvisor, ProjectRoot: root, DefaultModel: policy.SeatDefault(policy.SeatRouter).Model},
 		cliroute.Request{Agent: cliroute.ClassifierAgent, Launch: cliroute.LaunchClassifier, ProjectRoot: root, DefaultModel: unsetDispatchTier})
 	for _, req := range requests {
 		d, err := r.Resolve(req)

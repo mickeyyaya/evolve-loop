@@ -15,7 +15,7 @@ func TestRun_WorkspaceMkdirFails(t *testing.T) {
 	dir := t.TempDir()
 	prof := filepath.Join(dir, "prof.json")
 	prompt := filepath.Join(dir, "prompt.md")
-	writeProfile(t, prof, map[string]any{"enabled": true, "cli_voters": []string{"claude", "gemini"}, "quorum": 2})
+	writeProfile(t, prof, map[string]any{"enabled": true, "cli_voters": []string{"claude", "agy"}, "quorum": 2})
 	writeFile(t, prompt, "audit")
 	blocker := filepath.Join(dir, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {

@@ -10,7 +10,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 func ModelChainFor(on bool) func(cli, model string) []string {
@@ -56,24 +55,32 @@ func (e *Engine) clearArtifact(req core.BridgeRequest) {
 	}
 }
 
-var claudeModelWords = []string{"claude", "opus", "sonnet", "haiku"}
+var familyModelWords = map[string][]string{"claude": {"claude", "opus", "sonnet", "haiku"}}
 
-func isClaudeFamilyModel(model string) bool {
+func isFamilyModel(family, model string) bool {
 	lower := strings.ToLower(model)
-	return slices.ContainsFunc(claudeModelWords, func(w string) bool { return strings.Contains(lower, w) })
+	return slices.ContainsFunc(familyModelWords[family], func(w string) bool { return strings.Contains(lower, w) })
+}
+
+func (e *Engine) floors() policy.Floors {
+	if e.deps.Floors != nil {
+		return e.deps.Floors
+	}
+	return policy.DefaultFloors()
 }
 
 func (e *Engine) floorChain(seat string, chain []string) []string {
-	if !profiles.IsClaudeFamilyFloor(seat) {
+	floor := e.floors().FamilyOf(seat)
+	if floor == "" {
 		return chain
 	}
 	kept := []string{chain[0]}
 	for _, model := range chain[1:] {
-		if isClaudeFamilyModel(model) {
+		if isFamilyModel(floor, model) {
 			kept = append(kept, model)
 			continue
 		}
-		fmt.Fprintf(e.deps.Stderr, "[bridge] WARN model failover: %s holds the Claude family floor; skipping fallback %s, which is not a Claude model\n", seat, model)
+		fmt.Fprintf(e.deps.Stderr, "[bridge] WARN model failover: %s holds the %s family floor; skipping fallback %s, which is outside the %s family\n", seat, floor, model, floor)
 	}
 	return kept
 }

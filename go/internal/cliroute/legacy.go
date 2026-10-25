@@ -19,10 +19,9 @@ const (
 	ruleLegacyProfile    = "legacy:profile"
 	ruleLegacyRouter     = "legacy:router"
 	ruleLegacyClassifier = "legacy:classifier"
-	legacyDefaultDriver  = "claude-tmux"
 )
 
-var legacyClassifierFamilies = []string{"codex", "claude", "agy"}
+func legacyDefaultDriver() string { return policy.SeatDefault(policy.SeatNoProfile).CLI }
 
 func (v resolver) resolveLegacy(req Request) (Decision, error) {
 	switch req.Launch {
@@ -111,7 +110,7 @@ func legacyRule(req Request, plan llmroute.Plan, pin *policy.Pin) string {
 
 func (v resolver) legacyAdvisor(req Request) Decision {
 	prof := v.table.legacyProfile(req.Agent)
-	primary, model, rule := legacyDefaultDriver, req.DefaultModel, ruleLegacyDefault
+	primary, model, rule := legacyDefaultDriver(), req.DefaultModel, ruleLegacyDefault
 	if prof != nil && prof.CLI != "" {
 		primary, rule = prof.CLI, ruleLegacyProfile
 	}
@@ -126,14 +125,15 @@ func (v resolver) legacyAdvisor(req Request) Decision {
 		model = keys.Model
 	}
 	plan := llmroute.ChainFor(primary, prof)
-	plan.Candidates = withoutDuplicates(append(plan.Candidates, legacyDefaultDriver))
+	plan.Candidates = withoutDuplicates(append(plan.Candidates, legacyDefaultDriver()))
 	plan.Model, plan.PrimarySource = model, rule
 	return Decision{Plan: plan, Rule: rule, Allowed: prof.AllowedFamilies()}
 }
 
 func legacyClassifier() Decision {
-	chain := make([]string, 0, len(legacyClassifierFamilies))
-	for _, fam := range legacyClassifierFamilies {
+	families := policy.ClassifierFamilies()
+	chain := make([]string, 0, len(families))
+	for _, fam := range families {
 		chain = append(chain, llmroute.DefaultDriverForFamily(fam))
 	}
 	return Decision{Plan: llmroute.Plan{Candidates: chain, PrimarySource: ruleLegacyClassifier}, Rule: ruleLegacyClassifier}

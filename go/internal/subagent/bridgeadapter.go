@@ -16,7 +16,11 @@ import (
 )
 
 func driverExists(cli string) bool {
-	_, ok := gobridge.LookupDriver(gobridge.DriverFor(cli))
+	driver, err := gobridge.DriverFor(cli)
+	if err != nil {
+		return false
+	}
+	_, ok := gobridge.LookupDriver(driver)
 	return ok
 }
 
@@ -31,6 +35,7 @@ func execAdapterDeps(env map[string]string) gobridge.Deps {
 		FatalPaneStage: fatalPaneStage,
 		Efforts:        pol.Efforts(),
 		ModelChain:     gobridge.ModelChainFor(pol.BridgeConfig().ModelFailoverOn()),
+		Floors:         pol.Floors(),
 	}
 }
 
@@ -62,7 +67,10 @@ func (b bridgeAdapter) Exec(ctx context.Context, env subagentrun.AdapterEnv) (in
 }
 
 func execAdapter(ctx context.Context, env map[string]string, signals *signalcenter.Center) (int, error) {
-	cli := gobridge.DriverFor(env["RESOLVED_CLI"])
+	cli, err := gobridge.DriverFor(env["RESOLVED_CLI"])
+	if err != nil {
+		return -1, fmt.Errorf("subagent: %w", err)
+	}
 	prompt := ""
 	if pf := env["PROMPT_FILE"]; pf != "" {
 		b, err := os.ReadFile(pf)

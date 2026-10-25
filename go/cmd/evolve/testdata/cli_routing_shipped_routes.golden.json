@@ -1,0 +1,2590 @@
+{
+  "mode": "declared cli_routing table",
+  "static": true,
+  "agents": [
+    {
+      "agent": "accessibility-audit",
+      "phase": "accessibility-audit",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "account-reconcile",
+      "phase": "account-reconcile",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "adversarial-review",
+      "phase": "adversarial-review",
+      "rule": "default",
+      "chain": [
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "claude"
+      ],
+      "notes": [
+        "FLOOR",
+        "default: [agy-tmux agy-claude-tmux] filtered out, outside the allowed set [claude]"
+      ]
+    },
+    {
+      "agent": "api-contract-design",
+      "phase": "api-contract-design",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "architecture-design",
+      "phase": "architecture-design",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 55 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "auditor",
+      "phase": "audit",
+      "rule": "default",
+      "chain": [
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "claude"
+      ],
+      "notes": [
+        "FLOOR",
+        "default: [agy-tmux agy-claude-tmux] filtered out, outside the allowed set [claude]",
+        "warn cross_family_with.auditor+builder: auditor and builder fall back onto the shared family [claude]"
+      ]
+    },
+    {
+      "agent": "authz-gap-scan",
+      "phase": "authz-gap-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "behavior-baseline",
+      "phase": "behavior-baseline",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "behavior-compare",
+      "phase": "behavior-compare",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "benchmark-gate",
+      "phase": "benchmark-gate",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "bug-reproduction",
+      "phase": "bug-reproduction",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "build-planner",
+      "phase": "build-planner",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "builder",
+      "phase": "build",
+      "rule": "agents:builder",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "warn cross_family_with.auditor+builder: auditor and builder fall back onto the shared family [claude]",
+        "warn cross_family_with.builder+tdd-engineer: builder and tdd-engineer fall back onto the shared family [claude]",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "cache-strategy-scan",
+      "phase": "cache-strategy-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "caching-strategy-design",
+      "phase": "caching-strategy-design",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 95 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "capacity-plan",
+      "phase": "capacity-plan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "changelog-sync",
+      "phase": "changelog-sync",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "cicd-pipeline-audit",
+      "phase": "cicd-pipeline-audit",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "cleanup-sweep",
+      "phase": "cleanup-sweep",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "close-checklist",
+      "phase": "close-checklist",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "code-reviewer",
+      "rule": "default",
+      "chain": [
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "claude"
+      ],
+      "notes": [
+        "FLOOR",
+        "default: [agy-tmux agy-claude-tmux] filtered out, outside the allowed set [claude]"
+      ]
+    },
+    {
+      "agent": "compat-surface-check",
+      "phase": "compat-surface-check",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 57 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "container-hardening-scan",
+      "phase": "container-hardening-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "context-condense",
+      "phase": "context-condense",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "contract-fuzz-probe",
+      "phase": "contract-fuzz-probe",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "coverage-gate",
+      "phase": "coverage-gate",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "data-integrity-check",
+      "phase": "data-integrity-check",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 81 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "data-model-design",
+      "phase": "data-model-design",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 71 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "debugger",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 58 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "deliverable-recovery",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "dependency-audit",
+      "phase": "dependency-audit",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "dependency-map",
+      "phase": "dependency-map",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "doc-sync",
+      "phase": "doc-sync",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "error-handling-scan",
+      "phase": "error-handling-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "evaluator",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "failure-adjudicator",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 16 of 100; no usage reader, so the pace does not apply",
+        "share keeps the seat on agy",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "failure-advisor",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 28 of 100; no usage reader, so the pace does not apply",
+        "share keeps the seat on agy",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "fault-localization",
+      "phase": "fault-localization",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "flake-rerun-scan",
+      "phase": "flake-rerun-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "forces-analysis",
+      "phase": "forces-analysis",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "frontend-design-review",
+      "phase": "frontend-design-review",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "fuzz-probe",
+      "phase": "fuzz-probe",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "idempotency-check",
+      "phase": "idempotency-check",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 83 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "incident-postmortem",
+      "phase": "incident-postmortem",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "inspirer",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "intent",
+      "phase": "intent",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 35 of 100; no usage reader, so the pace does not apply",
+        "share keeps the seat on agy",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "license-provenance-audit",
+      "phase": "license-provenance-audit",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "locale-format-check",
+      "phase": "locale-format-check",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "market-sizing",
+      "phase": "market-sizing",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "memo",
+      "phase": "memo",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "merge-to-main-gate",
+      "phase": "merge-to-main-gate",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 55 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "metric-tree",
+      "phase": "metric-tree",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "migration-safety-check",
+      "phase": "migration-safety-check",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 79 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "mutation-gate",
+      "phase": "mutation-gate",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "observability-design",
+      "phase": "observability-design",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 39 of 100; no usage reader, so the pace does not apply",
+        "share keeps the seat on agy",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "okr-draft",
+      "phase": "okr-draft",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "opportunity-map",
+      "phase": "opportunity-map",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "orchestrator",
+      "phase": "orchestrator",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "perf-profile",
+      "phase": "perf-profile",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "plan-reviewer",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 22 of 100; no usage reader, so the pace does not apply",
+        "share keeps the seat on agy",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "post-ship-monitor",
+      "phase": "post-ship-monitor",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "prd-draft",
+      "phase": "prd-draft",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "preliminary-study",
+      "phase": "preliminary-study",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 79 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "premise-challenge",
+      "phase": "premise-challenge",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 67 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "prompt-regression-eval",
+      "phase": "prompt-regression-eval",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 25 of 100; no usage reader, so the pace does not apply",
+        "share keeps the seat on agy",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "query-performance-scan",
+      "phase": "query-performance-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "race-condition-scan",
+      "phase": "race-condition-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "reflector",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "low",
+          "effort_source": "cli_routing.agents.reflector"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "resilience-design",
+      "phase": "resilience-design",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 67 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "resilience-gap-scan",
+      "phase": "resilience-gap-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "retrospective",
+      "phase": "retro",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 74 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "risk-register",
+      "phase": "risk-register",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "rollback-plan",
+      "phase": "rollback-plan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "rollout-plan",
+      "phase": "rollout-plan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 13 of 100; no usage reader, so the pace does not apply",
+        "share keeps the seat on agy",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "router",
+      "phase": "router",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "default: [agy-tmux] filtered out, outside the allowed set [agy-claude claude]"
+      ]
+    },
+    {
+      "agent": "runbook-draft",
+      "phase": "runbook-draft",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "scope-baseline",
+      "phase": "scope-baseline",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "scout",
+      "phase": "scout",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "low",
+          "effort_source": "cli_routing.agents.scout"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "scout-scan",
+      "phase": "scout-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "secret-leak-scan",
+      "phase": "secret-leak-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "security-scan",
+      "phase": "security-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "smell-scan",
+      "phase": "smell-scan",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "spec-verifier",
+      "rule": "default",
+      "chain": [
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "claude"
+      ],
+      "notes": [
+        "FLOOR",
+        "default: [agy-tmux agy-claude-tmux] filtered out, outside the allowed set [claude]"
+      ]
+    },
+    {
+      "agent": "spec-verify",
+      "phase": "spec-verify",
+      "rule": "default",
+      "chain": [
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "claude"
+      ],
+      "notes": [
+        "FLOOR",
+        "default: [agy-tmux agy-claude-tmux] filtered out, outside the allowed set [claude]"
+      ]
+    },
+    {
+      "agent": "swarm-planner",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 58 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "tdd-engineer",
+      "phase": "tdd",
+      "rule": "agents:tdd-engineer",
+      "chain": [
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "claude-tmux",
+          "effort": "high",
+          "effort_source": "cli_routing.agents.tdd-engineer"
+        }
+      ],
+      "allowed": [
+        "claude"
+      ],
+      "notes": [
+        "FLOOR",
+        "warn cross_family_with.builder+tdd-engineer: builder and tdd-engineer fall back onto the shared family [claude]"
+      ]
+    },
+    {
+      "agent": "telemetry-coverage-check",
+      "phase": "telemetry-coverage-check",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "test-amplification",
+      "phase": "test-amplification",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "tester",
+      "phase": "tester",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "threat-model",
+      "phase": "threat-model",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "triage",
+      "phase": "triage",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "low",
+          "effort_source": "cli_routing.agents.triage"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "type-safety-audit",
+      "phase": "type-safety-audit",
+      "rule": "default",
+      "chain": [
+        "agy-claude-tmux",
+        "claude-tmux",
+        "agy-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-claude-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share 50%: bucket 55 of 100; no usage reader, so the pace does not apply",
+        "share gives the seat to agy-claude",
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "variance-analysis",
+      "phase": "variance-analysis",
+      "rule": "default",
+      "chain": [
+        "agy-tmux",
+        "agy-claude-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, agy takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "Severity": "warn",
+      "Key": "cross_family_with.auditor+builder",
+      "Message": "auditor and builder fall back onto the shared family [claude]"
+    },
+    {
+      "Severity": "warn",
+      "Key": "cross_family_with.builder+tdd-engineer",
+      "Message": "builder and tdd-engineer fall back onto the shared family [claude]"
+    }
+  ]
+}

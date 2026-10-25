@@ -154,8 +154,8 @@ func TestHooksMethods(t *testing.T) {
 	if got := h.ArtifactFilename(req); got != "debug-decision.json" {
 		t.Errorf("ArtifactFilename() = %q, want %q", got, "debug-decision.json")
 	}
-	if got := h.DefaultModel(); got != "opus" {
-		t.Errorf("DefaultModel() = %q, want %q", got, "opus")
+	if got := h.DefaultModel(); got != "deep" {
+		t.Errorf("DefaultModel() = %q, want %q", got, "deep")
 	}
 }
 

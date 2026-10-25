@@ -81,8 +81,8 @@ func TestPhaseMetadata(t *testing.T) {
 	if got := p.AgentPromptName(); got != "evolve-build-planner" {
 		t.Errorf("AgentPromptName=%q, want evolve-build-planner", got)
 	}
-	if got := p.DefaultModel(); got != "opus" {
-		t.Errorf("DefaultModel=%q, want opus (anti-cooperative-bias requirement)", got)
+	if got := p.DefaultModel(); got != "deep" {
+		t.Errorf("DefaultModel=%q, want the deep tier (anti-cooperative-bias requirement)", got)
 	}
 	if got := p.ArtifactFilename(core.PhaseRequest{}); got != "build-plan.md" {
 		t.Errorf("ArtifactFilename=%q, want build-plan.md", got)

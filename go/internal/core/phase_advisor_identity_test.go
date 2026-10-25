@@ -6,7 +6,7 @@ func TestAdvisorDispatch_DefaultsAndOverrides(t *testing.T) {
 	t.Parallel()
 
 	def := NewPhaseAdvisor(&fakeBridge{}).identity
-	if want := (AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"}); def != want {
+	if want := (AgentIdentity{CLI: "claude-tmux", Model: "deep", AgentLabel: "router"}); def != want {
 		t.Fatalf("default PhaseAdvisor identity = %+v, want %+v", def, want)
 	}
 
@@ -20,7 +20,7 @@ func TestAdvisorDispatch_DefaultsAndOverrides(t *testing.T) {
 	}
 
 	fdef := NewFailureAdvisor(&fakeBridge{}).identity
-	if want := (AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "failure-advisor"}); fdef != want {
+	if want := (AgentIdentity{CLI: "claude-tmux", Model: "deep", AgentLabel: "failure-advisor"}); fdef != want {
 		t.Fatalf("default FailureAdvisor identity = %+v, want %+v", fdef, want)
 	}
 
