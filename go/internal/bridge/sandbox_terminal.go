@@ -21,7 +21,11 @@ func sandboxTerminalPath(ctx context.Context, deps Deps, cfg *Config, session st
 	if err != nil {
 		return "", err
 	}
-	if err := validateSandboxTerminal(path); err != nil {
+	check := deps.terminalCheck
+	if check == nil {
+		check = validateSandboxTerminal
+	}
+	if err := check(path); err != nil {
 		return "", err
 	}
 	return path, nil

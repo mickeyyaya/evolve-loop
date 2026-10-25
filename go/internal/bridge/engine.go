@@ -85,6 +85,7 @@ type Deps struct {
 	SignalProcess         proctree.Signaler
 	sweep                 *dispatchSweep
 	hostOS                string
+	terminalCheck         func(string) error
 }
 
 type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available bool)
