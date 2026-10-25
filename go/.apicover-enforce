@@ -824,3 +824,6 @@
 ./internal/isolation
 # faketmux - the fake tmux of the hermetic e2e matrix: each pane is a detached process that reads a FIFO and writes a screen file, so a tmux driver runs with no tmux server.
 ./internal/faketmux
+
+# dispatchcred - the pipeline dispatch credential that no agent cell can read (ADR-0154 I-3).
+./internal/dispatchcred

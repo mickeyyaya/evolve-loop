@@ -238,6 +238,7 @@ The spec is [llm-isolation.md](../llm-isolation.md) §7.1.
 - `launchSwept` calls `Deps.refuseSandboxOffInPhase` first. A launcher with `EVOLVE_PHASE` and `EVOLVE_SANDBOX=off` gets `ErrSandboxOffInPhase` and `ExitSafetyGate`, and the bridge emits `ISOLATION_I3_VIOLATION`.
 - `Deps.execDeny(cli, goos)` gives the sandbox its exec deny paths and stage. The stage is `Deps.execStage` (policy `isolation.i3.stage`, default `shadow`). The targets come from `execDenyTargets`: the real path of each manifest binary on `PATH`, and each manifest `install_roots` entry that exists. On Linux the binary and the roots of the launched family are left out, because the `bwrap` mask also hides them from the launch.
 - `SandboxWrapRequest.CLI` carries the family of the launch to the wrapper.
+- `Deps.dispatchCredentialDeny(stage)` (`dispatch_credential.go`) runs at each sandboxed launch at `shadow` or `enforce`. It writes the dispatch credential and the stage through `dispatchcred.Store.Ensure`. It gives the real path of `held/` to `DenyReadPaths` and the store directory to `DenyPaths`. An `Ensure` failure writes one `[bridge] WARN dispatch credential` line and keeps both denies. A store that does not resolve adds no deny. `Deps.DispatchStore` is the seam; the default is `dispatchcred.Default` ([internal-dispatchcred.md](internal-dispatchcred.md), spec §7.1.1).
 
 ### The driver factory (`resolve.go`)
 

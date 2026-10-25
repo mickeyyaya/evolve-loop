@@ -96,3 +96,4 @@
 ./internal/codeshape 100
 ./internal/isolation 100
 ./internal/faketmux 100
+./internal/dispatchcred 100

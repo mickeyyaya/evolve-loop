@@ -18,7 +18,7 @@ The package uses two other packages:
 | `New(Config) (*Publisher, error)` | parses the routes, opens the channel logs and starts one writer goroutine for each `best_effort` channel. It reads no environment. |
 | `Config` | `Root` (the `ch` directory), `Role` (the record `source`), `Dispatch` (the `EVOLVE_DISPATCH_ID` that `rootwire` reads) and `Channels`. Also `Log` (the default segment size and the lock deadline), `QueueEvents`, `QueueBytes` and `EnqueueDeadline`. |
 | `Channel` | `Name`, `Route` (a filter expression; empty selects every event), `QoS` and `SegmentBytes` (0 uses `Config.Log.SegmentBytes`) |
-| `Roles() []string` | the closed set of roles of the spec §1: `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate`, `phase-observer`, `wave`, `inbox`, `ci` and `subscriber` |
+| `Roles() []string` | the closed set of roles of the spec §1: `cycle`, `loop`, `loop-chain`, `ship`, `subagent`, `simulate`, `phase-observer`, `wave`, `inbox`, `ci`, `subscriber`, `quality` and `dispatch`. The role `dispatch` is the credential check of [llm-isolation.md](../llm-isolation.md) §7.1.1. |
 | `QoS`, `QoSLossless`, `QoSBestEffort` | the two QoS classes of §6 |
 | `(*Publisher).Listen(signalcenter.Event)` | the Center listener: `center.Subscribe(p.Listen)` |
 | `(*Publisher).Close(deadline) int` | drains the queues and writes the pending gap records until the deadline. It returns the count of the losses that no gap record names. |

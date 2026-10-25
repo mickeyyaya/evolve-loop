@@ -106,6 +106,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/cmd_quality.go:newQualityCenter",
 			"cmd/evolve/cmd_ship.go:shipRootSignals",
 			"cmd/evolve/cmd_subagent.go:runSubagentRun",
+			"cmd/evolve/dispatch_gate.go:emitDispatchViolation",
 		},
 		"attachRootEventsFn": {"cmd/evolve/cmd_cycle.go:newRoleSignalCenter"},
 		"rootwire.Attach":    {"internal/cli/phasecmd/phase_observer.go:observerSignalCenter"},
@@ -141,7 +142,7 @@ func seamDefaultsTo(file *ast.File, name, value string) bool {
 
 func TestRootSignalCenter_EveryRootRunsUnderARoleOfTheClosedSet(t *testing.T) {
 	t.Parallel()
-	roles := []string{roleCycle, roleLoop, roleLoopChain, roleShip, roleSubagent, roleSimulate}
+	roles := []string{roleCycle, roleLoop, roleLoopChain, roleShip, roleSubagent, roleSimulate, roleDispatch}
 
 	for _, role := range roles {
 		if !slices.Contains(publisher.Roles(), role) {

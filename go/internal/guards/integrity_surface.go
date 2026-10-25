@@ -134,6 +134,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/bridge/", Rationale: "Bridge registry, drivers, and OS sandbox fail-closed enforcement for versioned Build"},
 	{Fragment: "/go/internal/adapters/bridge/", Rationale: "Bridge request adapter preserving mandatory Build sandbox propagation"},
 	{Fragment: "/go/internal/adapters/sandbox/", Rationale: "OS-specific confinement policy and generated write boundary"},
+	{Fragment: "/go/internal/dispatchcred/", Rationale: "the dispatch credential that no agent cell can read (ADR-0154 I-3): a cycle that could edit it could let a cell dispatch an agent"},
+	{Fragment: "/go/cmd/evolve/dispatch_gate.go", Rationale: "the check that each dispatch verb holds the dispatch credential (ADR-0154 I-3, llm-isolation.md §7.1.1)"},
 	{Fragment: "/go/internal/looppreflight/checks.go", Rationale: "pre-spend required-sandbox readiness HALT"},
 	{Fragment: "/go/internal/looppreflight/drivers.go", Rationale: "sandbox-enabled profile discovery used by readiness HALT"},
 	{Fragment: "/go/internal/preflight/preflight.go", Rationale: "measured host sandbox capability used by readiness HALT"},

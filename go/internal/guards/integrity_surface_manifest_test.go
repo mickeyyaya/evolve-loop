@@ -255,3 +255,15 @@ func TestProtectedSurfaceManifest_CoversTheBlockerProof(t *testing.T) {
 		t.Error("the prover's tests stay cycle territory")
 	}
 }
+
+func TestProtectedSurfaceManifest_CoversTheDispatchCredential(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/dispatchcred/dispatchcred.go",
+		"/wt/go/internal/dispatchcred/dispatchcred.go",
+		"go/cmd/evolve/dispatch_gate.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("%q holds the dispatch credential or its check; a cycle must not be able to let its own cell dispatch an agent", path)
+		}
+	}
+}
