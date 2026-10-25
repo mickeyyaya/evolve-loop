@@ -5,7 +5,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -136,17 +139,104 @@ const envFingerprintOption = "@evolve_env"
 
 func (t execTmux) NewSessionEnv(ctx context.Context, name string, width, height int, workdir string, env []string) error {
 	env = ipcenv.Keep(env, isShellIdentifier)
+	sweepStaleCellEnv(os.TempDir(), time.Now())
 	file, err := writeCellEnvFile(env)
 	if err != nil {
 		return err
 	}
+	dir := filepath.Dir(file)
 	args := newSessionEnvArgs(name, width, height, workdir, file, envFingerprint(env))
-	if _, err := runCmdBounded(ctx, tmuxCmdTimeout, tmuxClientEnv(env), "tmux", TmuxSocketArgs(args...)...); err != nil {
-		_ = os.RemoveAll(filepath.Dir(file))
-		_, _ = t.run(ctx, "kill-session", "-t", ExactSessionTarget(name))
+	out, err := runCmdBounded(ctx, tmuxCmdTimeout, tmuxClientEnv(env), "tmux", TmuxSocketArgs(args...)...)
+	if err == nil {
+		err = awaitCellEnvConsumed(ctx, dir, cellEnvConsumeTimeout)
+	}
+	if err != nil {
+		_ = os.RemoveAll(dir)
+		if id := createdSessionID(out); id != "" {
+			_, _ = t.run(context.WithoutCancel(ctx), "kill-session", "-t", id)
+		}
 		return err
 	}
 	return nil
+}
+
+var (
+	cellEnvConsumeTimeout = tmuxCmdTimeout
+	cellEnvStaleAfter     = 10 * time.Minute
+)
+
+const (
+	cellEnvPrefix       = "evolve-cellenv-"
+	cellEnvFileName     = "env"
+	cellEnvPollInterval = 5 * time.Millisecond
+)
+
+var sessionIDLine = regexp.MustCompile(`^\$[0-9]+$`)
+
+func createdSessionID(out string) string {
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); sessionIDLine.MatchString(line) {
+			return line
+		}
+	}
+	return ""
+}
+
+func awaitCellEnvConsumed(ctx context.Context, dir string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	tick := time.NewTicker(cellEnvPollInterval)
+	defer tick.Stop()
+	for {
+		if _, err := os.Lstat(dir); errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("the pane did not read its cell env file within %s: %w", timeout, ctx.Err())
+		case <-tick.C:
+		}
+	}
+}
+
+func sweepStaleCellEnv(tmp string, now time.Time) {
+	entries, _ := os.ReadDir(tmp)
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), cellEnvPrefix) {
+			continue
+		}
+		if dir := filepath.Join(tmp, e.Name()); isStaleCellEnvDir(dir, now) {
+			_ = os.RemoveAll(dir)
+		}
+	}
+}
+
+func isStaleCellEnvDir(dir string, now time.Time) bool {
+	info, err := os.Lstat(dir)
+	if err != nil || !info.IsDir() || now.Sub(info.ModTime()) < cellEnvStaleAfter {
+		return false
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 1 || entries[0].Name() != cellEnvFileName || !entries[0].Type().IsRegular() {
+		return false
+	}
+	return hasCellEnvHeader(dir)
+}
+
+func hasCellEnvHeader(dir string) bool {
+	f, err := os.Open(filepath.Join(dir, cellEnvFileName))
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	want := cellEnvHeader(dir)
+	got := make([]byte, len(want))
+	_, err = io.ReadFull(f, got)
+	return err == nil && string(got) == want
+}
+
+func cellEnvHeader(dir string) string {
+	return "/bin/rm -rf " + shellQuotePOSIX(dir) + "\n"
 }
 
 func (t execTmux) SessionEnvFingerprint(ctx context.Context, name string) (string, error) {
@@ -155,11 +245,11 @@ func (t execTmux) SessionEnvFingerprint(ctx context.Context, name string) (strin
 }
 
 func writeCellEnvFile(env []string) (string, error) {
-	dir, err := os.MkdirTemp("", "evolve-cellenv-")
+	dir, err := os.MkdirTemp("", cellEnvPrefix)
 	if err == nil {
 		dir, err = filepath.Abs(dir)
 	}
-	file := filepath.Join(dir, "env")
+	file := filepath.Join(dir, cellEnvFileName)
 	if err == nil {
 		err = os.WriteFile(file, []byte(cellEnvScript(dir, env)), 0o600)
 	}
@@ -172,7 +262,7 @@ func writeCellEnvFile(env []string) (string, error) {
 
 func cellEnvScript(dir string, env []string) string {
 	var body strings.Builder
-	body.WriteString("/bin/rm -rf " + shellQuotePOSIX(dir) + "\nset -a\n")
+	body.WriteString(cellEnvHeader(dir) + "set -a\n")
 	for _, kv := range ipcenv.Keep(env, isShellIdentifier) {
 		name, value, _ := strings.Cut(kv, "=")
 		body.WriteString(name + "=" + shellQuotePOSIX(value) + "\n")
@@ -198,7 +288,7 @@ func tmuxClientEnv(env []string) []string {
 }
 
 func newSessionEnvArgs(name string, width, height int, workdir, file, fingerprint string) []string {
-	args := []string{"new-session", "-d", "-s", name, "-x", fmt.Sprint(width), "-y", fmt.Sprint(height)}
+	args := []string{"new-session", "-d", "-P", "-F", "#{session_id}", "-s", name, "-x", fmt.Sprint(width), "-y", fmt.Sprint(height)}
 	if workdir != "" {
 		args = append(args, "-c", workdir)
 	}

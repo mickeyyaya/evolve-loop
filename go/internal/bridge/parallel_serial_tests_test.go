@@ -1,8 +1,12 @@
 package bridge
 
 var serialTests = map[string]string{
-	"bridge.TestLoadShadowObservers_SkipsRuleWhosePatternDoesNotCompile":        "swaps seam compileShadowPattern",
-	"bridge.TestPaneParity_ReportsTheCycle1853TriggerWhenThePtyRulesAreRemoved": "starts the fixed dispatch id parity-dispatch session that TestPaneParity_RealTmuxPackagesPassInTheSandboxedPaneAsOnTheHost also starts",
+	"bridge.TestNewSessionEnv_ReturnsOnlyAfterThePaneHasRemovedItsFile":                                         "sets env through a helper",
+	"bridge.TestNewSessionEnv_APaneThatNeverReadsItsFileFailsTheStartRemovesTheFileAndKillsOnlyItsOwnSessionID": "sets env through a helper, swaps seam cellEnvConsumeTimeout",
+	"bridge.TestNewSessionEnv_AStartThatPrintsNoSessionIDKillsNothing":                                          "sets env through a helper",
+	"bridge.TestNewSessionEnv_SweepsAStaleEnvDirBeforeItStarts":                                                 "sets env through a helper",
+	"bridge.TestLoadShadowObservers_SkipsRuleWhosePatternDoesNotCompile":                                        "swaps seam compileShadowPattern",
+	"bridge.TestPaneParity_ReportsTheCycle1853TriggerWhenThePtyRulesAreRemoved":                                 "starts the fixed dispatch id parity-dispatch session that TestPaneParity_RealTmuxPackagesPassInTheSandboxedPaneAsOnTheHost also starts",
 	"bridge.TestAddRule_BadCLI":                                                           "swaps seam bridgeManifestDirFn",
 	"bridge.TestAddRule_ErrorPaths":                                                       "swaps seam bridgeManifestDirFn, marshalIndent",
 	"bridge.TestAddRule_RoundTrip":                                                        "swaps seam bridgeManifestDirFn",

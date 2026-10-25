@@ -120,7 +120,7 @@ func TestNewSessionEnvArgs_CarriesNoValueOnlyTheFileAndTheFingerprint(t *testing
 	t.Parallel()
 	got := newSessionEnvArgs("s1", 200, 50, "/w", "/tmp/cell dir/env", "fp1")
 	want := []string{
-		"new-session", "-d", "-s", "s1", "-x", "200", "-y", "50", "-c", "/w",
+		"new-session", "-d", "-P", "-F", "#{session_id}", "-s", "s1", "-x", "200", "-y", "50", "-c", "/w",
 		"/bin/sh", "-c", `exec /usr/bin/env -i TERM="$TERM" /bin/sh '/tmp/cell dir/env'`,
 		";", "set-option", "-t", "=s1:", envFingerprintOption, "fp1",
 	}
@@ -128,7 +128,7 @@ func TestNewSessionEnvArgs_CarriesNoValueOnlyTheFileAndTheFingerprint(t *testing
 		t.Fatalf("args =\n  %q\nwant\n  %q", got, want)
 	}
 	bare := newSessionEnvArgs("s2", 1, 1, "", "/e/env", "fp")
-	wantBare := []string{"new-session", "-d", "-s", "s2", "-x", "1", "-y", "1",
+	wantBare := []string{"new-session", "-d", "-P", "-F", "#{session_id}", "-s", "s2", "-x", "1", "-y", "1",
 		"/bin/sh", "-c", `exec /usr/bin/env -i TERM="$TERM" /bin/sh /e/env`, ";", "set-option", "-t", "=s2:", envFingerprintOption, "fp"}
 	if !slices.Equal(bare, wantBare) {
 		t.Fatalf("no workdir means no -c workdir; got %q", bare)
