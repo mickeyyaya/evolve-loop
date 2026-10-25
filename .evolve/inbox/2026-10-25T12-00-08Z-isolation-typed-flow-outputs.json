@@ -1,0 +1,32 @@
+{
+  "id": "isolation-typed-flow-outputs",
+  "kind": "refactor",
+  "priority_class": "correctness",
+  "weight": 0.48,
+  "route": "console-manual",
+  "title": "LLM isolation X8: every flow-steering output is a declared JSON file that a phasecontract schema checks",
+  "summary": "The advisor, plan judge and retry adjudicator take the last JSON span of stdout (go/internal/core/advisor/parse.go:34,60; phase_judge.go:84; retry_adjudicator_agent.go:70), the failure advisor parses lines (failure_advisor.go:149,165), and the router digest and triage capacity fall back to prose (go/internal/router/digest.go:284,333,345; go/internal/triagecap/floors.go:31,101). Spec: docs/architecture/llm-isolation.md §12.",
+  "fix": "Each flow seat writes advisor-decision.json, judge-verdict.json, retry-adjudication.json, failure-advice.json or triage-decision.json, with a phasecontract schema. Stage legacy for one wave: read the file first, fall back to stdout, emit ISOLATION_I8_VIOLATION on each fallback. Stage enforce: remove the span parsers and prose fallbacks.",
+  "acceptance": [
+    "RED first: row N12 (a judge verdict in prose with no file passes) fails before and passes after",
+    "A schema test for each decision file rejects an unknown field and a missing field",
+    "In legacy each fallback emits ISOLATION_I8_VIOLATION",
+    "At enforce no flow decision reads stdout; a grep guard pins LastBalancedSpan out of flow code",
+    "Changed functions at 100% coverage; spec §12 and the core and router package notes updated"
+  ],
+  "deps": [
+    "isolation-substitution-matrix",
+    "isolation-artifact-index-read-isolation"
+  ],
+  "files": [
+    "go/internal/core/advisor/",
+    "go/internal/core/phase_judge.go",
+    "go/internal/core/retry_adjudicator_agent.go",
+    "go/internal/core/failure_advisor.go",
+    "go/internal/router/digest.go",
+    "go/internal/triagecap/",
+    "go/internal/phasecontract/"
+  ],
+  "created_at": "2026-10-25T12:00:08Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X8 (ADR-0154)"
+}

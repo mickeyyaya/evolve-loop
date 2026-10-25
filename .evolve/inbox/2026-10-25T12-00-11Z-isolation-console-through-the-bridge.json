@@ -1,0 +1,30 @@
+{
+  "id": "isolation-console-through-the-bridge",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.38,
+  "route": "console-manual",
+  "title": "LLM isolation X11: console builds and reviews run through evolve agent run and the bridge, so any family can hold the console seat",
+  "summary": "The console runs builds and reviews as in-process Claude Code subagents (skills/commit/SKILL.md:17, skills/diff-review/SKILL.md:104), outside the bridge and its cell. Spec: docs/architecture/llm-isolation.md §13.",
+  "fix": "Route each console review and build dispatch through evolve agent run with the X10 profiles. Update skills/commit, skills/diff-review and the console build brief. The Claude family stays the default console seat in routing data; another family can hold it.",
+  "acceptance": [
+    "RED first: a console review in the commit skill flow leaves no bridge launch record",
+    "After the change each console review has a bridge launch record and runs in a cell",
+    "A test runs the review chain with a non-Claude fake family as the console seat",
+    "The commit gate attests reviewers from their bridge records",
+    "Changed functions at 100% coverage; spec §13 and the console docs updated"
+  ],
+  "deps": [
+    "isolation-single-launcher",
+    "isolation-floors-and-defaults-as-routing-data",
+    "isolation-neutral-instruction-source"
+  ],
+  "files": [
+    "skills/commit/SKILL.md",
+    "skills/diff-review/SKILL.md",
+    "go/internal/cli/agentcmd/",
+    "go/internal/commitgate/"
+  ],
+  "created_at": "2026-10-25T12:00:11Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X11 (ADR-0154)"
+}

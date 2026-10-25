@@ -1,0 +1,29 @@
+{
+  "id": "selfheal-incident-detector",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.36,
+  "route": "console-manual",
+  "title": "Self-healing X12: a deterministic incident detector writes typed incident records from signals, breaches, red main and stalls",
+  "summary": "The north star of 2026-10-25 asks the loop to detect an error or an accident itself. Detection must be deterministic. Sources: Signal Center WARN and INCIDENT signals, QUALITY_*_BREACH, ISOLATION_* at enforce, red main or CI, zero-ship streaks, system-level failure digests. Spec: docs/architecture/llm-isolation.md §18.1, §18.2, §22 and §24.",
+  "fix": "Add the detector and the record .evolve/incidents/<id>.json (protected path) with id, class, sources, tier, state, attempts, repro_test, opened_at, closed_at. Add the healing module and the incident kinds and codes of spec §24. Implement the four close conditions of I-14. Stage shadow: open and close records only.",
+  "acceptance": [
+    "RED first: a red main and a QUALITY_PQ1_BREACH open no incident record today; after the change each opens one",
+    "A level-triggered pass reopens an incident whose signal still fires after a missed event",
+    "TestIncident_ClosesOnlyWithTheFourConditions",
+    "No agent profile can write .evolve/incidents/",
+    "evolve signals codes check passes; changed functions at 100% coverage"
+  ],
+  "deps": [
+    "isolation-substitution-matrix",
+    "isolation-artifact-index-read-isolation"
+  ],
+  "files": [
+    "go/internal/signalcenter/",
+    "go/internal/core/",
+    "go/internal/guards/integrity_surface.go",
+    "docs/architecture/llm-isolation.md"
+  ],
+  "created_at": "2026-10-25T12:00:12Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X12 (ADR-0155)"
+}

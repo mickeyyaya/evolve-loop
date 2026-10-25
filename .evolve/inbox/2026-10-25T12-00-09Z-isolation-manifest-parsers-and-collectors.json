@@ -1,0 +1,33 @@
+{
+  "id": "isolation-manifest-parsers-and-collectors",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "weight": 0.42,
+  "route": "console-manual",
+  "title": "LLM isolation X9: pane profiles, usage parsers, token collectors and transcripts become manifest capabilities",
+  "summary": "Parsers and collectors are Go switches on the family: panestream/panedelta.go:31, liveness.go:195-196, clicontrol/usage.go:41 (claude and codex only), tokenusage/defaultresolver.go:35,72,94, attemptpostmortem/transcript.go:28,35, llmroute.go:21,120 and modelquery/*. Spec: docs/architecture/llm-isolation.md §11.",
+  "fix": "Add the manifest fields parsers, collectors, transcript, capabilities and home_reads. Go keeps one implementation for each format id; a manifest picks it. A family with no collector shows no_collector. llmroute and modelquery tables read the manifest. A manifest schema test fails on an unknown field or format id.",
+  "acceptance": [
+    "RED first: row N14 (a new manifest with known format ids needs no Go change) fails before and passes after",
+    "A family with no usage parser shows the state no_collector, not zero",
+    "The manifest schema test rejects an unknown format id",
+    "Matrix rows M4 and M5 pass",
+    "Changed functions at 100% coverage; spec §11 and the bridge, panestream, clicontrol and tokenusage package notes updated"
+  ],
+  "deps": [
+    "isolation-single-launcher",
+    "isolation-floors-and-defaults-as-routing-data"
+  ],
+  "files": [
+    "go/internal/bridge/manifests/",
+    "go/internal/bridge/manifest.go",
+    "go/internal/bridge/panestream/",
+    "go/internal/bridge/clicontrol/usage.go",
+    "go/internal/tokenusage/",
+    "go/internal/attemptpostmortem/",
+    "go/internal/llmroute/",
+    "go/internal/modelquery/"
+  ],
+  "created_at": "2026-10-25T12:00:09Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X9 (ADR-0154)"
+}

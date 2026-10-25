@@ -1,0 +1,28 @@
+{
+  "id": "selfheal-repair-cycle-path",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.32,
+  "route": "console-manual",
+  "title": "Self-healing X16: the loop builds T1 pipeline-repair items in a normal repair cycle, and T0 items go to the operator queue",
+  "summary": "Today a pipeline defect gets a console fix (docs/operations/operating-policy.md:70-72); 62 pipeline-repair items are in the inbox, 18 routed to the console and 44 with no route. The tiers are the staged path from console-first to a loop that repairs T1. Spec: docs/architecture/llm-isolation.md §18, §20.2 and §22.",
+  "fix": "An accepted open-repair-item proposal creates an item with its tier. A T1 item runs scout, TDD (a red test that reproduces the incident), build, audit with another family, a mutation gate on changed functions, and ship. A T0 item goes to the console queue as a proposal. Stage keys healing.T1.stage and healing.T2.stage start at shadow and flip only by an operator change on the measured rates.",
+  "acceptance": [
+    "RED first: a T0 pipeline-repair item reaches a loop lane today; after the change the plan refuses it and routes it to the console",
+    "A T1 repair cycle needs a red reproduction test before build",
+    "The incident closes only when the four I-14 conditions hold, and a recovery retrospective exists (ADR-0151)",
+    "In shadow the loop records the proposal and the console does the repair",
+    "Changed functions at 100% coverage; spec §20.2 and the operating policy updated"
+  ],
+  "deps": [
+    "selfheal-action-catalog-validator-budgets",
+    "selfheal-surface-tiers-gate-classifier"
+  ],
+  "files": [
+    "go/internal/core/",
+    "go/internal/inboxrank/",
+    "docs/operations/operating-policy.md"
+  ],
+  "created_at": "2026-10-25T12:00:16Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X16 (ADR-0155)"
+}
