@@ -26,7 +26,7 @@ evolve-loop is a development pipeline that evolves itself. It orchestrates speci
 
 ## Cross-CLI invariants (the universal rules)
 
-These rules apply on every CLI that you run under. They are STRUCTURAL: the OS sandbox, the worktree fence and the ship gates enforce them for every family, not prompt instructions. The Claude Code kernel hooks are defence in depth ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)).
+These rules apply on every CLI that you run under. They are STRUCTURAL: the OS sandbox, the worktree fence and the ship gates enforce them for every family, not prompt instructions. The Claude Code kernel hooks are defence in depth ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports.
 
 ### 1. Pipeline ordering is non-negotiable
 Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`, matcher `Agent|Task` since ADR-0075) is defence in depth. During a cycle, it denies an `Agent` or `Task` call outside a phase cell when its `subagent_type` names a phase persona (`evolve-*`). Inside a cell (the phase marker of the launcher is set), each `Agent` and `Task` call passes. A phase agent can start any subagent of its own harness (llm-isolation §7.2).

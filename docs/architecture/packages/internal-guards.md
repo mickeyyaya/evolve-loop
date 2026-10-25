@@ -6,7 +6,7 @@
 
 `internal/guards` is the in-process trust kernel. It holds the five `core.Guard` implementations that `evolve guard <name>` runs as Claude Code PreToolUse hooks. It also holds `ProtectedSurfaceManifest`, the single list of the pipeline control plane that no autonomous cycle can change. Other packages (the ship tripwire, the build floor and the fleet preflight) inject `IsProtectedSurface` and keep no list of their own. The inbox routing roots and triage's breaker judge with `lanerouting.Forbidden`. It composes `IsProtectedScope` with the sandbox deny list of the build profile ([internal-lanerouting](internal-lanerouting.md)).
 
-The hooks are defence in depth, because they fire only in Claude Code panes. The OS sandbox, the worktree fence and the ship gates hold each guarantee for every family. The sandbox reads `ProtectedSurfaceManifest` for its protected write rule ([llm-isolation.md §9.1](../llm-isolation.md#91-as-built-x7), I-7).
+The hooks are defence in depth, because they fire only in Claude Code panes. The OS sandbox, the worktree fence and the ship gates hold each guarantee for every family. The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports. The sandbox reads `ProtectedSurfaceManifest` for its protected write rule ([llm-isolation.md §9.1](../llm-isolation.md#91-as-built-x7), I-7).
 
 ## Design
 

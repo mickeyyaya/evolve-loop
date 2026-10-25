@@ -60,7 +60,7 @@ func TestPhase_APhasePersonaOutsideACellIsDeniedDuringACycleForAgentAndTask(t *t
 	s, _ := setupStorageWithCS(t, core.CycleState{CycleID: 42, Phase: "build", ActiveAgent: "builder"})
 	g := newPhaseWithEnv(s, false, noCellEnv)
 	for _, tool := range []string{"Agent", "Task"} {
-		for _, persona := range []string{"evo:evolve-builder", "evolve-auditor", "EVO:Evolve-Scout"} {
+		for _, persona := range []string{"evo:evolve-builder", "evolve-auditor", "EVO:Evolve-Scout", " evo: evolve-builder "} {
 			dec := g.Decide(context.Background(), personaCall(tool, persona))
 			if dec.Allow || !strings.HasPrefix(dec.Reason, tool+" of the phase persona "+persona+" denied outside a phase cell during cycle build") {
 				t.Errorf("%s %s outside a cell during a cycle must be denied with a reason that names both: %+v", tool, persona, dec)

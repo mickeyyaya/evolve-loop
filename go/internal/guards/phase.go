@@ -54,6 +54,6 @@ func (p *Phase) Decide(ctx context.Context, in core.GuardInput) core.GuardDecisi
 func isSubagentTool(name string) bool { return name == "Agent" || name == "Task" }
 
 func isPhasePersona(subagentType string) bool {
-	role := subagentType[strings.LastIndex(subagentType, ":")+1:]
+	role := strings.TrimSpace(subagentType[strings.LastIndex(subagentType, ":")+1:])
 	return strings.HasPrefix(strings.ToLower(role), "evolve-")
 }

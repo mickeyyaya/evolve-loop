@@ -41,9 +41,8 @@ Bypass = "don't ask the user", NOT "skip integrity checks". These rules are mand
 1. Continue all cycles without a pause. Never ask "should I continue?".
 2. Run the FULL pipeline every cycle: real `scout-report.md` / `build-report.md` / `audit-report.md`.
 3. The Go orchestrator state machine (`go/internal/core`) enforces the phase order at every transition.
-   `evolve guard phase`: during a cycle, a session outside a phase cell cannot start a phase persona (`evolve-*`). Inside a cell, each `Agent` and `Task` call passes (matrix row N11, X7 of [ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)).
-   The four `evolve guard` hooks are defence in depth in Claude Code panes only. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)).
-   ADR-0075 rewired `evolve guard phase` (`go/internal/guards/phase.go`).
+   `evolve guard phase`: during a cycle, a session outside a phase cell cannot start a phase persona (`evolve-*`). Inside a cell, each `Agent` and `Task` call passes (`go/internal/guards/phase.go`, wired by ADR-0075; matrix row N11, X7 of [ADR-0154](docs/architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)).
+   The four `evolve guard` hooks are defence in depth in Claude Code panes only. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](docs/architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports.
 4. Never fabricate cycle numbers (CRITICAL violation).
 5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). A phase agent can start subagents of its own harness inside its cell.
 6. The OS sandbox wraps subprocesses (`EVOLVE_SANDBOX=1`). When the sandbox is nested, the EPERM fallback turns on automatically.
