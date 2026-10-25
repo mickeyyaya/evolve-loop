@@ -447,17 +447,18 @@ The console runs builds and reviews as in-process Claude Code subagents (F1.10).
 
 X1 builds the matrix first. Each row is a test. A row for an open gap starts as an expected failure, so each later component turns its rows green, and the progress is measured.
 
-The catalog of the rows is `isolation.Rows` in `go/internal/isolation/matrix.go`. Package note: [internal-isolation](packages/internal-isolation.md). Each row has an id, its check, its invariant, the component that turns it green, its state and its owner test file. Each owner test gives the result of its check to `isolation.Judge`:
+The catalog of the rows is `isolation.Rows` in `go/internal/isolation/matrix.go`. Package note: [internal-isolation](packages/internal-isolation.md). Each row has an id, its check, its invariant, the component that turns it green, its state and its owner test file. An open row also has its cause: a text that its failure must contain, for example `claude must be listed` for M2. Each owner test gives the result of its check to `isolation.Judge`:
 
 | Row state | Check result | `Judge` result |
 |---|---|---|
 | green | pass | the test passes |
 | green | fail | the test fails with the cause |
-| open | fail | the test passes and logs "expected failure until <component>" with the cause |
+| open | fail with its cause | the test passes and logs "expected failure until <component>" with the cause |
+| open | fail for another reason | the test fails as inconclusive: a broken harness cannot hide as an expected failure |
 | open | pass | the test fails: the component must set `Open` to false and mark the row green here |
 | unknown id | any | the test fails |
 
-The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` reads each owner file. It fails when a file does not judge its row id. Thus a fix cannot go unseen, and a row cannot go away without a change of the catalog.
+The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` parses each owner file. A test function of the file must call `isolation.Judge` with the row id as its argument, or with a table field that holds the id. Thus a fix cannot go unseen, and a row cannot go away without a change of the catalog.
 
 ### 14.1 Substitution rows (I-9)
 
@@ -465,7 +466,7 @@ The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` reads eac
 
 A row passes when the cycle ships, the ledger holds each phase, and only the stub of the row family ran. X6 adds `floors: {}` to the row policy when the key exists.
 
-Today rows M2 to M5 fail on the Claude floor: the compiler refuses the table with "claude must be listed: the Claude-family floor agents run only on claude". The M1 run also judges rows N1 and N4 from the records of its stubs.
+Today rows M2 to M5 fail on the Claude floor: the compiler refuses the table with "claude must be listed: the Claude-family floor agents run only on claude". The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
 
 The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
 
@@ -488,7 +489,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | open |
 | N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | open |
 | N5 | a cell cannot read `<ws>/.bridge/scout-stdout.log` | I-4 | X5 | sandbox contract | open |
-| N6 | a retry opens its predecessor's `retrospective-report.md` | I-4, I-5 | X5 | sandbox contract | open |
+| N6 | a retry opens its predecessor's `retrospective-report.md` through the index that the pipeline writes | I-4, I-5 | X5 | the matrix (M1 run) | open |
 | N7 | a retry cannot open an unrelated cycle's `audit-report.md` | I-5 | X5 | sandbox contract | open |
 | N8 | a cell cannot read `~/.ssh` | I-5 | X5 | sandbox contract | open |
 | N9 | the network row records today's behavior (allowed) | none | X1 | sandbox contract | green |
@@ -498,7 +499,9 @@ The stub for each family declares the same capabilities as the real manifest. Th
 | N13 | the grep guard finds no family string in flow code | I-6 | X6 | `internal/core` | open |
 | N14 | a new manifest with known format ids needs no Go change | I-6 | X9 | `internal/bridge` | open |
 
-Rows N3, N5 to N10 extend `TestAgentSandboxContract` (`go/internal/bridge/sandbox_contract_integration_test.go`, build tags `integration` and `darwin`). Before X1 it had 22 rows and none for exec, network or a cross-cycle read. The exec row runs a `fakeclitest` stub named `claude`, never a real CLI. The network row connects to a loopback listener of the test, so it needs no outside host. [agent-sandbox-contract.md](agent-sandbox-contract.md) lists the rows.
+Rows N3, N5 and N7 to N10 extend `TestAgentSandboxContract` (`go/internal/bridge/sandbox_contract_integration_test.go`, build tags `integration` and `darwin`). Before X1 it had 22 rows and none for exec, network or a cross-cycle read. The exec row runs a `fakeclitest` stub named `claude`, never a real CLI.
+
+The network row connects to a loopback listener of the test, so it needs no outside host. N8 reads a fixture `.ssh` file in a test `HOME`, so the row does not depend on the host. A plain allow row reads the predecessor's retrospective through a fixture index. It keeps the lineage read open when X5 adds its denies. [agent-sandbox-contract.md](agent-sandbox-contract.md) lists the rows.
 
 The static rows read source, not a run. N2 parses the three launch sites outside the bridge of research F1.2 and counts each use of `sysexec`. N13 parses the non-test files of `internal/core` and counts each string literal that names a family or a driver. The component that closes the row replaces the probe with its own guard if it needs to.
 

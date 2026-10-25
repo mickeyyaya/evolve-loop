@@ -37,7 +37,7 @@ type contractHost struct {
 	runSocket, defaultSocket    string
 	runName, runPID             string
 	ownTTY, peerTTY, scratch    string
-	stubBin, netPort            string
+	stubBin, netPort, home      string
 }
 
 type contractRow struct {
@@ -47,7 +47,6 @@ type contractRow struct {
 	env       []string
 	check     func(t *testing.T, h contractHost, out string)
 	isolation string
-	needs     func() string
 }
 
 const cycle1853ProbeLines = `d=$(mktemp -d /tmp/swxprobe.XXXX)
@@ -134,33 +133,27 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string { return "PATH=" + h.stubBin + ":$PATH claude --version" }},
 	{action: "isolation N5: read the raw output <ws>/.bridge/scout-stdout.log", want: contractDeny, isolation: "N5",
 		script: func(h contractHost) string { return "cat " + h.run + "/.bridge/scout-stdout.log" }},
-	{action: "isolation N6: a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow, isolation: "N6",
+	{action: "a retry opens its predecessor's retrospective through inputs/index.json", want: contractAllow,
 		script: func(h contractHost) string {
 			return `p=$(sed -n 's/.*"path": *"\([^"]*retrospective-report\.md\)".*/\1/p' ` + h.run + `/inputs/index.json) && test -n "$p" && cat "` + h.root + `/$p"`
+		},
+		check: func(t *testing.T, _ contractHost, out string) {
+			if out != "lesson of cycle 6" {
+				t.Fatalf("the indexed read must return the predecessor's lesson, got %q", out)
+			}
 		}},
 	{action: "isolation N7: a retry reads an unrelated cycle's audit-report.md", want: contractDeny, isolation: "N7",
 		script: func(h contractHost) string {
 			return "cat " + filepath.Join(filepath.Dir(h.otherCycle), "cycle-9", "audit-report.md")
 		}},
 	{action: "isolation N8: read ~/.ssh", want: contractDeny, isolation: "N8",
-		script: func(contractHost) string { return `ls "$HOME/.ssh" > /dev/null && echo ok` },
-		needs: func() string {
-			if home, err := os.UserHomeDir(); err != nil || !isDir(filepath.Join(home, ".ssh")) {
-				return "the host has no ~/.ssh, so a refused read cannot be told from an absent one"
-			}
-			return ""
-		}},
+		script: func(contractHost) string { return `cat "$HOME/.ssh/id_fixture"` }},
 	{action: "isolation N9: open a TCP connection (loopback listener of the host)", want: contractAllow, isolation: "N9",
 		script: func(h contractHost) string { return "nc -z -w 2 127.0.0.1 " + h.netPort + " && echo ok" }},
 	{action: "isolation N10: an agy pane writes the protected path go/internal/guards/role.go", want: contractDeny, isolation: "N10",
 		script: func(h contractHost) string {
 			return "mkdir -p " + h.worktree + "/go/internal/guards && echo x > " + h.worktree + "/go/internal/guards/role.go"
 		}},
-}
-
-func isDir(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
 }
 
 func contractFailure(want contractVerdict, out string, err error) error {
@@ -179,11 +172,6 @@ func TestAgentSandboxContract(t *testing.T) {
 	h := newContractHost(t)
 	for _, row := range agentContract {
 		t.Run(row.action, func(t *testing.T) {
-			if row.needs != nil {
-				if why := row.needs(); why != "" {
-					t.Skipf("inconclusive on this host: %s", why)
-				}
-			}
 			out, err := h.agent(t, row)
 			failure := contractFailure(row.want, out, err)
 			if row.isolation != "" {
@@ -274,11 +262,15 @@ func (h *contractHost) withProject(t *testing.T) {
 
 func (h *contractHost) withIsolationFixtures(t *testing.T) {
 	t.Helper()
+	h.home = contractTempDir(t, "", "sbc-home")
+	t.Setenv("HOME", h.home)
 	runs := filepath.Dir(h.run)
 	for rel, body := range map[string]string{
 		filepath.Join(h.run, ".bridge", "scout-stdout.log"):       "raw output of the scout\n",
 		filepath.Join(runs, "cycle-6", "retrospective-report.md"): "lesson of cycle 6\n",
 		filepath.Join(runs, "cycle-9", "audit-report.md"):         "audit of an unrelated item\n",
+		filepath.Join(h.run, "inputs", "index.json"):              `{"schema":"evolve.inputs.index/1","entries":[{"id":"l1","class":"lineage","path":".evolve/runs/cycle-6/retrospective-report.md"}]}` + "\n",
+		filepath.Join(h.home, ".ssh", "id_fixture"):               "fixture secret of the cell home\n",
 	} {
 		if err := os.MkdirAll(filepath.Dir(rel), 0o755); err != nil {
 			t.Fatal(err)

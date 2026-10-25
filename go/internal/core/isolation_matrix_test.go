@@ -15,13 +15,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 )
 
-func judgeRow(t *testing.T, id string, failure error) {
+func reportRow(t *testing.T) func(string, error) {
 	t.Helper()
-	note, err := isolation.Judge(id, failure)
-	if err != nil {
-		t.Fatal(err)
+	return func(note string, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log(note)
 	}
-	t.Log(note)
 }
 
 func TestIsolationMatrix_N12_AJudgeVerdictInProseWithNoFileFailsTheContract(t *testing.T) {
@@ -37,7 +39,7 @@ func TestIsolationMatrix_N12_AJudgeVerdictInProseWithNoFileFailsTheContract(t *t
 	if v.Score != judgeNoOpinion.Score {
 		failure = fmt.Errorf("the plan judge took score %.1f from a JSON span in its stdout prose; %s was never written", v.Score, filepath.Join(in.Workspace, "routing-judge.json"))
 	}
-	judgeRow(t, "N12", failure)
+	reportRow(t)(isolation.Judge("N12", failure))
 }
 
 var familyWords = map[string]bool{
@@ -113,5 +115,5 @@ func TestIsolationMatrix_N13_FlowCodeNamesNoFamily(t *testing.T) {
 	if len(hits) > 0 {
 		failure = fmt.Errorf("internal/core names a family in %d string literal(s), first %s", len(hits), hits[0])
 	}
-	judgeRow(t, "N13", failure)
+	reportRow(t)(isolation.Judge("N13", failure))
 }

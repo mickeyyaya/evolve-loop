@@ -44,34 +44,38 @@ func TestE2ECycleCLIMatrix(t *testing.T) {
 			t.Parallel()
 			run := runMatrixCycle(t, row, evolveBin, fakeBin, repoRoot)
 			failure := run.substitutionFailure(row)
-			judgeMatrixRow(t, row.id, failure)
+			reportRow(t)(isolation.Judge(row.id, failure))
 			if row.id != "M1" {
 				return
 			}
 			if failure != nil || len(run.calls) == 0 {
 				t.Fatalf("rows N1 and N4 read the stub records of a green M1 run; M1 failed or ran no seat: %v", failure)
 			}
-			judgeMatrixRow(t, "N1", run.envLeak())
-			judgeMatrixRow(t, "N4", run.agentRunNotRefused())
+			reportRow(t)(isolation.Judge("N1", run.envLeak()))
+			reportRow(t)(isolation.Judge("N4", run.agentRunNotRefused()))
+			reportRow(t)(isolation.Judge("N6", run.indexMissing()))
 		})
 	}
 }
 
-func judgeMatrixRow(t *testing.T, id string, failure error) {
+func reportRow(t *testing.T) func(string, error) {
 	t.Helper()
-	note, err := isolation.Judge(id, failure)
-	if err != nil {
-		t.Error(err)
-		return
+	return func(note string, err error) {
+		t.Helper()
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		t.Log(note)
 	}
-	t.Log(note)
 }
 
 type matrixRun struct {
-	err     error
-	out     string
-	entries []ledgerEntry
-	calls   []stubCall
+	projRoot string
+	err      error
+	out      string
+	entries  []ledgerEntry
+	calls    []stubCall
 }
 
 type stubCall struct {
@@ -112,7 +116,7 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 	if err != nil && strings.HasPrefix(err.Error(), "timed out") {
 		t.Fatalf("inconclusive: the %s cycle timed out, which is not the routing gap of the row", row.family)
 	}
-	run := matrixRun{err: err, out: out, calls: readStubCalls(t, callLog)}
+	run := matrixRun{projRoot: projRoot, err: err, out: out, calls: readStubCalls(t, callLog)}
 	if _, statErr := os.Stat(filepath.Join(projRoot, ".evolve", "ledger.jsonl")); statErr == nil {
 		run.entries = readLedger(t, projRoot)
 	}
@@ -184,7 +188,7 @@ func readStubCalls(t *testing.T, path string) []stubCall {
 
 func (r matrixRun) substitutionFailure(row matrixRow) error {
 	if r.err != nil {
-		return fmt.Errorf("evolve cycle run with %s as the only route: %v\n%s", row.family, r.err, lastN(r.out, 1500))
+		return fmt.Errorf("evolve cycle run with %s as the only route: %v: %s\n%s", row.family, r.err, lastLineWith(r.out, "evolve cycle run:"), lastN(r.out, 1500))
 	}
 	var missing []string
 	for _, role := range expectedPhasesHappyPath {
@@ -203,6 +207,28 @@ func (r matrixRun) substitutionFailure(row matrixRow) error {
 		if c.binary != want {
 			return fmt.Errorf("a seat ran the %s binary; %s is the only route", c.binary, row.family)
 		}
+	}
+	return nil
+}
+
+func lastLineWith(out, marker string) string {
+	lines := strings.Split(out, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.Contains(lines[i], marker) {
+			return strings.TrimSpace(lines[i])
+		}
+	}
+	return "no line names the cause"
+}
+
+func (r matrixRun) indexMissing() error {
+	workspaces, err := filepath.Glob(filepath.Join(r.projRoot, ".evolve", "runs", "cycle-*"))
+	if err != nil || len(workspaces) == 0 {
+		return fmt.Errorf("inconclusive: the M1 run left no cycle workspace (%v)", err)
+	}
+	indexes, err := filepath.Glob(filepath.Join(r.projRoot, ".evolve", "runs", "cycle-*", "inputs", "index.json"))
+	if err != nil || len(indexes) == 0 {
+		return fmt.Errorf("no inputs/index.json in the %d cycle workspace(s) of the M1 run, so a retry has no index to open its lineage through (%v)", len(workspaces), err)
 	}
 	return nil
 }

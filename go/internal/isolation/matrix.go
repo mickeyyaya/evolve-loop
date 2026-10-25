@@ -3,6 +3,7 @@ package isolation
 import (
 	"fmt"
 	"slices"
+	"strings"
 )
 
 type Row struct {
@@ -12,6 +13,7 @@ type Row struct {
 	ClosedBy  string
 	Open      bool
 	Owner     string
+	Cause     string
 }
 
 const (
@@ -21,24 +23,24 @@ const (
 
 var rows = []Row{
 	{ID: "M1", Check: "a full simulated cycle with claude as the only route", Invariant: "I-9", ClosedBy: "X1", Owner: ownerMatrix},
-	{ID: "M2", Check: "a full simulated cycle with agy as the only route", Invariant: "I-9", ClosedBy: "X6", Open: true, Owner: ownerMatrix},
-	{ID: "M3", Check: "a full simulated cycle with agy-claude as the only route", Invariant: "I-9", ClosedBy: "X6", Open: true, Owner: ownerMatrix},
-	{ID: "M4", Check: "a full simulated cycle with codex as the only route", Invariant: "I-9", ClosedBy: "X6, X9", Open: true, Owner: ownerMatrix},
-	{ID: "M5", Check: "a full simulated cycle with ollama as the only route", Invariant: "I-9", ClosedBy: "X6, X9", Open: true, Owner: ownerMatrix},
-	{ID: "N1", Check: "CLAUDECODE=1 on the parent does not reach any seat", Invariant: "I-2", ClosedBy: "X2", Open: true, Owner: ownerMatrix},
-	{ID: "N2", Check: "no LLM spawn outside the bridge launch API", Invariant: "I-1", ClosedBy: "X3", Open: true, Owner: "internal/sysexec/isolation_matrix_test.go"},
-	{ID: "N3", Check: "a phase pane cannot exec claude --version", Invariant: "I-3", ClosedBy: "X4", Open: true, Owner: ownerContract},
-	{ID: "N4", Check: "evolve agent run inside a phase pane is refused", Invariant: "I-3", ClosedBy: "X4", Open: true, Owner: ownerMatrix},
-	{ID: "N5", Check: "a cell cannot read <ws>/.bridge/scout-stdout.log", Invariant: "I-4", ClosedBy: "X5", Open: true, Owner: ownerContract},
-	{ID: "N6", Check: "a retry opens its predecessor's retrospective-report.md through the index", Invariant: "I-4, I-5", ClosedBy: "X5", Open: true, Owner: ownerContract},
-	{ID: "N7", Check: "a retry cannot open an unrelated cycle's audit-report.md", Invariant: "I-5", ClosedBy: "X5", Open: true, Owner: ownerContract},
-	{ID: "N8", Check: "a cell cannot read ~/.ssh", Invariant: "I-5", ClosedBy: "X5", Open: true, Owner: ownerContract},
+	{ID: "M2", Check: "a full simulated cycle with agy as the only route", Invariant: "I-9", ClosedBy: "X6", Open: true, Owner: ownerMatrix, Cause: "claude must be listed"},
+	{ID: "M3", Check: "a full simulated cycle with agy-claude as the only route", Invariant: "I-9", ClosedBy: "X6", Open: true, Owner: ownerMatrix, Cause: "claude must be listed"},
+	{ID: "M4", Check: "a full simulated cycle with codex as the only route", Invariant: "I-9", ClosedBy: "X6, X9", Open: true, Owner: ownerMatrix, Cause: "claude must be listed"},
+	{ID: "M5", Check: "a full simulated cycle with ollama as the only route", Invariant: "I-9", ClosedBy: "X6, X9", Open: true, Owner: ownerMatrix, Cause: "claude must be listed"},
+	{ID: "N1", Check: "CLAUDECODE=1 on the parent does not reach any seat", Invariant: "I-2", ClosedBy: "X2", Open: true, Owner: ownerMatrix, Cause: "CLAUDECODE=1 of the parent reached"},
+	{ID: "N2", Check: "no LLM spawn outside the bridge launch API", Invariant: "I-1", ClosedBy: "X3", Open: true, Owner: "internal/sysexec/isolation_matrix_test.go", Cause: "outside internal/bridge"},
+	{ID: "N3", Check: "a phase pane cannot exec claude --version", Invariant: "I-3", ClosedBy: "X4", Open: true, Owner: ownerContract, Cause: "stub-claude"},
+	{ID: "N4", Check: "evolve agent run inside a phase pane is refused", Invariant: "I-3", ClosedBy: "X4", Open: true, Owner: ownerMatrix, Cause: "dispatch depth 0"},
+	{ID: "N5", Check: "a cell cannot read <ws>/.bridge/scout-stdout.log", Invariant: "I-4", ClosedBy: "X5", Open: true, Owner: ownerContract, Cause: "raw output of the scout"},
+	{ID: "N6", Check: "the pipeline writes inputs/index.json, the index through which a retry opens its predecessor's retrospective-report.md", Invariant: "I-4, I-5", ClosedBy: "X5", Open: true, Owner: ownerMatrix, Cause: "no inputs/index.json"},
+	{ID: "N7", Check: "a retry cannot open an unrelated cycle's audit-report.md", Invariant: "I-5", ClosedBy: "X5", Open: true, Owner: ownerContract, Cause: "audit of an unrelated item"},
+	{ID: "N8", Check: "a cell cannot read ~/.ssh", Invariant: "I-5", ClosedBy: "X5", Open: true, Owner: ownerContract, Cause: "fixture secret of the cell home"},
 	{ID: "N9", Check: "the network row records today's behavior (allowed)", Invariant: "none", ClosedBy: "X1", Owner: ownerContract},
-	{ID: "N10", Check: "an agy pane cannot write a protected path", Invariant: "I-7", ClosedBy: "X7", Open: true, Owner: ownerContract},
-	{ID: "N11", Check: "guard phase denies Task", Invariant: "I-7", ClosedBy: "X7", Open: true, Owner: "internal/guards/isolation_matrix_test.go"},
-	{ID: "N12", Check: "a judge verdict in prose with no file fails the contract", Invariant: "I-8", ClosedBy: "X8", Open: true, Owner: "internal/core/isolation_matrix_test.go"},
-	{ID: "N13", Check: "no family string in flow code", Invariant: "I-6", ClosedBy: "X6", Open: true, Owner: "internal/core/isolation_matrix_test.go"},
-	{ID: "N14", Check: "a new manifest with known format ids needs no Go change", Invariant: "I-6", ClosedBy: "X9", Open: true, Owner: "internal/bridge/isolation_matrix_test.go"},
+	{ID: "N10", Check: "an agy pane cannot write a protected path", Invariant: "I-7", ClosedBy: "X7", Open: true, Owner: ownerContract, Cause: "err=<nil> out=\"\""},
+	{ID: "N11", Check: "guard phase denies Task", Invariant: "I-7", ClosedBy: "X7", Open: true, Owner: "internal/guards/isolation_matrix_test.go", Cause: "guard phase allowed Task"},
+	{ID: "N12", Check: "a judge verdict in prose with no file fails the contract", Invariant: "I-8", ClosedBy: "X8", Open: true, Owner: "internal/core/isolation_matrix_test.go", Cause: "from a JSON span in its stdout prose"},
+	{ID: "N13", Check: "no family string in flow code", Invariant: "I-6", ClosedBy: "X6", Open: true, Owner: "internal/core/isolation_matrix_test.go", Cause: "names a family in"},
+	{ID: "N14", Check: "a new manifest with known format ids needs no Go change", Invariant: "I-6", ClosedBy: "X9", Open: true, Owner: "internal/bridge/isolation_matrix_test.go", Cause: "unknown field \"parsers\""},
 }
 
 func Rows() []Row { return slices.Clone(rows) }
@@ -62,6 +64,8 @@ func Judge(id string, failure error) (string, error) {
 		return fmt.Sprintf("row %s green: %s", r.ID, r.Check), nil
 	case failure == nil:
 		return "", fmt.Errorf("row %s (%s) passed, but it is an expected failure until %s lands: set Open to false in isolation.Rows and mark the row green in docs/architecture/llm-isolation.md §14", r.ID, r.Check, r.ClosedBy)
+	case !strings.Contains(failure.Error(), r.Cause):
+		return "", fmt.Errorf("row %s: inconclusive: it must fail on its gap (%q) until %s, but it failed for another reason: %w", r.ID, r.Cause, r.ClosedBy, failure)
 	default:
 		return fmt.Sprintf("row %s: expected failure until %s: %v", r.ID, r.ClosedBy, failure), nil
 	}

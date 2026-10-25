@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -61,13 +62,35 @@ func TestLookup_FindsARowAndRefusesAnUnknownID(t *testing.T) {
 
 func TestJudge_AnOpenRowThatFailsIsTheExpectedFailureAndNamesItsComponent(t *testing.T) {
 	t.Parallel()
-	note, err := Judge("M2", errors.New("cli_routing.clis: claude must be listed"))
+	note, err := Judge("M2", errors.New("cli_routing.clis: claude must be listed: the Claude-family floor"))
 	if err != nil {
 		t.Fatalf("an open row that fails is expected, got %v", err)
 	}
 	for _, want := range []string{"M2", "expected failure", "X6", "claude must be listed"} {
 		if !strings.Contains(note, want) {
 			t.Errorf("the note %q must name %q", note, want)
+		}
+	}
+}
+
+func TestJudge_AnOpenRowThatFailsForAnotherReasonIsInconclusive(t *testing.T) {
+	t.Parallel()
+	_, err := Judge("M2", errors.New("evolve cycle run: timed out"))
+	if err == nil {
+		t.Fatal("an open row that fails for a reason other than its gap must fail the test")
+	}
+	for _, want := range []string{"M2", "inconclusive", "claude must be listed", "timed out"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the error %q must name %q", err, want)
+		}
+	}
+}
+
+func TestRows_EveryOpenRowPinsTheCauseOfItsGapAndNoGreenRowDoes(t *testing.T) {
+	t.Parallel()
+	for _, r := range Rows() {
+		if r.Open == (r.Cause == "") {
+			t.Errorf("row %s: Open=%v Cause=%q; an open row must name the text of its gap, a green row none", r.ID, r.Open, r.Cause)
 		}
 	}
 }
@@ -106,66 +129,112 @@ func TestJudge_AnUnknownRowFails(t *testing.T) {
 	}
 }
 
-type ownerCode struct {
-	callsJudge bool
-	literals   map[string]bool
-}
-
-func parseOwner(path string) (ownerCode, error) {
+func judgedIDs(path string) (map[string]bool, error) {
 	f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
 	if err != nil {
-		return ownerCode{}, err
+		return nil, err
 	}
-	code := ownerCode{literals: map[string]bool{}}
-	ast.Inspect(f, func(n ast.Node) bool {
-		switch n := n.(type) {
-		case *ast.SelectorExpr:
-			if pkg, ok := n.X.(*ast.Ident); ok && pkg.Name == "isolation" && n.Sel.Name == "Judge" {
-				code.callsJudge = true
+	ids, fields := map[string]bool{}, map[string]bool{}
+	for _, decl := range f.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || !strings.HasPrefix(fn.Name.Name, "Test") || fn.Body == nil {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok || !isJudge(call.Fun) || len(call.Args) == 0 {
+				return true
 			}
-		case *ast.BasicLit:
-			if s, err := strconv.Unquote(n.Value); n.Kind == token.STRING && err == nil {
-				code.literals[s] = true
+			switch arg := call.Args[0].(type) {
+			case *ast.BasicLit:
+				if id, err := strconv.Unquote(arg.Value); err == nil {
+					ids[id] = true
+				}
+			case *ast.SelectorExpr:
+				fields[arg.Sel.Name] = true
+			}
+			return true
+		})
+	}
+	ast.Inspect(f, func(n ast.Node) bool {
+		kv, ok := n.(*ast.KeyValueExpr)
+		if !ok {
+			return true
+		}
+		key, keyOK := kv.Key.(*ast.Ident)
+		lit, litOK := kv.Value.(*ast.BasicLit)
+		if keyOK && litOK && fields[key.Name] {
+			if id, err := strconv.Unquote(lit.Value); err == nil {
+				ids[id] = true
 			}
 		}
 		return true
 	})
-	return code, nil
+	return ids, nil
 }
 
-func TestParseOwner_SeesCodeNotComments(t *testing.T) {
+func isJudge(fun ast.Expr) bool {
+	sel, ok := fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "isolation" && sel.Sel.Name == "Judge"
+}
+
+func TestJudgedIDs_CountsOnlyAJudgeCallInATestWithTheIDOrATableFieldItReads(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "owner_test.go")
-	src := "package p\n\n// isolation.Judge(\"N5\")\nvar rows = []string{\"N3\"}\nvar _ = isolation.Judge\n"
+	src := `package p
+
+// isolation.Judge("N5", nil)
+var rows = []row{{id: "N3", name: "N7"}}
+var stray = "N8"
+
+func TestRows(t *testing.T) {
+	for _, r := range rows {
+		isolation.Judge(r.id, nil)
+	}
+	isolation.Judge("N1", nil)
+	other.Judge("N2", nil)
+	isolation.Lookup("N4")
+}
+
+func helper() { isolation.Judge("N6", nil) }
+`
 	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	code, err := parseOwner(path)
-	if err != nil || !code.callsJudge || !code.literals["N3"] || code.literals["N5"] {
-		t.Fatalf("code = %+v, err = %v; want Judge and N3 from code, not N5 from a comment", code, err)
+	ids, err := judgedIDs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := slices.Sorted(maps.Keys(ids))
+	if !slices.Equal(got, []string{"N1", "N3"}) {
+		t.Fatalf("judged ids = %v, want [N1 N3]: a comment, a stray literal, another field, another package, Lookup and a non-test function do not count", got)
 	}
 	if err := os.WriteFile(path, []byte("package"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := parseOwner(path); err == nil {
+	if _, err := judgedIDs(path); err == nil {
 		t.Fatal("an owner file that does not parse must fail")
 	}
 }
 
 func TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped(t *testing.T) {
 	t.Parallel()
-	owners := map[string]ownerCode{}
+	owners := map[string]map[string]bool{}
 	for _, r := range Rows() {
-		code, ok := owners[r.Owner]
+		ids, ok := owners[r.Owner]
 		if !ok {
 			var err error
-			if code, err = parseOwner(filepath.Join("..", "..", r.Owner)); err != nil {
+			if ids, err = judgedIDs(filepath.Join("..", "..", r.Owner)); err != nil {
 				t.Fatalf("row %s names owner %s: %v", r.ID, r.Owner, err)
 			}
-			owners[r.Owner] = code
+			owners[r.Owner] = ids
 		}
-		if !code.callsJudge || !code.literals[r.ID] {
-			t.Errorf("row %s: the code of %s must run the row through isolation.Judge with the id %q", r.ID, r.Owner, r.ID)
+		if !ids[r.ID] {
+			t.Errorf("row %s: a test function of %s must call isolation.Judge with %q, or with a table field that holds it", r.ID, r.Owner, r.ID)
 		}
 	}
 }
