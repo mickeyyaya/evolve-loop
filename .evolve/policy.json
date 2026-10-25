@@ -101,10 +101,6 @@
       ]
     }
   },
-  "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout and the operator keys forwarded to predicates, parallel-evaluate rollout, the CLI routing table, gc retention horizons, the inbox priority rank's class order and factor weights, the STE stage of the docs floor, the shadow stage of the audit cascade).",
-  "disposition": {
-    "stage": "enforce"
-  },
   "docs_floor": {
     "ste_stage": "enforce"
   },
@@ -171,6 +167,5 @@
   },
   "regression_tia": {
     "stage": "shadow"
-  },
-  "version": 1
+  }
 }

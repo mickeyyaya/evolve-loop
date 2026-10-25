@@ -245,11 +245,7 @@ func readyCLIsWithDetectMaps(rep setup.DetectReport) ([]string, map[string]map[s
 }
 
 func policyAllowedFamilies(projectRoot string) map[string][]string {
-	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
-	if err != nil {
-		return nil
-	}
-	return pol.CatalogConfig().AllowedFamilies
+	return policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr).CatalogConfig().AllowedFamilies
 }
 
 func tierClassifier(ready, preference []string, dispatcher modelquery.PromptDispatcher, log io.Writer) modelquery.ChainClassifier {

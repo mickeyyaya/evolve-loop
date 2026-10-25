@@ -3,6 +3,7 @@ package policy
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -120,6 +121,14 @@ func Load(path string) (Policy, error) {
 		return Policy{}, fmt.Errorf("policy: parse %s: %w", path, err)
 	}
 	return p, nil
+}
+
+func LoadOrDefaults(path string, warn io.Writer) Policy {
+	p, err := Load(path)
+	if err != nil {
+		fmt.Fprintf(warn, "[policy] WARN %v; the compiled defaults apply\n", err)
+	}
+	return p
 }
 
 func ValidatePin(phase string, pin Pin, prof *profiles.Profile) error {

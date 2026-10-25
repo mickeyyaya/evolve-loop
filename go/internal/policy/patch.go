@@ -10,6 +10,9 @@ func Parse(raw []byte) (Policy, error) {
 	if err := refuseNullCLIRouting(raw); err != nil {
 		return Policy{}, err
 	}
+	if err := refuseUnknownKeys(raw); err != nil {
+		return Policy{}, err
+	}
 	var p Policy
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return Policy{}, err

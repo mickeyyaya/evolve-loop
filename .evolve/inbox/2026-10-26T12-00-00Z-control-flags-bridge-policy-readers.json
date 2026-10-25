@@ -1,0 +1,25 @@
+{
+  "id": "control-flags-bridge-policy-readers",
+  "kind": "hardening",
+  "priority_class": "correctness",
+  "weight": 0.5,
+  "route": "console-manual",
+  "title": "Control flags X18a follow-up: the five bridge readers of policy.json stop dropping the load error",
+  "summary": "X18a made policy.Parse strict and moved 20 silent readers to policy.LoadOrDefaults, which prints one [policy] WARN line and uses the compiled defaults. Five readers in the bridge still drop the error, because builders X3 and X4 changed that code at the same time: go/internal/adapters/bridge/bridge.go NewDefault (if err == nil), go/internal/bridge/capabilities/capabilities.go, go/internal/bridge/catalog_overlay.go, go/internal/bridge/manifest.go and go/internal/bridge/recipe/loader.go. A refused policy then gives the compiled bridge settings with no signal. Spec: docs/architecture/llm-isolation.md §27 step 1.",
+  "fix": "Replace each silent policy.Load in the five readers with policy.LoadOrDefaults and the writer of the caller (deps.Stderr where it exists, else os.Stderr). Keep the behavior on a valid policy.",
+  "acceptance": [
+    "RED first: a test per reader writes a policy with fleet.cuont and asserts a [policy] WARN line that names the key",
+    "No policy.Load call under go/internal/bridge or go/internal/adapters/bridge drops its error",
+    "Changed functions at 100% coverage; the bridge package notes name LoadOrDefaults"
+  ],
+  "deps": ["control-flags-strict-policy-parse"],
+  "files": [
+    "go/internal/adapters/bridge/bridge.go",
+    "go/internal/bridge/capabilities/capabilities.go",
+    "go/internal/bridge/catalog_overlay.go",
+    "go/internal/bridge/manifest.go",
+    "go/internal/bridge/recipe/loader.go"
+  ],
+  "created_at": "2026-10-26T12:00:00Z",
+  "source": "console, 2026-10-26, X18a build (plan llm-isolation-2026-10, ADR-0156); start after X3 and X4 merge"
+}

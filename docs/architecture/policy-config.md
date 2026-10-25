@@ -11,6 +11,16 @@ dispatch resolver use their built-in defaults). A present-but-malformed file is
 a hard error (a typo'd rule fails loudly rather than silently disabling the
 policy).
 
+The whole file decodes strictly (X18a, [llm-isolation.md](llm-isolation.md) §27).
+A key that is not in the schema below fails the load, at any level. The
+error names the full key path, for example `unknown policy key "fleet.cuont"`.
+The file has no free-text keys: write notes in the docs, not in the file.
+
+The loop refuses to start on a refused file, because the `cli-routing` preflight
+check halts. A best-effort reader that runs mid-wave prints one
+`[policy] WARN` line. It then uses the compiled defaults
+(`policy.LoadOrDefaults`).
+
 ## Schema
 
 ```jsonc
@@ -61,7 +71,7 @@ policy).
   // The convergence policy (ADR-0126). The convergence sub-block decodes
   // STRICTLY: an unknown key or an out-of-range number fails the load; an
   // unknown stage or bar word warns and resolves to its default. Absent ⇒ the
-  // compiled default shown here. The other workflow keys stay lenient.
+  // compiled default shown here. An unknown key in any block fails the load.
   "workflow": {
     "convergence": {
       "stage": "shadow",

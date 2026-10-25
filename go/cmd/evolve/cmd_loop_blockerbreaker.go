@@ -44,8 +44,7 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 }
 
 func breakerFailurePolicy(evolveDir string, stderr io.Writer) policy.SystemFailurePolicy {
-	pol, _ := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	fp, err := pol.FailurePolicyConfig()
+	fp, err := policy.LoadOrDefaults(filepath.Join(evolveDir, "policy.json"), stderr).FailurePolicyConfig()
 	if err != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: blocker-breaker: failure policy unreadable (%v) — using compiled defaults\n", err)
 		return policy.DefaultSystemFailurePolicy()

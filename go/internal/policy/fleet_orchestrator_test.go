@@ -44,7 +44,7 @@ func TestFleetConfig_TheOrchestratorKeysOverrideTheDefaults(t *testing.T) {
 func TestParse_RefusesABadOrchestratorBlock(t *testing.T) {
 	cases := map[string]struct{ raw, want string }{
 		"an unknown stage":     {`{"stage":"enfroce"}`, `"enfroce"`},
-		"an unknown key":       {`{"stage":"shadow","width":4}`, `"width"`},
+		"an unknown key":       {`{"stage":"shadow","width":4}`, `orchestrator.width"`},
 		"a negative scan_k":    {`{"scan_k":-1}`, "scan_k"},
 		"a negative hub floor": {`{"hub_min_importers":-3}`, "hub_min_importers"},
 		"a malformed block":    {`{"scan_k":"many"}`, "scan_k"},
@@ -58,7 +58,7 @@ func TestParse_RefusesABadOrchestratorBlock(t *testing.T) {
 		"a negative window min":               {`{"window":{"min":-1}}`, "window.min"},
 		"a window min above the start":        {`{"window":{"start":3,"min":5}}`, "window.min"},
 		"a window min above the default":      {`{"window":{"min":6}}`, "window.min"},
-		"an unknown window key":               {`{"window":{"wide":4}}`, `"wide"`},
+		"an unknown window key":               {`{"window":{"wide":4}}`, `window.wide"`},
 		"a window that is not a block":        {`{"window":4}`, "window"},
 		"a window start that is not a number": {`{"window":{"start":"four"}}`, "start"},
 	}

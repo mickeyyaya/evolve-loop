@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -70,9 +71,5 @@ func usageProbeEnabled(env map[string]string, evolveDir string) bool {
 }
 
 func loadCLIHealthConfig(evolveDir string) policy.CLIHealthConfig {
-	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	if err != nil {
-		return policy.CLIHealthConfig{}
-	}
-	return pol.CLIHealthConfig()
+	return policy.LoadOrDefaults(filepath.Join(evolveDir, "policy.json"), os.Stderr).CLIHealthConfig()
 }

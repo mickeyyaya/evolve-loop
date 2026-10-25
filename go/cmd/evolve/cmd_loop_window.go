@@ -164,7 +164,7 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 }
 
 func (b *loopBatchCoordinator) diskSpaceHalt(iteration int) (batchDecision, bool) {
-	pol, _ := policy.Load(filepath.Join(b.cfg.EvolveDir, "policy.json"))
+	pol := policy.LoadOrDefaults(filepath.Join(b.cfg.EvolveDir, "policy.json"), b.stderr)
 	check := looppreflight.CheckDiskSpace(b.cfg.EvolveDir, pol.PreflightConfig().MinFreeBytes(), looppreflight.DiskFreeBytes)
 	if check.Level != looppreflight.LevelHalt {
 		return batchDecision{}, false

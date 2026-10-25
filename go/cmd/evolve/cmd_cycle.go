@@ -618,13 +618,11 @@ func hostFollowupFiler(ld inboxmover.LedgerAppender, signals *signalcenter.Cente
 }
 
 func kbRecallK(projectRoot string) int {
-	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
-	return pol.ResearchConfig().RecallK
+	return policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr).ResearchConfig().RecallK
 }
 
 func kbRootsAbs(projectRoot string) []string {
-	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
-	raw := research.SearchPathsFromEnv(pol.PathsConfig())
+	raw := research.SearchPathsFromEnv(policy.LoadOrDefaults(filepath.Join(projectRoot, ".evolve", "policy.json"), os.Stderr).PathsConfig())
 	out := make([]string, 0, len(raw))
 	for _, p := range raw {
 		if filepath.IsAbs(p) {

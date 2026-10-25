@@ -119,11 +119,11 @@ func routeRefusal(opts inboxmover.Options, in FailureInputs, committed []string,
 
 func FailureInputsFor(projectRoot, evolveDir, workspace string, cycle int, stderr io.Writer) FailureInputs {
 	failPol := policy.DefaultSystemFailurePolicy()
-	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	if err == nil {
-		if fp, fpErr := pol.FailurePolicyConfig(); fpErr == nil {
-			failPol = fp
-		}
+	pol := policy.LoadOrDefaults(filepath.Join(evolveDir, "policy.json"), stderr)
+	if fp, err := pol.FailurePolicyConfig(); err == nil {
+		failPol = fp
+	} else {
+		fmt.Fprintf(stderr, "[cycle-outcome] WARN: failure policy unreadable (%v); the compiled retry ceiling applies\n", err)
 	}
 	cls := cycleclassify.Classify(workspace)
 	in := FailureInputs{

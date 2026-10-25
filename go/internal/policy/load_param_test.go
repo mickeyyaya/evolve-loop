@@ -2,6 +2,7 @@ package policy_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -24,12 +25,13 @@ func TestLoad_MalformedJSONErrors(t *testing.T) {
 	}
 }
 
-func TestLoad_UnknownFieldsIgnored(t *testing.T) {
-	pol, err := policy.Load(writeTempPolicy(t, `{"totally_unknown_key":123,"quota_reset":{"reset_at":"X"}}`))
-	if err != nil {
-		t.Fatalf("unknown fields must be ignored, got %v", err)
+func TestLoad_AnUnknownFieldFailsTheLoadAndNamesTheFile(t *testing.T) {
+	path := writeTempPolicy(t, `{"totally_unknown_key":123,"quota_reset":{"reset_at":"X"}}`)
+	pol, err := policy.Load(path)
+	if err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), `"totally_unknown_key"`) {
+		t.Fatalf("an unknown key fails the load and names the file and the key, got %v", err)
 	}
-	if got := pol.QuotaResetConfig().ResetAt; got != "X" {
-		t.Errorf("known field after unknown = %q, want X", got)
+	if got := pol.QuotaResetConfig().ResetAt; got != "" {
+		t.Errorf("a refused policy yields no settings, got reset_at %q", got)
 	}
 }

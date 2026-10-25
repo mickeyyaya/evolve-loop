@@ -65,27 +65,15 @@ func resolveCircuitBreakerThreshold(threshold int) int {
 }
 
 func loadDispatchConfig(evolveDir string) policy.DispatchConfig {
-	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	if err != nil {
-		return policy.DispatchConfig{Policy: "verify", RepeatThreshold: defaultCircuitBreakerThreshold}
-	}
-	return pol.DispatchConfig()
+	return policy.LoadOrDefaults(filepath.Join(evolveDir, "policy.json"), os.Stderr).DispatchConfig()
 }
 
 func loadWorkflowConfig(evolveDir string) policy.WorkflowConfig {
-	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	if err != nil {
-		return policy.Policy{}.WorkflowConfig()
-	}
-	return pol.WorkflowConfig()
+	return policy.LoadOrDefaults(filepath.Join(evolveDir, "policy.json"), os.Stderr).WorkflowConfig()
 }
 
 func loadClassifyConfig(evolveDir string) policy.ClassifyPolicy {
-	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
-	if err != nil {
-		return policy.ClassifyPolicy{}
-	}
-	return pol.ClassifyConfig()
+	return policy.LoadOrDefaults(filepath.Join(evolveDir, "policy.json"), os.Stderr).ClassifyConfig()
 }
 
 func recordAbsorbedFail(cfg loopConfig, ranCycle int, stderr io.Writer) {

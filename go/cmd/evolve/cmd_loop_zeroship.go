@@ -25,7 +25,7 @@ func (b *loopBatchCoordinator) zeroShipHalt(batchStartCycle int) (rc int, halted
 	b.zeroShip.waves = append(b.zeroShip.waves, core.CountShips(cycles))
 
 	ceiling := policy.DefaultSystemFailurePolicy().Thresholds.ZeroShipHalt
-	pol, _ := policy.Load(filepath.Join(b.cfg.EvolveDir, "policy.json"))
+	pol := policy.LoadOrDefaults(filepath.Join(b.cfg.EvolveDir, "policy.json"), b.stderr)
 	if fp, err := pol.FailurePolicyConfig(); err != nil {
 		fmt.Fprintf(b.stderr, "[loop] WARN: zero-ship breaker: failure policy unreadable (%v) — using the compiled default\n", err)
 	} else {
