@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/faketmux"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -23,6 +24,7 @@ type Invocation struct {
 	VersionOnly  bool
 	Style        string
 	Interactive  bool
+	Model        string
 }
 
 var phaseToBasename = map[string]string{
@@ -52,6 +54,9 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 1 && args[0] == faketmux.Flag {
+		return faketmux.Run(args[1], args[2:], stdout, stderr)
+	}
 	inv, err := parseArgs(args, stdin)
 	if err != nil {
 		fmt.Fprintf(stderr, "fake-cli: parse args: %v\n", err)
@@ -62,6 +67,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 	if inv.Interactive {
+		printAgyFooter(stdout, inv)
 		return runREPL(stdin, stdout, stderr, auditVerdict())
 	}
 	if code := injectedExitCode(inv.Style); code != 0 {
@@ -122,6 +128,7 @@ func parseArgs(args []string, stdin io.Reader) (Invocation, error) {
 		Prompt:       prompt,
 		Style:        flags.style(),
 		Interactive:  interactive,
+		Model:        flags.model,
 	}, nil
 }
 
@@ -131,6 +138,7 @@ type argFlags struct {
 	isCodexExec   bool
 	hasPromptFlag bool
 	skipPerms     bool
+	model         string
 }
 
 func scanFlags(args []string) argFlags {
@@ -150,6 +158,7 @@ func scanFlags(args []string) argFlags {
 			f.isCodexExec = true
 			i++
 		case (a == "-m" || a == "--model") && i+1 < len(args):
+			f.model = args[i+1]
 			i += 2
 		case a == "--allowedTools":
 			i++
