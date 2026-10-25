@@ -215,6 +215,7 @@ The spec is [llm-isolation.md](../llm-isolation.md) §6 and §6.1. An LLM child 
 - Only the names of `pipelineEnvMarkers` pass from the `EVOLVE_` space, from the launcher or from `Deps.Env`. A `BRIDGE_ALLOW_*` opt-in passes its target variable (`envOptIns`).
 - A signal carries the name in `target`, never the value. `Deps.EnvDrops` reports each family and name once.
 - At `enforce`, `startSession` starts a pane through `envSessionStarter.NewSessionEnv`. The values go in a 0600 script that removes itself, never in an argv. The pane command `/bin/sh -c 'exec /usr/bin/env -i TERM="$TERM" /bin/sh <script>'` drops each other name. A controller with no `NewSessionEnv` refuses the launch.
+- `NewSessionEnv` returns only after the pane has removed the script. A failed start removes the script and kills a session only by the id that it created. Each start sweeps the stale script dirs that carry the bridge header (spec [llm-isolation](../llm-isolation.md) §6.1).
 - At `enforce`, a named session is used again only when its `@evolve_env` fingerprint matches the cell environment (`checkReusedSessionEnv`).
 - The signal code is `isolation.ViolationCode(2)`, which `internal/isolation` registers.
 - `LaunchLLM` gives `probeEnv(bin)` to the version inventory and the model queries, so they follow the same stage.

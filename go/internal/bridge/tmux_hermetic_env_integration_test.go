@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -141,5 +142,46 @@ func TestRealTmux_EachSessionOfASharedServerCarriesItsOwnFingerprint(t *testing.
 		if got, err := (execTmux{}).SessionEnvFingerprint(ctx, name); err != nil || got != envFingerprint(env) {
 			t.Errorf("%s fingerprint = %q, %v; want its own %q", name, got, err, envFingerprint(env))
 		}
+	}
+}
+
+func TestRealTmux_AKilledSessionLeavesNoEnvFile(t *testing.T) {
+	requireTmux(t)
+	socket := DeriveTestSocket(os.Getpid()) + "-earlykill"
+	t.Setenv(TmuxSocketEnv, socket)
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	t.Cleanup(func() { _ = exec.Command("tmux", TmuxSocketArgs("kill-server")...).Run() })
+	ctx := context.Background()
+	env := []string{"PATH=/usr/bin:/bin", "HOME=" + tmp, "CLAUDE_CODE_OAUTH_TOKEN=fake-secret-for-test"}
+	for i := range 20 {
+		name := "early-" + strconv.Itoa(i)
+		if err := (execTmux{}).NewSessionEnv(ctx, name, 80, 24, "", env); err != nil {
+			t.Fatalf("start %s: %v", name, err)
+		}
+		if err := (execTmux{}).KillSession(ctx, name); err != nil {
+			t.Fatalf("kill %s: %v", name, err)
+		}
+	}
+	if leftovers, _ := filepath.Glob(filepath.Join(tmp, "evolve-cellenv-*")); len(leftovers) != 0 {
+		t.Fatalf("a session killed right after its start left %d env files: %v", len(leftovers), leftovers)
+	}
+}
+
+func TestRealTmux_AFailedStartNeverKillsASessionItDidNotCreate(t *testing.T) {
+	requireTmux(t)
+	socket := DeriveTestSocket(os.Getpid()) + "-notmine"
+	t.Setenv(TmuxSocketEnv, socket)
+	t.Setenv("TMPDIR", t.TempDir())
+	t.Cleanup(func() { _ = exec.Command("tmux", TmuxSocketArgs("kill-server")...).Run() })
+	if out, err := exec.Command("tmux", TmuxSocketArgs("-f", os.DevNull, "new-session", "-d", "-s", "theirs")...).CombinedOutput(); err != nil {
+		t.Fatalf("start the session of another owner: %v: %s", err, out)
+	}
+	ctx := context.Background()
+	if err := (execTmux{}).NewSessionEnv(ctx, "theirs", 80, 24, "", []string{"PATH=/usr/bin:/bin"}); err == nil {
+		t.Fatal("a duplicate session name must fail the start")
+	}
+	if !(execTmux{}).HasSession(ctx, "theirs") {
+		t.Fatal("a failed start killed a session that it did not create")
 	}
 }
