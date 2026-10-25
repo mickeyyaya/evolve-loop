@@ -5,14 +5,21 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dashboard"
 )
 
-func isLoopStatusInvocation(args []string) bool {
-	return len(args) > 0 && args[0] == "status" && (len(args) == 1 || strings.HasPrefix(args[1], "-"))
+func loopStatusArgs(args []string) ([]string, bool) {
+	fs := flag.NewFlagSet("evolve loop", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	registerLoopArgFlags(fs)
+	registerPerAgentOverrides(fs)
+	if fs.Parse(args) != nil || fs.Arg(0) != "status" {
+		return nil, false
+	}
+	flagEnd := len(args) - fs.NArg()
+	return append(append([]string{}, args[:flagEnd]...), args[flagEnd+1:]...), true
 }
 
 func runLoopStatus(args []string, stdout, stderr io.Writer) int {

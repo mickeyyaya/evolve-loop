@@ -67,13 +67,19 @@ func signalStop(stdout, stderr io.Writer, lr *loopResult, where string) {
 }
 
 func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if isLoopStatusInvocation(args) {
-		return runLoopStatus(args[1:], stdout, stderr)
+	if statusArgs, ok := loopStatusArgs(args); ok {
+		return runLoopStatus(statusArgs, stdout, stderr)
 	}
 	cfg, rc := parseLoopArgs(args, stderr)
 	if rc != 0 {
 		return rc
 	}
+	return loopLaunchFn(cfg, stdin, stdout, stderr)
+}
+
+var loopLaunchFn = launchParsedLoop
+
+func launchParsedLoop(cfg loopConfig, stdin io.Reader, stdout, stderr io.Writer) int {
 	if cfg.PreflightOnly || cfg.Detach {
 		return runLoopFrontDoor(cfg, stdout, stderr)
 	}

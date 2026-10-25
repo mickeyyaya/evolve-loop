@@ -46,6 +46,27 @@ func TestBlockSpan(t *testing.T) {
 	}
 }
 
+func TestBlockSpan_AQuotedListItemStandsAlone(t *testing.T) {
+	t.Parallel()
+	lines := strings.Split("> **Head:**\n>\n> - item one\n>   more\n> - item two\n> - item three\n>\n> quoted text\n", "\n")
+	for name, tc := range map[string]struct {
+		line, from, to int
+	}{
+		"a quoted item runs to its continuation": {3, 3, 4},
+		"a quoted item stands alone":             {5, 5, 5},
+		"the last quoted item stops at a bare >": {6, 6, 6},
+		"a bare > is alone":                      {7, 7, 7},
+		"quoted text after a bare > is its own":  {8, 8, 8},
+	} {
+		t.Run(name, func(t *testing.T) {
+			from, to := blockSpan(lines, tc.line)
+			if got, want := []int{from, to}, []int{tc.from, tc.to}; !reflect.DeepEqual(got, want) {
+				t.Fatalf("blockSpan(%d) = %v, want %v", tc.line, got, want)
+			}
+		})
+	}
+}
+
 func FuzzBlockSpan(f *testing.F) {
 	f.Add("a\n\nb\n- c\n| d |\n# e\n", 3)
 	f.Add("", 1)

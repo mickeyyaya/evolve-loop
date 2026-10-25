@@ -59,6 +59,7 @@ The stages of the floor (2026-10-21):
 - At `shadow` the floor only WARNs. A lint that did not run is a WARN too.
 - At `enforce` a finding on an added line of a changed document is a floor failure, so the build gets the document back (`steLintFloor`).
 - The floor scopes the findings with `KeepAdded`, the same scope as `evolve docs ste-lint --changed <base> --added`, which CI runs. A document new at the base counts whole, and so does a document whose added lines git cannot report.
+- `KeepAdded` keeps a finding when its block holds an added line (`blockSpan`). A list item starts a new block, and so does a list item in a blockquote. A blank line and a bare `>` line end a block. Thus an edit of one quoted list item does not report the other items (`TestBlockSpan_AQuotedListItemStandsAlone`).
 - At `enforce` a standard that does not load is a floor failure, because a lane can break the standard in its worktree.
 - A document that the lint cannot read stays a WARN at every stage, so such a document can still land at `enforce`.
 
@@ -79,6 +80,7 @@ The stages of the floor (2026-10-21):
 
 ## History
 
+- **2026-10-26:** X17a found that an edit of one item of a quoted list reported the whole blockquote. `blockSpan` now reads a quoted line without its `>` marks.
 - **2026-10-17:** the review follow-ups of cycle 1927. The end of a blockquote closes its fence and its HTML comment. A `---` line after a list item is a rule, not a setext underline. Named tests kill three mutants of the quotation rules.
 - **2026-10-08:** fix round 1 after the J_0 review. A quotation is one word, and the lint checks link text and headings for words only. A blockquote is prose. The word-table exemption is for the standard only, and an inline tag does not start an HTML block. The `--go` mode knows injected streams, and three abbreviations join the house list.
 - **2026-10-07:** the first version: batch S0 of the STE plan, and the `--go` mode of batch S10.
