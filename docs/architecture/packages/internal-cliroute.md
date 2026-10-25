@@ -1,5 +1,7 @@
 # internal/cliroute
 
+> **Isolation ([ADR-0154](../adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)).** The routing table holds the family floors and the defaults of the flow seats as data (I-6). The spec of record: [llm-isolation.md](../llm-isolation.md).
+
 > The design and its landing plan: [cli-routing-table-2026-10.md](../../plans/cli-routing-table-2026-10.md). The plan primitives this package composes: [internal-llmroute.md](internal-llmroute.md). The schema of the `cli_routing` block: [internal-policy.md](internal-policy.md). The Claude-family floor list and `cross_family_with`: [internal-profiles.md](internal-profiles.md). This page keeps the package-level detail those do not.
 
 ## Purpose

@@ -1,5 +1,7 @@
 # internal/adapters/sandbox
 
+> **Isolation ([ADR-0154](../adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)).** The sandbox holds the read grants, the exec deny and the write fence of the agent cell (I-3, I-5, I-7). The spec of record: [llm-isolation.md](../llm-isolation.md).
+
 ## Purpose
 
 `internal/adapters/sandbox` ports the OS-level sandboxing layer. It has two halves. The generators build the macOS `sandbox-exec` profile (SBPL) and the Linux `bwrap` argv from one `Config`. The probe measures if the host's sandbox binary actually applies. `confinement.go` is the single source of the confinement decision that the bridge launch path and the host preflight both consume. The package is ported from `scripts/cli_adapters/claude.sh`.
