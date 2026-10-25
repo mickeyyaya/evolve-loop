@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
@@ -9,7 +10,7 @@ import (
 )
 
 func sandboxTerminalPath(ctx context.Context, deps Deps, cfg *Config, session string) (string, error) {
-	if runtime.GOOS != "darwin" || cfg.Worktree == "" && !cfg.RequireSandbox || strings.TrimSpace(deps.Env[envSandboxMode]) == "off" {
+	if cmp.Or(deps.hostOS, runtime.GOOS) != "darwin" || cfg.Worktree == "" && !cfg.RequireSandbox || strings.TrimSpace(deps.Env[envSandboxMode]) == "off" {
 		return "", nil
 	}
 	reader, ok := deps.Tmux.(paneTTYReader)
@@ -20,7 +21,11 @@ func sandboxTerminalPath(ctx context.Context, deps Deps, cfg *Config, session st
 	if err != nil {
 		return "", err
 	}
-	if err := validateSandboxTerminal(path); err != nil {
+	check := deps.terminalCheck
+	if check == nil {
+		check = validateSandboxTerminal
+	}
+	if err := check(path); err != nil {
 		return "", err
 	}
 	return path, nil

@@ -3,10 +3,13 @@ package bridge
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,10 +40,13 @@ type execTmux struct{}
 
 const tmuxCmdTimeout = 30 * time.Second
 
-func runCmdBounded(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
+func runCmdBounded(ctx context.Context, timeout time.Duration, env []string, name string, args ...string) (string, error) {
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := boundedCommand(cctx, name, args...)
+	if env != nil {
+		cmd.Env = env
+	}
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -99,7 +105,7 @@ func TmuxSocketArgs(args ...string) []string {
 }
 
 func (execTmux) run(ctx context.Context, args ...string) (string, error) {
-	return runCmdBounded(ctx, tmuxCmdTimeout, "tmux", TmuxSocketArgs(args...)...)
+	return runCmdBounded(ctx, tmuxCmdTimeout, nil, "tmux", TmuxSocketArgs(args...)...)
 }
 
 func (t execTmux) HasSession(ctx context.Context, name string) bool {
@@ -119,6 +125,85 @@ type workdirSessionStarter interface {
 func (t execTmux) NewSessionIn(ctx context.Context, name string, width, height int, workdir string) error {
 	_, err := t.run(ctx, "new-session", "-d", "-s", name, "-x", fmt.Sprint(width), "-y", fmt.Sprint(height), "-c", workdir)
 	return err
+}
+
+type envSessionStarter interface {
+	NewSessionEnv(ctx context.Context, name string, width, height int, workdir string, env []string) error
+	SessionEnvFingerprint(ctx context.Context, name string) (string, error)
+}
+
+const envFingerprintOption = "@evolve_env"
+
+func (t execTmux) NewSessionEnv(ctx context.Context, name string, width, height int, workdir string, env []string) error {
+	env = ipcenv.Keep(env, isShellIdentifier)
+	file, err := writeCellEnvFile(env)
+	if err != nil {
+		return err
+	}
+	args := newSessionEnvArgs(name, width, height, workdir, file, envFingerprint(env))
+	if _, err := runCmdBounded(ctx, tmuxCmdTimeout, tmuxClientEnv(env), "tmux", TmuxSocketArgs(args...)...); err != nil {
+		_ = os.RemoveAll(filepath.Dir(file))
+		_, _ = t.run(ctx, "kill-session", "-t", ExactSessionTarget(name))
+		return err
+	}
+	return nil
+}
+
+func (t execTmux) SessionEnvFingerprint(ctx context.Context, name string) (string, error) {
+	out, err := t.run(ctx, "show-options", "-qv", "-t", ExactSessionTarget(name), envFingerprintOption)
+	return strings.TrimSpace(out), err
+}
+
+func writeCellEnvFile(env []string) (string, error) {
+	dir, err := os.MkdirTemp("", "evolve-cellenv-")
+	if err == nil {
+		dir, err = filepath.Abs(dir)
+	}
+	file := filepath.Join(dir, "env")
+	if err == nil {
+		err = os.WriteFile(file, []byte(cellEnvScript(dir, env)), 0o600)
+	}
+	if err != nil {
+		_ = os.RemoveAll(dir)
+		return "", fmt.Errorf("write the cell env file: %w", err)
+	}
+	return file, nil
+}
+
+func cellEnvScript(dir string, env []string) string {
+	var body strings.Builder
+	body.WriteString("/bin/rm -rf " + shellQuotePOSIX(dir) + "\nset -a\n")
+	for _, kv := range ipcenv.Keep(env, isShellIdentifier) {
+		name, value, _ := strings.Cut(kv, "=")
+		body.WriteString(name + "=" + shellQuotePOSIX(value) + "\n")
+	}
+	body.WriteString("set +a\nexec /bin/sh\n")
+	return body.String()
+}
+
+func envFingerprint(env []string) string {
+	sorted := slices.Sorted(slices.Values(env))
+	sum := sha256.Sum256([]byte(strings.Join(sorted, "\x00")))
+	return hex.EncodeToString(sum[:8])
+}
+
+func tmuxClientEnv(env []string) []string {
+	client := ipcenv.Keep(env, func(name string) bool {
+		return slices.Contains(baseEnvNames, name) || strings.HasPrefix(name, "LC_")
+	})
+	if dir, ok := os.LookupEnv("TMUX_TMPDIR"); ok {
+		client = append(client, "TMUX_TMPDIR="+dir)
+	}
+	return client
+}
+
+func newSessionEnvArgs(name string, width, height int, workdir, file, fingerprint string) []string {
+	args := []string{"new-session", "-d", "-s", name, "-x", fmt.Sprint(width), "-y", fmt.Sprint(height)}
+	if workdir != "" {
+		args = append(args, "-c", workdir)
+	}
+	pane := `exec /usr/bin/env -i TERM="$TERM" /bin/sh ` + shellQuotePOSIX(file)
+	return append(args, "/bin/sh", "-c", pane, ";", "set-option", "-t", ExactSessionTarget(name), envFingerprintOption, fingerprint)
 }
 
 func (t execTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {
@@ -190,6 +275,8 @@ type FakeTmuxController struct {
 	KilledSessions []string
 	NewSessionErr  error
 	PaneCmd        string
+	Fingerprints   map[string]string
+	FingerprintErr error
 }
 
 func (f *FakeTmuxController) PaneCommand(_ context.Context, _ string) (string, error) {
@@ -217,6 +304,25 @@ func (f *FakeTmuxController) NewSession(_ context.Context, name string, _, _ int
 	f.Existing[name] = true
 	f.Events = append(f.Events, "new-session:"+name)
 	return nil
+}
+
+func (f *FakeTmuxController) NewSessionEnv(ctx context.Context, name string, width, height int, _ string, env []string) error {
+	if err := f.NewSession(ctx, name, width, height); err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.Fingerprints == nil {
+		f.Fingerprints = map[string]string{}
+	}
+	f.Fingerprints[name] = envFingerprint(ipcenv.Keep(env, isShellIdentifier))
+	return nil
+}
+
+func (f *FakeTmuxController) SessionEnvFingerprint(_ context.Context, name string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.Fingerprints[name], f.FingerprintErr
 }
 
 func (f *FakeTmuxController) SendKeys(_ context.Context, _ string, keys string, enter bool) error {

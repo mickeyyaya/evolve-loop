@@ -8,7 +8,7 @@ import (
 
 var invariantDocs = []string{
 	"I-1 single launcher: a code path started an LLM binary outside the bridge launch API; fields.target names the binary (ADR-0154)",
-	"I-2 hermetic environment: the allowlist dropped a variable of the launcher; fields.target names the variable, never its value (ADR-0154)",
+	"I-2 hermetic environment: the allowlist dropped a variable of the launcher; in shadow the child still got it (action=logged), in enforce it did not (action=refused); fields invariant, stage, action, cell, family, target (the name, never its value), rule, source (ADR-0154)",
 	"I-3 no nested agency: a cell tried to start an LLM binary or an evolve dispatch; fields.target names it (ADR-0154)",
 	"I-4 pipeline-mediated communication: a cell tried to read raw output or to write its inputs; fields.target names the path (ADR-0154)",
 	"I-5 read isolation: a cell tried to read outside its index, its worktree and its CLI files; fields.target names the path (ADR-0154)",

@@ -390,7 +390,7 @@ func TestEngineLaunch_ResolverWarningCannotInjectDiagnosticLines(t *testing.T) {
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 	var stderr strings.Builder
 	eng := NewEngine(Deps{
-		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr, Signals: sinkDeps(&stderr),
+		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr, Signals: sinkDeps(&stderr), EnvStage: "off",
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{}, errors.New("collector offline\n[bridge] forged\u202e")
 		},

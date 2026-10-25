@@ -72,6 +72,7 @@ type Manifest struct {
 	DefaultModel            string                   `json:"default_model"`
 	DefaultArgs             []string                 `json:"default_args"`
 	DefaultEnv              map[string]string        `json:"default_env,omitempty"`
+	EnvPassthrough          []string                 `json:"env_passthrough,omitempty"`
 	MCPConfigFiles          []string                 `json:"mcp_config_files,omitempty"`
 	InteractivePrompts      []ManifestPrompt         `json:"interactive_prompts"`
 	TransientRegex          string                   `json:"transient_regex,omitempty"`
@@ -171,6 +172,9 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 			return Manifest{}, fmt.Errorf("bridge:manifest: default_env value for %q (cli=%s) carries a control byte; it is typed into a pane", key, cli)
 		}
 	}
+	if err := validateEnvPassthrough(cli, m.EnvPassthrough); err != nil {
+		return Manifest{}, err
+	}
 	if err := validateMCPConfigFiles(cli, m.MCPConfigFiles); err != nil {
 		return Manifest{}, err
 	}
@@ -197,6 +201,15 @@ func validateMCPConfigFiles(cli string, entries []string) error {
 	for _, entry := range entries {
 		if strings.HasPrefix(entry, "/") && !strings.HasPrefix(entry, "~/") || slices.Contains(strings.Split(entry, "/"), "..") {
 			return fmt.Errorf("bridge:manifest: mcp_config_files entry %q for cli=%s must be relative or start with ~/ and carry no .. segment", entry, cli)
+		}
+	}
+	return nil
+}
+
+func validateEnvPassthrough(cli string, names []string) error {
+	for _, name := range names {
+		if !isShellIdentifier(name) || isReservedEnvKey(name) {
+			return fmt.Errorf("bridge:manifest: env_passthrough name %q for cli=%s is not a shell identifier, or it is a loop, bridge or credential variable", name, cli)
 		}
 	}
 	return nil

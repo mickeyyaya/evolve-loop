@@ -96,11 +96,10 @@ func runMatrixCycle(t *testing.T, row matrixRow, evolveBin, fakeBin, repoRoot st
 		"EVOLVE_RESEARCH_HOOK_DISABLED=1",
 		"EVOLVE_SANDBOX=off",
 		"BRIDGE_TESTING=1",
-		"MATRIX_CALL_LOG="+callLog,
 	)
 	for _, bin := range stubBinaries {
 		path := filepath.Join(binDir, bin)
-		fakeclitest.Install(t, path, stubScript(bin, fakeBin))
+		fakeclitest.Install(t, path, stubScript(bin, fakeBin, callLog))
 		env = append(env, "BRIDGE_"+strings.ToUpper(bin)+"_BINARY="+path)
 	}
 	fakeclitest.Install(t, filepath.Join(binDir, "tmux"), tmuxRefusal)
@@ -139,9 +138,9 @@ func stubFirstPath(t *testing.T, binDir string) string {
 
 const tmuxRefusal = "#!/bin/sh\necho 'the matrix harness has no tmux REPL fake' >&2\nexit 1\n"
 
-func stubScript(bin, fakeBin string) string {
+func stubScript(bin, fakeBin, callLog string) string {
 	return "#!/bin/sh\n" +
-		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" >> "$MATRIX_CALL_LOG"` + "\n" +
+		`printf '%s CLAUDECODE=%s EVOLVE_DISPATCH_DEPTH=%s\n' ` + bin + ` "${CLAUDECODE-unset}" "${EVOLVE_DISPATCH_DEPTH-unset}" >> "` + callLog + `"` + "\n" +
 		`exec "` + fakeBin + `" "$@"` + "\n"
 }
 
@@ -159,6 +158,7 @@ func writeMatrixProject(t *testing.T, projRoot, driver string) {
 	t.Helper()
 	writeProjectPolicy(t, projRoot, map[string]any{
 		"cli_routing": map[string]any{"clis": []string{driver}, "default": []string{driver}, "floors": map[string]any{}},
+		"isolation":   map[string]any{"i2": map[string]any{"stage": "enforce"}},
 	})
 	profilesDir := filepath.Join(projRoot, ".evolve", "profiles")
 	for _, name := range []string{"intent", "scout", "triage", "tdd-engineer", "builder", "auditor", "retrospective"} {

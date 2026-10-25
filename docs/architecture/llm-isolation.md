@@ -5,7 +5,7 @@
 >
 > The plan holds the components X1 to X16 and their order. The ADR holds the decision. The Signal Center contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md) §5.
 >
-> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. X1 is built: the conformance matrix of §14 and the module, kind, codes and channel of §15. X6 is built: the routing data of §10. No other component is built. Each name in this file that does not exist on `main` is marked "proposed".
+> Status: proposed (ADR-0154, ADR-0155), 2026-10-25. X1 is built: the conformance matrix of §14 and the module, kind, codes and channel of §15. X2 (§6, I-2) is built at stage `shadow`. X6 is built: the routing data of §10. No other component is built. Each name in this file that does not exist on `main` is marked "proposed".
 
 ## Table of contents
 
@@ -203,7 +203,67 @@ The environment of a child is the union of three closed sets, and nothing else:
 - A tmux session starts on a clean server with an explicit `-e NAME=VALUE` for each variable. The tmux server does not supply a variable.
 - In `shadow`, the builder computes both environments. It logs each dropped name once for each wave and emits `ISOLATION_I2_VIOLATION` with the name, not the value. The child still gets today's environment.
 - In `enforce`, the child gets only the union.
-- `process_env_test.go` flips to assert the allowlist (proposed `TestProcessEnv_IsTheAllowlistPlusTheManifest`).
+- `process_env_test.go` flips to assert the allowlist (`TestProcessEnv_IsTheAllowlistPlusTheManifest`).
+
+#### 6.1 As built (X2)
+
+The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM child of the bridge gets its environment from it. The headless drivers call it through `dispatchEnv`. The tmux and recipe panes call it through `paneEnv`, and the doctor probes through `probeEnv`.
+
+| Item | As built |
+|---|---|
+| Stage source | the policy key `isolation.i2.stage` (`{"isolation":{"i2":{"stage":"enforce"}}}`), read by `policy.IsolationEnvStage`. `Deps.envStage` reads it from the policy of the project root (`paths.ResolveFromEnv`) when `Deps.EnvStage` is empty, so each bridge entry follows the policy. An explicit `Deps.EnvStage` wins. |
+| Stage default | `shadow` (an empty value), resolved by `channel.ResolveStage`. An unknown word is `off`. |
+| `off` | today's environment, no signal |
+| `shadow` | today's environment, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=logged` |
+| `enforce` | the union only, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=refused` |
+| Base allowlist | the names of the table above and each `LC_*` name |
+| Pipeline markers | an explicit list, `pipelineEnvMarkers`: `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET` and the four `EVOLVE_FLEET*` keys. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
+| Operator opt-ins | `BRIDGE_ALLOW_ANTHROPIC_BASE_URL=1` passes `ANTHROPIC_BASE_URL`, and `BRIDGE_ALLOW_OPENAI_API_KEY=1` passes `OPENAI_API_KEY`. So the route that the operator opted into stays the route of the child. |
+| Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
+| Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
+| Report once | `Deps.EnvDrops` (`EnvDropLog`) keeps the family and name pairs that it reported. The in-process adapter shares one log for its process. An engine with no log gets its own. |
+| Bare execs | `ProcessEnv(bin)` (the version inventory and the model queries) follows the stage of the policy, with no signal |
+
+The manifest field `env_passthrough` is built (§11). The parser refuses a name that is not a shell identifier, and it refuses each loop, bridge and credential name, as for `default_env`. So `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and `OPENAI_API_KEY` cannot pass through.
+
+Each manifest also lists the proxy names `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY`, `ALL_PROXY` and their lowercase forms.
+
+| Manifest | `env_passthrough` besides the proxies |
+|---|---|
+| `claude-tmux`, `claude-p` | `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `NODE_EXTRA_CA_CERTS`; Bedrock: `CLAUDE_CODE_USE_BEDROCK`, `AWS_PROFILE`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK`; Vertex: `CLAUDE_CODE_USE_VERTEX`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION`, `GOOGLE_APPLICATION_CREDENTIALS` |
+| `codex`, `codex-tmux` | `CODEX_HOME`, `SSL_CERT_FILE` |
+| `agy`, `agy-tmux`, `agy-claude-tmux` (from its base) | `XDG_CONFIG_HOME`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_GENAI_USE_VERTEXAI` |
+| `ollama-tmux` | `OLLAMA_HOST`, `OLLAMA_API_KEY` |
+
+At `enforce`, a tmux pane starts through `execTmux.NewSessionEnv`. No value of the cell environment is in an argv:
+
+1. The bridge writes the cell environment to a 0600 script in a new 0700 directory under `TMPDIR` (`writeCellEnvFile`). The script first removes its own directory, then exports each pair and runs `exec /bin/sh`. The open script stays readable to the shell after the removal.
+2. The tmux client runs with the base allowlist names and `TMUX_TMPDIR` only, so no passthrough value is in its environment. A server that this client starts has a clean global environment.
+3. The pane command is `/bin/sh -c 'exec /usr/bin/env -i TERM="$TERM" /bin/sh <script>'`. tmux runs it with no `default-shell`, so no shell startup file runs. `env -i` clears each variable of the server and the client. `TERM` stays, because tmux sets it from `default-terminal`.
+4. The same tmux command sets the session option `@evolve_env` to a fingerprint of the cell environment (`envFingerprint`).
+
+At `enforce`, a named session that exists before the launch is used again only when its `@evolve_env` matches the fingerprint of this cell (`checkReusedSessionEnv`). Otherwise the launch stops at the safety gate with "env fingerprint mismatch". A session of another cell or another cycle has another environment, so the gate refuses it too. That is the intent.
+
+A controller that cannot start a session in this way refuses the launch. The bridge never falls back to a polluted pane.
+
+The guards are these tests:
+
+- row N1 of the matrix (green, §14.2)
+- `TestN1_LauncherClaudeVariablesReachNoSeatAtEnforce`, the bridge-level form of row N1, for all eight manifests
+- `TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue`
+- `TestProcessEnv_IsTheAllowlistPlusTheManifest`
+- `TestTmuxBoot_AtEnforceThePaneIsBornWithTheCellEnvOnly`
+- the integration tests `TestRealTmux_APollutedServerGivesThePaneOnlyItsEnvPairs` and `TestRealTmux_ASecretValueIsInNoArgvAndNoLeftoverFile`
+
+Known differences from the design:
+
+- tmux sets `SHELL` in a pane to its `default-shell` option. The name is in the base allowlist, but the value can come from the server option and not from `-e`.
+- The pane shell is `/bin/sh`, not the login shell of the operator. A user startup file does not change the cell environment.
+- The report is once for each family and name in a process, not once for each wave.
+- The values are in the environment of the pane processes, as the CLI needs them. The script file exists only until the pane shell starts.
+- Only the in-process adapter wires `Deps.Signals`. The other bridge entries follow the stage but emit no shadow signal.
+- With no explicit `Deps.EnvStage`, each child reads `policy.json` once. The project root comes from `Deps.Env`, then the process. A policy that cannot be read or parsed gives a `WARN isolation stage` line, and the stage stays `shadow`.
+- `envMap` in `go/cmd/evolve/cmd_bridge.go` feeds only the flag fallback of `parseLaunchArgs`. It does not reach a child, so X2 does not change it.
 
 ## 7. No nested agency
 
@@ -412,11 +472,11 @@ These parts stay open:
 
 ## 11. Manifest fields
 
-The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). The new fields are proposed:
+The manifests are `go/internal/bridge/manifests/*.json` (eight files). They have `binary`, `default_env`, `controls`, `transient_regex`, `token_line_regex`, `model_tier_map` and more (research F1.8). `env_passthrough` is built (X2). The other new fields are proposed:
 
 | Field | Type | Example (`claude-tmux.json`) | Replaces |
 |---|---|---|---|
-| `env_passthrough` | list of names | `["ANTHROPIC_BASE_URL", "HTTPS_PROXY"]` | the inherited environment (§6) |
+| `env_passthrough` (built, X2) | list of names | `["CLAUDE_CONFIG_DIR", "HTTPS_PROXY"]` | the inherited environment (§6) |
 | `home_reads` | list of `$HOME` paths | `["~/.claude", "~/.claude.json"]` | the read of all of `$HOME` (§9) |
 | `parsers` | map of output kind to format id | `{"usage": "claude-usage-v1", "pane": "claude-repl-v1"}` | `usageParsers` (`clicontrol/usage.go:41`), `Profiles` (`panestream/panedelta.go:31`), `DetectorFor` (`liveness.go:195`) |
 | `collectors` | map of metric to format id | `{"tokens": "claude-jsonl-v1"}` | `collectorFamilies` (`tokenusage/defaultresolver.go:35`) |
@@ -487,7 +547,9 @@ The guard `TestRows_EachOwnerTestJudgesItsRowSoNoRowIsSilentlyDropped` parses ea
 
 A row passes when the cycle ships, the ledger holds each phase, and only the stub of the row family ran. X6 adds `floors: {}` to the row policy when the key exists.
 
-Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver, and the harness has no tmux REPL fake. A stub `tmux` on the row `PATH` refuses, so rows M2 to M4 fail with `new-session: exit status 1` on each host. Row M5 fails because `ollama-tmux cannot use tools`. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
+Since X6 the row policy sets `floors: {}`, so the floor no longer refuses rows M2 to M5. Each bare family routes to its tmux driver, and the harness has no tmux REPL fake. A stub `tmux` on the row `PATH` refuses, so rows M2 to M4 fail with `new-session: exit status 1` on each host. Row M5 fails because `ollama-tmux cannot use tools`.
+
+The row policy also sets `isolation.i2.stage` to `enforce`, so the stubs see the cell environment. Each stub writes its record to a log path in its script, not in an environment variable. The M1 run also judges rows N1 and N4 from the records of its stubs. It judges row N6 from its cycle workspace: today the pipeline writes no `inputs/index.json`.
 
 The subagent conformance tests (`go/internal/subagent/conformance_test.go`) take the CLI from the row too. `TestConformance_AllRoles_HappyDispatchIsolated` dispatches each role on each of the five families and checks that the role ran on that family.
 
@@ -505,7 +567,7 @@ The stub for each family declares the same capabilities as the real manifest. Th
 
 | Row | Check | Invariant | Turned green by | Owner test | State at X1 |
 |---|---|---|---|---|---|
-| N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run) | open |
+| N1 | `CLAUDECODE=1` on the parent does not reach any seat | I-2 | X2 | the matrix (M1 run, policy `isolation.i2.stage=enforce`) | green (X2) |
 | N2 | the AST guard finds no LLM spawn outside the bridge launch API | I-1 | X3 | `internal/sysexec` | open |
 | N3 | a phase pane cannot exec `claude --version` | I-3 | X4 | sandbox contract | open |
 | N4 | `evolve agent run` inside a phase pane is refused | I-3 | X4 | the matrix (M1 run) | open |

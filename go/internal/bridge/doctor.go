@@ -154,7 +154,7 @@ func (e *Engine) doctorDeep(ctx context.Context, cli, binary string) DeepProbe {
 	defer cancel()
 	start := e.deps.Now()
 	var out bytes.Buffer
-	rc, err := e.deps.Runner(cctx, binary, "", probeArgs, driverEnv(e.deps, familyEnv(binary)), nil, &out, &out)
+	rc, err := e.deps.Runner(cctx, binary, "", probeArgs, probeEnv(e.deps, binary), nil, &out, &out)
 	dur := e.deps.Now().Sub(start).Milliseconds()
 	return DeepProbe{Ran: true, Passed: err == nil && rc == 0, DurationMS: dur}
 }
@@ -185,7 +185,7 @@ func (e *Engine) doctorOne(ctx context.Context, cli string, deep bool) DoctorRes
 
 func doctorVersion(ctx context.Context, deps Deps, binary string) string {
 	var out bytes.Buffer
-	if _, err := deps.Runner(ctx, binary, "", []string{"--version"}, driverEnv(deps, familyEnv(binary)), nil, &out, &out); err != nil {
+	if _, err := deps.Runner(ctx, binary, "", []string{"--version"}, probeEnv(deps, binary), nil, &out, &out); err != nil {
 		return "unknown"
 	}
 	line := out.String()

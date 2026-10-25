@@ -60,8 +60,8 @@ func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch)
 			return prep, ExitBadFlags, fmt.Errorf("%s write resolved prompt: %w", prep.prefix, err)
 		}
 	}
-	if prep.namedExists && sandboxRequiredButUnavailable(deps, cfg, false) {
-		fmt.Fprintf(deps.Stderr, "%s safety gate: existing named session cannot prove the requested sandbox policy; launch a new session\n", prep.prefix)
+	if reason := deps.reusedSessionRefusal(ctx, cfg, lp.session, prep.namedExists); reason != "" {
+		fmt.Fprintf(deps.Stderr, "%s safety gate: %s\n", prep.prefix, reason)
 		return prep, ExitSafetyGate, nil
 	}
 
@@ -84,6 +84,19 @@ func reportLaunchModel(deps Deps, cfg *Config, prefix, session, workingDir strin
 	}
 	fmt.Fprintf(deps.Stderr, "%s session=%s model=%s workdir=%s\n", prefix, session,
 		orDefault(effectiveModelLabel(cfg.Model, cfg.Realization.ModelOmitted), "(cli default)"), workingDir)
+}
+
+func (deps Deps) reusedSessionRefusal(ctx context.Context, cfg *Config, session string, exists bool) string {
+	if !exists {
+		return ""
+	}
+	if sandboxRequiredButUnavailable(deps, cfg, false) {
+		return "existing named session cannot prove the requested sandbox policy; launch a new session"
+	}
+	if err := deps.checkReusedSessionEnv(ctx, cfg, session); err != nil {
+		return err.Error()
+	}
+	return ""
 }
 
 func reportNamedSession(ctx context.Context, deps Deps, lp tmuxLaunch, prefix string) bool {
