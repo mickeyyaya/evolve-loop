@@ -1,0 +1,29 @@
+{
+  "id": "isolation-neutral-instruction-source",
+  "kind": "docs",
+  "priority_class": "maintainability",
+  "weight": 0.4,
+  "route": "console-manual",
+  "title": "LLM isolation X10: one neutral source renders CLAUDE.md, GEMINI.md and each CLI file; the reviewers become agent-run profiles",
+  "summary": "CLAUDE.md holds policy facts only Claude Code loads; CLAUDE.md:44 claims a Task deny that the Go guard lacks; AGENTS.md says the codex and agy drivers have a HYBRID mode that delegates to claude (to verify); skills/loop/SKILL.md:17,70 name removed shell hooks; .claude/agents has four reviewers that only Claude Code runs. Spec: docs/architecture/llm-isolation.md §13.",
+  "fix": "Make AGENTS.md plus the policy docs the one source. evolve skills generate renders CLAUDE.md, GEMINI.md and the other CLI files. Add a generator check. Turn architecture-reviewer, code-reviewer, code-simplifier and go-reviewer into profiles that evolve agent run launches on any family (ADR-0152). Verify and correct the HYBRID text.",
+  "acceptance": [
+    "RED first: the generator check fails because the checked-in GEMINI.md differs from its render",
+    "Each of the four reviewers runs through evolve agent run with a fake CLI of a non-Claude family in a test",
+    "No checked-in instruction file claims a delegation to another CLI",
+    "STE lint 0 on each rendered file; changed functions at 100% coverage"
+  ],
+  "deps": [
+    "isolation-substitution-matrix"
+  ],
+  "files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "skills/loop/SKILL.md",
+    ".claude/agents/",
+    "go/cmd/evolve/cmd_skills.go"
+  ],
+  "created_at": "2026-10-25T12:00:10Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X10 (ADR-0154)"
+}

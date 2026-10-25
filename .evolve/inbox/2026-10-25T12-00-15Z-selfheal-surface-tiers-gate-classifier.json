@@ -1,0 +1,27 @@
+{
+  "id": "selfheal-surface-tiers-gate-classifier",
+  "kind": "feature",
+  "priority_class": "security",
+  "weight": 0.36,
+  "route": "console-manual",
+  "title": "Self-healing X15: surface tiers T0, T1, T2 and a diff classifier that flags a change to the kernel or a weaker gate",
+  "summary": "ADR-0064 protects a path list (go/internal/guards/integrity_surface.go:184) and the ship refuses a cycle diff that touches it (go/internal/phases/ship/integrity.go:23). A weaker gate outside the list is not caught. Spec: docs/architecture/llm-isolation.md §20 and §21.",
+  "fix": "Add the tier table and the classifier patterns of spec §20.3: protected path, removed guard or contract test, added t.Skip, lowered threshold or budget, stage moved off enforce, changed frozen check, changed catalog or tiers. Run it at the build floor and at ship beside the P2 check. A T0 flag in a loop cycle refuses the ship with HEALING_I10_VIOLATION. Depends on the frozen predicates of item tdd-predicates-frozen-at-handoff for I-11.",
+  "acceptance": [
+    "RED first: a cycle diff that adds t.Skip to a guard test ships today; after the change the classifier refuses it",
+    "TestGateClassifier_FlagsEachWeakeningPattern has one case for each of the seven patterns",
+    "A T1 audit seat resolves to a family other than the builder (TestT1AuditSeatIsAnotherFamily)",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": [
+    "isolation-artifact-index-read-isolation"
+  ],
+  "files": [
+    "go/internal/guards/",
+    "go/internal/phases/ship/integrity.go",
+    "go/internal/core/",
+    "go/internal/cliroute/"
+  ],
+  "created_at": "2026-10-25T12:00:15Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X15 (ADR-0155)"
+}

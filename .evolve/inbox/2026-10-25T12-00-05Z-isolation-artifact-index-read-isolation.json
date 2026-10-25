@@ -1,0 +1,32 @@
+{
+  "id": "isolation-artifact-index-read-isolation",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.56,
+  "route": "console-manual",
+  "title": "LLM isolation X5: each phase reads an artifact index with read grants; deliverables and lineage lessons stay reachable on demand",
+  "summary": "The sandbox grants reads of the whole repo and $HOME (go/internal/adapters/sandbox/sandbox.go:164-182). Raw logs sit in the workspace (go/internal/bridge/engine.go:341, driver_tmux_prepare.go:69). The operator, 2026-10-25: earlier deliverables and the retry and recovery lessons must be \"accessible when needed (not necessary to be loaded at the beginning)\". Spec: docs/architecture/llm-isolation.md §8 and §9.",
+  "fix": "Write <ws>/inputs/index.json before each launch (spec §8.3): earlier deliverables of the cycle, and for a retry or recovery the lineage (lane-scope.json todo_ids and the continuation chain, capped by isolation.lineage_max). Grant reads of exactly the indexed paths; deny other .evolve/runs reads, raw output (logs move to <ws>/.bridge/) and $HOME secrets; allow manifest home_reads. Personas open index entries instead of fixed workspace paths. Handoff asks travel as an index entry.",
+  "acceptance": [
+    "RED first: a retry attempt can open its predecessor's retrospective-report.md (row N6) and cannot open an unrelated cycle's audit-report.md (row N7); today both reads pass",
+    "Row N5: a cell cannot read <ws>/.bridge/scout-stdout.log",
+    "Row N8: a cell cannot read ~/.ssh; a contract row proves the Claude OAuth login through the Keychain still works",
+    "The index lists no raw output; TestLineageComesOnlyFromPipelineRecords pins the lineage sources",
+    "Nothing from the index is preloaded into the prompt beyond the index itself",
+    "In shadow each denied read emits ISOLATION_I5_VIOLATION or ISOLATION_I4_VIOLATION and passes",
+    "Changed functions at 100% coverage; the personas, spec §8 and §9 and the core and sandbox package notes updated"
+  ],
+  "deps": [
+    "isolation-substitution-matrix",
+    "isolation-no-nested-agency"
+  ],
+  "files": [
+    "go/internal/core/",
+    "go/internal/adapters/sandbox/",
+    "go/internal/bridge/engine.go",
+    "agents/",
+    "go/internal/core/handoff_reviewer.go"
+  ],
+  "created_at": "2026-10-25T12:00:05Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X5 (ADR-0154)"
+}

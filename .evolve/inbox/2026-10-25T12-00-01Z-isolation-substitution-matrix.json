@@ -1,0 +1,30 @@
+{
+  "id": "isolation-substitution-matrix",
+  "kind": "test",
+  "priority_class": "stability",
+  "weight": 0.62,
+  "route": "console-manual",
+  "title": "LLM isolation X1: a substitution matrix proves any family can fill any seat, with each open gap as a red row",
+  "summary": "No test proves that another family can fill a seat. TestE2ECycleCLIMatrix skips (go/cmd/evolve/e2e_cycle_cli_matrix_test.go:25-27), the conformance options pin \"cli\":\"claude\" (go/internal/subagent/conformance_test.go:27), and the sandbox contract has no row for exec, network or a cross-cycle read. Spec: docs/architecture/llm-isolation.md §14 and §15.",
+  "fix": "Restore TestE2ECycleCLIMatrix with fakeclitest stub CLIs for claude, agy, agy-claude, codex and ollama as the only route (rows M1 to M5). Add the invariant rows N1 to N14 of spec §14.2. Each row for an open gap is an expected failure that names its component. Add the isolation module, the isolation.violation kind, the ISOLATION_I1_VIOLATION to ISOLATION_I9_VIOLATION codes and the isolation.violation channel (spec §15).",
+  "acceptance": [
+    "RED first: row M2 (agy as the only route) fails on the cli:claude pin, and the failure names X6",
+    "Rows M1 to M5 and N1 to N14 exist; M1 and N9 pass; every other row is an expected failure that names its component",
+    "The conformance options take the CLI from the row, not a literal",
+    "evolve signals codes check passes with the nine ISOLATION codes registered",
+    "No test launches a real LLM CLI",
+    "Changed functions at 100% coverage"
+  ],
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/e2e_cycle_cli_matrix_test.go",
+    "go/internal/subagent/conformance_test.go",
+    "go/internal/bridge/sandbox_contract_integration_test.go",
+    "go/internal/fakeclitest/",
+    "go/internal/signalcenter/",
+    "docs/architecture/llm-isolation.md",
+    "go/internal/isolation/ (proposed new package for the isolation codes)"
+  ],
+  "created_at": "2026-10-25T12:00:01Z",
+  "source": "console, 2026-10-25, plan llm-isolation-2026-10 component X1 (ADR-0154)"
+}
